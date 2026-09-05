@@ -70,6 +70,7 @@ Require Import UCodeShP.
 Require Import UkShParse.
 Require Import UkShRun.
 Require Import UkShDiag.
+Require Import UkShMalloc.
 Require Import TsoCtx.
 Require User.ShSyms User.ShInstrs.
 Local Open Scope Z_scope.
@@ -589,6 +590,61 @@ Section UkShMain.
               ltac:(cbn [ush_simple]; exact I)
               γt γd γs γfd h4 m4 p szv ld (60 + n) Ha0_4
               with "Hcode Hjt Htree Hsz Hstd Hrun").
+  Qed.
+
+  (* ===================================================================== *)
+  (* §5 THE CHILD, WITH THE ALLOCATOR DISCHARGED.                           *)
+  (*                                                                        *)
+  (* [wp_kshm_child] is stated over an ABSTRACT allocator, because that is  *)
+  (* what stage 4's contract is cut at; this is it at the CONCRETE one --   *)
+  (* [UkShMalloc.ushm_fresh], the [freep] cell holding zero, the sixteen    *)
+  (* bytes of [base] and the break -- so the only thing left on the far     *)
+  (* side of the seam is the engine's width-4 text load ([Hclw]) and the    *)
+  (* one place stage 3 had to name an assumption ([Hsbrk]: the 64 KiB       *)
+  (* [sbrk] that [morecore] issues succeeds; sh does not test malloc, so    *)
+  (* nothing below this line can branch on the failure).                    *)
+  (*                                                                        *)
+  (* THE BREAK MOVES ACROSS THE PARSE, and the statement says where to:     *)
+  (* the run [runcmd] and [exec] see is at [sz + 65536], because the        *)
+  (* allocator asked the kernel for sixteen pages on the way through.       *)
+  (* ===================================================================== *)
+  Lemma wp_kshm_child_alloc
+      (Hsbrk : forall (sz n : Z) (r : mword 64),
+         UkShMalloc.ushm_sbrk_ans γd γs sz n r -∗
+         ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
+         UkShMalloc.ushm_sbrk_ans γd γs sz n r)
+      (Hclw : UkShDiag.ushd_clw_text_ty)
+      (h : CpuId) (m : regfile) (dw dv : dfrac)
+      (s0 : Z) (len : nat) (f : nat -> bv 8) (toks : list (nat * nat))
+      (sz : Z) (ld : list fdstate) (n : nat) :
+    m !!! Regidx s1_idx = (mword_of_int s0 : mword 64) ->
+    ushp_no_symbols len f ->
+    ushp_tokens len f 0 toks ->
+    (length toks < 10)%nat ->
+    0 < s0 -> s0 + Z.of_nat len + 1 < Z64 -> s0 + Z.of_nat len < 2 ^ 38 ->
+    (* the break is above [base] (0x2088, the last sixteen bytes of the
+       image) and page-aligned, which [exec] leaves it *)
+    8344 <= sz ->
+    UserPtTree.pgroundup sz = sz ->
+    usz_ok (sz + 65536) ->
+    shk_code γt -∗ shp_code γt -∗ shp_rodata γt -∗ ush_jtab γt -∗
+    ustr γd (DfracOwn 1) s0 len f -∗
+    ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
+    ustr γd dv ushp_symbols 7 ushp_sym_f -∗
+    UserFd.ustd γfd ld -∗
+    UkShMalloc.ushm_fresh γd γs sz -∗
+    urun γt γd γs γfd h m (mword_of_int 0x9c0)
+      (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38 Hszlo Hszal Hszok.
+    iIntros "#Hcode #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd HM Hrun".
+    iApply (wp_kshm_child (UkShMalloc.ushm_fresh γd γs sz) (sz + 65536)
+              (UkShMalloc.ushm_malloc_ok_holds γt γd γs γfd Hsbrk sz
+                 Hszlo Hszal Hszok)
+              Hclw h m dw dv s0 len f toks ld n
+              Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38
+              with "Hcode Hpcode Hpro Hjt Hline Hws Hsy Hstd HM Hrun").
   Qed.
 
 End UkShMain.

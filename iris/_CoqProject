@@ -1916,9 +1916,14 @@ UkShDiag.v
 # both closing their loop by bounded Rocq induction on the [ustr]
 # resource's own terminator rather than an iLoeb.  THE PARSER THEOREM
 # [wp_kshp_parser] is at the foot of the file, over TWO named Hypotheses:
-# [ushp_malloc_ok] (stage 3's allocator, blocked on [wp_uk_ecall_sbrk])
+# [ushp_malloc_ok] (stage 3's allocator -- DISCHARGED, see UkShMalloc.v)
 # and [ushp_clw_text_ok] (the engine's width-4 text load, above).
 # Audit = the standing three, zero Admitted, zero Axiom.
+#   THE ALLOCATOR'S STATE IS THREADED, not assumed away: the parser calls
+# malloc exactly ONCE per line (execcmd is the only constructor a
+# symbol-free line reaches), so [UMalloc] goes in and [UMalloc'] comes
+# out, both ABSTRACT here -- which is what lets stage 3 pick the scope of
+# its own theorem without stage 4 having an opinion about it.
 UCodeShP.v
 UkShParse.v
 
@@ -1932,10 +1937,17 @@ UkShParse.v
 #   UkShMalloc.v is stage 3's walk.  It runs on [UkRunSys.wp_uk_ecall_sbrk],
 # the consumer leaf that landed with the sbrk RETURN-VALUE row, and it is
 # FIRST-CALL SCOPED ([freep == 0]) exactly as the first-generation stack's
-# [wp_sh_malloc_first_body] was: the arm that initialises [base], asks the
-# kernel for a 4096-unit chunk, inserts it with [free] and cuts the request
-# off its end.  What it hands back is the natural separation-logic spec --
-# the request's bytes, OWNED -- plus the allocator state for the next call.
+# [wp_sh_malloc_first_body] was: [freep == 0] is what turns K&R's circular
+# search into a straight line, since the list starts empty, so not one back
+# edge of the loop is taken.  [wp_kshm_malloc_first] is UNCONDITIONAL --
+# BOTH arms of sbrk are walked, because morecore checks the -1 -- and what
+# it hands back on the success arm is the natural separation-logic spec:
+# the request's bytes, OWNED, at an address 16-aligned and in range.
+#   [ushm_malloc_ok_holds] is the adapter to stage 4's contract, and the
+# ONE assumption left is [ushm_sbrk_never_fails], stated on the ROW'S OWN
+# ANSWER so it cannot be used anywhere else.  What it replaces is
+# "ninety-one instructions of C behave"; what it says is "the kernel has
+# sixteen pages", which is the gap sh's own UNCHECKED malloc leaves.
 UCodeShM.v
 UkShMalloc.v
 
@@ -1944,7 +1956,11 @@ UkShMalloc.v
 # what one BUILDS ([UkShParse.ushp_tree], owned, argv as index pairs into the
 # line) is what the other CONSUMES ([UkShRun.ush_cmd], discarded, argv as
 # [UserHeap.uarg]s), and the NUL-cut the parser publishes is exactly what
-# turns one into the other.
+# turns one into the other.  [wp_kshm_child] is the walk over an ABSTRACT
+# allocator; [wp_kshm_child_alloc] is it at the concrete one, so the only
+# things left on the far side of the seam are the engine's width-4 text
+# load and stage 3's named sbrk assumption -- and the break the theorem
+# hands [runcmd] is the one the allocator moved it to.
 UkShMain.v
 
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched

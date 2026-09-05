@@ -2015,9 +2015,66 @@ things, and the answer differs:
       `kalloc` can fail, so a caller that does not check (sh's `morecore`
       checks; `execcmd` does not check `malloc`) is where an assumption
       will have to be named.
-    * **WHAT IS LEFT FOR THE WALK**: the fourth catalog (`malloc`, `free`
-      and the `sbrk` stub, ~150 instructions) and the walk itself, which
-      discharges `UkShParse.ushp_malloc_ok`.
+    **STAGE 3 AS LANDED (2026-09-05)** — `tools/ucode_shm.txt` →
+    `iris/UCodeShM.v` (2791 lines, 150 instructions in four functions:
+    `malloc`, `free`, the C wrapper `sbrk` and the usys.S stub `sys_sbrk`;
+    fourth catalog, split for the same measured reason stage 4's was) plus
+    `iris/UkShMalloc.v` (~3600 lines).  Audit = the standing three, zero
+    `Admitted`, zero new `Axiom`.
+
+    * **`wp_kshm_sys_sbrk` / `wp_kshm_sbrk`** — the stub and its C wrapper.
+      Both arms of the row are carried through (`ushm_sbrk_ans`).  The
+      `li a1,1` between the two halves of the frame is the EAGER flag,
+      which the row does not read (lazy and eager differ in WHEN the pages
+      arrive, not in what the break becomes).  The two-word frame is
+      `UkShParse.wp_kshp_pro2`/`wp_kshp_epi2`, now exported — they were cut
+      parametric in the pc for exactly this.
+    * **`wp_kshm_free_first`** — free's circular-list insert at the list
+      malloc's first-call arm has just built.  Every one of the five tests
+      is decided by ARITHMETIC ON ADDRESSES rather than by a loop: `base`
+      is in .bss and the block is above the break, so the scan does not
+      run; `p->s.ptr` IS `p`, so the wrap test breaks at once; and neither
+      coalesce fires.  So free here is exactly "link the block in after
+      `base`".
+    * **`wp_kshm_malloc_first`, and it is UNCONDITIONAL.**  `freep == 0` is
+      what turns K&R's circular search into a straight line — the list
+      starts empty, so the loop comes straight back to `freep`, morecore
+      runs, and after the `free` that inserts the fresh chunk the next turn
+      finds it at once.  NOT ONE BACK EDGE IS TAKEN, which is why the walk
+      is a straight line and not an induction, and why the general contract
+      needs a list model this one does not.  BOTH arms of `sbrk` are
+      walked, because morecore checks the -1, and they share the eight-word
+      epilogue (cut out as `wp_kshm_malloc_epi`).  The 64 KiB chunk is
+      carved the way the code uses it: a header at the break, the remains
+      of that block, the header of the piece cut off its END, and the
+      payload — which is what the caller gets, at exactly `nbytes`.  The
+      allocator's leftover is DROPPED deliberately (a second call is a
+      different theorem).
+    * **THE HEADER PREDICATE.**  `ushm_hdr a nxt nu` is an 8-byte `next`, a
+      32-bit unit count and FOUR EXISTENTIAL PADDING BYTES the compiler
+      inserted and no instruction reads — which is what lets a header be
+      read out of a page nothing has written (`ushm_hdr_of_ubytes`).  Two
+      byte facts underneath, because the ABI STORES the `uint` field out of
+      a 64-bit register and LOADS it as an `mword 32`: `ushm_nth_byte_lo32`
+      says the two descriptions agree on the four bytes that exist.
+    * **HOW STAGE 4'S HYPOTHESIS IS DISCHARGED.**  `UkShParse` gained a
+      ONE-SHOT allocator state (`UMalloc` in, `UMalloc'` out), abstract,
+      threaded through the six statements execcmd → parseexec → parsepipe
+      → parseline → parsecmd → the parser theorem.  Naming it rather than
+      baking a free-list predicate into the parser is what lets stage 3
+      pick the scope of its own theorem without stage 4 having an opinion.
+      `UkShMalloc.ushm_malloc_ok_holds` is the adapter, at
+      `UMalloc := ushm_fresh sz` and `UMalloc' := usz (sz + 65536)`.
+    * **THE ONE ASSUMPTION LEFT, AND WHY IT IS SMALLER.**
+      `ushm_sbrk_never_fails`: the 64 KiB `sbrk` morecore issues succeeds.
+      It CAN fail (`growproc` → `kalloc`), so this is a real assumption; it
+      is stated on the ROW'S OWN ANSWER so it cannot be used anywhere else
+      (the only way to instantiate it is to be holding an `ushm_sbrk_ans`,
+      which only the leaf hands out), and malloc's failure arm returns that
+      answer for exactly this reason.  What it replaces is "ninety-one
+      instructions of C behave"; what it says is "the kernel has sixteen
+      pages" — which is the gap sh's own UNCHECKED `malloc` leaves, a
+      property of the program and not of the proof.
   * **STAGE 4 — the parser's recursion.**  `parsecmd` (0x86e) →
     `parseline` (0x6e2) → `parsepipe` (0x682) → `parseexec` (0x590) →
     `parseredirs` (0x4ac), over `peek` (0x448) / `gettoken` (0x310) /
@@ -2846,6 +2903,48 @@ things, and the answer differs:
     deepest chain at 560 bytes, i.e. 70 words) — and sh needs NO
     `uk_args_c` (it takes no argv), so its gate is sync's six conditions
     at sh's text and entry pc, not echo's nine.
+
+    **STAGE 6 AS LANDED — PARTIAL, 2026-09-05** (`iris/UkShMain.v`, ~650
+    lines; audit = the standing three, zero `Admitted`).  What landed is
+    THE SEAM and the CHILD path, i.e. everything from the blank-line test
+    down to `exec`:
+
+    * **`ush_cmd_of_ushp` — THE SEAM.**  What stage 4 BUILDS
+      (`ushp_tree`, owned at `DfracOwn 1`, argv as INDEX PAIRS into the
+      line) is not what stage 5 WALKS (`ush_cmd`, every byte
+      `DfracDiscarded`, argv as `UserHeap.uarg`s).  The NUL-CUT the parser
+      publishes is exactly what turns one into the other: a token `(i,j)`
+      becomes the string at `s0+i` of length `j-i` whose terminator is the
+      zero `nulterminate` wrote at `j`.  In bounds by `ushp_tokens_in`,
+      non-NUL in the body by `ushp_tokens_gap` + `ushp_nulfold_miss`.  The
+      conversion DISCARDS, which is what makes the tree persistent and so
+      what lets it cross a fork as a `UkFork.Forkable` payload.  The node's
+      address bound is read off the heap THROUGH THE RUN
+      (`urun_ubytes_bnd`), which is the only reason the run appears in the
+      statement.
+    * **`wp_kshm_child`** — `c.mv a0,s1 ; jal parsecmd ; jal runcmd`, over
+      an ABSTRACT allocator, landing in `UkShDiag.wp_kshr_runcmd_final`,
+      i.e. in `exec`.  The budget bookkeeping is the whole arithmetic:
+      `avail` is RESTORED across a call, so the parser's 60 words and the
+      runner's `6*ush_ht + 2 + Dg` both come out of the same frame and the
+      surplus rolls into the runner's tail.
+    * **`wp_kshm_child_alloc`** — the same at the CONCRETE allocator
+      (`UkShMalloc.ushm_fresh`), so the only assumptions on the far side of
+      the seam are the engine's width-4 text load (`Hclw`) and stage 3's
+      named sbrk one (`Hsbrk`).  The break the theorem hands `runcmd` is
+      the one the allocator moved it to (`sz + 65536`).
+    * **WHAT IS NOT YET DONE, and why each is not a gap in this file.**
+      (a) The FORK/PARENT arm (0x92c `jal fork1`, 0x930 `c.beqz` → the
+      child, 0x932/0x934 `li a0,0 ; jal wait`, falling into the loop head
+      at 0x938) — the leaves are all there (`wp_kshr_fork1_final`,
+      `wp_kshr_wait`), what it needs is the payload assembled and `usz` +
+      the parser's static tables threaded through `UkSh.ush_loop_head`,
+      which do not appear in it today.  (b) The `cd` BUILTIN (0x98e..0x9be)
+      — needs `strlen` catalogued, a `chdir` walk, and `UkShDiag.shd_str`
+      re-cut at a dfrac (it is persistent-only, and the cd arm's `fprintf`
+      prints the MUTABLE line buffer).  (c) Therefore `UkSh.ush_rest` is
+      NOT discharged, and it cannot be until (b) is, because the loop head
+      cannot supply a "this line is not a cd command" premise.
 
   **ASKS (relay, in priority order).**
   1. ~~**`wp_uk_ecall_window` in `UkRunSys.v`**~~ **DONE — built in-house
