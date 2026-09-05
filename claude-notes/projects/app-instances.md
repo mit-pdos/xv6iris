@@ -203,6 +203,11 @@ commit; nothing is per era but the parking.
    else), delta-indexed at the AU fires where the process's payload
    proves it.  A non-trivial application is green only once every retag
    site has a step; the generic application's is trivial everywhere.
+   RULED (owner, 2026-09-05): raw at the mover, and the landed non-AU
+   movers — link, mkdir, the free path in `iput` — move onto AU forms
+   with their deltas (`fs-syscall-specs.md` §4's δ_link, δ_create at a
+   directory, δ_free; §7's table), so a process can pay their steps.
+   That is the forcing function for `fs-syscall-specs`' remaining lanes.
 5. **Laters at the crossings.**  The commit's law, the boot mint and the
    PowerOn clone are fupds without a step, so the claim arrives as
    `▷ app_pred` and a basic update cannot run under it; `◇` strips only
@@ -224,3 +229,9 @@ commit; nothing is per era but the parking.
    half; `Hproj` frames the application conjunct; `Hswap` = `P_fs_swap`
    returning the clone's guest half, then the application's later-shaped
    clone, then the lend carrying both.  The machine layer is untouched.
+   RULED (owner): the xv6-level slot becomes the conjunction.  `Hproj`
+   stays pure on purpose: it is the non-destructive lend-and-return
+   projection (only a `Prop` can leave one), predating the resource
+   channel `Hswap`/`Rb`; the application's conjunct frames through it and
+   travels on the lend.  Folding `Hproj` into the lend (`⌜Ppure⌝` beside
+   the epoch) is an optional tidy-up, not part of this design.
