@@ -1922,6 +1922,14 @@ UkShDiag.v
 UCodeShP.v
 UkShParse.v
 
+# ... STAGE 6: main's body, and the seam between the two lanes.  UkShMain.v
+# is the only file that imports BOTH stage 4's parser and stage 5's runner:
+# what one BUILDS ([UkShParse.ushp_tree], owned, argv as index pairs into the
+# line) is what the other CONSUMES ([UkShRun.ush_cmd], discarded, argv as
+# [UserHeap.uarg]s), and the NUL-cut the parser publishes is exactly what
+# turns one into the other.
+UkShMain.v
+
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
 # u-tier syscall row.  FsFdMirror = the pure mirror + step table;
 # UexecRetFs = the parallel enriched trap contract + the conservativity
