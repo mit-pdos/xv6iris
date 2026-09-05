@@ -6,8 +6,13 @@ launched); Q-b NO (nlink-0 inodes stay in the view: a process may hold an open f
 real kernel"); Q-e W1 ("doesn't matter"); Q-f YES (dead pre-AU proofs not linked into the kernel and
 superseded by an AU spec are deleted); Q-h YES ("otherwise the spec cannot be complete and sound");
 Q-i YES ("a bug in the sys_write spec; the whole write spec may be non-deterministic but must account
-for the short write").  OPEN: Q-d (how the free step reaches iput) and Q-g (why `Happ_auto` outlives
-round E) — the owner asked for a plain-language explanation; being discussed.  Produced read-only against HEAD 668441141 after round E1's census; every claim carries file:line.  Design of record: design/applications.md §2/§6 L3; rounds record: app-instances.md §7 E.
+for the short write").  Q-g YES (docs corrected: E deletes the movers, L2 deletes the blanket promise).  Q-d DEFERRED by
+the owner: "lots of exit-style paths need to prove it's safe to iput the cwd and all the open
+inode file descriptors, which seems weird; even weirder, one process calling kill() on another
+now has to prove it's OK to iput the victim's cwd and FDs" — the free obligation lands on paths
+where the acting process does not own the resource.  Do NOT build E2-F; raise Q-d again when the
+other lanes are exhausted.  Until then EscrowDeposit's free site stays on `_auto`, so E2-Z (deleting
+`top_move`/the `_auto` movers) waits too.  Produced read-only against HEAD 668441141 after round E1's census; every claim carries file:line.  Design of record: design/applications.md §2/§6 L3; rounds record: app-instances.md §7 E.
 
 
 Scope: app-instances.md §6 ruling 4 / §7 E, applications.md §2 + §6 L3, fs-syscall-specs.md §4/§7.

@@ -98,7 +98,7 @@ definition and never a vacuous theorem):
 | `Hbirth` | `⊢ \|==> ∃ c, app_cl A c` — the fixed part's birth | `iExists ()` |
 | `Happ_xfer` | `∀ c, ⊢ app_xfer_raw (app_pred A c)` — the TRANSPORT (§3), the one durability obligation | `app_xfer_raw_triv` |
 | `Happ_init` | `∀ c, ⊢ \|==> ∃ r, app_pred A c r (abs_view (fss_inodes (img_state …)))` — era 0's claim at the mkfs image | trivial |
-| `Happ_auto` | `∀ c r, ⊢ app_auto_raw (app_pred A c) r` — the kernel-defined mover's step (§2; deleted by round E) | `app_auto_raw_triv` |
+| `Happ_auto` | `∀ c r, ⊢ app_auto_raw (app_pred A c) r` — the BLANKET PROMISE the kernel-defined mover's step is paid from (§2; deleted by lane L2, not by round E) | `app_auto_raw_triv` |
 | `HR0`, `HRt`, `Hpow`, `Htx`, `Hrx` | `xv6_trace_adequacy`'s ledger obligations, `HR0` RECEIVING `app_cl A c` | as today |
 | `Hphi` | the conclusion, holding the COMPOSITE crash slot `xv6_slot` and the ledger at the end of the run (§5) | as today |
 
@@ -141,7 +141,15 @@ on `m`, an update needs the whole:
       the application's era-wide `app_auto`.  Round E converts every
       `_auto` site to `_same` or `_step` (the landed non-AU contracts —
       link, mkdir, `iput`'s free — move onto AU forms with their deltas)
-      and then deletes `top_move`, `_auto` and `Happ_auto`.
+      and then deletes `top_move` and the `_auto` movers.  `app_auto` /
+      `Happ_auto` — the BLANKET PROMISE that the predicate survives every
+      kernel change — STAYS until lane L2: today every step the kernel
+      proof demands, at the AU fires included, is paid off this promise,
+      because nothing from the process reaches the kernel yet.  L2
+      replaces it by per-syscall proofs from the process and deletes it
+      (owner, 2026-09-05: "we eventually need to kill this blanket
+      permission").  An application whose predicate is not preserved by
+      arbitrary changes (echo) is therefore an instance only after L2.
 - **What a process sees at a syscall:** an AU fire lends the pre-map and
   the claim and takes the claim at the post-map back; read-kind fires
   lend and return it untouched.  `FsAbs.astate` is fraction-agnostic
@@ -277,11 +285,11 @@ design; `app-echo.md` is the worklist.)
   read-kind calls and console writes, and by presenting the taint for
   anything else.  The generic slot under the echo application is
   `taint -∗ □ uexec_wp`, minted by sh at the exec that leaves the
-  discipline.
+  discipline.  L2 is what DELETES the blanket promise `Happ_auto` (§2).
 - **L3 — round E** (kernel side, application-independent): every
   `_auto` site becomes `_same` or `_step`; link, mkdir and `iput`'s free
-  get AU forms with their deltas; `top_move`, `_auto`, `Happ_auto` are
-  deleted.
+  get AU forms with their deltas; `top_move` and the `_auto` movers are
+  deleted.  `Happ_auto` is L2's to delete (§2).
 - **L5 — the console INPUT tie.**  A located receipt on the input side,
   `UartSentLoc`'s twin: the bytes `consoleread` delivers are the
   line-edited image of a segment of the cycle's `ObsUartIn` bytes.  It is
