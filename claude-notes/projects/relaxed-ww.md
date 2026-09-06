@@ -1,7 +1,8 @@
 # Project: relaxing the memory model to allow store–store reordering (PSO)
 
-**STATUS 2026-09-06: DESIGN REVISED against the context abstractions that
-landed on `main` ([`design/contexts.md`](../design/contexts.md): one
+**STATUS 2026-09-06: DESIGN CHECKPOINT for the implementing agent, after
+five review rounds; two rulings (C) are the owner's.  Revised against the
+context abstractions that landed on `main` ([`design/contexts.md`](../design/contexts.md): one
 domination relation, `ctx_parked ξ ξ'`, per-lock contexts, the release
 hook).  Branch `relaxed-ww-twolog` holds stage A (the two-log spike and
 litmus suite), the ghost twin `TsoCtxTwin3.v`, and stage B (the two-log
@@ -271,27 +272,49 @@ hart AND a proof that holds the born record at that fence leaf, and the
   is inside `fork`'s `release(&np->lock)` or a scheduler release) and
   `log.lock` (`initlog`'s fences are inside `bread`/`brelse`).
 
-The design, (c1): `newlock` yields a BORN token, the record parked under
-the creator (`ctx_parked ξL cur_ctx`, no invariant yet), which rides an
-owned row the publishing proof holds -- the `started` obligation for the
-boot locks, the parent's open-file row (`proc_priv`) for a pipe lock,
-published by `fork`'s own `release(&np->lock)` hook, the fs globals for
-`log.lock`, published by `forkret`'s `first` fence -- and is published by
-that hook: resume (mint 1), stamp (publication), allocate the invariant,
-mint `is_lock`.  A born token survives the creator's migration (it is a
-payload of the creator's context).  Pre-publication acquires by the
-creator are a BORN-ACQUIRE path: `ctx_resume ξL cur_ctx` (interp-free),
-an AMO leaf on the creator's OWN word (the machine's exclusive read
-self-loops until the word's pending store drains, then reads memory), a
-`locked` token of the ordinary shape, and a born release that parks ξL
-back under the creator instead of stamping.  Its price is the generic
-callers: `kfree`, `printf`, `allocproc`/`allocpid`, `piperead`/`pipewrite`
-take their lock access through a class with two instances (published:
-`is_lock`; born: the token, creator only), or the boot proofs duplicate
-them.  Physically no other hart acquires any of these before the
-publishing fence (boot locks and `p->lock`s sit behind `started`, pipe
-locks behind `fork`'s release, `log.lock` behind `first`), and (c1) gives
-that rule a ghost witness.
+The design, (c1): `newlock` yields a BORN token -- the record parked
+under the creator's context ξc (`ctx_parked ξL ξc`, with `locked_core`'s
+ghost allocated inside it, no invariant yet).  The token is ξ-CONSTANT
+(it names the fixed ξc, so it is a `ctx_morph_const` row, not a
+`ctx_parked_morph` one) and is LISTED in an owned row the publishing
+proof holds: the `started` obligation for the boot locks, the parent's
+open-file row (`proc_priv`) for a pipe lock, the fs globals returned by
+`fsinit`/`initlog`'s posts for `log.lock`.  It stays resumable across the
+creator's migration because ξL's keys were registered at ξc at birth,
+ξc's at the scheduler at park, the scheduler's at the lock's context, all
+stamped at the release fence and unstamped clean on the new hart.  The
+publishing hook -- `started_store_obl` (which resumes, stamps and
+allocates the invariants of some 150 records in one fence callback, a
+`big_sepL` fold), `fork`'s own `release(&np->lock)` (`filedup` over the
+parent's `ofile` precedes it; the hook also rewrites the PARENT's row from
+born to published), `forkret`'s `first` fence (`fence rw,w; sw` in the boot
+arm, `first_fsinit` in hand; the first `begin_op` follows it) -- does
+resume (mint 1), stamp (publication), allocate the invariant, mint
+`is_lock`.  Pre-publication acquires by the creator are a BORN-ACQUIRE
+path: `ctx_resume ξL ξc` (interp-free), an exclusive read on the
+creator's OWN word (the machine self-loops on `own_fp_pending`, then
+reads memory; the leaf's `dmem !! a = Some v` comes from the fact's
+`latest` and `ts_ok`'s `chain_ok` once the word's own store has drained
+-- `dmem_of_latest`, the sibling of `tso_read_of_latest`, and a new
+owned-cell exclusive-read / conditional-write gate pair beside today's
+ledger-pin AMO gate), a `locked` token of the ordinary shape, and a born
+release that parks ξL back under the creator instead of stamping (its
+cpu clear, fence and word clear are plain owned-cell stores).  Its price:
+`SpecInitlock`'s post and its ~13 init callers hand out the born token;
+the generic callers used before publication -- `kfree` and `kalloc`
+(`kvminit`, `proc_mapstacks`, `allocproc`'s trapframe), `printf`,
+`allocproc`/`allocpid`, `piperead`/`pipewrite`/`pipeclose` -- take their
+lock access through a class with two instances (published: `is_lock`;
+born: the token, creator only); and the PERSISTENT init bundles that
+carry `is_lock`s before `started` -- `printk_env` (pr.lock), `procs_inv`
+(the 64 `p->lock`s, named in 166 files), `park_globals`'s pid lock, the
+kmem handle -- exist in a born mode until the `started` obligation
+converts them, so the class sits at the BUNDLE level for those; the
+bundles untouched before `started` (`bio_ctx`, ftable, `dev_inv`,
+tickslock, wait, cons, tx) need only the conversion.  Physically no other
+hart acquires any of these before the publishing fence (boot locks and
+`p->lock`s sit behind `started`, pipe locks behind `fork`'s release,
+`log.lock` behind `first`), and (c1) gives that rule a ghost witness.
 
 The alternative, (c2): allocate the invariant at `initlock` with a
 born free arm -- the twin's author-indexed record `ctx_parked ξL B W A`
@@ -302,8 +325,8 @@ crossing that delivered the handle.  This keeps the twin's receipt and
 author index alive for births only, and needs the creator to present
 the record's watermark at the publishing fence.  Both are priced for the
 owner; (c1) is the recommendation because it keeps one record shape and
-one receipt, at the cost of one class over four or five generic
-functions.
+one receipt, at the cost of the born mode over the generic callers and
+the pre-`started` bundles listed above.
 
 **The hook and the floor fold.**  `lock_ctx_hook` runs after the stamp,
 so under two logs it runs at the fence with every key of ξL published.
@@ -396,7 +419,9 @@ place of the branch's author-indexed receipt map.
   lands after it.  The protocol gains a "released, store pending" state
   whose word may be 1 and whose resolution is the drain.  The winner's
   `.aq` view is at the drain top, above the release store's position,
-  hence above `M` of the releaser's fence.
+  hence above `M` of the releaser's fence.  Its twin: the `lk->cpu` store
+  after the AMO is pending while a foreign `holding()` reads race it, so
+  the protocol also gains "held, cpu store pending" (stage E).
 - **Pins** (`pin_ok`, `KptPublish`): "every view `≥ B` reads a value in
   `Sv`" over drain positions; the mint takes the publishing fence's
   record.  `TsoMemPa`'s pure theory (`pin_ok`, `win_ok1`, `rel_ok1`,
@@ -447,7 +472,7 @@ drain-position map grows.
 | Twin | `TsoCtxTwin3.v`: `chain_ok`/`fifo_ok`/`tso_read_of_latest`, `dpos_ev`, the interp's persistent copies, publication at the fence | landed on the branch; its author-indexed record, receipt and domination index are SUPERSEDED by §2.3 -- a short fourth twin over `main`'s `TsoCtx.v` shapes (`key_at`, `ctx_stamp` as publication, fence-bound mint 2, `fence_rec`) before stage D |
 | B. Machine + interp + lifting | `RiscvLang` (`gdlog`, `MemLoopE`, the blocking arms, `dlog_ok`), `TsoMemPa` (§9b, `ts_ok` with `chain_ok`, the `*1` legacy theory), `TsoGhost`, `RiscvPtsto`, `RiscvExec` (`wp_mem_loop`), the sweep below `TsoCtx` | LANDED on the branch, 2026-09-05; REBASE onto `main` (the contexts change is above `TsoCtx.v`; the receipt map becomes the fence-record map) |
 | C. Rulings | two remain: lock birth, (c1) born tokens on owned rows with a born-acquire class over the generic callers, or (c2) the twin's author-indexed record for births only (§2.4); the box deposits inside the release hook (§2.6), a `ctx-box.md` §4 item | owner |
-| D. Ownership laws | the `llb loglen_name` classification (§2.8); `key_at`'s clean arm defined once; the watermark row dropped; `ctx_stamped` over `dpos_ev`; `ctx_stamp` and `ctx_dom_to_stamped` fence-bound (stated at the bundle, `TsoCtxLedger`), the `fence_rel`-keyed pub rule; `lock_finisher_pay`'s prelude at the fence leaf; the hook as a fence-leaf callback and its twelve callers; lock birth per ruling C; the fold over `dpos_ev`; `hart_view_lb`/floors/stamps on `dlen`; `StartedInv` over `fence_rec`; the boxes' deposits in hooks across the three instances, stamps on the drain line | 2–4 weeks |
+| D. Ownership laws | the `llb loglen_name` classification (§2.8); the owned-cell exclusive-read / conditional-write gates and `dmem_of_latest`; `key_at`'s clean arm defined once; the watermark row dropped; `ctx_stamped` over `dpos_ev`; `ctx_stamp` and `ctx_dom_to_stamped` fence-bound (stated at the bundle, `TsoCtxLedger`), the `fence_rel`-keyed pub rule; `lock_finisher_pay`'s prelude at the fence leaf; the hook as a fence-leaf callback and its twelve callers; lock birth per ruling C; the fold over `dpos_ev`; `hart_view_lb`/floors/stamps on `dlen`; `StartedInv` over `fence_rec`; the boxes' deposits in hooks across the three instances, stamps on the drain line; lock birth's born mode over the callers and bundles of §2.4 | 2–4 weeks is the floor |
 | E. Racy tiers | `TsoMemPa` theory over `(glog, gdlog)` replacing the `*1` names, `TsoCtxLedger` gates, the lock-word state, pins, virtio | 2–3 weeks |
 | F. Close | full build, `audit-only`, notes | 2–3 days |
 
