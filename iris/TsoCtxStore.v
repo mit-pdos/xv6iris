@@ -371,7 +371,7 @@ Section ctx.
           + by rewrite lookup_app_l.
           + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
       iSplitR; [iPureIntro; exact Hdpo|].
-      iSplitR; [iPureIntro; exact Hfro|].
+      iSplitR; [iPureIntro; rewrite ?Hlog ?Hdl; by apply fr_ok_app_log|].
       iSplitR.
       { iPureIntro. rewrite Hlog Hdl in Hchain. rewrite Hlog.
         apply chain_set_ok_insert; [by apply chain_set_ok_app_log | exact Hchain]. }
@@ -654,7 +654,7 @@ Section ctx.
         + by rewrite lookup_app_l.
         + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
     iSplitR; [iPureIntro; exact Hdpo|].
-    iSplitR; [iPureIntro; exact Hfro|].
+    iSplitR; [iPureIntro; rewrite ?Hlog ?Hdl; by apply fr_ok_app_log|].
     iSplitR; [iPureIntro; rewrite Hlog; exact (chain_set_ok_app_log _ _ _ _ Hcho)|].
     iPureIntro. split_and!; [split_and! | split_and! | rewrite Himg; exact Hera].
     - rewrite Hmem Hlog Himg flat_snoc /=. by rewrite -Hflat.
@@ -793,7 +793,7 @@ Section ctx.
     iSplitR.
     { rewrite big_sepM_insert; [|exact HDPi]. iSplitR; [iExact "Hnew"|iExact "Hdps"]. }
     iSplitR; [iPureIntro; rewrite Hdl; exact Hdpo'|].
-    iSplitR; [iPureIntro; rewrite Hdl; by apply fr_ok_drain|].
+    iSplitR; [iPureIntro; rewrite ?Hlog ?Hdl; by apply fr_ok_drain, fr_ok_app_log|].
     iSplitR.
     { iPureIntro. rewrite Hlog Hdl.
       exact (chain_set_ok_drain _ _ _ _ (dl_ok_app_log _ _ _ Hdok) Hpre
@@ -921,7 +921,7 @@ Section ctx.
         + by rewrite lookup_app_l.
         + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
     iSplitR; [iPureIntro; exact Hdpo|].
-    iSplitR; [iPureIntro; exact Hfro|].
+    iSplitR; [iPureIntro; rewrite ?Hlog ?Hdl; by apply fr_ok_app_log|].
     iSplitR; [iPureIntro; rewrite Hlog; exact (chain_set_ok_app_log _ _ _ _ Hcho)|].
     iPureIntro. split_and!; [split_and! | split_and! | rewrite Himg; exact Hera].
     - rewrite Hmem Hlog Himg flat_snoc /=. by rewrite -Hflat.
@@ -1053,7 +1053,7 @@ Section ctx.
     iSplitR.
     { rewrite big_sepM_insert; [|exact HDPi]. iSplitR; [iExact "Hnew"|iExact "Hdps"]. }
     iSplitR; [iPureIntro; rewrite Hdl; exact Hdpo'|].
-    iSplitR; [iPureIntro; rewrite Hdl; by apply fr_ok_drain|].
+    iSplitR; [iPureIntro; rewrite ?Hlog ?Hdl; by apply fr_ok_drain, fr_ok_app_log|].
     iSplitR.
     { iPureIntro. rewrite Hlog Hdl.
       exact (chain_set_ok_drain _ _ _ _ (dl_ok_app_log _ _ _ Hdok) Hpre
@@ -1221,7 +1221,7 @@ Section ctx.
       iSplitR.
       { rewrite big_sepM_insert; [|exact HDPi]. iSplitR; [iExact "Hnew"|iExact "Hdps"]. }
       iSplitR; [iPureIntro; rewrite Hdl; exact Hdpo'|].
-      iSplitR; [iPureIntro; rewrite Hdl; by apply fr_ok_drain|].
+      iSplitR; [iPureIntro; rewrite ?Hlog ?Hdl; by apply fr_ok_drain, fr_ok_app_log|].
       iSplitR.
       { iPureIntro. rewrite Hlog Hdl.
         apply (chain_set_ok_drain _ _ _ _ (dl_ok_app_log _ _ _ Hdok) Hpre').

@@ -43,7 +43,8 @@ Fixpoint goodbP (D : register -> bool) {X} (P : X -> bool) (m : M X) (s : mstate
        | Interface.RegRead r _ => fun k => andb (D r) (goodbP D P (k (register_lookup r s.(sregs))) s)
        | Interface.InstrAnnounce _   => fun k => goodbP D P (k tt) s
        | Interface.BranchAnnounce _ _=> fun k => goodbP D P (k tt) s
-       | Interface.Barrier _         => fun k => goodbP D P (k tt) s
+       (* a release fence is a LEAF (relaxed-ww): [goodb] refuses it *)
+       | Interface.Barrier b         => fun k => andb (negb (fence_rel b)) (goodbP D P (k tt) s)
        | Interface.CacheOp _         => fun k => goodbP D P (k tt) s
        | Interface.TlbOp _           => fun k => goodbP D P (k tt) s
        | Interface.TakeException _   => fun k => goodbP D P (k tt) s
@@ -69,7 +70,8 @@ Proof.
   - exists y. cbn in Hgood. auto.
   - destruct oc; cbn [goodbP exec] in Hgood |- *; try discriminate Hgood;
       try (apply (IH _ s2 Hagree Hgood)).
-    apply andb_prop in Hgood as [HDr Hgood'].
+    all: apply andb_prop in Hgood as [HDr Hgood'].
+    all: try (apply (IH _ s2 Hagree Hgood')).
     match goal with
     | HDr : D ?rr = true |- _ =>
       pose proof (Hagree _ HDr) as Hr; rewrite <- Hr;
@@ -85,7 +87,7 @@ Proof.
   - reflexivity.
   - destruct oc; cbn [goodb goodbP] in Hm |- *; try discriminate Hm;
       try (apply IH; exact Hm).
-    apply andb_prop in Hm as [HD Hk]. rewrite HD. cbn. apply IH; exact Hk.
+    all: apply andb_prop in Hm as [HD Hk]; rewrite HD; cbn; apply IH; exact Hk.
 Qed.
 
 (* ===================================================================== *)
@@ -106,7 +108,7 @@ Proof.
   - rewrite bind_Next.
     destruct oc; cbn [goodbP] in Hm |- *; try discriminate Hm;
       try (apply IH; exact Hm).
-    apply andb_prop in Hm as [HD Hk]. rewrite HD. cbn. apply IH; exact Hk.
+    all: apply andb_prop in Hm as [HD Hk]; rewrite HD; cbn; apply IH; exact Hk.
 Qed.
 
 Lemma goodbP_bind_forall (D : register -> bool) {X Y} (P : Y -> bool)
@@ -136,7 +138,7 @@ Proof.
   - rewrite bind_Next.
     destruct oc; cbn [exec] in He; cbn [goodbP] in Hm |- *; try discriminate Hm;
       try (apply IH; assumption).
-    apply andb_prop in Hm as [HD Hk]. rewrite HD. cbn. apply IH; assumption.
+    all: apply andb_prop in Hm as [HD Hk]; rewrite HD; cbn; apply IH; assumption.
 Qed.
 
 Lemma goodbP_read_reg (D : register -> bool) {X} (P : X -> bool) (r : register)

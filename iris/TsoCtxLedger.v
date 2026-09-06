@@ -619,7 +619,7 @@ Section ctx.
         + by rewrite lookup_app_l.
         + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
     iSplitR; [iPureIntro; exact Hdpo|].
-    iSplitR; [iPureIntro; exact Hfro|].
+    iSplitR; [iPureIntro; rewrite ?Hlog ?Hdl; by apply fr_ok_app_log|].
     iSplitR; [iPureIntro; rewrite Hlog; exact (chain_set_ok_app_log _ _ _ _ Hcho)|].
     iPureIntro. split_and!; [split_and! | split_and! | rewrite Himg; exact Hera].
     - rewrite Hmem Hlog Himg flat_snoc /=. by rewrite -Hflat.

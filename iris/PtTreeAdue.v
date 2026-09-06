@@ -532,29 +532,33 @@ Section SPmpSwp.
   (* ------------------------------------------------------------------ *)
   Definition xread_obl (pa : SailStdpp.Values.mword 64) (bytes : bv 64)
       : iProp Σ :=
-    (∀ σ img log tv V,
+    (∀ σ img log dl tv V,
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       ⌜~ own_fp_pending (hart_agent cpu_id) log dl pa 8⌝ -∗
        mstate_interp σ -∗
-       tso_interp_of riscv_eraGS img σ.(mem) log
-         (vstep (hart_agent cpu_id) tv log V) ={⊤,∅}=∗
-       ⌜read_bytes σ.(mem) pa 8 = Some bytes⌝ ∗
+       tso_interp_of riscv_eraGS img σ.(mem) log dl
+         (vstep (hart_agent cpu_id) tv dl V) -∗
+       TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) tv ={⊤,∅}=∗
+       ⌜read_bytes (TsoMemPa.dmem img log dl) pa 8 = Some bytes⌝ ∗
        ▷ (|={∅,⊤}=> mstate_interp σ ∗
-            tso_interp_of riscv_eraGS img σ.(mem) log
-              (vstep (hart_agent cpu_id) tv log V)))%I.
+            tso_interp_of riscv_eraGS img σ.(mem) log dl
+              (vstep (hart_agent cpu_id) tv dl V)))%I.
 
   (* the same at an existentially-quantified value (the predicate-indexed
      nodes below): the witness comes out of the obligation. *)
   Definition xread_obl_ex (pa : SailStdpp.Values.mword 64)
       (P : bv 64 -> Prop) : iProp Σ :=
-    (∀ σ img log tv V,
+    (∀ σ img log dl tv V,
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       ⌜~ own_fp_pending (hart_agent cpu_id) log dl pa 8⌝ -∗
        mstate_interp σ -∗
-       tso_interp_of riscv_eraGS img σ.(mem) log
-         (vstep (hart_agent cpu_id) tv log V) ={⊤,∅}=∗
-       (∃ w : bv 64, ⌜read_bytes σ.(mem) pa 8 = Some w⌝ ∗ ⌜P w⌝) ∗
+       tso_interp_of riscv_eraGS img σ.(mem) log dl
+         (vstep (hart_agent cpu_id) tv dl V) -∗
+       TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) tv ={⊤,∅}=∗
+       (∃ w : bv 64, ⌜read_bytes (TsoMemPa.dmem img log dl) pa 8 = Some w⌝ ∗ ⌜P w⌝) ∗
        ▷ (|={∅,⊤}=> mstate_interp σ ∗
-            tso_interp_of riscv_eraGS img σ.(mem) log
-              (vstep (hart_agent cpu_id) tv log V)))%I.
+            tso_interp_of riscv_eraGS img σ.(mem) log dl
+              (vstep (hart_agent cpu_id) tv dl V)))%I.
 
   Lemma swp_pmpCheck_S (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (pcfg : type_of_register pmpcfg_n)
@@ -664,13 +668,13 @@ Section pteread.
        strongly-ordered arm left), so what it owes is the VIEW-INDEXED fact
        -- threaded here, discharged where the slot's ledger fact and the
        hart's receipt live (A6.42's [TsoCtx.ledger_read_ok]). *)
-    (∀ σ img log tv V,
+    (∀ σ img log dl tv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
         mstate_interp σ -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜fobl_ram img log tv pa 8 bytes⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜fobl_ram img log dl tv pa 8 bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V)) -∗
     swp (checked_mem_read (Load PageTableEntry) PBMT_PMA Supervisor
            (Physaddr pa) 8 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -732,8 +736,8 @@ Section pteread.
                 (hread_req_at_read_ram8_ttw pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
+      iIntros (σ img log dl tv V) "%Htv Hσ Htso".
+      iMod ("Hmem" $! σ img log dl tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
       iIntros (tvn _ _) "_".
@@ -835,8 +839,8 @@ Section pteread.
                 rr (hread_req_at_read_ram8_res pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert Hfrag [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso _".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso")
+      iIntros (σ img log dl tv V) "%Htv %Hnp Hσ Htso #Hvlb".
+      iMod ("Hmem" $! σ img log dl tv V with "[//] [//] Hσ Htso Hvlb")
         as "[%Hrb Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "[Hσ Htso]". iModIntro. iFrame "Hσ Htso".
@@ -932,15 +936,15 @@ Section pteread.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ img log tv V,
+    (∀ σ img log dl tv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
         mstate_interp σ -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
         (* A6.51: the ∃ is INSIDE the ∀ view -- a slot with a completed
            A/D write-back above the reader has two values, not one. *)
-        ⌜fobl_ram_ex img log tv pa 8 P⌝ ∗
+        ⌜fobl_ram_ex img log dl tv pa 8 P⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V)) -∗
     swp (checked_mem_read (Load PageTableEntry) PBMT_PMA Supervisor
            (Physaddr pa) 8 false false false false)
       (fun r => ∃ w, ⌜r = Values.Ok (w, tt)⌝ ∗ ⌜P w⌝ ∗
@@ -999,8 +1003,8 @@ Section pteread.
                 (hread_req_at_read_ram8_ttw pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
+      iIntros (σ img log dl tv V) "%Htv Hσ Htso".
+      iMod ("Hmem" $! σ img log dl tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
       iModIntro. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
       iIntros (tvn w) "%Hlo %Hhi %Hrd' %HP _".
@@ -1104,8 +1108,8 @@ Section pteread.
                 rr (hread_req_at_read_ram8_res pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert Hfrag [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso _".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso")
+      iIntros (σ img log dl tv V) "%Htv %Hnp Hσ Htso #Hvlb".
+      iMod ("Hmem" $! σ img log dl tv V with "[//] [//] Hσ Htso Hvlb")
         as "[Hw Hclose]".
       iDestruct "Hw" as (w) "[%Hrb %HP]".
       iModIntro. iExists w. iSplitR; [done|]. iNext.
@@ -1218,28 +1222,31 @@ Section ptewrite.
   (* ------------------------------------------------------------------ *)
   Definition wpte_obl (pa : SailStdpp.Values.mword 64)
       (req : Interface.WriteReq.t 8) (R : iProp Σ) : iProp Σ :=
-    (∀ σ img log V,
+    (∀ σ img log dl V,
        mstate_interp σ -∗
-       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+       tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
              (MState σ.(sregs)
                 (write_bytes σ.(mem) pa 8 (Interface.WriteReq.value req))
                 σ.(mdev)) ∗
-             wobl_ram img σ log V 8 req ∗ R))%I.
+             wobl_ram img σ log dl V 8 req ∗ R))%I.
 
   (* … and the CONDITIONAL form, which is told what memory still holds (the
      reservation's snapshot is what makes the RMW atomic). *)
   Definition wpte_obl_at (pa : SailStdpp.Values.mword 64) (w : bv 64)
       (req : Interface.WriteReq.t 8) (R : iProp Σ) : iProp Σ :=
-    (∀ σ img log V,
-       ⌜read_bytes σ.(mem) pa 8 = Some w⌝ -∗
+    (∀ σ img log dl V,
+       ⌜read_bytes (TsoMemPa.dmem img log dl) pa 8 = Some w⌝ -∗
+       (* the conditional write's same-address guard (relaxed-ww): no own
+          store to the slot is pending *)
+       ⌜~ own_fp_pending (hart_agent cpu_id) log dl pa 8⌝ -∗
        mstate_interp σ -∗
-       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+       tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
              (MState σ.(sregs)
                 (write_bytes σ.(mem) pa 8 (Interface.WriteReq.value req))
                 σ.(mdev)) ∗
-             wobl_ram img σ log V 8 req ∗ R))%I.
+             wobl_ram img σ log dl V 8 req ∗ R))%I.
 
 
   (* THE WRITE-BACK's WRITE: the conditional write on the hart's own
@@ -1332,8 +1339,9 @@ Section ptewrite.
                 w false (hwrite_req_at_write_ram8_con pa v)
                 (addr_is_ram_not_dev pa Hram) ltac:(lia)
                 with "Hcert Hfrag [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Hrb %Htv Hσ Htso". subst tv.
-      iMod ("Hmem" $! σ img log V with "[//] Hσ Htso") as "Hclose".
+      iIntros (σ img log dl tv V) "%Hrb %Htv %Hnp Hσ Htso". subst tv.
+      pose proof (Hnp eq_refl) as Hnp'.
+      iMod ("Hmem" $! σ img log dl V with "[//] [//] Hσ Htso") as "Hclose".
       iModIntro. iNext. iMod "Hclose" as "(Hσ & Htso & HR)". iModIntro.
       iFrame "Hσ Htso". iIntros "Hfrag _".
       rewrite hwrite_resume_write_ram8_con. iApply swp_ret. by iFrame. }

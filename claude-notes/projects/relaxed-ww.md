@@ -13,9 +13,13 @@ publication leaf `rel_step`, `HartPilot`); the ownership-law files
 (`CtxValues`, `CtxPinMint`, `CtxPinw`, `CtxBox` with fence-bound deposits,
 `MemClaim`, `WpLock` §2.4 with the hook as a fence-leaf callback and
 `lk_floor` over `key_at`, `StartedInv`, `VirtioProto`, `WpUart` with the
-AMO-shaped gate `TsoCtxStore.ledger_store_amo_ok`).  IN FLIGHT: the sweep
-above these (`WpSconfLock`, `KptPublish`, `KptShare`, the box instances,
-`ProofMain*`, `RiscvAdequacy`'s era record); every racy-tier statement is
+AMO-shaped gate `TsoCtxStore.ledger_store_amo_ok`).  Done too: the two-log
+kernel-slot credential (§2.11: the fence record keyed by hart with its
+flush clause, `kpt_dbound`, `kpt_anchor`/`kpt_pub`, `KptPublish` as the
+boot route alone).  IN FLIGHT: build13 (the whole tree, `-k`) and the
+sweep above these (`WpSconfLock`, `KptShare`, `HartSKpt`, the box
+instances, `StartedInv`'s drain floor, `ProofMain*`, `RiscvAdequacy`'s era
+record); every racy-tier statement is
 restated over two logs and `Admitted` with `relaxed-ww STAGE E` (list
 below).  Two rulings (C) remain the owner's, and the ~13 `initlock` callers
 of the now fence-bound `newlock*` are blocked on them.**  The companion of
@@ -432,11 +436,13 @@ place of the branch's author-indexed receipt map.
   hence above `M` of the releaser's fence.  Its twin: the `lk->cpu` store
   after the AMO is pending while a foreign `holding()` reads race it, so
   the protocol also gains "held, cpu store pending" (stage E).
-- **Pins** (`pin_ok`, `KptPublish`): "every view `≥ B` reads a value in
-  `Sv`" over drain positions; the mint takes the publishing fence's
-  record.  `TsoMemPa`'s pure theory (`pin_ok`, `win_ok1`, `rel_ok1`,
-  `pinw_ok1`, kept under `*1` names on the branch) is restated over
-  `(glog, gdlog)`.
+- **Pins** (`pin_ok`, `KptPublish`): the pin's bound is its publication
+  FLOOR (the stamp the family was pinned at; the cell may be restamped by
+  family writes since), and what a reader needs is the floor's DRAIN
+  witness -- see §2.11 for the kernel-slot credential, which is where the
+  fence record acquired its flush clause.  `TsoMemPa`'s pure theory
+  (`pin_ok`, `win_ok1`, `rel_ok1`, `pinw_ok1`, kept under `*1` names on
+  the branch) is restated over `(glog, gdlog)` at stage E.
 - **Virtio** (`VirtioProto`, `DiskAvail`, `DiskInv`,
   `ProofVirtioDisk*`): the device reads memory, so the driver's
   descriptor and ring stores are visible to it only once drained; the
@@ -527,8 +533,11 @@ The revision, in place of §2.9's claim:
 `ledger_read_racy_ok` (its anchor premise is now `TsoCtx.ledger_anchor`:
 the floor itself or the agent's own message) -- restated over `(glog,
 gdlog)`, provable only once `TsoMemPa`'s `*1` theory is restated over the
-drain line; `CtxValues.cv_key_read` (a pin read at the stamp's drain
-position) and `cv_own_read` (the author arm); `WpLock.lock_word_fresh_free`
+drain line; `CtxValues.cv_key_read` (a pin read at its FLOOR's drain position, with
+the floor's chain) and `cv_own_read` (the author arm: the floor is the
+author's own message, with its chain; no bound premise);
+`TsoCtx.ledger_read_pin_ok` has one consumer left (`TsoCtxLedger`'s pinw
+word gate) and goes with it; `WpLock.lock_word_fresh_free`
 and `lk_cpu_fresh_free` (the lock's ledger cells going home to the
 ξ-indexed free tier need their `key_at` and chain); `VirtioProto.
 used_rel_read_ok` (over `msg_visible`) and the four `virtio_proto_*_dmem`
@@ -560,6 +569,63 @@ shape).
 - `TsoCtxStore.ledger_store_amo_ok`: the message performed at memory,
   appended to both logs, exporting its drain position as `dpos_ev`; its
   FIFO premise is the same-address guard (`dev_drained` for a bus master).
+
+### 2.11 Stage D finding: the kernel-slot credential over two logs
+
+The one-log slot form (`PtTree.kpt_slot_pin`: per byte a pin at a floor
+`Ba ≤ B` with `Ba = 0 ∨ cv_own 0 a Ba ∨ view_lb loglen 0 Ba`, read by a
+secondary through `view_lb h B`) does not survive two logs: `Ba` is an
+issue stamp and a view is a drain position, so "view `≥ B`" says nothing
+about whether the boot hart's stores have drained -- and under PSO they
+drain in ANY order relative to the `started` store, so the flag's position
+does not order them either.  What a secondary needs per byte is "the floor
+has drained at a position under my view", and the boot hart cannot hand it
+out at the mint (`csrw satp` -- `sfence.vma` is a TLB op, not a barrier, so
+hart 0 has NOT drained there).  The design that closes this without a
+two-phase tree or a rewrite of 4096 rows at the fence:
+
+- **The pin's bound is its floor.**  Every row is `∃ Ba t, ⌜Ba ≤ B⌝ ∗
+  phys_ledger_pin a dq v t Ba Sv ∗ chain_ev chain_name Ba ∗ kpt_anchor a
+  Ba`; the A/D write-back restamps `t` and keeps `(Ba, Sv, chain, anchor)`.
+  `chain_ev` at the floor puts every earlier write to the byte below it in
+  the drain order, which is what makes "the floor has drained" enough.
+- **Three anchors** (`CtxValues.kpt_anchor`): the image floor (`Ba = 0`);
+  the boot hart's OWN message (`cv_own 0 a Ba`, read off the running
+  token's dirty registry); a stamp already drained at the mint, recorded
+  as `∃ Bd, kpt_dbound Bd ∗ dpos_ev dpos_name Ba Bd` where `kpt_dbound`
+  is a one-shot agreement (`era_kptd_name`, `kptbR`'s shape) shot at the
+  boot publisher's view receipt `K` -- the tree's DRAIN bound, named by
+  agreement so `KTier B` keeps one index.  The mint threads the token
+  OPENED (`KptPublish.ctx_tok xi Btok`), because `Btok ≤ K` has to be the
+  same fact at all 4096 bytes.
+- **The boot hart reads** through `view_lb dlen 0 K` (drained arm) and
+  store forwarding (own arm): `cv_boot_cred B`'s left arm, no fence.
+- **A secondary reads through hart 0's release-fence RECORD.**  `fr_ok`
+  is now keyed by the recording hart -- `(h, N) ↦ M` -- and carries a
+  FLUSH clause beside the original one: every message of `h` below `N`
+  has drained at or under `M` (sound at a release fence: `own_drained` is
+  the barrier arm's premise; kept by every append since `N ≤ length glog`
+  is in the invariant).  The mint (`TsoCtx.fr_mint`) is total: a second
+  fence at the same issue length reuses the entry, and the older `M`
+  only weakens both clauses.  `kpt_pub B` is: a view receipt at `V`,
+  `fr_at 0 L M` with `B ≤ L`, a message `s ≥ L` (the started flag) with
+  `dpos_at s q`, `q ≤ V`, and `kpt_dbound Bd` with `Bd ≤ V`.  Then an own
+  row's `i < B ≤ L` gives `dpos_ev (S i) M` (`fr_at_flushed`), the flag's
+  position gives `M < q ≤ V` (`fr_at_after`), and a drained row's `Bd ≤ V`
+  closes the third arm; every arm ends in `cv_key_read` (stage E).
+- **What the boot chain owes** (the frontier below `KptPublish`):
+  `kptd_unset` rides beside `kptb_unset` from `BootShared` through
+  `SpecMain`/`BootChain` to `ProofMain`'s establishment hook; hart 0 mints
+  `fr_at 0 L M` at the `fence rw,rw` before `started = 1` (the `rel_step`
+  hook has the interp and `own_drained`) and deposits it in the started
+  payload with `⌜B ≤ L⌝` and `⌜Bd ≤ D⌝` for `D` the drain length at the
+  store; `StartedInv.started_W` records the flag store's DRAIN FLOOR `D`
+  (`∀ q, dl !! q = Some i → D ≤ q`, vacuous at the store, kept by every
+  drain) and passes it to the payload; `ProofMainSecondary` assembles
+  `kpt_pub` from the flag read's `dl !! q = Some i ∧ S q ≤ tv` (as
+  `dpos_at i (S q)` off the interp's copies), the payload, and its view
+  receipt.  `HartSKpt`'s walker destructures the row form and is still
+  stated over the one-log `tso_interp_of` bundle.
 
 ## 3. Stages
 

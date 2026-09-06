@@ -1043,24 +1043,24 @@ Section InstrBytes.
      what it was. *)
   Lemma text_fetch_obl (pa : Arch.pa) (n : N) (w : bv (8 * n)) :
     ([∗ list] j ∈ seq 0 (N.to_nat n), (pa_add pa j) ↦ₓ□ nth_byte w j) -∗
-    (∀ σ img log tv itv V,
+    (∀ σ img log dl tv itv V,
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
-       ⌜(itv <= length log)%nat⌝ -∗
+       ⌜(itv <= length dl)%nat⌝ -∗
        mstate_interp σ -∗
        hart_iview_auth cpu_id itv -∗
-       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-       ⌜HartMFetch.fobl_ifetch img log itv pa n w⌝ ∗
+       tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+       ⌜HartMFetch.fobl_ifetch img log dl itv pa n w⌝ ∗
        ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
-            tso_interp_of riscv_eraGS img σ.(mem) log V)).
+            tso_interp_of riscv_eraGS img σ.(mem) log dl V)).
   Proof.
-    iIntros "#Htext" (σ img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+    iIntros "#Htext" (σ img log dl tv itv V) "%Htv %Hitv Hσ Hiv Htso".
     rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log dl V
                σ.(sregs) σ.(mdev) Hpin).
     iDestruct (text_tso_read_bytes
-                 (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev)) pa n w
+                 (gs_of img σ.(mem) log dl V σ.(sregs) σ.(mdev)) pa n w
                  with "Hmem Htso Htext") as %Hok.
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iSplitR.
