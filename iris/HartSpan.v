@@ -61,7 +61,9 @@ Definition hspan_node {X : Type} (Drw : gset register)
            r ∈ Drw /\ c' = (k tt, register_set r v c.2)
        | Interface.InstrAnnounce _    => fun k => c' = (k tt, c.2)
        | Interface.BranchAnnounce _ _ => fun k => c' = (k tt, c.2)
-       | Interface.Barrier _          => fun k => c' = (k tt, c.2)
+       (* a release fence is not a span node under two logs: it can block
+          and it publishes ([HartLift.hsil_node]) *)
+       | Interface.Barrier b          => fun k => fence_rel b = false /\ c' = (k tt, c.2)
        | Interface.CacheOp _          => fun k => c' = (k tt, c.2)
        | Interface.TlbOp _            => fun k => c' = (k tt, c.2)
        | Interface.TakeException _    => fun k => c' = (k tt, c.2)
@@ -102,6 +104,7 @@ Definition hspan_stops {X : Type} (Drw : gset register) (m : M X) : bool :=
       | Interface.RegWrite r _ _ => bool_decide (r ∉ Drw)
       | Interface.MemRead _ _ => true
       | Interface.MemWrite _ _ => true
+      | Interface.Barrier b => fence_rel b
       | Interface.Choose _ => true
       | Interface.GenericFail _ => true
       | Interface.Discard => true
@@ -232,7 +235,8 @@ Fixpoint hfrun {X : Type} (n : nat) (D Drw : gset register) (rs : regstate)
                else None
            | Interface.InstrAnnounce _    => fun k => hfrun n' D Drw rs (k tt)
            | Interface.BranchAnnounce _ _ => fun k => hfrun n' D Drw rs (k tt)
-           | Interface.Barrier _          => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.Barrier b          => fun k =>
+               if fence_rel b then None else hfrun n' D Drw rs (k tt)
            | Interface.CacheOp _          => fun k => hfrun n' D Drw rs (k tt)
            | Interface.TlbOp _            => fun k => hfrun n' D Drw rs (k tt)
            | Interface.TakeException _    => fun k => hfrun n' D Drw rs (k tt)
@@ -296,6 +300,9 @@ Proof.
     [ destruct (bool_decide (reg ∈ D)); [|discriminate H]
     | destruct (bool_decide (reg ∈ Drw)); [|discriminate H]
     | .. ];
+    try (match type of H with
+         | (if fence_rel ?b then _ else _) = _ => destruct (fence_rel b); [discriminate H|]
+         end);
     apply (IH n' _ _ ltac:(lia) H).
 Qed.
 
@@ -310,20 +317,13 @@ Proof.
   - cbn in H1. injection H1 as <- <-.
     exact (hfrun_mono k (S n + k) D Drw rs (f z) (y, rs'') ltac:(lia) H2).
   - destruct oc; cbn in H1 |- *; try discriminate H1.
-    + destruct (bool_decide (reg ∈ D)); [|discriminate H1]. by apply IH.
-    + destruct (bool_decide (reg ∈ Drw)); [|discriminate H1]. by apply IH.
-    + by apply IH.
-    + by apply IH.
-    + by apply IH.
-    + by apply IH.
-    + by apply IH.
-    + by apply IH.
-    + by apply IH.
-    + by apply IH.
-    + by apply IH.
-    + by apply IH.
-    + by apply IH.
-    + by apply IH.
+    all: try (match type of H1 with
+              | (if bool_decide ?P then _ else _) = _ =>
+                  destruct (bool_decide P); [|discriminate H1]
+              | (if fence_rel ?b then _ else _) = _ =>
+                  destruct (fence_rel b); [discriminate H1|]
+              end);
+         by apply IH.
 Qed.
 
 Lemma hfrun_bind0 {Y : Type} (n k : nat) (D Drw : gset register)
@@ -455,10 +455,13 @@ Section span.
     rewrite (HC _ oc k Hoc).
     iApply (wp_hart_step with "Hcert").
     { (* a span node is a register or silent node: it keeps the reservation *)
-      intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
+      intros oth0 h0 img0 σ0 log0 dl0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 dl'0 tv'0 itv'0 hr'0 r'0 Hs.
       destruct oc; try discriminate Hns;
-        destruct Hs as (_ & _ & _ & _ & _ & -> & ->); by split. }
-    iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
+        first
+          [ destruct Hs as (_ & _ & _ & _ & _ & _ & -> & ->); by split
+          | destruct Hs as [(_ & _ & _ & _ & _ & _ & _ & _ & -> & ->)
+                           |(_ & _ & _ & _ & _ & _ & _ & -> & ->)]; by split ]. }
+    iIntros (σ oth rv img log dl tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     destruct Hhr as (Hrvlen & _).
     destruct σ as [rsM mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
@@ -474,21 +477,20 @@ Section span.
        fourteen arms below uniform -- in each of them [hbar_tv] reduces by
        iota to exactly that arm's [tv'], so the bundle matches by
        conversion. *)
-    iAssert (⌜(tv <= length log)%nat⌝)%I as %Htvlen.
-    { iDestruct "Htso" as (TM LM) "(_&_&_&_&_&_&_&_&%Hb&_)".
-      iPureIntro. rewrite -Htv. apply Hb. }
+    iDestruct (tso_interp_of_bound with "Htso") as %Hb.
+    assert (Htvlen : (tv <= length dl)%nat) by (rewrite -Htv; apply Hb).
     assert (Hadv : (V (hart_agent cpu_id)
-                    <= hbar_tv (hart_agent cpu_id) log oc tv (hr_rv hr))%nat)
+                    <= hbar_tv (hart_agent cpu_id) log dl oc tv (hr_rv hr))%nat)
       by (rewrite Htv; apply hbar_tv_ge).
-    iMod (tso_interp_of_advance _ img mem0 log V (hart_agent cpu_id)
-            (hbar_tv (hart_agent cpu_id) log oc tv (hr_rv hr))
-            (fin_to_nat_lt cpu_id) Hadv (hbar_tv_le _ _ _ _ _ Htvlen Hrvlen)
+    iMod (tso_interp_of_advance _ img mem0 log dl V (hart_agent cpu_id)
+            (hbar_tv (hart_agent cpu_id) log dl oc tv (hr_rv hr))
+            (fin_to_nat_lt cpu_id) Hadv (hbar_tv_le _ _ _ _ _ _ Htvlen Hrvlen)
            with "Htso") as "Htso".
     (* ... and the INSTRUCTION view, the same way: only [fence.i] moves it
        ([HartLift.hbar_itv]), and it reduces per arm exactly like [hbar_tv] *)
     iMod (hart_iview_auth_update cpu_id itv
-            (hbar_itv (hart_agent cpu_id) log oc tv (hr_rv hr) itv)
-            (hbar_itv_ge _ _ _ _ _ _) with "Hiv") as "Hiv".
+            (hbar_itv (hart_agent cpu_id) log dl oc tv (hr_rv hr) itv)
+            (hbar_itv_ge _ _ _ _ _ _ _) with "Hiv") as "Hiv".
     destruct oc; try discriminate Hns.
     (* 14 goals: RegRead, RegWrite, then the 12 silent classes *)
     2: { (* RegWrite: [hspan_stops = false] forces [reg ∈ Drw] *)
@@ -509,10 +511,10 @@ Section span.
         by apply HagO. }
       iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
       iExists (C (k tt)), (MState (register_set reg regval rsM) mem0 dev0),
-        log, tv, itv, hr, rv.
+        log, dl, tv, itv, hr, rv.
       iSplitR; [iPureIntro; split_and!; reflexivity|].
-      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
-      destruct Hstep as (-> & Hσ' & -> & -> & -> & -> & ->).
+      iNext. iIntros (m' σ' log' dl' tv' itv' hr' rv') "%Hstep".
+      destruct Hstep as (-> & Hσ' & -> & -> & -> & -> & -> & ->).
       assert (σ' = MState (register_set reg regval rsM) mem0 dev0) as ->
         by exact Hσ'.
       iMod (hreg_frame_update rs Drw reg regval rsM Hns with "Hri Hrf")
@@ -530,12 +532,34 @@ Section span.
                      (register_set reg regval rsM) Drw HagW').
       - by iApply (hreg_frame_ro_ext Df rs (register_set reg regval rsM)
                      Dro HagO'). }
+    (* the silent barrier ([fence_rel b = false]): the enabled arm, with the
+       view moved by the acquire *)
+    4: { simpl in Hns.
+      iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
+      iExists (C (k tt)), (MState rsM mem0 dev0), log, dl,
+        (hbar_tv (hart_agent cpu_id) log dl (Interface.Barrier b) tv (hr_rv hr)),
+        (hbar_itv (hart_agent cpu_id) log dl (Interface.Barrier b) tv (hr_rv hr) itv), hr, rv.
+      iSplitR.
+      { iPureIntro. right. split; [by left|]. split_and!; reflexivity. }
+      iNext. iIntros (m' σ' log' dl' tv' itv' hr' rv') "%Hstep".
+      destruct Hstep as [(Hrel' & _) | (_ & -> & -> & -> & -> & -> & -> & -> & ->)];
+        [congruence|].
+      iMod "Hmask" as "_". iModIntro.
+      iSplitR "H Hrf Hro Htso Hiv Hrv"; [iFrame "Hri Hmem Hdev"|].
+      iSplitL "Hiv"; [iExact "Hiv"|].
+      iSplitL "Hrv"; [iExact "Hrv"|].
+      iSplitL "Htso"; [iExact "Htso"|].
+      iApply ("H" $! (k tt) rsM rsM with "[%] [%] [Hrf] [Hro]").
+      - exact Hag.
+      - simpl. split; [exact Hns|reflexivity].
+      - by iApply (hreg_frame_ext rs rsM Drw HagW).
+      - by iApply (hreg_frame_ro_ext Df rs rsM Dro HagO). }
     (* RegRead and the silent classes: the file does not move *)
     all: iApply fupd_mask_intro; [apply empty_subseteq|]; iIntros "Hmask";
-         iExists _, (MState rsM mem0 dev0), log, _, _, hr, rv;
+         iExists _, (MState rsM mem0 dev0), log, dl, _, _, hr, rv;
          (iSplitR; [iPureIntro; split_and!; reflexivity|]);
-         iNext; iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep";
-         destruct Hstep as (-> & -> & -> & -> & -> & -> & ->);
+         iNext; iIntros (m' σ' log' dl' tv' itv' hr' rv') "%Hstep";
+         destruct Hstep as (-> & -> & -> & -> & -> & -> & -> & ->);
          iMod "Hmask" as "_"; iModIntro;
          (iSplitR "H Hrf Hro Htso Hiv Hrv"; [iFrame "Hri Hmem Hdev"|]);
          (iSplitL "Hiv"; [iExact "Hiv"|]);

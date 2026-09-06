@@ -180,22 +180,26 @@ Section MemClaim.
   (* (tso-port.md §0.26′): the freer holds no value determinate at its own *)
   (* view, and does not need one.                                         *)
   (* ------------------------------------------------------------------- *)
-  Definition wordw_free `{KTR : !CurKtier} (width : Z) (a : Arch.pa) : iProp Σ :=
+  (* ξ-INDEXED under two logs (relaxed-ww.md §2.10): a free byte is a
+     context's byte at an unknown value. *)
+  Definition wordw_free `{KTR : !CurKtier} (ξ : CtxId) (width : Z) (a : Arch.pa)
+      : iProp Σ :=
     (⌜is_aligned_paddr (Physaddr a) width = true⌝ ∗
      [∗ list] j ∈ seq 0 (Z.to_nat width),
-        TsoCtx.mem_free (pa_add a j) (DfracOwn 1))%I.
+        TsoCtx.mem_free ξ (pa_add a j) (DfracOwn 1))%I.
 
-  Lemma mem_free_claim `{KTR : !CurKtier} (a : Arch.pa) (dq : dfrac) :
-    TsoCtx.mem_free a dq -∗ mem_claim a.
+  Lemma mem_free_claim `{KTR : !CurKtier} (ξ : CtxId) (a : Arch.pa) (dq : dfrac) :
+    TsoCtx.mem_free ξ a dq -∗ mem_claim a.
   Proof.
     rewrite /TsoCtx.mem_free /mem_claim.
-    iIntros "(%ppn & #Hk & %Hc & %Hp & Hb)".
-    iDestruct (TsoCtx.phys_free_ram with "Hb") as %Hram.
+    iIntros "(%v & Hb)". rewrite ctx_pointsto_phys.
+    iDestruct "Hb" as "(%ppn & #Hk & %Hc & %Hp & Hb)".
+    iDestruct (TsoCtx.ctx_phys_pointsto_ram with "Hb") as %Hram.
     iExists ppn. iFrame "Hk". done.
   Qed.
 
-  Lemma wordw_free_claim `{KTR : !CurKtier} (width : Z) (a : Arch.pa) :
-    0 < width -> wordw_free width a -∗ wordw_claim width a.
+  Lemma wordw_free_claim `{KTR : !CurKtier} (ξ : CtxId) (width : Z) (a : Arch.pa) :
+    0 < width -> wordw_free ξ width a -∗ wordw_claim width a.
   Proof.
     intros Hw0. iIntros "[%Hal Hb]".
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hb") as "[Hb0 _]".
@@ -205,8 +209,8 @@ Section MemClaim.
   Qed.
 
   (* the width-1 free window IS one free byte, the twin of [wordw1_byte] *)
-  Lemma wordw1_free `{KTR : !CurKtier} (a : Arch.pa) :
-    wordw_free 1 a ⊣⊢ TsoCtx.mem_free a (DfracOwn 1).
+  Lemma wordw1_free `{KTR : !CurKtier} (ξ : CtxId) (a : Arch.pa) :
+    wordw_free ξ 1 a ⊣⊢ TsoCtx.mem_free ξ a (DfracOwn 1).
   Proof.
     rewrite /wordw_free. change (Z.to_nat 1) with 1%nat.
     rewrite big_sepL_singleton pa_add_0.
@@ -219,7 +223,7 @@ Section MemClaim.
   (* a REGISTERED window forgets to a free one, per byte *)
   Lemma wordw_pointsto_free `{KTR : !CurKtier} (width : Z) (a : Arch.pa)
       (w : mword (8*width)) :
-    wordw_pointsto width a (DfracOwn 1) w ⊢ wordw_free width a.
+    wordw_pointsto width a (DfracOwn 1) w ⊢ wordw_free cur_ctx width a.
   Proof.
     rewrite /wordw_pointsto /wordw_free. iIntros "[$ Hb]".
     iApply (big_sepL_mono with "Hb"). iIntros (k j _) "H".
