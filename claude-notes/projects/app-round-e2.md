@@ -1,5 +1,36 @@
 # Round E2 — design proposal (2026-09-05): AU forms for create's legs, link, mkdir, iput's free, write; the view; the rulings needed
 
+> **RESUME HERE (checkpoint 2026-09-05, end of the session that built rounds A–E1 and E2-V).**
+> Design of record: `design/applications.md` (as built).  Rounds record: `app-instances.md` §7.
+> This file: the E2 proposal + every ruling (status block below; all nine questions are RULED,
+> Q-b reversed: nlink-0 inodes LEAVE the view).  Briefs and the VM build script:
+> `app-round-e2-briefs.md`; E1's census: `app-round-e1-census.md`.
+>
+> STATE OF THE TREE: origin/main is green at the E2-V commit (view over allocated rows) plus these
+> notes.  LANE E2-V2 (view excludes nlink-0 rows; brief in the briefs file) was IN FLIGHT as a
+> subagent with UNCOMMITTED edits in `/shared/xv6iris-3/iris`.  On resume: `git status` — if iris
+> files are modified, that is E2-V2's partial or finished work; run the build script (log name
+> rE2V2) and either finish it to green against its brief or, if it is hopeless, `git checkout --
+> iris` and redo the lane from the brief.  If the tree is clean, E2-V2 either landed (check
+> `git log`) or was lost (redo from the brief).
+>
+> ORDER AFTER E2-V2 (each a green gate, then audit/commit/push): E2-D (deltas, brief in the
+> briefs file, reshaped for the nlink-0 ruling: no claim/free deltas) → E2-C (create's legs: arm/
+> unarm/dots/ent as fires from the contract bundle; §2(b), §3, §5, §8 below) and E2-L (link in
+> place: three fires; §4) in parallel → E2-W (write: dispatch the AU write for inode fds, raw step
+> premise on the non-AU write, the short-chunk arm's state fire — Q-i: "a bug in the sys_write
+> spec, fix it; the spec may be non-deterministic"; §7) → E2-X (delete the dead non-AU unlink walk,
+> non-AU mknod, `so_stores`; Q-f; §1) → E2-Z (ProofIlock's claim and EscrowDeposit's free become
+> `_same` since the row is absent on both sides; delete `top_move`, `ireg_top_retag_auto`,
+> `_armed_auto`, `app_top_update_auto`; `app_auto`/`Happ_auto` STAY — L2 deletes them).  E2-F
+> (threading a free obligation to iput) is CANCELLED by the nlink-0 ruling.
+>
+> AFTER E2: app-echo.md's lanes L2 (per-process steps; deletes `Happ_auto`), L5, L6, L7; and the
+> fd-row follow-up the nlink-0 ruling created (reads through an fd of an unlinked file get their
+> contents from a per-fd resource, not the view).  Owner's standing preferences: narrate, don't ask;
+> checkpoint at green (commit, rebase, push); briefs are law, no in-proof instrument invention.
+
+
 STATUS: PROPOSAL; RULINGS SO FAR (owner, 2026-09-05): Q-a YES (view = allocated rows; lane E2-V
 launched); Q-b NO (nlink-0 inodes stay in the view: a process may hold an open fd to one); Q-c YES
 (strengthen in place — "we have a single kernel proof, only one of these contracts can be in the
