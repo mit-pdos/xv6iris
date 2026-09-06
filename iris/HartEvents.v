@@ -194,6 +194,25 @@ Proof.
   exfalso. apply Hnp. exists j. split; [exact Hj|]. rewrite Hp. discriminate.
 Qed.
 
+(* ... and the FIFO premise of the AMO-shaped store gates
+   ([TsoCtxStore.ledger_store_amo_ok] and its kin): every earlier own message
+   overlapping the footprint has drained *)
+Lemma own_fp_pending_fifo (h : agent) (log : list pwmsg) (dl : list nat)
+    (pa : Arch.pa) (n : N) {w : N} (v : bv w) :
+  ~ own_fp_pending h log dl pa n ->
+  forall i mi, log !! i = Some mi -> pm_tid mi = h ->
+    msg_overlapb mi (PWMsg (snap_of pa n v) h) = true -> i ∈ dl.
+Proof.
+  intros Hnp i mi Hi Htid Hov.
+  destruct (msg_overlapb_true _ _ Hov) as (a & [b Hb] & [b' Hb']).
+  rewrite /msg_byte /= in Hb'.
+  destruct (snap_of_lookup_Some _ _ _ _ _ Hb') as (j & Hj & -> & _).
+  pose proof (own_fp_pending_none _ _ _ _ _ Hnp j Hj) as Hpend.
+  destruct (decide (i ∈ dl)) as [Hin|Hnin]; [exact Hin|exfalso].
+  pose proof (lookup_lt_Some _ _ _ Hi) as Hlt.
+  exact (pend_down_none log dl h (pa_add pa j) (length log) i mi b Hlt Hi Htid Hnin Hb Hpend).
+Qed.
+
 Lemma vstep_here (h : agent) (t : nat) (dl : list nat) (V : agent -> nat) :
   vstep h t dl V h = t.
 Proof. rewrite /vstep. case_decide as Hd; [reflexivity | congruence]. Qed.
@@ -510,6 +529,10 @@ Section events.
     resv_frag cpu_id rr -∗
     (∀ σ img log dl tv V (b : bool),
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       (* the same-address guard the machine checked before a CONDITIONAL
+          write: no own store to the footprint is pending *)
+       ⌜ak_excl (Interface.WriteReq.access_kind req) = true ->
+        ~ own_fp_pending (hart_agent cpu_id) log dl (Interface.WriteReq.pa req) n⌝ -∗
        mstate_interp σ -∗
        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp
@@ -552,7 +575,7 @@ Section events.
                            (Interface.WriteReq.pa req) n)))
       as [(Hfree & Hnp)|Hblocked].
     - (* the write *)
-      iMod ("H" $! σ img log dl tv V b with "[//] Hσ Htso") as "Hk".
+      iMod ("H" $! σ img log dl tv V b with "[//] [//] Hσ Htso") as "Hk".
       iModIntro.
       iExists (C (K (inl None))),
         (MState σ.(sregs)
@@ -763,6 +786,8 @@ Section events.
     (∀ σ img log dl tv V,
        ⌜read_bytes (dmem img log dl) (Interface.WriteReq.pa req) n = Some w⌝ -∗
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       ⌜ak_excl (Interface.WriteReq.access_kind req) = true ->
+        ~ own_fp_pending (hart_agent cpu_id) log dl (Interface.WriteReq.pa req) n⌝ -∗
        mstate_interp σ -∗
        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp
@@ -806,7 +831,7 @@ Section events.
                            (Interface.WriteReq.pa req) n)))
       as [(Hfree & Hnp)|Hblocked].
     - (* the write, at the pinned old value *)
-      iMod ("H" $! σ img log dl tv V with "[//] [//] Hσ Htso") as "Hk".
+      iMod ("H" $! σ img log dl tv V with "[//] [//] [//] Hσ Htso") as "Hk".
       iModIntro.
       iExists (C (K (inl None))),
         (MState σ.(sregs)
@@ -1123,6 +1148,10 @@ Section events.
     resv_frag cpu_id rr -∗
     (∀ σ img log dl tv V (b : bool),
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       (* the same-address guard the machine checked before a CONDITIONAL
+          write: no own store to the footprint is pending *)
+       ⌜ak_excl (Interface.WriteReq.access_kind req) = true ->
+        ~ own_fp_pending (hart_agent cpu_id) log dl (Interface.WriteReq.pa req) n⌝ -∗
        mstate_interp σ -∗
        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp
@@ -1149,8 +1178,8 @@ Section events.
     rewrite /swp. iIntros (C) "%HC Hcont".
     iApply (wp_hart_ram_write C n req m rr HC Hproj Hdev
               with "Hcert Hfrag [H Hcont]").
-    iIntros (σ img log dl tv V b) "%Htv Hσ Htso".
-    iMod ("H" $! σ img log dl tv V b with "[//] Hσ Htso") as "Hk".
+    iIntros (σ img log dl tv V b) "%Htv %Hnp Hσ Htso".
+    iMod ("H" $! σ img log dl tv V b with "[//] [//] Hσ Htso") as "Hk".
     iModIntro. iNext.
     iMod "Hk" as "(Hσ & Htso & Hswp)". iModIntro. iFrame "Hσ Htso".
     iIntros "Hfrag Hrec".
@@ -1168,6 +1197,8 @@ Section events.
     (∀ σ img log dl tv V,
        ⌜read_bytes (dmem img log dl) (Interface.WriteReq.pa req) n = Some w⌝ -∗
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       ⌜ak_excl (Interface.WriteReq.access_kind req) = true ->
+        ~ own_fp_pending (hart_agent cpu_id) log dl (Interface.WriteReq.pa req) n⌝ -∗
        mstate_interp σ -∗
        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp
@@ -1194,8 +1225,8 @@ Section events.
     rewrite /swp. iIntros (C) "%HC Hcont".
     iApply (wp_hart_ram_write_cond C n req m w b HC Hproj Hdev Hn
               with "Hcert Hfrag [H Hcont]").
-    iIntros (σ img log dl tv V) "%Hrb %Htv Hσ Htso".
-    iMod ("H" $! σ img log dl tv V with "[//] [//] Hσ Htso") as "Hk".
+    iIntros (σ img log dl tv V) "%Hrb %Htv %Hnp Hσ Htso".
+    iMod ("H" $! σ img log dl tv V with "[//] [//] [//] Hσ Htso") as "Hk".
     iModIntro. iNext.
     iMod "Hk" as "(Hσ & Htso & Hswp)". iModIntro. iFrame "Hσ Htso".
     iIntros "Hfrag Hrec".

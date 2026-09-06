@@ -667,6 +667,149 @@ Section ctx.
       exfalso. rewrite /msg /= in Hb. lia.
   Qed.
 
+  (* the pin gate at the AMO shape (relaxed-ww.md §2.4): the conditional
+     half of an RMW into a pinned window -- the A/D write-back into the
+     kernel page table -- is performed at memory, so both logs grow; the
+     drain half is [ledger_store_amo_ok]'s. *)
+  Lemma ledger_store_pin_amo_ok (g g' : gstate) (auth : agent)
+      (Pold Pnew : gmap Arch.pa (bv 8)) (Bg : Arch.pa -> nat)
+      (Sf : Arch.pa -> gset (bv 8)) :
+    dom Pold = dom Pnew ->
+    (forall a v, Pnew !! a = Some v -> v ∈ Sf a) ->
+    (forall i mi, g.(glog) !! i = Some mi -> pm_tid mi = auth ->
+       msg_overlapb mi (PWMsg Pnew auth) = true -> i ∈ g.(gdlog)) ->
+    g'.(gimg) = g.(gimg) ->
+    g'.(glog) = (g.(glog) ++ [PWMsg Pnew auth])%list ->
+    g'.(gdlog) = (g.(gdlog) ++ [length g.(glog)])%list ->
+    g'.(gmem) = Pnew ∪ g.(gmem) ->
+    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(gdlog))%nat) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    pin_map_own Pold (DfracOwn 1) Bg Sf ==∗
+    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
+    tso_interp_at riscv_eraGS g' ∗
+    ledger_msg_at (length g.(glog)) (PWMsg Pnew auth) ∗
+    dpos_ev dpos_name (S (length g.(glog))) (S (length g.(gdlog))) ∗
+    ([∗ map] a ↦ v ∈ Pnew,
+       phys_ledger_pin a (DfracOwn 1) v (S (length g.(glog))) (Bg a) (Sf a)).
+  Proof.
+    iIntros (Hdom Hin Hown Himg Hlog Hdl Hmem Htv Htvok') "Hgh Hint Hold".
+    iDestruct "Hint"
+      as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdomtm & %Htie & Hm & %HLM & Hlen & Hv & Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    destruct Hmm as ((Hflat & Htvok & Hcov) & (Hdok & Hfifo & Hdev) & Hera).
+    set (msg := PWMsg Pnew auth).
+    assert (HLMfresh : LM !! length g.(glog) = None).
+    { rewrite HLM. apply lookup_ge_None_2. lia. }
+    iMod (ghost_map_insert_persist (length g.(glog)) msg HLMfresh with "Hm")
+      as "[Hm #Hmsg]".
+    iMod (mono_nat_own_update (length g'.(glog)) with "Hlen") as "[Hlen _]".
+    { rewrite Hlog length_app /=. lia. }
+    iMod (ledger_store_pin_bytes (length g.(glog)) Bg Sf Pold Pnew g.(gmem) TM
+            Hdom with "Hgh Hts Hold")
+      as "(%Hsub & %Hold2 & Hgh & Hts & Hbig)".
+    destruct (dpos_ok_amo _ _ _ Hdok Hdpo) as (HDPi & Hdpo').
+    iMod (ghost_map_insert_persist (length g.(glog)) (S (length g.(gdlog))) HDPi
+            with "Hdp") as "[Hdp #Hnew]".
+    iMod (mono_nat_own_update (length g'.(gdlog)) with "Hdl") as "[Hdl _]".
+    { rewrite Hdl length_app /=. lia. }
+    assert (Havf : forall x, (avf g x <= avf g' x)%nat).
+    { intros x. rewrite /avf Hdl.
+      destruct (lt_dec x NCPU) as [Hx|Hx]; [apply Htv | rewrite length_app /=; lia]. }
+    iMod (view_auth_update _ (avf g) (avf g') Havf with "Hv") as "Hv".
+    assert (Hpre : drain_pre (g.(glog) ++ [msg])%list g.(gdlog) (length g.(glog))).
+    { split_and!.
+      - rewrite length_app /=. lia.
+      - intros Hin'. have := proj2 Hdok _ Hin'. lia.
+      - intros i mi mk Hik Hi Hk Htid Hov.
+        rewrite list_lookup_middle // in Hk. injection Hk as <-.
+        rewrite (lookup_app_l _ _ _ Hik) in Hi. exact (Hown _ _ Hi Htid Hov). }
+    iModIntro.
+    iSplitL "Hgh"; first by rewrite Hmem.
+    iFrame "Hbig". iFrame "Hmsg".
+    iSplitL "Hts Hm Hlen Hv Hdp Hdl Hfr Hch"; last first.
+    { rewrite /dpos_ev. iRight. iExists (length g.(glog)), (S (length g.(gdlog))).
+      iSplit; [done|]. iSplitL; [iExact "Hnew"|]. iPureIntro. lia. }
+    iExists (pin_tm (length g.(glog)) Bg Sf Pnew ∪ TM),
+            (<[length g.(glog) := msg]> LM),
+            (<[length g.(glog) := S (length g.(gdlog))]> DP), FR, CH.
+    iFrame "Hts Hm Hlen Hv Hdp Hdl Hfr Hfrs Hch".
+    iSplitR.
+    { iPureIntro.
+      assert (Hdpin : dom (pin_tm (length g.(glog)) Bg Sf Pnew) = dom Pnew).
+      { apply set_eq. intros k.
+        by rewrite !elem_of_dom pin_tm_lookup fmap_is_Some. }
+      rewrite dom_union_L Hdpin Hmem dom_union_L Hdomtm.
+      by rewrite (subseteq_union_1_L _ _ Hsub). }
+    iSplitR.
+    { iPureIntro. intros a e Hlk.
+      destruct (Pnew !! a) as [vn|] eqn:Hpa.
+      - assert (Hl : pin_tm (length g.(glog)) Bg Sf Pnew !! a
+                     = Some ((S (length g.(glog)), ts_pay_pin (Sf a) (Bg a)) : ts_elem))
+          by (rewrite pin_tm_lookup Hpa //).
+        rewrite (lookup_union_Some_l _ _ _ _ Hl) in Hlk. injection Hlk as <-.
+        assert (Hmb : msg_byte msg a = Some vn)
+          by (rewrite /msg_byte /=; exact Hpa).
+        split_and!; [ | | by move => W0 HW0 | by move => R0 HR0 | by move => Wp HWp ].
+        + exists vn. split.
+          { rewrite Hmem. by apply lookup_union_Some_l. }
+          rewrite Hlog Himg. apply latest_app_new. exact Hmb.
+        + intros Sv' B' Heq. cbn in Heq. injection Heq as <- <-.
+          destruct (Hold2 a ltac:(by apply elem_of_dom)) as (told & HTMa).
+          rewrite Hlog Himg.
+          apply pin_ok_app.
+          * exact (ts_ok_pin _ _ _ _ _ _ _ _ (Htie _ _ HTMa) eq_refl).
+          * right. exists vn. split; [exact Hmb | exact (Hin a vn Hpa)].
+      - assert (Hl : pin_tm (length g.(glog)) Bg Sf Pnew !! a = None)
+          by (rewrite pin_tm_lookup Hpa //).
+        rewrite (lookup_union_r _ _ _ Hl) in Hlk.
+        pose proof (Htie _ _ Hlk) as Hok.
+        assert (Hmb : msg_byte msg a = None) by (rewrite /msg_byte /=; exact Hpa).
+        split_and!.
+        + destruct (ts_ok_latest _ _ _ _ _ _ Hok) as (v0 & Hgm & Hlat).
+          exists v0. split.
+          { rewrite Hmem. by rewrite lookup_union_r. }
+          rewrite Hlog Himg. by apply latest_app_frame.
+        + intros Sv' B' He2. rewrite Hlog Himg.
+          apply (pin_ok_app_frame _ _ _ _ _ _
+                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb).
+        + intros W0 HW0. rewrite Hlog Himg.
+          apply (win_ok1_app_frame _ _ _ _ _
+                   (ts_ok_win _ _ _ _ _ _ _ Hok HW0) Hmb).
+        + intros R0 HR0. rewrite Hlog Himg.
+          apply (rel_ok1_app_frame _ _ _ _ _
+                   (ts_ok_rel _ _ _ _ _ _ _ Hok HR0) Hmb).
+        + intros Wp HWp. rewrite Hlog Himg.
+          apply (pinw_ok1_app_frame _ _ _ _ _
+                   (ts_ok_pinw _ _ _ _ _ _ _ Hok HWp) Hmb). }
+    iSplitR.
+    { iPureIntro. intros j. rewrite Hlog.
+      destruct (decide (j = length g.(glog))) as [->|Hne].
+      - rewrite lookup_insert. symmetry. by apply list_lookup_middle.
+      - rewrite lookup_insert_ne; last congruence. rewrite HLM.
+        destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
+        + by rewrite lookup_app_l.
+        + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
+    iSplitR.
+    { rewrite big_sepM_insert; [|exact HDPi]. iSplitR; [iExact "Hnew"|iExact "Hdps"]. }
+    iSplitR; [iPureIntro; rewrite Hdl; exact Hdpo'|].
+    iSplitR; [iPureIntro; rewrite Hdl; by apply fr_ok_drain|].
+    iSplitR.
+    { iPureIntro. rewrite Hlog Hdl.
+      exact (chain_set_ok_drain _ _ _ _ (dl_ok_app_log _ _ _ Hdok) Hpre
+               (chain_set_ok_app_log _ _ _ _ Hcho)). }
+    iPureIntro. split_and!; [split_and! | split_and! | rewrite Himg; exact Hera].
+    - rewrite Hmem Hlog Himg flat_snoc /=. by rewrite -Hflat.
+    - intros c. have := Htvok' c. lia.
+    - rewrite Himg. exact Hcov.
+    - rewrite Hlog Hdl. by apply amo_dl_ok.
+    - rewrite Hlog Hdl. apply fifo_ok_amo; [exact Hdok | exact Hfifo | exact Hown].
+    - rewrite /dev_drained Hlog Hdl. intros j mj Hj Hb.
+      apply lookup_app_last' in Hj as [[_ Hj]|[-> _]].
+      + apply elem_of_app. left. exact (Hdev _ _ Hj Hb).
+      + apply elem_of_app. right. apply elem_of_list_singleton. reflexivity.
+  Qed.
+
   (* THE CONTEXT-FREE STORE GATE.  Same three of the four ghost steps as
      [ctx_store_ok] -- γts to the new top, γlogm persist, the mono_nat bump
      -- and NO dirty-set insert, because there is no context to insert into.
@@ -940,6 +1083,229 @@ Section ctx.
   (* which is exactly [TsoMemPa.write_bytes_union]'s reading of          *)
   (* [write_bytes mm pa n v].                                           *)
   (* ---------------------------------------------------------------- *)
+  (* ================================================================== *)
+  (* THE OWNED-CELL CONDITIONAL WRITE (relaxed-ww.md §1.1, §2.4): the      *)
+  (* store performed at memory -- the conditional half of an RMW -- lands   *)
+  (* in a running context's own cells and is appended to BOTH logs at once. *)
+  (* [ctx_store_ok] with [ledger_store_amo_ok]'s drain half: the same-      *)
+  (* address guard is the FIFO premise, the message's chain is per-byte     *)
+  (* evidence as for a plain store, and its drain position comes out as a   *)
+  (* [dpos_ev] witness.                                                     *)
+  (* ================================================================== *)
+  Lemma ctx_store_amo_ok `{CID : CpuId} (g g' : gstate) (ξ : CtxId)
+      (Pold Pnew : gmap Arch.pa (bv 8)) :
+    dom Pold = dom Pnew ->
+    (forall i mi, g.(glog) !! i = Some mi -> pm_tid mi = hart_agent cpu_id ->
+       msg_overlapb mi (PWMsg Pnew (hart_agent cpu_id)) = true -> i ∈ g.(gdlog)) ->
+    g'.(gimg) = g.(gimg) ->
+    g'.(glog) = (g.(glog) ++ [PWMsg Pnew (hart_agent cpu_id)])%list ->
+    g'.(gdlog) = (g.(gdlog) ++ [length g.(glog)])%list ->
+    g'.(gmem) = Pnew ∪ g.(gmem) ->
+    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(gdlog))%nat) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    own_context ξ -∗
+    ([∗ map] a ↦ v ∈ Pold, ctx_phys_pointsto ξ a (DfracOwn 1) v) ==∗
+    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
+    tso_interp_at riscv_eraGS g' ∗
+    own_context ξ ∗
+    dpos_ev dpos_name (S (length g.(glog))) (S (length g.(gdlog))) ∗
+    ([∗ map] a ↦ v ∈ Pnew, ctx_phys_pointsto ξ a (DfracOwn 1) v).
+  Proof.
+    iIntros (Hdom Hown Himg Hlog Hdl Hmem Htv Htvok') "Hgh Hint Hrun Hold".
+    iDestruct (ctx_store_pre_map with "Hint Hrun Hold") as "(Hint & Hrun & Hold)".
+    rewrite own_context_unseal /own_context_def.
+    iDestruct "Hint"
+      as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdomtm & %Htie & Hm & %HLM & Hlen & Hv &
+           Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    destruct Hmm as ((Hflat & Htvok & Hcov) & (Hdok & Hfifo & Hdev) & Hera).
+    iDestruct "Hrun" as "(%B & %K & %D & [Hb Hd] & #HK & %HBK & #Hoks)".
+    iDestruct (ctx_store_pre_tm TM Pold _ with "Hts Hold") as "(Hts & %Hpre & Hold)".
+    set (msg := PWMsg Pnew (hart_agent cpu_id)).
+    assert (HLMfresh : LM !! length g.(glog) = None).
+    { rewrite HLM. apply lookup_ge_None_2. lia. }
+    iMod (ghost_map_insert_persist (length g.(glog)) msg HLMfresh with "Hm")
+      as "[Hm #Hlogm]".
+    iMod (mono_nat_own_update (length g'.(glog)) with "Hlen") as "[Hlen #Hlb]".
+    { rewrite Hlog length_app /=. lia. }
+    assert (HCHfresh : CH !! length g.(glog) = None).
+    { destruct (CH !! length g.(glog)) as [x|] eqn:HC; [|done].
+      destruct (Hcho _ _ HC) as [Hlt _]. lia. }
+    iMod (ghost_map_insert_persist (length g.(glog)) 0%nat HCHfresh with "Hch")
+      as "[Hch #Hchained]".
+    iMod (ctx_store_bytes ξ (length g.(glog)) Pold Pnew g.(gmem) TM D Hdom
+            with "Hgh Hts Hd Hold")
+      as "(%D' & %Hsub & %HD' & Hgh & Hts & Hd & Hbig)".
+    (* the drain half: the new index takes the next position *)
+    destruct (dpos_ok_amo _ _ _ Hdok Hdpo) as (HDPi & Hdpo').
+    iMod (ghost_map_insert_persist (length g.(glog)) (S (length g.(gdlog))) HDPi
+            with "Hdp") as "[Hdp #Hnew]".
+    iMod (mono_nat_own_update (length g'.(gdlog)) with "Hdl") as "[Hdl _]".
+    { rewrite Hdl length_app /=. lia. }
+    assert (Havf : forall x, (avf g x <= avf g' x)%nat).
+    { intros x. rewrite /avf Hdl.
+      destruct (lt_dec x NCPU) as [Hx|Hx]; [apply Htv | rewrite length_app /=; lia]. }
+    iMod (view_auth_update _ (avf g) (avf g') Havf with "Hv") as "Hv".
+    assert (Hpre' : drain_pre (g.(glog) ++ [msg])%list g.(gdlog) (length g.(glog))).
+    { split_and!.
+      - rewrite length_app /=. lia.
+      - intros Hin. have := proj2 Hdok _ Hin. lia.
+      - intros i mi mk Hik Hi Hk Htid Hov.
+        rewrite list_lookup_middle // in Hk. injection Hk as <-.
+        rewrite (lookup_app_l _ _ _ Hik) in Hi. exact (Hown _ _ Hi Htid Hov). }
+    (* the new message's chain over the OLD drain log, from the per-byte
+       evidence; the drain then keeps it *)
+    assert (Hchain : chain_msg (g.(glog) ++ [msg])%list g.(gdlog) (length g.(glog))).
+    { move => m' a Hlk Hb.
+      rewrite list_lookup_middle // in Hlk. injection Hlk as <-.
+      destruct Hb as [w Hw]. rewrite /msg_byte /= in Hw.
+      assert (Ha : a ∈ dom Pold) by (rewrite Hdom; by eapply elem_of_dom_2).
+      apply elem_of_dom in Ha as [vo Hvo].
+      destruct (Hpre _ _ Hvo) as (t & HTM & Hc & Hdob).
+      destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM)) as (v0 & _ & Hlat).
+      exact (chain_ok_new _ _ _ _ _ _ msg w Hdok Hfifo Hlat Hc Hdob Hw). }
+    iModIntro.
+    iSplitL "Hgh"; first by rewrite Hmem.
+    iSplitL "Hts Hm Hlen Hv Hdp Hdl Hfr Hch".
+    { iExists (((fun _ : bv 8 => ((S (length g.(glog)), ts_pay_none) : ts_elem)) <$> Pnew) ∪ TM),
+              (<[length g.(glog) := msg]> LM),
+              (<[length g.(glog) := S (length g.(gdlog))]> DP), FR,
+              (<[length g.(glog) := 0%nat]> CH).
+      iFrame "Hts Hm Hlen Hv Hdp Hdl Hfr Hfrs Hch".
+      iSplitR.
+      { iPureIntro.
+        rewrite dom_union_L dom_fmap_L Hmem dom_union_L Hdomtm.
+        by rewrite (subseteq_union_1_L _ _ Hsub). }
+      iSplitR.
+      { iPureIntro. intros a e Hlk.
+        destruct (Pnew !! a) as [vn|] eqn:Hpa.
+        - assert (Hl : ((fun _ : bv 8 => ((S (length g.(glog)), ts_pay_none) : ts_elem)) <$> Pnew) !! a
+                       = Some ((S (length g.(glog)), ts_pay_none) : ts_elem))
+            by (rewrite lookup_fmap Hpa //).
+          rewrite (lookup_union_Some_l _ _ _ _ Hl) in Hlk.
+          injection Hlk as <-.
+          apply (ts_ok_unpinned _ _ _ _ _ _ vn).
+          { rewrite Hmem. by apply lookup_union_Some_l. }
+          rewrite Hlog Himg. apply latest_app_new. by rewrite /msg_byte /=.
+        - assert (Hl : ((fun _ : bv 8 => ((S (length g.(glog)), ts_pay_none) : ts_elem)) <$> Pnew) !! a = None)
+            by (rewrite lookup_fmap Hpa //).
+          rewrite (lookup_union_r _ _ _ Hl) in Hlk.
+          pose proof (Htie _ _ Hlk) as Hok.
+          assert (Hmb : msg_byte msg a = None) by (rewrite /msg_byte /=; exact Hpa).
+          split_and!.
+          + destruct (ts_ok_latest _ _ _ _ _ _ Hok) as (v0 & Hgm & Hlat).
+            exists v0. split.
+            { rewrite Hmem. by rewrite lookup_union_r. }
+            rewrite Hlog Himg. by apply latest_app_frame.
+          + intros Sv Bp He2. rewrite Hlog Himg.
+            apply (pin_ok_app_frame _ _ _ _ _ _
+                     (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb).
+          + intros W0 HW0. rewrite Hlog Himg.
+            apply (win_ok1_app_frame _ _ _ _ _
+                     (ts_ok_win _ _ _ _ _ _ _ Hok HW0) Hmb).
+          + intros R0 HR0. rewrite Hlog Himg.
+            apply (rel_ok1_app_frame _ _ _ _ _
+                     (ts_ok_rel _ _ _ _ _ _ _ Hok HR0) Hmb).
+          + intros Wp HWp. rewrite Hlog Himg.
+            apply (pinw_ok1_app_frame _ _ _ _ _
+                     (ts_ok_pinw _ _ _ _ _ _ _ Hok HWp) Hmb). }
+      iSplitR.
+      { iPureIntro. intros j. rewrite Hlog.
+        destruct (decide (j = length g.(glog))) as [->|Hne].
+        - rewrite lookup_insert. symmetry. by apply list_lookup_middle.
+        - rewrite lookup_insert_ne; last congruence. rewrite HLM.
+          destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
+          + by rewrite lookup_app_l.
+          + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
+      iSplitR.
+      { rewrite big_sepM_insert; [|exact HDPi]. iSplitR; [iExact "Hnew"|iExact "Hdps"]. }
+      iSplitR; [iPureIntro; rewrite Hdl; exact Hdpo'|].
+      iSplitR; [iPureIntro; rewrite Hdl; by apply fr_ok_drain|].
+      iSplitR.
+      { iPureIntro. rewrite Hlog Hdl.
+        apply (chain_set_ok_drain _ _ _ _ (dl_ok_app_log _ _ _ Hdok) Hpre').
+        apply chain_set_ok_insert; [by apply chain_set_ok_app_log | exact Hchain]. }
+      iPureIntro. split_and!; [split_and! | split_and! | rewrite Himg; exact Hera].
+      - rewrite Hmem Hlog Himg flat_snoc /=. by rewrite -Hflat.
+      - intros c. have := Htvok' c. lia.
+      - rewrite Himg. exact Hcov.
+      - rewrite Hlog Hdl. by apply amo_dl_ok.
+      - rewrite Hlog Hdl. apply fifo_ok_amo; [exact Hdok | exact Hfifo | exact Hown].
+      - rewrite /dev_drained Hlog Hdl. intros j mj Hj Hb.
+        apply lookup_app_last' in Hj as [[_ Hj]|[-> _]].
+        + apply elem_of_app. left. exact (Hdev _ _ Hj Hb).
+        + apply elem_of_app. right. apply elem_of_list_singleton. reflexivity. }
+    iSplitL "Hb Hd".
+    { iExists B, K, D'. iFrame "Hb Hd HK".
+      iSplitR; first done.
+      iApply big_sepS_intro. iIntros "!>" (k Hk).
+      apply HD' in Hk as [Hin|[Hk1 _]].
+      - by iApply (big_sepS_elem_of _ _ _ Hin with "Hoks").
+      - rewrite /dirty_ok. iRight. iExists (length g.(glog)), msg. iFrame "Hlogm".
+        by iPureIntro. }
+    iSplitR.
+    { rewrite /dpos_ev. iRight. iExists (length g.(glog)), (S (length g.(gdlog))).
+      iSplit; [done|]. iSplitL; [iExact "Hnew"|]. iPureIntro. lia. }
+    iApply (big_sepM_impl with "Hbig").
+    iIntros "!>" (a v _) "(Hpt & Hte & Hdt)".
+    rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
+    iExists (S (length g.(glog))). iFrame "Hpt Hte".
+    iSplit; [rewrite /key_at; by iRight |].
+    rewrite /chain_ev. iRight. iExists (length g.(glog)). iSplit; [done | iExact "Hchained"].
+  Qed.
+
+  (* the submap form of the conditional write, as [ctx_store_sub_ok] *)
+  Lemma ctx_store_sub_amo_ok `{CID : CpuId} (g g' : gstate) (ξ : CtxId)
+      (mm Pnew : gmap Arch.pa (bv 8)) :
+    dom Pnew ⊆ dom mm ->
+    (forall i mi, g.(glog) !! i = Some mi -> pm_tid mi = hart_agent cpu_id ->
+       msg_overlapb mi (PWMsg Pnew (hart_agent cpu_id)) = true -> i ∈ g.(gdlog)) ->
+    g'.(gimg) = g.(gimg) ->
+    g'.(glog) = (g.(glog) ++ [PWMsg Pnew (hart_agent cpu_id)])%list ->
+    g'.(gdlog) = (g.(gdlog) ++ [length g.(glog)])%list ->
+    g'.(gmem) = Pnew ∪ g.(gmem) ->
+    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(gdlog))%nat) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    own_context ξ -∗
+    ([∗ map] a ↦ v ∈ mm, ctx_phys_pointsto ξ a (DfracOwn 1) v) ==∗
+    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
+    tso_interp_at riscv_eraGS g' ∗
+    own_context ξ ∗
+    dpos_ev dpos_name (S (length g.(glog))) (S (length g.(gdlog))) ∗
+    ([∗ map] a ↦ v ∈ Pnew ∪ mm, ctx_phys_pointsto ξ a (DfracOwn 1) v).
+  Proof.
+    iIntros (Hsubd Hown Himg Hlog Hdl Hmem Htv Htvok') "Hgh Hint Hrun Hown".
+    set (Pold := mm ∩ Pnew).
+    assert (HPsub : Pold ⊆ mm).
+    { rewrite map_subseteq_spec. intros a b Hab.
+      by apply lookup_intersection_Some in Hab as [? _]. }
+    assert (Hdom : dom Pold = dom Pnew).
+    { rewrite /Pold dom_intersection_L. set_solver. }
+    assert (Hdisj : Pold ##ₘ mm ∖ Pold)
+      by apply (map_disjoint_difference_r mm Pold Pold), reflexivity.
+    assert (Hsplit : mm = Pold ∪ (mm ∖ Pold))
+      by (symmetry; by apply map_difference_union).
+    assert (Hdisj2 : Pnew ##ₘ mm ∖ Pold).
+    { apply map_disjoint_dom. rewrite dom_difference_L -Hdom. set_solver + Pold. }
+    assert (Hjoin : Pnew ∪ mm = Pnew ∪ (mm ∖ Pold)).
+    { apply map_eq. intros a. destruct (Pnew !! a) as [b|] eqn:Hp.
+      - by rewrite !(lookup_union_Some_l _ _ _ _ Hp).
+      - rewrite !lookup_union_r //.
+        destruct (mm !! a) as [c|] eqn:Hm; last first.
+        { symmetry. apply lookup_difference_None. by left. }
+        symmetry. rewrite lookup_difference_Some. split; first done.
+        by rewrite /Pold lookup_intersection Hm Hp. }
+    rewrite Hsplit big_sepM_union //.
+    iDestruct "Hown" as "[Hfp Hrest]".
+    rewrite -Hsplit.
+    iMod (ctx_store_amo_ok g g' ξ Pold Pnew Hdom Hown Himg Hlog Hdl Hmem Htv Htvok'
+            with "Hgh Hint Hrun Hfp") as "($ & $ & $ & $ & Hfp)".
+    iModIntro. rewrite Hjoin big_sepM_union //. iFrame "Hfp Hrest".
+  Qed.
+
   Lemma ctx_store_sub_ok `{CID : CpuId} (g g' : gstate) (ξ : CtxId)
       (mm Pnew : gmap Arch.pa (bv 8)) :
     dom Pnew ⊆ dom mm ->
@@ -1094,6 +1460,50 @@ Section ctx.
                   rewrite (HS j ltac:(lia)); exact (Hin j ltac:(lia)))
             Himg Hlog Hdl ltac:(by rewrite Hmem write_bytes_union) Htv Htvok'
             with "Hgh Hint Hold") as "($ & $ & _ & Hnew)".
+    iModIntro. rewrite (phys_ledger_pin_win_map pa n vnew _ Bf Sf Sg Bg Hn HS HB).
+    rewrite /pin_map_own.
+    iApply (big_sepM_mono with "Hnew"). iIntros (a v _) "H".
+    by iExists (S (length g.(glog))).
+  Qed.
+
+  (* ... and at the AMO shape *)
+  Lemma ledger_store_win_pin_okf_amo `{CID : CpuId} (g g' : gstate)
+      (pa : Arch.pa) (n : N) {m : N} (vold vnew : bv m) (Bf : nat -> nat)
+      (Sf : nat -> TsoMemPa.byteset) (Sg : Arch.pa -> TsoMemPa.byteset)
+      (Bg : Arch.pa -> nat) :
+    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
+    (forall j : nat, (j < N.to_nat n)%nat -> Sg (pa_add pa j) = Sf j) ->
+    (forall j : nat, (j < N.to_nat n)%nat -> Bg (pa_add pa j) = Bf j) ->
+    (forall j : nat, (j < N.to_nat n)%nat -> nth_byte vnew j ∈ Sf j) ->
+    (forall i mi, g.(glog) !! i = Some mi -> pm_tid mi = hart_agent cpu_id ->
+       msg_overlapb mi (PWMsg (snap_of pa n vnew) (hart_agent cpu_id)) = true ->
+       i ∈ g.(gdlog)) ->
+    g'.(gimg) = g.(gimg) ->
+    g'.(glog) = (g.(glog) ++ [PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list ->
+    g'.(gdlog) = (g.(gdlog) ++ [length g.(glog)])%list ->
+    g'.(gmem) = write_bytes g.(gmem) pa n vnew ->
+    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(gdlog))%nat) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       ∃ t : nat, phys_ledger_pin (pa_add pa j) (DfracOwn 1) (nth_byte vold j) t (Bf j) (Sf j)) ==∗
+    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
+    tso_interp_at riscv_eraGS g' ∗
+    dpos_ev dpos_name (S (length g.(glog))) (S (length g.(gdlog))) ∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       ∃ t : nat, phys_ledger_pin (pa_add pa j) (DfracOwn 1) (nth_byte vnew j) t (Bf j) (Sf j)).
+  Proof.
+    iIntros (Hn HS HB Hin Hown Himg Hlog Hdl Hmem Htv Htvok') "Hgh Hint Hold".
+    rewrite (phys_ledger_pin_win_map pa n vold _ Bf Sf Sg Bg Hn HS HB).
+    iMod (ledger_store_pin_amo_ok g g' (hart_agent cpu_id)
+            (snap_of pa n vold) (snap_of pa n vnew) Bg Sg
+            ltac:(by rewrite !dom_snap_of)
+            ltac:(intros a b Hab;
+                  destruct (snap_of_lookup_Some _ _ _ _ _ Hab) as (j & Hj & -> & ->);
+                  rewrite (HS j ltac:(lia)); exact (Hin j ltac:(lia)))
+            Hown Himg Hlog Hdl ltac:(by rewrite Hmem write_bytes_union) Htv Htvok'
+            with "Hgh Hint Hold") as "($ & $ & _ & $ & Hnew)".
     iModIntro. rewrite (phys_ledger_pin_win_map pa n vnew _ Bf Sf Sg Bg Hn HS HB).
     rewrite /pin_map_own.
     iApply (big_sepM_mono with "Hnew"). iIntros (a v _) "H".

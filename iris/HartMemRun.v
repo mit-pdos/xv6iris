@@ -106,13 +106,13 @@ Fixpoint hmrun {X : Type} (n : nat) (D Drw : gset register) (rs : regstate)
                     | None => None
                     end
            (* RAM write inside the owned bytes: the map is updated *)
-           (* TWO LOGS (relaxed-ww.md §1.1): a plain store only -- the
-              conditional half of an RMW is performed at memory (both logs
-              move) and is not a walker step; a fence is a leaf of its own
-              ([HartBarrier]), and the walk has none *)
+           (* TWO LOGS (relaxed-ww.md §1.1): a fence with a W predecessor
+              is a leaf of its own ([HartBarrier]), and the walk has none;
+              the conditional half of an RMW (the A/D write-back) IS a
+              walker step -- performed at memory, both logs move
+              ([bytes_own_wobl]) *)
            | Interface.MemWrite nb req => fun k =>
                if dev_addr (Interface.WriteReq.pa req) then None
-               else if ak_excl (Interface.WriteReq.access_kind req) then None
                else if bytes_owned mm (Interface.WriteReq.pa req) nb
                     then hmrun n' D Drw rs
                            (write_bytes mm (Interface.WriteReq.pa req) nb
@@ -308,13 +308,18 @@ Section memrun.
   (* ([TsoMemPa.write_bytes_union]), which is exactly the gate's output    *)
   (* shape -- the payload ruling of §1 paying off again.                   *)
   (* ------------------------------------------------------------------ *)
-  (* TWO LOGS: the walker's store is PLAIN ([ak_excl = false]): it is born
-     pending, moves no view and drains nothing ([HartEvents.wstore_dl_plain]). *)
+  (* TWO LOGS (relaxed-ww.md §1.1, §2.4): a PLAIN store is born pending and
+     drains nothing; the CONDITIONAL half of an RMW -- the A/D write-back --
+     is performed at memory, so both logs move and the walker's owned cells
+     take it through the AMO-shaped ctx gate ([TsoCtxStore.ctx_store_sub_
+     amo_ok]); its FIFO premise is the same-address guard the machine
+     checked, handed down by the write rule. *)
   Lemma bytes_own_wobl (img : gmap Arch.pa (bv 8)) (sg : mstate)
       (log : list pwmsg) (dl : list nat) (V : agent -> nat) (tv : nat)
       (n : N) (req : Interface.WriteReq.t n)
       (mm : gmap Arch.pa (bv 8)) (b : bool) :
-    ak_excl (Interface.WriteReq.access_kind req) = false ->
+    (ak_excl (Interface.WriteReq.access_kind req) = true ->
+     ~ own_fp_pending (hart_agent cpu_id) log dl (Interface.WriteReq.pa req) n) ->
     V (hart_agent cpu_id) = tv ->
     bytes_owned mm (Interface.WriteReq.pa req) n = true ->
     gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
@@ -338,56 +343,102 @@ Section memrun.
     bytes_own (write_bytes mm (Interface.WriteReq.pa req) n
                  (Interface.WriteReq.value req)).
   Proof.
-    intros Hexcl Htv Hfp. iIntros "Hgh Htso Hrun Hown".
+    intros Hnp Htv Hfp. iIntros "Hgh Htso Hrun Hown".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     iDestruct (tso_interp_of_bound with "Htso") as %Hb.
-    rewrite (wstore_dl_plain _ _ _ Hexcl) (wstore_tv_plain _ _ _ _ Hexcl).
     set (pa := Interface.WriteReq.pa req).
     set (val := Interface.WriteReq.value req).
     set (log' := (log ++ [PWMsg (snap_of pa n val) (hart_agent cpu_id)])%list).
-    set (V' := vstep (hart_agent cpu_id) tv dl V).
     assert (Htvlen : (tv <= length dl)%nat)
       by (rewrite -Htv; apply Hb).
-    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl).
-    { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
-      - exfalso. subst h. pose proof (fin_to_nat_lt cpu_id).
-        rewrite /hart_agent in Hh. lia.
-      - destruct (lt_dec h NCPU); [lia | reflexivity]. }
-    assert (Hother : forall c : CPU, hart_agent c <> hart_agent cpu_id ->
-              V' (hart_agent c) = V (hart_agent c)).
-    { intros c Hne. rewrite /V' /vstep. case_decide as Hd; first done.
-      destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first reflexivity.
-      exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
-    assert (Htvmono : forall c : CPU,
-              (V (hart_agent c) <= V' (hart_agent c))%nat).
-    { intros c. destruct (decide (hart_agent c = hart_agent cpu_id)) as [He|Hne].
-      - rewrite /V' /vstep. case_decide as Hd; last (exfalso; exact (Hd He)).
-        rewrite He Htv. lia.
-      - rewrite Hother //. }
-    assert (Htvtop : forall c : CPU,
-              (V' (hart_agent c) <= length dl)%nat).
-    { intros c. destruct (decide (hart_agent c = hart_agent cpu_id)) as [He|Hne].
-      - rewrite /V' /vstep He decide_True; [exact Htvlen | reflexivity].
-      - rewrite (Hother c Hne). exact (Hb _). }
     (* the footprint is inside the owned map *)
     assert (Hsub : dom (snap_of pa n val) ⊆ dom mm).
     { rewrite dom_snap_of. intros a Ha. apply elem_of_footprint in Ha as (j & Hj & ->).
       apply elem_of_dom. apply (bytes_owned_spec mm pa n Hfp j Hj). }
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log dl V
-               sg.(sregs) sg.(mdev) Hpin).
-    iMod (TsoCtxStore.ctx_store_sub_ok
-            (gs_of img sg.(mem) log dl V sg.(sregs) sg.(mdev))
-            (gs_of img (write_bytes sg.(mem) pa n val) log' dl V'
-               sg.(sregs) sg.(mdev))
-            XI mm (snap_of pa n val) Hsub eq_refl eq_refl eq_refl
-            ltac:(cbn [gmem gs_of]; apply write_bytes_union) Htvmono Htvtop
-            with "Hgh Htso Hrun Hown") as "(Hgh & Htso & Hrun & Hown)".
-    iModIntro.
-    rewrite -(tso_interp_of_at_gs riscv_eraGS img
-                (write_bytes sg.(mem) pa n val) log' dl V'
-                sg.(sregs) sg.(mdev) Hpin').
-    iFrame "Hgh Htso Hrun".
-    rewrite /bytes_own (write_bytes_union mm pa n val). iExact "Hown".
+    destruct (ak_excl (Interface.WriteReq.access_kind req)) eqn:Hex.
+    - (* THE CONDITIONAL WRITE: performed at memory *)
+      rewrite /wstore_dl /wstore_tv Hex.
+      set (dl' := (dl ++ [length log])%list).
+      set (tv' := if b then S (length dl) else tv).
+      set (V' := vstep (hart_agent cpu_id) tv' dl' V).
+      assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl').
+      { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
+        - exfalso. subst h. pose proof (fin_to_nat_lt cpu_id).
+          rewrite /hart_agent in Hh. lia.
+        - destruct (lt_dec h NCPU); [lia | reflexivity]. }
+      assert (Hother : forall c : CPU, hart_agent c <> hart_agent cpu_id ->
+                V' (hart_agent c) = V (hart_agent c)).
+      { intros c Hne. rewrite /V' /vstep. case_decide as Hd; first done.
+        destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first reflexivity.
+        exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
+      assert (Htvmono : forall c : CPU,
+                (V (hart_agent c) <= V' (hart_agent c))%nat).
+      { intros c. destruct (decide (hart_agent c = hart_agent cpu_id)) as [He|Hne].
+        - rewrite /V' /vstep He decide_True; [|reflexivity].
+          rewrite Htv /tv'. destruct b; lia.
+        - rewrite (Hother c Hne). lia. }
+      assert (Htvtop : forall c : CPU,
+                (V' (hart_agent c) <= length dl')%nat).
+      { intros c. destruct (decide (hart_agent c = hart_agent cpu_id)) as [He|Hne].
+        - rewrite /V' /vstep He decide_True; [|reflexivity].
+          rewrite /tv' /dl' length_app /=. destruct b; lia.
+        - rewrite (Hother c Hne) /dl' length_app /=. have := Hb (hart_agent c). lia. }
+      rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log dl V
+                 sg.(sregs) sg.(mdev) Hpin).
+      iMod (TsoCtxStore.ctx_store_sub_amo_ok
+              (gs_of img sg.(mem) log dl V sg.(sregs) sg.(mdev))
+              (gs_of img (write_bytes sg.(mem) pa n val) log' dl' V'
+                 sg.(sregs) sg.(mdev))
+              XI mm (snap_of pa n val) Hsub
+              (own_fp_pending_fifo _ _ _ _ _ val (Hnp eq_refl))
+              eq_refl eq_refl eq_refl
+              ltac:(cbn [gmem gs_of]; apply write_bytes_union) Htvmono Htvtop
+              with "Hgh Htso Hrun Hown") as "(Hgh & Htso & Hrun & _ & Hown)".
+      iModIntro.
+      rewrite -(tso_interp_of_at_gs riscv_eraGS img
+                  (write_bytes sg.(mem) pa n val) log' dl' V'
+                  sg.(sregs) sg.(mdev) Hpin').
+      iFrame "Hgh Htso Hrun".
+      rewrite /bytes_own (write_bytes_union mm pa n val). iExact "Hown".
+    - (* THE PLAIN STORE: born pending, drains nothing, moves no view *)
+      rewrite (wstore_dl_plain _ _ _ Hex) (wstore_tv_plain _ _ _ _ Hex).
+      set (V' := vstep (hart_agent cpu_id) tv dl V).
+      assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl).
+      { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
+        - exfalso. subst h. pose proof (fin_to_nat_lt cpu_id).
+          rewrite /hart_agent in Hh. lia.
+        - destruct (lt_dec h NCPU); [lia | reflexivity]. }
+      assert (Hother : forall c : CPU, hart_agent c <> hart_agent cpu_id ->
+                V' (hart_agent c) = V (hart_agent c)).
+      { intros c Hne. rewrite /V' /vstep. case_decide as Hd; first done.
+        destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first reflexivity.
+        exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
+      assert (Htvmono : forall c : CPU,
+                (V (hart_agent c) <= V' (hart_agent c))%nat).
+      { intros c. destruct (decide (hart_agent c = hart_agent cpu_id)) as [He|Hne].
+        - rewrite /V' /vstep. case_decide as Hd; last (exfalso; exact (Hd He)).
+          rewrite He Htv. lia.
+        - rewrite Hother //. }
+      assert (Htvtop : forall c : CPU,
+                (V' (hart_agent c) <= length dl)%nat).
+      { intros c. destruct (decide (hart_agent c = hart_agent cpu_id)) as [He|Hne].
+        - rewrite /V' /vstep He decide_True; [exact Htvlen | reflexivity].
+        - rewrite (Hother c Hne). exact (Hb _). }
+      rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log dl V
+                 sg.(sregs) sg.(mdev) Hpin).
+      iMod (TsoCtxStore.ctx_store_sub_ok
+              (gs_of img sg.(mem) log dl V sg.(sregs) sg.(mdev))
+              (gs_of img (write_bytes sg.(mem) pa n val) log' dl V'
+                 sg.(sregs) sg.(mdev))
+              XI mm (snap_of pa n val) Hsub eq_refl eq_refl eq_refl
+              ltac:(cbn [gmem gs_of]; apply write_bytes_union) Htvmono Htvtop
+              with "Hgh Htso Hrun Hown") as "(Hgh & Htso & Hrun & Hown)".
+      iModIntro.
+      rewrite -(tso_interp_of_at_gs riscv_eraGS img
+                  (write_bytes sg.(mem) pa n val) log' dl V'
+                  sg.(sregs) sg.(mdev) Hpin').
+      iFrame "Hgh Htso Hrun".
+      rewrite /bytes_own (write_bytes_union mm pa n val). iExact "Hown".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -637,8 +688,6 @@ Section memrun.
          caller's own cells and the map moves with memory *)
       destruct (dev_addr (Interface.WriteReq.pa wreq)) eqn:Hdev;
         [discriminate Hf|].
-      destruct (ak_excl (Interface.WriteReq.access_kind wreq)) eqn:Hex;
-        [discriminate Hf|].
       destruct (bytes_owned mm (Interface.WriteReq.pa wreq) nb) eqn:Hfp;
         [|discriminate Hf].
       assert (Hproj : hwrite_req_at nb
@@ -655,11 +704,11 @@ Section memrun.
       iDestruct "Hany" as (rr) "Hfrag".
       iApply (swp_hart_ram_write nb wreq _ _ rr Hproj Hdev
                 with "Hcert Hfrag").
-      iIntros (sg img log dl tv V b) "%Htv Hsi Htso". rewrite /mstate_interp.
+      iIntros (sg img log dl tv V b) "%Htv %Hnp Hsi Htso". rewrite /mstate_interp.
       iDestruct "Hsi" as "(Hri & Hmem & Hdv)".
       iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
       iNext. iMod "Hcl" as "_".
-      iMod (bytes_own_wobl img sg log dl V tv nb wreq mm b Hex Htv Hfp
+      iMod (bytes_own_wobl img sg log dl V tv nb wreq mm b Hnp Htv Hfp
               with "Hmem Htso Hrun Hown")
         as "(Hmem & Htso & Hrun & Hown)".
       iModIntro. iSplitL "Hri Hmem Hdv"; [iFrame|]. iFrame "Htso".
@@ -742,8 +791,7 @@ Fixpoint goodmb (Dr Dw : register -> bool) {E X} (m : Defs.monad E X)
               | None => false
               end)
        | Interface.MemWrite n req => fun k =>
-           andb (andb (andb (negb (dev_addr (Interface.WriteReq.pa req)))
-                         (negb (ak_excl (Interface.WriteReq.access_kind req))))
+           andb (andb (negb (dev_addr (Interface.WriteReq.pa req)))
                    (bytes_owned mm (Interface.WriteReq.pa req) n))
              (goodmb Dr Dw (k (inl None))
                 (MState s.(sregs)
@@ -808,7 +856,6 @@ Lemma hmrun_ram_write {X : Type} (n : nat) (D Drw : gset register)
     (req : Interface.WriteReq.t nb) (k : _ -> M X) :
   hmrun (S n) D Drw rs mm (Interface.Next (Interface.MemWrite nb req) k)
   = if dev_addr (Interface.WriteReq.pa req) then None
-    else if ak_excl (Interface.WriteReq.access_kind req) then None
     else if bytes_owned mm (Interface.WriteReq.pa req) nb
          then hmrun n D Drw rs
                 (write_bytes mm (Interface.WriteReq.pa req) nb
@@ -936,8 +983,8 @@ Proof.
       by rewrite (read_bytes_owned_mono mm s.(mem) _ nb w Hfp Hsub Hrb). }
     { (* RAM WRITE; MMIO is refused by the certificate *)
       apply andb_prop in Hg as [Hg1 Hg2].
-      apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
-      apply negb_true_iff in Hdev. apply negb_true_iff in Hex.
+      apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev.
       rewrite Hdev in He. cbn beta iota in He.
       assert (Hsub' :
         write_bytes mm (Interface.WriteReq.pa wreq) nb
@@ -953,7 +1000,7 @@ Proof.
                   s' x _ Hsub' Hg2 He)
         as (n0 & mm' & Hw & Hs1 & Hd1).
       exists (S n0), mm'. split; [|split; [exact Hs1|]].
-      * rewrite hmrun_ram_write Hdev Hex Hfp. exact Hw.
+      * rewrite hmrun_ram_write Hdev Hfp. exact Hw.
       * rewrite Hd1. by apply write_bytes_dom. }
     3:{ (* THE FENCE: certified only without a W predecessor, which is what
            the walker refuses too *)
@@ -1180,8 +1227,8 @@ Proof.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
       cbn beta iota in He. by apply (IH _ s mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp Hex.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
     all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
              | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
@@ -1226,8 +1273,8 @@ Proof.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
       cbn beta iota in He. by apply (IH _ s mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp Hex.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
     all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
              | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
@@ -1499,8 +1546,8 @@ Proof.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
       cbn beta iota in He. by apply (IH _ s mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp Hex.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
     all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
              | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
@@ -1569,8 +1616,8 @@ Proof.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
       cbn beta iota in He. by apply (IH _ s mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp Hex.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
     all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
              | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
@@ -1612,8 +1659,8 @@ Proof.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
       cbn beta iota in He. by apply (IH _ s mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp Hex.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
     all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
              | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
@@ -1850,8 +1897,8 @@ Proof.
       by rewrite (read_bytes_owned_mono mm s.(mem) _ nb w Hfp Hsub Hrb). }
     { (* RAM WRITE *)
       apply andb_prop in Hg as [Hg1 Hg2].
-      apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
-      apply negb_true_iff in Hdev. apply negb_true_iff in Hex.
+      apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev.
       rewrite Hdev in He. cbn beta iota in He.
       assert (Hsub' :
         write_bytes mm (Interface.WriteReq.pa wreq) nb
@@ -1867,7 +1914,7 @@ Proof.
                   s' x _ Hsub' Hg2 He)
         as (n0 & Hw & Hs1 & Hd1).
       exists (S n0). split; [|split; [exact Hs1|]].
-      * rewrite hmrun_ram_write Hdev Hex Hfp. exact Hw.
+      * rewrite hmrun_ram_write Hdev Hfp. exact Hw.
       * rewrite Hd1. by apply write_bytes_dom. }
     3:{ apply andb_prop in Hg as [Hrel Hg]. apply negb_true_iff in Hrel.
       destruct (IH tt s s' x mm Hsub Hg He) as (n0 & Hw & Hs1 & Hd1).
@@ -1928,13 +1975,11 @@ Proof.
   { (* RAM WRITE *)
     destruct (dev_addr (Interface.WriteReq.pa wreq)) eqn:Hdev;
       [discriminate Hf|].
-    destruct (ak_excl (Interface.WriteReq.access_kind wreq)) eqn:Hex;
-      [discriminate Hf|].
     destruct (bytes_owned mm (Interface.WriteReq.pa wreq) nb) eqn:Hfp;
       [|discriminate Hf].
     destruct (IH rs1 rs2 _ _ x rs1' mm' Hag Hf) as (rs2' & Hf2 & Hag2).
     exists rs2'. split; [|exact Hag2].
-    rewrite hmrun_ram_write Hdev Hex Hfp. exact Hf2. }
+    rewrite hmrun_ram_write Hdev Hfp. exact Hf2. }
   3:{ (* the fence: the walker takes it only without a W predecessor *)
     destruct (fence_rel bar) eqn:Hrel; [discriminate Hf|].
     destruct (IH rs1 rs2 mm _ x rs1' mm' Hag Hf) as (rs2' & Hf2 & Hag2).

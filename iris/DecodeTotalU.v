@@ -53,7 +53,8 @@ Proof.
   - rewrite bind_Next.
     destruct oc; cbn [goodb] in Hm |- *; try discriminate Hm;
       try (apply IH; exact Hm).
-    apply andb_prop in Hm as [HD Hk]. rewrite HD. cbn. apply IH; exact Hk.
+    (* RegRead's register gate and the fence's [fence_rel] gate alike *)
+    all: apply andb_prop in Hm as [HD Hk]; rewrite HD; cbn; apply IH; exact Hk.
 Qed.
 
 (* goodb alone implies exec success with the state unchanged.            *)

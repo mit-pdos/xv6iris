@@ -74,7 +74,9 @@ Proof.
       [by apply (IH _ s mm)|reflexivity]. }
   { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [_ Hfp].
     rewrite (IH (inl None) _ _ Hg2). by apply write_bytes_dom. }
-  all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+  all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
+             | by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
 (* the one-line consequence every combinator below uses *)
@@ -565,7 +567,9 @@ Proof.
     { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
       apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ s' _ y). }
-    all: first [ by apply (IH tt s s' mm y) | by apply (IH 0%Z s s' mm y) ].
+    all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s s' mm y))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s s' mm y))
+             | by apply (IH tt s s' mm y) | by apply (IH 0%Z s s' mm y) ].
 Qed.
 
 Lemma gm_ctxR_after (Dr Dw : register -> bool) {R Y Z : Type}
@@ -605,7 +609,9 @@ Proof.
     { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
       apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ s' _ y). }
-    all: first [ by apply (IH tt s s' mm y) | by apply (IH 0%Z s s' mm y) ].
+    all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s s' mm y))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s s' mm y))
+             | by apply (IH tt s s' mm y) | by apply (IH 0%Z s s' mm y) ].
 Qed.
 
 Lemma gm_cer_ctx_after (Dr Dw : register -> bool) {R Y : Type}
@@ -647,7 +653,9 @@ Proof.
     { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
       apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ s' _ y). }
-    all: first [ by apply (IH tt s s' mm y) | by apply (IH 0%Z s s' mm y) ].
+    all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s s' mm y))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s s' mm y))
+             | by apply (IH tt s s' mm y) | by apply (IH 0%Z s s' mm y) ].
 Qed.
 
 (* the same three with the map collapsed back to [mm], and with EVERY

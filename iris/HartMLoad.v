@@ -296,15 +296,15 @@ Section load.
   (* THE WHOLE CHAIN BELOW IS A PASS-THROUGH for it: nothing in this file *)
   (* owns a points-to, so no lemma here DISCHARGES the obligation; each   *)
   (* one takes it and hands it down, and the bundle                       *)
-  (* [tso_interp_of riscv_eraGS img σ.(mem) log V] goes down and comes    *)
+  (* [tso_interp_of riscv_eraGS img σ.(mem) log dl V] goes down and comes    *)
   (* back untouched (a plain load moves no view, so the [V] returned is   *)
   (* the [V] received -- cf. [wobl_ram]'s [vstep], which is where the     *)
   (* store side differs).                                                 *)
   (* ------------------------------------------------------------------ *)
-  Definition robl_ram (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+  Definition robl_ram (img : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
       (tv : nat) (pa : Arch.pa) (w : bv 64) : Prop :=
-    ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
-      tso_read_bytes img log (hart_agent cpu_id) tv' pa 8 w.
+    ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length dl)%nat ->
+      tso_read_bytes img log dl (hart_agent cpu_id) tv' pa 8 w.
 
   (* A6.27: WHO CAN PAY [robl_ram] WHEN THE BYTE IS NOT PRISTINE.
      [robl_ram] says WHAT is owed; this says WHO can pay it for a byte that
@@ -317,22 +317,22 @@ Section load.
      premise of [robl_ram] is simply not needed: the gate's conclusion is
      ∀ tv' above the hart's own view, with no upper bound. *)
   Lemma robl_ram_ctx (img : gmap Arch.pa (bv 8)) (sg : mstate)
-      (log : list pwmsg) (V : agent -> nat) (xi : TsoCtx.CtxId)
+      (log : list pwmsg) (dl : list nat) (V : agent -> nat) (xi : TsoCtx.CtxId)
       (pa : Arch.pa) (w : bv 64) (dq : dfrac) (tv : nat) :
     V (hart_agent cpu_id) = tv ->
     gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
-    tso_interp_of riscv_eraGS img sg.(mem) log V -∗
+    tso_interp_of riscv_eraGS img sg.(mem) log dl V -∗
     TsoCtx.own_context xi -∗
     ([∗ list] j ∈ seq 0 8,
        TsoCtx.ctx_phys_pointsto xi (pa_add pa j) dq (nth_byte w j)) -∗
-    ⌜robl_ram img log tv pa w⌝.
+    ⌜robl_ram img log dl tv pa w⌝.
   Proof.
     intros Htv. iIntros "Hgh Htso Hrun Hb".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log dl V
                sg.(sregs) sg.(mdev) Hpin).
     iDestruct (TsoCtx.ctx_phys_load_bytes_ok
-                 (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
+                 (gs_of img sg.(mem) log dl V sg.(sregs) sg.(mdev))
                  xi pa 8 w dq with "Hgh Htso Hrun Hb") as %Hok.
     iPureIntro. intros tv' Hle _. apply Hok. cbn [gtv gs_of]. lia.
   Qed.
@@ -358,13 +358,13 @@ Section load.
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
     (* the obligation, threaded not discharged -- see [robl_ram] *)
-    (∀ σ img log tv V,
+    (∀ σ img log dl tv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
         mstate_interp σ -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜robl_ram img log tv pa bytes⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜robl_ram img log dl tv pa bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V ∗ R)) -∗
     swp (checked_mem_read (Load Data) PBMT_PMA Machine
            (Physaddr pa) 8 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -422,8 +422,8 @@ Section load.
                 (addr_is_ram_not_dev pa Hram)
                 ltac:(reflexivity) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
+      iIntros (σ img log dl tv V) "%Htv Hσ Htso".
+      iMod ("Hmem" $! σ img log dl tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Htso & HR)". iModIntro. iFrame "Hσ Htso".
       iIntros (tvn _ _) "_".
@@ -520,13 +520,13 @@ Section load.
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
     (* threaded straight through to [swp_checked_mem_read_load8] *)
-    (∀ σ img log tv V,
+    (∀ σ img log dl tv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
         mstate_interp σ -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜robl_ram img log tv pa bytes⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜robl_ram img log dl tv pa bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V ∗ R)) -∗
     swp (translate_and_read_value (Virtaddr pa) 8 (Load Data) false false false)
       (fun r => ⌜r = Values.Ok (Physaddr pa, bytes)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
@@ -586,13 +586,13 @@ Section load.
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
     (* threaded straight through *)
-    (∀ σ img log tv V,
+    (∀ σ img log dl tv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
         mstate_interp σ -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜robl_ram img log tv pa bytes⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜robl_ram img log dl tv pa bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V ∗ R)) -∗
     swp (vmem_read_addr (Virtaddr pa) 8 (Load Data) false false false)
       (fun r => ⌜r = Values.Ok bytes⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
@@ -724,13 +724,13 @@ Section load.
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
     (* threaded straight through *)
-    (∀ σ img log tv V,
+    (∀ σ img log dl tv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
         mstate_interp σ -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜robl_ram img log tv (add_vec (m !!! Regidx i) offset) bytes⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜robl_ram img log dl tv (add_vec (m !!! Regidx i) offset) bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V ∗ R)) -∗
     swp (vmem_read (Regidx i) offset 8 (Load Data) false false false)
       (fun r => ⌜r = Values.Ok bytes⌝ ∗ gpr_file m ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
@@ -797,13 +797,13 @@ Section load.
     (* the chain's TOP end of the obligation: this is what a caller with the
        points-to actually has to prove, and the only place the flat
        [read_bytes] used to sit *)
-    (∀ σ img log tv V,
+    (∀ σ img log dl tv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
         mstate_interp σ -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜robl_ram img log tv ea bytes⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜robl_ram img log dl tv ea bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V ∗ R)) -∗
     swp (execute_LOAD imm (Regidx rs1) (Regidx rd) is_unsigned 8)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                 gpr_file (<[Regidx rd := regval_into_reg bytes]> m) ∗

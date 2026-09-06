@@ -65,22 +65,28 @@ Section LockAt.
      pair become THE lock at the gname the caller already published. *)
   (* the free arm is the lock's stamped context, so this creator mints it
      ([lock_pay_born]); [own_context] in and straight back out. *)
-  Lemma newlock_at `{CID : RiscvLang.CpuId} E (γ : gname) (lk : mword 64) (s : string)
-      (R : CtxId → iProp Σ) `{!CtxMorph R} :
+  (* TWO LOGS (relaxed-ww.md §2.4, "Birth"): the record's publication is
+     fence-bound, so the construction runs at a fence on the creator's hart
+     with the bundle in hand (RULING C, the owner's, decides how the born
+     record travels there). *)
+  Lemma newlock_at `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate) (γ : gname)
+      (lk : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} :
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     lock_free_tok γ -∗
     lock_name lk s -∗
+    tso_interp_at riscv_eraGS g -∗
     own_context cur_ctx -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready lk -∗
-    R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
+    R cur_ctx ={E}=∗ tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ is_lock γ lk s R.
   Proof.
-    iIntros "[Ha Hf] #Hnm Hrun Hword Hready HR".
+    iIntros (Hod) "[Ha Hf] #Hnm Hint Hrun Hword Hready HR".
     (* A6.105: the floor travels bundled with the cell; unbundle it here and
        hand it to [is_lock_intro], which is where the handle's floor lives. *)
     rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
     iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
-    iMod (lock_pay_born_id R with "Hrun HR") as "[Hrun HR]".
-    iFrame "Hrun".
+    iMod (lock_pay_born_id E g R Hod with "Hint Hrun HR") as "(Hint & Hrun & HR)".
+    iFrame "Hint Hrun".
     iDestruct (WpLock.lk_addr_claim_of4 lk (DfracOwn 1) (mword_of_int 0 : mword 32)
                  with "Hword") as "#Hc4".
     iDestruct "Hcpu" as "[#Hc8 Hcell]".
@@ -100,25 +106,28 @@ Section LockAt.
   Qed.
 
   (* BOX v2 boot: [newlock_at] minted WITH the fold ([lock_hook_llb]). *)
-  Lemma newlock_at_llb `{CID : RiscvLang.CpuId} E (γ : gname) (lk : mword 64) (s : string)
+  Lemma newlock_at_llb `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate) (γ : gname)
+      (lk : mword 64) (s : string)
       (R Rdep : CtxId → iProp Σ) `{!CtxMorph Rdep} (tl : nat) :
     (forall ξ : CtxId, Rdep ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R ξ) ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     lock_free_tok γ -∗
     lock_name lk s -∗
+    tso_interp_at riscv_eraGS g -∗
     own_context cur_ctx -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready lk -∗
-    TsoGhost.llb loglen_name tl -∗
-    Rdep cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
+    TsoGhost.llb dlen_name tl -∗
+    Rdep cur_ctx ={E}=∗ tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ is_lock γ lk s R.
   Proof.
-    iIntros (Hfold) "[Ha Hf] #Hnm Hrun Hword Hready #Hllb HR".
+    iIntros (Hfold Hod) "[Ha Hf] #Hnm Hint Hrun Hword Hready #Hllb HR".
     (* A6.105: the floor travels bundled with the cell; unbundle it here and
        hand it to [is_lock_intro], which is where the handle's floor lives. *)
     rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
     iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
-    iMod (lock_pay_born Rdep R with "Hrun HR [Hllb]") as "[Hrun HR]".
-    { iApply (lock_hook_llb Rdep R tl Hfold with "Hllb"). }
-    iFrame "Hrun".
+    iMod (lock_pay_born E g Rdep R Hod with "Hint Hrun HR [Hllb]") as "(Hint & Hrun & HR)".
+    { iApply (lock_hook_llb E Rdep R tl Hfold with "Hllb"). }
+    iFrame "Hint Hrun".
     iDestruct (WpLock.lk_addr_claim_of4 lk (DfracOwn 1) (mword_of_int 0 : mword 32)
                  with "Hword") as "#Hc4".
     iDestruct "Hcpu" as "[#Hc8 Hcell]".

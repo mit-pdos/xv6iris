@@ -216,23 +216,23 @@ Section bytes_own_p_facts.
      leaf's currency ([tso_interp_of]), so that a read node's interp wand can
      discharge it directly.  [TsoCtx.ctx_phys_xfetch_ok] byte by byte. *)
   Lemma bytes_own_p_ifetch_of (img mem : gmap Arch.pa (bv 8))
-      (log : list pwmsg) (V : agent -> nat) (rs : regstate) (d : dev_state)
+      (log : list pwmsg) (dl : list nat) (V : agent -> nat) (rs : regstate) (d : dev_state)
       (F : Arch.pa -> option nat) (mm : gmap Arch.pa (bv 8)) (IK : nat)
       (pa : Arch.pa) (n : N) (w : bv (8 * n)) :
     (forall j : nat, (N.of_nat j < n)%N ->
        mm !! pa_add pa j = Some (nth_byte w j) /\ F (pa_add pa j) = Some IK) ->
     gen_heap_interp (hG := riscv_memGS) mem -∗
-    tso_interp_of riscv_eraGS img mem log V -∗
+    tso_interp_of riscv_eraGS img mem log dl V -∗
     bytes_own_p F mm -∗
     ⌜forall itv tv' : nat, (IK <= itv)%nat -> (itv <= tv')%nat ->
-       tso_read_bytes img log (ifetch_agent (hart_agent cpu_id)) tv' pa n w⌝.
+       tso_read_bytes img log dl (ifetch_agent (hart_agent cpu_id)) tv' pa n w⌝.
   Proof.
     intros Hwin. iIntros "Hgh Htso Hown".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img mem log V rs d Hpin).
+    rewrite (tso_interp_of_at_gs riscv_eraGS img mem log dl V rs d Hpin).
     iAssert (⌜forall j : nat, (N.of_nat j < n)%N ->
                forall itv tv' : nat, (IK <= itv)%nat -> (itv <= tv')%nat ->
-                 tso_read img log (ifetch_agent (hart_agent cpu_id)) tv'
+                 tso_read img log dl (ifetch_agent (hart_agent cpu_id)) tv'
                    (pa_add pa j) = Some (nth_byte w j)⌝)%I
       with "[Hgh Htso Hown]" as %HH.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
@@ -242,7 +242,7 @@ Section bytes_own_p_facts.
       rewrite /bytes_own_p.
       iDestruct (big_sepM_lookup _ _ _ _ Hmm with "Hown") as "Ha".
       rewrite /xbyte HF.
-      iDestruct (TsoCtx.ctx_phys_xfetch_ok (gs_of img mem log V rs d) XI IK itv
+      iDestruct (TsoCtx.ctx_phys_xfetch_ok (gs_of img mem log dl V rs d) XI IK itv
                    (pa_add pa j) (DfracOwn 1) (nth_byte w j) HIK
                    with "Hgh Htso Ha") as %Hrd.
       iPureIntro. cbn [gimg glog gs_of] in Hrd. exact (Hrd tv' Htv). }

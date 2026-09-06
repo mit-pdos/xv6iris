@@ -146,8 +146,11 @@ Section Kalloc.
   (* so a client that wants named contents gets them from its own memset   *)
   (* -- which is where [kalloc_post] hands them out ([page_filled]).       *)
   (* ================================================================== *)
+  (* TWO LOGS (relaxed-ww.md §2.10): the free tier is ξ-INDEXED -- a free
+     byte is a context's byte at an unknown value; the freelist's pages ride
+     the kmem lock's context like any payload. *)
   Definition byte_any (a : Arch.pa) : iProp Σ :=
-    TsoCtx.mem_free a (DfracOwn 1).
+    TsoCtx.mem_free cur_ctx a (DfracOwn 1).
   (* an 8-byte little-endian word, now expressed via the word points-to
      abstraction (so it also carries the doubleword-alignment of [a]). *)
   Definition word_at (a : mword 64) (w : mword 64) : iProp Σ :=
@@ -504,9 +507,11 @@ Section KallocCtx.
      identity here -- there is nothing indexed to carry.  That is the
      ruling's collapse showing up one tier down: a byte nobody may read
      has no context to be registered to. *)
+  (* TWO LOGS: [byte_any] is ξ-indexed again (relaxed-ww.md §2.10), and it
+     transports as any ctx byte does ([TsoCtx.ctx_morph_mem_free]). *)
   Global Instance byte_any_morph (a : Arch.pa) :
-    CtxMorph (λ _ : CtxId, byte_any a).
-  Proof. iIntros (ξ ξ') "Hd H". iModIntro. iFrame. Qed.
+    CtxMorph (λ ξ0 : CtxId, byte_any (XIk := ξ0) a).
+  Proof. rewrite /byte_any. apply ctx_morph_mem_free. Qed.
 
   Global Instance word_at_morph (a w : mword 64) :
     CtxMorph (λ ξ0 : CtxId, word_at (XIk := ξ0) a w).
@@ -517,8 +522,8 @@ Section KallocCtx.
   Qed.
 
   Global Instance page_rest_morph (p : mword 64) :
-    CtxMorph (λ _ : CtxId, page_rest p).
-  Proof. iIntros (ξ ξ') "Hd H". iModIntro. iFrame. Qed.
+    CtxMorph (λ ξ0 : CtxId, page_rest (XIk := ξ0) p).
+  Proof. rewrite /page_rest. apply ctx_morph_big_sepL. intros i x. apply byte_any_morph. Qed.
 
   Global Instance run_page_morph (p next : mword 64) :
     CtxMorph (λ ξ0 : CtxId, run_page (XIk := ξ0) p next).
