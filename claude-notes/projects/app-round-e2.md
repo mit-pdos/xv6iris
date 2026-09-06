@@ -6,13 +6,15 @@
 > Q-b reversed: nlink-0 inodes LEAVE the view).  Briefs and the VM build script:
 > `app-round-e2-briefs.md`; E1's census: `app-round-e1-census.md`.
 >
-> STATE OF THE TREE: origin/main is green at the E2-V commit (view over allocated rows) plus these
-> notes.  LANE E2-V2 (view excludes nlink-0 rows; brief in the briefs file) was IN FLIGHT as a
-> subagent with UNCOMMITTED edits in `/shared/xv6iris-3/iris`.  On resume: `git status` — if iris
-> files are modified, that is E2-V2's partial or finished work; run the build script (log name
-> rE2V2) and either finish it to green against its brief or, if it is hopeless, `git checkout --
-> iris` and redo the lane from the brief.  If the tree is clean, E2-V2 either landed (check
-> `git log`) or was lost (redo from the brief).
+> STATE OF THE TREE: origin/main is green through lane E2-V2 (the view is the live namespace:
+> `abs_of` is `None` at type 0 OR nlink 0; the read/write/open/trunc/miss observations state their
+> row on the count, `FsAbsDefs.arow_at`; `delta_unl_tgt` deletes at 0).  Its as-built record is the
+> "E2-V2 AS BUILT" section right below this block and app-instances.md §7.  NEXT LANE: E2-D (brief in
+> the briefs file; read FsAbsDefs.v/FsAbsDelta.v at HEAD first — the counted insert
+> `abs_view_insert_row`, `arow_at`, `delta_unl_tgt_unfold`/`_last` are the molds the new deltas'
+> row lemmas should follow).  On resume: `git status` — a clean tree means E2-V2 landed (check `git
+> log`); modified iris files are the next lane's partial work: run the build script (log name = the
+> lane) and finish to green against its brief, or `git checkout -- iris` and redo from the brief.
 >
 > ORDER AFTER E2-V2 (each a green gate, then audit/commit/push): E2-D (deltas, brief in the
 > briefs file, reshaped for the nlink-0 ruling: no claim/free deltas) → E2-C (create's legs: arm/
@@ -74,6 +76,61 @@ state).  RULED (owner, 2026-09-05): "let's exclude nlink==0 inodes from the view
 the count; `delta_unl_tgt` deletes at 0).  E2-F is unnecessary; #1/#2 become `_same` in E2-Z; the
 read spec through an fd of an unlinked file is fd-row follow-up work (app-echo.md does not need it).  Produced read-only against HEAD 668441141 after round E1's census; every claim carries file:line.  Design of record: design/applications.md §2/§6 L3; rounds record: app-instances.md §7 E.
 
+
+
+## E2-V2 AS BUILT (landed 2026-09-05; 34 iris files; green, 13 axioms, both audited statements untouched)
+
+- `FsAbsDefs.abs_of n := if decide (fn_type n = 0 \/ fn_nlink n = 0) then None else Some (abs_row n)`.
+  Lemma renames: `abs_of_free` → `abs_of_none` (the disjunction ↔ `None`); `abs_of_typed` →
+  `abs_of_live` (type AND count); `abs_view_lookup_typed` → `abs_view_lookup_live`;
+  `FsAbs.nview_of_frag_typed` → `nview_of_frag_live`; `abs_of_orphan` now says a view row is never at
+  count 0 (`FsAbs.nview_dq_nlink` lifts it to a share); `abs_of_bare_dir` → `abs_of_bare` (`None`);
+  `abs_of_dir`/`_file`/`_dev`/`abs_of_Some`/`abs_of_is_Some` carry the count.  NEW: `abs_of_counted`
+  (a typed record's row is `Some` iff its count is nonzero), `arow_at av i a := av !! i = (if decide
+  (an_nlink a = 0) then None else Some a)` with `arow_at_live/_gone/_of_Some/_of_None/_cases/_pinned/
+  _witness`, `abs_view_arow` (the fire-side producer), `abs_view_insert_row` (THE COUNTED INSERT:
+  a typed record lands as its row or deletes it), `abs_of_dir_same` re-proved.
+- `FsAbsDelta`: `delta_unl_tgt t` deletes the row when `an_nlink a - 1 = 0`, else lowers the count;
+  `delta_unlink` fused likewise; `delta_unl_tgt_unfold`, `delta_unl_tgt_target` (needs `2 <= nlink`),
+  `delta_unl_tgt_last`, `delta_unlink_unfold/_target/_last`, `delta_unlink_is_Some` → `_other`;
+  `delta_write_absent`, `delta_trunc_absent` (identity at an absent row).  `delta_unlink_split` is
+  unchanged in statement.
+- `AppInv.app_step_id` (the identity step: `app_step i I (abs_view I)` for free) and
+  `app_step_acc_view` (license where the row is, identity where it is not) — what the write-kind
+  `_unit`/`_pinned` dischargers and `FsAbsInvFire.fsabs_awrite_chain` now pay with.
+- CONTRACTS WHOSE SHAPE CHANGED (`av !! i = Some a` → `arow_at av i a`): `SpecSysReadAU.ard_pre`
+  (first conjunct); `SpecSysWriteAU.wri_pre` (first conjunct); `SpecSysOpenAU.aopen_commit_at`,
+  `aopen_commit`, `atrunc_commit_at` (their row premise), and the open post arms' device/file/dir
+  rows, the trunc receipt's row, and the fail arm's observed row; `SpecSysUnlinkAU.dmiss_commit_at`
+  and the miss fail arm (iii-b); `SpecKexecAU.exec_post_ok`/`exec_post_fail` (iii)'s row;
+  `SpecSysChdirAU.chdir_post_fail` (iii) and `chdir_post_ok`'s row.  The stable corollaries
+  (`read_stable_arms`, `wri_receipts_chained`, the `_pinned` seeds) keep their unconditional rows —
+  a held share pins the count nonzero (`arow_at_pinned`).  Rows that stay unconditional: every
+  parent row (create/link/unlink's found arms), unlink's target row (`1 <= nlink`), `cre_pre`.
+- FIRES: `opf_open_fire(_1)`, `arf_read_fire(_1)`, `uf_dmiss_fire` conclude `arow_at`;
+  `opf_atrunc_fire`, `wrf_awrite_fire` take `fn_type n <> 0` + `abs_row n = …` (pre and post) and
+  conclude/precondition `arow_at`; `uf_utgt_fire` takes `fn_type nt' <> 0 /\ abs_row nt' = …`
+  (`uf_nlink_row` now yields that conjunction); `mkf_dlookup_fire`, `mkf_acre_fire`,
+  `caf_acre_fire(_file)`, `uf_dex_fire` (both rows) take `fn_nlink _ <> 0`; `uf_uent_fire` unchanged
+  (it already carried `1 <= fn_nlink np`); `uf_parent_row`/`ProofSysUnlinkAUParts.su_au_parent_row_era`
+  take `(fn_nlink n - dec) <> 0` (file arm: `Nat.sub_0_r` + home-live; dir arm: W5D's `Hdp2 : 2 <=
+  nlink dnd`).  `FsAbsEra.elend` carries `fn_nlink n <> 0` (namex's guard precedes every hop);
+  `elend_of_era`/`elend_fire_hit`/`_miss` take `bv_unsigned (di_nlink dn) <> 0`, supplied by
+  `nx_nlink_nz _ Hnl0` at the four ProofNamexEra/ProofNparEra sites.  Pins: `img_abs_file` takes
+  the image count; `fsimg_init_nlink_nz`, `fsimg_sh_nlink_nz`, `fsimg_root_nlink` (all 1).
+  Helpers minted: `FsAbsEra.era_nlink_nz`, `FsAbsOpenFire.opf_era_file_typed`/`opf_era_live`,
+  `FsAbsMknodFire.mkf_era_live`.  `opf_era_file_of`/`opf_trunc_of` deleted (`_row` forms serve);
+  `wrf_write_row` concludes on `abs_row`.
+- DEVIATIONS from the brief: none of substance.  The brief's "or a match/disjunction" became one
+  named predicate `arow_at` so every contract spells the counted row the same way; the parent row at
+  unlink's MISS is conditional too (the brief did not list it: nothing pins the parent live there —
+  an empty dir may be removed between nameiparent and the re-lock), which is honest, not a weakening
+  the machine can't meet.  Files touched (34): FsAbsDefs, FsAbsDelta, FsAbs, FsAbsEra, FsAbsOpenFire,
+  FsAbsMknodFire, FsAbsUnlinkFire, FsAbsReadFire, FsAbsWriteFire, FsAbsInvFire, AppInv, SpecSysReadAU,
+  SpecSysWriteAU, SpecSysOpenAU, SpecSysUnlinkAU, SpecKexecAU, SpecSysChdirAU, SpecKexecPin,
+  FsInitPin, FsShPin, ProofKexecAUA, ProofSysOpenAUParts, ProofSysOpenAUCreArm, ProofSysOpenAUStores,
+  ProofFilewriteAU, ProofNamexEra, ProofNparEra, ProofCreateAU, ProofCreateAUF, ProofSysUnlinkAUParts,
+  ProofSysUnlinkAUW3, ProofSysUnlinkAUW5F, ProofSysUnlinkAUW5D (+ comment-only touches).
 
 Scope: app-instances.md §6 ruling 4 / §7 E, applications.md §2 + §6 L3, fs-syscall-specs.md §4/§7.
 Census input: roundE1-census.md (22 helper-level sites = 17 `_auto` + 5 `_armed_auto`).  All line

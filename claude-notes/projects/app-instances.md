@@ -389,3 +389,31 @@ Rounds, each a green gate:
   iput's free, link, in place) → E2-W (write dispatch) → E2-X (delete the
   dead walks) → E2-Z (delete `_auto`).  Nine owner rulings Q-a..Q-i are
   listed there with recommendations; NOTHING of E2 is built.
+- **E2-V LANDED 2026-09-05** (view = allocated rows: `abs_of : fs_node ->
+  option anode`, `abs_view := omap abs_of`).
+- **E2-V2 LANDED 2026-09-05** (the view is the LIVE namespace; ruling Q-d
+  reversed Q-b): `abs_of n = None` at `fn_type n = 0` OR `fn_nlink n = 0`.
+  As built (34 iris files, green, 13 axioms, both audited statements
+  untouched): `delta_unl_tgt` deletes the row when the count reaches 0
+  (`delta_unl_tgt_unfold`/`_last`, `delta_unlink_last`, the orphan lemmas
+  became `delta_unlink_last_file/_dir`, `delta_unlink_is_Some` became
+  `_other`); `delta_write_absent`/`delta_trunc_absent` (identity at an
+  absent row); the counted clause `FsAbsDefs.arow_at` replaced `av !! i =
+  Some a` in `ard_pre`, `wri_pre`, `aopen_commit(_at)`, `atrunc_commit_at`,
+  `dmiss_commit_at`, the read/open/trunc/dmiss fires' conclusions, the
+  open/exec/chdir post arms and unlink's miss arm; `abs_view_insert_row`
+  (the counted insert) + `AppInv.app_step_id`/`app_step_acc_view` pay the
+  write-kind steps at a row the view lacks; the write/trunc/utgt fires
+  take `abs_row` + `fn_type ≠ 0` premises instead of `abs_of = Some`;
+  `mkf_abs_of_dir`/`abs_of_dir`/`abs_of_file`/`abs_of_dev`/`mkf_parent_row`/
+  `uf_parent_row`/`mkf_dlookup_fire`/`mkf_acre_fire`/`caf_acre_fire(_file)`/
+  `uf_dex_fire`/`elend`/`elend_of_era`/`elend_fire_hit`/`_miss`/
+  `img_abs_file` gained an `nlink ≠ 0` premise (supplied at every call
+  site from the kernel's own guards: create's and namex's `nlink == 0`
+  tests, unlink's home-live derivation and `nlink < 1` panic, the image's
+  counts); `abs_of_typed`/`abs_view_lookup_typed`/`nview_of_frag_typed`
+  became `_live` (two premises); `abs_of_free` → `abs_of_none`,
+  `abs_of_orphan` restated (a view row is never at count 0),
+  `abs_of_bare_dir` → `abs_of_bare` (`None`); `opf_era_file_of`/`opf_trunc_of`
+  deleted (the `_row` forms serve).  ProofIlock's claim and EscrowDeposit's
+  free stay on `_auto` for E2-Z.  E2-F is cancelled by the ruling.

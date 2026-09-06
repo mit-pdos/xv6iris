@@ -26,7 +26,7 @@ FILES="$FILES $*"
   tail -1 /tmp/$LOG.log"
 ```
 
-## roundE2V2-brief.md
+## roundE2V2-brief.md — LANDED 2026-09-05 (as-built record: app-round-e2.md "E2-V2 AS BUILT")
 
 ## Lane E2-V2: the view EXCLUDES nlink = 0 inodes
 
@@ -78,7 +78,7 @@ Green; both audited statements byte-identical; no Admitted/Axiom.  Report: `abs_
 restated lemma verbatim, every contract whose SHAPE changed (the conditional view clause), the
 new `delta_unl_tgt`, files touched with one line each, deviations.  Do not commit.
 
-## roundE2D-brief.md
+## roundE2D-brief.md — NEXT (E2-V2 has landed: read FsAbsDefs.v's `arow_at`/`abs_view_insert_row` and FsAbsDelta.v's `delta_unl_tgt_unfold`/`_last` first — the new deltas' row lemmas should follow those molds, and `delta_unarm` is `delete`, the shape `delta_unl_tgt` already takes at count 0)
 
 ## Lane E2-D: the delta vocabulary for create's legs, link and the free (PURE; FsAbsDelta.v)
 

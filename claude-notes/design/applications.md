@@ -53,7 +53,12 @@ the boot mints the new era's running instance from the clone.
 
 The application's claim gets exactly the same life.  It is one predicate
 over the USER-VISIBLE VIEW of the abstract state (`FsAbsDefs.aview`,
-ruling 2: nothing invisible to user code), at a FIXED part and an
+ruling 2: nothing invisible to user code — since round E2 the view is THE
+LIVE NAMESPACE: `abs_view I := omap abs_of I` keeps a row iff the inode is
+allocated AND `nlink ≠ 0`, so ialloc's claim and iput's free move nothing
+it has, and a node an fd reaches after its last unlink has no row; the
+fires that read through an fd state their row on the count,
+`FsAbsDefs.arow_at`), at a FIXED part and an
 INSTANCE of the application's own ghost names:
 
     app_pred : app_fixed -> app_names -> aview -> iProp Σ      (App.xv6_app)

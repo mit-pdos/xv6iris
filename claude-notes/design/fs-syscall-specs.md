@@ -166,10 +166,18 @@ Decisions folded in, each inherited from a landed ruling:
   work below the surface.  Lampson's `isDirTree` states the global
   version — for a QUIESCENT state seen by one observer, which is the
   tree layer's business, not this one's.
-- **Orphans are IN the map.**  An unlinked-but-open file is a real
-  state (`an_nlink = 0`, no entry names it); it leaves `aview` when the
-  last fd closes (`iput`'s free).  Hiding it would make `sys_read` on an
-  unlinked fd unspecifiable.
+- **Orphans are NOT in the view** (reversed 2026-09-05, owner's ruling
+  Q-d of `projects/app-round-e2.md`; lane E2-V2 built it).  An
+  unlinked-but-open file is a real machine state (`fn_nlink = 0`, no entry
+  names it) but it is no longer part of the file system a user can NAME,
+  so `aview` drops it at the last unlink (`δ_unlink` deletes the target's
+  row when its count reaches 0); `iput`'s eventual free then moves nothing
+  the view has.  The cost, accepted: `sys_read`/`sys_write` through an fd
+  of an unlinked file cannot state their row in the view — their fires
+  state it CONDITIONALLY on the count (`FsAbsDefs.arow_at av i a`:
+  `av !! i = Some a` when `an_nlink a ≠ 0`, `None` when it is 0), and the
+  content a holder still reads is the fd row's business (§4's stable
+  corollary at the client's own share).
 
 ## 2. The client-facing resources (v3: readings of landed ghosts, nothing minted)
 
@@ -294,9 +302,19 @@ truncate syscall):
 ```
 
 **THE VIEW IS THE LIVE NAMESPACE (owner's ruling 2026-09-05, round E2 of
-`applications.md`; `projects/app-round-e2.md` "Q-d"):** `aview` holds an
+`applications.md`; `projects/app-round-e2.md` "Q-d"; BUILT by lane E2-V2
+the same day):** `aview` holds an
 inode iff it is allocated AND `nlink ≠ 0` (`FsAbsDefs.abs_of : fs_node ->
-option anode`, `abs_view := omap abs_of`).  So `ialloc`'s claim (type set at
+option anode`, `abs_view := omap abs_of`).  As built: every fire whose
+node is reached through an fd or a re-locked path (read, write, trunc,
+open's observation, exec's observation, chdir's observation, unlink's
+MISS observation) states its row as `FsAbsDefs.arow_at av i a` — `av !! i
+= Some a` at a nonzero count, `av !! i = None` at zero — because between
+namei and the lock, or while an fd is open, the node may have been
+unlinked; a client holding a share collapses it to the `Some` arm by
+agreement (`arow_at_pinned`).  Fires whose node the kernel has pinned
+live (a parent that passed `dp->nlink == 0`, a target past the `nlink <
+1` panic, a directory the namex walk holds) keep the unconditional row.  So `ialloc`'s claim (type set at
 nlink 0) and `iput`'s free are view-preserving; a created node APPEARS when
 its count goes to 1 and DISAPPEARS on the failure arm or at the last
 unlink.  What is deliberately NOT in the view: a file unlinked while some
