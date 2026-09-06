@@ -35,6 +35,13 @@ From stdpp Require Import list_monad.
 (* protection being relied on here.                                          *)
 Require Export FastSetSolver.
 
+(* And the same override for [lia], for the same reason and by the same
+   mechanism -- see FastLia.v.  [Require Export] for the two reasons the
+   comment above gives: it is what reaches this file's importers, and it is
+   what keeps the nightly dead-import sweep from deleting a line the tree
+   compiles without. *)
+Require Export FastLia.
+
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 

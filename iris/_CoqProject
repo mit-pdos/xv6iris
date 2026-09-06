@@ -11,7 +11,9 @@
 SetShrink.v
 SepThread.v
 FastSetSolver.v
+FastLia.v
 FastSetSolverTests.v
+FastLiaTests.v
 BvShift.v
 ResvAxioms.v
 ArchReset.v

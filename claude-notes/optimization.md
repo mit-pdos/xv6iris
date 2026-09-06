@@ -156,18 +156,41 @@ trivially discharging a goal you can read at a glance.
   Never hand-roll the alternation. Its branch order is the point, and its
   name-free branch must use `match` (not `lazymatch`) over the hypotheses.
 
-### `lia` is a general-purpose closer too
+### `lia`, and the override that handles it
+
+`iris/FastLia.v` overrides `lia`/`nia` tree-wide from the same hook as the
+`set_solver` one: before solving it clears every hypothesis `zify` could not
+have read, so cost tracks the arithmetic in scope, not the context. Read that
+file's header; every `set_solver` bullet below applies to it too. Two rules are
+specific to it:
+
+- **Never clear a hypothesis that is not a `Prop`.** Clearing one RESTRICTS the
+  context of every undefined evar, silently, so a SIBLING goal stops unifying
+  somewhere else entirely and the error names a broken `rewrite` rather than the
+  closer. (This is what the hand-written keep-lists' `XI` was really for.)
+- **Do not write new `clear -H..; lia`** — the override does it, and it reaches
+  the argument-position case a hand-written `clear -` cannot.
+- **A context filter must be GATED BEHIND THE UNFILTERED TACTIC, not run ahead
+  of it.** Most calls of a general-purpose closer are already cheap, and there
+  are tens of thousands of them; charging every one an analysis to rescue the
+  few hundred expensive ones is a net loss. `first [ timeout 1 tac | shrink; tac
+  | tac ]` — cheap calls never pay the analysis, and the unbounded unfiltered
+  arm last is what keeps the override from turning a provable goal into a
+  failing one. Same filter, opposite sign, purely from the order.
+- **Derive a tactic's vocabulary from SAMPLE TERMS, never from constant names.**
+  `(0 <= 0)%nat` is `Peano.le`; `Nat.le` is a different constant no goal carries,
+  so a list naming it drops every nat inequality while looking right.
+- **A starved `lia` does not fail fast, it can hang** — so `first [ fast | slow ]`
+  is not a safety net for a filter, and a green tree is not evidence the filter
+  is sound. Check it with the fallback deleted.
+
+What the override does not fix:
 
 1. **A side condition that is the same at every call site belongs in a lemma
-   proved where the context is EMPTY** — and a `lia` certificate reifies the
+   proved where the context is EMPTY** — a `lia` certificate reifies the
    hypotheses it was handed, so the PROOF TERM carries them too and the `Qed`
    cost falls with the tactic cost.
-2. **`clear -H..` before a deep `lia`**, with `match goal` naming the hypothesis
-   by SHAPE so one `Local Ltac` covers a family. The fixed facts must be
-   PARAMETERS of the tactic — `clear`'s arguments are globalised at definition
-   time, so a name written in the body fails at the *definition*. Keep a
-   `| _ => lia` last arm so the conversion is one `sed`.
-3. **Close a concrete goal with `discriminate`, not `lia`.**
+2. **Close a concrete goal with `discriminate`, not `lia`.**
 
 ### A bespoke side-condition tactic is the same bug and hides better
 
@@ -421,19 +444,11 @@ site, not by its goal** — the identical sentence terminates in one arm and not
 another. The goal can even be a closed numeral and still cost seconds. Read a
 slow closer as a CONTEXT problem before you read the goal at all.
 
-**`clear -H` is only available once the goal is a NAMED assert** — the goal in
-argument position is an evar whose instance names every variable in scope, so
-there is nothing to clear. Hoist it. One `Tactic Notation` per file turns the
-rest into a `sed`:
-
-```coq
-Tactic Notation "zlia" hyp_list(Hs) := clear - XI Hs; lia.
-```
-
-**Keep the section's `CurCtx` instance (`XI`) in every keep-list**, or bounds
-over a section-parameterized definition fail at *"Could not find an instance for
-CurCtx"*. The list must include every hypothesis the final `lia` draws on, not
-just the ones named textually.
+**`clear -H` is unavailable here** — the goal in argument position is an evar
+whose instance names every variable in scope, so there is nothing to keep. The
+`FastLia`/`FastSetSolver` filters work anyway, because `SetShrink.vars_of` skips
+an evar's instance, so COST is no longer a reason to hoist; re-elaboration
+against unresolved evars still is.
 
 ## Conversion and `Qed`
 
