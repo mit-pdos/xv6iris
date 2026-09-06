@@ -711,10 +711,10 @@ Section fetch.
   (* vector copy, a future JIT) needs the ledger tier instead            *)
   (* ([TsoCtx.ctx_phys_load_bytes_ok], cf. [HartMLoad.robl_ram_ctx]).    *)
   (* ------------------------------------------------------------------ *)
-  Definition fobl_ram (img : TsoMemPa.bytemap) (log : list pwmsg)
+  Definition fobl_ram (img : TsoMemPa.bytemap) (log : list pwmsg) (dl : list nat)
       (tv : nat) (pa : Arch.pa) (n : N) {m : N} (w : bv m) : Prop :=
-    ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
-      tso_read_bytes img log (hart_agent cpu_id) tv' pa n w.
+    ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length dl)%nat ->
+      tso_read_bytes img log dl (hart_agent cpu_id) tv' pa n w.
 
   (* THE VALUE-AFTER-VIEW OBLIGATION (tso-pin-memo.md §0; A6.51's rule
      pair).  [fobl_ram] quantifies ONE [w] good at EVERY reachable view,
@@ -730,15 +730,15 @@ Section fetch.
      with the pristine receipt exactly as [fobl_ram]'s payer does (its
      conclusion is at every agent and view); run-time-written text pays with
      its context's instruction bound and the [fence.i] receipt. *)
-  Definition fobl_ifetch (img : TsoMemPa.bytemap) (log : list pwmsg)
+  Definition fobl_ifetch (img : TsoMemPa.bytemap) (log : list pwmsg) (dl : list nat)
       (itv : nat) (pa : Arch.pa) (n : N) {m : N} (w : bv m) : Prop :=
-    ∀ tv' : nat, (itv <= tv')%nat -> (tv' <= length log)%nat ->
-      tso_read_bytes img log (ifetch_agent (hart_agent cpu_id)) tv' pa n w.
+    ∀ tv' : nat, (itv <= tv')%nat -> (tv' <= length dl)%nat ->
+      tso_read_bytes img log dl (ifetch_agent (hart_agent cpu_id)) tv' pa n w.
 
-  Definition fobl_ram_ex (img : TsoMemPa.bytemap) (log : list pwmsg)
+  Definition fobl_ram_ex (img : TsoMemPa.bytemap) (log : list pwmsg) (dl : list nat)
       (tv : nat) (pa : Arch.pa) (n : N) {m : N} (P : bv m -> Prop) : Prop :=
-    ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
-      ∃ w : bv m, tso_read_bytes img log (hart_agent cpu_id) tv' pa n w /\ P w.
+    ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length dl)%nat ->
+      ∃ w : bv m, tso_read_bytes img log dl (hart_agent cpu_id) tv' pa n w /\ P w.
 
 
   Lemma swp_checked_mem_read_ifetch4 (Drw Dro : gset register) (Df : register -> dfrac)
@@ -759,15 +759,15 @@ Section fetch.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ img log tv itv V,
+    (∀ σ img log dl tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
-        ⌜(itv <= length log)%nat⌝ -∗
+        ⌜(itv <= length dl)%nat⌝ -∗
         mstate_interp σ -∗
         hart_iview_auth cpu_id itv -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜fobl_ifetch img log itv pa 4 bytes⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜fobl_ifetch img log dl itv pa 4 bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V)) -∗
     swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Machine
            (Physaddr pa) 4 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -831,8 +831,8 @@ Section fetch.
                 (addr_is_ram_not_dev pa Hram)
                 ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
-      iMod ("Hmem" $! σ img log tv itv V with "[//] [//] Hσ Hiv Htso")
+      iIntros (σ img log dl tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+      iMod ("Hmem" $! σ img log dl tv itv V with "[//] [//] Hσ Hiv Htso")
         as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Hiv & Htso)". iModIntro. iFrame "Hσ Hiv Htso".
@@ -863,15 +863,15 @@ Section fetch.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ img log tv itv V,
+    (∀ σ img log dl tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
-        ⌜(itv <= length log)%nat⌝ -∗
+        ⌜(itv <= length dl)%nat⌝ -∗
         mstate_interp σ -∗
         hart_iview_auth cpu_id itv -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜fobl_ifetch img log itv pa 2 bytes⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜fobl_ifetch img log dl itv pa 2 bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V)) -∗
     swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Machine
            (Physaddr pa) 2 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -931,8 +931,8 @@ Section fetch.
                 (addr_is_ram_not_dev pa Hram)
                 ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
-      iMod ("Hmem" $! σ img log tv itv V with "[//] [//] Hσ Hiv Htso")
+      iIntros (σ img log dl tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+      iMod ("Hmem" $! σ img log dl tv itv V with "[//] [//] Hσ Hiv Htso")
         as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Hiv & Htso)". iModIntro. iFrame "Hσ Hiv Htso".
@@ -1545,15 +1545,15 @@ Section fetch.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ img log tv itv V,
+    (∀ σ img log dl tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
-        ⌜(itv <= length log)%nat⌝ -∗
+        ⌜(itv <= length dl)%nat⌝ -∗
         mstate_interp σ -∗
         hart_iview_auth cpu_id itv -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜fobl_ifetch img log itv pc 4 w⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜fobl_ifetch img log dl itv pc 4 w⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V)) -∗
     swp (fetch tt)
       (fun r => ⌜r = (if isRVC (subrange_vec_dec w 15 0)
                       then F_RVC (subrange_vec_dec w 15 0)
@@ -1606,15 +1606,15 @@ Section fetch.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ img log tv itv V,
+    (∀ σ img log dl tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
-        ⌜(itv <= length log)%nat⌝ -∗
+        ⌜(itv <= length dl)%nat⌝ -∗
         mstate_interp σ -∗
         hart_iview_auth cpu_id itv -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜fobl_ifetch img log itv pc 2 h⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜fobl_ifetch img log dl itv pc 2 h⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V)) -∗
     swp (fetch tt)
       (fun r => ⌜r = F_RVC h⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
@@ -1673,24 +1673,24 @@ Section fetch.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ img log tv itv V,
+    (∀ σ img log dl tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
-        ⌜(itv <= length log)%nat⌝ -∗
+        ⌜(itv <= length dl)%nat⌝ -∗
         mstate_interp σ -∗
         hart_iview_auth cpu_id itv -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜fobl_ifetch img log itv pc 2 ilo⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜fobl_ifetch img log dl itv pc 2 ilo⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
-    (∀ σ img log tv itv V,
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V)) -∗
+    (∀ σ img log dl tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
-        ⌜(itv <= length log)%nat⌝ -∗
+        ⌜(itv <= length dl)%nat⌝ -∗
         mstate_interp σ -∗
         hart_iview_auth cpu_id itv -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜fobl_ifetch img log itv (add_vec_int pc 2) 2 ihi⌝ ∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V ={⊤,∅}=∗
+        ⌜fobl_ifetch img log dl itv (add_vec_int pc 2) 2 ihi⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V)) -∗
     swp (fetch tt)
       (fun r => ⌜r = F_Base (concat_vec ihi ilo)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
