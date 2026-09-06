@@ -87,7 +87,7 @@ Definition log_byte (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
 (* ------------------------------------------------------------------ *)
 (** ** Visibility: below the view, or the agent's own message *)
 
-Definition visibleb (h : agent) (tv : nat) (log : list pwmsg) (t : nat)
+Definition visibleb1 (h : agent) (tv : nat) (log : list pwmsg) (t : nat)
     : bool :=
   bool_decide (t ≤ tv)%nat ||
   match t with
@@ -98,22 +98,22 @@ Definition visibleb (h : agent) (tv : nat) (log : list pwmsg) (t : nat)
            end
   end.
 
-Lemma visibleb_below h tv log t :
-  (t ≤ tv)%nat → visibleb h tv log t = true.
-Proof. rewrite /visibleb => Ht. rewrite bool_decide_eq_true_2 //. Qed.
+Lemma visibleb1_below h tv log t :
+  (t ≤ tv)%nat → visibleb1 h tv log t = true.
+Proof. rewrite /visibleb1 => Ht. rewrite bool_decide_eq_true_2 //. Qed.
 
-Lemma visibleb_own h tv log i m :
-  log !! i = Some m → pm_tid m = h → visibleb h tv log (S i) = true.
+Lemma visibleb1_own h tv log i m :
+  log !! i = Some m → pm_tid m = h → visibleb1 h tv log (S i) = true.
 Proof.
-  rewrite /visibleb => Hlk Htid. rewrite Hlk /= Htid.
+  rewrite /visibleb1 => Hlk Htid. rewrite Hlk /= Htid.
   have -> : bool_decide (h = h) = true by apply bool_decide_eq_true_2.
   by destruct (bool_decide (S i ≤ tv)%nat).
 Qed.
 
-Lemma visibleb_le h tv tv' log t :
-  (tv ≤ tv')%nat → visibleb h tv log t = true → visibleb h tv' log t = true.
+Lemma visibleb1_le h tv tv' log t :
+  (tv ≤ tv')%nat → visibleb1 h tv log t = true → visibleb1 h tv' log t = true.
 Proof.
-  rewrite /visibleb => Hle.
+  rewrite /visibleb1 => Hle.
   destruct (bool_decide (t ≤ tv)%nat) eqn:Ht => /=.
   - move => _. apply bool_decide_eq_true in Ht.
     have -> : bool_decide (t ≤ tv')%nat = true
@@ -122,11 +122,11 @@ Proof.
   - move => Ho. rewrite Ho. by destruct (bool_decide (t ≤ tv')%nat).
 Qed.
 
-Lemma visibleb_true h tv log t :
-  visibleb h tv log t = true →
+Lemma visibleb1_true h tv log t :
+  visibleb1 h tv log t = true →
   (t ≤ tv)%nat ∨ ∃ i m, t = S i ∧ log !! i = Some m ∧ pm_tid m = h.
 Proof.
-  rewrite /visibleb.
+  rewrite /visibleb1.
   destruct (bool_decide (t ≤ tv)%nat) eqn:Ht => /=.
   { move => _. left. by apply bool_decide_eq_true in Ht. }
   destruct t as [|i]; first by move => _; left; lia.
@@ -138,42 +138,42 @@ Proof.
 Qed.
 
 (** Appending preserves visibility of in-range timestamps (both arms). *)
-Lemma visibleb_app h tv log m t :
-  (t ≤ length log)%nat → visibleb h tv log t = true →
-  visibleb h tv (log ++ [m]) t = true.
+Lemma visibleb1_app h tv log m t :
+  (t ≤ length log)%nat → visibleb1 h tv log t = true →
+  visibleb1 h tv (log ++ [m]) t = true.
 Proof.
   move => Ht Hvis.
-  destruct (visibleb_true _ _ _ _ Hvis) as [Hle | (i & m0 & -> & Hlk & Htid)].
-  - by apply visibleb_below.
+  destruct (visibleb1_true _ _ _ _ Hvis) as [Hle | (i & m0 & -> & Hlk & Htid)].
+  - by apply visibleb1_below.
   - have Hlk' : (log ++ [m]) !! i = Some m0 by apply lookup_app_l_Some.
-    by apply (visibleb_own _ _ _ _ _ Hlk' Htid).
+    by apply (visibleb1_own _ _ _ _ _ Hlk' Htid).
 Qed.
 
 (* ------------------------------------------------------------------ *)
 (** ** Reading: the latest visible write *)
 
-Fixpoint read_down (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+Fixpoint read_down1 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
     (h : agent) (tv : nat) (a : Arch.pa) (t : nat) : option (bv 8) :=
-  match (if visibleb h tv log t then log_byte img log t a else None) with
+  match (if visibleb1 h tv log t then log_byte img log t a else None) with
   | Some v => Some v
-  | None => match t with O => None | S t' => read_down img log h tv a t' end
+  | None => match t with O => None | S t' => read_down1 img log h tv a t' end
   end.
 
-Definition tso_read (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+Definition tso_read1 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
     (h : agent) (tv : nat) (a : Arch.pa) : option (bv 8) :=
-  read_down img log h tv a (length log).
+  read_down1 img log h tv a (length log).
 
 (** An [n]-byte load reads every byte at the SAME view. *)
-Definition tso_read_bytes (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+Definition tso_read1_bytes (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
     (h : agent) (tv : nat) (a : Arch.pa) (n : N) {w : N} (v : bv w) : Prop :=
   ∀ j : nat, (N.of_nat j < n)%N →
-    tso_read img log h tv (pa_add a j) = Some (nth_byte v j).
+    tso_read1 img log h tv (pa_add a j) = Some (nth_byte v j).
 
 (* ------------------------------------------------------------------ *)
 (** ** The step vocabulary the arms use *)
 
 (** The author's latest published timestamp: [S i] of its last message. *)
-Definition own_pub (h : agent) (log : list pwmsg) : nat :=
+Definition own_pub1 (h : agent) (log : list pwmsg) : nat :=
   foldr Nat.max 0%nat
     (imap (λ i m, if bool_decide (pm_tid m = h) then S i else 0%nat) log).
 
@@ -191,11 +191,11 @@ Proof.
 Qed.
 
 (** ... and it covers every one of the author's messages: the drain that
-    passes [own_pub] passes them all. *)
-Lemma own_pub_lookup h log i m :
-  log !! i = Some m → pm_tid m = h → (S i ≤ own_pub h log)%nat.
+    passes [own_pub1] passes them all. *)
+Lemma own_pub1_lookup h log i m :
+  log !! i = Some m → pm_tid m = h → (S i ≤ own_pub1 h log)%nat.
 Proof.
-  move => Hlk Htid. rewrite /own_pub.
+  move => Hlk Htid. rewrite /own_pub1.
   apply (foldr_max_ge
            (imap (λ j m0, if bool_decide (pm_tid m0 = h) then S j else 0%nat) log)
            (S i)).
@@ -203,7 +203,7 @@ Proof.
   by rewrite Htid bool_decide_eq_true_2.
 Qed.
 
-Lemma own_pub_le h log : (own_pub h log ≤ length log)%nat.
+Lemma own_pub1_le h log : (own_pub1 h log ≤ length log)%nat.
 Proof.
   apply foldr_max_le. apply Forall_forall => x Hx.
   apply elem_of_list_In, elem_of_lookup_imap in Hx.
@@ -217,34 +217,34 @@ Qed.
     message) and an R→R edge ACQUIRES ([RiscvLang.fence_acq]: the floor
     passes the hart's read watermark [rv], so every later load sees at least
     what every earlier load saw).  A fence with neither edge is a no-op. *)
-Definition fence_post (h : agent) (log : list pwmsg) (drain acq : bool)
+Definition fence_post1 (h : agent) (log : list pwmsg) (drain acq : bool)
     (tv rv : nat) : nat :=
   match drain, acq with
   | false, false => tv
-  | true, false => Nat.max tv (own_pub h log)
+  | true, false => Nat.max tv (own_pub1 h log)
   | false, true => Nat.max tv rv
-  | true, true => Nat.max tv (Nat.max (own_pub h log) rv)
+  | true, true => Nat.max tv (Nat.max (own_pub1 h log) rv)
   end.
 
-Lemma fence_post_ge h log drain acq tv rv :
-  (tv ≤ fence_post h log drain acq tv rv)%nat.
-Proof. rewrite /fence_post. destruct drain, acq; lia. Qed.
+Lemma fence_post1_ge h log drain acq tv rv :
+  (tv ≤ fence_post1 h log drain acq tv rv)%nat.
+Proof. rewrite /fence_post1. destruct drain, acq; lia. Qed.
 
-Lemma fence_post_le h log drain acq tv rv :
+Lemma fence_post1_le h log drain acq tv rv :
   (tv ≤ length log)%nat → (rv ≤ length log)%nat →
-  (fence_post h log drain acq tv rv ≤ length log)%nat.
+  (fence_post1 h log drain acq tv rv ≤ length log)%nat.
 Proof.
-  intros Htv Hrv. rewrite /fence_post. pose proof (own_pub_le h log).
+  intros Htv Hrv. rewrite /fence_post1. pose proof (own_pub1_le h log).
   destruct drain, acq; lia.
 Qed.
 
-Lemma fence_post_drain h log acq tv rv :
-  (own_pub h log ≤ fence_post h log true acq tv rv)%nat.
-Proof. rewrite /fence_post. destruct acq; lia. Qed.
+Lemma fence_post1_drain h log acq tv rv :
+  (own_pub1 h log ≤ fence_post1 h log true acq tv rv)%nat.
+Proof. rewrite /fence_post1. destruct acq; lia. Qed.
 
-Lemma fence_post_acq h log drain tv rv :
-  (rv ≤ fence_post h log drain true tv rv)%nat.
-Proof. rewrite /fence_post. destruct drain; lia. Qed.
+Lemma fence_post1_acq h log drain tv rv :
+  (rv ≤ fence_post1 h log drain true tv rv)%nat.
+Proof. rewrite /fence_post1. destruct drain; lia. Qed.
 
 (** THE COHERENCE FLOOR (relaxed-rr.md §2.1): per byte, the view at which a
     hart last read it.  A total function on [Arch.pa], like the image on
@@ -337,55 +337,55 @@ Proof. by rewrite flat_snoc (write_bytes_union (flat img log)). Qed.
 (* ------------------------------------------------------------------ *)
 (** ** Sanity theorems (ports of TsoMem.v's, payload-agnostic) *)
 
-Lemma read_down_S img log h tv a t :
-  read_down img log h tv a (S t) =
-  match (if visibleb h tv log (S t) then log_byte img log (S t) a else None)
+Lemma read_down1_S img log h tv a t :
+  read_down1 img log h tv a (S t) =
+  match (if visibleb1 h tv log (S t) then log_byte img log (S t) a else None)
   with
   | Some v => Some v
-  | None => read_down img log h tv a t
+  | None => read_down1 img log h tv a t
   end.
 Proof. done. Qed.
 
-Lemma read_down_0 img log h tv a :
-  read_down img log h tv a 0 = img !! a.
+Lemma read_down1_0 img log h tv a :
+  read_down1 img log h tv a 0 = img !! a.
 Proof.
-  cbn [read_down].
-  have -> : visibleb h tv log 0 = true by (apply visibleb_below; lia).
+  cbn [read_down1].
+  have -> : visibleb1 h tv log 0 = true by (apply visibleb1_below; lia).
   rewrite {1}/log_byte. by destruct (img !! a).
 Qed.
 
-Lemma read_down_le img log h tv a t :
-  ∀ v, read_down img log h tv a t = Some v →
-  ∃ t', (t' ≤ t)%nat ∧ visibleb h tv log t' = true ∧
+Lemma read_down1_le img log h tv a t :
+  ∀ v, read_down1 img log h tv a t = Some v →
+  ∃ t', (t' ≤ t)%nat ∧ visibleb1 h tv log t' = true ∧
         log_byte img log t' a = Some v.
 Proof.
   induction t as [|t IH] => v.
-  - rewrite read_down_0 => Hi. exists 0%nat.
-    split_and!; [lia| by (apply visibleb_below; lia) | exact Hi].
-  - rewrite read_down_S.
-    destruct (visibleb h tv log (S t)) eqn:Hv.
+  - rewrite read_down1_0 => Hi. exists 0%nat.
+    split_and!; [lia| by (apply visibleb1_below; lia) | exact Hi].
+  - rewrite read_down1_S.
+    destruct (visibleb1 h tv log (S t)) eqn:Hv.
     + destruct (log_byte img log (S t) a) eqn:Hb.
       * move => [<-]. exists (S t). by split_and!.
       * move => /IH [t' [? [? ?]]]. exists t'. split_and!; [lia|done|done].
     + move => /IH [t' [? [? ?]]]. exists t'. split_and!; [lia|done|done].
 Qed.
 
-Lemma read_down_latest img log h tv a t t' v' :
-  (t' ≤ t)%nat → visibleb h tv log t' = true →
+Lemma read_down1_latest img log h tv a t t' v' :
+  (t' ≤ t)%nat → visibleb1 h tv log t' = true →
   log_byte img log t' a = Some v' →
-  ∃ t'' v'', (t' ≤ t'')%nat ∧ read_down img log h tv a t = Some v'' ∧
-             visibleb h tv log t'' = true ∧
+  ∃ t'' v'', (t' ≤ t'')%nat ∧ read_down1 img log h tv a t = Some v'' ∧
+             visibleb1 h tv log t'' = true ∧
              log_byte img log t'' a = Some v''.
 Proof.
   induction t as [|t IH] => Hle Hvis Hb.
   - assert (t' = 0%nat) as -> by lia.
     exists 0%nat, v'. split_and!.
     + lia.
-    + rewrite read_down_0. move: Hb. rewrite /log_byte //.
+    + rewrite read_down1_0. move: Hb. rewrite /log_byte //.
     + exact Hvis.
     + exact Hb.
-  - rewrite read_down_S.
-    destruct (visibleb h tv log (S t)) eqn:Hv.
+  - rewrite read_down1_S.
+    destruct (visibleb1 h tv log (S t)) eqn:Hv.
     + destruct (log_byte img log (S t) a) eqn:Hbt.
       * exists (S t), b. split_and!; [lia|done|done|done].
       * destruct (decide (t' = S t)) as [->|Hne].
@@ -398,37 +398,37 @@ Proof.
       exists t'', v''. rewrite Hr. split_and!; [lia|done|done|done].
 Qed.
 
-(* TOTALITY: a read of an IMAGE-COVERED address always answers.  [read_down]
+(* TOTALITY: a read of an IMAGE-COVERED address always answers.  [read_down1]
    scans down and bottoms out at timestamp 0, which is visible at every view
-   ([visibleb_below]) and is the era image.  This is what the "no evidence"
+   ([visibleb1_below]) and is the era image.  This is what the "no evidence"
    leaves need -- they conclude nothing about the VALUE but still owe a read
    RESULT at every reachable view (tso-machine-flip.md A6.74 §(3)'s third
    kit item).  The image-coverage premise is supplied by [win_ok1]'s
    conjunct (2) for a windowed cell. *)
-Lemma read_down_total img log h tv a b k :
-  img !! a = Some b -> exists c, read_down img log h tv a k = Some c.
+Lemma read_down1_total img log h tv a b k :
+  img !! a = Some b -> exists c, read_down1 img log h tv a k = Some c.
 Proof.
   move => Hi. elim: k => [|k [c IH]].
-  - rewrite read_down_0 Hi. by exists b.
-  - rewrite read_down_S.
-    case: (if visibleb h tv log (S k) then log_byte img log (S k) a else None)
+  - rewrite read_down1_0 Hi. by exists b.
+  - rewrite read_down1_S.
+    case: (if visibleb1 h tv log (S k) then log_byte img log (S k) a else None)
       => [d|]; [ by exists d | by exists c ].
 Qed.
 
-Lemma tso_read_total img log h tv a b :
-  img !! a = Some b -> exists c, tso_read img log h tv a = Some c.
-Proof. move => Hi. rewrite /tso_read. exact (read_down_total _ _ _ _ _ b _ Hi). Qed.
+Lemma tso_read1_total img log h tv a b :
+  img !! a = Some b -> exists c, tso_read1 img log h tv a = Some c.
+Proof. move => Hi. rewrite /tso_read1. exact (read_down1_total _ _ _ _ _ b _ Hi). Qed.
 
-Lemma read_down_app_below img log m h tv tv' a t :
+Lemma read_down1_app_below img log m h tv tv' a t :
   (t ≤ length log)%nat → (t ≤ tv)%nat → (t ≤ tv')%nat →
-  read_down img (log ++ [m]) h tv' a t = read_down img log h tv a t.
+  read_down1 img (log ++ [m]) h tv' a t = read_down1 img log h tv a t.
 Proof.
   induction t as [|t IH] => Hlen Htv Htv'.
-  - by rewrite !read_down_0.
-  - rewrite !read_down_S.
-    have -> : visibleb h tv' (log ++ [m]) (S t) = true
-      by apply visibleb_below; lia.
-    have -> : visibleb h tv log (S t) = true by apply visibleb_below; lia.
+  - by rewrite !read_down1_0.
+  - rewrite !read_down1_S.
+    have -> : visibleb1 h tv' (log ++ [m]) (S t) = true
+      by apply visibleb1_below; lia.
+    have -> : visibleb1 h tv log (S t) = true by apply visibleb1_below; lia.
     have Hlk : (log ++ [m]) !! t = log !! t by apply lookup_app_l; lia.
     rewrite {1}/log_byte /= Hlk.
     destruct (log !! t) as [m0|] eqn:Hm0.
@@ -438,43 +438,43 @@ Qed.
 
 (** FORWARDING IS MANDATORY: an agent whose message sits at the log top
     reads its own byte at EVERY view. *)
-Lemma tso_read_own_top img log h a m v :
+Lemma tso_read1_own_top img log h a m v :
   pm_tid m = h → msg_byte m a = Some v →
-  ∀ tv, tso_read img (log ++ [m]) h tv a = Some v.
+  ∀ tv, tso_read1 img (log ++ [m]) h tv a = Some v.
 Proof.
-  move => Htid Hb tv. rewrite /tso_read.
+  move => Htid Hb tv. rewrite /tso_read1.
   have -> : length (log ++ [m]) = S (length log).
   { rewrite length_app /=. lia. }
   have Hlk : (log ++ [m]) !! length log = Some m.
   { by apply list_lookup_middle. }
-  rewrite read_down_S.
-  have -> : visibleb h tv (log ++ [m]) (S (length log)) = true
-    by eapply visibleb_own.
+  rewrite read_down1_S.
+  have -> : visibleb1 h tv (log ++ [m]) (S (length log)) = true
+    by eapply visibleb1_own.
   by rewrite {1}/log_byte /= Hlk Hb.
 Qed.
 
-(** THE SC COLLAPSE: at the top view, [tso_read] IS the flat cache —
+(** THE SC COLLAPSE: at the top view, [tso_read1] IS the flat cache —
     the equation the exclusive/ifetch/ttw/DMA arms lean on. *)
-Lemma tso_read_top_flat img log h a :
-  tso_read img log h (length log) a = flat img log !! a.
+Lemma tso_read1_top_flat img log h a :
+  tso_read1 img log h (length log) a = flat img log !! a.
 Proof.
   induction log as [|m log IH] using rev_ind.
-  - by rewrite /tso_read [length _]/= read_down_0 /flat /=.
-  - rewrite /tso_read flat_snoc.
+  - by rewrite /tso_read1 [length _]/= read_down1_0 /flat /=.
+  - rewrite /tso_read1 flat_snoc.
     have -> : length (log ++ [m]) = S (length log).
     { rewrite length_app /=. lia. }
     have Hlk : (log ++ [m]) !! length log = Some m.
     { by apply list_lookup_middle. }
-    rewrite read_down_S.
-    have -> : visibleb h (S (length log)) (log ++ [m]) (S (length log)) = true
-      by apply visibleb_below; lia.
+    rewrite read_down1_S.
+    have -> : visibleb1 h (S (length log)) (log ++ [m]) (S (length log)) = true
+      by apply visibleb1_below; lia.
     rewrite {1}/log_byte /= Hlk.
     destruct (msg_byte m a) eqn:Hb; rewrite /msg_byte in Hb.
     + by rewrite /= (lookup_union_Some_l _ _ _ _ Hb).
     + rewrite /= (lookup_union_r _ _ _ Hb).
-      rewrite (read_down_app_below img log m h (length log) (S (length log))
+      rewrite (read_down1_app_below img log m h (length log) (S (length log))
                  a (length log)); [lia|lia|lia|].
-      by rewrite -IH /tso_read.
+      by rewrite -IH /tso_read1.
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -484,7 +484,7 @@ Qed.
     second, orthogonal one, and it is what makes the solo-block bracket
     ([HartBlock.v], tso-machine-flip.md RULING 3) true at TSO: when the
     log holds NOTHING BUT [h]'s own messages, the own-author arm of
-    [visibleb] fires at every timestamp, so [h] sees the whole log at
+    [visibleb1] fires at every timestamp, so [h] sees the whole log at
     EVERY view and its plain loads read the flat cache no matter where
     the view happens to sit.  "My store buffer is the only one" — the
     boot era before the other harts are released, and the
@@ -513,39 +513,39 @@ Proof.
 Qed.
 
 (** Every in-range timestamp is visible to the sole author, at any view. *)
-Lemma all_own_visible h tv log t :
-  all_own h log → (t ≤ length log)%nat → visibleb h tv log t = true.
+Lemma all_own_visible1 h tv log t :
+  all_own h log → (t ≤ length log)%nat → visibleb1 h tv log t = true.
 Proof.
-  move => Hown Ht. destruct t as [|i]; first by apply visibleb_below; lia.
+  move => Hown Ht. destruct t as [|i]; first by apply visibleb1_below; lia.
   destruct (log !! i) as [m|] eqn:Hlk.
-  - eapply visibleb_own; [exact Hlk|].
+  - eapply visibleb1_own; [exact Hlk|].
     apply Hown. by eapply elem_of_list_lookup_2.
   - exfalso. apply lookup_ge_None_1 in Hlk. simpl in Ht. lia.
 Qed.
 
-(** [read_down] only ever consults [visibleb] at timestamps it scans, so
+(** [read_down1] only ever consults [visibleb1] at timestamps it scans, so
     two views that agree "visible" over the whole scan read alike. *)
-Lemma read_down_vis_irrel img log h tv tv' a n :
-  (∀ t, (t ≤ n)%nat → visibleb h tv log t = true) →
-  (∀ t, (t ≤ n)%nat → visibleb h tv' log t = true) →
-  read_down img log h tv a n = read_down img log h tv' a n.
+Lemma read_down1_vis_irrel img log h tv tv' a n :
+  (∀ t, (t ≤ n)%nat → visibleb1 h tv log t = true) →
+  (∀ t, (t ≤ n)%nat → visibleb1 h tv' log t = true) →
+  read_down1 img log h tv a n = read_down1 img log h tv' a n.
 Proof.
   induction n as [|n IH] => Hv Hv'.
-  - by rewrite !read_down_0.
-  - rewrite !read_down_S (Hv (S n) ltac:(lia)) (Hv' (S n) ltac:(lia)).
+  - by rewrite !read_down1_0.
+  - rewrite !read_down1_S (Hv (S n) ltac:(lia)) (Hv' (S n) ltac:(lia)).
     cbn beta iota.
     destruct (log_byte img log (S n) a); first done.
     apply IH; move => t Ht; [apply Hv|apply Hv']; lia.
 Qed.
 
 (** THE SOLO COLLAPSE: the sole author of the log reads the flat cache
-    at EVERY view.  (Contrast [tso_read_top_flat], which is any agent at
+    at EVERY view.  (Contrast [tso_read1_top_flat], which is any agent at
     the top view.) *)
-Lemma tso_read_all_own img log h tv a :
-  all_own h log → tso_read img log h tv a = flat img log !! a.
+Lemma tso_read1_all_own img log h tv a :
+  all_own h log → tso_read1 img log h tv a = flat img log !! a.
 Proof.
-  move => Hown. rewrite -(tso_read_top_flat img log h a) /tso_read.
-  apply read_down_vis_irrel; move => t Ht; by apply all_own_visible.
+  move => Hown. rewrite -(tso_read1_top_flat img log h a) /tso_read1.
+  apply read_down1_vis_irrel; move => t Ht; by apply all_own_visible1.
 Qed.
 
 (** THE UNWRITTEN BYTE: no message in the log touches [a], so EVERY agent
@@ -572,18 +572,18 @@ Proof.
   apply Hu. by eapply elem_of_list_lookup_2.
 Qed.
 
-Lemma read_down_unwritten img log h tv a t :
-  unwritten log a → read_down img log h tv a t = img !! a.
+Lemma read_down1_unwritten img log h tv a t :
+  unwritten log a → read_down1 img log h tv a t = img !! a.
 Proof.
   move => Hu. induction t as [|t IH].
-  - apply read_down_0.
-  - rewrite read_down_S (log_byte_unwritten img log a (S t) Hu ltac:(lia)).
-    by destruct (visibleb h tv log (S t)).
+  - apply read_down1_0.
+  - rewrite read_down1_S (log_byte_unwritten img log a (S t) Hu ltac:(lia)).
+    by destruct (visibleb1 h tv log (S t)).
 Qed.
 
-Lemma tso_read_unwritten img log h tv a :
-  unwritten log a → tso_read img log h tv a = img !! a.
-Proof. move => Hu. by apply read_down_unwritten. Qed.
+Lemma tso_read1_unwritten img log h tv a :
+  unwritten log a → tso_read1 img log h tv a = img !! a.
+Proof. move => Hu. by apply read_down1_unwritten. Qed.
 
 Lemma flat_unwritten img log a :
   unwritten log a → flat img log !! a = img !! a.
@@ -662,15 +662,15 @@ Proof.
 Qed.
 
 (** THE BRIDGE: a visible latest write determines the machine's read. *)
-Lemma tso_read_of_latest img log h tv a t v :
-  latest img log a t v → visibleb h tv log t = true →
-  tso_read img log h tv a = Some v.
+Lemma tso_read1_of_latest img log h tv a t v :
+  latest img log a t v → visibleb1 h tv log t = true →
+  tso_read1 img log h tv a = Some v.
 Proof.
   move => [Hb Hab] Hvis.
   have Hle : (t ≤ length log)%nat by eapply log_byte_some_le.
-  destruct (read_down_latest img log h tv a (length log) t v Hle Hvis Hb)
+  destruct (read_down1_latest img log h tv a (length log) t v Hle Hvis Hb)
     as (t'' & v'' & Ht'' & Hr & Hvis'' & Hb'').
-  rewrite /tso_read Hr.
+  rewrite /tso_read1 Hr.
   destruct (decide (t'' = t)) as [->|Hne]; first congruence.
   exfalso.
   have HN : log_byte img log t'' a = None by apply Hab; lia.
@@ -722,6 +722,1009 @@ Proof.
       exists t. apply latest_app_frame; [rewrite /msg_byte Hm //|done].
 Qed.
 
+
+(* ===================================================================== *)
+(* §9b THE TWO-LOG MACHINE (claude-notes/projects/relaxed-ww.md §1).     *)
+(*                                                                       *)
+(* The store-store relaxation splits the log.  [log] above stays the      *)
+(* ISSUE log -- appended at issue, the identity of every message, what    *)
+(* [flat]/[gmem], [latest] and every ghost key name -- and a DRAIN log    *)
+(* [dl : list nat] records the order in which issued messages REACHED     *)
+(* MEMORY.  Coherence and every view live on [dl]: position [S q] of      *)
+(* [dl !! q = i] is message [i]'s coherence position, position 0 the      *)
+(* image, and a message not in [dl] is PENDING.  Memory is [dmem], the    *)
+(* image with [dl]'s messages applied in order.  The read vocabulary      *)
+(* below is what [RiscvLang.mnode_step] uses; the ONE-LOG functions above *)
+(* it ([visibleb1], [read_down1], [tso_read1], [own_pub1], [fence_post1]) *)
+(* are LEGACY, kept so the racy-tier pure theory (§10-§12) keeps          *)
+(* compiling until stage E restates it here.  Nothing in the machine or   *)
+(* the interp may use a [*1] function.                                    *)
+(* ===================================================================== *)
+
+(** [i] has reached memory. *)
+Definition drainedb (dl : list nat) (i : nat) : bool := bool_decide (i ∈ dl).
+
+Lemma drainedb_true dl i : drainedb dl i = true ↔ i ∈ dl.
+Proof. rewrite /drainedb. apply bool_decide_eq_true. Qed.
+
+Lemma drainedb_false dl i : drainedb dl i = false ↔ i ∉ dl.
+Proof. rewrite /drainedb. apply bool_decide_eq_false. Qed.
+
+(** The message at drain position [p] (1-based; none at 0 or past the top). *)
+Definition dmsg (log : list pwmsg) (dl : list nat) (p : nat) : option pwmsg :=
+  match p with
+  | O => None
+  | S q => match dl !! q with Some i => log !! i | None => None end
+  end.
+
+(** The byte written at drain position [p] (0 = the image). *)
+Definition dpos_byte (img : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
+    (p : nat) (a : Arch.pa) : option (bv 8) :=
+  match p with
+  | O => img !! a
+  | S _ => match dmsg log dl p with Some m => msg_byte m a | None => None end
+  end.
+
+(** Well-formed drain log: no message drains twice, every entry is issued. *)
+Definition dl_ok (log : list pwmsg) (dl : list nat) : Prop :=
+  NoDup dl ∧ ∀ i, i ∈ dl → (i < length log)%nat.
+
+Lemma dl_ok_nil log : dl_ok log [].
+Proof. split; [apply NoDup_nil_2|]. by intros i ?%elem_of_nil. Qed.
+
+Lemma dl_ok_app_log log m dl : dl_ok log dl → dl_ok (log ++ [m]) dl.
+Proof.
+  move => [Hnd Hlt]. split; [done|]. move => i Hi. rewrite length_app /=.
+  have := Hlt _ Hi. lia.
+Qed.
+
+Lemma dl_lookup_lt log dl q i :
+  dl_ok log dl → dl !! q = Some i → (i < length log)%nat.
+Proof. move => [_ Hlt] Hq. apply Hlt. by eapply elem_of_list_lookup_2. Qed.
+
+Lemma lookup_app_last' {A} (l : list A) (m : A) (j : nat) (m' : A) :
+  (l ++ [m]) !! j = Some m' →
+  ((j < length l)%nat ∧ l !! j = Some m') ∨ (j = length l ∧ m' = m).
+Proof.
+  move => Hlk. destruct (decide (j < length l)%nat) as [Hlt|Hge].
+  - left. split; [done|]. rewrite -Hlk. symmetry. by apply lookup_app_l.
+  - right.
+    have Heq : (l ++ [m]) !! j = [m] !! (j - length l)%nat by apply lookup_app_r; lia.
+    rewrite Heq in Hlk.
+    destruct (j - length l)%nat as [|k] eqn:Hk; simpl in Hlk; [|done].
+    split; [lia|]. by simplify_eq.
+Qed.
+
+(** Two messages overlap when some byte is in both maps. *)
+Definition msg_overlapb (m m' : pwmsg) : bool :=
+  bool_decide (dom (pm_map m) ∩ dom (pm_map m') ≠ ∅).
+
+Lemma msg_overlapb_of_byte m m' a v v' :
+  msg_byte m a = Some v → msg_byte m' a = Some v' → msg_overlapb m m' = true.
+Proof.
+  rewrite /msg_byte /msg_overlapb => Hv Hv'. apply bool_decide_eq_true_2.
+  have Ha : a ∈ dom (pm_map m) ∩ dom (pm_map m').
+  { apply elem_of_intersection. split; apply elem_of_dom; by eexists. }
+  set_solver.
+Qed.
+
+Lemma msg_overlapb_true m m' :
+  msg_overlapb m m' = true → ∃ a, is_Some (msg_byte m a) ∧ is_Some (msg_byte m' a).
+Proof.
+  rewrite /msg_overlapb => /bool_decide_eq_true Hne.
+  destruct (set_choose_L _ Hne) as [a Ha].
+  apply elem_of_intersection in Ha as [Ha Ha'].
+  exists a. rewrite /msg_byte. split; by apply elem_of_dom.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** Visibility over drain positions *)
+
+(** Drain position [p] is visible to agent [h] at view [tv]: below the
+    view, or the message there is [h]'s own. *)
+Definition visibleb (h : agent) (tv : nat) (log : list pwmsg) (dl : list nat)
+    (p : nat) : bool :=
+  bool_decide (p ≤ tv)%nat ||
+  match dmsg log dl p with
+  | Some m => bool_decide (pm_tid m = h)
+  | None => false
+  end.
+
+Lemma visibleb_below h tv log dl p :
+  (p ≤ tv)%nat → visibleb h tv log dl p = true.
+Proof. rewrite /visibleb => Hp. rewrite bool_decide_eq_true_2 //. Qed.
+
+Lemma visibleb_own h tv log dl q i m :
+  dl !! q = Some i → log !! i = Some m → pm_tid m = h →
+  visibleb h tv log dl (S q) = true.
+Proof.
+  rewrite /visibleb /dmsg => Hq Hi Htid. rewrite Hq Hi Htid.
+  have -> : bool_decide (h = h) = true by apply bool_decide_eq_true_2.
+  by destruct (bool_decide (S q ≤ tv)%nat).
+Qed.
+
+Lemma visibleb_le h tv tv' log dl p :
+  (tv ≤ tv')%nat → visibleb h tv log dl p = true →
+  visibleb h tv' log dl p = true.
+Proof.
+  rewrite /visibleb => Hle.
+  destruct (bool_decide (p ≤ tv)%nat) eqn:Hp => /=.
+  - move => _. apply bool_decide_eq_true in Hp.
+    have -> : bool_decide (p ≤ tv')%nat = true by apply bool_decide_eq_true_2; lia.
+    done.
+  - move => Ho. rewrite Ho. by destruct (bool_decide (p ≤ tv')%nat).
+Qed.
+
+Lemma visibleb_true h tv log dl p :
+  visibleb h tv log dl p = true →
+  (p ≤ tv)%nat ∨
+  ∃ q i m, p = S q ∧ dl !! q = Some i ∧ log !! i = Some m ∧ pm_tid m = h.
+Proof.
+  rewrite /visibleb.
+  destruct (bool_decide (p ≤ tv)%nat) eqn:Hp => /=.
+  { move => _. left. by apply bool_decide_eq_true in Hp. }
+  destruct p as [|q]; first by move => _; left; lia.
+  rewrite /dmsg.
+  destruct (dl !! q) as [i|] eqn:Hq; last by move => H; discriminate H.
+  destruct (log !! i) as [m|] eqn:Hi; last by move => H; discriminate H.
+  destruct (bool_decide (pm_tid m = h)) eqn:Htid; last by move => H; discriminate H.
+  move => _. right. exists q, i, m.
+  split_and!; [done|done|done|by apply bool_decide_eq_true in Htid].
+Qed.
+
+Lemma dmsg_app_log log m dl p :
+  dl_ok log dl → dmsg (log ++ [m]) dl p = dmsg log dl p.
+Proof.
+  move => [_ Hlt]. rewrite /dmsg. destruct p as [|q]; first done.
+  destruct (dl !! q) as [i|] eqn:Hq; last done.
+  apply lookup_app_l. apply Hlt. by eapply elem_of_list_lookup_2.
+Qed.
+
+Lemma dmsg_app_dl log dl j p :
+  (p ≤ length dl)%nat → dmsg log (dl ++ [j]) p = dmsg log dl p.
+Proof.
+  move => Hp. rewrite /dmsg. destruct p as [|q]; first done.
+  have -> : (dl ++ [j]) !! q = dl !! q by apply lookup_app_l; lia.
+  done.
+Qed.
+
+Lemma visibleb_app_log h tv log m dl p :
+  dl_ok log dl → visibleb h tv (log ++ [m]) dl p = visibleb h tv log dl p.
+Proof. move => Hok. rewrite /visibleb (dmsg_app_log _ _ _ _ Hok) //. Qed.
+
+Lemma visibleb_app_dl h tv log dl j p :
+  (p ≤ length dl)%nat → visibleb h tv log (dl ++ [j]) p = visibleb h tv log dl p.
+Proof. move => Hp. rewrite /visibleb (dmsg_app_dl _ _ _ _ Hp) //. Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** Reading: own pending first, else the latest visible drain position *)
+
+Fixpoint read_down (img : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
+    (h : agent) (tv : nat) (a : Arch.pa) (p : nat) : option (bv 8) :=
+  match (if visibleb h tv log dl p then dpos_byte img log dl p a else None) with
+  | Some v => Some v
+  | None => match p with O => None | S p' => read_down img log dl h tv a p' end
+  end.
+
+(** The hart's latest ISSUED pending message to [a]. *)
+Fixpoint pend_down (log : list pwmsg) (dl : list nat) (h : agent) (a : Arch.pa)
+    (t : nat) : option (bv 8) :=
+  match t with
+  | O => None
+  | S i =>
+      match log !! i with
+      | Some m =>
+          if bool_decide (pm_tid m = h) && negb (drainedb dl i)
+          then match msg_byte m a with
+               | Some v => Some v
+               | None => pend_down log dl h a i
+               end
+          else pend_down log dl h a i
+      | None => pend_down log dl h a i
+      end
+  end.
+
+Definition pend_read (log : list pwmsg) (dl : list nat) (h : agent) (a : Arch.pa)
+    : option (bv 8) :=
+  pend_down log dl h a (length log).
+
+(** The value agent [h] at view [tv] reads at byte [a]. *)
+Definition tso_read (img : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
+    (h : agent) (tv : nat) (a : Arch.pa) : option (bv 8) :=
+  match pend_read log dl h a with
+  | Some v => Some v
+  | None => read_down img log dl h tv a (length dl)
+  end.
+
+(** An [n]-byte load reads every byte at the SAME view. *)
+Definition tso_read_bytes (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (dl : list nat) (h : agent) (tv : nat) (a : Arch.pa) (n : N) {w : N} (v : bv w)
+    : Prop :=
+  ∀ j : nat, (N.of_nat j < n)%N →
+    tso_read img log dl h tv (pa_add a j) = Some (nth_byte v j).
+
+(** MEMORY: the image with the drain log's messages applied in order.  What
+    an AMO, a fetch at the top and the disk's DMA read. *)
+Definition dmem (img : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
+    : gmap Arch.pa (bv 8) :=
+  foldl (λ acc i, match log !! i with Some m => pm_map m ∪ acc | None => acc end)
+        img dl.
+
+Lemma dmem_nil img log : dmem img log [] = img.
+Proof. done. Qed.
+
+Lemma dmem_snoc img log dl i :
+  dmem img log (dl ++ [i]) =
+  match log !! i with Some m => pm_map m ∪ dmem img log dl | None => dmem img log dl end.
+Proof. rewrite /dmem foldl_app //. Qed.
+
+(** An issue-log append leaves memory alone: every drained index is below
+    the append. *)
+Lemma dmem_app_log img log m dl :
+  dl_ok log dl → dmem img (log ++ [m]) dl = dmem img log dl.
+Proof.
+  move => Hok. induction dl as [|i dl IH] using rev_ind; first done.
+  have Hok' : dl_ok log dl.
+  { destruct Hok as [Hnd Hlt]. split.
+    - by apply list_relations.NoDup_app in Hnd as (Hnd1 & _ & _).
+    - move => j Hj. apply Hlt. apply elem_of_app. by left. }
+  have Hi : (i < length log)%nat.
+  { apply (proj2 Hok). apply elem_of_app. right. by apply elem_of_list_singleton. }
+  rewrite !dmem_snoc (lookup_app_l _ _ _ Hi) (IH Hok') //.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** The step vocabulary *)
+
+(** All of [h]'s messages have drained (the release fence's enabling
+    condition). *)
+Definition own_drained (h : agent) (log : list pwmsg) (dl : list nat) : Prop :=
+  ∀ i m, log !! i = Some m → pm_tid m = h → i ∈ dl.
+
+(** The hart's highest own DRAIN position: [S q] of its last drained
+    message, 0 if none. *)
+Definition own_pub (h : agent) (log : list pwmsg) (dl : list nat) : nat :=
+  foldr Nat.max 0%nat
+    (imap (λ q i, match log !! i with
+                  | Some m => if bool_decide (pm_tid m = h) then S q else 0%nat
+                  | None => 0%nat
+                  end) dl).
+
+Lemma foldr_max_ge_lookup (l : list nat) (i x : nat) :
+  l !! i = Some x → (x ≤ foldr Nat.max 0 l)%nat.
+Proof.
+  revert i. induction l as [|y l IH]; intros [|i] Hlk; simpl in Hlk;
+    try discriminate.
+  - simplify_eq. simpl. lia.
+  - specialize (IH _ Hlk). simpl. lia.
+Qed.
+
+Lemma own_pub_ge h log dl q i m :
+  dl !! q = Some i → log !! i = Some m → pm_tid m = h →
+  (S q ≤ own_pub h log dl)%nat.
+Proof.
+  move => Hq Hi Htid. rewrite /own_pub. apply (foldr_max_ge_lookup _ q).
+  rewrite list_lookup_imap Hq /= Hi Htid bool_decide_eq_true_2 //.
+Qed.
+
+Lemma own_pub_le h log dl : (own_pub h log dl ≤ length dl)%nat.
+Proof.
+  apply foldr_max_le. apply Forall_forall => x Hx.
+  apply elem_of_list_In, elem_of_list_lookup in Hx as [q Hq].
+  rewrite list_lookup_imap in Hq.
+  destruct (dl !! q) as [i|] eqn:Hdq; simpl in Hq; [|done].
+  apply lookup_lt_Some in Hdq. simplify_eq.
+  destruct (log !! i); [case_bool_decide|]; lia.
+Qed.
+
+(** FENCE (relaxed-ww.md §1.1): the caller decides both edges from the
+    barrier kind.  A W→R edge DRAINS -- the floor passes the hart's highest
+    own drain position (its own messages have all drained by the time the
+    fence is enabled) -- and an R→R edge ACQUIRES -- the floor passes the
+    read watermark.  A fence with neither edge is [tv]. *)
+Definition fence_post (h : agent) (log : list pwmsg) (dl : list nat)
+    (drain acq : bool) (tv rv : nat) : nat :=
+  match drain, acq with
+  | false, false => tv
+  | true, false => Nat.max tv (own_pub h log dl)
+  | false, true => Nat.max tv rv
+  | true, true => Nat.max tv (Nat.max (own_pub h log dl) rv)
+  end.
+
+Lemma fence_post_ge h log dl drain acq tv rv :
+  (tv ≤ fence_post h log dl drain acq tv rv)%nat.
+Proof. rewrite /fence_post. destruct drain, acq; lia. Qed.
+
+Lemma fence_post_le h log dl drain acq tv rv :
+  (tv ≤ length dl)%nat → (rv ≤ length dl)%nat →
+  (fence_post h log dl drain acq tv rv ≤ length dl)%nat.
+Proof.
+  intros Htv Hrv. rewrite /fence_post. pose proof (own_pub_le h log dl).
+  destruct drain, acq; lia.
+Qed.
+
+Lemma fence_post_drain h log dl acq tv rv :
+  (own_pub h log dl ≤ fence_post h log dl true acq tv rv)%nat.
+Proof. rewrite /fence_post. destruct acq; lia. Qed.
+
+Lemma fence_post_acq h log dl drain tv rv :
+  (rv ≤ fence_post h log dl drain true tv rv)%nat.
+Proof. rewrite /fence_post. destruct drain; lia. Qed.
+
+(** DRAIN: [k] is issued, pending, and every earlier message of the same
+    author that overlaps it has drained (per-byte FIFO per hart).  The
+    environment thread's premise. *)
+Definition drain_pre (log : list pwmsg) (dl : list nat) (k : nat) : Prop :=
+  (k < length log)%nat ∧ k ∉ dl ∧
+  ∀ i mi mk, (i < k)%nat → log !! i = Some mi → log !! k = Some mk →
+    pm_tid mi = pm_tid mk → msg_overlapb mi mk = true → i ∈ dl.
+
+Lemma drain_dl_ok log dl k :
+  dl_ok log dl → drain_pre log dl k → dl_ok log (dl ++ [k]).
+Proof.
+  move => [Hnd Hlt] [Hk [Hnin _]]. split.
+  - apply list_relations.NoDup_app. split_and!; [done| |apply NoDup_singleton].
+    move => x Hx Hx'. apply elem_of_list_singleton in Hx'. subst x. done.
+  - move => j /elem_of_app [Hj|Hj]; first by apply Hlt.
+    apply elem_of_list_singleton in Hj. by subst j.
+Qed.
+
+(** The AMO's write: appended to BOTH logs at once (performed at memory).
+    Its premise is the FIFO one for the new index. *)
+Lemma amo_dl_ok log m dl :
+  dl_ok log dl → dl_ok (log ++ [m]) (dl ++ [length log]).
+Proof.
+  move => [Hnd Hlt]. split.
+  - apply list_relations.NoDup_app. split_and!; [done| |apply NoDup_singleton].
+    move => x Hx Hx'. apply elem_of_list_singleton in Hx'. subst x.
+    have := Hlt _ Hx. lia.
+  - move => j /elem_of_app [Hj|Hj]; rewrite length_app /=.
+    + have := Hlt _ Hj. lia.
+    + apply elem_of_list_singleton in Hj as ->. lia.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** The machine invariants beside [dl_ok] *)
+
+(** Per-hart FIFO across the drain log: a drained message's earlier
+    same-author overlapping messages drained BELOW it.  A step invariant
+    (the drain premise makes it so). *)
+Definition fifo_ok (log : list pwmsg) (dl : list nat) : Prop :=
+  ∀ i j mi mj qj, (i < j)%nat → log !! i = Some mi → log !! j = Some mj →
+    pm_tid mi = pm_tid mj → msg_overlapb mi mj = true → dl !! qj = Some j →
+    ∃ qi, dl !! qi = Some i ∧ (qi < qj)%nat.
+
+Lemma fifo_ok_nil log : fifo_ok log [].
+Proof. move => i j mi mj qj _ _ _ _ _ Hq. rewrite lookup_nil in Hq. done. Qed.
+
+Lemma fifo_ok_app_log log dl m : dl_ok log dl → fifo_ok log dl → fifo_ok (log ++ [m]) dl.
+Proof.
+  move => Hok Hf i j mi mj qj Hij Hi Hj Htid Hov Hqj.
+  have Hjl : (j < length log)%nat by eapply dl_lookup_lt.
+  have Hil : (i < length log)%nat by lia.
+  rewrite (lookup_app_l _ _ _ Hjl) in Hj. rewrite (lookup_app_l _ _ _ Hil) in Hi.
+  exact (Hf _ _ _ _ _ Hij Hi Hj Htid Hov Hqj).
+Qed.
+
+Lemma fifo_ok_drain log dl k :
+  drain_pre log dl k → fifo_ok log dl → fifo_ok log (dl ++ [k]).
+Proof.
+  move => [Hk [Hnin Hfifo]] Hf i j mi mj qj Hij Hi Hj Htid Hov Hqj.
+  apply lookup_app_last' in Hqj as [[_ Hqj]|[-> <-]].
+  - destruct (Hf _ _ _ _ _ Hij Hi Hj Htid Hov Hqj) as (qi & Hqi & ?).
+    exists qi. split; [by apply lookup_app_l_Some|done].
+  - have Hin := Hfifo _ _ _ Hij Hi Hj Htid Hov.
+    apply elem_of_list_lookup_1 in Hin as [qi Hqi]. exists qi.
+    split; [by apply lookup_app_l_Some|by eapply lookup_lt_Some].
+Qed.
+
+(** The AMO: its own earlier overlapping messages are drained (the arm's
+    premise), so the double append keeps the FIFO. *)
+Lemma fifo_ok_amo log dl m :
+  dl_ok log dl → fifo_ok log dl →
+  (∀ i mi, log !! i = Some mi → pm_tid mi = pm_tid m → msg_overlapb mi m = true → i ∈ dl) →
+  fifo_ok (log ++ [m]) (dl ++ [length log]).
+Proof.
+  move => Hok Hf Hown. apply fifo_ok_drain; last by apply fifo_ok_app_log.
+  split_and!.
+  - rewrite length_app /=. lia.
+  - move => Hin. have := proj2 Hok _ Hin. lia.
+  - move => i mi mk Hik Hi Hk Htid Hov.
+    rewrite list_lookup_middle // in Hk. injection Hk as <-.
+    rewrite (lookup_app_l _ _ _ Hik) in Hi. exact (Hown _ _ Hi Htid Hov).
+Qed.
+
+(** The per-byte CHAIN at the byte's latest write [t] (issue index [S j]):
+    every earlier message to the byte is drained or by the same author,
+    and drained below [j] once [j] has drained.  NOT a machine invariant
+    (the machine lets a foreign later store drain first) but the fact the
+    ownership discipline's store gate enforces and the heap tie carries;
+    with [fifo_ok] it makes the issue-latest write the coherence-latest. *)
+Definition chain_ok (log : list pwmsg) (dl : list nat) (a : Arch.pa) (t : nat) : Prop :=
+  ∀ j mj, t = S j → log !! j = Some mj →
+  ∀ i mi, (i < j)%nat → log !! i = Some mi → is_Some (msg_byte mi a) →
+    (i ∈ dl ∨ pm_tid mi = pm_tid mj) ∧
+    (∀ q, dl !! q = Some j → ∃ q', dl !! q' = Some i ∧ (q' < q)%nat).
+
+Lemma chain_ok_0 log dl a : chain_ok log dl a 0.
+Proof. by move => j mj. Qed.
+
+(** [latest] at a message index: the message writes the byte, and nothing
+    above it does. *)
+Lemma latest_S img log a j v :
+  latest img log a (S j) v →
+  ∃ m, log !! j = Some m ∧ msg_byte m a = Some v ∧
+       ∀ i mi, (j < i)%nat → log !! i = Some mi → msg_byte mi a = None.
+Proof.
+  move => [Hb Hab]. rewrite /log_byte in Hb.
+  destruct (log !! j) as [m|] eqn:Hj; last done.
+  exists m. split_and!; [done|done|].
+  move => i mi Hlt Hi. have := Hab (S i) ltac:(lia). rewrite /log_byte Hi //.
+Qed.
+
+Lemma latest_0 img log a v :
+  latest img log a 0 v →
+  img !! a = Some v ∧ ∀ i mi, log !! i = Some mi → msg_byte mi a = None.
+Proof.
+  move => [Hb Hab]. split; [done|].
+  move => i mi Hi. have := Hab (S i) ltac:(lia). rewrite /log_byte Hi //.
+Qed.
+
+Lemma chain_ok_app_log log dl a t m :
+  (t ≤ length log)%nat → chain_ok log dl a t → chain_ok (log ++ [m]) dl a t.
+Proof.
+  move => Ht Hc j mj Ht' Hj i mi Hij Hi Hb. subst t.
+  have Hjl : (j < length log)%nat by lia. have Hil : (i < length log)%nat by lia.
+  rewrite (lookup_app_l _ _ _ Hjl) in Hj. rewrite (lookup_app_l _ _ _ Hil) in Hi.
+  exact (Hc _ _ eq_refl Hj _ _ Hij Hi Hb).
+Qed.
+
+Lemma chain_ok_drain img log dl a t v k :
+  dl_ok log dl → drain_pre log dl k → latest img log a t v →
+  chain_ok log dl a t → chain_ok log (dl ++ [k]) a t.
+Proof.
+  move => Hok [Hk [Hnin Hfifo]] Hlat Hc j mj Ht Hj i mi Hij Hi Hb.
+  destruct (Hc _ _ Ht Hj _ _ Hij Hi Hb) as [Hor Hpos]. split.
+  - destruct Hor as [Hin|?]; [left; apply elem_of_app; by left|by right].
+  - move => q Hq. apply lookup_app_last' in Hq as [[_ Hq]|[-> <-]].
+    + destruct (Hpos _ Hq) as (q' & Hq' & ?). exists q'.
+      split; [by apply lookup_app_l_Some|done].
+    + have Hin : i ∈ dl.
+      { destruct Hor as [Hin|Htid]; [done|].
+        destruct Hb as [vi Hvi].
+        subst t. destruct (latest_S _ _ _ _ _ Hlat) as (mj' & Hj' & Hvj & _).
+        rewrite Hj in Hj'. injection Hj' as <-.
+        eapply (Hfifo _ _ _ Hij Hi Hj Htid). by eapply msg_overlapb_of_byte. }
+      apply elem_of_list_lookup_1 in Hin as [q' Hq']. exists q'.
+      split; [by apply lookup_app_l_Some|by eapply lookup_lt_Some].
+Qed.
+
+(** The STORE GATE's pure half: the previous latest write is drained or by
+    the storing hart. *)
+Definition drained_or_by (log : list pwmsg) (dl : list nat) (h : agent) (t : nat)
+    : Prop :=
+  ∀ j mj, t = S j → log !! j = Some mj → j ∈ dl ∨ pm_tid mj = h.
+
+Lemma chain_ok_new img log dl a t v m w :
+  dl_ok log dl → fifo_ok log dl →
+  latest img log a t v → chain_ok log dl a t → drained_or_by log dl (pm_tid m) t →
+  msg_byte m a = Some w →
+  chain_ok (log ++ [m]) dl a (S (length log)).
+Proof.
+  move => Hok Hf Hlat Hc Hgate Hw j mj [= <-] Hj i mi Hij Hi Hb.
+  rewrite list_lookup_middle // in Hj. injection Hj as <-.
+  rewrite (lookup_app_l _ _ _ Hij) in Hi.
+  split; last first.
+  { move => q Hq. exfalso. have := dl_lookup_lt _ _ _ _ Hok Hq. lia. }
+  destruct t as [|j0].
+  { exfalso. destruct (latest_0 _ _ _ _ Hlat) as [_ Hnone].
+    destruct Hb as [vi Hvi]. rewrite (Hnone _ _ Hi) in Hvi. discriminate. }
+  destruct (latest_S _ _ _ _ _ Hlat) as (m0 & Hj0 & Hv0 & Habove).
+  destruct (decide (i = j0)) as [->|Hne].
+  - rewrite Hj0 in Hi. injection Hi as <-. by apply (Hgate _ _ eq_refl Hj0).
+  - destruct (decide (j0 < i)%nat) as [Hlt|Hge].
+    { exfalso. destruct Hb as [vi Hvi]. rewrite (Habove _ _ Hlt Hi) in Hvi. discriminate. }
+    have Hij0 : (i < j0)%nat by lia.
+    destruct (Hc _ _ eq_refl Hj0 _ _ Hij0 Hi Hb) as [[Hin|Htid] _]; [by left|].
+    destruct (Hgate _ _ eq_refl Hj0) as [Hin0|Htid0]; last by right; congruence.
+    left. apply elem_of_list_lookup_1 in Hin0 as [q0 Hq0].
+    destruct Hb as [vi Hvi].
+    destruct (Hf _ _ _ _ _ Hij0 Hi Hj0 Htid (msg_overlapb_of_byte _ _ _ _ _ Hvi Hv0) Hq0)
+      as (qi & Hqi & _).
+    by eapply elem_of_list_lookup_2.
+Qed.
+
+Lemma chain_ok_all_own img log dl h a t v :
+  all_own h log → fifo_ok log dl → latest img log a t v → chain_ok log dl a t.
+Proof.
+  move => Hown Hf Hlat j mj Ht Hj i mi Hij Hi [vi Hvi]. subst t.
+  destruct (latest_S _ _ _ _ _ Hlat) as (mj' & Hj' & Hvj & _).
+  rewrite Hj in Hj'. injection Hj' as <-.
+  have Htid : pm_tid mi = pm_tid mj.
+  { rewrite (Hown mi) ?(Hown mj) //; by eapply elem_of_list_lookup_2. }
+  split; [by right|].
+  move => q Hq. destruct (Hf _ _ _ _ _ Hij Hi Hj Htid (msg_overlapb_of_byte _ _ _ _ _ Hvi Hvj) Hq)
+    as (q' & Hq' & ?). by exists q'.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** The ghost mirrors of the drain log (the interp's pure ties) *)
+
+(** [DP] mirrors the drain log: message [i] is at position [S q]. *)
+Definition dpos_ok (dl : list nat) (DP : gmap nat nat) : Prop :=
+  ∀ i p, DP !! i = Some p ↔ ∃ q, dl !! q = Some i ∧ p = S q.
+
+Lemma dpos_ok_nil : dpos_ok [] ∅.
+Proof.
+  move => i p. rewrite lookup_empty. split; [done|].
+  move => [q [Hq _]]. rewrite lookup_nil in Hq. done.
+Qed.
+
+(** The drain-map update needs only the new index's freshness. *)
+Lemma dpos_ok_snoc dl DP k :
+  k ∉ dl → dpos_ok dl DP →
+  DP !! k = None ∧ dpos_ok (dl ++ [k]) (<[k := S (length dl)]> DP).
+Proof.
+  move => Hnin Hdp.
+  have HDPk : DP !! k = None.
+  { destruct (DP !! k) as [p|] eqn:HDP; last done.
+    apply Hdp in HDP as (q & Hq & _). exfalso. apply Hnin. by eapply elem_of_list_lookup_2. }
+  split; [done|].
+  move => i p. destruct (decide (i = k)) as [->|Hne].
+  - rewrite lookup_insert. split.
+    + move => [= <-]. exists (length dl). split; [by apply list_lookup_middle|done].
+    + move => [q [Hq ->]]. apply lookup_app_last' in Hq as [[_ Hq]|[-> _]].
+      * exfalso. apply Hnin. by eapply elem_of_list_lookup_2.
+      * done.
+  - rewrite lookup_insert_ne //. rewrite Hdp. split.
+    + move => [q [Hq ->]]. exists q. split; [by apply lookup_app_l_Some|done].
+    + move => [q [Hq ->]]. apply lookup_app_last' in Hq as [[_ Hq]|[_ Heq]];
+        [by exists q|congruence].
+Qed.
+
+Lemma dpos_ok_drain log dl DP k :
+  drain_pre log dl k → dpos_ok dl DP →
+  DP !! k = None ∧ dpos_ok (dl ++ [k]) (<[k := S (length dl)]> DP).
+Proof. move => [_ [Hnin _]]. by apply dpos_ok_snoc. Qed.
+
+(** The AMO's double append: the new index is fresh in the drain log. *)
+Lemma dpos_ok_amo log dl DP :
+  dl_ok log dl → dpos_ok dl DP →
+  DP !! length log = None ∧
+  dpos_ok (dl ++ [length log]) (<[length log := S (length dl)]> DP).
+Proof.
+  move => [_ Hlt] Hdp. apply dpos_ok_snoc; [|done].
+  move => Hin. have := Hlt _ Hin. lia.
+Qed.
+
+(** [RL] holds the release receipts: at [(A, N) ↦ M], every A-message issued
+    below [N] is drained at a position at most [M]. *)
+Definition rl_ok (log : list pwmsg) (dl : list nat) (RL : gmap (agent * nat) nat)
+    : Prop :=
+  ∀ A N M, RL !! (A, N) = Some M →
+    (N ≤ length log)%nat ∧ (M ≤ length dl)%nat ∧
+    ∀ i m, (i < N)%nat → log !! i = Some m → pm_tid m = A →
+      ∃ q, dl !! q = Some i ∧ (S q ≤ M)%nat.
+
+Lemma rl_ok_nil log dl : rl_ok log dl ∅.
+Proof. move => A N M. rewrite lookup_empty //. Qed.
+
+Lemma rl_ok_app_log log dl RL m : rl_ok log dl RL → rl_ok (log ++ [m]) dl RL.
+Proof.
+  move => Hrl A N M HAN. destruct (Hrl _ _ _ HAN) as (HN & HM & Hall).
+  split_and!; [rewrite length_app /=; lia|done|].
+  move => i mi Hi Hlk Htid. have Hil : (i < length log)%nat by lia.
+  rewrite (lookup_app_l _ _ _ Hil) in Hlk. exact (Hall _ _ Hi Hlk Htid).
+Qed.
+
+Lemma rl_ok_drain log dl RL k : rl_ok log dl RL → rl_ok log (dl ++ [k]) RL.
+Proof.
+  move => Hrl A N M HAN. destruct (Hrl _ _ _ HAN) as (HN & HM & Hall).
+  split_and!; [done|rewrite length_app /=; lia|].
+  move => i mi Hi Hlk Htid. destruct (Hall _ _ Hi Hlk Htid) as (q & Hq & ?).
+  exists q. split; [by apply lookup_app_l_Some|done].
+Qed.
+
+Lemma rl_ok_mint log dl RL h :
+  own_drained h log dl → rl_ok log dl RL →
+  rl_ok log dl (<[(h, length log) := length dl]> RL).
+Proof.
+  move => Hod Hrl A N M. destruct (decide ((A, N) = (h, length log))) as [[= -> ->]|Hne].
+  - rewrite lookup_insert. move => [= <-]. split_and!; [done|done|].
+    move => i m Hi Hlk Htid.
+    destruct (elem_of_list_lookup_1 _ _ (Hod _ _ Hlk Htid)) as [q Hq]. exists q.
+    split; [done|by eapply lookup_lt_Some].
+  - rewrite lookup_insert_ne //. apply Hrl.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** Sanity theorems for the two-log read *)
+
+Lemma read_down_S img log dl h tv a p :
+  read_down img log dl h tv a (S p) =
+  match (if visibleb h tv log dl (S p) then dpos_byte img log dl (S p) a else None)
+  with
+  | Some v => Some v
+  | None => read_down img log dl h tv a p
+  end.
+Proof. done. Qed.
+
+Lemma read_down_unfold img log dl h tv a p :
+  read_down img log dl h tv a p =
+  match (if visibleb h tv log dl p then dpos_byte img log dl p a else None) with
+  | Some v => Some v
+  | None => match p with O => None | S p' => read_down img log dl h tv a p' end
+  end.
+Proof. by destruct p. Qed.
+
+Lemma option_match_id {A} (o : option A) :
+  match o with Some v => Some v | None => None end = o.
+Proof. by destruct o. Qed.
+
+Lemma read_down_0 img log dl h tv a :
+  read_down img log dl h tv a 0 = img !! a.
+Proof.
+  have Hv : visibleb h tv log dl 0 = true by apply visibleb_below; lia.
+  rewrite read_down_unfold Hv. cbn. apply option_match_id.
+Qed.
+
+Lemma pend_down_S log dl h a i :
+  pend_down log dl h a (S i) =
+  match log !! i with
+  | Some m =>
+      if bool_decide (pm_tid m = h) && negb (drainedb dl i)
+      then match msg_byte m a with
+           | Some v => Some v
+           | None => pend_down log dl h a i
+           end
+      else pend_down log dl h a i
+  | None => pend_down log dl h a i
+  end.
+Proof. done. Qed.
+
+Lemma read_down_le img log dl h tv a p :
+  ∀ v, read_down img log dl h tv a p = Some v →
+  ∃ p', (p' ≤ p)%nat ∧ visibleb h tv log dl p' = true ∧
+        dpos_byte img log dl p' a = Some v.
+Proof.
+  induction p as [|p IH] => v.
+  - rewrite read_down_0 => Hi. exists 0%nat.
+    split_and!; [lia| by (apply visibleb_below; lia) | done].
+  - rewrite read_down_S.
+    destruct (visibleb h tv log dl (S p)) eqn:Hv.
+    + destruct (dpos_byte img log dl (S p) a) eqn:Hb.
+      * move => [<-]. exists (S p). by split_and!.
+      * move => /IH [p' [? [? ?]]]. exists p'. split_and!; [lia|done|done].
+    + move => /IH [p' [? [? ?]]]. exists p'. split_and!; [lia|done|done].
+Qed.
+
+Lemma read_down_latest img log dl h tv a p p' v' :
+  (p' ≤ p)%nat → visibleb h tv log dl p' = true →
+  dpos_byte img log dl p' a = Some v' →
+  ∃ p'' v'', (p' ≤ p'')%nat ∧ read_down img log dl h tv a p = Some v'' ∧
+             visibleb h tv log dl p'' = true ∧
+             dpos_byte img log dl p'' a = Some v''.
+Proof.
+  induction p as [|p IH] => Hle Hvis Hb.
+  - assert (p' = 0%nat) as -> by lia.
+    exists 0%nat, v'. split_and!; [lia|by rewrite read_down_0|exact Hvis|exact Hb].
+  - rewrite read_down_S.
+    destruct (visibleb h tv log dl (S p)) eqn:Hv.
+    + destruct (dpos_byte img log dl (S p) a) eqn:Hbt.
+      * exists (S p), b. split_and!; [lia|done|done|done].
+      * destruct (decide (p' = S p)) as [->|Hne].
+        { rewrite Hbt in Hb. done. }
+        destruct (IH ltac:(lia) Hvis Hb) as (p''&v''&?&Hr&?&?).
+        exists p'', v''. rewrite Hr. split_and!; [lia|done|done|done].
+    + destruct (decide (p' = S p)) as [->|Hne].
+      { rewrite Hv in Hvis. done. }
+      destruct (IH ltac:(lia) Hvis Hb) as (p''&v''&?&Hr&?&?).
+      exists p'', v''. rewrite Hr. split_and!; [lia|done|done|done].
+Qed.
+
+Lemma dpos_byte_app_log img log m dl p a :
+  dl_ok log dl → dpos_byte img (log ++ [m]) dl p a = dpos_byte img log dl p a.
+Proof.
+  move => Hok. rewrite /dpos_byte. destruct p; first done.
+  by rewrite (dmsg_app_log _ _ _ _ Hok).
+Qed.
+
+Lemma read_down_app_log img log m dl h tv a p :
+  dl_ok log dl →
+  read_down img (log ++ [m]) dl h tv a p = read_down img log dl h tv a p.
+Proof.
+  move => Hok. induction p as [|p IH]; first by rewrite !read_down_0.
+  rewrite !read_down_S (visibleb_app_log _ _ _ _ _ _ Hok)
+          (dpos_byte_app_log _ _ _ _ _ _ Hok) IH //.
+Qed.
+
+Lemma dpos_byte_app_dl img log dl j p a :
+  (p ≤ length dl)%nat →
+  dpos_byte img log (dl ++ [j]) p a = dpos_byte img log dl p a.
+Proof.
+  move => Hp. rewrite /dpos_byte. destruct p; first done.
+  by rewrite (dmsg_app_dl _ _ _ _ Hp).
+Qed.
+
+Lemma read_down_app_dl_below img log dl j h tv tv' a p :
+  (p ≤ length dl)%nat → (p ≤ tv)%nat → (p ≤ tv')%nat →
+  read_down img log (dl ++ [j]) h tv' a p = read_down img log dl h tv a p.
+Proof.
+  induction p as [|p IH] => Hlen Htv Htv'.
+  - by rewrite !read_down_0.
+  - rewrite !read_down_S.
+    have -> : visibleb h tv' log (dl ++ [j]) (S p) = true by apply visibleb_below; lia.
+    have -> : visibleb h tv log dl (S p) = true by apply visibleb_below; lia.
+    rewrite (dpos_byte_app_dl _ _ _ _ _ _ Hlen).
+    destruct (dpos_byte img log dl (S p) a); first done. apply IH; lia.
+Qed.
+
+Lemma pend_down_app_log log m dl h a t :
+  (t ≤ length log)%nat →
+  pend_down (log ++ [m]) dl h a t = pend_down log dl h a t.
+Proof.
+  induction t as [|t IH] => Ht; first done.
+  rewrite !pend_down_S.
+  have -> : (log ++ [m]) !! t = log !! t by apply lookup_app_l; lia.
+  rewrite IH; [lia|]. done.
+Qed.
+
+(** A pending scan that finds a value found one of the hart's OWN pending
+    messages. *)
+Lemma pend_down_some log dl h a t v :
+  pend_down log dl h a t = Some v →
+  ∃ i m, (i < t)%nat ∧ log !! i = Some m ∧ pm_tid m = h ∧ i ∉ dl ∧
+         msg_byte m a = Some v.
+Proof.
+  induction t as [|t IH]; first done.
+  rewrite pend_down_S.
+  destruct (log !! t) as [m|] eqn:Hm.
+  - destruct (bool_decide (pm_tid m = h) && negb (drainedb dl t)) eqn:Hc.
+    + destruct (msg_byte m a) as [v0|] eqn:Hb.
+      * move => [<-]. exists t, m.
+        move: Hc => /andb_true_iff [/bool_decide_eq_true Htid /negb_true_iff Hd].
+        split_and!; [lia|done|done|by apply drainedb_false|done].
+      * intros Hr; destruct (IH Hr) as (i & m' & ? & ? & ? & ? & ?). exists i, m'. split_and!; [lia|done..].
+    + intros Hr; destruct (IH Hr) as (i & m' & ? & ? & ? & ? & ?). exists i, m'. split_and!; [lia|done..].
+  - intros Hr; destruct (IH Hr) as (i & m' & ? & ? & ? & ? & ?). exists i, m'. split_and!; [lia|done..].
+Qed.
+
+(** And conversely: a hart with an undrained message to [a] has SOME
+    pending value there. *)
+Lemma pend_down_none log dl h a t i m v :
+  (i < t)%nat → log !! i = Some m → pm_tid m = h → i ∉ dl →
+  msg_byte m a = Some v → pend_down log dl h a t ≠ None.
+Proof.
+  induction t as [|t IH] => Hlt Hi Htid Hnd Hb; first lia.
+  rewrite pend_down_S.
+  destruct (decide (i = t)) as [->|Hne].
+  - rewrite Hi Htid bool_decide_eq_true_2 //.
+    have -> : drainedb dl t = false by apply drainedb_false.
+    rewrite /= Hb //.
+  - have Hlt' : (i < t)%nat by lia.
+    destruct (log !! t) as [m'|]; [|by apply IH].
+    destruct (bool_decide (pm_tid m' = h) && negb (drainedb dl t)); [|by apply IH].
+    destruct (msg_byte m' a); [done|by apply IH].
+Qed.
+
+(** A hart with no undrained message to [a] forwards nothing. *)
+Lemma pend_read_none_of log dl h a :
+  (∀ i m, log !! i = Some m → pm_tid m = h → i ∉ dl → msg_byte m a = None) →
+  pend_read log dl h a = None.
+Proof.
+  move => Hno. rewrite /pend_read.
+  destruct (pend_down log dl h a (length log)) as [v|] eqn:Hp; [|done].
+  destruct (pend_down_some _ _ _ _ _ _ Hp) as (i & m & _ & Hi & Htid & Hnd & Hb).
+  rewrite (Hno _ _ Hi Htid Hnd) in Hb. discriminate.
+Qed.
+
+Lemma own_drained_pend_none h log dl a :
+  own_drained h log dl → pend_read log dl h a = None.
+Proof.
+  move => Hod. apply pend_read_none_of => i m Hi Htid Hnd. exfalso. apply Hnd.
+  by eapply Hod.
+Qed.
+
+(** The pending scan finds the hart's topmost pending message to [a] when
+    nothing above it writes [a]. *)
+Lemma pend_down_hit log dl h a t j m v :
+  (j < t)%nat → log !! j = Some m → pm_tid m = h → j ∉ dl → msg_byte m a = Some v →
+  (∀ i mi, (j < i)%nat → log !! i = Some mi → msg_byte mi a = None) →
+  pend_down log dl h a t = Some v.
+Proof.
+  induction t as [|t IH] => Hjt Hj Htid Hnd Hb Habove; first lia.
+  rewrite pend_down_S.
+  destruct (decide (t = j)) as [->|Hne].
+  - rewrite Hj Htid bool_decide_eq_true_2 //.
+    have -> : drainedb dl j = false by apply drainedb_false.
+    rewrite /= Hb //.
+  - have Hlt : (j < t)%nat by lia.
+    destruct (log !! t) as [mt|] eqn:Ht; last by apply IH.
+    rewrite (Habove _ _ Hlt Ht).
+    destruct (bool_decide (pm_tid mt = h) && negb (drainedb dl t)); by apply IH.
+Qed.
+
+(** FORWARDING IS MANDATORY: the author reads its own fresh pending store
+    at every view. *)
+Lemma pend_read_own_new log dl h m a v :
+  dl_ok log dl → pm_tid m = h → msg_byte m a = Some v →
+  pend_read (log ++ [m]) dl h a = Some v.
+Proof.
+  move => [_ Hlt] Htid Hb. rewrite /pend_read length_app /= Nat.add_1_r pend_down_S.
+  rewrite list_lookup_middle //.
+  have -> : drainedb dl (length log) = false.
+  { apply drainedb_false => Hin. specialize (Hlt _ Hin). lia. }
+  rewrite Htid bool_decide_eq_true_2 //= Hb //.
+Qed.
+
+Lemma tso_read_own_pending img log dl h tv a v :
+  pend_read log dl h a = Some v → tso_read img log dl h tv a = Some v.
+Proof. rewrite /tso_read => -> //. Qed.
+
+(** A scan over positions none of which writes [a] returns the image. *)
+Lemma read_down_none_above img log dl h tv a P :
+  (∀ p, (1 ≤ p)%nat → (p ≤ P)%nat → dpos_byte img log dl p a = None) →
+  read_down img log dl h tv a P = img !! a.
+Proof.
+  induction P as [|P IH] => Hnone; first by rewrite read_down_0.
+  have Hn : dpos_byte img log dl (S P) a = None by apply Hnone; lia.
+  rewrite read_down_S Hn.
+  destruct (visibleb h tv log dl (S P)); apply IH; move => p ? ?; apply Hnone; lia.
+Qed.
+
+(** THE SC COLLAPSE, AT MEMORY: at the top, [read_down] is [dmem]. *)
+Lemma read_down_top_dmem img log dl h a :
+  read_down img log dl h (length dl) a (length dl) = dmem img log dl !! a.
+Proof.
+  induction dl as [|i dl IH] using rev_ind.
+  - rewrite read_down_0 dmem_nil //.
+  - rewrite dmem_snoc.
+    have Hlen : length (dl ++ [i]) = S (length dl) by rewrite length_app /=; lia.
+    rewrite Hlen read_down_S.
+    have -> : visibleb h (S (length dl)) log (dl ++ [i]) (S (length dl)) = true
+      by apply visibleb_below; lia.
+    rewrite {1}/dpos_byte /dmsg.
+    have -> : (dl ++ [i]) !! length dl = Some i by apply list_lookup_middle.
+    destruct (log !! i) as [m|] eqn:Hm.
+    + rewrite lookup_union. destruct (msg_byte m a) eqn:Hb; rewrite /msg_byte in Hb; rewrite Hb.
+      * by rewrite union_Some_l.
+      * rewrite union_None_l.
+        rewrite (read_down_app_dl_below img log dl i h (length dl) (S (length dl))
+                   a (length dl)); [lia|lia|lia|]. exact IH.
+    + rewrite (read_down_app_dl_below img log dl i h (length dl) (S (length dl))
+                 a (length dl)); [lia|lia|lia|]. exact IH.
+Qed.
+
+Lemma tso_read_top_dmem img log dl h a :
+  pend_read log dl h a = None →
+  tso_read img log dl h (length dl) a = dmem img log dl !! a.
+Proof. rewrite /tso_read => ->. apply read_down_top_dmem. Qed.
+
+Lemma dpos_byte_unwritten img log dl a p :
+  unwritten log a → (0 < p)%nat → dpos_byte img log dl p a = None.
+Proof.
+  move => Hu Hp. destruct p as [|q]; first lia.
+  rewrite /dpos_byte /dmsg. destruct (dl !! q) as [i|]; last done.
+  destruct (log !! i) as [m|] eqn:Hi; last done.
+  apply Hu. by eapply elem_of_list_lookup_2.
+Qed.
+
+Lemma tso_read_unwritten img log dl h tv a :
+  unwritten log a → tso_read img log dl h tv a = img !! a.
+Proof.
+  move => Hu.
+  have Hp : pend_read log dl h a = None.
+  { apply pend_read_none_of. move => i m Hi _ _. apply Hu. by eapply elem_of_list_lookup_2. }
+  have Hn : read_down img log dl h tv a (length dl) = img !! a.
+  { apply (read_down_none_above img log dl h tv a (length dl)).
+    move => p Hp' _. by apply dpos_byte_unwritten. }
+  by rewrite /tso_read Hp Hn.
+Qed.
+
+Lemma flat_None_unwritten img log a :
+  flat img log !! a = None → unwritten log a ∧ img !! a = None.
+Proof.
+  induction log as [|m log IH] using rev_ind => Hn.
+  - split; [|done]. move => m0 Hm0. by apply elem_of_nil in Hm0.
+  - rewrite flat_snoc lookup_union in Hn.
+    destruct (pm_map m !! a) eqn:Hm; first by rewrite union_Some_l in Hn.
+    rewrite union_None_l in Hn. destruct (IH Hn) as [Hu Hi]. split; [|done].
+    move => m0 /elem_of_app [Hin|Hin]; first by apply Hu.
+    apply elem_of_list_singleton in Hin as ->. exact Hm.
+Qed.
+
+(** THE BRIDGE.  The latest issued write to [a] is at [t]; the chain holds;
+    and [t]'s message is VISIBLE to [h] at [tv] -- drained at a position
+    under the view, or [h]'s own (pending or drained).  Then [h] reads its
+    value.  What every load gate discharges. *)
+Definition msg_visible (log : list pwmsg) (dl : list nat) (h : agent) (tv : nat)
+    (t : nat) : Prop :=
+  t = 0%nat ∨
+  ∃ j m, t = S j ∧ log !! j = Some m ∧
+    ((∃ q, dl !! q = Some j ∧ (S q ≤ tv)%nat) ∨ pm_tid m = h).
+
+Lemma tso_read_of_latest img log dl h tv a t v :
+  dl_ok log dl → fifo_ok log dl →
+  latest img log a t v → chain_ok log dl a t → msg_visible log dl h tv t →
+  tso_read img log dl h tv a = Some v.
+Proof.
+  move => [Hnd Hlt] Hf Hlat Hc Hvis.
+  destruct Hvis as [->|(j & m & -> & Hj & Hvis)].
+  { destruct (latest_0 _ _ _ _ Hlat) as [Hi Hnone].
+    have Hp : pend_read log dl h a = None.
+    { apply pend_read_none_of. move => i mi Hi' _ _. by apply (Hnone _ _ Hi'). }
+    have Hn : read_down img log dl h tv a (length dl) = img !! a.
+    { apply (read_down_none_above img log dl h tv a (length dl)).
+      move => p Hp1 HpP. rewrite /dpos_byte /dmsg. destruct p as [|q]; first lia.
+      destruct (dl !! q) as [i|]; last done.
+      destruct (log !! i) as [mi|] eqn:Hi'; last done. by apply (Hnone _ _ Hi'). }
+    by rewrite /tso_read Hp Hn. }
+  destruct (latest_S _ _ _ _ _ Hlat) as (m' & Hj' & Hb & Habove).
+  rewrite Hj in Hj'. injection Hj' as <-.
+  have Hchain := Hc _ _ eq_refl Hj.
+  destruct (decide (j ∈ dl)) as [Hin|Hout]; last first.
+  { destruct Hvis as [(q & Hq & _)|Htid].
+    { exfalso. apply Hout. by eapply elem_of_list_lookup_2. }
+    rewrite /tso_read /pend_read.
+    rewrite (pend_down_hit _ _ _ _ _ j m v) //. by eapply lookup_lt_Some. }
+  apply elem_of_list_lookup_1 in Hin as [q Hq].
+  have Hpend : pend_read log dl h a = None.
+  { apply pend_read_none_of. move => i mi Hi Htid Hnd0.
+    destruct (msg_byte mi a) as [vi|] eqn:Hvi; last done. exfalso.
+    destruct (decide (j < i)%nat) as [Hlt'|Hge].
+    { rewrite (Habove _ _ Hlt' Hi) in Hvi. discriminate. }
+    destruct (decide (i = j)) as [->|Hne].
+    { apply Hnd0. by eapply elem_of_list_lookup_2. }
+    have Hij : (i < j)%nat by lia.
+    destruct (Hchain _ _ Hij Hi ltac:(by eexists)) as [[Hin'|Hsame] _]; [done|].
+    destruct (Hf _ _ _ _ _ Hij Hi Hj Hsame (msg_overlapb_of_byte _ _ _ _ _ Hvi Hb) Hq)
+      as (qi & Hqi & _).
+    apply Hnd0. by eapply elem_of_list_lookup_2. }
+  rewrite /tso_read Hpend.
+  have Hvq : visibleb h tv log dl (S q) = true.
+  { destruct Hvis as [(q' & Hq' & Hle)|Htid].
+    - have Heq : q' = q by eapply NoDup_lookup. subst q'. by apply visibleb_below.
+    - by eapply visibleb_own. }
+  have Hbq : dpos_byte img log dl (S q) a = Some v by rewrite /dpos_byte /dmsg Hq Hj.
+  have Hqlen : (S q ≤ length dl)%nat by apply lookup_lt_Some in Hq; lia.
+  destruct (read_down_latest img log dl h tv a (length dl) (S q) v Hqlen Hvq Hbq)
+    as (p'' & v'' & Hge & Hr & Hvis'' & Hb'').
+  rewrite Hr. destruct (decide (p'' = S q)) as [->|Hne]; first congruence.
+  exfalso.
+  destruct p'' as [|q'']; first lia.
+  rewrite /dpos_byte /dmsg in Hb''.
+  destruct (dl !! q'') as [i|] eqn:Hq''; last done.
+  destruct (log !! i) as [mi|] eqn:Hi; last done.
+  destruct (decide (j < i)%nat) as [Hlt'|Hge'].
+  { rewrite (Habove _ _ Hlt' Hi) in Hb''. discriminate. }
+  destruct (decide (i = j)) as [->|Hne'].
+  { have : q'' = q by eapply NoDup_lookup. lia. }
+  have Hij : (i < j)%nat by lia.
+  destruct (Hchain _ _ Hij Hi ltac:(by eexists)) as [_ Hpos].
+  destruct (Hpos _ Hq) as (q' & Hq' & Hlt2).
+  have : q' = q'' by eapply NoDup_lookup. lia.
+Qed.
+
+(** THE SOLO COLLAPSE: the sole author of the log reads the flat cache at
+    EVERY view -- the solo-block bracket's premise ([HartBlock.v]), now
+    needing the drain FIFO for "issue-latest is coherence-latest". *)
+Lemma tso_read_all_own img log dl h tv a :
+  all_own h log → dl_ok log dl → fifo_ok log dl →
+  tso_read img log dl h tv a = flat img log !! a.
+Proof.
+  move => Hown Hok Hf.
+  destruct (flat img log !! a) as [v|] eqn:Hfl.
+  - destruct (flat_latest _ _ _ _ Hfl) as [t Hlat].
+    apply (tso_read_of_latest _ _ _ _ _ _ t v Hok Hf Hlat
+             (chain_ok_all_own _ _ _ _ _ _ _ Hown Hf Hlat)).
+    destruct t as [|j]; first by left.
+    destruct (latest_S _ _ _ _ _ Hlat) as (m & Hj & _ & _).
+    right. exists j, m. split_and!; [done|done|]. right. apply Hown.
+    by eapply elem_of_list_lookup_2.
+  - destruct (flat_None_unwritten _ _ _ Hfl) as [Hu Hi].
+    by rewrite tso_read_unwritten.
+Qed.
+
 (* ===================================================================== *)
 (* §10  THE CANON PIN'S PURE LAYER (tso-pin-memo.md §5, ruling 2).        *)
 (*                                                                       *)
@@ -744,29 +1747,29 @@ Definition pin_ok (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
   (* [Sv] is [byteset] below; stated at the raw type here because the
      definition PRECEDES the name (the name is §11's, beside [ts_elem]). *)
   forall (h : agent) (tv' : nat), (B <= tv')%nat ->
-    exists b, tso_read img log h tv' a = Some b /\ b ∈ Sv.
+    exists b, tso_read1 img log h tv' a = Some b /\ b ∈ Sv.
 
 Lemma pin_ok_mint img log a B Sv t v :
   latest img log a t v -> (t <= B)%nat -> v ∈ Sv -> pin_ok img log a B Sv.
 Proof.
   move => Hlat HtB Hv h tv' HB. exists v. split; [|exact Hv].
-  apply (tso_read_of_latest _ _ _ _ _ t); [exact Hlat|].
-  apply visibleb_below. lia.
+  apply (tso_read1_of_latest _ _ _ _ _ t); [exact Hlat|].
+  apply visibleb1_below. lia.
 Qed.
 
-(* the frame law the preservation step needs: [read_down_app_below] asks
+(* the frame law the preservation step needs: [read_down1_app_below] asks
    [t ≤ tv], which a reader BELOW the append does not have. *)
-Lemma read_down_app_frame img log m h tv a t :
+Lemma read_down1_app_frame img log m h tv a t :
   (t <= length log)%nat ->
-  read_down img (log ++ [m]) h tv a t = read_down img log h tv a t.
+  read_down1 img (log ++ [m]) h tv a t = read_down1 img log h tv a t.
 Proof.
-  elim: t => [|t IH] Hlen; first by rewrite !read_down_0.
-  rewrite !read_down_S.
+  elim: t => [|t IH] Hlen; first by rewrite !read_down1_0.
+  rewrite !read_down1_S.
   have Hlk : (log ++ [m]) !! t = log !! t by apply lookup_app_l; lia.
-  have Hvis : visibleb h tv (log ++ [m]) (S t) = visibleb h tv log (S t)
-    by rewrite /visibleb Hlk.
+  have Hvis : visibleb1 h tv (log ++ [m]) (S t) = visibleb1 h tv log (S t)
+    by rewrite /visibleb1 Hlk.
   rewrite Hvis {1}/log_byte /= Hlk.
-  case: (visibleb h tv log (S t)) => /=; last by apply IH; lia.
+  case: (visibleb1 h tv log (S t)) => /=; last by apply IH; lia.
   case: (log !! t) => [m0|]; last by apply IH; lia.
   case: (msg_byte m0 a) => [b|] //. apply IH; lia.
 Qed.
@@ -777,14 +1780,14 @@ Lemma pin_ok_app img log m a B Sv :
   pin_ok img (log ++ [m]) a B Sv.
 Proof.
   move => Hpin Hm h tv' HB.
-  rewrite /tso_read length_app /= Nat.add_1_r read_down_S.
+  rewrite /tso_read1 length_app /= Nat.add_1_r read_down1_S.
   rewrite log_byte_top.
-  case Hv : (visibleb h tv' (log ++ [m]) (S (length log))) => /=.
+  case Hv : (visibleb1 h tv' (log ++ [m]) (S (length log))) => /=.
   - case: Hm => [-> | [b [-> Hb]]].
-    + rewrite read_down_app_frame //.
+    + rewrite read_down1_app_frame //.
       have [b [Hr Hb]] := Hpin h tv' HB. by exists b.
     + by exists b.
-  - rewrite read_down_app_frame //.
+  - rewrite read_down1_app_frame //.
     have [b [Hr Hb]] := Hpin h tv' HB. by exists b.
 Qed.
 
@@ -865,8 +1868,8 @@ Qed.
 (* reader, which is exactly the exclusion's negation).                    *)
 (*                                                                       *)
 (* THE EXCLUSION IS NOT A PROPERTY OF THE VALUE, IT IS A PROPERTY OF THE  *)
-(* READER'S OWN WRITE HISTORY, and it is true only because [read_down]    *)
-(* scans DOWN from the top and [visibleb_own] makes a hart's own message  *)
+(* READER'S OWN WRITE HISTORY, and it is true only because [read_down1]    *)
+(* scans DOWN from the top and [visibleb1_own] makes a hart's own message  *)
 (* visible at every view.  Two facts carry it, both O(1) per address and  *)
 (* both maintainable per store:                                          *)
 (*                                                                       *)
@@ -965,17 +1968,17 @@ Section racy.
   Lemma racy_read_split (img : gmap Arch.pa (bv 8)) (log : list pwmsg) (h : agent)
       (a : Arch.pa) (tv t : nat) (v b : bv 8) (Sf : agent -> bv 8 -> Prop) :
     (t <= length log)%nat ->
-    visibleb h tv log t = true ->
+    visibleb1 h tv log t = true ->
     log_byte img log t a = Some v ->
     own_last log h a t ->
     writer_pin log a Sf ->
-    tso_read img log h tv a = Some b ->
+    tso_read1 img log h tv a = Some b ->
     b = v \/ exists h', h' <> h /\ Sf h' b.
   Proof.
     move => Hlen Hvis Hb Ho Hw Hrd.
-    destruct (read_down_latest img log h tv a (length log) t v Hlen Hvis Hb)
+    destruct (read_down1_latest img log h tv a (length log) t v Hlen Hvis Hb)
       as (t'' & v'' & Hle & Hrd'' & Hvis'' & Hb'').
-    rewrite /tso_read Hrd'' in Hrd. injection Hrd as <-.
+    rewrite /tso_read1 Hrd'' in Hrd. injection Hrd as <-.
     destruct (decide (t'' = t)) as [->|Hne].
     { left. rewrite Hb'' in Hb. by injection Hb as <-. }
     right.
@@ -995,13 +1998,13 @@ Section racy.
   Lemma racy_read_not_mine (img : gmap Arch.pa (bv 8)) (log : list pwmsg) (h : agent)
       (a : Arch.pa) (tv t : nat) (b z : bv 8) (cp : agent -> bv 8) :
     (t <= length log)%nat ->
-    visibleb h tv log t = true ->
+    visibleb1 h tv log t = true ->
     log_byte img log t a = Some z ->              (* my own last write was the CLEAR *)
     own_last log h a t ->
     writer_pin log a (fun j c => c = z \/ c = cp j) ->
     z <> cp h ->
     (forall j, j <> h -> cp j <> cp h) ->         (* cp injective at h *)
-    tso_read img log h tv a = Some b ->
+    tso_read1 img log h tv a = Some b ->
     b <> cp h.
   Proof.
     move => Hlen Hvis Hb Ho Hw Hz Hinj Hrd.
@@ -1011,7 +2014,7 @@ Section racy.
   Qed.
 
   (* ---- AND THE FREE HALF: the OWN-WRITE read needs no receipt at all.
-     [visibleb_own] makes the author's own message visible at EVERY view,
+     [visibleb1_own] makes the author's own message visible at EVERY view,
      so the holder's read of the cell it itself wrote is exact.  This is
      the pure form of what [TsoCtxStore.ledger_read_vis_ok] already does in
      Iris -- recorded here because it is what makes the memo's ruling 2
@@ -1020,19 +2023,19 @@ Section racy.
       (a : Arch.pa) (tv i : nat) (m : pwmsg) (v b : bv 8) :
     log !! i = Some m -> pm_tid m = h -> msg_byte m a = Some v ->
     own_last log h a (S i) ->
-    tso_read img log h tv a = Some b ->
+    tso_read1 img log h tv a = Some b ->
     b = v \/ exists j m', (S i <= j)%nat /\ log !! j = Some m' /\
                           pm_tid m' <> h /\ msg_byte m' a = Some b.
   Proof.
     move => Hlk Htid Hb Ho Hrd.
     have Hlen : (S i <= length log)%nat by (apply lookup_lt_Some in Hlk; lia).
-    have Hvis : visibleb h tv log (S i) = true
-      by apply (visibleb_own _ _ _ _ _ Hlk Htid).
+    have Hvis : visibleb1 h tv log (S i) = true
+      by apply (visibleb1_own _ _ _ _ _ Hlk Htid).
     have Hlb : log_byte img log (S i) a = Some v
       by rewrite /log_byte Hlk.
-    destruct (read_down_latest img log h tv a (length log) (S i) v Hlen Hvis Hlb)
+    destruct (read_down1_latest img log h tv a (length log) (S i) v Hlen Hvis Hlb)
       as (t'' & v'' & Hle & Hrd'' & Hvis'' & Hb'').
-    rewrite /tso_read Hrd'' in Hrd. injection Hrd as <-.
+    rewrite /tso_read1 Hrd'' in Hrd. injection Hrd as <-.
     destruct (decide (t'' = S i)) as [->|Hne].
     { left. rewrite Hb'' in Hlb. by injection Hlb as <-. }
     right. destruct t'' as [|j]; first lia.
@@ -1069,45 +2072,45 @@ Section window.
       (forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j)))
       \/ (forall j, (j < n)%nat -> log_byte img log t (pa_add a j) = None).
 
-  (* the timestamp [read_down] settles on, computed at BYTE 0 *)
+  (* the timestamp [read_down1] settles on, computed at BYTE 0 *)
   Fixpoint find_top (h : agent) (tv : nat) (t : nat) : option nat :=
-    match (if visibleb h tv log t then log_byte img log t (pa_add a 0) else None) with
+    match (if visibleb1 h tv log t then log_byte img log t (pa_add a 0) else None) with
     | Some _ => Some t
     | None => match t with O => None | S t' => find_top h tv t' end
     end.
 
   Lemma find_top_0 (h : agent) (tv : nat) :
     find_top h tv 0 =
-      match (if visibleb h tv log 0 then log_byte img log 0 (pa_add a 0) else None) with
+      match (if visibleb1 h tv log 0 then log_byte img log 0 (pa_add a 0) else None) with
       | Some _ => Some 0%nat | None => None end.
   Proof. reflexivity. Qed.
 
   Lemma find_top_S (h : agent) (tv t : nat) :
     find_top h tv (S t) =
-      match (if visibleb h tv log (S t) then log_byte img log (S t) (pa_add a 0) else None) with
+      match (if visibleb1 h tv log (S t) then log_byte img log (S t) (pa_add a 0) else None) with
       | Some _ => Some (S t) | None => find_top h tv t end.
   Proof. reflexivity. Qed.
 
   (* ---- THE REASSEMBLY: one timestamp serves every byte ---- *)
-  Lemma read_down_win (h : agent) (tv t : nat) (j : nat) :
+  Lemma read_down1_win (h : agent) (tv t : nat) (j : nat) :
     win_ok -> (j < n)%nat ->
-    read_down img log h tv (pa_add a j) t
+    read_down1 img log h tv (pa_add a j) t
     = match find_top h tv t with
       | Some T => log_byte img log T (pa_add a j)
       | None => None
       end.
   Proof.
     move => Hw Hj. elim: t => [|t IH].
-    - rewrite read_down_0 find_top_0.
-      have Hv : visibleb h tv log 0 = true by (apply visibleb_below; lia).
+    - rewrite read_down1_0 find_top_0.
+      have Hv : visibleb1 h tv log 0 = true by (apply visibleb1_below; lia).
       rewrite Hv.
       case E0 : (log_byte img log 0 (pa_add a 0)) => [b0|].
       + by rewrite /log_byte.
       + case: (Hw 0%nat) => Hall.
         * have := Hall 0%nat ltac:(lia). rewrite E0. by move => [? ?].
         * have H := Hall j Hj. move: H. rewrite /log_byte. by move => ->.
-    - rewrite read_down_S find_top_S.
-      case Ev : (visibleb h tv log (S t)); last by rewrite IH.
+    - rewrite read_down1_S find_top_S.
+      case Ev : (visibleb1 h tv log (S t)); last by rewrite IH.
       case E0 : (log_byte img log (S t) (pa_add a 0)) => [b0|].
       + case: (Hw (S t)) => Hall.
         * have [bj Hbj] := Hall j Hj. by rewrite Hbj.
@@ -1120,16 +2123,16 @@ Section window.
   (* find_top lands on a visible, window-writing timestamp *)
   Lemma find_top_spec (h : agent) (tv t T : nat) :
     find_top h tv t = Some T ->
-    (T <= t)%nat /\ visibleb h tv log T = true
+    (T <= t)%nat /\ visibleb1 h tv log T = true
     /\ is_Some (log_byte img log T (pa_add a 0)).
   Proof.
     elim: t => [|t IH].
     - rewrite find_top_0.
-      case Ev : (visibleb h tv log 0); last by [].
+      case Ev : (visibleb1 h tv log 0); last by [].
       case E0 : (log_byte img log 0 (pa_add a 0)) => [b0|]; last by [].
       move => [<-]. split_and!; [lia|done|by eexists].
     - rewrite find_top_S.
-      case Ev : (visibleb h tv log (S t)).
+      case Ev : (visibleb1 h tv log (S t)).
       + case E0 : (log_byte img log (S t) (pa_add a 0)) => [b0|].
         * move => [<-]. split_and!; [lia|done|by eexists].
         * move => /IH [? [? ?]]. split_and!; [lia|done|done].
@@ -1138,7 +2141,7 @@ Section window.
 
   (* find_top is MAXIMAL: nothing visible and window-writing sits above it *)
   Lemma find_top_max (h : agent) (tv t t' : nat) :
-    (t' <= t)%nat -> visibleb h tv log t' = true ->
+    (t' <= t)%nat -> visibleb1 h tv log t' = true ->
     is_Some (log_byte img log t' (pa_add a 0)) ->
     exists T, find_top h tv t = Some T /\ (t' <= T)%nat.
   Proof.
@@ -1147,7 +2150,7 @@ Section window.
       rewrite find_top_0. move: Hb Hv. rewrite Ht0 => -> ->.
       exists 0%nat. split; [done|lia].
     - rewrite find_top_S.
-      case Ev : (visibleb h tv log (S t)).
+      case Ev : (visibleb1 h tv log (S t)).
       + case E0 : (log_byte img log (S t) (pa_add a 0)) => [b0|].
         * exists (S t). split; [done|lia].
         * have Hne : t' <> S t.
@@ -1167,13 +2170,13 @@ Section window.
   Lemma racy_read_window (h : agent) (tv t : nat) :
     win_ok ->
     (t <= length log)%nat ->
-    visibleb h tv log t = true ->
+    visibleb1 h tv log t = true ->
     (forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))) ->
     (forall j, (j < n)%nat -> own_last log h (pa_add a j) t) ->
     exists T : nat,
       (t <= T)%nat
       /\ (forall j, (j < n)%nat ->
-            tso_read img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
+            tso_read1 img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
       /\ (T = t \/ exists i m, T = S i /\ log !! i = Some m /\ pm_tid m <> h
                             /\ is_Some (msg_byte m (pa_add a 0))).
   Proof.
@@ -1181,7 +2184,7 @@ Section window.
     have [T [HT Hge]] := find_top_max h tv (length log) t Hlen Hvis (Hsome 0%nat ltac:(lia)).
     exists T. split; first done.
     split.
-    { move => j Hj. rewrite /tso_read (read_down_win h tv (length log) j Hw Hj) HT //. }
+    { move => j Hj. rewrite /tso_read1 (read_down1_win h tv (length log) j Hw Hj) HT //. }
     case: (decide (T = t)) => [->|Hne]; first by left.
     right.
     have [Hle [Hv [b0 Hb0]]] := find_top_spec h tv (length log) T HT.
@@ -1212,16 +2215,16 @@ Section window.
       (Wf : agent -> (nat -> option (bv 8)) -> Prop) :
     win_ok -> wpin Wf ->
     (t <= length log)%nat ->
-    visibleb h tv log t = true ->
+    visibleb1 h tv log t = true ->
     (forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))) ->
     (forall j, (j < n)%nat -> own_last log h (pa_add a j) t) ->
     (forall j, (j < n)%nat ->
-       tso_read img log h tv (pa_add a j) = log_byte img log t (pa_add a j))
+       tso_read1 img log h tv (pa_add a j) = log_byte img log t (pa_add a j))
     \/ (exists (h' : agent) (m : pwmsg),
           h' <> h /\ pm_tid m = h'
           /\ Wf h' (fun j => msg_byte m (pa_add a j))
           /\ forall j, (j < n)%nat ->
-               tso_read img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
+               tso_read1 img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
   Proof.
     move => Hw Hp Hlen Hvis Hsome Ho.
     have [T [Hge [Hrd Harm]]] := racy_read_window h tv t Hw Hlen Hvis Hsome Ho.
@@ -1252,12 +2255,12 @@ Section window.
     wpin (fun j f => (forall k, (k < n)%nat -> f k = Some (z k))
                   \/ (forall k, (k < n)%nat -> f k = Some (cp j k))) ->
     (t <= length log)%nat ->
-    visibleb h tv log t = true ->
+    visibleb1 h tv log t = true ->
     (forall j, (j < n)%nat -> log_byte img log t (pa_add a j) = Some (z j)) ->
     (forall j, (j < n)%nat -> own_last log h (pa_add a j) t) ->
     (exists k, (k < n)%nat /\ z k <> cp h k) ->
     (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
-    exists k, (k < n)%nat /\ tso_read img log h tv (pa_add a k) <> Some (cp h k).
+    exists k, (k < n)%nat /\ tso_read1 img log h tv (pa_add a k) <> Some (cp h k).
   Proof.
     move => Hw Hp Hlen Hvis Hz Ho [k0 [Hk0 Hzk]] Hinj.
     have Hsome : forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))
@@ -1288,8 +2291,8 @@ End window.
 (* THE RULING: every claim gains a FLOOR [Bm] -- the position of the      *)
 (* MINT STORE itself -- and constrains only messages AT OR ABOVE it; the  *)
 (* reader pays with a monotone receipt [Bm <= tv].  WHY THAT IS ENOUGH IS *)
-(* ONE FACT, and it is [read_down_shadow] below: the mint store TOUCHED   *)
-(* the cell and is visible at every view past it, so [read_down]'s scan   *)
+(* ONE FACT, and it is [read_down1_shadow] below: the mint store TOUCHED   *)
+(* the cell and is visible at every view past it, so [read_down1]'s scan   *)
 (* is stopped at or above the floor and the pre-mint past is never        *)
 (* consulted.                                                            *)
 (*                                                                       *)
@@ -1345,25 +2348,25 @@ Section floor_byte.
 
   (* ------------------------------------------------------------------ *)
   (* (1) THE SHADOW.  A view past the floor cannot resolve below it --    *)
-  (* the floor message is visible there ([visibleb_below]) and it WRITES  *)
-  (* the byte, so [read_down]'s scan is stopped at or above it.  This is  *)
-  (* the whole content of the ruling, and it is [read_down_latest] at     *)
+  (* the floor message is visible there ([visibleb1_below]) and it WRITES  *)
+  (* the byte, so [read_down1]'s scan is stopped at or above it.  This is  *)
+  (* the whole content of the ruling, and it is [read_down1_latest] at     *)
   (* [t' := Bm].                                                          *)
   (* ------------------------------------------------------------------ *)
-  Lemma read_down_shadow (h : agent) (tv Bm : nat) (a : Arch.pa) (bm : bv 8) :
+  Lemma read_down1_shadow (h : agent) (tv Bm : nat) (a : Arch.pa) (bm : bv 8) :
     (Bm <= tv)%nat -> (Bm <= length log)%nat ->
     log_byte img log Bm a = Some bm ->
     exists (T : nat) (v : bv 8),
       (Bm <= T)%nat
-      /\ tso_read img log h tv a = Some v
-      /\ visibleb h tv log T = true
+      /\ tso_read1 img log h tv a = Some v
+      /\ visibleb1 h tv log T = true
       /\ log_byte img log T a = Some v.
   Proof.
     move => Htv Hlen Hbm.
-    have Hvis : visibleb h tv log Bm = true by (apply visibleb_below; lia).
+    have Hvis : visibleb1 h tv log Bm = true by (apply visibleb1_below; lia).
     have [T [v [Hge [Hrd [Hv Hb]]]]] :=
-      read_down_latest img log h tv a (length log) Bm bm Hlen Hvis Hbm.
-    exists T, v. by rewrite /tso_read.
+      read_down1_latest img log h tv a (length log) Bm bm Hlen Hvis Hbm.
+    exists T, v. by rewrite /tso_read1.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1376,17 +2379,17 @@ Section floor_byte.
       (v b : bv 8) (Sf : agent -> bv 8 -> Prop) :
     (Bm <= t)%nat ->
     (t <= length log)%nat ->
-    visibleb h tv log t = true ->
+    visibleb1 h tv log t = true ->
     log_byte img log t a = Some v ->
     own_last_fl Bm h a t ->
     writer_pin_fl Bm a Sf ->
-    tso_read img log h tv a = Some b ->
+    tso_read1 img log h tv a = Some b ->
     b = v \/ exists h', h' <> h /\ Sf h' b.
   Proof.
     move => Hfl Hlen Hvis Hb Ho Hw Hrd.
-    destruct (read_down_latest img log h tv a (length log) t v Hlen Hvis Hb)
+    destruct (read_down1_latest img log h tv a (length log) t v Hlen Hvis Hb)
       as (t'' & v'' & Hle & Hrd'' & Hvis'' & Hb'').
-    rewrite /tso_read Hrd'' in Hrd. injection Hrd as <-.
+    rewrite /tso_read1 Hrd'' in Hrd. injection Hrd as <-.
     destruct (decide (t'' = t)) as [->|Hne].
     { left. rewrite Hb'' in Hb. by injection Hb as <-. }
     right.
@@ -1462,7 +2465,7 @@ Section floor_window.
   (* [win_ok] MUST BE RELATIVISED TOO, AND THAT IS THE PART THE RULING's *)
   (* SKETCH DOES NOT COVER.                                             *)
   (*                                                                    *)
-  (* [TsoMemPa.read_down_win] -- the reassembly that makes ONE timestamp *)
+  (* [TsoMemPa.read_down1_win] -- the reassembly that makes ONE timestamp *)
   (* serve every byte of the window -- takes [win_ok] at EVERY           *)
   (* timestamp, and below the floor that is FALSE for exactly the cell   *)
   (* this whole ruling exists for: xv6's [memset] is a BYTE LOOP         *)
@@ -1489,24 +2492,24 @@ Section floor_window.
     - move => Hw t. exact (Hw t ltac:(lia)).
   Qed.
 
-  (* THE RELATIVISED REASSEMBLY.  [read_down_win]'s proof, with the
+  (* THE RELATIVISED REASSEMBLY.  [read_down1_win]'s proof, with the
      induction stopped at the floor: at [t = Bm] the floor message is
      visible ([Bm <= tv]) and writes every byte, so the scan halts there
      and never asks [win_ok] about anything below. *)
   (* >>> A6.111 (§0.36′(a) at the lock tier + §0.38′'s received-or-wrote
      reading; owner informed, veto standing).  THE PREMISE IS THE FLOOR
      MESSAGE'S VISIBILITY, NOT THE READER'S VIEW.  [Bm <= tv] was only ever
-     used to prove [visibleb h tv log Bm = true] in the two base cases below
-     -- the step case never mentions it -- and [visibleb] has TWO arms: below
+     used to prove [visibleb1 h tv log Bm = true] in the two base cases below
+     -- the step case never mentions it -- and [visibleb1] has TWO arms: below
      the view, or authored by the reader.  A hart that WROTE the floor (the
      creator of a lock: [initlock]'s [sd x0] IS the mint store, so its own
      anchor and the floor coincide) has the second arm at EVERY view, and
-     needs no receipt.  [visibleb_below] recovers the old premise, so this is
+     needs no receipt.  [visibleb1_below] recovers the old premise, so this is
      a strict weakening. <<< *)
-  Lemma read_down_win_fl (h : agent) (tv Bm t j : nat) :
-    win_ok_fl Bm -> (j < n)%nat -> visibleb h tv log Bm = true -> (Bm <= t)%nat ->
+  Lemma read_down1_win_fl (h : agent) (tv Bm t j : nat) :
+    win_ok_fl Bm -> (j < n)%nat -> visibleb1 h tv log Bm = true -> (Bm <= t)%nat ->
     (forall k, (k < n)%nat -> is_Some (log_byte img log Bm (pa_add a k))) ->
-    read_down img log h tv (pa_add a j) t
+    read_down1 img log h tv (pa_add a j) t
     = match find_top h tv t with
       | Some T => log_byte img log T (pa_add a j)
       | None => None
@@ -1516,25 +2519,25 @@ Section floor_window.
     - (* t = 0, so the floor is 0 and the image writes the window *)
       have HB : Bm = 0%nat by lia.
       rewrite HB in Hfl.
-      rewrite read_down_0 find_top_0.
-      have Hv : visibleb h tv log 0 = true by (rewrite -HB; exact Htv).
+      rewrite read_down1_0 find_top_0.
+      have Hv : visibleb1 h tv log 0 = true by (rewrite -HB; exact Htv).
       rewrite Hv.
       have [b0 Hb0] := Hfl 0%nat ltac:(lia).
       rewrite Hb0. move: Hb0. rewrite /log_byte. by move => _.
     - case: (decide (Bm = S t)) => [HB|Hne].
       + (* the floor itself: it is visible and it writes every byte *)
-        rewrite read_down_S find_top_S.
-        have Hv : visibleb h tv log (S t) = true
+        rewrite read_down1_S find_top_S.
+        have Hv : visibleb1 h tv log (S t) = true
           by (rewrite -HB; exact Htv).
         rewrite Hv.
         rewrite HB in Hfl.
         have [b0 Hb0] := Hfl 0%nat ltac:(lia).
         have [bj Hbj] := Hfl j Hj.
         by rewrite Hb0 Hbj.
-      + (* above the floor: [read_down_win]'s step, verbatim *)
+      + (* above the floor: [read_down1_win]'s step, verbatim *)
         have Hge' : (Bm <= t)%nat by lia.
-        rewrite read_down_S find_top_S.
-        case Ev : (visibleb h tv log (S t)); last by rewrite (IH Hge' Hfl).
+        rewrite read_down1_S find_top_S.
+        case Ev : (visibleb1 h tv log (S t)); last by rewrite (IH Hge' Hfl).
         case E0 : (log_byte img log (S t) (pa_add a 0)) => [b0|].
         * case: (Hw (S t) ltac:(lia)) => Hall.
           -- have [bj Hbj] := Hall j Hj. by rewrite Hbj.
@@ -1556,17 +2559,17 @@ Section floor_window.
   (* ------------------------------------------------------------------ *)
   Lemma racy_read_window_fl (h : agent) (tv Bm t : nat) :
     win_ok_fl Bm ->
-    visibleb h tv log Bm = true ->
+    visibleb1 h tv log Bm = true ->
     (forall k, (k < n)%nat -> is_Some (log_byte img log Bm (pa_add a k))) ->
     (Bm <= t)%nat ->
     (t <= length log)%nat ->
-    visibleb h tv log t = true ->
+    visibleb1 h tv log t = true ->
     (forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))) ->
     (forall j, (j < n)%nat -> own_last_fl log Bm h (pa_add a j) t) ->
     exists T : nat,
       (t <= T)%nat
       /\ (forall j, (j < n)%nat ->
-            tso_read img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
+            tso_read1 img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
       /\ (T = t \/ exists i m, T = S i /\ log !! i = Some m /\ pm_tid m <> h
                             /\ (Bm <= S i)%nat
                             /\ is_Some (msg_byte m (pa_add a 0))).
@@ -1577,8 +2580,8 @@ Section floor_window.
     exists T. split; first done.
     split.
     { move => j Hj.
-      rewrite /tso_read
-        (read_down_win_fl h tv Bm (length log) j Hw Hj Htv ltac:(lia) Hcov) HT //. }
+      rewrite /tso_read1
+        (read_down1_win_fl h tv Bm (length log) j Hw Hj Htv ltac:(lia) Hcov) HT //. }
     case: (decide (T = t)) => [->|Hne]; first by left.
     right.
     have [Hle [Hv [b0 Hb0]]] := find_top_spec img log a n Hn h tv (length log) T HT.
@@ -1603,13 +2606,13 @@ Section floor_window.
   (* ------------------------------------------------------------------ *)
   Lemma racy_read_window_any_fl (h : agent) (tv Bm : nat) :
     win_ok_fl Bm ->
-    visibleb h tv log Bm = true ->
+    visibleb1 h tv log Bm = true ->
     (Bm <= length log)%nat ->
     (forall k, (k < n)%nat -> is_Some (log_byte img log Bm (pa_add a k))) ->
     exists T : nat,
       (Bm <= T)%nat
       /\ (forall j, (j < n)%nat ->
-            tso_read img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
+            tso_read1 img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
       /\ (T = Bm \/ exists i m, T = S i /\ log !! i = Some m /\ (Bm <= S i)%nat
                              /\ is_Some (msg_byte m (pa_add a 0))).
   Proof.
@@ -1619,8 +2622,8 @@ Section floor_window.
     exists T. split; first done.
     split.
     { move => j Hj.
-      rewrite /tso_read
-        (read_down_win_fl h tv Bm (length log) j Hw Hj Htv ltac:(lia) Hcov)
+      rewrite /tso_read1
+        (read_down1_win_fl h tv Bm (length log) j Hw Hj Htv ltac:(lia) Hcov)
         HT //. }
     case: (decide (T = Bm)) => [->|Hne]; first by left.
     right.
@@ -1642,18 +2645,18 @@ Section floor_window.
   Lemma racy_read_window_pin_fl_at (h : agent) (tv Bm t : nat)
       (Wf : agent -> (nat -> option (bv 8)) -> Prop) :
     win_ok_fl Bm -> wpin_fl Bm Wf ->
-    visibleb h tv log Bm = true -> (Bm <= t)%nat -> (t <= length log)%nat ->
-    visibleb h tv log t = true ->
+    visibleb1 h tv log Bm = true -> (Bm <= t)%nat -> (t <= length log)%nat ->
+    visibleb1 h tv log t = true ->
     (forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))) ->
     (forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))) ->
     (forall j, (j < n)%nat -> own_last_fl log Bm h (pa_add a j) t) ->
     (forall j, (j < n)%nat ->
-       tso_read img log h tv (pa_add a j) = log_byte img log t (pa_add a j))
+       tso_read1 img log h tv (pa_add a j) = log_byte img log t (pa_add a j))
     \/ (exists (h' : agent) (m : pwmsg),
           h' <> h /\ pm_tid m = h'
           /\ Wf h' (fun j => msg_byte m (pa_add a j))
           /\ forall j, (j < n)%nat ->
-               tso_read img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
+               tso_read1 img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
   Proof.
     move => Hw Hp Htv Hge Hlen Hvis Hcov Hsome Ho.
     have [T [HgeT [Hrd Harm]]] :=
@@ -1677,14 +2680,14 @@ Section floor_window.
     wpin_fl Bm
       (fun j f => (forall k, (k < n)%nat -> f k = Some (z k))
                \/ (forall k, (k < n)%nat -> f k = Some (cp j k))) ->
-    visibleb h tv log Bm = true -> (Bm <= t)%nat -> (t <= length log)%nat ->
-    visibleb h tv log t = true ->
+    visibleb1 h tv log Bm = true -> (Bm <= t)%nat -> (t <= length log)%nat ->
+    visibleb1 h tv log t = true ->
     (forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))) ->
     (forall j, (j < n)%nat -> log_byte img log t (pa_add a j) = Some (z j)) ->
     (forall j, (j < n)%nat -> own_last_fl log Bm h (pa_add a j) t) ->
     (exists k, (k < n)%nat /\ z k <> cp h k) ->
     (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
-    exists k, (k < n)%nat /\ tso_read img log h tv (pa_add a k) <> Some (cp h k).
+    exists k, (k < n)%nat /\ tso_read1 img log h tv (pa_add a k) <> Some (cp h k).
   Proof.
     move => Hw Hp Htv Hge Hlen Hvis Hcov Hz Ho [k0 [Hk0 Hzk]] Hinj.
     have Hsome : forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))
@@ -1720,15 +2723,15 @@ Section floor_window.
     exists T : nat,
       (Bm <= T)%nat
       /\ (forall j, (j < n)%nat ->
-            tso_read img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
+            tso_read1 img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
       /\ (T = Bm \/ exists i m, T = S i /\ log !! i = Some m /\ pm_tid m <> h
                              /\ (Bm <= S i)%nat
                              /\ is_Some (msg_byte m (pa_add a 0))).
   Proof.
     move => Hw Htv Hlen Hsome Hno.
     apply (racy_read_window_fl h tv Bm Bm Hw
-             ltac:(apply visibleb_below; lia) Hsome ltac:(lia) Hlen
-             ltac:(apply visibleb_below; lia) Hsome).
+             ltac:(apply visibleb1_below; lia) Hsome ltac:(lia) Hlen
+             ltac:(apply visibleb1_below; lia) Hsome).
     (* the anchor: [own_last_fl] at [Bm] for every byte of the window.
        [win_ok] carries "writes byte 0" to "writes byte j", so the ONE
        hypothesis about byte 0 serves the whole window. *)
@@ -1755,12 +2758,12 @@ Section floor_window.
     (forall i m, (Bm <= S i)%nat -> log !! i = Some m -> pm_tid m = h ->
        msg_byte m (pa_add a 0) = None) ->
     (forall j, (j < n)%nat ->
-       tso_read img log h tv (pa_add a j) = log_byte img log Bm (pa_add a j))
+       tso_read1 img log h tv (pa_add a j) = log_byte img log Bm (pa_add a j))
     \/ (exists (h' : agent) (m : pwmsg),
           h' <> h /\ pm_tid m = h'
           /\ Wf h' (fun j => msg_byte m (pa_add a j))
           /\ forall j, (j < n)%nat ->
-               tso_read img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
+               tso_read1 img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
   Proof.
     move => Hw Hp Htv Hlen Hsome Hno.
     have [T [Hge [Hrd Harm]]] :=
@@ -1800,7 +2803,7 @@ Section floor_window.
        msg_byte m (pa_add a 0) = None) ->
     (exists k, (k < n)%nat /\ z k <> cp h k) ->
     (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
-    exists k, (k < n)%nat /\ tso_read img log h tv (pa_add a k) <> Some (cp h k).
+    exists k, (k < n)%nat /\ tso_read1 img log h tv (pa_add a k) <> Some (cp h k).
   Proof.
     move => Hw Hp Htv Hlen Hz Hno [k0 [Hk0 Hzk]] Hinj.
     have Hsome : forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))
@@ -1838,7 +2841,7 @@ Lemma lkcpu_not_mine_floor0 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
      msg_byte m (pa_add a 0) = None) ->
   (exists k, (k < n)%nat /\ z k <> cp h k) ->
   (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
-  exists k, (k < n)%nat /\ tso_read img log h tv (pa_add a k) <> Some (cp h k).
+  exists k, (k < n)%nat /\ tso_read1 img log h tv (pa_add a k) <> Some (cp h k).
 Proof.
   move => Hn Hw Hp Hz Hno Hzk Hinj.
   apply (lkcpu_not_mine_fl img log a n Hn h tv 0 z cp
@@ -1904,8 +2907,8 @@ Record ts_win : Type := TsWin {
 
    THE FLOOR IS THE MINT STORE'S OWN POSITION, and conjunct (2b) is what
    says so: the timestamp [tw_lo] wrote the CLEAR word over the whole
-   window.  That is the message [read_down]'s scan is stopped at
-   ([TsoMemPa.read_down_shadow]), and it is why the cell's pre-mint past
+   window.  That is the message [read_down1]'s scan is stopped at
+   ([TsoMemPa.read_down1_shadow]), and it is why the cell's pre-mint past
    -- a [kfree] memset, for a lock inside a [kalloc]'d page -- is never
    consulted and needs no constraint. *)
 Definition win_ok1 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
@@ -1937,7 +2940,7 @@ Definition win_ok1 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
   /\ (forall h t, tw_own W h = Some t ->
         (tw_lo W <= t)%nat
         /\ (t <= length log)%nat
-        /\ (forall tv, (tw_lo W <= tv)%nat -> visibleb h tv log t = true)
+        /\ (forall tv, (tw_lo W <= tv)%nat -> visibleb1 h tv log t = true)
         /\ log_byte img log t a = Some (tw_z W (tw_j W))
         /\ own_last_fl log (tw_lo W) h a t).
 
@@ -1946,7 +2949,7 @@ Definition win_ok1 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
    with no premise about the rest of the window: conjunct (1)'s premise
    ([is_Some (msg_byte m a)]) is false for the new message, so it says
    nothing about it; (2) is about the image; (3)'s four parts frame by
-   [visibleb_app], [log_byte_app_le] and [own_last_app_frame], whose own
+   [visibleb1_app], [log_byte_app_le] and [own_last_app_frame], whose own
    side condition [pm_tid m = h -> msg_byte m a = None] this premise
    implies outright.
 
@@ -1974,7 +2977,7 @@ Proof.
     split_and!.
     + exact Hge.
     + rewrite length_app /=. lia.
-    + move => tv Htv. by apply visibleb_app, Hvis.
+    + move => tv Htv. by apply visibleb1_app, Hvis.
     + by rewrite (log_byte_app_le _ _ _ _ _ Hlen).
     + exact (own_last_fl_app_frame log (tw_lo W) m h a t Hol (fun _ => Hm)).
 Qed.
@@ -2031,7 +3034,7 @@ Proof.
       split_and!.
       * lia.
       * rewrite length_app /=. lia.
-      * move => tv _. exact (visibleb_own _ _ _ _ _ Hlk_top eq_refl).
+      * move => tv _. exact (visibleb1_own _ _ _ _ _ Hlk_top eq_refl).
       * rewrite log_byte_top. exact (Hcl j Hj).
       * move => i m0 Hge Hlk _ _.
         apply lookup_lt_Some in Hlk. rewrite length_app /= in Hlk. lia.
@@ -2040,7 +3043,7 @@ Proof.
       split_and!.
       * exact Hge.
       * rewrite length_app /=. lia.
-      * move => tv Htv. by apply visibleb_app, Hvis.
+      * move => tv Htv. by apply visibleb1_app, Hvis.
       * by rewrite (log_byte_app_le _ _ _ _ _ Hlen).
       * have Hfr : pm_tid msg = h -> msg_byte msg (pa_add base j) = None
           by move => Heq; congruence.
@@ -2100,7 +3103,7 @@ Proof.
     split_and!.
     + lia.
     + exact Hlen.
-    + move => tv Htv. by apply visibleb_below.
+    + move => tv Htv. by apply visibleb1_below.
     + by have [Hb _] := Hlat j Hj.
     + move => i m Hge Hlk _ Hs.
       have Heq : S i = t := Hat i m j Hge Hlk Hj Hs. lia.
@@ -2187,17 +3190,17 @@ Section assemble.
      [t = lo], since [initlock]'s store is the mint store). *)
   Lemma win_assemble_not_mine (h : agent) (t tv : nat) :
     own h = Some t ->
-    visibleb h tv log lo = true ->
+    visibleb1 h tv log lo = true ->
     (* A6.115: the ANCHOR, and it no longer mentions the reader's view at
        all.  Either my record IS the floor (and the floor's visibility above
        covers it), or the write at [t] is MINE and visible at every view --
        which is the owner cell's own invariant, [ledger_vis h lo t], carried
        in the cell since A6.114 §2 and re-established free at the mint and off
        the store's message fragment at a release. *)
-    ((t <= lo)%nat \/ (forall tv' : nat, visibleb h tv' log t = true)) ->
+    ((t <= lo)%nat \/ (forall tv' : nat, visibleb1 h tv' log t = true)) ->
     (exists k, (k < n)%nat /\ z k <> cp h k) ->
     (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
-    exists k, (k < n)%nat /\ tso_read img log h tv (pa_add base k) <> Some (cp h k).
+    exists k, (k < n)%nat /\ tso_read1 img log h tv (pa_add base k) <> Some (cp h k).
   Proof.
     move => Hown Hfv Hanc Hzk Hinj.
     have Hge : (lo <= t)%nat
@@ -2206,7 +3209,7 @@ Section assemble.
     have Hlen : (t <= length log)%nat
       by (have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov 0%nat Hn;
           by have [_ [? _]] := H3 h t Hown).
-    have Hvis : visibleb h tv log t = true.
+    have Hvis : visibleb1 h tv log t = true.
     { case: Hanc => [Hle|Hown']; last exact (Hown' tv).
       have Hteq : t = lo by lia.
       by rewrite Hteq. }
@@ -2392,34 +3395,34 @@ Proof.
 Qed.
 
 (* the read-down scan skips a stretch of invisible-or-missing positions *)
-Lemma read_down_skip img log h tv a t T :
+Lemma read_down1_skip img log h tv a t T :
   (T <= t)%nat ->
   (forall t', (T < t')%nat -> (t' <= t)%nat ->
-     visibleb h tv log t' = false \/ log_byte img log t' a = None) ->
-  read_down img log h tv a t = read_down img log h tv a T.
+     visibleb1 h tv log t' = false \/ log_byte img log t' a = None) ->
+  read_down1 img log h tv a t = read_down1 img log h tv a T.
 Proof.
   elim: t => [|t IH] Hle Hsk.
   - have -> : T = 0%nat by lia. reflexivity.
   - case: (decide (T = S t)) => [-> | Hne]; first reflexivity.
-    rewrite read_down_S.
+    rewrite read_down1_S.
     have Hlt : (T <= t)%nat by lia.
     have Hsk' : forall t', (T < t')%nat -> (t' <= t)%nat ->
-        visibleb h tv log t' = false \/ log_byte img log t' a = None.
+        visibleb1 h tv log t' = false \/ log_byte img log t' a = None.
     { move => t' H1 H2. apply Hsk; lia. }
     rewrite -(IH Hlt Hsk').
     case: (Hsk (S t) ltac:(lia) ltac:(lia)) => Hc.
     + by rewrite Hc.
-    + case Ev : (visibleb h tv log (S t)); [by rewrite Hc | done].
+    + case Ev : (visibleb1 h tv log (S t)); [by rewrite Hc | done].
 Qed.
 
 (* a visible position whose message writes the byte is where the scan stops *)
-Lemma read_down_hit img log h tv a t v :
-  visibleb h tv log t = true -> log_byte img log t a = Some v ->
-  read_down img log h tv a t = Some v.
+Lemma read_down1_hit img log h tv a t v :
+  visibleb1 h tv log t = true -> log_byte img log t a = Some v ->
+  read_down1 img log h tv a t = Some v.
 Proof.
   case: t => [|i] Hv Hb.
-  - rewrite read_down_0. by rewrite /log_byte in Hb.
-  - rewrite read_down_S Hv Hb. reflexivity.
+  - rewrite read_down1_0. by rewrite /log_byte in Hb.
+  - rewrite read_down1_S Hv Hb. reflexivity.
 Qed.
 
 
@@ -2435,10 +3438,10 @@ Qed.
 
 (* a position above the view that is visible is visible at EVERY view
    (its visibility is the tv-independent own/image arm) *)
-Lemma visibleb_high h tv tv' log r :
-  (tv < r)%nat -> visibleb h tv log r = true -> visibleb h tv' log r = true.
+Lemma visibleb1_high h tv tv' log r :
+  (tv < r)%nat -> visibleb1 h tv log r = true -> visibleb1 h tv' log r = true.
 Proof.
-  move => Hlt. rewrite /visibleb.
+  move => Hlt. rewrite /visibleb1.
   have -> : bool_decide (r <= tv)%nat = false by apply bool_decide_eq_false; lia.
   rewrite orb_false_l => Hm. by rewrite Hm orb_true_r.
 Qed.
@@ -2446,46 +3449,46 @@ Qed.
 (* the descent from [t ≥ B] cannot pass an always-visible byte at [B]:
    it settles at some [q ≥ B], and everything strictly above the settle
    was skipped *)
-Lemma read_down_above img log h tv a (B t : nat) (b0 : bv 8) :
-  visibleb h tv log B = true ->
+Lemma read_down1_above img log h tv a (B t : nat) (b0 : bv 8) :
+  visibleb1 h tv log B = true ->
   log_byte img log B a = Some b0 ->
   (B <= t)%nat ->
   exists q b, (B <= q)%nat /\ (q <= t)%nat /\
-    visibleb h tv log q = true /\ log_byte img log q a = Some b /\
-    read_down img log h tv a t = Some b /\
+    visibleb1 h tv log q = true /\ log_byte img log q a = Some b /\
+    read_down1 img log h tv a t = Some b /\
     (forall r, (q < r)%nat -> (r <= t)%nat ->
-       visibleb h tv log r = false \/ log_byte img log r a = None).
+       visibleb1 h tv log r = false \/ log_byte img log r a = None).
 Proof.
   move => HvB HbB.
   elim: t => [|t IH] HBt.
   - have HB0 : B = 0%nat by lia. subst B.
     exists 0%nat, b0. split_and!.
     { lia. } { lia. } { exact HvB. } { exact HbB. }
-    { exact (read_down_hit img log h tv a 0 b0 HvB HbB). }
+    { exact (read_down1_hit img log h tv a 0 b0 HvB HbB). }
     { move => r H1 H2. lia. }
   - case: (decide (B = S t)) => [HBeq | Hne].
     + subst B. exists (S t), b0. split_and!.
       { lia. } { lia. } { exact HvB. } { exact HbB. }
-      { exact (read_down_hit img log h tv a (S t) b0 HvB HbB). }
+      { exact (read_down1_hit img log h tv a (S t) b0 HvB HbB). }
       { move => r H1 H2. lia. }
     + have HBt' : (B <= t)%nat by lia.
-      case Ev : (visibleb h tv log (S t)).
+      case Ev : (visibleb1 h tv log (S t)).
       * case Eb : (log_byte img log (S t) a) => [b1|].
         -- exists (S t), b1. split_and!.
            { lia. } { lia. } { exact Ev. } { exact Eb. }
-           { exact (read_down_hit img log h tv a (S t) b1 Ev Eb). }
+           { exact (read_down1_hit img log h tv a (S t) b1 Ev Eb). }
            { move => r H1 H2. lia. }
         -- destruct (IH HBt') as (q & b & Hq1 & Hq2 & Hq3 & Hq4 & Hq5 & Hq6).
            exists q, b. split_and!.
            { lia. } { lia. } { exact Hq3. } { exact Hq4. }
-           { rewrite read_down_S Ev Eb. exact Hq5. }
+           { rewrite read_down1_S Ev Eb. exact Hq5. }
            { move => r H1 H2.
              case: (decide (r = S t)) => [-> | Hne2];
                [by right | apply Hq6; lia]. }
       * destruct (IH HBt') as (q & b & Hq1 & Hq2 & Hq3 & Hq4 & Hq5 & Hq6).
         exists q, b. split_and!.
         { lia. } { lia. } { exact Hq3. } { exact Hq4. }
-        { rewrite read_down_S Ev. exact Hq5. }
+        { rewrite read_down1_S Ev. exact Hq5. }
         { move => r H1 H2.
           case: (decide (r = S t)) => [-> | Hne2];
             [by left | apply Hq6; lia]. }
@@ -2494,27 +3497,27 @@ Qed.
 Lemma pin_ok_author img log a (B p : nat) (b0 : bv 8) (Sv : gset (bv 8)) (h : agent) :
   pin_ok img log a B Sv ->
   (B <= p)%nat ->
-  (forall tv, visibleb h tv log p = true) ->
+  (forall tv, visibleb1 h tv log p = true) ->
   log_byte img log p a = Some b0 ->
   (p <= length log)%nat ->
-  forall tv, exists b, tso_read img log h tv a = Some b /\ b ∈ Sv.
+  forall tv, exists b, tso_read1 img log h tv a = Some b /\ b ∈ Sv.
 Proof.
   move => Hpin HBp Hvis Hb0 HBlen tv.
-  destruct (read_down_above img log h tv a p (length log) b0 (Hvis tv) Hb0 HBlen)
+  destruct (read_down1_above img log h tv a p (length log) b0 (Hvis tv) Hb0 HBlen)
     as (q & b & HBq & Hqlen & Hqvis & Hqb & Hrd & Hmax).
   exists b. split; [exact Hrd |].
   destruct (Hpin h q ltac:(lia)) as (b' & Hrd' & Hb').
-  have Hq2 : tso_read img log h q a = Some b.
-  { rewrite /tso_read.
-    rewrite (read_down_skip img log h q a (length log) q Hqlen).
+  have Hq2 : tso_read1 img log h q a = Some b.
+  { rewrite /tso_read1.
+    rewrite (read_down1_skip img log h q a (length log) q Hqlen).
     { move => r H1 H2.
-      case Ev : (visibleb h q log r); last by left.
+      case Ev : (visibleb1 h q log r); last by left.
       right.
-      have Hvr : visibleb h tv log r = true
-        by apply (visibleb_high h q tv); [lia | exact Ev].
+      have Hvr : visibleb1 h tv log r = true
+        by apply (visibleb1_high h q tv); [lia | exact Ev].
       case: (Hmax r H1 H2) => [Hc | //]. by rewrite Hvr in Hc. }
-    apply (read_down_hit img log h q a q b);
-      [apply visibleb_below; lia | exact Hqb]. }
+    apply (read_down1_hit img log h q a q b);
+      [apply visibleb1_below; lia | exact Hqb]. }
   rewrite Hq2 in Hrd'. case: Hrd' => Heq. rewrite -Heq in Hb'. exact Hb'.
 Qed.
 
@@ -2535,35 +3538,35 @@ Section rel_read.
 
   (* the floor: below the bound, each byte's scan stops at its floor write *)
   Lemma rel_read_floor (h : agent) (tv : nat) (j : nat) :
-    (j < n)%nat -> visibleb h tv log (tf j) = true ->
-    read_down img log h tv (pa_add base j) lo = Some (fv j).
+    (j < n)%nat -> visibleb1 h tv log (tf j) = true ->
+    read_down1 img log h tv (pa_add base j) lo = Some (fv j).
   Proof.
     move => Hj Hv.
     have [_ [_ [_ [_ [_ [_ Hfl]]]]]] := Hcov j Hj.
     have [Hle [Hb Hnone]] := Hfl j Hj.
     cbn [tr_base tr_n tr_j tr_auth tr_lo tr_fl tr_fv tr_hist] in *.
     have Hsk : forall t', (tf j < t')%nat -> (t' <= lo)%nat ->
-        visibleb h tv log t' = false \/ log_byte img log t' (pa_add base j) = None.
+        visibleb1 h tv log t' = false \/ log_byte img log t' (pa_add base j) = None.
     { move => t' H1 H2. right. exact (Hnone t' H1 H2). }
-    rewrite (read_down_skip img log h tv (pa_add base j) lo (tf j) Hle Hsk).
-    exact (read_down_hit _ _ _ _ _ _ _ Hv Hb).
+    rewrite (read_down1_skip img log h tv (pa_add base j) lo (tf j) Hle Hsk).
+    exact (read_down1_hit _ _ _ _ _ _ _ Hv Hb).
   Qed.
 
   (* the scan from [lo + d]: the floor's bytes with no history entry visible
      at or under it, or the latest visible history entry's bytes *)
   Lemma rel_read_aux (h : agent) (tv : nat) (d : nat) :
-    (forall k, (k < n)%nat -> visibleb h tv log (tf k) = true) ->
+    (forall k, (k < n)%nat -> visibleb1 h tv log (tf k) = true) ->
     (lo + d <= length log)%nat ->
     ((forall j, (j < n)%nat ->
-        read_down img log h tv (pa_add base j) (lo + d) = Some (fv j))
+        read_down1 img log h tv (pa_add base j) (lo + d) = Some (fv j))
      /\ (forall q f, (q, f) ∈ hist -> (q <= lo + d)%nat ->
-           visibleb h tv log q = false))
+           visibleb1 h tv log q = false))
     \/ (exists T f, (T, f) ∈ hist /\ (T <= lo + d)%nat
-          /\ visibleb h tv log T = true
+          /\ visibleb1 h tv log T = true
           /\ (forall j, (j < n)%nat ->
-                read_down img log h tv (pa_add base j) (lo + d) = Some (f j))
+                read_down1 img log h tv (pa_add base j) (lo + d) = Some (f j))
           /\ (forall q g, (q, g) ∈ hist -> (q <= lo + d)%nat ->
-                visibleb h tv log q = true -> (q <= T)%nat)).
+                visibleb1 h tv log q = true -> (q <= T)%nat)).
   Proof.
     move => Hvf. elim: d => [|d IH] Hlen.
     - left. rewrite Nat.add_0_r. split.
@@ -2577,7 +3580,7 @@ Section rel_read.
       (* does the position [S (lo + d)] carry a visible whole-window write? *)
       have [_ [_ [_ [H1 [H1b [_ _]]]]]] := Hcov 0%nat Hn.
       cbn [tr_base tr_n tr_j tr_auth tr_lo tr_fl tr_fv tr_hist] in H1, H1b.
-      case Ev : (visibleb h tv log (S (lo + d))).
+      case Ev : (visibleb1 h tv log (S (lo + d))).
       + case E0 : (log_byte img log (S (lo + d)) (pa_add base 0%nat)) => [b0|].
         * (* a visible history entry at exactly this position *)
           right.
@@ -2591,7 +3594,7 @@ Section rel_read.
           rewrite Hi Hlk in Hlk'. injection Hlk' as <-.
           exists (S (lo + d)), f.
           split_and!; [exact Hin | lia | exact Ev | | ].
-          -- move => j Hj. apply read_down_hit; [exact Ev |].
+          -- move => j Hj. apply read_down1_hit; [exact Ev |].
              rewrite /log_byte Hlk. exact (Hw j Hj).
           -- move => q g _ Hle _. exact Hle.
         * (* visible, but no byte-0 write: no window byte is written here *)
@@ -2620,9 +3623,9 @@ Section rel_read.
             have := Hw 0%nat Hn. rewrite Hi in Hlk'.
             rewrite /log_byte Hlk' in E0. by rewrite E0. }
           have Hstep : forall j, (j < n)%nat ->
-              read_down img log h tv (pa_add base j) (S (lo + d))
-              = read_down img log h tv (pa_add base j) (lo + d).
-          { move => j Hj. rewrite read_down_S Ev (Hnone j Hj). reflexivity. }
+              read_down1 img log h tv (pa_add base j) (S (lo + d))
+              = read_down1 img log h tv (pa_add base j) (lo + d).
+          { move => j Hj. rewrite read_down1_S Ev (Hnone j Hj). reflexivity. }
           case: (IH Hlen') => [[Hrd Hinv] | [T [f [Hin [HT [HvT [Hrd Hmax]]]]]]].
           -- left. split.
              ++ move => j Hj. rewrite (Hstep j Hj). exact (Hrd j Hj).
@@ -2634,9 +3637,9 @@ Section rel_read.
                 have := Hno_entry q g Hin'. lia.
       + (* not visible: the scan passes it, and no entry here is visible *)
         have Hstep : forall j, (j < n)%nat ->
-            read_down img log h tv (pa_add base j) (S (lo + d))
-            = read_down img log h tv (pa_add base j) (lo + d).
-        { move => j Hj. rewrite read_down_S Ev. reflexivity. }
+            read_down1 img log h tv (pa_add base j) (S (lo + d))
+            = read_down1 img log h tv (pa_add base j) (lo + d).
+        { move => j Hj. rewrite read_down1_S Ev. reflexivity. }
         case: (IH Hlen') => [[Hrd Hinv] | [T [f [Hin [HT [HvT [Hrd Hmax]]]]]]].
         * left. split.
           -- move => j Hj. rewrite (Hstep j Hj). exact (Hrd j Hj).
@@ -2655,15 +3658,15 @@ Section rel_read.
      whole word from ONE entry -- the floor's bytes when no history entry
      is visible, else the LATEST visible history entry's *)
   Lemma rel_read (h : agent) (tv : nat) :
-    (forall k, (k < n)%nat -> visibleb h tv log (tf k) = true) ->
+    (forall k, (k < n)%nat -> visibleb1 h tv log (tf k) = true) ->
     ((forall j, (j < n)%nat ->
-        tso_read img log h tv (pa_add base j) = Some (fv j))
-     /\ (forall q f, (q, f) ∈ hist -> visibleb h tv log q = false))
+        tso_read1 img log h tv (pa_add base j) = Some (fv j))
+     /\ (forall q f, (q, f) ∈ hist -> visibleb1 h tv log q = false))
     \/ (exists T f, (T, f) ∈ hist
-          /\ visibleb h tv log T = true
+          /\ visibleb1 h tv log T = true
           /\ (forall j, (j < n)%nat ->
-                tso_read img log h tv (pa_add base j) = Some (f j))
-          /\ (forall q g, (q, g) ∈ hist -> visibleb h tv log q = true -> (q <= T)%nat)).
+                tso_read1 img log h tv (pa_add base j) = Some (f j))
+          /\ (forall q g, (q, g) ∈ hist -> visibleb1 h tv log q = true -> (q <= T)%nat)).
   Proof.
     move => Hvf.
     have [_ [_ [Hlo [_ [H1b _]]]]] := Hcov 0%nat Hn.
@@ -2677,10 +3680,10 @@ Section rel_read.
     case: (rel_read_aux h tv (length log - lo) Hvf Hd)
       => [[Hrd Hinv] | [T [f [Hin [HT [HvT [Hrd Hmax]]]]]]].
     - left. split.
-      + move => j Hj. rewrite /tso_read -Heq. exact (Hrd j Hj).
+      + move => j Hj. rewrite /tso_read1 -Heq. exact (Hrd j Hj).
       + move => q g Hin. apply (Hinv q g Hin). rewrite Heq. exact (Hqle q g Hin).
     - right. exists T, f. split_and!; [exact Hin | exact HvT | | ].
-      + move => j Hj. rewrite /tso_read -Heq. exact (Hrd j Hj).
+      + move => j Hj. rewrite /tso_read1 -Heq. exact (Hrd j Hj).
       + move => q g Hin' Hv. apply (Hmax q g Hin'); [| exact Hv].
         rewrite Heq. exact (Hqle q g Hin').
   Qed.
@@ -2796,11 +3799,11 @@ Lemma pinw_read img log (base : Arch.pa) (nn lo : nat)
   (0 < nn)%nat ->
   (forall j, (j < nn)%nat ->
      pinw_ok1 img log (pa_add base j) (TsPinw base nn j lo Sw)) ->
-  visibleb h tv log lo = true ->
+  visibleb1 h tv log lo = true ->
   exists f : nat -> bv 8,
     Sw f /\
     forall j, (j < nn)%nat ->
-      tso_read img log h tv (pa_add base j) = Some (f j).
+      tso_read1 img log h tv (pa_add base j) = Some (f j).
 Proof.
   intros Hn Hall Hvis.
   destruct (Hall 0%nat Hn) as (_ & _ & _ & H1b & Hlo & fB & HfBS & HfB).
@@ -2864,40 +3867,58 @@ Definition ts_pay_pinw (W : ts_pinw) : ts_pay := TsPay None None None (Some W).
 
 Definition ts_elem : Type := nat * ts_pay.
 
-Definition ts_ok (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg)
+(* THE TIE (relaxed-ww.md §2): the byte's latest ISSUED write with its
+   value -- AND ITS CHAIN over the drain log, which is what makes that write
+   the one every reader at every view above the floor gets ([tso_read_of_
+   latest]).  The four racy arms are LEGACY, stated over the one-log
+   functions (§9b's banner): true theorems about [img]/[log], preserved by
+   every step because they name no drain position, and re-founded in stage
+   E of relaxed-ww. *)
+Definition ts_ok (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
     (a : Arch.pa) (e : ts_elem) : Prop :=
-  (exists v, mem !! a = Some v /\ latest img log a e.1 v)
+  (exists v, mem !! a = Some v /\ latest img log a e.1 v /\ chain_ok log dl a e.1)
   /\ (forall (Sv : byteset) (B : nat),
         tsp_pin e.2 = Some (Sv, B) -> pin_ok img log a B Sv)
   /\ (forall W : ts_win, tsp_win e.2 = Some W -> win_ok1 img log a W)
   /\ (forall R : ts_rel, tsp_rel e.2 = Some R -> rel_ok1 img log a R)
   /\ (forall W : ts_pinw, tsp_pinw e.2 = Some W -> pinw_ok1 img log a W).
 
-Lemma ts_ok_latest img mem log a e :
-  ts_ok img mem log a e -> exists v, mem !! a = Some v /\ latest img log a e.1 v.
+Lemma ts_ok_latest img mem log dl a e :
+  ts_ok img mem log dl a e ->
+  exists v, mem !! a = Some v /\ latest img log a e.1 v /\ chain_ok log dl a e.1.
 Proof. by move => [H _]. Qed.
 
-Lemma ts_ok_pin img mem log a e Sv B :
-  ts_ok img mem log a e -> tsp_pin e.2 = Some (Sv, B) -> pin_ok img log a B Sv.
+Lemma ts_ok_pin img mem log dl a e Sv B :
+  ts_ok img mem log dl a e -> tsp_pin e.2 = Some (Sv, B) -> pin_ok img log a B Sv.
 Proof. move => [_ [H _]]. by apply H. Qed.
 
-Lemma ts_ok_win img mem log a e W :
-  ts_ok img mem log a e -> tsp_win e.2 = Some W -> win_ok1 img log a W.
+Lemma ts_ok_win img mem log dl a e W :
+  ts_ok img mem log dl a e -> tsp_win e.2 = Some W -> win_ok1 img log a W.
 Proof. move => [_ [_ [H _]]]. by apply H. Qed.
 
-Lemma ts_ok_rel img mem log a e R :
-  ts_ok img mem log a e -> tsp_rel e.2 = Some R -> rel_ok1 img log a R.
+Lemma ts_ok_rel img mem log dl a e R :
+  ts_ok img mem log dl a e -> tsp_rel e.2 = Some R -> rel_ok1 img log a R.
 Proof. move => [_ [_ [_ [H _]]]]. by apply H. Qed.
 
-Lemma ts_ok_pinw img mem log a e W :
-  ts_ok img mem log a e -> tsp_pinw e.2 = Some W -> pinw_ok1 img log a W.
+Lemma ts_ok_pinw img mem log dl a e W :
+  ts_ok img mem log dl a e -> tsp_pinw e.2 = Some W -> pinw_ok1 img log a W.
 Proof. move => [_ [_ [_ [_ H]]]]. by apply H. Qed.
 
-(* the UNPAYLOADED element: exactly the old tie, and nothing more to prove *)
-Lemma ts_ok_unpinned img mem log a t v :
-  mem !! a = Some v -> latest img log a t v ->
-  ts_ok img mem log a (t, ts_pay_none).
+(* the UNPAYLOADED element: the tie and its chain, and nothing more to prove *)
+Lemma ts_ok_unpinned img mem log dl a t v :
+  mem !! a = Some v -> latest img log a t v -> chain_ok log dl a t ->
+  ts_ok img mem log dl a (t, ts_pay_none).
 Proof.
-  move => Hm Hl. split; [by exists v |].
+  move => Hm Hl Hc. split; [by exists v |].
   split; [by move => * |]. split; [by move => * |]. split; by move => *.
+Qed.
+
+(* the tie is kept by a DRAIN: nothing in it names a drain position except
+   the chain, and the chain survives ([chain_ok_drain]) *)
+Lemma ts_ok_drain img mem log dl a e k :
+  dl_ok log dl -> drain_pre log dl k ->
+  ts_ok img mem log dl a e -> ts_ok img mem log (dl ++ [k]) a e.
+Proof.
+  move => Hok Hdr [[v [Hm [Hl Hc]]] Hrest]. split; [|exact Hrest].
+  exists v. split_and!; [done|done|]. exact (chain_ok_drain _ _ _ _ _ _ _ Hok Hdr Hl Hc).
 Qed.

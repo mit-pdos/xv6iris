@@ -105,6 +105,14 @@ Class tsoMemG Σ := TsoMemG {
      ([TsoCtx.ctx_move]): the receiver registers the key whether or not
      it already has it. *)
   tsomem_dirtyG :: inG Σ (authR (gsetUR (nat * Arch.pa)));
+  (* THE DRAIN LOG'S GHOSTS (claude-notes/projects/relaxed-ww.md §2): the
+     drain-position map -- issue index [i] ↦ its 1-based drain position,
+     persisted at the drain ([dpos_at]) -- and the release receipts
+     [(A, N) ↦ M] ([drain_lb]).  Both maps' persistent fragments are kept
+     IN the interp too: a drain is an environment step nobody's proof
+     holds a fragment for. *)
+  tsomem_dposG :: ghost_mapG Σ nat nat;
+  tsomem_rlG :: ghost_mapG Σ (agent * nat) nat;
 }.
 
 (* ---------------------------------------------------------------------- *)
@@ -125,7 +133,9 @@ Definition tsoMemΣ : gFunctors :=
   #[ ghost_mapΣ Arch.pa TsoMemPa.ts_elem;
      ghost_mapΣ nat TsoMemPa.pwmsg;
      GFunctor (authR viewUR);
-     GFunctor (authR (gsetUR (nat * Arch.pa))) ].
+     GFunctor (authR (gsetUR (nat * Arch.pa)));
+     ghost_mapΣ nat nat;
+     ghost_mapΣ (agent * nat) nat ].
 
 Global Instance subG_tsoMemG {Σ} : subG tsoMemΣ Σ -> tsoMemG Σ.
 Proof. solve_inG. Qed.
@@ -369,6 +379,33 @@ Section ghosts.
     iFrame "Hv Hll". iLeft. iFrame "Hf".
     iApply (mono_nat_lb_own_le with "Hlb"). exact Htop.
   Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** ** 4b. The drain log's receipts (relaxed-ww.md §2)               *)
+  (* ---------------------------------------------------------------- *)
+
+  (** The author of an issued message (a persistent log fragment). *)
+  Definition author (γlogm : gname) (i : nat) (A : agent) : iProp Σ :=
+    (∃ m, i ↪[γlogm]□ m ∗ ⌜pm_tid m = A⌝)%I.
+  Global Instance author_persistent γlogm i A : Persistent (author γlogm i A).
+  Proof. apply _. Qed.
+
+  (** Message [i] drained at (1-based) position [p]. *)
+  Definition dpos_at (γdp : gname) (i p : nat) : iProp Σ := i ↪[γdp]□ p.
+  Global Instance dpos_at_persistent γdp i p : Persistent (dpos_at γdp i p).
+  Proof. apply _. Qed.
+  Global Instance dpos_at_timeless γdp i p : Timeless (dpos_at γdp i p).
+  Proof. apply _. Qed.
+
+  (** THE RELEASE RECEIPT: every [A]-message issued below [N] is drained at
+      a position at most [M].  Born at [A]'s release fence.  Carries the two
+      length bounds so consumers can place [N] and [M] without the interp:
+      [γdlen] is the drain log's length, [γll] the issue log's. *)
+  Definition drain_lb (γrl γdlen γll : gname) (A N M : nat) : iProp Σ :=
+    ((A, N) ↪[γrl]□ M ∗ mono_nat_lb_own γdlen M ∗ llb γll N)%I.
+  Global Instance drain_lb_persistent γrl γdlen γll A N M :
+    Persistent (drain_lb γrl γdlen γll A N M).
+  Proof. apply _. Qed.
 
   (* ---------------------------------------------------------------- *)
   (** ** 5. The dirty entry's justification                            *)

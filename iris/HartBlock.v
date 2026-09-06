@@ -113,10 +113,15 @@ Definition mstep1 (h : agent) (img : gmap Arch.pa (bv 8))
     (c c' : M unit * mstate) : Prop :=
   match c.1 with
   | Interface.Ret _ => False
-  | _ => exists (log log' : list pwmsg) (tv tv' itv itv' : nat) (hr hr' : hread)
-                (r r' : option resv),
-      c.2.(mem) = flat img log /\ all_own h log /\ fetch_unwritten log c.1 /\
-      mnode_step ∅ h img c.2 log tv itv hr r c.1 c'.1 c'.2 log' tv' itv' hr' r'
+  | _ => exists (log log' : list pwmsg) (dl dl' : list nat) (tv tv' itv itv' : nat)
+                (hr hr' : hread) (r r' : option resv),
+      c.2.(mem) = flat img log /\ all_own h log /\
+      (* the DRAIN LOG's two machine invariants (relaxed-ww.md §1.1), which
+         [RiscvLang.mnode_step_mm] keeps: with them the solo era's stores,
+         drained or pending, read back as the flat cache *)
+      dl_ok log dl /\ fifo_ok log dl /\
+      fetch_unwritten log c.1 /\
+      mnode_step ∅ h img c.2 log dl tv itv hr r c.1 c'.1 c'.2 log' dl' tv' itv' hr' r'
   end.
 
 Definition mblock (h : agent) (img : gmap Arch.pa (bv 8))
@@ -134,6 +139,18 @@ Definition mblock (h : agent) (img : gmap Arch.pa (bv 8))
 (* by the append beside it.                                                 *)
 (* ====================================================================== *)
 
+(* MEMORY IS THE FLAT CACHE at a byte the solo hart has no pending store to:
+   the top-view read is memory ([tso_read_top_dmem]) and, in a solo era, the
+   flat cache ([tso_read_all_own]). *)
+Lemma dmem_flat_no_pending (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (dl : list nat) (h : agent) (a : Arch.pa) :
+  all_own h log -> dl_ok log dl -> fifo_ok log dl -> pend_read log dl h a = None ->
+  dmem img log dl !! a = flat img log !! a.
+Proof.
+  intros Hown Hok Hf Hp. rewrite -(tso_read_top_dmem img log dl h a Hp).
+  by apply tso_read_all_own.
+Qed.
+
 Lemma mnode_step_run (h : agent) (img : gmap Arch.pa (bv 8))
     (s : mstate) (m m' : M unit) (s' : mstate) :
   mstep1 h img (m, s) (m', s') ->
@@ -141,7 +158,8 @@ Lemma mnode_step_run (h : agent) (img : gmap Arch.pa (bv 8))
 Proof.
   rewrite /mstep1 /=.
   destruct m as [y|T oc k]; [by intros []|].
-  intros (log & log' & tv & tv' & itv & itv' & hr & hr' & r & r' & Hflat & Hown & Hfu & Hn).
+  intros (log & log' & dl & dl' & tv & tv' & itv & itv' & hr & hr' & r & r' &
+          Hflat & Hown & Hok & Hfifo & Hfu & Hn).
   revert Hfu Hn.
   rewrite /mnode_step /fetch_unwritten.
   (* [cbn beta iota] and NOT [simpl]: it reduces the dependent match that
@@ -156,7 +174,7 @@ Proof.
       cbn [run]. rewrite Hd Hdr. exact H.
     + intros Hfu [(Hif & tvn & w & _ & _ & Hbytes & Hm & Hs & _)
                  |[(_ & _ & tvn & w & _ & _ & _ & Hbytes & Hm & Hs & _)
-                  |(_ & [(Hov & _) | (_ & w & Hbytes & Hm & Hs & _)])]] x s2 H.
+                  |(_ & [(_ & Hm & Hs & _) | (_ & Hnp & w & Hbytes & Hm & Hs & _)])]] x s2 H.
       * (* THE FETCH: [Hbytes] reads through the icache agent at some view
            [tvn] at or above the instruction view; the third tie says the
            fetched bytes are unwritten, so that read IS the image byte,
@@ -164,7 +182,7 @@ Proof.
         subst m' s'. cbn [run]. rewrite Hd.
         exists w. split; [|exact H].
         intros j Hj. pose proof (Hbytes j Hj) as Hb.
-        rewrite (tso_read_unwritten _ _ _ _ _ (Hfu Hif j Hj)) in Hb.
+        rewrite (tso_read_unwritten _ _ _ _ _ _ (Hfu Hif j Hj)) in Hb.
         rewrite Hflat (flat_unwritten _ _ _ (Hfu Hif j Hj)). exact Hb.
       * (* THE PLAIN LOAD -- every non-exclusive DATA read.  [Hbytes] reads
            [tso_read] at the drained view [tvn]; the solo era collapses that
@@ -172,21 +190,30 @@ Proof.
            cache [s.(mem)]. *)
         subst m' s'. cbn [run]. rewrite Hd.
         exists w. split; [|exact H].
-        intros j Hj. rewrite Hflat -(tso_read_all_own img log h tvn _ Hown).
+        intros j Hj. rewrite Hflat -(tso_read_all_own img log dl h tvn _ Hown Hok Hfifo).
         exact (Hbytes j Hj).
-      * (* blocked exclusive read: the self-loop needs an overlap with the
-           EMPTY set *)
-        by exfalso; apply Hov; set_solver.
-      * (* exclusive read: reads [s.(mem)], which IS the read at the top *)
+      * (* blocked exclusive read (a pending own store to the footprint;
+           the empty [oth] never blocks): a self-loop, nothing to fold *)
+        subst m' s'. exact H.
+      * (* exclusive read: reads MEMORY, which at a byte with no pending
+           own store is the flat cache, i.e. [s.(mem)] *)
         subst m' s'. cbn [run]. rewrite Hd.
-        exists w. split; [exact Hbytes|exact H].
+        exists w. split; [|exact H].
+        intros j Hj.
+        rewrite Hflat -(dmem_flat_no_pending img log dl h _ Hown Hok Hfifo);
+          [exact (Hbytes j Hj)|].
+        destruct (pend_read log dl h (pa_add _ j)) eqn:Hp; [|done].
+        exfalso. apply Hnp. exists j. split; [exact Hj|]. by rewrite Hp.
   - (* MemWrite *)
     destruct (dev_addr _) eqn:Hd.
     + intros _ (d' & Hdw & Hm & Hs & _) x s2 H. subst m' s'.
       cbn [run]. rewrite Hd Hdw. exact H.
-    + intros _ [(Hov & _) | (_ & Hm & Hs & _)] x s2 H;
-        [by exfalso; apply Hov; set_solver|].
-      subst m' s'. cbn [run]. rewrite Hd. exact H.
+    + intros _ [(_ & Hm & Hs & _) | (_ & _ & Hm & Hs & _)] x s2 H;
+        subst m' s'; [exact H|].
+      cbn [run]. rewrite Hd. exact H.
+  - (* Barrier: blocked (own stores pending) is a self-loop; enabled, the
+       fence is a state no-op exactly as in [run] *)
+    intros _ [(_ & _ & Hm & Hs & _) | (_ & Hm & Hs & _)] x s2 H; subst m' s'; exact H.
   - (* Choose *) intros _ (ch & -> & -> & _) x s2 H. cbn [run]. by exists ch.
 Qed.
 
@@ -228,10 +255,11 @@ Proof. intros H. exact (mblock_run _ _ _ _ H tt eq_refl). Qed.
 (* ====================================================================== *)
 
 Lemma mnode_step_all_own (oth : gset Arch.pa) (h : agent)
-    (img : gmap Arch.pa (bv 8)) (s : mstate) (log : list pwmsg) (tv itv : nat)
-    (hr : hread) (r : option resv) (m m' : M unit) (s' : mstate) (log' : list pwmsg)
-    (tv' itv' : nat) (hr' : hread) (r' : option resv) :
-  mnode_step oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' ->
+    (img : gmap Arch.pa (bv 8)) (s : mstate) (log : list pwmsg) (dl : list nat)
+    (tv itv : nat) (hr : hread) (r : option resv) (m m' : M unit) (s' : mstate)
+    (log' : list pwmsg) (dl' : list nat) (tv' itv' : nat) (hr' : hread)
+    (r' : option resv) :
+  mnode_step oth h img s log dl tv itv hr r m m' s' log' dl' tv' itv' hr' r' ->
   all_own h log -> all_own h log'.
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
@@ -243,12 +271,14 @@ Proof.
     + by intros (w & d' & _ & _ & _ & -> & _).
     + by intros [(_ & tvn & w & _ & _ & _ & _ & _ & -> & _)
                 |[(_ & _ & tvn & w & _ & _ & _ & _ & _ & _ & -> & _)
-                 |(_ & [(_ & _ & _ & -> & _) | (_ & w & _ & _ & _ & -> & _)])]].
+                 |(_ & [(_ & _ & _ & -> & _) | (_ & _ & w & _ & _ & _ & -> & _)])]].
   - (* MemWrite: the MMIO half is strongly ordered (no log); the RAM half
        appends THIS hart's message *)
     destruct (dev_addr _).
     + by intros (d' & _ & _ & _ & -> & _).
-    + intros [(_ & _ & _ & -> & _) | (_ & _ & _ & -> & _)] Hown; [done|].
+    + intros [(_ & _ & _ & -> & _) | (_ & _ & _ & _ & -> & _)] Hown; [done|].
       apply all_own_app; [exact Hown|done].
+  - (* Barrier: neither arm appends *)
+    by intros [(_ & _ & _ & _ & -> & _) | (_ & _ & _ & -> & _)].
   - (* Choose *) by intros (ch & _ & _ & -> & _).
 Qed.

@@ -388,7 +388,15 @@ Record riscvEraGS := RiscvEraGS {
      lower bound [hart_rview_lb_at] is the receipt a PLAIN LOAD mints (the
      view it read at), and an acquire fence turns it into a [view_lb].  Per
      hart like [era_iview_name], and LAST, for the same reason. *)
-  era_rv_name : CPU -> gname
+  era_rv_name : CPU -> gname;
+  (* THE DRAIN LOG'S MIRRORS (claude-notes/projects/relaxed-ww.md §2), three
+     names, LAST: the drain-position map ([TsoGhost.dpos_at]), the drain
+     log's length (mono-nat; what [view_lb] and [drain_lb] bound against --
+     every view is a DRAIN position now), and the release receipts
+     ([TsoGhost.drain_lb]). *)
+  era_dpos_name : gname;
+  era_dlen_name : gname;
+  era_rl_name : gname
 }.
 
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
@@ -568,6 +576,9 @@ Definition ts_name `{!riscvGS Σ} : gname := era_ts_name riscv_eraGS.
 Definition logm_name `{!riscvGS Σ} : gname := era_logm_name riscv_eraGS.
 Definition loglen_name `{!riscvGS Σ} : gname := era_loglen_name riscv_eraGS.
 Definition view_name `{!riscvGS Σ} : gname := era_view_name riscv_eraGS.
+Definition dpos_name `{!riscvGS Σ} : gname := era_dpos_name riscv_eraGS.
+Definition dlen_name `{!riscvGS Σ} : gname := era_dlen_name riscv_eraGS.
+Definition rl_name `{!riscvGS Σ} : gname := era_rl_name riscv_eraGS.
 Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name riscv_eraGS.
 Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name riscv_eraGS.
 Definition spp_name `{!riscvGS Σ} : CPU -> gname := era_spp_name riscv_eraGS.
@@ -2298,12 +2309,12 @@ Definition dev_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
    [era_disk_name]), so when the power is off there is no disk conjunct at
    all -- the era, and its image map, are gone. *)
 (* THE PER-AGENT VIEW FUNCTION of a machine state: harts at their [gtv],
-   every device agent pinned to the top (strongly-ordered DMA,
-   tso-machine-flip.md RULING 2). *)
+   every device agent pinned to the DRAIN top -- a bus master reads memory
+   (strongly-ordered DMA, tso-machine-flip.md RULING 2; relaxed-ww.md §1.1). *)
 Definition avf (g : gstate) : agent -> nat :=
   fun h => match lt_dec h NCPU with
            | left H => g.(gtv) (nat_to_fin H)
-           | right _ => length g.(glog)
+           | right _ => length g.(gdlog)
            end.
 
 Lemma avf_hart (g : gstate) (c : CPU) : avf g (hart_agent c) = g.(gtv) c.
@@ -2314,47 +2325,74 @@ Proof.
   - exfalso. pose proof (fin_to_nat_lt c). lia.
 Qed.
 
-Lemma avf_disk (g : gstate) : avf g disk_agent = length g.(glog).
+Lemma avf_disk (g : gstate) : avf g disk_agent = length g.(gdlog).
 Proof.
   rewrite /avf /disk_agent. destruct (lt_dec NCPU NCPU); [lia|done].
 Qed.
 
-(* THE TSO MACHINE GHOSTS' INTERP (tso-machine-flip.md par.4): the
-   timestamp map, tied per-address to the LATEST write over the log; the
-   persisted log entries; the log length; and the per-agent view
-   authority.  [mm_ok] rides as the pure conjunct exactly like
-   [resv_ok].  gen_heap (the conjunct above it in [era_interp]) still
-   interprets [gmem] -- the FLAT cache -- so a [pointsto] fragment keeps
-   meaning "the flat byte" and the timestamp fragment beside it (inside
+(* THE TSO MACHINE GHOSTS' INTERP (tso-machine-flip.md par.4, relaxed-ww.md
+   §2): the timestamp map, tied per-address to the LATEST write over the
+   ISSUE log and to its drain chain; the persisted log entries; the issue
+   log's length; the per-agent view authority (views are DRAIN positions);
+   and the drain log's three mirrors -- the drain-position map with its
+   persistent copies, the drain length, and the release receipts with
+   theirs.  [mm_ok] rides as the pure conjunct exactly like [resv_ok].
+   gen_heap (the conjunct above it in [era_interp]) still interprets
+   [gmem] -- the ISSUE-flat cache -- so a [pointsto] fragment keeps meaning
+   "the flat byte" and the timestamp fragment beside it (inside
    [TsoCtx.ctx_pointsto]) is what adds the justification axis. *)
 Definition tso_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
     : iProp Σ :=
-  (∃ (TM : gmap Arch.pa ts_elem) (LM : gmap nat pwmsg),
+  (∃ (TM : gmap Arch.pa ts_elem) (LM : gmap nat pwmsg)
+     (DP : gmap nat nat) (RL : gmap (agent * nat) nat),
      ghost_map_auth (era_ts_name E) 1 TM ∗
      ⌜dom TM = dom g.(gmem)⌝ ∗
      (* THE ELEMENT'S TIE, one conjunct (tso-pin-memo.md §5.1): the LATEST
-        half is the old statement verbatim at [e.1]; the PIN half is
-        vacuous at [None] and is [TsoMemPa.pin_ok] -- the walk's discharge
-        CONCLUSION, stored where the step relation can maintain it. *)
+        half is the old statement verbatim at [e.1], now with its drain
+        chain; the PIN half is vacuous at [None] and is [TsoMemPa.pin_ok]
+        -- the walk's discharge CONCLUSION, stored where the step relation
+        can maintain it. *)
      ⌜∀ a e, TM !! a = Some e →
-        ts_ok g.(gimg) g.(gmem) g.(glog) a e⌝ ∗
+        ts_ok g.(gimg) g.(gmem) g.(glog) g.(gdlog) a e⌝ ∗
      ghost_map_auth (era_logm_name E) 1 LM ∗
      ⌜∀ i, LM !! i = g.(glog) !! i⌝ ∗
      mono_nat_auth_own (era_loglen_name E) 1 (length g.(glog)) ∗
      view_auth (era_view_name E) (avf g) ∗
-     ⌜mm_ok g /\ g.(gimg) = era_img E⌝)%I.
+     ghost_map_auth (era_dpos_name E) 1 DP ∗
+     ([∗ map] i ↦ p ∈ DP, dpos_at (era_dpos_name E) i p) ∗
+     ⌜dpos_ok g.(gdlog) DP⌝ ∗
+     mono_nat_auth_own (era_dlen_name E) 1 (length g.(gdlog)) ∗
+     ghost_map_auth (era_rl_name E) 1 RL ∗
+     ([∗ map] k ↦ M ∈ RL, k ↪[era_rl_name E]□ M) ∗
+     ⌜rl_ok g.(glog) g.(gdlog) RL⌝ ∗
+     (* the drain log's soundness, FIFO and bus-master drainedness
+        ([RiscvLang.dlog_ok], relaxed-ww.md §1.1) ride HERE, beside
+        [mm_ok]: they are the two logs' own invariants, and the leaf-side
+        bundle ([RiscvExec.tso_interp_of]) has to carry them for the load
+        gate ([TsoMemPa.tso_read_of_latest]) *)
+     ⌜mm_ok g /\ dlog_ok g /\ g.(gimg) = era_img E⌝)%I.
 
 Lemma tso_interp_at_img `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) :
   tso_interp_at E g -∗ ⌜g.(gimg) = era_img E⌝.
 Proof.
-  iIntros "H". iDestruct "H" as (TM LM) "(_ & _ & _ & _ & _ & _ & _ & %Hmm)".
-  iPureIntro. exact (proj2 Hmm).
+  iIntros "H".
+  iDestruct "H" as (TM LM DP RL) "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+  iPureIntro. exact (proj2 (proj2 Hmm)).
+Qed.
+
+Lemma tso_interp_at_dlog_ok `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) :
+  tso_interp_at E g -∗ ⌜dlog_ok g⌝.
+Proof.
+  iIntros "H".
+  iDestruct "H" as (TM LM DP RL) "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+  iPureIntro. exact (proj1 (proj2 Hmm)).
 Qed.
 
 Lemma tso_interp_at_mm_ok `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) :
   tso_interp_at E g -∗ ⌜mm_ok g⌝.
 Proof.
-  iIntros "H". iDestruct "H" as (TM LM) "(_ & _ & _ & _ & _ & _ & _ & %Hmm)".
+  iIntros "H".
+  iDestruct "H" as (TM LM DP RL) "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
   iPureIntro. exact (proj1 Hmm).
 Qed.
 
