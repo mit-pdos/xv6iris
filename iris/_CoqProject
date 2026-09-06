@@ -25,6 +25,7 @@ TsoCtxTwin.v
 TsoCtxRehearsal.v
 TsoCtxTwin2.v
 TsoCtxTwin3.v
+TsoCtxTwin4.v
 VirtioModel.v
 DiskImg.v
 DevModel.v
