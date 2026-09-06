@@ -754,6 +754,18 @@ Qed.
    count is literally the one the guard tested, and for [dp] it is the one
    [IregLinkNz.ireg_tok_nz] reads off the fragment the ".." record
    supplies. *)
+(* THE STORED HALFWORD ITSELF, NAMED.  [sh]'s operand at both [--] sites is
+   this eight-constructor Sail term; spelled out it is ~30 nodes, and the
+   AU/W5 proofs mention it fifty times, in hypothesis types that the proof
+   term then carries.  Naming it costs one delta step at each unification
+   against the goal (which still holds the model's own spelling) and takes
+   the occurrences out of every type we write. *)
+Definition su_dec16 (h : mword 16) : mword 16 :=
+  trunc16 (sign_extend' 64 (subrange_vec_dec
+     (add_vec (zero_extend' 64 h : mword 64)
+        (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))
+         : mword 64)) 31 0)).
+
 Lemma su_nlink_decr (h : mword 16) :
   bv_unsigned h <> 0%Z ->
   bv_unsigned h

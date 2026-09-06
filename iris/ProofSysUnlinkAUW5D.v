@@ -1007,26 +1007,11 @@ Section ProofSysUnlinkAUW5D.
                     = bv_unsigned (di_nlink dnd))
       by (rewrite Hnl'v; reflexivity).
     assert (HdecrW : bv_unsigned (di_nlink dnW)
-                     = bv_unsigned (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0))) + 1)
+                     = bv_unsigned (su_dec16 (di_nlink dnW)) + 1)
       by (exact (su_nlink_decr (di_nlink dnW) HnlzW)).
-    assert (HtyF2 : di_type (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) = di_type dnd)
+    assert (HtyF2 : di_type (su_setnl dnW (su_dec16 (di_nlink dnW))) = di_type dnd)
       by (rewrite su_setnl_type; exact Hty'v).
-    assert (HszF2 : di_size (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) = di_size dnd)
+    assert (HszF2 : di_size (su_setnl dnW (su_dec16 (di_nlink dnW))) = di_size dnd)
       by (rewrite su_setnl_size; exact Hsz'v).
     (* ===================================================================
        (D1) AND (D2) FALL HERE, IN THAT ORDER.  (D2) reads the parent's
@@ -1135,21 +1120,11 @@ Section ProofSysUnlinkAUW5D.
     (* ...and the counting RA's half of the zeroing move (durable-disk
        2b-inode-5): the zeroed entry gives up its token, which is what
        pays for the CHILD's own [ip->nlink--] below. *)
-    assert (HnlzF2a : bv_unsigned (di_nlink (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0))))) <> 0).
+    assert (HnlzF2a : bv_unsigned (di_nlink (su_setnl dnW (su_dec16 (di_nlink dnW)))) <> 0).
     { rewrite su_setnl_nlink.
       exact (su_decr_pos _ _ _ HdecrW HdWnd Hdp2). }
     iDestruct (ent_toks_unlink (fs_gamma_L fsc_fs) (bv_unsigned dinum)
-                 dnd (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmd bm' datd data' kk Dd
+                 dnd (su_setnl dnW (su_dec16 (di_nlink dnW))) bmd bm' datd data' kk Dd
                  Hkklt Hkklive Hnotself Hkknotdot Hkknotdd Hnotself (Hduq Htydz)
                  (conj Hz' (conj Hagree Hnm')) Htydz Hdplive HnlzF2a
                  HtyF2 HszF2 Hhzd Hhz' Hszcap
@@ -1162,29 +1137,14 @@ Section ProofSysUnlinkAUW5D.
     (* THE MARKER SET LOSES EXACTLY THE ZEROED NAME, and [dp]'s count drops
        with it -- which is what keeps the per-directory count EXACT across
        an rmdir (durable-disk G5's (D2), the write half). *)
-    assert (HentsD : dir_entries (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bm' data')
+    assert (HentsD : dir_entries (era_node (su_setnl dnW (su_dec16 (di_nlink dnW))) bm' data')
                      = delete (dir_bname datd kk)
                          (dir_entries (era_node dnd bmd datd)))
-      by exact (dir_entries_unlink_eq dnd (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmd bm' datd data' kk
+      by exact (dir_entries_unlink_eq dnd (su_setnl dnW (su_dec16 (di_nlink dnW))) bmd bm' datd data' kk
                   Hkklt Hkklive (Hduq Htydz)
                   (conj Hz' (conj Hagree Hnm')) Htydz HtyF2 HszF2
                   Hhzd Hhz' Hszcap).
-    assert (HdokF2E : FsStateInode.ent_dset_ok (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bm' data')
+    assert (HdokF2E : FsStateInode.ent_dset_ok (era_node (su_setnl dnW (su_dec16 (di_nlink dnW))) bm' data')
                        (Dd ∖ {[dir_bname datd kk]}))
       by exact (FsStateInode.ent_dset_ok_delete _ _ (dir_bname datd kk) _
                   HentsD
@@ -1192,12 +1152,7 @@ Section ProofSysUnlinkAUW5D.
                         apply elem_of_singleton; reflexivity)
                   ltac:(intros tz Htz; apply Hdokd;
                         exact (proj1 (proj1 (elem_of_difference _ _ _) Htz)))). 
-    assert (HxactF2E : FsStateInode.node_exact (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bm' data')
+    assert (HxactF2E : FsStateInode.node_exact (era_node (su_setnl dnW (su_dec16 (di_nlink dnW))) bm' data')
                        (Dd ∖ {[dir_bname datd kk]})).
     { intros _.
       pose proof (Hxactd ltac:(rewrite /fn_is_dir /fn_type era_node_rec;
@@ -1211,20 +1166,10 @@ Section ProofSysUnlinkAUW5D.
                     ltac:(apply singleton_subseteq_l; exact HmarkD)) as Hszd.
       rewrite size_singleton in Hszd.
       rewrite /fn_nlink era_node_rec.
-      rewrite (fn_orphan_era_nz (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bm' data' HnlzF2a).
+      rewrite (fn_orphan_era_nz (su_setnl dnW (su_dec16 (di_nlink dnW))) bm' data' HnlzF2a).
       rewrite Hszd.
       pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dnW))) as Hnn.
-      pose proof (proj1 (bv_unsigned_in_range _ (di_nlink (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0))))))) as Hnn2.
+      pose proof (proj1 (bv_unsigned_in_range _ (di_nlink (su_setnl dnW (su_dec16 (di_nlink dnW)))))) as Hnn2.
       rewrite su_setnl_nlink in Hnn2 |- *.
       (* the count itself, in small steps: [lia] does not see through
          [Z.to_nat] of a decremented halfword in one go. *)
@@ -1239,27 +1184,12 @@ Section ProofSysUnlinkAUW5D.
     iDestruct (dlinks_intro _ _ _ _ _ (Dd ∖ {[dir_bname datd kk]})
                  HdokF2E HxactF2E with "Hetkd") as "Hdlnkd2".
     (* [dp]'s pure re-park facts, moved DOWN to the decremented record *)
-    assert (HiokF2 : inode_ok fsc_cov fsc_logst (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bm' data')
+    assert (HiokF2 : inode_ok fsc_cov fsc_logst (su_setnl dnW (su_dec16 (di_nlink dnW))) bm' data')
       by (exact (su_setnl_inode_ok fsc_cov fsc_logst dnW bm' data' _ Hiok')).
-    assert (HdokF2 : dir_ok icfg_nib (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) data')
+    assert (HdokF2 : dir_ok icfg_nib (su_setnl dnW (su_dec16 (di_nlink dnW))) data')
       by (exact (su_setnl_dir_ok icfg_nib dnW data' _ Hdok')).
     assert (HddixF2 : dir_dots_ix (bv_unsigned dinum)
-                        (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) data').
+                        (su_setnl dnW (su_dec16 (di_nlink dnW))) data').
     { intros _ _. rewrite su_setnl_size Hsz'v. split_and!.
       - exact Hnrec2.
       - unfold dir_live. rewrite (Hagree 0%nat Hkk0'). exact Hlv0.
@@ -1267,28 +1197,13 @@ Section ProofSysUnlinkAUW5D.
       - rewrite (Hnm' 0%nat Hkk0'). exact Hname0.
       - unfold dir_live. rewrite (Hagree 1%nat Hkk1'). exact Hlv1.
       - rewrite (Hnm' 1%nat Hkk1'). exact Hname1. }
-    assert (HnlzF2 : bv_unsigned (di_nlink (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0))))) <> 0).
+    assert (HnlzF2 : bv_unsigned (di_nlink (su_setnl dnW (su_dec16 (di_nlink dnW)))) <> 0).
     { rewrite su_setnl_nlink.
       exact (su_decr_pos _ _ _ HdecrW HdWnd Hdp2). }
-    assert (HdocF2 : dir_orphan_clean (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) data')
+    assert (HdocF2 : dir_orphan_clean (su_setnl dnW (su_dec16 (di_nlink dnW))) data')
       by (exact (dir_orphan_clean_live _ _ HnlzF2)).
     (* the [--] moved the COUNT, and [dir_uniq] reads only type and size *)
-    assert (HduqF2 : dir_uniq (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) data')
+    assert (HduqF2 : dir_uniq (su_setnl dnW (su_dec16 (di_nlink dnW))) data')
       by (exact (dir_uniq_cong dnW _ data' (su_setnl_type _ _)
                    (su_setnl_size _ _) Hduq')).
     iDestruct "Hmapd" as "[Haddrsd Hindd]".
@@ -1409,12 +1324,7 @@ Section ProofSysUnlinkAUW5D.
     iIntros (T4 Ht4) "Hcg Hpc Hinld".
     iEval (rgne; rgne;
            rewrite (su_regs_s1 _ _ _ _ _ _ HG2regs) HG2a5) in "Hinld".
-    iAssert (inode_meta (ientry kd) (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))))
+    iAssert (inode_meta (ientry kd) (su_setnl dnW (su_dec16 (di_nlink dnW))))
       with "[Hityd Himad Himid Hinld Hiszd]" as "Hmetad".
     { rewrite /inode_meta /su_setnl /= /i_nlink. iFrame. }
     assert (Hpp150 : add_vec_int (mword_of_int (SU + 0x14c) : mword 64) 4
@@ -1471,23 +1381,13 @@ Section ProofSysUnlinkAUW5D.
     assert (Hszcapi : bv_unsigned (di_size dni)
                       <= Z.of_nat MAXFILE * Z.of_nat BSIZE).
     { destruct Hioki as (_ & _ & _ & _ & Hc & _). exact Hc. }
-    assert (Hnl2za : bv_unsigned (di_nlink (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0))))) = 0).
+    assert (Hnl2za : bv_unsigned (di_nlink (su_setnl dni (su_dec16 (di_nlink dni)))) = 0).
     { rewrite su_setnl_nlink.
       exact (su_decr_zero _ _ (su_nlink_decr (di_nlink dni) Hnlzi) Hnl1). }
     iDestruct (ent_toks_era_orphan (fs_gamma_L fsc_fs)
                  (bv_unsigned (zero_extend' 32
                     (dir_inum datd kk : mword 16) : mword 32))
-                 dni (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmi dati (bv_unsigned dinum) Di
+                 dni (su_setnl dni (su_dec16 (di_nlink dni))) bmi dati (bv_unsigned dinum) Di
                  (su_setnl_type _ _) (su_setnl_size _ _) Hnlzi Hnl2za
                  Htyzi Hhzi Hszcapi (Hduqi Htyzi) Hnrec2i Hlv1i
                  ltac:(rewrite DOTDOT_dotdot; exact Hname1i) Hpar
@@ -1515,20 +1415,10 @@ Section ProofSysUnlinkAUW5D.
       rewrite /fn_nlink era_node_rec Hnl1
         (fn_orphan_era_nz dni bmi dati Hnlzi) in Hex.
       change (Z.to_nat 1) with 1%nat in Hex. clear -Hex. lia. }
-    assert (HdokiZ : FsStateInode.ent_dset_ok (era_node (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmi dati) Di)
+    assert (HdokiZ : FsStateInode.ent_dset_ok (era_node (su_setnl dni (su_dec16 (di_nlink dni))) bmi dati) Di)
       by (rewrite HDiempty; intros tz Htz;
           exfalso; exact (not_elem_of_empty tz Htz)).
-    assert (HxactiZ : FsStateInode.node_exact (era_node (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmi dati) Di).
+    assert (HxactiZ : FsStateInode.node_exact (era_node (su_setnl dni (su_dec16 (di_nlink dni))) bmi dati) Di).
     { intros _. rewrite /fn_orphan /fn_nlink era_node_rec Hnl2za HDiempty
         size_empty. reflexivity. }
     assert (Hmoidin : (mword_of_int (bv_unsigned dinum) : mword 32) = dinum)
@@ -1539,12 +1429,7 @@ Section ProofSysUnlinkAUW5D.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iupdate.wp_iupdate_unlink (CID := T6) gs jx gl pd pav pu
  (ientry kd) dinum
-              (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0))))
+              (su_setnl dnW (su_dec16 (di_nlink dnW)))
               dnW bm' c1 (Sbw : gset Z) true tyup pid
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G4 (K - 30)%nat eb b lks
@@ -1597,12 +1482,7 @@ Section ProofSysUnlinkAUW5D.
        -- the entry's removal left the directory well-formed and the count
        move touches nothing else. *)
     assert (HlocW : inode_local (bv_unsigned dinum)
-              (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                    (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                              : mword 64)
-                       (sign_extend' 64
-                          (sign_extend' 12 (mword_of_int 63 : mword 6))
-                        : mword 64)) 31 0)))) bm' data')).
+              (era_node (su_setnl dnW (su_dec16 (di_nlink dnW))) bm' data')).
     { apply (inode_local_of_ok_rec (bv_unsigned dinum) fsc_cov fsc_logst _ bm' data').
       - exact HiokF2.
       - exact (inode_rec_local_same_type dnW _ Hrl_data'
@@ -1619,12 +1499,7 @@ Section ProofSysUnlinkAUW5D.
        fragment ([su_au_dir_dec]), which is why one fire lemma serves both
        W5 arms.  [unl_pre]'s dots-only conjunct is the isdirempty harvest
        [Hdots], read through [su_au_dir_dots]. *)
-    assert (HdnlD : bv_unsigned (di_nlink (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))))
+    assert (HdnlD : bv_unsigned (di_nlink (su_setnl dnW (su_dec16 (di_nlink dnW))))
                     = bv_unsigned (di_nlink dnd) - 1).
     (* [lia] does NOT close this: the two spellings of the stored halfword
        are CONVERTIBLE but not syntactically equal, and lia identifies atoms
@@ -1644,17 +1519,18 @@ Section ProofSysUnlinkAUW5D.
     (* E2-V: the target has a row -- it is a directory *)
     assert (Htynz0 : fn_type (era_node dni bmi dati) <> 0).
     { rewrite /fn_type era_node_rec Htyzi. cbv [T_DIR_z]. lia. }
+    (* [su_au_parent_row_era]'s "the parent stays linked" premise, HOISTED
+       OUT OF ARGUMENT POSITION for the same reason as [HdnlI] below: as
+       [ltac:(rewrite mkf_era_nlink; lia)] the closer runs against the full
+       context, where [clear -Hdp2] leaves it one hypothesis. *)
+    assert (Hdp2nz : (fn_nlink (era_node dnd bmd datd) - 1)%nat <> 0%nat).
+    { rewrite mkf_era_nlink. clear -Hdp2. lia. }
     iMod (uf_uent_fire fsc_fs ⊤ (DfracOwn 1) Phient
             (bv_unsigned dinum) (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
                                         : mword 32))
             (dir_bname datd kk) 1%nat
             (era_node dnd bmd datd)
-            (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bm' data')
+            (era_node (su_setnl dnW (su_dec16 (di_nlink dnW))) bm' data')
             (era_node dni bmi dati)
             uf_nd_top HlocW
             Hdirdp Hentd Hkknotdot Hkknotdd
@@ -1662,33 +1538,18 @@ Section ProofSysUnlinkAUW5D.
             (su_au_nl1 dni bmi dati Hnlzi)
             (su_au_dir_dots dni bmi dati Hhzi0 Hszcapi0 Htyzi Hdots)
             (su_au_dir_dec (era_node dni bmi dati) Hdirip)
-            (su_au_parent_row_era dnd (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmd bm' datd data'
+            (su_au_parent_row_era dnd (su_setnl dnW (su_dec16 (di_nlink dnW))) bmd bm' datd data'
                (dir_bname datd kk) 1%nat Htydz HtyF2
-               (su_au_nlink_down dnd (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmd bm' datd data'
+               (su_au_nlink_down dnd (su_setnl dnW (su_dec16 (di_nlink dnW))) bmd bm' datd data'
                   Hdplive HdnlD)
-               ltac:(rewrite mkf_era_nlink; lia)
+               Hdp2nz
                HentsD)
             Htynz0
             with "[] [] Hcent Htop Htopi") as "(Htop & Htopi & Hfire1)";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iDestruct "Hfire1" as (av0) "(%Hpre0 & Hent)".
     iModIntro.
-    iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dinum (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bm')
+    iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dinum (su_setnl dnW (su_dec16 (di_nlink dnW))) bm')
       with "[Hdlnkd2 Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop]" as "Hloadd".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists data'.
       iSplitR; [iPureIntro; exact HiokF2 |].
@@ -1704,12 +1565,7 @@ Section ProofSysUnlinkAUW5D.
       iSplitR; [iPureIntro; exact HduqF2 |].
       iFrame "Hdlnkd2 Hdiatd Hmetad Haddrsd Hindd Hblocksd".
       iExact "Htop". }
-    iAssert (ity_shot gyd (di_type (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))))) as "#Hshotd2".
+    iAssert (ity_shot gyd (di_type (su_setnl dnW (su_dec16 (di_nlink dnW))))) as "#Hshotd2".
     { rewrite su_setnl_type Hty'v. iExact "Hshotd". }
     iClear "Hshotd".
     (* ===== +0xb8 c.mv a0,s1 ===== *)
@@ -1752,11 +1608,7 @@ Section ProofSysUnlinkAUW5D.
     iDestruct (su_esc_acc kd Hkd with "Hescrows")
       as "#Hescd".
     iDestruct (log_opS_named with "HopS") as (e0) "HopS".
-    pose (dnW2 := su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-              (add_vec (zero_extend' 64 (di_nlink dnW : mword 16) : mword 64)
-                 (sign_extend' 64
-                    (sign_extend' 12 (mword_of_int 63 : mword 6))))
-              31 0)))).
+    pose (dnW2 := su_setnl dnW (su_dec16 (di_nlink dnW))).
     assert (Hcrbd2 : false = true ->
               fsc_bmapstart ∈ (Sbw ∪ {[IBLOCK dinum icfg_ist]})).
     { intros Hfalse. discriminate Hfalse. }
@@ -1860,22 +1712,12 @@ Section ProofSysUnlinkAUW5D.
            rewrite (su_regs_s2 _ _ _ _ _ _ HC7regs) HC7a5) in "Hinli".
     (* the stored halfword, named; the record it makes is [su_setnl] *)
     iAssert (inode_meta (ientry ks)
-               (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))))
+               (su_setnl dni (su_dec16 (di_nlink dni))))
       with "[Hityi Himai Himii Hinli Hiszi]" as "Hmetai".
     { rewrite /inode_meta /su_setnl /= /i_nlink. iFrame. }
     assert (Hdecr : bv_unsigned (di_nlink dni)
                     = bv_unsigned (di_nlink (su_setnl dni
-                        (trunc16 (sign_extend' 64 (subrange_vec_dec
-                           (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                                     : mword 64)
-                              (sign_extend' 64
-                                 (sign_extend' 12 (mword_of_int 63 : mword 6))
-                               : mword 64)) 31 0))))) + 1).
+                        (su_dec16 (di_nlink dni)))) + 1).
     { rewrite su_setnl_nlink. exact (su_nlink_decr (di_nlink dni) Hnlzi). }
     assert (Hppc8 : add_vec_int (mword_of_int (SU + 0xc4) : mword 64) 4
                     = mword_of_int (SU + 0xc8)) by pcw.
@@ -1931,12 +1773,7 @@ Section ProofSysUnlinkAUW5D.
     iApply (Iupdate.wp_iupdate_unlink (CID := D26) gs jx gl pd pav pu
  (ientry ks)
               (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
-              (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                 (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                           : mword 64)
-                    (sign_extend' 64
-                       (sign_extend' 12 (mword_of_int 63 : mword 6))
-                     : mword 64)) 31 0))))
+              (su_setnl dni (su_dec16 (di_nlink dni)))
               dni bmi c2 (Sb2 : gset Z) false
               (TDir (bv_unsigned dinum)) pid
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
@@ -1956,18 +1793,8 @@ Section ProofSysUnlinkAUW5D.
          [1 + 1 -> 0], and the two fragments are its NAME in [dp] (freed by
          the zeroing) and its own ["."] (freed by the orphan move). *)
       assert (Hdd2 : InodeRegion.ireg_dot_delta
-                      (bv_unsigned (di_type (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0))))))
-                      (bv_unsigned (di_nlink (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))))) = 2%nat).
+                      (bv_unsigned (di_type (su_setnl dni (su_dec16 (di_nlink dni)))))
+                      (bv_unsigned (di_nlink (su_setnl dni (su_dec16 (di_nlink dni))))) = 2%nat).
       { rewrite /InodeRegion.ireg_dot_delta
           (bool_decide_eq_true_2 _ Hnl2za) su_setnl_type
           (bool_decide_eq_true_2
@@ -2028,55 +1855,25 @@ Section ProofSysUnlinkAUW5D.
        orphan's dots owe nothing ([FsStateEra.ent_toks_era_orphan]), fed by
        FINDING 3 and the [blez]'s [1 <=] *)
     iDestruct "Hmapi" as "[Haddrsi Hindi]".
-    assert (Hnl2z : bv_unsigned (di_nlink (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0))))) = 0).
+    assert (Hnl2z : bv_unsigned (di_nlink (su_setnl dni (su_dec16 (di_nlink dni)))) = 0).
     { rewrite su_setnl_nlink.
       exact (su_decr_zero _ _ (su_nlink_decr (di_nlink dni) Hnlzi) Hnl1). }
     assert (Hdead2 : forall k : nat, (2 <= k)%nat ->
               (k < dir_nrec (bv_unsigned
-                     (di_size (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))))))%nat ->
+                     (di_size (su_setnl dni (su_dec16 (di_nlink dni))))))%nat ->
               dir_inum dati k = bv_0 16).
     { intros k Hk1 Hk2. apply (Hdead k Hk1).
       revert Hk2. rewrite su_setnl_size. exact (fun H => H). }
     assert (HddixZ : dir_dots_ix (bv_unsigned (zero_extend' 32
                        (dir_inum datd kk : mword 16) : mword 32))
-                       (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) dati).
+                       (su_setnl dni (su_dec16 (di_nlink dni))) dati).
     { intros _ Hc. exfalso. apply Hc. exact Hnl2z. }
-    assert (HdocZ : dir_orphan_clean (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) dati).
+    assert (HdocZ : dir_orphan_clean (su_setnl dni (su_dec16 (di_nlink dni))) dati).
     { apply dir_orphan_clean_of_only.
-      apply (dir_dots_only_of dni (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) dati).
+      apply (dir_dots_only_of dni (su_setnl dni (su_dec16 (di_nlink dni))) dati).
       - rewrite su_setnl_size. reflexivity.
       - exact Hdots. }
-    assert (HduqZ : dir_uniq (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) dati)
+    assert (HduqZ : dir_uniq (su_setnl dni (su_dec16 (di_nlink dni))) dati)
       by (exact (dir_uniq_cong dni _ dati (su_setnl_type _ _)
                    (su_setnl_size _ _) Hduqi)).
     iDestruct (dlinks_intro _ _ _ _ _ Di HdokiZ HxactiZ
@@ -2089,12 +1886,7 @@ Section ProofSysUnlinkAUW5D.
     assert (Hlocdec : inode_local
               (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
                             : mword 32))
-              (era_node (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                    (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                              : mword 64)
-                       (sign_extend' 64
-                          (sign_extend' 12 (mword_of_int 63 : mword 6))
-                        : mword 64)) 31 0)))) bmi dati)).
+              (era_node (su_setnl dni (su_dec16 (di_nlink dni))) bmi dati)).
     { apply (inode_local_of_ok_rec _ fsc_cov fsc_logst _ bmi dati).
       - exact (su_setnl_inode_ok fsc_cov fsc_logst dni bmi dati _ Hioki).
       - apply (inode_rec_local_same_type dni _ Hrl_dati
@@ -2114,32 +1906,25 @@ Section ProofSysUnlinkAUW5D.
       by (rewrite Htyzi; cbv [T_DIR_z]; lia).
     assert (Htynz2 : fn_type (era_node dni bmi dati) <> 0)
       by (rewrite /fn_type era_node_rec; exact Htynz1).
+    (* [su_au_nlink_down]'s decrement premise, HOISTED OUT OF ARGUMENT
+       POSITION.  Spliced as [ltac:(lia)] it reifies this proof's whole
+       context -- the tree's largest -- to combine two equations that are
+       already named; measured 14.9 s on the [iMod] below.  Closed here by
+       the two rewrites instead, exactly as [HdnlD] does for the parent. *)
+    assert (HdnlI : bv_unsigned (di_nlink (su_setnl dni (su_dec16 (di_nlink dni))))
+                    = bv_unsigned (di_nlink dni) - 1).
+    { rewrite Hnl2za Hnl1. reflexivity. }
     iMod (uf_utgt_fire fsc_fs ⊤ Phitgt
             (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
                           : mword 32))
             (era_node dni bmi dati)
-            (era_node (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmi dati)
+            (era_node (su_setnl dni (su_dec16 (di_nlink dni))) bmi dati)
             uf_nd_top Hlocdec
             (su_au_nl1 dni bmi dati Hnlzi)
-            (uf_nlink_row dni (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmi dati
+            (uf_nlink_row dni (su_setnl dni (su_dec16 (di_nlink dni))) bmi dati
                Htynz1 eq_refl eq_refl eq_refl eq_refl
-               (su_au_nlink_down dni (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmi bmi dati dati Hnlzi
-                  ltac:(lia)))
+               (su_au_nlink_down dni (su_setnl dni (su_dec16 (di_nlink dni))) bmi bmi dati dati Hnlzi
+                  HdnlI))
             Htynz2
             with "[] [] Hctgt Htopi") as "(Htopi & Hfire2)";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
@@ -2147,12 +1932,7 @@ Section ProofSysUnlinkAUW5D.
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ks
                (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
-               (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmi)
+               (su_setnl dni (su_dec16 (di_nlink dni))) bmi)
       with "[Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi]" as "Hloadi".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dati.
       iFrame "Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi".
@@ -2165,24 +1945,14 @@ Section ProofSysUnlinkAUW5D.
       - exact HddixZ.
       - exact HdocZ.
       - exact HduqZ. }
-    iAssert (ity_shot gyi (di_type (su_setnl dni (trunc16 (sign_extend' 64
-               (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))))) as "#Hshoti2".
+    iAssert (ity_shot gyi (di_type (su_setnl dni (su_dec16 (di_nlink dni))))) as "#Hshoti2".
     { rewrite su_setnl_type. iExact "Hshoti". }
     iDestruct (cpu_own_transport D27 D29 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (su_esc_acc ks Hks with "Hescrows")
       as "#Hesci".
     iDestruct (log_opS_named with "HopS") as (e1) "HopS".
-    pose (dni2 := su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-              (add_vec (zero_extend' 64 (di_nlink dni : mword 16) : mword 64)
-                 (sign_extend' 64
-                    (sign_extend' 12 (mword_of_int 63 : mword 6))))
-              31 0)))).
+    pose (dni2 := su_setnl dni (su_dec16 (di_nlink dni))).
     assert (Hcrb2 : false = true ->
               fsc_bmapstart ∈ (Sb2 ∪ {[IBLOCK (zero_extend' 32
                 (dir_inum datd kk : mword 16) : mword 32) icfg_ist]})).
