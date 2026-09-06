@@ -4,11 +4,15 @@
 five review rounds; two rulings (C) are the owner's.  Revised against the
 context abstractions that landed on `main` ([`design/contexts.md`](../design/contexts.md): one
 domination relation, `ctx_parked ξ ξ'`, per-lock contexts, the release
-hook).  Branch `relaxed-ww-twolog` holds stage A (the two-log spike and
-litmus suite), the ghost twin `TsoCtxTwin3.v`, and stage B (the two-log
-machine, interp and lifting rules), all built against the pre-contexts
-`main`; §3 says what of it is kept, what is rebased and what is
-superseded.**  The companion of
+hook).  The two-log work so far is on branch `relaxed-ww-twolog` on
+`origin` (three commits on top of `f7e2748e3`, the `main` before the
+contexts change): `2ea63c9fe` stage A (`iris/TsoMem.v`,
+`iris/TsoLitmus.v`, `iris/TsoMemOne.v`), `c2e717157` the ghost twin
+(`iris/TsoCtxTwin3.v`), `7be06e9ed` stage B (`iris/RiscvLang.v`,
+`TsoMemPa.v`, `TsoGhost.v`, `RiscvPtsto.v`, `RiscvExec.v`, `ObsTrace.v`,
+`HartBlock.v`, `UartAccepted.v`, `PowerBoot.v`); that branch's copy of
+this note is the pre-revision design and is superseded by this file.  §3
+says what of it is kept, what is rebased and what is superseded.**  The companion of
 [`completed/relaxed-rr.md`](../completed/relaxed-rr.md) (load–load
 reordering).  §1 is the machine of record and §1.3 the rejected first
 encoding, with the witnesses that kill it.
