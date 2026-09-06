@@ -1248,6 +1248,86 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------ *)
+(** ** §9c THE CHAINED SET (relaxed-ww.md §2.10).  The chain is a fact of
+    the FACT, not of every element: the interp keeps the set of message
+    indices whose chain holds at every byte they write.  A ctx store gate
+    inserts its message (it holds the previous latest's chain and its bit);
+    a ledger store, a racy store and an AMO insert nothing -- an AMO racing
+    a pending foreign store is legitimately not coherence-latest.  The set
+    is kept by every append (the chain is monotone in the log) and by every
+    drain (FIFO), with no [latest] needed. *)
+
+Definition chain_msg (log : list pwmsg) (dl : list nat) (i : nat) : Prop :=
+  ∀ m a, log !! i = Some m → is_Some (msg_byte m a) → chain_ok log dl a (S i).
+
+Definition chain_set_ok (log : list pwmsg) (dl : list nat) (CH : gmap nat nat)
+    : Prop :=
+  ∀ i v, CH !! i = Some v → (i < length log)%nat ∧ chain_msg log dl i.
+
+Lemma chain_msg_app_log log dl i m :
+  (i < length log)%nat → chain_msg log dl i → chain_msg (log ++ [m]) dl i.
+Proof.
+  move => Hi Hc m' a Hlk Hb. rewrite lookup_app_l // in Hlk.
+  apply chain_ok_app_log; [lia|]. exact (Hc _ _ Hlk Hb).
+Qed.
+
+Lemma chain_msg_drain log dl i k :
+  dl_ok log dl → drain_pre log dl k → chain_msg log dl i → chain_msg log (dl ++ [k]) i.
+Proof.
+  move => Hok [Hk [Hnin Hfifo]] Hc m a Hi Hb j mj [= <-] Hj i' mi' Hi'j Hi' Hb'.
+  rewrite Hi in Hj. injection Hj as <-.
+  destruct (Hc m a Hi Hb i m eq_refl Hi i' mi' Hi'j Hi' Hb') as [Hor Hpos]. split.
+  - destruct Hor as [Hin|?]; [left; apply elem_of_app; by left|by right].
+  - move => q Hq. apply lookup_app_last' in Hq as [[_ Hq]|[-> <-]].
+    + destruct (Hpos _ Hq) as (q' & Hq' & ?). exists q'.
+      split; [by apply lookup_app_l_Some|done].
+    + have Hin : i' ∈ dl.
+      { destruct Hor as [Hin|Htid]; [done|].
+        destruct Hb as [v Hv]. destruct Hb' as [v' Hv'].
+        eapply (Hfifo _ _ _ Hi'j Hi' Hi Htid). by eapply msg_overlapb_of_byte. }
+      apply elem_of_list_lookup_1 in Hin as [q' Hq']. exists q'.
+      split; [by apply lookup_app_l_Some|by eapply lookup_lt_Some].
+Qed.
+
+Lemma chain_set_ok_nil log dl : chain_set_ok log dl ∅.
+Proof. move => i v. rewrite lookup_empty //. Qed.
+
+Lemma chain_set_ok_app_log log dl CH m :
+  chain_set_ok log dl CH → chain_set_ok (log ++ [m]) dl CH.
+Proof.
+  move => Hc i v Hiv. destruct (Hc _ _ Hiv) as [Hi Hm]. split.
+  - rewrite length_app /=. lia.
+  - by apply chain_msg_app_log.
+Qed.
+
+Lemma chain_set_ok_drain log dl CH k :
+  dl_ok log dl → drain_pre log dl k →
+  chain_set_ok log dl CH → chain_set_ok log (dl ++ [k]) CH.
+Proof.
+  move => Hok Hpre Hc i v Hiv. destruct (Hc _ _ Hiv) as [Hi Hm]. split; [done|].
+  by apply chain_msg_drain.
+Qed.
+
+(** The ctx store gate's insert: the message just appended is chained. *)
+Lemma chain_set_ok_insert log dl CH m v :
+  chain_set_ok (log ++ [m]) dl CH → chain_msg (log ++ [m]) dl (length log) →
+  chain_set_ok (log ++ [m]) dl (<[length log := v]> CH).
+Proof.
+  move => Hc Hm i v'. destruct (decide (i = length log)) as [->|Hne].
+  - rewrite lookup_insert. move => _. split; [rewrite length_app /=; lia|exact Hm].
+  - have Hne' : length log ≠ i by congruence.
+    rewrite (lookup_insert_ne CH _ _ _ Hne'). apply Hc.
+Qed.
+
+(** A chained message's chain at one of its bytes, read off [latest]. *)
+Lemma chain_msg_ok img log dl a i v :
+  latest img log a (S i) v → chain_msg log dl i → chain_ok log dl a (S i).
+Proof.
+  move => Hlat Hc. destruct (latest_S _ _ _ _ _ Hlat) as (m & Hm & Hb & _).
+  apply (Hc m a Hm). by exists v.
+Qed.
+
+(* ------------------------------------------------------------------ *)
 (** ** The ghost mirrors of the drain log (the interp's pure ties) *)
 
 (** [DP] mirrors the drain log: message [i] is at position [S q]. *)
@@ -3873,7 +3953,7 @@ Definition ts_elem : Type := nat * ts_pay.
    E of relaxed-ww. *)
 Definition ts_ok (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
     (a : Arch.pa) (e : ts_elem) : Prop :=
-  (exists v, mem !! a = Some v /\ latest img log a e.1 v /\ chain_ok log dl a e.1)
+  (exists v, mem !! a = Some v /\ latest img log a e.1 v)
   /\ (forall (Sv : byteset) (B : nat),
         tsp_pin e.2 = Some (Sv, B) -> pin_ok img log a B Sv)
   /\ (forall W : ts_win, tsp_win e.2 = Some W -> win_ok1 img log a W)
@@ -3882,7 +3962,7 @@ Definition ts_ok (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list n
 
 Lemma ts_ok_latest img mem log dl a e :
   ts_ok img mem log dl a e ->
-  exists v, mem !! a = Some v /\ latest img log a e.1 v /\ chain_ok log dl a e.1.
+  exists v, mem !! a = Some v /\ latest img log a e.1 v.
 Proof. by move => [H _]. Qed.
 
 Lemma ts_ok_pin img mem log dl a e Sv B :
@@ -3903,19 +3983,15 @@ Proof. move => [_ [_ [_ [_ H]]]]. by apply H. Qed.
 
 (* the UNPAYLOADED element: the tie and its chain, and nothing more to prove *)
 Lemma ts_ok_unpinned img mem log dl a t v :
-  mem !! a = Some v -> latest img log a t v -> chain_ok log dl a t ->
+  mem !! a = Some v -> latest img log a t v ->
   ts_ok img mem log dl a (t, ts_pay_none).
 Proof.
-  move => Hm Hl Hc. split; [by exists v |].
+  move => Hm Hl. split; [by exists v |].
   split; [by move => * |]. split; [by move => * |]. split; by move => *.
 Qed.
 
-(* the tie is kept by a DRAIN: nothing in it names a drain position except
-   the chain, and the chain survives ([chain_ok_drain]) *)
+(* the tie names no drain position at all (the chain is the CHAINED SET's,
+   §9c), so a drain keeps it verbatim *)
 Lemma ts_ok_drain img mem log dl a e k :
-  dl_ok log dl -> drain_pre log dl k ->
   ts_ok img mem log dl a e -> ts_ok img mem log (dl ++ [k]) a e.
-Proof.
-  move => Hok Hdr [[v [Hm [Hl Hc]]] Hrest]. split; [|exact Hrest].
-  exists v. split_and!; [done|done|]. exact (chain_ok_drain _ _ _ _ _ _ _ Hok Hdr Hl Hc).
-Qed.
+Proof. done. Qed.

@@ -23,7 +23,7 @@ Require Import SailStdpp.Operators_mwords.  (* [uint]; exports no mword key inst
 Require Import Riscv.rv64d_types Riscv.rv64d.   (* [is_aligned_paddr]/[Physaddr]: the word tower's alignment vocabulary *)
 Require Import RiscvModelBytes RiscvLang RiscvPtsto Ktier.
 Require Import TsoMemPa TsoGhost.
-Require Import TsoCtx TsoCtxStore.
+Require Import TsoCtx TsoCtxStore TsoCtxAbsorbLb.
 
 
 Section ctx.
@@ -45,23 +45,23 @@ Section ctx.
      consume -- persistent-monotone, so it survives every step between
      the acquire and the swtch. *)
   Lemma hart_view_lb_get `{CID : CpuId} (g : gstate) (T : nat) :
-    (length g.(glog) ≤ g.(gtv) cpu_id)%nat →
-    tso_interp_at riscv_eraGS g -∗ llb loglen_name T -∗
+    (length g.(gdlog) ≤ g.(gtv) cpu_id)%nat →
+    tso_interp_at riscv_eraGS g -∗ llb dlen_name T -∗
     tso_interp_at riscv_eraGS g ∗
     hart_view_lb (g.(gtv) cpu_id) ∗ ⌜(T ≤ g.(gtv) cpu_id)%nat⌝.
   Proof.
     rewrite hart_view_lb_unseal /hart_view_lb_def.
     iIntros (Htop) "Hint #HT".
-    iDestruct "Hint"
-      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as ((Hflat & Htv & Hcov) & Hera).
-    iDestruct (llb_valid with "Hlen HT") as %HTlen.
-    iDestruct (view_lb_get _ _ (avf g) (length g.(glog)) (hart_agent cpu_id)
-                with "Hv Hlen") as "(Hv & Hlen & #Hrcpt)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    destruct Hmm as ((Hflat & Htv & Hcov) & Hdlog & Hera).
+    iDestruct (llb_valid with "Hdl HT") as %HTlen.
+    iDestruct (view_lb_get _ _ (avf g) (length g.(gdlog)) (hart_agent cpu_id)
+                with "Hv Hdl") as "(Hv & Hdl & #Hrcpt)".
     { rewrite avf_hart. apply Htv. }
     rewrite avf_hart.
-    iSplitL "Hts Hm Hlen Hv".
-    { iExists TM, LM. iFrame. iPureIntro. split_and!; done. }
+    iSplitL.
+    { iExists TM, LM, DP, FR, CH. iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch". by iPureIntro. }
     iFrame "Hrcpt". iPureIntro. lia.
   Qed.
 
@@ -71,55 +71,152 @@ Section ctx.
      interp -- it must compare the source's stamp with the log length
      and raise the acquirer's bound to its hart's view. *)
   Lemma ctx_dom_of_stamped `{CID : CpuId} (g : gstate) (ξ ξ' : CtxId) (T : nat) :
-    (length g.(glog) ≤ g.(gtv) cpu_id)%nat →
+    (length g.(gdlog) ≤ g.(gtv) cpu_id)%nat →
     tso_interp_at riscv_eraGS g -∗ own_context ξ' -∗ ctx_stamped ξ T ==∗
     tso_interp_at riscv_eraGS g ∗ own_context ξ' ∗
     ctx_dom ξ ξ' ∗ (ctx_dom ξ ξ' -∗ ctx_stamped ξ T).
   Proof.
-    rewrite own_context_unseal /own_context_def
-            ctx_stamped_unseal /ctx_stamped_def ctx_dom_unseal /ctx_dom_at_def.
     iIntros (Htop) "Hint Hrun Hpk".
+    iDestruct (ctx_stamped_dlb with "Hpk") as "[Hpk #HT]".
+    iDestruct (hart_view_lb_get g T Htop with "Hint HT") as "(Hint & #HK & %HTK)".
+    iMod (ctx_dom_of_stamped_lb ξ ξ' T _ HTK with "HK Hrun Hpk") as "(Hrun & Hdom & Hback)".
+    iModIntro. iFrame.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* PUBLICATION AT A FENCE (relaxed-ww.md §2.3).  Under two logs a       *)
+  (* pending store has no drain position, so a running context can be    *)
+  (* STAMPED -- and can DEPOSIT into a stamped root (mint 2) -- only      *)
+  (* where every one of its own messages has drained: a fence with a W   *)
+  (* predecessor ([TsoMemPa.own_drained], the fence arm's enabling        *)
+  (* condition).  Then every key this hart justifies as its own message  *)
+  (* has a drain witness in the interp, under the drain top, and the     *)
+  (* stamp is the drain top.  These two are the ONLY fence-bound ghost   *)
+  (* steps; every other mint is interp-free ([TsoCtx.v]).               *)
+  (* ---------------------------------------------------------------- *)
+  Local Lemma publish_key `{CID : CpuId} (g : gstate) (B : nat)
+      (k : nat * Arch.pa) :
+    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
+    (B ≤ length g.(gdlog))%nat →
+    tso_interp_at riscv_eraGS g -∗
+    dirty_ok logm_name dpos_name (hart_agent cpu_id) B k -∗
+    tso_interp_at riscv_eraGS g ∗ dpos_ev dpos_name k.1 (length g.(gdlog)).
+  Proof.
+    iIntros (Hod HB) "Hint [Hev|(%i & %m & %Hki & #Hm & %Htid)]".
+    { iFrame "Hint". iApply (dpos_ev_mono with "Hev"). lia. }
     iDestruct "Hint"
-      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as ((Hflat & Htv & Hcov) & Hera).
-    iDestruct "Hrun"
-      as "(%B' & %K & %W & %D' & [Hb' Hd'] & #HK & %HBK & #HW & %HDW & #Hoks)".
-    iDestruct "Hpk" as "(%D & Hat & #HT & %HDT)".
-    (* the source stamp is a legal log position, hence under the view *)
-    iDestruct (llb_valid with "Hlen HT") as %HTlen.
-    iDestruct (view_auth_valid with "Hv HK") as %HKtvs.
-    rewrite avf_hart in HKtvs.
-    (* raise the acquirer's bound to its (top) view *)
-    iMod (mono_nat_own_update (g.(gtv) cpu_id) with "Hb'") as "[Hb' #Hlb']".
-    { lia. }
-    iDestruct (view_lb_get _ _ (avf g) (length g.(glog)) (hart_agent cpu_id)
-                with "Hv Hlen") as "(Hv & Hlen & #Hrcpt)".
-    { rewrite avf_hart. apply Htv. }
-    rewrite avf_hart.
+      as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hlm & %HLM & Hlen & Hv &
+           Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    iDestruct (ghost_map_lookup with "Hlm Hm") as %HLMi. rewrite HLM in HLMi.
+    have Hin := Hod _ _ HLMi Htid.
+    apply elem_of_list_lookup_1 in Hin as [q Hq].
+    have HDP : DP !! i = Some (S q) by apply Hdpo; eauto.
+    iDestruct (big_sepM_lookup _ _ _ _ HDP with "Hdps") as "#Hat".
+    iSplitL.
+    { iExists TM, LM, DP, FR, CH. iFrame "Hts Hlm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch".
+      by iPureIntro. }
+    rewrite /dpos_ev. iRight. iExists i, (S q). iFrame "Hat". iPureIntro.
+    split; [done|]. by eapply lookup_lt_Some.
+  Qed.
+
+  Local Lemma publish_keys `{CID : CpuId} (g : gstate) (B : nat)
+      (D : gset (nat * Arch.pa)) :
+    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
+    (B ≤ length g.(gdlog))%nat →
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ set] k ∈ D, dirty_ok logm_name dpos_name (hart_agent cpu_id) B k) -∗
+    tso_interp_at riscv_eraGS g ∗
+    [∗ set] k ∈ D, dpos_ev dpos_name k.1 (length g.(gdlog)).
+  Proof.
+    iIntros (Hod HB). apply thread_big_sepS. iIntros (k _).
+    by iApply publish_key.
+  Qed.
+
+  (* STAMP IS PUBLICATION AT THE FENCE: running → stamped at the drain
+     top, every key drained under it.  The lock's release stamps its
+     context here ([release]'s [fence rw,w]). *)
+  Lemma ctx_stamp `{CID : CpuId} (g : gstate) (ξ : CtxId) :
+    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
+    tso_interp_at riscv_eraGS g -∗ own_context ξ ==∗
+    tso_interp_at riscv_eraGS g ∗ ctx_stamped ξ (length g.(gdlog)).
+  Proof.
+    rewrite own_context_unseal /own_context_def ctx_stamped_unseal /ctx_stamped_def.
+    iIntros (Hod) "Hint (%B & %K & %D & [Hb Hd] & #HK & %HBK & #Hoks)".
+    iDestruct (view_lb_le_view with "Hint HK") as %HKtvs.
+    iAssert (⌜(g.(gtv) cpu_id ≤ length g.(gdlog))%nat⌝)%I as %Htop.
+    { iDestruct "Hint" as "(% & % & % & % & % & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+      iPureIntro. exact (proj1 (proj2 (proj1 Hmm)) cpu_id). }
+    iDestruct (publish_keys g B D with "Hint Hoks") as "[Hint #Hpub]"; [done|lia|].
+    iDestruct (tso_interp_dlen_llb with "Hint") as "[Hint #Hdlb]".
+    iMod (mono_nat_own_update (length g.(gdlog)) with "Hb") as "[Hb _]"; first lia.
+    iModIntro. iFrame "Hint". iExists D. iFrame "Hb Hd Hdlb". iModIntro. iExact "Hpub".
+  Qed.
+
+  (* MINT 2 -- A DEPOSIT INTO A STAMPED ROOT, at the fence: the root's
+     stamp rises to the drain top, which covers the depositor's keys
+     because they are drained there.  The give-back re-agrees the halves,
+     so the depositor's token comes back exactly as it went in. *)
+  Lemma ctx_dom_to_stamped `{CID : CpuId} (g : gstate) (ξ ξ' : CtxId) (T : nat) :
+    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
+    tso_interp_at riscv_eraGS g -∗ own_context ξ -∗ ctx_stamped ξ' T ==∗
+    tso_interp_at riscv_eraGS g ∗
+    ∃ T', ⌜(T ≤ T')%nat⌝ ∗ ctx_stamped ξ' T' ∗ ctx_dom ξ ξ' ∗
+          (ctx_dom ξ ξ' -∗ own_context ξ).
+  Proof.
+    iIntros (Hod) "Hint Hrun Hpk".
+    iEval (rewrite own_context_unseal /own_context_def) in "Hrun".
+    iEval (rewrite ctx_stamped_unseal /ctx_stamped_def) in "Hpk".
+    iDestruct "Hrun" as "(%B & %K & %D & Hat & #HK & %HBK & #Hoks)".
+    iDestruct "Hpk" as "(%D' & [Hb' Hd'] & #HT & #Hks')".
+    iDestruct (view_lb_le_view with "Hint HK") as %HKtvs.
+    iAssert (⌜(g.(gtv) cpu_id ≤ length g.(gdlog))%nat⌝)%I as %Htop.
+    { iDestruct "Hint" as "(% & % & % & % & % & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+      iPureIntro. exact (proj1 (proj2 (proj1 Hmm)) cpu_id). }
+    iDestruct (publish_keys g B D with "Hint Hoks") as "[Hint #Hpub]"; [done|lia|].
+    iDestruct (tso_interp_dlen_llb with "Hint") as "[Hint #Hdlb]".
+    set (T' := Nat.max T (length g.(gdlog))).
+    iMod (mono_nat_own_update T' with "Hb'") as "[Hb' #Hlb']"; first lia.
+    iModIntro. iFrame "Hint". iExists T'.
+    rewrite ctx_stamped_unseal /ctx_stamped_def ctx_dom_unseal /ctx_dom_at_def
+            own_context_unseal /own_context_def.
     iDestruct (ctx_at_halves with "Hat") as "[Hat1 Hat2]".
-    iModIntro.
-    iSplitL "Hts Hm Hlen Hv".
-    { iExists TM, LM. iFrame. iPureIntro. split_and!; done. }
+    iSplitR; first (iPureIntro; lia).
     iSplitL "Hb' Hd'".
-    { iExists (g.(gtv) cpu_id), (g.(gtv) cpu_id), W, D'. iFrame "Hb' Hd'".
-      iSplitR; first iExact "Hrcpt".
-      iSplitR; first done.
-      iFrame "HW". iSplitR; first done.
-      iApply (big_sepS_impl with "Hoks").
-      iIntros "!>" (k Hk) "Hok".
-      iApply (dirty_ok_mono with "Hok"). lia. }
+    { iExists D'. iFrame "Hb' Hd'".
+      iSplitR; first by iApply (llb_max with "HT Hdlb").
+      iModIntro. iApply (big_sepS_impl with "Hks'"). iIntros "!>" (k _) "Hev".
+      iApply (dpos_ev_mono with "Hev"). lia. }
     iSplitL "Hat1".
-    { iExists T, D. iFrame "Hat1".
+    { iExists B, D. iFrame "Hat1".
       iSplitR.
-      { rewrite /ctx_floor /llb. iLeft.
-        iApply (mono_nat_lb_own_le with "Hlb'"). lia. }
+      { rewrite /ctx_floor /llb. iLeft. iApply (mono_nat_lb_own_le with "Hlb'"). lia. }
       iModIntro. iApply big_sepS_intro. iIntros "!>" (k Hk).
-      rewrite /key_at /llb. iLeft. iLeft.
-      iApply (mono_nat_lb_own_le with "Hlb'"). have := HDT _ Hk. lia. }
+      rewrite /key_at. iLeft. iExists T'. iSplitL.
+      - iApply (dpos_ev_mono _ _ (length g.(gdlog))); [lia|].
+        iApply (big_sepS_elem_of with "Hpub"). exact Hk.
+      - rewrite /ctx_floor /llb. iLeft. iExact "Hlb'". }
+    (* the give-back *)
     iIntros "(%B0 & %D0 & Hat0 & _ & _)".
     iDestruct (ctx_at_agree with "Hat0 Hat2") as %[-> ->].
     iCombine "Hat0 Hat2" as "Hat". rewrite -ctx_at_halves.
-    iExists D. iFrame "Hat HT". by iPureIntro.
+    iExists B, K, D. iFrame "Hat HK Hoks". by iPureIntro.
+  Qed.
+
+  (* THE DEPOSIT: a running context hands ANY morphable payload to a
+     STAMPED one, at a fence. *)
+  Lemma ctx_deposit `{CID : CpuId} (R : CtxId → iProp Σ) `{!CtxMorph R}
+      (g : gstate) (ξ ξc : CtxId) (T : nat) :
+    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
+    tso_interp_at riscv_eraGS g -∗ own_context ξ -∗ ctx_stamped ξc T -∗ R ξ ==∗
+    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗
+    ∃ T', ⌜(T ≤ T')%nat⌝ ∗ ctx_stamped ξc T' ∗ R ξc.
+  Proof.
+    iIntros (Hod) "Hint Hrun Hpk HR".
+    iMod (ctx_dom_to_stamped g ξ ξc T Hod with "Hint Hrun Hpk")
+      as "(Hint & %T' & %HTT' & Hpk & Hdom & Hback)".
+    iMod (ctx_morph with "Hdom HR") as "[Hdom HR]".
+    iModIntro. iFrame "Hint". iSplitL "Hback Hdom"; first by iApply "Hback".
+    iExists T'. by iFrame.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -166,9 +263,8 @@ Section ctx.
        ⌜ktier_pin cur_ktier ppn va⌝ ∗
        pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v ∗
        (pa_of ppn va) ↪[ts_name]{dq} (t, ts_pay_none) ∗
-       (llb (ctx_bound_name ξ) t
-        ∨ dset_in (ctx_dirty_name ξ) (t, pa_of ppn va)) ∗
-       ⌜(t <= IK)%nat⌝)%I.
+       key_at ξ (t, pa_of ppn va) ∗ chain_ev chain_name t ∗
+       dpos_ev dpos_name t IK)%I.
   Lemma ctx_xpointsto_aux : { f | f = @ctx_xpointsto_def }.
   Proof. by eexists. Qed.
   Definition ctx_xpointsto `{KTR : !CurKtier} (ξ : CtxId) (IK : nat)
@@ -189,7 +285,7 @@ Section ctx.
   Proof.
     rewrite ctx_xpointsto_unseal /ctx_xpointsto_def
             ctx_pointsto_unseal /ctx_pointsto_def.
-    iIntros "(%ppn & %t & Hk & % & % & % & Hp & Hts & Hbit & _)".
+    iIntros "(%ppn & %t & Hk & % & % & % & Hp & Hts & Hbit & Hch & _)".
     iExists ppn, t. by iFrame.
   Qed.
 
@@ -198,8 +294,10 @@ Section ctx.
     (IK <= IK')%nat -> ctx_xpointsto ξ IK va dq v ⊢ ctx_xpointsto ξ IK' va dq v.
   Proof.
     intros Hle. rewrite !ctx_xpointsto_unseal /ctx_xpointsto_def.
-    iIntros "(%ppn & %t & Hk & % & % & % & Hp & Hts & Hbit & %Ht)".
-    iExists ppn, t. iFrame. iPureIntro. split_and!; [done|done|done|lia].
+    iIntros "(%ppn & %t & Hk & % & % & % & Hp & Hts & Hbit & Hch & #Hst)".
+    iExists ppn, t. iFrame.
+    iSplit; [done|]. iSplit; [done|]. iSplit; [done|].
+    by iApply (dpos_ev_mono with "Hst").
   Qed.
 
   (* THE STAMP, at a [fence.i]: a running context's fact is clean -- under
@@ -211,43 +309,24 @@ Section ctx.
   Lemma ctx_xstamp `{CID : CpuId} {KTR : CurKtier} (g : gstate)
       (ξ : CtxId) (IK : nat) (a : Arch.pa) (dq : dfrac) (v : bv 8) :
     (g.(gtv) cpu_id <= IK)%nat ->
-    (own_pub (hart_agent cpu_id) g.(glog) <= IK)%nat ->
+    (own_pub (hart_agent cpu_id) g.(glog) g.(gdlog) <= IK)%nat ->
+    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) ->
     tso_interp_at riscv_eraGS g -∗
     own_context ξ -∗
     ctx_pointsto (KTR := KTR) ξ a dq v -∗
     tso_interp_at riscv_eraGS g ∗ own_context ξ ∗
     ctx_xpointsto (KTR := KTR) ξ IK a dq v.
   Proof.
-    intros Htv Hpub.
-    rewrite own_context_unseal /own_context_def
-            ctx_pointsto_unseal /ctx_pointsto_def
-            ctx_xpointsto_unseal /ctx_xpointsto_def.
-    iIntros "Hint Hrun Hfact".
-    iDestruct "Hint"
-      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as ((Hflat & Htv0 & Hcov) & Hera).
-    iDestruct "Hrun"
-      as "(%B & %K & %W & %D & [Hb Hd] & #HK & %HBK & #HW & %HDW & #Hoks)".
-    iDestruct "Hfact"
-      as "(%ppn & %t & #Hk & %Hc & %Hr & %Hpin & Hpt & Htse & Hbit)".
-    iDestruct (view_auth_valid with "Hv HK") as %HKtvs.
-    rewrite avf_hart in HKtvs.
-    iAssert (⌜(t <= IK)%nat⌝)%I as %HtIK.
-    { iDestruct "Hbit" as "[Hcl | Hdt]".
-      - iDestruct (llb_valid with "Hb Hcl") as %HtB. iPureIntro. lia.
-      - iDestruct (dset_lookup with "Hd Hdt") as %HDt.
-        iDestruct (big_sepS_elem_of _ _ _ HDt with "Hoks") as "[%HtB | Hown]".
-        + iPureIntro. simpl in HtB. lia.
-        + iDestruct "Hown" as (i m) "(%Hti & Hi & %Htid)".
-          iDestruct (ghost_map_lookup with "Hm Hi") as %HLi.
-          iPureIntro. simpl in Hti. rewrite Hti.
-          rewrite HLM in HLi.
-          pose proof (own_pub_lookup _ _ _ _ HLi Htid). lia. }
-    iSplitL "Hts Hm Hlen Hv".
-    { iExists TM, LM. iFrame. iPureIntro. split_and!; done. }
-    iSplitL "Hb Hd".
-    { iExists B, K, W, D. iFrame "Hb Hd HK HW Hoks". by iPureIntro. }
-    iExists ppn, t. iFrame "Hk Hpt Htse Hbit". by iPureIntro.
+    intros Htv Hpub Hod.
+    rewrite ctx_pointsto_phys.
+    iIntros "Hint Hrun (%ppn & #Hk & %Hc & %Hpin & Hb)".
+    iDestruct (ctx_phys_xstamp g ξ IK (pa_of ppn a) dq v Htv Hpub Hod with "Hint Hrun Hb")
+      as "(Hint & Hrun & Hx)".
+    iFrame "Hint Hrun".
+    rewrite ctx_xpointsto_unseal /ctx_xpointsto_def
+            ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def /phys_pointsto.
+    iDestruct "Hx" as "(%t & [Hpt %Hr] & Hts & Hbit & Hch & Hst)".
+    iExists ppn, t. iFrame "Hk Hpt Hts Hbit Hch Hst". by iPureIntro.
   Qed.
 
   (* THE FETCH GATE: with the receipt that this hart's instruction view is
@@ -266,30 +345,23 @@ Section ctx.
     ∃ ppn : mword 44,
       kmap_at (svpn_of a) ppn KP_rw ∗
       ⌜∀ tv', (itv ≤ tv')%nat →
-         tso_read g.(gimg) g.(glog) (ifetch_agent (hart_agent cpu_id)) tv'
+         tso_read g.(gimg) g.(glog) g.(gdlog) (ifetch_agent (hart_agent cpu_id)) tv'
            (pa_of ppn a) = Some v⌝.
   Proof.
     intros HIK.
     rewrite ctx_xpointsto_unseal /ctx_xpointsto_def.
-    iIntros "Hgh Hint Hfact".
-    iDestruct "Hint"
-      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as ((Hflat & Htv0 & Hcov) & Hera).
-    iDestruct "Hfact"
-      as "(%ppn & %t & #Hk & %Hc & %Hr & %Hpin & Hpt & Htse & Hbit & %HtIK)".
-    iDestruct (gen_heap_valid with "Hgh Hpt") as %Hgm.
-    iDestruct (ghost_map_lookup with "Hts Htse") as %HTMt.
-    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
-    rewrite Hgm in Hgm0. injection Hgm0 as <-.
-    iSplitL "Hgh"; first iExact "Hgh".
-    iSplitL "Hts Hm Hlen Hv".
-    { iExists TM, LM. iFrame. iPureIntro. split_and!; done. }
+    iIntros "Hgh Hint (%ppn & %t & #Hk & %Hc & %Hr & %Hpin & Hpt & Htse & #Hbit & #Hch & #Hst)".
+    iAssert (ctx_phys_xpointsto ξ IK (pa_of ppn a) dq v) with "[Hpt Htse]" as "Hx".
+    { rewrite ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def /phys_pointsto.
+      iExists t. iFrame "Hpt Htse Hbit Hch Hst". by iPureIntro. }
+    iDestruct (ctx_phys_xfetch_ok g ξ IK itv (pa_of ppn a) dq v HIK with "Hgh Hint Hx") as %Hrd.
+    iFrame "Hgh Hint".
+    rewrite ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def /phys_pointsto.
+    iDestruct "Hx" as "(%t' & [Hpt _] & Htse & #Hbit' & #Hch' & #Hst')".
     iSplitL.
-    { iExists ppn, t. iFrame "Hk Hpt Htse Hbit". by iPureIntro. }
-    iExists ppn. iFrame "Hk". iPureIntro.
-    intros tv' Htv'.
-    apply (tso_read_of_latest _ _ _ _ _ t); [exact Hlat|].
-    apply visibleb_below. lia.
+    { iExists ppn, t'. iFrame "Hk Hpt Htse Hbit' Hch' Hst'".
+      iSplit; [done|]. iSplit; [done|]. done. }
+    iExists ppn. iFrame "Hk". by iPureIntro.
   Qed.
 
 
@@ -433,11 +505,13 @@ Section ctx.
      \/ (forall j, (j < n)%nat -> Pnew !! pa_add base j = Some (cp auth j))
        /\ own' auth = None) ->
     (forall h, h <> auth -> own' h = own h) ->
+    (auth < NCPU)%nat ->
     g'.(gimg) = g.(gimg) ->
     g'.(glog) = (g.(glog) ++ [PWMsg Pnew auth])%list ->
+    g'.(gdlog) = g.(gdlog) ->
     g'.(gmem) = Pnew ∪ g.(gmem) ->
     (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
-    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(gdlog))%nat) ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
     wpay_map_own Pold (DfracOwn 1) Wold ==∗
@@ -447,10 +521,10 @@ Section ctx.
     ([∗ map] a ↦ v ∈ Pnew,
        phys_ledger_wpay a (DfracOwn 1) v (S (length g.(glog))) (Wf a)).
   Proof.
-    iIntros (Hdom HWold HWf Hfoot Hstore Hoth Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
+    iIntros (Hdom HWold HWf Hfoot Hstore Hoth Hauth Himg Hlog Hdl Hmem Htv Htvok') "Hgh Hint Hold".
     iDestruct "Hint"
-      as "(%TM & %LM & Hts & %Hdomtm & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as ((Hflat & Htvok & Hcov) & Hera).
+      as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdomtm & %Htie & Hm & %HLM & Hlen & Hv & Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    destruct Hmm as ((Hflat & Htvok & Hcov) & (Hdok & Hfifo & Hdev) & Hera).
     set (msg := PWMsg Pnew auth).
     assert (HLMfresh : LM !! length g.(glog) = None).
     { rewrite HLM. apply lookup_ge_None_2. lia. }
@@ -464,15 +538,16 @@ Section ctx.
     assert (Hlen' : length g'.(glog) = S (length g.(glog))).
     { rewrite Hlog length_app /=. lia. }
     assert (Havf : forall x, (avf g x <= avf g' x)%nat).
-    { intros x. rewrite /avf Hlog length_app /=.
+    { intros x. rewrite /avf Hdl.
       destruct (lt_dec x NCPU) as [Hx|Hx]; [apply Htv | lia]. }
     iMod (view_auth_update _ (avf g) (avf g') Havf with "Hv") as "Hv".
     iModIntro.
     iSplitL "Hgh"; first by rewrite Hmem.
     iFrame "Hbig". iFrame "Hmsg".
     iExists (wpay_tm (length g.(glog)) Wf Pnew ∪ TM),
-            (<[length g.(glog) := msg]> LM).
-    iFrame "Hts Hm Hlen Hv".
+            (<[length g.(glog) := msg]> LM), DP, FR, CH.
+    iEval (rewrite Hdl).
+    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch".
     iSplitR.
     { iPureIntro.
       assert (Hdpin : dom (wpay_tm (length g.(glog)) Wf Pnew) = dom Pnew).
@@ -502,7 +577,7 @@ Section ctx.
           rewrite Hlog Himg.
           apply (win_ok1_app_store _ _ _ base n j lo z cp own own').
           * rewrite -(HWold j Hj).
-            exact (ts_ok_win _ _ _ _ _ _ (Htie _ _ HTMa) eq_refl).
+            exact (ts_ok_win _ _ _ _ _ _ _ (Htie _ _ HTMa) eq_refl).
           * cbn [pm_tid]. case: Hstore => [[Hcl Ho] | [Hme Ho]].
             -- left. split; [| exact Ho].
                move => k Hk. rewrite /msg_byte /=. exact (Hcl k Hk).
@@ -517,24 +592,24 @@ Section ctx.
         pose proof (Htie _ _ Hlk) as Hok.
         assert (Hmb : msg_byte msg a = None) by (rewrite /msg_byte /=; exact Hpa).
         split_and!.
-        + destruct (ts_ok_latest _ _ _ _ _ Hok) as (v0 & Hgm & Hlat).
+        + destruct (ts_ok_latest _ _ _ _ _ _ Hok) as (v0 & Hgm & Hlat).
           exists v0. split.
           { rewrite Hmem. by rewrite lookup_union_r. }
           rewrite Hlog Himg. by apply latest_app_frame.
         + intros Sv' B' He2. rewrite Hlog Himg.
           apply (pin_ok_app_frame _ _ _ _ _ _
-                   (ts_ok_pin _ _ _ _ _ _ _ Hok He2) Hmb).
+                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb).
         (* the WINDOW arm frames on the SAME per-address side condition
            as the pin's (TsoMemPa §12c) *)
         + intros W0 HW0. rewrite Hlog Himg.
           apply (win_ok1_app_frame _ _ _ _ _
-                   (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb).
+                   (ts_ok_win _ _ _ _ _ _ _ Hok HW0) Hmb).
         + intros R0 HR0. rewrite Hlog Himg.
           apply (rel_ok1_app_frame _ _ _ _ _
-                   (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb).
+                   (ts_ok_rel _ _ _ _ _ _ _ Hok HR0) Hmb).
         + intros Wp HWp. rewrite Hlog Himg.
           apply (pinw_ok1_app_frame _ _ _ _ _
-                   (ts_ok_pinw _ _ _ _ _ _ Hok HWp) Hmb). }
+                   (ts_ok_pinw _ _ _ _ _ _ _ Hok HWp) Hmb). }
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -543,10 +618,18 @@ Section ctx.
         destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
         + by rewrite lookup_app_l.
         + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
-    iPureIntro. split; [split_and! | rewrite Himg; exact Hera].
+    iSplitR; [iPureIntro; exact Hdpo|].
+    iSplitR; [iPureIntro; exact Hfro|].
+    iSplitR; [iPureIntro; rewrite Hlog; exact (chain_set_ok_app_log _ _ _ _ Hcho)|].
+    iPureIntro. split_and!; [split_and! | split_and! | rewrite Himg; exact Hera].
     - rewrite Hmem Hlog Himg flat_snoc /=. by rewrite -Hflat.
     - intros c. have := Htvok' c. lia.
     - rewrite Himg. exact Hcov.
+    - rewrite Hlog Hdl. by apply dl_ok_app_log.
+    - rewrite Hlog Hdl. apply fifo_ok_app_log; [exact Hdok | exact Hfifo].
+    - rewrite /dev_drained Hlog Hdl. intros j mj Hj Hb.
+      apply lookup_app_last' in Hj as [[_ Hj]|[_ ->]]; [exact (Hdev _ _ Hj Hb)|].
+      exfalso. rewrite /msg /= in Hb. lia.
   Qed.
 
   (* the context-free gate in the shape a leaf's [Wobl_ram] is stated in --
@@ -557,9 +640,10 @@ Section ctx.
     (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
     g'.(gimg) = g.(gimg) ->
     g'.(glog) = (g.(glog) ++ [PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list ->
+    g'.(gdlog) = g.(gdlog) ->
     g'.(gmem) = write_bytes g.(gmem) pa n vnew ->
     (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
-    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(gdlog))%nat) ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
     ([∗ list] j ∈ seq 0 (N.to_nat n),
@@ -569,11 +653,11 @@ Section ctx.
     ([∗ list] j ∈ seq 0 (N.to_nat n),
        phys_ledger (pa_add pa j) (DfracOwn 1) (nth_byte vnew j)).
   Proof.
-    iIntros (Hn Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
+    iIntros (Hn Himg Hlog Hdl Hmem Htv Htvok') "Hgh Hint Hold".
     rewrite (phys_ledger_win_map pa n vold _ Hn).
     iMod (ledger_store_ok g g' (hart_agent cpu_id)
-            (snap_of pa n vold) (snap_of pa n vnew)
-            ltac:(by rewrite !dom_snap_of) Himg Hlog
+            (snap_of pa n vold) (snap_of pa n vnew) (fin_to_nat_lt cpu_id)
+            ltac:(by rewrite !dom_snap_of) Himg Hlog Hdl
             ltac:(by rewrite Hmem write_bytes_union) Htv Htvok'
             with "Hgh Hint Hold") as "($ & $ & _ & Hnew)".
     iModIntro. rewrite (phys_ledger_win_map pa n vnew _ Hn).
@@ -589,9 +673,10 @@ Section ctx.
     (forall j : nat, (j < N.to_nat n)%nat -> nth_byte vnew j ∈ Sf j) ->
     g'.(gimg) = g.(gimg) ->
     g'.(glog) = (g.(glog) ++ [PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list ->
+    g'.(gdlog) = g.(gdlog) ->
     g'.(gmem) = write_bytes g.(gmem) pa n vnew ->
     (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
-    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(gdlog))%nat) ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
     ([∗ list] j ∈ seq 0 (N.to_nat n),
@@ -606,70 +691,10 @@ Section ctx.
              (fun _ => B) Hn HS (fun j _ => eq_refl) Hin).
   Qed.
 
-  (* §0.26′: the window bridge and the window gate at the VISIBILITY-FREE
-     tier.  Same two lines as the registered pair above; the OLD side is
-     free, the NEW side comes back registered and dirty. *)
-  (* THE OLD SIDE IS FUNCTION-VALUED, NOT WORD-VALUED, and that is the
-     whole point: a free window's bytes are NOT the bytes of any word the
-     caller can name.  [snap_of] is this foldr at [f := nth_byte v], so
-     the two footprints have the same domain by [tso_foldr_ins_dom]. *)
-  Definition free_win_map (pa : Arch.pa) (nn : nat) (f : nat -> bv 8)
-      : gmap Arch.pa (bv 8) :=
-    foldr (fun j acc => <[pa_add pa j := f j]> acc) ∅ (seq 0 nn).
-
-  Lemma dom_free_win_map (pa : Arch.pa) (nn : nat) (f : nat -> bv 8) :
-    dom (free_win_map pa nn f) = list_to_set (pa_add pa <$> seq 0 nn).
-  Proof.
-    rewrite /free_win_map tso_foldr_ins_dom dom_empty_L. set_solver.
-  Qed.
-
-  Lemma dom_free_win_snap (pa : Arch.pa) (n : N) {m : N}
-      (f : nat -> bv 8) (v : bv m) :
-    dom (free_win_map pa (N.to_nat n) f) = dom (snap_of pa n v).
-  Proof.
-    rewrite dom_free_win_map /snap_of /write_bytes tso_foldr_ins_dom dom_empty_L.
-    set_solver.
-  Qed.
-
-  Lemma phys_free_win_map (pa : Arch.pa) (nn : nat)
-      (f : nat -> bv 8) (dq : dfrac) :
-    (Z.of_nat nn <= 18446744073709551616)%Z ->
-    ([∗ list] j ∈ seq 0 nn, phys_free (pa_add pa j) dq) ⊣⊢
-    ([∗ map] a ↦ _ ∈ free_win_map pa nn f, phys_free a dq).
-  Proof.
-    intros Hn. rewrite /free_win_map.
-    apply (big_sepM_foldr_ins (fun a (_ : bv 8) => phys_free a dq) f pa (seq 0 nn)).
-    by apply tso_nodup_win.
-  Qed.
-
-  Lemma ctx_store_win_free_ok `{CID : CpuId} (g g' : gstate) (ξ : CtxId)
-      (pa : Arch.pa) (n : N) {m : N} (vnew : bv m) :
-    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
-    g'.(gimg) = g.(gimg) ->
-    g'.(glog) = (g.(glog) ++ [PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list ->
-    g'.(gmem) = write_bytes g.(gmem) pa n vnew ->
-    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
-    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
-    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
-    ([∗ list] j ∈ seq 0 (N.to_nat n),
-       phys_free (pa_add pa j) (DfracOwn 1)) ==∗
-    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
-    tso_interp_at riscv_eraGS g' ∗
-    own_context ξ ∗
-    ([∗ list] j ∈ seq 0 (N.to_nat n),
-       ctx_phys_pointsto ξ (pa_add pa j) (DfracOwn 1) (nth_byte vnew j)).
-  Proof.
-    iIntros (Hn Himg Hlog Hmem Htv Htvok') "Hgh Hint Hrun Hold".
-    rewrite (phys_free_win_map pa (N.to_nat n) (fun _ => bv_0 8) _ Hn).
-    iMod (ctx_store_free_ok g g' ξ (free_win_map pa (N.to_nat n) (fun _ => bv_0 8))
-            (snap_of pa n vnew)
-            (dom_free_win_snap pa n (fun _ => bv_0 8) vnew) Himg Hlog
-            ltac:(by rewrite Hmem write_bytes_union) Htv Htvok'
-            with "Hgh Hint Hrun Hold") as "($ & $ & $ & Hnew)".
-    iModIntro. by rewrite (ctx_phys_win_map ξ pa n vnew _ Hn).
-  Qed.
+  (* §0.26′'s visibility-free window gate ([ctx_store_win_free_ok]) is GONE
+     under two logs (relaxed-ww.md §2.10): a free byte is a ctx byte at an
+     unknown value, so a window of free bytes is stored through
+     [ctx_store_win_ok] on the existentials. *)
 
   (* ... and the window form, [HartMFetch.fobl_ifetch]'s shape *)
   Lemma ctx_phys_xfetch_bytes_ok `{CID : CpuId} (g : gstate) (ξ : CtxId)
@@ -680,13 +705,13 @@ Section ctx.
     ([∗ list] j ∈ seq 0 (N.to_nat n),
        ctx_phys_xpointsto ξ IK (pa_add a j) dq (nth_byte w j)) -∗
     ⌜forall tv' : nat, (itv <= tv')%nat ->
-       tso_read_bytes g.(gimg) g.(glog) (ifetch_agent (hart_agent cpu_id))
+       tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (ifetch_agent (hart_agent cpu_id))
          tv' a n w⌝.
   Proof.
     intros HIK. iIntros "Hgh Hint Hb".
     iAssert (⌜forall j : nat, (N.of_nat j < n)%N ->
                forall tv' : nat, (itv <= tv')%nat ->
-                 tso_read g.(gimg) g.(glog) (ifetch_agent (hart_agent cpu_id))
+                 tso_read g.(gimg) g.(glog) g.(gdlog) (ifetch_agent (hart_agent cpu_id))
                    tv' (pa_add a j) = Some (nth_byte w j)⌝)%I as %HH.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
       iDestruct (big_sepL_lookup _ (seq 0 (N.to_nat n)) j j with "Hb")
@@ -722,22 +747,23 @@ Section ctx.
   Proof.
     iIntros "Hgh Hint [Hpt Hts]".
     iDestruct "Hint"
-      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
-    destruct Hmm as (Hmm & Hera).
+      as "(%TM & %LM & %DP & %FR & %CH & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    destruct Hmm as (Hmm & Hdlog & Hera).
     iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
     iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
-    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
+    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
     rewrite Hgm in Hgm0. injection Hgm0 as <-.
     iMod (ghost_map_update ((t, ts_pay_none) : ts_elem) with "Hauth Hts")
       as "[Hauth Hts]".
     iModIntro. iFrame "Hgh Hpt Hts".
-    iExists (<[a := ((t, ts_pay_none) : ts_elem)]> TM), LM.
-    iFrame "Hauth Hm Hlen Hvw".
+    iExists (<[a := ((t, ts_pay_none) : ts_elem)]> TM),
+            LM, DP, FR, CH.
+    iFrame "Hauth Hm Hlen Hvw Hdp Hdps Hdl Hfr Hfrs Hch".
     iSplitR.
     { iPureIntro. rewrite dom_insert_L Hdom.
       assert (Ha : a ∈ dom g.(gmem)) by (by eapply elem_of_dom_2).
       set_solver. }
-    iSplitR; last (iPureIntro; split; [exact HLM | exact (conj Hmm Hera)]).
+    iSplitR; last (iPureIntro; exact (conj HLM (conj Hdpo (conj Hfro (conj Hcho (conj Hmm (conj Hdlog Hera))))))).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
     - rewrite lookup_insert in Hlk. injection Hlk as <-.
@@ -765,22 +791,23 @@ Section ctx.
   Proof.
     iIntros (Hw) "Hint [Hpt Hts]".
     iDestruct "Hint"
-      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
-    destruct Hmm as (Hmm & Hera).
+      as "(%TM & %LM & %DP & %FR & %CH & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    destruct Hmm as (Hmm & Hdlog & Hera).
     iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
-    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
+    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
     cbn in Hlat.
     iMod (ghost_map_update ((t, ts_pay_win W) : ts_elem) with "Hauth Hts")
       as "[Hauth Hts]".
     iModIntro.
     iSplitR "Hpt Hts"; last (rewrite /phys_ledger_wpay; iFrame "Hpt Hts").
-    iExists (<[a := ((t, ts_pay_win W) : ts_elem)]> TM), LM.
-    iFrame "Hauth Hm Hlen Hvw".
+    iExists (<[a := ((t, ts_pay_win W) : ts_elem)]> TM),
+            LM, DP, FR, CH.
+    iFrame "Hauth Hm Hlen Hvw Hdp Hdps Hdl Hfr Hfrs Hch".
     iSplitR.
     { iPureIntro. rewrite dom_insert_L Hdom.
       assert (Ha' : a ∈ dom g.(gmem)) by (by eapply elem_of_dom_2).
       set_solver. }
-    iSplitR; last (iPureIntro; split; [exact HLM | exact (conj Hmm Hera)]).
+    iSplitR; last (iPureIntro; exact (conj HLM (conj Hdpo (conj Hfro (conj Hcho (conj Hmm (conj Hdlog Hera))))))).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
     - rewrite lookup_insert in Hlk. injection Hlk as <-.
@@ -874,31 +901,27 @@ Section ctx.
       (a : Arch.pa) (dq : dfrac) (v : bv 8) (t B : nat) (W : ts_win) :
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    view_lb view_name dlen_name (hart_agent cpu_id) B -∗
     ledger_vis (hart_agent cpu_id) B t -∗
+    chain_ev chain_name t -∗
     phys_ledger_wpay a dq v t W -∗
     ⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-       tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv' a = Some v⌝.
+       tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv' a = Some v⌝.
   Proof.
-    iIntros "Hgh Hint #HB #Hvis [Hpt Htse]".
-    iDestruct "Hint"
-      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as (Hmm & Hera).
+    iIntros "Hgh Hint #HB #Hvis #Hchain [Hpt Htse]".
+    iDestruct (chain_ev_ok with "Hint Hchain") as %Hcev.
+    iDestruct (ledger_vis_visibleb with "Hint Hvis") as %Hvisb.
+    iDestruct (view_lb_le_view with "Hint HB") as %HBtvs.
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    destruct Hmm as (Hmm & (Hdok & Hfifo & _) & Hera).
     iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
     iDestruct (ghost_map_lookup with "Hts Htse") as %HTMt.
-    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
-    rewrite Hgm in Hgm0. injection Hgm0 as <-.
-    iDestruct (view_auth_valid with "Hv HB") as %HBtvs.
-    rewrite avf_hart in HBtvs.
-    iAssert (⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-               visibleb (hart_agent cpu_id) tv' g.(glog) t = true⌝)%I as %Hvis.
-    { iDestruct "Hvis" as "[%Hb | (%i & %mg & %Hti & Hi & %Htid)]".
-      - iPureIntro. intros tv' Htv'. apply visibleb_below. lia.
-      - iDestruct (ghost_map_lookup with "Hm Hi") as %HLi.
-        iPureIntro. intros tv' _. rewrite Hti.
-        apply (visibleb_own _ _ _ _ mg); [by rewrite -HLM | done]. }
+    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
+    rewrite Hgm in Hgm0. injection Hgm0 as <-. cbn in Hlat.
+    have Hch := chain_of_ev _ _ _ _ _ _ Hlat Hcev.
     iPureIntro. intros tv' Htv'.
-    apply (tso_read_of_latest _ _ _ _ _ t); [exact Hlat|by apply Hvis].
+    apply (tso_read_of_latest _ _ _ _ _ _ t v Hdok Hfifo Hlat Hch). apply Hvisb. lia.
   Qed.
 
   (* and its window form, in the shape a load leaf's obligation wants *)
@@ -907,23 +930,24 @@ Section ctx.
       (Wf : nat -> ts_win) :
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    view_lb view_name dlen_name (hart_agent cpu_id) B -∗
     ([∗ list] j ∈ seq 0 n, ∃ t : nat, ledger_vis (hart_agent cpu_id) B t ∗
+       chain_ev chain_name t ∗
        phys_ledger_wpay (pa_add a j) dq (nth_byte w j) t (Wf j)) -∗
     ⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv' a
+       tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv' a
          (N.of_nat n) w⌝.
   Proof.
     iIntros "Hgh Hint #HB Hb".
     iAssert (⌜forall j : nat, (j < n)%nat ->
                forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-                 tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv' (pa_add a j)
+                 tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv' (pa_add a j)
                  = Some (nth_byte w j)⌝)%I as %HH.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
-      iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hb") as (t) "[#Hvis Hbj]".
+      iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hb") as (t) "(#Hvis & #Hch & Hbj)".
       { rewrite lookup_seq_lt; [reflexivity|lia]. }
       iApply (ledger_read_wpay_vis_ok g (pa_add a j) dq (nth_byte w j) t B (Wf j)
-                with "Hgh Hint HB Hvis Hbj"). }
+                with "Hgh Hint HB Hvis Hch Hbj"). }
     iPureIntro. intros tv' Htv' j Hj. apply HH; [lia|exact Htv'].
   Qed.
 
@@ -986,9 +1010,10 @@ Section ctx.
     (forall h, h <> hart_agent cpu_id -> own' h = own h) ->
     g'.(gimg) = g.(gimg) ->
     g'.(glog) = (g.(glog) ++ [PWMsg (snap_of base n vnew) (hart_agent cpu_id)])%list ->
+    g'.(gdlog) = g.(gdlog) ->
     g'.(gmem) = write_bytes g.(gmem) base n vnew ->
     (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
-    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(gdlog))%nat) ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
     ([∗ list] j ∈ seq 0 (N.to_nat n), ∃ t : nat,
@@ -1002,7 +1027,7 @@ Section ctx.
        phys_ledger_wpay (pa_add base j) (DfracOwn 1) (nth_byte vnew j)
          (S (length g.(glog))) (TsWin base (N.to_nat n) j z cp own' lo)).
   Proof.
-    iIntros (Hn Hstore Hoth Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
+    iIntros (Hn Hstore Hoth Himg Hlog Hdl Hmem Htv Htvok') "Hgh Hint Hold".
     assert (Hfoot : forall a, a ∈ dom (snap_of base n vnew) ->
               exists j, (j < N.to_nat n)%nat /\ a = pa_add base j).
     { intros a Ha. apply elem_of_dom in Ha. destruct Ha as (b & Hb).
@@ -1047,8 +1072,7 @@ Section ctx.
             (snap_of base n vold) (snap_of base n vnew)
             base (N.to_nat n) lo z cp own own' Wold Wf
             ltac:(by rewrite !dom_snap_of) HWold HWf
-            Hfoot Hwritten
-            Hoth Himg Hlog
+            Hfoot Hwritten Hoth (fin_to_nat_lt cpu_id) Himg Hlog Hdl
             ltac:(by rewrite Hmem write_bytes_union) Htv Htvok'
             with "Hgh Hint Hold") as "($ & $ & $ & Hnew)".
     iModIntro.
@@ -1083,9 +1107,10 @@ Section ctx.
     (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
     g'.(gimg) = g.(gimg) ->
     g'.(glog) = (g.(glog) ++ [PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list ->
+    g'.(gdlog) = g.(gdlog) ->
     g'.(gmem) = write_bytes g.(gmem) pa n vnew ->
     (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
-    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(gdlog))%nat) ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
     ([∗ list] j ∈ seq 0 (N.to_nat n),
@@ -1105,8 +1130,8 @@ Section ctx.
     ledger_msg_at (length g.(glog))
       (PWMsg (snap_of pa n vnew) (hart_agent cpu_id)).
   Proof.
-    iIntros (Hn Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
-    iMod (ledger_store_win_at_ok g g' pa n vold vnew Hn Himg Hlog Hmem Htv Htvok'
+    iIntros (Hn Himg Hlog Hdl Hmem Htv Htvok') "Hgh Hint Hold".
+    iMod (ledger_store_win_at_ok g g' pa n vold vnew Hn Himg Hlog Hdl Hmem Htv Htvok'
             with "Hgh Hint Hold") as "(Hgh & Hint & #Hmsg & Hnew)".
     iMod (ledger_wpay_mint g' pa (N.to_nat n) (S (length g.(glog)))
             (nth_byte vnew) cp with "Hgh Hint Hnew") as "(Hgh & Hint & Hnew)".
@@ -1118,18 +1143,18 @@ Section ctx.
       (a : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8) (B : nat)
       (Sf : nat -> gset (bv 8)) :
     tso_interp_at riscv_eraGS g -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    view_lb view_name dlen_name (hart_agent cpu_id) B -∗
     ([∗ list] j ∈ seq 0 n, ∃ t : nat,
        phys_ledger_pin (pa_add a j) dq (f j) t B (Sf j)) -∗
     ⌜forall (h : agent) (tv' : nat), (g.(gtv) cpu_id <= tv')%nat ->
        forall j : nat, (j < n)%nat ->
-         exists b, tso_read g.(gimg) g.(glog) h tv' (pa_add a j) = Some b
+         exists b, tso_read g.(gimg) g.(glog) g.(gdlog) h tv' (pa_add a j) = Some b
                    /\ b ∈ Sf j⌝.
   Proof.
     iIntros "Hint #HB Hb".
     iAssert (⌜forall j : nat, (j < n)%nat ->
                forall (h : agent) (tv' : nat), (g.(gtv) cpu_id <= tv')%nat ->
-                 exists b, tso_read g.(gimg) g.(glog) h tv' (pa_add a j) = Some b
+                 exists b, tso_read g.(gimg) g.(glog) g.(gdlog) h tv' (pa_add a j) = Some b
                            /\ b ∈ Sf j⌝)%I as %HH.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
       iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hb") as (t) "Hbj".
@@ -1150,17 +1175,38 @@ Section ctx.
   (* PURE: it consumes no resource at all, which is the honest statement of
      "no evidence" -- the leaf's obligation is discharged by the machine's
      own totality over the image, not by anything the client owns. *)
+  (* the two-log read is total over the image: [read_down] bottoms out at
+     position 0, which is the image byte *)
+  Local Lemma read_down_total (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+      (dl : list nat) (h : agent) (tv : nat) (a : Arch.pa) (b : bv 8) (p : nat) :
+    img !! a = Some b → ∃ c, read_down img log dl h tv a p = Some c.
+  Proof.
+    intros Hb. induction p as [|q IH].
+    { rewrite read_down_unfold (visibleb_below _ _ _ _ 0 (Nat.le_0_l _)) /= Hb. by exists b. }
+    rewrite read_down_S.
+    destruct (if visibleb h tv log dl (S q) then dpos_byte img log dl (S q) a else None)
+      as [c|]; [by exists c | exact IH].
+  Qed.
+
+  Local Lemma tso_read_total (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+      (dl : list nat) (h : agent) (tv : nat) (a : Arch.pa) (b : bv 8) :
+    img !! a = Some b → ∃ c, tso_read img log dl h tv a = Some c.
+  Proof.
+    intros Hb. rewrite /tso_read. destruct (pend_read log dl h a) as [c|]; [by exists c|].
+    exact (read_down_total _ _ _ _ _ _ b _ Hb).
+  Qed.
+
   Lemma ledger_read_any_ok `{CID : CpuId} (g : gstate) (a : Arch.pa) (b : bv 8) :
     g.(gimg) !! a = Some b ->
     forall tv : nat, exists c,
-      tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv a = Some c.
-  Proof. intros Hi tv. exact (tso_read_total _ _ _ _ _ b Hi). Qed.
+      tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv a = Some c.
+  Proof. intros Hi tv. exact (tso_read_total _ _ _ _ _ _ b Hi). Qed.
 
   Lemma ledger_read_any_ram_ok `{CID : CpuId} (g : gstate) (a : Arch.pa) :
     addr_is_ram a ->
     tso_interp_at riscv_eraGS g -∗
     ⌜forall tv : nat, exists c,
-       tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv a = Some c⌝.
+       tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv a = Some c⌝.
   Proof.
     iIntros (Hram) "Hint".
     iDestruct (ledger_img_cover g a Hram with "Hint") as %[b Hb].
@@ -1178,13 +1224,13 @@ Section ctx.
     (forall j, (j < n)%nat -> addr_is_ram (pa_add a j)) ->
     tso_interp_at riscv_eraGS g -∗
     ⌜forall tv : nat, exists w : bv m,
-       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv a
+       tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv a
          (N.of_nat n) w⌝.
   Proof.
     iIntros (Hm Hram) "Hint".
     iAssert (⌜forall j : nat, (j < n)%nat ->
                forall tv : nat, exists c,
-                 tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add a j)
+                 tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv (pa_add a j)
                  = Some c⌝)%I as %HH.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
       iApply (ledger_read_any_ram_ok g (pa_add a j) (Hram j Hj) with "Hint"). }
@@ -1194,7 +1240,7 @@ Section ctx.
        option is not [None]. *)
     pose (f := fun j : nat =>
             default (bv_0 8)
-              (tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add a j))).
+              (tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv (pa_add a j))).
     exists (Z_to_bv m (assemble_bytes (f <$> seq 0 n))).
     intros j Hj.
     assert (Hjn : (j < n)%nat) by lia.
@@ -1222,7 +1268,7 @@ Section ctx.
     tso_interp_at riscv_eraGS g -∗
     phys_ledger_word4_vis (hart_agent cpu_id) 0 a dq w -∗
     ⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv' a 4 w⌝.
+       tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv' a 4 w⌝.
   Proof.
     iIntros "Hgh Hint [%Hal Hb]".
     iApply (ledger_read_bytes_vis_ok g a 4 w dq 0 with "Hgh Hint [] [Hb]").
@@ -1232,27 +1278,18 @@ Section ctx.
 
   Lemma ledger_read_at_ok `{CID : CpuId} (g : gstate)
       (a : Arch.pa) (dq : dfrac) (v : bv 8) (t F : nat) :
-    (t ≤ F)%nat ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) F -∗
+    view_lb view_name dlen_name (hart_agent cpu_id) F -∗
+    dpos_ev dpos_name t F -∗
+    chain_ev chain_name t -∗
     phys_ledger_at a dq v t -∗
     ⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-       tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv' a = Some v⌝.
+       tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv' a = Some v⌝.
   Proof.
-    iIntros (HtF) "Hgh Hint #HF [Hpt Htse]".
-    iDestruct "Hint"
-      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as (Hmm & Hera).
-    iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
-    iDestruct (ghost_map_lookup with "Hts Htse") as %HTMt.
-    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
-    rewrite Hgm in Hgm0. injection Hgm0 as <-.
-    iDestruct (view_auth_valid with "Hv HF") as %HFtvs.
-    rewrite avf_hart in HFtvs.
-    iPureIntro. intros tv' Htv'.
-    apply (tso_read_of_latest _ _ _ _ _ t); [exact Hlat|].
-    apply visibleb_below. lia.
+    iIntros "Hgh Hint #HF #Hev #Hch Hb".
+    iApply (ledger_read_at_vis_ok with "Hgh Hint HF [] Hch Hb").
+    by iApply ledger_vis_ev.
   Qed.
 
 End ctx.

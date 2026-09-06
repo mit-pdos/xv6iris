@@ -68,41 +68,25 @@ Section AbsorbLb.
     own_context xi' ∗ ctx_dom xi xi' ∗ (ctx_dom xi xi' -∗ ctx_stamped xi T).
   Proof.
     iIntros (HTK) "#HK Hrun Hpk".
-    iEval (rewrite own_context_unseal /own_context_def) in "Hrun".
+    (* raise the claimer's bound to the receipt: the floor it yields covers
+       the record's stamp, and every key of the record is drained under it *)
+    iMod (ctx_bound_raise xi' K with "Hrun HK") as "[Hrun #HflK]".
     iEval (rewrite ctx_stamped_unseal /ctx_stamped_def) in "Hpk".
-    iDestruct "Hrun"
-      as "(%B' & %K' & %W' & %D' & [Hb' Hd'] & #HK' & %HBK' & #HW' & %HDW' & #Hoks)".
-    iDestruct "Hpk" as "(%D & Hat & #HT & %HDT)".
-    (* raise the claimer's bound past the record's stamp; the joined
-       receipt is what keeps [B <= K] true of the rebuilt token *)
-    iEval (rewrite hart_view_lb_unseal /hart_view_lb_def) in "HK".
-    iDestruct (view_lb_max _ _ _ K' K with "HK' HK") as "#HKj".
-    iMod (mono_nat_own_update (Nat.max B' T) with "Hb'") as "[Hb' #Hlb']";
-      first lia.
+    iDestruct "Hpk" as "(%D & Hat & #HT & #Hks)".
+    iAssert (ctx_floor xi' T) as "#HflT".
+    { iApply (ctx_floor_le _ _ _ HTK with "HflK"). }
     iDestruct (ctx_at_halves with "Hat") as "[Hat1 Hat2]".
-    iModIntro.
-    rewrite own_context_unseal /own_context_def
-            ctx_dom_unseal /ctx_dom_at_def
-            ctx_stamped_unseal /ctx_stamped_def.
-    iSplitL "Hb' Hd'".
-    { iExists (Nat.max B' T), (Nat.max K' K), W', D'.
-      iFrame "Hb' Hd' HKj HW'".
-      iSplitR; first (iPureIntro; lia).
-      iSplitR; first (iPureIntro; exact HDW').
-      iApply (big_sepS_impl with "Hoks").
-      iIntros "!>" (k Hk) "Hok". iApply (dirty_ok_mono with "Hok"). lia. }
+    iModIntro. iFrame "Hrun".
+    rewrite ctx_dom_unseal /ctx_dom_at_def ctx_stamped_unseal /ctx_stamped_def.
     iSplitL "Hat1".
-    { iExists T, D. iFrame "Hat1".
-      iSplitR.
-      { rewrite /ctx_floor /llb. iLeft.
-        iApply (mono_nat_lb_own_le with "Hlb'"). lia. }
+    { iExists T, D. iFrame "Hat1 HflT".
       iModIntro. iApply big_sepS_intro. iIntros "!>" (k Hk).
-      rewrite /key_at /llb. iLeft. iLeft.
-      iApply (mono_nat_lb_own_le with "Hlb'"). have := HDT _ Hk. lia. }
+      rewrite /key_at. iLeft. iExists T. iFrame "HflT".
+      iApply (big_sepS_elem_of with "Hks"). exact Hk. }
     iIntros "(%B0 & %D0 & Hat0 & _ & _)".
     iDestruct (ctx_at_agree with "Hat0 Hat2") as %[-> ->].
     iCombine "Hat0 Hat2" as "Hat". rewrite -ctx_at_halves.
-    iExists D. iFrame "Hat HT". by iPureIntro.
+    iExists D. iFrame "Hat HT". iModIntro. iExact "Hks".
   Qed.
 
   (* THE ABSORB, at a receipt.  [tso-port.md] §0.18′'s statement exactly

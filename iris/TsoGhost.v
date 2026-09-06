@@ -408,6 +408,26 @@ Section ghosts.
   Global Instance fence_rec_persistent γfr N M : Persistent (fence_rec γfr N M).
   Proof. apply _. Qed.
 
+  (** THE CHAIN WITNESS (relaxed-ww.md §2.10): message [i] is in the
+      interp's chained set -- its chain holds at every byte it writes, for
+      ever (the set is monotone and the chain is kept by every step).
+      Minted by the ctx store gate, carried by every ctx fact. *)
+  Definition chained (γch : gname) (i : nat) : iProp Σ := i ↪[γch]□ 0%nat.
+  Global Instance chained_persistent γch i : Persistent (chained γch i).
+  Proof. apply _. Qed.
+  Global Instance chained_timeless γch i : Timeless (chained γch i).
+  Proof. apply _. Qed.
+
+  (** ... at a timestamp: the image, or a chained message. *)
+  Definition chain_ev (γch : gname) (t : nat) : iProp Σ :=
+    (⌜t = 0%nat⌝ ∨ ∃ i, ⌜t = S i⌝ ∗ chained γch i)%I.
+  Global Instance chain_ev_persistent γch t : Persistent (chain_ev γch t).
+  Proof. apply _. Qed.
+  Global Instance chain_ev_timeless γch t : Timeless (chain_ev γch t).
+  Proof. apply _. Qed.
+  Lemma chain_ev_0 γch : ⊢ chain_ev γch 0.
+  Proof. by iLeft. Qed.
+
   (** THE TIE BETWEEN THE NUMBER LINES (relaxed-ww.md §2.1): issue
       timestamp [t]'s message is the image, or is drained at a position
       under [B].  What a clean key carries. *)

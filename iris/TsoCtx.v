@@ -650,7 +650,8 @@ Section ctx.
        ⌜ktier_pin cur_ktier ppn va⌝ ∗
        pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v ∗
        (pa_of ppn va) ↪[ts_name]{dq} (t, ts_pay_none) ∗
-       key_at ξ (t, pa_of ppn va))%I.               (* CLEAN or DIRTY *)
+       key_at ξ (t, pa_of ppn va) ∗                 (* CLEAN or DIRTY *)
+       chain_ev chain_name t)%I.                     (* the chain (§2.10) *)
   Lemma ctx_pointsto_aux : { f | f = @ctx_pointsto_def }.
   Proof. by eexists. Qed.
   Definition ctx_pointsto `{KTR : !CurKtier} (ξ : CtxId)
@@ -669,7 +670,7 @@ Section ctx.
   Local Lemma ctx_pointsto_mem_proj {KTR : CurKtier} ξ a dq v :
     ctx_pointsto_def (KTR := KTR) ξ a dq v ⊢ mem_pointsto (KTR := KTR) a dq v.
   Proof.
-    iIntros "(%ppn & %t & #Hk & % & % & % & Hp & _ & _)".
+    iIntros "(%ppn & %t & #Hk & % & % & % & Hp & _ & _ & _)".
     rewrite /mem_pointsto. iExists ppn. by iFrame "Hk Hp".
   Qed.
 
@@ -748,22 +749,22 @@ Section ctx.
   Proof.
     rewrite !ctx_pointsto_unseal /ctx_pointsto_def.
     iSplit.
-    - iIntros "(%ppn & %t & #Hk & %Hc & %Hr & %Hp & Hpt & Hts & #Hbit)".
+    - iIntros "(%ppn & %t & #Hk & %Hc & %Hr & %Hp & Hpt & Hts & #Hbit & #Hch)".
       iDestruct "Hpt" as "[Hpt1 Hpt2]".
       iDestruct "Hts" as "[Hts1 Hts2]".
       iSplitL "Hpt1 Hts1".
-      + iExists ppn, t. iFrame "Hk Hpt1 Hts1 Hbit".
+      + iExists ppn, t. iFrame "Hk Hpt1 Hts1 Hbit Hch".
         iSplit; [done|]. iSplit; [done|]. done.
-      + iExists ppn, t. iFrame "Hk Hpt2 Hts2 Hbit".
+      + iExists ppn, t. iFrame "Hk Hpt2 Hts2 Hbit Hch".
         iSplit; [done|]. iSplit; [done|]. done.
-    - iIntros "[(%ppn1 & %t1 & #Hk1 & %Hc & %Hr1 & %Hp1 & Hpt1 & Hts1 & #Hbit1)
-                (%ppn2 & %t2 & #Hk2 & %  & %Hr2 & %Hp2 & Hpt2 & Hts2 & _)]".
+    - iIntros "[(%ppn1 & %t1 & #Hk1 & %Hc & %Hr1 & %Hp1 & Hpt1 & Hts1 & #Hbit1 & #Hch1)
+                (%ppn2 & %t2 & #Hk2 & %  & %Hr2 & %Hp2 & Hpt2 & Hts2 & _ & _)]".
       iDestruct (kmap_at_agree with "Hk1 Hk2") as %[<- _].
       iDestruct (ghost_map_elem_combine with "Hts1 Hts2") as "[Hts %Heq]".
       injection Heq as Heq. subst t2.
       iCombine "Hpt1 Hpt2" as "Hpt".
       rewrite !dfrac_op_own.
-      iExists ppn1, t1. iFrame "Hk1 Hpt Hts Hbit1".
+      iExists ppn1, t1. iFrame "Hk1 Hpt Hts Hbit1 Hch1".
       iSplit; first done. iSplit; first done. done.
   Qed.
 
@@ -771,10 +772,10 @@ Section ctx.
     ctx_pointsto ξ a dq b ==∗ ctx_pointsto ξ a DfracDiscarded b.
   Proof.
     rewrite !ctx_pointsto_unseal /ctx_pointsto_def.
-    iIntros "(%ppn & %t & #Hk & % & % & % & Hpt & Hts & #Hbit)".
+    iIntros "(%ppn & %t & #Hk & % & % & % & Hpt & Hts & #Hbit & #Hch)".
     iMod (pointsto_persist with "Hpt") as "Hpt".
     iMod (ghost_map_elem_persist with "Hts") as "Hts".
-    iModIntro. iExists ppn, t. iFrame "Hk Hpt Hts Hbit".
+    iModIntro. iExists ppn, t. iFrame "Hk Hpt Hts Hbit Hch".
     iSplit; first done. iSplit; first done. done.
   Qed.
 
@@ -1404,10 +1405,10 @@ Section ctx.
   Proof.
     iIntros (ξ ξ') "Hd HP".
     rewrite !ctx_pointsto_unseal /ctx_pointsto_def.
-    iDestruct "HP" as "(%ppn & %t & #Hk & % & % & % & Hpt & Hts & Hbit)".
+    iDestruct "HP" as "(%ppn & %t & #Hk & % & % & % & Hpt & Hts & Hbit & #Hch)".
     iDestruct (ctx_dom_key ξ ξ' (t, pa_of ppn a) with "Hd Hbit") as "[Hd #Hbit']".
     iModIntro. iFrame "Hd".
-    iExists ppn, t. iFrame "Hk Hpt Hts".
+    iExists ppn, t. iFrame "Hk Hpt Hts Hch".
     iSplit; first done. iSplit; first done. iSplit; first done.
     iExact "Hbit'".
   Qed.
@@ -1869,11 +1870,11 @@ Section ctx.
     tso_interp_at riscv_eraGS g -∗
     tso_interp_at riscv_eraGS g ∗ llb loglen_name (length g.(glog)).
   Proof.
-    iIntros "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iIntros "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (llb_get with "Hlen") as "[Hlen #Hlb]".
-    iFrame "Hlb". iExists TM, LM, DP, FR.
-    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs". by iPureIntro.
+    iFrame "Hlb". iExists TM, LM, DP, FR, CH.
+    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch". by iPureIntro.
   Qed.
 
   (* ... and the DRAIN length's, which is what every stamp and floor is
@@ -1882,11 +1883,11 @@ Section ctx.
     tso_interp_at riscv_eraGS g -∗
     tso_interp_at riscv_eraGS g ∗ llb dlen_name (length g.(gdlog)).
   Proof.
-    iIntros "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iIntros "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (llb_get with "Hdl") as "[Hdl #Hlb]".
-    iFrame "Hlb". iExists TM, LM, DP, FR.
-    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs". by iPureIntro.
+    iFrame "Hlb". iExists TM, LM, DP, FR, CH.
+    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch". by iPureIntro.
   Qed.
 
   (* what a drain-position witness says at the machine *)
@@ -1895,10 +1896,35 @@ Section ctx.
     ⌜t = 0%nat ∨ ∃ i q, t = S i ∧ g.(gdlog) !! q = Some i ∧ (S q ≤ B)%nat⌝.
   Proof.
     iIntros "Hint [%|(%i & %p & -> & Hat & %Hp)]"; first by iLeft.
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (ghost_map_lookup with "Hdp Hat") as %HDP.
     apply Hdpo in HDP as (q & Hq & ->). iPureIntro. right. exists i, q. done.
+  Qed.
+
+  (* THE CHAIN, read off the fact (relaxed-ww.md §2.10): a chained
+     message's chain holds at every byte it writes, so with [latest] the
+     load gate's [chain_ok] is one lookup in the interp's chained set. *)
+  Lemma chain_ev_ok (g : gstate) (t : nat) :
+    tso_interp_at riscv_eraGS g -∗ chain_ev chain_name t -∗
+    ⌜t = 0%nat ∨ ∃ i, t = S i ∧ chain_msg g.(glog) g.(gdlog) i⌝.
+  Proof.
+    iIntros "Hint [%|(%i & -> & Hc)]"; first by iLeft.
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    iDestruct (ghost_map_lookup with "Hch Hc") as %HCH.
+    iPureIntro. right. exists i. split; [done|]. exact (proj2 (Hcho _ _ HCH)).
+  Qed.
+
+  (* ... and with [latest] in hand, the byte's [chain_ok] *)
+  Lemma chain_of_ev (img : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
+      (a : Arch.pa) (t : nat) (v : bv 8) :
+    latest img log a t v →
+    (t = 0%nat ∨ ∃ i, t = S i ∧ chain_msg log dl i) →
+    chain_ok log dl a t.
+  Proof.
+    move => Hlat [->|[i [Ht Hc]]]; [apply chain_ok_0|]. subst t.
+    exact (chain_msg_ok _ _ _ _ _ _ Hlat Hc).
   Qed.
 
   Lemma ctx_stamped_dlb ξ T :
@@ -1992,15 +2018,15 @@ Section ctx.
     ⌜∀ (h : agent) (tv : nat), tso_read g.(gimg) g.(glog) g.(gdlog) h tv a = Some v⌝.
   Proof.
     iIntros "Hgh Hint Hpt #Hpr".
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     destruct Hmm as (Hmm & (Hdok & Hfifo & _) & Hera).
     iDestruct (ghost_map_lookup with "Hts Hpr") as %HTM.
     iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
-    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat & Hch).
+    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
     rewrite Hgm in Hgm0. injection Hgm0 as <-.
     iPureIntro. intros h tv.
-    apply (tso_read_of_latest _ _ _ _ _ _ 0%nat v Hdok Hfifo Hlat Hch). by left.
+    apply (tso_read_of_latest _ _ _ _ _ _ 0%nat v Hdok Hfifo Hlat (chain_ok_0 _ _ _)). by left.
   Qed.
 
   (* the window form, in the shape [HartMLoad.robl_ram] is stated at --
@@ -2059,7 +2085,7 @@ Section ctx.
     iDestruct (kmap_at_agree with "Hk Hk'") as %[<- _].
     iExists ppn, 0%nat. iFrame "Hk Hpt Hpr".
     iSplit; first done. iSplit; first done. iSplit; first done.
-    iApply key_at_0.
+    iSplitR; [iApply key_at_0 | iApply chain_ev_0].
   Qed.
 
 
@@ -2111,7 +2137,8 @@ Section ctx.
     (∃ t : nat,
        phys_pointsto a dq v ∗
        a ↪[ts_name]{dq} (t, ts_pay_none) ∗
-       key_at ξ (t, a))%I.                                (* CLEAN or DIRTY *)
+       key_at ξ (t, a) ∗                                  (* CLEAN or DIRTY *)
+       chain_ev chain_name t)%I.                           (* the chain (§2.10) *)
   Lemma ctx_phys_pointsto_aux : { f | f = ctx_phys_pointsto_def }.
   Proof. by eexists. Qed.
   Definition ctx_phys_pointsto (ξ : CtxId) (a : Arch.pa) (dq : dfrac)
@@ -2135,7 +2162,7 @@ Section ctx.
     ctx_phys_pointsto ξ a dq v ⊢ phys_pointsto a dq v.
   Proof.
     rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
-    by iIntros "(% & $ & _)".
+    by iIntros "(% & $ & _ & _ & _)".
   Qed.
 
   Lemma ctx_phys_pointsto_ram ξ a dq v :
@@ -2158,107 +2185,91 @@ Section ctx.
   Proof.
     iSplit.
     - rewrite ctx_pointsto_unseal /ctx_pointsto_def.
-      iIntros "(%ppn & %t & #Hk & %Hc & %Hr & %Hp & Hpt & Hts & Hbit)".
+      iIntros "(%ppn & %t & #Hk & %Hc & %Hr & %Hp & Hpt & Hts & Hbit & Hch)".
       iExists ppn. iFrame "Hk". iSplit; [done|]. iSplit; [done|].
       rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /phys_pointsto.
-      iExists t. iFrame "Hpt Hts Hbit". by iPureIntro.
+      iExists t. iFrame "Hpt Hts Hbit Hch". by iPureIntro.
     - iIntros "(%ppn & #Hk & %Hc & %Hp & Hb)".
       rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /phys_pointsto
               ctx_pointsto_unseal /ctx_pointsto_def.
-      iDestruct "Hb" as "(%t & [Hpt %Hr] & Hts & Hbit)".
-      iExists ppn, t. iFrame "Hk Hpt Hts Hbit". by iPureIntro.
+      iDestruct "Hb" as "(%t & [Hpt %Hr] & Hts & Hbit & Hch)".
+      iExists ppn, t. iFrame "Hk Hpt Hts Hbit Hch". by iPureIntro.
   Qed.
 
   (* ================================================================== *)
-  (* THE VISIBILITY-FREE BYTE (tso-port.md §0.26′, A6.85).              *)
-  (*                                                                   *)
-  (* WHAT IT IS: the FUTURE half of ownership and nothing else -- the   *)
-  (* physical fraction plus the byte's timestamp ELEMENT, at WHATEVER   *)
-  (* history payload the element currently carries.  It licenses a      *)
-  (* STORE (the store gate needs the element and nothing else -- see    *)
-  (* [ctx_store_bytes], which destructs the ctx byte and [iClear]s the  *)
-  (* bit) and it licenses NO LOAD (no clean/dirty justification, so     *)
-  (* [ctx_load_ok] cannot fire).                                       *)
-  (*                                                                   *)
-  (* WHY IT IS THE FREE PAGE'S TIER.  §0.26′: [kfree]'s classical       *)
-  (* precondition [∃ x, a ↦ x] asserts a value DETERMINATE AT THE       *)
-  (* FREER'S OWN VIEW, and under TSO that is surplus -- a page whose    *)
-  (* lock another CPU just released has no value well-known to the      *)
-  (* freer, and freeing must not require one.  Determinacy re-mints     *)
-  (* itself at the next write with NO evidence (a store does not read;  *)
-  (* one's own write is visible by forwarding), and xv6's kfree/kalloc  *)
-  (* memset immediately, so the allocator path never reads before       *)
-  (* writing.                                                         *)
-  (*                                                                   *)
-  (* AND THE ∃ OVER THE PAYLOAD IS THE RECLAMATION (§0.26′ (ii)).  A    *)
-  (* history claim -- a canon pin, a lock window -- is an OBLIGATION on *)
-  (* the log recorded IN the element; at FULL element ownership,        *)
-  (* forgetting it is a pure weakening of the interpretation, so the    *)
-  (* "ghost reset" the ruling names needs no evidence AND, here, no     *)
-  (* ghost step at all: [phys_ledger_wpay_free] below is an ⊢.  The     *)
-  (* auth-side reset happens LAZILY, at the next store, which is the    *)
-  (* only place the interp is in hand ([A6.68]'s rule: [own_context]    *)
-  (* outside a leaf, [tso_interp_at] inside one) -- and the next store  *)
-  (* is exactly [kfree]'s own memset.                                  *)
+  (* THE FREE BYTE (tso-port.md §0.26′ / A6.85, REVISED by relaxed-ww.md  *)
+  (* §2.10): a context's byte at an UNKNOWN value -- the fraction, the    *)
+  (* element, the bit and the chain, with the value hidden.  It licenses  *)
+  (* a STORE (through [ctx_store_ok], on the existential) and no LOAD     *)
+  (* (nobody knows the value), which is what a free page needs.           *)
+  (*                                                                     *)
+  (* WHY IT IS ξ-INDEXED NOW.  Under two logs a store must know the       *)
+  (* byte's previous write is drained or its own (the chain, §2.10), and  *)
+  (* that evidence is the ctx byte's bit.  A ξ-free free tier could not   *)
+  (* carry it, and a chain once lost cannot be rebuilt -- so a free page  *)
+  (* rides the kmem lock's context like any other payload (mint 1 in,    *)
+  (* publication at the release fence, unstamp out) and stays chained.   *)
+  (* §0.26′'s reason for a ξ-free tier ("no value determinate at the      *)
+  (* freer's view") is moot at the ctx tier, whose value is the ledger's  *)
+  (* latest write.  The ∃ over the value is still the reclamation of any  *)
+  (* history claim: the element is pinned to [ts_pay_none] by the ctx     *)
+  (* byte's definition.                                                   *)
   (* ================================================================== *)
-  (* THE VALUE IS HIDDEN TOO, and that is not tidiness: the byte's value
-     is ghost bookkeeping for the interp's flat-memory tie -- it promises
-     nothing, licenses nothing, and is re-established by the very store
-     this resource exists to license.  Leaving it in the spelling would
-     let a reader mistake it for a stability claim, which is precisely
-     the claim §0.26′ says the freer does not have.  So it sits beside
-     the element, existentially, and is invisible at every tier above. *)
-  Definition phys_free (a : Arch.pa) (dq : dfrac) : iProp Σ :=
-    (∃ (v : bv 8) (e : ts_elem),
-       phys_pointsto a dq v ∗ a ↪[ts_name]{dq} e)%I.
+  Definition phys_free (ξ : CtxId) (a : Arch.pa) (dq : dfrac) : iProp Σ :=
+    (∃ v : bv 8, ctx_phys_pointsto ξ a dq v)%I.
 
-  Global Instance phys_free_timeless a dq : Timeless (phys_free a dq).
+  Global Instance phys_free_timeless ξ a dq : Timeless (phys_free ξ a dq).
   Proof. rewrite /phys_free. apply _. Qed.
 
-  Lemma phys_free_ram a dq : phys_free a dq ⊢ ⌜addr_is_ram a⌝.
-  Proof.
-    rewrite /phys_free /phys_pointsto. by iIntros "(% & % & [_ $] & _)".
-  Qed.
+  Lemma phys_free_ram ξ a dq : phys_free ξ a dq ⊢ ⌜addr_is_ram a⌝.
+  Proof. rewrite /phys_free. iIntros "(%v & H)". by iApply ctx_phys_pointsto_ram. Qed.
 
-
-  (* the REGISTERED byte forgets to the visibility-free one: the bit is
-     dropped, and with it the load license, nothing else.  (The
-     [phys_ledger*] family's own weakenings are stated below, beside
-     their definitions.) *)
   Lemma ctx_phys_pointsto_free ξ a dq v :
-    ctx_phys_pointsto ξ a dq v ⊢ phys_free a dq.
+    ctx_phys_pointsto ξ a dq v ⊢ phys_free ξ a dq.
+  Proof. rewrite /phys_free. iIntros "H". by iExists v. Qed.
+
+  (* THE TRANSPORT OF A PHYSICAL FACT: the bit re-indexes by [ctx_dom_key],
+     the element and the chain are ξ-free. *)
+  Global Instance ctx_morph_phys_pointsto (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    CtxMorph (λ ξ, ctx_phys_pointsto ξ a dq v).
   Proof.
-    rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /phys_free.
-    iIntros "(%t & Hpt & Hts & _)". iExists v, (t, ts_pay_none). iFrame.
+    iIntros (ξ ξ') "Hd HP".
+    rewrite !ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
+    iDestruct "HP" as "(%t & Hpt & Hts & #Hbit & #Hch)".
+    iDestruct (ctx_dom_key ξ ξ' (t, a) with "Hd Hbit") as "[Hd #Hbit']".
+    iModIntro. iFrame "Hd". iExists t. iFrame "Hpt Hts Hch". iExact "Hbit'".
   Qed.
 
+  Global Instance ctx_morph_phys_free (a : Arch.pa) (dq : dfrac) :
+    CtxMorph (λ ξ, phys_free ξ a dq).
+  Proof.
+    iIntros (ξ ξ') "Hd (%v & H)".
+    iMod (ctx_morph (R := λ ξ0, ctx_phys_pointsto ξ0 a dq v) with "Hd H") as "[Hd H]".
+    iModIntro. iFrame "Hd". by iExists v.
+  Qed.
 
   (* ---------------------------------------------------------------- *)
-  (* THE VA-KEYED VISIBILITY-FREE BYTE.  [ctx_pointsto]'s body with the *)
-  (* justification stripped and the kmap plumbing kept -- so a free     *)
-  (* page's bytes still know WHERE they are (which is what the store    *)
-  (* leaf's translation needs) and no longer claim WHAT they are.       *)
+  (* THE VA-KEYED FREE BYTE: [ctx_pointsto] with the value hidden.       *)
   (* ---------------------------------------------------------------- *)
-  Definition mem_free `{KTR : !CurKtier} (a : Arch.pa) (dq : dfrac)
+  Definition mem_free `{KTR : !CurKtier} (ξ : CtxId) (a : Arch.pa) (dq : dfrac)
       : iProp Σ :=
-    (∃ ppn : mword 44,
-       kmap_at (svpn_of a) ppn KP_rw ∗
-       ⌜(uint a < 274877906944)%Z⌝ ∗
-       ⌜ktier_pin cur_ktier ppn a⌝ ∗
-       phys_free (pa_of ppn a) dq)%I.
+    (∃ v : bv 8, ctx_pointsto ξ a dq v)%I.
 
-  Global Instance mem_free_timeless `{KTR : !CurKtier} a dq :
-    Timeless (mem_free a dq).
+  Global Instance mem_free_timeless `{KTR : !CurKtier} ξ a dq :
+    Timeless (mem_free ξ a dq).
   Proof. rewrite /mem_free. apply _. Qed.
 
   Lemma ctx_pointsto_free `{KTR : !CurKtier} (ξ : CtxId) (a : Arch.pa)
       (dq : dfrac) (v : bv 8) :
-    ctx_pointsto ξ a dq v ⊢ mem_free a dq.
+    ctx_pointsto ξ a dq v ⊢ mem_free ξ a dq.
+  Proof. rewrite /mem_free. iIntros "H". by iExists v. Qed.
+
+  Global Instance ctx_morph_mem_free `{KTR : !CurKtier} (a : Arch.pa) (dq : dfrac) :
+    CtxMorph (λ ξ, mem_free (KTR := KTR) ξ a dq).
   Proof.
-    rewrite ctx_pointsto_phys /mem_free.
-    iIntros "(%ppn & #Hk & %Hc & %Hp & Hb)".
-    iExists ppn. iFrame "Hk". iSplit; [done|]. iSplit; [done|].
-    by iApply ctx_phys_pointsto_free.
+    iIntros (ξ ξ') "Hd (%v & H)".
+    iMod (ctx_morph_pointsto KTR a dq v ξ ξ' with "Hd H") as "[Hd H]".
+    iModIntro. iFrame "Hd". by iExists v.
   Qed.
 
 
@@ -2283,8 +2294,8 @@ Section ctx.
     ctx_pointsto (KTR := kt) ξ a dq v ⊢ ctx_pointsto (KTR := kt') ξ a dq v.
   Proof.
     rewrite !ctx_pointsto_unseal /ctx_pointsto_def.
-    iIntros "(%ppn & %t & #Hk & %Hc & %Hr & %Hp & Hpt & Hts & Hbit)".
-    iExists ppn, t. iFrame "Hk Hpt Hts Hbit".
+    iIntros "(%ppn & %t & #Hk & %Hc & %Hr & %Hp & Hpt & Hts & Hbit & Hch)".
+    iExists ppn, t. iFrame "Hk Hpt Hts Hbit Hch".
     iPureIntro. split_and!.
     - exact Hc.
     - exact Hr.
@@ -2424,36 +2435,11 @@ Section ctx.
     phys_ledger_at a dq v t ⊢ phys_pointsto a dq v.
   Proof. by iIntros "[$ _]". Qed.
 
-  (* ---------------------------------------------------------------- *)
-  (* §0.26′ (ii): THE EVIDENCE-FREE RECLAMATION.  Every history-shaped  *)
-  (* claim this port carries lives in the byte's ELEMENT -- the canon   *)
-  (* pin's [(Sv, B)], the lock window's [W] -- and at FULL element      *)
-  (* ownership dropping it is an ⊢, not a ghost step: the ∃ over the    *)
-  (* element in [phys_free] IS the reset, and the interpretation's      *)
-  (* obligation disappears with the claim rather than being discharged. *)
-  (* The auth side catches up at the next store ([ledger_store_bytes] / *)
-  (* [ctx_store_bytes] below both re-key the element to                 *)
-  (* [(S i, ts_pay_none)] from WHATEVER it was).                        *)
-  (*                                                                   *)
-  (* THIS IS WHAT UNBLOCKS [ProofPipeclose:749] (A6.84 §(2)): a lock on *)
-  (* a [kalloc]'d page must be able to DIE, and its owner word is a     *)
-  (* [phys_ledger_wpay] cell.  It cannot re-enter the ctx tower (that   *)
-  (* needs a drain) -- but it does not have to: the page it is being    *)
-  (* handed back into is VISIBILITY-FREE.                               *)
-  (* ---------------------------------------------------------------- *)
-  Lemma phys_ledger_free a dq v : phys_ledger a dq v ⊢ phys_free a dq.
-  Proof.
-    rewrite phys_ledger_unseal /phys_ledger_def /phys_free.
-    iIntros "(%t & Hp & He)". iExists v, (t, ts_pay_none). iFrame.
-  Qed.
-
-
-  Lemma phys_ledger_wpay_free a dq v t W :
-    phys_ledger_wpay a dq v t W ⊢ phys_free a dq.
-  Proof.
-    rewrite /phys_ledger_wpay /phys_free.
-    iIntros "[Hp He]". iExists v, (t, ts_pay_win W). iFrame.
-  Qed.
+  (* §0.26′ (ii)'s evidence-free reclamation ([phys_ledger_free],
+     [phys_ledger_wpay_free]) is GONE under two logs (relaxed-ww.md §2.10):
+     a ledger cell carries no bit and no chain, and a free byte is a ctx
+     byte.  A cell returns to the tower through [ctx_phys_pointsto_of_at_floor]
+     with its key and chain evidence in hand. *)
 
   (* ---------------------------------------------------------------- *)
   (* THE AUTHOR TIE (A6.47 ruling 1 -- the ratified replacement for the *)
@@ -2619,11 +2605,11 @@ Section ctx.
     tso_interp_at riscv_eraGS g ∗ ⌜(K ≤ length g.(glog))%nat⌝.
   Proof.
     iIntros "Hint #HK".
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (llb_valid with "Hlen HK") as %HKlen.
     iSplitL; [ | by iPureIntro ].
-    iExists TM, LM, DP, FR. iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs". by iPureIntro.
+    iExists TM, LM, DP, FR, CH. iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch". by iPureIntro.
   Qed.
 
   Lemma tso_interp_dlb_valid (g : gstate) (K : nat) :
@@ -2631,11 +2617,11 @@ Section ctx.
     tso_interp_at riscv_eraGS g ∗ ⌜(K ≤ length g.(gdlog))%nat⌝.
   Proof.
     iIntros "Hint #HK".
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (llb_valid with "Hdl HK") as %HKlen.
     iSplitL; [ | by iPureIntro ].
-    iExists TM, LM, DP, FR. iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs". by iPureIntro.
+    iExists TM, LM, DP, FR, CH. iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch". by iPureIntro.
   Qed.
 
   (* A6.111: the projection to the machine's own predicate, BOTH ARMS.  It
@@ -2650,8 +2636,8 @@ Section ctx.
     ⌜(K <= g.(gtv) cpu_id)%nat⌝.
   Proof.
     iIntros "Hint #HK".
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (view_auth_valid with "Hv HK") as %HK.
     rewrite avf_hart in HK. by iPureIntro.
   Qed.
@@ -2665,15 +2651,15 @@ Section ctx.
     iIntros "Hint Hvis".
     iDestruct "Hvis" as "[Hev | (%i & %mg & %Hti & Hi & %Htid)]".
     - iDestruct (dpos_ev_vis_at with "Hint Hev") as %Hvis.
-      iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+      iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
       iPureIntro. intros tv Htv.
       destruct Hvis as [->|(i & q & -> & Hq & Hle)]; first by left.
       right. have Hlt := dl_lookup_lt _ _ _ _ (proj1 (proj1 (proj2 Hmm))) Hq.
       destruct (lookup_lt_is_Some_2 g.(glog) i Hlt) as [m Hm].
       exists i, m. split_and!; [done|done|]. left. exists q. split; [done|lia].
-    - iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    - iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
       iDestruct (ghost_map_lookup with "Hm Hi") as %HLi.
       iPureIntro. intros tv _. right. exists i, mg.
       split_and!; [done|by rewrite -HLM|by right].
@@ -2693,8 +2679,8 @@ Section ctx.
     iIntros "Hint Hvis".
     iDestruct "Hvis" as "[Hev | (%i & %mg & %Hti & Hi & %Htid)]".
     - iDestruct (dpos_ev_vis_at with "Hint Hev") as %Hvis. iPureIntro. by left.
-    - iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    - iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
       iDestruct (ghost_map_lookup with "Hm Hi") as %HLi.
       iPureIntro. right. intros tv. right. exists i, mg.
       split_and!; [done|by rewrite -HLM|by right].
@@ -2745,7 +2731,7 @@ Section ctx.
   Proof.
     iIntros "Hp He".
     rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
-    iExists 0%nat. iFrame "Hp He". iApply key_at_0.
+    iExists 0%nat. iFrame "Hp He". iSplitR; [iApply key_at_0 | iApply chain_ev_0].
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -2785,7 +2771,7 @@ Section ctx.
     iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |].
-    iFrame "Hpt He". iApply key_at_0.
+    iFrame "Hpt He". iSplitR; [iApply key_at_0 | iApply chain_ev_0].
   Qed.
 
 
@@ -2826,7 +2812,7 @@ Section ctx.
   Proof.
     rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def
             phys_ledger_unseal /phys_ledger_def.
-    iIntros "(%t & Hpt & Hts & _)". iExists t. iFrame.
+    iIntros "(%t & Hpt & Hts & _ & _)". iExists t. iFrame.
   Qed.
 
   (* A6.123: FORGETTING A CELL HANDS OUT ITS FLOOR.  A ctx cell leaving the
@@ -2839,11 +2825,12 @@ Section ctx.
      payload the floor its readers will cash. *)
   Lemma ctx_phys_pointsto_forget_floor (ξ : CtxId) (a : Arch.pa) (v : bv 8) :
     ctx_phys_pointsto ξ a (DfracOwn 1) v ==∗
-    ∃ t : nat, phys_ledger_at a (DfracOwn 1) v t ∗ key_at ξ (t, a).
+    ∃ t : nat, phys_ledger_at a (DfracOwn 1) v t ∗ key_at ξ (t, a) ∗
+               chain_ev chain_name t.
   Proof.
     rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /phys_ledger_at.
-    iIntros "(%t & Hpt & Hts & #Hbit)".
-    iModIntro. iExists t. iFrame "Hpt Hts Hbit".
+    iIntros "(%t & Hpt & Hts & #Hbit & #Hch)".
+    iModIntro. iExists t. iFrame "Hpt Hts Hbit Hch".
   Qed.
 
   (* >>> A6.125: THE HALF CTX CELL -- the pin-return crossing's instrument.
@@ -2862,7 +2849,7 @@ Section ctx.
     (∃ t : nat,
        phys_pointsto a (DfracOwn (1/2)) v ∗
        a ↪[ts_name]{DfracOwn (1/2)} (t, TsoMemPa.ts_pay_none) ∗
-       key_at ξ (t, a))%I.
+       key_at ξ (t, a) ∗ chain_ev chain_name t)%I.
 
 
   Lemma ctx_phys_pointsto_join (ξ : CtxId) (a : Arch.pa) (v v' : bv 8) :
@@ -2871,14 +2858,14 @@ Section ctx.
   Proof.
     rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /ctx_phys_pointsto_h
             phys_ledger_unseal /phys_ledger_def /phys_pointsto.
-    iIntros "(%t & [Hp1 %Hr] & Ht1 & Harm) (%t' & [Hp2 _] & Ht2)".
+    iIntros "(%t & [Hp1 %Hr] & Ht1 & Harm & Hch) (%t' & [Hp2 _] & Ht2)".
     iDestruct (pointsto_agree with "Hp1 Hp2") as %Heqv. subst v'.
     iDestruct (ghost_map_elem_agree with "Ht1 Ht2") as %Heq.
     injection Heq as Ht. subst t'.
     iSplitR; [done|]. iExists t.
     rewrite (fractional_half (pointsto (L := Arch.pa) (V := bv 8) a (DfracOwn 1) v))
             (fractional_half (a ↪[ts_name] (t, TsoMemPa.ts_pay_none))).
-    iFrame "Hp1 Hp2 Ht1 Ht2 Harm". by iPureIntro.
+    iFrame "Hp1 Hp2 Ht1 Ht2 Harm Hch". by iPureIntro.
   Qed.
 
   Global Instance ctx_morph_phys_pointsto_h (a : Arch.pa) (v : bv 8) :
@@ -2886,9 +2873,9 @@ Section ctx.
   Proof.
     iIntros (ξ ξ') "Hd HP".
     rewrite /ctx_phys_pointsto_h.
-    iDestruct "HP" as "(%t & Hpt & Hts & Hbit)".
+    iDestruct "HP" as "(%t & Hpt & Hts & Hbit & Hch)".
     iDestruct (ctx_dom_key ξ ξ' (t, a) with "Hd Hbit") as "[Hd #Hbit']".
-    iModIntro. iFrame "Hd". iExists t. iFrame "Hpt Hts". iExact "Hbit'".
+    iModIntro. iFrame "Hd". iExists t. iFrame "Hpt Hts Hch". iExact "Hbit'".
   Qed.
 
   (* >>> A6.125 step 4: THE OFFER/KEEP SPLIT of a ctx cell (VirtioProto's
@@ -2902,7 +2889,7 @@ Section ctx.
   Definition ctx_cell_keep (ξ : CtxId) (a : Arch.pa) : iProp Σ :=
     (∃ t : nat,
        a ↪[ts_name]{DfracOwn (1/2)} (t, TsoMemPa.ts_pay_none) ∗
-       key_at ξ (t, a))%I.
+       key_at ξ (t, a) ∗ chain_ev chain_name t)%I.
 
   Lemma ctx_phys_pointsto_offer_split (ξ : CtxId) (a : Arch.pa) (v : bv 8) :
     ctx_phys_pointsto ξ a (DfracOwn 1) v ⊢
@@ -2911,15 +2898,15 @@ Section ctx.
   Proof.
     rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /ctx_cell_keep
             phys_ledger_unseal /phys_ledger_def /phys_pointsto.
-    iIntros "(%t & [Hp %Hr] & Hts & Harm)".
+    iIntros "(%t & [Hp %Hr] & Hts & Harm & Hch)".
     iEval (rewrite (fractional_half (pointsto (L := Arch.pa) (V := bv 8) a (DfracOwn 1) v)))
       in "Hp".
     iEval (rewrite (fractional_half (a ↪[ts_name] (t, TsoMemPa.ts_pay_none)))) in "Hts".
     iDestruct "Hp" as "[Hp1 Hp2]". iDestruct "Hts" as "[Ht1 Ht2]".
-    iSplitR "Ht2 Harm".
+    iSplitR "Ht2 Harm Hch".
     { iSplitL "Hp1"; [ iFrame "Hp1"; by iPureIntro |].
       iExists t. iFrame "Ht1 Hp2". by iPureIntro. }
-    iExists t. iFrame "Ht2 Harm".
+    iExists t. iFrame "Ht2 Harm Hch".
   Qed.
 
   Lemma ctx_cell_keep_back (ξ : CtxId) (a : Arch.pa) (v : bv 8) :
@@ -2927,7 +2914,7 @@ Section ctx.
     ctx_phys_pointsto_h ξ a v.
   Proof.
     rewrite /ctx_cell_keep /ctx_phys_pointsto_h.
-    iIntros "(%t & Ht & Harm) Hp". iExists t. iFrame.
+    iIntros "(%t & Ht & Harm & Hch) Hp". iExists t. iFrame.
   Qed.
 
   Global Instance ctx_morph_cell_keep (a : Arch.pa) :
@@ -2935,9 +2922,9 @@ Section ctx.
   Proof.
     iIntros (ξ ξ') "Hd HP".
     rewrite /ctx_cell_keep.
-    iDestruct "HP" as "(%t & Hts & Hbit)".
+    iDestruct "HP" as "(%t & Hts & Hbit & Hch)".
     iDestruct (ctx_dom_key ξ ξ' (t, a) with "Hd Hbit") as "[Hd #Hbit']".
-    iModIntro. iFrame "Hd". iExists t. iFrame "Hts". iExact "Hbit'".
+    iModIntro. iFrame "Hd". iExists t. iFrame "Hts Hch". iExact "Hbit'".
   Qed.
 
   (* exclusivity at the REGISTERED physical tier, the companion of
@@ -2969,7 +2956,7 @@ Section ctx.
      token's justification: the message at [t] is the image, is drained
      under the hart's view, or is the hart's own -- [TsoMemPa.msg_visible]
      at every view from the hart's own up. *)
-  Local Lemma key_visible `{CID : CpuId} (g : gstate) (ξ : CtxId)
+  Lemma key_visible `{CID : CpuId} (g : gstate) (ξ : CtxId)
       (t : nat) (a : Arch.pa) :
     tso_interp_at riscv_eraGS g -∗ own_context ξ -∗ key_at ξ (t, a) -∗
     tso_interp_at riscv_eraGS g ∗ own_context ξ ∗
@@ -2995,13 +2982,13 @@ Section ctx.
         + iDestruct (dpos_ev_vis_at with "Hint Hev") as %[Ht0|(i & q & Hti' & Hq & Hle)].
           * simpl in Ht0. subst t. iPureIntro. by left.
           * simpl in Hti'. subst t. iPureIntro. right; left. exists i, q. done.
-        + iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+        + iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
           iDestruct (ghost_map_lookup with "Hm Hmsg") as %HLMi. rewrite HLM in HLMi.
           iPureIntro. right; right. simpl in Hti. exists i, m. done. }
     iAssert (⌜dl_ok g.(glog) g.(gdlog)⌝)%I as %Hdok.
-    { iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    { iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
       iPureIntro. exact (proj1 (proj1 (proj2 Hmm))). }
     iFrame "Hint". iSplitL.
     { iExists B, K, D. iFrame "Hb Hd HK Hoks". by iPureIntro. }
@@ -3024,15 +3011,17 @@ Section ctx.
        tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv' a = Some v⌝.
   Proof.
     rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
-    iIntros "Hgh Hint Hrun (%t & Hpt & Htse & #Hbit)".
+    iIntros "Hgh Hint Hrun (%t & Hpt & Htse & #Hbit & #Hchain)".
+    iDestruct (chain_ev_ok with "Hint Hchain") as %Hcev.
     iDestruct (key_visible with "Hint Hrun Hbit") as "(Hint & _ & %Hvis)".
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     destruct Hmm as (Hmm & (Hdok & Hfifo & _) & Hera).
     iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
     iDestruct (ghost_map_lookup with "Hts Htse") as %HTMt.
-    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat & Hch).
+    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
     rewrite Hgm in Hgm0. injection Hgm0 as <-.
+    have Hch := chain_of_ev _ _ _ _ _ _ Hlat Hcev.
     iPureIntro. intros tv' Htv'.
     apply (tso_read_of_latest _ _ _ _ _ _ t v Hdok Hfifo Hlat Hch). by apply Hvis.
   Qed.
@@ -3080,7 +3069,7 @@ Section ctx.
     (∃ t : nat,
        phys_pointsto a dq v ∗
        a ↪[ts_name]{dq} (t, ts_pay_none) ∗
-       key_at ξ (t, a) ∗
+       key_at ξ (t, a) ∗ chain_ev chain_name t ∗
        dpos_ev dpos_name t IK)%I.
   Lemma ctx_phys_xpointsto_aux : { f | f = ctx_phys_xpointsto_def }.
   Proof. by eexists. Qed.
@@ -3103,7 +3092,7 @@ Section ctx.
   Proof.
     rewrite ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def
             ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
-    iIntros "(%t & Hp & Hts & Hbit & _)". iExists t. by iFrame.
+    iIntros "(%t & Hp & Hts & Hbit & Hch & _)". iExists t. by iFrame.
   Qed.
 
   Lemma ctx_phys_xpointsto_mono ξ IK IK' a dq v :
@@ -3111,7 +3100,7 @@ Section ctx.
     ctx_phys_xpointsto ξ IK a dq v ⊢ ctx_phys_xpointsto ξ IK' a dq v.
   Proof.
     intros Hle. rewrite !ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def.
-    iIntros "(%t & Hp & Hts & Hbit & #Hst)". iExists t. iFrame.
+    iIntros "(%t & Hp & Hts & Hbit & Hch & #Hst)". iExists t. iFrame.
     by iApply (dpos_ev_mono with "Hst").
   Qed.
 
@@ -3136,7 +3125,7 @@ Section ctx.
             ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def.
     iIntros "Hint Hrun Hfact".
     iDestruct "Hrun" as "(%B & %K & %D & [Hb Hd] & #HK & %HBK & #Hoks)".
-    iDestruct "Hfact" as "(%t & Hpt & Htse & #Hbit)".
+    iDestruct "Hfact" as "(%t & Hpt & Htse & #Hbit & #Hchain)".
     iDestruct (view_lb_le_view with "Hint HK") as %HKtvs.
     iAssert (dpos_ev dpos_name t IK) as "#Hst".
     { iDestruct "Hbit" as "[(%p & Hev & Hlb) | Hdt]".
@@ -3146,8 +3135,8 @@ Section ctx.
         iDestruct (big_sepS_elem_of _ _ _ HDt with "Hoks") as "[Hev | Hown]".
         + iApply (dpos_ev_mono with "Hev"). lia.
         + iDestruct "Hown" as (i mg) "(%Hti & Hi & %Htid)".
-          iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+          iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
           iDestruct (ghost_map_lookup with "Hm Hi") as %HLi. rewrite HLM in HLi.
           have Hin := Hod _ _ HLi Htid.
           apply elem_of_list_lookup_1 in Hin as [q Hq].
@@ -3159,7 +3148,7 @@ Section ctx.
     iFrame "Hint".
     iSplitL "Hb Hd".
     { iExists B, K, D. iFrame "Hb Hd HK Hoks". by iPureIntro. }
-    iExists t. iFrame "Hpt Htse Hbit Hst".
+    iExists t. iFrame "Hpt Htse Hbit Hchain Hst".
   Qed.
 
   (* a stamped byte loads like any context byte: forget the stamp *)
@@ -3191,15 +3180,17 @@ Section ctx.
   Proof.
     intros HIK.
     rewrite ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def.
-    iIntros "Hgh Hint (%t & Hpt & Htse & _ & #Hst)".
+    iIntros "Hgh Hint (%t & Hpt & Htse & _ & #Hchain & #Hst)".
+    iDestruct (chain_ev_ok with "Hint Hchain") as %Hcev.
     iDestruct (dpos_ev_vis_at with "Hint Hst") as %Hvis.
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     destruct Hmm as (Hmm & (Hdok & Hfifo & _) & Hera).
     iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
     iDestruct (ghost_map_lookup with "Hts Htse") as %HTMt.
-    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat & Hch).
+    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
     rewrite Hgm in Hgm0. injection Hgm0 as <-.
+    have Hch := chain_of_ev _ _ _ _ _ _ Hlat Hcev.
     iPureIntro. intros tv' Htv'.
     apply (tso_read_of_latest _ _ _ _ _ _ t v Hdok Hfifo Hlat Hch).
     destruct Hvis as [->|(i & q & -> & Hq & Hle)]; first by left.
@@ -3228,27 +3219,27 @@ Section ctx.
     phys_ledger_pin a (DfracOwn 1) v t B Sv.
   Proof.
     iIntros (HtB Hv) "Hgh Hint [Hpt Htse]".
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
     iDestruct (ghost_map_lookup with "Hts Htse") as %HTM.
-    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat & Hch).
+    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
     rewrite Hgm in Hgm0. injection Hgm0 as <-.
     iMod (ghost_map_update ((t, ts_pay_pin Sv B) : ts_elem) with "Hts Htse")
       as "[Hts Htse]".
     iModIntro. iFrame "Hgh Hpt Htse".
-    iExists (<[a := ((t, ts_pay_pin Sv B) : ts_elem)]> TM), LM, DP, FR.
-    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs".
+    iExists (<[a := ((t, ts_pay_pin Sv B) : ts_elem)]> TM), LM, DP, FR, CH.
+    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch".
     iSplitR.
     { iPureIntro. rewrite dom_insert_L Hdom.
       assert (Ha : a ∈ dom g.(gmem)) by (by eapply elem_of_dom_2).
       set_solver. }
-    iSplitR; last (iPureIntro; exact (conj HLM (conj Hdpo (conj Hfro Hmm)))).
+    iSplitR; last (iPureIntro; exact (conj HLM (conj Hdpo (conj Hfro (conj Hcho Hmm))))).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
     - rewrite lookup_insert in Hlk. injection Hlk as <-.
       split_and!; [ | | by move => W0 HW0 | by move => R0 HR0 | by move => Wp HWp ].
-      + exists v. split_and!; [exact Hgm | exact Hlat | exact Hch].
+      + exists v. split; [exact Hgm | exact Hlat].
       + intros Sv' B' Heq. cbn in Heq. injection Heq as <- <-.
         exact (pin_ok_mint _ _ _ _ _ t v Hlat HtB Hv).
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
@@ -3294,14 +3285,14 @@ Section ctx.
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
     phys_ledger_at a dq v t -∗
-    ⌜latest g.(gimg) g.(glog) a t v ∧ chain_ok g.(glog) g.(gdlog) a t⌝.
+    ⌜latest g.(gimg) g.(glog) a t v⌝.
   Proof.
     iIntros "Hgh Hint [Hpt Htse]".
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
     iDestruct (ghost_map_lookup with "Hts Htse") as %HTM.
-    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat & Hch).
+    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
     rewrite Hgm in Hgm0. injection Hgm0 as <-. by iPureIntro.
   Qed.
 
@@ -3365,7 +3356,8 @@ Section ctx.
       (dq : dfrac) (w : bv 32) : iProp Σ :=
     (⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗
      [∗ list] j ∈ seq 0 4, ∃ t : nat,
-       ledger_vis h B t ∗ phys_ledger_at (pa_add a j) dq (nth_byte w j) t)%I.
+       ledger_vis h B t ∗ chain_ev chain_name t ∗
+       phys_ledger_at (pa_add a j) dq (nth_byte w j) t)%I.
 
   Global Instance phys_ledger_word4_vis_timeless h B a dq w :
     Timeless (phys_ledger_word4_vis h B a dq w).
@@ -3379,7 +3371,7 @@ Section ctx.
   Proof.
     rewrite /phys_ledger_word4_vis /phys_ledger_word4.
     iIntros "[$ Hb]". iApply (big_sepL_impl with "Hb").
-    iIntros "!>" (k j _) "(%t & _ & Hbj)".
+    iIntros "!>" (k j _) "(%t & _ & _ & Hbj)".
     by iApply phys_ledger_at_ledger.
   Qed.
 
@@ -3573,8 +3565,8 @@ Section ctx.
     ⌜pinw_ok1 g.(gimg) g.(glog) a W⌝.
   Proof.
     iIntros "Hint [Hpt Htse]".
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (ghost_map_lookup with "Hts Htse") as %HTM.
     iPureIntro. exact (ts_ok_pinw _ _ _ _ _ _ _ (Htie _ _ HTM) eq_refl).
   Qed.
@@ -3611,11 +3603,11 @@ Section ctx.
      publisher through the lock payload's floor) *)
   Lemma ctx_phys_pointsto_of_at_floor (ξ : CtxId) (a : Arch.pa) (v : bv 8)
       (t : nat) :
-    phys_ledger_at a (DfracOwn 1) v t -∗ key_at ξ (t, a) -∗
+    phys_ledger_at a (DfracOwn 1) v t -∗ key_at ξ (t, a) -∗ chain_ev chain_name t -∗
     ctx_phys_pointsto ξ a (DfracOwn 1) v.
   Proof.
     rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /phys_ledger_at.
-    iIntros "[Hpt Hts] #Hk". iExists t. iFrame "Hpt Hts Hk".
+    iIntros "[Hpt Hts] #Hk #Hc". iExists t. iFrame "Hpt Hts Hk Hc".
   Qed.
 
   (* The one read in the tree with NO receipt and NO synchronisation:    *)
@@ -3736,20 +3728,23 @@ Section ctx.
     tso_interp_at riscv_eraGS g -∗
     view_lb view_name dlen_name (hart_agent cpu_id) F -∗
     ledger_vis (hart_agent cpu_id) F t -∗
+    chain_ev chain_name t -∗
     phys_ledger_at a dq v t -∗
     ⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
        tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv' a = Some v⌝.
   Proof.
-    iIntros "Hgh Hint #HF #Hvis [Hpt Htse]".
+    iIntros "Hgh Hint #HF #Hvis #Hchain [Hpt Htse]".
+    iDestruct (chain_ev_ok with "Hint Hchain") as %Hcev.
     iDestruct (ledger_vis_visibleb with "Hint Hvis") as %Hvisb.
     iDestruct (view_lb_le_view with "Hint HF") as %HFtvs.
-    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & %Hmm)".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     destruct Hmm as (Hmm & (Hdok & Hfifo & _) & Hera).
     iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
     iDestruct (ghost_map_lookup with "Hts Htse") as %HTMt.
-    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat & Hch).
+    destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
     rewrite Hgm in Hgm0. injection Hgm0 as <-.
+    have Hch := chain_of_ev _ _ _ _ _ _ Hlat Hcev.
     iPureIntro. intros tv' Htv'.
     apply (tso_read_of_latest _ _ _ _ _ _ t v Hdok Hfifo Hlat Hch).
     apply Hvisb. lia.
@@ -3763,13 +3758,14 @@ Section ctx.
     tso_interp_at riscv_eraGS g -∗
     view_lb view_name dlen_name (hart_agent cpu_id) K -∗
     rel_floor_vis (hart_agent cpu_id) K n tf -∗
+    ([∗ list] k ∈ seq 0 n, chain_ev chain_name (tf k)) -∗
     rel_pre_cells base n tf f -∗
     ⌜forall tv : nat, (g.(gtv) cpu_id <= tv)%nat ->
        forall j, (j < n)%nat ->
          tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv (pa_add base j)
          = Some (f j)⌝.
   Proof.
-    iIntros "Hgh Hint #HK #Hfv Hb". rewrite /rel_pre_cells /rel_floor_vis.
+    iIntros "Hgh Hint #HK #Hfv #Hchs Hb". rewrite /rel_pre_cells /rel_floor_vis.
     iAssert (⌜forall j, (j < n)%nat -> forall tv : nat, (g.(gtv) cpu_id <= tv)%nat ->
                tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv (pa_add base j)
                = Some (f j)⌝)%I as %H.
@@ -3778,8 +3774,10 @@ Section ctx.
       { rewrite lookup_seq_lt; [reflexivity|lia]. }
       iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hfv") as "Hvj".
       { rewrite lookup_seq_lt; [reflexivity|lia]. }
+      iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hchs") as "Hcj".
+      { rewrite lookup_seq_lt; [reflexivity|lia]. }
       iApply (ledger_read_at_vis_ok g (pa_add base j) (DfracOwn 1) (f j) (tf j) K
-                with "Hgh Hint HK Hvj Hbj"). }
+                with "Hgh Hint HK Hvj Hcj Hbj"). }
     iPureIntro. intros tv Htv j Hj. exact (H j Hj tv Htv).
   Qed.
 

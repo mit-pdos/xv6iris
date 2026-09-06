@@ -1,18 +1,19 @@
 # Project: relaxing the memory model to allow store–store reordering (PSO)
 
-**STATUS 2026-09-06: DESIGN CHECKPOINT for the implementing agent, after
-five review rounds; two rulings (C) are the owner's.  Revised against the
-context abstractions that landed on `main` ([`design/contexts.md`](../design/contexts.md): one
-domination relation, `ctx_parked ξ ξ'`, per-lock contexts, the release
-hook).  The two-log work so far is on branch `relaxed-ww-twolog` on
-`origin` (three commits on top of `f7e2748e3`, the `main` before the
-contexts change): `2ea63c9fe` stage A (`iris/TsoMem.v`,
-`iris/TsoLitmus.v`, `iris/TsoMemOne.v`), `c2e717157` the ghost twin
-(`iris/TsoCtxTwin3.v`), `7be06e9ed` stage B (`iris/RiscvLang.v`,
-`TsoMemPa.v`, `TsoGhost.v`, `RiscvPtsto.v`, `RiscvExec.v`, `ObsTrace.v`,
-`HartBlock.v`, `UartAccepted.v`, `PowerBoot.v`); that branch's copy of
-this note is the pre-revision design and is superseded by this file.  §3
-says what of it is kept, what is rebased and what is superseded.**  The companion of
+**STATUS 2026-09-06 (evening): STAGE D IN PROGRESS on branch `relaxed-ww`
+(local; `main` + the three `relaxed-ww-twolog` commits rebased + the work
+below).  Done: the rebase (§3, tree red from `TsoCtx.v` up as predicted);
+the fourth twin `iris/TsoCtxTwin4.v` (§2 over `main`'s shapes, closed
+under the global context); the receipt map is the fence-record map
+(`fence_rec`/`fr_ok`/`era_fr_name`; `TsoGhost.dpos_ev`); `TsoCtx.v`
+ported (commit "stage D: TsoCtx.v over the two-log machine": `key_at`
+defined once, no watermark, `ctx_stamped` on the drain line, the load
+gates through `chain_ok`, four racy-tier gates `Admitted` and marked
+`relaxed-ww STAGE E`).  IN FLIGHT: §2.10's revision (the chain is a
+PER-FACT witness, the free tier is ξ-indexed) across `TsoMemPa` /
+`TsoGhost` / `RiscvPtsto` / `RiscvExec` / `TsoCtx` / `TsoCtxStore` /
+`TsoCtxLedger`; then the sweep above.  Two rulings (C) remain the
+owner's.**  The companion of
 [`completed/relaxed-rr.md`](../completed/relaxed-rr.md) (load–load
 reordering).  §1 is the machine of record and §1.3 the rejected first
 encoding, with the witnesses that kill it.
@@ -467,6 +468,59 @@ litmus verdicts other than the three that flip.  A drain changes nothing
 any client holds: `gmem` is the issue flat and does not move at a drain,
 the timestamp fragment names an index, and only the interp-internal
 drain-position map grows.
+
+### 2.10 Stage D finding: the chain is a per-fact witness, and the free tier is ξ-indexed
+
+§2.9 said the store gates do not move.  They do, and the reason is the
+heap tie's chain.  `chain_ok log dl a t` ("every earlier message to the
+byte is drained or by the same author, and drained below `t`'s
+position") is what `tso_read_of_latest` needs; a store re-establishes it
+for the new message from the previous latest's chain AND
+`drained_or_by` (the previous latest is drained or the writer's own).
+Two things follow that stage B's interp, which put `chain_ok` on EVERY
+element, cannot accommodate:
+
+- **An AMO cannot be chained.**  The contender's `amoswap` on the lock
+  word races the releaser's pending `sw zero` (§1.2's last-but-one row):
+  the previous latest is a foreign pending store, `drained_or_by` is
+  false, and the AMO's message is legitimately NOT coherence-latest.  A
+  universal chain clause makes the AMO gate unprovable.
+- **A byte without a bit cannot re-establish a chain.**  `phys_free` /
+  `mem_free` / `byte_any` (the visibility-free tier) and `phys_ledger`
+  carry no clean/dirty bit, so a store through them has no evidence about
+  the previous latest -- and a chain once lost is lost for good (the new
+  chain needs the old one).  Since every kalloc'd page is loaded through
+  the ledger later, the free tier must stay chained.
+
+The revision, in place of §2.9's claim:
+
+- **The chain is a fact of the FACT.**  The interp keeps a ghost map
+  `CH` of CHAINED message indices (`era_chain_name`, persistent
+  fragments `chained i`) with the pure tie `chain_set_ok log dl CH`
+  (`chain_msg` at every index: `chain_ok` at every byte the message
+  writes).  `ts_ok` keeps only `latest`.  A ctx fact carries `chain_ev
+  chain_name t` (`t = 0 ∨ chained (t-1)`); the ctx store gate inserts
+  the new index (its premise comes from the previous fact's `chain_ev`
+  and its bit at the running token); ledger and racy stores and the AMO
+  insert nothing.  `chain_set_ok` is kept by every append (`chain_ok`
+  is monotone in the log) and by every drain (`chain_msg_drain`, FIFO;
+  no `latest` needed).  The load gate reads the chain off the fact.
+- **The visibility-free tier is ξ-indexed**: `mem_free ξ a dq := ∃ v,
+  ctx_pointsto ξ a dq v`, `phys_free` likewise, `byte_any ξ a`.  The
+  freelist's pages ride the kmem lock's context like any payload (mint 1
+  in, publication at the release fence, unstamp out) and stay chained;
+  `ctx_store_free_ok` / `ctx_store_win_free_ok` go (a free byte is a ctx
+  byte, stored through `ctx_store_ok`).  §0.26′'s reason for the ξ-free
+  tier ("no value determinate at the freer's view") is moot at the ctx
+  tier, whose value is the ledger's latest write.
+- **A ledger cell read through `ledger_vis` needs `chain_ev`** as a
+  premise (`ledger_read_at_vis_ok`); its consumers (DiskAvail, the virtio
+  interrupt) are stage E's.
+
+**Stage E's marked debt** (each `Admitted` carries `relaxed-ww STAGE E`):
+`TsoCtx.ledger_read_pin_ok`, `ledger_read_rel_ok`, `ledger_read_pinw_vis`,
+`ledger_read_racy_ok` -- restated over `(glog, gdlog)`, provable only
+once `TsoMemPa`'s `*1` theory is restated over the drain line.
 
 ## 3. Stages
 

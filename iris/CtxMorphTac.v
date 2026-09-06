@@ -56,15 +56,7 @@ Section MorphMore.
       iModIntro. iFrame "Hd". rewrite (big_sepS_insert _ _ _ Hx). iFrame.
   Qed.
 
-  Global Instance ctx_morph_phys_pointsto (a : Arch.pa) (dq : dfrac) (v : bv 8) :
-    CtxMorph (λ ξ, ctx_phys_pointsto ξ a dq v).
-  Proof.
-    iIntros (ξ ξ') "Hd HP".
-    rewrite !ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
-    iDestruct "HP" as "(%t & Hpt & Hts & Hbit)".
-    iDestruct (ctx_dom_key ξ ξ' (t, a) with "Hd Hbit") as "[Hd #Hbit']".
-    iModIntro. iFrame "Hd". iExists t. iFrame "Hpt Hts". iExact "Hbit'".
-  Qed.
+  (* [ctx_morph_phys_pointsto] lives in [TsoCtx.v] now (relaxed-ww stage D). *)
 
   Global Instance ctx_morph_phys_word (a : Arch.pa) (dq : dfrac) (w : bv 64) :
     CtxMorph (λ ξ, ctx_phys_word_pointsto ξ a dq w).
