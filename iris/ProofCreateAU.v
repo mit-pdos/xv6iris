@@ -5627,9 +5627,9 @@ Section ProofCreateMain.
                          (dir_entries (era_node dn bm data)))
                by (rewrite Hins0 Hcl16; reflexivity).
              assert (Habsp' : abs_of (era_node dn' bm' data')
-                     = MkAnode (ADir (<[bname 14 nf := bv_unsigned cinum]>
-                                        (dir_entries (era_node dn bm data))))
-                               (fn_nlink (era_node dn bm data)))
+                     = Some (MkAnode (ADir (<[bname 14 nf := bv_unsigned cinum]>
+                                              (dir_entries (era_node dn bm data))))
+                                     (fn_nlink (era_node dn bm data))))
                by exact (mkf_parent_row dn dn' bm bm' data data'
                            (bname 14 nf) (bv_unsigned cinum)
                            Hdz Hty' Hnl' Hins).
@@ -5639,8 +5639,8 @@ Section ProofCreateMain.
              assert (Habsc : abs_of (era_node
                        (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                        bmc datc)
-                     = MkAnode (ADev (bv_unsigned major) (bv_unsigned minor))
-                               1%nat).
+                     = Some (MkAnode (ADev (bv_unsigned major) (bv_unsigned minor))
+                                     1%nat)).
              { apply (mkf_child_dev _ bmc datc major minor).
                rewrite (cr_setf_fresh_made dnc ty major minor Hfresh Htyc).
                by rewrite Hty. }

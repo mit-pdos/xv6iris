@@ -775,13 +775,13 @@ Section KexecAUAMain.
       (sts : list fdstate)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) : iProp Σ :=
     (∃ av : aview,
-       ⌜av !! zi = Some (abs_of (FsStateEra.era_node dn bm data))⌝ ∗
+       ⌜av !! zi = Some (abs_row (FsStateEra.era_node dn bm data))⌝ ∗
        ⌜bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
-          abs_of (FsStateEra.era_node dn bm data)
+          abs_row (FsStateEra.era_node dn bm data)
           = MkAnode (AFile (FsTree.file_bytes data
                               (Z.to_nat (bv_unsigned (di_size dn)))))
                     (fn_nlink (FsStateEra.era_node dn bm data))⌝ ∗
-       Φo av zi (abs_of (FsStateEra.era_node dn bm data)) ∗
+       Φo av zi (abs_row (FsStateEra.era_node dn bm data)) ∗
        P L zi ∗
        SpecKexecAU.exec_slot_pre Sl Φo na alen afun sts)%I.
 
@@ -881,12 +881,12 @@ Section KexecAUAMain.
   Lemma kxa_not_loadable (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) (ef : nat -> bv 8) :
     (bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
-       abs_of (FsStateEra.era_node dn bm data)
+       abs_row (FsStateEra.era_node dn bm data)
        = MkAnode (AFile (FsTree.file_bytes data
                            (Z.to_nat (bv_unsigned (di_size dn)))))
                  (fn_nlink (FsStateEra.era_node dn bm data))) ->
     LA.kxc_bad_cause dn ef data ->
-    ~ SpecKexecAU.anode_loadable (abs_of (FsStateEra.era_node dn bm data)).
+    ~ SpecKexecAU.anode_loadable (abs_row (FsStateEra.era_node dn bm data)).
   Proof.
     intros Hrow Hbad (f & nl & Heq & Hload).
     (* first: the row IS a file row, or [Heq] is already absurd *)
@@ -935,7 +935,7 @@ Section KexecAUAMain.
     intros HL Hbad. iIntros "H". rewrite /kxa_receipt.
     iDestruct "H" as (av) "(%Hav & %Hrow & HΦ & HP & Hsl)".
     rewrite /SpecKexecAU.exec_post_fail. iRight. iExists pl. iRight.
-    iExists zi, av, (abs_of (FsStateEra.era_node dn bm data)),
+    iExists zi, av, (abs_row (FsStateEra.era_node dn bm data)),
             SpecKexecAU.EfNotLoadable.
     rewrite -HL.
     iSplitL "HP"; [iExact "HP" |].
@@ -972,7 +972,7 @@ Section KexecAUAMain.
   Lemma kxa_file_row (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
     inode_ok fsc_cov fsc_logst dn bm data ->
     bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
-    abs_of (FsStateEra.era_node dn bm data)
+    abs_row (FsStateEra.era_node dn bm data)
     = MkAnode (AFile (FsTree.file_bytes data (Z.to_nat (bv_unsigned (di_size dn)))))
               (fn_nlink (FsStateEra.era_node dn bm data)).
   Proof.
@@ -1174,6 +1174,7 @@ Section KexecAUAMain.
       rewrite FsState.top_frag_1.
       iMod (FsAbsOpenFire.opf_open_fire fsc_fs ⊤ (DfracOwn 1) Φo zi
               (FsStateEra.era_node dn bm data) ltac:(solve_ndisj)
+              (FsAbsOpenFire.opf_era_typed_ok _ _ dn bm data Hok)
               with "Hftop Hoc Hpay") as "[Hpay Hobs]".
       iDestruct "Hobs" as (av0) "[%Hav HΦ]".
       iModIntro. rewrite -FsState.top_frag_1. iFrame "Hpay".

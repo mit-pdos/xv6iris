@@ -312,9 +312,9 @@ Lemma wrf_write_row `{XI : TsoCtx.CurCtx} (dn dn' : dinode) (bm bm' : blkmap)
        then wrote (k - off)%nat
        else file_byte data k) ->
   abs_of (era_node dn' bm' data')
-  = MkAnode (AFile (blk_splice off (wrf_run wrote tot)
-                      (fn_file_bytes (era_node dn bm data))))
-            (fn_nlink (era_node dn bm data)).
+  = Some (MkAnode (AFile (blk_splice off (wrf_run wrote tot)
+                            (fn_file_bytes (era_node dn bm data))))
+                  (fn_nlink (era_node dn bm data))).
 Proof.
   intros Hty Hty' Hnl' Hh Hh' Hsz' Hoff Hcap Hcap0 Hrange.
   assert (Hty2 : bv_unsigned (di_type dn') = FsImg.T_FILE_z)
@@ -334,7 +334,7 @@ Proof.
     rewrite (wrf_era_file_byte dn' bm' data' k Hh' Hkb)
             (wrf_era_file_byte dn bm data k Hh Hkb).
     exact (Hrange k Hkb). }
-  rewrite (opf_era_file_row dn' bm' data' Hty2) Hb Hnl //.
+  rewrite (opf_era_file_of dn' bm' data' Hty2) Hb Hnl //.
 Qed.
 
 (* ===================================================================== *)
@@ -503,8 +503,8 @@ Section WriteFire.
     (0 < length bs)%nat ->
     (off <= length bs0)%nat ->
     (off + length bs <= MAXFILE * BSIZE)%nat ->
-    abs_of n = MkAnode (AFile bs0) nl ->
-    abs_of n' = MkAnode (AFile (blk_splice off bs bs0)) nl ->
+    abs_of n = Some (MkAnode (AFile bs0) nl) ->
+    abs_of n' = Some (MkAnode (AFile (blk_splice off bs bs0)) nl) ->
     ftop_inv γfs -∗ app_inv γfs -∗
     awrite_full_at (fs_gamma_L γfs) appE i γo k Φ REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
@@ -523,7 +523,7 @@ Section WriteFire.
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
     assert (Hrow : abs_view I !! i = Some (MkAnode (AFile bs0) nl)).
-    { by rewrite (abs_view_lookup I i n Hlk) Habs. }
+    { by rewrite (abs_view_lookup_of I i n Hlk) Habs. }
     assert (Hpre : wri_pre (abs_view I) i off bs bs0 nl).
     { rewrite /wri_pre. split_and!; [exact Hrow | exact Hpos | exact Hoff |
                                      exact Hcap]. }
@@ -531,7 +531,7 @@ Section WriteFire.
        is the written record's own row *)
     assert (Hdelta : abs_view (<[i := n']> I)
                      = delta_write i off bs (abs_view I)).
-    { rewrite (abs_view_insert I i n') Habs'.
+    { rewrite (abs_view_insert I i n' _ Habs').
       by rewrite (delta_write_file (abs_view I) i off bs bs0 nl Hrow). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I off bs bs0 nl with "[//] Hta Hg") as "(Hta & Hstep & Hph2)".

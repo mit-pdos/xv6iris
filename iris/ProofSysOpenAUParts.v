@@ -122,6 +122,17 @@ Section ProofSysOpenAUParts.
     iExists data. iExact "H".
   Qed.
 
+  (* the payload's [inode_ok], read off the flat form and the form handed
+     back (E2-V: the terminal fire wants the locked node TYPED) *)
+  Lemma so_flat_ok (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    so_flat k inum dn bm data -∗
+      ⌜inode_ok fsc_cov fsc_logst dn bm data⌝ ∗ so_flat k inum dn bm data.
+  Proof.
+    rewrite /so_flat. iIntros "H". iDestruct "H" as "(%Hok & Hrest)".
+    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |]. iExact "Hrest".
+  Qed.
+
   Lemma so_flat_close (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) :
     so_flat k inum dn bm data -∗
@@ -335,7 +346,7 @@ Section ProofSysOpenAUParts.
      node reads as), and the trunc commit still in hand. *)
   Definition so_obs (Φo : aview -> Z -> anode -> iProp Σ) (i : Z)
       (n : fs_node) : iProp Σ :=
-    (∃ av : aview, ⌜av !! i = Some (abs_of n)⌝ ∗ Φo av i (abs_of n))%I.
+    (∃ av : aview, ⌜av !! i = Some (abs_row n)⌝ ∗ Φo av i (abs_row n))%I.
 
   (* the post-walk FAILURE arm (ARMs C-FAIL / D-FAIL / E-FAIL / F-FAIL):
      the observation HAS fired and its receipt is delivered, the trunc
@@ -363,7 +374,7 @@ Section ProofSysOpenAUParts.
     rewrite /open_post_fail_plain. iRight. iExists pl. iRight.
     iExists i. iFrame "HP Htc".
     rewrite /so_obs. iDestruct "Hobs" as (av) "[%Hav HΦ]".
-    iExists av, (abs_of n). iSplitR; [by iPureIntro |]. iExact "HΦ".
+    iExists av, (abs_row n). iSplitR; [by iPureIntro |]. iExact "HΦ".
   Qed.
 
   (* ...and the WALK-DEAD arm (ARM B-FAIL): nothing was observed, the era

@@ -630,7 +630,7 @@ Section ProofSysOpenAUEntryC.
          pure row receipt. *)
       assert (Htyf : bv_unsigned (di_type dn) = FsImg.T_FILE_z).
       { rewrite Hrep create_made_type. vm_compute. reflexivity. }
-      assert (Harow : abs_of (era_node dn bm data)
+      assert (Harow : abs_row (era_node dn bm data)
                       = MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
                                 (fn_nlink (era_node dn bm data)))
         by exact (opf_era_file_row dn bm data Htyf).
@@ -707,7 +707,7 @@ Section ProofSysOpenAUEntryC.
          The contract wants the terminal observation FIRED at the found
          node, so it fires here, off the payload's own [top_frag]. *)
       assert (Hnd : forall (ents : gmap fname Z) (nl : nat),
-                      abs_of (era_node dn bm data) <> MkAnode (ADir ents) nl).
+                      abs_row (era_node dn bm data) <> MkAnode (ADir ents) nl).
       { destruct Hrep as [Hty | Hty].
         - rewrite (opf_era_file_row dn bm data
                      ltac:(rewrite Hty; vm_compute; reflexivity)).
@@ -716,10 +716,14 @@ Section ProofSysOpenAUEntryC.
                      ltac:(rewrite Hty; vm_compute; discriminate)
                      ltac:(rewrite Hty; vm_compute; discriminate)).
           intros ents nl Hc. inversion Hc. }
+      (* E2-V: the found node is typed (a file or a device), so it has a row *)
+      assert (Htynz : fn_type (era_node dn bm data) <> 0).
+      { rewrite opf_era_type.
+        destruct Hrep as [Hty | Hty]; rewrite Hty; vm_compute; discriminate. }
       iDestruct (so_flat_top with "Hflat") as "[Htop Hflatb]".
       iApply fupd_wp.
       iMod (opf_open_fire_1 fsc_fs ⊤ Phio (bv_unsigned inum)
-              (era_node dn bm data) ltac:(solve_ndisj) with "[] Hoc Htop")
+              (era_node dn bm data) ltac:(solve_ndisj) Htynz with "[] Hoc Htop")
         as "[Htop Hobs0]";
         [iApply (ireg_inv_ftop with "Hireg") |].
       iModIntro.
@@ -741,7 +745,7 @@ Section ProofSysOpenAUEntryC.
                     (socr_Pm (socr_exists P Phiok Phiex (bview plen bp)
                                 (bv_unsigned inum)))
                     (socr_Phio_tag (bv_unsigned inum)
-                       (abs_of (era_node dn bm data)) Phio)
+                       (abs_row (era_node dn bm data)) Phio)
                     Phit m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
@@ -751,7 +755,7 @@ Section ProofSysOpenAUEntryC.
         iApply fupd_wp.
         iMod (socr_arms_exists gf (proc_addr jx) pidv vom P Pmiss
                 Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
-                (abs_of (era_node dn bm data)) Hnd with "Hpost") as "Hpost".
+                (abs_row (era_node dn bm data)) Hnd with "Hpost") as "Hpost".
         iModIntro.
         iApply ("Hcont" $! mf ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
@@ -766,7 +770,7 @@ Section ProofSysOpenAUEntryC.
                 (socr_Pm (socr_exists P Phiok Phiex (bview plen bp)
                             (bv_unsigned inum)))
                 (socr_Phio_tag (bv_unsigned inum)
-                   (abs_of (era_node dn bm data)) Phio)
+                   (abs_row (era_node dn bm data)) Phio)
                 Phit
                 Hqs HKfull Hkk ltac:(exact (proj2 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hibcov Hiblog Hcovb

@@ -193,8 +193,9 @@ Lemma abs_of_era_dir (cov : gset Z) (logstart : Z) (dn : dinode)
     (bm : blkmap) (data : nat -> list (bv 8)) :
   inode_ok cov logstart dn bm data ->
   fn_is_dir (era_node dn bm data) = true ->
-  an_node (abs_of (era_node dn bm data))
-  = ADir (dir_view data (dir_nrec (bv_unsigned (di_size dn)))).
+  abs_of (era_node dn bm data)
+  = Some (MkAnode (ADir (dir_view data (dir_nrec (bv_unsigned (di_size dn)))))
+                  (fn_nlink (era_node dn bm data))).
 Proof.
   intros Hok Hd.
   by rewrite (abs_of_dir _ Hd) (dir_entries_era_ok cov logstart dn bm data Hok Hd).
@@ -220,11 +221,13 @@ Section FsAbsSeam.
      beside it because a read-locker needs them to call [readi]. *)
   Lemma inode_rd_era_nview (γfs : fs_names) (q : Qp) (inum : mword 32)
       (n : fs_node) :
+    fn_type n <> 0 ->
     inode_rd_era γfs (DfracOwn q) inum n -∗
       inode_dat_q (fs_gamma_L γfs) (DfracOwn q) n
-      ∗ nview (fs_gamma_L γfs) q (bv_unsigned inum) (abs_of n).
+      ∗ nview (fs_gamma_L γfs) q (bv_unsigned inum) (abs_row n).
   Proof.
-    rewrite /inode_rd_era. iIntros "[$ Ht]". by iApply nview_of_frag.
+    intros Hnz. rewrite /inode_rd_era. iIntros "[$ Ht]".
+    by iApply (nview_of_frag_typed _ _ _ _ Hnz).
   Qed.
 
   (* =================================================================== *)
@@ -316,7 +319,8 @@ Section FsAbsEra.
     iDestruct "HF" as (n) "[Hf [%Hdir %Hde]]".
     iDestruct (nview_frag with "Hn") as (n') "[Hf' %Han]".
     iDestruct (top_frag_q_agree with "Hf Hf'") as %<-.
-    iPureIntro. by rewrite -Han (abs_of_dir n Hdir) Hde.
+    iPureIntro. rewrite (abs_of_dir n Hdir) in Han. apply Some_inj in Han.
+    by rewrite -Han /= Hde.
   Qed.
 
   Lemma elend_reads Γ : lend_reads Γ (elend Γ).
@@ -335,10 +339,10 @@ Section FsAbsEra.
   Proof.
     rewrite /elend. iIntros "Hst HF".
     iDestruct "HF" as (n) "[Hf [%Hdir %Hde]]".
-    iDestruct (nview_of_frag with "Hf") as "Hn".
+    iDestruct (nview_of_frag _ _ _ _ _ (abs_of_dir n Hdir) with "Hf") as "Hn".
     iDestruct (astate_q_nview_dq with "Hst Hn") as %Hav.
     iPureIntro. exists (fn_nlink n).
-    by rewrite Hav /abs_of /abs_node Hdir Hde.
+    by rewrite Hav Hde.
   Qed.
 
   (* ...and at the READING, any fraction *)

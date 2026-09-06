@@ -169,10 +169,10 @@ Section ProofSysOpenAUCreArm.
   (* the FRESH tail's receipt costs NOTHING: it is a row equation, and the
      singleton map is its witness. *)
   Lemma socr_obs_pure (i0 : Z) (n0 : fs_node) :
-    ⊢ so_obs (socr_Phio_pure i0 (abs_of n0)) i0 n0.
+    ⊢ so_obs (socr_Phio_pure i0 (abs_row n0)) i0 n0.
   Proof.
     rewrite /so_obs /socr_Phio_pure.
-    iExists ({[ i0 := abs_of n0 ]} : aview).
+    iExists ({[ i0 := abs_row n0 ]} : aview).
     iSplitR; [iPureIntro; apply lookup_singleton |].
     iPureIntro. split; reflexivity.
   Qed.
@@ -180,8 +180,8 @@ Section ProofSysOpenAUCreArm.
   (* ...and the EXISTS tail's is the real fire, tagged. *)
   Lemma socr_obs_tag (i0 : Z) (n0 : fs_node)
       (Phio : aview -> Z -> anode -> iProp Σ) :
-    (∃ av : aview, ⌜av !! i0 = Some (abs_of n0)⌝ ∗ Phio av i0 (abs_of n0))
-    -∗ so_obs (socr_Phio_tag i0 (abs_of n0) Phio) i0 n0.
+    (∃ av : aview, ⌜av !! i0 = Some (abs_row n0)⌝ ∗ Phio av i0 (abs_row n0))
+    -∗ so_obs (socr_Phio_tag i0 (abs_row n0) Phio) i0 n0.
   Proof.
     iIntros "H". iDestruct "H" as (av) "[%Hav HP]".
     rewrite /so_obs /socr_Phio_tag. iExists av.

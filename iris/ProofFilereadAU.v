@@ -176,14 +176,14 @@ Lemma frau_ret_tie (nz : Z) (dn : dinode) (bm : blkmap)
     (data : nat -> list (bv 8)) (off tot : nat) :
   (0 <= nz)%Z ->
   tot = rd_clamp (di_size dn) off (Z.to_nat nz) ->
-  ard_ret_tie nz (abs_of (era_node dn bm data)) off
+  ard_ret_tie nz (abs_row (era_node dn bm data)) off
     (mword_of_int (Z.of_nat tot) : mword 64).
 Proof.
   intros Hnn Htot.
   assert (Hle : (tot <= Z.to_nat nz)%nat)
     by (rewrite Htot; apply fr_clamp_le).
   rewrite /ard_ret_tie.
-  destruct (an_node (abs_of (era_node dn bm data))) as [bs | ents | ma mi]
+  destruct (an_node (abs_row (era_node dn bm data))) as [bs | ents | ma mi]
     eqn:Hrow.
   - do 2 f_equal. rewrite Htot.
     exact (arf_count_bridge_era dn bm data bs off (Z.to_nat nz) Hrow).
@@ -1566,13 +1566,14 @@ Section ProofFilereadAU.
                         (era_node dnl bml data)
                         ltac:(solve_ndisj) Hoffcap
                         (arf_size_ok_era dnl bml data Hszn)
+                        (arf_era_typed dnl bml data Hdty)
                         with "[] [Hau] [Htop] [Hgv]") as "(Htop & Hgv & Hfired)";
                   [iApply (ireg_inv_ftop with "Hireg") | rewrite -Hgoo; iExact "Hau"
                   | iExact "Htop" | rewrite Hoffz; iExact "Hgv" |].
                 iDestruct "Hfired" as (avf) "[%Hrowf HΦf]".
                 assert (Hpref : ard_pre avf (bv_unsigned inm)
                                   (Z.to_nat (bv_unsigned v))
-                                  (abs_of (era_node dnl bml data))).
+                                  (abs_row (era_node dnl bml data))).
                 { split; [exact Hrowf | split;
                     [exact Hoffcap | exact (arf_size_ok_era dnl bml data Hszn)]]. }
                 (* CHECK IN the cell, at the value it went out with *)
@@ -1774,14 +1775,14 @@ Section ProofFilereadAU.
                     iSplitR; [iPureIntro; exact H1 |]. iRight.
                     iSplitR; [iPureIntro; exact Hn0 |].
                     iExists avf, (Z.to_nat (bv_unsigned v)),
-                      (abs_of (era_node dnl bml data)).
+                      (abs_row (era_node dnl bml data)).
                     iSplitR; [iPureIntro; exact Hpref |]. iExact "HΦf".
                   - destruct Hrdret as [[H1' _] | [_ Hteq]].
                     { exfalso. rewrite H1' in H1. apply (f_equal bv_unsigned) in H1.
                       rewrite Ht0 in H1. vm_compute in H1. discriminate. }
                     rewrite /read_arms /read_post_ok. iLeft.
                     iExists avf, (Z.to_nat (bv_unsigned v)),
-                      (abs_of (era_node dnl bml data)), 0%nat.
+                      (abs_row (era_node dnl bml data)), 0%nat.
                     iSplitR; [iPureIntro; exact Hpref |].
                     iSplitR; [iPureIntro; exact Hn0 |].
                     iSplitR; [iPureIntro; rewrite H1;
@@ -1909,13 +1910,14 @@ Section ProofFilereadAU.
                         (era_node dnl bml data)
                         ltac:(solve_ndisj) Hoffcap
                         (arf_size_ok_era dnl bml data Hszn)
+                        (arf_era_typed dnl bml data Hdty)
                         with "[] [Hau] [Htop] [Hgv]") as "(Htop & Hgv & Hfired)";
                   [iApply (ireg_inv_ftop with "Hireg") | rewrite -Hgoo; iExact "Hau"
                   | iExact "Htop" | rewrite Hoffz; iExact "Hgv" |].
                 iDestruct "Hfired" as (avf) "[%Hrowf HΦf]".
                 assert (Hpref : ard_pre avf (bv_unsigned inm)
                                   (Z.to_nat (bv_unsigned v))
-                                  (abs_of (era_node dnl bml data))).
+                                  (abs_row (era_node dnl bml data))).
                 { split; [exact Hrowf | split;
                     [exact Hoffcap | exact (arf_size_ok_era dnl bml data Hszn)]]. }
                 (* CHECK IN the advanced cell: the half came back at exactly
@@ -2109,7 +2111,7 @@ Section ProofFilereadAU.
                    readi's own equation, carried down by [Hcase]. *)
                 { rewrite /read_arms /read_post_ok. iLeft.
                   iExists avf, (Z.to_nat (bv_unsigned v)),
-                    (abs_of (era_node dnl bml data)), tot.
+                    (abs_row (era_node dnl bml data)), tot.
                   iSplitR; [iPureIntro; exact Hpref |].
                   iSplitR; [iPureIntro; exact Hn0 |].
                   iSplitR; [iPureIntro;

@@ -318,8 +318,8 @@ Definition kxp_pins (av : aview) (pb : kx_pin) : Prop :=
 (* ---- 3a.  the row, read at a node: [abs_of n = AFile bs row] pins the
    node's byte reading.  At VARIABLES (FsInitPin sect. 3's rule); the
    instances never [injection] a literal. ---- *)
-Lemma abs_of_file_read (n : fs_node) (bs : list (bv 8)) (nl : nat) :
-  abs_of n = MkAnode (AFile bs) nl -> fn_file_bytes n = bs.
+Lemma abs_row_file_read (n : fs_node) (bs : list (bv 8)) (nl : nat) :
+  abs_row n = MkAnode (AFile bs) nl -> fn_file_bytes n = bs.
 Proof.
   intros H.
   assert (Hn : abs_node n = AFile bs) by exact (f_equal an_node H).
@@ -328,6 +328,14 @@ Proof.
   - intros Hc. discriminate Hc.
   - case_decide; intros Hc; [| discriminate Hc].
     injection Hc. intros Hb. exact Hb.
+Qed.
+
+(* ...and at the view's reading: a node WITH a file row (E2-V) *)
+Lemma abs_of_file_read (n : fs_node) (bs : list (bv 8)) (nl : nat) :
+  abs_of n = Some (MkAnode (AFile bs) nl) -> fn_file_bytes n = bs.
+Proof.
+  intros H. destruct (abs_of_Some _ _ H) as [_ Hr].
+  exact (abs_row_file_read n bs nl (eq_sym Hr)).
 Qed.
 
 (* ---- 3b.  the payload tie: on an ilock payload's node ([era_node dn bm
@@ -361,7 +369,7 @@ Qed.
 Lemma kxp_era_bytes (cov : gset Z) (logstart : Z) (dn : dinode)
     (bm : blkmap) (data : nat -> list (bv 8)) (bs : list (bv 8)) (nl : nat) :
   inode_ok cov logstart dn bm data ->
-  abs_of (era_node dn bm data) = MkAnode (AFile bs) nl ->
+  abs_of (era_node dn bm data) = Some (MkAnode (AFile bs) nl) ->
   file_bytes data (Z.to_nat (bv_unsigned (di_size dn))) = bs.
 Proof.
   intros Hok Habs.
@@ -481,10 +489,9 @@ Section KexecPinView.
       ⌜fn_file_bytes n = kxp_bytes pb⌝.
   Proof.
     intros (_ & nl & Hrow). iIntros "Hst Hf".
-    iDestruct (nview_of_frag with "Hf") as "Hn".
-    iDestruct (astate_nview_dq with "Hst Hn") as %Hav.
+    iDestruct (astate_frag with "Hst Hf") as %Hav.
     iPureIntro.
-    rewrite Hrow in Hav. apply Some_inj in Hav. symmetry in Hav.
+    rewrite Hrow in Hav. symmetry in Hav.
     exact (abs_of_file_read n (kxp_bytes pb) nl Hav).
   Qed.
 

@@ -338,21 +338,19 @@ Proof.
   by rewrite (insert_id av i (MkAnode (ADev ma mi) 1%nat) Hi).
 Qed.
 
-(* the reading bridge's trivial half (the prover's item 2): pushing one
-   raw-map insert through [abs_view] *)
-Lemma abs_view_insert (I : gmap Z fs_node) (d : Z) (n : fs_node) :
-  abs_view (<[d := n]> I) = <[d := abs_of n]> (abs_view I).
-Proof. apply fmap_insert. Qed.
+(* the reading bridge's trivial half (the prover's item 2) -- pushing one
+   raw-map insert through [abs_view] -- is [FsAbsDefs.abs_view_insert]
+   since E2-V (the view is an [omap], so the insert needs the node's row) *)
 
 (* the abstract child create's non-directory success arm leaves behind:
    [SpecCreate.create_made] read through [abs_of] *)
 Lemma abs_of_create_dev (n : fs_node) (major minor : mword 16) :
   fn_rec n = create_made T_DEVICE major minor ->
   abs_of n
-  = MkAnode (ADev (bv_unsigned major) (bv_unsigned minor)) 1%nat.
+  = Some (MkAnode (ADev (bv_unsigned major) (bv_unsigned minor)) 1%nat).
 Proof.
   intros Hr.
-  rewrite /abs_of /abs_node /fn_is_dir /fn_type /fn_major /fn_minor
+  rewrite /abs_of /abs_row /abs_node /fn_is_dir /fn_type /fn_major /fn_minor
           /fn_nlink Hr.
   reflexivity.
 Qed.

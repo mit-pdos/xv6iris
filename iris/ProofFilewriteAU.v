@@ -2885,14 +2885,14 @@ Section ProofFilewriteAU.
           by (rewrite Hdnwi; exact (wrf_wi_size dnl bm'
                 (Z.to_nat (bv_unsigned v)) tot Hoff32)).
         assert (Hrow : abs_of (era_node dnl bml datal)
-                  = MkAnode (AFile (fn_file_bytes (era_node dnl bml datal)))
-                            (fn_nlink (era_node dnl bml datal)))
-          by exact (opf_era_file_row dnl bml datal Htyfile).
+                  = Some (MkAnode (AFile (fn_file_bytes (era_node dnl bml datal)))
+                                  (fn_nlink (era_node dnl bml datal))))
+          by exact (opf_era_file_of dnl bml datal Htyfile).
         assert (Hrow' : abs_of (era_node dn' bm' data')
-                  = MkAnode (AFile (blk_splice (Z.to_nat (bv_unsigned v))
-                                      (wrf_run wrote tot)
-                                      (fn_file_bytes (era_node dnl bml datal))))
-                            (fn_nlink (era_node dnl bml datal)))
+                  = Some (MkAnode (AFile (blk_splice (Z.to_nat (bv_unsigned v))
+                                            (wrf_run wrote tot)
+                                            (fn_file_bytes (era_node dnl bml datal))))
+                                  (fn_nlink (era_node dnl bml datal))))
           by exact (wrf_write_row dnl dn' bml bm' datal data'
                       (Z.to_nat (bv_unsigned v)) tot wrote
                       Htyfile Htyq Hnlq Hholes Hholes2 Hszwi Hfo Hcapt Hszb'

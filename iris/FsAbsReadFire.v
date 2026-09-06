@@ -121,34 +121,40 @@ Local Open Scope Z_scope.
    unfolding it puts the answer under a [decide] that a later [rewrite]
    cannot see through. *)
 Lemma arf_abs_file_inv (n : fs_node) (bs : list (bv 8)) :
-  an_node (abs_of n) = AFile bs -> bs = fn_file_bytes n.
+  an_node (abs_row n) = AFile bs -> bs = fn_file_bytes n.
 Proof.
   destruct (fn_is_dir n) eqn:Hd.
-  - rewrite (abs_of_dir n Hd). discriminate.
+  - rewrite (abs_row_dir n Hd). discriminate.
   - destruct (decide (fn_type n = FsImg.T_FILE_z)) as [Ht | Ht].
-    + rewrite (abs_of_file n Hd Ht). intros He. injection He as He.
+    + rewrite (abs_row_file n Hd Ht). intros He. injection He as He.
       symmetry. exact He.
-    + rewrite (abs_of_dev n Hd Ht). discriminate.
+    + rewrite (abs_row_dev n Hd Ht). discriminate.
 Qed.
+
+(* an era node whose record has a nonzero type has a row (E2-V): the fire
+   below reads it *)
+Lemma arf_era_typed (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) <> 0 -> fn_type (era_node dn bm data) <> 0.
+Proof. intros H. rewrite /fn_type era_node_rec. exact H. Qed.
 
 (* [ard_pre]'s ROW-SHAPED CAP, from the record's own size.  The other two
    kinds carry nothing, so the size premise is only ever about a file. *)
 Lemma arf_size_ok (n : fs_node) :
-  fn_size n <= Z.of_nat (MAXFILE * BSIZE)%nat -> anode_size_ok (abs_of n).
+  fn_size n <= Z.of_nat (MAXFILE * BSIZE)%nat -> anode_size_ok (abs_row n).
 Proof.
   intros Hsz. rewrite /anode_size_ok.
   destruct (fn_is_dir n) eqn:Hd.
-  - rewrite (abs_of_dir n Hd). exact I.
+  - rewrite (abs_row_dir n Hd). exact I.
   - destruct (decide (fn_type n = FsImg.T_FILE_z)) as [Ht | Ht].
-    + rewrite (abs_of_file n Hd Ht). cbv beta iota.
+    + rewrite (abs_row_file n Hd Ht). cbv beta iota.
       rewrite length_fn_file_bytes. lia.
-    + rewrite (abs_of_dev n Hd Ht). exact I.
+    + rewrite (abs_row_dev n Hd Ht). exact I.
 Qed.
 
 Lemma arf_size_ok_era (dn : dinode) (bm : blkmap)
     (data : nat -> list (bv 8)) :
   bv_unsigned (di_size dn) <= Z.of_nat (MAXFILE * BSIZE)%nat ->
-  anode_size_ok (abs_of (era_node dn bm data)).
+  anode_size_ok (abs_row (era_node dn bm data)).
 Proof.
   intros Hsz. apply arf_size_ok. rewrite /fn_size era_node_rec. exact Hsz.
 Qed.
@@ -158,7 +164,7 @@ Qed.
 (* readi's arm 2 answers [rd_clamp] over the SIZE WORD; over a row that
    reads as a file that IS [ard_count] over the OBSERVED bytes. *)
 Lemma arf_count_bridge (n : fs_node) (bs : list (bv 8)) (off n' : nat) :
-  an_node (abs_of n) = AFile bs ->
+  an_node (abs_row n) = AFile bs ->
   rd_clamp (di_size (fn_rec n)) off n' = ard_count n' off (length bs).
 Proof.
   intros Hf. rewrite (arf_abs_file_inv n bs Hf) length_fn_file_bytes /fn_size.
@@ -168,7 +174,7 @@ Qed.
 (* ...at the spelling a walk holding a LOADED record has it *)
 Lemma arf_count_bridge_era (dn : dinode) (bm : blkmap)
     (data : nat -> list (bv 8)) (bs : list (bv 8)) (off n' : nat) :
-  an_node (abs_of (era_node dn bm data)) = AFile bs ->
+  an_node (abs_row (era_node dn bm data)) = AFile bs ->
   rd_clamp (di_size dn) off n' = ard_count n' off (length bs).
 Proof.
   intros Hf.
@@ -326,7 +332,8 @@ Section ReadFire.
       (off d : nat) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     (off <= MAXFILE * BSIZE)%nat ->
-    anode_size_ok (abs_of n) ->
+    anode_size_ok (abs_row n) ->
+    fn_type n <> 0 ->
     ftop_inv γfs -∗
     aread_commit_at (fs_gamma_L γfs) appE i γo Φ -∗
     top_frag_q (fs_gamma_L γfs) dq i n -∗
@@ -334,9 +341,9 @@ Section ReadFire.
       top_frag_q (fs_gamma_L γfs) dq i n
       ∗ off_gv γo (1/2) (Z.of_nat (off + d))
       ∗ ∃ av : aview,
-          ⌜av !! i = Some (abs_of n)⌝ ∗ Φ av off (abs_of n) d.
+          ⌜av !! i = Some (abs_row n)⌝ ∗ Φ av off (abs_row n) d.
   Proof.
-    intros HE Hoff Hsz. iIntros "#Hi Hcm Hf Hg".
+    intros HE Hoff Hsz Hnz. iIntros "#Hi Hcm Hf Hg".
     (* the same re-spelling [opf_open_fire] does, and for the same reason:
        the unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag_q /fs_gamma_L /=.
@@ -344,12 +351,12 @@ Section ReadFire.
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
-    assert (Hrow : abs_view I !! i = Some (abs_of n))
-      by exact (abs_view_lookup I i n Hlk).
-    assert (Hpre : ard_pre (abs_view I) i off (abs_of n))
+    assert (Hrow : abs_view I !! i = Some (abs_row n))
+      by exact (abs_view_lookup_typed I i n Hlk Hnz).
+    assert (Hpre : ard_pre (abs_view I) i off (abs_row n))
       by (split; [exact Hrow | split; [exact Hoff | exact Hsz]]).
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
-    iMod ("Hcm" $! I off (abs_of n) d with "[//] Hta Hg") as "(Hta & Hg & HΦ)".
+    iMod ("Hcm" $! I off (abs_row n) d with "[//] Hta Hg") as "(Hta & Hg & HΦ)".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists I, A. by iFrame. }
@@ -364,7 +371,8 @@ Section ReadFire.
       (off d : nat) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     (off <= MAXFILE * BSIZE)%nat ->
-    anode_size_ok (abs_of n) ->
+    anode_size_ok (abs_row n) ->
+    fn_type n <> 0 ->
     ftop_inv γfs -∗
     aread_commit_at (fs_gamma_L γfs) appE i γo Φ -∗
     top_frag (fs_gamma_L γfs) i n -∗
@@ -372,10 +380,10 @@ Section ReadFire.
       top_frag (fs_gamma_L γfs) i n
       ∗ off_gv γo (1/2) (Z.of_nat (off + d))
       ∗ ∃ av : aview,
-          ⌜av !! i = Some (abs_of n)⌝ ∗ Φ av off (abs_of n) d.
+          ⌜av !! i = Some (abs_row n)⌝ ∗ Φ av off (abs_row n) d.
   Proof.
-    intros HE Hoff Hsz. rewrite top_frag_1.
-    exact (arf_read_fire γfs E _ Φ i γo off d n HE Hoff Hsz).
+    intros HE Hoff Hsz Hnz. rewrite top_frag_1.
+    exact (arf_read_fire γfs E _ Φ i γo off d n HE Hoff Hsz Hnz).
   Qed.
 
   (* =================================================================== *)

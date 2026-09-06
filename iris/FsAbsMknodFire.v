@@ -243,7 +243,7 @@ Section MknodFire.
   Proof.
     rewrite /nview_dq. iIntros "Ha Hn". iDestruct "Hn" as (n) "[Hf %Han]".
     iDestruct (mkf_auth_frag with "Ha Hf") as %Hl.
-    iPureIntro. by rewrite (abs_view_lookup I i n Hl) Han.
+    iPureIntro. exact (abs_view_lookup I i n a Hl Han).
   Qed.
 
   (* THE STABLE SEEDS at this shape -- the frozen file's [_pinned] pair,
@@ -290,8 +290,8 @@ Section MknodFire.
 
   Lemma mkf_abs_of_dir (n : fs_node) :
     fn_is_dir n = true ->
-    abs_of n = MkAnode (ADir (dir_entries n)) (fn_nlink n).
-  Proof. intros Hd. by rewrite /abs_of /abs_node Hd. Qed.
+    abs_of n = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n)).
+  Proof. apply abs_of_dir. Qed.
 
   Lemma mkf_era_is_dir (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) :
@@ -324,8 +324,8 @@ Section MknodFire.
     dir_entries (era_node dn' bm' data')
       = <[s := v]> (dir_entries (era_node dn bm data)) ->
     abs_of (era_node dn' bm' data')
-    = MkAnode (ADir (<[s := v]> (dir_entries (era_node dn bm data))))
-              (fn_nlink (era_node dn bm data)).
+    = Some (MkAnode (ADir (<[s := v]> (dir_entries (era_node dn bm data))))
+                    (fn_nlink (era_node dn bm data))).
   Proof.
     intros Hty Hty' Hnl' Hents.
     assert (Hdir' : fn_is_dir (era_node dn' bm' data') = true).
@@ -340,7 +340,7 @@ Section MknodFire.
       (data : nat -> list (bv 8)) (major minor : mword 16) :
     dn = create_made T_DEVICE major minor ->
     abs_of (era_node dn bm data)
-    = MkAnode (ADev (bv_unsigned major) (bv_unsigned minor)) 1%nat.
+    = Some (MkAnode (ADev (bv_unsigned major) (bv_unsigned minor)) 1%nat).
   Proof.
     intros ->. apply abs_of_create_dev. by rewrite era_node_rec.
   Qed.
@@ -381,7 +381,7 @@ Section MknodFire.
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
     assert (Hrow : abs_view I !! d
                    = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n))).
-    { by rewrite (abs_view_lookup I d n Hlk) (mkf_abs_of_dir n Hdir). }
+    { by rewrite (abs_view_lookup_of I d n Hlk) (mkf_abs_of_dir n Hdir). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I d i nm (dir_entries n) (fn_nlink n)
             with "[//] [//] Hta") as "[Hta HΦ]".
@@ -407,8 +407,8 @@ Section MknodFire.
     inode_local d np' ->
     fn_is_dir np = true ->
     dir_entries np !! nm = None ->
-    abs_of np' = MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np) ->
-    abs_of nc = MkAnode (ADev ma mi) 1%nat ->
+    abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np)) ->
+    abs_of nc = Some (MkAnode (ADev ma mi) 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗
     acre_commit_at (fs_gamma_L γfs) appE (ADev ma mi) Φ -∗
     top_frag (fs_gamma_L γfs) d np -∗
@@ -431,14 +431,14 @@ Section MknodFire.
     assert (Hpre : cre_pre (abs_view I) d nm (dir_entries np)
                      (fn_nlink np) i (ADev ma mi)).
     { rewrite /cre_pre. split_and!.
-      - by rewrite (abs_view_lookup I d np Hlkp) (mkf_abs_of_dir np Hdir).
+      - by rewrite (abs_view_lookup_of I d np Hlkp) (mkf_abs_of_dir np Hdir).
       - exact Hnone.
-      - by rewrite (abs_view_lookup I i nc Hlkc) Habsc. }
+      - by rewrite (abs_view_lookup_of I i nc Hlkc) Habsc. }
     (* the fused delta collapses to the ONE-ROW parent insert, and the
        insert's reading is the new record's own row *)
     assert (Hdelta : abs_view (<[d := np']> I)
                      = delta_create d nm i (ADev ma mi) (abs_view I)).
-    { rewrite (abs_view_insert I d np') Habsp'.
+    { rewrite (abs_view_insert I d np' _ Habsp').
       by rewrite (delta_create_dev (abs_view I) d nm (dir_entries np)
                     (fn_nlink np) i ma mi Hpre). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
@@ -914,7 +914,7 @@ Qed.
    the byte list is [file_bytes _ 0 = []]; the count is one. *)
 Lemma caf_abs_of_create_file (n : fs_node) (major minor : mword 16) :
   fn_rec n = create_made T_FILE major minor ->
-  abs_of n = MkAnode (AFile []) 1%nat.
+  abs_of n = Some (MkAnode (AFile []) 1%nat).
 Proof.
   intros Hr.
   assert (Hnd : fn_is_dir n = false).
@@ -925,9 +925,7 @@ Proof.
   { rewrite /fn_file_bytes /fn_size Hr. reflexivity. }
   assert (Hnl : fn_nlink n = 1%nat)
     by (rewrite /fn_nlink Hr; reflexivity).
-  rewrite /abs_of Hnl. f_equal.
-  change (abs_node n) with (an_node (abs_of n)).
-  by rewrite (abs_of_file n Hnd Hfl) Hbytes.
+  by rewrite (abs_of_file n Hnd Hfl) Hbytes Hnl.
 Qed.
 
 (* ...and at the era node, which is the shape a walk holds
@@ -935,7 +933,7 @@ Qed.
 Lemma caf_child_file (dn : dinode) (bm : blkmap)
     (data : nat -> list (bv 8)) (major minor : mword 16) :
   dn = create_made T_FILE major minor ->
-  abs_of (era_node dn bm data) = MkAnode (AFile []) 1%nat.
+  abs_of (era_node dn bm data) = Some (MkAnode (AFile []) 1%nat).
 Proof.
   intros ->. apply (caf_abs_of_create_file _ major minor).
   by rewrite era_node_rec.
@@ -965,8 +963,8 @@ Section CreateFire.
     inode_local d np' ->
     fn_is_dir np = true ->
     dir_entries np !! nm = None ->
-    abs_of np' = MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np) ->
-    abs_of nc = MkAnode c 1%nat ->
+    abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np)) ->
+    abs_of nc = Some (MkAnode c 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗
     acre_commit_at (fs_gamma_L γfs) appE c Φ -∗
     top_frag (fs_gamma_L γfs) d np -∗
@@ -992,12 +990,12 @@ Section CreateFire.
     assert (Hpre : cre_pre (abs_view I) d nm (dir_entries np)
                      (fn_nlink np) i c).
     { rewrite /cre_pre. split_and!.
-      - by rewrite (abs_view_lookup I d np Hlkp) (mkf_abs_of_dir np Hdir).
+      - by rewrite (abs_view_lookup_of I d np Hlkp) (mkf_abs_of_dir np Hdir).
       - exact Hnone.
-      - by rewrite (abs_view_lookup I i nc Hlkc) Habsc. }
+      - by rewrite (abs_view_lookup_of I i nc Hlkc) Habsc. }
     assert (Hdelta : abs_view (<[d := np']> I)
                      = delta_create d nm i c (abs_view I)).
-    { rewrite (abs_view_insert I d np') Habsp'.
+    { rewrite (abs_view_insert I d np' _ Habsp').
       by rewrite (caf_delta_create_nondir (abs_view I) d nm (dir_entries np)
                     (fn_nlink np) i c Hc Hpre). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
@@ -1031,8 +1029,8 @@ Section CreateFire.
     inode_local d np' ->
     fn_is_dir np = true ->
     dir_entries np !! nm = None ->
-    abs_of np' = MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np) ->
-    abs_of nc = MkAnode (AFile []) 1%nat ->
+    abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np)) ->
+    abs_of nc = Some (MkAnode (AFile []) 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗
     acre_commit_at (fs_gamma_L γfs) appE (AFile []) Φ -∗
     top_frag (fs_gamma_L γfs) d np -∗

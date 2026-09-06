@@ -122,7 +122,7 @@ Lemma uf_parent_row (n n' : fs_node) (nm : fname) (dec : nat) :
   (fn_nlink n' = fn_nlink n - dec)%nat ->
   dir_entries n' = delete nm (dir_entries n) ->
   abs_of n'
-  = MkAnode (ADir (delete nm (dir_entries n))) (fn_nlink n - dec)%nat.
+  = Some (MkAnode (ADir (delete nm (dir_entries n))) (fn_nlink n - dec)%nat).
 Proof.
   intros Hdir Hnl Hents.
   by rewrite (mkf_abs_of_dir n' Hdir) Hents Hnl.
@@ -157,8 +157,11 @@ Proof.
   rewrite Hty' Hsz' Hdat !era_node_rec Hmaj Hmin. reflexivity.
 Qed.
 
+(* ...at a TYPED record (E2-V): the type rides, so the lowered node has the
+   old node's row at the lowered count *)
 Lemma uf_nlink_row (dn dn' : dinode) (bm : blkmap)
     (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) <> 0 ->
   di_type dn' = di_type dn ->
   di_size dn' = di_size dn ->
   di_major dn' = di_major dn ->
@@ -166,11 +169,13 @@ Lemma uf_nlink_row (dn dn' : dinode) (bm : blkmap)
   (fn_nlink (era_node dn' bm data)
    = fn_nlink (era_node dn bm data) - 1)%nat ->
   abs_of (era_node dn' bm data)
-  = MkAnode (an_node (abs_of (era_node dn bm data)))
-            (fn_nlink (era_node dn bm data) - 1)%nat.
+  = Some (MkAnode (an_node (abs_row (era_node dn bm data)))
+                  (fn_nlink (era_node dn bm data) - 1)%nat).
 Proof.
-  intros Hty Hsz Hmaj Hmin Hnl.
-  rewrite /abs_of /=.
+  intros Hnz Hty Hsz Hmaj Hmin Hnl.
+  assert (Hnz' : fn_type (era_node dn' bm data) <> 0)
+    by (rewrite /fn_type era_node_rec Hty; exact Hnz).
+  rewrite (abs_of_typed _ Hnz') /abs_row /=.
   by rewrite (uf_abs_node_nlink dn dn' bm data Hty Hsz Hmaj Hmin) Hnl.
 Qed.
 
@@ -282,7 +287,7 @@ Section UnlinkFire.
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
     assert (Hrow : abs_view I !! d
                    = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n))).
-    { by rewrite (abs_view_lookup I d n Hlk) (mkf_abs_of_dir n Hdir). }
+    { by rewrite (abs_view_lookup_of I d n Hlk) (mkf_abs_of_dir n Hdir). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I d nm (dir_entries n) (fn_nlink n)
             with "[//] [//] Hta") as "[Hta HΦ]".
@@ -327,10 +332,10 @@ Section UnlinkFire.
     iDestruct (ghost_map_lookup with "Hta Hft") as %Hlkt.
     assert (Hrowd : abs_view I !! d
                     = Some (MkAnode (ADir (dir_entries nd)) (fn_nlink nd))).
-    { by rewrite (abs_view_lookup I d nd Hlkd) (mkf_abs_of_dir nd Hdird). }
+    { by rewrite (abs_view_lookup_of I d nd Hlkd) (mkf_abs_of_dir nd Hdird). }
     assert (Hrowt : abs_view I !! t
                     = Some (MkAnode (ADir (dir_entries nt)) (fn_nlink nt))).
-    { by rewrite (abs_view_lookup I t nt Hlkt) (mkf_abs_of_dir nt Hdirt). }
+    { by rewrite (abs_view_lookup_of I t nt Hlkt) (mkf_abs_of_dir nt Hdirt). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I d t nm (dir_entries nd) (fn_nlink nd)
             with "[//] [//] Hta") as "[Hta HΦ]".
@@ -367,10 +372,11 @@ Section UnlinkFire.
     nm <> DOTDOT ->
     (1 <= fn_nlink np)%nat ->
     (1 <= fn_nlink nt)%nat ->
-    (forall es, an_node (abs_of nt) = ADir es -> dots_only es) ->
-    unl_dec (an_node (abs_of nt)) = dec ->
+    (forall es, an_node (abs_row nt) = ADir es -> dots_only es) ->
+    unl_dec (an_node (abs_row nt)) = dec ->
     abs_of np'
-      = MkAnode (ADir (delete nm (dir_entries np))) (fn_nlink np - dec)%nat ->
+      = Some (MkAnode (ADir (delete nm (dir_entries np))) (fn_nlink np - dec)%nat) ->
+    fn_type nt <> 0 ->
     ftop_inv γfs -∗ app_inv γfs -∗
     uent_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag (fs_gamma_L γfs) d np -∗
@@ -378,10 +384,10 @@ Section UnlinkFire.
       top_frag (fs_gamma_L γfs) d np'
       ∗ top_frag_q (fs_gamma_L γfs) dqt t nt
       ∗ ∃ av : aview,
-          ⌜unl_pre av d nm (dir_entries np) (fn_nlink np) t (abs_of nt)⌝
+          ⌜unl_pre av d nm (dir_entries np) (fn_nlink np) t (abs_row nt)⌝
           ∗ Φ av d nm t.
   Proof.
-    intros HE Hloc Hdir Hnm HnD HnDD Hnlp Hnlt Hdots Hdec Habsp'.
+    intros HE Hloc Hdir Hnm HnD HnDD Hnlp Hnlt Hdots Hdec Habsp' Hnzt.
     iIntros "#Hi #Hai Hcm Hfp Hft".
     rewrite /top_frag /top_frag_q /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
@@ -391,11 +397,11 @@ Section UnlinkFire.
     iDestruct (ghost_map_lookup with "Hta Hft") as %Hlkt.
     assert (Hrowp : abs_view I !! d
                     = Some (MkAnode (ADir (dir_entries np)) (fn_nlink np))).
-    { by rewrite (abs_view_lookup I d np Hlkp) (mkf_abs_of_dir np Hdir). }
-    assert (Hrowt : abs_view I !! t = Some (abs_of nt))
-      by exact (abs_view_lookup I t nt Hlkt).
+    { by rewrite (abs_view_lookup_of I d np Hlkp) (mkf_abs_of_dir np Hdir). }
+    assert (Hrowt : abs_view I !! t = Some (abs_row nt))
+      by exact (abs_view_lookup_typed I t nt Hlkt Hnzt).
     assert (Hpre : unl_pre (abs_view I) d nm (dir_entries np)
-                     (fn_nlink np) t (abs_of nt)).
+                     (fn_nlink np) t (abs_row nt)).
     { rewrite /unl_pre. split_and!.
       - exact Hrowp.
       - exact Hnm.
@@ -409,10 +415,10 @@ Section UnlinkFire.
        reading is the flushed record's own row *)
     assert (Hdelta : abs_view (<[d := np']> I)
                      = delta_unl_ent d nm dec (abs_view I)).
-    { rewrite (abs_view_insert I d np') Habsp'.
+    { rewrite (abs_view_insert I d np' _ Habsp').
       rewrite /delta_unl_ent Hrowp /=. reflexivity. }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
-    iMod ("Hcm" $! I d t nm (dir_entries np) (fn_nlink np) (abs_of nt)
+    iMod ("Hcm" $! I d t nm (dir_entries np) (fn_nlink np) (abs_row nt)
             with "[//] Hta") as "(Hta & Hstep & Hph2)".
     (* THE MOVE, at the whole authority: the application's half comes out
        of [appN] beside its claim, which the caller's step re-establishes
@@ -459,27 +465,28 @@ Section UnlinkFire.
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local t nt' ->
     (1 <= fn_nlink nt)%nat ->
-    abs_of nt' = MkAnode (an_node (abs_of nt)) (fn_nlink nt - 1)%nat ->
+    abs_of nt' = Some (MkAnode (an_node (abs_row nt)) (fn_nlink nt - 1)%nat) ->
+    fn_type nt <> 0 ->
     ftop_inv γfs -∗ app_inv γfs -∗
     utgt_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag (fs_gamma_L γfs) t nt ={E}=∗
       top_frag (fs_gamma_L γfs) t nt'
-      ∗ ∃ av : aview, ⌜av !! t = Some (abs_of nt)⌝ ∗ Φ av t.
+      ∗ ∃ av : aview, ⌜av !! t = Some (abs_row nt)⌝ ∗ Φ av t.
   Proof.
-    intros HE Hloc Hnl Habs'. iIntros "#Hi #Hai Hcm Hf".
+    intros HE Hloc Hnl Habs' Hnzt. iIntros "#Hi #Hai Hcm Hf".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
-    assert (Hrow : abs_view I !! t = Some (abs_of nt))
-      by exact (abs_view_lookup I t nt Hlk).
+    assert (Hrow : abs_view I !! t = Some (abs_row nt))
+      by exact (abs_view_lookup_typed I t nt Hlk Hnzt).
     assert (Hdelta : abs_view (<[t := nt']> I)
                      = delta_unl_tgt t (abs_view I)).
-    { rewrite (abs_view_insert I t nt') Habs'.
+    { rewrite (abs_view_insert I t nt' _ Habs').
       rewrite /delta_unl_tgt Hrow. reflexivity. }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
-    iMod ("Hcm" $! I t (abs_of nt) with "[//] [%] Hta") as "(Hta & Hstep & Hph2)".
+    iMod ("Hcm" $! I t (abs_row nt) with "[//] [%] Hta") as "(Hta & Hstep & Hph2)".
     { exact Hnl. }
     (* THE MOVE, at the whole authority: the application's half comes out
        of [appN] beside its claim, which the caller's step re-establishes

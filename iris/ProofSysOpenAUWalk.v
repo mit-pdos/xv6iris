@@ -638,10 +638,13 @@ Section ProofSysOpenAUWalk.
        The payload STAYS PEELED from here down -- the O_TRUNC receipt far
        below has to read the same [data] this row was read at. ---- *)
     iDestruct (so_flat_open with "Hload") as (data) "Hflat".
+    (* E2-V: the locked node is typed ([inode_ok]), so it has a row *)
+    iDestruct (so_flat_ok with "Hflat") as "[%Hiokf Hflat]".
     iDestruct (so_flat_top with "Hflat") as "[Htop Hflatb]".
     iApply fupd_wp.
     iMod (opf_open_fire_1 fsc_fs ⊤ Φo (bv_unsigned inum)
-            (era_node dn bm data) ltac:(solve_ndisj) with "[] Hoc Htop")
+            (era_node dn bm data) ltac:(solve_ndisj)
+            (opf_era_typed_ok _ _ dn bm data Hiokf) with "[] Hoc Htop")
       as "[Htop Hobs0]";
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.

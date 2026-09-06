@@ -132,12 +132,12 @@ Proof.
 Qed.
 
 Lemma era0_root_abs :
-  abs_of (img_node fsimg_P fsimg_sb FsImg.ROOTINO)
+  abs_row (img_node fsimg_P fsimg_sb FsImg.ROOTINO)
   = MkAnode (ADir (dir_entries (img_node fsimg_P fsimg_sb FsImg.ROOTINO)))
             (fn_nlink (img_node fsimg_P fsimg_sb FsImg.ROOTINO)).
 Proof.
-  pose proof (abs_of_dir _ era0_root_dir) as Hn.
-  rewrite /abs_of in Hn |- *.
+  pose proof (abs_row_dir _ era0_root_dir) as Hn.
+  rewrite /abs_row in Hn |- *.
   cbv [an_node] in Hn.
   rewrite Hn. reflexivity.
 Qed.

@@ -44,7 +44,7 @@
          the byte legs or [fs_geom] -- [astate_nview_dq] needs the authority
          and nothing else -- so the state predicate was dead weight that only
          served to name an [S].  [abs_view] is correspondingly restated over
-         the RAW MAP ([abs_of <$> I]) rather than over [fss_inodes S]: that is
+         the RAW MAP ([omap abs_of I], allocated rows only since lane E2-V) rather than over [fss_inodes S]: that is
          the form [ftop_body] hands out, it is the same function on the nose
          at [I := fss_inodes S], and it keeps [abs_view_lookup] and
          [astate_nview_dq] byte-identical in shape.  [astate_timeless] lost
@@ -185,22 +185,28 @@ Section FsAbsCarrier.
      [DfracOwn] reading, on the nose (as [top_frag] is [top_frag_q]'s), so a
      site that spells either sees the same proposition. *)
   Definition nview_dq Γ (dq : dfrac) (i : Z) (a : anode) : iProp Σ :=
-    (∃ n, top_frag_q Γ dq i n ∗ ⌜abs_of n = a⌝)%I.
+    (∃ n, top_frag_q Γ dq i n ∗ ⌜abs_of n = Some a⌝)%I.
 
   Definition nview Γ (q : Qp) (i : Z) (a : anode) : iProp Σ :=
     nview_dq Γ (DfracOwn q) i a.
 
   Lemma nview_eq Γ q i a :
-    nview Γ q i a = (∃ n, top_frag_q Γ (DfracOwn q) i n ∗ ⌜abs_of n = a⌝)%I.
+    nview Γ q i a = (∃ n, top_frag_q Γ (DfracOwn q) i n ∗ ⌜abs_of n = Some a⌝)%I.
   Proof. reflexivity. Qed.
 
-  (* the introduction rule: a holder of the landed fragment holds the
-     carrier, and there is nothing to update to get it *)
-  Lemma nview_of_frag Γ dq i n : top_frag_q Γ dq i n ⊢ nview_dq Γ dq i (abs_of n).
-  Proof. iIntros "H". iExists n. by iFrame. Qed.
+  (* the introduction rule: a holder of the landed fragment of a TYPED node
+     holds the carrier, and there is nothing to update to get it.  A free
+     record's fragment is no carrier: it has no row (E2-V). *)
+  Lemma nview_of_frag Γ dq i n a :
+    abs_of n = Some a -> top_frag_q Γ dq i n ⊢ nview_dq Γ dq i a.
+  Proof. intros Ha. iIntros "H". iExists n. by iFrame. Qed.
+
+  Lemma nview_of_frag_typed Γ dq i n :
+    fn_type n <> 0 -> top_frag_q Γ dq i n ⊢ nview_dq Γ dq i (abs_row n).
+  Proof. intros Hnz. exact (nview_of_frag Γ dq i n _ (abs_of_typed n Hnz)). Qed.
 
   Lemma nview_frag Γ dq i a :
-    nview_dq Γ dq i a ⊢ ∃ n, top_frag_q Γ dq i n ∗ ⌜abs_of n = a⌝.
+    nview_dq Γ dq i a ⊢ ∃ n, top_frag_q Γ dq i n ∗ ⌜abs_of n = Some a⌝.
   Proof. by iIntros "H". Qed.
 
   Global Instance nview_dq_timeless Γ dq i a : Timeless (nview_dq Γ dq i a).
@@ -216,7 +222,7 @@ Section FsAbsCarrier.
     rewrite /nview_dq. iIntros "H1 H2".
     iDestruct "H1" as (n1) "[H1 %Ha1]". iDestruct "H2" as (n2) "[H2 %Ha2]".
     iDestruct (top_frag_q_agree with "H1 H2") as %<-.
-    iPureIntro. by rewrite -Ha1 -Ha2.
+    iPureIntro. rewrite Ha1 in Ha2. apply Some_inj in Ha2. exact Ha2.
   Qed.
 
   Lemma nview_agree Γ q1 q2 i a1 a2 :
@@ -327,7 +333,26 @@ Section FsAbsCarrier.
     iIntros "Hst Hn". iDestruct "Hst" as (I) "(Ha & %Hav)".
     iDestruct "Hn" as (n) "[Hf %Han]".
     iDestruct (ghost_map_lookup with "Ha Hf") as %Hl.
-    iPureIntro. subst av. by rewrite (abs_view_lookup I i n Hl) Han.
+    iPureIntro. subst av. exact (abs_view_lookup I i n a Hl Han).
+  Qed.
+
+  (* ...AND A HELD FRAGMENT OF ANY NODE READS THE AUTHORITY'S ROW RAW: [None]
+     at a free record, the row otherwise (E2-V).  The [nview]-free form, for a
+     reader that knows the node and not yet its type. *)
+  Lemma astate_q_frag Γ (q : Qp) av dq i n :
+    astate_q Γ q av -∗ top_frag_q Γ dq i n -∗ ⌜av !! i = abs_of n⌝.
+  Proof.
+    rewrite /astate_q /top_frag_q.
+    iIntros "Hst Hf". iDestruct "Hst" as (I) "(Ha & %Hav)".
+    iDestruct (ghost_map_lookup with "Ha Hf") as %Hl.
+    iPureIntro. subst av. exact (abs_view_lookup_of I i n Hl).
+  Qed.
+
+  Lemma astate_frag Γ av dq i n :
+    astate Γ av -∗ top_frag_q Γ dq i n -∗ ⌜av !! i = abs_of n⌝.
+  Proof.
+    iIntros "Hst Hf". iDestruct "Hst" as (q) "Hst".
+    iApply (astate_q_frag with "Hst Hf").
   Qed.
 
   Lemma astate_nview_dq Γ av dq i a :

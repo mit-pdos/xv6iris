@@ -1641,6 +1641,9 @@ Section ProofSysUnlinkAUW5D.
     { rewrite (dir_entries_era_node dnd bmd datd Hhzd Hszcap)
               (bool_decide_eq_true_2 _ Htydz) su_zext32_unsigned.
       exact (dir_view_live datd _ kk (Hduq Htydz) Hkklt Hkklive). }
+    (* E2-V: the target has a row -- it is a directory *)
+    assert (Htynz0 : fn_type (era_node dni bmi dati) <> 0).
+    { rewrite /fn_type era_node_rec Htyzi. cbv [T_DIR_z]. lia. }
     iMod (uf_uent_fire fsc_fs ⊤ (DfracOwn 1) Phient
             (bv_unsigned dinum) (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
                                         : mword 32))
@@ -1674,6 +1677,7 @@ Section ProofSysUnlinkAUW5D.
                       : mword 64)) 31 0)))) bmd bm' datd data'
                   Hdplive HdnlD)
                HentsD)
+            Htynz0
             with "[] [] Hcent Htop Htopi") as "(Htop & Htopi & Hfire1)";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iDestruct "Hfire1" as (av0) "(%Hpre0 & Hent)".
@@ -2104,6 +2108,10 @@ Section ProofSysUnlinkAUW5D.
        included -- survives UNTOUCHED, so its [".."] still names the
        ex-parent.  That is the doc's grey edge, and
        [delta_unlink_orphan_dir] is the pure statement of it. *)
+    assert (Htynz1 : bv_unsigned (di_type dni) <> 0)
+      by (rewrite Htyzi; cbv [T_DIR_z]; lia).
+    assert (Htynz2 : fn_type (era_node dni bmi dati) <> 0)
+      by (rewrite /fn_type era_node_rec; exact Htynz1).
     iMod (uf_utgt_fire fsc_fs ⊤ Phitgt
             (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
                           : mword 32))
@@ -2122,7 +2130,7 @@ Section ProofSysUnlinkAUW5D.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi dati
-               eq_refl eq_refl eq_refl eq_refl
+               Htynz1 eq_refl eq_refl eq_refl eq_refl
                (su_au_nlink_down dni (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
                             : mword 64)
@@ -2130,6 +2138,7 @@ Section ProofSysUnlinkAUW5D.
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi bmi dati dati Hnlzi
                   ltac:(lia)))
+            Htynz2
             with "[] [] Hctgt Htopi") as "(Htopi & Hfire2)";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iDestruct "Hfire2" as (av1) "(%Hrow1 & Htgt)".
@@ -2466,7 +2475,7 @@ Section ProofSysUnlinkAUW5D.
                                         : mword 32)),
               (dir_bname datd kk), (dir_entries (era_node dnd bmd datd)),
               (fn_nlink (era_node dnd bmd datd)),
-              (abs_of (era_node dni bmi dati)).
+              (abs_row (era_node dni bmi dati)).
       iSplitR.
       { iPureIntro. rewrite /dir_bname Hkkname.
         exact (su_last_of_npar pl nf Hname). }

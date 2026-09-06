@@ -205,7 +205,7 @@ Qed.
    whole content, with no state and no map in it yet. *)
 Lemma fsimg_sh_abs :
   abs_of (img_node fsimg_P fsimg_sb SH_INO)
-  = MkAnode (AFile sh_bytes) 1%nat.
+  = Some (MkAnode (AFile sh_bytes) 1%nat).
 Proof.
   rewrite (img_abs_file fsimg_P fsimg_sb SH_INO fsimg_sh_type
              fsimg_sh_size_bound).

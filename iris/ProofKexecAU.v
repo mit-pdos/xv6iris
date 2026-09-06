@@ -447,13 +447,13 @@ Section KexecAUExit.
   (* ------------------------------------------------------------------ *)
   Lemma kxau_classify (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
     (bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
-       abs_of (FsStateEra.era_node dn bm data)
+       abs_row (FsStateEra.era_node dn bm data)
        = MkAnode (AFile (kxc_fb data dn))
                  (fn_nlink (FsStateEra.era_node dn bm data))) ->
-    { nl : nat | abs_of (FsStateEra.era_node dn bm data)
+    { nl : nat | abs_row (FsStateEra.era_node dn bm data)
                  = MkAnode (AFile (kxc_fb data dn)) nl
                  /\ SpecKexecAU.kexec_loadable (kxc_fb data dn) }
-    + { ~ SpecKexecAU.anode_loadable (abs_of (FsStateEra.era_node dn bm data)) }.
+    + { ~ SpecKexecAU.anode_loadable (abs_row (FsStateEra.era_node dn bm data)) }.
   Proof.
     intros Hrow.
     destruct (decide (bv_unsigned (di_type dn) = FsImg.T_FILE_z)) as [Ht | Ht].
@@ -723,7 +723,7 @@ Section KexecAUExit.
         rewrite /SpecKexecAU.exec_arms. iLeft.
         iSplitR; [iPureIntro; split_and!; assumption |].
         rewrite /SpecKexecAU.exec_post_fail. iRight. iExists pl. iRight.
-        iExists zi, av0, (abs_of (FsStateEra.era_node dn bm datl)),
+        iExists zi, av0, (abs_row (FsStateEra.era_node dn bm datl)),
                 SpecKexecAU.EfNotLoadable.
         iSplitL "HP"; [iExact "HP" |].
         iSplitR; [iPureIntro; exact Hav |].
@@ -735,7 +735,7 @@ Section KexecAUExit.
           exact (kxau_argc_ne_m1 na Hnamax). }
         rewrite /SpecKexecAU.exec_arms. iRight.
         rewrite /SpecKexecAU.exec_post_ok.
-        iExists pl, zi, av0, (abs_of (FsStateEra.era_node dn bm datl)).
+        iExists pl, zi, av0, (abs_row (FsStateEra.era_node dn bm datl)).
         iSplitL "HP"; [iExact "HP" |].
         iSplitR; [iPureIntro; exact Hav |].
         iRight.

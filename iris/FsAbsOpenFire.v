@@ -126,7 +126,7 @@ Qed.
 Lemma opf_era_file_row `{XI : TsoCtx.CurCtx} (dn : dinode) (bm : blkmap)
     (data : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
-  abs_of (era_node dn bm data)
+  abs_row (era_node dn bm data)
   = MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
             (fn_nlink (era_node dn bm data)).
 Proof.
@@ -134,7 +134,7 @@ Proof.
   assert (Hnd : fn_is_dir (era_node dn bm data) = false).
   { apply opf_era_not_dir. rewrite Hty /T_DIR_z /FsImg.T_FILE_z.
     discriminate. }
-  rewrite /abs_of /abs_node Hnd.
+  rewrite /abs_row /abs_node Hnd.
   destruct (decide (fn_type (era_node dn bm data) = FsImg.T_FILE_z))
     as [_ | Hno]; [reflexivity |].
   exfalso. apply Hno. rewrite opf_era_type. exact Hty.
@@ -145,12 +145,12 @@ Lemma opf_era_dev_row `{XI : TsoCtx.CurCtx} (dn : dinode) (bm : blkmap)
     (data : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) <> T_DIR_z ->
   bv_unsigned (di_type dn) <> FsImg.T_FILE_z ->
-  abs_of (era_node dn bm data)
+  abs_row (era_node dn bm data)
   = MkAnode (ADev (bv_unsigned (di_major dn)) (bv_unsigned (di_minor dn)))
             (fn_nlink (era_node dn bm data)).
 Proof.
   intros Hnd Hnf.
-  rewrite /abs_of /abs_node (opf_era_not_dir dn bm data Hnd).
+  rewrite /abs_row /abs_node (opf_era_not_dir dn bm data Hnd).
   destruct (decide (fn_type (era_node dn bm data) = FsImg.T_FILE_z))
     as [Hyes | _].
   - exfalso. apply Hnf. rewrite -(opf_era_type dn bm data). exact Hyes.
@@ -161,11 +161,12 @@ Qed.
 Lemma opf_era_dir_row `{XI : TsoCtx.CurCtx} (dn : dinode) (bm : blkmap)
     (data : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) = T_DIR_z ->
-  abs_of (era_node dn bm data)
+  abs_row (era_node dn bm data)
   = MkAnode (ADir (dir_entries (era_node dn bm data)))
             (fn_nlink (era_node dn bm data)).
 Proof.
-  intros Hty. exact (mkf_abs_of_dir _ (mkf_era_is_dir dn bm data Hty)).
+  intros Hty. pose proof (abs_row_dir _ (mkf_era_is_dir dn bm data Hty)) as H.
+  rewrite /abs_row in H |- *. cbv [an_node] in H. by rewrite H.
 Qed.
 
 (* ---- THE TRUNC READING BRIDGE (item 3) ------------------------------ *)
@@ -197,7 +198,7 @@ Proof. by rewrite /fn_nlink !era_node_rec. Qed.
 Lemma opf_trunc_row `{XI : TsoCtx.CurCtx} (dn : dinode) (bm bm' : blkmap)
     (data data' : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
-  abs_of (era_node (di_trunc dn) bm' data')
+  abs_row (era_node (di_trunc dn) bm' data')
   = MkAnode (AFile []) (fn_nlink (era_node dn bm data)).
 Proof.
   intros Hty.
@@ -206,6 +207,73 @@ Proof.
   rewrite (opf_era_file_row (di_trunc dn) bm' data' Htyt).
   by rewrite (opf_trunc_bytes dn bm' data')
              (opf_trunc_nlink dn bm bm' data data').
+Qed.
+
+(* ---- THE TYPED ROW, AS [abs_of] (E2-V) -------------------------------- *)
+
+(* an era node whose record has a nonzero type has a row, and it is the
+   typed row above *)
+Lemma opf_era_typed `{XI : TsoCtx.CurCtx} (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) <> 0 -> fn_type (era_node dn bm data) <> 0.
+Proof. intros H. rewrite opf_era_type. exact H. Qed.
+
+(* ...which every [inode_ok] payload has: its fourth clause is the type *)
+Lemma opf_era_typed_ok `{XI : TsoCtx.CurCtx} (cov : gset Z) (logstart : Z)
+    (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+  InodeLock.inode_ok cov logstart dn bm data -> fn_type (era_node dn bm data) <> 0.
+Proof. intros (_ & _ & _ & Hty & _). exact (opf_era_typed dn bm data Hty). Qed.
+
+Lemma opf_era_file_of `{XI : TsoCtx.CurCtx} (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
+  abs_of (era_node dn bm data)
+  = Some (MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
+                  (fn_nlink (era_node dn bm data))).
+Proof.
+  intros Hty.
+  assert (Hnz : bv_unsigned (di_type dn) <> 0)
+    by (rewrite Hty; cbv [FsImg.T_FILE_z]; lia).
+  rewrite (abs_of_typed _ (opf_era_typed dn bm data Hnz)).
+  by rewrite (opf_era_file_row dn bm data Hty).
+Qed.
+
+(* the device row NEEDS the nonzero type: a free record is neither a
+   directory nor a file either, and has no row *)
+Lemma opf_era_dev_of `{XI : TsoCtx.CurCtx} (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) <> T_DIR_z ->
+  bv_unsigned (di_type dn) <> FsImg.T_FILE_z ->
+  bv_unsigned (di_type dn) <> 0 ->
+  abs_of (era_node dn bm data)
+  = Some (MkAnode (ADev (bv_unsigned (di_major dn)) (bv_unsigned (di_minor dn)))
+                  (fn_nlink (era_node dn bm data))).
+Proof.
+  intros Hnd Hnf Hnz.
+  rewrite (abs_of_typed _ (opf_era_typed dn bm data Hnz)).
+  by rewrite (opf_era_dev_row dn bm data Hnd Hnf).
+Qed.
+
+Lemma opf_era_dir_of `{XI : TsoCtx.CurCtx} (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  abs_of (era_node dn bm data)
+  = Some (MkAnode (ADir (dir_entries (era_node dn bm data)))
+                  (fn_nlink (era_node dn bm data))).
+Proof. intros Hty. exact (mkf_abs_of_dir _ (mkf_era_is_dir dn bm data Hty)). Qed.
+
+Lemma opf_trunc_of `{XI : TsoCtx.CurCtx} (dn : dinode) (bm bm' : blkmap)
+    (data data' : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
+  abs_of (era_node (di_trunc dn) bm' data')
+  = Some (MkAnode (AFile []) (fn_nlink (era_node dn bm data))).
+Proof.
+  intros Hty.
+  assert (Hnz : bv_unsigned (di_type (di_trunc dn)) <> 0)
+    by (change (di_type (di_trunc dn)) with (di_type dn); rewrite Hty;
+        cbv [FsImg.T_FILE_z]; lia).
+  rewrite (abs_of_typed _ (opf_era_typed (di_trunc dn) bm' data' Hnz)).
+  by rewrite (opf_trunc_row dn bm bm' data data' Hty).
 Qed.
 
 Section OpenFire.
@@ -241,14 +309,15 @@ Section OpenFire.
   Lemma opf_open_fire `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset) (dq : dfrac)
       (Φ : aview -> Z -> anode -> iProp Σ) (i : Z) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
+    fn_type n <> 0 ->
     ftop_inv γfs -∗
     aopen_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag_q (fs_gamma_L γfs) dq i n ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq i n
       ∗ ∃ av : aview,
-          ⌜av !! i = Some (abs_of n)⌝ ∗ Φ av i (abs_of n).
+          ⌜av !! i = Some (abs_row n)⌝ ∗ Φ av i (abs_row n).
   Proof.
-    intros HE. iIntros "#Hi Hcm Hf".
+    intros HE Hnz. iIntros "#Hi Hcm Hf".
     (* the same re-spelling [mkf_dlookup_fire] does, and for the same
        reason: the unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag_q /fs_gamma_L /=.
@@ -256,10 +325,10 @@ Section OpenFire.
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
-    assert (Hrow : abs_view I !! i = Some (abs_of n))
-      by exact (abs_view_lookup I i n Hlk).
+    assert (Hrow : abs_view I !! i = Some (abs_row n))
+      by exact (abs_view_lookup_typed I i n Hlk Hnz).
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
-    iMod ("Hcm" $! I i (abs_of n) with "[//] Hta") as "[Hta HΦ]".
+    iMod ("Hcm" $! I i (abs_row n) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists I, A. by iFrame. }
@@ -272,14 +341,15 @@ Section OpenFire.
   Lemma opf_open_fire_1 `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset)
       (Φ : aview -> Z -> anode -> iProp Σ) (i : Z) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
+    fn_type n <> 0 ->
     ftop_inv γfs -∗
     aopen_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       top_frag (fs_gamma_L γfs) i n
       ∗ ∃ av : aview,
-          ⌜av !! i = Some (abs_of n)⌝ ∗ Φ av i (abs_of n).
+          ⌜av !! i = Some (abs_row n)⌝ ∗ Φ av i (abs_row n).
   Proof.
-    intros HE. rewrite top_frag_1. exact (opf_open_fire γfs E _ Φ i n HE).
+    intros HE Hnz. rewrite top_frag_1. exact (opf_open_fire γfs E _ Φ i n HE Hnz).
   Qed.
 
   (* =================================================================== *)
@@ -297,8 +367,8 @@ Section OpenFire.
       (i : Z) (bs0 : list (bv 8)) (nl : nat) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
-    abs_of n = MkAnode (AFile bs0) nl ->
-    abs_of n' = MkAnode (AFile []) nl ->
+    abs_of n = Some (MkAnode (AFile bs0) nl) ->
+    abs_of n' = Some (MkAnode (AFile []) nl) ->
     ftop_inv γfs -∗ app_inv γfs -∗
     atrunc_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
@@ -313,11 +383,11 @@ Section OpenFire.
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
     assert (Hrow : abs_view I !! i = Some (MkAnode (AFile bs0) nl)).
-    { by rewrite (abs_view_lookup I i n Hlk) Habs. }
+    { by rewrite (abs_view_lookup_of I i n Hlk) Habs. }
     (* the delta collapses to the ONE-ROW insert, and the insert's reading
        is the truncated record's own row *)
     assert (Hdelta : abs_view (<[i := n']> I) = delta_trunc i (abs_view I)).
-    { rewrite (abs_view_insert I i n') Habs'.
+    { rewrite (abs_view_insert I i n' _ Habs').
       by rewrite (delta_trunc_file (abs_view I) i bs0 nl Hrow). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I i bs0 nl with "[//] Hta") as "(Hta & Hstep & Hph2)".

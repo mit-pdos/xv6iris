@@ -11,6 +11,15 @@
    to [FsTree.fsnode], the hop-by-hop lookup [apath_at], the visited-inum
    run [arun], and [abs_view] (the raw γtop map read through [abs_of]).
    None of it mentions a ghost, Σ, or an iProp; FsAbs.v's sections 3-5 do.
+
+   THE VIEW IS OVER ALLOCATED ROWS ONLY (lane E2-V, 2026-09-05; owner's
+   ruling Q-a of claude-notes/projects/app-round-e2.md): [abs_of : fs_node
+   -> option anode] is [None] at a FREE inode ([fn_type n = 0]) and
+   [Some (abs_row n)] otherwise, and [abs_view I := omap abs_of I] -- so
+   fs-syscall-specs section 4's [∃ i ∉ dom av] is statable and δ_free is
+   [delete].  Inodes at nlink 0 STAY in the view (ruling Q-b: a process may
+   hold an open fd to one); the filter is on the type alone.  [abs_row] is
+   the total typed reading the fires and pins name as an [anode] term.
    Files BELOW [ProcInv] that must STATE something over [aview]/[abs_view]
    -- FsAbsInv's application license, FsAbsDelta's write deltas -- can now
    require this file alone instead of FsAbs's ghost cone.
@@ -75,7 +84,7 @@ Global Instance absnode_inhabited : Inhabited absnode := populate (AFile []).
 Global Instance anode_inhabited : Inhabited anode :=
   populate (MkAnode (AFile []) 0%nat).
 
-(* THE READING.  Three arms, each one of FsStateInode's existing readings;
+(* THE TYPED ROW.  Three arms, each one of FsStateInode's existing readings;
    the type halfword picks the arm and [fn_nlink] is carried as a FIELD, not
    derived from any edge count (fs-syscall-specs section 1, "nlink is
    node-local data"). *)
@@ -84,55 +93,142 @@ Definition abs_node (n : fs_node) : absnode :=
   else if decide (fn_type n = T_FILE_z) then AFile (fn_file_bytes n)
   else ADev (fn_major n) (fn_minor n).
 
-Definition abs_of (n : fs_node) : anode := MkAnode (abs_node n) (fn_nlink n).
+(* the row an ALLOCATED record reads as: [abs_of] below is this, guarded *)
+Definition abs_row (n : fs_node) : anode := MkAnode (abs_node n) (fn_nlink n).
 
-Lemma abs_of_nlink (n : fs_node) : an_nlink (abs_of n) = fn_nlink n.
+(* THE READING (round E2-V, owner ruling Q-a, 2026-09-05): THE VIEW COVERS
+   ALLOCATED ROWS ONLY.  A FREE record -- [fn_type n = 0]: every unallocated
+   inum, [ialloc]'s target before its claim, the corpse [iput] leaves -- has
+   NO row, so fs-syscall-specs section 4's [∃ i ∉ dom av] is statable as the
+   create precondition and [δ_free i] is [delete i] of the view.  The filter
+   is on the TYPE and never on nlink (ruling Q-b): an unlinked-but-open node
+   is an ordinary row at nlink 0 ([abs_of_orphan]), because a process may
+   hold an open descriptor to it. *)
+Definition abs_of (n : fs_node) : option anode :=
+  if decide (fn_type n = 0) then None else Some (abs_row n).
+
+Lemma abs_of_free (n : fs_node) : fn_type n = 0 <-> abs_of n = None.
+Proof.
+  rewrite /abs_of. destruct (decide (fn_type n = 0)) as [H0 | H0].
+  - split; [intros _; reflexivity | intros _; exact H0].
+  - split; [intros Hc; destruct (H0 Hc) | intros Hc; discriminate Hc].
+Qed.
+
+Lemma abs_of_typed (n : fs_node) :
+  fn_type n <> 0 -> abs_of n = Some (abs_row n).
+Proof.
+  intros Hnz. rewrite /abs_of. by rewrite (decide_False (P := fn_type n = 0)).
+Qed.
+
+Lemma abs_of_Some (n : fs_node) (a : anode) :
+  abs_of n = Some a -> fn_type n <> 0 /\ a = abs_row n.
+Proof.
+  rewrite /abs_of. destruct (decide (fn_type n = 0)) as [H0 | H0];
+    [intros Hc; discriminate Hc |].
+  intros Ha. injection Ha as <-. by split.
+Qed.
+
+Lemma abs_of_is_Some (n : fs_node) : is_Some (abs_of n) <-> fn_type n <> 0.
+Proof.
+  split.
+  - intros [a Ha]. exact (proj1 (abs_of_Some n a Ha)).
+  - intros Hnz. rewrite (abs_of_typed n Hnz). by eexists.
+Qed.
+
+(* a directory is typed: [T_DIR_z] is 1 *)
+Lemma fn_is_dir_typed (n : fs_node) : fn_is_dir n = true -> fn_type n <> 0.
+Proof. rewrite /fn_is_dir bool_decide_eq_true. intros ->. cbv [T_DIR_z]. lia. Qed.
+
+Lemma abs_row_nlink (n : fs_node) : an_nlink (abs_row n) = fn_nlink n.
 Proof. reflexivity. Qed.
 
+Lemma abs_of_nlink (n : fs_node) (a : anode) :
+  abs_of n = Some a -> an_nlink a = fn_nlink n.
+Proof. intros Ha. destruct (abs_of_Some n a Ha) as [_ ->]. reflexivity. Qed.
+
+Lemma abs_row_dir (n : fs_node) :
+  fn_is_dir n = true -> an_node (abs_row n) = ADir (dir_entries n).
+Proof. intros Hd. rewrite /abs_row /abs_node /= Hd //. Qed.
+
 Lemma abs_of_dir (n : fs_node) :
-  fn_is_dir n = true -> an_node (abs_of n) = ADir (dir_entries n).
-Proof. intros Hd. rewrite /abs_of /abs_node /= Hd //. Qed.
+  fn_is_dir n = true ->
+  abs_of n = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n)).
+Proof.
+  intros Hd. rewrite (abs_of_typed n (fn_is_dir_typed n Hd)) /abs_row /abs_node Hd //.
+Qed.
 
 (* ...AND ITS INVERSE, which is what a LEND-side law needs: only a directory
    reads as [ADir], and the map it reads as is [dir_entries].  Stated as an
    inversion rather than as an [iff] because the two conclusions are used
-   together at exactly one place ([FsAbsSeam.dv_top_seam]). *)
-Lemma abs_of_dir_inv (n : fs_node) (e : gmap fname Z) :
-  an_node (abs_of n) = ADir e -> fn_is_dir n = true /\ e = dir_entries n.
+   together. *)
+Lemma abs_row_dir_inv (n : fs_node) (e : gmap fname Z) :
+  an_node (abs_row n) = ADir e -> fn_is_dir n = true /\ e = dir_entries n.
 Proof.
-  rewrite /abs_of /abs_node /=. destruct (fn_is_dir n) eqn:Hd.
+  rewrite /abs_row /abs_node /=. destruct (fn_is_dir n) eqn:Hd.
   - intros He. injection He as He. split; [reflexivity | by rewrite He].
   - destruct (decide (fn_type n = T_FILE_z)); intros He; discriminate.
 Qed.
 
-Lemma abs_of_file (n : fs_node) :
-  fn_is_dir n = false -> fn_type n = T_FILE_z ->
-  an_node (abs_of n) = AFile (fn_file_bytes n).
+Lemma abs_of_dir_inv (n : fs_node) (a : anode) (e : gmap fname Z) :
+  abs_of n = Some a -> an_node a = ADir e ->
+  fn_is_dir n = true /\ e = dir_entries n.
 Proof.
-  intros Hd Ht. rewrite /abs_of /abs_node /= Hd.
+  intros Ha He. destruct (abs_of_Some n a Ha) as [_ ->].
+  exact (abs_row_dir_inv n e He).
+Qed.
+
+Lemma abs_row_file (n : fs_node) :
+  fn_is_dir n = false -> fn_type n = T_FILE_z ->
+  an_node (abs_row n) = AFile (fn_file_bytes n).
+Proof.
+  intros Hd Ht. rewrite /abs_row /abs_node /= Hd.
   by rewrite (decide_True (P := fn_type n = T_FILE_z)).
 Qed.
 
-Lemma abs_of_dev (n : fs_node) :
-  fn_is_dir n = false -> fn_type n <> T_FILE_z ->
-  an_node (abs_of n) = ADev (fn_major n) (fn_minor n).
+Lemma abs_of_file (n : fs_node) :
+  fn_is_dir n = false -> fn_type n = T_FILE_z ->
+  abs_of n = Some (MkAnode (AFile (fn_file_bytes n)) (fn_nlink n)).
 Proof.
-  intros Hd Ht. rewrite /abs_of /abs_node /= Hd.
+  intros Hd Ht.
+  assert (Hnz : fn_type n <> 0) by (rewrite Ht; cbv [T_FILE_z]; lia).
+  rewrite (abs_of_typed n Hnz) /abs_row /abs_node /= Hd.
+  by rewrite (decide_True (P := fn_type n = T_FILE_z)).
+Qed.
+
+Lemma abs_row_dev (n : fs_node) :
+  fn_is_dir n = false -> fn_type n <> T_FILE_z ->
+  an_node (abs_row n) = ADev (fn_major n) (fn_minor n).
+Proof.
+  intros Hd Ht. rewrite /abs_row /abs_node /= Hd.
+  by rewrite (decide_False (P := fn_type n = T_FILE_z)).
+Qed.
+
+(* the device arm NEEDS the type to be nonzero: a free record is neither a
+   directory nor a file either, and it has no row at all *)
+Lemma abs_of_dev (n : fs_node) :
+  fn_is_dir n = false -> fn_type n <> T_FILE_z -> fn_type n <> 0 ->
+  abs_of n = Some (MkAnode (ADev (fn_major n) (fn_minor n)) (fn_nlink n)).
+Proof.
+  intros Hd Ht Hnz. rewrite (abs_of_typed n Hnz) /abs_row /abs_node /= Hd.
   by rewrite (decide_False (P := fn_type n = T_FILE_z)).
 Qed.
 
 (* the orphan reading (fs-syscall-specs section 1, "orphans are IN the
    map"): an unlinked-but-open node is an ordinary row at nlink 0 *)
-Lemma abs_of_orphan (n : fs_node) :
-  fn_orphan n = true <-> an_nlink (abs_of n) = 0%nat.
-Proof. rewrite /fn_orphan bool_decide_eq_true. reflexivity. Qed.
-
-(* a bare record (every free record, [ialloc]'s claim box, the corpse
-   [itrunc]/[iput] leave) reads as a nlink-0 node with no entries *)
-Lemma abs_of_bare_dir (n : fs_node) :
-  fn_bare n -> fn_is_dir n = true -> abs_of n = MkAnode (ADir ∅) 0%nat.
+Lemma abs_of_orphan (n : fs_node) (a : anode) :
+  abs_of n = Some a -> (fn_orphan n = true <-> an_nlink a = 0%nat).
 Proof.
-  intros Hb Hd. rewrite /abs_of /abs_node Hd (dir_entries_bare n Hb).
+  intros Ha. rewrite (abs_of_nlink n a Ha) /fn_orphan bool_decide_eq_true.
+  reflexivity.
+Qed.
+
+(* a bare DIRECTORY record ([ialloc]'s claim box at [T_DIR]) reads as a
+   nlink-0 node with no entries.  A bare FREE record has no row at all
+   ([abs_of_free]). *)
+Lemma abs_of_bare_dir (n : fs_node) :
+  fn_bare n -> fn_is_dir n = true -> abs_of n = Some (MkAnode (ADir ∅) 0%nat).
+Proof.
+  intros Hb Hd. rewrite (abs_of_dir n Hd) (dir_entries_bare n Hb).
   by destruct Hb as (_ & _ & _ & _ & ->).
 Qed.
 
@@ -143,7 +239,8 @@ Qed.
    dirlink that wrote nothing (create's and link's fail bodies, mkdir's
    failing parent append), or a bare directory either side (mkdir's failing
    ["."]).  The block addresses and the bytes past the size may move
-   freely: [abs_of] never reads them. *)
+   freely: [abs_of] never reads them.  The equation is one of OPTIONS since
+   E2-V; a free-to-free retag is [_same] too, both sides [None]. *)
 Lemma abs_of_dir_same (n n' : fs_node) :
   fn_is_dir n = true ->
   fn_type n = fn_type n' ->
@@ -153,7 +250,7 @@ Lemma abs_of_dir_same (n n' : fs_node) :
 Proof.
   intros Hd Hty Hnl He.
   assert (Hd' : fn_is_dir n' = true) by (rewrite /fn_is_dir -Hty; exact Hd).
-  rewrite /abs_of /abs_node Hd Hd' He Hnl. reflexivity.
+  rewrite (abs_of_dir n Hd) (abs_of_dir n' Hd') He Hnl. reflexivity.
 Qed.
 
 (* ...and a directory at size 0 has no entries whatever its bytes say *)
@@ -189,9 +286,9 @@ Definition abs_tree (av : aview) (r : Z) : fstree :=
    the arm [absnode] adds. *)
 Lemma abs_fsnode_node_of (n : fs_node) :
   fn_is_dir n = true \/ fn_type n = T_FILE_z ->
-  abs_fsnode (abs_of n) = node_of (fn_rec n) (fn_data n).
+  abs_fsnode (abs_row n) = node_of (fn_rec n) (fn_data n).
 Proof.
-  intros Hn. rewrite /abs_fsnode /node_of /abs_of /abs_node /=.
+  intros Hn. rewrite /abs_fsnode /node_of /abs_row /abs_node /=.
   destruct (fn_is_dir n) eqn:Hd.
   - rewrite /fn_is_dir bool_decide_eq_true in Hd.
     rewrite (decide_True (P := bv_unsigned (di_type (fn_rec n)) = T_DIR_z));
@@ -377,19 +474,47 @@ Qed.
    this -- stays in FsAbs.v. *)
 (* OVER THE RAW MAP since durable-disk EV (header, consequence (1)): it is
    the form [InodeRegion.ftop_body] holds, and at [I := fss_inodes S] it is
-   the old function on the nose. *)
-Definition abs_view (I : gmap Z fs_node) : aview := abs_of <$> I.
+   the old function on the nose.  Since round E2-V it is an [omap]: the
+   authority still rows the WHOLE region ([AppInv.app_dom] is about the
+   map), the view keeps the ALLOCATED rows only. *)
+Definition abs_view (I : gmap Z fs_node) : aview := omap abs_of I.
 
-Lemma abs_view_lookup I i n :
-  I !! i = Some n -> abs_view I !! i = Some (abs_of n).
-Proof. intros Hi. by rewrite /abs_view lookup_fmap Hi. Qed.
+(* the raw reading of a row: whatever [abs_of] says of the node, [None]
+   at a free record *)
+Lemma abs_view_lookup_of (I : gmap Z fs_node) (i : Z) (n : fs_node) :
+  I !! i = Some n -> abs_view I !! i = abs_of n.
+Proof. intros Hi. by rewrite /abs_view lookup_omap Hi. Qed.
+
+Lemma abs_view_lookup (I : gmap Z fs_node) (i : Z) (n : fs_node) (a : anode) :
+  I !! i = Some n -> abs_of n = Some a -> abs_view I !! i = Some a.
+Proof. intros Hi Ha. by rewrite (abs_view_lookup_of I i n Hi). Qed.
+
+Lemma abs_view_lookup_typed (I : gmap Z fs_node) (i : Z) (n : fs_node) :
+  I !! i = Some n -> fn_type n <> 0 -> abs_view I !! i = Some (abs_row n).
+Proof. intros Hi Hnz. exact (abs_view_lookup I i n _ Hi (abs_of_typed n Hnz)). Qed.
+
+Lemma abs_view_lookup_Some (I : gmap Z fs_node) (i : Z) (a : anode) :
+  abs_view I !! i = Some a -> exists n, I !! i = Some n /\ abs_of n = Some a.
+Proof.
+  rewrite /abs_view lookup_omap_Some. intros (n & Ha & Hi). by exists n.
+Qed.
 
 Lemma abs_view_lookup_is_Some (I : gmap Z fs_node) (i : Z) (a : anode) :
   abs_view I !! i = Some a -> is_Some (I !! i).
 Proof.
-  rewrite /abs_view lookup_fmap. intros Ha.
-  destruct (I !! i) as [n |]; [by exists n | discriminate].
+  intros Ha. destruct (abs_view_lookup_Some I i a Ha) as (n & Hi & _).
+  by exists n.
 Qed.
+
+(* pushing one raw-map insert through the view: a typed node lands as its
+   row, a free node deletes the row (the doc's [δ_free]) *)
+Lemma abs_view_insert (I : gmap Z fs_node) (i : Z) (n : fs_node) (a : anode) :
+  abs_of n = Some a -> abs_view (<[i := n]> I) = <[i := a]> (abs_view I).
+Proof. intros Ha. rewrite /abs_view. exact (omap_insert_Some abs_of I i n a Ha). Qed.
+
+Lemma abs_view_insert_None (I : gmap Z fs_node) (i : Z) (n : fs_node) :
+  abs_of n = None -> abs_view (<[i := n]> I) = delete i (abs_view I).
+Proof. intros Ha. rewrite /abs_view. exact (omap_insert_None abs_of I i n Ha). Qed.
 
 (* A RETAG THAT KEEPS THE READING KEEPS THE VIEW (app-instances.md section 7,
    the [_same] mover form): block addresses and records are invisible to
@@ -399,6 +524,10 @@ Lemma abs_view_insert_same (I : gmap Z fs_node) (i : Z) (n n' : fs_node) :
   I !! i = Some n -> abs_of n = abs_of n' ->
   abs_view (<[i := n']> I) = abs_view I.
 Proof.
-  intros Hi Heq. rewrite /abs_view fmap_insert -Heq.
-  apply insert_id. by rewrite lookup_fmap Hi.
+  intros Hi Heq.
+  assert (Hrow : abs_view I !! i = abs_of n')
+    by (rewrite (abs_view_lookup_of I i n Hi); exact Heq).
+  destruct (abs_of n') as [a |] eqn:Hn'.
+  - rewrite (abs_view_insert I i n' a Hn'). apply insert_id. by rewrite Hrow.
+  - rewrite (abs_view_insert_None I i n' Hn'). apply delete_notin. by rewrite Hrow.
 Qed.

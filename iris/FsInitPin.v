@@ -122,7 +122,7 @@ Lemma img_astep_root (P : Z -> list (bv 8)) (sb : fs_sb) (av : aview)
     (f : fname) :
   fsimg_wf P sb = true ->
   0 <= FsImg.ROOTINO < FsImg.sb_ninodes sb ->
-  av !! FsImg.ROOTINO = Some (abs_of (img_node P sb FsImg.ROOTINO)) ->
+  av !! FsImg.ROOTINO = Some (abs_row (img_node P sb FsImg.ROOTINO)) ->
   astep av FsImg.ROOTINO f = path_at (tree_of_disk P sb) FsImg.ROOTINO [f].
 Proof.
   intros Hwf Hran Hav.
@@ -130,7 +130,7 @@ Proof.
     by exact (fs_root_wf_type P sb (fsimg_wf_root P sb Hwf)).
   assert (Hdir : fn_is_dir (img_node P sb FsImg.ROOTINO) = true).
   { rewrite /fn_is_dir /fn_type. by apply bool_decide_eq_true_2. }
-  rewrite /astep /aents Hav /= /anode_ents (abs_of_dir _ Hdir) /=.
+  rewrite /astep /aents Hav /= /anode_ents (abs_row_dir _ Hdir) /=.
   rewrite (img_root_entries P sb Hwf) dir_view_lookup.
   rewrite (path_at_disk_dir P sb FsImg.ROOTINO f Hran Hty).
   reflexivity.
@@ -141,7 +141,7 @@ Lemma img_apath_root (P : Z -> list (bv 8)) (sb : fs_sb) (av : aview)
     (f : fname) (c : Z) :
   fsimg_wf P sb = true ->
   0 <= FsImg.ROOTINO < FsImg.sb_ninodes sb ->
-  av !! FsImg.ROOTINO = Some (abs_of (img_node P sb FsImg.ROOTINO)) ->
+  av !! FsImg.ROOTINO = Some (abs_row (img_node P sb FsImg.ROOTINO)) ->
   path_at (tree_of_disk P sb) FsImg.ROOTINO [f] = Some c ->
   apath_at av FsImg.ROOTINO [f] = Some c.
 Proof.
@@ -183,13 +183,15 @@ Lemma img_abs_file (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
   bv_unsigned (di_type (fs_dinode P sb z)) = T_FILE_z ->
   bv_unsigned (di_size (fs_dinode P sb z)) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   abs_of (img_node P sb z)
-  = MkAnode
+  = Some (MkAnode
       (AFile (file_bytes (fs_data_of P (fs_dinode P sb z))
                 (Z.to_nat (bv_unsigned (di_size (fs_dinode P sb z))))))
-      (Z.to_nat (bv_unsigned (di_nlink (fs_dinode P sb z)))).
+      (Z.to_nat (bv_unsigned (di_nlink (fs_dinode P sb z))))).
 Proof.
   intros Hty Hsz.
   assert (Hft : fn_type (img_node P sb z) = T_FILE_z) by exact Hty.
+  assert (Hnz : fn_type (img_node P sb z) <> 0)
+    by (rewrite Hft; cbv [T_FILE_z]; lia).
   assert (Hnd : fn_is_dir (img_node P sb z) = false).
   { rewrite /fn_is_dir. apply bool_decide_eq_false_2.
     rewrite Hft. cbv [T_FILE_z T_DIR_z]. lia. }
@@ -200,7 +202,7 @@ Proof.
   { rewrite /abs_node Hnd.
     destruct (decide (fn_type (img_node P sb z) = T_FILE_z)) as [_ | Hc];
       [f_equal; exact (img_file_bytes P sb z Hsz) | exfalso; exact (Hc Hft)]. }
-  rewrite /abs_of Hnode. reflexivity.
+  rewrite (abs_of_typed _ Hnz) /abs_row Hnode. reflexivity.
 Qed.
 
 (* ====================================================================== *)
@@ -276,9 +278,9 @@ Proof. intros HS Hd. exact (Hd S HS). Qed.
 
 Lemma era0_arow (S : fs_state_rec) (z : Z) (n : fs_node) :
   snap_ok S era0_D -> dur_node era0_D z n ->
-  abs_view (fss_inodes S) !! z = Some (abs_of n).
+  abs_view (fss_inodes S) !! z = abs_of n.
 Proof.
-  intros HS Hd. exact (abs_view_lookup _ z n (era0_row S z n HS Hd)).
+  intros HS Hd. exact (abs_view_lookup_of _ z n (era0_row S z n HS Hd)).
 Qed.
 
 (* ====================================================================== *)
@@ -384,7 +386,7 @@ Qed.
    whole content, with no state and no map in it yet. *)
 Lemma fsimg_init_abs :
   abs_of (img_node fsimg_P fsimg_sb INIT_INO)
-  = MkAnode (AFile init_bytes) 1%nat.
+  = Some (MkAnode (AFile init_bytes) 1%nat).
 Proof.
   rewrite (img_abs_file fsimg_P fsimg_sb INIT_INO fsimg_init_type
              fsimg_init_size_bound).
@@ -425,11 +427,25 @@ Qed.
 
 (* ...and the root's row, which the path pin consumed and which a caller
    that wants to keep walking needs in its own right. *)
+(* the image's root IS a directory, so it has a row (E2-V) *)
+Lemma fsimg_root_dir :
+  fn_is_dir (img_node fsimg_P fsimg_sb FsImg.ROOTINO) = true.
+Proof.
+  assert (Hty : bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb
+                                        FsImg.ROOTINO)) = T_DIR_z)
+    by exact (fs_root_wf_type fsimg_P fsimg_sb
+                (fsimg_wf_root fsimg_P fsimg_sb fsimg_wf_ok)).
+  rewrite /fn_is_dir /fn_type. by apply bool_decide_eq_true_2.
+Qed.
+
 Theorem era0_root_row (S : fs_state_rec) :
   snap_ok S era0_D ->
   abs_view (fss_inodes S) !! FsImg.ROOTINO
-  = Some (abs_of (img_node fsimg_P fsimg_sb FsImg.ROOTINO)).
-Proof. intros HS. exact (era0_arow S FsImg.ROOTINO _ HS era0_dur_root). Qed.
+  = Some (abs_row (img_node fsimg_P fsimg_sb FsImg.ROOTINO)).
+Proof.
+  intros HS. rewrite (era0_arow S FsImg.ROOTINO _ HS era0_dur_root).
+  exact (abs_of_typed _ (fn_is_dir_typed _ fsimg_root_dir)).
+Qed.
 
 (* ====================================================================== *)
 (*  5.  THE ERA-WALK INSTANTIATION                                         *)

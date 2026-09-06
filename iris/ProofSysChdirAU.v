@@ -1628,7 +1628,8 @@ Section ProofSysChdirBody.
            [T_DIR] test below reads the type of ---- *)
         iApply fupd_wp.
         iMod (opf_open_fire_1 fsc_fs ⊤ Φo (bv_unsigned inum) (era_node dn bm dat)
-                ltac:(solve_ndisj) with "[] Hoc Htopl") as "[Htopl Hobs]";
+                ltac:(solve_ndisj) (opf_era_typed_ok _ _ dn bm dat Hiok)
+                with "[] Hoc Htopl") as "[Htopl Hobs]";
           [iApply (ireg_inv_ftop with "Hireg") |].
         iModIntro.
         iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
@@ -1700,8 +1701,8 @@ Section ProofSysChdirBody.
           assert (Hisdir : fn_is_dir (era_node dn bm dat) = true).
           { apply bool_decide_eq_true. rewrite /fn_type era_node_rec Hty.
             vm_compute. reflexivity. }
-          pose proof (abs_of_dir _ Hisdir) as Hnode.
-          set (an0 := abs_of (era_node dn bm dat)) in *. clearbody an0.
+          pose proof (abs_row_dir _ Hisdir) as Hnode.
+          set (an0 := abs_row (era_node dn bm dat)) in *. clearbody an0.
           destruct an0 as [an nl]. cbn in Hnode. subst an.
           iApply (wp_bne_fall_s_sconf (CID := CID26) (mword_of_int (SC + 0x3e))
                     (mword_of_int 50 : mword 13) Ra5 Ra4 P2 (K - 20)%nat b
@@ -2105,9 +2106,9 @@ Section ProofSysChdirBody.
           (* ...and the observed row is NOT one ([FsAbs.abs_of_dir_inv]):
              what the refused arm's receipt says *)
           assert (Hnotdir : forall (e : gmap fname Z) (nl : nat),
-                    abs_of (era_node dn bm dat) <> MkAnode (ADir e) nl).
+                    abs_row (era_node dn bm dat) <> MkAnode (ADir e) nl).
           { intros e nl He. apply Hty.
-            destruct (abs_of_dir_inv (era_node dn bm dat) e
+            destruct (abs_row_dir_inv (era_node dn bm dat) e
                         ltac:(rewrite He; reflexivity)) as [Hd _].
             rewrite /fn_is_dir in Hd. apply bool_decide_eq_true_1 in Hd.
             rewrite /fn_type era_node_rec in Hd.
@@ -2356,7 +2357,7 @@ Section ProofSysChdirBody.
             iSplitR; [iPureIntro; rewrite Ha0f; exact HQ4a0 |].
             rewrite /chdir_post_fail. iRight. iExists (bview pk bf). iRight.
             iDestruct "Hobs" as (av) "(%Hav & HΦ)".
-            iExists (bv_unsigned inum), av, (abs_of (era_node dn bm dat)).
+            iExists (bv_unsigned inum), av, (abs_row (era_node dn bm dat)).
             iFrame "HP HΦ". iPureIntro. split; [exact Hav | exact Hnotdir]. }
       + (* ================= ARM B: namei returned 0 =================
            +0x66 restores s1 and falls into the shared "-1" tail. *)
