@@ -78,16 +78,23 @@ Section TicksInv.
      persistent name, plus the counter cell, become the tickslock. *)
   (* A6.67: the creator's honest deposit (A6.66) wants the running token;
      it is handed straight back, so a caller that has one loses nothing. *)
-  Lemma new_tickslock `{CID : RiscvLang.CpuId} E (t : mword 32) :
+  (* TWO LOGS (relaxed-ww.md §2.4, "Birth"): the record's publication is
+     fence-bound, so the construction runs at a fence on the creator's hart
+     with the bundle in hand -- for a boot lock, hart 0's [started] fence
+     (RULING C, the owner's, decides how the born record travels there). *)
+  Lemma new_tickslock `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate) (t : mword 32) :
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     lock_name a_tickslock "time"%string -∗
+    tso_interp_at riscv_eraGS g -∗
     own_context cur_ctx -∗
     a_tickslock ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready a_tickslock -∗
-    a_ticks ↦₄ t ={E}=∗ own_context cur_ctx ∗ ∃ γl : gname, is_tickslock γl.
+    a_ticks ↦₄ t ={E}=∗
+    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ ∃ γl : gname, is_tickslock γl.
   Proof.
-    iIntros "#Hnm Hrun Hlkw Hcpu Hticks".
-    iApply (newlock E a_tickslock "time"%string ticks_res_at
-              with "Hnm Hrun Hlkw Hcpu [Hticks]").
+    iIntros (Hod) "#Hnm Hint Hrun Hlkw Hcpu Hticks".
+    iApply (newlock E g a_tickslock "time"%string ticks_res_at Hod
+              with "Hnm Hint Hrun Hlkw Hcpu [Hticks]").
     iApply (ticks_res_intro with "Hticks").
   Qed.
 

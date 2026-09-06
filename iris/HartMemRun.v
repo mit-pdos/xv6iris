@@ -106,8 +106,13 @@ Fixpoint hmrun {X : Type} (n : nat) (D Drw : gset register) (rs : regstate)
                     | None => None
                     end
            (* RAM write inside the owned bytes: the map is updated *)
+           (* TWO LOGS (relaxed-ww.md §1.1): a plain store only -- the
+              conditional half of an RMW is performed at memory (both logs
+              move) and is not a walker step; a fence is a leaf of its own
+              ([HartBarrier]), and the walk has none *)
            | Interface.MemWrite nb req => fun k =>
                if dev_addr (Interface.WriteReq.pa req) then None
+               else if ak_excl (Interface.WriteReq.access_kind req) then None
                else if bytes_owned mm (Interface.WriteReq.pa req) nb
                     then hmrun n' D Drw rs
                            (write_bytes mm (Interface.WriteReq.pa req) nb
@@ -116,7 +121,8 @@ Fixpoint hmrun {X : Type} (n : nat) (D Drw : gset register) (rs : regstate)
                     else None
            | Interface.InstrAnnounce _    => fun k => hmrun n' D Drw rs mm (k tt)
            | Interface.BranchAnnounce _ _ => fun k => hmrun n' D Drw rs mm (k tt)
-           | Interface.Barrier _          => fun k => hmrun n' D Drw rs mm (k tt)
+           | Interface.Barrier b          => fun k =>
+               if fence_rel b then None else hmrun n' D Drw rs mm (k tt)
            | Interface.CacheOp _          => fun k => hmrun n' D Drw rs mm (k tt)
            | Interface.TlbOp _            => fun k => hmrun n' D Drw rs mm (k tt)
            | Interface.TakeException _    => fun k => hmrun n' D Drw rs mm (k tt)
@@ -249,12 +255,12 @@ Section memrun.
     TsoCtx.own_context XI -∗
     bytes_own mm -∗
     ⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv' pa n w⌝.
+       tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv' pa n w⌝.
   Proof.
     intros Hrb. iIntros "Hgh Hint Hrun Hown".
     iAssert (⌜forall j : nat, (N.of_nat j < n)%N ->
                forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-                 tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv'
+                 tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv'
                    (pa_add pa j) = Some (nth_byte w j)⌝)%I
       with "[Hgh Hint Hrun Hown]" as %HH.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
@@ -269,22 +275,23 @@ Section memrun.
   (* ... and the same at the LEAF's currency (A6.1's gstate-free bundle),
      so the arm below never has to rewrite an [⊣⊢] under a [fupd]. *)
   Lemma bytes_own_tso_read_of (img mem : gmap Arch.pa (bv 8))
-      (log : list pwmsg) (V : agent -> nat) (rs : regstate) (d : dev_state)
+      (log : list pwmsg) (dl : list nat) (V : agent -> nat) (rs : regstate)
+      (d : dev_state)
       (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa) (n : N) (w : bv (8 * n)) :
     read_bytes mm pa n = Some w ->
     gen_heap_interp (hG := riscv_memGS) mem -∗
-    tso_interp_of riscv_eraGS img mem log V -∗
+    tso_interp_of riscv_eraGS img mem log dl V -∗
     TsoCtx.own_context XI -∗
     bytes_own mm -∗
     ⌜forall tv' : nat, (V (hart_agent cpu_id) <= tv')%nat ->
-       tso_read_bytes img log (hart_agent cpu_id) tv' pa n w⌝.
+       tso_read_bytes img log dl (hart_agent cpu_id) tv' pa n w⌝.
   Proof.
     intros Hrb. iIntros "Hgh Htso Hrun Hown".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img mem log V rs d Hpin).
-    iDestruct (bytes_own_tso_read (gs_of img mem log V rs d) mm pa n w Hrb
+    rewrite (tso_interp_of_at_gs riscv_eraGS img mem log dl V rs d Hpin).
+    iDestruct (bytes_own_tso_read (gs_of img mem log dl V rs d) mm pa n w Hrb
                  with "Hgh Htso Hrun Hown") as %Hrd.
-    cbn [gimg glog gtv gs_of] in Hrd. iPureIntro. exact Hrd.
+    cbn [gimg glog gdlog gtv gs_of] in Hrd. iPureIntro. exact Hrd.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -301,14 +308,17 @@ Section memrun.
   (* ([TsoMemPa.write_bytes_union]), which is exactly the gate's output    *)
   (* shape -- the payload ruling of §1 paying off again.                   *)
   (* ------------------------------------------------------------------ *)
+  (* TWO LOGS: the walker's store is PLAIN ([ak_excl = false]): it is born
+     pending, moves no view and drains nothing ([HartEvents.wstore_dl_plain]). *)
   Lemma bytes_own_wobl (img : gmap Arch.pa (bv 8)) (sg : mstate)
-      (log : list pwmsg) (V : agent -> nat) (tv : nat)
+      (log : list pwmsg) (dl : list nat) (V : agent -> nat) (tv : nat)
       (n : N) (req : Interface.WriteReq.t n)
       (mm : gmap Arch.pa (bv 8)) (b : bool) :
+    ak_excl (Interface.WriteReq.access_kind req) = false ->
     V (hart_agent cpu_id) = tv ->
     bytes_owned mm (Interface.WriteReq.pa req) n = true ->
     gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
-    tso_interp_of riscv_eraGS img sg.(mem) log V -∗
+    tso_interp_of riscv_eraGS img sg.(mem) log dl V -∗
     TsoCtx.own_context XI -∗
     bytes_own mm ==∗
     gen_heap_interp (hG := riscv_memGS)
@@ -320,34 +330,25 @@ Section memrun.
       (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
                         (Interface.WriteReq.value req))
                  (hart_agent cpu_id)])%list
+      (wstore_dl (Interface.WriteReq.access_kind req) log dl)
       (vstep (hart_agent cpu_id)
-         (wstore_tv (Interface.WriteReq.access_kind req) b log tv)
-         (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
-                           (Interface.WriteReq.value req))
-                    (hart_agent cpu_id)])%list V) ∗
+         (wstore_tv (Interface.WriteReq.access_kind req) b dl tv)
+         (wstore_dl (Interface.WriteReq.access_kind req) log dl) V) ∗
     TsoCtx.own_context XI ∗
     bytes_own (write_bytes mm (Interface.WriteReq.pa req) n
                  (Interface.WriteReq.value req)).
   Proof.
-    intros Htv Hfp. iIntros "Hgh Htso Hrun Hown".
+    intros Hexcl Htv Hfp. iIntros "Hgh Htso Hrun Hown".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     iDestruct (tso_interp_of_bound with "Htso") as %Hb.
+    rewrite (wstore_dl_plain _ _ _ Hexcl) (wstore_tv_plain _ _ _ _ Hexcl).
     set (pa := Interface.WriteReq.pa req).
     set (val := Interface.WriteReq.value req).
     set (log' := (log ++ [PWMsg (snap_of pa n val) (hart_agent cpu_id)])%list).
-    set (V' := vstep (hart_agent cpu_id)
-                 (wstore_tv (Interface.WriteReq.access_kind req) b log tv)
-                 log' V).
-    assert (Hlen' : length log' = S (length log))
-      by (rewrite /log' length_app /=; lia).
-    assert (Htvlen : (tv <= length log)%nat)
+    set (V' := vstep (hart_agent cpu_id) tv dl V).
+    assert (Htvlen : (tv <= length dl)%nat)
       by (rewrite -Htv; apply Hb).
-    assert (Hw1 : (tv <= wstore_tv (Interface.WriteReq.access_kind req) b log tv)%nat
-              /\ (wstore_tv (Interface.WriteReq.access_kind req) b log tv
-                  <= length log')%nat).
-    { rewrite /wstore_tv Hlen'. destruct (ak_excl _); [destruct b|]; split; lia. }
-    destruct Hw1 as [Hwlo Hwhi].
-    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl).
     { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
       - exfalso. subst h. pose proof (fin_to_nat_lt cpu_id).
         rewrite /hart_agent in Hh. lia.
@@ -364,27 +365,26 @@ Section memrun.
         rewrite He Htv. lia.
       - rewrite Hother //. }
     assert (Htvtop : forall c : CPU,
-              (V' (hart_agent c) <= length log')%nat).
+              (V' (hart_agent c) <= length dl)%nat).
     { intros c. destruct (decide (hart_agent c = hart_agent cpu_id)) as [He|Hne].
-      - rewrite /V' /vstep. case_decide as Hd; last (exfalso; exact (Hd He)).
-        lia.
-      - rewrite Hother //. have := Hb (hart_agent c). lia. }
+      - rewrite /V' /vstep He decide_True; [exact Htvlen | reflexivity].
+      - rewrite (Hother c Hne). exact (Hb _). }
     (* the footprint is inside the owned map *)
     assert (Hsub : dom (snap_of pa n val) ⊆ dom mm).
     { rewrite dom_snap_of. intros a Ha. apply elem_of_footprint in Ha as (j & Hj & ->).
       apply elem_of_dom. apply (bytes_owned_spec mm pa n Hfp j Hj). }
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log dl V
                sg.(sregs) sg.(mdev) Hpin).
     iMod (TsoCtxStore.ctx_store_sub_ok
-            (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
-            (gs_of img (write_bytes sg.(mem) pa n val) log' V'
+            (gs_of img sg.(mem) log dl V sg.(sregs) sg.(mdev))
+            (gs_of img (write_bytes sg.(mem) pa n val) log' dl V'
                sg.(sregs) sg.(mdev))
-            XI mm (snap_of pa n val) Hsub eq_refl eq_refl
+            XI mm (snap_of pa n val) Hsub eq_refl eq_refl eq_refl
             ltac:(cbn [gmem gs_of]; apply write_bytes_union) Htvmono Htvtop
             with "Hgh Htso Hrun Hown") as "(Hgh & Htso & Hrun & Hown)".
     iModIntro.
     rewrite -(tso_interp_of_at_gs riscv_eraGS img
-                (write_bytes sg.(mem) pa n val) log' V'
+                (write_bytes sg.(mem) pa n val) log' dl V'
                 sg.(sregs) sg.(mdev) Hpin').
     iFrame "Hgh Htso Hrun".
     rewrite /bytes_own (write_bytes_union mm pa n val). iExact "Hown".
@@ -401,6 +401,98 @@ Section memrun.
   (* classes go through this one lemma -- the arm only has to say what      *)
   (* [hfrun] answered.                                                     *)
   (* ------------------------------------------------------------------ *)
+  (* ------------------------------------------------------------------ *)
+  (* THE EXCLUSIVE READ'S FACT (relaxed-ww.md §2.4): an exclusive read    *)
+  (* reads MEMORY -- the drain flat -- and the walker's owned cells hold  *)
+  (* their latest writes there once no own store to them is pending: the *)
+  (* write is visible to this hart ([TsoCtx.key_visible]), chained, and   *)
+  (* drained ([HartEvents.dmem_of_latest]).  The cells are taken apart    *)
+  (* and put back ([ctx_phys_pointsto_forget_floor] / [_of_at_floor]).    *)
+  (* ------------------------------------------------------------------ *)
+  Local Lemma tso_interp_dlog_ok (g : gstate) :
+    tso_interp_at riscv_eraGS g -∗ ⌜dl_ok g.(glog) g.(gdlog) /\ fifo_ok g.(glog) g.(gdlog)⌝.
+  Proof.
+    iIntros "Hint".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+    iPureIntro. destruct Hmm as (_ & (Hdok & Hfifo & _) & _). done.
+  Qed.
+
+  Local Lemma own_byte_dmem (g : gstate) (a : Arch.pa) (v : bv 8) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    TsoCtx.own_context XI -∗
+    TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) v ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗
+    TsoCtx.own_context XI ∗
+    TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) v ∗
+    ⌜pend_read g.(glog) g.(gdlog) (hart_agent cpu_id) a = None ->
+     dmem g.(gimg) g.(glog) g.(gdlog) !! a = Some v⌝.
+  Proof.
+    iIntros "Hgh Hint Hrun Hc".
+    iMod (TsoCtx.ctx_phys_pointsto_forget_floor with "Hc") as (t) "(Hpt & #Hk & #Hch)".
+    iDestruct (TsoCtx.key_visible with "Hint Hrun Hk") as "(Hint & Hrun & %Hvis)".
+    iDestruct (TsoCtx.chain_ev_ok with "Hint Hch") as %Hcev.
+    iDestruct (TsoCtx.ledger_latest_ok with "Hgh Hint Hpt") as %Hlat.
+    iDestruct (tso_interp_dlog_ok with "Hint") as %[Hdok Hfifo].
+    iModIntro. iFrame "Hgh Hint Hrun".
+    iSplitL "Hpt". { iApply (TsoCtx.ctx_phys_pointsto_of_at_floor with "Hpt Hk Hch"). }
+    iPureIntro. intros Hpend.
+    exact (dmem_of_latest _ _ _ _ _ _ _ _ Hdok Hfifo Hlat
+             (TsoCtx.chain_of_ev _ _ _ _ _ _ Hlat Hcev) (Hvis _ (Nat.le_refl _)) Hpend).
+  Qed.
+
+  Local Lemma bytes_own_dmem (g : gstate) (mm : gmap Arch.pa (bv 8)) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    TsoCtx.own_context XI -∗
+    bytes_own mm ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗
+    TsoCtx.own_context XI ∗
+    bytes_own mm ∗
+    ⌜forall a v, mm !! a = Some v ->
+       pend_read g.(glog) g.(gdlog) (hart_agent cpu_id) a = None ->
+       dmem g.(gimg) g.(glog) g.(gdlog) !! a = Some v⌝.
+  Proof.
+    rewrite /bytes_own. iIntros "Hgh Hint Hrun Hown". iRevert "Hgh Hint Hrun Hown".
+    iInduction mm as [|a b mm Hnone] "IH" using map_ind; iIntros "Hgh Hint Hrun Hown".
+    - iModIntro. iFrame. iPureIntro. intros a v Hl. rewrite lookup_empty in Hl. discriminate.
+    - rewrite !(big_sepM_insert _ _ _ _ Hnone). iDestruct "Hown" as "[Hc Hown]".
+      iMod ("IH" with "Hgh Hint Hrun Hown") as "(Hgh & Hint & Hrun & Hown & %Hrest)".
+      iMod (own_byte_dmem with "Hgh Hint Hrun Hc") as "(Hgh & Hint & Hrun & Hc & %Ha)".
+      iModIntro. iFrame "Hgh Hint Hrun Hc Hown". iPureIntro.
+      intros a' v Hl Hp. destruct (decide (a' = a)) as [->|Hne].
+      + rewrite lookup_insert in Hl. injection Hl as <-. exact (Ha Hp).
+      + rewrite lookup_insert_ne in Hl; [|congruence]. exact (Hrest _ _ Hl Hp).
+  Qed.
+
+  Lemma bytes_own_dmem_read (img mem : gmap Arch.pa (bv 8))
+      (log : list pwmsg) (dl : list nat) (V : agent -> nat) (rs : regstate)
+      (d : dev_state) (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa) (n : N)
+      (w : bv (8 * n)) :
+    read_bytes mm pa n = Some w ->
+    ~ own_fp_pending (hart_agent cpu_id) log dl pa n ->
+    gen_heap_interp (hG := riscv_memGS) mem -∗
+    tso_interp_of riscv_eraGS img mem log dl V -∗
+    TsoCtx.own_context XI -∗
+    bytes_own mm ==∗
+    gen_heap_interp (hG := riscv_memGS) mem ∗
+    tso_interp_of riscv_eraGS img mem log dl V ∗
+    TsoCtx.own_context XI ∗
+    bytes_own mm ∗
+    ⌜read_bytes (dmem img log dl) pa n = Some w⌝.
+  Proof.
+    intros Hrb Hnp. iIntros "Hgh Htso Hrun Hown".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img mem log dl V rs d Hpin).
+    iMod (bytes_own_dmem (gs_of img mem log dl V rs d) mm with "Hgh Htso Hrun Hown")
+      as "(Hgh & Htso & Hrun & Hown & %Hd)".
+    iModIntro. iFrame "Hgh Htso Hrun Hown". iPureIntro.
+    apply read_bytes_of_bytes. intros j Hj.
+    exact (Hd _ _ (read_bytes_spec _ _ _ _ Hrb j Hj) (own_fp_pending_none _ _ _ _ _ Hnp j Hj)).
+  Qed.
+
   Lemma swp_hfnode {X T : Type} (Drw Dro : gset register)
       (Df : register -> dfrac) (rs rs1 : regstate)
       (oc : Interface.outcome (fun _ => exception) T) (k : T -> M X) (v : T)
@@ -505,10 +597,13 @@ Section memrun.
         (* the rule has already drained this hart's view to the TOP and
            handed the receipt; an exclusive read reads the FLAT cache
            (RULING 4), so the map's members serve through [_forget] *)
-        iIntros (sg img log tv V) "%Htv Hsi Htso _". rewrite /mstate_interp.
+        iIntros (sg img log dl tv V) "%Htv %Hnp Hsi Htso _". rewrite /mstate_interp.
         iDestruct "Hsi" as "(Hri & Hmem & Hdv)".
-        iDestruct (bytes_own_read mm sg.(mem) _ nb w Hrb with "Hown Hmem")
-          as %Hrb'.
+        (* the read is against MEMORY (the drain flat); the owned cells'
+           latest writes are there because no own store to them is pending *)
+        iMod (bytes_own_dmem_read img sg.(mem) log dl _ sg.(sregs) sg.(mdev) mm
+                _ nb w Hrb Hnp with "Hmem Htso Hrun Hown")
+          as "(Hmem & Htso & Hrun & Hown & %Hrb')".
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
         iExists w. iSplitR; [done|]. iNext. iMod "Hcl" as "_". iModIntro.
         iSplitL "Hri Hmem Hdv"; [iFrame|]. iFrame "Htso".
@@ -524,9 +619,9 @@ Section memrun.
            [ctx_phys_pointsto] is why this collapse costs it nothing. *)
         iApply (swp_hart_ram_read_plain nb rreq _ _ Hproj Hdev Hif Hex
                   with "Hcert").
-        iIntros (sg img log tv V) "%Htv Hsi Htso". rewrite /mstate_interp.
+        iIntros (sg img log dl tv V) "%Htv Hsi Htso". rewrite /mstate_interp.
         iDestruct "Hsi" as "(Hri & Hmem & Hdv)".
-        iDestruct (bytes_own_tso_read_of img sg.(mem) log V sg.(sregs)
+        iDestruct (bytes_own_tso_read_of img sg.(mem) log dl V sg.(sregs)
                      sg.(mdev) mm _ nb w Hrb
                      with "Hmem Htso Hrun Hown") as %Hrd.
         rewrite Htv in Hrd.
@@ -541,6 +636,8 @@ Section memrun.
     { (* RAM WRITE: the footprint is owned, so the update happens in the
          caller's own cells and the map moves with memory *)
       destruct (dev_addr (Interface.WriteReq.pa wreq)) eqn:Hdev;
+        [discriminate Hf|].
+      destruct (ak_excl (Interface.WriteReq.access_kind wreq)) eqn:Hex;
         [discriminate Hf|].
       destruct (bytes_owned mm (Interface.WriteReq.pa wreq) nb) eqn:Hfp;
         [|discriminate Hf].
@@ -558,18 +655,30 @@ Section memrun.
       iDestruct "Hany" as (rr) "Hfrag".
       iApply (swp_hart_ram_write nb wreq _ _ rr Hproj Hdev
                 with "Hcert Hfrag").
-      iIntros (sg img log tv V b) "%Htv Hsi Htso". rewrite /mstate_interp.
+      iIntros (sg img log dl tv V b) "%Htv Hsi Htso". rewrite /mstate_interp.
       iDestruct "Hsi" as "(Hri & Hmem & Hdv)".
       iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
       iNext. iMod "Hcl" as "_".
-      iMod (bytes_own_wobl img sg log V tv nb wreq mm b Htv Hfp
+      iMod (bytes_own_wobl img sg log dl V tv nb wreq mm b Hex Htv Hfp
               with "Hmem Htso Hrun Hown")
         as "(Hmem & Htso & Hrun & Hown)".
       iModIntro. iSplitL "Hri Hmem Hdv"; [iFrame|]. iFrame "Htso".
       iIntros "Hfrag _". rewrite Hres.
       iApply (IH rs _ _ x rs' mm' Hf with "Hcert [Hfrag] Hrw Hro Hrun Hown").
       by iApply resv_any_intro. }
-    (* THE TWELVE SILENT CLASSES: the file and the map do not move *)
+    3:{ (* THE FENCE without a W predecessor: silent, the file and the map
+           do not move ([HartSpan.hfrun]'s own arm) *)
+      destruct (fence_rel bar) eqn:Hrel; [discriminate Hf|].
+      iIntros "#Hcert Hany Hrw Hro Hrun Hown".
+      match goal with
+      | |- context [Interface.Next ?oc ?kk] =>
+          iApply (swp_hfnode Drw Dro Df rs rs oc kk tt _ Hdisj
+                    ltac:(cbn [hfrun]; rewrite Hrel; reflexivity)
+                    with "Hcert Hrw Hro [Hany Hrun Hown]")
+      end.
+      iIntros "Hrw Hro".
+      iApply (IH rs mm _ x rs' mm' Hf with "Hcert Hany Hrw Hro Hrun Hown"). }
+    (* THE ELEVEN OTHER SILENT CLASSES: the file and the map do not move *)
     (* [oc] is read back OUT OF THE GOAL rather than left to unification:
        the walker equation is discharged by [reflexivity] at elaboration
        time, which needs the node already spelled. *)
@@ -633,7 +742,8 @@ Fixpoint goodmb (Dr Dw : register -> bool) {E X} (m : Defs.monad E X)
               | None => false
               end)
        | Interface.MemWrite n req => fun k =>
-           andb (andb (negb (dev_addr (Interface.WriteReq.pa req)))
+           andb (andb (andb (negb (dev_addr (Interface.WriteReq.pa req)))
+                         (negb (ak_excl (Interface.WriteReq.access_kind req))))
                    (bytes_owned mm (Interface.WriteReq.pa req) n))
              (goodmb Dr Dw (k (inl None))
                 (MState s.(sregs)
@@ -643,7 +753,8 @@ Fixpoint goodmb (Dr Dw : register -> bool) {E X} (m : Defs.monad E X)
                    (Interface.WriteReq.value req)))
        | Interface.InstrAnnounce _    => fun k => goodmb Dr Dw (k tt) s mm
        | Interface.BranchAnnounce _ _ => fun k => goodmb Dr Dw (k tt) s mm
-       | Interface.Barrier _          => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.Barrier b          => fun k =>
+           andb (negb (fence_rel b)) (goodmb Dr Dw (k tt) s mm)
        | Interface.CacheOp _          => fun k => goodmb Dr Dw (k tt) s mm
        | Interface.TlbOp _            => fun k => goodmb Dr Dw (k tt) s mm
        | Interface.TakeException _    => fun k => goodmb Dr Dw (k tt) s mm
@@ -697,6 +808,7 @@ Lemma hmrun_ram_write {X : Type} (n : nat) (D Drw : gset register)
     (req : Interface.WriteReq.t nb) (k : _ -> M X) :
   hmrun (S n) D Drw rs mm (Interface.Next (Interface.MemWrite nb req) k)
   = if dev_addr (Interface.WriteReq.pa req) then None
+    else if ak_excl (Interface.WriteReq.access_kind req) then None
     else if bytes_owned mm (Interface.WriteReq.pa req) nb
          then hmrun n D Drw rs
                 (write_bytes mm (Interface.WriteReq.pa req) nb
@@ -709,6 +821,12 @@ Proof. reflexivity. Qed.
 (* relation, a store inside the footprint preserves the owned DOMAIN, and   *)
 (* an owned footprint makes the map answer a read exactly as memory does.   *)
 (* ---------------------------------------------------------------------- *)
+Lemma hmrun_barrier {X : Type} (n : nat) (D Drw : gset register)
+    (rs : regstate) (mm : gmap Arch.pa (bv 8)) (b : barrier_kind) (k : unit -> M X) :
+  hmrun (S n) D Drw rs mm (Interface.Next (Interface.Barrier b) k)
+  = if fence_rel b then None else hmrun n D Drw rs mm (k tt).
+Proof. reflexivity. Qed.
+
 Lemma foldr_ins_mono (pa : Arch.pa) {wd : N} (v : bv wd) (js : list nat)
     (mm mem : gmap Arch.pa (bv 8)) :
   mm ⊆ mem ->
@@ -818,8 +936,8 @@ Proof.
       by rewrite (read_bytes_owned_mono mm s.(mem) _ nb w Hfp Hsub Hrb). }
     { (* RAM WRITE; MMIO is refused by the certificate *)
       apply andb_prop in Hg as [Hg1 Hg2].
-      apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev.
+      apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hex.
       rewrite Hdev in He. cbn beta iota in He.
       assert (Hsub' :
         write_bytes mm (Interface.WriteReq.pa wreq) nb
@@ -835,9 +953,15 @@ Proof.
                   s' x _ Hsub' Hg2 He)
         as (n0 & mm' & Hw & Hs1 & Hd1).
       exists (S n0), mm'. split; [|split; [exact Hs1|]].
-      * rewrite hmrun_ram_write Hdev Hfp. exact Hw.
+      * rewrite hmrun_ram_write Hdev Hex Hfp. exact Hw.
       * rewrite Hd1. by apply write_bytes_dom. }
-    (* THE TWELVE SILENT CLASSES: one walker step is a conversion *)
+    3:{ (* THE FENCE: certified only without a W predecessor, which is what
+           the walker refuses too *)
+      apply andb_prop in Hg as [Hrel Hg]. apply negb_true_iff in Hrel.
+      destruct (IH tt s s' x mm Hsub Hg He) as (n0 & mm' & Hw & Hs1 & Hd1).
+      exists (S n0), mm'. split; [rewrite hmrun_barrier Hrel; exact Hw|].
+      split; [exact Hs1|exact Hd1]. }
+    (* THE ELEVEN OTHER SILENT CLASSES: one walker step is a conversion *)
     all: first
            [ destruct (IH tt s s' x mm Hsub Hg He)
                as (n0 & mm' & Hw & Hs1 & Hd1)
@@ -940,7 +1064,9 @@ Proof.
       [by apply (IH _ s mm)|discriminate Hg2]. }
   { apply andb_prop in Hg as [Hg1 Hg2]. rewrite Hg1. cbn [andb].
     by apply (IH (inl None) _ _). }
-  all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+  all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
+             | by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
 (* an event-free, READ-ONLY stretch is certified for ANY map and ANY write
@@ -955,7 +1081,9 @@ Proof.
                  | A ao | gmsg | | | cty | | msg ];
     cbn [goodb goodmb] in Hg |- *; try discriminate Hg.
   { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb]. by apply IH. }
-  all: first [ by apply (IH tt) | by apply (IH 0%Z) ].
+  all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt))
+             | by apply (IH tt) | by apply (IH 0%Z) ].
 Qed.
 
 (* THE MAP AFTER A STRETCH.  [exec] moves the machine state along the
@@ -1014,7 +1142,9 @@ Proof.
                  | A ao | gmsg | | | cty | | msg ];
     cbn [goodb mm_after] in Hg |- *; try discriminate Hg.
   { apply andb_prop in Hg as [_ Hg]. by apply IH. }
-  all: first [ by apply (IH tt) | by apply (IH 0%Z) ].
+  all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt))
+             | by apply (IH tt) | by apply (IH 0%Z) ].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1050,10 +1180,12 @@ Proof.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
       cbn beta iota in He. by apply (IH _ s mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp Hex.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
-    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+    all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
+             | by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
 Lemma goodmb_bind0 (Dr Dw : register -> bool) {Y} (m : M unit) (n : M Y)
@@ -1094,10 +1226,12 @@ Proof.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
       cbn beta iota in He. by apply (IH _ s mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp Hex.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
-    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+    all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
+             | by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
 Lemma goodmb_bind0R (Dr Dw : register -> bool) {R Y : Type}
@@ -1135,7 +1269,9 @@ Proof.
       [by apply (IH _ s mm)|discriminate Hg2]. }
   { apply andb_prop in Hg as [Hg1 Hg2]. rewrite Hg1. cbn [andb].
     by apply (IH (inl None) _ _). }
-  all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+  all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
+             | by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
 Lemma mm_after_try_catch (Dr Dw : register -> bool) {X E1 E2 : Type}
@@ -1155,7 +1291,9 @@ Proof.
     destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
       [by apply (IH _ s mm)|discriminate Hg2]. }
   { apply andb_prop in Hg as [_ Hg2]. by apply (IH (inl None) _ _). }
-  all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+  all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
+             | by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
 Lemma goodmb_liftR (Dr Dw : register -> bool) {X R : Type} (m : M X)
@@ -1238,7 +1376,9 @@ Proof.
   { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [_ Hfp].
     rewrite (write_bytes_empty _ nb _ (bytes_owned_empty _ nb Hfp)) in Hg2 |- *.
     by apply (IH (inl None) _). }
-  all: first [ by apply (IH tt s) | by apply (IH 0%Z s) ].
+  all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s))
+             | by apply (IH tt s) | by apply (IH 0%Z s) ].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1359,10 +1499,12 @@ Proof.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
       cbn beta iota in He. by apply (IH _ s mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp Hex.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
-    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+    all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
+             | by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
 Lemma goodmb_cer_bind_empty (Dr Dw : register -> bool) {X Y : Type}
@@ -1427,10 +1569,12 @@ Proof.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
       cbn beta iota in He. by apply (IH _ s mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp Hex.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
-    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+    all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
+             | by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1468,10 +1612,12 @@ Proof.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
       cbn beta iota in He. by apply (IH _ s mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp Hex.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
-    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+    all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm))
+             | by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
 Lemma goodmb_bind_nest_empty (Dr Dw : register -> bool) {X Y Z : Type}
@@ -1570,7 +1716,9 @@ Proof.
   { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
     rewrite Hdev (bytes_owned_dom_mono mm1 mm2 _ nb Hd Hfp). cbn [andb].
     apply (IH (inl None) _ _ _ (foldr_ins_dom_mono _ _ _ mm1 mm2 Hd) Hg2). }
-  all: first [ by apply (IH tt s mm1 mm2) | by apply (IH 0%Z s mm1 mm2) ].
+  all: first [ (apply andb_prop in Hg as [Hrel Hg]; rewrite Hrel; cbn [andb]; by apply (IH tt s mm1 mm2))
+             | (apply andb_prop in Hg as [_ Hg]; by apply (IH tt s mm1 mm2))
+             | by apply (IH tt s mm1 mm2) | by apply (IH 0%Z s mm1 mm2) ].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1702,8 +1850,8 @@ Proof.
       by rewrite (read_bytes_owned_mono mm s.(mem) _ nb w Hfp Hsub Hrb). }
     { (* RAM WRITE *)
       apply andb_prop in Hg as [Hg1 Hg2].
-      apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev.
+      apply andb_prop in Hg1 as [Hg1 Hfp]. apply andb_prop in Hg1 as [Hdev Hex].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hex.
       rewrite Hdev in He. cbn beta iota in He.
       assert (Hsub' :
         write_bytes mm (Interface.WriteReq.pa wreq) nb
@@ -1719,8 +1867,12 @@ Proof.
                   s' x _ Hsub' Hg2 He)
         as (n0 & Hw & Hs1 & Hd1).
       exists (S n0). split; [|split; [exact Hs1|]].
-      * rewrite hmrun_ram_write Hdev Hfp. exact Hw.
+      * rewrite hmrun_ram_write Hdev Hex Hfp. exact Hw.
       * rewrite Hd1. by apply write_bytes_dom. }
+    3:{ apply andb_prop in Hg as [Hrel Hg]. apply negb_true_iff in Hrel.
+      destruct (IH tt s s' x mm Hsub Hg He) as (n0 & Hw & Hs1 & Hd1).
+      exists (S n0). split; [rewrite hmrun_barrier Hrel; exact Hw|].
+      split; [exact Hs1|exact Hd1]. }
     all: first
            [ destruct (IH tt s s' x mm Hsub Hg He) as (n0 & Hw & Hs1 & Hd1)
            | destruct (IH 0%Z s s' x mm Hsub Hg He) as (n0 & Hw & Hs1 & Hd1) ];
@@ -1776,11 +1928,17 @@ Proof.
   { (* RAM WRITE *)
     destruct (dev_addr (Interface.WriteReq.pa wreq)) eqn:Hdev;
       [discriminate Hf|].
+    destruct (ak_excl (Interface.WriteReq.access_kind wreq)) eqn:Hex;
+      [discriminate Hf|].
     destruct (bytes_owned mm (Interface.WriteReq.pa wreq) nb) eqn:Hfp;
       [|discriminate Hf].
     destruct (IH rs1 rs2 _ _ x rs1' mm' Hag Hf) as (rs2' & Hf2 & Hag2).
     exists rs2'. split; [|exact Hag2].
-    rewrite hmrun_ram_write Hdev Hfp. exact Hf2. }
+    rewrite hmrun_ram_write Hdev Hex Hfp. exact Hf2. }
+  3:{ (* the fence: the walker takes it only without a W predecessor *)
+    destruct (fence_rel bar) eqn:Hrel; [discriminate Hf|].
+    destruct (IH rs1 rs2 mm _ x rs1' mm' Hag Hf) as (rs2' & Hf2 & Hag2).
+    exists rs2'. split; [rewrite hmrun_barrier Hrel; exact Hf2|exact Hag2]. }
   all: destruct (IH rs1 rs2 mm _ x rs1' mm' Hag Hf) as (rs2' & Hf2 & Hag2);
        exists rs2'; split; [exact Hf2|exact Hag2].
 Qed.

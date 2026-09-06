@@ -155,6 +155,45 @@ Qed.
 
 (* [vstep] at the hart it moved: the premise [tso_interp_of_receipt_at] wants
    when the plain read mints its receipt (A6.47 ruling 2). *)
+(* THE OWNED-CELL EXCLUSIVE READ (relaxed-ww.md §2.4): an exclusive read
+   reads MEMORY -- the drain flat [dmem] -- once the hart has no pending
+   store to the footprint.  A cell whose latest write is visible to the
+   reader and chained then holds that write in memory: the sibling of
+   [TsoMemPa.tso_read_of_latest] at the drain top. *)
+Lemma msg_visible_top (log : list pwmsg) (dl : list nat) (h : agent) (tv t : nat) :
+  msg_visible log dl h tv t -> msg_visible log dl h (length dl) t.
+Proof.
+  intros [Ht|(j & m & Ht & Hj & Hv)]; [by left|].
+  right. exists j, m. split; [exact Ht|]. split; [exact Hj|].
+  destruct Hv as [(q & Hq & _)|Htid].
+  - left. exists q. split; [exact Hq|]. apply lookup_lt_Some in Hq. lia.
+  - right. exact Htid.
+Qed.
+
+Lemma dmem_of_latest (img : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
+    (h : agent) (tv : nat) (a : Arch.pa) (t : nat) (v : bv 8) :
+  dl_ok log dl -> fifo_ok log dl ->
+  latest img log a t v -> chain_ok log dl a t ->
+  msg_visible log dl h tv t ->
+  pend_read log dl h a = None ->
+  dmem img log dl !! a = Some v.
+Proof.
+  intros Hdok Hfifo Hlat Hch Hvis Hpend.
+  rewrite -(tso_read_top_dmem img log dl h a Hpend).
+  apply (tso_read_of_latest _ _ _ _ _ _ t v Hdok Hfifo Hlat Hch).
+  exact (msg_visible_top _ _ _ _ _ Hvis).
+Qed.
+
+(* no pending own store to the footprint, byte by byte *)
+Lemma own_fp_pending_none (h : agent) (log : list pwmsg) (dl : list nat)
+    (pa : Arch.pa) (n : N) :
+  ~ own_fp_pending h log dl pa n ->
+  forall j : nat, (N.of_nat j < n)%N -> pend_read log dl h (pa_add pa j) = None.
+Proof.
+  intros Hnp j Hj. destruct (pend_read log dl h (pa_add pa j)) eqn:Hp; [|reflexivity].
+  exfalso. apply Hnp. exists j. split; [exact Hj|]. rewrite Hp. discriminate.
+Qed.
+
 Lemma vstep_here (h : agent) (t : nat) (dl : list nat) (V : agent -> nat) :
   vstep h t dl V h = t.
 Proof. rewrite /vstep. case_decide as Hd; [reflexivity | congruence]. Qed.
@@ -591,6 +630,10 @@ Section events.
     resv_frag cpu_id rr -∗
     (∀ σ img log dl tv V,
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       (* the same-address guard the machine checked: no own store to the
+          footprint is pending, so the owned cells' latest writes are in
+          MEMORY ([dmem_of_latest]) *)
+       ⌜~ own_fp_pending (hart_agent cpu_id) log dl (Interface.ReadReq.pa req) n⌝ -∗
        mstate_interp σ -∗
        tso_interp_of riscv_eraGS img σ.(mem) log dl
          (vstep (hart_agent cpu_id)
@@ -644,7 +687,7 @@ Section events.
           iApply (tso_interp_of_idle with "Htso"). }
       iMod (hart_rview_auth_update cpu_id (hr_rv hr) (length dl) Hrvlen
               with "Hrv") as "Hrv".
-      iMod ("H" $! σ img log dl tv V with "[//] Hσ Htso Hrec") as (w) "[%Hrb Hk]".
+      iMod ("H" $! σ img log dl tv V with "[//] [//] Hσ Htso Hrec") as (w) "[%Hrb Hk]".
       iModIntro. iExists (C (K (inl (w, None)))), σ, log, dl,
         (rtv (Interface.ReadReq.access_kind req) dl tv), itv,
         (HRead (length dl) (hr_coh hr) (ak_acq (Interface.ReadReq.access_kind req))),
@@ -1042,6 +1085,7 @@ Section events.
     resv_frag cpu_id rr -∗
     (∀ σ img log dl tv V,
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       ⌜~ own_fp_pending (hart_agent cpu_id) log dl (Interface.ReadReq.pa req) n⌝ -∗
        mstate_interp σ -∗
        tso_interp_of riscv_eraGS img σ.(mem) log dl
          (vstep (hart_agent cpu_id)
@@ -1063,8 +1107,8 @@ Section events.
     rewrite /swp. iIntros (C) "%HC Hcont".
     iApply (wp_hart_ram_read_excl C n req m rr HC Hproj Hdev Hexcl
               with "Hcert Hfrag [H Hcont]").
-    iIntros (σ img log dl tv V) "%Htv Hσ Htso Hrec".
-    iMod ("H" $! σ img log dl tv V with "[//] Hσ Htso Hrec") as (w) "[%Hrb Hk]".
+    iIntros (σ img log dl tv V) "%Htv %Hnp Hσ Htso Hrec".
+    iMod ("H" $! σ img log dl tv V with "[//] [//] Hσ Htso Hrec") as (w) "[%Hrb Hk]".
     iModIntro. iExists w. iSplitR; [done|]. iNext.
     iMod "Hk" as "(Hσ & Htso & Hswp)". iModIntro. iFrame "Hσ Htso".
     iIntros "Hfrag".
