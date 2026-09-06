@@ -38,8 +38,10 @@ disk but are unreachable, so excluding them from the durable view is the user-vi
 Alternatives considered and why not: keeping nlink-0 rows only while some process has the inode
 open ("in use") re-creates the obligation exactly at the last `iput`; a generic rule "the predicate
 tolerates deleting an nlink-0 row" cannot be stated on the view alone (open-ness is per-process
-state).  RECOMMENDATION (not yet ruled): (B) exclude nlink-0 rows; accept downside (1) as a
-follow-up on the fd row; then E2-F is unnecessary and #1/#2 are `_same`, and E2-Z can close.  Produced read-only against HEAD 668441141 after round E1's census; every claim carries file:line.  Design of record: design/applications.md §2/§6 L3; rounds record: app-instances.md §7 E.
+state).  RULED (owner, 2026-09-05): "let's exclude nlink==0 inodes from the view."  Lane E2-V2 launched
+(`abs_of` is `None` at type 0 OR nlink 0; the read/write fires' view clause becomes conditional on
+the count; `delta_unl_tgt` deletes at 0).  E2-F is unnecessary; #1/#2 become `_same` in E2-Z; the
+read spec through an fd of an unlinked file is fd-row follow-up work (app-echo.md does not need it).  Produced read-only against HEAD 668441141 after round E1's census; every claim carries file:line.  Design of record: design/applications.md §2/§6 L3; rounds record: app-instances.md §7 E.
 
 
 Scope: app-instances.md §6 ruling 4 / §7 E, applications.md §2 + §6 L3, fs-syscall-specs.md §4/§7.

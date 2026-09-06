@@ -286,12 +286,26 @@ truncate syscall):
 δ_create d name i ty   :  <[name:=i]> at d's ents  ∗  i fresh (AFile []/ADev/ADir with dots), nlink 1
                           (mkdir additionally: d.nlink+1 — fused, one delta)
 δ_link   d name i      :  <[name:=i]> at d's ents  ∗  i.nlink+1        (files/devs only)
-δ_unlink d name        :  delete name at d's ents  ∗  target.nlink−1
-                          (dir arm: also d.nlink−1; child's ".." goes grey — the
-                           child stays in aview as an orphan dir until iput)
+δ_unlink d name        :  delete name at d's ents  ∗  target.nlink−1,
+                          and the target LEAVES aview when its count reaches 0
+                          (dir arm: also d.nlink−1)
 δ_write  i off bs      :  AFile (splice off bs) — MAY GROW (size = max)
-δ_free   i             :  delete i from aview     (iput at nlink 0, last ref)
+δ_free   i             :  IDENTITY on aview (iput's free acts on a row already gone)
 ```
+
+**THE VIEW IS THE LIVE NAMESPACE (owner's ruling 2026-09-05, round E2 of
+`applications.md`; `projects/app-round-e2.md` "Q-d"):** `aview` holds an
+inode iff it is allocated AND `nlink ≠ 0` (`FsAbsDefs.abs_of : fs_node ->
+option anode`, `abs_view := omap abs_of`).  So `ialloc`'s claim (type set at
+nlink 0) and `iput`'s free are view-preserving; a created node APPEARS when
+its count goes to 1 and DISAPPEARS on the failure arm or at the last
+unlink.  What is deliberately NOT in the view: a file unlinked while some
+process still holds it open (the temp-file idiom) — its read/write specs
+are the fd row's business (a per-fd contents resource, the "stable
+corollary" below), not the file system's; and a removed directory that is
+still some process's cwd (relative lookups from it are unspecified, as
+Unix's ENOENT).  This supersedes the earlier "orphans stay in aview until
+iput" of §1 and the note under §7.
 
 **[SUPERSEDED 2026-08-25 — see the IMPACT NOTE at the top: ruling 4⁹
 replaced the ledger/fold commit with snapshot re-allocation and slates
@@ -612,9 +626,10 @@ carriers, identical in shape for every mutator.
 
 Notes: `open(O_CREATE)` on an existing file is xv6's open-not-fail arm —
 the delta is CONDITIONAL, which the AU form expresses as two arms, not
-nondeterminism.  `unlink`'s dir arm leaves the child orphaned-in-map
-(§1); `close`'s δ_free fires only at nlink 0 + last ref, i.e. the spec
-of `iput`'s free path, reached from several syscalls.
+nondeterminism.  `unlink`'s dir arm removes the child from the view when
+its count reaches 0 (§4's ruling of 2026-09-05; the earlier
+"orphaned-in-map" is superseded); `iput`'s free is then view-preserving,
+so `close` carries no δ_free obligation.
 
 ## 8. What is inherited from the sources, and what is deliberately different
 
