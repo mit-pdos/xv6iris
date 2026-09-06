@@ -20,9 +20,12 @@
    shows the new token GENERALIZES today's [ctx_parked XIp Tp ∗ ctx_floor
    ξl Tp] pair, which is what lets every existing site convert in place.
 
-   NAME: [ctx_under]; the stamped form keeps [ctx_parked ξ T] and its whole
-   law family (ctx-parent.md §2, §8(a)).  The file becomes [TsoCtxUnder.v]
-   when the design is adopted.
+   RULING (ctx-parent.md §8): [ctx_under] IS the final domination relation
+   at full authority -- [ctx_dom ξ ξ'] is the same body at a half, the
+   ONLY transport relation, and [CtxMorph] its only class; the same-hart
+   move is derived.  The final names are [ctx_parked ξ ξ'] for this token
+   and [ctx_stamped ξ T] for today's stamped record; the laws below move
+   into TsoCtx.v verbatim.
 
    WHAT THE TOKEN IS A RESOURCE ABOUT.  [ctx_under ξ ξ'] owns ξ's whole
    authority and holds only LOWER BOUNDS and MEMBERSHIPS about ξ' -- both
@@ -34,8 +37,10 @@
    rules:
      - chains resume parents first: ξ under P under S is resumed by
        resuming P (needs S running here) and then ξ;
-     - there is NO transitivity law [ctx_under ξ P ∗ ctx_under P S ⊢
-       ctx_under ξ S]: ξ's keys registered at P are not registered at S;
+     - chains flatten through a PARKED middle context ([ctx_under ξ P ∗
+       ctx_under P S ⊢ ctx_under ξ S ∗ ctx_under P S]: lend a half of P's
+       record and morph the child along it) and NOT through a running one
+       (no borrow of a running context's authority exists);
      - there is NO deposit into a parked child: it would need a domination
        [ctx_dom parent child], whose target bound must exceed the parent's
        dirty watermark, which sits above the hart's view -- fill a child
