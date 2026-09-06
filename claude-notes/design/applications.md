@@ -275,45 +275,6 @@ claim gives `pristine ∨ taint`, and `echo_R_untainted` settles it.  No
 era-local fact is exported, which is what makes the statement hold
 across reboots.
 
-## 6. What the echo application owes, lane by lane
-
-Every lane is a kernel-side or program-side proof; none changes the
-record or the theorem.  (Re-scoped 2026-09-05 from the client-copy
-design; `app-echo.md` is the worklist.)
-
-- **L2 — the step moves to the process.**  Today every view-changing
-  retag is paid by the era-wide `app_auto` (generic only).  The echo
-  application needs `app_step` PER SYSCALL from the PROCESS: the
-  returning-ecall arm of the trap contract gains a persistent give
-  (the fd-row pilot's deposit shape), the AU fires take the step from
-  it, and a verified process pays it at each ecall — trivially for
-  read-kind calls and console writes, and by presenting the taint for
-  anything else.  The generic slot under the echo application is
-  `taint -∗ □ uexec_wp`, minted by sh at the exec that leaves the
-  discipline.  L2 is what DELETES the blanket promise `Happ_auto` (§2).
-- **L3 — round E** (kernel side, application-independent): every
-  `_auto` site becomes `_same` or `_step`; link, mkdir and `iput`'s free
-  get AU forms with their deltas; `top_move` and the `_auto` movers are
-  deleted.  `Happ_auto` is L2's to delete (§2).
-- **L5 — the console INPUT tie.**  A located receipt on the input side,
-  `UartSentLoc`'s twin: the bytes `consoleread` delivers are the
-  line-edited image of a segment of the cycle's `ObsUartIn` bytes.  It is
-  what lets sh know its input left the discipline, hence what lets sh
-  mint the taint.
-- **L6 — the programs on the Uk engine with paid ecalls.**  init and sh
-  still run on the old capability engine; echo runs on Uk.  All three
-  need the L2 give at every ecall leaf, the exec-site gate at the
-  OBSERVED image (`SpecKexecAU`'s slot wand at `/echo`'s bytes, which the
-  pristine claim pins to the image's — `FsShPin`'s shape for echo), and
-  fork's real row.
-- **L7 — the output side.**  `echo_out h` and `good_out`: the console's
-  `ObsUartOut` bytes are a prefix of the expected stream for the inputs
-  so far, through `UartSentLoc.uart_sent_from` and
-  `UartAccepted.run_out_accepted_from`.  Safety only (uart-trace.md
-  ruling 5).
-
-Lane L4 (a durable application conjunct) dissolved into §3's transport.
-
 ## 7. Rejected shapes
 
 - **The application predicate as a `Prop`** (the scaffold's first cut).

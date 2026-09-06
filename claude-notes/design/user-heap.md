@@ -279,14 +279,6 @@ in where its bytes live.  If a later program needs that branch, the honest
 fix is to give `uargv` the clause, which means one producer
 (`UEchoKernel.echo_uargv_of_area`) has to prove it.
 
-## Status
-
-The engine is complete except the two syscall rows above.  `init` and `cat`
-are proved on it end to end (`wp_kinit_start`, `wp_kcat_start`).  `UkSync.v`
-and `UkEcho.v` are still on the OLD interface (`ukc`, `uvb`, `uk_instr`) and
-have not been re-cut; the old leaves in `UkLeaf.v` / `UkStore.v` /
-`UkLoad.v` / `UkBranch.v` stay because the new ones are wrappers over them.
-
 ## The free stack
 
 `urun` carries `avail`, the words of free stack below sp, owned by the

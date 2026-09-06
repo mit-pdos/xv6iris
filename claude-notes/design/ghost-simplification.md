@@ -1,38 +1,31 @@
 # Post-campaign ghost-state redundancy review — can the proof be simplified?
 
-STATUS: the standing list of what may still be simplified, and — more
-usefully — of what has been PROBED AND REFUSED, so nobody re-opens it.
-SIMP-1 landed, SIMP-2's `fs_ready` half landed (§5.3a), SIMP-4 is refused
-(H2), and SIMP-3 (`gd`) is the one item still open.  Every verdict rests on
-a consumer enumeration run against the sources; the machine-checked ones
-cite the campaign's own probes (recorded in
-[`../completed/iclaim-ledger.md`](../completed/iclaim-ledger.md) §5⁗″/§5⁗⁗).
-Ranking metric, per the user's refinement: **contract-surface reduction
-first** — a candidate that deletes Spec clauses at moderate internal cost
-outranks one that only merges invariants.
+What may still be simplified, and — more usefully — what has been PROBED AND
+REFUSED, so nobody re-opens it. Every verdict rests on a consumer enumeration
+run against the sources.
 
-## 0. Executive summary — the top three by value/cost
+**The ranking metric is contract-surface reduction first**: a candidate that
+deletes Spec clauses at moderate internal cost outranks one that only merges
+invariants.
 
-1. **SIMP-A: retire the `rg` binder from the runtime iput contracts.**
-   `ireg_open` is persistent, so a runtime caller's "lend a copy, get a
-   copy back" round-trip (`SpecIput.v:224/:291`, same on `SpecIunlockput`)
-   carries no information.  State `wp_iput_sconf`/`wp_iunlockput_sconf` at
-   `rg := true` internally (the persistent `ireg_open` premise those specs
-   ALREADY carry supplies `ireg_regime true` on the spot); only ireclaim
-   keeps the indexed `_gen` form.  Deletes: the `(rg : bool)` binder, the
-   `ireg_regime` premise AND its return clause from the contract every
-   runtime caller reads — ~10 proof files get one binder and two clauses
-   shorter.  Cost: tiny (a specialization lemma + mechanical rethreading).
-2. **SIMP-B: fold the provenance unit into the reference.**  Define the
-   flavoured reference package (`inode_refb b := inode_ref ∗ runit b`,
-   with the existential form at iput).  Deletes: `SpecIget`'s separate
-   `runit (is_claim l)` post clause (`SpecIget.v:284`), the `runit_any`
-   premise AND the `bfl` binder on `SpecIput`/`SpecIunlockput`
-   (`SpecIput.v:240` — the spend destructs the existential internally),
-   both `runit` clauses on `SpecIdup`, and reshapes `SpecIalloc`'s receipt
-   into one package.  iget goes back to returning ONE resource — at these
-   contracts the post-campaign surface becomes *shorter than pre-campaign*.
-   Cost: an IIIe-sized rethread (package defs + iget/iput/idup/ilkc arms).
+## 0. The two candidates worth doing
+
+**SIMP-A — retire the `rg` binder from the runtime `iput` contracts.**
+`ireg_open` is persistent, so a runtime caller's "lend a copy, get a copy back"
+round-trip carries no information. State the runtime contracts at `rg := true`
+internally — the persistent premise those specs ALREADY carry supplies the
+regime on the spot — and keep the indexed `_gen` form for `ireclaim` alone. That
+deletes a binder, a premise and a return clause from the contract every runtime
+caller reads. Cost: a specialization lemma plus mechanical rethreading.
+
+**SIMP-B — fold the provenance unit into the reference.** Define the flavoured
+package (`inode_refb b := inode_ref ∗ runit b`, existential at `iput`). That
+deletes `SpecIget`'s separate `runit` post clause, the `runit_any` premise and
+the flavour binder on `SpecIput`/`SpecIunlockput`, both `runit` clauses on
+`SpecIdup`, and reshapes `SpecIalloc`'s receipt into one package. `iget` goes
+back to returning ONE resource, and at these contracts the surface becomes
+*shorter than it was before the campaign that added them*.
+
 ## 1. The spec-clause inventory (what the campaign added, and its fate)
 
 | clause | verdict |
@@ -137,28 +130,6 @@ refers to one accessor, not the piece.)
   drift errors, and the check will say so.
 - The three `ZZProbe*` scratch files are untracked and do not travel; the
   `proof_coverage --check` drift rows they cause vanish on any fresh clone.
-
-## 3. A priced simplification campaign (if/when the user wants it)
-
-Gated increments, each ending at the full three-tops/standing-six gate:
-
-1. **SIMP-1 (contract dead-weight, ~1 executor-day):** SIMP-A (the `rg`
-   specialization) + the BufL-equation fold + H6's dead-lemma sweep.
-   Immediate spec-surface win, near-zero risk.
-2. **SIMP-2 (the reference package, IIIe-sized):** SIMP-B across
-   SpecIget/SpecIput/SpecIunlockput/SpecIdup/SpecIalloc + the ilkc arms.
-   The big contract shortening.
-3. **SIMP-3 (gname diet, probe-first):** `gd` retirement (H4).  `icfg`
-   shrinks 9 → 8 gnames.  Internal.  **The one item of this list still
-   open**, and never proposed to the owner.
-4. ~~**SIMP-4: the icnt-into-ledger merge**~~ — REFUSED (H2 above): `icnt`
-   is the only resource crossing the lock↔region wall, and every sound
-   variant re-homes it into `Xv6Cameras.v`.  Do not re-open.
-
-**One deletion this list did not predict** and that did land: the freeze
-RECEIPT (`frzown`) is gone from the tree, camera and all.  It bought one
-fact at one program point, which the freeze pin already gives; a receipt
-whose content is a second copy of a pin's is the shape to look for next.
 
 ## 4. Leave it alone (accreted, but load-bearing)
 
@@ -271,36 +242,6 @@ lemmas consume it.  SIMP-2 promotes it:
   4. Pure ties (`dev = icfg_dev` etc.) ride as today (`sysc_fs_env`'s
      pattern).
 
-### 5.3 The forkret delta (the acceptance criterion)
-
-`LinkForkretNF.v`'s own header states the current situation: the
-not-forked arm calls fsinit and kexec, and forkret holds the fs
-environment "only INSIDE the residue closer … If the arm's proof needs
-those resources up front, this contract grows a premise."  I.e. today,
-proving the axiom means growing it by the CONSTITUENT pile (15+ rows,
-with the boot/regime story unresolved at that altitude).
-
-Under SIMP-2 the delta is one row: `fs_ready … -∗` (persistent) —
-definitionally the ∗ of every fs constituent a runtime continuation
-wants (the projection family is an iDestruct one-liner INSIDE
-FsReady.v's section; see the live finding).  The fs-side obligation of
-forkret's first branch becomes: *the boot chain sealed (fs_ready
-exists), forkret carries it.*  The remaining content of the IOU is
-then scheduler/trapframe work with NO fs entanglement — which is
-exactly what makes it plausibly provable at last.
-
-A LIVE FINDING from the probe, load-bearing for the executor:
-`fs_world` today is elaborated over auto-generalized instance binders
-(`icfg` among them — the class-used-as-INDEX trap, durable-notes), so
-its unfolded conjuncts do NOT syntactically match re-typed copies in a
-foreign section: the icache/region-family conjuncts were unframeable
-from the probe's section until the shadowing `ICFG` binder was dropped,
-and `is_itable2`/`itable_inv`/`ic_escrows`/`ireg_inv`/`ireg_open`
-remained baked-instance-mismatched even then.  This fragility is itself
-an argument FOR the rehoming: `FsReady.v` states `fs_ready` over an
-EXPLICIT `Context`, and every projection/pack lemma lives inside that
-section.  Executor step 1 carries a tripwire for it.
-
 ### 5.3a LANDED: the parameter-free `fs_ready`
 
 §5.3's delta was "one row, `fs_ready … -∗`".  Making that row CARRIABLE
@@ -330,49 +271,3 @@ Not done, and deliberately: the §7d adoption sweep.  `SpecIput`/
 `SpecDirlookup` are now UNBLOCKED (the cycle is gone) but the weighing in
 §7d is unchanged — iput uses about seven of the eighteen constituents, so
 adoption is still a contract-content gain rather than a collapse.
-
-### 5.4 The SIMP-2 executable brief (dependency order)
-
-  1. `FsReady.v` (rehomed `fs_world` = `fs_ready` + the establishment
-     lemma from the probe + the projection lemma family).  Wire the
-     SEAL into the boot chain (main, at fsinit's return); `fs_world` /
-     `sysc_fs_env` become derived forms.  TRIPWIRE: a constituent
-     missing at the seal site (report what ProofMain actually lacks).
-  2. The package defs (`inode_refb/refp/claimed`, from the probe) in
-     `IcacheRef.v` beside `inode_held`; restate `inode_held` over
-     `inode_refp`.
-  3. `SpecIget` post → `inode_refb (is_claim l)`; ProofIget packs
-     (probe's intro); callers re-thread (they currently destruct two
-     rows — now one).
-  4. `SpecIput`/`SpecIunlockput` pre → `inode_refp` (rename by
-     `inode_refp_spend`); callers re-thread.
-  5. `SpecIalloc` receipt → `inode_claimed ty`; `ProofCreate`'s fill
-     presents it via `inode_claimed_to_ClaimK`.
-  6. `SpecIdup` → `inode_held` in / `inode_held ∗ inode_held` out;
-     ProofIdup re-proves over the carve; kfork cone re-threads (its
-     sites get SHORTER — they stop unpacking).
-  7. fs_ready adoption sweep over the fs-internal Specs (the ~7-row
-     collapses), then the syscall layer's `sysc_fs_env` restatement.
-  8. GATE: whole tree green to fixpoint; three tops at the standing
-     six; the contract-shrink table (this section's projections,
-     measured); `fs-ghost-state.md` updated in the same series (the
-     standing rule); lemma_diff justified.
-  TRIPWIRES: any Spec GAINING a row; the seal site missing a
-  constituent; SpecIdup's carve not closing at a caller; red growth.
-
-### 5.5 Probe results (ZZSimp2.v, lane, untracked)
-
-| lemma | status |
-|---|---|
-| `inode_refb_intro` (SAT, iget's rows) | Qed |
-| `inode_refp_spend` (⊣⊢, iput's rows) | Qed |
-| `inode_claimed_intro` (SAT, ialloc's rows) | Qed |
-| `inode_claimed_to_ClaimK` (create's fill supply) | Qed |
-| `fs_ready_seal` (`ireg_boot ==∗ ireg_open`) | Qed, closed |
-| `fs_ready_establish` (pack-wand ∗ ireg_boot ==∗ fs_world) | Qed, at the standing platform axioms |
-
-All zero-admit; five of six closed under the global context (the
-establishment's statement mentions `fs_world`, whose constants carry
-the standing platform base — the same closure every top theorem has).
-The projection lemma was NOT probeable in a foreign section (the live
-finding above) and moved to executor step 1.
