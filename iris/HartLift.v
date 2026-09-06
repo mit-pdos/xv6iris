@@ -79,7 +79,11 @@ Definition hsil_node {X : Type} (D : gset register) (rs : regstate) (m : M X)
            if decide (r ∈ D) then Some (register_set r v rs, k tt) else None
        | Interface.InstrAnnounce _    => fun k => Some (rs, k tt)
        | Interface.BranchAnnounce _ _ => fun k => Some (rs, k tt)
-       | Interface.Barrier _          => fun k => Some (rs, k tt)
+       (* a fence with a W predecessor is NOT silent under two logs
+          (relaxed-ww.md §1.1): it blocks until the hart's stores have
+          drained and it publishes -- [HartBarrier]'s leaf owns it *)
+       | Interface.Barrier b          => fun k =>
+           if fence_rel b then None else Some (rs, k tt)
        | Interface.CacheOp _          => fun k => Some (rs, k tt)
        | Interface.TlbOp _            => fun k => Some (rs, k tt)
        | Interface.TakeException _    => fun k => Some (rs, k tt)
@@ -147,110 +151,122 @@ Qed.
    view effect takes the hart's read watermark [rv] beside the view, because
    an R→R fence raises the floor to it.  A silent node never moves the read
    side itself. *)
-Definition hbar_tv {T : Type} (h : agent) (log : list pwmsg)
+Definition hbar_tv {T : Type} (h : agent) (log : list pwmsg) (dl : list nat)
     (oc : Interface.outcome (fun _ => exception) T) (tv rv : nat) : nat :=
   match oc with
-  | Interface.Barrier b => fence_post h log (fence_drains b) (fence_acq b) tv rv
+  | Interface.Barrier b => fence_post h log dl (fence_drains b) (fence_acq b) tv rv
   | _ => tv
   end.
 
-Definition hsil_tv {X : Type} (h : agent) (log : list pwmsg) (m : M X)
+Definition hsil_tv {X : Type} (h : agent) (log : list pwmsg) (dl : list nat) (m : M X)
     (tv rv : nat) : nat :=
   match m with
   | Interface.Ret _ => tv
-  | Interface.Next oc _ => hbar_tv h log oc tv rv
+  | Interface.Next oc _ => hbar_tv h log dl oc tv rv
   end.
 
 (* ... and the INSTRUCTION view (claude-notes/projects/icache.md): among the
    silent nodes only [fence.i] moves it, past the hart's data view and its
    own last store, and only ever forward. *)
-Definition hbar_itv {T : Type} (h : agent) (log : list pwmsg)
+Definition hbar_itv {T : Type} (h : agent) (log : list pwmsg) (dl : list nat)
     (oc : Interface.outcome (fun _ => exception) T) (tv rv itv : nat) : nat :=
   match oc with
   | Interface.Barrier b =>
-      if fence_ifetch b then Nat.max itv (fence_post h log true false tv rv) else itv
+      if fence_ifetch b then Nat.max itv (fence_post h log dl true false tv rv) else itv
   | _ => itv
   end.
 
-Definition hsil_itv {X : Type} (h : agent) (log : list pwmsg) (m : M X)
+Definition hsil_itv {X : Type} (h : agent) (log : list pwmsg) (dl : list nat) (m : M X)
     (tv rv itv : nat) : nat :=
   match m with
   | Interface.Ret _ => itv
-  | Interface.Next oc _ => hbar_itv h log oc tv rv itv
+  | Interface.Next oc _ => hbar_itv h log dl oc tv rv itv
   end.
 
-Lemma hbar_itv_ge {T : Type} (h : agent) (log : list pwmsg)
+Lemma hbar_itv_ge {T : Type} (h : agent) (log : list pwmsg) (dl : list nat)
     (oc : Interface.outcome (fun _ => exception) T) (tv rv itv : nat) :
-  (itv <= hbar_itv h log oc tv rv itv)%nat.
+  (itv <= hbar_itv h log dl oc tv rv itv)%nat.
 Proof. destruct oc; try done. rewrite /hbar_itv. case_match; lia. Qed.
 
-Lemma hsil_itv_ge {X : Type} (h : agent) (log : list pwmsg) (m : M X)
-    (tv rv itv : nat) : (itv <= hsil_itv h log m tv rv itv)%nat.
+Lemma hsil_itv_ge {X : Type} (h : agent) (log : list pwmsg) (dl : list nat) (m : M X)
+    (tv rv itv : nat) : (itv <= hsil_itv h log dl m tv rv itv)%nat.
 Proof. destruct m as [y|T oc k]; [done|]. apply hbar_itv_ge. Qed.
 
 (* the drain and the acquire only ever move the view FORWARD ... *)
-Lemma hbar_tv_ge {T : Type} (h : agent) (log : list pwmsg)
+Lemma hbar_tv_ge {T : Type} (h : agent) (log : list pwmsg) (dl : list nat)
     (oc : Interface.outcome (fun _ => exception) T) (tv rv : nat) :
-  (tv <= hbar_tv h log oc tv rv)%nat.
+  (tv <= hbar_tv h log dl oc tv rv)%nat.
 Proof.
   destruct oc; try done. rewrite /hbar_tv. apply fence_post_ge.
 Qed.
 
-(* ... and never past the top of the log ([fence_post_le]: [own_pub_le] for
-   the drain, the watermark's own bound for the acquire). *)
-Lemma hbar_tv_le {T : Type} (h : agent) (log : list pwmsg)
+(* ... and never past the top of the DRAIN log ([fence_post_le]:
+   [own_pub_le] for the drain, the watermark's own bound for the acquire). *)
+Lemma hbar_tv_le {T : Type} (h : agent) (log : list pwmsg) (dl : list nat)
     (oc : Interface.outcome (fun _ => exception) T) (tv rv : nat) :
-  (tv <= length log)%nat -> (rv <= length log)%nat ->
-  (hbar_tv h log oc tv rv <= length log)%nat.
+  (tv <= length dl)%nat -> (rv <= length dl)%nat ->
+  (hbar_tv h log dl oc tv rv <= length dl)%nat.
 Proof.
   intros Htv Hrv. destruct oc; try done.
   rewrite /hbar_tv. by apply fence_post_le.
 Qed.
 
-Lemma hsil_tv_ge {X : Type} (h : agent) (log : list pwmsg) (m : M X)
-    (tv rv : nat) : (tv <= hsil_tv h log m tv rv)%nat.
+Lemma hsil_tv_ge {X : Type} (h : agent) (log : list pwmsg) (dl : list nat) (m : M X)
+    (tv rv : nat) : (tv <= hsil_tv h log dl m tv rv)%nat.
 Proof. destruct m as [y|T oc k]; [done|]. apply hbar_tv_ge. Qed.
 
-Lemma hsil_tv_le {X : Type} (h : agent) (log : list pwmsg) (m : M X)
+Lemma hsil_tv_le {X : Type} (h : agent) (log : list pwmsg) (dl : list nat) (m : M X)
     (tv rv : nat) :
-  (tv <= length log)%nat -> (rv <= length log)%nat ->
-  (hsil_tv h log m tv rv <= length log)%nat.
+  (tv <= length dl)%nat -> (rv <= length dl)%nat ->
+  (hsil_tv h log dl m tv rv <= length dl)%nat.
 Proof.
   intros Htv Hrv. destruct m as [y|T oc k]; [done|]. by apply hbar_tv_le.
 Qed.
 
 Lemma hsil_node_mnode (D : gset register) (rs rs' : regstate)
-    (m m' : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state) :
+  (m m' : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state) :
   hsil_node D rs m = Some (rs', m') ->
   forall (oth : gset Arch.pa) (h : agent) (img : gmap Arch.pa (bv 8))
-         (log : list pwmsg) (tv itv : nat) (hr : hread) (r : option resv),
-    mnode_step oth h img (MState rs mem dev) log tv itv hr r m m'
-      (MState rs' mem dev) log (hsil_tv h log m tv (hr_rv hr))
-      (hsil_itv h log m tv (hr_rv hr) itv) hr r.
+         (log : list pwmsg) (dl : list nat) (tv itv : nat) (hr : hread) (r : option resv),
+    mnode_step oth h img (MState rs mem dev) log dl tv itv hr r m m'
+      (MState rs' mem dev) log dl (hsil_tv h log dl m tv (hr_rv hr))
+      (hsil_itv h log dl m tv (hr_rv hr) itv) hr r.
 Proof.
-  intros Hnode oth h img log tv itv hr r. destruct m as [y|T oc k];
+  intros Hnode oth h img log dl tv itv hr r. destruct m as [y|T oc k];
     [by simpl in Hnode|].
   destruct oc; simpl in Hnode |- *; try discriminate Hnode;
-    try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; by split_and!.
+    first
+      [ (* the register nodes *)
+        case_decide; [|discriminate Hnode]; injection Hnode as <- <-; by split_and!
+      | (* the silent barrier: [fence_rel b = false], so the enabled arm *)
+        destruct (fence_rel _) eqn:Hrel; [discriminate Hnode|];
+        injection Hnode as <- <-; right; split_and!; [by left|done|done|done|done|done|done|done|done]
+      | injection Hnode as <- <-; by split_and! ].
 Qed.
 
 Lemma hsil_node_mnode_inv (D : gset register) (rs rs' : regstate)
-    (m m' m2 : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state)
-    (σ2 : mstate) (oth : gset Arch.pa) (h : agent)
-    (img : gmap Arch.pa (bv 8)) (log log2 : list pwmsg) (tv tv2 itv itv2 : nat)
-    (hr hr2 : hread) (r r2 : option resv) :
+  (m m' m2 : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state)
+  (σ2 : mstate) (oth : gset Arch.pa) (h : agent)
+  (img : gmap Arch.pa (bv 8)) (log log2 : list pwmsg) (dl dl2 : list nat)
+  (tv tv2 itv itv2 : nat) (hr hr2 : hread) (r r2 : option resv) :
   hsil_node D rs m = Some (rs', m') ->
-  mnode_step oth h img (MState rs mem dev) log tv itv hr r m m2 σ2 log2 tv2 itv2 hr2 r2 ->
-  m2 = m' /\ σ2 = MState rs' mem dev /\ log2 = log /\
-  tv2 = hsil_tv h log m tv (hr_rv hr) /\ itv2 = hsil_itv h log m tv (hr_rv hr) itv /\
+  mnode_step oth h img (MState rs mem dev) log dl tv itv hr r m m2 σ2 log2 dl2 tv2 itv2 hr2 r2 ->
+  m2 = m' /\ σ2 = MState rs' mem dev /\ log2 = log /\ dl2 = dl /\
+  tv2 = hsil_tv h log dl m tv (hr_rv hr) /\ itv2 = hsil_itv h log dl m tv (hr_rv hr) itv /\
   hr2 = hr /\ r2 = r.
 Proof.
   intros Hnode Hstep. destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode |- *; try discriminate Hnode;
-    try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; destruct Hstep as (-> & -> & -> & -> & -> & -> & ->);
-    by split_and!.
+    first
+      [ case_decide; [|discriminate Hnode];
+        injection Hnode as <- <-; destruct Hstep as (-> & -> & -> & -> & -> & -> & -> & ->);
+        by split_and!
+      | destruct (fence_rel _) eqn:Hrel; [discriminate Hnode|];
+        injection Hnode as <- <-;
+        destruct Hstep as [(Hrel' & _) | (_ & -> & -> & -> & -> & -> & -> & -> & ->)];
+        [congruence | by split_and!]
+      | injection Hnode as <- <-; destruct Hstep as (-> & -> & -> & -> & -> & -> & -> & ->);
+        by split_and! ].
 Qed.
 
 (* a silent node never touches the hart's reservation -- the side condition
@@ -259,18 +275,23 @@ Lemma hsil_node_pres (D : gset register) (rs rs' : regstate)
     (m m' : M unit) :
   hsil_node D rs m = Some (rs', m') ->
   forall (oth : gset Arch.pa) (h : agent) (img : gmap Arch.pa (bv 8))
-         (s : mstate) (log : list pwmsg) (tv itv : nat) (hr : hread) (r : option resv)
-         (m2 : M unit) (s2 : mstate) (log2 : list pwmsg) (tv2 itv2 : nat)
-         (hr2 : hread) (r2 : option resv),
-    mnode_step oth h img s log tv itv hr r m m2 s2 log2 tv2 itv2 hr2 r2 ->
+         (s : mstate) (log : list pwmsg) (dl : list nat) (tv itv : nat) (hr : hread)
+         (r : option resv) (m2 : M unit) (s2 : mstate) (log2 : list pwmsg)
+         (dl2 : list nat) (tv2 itv2 : nat) (hr2 : hread) (r2 : option resv),
+    mnode_step oth h img s log dl tv itv hr r m m2 s2 log2 dl2 tv2 itv2 hr2 r2 ->
     r2 = r /\ hr_acq hr2 = hr_acq hr.
 Proof.
-  intros Hnode oth h img s log tv itv hr r m2 s2 log2 tv2 itv2 hr2 r2 Hstep.
+  intros Hnode oth h img s log dl tv itv hr r m2 s2 log2 dl2 tv2 itv2 hr2 r2 Hstep.
   destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode; try discriminate Hnode;
-    try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; destruct Hstep as (_ & _ & _ & _ & _ & -> & ->);
-    by split.
+    first
+      [ case_decide; [|discriminate Hnode];
+        injection Hnode as <- <-; destruct Hstep as (_ & _ & _ & _ & _ & _ & -> & ->); by split
+      | destruct (fence_rel _) eqn:Hrel; [discriminate Hnode|];
+        injection Hnode as <- <-;
+        destruct Hstep as [(_ & _ & _ & _ & _ & _ & _ & _ & -> & ->) | (_ & _ & _ & _ & _ & _ & _ & -> & ->)];
+        by split
+      | injection Hnode as <- <-; destruct Hstep as (_ & _ & _ & _ & _ & _ & -> & ->); by split ].
 Qed.
 
 (* ====================================================================== *)
@@ -539,6 +560,9 @@ Section batch.
           [ by rewrite !register_lookup_set
           | rewrite !(irrelevant_register_set r' reg _ regval
                         (register_beq_false r' reg Hne)); by apply Hag ]
+        | (* the silent barrier: [fence_rel b = false] on both sides *)
+          destruct (fence_rel _) eqn:Hrel; [discriminate Hnode|];
+          injection Hnode as <- <-; exists rs2; by split
         | injection Hnode as <- <-; exists rs2; by split ].
   Qed.
 
@@ -557,10 +581,10 @@ Section batch.
   Proof.
     iIntros (Hnode) "#Hcert Hrf H".
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
-      exact (hsil_node_pres D rs rs1 m m1 Hnode oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0
-               m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs). }
-    iIntros (σ oth r img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
+    { intros oth0 h0 img0 σ0 log0 dl0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 dl'0 tv'0 itv'0 hr'0 r'0 Hs.
+      exact (hsil_node_pres D rs rs1 m m1 Hnode oth0 h0 img0 σ0 log0 dl0 tv0 itv0 hr0 r0
+               m'0 σ'0 log'0 dl'0 tv'0 itv'0 hr'0 r'0 Hs). }
+    iIntros (σ oth r img log dl tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     destruct Hhr as (Hrvlen & _).
     destruct σ as [rs0 mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
@@ -569,35 +593,34 @@ Section batch.
       as (rs2 & Hnode2 & Hag2).
     (* the view's legal-position bound, read off the bundle: what makes the
        fence's drain a MONOTONE advance rather than an arbitrary jump *)
-    iAssert (⌜(tv <= length log)%nat⌝)%I as %Htvlen.
-    { iDestruct "Htso" as (TM LM) "(_&_&_&_&_&_&_&_&%Hb&_)".
-      iPureIntro. rewrite -Htv. apply Hb. }
+    iDestruct (tso_interp_of_bound with "Htso") as %Hb.
+    assert (Htvlen : (tv <= length dl)%nat) by (rewrite -Htv; apply Hb).
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iExists m1, (MState rs2 mem0 dev0), log,
-      (hsil_tv (hart_agent cpu_id) log m tv (hr_rv hr)),
-      (hsil_itv (hart_agent cpu_id) log m tv (hr_rv hr) itv), hr, r.
+    iExists m1, (MState rs2 mem0 dev0), log, dl,
+      (hsil_tv (hart_agent cpu_id) log dl m tv (hr_rv hr)),
+      (hsil_itv (hart_agent cpu_id) log dl m tv (hr_rv hr) itv), hr, r.
     iSplitR.
     { iPureIntro.
       exact (hsil_node_mnode D rs0 rs2 m m1 mem0 dev0 Hnode2 oth
-               (hart_agent cpu_id) img log tv itv hr r). }
-    iNext. iIntros (m' σ' log' tv' itv' hr' r') "%Hstep".
+               (hart_agent cpu_id) img log dl tv itv hr r). }
+    iNext. iIntros (m' σ' log' dl' tv' itv' hr' r') "%Hstep".
     destruct (hsil_node_mnode_inv D rs0 rs2 m m1 m' mem0 dev0 σ' oth
-                (hart_agent cpu_id) img log log' tv tv' itv itv' hr hr' r r' Hnode2 Hstep)
-      as (-> & -> & -> & -> & -> & -> & ->).
+                (hart_agent cpu_id) img log log' dl dl' tv tv' itv itv' hr hr' r r' Hnode2 Hstep)
+      as (-> & -> & -> & -> & -> & -> & -> & ->).
     (* the INSTRUCTION view: a fence.i raises it, everything else leaves it;
        the mirror follows ([hsil_itv_ge] is the monotone update) *)
     iMod (hart_iview_auth_update cpu_id itv
-            (hsil_itv (hart_agent cpu_id) log m tv (hr_rv hr) itv)
-            (hsil_itv_ge _ _ _ _ _ _) with "Hiv") as "Hiv".
-    (* THE ONE MEMORY-MODEL EFFECT (see [hsil_tv]): a draining fence moves
+            (hsil_itv (hart_agent cpu_id) log dl m tv (hr_rv hr) itv)
+            (hsil_itv_ge _ _ _ _ _ _ _) with "Hiv") as "Hiv".
+    (* THE ONE MEMORY-MODEL EFFECT (see [hsil_tv]): an acquiring fence moves
        this hart's view forward.  Every other silent node leaves it where it
        was, and [tso_interp_of_advance] is then the identity update. *)
     assert (Hadv : (V (hart_agent cpu_id)
-                    <= hsil_tv (hart_agent cpu_id) log m tv (hr_rv hr))%nat)
+                    <= hsil_tv (hart_agent cpu_id) log dl m tv (hr_rv hr))%nat)
       by (rewrite Htv; apply hsil_tv_ge).
-    iMod (tso_interp_of_advance _ img mem0 log V (hart_agent cpu_id)
-            (hsil_tv (hart_agent cpu_id) log m tv (hr_rv hr))
-            (fin_to_nat_lt cpu_id) Hadv (hsil_tv_le _ _ _ _ _ Htvlen Hrvlen)
+    iMod (tso_interp_of_advance _ img mem0 log dl V (hart_agent cpu_id)
+            (hsil_tv (hart_agent cpu_id) log dl m tv (hr_rv hr))
+            (fin_to_nat_lt cpu_id) Hadv (hsil_tv_le _ _ _ _ _ _ Htvlen Hrvlen)
            with "Htso") as "Htso".
     (* re-establish: for a RegWrite one footprint register moves, for
        everything else the file is untouched *)
@@ -619,6 +642,11 @@ Section batch.
             injection Hnode as Hq1 Hq2; simpl in Hnode2;
             case_decide; [|discriminate Hnode2];
             injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
+            iModIntro; iFrame "Hri"; by iApply (hreg_frame_ext rs rs D)
+          | (* the silent barrier *)
+            destruct (fence_rel _) eqn:Hrel; [discriminate Hnode|];
+            injection Hnode as Hq1 Hq2; simpl in Hnode2; rewrite Hrel in Hnode2;
+            simpl in Hnode2; injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
             iModIntro; iFrame "Hri"; by iApply (hreg_frame_ext rs rs D)
           | injection Hnode as Hq1 Hq2; simpl in Hnode2;
             injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
