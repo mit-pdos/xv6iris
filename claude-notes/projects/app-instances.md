@@ -424,3 +424,9 @@ Rounds, each a green gate:
   view lacks), `delta_link_ent`, `delta_link_untgt := delta_unl_tgt`,
   `delta_link` with `delta_link_split` and `delta_link_untgt_tgt`; `fs_delta`
   gained six disjuncts.  Record in app-round-e2.md "E2-D AS BUILT".
+- **E2-L BLOCKED (2026-09-05)** on a missing invariant: the link parent-leg
+  fire needs the target's inum nonzero (`FsStateEra.dir_entries_dirlink_ins`,
+  since a zero inum is a free dirent) and `IcacheHeld.inode_held` / `SpecIget`
+  carry only the upper bound.  Prerequisite lane E2-L0 (briefs file) threads
+  `0 < inum` through `inode_held` and iget's premise (discharged at namex's
+  root, dirlookup's `dir_live`, ialloc's post).  E2-C is unaffected.

@@ -120,7 +120,7 @@ existing lemma's statement.  No consumer outside FsAbsDelta.v changes in this la
 Green; both audited statements byte-identical; report the definitions verbatim and the lemma
 list.  Do not commit.
 
-## roundE2L-brief.md — NEXT (written 2026-09-05 after E2-D landed)
+## roundE2L-brief.md — BLOCKED (written 2026-09-05 after E2-D landed; blocker found the same day, see the end of this brief and roundE2L0-brief.md below)
 
 ## Lane E2-L: link IN PLACE — `wp_sys_link_sconf` gains the three-commit bundle, its three retags become fires
 
@@ -187,6 +187,34 @@ build once per pass.  Delete nothing else (E2-Z deletes the `_auto` movers once 
 Green; `make audit-only` 13; both audited statements byte-identical; the dispatcher's link arm passes
 `_unit`s; no Admitted/Axiom.  Report: the bundle verbatim, the post arms, the fires' statements, the
 three site diffs, deviations.  Do not commit.
+
+### BLOCKER (found 2026-09-05 while staging the lane; nothing of E2-L is built)
+
+The parent-leg fire (`lf_ent_fire` at #29) needs the parent's new entry map to be
+`<[nm := bv_unsigned inum]> old` — `FsStateEra.dir_entries_dirlink_ins` — and that lemma requires
+`inum <> bv_0 16`: a dirent whose inum is 0 IS a free slot (`DirView.dir_live`), so a zero target
+inum would leave the view unchanged and the delta would be false of the machine.  sys_link's
+proof does NOT have the target's inum nonzero: the target comes out of namei as `inode_held`
+(IcacheHeld.v:102), whose only bound is `bv_unsigned inum < 16 * Z.of_nat icfg_nib`; `SpecIget`'s
+premise is the same upper bound (SpecIget.v ~226); neither SpecNamex nor SpecDirlookup states a lower
+bound.  The fact is TRUE of every execution (dirlookup skips `de.inum == 0`, the root is 1, ialloc's
+post has `0 < inum`) but no contract carries it, so E2-L cannot land honestly until it does.
+(Create is not affected: its child inum is ialloc's, `Hcpos : 0 < bv_unsigned cinum`.)
+
+ORDER: E2-L0 (below) → E2-L.  E2-C does not depend on either.
+
+## roundE2L0-brief.md — the missing invariant: HELD INUMS ARE POSITIVE (prerequisite of E2-L)
+
+Add `0 < bv_unsigned inum` beside the upper bound in `IcacheHeld.inode_held` (and its one-unfold
+view `inode_held_refp`), in `SpecIget`'s premise, and in every producer/consumer pattern.  Where it
+is discharged: namex's root (`ROOTINO = 1`) and dirlookup's found arm (`DirView.dir_live data k :=
+dir_inum data k <> bv_0 16` — the zero-extended halfword is positive), ialloc (`0 < bv_unsigned
+inum < fsc_ninodes`, SpecIalloc.v ~318/516), the boot pins (INIT_INO/SH_INO/ROOTINO literals).
+Sizing (2026-09-05): 67 files mention `inode_held`; the destructuring pattern `(%Hipe & %Hkk &
+%Hinumc & …)` occurs 17 times in ProofIdup, ProofSysChdir, ProofSysOpenAUWalk, ProofSysChdirAU,
+ProofSysLink, ProofSysOpen; every `iExists k, q, inum; iSplitR …` producer gains one pure conjunct.
+Mechanical; batch the edits (the IcacheHeld cone is most of the syscall proofs).  Gate: green,
+audit 13, both audited statements byte-identical, no Admitted/Axiom.  Do not commit.
 
 ## roundE2C-brief.md — NEXT, in parallel with E2-L (written 2026-09-05)
 
