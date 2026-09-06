@@ -16,30 +16,24 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 ## Top level
 
 - **[`durable-notes.md`](durable-notes.md)** — the always-relevant core: the
-  guiding principle (clean specs over rework), how to maintain these notes,
-  build/opam instructions, the proof-coverage report, proofmode & bitvector
-  gotchas, reusable recipes, and durable spec-design preferences.
-- **[`optimization.md`](optimization.md)** — proof performance: the diagnostics,
-  the rules that keep a proof fast, and the negative results so nobody re-runs
-  them. Apply the rules when writing new proofs, not after.
+  guiding principle, how to maintain these notes, build and staleness rules,
+  vacuity (the defect class nothing in the build sees), hart indexing, the
+  proofmode and bitvector gotchas, and spec-design preferences.
+- **[`optimization.md`](optimization.md)** — proof performance: the
+  diagnostics, the techniques that keep a proof fast, and the negative results
+  so nobody re-runs them. Apply them when writing new proofs, not after.
 - **[`xv6-bump-playbook.md`](xv6-bump-playbook.md)** — moving to a new upstream
   `XV6_REV`: the mechanical steps and their silent no-ops, how to CLASSIFY a
-  change before touching a proof, the two relayout tools, the categories of
+  change before touching a proof, the relayout tools, the categories of
   breakage, and the finishing checks. Read before any bump.
 - **[`remote-build-gcp.md`](remote-build-gcp.md)** — building on the GCP VM:
-  the two scripts, daily use, pulling `.vo` back for a local single-file
-  recheck, preemption and cost, and the two things that silently break (the
-  VM's Ubuntu must match, and the opam switch must be byte-identical).
-- **[`rocq-warm.md`](rocq-warm.md)** — using
-  [`rocq-warm`](https://github.com/zeldovich/rocq-warm) here: it checks a
-  `.v` file against a warm `rocq repl` session, so editing one proof
-  re-executes only from the edit onwards. How to get it, the memory budget
-  this tree needs, and what it deliberately does not do. The tool is not
-  vendored here and its internals are documented in its own repo.
-- **[`kernel-defects.md`](kernel-defects.md)** — how to tell a defect in the xv6
-  SOURCE from a problem in a spec, the register of open ones, and the provably
-  dead code.  The newest entry -- `read(fd, buf, -1)` delivering the rest of
-  the file -- is FIXED UPSTREAM, and is why `XV6_REV` is at `31f115a`.
+  the two scripts, `run-on-gcp --proofs`, pulling `.vo` back for a local
+  recheck, sharing the machine, preemption and cost.
+- **[`rocq-warm.md`](rocq-warm.md)** — a warm `rocq repl` for the edit loop, so
+  a change re-executes only from the edit onwards.
+- **[`kernel-defects.md`](kernel-defects.md)** — how to tell a defect in the
+  xv6 SOURCE from a problem in a spec, the register of open ones, and the
+  provably dead code.
 
 ## `design/` — how each part of the project is built
 
