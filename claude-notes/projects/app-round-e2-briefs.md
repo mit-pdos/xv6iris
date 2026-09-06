@@ -213,6 +213,9 @@ inum < fsc_ninodes`, SpecIalloc.v ~318/516), the boot pins (INIT_INO/SH_INO/ROOT
 Sizing (2026-09-05): 67 files mention `inode_held`; the destructuring pattern `(%Hipe & %Hkk &
 %Hinumc & …)` occurs 17 times in ProofIdup, ProofSysChdir, ProofSysOpenAUWalk, ProofSysChdirAU,
 ProofSysLink, ProofSysOpen; every `iExists k, q, inum; iSplitR …` producer gains one pure conjunct.
+`SpecIget.wp_iget_sconf` (SpecIget.v ~212/286) is called from ProofIalloc, ProofIreclaim,
+ProofDirlookup, ProofNamexRoot, ProofNamex, ProofNamexTr, ProofNamexEra, ProofNparEra (8 files);
+SpecNamex/SpecNamei/SpecNameiparent/IgetLic mention `inode_held` 24 times.
 Mechanical; batch the edits (the IcacheHeld cone is most of the syscall proofs).  Gate: green,
 audit 13, both audited statements byte-identical, no Admitted/Axiom.  Do not commit.
 
