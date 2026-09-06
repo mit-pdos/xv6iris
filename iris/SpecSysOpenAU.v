@@ -312,7 +312,6 @@ Require Import FsAbsEraMknod.   (* [mknod_walk_pre_era], [mknod_walk_dead_era]
                                    -- the parent-prefix one-shot, REUSED *)
 Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at],
                                    [mkf_auth_nview] *)
-Require Import AppCfg.          (* [app_pred], [app_run]: the application's claim, for the step wands *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.

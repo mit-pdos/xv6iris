@@ -39,34 +39,24 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto MinstretInv.
-Require Import RegFile HartTp InstrBytes WpGpr.
+Require Import HartTp InstrBytes WpGpr.
 Require Import KMap.
 Require Import StackOwn.
-Require Import KernelText KernelDataInv.
 Require Import MbootVocab.
-Require Import MstatusFacts.
-Require Import KptPt.
 Require Import IntrDefs.
-Require Import WireInv.   (* [wire_inv] *)
-Require Import ProcGeom CpuOwn SchedCtx.
+Require Import ProcGeom SchedCtx.
 Require Import SpecMain.
 Require Import BootConfig BootBridge PowerBoot.
 Require Import SpecMainSecondary.
-Require Import StartedInv DevModel.
-Require Import WpUart DiskPtsto.
-Require Import KallocInv FdSlots.
+Require Import DevModel.
+Require Import Xv6Cameras.
 Require Import LockSet.
-Require Import FileInvDefs.
-Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
-Require Import TimerCap.
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
 Require Import KernelConsts.
-Require Import ProcAvail.
 (* [fs_boot_supply] / [iref_slots_auth] -- the file system's boot-era mint
    and the iref-slot authority, both threaded from [BootShared] into
    [SpecMain]'s boot arm (fs-cfg-boot.md stage (e)). *)
-Require Import FsCfgBoot IrefSlots LogDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.

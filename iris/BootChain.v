@@ -36,10 +36,9 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto MinstretInv.
-Require Import RegFile HartTp InstrBytes WpGpr.
+Require Import RiscvLang RiscvPtsto.
+Require Import RegFile InstrBytes.
 Require Import KMap.
-Require Import StackOwn.
 Require Import KernelText KernelDataInv.
 Require Import MbootVocab.
 Require Import MstatusFacts.
@@ -48,21 +47,19 @@ Require Import IntrDefs.
 Require Import WireInv.   (* [wire_inv] *)
 Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.
-Require Import BootConfig BootBridge PowerBoot.
+Require Import BootConfig BootBridge.
 Require Import BootHart.   (* §1 geometry, [boot_entry_pre], [boot_hart_res] *)
 Require Import LinkEntry.
 Require Import SpecMainSecondary LinkMainSecondary.
-Require Import StartedInv DevModel.
+Require Import StartedInv.
 Require Import WpUart DiskPtsto.
 Require Import KallocInv FdSlots.
-Require Import LockSet.
 Require Import FileInvDefs.
 Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
 Require Import LinkMain.
 Require Import TimerCap.
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
-Require Import KernelConsts.
 Require Import ProcAvail.
 (* [fs_boot_supply] / [iref_slots_auth] -- the file system's boot-era mint
    and the iref-slot authority, both threaded from [BootShared] into

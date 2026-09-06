@@ -62,10 +62,6 @@ Require Import FdSlots UserFd.
 Require Import UCodeShK.
 Require Import UCodeShP.
 Require Import UkShParse.
-Require Import UkShParseLex.
-Require Import UkShParseTok.
-Require Import UkShParseRedir.
-Require Import UkShParseExec.
 Require Import UkShParseCmd.
 Require Import UkShRun.
 Require Import UkShDiag.

@@ -52,7 +52,6 @@ Require Import BvShift.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpSmodeHalf.
 Require Import IntrDefs.
 Require Import ByteBuf.
 Require Import ProcGeom.

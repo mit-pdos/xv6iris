@@ -209,7 +209,6 @@ Require Import UmodeArith UmodeAbi.
 Require Import UkStep.
 Require Import UserHeap UkRun UkRunLeaf UkRunMem.
 Require Import UCodeShK UCodeShP.
-Require Import UkSh.
 Require Import TsoCtx.
 Require User.ShSyms User.ShInstrs.
 Local Open Scope Z_scope.

@@ -102,7 +102,6 @@ Require Import SpecReadi.        (* [rd_clamp]                              *)
 Require Import SpecSysReadAU.    (* the contract this file serves           *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import
                                     ([FsAbsOpenFire]'s reason)              *)
-Require Import AppCfg.          (* [app_pred], [app_run]: the application's claim, for the step wands *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.

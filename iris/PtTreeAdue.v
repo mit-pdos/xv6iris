@@ -44,7 +44,6 @@ Require Import PtTree.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 (* [pwmsg]/[view_lb]/[view_name]: the exclusive read's callback carries the
    memory-model bundle and the AMO's view receipt.  Import is not transitive. *)
-Require Import TsoGhost.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.

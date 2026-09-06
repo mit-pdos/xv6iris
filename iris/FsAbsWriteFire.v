@@ -145,11 +145,10 @@ Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]     *)
 Require Import Xv6G.
 Require Import SpecWritei.       (* [wi_dinode]                             *)
 Require Import SpecFilewrite.    (* [FW_MAX]                                *)
-Require Import SpecSysMknodAU.   (* [abs_view_insert]                       *)
+Require Import FsAbsDelta.   (* [abs_view_insert]                       *)
 Require Import SpecSysWriteAU.   (* the contract this file serves           *)
 Require Import FsAbsOpenFire.    (* [opf_era_file_row], [opf_era_type]      *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import       *)
-Require Import AppCfg.          (* [app_pred], [app_run]: the application's claim, for the step wands *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.

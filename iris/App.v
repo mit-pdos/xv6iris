@@ -73,7 +73,6 @@ Require Import WpUart.
 Require Import FsCfgBoot.
 Require Import RiscvAdequacy.
 Require Import FsCrash.
-Require Import FsDurSnap.
 Require Import VirtioModel.
 Require Import IrefSlots.
 Require Import Xv6Cameras.
@@ -85,8 +84,6 @@ Require Import Xv6G.
    (durable-notes), which is how [ufdG] became one here once. *)
 Require Import UserFd.
 (* ...and this file's own *)
-Require Import FsNode.
-Require Import AppCfg.           (* [appcfg]: what the record's data becomes at the era *)
 Require Import SystemAdequacy.
 (* the image's own superblock and region width, and the disk literal, for
    the closed corollary at the real image *)

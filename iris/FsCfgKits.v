@@ -64,7 +64,6 @@ Require Import IcacheEscrow.
 Require Import BitmapInv.
 Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import AppCfg.         (* [appcfg]: the application's record, threaded beside [fscfg] *)
-Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ the application copy shadows *)
 Require Import AppInv.         (* [app_inv]: kit 2's application row (app-instances.md section 2);
                                   [app_xfer]: the transport, kit 2's last row (round C) *)
 Require Import AppDur.         (* [app_guest]: the guest the crash seam is stated at (round C) *)

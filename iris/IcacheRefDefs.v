@@ -51,7 +51,6 @@ Require Import LogDefs.
 (* [WpLock] for [lockG] itself -- [Import] is not transitive, and without it
    the [!lockG Σ] binders below auto-generalize into a fresh variable. *)
 Require Import SleepLock.
-Require Import CtxBox.   (* R3 (M-5): the box's stamps fragment rides every reference form *)
 From Stdlib Require Import QArith Qcanon.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -75,7 +74,6 @@ Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
    InodeInv's [i_size] IS ctx and IcacheEscrow holds both families; and a
    NON-Local [Notation] escapes to importers and silently un-flips theirs.)
    The import must come LAST, after RiscvPtsto, for the notations to flip. *)
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 

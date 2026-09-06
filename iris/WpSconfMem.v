@@ -62,7 +62,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoMemPa.  (* [agent]/[pwmsg]/[bytemap]: the era log's vocabulary
                              (A6.58 -- the write node speaks it now) *)
 Require Import TsoCtx.
-Require Import TsoCtxStore TsoCtxLedger.
+Require Import TsoCtxLedger.
 (* the window and its address claim, split out for the build DAG (see that
    file's header): [Export], so every consumer that reached [wordw_pointsto]
    / [wordw_claim] / [wordw_free] through this file still does. *)

@@ -126,7 +126,6 @@ Require Import InodeInv.
 Require Import DirView.
 Require Import InodeLock.
 Require Import InodeRegion.
-Require Import AppInv.       (* [top_move]: ilock's fresh-inode claim is a non-AU move *)
 Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
 Require Import IcacheInv.

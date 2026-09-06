@@ -59,14 +59,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
 Require Import RegFile.
-Require Import WpMmodeLeafBase.
-Require Import UserBits.
 Require Import WpUmodeBranch.
 Require Import UmodeArith UmodeAbi.
-Require Import UserPerm UsysMemOk.
-Require Import UkStep.
+Require Import UserPerm.
 From Stdlib Require Import FunctionalExtensionality.
-Require Import UserHeap UkRun UkRunLeaf UkRunMem UkRunSys UkRunBr.
+Require Import UserHeap UkRun UkRunLeaf UkRunMem.
 Require Import UkFork.
 Require Import FdSlots UserFd.
 Require Import UCodeShK UCodeShP.

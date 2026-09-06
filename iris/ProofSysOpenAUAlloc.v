@@ -56,7 +56,6 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
 Require Import DinodeEnc.
-Require Import DinodeSlot.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.

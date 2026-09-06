@@ -24,7 +24,7 @@ From iris.base_logic.lib Require Import ghost_var ghost_map mono_nat gen_heap.
 Require Import SailStdpp.Values.
 Require Import SailStdpp.Operators_mwords.  (* [uint]; exports no mword key instances *)
 Require Import Riscv.rv64d_types Riscv.rv64d.   (* [is_aligned_paddr]/[Physaddr]: the word tower's alignment vocabulary *)
-Require Import RiscvModelBytes RiscvLang RiscvPtsto Ktier.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto.
 Require Import TsoMemPa TsoGhost.
 Require Import TsoCtx.
 

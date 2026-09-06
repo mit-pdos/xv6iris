@@ -110,7 +110,6 @@ Require Import BufOwn BcacheInv BioInv.
 (* THE DURABLE SNAPSHOT's vocabulary (lane CE), FIRST: [FsDurSnap] re-exports
    [FsState], whose [fs_view]-family names would otherwise shadow the block
    layer's below. *)
-Require Import FsDurSnap.    (* [snap_ok] / [fs_state_rec]: the commit's tie *)
 Require Import LogSnapLaw.   (* [snap_law_out]: what [log_ctx]'s law hands down *)
 Require Import FsBlocks LogInv.
 Require Import CodeEndOp.

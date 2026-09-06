@@ -73,11 +73,10 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own ghost_var mono_nat ghost_map.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvPtsto RiscvExtras.
+Require Import RiscvPtsto.
 (* for [log_names] alone -- [icfg_log], fs-log.md G.17's region placement.
    No class comes with it: the log's ghost lives in [logG], which this file
    does not need and does not take. *)
-Require Import LogDefs.
 (* [WpLock] for [lockG] itself -- [Import] is not transitive, and without it
    the [!lockG Σ] binders below auto-generalize into a fresh variable. *)
 Require Import SleepLock.

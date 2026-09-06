@@ -201,7 +201,6 @@ Require Import DinodeEnc.
 (* [trunc16_sext64]: an [sh] of a register an [lh] filled is the identity on
    the halfword -- the three metadata stores at +0xb4 / +0xb8 are exactly
    that, at the ABI's sign-extended [major] / [minor] arguments. *)
-Require Import DinodeSlot.
 Require Import DirentEnc.
 Require Import BvShift.
 Require Import PathElems.

@@ -66,7 +66,6 @@ Require Import FsImgDisk.
 Require Import SystemAdequacy.
 Require Import FsImgCheck.
 Require Import FsState.
-Require Import FsNode.           (* [fs_node] *)
 Require Import FsAbsDefs.        (* [aview], [abs_view] *)
 Require Import FsInitPinBoot.    (* [era0_pins], [era0_recovery_pins] *)
 Require Import FsShPin.          (* [era0_sh_pins], [era0_recovery_sh_pins] *)

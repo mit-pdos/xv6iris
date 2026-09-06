@@ -76,7 +76,6 @@ Require Import ProcAvail.
    definition of THIS file and [FsCfgBoot] sits below it, so stating the
    second lemma there would be a dependency cycle. *)
 Require Import FsBoot.
-Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ the client copy shadows *)
 Require Import AppInv.         (* [app_inv]/[app_xfer]: the application's running invariant and its transport (app-instances.md) *)
 Require Import AppDur.         (* [app_guest]: the guest kit 2's crash seam is stated at (round C) *)
 Require Import FsImg.

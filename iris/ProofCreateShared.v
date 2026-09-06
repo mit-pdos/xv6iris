@@ -95,7 +95,6 @@ Require Import KernelText.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.

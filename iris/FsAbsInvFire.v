@@ -64,7 +64,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsTree.          (* [fname] *)
-Require Import FsStateDefs.
 Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ *)
 Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    Import: [FsImg]'s [fs_sb] field readers
@@ -88,7 +87,6 @@ Require Import SpecSysUnlinkAU.    (* [uent/utgt/dmiss_commit_at], [unlink_au_pr
 Require Import FsAbsReadFire.      (* [aread_commit_at] *)
 Require Import FsAbsWriteFire.     (* [awrite_full_at], [awrite_chain] *)
 Require Import OffGv.              (* [off_user_inv], the process's half *)
-Require Import AppCfg.             (* [app_pred], [app_run]: the claim the steps are about *)
 Require Import AppInv.             (* [app_inv], [appN]/[appE], [app_step_acc]: the parked license *)
 Require Import FsAbsDefs.          (* [abs_view_lookup_is_Some] *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)

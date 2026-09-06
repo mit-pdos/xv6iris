@@ -96,10 +96,9 @@ Require Import FsStateInode.     (* [fn_*], [dir_entries]                    *)
 Require Import FsStateEra.       (* [era_node], [dir_entries_era_node]       *)
 Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]      *)
 Require Import Xv6G.
-Require Import SpecSysMknodAU.   (* [abs_view_insert]                        *)
+Require Import FsAbsDelta.   (* [abs_view_insert]                        *)
 Require Import FsAbsMknodFire.   (* [dlookup_commit_at], [mkf_abs_of_dir]    *)
 Require Import SpecSysUnlinkAU.  (* the statement this file's fires serve    *)
-Require Import AppCfg.          (* [app_pred], [app_run]: the application's claim, for the step wands *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                  *)
 
