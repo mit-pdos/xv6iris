@@ -54,9 +54,11 @@ Proof.
     + (* BranchAnnounce *)
       destruct (IH _ Hg) as (n & x & Hf & He).
       exists (S n), x. split; [exact Hf | exact He].
-    + (* Barrier *)
-      destruct (IH _ Hg) as (n & x & Hf & He).
-      exists (S n), x. split; [exact Hf | exact He].
+    + (* Barrier: certified only without a W predecessor, which is exactly
+         the walker's own refusal *)
+      apply andb_prop in Hg as [Hrel Hk]. apply negb_true_iff in Hrel.
+      destruct (IH _ Hk) as (n & x & Hf & He).
+      exists (S n), x. split; [simpl; rewrite Hrel; exact Hf | exact He].
     + (* CacheOp *)
       destruct (IH _ Hg) as (n & x & Hf & He).
       exists (S n), x. split; [exact Hf | exact He].
@@ -98,20 +100,13 @@ Proof.
   fix IH 1. intros m Hg.
   destruct m as [y | T oc k]; [reflexivity|].
   destruct oc; simpl in Hg |- *; try discriminate Hg.
-  - apply andb_prop in Hg as [Hr Hk].
-    rewrite Hr. simpl. rewrite <- (Hag _ Hr). exact (IH _ Hk).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
-  - exact (IH _ Hg).
+  all: first
+    [ (* RegRead: the pinned register agrees *)
+      (apply andb_prop in Hg as [Hr Hk];
+       rewrite Hr; simpl; rewrite <- (Hag _ Hr); exact (IH _ Hk))
+    | (* the silent barrier: the [fence_rel] conjunct is state-free *)
+      (apply andb_prop in Hg as [Hr Hk]; rewrite Hr; simpl; exact (IH _ Hk))
+    | exact (IH _ Hg) ].
 Qed.
 
 
@@ -139,8 +134,10 @@ Proof.
   destruct oc; cbn [goodb]; intros Hg; try discriminate Hg;
     try (by apply (IH (k tt)));
     try (by apply (IH (k 0%Z))).
-  apply andb_prop in Hg as [Hr Hk]. rewrite (Hle _ Hr). cbn [andb].
-  by apply (IH (k (register_lookup _ s.(sregs)))).
+  all: apply andb_prop in Hg as [Hr Hk].
+  all: first
+    [ (rewrite (Hle _ Hr); cbn [andb]; by apply (IH (k (register_lookup _ s.(sregs)))))
+    | (rewrite Hr; cbn [andb]; by apply (IH (k tt))) ].
 Qed.
 
 Lemma goodb_try_catch (Db : register -> bool) {X E1 E2 : Type}
@@ -152,9 +149,12 @@ Proof.
   destruct oc; cbn [Defs.try_catch goodb]; intros Hg; try discriminate Hg;
     try (by apply (IH (k tt)));
     try (by apply (IH (k 0%Z))).
-  (* RegRead: the outcome is preserved, so the [Db r] conjunct survives *)
-  apply andb_prop in Hg as [Hr Hk]. rewrite Hr. cbn [andb].
-  by apply (IH (k (register_lookup _ s.(sregs)))).
+  (* RegRead: the outcome is preserved, so the [Db r] conjunct survives;
+     the barrier's [fence_rel] conjunct likewise *)
+  all: apply andb_prop in Hg as [Hr Hk]; rewrite Hr; cbn [andb].
+  all: first
+    [ by apply (IH (k (register_lookup _ s.(sregs))))
+    | by apply (IH (k tt)) ].
 Qed.
 
 (* ONE DIRECTION ONLY, and that is the useful one: a body that makes no

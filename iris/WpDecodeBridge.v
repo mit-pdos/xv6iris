@@ -50,7 +50,10 @@ Fixpoint goodb (D : register -> bool) {E X} (m : Defs.monad E X) (s : mstate) {s
        | Interface.RegRead r _ => fun k => andb (D r) (goodb D (k (register_lookup r s.(sregs))) s)
        | Interface.InstrAnnounce _   => fun k => goodb D (k tt) s
        | Interface.BranchAnnounce _ _=> fun k => goodb D (k tt) s
-       | Interface.Barrier _         => fun k => goodb D (k tt) s
+       (* a fence with a W predecessor is NOT silent under two logs
+          (relaxed-ww.md §1.1): it is a leaf ([HartBarrier]), so a certified
+          stretch stops at it, as [HartSpan.hfrun] does *)
+       | Interface.Barrier b         => fun k => andb (negb (fence_rel b)) (goodb D (k tt) s)
        | Interface.CacheOp _         => fun k => goodb D (k tt) s
        | Interface.TlbOp _           => fun k => goodb D (k tt) s
        | Interface.TakeException _   => fun k => goodb D (k tt) s
@@ -95,7 +98,7 @@ Proof.
   - destruct oc; cbn [goodb exec Defs.bind Interface.iMon_bind] in Hg, He |- *;
       try discriminate Hg.
     all: first
-      [ (apply andb_prop in Hg as [HDr Hg']; rewrite HDr;
+      [ (apply andb_prop in Hg as [HDr Hg']; rewrite HDr; cbn [andb];
          by apply (IH _ x Hg' He))
       | by apply (IH tt x Hg He)
       | by apply (IH 0%Z x Hg He) ].
@@ -123,12 +126,12 @@ Proof.
   - exists y. split; reflexivity.
   - destruct oc; cbn [goodb exec] in Hgood |- *; try discriminate Hgood;
       try (apply (IH _ s2 Hagree Hgood)).
-    apply andb_prop in Hgood as [HDr Hgood'].
-    match goal with
-    | HDr : D ?rr = true |- _ =>
-      pose proof (Hagree _ HDr) as Hr; rewrite <- Hr;
-      apply (IH (register_lookup rr s1.(sregs)) s2 Hagree Hgood')
-    end.
+    all: apply andb_prop in Hgood as [HDr Hgood'].
+    all: first
+      [ (pose proof (Hagree _ HDr) as Hr; rewrite <- Hr;
+         apply (IH _ s2 Hagree Hgood'))
+      | (* the silent barrier: the state is untouched on both sides *)
+        apply (IH tt s2 Hagree Hgood') ].
 Qed.
 
 (* register_beq reflects equality -- to discharge the per-register agreement. *)
