@@ -32,7 +32,9 @@ proposition (`key_at`'s clean arm).  Exactly two ghost steps become
 fence-bound -- stamping a context (`ctx_stamp`, the lock's release) and
 depositing into a stamped root (`ctx_dom_to_stamped`, the boxes) -- and
 both already sit at a release fence in every xv6 use.  The receipt the
-racy tier needs is one author-free fact per fence.
+racy tier needs is one author-free fact per fence; the one place a
+per-author receipt may still be needed is the birth of a lock (§2.4).
+Reviewed (round 4, 2026-09-06): adopt with changes, folded in.
 
 ## 1. The machine
 
@@ -169,8 +171,13 @@ floor (the twin's finding).
 ### 2.2 The three tokens
 
 - `own_context ξ`: bound `B ≤ K ≤ tv_h` (positions); every dirty key is
-  this hart's own message or `dpos_ev`-clean under `B`; the watermark
-  `W` (issue) unchanged.
+  this hart's own message or `dpos_ev`-clean under `B`.  The dirty
+  WATERMARK row (`llb loglen_name W ∗ ∀ k ∈ D, k.1 ≤ W`) is DROPPED: its
+  consumers were the interp-free stamps (`max K W`, `max T K W`), which
+  are gone, and neither `ctx_resume` nor `ctx_unstamp` can rebuild it --
+  a clean key carries a drain position, which bounds nothing about its
+  issue index.  `ctx_wrote_register` loses its `W ≤ i` premise and
+  `own_context_w` (six sites in five files) goes with it.
 - `ctx_stamped ξ T := ∃ D, ctx_at ξ 1 T D ∗ dlb T ∗ □ [∗ set] k ∈ D,
   dpos_ev k.1 T` -- hung on a DRAIN position: every key drained under
   `T`.  `dlb` (the drain length's lower bound) where it had `llb loglen`.
@@ -178,7 +185,12 @@ floor (the twin's finding).
   unchanged, `key_at` as above.
 
 `ctx_unstamp` keeps its statement (`hart_view_lb K`, `T ≤ K`,
-interp-free): every key is drained under `T ≤ K ≤ view`.  `ctx_park`,
+interp-free): every key is drained under `T ≤ K ≤ view`.  Mint 1 keeps
+the target's invariant because both tokens share one hart: a key that
+reached the source by an earlier mint 1 is this hart's own message, and a
+key that reached it across harts came through `ctx_unstamp`, which
+re-founds every key on the clean arm; no key at a running context is ever
+"another hart's message without a witness".  `ctx_park`,
 `ctx_resume`, `ctx_dom_run`, `ctx_move`, `ctx_parked_borrow`,
 `ctx_parked_morph`, the composition and flattening laws, the bridge
 `ctx_parked_of_stamped` and exclusivity keep their statements and their
@@ -208,11 +220,17 @@ interp-free proofs; only the clean arm they read changes.
   gdlog`, which covers the depositor's keys because they are drained at
   the fence.  Its users are the boxes and the boot roots (§2.6, §2.7).
 
-Nothing else changes.  No author-indexed record, no receipt on any lock
-row, no author index on domination: the twin's `ctx_parked ξ B W A`,
-`drain_lb A N M` and `ctx_dom A' ξ ξ'` are not needed, because
-publication has per-message witnesses in hand and every cross-hart
-transfer goes through a stamped root that was stamped at a fence.
+The fence leaf that hosts publication is a new rule in `HartBarrier`'s
+existing `pub_step` shape, keyed on `fence_rel b` (today's is keyed on
+`fence_drains`, which `fence rw,w` fails) and passing `own_drained` from
+the enabled arm.
+
+Nothing else changes on the thread and lock paths.  No author-indexed
+record, no receipt on any lock row, no author index on domination: the
+twin's `ctx_parked ξ B W A`, `drain_lb A N M` and `ctx_dom A' ξ ξ'` are
+not needed there, because publication has per-message witnesses in hand
+and every cross-hart transfer goes through a root stamped at a fence.
+The one place they may return is the birth of a lock (§2.4).
 
 ### 2.4 The lock path
 
@@ -224,36 +242,88 @@ publication above, and it sits where the finisher's prelude already runs:
 after the `lk->cpu` clear and before the word clear, i.e. at `release`'s
 `fence rw,w`.  So `lock_finisher_pay`'s prelude becomes a fence-leaf
 callback (the fence leaf hands it the bundle and `own_drained`) instead of
-a bare bupd.  The acquirer's `hart_view_lb_get` argument is unchanged with `dlb` for
-`llb loglen`: the AMO puts the view at the drain top, so `T ≤ length
-gdlog ≤ K`.  Every acquire/release spec keeps its statement.
+a bare bupd: the split is straight-line (interrupts are off), with
+`ctx_resume` and `ctx_move` at the `lk->cpu` clear and the stamp plus the
+hook at the fence.  The acquirer's `hart_view_lb_get` argument is
+unchanged with `dlb` for `llb loglen`: the AMO puts the view at the drain
+top, so `T ≤ length gdlog ≤ K`.  The plain acquire and release specs keep
+their statements; the HOOK forms do not (below).
 
 **Birth.**  `lock_pay_born` at `newlock` stamps the fresh record
 interp-free today; under two logs the record is the creator's pending
-stores and has no position.  A fresh lock's record is therefore PARKED
-UNDER THE CREATOR (`ctx_parked ξL cur_ctx`, a `lock_born` token in the
-creator's hands, no invariant yet) until a release hook on the creator's
-hart publishes it: the hook resumes it (mint 1), stamps it (publication),
-allocates the invariant and mints `is_lock`.  The lock's own first release
-is such a hook (kinit's `kfree` right after `initlock`); the boot-time
-locks are published by hart 0's `started` fence together with the
-handles that ride that payload; a pipe's lock by the parent's next release
-(fork's `filedup`).  The creator may acquire its own unpublished lock
-meanwhile, since the record is parked under the context it runs.  A
-handle cannot be conjured (§0.35′), so no other hart acquires before the
-publication; that rule now has a ghost witness instead of an argument.
-No receipt is involved.
+stores and has no position.  Publication needs a fence on the creator's
+hart AND a proof that holds the born record at that fence leaf, and the
+`initlock` sites fall in three classes:
+
+- Boot locks hart 0 never touches before `started` (`bcache.lock` and the
+  buffer sleeplocks, `itable.lock` and the inode sleeplocks,
+  `ftable.lock`, `vdisk_lock`, `tickslock`, `wait_lock`, `cons.lock`,
+  `uart tx_lock`): published by hart 0's `started` fence, whose
+  obligation (`started_store_obl`, run by `ProofMain` holding every born
+  record) stamps them and mints their handles.
+- Boot locks hart 0 acquires before any fence follows their `initlock`
+  (`pr.lock` at the first `printf`, `kmem.lock` in `kinit`'s `kfree`
+  loop, `p->lock` and `pid_lock` in `userinit`'s `allocproc`): acquired
+  UNPUBLISHED by their creator, inside generic functions proved once
+  against `is_lock`.
+- Runtime births whose creating proof contains no fence: `pi->lock`
+  (`pipealloc`'s `initlock` is its last act; the next fence on that hart
+  is inside `fork`'s `release(&np->lock)` or a scheduler release) and
+  `log.lock` (`initlog`'s fences are inside `bread`/`brelse`).
+
+The design, (c1): `newlock` yields a BORN token, the record parked under
+the creator (`ctx_parked ξL cur_ctx`, no invariant yet), which rides an
+owned row the publishing proof holds -- the `started` obligation for the
+boot locks, the parent's open-file row (`proc_priv`) for a pipe lock,
+published by `fork`'s own `release(&np->lock)` hook, the fs globals for
+`log.lock`, published by `forkret`'s `first` fence -- and is published by
+that hook: resume (mint 1), stamp (publication), allocate the invariant,
+mint `is_lock`.  A born token survives the creator's migration (it is a
+payload of the creator's context).  Pre-publication acquires by the
+creator are a BORN-ACQUIRE path: `ctx_resume ξL cur_ctx` (interp-free),
+an AMO leaf on the creator's OWN word (the machine's exclusive read
+self-loops until the word's pending store drains, then reads memory), a
+`locked` token of the ordinary shape, and a born release that parks ξL
+back under the creator instead of stamping.  Its price is the generic
+callers: `kfree`, `printf`, `allocproc`/`allocpid`, `piperead`/`pipewrite`
+take their lock access through a class with two instances (published:
+`is_lock`; born: the token, creator only), or the boot proofs duplicate
+them.  Physically no other hart acquires any of these before the
+publishing fence (boot locks and `p->lock`s sit behind `started`, pipe
+locks behind `fork`'s release, `log.lock` behind `first`), and (c1) gives
+that rule a ghost witness.
+
+The alternative, (c2): allocate the invariant at `initlock` with a
+born free arm -- the twin's author-indexed record `ctx_parked ξL B W A`
+-- and mint `is_lock` at once, so generic callers are untouched; a
+foreign acquirer converts the born arm with a per-author receipt
+`drain_lb A N M ∗ W ≤ N` carried on the handle's floor row by the
+crossing that delivered the handle.  This keeps the twin's receipt and
+author index alive for births only, and needs the creator to present
+the record's watermark at the publishing fence.  Both are priced for the
+owner; (c1) is the recommendation because it keeps one record shape and
+one receipt, at the cost of one class over four or five generic
+functions.
 
 **The hook and the floor fold.**  `lock_ctx_hook` runs after the stamp,
 so under two logs it runs at the fence with every key of ξL published.
-The R2 fold `lock_hook_llb` today raises the stamp to a payload row's
-`llb tl` (an ISSUE index: the position of a store still in the buffer);
-under two logs a floor is a drain position, and the row's evidence is the
-store's `dpos_ev t T` read off the stamped record (`ctx_stamped ξ T ∗
-dset_in ξ k ⊢ dpos_ev k.1 T`) -- the `ctx_wrote` right arm of `lk_floor`
-that A6.120 already introduced.  The two fold clients (the itable's count
-row, the anchor slot) restate their rows over that evidence; no `llb`
-premise remains.
+Today it is a bupd over `ctx_stamped ξ T ∗ Rin ξ`; it becomes a
+FENCE-LEAF CALLBACK -- a fupd at the lock's mask taking the bundle,
+`own_drained`, `own_context cur_ctx` and caller extras -- because two of
+its clients need the fence (the boxes' deposits, §2.6) and none can be
+`Rin`-shaped when the hook produces the stamp they depend on.  So
+`wp_release_hook_sconf` and `wp_releasesleep_genin_sconf` change
+statement, and so do their callers (`ProofBunpin`, `ProofBread`,
+`ProofBrelse`, `ProofIget`, `ProofIput`, `ProofIdup`,
+`ProofReleasesleep`, `SpecRelease`, `SleepLock`, `WpLockAt`, `BioInv`,
+`CtxBox`); the identity hook stays the plain release.  The R2 fold
+`lock_hook_llb` today raises the stamp to a payload row's `llb tl` (an
+ISSUE index: the position of a store still in the buffer); under two logs
+a floor is a drain position, and the row's evidence is the store's
+`dpos_ev t T` read off the stamped record (`ctx_stamped ξ T ∗ dset_in ξ
+k ⊢ dpos_ev k.1 T`).  The fold clients (the itable's count row, the
+anchor slot) restate their rows over that evidence; no `llb` premise
+remains.  See §2.8 for the general rule.
 
 ### 2.5 The thread record and fork
 
@@ -271,15 +341,19 @@ drain position.
 
 The box keeps its stamped root (`contexts.md` §6) and its seven
 transitions.  What changes is WHERE the two deposits run.  A deposit
-(`box_deposit_L1_hook` under `bcache.lock`, `box_park_hook` under the
-buffer's sleeplock) is mint 2 and needs the depositor's stores drained, so
-it runs inside the release hook of the lock it is made under -- the hook
-becomes a fupd at the lock's mask so the box invariant can be opened
-there.  In xv6 that is where the deposits already are in time: the (f)
-park in `brelse` must precede `releasesleep`'s word clear and now sits at
-`release(&lk->lk)`'s fence inside it; the (b) re-deposit in `bget`'s
-recycle path sits at `release(&bcache.lock)`.  The withdraw side ((a),
-(e)) is mint 3 and unchanged.  Stamps, the reference's bound
+(`box_deposit_L1_hook`, `box_park_hook`) is mint 2 and needs the
+depositor's stores drained, so it runs inside the release hook (§2.4) of
+the lock it is made under, with the bundle at `cur_ctx`, `l2_hold` and
+the exclusivity token travelling as HOOK EXTRAS (mint 2 needs a RUNNING
+depositor; inside the hook the lock's context is already stamped, so the
+bundle cannot ride `Rin`).  In xv6 that is where the deposits already are
+in time.  The sites, all three instances: bcache's (b) in `bget`'s
+recycle path at `release(&bcache.lock)` and its (f) in `brelse` at
+`releasesleep`'s inner `release(&lk->lk)` (a waiter sees `locked = 0`
+only after that fence's word clear); icache's (b) under `itable.lock` in
+`iget`/`iput` and its (f) under the inode sleeplock in `iunlock`; the
+off box's two parks (`off_publish_park`, `off_read_park`).  The withdraw
+side ((a), (e)) is mint 3 and unchanged.  Stamps, the reference's bound
 (`llb loglen (max_stamp m)` → `dlb`), and the two row floors `sr_td`,
 `lr_tp` become drain positions; the phase change at `brelse`'s decrement
 folds the reference's stamp into `sr_td` as today, the stamp now being the
@@ -295,20 +369,27 @@ author-free fact per release fence:
 
     fence_rec N M   "every message with issue index ≥ N drains at a position > M"
 
-minted at any release fence with `N = length glog`, `M = length gdlog`,
-and maintained by the interp for free: a message with index `≥ N` did not
-exist at the fence, so it drains later, at a position above `M`.  This is
-the twin's `drain_lb` with the author dropped; the interp keeps the
-records as a persistent map `(N ↦ M)` in place of the branch's
-author-indexed receipt map.
+mintable at ANY leaf with `N ≤ length glog`, `M = length gdlog` (only
+the stamp needs the fence) and maintained by the interp for free: a
+message with index `≥ N` did not exist at the mint, so it drains later,
+at a position above `M`.  This is the twin's `drain_lb` with the author
+dropped; the interp keeps the records as a persistent map `(N ↦ M)` in
+place of the branch's author-indexed receipt map.
 
 - **`started`, `first`** (`StartedInv`, `ProofMainSecondary`,
   `ProofForkret`): hart 0 runs the handover record, fills it, and
   publishes it at its `fence rw,w` (`ctx_stamp` at `M`); the flag store
-  that follows has index `≥ N`.  A reader that saw the flag at view `K`
-  saw it at or above its drain position, hence `K > M ≥ T`, and
-  `ctx_unstamp`s the record.  `StartedInv`'s tie `T ≤ S i` (issue)
-  becomes `fence_rec N M ∗ N ≤ S i ∗ T ≤ M`.
+  that follows has index `≥ N` (the store leaf gives `N ≤ length glog`
+  the way `started_store_obl` gets its bound today).  A non-author's
+  `tso_read` at view `K` returns the value at the latest VISIBLE drain
+  position `p ≤ K`, and `started_win_rel i` names message `i` as the
+  flag's unique writer, so `p` is `i`'s position; `fence_rec N M ∗ N ≤ i`
+  gives `p > M ≥ T`, hence `K > T`, hence `ctx_unstamp`.  `StartedInv`'s
+  tie `T ≤ S i` (issue) becomes `fence_rec N M ∗ N ≤ S i ∗ T ≤ M`.
+  `kptree_publish`'s one-log `drained g` becomes `own_drained` at the same
+  fence, which is now a site (today's pub rule has none for `fence rw,w`).
+  `fence.i` is a `fence_rel` fence too, so the icache's `ctx_xstamp` is a
+  publication at `fence.i`.
 - **Lock word** (`WpLock`, `WpSconfLock`, `ProofAcquire`,
   `ProofRelease`): the release store may be pending when a contender's
   `amoswap.aq` reads the word; the AMO reads 1, writes 1, the release
@@ -329,7 +410,24 @@ author-indexed receipt map.
   own writes are at memory, so the interrupt side needs nothing beyond
   relaxed-rr's acquire.
 
-### 2.8 What does not move
+### 2.8 Floors and the two number lines
+
+A floor is a drain position; a store's identity is an issue index; today
+several rows use ONE number for both.  `lk_floor ξ lo := ctx_floor ξ lo
+∨ ∃ a, ctx_wrote ξ lo a` compares `lo` against a bound and uses it as a
+dirty key; `cred_floor lo tl`, the itable count row and `lock_hook_llb`'s
+clients do the same.  The rule: a store-derived floor is `key_at ξ (t, a)`
+with `t` the store's ISSUE index -- left arm `∃ p, dpos_ev t p ∗
+ctx_floor ξ p` (drained under the bound), right arm `ctx_wrote ξ t a`
+(the fact's own bit) -- and `is_lock`'s `lo` becomes the init store's
+identity, its pin stated through `dpos_ev`.  `llb loglen_name` occurs 181
+times in 35 files; each occurrence is an identity or a watermark (stays)
+or a floor (becomes `dlb` or `key_at`), and that classification is the
+first task of stage D.  `hart_view_lb`'s length half is `era_dlen_name`,
+so a consumer that used `view_lb_llb` for an ISSUE bound loses it -- the
+same classification.
+
+### 2.9 What does not move
 
 Every store gate and ledger position (`TsoCtxStore`, the timestamp tie,
 `gmem` and `gen_heap`), the acquire side of relaxed-rr (`hread`,
@@ -348,8 +446,8 @@ drain-position map grows.
 | A. Spike + litmus | `TsoMem` two-log spike, `TsoLitmus` (§1.2, every forbidden verdict non-vacuous) | LANDED on the branch, 2026-09-05; unchanged |
 | Twin | `TsoCtxTwin3.v`: `chain_ok`/`fifo_ok`/`tso_read_of_latest`, `dpos_ev`, the interp's persistent copies, publication at the fence | landed on the branch; its author-indexed record, receipt and domination index are SUPERSEDED by §2.3 -- a short fourth twin over `main`'s `TsoCtx.v` shapes (`key_at`, `ctx_stamp` as publication, fence-bound mint 2, `fence_rec`) before stage D |
 | B. Machine + interp + lifting | `RiscvLang` (`gdlog`, `MemLoopE`, the blocking arms, `dlog_ok`), `TsoMemPa` (§9b, `ts_ok` with `chain_ok`, the `*1` legacy theory), `TsoGhost`, `RiscvPtsto`, `RiscvExec` (`wp_mem_loop`), the sweep below `TsoCtx` | LANDED on the branch, 2026-09-05; REBASE onto `main` (the contexts change is above `TsoCtx.v`; the receipt map becomes the fence-record map) |
-| C. Rulings | settled by the four ctx-parent rulings and this revision; one remains: the box deposits inside the release hook (§2.6), a `ctx-box.md` §4 item | owner |
-| D. Ownership laws | `key_at`'s clean arm defined once; `ctx_stamped` over `dpos_ev`; `ctx_stamp` and `ctx_dom_to_stamped` fence-bound (stated at the bundle, `TsoCtxLedger`); `lock_finisher_pay`'s prelude at the fence leaf; `lock_born` and publication by a hook at every `initlock` site; the hook as a fupd; the fold over `dpos_ev`; `hart_view_lb`/floors/stamps on `dlen`; `StartedInv` over `fence_rec`; boxes' two deposits in hooks, stamps on the drain line | 1–2 weeks (was 2–3: the parked forms, the receipt rows and the domination index are gone) |
+| C. Rulings | two remain: lock birth, (c1) born tokens on owned rows with a born-acquire class over the generic callers, or (c2) the twin's author-indexed record for births only (§2.4); the box deposits inside the release hook (§2.6), a `ctx-box.md` §4 item | owner |
+| D. Ownership laws | the `llb loglen_name` classification (§2.8); `key_at`'s clean arm defined once; the watermark row dropped; `ctx_stamped` over `dpos_ev`; `ctx_stamp` and `ctx_dom_to_stamped` fence-bound (stated at the bundle, `TsoCtxLedger`), the `fence_rel`-keyed pub rule; `lock_finisher_pay`'s prelude at the fence leaf; the hook as a fence-leaf callback and its twelve callers; lock birth per ruling C; the fold over `dpos_ev`; `hart_view_lb`/floors/stamps on `dlen`; `StartedInv` over `fence_rec`; the boxes' deposits in hooks across the three instances, stamps on the drain line | 2–4 weeks |
 | E. Racy tiers | `TsoMemPa` theory over `(glog, gdlog)` replacing the `*1` names, `TsoCtxLedger` gates, the lock-word state, pins, virtio | 2–3 weeks |
 | F. Close | full build, `audit-only`, notes | 2–3 days |
 
@@ -373,7 +471,8 @@ Order: 1. rebase B onto `main` (tree red from `TsoCtx.v` up, as before);
   store has no drain position; the stamp is the fence's to give.  This is
   why the thread path is parent-shaped and why the lock path's stamp sits
   at `release`'s fence.
-- **A receipt on the lock row, or an author-indexed record.**  Not needed
-  once every cross-hart transfer passes a root stamped at a fence with
-  per-message witnesses in hand; the only receipt left is `fence_rec`,
-  for readers who hold a value and no record.
+- **A receipt on the lock row, or an author-indexed record, for the
+  thread and lock paths.**  Not needed once every cross-hart transfer
+  passes a root stamped at a fence with per-message witnesses in hand; the
+  receipt left is `fence_rec`, for readers who hold a value and no
+  record, plus whatever ruling C keeps for births.
