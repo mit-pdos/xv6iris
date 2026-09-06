@@ -968,6 +968,53 @@ Section DevLoops.
   (*  THE DISK THREAD.  Opens [diskN] for the DMA/wild arms and [plicN]   *)
   (*  for the latch arm.                                                 *)
   (* ------------------------------------------------------------------ *)
+  (* every bus-master message has drained ([RiscvLang.dev_drained]): the
+     FIFO premise of the disk's own append, read off the interp *)
+  Local Lemma disk_dev_drained (g : gstate) :
+    tso_interp_at riscv_eraGS g -∗ ⌜dev_drained g⌝.
+  Proof.
+    iIntros "Hint".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+    iPureIntro. destruct Hmm as (_ & (_ & _ & Hdev) & _). exact Hdev.
+  Qed.
+
+  (* THE INDEX BUMP'S APPEND, performed at memory (A6.48 ruling 4, A6.126
+     §6): the write set is the index word's snapshot, appended to BOTH logs
+     through the RELEASE-WINDOW gate, which re-mints the window with its
+     history extended by this append's position; the record's sealed cells
+     come back as [ledger_le] at that position.
+     relaxed-ww STAGE E: the release-window gate at the AMO shape
+     ([TsoCtxStore.ledger_store_rel_map_ok] is a hart's pending append) is
+     the racy-tier stage's; the two-log window theory is not yet re-founded
+     ([TsoCtx.ledger_read_rel_ok] is Admitted).  Tracked in
+     claude-notes/projects/relaxed-ww.md. *)
+  Local Lemma disk_complete_append (img : bytemap) (m : resv)
+      (log : list pwmsg) (dl : list nat) (V : agent -> nat) (rs : regstate)
+      (d : dev_state) (vs : virtio_state) (w old : resv)
+      (nc lo : nat) (tf : nat -> nat) (hist : list (nat * (nat -> bv 8))) :
+    w = snap_of (used_idx_pa (v_cfg vs)) 2 (wrap16 (S nc)) ->
+    hist_ok hist nc ->
+    (forall k, (k < 2)%nat -> (tf k <= lo)%nat) ->
+    (exists k, (k < 2)%nat /\ lo = tf k) ->
+    gen_heap_interp m -∗
+    tso_interp_of riscv_eraGS img m log dl V -∗
+    phys_map old -∗
+    ((⌜hist = []⌝ ∗ TsoCtx.rel_pre_cells (used_idx_pa (v_cfg vs)) 2 tf (nth_byte (wrap16 0)))
+     ∨ TsoCtx.rel_cells (used_idx_pa (v_cfg vs)) 2 (DfracOwn 1) disk_agent lo tf
+         (nth_byte (wrap16 0)) (nth_byte (wrap16 nc)) hist) ==∗
+    gen_heap_interp (w ∪ m) ∗
+    tso_interp_of riscv_eraGS img (w ∪ m) (log ++ [TsoMemPa.PWMsg w disk_agent])%list
+      (dl ++ [length log])%list
+      (vstep disk_agent (length (dl ++ [length log])%list) (dl ++ [length log])%list V) ∗
+    (∃ q : nat,
+       ⌜forall k q' g, hist !! k = Some (q', g) -> (q' < q)%nat⌝ ∗
+       ([∗ map] a ↦ b ∈ old, ledger_le a b q) ∗
+       TsoCtx.rel_cells (used_idx_pa (v_cfg vs)) 2 (DfracOwn 1) disk_agent lo tf
+         (nth_byte (wrap16 0)) (nth_byte (wrap16 (S nc)))
+         (hist ++ [(q, nth_byte (wrap16 (S nc)))])).
+  Proof.
+  Admitted.
+
   Lemma wp_disk_loop γd :
     (* the disk names are the CANONICAL ones: the image gname is the AMBIENT
        ERA's, which is what identifies the auth [wp_disk_step] hands over with
@@ -991,7 +1038,7 @@ Section DevLoops.
        over because a DMA completion is the one step that moves [v_disk]): the
        latch and stutter arms FRAME it, and the completion arm passes it
        through [virtio_proto_step] (claude-notes/design/crash.md). *)
-    iIntros (gr m d n img log V Hn)
+    iIntros (gr m d n img log dl V Hn)
             "(Hgr & Hmem & Hdev & Hdur & Htie & Hsa & Htso)".
     (* THE PERMIT INVARIANT IS OPENED IN THE FIRST (⊤ -> ∅) LEG, before the
        arm is even known.  It has to be: [perm_inv_body] is NOT timeless (it
@@ -1002,7 +1049,7 @@ Section DevLoops.
        so the openings compose ([solve_ndisj]). *)
     iInv "Hqinv" as "Hpbody" "Hpclose".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iNext. iIntros (d' W log') "%Hstep %Hlog".
+    iNext. iIntros (d' W log' dl') "%Hstep %Hlog".
     iMod "Hmask" as "_".
     destruct Hstep as [mv vnew Hview Hpop | mv h vnew Hview Hfetch
                       | mv h vnew Hview Hcap | h vnew w Hwrite
@@ -1022,12 +1069,15 @@ Section DevLoops.
          [log' = log] and the memory is untouched -- the bundle comes
          straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
          agent's pinned view). *)
-      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      destruct Hlog as [[_ [-> ->]] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
       rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       rewrite Hv in Hpop.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      iDestruct (virtio_proto_pop_step γd vs m mv vnew Hview Hpop
-                   with "Hmem Hlease") as "[Hmem Hlease]".
+      iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+      rewrite (tso_interp_of_at_gs riscv_eraGS img m log dl V (gr 0%fin) d Hpin).
+      iDestruct (virtio_proto_pop_step_dmem γd vs (gs_of img m log dl V (gr 0%fin) d)
+                   mv vnew Hview Hpop with "Hmem Htso Hlease") as "(Hmem & Htso & Hlease)".
+      rewrite -(tso_interp_of_at_gs riscv_eraGS img m log dl V (gr 0%fin) d Hpin).
       iMod ("Hclose" with "[Hv' Hlease]") as "_".
       { iNext. iExists vnew. iFrame "Hv' Hlease".
         iPureIntro. exact (virtio_pop_step_isr_ok vs mv vnew Hvok Hpop). }
@@ -1051,12 +1101,15 @@ Section DevLoops.
       iInv "Hvinv" as ">Hbody" "Hclose".
       iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
-      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      destruct Hlog as [[_ [-> ->]] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
       rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       rewrite Hv in Hfetch.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      iDestruct (virtio_proto_fetch_step γd vs m mv h vnew Hview Hfetch
-                   with "Hmem Hlease") as "[Hmem Hlease]".
+      iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+      rewrite (tso_interp_of_at_gs riscv_eraGS img m log dl V (gr 0%fin) d Hpin).
+      iDestruct (virtio_proto_fetch_step_dmem γd vs (gs_of img m log dl V (gr 0%fin) d)
+                   mv h vnew Hview Hfetch with "Hmem Htso Hlease") as "(Hmem & Htso & Hlease)".
+      rewrite -(tso_interp_of_at_gs riscv_eraGS img m log dl V (gr 0%fin) d Hpin).
       iMod ("Hclose" with "[Hv' Hlease]") as "_".
       { iNext. iExists vnew. iFrame "Hv' Hlease".
         iPureIntro. exact (virtio_fetch_step_isr_ok vs mv h vnew Hvok Hfetch). }
@@ -1085,12 +1138,15 @@ Section DevLoops.
       iInv "Hvinv" as ">Hbody" "Hclose".
       iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
-      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      destruct Hlog as [[_ [-> ->]] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
       rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       rewrite Hv in Hcap.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      iDestruct (virtio_proto_capture_step γd vs m mv h vnew Hview Hcap
-                   with "Hmem Hlease") as "[Hmem Hlease]".
+      iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+      rewrite (tso_interp_of_at_gs riscv_eraGS img m log dl V (gr 0%fin) d Hpin).
+      iDestruct (virtio_proto_capture_step_dmem γd vs (gs_of img m log dl V (gr 0%fin) d)
+                   mv h vnew Hview Hcap with "Hmem Htso Hlease") as "(Hmem & Htso & Hlease)".
+      rewrite -(tso_interp_of_at_gs riscv_eraGS img m log dl V (gr 0%fin) d Hpin).
       iMod ("Hclose" with "[Hv' Hlease]") as "_".
       { iNext. iExists vnew. iFrame "Hv' Hlease".
         iPureIntro. exact (virtio_capture_step_isr_ok vs mv h vnew Hvok Hcap). }
@@ -1134,25 +1190,26 @@ Section DevLoops.
       iDestruct (virtio_proto_write_step γd vs h vnew w Hwrite with "Hdur Hlease")
         as (old) "(%Hdomold & Hold & Hback)".
       iAssert (|==> gen_heap_interp (w ∪ m) ∗
-                 tso_interp_of riscv_eraGS img (w ∪ m) log'
-                   (vstep disk_agent (length log') log' V) ∗
+                 tso_interp_of riscv_eraGS img (w ∪ m) log' dl'
+                   (vstep disk_agent (length dl') dl' V) ∗
                  phys_map w)%I
         with "[Hmem Htso Hold]" as ">(Hmem & Htso & Hnew)".
       { iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
         iDestruct (tso_interp_of_bound with "Htso") as %Hbnd.
-        destruct Hlog as [[Hw Hl] | [Hne Hl]].
+        destruct Hlog as [[Hw [Hl Hd]] | [Hne [Hl Hd]]].
         - (* nothing written: the bundle comes straight back *)
-          subst w log'. rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
+          subst w log' dl'. rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
           iModIntro. iFrame "Hmem".
           iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
           rewrite /phys_map big_sepM_empty. done.
-        - (* the real append, at the [disk_agent] author *)
-          subst log'.
-          set (V' := vstep disk_agent
-                       (length (log ++ [TsoMemPa.PWMsg w disk_agent])%list)
-                       (log ++ [TsoMemPa.PWMsg w disk_agent])%list V).
-          assert (Hpin' : forall h, (NCPU <= h)%nat ->
-                    V' h = length (log ++ [TsoMemPa.PWMsg w disk_agent])%list).
+        - (* the real append, at the [disk_agent] author: a DMA write is
+             PERFORMED AT MEMORY, so it drains as it issues
+             ([TsoCtxStore.ledger_store_amo_ok]); its FIFO premise is
+             [dev_drained] -- every earlier disk message has drained *)
+          subst log' dl'.
+          set (dl' := (dl ++ [length log])%list).
+          set (V' := vstep disk_agent (length dl') dl' V).
+          assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl').
           { intros h' Hh. rewrite /V' /vstep. case_decide as Hd; [done|].
             destruct (lt_dec h' NCPU) as [|Hge]; [lia|done]. }
           assert (Htvmono : forall c : CPU,
@@ -1163,27 +1220,28 @@ Section DevLoops.
             - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; [lia|].
               exfalso. pose proof (fin_to_nat_lt c).
               rewrite /hart_agent in Hge. lia. }
-          assert (Htvtop : forall c : CPU,
-                    (V' (hart_agent c) <= length
-                       (log ++ [TsoMemPa.PWMsg w disk_agent])%list)%nat).
+          assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length dl')%nat).
           { intros c. rewrite /V' /vstep. case_decide as Hd; [lia|].
             destruct (lt_dec (hart_agent c) NCPU) as [|Hge].
-            - rewrite length_app /=. have := Hbnd (hart_agent c). lia.
+            - rewrite /dl' length_app /=. have := Hbnd (hart_agent c). lia.
             - lia. }
-          rewrite (tso_interp_of_at_gs riscv_eraGS img m log V
+          rewrite (tso_interp_of_at_gs riscv_eraGS img m log dl V
                      (gr 0%fin) d Hpin).
+          iDestruct (disk_dev_drained with "Htso") as %Hdev.
           iEval (rewrite /phys_map) in "Hold".
-          iMod (TsoCtxStore.ledger_store_ok
-                  (gs_of img m log V (gr 0%fin) d)
+          iMod (TsoCtxStore.ledger_store_amo_ok
+                  (gs_of img m log dl V (gr 0%fin) d)
                   (gs_of img (w ∪ m)
-                     (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
+                     (log ++ [TsoMemPa.PWMsg w disk_agent])%list dl' V'
                      (gr 0%fin) d)
-                  disk_agent old w Hdomold eq_refl eq_refl eq_refl
+                  disk_agent old w Hdomold
+                  ltac:(intros i mi Hi Htid _; apply (Hdev i mi Hi); rewrite Htid; done)
+                  eq_refl eq_refl eq_refl eq_refl
                   Htvmono Htvtop with "Hmem Htso Hold")
-            as "(Hmem & Htso & _ & Hnew)".
+            as "(Hmem & Htso & _ & _ & Hnew)".
           iModIntro. iFrame "Hmem".
           rewrite -(tso_interp_of_at_gs riscv_eraGS img (w ∪ m)
-                      (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
+                      (log ++ [TsoMemPa.PWMsg w disk_agent])%list dl' V'
                       (gr 0%fin) d Hpin').
           iFrame "Htso". rewrite /phys_map.
           iApply (big_sepM_impl with "Hnew"). iIntros "!>" (a b _) "H".
@@ -1260,8 +1318,8 @@ Section DevLoops.
       (* by the log's length BEFORE the append ([phys_map_ledger_le]).     *)
       (* ================================================================ *)
       iAssert (|==> gen_heap_interp (w ∪ m) ∗
-                 tso_interp_of riscv_eraGS img (w ∪ m) log'
-                   (vstep disk_agent (length log') log' V) ∗
+                 tso_interp_of riscv_eraGS img (w ∪ m) log' dl'
+                   (vstep disk_agent (length dl') dl' V) ∗
                  (∃ q : nat,
                     ⌜forall k q' g, hist !! k = Some (q', g) -> (q' < q)%nat⌝ ∗
                     ([∗ map] a ↦ b ∈ old, ledger_le a b q) ∗
@@ -1269,100 +1327,16 @@ Section DevLoops.
                       (nth_byte (wrap16 0)) (nth_byte (wrap16 (S nc)))
                       (hist ++ [(q, nth_byte (wrap16 (S nc)))])))%I
         with "[Hmem Htso Hold Hrel]" as ">(Hmem & Htso & Hnew)".
-      { iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-        iDestruct (tso_interp_of_bound with "Htso") as %Hbnd.
-        destruct Hlog as [[Hw Hl] | [Hne Hl]].
+      { destruct Hlog as [[Hw _] | [Hne [Hl Hd]]].
         - (* the completion always writes the index word: never empty *)
           exfalso. subst w.
           assert (Hs : snap_of (used_idx_pa (v_cfg vs)) 2 (wrap16 (S nc))
                          !! pa_add (used_idx_pa (v_cfg vs)) 0 = Some (nth_byte (wrap16 (S nc)) 0))
             by (apply write_bytes_lookup; lia).
           rewrite <- Hsnapw in Hs. rewrite lookup_empty in Hs. discriminate Hs.
-        - (* the real append, at the [disk_agent] author *)
-          subst log'.
-          set (V' := vstep disk_agent
-                       (length (log ++ [TsoMemPa.PWMsg w disk_agent])%list)
-                       (log ++ [TsoMemPa.PWMsg w disk_agent])%list V).
-          assert (Hpin' : forall h, (NCPU <= h)%nat ->
-                    V' h = length (log ++ [TsoMemPa.PWMsg w disk_agent])%list).
-          { intros h' Hh. rewrite /V' /vstep. case_decide as Hd; [done|].
-            destruct (lt_dec h' NCPU) as [|Hge]; [lia|done]. }
-          assert (Htvmono : forall c : CPU,
-                    (V (hart_agent c) <= V' (hart_agent c))%nat).
-          { intros c. rewrite /V' /vstep. case_decide as Hd.
-            - exfalso. pose proof (fin_to_nat_lt c).
-              rewrite /hart_agent /disk_agent in Hd. lia.
-            - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; [lia|].
-              exfalso. pose proof (fin_to_nat_lt c).
-              rewrite /hart_agent in Hge. lia. }
-          assert (Htvtop : forall c : CPU,
-                    (V' (hart_agent c) <= length
-                       (log ++ [TsoMemPa.PWMsg w disk_agent])%list)%nat).
-          { intros c. rewrite /V' /vstep. case_decide as Hd; [lia|].
-            destruct (lt_dec (hart_agent c) NCPU) as [|Hge].
-            - rewrite length_app /=. have := Hbnd (hart_agent c). lia.
-            - lia. }
-          rewrite (tso_interp_of_at_gs riscv_eraGS img m log V
-                     (gr 0%fin) d Hpin).
-          (* the window in minted form: minted now if this is the first completion *)
-          iAssert (|==> tso_interp_at riscv_eraGS (gs_of img m log V (gr 0%fin) d) ∗
-                     gen_heap_interp m ∗
-                     TsoCtx.rel_cells (used_idx_pa (v_cfg vs)) 2 (DfracOwn 1) disk_agent lo tf
-                       (nth_byte (wrap16 0)) (nth_byte (wrap16 nc)) hist)%I
-            with "[Htso Hmem Hrel]" as ">(Htso & Hmem & Hrel)".
-          { iDestruct "Hrel" as "[[%Hnil Hpre] | Hrel]"; last by iFrame.
-            assert (Hnc0 : nc = 0%nat)
-              by (destruct Hho as [Hlen _]; rewrite Hnil in Hlen; cbn in Hlen; lia).
-            subst hist. rewrite Hnc0.
-            iEval (rewrite /TsoCtx.rel_pre_cells) in "Hpre".
-            iMod (TsoCtxStore.ledger_rpay_mint (gs_of img m log V (gr 0%fin) d)
-                    (used_idx_pa (v_cfg vs)) 2 disk_agent lo tf (nth_byte (wrap16 0))
-                    ltac:(lia) Htf Hlo with "Hmem Htso Hpre") as "(Hmem & Htso & Hcells)".
-            iModIntro. iFrame "Htso Hmem". rewrite /TsoCtx.rel_cells.
-            iApply (big_sepL_impl with "Hcells"). iIntros "!>" (k j _) "H".
-            iExists (tf j). iExact "H". }
-          (* every history position is a log position: under the append *)
-          iAssert (⌜forall k q' g, hist !! k = Some (q', g) -> (q' < S (length log))%nat⌝)%I
-            as %Hqgt.
-          { rewrite /TsoCtx.rel_cells.
-            iDestruct (big_sepL_lookup _ (seq 0 2) 0%nat 0%nat with "Hrel") as (tc) "Hc0";
-              [reflexivity|].
-            iDestruct (TsoCtxStore.ledger_rpay_ok with "Htso Hc0") as %Hok0.
-            iPureIntro. intros k q' g Hk.
-            destruct Hok0 as (_ & _ & _ & _ & H1b & _). cbn in H1b.
-            destruct (H1b q' g (elem_of_list_lookup_2 _ _ _ Hk)) as (_ & i0 & mg & -> & Hlk & _).
-            apply lookup_lt_Some in Hlk. lia. }
-          (* THE RECORD'S CELLS: stamped by earlier appends, so under the log *)
-          iDestruct (phys_map_ledger_le (gs_of img m log V (gr 0%fin) d) old
-                       with "Hmem Htso Hold") as "(Hmem & Htso & Hold)".
-          iEval (cbn [gs_of glog]) in "Hold".
-          (* the append: the index word alone, through the window gate *)
-          iMod (TsoCtxStore.ledger_store_rel_map_ok
-                  (gs_of img m log V (gr 0%fin) d)
-                  (gs_of img (w ∪ m)
-                     (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
-                     (gr 0%fin) d)
-                  disk_agent ∅ w (used_idx_pa (v_cfg vs)) 2 (wrap16 nc) (wrap16 (S nc))
-                  lo tf (nth_byte (wrap16 0)) hist
-                  ltac:(cbn; lia) ltac:(rewrite Hsnapw; reflexivity)
-                  ltac:(rewrite dom_empty_L Hsnapw !dom_snap_of difference_diag_L; reflexivity)
-                  eq_refl eq_refl eq_refl
-                  Htvmono Htvtop with "Hmem Htso [] Hrel")
-            as "(Hmem & Htso & _ & _ & Hrel)"; [by rewrite big_sepM_empty|].
-          iModIntro. iFrame "Hmem".
-          rewrite -(tso_interp_of_at_gs riscv_eraGS img (w ∪ m)
-                      (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
-                      (gr 0%fin) d Hpin').
-          iFrame "Htso". iEval (cbn [gs_of glog]) in "Hrel".
-          iExists (S (length log)).
-          iSplitR; [iPureIntro; exact Hqgt|].
-          iSplitL "Hold".
-          { iApply (big_sepM_impl with "Hold"). iIntros "!>" (a b _) "H".
-            iApply (ledger_le_mono _ _ (length log)); [lia | iExact "H"]. }
-          iEval (change (N.to_nat 2) with 2%nat) in "Hrel".
-          rewrite /TsoCtx.rel_cells.
-          iApply (big_sepL_mono with "Hrel"). iIntros (k j _) "H".
-          iExists (S (length log)). iExact "H". }
+        - subst log' dl'.
+          iApply (disk_complete_append img m log dl V (gr 0%fin) d vs w old nc lo tf hist
+                    Hsnapw Hho Htf Hlo with "Hmem Htso Hold Hrel"). }
       iDestruct "Hnew" as (q) "(%Hqgt & Hnew & Hrel)".
       iMod ("Hback" $! q with "[%] Hdone Hnew Hrel") as "Hlease'"; [exact Hqgt|].
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
@@ -1406,7 +1380,7 @@ Section DevLoops.
          [log' = log] and the memory is untouched -- the bundle comes
          straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
          agent's pinned view). *)
-      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      destruct Hlog as [[_ [-> ->]] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
       rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       rewrite Hv in Hdrain.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
@@ -1456,8 +1430,10 @@ Section DevLoops.
       iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
       rewrite Hv in Hstall.
-      iDestruct (virtio_proto_not_stalled m vs mv γd Hview with "Hmem Hlease")
-        as %Hns.
+      iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+      rewrite (tso_interp_of_at_gs riscv_eraGS img m log dl V (gr 0%fin) d Hpin).
+      iDestruct (virtio_proto_not_stalled_dmem γd vs (gs_of img m log dl V (gr 0%fin) d) mv
+                   Hview with "Hmem Htso Hlease") as %Hns.
       exfalso. congruence.
     - (* the gateway latches the DISK's interrupt level -- the disk's own
          source, so this is the disk thread's business and not the UART's *)
@@ -1465,7 +1441,7 @@ Section DevLoops.
          [log' = log] and the memory is untouched -- the bundle comes
          straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
          agent's pinned view). *)
-      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      destruct Hlog as [[_ [-> ->]] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
       rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       iInv "Hpinv" as ">Hbody" "Hclose".
       iDestruct "Hbody" as (p) "(Hp & %Hpok)".
@@ -1489,7 +1465,7 @@ Section DevLoops.
          [log' = log] and the memory is untouched -- the bundle comes
          straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
          agent's pinned view). *)
-      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      destruct Hlog as [[_ [-> ->]] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
       rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev".

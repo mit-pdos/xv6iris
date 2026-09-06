@@ -4556,6 +4556,60 @@ Section VirtioProto.
      BEHIND its hole as the release window (pre-mint or minted, with its
      history); the window comes out here and goes back re-minted with the
      history extended by the append's position [q]. *)
+  (* ================================================================== *)
+  (* THE DEVICE READS MEMORY (relaxed-ww.md §1.1): the three bus-reading  *)
+  (* arms take their view of the DRAIN FLAT [TsoMemPa.dmem], not of the     *)
+  (* issue flat that gen_heap interprets -- a driver's store reaches the    *)
+  (* device only once drained.  The lease's cells agree with the drain      *)
+  (* flat because the driver fences before it publishes an entry            *)
+  (* ([__sync_synchronize] before the index bump and before the notify), so *)
+  (* an entry the device can see has every store behind it drained.        *)
+  (* relaxed-ww STAGE E: that argument -- the lease's cells carry their     *)
+  (* drain witnesses -- is the virtio item of the racy-tier stage; these    *)
+  (* four are its obligations, Admitted.  Tracked in                        *)
+  (* claude-notes/projects/relaxed-ww.md.                                   *)
+  (* ================================================================== *)
+  Lemma virtio_proto_pop_step_dmem (γ : disk_names) (v : virtio_state)
+      (g : gstate) (mv : vmem) (v' : virtio_state) :
+    mem_view (TsoMemPa.dmem g.(gimg) g.(glog) g.(gdlog)) mv ->
+    virtio_pop_step v mv = Some v' ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+    virtio_proto γ v -∗
+      gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗ tso_interp_at riscv_eraGS g ∗
+      virtio_proto γ v'.
+  Proof.
+  Admitted.
+
+  Lemma virtio_proto_fetch_step_dmem (γ : disk_names) (v : virtio_state)
+      (g : gstate) (mv : vmem) (h : bv 16) (v' : virtio_state) :
+    mem_view (TsoMemPa.dmem g.(gimg) g.(glog) g.(gdlog)) mv ->
+    virtio_fetch_step v mv h = Some v' ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+    virtio_proto γ v -∗
+      gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗ tso_interp_at riscv_eraGS g ∗
+      virtio_proto γ v'.
+  Proof.
+  Admitted.
+
+  Lemma virtio_proto_capture_step_dmem (γ : disk_names) (v : virtio_state)
+      (g : gstate) (mv : vmem) (h : bv 16) (v' : virtio_state) :
+    mem_view (TsoMemPa.dmem g.(gimg) g.(glog) g.(gdlog)) mv ->
+    virtio_capture_step v mv h = Some v' ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+    virtio_proto γ v -∗
+      gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗ tso_interp_at riscv_eraGS g ∗
+      virtio_proto γ v'.
+  Proof.
+  Admitted.
+
+  Lemma virtio_proto_not_stalled_dmem (γ : disk_names) (v : virtio_state)
+      (g : gstate) (mv : vmem) :
+    mem_view (TsoMemPa.dmem g.(gimg) g.(glog) g.(gdlog)) mv ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+    virtio_proto γ v -∗ ⌜virtio_stalled v mv = false⌝.
+  Proof.
+  Admitted.
+
   Lemma virtio_proto_step (γ : disk_names) (v : virtio_state)
       (i : bv 16) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
     virtio_complete_step v i = Some (v', w) ->
