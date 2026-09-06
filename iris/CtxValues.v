@@ -64,11 +64,18 @@ Section CtxValues.
   Global Instance cv_touch_timeless a B Sv : Timeless (cv_touch a B Sv).
   Proof. rewrite /cv_touch. apply _. Qed.
 
+  (* TWO LOGS (relaxed-ww.md §2.10): the justification is the cell's own,
+     UNCHANGED -- [key_at]'s two arms with the dirty arm's floor receipt,
+     and the chain.  The pin's bound is the stamp itself: the racy payload
+     is the LEGACY one-log [pin_ok] (stage E re-founds it), and what the
+     reader consumes is the stamp's drain position ([cv_key_read]). *)
   Definition ctx_values (ξ : CtxId) (a : Arch.pa) (dq : dfrac)
       (Sv : gset (bv 8)) : iProp Σ :=
-    (∃ (B t : nat) (v : bv 8),
-       phys_ledger_pin a dq v t B Sv ∗
-       (ctx_floor ξ B ∨ (ctx_wrote ξ B a ∗ cv_touch a B Sv)))%I.
+    (∃ (t : nat) (v : bv 8),
+       phys_ledger_pin a dq v t t Sv ∗
+       chain_ev chain_name t ∗
+       ((∃ p : nat, dpos_ev dpos_name t p ∗ ctx_floor ξ p) ∨
+        (ctx_wrote ξ t a ∗ cv_touch a t Sv)))%I.
 
   Global Instance ctx_values_timeless ξ a dq Sv :
     Timeless (ctx_values ξ a dq Sv).
@@ -85,7 +92,7 @@ Section CtxValues.
   Proof.
     iIntros "Hint #Hm".
     iDestruct "Hint"
-      as "(%TM & %LM & Hts & %Hdom & %Htie & Hlm & %HLM & Hlen & Hv & %Hmm)".
+      as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hlm & %HLM & Hlen & Hv & Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (ghost_map_lookup with "Hlm Hm") as %HL.
     iPureIntro. rewrite -HLM. exact HL.
   Qed.
@@ -97,11 +104,30 @@ Section CtxValues.
   Proof.
     iIntros "Hint [Hp Hts]".
     iDestruct "Hint"
-      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hlm & %HLM & Hlen & Hv & %Hmm)".
+      as "(%TM & %LM & %DP & %FR & %CH & Hauth & %Hdom & %Htie & Hlm & %HLM & Hlen & Hv & Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
     iPureIntro.
-    exact (TsoMemPa.ts_ok_pin _ _ _ _ _ _ _ (Htie _ _ HTM) eq_refl).
+    exact (TsoMemPa.ts_ok_pin _ _ _ _ _ _ _ _ (Htie _ _ HTM) eq_refl).
   Qed.
+
+  (* THE READ AT THE STAMP'S DRAIN POSITION.  A reader whose floor has
+     passed the drain position of the pinned cell's stamp sees that write
+     or a later one to the byte, and the pin's store gates keep every later
+     write in the family.  relaxed-ww STAGE E: the two-log pin theory
+     ([TsoMemPa.pin_ok] is legacy, over the issue log alone); tracked in
+     claude-notes/projects/relaxed-ww.md. *)
+  Lemma cv_key_read `{CID : CpuId} (g : gstate) (a : Arch.pa) (dq : dfrac)
+      (v : bv 8) (t B p : nat) (Sv : gset (bv 8)) :
+    tso_interp_at riscv_eraGS g -∗
+    dpos_ev dpos_name t p -∗
+    TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) p -∗
+    chain_ev chain_name t -∗
+    phys_ledger_pin a dq v t B Sv -∗
+    ⌜forall tv, (g.(gtv) cpu_id <= tv)%nat ->
+       exists b, TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv a
+                 = Some b /\ b ∈ Sv⌝.
+  Proof.
+  Admitted.
 
   Lemma cv_latest (g : gstate) (a : Arch.pa) (dq : dfrac)
       (v : bv 8) (t : nat) :
@@ -113,13 +139,13 @@ Section CtxValues.
   Proof.
     iIntros "Hint Hgh Hp Hts".
     iDestruct "Hint"
-      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hlm & %HLM & Hlen & Hv & %Hmm)".
+      as "(%TM & %LM & %DP & %FR & %CH & Hauth & %Hdom & %Htie & Hlm & %HLM & Hlen & Hv & Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
     iEval (rewrite /phys_pointsto) in "Hp".
     iDestruct "Hp" as "[Hp %Hram]".
     iDestruct (gen_heap_valid with "Hgh Hp") as %Hgm.
     iPureIntro.
-    destruct (TsoMemPa.ts_ok_latest _ _ _ _ _ (Htie _ _ HTM))
+    destruct (TsoMemPa.ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM))
       as (v0 & Hgm0 & Hlat).
     rewrite Hgm in Hgm0. by injection Hgm0 as <-.
   Qed.
@@ -145,152 +171,54 @@ Section CtxValues.
   Proof.
     iIntros (Hv) "Hgh Hint Hrun Hc".
     rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
-    iDestruct "Hc" as (t) "(Hp & Hts & Harm)".
+    iDestruct "Hc" as (t) "(Hp & Hts & #Hkey & #Hchain)".
     iAssert (⌜TsoMemPa.latest g.(gimg) g.(glog) a t v⌝)%I as %Hlat.
     { iApply (cv_latest with "Hint Hgh Hp Hts"). }
-    iDestruct "Harm" as "[#Hclean | #Hdirty]".
-    - (* CLEAN: the floor is under ξ's bound *)
-      iMod (ledger_pin_mint g a v t t Sv (le_n t) Hv with "Hgh Hint [Hp Hts]")
-        as "(Hgh & Hint & Hpin)".
-      { rewrite /phys_ledger_at. iFrame "Hp Hts". }
+    iMod (ledger_pin_mint g a v t t Sv (le_n t) Hv with "Hgh Hint [Hp Hts]")
+      as "(Hgh & Hint & Hpin)".
+    { rewrite /phys_ledger_at. iFrame "Hp Hts". }
+    iDestruct "Hkey" as "[(%p & #Hdp & #Hfl) | #Hdirty]".
+    - (* CLEAN: the stamp is drained under ξ's bound *)
       iModIntro. iFrame "Hgh Hint Hrun".
-      iExists t, t, v. iFrame "Hpin". iLeft. iExact "Hclean".
+      iExists t, v. iFrame "Hpin Hchain". iLeft. iExists p. iFrame "Hdp Hfl".
     - (* DIRTY: ξ's own write; record the receipt off the token *)
       destruct t as [|i].
-      + (* stamp 0: the image floor -- use the clean arm, llb at 0 *)
-        iMod (ledger_pin_mint g a v 0 0 Sv (le_n 0) Hv with "Hgh Hint [Hp Hts]")
-          as "(Hgh & Hint & Hpin)".
-        { rewrite /phys_ledger_at. iFrame "Hp Hts". }
+      + (* stamp 0: the image floor, drained at every position *)
         iModIntro. iFrame "Hgh Hint Hrun".
-        iExists 0%nat, 0%nat, v. iFrame "Hpin". iLeft.
-        rewrite /ctx_floor. iApply TsoGhost.llb_0.
+        iExists 0%nat, v. iFrame "Hpin Hchain". iLeft. iExists 0%nat.
+        iSplit; [iApply TsoGhost.dpos_ev_0 | rewrite /ctx_floor; iApply TsoGhost.llb_0].
       + (* stamp S i: [latest] says log !! i writes v to a *)
         destruct Hlat as [Hbyte _].
         rewrite /TsoMemPa.log_byte in Hbyte.
         destruct (g.(glog) !! i) as [m|] eqn:Hlog; last done.
-        (* the token's dirty_ok at (S i, a): own-message or under-bound *)
+        (* the token's dirty_ok at (S i, a): drained under the bound, or own *)
         rewrite own_context_unseal /own_context_def.
-        iDestruct "Hrun"
-          as (Btok K W D) "(Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
-        iDestruct (TsoGhost.dset_lookup with "[Hat] [Hdirty]") as %HinD.
-        { iDestruct "Hat" as "[_ $]". }
-        { iExact "Hdirty". }
+        iDestruct "Hrun" as (Btok K D) "([Hb Hd] & #HK & %HBK & #Hoks)".
+        iDestruct (TsoGhost.dset_lookup with "Hd Hdirty") as %HinD.
         iDestruct (big_sepS_elem_of _ _ _ HinD with "Hoks") as "#Hok".
-        iDestruct "Hok" as "[%Hle | Hown]".
-        * (* under the token's bound: clean arm via llb *)
-          iDestruct "Hat" as "[Hb Hd]".
+        iDestruct "Hok" as "[#Hdp | Hown]".
+        * (* drained under the token's bound: the clean arm at [Btok] *)
+          iEval (cbn) in "Hdp".
           iDestruct (TsoGhost.llb_get with "Hb") as "[Hb #Hllb]".
-          iMod (ledger_pin_mint g a v (S i) (S i) Sv (le_n _) Hv
-                  with "Hgh Hint [Hp Hts]") as "(Hgh & Hint & Hpin)".
-          { rewrite /phys_ledger_at. iFrame "Hp Hts". }
           iModIntro. iFrame "Hgh Hint".
           iSplitL "Hb Hd".
-          { iExists Btok, K, W, D. iFrame "Hb Hd HK HW Hoks".
-            iSplit; by iPureIntro. }
-          iExists (S i), (S i), v. iFrame "Hpin". iLeft.
-          rewrite /ctx_floor.
-          iApply (TsoGhost.llb_le with "Hllb"). cbn in Hle. lia.
+          { iExists Btok, K, D. iFrame "Hb Hd HK Hoks". by iPureIntro. }
+          iExists (S i), v. iFrame "Hpin Hchain". iLeft. iExists Btok.
+          iFrame "Hdp". rewrite /ctx_floor. iExact "Hllb".
         * (* the own-message arm: the receipt *)
           iDestruct "Hown" as (i' m') "(%Hii & #Hm & %Htid)".
           cbn in Hii. injection Hii as <-.
           iAssert (⌜g.(glog) !! i = Some m'⌝)%I as %Hlog'.
           { iApply (cv_msg_lookup with "Hint Hm"). }
           rewrite Hlog in Hlog'. injection Hlog' as <-.
-          iMod (ledger_pin_mint g a v (S i) (S i) Sv (le_n _) Hv
-                  with "Hgh Hint [Hp Hts]") as "(Hgh & Hint & Hpin)".
-          { rewrite /phys_ledger_at. iFrame "Hp Hts". }
           iModIntro. iFrame "Hgh Hint".
-          iSplitL "Hat".
-          { iExists Btok, K, W, D. iFrame "Hat HK HW Hoks".
-            iSplit; by iPureIntro. }
-          iExists (S i), (S i), v. iFrame "Hpin". iRight.
+          iSplitL "Hb Hd".
+          { iExists Btok, K, D. iFrame "Hb Hd HK Hoks". by iPureIntro. }
+          iExists (S i), v. iFrame "Hpin Hchain". iRight.
           iSplit; [iExact "Hdirty" |].
           iRight. iExists i, m, v. iFrame "Hm".
           iSplit; [by iPureIntro |]. iSplit; by iPureIntro.
   Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (* THE RACY READ RULE: you get one of the values from the set.         *)
-  (* ------------------------------------------------------------------ *)
-
-  Lemma ctx_values_read `{CID : CpuId} (g : gstate) (ξ : CtxId)
-      (a : Arch.pa) (dq : dfrac) (Sv : gset (bv 8)) :
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
-    ctx_values ξ a dq Sv -∗
-    ⌜forall tv, (g.(gtv) cpu_id <= tv)%nat ->
-       exists b, TsoMemPa.tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv a
-                 = Some b /\ b ∈ Sv⌝.
-  Proof.
-    iIntros "Hint Hrun Hc".
-    iDestruct "Hc" as (B t v) "(Hpin & Harm)".
-    iAssert (⌜TsoMemPa.pin_ok g.(gimg) g.(glog) a B Sv⌝)%I as %Hpin.
-    { iApply (cv_pin_ok with "Hint Hpin"). }
-    iDestruct "Harm" as "[#Hclean | [#Hdirty #Htouch]]".
-    - (* CLEAN: ξ's bound passed B, so this hart's view has too *)
-      rewrite own_context_unseal /own_context_def.
-      iDestruct "Hrun"
-        as (Btok K W D) "(Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
-      iDestruct "Hat" as "[Hb Hd]".
-      rewrite /ctx_floor.
-      iDestruct (TsoGhost.llb_valid with "Hb Hclean") as %HBtok.
-      iDestruct (TsoGhost.view_lb_le view_name loglen_name (hart_agent cpu_id) K B ltac:(lia) with "HK") as "#HB".
-      iDestruct (ledger_read_pin_ok g a dq v t B Sv with "Hint HB [Hpin]")
-        as %Hrd.
-      { iExact "Hpin". }
-      iPureIntro. intros tv Htv. exact (Hrd (hart_agent cpu_id) tv Htv).
-    - (* DIRTY: the author arm *)
-      iDestruct "Htouch" as "[%HB0 | Hseed]".
-      + (* B = 0: pin_ok covers every view outright *)
-        subst B. iPureIntro. intros tv Htv.
-        exact (Hpin (hart_agent cpu_id) tv (Nat.le_0_l tv)).
-      + iDestruct "Hseed" as (i m b) "(%HBi & #Hm & %Hmb & %HbS)".
-        iAssert (⌜g.(glog) !! i = Some m⌝)%I as %Hlog.
-        { iApply (cv_msg_lookup with "Hint Hm"). }
-        (* the token certifies the message at B is this hart's own,
-           or that B is under the bound (then the clean route applies) *)
-        rewrite own_context_unseal /own_context_def.
-        iDestruct "Hrun"
-          as (Btok K W D) "(Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
-        iDestruct (TsoGhost.dset_lookup with "[Hat] [Hdirty]") as %HinD.
-        { iDestruct "Hat" as "[_ $]". }
-        { iExact "Hdirty". }
-        iDestruct (big_sepS_elem_of _ _ _ HinD with "Hoks") as "#Hok".
-        iDestruct "Hok" as "[%Hle | Hown]".
-        * (* under the bound: view receipt route *)
-          iDestruct "Hat" as "[Hb Hd]".
-          cbn in Hle.
-          iDestruct (TsoGhost.view_lb_le view_name loglen_name (hart_agent cpu_id) K B ltac:(lia) with "HK")
-            as "#HB".
-          iDestruct (ledger_read_pin_ok g a dq v t B Sv with "Hint HB [Hpin]")
-            as %Hrd.
-          { iExact "Hpin". }
-          iPureIntro. intros tv Htv. exact (Hrd (hart_agent cpu_id) tv Htv).
-        * (* own: [pin_ok_author] *)
-          iDestruct "Hown" as (i' m') "(%Hii & #Hm' & %Htid)".
-          cbn in Hii. rewrite HBi in Hii. injection Hii as <-.
-          iAssert (⌜g.(glog) !! i = Some m'⌝)%I as %Hlog'.
-          { iApply (cv_msg_lookup with "Hint Hm'"). }
-          rewrite Hlog in Hlog'. injection Hlog' as <-.
-          iPureIntro. intros tv Htv.
-          apply (TsoMemPa.pin_ok_author g.(gimg) g.(glog) a B B b Sv
-                   (hart_agent cpu_id) Hpin (Nat.le_refl B)).
-          -- (* always visible: the own arm *)
-             intros tv'. rewrite HBi /TsoMemPa.visibleb Hlog /= Htid.
-             rewrite (bool_decide_eq_true_2 _ eq_refl). by rewrite orb_true_r.
-          -- rewrite HBi /TsoMemPa.log_byte Hlog. exact Hmb.
-          -- rewrite HBi. apply lookup_lt_Some in Hlog. lia.
-  Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (* THE WALKER-FACING CREDENTIAL (A6.135 §1).  [cv_own h a p]: position *)
-  (* p is h's OWN message touching [a].  Persistent, TOKEN-FREE at the   *)
-  (* read: the walker never holds [own_context].  [cv_cred a B] is the   *)
-  (* per-hart disjunction the page-table walk consumes: either the       *)
-  (* hart's view has passed the arm's floor (a secondary, via the        *)
-  (* started receipt), or the floor is dominated by the hart's own       *)
-  (* write (the boot hart's anchors, minted at establishment).           *)
-  (* ------------------------------------------------------------------ *)
 
   Definition cv_own (h : agent) (a : Arch.pa) (p : nat) : iProp Σ :=
     (∃ (i : nat) (m : TsoMemPa.pwmsg) (b : bv 8),
@@ -303,7 +231,7 @@ Section CtxValues.
   Proof. rewrite /cv_own. apply _. Qed.
 
   Definition cv_cred `{CID : CpuId} (a : Arch.pa) (B : nat) : iProp Σ :=
-    (TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) B ∨
+    (TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) B ∨
      ∃ (p : nat), ⌜(B <= p)%nat⌝ ∗ cv_own (hart_agent cpu_id) a p)%I.
 
   Global Instance cv_cred_persistent `{CID : CpuId} a B :
@@ -320,6 +248,10 @@ Section CtxValues.
 
   (* the author's read: settle at or above the own anchor, family via
      [pin_ok] at the settle's own view.  No view receipt, no token. *)
+  (* relaxed-ww STAGE E: the author arm over two logs -- the author's own
+     pending store is forwarded ([visibleb]'s own arm) and every later write
+     is in the family; [TsoMemPa.pin_ok_author] is the legacy one-log
+     statement.  Tracked in claude-notes/projects/relaxed-ww.md. *)
   Lemma cv_own_read (g : gstate) (a : Arch.pa) (dq : dfrac)
       (v : bv 8) (t B p : nat) (Sv : gset (bv 8)) (h : agent) :
     (B <= p)%nat ->
@@ -327,21 +259,69 @@ Section CtxValues.
     phys_ledger_pin a dq v t B Sv -∗
     cv_own h a p -∗
     ⌜forall tv, exists b,
-       TsoMemPa.tso_read g.(gimg) g.(glog) h tv a = Some b /\ b ∈ Sv⌝.
+       TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) h tv a = Some b /\ b ∈ Sv⌝.
   Proof.
-    iIntros (HBp) "Hint Hpin #Hown".
-    iAssert (⌜TsoMemPa.pin_ok g.(gimg) g.(glog) a B Sv⌝)%I as %Hpin.
-    { iApply (cv_pin_ok with "Hint Hpin"). }
-    iDestruct "Hown" as (i m b0) "(%Hp & #Hm & %Hmb & %Htid)".
-    iAssert (⌜g.(glog) !! i = Some m⌝)%I as %Hlog.
-    { iApply (cv_msg_lookup with "Hint Hm"). }
-    iPureIntro. intros tv.
-    apply (TsoMemPa.pin_ok_author g.(gimg) g.(glog) a B p b0 Sv h Hpin HBp).
-    - intros tv'. rewrite Hp /TsoMemPa.visibleb Hlog /= Htid.
-      rewrite (bool_decide_eq_true_2 _ eq_refl). by rewrite orb_true_r.
-    - rewrite Hp /TsoMemPa.log_byte Hlog. exact Hmb.
-    - rewrite Hp. apply lookup_lt_Some in Hlog. lia.
+  Admitted.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE RACY READ RULE: you get one of the values from the set.         *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma ctx_values_read `{CID : CpuId} (g : gstate) (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (Sv : gset (bv 8)) :
+    tso_interp_at riscv_eraGS g -∗
+    own_context ξ -∗
+    ctx_values ξ a dq Sv -∗
+    ⌜forall tv, (g.(gtv) cpu_id <= tv)%nat ->
+       exists b, TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv a
+                 = Some b /\ b ∈ Sv⌝.
+  Proof.
+    iIntros "Hint Hrun Hc".
+    iDestruct "Hc" as (t v) "(Hpin & #Hchain & Harm)".
+    rewrite own_context_unseal /own_context_def.
+    iDestruct "Hrun" as (Btok K D) "([Hb Hd] & #HK & %HBK & #Hoks)".
+    iDestruct "Harm" as "[(%p & #Hdp & #Hfl) | [#Hdirty #Htouch]]".
+    - (* CLEAN: the stamp is drained under ξ's bound, which this hart's floor
+         has passed *)
+      rewrite /ctx_floor.
+      iDestruct (TsoGhost.llb_valid with "Hb Hfl") as %HpB.
+      iDestruct (TsoGhost.view_lb_le view_name dlen_name (hart_agent cpu_id) K p
+                   ltac:(lia) with "HK") as "#Hp".
+      iApply (cv_key_read with "Hint Hdp Hp Hchain Hpin").
+    - (* DIRTY: the token certifies the stamp is drained under the bound, or
+         that the message is this hart's own *)
+      iDestruct (TsoGhost.dset_lookup with "Hd Hdirty") as %HinD.
+      iDestruct (big_sepS_elem_of _ _ _ HinD with "Hoks") as "#Hok".
+      iDestruct "Hok" as "[#Hdp | Hown]".
+      + iEval (cbn) in "Hdp".
+        iDestruct (TsoGhost.view_lb_le view_name dlen_name (hart_agent cpu_id) K Btok
+                     HBK with "HK") as "#HB".
+        iApply (cv_key_read with "Hint Hdp HB Hchain Hpin").
+      + (* own: the author's read, at every view *)
+        iDestruct "Hown" as (i' m') "(%Hii & #Hm' & %Htid)". cbn in Hii.
+        iDestruct "Htouch" as "[%HB0 | Hseed]"; [rewrite HB0 in Hii; discriminate Hii|].
+        iDestruct "Hseed" as (i m b) "(%HBi & #Hm & %Hmb & %HbS)".
+        rewrite HBi in Hii. injection Hii as <-.
+        iAssert (⌜g.(glog) !! i = Some m⌝)%I as %Hlog.
+        { iApply (cv_msg_lookup with "Hint Hm"). }
+        iAssert (⌜g.(glog) !! i = Some m'⌝)%I as %Hlog'.
+        { iApply (cv_msg_lookup with "Hint Hm'"). }
+        rewrite Hlog in Hlog'. injection Hlog' as <-.
+        iDestruct (cv_own_read g a dq v t t t Sv (hart_agent cpu_id) (Nat.le_refl t)
+                     with "Hint Hpin []") as %Hrd.
+        { iExists i, m, b. iFrame "Hm". iPureIntro. split_and!; done. }
+        iPureIntro. intros tv _. exact (Hrd tv).
   Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE WALKER-FACING CREDENTIAL (A6.135 §1).  [cv_own h a p]: position *)
+  (* p is h's OWN message touching [a].  Persistent, TOKEN-FREE at the   *)
+  (* read: the walker never holds [own_context].  [cv_cred a B] is the   *)
+  (* per-hart disjunction the page-table walk consumes: either the       *)
+  (* hart's view has passed the arm's floor (a secondary, via the        *)
+  (* started receipt), or the floor is dominated by the hart's own       *)
+  (* write (the boot hart's anchors, minted at establishment).           *)
+  (* ------------------------------------------------------------------ *)
 
   (* the one law the page-table walk consumes *)
   Lemma cv_cred_read `{CID : CpuId} (g : gstate) (a : Arch.pa)
@@ -350,7 +330,7 @@ Section CtxValues.
     phys_ledger_pin a dq v t B Sv -∗
     cv_cred a B -∗
     ⌜forall tv, (g.(gtv) cpu_id <= tv)%nat ->
-       exists b, TsoMemPa.tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv a
+       exists b, TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv a
                  = Some b /\ b ∈ Sv⌝.
   Proof.
     iIntros "Hint Hpin [#Hv | (%p & %Hp & #Ho)]".
@@ -373,8 +353,8 @@ Section CtxValues.
      bound (a secondary, off the started barrier) or being the boot hart
      (whose anchors ride in the slots). *)
   Definition cv_boot_cred `{CID : CpuId} (B : nat) : iProp Σ :=
-    (TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) B ∨
-     (⌜hart_agent cpu_id = 0%nat⌝ ∗ TsoGhost.llb loglen_name B))%I.
+    (TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) B ∨
+     (⌜hart_agent cpu_id = 0%nat⌝ ∗ TsoGhost.llb dlen_name B))%I.
 
   Global Instance cv_boot_cred_persistent `{CID : CpuId} B :
     Persistent (cv_boot_cred B).
@@ -384,20 +364,20 @@ Section CtxValues.
   Proof. rewrite /cv_boot_cred. apply _. Qed.
 
   Lemma cv_boot_cred_view `{CID : CpuId} (B : nat) :
-    TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) B -∗
     cv_boot_cred B.
   Proof. iIntros "H". iLeft. iExact "H". Qed.
 
   Lemma cv_boot_cred_boot `{CID : CpuId} (B : nat) :
     hart_agent cpu_id = 0%nat ->
-    TsoGhost.llb loglen_name B -∗ cv_boot_cred B.
+    TsoGhost.llb dlen_name B -∗ cv_boot_cred B.
   Proof.
     intros H0. iIntros "Hl". iRight.
     iSplitR; [by iPureIntro | iExact "Hl"].
   Qed.
 
   Lemma cv_boot_cred_llb `{CID : CpuId} (B : nat) :
-    cv_boot_cred B -∗ TsoGhost.llb loglen_name B.
+    cv_boot_cred B -∗ TsoGhost.llb dlen_name B.
   Proof.
     iIntros "[Hv | [_ Hl]]";
       [iApply (TsoGhost.view_lb_llb with "Hv") | iExact "Hl"].
@@ -431,16 +411,16 @@ Section CtxValues.
     ([∗ list] j ∈ seq 0 n, ∃ (Ba t : nat), ⌜(Ba <= B)%nat⌝ ∗
        phys_ledger_pin (pa_add a j) dq (f j) t Ba (Sf j) ∗
        (⌜Ba = 0%nat⌝ ∨ cv_own 0%nat (pa_add a j) Ba ∨
-        TsoGhost.view_lb view_name loglen_name 0%nat Ba)) -∗
+        TsoGhost.view_lb view_name dlen_name 0%nat Ba)) -∗
     ⌜forall (tv' : nat), (g.(gtv) cpu_id <= tv')%nat ->
        forall j : nat, (j < n)%nat ->
-         exists b, TsoMemPa.tso_read g.(gimg) g.(glog) (hart_agent cpu_id)
+         exists b, TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id)
                      tv' (pa_add a j) = Some b /\ b ∈ Sf j⌝.
   Proof.
     iIntros "Hint #Hcred Hb". iEval (rewrite /cv_boot_cred) in "Hcred".
     iAssert (⌜forall j : nat, (j < n)%nat ->
                forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-                 exists b, TsoMemPa.tso_read g.(gimg) g.(glog)
+                 exists b, TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog)
                              (hart_agent cpu_id) tv' (pa_add a j) = Some b
                            /\ b ∈ Sf j⌝)%I as %HH; last first.
     { iPureIntro. intros tv' Htv j Hj. exact (HH j Hj tv' Htv). }
