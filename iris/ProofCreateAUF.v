@@ -3595,7 +3595,9 @@ Section ProofCreateMain.
           iMod (mkf_dlookup_fire fsc_fs ⊤ (DfracOwn 1) Φex
                   (bv_unsigned dind) (bv_unsigned cinum) (bname 14 nfp)
                   (era_node dnl bml datl)
-                  ltac:(solve_ndisj) Hdirp Hentp with "[] Hdlkc Htop")
+                  ltac:(solve_ndisj) Hdirp
+                  (mkf_era_live dnl bml datl (nx_nlink_nz _ Hnl0))
+                  Hentp with "[] Hdlkc Htop")
             as "[Htop Hobs]";
             [iApply (ireg_inv_ftop with "Hiregi") |].
           iModIntro.
@@ -5915,7 +5917,7 @@ Section ProofCreateMain.
                                      (fn_nlink (era_node dn bm data))))
                by exact (mkf_parent_row dn dn' bm bm' data data'
                            (bname 14 nf) (bv_unsigned cinum)
-                           Hdz Hty' Hnl' Hins).
+                           Hdz Hty' Hnl' (nx_nlink_nz _ Hnl0) Hins).
              (* ...and the MINTED CHILD's row (prover item 4): the three
                 halfword stores at +0xb4/+0xb8/+0xbe left exactly
                 [SpecCreate.create_made], which reads as the device node. *)
@@ -5941,7 +5943,9 @@ Section ProofCreateMain.
                      ltac:(solve_ndisj)
                      (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst
                         dn' bm' data' Hiok' Hrl' Hduq' Hddix')
-                     (mkf_era_is_dir dn bm data Hdz) Hnonep Habsp' Habsc
+                     (mkf_era_is_dir dn bm data Hdz)
+                     (mkf_era_live dn bm data (nx_nlink_nz _ Hnl0))
+                     Hnonep Habsp' Habsc
                      with "[] [] Hacre Htop Hctop") as "(Htop & Hctop & Hokr)";
                [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
              iEval (rewrite -top_frag_1) in "Hctop".

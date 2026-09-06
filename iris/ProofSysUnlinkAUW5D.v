@@ -22,7 +22,7 @@
        [wp_iupdate_unlink].  The row it leaves is the ORPHAN DIR -- count 0,
        entry map (the dots included) UNTOUCHED, so its [".."] still names
        the ex-parent.  That is the doc's grey edge, and
-       [SpecSysUnlinkAU.delta_unlink_orphan_dir] is the pure statement of
+       [SpecSysUnlinkAU.delta_unlink_last_dir] is the pure statement of
        it.
 
    THE LINK-RA MOVES ARE AGAIN THE LANDED WALK'S, UNREORDERED, and this arm
@@ -1676,6 +1676,7 @@ Section ProofSysUnlinkAUW5D.
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmd bm' datd data'
                   Hdplive HdnlD)
+               ltac:(rewrite mkf_era_nlink; lia)
                HentsD)
             Htynz0
             with "[] [] Hcent Htop Htopi") as "(Htop & Htopi & Hfire1)";
@@ -2104,10 +2105,11 @@ Section ProofSysUnlinkAUW5D.
       - exact HddixZ. }
     iApply fupd_wp.
     (* ===== INSTANT 2: THE TARGET'S ROW =====
-       The orphan dir: its count goes to zero and its entry map -- the dots
-       included -- survives UNTOUCHED, so its [".."] still names the
-       ex-parent.  That is the doc's grey edge, and
-       [delta_unlink_orphan_dir] is the pure statement of it. *)
+       The removed dir: its count goes to zero, so its row LEAVES the view
+       (E2-V2, the view is the live namespace); the record's entry map --
+       the dots included -- survives untouched underneath, but nothing a
+       user can name reads it any more.  [delta_unlink_last_dir] is the
+       pure statement of it. *)
     assert (Htynz1 : bv_unsigned (di_type dni) <> 0)
       by (rewrite Htyzi; cbv [T_DIR_z]; lia).
     assert (Htynz2 : fn_type (era_node dni bmi dati) <> 0)

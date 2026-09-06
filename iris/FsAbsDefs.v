@@ -12,14 +12,20 @@
    run [arun], and [abs_view] (the raw γtop map read through [abs_of]).
    None of it mentions a ghost, Σ, or an iProp; FsAbs.v's sections 3-5 do.
 
-   THE VIEW IS OVER ALLOCATED ROWS ONLY (lane E2-V, 2026-09-05; owner's
-   ruling Q-a of claude-notes/projects/app-round-e2.md): [abs_of : fs_node
-   -> option anode] is [None] at a FREE inode ([fn_type n = 0]) and
-   [Some (abs_row n)] otherwise, and [abs_view I := omap abs_of I] -- so
-   fs-syscall-specs section 4's [∃ i ∉ dom av] is statable and δ_free is
-   [delete].  Inodes at nlink 0 STAY in the view (ruling Q-b: a process may
-   hold an open fd to one); the filter is on the type alone.  [abs_row] is
-   the total typed reading the fires and pins name as an [anode] term.
+   THE VIEW IS OVER LIVE ROWS ONLY (lane E2-V, 2026-09-05, owner's ruling
+   Q-a of claude-notes/projects/app-round-e2.md; sharpened by lane E2-V2 the
+   same day, ruling Q-d): [abs_of : fs_node -> option anode] is [None] at a
+   FREE inode ([fn_type n = 0]) AND at an inode with NO LINKS
+   ([fn_nlink n = 0]), and [Some (abs_row n)] otherwise; [abs_view I :=
+   omap abs_of I] -- so fs-syscall-specs section 4's [∃ i ∉ dom av] is
+   statable, δ_free is [delete], and iput's free / ialloc's claim are
+   VIEW-PRESERVING (the row is absent on both sides).  The filter is on the
+   TYPE AND THE COUNT: an unlinked-but-open inode is no longer part of the
+   file system a user can name, so it has no row; what an fd-holder still
+   sees of it is the fd row's business, not the view's (Q-d's accepted
+   cost: the read/write/open observations state their row CONDITIONALLY on
+   the count, [arow_at]).  [abs_row] is the total typed reading the fires
+   and pins name as an [anode] term.
    Files BELOW [ProcInv] that must STATE something over [aview]/[abs_view]
    -- FsAbsInv's application license, FsAbsDelta's write deltas -- can now
    require this file alone instead of FsAbs's ghost cone.
@@ -96,43 +102,66 @@ Definition abs_node (n : fs_node) : absnode :=
 (* the row an ALLOCATED record reads as: [abs_of] below is this, guarded *)
 Definition abs_row (n : fs_node) : anode := MkAnode (abs_node n) (fn_nlink n).
 
-(* THE READING (round E2-V, owner ruling Q-a, 2026-09-05): THE VIEW COVERS
-   ALLOCATED ROWS ONLY.  A FREE record -- [fn_type n = 0]: every unallocated
-   inum, [ialloc]'s target before its claim, the corpse [iput] leaves -- has
-   NO row, so fs-syscall-specs section 4's [∃ i ∉ dom av] is statable as the
-   create precondition and [δ_free i] is [delete i] of the view.  The filter
-   is on the TYPE and never on nlink (ruling Q-b): an unlinked-but-open node
-   is an ordinary row at nlink 0 ([abs_of_orphan]), because a process may
-   hold an open descriptor to it. *)
+(* THE READING (round E2-V, owner ruling Q-a; round E2-V2, ruling Q-d,
+   both 2026-09-05): THE VIEW COVERS LIVE ROWS ONLY.  A record with NO row
+   is one that is FREE -- [fn_type n = 0]: every unallocated inum,
+   [ialloc]'s target before its claim, the corpse [iput] leaves -- or one
+   with NO LINKS -- [fn_nlink n = 0]: [ialloc]'s claim box before create's
+   arm, an unlinked-but-open file, a removed directory that is still
+   someone's cwd.  So fs-syscall-specs section 4's [∃ i ∉ dom av] is
+   statable as the create precondition, [δ_free i] is [delete i] of the
+   view, and the moves at the two ends of an inode's life ([ialloc]'s claim
+   at nlink 0, [iput]'s free) are [_same]: [None] on both sides.  What the
+   ruling gives up is a view row for a node only an fd can reach; the fires
+   that read through an fd state their row conditionally ([arow_at]). *)
 Definition abs_of (n : fs_node) : option anode :=
-  if decide (fn_type n = 0) then None else Some (abs_row n).
+  if decide (fn_type n = 0 \/ fn_nlink n = 0%nat) then None else Some (abs_row n).
 
-Lemma abs_of_free (n : fs_node) : fn_type n = 0 <-> abs_of n = None.
+Lemma abs_of_none (n : fs_node) :
+  fn_type n = 0 \/ fn_nlink n = 0%nat <-> abs_of n = None.
 Proof.
-  rewrite /abs_of. destruct (decide (fn_type n = 0)) as [H0 | H0].
+  rewrite /abs_of. destruct (decide (fn_type n = 0 \/ fn_nlink n = 0%nat)) as [H0 | H0].
   - split; [intros _; reflexivity | intros _; exact H0].
   - split; [intros Hc; destruct (H0 Hc) | intros Hc; discriminate Hc].
 Qed.
 
-Lemma abs_of_typed (n : fs_node) :
-  fn_type n <> 0 -> abs_of n = Some (abs_row n).
+(* a LIVE record -- typed, with at least one link -- has its typed row *)
+Lemma abs_of_live (n : fs_node) :
+  fn_type n <> 0 -> fn_nlink n <> 0%nat -> abs_of n = Some (abs_row n).
 Proof.
-  intros Hnz. rewrite /abs_of. by rewrite (decide_False (P := fn_type n = 0)).
+  intros Hnz Hnl. rewrite /abs_of.
+  rewrite (decide_False (P := fn_type n = 0 \/ fn_nlink n = 0%nat)); [reflexivity |].
+  intros [Hc | Hc]; [exact (Hnz Hc) | exact (Hnl Hc)].
+Qed.
+
+(* ...and a TYPED record's row is present exactly when its count is: the
+   form the fd-side fires read the view in (the node's type is theirs to
+   know from the record, its count is not) *)
+Lemma abs_of_counted (n : fs_node) :
+  fn_type n <> 0 ->
+  abs_of n = (if decide (fn_nlink n = 0%nat) then None else Some (abs_row n)).
+Proof.
+  intros Hnz. destruct (decide (fn_nlink n = 0%nat)) as [Hz | Hnl].
+  - apply abs_of_none. by right.
+  - exact (abs_of_live n Hnz Hnl).
 Qed.
 
 Lemma abs_of_Some (n : fs_node) (a : anode) :
-  abs_of n = Some a -> fn_type n <> 0 /\ a = abs_row n.
+  abs_of n = Some a -> fn_type n <> 0 /\ fn_nlink n <> 0%nat /\ a = abs_row n.
 Proof.
-  rewrite /abs_of. destruct (decide (fn_type n = 0)) as [H0 | H0];
+  rewrite /abs_of. destruct (decide (fn_type n = 0 \/ fn_nlink n = 0%nat)) as [H0 | H0];
     [intros Hc; discriminate Hc |].
-  intros Ha. injection Ha as <-. by split.
+  intros Ha. injection Ha as <-.
+  split; [intros Hc; exact (H0 (or_introl Hc)) |].
+  split; [intros Hc; exact (H0 (or_intror Hc)) | reflexivity].
 Qed.
 
-Lemma abs_of_is_Some (n : fs_node) : is_Some (abs_of n) <-> fn_type n <> 0.
+Lemma abs_of_is_Some (n : fs_node) :
+  is_Some (abs_of n) <-> fn_type n <> 0 /\ fn_nlink n <> 0%nat.
 Proof.
   split.
-  - intros [a Ha]. exact (proj1 (abs_of_Some n a Ha)).
-  - intros Hnz. rewrite (abs_of_typed n Hnz). by eexists.
+  - intros [a Ha]. destruct (abs_of_Some n a Ha) as (Hnz & Hnl & _). by split.
+  - intros [Hnz Hnl]. rewrite (abs_of_live n Hnz Hnl). by eexists.
 Qed.
 
 (* a directory is typed: [T_DIR_z] is 1 *)
@@ -144,17 +173,26 @@ Proof. reflexivity. Qed.
 
 Lemma abs_of_nlink (n : fs_node) (a : anode) :
   abs_of n = Some a -> an_nlink a = fn_nlink n.
-Proof. intros Ha. destruct (abs_of_Some n a Ha) as [_ ->]. reflexivity. Qed.
+Proof. intros Ha. destruct (abs_of_Some n a Ha) as (_ & _ & ->). reflexivity. Qed.
 
 Lemma abs_row_dir (n : fs_node) :
   fn_is_dir n = true -> an_node (abs_row n) = ADir (dir_entries n).
 Proof. intros Hd. rewrite /abs_row /abs_node /= Hd //. Qed.
 
+(* the row an [abs_row] reads as, when the record is a directory *)
+Lemma abs_row_dir_eq (n : fs_node) :
+  fn_is_dir n = true -> abs_row n = MkAnode (ADir (dir_entries n)) (fn_nlink n).
+Proof. intros Hd. rewrite /abs_row /abs_node Hd //. Qed.
+
+(* a LIVE directory ([fn_nlink n <> 0]: namex's guard, create's and link's
+   [dp->nlink == 0] refusals, the home-live derivation at unlink's found
+   arms) has its row; a claim box or a removed cwd does not *)
 Lemma abs_of_dir (n : fs_node) :
-  fn_is_dir n = true ->
+  fn_is_dir n = true -> fn_nlink n <> 0%nat ->
   abs_of n = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n)).
 Proof.
-  intros Hd. rewrite (abs_of_typed n (fn_is_dir_typed n Hd)) /abs_row /abs_node Hd //.
+  intros Hd Hnl.
+  rewrite (abs_of_live n (fn_is_dir_typed n Hd) Hnl) /abs_row /abs_node Hd //.
 Qed.
 
 (* ...AND ITS INVERSE, which is what a LEND-side law needs: only a directory
@@ -173,7 +211,7 @@ Lemma abs_of_dir_inv (n : fs_node) (a : anode) (e : gmap fname Z) :
   abs_of n = Some a -> an_node a = ADir e ->
   fn_is_dir n = true /\ e = dir_entries n.
 Proof.
-  intros Ha He. destruct (abs_of_Some n a Ha) as [_ ->].
+  intros Ha He. destruct (abs_of_Some n a Ha) as (_ & _ & ->).
   exact (abs_row_dir_inv n e He).
 Qed.
 
@@ -186,12 +224,12 @@ Proof.
 Qed.
 
 Lemma abs_of_file (n : fs_node) :
-  fn_is_dir n = false -> fn_type n = T_FILE_z ->
+  fn_is_dir n = false -> fn_type n = T_FILE_z -> fn_nlink n <> 0%nat ->
   abs_of n = Some (MkAnode (AFile (fn_file_bytes n)) (fn_nlink n)).
 Proof.
-  intros Hd Ht.
+  intros Hd Ht Hnl.
   assert (Hnz : fn_type n <> 0) by (rewrite Ht; cbv [T_FILE_z]; lia).
-  rewrite (abs_of_typed n Hnz) /abs_row /abs_node /= Hd.
+  rewrite (abs_of_live n Hnz Hnl) /abs_row /abs_node /= Hd.
   by rewrite (decide_True (P := fn_type n = T_FILE_z)).
 Qed.
 
@@ -207,29 +245,102 @@ Qed.
    directory nor a file either, and it has no row at all *)
 Lemma abs_of_dev (n : fs_node) :
   fn_is_dir n = false -> fn_type n <> T_FILE_z -> fn_type n <> 0 ->
+  fn_nlink n <> 0%nat ->
   abs_of n = Some (MkAnode (ADev (fn_major n) (fn_minor n)) (fn_nlink n)).
 Proof.
-  intros Hd Ht Hnz. rewrite (abs_of_typed n Hnz) /abs_row /abs_node /= Hd.
+  intros Hd Ht Hnz Hnl. rewrite (abs_of_live n Hnz Hnl) /abs_row /abs_node /= Hd.
   by rewrite (decide_False (P := fn_type n = T_FILE_z)).
 Qed.
 
-(* the orphan reading (fs-syscall-specs section 1, "orphans are IN the
-   map"): an unlinked-but-open node is an ordinary row at nlink 0 *)
+(* THE ORPHAN READING, INVERTED (E2-V2, ruling Q-d): a row in the view is
+   never an orphan.  An unlinked-but-open node has NO row; what a holder
+   of a client share ([FsAbs.nview]) learns is that its node is linked. *)
 Lemma abs_of_orphan (n : fs_node) (a : anode) :
-  abs_of n = Some a -> (fn_orphan n = true <-> an_nlink a = 0%nat).
+  abs_of n = Some a -> an_nlink a <> 0%nat.
 Proof.
-  intros Ha. rewrite (abs_of_nlink n a Ha) /fn_orphan bool_decide_eq_true.
-  reflexivity.
+  intros Ha. destruct (abs_of_Some n a Ha) as (_ & Hnl & ->). exact Hnl.
 Qed.
 
-(* a bare DIRECTORY record ([ialloc]'s claim box at [T_DIR]) reads as a
-   nlink-0 node with no entries.  A bare FREE record has no row at all
-   ([abs_of_free]). *)
-Lemma abs_of_bare_dir (n : fs_node) :
-  fn_bare n -> fn_is_dir n = true -> abs_of n = Some (MkAnode (ADir ∅) 0%nat).
+(* a BARE record -- [ialloc]'s claim box (typed, size 0, nlink 0) as much
+   as the corpse [itrunc] leaves or a free inum -- has no row at all: the
+   count is zero whatever the type says.  This is what makes ilock's claim
+   ([ProofIlock]) and the escrow's free ([EscrowDeposit]) view-preserving. *)
+Lemma abs_of_bare (n : fs_node) : fn_bare n -> abs_of n = None.
 Proof.
-  intros Hb Hd. rewrite (abs_of_dir n Hd) (dir_entries_bare n Hb).
-  by destruct Hb as (_ & _ & _ & _ & ->).
+  intros Hb. apply abs_of_none. right. by destruct Hb as (_ & _ & _ & _ & ->).
+Qed.
+
+(* ---------------------------------------------------------------------
+   1b'.  THE COUNTED ROW CLAUSE (E2-V2): what the view says of a node an
+   fd reaches.  The node's typed row [a] is the machine's to know (it
+   holds the record under [ip->lock]); whether the view HAS that row is
+   decided by the count alone -- present at a nonzero count, absent at
+   zero (the file was unlinked while open; the cwd was removed).
+   [arow_at av i a] is that statement, and it is what the read, write,
+   open-observation, trunc and unlink-miss commits carry where an
+   unconditional [av !! i = Some a] used to stand.  A client that holds a
+   share of the row ([FsAbs.nview]) collapses it to the [Some] arm by
+   agreement ([arow_at_pinned]).
+   --------------------------------------------------------------------- *)
+Definition arow_at (av : aview) (i : Z) (a : anode) : Prop :=
+  av !! i = (if decide (an_nlink a = 0%nat) then None else Some a).
+
+Lemma arow_at_live (av : aview) (i : Z) (a : anode) :
+  arow_at av i a -> an_nlink a <> 0%nat -> av !! i = Some a.
+Proof.
+  rewrite /arow_at. intros H Hnl. rewrite H.
+  by rewrite (decide_False (P := an_nlink a = 0%nat)).
+Qed.
+
+Lemma arow_at_gone (av : aview) (i : Z) (a : anode) :
+  arow_at av i a -> an_nlink a = 0%nat -> av !! i = None.
+Proof.
+  rewrite /arow_at. intros H Hz. rewrite H.
+  by rewrite (decide_True (P := an_nlink a = 0%nat)).
+Qed.
+
+Lemma arow_at_of_Some (av : aview) (i : Z) (a : anode) :
+  an_nlink a <> 0%nat -> av !! i = Some a -> arow_at av i a.
+Proof.
+  rewrite /arow_at. intros Hnl H. rewrite H.
+  by rewrite (decide_False (P := an_nlink a = 0%nat)).
+Qed.
+
+Lemma arow_at_of_None (av : aview) (i : Z) (a : anode) :
+  an_nlink a = 0%nat -> av !! i = None -> arow_at av i a.
+Proof.
+  rewrite /arow_at. intros Hz H. rewrite H.
+  by rewrite (decide_True (P := an_nlink a = 0%nat)).
+Qed.
+
+Lemma arow_at_cases (av : aview) (i : Z) (a : anode) :
+  arow_at av i a ->
+  (an_nlink a = 0%nat /\ av !! i = None)
+  \/ (an_nlink a <> 0%nat /\ av !! i = Some a).
+Proof.
+  intros H. destruct (decide (an_nlink a = 0%nat)) as [Hz | Hnl].
+  - left. split; [exact Hz | exact (arow_at_gone av i a H Hz)].
+  - right. split; [exact Hnl | exact (arow_at_live av i a H Hnl)].
+Qed.
+
+(* THE AGREEMENT COLLAPSE: a row the view is known to HAVE is the counted
+   row -- the absent arm is refuted by the very presence *)
+Lemma arow_at_pinned (av : aview) (i : Z) (a b : anode) :
+  arow_at av i a -> av !! i = Some b -> a = b.
+Proof.
+  intros H Hb. destruct (arow_at_cases av i a H) as [[_ Hn] | [_ Hs]].
+  - rewrite Hn in Hb. discriminate Hb.
+  - rewrite Hs in Hb. injection Hb as Hab. exact Hab.
+Qed.
+
+(* a witness at any node: the singleton at a nonzero count, the empty
+   view at zero (what a receipt that is pure in its row pays with) *)
+Lemma arow_at_witness (i : Z) (a : anode) :
+  arow_at (if decide (an_nlink a = 0%nat) then ∅ else {[i := a]}) i a.
+Proof.
+  rewrite /arow_at. destruct (decide (an_nlink a = 0%nat)).
+  - exact (lookup_empty i).
+  - exact (lookup_singleton i a).
 Qed.
 
 (* THE VIEW-PRESERVING RETAG (app-instances.md section 7, round E1).  A
@@ -240,7 +351,8 @@ Qed.
    failing parent append), or a bare directory either side (mkdir's failing
    ["."]).  The block addresses and the bytes past the size may move
    freely: [abs_of] never reads them.  The equation is one of OPTIONS since
-   E2-V; a free-to-free retag is [_same] too, both sides [None]. *)
+   E2-V; a free-to-free retag is [_same] too, both sides [None], and so is
+   any move between two nlink-0 records (E2-V2). *)
 Lemma abs_of_dir_same (n n' : fs_node) :
   fn_is_dir n = true ->
   fn_type n = fn_type n' ->
@@ -250,7 +362,13 @@ Lemma abs_of_dir_same (n n' : fs_node) :
 Proof.
   intros Hd Hty Hnl He.
   assert (Hd' : fn_is_dir n' = true) by (rewrite /fn_is_dir -Hty; exact Hd).
-  rewrite (abs_of_dir n Hd) (abs_of_dir n' Hd') He Hnl. reflexivity.
+  rewrite /abs_of.
+  destruct (decide (fn_type n = 0 \/ fn_nlink n = 0%nat)) as [H0 | H0];
+    destruct (decide (fn_type n' = 0 \/ fn_nlink n' = 0%nat)) as [H0' | H0'].
+  - reflexivity.
+  - exfalso. apply H0'. rewrite -Hty -Hnl. exact H0.
+  - exfalso. apply H0. rewrite Hty Hnl. exact H0'.
+  - rewrite /abs_row /abs_node Hd Hd' He Hnl. reflexivity.
 Qed.
 
 (* ...and a directory at size 0 has no entries whatever its bytes say *)
@@ -476,11 +594,11 @@ Qed.
    the form [InodeRegion.ftop_body] holds, and at [I := fss_inodes S] it is
    the old function on the nose.  Since round E2-V it is an [omap]: the
    authority still rows the WHOLE region ([AppInv.app_dom] is about the
-   map), the view keeps the ALLOCATED rows only. *)
+   map), the view keeps the LIVE rows only (typed, nlink > 0; E2-V2). *)
 Definition abs_view (I : gmap Z fs_node) : aview := omap abs_of I.
 
 (* the raw reading of a row: whatever [abs_of] says of the node, [None]
-   at a free record *)
+   at a free or unlinked record *)
 Lemma abs_view_lookup_of (I : gmap Z fs_node) (i : Z) (n : fs_node) :
   I !! i = Some n -> abs_view I !! i = abs_of n.
 Proof. intros Hi. by rewrite /abs_view lookup_omap Hi. Qed.
@@ -489,9 +607,21 @@ Lemma abs_view_lookup (I : gmap Z fs_node) (i : Z) (n : fs_node) (a : anode) :
   I !! i = Some n -> abs_of n = Some a -> abs_view I !! i = Some a.
 Proof. intros Hi Ha. by rewrite (abs_view_lookup_of I i n Hi). Qed.
 
-Lemma abs_view_lookup_typed (I : gmap Z fs_node) (i : Z) (n : fs_node) :
-  I !! i = Some n -> fn_type n <> 0 -> abs_view I !! i = Some (abs_row n).
-Proof. intros Hi Hnz. exact (abs_view_lookup I i n _ Hi (abs_of_typed n Hnz)). Qed.
+Lemma abs_view_lookup_live (I : gmap Z fs_node) (i : Z) (n : fs_node) :
+  I !! i = Some n -> fn_type n <> 0 -> fn_nlink n <> 0%nat ->
+  abs_view I !! i = Some (abs_row n).
+Proof.
+  intros Hi Hnz Hnl. exact (abs_view_lookup I i n _ Hi (abs_of_live n Hnz Hnl)).
+Qed.
+
+(* the COUNTED reading of a typed node's row: what a fire that holds the
+   record but not its count's history can say of the view *)
+Lemma abs_view_arow (I : gmap Z fs_node) (i : Z) (n : fs_node) :
+  I !! i = Some n -> fn_type n <> 0 -> arow_at (abs_view I) i (abs_row n).
+Proof.
+  intros Hi Hnz. rewrite /arow_at (abs_view_lookup_of I i n Hi).
+  exact (abs_of_counted n Hnz).
+Qed.
 
 Lemma abs_view_lookup_Some (I : gmap Z fs_node) (i : Z) (a : anode) :
   abs_view I !! i = Some a -> exists n, I !! i = Some n /\ abs_of n = Some a.
@@ -506,8 +636,8 @@ Proof.
   by exists n.
 Qed.
 
-(* pushing one raw-map insert through the view: a typed node lands as its
-   row, a free node deletes the row (the doc's [δ_free]) *)
+(* pushing one raw-map insert through the view: a live node lands as its
+   row, a free or unlinked node deletes the row (the doc's [δ_free]) *)
 Lemma abs_view_insert (I : gmap Z fs_node) (i : Z) (n : fs_node) (a : anode) :
   abs_of n = Some a -> abs_view (<[i := n]> I) = <[i := a]> (abs_view I).
 Proof. intros Ha. rewrite /abs_view. exact (omap_insert_Some abs_of I i n a Ha). Qed.
@@ -515,6 +645,22 @@ Proof. intros Ha. rewrite /abs_view. exact (omap_insert_Some abs_of I i n a Ha).
 Lemma abs_view_insert_None (I : gmap Z fs_node) (i : Z) (n : fs_node) :
   abs_of n = None -> abs_view (<[i := n]> I) = delete i (abs_view I).
 Proof. intros Ha. rewrite /abs_view. exact (omap_insert_None abs_of I i n Ha). Qed.
+
+(* THE COUNTED INSERT (E2-V2): a TYPED record lands as its row when its
+   count is nonzero and DELETES the row when the count is zero.  This is
+   the one form every write-kind fire pushes its retag through, whether
+   or not the node it moves is still linked ([arow_at] is its reading). *)
+Lemma abs_view_insert_row (I : gmap Z fs_node) (i : Z) (n : fs_node) (a : anode) :
+  fn_type n <> 0 -> abs_row n = a ->
+  abs_view (<[i := n]> I)
+  = (if decide (an_nlink a = 0%nat) then delete i (abs_view I)
+     else <[i := a]> (abs_view I)).
+Proof.
+  intros Hnz <-. rewrite abs_row_nlink.
+  case_decide as Hz.
+  - apply abs_view_insert_None. apply abs_of_none. by right.
+  - apply abs_view_insert. exact (abs_of_live n Hnz Hz).
+Qed.
 
 (* A RETAG THAT KEEPS THE READING KEEPS THE VIEW (app-instances.md section 7,
    the [_same] mover form): block addresses and records are invisible to

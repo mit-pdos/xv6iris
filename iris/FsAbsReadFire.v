@@ -307,7 +307,7 @@ Section ReadFire.
     iIntros (I off a d) "%Hpre Ha Hk".
     iDestruct (arf_auth_nview with "Ha Hn") as %Hav.
     destruct Hpre as (Hrow & _ & _).
-    assert (a = b) as -> by congruence.
+    assert (a = b) as -> by exact (arow_at_pinned _ _ _ _ Hrow Hav).
     iDestruct (off_gv_agree with "Hk Hu") as %->.
     iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
     iModIntro. iFrame "Ha Hk".
@@ -341,7 +341,7 @@ Section ReadFire.
       top_frag_q (fs_gamma_L γfs) dq i n
       ∗ off_gv γo (1/2) (Z.of_nat (off + d))
       ∗ ∃ av : aview,
-          ⌜av !! i = Some (abs_row n)⌝ ∗ Φ av off (abs_row n) d.
+          ⌜arow_at av i (abs_row n)⌝ ∗ Φ av off (abs_row n) d.
   Proof.
     intros HE Hoff Hsz Hnz. iIntros "#Hi Hcm Hf Hg".
     (* the same re-spelling [opf_open_fire] does, and for the same reason:
@@ -351,8 +351,10 @@ Section ReadFire.
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
-    assert (Hrow : abs_view I !! i = Some (abs_row n))
-      by exact (abs_view_lookup_typed I i n Hlk Hnz).
+    (* the row is stated on the COUNT (E2-V2): the fd's inode may have
+       been unlinked while open, and then the view has no row for it *)
+    assert (Hrow : arow_at (abs_view I) i (abs_row n))
+      by exact (abs_view_arow I i n Hlk Hnz).
     assert (Hpre : ard_pre (abs_view I) i off (abs_row n))
       by (split; [exact Hrow | split; [exact Hoff | exact Hsz]]).
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
@@ -380,7 +382,7 @@ Section ReadFire.
       top_frag (fs_gamma_L γfs) i n
       ∗ off_gv γo (1/2) (Z.of_nat (off + d))
       ∗ ∃ av : aview,
-          ⌜av !! i = Some (abs_row n)⌝ ∗ Φ av off (abs_row n) d.
+          ⌜arow_at av i (abs_row n)⌝ ∗ Φ av off (abs_row n) d.
   Proof.
     intros HE Hoff Hsz Hnz. rewrite top_frag_1.
     exact (arf_read_fire γfs E _ Φ i γo off d n HE Hoff Hsz Hnz).
@@ -414,7 +416,7 @@ Section ReadFire.
     iIntros (I off a d) "%Hpre Ha Hg".
     iDestruct (arf_auth_nview with "Ha Hn") as %Hav.
     destruct Hpre as (Hrow & Hoff & Hsz).
-    assert (a = b) as Hab by congruence.
+    assert (a = b) as Hab by exact (arow_at_pinned _ _ _ _ Hrow Hav).
     iMod ("Hcm" $! I off a d with "[%] Ha Hg") as "(Ha & Hg & HΦ)".
     { split; [exact Hrow | split; [exact Hoff | exact Hsz]]. }
     iModIntro. iFrame "Ha Hg". rewrite /arf_pin_recv.

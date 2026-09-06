@@ -288,8 +288,11 @@ Section MknodFire.
   (*  2.  THE ROW READINGS                                                *)
   (* =================================================================== *)
 
+  (* a LIVE directory's row (E2-V2 added the count: the parent every
+     create/link/unlink fire reads has passed a [dp->nlink == 0] guard or
+     holds a live entry -- [DirView.dir_orphan_clean]) *)
   Lemma mkf_abs_of_dir (n : fs_node) :
-    fn_is_dir n = true ->
+    fn_is_dir n = true -> fn_nlink n <> 0%nat ->
     abs_of n = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n)).
   Proof. apply abs_of_dir. Qed.
 
@@ -307,6 +310,15 @@ Section MknodFire.
     fn_nlink (era_node dn bm data) = Z.to_nat (bv_unsigned (di_nlink dn)).
   Proof. by rewrite /fn_nlink era_node_rec. Qed.
 
+  (* ...and a nonzero record count is a nonzero [fn_nlink] (E2-V2) *)
+  Lemma mkf_era_live (dn : dinode) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    bv_unsigned (di_nlink dn) <> 0 -> fn_nlink (era_node dn bm data) <> 0%nat.
+  Proof.
+    intros Hnz. rewrite mkf_era_nlink.
+    pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dn))). lia.
+  Qed.
+
   (* ---- ITEM 2: THE READING BRIDGE AT THE WRITE ---------------------- *)
 
   (* The real half is [FsStateEra.dir_entries_dirlink_ins] (LANDED): the
@@ -321,16 +333,18 @@ Section MknodFire.
     bv_unsigned (di_type dn) = T_DIR_z ->
     di_type dn' = di_type dn ->
     di_nlink dn' = di_nlink dn ->
+    bv_unsigned (di_nlink dn) <> 0 ->
     dir_entries (era_node dn' bm' data')
       = <[s := v]> (dir_entries (era_node dn bm data)) ->
     abs_of (era_node dn' bm' data')
     = Some (MkAnode (ADir (<[s := v]> (dir_entries (era_node dn bm data))))
                     (fn_nlink (era_node dn bm data))).
   Proof.
-    intros Hty Hty' Hnl' Hents.
+    intros Hty Hty' Hnl' Hnl Hents.
     assert (Hdir' : fn_is_dir (era_node dn' bm' data') = true).
     { apply mkf_era_is_dir. by rewrite Hty'. }
-    rewrite (mkf_abs_of_dir _ Hdir') Hents.
+    rewrite (mkf_abs_of_dir _ Hdir'
+               (mkf_era_live dn' bm' data' ltac:(rewrite Hnl'; exact Hnl))) Hents.
     by rewrite !mkf_era_nlink Hnl'.
   Qed.
 
@@ -358,6 +372,7 @@ Section MknodFire.
       (d i : Z) (nm : fname) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     fn_is_dir n = true ->
+    fn_nlink n <> 0%nat ->
     dir_entries n !! nm = Some i ->
     ftop_inv γfs -∗
     dlookup_commit_at (fs_gamma_L γfs) appE Φ -∗
@@ -368,7 +383,7 @@ Section MknodFire.
           ∗ ⌜dir_entries n !! nm = Some i⌝
           ∗ Φ av d nm i.
   Proof.
-    intros HE Hdir Hnm. iIntros "#Hi Hcm Hf".
+    intros HE Hdir Hnl Hnm. iIntros "#Hi Hcm Hf".
     (* [γtop (fs_gamma_L γfs)] and [fs_top γfs] are the SAME gname
        ([FsAbs.ftop_gamma_top], by reflexivity) but the unifier cannot
        solve [γtop ?Γ =?= fs_top γfs], so the fragment is put in the
@@ -381,7 +396,7 @@ Section MknodFire.
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
     assert (Hrow : abs_view I !! d
                    = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n))).
-    { by rewrite (abs_view_lookup_of I d n Hlk) (mkf_abs_of_dir n Hdir). }
+    { by rewrite (abs_view_lookup_of I d n Hlk) (mkf_abs_of_dir n Hdir Hnl). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I d i nm (dir_entries n) (fn_nlink n)
             with "[//] [//] Hta") as "[Hta HΦ]".
@@ -398,14 +413,15 @@ Section MknodFire.
      (the moved fragment), plus the caller's two phases fired on either
      side of the [ghost_map_update] INSIDE the one [ftopN] critical
      section.  The child's fragment is only READ (its row is the
-     minted-orphan observation [cre_pre]'s third conjunct asks for) and
-     comes back untouched. *)
+     armed-child observation [cre_pre]'s third conjunct asks for: nlink 1,
+     not yet in the parent) and comes back untouched. *)
   Lemma mkf_acre_fire (γfs : fs_names) (E : coPset) (ma mi : Z)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local d np' ->
     fn_is_dir np = true ->
+    fn_nlink np <> 0%nat ->
     dir_entries np !! nm = None ->
     abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np)) ->
     abs_of nc = Some (MkAnode (ADev ma mi) 1%nat) ->
@@ -419,7 +435,7 @@ Section MknodFire.
           ⌜cre_pre av d nm (dir_entries np) (fn_nlink np) i (ADev ma mi)⌝
           ∗ Φ av d nm i.
   Proof.
-    intros HE Hloc Hdir Hnone Habsp' Habsc.
+    intros HE Hloc Hdir Hnl Hnone Habsp' Habsc.
     iIntros "#Hi #Hai Hcm Hfp Hfc".
     (* the same re-spelling as above, and the reason is the same *)
     rewrite /top_frag /top_frag_q /fs_gamma_L /=.
@@ -431,7 +447,7 @@ Section MknodFire.
     assert (Hpre : cre_pre (abs_view I) d nm (dir_entries np)
                      (fn_nlink np) i (ADev ma mi)).
     { rewrite /cre_pre. split_and!.
-      - by rewrite (abs_view_lookup_of I d np Hlkp) (mkf_abs_of_dir np Hdir).
+      - by rewrite (abs_view_lookup_of I d np Hlkp) (mkf_abs_of_dir np Hdir Hnl).
       - exact Hnone.
       - by rewrite (abs_view_lookup_of I i nc Hlkc) Habsc. }
     (* the fused delta collapses to the ONE-ROW parent insert, and the
@@ -925,7 +941,7 @@ Proof.
   { rewrite /fn_file_bytes /fn_size Hr. reflexivity. }
   assert (Hnl : fn_nlink n = 1%nat)
     by (rewrite /fn_nlink Hr; reflexivity).
-  by rewrite (abs_of_file n Hnd Hfl) Hbytes Hnl.
+  by rewrite (abs_of_file n Hnd Hfl ltac:(rewrite Hnl; lia)) Hbytes Hnl.
 Qed.
 
 (* ...and at the era node, which is the shape a walk holds
@@ -962,6 +978,7 @@ Section CreateFire.
     (forall e, c <> ADir e) ->
     inode_local d np' ->
     fn_is_dir np = true ->
+    fn_nlink np <> 0%nat ->
     dir_entries np !! nm = None ->
     abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np)) ->
     abs_of nc = Some (MkAnode c 1%nat) ->
@@ -975,7 +992,7 @@ Section CreateFire.
           ⌜cre_pre av d nm (dir_entries np) (fn_nlink np) i c⌝
           ∗ Φ av d nm i.
   Proof.
-    intros HE Hc Hloc Hdir Hnone Habsp' Habsc.
+    intros HE Hc Hloc Hdir Hnl Hnone Habsp' Habsc.
     iIntros "#Hi #Hai Hcm Hfp Hfc".
     (* the same re-spelling [mkf_acre_fire] does, and for the same reason:
        [γtop (fs_gamma_L γfs)] and [fs_top γfs] are the SAME gname
@@ -990,7 +1007,7 @@ Section CreateFire.
     assert (Hpre : cre_pre (abs_view I) d nm (dir_entries np)
                      (fn_nlink np) i c).
     { rewrite /cre_pre. split_and!.
-      - by rewrite (abs_view_lookup_of I d np Hlkp) (mkf_abs_of_dir np Hdir).
+      - by rewrite (abs_view_lookup_of I d np Hlkp) (mkf_abs_of_dir np Hdir Hnl).
       - exact Hnone.
       - by rewrite (abs_view_lookup_of I i nc Hlkc) Habsc. }
     assert (Hdelta : abs_view (<[d := np']> I)
@@ -1028,6 +1045,7 @@ Section CreateFire.
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local d np' ->
     fn_is_dir np = true ->
+    fn_nlink np <> 0%nat ->
     dir_entries np !! nm = None ->
     abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np)) ->
     abs_of nc = Some (MkAnode (AFile []) 1%nat) ->
@@ -1041,11 +1059,11 @@ Section CreateFire.
           ⌜cre_pre av d nm (dir_entries np) (fn_nlink np) i (AFile [])⌝
           ∗ Φ av d nm i.
   Proof.
-    intros HE Hloc Hdir Hnone Habsp' Habsc.
+    intros HE Hloc Hdir Hnl Hnone Habsp' Habsc.
     iIntros "Hi Hai Hcm Hfp Hfc".
     iApply (caf_acre_fire γfs E (AFile []) Φ d i nm dqc np np' nc HE
               ltac:(intros e Hc; discriminate Hc)
-              Hloc Hdir Hnone Habsp' Habsc with "Hi Hai Hcm Hfp Hfc").
+              Hloc Hdir Hnl Hnone Habsp' Habsc with "Hi Hai Hcm Hfp Hfc").
   Qed.
 
 End CreateFire.

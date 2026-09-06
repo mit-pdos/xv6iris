@@ -121,7 +121,7 @@ Section SysChdirAU.
              ∗ aopen_commit_at Γ appE Φo)
           ∨ (∃ (i : Z) (av : aview) (a : anode),
                P (length (path_elems pl)) i
-               ∗ ⌜av !! i = Some a⌝ ∗ Φo av i a
+               ∗ ⌜arow_at av i a⌝ ∗ Φo av i a
                ∗ ⌜forall (e : gmap fname Z) (nl : nat),
                     a <> MkAnode (ADir e) nl⌝)))%I.
 
@@ -135,7 +135,7 @@ Section SysChdirAU.
     (∃ (ipv : mword 64) (pl : list (bv 8)) (i : Z)
        (e : gmap fname Z) (nl : nat) (av : aview),
        P (length (path_elems pl)) i
-       ∗ ⌜av !! i = Some (MkAnode (ADir e) nl)⌝
+       ∗ ⌜arow_at av i (MkAnode (ADir e) nl)⌝
        ∗ Φo av i (MkAnode (ADir e) nl)
        ∗ proc_priv γf pj pid (us_cwi (us_cwd U ipv) i))%I.
 

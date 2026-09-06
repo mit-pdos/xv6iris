@@ -311,10 +311,10 @@ Lemma wrf_write_row `{XI : TsoCtx.CurCtx} (dn dn' : dinode) (bm bm' : blkmap)
      = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
        then wrote (k - off)%nat
        else file_byte data k) ->
-  abs_of (era_node dn' bm' data')
-  = Some (MkAnode (AFile (blk_splice off (wrf_run wrote tot)
-                            (fn_file_bytes (era_node dn bm data))))
-                  (fn_nlink (era_node dn bm data))).
+  abs_row (era_node dn' bm' data')
+  = MkAnode (AFile (blk_splice off (wrf_run wrote tot)
+                      (fn_file_bytes (era_node dn bm data))))
+            (fn_nlink (era_node dn bm data)).
 Proof.
   intros Hty Hty' Hnl' Hh Hh' Hsz' Hoff Hcap Hcap0 Hrange.
   assert (Hty2 : bv_unsigned (di_type dn') = FsImg.T_FILE_z)
@@ -334,7 +334,7 @@ Proof.
     rewrite (wrf_era_file_byte dn' bm' data' k Hh' Hkb)
             (wrf_era_file_byte dn bm data k Hh Hkb).
     exact (Hrange k Hkb). }
-  rewrite (opf_era_file_of dn' bm' data' Hty2) Hb Hnl //.
+  rewrite (opf_era_file_row dn' bm' data' Hty2) Hb Hnl //.
 Qed.
 
 (* ===================================================================== *)
@@ -474,8 +474,8 @@ Section WriteFire.
       iDestruct (off_gv_agree with "Hk Hu") as %<-.
       iMod (off_gv_update_halves (Z.of_nat (off + length bs)) with "Hk Hu")
         as "[Hk Hu]".
-      iMod (app_step_acc E γfs i I _ HE
-              (abs_view_lookup_is_Some I i _ (proj1 Hpre)) with "Hai") as "Hstep".
+      iMod (app_step_acc_view E γfs i I _ HE
+              (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
       iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
       iFrame "Ha' Hk". iSplitR; [done |]. iApply (IH with "Hai Hu").
     - rewrite /awrite_part_at. iIntros (off d) "Hk".
@@ -503,8 +503,10 @@ Section WriteFire.
     (0 < length bs)%nat ->
     (off <= length bs0)%nat ->
     (off + length bs <= MAXFILE * BSIZE)%nat ->
-    abs_of n = Some (MkAnode (AFile bs0) nl) ->
-    abs_of n' = Some (MkAnode (AFile (blk_splice off bs bs0)) nl) ->
+    fn_type n <> 0 ->
+    abs_row n = MkAnode (AFile bs0) nl ->
+    fn_type n' <> 0 ->
+    abs_row n' = MkAnode (AFile (blk_splice off bs bs0)) nl ->
     ftop_inv γfs -∗ app_inv γfs -∗
     awrite_full_at (fs_gamma_L γfs) appE i γo k Φ REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
@@ -514,7 +516,7 @@ Section WriteFire.
       ∗ REST
       ∗ ∃ av : aview, ⌜wri_pre av i off bs bs0 nl⌝ ∗ Φ k av off bs.
   Proof.
-    intros HE Hloc Hpos Hoff Hcap Habs Habs'. iIntros "#Hi #Hai Hcm Hf Hg".
+    intros HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs'. iIntros "#Hi #Hai Hcm Hf Hg".
     (* the re-spelling [mkf_acre_fire] does, and for the same reason: the
        unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag /fs_gamma_L /=.
@@ -522,17 +524,23 @@ Section WriteFire.
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
-    assert (Hrow : abs_view I !! i = Some (MkAnode (AFile bs0) nl)).
-    { by rewrite (abs_view_lookup_of I i n Hlk) Habs. }
+    (* the row is stated on the COUNT (E2-V2): the fd's inode may have
+       been unlinked while open, and then the view has no row for it *)
+    assert (Hrow : arow_at (abs_view I) i (MkAnode (AFile bs0) nl)).
+    { rewrite -Habs. exact (abs_view_arow I i n Hlk Hnz). }
     assert (Hpre : wri_pre (abs_view I) i off bs bs0 nl).
     { rewrite /wri_pre. split_and!; [exact Hrow | exact Hpos | exact Hoff |
                                      exact Hcap]. }
-    (* the delta collapses to the ONE-ROW insert, and the insert's reading
-       is the written record's own row *)
+    (* the delta collapses to the ONE-ROW counted insert: at a nonzero
+       count the written record's own row, at zero nothing moves *)
     assert (Hdelta : abs_view (<[i := n']> I)
                      = delta_write i off bs (abs_view I)).
-    { rewrite (abs_view_insert I i n' _ Habs').
-      by rewrite (delta_write_file (abs_view I) i off bs bs0 nl Hrow). }
+    { rewrite (abs_view_insert_row I i n' _ Hnz' Habs') /=.
+      case_decide as Hz.
+      - pose proof (arow_at_gone _ _ _ Hrow Hz) as Hnone.
+        rewrite (delta_write_absent _ _ _ _ Hnone). exact (delete_notin _ _ Hnone).
+      - by rewrite (delta_write_file (abs_view I) i off bs bs0 nl
+                      (arow_at_live _ _ _ Hrow Hz)). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I off bs bs0 nl with "[//] Hta Hg") as "(Hta & Hstep & Hph2)".
     (* THE MOVE, at the whole authority: the application's half comes out

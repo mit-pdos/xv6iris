@@ -44,7 +44,7 @@
          the byte legs or [fs_geom] -- [astate_nview_dq] needs the authority
          and nothing else -- so the state predicate was dead weight that only
          served to name an [S].  [abs_view] is correspondingly restated over
-         the RAW MAP ([omap abs_of I], allocated rows only since lane E2-V) rather than over [fss_inodes S]: that is
+         the RAW MAP ([omap abs_of I], live rows -- typed AND linked -- since lanes E2-V/E2-V2) rather than over [fss_inodes S]: that is
          the form [ftop_body] hands out, it is the same function on the nose
          at [I := fss_inodes S], and it keeps [abs_view_lookup] and
          [astate_nview_dq] byte-identical in shape.  [astate_timeless] lost
@@ -201,9 +201,20 @@ Section FsAbsCarrier.
     abs_of n = Some a -> top_frag_q Γ dq i n ⊢ nview_dq Γ dq i a.
   Proof. intros Ha. iIntros "H". iExists n. by iFrame. Qed.
 
-  Lemma nview_of_frag_typed Γ dq i n :
-    fn_type n <> 0 -> top_frag_q Γ dq i n ⊢ nview_dq Γ dq i (abs_row n).
-  Proof. intros Hnz. exact (nview_of_frag Γ dq i n _ (abs_of_typed n Hnz)). Qed.
+  Lemma nview_of_frag_live Γ dq i n :
+    fn_type n <> 0 -> fn_nlink n <> 0%nat ->
+    top_frag_q Γ dq i n ⊢ nview_dq Γ dq i (abs_row n).
+  Proof.
+    intros Hnz Hnl. exact (nview_of_frag Γ dq i n _ (abs_of_live n Hnz Hnl)).
+  Qed.
+
+  (* a carrier share is a share of a LINKED node (E2-V2): the view has no
+     row at count zero, so nobody can hold one *)
+  Lemma nview_dq_nlink Γ dq i a : nview_dq Γ dq i a ⊢ ⌜an_nlink a <> 0%nat⌝.
+  Proof.
+    iIntros "H". iDestruct "H" as (n) "[_ %Ha]". iPureIntro.
+    exact (abs_of_orphan n a Ha).
+  Qed.
 
   Lemma nview_frag Γ dq i a :
     nview_dq Γ dq i a ⊢ ∃ n, top_frag_q Γ dq i n ∗ ⌜abs_of n = Some a⌝.

@@ -2884,15 +2884,23 @@ Section ProofFilewriteAU.
                             (Z.to_nat (bv_unsigned (di_size dnl))))
           by (rewrite Hdnwi; exact (wrf_wi_size dnl bm'
                 (Z.to_nat (bv_unsigned v)) tot Hoff32)).
-        assert (Hrow : abs_of (era_node dnl bml datal)
-                  = Some (MkAnode (AFile (fn_file_bytes (era_node dnl bml datal)))
-                                  (fn_nlink (era_node dnl bml datal))))
-          by exact (opf_era_file_of dnl bml datal Htyfile).
-        assert (Hrow' : abs_of (era_node dn' bm' data')
-                  = Some (MkAnode (AFile (blk_splice (Z.to_nat (bv_unsigned v))
-                                            (wrf_run wrote tot)
-                                            (fn_file_bytes (era_node dnl bml datal))))
-                                  (fn_nlink (era_node dnl bml datal))))
+        (* the rows as [abs_row], with the type beside them (E2-V2: the fire
+           states the view's row on the count itself) *)
+        assert (Hnzl : fn_type (era_node dnl bml datal) <> 0)
+          by exact (opf_era_file_typed dnl bml datal Htyfile).
+        assert (Hrow : abs_row (era_node dnl bml datal)
+                  = MkAnode (AFile (fn_file_bytes (era_node dnl bml datal)))
+                            (fn_nlink (era_node dnl bml datal)))
+          by exact (opf_era_file_row dnl bml datal Htyfile).
+        assert (Htyfile' : bv_unsigned (di_type dn') = FsImg.T_FILE_z)
+          by (rewrite Htyq; exact Htyfile).
+        assert (Hnz' : fn_type (era_node dn' bm' data') <> 0)
+          by exact (opf_era_file_typed dn' bm' data' Htyfile').
+        assert (Hrow' : abs_row (era_node dn' bm' data')
+                  = MkAnode (AFile (blk_splice (Z.to_nat (bv_unsigned v))
+                                      (wrf_run wrote tot)
+                                      (fn_file_bytes (era_node dnl bml datal))))
+                            (fn_nlink (era_node dnl bml datal)))
           by exact (wrf_write_row dnl dn' bml bm' datal data'
                       (Z.to_nat (bv_unsigned v)) tot wrote
                       Htyfile Htyq Hnlq Hholes Hholes2 Hszwi Hfo Hcapt Hszb'
@@ -2945,7 +2953,7 @@ Section ProofFilewriteAU.
                 (fn_file_bytes (era_node dnl bml datal))
                 (fn_nlink (era_node dnl bml datal))
                 (era_node dnl bml datal) (era_node dn' bm' data')
-                ltac:(solve_ndisj) Hlocw Hposbs Hoffbs Hcapbs Hrow Hrow'
+                ltac:(solve_ndisj) Hlocw Hposbs Hoffbs Hcapbs Hnzl Hrow Hnz' Hrow'
                 with "[] [] Hcm Htop [Hgv]") as "(Htop & Hgv & Htail & Hrec)";
           [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") | rewrite Hgxo Hoffz; iExact "Hgv" |].
         iDestruct "Hrec" as (av) "[%Hpre HΦ]".

@@ -3321,7 +3321,7 @@ Section ProofNamexTrMain.
                                    (bname 14 nf') (bv_unsigned iinum)
                                    dnl bml datl
                                    (bv_unsigned (dir_inum datl kdir))
-                                   Hiok Htydz Hents
+                                   Hiok Htydz (nx_nlink_nz _ Hnl0) Hents
                                    with "Hhop HP Htop") as "[Htop HP]".
                            iModIntro.
                            (* the cursor's index is the NEW prefix's length *)
@@ -3612,7 +3612,7 @@ Section ProofNamexTrMain.
                                    P Pmiss (length es0)
                                    (bname 14 nf') (bv_unsigned iinum)
                                    dnl bml datl
-                                   Hiok Htydz Hents
+                                   Hiok Htydz (nx_nlink_nz _ Hnl0) Hents
                                    with "Hhop HP Htop") as "[Htop HP]".
                            iModIntro.
                            iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl

@@ -775,7 +775,7 @@ Section KexecAUAMain.
       (sts : list fdstate)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) : iProp Σ :=
     (∃ av : aview,
-       ⌜av !! zi = Some (abs_row (FsStateEra.era_node dn bm data))⌝ ∗
+       ⌜arow_at av zi (abs_row (FsStateEra.era_node dn bm data))⌝ ∗
        ⌜bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
           abs_row (FsStateEra.era_node dn bm data)
           = MkAnode (AFile (FsTree.file_bytes data

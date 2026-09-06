@@ -47,23 +47,20 @@
    consumer's, through [flushed]/[dur_at]; no durable clause appears
    below).
 
-   And NOTHING ABOUT [δ_free].  A successful unlink of a target with
-   prior nlink 1 leaves the row IN the map at [an_nlink = 0] -- the
-   ORPHAN state (doc section 1: "Orphans are IN the map"; section 4:
-   the dir arm's child "stays in aview as an orphan dir until iput").
-   Its leaving the map is [δ_free], which is IPUT's business at the last
-   reference drop, not unlink's (doc section 7's close/iput row).  Two
-   honest notes on that boundary:
-     - when NO other process holds the target open, sys_unlink's OWN
-       tail [iunlockput(ip)] is that last drop, so the free fires inside
-       this very syscall, after the instants this contract receipts --
-       exactly the stance the mknod header takes for create's
-       mint-before-insert ("an ordinary state change a concurrent
-       observer may see");
-     - the orphan-dir's dots survive the delta untouched -- its [".."]
-       still NAMES the (now ex-)parent, the doc's "goes grey" edge.
-       [delta_unlink_orphan_file] / [delta_unlink_orphan_dir] and
-       [delta_unlink_is_Some] state the rows.
+   And NOTHING ABOUT [δ_free] -- because since lane E2-V2 (owner ruling
+   Q-d, 2026-09-05: THE VIEW IS THE LIVE NAMESPACE) there is nothing left
+   for it to do.  A successful unlink of a target with prior nlink 1 takes
+   the row OUT of the view at instant 2 ([delta_unl_tgt] deletes at count
+   0): an unlinked-but-open file is the fd-holders' private buffer, not
+   part of the file system a user can name, and [iput]'s eventual free of
+   the record moves nothing the view has ([FsAbsDefs.abs_of] is [None]
+   on both sides).  Two honest notes on that boundary:
+     - what an fd-holder still reads of the unlinked file is the fd row's
+       business (fs-syscall-specs section 4's stable corollary at the
+       client's own share), not this contract's;
+     - [delta_unlink_last_file] / [delta_unlink_last_dir] and
+       [delta_unlink_is_Some_other] state the rows; the record's dots
+       survive underneath, unnamed.
 
    ==== THE DELTA IS TWO INSTANTS, AND THAT IS A MACHINE FACT ==========
    ==== (the one structural deviation from the mknod mold)    ==========
@@ -398,36 +395,34 @@ Proof.
   rewrite Ht. reflexivity.
 Qed.
 
-(* ---- THE ORPHAN FAMILY (header: nothing leaves the map) -------------- *)
+(* ---- THE LAST-LINK FAMILY (E2-V2: the view is the live namespace) ---- *)
 
-(* a file target whose only link this was: the row STAYS, reading
-   [an_nlink = 0] -- the unlinked-but-open state the doc's orphan bullet
-   names.  (Whether it stays past the syscall is a question about who
-   holds references -- see the header's δ_free note.) *)
-Lemma delta_unlink_orphan_file (av : aview) (d : Z) (nm : fname)
+(* a file target whose only link this was: the row LEAVES the view.  What
+   an fd-holder still sees of the file is the fd row's business
+   (fs-syscall-specs section 4), not the view's. *)
+Lemma delta_unlink_last_file (av : aview) (d : Z) (nm : fname)
     (ents : gmap fname Z) (nl : nat) (t : Z) (bs : list (bv 8)) :
   unl_pre av d nm ents nl t (MkAnode (AFile bs) 1%nat) ->
-  delta_unlink d nm t av !! t = Some (MkAnode (AFile bs) 0%nat).
+  delta_unlink d nm t av !! t = None.
 Proof.
   intros Hp. destruct Hp as (Hd & _ & _ & _ & _ & Ht & _ & _).
-  by rewrite (delta_unlink_target av d nm ents nl t _ Hd Ht).
+  exact (delta_unlink_last av d nm ents nl t _ Hd Ht eq_refl).
 Qed.
 
-(* the dir arm: the child stays as an ORPHAN DIR at count 0 -- its entry
-   map (the dots included; [unl_pre] says it is dots-only) survives
-   UNTOUCHED, so its [".."] still names [d]: the grey edge.  The parent
-   pays its own count down one. *)
-Lemma delta_unlink_orphan_dir (av : aview) (d : Z) (nm : fname)
+(* the dir arm: the child's row leaves too -- there is no orphan dir in
+   the view, and no grey [".."] edge -- while the parent pays its own
+   count down one and keeps its row. *)
+Lemma delta_unlink_last_dir (av : aview) (d : Z) (nm : fname)
     (ents : gmap fname Z) (nl : nat) (t : Z) (es : gmap fname Z) :
   unl_pre av d nm ents nl t (MkAnode (ADir es) 1%nat) ->
-  delta_unlink d nm t av !! t = Some (MkAnode (ADir es) 0%nat)
+  delta_unlink d nm t av !! t = None
   /\ delta_unlink d nm t av !! d
      = Some (MkAnode (ADir (delete nm ents)) (nl - 1)%nat).
 Proof.
   intros Hp. pose proof (unl_pre_ne _ _ _ _ _ _ _ Hp) as Hne.
   destruct Hp as (Hd & _ & _ & _ & _ & Ht & _ & _).
   split.
-  - by rewrite (delta_unlink_target av d nm ents nl t _ Hd Ht).
+  - exact (delta_unlink_last av d nm ents nl t _ Hd Ht eq_refl).
   - by rewrite (delta_unlink_parent av d nm ents nl t _ Hd Ht Hne).
 Qed.
 
@@ -495,7 +490,10 @@ Section SysUnlinkAU.
       (Φ : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (d : Z) (nm : fname)
        (ents : gmap fname Z) (nl : nat),
-       ⌜abs_view I !! d = Some (MkAnode (ADir ents) nl)⌝ -∗
+       (* on the COUNT (E2-V2): at a miss nothing pins the parent live --
+          an empty directory may have been removed between nameiparent
+          and this lock, and then the view has no row for it *)
+       ⌜arow_at (abs_view I) d (MkAnode (ADir ents) nl)⌝ -∗
        ⌜ents !! nm = None⌝ -∗
        ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
        ghost_map_auth (γtop Γ) (1/2) I ∗ Φ (abs_view I) d nm)%I.
@@ -612,7 +610,7 @@ Section SysUnlinkAU.
                   (∃ (av : aview) (nm : fname) (ents : gmap fname Z)
                      (nl : nat),
                      ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
-                     ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
+                     ⌜arow_at av d (MkAnode (ADir ents) nl)⌝ ∗
                      ⌜ents !! nm = None⌝ ∗
                      Φmiss av d nm ∗
                      dlookup_commit_at Γ appE Φex)

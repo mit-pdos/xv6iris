@@ -425,11 +425,13 @@ Definition anode_size_ok (a : anode) : Prop :=
   end.
 
 (* WHAT A FIRED OBSERVATION MAY ASSUME AT ITS INSTANT, each conjunct
-   realized by the machine (header, prover items 1): the row IS the
-   authority's at [i]; the offset the call used respects [off_wf]; the
-   row's bytes respect the size cap. *)
+   realized by the machine (header, prover items 1): the row is the
+   authority's at [i] -- stated on the COUNT ([FsAbsDefs.arow_at], E2-V2):
+   the fd's inode may have been unlinked while open, and then the view has
+   no row for it and [a] is what the record reads as; the offset the call
+   used respects [off_wf]; the row's bytes respect the size cap. *)
 Definition ard_pre (av : aview) (i : Z) (off : nat) (a : anode) : Prop :=
-  av !! i = Some a
+  arow_at av i a
   /\ (off <= MAXFILE * BSIZE)%nat
   /\ anode_size_ok a.
 
@@ -660,7 +662,7 @@ Section SysReadAU.
     iIntros (av off a d) "%Hpre Hst Hk".
     iDestruct (astate_q_nview with "Hst Hn") as %Hav.
     destruct Hpre as (Hrow & _ & _).
-    assert (a = b) as -> by congruence.
+    assert (a = b) as -> by exact (arow_at_pinned _ _ _ _ Hrow Hav).
     iDestruct (off_gv_agree with "Hk Hu") as %->.
     iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
     iModIntro. iFrame "Hst Hk".

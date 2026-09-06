@@ -292,7 +292,9 @@ Require Export FsAbsDelta.   (* the splice algebra, [delta_write] + its row alge
    and the end is inside the file-size cap. *)
 Definition wri_pre (av : aview) (i : Z) (off : nat)
     (bs bs0 : list (bv 8)) (nl : nat) : Prop :=
-  av !! i = Some (MkAnode (AFile bs0) nl)
+  (* on the COUNT ([FsAbsDefs.arow_at], E2-V2): a write through the fd of
+     an unlinked file finds no row, and moves none *)
+  arow_at av i (MkAnode (AFile bs0) nl)
   /\ (0 < length bs)%nat
   /\ (off <= length bs0)%nat
   /\ (off + length bs <= MAXFILE * BSIZE)%nat.

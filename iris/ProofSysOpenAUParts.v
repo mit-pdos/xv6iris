@@ -346,7 +346,7 @@ Section ProofSysOpenAUParts.
      node reads as), and the trunc commit still in hand. *)
   Definition so_obs (Φo : aview -> Z -> anode -> iProp Σ) (i : Z)
       (n : fs_node) : iProp Σ :=
-    (∃ av : aview, ⌜av !! i = Some (abs_row n)⌝ ∗ Φo av i (abs_row n))%I.
+    (∃ av : aview, ⌜arow_at av i (abs_row n)⌝ ∗ Φo av i (abs_row n))%I.
 
   (* the post-walk FAILURE arm (ARMs C-FAIL / D-FAIL / E-FAIL / F-FAIL):
      the observation HAS fired and its receipt is delivered, the trunc
@@ -440,7 +440,7 @@ Section ProofSysOpenAUParts.
       (pl : list (bv 8)) (i ma mi : Z) (nl : nat) :
     0 <= ma <= NDEV_max ->
     P (length (path_elems pl)) i -∗
-    (∃ av : aview, ⌜av !! i = Some (MkAnode (ADev ma mi) nl)⌝
+    (∃ av : aview, ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝
                    ∗ Φo av i (MkAnode (ADev ma mi) nl)) -∗
     atrunc_commit_at (fs_gamma_L fsc_fs) appE Φt -∗
     (∀ r : mword 64,
@@ -465,7 +465,7 @@ Section ProofSysOpenAUParts.
       (pl : list (bv 8)) (i : Z) (bs0 : list (bv 8)) (nl : nat) (γo : gname) :
     om_trunc vom = false ->
     P (length (path_elems pl)) i -∗
-    (∃ av : aview, ⌜av !! i = Some (MkAnode (AFile bs0) nl)⌝
+    (∃ av : aview, ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝
                    ∗ Φo av i (MkAnode (AFile bs0) nl)) -∗
     atrunc_commit_at (fs_gamma_L fsc_fs) appE Φt -∗
     (∀ r : mword 64,
@@ -491,9 +491,9 @@ Section ProofSysOpenAUParts.
       (pl : list (bv 8)) (i : Z) (bs0 : list (bv 8)) (nl : nat) (γo : gname) :
     om_trunc vom = true ->
     P (length (path_elems pl)) i -∗
-    (∃ av : aview, ⌜av !! i = Some (MkAnode (AFile bs0) nl)⌝
+    (∃ av : aview, ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝
                    ∗ Φo av i (MkAnode (AFile bs0) nl)) -∗
-    (∃ av' : aview, ⌜av' !! i = Some (MkAnode (AFile bs0) nl)⌝
+    (∃ av' : aview, ⌜arow_at av' i (MkAnode (AFile bs0) nl)⌝
                     ∗ Φt av' i bs0) -∗
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
@@ -519,7 +519,7 @@ Section ProofSysOpenAUParts.
       (pl : list (bv 8)) (i : Z) (ents : gmap fname Z) (nl : nat) (γo : gname) :
     om_arg vom = 0 ->
     P (length (path_elems pl)) i -∗
-    (∃ av : aview, ⌜av !! i = Some (MkAnode (ADir ents) nl)⌝
+    (∃ av : aview, ⌜arow_at av i (MkAnode (ADir ents) nl)⌝
                    ∗ Φo av i (MkAnode (ADir ents) nl)) -∗
     atrunc_commit_at (fs_gamma_L fsc_fs) appE Φt -∗
     (∀ r : mword 64,

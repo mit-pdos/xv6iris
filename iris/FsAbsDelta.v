@@ -14,7 +14,7 @@
    text stood, so every consumer of a spec file still sees the same names
    bound to the same constants.  What did NOT move: the side-condition
    predicates ([cre_pre], [wri_pre], [unl_pre]) and every lemma stated over
-   one of them ([delta_create_dev], [delta_unlink_split], the orphan
+   one of them ([delta_create_dev], [delta_unlink_split], the last-link
    family, [unl_pre_ne]), the chained reading ([woff]/[wri_row]/
    [delta_write_chain]), and anything that names an iProp or a ghost.
 
@@ -190,6 +190,13 @@ Proof.
   rewrite (delta_write_file _ _ _ _ _ _ Hi) blk_splice_nil insert_id //.
 Qed.
 
+(* a row the view does not have is not written: a write through the fd of
+   an UNLINKED file is view-preserving (E2-V2, ruling Q-d) *)
+Lemma delta_write_absent (av : aview) (i : Z) (off : nat)
+    (new : list (bv 8)) :
+  av !! i = None -> delta_write i off new av = av.
+Proof. intros Hi. rewrite /delta_write Hi //. Qed.
+
 (* ===================================================================== *)
 (*  3.  TRUNC (from SpecSysOpenAU.v)                                     *)
 (* ===================================================================== *)
@@ -241,6 +248,12 @@ Proof.
   by rewrite (insert_id av i (MkAnode (AFile []) nl) Hi).
 Qed.
 
+(* ...and so is truncating a row the view does not have: O_TRUNC on a
+   file unlinked between namei and the open's lock (E2-V2) *)
+Lemma delta_trunc_absent `{XI : CurCtx} (av : aview) (i : Z) :
+  av !! i = None -> delta_trunc i av = av.
+Proof. intros Hi. rewrite /delta_trunc Hi //. Qed.
+
 (* ===================================================================== *)
 (*  4.  UNLINK (from SpecSysUnlinkAU.v)                                  *)
 (* ===================================================================== *)
@@ -269,17 +282,24 @@ Definition delta_unl_ent (d : Z) (nm : fname) (dec : nat)
   | None => av
   end.
 
-(* instant 2 -- the target's row: same node, count down one *)
+(* instant 2 -- the target's row: same node, count down one, AND GONE WHEN
+   THE COUNT REACHES ZERO (E2-V2, ruling Q-d).  The view keeps live rows
+   only, so the last unlink DELETES the row, whatever descriptors still
+   reach the inode: from here on the file is the fd-holders' private
+   buffer, not part of the file system a user can name. *)
 Definition delta_unl_tgt (t : Z) (av : aview) : aview :=
   match av !! t with
-  | Some a => <[t := MkAnode (an_node a) (an_nlink a - 1)%nat]> av
+  | Some a =>
+      if decide ((an_nlink a - 1)%nat = 0%nat) then delete t av
+      else <[t := MkAnode (an_node a) (an_nlink a - 1)%nat]> av
   | None => av
   end.
 
 (* THE FUSED DELTA (doc section 4's [δ_unlink], the quiescent reading):
-   parent loses [nm], target's nlink drops, a directory target drops the
-   parent's nlink too.  [delta_unlink_split] below ties it to the two
-   halves; the AU commits fire the halves. *)
+   parent loses [nm], target's nlink drops -- and its row leaves when the
+   link was its last -- a directory target drops the parent's nlink too.
+   [delta_unlink_split] below ties it to the two halves; the AU commits
+   fire the halves. *)
 Definition delta_unlink (d : Z) (nm : fname) (t : Z)
     (av : aview) : aview :=
   match av !! d with
@@ -288,9 +308,13 @@ Definition delta_unlink (d : Z) (nm : fname) (t : Z)
       | Some a =>
           match an_node p with
           | ADir ents =>
-              <[t := MkAnode (an_node a) (an_nlink a - 1)%nat]>
-                (<[d := MkAnode (ADir (delete nm ents))
-                                (an_nlink p - unl_dec (an_node a))%nat]> av)
+              if decide ((an_nlink a - 1)%nat = 0%nat)
+              then delete t
+                     (<[d := MkAnode (ADir (delete nm ents))
+                                     (an_nlink p - unl_dec (an_node a))%nat]> av)
+              else <[t := MkAnode (an_node a) (an_nlink a - 1)%nat]>
+                     (<[d := MkAnode (ADir (delete nm ents))
+                                     (an_nlink p - unl_dec (an_node a))%nat]> av)
           | _ => av
           end
       | None => av
@@ -317,21 +341,60 @@ Proof.
   by rewrite lookup_insert_ne; [| congruence].
 Qed.
 
-Lemma delta_unl_tgt_target (av : aview) (t : Z) (a : anode) :
+(* the target's row after the halves, spelled out: the [match] on the row
+   the view has, reduced -- so a consumer can case on the count *)
+Lemma delta_unl_tgt_unfold (av : aview) (t : Z) (a : anode) :
   av !! t = Some a ->
+  delta_unl_tgt t av
+  = (if decide ((an_nlink a - 1)%nat = 0%nat) then delete t av
+     else <[t := MkAnode (an_node a) (an_nlink a - 1)%nat]> av).
+Proof. intros Ht. rewrite /delta_unl_tgt Ht. reflexivity. Qed.
+
+Lemma delta_unl_tgt_target (av : aview) (t : Z) (a : anode) :
+  av !! t = Some a -> (2 <= an_nlink a)%nat ->
   delta_unl_tgt t av !! t
   = Some (MkAnode (an_node a) (an_nlink a - 1)%nat).
-Proof. intros Ht. rewrite /delta_unl_tgt Ht. by rewrite lookup_insert. Qed.
+Proof.
+  intros Ht Hnl. rewrite (delta_unl_tgt_unfold av t a Ht).
+  destruct (decide ((an_nlink a - 1)%nat = 0%nat)); [lia |].
+  by rewrite lookup_insert.
+Qed.
+
+(* the LAST link: the row leaves *)
+Lemma delta_unl_tgt_last (av : aview) (t : Z) (a : anode) :
+  av !! t = Some a -> an_nlink a = 1%nat ->
+  delta_unl_tgt t av !! t = None.
+Proof.
+  intros Ht Hnl. rewrite (delta_unl_tgt_unfold av t a Ht).
+  destruct (decide ((an_nlink a - 1)%nat = 0%nat)); [| lia].
+  by rewrite lookup_delete.
+Qed.
 
 Lemma delta_unl_tgt_other (av : aview) (t j : Z) :
   j <> t -> delta_unl_tgt t av !! j = av !! j.
 Proof.
   intros Hj. rewrite /delta_unl_tgt.
   destruct (av !! t) as [a |]; [| done].
-  by rewrite lookup_insert_ne; [| congruence].
+  destruct (decide ((an_nlink a - 1)%nat = 0%nat)).
+  - by rewrite lookup_delete_ne; [| congruence].
+  - by rewrite lookup_insert_ne; [| congruence].
 Qed.
 
 (* ---- the fused delta's row algebra ---------------------------------- *)
+
+(* the fused delta at a parent row and a target row, spelled out *)
+Lemma delta_unlink_unfold (av : aview) (d : Z) (nm : fname)
+    (ents : gmap fname Z) (nl : nat) (t : Z) (a : anode) :
+  av !! d = Some (MkAnode (ADir ents) nl) -> av !! t = Some a ->
+  delta_unlink d nm t av
+  = (if decide ((an_nlink a - 1)%nat = 0%nat)
+     then delete t
+            (<[d := MkAnode (ADir (delete nm ents))
+                            (nl - unl_dec (an_node a))%nat]> av)
+     else <[t := MkAnode (an_node a) (an_nlink a - 1)%nat]>
+            (<[d := MkAnode (ADir (delete nm ents))
+                            (nl - unl_dec (an_node a))%nat]> av)).
+Proof. intros Hd Ht. rewrite /delta_unlink Hd Ht. reflexivity. Qed.
 
 Lemma delta_unlink_parent (av : aview) (d : Z) (nm : fname)
     (ents : gmap fname Z) (nl : nat) (t : Z) (a : anode) :
@@ -340,17 +403,34 @@ Lemma delta_unlink_parent (av : aview) (d : Z) (nm : fname)
   = Some (MkAnode (ADir (delete nm ents))
                   (nl - unl_dec (an_node a))%nat).
 Proof.
-  intros Hd Ht Hne. rewrite /delta_unlink Hd Ht /=.
-  rewrite lookup_insert_ne; [| congruence]. by rewrite lookup_insert.
+  intros Hd Ht Hne. rewrite (delta_unlink_unfold av d nm ents nl t a Hd Ht).
+  destruct (decide ((an_nlink a - 1)%nat = 0%nat)).
+  - rewrite lookup_delete_ne; [| congruence]. by rewrite lookup_insert.
+  - rewrite lookup_insert_ne; [| congruence]. by rewrite lookup_insert.
 Qed.
 
 Lemma delta_unlink_target (av : aview) (d : Z) (nm : fname)
     (ents : gmap fname Z) (nl : nat) (t : Z) (a : anode) :
   av !! d = Some (MkAnode (ADir ents) nl) -> av !! t = Some a ->
+  (2 <= an_nlink a)%nat ->
   delta_unlink d nm t av !! t
   = Some (MkAnode (an_node a) (an_nlink a - 1)%nat).
 Proof.
-  intros Hd Ht. rewrite /delta_unlink Hd Ht /=. by rewrite lookup_insert.
+  intros Hd Ht Hnl. rewrite (delta_unlink_unfold av d nm ents nl t a Hd Ht).
+  destruct (decide ((an_nlink a - 1)%nat = 0%nat)); [lia |].
+  by rewrite lookup_insert.
+Qed.
+
+(* the LAST link: the target's row leaves the view (E2-V2) *)
+Lemma delta_unlink_last (av : aview) (d : Z) (nm : fname)
+    (ents : gmap fname Z) (nl : nat) (t : Z) (a : anode) :
+  av !! d = Some (MkAnode (ADir ents) nl) -> av !! t = Some a ->
+  an_nlink a = 1%nat ->
+  delta_unlink d nm t av !! t = None.
+Proof.
+  intros Hd Ht Hnl. rewrite (delta_unlink_unfold av d nm ents nl t a Hd Ht).
+  destruct (decide ((an_nlink a - 1)%nat = 0%nat)); [| lia].
+  by rewrite lookup_delete.
 Qed.
 
 Lemma delta_unlink_other (av : aview) (d : Z) (nm : fname) (t j : Z) :
@@ -360,26 +440,33 @@ Proof.
   destruct (av !! d) as [p |]; [| done].
   destruct (av !! t) as [a |]; [| done].
   destruct (an_node p) as [bs | ents0 | ma mi]; [done | | done].
-  rewrite lookup_insert_ne; [| congruence].
-  by rewrite lookup_insert_ne; [| congruence].
+  destruct (decide ((an_nlink a - 1)%nat = 0%nat)).
+  - rewrite lookup_delete_ne; [| congruence].
+    by rewrite lookup_insert_ne; [| congruence].
+  - rewrite lookup_insert_ne; [| congruence].
+    by rewrite lookup_insert_ne; [| congruence].
 Qed.
 
-(* no key ever leaves: unlink deletes an EDGE, never a node.  [δ_free]
-   (the row leaving [aview]) is iput's, at nlink 0 + last reference --
-   doc sections 1, 4 and 7. *)
-Lemma delta_unlink_is_Some (av : aview) (d : Z) (nm : fname) (t j : Z) :
-  is_Some (delta_unlink d nm t av !! j) <-> is_Some (av !! j).
+(* no key but the TARGET's ever leaves: unlink deletes an EDGE, and the
+   target's row only when that edge was its last link (E2-V2; before it,
+   [δ_free] was iput's alone -- doc sections 1, 4 and 7). *)
+Lemma delta_unlink_is_Some_other (av : aview) (d : Z) (nm : fname) (t j : Z) :
+  j <> t ->
+  (is_Some (delta_unlink d nm t av !! j) <-> is_Some (av !! j)).
 Proof.
-  rewrite /delta_unlink.
+  intros Hjt. rewrite /delta_unlink.
   destruct (av !! d) as [p |] eqn:Hd; [| done].
   destruct (av !! t) as [a |] eqn:Ht; [| done].
   destruct (an_node p) as [bs | ents0 | ma mi]; [done | | done].
-  destruct (decide (j = t)) as [-> | Hjt].
-  { rewrite lookup_insert Ht. split; intros _; by eexists. }
-  rewrite lookup_insert_ne; [| congruence].
-  destruct (decide (j = d)) as [-> | Hjd].
-  { rewrite lookup_insert Hd. split; intros _; by eexists. }
-  by rewrite lookup_insert_ne; [| congruence].
+  destruct (decide ((an_nlink a - 1)%nat = 0%nat)).
+  - rewrite lookup_delete_ne; [| congruence].
+    destruct (decide (j = d)) as [-> | Hjd].
+    { rewrite lookup_insert Hd. split; intros _; by eexists. }
+    by rewrite lookup_insert_ne; [| congruence].
+  - rewrite lookup_insert_ne; [| congruence].
+    destruct (decide (j = d)) as [-> | Hjd].
+    { rewrite lookup_insert Hd. split; intros _; by eexists. }
+    by rewrite lookup_insert_ne; [| congruence].
 Qed.
 
 (* ===================================================================== *)

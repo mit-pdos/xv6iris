@@ -597,7 +597,7 @@ Section KexecAU.
       (sts : list fdstate) (U U' : ustate) (r : mword 64) : iProp Σ :=
     (∃ (pl : list (bv 8)) (i : Z) (av : aview) (a : anode),
        P (length (path_elems pl)) i ∗
-       ⌜av !! i = Some a⌝ ∗
+       ⌜arow_at av i a⌝ ∗
        ((* (a) a loadable file: the program xv6 loaded is the ELF
            semantics' image, and the caller's WP is returned at the key
            the process resumes in *)
@@ -636,7 +636,7 @@ Section KexecAU.
                arguments did not fit, or out of memory *)
           (∃ (i : Z) (av : aview) (a : anode) (c : exec_fail_cause),
              P (length (path_elems pl)) i
-             ∗ ⌜av !! i = Some a⌝ ∗ Φo av i a
+             ∗ ⌜arow_at av i a⌝ ∗ Φo av i a
              ∗ ⌜exec_fail_ok a na alen c⌝
              ∗ exec_slot_pre S Φo na alen afun sts)))%I.
 

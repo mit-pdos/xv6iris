@@ -166,7 +166,8 @@
    no client-facing carrier (lane A item (iv), the offset seam -- this
    contract is that seam's THIRD consumer).  NOTHING about user memory
    (the fetched path is existential, SpecFetchstr's stance).  NOTHING
-   about create's intermediate states (the minted orphan is observable;
+   about create's intermediate states (the armed child is observable at
+   nlink 1 before the parent's entry lands;
    SpecSysMknodAU's honesty stance inherited wholesale, [cre_pre]'s
    freshness shape included).  And NO STABLE COROLLARY -- deliberately
    ABSENT rather than sealed vacuous: the mknod prover showed the
@@ -408,7 +409,7 @@ Section SysOpenAU.
   Definition aopen_commit_at `{XI : CurCtx} Γ (E : coPset)
       (Φ : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i : Z) (a : anode),
-       ⌜abs_view I !! i = Some a⌝ -∗
+       ⌜arow_at (abs_view I) i a⌝ -∗
        ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
        ghost_map_auth (γtop Γ) (1/2) I ∗ Φ (abs_view I) i a)%I.
 
@@ -420,7 +421,7 @@ Section SysOpenAU.
   Definition aopen_commit `{XI : CurCtx} Γ (E : coPset)
       (Φ : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
     (∀ (av : aview) (i : Z) (a : anode),
-       ⌜av !! i = Some a⌝ -∗
+       ⌜arow_at av i a⌝ -∗
        astate_q Γ (1/2) av ={E}=∗ astate_q Γ (1/2) av ∗ Φ av i a)%I.
 
   Lemma aopen_commit_at_weaken `{XI : CurCtx} Γ E Φ :
@@ -470,7 +471,7 @@ Section SysOpenAU.
   Definition atrunc_commit_at `{XI : CurCtx} Γ (E : coPset)
       (Φ : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i : Z) (bs0 : list (bv 8)) (nl : nat),
-       ⌜abs_view I !! i = Some (MkAnode (AFile bs0) nl)⌝ -∗
+       ⌜arow_at (abs_view I) i (MkAnode (AFile bs0) nl)⌝ -∗
        ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
        ghost_map_auth (γtop Γ) (1/2) I ∗
          (* THE CALLER'S STEP (app-instances.md section 7): its claim about
@@ -490,8 +491,8 @@ Section SysOpenAU.
     app_inv γfs -∗ atrunc_commit_at (fs_gamma_L γfs) E (fun _ _ _ => True%I).
   Proof.
     iIntros (HE) "#Hai". rewrite /atrunc_commit_at. iIntros (I i bs0 nl) "%Hpre Ha".
-    iMod (app_step_acc E γfs i I (delta_trunc i (abs_view I)) HE
-            (abs_view_lookup_is_Some I i _ Hpre) with "Hai") as "Hstep".
+    iMod (app_step_acc_view E γfs i I (delta_trunc i (abs_view I)) HE
+            (delta_trunc_absent (abs_view I) i) with "Hai") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
@@ -508,8 +509,8 @@ Section SysOpenAU.
     iIntros (HE) "#Hai Hn HΦ". rewrite /atrunc_commit_at.
     iIntros (I i bs0 nl) "%Hpre Ha".
     iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
-    iMod (app_step_acc E γfs i I (delta_trunc i (abs_view I)) HE
-            (abs_view_lookup_is_Some I i _ Hpre) with "Hai") as "Hstep".
+    iMod (app_step_acc_view E γfs i I (delta_trunc i (abs_view I)) HE
+            (delta_trunc_absent (abs_view I) i) with "Hai") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     iFrame "Ha'".
     iApply ("HΦ" $! (abs_view I) i bs0 with "[%] Hn"). done.
@@ -626,7 +627,7 @@ Section SysOpenAU.
        ((* DEVICE (the init arm): the major is in range, the fragment is
            [FdDevice ma], and O_TRUNC never applies *)
         (∃ (ma mi : Z) (nl : nat),
-           ⌜av !! i = Some (MkAnode (ADev ma mi) nl)⌝ ∗
+           ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝ ∗
            ⌜0 <= ma <= NDEV_max⌝ ∗
            Φo av i (MkAnode (ADev ma mi) nl) ∗
            atrunc_commit_at Γ appE Φt ∗
@@ -636,11 +637,11 @@ Section SysOpenAU.
              fired at a state still holding the OBSERVED row (the
              lock-hold tie, header) *)
         (∃ (bs0 : list (bv 8)) (nl : nat),
-           ⌜av !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
+           ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝ ∗
            Φo av i (MkAnode (AFile bs0) nl) ∗
            (if om_trunc vom
             then ∃ av' : aview,
-                   ⌜av' !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
+                   ⌜arow_at av' i (MkAnode (AFile bs0) nl)⌝ ∗
                    Φt av' i bs0
             else atrunc_commit_at Γ appE Φt) ∗
            ∃ γo : gname,
@@ -650,7 +651,7 @@ Section SysOpenAU.
              pays the writable-fd-is-not-a-directory theorem here
              ([om_rdonly_modes]) *)
         (∃ (ents : gmap fname Z) (nl : nat),
-           ⌜av !! i = Some (MkAnode (ADir ents) nl)⌝ ∗
+           ⌜arow_at av i (MkAnode (ADir ents) nl)⌝ ∗
            ⌜om_arg vom = 0⌝ ∗
            Φo av i (MkAnode (ADir ents) nl) ∗
            atrunc_commit_at Γ appE Φt ∗
@@ -672,7 +673,7 @@ Section SysOpenAU.
           ∨ (∃ i : Z,
                P (length (path_elems pl)) i
                ∗ (∃ (av : aview) (a : anode),
-                    ⌜av !! i = Some a⌝ ∗ Φo av i a)
+                    ⌜arow_at av i a⌝ ∗ Φo av i a)
                ∗ atrunc_commit_at Γ appE Φt)))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, with
@@ -735,11 +736,11 @@ Section SysOpenAU.
            (∃ (av : aview) (nl : nat),
               ((* the found node is a FILE *)
                (∃ bs0 : list (bv 8),
-                  ⌜av !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
+                  ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝ ∗
                   Φo av i (MkAnode (AFile bs0) nl) ∗
                   (if om_trunc vom
                    then ∃ av' : aview,
-                          ⌜av' !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
+                          ⌜arow_at av' i (MkAnode (AFile bs0) nl)⌝ ∗
                           Φt av' i bs0
                    else atrunc_commit_at Γ appE Φt) ∗
                   ∃ γo : gname,
@@ -748,7 +749,7 @@ Section SysOpenAU.
                ∨ (* ...or a DEVICE (F-OK admits it; the major test still
                     stands between it and the fd) *)
                (∃ ma mi : Z,
-                  ⌜av !! i = Some (MkAnode (ADev ma mi) nl)⌝ ∗
+                  ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝ ∗
                   ⌜0 <= ma <= NDEV_max⌝ ∗
                   Φo av i (MkAnode (ADev ma mi) nl) ∗
                   atrunc_commit_at Γ appE Φt ∗
@@ -794,7 +795,7 @@ Section SysOpenAU.
                      ∗ acre_commit_at Γ appE (AFile []) Φok
                      ∗ (aopen_commit_at Γ appE Φo
                         ∨ (∃ (av' : aview) (a : anode),
-                             ⌜av' !! i = Some a⌝ ∗ Φo av' i a)))
+                             ⌜arow_at av' i a⌝ ∗ Φo av' i a)))
                   ∨ (* (c) nothing observed: the nlink guard, out of
                        inodes, dirlink failure, "/" *)
                   (acre_commit_at Γ appE (AFile []) Φok

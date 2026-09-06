@@ -172,15 +172,16 @@ Section ProofSysOpenAUCreArm.
     ⊢ so_obs (socr_Phio_pure i0 (abs_row n0)) i0 n0.
   Proof.
     rewrite /so_obs /socr_Phio_pure.
-    iExists ({[ i0 := abs_row n0 ]} : aview).
-    iSplitR; [iPureIntro; apply lookup_singleton |].
+    iExists (if decide (an_nlink (abs_row n0) = 0%nat) then ∅
+             else {[ i0 := abs_row n0 ]} : aview).
+    iSplitR; [iPureIntro; apply arow_at_witness |].
     iPureIntro. split; reflexivity.
   Qed.
 
   (* ...and the EXISTS tail's is the real fire, tagged. *)
   Lemma socr_obs_tag (i0 : Z) (n0 : fs_node)
       (Phio : aview -> Z -> anode -> iProp Σ) :
-    (∃ av : aview, ⌜av !! i0 = Some (abs_row n0)⌝ ∗ Phio av i0 (abs_row n0))
+    (∃ av : aview, ⌜arow_at av i0 (abs_row n0)⌝ ∗ Phio av i0 (abs_row n0))
     -∗ so_obs (socr_Phio_tag i0 (abs_row n0) Phio) i0 n0.
   Proof.
     iIntros "H". iDestruct "H" as (av) "[%Hav HP]".
@@ -201,7 +202,7 @@ Section ProofSysOpenAUCreArm.
     ={⊤}=∗ R
            ∗ (aopen_commit_at (fs_gamma_L fsc_fs) appE Phio
               ∨ (∃ (i : Z) (av : aview) (a : anode),
-                   ⌜av !! i = Some a⌝ ∗ Phio av i a))
+                   ⌜arow_at av i a⌝ ∗ Phio av i a))
            ∗ atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit.
   Proof.
     rewrite /open_post_fail_plain /socr_P /socr_Pm.
@@ -273,18 +274,18 @@ Section ProofSysOpenAUCreArm.
       (socr_P R i0) (socr_Phio_tag i0 a0 Phio) Phit sts U r
     ⊢ R ∗ ∃ (av : aview) (nl : nat),
         ((∃ bs0 : list (bv 8),
-            ⌜av !! i0 = Some (MkAnode (AFile bs0) nl)⌝ ∗
+            ⌜arow_at av i0 (MkAnode (AFile bs0) nl)⌝ ∗
             Phio av i0 (MkAnode (AFile bs0) nl) ∗
             (if om_trunc vom
              then ∃ av' : aview,
-                    ⌜av' !! i0 = Some (MkAnode (AFile bs0) nl)⌝ ∗
+                    ⌜arow_at av' i0 (MkAnode (AFile bs0) nl)⌝ ∗
                     Phit av' i0 bs0
              else atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit) ∗
             ∃ γo : gname,
               open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
                 (FdInode i0 γo) sts r)
          ∨ (∃ ma mi : Z,
-              ⌜av !! i0 = Some (MkAnode (ADev ma mi) nl)⌝ ∗
+              ⌜arow_at av i0 (MkAnode (ADev ma mi) nl)⌝ ∗
               ⌜0 <= ma <= NDEV_max⌝ ∗
               Phio av i0 (MkAnode (ADev ma mi) nl) ∗
               atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit ∗

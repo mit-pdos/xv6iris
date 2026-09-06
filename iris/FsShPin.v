@@ -162,6 +162,14 @@ Lemma fsimg_sh_nlink :
   = 1%nat.
 Proof. vm_eq. Qed.
 
+(* ...so /sh is LINKED, which is what its row needs (E2-V2) *)
+Lemma fsimg_sh_nlink_nz :
+  bv_unsigned (di_nlink (fs_dinode fsimg_P fsimg_sb SH_INO)) <> 0.
+Proof.
+  intros Hz. pose proof fsimg_sh_nlink as H1. rewrite Hz in H1.
+  simpl in H1. discriminate H1.
+Qed.
+
 (* the shell is the biggest of the four user programs and still an eighth
    of what a file may hold; [FsInitPin.maxfile_bytes] is the bound, cited *)
 Lemma fsimg_sh_size_bound :
@@ -208,7 +216,7 @@ Lemma fsimg_sh_abs :
   = Some (MkAnode (AFile sh_bytes) 1%nat).
 Proof.
   rewrite (img_abs_file fsimg_P fsimg_sb SH_INO fsimg_sh_type
-             fsimg_sh_size_bound).
+             fsimg_sh_size_bound fsimg_sh_nlink_nz).
   rewrite fsimg_sh_file_bytes fsimg_sh_nlink. reflexivity.
 Qed.
 

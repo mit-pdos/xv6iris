@@ -334,7 +334,7 @@ Qed.
 Lemma abs_of_file_read (n : fs_node) (bs : list (bv 8)) (nl : nat) :
   abs_of n = Some (MkAnode (AFile bs) nl) -> fn_file_bytes n = bs.
 Proof.
-  intros H. destruct (abs_of_Some _ _ H) as [_ Hr].
+  intros H. destruct (abs_of_Some _ _ H) as (_ & _ & Hr).
   exact (abs_row_file_read n bs nl (eq_sym Hr)).
 Qed.
 

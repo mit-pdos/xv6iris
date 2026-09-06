@@ -356,6 +356,17 @@ Section AppInv.
     iApply ("Hstep" $! n' with "[//] Hp").
   Qed.
 
+  (* THE IDENTITY STEP (E2-V2): a move that leaves the view where it is
+     owes the application nothing.  It is the arm every counted commit takes
+     at a row the view does not have -- the write to, the truncation of, an
+     unlinked-but-open file -- and it needs neither the license nor the
+     row: the reading is the same map. *)
+  Lemma app_step_id (i : Z) (I : gmap Z fs_node) :
+    ⊢ app_step i I (abs_view I).
+  Proof.
+    rewrite /app_step. iIntros (n' Heq) "Hp". rewrite Heq. iExact "Hp".
+  Qed.
+
   (* the license pays any step at a row the map has (round A: [top_move] is
      everything) *)
   Lemma app_step_of_auto (i : Z) (I : gmap Z fs_node) (av' : aview) :
@@ -412,6 +423,21 @@ Section AppInv.
     iIntros (HE Hi) "#Hinv".
     iMod (app_auto_acc E γfs HE with "Hinv") as "#Ha".
     iModIntro. iApply (app_step_of_auto i I av' Hi with "Ha").
+  Qed.
+
+  (* ...and the two joined (E2-V2): a write-kind delta that is the IDENTITY
+     where the view has no row -- every landed one is -- is paid by the
+     license where the row is and by [app_step_id] where it is not.  The
+     fd-side dischargers use this: the node an fd reaches may be unlinked. *)
+  Lemma app_step_acc_view (E : coPset) (γfs : fs_names) (i : Z)
+      (I : gmap Z fs_node) (av' : aview) :
+    ↑appN ⊆ E ->
+    (abs_view I !! i = None -> av' = abs_view I) ->
+    app_inv γfs ={E}=∗ app_step i I av'.
+  Proof.
+    intros HE Hid. destruct (abs_view I !! i) as [a |] eqn:Hav.
+    - exact (app_step_acc E γfs i I av' HE (abs_view_lookup_is_Some I i a Hav)).
+    - rewrite (Hid eq_refl). iIntros "_". iModIntro. iApply app_step_id.
   Qed.
 
 End AppInv.

@@ -182,14 +182,19 @@ Qed.
 Lemma img_abs_file (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
   bv_unsigned (di_type (fs_dinode P sb z)) = T_FILE_z ->
   bv_unsigned (di_size (fs_dinode P sb z)) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  bv_unsigned (di_nlink (fs_dinode P sb z)) <> 0 ->
   abs_of (img_node P sb z)
   = Some (MkAnode
       (AFile (file_bytes (fs_data_of P (fs_dinode P sb z))
                 (Z.to_nat (bv_unsigned (di_size (fs_dinode P sb z))))))
       (Z.to_nat (bv_unsigned (di_nlink (fs_dinode P sb z))))).
 Proof.
-  intros Hty Hsz.
+  intros Hty Hsz Hnl.
   assert (Hft : fn_type (img_node P sb z) = T_FILE_z) by exact Hty.
+  assert (Hnl' : fn_nlink (img_node P sb z) <> 0%nat).
+  { change (fn_nlink (img_node P sb z))
+      with (Z.to_nat (bv_unsigned (di_nlink (fs_dinode P sb z)))).
+    pose proof (proj1 (bv_unsigned_in_range _ (di_nlink (fs_dinode P sb z)))). lia. }
   assert (Hnz : fn_type (img_node P sb z) <> 0)
     by (rewrite Hft; cbv [T_FILE_z]; lia).
   assert (Hnd : fn_is_dir (img_node P sb z) = false).
@@ -202,7 +207,7 @@ Proof.
   { rewrite /abs_node Hnd.
     destruct (decide (fn_type (img_node P sb z) = T_FILE_z)) as [_ | Hc];
       [f_equal; exact (img_file_bytes P sb z Hsz) | exfalso; exact (Hc Hft)]. }
-  rewrite (abs_of_typed _ Hnz) /abs_row Hnode. reflexivity.
+  rewrite (abs_of_live _ Hnz Hnl') /abs_row Hnode. reflexivity.
 Qed.
 
 (* ====================================================================== *)
@@ -302,6 +307,14 @@ Lemma fsimg_init_nlink :
   = 1%nat.
 Proof. vm_eq. Qed.
 
+(* ...so /init is LINKED, which is what its row needs (E2-V2) *)
+Lemma fsimg_init_nlink_nz :
+  bv_unsigned (di_nlink (fs_dinode fsimg_P fsimg_sb INIT_INO)) <> 0.
+Proof.
+  intros Hz. pose proof fsimg_init_nlink as H1. rewrite Hz in H1.
+  simpl in H1. discriminate H1.
+Qed.
+
 Lemma maxfile_bytes : Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432.
 Proof. vm_eq. Qed.
 
@@ -389,7 +402,7 @@ Lemma fsimg_init_abs :
   = Some (MkAnode (AFile init_bytes) 1%nat).
 Proof.
   rewrite (img_abs_file fsimg_P fsimg_sb INIT_INO fsimg_init_type
-             fsimg_init_size_bound).
+             fsimg_init_size_bound fsimg_init_nlink_nz).
   rewrite fsimg_init_file_bytes fsimg_init_nlink. reflexivity.
 Qed.
 
@@ -438,13 +451,19 @@ Proof.
   rewrite /fn_is_dir /fn_type. by apply bool_decide_eq_true_2.
 Qed.
 
+(* ...and it is LINKED (E2-V2): the image's root record carries count 1 *)
+Lemma fsimg_root_nlink :
+  fn_nlink (img_node fsimg_P fsimg_sb FsImg.ROOTINO) = 1%nat.
+Proof. vm_eq. Qed.
+
 Theorem era0_root_row (S : fs_state_rec) :
   snap_ok S era0_D ->
   abs_view (fss_inodes S) !! FsImg.ROOTINO
   = Some (abs_row (img_node fsimg_P fsimg_sb FsImg.ROOTINO)).
 Proof.
   intros HS. rewrite (era0_arow S FsImg.ROOTINO _ HS era0_dur_root).
-  exact (abs_of_typed _ (fn_is_dir_typed _ fsimg_root_dir)).
+  apply (abs_of_live _ (fn_is_dir_typed _ fsimg_root_dir)).
+  rewrite fsimg_root_nlink. lia.
 Qed.
 
 (* ====================================================================== *)

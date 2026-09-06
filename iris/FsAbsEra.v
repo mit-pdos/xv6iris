@@ -189,16 +189,27 @@ Qed.
 
 (* ...and the same fact as the ABSTRACT NODE's arm, which is the form the
    lend law's conclusion is stated in. *)
+(* a record with a nonzero link count has a nonzero [fn_nlink] (E2-V2:
+   the fact every live-row reading of an era node needs) *)
+Lemma era_nlink_nz (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn) <> 0 -> fn_nlink (era_node dn bm data) <> 0%nat.
+Proof.
+  intros Hnz. rewrite /fn_nlink era_node_rec.
+  pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dn))). lia.
+Qed.
+
 Lemma abs_of_era_dir (cov : gset Z) (logstart : Z) (dn : dinode)
     (bm : blkmap) (data : nat -> list (bv 8)) :
   inode_ok cov logstart dn bm data ->
   fn_is_dir (era_node dn bm data) = true ->
+  bv_unsigned (di_nlink dn) <> 0 ->
   abs_of (era_node dn bm data)
   = Some (MkAnode (ADir (dir_view data (dir_nrec (bv_unsigned (di_size dn)))))
                   (fn_nlink (era_node dn bm data))).
 Proof.
-  intros Hok Hd.
-  by rewrite (abs_of_dir _ Hd) (dir_entries_era_ok cov logstart dn bm data Hok Hd).
+  intros Hok Hd Hnl.
+  by rewrite (abs_of_dir _ Hd (era_nlink_nz dn bm data Hnl))
+             (dir_entries_era_ok cov logstart dn bm data Hok Hd).
 Qed.
 
 Section FsAbsSeam.
@@ -221,13 +232,13 @@ Section FsAbsSeam.
      beside it because a read-locker needs them to call [readi]. *)
   Lemma inode_rd_era_nview (γfs : fs_names) (q : Qp) (inum : mword 32)
       (n : fs_node) :
-    fn_type n <> 0 ->
+    fn_type n <> 0 -> fn_nlink n <> 0%nat ->
     inode_rd_era γfs (DfracOwn q) inum n -∗
       inode_dat_q (fs_gamma_L γfs) (DfracOwn q) n
       ∗ nview (fs_gamma_L γfs) q (bv_unsigned inum) (abs_row n).
   Proof.
-    intros Hnz. rewrite /inode_rd_era. iIntros "[$ Ht]".
-    by iApply (nview_of_frag_typed _ _ _ _ Hnz).
+    intros Hnz Hnl. rewrite /inode_rd_era. iIntros "[$ Ht]".
+    by iApply (nview_of_frag_live _ _ _ _ Hnz Hnl).
   Qed.
 
   (* =================================================================== *)
@@ -293,7 +304,8 @@ Section FsAbsEra.
      consumer takes the fragment first and the two facts as one [%]. *)
   Definition elend Γ (d : Z) (dq : dfrac) (ents : gmap fname Z) : iProp Σ :=
     (∃ n : fs_node,
-       top_frag_q Γ dq d n ∗ ⌜fn_is_dir n = true /\ dir_entries n = ents⌝)%I.
+       top_frag_q Γ dq d n
+       ∗ ⌜fn_is_dir n = true /\ dir_entries n = ents /\ fn_nlink n <> 0%nat⌝)%I.
 
   Global Instance elend_timeless Γ d dq ents : Timeless (elend Γ d dq ents).
   Proof. rewrite /elend. apply _. Qed.
@@ -301,10 +313,15 @@ Section FsAbsEra.
   Lemma elend_frag Γ d dq ents : elend Γ d dq ents ⊢ ∃ n, top_frag_q Γ dq d n.
   Proof. iIntros "H". iDestruct "H" as (n) "[H _]". by iExists n. Qed.
 
+  (* the lend carries LIVENESS too (E2-V2): namex's [ip->nlink == 0] guard
+     precedes every hop, so a lent directory has its row *)
   Lemma elend_intro Γ d dq (n : fs_node) :
-    fn_is_dir n = true ->
+    fn_is_dir n = true -> fn_nlink n <> 0%nat ->
     top_frag_q Γ dq d n ⊢ elend Γ d dq (dir_entries n).
-  Proof. intros Hd. iIntros "H". iExists n. by iFrame. Qed.
+  Proof.
+    intros Hd Hnl. iIntros "H". iExists n. iFrame "H". iPureIntro.
+    split_and!; [exact Hd | reflexivity | exact Hnl].
+  Qed.
 
   (* =================================================================== *)
   (*  2.  THE THREE LAWS                                                  *)
@@ -316,10 +333,10 @@ Section FsAbsEra.
   Lemma elend_agrees Γ : lend_agrees Γ (elend Γ).
   Proof.
     intros d dq ents q a. rewrite /elend. iIntros "HF Hn".
-    iDestruct "HF" as (n) "[Hf [%Hdir %Hde]]".
+    iDestruct "HF" as (n) "[Hf (%Hdir & %Hde & %Hnl)]".
     iDestruct (nview_frag with "Hn") as (n') "[Hf' %Han]".
     iDestruct (top_frag_q_agree with "Hf Hf'") as %<-.
-    iPureIntro. rewrite (abs_of_dir n Hdir) in Han. apply Some_inj in Han.
+    iPureIntro. rewrite (abs_of_dir n Hdir Hnl) in Han. apply Some_inj in Han.
     by rewrite -Han /= Hde.
   Qed.
 
@@ -338,8 +355,8 @@ Section FsAbsEra.
       ⌜∃ nl : nat, av !! d = Some (MkAnode (ADir ents) nl)⌝.
   Proof.
     rewrite /elend. iIntros "Hst HF".
-    iDestruct "HF" as (n) "[Hf [%Hdir %Hde]]".
-    iDestruct (nview_of_frag _ _ _ _ _ (abs_of_dir n Hdir) with "Hf") as "Hn".
+    iDestruct "HF" as (n) "[Hf (%Hdir & %Hde & %Hnl)]".
+    iDestruct (nview_of_frag _ _ _ _ _ (abs_of_dir n Hdir Hnl) with "Hf") as "Hn".
     iDestruct (astate_q_nview_dq with "Hst Hn") as %Hav.
     iPureIntro. exists (fn_nlink n).
     by rewrite Hav Hde.
@@ -425,16 +442,18 @@ Section FsAbsEra.
       (data : nat -> list (bv 8)) :
     inode_ok cov logstart dn bm data ->
     bv_unsigned (di_type dn) = T_DIR_z ->
+    bv_unsigned (di_nlink dn) <> 0 ->
     top_frag_q (fs_gamma_L γfs) dq d (era_node dn bm data) ⊢
       elend (fs_gamma_L γfs) d dq
         (dir_view data (dir_nrec (bv_unsigned (di_size dn)))).
   Proof.
-    intros Hok Hty.
+    intros Hok Hty Hnl.
     assert (Hd : fn_is_dir (era_node dn bm data) = true).
     { rewrite /fn_is_dir /fn_type era_node_rec.
       by apply bool_decide_eq_true_2. }
     iIntros "H". iExists (era_node dn bm data). iFrame "H". iPureIntro.
-    split; [exact Hd | exact (dir_entries_era_ok cov logstart dn bm data Hok Hd)].
+    split_and!; [exact Hd | exact (dir_entries_era_ok cov logstart dn bm data Hok Hd)
+                 | exact (era_nlink_nz dn bm data Hnl)].
   Qed.
 
   (* THE SPLIT THE FIRE RIDES ON.  The walk lends HALF and keeps HALF; the
@@ -455,15 +474,16 @@ Section FsAbsEra.
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (c : Z) :
     inode_ok cov logstart dn bm data ->
     bv_unsigned (di_type dn) = T_DIR_z ->
+    bv_unsigned (di_nlink dn) <> 0 ->
     dir_view data (dir_nrec (bv_unsigned (di_size dn))) !! s = Some c ->
     ex_hop γfs P Pmiss k s -∗ P k d -∗
     top_frag (fs_gamma_L γfs) d (era_node dn bm data) ={⊤}=∗
       top_frag (fs_gamma_L γfs) d (era_node dn bm data) ∗ P (S k) c.
   Proof.
-    intros Hok Hty He. iIntros "Hh HP Ht".
+    intros Hok Hty Hnl He. iIntros "Hh HP Ht".
     rewrite era_half_split. iDestruct "Ht" as "[Ht1 Ht2]".
     iDestruct (elend_of_era γfs cov logstart (DfracOwn (1/2)) d dn bm data
-                 Hok Hty with "Ht2") as "HF".
+                 Hok Hty Hnl with "Ht2") as "HF".
     rewrite /ex_hop /ax_hop.
     iMod ("Hh" $! d (dir_view data (dir_nrec (bv_unsigned (di_size dn))))
             (DfracOwn (1/2)) with "HP HF")
@@ -481,15 +501,16 @@ Section FsAbsEra.
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
     inode_ok cov logstart dn bm data ->
     bv_unsigned (di_type dn) = T_DIR_z ->
+    bv_unsigned (di_nlink dn) <> 0 ->
     dir_view data (dir_nrec (bv_unsigned (di_size dn))) !! s = None ->
     ex_hop γfs P Pmiss k s -∗ P k d -∗
     top_frag (fs_gamma_L γfs) d (era_node dn bm data) ={⊤}=∗
       top_frag (fs_gamma_L γfs) d (era_node dn bm data) ∗ Pmiss k d.
   Proof.
-    intros Hok Hty He. iIntros "Hh HP Ht".
+    intros Hok Hty Hnl He. iIntros "Hh HP Ht".
     rewrite era_half_split. iDestruct "Ht" as "[Ht1 Ht2]".
     iDestruct (elend_of_era γfs cov logstart (DfracOwn (1/2)) d dn bm data
-                 Hok Hty with "Ht2") as "HF".
+                 Hok Hty Hnl with "Ht2") as "HF".
     rewrite /ex_hop /ax_hop.
     iMod ("Hh" $! d (dir_view data (dir_nrec (bv_unsigned (di_size dn))))
             (DfracOwn (1/2)) with "HP HF")

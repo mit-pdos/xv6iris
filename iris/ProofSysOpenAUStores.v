@@ -887,8 +887,11 @@ Section ProofSysOpenAUStores.
             (era_node dn bm data)
             (era_node (di_trunc dn) bm_empty (fun _ => replicate BSIZE (bv_0 8)))
             ltac:(solve_ndisj) Hloctr
-            (opf_era_file_of dn bm data Htyfz)
-            (opf_trunc_of dn bm bm_empty data
+            (opf_era_file_typed dn bm data Htyfz)
+            (opf_era_file_row dn bm data Htyfz)
+            (opf_era_file_typed (di_trunc dn) bm_empty
+               (fun _ => replicate BSIZE (bv_0 8)) Htyfz)
+            (opf_trunc_row dn bm bm_empty data
                (fun _ => replicate BSIZE (bv_0 8)) Htyfz)
             with "[] [] Htc Htop") as "[Htop Htr2]";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].

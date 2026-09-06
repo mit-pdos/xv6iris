@@ -1718,13 +1718,23 @@ Section ProofSysUnlinkAUW3.
                                       (dir_inum datd kk : mword 16) : mword 32))
                       dni bmi dati kw Hholesi Hszcapi Htyzi Hnlzi Hddixi
                       (Hduqi Htyzi) Hkw2 Hkwlt Hkwlive).
+        (* E2-V2: both rows are LIVE -- the parent by the home-live
+           derivation (the matched record is neither dot, so [dp] cannot be
+           orphaned), the child by unlink's own [nlink < 1] panic *)
+        assert (Hkkname : bname 14 (dir_name datd kk) = bname 14 nf)
+          by exact (dir_first_name _ _ _ _ Hfst).
+        assert (Hdplive : bv_unsigned (di_nlink dnd) <> 0).
+        { intro Hz.
+          destruct (Hdoc Htydz Hz kk Hkklt Hkklive) as [Hd | Hd];
+            rewrite Hkkname in Hd; [exact (Hnotdot Hd) | exact (Hnotdd Hd)]. }
         iApply fupd_wp.
         iMod (uf_dex_fire fsc_fs ⊤ (DfracOwn 1) (DfracOwn 1) Phiex
                 (bv_unsigned dinum)
                 (bv_unsigned (zero_extend' 32
                                 (dir_inum datd kk : mword 16) : mword 32))
                 (bname 14 nf) (era_node dnd bmd datd) (era_node dni bmi dati)
-                ltac:(solve_ndisj) Hdirdp Hentd Hdirip Hnotdots
+                ltac:(solve_ndisj) Hdirdp (mkf_era_live dnd bmd datd Hdplive)
+                Hentd Hdirip (mkf_era_live dni bmi dati Hnlzi) Hnotdots
                 with "[] Hcex Htop Htopi") as "(Htop & Htopi & Hfired)";
           [iApply (ireg_inv_ftop with "Hireg") |].
         iModIntro.

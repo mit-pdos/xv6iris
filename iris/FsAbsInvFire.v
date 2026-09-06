@@ -214,8 +214,8 @@ Section FsAbsInvFire.
     { rewrite awrite_chain_0. done. }
     rewrite awrite_chain_S. iSplit.
     - rewrite /awrite_full_at. iIntros (I off bs bs0 nl) "%Hpre Ha Hk".
-      iMod (app_step_acc appE γfs i I _ appN_appE
-              (abs_view_lookup_is_Some I i _ (proj1 Hpre)) with "Hai") as "Hstep".
+      iMod (app_step_acc_view appE γfs i I _ appN_appE
+              (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
       iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'".
       iMod (off_user_inv_move appE γo _ (Z.of_nat (off + length bs)) foffN_appE
               with "Hoinv Hk") as "Hk".

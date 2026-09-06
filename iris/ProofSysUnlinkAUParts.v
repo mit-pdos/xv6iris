@@ -219,14 +219,17 @@ Lemma su_au_parent_row_era (dn dn' : dinode) (bm bm' : blkmap)
   di_type dn' = di_type dn ->
   (fn_nlink (era_node dn' bm' data')
    = fn_nlink (era_node dn bm data) - dec)%nat ->
+  (* E2-V2: the parent stays LINKED -- on the file arm its count does not
+     move, on the dir arm it was at least 2 (the child's [".."]) *)
+  (fn_nlink (era_node dn bm data) - dec)%nat <> 0%nat ->
   dir_entries (era_node dn' bm' data')
     = delete nm (dir_entries (era_node dn bm data)) ->
   abs_of (era_node dn' bm' data')
   = Some (MkAnode (ADir (delete nm (dir_entries (era_node dn bm data))))
                   (fn_nlink (era_node dn bm data) - dec)%nat).
 Proof.
-  intros Hty Hty' Hnl Hents.
-  apply (uf_parent_row _ _ nm dec); [| exact Hnl | exact Hents].
+  intros Hty Hty' Hnl Hpos Hents.
+  apply (uf_parent_row _ _ nm dec); [| exact Hnl | exact Hpos | exact Hents].
   apply mkf_era_is_dir. by rewrite Hty'.
 Qed.
 
