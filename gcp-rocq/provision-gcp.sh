@@ -379,17 +379,29 @@ REMOTE
 
 # ---------------------------------------------------------------- opam env
 # No opam init/repository/install here -- see the comment on OPAM_ROOT in
-# config.sh. This just points every future login shell's OPAMROOT at the data
-# disk's opam root, so `opam exec --switch=/shared/xv6rocq --` (what the
-# Makefile actually runs) has a root to resolve that switch against. Cheap and
-# idempotent, so it runs on every provision rather than being sentinel-gated.
+# config.sh. This points every future login shell's OPAMROOT at the data disk's
+# opam root AND puts $OPAM_SWITCH on PATH.
+#
+# The second half is load-bearing. With only OPAMROOT wired, `rocq` is not on
+# PATH, so every remote command has to be spelled
+# `opam exec --switch=... -- <cmd>` -- and forgetting it does not fail: a
+# sub-make's coqdep silently produces nothing, make prints "Nothing to be done"
+# and exits 0. Putting the switch on PATH removes both the wrapper and the
+# green-looking no-op it guards against.
+#
+# The guard keeps this generic: if the switch is not on the disk, the profile
+# still sets OPAMROOT and nothing else, exactly as before.
+# Cheap and idempotent, so it runs on every provision.
 wire_opam_env() {
   local ip; ip="$(instance_ip)"
   mapfile -t opts < <(ssh_opts)
-  say "wiring OPAMROOT into login shells"
+  say "wiring OPAMROOT (and \$OPAM_SWITCH onto PATH) into login shells"
   ssh "${opts[@]}" "$SSH_USER@$ip" \
     "sudo tee /etc/profile.d/rocq-opam.sh >/dev/null" <<PROFILE
 export OPAMROOT=$OPAM_ROOT
+if [ -n "$OPAM_SWITCH" ] && [ -d "$OPAM_SWITCH/_opam/bin" ]; then
+  eval "\$(opam env --switch=$OPAM_SWITCH --set-switch 2>/dev/null)"
+fi
 PROFILE
 }
 

@@ -71,6 +71,27 @@ IDLE_CHECK_INTERVAL="${ROCQ_IDLE_CHECK_INTERVAL:-5min}"
 # already know about that switch, which is true whenever the data disk is a
 # clone of one that was set up that way.
 OPAM_ROOT="${ROCQ_OPAM_ROOT:-$DATA_MOUNT/opam}"
+# The switch every Rocq command must run in. wire_opam_env puts it on PATH for
+# every login shell, so a remote `make -C iris -f CoqMakefile` finds `rocq`
+# without an `opam exec --switch=...` wrapper. Without that, the sub-make form
+# does not fail: coqdep silently produces nothing, make prints "Nothing to be
+# done" and exits 0 -- a green-looking no-op. Leave empty to wire only OPAMROOT.
+OPAM_SWITCH="${ROCQ_OPAM_SWITCH:-/shared/xv6rocq}"
+
+# ---- the safe build ----------------------------------------------------
+# `run-on-gcp --proofs` runs this, and it is the only build form that is safe
+# on the VM. A top-level `make` reaches the dump rules, which regenerate the
+# tracked kernel-rocq/user-rocq sources from whatever ELF the VM happens to
+# have -- clobbering the image the sync just pushed, with the damage surfacing
+# far away as a bogus address failure. Driving each sub-tree through its own
+# generated CoqMakefile never reaches a dump rule at all.
+#
+# Order matters: iris/ requires the .vo of all three.
+PROOF_SUBTREES=( model-xv6iris kernel-rocq user-rocq )
+PROOF_MAIN_SUBTREE="iris"
+# Directories whose tracked .v are GENERATED and must never move on the VM.
+# --proofs checksums them before and after and fails if anything did.
+DUMP_GUARD_DIRS=( kernel-rocq user-rocq )
 # Extra system packages. The riscv64 cross toolchain is here because xv6iris
 # disassembles a real kernel ELF into Rocq; harmless for projects that do not.
 EXTRA_APT_PACKAGES="${ROCQ_EXTRA_APT_PACKAGES:-gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu}"

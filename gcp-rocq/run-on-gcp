@@ -26,6 +26,8 @@ usage: run-on-gcp [options] <command> [args...]
   Runs <command> on the shared Rocq VM, in a remote mirror of \$PWD.
 
 options:
+  --proofs             build the Rocq proofs, safely (see below). Takes make
+                       arguments: --proofs -k, --proofs SomeFile.vo
   --shell              open an interactive shell in the remote work tree
   --sync-only          push the tree and exit, running nothing
   --no-sync            skip the push (use the tree as it already is remotely)
@@ -35,6 +37,8 @@ options:
                        dependencies. Works standalone too.
   --no-checksum        decide what to send by mtime+size rather than content
                        (faster on huge trees, see the note in config.sh)
+  --check-dumps        verify the VM's tracked generated sources match this
+                       checkout, then exit
   --status             show VM state and idle timer, then exit
   --start / --stop     power the VM on or off, then exit
   --where              print the remote path for \$PWD, then exit
@@ -42,25 +46,34 @@ options:
   -h, --help           this message
 
 examples:
-  run-on-gcp make -j 36
+  run-on-gcp --proofs                 # the whole tree
+  run-on-gcp --proofs -k              # ... don't stop at the first error
   run-on-gcp --pull doc/ make doc
   run-on-gcp --shell
+
+Use --proofs rather than 'make': a top-level make on the VM reaches the dump
+rules, which regenerate the tracked kernel-rocq/user-rocq sources from whatever
+ELF the VM has and clobber the image the sync just pushed. --proofs drives each
+sub-tree through its own CoqMakefile, so no dump rule can run, and it verifies
+the tracked dumps are byte-identical afterwards anyway.
 EOF
 }
 
 # ------------------------------------------------------------------ options
 declare -a PULL_PATHS=()
-DO_SYNC=1; SHELL_MODE=0; SYNC_ONLY=0; PULL_VO=0
+DO_SYNC=1; SHELL_MODE=0; SYNC_ONLY=0; PULL_VO=0; PROOFS=0
 ACTION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --proofs)      PROOFS=1; shift; break ;;
     --shell)       SHELL_MODE=1; shift ;;
     --sync-only)   SYNC_ONLY=1; shift ;;
     --no-sync)     DO_SYNC=0; shift ;;
     --pull)        [[ $# -ge 2 ]] || die "--pull needs a path"; PULL_PATHS+=("$2"); shift 2 ;;
     --pull-vo)     PULL_VO=1; shift ;;
     --no-checksum) USE_CHECKSUM=0; shift ;;
+    --check-dumps) ACTION=check-dumps; shift ;;
     --status)      ACTION=status; shift ;;
     --start)       ACTION=start; shift ;;
     --stop)        ACTION=stop; shift ;;
@@ -213,7 +226,8 @@ case "$ACTION" in
     say "stopping $INSTANCE"; g compute instances stop "$INSTANCE" --zone="$ZONE"; exit 0 ;;
 esac
 
-if (( SYNC_ONLY == 0 && SHELL_MODE == 0 && PULL_VO == 0 )) && [[ $# -eq 0 ]]; then
+if (( SYNC_ONLY == 0 && SHELL_MODE == 0 && PULL_VO == 0 && PROOFS == 0 )) \
+   && [[ $# -eq 0 && "$ACTION" != check-dumps ]]; then
   usage; exit 2
 fi
 
@@ -223,6 +237,30 @@ IP="$(instance_ip)"
 wait_for_ssh "$IP"
 
 # ------------------------------------------------------------------ sync
+# Delete the build artifacts of every .v the push just replaced.
+#
+# --checksum --no-times gets the common case right, but not this one: if a file
+# is edited WHILE a remote build is running, the .vo that build produces is
+# stamped with a later remote clock than the .v the next sync writes, so make
+# considers it up to date and the edit is silently never compiled -- the file
+# simply stops appearing in any compile line while its errors are still in the
+# source. Removing the artifacts of exactly the files we just transferred makes
+# that impossible, and costs nothing when nothing changed.
+drop_stale_artifacts() {
+  local -a vs=()
+  local f
+  for f in "$@"; do [[ "$f" == *.v ]] && vs+=( "$f" ); done
+  (( ${#vs[@]} )) || return 0
+
+  local script='cd "$1" || exit 0; shift
+    for v in "$@"; do b="${v%.v}"; rm -f "$b".vo "$b".vos "$b".vok "$b".glob \
+      "$(dirname "$b")/.$(basename "$b").aux"; done'
+  say "dropping stale artifacts for ${#vs[@]} changed .v"
+  ssh "${SSH_OPTS[@]}" "$SSH_USER@$IP" \
+    "bash -s -- $(printf %q "$REMOTE_DIR") $(printf '%q ' "${vs[@]}")" \
+    <<<"$script" || warn "could not drop stale artifacts"
+}
+
 sync_tree() {
   local -a excl=() rsync_args=()
   local x
@@ -274,6 +312,7 @@ sync_tree() {
 
   if (( ${#changed[@]} )); then
     say "updated ${#changed[@]} file(s)"
+    drop_stale_artifacts "${changed[@]}"
   else
     say "already up to date"
   fi
@@ -337,8 +376,88 @@ pull_artifacts() {
   say "pulled $(find "$LOCAL_DIR" -name '*.vo' | wc -l) .vo into $LOCAL_DIR"
 }
 
+# ------------------------------------------------------------------ proofs
+# Prove the VM's copies of the generated-and-tracked dumps are byte-identical
+# to the ones in this checkout.
+#
+# This is the check that used to be a line of documentation asking the user to
+# run md5sum by hand after every remote build. Comparing REMOTE against LOCAL,
+# rather than before against after, is what makes it catch a tree some earlier
+# run already poisoned -- which is the case that actually bites, because the
+# damage surfaces far away and much later, as a bogus address failure at the
+# bottom of the tree.
+dump_sums_local() {
+  local d
+  for d in "${DUMP_GUARD_DIRS[@]:-}"; do
+    [[ -d "$LOCAL_DIR/$d" ]] || continue
+    ( cd "$LOCAL_DIR" && md5sum "$d"/*.v 2>/dev/null )
+  done | sort
+}
+
+dump_sums_remote() {
+  local -a dirs=("${DUMP_GUARD_DIRS[@]:-}")
+  (( ${#dirs[@]} )) || return 0
+  local script='cd "$1" || exit 0; shift
+    for d in "$@"; do [ -d "$d" ] && md5sum "$d"/*.v 2>/dev/null; done | sort'
+  ssh "${SSH_OPTS[@]}" "$SSH_USER@$IP" \
+    "bash -s -- $(printf %q "$REMOTE_DIR") $(printf '%q ' "${dirs[@]}")" \
+    <<<"$script" 2>/dev/null || true
+}
+
+check_dumps() {
+  local want have
+  want="$(dump_sums_local)"
+  [[ -n "$want" ]] || return 0
+  have="$(dump_sums_remote)"
+  [[ "$want" == "$have" ]] && return 0
+  warn "THE VM'S TRACKED DUMPS DO NOT MATCH THIS CHECKOUT -- a dump rule ran there."
+  diff <(printf '%s\n' "$want") <(printf '%s\n' "$have") >&2 || true
+  warn "every proof built against them is about a different image."
+  die "re-sync and rebuild: run-on-gcp --proofs (never a bare remote 'make')"
+}
+
+# The safe build: each sub-tree through its OWN generated CoqMakefile, in
+# dependency order. No dump rule exists on this path, so the tracked image
+# cannot move -- and the guard below proves it rather than trusting it.
+run_proofs() {
+  local jobs="${ROCQ_BUILD_JOBS:-}"   # empty => the remote picks nproc
+  local rc=0
+
+  local script
+  script=$(cat <<'REMOTE'
+set -uo pipefail
+tree="$1"; jobs="${2:-$(nproc)}"; main="$3"; shift 3
+cd "$tree" || exit 1
+command -v rocq >/dev/null || { echo "rocq not on PATH: re-run provision-gcp.sh" >&2; exit 1; }
+subs=(); while [ "$1" != "--" ]; do subs+=("$1"); shift; done; shift
+for d in "${subs[@]}" "$main"; do
+  [ -d "$d" ] || continue
+  ( cd "$d" && { [ -f CoqMakefile ] || coq_makefile -f _CoqProject -o CoqMakefile >/dev/null; }     && make -f CoqMakefile -j"$jobs" "$@" ) || exit $?
+done
+REMOTE
+)
+  # bash -ls, not bash -s: a LOGIN shell is what sources
+  # /etc/profile.d/rocq-opam.sh and puts the switch on PATH.
+  say "building proofs (${PROOF_SUBTREES[*]} then $PROOF_MAIN_SUBTREE)"
+  ssh "${SSH_OPTS[@]}" "$SSH_USER@$IP" \
+    "bash -ls -- $(printf %q "$REMOTE_DIR") $(printf %q "$jobs") \
+     $(printf %q "$PROOF_MAIN_SUBTREE") $(printf '%q ' "${PROOF_SUBTREES[@]}") -- \
+     $(printf '%q ' "$@")" <<<"$script" || rc=$?
+
+  check_dumps
+  return $rc
+}
+
+if [[ "$ACTION" == check-dumps ]]; then
+  check_dumps
+  say "the VM's tracked dumps match this checkout"
+  exit 0
+fi
+
 RC=0
-if (( SHELL_MODE )) || [[ $# -gt 0 ]]; then
+if (( PROOFS )); then
+  run_proofs "$@" || RC=$?
+elif (( SHELL_MODE )) || [[ $# -gt 0 ]]; then
   run_remote "$@" || RC=$?
 fi
 
