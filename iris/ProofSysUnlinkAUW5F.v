@@ -1475,6 +1475,18 @@ Section ProofSysUnlinkAUW5F.
        because [ip]'s fragment has been in this walk's custody since W3. *)
     assert (Htynz2 : fn_type (era_node dni bmi dati) <> 0)
       by (rewrite /fn_type era_node_rec; exact Htynzi0).
+    (* [su_au_nlink_down]'s decrement premise, HOISTED OUT OF ARGUMENT
+       POSITION: spliced as [ltac:(lia)] the closer runs against this proof's
+       whole context to rearrange ONE equation that is already named.  Same
+       edit as [HdnlI] in the W5 dir arm. *)
+    assert (HdnlI : bv_unsigned (di_nlink (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
+                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
+                            : mword 64)
+                     (sign_extend' 64
+                        (sign_extend' 12 (mword_of_int 63 : mword 6))
+                      : mword 64)) 31 0)))))
+                    = bv_unsigned (di_nlink dni) - 1)
+      by (clear -Hdecr; lia).
     iMod (uf_utgt_fire fsc_fs ⊤ Phitgt
             (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
                           : mword 32))
@@ -1500,7 +1512,7 @@ Section ProofSysUnlinkAUW5F.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi bmi dati dati Hnlzi
-                  ltac:(lia)))
+                  HdnlI))
             Htynz2
             with "[] [] Hctgt Htopi") as "(Htopi & Hfire2)";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
