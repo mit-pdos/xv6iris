@@ -15,9 +15,10 @@
 > `delta_link` + `delta_link_split`/`delta_link_untgt_tgt`; `fs_delta` gained six disjuncts; see
 > "E2-D AS BUILT" below — ONE deviation: `delta_link_tgt` takes the observed row because sys_link has
 > no nlink-0 guard on its target, so E2-L's target fire must state `arow_at`).  NEXT LANES: E2-C
-> (create's legs as fires; §2(b), §3, §5, §8 below) and E2-L (link in place; §4 below) in parallel —
-> their briefs are NOT yet written: write them in the briefs file first, from those sections, in the
-> E2-V2/E2-D briefs' mold.  On resume: `git status` — a clean tree means the last lane landed (check
+> (create's legs as fires; §2(b), §3, §5 below — §8's claim is E2-Z's `_same` under the live view) and
+> E2-L (link in place; §4 below) in parallel — BOTH BRIEFS ARE WRITTEN in the briefs file
+> (roundE2L-brief.md, roundE2C-brief.md), with the site list, the commit shapes, the fire molds and
+> the gates; E2-L is the smaller lane (one new fire file, one spec, three sites).  On resume: `git status` — a clean tree means the last lane landed (check
 > `git log`); modified iris files are the next lane's partial work: run the build script (log name =
 > the lane) and finish to green against its brief, or `git checkout -- iris` and redo from the brief.
 >

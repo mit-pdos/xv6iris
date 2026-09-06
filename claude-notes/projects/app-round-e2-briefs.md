@@ -119,3 +119,151 @@ existing lemma's statement.  No consumer outside FsAbsDelta.v changes in this la
 
 Green; both audited statements byte-identical; report the definitions verbatim and the lemma
 list.  Do not commit.
+
+## roundE2L-brief.md — NEXT (written 2026-09-05 after E2-D landed)
+
+## Lane E2-L: link IN PLACE — `wp_sys_link_sconf` gains the three-commit bundle, its three retags become fires
+
+Rulings: Q-c YES ("strengthen in place: we have a single kernel proof"); Q-d (the view is the live
+namespace, lane E2-V2); E2-D's deviation (`delta_link_tgt t a` takes the OBSERVED row — sys_link has
+no `ip->nlink == 0` guard on its target, ProofSysLink.v ~1843 "THE IIIc WALL", so the target may be an
+unlinked-but-open file with NO view row and the bump brings it back).  Read app-round-e2.md §4 and its
+"E2-D AS BUILT"; FsAbsDelta.v §4b; SpecSysUnlinkAU.v §2 (`uent_commit_at`/`utgt_commit_at`, lines
+~455-530: the two-phase mold, the `_unit` dischargers) and FsAbsUnlinkFire.v §2b/2c (`uf_uent_fire`,
+`uf_utgt_fire`: the fire mold).  Build ONLY via the script (log `rE2L`); standing rules as above.
+
+### The contract (SpecSysLink.v; body at :210, module type at :337 — the STATEMENT changes, Q-c)
+
+Add, in the mold of SpecSysUnlinkAU's commits, three commits and their receipts:
+
+    ltgt_commit_at Γ E Φtgt   : ∀ I t a, ⌜arow_at (abs_view I) t a⌝ -∗ ⌜an_node a is AFile _ or ADev _ _⌝ -∗
+                                 auth(1/2) I ={E}=∗ auth(1/2) I ∗ app_step t I (delta_link_tgt t a (abs_view I))
+                                 ∗ (∀ I', ⌜abs_view I' = delta_link_tgt t a (abs_view I)⌝ -∗ auth I' ={E}=∗ auth I' ∗ Φtgt (abs_view I) t a)
+    lent_commit_at Γ E Φent   : the parent leg, `uent_commit_at`'s shape at `delta_link_ent d nm t` with
+                                 ⌜abs_view I !! d = Some (MkAnode (ADir ents) nl)⌝ and ⌜ents !! nm = None⌝
+    luntgt_commit_at          : IS `SpecSysUnlinkAU.utgt_commit_at` (the failure arm's count-down is an
+                                 unlink-target step: `delta_link_untgt t = delta_unl_tgt t`) — reuse it, do not clone
+
+Post arms (the honest two-instant reading, SpecSysUnlinkAU.v:95-108's stance): ret 0 — the tgt receipt
+(`∃ av0 a, ⌜arow_at av0 t a⌝ ∗ Φtgt av0 t a`) AND the ent receipt (`∃ av1 ents nl, ⌜av1 !! d = Some
+(MkAnode (ADir ents) nl)⌝ ∗ ⌜ents !! nm = None⌝ ∗ Φent av1 d nm t`), with `t` the target's inum and
+`nm` the new path's last element; ret −1 — the fold: (i) nothing fired (all three commits back:
+argstr failed, namei(old) failed, target is a dir, NLINK_MAX), (ii) tgt fired AND untgt fired (both
+receipts; untgt's pre-row is `av2 !! t = Some (MkAnode (an_node a) (an_nlink a + 1))`, present since
+the count is ≥ 1; `lent_commit_at` back) — every `goto bad` after the bump.  The dispatcher
+(ProofSyscall.v ~4947) passes the `_unit` dischargers exactly as unlink's arm does (~4847-4860,
+`FsAbsInvFire.fsabs_unlink_pre`): add `fsabs_link_pre` (the tgt unit pays with
+`AppInv.app_step_acc_view`? NO — `delta_link_tgt` is an insert even at an absent row, so the unit
+needs `is_Some (I !! t)`: add ⌜is_Some (I !! t)⌝ to `ltgt_commit_at`'s premises — the target's inum is
+a region row, the fire has it from `ghost_map_lookup` — and pay with `app_step_acc`).
+
+### The fires (new FsAbsLinkFire.v, ~300 lines, cloned from FsAbsUnlinkFire.v §2b/2c)
+
+- `lf_tgt_fire`: `uf_utgt_fire`'s mold.  Premises: `inode_local t nt'`, `fn_type nt <> 0`,
+  `fn_type nt' <> 0 /\ abs_row nt' = MkAnode (an_node (abs_row nt)) (fn_nlink nt + 1)`, the target is
+  not a dir (`sl_tdir_zne`).  Pre-row: `arow_at (abs_view I) t (abs_row nt)` (`abs_view_arow`).
+  Hdelta: `abs_view_insert_row` at count `fn_nlink nt + 1 ≠ 0` (the insert arm) = `delta_link_tgt`.
+  Receipt: `⌜arow_at av t (abs_row nt)⌝ ∗ Φtgt av t (abs_row nt)`.  Pure helper `lf_nlink_row`
+  (twin of `uf_nlink_row` at +1: `sl_setnl`/`sl_incnl` keep type/size/major/minor).
+- `lf_ent_fire`: `uf_uent_fire`'s parent half / `mkf_acre_fire`'s parent leg.  Premises: parent is a
+  dir with `fn_nlink np <> 0` (the `dp->nlink == 0` guard fell through: ProofSysLink.v ~2658, ARM E2),
+  `dir_entries np !! nm = None`, `abs_of np' = Some (MkAnode (ADir (<[nm := t]> (dir_entries np))) (fn_nlink np))`
+  (a `lf_parent_row` twin of `mkf_parent_row`: dirlink keeps type and count).  Hdelta:
+  `abs_view_insert` + `delta_link_ent_dir`.
+- `lf_untgt_fire`: IS `uf_utgt_fire` (premise `1 <= fn_nlink nt` holds: the count was bumped) — reuse.
+
+### The three sites (the ONLY proof edits; each `ireg_top_retag_auto … Logic.I` becomes a fire)
+
+- #28 ProofSysLink.v ~1934 (`era_node dn bm dat → era_node (sl_incnl dn) bm dat`, `Hlocnl`): `lf_tgt_fire`.
+- #29 ProofSysLink.v ~3091 (parent `era_node dnd bmd datd → era_node dnd' bmd' datd'`, `Hdiok'`…): `lf_ent_fire`.
+- #4 ProofSysLinkTails.v ~1438 (`sl_tail_bad`: `era_node dn bm dat → era_node dn' bm dat`, `Hloc'`, `Hnz`): `uf_utgt_fire`.
+Thread the tgt receipt from #28 through the walk to every exit (the six tails `sl_tail_b/c/d/bad/f/e2`
+take the residue in their binders; `sl_tail_bad` fires untgt and delivers both receipts), the ent
+receipt from #29 to the success exit.  `ProofSysLink.v` is ONE lemma (~3.9k lines): batch the edits,
+build once per pass.  Delete nothing else (E2-Z deletes the `_auto` movers once no site uses them).
+
+### Gate
+
+Green; `make audit-only` 13; both audited statements byte-identical; the dispatcher's link arm passes
+`_unit`s; no Admitted/Axiom.  Report: the bundle verbatim, the post arms, the fires' statements, the
+three site diffs, deviations.  Do not commit.
+
+## roundE2C-brief.md — NEXT, in parallel with E2-L (written 2026-09-05)
+
+## Lane E2-C: create's legs as fires — arm / dots / ent / unarm from the contract bundle
+
+Rulings: Q-c YES (strengthen `wp_create_sconf` in place — it is the only create over an unpinned `ty`
+and mkdir's only path: ProofSysMkdir.v ~1185 → `Create.wp_create_sconf` at `T_DIR_ty_ok`); Q-h YES
+(the failure arms are a do-then-undo PAIR: arm then unarm); Q-d (live view: ialloc's CLAIM is
+view-preserving — `abs_of_bare`: the claim box has no row — so there is NO claim commit and
+ProofIlock.v:1271 / §8 is E2-Z's `_same`, not this lane's).  Read app-round-e2.md §1 (sites #7, #8,
+#9, #10, #13, #13b, #14, #16, #18, #21, #23, #26), §2(b), §3, §5, "E2-D AS BUILT"; FsAbsDelta.v §1b;
+FsAbsMknodFire.v (`mkf_acre_fire`, `caf_acre_fire`, the `acre_commit_at` two-phase mold);
+ProofCreateShared.v ~1600-1760 (`cr_dirty`, `cr_dirty_arm/retag/clear` and their `_same` twins —
+the armed child's movers over `ireg_top_retag_armed_auto`); InodeRegion.v ~3393/3472
+(`ireg_top_retag_step`/`_armed_step`: the step-shaped movers, whose step is exactly what
+`AppInv.app_step_at` produces from an `app_step` and a delta equation).  Build via the script (`rE2C`).
+
+### The commits (FsAbsMknodFire.v or a new FsAbsCreateFire.v; `acre_commit_at`'s two-phase mold)
+
+    aarm_commit_at Γ E c Φarm   : ∀ I i, ⌜abs_view I !! i = None⌝ -∗ ⌜is_Some (I !! i)⌝ -∗ auth(1/2) I ={E}=∗
+                                   auth I ∗ app_step i I (delta_arm i c (abs_view I))
+                                   ∗ (∀ I', ⌜abs_view I' = delta_arm i c (abs_view I)⌝ -∗ auth I' ={E}=∗ auth I' ∗ Φarm (abs_view I) i)
+    adots_commit_at Γ E Φdots   : the same at ⌜abs_view I !! i = Some (MkAnode (ADir ∅) 1)⌝ and `delta_dots i d`
+    aunarm_commit_at Γ E Φun    : the same at ⌜abs_view I !! i = Some (MkAnode c 1)⌝ and `delta_unarm i`
+    (the parent leg STAYS `acre_commit_at`: at the fire instant the child is armed, so the fused
+     `delta_create` IS `delta_ent` — `delta_create_split` + `insert_id`; no new commit)
+
+The `is_Some (I !! i)` premise on the arm (the child's inum is a region row; the fire has it from
+`ghost_map_lookup`) is what lets the `_unit` discharger pay with `app_step_acc` although the VIEW has
+no row there; the other two pay off the row (`abs_view_lookup_is_Some`).  `_unit` and `_pinned` seeds
+for each, in FsAbsInvFire's `fsabs_*` family for the dispatcher.
+
+### The fires (the armed-child form: mold = `mkf_acre_fire`'s two phases INSIDE
+`ireg_top_retag_armed_step`'s ftopN critical section — the armed registry is what exempts the
+half-built child from `ftop_body`'s `inode_local` clause; copy how `_armed_step` closes it)
+
+- `caf_arm_fire` (#8 ProofCreateAlloc.v ~453, #18 ProofCreateAU.v ~4873, #23 ProofCreateAUF.v ~5155;
+  today `cr_dirty_arm`): pre-row `abs_of nc0 = None` (`abs_of_bare`: the claim box), post-row
+  `abs_of nc = Some (MkAnode c 1)` (`abs_of_create_dev`/`caf_abs_of_create_file`/a dir twin at
+  `ADir ∅`); Hdelta `abs_view_insert` = `delta_arm`.  Make `cr_dirty_arm` take the commit (or add
+  `cr_dirty_arm_fire` beside it) — the arm and the retag stay ONE step (the registry arm is inside).
+- `caf_dots_fire` (#13 ProofCreateMkdir.v ~2344, today `cr_dirty_clear`): `ADir ∅ → ADir {DOT ↦ i,
+  DOTDOT ↦ d}` at count 1; Hdelta `abs_view_insert` + `delta_dots_dir`.  The clear also disarms and
+  releases the token: keep that in the helper, the fire replaces only the `_armed_auto` inside.
+- `caf_unarm_fire` (#9/#10 ProofCreateMkdir.v ~2510/~2648 via `cr_dirty_retag`; #13b
+  ProofCreateFailMkdir.v ~494 via `cr_dirty_clear`; #16 ProofCreateFail.v ~474, #21 ProofCreateAU.v
+  ~6621, #26 ProofCreateAUF.v ~6901 via `ireg_top_retag_auto`): post-row `abs_of nc' = None`
+  (`abs_of_none`, right: `fn_nlink = 0` — `cr_setf … (mword_of_int 0)`); Hdelta `abs_view_insert_None`
+  = `delta_unarm`.  At #16/#21/#26 the child is NOT armed (the plain fragment): `mkf_acre_fire`'s plain
+  mold.
+- The parent leg: #14 ProofCreateMkdir.v ~2110 (fused `ents += nm` AND `nlink+1`, c := `ADir dots`)
+  and #7 ProofCreateAlloc.v ~1244 (non-dir): generalize `caf_acre_fire` from `(forall e, c <> ADir e)`
+  to `d <> i` (fresh child ≠ parent: both proofs have it) so one fire serves every child kind, keep
+  `caf_acre_fire_file` as its wrapper; the collapse lemma is `delta_create_parent` + `insert_id` at the
+  armed child (mold `caf_delta_create_nondir`/`delta_create_dev`).  Both sites then call it with the
+  `acre_commit_at` from the bundle.
+
+### The bundles and the threading
+
+- SpecCreate.v (`wp_create_sconf_body` :562, module type :771): gains `aarm_commit_at (c := c0 ty)`,
+  `adots_commit_at`, `aunarm_commit_at`, `acre_commit_at` for the child's kind (ty-indexed:
+  `c0 T_DIR = ADir ∅` etc.), and the post carries the receipts: success — arm + [dots] + acre
+  receipts; failure — nothing fired (walk/guards/ialloc), or arm fired (+dots) and unarm fired.
+  `ProofSysMkdir.v` (~1185) threads the bundle; the dispatcher's mkdir arm (ProofSyscall.v ~5504)
+  passes `_unit`s.
+- SpecCreateAU.v (`cau_ok`/`cau_fail` :150-183) and SpecCreateAUF.v (:150-190): `cau_ok` gains the
+  arm receipt beside `cre_pre`; `cau_fail`'s ARM-FAIL branch gains the arm+unarm receipts (Q-h) and
+  the other branches return the unfired `aarm_commit_at`/`aunarm_commit_at`; SpecSysMknodAU.v
+  (~575-800 arms) and SpecSysOpenAU.v (`open_post_ok_create`/`_fail_create`) thread them;
+  `fsabs_mknod_pre_era`/`fsabs_open_pre_create` gain the units; dispatcher arms unchanged in shape.
+- ProofCreateShared.v: `cr_dirty_arm/retag/clear` → fire-taking forms (the `_same` twins stay for the
+  arms that do not move the reading).  Every `Logic.I` (`top_move`) argument at the 13 sites
+  disappears; `ireg_top_retag_auto`/`_armed_auto` are then unused by create (E2-Z deletes them).
+
+### Gate
+
+Green; audit 13; both audited statements byte-identical; no Admitted/Axiom; the mknod/open/mkdir
+dispatcher arms pass `_unit`s.  Report: the commits verbatim, every changed post arm, the fires'
+statements, the 13 site diffs, deviations.  Do not commit.  Expect ~3-4 VM builds: the SpecCreate*
+cone is the whole create family (ProofCreateAU/AUF ~7k lines each; ~2 min per file).
