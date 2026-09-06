@@ -440,18 +440,18 @@ Section ghosts.
       exactly why park must raise the bound before the context can
       leave [h]: the weak-memory branch's migration invariant, at a
       single nat.  ([TsoCtxTwin2.dirty_ok] at the era's log name.) *)
-  Definition dirty_ok (γlogm : gname) (h : agent) (B : nat)
+  Definition dirty_ok (γlogm γdp : gname) (h : agent) (B : nat)
       (k : nat * Arch.pa) : iProp Σ :=
-    (⌜(k.1 ≤ B)%nat⌝ ∨
+    (dpos_ev γdp k.1 B ∨
      ∃ i m, ⌜k.1 = S i⌝ ∗ i ↪[γlogm]□ m ∗ ⌜pm_tid m = h⌝)%I.
 
-  Global Instance dirty_ok_persistent γlogm h B k :
-    Persistent (dirty_ok γlogm h B k).
+  Global Instance dirty_ok_persistent γlogm γdp h B k :
+    Persistent (dirty_ok γlogm γdp h B k).
   Proof. apply _. Qed.
 
-  Lemma dirty_ok_mono γlogm h B B' k :
-    (B ≤ B')%nat → dirty_ok γlogm h B k -∗ dirty_ok γlogm h B' k.
+  Lemma dirty_ok_mono γlogm γdp h B B' k :
+    (B ≤ B')%nat → dirty_ok γlogm γdp h B k -∗ dirty_ok γlogm γdp h B' k.
   Proof.
-    iIntros (Hle) "[%Hb|H]"; [iLeft; iPureIntro; lia | by iRight].
+    iIntros (Hle) "[H|H]"; [iLeft; by iApply dpos_ev_mono | by iRight].
   Qed.
 End ghosts.
