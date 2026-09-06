@@ -78,7 +78,7 @@ Green; both audited statements byte-identical; no Admitted/Axiom.  Report: `abs_
 restated lemma verbatim, every contract whose SHAPE changed (the conditional view clause), the
 new `delta_unl_tgt`, files touched with one line each, deviations.  Do not commit.
 
-## roundE2D-brief.md — NEXT (E2-V2 has landed: read FsAbsDefs.v's `arow_at`/`abs_view_insert_row` and FsAbsDelta.v's `delta_unl_tgt_unfold`/`_last` first — the new deltas' row lemmas should follow those molds, and `delta_unarm` is `delete`, the shape `delta_unl_tgt` already takes at count 0)
+## roundE2D-brief.md — LANDED 2026-09-05 (as-built record: app-round-e2.md "E2-D AS BUILT"; one deviation: `delta_link_tgt t a` takes the observed row, because sys_link has no nlink-0 guard on its target).  NEXT: write the E2-C and E2-L briefs from app-round-e2.md §2(b)/§3/§5/§8 and §4, in these briefs' mold.
 
 ## Lane E2-D: the delta vocabulary for create's legs, link and the free (PURE; FsAbsDelta.v)
 

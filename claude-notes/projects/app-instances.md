@@ -417,3 +417,10 @@ Rounds, each a green gate:
   `abs_of_bare_dir` → `abs_of_bare` (`None`); `opf_era_file_of`/`opf_trunc_of`
   deleted (the `_row` forms serve).  ProofIlock's claim and EscrowDeposit's
   free stay on `_auto` for E2-Z.  E2-F is cancelled by the ruling.
+- **E2-D LANDED 2026-09-05** (FsAbsDelta.v §1b/§4b, pure): create's legs
+  `delta_arm`/`delta_unarm`/`delta_dots`/`delta_ent` with `delta_create_split`;
+  link's `delta_link_tgt t a` (the observed row is a parameter — sys_link has
+  no nlink-0 guard on its target, so the bump may resurrect a row the live
+  view lacks), `delta_link_ent`, `delta_link_untgt := delta_unl_tgt`,
+  `delta_link` with `delta_link_split` and `delta_link_untgt_tgt`; `fs_delta`
+  gained six disjuncts.  Record in app-round-e2.md "E2-D AS BUILT".

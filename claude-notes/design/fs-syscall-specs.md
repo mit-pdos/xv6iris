@@ -314,7 +314,16 @@ namei and the lock, or while an fd is open, the node may have been
 unlinked; a client holding a share collapses it to the `Some` arm by
 agreement (`arow_at_pinned`).  Fires whose node the kernel has pinned
 live (a parent that passed `dp->nlink == 0`, a target past the `nlink <
-1` panic, a directory the namex walk holds) keep the unconditional row.  So `ialloc`'s claim (type set at
+1` panic, a directory the namex walk holds) keep the unconditional row.
+The LEGS the kernel performs the fused deltas in (lane E2-D, `FsAbsDelta.v`
+§1b/§4b): `δ_create = delta_ent ∘ delta_arm` (the child's row APPEARS at
+nlink 1, then the parent gains the name and mkdir's bump; `delta_dots`
+between them for a directory; `delta_unarm` is the failure arm), `δ_link =
+delta_link_ent ∘ delta_link_tgt t a` — the target leg takes the OBSERVED
+row `a` because `sys_link` has no nlink-0 guard on its target: linking an
+unlinked-but-open file brings it back into the view — with
+`delta_link_untgt = delta_unl_tgt` (count down, gone at 0) as the failure
+arm.  So `ialloc`'s claim (type set at
 nlink 0) and `iput`'s free are view-preserving; a created node APPEARS when
 its count goes to 1 and DISAPPEARS on the failure arm or at the last
 unlink.  What is deliberately NOT in the view: a file unlinked while some

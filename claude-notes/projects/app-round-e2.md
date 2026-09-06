@@ -9,15 +9,19 @@
 > STATE OF THE TREE: origin/main is green through lane E2-V2 (the view is the live namespace:
 > `abs_of` is `None` at type 0 OR nlink 0; the read/write/open/trunc/miss observations state their
 > row on the count, `FsAbsDefs.arow_at`; `delta_unl_tgt` deletes at 0).  Its as-built record is the
-> "E2-V2 AS BUILT" section right below this block and app-instances.md §7.  NEXT LANE: E2-D (brief in
-> the briefs file; read FsAbsDefs.v/FsAbsDelta.v at HEAD first — the counted insert
-> `abs_view_insert_row`, `arow_at`, `delta_unl_tgt_unfold`/`_last` are the molds the new deltas'
-> row lemmas should follow).  On resume: `git status` — a clean tree means E2-V2 landed (check `git
-> log`); modified iris files are the next lane's partial work: run the build script (log name = the
-> lane) and finish to green against its brief, or `git checkout -- iris` and redo from the brief.
+> "E2-V2 AS BUILT" section right below this block and app-instances.md §7.  LANE E2-D HAS ALSO
+> LANDED (FsAbsDelta.v §1b/§4b: `delta_arm`/`delta_unarm`/`delta_dots`/`delta_ent` +
+> `delta_create_split`; `delta_link_tgt t a`/`delta_link_ent`/`delta_link_untgt := delta_unl_tgt`/
+> `delta_link` + `delta_link_split`/`delta_link_untgt_tgt`; `fs_delta` gained six disjuncts; see
+> "E2-D AS BUILT" below — ONE deviation: `delta_link_tgt` takes the observed row because sys_link has
+> no nlink-0 guard on its target, so E2-L's target fire must state `arow_at`).  NEXT LANES: E2-C
+> (create's legs as fires; §2(b), §3, §5, §8 below) and E2-L (link in place; §4 below) in parallel —
+> their briefs are NOT yet written: write them in the briefs file first, from those sections, in the
+> E2-V2/E2-D briefs' mold.  On resume: `git status` — a clean tree means the last lane landed (check
+> `git log`); modified iris files are the next lane's partial work: run the build script (log name =
+> the lane) and finish to green against its brief, or `git checkout -- iris` and redo from the brief.
 >
-> ORDER AFTER E2-V2 (each a green gate, then audit/commit/push): E2-D (deltas, brief in the
-> briefs file, reshaped for the nlink-0 ruling: no claim/free deltas) → E2-C (create's legs: arm/
+> ORDER AFTER E2-V2 (each a green gate, then audit/commit/push): E2-D (LANDED) → E2-C (create's legs: arm/
 > unarm/dots/ent as fires from the contract bundle; §2(b), §3, §5, §8 below) and E2-L (link in
 > place: three fires; §4) in parallel → E2-W (write: dispatch the AU write for inode fds, raw step
 > premise on the non-AU write, the short-chunk arm's state fire — Q-i: "a bug in the sys_write
@@ -131,6 +135,33 @@ read spec through an fd of an unlinked file is fd-row follow-up work (app-echo.m
   FsInitPin, FsShPin, ProofKexecAUA, ProofSysOpenAUParts, ProofSysOpenAUCreArm, ProofSysOpenAUStores,
   ProofFilewriteAU, ProofNamexEra, ProofNparEra, ProofCreateAU, ProofCreateAUF, ProofSysUnlinkAUParts,
   ProofSysUnlinkAUW3, ProofSysUnlinkAUW5F, ProofSysUnlinkAUW5D (+ comment-only touches).
+
+## E2-D AS BUILT (landed 2026-09-05; FsAbsDelta.v only; green, 13 axioms)
+
+- §1b CREATE'S LEGS: `delta_arm i c av := <[i := MkAnode c 1]> av`; `delta_unarm i := delete i`;
+  `delta_dots i d` (a dir row's entries gain `DOT ↦ i`, `DOTDOT ↦ d`; count unchanged; identity at a
+  non-dir/absent row); `delta_ent d nm i av` (the parent gains `nm ↦ i` and `acre_bump` of the
+  CHILD'S ROW READ FROM THE VIEW — the child is armed at that instant; identity unless both rows are
+  there and the parent is a dir).  Row lemmas: `delta_arm_lookup_at/_same`, `delta_arm_unarm`
+  (`av !! i = None → delta_unarm i (delta_arm i c av) = av`), `delta_arm_fresh` (`i ∉ dom av ↔ av !! i
+  = None`), `delta_unarm_lookup_at/_same`, `delta_dots_dir/_lookup_at/_lookup_same/_absent`,
+  `delta_ent_dir/_lookup_at/_lookup_same/_lookup_child`.  `delta_create_split : av !! d = Some (MkAnode
+  (ADir ents) nl) → av !! i = None → delta_create d nm i c av = delta_ent d nm i (delta_arm i c av)`.
+- §4b LINK: `delta_link_tgt t a av := <[t := MkAnode (an_node a) (an_nlink a + 1)]> av` (DEVIATION from
+  the brief's view-only "nlink+1 at t": sys_link has no `ip->nlink == 0` guard on its target — ProofSysLink.v's
+  "IIIc WALL" comment records that the count fact is genuinely unavailable there — so the target may be
+  an unlinked-but-open file with NO row, and the bump RESURRECTS it; the observed row `a` is the
+  parameter, `arow_at av t a` the side condition, and the delta is one insert in both arms);
+  `delta_link_ent d nm t` (parent gains `nm ↦ t`, count unchanged); `delta_link_untgt t := delta_unl_tgt t`
+  (count down, gone at 0); `delta_link d nm t a := delta_link_ent d nm t ∘ delta_link_tgt t a`.  Row
+  lemmas: `delta_link_tgt_lookup_at/_same`, `delta_link_ent_dir/_lookup_at/_lookup_same/_absent`,
+  `delta_link_untgt_tgt : arow_at av t a → delta_link_untgt t (delta_link_tgt t a av) = av` (the failure
+  arm restores the pre-view in BOTH arms), `delta_link_split` (the two inserts, under `av !! d = Some
+  (ADir ents, nl)` and `d ≠ t`), `delta_link_parent/_target/_other`.
+- `fs_delta` gained `delta_arm`, `delta_unarm`, `delta_dots`, `delta_ent`, `delta_link_tgt`,
+  `delta_link_ent` (no consumer outside FsAbsDelta.v cases on it).  No existing statement changed.
+- CONSEQUENCE FOR E2-L: link's target fire fires at `arow_at av t (abs_row nt)` and its delta is
+  `delta_link_tgt t (abs_row nt)`; the AU link spec's target row is conditional like read/write's.
 
 Scope: app-instances.md §6 ruling 4 / §7 E, applications.md §2 + §6 L3, fs-syscall-specs.md §4/§7.
 Census input: roundE1-census.md (22 helper-level sites = 17 `_auto` + 5 `_armed_auto`).  All line
