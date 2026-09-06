@@ -58,6 +58,7 @@ Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExec Ktier.
 From Kernel Require KernelSyms.
 Require Import TsoMemPa TsoGhost TsoCtx TsoCtxAbsorbLb.
 Require Import TsoCtxStore.
+Require Import TsoCtxLedger.  (* [ctx_deposit] is FENCE-BOUND under two logs (relaxed-ww.md §2.3) *)
 Require Import HartTp.
 Require Import MemClaim.
 Local Open Scope Z_scope.
@@ -230,12 +231,12 @@ Section StartedInv.
       (P : nat -> CtxId -> iProp Σ) (B0 : nat) :
     ↑startedN ⊆ Em ->
     started_inv γi ξd P -∗ started_prim γi -∗
-    (llb loglen_name B0 ∗
+    (llb dlen_name B0 ∗
      □ (∀ pos : nat, ⌜(B0 <= pos)%nat⌝ -∗ P pos cur_ctx)) -∗
     (|={Em, Em ∖ ↑startedN}=>
        (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_stamped ξd 0 ∗
         started_prim γi ∗
-        (llb loglen_name B0 ∗
+        (llb dlen_name B0 ∗
          □ (∀ pos : nat, ⌜(B0 <= pos)%nat⌝ -∗ P pos cur_ctx))) ∗
        (started_right γi ξd P ={Em ∖ ↑startedN, Em}=∗ True)).
   Proof.
@@ -305,10 +306,14 @@ Section StartedInv.
       ∨ ∃ i : nat,
           started_win_rel i ∗ started_idx γi i ∗ ▷ P (S i) ξd))%I.
 
+  (* TWO LOGS: a reader that saw [started_set] has the store's DRAIN
+     position under its view -- it is not the author, so the entry is
+     visible by position, not by forwarding (relaxed-ww.md §2.7). *)
   Definition started_W (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
-      (v : mword 32) (tv : nat) : iProp Σ :=
+      (log : list pwmsg) (dl : list nat) (v : mword 32) (tv : nat) : iProp Σ :=
     (⌜v = started_clear⌝
-     ∨ ∃ i : nat, ⌜v = started_clear \/ (v = started_set /\ (S i <= tv)%nat)⌝ ∗
+     ∨ ∃ i : nat, ⌜v = started_clear \/
+                   (v = started_set /\ exists q, dl !! q = Some i /\ (S q <= tv)%nat)⌝ ∗
                   started_idx γi i ∗ ▷ P (S i) ξd)%I.
 
   Lemma started_read_open (Em : coPset) (γi : gname) (ξd : CtxId)
@@ -358,134 +363,40 @@ Section StartedInv.
   (* position, the store; so a reader that sees [started_set] settled on   *)
   (* the store, which is visible to it and not its own message.            *)
   (* ------------------------------------------------------------------- *)
+  (* relaxed-ww STAGE E: the racy release read ([TsoCtx.ledger_read_rel_ok],
+     itself Admitted) over two logs; the plain arm is [ledger_read_bytes_
+     vis_ok] at stamp 0 (chain and visibility free), the armed arm the
+     window's one history entry, visible to a non-author by drain position.
+     Tracked in claude-notes/projects/relaxed-ww.md. *)
   Lemma started_read_obl (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
       `{!∀ pos ξ, Persistent (P pos ξ)} (p : mword 64) :
     cid_word <> zero_reg ->
     forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
-           (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
+           (log : list pwmsg) (dl : list nat) (V : agent -> nat) (ppn : mword 44),
       (uint started_addr < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec started_addr 11 0) + 4 <= 4096)%Z ->
       ktier_pin KT0 ppn started_addr ->
       (false = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of started_addr) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       started_res γi ξd P ==∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) ∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V ∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V ∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
       started_res γi ξd P ∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
          exists v : mword (8*4),
-           tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+           tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
              (pa_of ppn started_addr) (Z.to_N 4) v⌝ ∗
       (∀ (tvr : nat) (v : mword (8*4)),
          ⌜(V (hart_agent (@cpu_id CIDw)) <= tvr)%nat⌝ -∗
-         ⌜tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+         ⌜tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
             (pa_of ppn started_addr) (Z.to_N 4) v⌝ -∗
-         started_W γi ξd P v tvr).
+         started_W γi ξd P log dl v tvr).
   Proof.
-    intros Hnz CIDw img sigma log V ppn Hcan Hoff Hid Hmig.
-    rewrite (ktier_pin_id ppn started_addr Hid).
-    pose proof (Hmig (or_introl eq_refl)) as HCw.
-    iIntros "#Hk Hm Htso Hctx [%Himg Hres]".
-    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    iDestruct (tso_interp_of_img with "Htso") as %Hera.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
-               sigma.(sregs) sigma.(mdev) Hpin).
-    set (g := gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev)).
-    assert (Hgtv : g.(gtv) (@cpu_id CIDw) = V (hart_agent (@cpu_id CIDw))) by reflexivity.
-    assert (Hgimg : g.(gimg) = img) by reflexivity.
-    assert (Hglog : g.(glog) = log) by reflexivity.
-    iDestruct "Hres" as "[[Hw Ha] | Hr]".
-    - (* ---- the plain window: [started_clear] at every view ---- *)
-      iAssert (⌜forall tv' : nat, (g.(gtv) (@cpu_id CIDw) <= tv')%nat ->
-                 tso_read_bytes g.(gimg) g.(glog) (hart_agent (@cpu_id CIDw)) tv'
-                   started_addr 4 started_clear⌝)%I as %Hrd.
-      { iApply (ledger_read_bytes_vis_ok (CID := CIDw) g started_addr 4%N started_clear
-                  (DfracOwn 1) 0%nat with "Hm Htso [] [Hw]").
-        { iApply view_lb_0. }
-        rewrite /started_win_plain. change (N.to_nat 4) with 4%nat.
-        iApply (big_sepL_mono with "Hw"). iIntros (k j _) "H".
-        iExists 0%nat. iFrame "H". iApply ledger_vis_below. lia. }
-      iModIntro.
-      rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
-                  sigma.(sregs) sigma.(mdev) Hpin).
-      iFrame "Hm Htso Hctx".
-      iSplitL "Hw Ha". { iSplitR; [by iPureIntro|]. iLeft. iFrame "Hw Ha". }
-      iSplitR.
-      { iPureIntro. intros tvr Hle. exists started_clear.
-        rewrite -Hgtv in Hle. specialize (Hrd tvr Hle).
-        rewrite Hgimg Hglog in Hrd. exact Hrd. }
-      iIntros (tvr v) "%Hle %Hrdv". iLeft. iPureIntro.
-      rewrite -Hgtv in Hle. specialize (Hrd tvr Hle). rewrite Hgimg Hglog in Hrd.
-      apply (bv_eq_of_bytes (n := 4%N)). intros j Hj.
-      specialize (Hrdv j Hj). specialize (Hrd j Hj).
-      rewrite Hrdv in Hrd. injection Hrd as Hb. apply bv_eq. exact Hb.
-    - (* ---- the release-armed window ---- *)
-      iDestruct "Hr" as (i) "(Hw & #Hidx & #HP)".
-      (* this reader is NOT the author: its cid word is nonzero *)
-      assert (Hag : hart_agent (@cpu_id CIDw) <> 0%nat).
-      { intro H0. apply Hnz. rewrite /cid_word -HCw.
-        apply agent_zero_cid. exact H0. }
-      iAssert (⌜forall tv : nat, (g.(gtv) (@cpu_id CIDw) <= tv)%nat ->
-         ((forall j, (j < 4)%nat ->
-             tso_read g.(gimg) g.(glog) (hart_agent (@cpu_id CIDw)) tv
-               (pa_add started_addr j) = Some (nth_byte started_clear j))
-          /\ (forall q g0,
-                (q, g0) ∈ [(S i, nth_byte started_set)] ->
-                visibleb (hart_agent (@cpu_id CIDw)) tv g.(glog) q = false))
-         \/ (exists T g0, (T, g0) ∈ [(S i, nth_byte started_set)]
-               /\ visibleb (hart_agent (@cpu_id CIDw)) tv g.(glog) T = true
-               /\ (hart_agent (@cpu_id CIDw) <> 0%nat -> (T <= tv)%nat)
-               /\ (forall j, (j < 4)%nat ->
-                     tso_read g.(gimg) g.(glog) (hart_agent (@cpu_id CIDw)) tv
-                       (pa_add started_addr j) = Some (g0 j))
-               /\ (forall q g1, (q, g1) ∈ [(S i, nth_byte started_set)] ->
-                     visibleb (hart_agent (@cpu_id CIDw)) tv g.(glog) q = true ->
-                     (q <= T)%nat))⌝)%I
-        as %Hrel.
-      { iApply (ledger_read_rel_ok (CID := CIDw) g started_addr 4%nat (DfracOwn 1)
-                  0%nat 0%nat (fun _ => 0%nat) (nth_byte started_clear)
-                  (nth_byte started_set) [(S i, nth_byte started_set)] 0%nat
-                  ltac:(lia) with "Htso [] [] [Hw]").
-        { iApply view_lb_0. }
-        { rewrite /rel_floor_vis. iApply big_sepL_intro.
-          iIntros "!>" (k j _). iApply ledger_vis_below. lia. }
-        rewrite /started_win_rel /rel_cells. iApply (big_sepL_mono with "Hw").
-        iIntros (k j _) "H". iExists (S i). iExact "H". }
-      iModIntro.
-      rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
-                  sigma.(sregs) sigma.(mdev) Hpin).
-      iFrame "Hm Htso Hctx".
-      iSplitL "Hw".
-      { iSplitR; [by iPureIntro|]. iRight. iExists i. iFrame "Hw Hidx HP". }
-      iSplitR.
-      { iPureIntro. intros tvr Hle. rewrite -Hgtv in Hle.
-        destruct (Hrel tvr Hle) as [[Hfl _] | (T & g0 & Hin & _ & _ & Hrd0 & _)].
-        - exists started_clear. intros j Hj. apply (Hfl j). lia.
-        - apply elem_of_list_singleton in Hin. injection Hin as -> ->.
-          exists started_set. intros j Hj. apply (Hrd0 j). lia. }
-      iIntros (tvr v) "%Hle %Hrdv". rewrite -Hgtv in Hle.
-      iRight. iExists i. iFrame "Hidx HP". iPureIntro.
-      destruct (Hrel tvr Hle) as [[Hfl _] | (T & g0 & Hin & _ & HTle & Hrd0 & _)].
-      + (* the floor: no history entry visible, the window reads its floor bytes *)
-        left. apply (bv_eq_of_bytes (n := 4%N)). intros j Hj.
-        assert (Hj4 : (j < 4)%nat) by lia.
-        specialize (Hrdv j Hj). specialize (Hfl j Hj4).
-        rewrite Hgimg Hglog in Hfl. rewrite Hrdv in Hfl.
-        injection Hfl as Hb. apply bv_eq. exact Hb.
-      + (* the hit: the one history entry, at or under this read's view *)
-        apply elem_of_list_singleton in Hin. injection Hin as -> ->.
-        right. split.
-        * apply (bv_eq_of_bytes (n := 4%N)). intros j Hj.
-          assert (Hj4 : (j < 4)%nat) by lia.
-          specialize (Hrdv j Hj). specialize (Hrd0 j Hj4).
-          rewrite Hgimg Hglog in Hrd0. rewrite Hrdv in Hrd0.
-          injection Hrd0 as Hb. apply bv_eq. exact Hb.
-        * exact (HTle Hag).
-  Qed.
+  Admitted.
 
   (* ------------------------------------------------------------------- *)
   (* THE ABSORB, at a second open after the fence: the reader that        *)
@@ -524,64 +435,86 @@ Section StartedInv.
   (* so its stamp is below the store), the plain window is release-armed  *)
   (* at floor 0 and stored through, the index is registered.             *)
   (* ------------------------------------------------------------------- *)
-  Local Lemma started_parked_llb (ξ : CtxId) (T : nat) :
-    ctx_stamped ξ T -∗ ctx_stamped ξ T ∗ llb loglen_name T.
+  (* the drain log never outruns the issue log: its entries are distinct
+     issue indices *)
+  Local Lemma dl_ok_length (log : list pwmsg) (dl : list nat) :
+    dl_ok log dl -> (length dl <= length log)%nat.
   Proof.
-    rewrite ctx_stamped_unseal /ctx_stamped_def.
-    iIntros "(%D & Hat & #Hllb & %HD)". iSplitL; [| iExact "Hllb"].
-    iExists D. iFrame "Hat Hllb". by iPureIntro.
+    intros [Hnd Hlt].
+    assert (Hsub : dl ⊆ seq 0 (length log)).
+    { intros i Hi. apply elem_of_seq. split; [lia|]. pose proof (Hlt i Hi). lia. }
+    pose proof (submseteq_length _ _ (NoDup_submseteq _ _ Hnd Hsub)) as Hlen.
+    rewrite length_seq in Hlen. exact Hlen.
   Qed.
 
+  Local Lemma tso_interp_dlog_ok (g : gstate) :
+    tso_interp_at riscv_eraGS g -∗ ⌜dl_ok g.(glog) g.(gdlog) /\ fifo_ok g.(glog) g.(gdlog)⌝.
+  Proof.
+    iIntros "Hint".
+    iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+    iPureIntro. destruct Hmm as (_ & (Hdok & Hfifo & _) & _). done.
+  Qed.
+
+  Local Lemma started_parked_llb (ξ : CtxId) (T : nat) :
+    ctx_stamped ξ T -∗ ctx_stamped ξ T ∗ llb dlen_name T.
+  Proof. apply ctx_stamped_dlb. Qed.
+
+  (* TWO LOGS (relaxed-ww.md §2.3/§2.4): the deposit is mint 2 and is
+     FENCE-BOUND -- the primary's stores must have drained.  [started = 1]
+     follows [__sync_synchronize()] with no store in between, so the
+     fence's [own_drained] still holds at the store; the obligation takes
+     it as a premise and the caller carries it across the one node. *)
   Lemma started_store_obl (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
       `{!∀ pos, CtxMorph (P pos)} (B0 : nat) (p : mword 64) :
     cid_word = zero_reg ->
     forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
-           (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
+           (log : list pwmsg) (dl : list nat) (V : agent -> nat) (ppn : mword 44),
       (uint started_addr < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec started_addr 11 0) + 4 <= 4096)%Z ->
       ktier_pin KT0 ppn started_addr ->
       (false = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
+      own_drained (hart_agent (@cpu_id CIDw)) log dl ->
       kmap_at (svpn_of started_addr) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_stamped ξd 0 ∗
        started_prim γi ∗
-       (llb loglen_name B0 ∗
+       (llb dlen_name B0 ∗
         □ (∀ pos : nat, ⌜(B0 <= pos)%nat⌝ -∗ P pos TsoCtx.cur_ctx))) ==∗
       gen_heap_interp (hG := riscv_memGS)
         (write_bytes sigma.(mem) (pa_of ppn started_addr) (Z.to_N 4) started_set) ∗
       tso_interp_of riscv_eraGS img
         (write_bytes sigma.(mem) (pa_of ppn started_addr) (Z.to_N 4) started_set)
         (log ++ [PWMsg (snap_of (pa_of ppn started_addr) (Z.to_N 4) started_set)
-                   (hart_agent (@cpu_id CIDw))])%list
-        (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
-           (log ++ [PWMsg (snap_of (pa_of ppn started_addr) (Z.to_N 4) started_set)
-                      (hart_agent (@cpu_id CIDw))])%list V) ∗
+                   (hart_agent (@cpu_id CIDw))])%list dl
+        (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw))) dl V) ∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
       started_right γi ξd P.
   Proof.
-    intros Hz CIDw img sigma log V ppn Hcan Hoff Hid Hmig.
+    intros Hz CIDw img sigma log dl V ppn Hcan Hoff Hid Hmig Hod.
     rewrite (ktier_pin_id ppn started_addr Hid).
     pose proof (Hmig (or_introl eq_refl)) as HCw.
     iIntros "#Hk Hm Htso Hctx (Hw & Ha1 & Hpk & Ha2 & [#HllbB #Hmk])".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     iDestruct (tso_interp_of_bound with "Htso") as %Hbd.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
-    set (g := gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev)).
+    set (g := gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev)).
     (* A6.138: the store's position is [length log]; the payload builder
        fires at [S (length log)], where the caller's bound receipt gives
        the pure tie [B0 ≤ length log] against the interp's log length. *)
-    iDestruct (tso_interp_llb_valid g B0 with "Htso HllbB") as "[Htso %HB0len]".
+    iDestruct (tso_interp_dlb_valid g B0 with "Htso HllbB") as "[Htso %HB0len]".
+    iDestruct (tso_interp_dlog_ok with "Htso") as %Hdlog.
+    pose proof (dl_ok_length _ _ (proj1 Hdlog)) as Hdllen. cbn in Hdllen.
     iDestruct ("Hmk" $! (S (length log)) with "[%]") as "HPmk".
     { cbn in HB0len. lia. }
-    (* the deposit, at the old log *)
-    iMod (ctx_deposit (CID := CIDw) (P (S (length log))) TsoCtx.cur_ctx ξd 0%nat
-            with "Hctx Hpk HPmk")
-      as "(Hctx & %T & _ & Hpk & HP)".
+    (* the deposit, at the fence's drain: every own store has drained *)
+    iMod (ctx_deposit (CID := CIDw) (P (S (length log))) g TsoCtx.cur_ctx ξd 0%nat Hod
+            with "Htso Hctx Hpk HPmk")
+      as "(Htso & Hctx & %T & _ & Hpk & HP)".
     iDestruct (started_parked_llb with "Hpk") as "[Hpk #Hllb]".
-    iDestruct (tso_interp_llb_valid g T with "Htso Hllb") as "[Htso %HTlen]".
+    iDestruct (tso_interp_dlb_valid g T with "Htso Hllb") as "[Htso %HTlen]".
     (* the author is agent 0: this hart's cid word is zero *)
     assert (Hagent0 : hart_agent (@cpu_id CIDw) = 0%nat).
     { rewrite HCw. apply cid_zero_agent. exact Hz. }
@@ -597,8 +530,8 @@ Section StartedInv.
     set (log' := (log ++ [PWMsg (snap_of started_addr (Z.to_N 4) started_set)
                             (hart_agent (@cpu_id CIDw))])%list).
     set (V' := vstep (hart_agent (@cpu_id CIDw))
-                 (V (hart_agent (@cpu_id CIDw))) log' V).
-    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+                 (V (hart_agent (@cpu_id CIDw))) dl V).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl).
     { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
       - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CIDw)).
         rewrite /hart_agent in Hh. lia.
@@ -610,18 +543,18 @@ Section StartedInv.
         exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
     assert (Htvmono : forall c : CPU, (V (hart_agent c) <= V' (hart_agent c))%nat)
       by (intros c; rewrite Htvc; lia).
-    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
-    { intros c. rewrite Htvc /log' length_app /=.
-      have := Hbd (hart_agent c). lia. }
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length dl)%nat).
+    { intros c. rewrite Htvc. have := Hbd (hart_agent c). lia. }
     iMod (ledger_store_rel_map_ok g
             (gs_of img (write_bytes sigma.(mem) started_addr (Z.to_N 4) started_set)
-               log' V' sigma.(sregs) sigma.(mdev))
+               log' dl V' sigma.(sregs) sigma.(mdev))
             0%nat ∅ (snap_of started_addr (Z.to_N 4) started_set)
             started_addr (Z.to_N 4) started_clear started_set
             0%nat (fun _ => 0%nat) (nth_byte started_clear) []
+            ltac:(pose proof (fin_to_nat_lt (@cpu_id CIDw)); lia)
             ltac:(cbn; lia) ltac:(reflexivity)
             ltac:(rewrite dom_empty_L !dom_snap_of; set_solver)
-            eq_refl ltac:(by rewrite /log' Hagent0)
+            eq_refl ltac:(by rewrite /log' Hagent0) eq_refl
             ltac:(apply write_bytes_union) Htvmono Htvtop
             with "Hm Htso [] [Hw]") as "(Hm & Htso & #Hmsg & Hjunk & Hw)".
     { by rewrite big_sepM_empty. }
@@ -630,7 +563,7 @@ Section StartedInv.
       iIntros (k j _) "H". iExists 0%nat. iExact "H". }
     rewrite -(tso_interp_of_at_gs riscv_eraGS img
                 (write_bytes sigma.(mem) started_addr (Z.to_N 4) started_set)
-                log' V' sigma.(sregs) sigma.(mdev) Hpin').
+                log' dl V' sigma.(sregs) sigma.(mdev) Hpin').
     (* the index *)
     iAssert (dset_auth γi 1 ∅) with "[Ha1 Ha2]" as "Ha".
     { rewrite dset_halves. iFrame "Ha1 Ha2". }

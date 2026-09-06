@@ -363,21 +363,21 @@ Section pilot.
      [HartMFetch.fobl_ram_pristine]; kept local because this file is a
      pilot and deliberately does not depend on the fetch tier. *)
   Lemma hp_read_pristine (img : TsoMemPa.bytemap) (sg : mstate)
-      (log : list pwmsg) (V : agent -> nat)
+      (log : list pwmsg) (dl : list nat) (V : agent -> nat)
       (pa : Arch.pa) (n : N) {m : N} (w : bv m) (dq : dfrac) :
     gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
-    tso_interp_of riscv_eraGS img sg.(mem) log V -∗
+    tso_interp_of riscv_eraGS img sg.(mem) log dl V -∗
     ([∗ list] j ∈ seq 0 (N.to_nat n),
        phys_pointsto (pa_add pa j) dq (nth_byte w j)) -∗
     TsoCtx.pristine_win pa (N.to_nat n) -∗
-    ⌜∀ (h : agent) (tv' : nat), tso_read_bytes img log h tv' pa n w⌝.
+    ⌜∀ (h : agent) (tv' : nat), tso_read_bytes img log dl h tv' pa n w⌝.
   Proof.
     iIntros "Hgh Htso Hb #Hpr".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log dl V
                sg.(sregs) sg.(mdev) Hpin).
     iDestruct (TsoCtx.pristine_read_bytes_ok
-                 (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
+                 (gs_of img sg.(mem) log dl V sg.(sregs) sg.(mdev))
                  pa n w dq with "Hgh Htso Hb Hpr") as %Hok.
     iPureIntro. intros h tv'. exact (Hok h tv').
   Qed.
@@ -410,20 +410,19 @@ Section pilot.
        and the appended log.  [wstore_tv] is [tv] here -- the pilot's store
        is plain, so the view does not move. *)
     (∀ (σw : mstate) (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
-       (tv : nat) (V : agent -> nat) (b : bool),
+       (dl : list nat) (tv : nat) (V : agent -> nat) (b : bool),
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
-       tso_interp_of riscv_eraGS img σw.(mem) log V ==∗
+       tso_interp_of riscv_eraGS img σw.(mem) log dl V ==∗
        tso_interp_of riscv_eraGS img
          (write_bytes σw.(mem) (Interface.WriteReq.pa reqw) nw
             (Interface.WriteReq.value reqw))
          (log ++ [PWMsg (snap_of (Interface.WriteReq.pa reqw) nw
                            (Interface.WriteReq.value reqw))
                     (hart_agent cpu_id)])%list
+         (wstore_dl (Interface.WriteReq.access_kind reqw) log dl)
          (vstep (hart_agent cpu_id)
-            (wstore_tv (Interface.WriteReq.access_kind reqw) b log tv)
-            (log ++ [PWMsg (snap_of (Interface.WriteReq.pa reqw) nw
-                              (Interface.WriteReq.value reqw))
-                       (hart_agent cpu_id)])%list V)) -∗
+            (wstore_tv (Interface.WriteReq.access_kind reqw) b dl tv)
+            (wstore_dl (Interface.WriteReq.access_kind reqw) log dl) V)) -∗
     ▷ (hreg_frame x3.1 D -∗
        ([∗ list] j ∈ seq 0 (N.to_nat nw),
           (pa_add (Interface.WriteReq.pa reqw) j) ↦ₚ
@@ -442,9 +441,9 @@ Section pilot.
        receipt pays it at EVERY agent and view. *)
     iApply (wp_hart_ram_read_ifetch (fun m' : M unit => m') nf reqf x1.2
               mctx_id Hreqf Hdevf Hexf with "Hcert").
-    iIntros (σ imgf logf tvf itvf Vf) "%Htvf %Hitvf Hσ Hiv Htso". rewrite /mstate_interp.
+    iIntros (σ imgf logf dlf tvf itvf Vf) "%Htvf %Hitvf Hσ Hiv Htso". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
-    iDestruct (hp_read_pristine imgf σ logf Vf (Interface.ReadReq.pa reqf)
+    iDestruct (hp_read_pristine imgf σ logf dlf Vf (Interface.ReadReq.pa reqf)
                  nf wf dqf with "Hmem Htso Hfetch Hpr") as %Hok.
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iExists wf.
@@ -458,14 +457,14 @@ Section pilot.
     (* the store *)
     iApply (wp_hart_ram_write (fun m' : M unit => m') nw reqw x2.2 rr mctx_id
               Hreqw Hdevw with "Hcert Hfrag").
-    iIntros (σ' img log tv V b) "%Htv Hσ Htso". rewrite /mstate_interp.
+    iIntros (σ' img log dl tv V b) "%Htv Hσ Htso". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iNext. iMod "Hmask" as "_".
     iMod (phys_upd_window σ'.(mem) (Interface.WriteReq.pa reqw) nw vold
             (Interface.WriteReq.value reqw) with "Hmem Hold")
       as "[Hmem Hnew]".
-    iMod ("Hwobl" $! σ' img log tv V b with "[//] Htso") as "Htso".
+    iMod ("Hwobl" $! σ' img log dl tv V b with "[//] Htso") as "Htso".
     iModIntro.
     iSplitL "Hri Hmem Hdev"; [by iFrame|].
     iFrame "Htso".
@@ -498,20 +497,19 @@ Section pilot.
     TsoCtx.pristine_win (Interface.ReadReq.pa hp_reqf) 4 -∗
     ([∗ list] j ∈ seq 0 4, (pa_add hp_flag j) ↦ₚ nth_byte vold j) -∗
     (∀ (σw : mstate) (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
-       (tv : nat) (V : agent -> nat) (b : bool),
+       (dl : list nat) (tv : nat) (V : agent -> nat) (b : bool),
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
-       tso_interp_of riscv_eraGS img σw.(mem) log V ==∗
+       tso_interp_of riscv_eraGS img σw.(mem) log dl V ==∗
        tso_interp_of riscv_eraGS img
          (write_bytes σw.(mem) (Interface.WriteReq.pa hp_reqw) 4
             (Interface.WriteReq.value hp_reqw))
          (log ++ [PWMsg (snap_of (Interface.WriteReq.pa hp_reqw) 4
                            (Interface.WriteReq.value hp_reqw))
                     (hart_agent cpu_id)])%list
+         (wstore_dl (Interface.WriteReq.access_kind hp_reqw) log dl)
          (vstep (hart_agent cpu_id)
-            (wstore_tv (Interface.WriteReq.access_kind hp_reqw) b log tv)
-            (log ++ [PWMsg (snap_of (Interface.WriteReq.pa hp_reqw) 4
-                              (Interface.WriteReq.value hp_reqw))
-                       (hart_agent cpu_id)])%list V)) -∗
+            (wstore_tv (Interface.WriteReq.access_kind hp_reqw) b dl tv)
+            (wstore_dl (Interface.WriteReq.access_kind hp_reqw) log dl) V)) -∗
     ▷ (hreg_frame hp_x3.1 hp_D -∗
        ([∗ list] j ∈ seq 0 4, (pa_add hp_flag j) ↦ₚ nth_byte hp_one j) -∗
        resv_frag cpu_id None -∗
