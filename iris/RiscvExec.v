@@ -410,7 +410,7 @@ Section TsoBundle.
       (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
       (V : agent -> nat) : iProp Σ :=
     (∃ (TM : gmap Arch.pa ts_elem) (LM : gmap nat pwmsg)
-       (DP : gmap nat nat) (RL : gmap (agent * nat) nat),
+       (DP : gmap nat nat) (FR : gmap (agent * nat) nat),
        ghost_map_auth (era_ts_name E) 1 TM ∗
        ⌜dom TM = dom mem⌝ ∗
        (* one conjunct; see [RiscvPtsto.tso_interp_at]'s note *)
@@ -425,9 +425,9 @@ Section TsoBundle.
        ([∗ map] i ↦ p ∈ DP, dpos_at (era_dpos_name E) i p) ∗
        ⌜dpos_ok dl DP⌝ ∗
        mono_nat_auth_own (era_dlen_name E) 1 (length dl) ∗
-       ghost_map_auth (era_rl_name E) 1 RL ∗
-       ([∗ map] k ↦ M ∈ RL, k ↪[era_rl_name E]□ M) ∗
-       ⌜rl_ok log dl RL⌝ ∗
+       ghost_map_auth (era_fr_name E) 1 FR ∗
+       ([∗ map] k ↦ v ∈ FR, k ↪[era_fr_name E]□ v) ∗
+       ⌜fr_ok dl FR⌝ ∗
        ⌜mem = flat img log⌝ ∗
        ⌜∀ h, (V h ≤ length dl)%nat⌝ ∗
        ⌜∀ h, (NCPU ≤ h)%nat -> V h = length dl⌝ ∗
@@ -449,7 +449,7 @@ Section TsoBundle.
   Lemma tso_interp_of_img (E : riscvEraGS) img mem log dl (V : agent -> nat) :
     tso_interp_of E img mem log dl V -∗ ⌜img = era_img E⌝.
   Proof.
-    iIntros "H". iDestruct "H" as (TM LM DP RL)
+    iIntros "H". iDestruct "H" as (TM LM DP FR)
       "(_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&%Hi&_)".
     by iPureIntro.
   Qed.
@@ -463,11 +463,11 @@ Section TsoBundle.
     tso_interp_of E img mem log dl V -∗
     tso_interp_of E img mem log dl V ∗ llb (era_loglen_name E) (length log).
   Proof.
-    iIntros "(%TM & %LM & %DP & %RL & Hts & %Hd & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hrl & #Hrls & %Hrlo & Hpure)".
+    iIntros "(%TM & %LM & %DP & %FR & Hts & %Hd & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hpure)".
     iDestruct (llb_get with "Hlen") as "[Hlen #Hlb]".
-    iFrame "Hlb". iExists TM, LM, DP, RL.
-    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hrl Hrls Hpure". by iPureIntro.
+    iFrame "Hlb". iExists TM, LM, DP, FR.
+    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hpure". by iPureIntro.
   Qed.
 
   (* the drain-length receipt, the same way: what a RELEASE fence's receipt
@@ -478,11 +478,11 @@ Section TsoBundle.
     tso_interp_of E img mem log dl V -∗
     tso_interp_of E img mem log dl V ∗ mono_nat_lb_own (era_dlen_name E) (length dl).
   Proof.
-    iIntros "(%TM & %LM & %DP & %RL & Hts & %Hd & %Htie & Hm & %HLM & Hlen & Hv &
-              Hdp & #Hdps & %Hdpo & Hdl & Hrl & #Hrls & %Hrlo & Hpure)".
+    iIntros "(%TM & %LM & %DP & %FR & Hts & %Hd & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hpure)".
     iDestruct (mono_nat_lb_own_get with "Hdl") as "#Hlb".
-    iFrame "Hlb". iExists TM, LM, DP, RL.
-    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hrl Hrls Hpure". by iPureIntro.
+    iFrame "Hlb". iExists TM, LM, DP, FR.
+    iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hpure". by iPureIntro.
   Qed.
 
   (* the drain log's two step invariants, read off the bundle -- what the
@@ -490,7 +490,7 @@ Section TsoBundle.
   Lemma tso_interp_of_dlog (E : riscvEraGS) img mem log dl (V : agent -> nat) :
     tso_interp_of E img mem log dl V -∗ ⌜dl_ok log dl /\ fifo_ok log dl⌝.
   Proof.
-    iIntros "H". iDestruct "H" as (TM LM DP RL)
+    iIntros "H". iDestruct "H" as (TM LM DP FR)
       "(_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&%Hok&%Hf&_)".
     by iPureIntro.
   Qed.
@@ -511,20 +511,20 @@ Section TsoBundle.
     tso_interp_of E img mem log dl V ⊣⊢ tso_interp_of E img mem log dl V'.
   Proof.
     intros HV. rewrite /tso_interp_of. iSplit.
-    - iIntros "H". iDestruct "H" as (TM LM DP RL)
+    - iIntros "H". iDestruct "H" as (TM LM DP FR)
         "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & Hdp & #Hdps & %Hdpo & Hdl &
-          Hrl & #Hrls & %Hrlo & %H4 & %H5 & %H6 & %H7 & %H8 & %H9 & %H10 & %H11)".
-      iExists TM, LM, DP, RL.
+          Hfr & #Hfrs & %Hfro & %H4 & %H5 & %H6 & %H7 & %H8 & %H9 & %H10 & %H11)".
+      iExists TM, LM, DP, FR.
       rewrite -(view_auth_ext (era_view_name E) V V' HV).
-      iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hrl Hrls". iPureIntro. split_and!; try done.
+      iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hfr Hfrs". iPureIntro. split_and!; try done.
       + intros h. rewrite -HV. apply H5.
       + intros h Hh. rewrite -HV. by apply H6.
-    - iIntros "H". iDestruct "H" as (TM LM DP RL)
+    - iIntros "H". iDestruct "H" as (TM LM DP FR)
         "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & Hdp & #Hdps & %Hdpo & Hdl &
-          Hrl & #Hrls & %Hrlo & %H4 & %H5 & %H6 & %H7 & %H8 & %H9 & %H10 & %H11)".
-      iExists TM, LM, DP, RL.
+          Hfr & #Hfrs & %Hfro & %H4 & %H5 & %H6 & %H7 & %H8 & %H9 & %H10 & %H11)".
+      iExists TM, LM, DP, FR.
       rewrite (view_auth_ext (era_view_name E) V V' HV).
-      iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hrl Hrls". iPureIntro. split_and!; try done.
+      iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hfr Hfrs". iPureIntro. split_and!; try done.
       + intros h. rewrite HV. apply H5.
       + intros h Hh. rewrite HV. by apply H6.
   Qed.
@@ -536,23 +536,23 @@ Section TsoBundle.
     tso_interp_of E g.(gimg) g.(gmem) g.(glog) g.(gdlog) (avf g).
   Proof.
     rewrite /tso_interp_at /tso_interp_of. iSplit.
-    - iIntros "H". iDestruct "H" as (TM LM DP RL)
+    - iIntros "H". iDestruct "H" as (TM LM DP FR)
         "(Hts & %Hdom & %Hlat & Hlm & %Hlm2 & Hll & Hv & Hdp & #Hdps & %Hdpo & Hdl &
-          Hrl & #Hrls & %Hrlo & %Hmm)".
+          Hfr & #Hfrs & %Hfro & %Hmm)".
       destruct Hmm as ((Hflat & Htv & Hcov) & (Hdok & Hfifo & Hdev) & Himg).
-      iExists TM, LM, DP, RL. iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hrl Hrls". iPureIntro.
+      iExists TM, LM, DP, FR. iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hfr Hfrs". iPureIntro.
       split_and!;
-        [exact Hdom|exact Hlat|exact Hlm2|exact Hdpo|exact Hrlo|exact Hflat| |
+        [exact Hdom|exact Hlat|exact Hlm2|exact Hdpo|exact Hfro|exact Hflat| |
          |exact Hcov|exact Himg|exact Hdok|exact Hfifo|exact Hdev].
       + intros h. rewrite /avf. destruct (lt_dec h NCPU) as [Hlt|]; [|lia].
         apply Htv.
       + intros h Hh. rewrite /avf.
         destruct (lt_dec h NCPU) as [Hlt|]; [lia|done].
-    - iIntros "H". iDestruct "H" as (TM LM DP RL)
+    - iIntros "H". iDestruct "H" as (TM LM DP FR)
         "(Hts & %Hdom & %Hlat & Hlm & %Hlm2 & Hll & Hv & Hdp & #Hdps & %Hdpo & Hdl &
-          Hrl & #Hrls & %Hrlo & %Hflat & %HV & _ & %Hcov & %Himg & %Hdok & %Hfifo & %Hdev)".
-      iExists TM, LM, DP, RL. iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hrl Hrls". iPureIntro.
-      split_and!; [exact Hdom|exact Hlat|exact Hlm2|exact Hdpo|exact Hrlo| | |exact Himg].
+          Hfr & #Hfrs & %Hfro & %Hflat & %HV & _ & %Hcov & %Himg & %Hdok & %Hfifo & %Hdev)".
+      iExists TM, LM, DP, FR. iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hfr Hfrs". iPureIntro.
+      split_and!; [exact Hdom|exact Hlat|exact Hlm2|exact Hdpo|exact Hfro| | |exact Himg].
       + split_and!; [exact Hflat| |exact Hcov].
         intros c. rewrite -(avf_hart g c). apply HV.
       + split_and!; [exact Hdok|exact Hfifo|exact Hdev].
@@ -568,7 +568,7 @@ Section TsoBundle.
        (ram_lo <= SailStdpp.Operators_mwords.uint a < ram_hi)%Z ->
        is_Some (img !! a)⌝.
   Proof.
-    iIntros "H". iDestruct "H" as (TM LM DP RL)
+    iIntros "H". iDestruct "H" as (TM LM DP FR)
       "(_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&%Hc&_)".
     iPureIntro. exact Hc.
   Qed.
@@ -587,12 +587,12 @@ Section TsoBundle.
     tso_interp_of E img mem log dl V -∗
     tso_interp_of E img mem log dl (vstep h (V h) dl V).
   Proof.
-    iIntros "H". iDestruct "H" as (TM LM DP RL)
+    iIntros "H". iDestruct "H" as (TM LM DP FR)
       "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & Hdp & #Hdps & %Hdpo & Hdl &
-        Hrl & #Hrls & %Hrlo & %H4 & %H5 & %H6 & %H7 & %H8 & %H9 & %H10 & %H11)".
+        Hfr & #Hfrs & %Hfro & %H4 & %H5 & %H6 & %H7 & %H8 & %H9 & %H10 & %H11)".
     iApply (tso_interp_of_mono E img mem log dl V (vstep h (V h) dl V)
               (fun h' => eq_sym (vstep_idle V dl h h' H6))).
-    iExists TM, LM, DP, RL. iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hrl Hrls".
+    iExists TM, LM, DP, FR. iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hfr Hfrs".
     iPureIntro. by split_and!.
   Qed.
 
@@ -602,7 +602,7 @@ Section TsoBundle.
   Lemma tso_interp_of_bound E img mem log dl (V : agent -> nat) :
     tso_interp_of E img mem log dl V -∗ ⌜∀ h, (V h ≤ length dl)%nat⌝.
   Proof.
-    iIntros "H". iDestruct "H" as (TM LM DP RL)
+    iIntros "H". iDestruct "H" as (TM LM DP FR)
       "(_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&%Hb&_)".
     iPureIntro. exact Hb.
   Qed.
@@ -619,13 +619,13 @@ Section TsoBundle.
     tso_interp_of E img mem log dl V ∗
     view_lb (era_view_name E) (era_dlen_name E) h (V h).
   Proof.
-    iIntros "H". iDestruct "H" as (TM LM DP RL)
+    iIntros "H". iDestruct "H" as (TM LM DP FR)
       "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & Hdp & #Hdps & %Hdpo & Hdl &
-        Hrl & #Hrls & %Hrlo & %H4 & %H5 & %H6 & %H7 & %H8 & %H9 & %H10 & %H11)".
+        Hfr & #Hfrs & %Hfro & %H4 & %H5 & %H6 & %H7 & %H8 & %H9 & %H10 & %H11)".
     iDestruct (view_lb_get (era_view_name E) (era_dlen_name E) V
                  (length dl) h (H5 h) with "Hv Hdl") as "(Hv & Hdl & #Hrec)".
-    iFrame "Hrec". iExists TM, LM, DP, RL.
-    iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hrl Hrls". iPureIntro. by split_and!.
+    iFrame "Hrec". iExists TM, LM, DP, FR.
+    iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hfr Hfrs". iPureIntro. by split_and!.
   Qed.
 
   (* the same at a NAMED index -- the form the leaves use, so no [vstep]
@@ -644,7 +644,7 @@ Section TsoBundle.
     tso_interp_of E img mem log dl V -∗
     ⌜∀ h, (NCPU ≤ h)%nat -> V h = length dl⌝.
   Proof.
-    iIntros "H". iDestruct "H" as (TM LM DP RL)
+    iIntros "H". iDestruct "H" as (TM LM DP FR)
       "(_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&%Hp&_)".
     iPureIntro. exact Hp.
   Qed.
@@ -691,16 +691,16 @@ Section TsoBundle.
     tso_interp_of E img mem log dl V ==∗
     tso_interp_of E img mem log dl (vstep h t dl V).
   Proof.
-    iIntros (Hh Hle Htop) "H". iDestruct "H" as (TM LM DP RL)
+    iIntros (Hh Hle Htop) "H". iDestruct "H" as (TM LM DP FR)
       "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & Hdp & #Hdps & %Hdpo & Hdl &
-        Hrl & #Hrls & %Hrlo & %H4 & %H5 & %H6 & %H7 & %H8 & %H9 & %H10 & %H11)".
+        Hfr & #Hfrs & %Hfro & %H4 & %H5 & %H6 & %H7 & %H8 & %H9 & %H10 & %H11)".
     assert (Hmono : ∀ h', (V h' ≤ vstep h t dl V h')%nat).
     { intros h'. rewrite /vstep. case_decide as Hd; [by subst|].
       destruct (lt_dec h' NCPU) as [|Hge]; [done|].
       rewrite H6; [done|lia]. }
     iMod (view_auth_update _ V (vstep h t dl V) Hmono with "Hv") as "Hv".
-    iModIntro. iExists TM, LM, DP, RL.
-    iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hrl Hrls". iPureIntro.
+    iModIntro. iExists TM, LM, DP, FR.
+    iFrame "Hts Hlm Hll Hv Hdp Hdps Hdl Hfr Hfrs". iPureIntro.
     split_and!; [done|done|done|done|done|done| | |done|done|done|done|done].
     - intros h'. rewrite /vstep. case_decide as Hd; [exact Htop|].
       destruct (lt_dec h' NCPU); [apply H5|lia].
@@ -778,9 +778,9 @@ Section TsoBundle.
                        g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr) (g.(gdlog) ++ [i])).
   Proof.
     iIntros (Hpre Hmi) "H".
-    iDestruct "H" as (TM LM DP RL)
+    iDestruct "H" as (TM LM DP FR)
       "(Hts & %Hdom & %Hlat & Hlm & %Hlm2 & Hll & Hv & Hdp & #Hdps & %Hdpo & Hdl &
-        Hrl & #Hrls & %Hrlo & %Hmm)".
+        Hfr & #Hfrs & %Hfro & %Hmm)".
     destruct Hmm as ((Hflat & Htv & Hcov) & (Hdok & Hfifo & Hdev) & Himg).
     destruct (dpos_ok_drain _ _ _ _ Hpre Hdpo) as (HDPi & Hdpo').
     iMod (ghost_map_insert_persist i (S (length g.(gdlog))) HDPi with "Hdp")
@@ -793,9 +793,9 @@ Section TsoBundle.
             with "Hv") as "Hv".
     { intros h. rewrite /avf. cbn [gtv gdlog]. destruct (lt_dec h NCPU); [done|].
       rewrite length_app /=. lia. }
-    iModIntro. iExists TM, LM, (<[i := S (length g.(gdlog))]> DP), RL.
+    iModIntro. iExists TM, LM, (<[i := S (length g.(gdlog))]> DP), FR.
     cbn [gimg gmem glog gdlog].
-    iFrame "Hts Hlm Hll Hv Hdp Hdl Hrl Hrls".
+    iFrame "Hts Hlm Hll Hv Hdp Hdl Hfr Hfrs".
     iSplitR; [iPureIntro; exact Hdom|].
     iSplitR.
     { iPureIntro. intros a e He.
@@ -807,7 +807,7 @@ Section TsoBundle.
     iPureIntro. rewrite /mm_ok /dlog_ok /dev_drained. cbn [gimg gmem glog gdlog gtv].
     split_and!.
     - exact Hdpo'.
-    - by apply rl_ok_drain.
+    - by apply fr_ok_drain.
     - exact Hflat.
     - intros c. rewrite length_app /=. pose proof (Htv c). lia.
     - exact Hcov.

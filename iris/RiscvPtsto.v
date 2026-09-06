@@ -391,12 +391,12 @@ Record riscvEraGS := RiscvEraGS {
   era_rv_name : CPU -> gname;
   (* THE DRAIN LOG'S MIRRORS (claude-notes/projects/relaxed-ww.md §2), three
      names, LAST: the drain-position map ([TsoGhost.dpos_at]), the drain
-     log's length (mono-nat; what [view_lb] and [drain_lb] bound against --
+     log's length (mono-nat; what [view_lb] and [fence_rec] bound against --
      every view is a DRAIN position now), and the release receipts
-     ([TsoGhost.drain_lb]). *)
+     ([TsoGhost.fence_rec]). *)
   era_dpos_name : gname;
   era_dlen_name : gname;
-  era_rl_name : gname
+  era_fr_name : gname
 }.
 
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
@@ -578,7 +578,7 @@ Definition loglen_name `{!riscvGS Σ} : gname := era_loglen_name riscv_eraGS.
 Definition view_name `{!riscvGS Σ} : gname := era_view_name riscv_eraGS.
 Definition dpos_name `{!riscvGS Σ} : gname := era_dpos_name riscv_eraGS.
 Definition dlen_name `{!riscvGS Σ} : gname := era_dlen_name riscv_eraGS.
-Definition rl_name `{!riscvGS Σ} : gname := era_rl_name riscv_eraGS.
+Definition fr_name `{!riscvGS Σ} : gname := era_fr_name riscv_eraGS.
 Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name riscv_eraGS.
 Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name riscv_eraGS.
 Definition spp_name `{!riscvGS Σ} : CPU -> gname := era_spp_name riscv_eraGS.
@@ -2344,7 +2344,7 @@ Qed.
 Definition tso_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
     : iProp Σ :=
   (∃ (TM : gmap Arch.pa ts_elem) (LM : gmap nat pwmsg)
-     (DP : gmap nat nat) (RL : gmap (agent * nat) nat),
+     (DP : gmap nat nat) (FR : gmap (agent * nat) nat),
      ghost_map_auth (era_ts_name E) 1 TM ∗
      ⌜dom TM = dom g.(gmem)⌝ ∗
      (* THE ELEMENT'S TIE, one conjunct (tso-pin-memo.md §5.1): the LATEST
@@ -2362,9 +2362,9 @@ Definition tso_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
      ([∗ map] i ↦ p ∈ DP, dpos_at (era_dpos_name E) i p) ∗
      ⌜dpos_ok g.(gdlog) DP⌝ ∗
      mono_nat_auth_own (era_dlen_name E) 1 (length g.(gdlog)) ∗
-     ghost_map_auth (era_rl_name E) 1 RL ∗
-     ([∗ map] k ↦ M ∈ RL, k ↪[era_rl_name E]□ M) ∗
-     ⌜rl_ok g.(glog) g.(gdlog) RL⌝ ∗
+     ghost_map_auth (era_fr_name E) 1 FR ∗
+     ([∗ map] k ↦ v ∈ FR, k ↪[era_fr_name E]□ v) ∗
+     ⌜fr_ok g.(gdlog) FR⌝ ∗
      (* the drain log's soundness, FIFO and bus-master drainedness
         ([RiscvLang.dlog_ok], relaxed-ww.md §1.1) ride HERE, beside
         [mm_ok]: they are the two logs' own invariants, and the leaf-side
@@ -2376,7 +2376,7 @@ Lemma tso_interp_at_img `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) :
   tso_interp_at E g -∗ ⌜g.(gimg) = era_img E⌝.
 Proof.
   iIntros "H".
-  iDestruct "H" as (TM LM DP RL) "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+  iDestruct "H" as (TM LM DP FR) "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
   iPureIntro. exact (proj2 (proj2 Hmm)).
 Qed.
 
@@ -2384,7 +2384,7 @@ Lemma tso_interp_at_dlog_ok `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) :
   tso_interp_at E g -∗ ⌜dlog_ok g⌝.
 Proof.
   iIntros "H".
-  iDestruct "H" as (TM LM DP RL) "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+  iDestruct "H" as (TM LM DP FR) "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
   iPureIntro. exact (proj1 (proj2 Hmm)).
 Qed.
 
@@ -2392,7 +2392,7 @@ Lemma tso_interp_at_mm_ok `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) :
   tso_interp_at E g -∗ ⌜mm_ok g⌝.
 Proof.
   iIntros "H".
-  iDestruct "H" as (TM LM DP RL) "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+  iDestruct "H" as (TM LM DP FR) "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
   iPureIntro. exact (proj1 Hmm).
 Qed.
 

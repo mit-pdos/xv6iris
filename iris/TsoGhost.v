@@ -107,12 +107,12 @@ Class tsoMemG Σ := TsoMemG {
   tsomem_dirtyG :: inG Σ (authR (gsetUR (nat * Arch.pa)));
   (* THE DRAIN LOG'S GHOSTS (claude-notes/projects/relaxed-ww.md §2): the
      drain-position map -- issue index [i] ↦ its 1-based drain position,
-     persisted at the drain ([dpos_at]) -- and the release receipts
-     [(A, N) ↦ M] ([drain_lb]).  Both maps' persistent fragments are kept
-     IN the interp too: a drain is an environment step nobody's proof
-     holds a fragment for. *)
+     persisted at the drain ([dpos_at]) -- and the fence records, keyed
+     [(N, M)] ([fence_rec]).  Both maps' persistent fragments are kept IN
+     the interp too: a drain is an environment step nobody's proof holds a
+     fragment for, and a record is re-minted on demand. *)
   tsomem_dposG :: ghost_mapG Σ nat nat;
-  tsomem_rlG :: ghost_mapG Σ (agent * nat) nat;
+  tsomem_frG :: ghost_mapG Σ (agent * nat) nat;
 }.
 
 (* ---------------------------------------------------------------------- *)
@@ -397,15 +397,37 @@ Section ghosts.
   Global Instance dpos_at_timeless γdp i p : Timeless (dpos_at γdp i p).
   Proof. apply _. Qed.
 
-  (** THE RELEASE RECEIPT: every [A]-message issued below [N] is drained at
-      a position at most [M].  Born at [A]'s release fence.  Carries the two
-      length bounds so consumers can place [N] and [M] without the interp:
-      [γdlen] is the drain log's length, [γll] the issue log's. *)
-  Definition drain_lb (γrl γdlen γll : gname) (A N M : nat) : iProp Σ :=
-    ((A, N) ↪[γrl]□ M ∗ mono_nat_lb_own γdlen M ∗ llb γll N)%I.
-  Global Instance drain_lb_persistent γrl γdlen γll A N M :
-    Persistent (drain_lb γrl γdlen γll A N M).
+  (** THE FENCE RECORD (relaxed-ww.md §2.7): every message with issue
+      index [≥ N] drains at a position [> M].  Author-free; mintable at ANY
+      leaf with [N] the issue length and [M] the drain length (a message
+      that does not exist yet drains later), and maintained by the interp
+      for free.  The racy tiers' one receipt.  The entry's value is
+      irrelevant. *)
+  Definition fence_rec (γfr : gname) (N M : nat) : iProp Σ :=
+    (∃ v, (N, M) ↪[γfr]□ v)%I.
+  Global Instance fence_rec_persistent γfr N M : Persistent (fence_rec γfr N M).
   Proof. apply _. Qed.
+
+  (** THE TIE BETWEEN THE NUMBER LINES (relaxed-ww.md §2.1): issue
+      timestamp [t]'s message is the image, or is drained at a position
+      under [B].  What a clean key carries. *)
+  Definition dpos_ev (γdp : gname) (t B : nat) : iProp Σ :=
+    (⌜t = 0%nat⌝ ∨ ∃ i p, ⌜t = S i⌝ ∗ dpos_at γdp i p ∗ ⌜(p ≤ B)%nat⌝)%I.
+  Global Instance dpos_ev_persistent γdp t B : Persistent (dpos_ev γdp t B).
+  Proof. apply _. Qed.
+  Global Instance dpos_ev_timeless γdp t B : Timeless (dpos_ev γdp t B).
+  Proof. apply _. Qed.
+
+  Lemma dpos_ev_mono γdp t B B' :
+    (B ≤ B')%nat → dpos_ev γdp t B -∗ dpos_ev γdp t B'.
+  Proof.
+    iIntros (Hle) "[%|(%i & %p & % & #H & %)]".
+    - by iLeft.
+    - iRight. iExists i, p. iFrame "H". iPureIntro. split; [done|lia].
+  Qed.
+
+  Lemma dpos_ev_0 γdp B : ⊢ dpos_ev γdp 0 B.
+  Proof. by iLeft. Qed.
 
   (* ---------------------------------------------------------------- *)
   (** ** 5. The dirty entry's justification                            *)
