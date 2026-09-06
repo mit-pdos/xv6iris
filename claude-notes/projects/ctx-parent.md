@@ -1,7 +1,6 @@
 # Project: a context parked under a context
 
-**STATUS 2026-09-06: DESIGN CHECKPOINT, awaiting the owner's go-ahead for
-implementation.**  Prototype on `main` (the one-log machine with load–load
+**STATUS 2026-09-06: DESIGN RULED (§8), implementation not started.**  Prototype on `main` (the one-log machine with load–load
 relaxation); the two-log store–store work is parked on branch
 `relaxed-ww-twolog` and will consume this design.  Skeleton:
 `iris/CtxParkedProto.v`, compiled against `TsoCtx.v`'s public unseal
@@ -219,14 +218,24 @@ that earns it.
 5. Notes: `ctx-box.md` §1 (the tiers), a contexts section in the design
    notes, this file to `completed/`.
 
-## 8. Decisions for the owner
+## 8. The owner's rulings (2026-09-06)
 
-(a) **Name.**  The owner asked for `ctx_parked ξ ξ'`.  Taking the name
-now means renaming today's `ctx_parked ξ T` (seventeen real files, a full
-rebuild under `TsoCtx.v`, merge noise against the branch's `ctx_parked ξ
-B W A`).  The reviewer recommends `ctx_under` now and the rename at the
-branch's stage D, when `TsoCtx.v` is rewritten anyway.
-(b) **Fork.**  Keep the box at fork (§3, one line) or write the `CtxMove`
-twins for `park_globals`/`proc_priv` and retire the box there too.
-(c) **Per-lock contexts (§6).**  Whether to rule on it now or after the
-branch's stage C.
+(a) **Name.**  The new token IS `ctx_parked ξ ξ'`; today's stamped record
+becomes `ctx_stamped ξ T` and the rename is swept through the tree now
+(rebuild cost is not a consideration).  The skeleton's `ctx_under` is the
+pre-rename working name.
+(b) **Fork.**  Option B: the child record is filled while it RUNS
+(`CtxMove` instances for `park_globals`' and `proc_priv`'s row families,
+the page-table wrapper being the one real proof) and parked under the
+parent; the park box, `proc_ctx_boxed` and the pre-parked release form
+retire with it.  Land the instances first, then the producer.
+(c) **Per-lock persistent contexts (§6).**  Adopted, as PHASE TWO after
+the thread path and fork land: acquire resumes the lock's context ξL and
+parks it under the winner (inside `locked`), release resumes it and stamps
+it; the deposit/absorb/dom family leaves the lock path.  Not to be
+interleaved with phase one.
+
+Phase one, in order: the skeleton under its final name and the rename;
+`SwtchCtx.v` + `ProofSwtch.v`; `SchedCtx.v` and `ProofScheduler.v`'s
+post-swtch release as a plain release; the eleven move instances; the
+fork/userinit producer; the rebuild; the notes.
