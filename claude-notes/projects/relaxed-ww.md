@@ -627,6 +627,35 @@ two-phase tree or a rewrite of 4096 rows at the fence:
   receipt.  `HartSKpt`'s walker destructures the row form and is still
   stated over the one-log `tso_interp_of` bundle.
 
+### 2.12 Stage D finding: fences are leaves at U-mode too
+
+The U-mode totality (`UserClassifyAsm.base_post` / `rvc_post`) classified
+every user instruction as a `goodmb` walker step or one `ExecuteAs`
+redirect of one; `UserExecFacts` certified `FENCE`, `FENCE.I` and
+`FENCE.TSO` that way.  Under two logs a release fence is a LEAF for every
+hart -- `goodb`/`goodmb` refuse it, and the machine blocks it until the
+hart's own stores have drained -- so those certificates were false.  The
+totality gains a THIRD arm, `u_fence_instr instr ∧ exec … = Some
+(RETIRE_SUCCESS, s) ∧ r = RETIRE_SUCCESS ∧ s_x = s` (`UserTotalU.
+finish_fence` produces it for all three fence instructions, release or
+not), and the `swp` layer pays it with the barrier leaf:
+`UserActiveClass.swp_execute_fence_u` (stage E; `wp_hart_barrier_core`
+over `execute`'s fiom prologue -- the user frame holds nothing the view
+move disturbs).  `UserMemTotal`'s redirect injections move one arm right.
+
+**Also recorded in code (this pass):** `TsoMemPa.fr_ok` keyed by hart
+with its flush clause (§2.11) is re-established at every log append by
+`fr_ok_app_log` (the store gates) and at every drain by `fr_ok_drain`;
+`IcacheRef.cred_floor lo tl := WpLock.lk_floor cur_ctx lo` (the `tl`
+half is vestigial; `cred_floor_of_ctx` is gone -- `_of_key`, `_of_dpos`,
+`_of_wrote` replace it); `IcacheInv.iref_pin_rows` rows carry `dpos_ev t
+tst ∗ chain_ev t`; `OffBox.off_last_close` returns the free bytes at the
+box's own (existential) context; `bio_init`, `buf_box_alloc`,
+`bbox_deposit_L1`, `bbox_park`, `off_publish_park`, `off_read_park` and
+the `SleepLockAt` births are fence-bound; `RiscvAdequacy`'s power arm
+allocates the drain log's mirrors, the chained set and the drain-bound
+one-shot and builds the two-log interp at the reset machine.
+
 ## 3. Stages
 
 | stage | what | state |
