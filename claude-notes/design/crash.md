@@ -175,7 +175,7 @@ per-milestone record):
 - Adequacy shrinks to: allocate the fixed layer, hand the pool
   `wp_power_loop`. The era-0-vs-era-k distinction does not exist.
 
-## The durable disk: ONE fixed gname, owned by the crash predicate (ruled 2026-08-22)
+## The durable disk: ONE fixed gname, owned by the crash predicate
 
 **Ruling (owner, 2026-08-22), replacing the per-era re-minted image below.**
 Three principles, in order of force:
@@ -253,7 +253,7 @@ the critical path to a true theorem, not optional. Until they land, the
 boot obligation cannot be discharged on the dirty-log arm and the theorem
 stays open — honestly open, not vacuously closed.
 
-### The split crash predicate (ruled 2026-08-22): `fr_D` is the interface; recovery is logically invisible
+### The split crash predicate: `fr_D` is the interface; recovery is logically invisible
 
 Refines the ruling above (the stages E–I it was written against are in
 `completed/durable-disk-byteview.md`). Five decisions:
@@ -356,7 +356,7 @@ and the WAL swaps the registry over.  The predicate is
 [`fs-state.md`](fs-state.md); the durable side and the commit are
 [`durable-fs-plan.md`](durable-fs-plan.md), the design of record.
 
-### Custody at birth: the PowerOn arm's two client hooks (landed 2026-08-23), and the power arms' trace hook (2026-08-29)
+### Custody at birth: the PowerOn arm's two client hooks, and the power arms' trace hook
 
 The era's mirror `ghost_var` is allocated at PowerOn **at the picture of
 the disk the era boots on**, and the crash record's custody arm is
@@ -383,7 +383,7 @@ boot must LEARN rather than assume:
   the client's obligation is stated at RAW gnames in a context that
   carries `invGpreS` and no `invGS`, so no fupd exists to write it with.
   The `◇` is what lets the client strip the crash predicate's later.
-- **`Hobs`** (landed 2026-08-29, `projects/uart-trace.md`) runs on BOTH
+- **`Hobs`** runs on BOTH
   arms, at ⊤ before the mask shrink, with the SECOND fixed-layer invariant
   `obs_inv` (`riscv_obs_pred`, the client's TRACE predicate) open: a power
   event is an observation (`ObsPowerOff`/`ObsPowerOn`), the history ghost
@@ -444,106 +444,6 @@ nothing on this path may close with a bare `iFrame` — `P_fs_named`'s body
 owns `disk_img_bytes γd 0 (disk_read dk0 0 N)`, a big-op of `N` bytes
 behind a `Definition`, and framing delta-unfolds it (SystemAdequacy.v:
 7 s → unbounded at 32 GB).
-### The previous shape (superseded 2026-08-22): per-era, re-minted at every boot
-
-Kept for the reasoning it records — the stranded-fragment problem is real and
-is exactly principle 1's motivation; the per-era mint was the wrong answer to
-it (it made the durable view die with the era instead of forbidding mortal
-owners).
-
-The disk itself is the one machine component a power cycle preserves; its
-GHOST mirror deliberately is not.
-
-- **Nothing linear may be parked in an era invariant and still be needed
-  after a crash**: Iris invariants are never deallocated, so a resource
-  inside a dead era's invariant is unreachable forever. The image auth
-  therefore cannot live in `virtio_proto`/`disk_inv` *and* be the thing
-  clients hold fragments of. It does not live in the FIXED layer either
-  (that was M5's shape, and it does not survive contact with the FS
-  layer): a fixed map's stranded fragments can never be re-minted —
-  `ghost_map` cannot re-create an existing key, and auth-side forgetting
-  needs the element, which is exactly what is stranded — so a system whose
-  bio/log layers hold image fragments could not boot twice.
-- **The shape: one image map PER ERA** (`riscvEraGS.era_disk_name`; the
-  typing class `diskImgG` stays fixed-layer, `riscvFixedGS.riscvF_diskGS`,
-  and is the UNIQUE source of that `ghost_mapG Σ Z (bv 8)` instance).
-  `state_interp`'s live branch holds `disk_img_auth (era_disk_name E)
-  (v_disk …)`; PowerOff drops it with the era (nothing is owed — the map's
-  only reader was that era's own disk thread); PowerOn allocates a FRESH
-  map at the disk's preserved content and hands the client its FULL
-  fragments (`DiskImg.disk_img_alloc`, delivered in `power_boot_res` as
-  `disk_img_bytes (era_disk_name HE) 0 (disk_read (v_disk …) 0 ndisk)`).
-  So every boot — the first one included — starts with total ownership of
-  a whole disk's worth of ghost bytes, and a crash abandons the previous
-  era's wholesale. `DiskPtsto.disk_names.dn_img` is CONSTRUCTED at the
-  ambient era's gname (`RiscvPtsto.disk_img_name`), so every client
-  spelling `disk_bytes γ …` / `disk_block γ …` is unchanged.
-- The era-level `virtio_proto` keeps the queue/slot/claim
-  protocol — which SHOULD die at a crash: in-flight requests vanish with
-  the device reset, and sleepers holding receipts are dead anyway.
-- `crash_inv := inv crashN riscv_crash_pred`, where `riscv_crash_pred` is
-  a FIELD of `riscvFixedGS` of type `iProp Σ` — the client fixes it at
-  adequacy (the `Pc` parameter). Intended instance: "the durable image
-  satisfies `P_fs`", over `disk_bytes` fragments plus whatever abstract FS
-  state, commit-history mono-lists and persistent durability receipts the
-  FS keeps. Carrying it as a FIELD rather than a parameter is what keeps
-  `P_fs` out of every `dev_inv`-adjacent signature — nothing between
-  RiscvPtsto and the disk thread names it. Allocated once, in adequacy,
-  and handed to every boot (`power_boot_res`), so all generations share
-  it; it spans power cycles because neither power arm touches `v_disk` and
-  neither opens the invariant.  Note the asymmetry that makes the whole
-  design work: what spans a crash is the CRASH PREDICATE (an iProp over
-  whatever ghost state the client chooses), never the image map — the
-  image ghost is per-era and re-minted, and `P_fs`'s own state has to be
-  fixed-layer or re-derivable, which is what recovery is for.
-  - **A FIELD OF TYPE `iProp Σ` IS OPAQUE TO EVERY OPENER, and that
-    decides what may be parked inside it.** `crash_inv`'s body used to be
-    the field itself, so the disk thread's completion — the one opener —
-    got the proposition, never its innards. Anything the MACHINE layer
-    has to move at a completion (the FS tie's other half: a
-    `ghost_var` ½ mirroring `v_disk`) therefore cannot be a conjunct of
-    the client's `Pc`; it has to be a SIBLING of it in the invariant
-    body, which means indexing the field by the value being tied. That
-    is now the shape (fs-log stage 4 phase C2a):
-    `riscv_crash_pred : (Z -> bv 8) -> iProp Σ` and
-    `crash_inv := inv crashN (∃ dk, disk_tie dk ∗ riscv_crash_pred dk)`,
-    against `state_interp`'s new FIXED conjunct `fs_tie_interp`. The
-    corollary for adequacy is that `HPc : ⊢ Pc` becomes
-    `⊢ |==> Pc (v_disk …)` — a crash predicate that OWNS ghosts is never
-    provable from nothing — and that a WRITE's permit is no longer free
-    (`design/fs-log.md`, stage-4 item 3).
-  - **The stranded-fragment question is CLOSED by the per-era map**: a
-    sleeper's `disk_bytes` fragments sit in the per-era `disk_inv`, so a
-    crash abandons them together with the auth that remembers their keys.
-    Nothing is lost, because the next boot's map is brand new.
-- `v_disk` changes in exactly ONE place (the device thread's drain of a
-  cached sector; the completion, `virtio_complete`, moves no disk byte), so that step carries the only
-  crash obligation in the whole kernel: `wp_disk_loop` opens `crash_inv`,
-  `permN` and `disk_inv` together (disjoint namespaces) at that instant,
-  does the MECHANICAL update of the FS tie's two halves (it is the only
-  holder of both), and spends a WRITE PERMIT —
-  `disk_write_permit (w : disk_wr) Q := ∀ dk, ▷ riscv_crash_pred dk ==∗
-  ▷ riscv_crash_pred (wr_apply w dk) ∗ Q`, transported by `PermInv` and
-  INDEXED by the completing slot's own write identity (`VirtioQueue.vs_wr`,
-  pinned to the request by `VirtioProto.slot_pend_res`) — to re-establish
-  `P_fs`. A BASIC update suffices, with no mask annotation: a serialized
-  writer (xv6's log) needs nothing conditional. Disk reads cost nothing
-  (`w = None`, and `wr_apply None` is the identity ON THE NOSE, which is
-  what keeps every read caller's statement unchanged).
-  - **Where the permit comes FROM is still open.** The intended source is
-    the enqueuer (`virtio_disk_rw`'s caller), per the recorded vs_data
-    rule, but the `vslot` cannot hold it: `disk_inv_body` must be
-    `Timeless` (the MMIO accessors open it with no step left to absorb a
-    `▷`), and no iProp can pass through a timeless invariant. The two
-    candidate channels — a second, non-timeless era invariant with a
-    timeless ghost skeleton, or a `P_fs` closed under in-flight writes so
-    that no per-slot deposit is needed — are written up in
-    `../completed/crash.md` (M5b). Until one lands, the completion mints
-    the identity permit, so nothing in the kernel yet owes anything. In-era
-  kernel code has NO crash conditions anywhere — no wpc, no per-function
-  crash specs; the write-ahead-log discipline lands entirely on the
-  enqueue permit.
-
 ## Decision record (rejected shapes, and why)
 
 - **Per-thread crash `prim_step` absorbed by a WP engine** (the
@@ -580,8 +480,7 @@ GHOST mirror deliberately is not.
   order, and PowerOn's `virtio_reset` drops the cache. xv6 declines FLUSH, so
   its writes are durable at completion — proved, not assumed
   (`VirtioProto.virtio_proto_writethrough`).
-- Disk writes are SECTOR-ATOMIC, not block-atomic (ruled 2026-08-22;
-  campaign in `completed/sector-atomic-disk.md`). A 512-byte sector lands
+- Disk writes are SECTOR-ATOMIC, not block-atomic. A 512-byte sector lands
   atomically; an xv6 block (BSIZE = 1024 = 2 sectors) lands one sector per
   device step in ANY order, and the request completes only after every
   sector has landed, so a crash can leave any subset of a block's sectors
@@ -593,7 +492,7 @@ GHOST mirror deliberately is not.
   and every other log write is content-insensitive to recovery. (An
   earlier version of this note claimed xv6's log does NOT tolerate
   tearing; that was wrong, for the 124-byte reason.) Reads stay
-  single-step. LANDED 2026-08-22 (`b227bb54`; record in
+  single-step. (`b227bb54`; record in
   `completed/sector-atomic-disk.md`).
 - PowerOn models the loader/firmware: kernel image reloaded, bss zeroed,
   registers per SpecEntry.v's reset state. Warm-boot memory retention is

@@ -689,7 +689,7 @@ exactly why it needs refusing in writing). The rule the two sides divide on:
 > The RESOURCE travels with the reference; the FACT travels with the
 > descriptor.
 
-**AND IT NOW EXISTS** (2026-08-20): the per-`ofile` ghost state is
+**AND IT NOW EXISTS**: the per-`ofile` ghost state is
 `FdSlots.fd_st`, a two-halved per-descriptor `fdstate` (`FdClosed` /
 `FdOpen FdInode | FdPipe | FdDevice major`) pinned to the cell and to the
 named file's type inside `ProcInv.ofile_slot`.  The ftable is untouched by it,

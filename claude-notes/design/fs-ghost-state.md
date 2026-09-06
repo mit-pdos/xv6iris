@@ -1,8 +1,11 @@
 # The file system's abstract/ghost state — a reference inventory
 
-STATUS: verified name by name against `main` at `4a0bb6f8`.  Every name
-below is grepped out of `iris/*.v`; citations name FILES and not line
-numbers, because line numbers rot at every commit.
+A reference inventory of the file system's abstract/ghost state. Citations
+name FILES and not line numbers, because line numbers rot at every commit.
+
+Layout: one section per layer, bottom-up. For each piece: the RA/type, its HOME
+(which invariant or lock-held bundle owns the authority), what a fragment in a
+client's hand MEANS, who mints/spends it, and why it exists.
 
 Layout: one section per layer, bottom-up.  For each piece: the RA/type, its
 HOME (which invariant or lock-held bundle owns the authority), what a

@@ -1,11 +1,7 @@
 # fd-row-pilot — the enriched u-tier syscall row, piloted on init's console
 
-STATUS: design of record, v2 (2026-08-31, Fable — v1 the design lane,
-v2 the PILOT-CONVERGENCE round: §6 rewritten against upstream's landed fd
-channel, the re-key plan re-gated, asks 4 and 5 added to §8).
-Spec statements: `iris/FsFdMirror.v`, `iris/UexecRetFs.v`, `iris/FdRowPilot.v`
-(all new files; nothing frozen was touched).  Prover plan: the
-"## FD-ROW PILOT" section of `projects/fs-syscall-specs.md`.
+The design of record for the enriched u-tier syscall row. Spec statements:
+`iris/FsFdMirror.v`, `iris/UexecRetFs.v`, `iris/FdRowPilot.v`.
 
 Related: [`user-wp-slot.md`](user-wp-slot.md) (the trap contract this
 enriches; its part (A) PARKS exactly this refinement: "a later refinement
@@ -296,167 +292,39 @@ persistent certificates — the arm SHAPE does not change, only the
 relation; recorded as a non-goal (§7).  Fork's own enriched arm (retire
 or downgrade the mirror at the fork) is stage P5's design note.
 
-## 6. What upstream must eventually adopt vs what stays ours
+## 6. What upstream must adopt
 
-### 6.0 THE CONVERGENCE STATE (2026-08-31, PILOT-CONVERGENCE lane)
+**The one thing the fd channel still lacks: the arm does not read the table.**
+The returning-syscall arm ∀-binds the new fd component with **no premise at
+all**, so a program learns NOTHING about its own descriptors across a syscall
+and the key's fd field is write-only at the one arm this pilot cares about. The
+ask is one line — splice the `usys_fd_ok` conjunct into that arm. Everything it
+needs is landed and pure; it costs the arm one conjunct and every leaf's proof
+one `%` premise to pass through. **It is the precondition of everything else
+here**, and it is strictly smaller than the disjunct ask below: no payload
+class, no fs vocabulary in the return former's cone.
 
-**Upstream answered a large part of this section BY BUILDING, in five
-commits on one day.**  What landed is the fd CHANNEL:
+Then, in priority order:
 
-| commit | what landed |
-|---|---|
-| `c83604c8b` | the key carries the fd view — `uvis` gains `uvis_fd : list fdstate` (route (c1)'s fd half; §2's tax argument was mispriced, ~250 `urun` sites did not move) |
-| `8091053d1` | the trap residue carries the descriptor states BY NAME |
-| `34c2d83f2` | the descriptor fragments move into the process's bundle |
-| `544c08005` | **`UsysMemOk.usys_fd_ok`** — the pure per-syscall DESCRIPTOR table (close / dup / open / pipe rows + `usys_fd_ok_length`), the fd twin of `usys_mem_ok`, discharged kernel-side through `SpecSyscall.sysc_fd_ok` |
-| `e185c293a` | **`fd_frags_any` retires at the mint and the park** — allocproc's fresh table is named `fdt0` end to end (`ProcInv` → `SpecAllocproc.v:195` → `ParkCap.park_token_park`'s named `sts` → `ProofUserinit.v:776`) |
-
-That closes **ask 2's input (A) outright** (the value the mirror wanted is
-now carried, not forgotten) and gives the pilot's fd leg an upstream
-statement to be a READING of rather than a twin.
-
-**Our side of the convergence is landed too:** `FsFdMirror.ufs_step`'s
-catch-all now DELEGATES to `usys_fd_ok` (it used to claim `u' = u` for
-every non-enriched number — false of close/pipe/dup on upstream's own
-rows, and an undischargeable contract the day `uenr_dom` widened), and
-`ufs_step_fd_agrees` / `ufs_step_at_fd_agrees` / `ufs_step_fd_len` are
-the compiled receipts that **every step of the mirror is a legal step of
-upstream's table**: definitional off the enriched rows, a REFINEMENT on
-them (ours pins the descriptor number — `fd_lowest_closed`, fdalloc's own
-scan — and the row's type, where theirs says only that some open row
-landed at `Z.to_nat (uint r)`).  Ripple: zero, no consumer moved.  Audit:
-*Closed under the global context*.
-
-### 6.0b THE ONE THING THE FD CHANNEL STILL LACKS: THE ARM DOES NOT READ THE TABLE
-
-`usys_fd_ok` is not attached to the user contract.  `uexec_ret_F`'s
-returning-syscall arm ∀-binds `fdv'` with **no premise at all**
-(`UexecRet.v:529-533`), and both sides say so in as many words:
-
-- `UexecApply.v:575-580` — "the fd component is the LOOP's to choose …
-  the returning ecall arm instantiates `uexec_ret`'s own ∀-bound `fdv'`
-  at `uvis_fd W'`, which is arbitrary";
-- `ProofUsertrapSys.v:558-563` — future tense at the loop: "When the four
-  fd-touching rows (pipe, dup, open, close) state a delta, it is `sts2`
-  they will relate to the entry `sts`."
-
-So a program today learns NOTHING about its own descriptors across a
-syscall, and the key's new fd field is write-only at the one arm the
-pilot cares about.  **NEW ASK (5), one line:** splice
-`⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗` into that arm.
-Everything it needs is landed and pure; it costs the arm one conjunct and
-every leaf's proof one `%` premise to pass through.  It is the
-PRECONDITION of the re-key plan below, and it is strictly smaller than
-ask 1 (no disjunct, no payload class, no fs vocabulary in `UexecRet`'s
-cone).
-
-**Upstream's (the diff-shaped ask, in priority order):**
-
-1. **The arm diff in `UexecRet.v`** — splice §2's disjunct into
-   `uexec_ret_F`'s returning-syscall arm at `uenr_dom n`, with the
-   payload family taken through a small ambient class (so `UexecRet`'s
-   cone gains ZERO fs imports; our `UexecRetFs.v` is the concrete
-   demonstration and collapses into it at adoption, the
-   `SpecNamexEra`-transitional precedent).  Conservative by the compiled
-   bridge; `solve_contractive` unchanged; `uexec_ret_of_all` gains one
-   `iLeft`.  Leaves' statements do not move; `wp_uk_ecall_quiet`'s PROOF
-   gains a `destruct (decide (uenr_dom n))` + `iLeft`.
-2. **The enriched loop round** — the real work (sealed here as
-   `FDROW_PILOT_SEAL.uslot_fs_run`): the trap excursion relays the AU
-   receipts (the AU dispatch arms are landed; the relay is a
-   uservec/usertrap-post conjunct in the block-reuse mold that priced
-   `ProofSysOpenAU`'s reuse of the landed tails), and the loop's
-   right-branch joins/steps the mirror halves.  Milestone-J-shaped;
-   staged in the prover plan, not a blocker for anything above.
-3. **The era-0 mint at the userinit park** — allocate `γm`, kernel half
-   into the enriched residue, user half + seed facts into init's entry
-   deposit (`FsInitPin` territory; prover stage P3).  **RE-MEASURED
-   2026-08-31 against the current text, and it SPLITS** (the receipt is
-   `FdRowMint.v` §6, verbatim-current; the splice was compiled on a
-   scratch twin of `ProofUserinit.v`):
-   - **(3a) the mint — ONE `iMod` line, COMPILES.**
-     `iMod (FdRowMint.mirror_era0_mint Sfs Hsnap) as (γm) "[Hkhalf
-     Hentry]"` drops in between the family `iAssert` and the park call,
-     the park call is UNTOUCHED, and the remaining ~270 lines of the walk
-     are unaffected.  Its three costs are all outside the site: the ghost
-     class `ghost_varG Σ umirror` (the mint's other classes are free —
-     `fsTopG`/`fsLinkG` are members of `Xv6G.xv6G`); the pure premise
-     `snap_ok S era0_D`, which widens `wp_userinit_sconf`'s type and
-     therefore the Module Type `SpecUserinit.USERINIT` and its callers
-     (measured exactly: the twin fails at "Signature components for field
-     `wp_userinit_sconf` do not match" and is green with the ascription
-     dropped); and a CONE SPLIT — `Require Import FdRowMint` inside
-     `ProofUserinit` is a cycle (FdRowMint → FdRowPilot → FsImgCheck →
-     SystemAdequacy → BootChain → LinkMain → LinkUserinit →
-     ProofUserinit), so the mint's statements must move to a file below
-     the boot chain (only `era0_u_seed` and the two console-miss
-     corollaries actually need the image check).
-   - **(3b) parking the ENRICHED family — not three lines, and not
-     independent of ask 1.**  `park_token_park` rejects `∀ W, uslot_fs γm
-     W` (twin 2, verbatim: "iSpecialize: cannot instantiate … with (∀ W :
-     uvis, UexecRetFs.uslot_fs gm W)"), and it cannot merely be re-typed:
-     `uslot (uvis_of U' sts)` sits inside `ParkCap.park_pkg`, i.e. inside
-     the `park_token` FIXPOINT (`ParkCap.v:134`).  Parking an enriched
-     family is a generalisation of the park CHANNEL over the slot family
-     — the same shape ask 4 asks of the engine.  And it would be
-     premature: while upstream's loop is the plain one, the honest park
-     is the plain family and the process lifts at its own walk through
-     the proven `uslot_uslot_fs`.
-   - **the TIED mint cannot fire at the park at all, for a reason that is
-     not plumbing.**  `mirror_tied` holds `fd_frags γfd (um_fdt u)` =
-     `fd_frags (pv_fdg V) fdt0`, which is the very bundle the site hands
-     to `park_token_park` and which the park package then holds across
-     the whole parked period (`ParkCap.v:284-299`).  One bundle, two
-     would-be owners.  (Input (B), the founded `astate`, is absent from
-     `ProofUserinit` too — the file names no `astate` anywhere — but
-     linearity is the fatal one.)  **The park mints the GHOST; the LOOP
-     establishes the TIE** — beside `UsertrapRes.ut_own`, where the
-     fragments actually are during a trap, which is where
-     `mirror_tied_round` was already aimed.  P4 absorbs it at no extra
-     cost.
-4. **(independent, WINDOW-LEAF-style) the pure return-range conjuncts**
-   on open/mknod's rows (§2's side ask).
-5. **NEW (§6.0b): attach `usys_fd_ok` to the returning-syscall arm.**
-   One pure conjunct on the ∀-bound `fdv'`.  Cheapest of the five,
-   independent of all of them, and the precondition of the re-key below.
-
-**Ours (this campaign's):** `FsFdMirror.v` (the mirror, the step tables,
-the pure pilot chain), `UexecRetFs.v` (the parallel contract + bridge +
-seal), `FdRowPilot.v` (the era-0 seed + the pilot theorems), the enriched
-ecall leaf's proof once the arm lands (stage P2), and the enriched
-`UkInit` preamble walk (stage P4).
-
-**THE RE-KEY PLAN (`um_fdt` → `uvis_fd`), AFTER THE ALIGNMENT.**  The
-mirror's `um_fdt` leg is a SECOND CARRIER for something the key now
-carries, so the plan stands: `umirror` sheds `um_fdt` and keeps `um_av` /
-`um_cwd` (the fd half rides the key — per-process, unconditionally
-faithful; the shared-fs half is what needs the deposit), splitting the
-payload along the line §5's solo-scoping note already draws.  What the
-convergence round changed about it:
-
-- **What the alignment REMOVED from the plan.**  The plan used to owe an
-  argument that the two fd descriptions agree.  It does not any more:
-  `ufs_step_fd_agrees` is that argument, compiled — off the enriched rows
-  our leg IS `usys_fd_ok`, on them it refines it — so identifying
-  `um_fdt u` with `uvis_fd W` is consistent BY CONSTRUCTION, and neither
-  the arm tables' content nor the pilot's theorems need re-justifying to
-  do it.  The delegation also means the two cannot silently drift while
-  the re-key waits.
-- **What GATES it, and it is not the enriched loop.**  Ask 5.  Until the
-  arm carries `⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝`, the key's
-  fd field is ∀-bound at exactly the arm the pilot is about, so a leg
-  that rode the key would learn NOTHING across init's open — and "fd 0"
-  is a fact about the post-state.  A re-key done today would delete the
-  only carrier that says anything.
-- **What it then costs, honestly.**  Not a deletion and not free: the
-  fd-number pinning (`fd = fd_lowest_closed (um_fdt u)`, dup's row
-  equality) is OURS — `usys_fd_ok` does not give it — so what moves is
-  the CARRIER, not the content: those conjuncts restate at `uvis_fd W`
-  and the arm tables lose their `um_fdt` leg.  `pilot_console_pure` /
-  `pilot_console_dups` / the P5 walk read `um_fdt` throughout, so the
-  pure chain restates at the key's list.  Priced as a mechanical sweep of
-  `FsFdMirror` §5 + the two pilot theorems, gated on ask 5, and worth
-  doing only once ask 5 has landed.
+1. **The arm diff** — splice the enriched disjunct into the returning-syscall
+   arm, with the payload family taken through a small ambient class so the
+   former's cone gains ZERO fs imports. Conservative by the compiled bridge;
+   contractiveness unchanged; the "all" introduction gains one `iLeft`, and
+   leaves' statements do not move.
+2. **The enriched loop round** — the trap excursion relays the AU receipts and
+   the loop joins the mirror halves. The real work, and not a blocker for
+   anything above it.
+3. **The era-0 mint at the userinit park.** The mint itself is one `iMod` and
+   drops in cleanly, but it **splits into two asks** and the second is not
+   independent of (1):
+   - the mint costs a ghost class, a pure premise that widens the userinit
+     contract's Module Type, and a CONE SPLIT — requiring the mint's file from
+     the userinit proof is a cycle through the boot chain, so its statements
+     must move below that chain;
+   - **parking the ENRICHED family is not three lines.** The park rejects a
+     family-quantified slot, and it cannot merely be re-typed: the slot sits
+     inside the park token's FIXPOINT. Parking an enriched family is a
+     generalisation of the park CHANNEL, not of its payload.
 
 ## 7. Non-goals, explicit
 

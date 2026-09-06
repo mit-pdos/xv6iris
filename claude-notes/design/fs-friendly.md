@@ -1,15 +1,14 @@
 # Programmer-friendly filesystem specs — a direction sketch
 
-STATUS: brainstorm (2026-08-15, coordinator + user).  Nothing here is
-staged work; this file exists so the idea survives until the sysfile
-cone lands and someone can rule on it.  Prompted by the observation that
-the landed syscall contracts pin every machine detail (register files,
-decode facts, K-budgets, the log ledger, the escrow) and are therefore
-LINKER's specs — a developer of user programs needs three sentences: the
-path resolves or it does not; on success the tree gains a node; nothing
-else changed.  Comparators: FSCQ (tree representation), DFSCQ (deferred
-durability), Perennial/GoNFS (logically-atomic specs against an abstract
-state machine, in a concurrent separation logic).
+A direction sketch, not staged work: this file exists so the idea survives
+until someone can rule on it. Prompted by the observation that the landed
+syscall contracts pin every machine detail — register files, decode facts,
+K-budgets, the log ledger, the escrow — and are therefore a LINKER's specs,
+where a developer of user programs needs three sentences: the path resolves or
+it does not; on success the tree gains a node; nothing else changed.
+Comparators: FSCQ (tree representation), DFSCQ (deferred durability),
+Perennial/GoNFS (logically-atomic specs against an abstract state machine, in a
+concurrent separation logic).
 
 ## 1. The abstract state, and how close the tree already is
 
@@ -141,7 +140,7 @@ the SHAPE premises' churn (dir_links threading, the type bundles) but
 NOT the ledger renegotiations (wi16/dl16/crz) — those were about log
 accounting, orthogonal to shape.
 
-## 6a. The first user-visible ghost has LANDED (2026-08-20): fd state
+## 6a. The first user-visible ghost has LANDED: fd state
 
 Ahead of F1, and independently of the tree layer, the process's DESCRIPTOR
 state is now ghost state: per fd, `FdClosed` or `FdOpen` of a type (inode,
@@ -167,7 +166,7 @@ assertion that each syscall frames all but one slot of.  Note the second shape
 composes with F4's path-points-to the same way: both are per-object fragments
 of one process-local map.
 
-## 7. RULED (2026-08-15): create_fresh_ty's retirement path runs through here
+## 7. RULED: create_fresh_ty's retirement path runs through here
 
 UPDATE 2026-08-14: the F1/F1.5 design was VERIFIED against the landed
 tree and RULED — see `fs-fragments.md`, now the design of record for

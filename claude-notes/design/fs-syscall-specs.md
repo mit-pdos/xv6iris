@@ -1,20 +1,9 @@
 # fs-syscall-specs — directory-based specs for the fs syscalls, one history, two boundaries
 
-STATUS: v3 (2026-08-27, Fable, on the user's ruling: "we can change the
-design to match better the kernel specs").  v3's one move: every §2
-carrier is now DEFINED as a reading of a ghost the kernel proofs already
-maintain (`top_frag_q`, the fd-state fragments, `proc_priv`'s cwd leg,
-`fs_view`'s authority) — nothing is minted, `dview` is slated for
-retirement inside this campaign, and §9 Q1–Q3 are RULED.  §§2, 3, 5.3
-and 9 carry the changes; the rest of v2 stands.
-Previously: EXPLORATION, v2 (2026-08-24, Fable + owner).  A proposal, not a
-design of record.  v1 (same day) presented each syscall's spec as "the
-same delta read twice" — once at the logged view, once at the durable
-view — with per-op durable tokens.  The owner asked for a design that
-LIFTS the two-view burden off the spec's CONSUMER: no reasoning about
-two states, no possibility of the two drifting apart.  v2 is that
-design; the two-view machinery survives only INSIDE the framework, as
-the proof obligation, never in a consumer-visible statement.
+Directory-based specs for the fs syscalls: one history, two boundaries. Every
+§2 carrier is DEFINED as a reading of a ghost the kernel proofs already maintain
+(`top_frag_q`, the fd-state fragments, `proc_priv`'s cwd leg, `fs_view`'s
+authority) — nothing is minted.
 
 Prompted by the owner: once the durable-disk spike lands, we want specs
 for the individual file system calls covering BOTH the in-memory and the
@@ -27,7 +16,7 @@ against the union of states it might see.  The consumer-facing shape of
 v2 additionally matches DFSCQ's tree-sequence idea (crash = a recent
 past state), specialized by the WAL's batch atomicity.
 
-> **UPDATE (2026-08-27): the durable plan is PROVEN and the campaign is
+> **UPDATE: the durable plan is PROVEN and the campaign is
 > OPEN.**  The adequacy theorem is true (`Himg` deleted; the ladder is
 > three rungs; lane H complete; the durable campaign's one open lane is
 > F — receipts).  The user's word: rank 4's finding first, then get
@@ -38,7 +27,7 @@ past state), specialized by the WAL's batch atomicity.
 > impact-note mapping below remains accurate; §5's grounding block is
 > rewritten to the as-landed names.
 
-> **IMPACT NOTE (2026-08-25): the durable plan underneath changed.**
+> **IMPACT NOTE: the durable plan underneath changed.**
 > [`durable-fs-plan.md`](durable-fs-plan.md) (ruling 4⁹) superseded the
 > fold/ledger commit this doc's internal story cites: the durable view
 > is now a FROZEN SNAPSHOT — a fresh copy of `fs_state` re-allocated at
@@ -628,67 +617,6 @@ composes upward mechanically; nothing below re-opens:
 
 This is `fs-friendly.md`'s F4/F5 finish line, reached without ever
 making the tree the KERNEL's abstraction.
-
-## 7. Per-syscall inventory (the checklist for the eventual campaign)
-
-Durable columns are GONE relative to v1 — that is the point.  The only
-per-syscall durable artifact is the mechanical bound-stamp on returned
-carriers, identical in shape for every mutator.
-
-| syscall | deltas | instants | notable failure arms |
-|---|---|---|---|
-| `open` (no CREATE) | — | trace + iget | ENOENT-ish (ret −1), T_DIR w/ write mode |
-| `open` (O_CREATE) | δ_create(AFile) | trace + create AU | exists→open-instead arm (xv6: returns existing FILE), parent gone |
-| `mkdir` | δ_create(ADir+dots, d.nlink+1) | trace + AU | exists, parent gone |
-| `mknod` | δ_create(ADev) | trace + AU | exists |
-| `link` | δ_link | trace×2 + AU | target is dir, new exists, cross-of-life (target unlinked between instants — the two-instant shape makes this arm STATABLE) |
-| `unlink` | δ_unlink (+dir arm) | trace + AU | ".": refused; dir non-empty; gone |
-| `read` | — | ONE AU — fileread's inode arm is a single ilock/readi/iunlock hold, no per-chunk unlock ("per-chunk" here was pessimistic; as-verified 2026-08-28, lane W, `SpecSysReadAU.v`) | off past size (ret 0); n<0 guard and copyout fault (ret −1, this fork) |
-| `write` | δ_write per chunk | per-chunk AU | full disk mid-write (partial ret) |
-| `close`/`iput` | δ_free when last | AU at iput | — |
-| `chdir` | — | trace + cwd swap | not a dir |
-| `fstat` | — | one AU (read i's meta) | — |
-| `dup`,`pipe` | — | fd-table only | — |
-| `exec` | — | trace + reads | (kexec cone; stage C of namei-pinned) |
-
-Notes: `open(O_CREATE)` on an existing file is xv6's open-not-fail arm —
-the delta is CONDITIONAL, which the AU form expresses as two arms, not
-nondeterminism.  `unlink`'s dir arm removes the child from the view when
-its count reaches 0 (§4's ruling of 2026-09-05; the earlier
-"orphaned-in-map" is superseded); `iput`'s free is then view-preserving,
-so `close` carries no δ_free obligation.
-
-## 8. What is inherited from the sources, and what is deliberately different
-
-From Lampson's notes:
-- **The history/`h` crash spec** (files, p.4–5): durability as "which
-  recorded writes survive", `sync` collapsing the set.  Here `h` is
-  batch-granular and the surviving set is always a PREFIX — the WAL's
-  gift — so the nondeterminism shrinks to one number, and (v2) the
-  history itself is demoted to framework-internal.
-- **Directories as a link graph, invariants derived** (p.6): the state
-  is the edges; `isDirTree` is a separate predicate consumed only where
-  it holds.  Here: entry maps per inum; acyclicity is the tree layer's.
-- **Non-atomic ops against a state interval** (p.8–10, `cLookup`/
-  `allLinks`): here the per-hop ghost trace (strictly sharper — our
-  hops are lock-atomic), and the same two-instant honesty for `link`.
-- **"Keep the spec simple; show desired properties hold"**: v2 takes
-  this further than v1 did — the durable spec is three principles
-  total, and Lampson's own non-atomic-write machinery (`Op`/`done`/
-  `mix`) becomes a corollary of SNAPSHOT rather than copied structure.
-
-From DFSCQ (the consumer-facing shape): crash = a recent past state of
-ONE evolving view, fsync-like operations only tighten the bound.  Ours
-is sharper (totally ordered, batch-aligned) because the WAL's
-atomicity is a theorem here, and — unlike DFSCQ — the principles are
-node-local where consumers live (principle 3), because the carriers are
-per-inum fragments rather than a whole tree.
-
-Deliberately different from both:
-- **No `choose`-nondeterminism in crash states** — batch prefixes only.
-- **No symlinks, no rename** — xv6 doesn't have them; their absence is
-  load-bearing simplicity.
-- **`nlink` exposed, edge-count equation not stated** (§1).
 
 ## 9. Open questions for the owner
 

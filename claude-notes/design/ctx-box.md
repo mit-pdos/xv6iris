@@ -1,12 +1,7 @@
 # The transit box (`iris/CtxBox.v`) — the law for a cell that crosses locks under TSO
 
-STATUS 2026-09-03: LANDED ON MAIN with the TSO cutover.  `CtxBox.v` is
-fully proven (no `Admitted`); three instances are live (bcache, icache,
-the `f->off` box).  This note is the law as it stands.  Its history — the
-F-series findings, rule 0, the review rounds — is in
-`completed/tso-escrow-endgame.md` (the flip's design), `completed/tso-escrow-box-v2.md`
-(the register-selected arms) and `completed/tso-cutover-endgame.md` (the
-plan of record with its rulings table).
+`iris/CtxBox.v` is fully proven and three instances are live (bcache, icache,
+the `f->off` box). This note is the law as it stands.
 
 ## 1. Why a box exists
 

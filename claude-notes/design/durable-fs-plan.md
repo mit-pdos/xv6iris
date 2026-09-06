@@ -1,16 +1,8 @@
 # durable-fs-plan — the crash-consistent file system, the whole design in one place
 
-STATUS: DESIGN OF RECORD, ruled by the owner 2026-08-25 after three days
-of machine-checked refutations (archived with their lane reports in
-[`../completed/durable-disk-2026-08-23-to-25.md`](../completed/durable-disk-2026-08-23-to-25.md);
-the Coq files that held them are deleted and §8 below carries their
-lessons).  The live worklist is
-[`../completed/durable-disk.md`](../completed/durable-disk.md), a stub
-carrying the residue; the lane history is in
-[`../completed/`](../completed/).  This file
-is where the durable side's design lives; [`fs-state.md`](fs-state.md)
-§0–§2 (the guiding rule and the nested predicate) and §7 (as-built notes)
-remain the reference for the predicate itself.
+The design of record for the durable side. [`fs-state.md`](fs-state.md) §0–§2
+(the guiding rule and the nested predicate) is the reference for the predicate
+itself; §8 below carries the lessons of the mechanisms that died.
 
 Vocabulary used below is xv6's and CSL's only.  "The crash predicate" is
 the one Iris predicate the machine layer preserves across a power cycle
@@ -669,27 +661,6 @@ consumed; S2 deleted them, and whoever writes the spike restates what it
 actually needs.)  The
 bytes-level statement is a corollary.  Later theorems read any effect
 the same way.
-
-## 6. What it costs, and what is deleted
-
-Costs: the transaction token is fractional while locks are held
-(contracts spanning a held lock carry that form — wide, shallow); the
-inode bundle's byte elements are fraction-indexed so a read-locker can
-take ¼ (`inode_owned_era`/`blk_owned` at `fs_gamma_L` are dfrac-1 today:
-the footprint is every consumer of the bundle's data-block accessors);
-the commit's collection lemma opens five invariant families at one ghost
-step.  Nothing is owed at a `log_write` beyond the bytes it writes.
-
-WHAT IS NOT IN THE TREE, stated once so nobody reintroduces it: a parked
-client payload in the log and its laws; a fixed-layer durable byte view or
-durable-ghost bundle; a pure whole-state well-formedness predicate and its
-per-op preservation lemmas; a per-write accumulation of the snapshot tie
-and the one-block frame family it needed; a pure kinds/decode tie over the
-durable bytes; state-determinacy lemmas for the snapshot; and the old
-per-holder link ledger.  Every one of them is refuted or superseded in §8,
-and the Coq files that held them are deleted.  The blow-by-blow of which
-lemma went at which step is history and lives in
-[`../completed/`](../completed/), not here.
 
 ## 7. The vacuity discipline (why the tie cannot silently go empty)
 

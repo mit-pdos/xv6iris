@@ -351,7 +351,7 @@ addrs had been written, so the tie is load-bearing and it is present.
 The cleaner alternative is five explicit scalar arguments with the written
 dinode assembled at the seam (`mk_dinode ty maj min nl sz (bm_cells bm)`) —
 no phantom, no premise for callers. **Considered and deliberately not
-taken** (2026-08-06): every caller that has `inode_meta` also has
+taken**: every caller that has `inode_meta` also has
 `inode_map`, so the tie discharges from what it already holds and costs one
 pure step. Revisit if a caller ever turns up that holds the scalars WITHOUT
 the map — that is the case the phantom would actually hurt.

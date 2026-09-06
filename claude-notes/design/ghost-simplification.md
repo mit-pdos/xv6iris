@@ -301,7 +301,7 @@ an argument FOR the rehoming: `FsReady.v` states `fs_ready` over an
 EXPLICIT `Context`, and every projection/pack lemma lives inside that
 section.  Executor step 1 carries a tripwire for it.
 
-### 5.3a LANDED (2026-08-19): the parameter-free `fs_ready`
+### 5.3a LANDED: the parameter-free `fs_ready`
 
 §5.3's delta was "one row, `fs_ready … -∗`".  Making that row CARRIABLE
 took two further steps, both landed; `design/fs-ghost-state.md` §7b/§7e is
