@@ -12,7 +12,34 @@ inode file descriptors, which seems weird; even weirder, one process calling kil
 now has to prove it's OK to iput the victim's cwd and FDs" — the free obligation lands on paths
 where the acting process does not own the resource.  Do NOT build E2-F; raise Q-d again when the
 other lanes are exhausted.  Until then EscrowDeposit's free site stays on `_auto`, so E2-Z (deleting
-`top_move`/the `_auto` movers) waits too.  Produced read-only against HEAD 668441141 after round E1's census; every claim carries file:line.  Design of record: design/applications.md §2/§6 L3; rounds record: app-instances.md §7 E.
+`top_move`/the `_auto` movers) waits too.
+
+**Q-d, THE OPEN DESIGN QUESTION (checkpointed 2026-09-05; owner: "let me ruminate").**  The owner's
+new idea: REMOVE nlink = 0 inodes from the abstract view after all (reversing Q-b), noting that on
+durable commit / recovery they disappear anyway.  What it buys: iput's free (#1) and ialloc's
+claim (#2) become `_same` (the row is absent before and after), so NO free obligation has to reach
+`iput` — no threading through 14 callers and 9 syscall specs, and no exit/kill path has to prove
+anything about another process's cwd or fds.  δ_create becomes "the row APPEARS at the arm (nlink
+0→1)", the failure arm's unarm "the row DISAPPEARS", δ_unl_tgt "delete when the count hits 0" —
+conditional deltas, clean.  The downsides, measured against the tree: (1) READ/WRITE THROUGH AN
+OPEN FD OF AN UNLINKED FILE loses its abstract-view spec — `SpecSysReadAU.v:725`'s
+`⌜av !! i = Some (MkAnode (AFile bs0) nl)⌝` is unstatable when the row is gone (the Unix temp-file
+idiom create/unlink/use); writes to such a file become view-preserving (fine), reads need the
+contents from somewhere else — the honest framing is that after unlink the file is no longer part
+of the FILE SYSTEM but the process's private buffer, so its read spec belongs to the fd row (a
+per-fd contents resource, fs-syscall-specs §4's "stable corollary when the client holds the file's
+half"), which is follow-up work on the fd-row pilot, not on the view.  (2) A process whose cwd
+directory was removed (unlink's dir arm takes the child to nlink 0 while it may be someone's cwd):
+relative lookups from it read the view at a row that is gone — unspecified for that corner (Unix
+returns ENOENT there anyway).  (3) The view is no longer "every allocated inode", so `app_dom`-style
+domain facts stay about the MAP, and the durable claim's view drops the orphans — consistent with
+"unreachable after a crash" (stock xv6 does not reclaim nlink-0 inodes at recovery; they leak on
+disk but are unreachable, so excluding them from the durable view is the user-visible truth).
+Alternatives considered and why not: keeping nlink-0 rows only while some process has the inode
+open ("in use") re-creates the obligation exactly at the last `iput`; a generic rule "the predicate
+tolerates deleting an nlink-0 row" cannot be stated on the view alone (open-ness is per-process
+state).  RECOMMENDATION (not yet ruled): (B) exclude nlink-0 rows; accept downside (1) as a
+follow-up on the fd row; then E2-F is unnecessary and #1/#2 are `_same`, and E2-Z can close.  Produced read-only against HEAD 668441141 after round E1's census; every claim carries file:line.  Design of record: design/applications.md §2/§6 L3; rounds record: app-instances.md §7 E.
 
 
 Scope: app-instances.md §6 ruling 4 / §7 E, applications.md §2 + §6 L3, fs-syscall-specs.md §4/§7.
