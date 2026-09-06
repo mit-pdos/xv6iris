@@ -44,14 +44,18 @@
        of mine is visible on the hart I am running on), and the per-entry
        justification of the dirty set (mine-on-this-hart, or under the
        bound).
-     - [ctx_parked ξ T]: the authorities with no hart tie; the bound IS
-       the stamp (park raised it past every dirty entry).
+     - [ctx_stamped ξ T]: the authorities with no hart tie, hung on a LOG
+       POSITION; the bound IS the stamp (stamping raised it past every
+       dirty entry).  The ROOT of every parked chain.
      - [hart_view_lb K] = [view_lb] at the ambient hart: the persistent,
        monotone acquire receipt.
-     - [ctx_dom ξ ξ'] carries HALF of ξ's authorities plus a bound-lb of
-       ξ' dominating ξ's bound and dirty watermark -- statable with no
-       machine state, which is what makes [CtxMorph]'s bare shape true
-       as written.
+     - [ctx_dom ξ ξ'] -- "ξ is dominated by ξ'" -- carries HALF of ξ's
+       authorities, ξ's bound under ξ''s and, per dirty key of ξ, that
+       key's justification AT ξ' ([key_at]) -- statable with no machine
+       state, which is what makes [CtxMorph]'s bare shape true as
+       written.  [ctx_parked ξ ξ'] is the SAME relation at full
+       authority: a context parked under a context
+       (claude-notes/projects/ctx-parent.md).
 
    Every law below was first proven of the self-contained twin
    ([TsoCtxTwin2.v], kept as the discovery record); the twin lemma is
@@ -384,25 +388,29 @@ Section ctx.
     iExists K. iFrame "HK". iPureIntro. lia.
   Qed.
 
-  (* THE PARKED TOKEN ([TsoCtxTwin2.ctx_parked]): a thread of control
-     not running anywhere -- ξ's authorities with no hart tie.  The
-     bound IS the stamp: park raised it past every dirty entry (the
-     dirty→clean conversion), so a parked context's facts are all clean
-     at [T] and the resumer needs exactly [T ≤ its view].  [llb T]
-     keeps the stamp a legal log position.  Deliberately NOT
-     hart-ambient: a parked record is migratable, and this token is why
-     that is type-correct. *)
-  Definition ctx_parked_def (ξ : CtxId) (T : nat) : iProp Σ :=
+  (* THE STAMPED TOKEN ([TsoCtxTwin2.ctx_parked]): a thread of control
+     not running anywhere, hung on a LOG POSITION -- ξ's authorities with
+     no hart tie.  The bound IS the stamp: stamping raised it past every
+     dirty entry (the dirty→clean conversion), so a stamped context's
+     facts are all clean at [T] and whoever resumes it needs exactly
+     [T ≤ its view].  [llb T] keeps the stamp a legal log position.
+     Deliberately NOT hart-ambient: a stamped record is migratable, and
+     this token is why that is type-correct.  It is the ROOT of every
+     parked chain -- the record a lock invariant, a box or a racy tier
+     holds.  A thread parked at [swtch] is parked under a CONTEXT instead
+     ([ctx_parked ξ ξ'] below, the domination relation at full
+     authority), and needs no stamp. *)
+  Definition ctx_stamped_def (ξ : CtxId) (T : nat) : iProp Σ :=
     (∃ D : gset (nat * Arch.pa),
       ctx_at ξ 1 T D ∗ llb loglen_name T ∗
       ⌜∀ k, k ∈ D → (k.1 ≤ T)%nat⌝)%I.
-  Lemma ctx_parked_aux : { f | f = ctx_parked_def }.
+  Lemma ctx_stamped_aux : { f | f = ctx_stamped_def }.
   Proof. by eexists. Qed.
-  Definition ctx_parked (ξ : CtxId) (T : nat) : iProp Σ :=
-    proj1_sig ctx_parked_aux ξ T.
-  Lemma ctx_parked_unseal (ξ : CtxId) (T : nat) :
-    ctx_parked ξ T = ctx_parked_def ξ T.
-  Proof. unfold ctx_parked. by rewrite (proj2_sig ctx_parked_aux). Qed.
+  Definition ctx_stamped (ξ : CtxId) (T : nat) : iProp Σ :=
+    proj1_sig ctx_stamped_aux ξ T.
+  Lemma ctx_stamped_unseal (ξ : CtxId) (T : nat) :
+    ctx_stamped ξ T = ctx_stamped_def ξ T.
+  Proof. unfold ctx_stamped. by rewrite (proj2_sig ctx_stamped_aux). Qed.
 
   (* THE STABLE HART-VIEW LOWER BOUND ([TsoCtxTwin2.view_lb] at the
      ambient hart): "this hart's view has passed K".  Persistent and
@@ -490,24 +498,23 @@ Section ctx.
   Global Instance own_context_timeless `{CID : CpuId} ξ :
     Timeless (own_context ξ).
   Proof. rewrite own_context_unseal /own_context_def. apply _. Qed.
-  Global Instance ctx_parked_timeless ξ T : Timeless (ctx_parked ξ T).
-  Proof. rewrite ctx_parked_unseal /ctx_parked_def. apply _. Qed.
+  Global Instance ctx_stamped_timeless ξ T : Timeless (ctx_stamped ξ T).
+  Proof. rewrite ctx_stamped_unseal /ctx_stamped_def. apply _. Qed.
 
   (* ---------------------------------------------------------------- *)
   (* The token lifecycle (ruling 4's three primitives, plus deposit)    *)
   (* ---------------------------------------------------------------- *)
 
-  (* FRESH ALLOCATION YIELDS A PARKED CONTEXT, and the mint is PURE (no
+  (* FRESH ALLOCATION YIELDS A STAMPED CONTEXT, and the mint is PURE (no
      interp, no premise): a context that has never run claims no hart and
      no visibility.  Stamp 0 suffices because [ctx_deposit] raises the
-     stamp per deposited fact.  ([TsoCtxTwin2.twin_parked_alloc].)
-     This is [ProofForkretPark]'s mint. *)
-  Lemma ctx_parked_alloc : ⊢ |==> ∃ ξc : CtxId, ctx_parked ξc 0.
+     stamp per deposited fact.  ([TsoCtxTwin2.twin_parked_alloc].) *)
+  Lemma ctx_stamped_alloc : ⊢ |==> ∃ ξc : CtxId, ctx_stamped ξc 0.
   Proof.
     iMod (mono_nat_own_alloc 0) as (γb) "[Hb _]".
     iMod dset_alloc as (γd) "Hd".
     iModIntro. iExists (MkCtxId γb γd).
-    rewrite ctx_parked_unseal /ctx_parked_def.
+    rewrite ctx_stamped_unseal /ctx_stamped_def.
     iExists ∅. iFrame "Hb Hd".
     iSplitR; first by iApply llb_0.
     iPureIntro. intros k Hk. set_solver.
@@ -533,37 +540,38 @@ Section ctx.
     by iApply big_sepS_empty.
   Qed.
 
-  (* PARK: publish and let go of the hart.  ONE BOUND-RAISE converts
+  (* STAMP: publish and let go of the hart.  ONE BOUND-RAISE converts
      every dirty entry to clean; the stamp is K ⊔ W -- the token's own
-     receipts -- so the scheduler needs nothing from the machine.
+     receipts -- so nothing is needed from the machine.
      ([TsoCtxTwin2.twin_park], interp-free.) *)
-  Lemma ctx_park `{CID : CpuId} (ξ : CtxId) :
-    own_context ξ ==∗ ∃ T, ctx_parked ξ T.
+  Lemma ctx_stamp `{CID : CpuId} (ξ : CtxId) :
+    own_context ξ ==∗ ∃ T, ctx_stamped ξ T.
   Proof.
     rewrite own_context_unseal /own_context_def.
     iIntros "(%B & %K & %W & %D & [Hb Hd] & #HK & %HBK & #HW & %HDW & _)".
     set (T := Nat.max K W).
     iMod (mono_nat_own_update T with "Hb") as "[Hb _]"; first lia.
     iModIntro. iExists T.
-    rewrite ctx_parked_unseal /ctx_parked_def.
+    rewrite ctx_stamped_unseal /ctx_stamped_def.
     iExists D. iFrame "Hb Hd".
     iSplitR.
     { iApply (llb_max with "[] HW"). by iApply view_lb_llb. }
     iPureIntro. intros k Hk. have := HDW _ Hk. lia.
   Qed.
 
-  (* RESUME: re-host a parked context on THIS hart.  The premise is the
-     stable pair -- a persistent view receipt dominating the parked stamp
-     -- and NOTHING relates the parking and resuming harts.  The bundle
-     is re-founded with every dirty entry on its clean arm.
+  (* UNSTAMP: re-host a stamped context on THIS hart.  The premise is the
+     stable pair -- a persistent view receipt dominating the stamp -- and
+     NOTHING relates the stamping and resuming harts.  The bundle is
+     re-founded with every dirty entry on its clean arm.
      ([TsoCtxTwin2.twin_resume]; the receipt/stamp comparison is minted
-     at the resuming hart's lock acquire, [hart_view_lb_get] below.) *)
-  Lemma ctx_resume `{CID : CpuId} (ξ : CtxId) (T K : nat) :
+     at the resuming hart's lock acquire, [hart_view_lb_get] in
+     [TsoCtxLedger].) *)
+  Lemma ctx_unstamp `{CID : CpuId} (ξ : CtxId) (T K : nat) :
     (T ≤ K)%nat →
-    hart_view_lb K -∗ ctx_parked ξ T ==∗ own_context ξ.
+    hart_view_lb K -∗ ctx_stamped ξ T ==∗ own_context ξ.
   Proof.
     rewrite hart_view_lb_unseal /hart_view_lb_def
-            ctx_parked_unseal /ctx_parked_def
+            ctx_stamped_unseal /ctx_stamped_def
             own_context_unseal /own_context_def.
     iIntros (HTK) "#HK (%D & Hat & #HT & %HDT)".
     iModIntro. iExists T, K, T, D. iFrame "Hat HK HT".
@@ -571,6 +579,31 @@ Section ctx.
     iSplitR; first done.
     iApply big_sepS_intro. iIntros "!>" (k Hk).
     iLeft. iPureIntro. by apply HDT.
+  Qed.
+
+  (* FORK'S MINT (A6.129, owner ruling §0.44′): a RUNNING TWIN of a
+     running context.  A new kernel thread's context is not born empty at
+     stamp 0 -- that is boot's mint, [own_context_boot], for the per-hart
+     contexts that become the schedulers' -- it is born as a copy of its
+     PARKER's: the same bound and watermark (the parker's own view
+     receipts vouch for it), an empty dirty set (the rows the parker hands
+     over re-register as they cross, [ctx_move] below).  While both tokens
+     are running every row moves by [ctx_move]; then the twin is parked
+     under its parent ([ctx_park]). *)
+  Lemma own_context_twin `{CID : CpuId} (ξ : CtxId) :
+    own_context ξ ==∗ own_context ξ ∗ ∃ ξc : CtxId, own_context ξc.
+  Proof.
+    iIntros "H". rewrite own_context_unseal /own_context_def.
+    iDestruct "H" as "(%B & %K & %W & %D & Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iMod (mono_nat_own_alloc B) as (γb) "[Hb _]".
+    iMod dset_alloc as (γd) "Hd".
+    iModIntro. iSplitL "Hat".
+    { iExists B, K, W, D. iFrame "Hat HK HW Hoks". by iPureIntro. }
+    iExists (MkCtxId γb γd). rewrite own_context_unseal /own_context_def.
+    iExists B, K, W, ∅. rewrite /ctx_at. iFrame "Hb Hd HK HW".
+    iSplitR; first done.
+    iSplitR; first (iPureIntro; intros k Hk; set_solver).
+    by iApply big_sepS_empty.
   Qed.
 
 
@@ -1218,50 +1251,132 @@ Section ctx.
   (* Transport: the ONLY ways a fact changes context                   *)
   (* ---------------------------------------------------------------- *)
 
-  (* [ctx_dom ξ ξ']: ξ's facts may be re-registered to ξ'
-     ([TsoCtxTwin2.ctx_dom] -- the checkpoint's "one correction, three
-     problems" in one definition).  It carries HALF of ξ's own
-     authorities (borrowed out of ξ's token, value-pinned by agreement
-     with the half left behind) plus a bound-lb of ξ' dominating both
-     ξ's bound and ξ's dirty watermark.  Nothing about the machine: Σ's
-     constraint that [ctx_dom] be statable without the state
-     interpretation holds BY CONSTRUCTION.  Minted ONLY inside the lock
-     release/acquire and scheduler park/resume proofs
-     ([ctx_dom_to_parked] / [ctx_dom_of_parked] below).  It is
-     deliberately NOT persistent (a persistent domination would license
-     registering later facts -- the unsound step the `weak-memory`
-     branch's notes call out). *)
-  Definition ctx_dom_def (ξ ξ' : CtxId) : iProp Σ :=
-    (∃ (B W B' : nat) (D : gset (nat * Arch.pa)),
-      ctx_at ξ (1/2) B D ∗
-      ⌜∀ k, k ∈ D → (k.1 ≤ W)%nat⌝ ∗
-      ⌜(B ≤ B')%nat⌝ ∗ ⌜(W ≤ B')%nat⌝ ∗
-      mono_nat_lb_own (ctx_bound_name ξ') B')%I.
-  Lemma ctx_dom_aux : { f | f = ctx_dom_def }.
+  (* THE JUSTIFICATION OF A KEY AT A CONTEXT: [ctx_pointsto]'s clean/dirty
+     bit at a key rather than a fact -- the key's timestamp is under the
+     context's bound, or the key is registered in the context's dirty
+     set.  Defined once and used by the fact's seal and by the domination
+     body below, so "justified at ξ' exactly as a fact of ξ' would be" is
+     literally the same proposition. *)
+  Definition key_at (ξ' : CtxId) (k : nat * Arch.pa) : iProp Σ :=
+    (llb (ctx_bound_name ξ') k.1 ∨ dset_in (ctx_dirty_name ξ') k)%I.
+  Global Instance key_at_persistent ξ' k : Persistent (key_at ξ' k).
+  Proof. rewrite /key_at. apply _. Qed.
+  Global Instance key_at_timeless ξ' k : Timeless (key_at ξ' k).
+  Proof. rewrite /key_at. apply _. Qed.
+
+  (* DOMINATION, ONE RELATION (claude-notes/projects/ctx-parent.md §2).
+     [ctx_dom_at ξ ξ' q] -- "ξ is dominated by ξ'" -- carries ξ's
+     authorities at fraction [q], ξ's bound under ξ''s ([ctx_floor ξ' B])
+     and, per key of ξ's dirty set, that key's justification AT ξ'
+     ([key_at]).  A fact of ξ re-indexes to ξ' in two lines: a clean fact
+     by [t ≤ B] and the floor, a dirty one by [k ∈ D] and the [key_at]
+     that IS its bit at ξ' ([ctx_dom_at_key]).  Whether a key is clean or
+     dirty at the target is decided at the MINT, and every mint produces
+     this one body:
+       1. same hart, both running ([ctx_dom_run]; [ctx_park] is the same
+          mint at full authority): ξ's keys REGISTER at ξ' -- ξ's
+          buffered stores are ξ''s own messages on this hart;
+       2. release, running into a stamped root ([ctx_dom_to_stamped]):
+          every key clean under the raised stamp;
+       3. acquire and barriers, a stamped root into the running winner at
+          a view receipt ([TsoCtxAbsorbLb.ctx_dom_of_stamped_lb],
+          [TsoCtxLedger.ctx_dom_of_stamped]): every key clean;
+       4. a parked record lends a half to its dominator
+          ([ctx_parked_borrow]).
+     About ξ' it holds LOWER BOUNDS and MEMBERSHIPS only -- both
+     persistent, both preserved by everything that can happen to ξ' -- so
+     a dominated context stays dominated while its dominator is parked,
+     stamped, resumed elsewhere, moved or morphed.  Nothing about the
+     machine: Σ's constraint that domination be statable without the
+     state interpretation holds BY CONSTRUCTION.  The relation is NOT
+     persistent (a fraction of ξ's authority is inside; a persistent
+     domination would license registering later facts): nobody holds a
+     borrow while ξ runs.  The big-op is over the ABSTRACT dirty set of
+     an existential and sits under [□], so no client ever crawls it;
+     inside this file it is framed by name.
+
+     [ctx_dom ξ ξ'] is the relation at a HALF -- the borrow every
+     [CtxMorph] transport is stated over (the other half stays in ξ's
+     token, and agreement across the halves is what pins the borrow).
+     [ctx_parked ξ ξ'] is the relation at FULL authority: ξ wholly
+     dominated by ξ', nobody running it -- the thread record at [swtch],
+     a forked child under its parent.  Parking and resuming are
+     statements about two contexts on one hart and need no fence, no
+     view receipt and no stamp ([ctx_park], [ctx_resume]). *)
+  Definition ctx_dom_at_def (ξ ξ' : CtxId) (q : Qp) : iProp Σ :=
+    (∃ (B : nat) (D : gset (nat * Arch.pa)),
+      ctx_at ξ q B D ∗ ctx_floor ξ' B ∗ □ [∗ set] k ∈ D, key_at ξ' k)%I.
+  Lemma ctx_dom_at_aux : { f | f = ctx_dom_at_def }.
   Proof. by eexists. Qed.
-  Definition ctx_dom (ξ ξ' : CtxId) : iProp Σ := proj1_sig ctx_dom_aux ξ ξ'.
-  Lemma ctx_dom_unseal (ξ ξ' : CtxId) : ctx_dom ξ ξ' = ctx_dom_def ξ ξ'.
-  Proof. unfold ctx_dom. by rewrite (proj2_sig ctx_dom_aux). Qed.
+  Definition ctx_dom_at (ξ ξ' : CtxId) (q : Qp) : iProp Σ :=
+    proj1_sig ctx_dom_at_aux ξ ξ' q.
+  Lemma ctx_dom_at_unseal (ξ ξ' : CtxId) (q : Qp) :
+    ctx_dom_at ξ ξ' q = ctx_dom_at_def ξ ξ' q.
+  Proof. unfold ctx_dom_at. by rewrite (proj2_sig ctx_dom_at_aux). Qed.
+
+  Definition ctx_dom (ξ ξ' : CtxId) : iProp Σ := ctx_dom_at ξ ξ' (1/2).
+  Lemma ctx_dom_unseal (ξ ξ' : CtxId) :
+    ctx_dom ξ ξ' = ctx_dom_at_def ξ ξ' (1/2).
+  Proof. apply ctx_dom_at_unseal. Qed.
+
+  Definition ctx_parked (ξ ξ' : CtxId) : iProp Σ := ctx_dom_at ξ ξ' 1.
+  Lemma ctx_parked_unseal (ξ ξ' : CtxId) :
+    ctx_parked ξ ξ' = ctx_dom_at_def ξ ξ' 1.
+  Proof. apply ctx_dom_at_unseal. Qed.
+
+  Global Instance ctx_dom_at_timeless ξ ξ' q : Timeless (ctx_dom_at ξ ξ' q).
+  Proof. rewrite ctx_dom_at_unseal /ctx_dom_at_def. apply _. Qed.
+  Global Instance ctx_dom_timeless ξ ξ' : Timeless (ctx_dom ξ ξ').
+  Proof. rewrite /ctx_dom. apply _. Qed.
+  Global Instance ctx_parked_timeless ξ ξ' : Timeless (ctx_parked ξ ξ').
+  Proof. rewrite /ctx_parked. apply _. Qed.
 
   (* >>> A6.116 §3(2): THE FLOOR TRANSPORTS ALONG DOMINATION, FOR FREE.
-     [ctx_dom]'s body already carries everything: the sender's authority at
-     [B], the relation [B ≤ B'], and the receiver's lower bound at [B'].  So a
-     floor the SENDER could discharge is one the RECEIVER can discharge, and
-     the ξ-indexed half of §0.35′(i) is not an obstacle to payload transport
-     at all -- what a crossing cannot do is CREATE the floor, only carry it.
-
+     The body already carries everything: the sender's authority at [B]
+     and the receiver's floor at [B].  So a floor the SENDER could
+     discharge is one the RECEIVER can discharge, and the ξ-indexed half
+     of §0.35′(i) is not an obstacle to payload transport at all -- what a
+     crossing cannot do is CREATE the floor, only carry it.  At full
+     authority this is "a floor of the child is a floor of the parent".
      This is what makes the lock handle's left arm propagate once anyone
      has it; A6.116 §3 is then only about where the FIRST one comes from. <<< *)
+  Lemma ctx_floor_dom_at (ξ ξ' : CtxId) (q : Qp) (lo : nat) :
+    ctx_dom_at ξ ξ' q -∗ ctx_floor ξ lo -∗ ctx_dom_at ξ ξ' q ∗ ctx_floor ξ' lo.
+  Proof.
+    rewrite ctx_dom_at_unseal /ctx_dom_at_def.
+    iIntros "(%B & %D & [Hb Hd] & #Hfl & #Hks) #Hlo".
+    iDestruct (llb_valid_q with "Hb Hlo") as %HloB.
+    iSplitL.
+    { iExists B, D. iFrame "Hb Hd Hfl". iModIntro. iExact "Hks". }
+    iApply (ctx_floor_le _ _ _ HloB with "Hfl").
+  Qed.
   Lemma ctx_floor_dom (ξ ξ' : CtxId) (lo : nat) :
     ctx_dom ξ ξ' -∗ ctx_floor ξ lo -∗ ctx_dom ξ ξ' ∗ ctx_floor ξ' lo.
+  Proof. apply ctx_floor_dom_at. Qed.
+  Lemma ctx_parked_floor (ξ ξ' : CtxId) (lo : nat) :
+    ctx_parked ξ ξ' -∗ ctx_floor ξ lo -∗ ctx_parked ξ ξ' ∗ ctx_floor ξ' lo.
+  Proof. apply ctx_floor_dom_at. Qed.
+
+  (* THE KEY TRANSPORTS: a key justified at the dominated context is
+     justified at the dominator -- the clean arm by [t ≤ B] and the floor,
+     the dirty arm by membership and the registered [key_at].  Every fact
+     morph below is this lemma applied to the fact's bit. *)
+  Lemma ctx_dom_at_key (ξ ξ' : CtxId) (q : Qp) (k : nat * Arch.pa) :
+    ctx_dom_at ξ ξ' q -∗ key_at ξ k -∗ ctx_dom_at ξ ξ' q ∗ key_at ξ' k.
   Proof.
-    rewrite ctx_dom_unseal /ctx_dom_def /ctx_floor.
-    iIntros "(%B & %W & %B' & %D & [Hb Hd] & %HDW & %HBB' & %HWB' & #Hlb') Hfl".
-    iDestruct (llb_valid_q with "Hb Hfl") as %HloB.
-    iSplitR "".
-    - iExists B, W, B', D. iFrame "Hb Hd Hlb'". by iPureIntro.
-    - iApply (llb_le _ B'); [lia|]. by iLeft.
+    rewrite ctx_dom_at_unseal /ctx_dom_at_def.
+    iIntros "(%B & %D & [Hb Hd] & #Hfl & #Hks) #Hk".
+    iAssert (key_at ξ' k) as "#Hk'".
+    { iDestruct "Hk" as "[Hcl | Hdt]".
+      - iDestruct (llb_valid_q with "Hb Hcl") as %HtB.
+        rewrite /key_at. iLeft. iApply (ctx_floor_le _ _ _ HtB with "Hfl").
+      - iDestruct (dset_lookup with "Hd Hdt") as %HkD.
+        iApply (big_sepS_elem_of with "Hks"). exact HkD. }
+    iFrame "Hk'". iExists B, D. iFrame "Hb Hd Hfl". iModIntro. iExact "Hks".
   Qed.
+  Lemma ctx_dom_key (ξ ξ' : CtxId) (k : nat * Arch.pa) :
+    ctx_dom ξ ξ' -∗ key_at ξ k -∗ ctx_dom ξ ξ' ∗ key_at ξ' k.
+  Proof. apply ctx_dom_at_key. Qed.
 
   (* A context-indexed payload that transports along domination.  This is
      the obligation lock payloads pick up in the M3 sweep: any payload
@@ -1289,33 +1404,21 @@ Section ctx.
   Global Instance ctx_morph_const (P : iProp Σ) : CtxMorph (λ _, P) | 100.
   Proof. iIntros (ξ ξ') "Hd HP !>". iFrame. Qed.
 
-  (* THE TRANSPORT OF A FACT ([TsoCtxTwin2.ctx_morph_pointsto]): a clean
-     fact re-indexes by COPYING its justification (t ≤ B ≤ B', and ξ''s
-     lb is persistent); a dirty one's timestamp sits under the watermark
-     (t ≤ W ≤ B'), and its fragment is dropped -- the pinned key is a
-     timestamp, never reused, so the leftover entry is inert. *)
+  (* THE TRANSPORT OF A FACT ([TsoCtxTwin2.ctx_morph_pointsto]): the
+     fact's bit is a [key_at] at the sender, and [ctx_dom_key] makes it
+     one at the receiver -- a clean fact stays clean, a dirty fact takes
+     whatever arm the mint registered for its key. *)
   Global Instance ctx_morph_pointsto (kt : ktier) a dq v :
     CtxMorph (λ ξ, ctx_pointsto (KTR := kt) ξ a dq v).
   Proof.
     iIntros (ξ ξ') "Hd HP".
-    rewrite ctx_dom_unseal /ctx_dom_def !ctx_pointsto_unseal /ctx_pointsto_def.
-    iDestruct "Hd" as
-      "(%B & %W & %B' & %D & [Hb Hdm] & %HDW & %HBB' & %HWB' & #Hlb')".
+    rewrite !ctx_pointsto_unseal /ctx_pointsto_def.
     iDestruct "HP" as "(%ppn & %t & #Hk & % & % & % & Hpt & Hts & Hbit)".
-    iAssert (⌜(t ≤ B')%nat⌝)%I as %HtB'.
-    { iDestruct "Hbit" as "[Hcl | Hdt]".
-      - iDestruct (llb_valid_q with "Hb Hcl") as %HtB.
-        iPureIntro. lia.
-      - iDestruct (dset_lookup with "Hdm Hdt") as %HDt.
-        have HtW : ((t, pa_of ppn a).1 ≤ W)%nat by apply HDW.
-        simpl in HtW. iPureIntro. lia. }
-    iClear "Hbit". iModIntro.
-    iSplitL "Hb Hdm".
-    { iExists B, W, B', D. iFrame "Hb Hdm Hlb'". by iPureIntro. }
+    iDestruct (ctx_dom_key ξ ξ' (t, pa_of ppn a) with "Hd Hbit") as "[Hd #Hbit']".
+    iModIntro. iFrame "Hd".
     iExists ppn, t. iFrame "Hk Hpt Hts".
     iSplit; first done. iSplit; first done. iSplit; first done.
-    iLeft. rewrite /llb. iLeft.
-    iApply (mono_nat_lb_own_le with "Hlb'"). lia.
+    iExact "Hbit'".
   Qed.
 
   Global Instance ctx_morph_sep (R1 R2 : CtxId → iProp Σ) :
@@ -1405,32 +1508,42 @@ Section ctx.
     iModIntro. iFrame "Hd". iSplit; [done|]. iExact "H".
   Qed.
 
+  (* THE FLOOR IS A TRANSPORTABLE PAYLOAD MEMBER -- [ctx_floor_dom] as an
+     instance, so a payload whose only context-dependence is a floor is
+     morphable by instance search alone. *)
+  Global Instance ctx_morph_floor (lo : nat) : CtxMorph (λ ξ, ctx_floor ξ lo).
+  Proof.
+    iIntros (ξ ξ') "Hd #Hfl".
+    iDestruct (ctx_floor_dom with "Hd Hfl") as "[Hd #Hfl']".
+    iModIntro. iFrame "Hd Hfl'".
+  Qed.
+
 
   (* ---------------------------------------------------------------- *)
   (* The ctx_dom mints -- borrow accessors on the tokens               *)
   (* ---------------------------------------------------------------- *)
 
-  (* RELEASE-SIDE / FORK-SIDE MINT, INTERP-FREE
-     ([TsoCtxTwin2.ctx_dom_to_parked]): domination into a PARKED target.
-     The target's stamp is raised to cover everything the source could
-     deposit (its bound receipt K and its dirty watermark W -- both
-     legal log positions by their [llb]s, so no interp is consulted).
+  (* MINT 2 -- RELEASE, INTERP-FREE ([TsoCtxTwin2.ctx_dom_to_parked]):
+     domination into a STAMPED root.  The root's stamp is raised to cover
+     everything the source could deposit (its bound receipt K and its
+     dirty watermark W -- both legal log positions by their [llb]s, so no
+     interp is consulted), and every key of the source is clean under it.
      The give-back wand re-agrees the halves, so the source token comes
      back exactly as it went in. *)
-  Lemma ctx_dom_to_parked `{CID : CpuId} (ξ ξ' : CtxId) (T : nat) :
-    own_context ξ -∗ ctx_parked ξ' T ==∗
-    ∃ T', ⌜(T ≤ T')%nat⌝ ∗ ctx_parked ξ' T' ∗ ctx_dom ξ ξ' ∗
+  Lemma ctx_dom_to_stamped `{CID : CpuId} (ξ ξ' : CtxId) (T : nat) :
+    own_context ξ -∗ ctx_stamped ξ' T ==∗
+    ∃ T', ⌜(T ≤ T')%nat⌝ ∗ ctx_stamped ξ' T' ∗ ctx_dom ξ ξ' ∗
           (ctx_dom ξ ξ' -∗ own_context ξ).
   Proof.
     iIntros "Hrun Hpk".
     iEval (rewrite own_context_unseal /own_context_def) in "Hrun".
-    iEval (rewrite ctx_parked_unseal /ctx_parked_def) in "Hpk".
+    iEval (rewrite ctx_stamped_unseal /ctx_stamped_def) in "Hpk".
     iDestruct "Hrun" as "(%B & %K & %W & %D & Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
     iDestruct "Hpk" as "(%D' & [Hb' Hd'] & #HT & %HD'T)".
     set (T' := Nat.max T (Nat.max K W)).
     iMod (mono_nat_own_update T' with "Hb'") as "[Hb' #Hlb']"; first lia.
     iModIntro. iExists T'.
-    rewrite ctx_parked_unseal /ctx_parked_def ctx_dom_unseal /ctx_dom_def
+    rewrite ctx_stamped_unseal /ctx_stamped_def ctx_dom_unseal /ctx_dom_at_def
             own_context_unseal /own_context_def.
     iDestruct (ctx_at_halves with "Hat") as "[Hat1 Hat2]".
     iSplitR; first (iPureIntro; lia).
@@ -1441,10 +1554,15 @@ Section ctx.
         iApply (llb_max with "[] HW"). by iApply view_lb_llb. }
       iPureIntro. intros k Hk. have := HD'T _ Hk. lia. }
     iSplitL "Hat1".
-    { iExists B, W, T', D. iFrame "Hat1 Hlb'". iPureIntro.
-      split_and!; [done | lia | lia]. }
+    { iExists B, D. iFrame "Hat1".
+      iSplitR.
+      { rewrite /ctx_floor /llb. iLeft.
+        iApply (mono_nat_lb_own_le with "Hlb'"). lia. }
+      iModIntro. iApply big_sepS_intro. iIntros "!>" (k Hk).
+      rewrite /key_at /llb. iLeft. iLeft.
+      iApply (mono_nat_lb_own_le with "Hlb'"). have := HDW _ Hk. lia. }
     (* the give-back *)
-    iIntros "(%B0 & %W0 & %B0' & %D0 & Hat0 & _ & _ & _ & _)".
+    iIntros "(%B0 & %D0 & Hat0 & _ & _)".
     iDestruct (ctx_at_agree with "Hat0 Hat2") as %[-> ->].
     iCombine "Hat0 Hat2" as "Hat".
     rewrite -ctx_at_halves.
@@ -1452,22 +1570,343 @@ Section ctx.
   Qed.
 
   (* THE DEPOSIT: a running context hands ANY morphable payload to a
-     PARKED one, the parked stamp raised to cover it -- so a fork's
-     hand-me-downs (including bytes the parent wrote after the child's
-     mint: uvmcopy) have NOTHING TO PROVE at the deposit site; the
-     resumer's lock acquire pays the raised stamp.
+     STAMPED one, the stamp raised to cover it -- so a payload deposited
+     into a lock's record has NOTHING TO PROVE at the deposit site; the
+     acquirer's receipt pays the raised stamp.
      ([TsoCtxTwin2.twin_deposit], interp-free.) *)
   Lemma ctx_deposit `{CID : CpuId} (R : CtxId → iProp Σ) `{!CtxMorph R}
       (ξ ξc : CtxId) (T : nat) :
-    own_context ξ -∗ ctx_parked ξc T -∗ R ξ ==∗
-    own_context ξ ∗ ∃ T', ⌜(T ≤ T')%nat⌝ ∗ ctx_parked ξc T' ∗ R ξc.
+    own_context ξ -∗ ctx_stamped ξc T -∗ R ξ ==∗
+    own_context ξ ∗ ∃ T', ⌜(T ≤ T')%nat⌝ ∗ ctx_stamped ξc T' ∗ R ξc.
   Proof.
     iIntros "Hrun Hpk HR".
-    iMod (ctx_dom_to_parked ξ ξc T with "Hrun Hpk")
+    iMod (ctx_dom_to_stamped ξ ξc T with "Hrun Hpk")
       as (T') "(%HTT' & Hpk & Hdom & Hback)".
     iMod (ctx_morph with "Hdom HR") as "[Hdom HR]".
     iModIntro. iSplitL "Hback Hdom"; first by iApply "Hback".
     iExists T'. by iFrame.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* Mint 1: a context dominated by a context running on the same hart *)
+  (* ---------------------------------------------------------------- *)
+
+  Local Lemma view_lb_join (gv gl : gname) (h : agent) (K1 K2 : nat) :
+    view_lb gv gl h K1 -∗ view_lb gv gl h K2 -∗ view_lb gv gl h (Nat.max K1 K2).
+  Proof.
+    iIntros "H1 H2".
+    destruct (Nat.le_ge_cases K1 K2) as [Hle|Hle].
+    - rewrite (Nat.max_r _ _ Hle). iExact "H2".
+    - rewrite (Nat.max_l _ _ Hle). iExact "H1".
+  Qed.
+
+  (* register a whole set of keys at once *)
+  Local Lemma dset_insert_set (γ : gname) (S D : gset (nat * Arch.pa)) :
+    dset_auth γ 1 S ==∗ dset_auth γ 1 (S ∪ D) ∗ [∗ set] k ∈ D, dset_in γ k.
+  Proof.
+    induction D as [|k D Hk IH] using set_ind_L.
+    - iIntros "H". rewrite union_empty_r_L big_sepS_empty. by iFrame.
+    - iIntros "H". iMod (IH with "H") as "[H #Hs]".
+      iMod (dset_insert _ _ k with "H") as "[H #Hk]".
+      iModIntro. rewrite big_sepS_insert; [|exact Hk]. iFrame "Hk Hs".
+      replace (S ∪ ({[k]} ∪ D)) with (S ∪ D ∪ {[k]}) by set_solver. iFrame.
+  Qed.
+
+  (* Every key justified at ξ' is under ξ''s bound or in ξ''s dirty set --
+     read off ξ''s authority (at any fraction), which is threaded, not
+     consumed.  A set induction, because the authority is spatial and
+     [big_sepS_intro]'s □ would drop it. *)
+  Local Lemma keys_pure (ξ' : CtxId) (q : Qp) (B' : nat)
+      (D' D : gset (nat * Arch.pa)) :
+    ctx_at ξ' q B' D' -∗ ([∗ set] k ∈ D, key_at ξ' k) -∗
+    ctx_at ξ' q B' D' ∗ ⌜∀ k, k ∈ D → (k.1 ≤ B')%nat ∨ k ∈ D'⌝.
+  Proof.
+    induction D as [|k D Hk IH] using set_ind_L.
+    - iIntros "Hat _". iFrame "Hat". iPureIntro. intros k Hk. set_solver.
+    - iIntros "Hat Hks". rewrite big_sepS_insert; [|exact Hk].
+      iDestruct "Hks" as "[#Hkey Hks]".
+      iDestruct (IH with "Hat Hks") as "[[Hb Hd] %HD]".
+      iAssert (⌜(k.1 ≤ B')%nat ∨ k ∈ D'⌝)%I as %Hk'.
+      { iDestruct "Hkey" as "[Hcl|Hdt]".
+        - iDestruct (llb_valid_q with "Hb Hcl") as %?. iPureIntro. by left.
+        - iDestruct (dset_lookup with "Hd Hdt") as %?. iPureIntro. by right. }
+      iFrame "Hb Hd". iPureIntro. intros k' Hk'in.
+      apply elem_of_union in Hk'in as [->%elem_of_singleton | Hin]; [exact Hk' | exact (HD _ Hin)].
+  Qed.
+
+  (* THE CORE OF MINT 1: a running context ξ' takes on the keys of a
+     context ξ running beside it on THIS hart.  ξ's dirty keys are this
+     hart's own messages (their [dirty_ok]), so registering them at ξ'
+     keeps ξ''s invariant once ξ''s bound has risen to [max B' B] -- both
+     under this hart's view ([ctx_bound_raise]'s argument, paid with the
+     joined receipt); ξ''s watermark joins by [llb_max].  What comes out
+     beside ξ''s token is exactly the domination body about ξ': the floor
+     at ξ's bound and, per key of ξ, its registration.  ξ's own authority
+     is not touched, which is why the same core serves the park (full
+     authority moves) and the borrow (a half moves, the rest is a
+     give-back).
+
+     THE WATERMARK JOIN [max W' W] IS LOAD-BEARING: it is what makes a
+     later STAMP of ξ' (mint 2, at or above its watermark) cover ξ's keys
+     -- hence what keeps a child validly parked when its parent is stamped
+     and resumed on another hart, i.e. what makes the mints compose. *)
+  Local Lemma ctx_dom_run_core `{CID : CpuId} (ξ' : CtxId) (B K W : nat)
+      (D : gset (nat * Arch.pa)) :
+    (B ≤ K)%nat → (∀ k, k ∈ D → (k.1 ≤ W)%nat) →
+    own_context ξ' -∗
+    view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    llb loglen_name W -∗
+    ([∗ set] k ∈ D, dirty_ok logm_name (hart_agent cpu_id) B k) ==∗
+    own_context ξ' ∗ ctx_floor ξ' B ∗ [∗ set] k ∈ D, key_at ξ' k.
+  Proof.
+    iIntros (HBK HDW) "Hrun' #HK #HW #Hoks".
+    rewrite own_context_unseal /own_context_def.
+    iDestruct "Hrun'" as "(%B' & %K' & %W' & %D' & [Hb' Hd'] & #HK' & %HBK' & #HW' & %HD'W' & #Hoks')".
+    iDestruct (view_lb_join with "HK' HK") as "#HKK".
+    iMod (mono_nat_own_update (Nat.max B' B) with "Hb'") as "[Hb' #Hlb']"; first lia.
+    iMod (dset_insert_set (ctx_dirty_name ξ') D' D with "Hd'") as "[Hd' #Hins]".
+    iAssert ([∗ set] k ∈ D' ∪ D, dirty_ok logm_name (hart_agent cpu_id) (Nat.max B' B) k)%I
+      as "#Hoks''".
+    { iApply big_sepS_intro. iIntros "!>" (k Hk).
+      apply elem_of_union in Hk as [Hk|Hk].
+      - iApply (dirty_ok_mono _ _ B' with "[]"); [lia|].
+        iApply (big_sepS_elem_of with "Hoks'"). exact Hk.
+      - iApply (dirty_ok_mono _ _ B with "[]"); [lia|].
+        iApply (big_sepS_elem_of with "Hoks"). exact Hk. }
+    iModIntro.
+    iSplitL "Hb' Hd'".
+    { iExists (Nat.max B' B), (Nat.max K' K), (Nat.max W' W), (D' ∪ D).
+      iFrame "Hb' Hd' HKK Hoks''".
+      iSplitR; [iPureIntro; lia|].
+      iSplitR; [iApply (llb_max with "HW' HW")|].
+      iPureIntro. intros k Hk. apply elem_of_union in Hk as [Hk|Hk].
+      - have := HD'W' _ Hk. lia.
+      - have := HDW _ Hk. lia. }
+    iSplitR.
+    { rewrite /ctx_floor. iApply (llb_le _ (Nat.max B' B)); [lia|].
+      rewrite /llb. iLeft. iExact "Hlb'". }
+    iApply big_sepS_intro. iIntros "!>" (k Hk).
+    rewrite /key_at. iRight. iApply (big_sepS_elem_of with "Hins"). exact Hk.
+  Qed.
+
+  (* PARK -- mint 1 at full authority: both running here, ξ's whole
+     authority moves into the relation.  No fence, no view receipt, no
+     stamp: a statement about two contexts on one hart.  This is the
+     thread record at [swtch] (the parker parks under the TARGET, whose
+     token the resume half has just produced) and the forked child under
+     its parent. *)
+  Lemma ctx_park `{CID : CpuId} (ξ ξ' : CtxId) :
+    own_context ξ' -∗ own_context ξ ==∗ own_context ξ' ∗ ctx_parked ξ ξ'.
+  Proof.
+    iIntros "Hrun' Hrun".
+    iEval (rewrite own_context_unseal /own_context_def) in "Hrun".
+    iDestruct "Hrun" as "(%B & %K & %W & %D & Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iMod (ctx_dom_run_core ξ' B K W D HBK HDW with "Hrun' HK HW Hoks")
+      as "(Hrun' & #Hfl & #Hks)".
+    iModIntro. iFrame "Hrun'".
+    rewrite ctx_parked_unseal /ctx_dom_at_def.
+    iExists B, D. iFrame "Hat Hfl". iModIntro. iExact "Hks".
+  Qed.
+
+  (* RESUME: the dominator runs here, so the dominated may.  The child's
+     bound rises to the parent's; every child key is under it (clean at
+     ξ') or registered at ξ' (so ξ''s own justification on this hart
+     applies); the watermark is the join of the parent's with its view.
+     No receipt, no interp; the parent's token comes straight back.
+     Chains resume parents first: nothing is ever parked under a parked
+     context, and a running parent with children may itself park. *)
+  Lemma ctx_resume `{CID : CpuId} (ξ ξ' : CtxId) :
+    own_context ξ' -∗ ctx_parked ξ ξ' ==∗ own_context ξ' ∗ own_context ξ.
+  Proof.
+    rewrite !own_context_unseal /own_context_def ctx_parked_unseal /ctx_dom_at_def.
+    iIntros "(%B' & %K' & %W' & %D' & [Hb' Hd'] & #HK' & %HBK' & #HW' & %HD'W' & #Hoks')
+             (%B & %D & [Hb Hd] & #Hfl & #Hks)".
+    iDestruct (llb_valid with "Hb' Hfl") as %HBB'.
+    iDestruct (keys_pure ξ' 1 B' D' D with "[$Hb' $Hd'] Hks") as "[[Hb' Hd'] %Hkeys]".
+    iMod (mono_nat_own_update B' with "Hb") as "[Hb _]"; first exact HBB'.
+    iModIntro.
+    iSplitL "Hb' Hd'".
+    { iExists B', K', W', D'. iFrame "Hb' Hd' HK' HW' Hoks'". by iPureIntro. }
+    iAssert ([∗ set] k ∈ D, dirty_ok logm_name (hart_agent cpu_id) B' k)%I as "#Hoks".
+    { iApply big_sepS_intro. iIntros "!>" (k Hk).
+      destruct (Hkeys k Hk) as [HkB' | HkD'].
+      - iLeft. by iPureIntro.
+      - iApply (big_sepS_elem_of with "Hoks'"). exact HkD'. }
+    iExists B', K', (Nat.max W' K'), D. iFrame "Hb Hd HK' Hoks".
+    iSplitR; first done.
+    iSplitR.
+    { iApply (llb_max with "HW'"). by iApply view_lb_llb. }
+    iPureIntro. intros k Hk. destruct (Hkeys k Hk) as [HkB' | HkD'].
+    - lia.
+    - have := HD'W' _ HkD'. lia.
+  Qed.
+
+  (* MINT 1 AT A HALF -- THE SAME-HART BORROW: the park minus the parking.
+     ξ's authority is untouched, so the give-back is [ctx_at_agree] plus
+     [ctx_at_halves] and the source token comes back exactly as it went
+     in. *)
+  Lemma ctx_dom_run `{CID : CpuId} (ξ ξ' : CtxId) :
+    own_context ξ -∗ own_context ξ' ==∗
+    own_context ξ' ∗ ctx_dom ξ ξ' ∗ (ctx_dom ξ ξ' -∗ own_context ξ).
+  Proof.
+    iIntros "Hrun Hrun'".
+    iEval (rewrite own_context_unseal /own_context_def) in "Hrun".
+    iDestruct "Hrun" as "(%B & %K & %W & %D & Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iMod (ctx_dom_run_core ξ' B K W D HBK HDW with "Hrun' HK HW Hoks")
+      as "(Hrun' & #Hfl & #Hks)".
+    iModIntro. iFrame "Hrun'".
+    rewrite ctx_dom_unseal /ctx_dom_at_def own_context_unseal /own_context_def.
+    iDestruct (ctx_at_halves with "Hat") as "[Hat1 Hat2]".
+    iSplitL "Hat1".
+    { iExists B, D. iFrame "Hat1 Hfl". iModIntro. iExact "Hks". }
+    (* the give-back *)
+    iIntros "(%B0 & %D0 & Hat0 & _ & _)".
+    iDestruct (ctx_at_agree with "Hat0 Hat2") as %[-> ->].
+    iCombine "Hat0 Hat2" as "Hat".
+    rewrite -ctx_at_halves.
+    iExists B, K, W, D. iFrame "Hat HK HW Hoks". by iPureIntro.
+  Qed.
+
+  (* THE SAME-HART HAND-OFF (tso-port.md §0.43′): a context-indexed fact
+     moves between two RUNNING contexts on one hart, with both running
+     tokens in hand -- mint, morph, give back, for EVERY [CtxMorph]
+     payload.  This is the store-forwarding step at swtch: the
+     scheduler's [p->state = RUNNING] / [c->proc = p] stores are still in
+     the hart's store buffer when the resumed thread reads them, and the
+     parker's save-area stores are buffered when the scheduler resumes;
+     the hardware forwards, and in the logic that is the dirty
+     registration mint 1 records.  Nothing here consults the
+     interpretation. *)
+  Lemma ctx_move `{CID : CpuId} {R : CtxId → iProp Σ} `{!CtxMorph R}
+      (ξ0 ξ1 : CtxId) :
+    own_context ξ0 -∗ own_context ξ1 -∗ R ξ0 ==∗
+    own_context ξ0 ∗ own_context ξ1 ∗ R ξ1.
+  Proof.
+    iIntros "H0 H1 HR".
+    iMod (ctx_dom_run ξ0 ξ1 with "H0 H1") as "(H1 & Hdom & Hback)".
+    iMod (ctx_morph with "Hdom HR") as "[Hdom HR]".
+    iModIntro. iFrame "H1 HR". by iApply "Hback".
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* Mint 4 and the algebra of the parked-under record                 *)
+  (* ---------------------------------------------------------------- *)
+
+  (* MINT 4 -- A PARKED RECORD LENDS A HALF TO ITS DOMINATOR: the parent
+     pulls facts out of a child without resuming it (a zombie's cells);
+     the child's token comes back unchanged. *)
+  Lemma ctx_parked_borrow (ξ ξ' : CtxId) :
+    ctx_parked ξ ξ' ⊢ ctx_dom ξ ξ' ∗ (ctx_dom ξ ξ' -∗ ctx_parked ξ ξ').
+  Proof.
+    rewrite ctx_dom_unseal ctx_parked_unseal /ctx_dom_at_def.
+    iIntros "(%B & %D & Hat & #Hfl & #Hks)".
+    iDestruct (ctx_at_halves with "Hat") as "[Hat1 Hat2]".
+    iSplitL "Hat1".
+    { iExists B, D. iFrame "Hat1 Hfl". iModIntro. iExact "Hks". }
+    iIntros "(%B0 & %D0 & Hat0 & _ & _)".
+    iDestruct (ctx_at_agree with "Hat0 Hat2") as %[-> ->].
+    iCombine "Hat0 Hat2" as "Hat". rewrite -ctx_at_halves.
+    iExists B, D. iFrame "Hat Hfl". iModIntro. iExact "Hks".
+  Qed.
+
+  (* THE RELATION COMPOSES THROUGH A DOMINATED MIDDLE: ξ dominated by ξ',
+     ξ' dominated by ξ'', hence ξ dominated by ξ'' -- a floor of ξ' is a
+     floor of ξ'' and a key clean or dirty at ξ' is clean or dirty at ξ''.
+     Stated at any fraction of ξ's authority: at 1 it is the transport of
+     a PARKED record along its parent's domination ([ctx_parked_morph]),
+     so the record is a payload of its parent and rides the ordinary lock
+     transport.  Through a RUNNING middle context nothing composes (no
+     [ctx_dom ξ' _] exists while ξ' runs), which is all "chains resume
+     parents first" needs. *)
+  Lemma ctx_dom_at_dom (ξ ξ' ξ'' : CtxId) (q : Qp) :
+    ctx_dom ξ' ξ'' -∗ ctx_dom_at ξ ξ' q -∗ ctx_dom ξ' ξ'' ∗ ctx_dom_at ξ ξ'' q.
+  Proof.
+    rewrite ctx_dom_unseal !ctx_dom_at_unseal /ctx_dom_at_def.
+    iIntros "(%B' & %D' & [Hb' Hd'] & #Hfl' & #Hks') (%B & %D & Hat & #Hfl & #Hks)".
+    iDestruct (llb_valid_q with "Hb' Hfl") as %HBB'.
+    iDestruct (keys_pure ξ' (1/2) B' D' D with "[$Hb' $Hd'] Hks") as "[[Hb' Hd'] %Hkeys]".
+    iAssert (ctx_floor ξ'' B) as "#Hfl''".
+    { iApply (ctx_floor_le _ _ _ HBB' with "Hfl'"). }
+    iAssert ([∗ set] k ∈ D, key_at ξ'' k)%I as "#Hks''".
+    { iApply big_sepS_intro. iIntros "!>" (k Hk).
+      destruct (Hkeys k Hk) as [HkB' | HkD'].
+      - rewrite /key_at. iLeft. iApply (ctx_floor_le _ _ _ HkB' with "Hfl'").
+      - iApply (big_sepS_elem_of with "Hks'"). exact HkD'. }
+    iSplitL "Hb' Hd'".
+    { iExists B', D'. iFrame "Hb' Hd' Hfl'". iModIntro. iExact "Hks'". }
+    iExists B, D. iFrame "Hat Hfl''". iModIntro. iExact "Hks''".
+  Qed.
+
+  Global Instance ctx_parked_morph (ξ : CtxId) : CtxMorph (λ ξ', ctx_parked ξ ξ').
+  Proof.
+    rewrite /ctx_parked. iIntros (ξ' ξ'') "Hd HP".
+    iDestruct (ctx_dom_at_dom ξ ξ' ξ'' 1 with "Hd HP") as "[Hd HP]".
+    iModIntro. iFrame "Hd HP".
+  Qed.
+
+  (* Chains flatten through a PARKED middle context (mint 4 and the
+     composition), never through a running one. *)
+  Lemma ctx_parked_flatten (ξ P S : CtxId) :
+    ctx_parked ξ P -∗ ctx_parked P S -∗ ctx_parked ξ S ∗ ctx_parked P S.
+  Proof.
+    iIntros "Hξ HP".
+    iDestruct (ctx_parked_borrow with "HP") as "[Hd Hback]".
+    iDestruct (ctx_dom_at_dom ξ P S 1 with "Hd Hξ") as "[Hd Hξ]".
+    iSplitL "Hξ"; [iExact "Hξ" | by iApply "Hback"].
+  Qed.
+
+  (* THE BRIDGE FROM THE ROOT: a stamped record beside a floor of ξ' over
+     its stamp IS a record parked under ξ' -- every key is under T, and T
+     is under ξ''s bound.  Pure, so a producer of the stamped form
+     converts at its boundary. *)
+  Lemma ctx_parked_of_stamped (ξ ξ' : CtxId) (T : nat) :
+    ctx_stamped ξ T -∗ ctx_floor ξ' T -∗ ctx_parked ξ ξ'.
+  Proof.
+    rewrite ctx_stamped_unseal /ctx_stamped_def ctx_parked_unseal /ctx_dom_at_def.
+    iIntros "(%D & Hat & #HT & %HDT) #Hfl".
+    iExists T, D. iFrame "Hat Hfl".
+    iModIntro. iApply big_sepS_intro. iIntros "!>" (k Hk).
+    rewrite /key_at. iLeft. iApply (ctx_floor_le _ _ _ (HDT _ Hk) with "Hfl").
+  Qed.
+
+  (* A RECORD PARKED UNDER A STAMPED ROOT IS ITSELF STAMPED at the root's
+     stamp: every key of ξ is clean under T at ξ' or registered at ξ',
+     hence ≤ T by the root's own row; ξ's bound RISES to T (a bupd -- the
+     child's bound authority sits at B ≤ T and a wand cannot move it).
+     The root is threaded, not consumed. *)
+  Lemma ctx_stamped_of_parked (ξ ξ' : CtxId) (T : nat) :
+    ctx_stamped ξ' T -∗ ctx_parked ξ ξ' ==∗ ctx_stamped ξ' T ∗ ctx_stamped ξ T.
+  Proof.
+    rewrite !ctx_stamped_unseal /ctx_stamped_def ctx_parked_unseal /ctx_dom_at_def.
+    iIntros "(%D' & Hat' & #HT & %HD'T) (%B & %D & [Hb Hd] & #Hfl & #Hks)".
+    iDestruct (keys_pure ξ' 1 T D' D with "Hat' Hks") as "[[Hb' Hd'] %Hkeys]".
+    iDestruct (llb_valid with "Hb' Hfl") as %HBT.
+    iMod (mono_nat_own_update T with "Hb") as "[Hb _]"; first exact HBT.
+    iModIntro. iSplitL "Hb' Hd'".
+    { iExists D'. iFrame "Hb' Hd' HT". by iPureIntro. }
+    iExists D. iFrame "Hb Hd HT". iPureIntro. intros k Hk.
+    destruct (Hkeys k Hk) as [?|HkD']; [lia | exact (HD'T _ HkD')].
+  Qed.
+
+  (* EXCLUSIVITY: the whole authority is inside, so a context is parked
+     under at most one parent and never both parked and running.
+     Corollary: [ctx_park ξ ξ] and [ctx_resume ξ ξ] are vacuous. *)
+  Lemma ctx_parked_excl (ξ ξ1 ξ2 : CtxId) :
+    ctx_parked ξ ξ1 -∗ ctx_parked ξ ξ2 -∗ False.
+  Proof.
+    rewrite !ctx_parked_unseal /ctx_dom_at_def.
+    iIntros "(%B1 & %D1 & [Hb1 _] & _ & _) (%B2 & %D2 & [Hb2 _] & _ & _)".
+    iDestruct (mono_nat_auth_own_agree with "Hb1 Hb2") as %[Hq _].
+    exfalso. by apply (Qp.not_add_le_l 1 1).
+  Qed.
+
+  Lemma ctx_parked_running_excl `{CID : CpuId} (ξ ξ' : CtxId) :
+    ctx_parked ξ ξ' -∗ own_context ξ -∗ False.
+  Proof.
+    rewrite ctx_parked_unseal /ctx_dom_at_def own_context_unseal /own_context_def.
+    iIntros "(%B1 & %D1 & [Hb1 _] & _ & _) (%B & %K & %W & %D & [Hb _] & _)".
+    iDestruct (mono_nat_auth_own_agree with "Hb1 Hb") as %[Hq _].
+    exfalso. by apply (Qp.not_add_le_l 1 1).
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -1493,13 +1932,33 @@ Section ctx.
     iFrame "Hlb". iExists TM, LM. iFrame "Hts Hm Hlen Hv". by iPureIntro.
   Qed.
 
-  Lemma ctx_parked_llb ξ T :
-    ctx_parked ξ T -∗ ctx_parked ξ T ∗ llb loglen_name T.
+  Lemma ctx_stamped_llb ξ T :
+    ctx_stamped ξ T -∗ ctx_stamped ξ T ∗ llb loglen_name T.
   Proof.
-    rewrite ctx_parked_unseal /ctx_parked_def.
+    rewrite ctx_stamped_unseal /ctx_stamped_def.
     iIntros "(%D & Hat & #HT & %HDT)".
     iSplitL "Hat"; last iExact "HT".
     iExists D. iFrame "Hat HT". by iPureIntro.
+  Qed.
+
+  (* A STAMPED CONTEXT'S STAMP RISES AT A LOG-LENGTH RECEIPT.  A stamped
+     context has no hart, so raising its stamp falsifies nothing: every
+     clean fact is still under the (larger) stamp, and the dirty positions
+     were under the old one.  What comes out beside it is the floor a
+     payload row needs ([WpLock.lock_pay_intro_llb]'s R2 fold). *)
+  Lemma ctx_stamped_raise (ξ : CtxId) (T T' : nat) :
+    llb loglen_name T' -∗ ctx_stamped ξ T ==∗
+    ctx_stamped ξ (Nat.max T T') ∗ ctx_floor ξ T'.
+  Proof.
+    rewrite !ctx_stamped_unseal /ctx_stamped_def.
+    iIntros "#HT' (%D & [Hb Hd] & #HT & %HDT)".
+    iMod (mono_nat_own_update (Nat.max T T') with "Hb") as "[Hb #Hlb]"; first lia.
+    iModIntro. iSplitL.
+    - iExists D. iFrame "Hb Hd".
+      iSplitR; first by iApply (llb_max with "HT HT'").
+      iPureIntro. intros k Hk. have := HDT _ Hk. lia.
+    - rewrite /ctx_floor /llb. iLeft.
+      iApply (mono_nat_lb_own_le with "Hlb"). lia.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -2188,18 +2647,18 @@ Section ctx.
   Qed.
 
   (* THE TRANSPORT: a crossing turns the creator's arm into the receiver's
-     LEFT arm for free -- [ctx_dom] already says the sender's dirty
-     watermark is below the receiver's bound. *)
+     -- the dirty key is a key of the sender, and the domination body
+     carries its justification at the receiver: a floor (the key is clean
+     there) or the receiver's own registration (a same-hart mint).  Both
+     consumers of the floor are two-armed already. *)
   Lemma ctx_dom_wrote_floor (ξ ξ' : CtxId) (t : nat) (a : Arch.pa) :
-    ctx_dom ξ ξ' -∗ ctx_wrote ξ t a -∗ ctx_dom ξ ξ' ∗ ctx_floor ξ' t.
+    ctx_dom ξ ξ' -∗ ctx_wrote ξ t a -∗
+    ctx_dom ξ ξ' ∗ (ctx_floor ξ' t ∨ ctx_wrote ξ' t a).
   Proof.
-    rewrite ctx_dom_unseal /ctx_dom_def /ctx_floor /ctx_wrote.
-    iIntros "(%B & %W & %B' & %D & [Hb Hd] & %HDW & %HBB' & %HWB' & #Hlb') #Hw".
-    iDestruct (dset_lookup with "Hd Hw") as %HD.
-    pose proof (HDW _ HD) as HtW. simpl in HtW.
-    iSplitR "".
-    - iExists B, W, B', D. iFrame "Hb Hd Hlb'". by iPureIntro.
-    - iApply (llb_le _ B'); [lia|]. by iLeft.
+    iIntros "Hd #Hw".
+    iDestruct (ctx_dom_key ξ ξ' (t, a) with "Hd [Hw]") as "[Hd #Hk]".
+    { rewrite /key_at /ctx_wrote /=. by iRight. }
+    iFrame "Hd". rewrite /key_at /ctx_floor /ctx_wrote /=. iExact "Hk".
   Qed.
 
   (* a log-length receipt, validated against the interpretation *)
@@ -2462,23 +2921,10 @@ Section ctx.
     CtxMorph (λ ξ, ctx_phys_pointsto_h ξ a v).
   Proof.
     iIntros (ξ ξ') "Hd HP".
-    rewrite ctx_dom_unseal /ctx_dom_def /ctx_phys_pointsto_h.
-    iDestruct "Hd" as
-      "(%B & %W & %B' & %D & [Hb Hdm] & %HDW & %HBB' & %HWB' & #Hlb')".
+    rewrite /ctx_phys_pointsto_h.
     iDestruct "HP" as "(%t & Hpt & Hts & Hbit)".
-    iAssert (⌜(t ≤ B')%nat⌝)%I as %HtB'.
-    { iDestruct "Hbit" as "[Hcl | Hdt]".
-      - iDestruct (llb_valid_q with "Hb Hcl") as %HtB.
-        iPureIntro. lia.
-      - iDestruct (dset_lookup with "Hdm Hdt") as %HDt.
-        have HtW : ((t, a).1 ≤ W)%nat by apply HDW.
-        simpl in HtW. iPureIntro. lia. }
-    iClear "Hbit". iModIntro.
-    iSplitL "Hb Hdm".
-    { iExists B, W, B', D. iFrame "Hb Hdm Hlb'". by iPureIntro. }
-    iExists t. iFrame "Hpt Hts".
-    iLeft. rewrite /llb. iLeft.
-    iApply (mono_nat_lb_own_le with "Hlb'"). lia.
+    iDestruct (ctx_dom_key ξ ξ' (t, a) with "Hd Hbit") as "[Hd #Hbit']".
+    iModIntro. iFrame "Hd". iExists t. iFrame "Hpt Hts". iExact "Hbit'".
   Qed.
 
   (* >>> A6.125 step 4: THE OFFER/KEEP SPLIT of a ctx cell (VirtioProto's
@@ -2524,23 +2970,10 @@ Section ctx.
     CtxMorph (λ ξ, ctx_cell_keep ξ a).
   Proof.
     iIntros (ξ ξ') "Hd HP".
-    rewrite ctx_dom_unseal /ctx_dom_def /ctx_cell_keep.
-    iDestruct "Hd" as
-      "(%B & %W & %B' & %D & [Hb Hdm] & %HDW & %HBB' & %HWB' & #Hlb')".
+    rewrite /ctx_cell_keep.
     iDestruct "HP" as "(%t & Hts & Hbit)".
-    iAssert (⌜(t ≤ B')%nat⌝)%I as %HtB'.
-    { iDestruct "Hbit" as "[Hcl | Hdt]".
-      - iDestruct (llb_valid_q with "Hb Hcl") as %HtB.
-        iPureIntro. lia.
-      - iDestruct (dset_lookup with "Hdm Hdt") as %HDt.
-        have HtW : ((t, a).1 ≤ W)%nat by apply HDW.
-        simpl in HtW. iPureIntro. lia. }
-    iClear "Hbit". iModIntro.
-    iSplitL "Hb Hdm".
-    { iExists B, W, B', D. iFrame "Hb Hdm Hlb'". by iPureIntro. }
-    iExists t. iFrame "Hts".
-    iLeft. rewrite /llb. iLeft.
-    iApply (mono_nat_lb_own_le with "Hlb'"). lia.
+    iDestruct (ctx_dom_key ξ ξ' (t, a) with "Hd Hbit") as "[Hd #Hbit']".
+    iModIntro. iFrame "Hd". iExists t. iFrame "Hts". iExact "Hbit'".
   Qed.
 
   (* exclusivity at the REGISTERED physical tier, the companion of
@@ -3683,13 +4116,15 @@ Notation "a ↦ₛ[ kt ] dq s" := (ctx_string_pointsto (KTR := kt) cur_ctx a dq 
   (at level 20, kt at level 50, dq custom dfrac at level 1,
    format "a  ↦ₛ[ kt ] dq  s") : bi_scope.
 
-(* The seal.  [ctx_dom] and [hart_view_lb] stay opaque too: nothing above
-   this file may learn their bodies, and nothing may learn what
-   [ctx_parked] does with its stamp. *)
-Global Typeclasses Opaque own_context ctx_parked hart_view_lb
-  ctx_pointsto ctx_dom ctx_phys_pointsto.
-Global Opaque own_context ctx_parked hart_view_lb ctx_pointsto ctx_dom
-  ctx_phys_pointsto.
+(* The seal.  The domination relation ([ctx_dom_at] and its two faces
+   [ctx_dom] / [ctx_parked]) and [hart_view_lb] stay opaque too: nothing
+   above this file may learn their bodies -- a client never sees the
+   domination big-op, so no [iFrame] ever crawls it -- and nothing may
+   learn what [ctx_stamped] does with its stamp. *)
+Global Typeclasses Opaque own_context ctx_stamped hart_view_lb
+  ctx_pointsto ctx_dom_at ctx_dom ctx_parked ctx_phys_pointsto.
+Global Opaque own_context ctx_stamped hart_view_lb ctx_pointsto
+  ctx_dom_at ctx_dom ctx_parked ctx_phys_pointsto.
 (* [ctx_phys_pointsto] (A6.16) is sealed for exactly [ctx_pointsto]'s
    reason: the rehearsal's finding was that a PERMEABLE seal lets ctx↔raw
    cross silently by δ, and the physical family faces [phys_pointsto] the

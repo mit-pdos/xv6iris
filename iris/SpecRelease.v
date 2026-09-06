@@ -230,9 +230,9 @@ Definition wp_release_in_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lka s R -∗
   locked γl cpu_id -∗
-  (* THE DEPOSIT, PRE-PARKED (A6.127 §6): the free arm's record itself,
-     produced from the caller's running token -- what a release that just
-     created a thread record holds (its park box is the lock's context) *)
+  (* THE DEPOSIT, PRE-PARKED: the free arm's record itself, produced from
+     the caller's running token -- what a release whose payload carries a
+     FLOOR holds ([WpLockIn], [WpLock.lock_pay_intro_llb]) *)
   (own_context cur_ctx ==∗ own_context cur_ctx ∗ lock_pay R) -∗
   cpu_own (S n) eb p false lks -∗
   arm_pay kt n eb p -∗

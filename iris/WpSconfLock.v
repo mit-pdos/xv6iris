@@ -2010,14 +2010,14 @@ Section WpSconfLock.
            below it.  The BioBox guard mint ([aguard_receipt]) consumes it. *)
         (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) -∗
         (* >>> A6.119: THE WINNER RECEIVES THE WHOLE PARKED RECORD.  The
-           invariant's free arm holds [lock_pay R] = [∃ ξ T, ctx_parked ξ T ∗
+           invariant's free arm holds [lock_pay R] = [∃ ξ T, ctx_stamped ξ T ∗
            R ξ]; this post used to promise only [∃ ξ, R ξ], i.e. to DROP
-           [ctx_parked].  §0.18′/A6.66 puts the parked-record absorb AT
-           ACQUIRE ([ctx_dom_of_parked] against the AMO's at-the-top
+           [ctx_stamped].  §0.18′/A6.66 puts the parked-record absorb AT
+           ACQUIRE ([ctx_dom_of_stamped] against the AMO's at-the-top
            evidence), so the leaf hands the record over and [SpecAcquire]
            absorbs it.  The old post was pre-flip residue, never checked
            because this file has been red upstream of it since the baseline.
-           FORWARD PAYOFF: [ctx_parked ξ T] arriving at the winner is exactly
+           FORWARD PAYOFF: [ctx_stamped ξ T] arriving at the winner is exactly
            what §0.27′'s resume tie will consume -- this is that ruling's
            prerequisite landing early, not incidental churn. <<< *)
         (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ WpLock.lock_pay_won R
@@ -2294,7 +2294,7 @@ Section WpSconfLock.
                    WITH its floor at that stamp ([WpLock.lock_pay_won]) --
                    the absorb's premise, minted where the evidence is. *)
                 iDestruct "HR" as (ξw Tw) "[>Hpkw HR]".
-                iDestruct (TsoCtx.ctx_parked_llb with "Hpkw") as "[Hpkw #HTw]".
+                iDestruct (TsoCtx.ctx_stamped_llb with "Hpkw") as "[Hpkw #HTw]".
                 iDestruct (tso_interp_of_pin with "Htso") as %Hpinw.
                 iEval (rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                                   sigma.(sregs) sigma.(mdev) Hpinw)) in "Htso".

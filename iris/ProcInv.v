@@ -2827,7 +2827,7 @@ Section ProcPtMorph.
   (* [proc_ptm_at] is [proc_pt_at]'s lazy twin: the same two [↦₈] cells,
      then the page-table frame and the LAZY user memory -- which is
      [umem_own] under three pure facts, so it closes on
-     [ProcPtOwn.umem_own_morph] and [PtTreeMove.pt_frame_at_morph]. *)
+     [ProcPtOwn.umem_own_morph] and [PtTreeMorph.pt_frame_at_morph]. *)
   (* the descriptor's two page-table cells ([p_pagetable], [p_trapframe]) *)
   Global Instance proc_pt_cells_morph (pa : SailStdpp.Values.mword 64) (P : uptd) :
     CtxMorph (λ ξ : CtxId, (proc_pt_cells (XI := ξ) pa P : iProp Σ)).

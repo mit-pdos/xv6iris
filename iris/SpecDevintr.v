@@ -71,7 +71,6 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
-Require Import TsoCtxMove.
 Require Import SchedCtx.
 Require Import DiskPtsto WpUart DiskInv.
 Require Import TimerCap.
@@ -81,7 +80,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx.
+Require Import TsoCtx CtxMorphTac.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -159,42 +158,30 @@ Section DevintrCaps.
     Persistent (devintr_caps γu γv γdk γtl γs pd pav pu).
   Proof. rewrite /devintr_caps. apply _. Qed.
 
-  (* A6.139: the bundle CROSSES contexts -- every ξ-relative member is a
-     lock handle ([CtxMove] via [SchedCtx.is_lock_move]) and the rest are
-     context-free.  This is what funds [SpecKernelvec.kernelvec_env]'s
-     packed swtch-crossing witness. *)
-  Global Instance console_caps_move γu :
-    CtxMove (λ ξ, console_caps (XI := ξ) γu).
-  Proof.
-    rewrite /console_caps /UartTxInv.is_txlock /ConsoleInv.is_conslock.
-    ctx_move_solve.
-  Qed.
-  Global Instance disk_geom_move γv pd pav pu :
-    CtxMove (λ ξ, disk_geom (XI := ξ) γv pd pav pu).
-  Proof. rewrite /disk_geom. ctx_move_solve. Qed.
-  Global Instance tick_keeper_move γtl γs :
-    CtxMove (λ ξ, tick_keeper (XI := ξ) γtl γs).
-  Proof.
-    rewrite /tick_keeper /TicksInv.is_tickslock. ctx_move_solve.
-  Qed.
 End DevintrCaps.
 
-(* stated after the section so the bundle's context is explicit
-   (SchedCtx's A6.129 pattern) *)
-Section DevintrCapsMove.
+(* A6.139: THE BUNDLE CROSSES CONTEXTS -- every ξ-relative member is a lock
+   handle ([CtxMorph] via [SchedCtx.is_lock_morph]) and the rest are
+   context-free.  This is what funds [SpecKernelvec.kernelvec_env]'s packed
+   crossing witness.  Stated after the section so the bundle's context is
+   explicit (SchedCtx's A6.129 pattern): the transport class names no hart,
+   while the bundle's hart is a PARAMETER of the payload -- a parked world's
+   credentials stay at the parked hart while the mover runs wherever it
+   runs.  [disk_geom] is carried by [DiskInv.disk_geom_morph]; the console
+   bundle's own name is qualified because [SpecMainSecondary] states the
+   same payload's instance on a sibling branch of the import graph. *)
+Section DevintrCapsMorph.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  (* the class hart (the crossing's tokens) and the bundle's hart are
-     SPLIT: a parked world's credentials stay at the parked hart while the
-     mover runs wherever it runs. *)
-  Global Instance tick_keeper_move_at (CIDc : CpuId) γtl γs :
-    CtxMove (λ ξ, tick_keeper (XI := ξ) (CID := CIDc) γtl γs).
-  Proof. rewrite /tick_keeper /TicksInv.is_tickslock. ctx_move_solve. Qed.
-  Global Instance devintr_caps_move (CIDc : CpuId) γu γv γdk γtl γs pd pav pu :
-    CtxMove (λ ξ, devintr_caps (XI := ξ) (CID := CIDc)
-                    γu γv γdk γtl γs pd pav pu).
-  Proof. rewrite /devintr_caps. ctx_move_solve. Qed.
-End DevintrCapsMove.
+  Context `{GEN : GenId}.
+
+  Global Instance tick_keeper_morph (CIDc : CpuId) γtl γs :
+    CtxMorph (λ ξ, tick_keeper (XI := ξ) (CID := CIDc) γtl γs).
+  Proof. rewrite /tick_keeper /TicksInv.is_tickslock. ctx_morph_solve. Qed.
+  Global Instance devintr_caps_morph (CIDc : CpuId) γu γv γdk γtl γs pd pav pu :
+    CtxMorph (λ ξ, devintr_caps (XI := ξ) (CID := CIDc)
+                     γu γv γdk γtl γs pd pav pu).
+  Proof. rewrite /devintr_caps. ctx_morph_solve. Qed.
+End DevintrCapsMorph.
 
 (* devintr's own frame is 4 slots; the deepest callee is uartintr at
    [SpecUartintr.uartintr_stack] = 36 (virtio_disk_intr wants 22, clockintr

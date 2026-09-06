@@ -32,7 +32,6 @@ Require Import MinstretInv.
 Require Import KernelText.
 Require Import WpIntrCore.
 Require Import IntrDefs.
-Require Import TsoCtxMove.
 (* devintr_caps: the PERSISTENT device/proc credential kerneltrap's cone needs.
    It is closed over here, exactly as [hw_config] / [minstret_inv] /
    [kernel_text] already are -- the handler contract is a [□], so everything it
@@ -97,14 +96,14 @@ Lemma kernelvec_env_move
   ⊢ □ IntrDefs.env_move (kernelvec_env γu γv γdk γtl γs pd pav pu).
 Proof.
   iModIntro. rewrite /IntrDefs.env_move.
-  iIntros (CIDm ξ0 ξ1) "H0 H1 #HE".
+  iIntros (ξ0 ξ1) "Hd #HE".
   iEval (rewrite /kernelvec_env) in "HE".
-  iMod (ctx_move (CID := CIDm)
+  iMod (ctx_morph
           (R := λ ξ, devintr_caps (XI := ξ) (CID := CID)
                        γu γv γdk γtl γs pd pav pu)
-          ξ0 ξ1 with "H0 H1 HE") as "(H0 & H1 & HE1)".
+          ξ0 ξ1 with "Hd HE") as "(Hd & HE1)".
   iDestruct "HE1" as "#HE1".
-  iModIntro. iFrame "H0 H1".
+  iModIntro. iFrame "Hd".
   iEval (rewrite /kernelvec_env). iModIntro. iExact "HE1".
 Qed.
 

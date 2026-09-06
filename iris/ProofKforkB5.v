@@ -131,7 +131,7 @@ Section PstateUsedHelper.
   Proof. rewrite pstate_whole_split unclaimed_USED. done. Qed.
 End PstateUsedHelper.
 
-Module KforkB5 (AQ : ACQUIRE) (RL : RELEASE) (RLI : RELEASE_IN).
+Module KforkB5 (AQ : ACQUIRE) (RL : RELEASE).
 
 Section ProofKforkB5.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
@@ -301,10 +301,9 @@ Section ProofKforkB5.
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".
     iDestruct "Hpwhole" as "[Hplock Hpclaim]".
-    (* A6.127 §6: the child's record came WITH ITS BOX; the slot is built at
-       the box's context and the release below makes the box the lock's. *)
-    iDestruct "Hpctx" as (ξb Tb) "[Hbox Hpctx]".
-    iDestruct (SchedCtx.proc_slots_park_at γs ξb (proc_addr j) USED needs_ctx_USED
+    (* the child's record is parked under THIS context, so the slot -- and
+       the payload the release below deposits -- is built at the ambient. *)
+    iDestruct (SchedCtx.proc_slots_park γs (proc_addr j) USED needs_ctx_USED
                  with "Hpctx Hhart Hmk") as "Hslots".
     (* -------------------------------------------------------------- *)
     (* +0x0c2 c.mv a0,s4  -- regime OFF (np's lock still held)            *)
@@ -350,20 +349,14 @@ Section ProofKforkB5.
        for the call.  (The [rewrite -Hb] after the call does the reverse
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
-    iApply (RLI.wp_release_in_sconf KT1 (CID := CID0) γl (proc_addr j) "proc"%string
+    iDestruct (SchedCtx.proc_lock_res_intro γs γl (proc_addr j) USED ch
+                 with "Hpstcell Hplock Hpchan Hppub Hslots") as "HRused".
+    iApply (RL.wp_release_sconf KT1 (CID := CID0) γl (proc_addr j) "proc"%string
               (SchedCtx.proc_lock_pay γs γl (proc_addr j)) M2 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka1 (kfkb5_stack_ok K HK)
-              with "Hcg Htext Hpc [Hpinv] Htok [Hbox Hpstcell Hplock Hpchan Hppub Hslots] Hown Hpay").
+              with "Hcg Htext Hpc [Hpinv] Htok HRused Hown Hpay").
     { iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
-    { (* A6.129: the cells are deposited into the record's box, which the
-         release makes the lock's context *)
-      iIntros "Hrun".
-      iMod (SchedCtx.proc_lock_res_deposit γs γl (proc_addr j) USED ch ξb Tb
-              with "Hrun Hbox Hpstcell Hplock Hpchan Hppub Hslots")
-        as "[Hrun (%Tb' & _ & Hbox & HRused)]".
-      iModIntro. iFrame "Hrun". iApply SchedCtx.proc_lock_pay_of_box.
-      iExists ξb, Tb'. iFrame "Hbox HRused". }
     iIntros (CID1 Hs1 mr1) "Hcg Hpc %Hcs_2_r1 Hown".
     assert (Hfresh_proc : locks_below lks "proc")
       by lkbelow.

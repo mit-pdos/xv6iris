@@ -82,7 +82,7 @@ Require Import ConsoleInv.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx.
+Require Import TsoCtx CtxMorphTac.
 
 (* consoleintr's own frame (48 bytes = 6 slots) plus its deepest callee
    (wakeup, 18) is 24; this is that with slack.  consputc (16) and the two
@@ -101,6 +101,14 @@ Section ConsoleCaps.
 
   Global Instance console_caps_persistent `{XI : CurCtx} γu : Persistent (console_caps γu).
   Proof. rewrite /console_caps. apply _. Qed.
+
+  (* the capabilities are two lock handles, so they ride any domination *)
+  Global Instance console_caps_morph γu :
+    CtxMorph (λ ξ, console_caps (XI := ξ) γu).
+  Proof.
+    rewrite /console_caps /UartTxInv.is_txlock /ConsoleInv.is_conslock.
+    ctx_morph_solve.
+  Qed.
 
 End ConsoleCaps.
 

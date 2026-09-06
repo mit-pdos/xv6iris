@@ -10,9 +10,9 @@
    and [tso_interp_at] is only in hand INSIDE one.  A transport that needs
    both in one hand has no site.
 
-   THE FIX IS NOT A WEAKENING: [TsoCtx.ctx_resume] already shows that a
+   THE FIX IS NOT A WEAKENING: [TsoCtx.ctx_unstamp] already shows that a
    parked context's facts may be claimed on the strength of a RECEIPT
-   alone -- [(T <= K) -> hart_view_lb K -* ctx_parked xi T ==* own_context
+   alone -- [(T <= K) -> hart_view_lb K -* ctx_stamped xi T ==* own_context
    xi] -- with no interp anywhere, because a stamp is a legal log position
    and a hart whose view has passed it has seen every write the record
    published.  The same evidence justifies the [ctx_dom] mint, and that is
@@ -58,18 +58,18 @@ Section AbsorbLb.
   Qed.
 
   (* THE ACQUIRE-SIDE MINT AT A RECEIPT.  Same conclusion as
-     [TsoCtxLedger.ctx_dom_of_parked]; the source's stamp is compared with the
+     [TsoCtxLedger.ctx_dom_of_stamped]; the source's stamp is compared with the
      claimer's own view rather than with the log length, so no interp is
      consulted and the mint is available at any ghost step where the
      running token is. *)
-  Lemma ctx_dom_of_parked_lb `{CID : CpuId} (xi xi' : CtxId) (T K : nat) :
+  Lemma ctx_dom_of_stamped_lb `{CID : CpuId} (xi xi' : CtxId) (T K : nat) :
     (T <= K)%nat ->
-    hart_view_lb K -∗ own_context xi' -∗ ctx_parked xi T ==∗
-    own_context xi' ∗ ctx_dom xi xi' ∗ (ctx_dom xi xi' -∗ ctx_parked xi T).
+    hart_view_lb K -∗ own_context xi' -∗ ctx_stamped xi T ==∗
+    own_context xi' ∗ ctx_dom xi xi' ∗ (ctx_dom xi xi' -∗ ctx_stamped xi T).
   Proof.
     iIntros (HTK) "#HK Hrun Hpk".
     iEval (rewrite own_context_unseal /own_context_def) in "Hrun".
-    iEval (rewrite ctx_parked_unseal /ctx_parked_def) in "Hpk".
+    iEval (rewrite ctx_stamped_unseal /ctx_stamped_def) in "Hpk".
     iDestruct "Hrun"
       as "(%B' & %K' & %W' & %D' & [Hb' Hd'] & #HK' & %HBK' & #HW' & %HDW' & #Hoks)".
     iDestruct "Hpk" as "(%D & Hat & #HT & %HDT)".
@@ -82,8 +82,8 @@ Section AbsorbLb.
     iDestruct (ctx_at_halves with "Hat") as "[Hat1 Hat2]".
     iModIntro.
     rewrite own_context_unseal /own_context_def
-            ctx_dom_unseal /ctx_dom_def
-            ctx_parked_unseal /ctx_parked_def.
+            ctx_dom_unseal /ctx_dom_at_def
+            ctx_stamped_unseal /ctx_stamped_def.
     iSplitL "Hb' Hd'".
     { iExists (Nat.max B' T), (Nat.max K' K), W', D'.
       iFrame "Hb' Hd' HKj HW'".
@@ -92,9 +92,14 @@ Section AbsorbLb.
       iApply (big_sepS_impl with "Hoks").
       iIntros "!>" (k Hk) "Hok". iApply (dirty_ok_mono with "Hok"). lia. }
     iSplitL "Hat1".
-    { iExists T, T, (Nat.max B' T), D. iFrame "Hat1 Hlb'".
-      iPureIntro. split_and!; [exact HDT | lia | lia]. }
-    iIntros "(%B0 & %W0 & %B0' & %D0 & Hat0 & _)".
+    { iExists T, D. iFrame "Hat1".
+      iSplitR.
+      { rewrite /ctx_floor /llb. iLeft.
+        iApply (mono_nat_lb_own_le with "Hlb'"). lia. }
+      iModIntro. iApply big_sepS_intro. iIntros "!>" (k Hk).
+      rewrite /key_at /llb. iLeft. iLeft.
+      iApply (mono_nat_lb_own_le with "Hlb'"). have := HDT _ Hk. lia. }
+    iIntros "(%B0 & %D0 & Hat0 & _ & _)".
     iDestruct (ctx_at_agree with "Hat0 Hat2") as %[-> ->].
     iCombine "Hat0 Hat2" as "Hat". rewrite -ctx_at_halves.
     iExists D. iFrame "Hat HT". by iPureIntro.
@@ -105,11 +110,11 @@ Section AbsorbLb.
   Lemma ctx_absorb_lb `{CID : CpuId} (R : CtxId -> iProp Σ) `{!CtxMorph R}
       (xi xi' : CtxId) (T K : nat) :
     (T <= K)%nat ->
-    own_context xi' -∗ hart_view_lb K -∗ ctx_parked xi T -∗ R xi ==∗
-    own_context xi' ∗ ctx_parked xi T ∗ R xi'.
+    own_context xi' -∗ hart_view_lb K -∗ ctx_stamped xi T -∗ R xi ==∗
+    own_context xi' ∗ ctx_stamped xi T ∗ R xi'.
   Proof.
     iIntros (HTK) "Hrun #HK Hpk HR".
-    iMod (ctx_dom_of_parked_lb xi xi' T K HTK with "HK Hrun Hpk")
+    iMod (ctx_dom_of_stamped_lb xi xi' T K HTK with "HK Hrun Hpk")
       as "(Hrun & Hdom & Hback)".
     iMod (ctx_morph with "Hdom HR") as "[Hdom HR]".
     iModIntro. iFrame "Hrun HR". by iApply "Hback".

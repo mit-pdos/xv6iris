@@ -123,8 +123,8 @@ through the hart's later stores, which drain after it in either reading.
 foreign-authored fact with `t ≤ tv_h` is visible only if `t ∈ D`.  So the
 context invariant becomes **clean ⟹ drained; dirty ⟹ authored by this
 hart** (drained or not — forwarding covers it).  Everything that turns
-dirty facts into clean ones — `ctx_park` + `ctx_resume`, `ctx_deposit`,
-`ctx_absorb_lb`, `ctx_dom_of_parked`, the box's withdraw/checkout floors —
+dirty facts into clean ones — `ctx_stamp` + `ctx_unstamp`, `ctx_deposit`,
+`ctx_absorb_lb`, `ctx_dom_of_stamped`, the box's withdraw/checkout floors —
 must be justified by a DRAIN RECEIPT for the dirty entries' author.
 
 ### 2.2 The receipt and where it is born
@@ -142,10 +142,10 @@ release) and in the llb-tier acquire post (R1).
 
 A record parked at swtch (`SwtchCtx`, the proc's saved context) is parked
 BEFORE the scheduler's release fence, so it cannot be drained at park
-time.  Two parked spellings are therefore forced: `ctx_parked_pend ξ T A`
-(entries authored by hart `A`, drain pending) and today's `ctx_parked ξ T`
-(drained), with `ctx_parked_drain : drain_lb A N → T ≤ N →
-ctx_parked_pend ξ T A ==∗ ctx_parked ξ T`.  Who runs the upgrade is a
+time.  Two parked spellings are therefore forced: `ctx_stamped_pend ξ T A`
+(entries authored by hart `A`, drain pending) and today's `ctx_stamped ξ T`
+(drained), with `ctx_stamped_drain : drain_lb A N → T ≤ N →
+ctx_stamped_pend ξ T A ==∗ ctx_stamped ξ T`.  Who runs the upgrade is a
 ruling: the RELEASER (after its fence, for everything it parked or
 deposited under the lock — needs a `DrainMorph`-style class over every
 payload shape, since the payload is in dep form at release), or the

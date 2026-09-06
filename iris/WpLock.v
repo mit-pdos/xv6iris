@@ -56,9 +56,6 @@ Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Require Import Ktier KMap RiscvExtras.  (* A6.84: [ktier_pin] / [kmap_at] --
    a ledger cell carries no MAPPING, so [lk_addr_claim] states one here *)
 Require Import TsoCtx.
-Require Import TsoCtxPark.  (* A6.144: [ctx_parked_raise] -- the record's
-   stamp rises at any log-length receipt, minting the floor a payload row
-   needs (the [lock_pay_intro_llb] mint below) *)
 (* [lock_name_intro] mints the deliberately-RAW name-field metadata
    (tso-port.md §0.8' ruling 2) out of a context-indexed store result, so it
    leaves the ledger through [TsoCtx.ctx_word_pointsto_forget] -- the named
@@ -859,8 +856,8 @@ Section Lock.
      against the shim's [ctx_dom_sc].  AT CUTOVER this free arm instead
      holds [R ξ_L] beside the lock's own internal context token
      ([TsoCtxTwin2]'s parked shape: release deposits by
-     [ctx_dom_to_parked]-transport, acquire withdraws by
-     [ctx_dom_of_parked] against its AMO-at-the-top evidence); the
+     [ctx_dom_to_stamped]-transport, acquire withdraws by
+     [ctx_dom_of_stamped] against its AMO-at-the-top evidence); the
      statement list above this definition is what stays. *)
 
   Definition lk_cpu_pay (lk : mword 64) (v : mword 64)
@@ -1088,17 +1085,21 @@ Section Lock.
     TsoCtx.ctx_wrote ξ lo a -∗ lk_floor ξ lo.
   Proof. iIntros "#Hw". iRight. by iExists a. Qed.
 
-  (* A6.123: the floor TRANSPORTS -- both arms land on the receiver's LEFT
-     arm (A6.117's [ctx_floor_dom], A6.120's [ctx_dom_wrote_floor]), so a
-     payload that carries a floor (a lease-held word's, a nested handle's)
-     is [CtxMorph] with no absorb capability at all. *)
+  (* A6.123: the floor TRANSPORTS -- the left arm lands on the receiver's
+     left arm (A6.117's [ctx_floor_dom]); the right arm lands on whichever
+     arm the domination justifies the key at (A6.120's
+     [ctx_dom_wrote_floor] yields the receiver's floor or the receiver's own
+     registration), and this predicate has both.  So a payload that carries
+     a floor (a lease-held word's, a nested handle's) is [CtxMorph] with no
+     absorb capability at all. *)
   Global Instance lk_floor_morph (lo : nat) : CtxMorph (λ ξ, lk_floor ξ lo).
   Proof.
     iIntros (ξ ξ') "Hd [#Hfl | (%a & #Hw)]".
     - iDestruct (TsoCtx.ctx_floor_dom with "Hd Hfl") as "[Hd #Hfl']".
       iModIntro. iFrame "Hd". by iLeft.
-    - iDestruct (TsoCtx.ctx_dom_wrote_floor with "Hd Hw") as "[Hd #Hfl']".
-      iModIntro. iFrame "Hd". by iLeft.
+    - iDestruct (TsoCtx.ctx_dom_wrote_floor with "Hd Hw") as "[Hd [#Hfl' | #Hw']]".
+      + iModIntro. iFrame "Hd". by iLeft.
+      + iModIntro. iFrame "Hd". iRight. iExists a. iExact "Hw'".
   Qed.
 
   (* A6.120: THE READ-SIDE CASH-IN, ON EITHER ARM.  The left arm is
@@ -1206,9 +1207,9 @@ Section Lock.
 
      WHAT THE ELIMINATION NEEDS, so the M4 worklist entry is written down
      rather than implied: the invariant must hold the cell's context PARKED
-     ([TsoCtx.ctx_parked ξ T]) beside the word, and the acquirer -- whose
+     ([TsoCtx.ctx_stamped ξ T]) beside the word, and the acquirer -- whose
      AMO puts its view at the log top -- mints [ctx_dom ξ cur_ctx] from it
-     with [TsoCtxLedger.ctx_dom_of_parked] and moves the word with
+     with [TsoCtxLedger.ctx_dom_of_stamped] and moves the word with
      [ctx_morph_word].  That is the racy-kit design; it is the ONE reason
      [lk_cpu_res] may not simply go ambient (an ambient index in the payload
      would drag a context into the persistent [is_lock] handle).  The
@@ -1240,7 +1241,7 @@ Section Lock.
      release and abandoned by the winner that claims it.  Nothing needs to
      ratchet across generations and no token travels with the holder. *)
   Definition lock_pay (R : CtxId -> iProp Σ) : iProp Σ :=
-    (∃ (ξ : CtxId) (T : nat), ctx_parked ξ T ∗ R ξ)%I.
+    (∃ (ξ : CtxId) (T : nat), ctx_stamped ξ T ∗ R ξ)%I.
 
   (* A6.120: THE WINNER'S FORM of the record -- the same record, plus the
      acquirer's floor AT THE RECORD'S STAMP.  The AMO leaf mints it: the
@@ -1253,7 +1254,7 @@ Section Lock.
      retired SC shim [ctx_dom_sc] has nothing left to conjure. *)
   Definition lock_pay_won (R : CtxId -> iProp Σ) : iProp Σ :=
     (∃ (ξ : CtxId) (T : nat),
-       ctx_parked ξ T ∗ TsoCtx.ctx_floor cur_ctx T ∗ R ξ)%I.
+       ctx_stamped ξ T ∗ TsoCtx.ctx_floor cur_ctx T ∗ R ξ)%I.
 
   (* THE CREATOR'S MINT -- AND HERE IT IS HONEST, WHICH IT IS NOT ON MAIN.
      §0.18′ had to quarantine this at one site behind the shim's
@@ -1276,7 +1277,7 @@ Section Lock.
     own_context cur_ctx -∗ R cur_ctx ==∗ own_context cur_ctx ∗ lock_pay R.
   Proof.
     iIntros "Hrun HR".
-    iMod ctx_parked_alloc as (ξc) "Hpk".
+    iMod ctx_stamped_alloc as (ξc) "Hpk".
     iMod (ctx_deposit R cur_ctx ξc 0 with "Hrun Hpk HR")
       as "(Hrun & %T' & _ & Hpk & HR)".
     iModIntro. iFrame "Hrun". iExists ξc, T'. iFrame "Hpk HR".
@@ -1288,7 +1289,7 @@ Section Lock.
      its own context (its bound is capped by its view), so a payload row
      [λ ξ, ctx_floor ξ tl] with [tl] at or above those stores is
      unmintable through the plain deposit.  But the RECORD has no hart:
-     [TsoCtxPark.ctx_parked_raise] lifts its stamp past ANY legal log
+     [TsoCtx.ctx_stamped_raise] lifts its stamp past ANY legal log
      position for free and hands back exactly the floor.  So the mint is:
      deposit as always, raise the record at the row's [llb], fold the
      floor in.  The acquire side is unchanged -- the row rides the
@@ -1308,10 +1309,10 @@ Section Lock.
     own_context cur_ctx -∗ R cur_ctx ==∗ own_context cur_ctx ∗ lock_pay R'.
   Proof.
     iIntros (Hfold) "#Hllb Hrun HR".
-    iMod ctx_parked_alloc as (ξc) "Hpk".
+    iMod ctx_stamped_alloc as (ξc) "Hpk".
     iMod (ctx_deposit R cur_ctx ξc 0 with "Hrun Hpk HR")
       as "(Hrun & %T' & _ & Hpk & HR)".
-    iMod (TsoCtxPark.ctx_parked_raise ξc T' tl with "Hllb Hpk")
+    iMod (TsoCtx.ctx_stamped_raise ξc T' tl with "Hllb Hpk")
       as "[Hpk #Hfl]".
     iModIntro. iFrame "Hrun". iExists ξc, (Nat.max T' tl). iFrame "Hpk".
     iApply Hfold. iFrame "HR Hfl".

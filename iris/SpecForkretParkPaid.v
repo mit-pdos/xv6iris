@@ -263,7 +263,7 @@ Definition forkret_park_paid_body
     proc_priv γf pa pid U -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
-    |==> own_context cur_ctx ∗ proc_ctx_boxed γs pa.
+    |==> own_context cur_ctx ∗ proc_ctx γs pa.
 
 Require Import UserFd.   (* [ufdG] -- carried through the park/forkret seals *)
 Module Type FORKRET_PARK_PAID.

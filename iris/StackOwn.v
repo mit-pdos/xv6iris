@@ -447,7 +447,7 @@ Qed.
    -- FALSE at TSO, where a slot's justification is pinned to its context.
    What IS true is the TRANSPORT: a region moves along a DOMINATION, and
    [ctx_dom] is exactly what the swtch hand-off has in hand
-   ([TsoCtx.ctx_dom_to_parked] on the release side, [ctx_dom_of_parked] on
+   ([TsoCtx.ctx_dom_to_stamped] on the release side, [ctx_dom_of_stamped] on
    the acquire side).  So this is no longer a placeholder: it is
    [CtxMorph] at the stack region, and its single call site ([ProofSwtch])
    now has to SUPPLY the domination -- which is the M2 worklist entry the

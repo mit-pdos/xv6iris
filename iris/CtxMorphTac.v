@@ -35,15 +35,6 @@ Require Import TsoCtx.
 Section MorphMore.
   Context `{!riscvGS Σ}.
 
-  (* TsoCtx's [llb_valid_q], which is Local there *)
-  Lemma cmt_llb_valid_q (γ : gname) (q : Qp) (n K : nat) :
-    mono_nat_auth_own γ q n -∗ llb γ K -∗ ⌜(K ≤ n)%nat⌝.
-  Proof.
-    iIntros "Ha [Hlb|%Hz]".
-    - by iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ ?].
-    - iPureIntro. lia.
-  Qed.
-
   Global Instance ctx_morph_or (R1 R2 : CtxId → iProp Σ) :
     CtxMorph R1 → CtxMorph R2 → CtxMorph (λ ξ, R1 ξ ∨ R2 ξ)%I.
   Proof.
@@ -69,23 +60,10 @@ Section MorphMore.
     CtxMorph (λ ξ, ctx_phys_pointsto ξ a dq v).
   Proof.
     iIntros (ξ ξ') "Hd HP".
-    rewrite ctx_dom_unseal /ctx_dom_def !ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
-    iDestruct "Hd" as
-      "(%B & %W & %B' & %D & [Hb Hdm] & %HDW & %HBB' & %HWB' & #Hlb')".
+    rewrite !ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
     iDestruct "HP" as "(%t & Hpt & Hts & Hbit)".
-    iAssert (⌜(t ≤ B')%nat⌝)%I as %HtB'.
-    { iDestruct "Hbit" as "[Hcl | Hdt]".
-      - iDestruct (cmt_llb_valid_q with "Hb Hcl") as %HtB.
-        iPureIntro. lia.
-      - iDestruct (dset_lookup with "Hdm Hdt") as %HDt.
-        have HtW : ((t, a).1 ≤ W)%nat by apply HDW.
-        simpl in HtW. iPureIntro. lia. }
-    iClear "Hbit". iModIntro.
-    iSplitL "Hb Hdm".
-    { iExists B, W, B', D. iFrame "Hb Hdm Hlb'". by iPureIntro. }
-    iExists t. iFrame "Hpt Hts".
-    iLeft. rewrite /llb. iLeft.
-    iApply (mono_nat_lb_own_le with "Hlb'"). lia.
+    iDestruct (ctx_dom_key ξ ξ' (t, a) with "Hd Hbit") as "[Hd #Hbit']".
+    iModIntro. iFrame "Hd". iExists t. iFrame "Hpt Hts". iExact "Hbit'".
   Qed.
 
   Global Instance ctx_morph_phys_word (a : Arch.pa) (dq : dfrac) (w : bv 64) :
@@ -99,9 +77,9 @@ Section MorphMore.
   Qed.
 End MorphMore.
 
-(* THE SOLVER IS SYNTACTIC (A6.129; TsoCtxMove.ctx_move_step's twin, and
-   for the same measured reason: an [apply ctx_morph_sep] or a leaf [apply]
-   against a NAMED piece δ-unfolds it and hangs).  Head-symbol dispatch;
+(* THE SOLVER IS SYNTACTIC (A6.129): an [apply ctx_morph_sep] or a leaf
+   [apply] against a NAMED piece δ-unfolds it and hangs (measured: a
+   payload instance ran twenty minutes).  Head-symbol dispatch;
    a named ξ-dependent leaf goes to instance search, where the consumer's
    per-piece instances live; [cur_ctx] is unfolded at every step. *)
 Ltac ctx_morph_step :=

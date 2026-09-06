@@ -56,9 +56,7 @@ From Kernel Require KernelSyms.
 Require Import CodeSwtch.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxPark.
-Require Import TsoCtxMove.
-Require Import CpuOwnMove.
+Require Import CpuOwnMorph.
 (* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
    contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
@@ -152,20 +150,18 @@ Section ProofSwtch.
     iDestruct "Hvalidnew" as (new_vs av_t) "Hvalidnew".
     iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & Hnewwand)".
     (* RE-CONNECT THE TARGET'S CONTEXT TO THIS CPU (§0.42′ / A6.127 §6).
-       A migratable record arrives with its token PARKED and LINKED to this
-       thread's own context -- [ctx_parked XIt Tt ∗ ctx_floor cur_ctx Tt],
-       the shape the p->lock acquire's morph leaves -- and our running
-       token cashes the floor into the view receipt [ctx_resume] needs
-       ([TsoCtxPark.ctx_resume_floor]).  A pinned record (the hart's
-       scheduler) holds its RUNNING token outright, and its admissibility
-       says that token is this hart's.  No receipt is conjured. *)
+       A migratable record arrives PARKED UNDER THIS THREAD'S OWN CONTEXT
+       ([TsoCtx.ctx_parked XIt cur_ctx] -- where the p->lock acquire's
+       morph left it), and our running token resumes it: the dominator
+       runs here, so the dominated may ([TsoCtx.ctx_resume]).  A pinned
+       record (the hart's scheduler) holds its RUNNING token outright, and
+       its admissibility says that token is this hart's. *)
     iAssert (|==> own_context cur_ctx ∗ own_context XIt)%I
       with "[Hctx Htok_t]" as ">[Hctx Hctx_t]".
     { destruct An as [h|].
       - pose proof (adm_pin_inv _ _ Hadm) as Heq. subst h.
         rewrite /resume_tok. iModIntro. iSplitL "Hctx"; [iExact "Hctx" | iExact "Htok_t"].
-      - rewrite /resume_tok. iDestruct "Htok_t" as (Tt) "[Hpk_t #Hfl_t]".
-        iApply (ctx_resume_floor XIt cur_ctx Tt with "Hctx Hpk_t Hfl_t"). }
+      - rewrite /resume_tok. iApply (ctx_resume XIt cur_ctx with "Hctx Htok_t"). }
     (* THE HAND-OFF, PART 1 (A6.128): the target's save-area cells are ITS
        (written by its own park); this hart's swtch block loads them, so
        they move to THIS thread's context -- both tokens are running. *)
@@ -248,17 +244,16 @@ Section ProofSwtch.
        above wrote -- which is all a slot that will never be resumed can use
        ([SchedCtx.proc_slots] at ZOMBIE wants [own_ctx] and nothing more). *)
     (* THE PARKER'S HALF OF THE EXCHANGE: this thread's running token,
-       taken out of the capability above, PARKS into the record it leaves
-       behind ([TsoCtx.ctx_park] -- one ghost step, no machine evidence:
-       the stamp is read off the token's own receipts).  In the no-return
-       case the token is dropped instead -- the zombie park is the one
-       place a thread's identity dies. *)
-    (* THE TOKEN BESIDE THE RECORD (§0.42′ / A6.127 §6): a migratable
-       caller parks INTO A FRESH BOX -- a stamped context whose stamp is
-       raised over the parker's, leaving the link the resumer will cash
-       ([TsoCtxPark.ctx_park_box]); a pinned caller (the scheduler) puts
-       its RUNNING token into its record as it is, indexed by this hart by
-       its own admissibility. *)
+       taken out of the capability above, PARKS UNDER THE TARGET -- the
+       other running token this proof holds ([TsoCtx.ctx_park]: one ghost
+       step, no fence, no stamp, no receipt).  The record the caller
+       leaves behind is then read by the resumed thread as parked under
+       ITS OWN context, which is what makes the hart keep running while
+       the thread of control changes.  A pinned caller (the scheduler)
+       puts its RUNNING token into its record as it is, indexed by this
+       hart by its own admissibility.  In the no-return case there is no
+       record at all -- the zombie park is the one place a thread's
+       identity dies. *)
     (* THE HAND-OFF, PART 2: what the resumed thread receives -- the target's
        cells the block just wrote, the per-cpu bundle, the crossing payload
        -- moves to ITS identity now, while both tokens are still running;
@@ -267,8 +262,11 @@ Section ProofSwtch.
             with "Hctx Hctx_t Hnewpart") as "(Hctx & Hctx_t & Hnewpart)".
     iMod (ctx_move (R := λ ξ, cpu_own (XI := ξ) 1 eb p false {["proc"]}) cur_ctx XIt
             with "Hctx Hctx_t Hcpuown") as "(Hctx & Hctx_t & Hcpuown)".
-    iMod (HPm cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back cur_ctx XIt
-            with "Hctx Hctx_t HP") as "(Hctx & Hctx_t & HP)".
+    pose proof (HPm cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back)
+      as HPmv.
+    iMod (ctx_move (R := λ ξ, P cpu_id Ao newc oldc
+                                (rget m0 (mword_of_int 4 : mword 5)) p back ξ)
+            cur_ctx XIt with "Hctx Hctx_t HP") as "(Hctx & Hctx_t & HP)".
     (* the caller's own cells: at a resumable park they stay at [cur_ctx]
        (its record); at the zombie park they go to the target too -- the
        spec hands the dead caller's cells to the resumed thread at ITS
@@ -282,13 +280,15 @@ Section ProofSwtch.
     { destruct back; first by iFrame.
       iApply (ctx_move (R := λ ξ, ctx_cells (XI := ξ) oldc (callee_img m0)) cur_ctx XIt
                 with "Hctx Hctx_t Holdpart"). }
-    iAssert (|==> park_tok Ao cur_ctx)%I with "[Hctx]" as ">Htok".
+    (* THE PARK ITSELF, and it is the LAST thing done with both running
+       tokens: the caller's token goes under the target's, at the target's
+       identity -- which is where the resumed thread reads it. *)
+    iAssert (|==> own_context XIt ∗ park_tok_at XIt Ao cur_ctx)%I
+      with "[Hctx Hctx_t]" as ">[Hctx_t Htok]".
     { destruct Ao as [h|].
       - pose proof (adm_pin_inv _ _ Hadmo) as Heq. subst h.
-        rewrite /park_tok. iModIntro. iExact "Hctx".
-      - rewrite /park_tok. iMod ctx_parked_alloc as (ξb) "Hbox".
-        iMod (ctx_park_box cur_ctx ξb 0 with "Hctx Hbox") as (Tp Tb) "(_ & Hbox & Hpk & #Hfl)".
-        iModIntro. iExists ξb, Tb, Tp. iFrame "Hbox Hpk Hfl". }
+        rewrite /park_tok_at. iModIntro. iFrame "Hctx_t Hctx".
+      - rewrite /park_tok_at. iApply (ctx_park cur_ctx XIt with "Hctx_t Hctx"). }
     iAssert (if back then valid_context P Ao oldc p cur_ctx else own_ctx (XI := XIt) oldc)
       with "[Holdpart Hstk Hwold]" as "Hvoldc".
     { destruct back; last first.

@@ -90,7 +90,7 @@ Section KptGhost.
      [KptShare.kpt_creds] out of a top-of-log receipt needs exactly
      [B <= K].  [TsoGhost.llb] is what makes that comparison free
      ([llb_valid] against the interp's length authority), it is PERSISTENT,
-     and it is what [TsoCtx.ctx_parked]'s stamp already carries for the
+     and it is what [TsoCtx.ctx_stamped]'s stamp already carries for the
      same reason.  Riding it INSIDE [kpt_bound] rather than beside it keeps
      [kpt_creds] and [tlb_res_pt] at their recorded arities. *)
   Definition kpt_bound (B : nat) : iProp Σ :=

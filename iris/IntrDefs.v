@@ -2226,18 +2226,19 @@ Section IntrDefs.
     solve_proper.
   Qed.
 
-  (* the environment's SWTCH-CROSSING witness: with both crossing parties'
-     run tokens in hand, the env re-homes.  Packed beside the env so the
-     scheduler's [p_sched] move (SchedCtx) can relocate a parked world's
-     handler environment without knowing what it is.  For the concrete
+  (* the environment's TRANSPORT WITNESS: the handler environment rides
+     domination like every other payload, so this is [TsoCtx.CtxMorph] at
+     [□ E], packed as a resource because the environment family is an
+     existential.  Packed beside the env so the scheduler's [p_sched] move
+     (SchedCtx) can relocate a parked world's handler environment without
+     knowing what it is, and so the derived same-hart move
+     ([TsoCtx.ctx_move]) carries it across swtch.  For the concrete
      kernelvec env (the device/lock credentials) it is provable because
-     every member is a lock handle (CtxMove) or context-free. *)
+     every member is a lock handle ([CtxMorph]) or context-free. *)
   Definition env_move (E : CurCtx -d> iPropO Σ) : iProp Σ :=
-    (∀ (CIDm : CpuId) (ξ0 ξ1 : CtxId),
-       TsoCtx.own_context (CID := CIDm) ξ0 -∗
-       TsoCtx.own_context (CID := CIDm) ξ1 -∗ □ E ξ0 ==∗
-       TsoCtx.own_context (CID := CIDm) ξ0 ∗
-       TsoCtx.own_context (CID := CIDm) ξ1 ∗ □ E ξ1)%I.
+    (∀ ξ0 ξ1 : CtxId,
+       TsoCtx.ctx_dom ξ0 ξ1 -∗ □ E ξ0 ==∗
+       TsoCtx.ctx_dom ξ0 ξ1 ∗ □ E ξ1)%I.
 
   (* A6.139: the RECURSION IS OVER THE ENVIRONMENT FAMILY, and the body
      instantiates its resource slot AT ITS OWN CONTEXT ([ires_pack_of S

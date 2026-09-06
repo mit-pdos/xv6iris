@@ -56,7 +56,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxAbsorbLb.   (* [ctx_dom_of_parked_lb]: the receipt-side mint *)
+Require Import TsoCtxAbsorbLb.   (* [ctx_dom_of_stamped_lb]: the receipt-side mint *)
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the claimer's token *)
 Import Defs.
 Local Open Scope Z_scope.
@@ -313,7 +313,7 @@ Qed.
 
 (* ===================================================================== *)
 
-Module SchedulerProof (Acquire : ACQUIRE) (Release : RELEASE) (ReleaseIn : RELEASE_IN) (Swtch : SWTCH) : SCHEDULER.
+Module SchedulerProof (Acquire : ACQUIRE) (Release : RELEASE) (Swtch : SWTCH) : SCHEDULER.
 
 Section ProofScheduler.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
@@ -388,12 +388,13 @@ Section ProofScheduler.
         sie_cap_gpr KT1 Mt (av - 12)%nat false zero_reg -∗
         pc_is (mword_of_int (KernelSyms.scheduler + 0x4e)) -∗
         locked γl cpu_id -∗
-        (* THE PAYLOAD, PRE-PARKED (A6.127 §6): the tail releases through the
-           input-side finisher, so it takes the free arm's record itself --
-           a scan that found no work parks the payload it holds at its own
-           context ([lock_pay_intro]); a reclaim after a park hands the
-           record at the park BOX the swtch brought back. *)
-        (own_context cur_ctx ==∗ own_context cur_ctx ∗ lock_pay (proc_lock_pay γs γl (proc_addr jj))) -∗
+        (* THE PAYLOAD, AT THE SCHEDULER'S OWN CONTEXT: an ordinary release
+           deposit.  A scan that found no work hands the slot back
+           untouched; a reclaim after a park rebuilds it from what the
+           crossing returned ([SchedCtx.proc_slots_park_gen]) -- either way
+           the slot is already this context's, so there is nothing to park
+           and nothing to deposit. *)
+        proc_lock_res γs γl (proc_addr jj) -∗
         (* THE SET IS {proc} ON THE WAY IN AND ∅ ON THE WAY OUT: the tail IS
            the release of proc jj's lock, so it is the one place in this file
            where the held set changes.  Every other [cpu_own] here is at one
@@ -515,7 +516,7 @@ Section ProofScheduler.
        kernel bundle, so it borrows its own running token
        ([SieCapCtx.sie_cap_gpr_own_ctx_acc]), mints the domination from the
        record against the hart's own receipt at [Tfr ≤ Tfr]
-       ([TsoCtxAbsorbLb.ctx_dom_of_parked_lb] -- interp-free, which is the
+       ([TsoCtxAbsorbLb.ctx_dom_of_stamped_lb] -- interp-free, which is the
        whole reason it can run HERE, outside every WP leaf), and re-indexes
        the fourteen cells with the price [SwtchCtx.ctx_cells_reindex] was
        always going to charge.  The record is abandoned after the claim,
@@ -523,7 +524,7 @@ Section ProofScheduler.
     iDestruct "Hfree" as (ctx0 ξ0 Tfr) "(%Hctx0len & Hpk0 & #HK0 & Hctx0)".
     iApply fupd_wp.
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (ctx_dom_of_parked_lb ξ0 cur_ctx Tfr Tfr ltac:(lia) with "HK0 Hrun Hpk0")
+    iMod (ctx_dom_of_stamped_lb ξ0 cur_ctx Tfr Tfr ltac:(lia) with "HK0 Hrun Hpk0")
       as "(Hrun & Hdom & _)".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iMod (ctx_cells_reindex ξ0 cur_ctx (a_cpu_ctx cid_word) ctx0
@@ -1128,7 +1129,7 @@ Section ProofScheduler.
          the in-lock carve [av - 12]; its exit is [n], the index the tail owes
          its caller. *)
       iEval (rewrite -Hn) in "Hcg".
-      iApply (ReleaseIn.wp_release_in_sconf KT1 γl (proc_addr jj) "proc"%string (proc_lock_pay γs γl (proc_addr jj)) T1 0 ebx zero_reg n
+      iApply (Release.wp_release_sconf KT1 γl (proc_addr jj) "proc"%string (proc_lock_pay γs γl (proc_addr jj)) T1 0 ebx zero_reg n
                 {["proc"]}
                 Hlka ltac:(pose proof (sc_res_le ebx); lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -1381,10 +1382,6 @@ Section ProofScheduler.
         (* the slot goes back UNTOUCHED *)
         iAssert (proc_lock_res γs γl (proc_addr jj)) with "[Hstate Hpg Hchan Hpub Hslot]" as "HR".
         { rewrite /proc_lock_res. iExists st, ch. iFrame "Hstate Hpg Hchan Hpub Hslot". }
-        iAssert (own_context cur_ctx ==∗ own_context cur_ctx ∗
-                   lock_pay (proc_lock_pay γs γl (proc_addr jj)))%I with "[HR]" as "HR".
-        { iIntros "Hrun". iEval (rewrite /proc_lock_res) in "HR".
-          iApply (lock_pay_intro (proc_lock_pay γs γl (proc_addr jj)) with "Hrun HR"). }
         iApply ("Tail" $! jj γl M2 ebc n with "[%] [%] [%] [%] [%] Hcg Hpc Hlocked HR Hcpu Hcsrs Hown").
         { exact Hjj. }
         { exact Hgl. }
@@ -1852,26 +1849,21 @@ Section ProofScheduler.
            mirror the swtch payload carried is the lock's share again. *)
         iDestruct (pstate_whole_split (proc_addr jj) st') as "[Hwk _]".
         iDestruct ("Hwk" with "Hpg") as "[Hpg _]".
-        (* A6.127 §6 / A6.129: a resumable park came back WITH ITS BOX
-           ([park_tok]); the slot is rebuilt at the box's context, the cells
-           are DEPOSITED into the box, and the box becomes the lock's
-           context at the release below.  Both steps need the running token,
-           which the release's [ReleaseIn] wand lends -- so they run inside
-           it. *)
-        iAssert (own_context cur_ctx ==∗ own_context cur_ctx ∗
-                   lock_pay (proc_lock_pay γs γl (proc_addr jj)))%I
+        (* A6.127 §6 / A6.129: the crossing handed the record back PARKED
+           UNDER THIS SCHEDULER's context ([park_tok None]), so the slot is
+           rebuilt at the scheduler's own context and the payload the
+           release deposits is an ordinary one -- no box, no deposit, no
+           running token needed here. *)
+        iAssert (proc_lock_res γs γl (proc_addr jj))
           with "[Hvc' Htag' Hstate Hpg Hchan Hpub Hppay]" as "HR".
-        { iIntros "Hrun".
-          iMod (proc_slots_park_box γs (proc_addr jj) st' Hneeds'
-                  with "Hrun [Hvc'] [Htag'] Hmk Hppay") as "[Hrun (%ξb & %Tb & Hbox & Hsl)]".
+        { iDestruct (proc_slots_park_gen γs (proc_addr jj) st' Hneeds'
+                       with "[Hvc'] [Htag'] Hmk Hppay") as "Hsl".
           { iEval (rewrite Hcret) in "Hvc'". destruct (needs_ctx st'); [| iExact "Hvc'"].
             iDestruct "Hvc'" as (XIo) "[Htok Hrec]".
-            iApply (proc_ctx_at_of_tok with "Htok Hrec"). }
+            iApply (proc_ctx_of_tok with "Htok Hrec"). }
           { iApply (hart_at_any_intro jj cpu_id Hjj with "Htag'"). }
-          iMod (proc_lock_res_deposit γs γl (proc_addr jj) st' _ ξb Tb
-                  with "Hrun Hbox Hstate Hpg Hchan Hpub Hsl") as "[Hrun (%Tb' & _ & Hbox & Hres)]".
-          iModIntro. iFrame "Hrun".
-          iApply proc_lock_pay_of_box. iExists ξb, Tb'. iFrame "Hbox Hres". }
+          iApply (proc_lock_res_intro γs γl (proc_addr jj) st' _
+                    with "Hstate Hpg Hchan Hpub Hsl"). }
         (* c->proc is 0 again, so re-tag the bundle back to the idle index --
            this is what keeps [wp_next_idle] available at the loop head. *)
         iEval (rewrite (sc_retag_p M5 (av - 12)%nat (proc_addr jj) zero_reg)) in "Hcg".

@@ -59,16 +59,15 @@ Require Import ProcGeom.
 Require Export ProcAvail.
 Require Import FdSlots.
 Require Export IrefSlots.
-(* A6.128: [proc_pt]'s pieces are named by the payload's move instances.
-   [PtTreeMove] carries the tree; main's [proc_pt] keys the image bytes by
-   [M] beside it. *)
+(* A6.128: [proc_pt]'s pieces are named by the payload's transport
+   instances.  [PtTreeMorph] carries the tree; main's [proc_pt] keys the
+   image bytes by [M] beside it. *)
 Require Import ProcPtOwn CtxMorphTac.
 Require Import ProcDefs.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxMove.
 Local Open Scope Z_scope.
 
 (* the context-slot payload while nobody is parked in it: the raw
@@ -96,13 +95,13 @@ Definition cpu_ctx_free `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} : iProp Σ 
      honest is the lock kit's own idiom one tier up (tso-port.md §0.18′):
      the slot carries the record's TOKEN and, beside it, THIS HART's
      receipt that its view has passed the record's stamp.  The absorb is
-     then [TsoCtxAbsorbLb.ctx_dom_of_parked_lb] at [T ≤ T], reflexivity.
+     then [TsoCtxAbsorbLb.ctx_dom_of_stamped_lb] at [T ≤ T], reflexivity.
      At boot the stamp is 0 and [TsoGhost.view_lb_0] gives the receipt for
      nothing; every later publication (a park into this slot) stamps at a
      position its own hart has already passed. *)
   (∃ (vs : list (mword 64)) (ξ : CtxId) (T : nat),
      ⌜ length vs = 14%nat ⌝ ∗
-     TsoCtx.ctx_parked ξ T ∗ TsoCtx.hart_view_lb T ∗
+     TsoCtx.ctx_stamped ξ T ∗ TsoCtx.hart_view_lb T ∗
      ctx_cells (XI := ξ) (a_cpu_ctx cid_word) vs)%I.
 
 (* [cpus[h].proc = 0] and [cpus[h].proc = &proc[j]] are the two live values
@@ -242,7 +241,7 @@ Section SchedCtxPay.
 
   (* A6.128: THE PAYLOAD IS A FUNCTION OF THE CONTEXT [ξ] -- the identity of
      the thread that holds it, moved across the swtch crossing by
-     [TsoCtxMove.ctx_move] ([p_sched_move] below).  The ambient forms the
+     [TsoCtx.ctx_move] ([p_sched_morph] below).  The ambient forms the
      consumers wrote stay as they were: at [cur_ctx]. *)
   Definition p_sched : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
                        mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ :=
@@ -270,106 +269,57 @@ Section SchedCtxPay.
            A' = Some h /\ back = true⌝ ∗
           proc_held (XI := ξ) h j γl RUNNING ch ∗ hart_full j h)))%I.
 
-  (* THE PAYLOAD MOVES BETWEEN CONTEXTS, one [CtxMove] instance per named
-     piece: TsoCtxMove's leaf dispatch is syntactic, so a named piece is
-     resolved by instance search rather than unfolded by [apply]. *)
-  Global Instance pname_cells_move pa dq bs :
-    CtxMove (λ ξ, pname_cells (XI := ξ) pa dq bs).
-  Proof. rewrite /pname_cells. ctx_move_solve. Qed.
-  Global Instance proc_fields_move pa dq V :
-    CtxMove (λ ξ, proc_fields (XI := ξ) pa dq V).
-  Proof. rewrite /proc_fields. ctx_move_solve. Qed.
-  Global Instance ofile_cells_move pa fs :
-    CtxMove (λ ξ, ofile_cells (XI := ξ) pa fs).
-  Proof. rewrite /ofile_cells. ctx_move_solve. Qed.
-  Global Instance tf_words_move tfp ws :
-    CtxMove (λ ξ, tf_words (XI := ξ) tfp ws).
-  Proof. rewrite /tf_words. ctx_move_solve. Qed.
-  Global Instance tf_tail_move tfp :
-    CtxMove (λ ξ, tf_tail (XI := ξ) tfp).
-  Proof. rewrite /tf_tail. ctx_move_solve. Qed.
-  Global Instance tf_page_move tfp ws :
-    CtxMove (λ ξ, tf_page (XI := ξ) tfp ws).
-  Proof. rewrite /tf_page. ctx_move_solve. Qed.
-  Global Instance is_kstack_move pa ks :
-    CtxMove (λ ξ, is_kstack (XI := ξ) pa ks).
-  Proof. rewrite /is_kstack. ctx_move_solve. Qed.
-  Global Instance kstack_free_move pa :
-    CtxMove (λ ξ, kstack_free (XI := ξ) pa).
-  Proof. rewrite /kstack_free. ctx_move_solve. Qed.
-  Global Instance phys_byte_any_move a :
-    CtxMove (λ ξ, phys_byte_any (XI := ξ) a).
-  Proof. rewrite /phys_byte_any. ctx_move_solve. Qed.
-  Global Instance phys_page_own_move ppn :
-    CtxMove (λ ξ, phys_page_own (XI := ξ) ppn).
-  Proof. rewrite /phys_page_own. ctx_move_solve. Qed.
-  Global Instance upt_pages_own_move um :
-    CtxMove (λ ξ, upt_pages_own (XI := ξ) um).
-  Proof. rewrite /upt_pages_own. ctx_move_solve. Qed.
-  Global Instance proc_pt_own_move P :
-    CtxMove (λ ξ, proc_pt_own (XI := ξ) P).
-  Proof. rewrite /proc_pt_own. ctx_move_solve. Qed.
-  Global Instance proc_pt_move P M :
-    CtxMove (λ ξ, proc_pt (XI := ξ) P M).
-  Proof. rewrite /proc_pt. ctx_move_solve. Qed.
-  Global Instance proc_pt_at_move pa P M :
-    CtxMove (λ ξ, proc_pt_at (XI := ξ) pa P M).
-  Proof. rewrite /proc_pt_at. ctx_move_solve. Qed.
-  Global Instance proc_dormant_noctx_move pa st :
-    CtxMove (λ ξ, proc_dormant_noctx (XI := ξ) pa st).
-  Proof. rewrite /proc_dormant_noctx. ctx_move_solve. Qed.
-  Global Instance locked_move γ i :
-    CtxMove (λ ξ, WpLock.locked (XI := ξ) γ i).
-  Proof. rewrite /WpLock.locked. ctx_move_solve. Qed.
-  Global Instance proc_pub_move pa :
-    CtxMove (λ ξ, proc_pub (XI := ξ) pa).
-  Proof. rewrite /proc_pub. ctx_move_solve. Qed.
-  Global Instance proc_held_move i j γl st ch :
-    CtxMove (λ ξ, proc_held (XI := ξ) i j γl st ch).
-  Proof. rewrite /proc_held. ctx_move_solve. Qed.
-  Global Instance park_pay_move pa st :
-    CtxMove (λ ξ, park_pay (XI := ξ) pa st).
-  Proof. rewrite /park_pay. ctx_move_solve. Qed.
-  (* the lock HANDLES move too (A6.129, for [procs_inv] into a forked
-     child's record): a handle is the name, the invariant and a floor, and
-     a floor's dirty arm moves by [TsoCtxMove.ctx_move_wrote] *)
-  Global Instance lk_floor_move (lo : nat) : CtxMove (λ ξ, WpLock.lk_floor ξ lo).
+  (* THE PAYLOAD TRANSPORTS, one [CtxMorph] instance per named piece:
+     CtxMorphTac's leaf dispatch is syntactic, so a named piece is resolved
+     by instance search rather than unfolded by [apply].  Only the pieces
+     the crossing payload needs BEFORE the slot pile below are stated here;
+     the rest come from that pile, from [ProcPtOwn] ([proc_pt*]), from
+     [ProcDefs] ([proc_dormant*]) and from [WpLock] ([lk_floor]). *)
+  Global Instance locked_morph γ i :
+    CtxMorph (λ ξ, WpLock.locked (XI := ξ) γ i).
+  Proof. rewrite /WpLock.locked. ctx_morph_solve. Qed.
+  (* [proc_pub] is unfolded rather than taken by instance: its own instance
+     stands with the slot pile further down, below this one. *)
+  Global Instance proc_held_morph i j γl st ch :
+    CtxMorph (λ ξ, proc_held (XI := ξ) i j γl st ch).
+  Proof. rewrite /proc_held /proc_pub. ctx_morph_solve. Qed.
+  (* the dormant block is taken BY NAME: left to instance search, the leaf
+     tries every later-declared instance against the block's body up to δ
+     before reaching [ProcDefs.proc_dormant_noctx_morph] -- measured as a
+     hang, not a slow step *)
+  Global Instance park_pay_morph pa st :
+    CtxMorph (λ ξ, park_pay (XI := ξ) pa st).
   Proof.
-    iIntros (ξ0 ξ1) "H0 H1 [Hfl | (%a & Hw)]".
-    - iMod (ctx_move_floor ξ0 ξ1 lo with "H0 H1 Hfl") as "(H0 & H1 & Hfl)".
-      iModIntro. iFrame "H0 H1". by iLeft.
-    - iMod (ctx_move_wrote ξ0 ξ1 lo a with "H0 H1 Hw") as "(H0 & H1 & [Hfl | Hw])".
-      + iModIntro. iFrame "H0 H1". by iLeft.
-      + iModIntro. iFrame "H0 H1". iRight. iExists a. iExact "Hw".
+    rewrite /park_pay. apply ctx_morph_if_then.
+    apply ProcDefs.proc_dormant_noctx_morph.
   Qed.
-  Global Instance is_lock_move γ lk s R : CtxMove (λ ξ, is_lock (XI := ξ) γ lk s R).
-  Proof. rewrite /is_lock. ctx_move_solve. Qed.
   Global Instance is_lock_morph γ lk s R : CtxMorph (λ ξ, is_lock (XI := ξ) γ lk s R).
   Proof. rewrite /is_lock. ctx_morph_solve. Qed.
-  (* A6.139: the handler ENVIRONMENT re-homes across the crossing by the
+  (* A6.139: the handler ENVIRONMENT re-homes across a domination by the
      witness packed beside it in [intr_res]; everything else in the bundle
      is context-free.  These two instances are what lets the payload rows
-     stay pinned at the box's own ξ. *)
-  Global Instance intr_res_move (kt : ktier) (CIDh : CpuId) :
-    CtxMove (CID := CID) (λ ξ, intr_res (XI := ξ) (CID := CIDh) kt).
+     stay pinned at the box's own ξ.  The transport class names no hart --
+     the bundle's hart [CIDh] is a parameter of the payload. *)
+  Global Instance intr_res_morph (kt : ktier) (CIDh : CpuId) :
+    CtxMorph (λ ξ, intr_res (XI := ξ) (CID := CIDh) kt).
   Proof.
-    iIntros (ξ0 ξ1) "H0 H1 Hres".
+    iIntros (ξ ξ') "Hd Hres".
     iEval (rewrite /intr_res) in "Hres".
     iDestruct "Hres" as (E) "(Hat & #HE & #Hmv)".
-    iMod ("Hmv" $! _ ξ0 ξ1 with "H0 H1 HE") as "(H0 & H1 & #HE')".
-    iModIntro. iFrame "H0 H1".
+    iMod ("Hmv" $! ξ ξ' with "Hd HE") as "(Hd & #HE')".
+    iModIntro. iFrame "Hd".
     iEval (rewrite /intr_res). iExists E. iFrame "Hat HE' Hmv".
   Qed.
 
-  Global Instance trap_csrs_move (kt : ktier) (CIDh : CpuId) :
-    CtxMove (CID := CID) (λ ξ, trap_csrs (XI := ξ) (CID := CIDh) kt).
-  Proof. rewrite /trap_csrs. ctx_move_solve. Qed.
+  Global Instance trap_csrs_morph (kt : ktier) (CIDh : CpuId) :
+    CtxMorph (λ ξ, trap_csrs (XI := ξ) (CID := CIDh) kt).
+  Proof. rewrite /trap_csrs. ctx_morph_solve. Qed.
 
-  Global Instance p_sched_move h A' c cret tpv p back :
-    CtxMove (λ ξ, p_sched h A' c cret tpv p back ξ).
+  Global Instance p_sched_morph h A' c cret tpv p back :
+    CtxMorph (λ ξ, p_sched h A' c cret tpv p back ξ).
   Proof.
-    rewrite /p_sched. ctx_move_solve.
-    all: apply (trap_csrs_move KT1 h).
+    rewrite /p_sched. ctx_morph_solve.
+    all: apply (trap_csrs_morph KT1 h).
   Qed.
 
   (* the scheduler-chain valid context, PINNED at hart [h]
@@ -513,16 +463,19 @@ Section SchedCtxPay.
      hart nor a per-hart SIE ghost.  Consequently [proc_lock_res] and
      [procs_inv] below mention neither -- which is what lets ONE [procs_inv]
      ride the [started] payload to every secondary hart. *)
-  (* A6.127 §6: THE MIGRATABLE RECORD'S TOKEN IS BESIDE IT, LINKED.  The
-     record at its own identity [XIp] under the later it always arrives
-     beneath; its parked token OUTSIDE the later, with the link
-     [ctx_floor ξl Tp] on the slot's context [ξl] -- the ONLY context
-     dependence of the slot, which is what makes [proc_lock_pay] a genuine
-     λ-payload ([ctx_floor_dom] transports the link; nothing else moves).
-     The ambient form [proc_ctx] is the slot at the holder's own context. *)
+  (* THE MIGRATABLE RECORD'S TOKEN IS BESIDE IT, PARKED UNDER THE SLOT'S
+     CONTEXT (A6.127 §6; claude-notes/projects/ctx-parent.md).  The record
+     at its own identity [XIp] under the later it always arrives beneath;
+     its token OUTSIDE the later, parked under the slot's context [ξl]
+     ([TsoCtx.ctx_parked XIp ξl]) -- the ONLY context dependence of the
+     slot, which is what makes [proc_lock_pay] a genuine λ-payload
+     ([TsoCtx.ctx_parked_morph] transports the token; nothing else moves).
+     The ambient form [proc_ctx] is the slot at the holder's own context:
+     what a park hands the scheduler ([proc_ctx_of_tok]) and what a
+     dispatch resumes ([proc_ctx_resume_tok]). *)
   Definition proc_ctx_at (ξl : CtxId) (pa : mword 64) : iProp Σ :=
-    (∃ (XIp : CtxId) (Tp : nat),
-       ctx_parked XIp Tp ∗ ctx_floor ξl Tp ∗
+    (∃ XIp : CtxId,
+       ctx_parked XIp ξl ∗
        ▷ valid_context p_sched None (p_context pa) pa XIp)%I.
   Definition proc_ctx (pa : mword 64) : iProp Σ := proc_ctx_at cur_ctx pa.
 
@@ -578,8 +531,8 @@ Section SchedCtxPay.
   Definition run_slot (pa : mword 64) : iProp Σ := run_slot_at cur_ctx pa.
   (* A6.129: the transports the forked child's record needs -- the context
      field's cells, the running slot, and the lock HANDLES (a handle is the
-     name, the invariant and a floor; a floor's dirty arm moves by
-     [TsoCtxMove.ctx_move_wrote]). *)
+     name, the invariant and a floor; a floor's dirty arm crosses by
+     [TsoCtx.ctx_dom_wrote_floor]). *)
   Global Instance ctx_cells_morph c vs : CtxMorph (λ ξ, ctx_cells (XI := ξ) c vs).
   Proof. rewrite /ctx_cells. apply ctx_cells_at_morph. Qed.
   Global Instance own_ctx_morph pa : CtxMorph (λ ξ, own_ctx (XI := ξ) pa).
@@ -642,8 +595,8 @@ Section SchedCtxPay.
     λ ξ, proc_lock_res_at ξ γl pa.
 
   (* A6.129: THE TRANSPORT IS REAL NOW -- one [CtxMorph] instance per
-     named piece, the [CtxMove] pile's twin (the pieces of a dormant slot
-     down to its page table; [PtTreeMove] carries the tree). *)
+     named piece (the pieces of a dormant slot down to its page table;
+     [PtTreeMorph] carries the tree). *)
   Global Instance pname_cells_morph pa dq bs : CtxMorph (λ ξ, pname_cells (XI := ξ) pa dq bs).
   Proof. rewrite /pname_cells. ctx_morph_solve. Qed.
   Global Instance proc_fields_morph pa dq V : CtxMorph (λ ξ, proc_fields (XI := ξ) pa dq V).
@@ -675,7 +628,10 @@ Section SchedCtxPay.
   Proof. rewrite /proc_pub. ctx_morph_solve. Qed.
 
   Global Instance proc_ctx_at_morph pa : CtxMorph (λ ξ, proc_ctx_at ξ pa).
-  Proof. rewrite /proc_ctx_at. apply _. Qed.
+  Proof.
+    rewrite /proc_ctx_at. apply ctx_morph_exist; intros XIp.
+    apply ctx_morph_sep; [apply ctx_parked_morph | apply ctx_morph_const].
+  Qed.
   Global Instance proc_slots_at_morph pa st : CtxMorph (λ ξ, proc_slots_at ξ pa st).
   Proof. rewrite /proc_slots_at. ctx_morph_solve. Qed.
   Global Instance proc_lock_res_at_morph γl pa : CtxMorph (λ ξ, proc_lock_res_at ξ γl pa).
@@ -796,43 +752,8 @@ Section SchedCtxPay.
   (* A6.128: the old [proc_ctx_cells] / [proc_ctx_own_ctx] (a parked record
      forgotten down to [own_ctx] AT THE AMBIENT context) are gone: a record's
      cells live at ITS identity (SwtchCtx.valid_context_pre), and only a
-     running context can move them ([TsoCtxMove.ctx_move]).  Neither had a
+     running context can move them ([TsoCtx.ctx_move]).  Neither had a
      consumer. *)
-
-  (* THE RECLAIMING SCHEDULER'S ONE MOVE, at either kind of park: it holds
-     the record its swtch handed back, the rejoined receipt, and whatever the
-     crossing's [park_pay] carried, and that is [proc_slots] at the state the
-     parking thread stored.  Stated once, so the scheduler never cases on the
-     state -- the case analysis lives here. *)
-  (* THE CONTEXT SLOT ARRIVES IN THE SHAPE THE CROSSING DELIVERED, and that
-     is the same [needs_ctx st] guard the slot itself uses
-     ([SchedCtx.p_sched]'s [back], [SwtchCtx.valid_context_pre]'s [if]).  A
-     resumable park hands over a record; a ZOMBIE park hands over the raw
-     cells, because its swtch is not coming back and there is no
-     continuation to park.  Nothing is forgotten here any more -- the old
-     [proc_ctx_own_ctx] step, which threw a record's parked stack away, is
-     gone from this path, and with it the hole it used to leave in the
-     dying thread's kernel stack. *)
-  Lemma proc_slots_park_gen (E : coPset) (pa : mword 64) (st : mword 32) :
-    park_ok st = true ->
-    (if needs_ctx st then proc_ctx pa else own_ctx (p_context pa)) -∗
-    hart_at_any pa -∗ pslot_used_at pa -∗ park_pay pa st
-    ={E}=∗ proc_slots pa st.
-  Proof.
-    intros Hst. iIntros "Hctx Hpark #Hused Hpay".
-    pose proof (is_unused_of_park_ok st Hst) as Hu.
-    apply park_ok_cases in Hst as [Hn | Hz].
-    - rewrite Hn. iModIntro. rewrite /proc_slots /proc_slots_at Hn Hu.
-      rewrite (inv_dormant_of_needs_ctx st Hn) (not_running_of_needs_ctx st Hn).
-      rewrite (is_running_of_needs_ctx st Hn).
-      iFrame "Hctx Hpark". by iFrame "Hused".
-    - subst st. rewrite /park_pay inv_dormant_ZOMBIE needs_ctx_ZOMBIE_false.
-      iModIntro. rewrite /proc_slots /proc_slots_at not_running_ZOMBIE inv_dormant_ZOMBIE
-                        is_unused_ZOMBIE needs_ctx_ZOMBIE_false is_running_ZOMBIE.
-      iSplitR; [done|]. iSplitR; [done|].
-      iSplitR "Hpark Hused"; [| iFrame "Hpark Hused"].
-      iEval (rewrite proc_dormant_split). iFrame "Hpay Hctx".
-  Qed.
 
   (* ------------------------------------------------------------------ *)
   (* A6.127 §6: THE RECORD/TOKEN SHAPES THE SWTCH CONTRACT SPEAKS.         *)
@@ -860,77 +781,51 @@ Section SchedCtxPay.
   Qed.
 
   (* a migratable record at the holder's own context IS what swtch wants of
-     its target: the link at [cur_ctx] ([SwtchCtx.resume_tok None]) *)
+     its target: parked under [cur_ctx] ([SwtchCtx.resume_tok None]) *)
   Lemma proc_ctx_resume_tok (pa : mword 64) :
     proc_ctx pa -∗
     ∃ XIt : CtxId, resume_tok None XIt ∗
                    ▷ valid_context p_sched None (p_context pa) pa XIt.
   Proof.
-    rewrite /proc_ctx /proc_ctx_at /resume_tok.
-    iIntros "(%XIp & %Tp & Hpk & #Hfl & Hrec)".
-    iExists XIp. iFrame "Hrec". iExists Tp. iFrame "Hpk Hfl".
+    rewrite /proc_ctx /proc_ctx_at /resume_tok /=.
+    iIntros "(%XIp & Hpk & Hrec)". iExists XIp. iFrame "Hpk Hrec".
   Qed.
 
-  (* ...and what a park hands back -- the record with its BOX
-     ([SwtchCtx.park_tok None]) -- is the slot at the box's context *)
-  Lemma proc_ctx_at_of_tok (pa : mword 64) (XIo : CtxId) :
+  (* ...and what a park hands the resumed scheduler -- the record parked
+     under the scheduler's own context ([SwtchCtx.park_tok None]) -- IS the
+     slot at that context *)
+  Lemma proc_ctx_of_tok (pa : mword 64) (XIo : CtxId) :
     park_tok None XIo -∗ ▷ valid_context p_sched None (p_context pa) pa XIo -∗
-    ∃ (ξb : CtxId) (Tb : nat), ctx_parked ξb Tb ∗ proc_ctx_at ξb pa.
+    proc_ctx pa.
   Proof.
-    rewrite /park_tok. iIntros "(%ξb & %Tb & %Tp & Hbox & Hpk & #Hfl) Hrec".
-    iExists ξb, Tb. iFrame "Hbox". rewrite /proc_ctx_at.
-    iExists XIo, Tp. iFrame "Hpk Hfl Hrec".
+    rewrite /park_tok /park_tok_at /proc_ctx /proc_ctx_at /=. iIntros "Hpk Hrec".
+    iExists XIo. iFrame "Hpk Hrec".
   Qed.
 
-  (* a fresh migratable record WITH ITS BOX -- what the child-record producers
-     (fork, userinit) mint and their release makes the lock's context *)
-  Definition proc_ctx_boxed (pa : mword 64) : iProp Σ :=
-    (∃ (ξb : CtxId) (Tb : nat), ctx_parked ξb Tb ∗ proc_ctx_at ξb pa)%I.
-
-  Lemma proc_slots_park_at (ξl : CtxId) (pa : mword 64) (st : mword 32) :
-    needs_ctx st = true ->
-    proc_ctx_at ξl pa -∗ hart_at_any pa -∗ pslot_used_at pa -∗ proc_slots_at ξl pa st.
-  Proof.
-    intros Hn. rewrite /proc_slots_at Hn.
-    rewrite (not_running_of_needs_ctx st Hn).
-    rewrite (is_running_of_needs_ctx st Hn).
-    rewrite (inv_dormant_of_needs_ctx st Hn).
-    rewrite (is_unused_of_needs_ctx st Hn).
-    iIntros "$ $ $".
-  Qed.
-
-  (* THE RECLAIMING SCHEDULER'S SLOT, AT THE BOX: [proc_slots_park_gen] with
-     the record's box as the slot's context.  A ZOMBIE park brings no box,
-     so one is minted -- and (A6.129) the dormant block is DEPOSITED into
-     it from the reclaimer's context, which is why the running token comes
-     through: the slot's rows are at the box, not at the ambient. *)
-  Lemma proc_slots_park_box (pa : mword 64) (st : mword 32) :
+  (* THE RECLAIMING SCHEDULER'S SLOT: what the crossing handed back -- a
+     RECORD (parked under this scheduler) at a resumable park, the bare
+     CELLS at a ZOMBIE one, in exactly the shape the slot's own [needs_ctx]
+     guard asks for -- plus whatever [park_pay] carried (the dormant block
+     at a ZOMBIE park, nothing at a resumable one), all at the scheduler's
+     own context.  No token: the scheduler's release then deposits the slot
+     as an ordinary payload. *)
+  Lemma proc_slots_park_gen (pa : mword 64) (st : mword 32) :
     park_ok st = true ->
-    own_context cur_ctx -∗
-    (if needs_ctx st
-     then ∃ (ξb : CtxId) (Tb : nat), ctx_parked ξb Tb ∗ proc_ctx_at ξb pa
-     else own_ctx (p_context pa)) -∗
-    hart_at_any pa -∗ pslot_used_at pa -∗ park_pay pa st
-    ==∗ own_context cur_ctx ∗
-        ∃ (ξb : CtxId) (Tb : nat), ctx_parked ξb Tb ∗ proc_slots_at ξb pa st.
+    (if needs_ctx st then proc_ctx pa else own_ctx (p_context pa)) -∗
+    hart_at_any pa -∗ pslot_used_at pa -∗ park_pay pa st -∗
+    proc_slots pa st.
   Proof.
-    intros Hst. iIntros "Hrun Hctx Hpark #Hused Hpay".
+    intros Hst. iIntros "Hctx Hpark #Hused Hpay".
     pose proof (is_unused_of_park_ok st Hst) as Hu.
     apply park_ok_cases in Hst as [Hn | Hz].
-    - rewrite Hn. iDestruct "Hctx" as (ξb Tb) "[Hbox Hctx]".
-      iModIntro. iFrame "Hrun". iExists ξb, Tb. iFrame "Hbox".
-      rewrite /proc_slots_at Hn Hu.
+    - rewrite Hn. rewrite /proc_slots /proc_slots_at Hn Hu.
       rewrite (inv_dormant_of_needs_ctx st Hn) (not_running_of_needs_ctx st Hn).
       rewrite (is_running_of_needs_ctx st Hn).
       iFrame "Hctx Hpark". by iFrame "Hused".
     - subst st. rewrite /park_pay inv_dormant_ZOMBIE needs_ctx_ZOMBIE_false.
-      iMod ctx_parked_alloc as (ξb) "Hbox".
       iAssert (proc_dormant pa ZOMBIE) with "[Hpay Hctx]" as "Hdorm".
       { iEval (rewrite proc_dormant_split). iFrame "Hpay Hctx". }
-      iMod (ctx_deposit (λ ξ, proc_dormant (XI := ξ) pa ZOMBIE) cur_ctx ξb 0
-              with "Hrun Hbox Hdorm") as "(Hrun & %Tb & _ & Hbox & Hdorm)".
-      iModIntro. iFrame "Hrun". iExists ξb, Tb. iFrame "Hbox".
-      rewrite /proc_slots_at not_running_ZOMBIE inv_dormant_ZOMBIE
+      rewrite /proc_slots /proc_slots_at not_running_ZOMBIE inv_dormant_ZOMBIE
               is_unused_ZOMBIE needs_ctx_ZOMBIE_false is_running_ZOMBIE.
       iSplitR; [done|]. iSplitR; [done|]. iFrame "Hdorm Hpark Hused".
   Qed.
@@ -1064,42 +959,6 @@ Section SchedCtxPay.
     proc_lock_res_at ξl γl pa.
   Proof. iIntros "Hs Hg Hc Hpub Hsl". iExists st, ch. iFrame. Qed.
 
-  (* A6.129: THE PRODUCER'S FORM -- the cells at the ambient, the slot at a
-     PARKED box (a child record's, or the reclaimer's fresh one): the cells
-     are deposited into the box from the running context, which raises the
-     box's stamp.  What the release then hands the lock is
-     [proc_lock_pay_of_box]'s [lock_pay]. *)
-  Lemma proc_lock_res_deposit (γl : gname) (pa : mword 64) (st : mword 32) (ch : mword 64)
-      (ξb : CtxId) (Tb : nat) :
-    own_context cur_ctx -∗ ctx_parked ξb Tb -∗
-    p_state pa ↦₄ st -∗
-    pstate_lock pa st -∗
-    p_chan pa ↦₈ ch -∗
-    proc_pub pa -∗
-    proc_slots_at ξb pa st ==∗
-    own_context cur_ctx ∗
-    ∃ Tb' : nat, ⌜(Tb ≤ Tb')%nat⌝ ∗ ctx_parked ξb Tb' ∗ proc_lock_res_at ξb γl pa.
-  Proof.
-    iIntros "Hrun Hbox Hs Hg Hc Hpub Hsl".
-    pose (R := (λ ξ, ctx_word4_pointsto ξ (p_state pa) (DfracOwn 1) st ∗
-                     ctx_word_pointsto ξ (p_chan pa) (DfracOwn 1) ch ∗
-                     proc_pub (XI := ξ) pa)%I).
-    assert (HR : CtxMorph R) by (subst R; ctx_morph_solve).
-    iMod (ctx_deposit R cur_ctx ξb Tb with "Hrun Hbox [Hs Hc Hpub]")
-      as "(Hrun & %Tb' & %HT & Hbox & (Hs & Hc & Hpub))".
-    { subst R. iFrame "Hs Hc". iExact "Hpub". }
-    subst R.
-    iModIntro. iFrame "Hrun". iExists Tb'. iFrame "Hbox". iSplitR; [done|].
-    iApply (proc_lock_res_at_intro with "Hs Hg Hc Hpub Hsl").
-  Qed.
-
-  (* the free arm's record, off a slot at its box: what a release that just
-     reclaimed a park hands the input-side finisher ([WpLockIn]) *)
-  Lemma proc_lock_pay_of_box (γl : gname) (pa : mword 64) :
-    (∃ (ξb : CtxId) (Tb : nat), ctx_parked ξb Tb ∗ proc_lock_res_at ξb γl pa) -∗
-    lock_pay (proc_lock_pay γl pa).
-  Proof. iIntros "(%ξb & %Tb & Hbox & HR)". iExists ξb, Tb. iFrame. Qed.
-
   Lemma proc_lock_res_elim (γl : gname) (pa : mword 64) :
     proc_lock_res γl pa -∗
     ∃ (st : mword 32) (ch : mword 64),
@@ -1136,15 +995,13 @@ End SchedCtxPay.
 
 (* A6.129: the lock table moves into a forked child's record whole -- stated
    after the section so the table's context is explicit. *)
-Section SchedCtxMove.
+Section SchedCtxTable.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (γs : list gname).
-  Global Instance procs_inv_move : CtxMove (λ ξ, procs_inv (XI := ξ) γs).
-  Proof. rewrite /procs_inv. ctx_move_solve. Qed.
   Global Instance procs_inv_morph : CtxMorph (λ ξ, procs_inv (XI := ξ) γs).
   Proof. rewrite /procs_inv. ctx_morph_solve. Qed.
-End SchedCtxMove.
+End SchedCtxTable.
 
 
 

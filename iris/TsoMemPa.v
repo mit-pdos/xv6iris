@@ -1297,7 +1297,7 @@ End window.
 (* pin's bound [B] and the parked record's stamp again.  EVERY            *)
 (* HISTORY-SHAPED CLAIM IN THIS PORT CARRIES A FLOOR AND IS CLAIMED       *)
 (* AGAINST A MONOTONE RECEIPT -- [pin_ok]'s [B] with [hart_view_lb],      *)
-(* [ctx_parked]'s [T] with the resume receipt, and now the window's       *)
+(* [ctx_stamped]'s [T] with the resume receipt, and now the window's       *)
 (* [Bm].  A history claim with no floor is a claim about a past nobody    *)
 (* owns.                                                                 *)
 (*                                                                       *)

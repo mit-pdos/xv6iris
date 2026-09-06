@@ -1383,7 +1383,7 @@ Section BootAlloc.
        let [boot_shared_alloc]'s eight bundles pin one evar to eight contexts
        (plan §9 items 38/39).  The carve's [∀ ξ] row is instantiated at that
        context; the receipt is the boot one, [view_lb_0]. *)
-    iMod TsoCtx.ctx_parked_alloc as (ξb) "Hpk".
+    iMod TsoCtx.ctx_stamped_alloc as (ξb) "Hpk".
     iModIntro. iFrame "Hseip Hmeip".
     iDestruct "Hint" as (iv) "Hint".
     iExists iv.
@@ -1835,7 +1835,7 @@ Section BootAlloc.
       as "#Hwinv".
     { iApply RiscvAdequacy.big_sepL_enum_to_set. iExact "Hpins". }
     (* ---- the handover channel, at the settled payload ---- *)
-    iMod ctx_parked_alloc as (ξd) "Hpkd".
+    iMod ctx_stamped_alloc as (ξd) "Hpkd".
     assert (Hsimg : started_img).
     { pose proof Hbf as Hbf2.
       destruct Hbf2 as (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hgimg & _).

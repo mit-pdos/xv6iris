@@ -98,7 +98,7 @@ Section EnvPark.
   Context `{GEN : GenId}.
 
   (* the six rows a devintr caller needs: the device invariants (ξ-free),
-     the console capabilities ([SpecMainSecondary.console_caps_morph]), the
+     the console capabilities ([SpecConsoleintr.console_caps_morph]), the
      disk geometry cells ([DiskInv.disk_geom_morph]), the vdisk lock's
      handle over [disk_res_at], the ticks lock and the process table. *)
   Global Instance devintr_caps_any_morph (γu : uart_names) (γv : disk_names)

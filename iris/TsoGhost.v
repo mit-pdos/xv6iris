@@ -102,7 +102,7 @@ Class tsoMemG Σ := TsoMemG {
      with owned element fragments -- membership fragments are persistent
      and RE-MINTABLE from the authority, which is what makes the same-hart
      hand-off of a dirty cell between two running contexts a total rule
-     ([TsoCtx.ctx_move_h]): the receiver registers the key whether or not
+     ([TsoCtx.ctx_move]): the receiver registers the key whether or not
      it already has it. *)
   tsomem_dirtyG :: inG Σ (authR (gsetUR (nat * Arch.pa)));
 }.

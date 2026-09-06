@@ -13,9 +13,11 @@ plan of record with its rulings table).
 Under the view-machine model (`TsoCtx.v`; born as Ztso, relaxed for
 load–load reordering by `completed/relaxed-rr.md` -- the relaxation changed
 what a plain LOAD mints, not what a cell IS, so everything here reads as
-written) a physical cell is owned in one of three tiers: **T1**, a running context's exact cell; **T2**, parked at a stamped
-context inside a box or lock record; **T3**, a ledger pin above a floor
-(racy reads).  A cell that is written under one lock and read under another
+written) a physical cell is owned in one of three tiers: **T1**, a running context's
+exact cell; **T2**, at a context that is not running -- STAMPED (a box's or
+a lock record's root, `ctx_stamped`) or PARKED UNDER a context (a thread
+record at `swtch`, `ctx_parked`; see [`contexts.md`](contexts.md)); **T3**,
+a ledger pin above a floor (racy reads).  A cell that is written under one lock and read under another
 — a buffer's data, an in-core inode's header, a file's `off` — cannot sit
 in a plain invariant, because an invariant body at a fixed context cannot
 be absorbed by a different thread of control.  The box is the ONE generic
@@ -45,7 +47,7 @@ reason), and a cell whose owner crosses WITH it (a floored bundle whose
 | `Q1 : nat → iProp` | the OUT_L1 residue, indexed by the body's COUNT |
 | `Q2 : iProp` | the OUT_L2 (checkout) residue |
 
-The box owns exactly: the parked context `ctx_parked ξb T`, the stamps
+The box owns exactly: the stamped context `ctx_stamped ξb T`, the stamps
 authority (`authR (gmapUR (id*nat) ufracR)`: mass = reference count, one
 key per `(identity, stamp)`), the count, and one half each of two
 registers.  The **L1 register** `slot_reg` = `{sr_td; sr_win; sr_ident;

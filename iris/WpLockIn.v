@@ -1,19 +1,25 @@
-(* WpLockIn.v -- THE INPUT-SIDE FINISHER (tso-port.md §0.42′; tso-machine-flip.md
-   A6.127 §6): a release whose payload is ALREADY PARKED.
+(* WpLockIn.v -- THE INPUT-SIDE FINISHER: a release whose payload is
+   ALREADY PARKED.
 
    [WpLock.lock_finisher]'s prelude is [own_context cur_ctx -∗ R cur_ctx ==∗
    own_context cur_ctx ∗ Pay]: release takes the payload at the caller's own
-   context and the closing finisher deposits it into a fresh parked context
-   ([lock_pay_intro]).  A release that CREATES a parked-thread record cannot
-   state [R cur_ctx]: the record's link ([SchedCtx.proc_ctx]) is a floor on
-   the PARK BOX the record came with, and no running context's bound covers
-   a fresh park.  What such a release holds is [lock_pay R] outright -- the
-   box IS the lock's context.  So the prelude here takes only the running
-   token, and the caller has closed over its own material.  The ordinary
-   finisher is the special case ([lock_finisher_to_in]).
+   context and the closing finisher deposits it into a fresh stamped record
+   ([lock_pay_intro]).  The pre-parked form exists for the R2 FLOOR FOLD: a
+   releaser cannot floor a log position covering its own buffered stores at
+   its own context (its bound is capped by its hart's view), so a payload
+   row [λ ξ, ctx_floor ξ tl] is unmintable through the plain deposit.  The
+   caller deposits and raises the record itself
+   ([WpLock.lock_pay_intro_llb], packaged as [lock_finisher_close_in_llb])
+   and hands over [lock_pay R] outright.  So the prelude here takes only the
+   running token, and the caller has closed over its own material.  The
+   ordinary finisher is the special case ([lock_finisher_to_in]).
+
+   A THREAD RECORD IS NOT ONE OF THESE: a record is parked under a context
+   ([TsoCtx.ctx_parked], [SchedCtx.proc_ctx]) and released as an ordinary
+   payload at the releaser's own context.
 
    WHY ITS OWN FILE: [WpLock.v] sits under 684 files; this is thirty lines
-   off its public definitions ([TsoCtxAbsorbLb] / [TsoCtxPark] precedent). *)
+   off its public definitions ([TsoCtxAbsorbLb] precedent). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -89,13 +95,6 @@ Section LockIn.
     { iIntros "Hrun".
       iApply (lock_pay_intro_llb Rdep R tl Hfold with "Hllb Hrun HR"). }
     iApply lock_finisher_close_body.
-  Qed.
-
-  (* ...and the plainest form: the record in hand, no token consulted *)
-  Lemma lock_finisher_close_pay `{CID : CpuId} γ lk s R D E :
-    lock_pay R -∗ lock_finisher_in γ lk s R D emp E.
-  Proof.
-    iIntros "Hpay". iApply lock_finisher_close_in. iIntros "Hrun". iModIntro. iFrame.
   Qed.
 
 End LockIn.

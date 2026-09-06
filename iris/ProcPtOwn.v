@@ -5664,13 +5664,13 @@ Section ProcPt.
 
 End ProcPt.
 
-Require Import CtxMorphTac PtTreeMove.
+Require Import CtxMorphTac PtTreeMorph.
 
 (* the descriptor's transport (tso-port M3).  [proc_pt] is the address
    space itself, and post-tier-flip it is ξ-DEPENDENT through and through:
    the tree's slots and the process image's bytes are context-registered
    ([PtTree.pt_slot_own (UTier ξ)] / [ctx_phys_pointsto ξ]), so the whole
-   descriptor rides the morph -- structural down to PtTreeMove's tree
+   descriptor rides the morph -- structural down to PtTreeMorph's tree
    instance and the phys leaves. *)
 Global Instance phys_byte_any_morph `{!riscvGS Σ} (a : Arch.pa) :
   CtxMorph (fun xi : CtxId => phys_byte_any (XI := xi) a).

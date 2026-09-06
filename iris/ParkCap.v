@@ -181,12 +181,13 @@ Section ParkCap.
           later, for the same reason *)
        ▷ W -∗
        park_child (XI := ξp) γs γf pa ks rest pid U -∗
-       (* THE CONCLUSION IS ξ-FREE: [SchedCtx.proc_ctx_boxed] is a CLOSED
-          TERM since A6.128 (the record's rows live at the record's own
-          existential identity, [SwtchCtx.valid_context_pre]'s [XIp]) --
-          main's §0.15′ shape, reached here by the same-hart hand-off.  This
-          is the property [UtResFits] needs of [park_cap]/[park_token]. *)
-       |==> own_context (CID := hp) ξp ∗ proc_ctx_boxed γs pa)%I.
+       (* THE CONCLUSION IS THE RECORD PARKED UNDER THE PARKER'S CONTEXT:
+          the child's rows live at the record's own existential identity
+          ([SwtchCtx.valid_context_pre]'s [XIp]) and its token is
+          [ctx_parked XIp ξp], so the only ξ the statement names is the
+          binder's own -- which is what [UtResFits] needs of
+          [park_cap]/[park_token]. *)
+       |==> own_context (CID := hp) ξp ∗ proc_ctx (XI := ξp) γs pa)%I.
 
   (* THE CHANNEL, at a given [W], as a [□] proposition under a later -- for
      the records of THIS table ([un_s N = γs]), which is all the token for
@@ -296,7 +297,7 @@ Section ParkCap.
        record is at it. *)
     (∀ W : uvis, ⌜uvis_fd W = sts /\ uvis_cwd W = pv_cwi (us_V U)⌝ -∗ uslot W) -∗
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U -∗
-    |==> own_context cur_ctx ∗ proc_ctx_boxed (un_s N) (un_pj N).
+    |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
   Proof.
     iIntros (Hwf Hrest) "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Hslot Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).

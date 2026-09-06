@@ -69,15 +69,12 @@ TsoCtxLedger.v
 MemClaim.v
 TsoCtxAbsorbLb.v
 CtxMorphTac.v
-TsoCtxPark.v
 CtxBox.v
-TsoCtxMove.v
-CtxParkedProto.v
 CtxValues.v
 CtxPinw.v
 CtxKMap.v
 CtxPinMint.v
-PtTreeMove.v
+PtTreeMorph.v
 PermInv.v
 PageGeom.v
 KptExecMap.v
@@ -571,7 +568,7 @@ VcGen.v
 VcGenS.v
 SwtchCtx.v
 CpuOwn.v
-CpuOwnMove.v
+CpuOwnMorph.v
 ProcInv.v
 WpPushOffBridges.v
 CodeSwtch.v

@@ -144,8 +144,6 @@ Section MainDepositMorph.
   Proof. rewrite /is_txlock. ctx_morph_solve. Qed.
   Global Instance is_conslock_morph γ : CtxMorph (λ ξ, is_conslock (XI := ξ) γ).
   Proof. rewrite /is_conslock. ctx_morph_solve. Qed.
-  Global Instance console_caps_morph γu : CtxMorph (λ ξ, console_caps (XI := ξ) γu).
-  Proof. rewrite /console_caps. ctx_morph_solve. Qed.
   Global Instance printk_env_morph γpr γd γv : CtxMorph (λ ξ, printk_env (XI := ξ) γpr γd γv).
   Proof. rewrite /printk_env. ctx_morph_solve. Qed.
   Global Instance disk_geom_morph γ pd pav pu : CtxMorph (λ ξ, disk_geom (XI := ξ) γ pd pav pu).

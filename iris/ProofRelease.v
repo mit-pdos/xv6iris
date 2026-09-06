@@ -79,10 +79,10 @@ Section ProofRelease.
     (* the deposit arrives at the caller's own context; the invariant parks
        it ∃-closed (tso-port M3 -- at cutover this introduction becomes the
        transport into the lock's internal context,
-       [TsoCtxTwin2.ctx_dom_to_parked]) *)
+       [TsoCtxTwin2.ctx_dom_to_stamped]) *)
     (* A6.119 (§0.18′): THE HONEST DEPOSIT, replacing the SC-era ∃-closure
        this very comment predicted.  [lock_pay_intro] parks the payload on a
-       fresh context ([ctx_deposit] / [ctx_dom_to_parked]) and hands the
+       fresh context ([ctx_deposit] / [ctx_dom_to_stamped]) and hands the
        running token straight back. *)
     (* A6.119 (§0.18′): the honest deposit, and it needs NO new premise --
        [own_context] is a component of [sie_cap] (IntrDefs), and

@@ -2081,7 +2081,7 @@ Section ProofMain.
               (mword_of_int 0 : mword 12) S3 n
               (trunc32 (rget S3 (mword_of_int 14 : mword 5))) True%I
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
-              (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0 ∗
+              (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_stamped ξd 0 ∗
                started_prim γi ∗
                (llb loglen_name Bk ∗
                 □ (∀ pos : nat, ⌜(Bk <= pos)%nat⌝ -∗ P pos cur_ctx)))%I

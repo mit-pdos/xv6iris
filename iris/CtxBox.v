@@ -30,7 +30,7 @@
      tok      the L2 exclusivity token (bcache: bown; icache: ic_tok)
    with the two exclusivity laws the arms are refuted by.  tok and Q must
    be GHOST (no cells): CtxMorph of a constant is trivial, so only
-   ξ-freedom keeps the box CtxMove-able across the fork (R-4).
+   ξ-freedom keeps the box transportable across the fork (R-4).
    THE L2 HOLDER'S HANDLE pins the parked fragment's keys AND mass when it
    instantiates l2_hold (bcache: a unit singleton at ((dev,bno), t); icache:
    the share singleton at mass s) -- never ∃ over the map (R-1).
@@ -81,7 +81,6 @@ From iris.base_logic.lib Require Import own ghost_var invariants.
 Require Import RiscvLang RiscvPtsto.
 Require Import TsoGhost.
 Require Import TsoCtx.
-Require Import TsoCtxPark.
 Require Import TsoCtxAbsorbLb.
 
 (* the registers' value types, the stamps camera, the class [boxG] and the
@@ -550,7 +549,7 @@ Section box.
     ((T ≤ sr_td r)%nat ∨ ∃ p, p ∈ dom m ∧ p.2 = T).            (* D *)
   Definition box_body γ : iProp Σ :=
     (∃ (T : nat) (ξb : CtxId) m (c : nat) (r : slot_reg id X) (s : l2_reg id),
-       ctx_parked ξb T ∗ llb loglen_name T ∗
+       ctx_stamped ξb T ∗ llb loglen_name T ∗
        stamps_auth γ m ∗ cnt_half γ c ∗ slotd_half γ r ∗ slotp_half γ s ∗
        ⌜box_rows T m c r s⌝ ∗
        box_arm γ T ξb m c r s)%I.
@@ -938,7 +937,7 @@ Section box.
       apply (Qc_plus_cancel_l (qsum m)). by rewrite Hq1 Qcplus_0_r. }
     iMod (ctx_deposit (P_hdr i' x1) ξ ξb T with "Hrun Hpk Hhdr")
       as "(Hrun & %T' & %HTT' & Hpk & Hhdr)".
-    iDestruct (ctx_parked_llb with "Hpk") as "[Hpk #Hllb']".
+    iDestruct (ctx_stamped_llb with "Hpk") as "[Hpk #Hllb']".
     iMod (own_update _ _ _ (stamps_alloc_upd ∅ (i', T') (unit_mass c)) with "Hst") as "[Hst Hfr]".
     iEval (rewrite right_id) in "Hst".
     iMod (ghost_var_update_2 (SlotReg T' false i' None) with "Hrd Hrd0")
@@ -1322,7 +1321,7 @@ Section box.
     iMod (ctx_deposit (in_arm i) ξ ξb T with "Hrun Hpk [Hhdr Hrest]")
       as "(Hrun & %T' & %HTT' & Hpk & Hbun)".
     { rewrite /in_arm. iExists x. iFrame "Hhdr Hrest". }
-    iDestruct (ctx_parked_llb with "Hpk") as "[Hpk #Hllb']".
+    iDestruct (ctx_stamped_llb with "Hpk") as "[Hpk #Hllb']".
     iMod (stamps_dealloc with "Hst Hf0") as (m1) "(Hst & %Hq1 & %Hdom1 & _)".
     set (q := mk_Qp (qsum mh) (qsum_pos mh Hne0)).
     iMod (own_update _ _ _ (stamps_alloc_upd m1 (i, T') q) with "Hst") as "[Hst Hfr]".
@@ -1626,7 +1625,7 @@ Section box.
      llb T_boot (L1's floor row must start at td = T_boot -- the newlock
      twin over lock_pay_intro_llb folds it), the cnt half at 0, and L2's
      register half at {| 0; None |} (ctx_floor_0 serves its row).
-     Proof skeleton: ctx_parked_alloc; ctx_deposit the bundle (T_boot);
+     Proof skeleton: ctx_stamped_alloc; ctx_deposit the bundle (T_boot);
      own_alloc (● ∅); ghost_var_alloc ×3; inv_alloc with m = ∅ (rows: Σ
      trivial, I vacuous, C vacuous-left, D td = T_boot). *)
   Lemma box_alloc `{CID : CpuId} (N : namespace) (ξ : CtxId) (i0 : id) (E : coPset) :
@@ -1640,11 +1639,11 @@ Section box.
       slotp_half γ (L2Reg 0 None).
   Proof.
     iIntros "Hrun Hbun".
-    iMod ctx_parked_alloc as (ξb) "Hpk".
+    iMod ctx_stamped_alloc as (ξb) "Hpk".
     iMod (ctx_deposit (in_arm i0) ξ ξb 0 with "Hrun Hpk [Hbun]")
       as "(Hrun & %Tb & _ & Hpk & Hbun)".
     { rewrite /in_arm. iExact "Hbun". }
-    iDestruct (ctx_parked_llb with "Hpk") as "[Hpk #Hllb]".
+    iDestruct (ctx_stamped_llb with "Hpk") as "[Hpk #Hllb]".
     iMod (own_alloc (● (∅ : gmapUR (id * nat) ufracR))) as (γst) "Hst"; [by apply auth_auth_valid|].
     iMod (ghost_var_alloc 0%nat) as (γc) "Hc".
     iEval (rewrite -Qp.half_half) in "Hc". iDestruct (ghost_var_split with "Hc") as "[Hc1 Hc2]".
@@ -1688,11 +1687,11 @@ Section box.
       slotp_half γ (L2Reg 0 None).
   Proof.
     iIntros "Hst Hc Hd Hp Hrun Hbun".
-    iMod ctx_parked_alloc as (ξb) "Hpk".
+    iMod ctx_stamped_alloc as (ξb) "Hpk".
     iMod (ctx_deposit (in_arm i0) ξ ξb 0 with "Hrun Hpk [Hbun]")
       as "(Hrun & %Tb & _ & Hpk & Hbun)".
     { rewrite /in_arm. iExact "Hbun". }
-    iDestruct (ctx_parked_llb with "Hpk") as "[Hpk #Hllb]".
+    iDestruct (ctx_stamped_llb with "Hpk") as "[Hpk #Hllb]".
     iMod (ghost_var_update (SlotReg Tb false i0 None) with "Hd") as "Hd".
     iEval (rewrite -Qp.half_half) in "Hd". iDestruct (ghost_var_split with "Hd") as "[Hd1 Hd2]".
     iMod (ghost_var_update (L2Reg 0 None) with "Hp") as "Hp".
@@ -1729,11 +1728,11 @@ Section box.
       slotd_half γ (SlotReg T_boot false i0 None) ∗ llb loglen_name T_boot.
   Proof.
     iIntros "Hrun Hst Hc Hd Hp Hbun". iDestruct "Hd" as (r0) "Hd".
-    iMod ctx_parked_alloc as (ξb) "Hpk".
+    iMod ctx_stamped_alloc as (ξb) "Hpk".
     iMod (ctx_deposit (in_arm i0) ξ ξb 0 with "Hrun Hpk [Hbun]")
       as "(Hrun & %Tb & _ & Hpk & Hbun)".
     { rewrite /in_arm. iExact "Hbun". }
-    iDestruct (ctx_parked_llb with "Hpk") as "[Hpk #Hllb]".
+    iDestruct (ctx_stamped_llb with "Hpk") as "[Hpk #Hllb]".
     iMod (ghost_var_update (SlotReg Tb false i0 None) with "Hd") as "Hd".
     iEval (rewrite -Qp.half_half) in "Hd". iDestruct (ghost_var_split with "Hd") as "[Hd1 Hd2]".
     iMod (inv_alloc N _ (box_body γ) with "[Hpk Hst Hc Hd1 Hp Hbun]") as "#Hinv".

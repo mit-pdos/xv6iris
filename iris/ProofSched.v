@@ -1409,7 +1409,7 @@ Section ProofSched.
        ([park_tok (Some h)]); fold it back under the later the slot holds it
        beneath ([sched_vc_at_intro]). *)
     iDestruct "Hvc'" as (XIo) "[Htok Hrec]".
-    iEval (rewrite /park_tok) in "Htok".
+    iEval (rewrite /park_tok /park_tok_at) in "Htok".
     iDestruct (sched_vc_at_intro γs h _ _ XIo with "Htok Hrec") as "Hvc'".
     (* callee-image component equalities. *)
     unfold callee_img, ctx_regs in Hcallee. simpl in Hcallee.

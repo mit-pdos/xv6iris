@@ -158,12 +158,12 @@ Section StartedInv.
     (∃ (i : nat) (T : nat),
        started_win_rel i ∗
        dset_auth γi 1 {[(S i, started_addr)]} ∗
-       ctx_parked ξd T ∗ ⌜(T ≤ S i)%nat⌝ ∗ P (S i) ξd)%I.
+       ctx_stamped ξd T ∗ ⌜(T ≤ S i)%nat⌝ ∗ P (S i) ξd)%I.
 
   Definition started_body (γi : gname) (ξd : CtxId)
       (P : nat -> CtxId -> iProp Σ) : iProp Σ :=
     (wordw_claim (KTR := KT0) 4 started_addr ∗ ⌜started_img⌝ ∗
-     (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0
+     (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_stamped ξd 0
       ∨ started_right γi ξd P))%I.
 
   Definition started_inv (γi : gname) (ξd : CtxId)
@@ -182,7 +182,7 @@ Section StartedInv.
   Lemma started_alloc (E : coPset) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ) :
     started_img ->
     wordw_claim (KTR := KT0) 4 started_addr -∗
-    started_win_plain -∗ ctx_parked ξd 0 ={E}=∗
+    started_win_plain -∗ ctx_stamped ξd 0 ={E}=∗
     ∃ γi : gname, started_inv γi ξd P ∗ started_prim γi.
   Proof.
     iIntros (Himg) "#Hcl Hw Hpk".
@@ -233,7 +233,7 @@ Section StartedInv.
     (llb loglen_name B0 ∗
      □ (∀ pos : nat, ⌜(B0 <= pos)%nat⌝ -∗ P pos cur_ctx)) -∗
     (|={Em, Em ∖ ↑startedN}=>
-       (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0 ∗
+       (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_stamped ξd 0 ∗
         started_prim γi ∗
         (llb loglen_name B0 ∗
          □ (∀ pos : nat, ⌜(B0 <= pos)%nat⌝ -∗ P pos cur_ctx))) ∗
@@ -525,9 +525,9 @@ Section StartedInv.
   (* at floor 0 and stored through, the index is registered.             *)
   (* ------------------------------------------------------------------- *)
   Local Lemma started_parked_llb (ξ : CtxId) (T : nat) :
-    ctx_parked ξ T -∗ ctx_parked ξ T ∗ llb loglen_name T.
+    ctx_stamped ξ T -∗ ctx_stamped ξ T ∗ llb loglen_name T.
   Proof.
-    rewrite ctx_parked_unseal /ctx_parked_def.
+    rewrite ctx_stamped_unseal /ctx_stamped_def.
     iIntros "(%D & Hat & #Hllb & %HD)". iSplitL; [| iExact "Hllb"].
     iExists D. iFrame "Hat Hllb". by iPureIntro.
   Qed.
@@ -545,7 +545,7 @@ Section StartedInv.
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
-      (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0 ∗
+      (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_stamped ξd 0 ∗
        started_prim γi ∗
        (llb loglen_name B0 ∗
         □ (∀ pos : nat, ⌜(B0 <= pos)%nat⌝ -∗ P pos TsoCtx.cur_ctx))) ==∗

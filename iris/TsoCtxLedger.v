@@ -41,7 +41,7 @@ Section ctx.
   (* THE VIEW-RECEIPT MINT ([TsoCtxTwin2.twin_passed_get]): at the
      AMO-acquire leaf the hart's view sits at the log top, so the parked
      record's own [llb T] receipt yields the STABLE pair
-     [hart_view_lb K ∗ ⌜T ≤ K⌝] that [ctx_resume]/[ctx_exchange]
+     [hart_view_lb K ∗ ⌜T ≤ K⌝] that [ctx_unstamp]/[ctx_exchange]
      consume -- persistent-monotone, so it survives every step between
      the acquire and the swtch. *)
   Lemma hart_view_lb_get `{CID : CpuId} (g : gstate) (T : nat) :
@@ -65,19 +65,19 @@ Section ctx.
     iFrame "Hrcpt". iPureIntro. lia.
   Qed.
 
-  (* ACQUIRE-SIDE MINT ([TsoCtxTwin2.ctx_dom_of_parked]): domination
+  (* ACQUIRE-SIDE MINT ([TsoCtxTwin2.ctx_dom_of_stamped]): domination
      FROM a parked source INTO the running acquirer, whose hart sits at
      the log top (what the AMO delivers).  The one mint that needs the
      interp -- it must compare the source's stamp with the log length
      and raise the acquirer's bound to its hart's view. *)
-  Lemma ctx_dom_of_parked `{CID : CpuId} (g : gstate) (ξ ξ' : CtxId) (T : nat) :
+  Lemma ctx_dom_of_stamped `{CID : CpuId} (g : gstate) (ξ ξ' : CtxId) (T : nat) :
     (length g.(glog) ≤ g.(gtv) cpu_id)%nat →
-    tso_interp_at riscv_eraGS g -∗ own_context ξ' -∗ ctx_parked ξ T ==∗
+    tso_interp_at riscv_eraGS g -∗ own_context ξ' -∗ ctx_stamped ξ T ==∗
     tso_interp_at riscv_eraGS g ∗ own_context ξ' ∗
-    ctx_dom ξ ξ' ∗ (ctx_dom ξ ξ' -∗ ctx_parked ξ T).
+    ctx_dom ξ ξ' ∗ (ctx_dom ξ ξ' -∗ ctx_stamped ξ T).
   Proof.
     rewrite own_context_unseal /own_context_def
-            ctx_parked_unseal /ctx_parked_def ctx_dom_unseal /ctx_dom_def.
+            ctx_stamped_unseal /ctx_stamped_def ctx_dom_unseal /ctx_dom_at_def.
     iIntros (Htop) "Hint Hrun Hpk".
     iDestruct "Hint"
       as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
@@ -109,9 +109,14 @@ Section ctx.
       iIntros "!>" (k Hk) "Hok".
       iApply (dirty_ok_mono with "Hok"). lia. }
     iSplitL "Hat1".
-    { iExists T, T, (g.(gtv) cpu_id), D. iFrame "Hat1 Hlb'".
-      iPureIntro. split_and!; [exact HDT | lia | lia]. }
-    iIntros "(%B0 & %W0 & %B0' & %D0 & Hat0 & _)".
+    { iExists T, D. iFrame "Hat1".
+      iSplitR.
+      { rewrite /ctx_floor /llb. iLeft.
+        iApply (mono_nat_lb_own_le with "Hlb'"). lia. }
+      iModIntro. iApply big_sepS_intro. iIntros "!>" (k Hk).
+      rewrite /key_at /llb. iLeft. iLeft.
+      iApply (mono_nat_lb_own_le with "Hlb'"). have := HDT _ Hk. lia. }
+    iIntros "(%B0 & %D0 & Hat0 & _ & _)".
     iDestruct (ctx_at_agree with "Hat0 Hat2") as %[-> ->].
     iCombine "Hat0 Hat2" as "Hat". rewrite -ctx_at_halves.
     iExists D. iFrame "Hat HT". by iPureIntro.
@@ -123,7 +128,7 @@ Section ctx.
   (* parked target's stamp may be raised at will).  Its dual is not:     *)
   (* claiming a parked record's facts INTO the running context needs the *)
   (* at-the-top evidence, because the claimer must show its own view     *)
-  (* already covers the whole log -- that is [ctx_dom_of_parked]'s       *)
+  (* already covers the whole log -- that is [ctx_dom_of_stamped]'s       *)
   (* [length glog ≤ gtv cpu_id] premise, and it is what the AMO leaf     *)
   (* actually establishes when it reads at the top.                      *)
   (*                                                                     *)

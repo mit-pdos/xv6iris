@@ -1,15 +1,14 @@
-# Project: a context parked under a context
+# Completed: a context parked under a context (ctx-parent, phase one)
 
-**STATUS 2026-09-06: DESIGN RULED (§8, four rulings), implementation not
-started.**  Ruling (d) -- one domination relation -- supersedes the
-two-class shape the skeleton was written against; the skeleton's laws
-hold verbatim as the relation at full authority (§2).  Prototype on `main` (the one-log machine with load–load
-relaxation); the two-log store–store work is parked on branch
-`relaxed-ww-twolog` and will consume this design.  Skeleton:
-`iris/CtxParkedProto.v`, compiled against `TsoCtx.v`'s public unseal
-lemmas, every law PROVED, no admits.  Reviewed once (a Fable subagent,
-2026-09-06); the review's required items are folded in below.  §8 lists
-the decisions left to the owner.
+Landed on `main`: the one domination relation with the per-key body, the
+`ctx_stamped` rename of the stamped record, `ctx_parked ξ ξ'` as that
+relation at full authority with `ctx_park`/`ctx_resume`, the derived
+same-hart move (`CtxMove` deleted), the swtch token exchange and the
+scheduler's slot without a box, and the fork/userinit producer parking the
+child under its parent.  The law as it stands is
+[`design/contexts.md`](../design/contexts.md); this file is the design
+record and the owner's rulings.  Phase two (per-lock persistent contexts,
+ruling (c)) is [`projects/lock-contexts.md`](../projects/lock-contexts.md).
 
 ## 0. The rule
 

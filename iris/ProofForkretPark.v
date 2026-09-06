@@ -101,47 +101,21 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
-Require Import TsoCtx.
-Require Import TsoCtxPark.   (* [ctx_box_over] -- the record's PARK BOX (A6.127 §5) *)
-Require Import TsoCtxMove.   (* [own_context_twin] / [ctx_move] -- the child's own context (A6.129) *)   (* [ctx_parked_any] -- the record's token, SC stub *)
+Require Import TsoCtx.   (* [own_context_twin] / [ctx_move] -- the child's own context (A6.129) *)
 
 (* ===================================================================== *)
-(* MAIN'S DEVIATION AT THIS SITE (Amendment 6.3 / Amendment 9).           *)
+(* THE CHILD-RECORD PRODUCER.                                            *)
 (*                                                                       *)
-(* §0.42′ moves the parked record's token OUT of the record and beside    *)
-(* it, boxed: what a child-record producer owes is                        *)
-(* [SchedCtx.proc_ctx_boxed pa] -- a fresh stamped PARK BOX [ξb], the     *)
-(* record's own token [ctx_parked XIp Tp], and the link                   *)
-(* [ctx_floor ξb Tp] the parker's release makes the lock's context.       *)
-(*                                                                       *)
-(* On the T-leg the producer MINTS the child's identity                   *)
-(* ([TsoCtx.ctx_parked_alloc]) and DEPOSITS the child's stack into it     *)
-(* ([TsoCtx.ctx_deposit] at [StackOwn.stack_own_morph]), so [XIp] is a    *)
-(* genuinely fresh context and the box is raised over ITS stamp.          *)
-(* MAIN CANNOT: [procs_inv] has no transport channel here (Amendment 6.3, *)
-(* the deferred §0.27′ item), so this is one of the TWO SC STUB SITES --  *)
-(* the record stays AT THE PARKER'S CONTEXT, [XIp := cur_ctx], and its    *)
-(* token is [TsoCtxShim.ctx_parked_any cur_ctx 0].  THERE IS NO STACK     *)
-(* DEPOSIT, and none is needed: the record's stack is already stated at   *)
-(* [cur_ctx = XIp], which is exactly what [valid_context_pre] asks for.   *)
-(* What IS honest here is the box: [TsoCtxPark.ctx_box_over] mints the    *)
-(* fresh stamped [ξb] with the floor over the stub's stamp, so the        *)
-(* [proc_ctx_boxed] shape the consumers (kfork B5, userinit) release      *)
-(* through [WpLockIn] is the T-leg's exactly.  At the TSO cutover only    *)
-(* the two lines that produce [Hthr]/[XIp] move.                          *)
-(*                                                                       *)
-(* AND WHAT AMENDMENT 10 (§0.43′ / A6.128) MEANS HERE.  On the T-leg the  *)
-(* record's cells and its kstack row are DEPOSITED into [XIc] beside the  *)
-(* stack, and its frontier is then three rows still at the PARKER's ξ --  *)
-(* [procs_inv], the park globals' handles, [proc_priv] through            *)
-(* [BioInv.buf_escrow] -- constant embeddings of ξ-indexed bodies that    *)
-(* neither [CtxMorph] (at the park) nor [TsoCtxMove.ctx_move] (the        *)
-(* parker's token is gone by the resume) can carry; the T-leg brackets    *)
-(* them in the final [iApply] so the mismatch fails FAST.  HERE THE STUB  *)
-(* MAKES THAT FRONTIER TRIVIAL: [XIp := cur_ctx], so those three rows are *)
-(* ALREADY at the record's identity and the file is green.  There are     *)
-(* correspondingly NO deposits to port -- the cells and the kstack row    *)
-(* are already stated at [cur_ctx = XIp], exactly as with the stack.      *)
+(* [own_context_twin] mints the child's identity [XIc] as a RUNNING copy  *)
+(* of the parker's bound and watermark; every row of the record then      *)
+(* moves into it by [TsoCtx.ctx_move] while both contexts run -- the      *)
+(* context cells, the kernel stack, the kstack handle, the process-table  *)
+(* handle, the park globals and [proc_priv].  The twin is then PARKED     *)
+(* UNDER THE PARENT ([TsoCtx.ctx_park XIc cur_ctx]), which is what        *)
+(* [SchedCtx.proc_ctx] holds beside the record, and the parker's release  *)
+(* of p->lock deposits the slot as an ordinary payload.  No stamp, no     *)
+(* box: a context is filled while it RUNS, because there is no deposit    *)
+(* into a parked child (claude-notes/design/contexts.md §2, §4).          *)
 (* ===================================================================== *)
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
@@ -232,11 +206,9 @@ Proof.
   intros Hrest [j [Hpa Hj]] Hut.
   subst pa.
   iIntros "Hrun Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
-  (* THE CHILD'S OWN CONTEXT (A6.129, L8/A12.19): twin the parker's running
-     token, move the record's rows across while both are running, then park
-     the twin and box it.  The rows that only MORPH (the globals' handles and
-     the process's private rows) are deposited into the parked twin, and the
-     box's floor is raised to the twin's stamp afterwards. *)
+  (* THE CHILD'S OWN CONTEXT: twin the parker's running token, move every
+     row of the record across while both are running, then park the twin
+     under the parker. *)
   iMod (own_context_twin cur_ctx with "Hrun") as "[Hrun (%XIc & Hthr)]".
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
@@ -249,17 +221,13 @@ Proof.
           cur_ctx XIc with "Hrun Hthr Hks") as "(Hrun & Hthr & #Hksc)".
   iMod (ctx_move (R := λ ξ, procs_inv (XI := ξ) γs)
           cur_ctx XIc with "Hrun Hthr Hpinv") as "(Hrun & Hthr & #Hpinvc)".
-  iMod ctx_parked_alloc as (ξb) "Hbox".
-  iMod (ctx_park_box XIc ξb 0 with "Hthr Hbox") as (Tc Tb) "(_ & Hbox & Hthr & _)".
-  iMod (ctx_deposit (λ ξ, UsertrapRes.park_globals ξ γs γw γft γf γtl) cur_ctx XIc Tc
-          with "Hrun Hthr Hglobp") as "(Hrun & %T1 & %HT1 & Hthr & #Hglobc)".
-  iMod (ctx_deposit (λ ξ, proc_priv (XI := ξ) γf (proc_addr j) pid U) cur_ctx XIc T1
-          with "Hrun Hthr Hpriv") as "(Hrun & %T2 & %HT2 & Hthr & Hpriv)".
-  iDestruct (ctx_parked_llb XIc T2 with "Hthr") as "[Hthr #Hllb]".
-  iMod (ctx_parked_raise ξb Tb T2 with "Hllb Hbox") as "[Hbox #Hfl]".
+  iMod (ctx_move (R := λ ξ, UsertrapRes.park_globals ξ γs γw γft γf γtl)
+          cur_ctx XIc with "Hrun Hthr Hglobp") as "(Hrun & Hthr & #Hglobc)".
+  iMod (ctx_move (R := λ ξ, proc_priv (XI := ξ) γf (proc_addr j) pid U)
+          cur_ctx XIc with "Hrun Hthr Hpriv") as "(Hrun & Hthr & Hpriv)".
+  iMod (ctx_park XIc cur_ctx with "Hrun Hthr") as "[Hrun Hpk]".
   iModIntro. iFrame "Hrun".
-  rewrite /proc_ctx_boxed. iExists ξb, (Nat.max Tb T2). iFrame "Hbox".
-  rewrite /proc_ctx_at. iExists XIc, T2. iFrame "Hthr Hfl".
+  rewrite /proc_ctx /proc_ctx_at. iExists XIc. iFrame "Hpk".
   iNext.
   rewrite (valid_context_unfold (p_sched γs) None (p_context (proc_addr j))
              (proc_addr j) XIc)
@@ -328,10 +296,10 @@ Proof.
   { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
     iFrame "Hcells". iPureIntro. cbn [length]. lia. }
   (* the dispatching scheduler's record came back with its RUNNING token
-     beside it ([SwtchCtx.park_tok (Some h)]); fold it back under the later
+     beside it ([SwtchCtx.park_tok_at (Some h)]); fold it back under the later
      the running slot holds it beneath (A6.127 §6). *)
   iDestruct "Hrec" as (XIo) "[Htok Hrec]".
-  iEval (rewrite /park_tok) in "Htok".
+  iEval (rewrite /park_tok_at) in "Htok".
   iDestruct (sched_vc_at_intro γs h _ _ XIo with "Htok Hrec") as "Hrec".
   iDestruct (proc_slots_running_intro (XI := XIc) γs j h Hj with "Htag2 Hown Hrec Hmk")
     as "Hslots".
@@ -362,16 +330,11 @@ Proof.
             Hj Hgl Hbud Hkx Hut Hsp
           with "Htext Hwire Hkmap Hpc [] [] Hcg Hcpu Htc Hclm
                 Hlocked HR Hksc [Hpriv] HW Hclose").
-  (* THE FRONTIER (tso-port.md §0.43′): three rows are still at the
-     PARKER's context -- [procs_inv], [park_globals]'s handles, and the
-     child's private block through [BioInv.buf_escrow] -- constant
-     embeddings of ξ-indexed bodies, which neither [CtxMorph] (at the park)
-     nor [ctx_move] (the parker's token is gone by the resume) can carry.
-     Bracketed so the mismatch FAILS HERE, fast, instead of sending
-     [iApply]'s unifier through the bodies.  ON MAIN the rows are at the
-     record's identity already, BY THE STUB ([XIp := cur_ctx], file header),
-     so the brackets close by [iExact]; main has no [park_globals] row, so
-     the T-leg's middle bracket has no counterpart. *)
+  (* THE THREE MOVED ROWS -- [procs_inv], [park_globals]'s handles and the
+     child's private block through [BioInv.buf_escrow] -- are at the
+     record's identity [XIc], so each closes by [iExact].  Bracketed rather
+     than framed: a ξ mismatch fails HERE, fast, instead of sending
+     [iApply]'s unifier through the bodies. *)
   { iExact "Hpinvc". }
   { iExact "Hglobc". }
   iExact "Hpriv".

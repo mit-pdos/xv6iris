@@ -160,12 +160,12 @@ Definition wp_acquire_gen_pre_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID
        are its own even if the prologue migrated -- CID rebinds, the
        thread of control does not.  Under TSO the re-indexing out of the
        invariant is paid by the AMO's at-the-top evidence
-       ([TsoCtxTwin2.ctx_dom_of_parked]); at SC it is a [CtxMorph] step
+       ([TsoCtxTwin2.ctx_dom_of_stamped]); at SC it is a [CtxMorph] step
        against the shim's [ctx_dom_sc], inside ProofAcquire. *)
     R cur_ctx -∗
     (* THE VIEW RECEIPT (tso-port M2), at the hart that WON the lock:
        persistent, monotone, the stable "my view passed the acquire"
-       fact that [TsoCtx.ctx_resume]/[ctx_exchange] consume.  The
+       fact that [TsoCtx.ctx_unstamp]/[ctx_exchange] consume.  The
        scheduler chain threads it from here to swtch, retiring the
        shim's [hart_view_lb_any].  Trivial at SC; minted at the AMO
        under TSO ([TsoCtxTwin2.twin_passed_get]). *)
@@ -240,12 +240,12 @@ Definition wp_acquire_gen_llb_pre_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
        are its own even if the prologue migrated -- CID rebinds, the
        thread of control does not.  Under TSO the re-indexing out of the
        invariant is paid by the AMO's at-the-top evidence
-       ([TsoCtxTwin2.ctx_dom_of_parked]); at SC it is a [CtxMorph] step
+       ([TsoCtxTwin2.ctx_dom_of_stamped]); at SC it is a [CtxMorph] step
        against the shim's [ctx_dom_sc], inside ProofAcquire. *)
     R cur_ctx -∗
     (* THE VIEW RECEIPT (tso-port M2), at the hart that WON the lock:
        persistent, monotone, the stable "my view passed the acquire"
-       fact that [TsoCtx.ctx_resume]/[ctx_exchange] consume.  The
+       fact that [TsoCtx.ctx_unstamp]/[ctx_exchange] consume.  The
        scheduler chain threads it from here to swtch, retiring the
        shim's [hart_view_lb_any].  Trivial at SC; minted at the AMO
        under TSO ([TsoCtxTwin2.twin_passed_get]). *)

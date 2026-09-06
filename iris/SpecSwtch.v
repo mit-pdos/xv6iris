@@ -46,7 +46,6 @@ Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxMove.
 Import Defs.
 
 
@@ -78,10 +77,12 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
      continuation below, so the continuation's [⌜adm Ao h⌝] is exactly what
      that record promises. *)
   (* A6.128: THE PAYLOAD IS A FUNCTION OF THE CONTEXT, and the crossing MOVES
-     it -- from the caller's identity to the target's, on this hart, with
-     both running tokens in hand ([TsoCtxMove.CtxMove]).  This is the
-     store-forwarding hand-off of [p->state]/[c->proc]/the held lock. *)
-  (forall h A c c' tp p' b, CtxMove (λ ξ, P h A c c' tp p' b ξ)) ->
+     it -- from the caller's identity to the target's, on this hart, by the
+     derived same-hart move [TsoCtx.ctx_move] with both running tokens in
+     hand.  So what [P] owes is the one transport class, [TsoCtx.CtxMorph].
+     This is the store-forwarding hand-off of [p->state]/[c->proc]/the held
+     lock. *)
+  (forall h A c c' tp p' b, CtxMorph (λ ξ, P h A c c' tp p' b ξ)) ->
   adm An cpu_id ->
   (* ...and the CALLER's own record admits resumption here too (A6.127 §6):
      a PINNED caller (the scheduler) parks its RUNNING token into its

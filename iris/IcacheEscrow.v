@@ -6031,16 +6031,16 @@ Section IcacheTable.
   Local Lemma itable_slot_row_raise (ξc : TsoCtx.CtxId) (T : nat)
       (M : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
       (k : nat) :
-    ctx_parked ξc T -∗ itable_slot_res_llb ξc M ci k ==∗
-    ∃ T' : nat, ctx_parked ξc T' ∗ itable_slot_res ξc M ci k.
+    ctx_stamped ξc T -∗ itable_slot_res_llb ξc M ci k ==∗
+    ∃ T' : nat, ctx_stamped ξc T' ∗ itable_slot_res ξc M ci k.
   Proof.
     rewrite /itable_slot_res_llb /itable_slot_res /ic_slot_row_llb /ic_slot_row_fl.
     iIntros "Hpk [Hrow H]".
     iDestruct "Hrow" as (tb) "(Hrow & #Hllb)".
-    iMod (TsoCtxPark.ctx_parked_raise ξc T tb with "Hllb Hpk") as "[Hpk #Hfl]".
+    iMod (TsoCtx.ctx_stamped_raise ξc T tb with "Hllb Hpk") as "[Hpk #Hfl]".
     destruct (M !! k) as [[qt n]|].
     - iDestruct "H" as (tst) "(Hst & #Hllb2)".
-      iMod (TsoCtxPark.ctx_parked_raise ξc _ tst with "Hllb2 Hpk")
+      iMod (TsoCtx.ctx_stamped_raise ξc _ tst with "Hllb2 Hpk")
         as "[Hpk #Hfl2]".
       iModIntro. iExists _. iFrame "Hpk".
       iSplitL "Hrow". { iExists tb. iFrame "Hrow Hllb Hfl". }
@@ -6053,9 +6053,9 @@ Section IcacheTable.
   Local Lemma itable_rows_raise (ξc : TsoCtx.CtxId) (T : nat)
       (M : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
       (l : list nat) :
-    ctx_parked ξc T -∗
+    ctx_stamped ξc T -∗
     ([∗ list] k ∈ l, itable_slot_res_llb ξc M ci k) ==∗
-    ∃ T' : nat, ctx_parked ξc T' ∗
+    ∃ T' : nat, ctx_stamped ξc T' ∗
     ([∗ list] k ∈ l, itable_slot_res ξc M ci k).
   Proof.
     iIntros "Hpk Hrows".
@@ -6080,7 +6080,7 @@ Section IcacheTable.
     lock_pay (fun ξ => itable_res2 ξ cn γfs γi cov logstart nib dv).
   Proof.
     iIntros "Hrun HR".
-    iMod TsoCtx.ctx_parked_alloc as (ξc) "Hpk".
+    iMod TsoCtx.ctx_stamped_alloc as (ξc) "Hpk".
     iMod (TsoCtx.ctx_deposit
             (fun ξ => itable_res2_llb ξ cn γfs γi cov logstart nib dv)
             TsoCtx.cur_ctx ξc 0 with "Hrun Hpk HR")

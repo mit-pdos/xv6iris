@@ -430,11 +430,14 @@ Section IcacheHeldAny.
      [cred_floor lo tl] is a DISJUNCTION and its UPPER index [tl] is
      ∃-BOUND by every bundle that carries it ([live_fracc],
      [inode_shr_held_gen], [inode_ref_short_gen]'s ∃-form): so a receiver
-     may RE-CHOOSE it.  Both arms land on the receiver's LEFT arm --
-     [TsoCtx.ctx_floor_dom] keeps [tl], and [TsoCtx.ctx_dom_wrote_floor]
-     turns the author's own message into [ctx_floor ξ' lo], for which
-     [tl := lo] is a legal choice ([lo <= lo]) -- which is exactly
-     [WpLock.lk_floor_morph]'s argument, one existential lower down.
+     may RE-CHOOSE it, and [tl := lo] is always a legal choice
+     ([lo <= lo]).  The left arm lands on the receiver's left arm
+     ([TsoCtx.ctx_floor_dom] keeps [tl]); the right arm lands on whichever
+     arm the domination justifies the author's own message at
+     ([TsoCtx.ctx_dom_wrote_floor] gives [ctx_floor ξ' lo] or the
+     receiver's own [ctx_wrote ξ' lo a]), and the credential has both --
+     which is exactly [WpLock.lk_floor_morph]'s argument, one existential
+     lower down.
 
      Nothing else in these bundles moves: [live_genlo], [iref_frag],
      [slh_tok] and the stamps are ghost state, and the only cells are
@@ -448,9 +451,11 @@ Section IcacheHeldAny.
     - iDestruct (TsoCtx.ctx_floor_dom with "Hd Hfl") as "[Hd #Hfl']".
       iModIntro. iFrame "Hd". iExists g, lo, tl. iFrame "Hlv".
       iSplitR; [done|]. by iLeft.
-    - iDestruct (TsoCtx.ctx_dom_wrote_floor with "Hd Hw") as "[Hd #Hfl']".
-      iModIntro. iFrame "Hd". iExists g, lo, lo. iFrame "Hlv".
-      iSplitR; [iPureIntro; lia|]. by iLeft.
+    - iDestruct (TsoCtx.ctx_dom_wrote_floor with "Hd Hw") as "[Hd [#Hfl' | #Hw']]".
+      + iModIntro. iFrame "Hd". iExists g, lo, lo. iFrame "Hlv".
+        iSplitR; [iPureIntro; lia|]. by iLeft.
+      + iModIntro. iFrame "Hd". iExists g, lo, lo. iFrame "Hlv".
+        iSplitR; [iPureIntro; lia|]. iRight. iExists a. iExact "Hw'".
   Qed.
 
   Global Instance inode_shr_genlo_morph (k : nat) (s : Qp)
@@ -476,12 +481,18 @@ Section IcacheHeldAny.
       iModIntro. iFrame "Hd". iExists k, lo, tl.
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iSplitR; [done|]. iSplitR; [by iLeft|]. iExact "Hs".
-    - iDestruct (TsoCtx.ctx_dom_wrote_floor with "Hd Hw") as "[Hd #Hfl']".
-      iMod (inode_shr_genlo_morph k s icfg_dev inum g lo ξ ξ'
-                   with "Hd Hs") as "[Hd Hs]".
-      iModIntro. iFrame "Hd". iExists k, lo, lo.
-      iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-      iSplitR; [iPureIntro; lia|]. iSplitR; [by iLeft|]. iExact "Hs".
+    - iDestruct (TsoCtx.ctx_dom_wrote_floor with "Hd Hw") as "[Hd [#Hfl' | #Hw']]".
+      + iMod (inode_shr_genlo_morph k s icfg_dev inum g lo ξ ξ'
+                     with "Hd Hs") as "[Hd Hs]".
+        iModIntro. iFrame "Hd". iExists k, lo, lo.
+        iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+        iSplitR; [iPureIntro; lia|]. iSplitR; [by iLeft|]. iExact "Hs".
+      + iMod (inode_shr_genlo_morph k s icfg_dev inum g lo ξ ξ'
+                     with "Hd Hs") as "[Hd Hs]".
+        iModIntro. iFrame "Hd". iExists k, lo, lo.
+        iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+        iSplitR; [iPureIntro; lia|].
+        iSplitR; [iRight; iExists a; iExact "Hw'"|]. iExact "Hs".
   Qed.
 
   Global Instance inode_shr_morph (k : nat) (s : Qp) (dev inum : mword 32) :
