@@ -30,7 +30,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras.
-Require Import TsoMemPa TsoCtx CtxMorphTac.
+Require Import TsoMemPa TsoGhost TsoCtx CtxMorphTac.
 Require Import KptPt KMap.
 Require Import VirtioModel VirtioQueue WpVirtio VirtioProto.
 Require Import DiskAddrs.   (* [d_ring] *)
@@ -43,16 +43,18 @@ Section DiskAvail.
 
   (* the payload's half of the word: per byte, the exposed stamp and the
      floor the holder cashes against its token *)
+  (* TWO LOGS (relaxed-ww.md §2.10): the row carries the stamp's CHAIN
+     beside the floor -- the exact read needs both. *)
   Definition avail_half (pav : SailStdpp.Values.mword 64) (np : nat) : iProp Σ :=
     ([∗ list] j ∈ seq 0 2, ∃ t : nat,
        phys_ledger_at (pa_add (pa_add pav 2%nat) j) (DfracOwn (1/2))
          (nth_byte (wrap16 np) j) t ∗
-       lk_floor cur_ctx t)%I.
+       lk_floor cur_ctx t ∗ chain_ev chain_name t)%I.
 
   Lemma avail_half_ram (pav : SailStdpp.Values.mword 64) (np : nat) :
     avail_half pav np -∗ ⌜addr_is_ram (pa_add pav 2%nat)⌝.
   Proof.
-    rewrite /avail_half. iEval (cbn [seq]). iIntros "((%t & Hc & _) & _)".
+    rewrite /avail_half. iEval (cbn [seq]). iIntros "((%t & Hc & _ & _) & _)".
     rewrite /phys_ledger_at /phys_pointsto pa_add_0.
     iDestruct "Hc" as "[[_ %Hr] _]". by iPureIntro.
   Qed.
@@ -66,19 +68,19 @@ Section DiskAvail.
     own_context cur_ctx -∗
     avail_half pav np -∗
     ⌜forall tvr : nat, (g.(gtv) cpu_id <= tvr)%nat ->
-       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tvr
+       tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tvr
          (pa_add pav 2%nat) 2 (wrap16 np)⌝.
   Proof.
     iIntros "Hgh Hint Hrun H".
     iAssert (⌜forall j, (j < 2)%nat -> forall tvr, (g.(gtv) cpu_id <= tvr)%nat ->
-               tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tvr
+               tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tvr
                  (pa_add (pa_add pav 2%nat) j) = Some (nth_byte (wrap16 np) j)⌝)%I
       with "[Hgh Hint Hrun H]" as %HH.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
-      iDestruct (big_sepL_lookup _ _ j j with "H") as (t) "[Hc #Hfl]";
+      iDestruct (big_sepL_lookup _ _ j j with "H") as (t) "(Hc & #Hfl & #Hch)";
         [apply lookup_seq; split; lia|].
       iDestruct (lk_floor_vis with "Hrun Hfl") as "[Hrun (%K & #HK & #Hvis)]".
-      iApply (ledger_read_at_vis_ok with "Hgh Hint HK Hvis Hc"). }
+      iApply (ledger_read_at_vis_ok with "Hgh Hint HK Hvis Hch Hc"). }
     iPureIntro. intros tvr Htvr j Hj. apply HH; [lia | exact Htvr].
   Qed.
 
@@ -100,7 +102,7 @@ Section DiskAvail.
          (nth_byte (wrap16 0%nat) j) ∗
        ∃ t : nat,
          phys_ledger_at (pa_add (pa_add pav 2%nat) j) (DfracOwn (1/2))
-           (nth_byte (wrap16 0%nat) j) t ∗ lk_floor cur_ctx t)%I
+           (nth_byte (wrap16 0%nat) j) t ∗ lk_floor cur_ctx t ∗ chain_ev chain_name t)%I
       with "[H]" as ">H".
     { iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
       iIntros "!>" (k j Hk) "Hb".
@@ -112,12 +114,10 @@ Section DiskAvail.
       iDestruct (ctx_pointsto_to_phys cur_ctx _ _ _ _
                    (pa_of_id (pa_add (pa_add pav 2%nat) (0 + k)%nat) Hc)
                    with "Hk0 Hb") as "Hb".
-      iMod (ctx_phys_pointsto_forget_floor with "Hb") as (t) "[Hat Hfl]".
+      iMod (ctx_phys_pointsto_forget_floor with "Hb") as (t) "(Hat & #Hk & #Hch)".
       iEval (rewrite phys_ledger_at_halves) in "Hat". iDestruct "Hat" as "[H1 H2]".
       iModIntro. iSplitL "H1"; [ by iApply phys_ledger_at_ledger | ].
-      iExists t. iFrame "H2".
-      iDestruct "Hfl" as "[Hfl | Hfl]";
-        [ by iApply lk_floor_of_ctx | by iApply lk_floor_of_wrote ]. }
+      iExists t. iFrame "H2 Hch". by iApply lk_floor_of_key. }
     iModIntro. rewrite big_sepL_sep. iDestruct "H" as "[$ $]".
   Qed.
 
@@ -187,7 +187,8 @@ Section DiskAvail.
       ([∗ list] j ∈ seq 0 2,
          phys_ledger_at (pa_add (used_idx_pa (virtio_init_cfg pd pav pu)) j)
            (DfracOwn 1) byte_zero (tf2 t0 t1 j)) ∗
-      lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1.
+      lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1 ∗
+      chain_ev chain_name t0 ∗ chain_ev chain_name t1.
   Proof.
     iIntros (Hs) "#Hkm H".
     assert (Hvu : vc_used (virtio_init_cfg pd pav pu) = pu) by reflexivity.
@@ -215,7 +216,8 @@ Section DiskAvail.
     (* the word's two bytes, stamped, with the floors *)
     iAssert (|==> [∗ list] j ∈ seq 0 2,
        ∃ t : nat,
-         phys_ledger_at (pa_add pu (2 + j)) (DfracOwn 1) byte_zero t ∗ lk_floor cur_ctx t)%I
+         phys_ledger_at (pa_add pu (2 + j)) (DfracOwn 1) byte_zero t ∗
+         lk_floor cur_ctx t ∗ chain_ev chain_name t)%I
       with "[H2]" as ">H2".
     { iEval (change (seq 2 2) with (seq (2 + 0) 2)) in "H2".
       iEval (rewrite -(fmap_add_seq 2 0 2) big_sepL_fmap) in "H2".
@@ -227,14 +229,12 @@ Section DiskAvail.
                    (Hs (2 + k)%nat ltac:(lia)) with "Hkm") as "#Hk0".
       iDestruct (ctx_pointsto_to_phys cur_ctx _ _ _ _
                    (pa_of_id (pa_add pu (2 + k)%nat) Hc) with "Hk0 Hb") as "Hb".
-      iMod (ctx_phys_pointsto_forget_floor with "Hb") as (t) "[Hat Hfl]".
-      iModIntro. iExists t. iFrame "Hat".
-      iDestruct "Hfl" as "[Hfl | Hfl]";
-        [ by iApply lk_floor_of_ctx | by iApply lk_floor_of_wrote ]. }
+      iMod (ctx_phys_pointsto_forget_floor with "Hb") as (t) "(Hat & #Hk & #Hch)".
+      iModIntro. iExists t. iFrame "Hat Hch". by iApply lk_floor_of_key. }
     iEval (cbn [seq]) in "H2".
     iEval (rewrite big_sepL_cons big_sepL_cons big_sepL_nil) in "H2".
-    iDestruct "H2" as "((%t0 & Hc0 & #Hf0) & (%t1 & Hc1 & #Hf1) & _)".
-    iModIntro. iExists t0, t1. iFrame "Hf0 Hf1".
+    iDestruct "H2" as "((%t0 & Hc0 & #Hf0 & #Hch0) & (%t1 & Hc1 & #Hf1 & #Hch1) & _)".
+    iModIntro. iExists t0, t1. iFrame "Hf0 Hf1 Hch0 Hch1".
     iSplitL "H0 H4".
     { rewrite used_page_rest_split Hvu.
       iDestruct (phys_map_range pu 2 (fun _ : nat => byte_zero) ltac:(lia)) as "Heq0".
@@ -459,14 +459,17 @@ Section DiskAvail.
     rewrite /TsoCtx.ctx_word2_pointsto. iFrame "Hm". iPureIntro. exact Hal.
   Qed.
 
+  (* TWO LOGS (relaxed-ww.md §2.10): a ledger byte re-enters a context with
+     its own justification -- [key_at] at its stamp and the chain -- rather
+     than under a floor at an issue index. *)
   Lemma ctx_byte_of_at (a : Arch.pa) (v : bv 8) (q : nat) :
     kmap_static (svpn_of a) KP_rw ->
     (uint (a : SailStdpp.Values.mword 64) < 274877906944)%Z ->
-    kmap_static_claims -∗ TsoCtx.ctx_floor cur_ctx q -∗
+    kmap_static_claims -∗ TsoCtx.key_at cur_ctx (q, a) -∗ chain_ev chain_name q -∗
     phys_ledger_at a (DfracOwn 1) v q -∗ a ↦ₘ v.
   Proof.
-    iIntros (Hs Hc) "#Hkm #Hfl Hat".
-    iDestruct (ctx_phys_pointsto_of_at_floor cur_ctx a v q with "Hat Hfl") as "Hb".
+    iIntros (Hs Hc) "#Hkm #Hk #Hch Hat".
+    iDestruct (ctx_phys_pointsto_of_at_floor cur_ctx a v q with "Hat Hk Hch") as "Hb".
     iDestruct (kmap_static_claims_at (svpn_of a) KP_rw Hs with "Hkm") as "#Hk0".
     iApply (ctx_pointsto_of_phys cur_ctx (kpt_leaf_ppn (svpn_of a)) _ _ _
               (pa_of_id _ Hc) Hc (ktier_pin_of_id _ _ _ (pa_of_id _ Hc)) with "Hk0 Hb").
@@ -476,15 +479,17 @@ Section DiskAvail.
     (forall j, (j < n)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < n)%nat ->
        (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
-    kmap_static_claims -∗ TsoCtx.ctx_floor cur_ctx q -∗
+    kmap_static_claims -∗ chain_ev chain_name q -∗
+    ([∗ list] j ∈ seq 0 n, TsoCtx.key_at cur_ctx (q, pa_add a j)) -∗
     ([∗ list] j ∈ seq 0 n, phys_ledger_at (pa_add a j) (DfracOwn 1) (f j) q) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add a j) ↦ₘ f j).
   Proof.
-    iIntros (Hs Hc) "#Hkm #Hfl H".
+    iIntros (Hs Hc) "#Hkm #Hch #Hks H".
     iApply (big_sepL_impl with "H"). iIntros "!>" (k j Hk) "Hb".
+    iDestruct (big_sepL_lookup _ _ k j Hk with "Hks") as "#Hk".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     iApply (ctx_byte_of_at _ _ _ (Hs (0 + k)%nat ltac:(lia)) (Hc (0 + k)%nat ltac:(lia))
-              with "Hkm Hfl Hb").
+              with "Hkm Hk Hch Hb").
   Qed.
   (* A6.126 §6, STAGED: the chain's bytes come back with their stamps
      BOUNDED by the completion's position rather than equal to it
@@ -494,16 +499,17 @@ Section DiskAvail.
     (forall j, (j < n)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < n)%nat ->
        (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
-    kmap_static_claims -∗ TsoCtx.ctx_floor cur_ctx q -∗
-    ([∗ list] j ∈ seq 0 n, ledger_le (pa_add a j) (f j) q) -∗
+    kmap_static_claims -∗
+    ([∗ list] j ∈ seq 0 n, ∃ t : nat, ⌜(t <= q)%nat⌝ ∗
+       TsoCtx.key_at cur_ctx (t, pa_add a j) ∗ chain_ev chain_name t ∗
+       phys_ledger_at (pa_add a j) (DfracOwn 1) (f j) t) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add a j) ↦ₘ f j).
   Proof.
-    iIntros (Hs Hc) "#Hkm #Hfl H".
-    iApply (big_sepL_impl with "H"). iIntros "!>" (k j Hk) "(%t & %Ht & Hb)".
+    iIntros (Hs Hc) "#Hkm H".
+    iApply (big_sepL_impl with "H"). iIntros "!>" (k j Hk) "(%t & %Ht & #Hk & #Hch & Hb)".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    iDestruct (TsoCtx.ctx_floor_le _ _ _ Ht with "Hfl") as "#Hflt".
     iApply (ctx_byte_of_at _ _ _ (Hs (0 + k)%nat ltac:(lia)) (Hc (0 + k)%nat ltac:(lia))
-              with "Hkm Hflt Hb").
+              with "Hkm Hk Hch Hb").
   Qed.
 End DiskAvail.
 
