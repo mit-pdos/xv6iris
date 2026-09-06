@@ -1,19 +1,24 @@
 # Project: relaxing the memory model to allow store–store reordering (PSO)
 
-**STATUS 2026-09-06 (evening): STAGE D IN PROGRESS on branch `relaxed-ww`
+**STATUS 2026-09-06 (night): STAGE D IN PROGRESS on branch `relaxed-ww`
 (local; `main` + the three `relaxed-ww-twolog` commits rebased + the work
-below).  Done: the rebase (§3, tree red from `TsoCtx.v` up as predicted);
-the fourth twin `iris/TsoCtxTwin4.v` (§2 over `main`'s shapes, closed
-under the global context); the receipt map is the fence-record map
-(`fence_rec`/`fr_ok`/`era_fr_name`; `TsoGhost.dpos_ev`); `TsoCtx.v`
-ported (commit "stage D: TsoCtx.v over the two-log machine": `key_at`
-defined once, no watermark, `ctx_stamped` on the drain line, the load
-gates through `chain_ok`, four racy-tier gates `Admitted` and marked
-`relaxed-ww STAGE E`).  IN FLIGHT: §2.10's revision (the chain is a
-PER-FACT witness, the free tier is ξ-indexed) across `TsoMemPa` /
-`TsoGhost` / `RiscvPtsto` / `RiscvExec` / `TsoCtx` / `TsoCtxStore` /
-`TsoCtxLedger`; then the sweep above.  Two rulings (C) remain the
-owner's.**  The companion of
+below).  Done: the rebase (§3); the fourth twin `iris/TsoCtxTwin4.v`; the
+fence-record map (`fence_rec`/`fr_ok`/`era_fr_name`; `TsoGhost.dpos_ev`);
+§2.10's revision (the chain is a PER-FACT witness, the free tier is
+ξ-indexed) across `TsoMemPa` / `TsoGhost` / `RiscvPtsto` / `RiscvExec` /
+`TsoCtx` / `TsoCtxStore` / `TsoCtxLedger` / `TsoCtxAbsorbLb`; the lifting
+layer over two logs (`HartLift`, `HartLift2`, `HartRegNode`, `HartSpan`,
+`HartSpanChar`, `HartEvents`, `HartBarrier` with the `fence_rel`-keyed
+publication leaf `rel_step`, `HartPilot`); the ownership-law files
+(`CtxValues`, `CtxPinMint`, `CtxPinw`, `CtxBox` with fence-bound deposits,
+`MemClaim`, `WpLock` §2.4 with the hook as a fence-leaf callback and
+`lk_floor` over `key_at`, `StartedInv`, `VirtioProto`, `WpUart` with the
+AMO-shaped gate `TsoCtxStore.ledger_store_amo_ok`).  IN FLIGHT: the sweep
+above these (`WpSconfLock`, `KptPublish`, `KptShare`, the box instances,
+`ProofMain*`, `RiscvAdequacy`'s era record); every racy-tier statement is
+restated over two logs and `Admitted` with `relaxed-ww STAGE E` (list
+below).  Two rulings (C) remain the owner's, and the ~13 `initlock` callers
+of the now fence-bound `newlock*` are blocked on them.**  The companion of
 [`completed/relaxed-rr.md`](../completed/relaxed-rr.md) (load–load
 reordering).  §1 is the machine of record and §1.3 the rejected first
 encoding, with the witnesses that kill it.
@@ -519,8 +524,42 @@ The revision, in place of §2.9's claim:
 
 **Stage E's marked debt** (each `Admitted` carries `relaxed-ww STAGE E`):
 `TsoCtx.ledger_read_pin_ok`, `ledger_read_rel_ok`, `ledger_read_pinw_vis`,
-`ledger_read_racy_ok` -- restated over `(glog, gdlog)`, provable only
-once `TsoMemPa`'s `*1` theory is restated over the drain line.
+`ledger_read_racy_ok` (its anchor premise is now `TsoCtx.ledger_anchor`:
+the floor itself or the agent's own message) -- restated over `(glog,
+gdlog)`, provable only once `TsoMemPa`'s `*1` theory is restated over the
+drain line; `CtxValues.cv_key_read` (a pin read at the stamp's drain
+position) and `cv_own_read` (the author arm); `WpLock.lock_word_fresh_free`
+and `lk_cpu_fresh_free` (the lock's ledger cells going home to the
+ξ-indexed free tier need their `key_at` and chain); `VirtioProto.
+used_rel_read_ok` (over `msg_visible`) and the four `virtio_proto_*_dmem`
+bridges (the device reads the DRAIN flat; the lease's cells must carry
+their drain witnesses); `StartedInv.started_read_obl` (the racy release
+read); `WpUart.disk_complete_append` (the release-window gate at the AMO
+shape).
+
+**Stage D findings recorded in code** (2026-09-06, night):
+- `HartBarrier`: one skeleton `wp_hart_barrier_core` decides the machine's
+  arm; a release fence self-loops until `own_drained` (decidable); the
+  drain leaf's `pub_step` and `ifence_step` gain the `own_drained` gift;
+  the publication leaf `rel_step` is keyed on `fence_rel` and is a fupd at
+  ⊤ (the release hook opens the lock's and the boxes' invariants).
+- `HartEvents`: `wstore_tv`/`rtv` are drain-position moves, `wstore_dl`
+  the store's drain-log move; the exclusive read and the conditional write
+  read `dmem`; the blocked arms are decided with `own_fp_pending`
+  (decidable).
+- `WpLock`: `lock_ctx_hook E R Rin` takes the fence context (`gstate`,
+  `own_drained`, the bundle, `own_context cur_ctx`) at the lock's mask;
+  `lock_pay_born`/`lock_pay_intro`/the finisher preludes likewise; `lk_floor
+  ξ lo := ∃ a, key_at ξ (lo, a)`; the anchor is `ledger_anchor`; the retired
+  `lock_openable_c` family is deleted (`lock_openable_inv_0` stays).
+- `CtxBox`: the deposits (`box_deposit_L1*`, `box_park*`, `box_alloc*`)
+  take `(g : gstate)`, `own_drained` and the interp; stamps and references
+  are on `dlen_name`.
+- `StartedInv.started_store_obl` takes `own_drained` (the fence precedes
+  the store with nothing in between; the caller carries it one node).
+- `TsoCtxStore.ledger_store_amo_ok`: the message performed at memory,
+  appended to both logs, exporting its drain position as `dpos_ev`; its
+  FIFO premise is the same-address guard (`dev_drained` for a bus master).
 
 ## 3. Stages
 
