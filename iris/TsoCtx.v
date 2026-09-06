@@ -2461,6 +2461,83 @@ Section ctx.
     Timeless (ledger_msg_at i m).
   Proof. rewrite /ledger_msg_at. apply _. Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (* THE FENCE RECORD (relaxed-ww.md §2.7; [TsoMemPa.fr_ok]).  A release  *)
+  (* fence of [h] at issue length [N] and drain length [M] leaves a       *)
+  (* PERSISTENT receipt [(h, N) ↦ M] behind: every message with index     *)
+  (* [≥ N] drains above [M] (nothing issued yet is below it), and every   *)
+  (* message OF [h] below [N] has drained at or under [M] (the barrier    *)
+  (* arm's [own_drained]).  It is what lets a secondary certify the boot  *)
+  (* hart's pre-fence stores -- the kernel page table's own-message       *)
+  (* anchors -- from the started flag alone: the flag's drain position    *)
+  (* sits above the receipt's [M], and the receipt says the anchors sit  *)
+  (* under it.  The map is keyed by the recording hart, so the mint is    *)
+  (* total: a second fence at the same issue length REUSES the entry      *)
+  (* (both clauses are stable, and the older [M] only makes them weaker). *)
+  (* ---------------------------------------------------------------- *)
+  Definition fr_at (h N M : nat) : iProp Σ := ((h, N) ↪[fr_name]□ M)%I.
+
+  Global Instance fr_at_persistent h N M : Persistent (fr_at h N M).
+  Proof. rewrite /fr_at. apply _. Qed.
+  Global Instance fr_at_timeless h N M : Timeless (fr_at h N M).
+  Proof. rewrite /fr_at. apply _. Qed.
+
+  Lemma fr_mint (g : gstate) (h : agent) :
+    own_drained h g.(glog) g.(gdlog) ->
+    tso_interp_at riscv_eraGS g ==∗
+    tso_interp_at riscv_eraGS g ∗ ∃ M : nat, fr_at h (length g.(glog)) M.
+  Proof.
+    iIntros (Hdr) "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    destruct (FR !! (h, length g.(glog))) as [M|] eqn:HFR.
+    - iDestruct (big_sepM_lookup _ _ _ _ HFR with "Hfrs") as "#Hr".
+      iModIntro. iSplitL; last by iExists M.
+      iExists TM, LM, DP, FR, CH.
+      iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch". by iPureIntro.
+    - iMod (ghost_map_insert_persist (h, length g.(glog)) (length g.(gdlog)) HFR
+              with "Hfr") as "[Hfr #Hr]".
+      iModIntro. iSplitL; last by iExists (length g.(gdlog)).
+      iExists TM, LM, DP, (<[(h, length g.(glog)) := length g.(gdlog)]> FR), CH.
+      iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hch".
+      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+      iSplitR. { rewrite big_sepM_insert //. iFrame "Hr Hfrs". }
+      iPureIntro. split; [|exact (conj Hcho Hmm)].
+      apply fr_ok_mint; [exact (proj1 (proj1 (proj2 Hmm))) | exact Hdr | exact Hfro].
+  Qed.
+
+  (* clause (i): a drained message with index [≥ N] sits above [M], and
+     the two bounds *)
+  Lemma fr_at_after (g : gstate) (h N M : nat) :
+    tso_interp_at riscv_eraGS g -∗ fr_at h N M -∗
+    ⌜(N ≤ length g.(glog))%nat ∧ (M ≤ length g.(gdlog))%nat ∧
+     ∀ i q, g.(gdlog) !! q = Some i → (N ≤ i)%nat → (M < S q)%nat⌝.
+  Proof.
+    iIntros "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm) #Hr".
+    iDestruct (ghost_map_lookup with "Hfr Hr") as %HFR.
+    iPureIntro. destruct (Hfro _ _ _ HFR) as (HN & HM & Hall & _). done.
+  Qed.
+
+  (* clause (ii), read off a persisted entry: [h]'s message below the
+     receipt has drained under [M] -- as the drain-position witness the
+     load gates consume *)
+  Lemma fr_at_flushed (g : gstate) (h N M i : nat) (m : pwmsg) :
+    (i < N)%nat -> pm_tid m = h ->
+    tso_interp_at riscv_eraGS g -∗ fr_at h N M -∗ ledger_msg_at i m -∗
+    dpos_ev dpos_name (S i) M.
+  Proof.
+    iIntros (Hi Htid) "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
+              Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm) #Hr #Hmsg".
+    iDestruct (ghost_map_lookup with "Hfr Hr") as %HFR.
+    iDestruct (ghost_map_lookup with "Hm Hmsg") as %HLMi. rewrite HLM in HLMi.
+    destruct (Hfro _ _ _ HFR) as (_ & _ & _ & Hown).
+    destruct (Hown _ _ Hi HLMi Htid) as (q & Hq & HqM).
+    assert (HDP : DP !! i = Some (S q)) by (apply Hdpo; by exists q).
+    iDestruct (big_sepM_lookup _ _ _ _ HDP with "Hdps") as "#Hat".
+    iRight. iExists i, (S q). iFrame "Hat". by iPureIntro.
+  Qed.
+
   (* THE READ LICENCE AT ONE TIMESTAMP, and the reason hart 0 and the
      secondaries end up using the SAME gate (which is what the withdrawn
      ruling wanted and this one delivers): "[t] is visible to [h] at every

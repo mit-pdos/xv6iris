@@ -510,6 +510,7 @@ Section power.
      (* A6.71: the pin bound's one-shot, beside the table's own (same
         reason, same moment -- see the system bundle above) *)
      own (era_kptb_name HE) (Cinl (Excl ()) : kptbR) ∗
+     own (era_kptd_name HE) (Cinl (Excl ()) : kptbR) ∗
      ([∗ list] c ∈ enum CPU,
         strans_pending_at (era_strans_name HE c) ∗
         strans_pending_at (era_strans_name HE c)) ∗

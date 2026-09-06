@@ -1144,24 +1144,25 @@ Section PtTreeIris.
      seven files; the ~50 consumer files behind the notations do not move. *)
   Context (PTT : ptier).
 
-  (* A6.135: the kernel slot at PER-BYTE floors under the global bound
-     [B], each byte carrying the BOOT HART's persistent own-write anchor
-     (or floor 0, the image).  [Ba] is the byte's own publication floor --
-     establishment mints it at the byte's own write stamp, which is what
-     makes the publication UNCONDITIONAL (no drain, no log-top) and gives
-     hart 0 a token-free read credential ([CtxValues.cv_own]); a secondary
-     reads through [view_lb B] and [Ba <= B].  The A/D write-back restamps
-     the cell but keeps [(Ba, pte_slot_set w)] -- the [Bg]-generalized
-     store gate ([TsoCtxStore.ledger_store_win_pin_okf]). *)
+  (* A6.135 / relaxed-ww: the kernel slot at PER-BYTE floors under the
+     tree's ISSUE bound [B], each byte carrying its floor's chain evidence
+     and one of [CtxValues.kpt_anchor]'s three anchors (the image floor, the
+     BOOT HART's own message, or a stamp drained under the tree's drain
+     bound).  [Ba] is the byte's own publication floor -- establishment
+     mints it at the byte's own write stamp, which is what makes the
+     publication UNCONDITIONAL (no drain, no log-top) and gives hart 0 a
+     token-free read credential; a secondary reads through
+     [CtxValues.kpt_pub B].  The A/D write-back restamps the cell but keeps
+     [(Ba, pte_slot_set w)] and the anchor -- the [Bg]-generalized store
+     gate ([TsoCtxStore.ledger_store_win_pin_okf_amo]). *)
   Definition kpt_slot_pin (a : Arch.pa) (dq : dfrac) (w : bv 64)
       (B : nat) : iProp Σ :=
     (⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
      [∗ list] j ∈ seq 0 8, ∃ (Ba t : nat), ⌜(Ba <= B)%nat⌝ ∗
        TsoCtx.phys_ledger_pin (pa_add a j) dq (nth_byte w j) t Ba
          (pte_slot_set w j) ∗
-       (⌜Ba = 0%nat⌝ ∨
-        CtxValues.cv_own 0%nat (pa_add a j) Ba ∨
-        TsoGhost.view_lb RiscvPtsto.view_name RiscvPtsto.loglen_name 0%nat Ba))%I.
+       TsoGhost.chain_ev RiscvPtsto.chain_name Ba ∗
+       CtxValues.kpt_anchor (pa_add a j) Ba)%I.
 
   Definition pt_slot_own (a : Arch.pa) (dq : dfrac) (w : bv 64) : iProp Σ :=
     match PTT with
@@ -1182,7 +1183,7 @@ Section PtTreeIris.
   Proof.
     iIntros "[%Hal Hb]". rewrite /phys_word_pointsto. iSplitR; first done.
     iApply (big_sepL_impl with "Hb").
-    iIntros "!>" (k j _) "(%Ba & %t & %HBa & H & _)".
+    iIntros "!>" (k j _) "(%Ba & %t & %HBa & H & _ & _)".
     by iApply TsoCtx.phys_ledger_pin_forget.
   Qed.
 

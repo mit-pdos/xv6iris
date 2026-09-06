@@ -427,7 +427,7 @@ Section TsoBundle.
        mono_nat_auth_own (era_dlen_name E) 1 (length dl) ∗
        ghost_map_auth (era_fr_name E) 1 FR ∗
        ([∗ map] k ↦ v ∈ FR, k ↪[era_fr_name E]□ v) ∗
-       ⌜fr_ok dl FR⌝ ∗
+       ⌜fr_ok log dl FR⌝ ∗
        ghost_map_auth (era_chain_name E) 1 CH ∗
        ⌜chain_set_ok log dl CH⌝ ∗
        ⌜mem = flat img log⌝ ∗

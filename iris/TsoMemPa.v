@@ -1377,40 +1377,71 @@ Proof.
   move => Hin. have := Hlt _ Hin. lia.
 Qed.
 
-(** [FR] holds the FENCE RECORDS (relaxed-ww.md §2.7, [TsoCtxTwin4.fr_ok]):
-    an entry at [(N, M)] says every message with issue index [≥ N] drains
-    at a position [> M].  Sound at the mint because [N] is the issue length
-    (no such message exists yet) and [M] the drain length; kept by every
-    later step because [M] only falls behind the drain top.  The entry's
-    value is irrelevant, and the log is not mentioned: an append changes
-    nothing. *)
-Definition fr_ok (dl : list nat) (FR : gmap (agent * nat) nat) : Prop :=
-  ∀ N M v, FR !! (N, M) = Some v →
-    (M ≤ length dl)%nat ∧
-    ∀ i q, dl !! q = Some i → (N ≤ i)%nat → (M < S q)%nat.
+(** [FR] holds the FENCE RECORDS (relaxed-ww.md §2.7, [TsoCtxTwin4.fr_ok]),
+    keyed by the RECORDING HART and the issue length at its release fence:
+    an entry at [(h, N)] with value [M] says
+      (i)  every message with issue index [≥ N] drains at a position [> M]
+           -- sound at the mint because [N] is the issue length (no such
+           message exists yet) and [M] the drain length; and
+      (ii) every message of [h] with issue index [< N] HAS drained, at a
+           position [≤ M] -- the release fence's own guarantee
+           ([own_drained] is the barrier arm's premise).
+    Kept by every later step: a drain only grows the log [M] falls behind,
+    and an appended message has index [≥ length log ≥ N], so neither
+    clause sees it.  The two bounds [N ≤ length log] and [M ≤ length dl]
+    are what make the appends silent. *)
+Definition fr_ok (log : list pwmsg) (dl : list nat) (FR : gmap (agent * nat) nat) : Prop :=
+  ∀ h N M, FR !! (h, N) = Some M →
+    (N ≤ length log)%nat ∧ (M ≤ length dl)%nat ∧
+    (∀ i q, dl !! q = Some i → (N ≤ i)%nat → (M < S q)%nat) ∧
+    (∀ i m, (i < N)%nat → log !! i = Some m → pm_tid m = h →
+       ∃ q, dl !! q = Some i ∧ (S q ≤ M)%nat).
 
-Lemma fr_ok_nil dl : fr_ok dl ∅.
-Proof. move => N M v. rewrite lookup_empty //. Qed.
+Lemma fr_ok_nil log dl : fr_ok log dl ∅.
+Proof. move => h N M. rewrite lookup_empty //. Qed.
 
-Lemma fr_ok_drain dl FR k : fr_ok dl FR → fr_ok (dl ++ [k]) FR.
+Lemma fr_ok_drain log dl FR k : fr_ok log dl FR → fr_ok log (dl ++ [k]) FR.
 Proof.
-  move => Hfr N M v HNM. destruct (Hfr _ _ _ HNM) as [HM Hall]. split.
+  move => Hfr h N M HNM. destruct (Hfr _ _ _ HNM) as (HN & HM & Hall & Hown).
+  split_and!.
+  - exact HN.
   - rewrite length_app /=. lia.
   - move => i q Hq HNi. apply lookup_app_last' in Hq as [[_ Hq]|[-> _]].
     + by eapply Hall.
     + lia.
+  - move => i m Hi Hm Htid. destruct (Hown _ _ Hi Hm Htid) as (q & Hq & HqM).
+    exists q. split; [|exact HqM].
+    have Hlt := lookup_lt_Some _ _ _ Hq. by rewrite (lookup_app_l _ _ _ Hlt).
 Qed.
 
-Lemma fr_ok_mint log dl FR v :
-  dl_ok log dl → fr_ok dl FR →
-  fr_ok dl (<[(length log, length dl) := v]> FR).
+(** An appended message has index [length log ≥ N]: both clauses are
+    silent on it. *)
+Lemma fr_ok_app_log log dl FR m : fr_ok log dl FR → fr_ok (log ++ [m]) dl FR.
 Proof.
-  move => [_ Hlt] Hfr N M v'.
-  destruct (decide ((N, M) = (length log, length dl))) as [[= -> ->]|Hne].
-  - rewrite lookup_insert. move => _. split; [lia|].
-    move => i q Hq HNi. exfalso.
-    have := Hlt _ (elem_of_list_lookup_2 _ _ _ Hq). lia.
-  - have Hne' : (length log, length dl) ≠ (N, M) by move => Heq; apply Hne; rewrite Heq.
+  move => Hfr h N M HNM. destruct (Hfr _ _ _ HNM) as (HN & HM & Hall & Hown).
+  split; [rewrite length_app /=; lia|]. split; [exact HM|]. split; [exact Hall|].
+  move => i m' Hi Hm' Htid. apply (Hown i m' Hi); [|exact Htid].
+  have Hlt : (i < length log)%nat by lia.
+  by rewrite (lookup_app_l _ _ _ Hlt) in Hm'.
+Qed.
+
+(** THE MINT, at a release fence of [h]: [own_drained] is the barrier
+    arm's premise, and it is exactly clause (ii) at the current lengths. *)
+Lemma fr_ok_mint log dl FR h :
+  dl_ok log dl → own_drained h log dl → fr_ok log dl FR →
+  fr_ok log dl (<[(h, length log) := length dl]> FR).
+Proof.
+  move => [_ Hlt] Hdr Hfr h' N M.
+  destruct (decide ((h', N) = (h, length log))) as [[= -> ->]|Hne].
+  - rewrite lookup_insert. move => [= <-].
+    split; [lia|]. split; [lia|]. split.
+    + move => i q Hq HNi. exfalso.
+      have := Hlt _ (elem_of_list_lookup_2 _ _ _ Hq). lia.
+    + move => i m Hi Hm Htid.
+      have Hin := Hdr _ _ Hm Htid.
+      apply elem_of_list_lookup in Hin as [q Hq].
+      exists q. split; [exact Hq|]. have := lookup_lt_Some _ _ _ Hq. lia.
+  - have Hne' : (h, length log) ≠ (h', N) by move => Heq; apply Hne; rewrite Heq.
     rewrite (lookup_insert_ne FR _ _ _ Hne'). by apply Hfr.
 Qed.
 

@@ -38,7 +38,8 @@ From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap.
 From stdpp.bitvector Require Import definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map.
+From iris.algebra Require Import csum excl agree.
+From iris.base_logic.lib Require Import gen_heap ghost_map own.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto.
@@ -110,18 +111,21 @@ Section CtxValues.
     exact (TsoMemPa.ts_ok_pin _ _ _ _ _ _ _ _ (Htie _ _ HTM) eq_refl).
   Qed.
 
-  (* THE READ AT THE STAMP'S DRAIN POSITION.  A reader whose floor has
-     passed the drain position of the pinned cell's stamp sees that write
-     or a later one to the byte, and the pin's store gates keep every later
-     write in the family.  relaxed-ww STAGE E: the two-log pin theory
-     ([TsoMemPa.pin_ok] is legacy, over the issue log alone); tracked in
-     claude-notes/projects/relaxed-ww.md. *)
+  (* THE READ AT THE FLOOR'S DRAIN POSITION.  A pinned cell's bound [B] is
+     its publication FLOOR: the stamp the family was pinned at (the cell may
+     have been restamped since, by family writes through the pin gate).  A
+     reader whose view has passed the floor's drain position sees the floor
+     write or a later one to the byte -- [chain_ev] at the floor is what
+     puts every earlier write BELOW it in the drain order -- and the pin's
+     store gates keep every later write in the family.
+     relaxed-ww STAGE E: the two-log pin theory ([TsoMemPa.pin_ok] is legacy,
+     over the issue log alone); tracked in claude-notes/projects/relaxed-ww.md. *)
   Lemma cv_key_read `{CID : CpuId} (g : gstate) (a : Arch.pa) (dq : dfrac)
       (v : bv 8) (t B p : nat) (Sv : gset (bv 8)) :
     tso_interp_at riscv_eraGS g -∗
-    dpos_ev dpos_name t p -∗
+    dpos_ev dpos_name B p -∗
     TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) p -∗
-    chain_ev chain_name t -∗
+    chain_ev chain_name B -∗
     phys_ledger_pin a dq v t B Sv -∗
     ⌜forall tv, (g.(gtv) cpu_id <= tv)%nat ->
        exists b, TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv a
@@ -230,38 +234,25 @@ Section CtxValues.
   Global Instance cv_own_timeless h a p : Timeless (cv_own h a p).
   Proof. rewrite /cv_own. apply _. Qed.
 
-  Definition cv_cred `{CID : CpuId} (a : Arch.pa) (B : nat) : iProp Σ :=
-    (TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) B ∨
-     ∃ (p : nat), ⌜(B <= p)%nat⌝ ∗ cv_own (hart_agent cpu_id) a p)%I.
-
-  Global Instance cv_cred_persistent `{CID : CpuId} a B :
-    Persistent (cv_cred a B).
-  Proof. rewrite /cv_cred. apply _. Qed.
-
-  Lemma cv_cred_le `{CID : CpuId} (a : Arch.pa) (B B' : nat) :
-    (B <= B')%nat -> cv_cred a B' -∗ cv_cred a B.
-  Proof.
-    iIntros (Hle) "[#Hv | (%p & %Hp & #Ho)]".
-    - iLeft. iApply (TsoGhost.view_lb_le with "Hv"). lia.
-    - iRight. iExists p. iSplit; [iPureIntro; lia | iExact "Ho"].
-  Qed.
-
-  (* the author's read: settle at or above the own anchor, family via
-     [pin_ok] at the settle's own view.  No view receipt, no token. *)
-  (* relaxed-ww STAGE E: the author arm over two logs -- the author's own
-     pending store is forwarded ([visibleb]'s own arm) and every later write
-     is in the family; [TsoMemPa.pin_ok_author] is the legacy one-log
-     statement.  Tracked in claude-notes/projects/relaxed-ww.md. *)
+  (* THE AUTHOR'S READ: the floor is the author's OWN message, so the
+     descent settles on it or on a later family write -- store forwarding
+     ([TsoMemPa.visibleb]'s own arm) if it is still pending, the drain flat
+     if not, where [chain_ev] puts every earlier write to the byte below it.
+     No view receipt, no token.
+     relaxed-ww STAGE E: the author arm over two logs ([TsoMemPa.pin_ok_author]
+     is the legacy one-log statement); tracked in
+     claude-notes/projects/relaxed-ww.md. *)
   Lemma cv_own_read (g : gstate) (a : Arch.pa) (dq : dfrac)
-      (v : bv 8) (t B p : nat) (Sv : gset (bv 8)) (h : agent) :
-    (B <= p)%nat ->
+      (v : bv 8) (t B : nat) (Sv : gset (bv 8)) (h : agent) :
     tso_interp_at riscv_eraGS g -∗
+    chain_ev chain_name B -∗
     phys_ledger_pin a dq v t B Sv -∗
-    cv_own h a p -∗
+    cv_own h a B -∗
     ⌜forall tv, exists b,
        TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) h tv a = Some b /\ b ∈ Sv⌝.
   Proof.
   Admitted.
+
 
   (* ------------------------------------------------------------------ *)
   (* THE RACY READ RULE: you get one of the values from the set.         *)
@@ -307,81 +298,106 @@ Section CtxValues.
         iAssert (⌜g.(glog) !! i = Some m'⌝)%I as %Hlog'.
         { iApply (cv_msg_lookup with "Hint Hm'"). }
         rewrite Hlog in Hlog'. injection Hlog' as <-.
-        iDestruct (cv_own_read g a dq v t t t Sv (hart_agent cpu_id) (Nat.le_refl t)
-                     with "Hint Hpin []") as %Hrd.
+        iDestruct (cv_own_read g a dq v t t Sv (hart_agent cpu_id)
+                     with "Hint Hchain Hpin []") as %Hrd.
         { iExists i, m, b. iFrame "Hm". iPureIntro. split_and!; done. }
         iPureIntro. intros tv _. exact (Hrd tv).
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* THE WALKER-FACING CREDENTIAL (A6.135 §1).  [cv_own h a p]: position *)
-  (* p is h's OWN message touching [a].  Persistent, TOKEN-FREE at the   *)
-  (* read: the walker never holds [own_context].  [cv_cred a B] is the   *)
-  (* per-hart disjunction the page-table walk consumes: either the       *)
-  (* hart's view has passed the arm's floor (a secondary, via the        *)
-  (* started receipt), or the floor is dominated by the hart's own       *)
-  (* write (the boot hart's anchors, minted at establishment).           *)
-  (* ------------------------------------------------------------------ *)
+  (* THE KERNEL-SLOT READ (relaxed-ww.md, the two-log slot credential): a
+     run of per-byte pins at ∃-floors under the tree's ISSUE bound [B],
+     each byte carrying one of three anchors for its floor [Ba]:
+       - floor 0, the image;
+       - the BOOT HART's own message ([cv_own 0]) -- minted at
+         establishment with no drain and no view, read by hart 0 through
+         store forwarding and by a secondary through hart 0's release
+         fence RECORD ([TsoCtx.fr_at 0 L M], [B <= L]): the started flag
+         drains above [M] and the anchor drained under it;
+       - a stamp already DRAINED at the mint, under the tree's DRAIN bound
+         [Bd] ([kpt_dbound], the boot hart's view receipt at the mint) --
+         read by hart 0 through that receipt and by a secondary through
+         [Bd <= V], off the started flag's drain position.
+     The reader's credential is [cv_boot_cred B]: the boot hart's view
+     receipt at [Bd], or a secondary's [kpt_pub B]. *)
 
-  (* the one law the page-table walk consumes *)
-  Lemma cv_cred_read `{CID : CpuId} (g : gstate) (a : Arch.pa)
-      (dq : dfrac) (v : bv 8) (t B : nat) (Sv : gset (bv 8)) :
-    tso_interp_at riscv_eraGS g -∗
-    phys_ledger_pin a dq v t B Sv -∗
-    cv_cred a B -∗
-    ⌜forall tv, (g.(gtv) cpu_id <= tv)%nat ->
-       exists b, TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv a
-                 = Some b /\ b ∈ Sv⌝.
+  (* THE TREE'S DRAIN BOUND: a one-shot agreement in [KptGhost.kptbR]'s
+     shape, shot at establishment at the boot publisher's view receipt.  It
+     lives HERE (below [PtTree]) so the slot rows can name it by agreement
+     rather than by an index in the tier. *)
+  Definition kptd_unset : iProp Σ :=
+    own kptd_name (Cinl (Excl ()) : kptbR).
+  Definition kpt_dbound (Bd : nat) : iProp Σ :=
+    own kptd_name (Cinr (to_agree (Bd : leibnizO nat)) : kptbR).
+
+  Global Instance kptd_unset_timeless : Timeless kptd_unset.
+  Proof. apply _. Qed.
+  Global Instance kpt_dbound_timeless Bd : Timeless (kpt_dbound Bd).
+  Proof. apply _. Qed.
+  Global Instance kpt_dbound_persistent Bd : Persistent (kpt_dbound Bd).
+  Proof. apply own_core_persistent, Cinr_core_id, _. Qed.
+
+  Lemma kptd_shoot (Bd : nat) : kptd_unset ==∗ kpt_dbound Bd.
   Proof.
-    iIntros "Hint Hpin [#Hv | (%p & %Hp & #Ho)]".
-    - iDestruct (ledger_read_pin_ok g a dq v t B Sv with "Hint Hv Hpin")
-        as %Hrd.
-      iPureIntro. intros tv Htv. exact (Hrd (hart_agent cpu_id) tv Htv).
-    - iDestruct (cv_own_read g a dq v t B p Sv (hart_agent cpu_id) Hp
-                   with "Hint Hpin Ho") as %Hrd.
-      iPureIntro. intros tv _. exact (Hrd tv).
+    iIntros "H". iMod (own_update with "H") as "$"; [|done].
+    apply cmra_update_exclusive; done.
   Qed.
 
-  (* ------------------------------------------------------------------ *)
-  (* THE KERNEL-SLOT READ (A6.135): a run of per-byte pins at ∃-floors    *)
-  (* under a global [B], each byte carrying the boot hart's own-write     *)
-  (* anchor (or floor 0).  The reader's credential: a view receipt at     *)
-  (* [B] (a secondary, via the started barrier) OR being the boot hart    *)
-  (* (the anchors are its own messages -- token-free, view-free).         *)
-  (* ------------------------------------------------------------------ *)
-  (* the WALK's per-hart credential: a view receipt at the tree's global
-     bound (a secondary, off the started barrier) or being the boot hart
-     (whose anchors ride in the slots). *)
+  Lemma kpt_dbound_agree (Bd Bd' : nat) :
+    kpt_dbound Bd -∗ kpt_dbound Bd' -∗ ⌜ Bd = Bd' ⌝.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite -Cinr_op Cinr_valid to_agree_op_valid_L in Hv.
+    by iPureIntro.
+  Qed.
+
+  (* a byte's anchor at its floor *)
+  Definition kpt_anchor (a : Arch.pa) (Ba : nat) : iProp Σ :=
+    (⌜Ba = 0%nat⌝ ∨ cv_own 0%nat a Ba ∨
+     ∃ Bd : nat, kpt_dbound Bd ∗ dpos_ev dpos_name Ba Bd)%I.
+
+  Global Instance kpt_anchor_persistent a Ba : Persistent (kpt_anchor a Ba).
+  Proof. rewrite /kpt_anchor. apply _. Qed.
+  Global Instance kpt_anchor_timeless a Ba : Timeless (kpt_anchor a Ba).
+  Proof. rewrite /kpt_anchor. apply _. Qed.
+
+  (* A SECONDARY'S CREDENTIAL: a view receipt at [V]; hart 0's release
+     record at some issue length [L >= B]; a message issued at or after
+     [L] (the started flag) drained under [V]; and the drain bound under
+     [V].  Assembled in [ProofMainSecondary] off the started read. *)
+  Definition kpt_pub `{CID : CpuId} (B : nat) : iProp Σ :=
+    (∃ (V L M s q Bd : nat),
+       TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) V ∗
+       fr_at 0%nat L M ∗ ⌜(B <= L)%nat⌝ ∗
+       dpos_at dpos_name s q ∗ ⌜(L <= s)%nat /\ (q <= V)%nat⌝ ∗
+       kpt_dbound Bd ∗ ⌜(Bd <= V)%nat⌝)%I.
+
+  Global Instance kpt_pub_persistent `{CID : CpuId} B : Persistent (kpt_pub B).
+  Proof. rewrite /kpt_pub. apply _. Qed.
+
   Definition cv_boot_cred `{CID : CpuId} (B : nat) : iProp Σ :=
-    (TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) B ∨
-     (⌜hart_agent cpu_id = 0%nat⌝ ∗ TsoGhost.llb dlen_name B))%I.
+    ((⌜hart_agent cpu_id = 0%nat⌝ ∗
+      ∃ Bd : nat, kpt_dbound Bd ∗ TsoGhost.view_lb view_name dlen_name 0%nat Bd) ∨
+     kpt_pub B)%I.
 
   Global Instance cv_boot_cred_persistent `{CID : CpuId} B :
     Persistent (cv_boot_cred B).
   Proof. rewrite /cv_boot_cred. apply _. Qed.
-  Global Instance cv_boot_cred_timeless `{CID : CpuId} B :
-    Timeless (cv_boot_cred B).
-  Proof. rewrite /cv_boot_cred. apply _. Qed.
 
-  Lemma cv_boot_cred_view `{CID : CpuId} (B : nat) :
-    TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) B -∗
-    cv_boot_cred B.
-  Proof. iIntros "H". iLeft. iExact "H". Qed.
-
-  Lemma cv_boot_cred_boot `{CID : CpuId} (B : nat) :
+  Lemma cv_boot_cred_boot `{CID : CpuId} (B Bd : nat) :
     hart_agent cpu_id = 0%nat ->
-    TsoGhost.llb dlen_name B -∗ cv_boot_cred B.
+    kpt_dbound Bd -∗ TsoGhost.view_lb view_name dlen_name 0%nat Bd -∗
+    cv_boot_cred B.
   Proof.
-    intros H0. iIntros "Hl". iRight.
-    iSplitR; [by iPureIntro | iExact "Hl"].
+    intros H0. iIntros "#Hd #Hv". iLeft.
+    iSplit; [by iPureIntro|]. iExists Bd. iFrame "Hd Hv".
   Qed.
 
-  Lemma cv_boot_cred_llb `{CID : CpuId} (B : nat) :
-    cv_boot_cred B -∗ TsoGhost.llb dlen_name B.
-  Proof.
-    iIntros "[Hv | [_ Hl]]";
-      [iApply (TsoGhost.view_lb_llb with "Hv") | iExact "Hl"].
-  Qed.
+  Lemma cv_boot_cred_pub `{CID : CpuId} (B : nat) :
+    kpt_pub B -∗ cv_boot_cred B.
+  Proof. iIntros "H". iRight. iExact "H". Qed.
+
 
   (* a bounded choice principle: name the per-byte floors of a run *)
   Lemma big_sepL_seq_exist (n : nat) (Φ : nat -> nat -> iProp Σ) :
@@ -403,6 +419,72 @@ Section CtxValues.
       + simpl. rewrite decide_True; [ | lia]. by iFrame "Hlast".
   Qed.
 
+  (* the started flag's drain witness, at the machine *)
+  Local Lemma dpos_at_pos (g : gstate) (s q : nat) :
+    tso_interp_at riscv_eraGS g -∗ dpos_at dpos_name s q -∗
+    ⌜∃ q0, g.(gdlog) !! q0 = Some s ∧ q = S q0⌝.
+  Proof.
+    iIntros "Hint #Hat".
+    iDestruct "Hint"
+      as "(%TM & %LM & %DP & %FR & %CH & Hauth & %Hdom & %Htie & Hlm & %HLM & Hlen & Hv & Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    iDestruct (ghost_map_lookup with "Hdp Hat") as %HDP.
+    iPureIntro. exact (proj1 (Hdpo _ _) HDP).
+  Qed.
+
+  (* ONE BYTE, under either credential *)
+  Lemma cv_anchor_read `{CID : CpuId} (g : gstate) (a : Arch.pa)
+      (dq : dfrac) (v : bv 8) (t Ba B : nat) (Sv : TsoMemPa.byteset) :
+    (Ba <= B)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    cv_boot_cred B -∗
+    phys_ledger_pin a dq v t Ba Sv -∗
+    chain_ev chain_name Ba -∗
+    kpt_anchor a Ba -∗
+    ⌜forall (tv' : nat), (g.(gtv) cpu_id <= tv')%nat ->
+       exists b, TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv' a
+                 = Some b /\ b ∈ Sv⌝.
+  Proof.
+    intros HBa. iIntros "Hint #Hcred Hpin #Hchain #Han".
+    iDestruct "Han" as "[%HBa0 | [#Hown | (%Bd & #Hd & #Hev)]]".
+    - (* the image floor: drained at 0, visible at every view *)
+      subst Ba.
+      iDestruct (cv_key_read g a dq v t 0%nat 0%nat Sv
+                   with "Hint [] [] Hchain Hpin") as %Hrd.
+      { by iLeft. }
+      { iApply TsoGhost.view_lb_0. }
+      iPureIntro. exact Hrd.
+    - (* the boot hart's own message *)
+      iDestruct "Hcred" as "[[%H0 _] | Hpub]".
+      + iEval (rewrite -H0) in "Hown".
+        iDestruct (cv_own_read g a dq v t Ba Sv (hart_agent cpu_id)
+                     with "Hint Hchain Hpin Hown") as %Hrd.
+        iPureIntro. intros tv' _. exact (Hrd tv').
+      + iDestruct "Hpub" as (V L M s q Bd) "(#HV & #Hfr & %HBL & #Hs & [%HLs %HqV] & _)".
+        iDestruct "Hown" as (i m b) "(%HBi & #Hm & %Hmb & %Htid)". subst Ba.
+        iDestruct (fr_at_flushed g 0%nat L M i m ltac:(lia) Htid
+                     with "Hint Hfr Hm") as "#HevM".
+        iDestruct (fr_at_after g 0%nat L M with "Hint Hfr") as %(_ & _ & Hafter).
+        iDestruct (dpos_at_pos g s q with "Hint Hs") as %(q0 & Hq0 & ->).
+        have HMV : (M <= V)%nat by (have := Hafter _ _ Hq0 HLs; lia).
+        iDestruct (dpos_ev_mono _ _ _ V HMV with "HevM") as "#HevV".
+        iDestruct (cv_key_read g a dq v t (S i) V Sv
+                     with "Hint HevV HV Hchain Hpin") as %Hrd.
+        iPureIntro. exact Hrd.
+    - (* drained at the mint, under the drain bound *)
+      iDestruct "Hcred" as "[[%H0 (%Bd' & #Hd' & #Hv0)] | Hpub]".
+      + iDestruct (kpt_dbound_agree with "Hd Hd'") as %<-.
+        iEval (rewrite -H0) in "Hv0".
+        iDestruct (cv_key_read g a dq v t Ba Bd Sv
+                     with "Hint Hev Hv0 Hchain Hpin") as %Hrd.
+        iPureIntro. exact Hrd.
+      + iDestruct "Hpub" as (V L M s q Bd') "(#HV & _ & _ & _ & _ & #Hd' & %HBdV)".
+        iDestruct (kpt_dbound_agree with "Hd Hd'") as %<-.
+        iDestruct (dpos_ev_mono _ _ _ V HBdV with "Hev") as "#HevV".
+        iDestruct (cv_key_read g a dq v t Ba V Sv
+                     with "Hint HevV HV Hchain Hpin") as %Hrd.
+        iPureIntro. exact Hrd.
+  Qed.
+
   Lemma cv_slot_read_ok `{CID : CpuId} (g : gstate) (a : Arch.pa)
       (dq : dfrac) (f : nat -> bv 8) (n : nat) (B : nat)
       (Sf : nat -> TsoMemPa.byteset) :
@@ -410,14 +492,13 @@ Section CtxValues.
     cv_boot_cred B -∗
     ([∗ list] j ∈ seq 0 n, ∃ (Ba t : nat), ⌜(Ba <= B)%nat⌝ ∗
        phys_ledger_pin (pa_add a j) dq (f j) t Ba (Sf j) ∗
-       (⌜Ba = 0%nat⌝ ∨ cv_own 0%nat (pa_add a j) Ba ∨
-        TsoGhost.view_lb view_name dlen_name 0%nat Ba)) -∗
+       chain_ev chain_name Ba ∗ kpt_anchor (pa_add a j) Ba) -∗
     ⌜forall (tv' : nat), (g.(gtv) cpu_id <= tv')%nat ->
        forall j : nat, (j < n)%nat ->
          exists b, TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id)
                      tv' (pa_add a j) = Some b /\ b ∈ Sf j⌝.
   Proof.
-    iIntros "Hint #Hcred Hb". iEval (rewrite /cv_boot_cred) in "Hcred".
+    iIntros "Hint #Hcred Hb".
     iAssert (⌜forall j : nat, (j < n)%nat ->
                forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
                  exists b, TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog)
@@ -426,35 +507,11 @@ Section CtxValues.
     { iPureIntro. intros tv' Htv j Hj. exact (HH j Hj tv' Htv). }
     rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
     iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hb")
-      as (Ba t) "(%HBa & Hbj & #Han)".
+      as (Ba t) "(%HBa & Hbj & #Hchain & #Han)".
     { rewrite lookup_seq_lt; [reflexivity|lia]. }
-    iDestruct "Hcred" as "[Hv | [%H0 _]]".
-    - (* a view receipt at the global bound covers every arm uniformly *)
-      iDestruct (TsoGhost.view_lb_le _ _ _ B Ba HBa with "Hv") as "#HvBa".
-      iDestruct (ledger_read_pin_ok g (pa_add a j) dq (f j) t Ba (Sf j)
-                   with "Hint HvBa Hbj") as %Hrd.
-      iPureIntro. intros tv' Htv'.
-      exact (Hrd (hart_agent cpu_id) tv' Htv').
-    - (* the boot hart: 3-way on the slot's own credential *)
-      iDestruct "Han" as "[%HBa0 | [#Hown | #Hv0]]".
-      + subst Ba.
-        iDestruct (ledger_read_pin_ok g (pa_add a j) dq (f j) t 0%nat (Sf j)
-                     with "Hint [] Hbj") as %Hrd.
-        { iApply TsoGhost.view_lb_0. }
-        iPureIntro. intros tv' Htv'.
-        exact (Hrd (hart_agent cpu_id) tv' Htv').
-      + (* its own anchor, no view receipt *)
-        iEval (rewrite -H0) in "Hown".
-        iDestruct (cv_own_read g (pa_add a j) dq (f j) t Ba Ba (Sf j)
-                     (hart_agent cpu_id) (Nat.le_refl Ba)
-                     with "Hint Hbj Hown") as %Hrd.
-        iPureIntro. intros tv' _. exact (Hrd tv').
-      + (* the drained-publisher receipt, recorded in the slot *)
-        iEval (rewrite -H0) in "Hv0".
-        iDestruct (ledger_read_pin_ok g (pa_add a j) dq (f j) t Ba (Sf j)
-                     with "Hint Hv0 Hbj") as %Hrd.
-        iPureIntro. intros tv' Htv'.
-        exact (Hrd (hart_agent cpu_id) tv' Htv').
+    iApply (cv_anchor_read g (pa_add a j) dq (f j) t Ba B (Sf j) HBa
+              with "Hint Hcred Hbj Hchain Han").
   Qed.
+
 
 End CtxValues.

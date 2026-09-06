@@ -205,6 +205,10 @@ Record riscvEraGS := RiscvEraGS {
      for the same table (A6.53 ruling 2).  Beside [era_kpt_name] rather
      than in a class, for the reason that one is here. *)
   era_kptb_name : gname;
+  (* ...and the table's DRAIN bound (relaxed-ww.md, the two-log slot
+     credential): the boot publisher's view receipt at the mint, shot
+     beside the issue bound so the slot rows can name it by agreement. *)
+  era_kptd_name : gname;
   (* the S-mode translation ONE-SHOT (Bare -> kernel PT installed): a ghost
      name tracking which arm of [strans_inv] the capability's translation
      slot is in.  A pending half held outside the slot is the "still-Bare
@@ -575,6 +579,7 @@ Definition virtio_name `{!riscvGS Σ} : gname := era_virtio_name riscv_eraGS.
 Definition kmap_name `{!riscvGS Σ} : gname := era_kmap_name riscv_eraGS.
 Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name riscv_eraGS.
 Definition kptb_name `{!riscvGS Σ} : gname := era_kptb_name riscv_eraGS.
+Definition kptd_name `{!riscvGS Σ} : gname := era_kptd_name riscv_eraGS.
 Definition ts_name `{!riscvGS Σ} : gname := era_ts_name riscv_eraGS.
 Definition logm_name `{!riscvGS Σ} : gname := era_logm_name riscv_eraGS.
 Definition loglen_name `{!riscvGS Σ} : gname := era_loglen_name riscv_eraGS.
@@ -2368,7 +2373,7 @@ Definition tso_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
      mono_nat_auth_own (era_dlen_name E) 1 (length g.(gdlog)) ∗
      ghost_map_auth (era_fr_name E) 1 FR ∗
      ([∗ map] k ↦ v ∈ FR, k ↪[era_fr_name E]□ v) ∗
-     ⌜fr_ok g.(gdlog) FR⌝ ∗
+     ⌜fr_ok g.(glog) g.(gdlog) FR⌝ ∗
      (* the chained set (relaxed-ww.md §2.10): no persistent copies here --
         a fragment is handed out exactly once, by the ctx store gate *)
      ghost_map_auth (era_chain_name E) 1 CH ∗
