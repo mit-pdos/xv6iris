@@ -89,8 +89,10 @@ an in-flight worklist under [`projects/`](projects/), one per effort. A finished
 project — no remaining work, no cleanup — moves to [`completed/`](completed/),
 which nobody reads for guidance and which is therefore the one place a narrative
 may survive; lift any broadly-applicable lesson up into the design or durable
-notes before it goes. Add a pointer line to [`README.md`](README.md) for any new
-file, and delete the line when the file goes.
+notes before it goes. [`README.md`](README.md) carries a pointer line per
+TOP-LEVEL and [`design/`](design/) file, added when the file arrives and deleted
+when it goes. It does NOT list `projects/` or `completed/` — `ls` them and read
+the banners; do not re-add those listings.
 
 ## Build
 
@@ -444,7 +446,8 @@ row's defining module rather than from how the row reads: `proc_priv` is
 `ProcInv`'s and needs `fileG`/`fdslotG` though nothing in its spelling says
 file or fd. Keep `ulimit -v 25000000` on `coqc`/`make` while experimenting —
 about 7x the tree's largest legitimate file, so it never bites a real build.
-See optimization.md's ProofSysUnlink case study for the fold itself.
+See optimization.md's "Fold block continuations into named definitions" for
+the fold itself.
 
 ## `rewrite` CAN FAIL ON A SUBTERM THAT PRINTS CHARACTER-FOR-CHARACTER
 

@@ -37,7 +37,10 @@ so the last line in the log is the stalling sentence. If the slow line is a
   that improves a file reads as a REGRESSION on the run that introduces it.
   Always take the second reading. (2) Compare cold against cold when the number
   you want is what CI or a fresh worktree pays: `rm -f .lia.cache` before each
-  arm. The gap is not noise, it is the whole certificate search.
+  arm. The gap is not noise, it is the whole certificate search. A file that owns a large
+  share of the directory cache is a confirmed instance of the closer bug below,
+  but the cache's SIZE is not itself a cost — the same file reads the same
+  against a full cache and an empty one, so do not chase it.
 - **`-async-proofs off`** when the question involves `Qed`: `coqc` offloads
   kernel-checking to a `rocqworker` that `-time` does not count, so `-time`'s
   sum can be tiny while the wall is minutes.
@@ -57,8 +60,8 @@ so the last line in the log is the stalling sentence. If the slow line is a
   (sum the `secs`, divide by the sentence count) separates the two kinds of
   expensive file. A file at or below its peers' rate has no hot statement to
   find; the tree's single most expensive file is routinely one of them, merely
-  the biggest. See "ProofCreate IS THE FLOOR" below for what that verdict costs
-  to reach the long way.
+  the biggest — and reaching that verdict the long way, by running every lever
+  against a file that has no pathology, is expensive.
 - **`.v.timing` roll-ups beat reading the proof.** After a build that felt slow,
   list every sentence over a few seconds across the tree and cross off the
   honest `Qed`s; what remains is the bug list. These sentences are exactly the
@@ -129,6 +132,21 @@ specifically, NOT bare folds: ProofScheduler's four `□ (∀ …)` blocks have 
 `wp_next` wrapper either and three folded clean (its leaves take the zero
 process pointer literally, so nothing needs `?p` through the fold).
 
+**A FOLD HELPS WHOEVER SUPPLIES THE CLOSER AND HURTS WHOEVER USES IT, so
+measure the USING file.** Naming a big inline closer can do exactly what it
+should to the context — Δ down by nearly a third, that entry from dominant to
+negligible — and still make the file that applies it *slower*, because every
+step now pays a delta-unfold of a many-argument constant. Argument count is not
+the predictor: a 58-argument seam pays where a 28-argument closer regresses.
+What decides it is the SHARE of Δ removed against the number of steps carrying
+it. The caller improving while the file regresses is the tell.
+
+**Do not fold the flat tail of short rows.** Only the entries that DOMINATE the
+Δ dump are worth naming; the tail (open-inode bundles, the stack frame, the
+ambient fs fabric) is consumed row by row by the walk, so bundling it forces a
+take-apart at every callee call and the cost moves rather than goes. Bundling
+those is a spec-layer change and should not be attempted as a perf edit alone.
+
 ### Seal a whole-function proof's continuation
 
 Do not spell the postcondition inline in the spec body: one `Definition` in the
@@ -165,103 +183,6 @@ fixes `CID` those rows do not take a `CID` argument yet — the error is
 *"Wrong argument name CID"* at the first such row. Give the `Definition` its
 own `` `{!riscvGS Σ, …} `{GEN : GenId} `` binders at top level, exactly as the
 contract body beside it already does.
-
-### ProofSysUnlink: the two CONTINUATIONS were the bulk of Δ
-
-`ProofSysUnlink.v` was the tree's most expensive file, and it is the worked
-example for this whole section — the diagnosis, the two folds, and why it lands
-on the opposite side of the ledger from `ProofIput` below.
-
-**The profile says RULE ONE and nothing else.** Isolated `coqc -time` showed no
-hot sentence at all: the cost was spread over `iApply`, `Qed`, `iDestruct` and
-`iIntros`, all of which are priced by `|Δ|`, and together they were the great
-majority of the file. **The hundreds of `assert`s, which look like the problem,
-are a rounding error** — do not chase them.
-
-**Δ, dumped and ranked** (`Unset Printing Notations. Set Printing Depth 250.
-Show.` on a copy with the other blocks `Admitted`, then split on the quoted
-names — the `Esnoc` scaffolding has to be stripped first or the last
-intuitionistic row absorbs the whole spatial-env prefix and reads much too
-big). Two entries dominated, both continuations, both spelled inline:
-
-- **`Hcont`, the RETURN continuation** — fifteen rows, written out TEN times
-  (the contract in `SpecSysUnlink.v` and nine block-lemma statements), and a
-  further copy inside each block's own seam.
-- **`Hseamk`, the block's fall-through seam** — one per block, dozens to
-  low-hundreds of source lines each, inert in Δ for the whole walk and applied
-  twice at the end.
-
-Everything else is a flat tail of short rows: the two 20-row open-inode
-bundles, the 15-row stack frame, the ambient fs fabric. **Do not fold those.**
-The walk consumes them row by row, so a bundle would have to be taken apart at
-every callee call and the cost would move rather than go — see "Extracting a
-persistent fact out of a bundle" below.
-
-Both folds are DROP-IN. `Definition sys_unlink_closer` in `SpecSysUnlink.v`
-(outside the `Section`, because it is a premise of the module-type contract)
-and one `Definition su_wN_seam` per block beside its lemma, all TRANSPARENT.
-**Not one line of proof script changed** — `iApply ("Hcont" $! …)`,
-`iApply ("Hseamk" $! …)` and the `iIntros` that discharges the seam goal in
-`wp_sys_unlink_sconf` all unify straight through a transparent constant. The
-closer alone was a modest win; the three seams on top of it took both the wall
-and the `.vo` down substantially, with peak RSS following.
-
-Min of three, arms interleaved. One outlying reading in the seam arm was the
-shared box, not the arm: the other two agreed to a fraction of a percent, and
-the closer arm's own pair straddled it the same way under load. Contention only
-ADDS — take the min, never the mean.
-
-**`su_w3_seam` is a 58-ARGUMENT constant and it pays, where `ProofIput`'s
-28-argument closer was a regression.** Argument count is not the predictor.
-What separates them is the SHARE of Δ removed against the number of steps that
-carry it: `ProofIput`'s fold shrank Δ in a file whose per-step cost was already
-modest, while here W3's Δ nearly halved under a walk with hundreds of `iApply`s
-and dozens of `Qed`s. Rank Δ first; fold the row that is tens of percent of it,
-and only that row.
-
-**GET THE `Definition`'s TYPECLASS BINDER LIST EXACTLY RIGHT — the two ways
-of getting it wrong fail in OPPOSITE directions, and only one of them
-errors.** Folding a bundle out of a proof file into a shared `Definition`
-means restating the `` `{!riscvGS Σ, …} `` list by hand, and:
-
-- **Too MANY classes** (one no row mentions) is a clean, immediate failure:
-  the extra binder is an argument every call site must supply, so any site
-  whose section context does not fix it reports *"Could not find an instance
-  for ProcAvail.pavG"* — or, on a whole statement, `UNDEFINED EVARS`.
-- **Too FEW classes** (one a row does need) does NOT error. Instance
-  resolution goes hunting through the `gFunctors` instances for the missing
-  evar and **DIVERGES**, consuming hundreds of gigabytes until it is killed,
-  against a second or two with the right list. There is no error message to
-  read, and on a shared box it takes the machine with it.
-  This is durable-notes.md's "NAMING AN AMBIENT CLASS FIELD OUTSIDE ITS
-  CLASS'S SCOPE IS A MEMORY BOMB" reached from a second direction — same root
-  cause, a class search with an unknown `Σ` — so if either bites you, read both.
-
-So derive the list, do not guess it: for each row, open the module that
-defines it and copy that section's `Context`. The one that catches people is
-`ProcInv` — `proc_priv` needs `` `{!riscvGS, !fileG, !xv6G, !bioslotG,
-!fdslotG, !irefslotG} ``, i.e. `fileG` and `fdslotG` even though nothing in
-the row's spelling mentions a file or an fd. **And cap the memory while
-experimenting**: `ulimit -v 25000000` before `coqc`/`make` is many times the
-largest legitimate file in the tree, so it never bites a real build and turns
-this failure into a fast one.
-
-**THE PRIZE IS ABSOLUTE BYTES OFF Δ, NOT THE SHARE.** Below roughly a kilobyte
-removed it is worth nothing however good the share looks: several folds with
-excellent-looking shares came out flat or within noise even where the `.vo`
-fell. `ProofPrintk`'s eleven `wp_printk_arm_*` exit continuations are
-character-for-character identical and a third to a half of each statement,
-which reads exactly like this section's shape — folding all eleven measured as
-nothing. `|Δ| × steps` is per PROOF, and those eleven lemmas are individually
-cheap, so a large share of a cheap proof's Δ is noise. `su_w3` is the
-contrasting case: ONE expensive lemma with a single entry approaching half of
-its Δ. **Rank candidates by the lemma's own `coqc -time` cost times its share,
-never by the file's cost times the share** — the file-level metric is what put
-ProofPrintk top of the list.
-
-**Still on the table in this file, not done**: its seven `iNext`s cost several
-times what `iApply bi.later_intro` costs — which the same file already uses at
-thirteen other sites. See "Modalities and rewriting".
 
 ### Do not pose instruction facts AT ALL — close them as subgoals
 
@@ -652,86 +573,6 @@ indices are not both concrete costs nothing, because a NAMED `discriminate`
 fails immediately) took ProofCreate's 419 calls out of the profile. The same
 edit is in `rgne`, whose side condition is the identical script.
 
-### ProofCreate IS THE FLOOR, NOT A BUG
-
-`ProofCreate.v` is the tree's most expensive file and it has **no pathology at
-all** — this is the record of what was measured, so nobody re-runs it looking
-for one.
-
-- **Per SENTENCE it is CHEAPER than its peers.** It is the top file because it
-  is the tree's biggest walk — five halves (`cr_found_half`, `cr_mkdir_half`,
-  `cr_alloc_half`, and the two failure halves) of a straight-line-with-branches
-  function. Compute this ratio from the `.v.timing` roll-up BEFORE opening a
-  slow file; it decides whether you are looking for a bug or at a floor.
-- **Δ is already flat and already folded.** Dumped mid-walk in `cr_mkdir_half`
-  (the recipe in "Seal a whole-function proof's continuation"): 90 rows, no
-  entry anywhere near dominant once the last intuitionistic row's absorbed
-  spatial prefix is discounted — the artefact that section warns about, seen
-  again. The parked bodies (`cr_alloc_body`, `cr_mkdir_body`, `cr_fail_body`,
-  `cr_cont_body`, `cr_tail_body`) are already named `Definition`s, so the
-  ProofSysUnlink lever was spent here before it was written down.
-- **The tail is the majority of the file**: thousands of sentences well under a
-  second. The few dozen above that are mostly honest `Qed`s.
-- **The `.lia.cache` is not hiding anything**: cold and warm agree, and this
-  file's contribution to the directory cache is small.
-- **`Strategy opaque [rget] [tp_pin] [rf_upd]`** is already on in this file;
-  adding the same three to `ProofNamex` — the obvious next candidate, a
-  register-chain-heavy whole-function proof — is a **NULL**. That lever is
-  still confined to `ProofVirtioDiskInit`'s shape.
-- What is left is `|Δ| × steps` and nothing else: the Ltac profile is
-  `iSpecializePat_go`, `notypeclasses refine`, `tc_solve` and `_iIntros_go`, in
-  that order. **The only lever that could still move it is fewer RESOURCE
-  ROWS per callee call** — ~30 names go out at each fs-callee `iApply` and
-  ~20 come back at the `iIntros` — i.e. bundling the two 20-row open-inode
-  bundles behind one abstraction with a constructor and an accessor. That is
-  a spec-layer change across `SpecIlock`/`SpecDirlink`/… , and it is the same
-  one ProofSysUnlink's case study declined ("the cost would move rather than
-  go"); it has NOT been measured, and it should not be attempted as a perf
-  edit alone.
-- **It is not on the critical path**, so splitting the file buys nothing:
-  `tools/proof_profile.py` puts the path elsewhere.
-
-### ProofIput RESISTS ALL FOUR OF THIS FILE'S LEVERS
-
-**Except the fold.** `ip_free_entry`'s two continuations (the largest inline one
-in the tree) and `ip_free_locked`'s own both paid, in two steps — i.e. the very
-continuation the regression below is about now measures NEGATIVE, folded as a
-seam on the current tree. The two results are not reconciled (the file has
-changed a great deal since, and the span that note describes is not obviously
-the one folded later); take it as: **re-measure before trusting an old per-file
-verdict, and never read "this file resists the lever" as "this continuation
-does".**
-
-`ProofIput.v` is well above the tree's median cost per sentence, so it reads
-like a textbook RULE ONE file. It is not fixable by the rules above, and here
-is what was tried so nobody re-runs it:
-
-- **Naming the closer made it SLOWER.** `ip_free_locked`'s +0x30 continuation
-  was 60 rows spelled inline and was the biggest entry in Δ by a wide margin —
-  a bigger share than the `ProofForkret` case that paid. One `Definition` for it
-  did exactly what it should to the context (Δ shrank by nearly a third, and
-  that entry went from dominant to negligible) and made the file **slower**,
-  confirmed on a second reading. The regression is inside `ip_free_locked`
-  itself, spread UNIFORMLY across every tactic at identical call counts: the
-  per-step delta-unfold of a **28-argument** constant costs more than the
-  smaller Δ saves. Its CALLER improved, which is the tell — a fold helps
-  whoever SUPPLIES the closer and hurts whoever USES it.
-- **Sealing that constant does not rescue it, either way.** `Typeclasses
-  Opaque` and `Strategy opaque` both fail identically at
-  *"iSpecialize: cannot instantiate"*, and the `iEval (rewrite /X)` repair puts
-  the expansion straight back into Δ, which is the thing being removed.
-- **`Strategy opaque [rget] [tp_pin] [rf_upd]` is a REGRESSION here**, over two
-  interleaved pairs, even though the mechanism is real elsewhere
-  (`ProofPipewrite` keeps the same three lines and benefits).
-- **Hoisting inline `ltac:` is not available**: the file's 247 splices are
-  individually cheap, against the much dearer splices that made the same edit
-  worth doing in `ProofSysUnlink`.
-
-**AND THE FIRST THREE READINGS SAID THE OPPOSITE, because the box was loaded.**
-The `Strategy` arm read as a clean win under load and reversed once the same
-interleaved A/B ran on a quiet box. A single reading on a shared machine is
-worth nothing here; take `uptime` before believing an A/B, and interleave.
-
 ### `lia` IS A GENERAL-PURPOSE CLOSER TOO, AND 180 HYPOTHESES IS A LARGE CONTEXT
 
 **THE EXHIBITS ARE GONE, THE LESSON IS NOT.** `iris/FsEff*.v` and
@@ -799,66 +640,6 @@ under `Set Default Proof Using "All"`, the seven per-file blocks of ~45
 *` chains, and the ticket `mjoin` over `seq 0 (Z.to_nat (sb_ninodes sb))`.
 `FsEffBase.v`, which carries the entire common-ground section, is trivial and
 did not move.
-
-#### `ProofFilewriteAU`: twelve one-line side conditions were the whole file
-
-The same rule at a WHOLE-FUNCTION proof rather than a pure band, and the
-worked example to copy — because the file looked innocent by every other
-diagnostic.
-
-- **`.lia.cache` hid it several-fold, which is the Diagnosis section's warning
-  seen live.** Warm it reads like an ordinary file; nothing in the warm profile
-  stands out and the shape is a flat RULE ONE tail. Cold, the top TWELVE
-  sentences are the great majority of the file and every one of them is a
-  `lia`. **If a file is reported slow and your warm reading disagrees, delete
-  the cache before believing the reading.**
-- **The certificates are the tell, and they are visible without any
-  profiling.** This one file owned a large fraction of the whole directory's
-  `.lia.cache` — because a certificate carries the hypotheses it was handed and
-  `fw_loop` hands over hundreds of them (dozens arithmetic, over `Z.to_nat` /
-  `bv_unsigned` / `MAXFILE * BSIZE`). After the fix its contribution is
-  negligible. `ls -laS` on the per-directory cache is not a ranking tool, but a
-  file that can be shown to own a large share of it is a confirmed instance of
-  this section.
-- **NEGATIVE RESULT — the cache's SIZE is not itself a cost, do not chase
-  it.** The fixed file compiled against the full cache and against an empty one
-  reads the same within load noise. micromega does not pay for entries it does
-  not look up.
-- **AN `ltac:(lia)` IN ARGUMENT POSITION CANNOT BE FIXED BY `clear -` — the
-  goal is an evar whose instance names every variable in scope, so there is
-  nothing to clear. Hoist it.** This is the "Inline `ltac:` in argument
-  position" rule with its largest instance: the loop's back edge spells
-  `iApply (IH … ltac:(lia) ltac:(lia) ltac:(… lia) ltac:(… lia) …)`, and that
-  ONE sentence was the most expensive in the file. Four named `assert`s above
-  it, passed positionally, make it free. The second and third worst
-  (`fw_au_raw_fail`'s `ltac:(left; lia)`, `fw_au_raw_take`'s two) are the same
-  edit.
-- **One `Tactic Notation` per file makes the rest a `sed`.** The keep-lists
-  differ per site, so a bare `Local Ltac` cannot carry them; `hyp_list` can,
-  and this is `FastSetSolver.v`'s own `set_solver +` idiom:
-
-  ```coq
-  Tactic Notation "fwclear" hyp_list(Hs) := clear - XI Hs.
-  Tactic Notation "zlia"    hyp_list(Hs) := clear - XI Hs; lia.
-  ```
-
-  **Keep the section's `CurCtx` instance (`XI`) in every list.** Half of this
-  file's bounds are stated over `SpecFilewrite.FW_MAX`, which is a
-  section-parameterized definition, so `clear - Hcrange` alone fails at
-  *"Could not find an instance for CurCtx"* — an error that reads like a
-  broken proof and is a scoping accident. Sixteen sites converted, no proof
-  restructured, and the two `clear`-free repairs found on the way are the
-  file's other closer bugs: a bare `discriminate` after `exfalso` (which
-  walks the whole context — `discriminate Hex` instead) at two sites, and an
-  `f_equal. lia.` closing `c + iz = iz + c` (`exact (Z.add_comm c iz)`).
-- **What is left is honest.** A flat tail, top sentence an honest `Qed`. The
-  continuation fold was NOT attempted: this file's blocks are already lemmas
-  and its return closer is under the floor "THE PRIZE IS ABSOLUTE BYTES OFF Δ"
-  gives.
-- **The sibling has the same shape and was not touched.** `ProofFilewrite.v`
-  carries five `ltac:(lia)` splices at the same four sites (its `IH` apply,
-  `fw_addw_moi`, `fw_tail`'s width premise, `fw_offupd`). Nobody has measured
-  it cold.
 
 ## Framing: name the context side, construct the goal side
 
@@ -1753,6 +1534,27 @@ reifies the context it is handed and this is the tree's largest.
 `assert (Htot16 : (0 < 16)%nat) by (apply Nat.lt_0_succ).` on the line above,
 passed by name, took both out of the profile. Read a slow closer as a CONTEXT
 problem before you read the goal at all.
+
+**AN `ltac:(lia)` IN ARGUMENT POSITION CANNOT BE FIXED BY `clear -` — HOIST
+IT.** The goal there is an evar whose instance names every variable in scope,
+so there is nothing to clear; `clear -` only becomes available once the goal is
+a named `assert`. A loop's back edge spelling
+`iApply (IH … ltac:(lia) ltac:(lia) …)` is the expensive shape, and named
+`assert`s above it, passed positionally, make it free.
+
+**One `Tactic Notation` per file turns the rest into a `sed`.** The keep-lists
+differ per site, so a bare `Local Ltac` cannot carry them; `hyp_list` can (the
+same idiom as `FastSetSolver.v`'s `set_solver +`):
+
+```coq
+Tactic Notation "fwclear" hyp_list(Hs) := clear - XI Hs.
+Tactic Notation "zlia"    hyp_list(Hs) := clear - XI Hs; lia.
+```
+
+**Keep the section's `CurCtx` instance (`XI`) in every keep-list.** Bounds
+stated over a section-parameterized definition make a bare `clear - H` fail at
+*"Could not find an instance for CurCtx"* — an error that reads like a broken
+proof and is a scoping accident.
 
 - Grep for `ltac:(intros` inside a `kernel_data_window` / `kernel_data_string`
   argument list — every hit is this bug.
