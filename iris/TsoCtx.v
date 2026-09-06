@@ -2474,6 +2474,25 @@ Section ctx.
   Global Instance ledger_vis_persistent h B t : Persistent (ledger_vis h B t).
   Proof. rewrite /ledger_vis. apply _. Qed.
 
+  (* THE RACY WINDOW'S PER-AGENT ANCHOR (A6.115, restated for two logs):
+     an agent's own-last record in a window floored at [lo] is the FLOOR
+     ITSELF or its OWN message.  Under one log this was [ledger_vis h lo t]
+     ([t ≤ lo] collapsing to [t = lo] by [win_ok1]); under two logs a
+     timestamp is never compared with a position, so the floor arm is the
+     equation.  relaxed-ww STAGE E re-founds the window theory over it. *)
+  Definition ledger_anchor (h : agent) (lo t : nat) : iProp Σ :=
+    (⌜t = lo⌝ ∨ ∃ i m, ⌜t = S i⌝ ∗ ledger_msg_at i m ∗ ⌜pm_tid m = h⌝)%I.
+
+  Global Instance ledger_anchor_persistent h lo t : Persistent (ledger_anchor h lo t).
+  Proof. rewrite /ledger_anchor. apply _. Qed.
+
+  Lemma ledger_anchor_floor (h : agent) (lo : nat) : ⊢ ledger_anchor h lo lo.
+  Proof. by iLeft. Qed.
+
+  Lemma ledger_anchor_own (h : agent) (lo i : nat) (m : pwmsg) :
+    pm_tid m = h -> ledger_msg_at i m -∗ ledger_anchor h lo (S i).
+  Proof. iIntros (Htid) "#Hm". iRight. iExists i, m. by iFrame "Hm". Qed.
+
   (* the clean arm: [t]'s message is drained under [B] -- under two logs a
      timestamp is never compared with a view directly, only through its
      drain witness *)
@@ -3668,8 +3687,9 @@ Section ctx.
     (* the FLOOR's visibility: [lo ≤ K] for a hart that received the handle,
        authorship for the one that wrote it *)
     ledger_vis (hart_agent cpu_id) K lo -∗
-    (* the ANCHOR's, off the cell's own invariant (A6.114 §2) *)
-    ledger_vis (hart_agent cpu_id) lo t -∗
+    (* the ANCHOR's, off the cell's own invariant (A6.114 §2): the floor
+       itself or my own message *)
+    ledger_anchor (hart_agent cpu_id) lo t -∗
     (* A6.119: the ∃-FORM window, which is what every producer in the tree
        hands out ([ledger_store_win_wpay_ok], [WpLock.lk_cpu_pay]).  The
        [ts]-function spelling was the outlier and nothing here needed it:
@@ -3700,7 +3720,7 @@ Section ctx.
     tso_interp_at riscv_eraGS g -∗
     view_lb view_name dlen_name (hart_agent cpu_id) K -∗
     ledger_vis (hart_agent cpu_id) K lo -∗
-    ledger_vis (hart_agent cpu_id) lo t -∗
+    ledger_anchor (hart_agent cpu_id) lo t -∗
     ([∗ list] j ∈ seq 0 n, ∃ tj : nat,
        phys_ledger_wpay (pa_add base j) dq (f j) tj
          (TsWin base n j z cp own lo)) -∗

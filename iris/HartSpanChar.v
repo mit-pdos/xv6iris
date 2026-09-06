@@ -39,7 +39,10 @@ Definition husilent_resume {X : Type} (m : M X) : option (M X) :=
              return (T -> M X) -> option (M X) with
        | Interface.InstrAnnounce _    => fun k => Some (k tt)
        | Interface.BranchAnnounce _ _ => fun k => Some (k tt)
-       | Interface.Barrier _          => fun k => Some (k tt)
+       (* a release fence is not silent under two logs (relaxed-ww.md
+          §1.1; [HartSpan.hspan_node]) *)
+       | Interface.Barrier b          => fun k =>
+           if fence_rel b then None else Some (k tt)
        | Interface.CacheOp _          => fun k => Some (k tt)
        | Interface.TlbOp _            => fun k => Some (k tt)
        | Interface.TakeException _    => fun k => Some (k tt)
@@ -70,6 +73,11 @@ Proof.
   intros Hres (rs1 & Hag & Hnode).
   destruct m as [y|T oc k]; [discriminate Hres|].
   destruct oc; simpl in Hres; try discriminate Hres;
+    try (match type of Hres with
+         | (if fence_rel ?b then _ else _) = _ =>
+             destruct (fence_rel b); [discriminate Hres|];
+             simpl in Hnode; destruct Hnode as [_ Hnode]
+         end);
     injection Hres as <-; simpl in Hnode;
     exists rs1; (split; [exact Hag|exact Hnode]).
 Qed.
@@ -152,8 +160,9 @@ Proof.
   destruct m as [y|T oc k]; simpl in Hstop, Hnode; [exact Hnode|].
   destruct oc; simpl in Hstop, Hnode; try discriminate Hstop;
     try exact Hnode.
-  destruct Hnode as [Hin _].
-  apply bool_decide_eq_true_1 in Hstop. exact (Hstop Hin).
+  all: first [ (destruct Hnode as [Hin _];
+                apply bool_decide_eq_true_1 in Hstop; exact (Hstop Hin))
+             | (destruct Hnode as [Hrel _]; congruence) ].
 Qed.
 
 (* a chain from a NON-stopped head to a stopped landing takes a first step *)
@@ -224,7 +233,15 @@ Proof.
                (reg_agree_set D reg regval rs1 rs
                   (reg_agree_trans D rs1 rs0 rs Hag1 Hag0))
                Hchain Hstop). }
-    (* the twelve silent classes: the file does not move *)
+    3:{ (* THE FENCE: silent only without a W predecessor (the walker
+           refuses a release fence, which is a node of its own) *)
+      destruct (fence_rel b) eqn:Hrel; [discriminate Hf|].
+      apply hspan_peel in Hchain; [|cbn; exact Hrel|exact Hstop].
+      destruct Hchain as (c1 & (rs1 & Hag1 & Hnode) & Hchain).
+      cbn [hspan_node fst snd] in Hnode. destruct Hnode as [_ ->].
+      exact (IH rs (k tt) Hf rs1 l
+               (reg_agree_trans D rs1 rs0 rs Hag1 Hag0) Hchain Hstop). }
+    (* the eleven other silent classes: the file does not move *)
     all: apply hspan_peel in Hchain; [|reflexivity|exact Hstop];
            destruct Hchain as (c1 & (rs1 & Hag1 & Hnode) & Hchain);
            cbn [hspan_node fst snd] in Hnode; subst c1;

@@ -322,6 +322,76 @@ Section barrier.
     iFrame "Hri Hmem Hdev Htso". iApply ("H" with "HQ").
   Qed.
 
+  (* ================================================================== *)
+  (* §3a THE PUBLICATION LEAF (relaxed-ww.md §2.3): keyed on [fence_rel], *)
+  (* which `fence rw,w` -- release's fence -- satisfies and              *)
+  (* [fence_drains] does not.  Its one gift is [own_drained]: every own   *)
+  (* store has drained, which is the premise of the fence-bound ctx laws  *)
+  (* ([TsoCtxLedger.ctx_stamp] / [ctx_dom_to_stamped] / [ctx_deposit]).  *)
+  (* The client's step is a FUPD AT ⊤ rather than a bupd: the release     *)
+  (* hook opens the lock's and the boxes' invariants there.               *)
+  (* ================================================================== *)
+  Definition rel_step (P Q : iProp Σ) : iProp Σ :=
+    (∀ g : gstate,
+       ⌜own_drained (hart_agent cpu_id) g.(glog) g.(gdlog)⌝ -∗
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+       tso_interp_at riscv_eraGS g -∗ P ={⊤}=∗
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+       tso_interp_at riscv_eraGS g ∗ Q)%I.
+
+  Lemma rel_step_id (P : iProp Σ) : ⊢ rel_step P P.
+  Proof. iIntros (g) "_ $ $ $". done. Qed.
+
+  Lemma wp_hart_barrier_rel {X : Type} (C : M X -> M unit) (bk : barrier_kind)
+      (m : M X) (P Q : iProp Σ) :
+    mctx C ->
+    hbar_at m = Some bk ->
+    fence_rel bk = true ->
+    gen_cert -∗ rel_step P Q -∗ P -∗
+    ▷ (Q -∗ WP (HartE gen_id cpu_id (C (hbar_resume m)) : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
+  Proof.
+    iIntros (HC Hproj Hrel) "#Hcert Hpub HP H".
+    iApply (wp_hart_barrier_core C bk m (rel_step P Q ∗ P ∗
+              ▷ (Q -∗ WP (HartE gen_id cpu_id (C (hbar_resume m)) : expr riscv_lang)))%I
+              HC Hproj with "Hcert [$Hpub $HP $H]").
+    iIntros (σ img log dl tv itv hr V) "%Hen %Htv %Htvlen %Hitv %Hhr #Hrcpt _ Hσ Htso (Hpub & HP & H)".
+    assert (Hod : own_drained (hart_agent cpu_id) log dl).
+    { destruct Hen as [Hen|Hen]; [congruence|exact Hen]. }
+    set (h := hart_agent cpu_id).
+    set (tvn := fence_post h log dl (fence_drains bk) (fence_acq bk) tv (hr_rv hr)).
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    assert (Hpin' : forall h', (NCPU <= h')%nat -> vstep h tvn dl V h' = length dl).
+    { intros h' Hh'. specialize (Hpin h' Hh'). exact Hpin. }
+    iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log dl (vstep h tvn dl V)
+               σ.(sregs) σ.(mdev) Hpin').
+    iMod ("Hpub" $! (gs_of img σ.(mem) log dl (vstep h tvn dl V) σ.(sregs) σ.(mdev))
+            with "[%] Hmem Htso HP") as "(Hmem & Htso & HQ)".
+    { cbn [glog gdlog gs_of]. exact Hod. }
+    rewrite -(tso_interp_of_at_gs riscv_eraGS img σ.(mem) log dl
+                (vstep h tvn dl V) σ.(sregs) σ.(mdev) Hpin').
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iNext. iMod "Hclose" as "_". iModIntro.
+    iFrame "Hri Hmem Hdev Htso". iApply ("H" with "HQ").
+  Qed.
+
+  Lemma swp_hart_barrier_rel {X : Type} (bk : barrier_kind) (m : M X)
+      (Φ : X -> iProp Σ) (P Q : iProp Σ) :
+    hbar_at m = Some bk ->
+    fence_rel bk = true ->
+    gen_cert -∗ rel_step P Q -∗ P -∗
+    ▷ (Q -∗ swp (hbar_resume m) Φ) -∗
+    swp m Φ.
+  Proof.
+    iIntros (Hproj Hrel) "#Hcert Hpub HP H".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (wp_hart_barrier_rel C bk m P Q HC Hproj Hrel
+              with "Hcert Hpub HP [H Hcont]").
+    iNext. iIntros "HQ".
+    iApply (swp_use _ Φ C HC with "[H HQ] Hcont"). by iApply "H".
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* §4 THE [swp] FORM -- the one every composed leaf actually uses.       *)
   (* ------------------------------------------------------------------ *)

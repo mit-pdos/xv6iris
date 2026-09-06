@@ -7029,9 +7029,15 @@ Section VirtioProto.
 
   (* THE READ THEOREM: what a hart with every floor write in view reads off
      the index word -- [wrap16 k] for some [k] between the reclaimed count
-     and the completed count, with every completion below [k] in its view
+     and the completed count, with every completion below [k] VISIBLE to it
      (TsoMemPa.rel_read through TsoCtx.ledger_read_rel_ok; the pre-mint
-     window reads its floor bytes). *)
+     window reads its floor bytes).
+     relaxed-ww STAGE E: under two logs a completion's position is an issue
+     index and a view a drain position, so "below [k] in view" is
+     [msg_visible] and the reclaimed-count premise [HF] wants the entries'
+     drain witnesses; the proof waits for the two-log window theory
+     ([TsoCtx.ledger_read_rel_ok] is itself Admitted).  Tracked in
+     claude-notes/projects/relaxed-ww.md. *)
   Lemma used_rel_read_ok `{CID : CpuId} (g : gstate) (c : virtio_cfg)
       (nc lo nr F K : nat) (tf : nat -> nat) (hist : list (nat * (nat -> bv 8))) :
     hist_ok hist nc ->
@@ -7039,7 +7045,7 @@ Section VirtioProto.
     (nr <= nc)%nat -> (F <= K)%nat ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
-    TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) K -∗
     TsoCtx.rel_floor_vis (hart_agent cpu_id) K 2 tf -∗
     ((⌜hist = []⌝ ∗ TsoCtx.rel_pre_cells (used_idx_pa c) 2 tf (nth_byte (wrap16 0)))
      ∨ TsoCtx.rel_cells (used_idx_pa c) 2 (DfracOwn 1) disk_agent lo tf
@@ -7047,62 +7053,14 @@ Section VirtioProto.
     ⌜forall tv : nat, (g.(gtv) cpu_id <= tv)%nat ->
        exists k, (nr <= k)%nat /\ (k <= nc)%nat
          /\ (forall j, (j < 2)%nat ->
-               TsoMemPa.tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv
+               TsoMemPa.tso_read g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tv
                  (pa_add (used_idx_pa c) j)
                = Some (nth_byte (wrap16 k) j))
          /\ (forall p, (p < k)%nat ->
-               exists q g0, hist !! p = Some (q, g0) /\ (q <= tv)%nat)⌝.
+               exists q g0, hist !! p = Some (q, g0) /\
+                 TsoMemPa.msg_visible g.(glog) g.(gdlog) (hart_agent cpu_id) tv q)⌝.
   Proof.
-    intros Hho HF Hnrnc HFK. iIntros "Hgh Hint #HK #Hfv Hcells".
-    iDestruct (TsoCtx.view_lb_le_view with "Hint HK") as %HKtv.
-    pose proof Hho as (Hlen & Hval & Hsort).
-    iDestruct "Hcells" as "[[%Hnil Hpre] | Hrel]".
-    - iDestruct (TsoCtx.ledger_read_relpre_ok g (used_idx_pa c) 2 tf
-                   (nth_byte (wrap16 0)) K
-                   with "Hgh Hint HK Hfv Hpre") as %Hrd.
-      iPureIntro. intros tv Htv. exists 0%nat.
-      assert (Hnc0 : nc = 0%nat) by (rewrite Hnil in Hlen; cbn in Hlen; lia).
-      split_and!; [lia | lia | |].
-      + intros j Hj. exact (Hrd tv Htv j Hj).
-      + intros p Hp. lia.
-    - iDestruct (TsoCtx.ledger_read_rel_ok g (used_idx_pa c) 2 (DfracOwn 1)
-                   disk_agent lo tf
-                   (nth_byte (wrap16 0)) (nth_byte (wrap16 nc)) hist K ltac:(lia)
-                   with "Hint HK Hfv Hrel") as %Hrd.
-      iPureIntro. intros tv Htv.
-      assert (Hne : hart_agent cpu_id ≠ disk_agent).
-      { unfold hart_agent, disk_agent. pose proof (fin_to_nat_lt cpu_id). lia. }
-      destruct (Hrd tv Htv) as [[Hfloor Hinv] | (T & g0 & Hin & HvT & Hle & Hbytes & Hmax)].
-      + (* the floor: no history entry visible, so nothing was reclaimed *)
-        exists 0%nat. split_and!; [| lia | exact Hfloor | intros p Hp; lia].
-        destruct nr as [|nr']; [lia |]. exfalso.
-        destruct (hist_ok_lookup_lt hist nc 0 Hho ltac:(lia)) as [q0 Hq0].
-        pose proof (HF 0%nat q0 _ Hq0 ltac:(lia)) as HqF.
-        pose proof (Hinv q0 _ (elem_of_list_lookup_2 _ _ _ Hq0)) as Hvis.
-        rewrite (TsoMemPa.visibleb_below (hart_agent cpu_id) tv g.(glog) q0
-                   ltac:(lia)) in Hvis. discriminate Hvis.
-      + (* the latest visible entry: completion [k'], index [S k'] *)
-        apply elem_of_list_lookup in Hin as [k' Hk'].
-        pose proof (Hval k' T g0 Hk') as Hg0. subst g0.
-        pose proof (Hle Hne) as HTtv.
-        pose proof (lookup_lt_Some _ _ _ Hk') as Hk'len.
-        exists (S k'). split_and!.
-        * destruct (decide (nr <= S k')%nat) as [Hok' | Hgt]; [exact Hok'|]. exfalso.
-          destruct (hist_ok_lookup_lt hist nc (S k') Hho ltac:(lia)) as [q1 Hq1].
-          pose proof (HF (S k') q1 _ Hq1 ltac:(lia)) as Hq1F.
-          pose proof (Hmax q1 _ (elem_of_list_lookup_2 _ _ _ Hq1)
-                        (TsoMemPa.visibleb_below (hart_agent cpu_id) tv g.(glog) q1
-                           ltac:(lia))) as Hq1T.
-          pose proof (Hsort k' (S k') T q1 _ _ ltac:(lia) Hk' Hq1). lia.
-        * lia.
-        * exact Hbytes.
-        * intros p Hp.
-          destruct (hist_ok_lookup_lt hist nc p Hho ltac:(lia)) as [qp Hqp].
-          exists qp, (nth_byte (wrap16 (S p))). split; [exact Hqp|].
-          destruct (decide (p = k')) as [-> | Hne'].
-          -- rewrite Hk' in Hqp. injection Hqp as Hq. subst qp. exact HTtv.
-          -- pose proof (Hsort p k' qp T _ _ ltac:(lia) Hqp Hk'). lia.
-  Qed.
+  Admitted.
 
   (* ==================================================================== *)
   (* driver operation 4: RECLAIM a completed slot (intr's used-elem lw)   *)
