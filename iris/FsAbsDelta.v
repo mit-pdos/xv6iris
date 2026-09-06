@@ -1,4 +1,5 @@
-(* FsAbsDelta.v -- THE FIVE WRITE DELTAS ON [aview], HOISTED.
+(* FsAbsDelta.v -- THE WRITE DELTAS ON [aview]: the five hoisted ones, and
+   (round E2, lane E2-D) the LEGS of create and link they decompose into.
 
    The pure delta functions the AU commits fire, each moved here VERBATIM
    from the spec file that minted it (2026-09-04; a pure hoist -- no
@@ -27,7 +28,36 @@
    [delta_trunc]'s `{XI : CurCtx}` binder is kept EXACTLY: consumers apply
    it under an ambient [CurCtx], and dropping the binder would change the
    constant's arity.  [fs_delta] carries the same binder for the same
-   reason. *)
+   reason.
+
+   ROUND E2, LANE E2-D (2026-09-05; claude-notes/projects/app-round-e2.md
+   sections 2(b)-5, briefs file): the fused deltas are what a QUIESCENT
+   observer reads; the kernel performs them as LEGS, one retag each, and
+   round E's fires commit a leg at a time.  Section 1b mints create's legs
+   -- [delta_arm] (the row APPEARS at nlink 1), [delta_unarm] (the failure
+   arm's undo: it DISAPPEARS), [delta_dots] (mkdir's dot writes), and
+   [delta_ent] (the parent leg, with mkdir's count bump fused) -- and
+   [delta_create_split] ties [delta_create] to arm-then-ent.  Section 4b
+   mints link's -- [delta_link_tgt] (count up), [delta_link_ent] (the
+   parent's new name), [delta_link_untgt] (the failure arm's count down,
+   which IS [delta_unl_tgt]) -- and [delta_link] with [delta_link_split].
+   THE VIEW IS THE LIVE NAMESPACE (lane E2-V2), so there is no
+   [delta_claim] and no [delta_free]: ialloc's claim and iput's free move
+   nothing the view has.
+
+   ONE DEVIATION FROM THE BRIEF, forced by the kernel: [delta_link_tgt]
+   takes the target's OBSERVED ROW [a] as a parameter instead of reading
+   it from the view.  sys_link has no [ip->nlink == 0] guard on its target
+   (ProofSysLink.v, "THE IIIc WALL": the walk pays iupdate's freeze-pin
+   premise with the freeze token because the count fact is genuinely
+   unavailable), so the target may be an unlinked-but-open file -- a row
+   the live view does NOT have -- and the bump RESURRECTS it: count 0 -> 1,
+   the row appears with the record's content.  A view-only "nlink+1 at t"
+   would be the identity there, which is false of the machine.  With [a]
+   in hand ([arow_at av t a] is the side condition: present at a nonzero
+   count, absent at zero) the delta is one insert in both arms, and
+   [delta_link_untgt] -- [delta_unl_tgt], count down and gone at 0 --
+   undoes it exactly ([delta_link_untgt_tgt]). *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -95,6 +125,170 @@ Proof.
   destruct (an_node a) as [bs | ents0 | ma0 mi0]; [done | | done].
   rewrite lookup_insert_ne; [| congruence].
   by rewrite lookup_insert_ne; [| congruence].
+Qed.
+
+(* ===================================================================== *)
+(*  1b.  CREATE'S LEGS (round E2, lane E2-D)                             *)
+(* ===================================================================== *)
+
+(* THE ARM (doc: "nlink 0 -> 1"): the child's row APPEARS, content [c]
+   at count 1 -- create's [ip->nlink = 1; iupdate(ip)] after ialloc's
+   claim (which the live view does not see: the claim box is at count 0).
+   For a device [c] carries the major/minor the two stores before it set;
+   for a directory it is [ADir ∅], the dots come with [delta_dots].  Side
+   condition, kept out of the function: [av !! i = None] (the inum was
+   free or a claim box, either way not in the view). *)
+Definition delta_arm (i : Z) (c : absnode) (av : aview) : aview :=
+  <[i := MkAnode c 1%nat]> av.
+
+(* THE UNARM (ruling Q-h, the failure arm's [ip->nlink = 0]): the row
+   DISAPPEARS.  Total: deleting an absent key is the identity. *)
+Definition delta_unarm (i : Z) (av : aview) : aview := delete i av.
+
+(* THE DOTS (mkdir's two [dirlink(ip, ".", ip->inum)] /
+   [dirlink(ip, "..", dp->inum)], one retag in the landed proof): the
+   directory's entry map gains its two dot names; the count does not move
+   ("No ip->nlink++ for '.'").  Total on purpose -- at a non-directory or
+   an absent row it is the identity. *)
+Definition delta_dots (i d : Z) (av : aview) : aview :=
+  match av !! i with
+  | Some a =>
+      match an_node a with
+      | ADir ents =>
+          <[i := MkAnode (ADir (<[DOT := i]> (<[DOTDOT := d]> ents))) (an_nlink a)]> av
+      | _ => av
+      end
+  | None => av
+  end.
+
+(* THE PARENT LEG (create's [dirlink(dp, name, ip->inum)] fused with
+   mkdir's [dp->nlink++] "for '..'"): the parent gains [nm ↦ i] and, if
+   the child is a directory, one link.  The child's KIND is read off the
+   VIEW -- at this instant the child is armed (in the view at count 1,
+   dots included), so [acre_bump] of its row is exactly [delta_create]'s
+   bump.  Total: identity unless both rows are there and the parent is a
+   directory. *)
+Definition delta_ent (d : Z) (nm : fname) (i : Z) (av : aview) : aview :=
+  match av !! d, av !! i with
+  | Some p, Some a =>
+      match an_node p with
+      | ADir ents =>
+          <[d := MkAnode (ADir (<[nm := i]> ents))
+                         (an_nlink p + acre_bump (an_node a))%nat]> av
+      | _ => av
+      end
+  | _, _ => av
+  end.
+
+(* ---- the row algebra: [_lookup_at] the moved key, [_lookup_same] the
+   others, and each leg's collapse to one insert -------------------- *)
+
+Lemma delta_arm_lookup_at (av : aview) (i : Z) (c : absnode) :
+  delta_arm i c av !! i = Some (MkAnode c 1%nat).
+Proof. rewrite /delta_arm lookup_insert //. Qed.
+
+Lemma delta_arm_lookup_same (av : aview) (i : Z) (c : absnode) (j : Z) :
+  j <> i -> delta_arm i c av !! j = av !! j.
+Proof. intros Hj. rewrite /delta_arm lookup_insert_ne //. Qed.
+
+(* the precondition's consequence: an arm at a row the view lacks is
+   undone EXACTLY by the unarm -- the failure arm restores the pre-view *)
+Lemma delta_arm_unarm (av : aview) (i : Z) (c : absnode) :
+  av !! i = None -> delta_unarm i (delta_arm i c av) = av.
+Proof.
+  intros Hi. rewrite /delta_unarm /delta_arm delete_insert //.
+Qed.
+
+(* ...and [i ∉ dom av] is that precondition's [dom] spelling *)
+Lemma delta_arm_fresh (av : aview) (i : Z) :
+  i ∉ dom av <-> av !! i = None.
+Proof. apply not_elem_of_dom. Qed.
+
+Lemma delta_unarm_lookup_at (av : aview) (i : Z) :
+  delta_unarm i av !! i = None.
+Proof. rewrite /delta_unarm lookup_delete //. Qed.
+
+Lemma delta_unarm_lookup_same (av : aview) (i j : Z) :
+  j <> i -> delta_unarm i av !! j = av !! j.
+Proof. intros Hj. rewrite /delta_unarm lookup_delete_ne //. Qed.
+
+Lemma delta_dots_dir (av : aview) (i d : Z) (ents : gmap fname Z) (nl : nat) :
+  av !! i = Some (MkAnode (ADir ents) nl) ->
+  delta_dots i d av
+  = <[i := MkAnode (ADir (<[DOT := i]> (<[DOTDOT := d]> ents))) nl]> av.
+Proof. intros Hi. rewrite /delta_dots Hi //=. Qed.
+
+Lemma delta_dots_lookup_at (av : aview) (i d : Z) (ents : gmap fname Z) (nl : nat) :
+  av !! i = Some (MkAnode (ADir ents) nl) ->
+  delta_dots i d av !! i
+  = Some (MkAnode (ADir (<[DOT := i]> (<[DOTDOT := d]> ents))) nl).
+Proof. intros Hi. rewrite (delta_dots_dir _ _ _ _ _ Hi) lookup_insert //. Qed.
+
+Lemma delta_dots_lookup_same (av : aview) (i d j : Z) :
+  j <> i -> delta_dots i d av !! j = av !! j.
+Proof.
+  intros Hj. rewrite /delta_dots.
+  destruct (av !! i) as [a |]; [| done].
+  destruct (an_node a) as [bs | ents | ma mi]; [done | | done].
+  rewrite lookup_insert_ne //.
+Qed.
+
+Lemma delta_dots_absent (av : aview) (i d : Z) :
+  av !! i = None -> delta_dots i d av = av.
+Proof. intros Hi. rewrite /delta_dots Hi //. Qed.
+
+Lemma delta_ent_dir (av : aview) (d : Z) (nm : fname) (i : Z)
+    (ents : gmap fname Z) (nl : nat) (c : absnode) (k : nat) :
+  av !! d = Some (MkAnode (ADir ents) nl) ->
+  av !! i = Some (MkAnode c k) ->
+  delta_ent d nm i av
+  = <[d := MkAnode (ADir (<[nm := i]> ents)) (nl + acre_bump c)%nat]> av.
+Proof. intros Hd Hi. rewrite /delta_ent Hd Hi //=. Qed.
+
+Lemma delta_ent_lookup_at (av : aview) (d : Z) (nm : fname) (i : Z)
+    (ents : gmap fname Z) (nl : nat) (c : absnode) (k : nat) :
+  av !! d = Some (MkAnode (ADir ents) nl) ->
+  av !! i = Some (MkAnode c k) ->
+  delta_ent d nm i av !! d
+  = Some (MkAnode (ADir (<[nm := i]> ents)) (nl + acre_bump c)%nat).
+Proof.
+  intros Hd Hi. rewrite (delta_ent_dir _ _ _ _ _ _ _ _ Hd Hi) lookup_insert //.
+Qed.
+
+Lemma delta_ent_lookup_same (av : aview) (d : Z) (nm : fname) (i j : Z) :
+  j <> d -> delta_ent d nm i av !! j = av !! j.
+Proof.
+  intros Hj. rewrite /delta_ent.
+  destruct (av !! d) as [p |]; [| done].
+  destruct (av !! i) as [a |]; [| done].
+  destruct (an_node p) as [bs | ents | ma mi]; [done | | done].
+  rewrite lookup_insert_ne //.
+Qed.
+
+(* the child's own row is untouched by the parent leg *)
+Lemma delta_ent_lookup_child (av : aview) (d : Z) (nm : fname) (i : Z) :
+  d <> i -> delta_ent d nm i av !! i = av !! i.
+Proof. intros Hne. apply delta_ent_lookup_same. congruence. Qed.
+
+(* THE SPLIT (the mold: [delta_unlink_split]): under create's premises --
+   the parent is a directory in the view, the child's inum is NOT -- the
+   fused [delta_create] IS the arm followed by the parent leg.  (mkdir's
+   dots sit between the two and change neither the parent's row nor the
+   child's kind, so [delta_create] at [ADir ∅] composes with [delta_dots]
+   the same way; the fires state that where they fire it.) *)
+Lemma delta_create_split (av : aview) (d : Z) (nm : fname) (i : Z)
+    (c : absnode) (ents : gmap fname Z) (nl : nat) :
+  av !! d = Some (MkAnode (ADir ents) nl) ->
+  av !! i = None ->
+  delta_create d nm i c av = delta_ent d nm i (delta_arm i c av).
+Proof.
+  intros Hd Hi.
+  assert (Hne : d <> i) by (intros ->; rewrite Hd in Hi; discriminate Hi).
+  rewrite /delta_create Hd /=.
+  rewrite (delta_ent_dir _ d nm i ents nl c 1%nat).
+  - rewrite /delta_arm. apply insert_commute. congruence.
+  - rewrite (delta_arm_lookup_same _ _ _ _ Hne). exact Hd.
+  - apply delta_arm_lookup_at.
 Qed.
 
 (* ===================================================================== *)
@@ -470,14 +664,152 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(*  4b.  LINK (round E2, lane E2-D)                                      *)
+(* ===================================================================== *)
+
+(* THE TARGET LEG (sys_link's [ip->nlink++; iupdate(ip)]): the target's
+   row at one more link, from the row [a] THE MACHINE READS under
+   [ip->lock].  Parameterized by [a] (the header's deviation): the view
+   has the row iff its count is nonzero ([arow_at av t a]), and sys_link
+   does not check the count, so at a count of zero this leg makes an
+   unlinked-but-open file REAPPEAR in the namespace-to-be.  One insert
+   either way. *)
+Definition delta_link_tgt (t : Z) (a : anode) (av : aview) : aview :=
+  <[t := MkAnode (an_node a) (an_nlink a + 1)%nat]> av.
+
+(* THE PARENT LEG (sys_link's [dirlink(dp, name, ip->inum)]): the parent
+   gains [nm ↦ t]; link is for files and devices only, so no count moves.
+   Total: identity unless the parent is a directory in the view. *)
+Definition delta_link_ent (d : Z) (nm : fname) (t : Z) (av : aview) : aview :=
+  match av !! d with
+  | Some p =>
+      match an_node p with
+      | ADir ents => <[d := MkAnode (ADir (<[nm := t]> ents)) (an_nlink p)]> av
+      | _ => av
+      end
+  | None => av
+  end.
+
+(* THE FAILURE ARM'S UNDO ([bad: ip->nlink--]): one link down, and gone
+   at zero -- which is [delta_unl_tgt] on the nose. *)
+Definition delta_link_untgt (t : Z) : aview -> aview := delta_unl_tgt t.
+
+(* THE FUSED DELTA (doc section 4's [δ_link]): the target leg, then the
+   parent's. *)
+Definition delta_link (d : Z) (nm : fname) (t : Z) (a : anode)
+    (av : aview) : aview :=
+  delta_link_ent d nm t (delta_link_tgt t a av).
+
+(* ---- the row algebra --------------------------------------------- *)
+
+Lemma delta_link_tgt_lookup_at (av : aview) (t : Z) (a : anode) :
+  delta_link_tgt t a av !! t = Some (MkAnode (an_node a) (an_nlink a + 1)%nat).
+Proof. rewrite /delta_link_tgt lookup_insert //. Qed.
+
+Lemma delta_link_tgt_lookup_same (av : aview) (t : Z) (a : anode) (j : Z) :
+  j <> t -> delta_link_tgt t a av !! j = av !! j.
+Proof. intros Hj. rewrite /delta_link_tgt lookup_insert_ne //. Qed.
+
+Lemma delta_link_ent_dir (av : aview) (d : Z) (nm : fname) (t : Z)
+    (ents : gmap fname Z) (nl : nat) :
+  av !! d = Some (MkAnode (ADir ents) nl) ->
+  delta_link_ent d nm t av = <[d := MkAnode (ADir (<[nm := t]> ents)) nl]> av.
+Proof. intros Hd. rewrite /delta_link_ent Hd //=. Qed.
+
+Lemma delta_link_ent_lookup_at (av : aview) (d : Z) (nm : fname) (t : Z)
+    (ents : gmap fname Z) (nl : nat) :
+  av !! d = Some (MkAnode (ADir ents) nl) ->
+  delta_link_ent d nm t av !! d = Some (MkAnode (ADir (<[nm := t]> ents)) nl).
+Proof. intros Hd. rewrite (delta_link_ent_dir _ _ _ _ _ _ Hd) lookup_insert //. Qed.
+
+Lemma delta_link_ent_lookup_same (av : aview) (d : Z) (nm : fname) (t j : Z) :
+  j <> d -> delta_link_ent d nm t av !! j = av !! j.
+Proof.
+  intros Hj. rewrite /delta_link_ent.
+  destruct (av !! d) as [p |]; [| done].
+  destruct (an_node p) as [bs | ents | ma mi]; [done | | done].
+  rewrite lookup_insert_ne //.
+Qed.
+
+Lemma delta_link_ent_absent (av : aview) (d : Z) (nm : fname) (t : Z) :
+  av !! d = None -> delta_link_ent d nm t av = av.
+Proof. intros Hd. rewrite /delta_link_ent Hd //. Qed.
+
+(* THE UNDO IS EXACT: at the row the machine read -- present at a nonzero
+   count, absent at zero -- the failure arm's count-down restores the
+   pre-view, in both arms.  [arow_at] is the [FsAbsDefs] counted clause. *)
+Lemma delta_link_untgt_tgt (av : aview) (t : Z) (a : anode) :
+  arow_at av t a -> delta_link_untgt t (delta_link_tgt t a av) = av.
+Proof.
+  intros Hrow. destruct a as [n k].
+  rewrite /delta_link_untgt /delta_link_tgt. cbn [an_node an_nlink].
+  erewrite delta_unl_tgt_unfold; [| apply lookup_insert]. cbn [an_node an_nlink].
+  destruct (arow_at_cases _ _ _ Hrow) as [[Hz Hnone] | [Hnz Hsome]].
+  - cbn [an_nlink] in Hz. case_decide as Hc; [| exfalso; lia].
+    rewrite delete_insert; [reflexivity | exact Hnone].
+  - cbn [an_nlink] in Hnz. case_decide as Hc; [exfalso; lia |].
+    rewrite insert_insert. replace (k + 1 - 1)%nat with k by lia.
+    apply insert_id. exact Hsome.
+Qed.
+
+(* THE SPLIT, spelled out: under link's premises -- the parent is a
+   directory in the view and is not the target -- the fused delta is the
+   two inserts. *)
+Lemma delta_link_split (av : aview) (d : Z) (nm : fname) (t : Z) (a : anode)
+    (ents : gmap fname Z) (nl : nat) :
+  av !! d = Some (MkAnode (ADir ents) nl) -> d <> t ->
+  delta_link d nm t a av
+  = <[d := MkAnode (ADir (<[nm := t]> ents)) nl]>
+      (<[t := MkAnode (an_node a) (an_nlink a + 1)%nat]> av).
+Proof.
+  intros Hd Hne. rewrite /delta_link.
+  rewrite (delta_link_ent_dir _ d nm t ents nl); [reflexivity |].
+  rewrite (delta_link_tgt_lookup_same _ _ _ _ Hne). exact Hd.
+Qed.
+
+Lemma delta_link_parent (av : aview) (d : Z) (nm : fname) (t : Z) (a : anode)
+    (ents : gmap fname Z) (nl : nat) :
+  av !! d = Some (MkAnode (ADir ents) nl) -> d <> t ->
+  delta_link d nm t a av !! d = Some (MkAnode (ADir (<[nm := t]> ents)) nl).
+Proof.
+  intros Hd Hne. rewrite (delta_link_split _ _ _ _ _ _ _ Hd Hne) lookup_insert //.
+Qed.
+
+Lemma delta_link_target (av : aview) (d : Z) (nm : fname) (t : Z) (a : anode)
+    (ents : gmap fname Z) (nl : nat) :
+  av !! d = Some (MkAnode (ADir ents) nl) -> d <> t ->
+  delta_link d nm t a av !! t = Some (MkAnode (an_node a) (an_nlink a + 1)%nat).
+Proof.
+  intros Hd Hne. rewrite (delta_link_split _ _ _ _ _ _ _ Hd Hne).
+  rewrite lookup_insert_ne; [| exact Hne]. rewrite lookup_insert //.
+Qed.
+
+Lemma delta_link_other (av : aview) (d : Z) (nm : fname) (t : Z) (a : anode) (j : Z) :
+  j <> d -> j <> t -> delta_link d nm t a av !! j = av !! j.
+Proof.
+  intros Hjd Hjt. rewrite /delta_link.
+  rewrite (delta_link_ent_lookup_same _ _ _ _ _ Hjd).
+  exact (delta_link_tgt_lookup_same _ _ _ _ Hjt).
+Qed.
+
+(* ===================================================================== *)
 (*  5.  THE UNION                                                        *)
 (* ===================================================================== *)
 
 (* THE UNION OF THE WRITE-KIND DELTAS the AU commits fire: what an
-   application's license (FsAbsInv.fsabs_lic) is stated over. *)
+   application's license (FsAbsInv.fsabs_lic) is stated over.  Round E2
+   added the legs (section 1b, 4b); the fused forms stay for the
+   quiescent readers.  [delta_link_untgt] is [delta_unl_tgt] and needs no
+   disjunct of its own. *)
 Definition fs_delta `{XI : CurCtx} (av av' : aview) : Prop :=
   (exists d nm i c, av' = delta_create d nm i c av)
   \/ (exists i, av' = delta_trunc i av)
   \/ (exists i off bs, av' = delta_write i off bs av)
   \/ (exists d nm dec, av' = delta_unl_ent d nm dec av)
-  \/ (exists t, av' = delta_unl_tgt t av).
+  \/ (exists t, av' = delta_unl_tgt t av)
+  \/ (exists i c, av' = delta_arm i c av)
+  \/ (exists i, av' = delta_unarm i av)
+  \/ (exists i d, av' = delta_dots i d av)
+  \/ (exists d nm i, av' = delta_ent d nm i av)
+  \/ (exists t a, av' = delta_link_tgt t a av)
+  \/ (exists d nm t, av' = delta_link_ent d nm t av).
