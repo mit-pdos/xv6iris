@@ -903,9 +903,11 @@ Local Lemma exec_sail_barrier' (b : Arch.barrier) s :
   exec (sail_barrier b) s = Some (tt, s).
 Proof. reflexivity. Qed.
 
-Lemma goodmb_sail_barrier' (Dr Dw : register -> bool) (b : Arch.barrier) (s : mstate) :
-  goodmb Dr Dw (sail_barrier b : M unit) s ∅ = true.
-Proof. reflexivity. Qed.
+(* relaxed-ww: FENCE / FENCE.I / FENCE.TSO are LEAVES at U-mode -- a fence
+   with a W predecessor blocks until the hart's own stores have drained,
+   so it is not a walker step; the exec facts above stay (the functional
+   interpreter treats a barrier as a no-op) and the totality carries them
+   in a third arm ([UserClassifyAsm.u_fence_instr]). *)
 
 Lemma exec_execute_NTL (g : ntl_type) (s : mstate) :
   exec (execute (NTL g)) s = Some (RETIRE_SUCCESS, s).
@@ -924,15 +926,6 @@ Proof.
   apply exec_returnm.
 Qed.
 
-Lemma goodmb_execute_FENCE_TSO_U (Dr Dw : register -> bool) (s : mstate) :
-  goodmb Dr Dw (execute (FENCE_TSO tt)) s ∅ = true.
-Proof.
-  change (execute (FENCE_TSO tt)) with (execute_FENCE_TSO tt).
-  unfold execute_FENCE_TSO.
-  erewrite goodmb_bind0_empty;
-    [ | apply goodmb_sail_barrier' | apply (exec_sail_barrier' _ s) ].
-  apply goodmb_returnm.
-Qed.
 
 Lemma exec_execute_FENCEI_U (imm : mword 12) (i1 ird : mword 5) (s : mstate) :
   exec (execute (FENCEI (imm, Regidx i1, Regidx ird))) s
@@ -945,17 +938,6 @@ Proof.
   apply exec_returnm.
 Qed.
 
-Lemma goodmb_execute_FENCEI_U (Dr Dw : register -> bool) (imm : mword 12)
-    (i1 ird : mword 5) (s : mstate) :
-  goodmb Dr Dw (execute (FENCEI (imm, Regidx i1, Regidx ird))) s ∅ = true.
-Proof.
-  change (execute (FENCEI (imm, Regidx i1, Regidx ird)))
-    with (execute_FENCEI imm (Regidx i1) (Regidx ird)).
-  unfold execute_FENCEI.
-  erewrite goodmb_bind0_empty;
-    [ | apply goodmb_sail_barrier' | apply (exec_sail_barrier' _ s) ].
-  apply goodmb_returnm.
-Qed.
 
 Lemma exec_execute_FENCE_total_U (fm pred succ : mword 4) (i1 ird : mword 5)
     (s : mstate) :
@@ -985,39 +967,6 @@ Proof.
   apply exec_returnm.
 Qed.
 
-Lemma goodmb_execute_FENCE_total_U (Dr Dw : register -> bool)
-    (fm pred succ : mword 4) (i1 ird : mword 5) (s : mstate) :
-  Dr cur_privilege = true -> Dr menvcfg = true -> Dr senvcfg = true ->
-  register_lookup cur_privilege s.(sregs) = User ->
-  goodmb Dr Dw (execute (FENCE (fm, pred, succ, Regidx i1, Regidx ird))) s ∅ = true.
-Proof.
-  intros HDp HDm HDs Hpriv.
-  change (execute (FENCE (fm, pred, succ, Regidx i1, Regidx ird)))
-    with (execute_FENCE fm pred succ (Regidx i1) (Regidx ird)).
-  unfold execute_FENCE.
-  erewrite goodmb_bind_empty.
-  2:{ unfold is_fiom_active.
-      gm_rr cur_privilege HDp. rewrite Hpriv. cbn match.
-      gm_rr menvcfg HDm. gm_rr senvcfg HDs. apply goodmb_returnm. }
-  2:{ unfold is_fiom_active.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
-      rewrite Hpriv. cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn beta.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg senvcfg s)). cbn beta.
-      apply exec_returnm. }
-  cbn beta. cbv zeta. cbn match.
-  erewrite goodmb_bind0_empty.
-  2:{ repeat match goal with
-             | |- goodmb _ _ (if ?b then _ else _) _ _ = _ => destruct b
-             end;
-      first [ apply goodmb_sail_barrier' | apply goodmb_returnm ]. }
-  2:{ repeat match goal with
-             | |- exec (if ?b then _ else _) _ = _ => destruct b
-             | |- exec (returnM (if ?b then _ else _)) _ = _ => destruct b
-             end;
-      first [ apply (exec_sail_barrier' _ s) | apply exec_returnm ]. }
-  apply goodmb_returnm.
-Qed.
 
 (* ===================================================================== *)
 (* CONTROL FLOW: JAL / JALR / BTYPE.  All three route through [jump_to];   *)

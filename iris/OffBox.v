@@ -188,7 +188,7 @@ Section OffBox.
   (* one published box's L2 row at rest, with its llb (so the releasesleep
      fold can re-floor every row at the maximum) *)
   Definition off_l2_row γ (s : l2_reg nat) (ξ : CtxId) : iProp Σ :=
-    (CtxBox.l2_row (X := unit) γ s ξ ∗ llb loglen_name (lr_tp s))%I.
+    (CtxBox.l2_row (X := unit) γ s ξ ∗ llb dlen_name (lr_tp s))%I.
 
   (* what rides in inode slot i's sleeplock payload (a conjunct of ic_slp):
      the set authority and every member box's row *)
@@ -259,7 +259,7 @@ Section OffBox.
   Lemma off_rows_insert_row on i γ (T' : nat) (ξ : CtxId) :
     off_rows on i ξ -∗
     CtxBox.slotp_half (X := unit) γ (L2Reg T' None) -∗
-    llb loglen_name T' ==∗
+    llb dlen_name T' ==∗
     (ctx_floor ξ T' -∗ off_rows on i ξ) ∗ off_member on i γ.
   Proof.
     rewrite /off_rows /off_member /off_set_auth.
@@ -299,9 +299,9 @@ Section OffBox.
      [TsoCtx.ctx_floor_le]). *)
   Definition off_rows_dep on i (T : nat) : iProp Σ :=
     (∃ L : gset box_names,
-       off_set_auth on i L ∗ llb loglen_name T ∗
+       off_set_auth on i L ∗ llb dlen_name T ∗
        [∗ set] γ ∈ L, ∃ s : l2_reg nat,
-         off_regp γ s ∗ ⌜lr_hold s = None⌝ ∗ llb loglen_name (lr_tp s) ∗
+         off_regp γ s ∗ ⌜lr_hold s = None⌝ ∗ llb dlen_name (lr_tp s) ∗
          ⌜(lr_tp s ≤ T)%nat⌝)%I.
   Lemma off_rows_fold on i (T : nat) (ξ : CtxId) :
     off_rows_dep on i T ∗ ctx_floor ξ T ⊢ off_rows on i ξ.
@@ -319,9 +319,9 @@ Section OffBox.
      ([llb_max]) and every row's [lr_tp] stays under it *)
   Lemma off_rows_bound (L : gset box_names) (ξ : CtxId) :
     ([∗ set] γ ∈ L, ∃ s : l2_reg nat, off_l2_row γ s ξ) -∗
-    ∃ T : nat, llb loglen_name T ∗
+    ∃ T : nat, llb dlen_name T ∗
       [∗ set] γ ∈ L, ∃ s : l2_reg nat,
-        off_regp γ s ∗ ⌜lr_hold s = None⌝ ∗ llb loglen_name (lr_tp s) ∗
+        off_regp γ s ∗ ⌜lr_hold s = None⌝ ∗ llb dlen_name (lr_tp s) ∗
         ⌜(lr_tp s ≤ T)%nat⌝.
   Proof.
     rewrite /off_l2_row /CtxBox.l2_row /off_regp.
@@ -349,9 +349,9 @@ Section OffBox.
      needed, which is the point: after a park the parker has none. *)
   Definition off_rows_dep_but on i (γ : box_names) (T : nat) : iProp Σ :=
     (∃ L : gset box_names,
-       ⌜γ ∈ L⌝ ∗ off_set_auth on i L ∗ llb loglen_name T ∗
+       ⌜γ ∈ L⌝ ∗ off_set_auth on i L ∗ llb dlen_name T ∗
        [∗ set] γ' ∈ L ∖ {[ γ ]}, ∃ s : l2_reg nat,
-         off_regp γ' s ∗ ⌜lr_hold s = None⌝ ∗ llb loglen_name (lr_tp s) ∗
+         off_regp γ' s ∗ ⌜lr_hold s = None⌝ ∗ llb dlen_name (lr_tp s) ∗
          ⌜(lr_tp s ≤ T)%nat⌝)%I.
 
   Lemma off_rows_take_dep on i γ (ξ : CtxId) :
@@ -372,7 +372,7 @@ Section OffBox.
 
   Lemma off_rows_dep_insert on i γ (T : nat) (s' : l2_reg nat) :
     lr_hold s' = None ->
-    off_rows_dep_but on i γ T -∗ off_regp γ s' -∗ llb loglen_name (lr_tp s') -∗
+    off_rows_dep_but on i γ T -∗ off_regp γ s' -∗ llb dlen_name (lr_tp s') -∗
     off_rows_dep on i (Nat.max T (lr_tp s')).
   Proof.
     iIntros (Hh) "(%L & %HγL & Hauth & #HllbT & Hset) Hrp #Hllbs".
@@ -429,18 +429,21 @@ Section OffBox.
      row is inserted into inode [i]'s set.  What comes out is exactly
      [FileInvDefs.off_fd]'s pieces at [q = 1]: the two register halves, the
      share, membership, the handle. *)
-  Lemma off_publish_park `{CID : RiscvLang.CpuId} on i k γ (γo : gname) (ξ : CtxId) (E : coPset) :
+  (* relaxed-ww: the deposit is FENCE-BOUND (the release hook runs it) *)
+  Lemma off_publish_park `{CID : RiscvLang.CpuId} on i k γ (γo : gname) (g : RiscvLang.gstate) (ξ : CtxId) (E : coPset) :
     ↑(offBoxN .@ k) ⊆ E ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     CtxBox.stamps_auth (X := unit) γ ∅ -∗
     ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γ) 1 0%nat -∗
     ghost_var (bx_slotd γ) 1 (inhabitant : slot_reg nat unit) -∗
     ghost_var (bx_slotp γ) 1 (inhabitant : l2_reg nat) -∗
+    tso_interp_at riscv_eraGS g -∗
     own_context ξ -∗
     off_resident (XI := ξ) γo k -∗
     off_rows on i ξ ={E}=∗
-    own_context ξ ∗ off_box k γ γo ∗
+    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗ off_box k γ γo ∗
     ∃ (T0 T : nat),
-      off_regd γ (SlotReg T0 false k None) ∗ llb loglen_name T0 ∗
+      off_regd γ (SlotReg T0 false k None) ∗ llb dlen_name T0 ∗
       off_cnt γ 1 ∗
       CtxBox.reference (X := unit) γ k {[ (k, T) := 1%Qp ]} ∗
       off_member on i γ ∗
@@ -449,19 +452,19 @@ Section OffBox.
             off_rows_insert_row at [L2Reg 0 None] -- whose floor the lemma
             discharges itself with [ctx_floor_0], so what comes out is the
             next link's premise (item 31 (a)) *)
-    intros HE.
+    intros HE Hod.
     rewrite /off_box /off_regd /off_cnt /off_regp.
-    iIntros "Hst Hc Hd Hp Hrun Hcell Hrows".
+    iIntros "Hst Hc Hd Hp Hint Hrun Hcell Hrows".
     iMod (CtxBox.box_alloc_at (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ ξ k E with "Hst Hc Hd Hp Hrun [Hcell]")
-      as "(Hrun & %Tb & #Hbx & Hrd & #Hllb & Hcnt & Hrp)".
+            (offBoxN .@ k) γ g ξ k E Hod with "Hst Hc Hd Hp Hint Hrun [Hcell]")
+      as "(Hint & Hrun & %Tb & #Hbx & Hrd & #Hllb & Hcnt & Hrp)".
     { iExists tt. rewrite /off_rest. iSplitL; [iExact "Hcell"|done]. }
     iMod (CtxBox.box_ref_incr (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
             (offBoxN .@ k) γ (SlotReg Tb false k None) 0 E HE eq_refl
             with "Hbx Hrd Hcnt") as "(Hrd & Hcnt & %T & Href)".
     iMod (off_rows_insert_row on i γ 0 ξ with "Hrows Hrp []") as "[Hfold #Hmem]".
     { iApply llb_0. }
-    iModIntro. iFrame "Hrun Hbx". iExists Tb, T.
+    iModIntro. iFrame "Hint Hrun Hbx". iExists Tb, T.
     iFrame "Hrd Hllb Hcnt Href Hmem".
     iApply "Hfold". iApply TsoCtx.ctx_floor_0.
   Qed.
@@ -489,26 +492,28 @@ Section OffBox.
     iModIntro. iFrame "Hrun Hhold". iExact "Hcell".
   Qed.
 
-  Lemma off_read_park `{CID : RiscvLang.CpuId} k γ (γo : gname) (ξ : CtxId)
+  (* relaxed-ww: the park is FENCE-BOUND (the release hook runs it) *)
+  Lemma off_read_park `{CID : RiscvLang.CpuId} k γ (γo : gname) (g : RiscvLang.gstate) (ξ : CtxId)
       (m : gmap (nat * nat) ufrac) (E : coPset) :
     ↑(offBoxN .@ k) ⊆ E ->
-    off_box k γ γo -∗ own_context ξ -∗
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
+    off_box k γ γo -∗ tso_interp_at riscv_eraGS g -∗ own_context ξ -∗
     off_resident (XI := ξ) γo k -∗
     CtxBox.l2_hold (X := unit) γ k m ={E}=∗
-    own_context ξ ∗
+    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗
     ∃ (T' : nat) (q : ufrac),
       ⌜Qp_to_Qc q = qsum m⌝ ∗
       off_regp γ (L2Reg T' None) ∗
       CtxBox.reference (X := unit) γ k {[ (k, T') := q ]} ∗
-      llb loglen_name T'.
+      llb dlen_name T'.
   Proof. (* box_park at Q := emp *)
-    intros HE. rewrite /off_box /off_regp.
-    iIntros "#Hbox Hrun Hcell Hhold".
+    intros HE Hod. rewrite /off_box /off_regp.
+    iIntros "#Hbox Hint Hrun Hcell Hhold".
     iMod (CtxBox.box_park (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ ξ k m E HE with "Hbox Hrun [Hcell] Hhold")
-      as "(Hrun & _ & %T' & %q & %Hq & Hrp & Href & #Hllb)".
+            (offBoxN .@ k) γ g ξ k m E HE Hod with "Hbox Hint Hrun [Hcell] Hhold")
+      as "(Hint & Hrun & _ & %T' & %q & %Hq & Hrp & Href & #Hllb)".
     { iExists tt. rewrite /off_rest. iSplitL; [iExact "Hcell"|done]. }
-    iModIntro. iFrame "Hrun". iExists T', q.
+    iModIntro. iFrame "Hint Hrun". iExists T', q.
     iSplitR; [iPureIntro; exact Hq|].
     iFrame "Hrp Href Hllb".
   Qed.
@@ -546,7 +551,9 @@ Section OffBox.
     off_cnt γ 1 -∗
     CtxBox.reference (X := unit) γ k m ={E}=∗
     off_cnt γ 1 ∗
-    ([∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn 1)).
+    (* relaxed-ww: the free tier is ξ-indexed -- the bytes come out at the
+       box's own (parked) context *)
+    (∃ ξb : CtxId, [∗ list] j ∈ seq 0 4, TsoCtx.mem_free ξb (pa_add (a_foff k) j) (DfracOwn 1)).
   Proof. (* [box_withdraw_L1_free] at [Qc := emp], [Q1 1 = emp]; the hook is
             the plain entailment [off_resident (XI := ξb) k ⊢ the four free
             bytes] -- one [ctx_pointsto_free] per byte, at the box's own
@@ -561,18 +568,18 @@ Section OffBox.
     assert (Hhook : ∀ (x : unit) (ξb : CtxId),
               emp ∗ off_hdr γo k x ξb
               ={E ∖ ↑(offBoxN .@ k)}=∗
-              ([∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn 1))
+              (∃ ξb : CtxId, [∗ list] j ∈ seq 0 4, TsoCtx.mem_free ξb (pa_add (a_foff k) j) (DfracOwn 1))
               ∗ emp).
     { intros x ξb. rewrite /off_hdr /off_resident.
       iIntros "[_ (%v & Hw & _ & _)]".
       rewrite TsoCtx.ctx_word4_pointsto_unfold.
       iDestruct "Hw" as "[_ Hbytes]".
-      iModIntro. iSplitL; [| done].
+      iModIntro. iSplitL; [| done]. iExists ξb.
       iApply (big_sepL_impl with "Hbytes").
       iIntros "!#" (j y Hy) "Hb". iApply (TsoCtx.ctx_pointsto_free with "Hb"). }
     iMod (CtxBox.box_withdraw_L1_free (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
             (offBoxN .@ k) γ (SlotReg T0 false k None) 1 m emp%I
-            ([∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn 1))%I
+            (∃ ξb : CtxId, [∗ list] j ∈ seq 0 4, TsoCtx.mem_free ξb (pa_add (a_foff k) j) (DfracOwn 1))%I
             E HE eq_refl Hq1 Hhook
             with "Hbox Hrd Hcnt HfD HllbD []") as "(Hcnt & Hfree & _)".
     { done. }

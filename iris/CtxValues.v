@@ -514,4 +514,28 @@ Section CtxValues.
   Qed.
 
 
+  (* THE SLOT AT THE DRAIN FLAT (relaxed-ww): what the A/D write-back's
+     exclusive re-read sees.  The reader has no own store to the slot
+     pending (the exclusive read's same-address guard), so its own anchors
+     have drained; every anchor is then drained under the reader's view
+     ([cv_anchor_read]'s three arms), the floor's chain puts every earlier
+     write below it, and the pin's gates keep every later write in the
+     family -- so the drain flat's byte is in the family.
+     relaxed-ww STAGE E: the two-log pin theory; tracked in
+     claude-notes/projects/relaxed-ww.md. *)
+  Lemma cv_slot_dmem_ok `{CID : CpuId} (g : gstate) (a : Arch.pa)
+      (dq : dfrac) (f : nat -> bv 8) (n : nat) (B : nat)
+      (Sf : nat -> TsoMemPa.byteset) :
+    ~ own_fp_pending (hart_agent cpu_id) g.(glog) g.(gdlog) a (N.of_nat n) ->
+    tso_interp_at riscv_eraGS g -∗
+    cv_boot_cred B -∗
+    ([∗ list] j ∈ seq 0 n, ∃ (Ba t : nat), ⌜(Ba <= B)%nat⌝ ∗
+       phys_ledger_pin (pa_add a j) dq (f j) t Ba (Sf j) ∗
+       chain_ev chain_name Ba ∗ kpt_anchor (pa_add a j) Ba) -∗
+    ⌜forall j : nat, (j < n)%nat ->
+       exists b, TsoMemPa.dmem g.(gimg) g.(glog) g.(gdlog) !! pa_add a j = Some b
+                 /\ b ∈ Sf j⌝.
+  Proof.
+  Admitted.
+
 End CtxValues.

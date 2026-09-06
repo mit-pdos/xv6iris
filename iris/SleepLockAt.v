@@ -46,78 +46,90 @@ Section SleepLockAt.
   (* ENDGAME R1-pre: the bound-indexed base builder -- the client payload
      at bound 0 seals the free arm under the free floor. *)
   Lemma new_sleeplock_genl_at2 `{XI : CurCtx} `{CID : RiscvLang.CpuId}
-      E (p : gname * gname) (slk : mword 64)
+      E (g : RiscvLang.gstate) (p : gname * gname) (slk : mword 64)
       (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : Qp -> iProp Σ) :
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     sl_free_pair p -∗
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
+    tso_interp_at riscv_eraGS g -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready (sl_lk slk) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
     own_context cur_ctx -∗
-    R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_sleeplock_genl p.1 p.2 slk s R H.
+    R cur_ctx ={E}=∗ tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+    is_sleeplock_genl p.1 p.2 slk s R H.
   Proof.
-    iIntros "[Hlfree Hfree] #Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
+    iIntros (Hod) "[Hlfree Hfree] #Hlnm #Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR".
     iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
-    iMod (newlock_at E p.1 (sl_lk slk) "sleep lock"%string (sl_pay p.2 slk R H)
-            with "Hlfree Hlnm Hrun Hlkw Hcpu [Hw Htok Hha HR]") as "[Hrun #Hlk]".
+    iMod (newlock_at E g p.1 (sl_lk slk) "sleep lock"%string (sl_pay p.2 slk R H) Hod
+            with "Hlfree Hlnm Hint Hrun Hlkw Hcpu [Hw Htok Hha HR]") as "(Hint & Hrun & #Hlk)".
     { iApply (sl_pay_of_res p.2 slk R H).
       iApply (sl_res_close_free with "Hw Htok Hha HR"). }
-    iModIntro. iFrame "Hrun".
+    iModIntro. iFrame "Hint Hrun".
     iApply (is_sleeplock_genl_intro with "Hsnm Hlk").
   Qed.
 
   Lemma new_sleeplock_gen_at2 `{XI : CurCtx} `{CID : RiscvLang.CpuId}
-      E (p : gname * gname) (slk : mword 64)
+      E (g : RiscvLang.gstate) (p : gname * gname) (slk : mword 64)
       (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) :
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     sl_free_pair p -∗
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
+    tso_interp_at riscv_eraGS g -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready (sl_lk slk) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
     own_context cur_ctx -∗
-    R ={E}=∗ own_context cur_ctx ∗ is_sleeplock_gen p.1 p.2 slk s R H.
+    R ={E}=∗ tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+    is_sleeplock_gen p.1 p.2 slk s R H.
   Proof.
-    iIntros "Hp #Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
-    iApply (new_sleeplock_genl_at2 E p slk s (fun _ => R) H
-              with "Hp Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
+    iIntros (Hod) "Hp #Hlnm #Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR".
+    iApply (new_sleeplock_genl_at2 E g p slk s (fun _ => R) H Hod
+              with "Hp Hlnm Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
   Lemma sl_fresh_new_genl_at2 `{XI : CurCtx} `{CID : RiscvLang.CpuId}
-      E (p : gname * gname) (slk : mword 64)
+      E (g : RiscvLang.gstate) (p : gname * gname) (slk : mword 64)
       (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : Qp -> iProp Σ) :
-    sl_free_pair p -∗ sl_fresh slk s -∗ own_context cur_ctx -∗ R cur_ctx ={E}=∗
-    own_context cur_ctx ∗ is_sleeplock_genl p.1 p.2 slk s R H.
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
+    sl_free_pair p -∗ sl_fresh slk s -∗ tso_interp_at riscv_eraGS g -∗
+    own_context cur_ctx -∗ R cur_ctx ={E}=∗
+    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ is_sleeplock_genl p.1 p.2 slk s R H.
   Proof.
-    iIntros "Hp (Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
-    iApply (new_sleeplock_genl_at2 E p slk s R H
-              with "Hp Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
+    iIntros (Hod) "Hp (Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hint Hrun HR".
+    iApply (new_sleeplock_genl_at2 E g p slk s R H Hod
+              with "Hp Hlnm Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
   (* the two forms an array initializer uses: initsleeplock's packaged output
      ([sl_fresh]) against a pre-minted pair. *)
   Lemma sl_fresh_new_gen_at2 `{XI : CurCtx} `{CID : RiscvLang.CpuId}
-      E (p : gname * gname) (slk : mword 64)
+      E (g : RiscvLang.gstate) (p : gname * gname) (slk : mword 64)
       (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) :
-    sl_free_pair p -∗ sl_fresh slk s -∗ own_context cur_ctx -∗ R ={E}=∗
-    own_context cur_ctx ∗ is_sleeplock_gen p.1 p.2 slk s R H.
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
+    sl_free_pair p -∗ sl_fresh slk s -∗ tso_interp_at riscv_eraGS g -∗
+    own_context cur_ctx -∗ R ={E}=∗
+    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ is_sleeplock_gen p.1 p.2 slk s R H.
   Proof.
-    iIntros "Hp (Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
-    iApply (new_sleeplock_gen_at2 E p slk s R H
-              with "Hp Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
+    iIntros (Hod) "Hp (Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hint Hrun HR".
+    iApply (new_sleeplock_gen_at2 E g p slk s R H Hod
+              with "Hp Hlnm Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
   Lemma sl_fresh_new_at2 `{XI : CurCtx} `{CID : RiscvLang.CpuId}
-      E (p : gname * gname) (slk : mword 64)
+      E (g : RiscvLang.gstate) (p : gname * gname) (slk : mword 64)
       (s : string) (R : iProp Σ) :
-    sl_free_pair p -∗ sl_fresh slk s -∗ own_context cur_ctx -∗ R ={E}=∗
-    own_context cur_ctx ∗ is_sleeplock p.1 p.2 slk s R.
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
+    sl_free_pair p -∗ sl_fresh slk s -∗ tso_interp_at riscv_eraGS g -∗
+    own_context cur_ctx -∗ R ={E}=∗
+    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ is_sleeplock p.1 p.2 slk s R.
   Proof.
-    iIntros "Hp Hf Hrun HR".
-    iApply (sl_fresh_new_gen_at2 E p slk s R sl_untracked with "Hp Hf Hrun HR").
+    iIntros (Hod) "Hp Hf Hint Hrun HR".
+    iApply (sl_fresh_new_gen_at2 E g p slk s R sl_untracked Hod with "Hp Hf Hint Hrun HR").
   Qed.
 
 End SleepLockAt.

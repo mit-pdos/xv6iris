@@ -1075,26 +1075,29 @@ Section BioBox.
 
   (* (b) at c = 0: the header comes back at the NEW identity; the chain's
      reference is minted at the deposit stamp *)
+  (* relaxed-ww: the deposit is FENCE-BOUND (the release hook runs it) *)
   Lemma bbox_deposit_L1 `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ)
-      (k : nat) (ξ : CtxId) (Td : nat) (i0 : bio_id) (x0 : bio_x) (T0 : nat)
+      (k : nat) (g : RiscvLang.gstate) (ξ : CtxId) (Td : nat) (i0 : bio_id) (x0 : bio_x) (T0 : nat)
       (dev bno : mword 32) (E : coPset) :
     ↑bioxN ⊆ E ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     buf_box bn V k -∗
+    tso_interp_at riscv_eraGS g -∗
     TsoCtx.own_context ξ -∗
     reg_drop bn k (SlotReg Td true i0 (Some (x0, T0))) -∗
     reg_cnt bn k 0 -∗
     bhdr bn V k (dev, bno) x0 ξ ={E}=∗
-    TsoCtx.own_context ξ ∗
+    tso_interp_at riscv_eraGS g ∗ TsoCtx.own_context ξ ∗
     ∃ T' : nat, reg_drop bn k (SlotReg T' false (dev, bno) None) ∗ reg_cnt bn k 1 ∗
-                bref_ghost bn k dev bno ∗ llb loglen_name T'.
+                bref_ghost bn k dev bno ∗ llb dlen_name T'.
   Proof.
-    iIntros (HE) "#Hbox Hrun Hrd Hc Hhdr".
+    iIntros (HE Hod) "#Hbox Hint Hrun Hrd Hc Hhdr".
     assert (HEk : ↑(bioxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
     iMod (CtxBox.box_deposit_L1 (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I
-            (bioxN .@ k) (bn_box bn k) ξ
-            (SlotReg Td true i0 (Some (x0, T0))) 0 (dev, bno) x0 T0 E HEk eq_refl eq_refl
-            with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & _ & %T' & Hrd & Hc & Href & #Hllb)".
-    iModIntro. iFrame "Hrun". iExists T'. iFrame "Hrd Hllb".
+            (bioxN .@ k) (bn_box bn k) g ξ
+            (SlotReg Td true i0 (Some (x0, T0))) 0 (dev, bno) x0 T0 E HEk eq_refl eq_refl Hod
+            with "Hbox Hint Hrun Hrd Hc Hhdr") as "(Hint & Hrun & _ & %T' & Hrd & Hc & Href & #Hllb)".
+    iModIntro. iFrame "Hint Hrun". iExists T'. iFrame "Hrd Hllb".
     iSplitL "Hc"; [iExact "Hc"|].
     rewrite /bref_ghost. iExists T'.
     assert (unit_mass 0 = 1%Qp) as -> by reflexivity. iExact "Href".
@@ -1127,12 +1130,12 @@ Section BioBox.
     sr_win r = false ->
     buf_box bn V k -∗
     reg_drop bn k r -∗
-    llb loglen_name (sr_td r) -∗
+    llb dlen_name (sr_td r) -∗
     reg_cnt bn k (S c) -∗
     bref_ghost bn k dev bno ={E}=∗
     ∃ td' : nat, ⌜(sr_td r <= td')%nat⌝ ∗
       reg_drop bn k (SlotReg td' false (sr_ident r) (sr_x r)) ∗ reg_cnt bn k c ∗
-      llb loglen_name td'.
+      llb dlen_name td'.
   Proof.
     iIntros (HE Hw) "#Hbox Hrd #Hllb Hc Href". iDestruct "Href" as (t) "Href".
     assert (HEk : ↑(bioxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
@@ -1178,25 +1181,28 @@ Section BioBox.
 
   (* (f) the park: the bundle at the handle's identity and the handle's
      register half naming the parked unit; the unit moves to the park stamp *)
+  (* relaxed-ww: the park is FENCE-BOUND (the release hook runs it) *)
   Lemma bbox_park `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ)
-      (k : nat) (ξ : CtxId) (dev bno : mword 32) (t : nat) (E : coPset) :
+      (k : nat) (g : RiscvLang.gstate) (ξ : CtxId) (dev bno : mword 32) (t : nat) (E : coPset) :
     ↑bioxN ⊆ E ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     buf_box bn V k -∗
+    tso_interp_at riscv_eraGS g -∗
     TsoCtx.own_context ξ -∗
     buf_bundle_at bn V k ξ dev bno -∗
     CtxBox.l2_hold (X := bio_x) (bn_box bn k) (dev, bno) {[((dev, bno), t) := 1%Qp]} ={E}=∗
-    TsoCtx.own_context ξ ∗
-    ∃ T' : nat, reg_park bn k (L2Reg T' None) ∗ bref_ghost bn k dev bno ∗ llb loglen_name T'.
+    tso_interp_at riscv_eraGS g ∗ TsoCtx.own_context ξ ∗
+    ∃ T' : nat, reg_park bn k (L2Reg T' None) ∗ bref_ghost bn k dev bno ∗ llb dlen_name T'.
   Proof.
-    iIntros (HE) "#Hbox Hrun Hbun Hhold".
+    iIntros (HE Hod) "#Hbox Hint Hrun Hbun Hhold".
     assert (HEk : ↑(bioxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
     iMod (CtxBox.box_park (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I
-            (bioxN .@ k) (bn_box bn k) ξ (dev, bno)
-            {[((dev, bno), t) := 1%Qp]} E HEk
-            with "Hbox Hrun Hbun Hhold") as "(Hrun & _ & %T' & %q & %Hq & Hrp & Href & #Hllb)".
+            (bioxN .@ k) (bn_box bn k) g ξ (dev, bno)
+            {[((dev, bno), t) := 1%Qp]} E HEk Hod
+            with "Hbox Hint Hrun Hbun Hhold") as "(Hint & Hrun & _ & %T' & %q & %Hq & Hrp & Href & #Hllb)".
     assert (q = 1%Qp) as ->.
     { apply Qp.to_Qc_inj_iff. rewrite Hq /qsum map_fold_singleton /qsum_step. by rewrite Qcplus_0_r. }
-    iModIntro. iFrame "Hrun". iExists T'. iFrame "Hrp Hllb".
+    iModIntro. iFrame "Hint Hrun". iExists T'. iFrame "Hrp Hllb".
     rewrite /bref_ghost. iExists T'. iExact "Href".
   Qed.
 
@@ -1210,7 +1216,7 @@ Section BioBox.
   Definition bslot_regs (bn : bio_names) (k : nat) (tl : nat) (dev bno : mword 32) : iProp Σ :=
     (∃ r : slot_reg bio_id bio_x,
        reg_drop bn k r ∗ ⌜sr_win r = false⌝ ∗ ⌜sr_x r = None⌝ ∗ ⌜sr_ident r = (dev, bno)⌝ ∗
-       llb loglen_name (sr_td r) ∗ ⌜(sr_td r ≤ tl)%nat⌝)%I.
+       llb dlen_name (sr_td r) ∗ ⌜(sr_td r ≤ tl)%nat⌝)%I.
 
   (* the L1 slot's tie on the bcache half (A6.155): [None] -- no fractioned
      reference outstanding, the slot keeps the whole half (the other half
@@ -1270,11 +1276,11 @@ Section BioBox.
   Definition bcache_res2 (bn : bio_names) (V : bio_view Σ) (ξ : CtxId) : iProp Σ :=
     (∃ (M : gmap nat (option Qp * positive)) (ord : list nat)
        (devs bnos : nat -> mword 32) (tl : nat),
-       TsoCtx.ctx_floor ξ tl ∗ llb loglen_name tl ∗
+       TsoCtx.ctx_floor ξ tl ∗ llb dlen_name tl ∗
        bcache_scan2 bn V M ord devs bnos tl ξ)%I.
 
   Lemma bcache_res2_fold bn V M ord devs bnos tl (ξ : CtxId) :
-    bcache_scan2 bn V M ord devs bnos tl ξ ∗ TsoCtx.ctx_floor ξ tl ∗ llb loglen_name tl
+    bcache_scan2 bn V M ord devs bnos tl ξ ∗ TsoCtx.ctx_floor ξ tl ∗ llb dlen_name tl
     ⊢ bcache_res2 bn V ξ.
   Proof. iIntros "(Hb & #Hfl & #Hllb)". iExists M, ord, devs, bnos, tl. iFrame "Hfl Hllb Hb". Qed.
 
@@ -1282,7 +1288,7 @@ Section BioBox.
      [lock_hook_llb] mints the floor) *)
   Lemma bcache_res2_fold_in bn V M ord devs bnos tl :
     forall ξ : CtxId,
-      (llb loglen_name tl ∗ bcache_scan2 bn V M ord devs bnos tl ξ) ∗ TsoCtx.ctx_floor ξ tl
+      (llb dlen_name tl ∗ bcache_scan2 bn V M ord devs bnos tl ξ) ∗ TsoCtx.ctx_floor ξ tl
       ⊢ bcache_res2 bn V ξ.
   Proof.
     intros ξ. iIntros "[[#Hl Hs] #Hf]". iApply bcache_res2_fold. iFrame "Hs Hf Hl".
@@ -1374,7 +1380,7 @@ Section BioBox.
     apply ctx_morph_sep; [apply ctx_morph_const | apply bcache_scan2_morph].
   Qed.
   Global Instance bcache_scan2_llb_morph bn V M ord devs bnos tl :
-    CtxMorph (fun ξ => llb loglen_name tl ∗ bcache_scan2 bn V M ord devs bnos tl ξ)%I.
+    CtxMorph (fun ξ => llb dlen_name tl ∗ bcache_scan2 bn V M ord devs bnos tl ξ)%I.
   Proof. apply ctx_morph_sep; [apply ctx_morph_const | apply bcache_scan2_morph]. Qed.
 
   (* ---- the sleeplock's client payload (endgame §3.2 / R1-pre): ξ-free,
@@ -1420,7 +1426,7 @@ Section BioBox.
   Lemma bcache_res2_to_scan (bn : bio_names) (V : bio_view Σ) :
     bcache_res2 bn V cur_ctx -∗
     ∃ M ord devs bnos tl,
-      TsoCtx.ctx_floor cur_ctx tl ∗ llb loglen_name tl ∗
+      TsoCtx.ctx_floor cur_ctx tl ∗ llb dlen_name tl ∗
       bcache_scan2 bn V M ord devs bnos tl cur_ctx.
   Proof. rewrite /bcache_res2. iIntros "H". iExact "H". Qed.
 
@@ -1566,8 +1572,11 @@ Section BioBox.
      {| 0; None |}, slot_d = {| T_boot; false; (0,0); None |}.  The caller
      floors L1 at the maximum of the boot stamps through the lock's llb
      mint. *)
-  Lemma buf_box_alloc `{CID : RiscvLang.CpuId} (E : coPset) (bn : bio_names)
+  (* relaxed-ww: the boot deposit is FENCE-BOUND like every deposit *)
+  Lemma buf_box_alloc `{CID : RiscvLang.CpuId} (E : coPset) (g : RiscvLang.gstate) (bn : bio_names)
       (V : bio_view Σ) (k : nat) :
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
+    tso_interp_at riscv_eraGS g -∗
     own_context cur_ctx -∗
     bstm_auth bn k ∅ -∗
     reg_cnt bn k 0 -∗
@@ -1580,12 +1589,12 @@ Section BioBox.
     (∃ bs : list (bv 8), ⌜length bs = 1024%nat⌝ ∗
        ([∗ list] j ↦ byte ∈ bs, pa_add (b_data (bpa k)) j ↦ₘ byte) ∗
        buf_pay bn V k false (mword_of_int 0 : mword 32) (mword_of_int 0 : mword 32) bs) ={E}=∗
-    own_context cur_ctx ∗ buf_box bn V k ∗
+    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ buf_box bn V k ∗
     ∃ Td : nat,
       reg_drop bn k (SlotReg Td false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None) ∗
-      llb loglen_name Td.
+      llb dlen_name Td.
   Proof.
-    iIntros "Hrun Hst Hc Hrp Hrd Hv Hdev Hbno Hdk Hdata".
+    iIntros (Hod) "Hint Hrun Hst Hc Hrp Hrd Hv Hdev Hbno Hdk Hdata".
     iDestruct "Hdata" as (bs) "(%Hlen & Hdata & Hpay)".
     iAssert (buf_bundle_at bn V k cur_ctx (mword_of_int 0 : mword 32) (mword_of_int 0 : mword 32))
       with "[Hv Hdev Hbno Hpay Hdk Hdata]" as "Hbun".
@@ -1594,16 +1603,21 @@ Section BioBox.
       { iExists false. cbn [fst snd]. cbv iota. iFrame "Hv Hdev Hbno Hpay". }
       iFrame "Hdk Hdata". done. }
     iMod (CtxBox.box_alloc_at_halves (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I
-            (bioxN .@ k) (bn_box bn k) cur_ctx
-            (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) E
-            with "Hrun Hst Hc [Hrd] Hrp Hbun") as "(Hrun & %Tb & #Hbx & Hrd & #Hllb)".
+            (bioxN .@ k) (bn_box bn k) g cur_ctx
+            (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) E Hod
+            with "Hint Hrun Hst Hc [Hrd] Hrp Hbun") as "(Hint & Hrun & %Tb & #Hbx & Hrd & #Hllb)".
     { rewrite /bn_box /=. iExact "Hrd". }
-    iModIntro. iFrame "Hrun". iSplitR; [iExact "Hbx"|]. iExists Tb. iFrame "Hrd Hllb".
+    iModIntro. iFrame "Hint Hrun". iSplitR; [iExact "Hbx"|]. iExists Tb. iFrame "Hrd Hllb".
   Qed.
 
-  Lemma bio_init `{CID : RiscvLang.CpuId} (V : bio_view Σ) E :
+  (* relaxed-ww: the whole boot is FENCE-BOUND -- the lock births and the
+     deposits run at a release fence, so the interp and [own_drained] ride
+     through the two folds *)
+  Lemma bio_init `{CID : RiscvLang.CpuId} (V : bio_view Σ) E (g : RiscvLang.gstate) :
     (0 ∉ bv_cov V) ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     own_context cur_ctx -∗
+    tso_interp_at riscv_eraGS g -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
     WpLock.lk_cpu_ready bcache_addr -∗
@@ -1619,10 +1633,10 @@ Section BioBox.
     bcache_lru bhead (blist 0 NBUF) -∗
     ([∗ set] b ∈ bv_cov V, pool_blk V b) -∗
     bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
-    own_context cur_ctx ∗
+    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
     ∃ bn : bio_names, bio_ctx bn V ∗ bslots BSLOTS_FS.
   Proof.
-    iIntros (Hnc0) "Hrun Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf".
+    iIntros (Hnc0 Hod) "Hrun Hint Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)
       by (vm_compute; reflexivity).
     iMod (tok_fun_alloc NBUF 0) as (fown) "Htoks".
@@ -1673,27 +1687,27 @@ Section BioBox.
     iDestruct (big_sepL_sep_2 with "Hfresh Htoks") as "Hsl".
     iDestruct (big_sepL_sep_2 with "Hsl Hregp1") as "Hsl".
     iAssert ([∗ list] idx↦k ∈ seq 0 NBUF,
-               own_context cur_ctx -∗
+               (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx) -∗
                ((sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
                  lock_tok_excl (fown k)) ∗
                 ghost_var (fregp k) (1/2) (L2Reg 0 None : l2_reg bio_id))
-               ={E}=∗ own_context cur_ctx ∗
+               ={E}=∗ (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx) ∗
                (∃ p : gname * gname,
                   is_sleeplock_genl (fst p) (snd p) (buf_lock (bnode k))
                     "buffer"%string
                     (bslp_raw (fown k) (fregp k))
                     sl_untracked))%I
       as "Hstep".
-    { iApply big_sepL_intro. iIntros "!>" (idx k Hk) "Hrun [[Hf Ht] Hrp]".
-      iMod (sl_fresh_new_genl E (buf_lock (bnode k)) "buffer"%string
+    { iApply big_sepL_intro. iIntros "!>" (idx k Hk) "[Hint Hrun] [[Hf Ht] Hrp]".
+      iMod (sl_fresh_new_genl E g (buf_lock (bnode k)) "buffer"%string
               (bslp_raw (fown k) (fregp k))
-              (fun _ => sl_untracked) with "Hf Hrun [Ht Hrp]") as "[Hrun Hlk]".
+              (fun _ => sl_untracked) Hod with "Hf Hint Hrun [Ht Hrp]") as "(Hint & Hrun & Hlk)".
       { rewrite /bslp_raw. iFrame "Ht". iExists (L2Reg 0 None). iFrame "Hrp".
         iSplitR; [done|]. simpl. iApply TsoCtx.ctx_floor_0. }
       iDestruct "Hlk" as (γl γsl) "[Hlk _]".
-      iModIntro. iFrame "Hrun". iExists (γl, γsl). iExact "Hlk". }
-    iMod (big_sepL_fupd_thread E (own_context cur_ctx)
-            with "Hrun Hstep Hsl") as "[Hrun Hsl]".
+      iModIntro. iFrame "Hint Hrun". iExists (γl, γsl). iExact "Hlk". }
+    iMod (big_sepL_fupd_thread E (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx)
+            with "[$Hint $Hrun] Hstep Hsl") as "[[Hint Hrun] Hsl]".
     iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ p : gname * gname,
                is_sleeplock_genl (fst p) (snd p) (buf_lock (bnode k))
                  "buffer"%string
@@ -1725,10 +1739,10 @@ Section BioBox.
     iDestruct (big_sepL_sep_2 with "Hregc2 Hbufs") as "Hslr".
     iDestruct (big_sepL_sep_2 with "Hap Hslr") as "Hall".
     iAssert ([∗ list] i↦k ∈ seq 0 NBUF,
-               own_context cur_ctx -∗ emp ={E}=∗
-               own_context cur_ctx ∗
+               (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx) -∗ emp ={E}=∗
+               (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx) ∗
                (buf_box bn V k ∗
-                ∃ Td : nat, llb loglen_name Td ∗
+                ∃ Td : nat, llb dlen_name Td ∗
                   (reg_drop bn k (SlotReg Td false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None) ∗
                    (brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
                     reg_cnt bn k 0 ∗
@@ -1737,21 +1751,21 @@ Section BioBox.
       with "[Hall]" as "Hstep2".
     { iApply (big_sepL_impl with "Hall").
       iIntros "!>" (i k Hk).
-      iIntros "[(((Hst & Hrp) & Hrd) & Hc) [Hc2 (Hv & Hdk & Hdev & Hbno & Hrc & Hdata)]] Hrun _".
+      iIntros "[(((Hst & Hrp) & Hrd) & Hc) [Hc2 (Hv & Hdk & Hdev & Hbno & Hrc & Hdata)]] [Hint Hrun] _".
       iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
       iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
-      iMod (buf_box_alloc E bn V k with "Hrun Hst Hc Hrp [Hrd] Hv Hdev1 Hbno1 Hdk [Hdata]")
-        as "(Hrun & #Hbx & Hreg)".
+      iMod (buf_box_alloc E g bn V k Hod with "Hint Hrun Hst Hc Hrp [Hrd] Hv Hdev1 Hbno1 Hdk [Hdata]")
+        as "(Hint & Hrun & #Hbx & Hreg)".
       { iExists _. iExact "Hrd". }
       { iDestruct "Hdata" as (bs) "[%Hlen Hdata]". iExists bs. iFrame "Hdata".
         iSplitR; [done|]. rewrite Hpay0. done. }
-      iModIntro. iFrame "Hrun". iSplitR; [iExact "Hbx"|].
+      iModIntro. iFrame "Hint Hrun". iSplitR; [iExact "Hbx"|].
       iDestruct "Hreg" as (Td) "[Hrd0 #Hllb]". iExists Td. iFrame "Hllb Hrd0".
       iFrame "Hrc Hc2 Hdev2 Hbno2". }
     iAssert ([∗ list] i↦k ∈ seq 0 NBUF, emp)%I as "Hemp".
     { rewrite big_sepL_emp. iEmpIntro. }
-    iMod (big_sepL_fupd_thread E (own_context cur_ctx) (fun _ _ => emp%I)
-            with "Hrun Hstep2 Hemp") as "[Hrun Hboth]".
+    iMod (big_sepL_fupd_thread E (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx) (fun _ _ => emp%I)
+            with "[$Hint $Hrun] Hstep2 Hemp") as "[[Hint Hrun] Hboth]".
     iEval (rewrite big_sepL_sep) in "Hboth".
     iDestruct "Hboth" as "[#Hboxs Hslots0]".
     iDestruct (big_sepL_llb_max (seq 0 NBUF)
@@ -1785,15 +1799,16 @@ Section BioBox.
           apply Hnc0. rewrite -Hu0. exact Hb. }
       rewrite Hc0. iExact "Hpool". }
     (* L1, minted WITH the fold at the boot floor slot *)
-    iMod ("Hmk" $! (fun ξ => bcache_res2 bn V ξ)
-            (fun ξ => llb loglen_name tl ∗
+    iMod ("Hmk" $! g (fun ξ => bcache_res2 bn V ξ)
+            (fun ξ => llb dlen_name tl ∗
                       bcache_scan2 bn V ∅ (rev (seq 0 NBUF))
                         (fun _ => (mword_of_int 0 : mword 32))
                         (fun _ => (mword_of_int 0 : mword 32)) tl ξ)%I tl
-            with "[%] [%] Hllbtl Hrun [Hauth Hsa Hslots Hlru Hpool]")
-      as "[Hrun #Hlock]".
+            with "[%] [%] [%] Hllbtl Hint Hrun [Hauth Hsa Hslots Hlru Hpool]")
+      as "(Hint & Hrun & #Hlock)".
     { apply _. }
     { apply bcache_res2_fold_in. }
+    { exact Hod. }
     { iFrame "Hllbtl". rewrite /bcache_scan2.
       iFrame "Hauth Hsa".
       iSplitR.
@@ -1809,7 +1824,7 @@ Section BioBox.
       assert (Hml : map bnode (rev (seq 0 NBUF)) = blist 0 NBUF)
         by (rewrite /blist map_rev //).
       rewrite Hml. iFrame "Hlru Hslots Hpool". }
-    iModIntro. iSplitL "Hrun"; [iExact "Hrun" |]. iExists bn. rewrite /bio_ctx.
+    iModIntro. iFrame "Hint Hrun". iExists bn. rewrite /bio_ctx.
     iSplitR "Hsf"; [| iExact "Hsf"].
     iSplitL "Hlock"; [iExact "Hlock" |].
     rewrite big_sepL_sep. iSplitL "Hsls"; [iExact "Hsls" | iExact "Hboxs"].

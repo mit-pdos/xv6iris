@@ -106,6 +106,9 @@ Proof.
     { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
       apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
+    (* a release fence is a leaf (relaxed-ww): the barrier arm carries it *)
+    all: try (apply andb_prop in Hg as [Hf Hg]; rewrite Hf; cbn [andb];
+              by apply (IH tt s mm)).
     all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
@@ -190,6 +193,9 @@ Proof.
     { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
       apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
       cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
+    (* a release fence is a leaf (relaxed-ww): the barrier arm carries it *)
+    all: try (apply andb_prop in Hg as [Hf Hg]; rewrite Hf; cbn [andb];
+              by apply (IH tt s mm)).
     all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 

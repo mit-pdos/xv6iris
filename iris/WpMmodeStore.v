@@ -543,11 +543,11 @@ Section WpStoreGpr.
                        with "Hcert Hrw Hro") ].
         iIntros (x) "(-> & Hrw & Hro)". by iFrame.
       - (* the memory obligation: the eight target bytes change hands *)
-        iIntros (sg img log V) "Hsg Htso". rewrite /mstate_interp.
+        iIntros (sg img log dl V) "Hsg Htso". rewrite /mstate_interp.
         iDestruct "Hsg" as "(Hri & Hmem & Hdev)".
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
         iNext. iMod "Hmask" as "_".
-        iMod (wobl_ram_ctx img sg log V cur_ctx 8
+        iMod (wobl_ram_ctx img sg log dl V cur_ctx 8
                 (mwrite_req8 ea (TypeCasts.autocast
                    (@subrange_vec_dec 64 (m !!! Regidx rs2) (8 * 8 - 1) 0)))
                 vold ltac:(reflexivity) ltac:(vm_compute; discriminate)
@@ -705,11 +705,11 @@ Section MmodeStoreTor.
                           ltac:(rewrite st_rs_sec; exact Hpmm))
                        with "Hcert Hrw Hro") ].
         iIntros (x) "(-> & Hrw & Hro)". by iFrame.
-      - iIntros (sg img log V) "Hsg Htso". rewrite /mstate_interp.
+      - iIntros (sg img log dl V) "Hsg Htso". rewrite /mstate_interp.
         iDestruct "Hsg" as "(Hri & Hmem & Hdev)".
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
         iNext. iMod "Hmask" as "_".
-        iMod (wobl_ram_ctx img sg log V cur_ctx 8
+        iMod (wobl_ram_ctx img sg log dl V cur_ctx 8
                 (mwrite_req8 ea (TypeCasts.autocast
                    (@subrange_vec_dec 64 (m !!! Regidx rs2) (8 * 8 - 1) 0)))
                 vold ltac:(reflexivity) ltac:(vm_compute; discriminate)

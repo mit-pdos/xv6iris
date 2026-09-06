@@ -715,6 +715,6 @@ Section PipeMorph.
     iDestruct "H" as "(%Hv & %lo & #Hi & Hf)".
     iMod (WpLock.lk_floor_morph lo ξ ξ' with "Hd Hf") as "[Hd #Hf']".
     iModIntro. iFrame "Hd". iSplitR; [done|].
-    iExists lo. by iFrame "Hi Hf'".
+    iExists lo. iFrame "Hf'". iExact "Hi".
   Qed.
 End PipeMorph.

@@ -1347,25 +1347,34 @@ Section IcacheRef.
      none is needed -- [TsoMemPa.visibleb]'s own-message arm serves the
      author's read at EVERY view (store forwarding).  Cash-in:
      [IcachePinwObl.cred_floor_vis]. *)
+  (* relaxed-ww: the credential floor IS the lock tier's floor at [lo] --
+     received (the message at [lo] drained under a floor the context has
+     passed) or the carrier's own message ([TsoCtx.key_at]); [tl] is kept
+     for the arity ([lo <= tl] rides in [live_fracc]).  Cash-in:
+     [IcachePinwObl.cred_floor_vis] via [WpLock.lk_floor_vis]. *)
   Definition cred_floor (lo tl : nat) : iProp Σ :=
-    (TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∨
-     ∃ a : Arch.pa, TsoCtx.ctx_wrote TsoCtx.cur_ctx lo a)%I.
+    WpLock.lk_floor TsoCtx.cur_ctx lo.
 
   Global Instance cred_floor_persistent lo tl : Persistent (cred_floor lo tl).
   Proof. rewrite /cred_floor. apply _. Qed.
   Global Instance cred_floor_timeless lo tl : Timeless (cred_floor lo tl).
   Proof. rewrite /cred_floor. apply _. Qed.
 
-  Lemma cred_floor_of_ctx (lo tl : nat) :
-    TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗ cred_floor lo tl.
-  Proof. iIntros "H". by iLeft. Qed.
+  Lemma cred_floor_of_key (lo tl : nat) (a : Arch.pa) :
+    TsoCtx.key_at TsoCtx.cur_ctx (lo, a) -∗ cred_floor lo tl.
+  Proof. iIntros "H". iApply (WpLock.lk_floor_of_key with "H"). Qed.
+
+  Lemma cred_floor_of_dpos (lo tl p : nat) :
+    TsoGhost.dpos_ev dpos_name lo p -∗ TsoCtx.ctx_floor TsoCtx.cur_ctx p -∗
+    cred_floor lo tl.
+  Proof. iIntros "Hd Hf". iApply (WpLock.lk_floor_of_dpos with "Hd Hf"). Qed.
 
   Lemma cred_floor_of_wrote (lo tl : nat) (a : Arch.pa) :
     TsoCtx.ctx_wrote TsoCtx.cur_ctx lo a -∗ cred_floor lo tl.
-  Proof. iIntros "H". iRight. by iExists a. Qed.
+  Proof. iIntros "H". iApply (WpLock.lk_floor_of_wrote with "H"). Qed.
 
   Lemma cred_floor_0 : ⊢ cred_floor 0 0.
-  Proof. iApply cred_floor_of_ctx. iApply TsoCtx.ctx_floor_0. Qed.
+  Proof. iApply WpLock.lk_floor_0. Qed.
 
   Definition live_fracc (k : nat) (s : Qp) : iProp Σ :=
     (∃ (g : gname) (lo tl : nat),
@@ -1563,7 +1572,7 @@ Section IcacheRef.
     rewrite /ic_ref_stamps /ic_ref_stamps_at /ic_stamps. iExists m. iFrame "Hr". done.
   Qed.
   Lemma inode_ref_at_llb k q dev inum m :
-    inode_ref_at k q dev inum m -∗ TsoGhost.llb loglen_name (max_stamp m).
+    inode_ref_at k q dev inum m -∗ TsoGhost.llb dlen_name (max_stamp m).
   Proof. iIntros "(_ & _ & _ & _ & _ & Hr)". iApply (CtxBox.reference_llb with "Hr"). Qed.
 
   Lemma inode_ref_tok k q dev inum :

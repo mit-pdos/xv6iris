@@ -369,16 +369,16 @@ Section WpLdGpr.
                   (ld_rs_pcfg ms0 mseccfg0 pmar0 pmpcfg0 pa0)
                   with "Hcert Hrw Hro").
       + (* the read node's obligation: the eight owned bytes ARE the value *)
-        iIntros (sg img log tv V) "%Htv Hsi Htso". rewrite /mstate_interp.
+        iIntros (sg img log dl tv V) "%Htv Hsi Htso". rewrite /mstate_interp.
         iDestruct "Hsi" as "(Hreg & Hmem & Hdev)".
         iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-        iEval (rewrite (tso_interp_of_at_gs _ img sg.(mem) log V
+        iEval (rewrite (tso_interp_of_at_gs _ img sg.(mem) log dl V
                           sg.(sregs) sg.(mdev) Hpin)) in "Htso".
         iDestruct "Hbw" as "[#Hal Hbytes8]".
         iDestruct (pristine_read_bytes_ok
-                     (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
+                     (gs_of img sg.(mem) log dl V sg.(sregs) sg.(mdev))
                      ea 8 v dq with "Hmem Htso Hbytes8 Hpr") as %Hrobl.
-        iEval (rewrite -(tso_interp_of_at_gs _ img sg.(mem) log V
+        iEval (rewrite -(tso_interp_of_at_gs _ img sg.(mem) log dl V
                            sg.(sregs) sg.(mdev) Hpin)) in "Htso".
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
         iSplitR; [iPureIntro; intros tv' _ _; apply Hrobl|].
@@ -516,10 +516,10 @@ Section MmodeLoadTor.
                   with "Hcert Hrw Hro").
       + (* the read node's obligation: the eight owned LEDGER bytes ARE the
            value, at every view the hart can reach (A6.27) *)
-        iIntros (sg img log tv V) "%Htv Hsi Htso". rewrite /mstate_interp.
+        iIntros (sg img log dl tv V) "%Htv Hsi Htso". rewrite /mstate_interp.
         iDestruct "Hsi" as "(Hreg & Hmem & Hdev)".
         iDestruct "Hbytes" as "[#Hal Hbytes8]".
-        iDestruct (robl_ram_ctx img sg log V cur_ctx ea v dq tv Htv
+        iDestruct (robl_ram_ctx img sg log dl V cur_ctx ea v dq tv Htv
                      with "Hmem Htso Hrun Hbytes8") as %Hrobl.
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
         iSplitR; [iPureIntro; exact Hrobl|].

@@ -166,13 +166,15 @@ Section KptShare.
     kpt_bound B -∗ CtxValues.cv_boot_cred B -∗ kpt_creds.
   Proof. iIntros "H1 H2". iExists B. iFrame. Qed.
 
-  (* the boot hart's arm: no view receipt anywhere (A6.135) *)
-  Lemma kpt_creds_intro_boot (B : nat) :
+  (* the boot hart's arm (A6.135 / relaxed-ww §2.11): its own view receipt
+     at the tree's drain bound, no fence anywhere *)
+  Lemma kpt_creds_intro_boot (B Bd : nat) :
     hart_agent cpu_id = 0%nat ->
-    kpt_bound B -∗ TsoGhost.llb loglen_name B -∗ kpt_creds.
+    kpt_bound B -∗ CtxValues.kpt_dbound Bd -∗
+    TsoGhost.view_lb view_name dlen_name 0%nat Bd -∗ kpt_creds.
   Proof.
-    intros H0. iIntros "H1 Hl". iExists B. iFrame "H1".
-    iApply (CtxValues.cv_boot_cred_boot B H0 with "Hl").
+    intros H0. iIntros "H1 #Hd #Hv". iExists B. iFrame "H1".
+    iApply (CtxValues.cv_boot_cred_boot B Bd H0 with "Hd Hv").
   Qed.
 
   Definition tlb_res_pt (root_ppn : mword 44) : iProp Σ :=
@@ -281,28 +283,9 @@ Section KptShare.
   (* §3 The one-way door from the exclusive bundle.                      *)
   (* ------------------------------------------------------------------- *)
 
-  (* A6.53: the door also shoots the canon pin's BOUND -- the bound the
-     exclusive bundle's slots were minted at is the one every later reader
-     matches against. *)
-  (* A6.55: publication takes the PUBLISHER'S OWN RECEIPT.  This is where
-     pin-memo §5.6(b) lands: hart 0 reaches [__sync_synchronize] -- a
-     [Barrier_RISCV_rw_rw], which [RiscvLang.fence_drains] drains -- so it
-     emerges at the top of the log and its [view_lb] at the pin's bound is
-     free.  Taking it as a PREMISE here is what makes that obligation
-     explicit instead of assumed. *)
-  Lemma tlb_inv_pt_share (root_ppn : mword 44) (E : coPset) :
-    tlb_inv_pt root_ppn -∗ kpt_unset -∗ kptb_unset ={E}=∗ tlb_res_pt root_ppn.
-  Proof.
-    iIntros "Hinv Hnone Hbnone".
-    iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t M B)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hok & %Hspec & HM & Ht & #Hvlb & Hpmp)".
-    iDestruct (CtxValues.cv_boot_cred_llb with "Hvlb") as "#Hllb".
-    iMod (kpt_inv_alloc root_ppn B t M E Hspec with "Ht HM Hllb Hnone Hbnone")
-      as "(#Hkinv & #Hlb & #Hbd)".
-    iModIntro.
-    iApply (tlb_res_pt_intro root_ppn satp0 tlbvec t B Hmode Hasid Hppn Hok
-              with "Hsatp Htlb Hlb Hbd Hvlb Hpmp Hkinv").
-  Qed.
+  (* relaxed-ww: the one-way door from the exclusive bundle
+     ([tlb_inv_pt_share]) had no consumer and is gone; publication is
+     [KptPublish.kptree_publish_boot] at kvminithart's establishment. *)
 
 End KptShare.
 
