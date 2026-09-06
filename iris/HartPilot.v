@@ -457,7 +457,7 @@ Section pilot.
     (* the store *)
     iApply (wp_hart_ram_write (fun m' : M unit => m') nw reqw x2.2 rr mctx_id
               Hreqw Hdevw with "Hcert Hfrag").
-    iIntros (σ' img log dl tv V b) "%Htv Hσ Htso". rewrite /mstate_interp.
+    iIntros (σ' img log dl tv V b) "%Htv _ Hσ Htso". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iNext. iMod "Hmask" as "_".
