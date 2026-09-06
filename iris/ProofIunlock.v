@@ -591,8 +591,8 @@ Section ProofIunlockMain.
     iDestruct (ic_park_side_dep_side fsc_fs fsc_ireg fsc_cov fsc_logst k d s dev inum g lo Hdshr
                  with "Hs") as "Hside".
     iModIntro.
-    (* the _in release: the L2 row goes back UNFLOORED at the park stamp and
-       the callee re-floors it at the parked context (M-6, R2) *)
+    (* the genin release: the L2 row goes back UNFLOORED at the park stamp
+       and the callee re-floors it at the parked context (M-6, R2) *)
     (* r25 pass 1 (correction 2): the release presents ONE bound, the
        maximum of the register's park stamp [Tp] and the off rows' own --
        [ic_slp_dep_of_rows] takes the rows out to [off_rows_dep] and joins

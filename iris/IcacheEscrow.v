@@ -4651,12 +4651,12 @@ Section IcacheBox.
     apply ctx_morph_sep; [apply ctx_morph_const | apply off_rows_morph].
   Qed.
   (* the releaser's UNFLOORED row at a known park stamp (R2's Rdep, the
-     bcache's bslp_dep): what (f) leaves in hand; the _in release re-floors
-     it at the parked context through the fold *)
+     bcache's bslp_dep): what (f) leaves in hand; the hooked release
+     re-floors it at the lock's stamped context through the fold *)
   (* the releaser's context-free form, at ONE bound [T] for the combined
      maximum (reviewer 2's correction 2): the register's own park stamp
      [Tp ≤ T] (it cannot be raised at release), the off rows bounded by [T]
-     (OffBox.off_rows_dep), and [llb T] so the [_in] release presents one
+     (OffBox.off_rows_dep), and [llb T] so the genin release presents one
      lower bound.  [ic_slp_fold]'s statement is unchanged; per row the fold
      weakens the floor by [TsoCtx.ctx_floor_le]. *)
   Definition ic_slp_dep cn k (T : nat) : iProp Σ :=
@@ -4672,7 +4672,7 @@ Section IcacheBox.
     rewrite /ic_slp. iExists (L2Reg Tp None).
     iSplitL "Hrp".
     { (* the register row: its own park stamp is [Tp ≤ T], so the one floor
-         the [_in] release presents weakens to it (TsoCtx.ctx_floor_le) *)
+         the genin release presents weakens to it (TsoCtx.ctx_floor_le) *)
       rewrite /CtxBox.l2_row /ic_regp. iFrame "Hrp". iSplitR; [done |].
       iApply (TsoCtx.ctx_floor_le ξ T Tp HTp with "Hfl"). }
     iFrame "Ht Hn".
@@ -4684,7 +4684,7 @@ Section IcacheBox.
   Proof. apply ctx_morph_const. Qed.
 
   (* [off_rows_dep] is monotone in its bound, given the bigger bound's own
-     [llb] -- what the [_in] releases need to lift the off rows from their
+     [llb] -- what the genin releases need to lift the off rows from their
      own maximum to the COMBINED one.  (OffBox states no such lemma; it is
      five lines over the definition, so it is proved here rather than
      re-opening the box lane's file.) *)
@@ -4698,7 +4698,7 @@ Section IcacheBox.
     iExists s. iFrame "Hp Hl". iPureIntro. split; [exact Hh | lia].
   Qed.
 
-  (* THE [_in] RELEASE'S ASSEMBLER (r25, correction 2).  A holder of
+  (* THE GENIN RELEASE'S ASSEMBLER (r25, correction 2).  A holder of
      ip->lock arrives at [releasesleep] with the park's register half at its
      own stamp [Tp] and the off rows it destructed out of the acquire's
      [ic_slp]; the release must present ONE lower bound.  This takes the
@@ -5702,8 +5702,8 @@ Section IcacheTable.
     end.
 
   (* the same rows with the live floors STRIPPED -- what a releaser can
-     hand ([lock_finisher_close_in_llb]'s Rdep side; the fold reinserts
-     the floors at the parked ξ, bounded by the twins' llb receipt). *)
+     hand (the hooked release's Rdep side; the hook reinserts the floors at
+     the lock's stamped context, bounded by the twins' llb receipt). *)
   Definition itable_slot_res_bare (ξ : TsoCtx.CtxId) (tl : nat)
       (M : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
       (k : nat) : iProp Σ :=
@@ -5739,8 +5739,8 @@ Section IcacheTable.
   Qed.
 
   (* the release-time rows: floors STRIPPED, llb-backed only -- what a
-     holder can hand back after bumping stamps.  [itable_pay_intro] below
-     re-floors them at the parked context, one raise per live slot. *)
+     holder can hand back after bumping stamps.  [itable_ctx_hook] below
+     re-floors them at the lock's stamped context, one raise per live slot. *)
   Definition itable_slot_res_llb (ξ : TsoCtx.CtxId)
       (M : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
       (k : nat) : iProp Σ :=
@@ -5976,8 +5976,8 @@ Section IcacheTable.
 
   (* THE BARE TABLE: every row's floor stripped and bounded by ONE [tl] --
      what the boot deposits through [newlock_at_llb] (the fifty boot stamps
-     under one llb, CtxBox.big_sepL_llb_max) and what an _in release hands
-     as its Rdep; [itable_res2_of_bare] re-floors it at the parked ξ. *)
+     under one llb, CtxBox.big_sepL_llb_max) and what a hooked release hands
+     as its Rdep; [itable_res2_of_bare] re-floors it at the stamped ξ. *)
   Global Instance itable_slot_res_bare_morph (tl : nat) (M : gmap nat (Qp * positive))
       (ci : gmap nat (mword 32 * mword 32)) (k : nat) :
     CtxMorph (fun ξ => itable_slot_res_bare ξ tl M ci k).
@@ -6067,30 +6067,23 @@ Section IcacheTable.
       iModIntro. iExists T'. iFrame "Hpk".
       iSplitR "Hrows"; [iExact "Hrow" | iExact "Hrows"].
   Qed.
-  (* THE A6.144 RELEASE MINT for the itable: deposit the llb-backed
-     payload into a fresh parked context and RAISE it once per live slot,
-     minting each exact-read floor at the parked ξ -- which is where the
+  (* THE A6.144 RELEASE HOOK for the itable: the releaser hands the rows
+     with their floors STRIPPED, each backed by its own [llb] receipt, and
+     the hook RAISES the lock context's stamp once per live slot, minting
+     each exact-read floor at that stamped context -- which is where the
      next acquirer's credentials transport from. *)
-  Lemma itable_pay_intro `{CIDr : RiscvLang.CpuId} (cn : ic_names) (γfs : fs_names)
+  Lemma itable_ctx_hook (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) :
-    TsoCtx.own_context TsoCtx.cur_ctx -∗
-    itable_res2_llb TsoCtx.cur_ctx cn γfs γi cov logstart nib dv ==∗
-    TsoCtx.own_context TsoCtx.cur_ctx ∗
-    lock_pay (fun ξ => itable_res2 ξ cn γfs γi cov logstart nib dv).
+    ⊢ lock_ctx_hook (fun ξ => itable_res2 ξ cn γfs γi cov logstart nib dv)
+        (fun ξ => itable_res2_llb ξ cn γfs γi cov logstart nib dv).
   Proof.
-    iIntros "Hrun HR".
-    iMod TsoCtx.ctx_stamped_alloc as (ξc) "Hpk".
-    iMod (TsoCtx.ctx_deposit
-            (fun ξ => itable_res2_llb ξ cn γfs γi cov logstart nib dv)
-            TsoCtx.cur_ctx ξc 0 with "Hrun Hpk HR")
-      as "(Hrun & %T' & _ & Hpk & HR)".
+    rewrite /lock_ctx_hook. iIntros (ξ T) "Hpk HR".
     iDestruct "HR" as (M ci) "(Hhalf & Hrows & %Hwf & %Hciwf & Hia & Hip &
                                Hslots & Hpool)".
-    iMod (itable_rows_raise ξc T' M ci (seq 0 NINODE) with "Hpk Hrows")
-      as (T'') "[Hpk Hrows]".
-    iModIntro. iFrame "Hrun".
-    iExists ξc, T''. iFrame "Hpk".
+    iMod (itable_rows_raise ξ T M ci (seq 0 NINODE) with "Hpk Hrows")
+      as (T') "[Hpk Hrows]".
+    iModIntro. iExists T'. iFrame "Hpk".
     rewrite /itable_res2. iExists M, ci.
     iFrame "Hhalf Hrows Hia Hip Hslots Hpool".
     iSplitR; [by iPureIntro|]. by iPureIntro.

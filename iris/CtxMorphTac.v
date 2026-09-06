@@ -102,6 +102,12 @@ Ltac ctx_morph_step :=
   | |- CtxMorph (λ ξ, ctx_word4_pointsto ξ _ _ _) => apply ctx_morph_word4
   | |- CtxMorph (λ ξ, ctx_phys_pointsto ξ _ _ _) => apply ctx_morph_phys_pointsto
   | |- CtxMorph (λ ξ, ctx_phys_word_pointsto ξ _ _ _) => apply ctx_morph_phys_word
+  (* a record PARKED UNDER the payload's own context: the relation is about
+     the parent's authority, so it rides the parent's domination
+     (contexts.md §2, [TsoCtx.ctx_parked_morph]).  Two spellings, because
+     [ctx_morph_exist] hands its sub-goal back ETA-REDUCED. *)
+  | |- CtxMorph (λ ξ, ctx_parked _ ξ) => apply ctx_parked_morph
+  | |- CtxMorph (ctx_parked _) => apply ctx_parked_morph
   | |- _ => apply _
   end.
 Ltac ctx_morph_solve := repeat ctx_morph_step.

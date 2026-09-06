@@ -277,7 +277,10 @@ Section SchedCtxPay.
      [ProcDefs] ([proc_dormant*]) and from [WpLock] ([lk_floor]). *)
   Global Instance locked_morph γ i :
     CtxMorph (λ ξ, WpLock.locked (XI := ξ) γ i).
-  Proof. rewrite /WpLock.locked. ctx_morph_solve. Qed.
+  Proof.
+    rewrite /WpLock.locked /WpLock.locked_core /WpLock.lock_ctx_held.
+    ctx_morph_solve.
+  Qed.
   (* [proc_pub] is unfolded rather than taken by instance: its own instance
      stands with the slot pile further down, below this one. *)
   Global Instance proc_held_morph i j γl st ch :

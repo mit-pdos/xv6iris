@@ -22,8 +22,8 @@ exactly one of three tokens:
 | token | who holds it | what it says |
 |---|---|---|
 | `own_context ξ` | the hart running as ξ (inside `sie_cap_gpr`) | the bound is under THIS hart's view; every dirty key is this hart's own message or under the bound |
-| `ctx_stamped ξ T` | a lock invariant, a box, a racy tier, `BootShared`'s two roots | not running anywhere, hung on a LOG POSITION: the bound is the stamp `T`, every key is under it; whoever holds a view receipt past `T` may run it (`ctx_unstamp`) |
-| `ctx_parked ξ ξ'` | whoever holds the record of a thread parked at `swtch`, a forked child's parent | not running anywhere, PARKED UNDER THE CONTEXT ξ': the domination relation at full authority (§2) |
+| `ctx_stamped ξ T` | a lock invariant's free arm (the lock's own context, §5), a box, a racy tier, `BootShared`'s two roots | not running anywhere, hung on a LOG POSITION: the bound is the stamp `T`, every key is under it; whoever holds a view receipt past `T` may run it (`ctx_unstamp`) |
+| `ctx_parked ξ ξ'` | whoever holds the record of a thread parked at `swtch`, a forked child's parent, a lock's holder (the lock's context, inside `locked`) | not running anywhere, PARKED UNDER THE CONTEXT ξ': the domination relation at full authority (§2) |
 
 `ctx_stamp` (running → stamped, stamp `max K W` off the token's own
 receipts), `ctx_unstamp` (stamped → running at a receipt `T ≤ K`),
@@ -56,12 +56,13 @@ mint produces this one body:
    the joined view receipt, and the WATERMARKS JOIN.  The join is
    load-bearing: it is what lets a later stamp of ξ' (mint 2) cover ξ's
    keys, i.e. what makes the mints compose.
-2. **Release**, running into a stamped root -- `ctx_dom_to_stamped`: the
-   stamp is raised over the releaser's view and watermark; every key clean.
-3. **Acquire and barriers**, a stamped root into the running winner at a
-   receipt `T ≤ K` -- `TsoCtxAbsorbLb.ctx_dom_of_stamped_lb` (from
-   `hart_view_lb`) and `TsoCtxLedger.ctx_dom_of_stamped` (from the interp
-   at the AMO leaf): every key clean.
+2. **Deposit into a stamped root** -- `ctx_dom_to_stamped`: the stamp is
+   raised over the depositor's view and watermark; every key clean.  Used
+   by the transit boxes and the boot roots; not by locks (§6).
+3. **Absorb out of a stamped root** into the running claimer at a receipt
+   `T ≤ K` -- `TsoCtxAbsorbLb.ctx_dom_of_stamped_lb` (from `hart_view_lb`)
+   and `TsoCtxLedger.ctx_dom_of_stamped` (from the interp at an AMO leaf):
+   every key clean.  Same users.
 4. **A parked record lends a half to its dominator** --
    `ctx_parked_borrow`: the parent pulls facts out of a child without
    resuming it; the child's token comes back unchanged.
@@ -72,7 +73,8 @@ the body.  The same-hart hand-off at `swtch` is DERIVED, not a second
 class: `ctx_move R ξ0 ξ1 : own_context ξ0 -∗ own_context ξ1 -∗ R ξ0 ==∗
 own_context ξ0 ∗ own_context ξ1 ∗ R ξ1` is mint 1, morph, give back.
 `ctx_deposit` (into a stamped root) and `ctx_absorb_lb` (out of one) are
-the same three lines around mints 2 and 3.
+the same three lines around mints 2 and 3; the lock path uses neither
+(§6).
 
 Rules that follow, stated once:
 
@@ -161,7 +163,54 @@ process-table handle, the park globals and `proc_priv`; then it is parked
 under the parent (`ctx_park`), and the parent's release of `p->lock`
 deposits the slot as an ordinary payload.  No stamp, no box.
 
-## 5. Boxes keep a stamped root
+## 5. Locks: one context per lock, parked under the holder
+
+Every spinlock owns one context ξL for its whole life (`WpLock.v`):
+
+- **Born** at `newlock` as a running twin of the creator
+  (`own_context_twin`), filled by `ctx_move`, stamped
+  (`lock_pay_born`).  The free arm of the invariant is unchanged in shape,
+  `lock_pay R := ∃ ξ T, ctx_stamped ξ T ∗ R ξ`, and its ξ is ξL every time.
+- **Acquire** (`lock_pay_take`): the AMO leaf hands the winner the record
+  with its floor at the stamp (`lock_pay_won`); the winner's token cashes
+  the floor into the receipt, `ctx_unstamp` runs ξL on the winner's hart,
+  `ctx_move` takes `R` to `cur_ctx`, and `ctx_park` parks the emptied ξL
+  under the winner.  That token is `lock_ctx_held := ∃ ξL, ctx_parked ξL
+  cur_ctx`, and `locked γ i := locked_core γ i ∗ lock_ctx_held` carries it
+  for the whole critical section (`locked_core` is the state fragment and
+  the pin floor; `locked_pre`, the amoswap-to-cpu-store window, carries no
+  context: the cpu store takes the held token in, the cpu clear hands it
+  back out -- `WpSconfLock`'s two exchanges).
+- **Release** (`lock_pay_intro`): `ctx_resume` ξL out of the held token,
+  `ctx_move` the payload in, `ctx_stamp`, then the HOOK.
+
+**The hook** `lock_ctx_hook R Rin := ∀ ξ T, ctx_stamped ξ T -∗ Rin ξ ==∗ ∃
+T', ctx_stamped ξ T' ∗ R ξ` is how a releaser finishes its payload at the
+lock's stamped context.  The ordinary release is the identity hook
+(`wp_release_sconf`); `wp_release_hook_sconf` takes `Rin cur_ctx` and a
+hook.  The one non-identity hook is the floor fold (`lock_hook_llb`): a
+payload row `ctx_floor ξ tl` above the releaser's view (the position of a
+store still in its buffer, or of a box deposit made under the lock) can be
+minted on a hartless record only, so it is minted here -- `ctx_stamped_raise`
+to the `llb tl` receipt, then the fold.  The next winner cashes the row
+against its own token after `lock_pay_take`.  There is no second release
+contract: bread/brelse/bunpin (`bcache_res2`), iput/iget/idup (the itable)
+and releasesleep (`sl_pay`) pass the fold hook.
+
+The finisher the generic release is proved against, `lock_finisher_pay`,
+has a prelude `own_context cur_ctx -∗ lock_ctx_held ==∗ own_context cur_ctx
+∗ Pay`: the payload is closed over, and the prelude runs after the cpu
+clear (where the held token comes back) and before the word clear, in
+straight-line code where the running token is borrowable.  `lock_finisher`
+(payload handed in at `cur_ctx`) and `lock_finisher_destroy` (a cancelled
+lock drops its context) are the two instances the generic callers name.
+
+Nothing on the lock path deposits into or absorbs out of a stamped root:
+mints 2 and 3 survive only in the boxes and the boot roots.  Under two logs
+the release stamp is the fence publication of the keys the holder moved
+into ξL, and the fold is the same `ctx_stamped_raise` afterwards.
+
+## 6. Boxes keep a stamped root
 
 The transit box ([`ctx-box.md`](ctx-box.md)) holds `ctx_stamped ξb T`,
 never a parked-under record, for two reasons that are not "no running

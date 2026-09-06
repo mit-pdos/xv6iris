@@ -387,7 +387,7 @@ Section IgetMsg.
   Qed.
 End IgetMsg.
 
-Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) (RLI : RELEASE_IN) (PN : PANIC) : IGET.
+Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) (PN : PANIC) : IGET.
 
 Section ProofIget.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ}.
@@ -1746,16 +1746,16 @@ Section ProofIget.
                are the same bool.  Pure re-spelling; it is what makes the
                acquire/release pair compose back to [N]. *)
             iEval (rewrite Houtb) in "Hcg".
-            iApply (RLI.wp_release_in_sconf KT1 fsc_itlock itable_lock "itable"%string (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) V4
+            iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
+                      (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
+                      (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) V4
                       n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
-                      with "Hcg Htext Hpc [Hlock] Htok [HRres] Hcnt Hpay").
+                      with "Hcg Htext Hpc [Hlock] Htok HRres [] Hcnt Hpay").
             { iExact "Hlock". }
-            { (* A6.144: the park deposits the llb-bare payload and re-floors
-                 every live row at the parked ξ ([itable_pay_intro]) *)
-              iIntros "Hrun".
-              iApply (itable_pay_intro fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev
-                        with "Hrun HRres"). }
+            { (* A6.144: the hook re-floors every live row at the lock's
+                 stamped context ([itable_ctx_hook]) *)
+              iApply itable_ctx_hook. }
             iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
             iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
             pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
@@ -2389,14 +2389,14 @@ Section ProofIget.
           by (rewrite (HL7thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HL3sp).
         (* same re-spelling as the HIT arm above. *)
         iEval (rewrite Houtb) in "Hcg".
-        iApply (RLI.wp_release_in_sconf KT1 fsc_itlock itable_lock "itable"%string (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) L7
+        iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
+                  (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
+                  (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) L7
                   n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
-                  with "Hcg Htext Hpc [Hlock] Htok [HRres] Hcnt Hpay").
+                  with "Hcg Htext Hpc [Hlock] Htok HRres [] Hcnt Hpay").
         { iExact "Hlock". }
-        { iIntros "Hrun".
-          iApply (itable_pay_intro fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev
-                    with "Hrun HRres"). }
+        { iApply itable_ctx_hook. }
         iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
         iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
         pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.

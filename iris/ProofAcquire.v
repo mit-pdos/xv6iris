@@ -29,7 +29,6 @@ Require Import SpecAcquire.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxAbsorbLb.
 (* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
    contract flip.  See its tombstone. *)
 Require Import SieCapCtx.
@@ -504,6 +503,27 @@ Section ProofAcquire.
     iIntros "HTc Hcg Hpc #Hpaira Htokp HRes".
     set (B8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> B3).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> B3) with B8.
+    (* THE WINNER'S MOVE, and it runs HERE, before the cpu store.  The AMO
+       leaf hands the lock's own context back as a stamped record with the
+       winner's floor at its stamp ([WpLock.lock_pay_won]);
+       [WpLock.lock_pay_take] cashes that floor, resumes the context on this
+       hart, moves the payload to the winner's identity and parks the emptied
+       context under it.  The parked token is what the cpu store below folds
+       into [locked], so the take cannot wait for the return.  The running
+       token is borrowed from the capability (SieCapCtx) and handed straight
+       back -- straight-line code, so it never crosses [wp_next].
+       The receipt [SpecAcquire] exports is the floor's own cash-in
+       ([TsoCtx.own_context_floor_view]), read off the same borrow. *)
+    iDestruct "HRes" as (ξ0 T0) "(Hst0 & #Hfl0 & HRes)".
+    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iDestruct (TsoCtx.own_context_floor_view (CID := CIDpo) cur_ctx T0
+                 with "Hrun Hfl0") as "[Hrun (%K0 & #HK0 & %HT0K)]".
+    iAssert (hart_view_lb (CID := CIDpo) K0) as "#HK0s".
+    { iEval (rewrite TsoCtx.hart_view_lb_unseal /TsoCtx.hart_view_lb_def). iExact "HK0". }
+    iMod (WpLock.lock_pay_take (CID := CIDpo) R with "Hrun [Hst0 HRes]")
+      as "(Hrun & HRes & Hheld)".
+    { iExists ξ0, T0. iFrame "Hst0 HRes". iExact "Hfl0". }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* ---- 0x24: jal ra,mycpu ---- *)
     assert (HcspB8 : B8 !!! Regidx csp_rs1 = spd).
     { rewrite /B8 upd_ne; [| vm_compute; discriminate].
@@ -550,7 +570,7 @@ Section ProofAcquire.
               (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 16 : mword 12) Cm (trap_res b + (av - 4))%nat false lks
               Hpacpu Ha0C Hfresh ltac:(left; reflexivity) (Hrefpre cpu_id)
-              with "Hcg Hpc [] Hlock Htokp Hlks").
+              with "Hcg Hpc [] Hlock Htokp Hheld Hlks").
     { iApply (aqi_28 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Htok Hlks".
@@ -669,25 +689,9 @@ Section ProofAcquire.
        Hs1..Hs7 (the seven pre-push_off leaf hops) plus [Hspo] (push_off's
        own conditional equality) gets us there via [wp_next_chain], with no
        case split on [b]. *)
-    (* THE CONTEXT HAND-OFF (tso-port M3): the payload came out of the
-       invariant at SOME context; re-index it to the caller's own, and
-       mint the view receipt.
-       A6.120: AGAINST REAL AMO EVIDENCE.  The leaf hands the winner the
-       parked record WITH the floor at its stamp ([WpLock.lock_pay_won]);
-       the running token (borrowed from the capability, SieCapCtx) cashes
-       that floor into the stable pair [hart_view_lb K ∗ ⌜T ≤ K⌝], and
-       [TsoCtxAbsorbLb.ctx_absorb_lb] is §0.35′(iii)'s absorb.  The receipt
-       [SpecAcquire] exports is the same [K].  The SC shim's [ctx_dom_sc]
-       and [hart_view_lb_any] are gone. *)
-    iDestruct "HRes" as (ξ0 T0) "(Hpk0 & #Hfl0 & HRes)".
-    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iDestruct (TsoCtx.own_context_floor_view (CID := CIDpo) cur_ctx T0
-                 with "Hrun Hfl0") as "[Hrun (%K0 & #HK0 & %HT0K)]".
-    iAssert (hart_view_lb (CID := CIDpo) K0) as "#HK0s".
-    { iEval (rewrite TsoCtx.hart_view_lb_unseal /TsoCtx.hart_view_lb_def). iExact "HK0". }
-    iMod (ctx_absorb_lb (CID := CIDpo) R ξ0 cur_ctx T0 K0 HT0K
-            with "Hrun HK0s Hpk0 HRes") as "(Hrun & _ & HRes)".
-    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    (* the payload and the view receipt were produced at the take, above:
+       the winner runs the lock's context on this hart from the moment it
+       wins the word, so nothing about the hand-off is left for the return. *)
     iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
     iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
     { iExists K0. iExact "HK0s". }

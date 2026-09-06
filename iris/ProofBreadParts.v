@@ -320,7 +320,7 @@ Section BreadScan2.
 
   (* the payload's re-formed pieces after a count edge: the floor slot may
      have moved to [tl'] (with its llb); the scan at [tl'].  The caller
-     re-floors through the _in release (R2: every L1 release). *)
+     re-floors through the release hook (R2: every L1 release). *)
   Definition bd_scan2_after (bn : bio_names) (V : bio_view Σ) (tl : nat) : iProp Σ :=
     (∃ (M : gmap nat (option Qp * positive)) (ord : list nat)
        (devs bnos : nat -> mword 32) (tl' : nat),

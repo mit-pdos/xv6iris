@@ -273,7 +273,7 @@ Section BreadMsg.
   Qed.
 End BreadMsg.
 
-Module BreadProof (A : ACQUIRE) (R : RELEASE) (RIn : RELEASE_IN) (ASL : ACQUIRESLEEP)
+Module BreadProof (A : ACQUIRE) (R : RELEASE) (ASL : ACQUIRESLEEP)
                   (RW : VIRTIODISKRW) (PN : PANIC) : BREAD.
 
 
@@ -1528,18 +1528,19 @@ Section BreadBlocks.
     assert (HC4ra : C4 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bread + 0xa8) : mword 64) 4)
       by (rewrite /C4; apply upd_eq).
     (* ENDGAME R2: the recycle moved the floor slot to the deposit stamp; the
-       _in release re-floors there from the llb the twin handed out *)
+       hook re-floors there from the llb the twin handed out *)
     iDestruct "Hafter" as (M' ord' devs' bnos' tl') "(%Htl' & #Hllbtl' & Hscan')".
-    iApply (RIn.wp_release_in_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string (fun ξ => bcache_res2 bn V ξ) C4
+    iApply (R.wp_release_hook_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string
+              (fun ξ => llb loglen_name tl' ∗ bcache_scan2 bn V M' ord' devs' bnos' tl' ξ)%I
+              (fun ξ => bcache_res2 bn V ξ) C4
               0%nat eb (proc_addr j) (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HC4a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
-              with "Hcg Htext Hpc [Hlock] Htok [Hscan'] Hcnt Hpay").
+              with "Hcg Htext Hpc [Hlock] Htok [Hscan'] [Hllbtl'] Hcnt Hpay").
     { iExact "Hlock". }
-    { iIntros "Hrun".
-      iApply (lock_pay_intro_llb _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
-                with "Hllbtl' Hrun [Hscan']").
-      iFrame "Hllbtl' Hscan'". }
+    { iFrame "Hllbtl' Hscan'". }
+    { iApply (lock_hook_llb _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
+                with "Hllbtl'"). }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)
       by (apply locks_add_del_below; lkbelow).

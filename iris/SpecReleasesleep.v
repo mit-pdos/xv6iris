@@ -101,10 +101,10 @@ Definition wp_releasesleep_genin_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
   is_sleeplock_genl γl γsl slk s R H -∗
   (* the holder's bundle, surrendered back into the lock *)
   sleeplocked_q γsl q slk pd -∗
-  (* ENDGAME R1-pre / R2: WpLock's [_in] release form relayed -- the
+  (* ENDGAME R1-pre / R2: WpLock's HOOKED release form relayed -- the
      releaser hands the payload UNFLOORED ([Rdep]) with a loglen receipt at
-     [tl]; the lock record mints the floor and the entailment above
-     re-floors the row inside it *)
+     [tl]; the hook mints the floor at the lock's stamped record and the
+     entailment above re-floors the row inside it *)
   TsoGhost.llb loglen_name tl -∗
   Rdep TsoCtx.cur_ctx -∗
   (* wakeup's resources *)

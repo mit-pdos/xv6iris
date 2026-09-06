@@ -8,7 +8,7 @@ scheduler's slot without a box, and the fork/userinit producer parking the
 child under its parent.  The law as it stands is
 [`design/contexts.md`](../design/contexts.md); this file is the design
 record and the owner's rulings.  Phase two (per-lock persistent contexts,
-ruling (c)) is [`projects/lock-contexts.md`](../projects/lock-contexts.md).
+ruling (c)) is [`lock-contexts.md`](lock-contexts.md), also landed.
 
 ## 0. The rule
 

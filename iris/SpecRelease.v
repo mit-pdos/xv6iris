@@ -38,7 +38,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpLock.
-Require Import WpLockIn.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
@@ -106,10 +105,11 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-(* THE GENERIC FORM, INPUT-SIDE (A6.127 §6): the same contract with the
-   finisher already holding its payload.  The proof is this one; the
-   original generic tier is its corollary (ProofRelease.v). *)
-Definition wp_release_gen_in_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
+(* THE GENERIC FORM WITH THE PAYLOAD CLOSED OVER: the same contract with a
+   finisher whose prelude needs only the running token and the lock's parked
+   context ([WpLock.lock_finisher_pay]).  The proof is this one; the tier
+   above is its corollary (ProofRelease.v). *)
+Definition wp_release_gen_pay_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -145,11 +145,9 @@ Definition wp_release_gen_in_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka s R Dc -∗
   locked γl cpu_id -∗
-  (* THE INPUT-SIDE FINISHER (A6.127 §6): the caller has closed over its
-     payload -- pre-parked, for a release that creates a thread record
-     ([WpLockIn.lock_finisher_in]); [wp_release_gen_sconf_body] below is
-     the special case with the payload at the caller's own context. *)
-  lock_finisher_in γl lka s R Dc Out (⊤ ∖ ↑minstretN) -∗
+  (* the finisher has closed over its payload; [wp_release_gen_sconf_body]
+     above is the special case with the payload at the caller's own context *)
+  lock_finisher_pay γl lka s R Dc Out (⊤ ∖ ↑minstretN) -∗
   cpu_own (S n) eb p false lks -∗
   arm_pay kt n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>
@@ -202,8 +200,14 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-(* The static-kernel-lock instance for a PRE-PARKED payload (A6.127 §6). *)
-Definition wp_release_in_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
+(* THE HOOKED INSTANCE: the caller hands its payload in an UNFINISHED shape
+   [Rin] and a hook that finishes it at the lock's stamped context
+   ([WpLock.lock_ctx_hook]).  [wp_release_sconf_body] is the identity hook.
+   The other instance is the floor fold ([WpLock.lock_hook_llb]): a payload
+   row [ctx_floor ξ tl] above the releaser's view can only be minted on the
+   hartless record, so the caller presents the receipt [llb tl] and the
+   fold, and the hook raises the stamp and completes the row. *)
+Definition wp_release_hook_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (Rin R : CtxId → iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -230,10 +234,10 @@ Definition wp_release_in_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lka s R -∗
   locked γl cpu_id -∗
-  (* THE DEPOSIT, PRE-PARKED: the free arm's record itself, produced from
-     the caller's running token -- what a release whose payload carries a
-     FLOOR holds ([WpLockIn], [WpLock.lock_pay_intro_llb]) *)
-  (own_context cur_ctx ==∗ own_context cur_ctx ∗ lock_pay R) -∗
+  (* the payload at the caller's own context, unfinished, and the hook that
+     finishes it at the lock's stamped context *)
+  Rin cur_ctx -∗
+  lock_ctx_hook R Rin -∗
   cpu_own (S n) eb p false lks -∗
   arm_pay kt n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>
@@ -306,24 +310,24 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
   WP (Loop : expr riscv_lang).
 
 Module Type RELEASE_GEN.
-  Parameter wp_release_gen_in_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
-      wp_release_gen_in_sconf_body kt γl lka s R Dc Out m n eb p av lks.
+  (* the PAY tier takes no transport class: the payload never moves in the
+     release proof itself -- every move is inside the finisher's prelude,
+     which carries whatever class it needs. *)
+  Parameter wp_release_gen_pay_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
+      wp_release_gen_pay_sconf_body kt γl lka s R Dc Out m n eb p av lks.
   Parameter wp_release_gen_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
       wp_release_gen_sconf_body kt γl lka s R Dc Out m n eb p av lks.
 End RELEASE_GEN.
 
-Module Type RELEASE_IN.
-  Parameter wp_release_in_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
-      wp_release_in_sconf_body kt γl lka s R m n eb p av lks.
-End RELEASE_IN.
-
 Module Type RELEASE.
   Parameter wp_release_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
       wp_release_sconf_body kt γl lka s R m n eb p av lks.
+  Parameter wp_release_hook_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (Rin R : CtxId → iProp Σ) `{!CtxMorph Rin} (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
+      wp_release_hook_sconf_body kt γl lka s Rin R m n eb p av lks.
 End RELEASE.
 
 Module Type RELEASE_CANCEL.

@@ -63,9 +63,8 @@ Section LockAt.
   (* [WpLock.newlock] with its [own_alloc] taken out: a free physical lock
      (word 0, cpu word 0), its name, its resource and the pre-minted ghost
      pair become THE lock at the gname the caller already published. *)
-  (* A6.67: the free arm is the parked record, so this creator DEPOSITS.
-     [own_context] in and straight back out -- the honest mint's price
-     (A6.66), paid once here for all seven [newlock_at] callers. *)
+  (* the free arm is the lock's stamped context, so this creator mints it
+     ([lock_pay_born]); [own_context] in and straight back out. *)
   Lemma newlock_at `{CID : RiscvLang.CpuId} E (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) `{!CtxMorph R} :
     lock_free_tok γ -∗
@@ -80,7 +79,7 @@ Section LockAt.
        hand it to [is_lock_intro], which is where the handle's floor lives. *)
     rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
     iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
-    iMod (lock_pay_intro R with "Hrun HR") as "[Hrun HR]".
+    iMod (lock_pay_born_id R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
     iDestruct (WpLock.lk_addr_claim_of4 lk (DfracOwn 1) (mword_of_int 0 : mword 32)
                  with "Hword") as "#Hc4".
@@ -100,7 +99,7 @@ Section LockAt.
     iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").
   Qed.
 
-  (* BOX v2 boot: [newlock_at] minted WITH the fold ([lock_pay_intro_llb]). *)
+  (* BOX v2 boot: [newlock_at] minted WITH the fold ([lock_hook_llb]). *)
   Lemma newlock_at_llb `{CID : RiscvLang.CpuId} E (γ : gname) (lk : mword 64) (s : string)
       (R Rdep : CtxId → iProp Σ) `{!CtxMorph Rdep} (tl : nat) :
     (forall ξ : CtxId, Rdep ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R ξ) ->
@@ -117,7 +116,8 @@ Section LockAt.
        hand it to [is_lock_intro], which is where the handle's floor lives. *)
     rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
     iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
-    iMod (lock_pay_intro_llb Rdep R tl Hfold with "Hllb Hrun HR") as "[Hrun HR]".
+    iMod (lock_pay_born Rdep R with "Hrun HR [Hllb]") as "[Hrun HR]".
+    { iApply (lock_hook_llb Rdep R tl Hfold with "Hllb"). }
     iFrame "Hrun".
     iDestruct (WpLock.lk_addr_claim_of4 lk (DfracOwn 1) (mword_of_int 0 : mword 32)
                  with "Hword") as "#Hc4".

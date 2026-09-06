@@ -1,10 +1,16 @@
-# Project: per-lock persistent contexts (ctx-parent phase two)
+# Completed: per-lock persistent contexts (ctx-parent phase two)
 
-**STATUS: NOT STARTED.**  Ruling (c) of `completed/ctx-parent.md` §8:
-adopted as phase two, after the thread path and fork landed (they have).
-Not to be interleaved with anything else on the context surface; a
-separate ruling on scope before the sweep starts.  The context surface
-this builds on is [`design/contexts.md`](../design/contexts.md).
+Landed on `main`: every spinlock owns one context for its life, born at
+`newlock`, stamped in the free arm, resumed and parked under the winner at
+acquire (inside `locked`), resumed and stamped at release.  The pre-parked
+release form (`RELEASE_IN`, `WpLockIn.v`) is replaced by the release HOOK:
+the caller finishes its payload at the lock's stamped context, and the
+floor fold is the hook `lock_hook_llb`.  The deposit/absorb/domination
+family with a stamped root survives only in the transit boxes and the boot
+roots.  The law as it stands is [`design/contexts.md`](../design/contexts.md)
+§5; the phase-one record and the owner's rulings are
+[`ctx-parent.md`](ctx-parent.md).  What follows is the plan this was built
+from.
 
 ## The design (from `completed/ctx-parent.md` §6)
 

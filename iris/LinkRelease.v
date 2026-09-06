@@ -9,4 +9,3 @@ Require Import LinkHolding LinkPushOff ProofRelease.
 Module ReleaseGen := ReleaseGenProof Holding PushOff.
 Module Release := ReleaseOfGen ReleaseGen.
 Module ReleaseCancel := ReleaseCancelOfGen ReleaseGen.
-Module ReleaseIn := ReleaseInOfGen ReleaseGen.

@@ -525,7 +525,6 @@ WpAmo.v
 CodeHolding.v
 CodeAcquire.v
 WpLock.v
-WpLockIn.v
 WpLockAt.v
 ArrCursor.v
 FdSlots.v

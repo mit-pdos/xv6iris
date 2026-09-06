@@ -1369,7 +1369,7 @@ Section box.
                     slot_p := {| T'; None |} (both halves).
        close in_arm at sr_ident r; rows: (Σ) unchanged (same mass),
        (I) i = sr_ident r, (C) right disjunct T' ≤ tp = T', (D) T' ∈ dom.
-       export llb T' for the _in releasesleep. *)
+       export llb T' for the genin releasesleep. *)
   Lemma box_park_join `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (i : id)
       (P_hdr' : id → X → CtxId → iProp Σ) (Qc' Q' : iProp Σ)
       (mh : gmap (id * nat) ufrac) (E : coPset) :
@@ -1623,7 +1623,7 @@ Section box.
   (* The caller (bio_init / icache boot) deposits the bundle at identity
      i0 and receives: L1's register half at {| T_boot; false; i0 |} with
      llb T_boot (L1's floor row must start at td = T_boot -- the newlock
-     twin over lock_pay_intro_llb folds it), the cnt half at 0, and L2's
+     twin's hook [WpLock.lock_hook_llb] folds it), the cnt half at 0, and L2's
      register half at {| 0; None |} (ctx_floor_0 serves its row).
      Proof skeleton: ctx_stamped_alloc; ctx_deposit the bundle (T_boot);
      own_alloc (● ∅); ghost_var_alloc ×3; inv_alloc with m = ∅ (rows: Σ
@@ -1758,7 +1758,7 @@ Section box.
     l1_row γ r ξ.
   Proof. iIntros (Hw Hx) "Hd #Hfl #Hllb". iFrame "Hd Hfl Hllb". by iPureIntro. Qed.
 
-  (* the L2 payload row folds at releasesleep (the _in form mints the
+  (* the L2 payload row folds at releasesleep (the genin form mints the
      floor from the park's llb T') *)
   Lemma l2_row_fold γ (T' : nat) (ξ : CtxId) :
     slotp_half γ (L2Reg T' None) -∗ ctx_floor ξ T' -∗

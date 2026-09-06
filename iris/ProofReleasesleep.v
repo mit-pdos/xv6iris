@@ -68,7 +68,7 @@ Local Open Scope Z_scope.
 (* ===================================================================== *)
 
 
-Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (ReleaseIn : RELEASE_IN) (Wakeup : WAKEUP) : RELEASESLEEP.
+Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Wakeup : WAKEUP) : RELEASESLEEP.
 
 Section ProofReleasesleep.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
@@ -386,21 +386,21 @@ Section ProofReleasesleep.
     (* rebuild the FREE sl_res: zeroed word + token + zeroed pid + R. *)
     iDestruct (sl_res_close_free γsl slk (Rdep TsoCtx.cur_ctx) H q with "Hslkw Hslk Hha HRdep") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0.  ENDGAME R1-pre / R2: the
-       free arm goes back PRE-PARKED through [lock_pay_intro_llb], which
-       raises the parked record to the presented [llb tl] and mints the
+       free arm goes back UNFLOORED and the hook ([lock_hook_llb]) raises
+       the lock's stamped record to the presented [llb tl] and mints the
        floor at [tl] inside the payload -- what the next winner's absorb
        hands over as [R cur_ctx] (the floor inside R, per the client). *)
-    iApply (ReleaseIn.wp_release_in_sconf KT1 γl (sl_lk slk) "sleep lock"%string (sl_pay γsl slk R H) Krel
+    iApply (Release.wp_release_hook_sconf KT1 γl (sl_lk slk) "sleep lock"%string
+              (sl_pay γsl slk Rdep H) (sl_pay γsl slk R H) Krel
               0%nat b pme (av - 4)%nat
               ({["sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)
               ltac:(lia)
-              with "Hcg Htext Hpc [] HtokL [HRsl] Hown Hpay").
+              with "Hcg Htext Hpc [] HtokL [HRsl] [Hllb] Hown Hpay").
     { iExact "Hlockinv". }
-    { iIntros "Hrun".
-      iApply (lock_pay_intro_llb (sl_pay γsl slk Rdep H) (sl_pay γsl slk R H) tl
-                (sl_body_fold γsl slk R Rdep H tl Hfold) with "Hllb Hrun [HRsl]").
-      iApply (sl_pay_of_res with "HRsl"). }
+    { iApply (sl_pay_of_res with "HRsl"). }
+    { iApply (lock_hook_llb (sl_pay γsl slk Rdep H) (sl_pay γsl slk R H) tl
+                (sl_body_fold γsl slk R Rdep H tl Hfold) with "Hllb"). }
     (* release's own exit index is [match 0 with O => eb | S _ => false end]
        -- the term [Hbmatch] equates with [b] -- so the hart it hands back is
        at [wp_next b], matching releasesleep's own top-level index. *)

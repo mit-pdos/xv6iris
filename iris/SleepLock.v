@@ -444,15 +444,13 @@ Section SleepLock.
 
   (* ================================================================== *)
   (*  ENDGAME R1-pre: THE PAYLOAD AS A CONTEXT-λ WITH A FLOOR SLOT.        *)
-  (*  The inner spinlock's payload used to be the CONST [<{ sl_res_gen }>] *)
-  (*  -- ambient-XI cells under a constant, the is_ftable class, and no    *)
-  (*  slot for the floor R2 folds at release.  Now: [sl_body] states the   *)
-  (*  word and the pid field at an explicit ξ over a BOUND-INDEXED client  *)
-  (*  payload [Rb : nat → iProp] (ξ-FREE by the sleeplock-payload rule),   *)
-  (*  and [sl_pay] packs it under [∃ tl, ctx_floor ξ tl].  The releaser    *)
-  (*  presents [llb tl] and [Rb tl]; the fold ([lock_pay_intro_llb]) mints  *)
-  (*  the floor at the parked context; the winner's absorb hands it back   *)
-  (*  at its own.  The const tier is the instance [Rb := λ _, R].          *)
+  (*  [sl_body] states the word and the pid field at an explicit ξ over a  *)
+  (*  BOUND-INDEXED client payload [Rb : nat → iProp] (ξ-FREE by the       *)
+  (*  sleeplock-payload rule), and [sl_pay] packs it under                 *)
+  (*  [∃ tl, ctx_floor ξ tl].  The releaser presents [llb tl] and [Rb tl]; *)
+  (*  the hook ([lock_hook_llb]) mints the floor at the lock's stamped     *)
+  (*  context; the winner's absorb hands it back at its own.  The const    *)
+  (*  tier is the instance [Rb := λ _, R].                                 *)
   (* ================================================================== *)
 
   Definition sl_free_hold_at (ξ : TsoCtx.CtxId) (γ : gname) (slk : mword 64) : iProp Σ :=

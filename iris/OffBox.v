@@ -291,7 +291,7 @@ Section OffBox.
      fraction ([FileInvDefs.off_fd]), the box named by [fp_obox]. *)
 
   (* THE ROWS' CONTEXT-FREE FORM (r25 shapes; SKELETON statements, proofs in
-     lane (ii)).  What an [_in] release of ip->lock holds: every row's L2
+     lane (ii)).  What a genin release of ip->lock holds: every row's L2
      register half with its park stamp bounded by [T], and [llb T] so the
      release can present one lower bound for the combined maximum
      (reviewer 2's correction 2: the register's [lr_tp] cannot be raised,

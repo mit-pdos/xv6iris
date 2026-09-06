@@ -428,7 +428,7 @@ Qed.
 
 (* ===================================================================== *)
 
-Module IputProof (Acquire : ACQUIRE) (Release : RELEASE) (RLI : RELEASE_IN)
+Module IputProof (Acquire : ACQUIRE) (Release : RELEASE)
                  (ASL : ACQUIRESLEEP) (RS : RELEASESLEEP)
                  (IT : ITRUNC) (IU : IUPDATE)
                  (* the off-lock tail's three leaves, new at the splice: the
@@ -959,14 +959,14 @@ Section IputTail.
       rewrite /D3 upd_ne; [reflexivity | regne]. }
     assert (HD5sp : D5 !!! Regidx csp_rs1 = spd)
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HDsp).
-    iApply (RLI.wp_release_in_sconf KT1 fsc_itlock itable_lock "itable"%string (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) D5
+    iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
+              (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
+              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) D5
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity) ltac:(lia)
-              with "Hcg Htext Hpc [Hlock] Htok [HRres] Hcnt Hpay").
+              with "Hcg Htext Hpc [Hlock] Htok HRres [] Hcnt Hpay").
     { iApply (is_itable2_lock with "Hlock"). }
-    { iIntros "Hrun".
-      iApply (itable_pay_intro fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev
-                with "Hrun HRres"). }
+    { iApply itable_ctx_hook. }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
@@ -2979,15 +2979,15 @@ Section IputFreePath.
                        H3 !!! Regidx c = mfa !!! Regidx c).
     { intros c Hcs. rewrite /H3 upd_ne; [| regne].
       rewrite /H2 upd_ne; [| regne]. rewrite /H1 upd_ne; [reflexivity | regne]. }
-    (* the _in tier: the rows go back LLB-bare and the release re-floors them *)
-    iApply (RLI.wp_release_in_sconf KT1 fsc_itlock itable_lock "itable"%string (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) H3
+    (* the hooked tier: the rows go back LLB-bare and the hook re-floors them *)
+    iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
+              (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
+              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) H3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HH3a0; reflexivity) ltac:(lia)
-              with "Hcg Htext Hpc [Hitlk] Htok [HRres] Hcnt Hpay").
+              with "Hcg Htext Hpc [Hitlk] Htok HRres [] Hcnt Hpay").
     { iApply (is_itable2_lock with "Hitlk"). }
-    { iIntros "Hrun".
-      iApply (itable_pay_intro fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev
-                with "Hrun HRres"). }
+    { iApply itable_ctx_hook. }
     iIntros (CIDrl Hsrl mr1) "Hcg Hpc %Hpins1 Hcnt".
     iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
@@ -3228,7 +3228,7 @@ Section IputFreePath.
     { intros c Hcs. rewrite /J6 upd_ne; [| regne]. exact (HJ5c c Hcs). }
     iDestruct (cpu_own_transport CIDit CIDm6 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    (* the _in release: the L2 row goes back UNFLOORED at the park stamp and
+    (* the genin tier: the L2 row goes back UNFLOORED at the park stamp and
        the callee re-floors it at the parked context (M-6, R2) *)
     (* r25 pass 1 (correction 2): ONE bound for the combined maximum *)
     iDestruct (ic_slp_dep_of_rows fsc_ic k Tp TsoCtx.cur_ctx
@@ -3765,14 +3765,14 @@ Section IputFreePath.
                        G3 !!! Regidx c = F1 !!! Regidx c).
     { intros c Hcs. rewrite /G3 upd_ne; [| regne].
       rewrite /G2 upd_ne; [| regne]. rewrite /G1 upd_ne; [reflexivity | regne]. }
-    iApply (RLI.wp_release_in_sconf KT1 fsc_itlock itable_lock "itable"%string (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) G3
+    iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
+              (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
+              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) G3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HG3a0; reflexivity) ltac:(lia)
-              with "Hcg Htext Hpc [Hitlk] Htok [HRres3] Hcnt Hpay").
+              with "Hcg Htext Hpc [Hitlk] Htok HRres3 [] Hcnt Hpay").
     { iApply (is_itable2_lock with "Hitlk"). }
-    { iIntros "Hrun".
-      iApply (itable_pay_intro fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev
-                with "Hrun HRres3"). }
+    { iApply itable_ctx_hook. }
     iIntros (CIDrl2 Hsrl2 mr2) "Hcg Hpc %Hpins2 Hcnt".
     iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".

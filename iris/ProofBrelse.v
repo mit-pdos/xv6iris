@@ -78,6 +78,7 @@ Require Import HartTp WpNext.
 Require Import KernelText.
 Require Import InstrBytes.
 Require Import BcacheInv BioInv ProofBreadParts SieCapCtx WpLock.
+Require Import TsoGhost.   (* [llb] -- the release hook's Rdep names the loglen receipt *)
 Require Import CodeBrelse.
 Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecAcquire SpecRelease.
@@ -110,7 +111,7 @@ Proof.
 Qed.
 
 Module BrelseProof (Hsl : HOLDINGSLEEP) (Rsl : RELEASESLEEP)
-                   (Aq : ACQUIRE) (Rl : RELEASE) (RlIn : RELEASE_IN) : BRELSE.
+                   (Aq : ACQUIRE) (Rl : RELEASE) : BRELSE.
 
 Section ProofBrelse.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
@@ -366,19 +367,19 @@ Section ProofBrelse.
     assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.brelse + 0x68) : mword 64) 4)
       by (rewrite /T3; apply upd_eq).
     (* BOX v2 / R2: every L1 release re-floors at the payload's slot through
-       the _in form, minting the floor from the llb the count edge handed out *)
+       the hook, minting the floor from the llb the count edge handed out *)
     iDestruct "Hafter" as (M' ord' devs' bnos' tl') "(%Htl' & #Hllbtl' & Hscan')".
-    iApply (RlIn.wp_release_in_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string
+    iApply (Rl.wp_release_hook_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string
+              (fun ξ => llb loglen_name tl' ∗ bcache_scan2 bn V M' ord' devs' bnos' tl' ξ)%I
               (fun ξ => bcache_res2 bn V ξ) T3
               0%nat eb p (K - 4)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HT3a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
-              with "Hcg Htext Hpc [Hlock] Htok [Hscan'] Hcnt Hpay").
+              with "Hcg Htext Hpc [Hlock] Htok [Hscan'] [Hllbtl'] Hcnt Hpay").
     { iExact "Hlock". }
-    { iIntros "Hrun".
-      iApply (lock_pay_intro_llb _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
-                with "Hllbtl' Hrun [Hscan']").
-      iFrame "Hllbtl' Hscan'". }
+    { iFrame "Hllbtl' Hscan'". }
+    { iApply (lock_hook_llb _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
+                with "Hllbtl'"). }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)
       by (apply locks_add_del_below; lkbelow).

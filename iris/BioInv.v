@@ -1266,7 +1266,7 @@ Section BioBox.
   Global Typeclasses Opaque bcache_scan2.
 
   (* the payload, with its floor slot: R2 folds the releaser's llb here
-     ([lock_pay_intro_llb] with [bcache_scan2] as the unfloored body) *)
+     ([lock_hook_llb] with [bcache_scan2] as the unfloored body) *)
   Definition bcache_res2 (bn : bio_names) (V : bio_view Σ) (ξ : CtxId) : iProp Σ :=
     (∃ (M : gmap nat (option Qp * positive)) (ord : list nat)
        (devs bnos : nat -> mword 32) (tl : nat),
@@ -1278,8 +1278,8 @@ Section BioBox.
     ⊢ bcache_res2 bn V ξ.
   Proof. iIntros "(Hb & #Hfl & #Hllb)". iExists M, ord, devs, bnos, tl. iFrame "Hfl Hllb Hb". Qed.
 
-  (* the _in release's fold: the releaser presents [llb tl] (R2's
-     [lock_pay_intro_llb] mints the floor) *)
+  (* the hooked release's fold: the releaser presents [llb tl] (R2's
+     [lock_hook_llb] mints the floor) *)
   Lemma bcache_res2_fold_in bn V M ord devs bnos tl :
     forall ξ : CtxId,
       (llb loglen_name tl ∗ bcache_scan2 bn V M ord devs bnos tl ξ) ∗ TsoCtx.ctx_floor ξ tl

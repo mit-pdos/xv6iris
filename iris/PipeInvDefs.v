@@ -584,14 +584,14 @@ Section PipeInv.
     lock_frag γl st -∗ pipe_dead γl γp -∗ False.
   Proof. iIntros "Hf (Hf' & _ & _)". iApply (lock_frag_exclusive with "Hf Hf'"). Qed.
 
-  (* A6.119: [locked] is no longer DEFINITIONALLY [lock_frag] -- it carries
-     the acquire position's floor beside it (§0.34′) -- so the token is
-     unpacked here rather than applied through.  The arity did not move; what
-     moved is the definitional unfolding, and this is the one shape in the
-     sweep that noticed. *)
+  (* [locked] is not DEFINITIONALLY [lock_frag]: it carries the acquire
+     position's floor and the lock's parked context beside the state
+     fragment, so the token is unpacked here rather than applied through.
+     The arity did not move; what moved is the definitional unfolding. *)
   Lemma locked_dead γl γp i : ⊢ locked γl i -∗ pipe_dead γl γp -∗ False.
   Proof.
-    iIntros "(%B & Hf & _) Hd".
+    iIntros "Hl Hd". iEval (rewrite locked_split) in "Hl".
+    iDestruct "Hl" as "[(%B & Hf & _) _]".
     iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
   Qed.
   Lemma locked_pre_dead γl γp i : ⊢ locked_pre γl i -∗ pipe_dead γl γp -∗ False.

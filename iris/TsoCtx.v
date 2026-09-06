@@ -1945,7 +1945,7 @@ Section ctx.
      context has no hart, so raising its stamp falsifies nothing: every
      clean fact is still under the (larger) stamp, and the dirty positions
      were under the old one.  What comes out beside it is the floor a
-     payload row needs ([WpLock.lock_pay_intro_llb]'s R2 fold). *)
+     payload row needs ([WpLock.lock_hook_llb]'s R2 fold). *)
   Lemma ctx_stamped_raise (ξ : CtxId) (T T' : nat) :
     llb loglen_name T' -∗ ctx_stamped ξ T ==∗
     ctx_stamped ξ (Nat.max T T') ∗ ctx_floor ξ T'.

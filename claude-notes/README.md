@@ -207,8 +207,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   tokens (running, stamped, parked under a context), the one domination
   relation and its four mints, `CtxMorph` as the only transport class with
   the same-hart move derived, the thread record at `swtch`, the scheduler's
-  slot, fork, and why boxes keep a stamped root.  Read before touching
-  `TsoCtx.v`, `SwtchCtx.v`, `SchedCtx.v` or any `CtxMorph` instance.
+  slot, fork, the per-lock context and the release hook, and why boxes keep
+  a stamped root.  Read before touching `TsoCtx.v`, `SwtchCtx.v`,
+  `SchedCtx.v`, `WpLock.v` or any `CtxMorph` instance.
 - **[`ctx-box.md`](design/ctx-box.md)** — THE TRANSIT BOX (`CtxBox.v`): the
   one mechanism for a cell that crosses locks under TSO — tiers, the
   register-selected arms, the seven hooked transitions, the accessors, the

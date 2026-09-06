@@ -93,9 +93,9 @@ Section ParkCap.
      wire_inv ∗
      kmap_at tramp_vpn tramp_ppn KP_rx ∗
      procs_inv γs ∗
-     (* THE PARKER'S GLOBALS, at ITS context (L8, A12.19): the cap hands
-        the parked twin a copy ([ProofForkretPark], by [ctx_deposit]), which
-        is what the twin's forkret needs to apply the closer below. *)
+     (* THE PARKER'S GLOBALS, at ITS context (L8, A12.19): the cap moves
+        them into the running twin ([ProofForkretPark], by [ctx_move]),
+        which is what the twin's forkret needs to apply the closer below. *)
      park_globals cur_ctx γs γw γft γf γtl ∗
      pslot_used_at pa ∗
      stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗

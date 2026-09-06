@@ -116,7 +116,7 @@ Proof.
   rewrite -Qp.add_assoc (Qp.div_2 qr). exact Hs.
 Qed.
 
-Module IdupProof (Acquire : ACQUIRE) (Release : RELEASE) (RLI : RELEASE_IN) : IDUP.
+Module IdupProof (Acquire : ACQUIRE) (Release : RELEASE) : IDUP.
 
 Section ProofIdup.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ}.
@@ -792,15 +792,15 @@ Section ProofIdup.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Houtb) in "Hcg".
-    iApply (RLI.wp_release_in_sconf KT1 fsc_itlock itable_lock "itable"%string (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) D5
+    iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
+              (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
+              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) D5
               n eb p (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)
-              with "Hcg Htext Hpc [Hlock] Htok [HRres] Hcnt Hpay").
+              with "Hcg Htext Hpc [Hlock] Htok HRres [] Hcnt Hpay").
     { iExact "Hlk2". }
-    { iIntros "Hrun".
-      iApply (itable_pay_intro fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev
-                with "Hrun HRres"). }
+    { iApply itable_ctx_hook. }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
     (* release handed back the FULL entry set minus the rank it just gave up;
