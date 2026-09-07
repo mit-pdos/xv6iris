@@ -5,10 +5,9 @@
    under WHAT IS NOT HERE).
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
-   prover).  A PARALLEL walk beside [ProofSysOpen] -- R10: the landed
-   contract and its proof do not move, and every failure tail
-   ([ProofSysOpenTails]) and every parts lemma ([ProofSysOpenParts]) is
-   REUSED VERBATIM, because none of them moves an fs-abstract resource.
+   prover).  THE walk: every failure tail ([ProofSysOpenTails]) and every
+   parts lemma ([ProofSysOpenParts]) is REUSED VERBATIM, because none of
+   them moves an fs-abstract resource.
 
    ==== THE FIVE BLOCKS, AND WHICH ONE OWES WHAT =======================
 

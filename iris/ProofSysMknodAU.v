@@ -1,4 +1,4 @@
-(* ProofSysMknod.v -- sys_mknod over the SIE-agnostic sconf world.
+(* ProofSysMknodAU.v -- sys_mknod over the SIE-agnostic sconf world.
 
      uint64 sys_mknod(void) {
        struct inode *ip;  char path[MAXPATH];  int major, minor;

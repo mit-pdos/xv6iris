@@ -272,19 +272,18 @@ Definition sys_unlink_ret (r : mword 64) : Prop :=
 
    claude-notes/optimization.md, "Seal a whole-function proof's
    continuation": spelled inline this is fifteen rows, and a mid-walk dump of
-   [Delta] in ProofSysUnlink measured it at 879 printed characters --
+   [Delta] in the unlink walk measured it at 879 printed characters --
    7.5 % of the Iris context inside W3 and 13-15 % inside W5, at EVERY step
    of the walk, in every block lemma, plus one more copy inside each block's
-   own seam continuation.  It was written out TEN times (this contract and
-   nine statements in ProofSysUnlink.v).  One [Definition] names it in all
-   ten.
+   own seam continuation.  One [Definition] names it in this contract and in
+   every block statement of [ProofSysUnlinkAUW1/W2/W3/W5F/W5D].
 
    It stays TRANSPARENT on purpose (same section's rule 1): the tails apply
    it with [iApply ("Hcont" $! ...)], which unifies through a transparent
    constant and fails through an opaque one.
 
    It is defined OUTSIDE any [Section] because it is a premise of the
-   module-type contract below and its rows are applied at the hart the
+   contract below and its rows are applied at the hart the
    caller picks; see the same note's last paragraph. *)
 Definition sys_unlink_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -425,19 +424,7 @@ Definition wp_sys_unlink_sconf_body
                       dqb dqs dqbs) -∗
   WP (Loop : expr riscv_lang).
 
-Module Type SYSUNLINK.
-  Parameter wp_sys_unlink_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γf : gname)
-      (gs : list gname) (j : nat) (gl : gname)
-      (pd pav pu : mword 64)
-      (dqb dqs dqbs : dfrac)
-      (v0 : mword 64)
-      (pid : mword 32) (U : ustate)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
-      wp_sys_unlink_sconf_body γf gs j gl pd pav pu
-
- dqb dqs dqbs v0 pid U
-                               m K eb b lks.
-End SYSUNLINK.
+(* NO [Module Type SYSUNLINK].  The landed walk it sealed is gone (round E2,
+   lane E2-X): the dispatch runs this syscall on its atomic-update
+   contract, and [wp_sys_unlink_sconf_body] survives as the FRAME that
+   contract restates. *)

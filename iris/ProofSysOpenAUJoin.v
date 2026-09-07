@@ -1,5 +1,5 @@
 (* ProofSysOpenAUJoin.v -- THE JOIN AT +0x4a AND ARM D-FAIL, at the ARMED
-   post: [ProofSysOpen.so_join] with the AU residue threaded and the DEVICE
+   post: the join block with the AU residue threaded and the DEVICE
    arm's major bound EARNED here and relayed down.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
@@ -92,7 +92,6 @@ Require Import FsBytesGamma.
 Require Import SpecSysOpenAU.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUAlloc.
-Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.

@@ -376,7 +376,7 @@ End MknodFire.
 (* ===================================================================== *)
 
 (* sys_mknod's [lh a2,-148(s0)] reads back the low HALFWORD of the [int]
-   [argint] wrote, i.e. [hw_lo (arg_int32 v)] in ProofSysMknod's
+   [argint] wrote, i.e. [hw_lo (arg_int32 v)] in [ProofSysMknodAU]'s
    vocabulary; the record field reads back UNSIGNED.  So the abstract
    child's major number is the low sixteen bits of the trapframe word --
    [SpecSysMknodAU.dev_arg] on the nose.  Stated over the byte spelling

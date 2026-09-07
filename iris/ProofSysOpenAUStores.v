@@ -1,5 +1,5 @@
 (* ProofSysOpenAUStores.v -- +0x88 .. +0xb4 AND THE +0x14e itrunc BLOCK, at
-   the ARMED post: [ProofSysOpen.so_stores] with the O_TRUNC commit fired at
+   the ARMED post: the O_TRUNC store block, with the commit fired at
    the retag and the three success arms built where [ip->type] is known.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
@@ -363,9 +363,9 @@ Section ProofSysOpenAUStores.
       by (intros Hq; exact (proj2 (Hti Hq))).
     (* THE OWNER'S RULING (2026-08-29), AND THIS LANE OWES IT NOTHING NEW:
        [Htd] already says a T_DEVICE inode was stored as FD_DEVICE, so the
-       contrapositive IS the payload's fifth conjunct.  [ProofSysOpen]'s
-       landed twin has to take it as a premise because its store block
-       carries no such tie -- the AU's [t] is what forced one here. *)
+       contrapositive IS the payload's fifth conjunct.  The retired landed
+       twin had to take it as a premise because its store block carried no
+       such tie -- the AU's [t] is what forced one here. *)
     assert (Hdvw : tyw = FD_INODE ->
                    bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z).
     { intros Hi Hq. destruct (Htd Hq) as (Hd & _). rewrite Hi in Hd.

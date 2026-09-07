@@ -1,7 +1,7 @@
 (* LinkSysOpenAU.v -- the sys_open ATOMIC-UPDATE proof (PLAIN ARM) composed
    with its callees'.
 
-   [LinkSysOpen.v]'s cone with TWO differences and no others:
+   The retired landed link's cone with TWO differences and no others:
 
    - namei arrives at the ERA trace contract ([LinkNameiEra.NameiEra])
      instead of the landed one.  [LinkNameiEra]'s header records that this
@@ -15,9 +15,8 @@
      HAS LANDED: [LinkSysOpenAUFull] is the whole seal, and this file is
      the plain arm's own link, kept because it is the cheaper cone.
 
-   Every remaining callee is already linked by [LinkSysOpen.v], and the era
-   walk by [LinkSysMknodAU.v]'s cone, so this composition assumes nothing
-   the landed sys_open does not. *)
+   Every remaining callee is linked elsewhere and the era walk by
+   [LinkSysMknodAU.v]'s cone, so this composition assumes nothing new. *)
 Require Import LinkArgint LinkArgstr LinkBeginOp LinkNameiEra
         LinkIlock LinkIunlock LinkIunlockput LinkEndOp LinkFileclose
         LinkItrunc LinkFilealloc LinkFdalloc

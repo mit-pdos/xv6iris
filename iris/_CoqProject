@@ -1449,13 +1449,13 @@ EnvMorph.v
 FirstTok.v
 FsSyscalls.v
 LinkFsSyscalls.v
+# THE NON-AU sys_open / sys_mknod / sys_unlink WALKS ARE GONE (round E2,
+# lane E2-X): the dispatch runs all three on their AU contracts
+# (LinkSyscall.v), so the landed walks and their links had no client.  The
+# three contracts stay -- SpecSysMknod / SpecSysOpen / SpecSysUnlink are the
+# frames the AU specs restate -- and so do the parts/tails/budget layers,
+# which the AU proofs use as lemma libraries.
 SpecSysMknod.v
-# ProofSysMknod.v
-# OFF THE BUILD (2026-09-03, the AU replacement): the dispatch runs sys_open /
-# sys_mknod / sys_unlink on their AU contracts (LinkSyscall.v), so these landed
-# links -- and ProofSysMknod, which nothing else consumes -- have no client.
-# ProofSysOpen*/ProofSysUnlink* stay: the AU proofs reuse them as lemma libraries.
-# LinkSysMknod.v
 SysLinkBudget.v
 SpecSysLink.v
 ProofSysLinkParts.v
@@ -1467,8 +1467,6 @@ SysOpenBudget.v
 SpecSysOpen.v
 ProofSysOpenParts.v
 ProofSysOpenTails.v
-ProofSysOpen.v
-# LinkSysOpen.v
 SpecUserretClosed.v
 ProofUserretClosed.v
 LogDefs.v
@@ -1481,14 +1479,7 @@ InodeDefs.v
 SpecSysUnlink.v
 ProofSysUnlinkParts.v
 ProofSysUnlinkTails.v
-ProofSysUnlinkShared.v
-ProofSysUnlinkW1.v
-ProofSysUnlinkW2.v
-ProofSysUnlinkW3.v
-ProofSysUnlinkW5File.v
-ProofSysUnlinkW5Dir.v
 ProofSysUnlink.v
-# LinkSysUnlink.v
 ProofSyscall.v
 LinkUserretClosed.v
 TfPage36.v

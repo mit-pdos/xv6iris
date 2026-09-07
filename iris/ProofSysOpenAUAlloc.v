@@ -1,5 +1,5 @@
 (* ProofSysOpenAUAlloc.v -- +0x5e .. +0x84 AND THE +0x140 FD_DEVICE BLOCK,
-   at the ARMED post: [ProofSysOpen.so_alloc] with the AU residue threaded
+   at the ARMED post: the alloc block with the AU residue threaded
    through filealloc and fdalloc and delivered at ARMs E-FAIL / F-FAIL.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU

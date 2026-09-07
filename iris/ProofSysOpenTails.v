@@ -1,7 +1,7 @@
 (* ProofSysOpenTails.v -- sys_open's FAILURE tails, as block lemmas.  They
    apply callees' contracts, so they live inside a module functor
    ([design/spec-modules.md]); the functor is NOT ascribed to a signature,
-   because it is a parts layer -- [ProofSysOpen.v] instantiates it beside its
+   because it is a parts layer -- each AU block file instantiates it beside its
    own callee arguments and the seal happens there.
 
    The eight arms of sys_open leave through six blocks, and ARM 0 is not one

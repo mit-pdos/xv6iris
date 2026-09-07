@@ -3,9 +3,9 @@
    callee's contract, and therefore everything that can live outside the
    module functor.
 
-   The walk itself is [ProofSysOpen.v]; the op-wide log ledger is
-   [SysOpenBudget.v]; the contract is [SpecSysOpen.v], whose header carries
-   the arm graph and the frame map.
+   The walk is [ProofSysOpenAU*.v] (the atomic-update form is the only one
+   left); the op-wide log ledger is [SysOpenBudget.v]; the contract is
+   [SpecSysOpen.v], whose header carries the arm graph and the frame map.
 
    NOTHING HERE IS IMPORTED FROM ANOTHER FUNCTION'S PROOF.  The sign
    cluster and the sixteen-bit compare cluster are restated rather than
@@ -109,6 +109,34 @@ Require Import TsoCtx.
 Set Printing Depth 40.
 
 Notation SO := KernelSyms.sys_open (only parsing).
+
+(* ===================================================================== *)
+(*  TWO PURE READINGS THE AU WALK SHARES                                  *)
+(* ===================================================================== *)
+
+(* [neq_vec] is [negb (eq_vec ...)], so the two BNE premises are the two
+   readings of the type cluster's [so_ty_eq] / [so_ty_ne]. *)
+Lemma so_neq_of_eq `{XI : CurCtx} (x y : mword 64) : eq_vec x y = true -> neq_vec x y = false.
+Proof. unfold neq_vec. intro H. rewrite H. reflexivity. Qed.
+
+Lemma so_neq_of_ne `{XI : CurCtx} (x y : mword 64) : eq_vec x y = false -> neq_vec x y = true.
+Proof. unfold neq_vec. intro H. rewrite H. reflexivity. Qed.
+
+(* WHAT SURVIVES namei's WALK, in the ledger's own vocabulary.  The SET-form
+   contract reports [n - (walk_spend w + (if ok then 0 else 1)) <= n'] and
+   the join needs [iput_units]; [SysOpenBudget.so_armC_closes] is the same
+   fact at the exact figures.  Kept as a plain [nat] lemma because a hot
+   [lia] inside a syscall-altitude Iris goal is what durable-notes warns
+   about.  [MAXOPBLOCKS] and [walk_spend] are QUALIFIED: this file requires
+   neither [LogInv] nor [SpecNamex] directly, and importing either here
+   would reorder what the payload vocabulary above already settles. *)
+Lemma so_bud_iput `{XI : CurCtx} (n' : nat) (w ok : bool) :
+  ((LogInv.MAXOPBLOCKS - (SpecNamex.walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat ->
+  (SpecIput.iput_units <= n')%nat.
+Proof.
+  unfold SpecNamex.walk_spend, SpecIput.iput_units, LogInv.MAXOPBLOCKS.
+  destruct w, ok; lia.
+Qed.
 
 (* ===================================================================== *)
 (*  THE REGISTER LEDGER                                                   *)
@@ -854,7 +882,7 @@ Section ProofSysOpenPublish.
 
   (* THE LEDGER DEPOSIT (off-ledger ruling), and it runs where the code
      runs it: UNDER [ip->lock].  The marker is ilock's valid cell, held
-     here because [so_tail_pub] has not yet reached iunlock; it comes back
+     here because the publication block has not yet reached iunlock; it comes back
      untouched.  On the FD_INODE arm the cell -- freshly written 0, hence
      the conditional bound -- goes into inode [kk]'s ledger and the
      fragment comes out; on the device arm the cell simply becomes the
@@ -950,7 +978,7 @@ Section ProofSysOpenPublish.
     fpay_tok gf kf 1 pn -∗
     (* THE OFF CONJUNCT, ALREADY DEPOSITED (off-ledger ruling): the ledger
        step ran under [ip->lock] -- [so_deposit] below, called by
-       [ProofSysOpen.so_tail_pub] before iunlock spends the valid cell --
+       [ProofSysOpenAUPub]'s publication before iunlock spends the valid cell --
        so what reaches the publication is the finished [file_core_off]. *)
     (* item 24: the share from [so_deposit] at FD_INODE, the free word at
        FD_DEVICE; [fpay_tok_update] records [fp_obox := γb] (the creator

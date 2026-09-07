@@ -494,20 +494,7 @@ Definition wp_sys_open_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-Module Type SYSOPEN.
-  Parameter wp_sys_open_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γfl γf : gname)
-      (gs : list gname) (j : nat) (gl : gname)
-      (pd pav pu : mword 64)
-      (ns : nat)
-      (dqb dqs dqbs dqn : dfrac)
-      (v vom : mword 64)
-      (pid : mword 32) (U : ustate) (sts : list fdstate)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
-      wp_sys_open_sconf_body γfl γf gs j gl pd pav pu
-
- ns dqb dqs dqbs dqn v vom
-                             pid U sts m K eb b lks.
-End SYSOPEN.
+(* NO [Module Type SYSOPEN].  The landed walk it sealed is gone (round E2,
+   lane E2-X): the dispatch runs this syscall on its atomic-update
+   contract, and [wp_sys_open_sconf_body] survives as the FRAME that
+   contract restates. *)

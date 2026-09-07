@@ -19,7 +19,7 @@
 (*  WHY THIS IS A SECOND LEAF, AND NOT THE REST OF [DirViewLend.v].  The
     lend's WRITER-side vocabulary ([dv_ride], [dv_set_rt]) has to be visible
     to every byte-write mover and every escrow arm -- ProofCreate,
-    ProofFilewrite, ProofSysOpen, ProofSysLink, IcacheEscrow, EscrowInode,
+    ProofFilewrite, ProofSysOpenAU, ProofSysLink, IcacheEscrow, EscrowInode,
     IcacheBoot, FsCfgBoot -- all of which sit BELOW the namei cone.  This
     file, which functors over [SpecNameiTr.NAMEI_TR], sits ABOVE it.  One
     file could not do both; the cut is exactly at the client side.

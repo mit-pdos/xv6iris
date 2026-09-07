@@ -1,5 +1,5 @@
 (* ProofSysOpenAUPub.v -- ARM S (+0xb8) AND THE PUBLICATION, at the ARMED
-   post: [ProofSysOpen.so_tail_pub] with [SpecSysOpen.sys_open_post]
+   post: the publication tail with [SpecSysOpen.sys_open_post]
    replaced by [SpecSysOpenAU.open_post_ok_plain]'s success arm.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU

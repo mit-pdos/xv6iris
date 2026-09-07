@@ -587,14 +587,13 @@ Section CreateSpec.
      ∗ aunarm_commit_at Γ appE Φun
      ∗ acre_commit_at_gen Γ appE (cre_child tyz ma mi) Φok)%I.
 
-  (* SATISFIABILITY, and the discharger the dispatcher and the two dead
-     non-AU callers hand down: the GENERIC application asks nothing of
-     create's legs, so every commit is its own unit and the whole bundle is
-     paid off the parked license ([AppInv.app_step_acc], through
-     [FsAbsCreateFire]'s four [_unit]s).  It sits here rather than in
-     [FsAbsInvFire]'s [fsabs_*] family because three of its four consumers
-     ([ProofSysMkdir], [ProofSysOpen], [ProofSysMknod]) are BELOW that file
-     in the cone. *)
+  (* SATISFIABILITY, and the discharger every caller of the landed create
+     hands down: the GENERIC application asks nothing of create's legs, so
+     every commit is its own unit and the whole bundle is paid off the
+     parked license ([AppInv.app_step_acc], through [FsAbsCreateFire]'s
+     four [_unit]s).  It sits here rather than in [FsAbsInvFire]'s
+     [fsabs_*] family because [ProofSysMkdir], one of its consumers, is
+     BELOW that file in the cone. *)
   Local Lemma cre_appN_appE : ↑appN ⊆ appE.
   Proof. rewrite /appE. done. Qed.
 

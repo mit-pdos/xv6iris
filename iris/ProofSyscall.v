@@ -295,7 +295,7 @@
      `K_sys_xxx <= av - 4` premise falls out of `K_syscall <= av` by `lia`.
 
    ALL 22 sys_* FUNCTIONS ARE PROVEN AND LINKED (sysfile.c is 16/16 and
-   file.c 7/7), sys_unlink included -- LinkSysUnlink.v retired the last
+   file.c 7/7), sys_unlink included -- LinkSysUnlinkAU.v retired the last
    stub axiom.  So nothing below this file is missing: both remaining
    unwired entries are blocked on debt (C) in the STATUS block, and on
    nothing else. *)
@@ -3981,8 +3981,7 @@ Section SyscallArms.
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
   Qed.
 
-  (* THE NINTH ARM: k = 18, [sys_unlink] -- the one table entry with no proof
-     anywhere in the tree, standing on LinkSysUnlink.v's [Axiom].  Its
+  (* THE NINTH ARM: k = 18, [sys_unlink].  Its
      contract (SpecSysUnlink.v) was written to BE [wp_syscall_sconf_body]
      with the entry point changed, abstract environment [R] and all, so the
      arm is the shortest of the nine: hand it [syscall_env] for [R] and every

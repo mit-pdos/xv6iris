@@ -4,10 +4,9 @@
    arm builders.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
-   prover).  Everything here is either copied verbatim out of
-   [ProofSysOpen]'s section (the four [Local] accessors, which are
-   inaccessible from another file and are needed by every block below) or
-   is the AU walk's own.
+   prover).  Everything here is either the four accessors every block
+   below needs (a [Local] lemma inside a block file is inaccessible from
+   another one) or is the AU walk's own.
 
    ==== WHY THE PAYLOAD IS THREADED PEELED ([so_flat]) ==================
 
@@ -27,7 +26,7 @@
    [so_flat_open] / [so_flat_close] are the two directions, and they are
    [IcacheEscrow]'s own pair with the existential moved out.
 
-   BINDERS: [ProofSysOpen]'s [ProofSysOpenBody] list verbatim. *)
+   BINDERS: [ProofSysOpenParts]'s section list verbatim. *)
 
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -52,7 +51,7 @@ Require Import DiskInv.
 Require Import Xv6Cameras.
 Require Import BioDefs.
 (* the payload's own vocabulary, IMPORTED BEFORE [FsBlocks] on purpose --
-   ProofSysOpen's rule, and its reason (the last import wins). *)
+   durable-notes' rule ("the last import wins"). *)
 Require Import FsStateEra.
 Require Import LogInv.
 Require Import BitmapInv.
@@ -174,7 +173,7 @@ Section ProofSysOpenAUParts.
   Qed.
 
   (* ================================================================== *)
-  (*  2.  THE FOUR ACCESSORS [ProofSysOpen] KEEPS [Local]                *)
+  (*  2.  THE FOUR ACCESSORS THE BLOCK FILES KEEP [Local]                *)
   (* ================================================================== *)
 
   Lemma so_meta_acc
@@ -278,7 +277,7 @@ Section ProofSysOpenAUParts.
   (*  3.  THE TWO EXIT CONTINUATIONS, AT THE ARMED POST                  *)
   (* ================================================================== *)
 
-  (* [ProofSysOpen.so_cont] with [SpecSysOpen.sys_open_post] replaced by
+  (* The landed exit continuation with [SpecSysOpen.sys_open_post] replaced by
      [SpecSysOpenAU.open_arms_plain] -- and that is the ONLY difference.
      The abstract state is read at the LIVE Γ, as the contract states it. *)
   Definition so_cont_au `{GEN : GenId}

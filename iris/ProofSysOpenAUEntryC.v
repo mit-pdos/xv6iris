@@ -4,9 +4,8 @@
    at +0x4a entered through [ProofSysOpenAUCreArm]'s SHIM.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
-   prover), create arm.  A PARALLEL block beside [ProofSysOpen.so_entry_c]
-   -- R10: the landed contract, its proof, and every AU block below the
-   join stay exactly where they are.  ARM A-FAIL is
+   prover), create arm.  The create-entry block; every AU block below
+   the join stays exactly where it is.  ARM A-FAIL is
    [ProofSysOpenTails.so_tail_a] VERBATIM (it moves no fs-abstract state)
    and the abstract payout there is [SpecCreateAUFOpen.cauf_fail_to_open],
    which is the WHOLE failure fold in one wand.

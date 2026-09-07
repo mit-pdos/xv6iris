@@ -1,7 +1,7 @@
 (* LinkSysMknodAU.v -- the sys_mknod ATOMIC-UPDATE proof composed with its
    callees'.
 
-   [LinkSysMknod.v]'s cone plus ONE argument: create arrives TWICE, at the
+   The retired landed link's cone plus ONE argument: create arrives TWICE, at the
    landed contract ([Create], through LinkCreate.v) and at the AU one
    ([CreateAU], through LinkCreateAU.v).  Both are real proofs and they
    share every callee but the walk, so nothing new is assumed -- the AU

@@ -1,5 +1,5 @@
 (* ProofSysOpenAUWalk.v -- THE else ARM (+0xdc .. +0xfa) AND ARMS B-FAIL /
-   C-FAIL, at the ARMED post: [ProofSysOpen.so_entry_n] with the ERA namei
+   C-FAIL, at the ARMED post: the namei-entry block with the ERA namei
    walk in place of the landed one and THE TERMINAL OBSERVATION FIRED.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
@@ -115,7 +115,6 @@ Require Import FsAbsOpenFire.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUAlloc.
 Require Import ProofSysOpenAUJoin.
-Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.

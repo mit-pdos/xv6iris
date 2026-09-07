@@ -1,10 +1,15 @@
-(* ProofSysUnlink.v -- sys_unlink's WALK.
+(* ProofSysUnlink.v -- sys_unlink's PURE LAYER: the name, register, ledger
+   and arithmetic facts the walk stands on, none of which applies a
+   callee's contract.
 
    The contract is [SpecSysUnlink.v] (its header carries the arm graph and
-   the frame map), the pure/frame/register layer is
-   [ProofSysUnlinkParts.v], every EXIT block is [ProofSysUnlinkTails.v] and
-   the op-wide log ledger is [SysUnlinkBudget.v].  This file is the walk
-   itself, decomposed exactly as projects/fs-sysfile.md's S7-unlink entry
+   the frame map), the frame/register carve is [ProofSysUnlinkParts.v],
+   every EXIT block is [ProofSysUnlinkTails.v] and the op-wide log ledger
+   is [SysUnlinkBudget.v].
+
+   THE WALK IS THE ATOMIC-UPDATE ONE.  [SpecSysUnlinkAU.v] states it and
+   [ProofSysUnlinkAUW1/W2/W3/W5F/W5D] (over [ProofSysUnlinkAUParts.v])
+   prove it, decomposed exactly as projects/fs-sysfile.md's S7-unlink entry
    decomposes it:
 
      W1  +0x00 .. +0x2e   the prologue, argstr, begin_op, nameiparent
@@ -14,21 +19,18 @@
      W4  +0xf8 .. +0x12c  the inlined isdirempty loop
      W5  +0x8a .. +0xd8   the zeroing writei and the two tails
 
-   SEALED.  The functor is ascribed [: SYSUNLINK] and
-   [wp_sys_unlink_sconf] at the bottom of this file composes
-   W1 ∘ W2 ∘ W3 ∘ {W5-FILE, W5-DIR}; [LinkSysUnlink.v] instantiates it
-   against the twelve callees' proofs and its [Axiom] is gone.  The two
-   pure facts the T_DIR half used to stop on -- the child's [".."] naming
-   the parent, and a directory with a live subdirectory entry having two
-   links -- are DERIVED inside [su_w5_dir] from the ledger's parent
-   register and its count clauses (projects/fs-fragments-campaign.md, V4
-   and V5'; projects/fs-sysfile.md, S7-unlink).
+   Those six files are what import this one.  The two pure facts the T_DIR
+   half stops on -- the child's [".."] naming the parent, and a directory
+   with a live subdirectory entry having two links -- are DERIVED in the
+   W5-DIR block from the ledger's parent register and its count clauses
+   (projects/fs-fragments-campaign.md, V4 and V5'; projects/fs-sysfile.md,
+   S7-unlink).
 
    ==== HOW THE BLOCKS CHAIN ============================================
 
    A single [wp_next] exit continuation is LINEAR, so a block that owns an
    exit arm cannot ALSO be handed the caller's continuation twice.  The
-   shape every block here uses is durable-notes' "the exit must be handed
+   shape every block uses is durable-notes' "the exit must be handed
    back": the block's FALL-THROUGH argument is a continuation that receives
    the seam AND the caller's own [wp_next] back, so whichever arm runs
    consumes the one copy.
@@ -39,17 +41,12 @@
 
    ==== THE TWO CONTINUATIONS ARE NAMED ================================
 
-   This file's cost was never a hot sentence -- it was |Delta|, RULE ONE in
-   claude-notes/optimization.md.  A mid-walk dump found 87 hypotheses / 11.7
-   kB, of which TWO entries, both continuations spelled inline, were 55 %:
-   the block's own fall-through seam ([su_wN_seam] beside each block lemma)
-   and the RETURN continuation ([SpecSysUnlink.sys_unlink_closer], which was
-   written out ten times -- the contract and nine statements here).  Naming
-   both, all TRANSPARENT, changed no proof script and took the file
-
-     153.7 s -> 133.1 s (-13.4 %), .vo 8.94 MB -> 7.62 MB (-14.8 %)
-
-   isolated, min of three interleaved runs.  The optimization note's
+   sys_unlink's cost was never a hot sentence -- it was |Delta|, RULE ONE in
+   claude-notes/optimization.md.  The two entries that dominated a mid-walk
+   context were both continuations spelled inline: the block's own
+   fall-through seam ([su_wN_seam_au] beside each block lemma) and the
+   RETURN continuation ([SpecSysUnlink.sys_unlink_closer]).  Naming both,
+   all TRANSPARENT, changes no proof script.  The optimization note's
    ProofSysUnlink case study has the full ranking and the two negative
    results (do NOT fold the open-inode bundles or the frame; they are
    consumed row by row). *)
@@ -64,18 +61,13 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile.
-Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import W32Arith.
 Require Import CalleeSaved.
 Require Import LockRank.
-Require Import FdSlots.
 Require Import SpecPanic.
-Require Import SpecPrintk.
 Require Import WpUart.
 Require Import DiskInv.
-Require Import Xv6Cameras.
 Require Import BioDefs.
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
@@ -88,35 +80,21 @@ Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeDefs.
-Require Import IrefSlots.
 Require Import IregLinkNz.   (* the nonzero-count reading at a held token
                                 ([ireg_tok_nz]) and the agreement of two
                                 fragments of one register
                                 ([ireg_toks_agree]), which is (D1) *)
-Require Import FileInvDefs.
 Require Import UserPtTree.
 Require Import ProcInv.
-Require Import SpecArgstr.
-Require Import SpecBeginOp.
-Require Import SpecEndOp.
-Require Import SpecIlock.
 Require Import SpecIput.
-Require Import SpecIupdate.
-Require Import SpecIunlockput.
-Require Import SpecNamecmp.
 Require Import SpecDirlookup.
-Require Import SpecMemset.
 Require Import SpecReadi.
 Require Import SpecWritei.
 Require Import SpecNamex.
-Require Import SpecNameiparent.
 Require Import SysUnlinkBudget.
 Require Import SpecSysUnlink.
 Require Import ProofSysUnlinkParts.
-Require Import ProofSysUnlinkTails.
 From Kernel Require KernelSyms KernelData.
-Require Import ProcAvail.
-Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 
@@ -462,206 +440,3 @@ Proof. lia. Qed.
 Lemma su_pn_below `{XI : CurCtx} (lks : gset string) :
   locks_below lks "log" -> locks_below lks "pr".
 Proof. intros H. apply (locks_below_mono lks "log" "pr" H). vm_compute; lia. Qed.
-(* ==================================================================== *)
-(*  ProofSysUnlink.v -- the seal. *)
-(*                                                                      *)
-(*  Split out of ProofSysUnlink.v FOR THE BUILD DAG: the five block      *)
-(*  lemmas are mutually independent (each seam is the NEXT block's        *)
-(*  premise list, so the seal composes them and nothing else does), and   *)
-(*  [Tails.] is named only inside proofs, never in a statement -- so each *)
-(*  file makes its own [Tails] and the vocabulary they share             *)
-(*  (ProofSysUnlinkShared.v) needs no functor argument at all.            *)
-(* ==================================================================== *)
-
-Require Import ProofSysUnlinkW1 ProofSysUnlinkW2 ProofSysUnlinkW3.
-Require Import ProofSysUnlinkW5File ProofSysUnlinkW5Dir.
-
-Module SysUnlinkProof (Argstr : ARGSTR) (BeginOp : BEGIN_OP)
-                      (Nameiparent : NAMEIPARENT) (Ilock : ILOCK)
-                      (Namecmp : NAMECMP) (Dirlookup : DIRLOOKUP)
-                      (Memset : MEMSET) (Readi : READI) (Writei : WRITEI)
-                      (Iupdate : IUPDATE) (Iunlockput : IUNLOCKPUT)
-                      (EndOp : END_OP) (PN : PANIC) : SYSUNLINK.
-
-  Module MW1 := SysUnlinkW1 Iunlockput EndOp PN Argstr BeginOp Nameiparent.
-  Module MW2 := SysUnlinkW2 Iunlockput EndOp PN Ilock Namecmp Dirlookup.
-  Module MW3 := SysUnlinkW3 Iunlockput EndOp PN Ilock Readi.
-  Module MWF := SysUnlinkW5File Iunlockput EndOp PN Memset Writei Iupdate.
-  Module MWD := SysUnlinkW5Dir Iunlockput EndOp PN Memset Writei Iupdate.
-  Import MW1. Import MW2. Import MW3. Import MWF. Import MWD.
-
-Module Tails := SysUnlinkTails Iunlockput EndOp PN.
-
-Section ProofSysUnlinkBody.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-
-  Notation Rra := (mword_of_int 1 : mword 5).
-  Notation Rs0 := (mword_of_int 8 : mword 5).
-  Notation Rs1 := (mword_of_int 9 : mword 5).
-  Notation Rs2 := (mword_of_int 18 : mword 5).
-  Notation Rs3 := (mword_of_int 19 : mword 5).
-  Notation Ra0 := (mword_of_int 10 : mword 5).
-  Notation Ra1 := (mword_of_int 11 : mword 5).
-  Notation Ra2 := (mword_of_int 12 : mword 5).
-  Notation Ra3 := (mword_of_int 13 : mword 5).
-  Notation Ra4 := (mword_of_int 14 : mword 5).
-  Notation Ra5 := (mword_of_int 15 : mword 5).
-
-
-
-  (* ==================================================================== *)
-  (*  **THE SEAL.**  W1 ∘ W2 ∘ W3 ∘ {W5-FILE, W5-DIR}, and nothing else.  *)
-  (*                                                                      *)
-  (*  Every block is a landed lemma and every seam is the next block's     *)
-  (*  premise list verbatim, so this composes rather than proves: the only *)
-  (*  work is naming the seam's ∀-bound bundle and handing the caller's    *)
-  (*  exit BACK at each stage (durable-notes, "chaining two halves").      *)
-  (*  [trap_csrs_ext eb] and [cpu_claim_ext eb] are DROPPED at entry --    *)
-  (*  both are [emp] at [eb = true], which this contract's own premise     *)
-  (*  forces -- and the exit continuation the walk hands on is the         *)
-  (*  caller's own, which still demands them, so nothing is lost.          *)
-  (*                                                                      *)
-  (*  The T_DIR arm takes NO design-fact premise any more: (D1) and (D2)   *)
-  (*  are derived inside [su_w5_dir] (V5' increment W).                    *)
-  (* ==================================================================== *)
-  Lemma wp_sys_unlink_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
-      (gf : gname)
-      (gs : list gname) (jx : nat) (gl : gname)
-      (pd pav pu : mword 64)
-      (dqb dqs dqbs : dfrac) (v0 : mword 64)
-      (pid : mword 32) (U : ustate)
-      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
-    SpecSysUnlink.wp_sys_unlink_sconf_body gf gs jx gl pd pav
-      pu
-      dqb dqs dqbs v0 pid U m K eb b lks.
-  Proof.
-    cbv beta zeta delta [SpecSysUnlink.wp_sys_unlink_sconf_body].
-    intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
-           Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hnib16 Hprk Hj Hgl Heb Harg0.
-    iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hprenv #Hbio #Hlog
-             Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows
-             #Hslks #Hireg #Hropen Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hir Hpriv
-             Hcont".
-    iPoseProof (printk_env_panic with "Hprenv") as "#Hpenv".
-    (* ---- W1, +0x00..+0x2e: the prologue, argstr, begin_op, nameiparent ---- *)
-    iApply (su_w1 gf gs jx gl pd pav pu
- dqb dqs dqbs
-              v0 pid U m K eb b lks HK HdevR Hnib0
-              Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb
-              Harg0
-              with "Hcg Hown Htext Hdata Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen
-                    Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hir Hpriv [] Hcont").
-    iIntros (CIDa Ms P1 n1 Sb1 w1 dpv nf bp bnm0 bd be w4 w5 w6 w27 w30).
-    iIntros "%Hal %Hregs1 %Hma01 %Hupt1 %Hn1 %Hw1 %Hdpvnz
-             Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv Hir
-             Hheld HopS Htx Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE
-             H30 Hcont".
-    (* ---- W2, +0x30..+0x6e: ilock(dp), the two namecmp refusals,
-       dirlookup ---- *)
-    iApply (su_w2 gf gs jx gl pd pav pu
- dqb dqs dqbs
-              pid U P1 n1 Sb1 w1 dpv nf bnm0 bp bd be w4 w5 w6 w27 w30
-              m Ms (m !!! Regidx csp_rs1 : mword 64) K eb b lks
-              HK Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
-              Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hregs1 Hma01 Hn1
-              Hupt1
-              with "Hcg Hown Htext Hdata Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen
-                    Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hir Hpriv Hheld HopS Htx
-                    Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE H30
-                    [] Hcont").
-    iIntros (CIDb M2 kd ks kk gild gisld gyd loyd tlyd qdi sd qs dinum dnd bmd datd lo t).
-    iIntros "%Hregs2 %Hkd %Hks %Hdinb %Htydir %Hiok %Hrl_datd %Hdok %Hddix
-             %Hdoc %Hduq
-             %Hnotdot %Hnotdd %Hfst %Hma02 %Hal27
-             Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
-             Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS Htx
-             Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
-             Hcont".
-    (* ---- W3, +0x72..+0x88: ilock(ip), the nlink panic, the T_DIR test
-       (and, on the taken arm, the whole isdirempty loop through W4) ---- *)
-    iPoseProof (printk_env_panic with "Hprenv") as "#Hpetop".
-    iApply (su_w3 gf gs jx gl pd pav pu
- dqb dqs dqbs
-              pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs loyd tlyd
-              dinum dnd bmd datd lo nf bnm0 bp bd be w5 w6 w30
-              m M2 (m !!! Regidx csp_rs1 : mword 64) K eb b lks t
-              HK Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
-              Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1 Hupt1 Hregs2
-              Hkd Hks Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq
-              Hnotdot Hnotdd
-              Hfst Hma02 Hal27
-              with "Hcg Hown Htext Hdata Hpetop Hpc Hbio Hlog Hseam Hgen Hdev Hgeo
-                    Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen Hsbb Hsbi
-                    Hsbs Hbmres Hkenv Hprocs Hpriv Hslkd Hslkdq
-                    [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
-                    Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS Htx
-                    Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
-                    HbE H30 [] Hcont").
-    iIntros (CIDc M3 s3x bex isdir gili gisli gyi si qsi loyi tlyi dni bmi dati).
-    iIntros "%Hregs3 %Hnlzi %Hioki %Hrl_dati %Hdoki %Hddixi %Hdoci %Hduqi
-             %Hisd
-             Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
-             Hslkd Hslkdq %Hleyd5 #Hflyd5 #Hclaimsyd5 Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud
-             Hslki Hslkiq %Hleyi #Hflyi #Hclaimsyi Hdepi Hoffri Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
-             Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
-             Hcont".
-    (* ---- W5, +0x8a..: the zeroing and the two tails, split on the seam's
-       own index.  The FILE arm is [su_w5_file]; the T_DIR arm is
-       [su_w5_dir], which since V5' increment W derives (D1) and (D2)
-       internally and takes neither as a premise. ---- *)
-    destruct isdir.
-    - destruct Hisd as (Htyzi & Hdots & Hdead).
-      iApply (su_w5_dir gf gs jx gl pd pav pu
-
-                dqb dqs dqbs pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd
-                qdi sd qs loyd tlyd dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
-                gili gisli gyi si qsi loyi tlyi dni bmi dati
-                m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks t
-                HK Hprk Hnib0 Hgeom Hsize Hbm0
-                Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1
-                Hupt1 Hkd Hks Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq
-                Hnotdot Hnotdd Hfst Hal27 Hregs3 Hnlzi Hioki Hrl_dati Hdoki
-                Hddixi
-                Hdoci Hduqi Htyzi Hdots Hdead
-                with "Hcg Hown Htext Hdata Hprenv Hpc Hbio Hlog Hseam
-                      Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
-                      Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
-                      Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd
-                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd
-                      Hfrz Hkeepd Hrud Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffri Hidevi Hiinumi
-                      Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
-                      Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
-                      Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
-                      HbE H30 Hcont").
-    - iApply (su_w5_file gf gs jx gl pd pav pu
-
-                dqb dqs dqbs pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd
-                qdi sd qs loyd tlyd dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
-                gili gisli gyi si qsi loyi tlyi dni bmi dati
-                m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks t
-                HK Hprk Hnib0 Hgeom Hsize Hbm0
-                Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1
-                Hupt1 Hkd Hks Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq
-                Hnotdot Hnotdd Hfst Hal27 Hregs3 Hnlzi Hioki Hrl_dati Hdoki
-                Hddixi
-                Hdoci Hduqi Hisd
-                with "Hcg Hown Htext Hdata Hprenv Hpc Hbio Hlog Hseam
-                      Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
-                      Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
-                      Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd
-                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd
-                      Hfrz Hkeepd Hrud Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffri Hidevi Hiinumi
-                      Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
-                      Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
-                      Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
-                      HbE H30 Hcont").
-  Qed.
-
-End ProofSysUnlinkBody.
-
-End SysUnlinkProof.

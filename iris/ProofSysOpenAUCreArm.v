@@ -66,7 +66,7 @@ Require Import WpUart.
 Require Import DiskInv.
 Require Import Xv6Cameras.
 (* the payload's own vocabulary, IMPORTED BEFORE [FsBlocks] on purpose --
-   ProofSysOpen's rule, and its reason (the last import wins). *)
+   durable-notes' rule ("the last import wins"). *)
 Require Import LogInv.
 Require Import BitmapInv.
 Require Import IrefSlots.
