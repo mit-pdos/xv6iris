@@ -169,17 +169,11 @@ Fixpoint texec {X} (pol : rpol) (h : agent) (img : gmap Arch.pa (bv 8))
              (* THE FETCH, read under the policy like a data load (the
                 instruction view is not modelled here -- see the header) but,
                 as in the model's fetch arm, touching no read-side state *)
-             match pol with
-             | PFresh =>
-                 match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
-                 | Some w => texec pol h img (k (inl (w, None))) s log tv hr
-                 | None => None
-                 end
-             | PStale =>
-                 match tso_read_bytes_f img log h tv (Interface.ReadReq.pa req) n with
-                 | Some w => texec pol h img (k (inl (w, None))) s log tv hr
-                 | None => None
-                 end
+             (* A FETCH IS NOT THE HART'S READ, so [pol] does not select
+                it -- see [tnode]'s arm for why. *)
+             match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
+             | Some w => texec pol h img (k (inl (w, None))) s log tv hr
+             | None => None
              end
            else
              (* THE PLAIN READ: the floor stays; the read side records the
@@ -304,17 +298,20 @@ Definition tnode (pol : rpol) (h : agent) (img : gmap Arch.pa (bv 8))
              | None => None
              end
            else if ak_ifetch (Interface.ReadReq.access_kind req) then
-             match pol with
-             | PFresh =>
-                 match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
-                 | Some w => Some (k (inl (w, None)), s, log, tv, hr)
-                 | None => None
-                 end
-             | PStale =>
-                 match tso_read_bytes_f img log h tv (Interface.ReadReq.pa req) n with
-                 | Some w => Some (k (inl (w, None)), s, log, tv, hr)
-                 | None => None
-                 end
+             (* A FETCH IS NOT THE HART'S READ, so [pol] does not select it.
+                It is the ICACHE's: [mnode_step]'s fetch arm reads with
+                [ifetch_agent h] at a view at or above the INSTRUCTION view,
+                and neither is what [pol] names -- reading it at the hart's
+                data floor with the hart's own agent, as this used to, is a
+                read the model has no arm for, because store forwarding
+                differs between the two agents.  The flat cache is the fetch
+                at the TOP view, which the fetch arm always admits
+                ([tso_read_top_flat] holds for every agent), so that is what
+                both policies read.  A STALE fetch is [VIcache]'s subject
+                and needs the instruction view threaded. *)
+             match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
+             | Some w => Some (k (inl (w, None)), s, log, tv, hr)
+             | None => None
              end
            else
              match pol with

@@ -45,9 +45,241 @@ From stdpp Require Import base list gmap functions relations bitvector.definitio
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvExec VirtioModel DevModel ColdBoot.
 Require Import RiscvLang TsoMemPa.
-From VTest Require Import VTest VRun VExecStep.
+From VTest Require Import VTest VRun VTso VExecStep.
 Import ListNotations.
 Local Open Scope Z_scope.
+
+(* ---------------------------------------------------------------------- *)
+(* 0. THE RELAXED INTERPRETER MEETS THE MODEL.                             *)
+(*                                                                         *)
+(*    [VExecStep]'s [enode_mnode] is this for the FLAT interpreter, and it *)
+(*    has to cross the flat/relaxed gap arm by arm.  These do not:         *)
+(*    [VTso.tnode] was written against [mnode_step]'s arms, so every arm   *)
+(*    below is a matter of naming the witnesses.  What they buy is the     *)
+(*    STALE read -- the one thing the flat interpreter cannot express, and *)
+(*    the one thing store buffering's (0,0) needs.                         *)
+(* ---------------------------------------------------------------------- *)
+
+(* THE FUNCTIONAL TSO READ MEETS THE RELATIONAL ONE.  [tso_read_bytes_f]
+   gathers the bytes and assembles them; [tso_read_bytes] is the arm's
+   premise, one equation per byte.  The proof is [read_bytes_spec]'s, with
+   the flat lookup replaced by [tso_read] -- the gathering, the assembly and
+   the [nth_byte] round-trip are the same. *)
+Lemma tso_read_bytes_f_spec (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (h : agent) (tv : nat) (pa : Arch.pa) (n : N) (w : bv (8 * n)) :
+  tso_read_bytes_f img log h tv pa n = Some w ->
+  tso_read_bytes img log h tv pa n w.
+Proof.
+  unfold tso_read_bytes_f, tso_read_bytes.
+  destruct (mapM (fun j : nat => tso_read img log h tv (pa_add pa j))
+                 (seq 0 (N.to_nat n))) as [bs|] eqn:Hm; [|discriminate].
+  intros [= <-] j Hj.
+  apply mapM_Some_1 in Hm.
+  pose proof (Forall2_length Hm) as Hlen. rewrite length_seq in Hlen.
+  assert (Hjlt : (j < length bs)%nat) by (rewrite <- Hlen; lia).
+  assert (Hseq : seq 0 (N.to_nat n) !! j = Some j).
+  { rewrite lookup_seq_lt by (rewrite <- Hlen in Hjlt; lia). f_equal. }
+  destruct (Forall2_lookup_l _ _ _ _ _ Hm Hseq) as (b & Hbs & Hmm).
+  rewrite Hmm. f_equal.
+  assert (Hbb : bs !!! j = b) by (apply list_lookup_total_correct; exact Hbs).
+  apply bv_eq. rewrite nth_byte_unsigned.
+  rewrite Z_to_bv_unsigned. unfold bv_wrap, bv_modulus.
+  pose proof (assemble_bytes_bound bs) as [Hlo Hhi]. rewrite <- Hlen in Hhi.
+  rewrite (Z.mod_small (assemble_bytes bs));
+    [| split; [lia| rewrite N2Z.inj_mul; lia ] ].
+  pose proof (assemble_bytes_byte bs j Hjlt) as Hbyte.
+  rewrite Nat2Z.inj_mul in Hbyte. change (Z.of_nat 8) with 8 in Hbyte.
+  replace (Z.of_N (8 * N.of_nat j)) with (8 * Z.of_nat j) by (rewrite N2Z.inj_mul; lia).
+  rewrite Hbyte, Hbb. reflexivity.
+Qed.
+
+(* ONE NODE OF THE RELAXED INTERPRETER IS ONE [mnode_step].
+
+   [VExecStep]'s [enode_mnode] is this for the FLAT interpreter, and it has
+   to cross the flat/relaxed gap arm by arm.  This does not: [VTso.tnode]
+   was written against [mnode_step]'s arms -- [stale_view] IS the two
+   premises of the plain-load arm, [hr_read] IS its post-state -- so every
+   arm here is a matter of naming the witnesses.  What it buys is the STALE
+   read, which the flat interpreter cannot express and which store
+   buffering's (0,0) needs. *)
+(* [hok_bounds] with the two facts the relaxed arms add: the stale view is
+   a max over the footprint's coherence floors, and every one of those is
+   under the top. *)
+Ltac tso_bounds :=
+  repeat first
+    [ assumption | reflexivity
+    | apply Nat.max_lub | apply if_le | apply fence_post_le | apply own_pub_le
+    | apply coh_upd_win_le | apply coh_win_max_le
+    | progress (unfold stale_view, hr_read, hr_excl, hr_clear, excl_tv, write_tv)
+    | progress cbn [hr_rv hr_coh]
+    | lia ].
+
+Lemma tnode_mnode (pol : rpol) (cpu : CPU) (g : gstate) (s : mstate)
+    (m m' : M unit) (s' : mstate) (log' : list pwmsg) (tv' : nat) (hr' : hread) :
+  hart_ok cpu g s ->
+  tnode pol (hart_agent cpu) g.(gimg) s g.(glog) (g.(gtv) cpu) (g.(ghr) cpu) m
+    = Some (m', s', log', tv', hr') ->
+  exists itv' r',
+    mnode_step (others_resv g.(gresv) cpu) (hart_agent cpu) g.(gimg)
+      s g.(glog) (g.(gtv) cpu) (g.(gitv) cpu) (g.(ghr) cpu) (g.(gresv) cpu)
+      m m' s' log' tv' itv' hr' r'
+    /\ hart_ok cpu (wb cpu g s' log' tv' itv' hr' r') s'.
+Proof.
+  intros Hok Hn.
+  pose proof Hok as [Hr Hm Hd Hfl Hal Htv Hitv Hrv Hcoh].
+  destruct m as [y|T oc k]; [discriminate Hn|].
+  destruct oc; cbn [tnode] in Hn;
+    first
+      [ discriminate Hn
+      | (* the state no-ops: the same equations on both sides *)
+        revert Hn; intros [= <- <- <- <- <-];
+        exists (g.(gitv) cpu), (g.(gresv) cpu);
+        split;
+          [ cbn [mnode_step]; repeat split; reflexivity
+          | apply (hart_ok_wb_same cpu g s _); try exact Hok;
+            try (cbn; reflexivity); tso_bounds ]
+      | idtac ].
+  (* --- A LOAD ------------------------------------------------------ *)
+  - destruct (dev_addr (Interface.ReadReq.pa t)) eqn:Hda.
+    + (* MMIO: the device answers, and its state may move *)
+      destruct (dev_read (mdev s) (Interface.ReadReq.pa t) n) as [[w d']|] eqn:Hdr;
+        [|discriminate Hn].
+      revert Hn; intros [= <- <- <- <- <-].
+      exists (g.(gitv) cpu), (g.(gresv) cpu).
+      split.
+      * cbn [mnode_step]. rewrite Hda. exists w, d'.
+        repeat split; first [ exact Hdr | reflexivity ].
+      * apply (hart_ok_wb_same cpu g s _); try exact Hok;
+          try (cbn; reflexivity); tso_bounds.
+    + destruct (ak_excl (Interface.ReadReq.access_kind t)) eqn:Hex.
+      * (* THE EXCLUSIVE READ: never blocked, because [ho_alone] says no
+           other hart reserves anything *)
+        destruct (read_bytes (mem s) (Interface.ReadReq.pa t) n) as [w|] eqn:Hrb;
+          [|discriminate Hn].
+        revert Hn; intros [= <- <- <- <- <-].
+        exists (g.(gitv) cpu), (Some (snap_of (Interface.ReadReq.pa t) n w)).
+        split.
+        -- cbn [mnode_step]. rewrite Hda. right. right.
+           split; [exact Hex|]. right.
+           split; [rewrite Hal; set_solver|].
+           exists w. repeat split;
+             first [ reflexivity
+                   | intros j Hj; exact (read_bytes_spec _ _ _ _ Hrb j Hj) ].
+        -- apply (hart_ok_wb_same cpu g s _); try exact Hok;
+             try (cbn; reflexivity);
+             tso_bounds.
+      * destruct (ak_ifetch (Interface.ReadReq.access_kind t)) eqn:Hif.
+        -- (* THE FETCH, at the TOP view and with the icache's agent --
+              [tso_read_top_flat] holds for every agent, which is why the
+              flat cache is a fetch the arm admits whatever [pol] says *)
+           destruct (read_bytes (mem s) (Interface.ReadReq.pa t) n) as [w|] eqn:Hrb;
+             [|discriminate Hn].
+           revert Hn; intros [= <- <- <- <- <-].
+           exists (g.(gitv) cpu), (g.(gresv) cpu).
+           split.
+           ++ cbn [mnode_step]. rewrite Hda. left. split; [exact Hif|].
+              exists (length g.(glog)), w.
+              repeat split;
+                first [ assumption | reflexivity | apply Nat.le_refl
+                      | intros j Hj; rewrite tso_read_top_flat, <- Hfl, Hm;
+                        exact (read_bytes_spec _ _ _ _ Hrb j Hj) ].
+           ++ apply (hart_ok_wb_same cpu g s _); try exact Hok;
+                try (cbn; reflexivity); tso_bounds.
+        -- destruct pol.
+           ++ (* PFresh: at the top of the log, which is the flat cache *)
+              destruct (read_bytes (mem s) (Interface.ReadReq.pa t) n) as [w|] eqn:Hrb;
+                [|discriminate Hn].
+              revert Hn; intros [= <- <- <- <- <-].
+              exists (g.(gitv) cpu), (g.(gresv) cpu).
+              split.
+              ** cbn [mnode_step]. rewrite Hda. right. left.
+                 split; [exact Hif|]. split; [exact Hex|].
+                 exists (length g.(glog)), w.
+                 repeat split;
+                   first [ assumption | reflexivity | apply Nat.le_refl
+                         | intros j Hj; apply Hcoh
+                         | intros j Hj; rewrite tso_read_top_flat, <- Hfl, Hm;
+                           exact (read_bytes_spec _ _ _ _ Hrb j Hj) ].
+              ** apply (hart_ok_wb_same cpu g s _); try exact Hok;
+                   try (cbn; reflexivity);
+                   tso_bounds.
+           ++ (* PStale: at the LOWEST view the arm admits, which is what
+                 [stale_view] computes -- and it is the whole point of this
+                 file: the other hart's later message is above it and stays
+                 invisible, which is store buffering's (0,0) *)
+              destruct (tso_read_bytes_f g.(gimg) g.(glog) (hart_agent cpu)
+                          (stale_view (ghr g cpu) (gtv g cpu)
+                             (Interface.ReadReq.pa t) n)
+                          (Interface.ReadReq.pa t) n) as [w|] eqn:Hrb;
+                [|discriminate Hn].
+              revert Hn; intros [= <- <- <- <- <-].
+              exists (g.(gitv) cpu), (g.(gresv) cpu).
+              split.
+              ** cbn [mnode_step]. rewrite Hda. right. left.
+                 split; [exact Hif|]. split; [exact Hex|].
+                 eexists (stale_view (ghr g cpu) (gtv g cpu)
+                            (Interface.ReadReq.pa t) n), w.
+                 repeat split;
+                   first
+                     [ reflexivity
+                     | (unfold stale_view; apply Nat.le_max_l)
+                     | (unfold stale_view; apply Nat.max_lub;
+                        [exact Htv | apply coh_win_max_le; exact Hcoh])
+                     | (intros j Hj; unfold stale_view;
+                        eapply Nat.le_trans;
+                        [apply coh_win_max_ge; exact Hj | apply Nat.le_max_r])
+                     | (intros j Hj;
+                        exact (tso_read_bytes_f_spec _ _ _ _ _ _ _ Hrb j Hj)) ].
+              ** apply (hart_ok_wb_same cpu g s _); try exact Hok;
+                   try (cbn; reflexivity);
+                   tso_bounds.
+  (* --- A STORE ----------------------------------------------------- *)
+  - destruct (dev_addr (Interface.WriteReq.pa t)) eqn:Hda.
+    + (* MMIO write: strongly ordered, no log *)
+      destruct (dev_write (mdev s) (Interface.WriteReq.pa t) n
+                          (Interface.WriteReq.value t)) as [d'|] eqn:Hdw;
+        [|discriminate Hn].
+      revert Hn; intros [= <- <- <- <- <-].
+      exists (g.(gitv) cpu), None.
+      split.
+      * cbn [mnode_step]. rewrite Hda. exists d'.
+        repeat split; first [ exact Hdw | reflexivity ].
+      * apply (hart_ok_wb_same cpu g s _); try exact Hok;
+          try (cbn; reflexivity); tso_bounds.
+    + (* THE RAM STORE: append the message, and the flat cache keeps
+         lock-step with the append *)
+      revert Hn; intros [= <- <- <- <- <-].
+      exists (g.(gitv) cpu), None.
+      split.
+      * cbn [mnode_step]. rewrite Hda. right.
+        split; [rewrite Hal; set_solver|].
+        repeat split; reflexivity.
+      * apply hart_ok_wb; try assumption.
+        -- cbn [mem].
+           assert (Hms : mem s = flat (gimg g) (glog g))
+             by (rewrite <- Hm; exact Hfl).
+           symmetry. rewrite Hms. unfold snap_of. apply flat_store.
+        -- (* the floor: a plain store moves nothing, the conditional half
+              of an acquire pair takes it past its own append *)
+           unfold write_tv. rewrite length_app. cbn [length].
+           apply if_le; [apply if_le|]; lia.
+        -- rewrite length_app. cbn [length]. lia.
+        -- unfold hr_clear; cbn [hr_rv]. rewrite length_app. cbn [length]. lia.
+        -- intros a. unfold hr_clear; cbn [hr_coh]. specialize (Hcoh a).
+           rewrite length_app. cbn [length]. lia.
+  (* --- A FENCE ----------------------------------------------------- *)
+  - revert Hn; intros [= <- <- <- <- <-].
+    exists (if fence_ifetch b
+            then Nat.max (g.(gitv) cpu)
+                   (fence_post (hart_agent cpu) g.(glog) true false
+                      (g.(gtv) cpu) (hr_rv (g.(ghr) cpu)))
+            else g.(gitv) cpu),
+           (g.(gresv) cpu).
+    split.
+    * cbn [mnode_step]. repeat split; reflexivity.
+    * apply (hart_ok_wb_same cpu g s _); try exact Hok;
+        try (cbn; reflexivity); tso_bounds.
+Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 1. THE STATE THE INTERPRETER CAN COMPUTE.                               *)
