@@ -6,18 +6,19 @@
 > Q-b reversed: nlink-0 inodes LEAVE the view).  Briefs and the VM build script:
 > `app-round-e2-briefs.md`; E1's census: `app-round-e1-census.md`.
 >
-> STATE OF THE TREE: origin/main is green through lane E2-L.  Landed in order: E2-V2 (the view is
+> STATE OF THE TREE: origin/main is green through lane E2-W.  Landed in order: E2-V2 (the view is
 > the live namespace; "E2-V2 AS BUILT" below), E2-D (the delta vocabulary; "E2-D AS BUILT"), E2-L0
 > (held inums are positive; as-built record atop its brief in the briefs file), E2-C (create's
-> legs as fires; "E2-C AS BUILT" below), E2-L (link in place; "E2-L AS BUILT" below).  NEXT LANE:
-> E2-W (write; brief `roundE2W-brief.md`, last in the briefs file; log `rE2W`).  Lanes run ONE AT
+> legs as fires; "E2-C AS BUILT" below), E2-L (link in place; "E2-L AS BUILT" below), E2-W (write;
+> "E2-W AS BUILT" below).  NEXT LANE: E2-X (delete the dead non-AU forms; brief `roundE2X-brief.md`
+> in the briefs file; log `rE2X`), then E2-Z (`roundE2Z-brief.md`).  Lanes run ONE AT
 > A TIME in the session's own checkout (owner's rule of 2026-09-07); the build script takes the
 > tree as its first argument and a log name.  On resume: `git status` — a clean tree means the
 > last lane landed (check `git log`); modified iris files are the next lane's partial work: run
 > the build script (log name = the lane) and finish to green against its brief, or
 > `git checkout -- iris` and redo from the brief.
 >
-> ORDER AFTER E2-L (each a green gate, then audit/commit/push): E2-W (write: dispatch the AU write for inode fds, raw step premise on the non-AU write, the
+> ORDER AFTER E2-W (each a green gate, then audit/commit/push): (E2-W LANDED) E2-W (write: dispatch the AU write for inode fds, raw step premise on the non-AU write, the
 > short-chunk arm's state fire — Q-i: "a bug in the sys_write spec, fix it; the spec may be
 > non-deterministic"; §7) → E2-X (delete the dead non-AU unlink walk, non-AU mknod, non-AU open's
 > create arm, `so_stores`; Q-f; §1) → E2-Z (ProofIlock's claim and EscrowDeposit's free become
@@ -34,7 +35,7 @@
 > landed write, #5 → `_step`), W-a (the AU chain's partial arm becomes a NON-DETERMINISTIC state
 > fire covering writei's disturbed region, #6), W-c (the dispatcher's write arm splits on the fd's
 > state out of `fd_frags` and dispatches the AU write for inode fds — the fragments ARE at the
-> dispatcher, `sysc_arm_pre` carries `fd_frags`).  E2-W LAUNCHED 2026-09-07 (log `rE2W`).  E2-X's
+> dispatcher, `sysc_arm_pre` carries `fd_frags`).  E2-W LANDED 2026-09-07.  E2-X's
 > and E2-Z's briefs are WRITTEN too (`roundE2X-brief.md`, `roundE2Z-brief.md`, last in the briefs
 > file, with the 2026-09-07 census: ProofSysMknod and the three non-AU Link files are already off
 > the build; the AU open reuses three pure helpers of ProofSysOpen.v and the AU unlink only
@@ -299,6 +300,49 @@ Three measured facts that shape everything below:
 - Proof surprise (durable-notes' "widths that differ only up to conversion"): two `lia`s at
   `Z.to_nat (bv_unsigned (di_nlink dn) + 1)` see the `mword 16` and `bv 16` spellings of the
   same `bv_unsigned` as distinct atoms; proved by `Z2Nat.inj_add`/`Z2Nat.id` at one spelling.
+
+## E2-W AS BUILT (landed 2026-09-07; 12 iris files; green, 13 axioms, both audited statements untouched)
+
+- W-a, THE SHORT CHUNK (#6, ruling Q-i).  `FsAbsWriteFire.awrite_part_at Γ E i γo k Φ REST` is now a
+  two-phase commit NON-DETERMINISTIC in the bytes: quantified over the LANDED RUN `bs` and the
+  counted `r` with `wri_pre (abs_view I) i off bs bs0 nl`, `r <= length bs <= r + BSIZE` (SpecWritei's
+  `dist <= BSIZE` relayed); step `delta_write i off bs`; the offset half comes out at `off + r`.
+  DEVIATION from the brief (which quantified `take r bs ++ junk` over the CALLER's chunk): `wri_pre`
+  at the caller's full chunk needs `off + c <= MAXFILE*BSIZE`, which writei's success arm does not
+  report; quantifying the landed run keeps `off + |bs| <= cap` derivable.  KNOWN WEAKENING: the
+  receipt does not tie `take r bs` to the caller's bytes (the full arm's `ubytes_at` does) — a
+  later local strengthening if an application needs it.  Receipt `SpecSysWriteAU.wri_part_receipt`;
+  fire `wrf_apart_fire`; `wrf_partial_move` deleted; `wrf_landed wrote dstb sz off tot dist :=
+  wrf_run wrote tot ++ wrf_run dstb (min dist (sz - (off + tot)))` with `wrf_file_bytes_splice`/
+  `wrf_write_row` restated as instances of `_dist` forms.  Fail arms (`write_post_fail`,
+  `write_post_fail_at`, `fw_au_raw`) carry an explicit `x <= 1` slack and `(⌜x = 0⌝ ∨
+  wri_part_receipt i Φ (length bss))`; `write_arms_at_ret` proves the landed `filewrite_ret`
+  blanket from the AU arms.  Sub-arms at ProofFilewriteAU.v ~2866-3180: `rz = c` full fire;
+  `0 <= rz < c` with a non-empty landed run → partial fire at `r := Z.to_nat rz`; landed run empty
+  (a fourth sub-arm the brief did not list: `rz = 0` is a SUCCESS return whose disturbed tail may
+  or may not have landed) → `_same`; writei's `-1` → `_same` (the join re-keeps `rz < 0 -> bm' =
+  bml /\ data' = datal /\ dn' = dnl`).
+- W-b, THE RAW STEP (#5).  `SpecFilewrite.fw_app_write_step := □ ∀ i I off bs, app_step i I
+  (delta_write i off bs (abs_view I))` (PERSISTENT — the chunk loop fires it once per chunk, so it
+  is not "returned"; `_of_auto` from the parked license, `_acc` from `app_inv`); the last resource
+  premise of `wp_filewrite_sconf_body` and `wp_sys_write_sconf_body`, threaded through `fw_loop`
+  and `ProofSysWrite`, supplied by ProofSyscall's write arm via `fw_app_write_step_acc`.  Site #5
+  (ProofFilewrite.v ~2395-2492) splits on `0 <= rz`: `ireg_top_retag_gen` with the step at
+  `delta_write i off (wrf_landed …)` (NOT `_step`: `app_step` is later-shaped, `_gen` is how
+  `wrf_awrite_fire` consumes it), else `_same`.  ProofFilewrite gained ProofFilewriteAU's `zlia`.
+- W-c, THE DISPATCH (W1).  `ProofSyscall.sysc_write_inode v ofile sts : option (nat * mword 64 *
+  fdstate)` (`arg_fd`, then `sts !! fd` matched against `FdOpen rb true (FdInode i γo)`); the write
+  arm (~4478) destructs it: `Some` → `fd_frags_acc` at `fd`, `SysWriteAU.wp_sys_write_au_era` with
+  the True family and `EXTRA := fsabs_awrite_chain … i γo 0 (wchunks n)` off the row's
+  `off_user_inv γo`, the fragment back at the same state, `sys_write_ret` from `write_arms_at_ret`;
+  `None` → the landed `wp_sys_write_sconf`.  `SyscallProof` gained a `SysWriteAU : SYSWRITE_AU_ERA`
+  functor argument; `LinkSyscall` passes `LinkSysWriteAU`'s.  Site #5 is now off the theorem's
+  path but stays `_step` in the build; the sconf's inode arm is kept (it serves the argfd-failure
+  and non-inode fds).
+- Files (12): FsAbsWriteFire, SpecSysWriteAU, SpecSysWriteAUEra, SpecFilewriteAU, FsAbsInvFire,
+  SpecFilewrite, SpecSysWrite, ProofFilewrite, ProofFilewriteAU, ProofSysWrite, ProofSyscall,
+  LinkSyscall.  Remaining `_auto` users: EscrowDeposit (#1), ProofIlock (#2), ProofSysOpen (#3,
+  dead → E2-X), ProofSysUnlinkW5File/Dir (dead → E2-X) — then E2-Z.
 
 ## 1. The 22 sites: view change, dispatcher arm, twin, liveness
 

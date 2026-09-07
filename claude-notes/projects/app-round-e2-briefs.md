@@ -331,7 +331,7 @@ dispatcher arms pass `_unit`s.  Report: the commits verbatim, every changed post
 statements, the 13 site diffs, deviations.  Do not commit.  Expect ~3-4 VM builds: the SpecCreate*
 cone is the whole create family (ProofCreateAU/AUF ~7k lines each; ~2 min per file).
 
-## roundE2W-brief.md — written 2026-09-07 (after E2-C landed; launch after E2-L)
+## roundE2W-brief.md — LANDED 2026-09-07 (as-built record: app-round-e2.md "E2-W AS BUILT"; deviations: the partial commit quantifies the LANDED run, the `-1` and empty-run sub-arms are `_same`, #5 uses `ireg_top_retag_gen`, the step premise is persistent)
 
 ## Lane E2-W: write — the short chunk's state fire (#6), the raw step on the landed write (#5), the dispatch (W1)
 

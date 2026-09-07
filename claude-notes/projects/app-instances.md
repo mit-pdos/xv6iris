@@ -448,3 +448,9 @@ Rounds, each a green gate:
   fired; ret −1: nothing, or the tgt/untgt pair); the three retags are
   `lf_tgt_fire`/`lf_ent_fire`/`uf_utgt_fire`.  Record in app-round-e2.md
   "E2-L AS BUILT".
+- **E2-W LANDED 2026-09-07** (12 files): the AU write's partial arm is a
+  state fire non-deterministic in the bytes (the landed run, `r <= |bs| <=
+  r + BSIZE`); the landed filewrite's inode arm takes a persistent raw step
+  premise (`fw_app_write_step`) and its retag is `_gen`/`_same`; the
+  dispatcher's write arm splits on the fd state out of `fd_frags` and runs
+  the AU write for inode fds.  Record in app-round-e2.md "E2-W AS BUILT".
