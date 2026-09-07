@@ -188,7 +188,7 @@ Require FsAbsDefs.          (* [abs_view], [abs_of]: the application's claim is 
                                Require, NOT Import: it re-exports [FsState], whose
                                [link_auth] would shadow this file's *)
 Require Import AppCfg.      (* [appcfg]: the era's application record, bound below *)
-Require Import AppInv.      (* [app_inv], [appN], [app_top_update_*], [top_move]:
+Require Import AppInv.      (* [app_inv], [appN], [app_top_update_*]:
                                the application's half of the abstract map
                                (app-instances.md section 2), which every mover
                                of [ftop_body]'s map opens beside [ftopN] *)
@@ -2511,22 +2511,34 @@ Section InodeRegion.
   (*  escrow the freer minted ([EscrowInode.escA_body]'s EMPTY arm) and      *)
   (*  retags it at the corpse's bare record.  Out: [ireg_withdraw], the ONE  *)
   (*  exit from the IN arm.                                                  *)
+  (*  ...AND THE COUNT, WHICH IS WHAT THE APPLICATION READS.  The second
+     clause is guarded by the record's NLINK rather than its type, and that
+     is what carries it across the claim window: BOTH shapes the arm admits
+     have a zero count -- a free record by (L3), a claim box by
+     [fresh_shape] -- so a parked fragment is always at a node the VIEW does
+     not have ([FsAbsDefs.abs_of _ = None], E2-V2's filter).  That is the
+     fact ilock's fill needs to move the fresh inode with
+     [ireg_top_retag_same] and no application input at all.  *)
   Definition ireg_top_park (γfs : fs_names) (z : Z) (d : dinode) : iProp Σ :=
     (∃ n : fs_node,
-       ⌜bv_unsigned (di_type d) = 0 -> ireg_bare d /\ n = free_node d⌝ ∗
+       ⌜(bv_unsigned (di_type d) = 0 -> ireg_bare d /\ n = free_node d)
+        /\ (bv_unsigned (di_nlink d) = 0 -> fn_nlink n = 0%nat)⌝ ∗
        top_frag (fs_gamma_L γfs) z n)%I.
 
   Global Instance ireg_top_park_timeless γfs z d :
     Timeless (ireg_top_park γfs z d).
   Proof. rewrite /ireg_top_park /top_frag. apply _. Qed.
 
-  (* the UNTIED park, which is all a nonzero-type record owes *)
+  (* the park at a nonzero-type record: the node is free of the RECORD but
+     not of the COUNT -- the claim box's fragment is the one the free record
+     carried, and it is still at count zero *)
   Lemma ireg_top_park_nz γfs z d (n : fs_node) :
     bv_unsigned (di_type d) <> 0 ->
+    (bv_unsigned (di_nlink d) = 0 -> fn_nlink n = 0%nat) ->
     top_frag (fs_gamma_L γfs) z n -∗ ireg_top_park γfs z d.
   Proof.
-    intros Hnz. iIntros "Hf". iExists n. iFrame "Hf".
-    iPureIntro. intros H0. exfalso. exact (Hnz H0).
+    intros Hnz Hcnt. iIntros "Hf". iExists n. iFrame "Hf".
+    iPureIntro. split; [intros H0; exfalso; exact (Hnz H0) | exact Hcnt].
   Qed.
 
   (* ...and the TIED one, at the free record the deposit and boot write *)
@@ -2535,7 +2547,9 @@ Section InodeRegion.
     top_frag (fs_gamma_L γfs) z (free_node d) -∗ ireg_top_park γfs z d.
   Proof.
     intros Hb. iIntros "Hf". iExists (free_node d). iFrame "Hf".
-    iPureIntro. intros _. split; [exact Hb | reflexivity].
+    iPureIntro. split.
+    - intros _. split; [exact Hb | reflexivity].
+    - intros Hnl. rewrite /fn_nlink free_node_rec Hnl. reflexivity.
   Qed.
 
   (* the park travels across a mover that writes a NONZERO type: the tie's
@@ -2553,7 +2567,7 @@ Section InodeRegion.
       ⌜ireg_bare d⌝ ∗ top_frag (fs_gamma_L γfs) z (free_node d).
   Proof.
     intros H0. iIntros "(%n & %Hn & Hf)".
-    destruct (Hn H0) as [Hb ->]. iFrame "Hf". iPureIntro. exact Hb.
+    destruct (proj1 Hn H0) as [Hb ->]. iFrame "Hf". iPureIntro. exact Hb.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -2563,9 +2577,11 @@ Section InodeRegion.
   (*  ialloc retags a FREE record to a [fresh_shape] one and the region    *)
   (*  keeps the fragment on its IN arm until the claimant's first ilock    *)
   (*  fills the box.  In that window the record has a NONZERO type, so     *)
-  (*  [ireg_top_park]'s tie is on its vacuous side and the commit's        *)
+  (*  [ireg_top_park]'s RECORD tie is on its vacuous side and the commit's *)
   (*  collection can read neither [FsDurSnap.sk_rec] nor [sk_links] at the *)
-  (*  inum ([FsCollect.col_claim_box_untied]).  The window is inside ONE   *)
+  (*  inum ([FsCollect.col_claim_box_untied]; the park's COUNT clause      *)
+  (*  still fires there, which is what the fill reads).  The window is     *)
+  (*  inside ONE                                                          *)
   (*  transaction -- ialloc runs between its caller's [begin_op] and       *)
   (*  [end_op] -- and this is what PROVES it: the claim parks a POSITIVE   *)
   (*  share of that transaction's [LogDefs.ln_tx] element, so an empty     *)
@@ -3340,16 +3356,17 @@ Section InodeRegion.
      [FsStateEra.inode_local_of_ok_rec] is the one line that assembles
      them.
 
-     ...AND THE APPLICATION'S CLAIM, in one of THREE FORMS (app-instances.md
-     section 7): [_same] when the reading is unchanged ([FsAbsDefs.abs_of n = FsAbsDefs.abs_of
-     n'], nothing from the application); [_step] with a step wand from the
-     caller's contract (the AU fires: round A pays it from the generic
-     dischargers, round B from the process's payload); [_auto] for a move
-     the kernel admits by itself ([AppInv.top_move] -- everything in round A,
-     narrowed in round E as each non-AU site gets an AU form), paid by the
-     license the application parks in its invariant.  The general form,
-     with the step under the later, is the one proof; the three are its
-     readings. *)
+     ...AND THE APPLICATION'S CLAIM, in one of TWO FORMS (design/
+     applications.md section 2): [_same] when the reading is unchanged
+     ([FsAbsDefs.abs_of n = FsAbsDefs.abs_of n'], nothing from the
+     application); [_step] with a step wand from the caller's contract (the
+     AU fires: today the generic dischargers pay it off the parked license,
+     lane L2 the process's payload).  There is no blanket form: every view
+     move on a dispatched path is an AU fire or a [_step], and the only
+     [_same] movers are the two that run between ABSENT rows -- ilock's
+     fresh-inode fill and the escrow deposit's free, both of which read the
+     pre-node's zero count off [ireg_top_park].  The general form, with the
+     step under the later, is the one proof; the two are its readings. *)
   Lemma ireg_top_retag_gen (E : coPset) (γfs : fs_names) (i : Z)
       (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
@@ -3405,24 +3422,9 @@ Section InodeRegion.
     iIntros (I Hin) "_ Hp". iNext. iApply ("Hstep" $! I with "[//] Hp").
   Qed.
 
-  Lemma ireg_top_retag_auto (E : coPset) (γfs : fs_names) (i : Z)
-      (n n' : fs_node) :
-    ↑ftopN ∪ ↑appN ⊆ E ->
-    top_move n n' ->
-    inode_local i n' ->
-    ftop_inv γfs -∗ app_inv γfs -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
-  Proof.
-    iIntros (HE Hmv Hloc) "#Hi #Hai Hf".
-    iApply (ireg_top_retag_gen E γfs i n n' HE Hloc with "Hi Hai [] Hf").
-    iIntros (I Hin) "#Ha Hp". iNext.
-    iEval (rewrite /app_auto /app_auto_raw) in "Ha".
-    iApply ("Ha" $! I i n n' with "[//] [//] Hp").
-  Qed.
-
   (* ...and the SUSPENDED form: the walk holds a receipt naming this inum,
      so the row says nothing about it and the new node may be anything.
-     The application's claim is owed all the same, in the same three
+     The application's claim is owed all the same, in the same two
      forms. *)
   Lemma ireg_top_retag_armed_gen (E : coPset) (γfs : fs_names) (k t : nat)
       (q : Qp) (S : gset Z) (i : Z) (n n' : fs_node) :
@@ -3484,23 +3486,6 @@ Section InodeRegion.
     iApply (ireg_top_retag_armed_gen E γfs k t q S i n n' HE Hin
               with "Hi Hai Hrec [Hstep] Hf").
     iIntros (I Hlk) "_ Hp". iNext. iApply ("Hstep" $! I with "[//] Hp").
-  Qed.
-
-  Lemma ireg_top_retag_armed_auto (E : coPset) (γfs : fs_names) (k t : nat)
-      (q : Qp) (S : gset Z) (i : Z) (n n' : fs_node) :
-    ↑ftopN ∪ ↑appN ⊆ E ->
-    i ∈ S ->
-    top_move n n' ->
-    ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
-      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
-  Proof.
-    iIntros (HE Hin Hmv) "#Hi #Hai Hrec Hf".
-    iApply (ireg_top_retag_armed_gen E γfs k t q S i n n' HE Hin
-              with "Hi Hai Hrec [] Hf").
-    iIntros (I Hlk) "#Ha Hp". iNext.
-    iEval (rewrite /app_auto /app_auto_raw) in "Ha".
-    iApply ("Ha" $! I i n n' with "[//] [//] Hp").
   Qed.
 
   (* [logN], [iregN] and [ftopN] are pairwise distinct namespaces, so a
@@ -4189,14 +4174,17 @@ Section InodeRegion.
        re-ties the fragment at the node it parks. *)
     iAssert ((bv_unsigned inum ↪[γi] (ds !!! islot inum))
              ∗ (∃ ge gr, reg_full (bv_unsigned inum) ge gr)
-             ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))%I
+             ∗ (∃ n : fs_node, ⌜fn_nlink n = 0%nat⌝
+                  ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))%I
       with "[Harm]" as "(Hfrg & Hrf & Htp)".
     { iDestruct "Harm" as "[[Harm Hrf] | Hpend]".
       - (* non-pending: fragment from the IN arm + the arm's own reg_full;
            a type-0 record refutes the marked sub-arm ([Ht2 Ht0]). *)
         iDestruct "Harm" as "[[_ [Hfrg Hpk]] | [%Ht2 _]]".
-        + iDestruct "Hpk" as (n0) "[_ Hn0]".
-          iFrame "Hfrg Hrf". iExists n0. iExact "Hn0".
+        + iDestruct "Hpk" as (n0) "[%Hpk0 Hn0]".
+          iFrame "Hfrg Hrf". iExists n0.
+          iSplitR; [iPureIntro; exact (proj2 Hpk0 (proj1 Hlok Ht0)) |].
+          iExact "Hn0".
         + iExFalso. iPureIntro. exact (proj1 Ht2 Ht0).
       - (* PENDING: recombine the arm's structural [reg_half] with
            [region_pending]'s half back into [reg_full] -- the coordinate, now
@@ -4206,9 +4194,11 @@ Section InodeRegion.
         iDestruct "Hrp" as (ge2 gr2) "[Hrh2 _]".
         iDestruct (reg_half_agree with "Hrh1 Hrh2") as %[-> ->].
         iDestruct (reg_join with "Hrh1 Hrh2") as "Hrf".
-        iDestruct "Hpk" as (n0) "[_ Hn0]".
+        iDestruct "Hpk" as (n0) "[%Hpk0 Hn0]".
         iFrame "Hfrg". iSplitL "Hrf"; [iExists ge2, gr2; iExact "Hrf" |].
-        iExists n0. iExact "Hn0". }
+        iExists n0.
+        iSplitR; [iPureIntro; exact (proj2 Hpk0 (proj1 Hlok Ht0)) |].
+        iExact "Hn0". }
     (* (L3)/(L4)/(L5) AT THE CLAIM BOX: the record ialloc writes is
        [fresh_shape], so its type is NONZERO and its count ZERO. *)
     assert (Hlok' : ireg_link_ok dn').
@@ -4339,9 +4329,9 @@ Section InodeRegion.
         [iLeft; iSplitR;
            [iPureIntro; right; split; [exact Hfr | discriminate] |];
          iSplitL "Hfrg"; [iExact "Hfrg" |];
-         iDestruct "Htp" as (n0) "Hn0";
+         iDestruct "Htp" as (n0) "[%Hn0z Hn0]";
          iApply (ireg_top_park_nz γfs (bv_unsigned inum) dn' n0
-                   (proj1 Hfr) with "Hn0")
+                   (proj1 Hfr) (fun _ => Hn0z) with "Hn0")
         | iExact "Hrf"]. }
   Qed.
 
@@ -4811,10 +4801,15 @@ Section InodeRegion.
     (b ↪[fs_cache γfs]{#(1/2)} bsl) ∗
     (* THE ERA's ABSTRACT VALUE LEAVES WITH THE RECORD (durable-disk C-3c),
        and this is the ONE exit from the region's IN arm.  It comes out
-       UNTIED -- the box is [fresh_shape], so [ireg_top_park]'s tie is on its
-       vacuous side -- which is exactly the shape the fill used to take off
-       the pool's marker arm, so ProofIlock's [ireg_top_retag_*] is unchanged. *)
-    (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n).
+       UNTIED IN THE RECORD -- the box is [fresh_shape], so
+       [ireg_top_park]'s record tie is on its vacuous side -- which is
+       exactly the shape the fill used to take off the pool's marker arm.
+       NOT UNTIED IN THE COUNT: the park's count clause fires at the box's
+       own [fresh_shape] count, so the node the fill picks up is one the
+       VIEW does not have, and ProofIlock moves it with
+       [ireg_top_retag_same] and no application input. *)
+    (∃ n : fs_node, ⌜fn_nlink n = 0%nat⌝
+       ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n).
   Proof.
     iIntros (HE HEl Hfills Hin Hb Hwf Hbsl Hnz) "#Hinv Hmk Hcl Hhalf".
     pose proof (islot_lt inum) as Hsl.
@@ -4940,9 +4935,12 @@ Section InodeRegion.
     iSplitR; [iPureIntro; exact Hty |].
     iSplitR;
       [iPureIntro; exact (ireg_link_ok_ty (ds !!! islot inum) Hlok) |].
-    (* the park leaves with the record, untied (the box is [fresh_shape]) *)
-    iDestruct "Hpk" as (n0) "[_ Hn0]".
-    iFrame "Hwback Hfr Hhalf". iExists n0. iExact "Hn0".
+    (* the park leaves with the record, untied in the record and at count
+       zero (the box is [fresh_shape]) *)
+    iDestruct "Hpk" as (n0) "[%Hpk0 Hn0]".
+    iFrame "Hwback Hfr Hhalf". iExists n0.
+    iSplitR; [iPureIntro; exact (proj2 Hpk0 (fresh_shape_nlink _ Hfresh)) |].
+    iExact "Hn0".
   Qed.
 
   (* ---- A CLAIM BOX HAS NO RECORD OUT (iclaim-ledger.md §5''''' step 2) --

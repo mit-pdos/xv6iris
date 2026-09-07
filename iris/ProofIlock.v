@@ -1233,7 +1233,7 @@ Section IlockLoad.
              where the claim parked it, rather than off the marker arm
              (durable-disk C-3c).  It is untied either way -- the box is
              [fresh_shape] -- so the retag below is unchanged. *)
-          iDestruct "Htop" as (n0) "Htop".
+          iDestruct "Htop" as (n0) "[%Hn0nl Htop]".
           (* THE CLAIM BOX IS WELL-FORMED (durable-disk lane A): the retag
              owes the registry's row, and this arm proves the four facts it
              is assembled from a few lines below anyway -- a claim box has
@@ -1260,16 +1260,33 @@ Section IlockLoad.
             - exact (dir_uniq_size_zero dn _ Hfsz).
             - exact (dir_dots_ix_orphan (bv_unsigned inum) dn _
                        (fresh_shape_nlink dn Hfr0)). }
-          (* the withdrawn fragment is untied; retag it at the claim
+          (* the withdrawn fragment is untied IN THE RECORD (its count is
+             the region's to know); retag it at the claim
              box's own node.  This ONE retag is the whole move now: the two
              contents holds that used to be set beside it were readings of
              this very fragment (THE DVIEW RETIREMENT). *)
-          (* ...a NON-AU move (free -> typed), paid by the application's
-             parked license until round E gives the claim its AU form
-             (app-instances.md section 7) *)
-          iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned inum) n0
+          (* ...AND THE MOVE COSTS THE APPLICATION NOTHING (round E2, lane
+             E2-Z).  Under the live view (E2-V2) a row exists only at a
+             nonzero type AND a nonzero count, and this fill runs between two
+             ABSENT rows: the withdrawn fragment is at count 0 (the region
+             parks nothing else -- [InodeRegion.ireg_top_park]'s count
+             clause, which the box's [fresh_shape] fires) and the claim box
+             the fill writes is at count 0 too ([fresh_shape_nlink]).  So the
+             retag is [_same] and reads nothing off the parked license. *)
+          assert (Habsbox : FsAbsDefs.abs_of n0
+                  = FsAbsDefs.abs_of
+                      (era_node dn bm_empty (fun _ => replicate BSIZE (bv_0 8)))).
+          { rewrite (proj1 (FsAbsDefs.abs_of_none n0) (or_intror Hn0nl)).
+            symmetry.
+            apply (proj1 (FsAbsDefs.abs_of_none
+                            (era_node dn bm_empty
+                               (fun _ => replicate BSIZE (bv_0 8))))).
+            right.
+            rewrite /fn_nlink era_node_rec (fresh_shape_nlink dn Hfr0).
+            reflexivity. }
+          iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned inum) n0
                   (era_node dn bm_empty (fun _ => replicate BSIZE (bv_0 8)))
-                  ltac:(solve_ndisj) Logic.I Hlocbox
+                  ltac:(solve_ndisj) Habsbox Hlocbox
                   with "[Hireg] [Hireg] Htop") as "Htop".
           { iApply (ireg_inv_ftop with "Hireg"). }
           { iApply (ireg_inv_app with "Hireg"). }

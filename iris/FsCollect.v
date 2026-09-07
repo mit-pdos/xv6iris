@@ -1630,9 +1630,12 @@ Section Collect.
   (*  TYPE-0 record.  The IN arm admits one other shape: a CLAIM BOX --    *)
   (*  the [InodeRegion.fresh_shape] record ialloc's [ireg_claim_au] writes *)
   (*  over a free one, which is a NONZERO type by definition.  There the   *)
-  (*  park's tie is on its VACUOUS side, so the fragment it carries is at  *)
-  (*  an ARBITRARY node and neither [FsDurSnap.sk_rec] nor [sk_links] can  *)
-  (*  be read at the inum.  [col_claim_box_untied] is that statement,      *)
+  (*  park's RECORD tie is on its VACUOUS side, so the fragment it        *)
+  (*  carries has an ARBITRARY record and neither [FsDurSnap.sk_rec] nor   *)
+  (*  [sk_links] can be read at the inum.  (Its COUNT is not arbitrary:    *)
+  (*  the park's count clause fires at a box, which is [nlink = 0] -- that *)
+  (*  is what ilock's fill reads, not the commit.)                         *)
+  (*  [col_claim_box_untied] is that statement,                            *)
   (*  machine-checked, and it is why the window had to be refuted rather   *)
   (*  than reasoned around.                                                *)
   (*                                                                      *)
@@ -1651,10 +1654,11 @@ Section Collect.
 
   Lemma col_claim_box_untied γfs (z : Z) (d : dinode) (n : fs_node) :
     fresh_shape d ->
+    fn_nlink n = 0%nat ->
     top_frag (fs_gamma_L γfs) z n -∗ ireg_top_park γfs z d.
   Proof.
-    intros (Hnz & _ & _ & _). iIntros "Hf".
-    iApply (ireg_top_park_nz γfs z d n Hnz with "Hf").
+    intros Hfr Hcnt. iIntros "Hf".
+    iApply (ireg_top_park_nz γfs z d n (proj1 Hfr) (fun _ => Hcnt) with "Hf").
   Qed.
 
   (* ...AND THE WINDOW ITSELF, REFUTED.  A slot the pool's marker arm

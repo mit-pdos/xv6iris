@@ -684,7 +684,7 @@ Definition wp_filewrite_sconf_body
   foff_permit_row st -∗
   (* THE APPLICATION'S RAW WRITE STEP (round E2, lane E2-W).  The FD_INODE
      arm's row retag pays the application's claim with THIS, in place of the
-     blanket license [ireg_top_retag_auto] used to read off [app_auto].
+     blanket retag that used to read [app_auto] off the invariant.
      Persistent, so the chunk loop may fire it once per chunk; trivially
      supplied by any caller holding the license ([fw_app_write_step_acc]),
      and vacuous for the pipe/device/closed arms, which move no row. *)

@@ -40,9 +40,11 @@
      lend by the TRANSPORT [Happ_xfer], and the boot founds the era from
      the lent claim.  Era 0's claim is [Happ_init], at the image's state.
    - [Happ_auto] is the application's PARKED LICENSE ([AppInv.app_auto]):
-     the moves it admits from anyone -- in round A, every one-row move
-     ([AppInv.top_move]), which is why a constraining application cannot
-     pay it yet ([AppEcho]); the era mint parks it in [app_inv].
+     the BLANKET PROMISE that its claim survives every one-row move of the
+     map, which is why a constraining application cannot pay it yet
+     ([AppEcho]); the era mint parks it in [app_inv], the generic
+     dischargers pay the AU fires' steps off it, and lane L2 replaces it by
+     per-syscall proofs from the process.
    - [app_R c] is the trace slot's resource at the fixed part; [HR0]
      RECEIVES the birth step's yield ([obs_ledger_at_alloc_cl]) -- for the
      echo application, its taint counter at 0; the power step and the two

@@ -231,7 +231,7 @@ Section LinkFire.
   (*  2a.  INSTANT 1 -- the target's count up, fused with its retag      *)
   (* ------------------------------------------------------------------ *)
 
-  (* Replaces the [InodeRegion.ireg_top_retag_auto] the landed walk performs
+  (* Replaces the blanket retag the landed walk used to perform
      after [wp_iupdate_link] (site #28): same premise ([inode_local] of the
      flushed record), same payout (the moved fragment), plus the caller's
      two phases on either side of the [ghost_map_update] INSIDE the one

@@ -2381,8 +2381,8 @@ Section ProofFilewrite.
 
        The row this walk moves is the FILE'S, and the application's claim
        about it is paid by the contract's own
-       [SpecFilewrite.fw_app_write_step] rather than by the blanket license
-       [ireg_top_retag_auto] used to read off [AppInv.app_auto].  The delta
+       [SpecFilewrite.fw_app_write_step] rather than by the blanket retag
+       that used to read [AppInv.app_auto] off the invariant.  The delta
        is [FsAbsDelta.delta_write] at the LANDED RUN -- the bytes writei
        counted, PLUS whatever of its DISTURBED TAIL lies inside the new size
        ([FsAbsWriteFire.wrf_landed]).  That is ruling Q-i's honesty: a short

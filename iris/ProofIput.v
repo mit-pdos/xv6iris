@@ -3666,7 +3666,11 @@ Section IputFreePath.
        freeze already travels and the deposit ties it region-side. *)
     iMod (escA_alloc ⊤ fsc_fs (bv_unsigned inum) rg with "Hfzpost [Htop2]")
       as (ge gr gd) "(#Hescr & Htkr & Htkd)";
-      [by iExists (era_node dn bm data2) |].
+      [iExists (era_node dn bm data2);
+       iSplitR;
+         [iPureIntro; rewrite /FsStateInode.fn_nlink era_node_rec Hnl0;
+          reflexivity |];
+       iExact "Htop2" |].
     iModIntro.
     (* THE TWO CONTENTS HOLDS ARE RETIRED (THE DVIEW RETIREMENT): the AWAIT
        arm was byte-less and parked them at a forgotten value, and the next

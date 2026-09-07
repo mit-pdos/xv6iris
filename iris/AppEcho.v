@@ -44,9 +44,9 @@
                                    ([echo_fs_era0]).
 
    WHAT IS DELIBERATELY NOT HERE: a theorem.  The application's parked
-   license ([AppInv.app_auto], over [AppInv.top_move]) is UNPAYABLE for
-   [echo_fs] until round E of app-instances.md narrows [top_move] -- in
-   round A it admits every one-row move, which no pin survives -- exactly
+   license ([AppInv.app_auto]) is UNPAYABLE for [echo_fs] until lane L2 of
+   app-instances.md retires it -- it admits EVERY one-row move, which no pin
+   survives -- exactly
    as the old delta-free license was payable only from [tainted]; the boot
    lend at a non-pristine boot needs the durable instance (round C); the
    conclusion needs both.  A theorem taking those as hypotheses would be

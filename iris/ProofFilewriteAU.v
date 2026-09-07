@@ -2995,7 +2995,7 @@ Section ProofFilewriteAU.
         rewrite -Hlenc. iApply ("Hback" with "HΦ Htail").
       - (* ---- THE CHUNK DOES NOT FIRE IN FULL ---------------------------
            ROUND E2, LANE E2-W (ruling Q-i): AND THE ROW STILL MOVED.  This
-           arm used to take [ireg_top_retag_auto] and pay only the offset,
+           arm used to take the blanket retag and pay only the offset,
            which is the contract hole the lane closes: writei COMMITS a
            chunk whose [either_copyin] failed part-way, so what landed at
            [f->off] is the bytes it COUNTED plus the visible part of its

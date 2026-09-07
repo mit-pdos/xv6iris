@@ -44,7 +44,7 @@ Require Import DinodeEnc.
 Require Import FsStateDefs.
 Require Import FsBytesGamma.
 Require Import InodeRegion.
-Require Import AppInv.       (* [appN], [top_move]: the deposit's retag opens the application's invariant *)
+Require Import AppInv.       (* [appN]: the deposit's retag opens the application's invariant *)
 Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import EscrowDefs.
 Require Import EscrowInode.
@@ -236,12 +236,21 @@ Section EscrowDeposit.
        record determines and parked beside that record, so the PENDING arm
        this deposit builds hands the commit's collection a whole
        [FsStateEra.inode_owned_era] at this inum. *)
-    iDestruct "Htop" as (ntop) "Htop".
-    (* ...a NON-AU move (orphan -> free), paid by the application's parked
-       license until round E gives the free path its AU form
-       (app-instances.md section 7) *)
-    iMod (ireg_top_retag_auto (E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum)) γfs
-            (bv_unsigned inum) ntop (free_node dn') Hftop_mask Logic.I
+    iDestruct "Htop" as (ntop) "[%Hntop0 Htop]".
+    (* ...AND THE MOVE COSTS THE APPLICATION NOTHING (round E2, lane E2-Z).
+       Under the live view (E2-V2) a row exists only at a nonzero type AND a
+       nonzero count, and this move runs between two ABSENT rows: the orphan
+       the escrow parked is at count 0 ([EscrowInode.escA_body]'s EMPTY arm,
+       minted at iput's [nlink == 0]) and the corpse record is type 0
+       ([Hz]).  So the retag is [_same] and reads nothing off the parked
+       license. *)
+    assert (Habs : FsAbsDefs.abs_of ntop = FsAbsDefs.abs_of (free_node dn')).
+    { rewrite (proj1 (FsAbsDefs.abs_of_none ntop) (or_intror Hntop0)).
+      symmetry.
+      exact (FsAbsDefs.abs_of_bare (free_node dn')
+               (fn_bare_free_node dn' Hbare Hnl0')). }
+    iMod (ireg_top_retag_same (E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum)) γfs
+            (bv_unsigned inum) ntop (free_node dn') Hftop_mask Habs
             (inode_local_free_node (bv_unsigned inum) dn' Hbare Hnl0' Hz)
             with "Hftopi Happi Htop") as "Htop".
     iDestruct (ireg_top_park_free γfs (bv_unsigned inum) dn' Hbare with "Htop")

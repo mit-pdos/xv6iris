@@ -103,7 +103,8 @@ Section EscrowInode.
   Definition escA_body (γfs : fs_names) (ge gr gd : gname) (z : Z)
       (rg : frzidx) : iProp Σ :=
     ( (mono_nat_auth_own ge 1 ST_EMPTY ∗ ifreeze_post rg z
-       ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) z n))
+       ∗ (∃ n : fs_node, ⌜fn_nlink n = 0%nat⌝
+            ∗ top_frag (fs_gamma_L γfs) z n))
     ∨ (mono_nat_auth_own ge 1 ST_FILLED ∗ crp_elem z CrpDep
        ∗ ifreeze_off z ∗ redeem_ticketA gd)
     ∨ (mono_nat_auth_own ge 1 ST_REDEEMED ∗ redeem_ticketA gr
@@ -127,8 +128,12 @@ Section EscrowInode.
     ifreeze_post rg z -∗
     (* ...AND THE FREED PAYLOAD'S ABSTRACT VALUE (durable-disk C-3c), which
        the walk hands over here instead of parking it in the pool's await
-       arm; the deposit takes it out again and ties it region-side. *)
-    (∃ n : fs_node, top_frag (fs_gamma_L γfs) z n) ={E}=∗ ∃ ge gr gd,
+       arm; the deposit takes it out again and ties it region-side.  AT
+       COUNT ZERO: iput frees at [nlink == 0], and that is what makes the
+       deposit's retag a view-preserving one ([EscrowDeposit]'s
+       [ireg_top_retag_same], round E2 lane Z). *)
+    (∃ n : fs_node, ⌜fn_nlink n = 0%nat⌝ ∗ top_frag (fs_gamma_L γfs) z n)
+      ={E}=∗ ∃ ge gr gd,
       escA_inv γfs ge gr gd z rg ∗ redeem_ticketA gr ∗ redeem_ticketA gd.
   Proof.
     iIntros "Hfz Htop".
@@ -161,7 +166,8 @@ Section EscrowInode.
     ↑escAN z ⊆ E →
     escA_inv γfs ge gr gd z rg -∗ redeem_ticketA gd
       ={E, E ∖ ↑escAN z}=∗
-      ifreeze_post rg z ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) z n) ∗
+      ifreeze_post rg z ∗
+      (∃ n : fs_node, ⌜fn_nlink n = 0%nat⌝ ∗ top_frag (fs_gamma_L γfs) z n) ∗
       (crp_elem z CrpDep -∗ ifreeze_off z
          ={E ∖ ↑escAN z, E}=∗ committedA ge).
   Proof.

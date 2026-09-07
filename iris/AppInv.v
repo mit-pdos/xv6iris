@@ -24,21 +24,21 @@
     user code, so a retag that preserves [abs_of] needs nothing from the
     application ([app_top_update_same]).
 
-    THREE WAYS TO PAY A MOVE (section 7), because two view-changing retags
-    sit outside any AU fire and inside contracts every path calls (ilock's
-    fresh-inode claim: free -> typed; the escrow deposit: orphan -> free):
-      [_same]  the reading is unchanged -- no application input;
+    TWO WAYS TO PAY A MOVE (section 7):
+      [_same]  the reading is unchanged -- no application input.  The two
+               retags that sit outside any AU fire take this form: ilock's
+               fresh-inode claim (free -> claim box) and the escrow deposit
+               (orphan -> free) both move between rows the view does not
+               have, and the region and the escrow carry the count that
+               says so ([InodeRegion.ireg_top_park],
+               [EscrowInode.escA_body]);
       [_step]  a step wand from the caller's contract -- the AU fires, whose
-               bundles carry it (round A: paid by the generic dischargers
-               out of [app_auto]; round B: by the process's payload);
-      [_auto]  THE PARKED LICENSE [app_auto]: a persistent wand the
-               application parks in its invariant admitting the kernel's
-               own non-AU moves, [top_move].  Round A: [top_move] is
-               everything, and every non-AU site takes this form; round E
-               narrows it as each site moves onto an AU form whose step the
-               caller pays.  Kernel-defined, so a kernel proof discharges it
-               by itself.
-    All three are ONE lemma, [app_top_update], at a later-shaped step: the
+               bundles carry it (today: paid by the generic dischargers out
+               of [app_auto]; lane L2: by the process's payload).
+    There is no blanket form: every view move on a dispatched path is an AU
+    fire or a [_step], and the only [_same] movers are the ones between
+    absent rows.
+    Both are ONE lemma, [app_top_update], at a later-shaped step: the
     application's claim is an arbitrary iProp -- neither timeless nor
     persistent -- so it stays under the invariant's later and the step is
     applied there ([▷ (P -∗ Q) ∗ ▷ P ⊢ ▷ Q]).  Only the authority comes out
@@ -68,14 +68,6 @@ Local Open Scope Z_scope.
 Definition appN : namespace := nroot .@ "app".
 Definition appE : coPset := ↑appN.
 
-(* THE KERNEL'S OWN NON-AU MOVES: the union of what the retag sites that
-   sit outside an AU fire do to a node (the fresh-inode claim in ilock,
-   the free in the escrow deposit, link/mkdir/create's landed paths).
-   ROUND A: everything; round E narrows it as each site moves onto an
-   AU form whose step the caller pays.  Kernel-defined, so a kernel
-   proof discharges it by itself. *)
-Definition top_move (n n' : fs_node) : Prop := True.
-
 (* ------------------------------------------------------------------ *)
 (*  1.  The raw license: at a predicate and an instance                 *)
 (* ------------------------------------------------------------------ *)
@@ -83,7 +75,11 @@ Definition top_move (n n' : fs_node) : Prop := True.
 Section AppAutoRaw.
   Context {Σ : gFunctors}.
 
-  (* the application's PARKED LICENSE: it admits the kernel's non-AU moves.
+  (* the application's PARKED LICENSE: the BLANKET PROMISE that its claim
+     survives ANY one-row move of the map.  It is what the generic
+     dischargers pay the AU fires' steps with, because nothing from the
+     process reaches the kernel yet; lane L2 replaces it by per-syscall
+     proofs from the process and deletes it.
      RAW -- the predicate (its fixed part already applied) and the instance
      are ARGUMENTS -- so the system theorem can state it under
      [riscvGpreS], before the fixed record exists
@@ -92,7 +88,7 @@ Section AppAutoRaw.
   Definition app_auto_raw {N : Type}
       (A : N -> aview -> iProp Σ) (r : N) : iProp Σ :=
     (□ (∀ (I : gmap Z fs_node) (i : Z) (n n' : fs_node),
-          ⌜I !! i = Some n⌝ -∗ ⌜top_move n n'⌝ -∗
+          ⌜I !! i = Some n⌝ -∗
           A r (abs_view I) -∗ A r (abs_view (<[i := n']> I))))%I.
 
   Global Instance app_auto_raw_persistent {N} (A : N -> aview -> iProp Σ) r :
@@ -104,7 +100,7 @@ Section AppAutoRaw.
   Lemma app_auto_raw_triv {N} (A : N -> aview -> iProp Σ) (r : N) :
     (forall r av, A r av ⊣⊢ True) -> ⊢ app_auto_raw A r.
   Proof.
-    intros Htriv. rewrite /app_auto_raw. iIntros "!>" (I i n n') "_ _ _".
+    intros Htriv. rewrite /app_auto_raw. iIntros "!>" (I i n n') "_ _".
     iApply (bi.equiv_entails_1_2 _ _ (Htriv r (abs_view (<[i := n']> I)))).
     iPureIntro. exact Logic.I.
   Qed.
@@ -309,22 +305,6 @@ Section AppInv.
     iIntros (Hi) "_ Hp". iNext. iApply ("Hstep" with "Hp").
   Qed.
 
-  (* [_auto]: the parked license pays, for a move the kernel admits *)
-  Lemma app_top_update_auto (E : coPset) (γfs : fs_names) (I : gmap Z fs_node)
-      (i : Z) (n n' : fs_node) :
-    ↑appN ⊆ E ->
-    top_move n n' ->
-    app_inv γfs -∗
-    ghost_map_auth (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
-      ghost_map_auth (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
-  Proof.
-    iIntros (HE Hmv) "#Hinv Hk Hf".
-    iApply (app_top_update E γfs I i n n' HE with "Hinv [] Hk Hf").
-    iIntros (Hi) "#Ha Hp". iNext.
-    iEval (rewrite /app_auto /app_auto_raw) in "Ha".
-    iApply ("Ha" $! I i n n' with "[//] [//] Hp").
-  Qed.
-
   (* ------------------------------------------------------------------ *)
   (*  4.  THE CALLER'S STEP, AS THE AU COMMIT SHAPES CARRY IT             *)
   (* ------------------------------------------------------------------ *)
@@ -367,8 +347,9 @@ Section AppInv.
     rewrite /app_step. iIntros (n' Heq) "Hp". rewrite Heq. iExact "Hp".
   Qed.
 
-  (* the license pays any step at a row the map has (round A: [top_move] is
-     everything) *)
+  (* the license pays any step at a row the map has: it admits EVERY
+     one-row move, which is what makes it a blanket promise (lane L2
+     replaces it by per-syscall proofs from the process) *)
   Lemma app_step_of_auto (i : Z) (I : gmap Z fs_node) (av' : aview) :
     is_Some (I !! i) ->
     ▷ app_auto -∗ app_step i I av'.
@@ -376,8 +357,7 @@ Section AppInv.
     intros [n Hn]. iIntros "#Ha". rewrite /app_step.
     iIntros (n' Heq) "Hp". iNext.
     iEval (rewrite /app_auto /app_auto_raw) in "Ha".
-    iApply ("Ha" $! I i n n' with "[//] [] Hp").
-    iPureIntro. exact Logic.I.
+    iApply ("Ha" $! I i n n' with "[//] Hp").
   Qed.
 
   (* THE LICENSE, READ OFF THE INVARIANT: [▷]-shaped and persistent, so the

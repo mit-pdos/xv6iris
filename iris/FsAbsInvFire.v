@@ -21,13 +21,14 @@
    pre-view survives the delta" (app-instances.md section 7).  At an
    arbitrary application record nothing is trivial -- and nothing has to
    be: the application PARKS a license in its own invariant
-   ([AppInv.app_auto], the moves it admits from anyone; round A: every
+   ([AppInv.app_auto], the BLANKET PROMISE that its claim survives every
    one-row move), and a commit fires at [appE] with that invariant closed,
    so the discharger opens it INSIDE its own fupd, reads the license
-   [▷]-shaped and persistent ([app_step_acc]) and pays.  That is the same
-   license the non-AU movers pay with ([InodeRegion.ireg_top_retag_auto]);
-   what changes in round B is only WHO pays -- the process's payload, per
-   syscall -- and the shapes do not move.  So every discharger below takes
+   [▷]-shaped and persistent ([app_step_acc]) and pays.  It is the ONLY
+   thing the license is still spent on: every view move on a dispatched path
+   is an AU fire or a [_step], and the two movers outside a fire are
+   [_same].  What changes in lane L2 is only WHO pays -- the process's
+   payload, per syscall -- and the shapes do not move.  So every discharger below takes
    [AppInv.app_inv] and NO invariant of its own: the client copy this file
    used to re-sync ([FsAbsInv], deleted) is gone with its license.
 
