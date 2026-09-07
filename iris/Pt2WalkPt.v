@@ -987,8 +987,8 @@ Section Pt2SharedWalk.
                (u_pte_addr (u_next_base p1) (subrange_vec_dec (svpn_of va) 8 0))
                (fun w => pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp))))%I
       as "Hrdx".
-    { iApply (kpt_leaf_node_canon_obl root_ppn t0 (svpn_of va) p2 p1 _ a0 d0
-                Hmaps with "Hlb0 Hkinv"). }
+    { iApply (kpt_leaf_node_canon_obl root_ppn t0 (svpn_of va) p2 p1 _ a0 d0 B
+                Hmaps with "Hbd Hvlb Hlb0 Hkinv"). }
     (* the WRITE seam, in the shape the [_ex] write-back takes *)
     iAssert (∀ (w w' : mword 64),
                ⌜pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp))⌝ -∗

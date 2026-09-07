@@ -100,8 +100,8 @@ Section UserMemTotal.
     intros Hdec Hhv Hlpad Hex1 Hg1 Hex2 Hg2 Hok Hnex Hag Htlb Hst.
     exists i, r, s_x, t'. split_and!;
       first [ exact Hdec | exact Hhv | exact Hlpad
-            | exact (or_intror (ex_intro _ other
-                       (conj Hex1 (conj Hg1 (conj Hex2 Hg2)))))
+            | exact (or_intror (or_introl (ex_intro _ other
+                       (conj Hex1 (conj Hg1 (conj Hex2 Hg2))))))
             | exact Hok | exact Hnex | exact Hag | exact Htlb | exact Hst ].
   Qed.
 
@@ -126,8 +126,8 @@ Section UserMemTotal.
     intros Hdec Hhv Hzca Hex1 Hg1 Hex2 Hg2 Hok Hnex Hag Htlb Hst.
     exists i, r, s_x, t'. split_and!;
       first [ exact Hdec | exact Hhv | exact Hzca
-            | exact (or_intror (ex_intro _ other
-                       (conj Hex1 (conj Hg1 (conj Hex2 Hg2)))))
+            | exact (or_intror (or_introl (ex_intro _ other
+                       (conj Hex1 (conj Hg1 (conj Hex2 Hg2))))))
             | exact Hok | exact Hnex | exact Hag | exact Htlb | exact Hst ].
   Qed.
 

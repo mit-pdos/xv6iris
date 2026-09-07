@@ -324,11 +324,11 @@ Section BreadScan2.
   Definition bd_scan2_after (bn : bio_names) (V : bio_view Σ) (tl : nat) : iProp Σ :=
     (∃ (M : gmap nat (option Qp * positive)) (ord : list nat)
        (devs bnos : nat -> mword 32) (tl' : nat),
-       ⌜(tl <= tl')%nat⌝ ∗ llb loglen_name tl' ∗
+       ⌜(tl <= tl')%nat⌝ ∗ llb dlen_name tl' ∗
        bcache_scan2 bn V M ord devs bnos tl' cur_ctx)%I.
 
   Local Lemma bd_llb_max (tl T : nat) :
-    llb loglen_name tl -∗ llb loglen_name T -∗ llb loglen_name (Nat.max tl T).
+    llb dlen_name tl -∗ llb dlen_name T -∗ llb dlen_name (Nat.max tl T).
   Proof.
     iIntros "#H1 #H2". destruct (Nat.max_spec tl T) as [[_ ->] | [_ ->]]; [iExact "H2" | iExact "H1"].
   Qed.
@@ -343,7 +343,7 @@ Section BreadScan2.
     ⌜∀ k1 k2, (k1 < NBUF)%nat -> (k2 < NBUF)%nat ->
         uint (bnos k1) ∈ bv_cov V -> uint (bnos k1) = uint (bnos k2) -> k1 = k2⌝ -∗
     ⌜∀ k0, (k0 < NBUF)%nat -> uint (bnos k0) ∈ bv_cov V -> devs k0 = bv_dev V⌝ -∗
-    TsoCtx.ctx_floor cur_ctx tl -∗ llb loglen_name tl -∗
+    TsoCtx.ctx_floor cur_ctx tl -∗ llb dlen_name tl -∗
     own (bn_auth bn) (● (<[k := e]> M)) -∗ bslots_auth -∗
     bcache_lru bhead (map bnode ord) -∗ bio_pool V bnos -∗
     ([∗ list] k0 ∈ seq 0 NBUF, bio_slot_res2 bn V (<[k := e]> M) k0 (devs k0) (bnos k0) tl cur_ctx) -∗
@@ -366,7 +366,7 @@ Section BreadScan2.
   Lemma bd_ref_llb (bn : bio_names) (k : nat) (dev bno : mword 32) (t : nat) :
     CtxBox.reference (X := bio_x) (bn_box bn k) (dev, bno) {[((dev, bno), t) := 1%Qp]} -∗
     CtxBox.reference (X := bio_x) (bn_box bn k) (dev, bno) {[((dev, bno), t) := 1%Qp]} ∗
-    llb loglen_name t.
+    llb dlen_name t.
   Proof.
     iIntros "H". iDestruct "H" as "(%H1 & %H2 & Hf & #Hllb)".
     iSplitL "Hf".
@@ -378,7 +378,7 @@ Section BreadScan2.
   Local Lemma bd_regs_same (bn : bio_names) (k tl : nat) (r : slot_reg bio_id bio_x)
       (dev bno : mword 32) :
     sr_win r = false -> sr_x r = None -> sr_ident r = (dev, bno) -> (sr_td r <= tl)%nat ->
-    reg_drop bn k r -∗ llb loglen_name (sr_td r) -∗ bslot_regs bn k tl dev bno.
+    reg_drop bn k r -∗ llb dlen_name (sr_td r) -∗ bslot_regs bn k tl dev bno.
   Proof.
     iIntros (Hw Hx Hid Hb) "Hrd #Hllb". iExists r. iFrame "Hrd Hllb". iPureIntro. split_and!; done.
   Qed.
@@ -390,7 +390,7 @@ Section BreadScan2.
     (k < NBUF)%nat ->
     buf_box bn V k -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    llb loglen_name tl -∗
+    llb dlen_name tl -∗
     bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗ bslot -∗
     ∃ cw : mword 32,
       brefcnt k ↦₄ cw ∗
@@ -502,7 +502,7 @@ Section BreadScan2.
     (k < NBUF)%nat ->
     buf_box bn V k -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    llb loglen_name tl -∗
+    llb dlen_name tl -∗
     bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗ bslot -∗
     ∃ cw : mword 32,
       brefcnt k ↦₄ cw ∗
@@ -606,19 +606,25 @@ Section BreadScan2.
     buf_box bn V k -∗
     TsoCtx.own_context cur_ctx -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    llb loglen_name tl -∗
+    llb dlen_name tl -∗
     bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗ bslot ={E}=∗
     TsoCtx.own_context cur_ctx ∗
     brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
     (∃ vld : mword 32, b_valid (bpa k) ↦₄ vld) ∗
     b_dev (bpa k) ↦₄ (devs k) ∗
     b_blockno (bpa k) ↦₄ (bnos k) ∗
-    (TsoCtx.own_context cur_ctx -∗
+    (* relaxed-ww: the (b) deposit is FENCE-BOUND -- the closer runs it at
+       the bcache release fence with the interp and [own_drained] in hand *)
+    (∀ g : gstate,
+     ⌜TsoMemPa.own_drained (hart_agent cpu_id) g.(glog) g.(gdlog)⌝ -∗
+     tso_interp_at riscv_eraGS g -∗
+     TsoCtx.own_context cur_ctx -∗
      brefcnt k ↦₄ (mword_of_int 1 : mword 32) -∗
      b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) -∗
      b_dev (bpa k) ↦₄ D -∗
      b_blockno (bpa k) ↦₄ B ={E}=∗
-     TsoCtx.own_context cur_ctx ∗ bd_scan2_after bn V tl ∗ bchain bn k D B).
+     tso_interp_at riscv_eraGS g ∗ TsoCtx.own_context cur_ctx ∗
+     bd_scan2_after bn V tl ∗ bchain bn k D B).
   Proof.
     iIntros (HE Hk HMk HD HcovB Htie) "#Hbox Hrun #Hfl #Hllbtl Hscan Hbslot".
     rewrite /bcache_scan2.
@@ -643,7 +649,7 @@ Section BreadScan2.
     iDestruct (ctx_word4_pointsto_half_join with "Hbnob Hbno") as "Hbno".
     iModIntro. iFrame "Hrun Hcell Hdev Hbno".
     iSplitL "Hvld". { by iExists _. }
-    iIntros "Hrun Hcell Hvld Hdev Hbno".
+    iIntros (g Hod) "Hint Hrun Hcell Hvld Hdev Hbno".
     (* the old payload leaves for the pool; the new block's bundle comes out *)
     iDestruct (buf_pay_evict bn V k M v (devs k) (bnos k) bs HMk with "Hauth Hpay")
       as "[Hauth Hold]".
@@ -661,9 +667,9 @@ Section BreadScan2.
     iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbnob Hbnos]".
     (* (b): the (invalid) header enters the box at the new stamp; the chain's
        unit is minted there *)
-    iMod (bbox_deposit_L1 bn V k cur_ctx (sr_td r) (sr_ident r) bs T0 D B E HE
-            with "Hbox Hrun Hrd Hc [Hvld Hdevb Hbnob Hpay]")
-      as "(Hrun & %T' & Hrd & Hc & Hgh & #Hllb')".
+    iMod (bbox_deposit_L1 bn V k g cur_ctx (sr_td r) (sr_ident r) bs T0 D B E HE Hod
+            with "Hbox Hint Hrun Hrd Hc [Hvld Hdevb Hbnob Hpay]")
+      as "(Hint & Hrun & %T' & Hrd & Hc & Hgh & #Hllb')".
     { rewrite /bhdr. iExists false. cbn [fst snd]. rewrite /buf_hdr. cbv iota.
       iFrame "Hvld Hdevb Hbnob Hpay". }
     iMod (bio_first_ref_step bn M k None HMk I with "Hauth") as "[Hauth Htok]".
@@ -688,7 +694,7 @@ Section BreadScan2.
         | exact (bfun_upd_ne devs k D j Hj)
         | exact (bfun_upd_ne bnos k B j Hj) ]. }
     { rewrite (bfun_upd_eq devs k D) (bfun_upd_eq bnos k B). iExact "Hslot". }
-    iModIntro. iFrame "Hrun". iSplitR "Htok Hgh".
+    iModIntro. iFrame "Hint Hrun". iSplitR "Htok Hgh".
     - iExists (<[k := (None, 1%positive)]> M), ord, (bfun_upd devs k D), (bfun_upd bnos k B), (Nat.max tl T').
       iSplitR; [iPureIntro; lia|].
       iSplitR; [iApply (bd_llb_max with "Hllbtl Hllb'")|].
@@ -714,7 +720,7 @@ Section BreadScan2.
     (k < NBUF)%nat ->
     buf_box bn V k -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    llb loglen_name tl -∗
+    llb dlen_name tl -∗
     bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗
     bref bn k q dev bno -∗
     ∃ cnt : positive,
@@ -838,7 +844,7 @@ Section BreadScan2.
     (k < NBUF)%nat ->
     buf_box bn V k -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    llb loglen_name tl -∗
+    llb dlen_name tl -∗
     bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗
     bchain bn k dev bno -∗
     ∃ cnt : positive,

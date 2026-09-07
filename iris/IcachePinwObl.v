@@ -46,20 +46,10 @@ Section IcachePinwObl.
     TsoCtx.own_context TsoCtx.cur_ctx -∗ IcacheRef.cred_floor lo tl -∗
     TsoCtx.own_context TsoCtx.cur_ctx ∗
     ∃ K : nat,
-      view_lb view_name loglen_name (hart_agent cpu_id) K ∗
+      view_lb view_name dlen_name (hart_agent cpu_id) K ∗
       TsoCtx.ledger_vis (hart_agent cpu_id) K lo.
   Proof.
-    iIntros (Hlotl) "Hctx #Hfl".
-    iDestruct "Hfl" as "[Hflc | (%a & Hw)]".
-    - iDestruct (TsoCtx.own_context_floor_view TsoCtx.cur_ctx tl
-                   with "Hctx Hflc") as "[Hctx Hview]".
-      iDestruct "Hview" as (K) "[#HvK %HtlK]".
-      iFrame "Hctx". iExists K. iFrame "HvK".
-      iApply TsoCtx.ledger_vis_below. lia.
-    - iDestruct (TsoCtx.own_context_wrote_vis TsoCtx.cur_ctx lo a
-                   with "Hctx Hw") as "[Hctx Hview]".
-      iDestruct "Hview" as (K) "[#HvK #Hvis]".
-      iFrame "Hctx". iExists K. iFrame "HvK Hvis".
+    iIntros (_) "Hctx #Hfl". iApply (WpLock.lk_floor_vis with "Hctx Hfl").
   Qed.
 
   Lemma iref_read_obl `{CIDw : CpuId} (g : gstate) (k : nat)
@@ -71,10 +61,10 @@ Section IcachePinwObl.
     iref_pin_rows k w lo tst -∗
     ⌜forall tvr : nat, (g.(gtv) cpu_id <= tvr)%nat ->
        (exists v : mword 32,
-          tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tvr
+          tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tvr
             (i_ref (ientry k)) 4 v)
        /\ (forall v : mword 32,
-             tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tvr
+             tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tvr
                (i_ref (ientry k)) 4 v ->
              (0 < bv_unsigned v < 2 ^ 31)%Z)⌝.
   Proof.
@@ -88,7 +78,7 @@ Section IcachePinwObl.
           (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set))%I
       with "[Hrows]" as "Hrows".
     { iApply (big_sepL_mono with "Hrows"). iIntros (i j Hij) "H".
-      iDestruct "H" as (t) "[_ H]". iExists t. iFrame "H". }
+      iDestruct "H" as (t) "(_ & _ & H)". iExists t. iFrame "H". }
     iDestruct (TsoCtx.ledger_read_pinw_vis g (i_ref (ientry k)) 4 lo K
                  iref_set (DfracOwn 1) (nth_byte w) ltac:(lia)
                  with "Hint HvK Hvis Hrows") as %Hrd.
@@ -120,23 +110,24 @@ Section IcachePinwObl.
     TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
     iref_pin_rows k w lo tst -∗
     ⌜forall tvr : nat, (g.(gtv) cpu_id <= tvr)%nat ->
-       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tvr
+       tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tvr
          (i_ref (ientry k)) 4 w⌝.
   Proof.
     iIntros (Htsttl) "Hint Hgh Hctx #Hfl Hrows".
     iDestruct (TsoCtx.own_context_floor_view TsoCtx.cur_ctx tl with "Hctx Hfl")
       as "[Hctx Hview]".
     iDestruct "Hview" as (K) "[#HvK %HtlK]".
-    iDestruct (view_lb_le view_name loglen_name (hart_agent cpu_id) K tl HtlK
+    iDestruct (view_lb_le view_name dlen_name (hart_agent cpu_id) K tl HtlK
                  with "HvK") as "#Hvtl".
-    iAssert ([∗ list] j ∈ seq 0 4, ∃ t : nat, ⌜(t <= tl)%nat⌝ ∗
+    iAssert ([∗ list] j ∈ seq 0 4, ∃ t : nat,
+        TsoGhost.dpos_ev dpos_name t tl ∗ TsoGhost.chain_ev chain_name t ∗
         TsoCtx.phys_ledger_pinw (pa_add (i_ref (ientry k)) j) (DfracOwn 1)
           (nth_byte w j) t
           (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set))%I
       with "[Hrows]" as "Hrows".
     { iApply (big_sepL_mono with "Hrows"). iIntros (i j Hij) "H".
-      iDestruct "H" as (t) "[%Ht H]". iExists t. iFrame "H".
-      iPureIntro. lia. }
+      iDestruct "H" as (t) "(#Hd & #Hc & H)". iExists t. iFrame "H Hc".
+      iApply (TsoGhost.dpos_ev_mono with "Hd"). lia. }
     iDestruct (CtxPinw.ledger_read_pinw_latest g (i_ref (ientry k)) 4 tl
                  (DfracOwn 1) (nth_byte w)
                  (fun j => TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set)
@@ -159,10 +150,10 @@ Section IcachePinwObl.
     iref_pin_rows k w lo tst -∗
     ⌜forall tvr : nat, (g.(gtv) cpu_id <= tvr)%nat ->
        (exists v : mword 32,
-          tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tvr
+          tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tvr
             (i_ref (ientry k)) (Z.to_N 4) v)
        /\ (forall v : mword 32,
-             tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tvr
+             tso_read_bytes g.(gimg) g.(glog) g.(gdlog) (hart_agent cpu_id) tvr
                (i_ref (ientry k)) (Z.to_N 4) v -> v = w)⌝.
   Proof.
     iIntros (Htsttl) "Hint Hgh Hctx #Hfl Hrows".

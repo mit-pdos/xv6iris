@@ -221,6 +221,9 @@ Proof.
   induction m as [y | T oc k IH]; intros s1 s2 Hag Hg; [reflexivity |].
   destruct oc; cbn [goodb] in Hg |- *; try discriminate Hg;
     try (by apply (IH _ s1 s2 Hag)).
+  (* a release fence is a leaf (relaxed-ww): the barrier arm carries it *)
+  all: try (apply andb_prop in Hg as [Hf Hg']; rewrite Hf; cbn [andb];
+            by apply (IH _ s1 s2 Hag)).
   apply andb_prop in Hg as [HD Hk]. rewrite HD. cbn [andb].
   rewrite (Hag _ HD). apply (IH _ s1 s2 Hag). exact Hk.
 Qed.
@@ -419,9 +422,6 @@ Hint Resolve goodmb_execute_DIVW_total : u_gm.
 Hint Resolve goodmb_execute_DIV_total : u_gm.
 Hint Resolve goodmb_execute_EBREAK_U : u_gm.
 Hint Resolve goodmb_execute_ECALL_U : u_gm.
-Hint Resolve goodmb_execute_FENCEI_U : u_gm.
-Hint Resolve goodmb_execute_FENCE_TSO_U : u_gm.
-Hint Resolve goodmb_execute_FENCE_total_U : u_gm.
 Hint Resolve goodmb_execute_ITYPE_total : u_gm.
 Hint Resolve goodmb_execute_JALR_total : u_gm.
 Hint Resolve goodmb_execute_JAL_total : u_gm.
@@ -495,7 +495,7 @@ Proof.
   - reflexivity.
   - destruct oc; cbn [goodb goodbP] in Hm |- *; try discriminate Hm;
       try (apply IH; exact Hm).
-    apply andb_prop in Hm as [HD Hk]. rewrite HD. cbn. apply IH; exact Hk.
+    all: apply andb_prop in Hm as [HD Hk]; rewrite HD; cbn; apply IH; exact Hk.
 Qed.
 
 Section UserTotalU.
@@ -806,9 +806,6 @@ Section UserTotalU.
       | apply goodmb_execute_DIV_total
       | apply goodmb_execute_EBREAK_U
       | apply goodmb_execute_ECALL_U
-      | apply goodmb_execute_FENCEI_U
-      | apply goodmb_execute_FENCE_TSO_U
-      | apply goodmb_execute_FENCE_total_U
       | apply goodmb_execute_ILLEGAL_U
       | apply goodmb_execute_ITYPE_total
       | apply goodmb_execute_JALR_total
@@ -888,9 +885,6 @@ Section UserTotalU.
     | |- goodmb _ _ (execute (DIVW _)) _ _ = true => apply goodmb_execute_DIVW_total
     | |- goodmb _ _ (execute (EBREAK _)) _ _ = true => apply goodmb_execute_EBREAK_U
     | |- goodmb _ _ (execute (ECALL _)) _ _ = true => apply goodmb_execute_ECALL_U
-    | |- goodmb _ _ (execute (FENCE _)) _ _ = true => apply goodmb_execute_FENCE_total_U
-    | |- goodmb _ _ (execute (FENCEI _)) _ _ = true => apply goodmb_execute_FENCEI_U
-    | |- goodmb _ _ (execute (FENCE_TSO _)) _ _ = true => apply goodmb_execute_FENCE_TSO_U
     | |- goodmb _ _ (execute (ILLEGAL _)) _ _ = true => apply goodmb_execute_ILLEGAL_U
     | |- goodmb _ _ (execute (ITYPE _)) _ _ = true => apply goodmb_execute_ITYPE_total
     | |- goodmb _ _ (execute (JAL _)) _ _ = true => apply goodmb_execute_JAL_total
@@ -975,7 +969,10 @@ Section UserTotalU.
            exec (execute i) (s0 rsf mm va) = Some (ExecuteAs other, s0 rsf mm va)
            /\ goodmb Du_r Du_w (execute i) (s0 rsf mm va) mm = true
            /\ exec (execute other) (s0 rsf mm va) = Some (r, s_x)
-           /\ goodmb Du_r Du_w (execute other) (s0 rsf mm va) mm = true)) ->
+           /\ goodmb Du_r Du_w (execute other) (s0 rsf mm va) mm = true)
+     \/ (u_fence_instr i
+         /\ exec (execute i) (s0 rsf mm va) = Some (RETIRE_SUCCESS, s0 rsf mm va)
+         /\ r = RETIRE_SUCCESS /\ s_x = s0 rsf mm va)) ->
     u_result_ok r ->
     match r with ExecuteAs _ => False | _ => True end ->
     u_post_reg t mm s_x (s0r rsf va) ->
@@ -997,7 +994,10 @@ Section UserTotalU.
            exec (execute i) (s2 rsf mm va) = Some (ExecuteAs other, s2 rsf mm va)
            /\ goodmb Du_r Du_w (execute i) (s2 rsf mm va) mm = true
            /\ exec (execute other) (s2 rsf mm va) = Some (r, s_x)
-           /\ goodmb Du_r Du_w (execute other) (s2 rsf mm va) mm = true)) ->
+           /\ goodmb Du_r Du_w (execute other) (s2 rsf mm va) mm = true)
+     \/ (u_fence_instr i
+         /\ exec (execute i) (s2 rsf mm va) = Some (RETIRE_SUCCESS, s2 rsf mm va)
+         /\ r = RETIRE_SUCCESS /\ s_x = s2 rsf mm va)) ->
     u_result_ok r ->
     match r with ExecuteAs _ => False | _ => True end ->
     u_post_reg t mm s_x (s2r rsf va) ->
@@ -1031,6 +1031,26 @@ Section UserTotalU.
     apply u_post_id; [ by apply u_pins_tick | exact Hwf ].
   Qed.
 
+  (* GLUE (a''): a FENCE, retired unchanged -- the third arm (relaxed-ww:
+     the fence is a leaf at the [swp] layer, so no [goodmb] certificate). *)
+  Lemma finish_fence (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (i : instruction) (w : mword 32) :
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode w) i rsf ->
+    exec (ext_decode w) (u_state rsf mm) = Some (i, u_state rsf mm) ->
+    is_lpad_instruction i = false ->
+    u_fence_instr i ->
+    exec (execute i) (s0 rsf mm va) = Some (RETIRE_SUCCESS, s0 rsf mm va) ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    base_post pt t mm rsf va w.
+  Proof.
+    intros Hhv Hdec Hlpad Hf Hexec Hpins Hwf.
+    apply (base_post_intro t mm rsf va w i RETIRE_SUCCESS (s0 rsf mm va)
+             Hdec Hhv Hlpad
+             (or_intror (or_intror (conj Hf (conj Hexec (conj eq_refl eq_refl)))))
+             u_result_ok_retire I).
+    apply u_post_id; [ by apply u_pins_tick | exact Hwf ].
+  Qed.
+
   (* GLUE (a'): state-unchanged via ONE base ExecuteAs redirect. *)
   Lemma finish_unchanged_redirect (t : ptree) (mm : PtBytes.pamap)
       (rsf : regstate) (va : mword 64) (i other : instruction)
@@ -1050,7 +1070,7 @@ Section UserTotalU.
     intros Hhv Hdec Hlpad Hex1 Hex2 Hok Hnex Hpins Hwf Hg1 Hg2.
     apply (base_post_intro t mm rsf va w i r (s0 rsf mm va)
              Hdec Hhv Hlpad
-             (or_intror (ex_intro _ other (conj Hex1 (conj Hg1 (conj Hex2 Hg2)))))
+             (or_intror (or_introl (ex_intro _ other (conj Hex1 (conj Hg1 (conj Hex2 Hg2))))))
              Hok Hnex).
     apply u_post_id; [ by apply u_pins_tick | exact Hwf ].
   Qed.
@@ -1366,7 +1386,7 @@ Section UserTotalU.
     intros Hhv Hdecc Hzca Hex1 Hex2 Hok Hnex Hpins Hwf Hg1 Hg2.
     apply (rvc_post_intro t mm rsf va h instr r (s2 rsf mm va)
              Hdecc Hhv Hzca
-             (or_intror (ex_intro _ other (conj Hex1 (conj Hg1 (conj Hex2 Hg2)))))
+             (or_intror (or_introl (ex_intro _ other (conj Hex1 (conj Hg1 (conj Hex2 Hg2))))))
              Hok Hnex).
     apply u_post_id; [ by apply u_pins_tick | exact Hwf ].
   Qed.
@@ -1390,7 +1410,7 @@ Section UserTotalU.
     apply (rvc_post_intro t mm rsf va h instr RETIRE_SUCCESS
              (gpr_write_state ird v (s2 rsf mm va))
              Hdecc Hhv Hzca
-             (or_intror (ex_intro _ other (conj Hex1 (conj Hg1 (conj Hex2 Hg2)))))
+             (or_intror (or_introl (ex_intro _ other (conj Hex1 (conj Hg1 (conj Hex2 Hg2))))))
              u_result_ok_retire I).
     apply u_post_gpr; [ by apply u_pins_tick | exact Hwf ].
   Qed.
@@ -1414,7 +1434,7 @@ Section UserTotalU.
     apply (rvc_post_intro t mm rsf va h instr RETIRE_SUCCESS
              (set_reg (s2 rsf mm va) nextPC tgt)
              Hdecc Hhv Hzca
-             (or_intror (ex_intro _ other (conj Hex1 (conj Hg1 (conj Hex2 Hg2)))))
+             (or_intror (or_introl (ex_intro _ other (conj Hex1 (conj Hg1 (conj Hex2 Hg2))))))
              u_result_ok_retire I).
     apply u_post_npc; [ by apply u_pins_tick | exact Hwf ].
   Qed.
@@ -1439,7 +1459,7 @@ Section UserTotalU.
     apply (rvc_post_intro t mm rsf va h instr RETIRE_SUCCESS
              (gpr_write_state ird v (set_reg (s2 rsf mm va) nextPC tgt))
              Hdecc Hhv Hzca
-             (or_intror (ex_intro _ other (conj Hex1 (conj Hg1 (conj Hex2 Hg2)))))
+             (or_intror (or_introl (ex_intro _ other (conj Hex1 (conj Hg1 (conj Hex2 Hg2))))))
              u_result_ok_retire I).
     apply u_post_npc_gpr; [ by apply u_pins_tick | exact Hwf ].
   Qed.
@@ -2445,19 +2465,20 @@ Section UserTotalU.
         destruct u;
         fin (finish_unchanged t mm rsf va (PAUSE tt) RETIRE_SUCCESS w
               Hhv Hdf eq_refl (exec_execute_PAUSE (s0 rsf mm va)) u_result_ok_retire I)
+    (* --- the fences: LEAVES (relaxed-ww), the third arm --- *)
     | _ = Some (FENCE_TSO ?u, _) =>
         destruct u;
-        fin (finish_unchanged t mm rsf va (FENCE_TSO tt) RETIRE_SUCCESS w
-              Hhv Hdf eq_refl (exec_execute_FENCE_TSO_U (s0 rsf mm va)) u_result_ok_retire I)
+        fin (finish_fence t mm rsf va (FENCE_TSO tt) w Hhv Hdf eq_refl I
+              (exec_execute_FENCE_TSO_U (s0 rsf mm va)))
     | _ = Some (FENCEI ?p, _) =>
         destruct p as [[imm i1] ird]; destruct i1 as [i1]; destruct ird as [ird];
-        fin (finish_unchanged t mm rsf va (FENCEI (imm, Regidx i1, Regidx ird)) RETIRE_SUCCESS w
-              Hhv Hdf eq_refl (exec_execute_FENCEI_U imm i1 ird (s0 rsf mm va)) u_result_ok_retire I)
+        fin (finish_fence t mm rsf va (FENCEI (imm, Regidx i1, Regidx ird)) w Hhv Hdf eq_refl I
+              (exec_execute_FENCEI_U imm i1 ird (s0 rsf mm va)))
     | _ = Some (FENCE ?p, _) =>
         destruct p as [[[[fm pred] succ] i1] ird]; destruct i1 as [i1]; destruct ird as [ird];
-        fin (finish_unchanged t mm rsf va (FENCE (fm, pred, succ, Regidx i1, Regidx ird))
-              RETIRE_SUCCESS w Hhv Hdf eq_refl
-              (exec_execute_FENCE_total_U fm pred succ i1 ird (s0 rsf mm va) Lcp0) u_result_ok_retire I)
+        fin (finish_fence t mm rsf va (FENCE (fm, pred, succ, Regidx i1, Regidx ird)) w
+              Hhv Hdf eq_refl I
+              (exec_execute_FENCE_total_U fm pred succ i1 ird (s0 rsf mm va) Lcp0))
     (* --- memory families: the section Variables (width threaded from Hdi) --- *)
     | _ = Some (LOAD ?p, _) =>
         destruct p as [[[[imm rs1] rd] us] width]; cbn [decodable_u] in Hdi;

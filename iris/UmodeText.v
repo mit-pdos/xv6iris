@@ -352,7 +352,8 @@ Section UmodeText.
      [userret] STEP 0 runs it through [swp_hart_fence_i]. *)
   Lemma umem_text_stamp (pt : uptd) (T : gmap Z (bv 8)) (g : gstate) (IK : nat) :
     (g.(gtv) cpu_id <= IK)%nat ->
-    (own_pub (hart_agent cpu_id) g.(glog) <= IK)%nat ->
+    (own_pub (hart_agent cpu_id) g.(glog) g.(gdlog) <= IK)%nat ->
+    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) ->
     tso_interp_at riscv_eraGS g -∗ TsoCtx.own_context XI -∗
     ([∗ map] va ↦ b ∈ T,
        TsoCtx.ctx_phys_pointsto XI (uva_pa pt va : Arch.pa) (DfracOwn 1) b) -∗
@@ -360,14 +361,14 @@ Section UmodeText.
     ([∗ map] va ↦ b ∈ T,
        TsoCtx.ctx_phys_xpointsto XI IK (uva_pa pt va : Arch.pa) (DfracOwn 1) b).
   Proof.
-    intros Htv Hpub.
+    intros Htv Hpub Hod.
     induction T as [|va b T Hfresh IH] using map_ind.
     - iIntros "Hint Hrun _". rewrite big_sepM_empty. by iFrame.
     - iIntros "Hint Hrun Hm". rewrite !big_sepM_insert //.
       iDestruct "Hm" as "[Hb Hm]".
       iDestruct (IH with "Hint Hrun Hm") as "(Hint & Hrun & Hm)".
       iDestruct (ctx_phys_xstamp g XI IK (uva_pa pt va : Arch.pa) (DfracOwn 1) b
-                   Htv Hpub with "Hint Hrun Hb") as "(Hint & Hrun & Hb)".
+                   Htv Hpub Hod with "Hint Hrun Hb") as "(Hint & Hrun & Hb)".
       iFrame.
   Qed.
 
@@ -375,9 +376,9 @@ Section UmodeText.
     ⊢ ifence_step (umem pt M ∗ TsoCtx.own_context XI)
                   (umem_x pt M ∗ TsoCtx.own_context XI).
   Proof.
-    rewrite /ifence_step. iIntros (g IK) "%Htv %Hpub #Hlb Hgh Hint [Hm Hrun]".
+    rewrite /ifence_step. iIntros (g IK) "%Hod %Htv %Hpub #Hlb Hgh Hint [Hm Hrun]".
     rewrite (umem_split pt M). iDestruct "Hm" as "[Ht Hd]".
-    iDestruct (umem_text_stamp pt (uM_text pt M) g IK Htv Hpub
+    iDestruct (umem_text_stamp pt (uM_text pt M) g IK Htv Hpub Hod
                  with "Hint Hrun Ht") as "(Hint & Hrun & Ht)".
     iModIntro. iFrame "Hgh Hint Hrun".
     iExists IK. iFrame "Hlb Hd". iExact "Ht".
@@ -430,13 +431,13 @@ Section UmodeText.
     ⊢ ifence_step (user_ptm_inv P sz M ∗ TsoCtx.own_context XI)
                   (user_ptm_inv_x P sz M ∗ TsoCtx.own_context XI).
   Proof.
-    rewrite /ifence_step. iIntros (g IK) "%Htv %Hpub #Hlb Hgh Hint [Hpt Hrun]".
+    rewrite /ifence_step. iIntros (g IK) "%Hod %Htv %Hpub #Hlb Hgh Hint [Hpt Hrun]".
     rewrite /user_ptm_inv /user_ptm_inv_x /umem_lazy /umem_lazy_x /umem_own /umem_own_x.
     iDestruct "Hpt" as "(Htlb & (%Mp & %Hsub & %Hiff & %Hz & %Hdom & Hm) & %Hinj & %Hacc)".
     iAssert (umem P Mp) with "[Hm]" as "Hm"; [iExact "Hm" |].
     rewrite (umem_split P Mp).
     iDestruct "Hm" as "[Ht Hd]".
-    iDestruct (umem_text_stamp P (uM_text P Mp) g IK Htv Hpub
+    iDestruct (umem_text_stamp P (uM_text P Mp) g IK Htv Hpub Hod
                  with "Hint Hrun Ht") as "(Hint & Hrun & Ht)".
     iModIntro. iFrame "Hgh Hint Hrun Htlb".
     iSplitL; [| iPureIntro; exact (conj Hinj Hacc)].
@@ -449,13 +450,13 @@ Section UmodeText.
     ⊢ ifence_step (umem_lazy P sz M ∗ TsoCtx.own_context XI)
                   (umem_lazy_x P sz M ∗ TsoCtx.own_context XI).
   Proof.
-    rewrite /ifence_step. iIntros (g IK) "%Htv %Hpub #Hlb Hgh Hint [Hlz Hrun]".
+    rewrite /ifence_step. iIntros (g IK) "%Hod %Htv %Hpub #Hlb Hgh Hint [Hlz Hrun]".
     rewrite /umem_lazy /umem_lazy_x /umem_own /umem_own_x.
     iDestruct "Hlz" as "(%Mp & %Hsub & %Hiff & %Hz & %Hdom & Hm)".
     iAssert (umem P Mp) with "[Hm]" as "Hm"; [iExact "Hm" |].
     rewrite (umem_split P Mp).
     iDestruct "Hm" as "[Ht Hd]".
-    iDestruct (umem_text_stamp P (uM_text P Mp) g IK Htv Hpub
+    iDestruct (umem_text_stamp P (uM_text P Mp) g IK Htv Hpub Hod
                  with "Hint Hrun Ht") as "(Hint & Hrun & Ht)".
     iModIntro. iFrame "Hgh Hint Hrun".
     iExists Mp. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].

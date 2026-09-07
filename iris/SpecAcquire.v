@@ -203,7 +203,7 @@ Definition wp_acquire_gen_llb_pre_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lk0 s R Dc -∗
-  TsoGhost.llb loglen_name Tl -∗
+  TsoGhost.llb dlen_name Tl -∗
   Tc -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
@@ -340,7 +340,7 @@ Definition wp_acquire_llb_pre_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk0 s R -∗
-  TsoGhost.llb loglen_name Tl -∗
+  TsoGhost.llb dlen_name Tl -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗

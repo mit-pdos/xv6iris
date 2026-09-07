@@ -153,7 +153,7 @@ Section WpSconfMem.
      [Local Set Printing All] shows [@own_context Σ _ CID …] vs [… CID0 …]. *)
   Local Lemma wordw_pointsto_write_c `{KTR : !CurKtier} {CIDw : CpuId}
       (width : Z)
-      (img : bytemap) (σ : mstate) (log : list pwmsg)
+      (img : bytemap) (σ : mstate) (log : list pwmsg) (dl : list nat)
       (V : agent -> nat) (a : mword 64)
       (ppn : mword 44) (vold vnew : mword (8*width)) :
     0 < width ->
@@ -161,7 +161,7 @@ Section WpSconfMem.
     (bv_unsigned (subrange_vec_dec a 11 0) + width <= 4096)%Z ->
     kmap_at (svpn_of a) ppn KP_rw -∗
     gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
-    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
     TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
     wordw_pointsto width a (DfracOwn 1) vold ==∗
     gen_heap_interp (hG:=riscv_memGS)
@@ -182,7 +182,7 @@ Section WpSconfMem.
     assert (Hwn : N.to_nat (Z.to_N width) = Z.to_nat width)
       by apply Z_N_nat.
     iEval (rewrite -Hwn) in "Hb".
-    iMod (wordw_win_store_c (CID := CIDw) (Z.to_N width) img σ log V a ppn vold vnew
+    iMod (wordw_win_store_c (CID := CIDw) (Z.to_N width) img σ log dl V a ppn vold vnew
             ltac:(pose proof (bv_unsigned_in_range _
                     (subrange_vec_dec a 11 0)) as [Hlo0 _];
                   rewrite Hwn; lia) Hcan
@@ -205,7 +205,7 @@ Section WpSconfMem.
      live -- the interp is in hand exactly inside a leaf (A6.68). *)
   Local Lemma wordw_free_write_c `{KTR : !CurKtier} {CIDw : CpuId}
       (width : Z)
-      (img : bytemap) (σ : mstate) (log : list pwmsg)
+      (img : bytemap) (σ : mstate) (log : list pwmsg) (dl : list nat)
       (V : agent -> nat) (a : mword 64)
       (ppn : mword 44) (vnew : mword (8*width)) :
     0 < width ->
@@ -213,7 +213,7 @@ Section WpSconfMem.
     (bv_unsigned (subrange_vec_dec a 11 0) + width <= 4096)%Z ->
     kmap_at (svpn_of a) ppn KP_rw -∗
     gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
-    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
     TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
     wordw_free width a ==∗
     gen_heap_interp (hG:=riscv_memGS)
@@ -234,7 +234,7 @@ Section WpSconfMem.
     assert (Hwn : N.to_nat (Z.to_N width) = Z.to_nat width)
       by apply Z_N_nat.
     iEval (rewrite -Hwn) in "Hb".
-    iMod (wordw_win_store_free_c (CID := CIDw) (Z.to_N width) img σ log V a ppn
+    iMod (wordw_win_store_free_c (CID := CIDw) (Z.to_N width) img σ log dl V a ppn
             vnew
             ltac:(pose proof (bv_unsigned_in_range _
                     (subrange_vec_dec a 11 0)) as [Hlo0 _];
@@ -261,7 +261,7 @@ Section WpSconfMem.
   (* A6.63'': same CpuId re-park as the write helper above. *)
   Local Lemma wordw_pointsto_load_c `{KTR : !CurKtier} {CIDw : CpuId}
       (width : Z)
-      (img : bytemap) (σ : mstate) (log : list pwmsg)
+      (img : bytemap) (σ : mstate) (log : list pwmsg) (dl : list nat)
       (V : agent -> nat) (a : mword 64) (ppn : mword 44)
       (v : mword (8*width)) (dq : dfrac) :
     0 < width ->
@@ -269,11 +269,11 @@ Section WpSconfMem.
     (bv_unsigned (subrange_vec_dec a 11 0) + width <= 4096)%Z ->
     kmap_at (svpn_of a) ppn KP_rw -∗
     gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
-    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
     TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
     wordw_pointsto width a dq v -∗
     ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
-       tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+       tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
          (pa_of ppn a) (Z.to_N width) v⌝.
   Proof.
     intros Hw0 Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
@@ -281,7 +281,7 @@ Section WpSconfMem.
     assert (Hwn : N.to_nat (Z.to_N width) = Z.to_nat width)
       by apply Z_N_nat.
     iEval (rewrite -Hwn) in "Hb".
-    iApply (wordw_win_load_c (KTR := KTR) (CID := CIDw) (Z.to_N width) img σ log V a ppn v dq
+    iApply (wordw_win_load_c (KTR := KTR) (CID := CIDw) (Z.to_N width) img σ log dl V a ppn v dq
               Hcan
               ltac:(rewrite Hwn; apply Forall_forall; intros j Hj;
                     apply elem_of_list_In, elem_of_seq in Hj;
@@ -440,7 +440,7 @@ Section WpSconfMem.
     (* THE LOAD OBLIGATION, AS A PREMISE.  One leaf, every route; nothing
        below [gstate] reaches the client, exactly as A6.72's barrier-leaf
        rule requires. *)
-    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
             (V : agent -> nat) (ppn : mword 44) (v : mword (8*width)),
        (* the address facts the CLAIM yields inside the leaf, handed on so a
           supplier that needs them (the ctx tower's does) has them.
@@ -470,11 +470,11 @@ Section WpSconfMem.
        (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
        Dat v -∗
        ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
-          tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+          tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
             (pa_of ppn ea) (Z.to_N width) v⌝) ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
@@ -689,7 +689,7 @@ Section WpSconfMem.
                back UNCHANGED (a plain load moves no view, so [V] returns
                as [V]), and the obligation is now the view-indexed family
                [wordw_pointsto_load_c] pays. *)
-            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
             iMod "HAU" as (v) "[Hbw Hcl]".
@@ -698,9 +698,9 @@ Section WpSconfMem.
                the ambient spelling here would print identically while
                failing to unify (tso-port.md §0.20′). *)
             iAssert (⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
-                       tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
+                       tso_read_bytes img log dl (hart_agent (@cpu_id CID)) tvr
                          (pa_of ppn ea) (Z.to_N width) v⌝)%I as %Hrb.
-            { iApply (Hload CID img sigma log V ppn v Hcan Hoff Hid Hs
+            { iApply (Hload CID img sigma log dl V ppn v Hcan Hoff Hid Hs
                         with "Hk Hmem Htso Hctx Hbw"). }
             iMod ("Hcl" with "Hbw") as "HPsi".
             iMod "Hb1" as "_".
@@ -819,9 +819,9 @@ Section WpSconfMem.
              Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext Hrd Hrdok HkptEm
              (* A6.89: the ctx tower's supplier is CONTEXT-relative and wants
                 nothing from the no-migration promise -- one more [_]. *)
-             (fun CIDw img sigma log V ppn v Hcan Hoff _Hid _Hsame =>
+             (fun CIDw img sigma log dl V ppn v Hcan Hoff _Hid _Hsame =>
                 wordw_pointsto_load_c (KTR := ktd) (CIDw := CIDw) width img sigma
-                  log V ea ppn v dqm Hw0 Hcan Hoff)).
+                  log dl V ea ppn v dqm Hw0 Hcan Hoff)).
   Qed.
 
   (* ==================================================================== *)
@@ -888,7 +888,7 @@ Section WpSconfMem.
        [∀ tvr], which is the whole difference from [_dat].  A racy cell's
        reader cannot name the word: what it can name is a predicate the word
        satisfies at EVERY view the machine's drain may choose. *)
-    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
             (V : agent -> nat) (ppn : mword 44),
        (* the address facts the CLAIM yields inside the leaf, handed on so a
           supplier that needs them (the ctx tower's does) has them.
@@ -908,12 +908,12 @@ Section WpSconfMem.
        (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
        Res -∗
        ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
           exists v : mword (8*width),
-            tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+            tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
               (pa_of ppn ea) (Z.to_N width) v /\ P v⌝) ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
@@ -1100,7 +1100,7 @@ Section WpSconfMem.
                back UNCHANGED (a plain load moves no view, so [V] returns
                as [V]), and the obligation is now the view-indexed family
                [wordw_pointsto_load_c] pays. *)
-            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
             iMod "HAU" as "[Hbw Hcl]".
@@ -1110,9 +1110,9 @@ Section WpSconfMem.
                failing to unify (tso-port.md §0.20′). *)
             iAssert (⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
                        exists v : mword (8*width),
-                         tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
+                         tso_read_bytes img log dl (hart_agent (@cpu_id CID)) tvr
                            (pa_of ppn ea) (Z.to_N width) v /\ P v⌝)%I as %Hrb.
-            { iApply (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
+            { iApply (Hload CID img sigma log dl V ppn Hcan Hoff Hid Hs
                         with "Hk Hmem Htso Hctx Hbw"). }
             iMod ("Hcl" with "Hbw") as "HT".
             iMod "Hb1" as "_".
@@ -1236,7 +1236,7 @@ Section WpSconfMem.
        [∀ tvr], which is the whole difference from [_dat].  A racy cell's
        reader cannot name the word: what it can name is a predicate the word
        satisfies at EVERY view the machine's drain may choose. *)
-    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
             (V : agent -> nat) (ppn : mword 44),
        (* the address facts the CLAIM yields inside the leaf, handed on so a
           supplier that needs them (the ctx tower's does) has them.
@@ -1256,15 +1256,15 @@ Section WpSconfMem.
        (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
        Res -∗
        ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
           (exists v : mword (8*width),
-             tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+             tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
                (pa_of ppn ea) (Z.to_N width) v)
           /\ (forall v : mword (8*width),
-                tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+                tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
                   (pa_of ppn ea) (Z.to_N width) v -> Q v tvr)⌝) ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
@@ -1453,7 +1453,7 @@ Section WpSconfMem.
                back UNCHANGED (a plain load moves no view, so [V] returns
                as [V]), and the obligation is now the view-indexed family
                [wordw_pointsto_load_c] pays. *)
-            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
             iMod "HAU" as "[Hbw Hcl]".
@@ -1463,12 +1463,12 @@ Section WpSconfMem.
                failing to unify (tso-port.md §0.20′). *)
             iAssert (⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
                        (exists v : mword (8*width),
-                          tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
+                          tso_read_bytes img log dl (hart_agent (@cpu_id CID)) tvr
                             (pa_of ppn ea) (Z.to_N width) v)
                        /\ (forall v : mword (8*width),
-                             tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
+                             tso_read_bytes img log dl (hart_agent (@cpu_id CID)) tvr
                                (pa_of ppn ea) (Z.to_N width) v -> Q v tvr)⌝)%I as %Hrb.
-            { iApply (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
+            { iApply (Hload CID img sigma log dl V ppn Hcan Hoff Hid Hs
                         with "Hk Hmem Htso Hctx Hbw"). }
             iMod ("Hcl" with "Hbw") as "HT".
             iMod "Hb1" as "_".
@@ -1597,7 +1597,7 @@ Section WpSconfMem.
        [∀ tvr], which is the whole difference from [_dat].  A racy cell's
        reader cannot name the word: what it can name is a predicate the word
        satisfies at EVERY view the machine's drain may choose. *)
-    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
             (V : agent -> nat) (ppn : mword 44),
        (* the address facts the CLAIM yields inside the leaf, handed on so a
           supplier that needs them (the ctx tower's does) has them.
@@ -1617,20 +1617,20 @@ Section WpSconfMem.
        (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
        Res ==∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) ∗
-       tso_interp_of riscv_eraGS img sigma.(mem) log V ∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log dl V ∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
        Res ∗
        ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
           exists v : mword (8*width),
-            tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+            tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
               (pa_of ppn ea) (Z.to_N width) v⌝ ∗
        (∀ (tvr : nat) (v : mword (8*width)),
           ⌜(V (hart_agent (@cpu_id CIDw)) <= tvr)%nat⌝ -∗
-          ⌜tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+          ⌜tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
              (pa_of ppn ea) (Z.to_N width) v⌝ -∗
           W v tvr)) ->
     sie_cap_gpr kt m n b p -∗
@@ -1820,7 +1820,7 @@ Section WpSconfMem.
                back UNCHANGED (a plain load moves no view, so [V] returns
                as [V]), and the obligation is now the view-indexed family
                [wordw_pointsto_load_c] pays. *)
-            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
             iMod "HAU" as "[Hbw Hcl]".
@@ -1828,7 +1828,7 @@ Section WpSconfMem.
                [wordw_pointsto_load_c] now concludes at [@cpu_id CID], and
                the ambient spelling here would print identically while
                failing to unify (tso-port.md §0.20′). *)
-            iMod (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
+            iMod (Hload CID img sigma log dl V ppn Hcan Hoff Hid Hs
                     with "Hk Hmem Htso Hctx Hbw") as "(Hmem & Htso & Hctx & Hbw & %Htot & HW)".
             iMod ("Hcl" with "Hbw") as "HT".
             iMod "Hb1" as "_".
@@ -1947,7 +1947,7 @@ Section WpSconfMem.
        [∀ tvr], which is the whole difference from [_dat].  A racy cell's
        reader cannot name the word: what it can name is a predicate the word
        satisfies at EVERY view the machine's drain may choose. *)
-    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
             (V : agent -> nat) (ppn : mword 44),
        (* the address facts the CLAIM yields inside the leaf, handed on so a
           supplier that needs them (the ctx tower's does) has them.
@@ -1967,16 +1967,16 @@ Section WpSconfMem.
        (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
        Res -∗
        ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
           exists v : mword (8*width),
-            tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+            tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
               (pa_of ppn ea) (Z.to_N width) v⌝ ∗
        □ (∀ (tvr : nat) (v : mword (8*width)),
             ⌜(V (hart_agent (@cpu_id CIDw)) <= tvr)%nat⌝ -∗
-            ⌜tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+            ⌜tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
                (pa_of ppn ea) (Z.to_N width) v⌝ -∗ Q v tvr)) ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
@@ -2165,7 +2165,7 @@ Section WpSconfMem.
                back UNCHANGED (a plain load moves no view, so [V] returns
                as [V]), and the obligation is now the view-indexed family
                [wordw_pointsto_load_c] pays. *)
-            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
             iMod "HAU" as "[Hbw Hcl]".
@@ -2175,13 +2175,13 @@ Section WpSconfMem.
                failing to unify (tso-port.md §0.20′). *)
             iAssert (⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
                        exists v : mword (8*width),
-                         tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
+                         tso_read_bytes img log dl (hart_agent (@cpu_id CID)) tvr
                            (pa_of ppn ea) (Z.to_N width) v⌝ ∗
                      □ (∀ (tvr : nat) (v : mword (8*width)),
                           ⌜(V (hart_agent (@cpu_id CID)) <= tvr)%nat⌝ -∗
-                          ⌜tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
+                          ⌜tso_read_bytes img log dl (hart_agent (@cpu_id CID)) tvr
                              (pa_of ppn ea) (Z.to_N width) v⌝ -∗ Q v tvr))%I as "#Hob".
-            { iApply (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
+            { iApply (Hload CID img sigma log dl V ppn Hcan Hoff Hid Hs
                         with "Hk Hmem Htso Hctx Hbw"). }
             iDestruct "Hob" as "[%Hrb #HQi]".
             iMod ("Hcl" with "Hbw") as "HT".
@@ -2723,7 +2723,7 @@ Section WpSconfMem.
        view all name the hart the instruction obligation bound, not the
        section's, and the two spellings print identically. *)
     (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
-            (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
+            (log : list pwmsg) (dl : list nat) (V : agent -> nat) (ppn : mword 44),
        (uint ea < 274877906944)%Z ->
        (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
        ktier_pin ktd ppn ea ->
@@ -2737,7 +2737,7 @@ Section WpSconfMem.
        (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
        Res ==∗
        gen_heap_interp (hG := riscv_memGS)
@@ -2906,11 +2906,11 @@ Section WpSconfMem.
                this store IS.  §0.17' is respected: no deposit or absorb
                runs inside the update; the token is a plain resource
                threaded through it. *)
-            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
             iMod "HAU" as "[Hres Hcl]".
-            iMod (Hwrite CID img sigma log V ppn Hcan Hoff Hid Hs
+            iMod (Hwrite CID img sigma log dl V ppn Hcan Hoff Hid Hs
                 with "Hk Hmem Htso Hctx Hres")
               as "(Hmem & Htso & Hctx & Hpost)".
             iMod ("Hcl" with "Hpost") as "HPsi".
@@ -3005,9 +3005,9 @@ Section WpSconfMem.
               (wordw_pointsto (KTR := ktd) width ea (DfracOwn 1) sv)
               Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv HkptEm
               with "Hcg Hpc Hinstr Hclaim [HAU] Hcont").
-    { intros CIDw img sigma log V ppn Hcan Hoff Hid _.
+    { intros CIDw img sigma log dl V ppn Hcan Hoff Hid _.
       iIntros "#Hk Hmem Htso Hctx [%vold Hbw]".
-      iApply (wordw_pointsto_write_c (KTR := ktd) (CIDw := CIDw) width img sigma log V
+      iApply (wordw_pointsto_write_c (KTR := ktd) (CIDw := CIDw) width img sigma log dl V
                 ea ppn vold sv Hw0 Hcan Hoff with "Hk Hmem Htso Hctx Hbw"). }
     iMod "HAU" as (vold) "[Hbw Hcl]". iModIntro. iFrame "Hcl". by iExists vold.
   Qed.
@@ -3111,9 +3111,9 @@ Section WpSconfMem.
               (wordw_pointsto (KTR := ktd) width pa (DfracOwn 1) sv)
               Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr Hclaim [Hbytes] [Hcont]").
-    { intros CIDw img sigma log V ppn Hcan Hoff Hid _.
+    { intros CIDw img sigma log dl V ppn Hcan Hoff Hid _.
       iIntros "#Hk Hmem Htso Hctx Hbw".
-      iApply (wordw_free_write_c (KTR := ktd) (CIDw := CIDw) width img sigma log V
+      iApply (wordw_free_write_c (KTR := ktd) (CIDw := CIDw) width img sigma log dl V
                 pa ppn sv Hw0 Hcan Hoff with "Hk Hmem Htso Hctx Hbw"). }
     { iModIntro. iFrame "Hbytes". iIntros "Hb". by iModIntro. }
     iIntros (CID1 Hs1) "Hcg Hpc Hbw".
@@ -3444,7 +3444,7 @@ Section WpSconfMem.
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
-    TsoCtx.mem_free (KTR := ktd) ea (DfracOwn 1) -∗
+    TsoCtx.mem_free (KTR := ktd) cur_ctx ea (DfracOwn 1) -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
@@ -3683,13 +3683,13 @@ Section WpSconfMem.
      [lock_word_store_plain] (A6.89) already spells: the pin, the [gs_of]
      bridge, and the [vstep] monotonicity triple. <<< *)
   Local Lemma word_wpay_frame_store_c {CIDw : CpuId}
-      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg)
+      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg) (dl : list nat)
       (V : agent -> nat) (a : Arch.pa) (vold : mword 64)
       (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
       (own : agent -> option nat) (lo : nat) :
     (forall j : nat, (j < 8)%nat -> nth_byte (zero_reg : mword 64) j = z j) ->
     gen_heap_interp (hG := riscv_memGS) σ.(mem) -∗
-    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
     ([∗ list] j ∈ seq 0 8, ∃ t : nat,
        TsoCtx.phys_ledger_wpay (pa_add a j) (DfracOwn 1) (nth_byte vold j) t
          (TsoMemPa.TsWin a 8 j z cp own lo)) ==∗
@@ -3734,10 +3734,10 @@ Section WpSconfMem.
     assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
     { intros c. rewrite Htvc /log' length_app /=.
       have := Hbd (hart_agent c). lia. }
-    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log dl V
                σ.(sregs) σ.(mdev) Hpin).
     iMod (TsoCtxLedger.ledger_store_win_wpay_ok (CID := CIDw)
-            (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
+            (gs_of img σ.(mem) log dl V σ.(sregs) σ.(mdev))
             (gs_of img (write_bytes σ.(mem) a 8 vnew) log' V'
                σ.(sregs) σ.(mdev))
             a 8%N vold vnew lo z cp own own'
@@ -3765,7 +3765,7 @@ Section WpSconfMem.
      that family opens the lock INSIDE the atomic step, so it cannot use
      the closed leaf below (which wants the window in hand). <<< *)
   Lemma word_wpay_frame_store_gen_c {CIDw : CpuId}
-      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg)
+      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg) (dl : list nat)
       (V : agent -> nat) (a : Arch.pa) (vold vnew : mword 64)
       (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
       (own own' : agent -> option nat) (lo : nat) :
@@ -3776,7 +3776,7 @@ Section WpSconfMem.
        /\ own' (hart_agent (@cpu_id CIDw)) = None) ->
     (forall h : agent, h <> hart_agent (@cpu_id CIDw) -> own' h = own h) ->
     gen_heap_interp (hG := riscv_memGS) σ.(mem) -∗
-    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
     ([∗ list] j ∈ seq 0 8, ∃ t : nat,
        TsoCtx.phys_ledger_wpay (pa_add a j) (DfracOwn 1) (nth_byte vold j) t
          (TsoMemPa.TsWin a 8 j z cp own lo)) ==∗
@@ -3818,10 +3818,10 @@ Section WpSconfMem.
     assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
     { intros c. rewrite Htvc /log' length_app /=.
       have := Hbd (hart_agent c). lia. }
-    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log dl V
                σ.(sregs) σ.(mdev) Hpin).
     iMod (TsoCtxLedger.ledger_store_win_wpay_ok (CID := CIDw)
-            (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
+            (gs_of img σ.(mem) log dl V σ.(sregs) σ.(mdev))
             (gs_of img (write_bytes σ.(mem) a 8 vnew) log' V'
                σ.(sregs) σ.(mdev))
             a 8%N vold vnew lo z cp own own'
@@ -3906,10 +3906,10 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hclaim [Hwin] [Hcont]").
     { (* THE WRITE OBLIGATION: the floor-FRAMING gate, at the physical
          address the tier pin identifies with [ea]. *)
-      intros CIDw img sigma log V ppn Hcan Hoff Hid _.
+      intros CIDw img sigma log dl V ppn Hcan Hoff Hid _.
       iIntros "#Hk Hmem Htso Hctx Hbw".
       rewrite (ktier_pin_id ppn ea Hid).
-      iMod (word_wpay_frame_store_c (CIDw := CIDw) img sigma log V ea vold
+      iMod (word_wpay_frame_store_c (CIDw := CIDw) img sigma log dl V ea vold
               z cp own lo Hz with "Hmem Htso Hbw") as "(Hmem & Htso & Hnew)".
       iModIntro. iFrame "Hmem Htso Hctx".
       iExists ea, (fun h => if decide (h = hart_agent (@cpu_id CIDw))
@@ -4006,7 +4006,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hclaim [Hbytes] [Hcont]").
     { (* THE WRITE OBLIGATION: the store-then-mint gate, at the physical
          address the tier pin identifies with [ea]. *)
-      intros CIDw img sigma log V ppn Hcan Hoff Hid _.
+      intros CIDw img sigma log dl V ppn Hcan Hoff Hid _.
       iIntros "#Hk Hmem Htso Hctx Hbw".
       iEval (rewrite (wordw8_ctx (KTR2 := KT0))) in "Hbw".
       (* A6.120: the dirty watermark's bound, taken BEFORE the append (the
@@ -4014,13 +4014,13 @@ Section WpSconfMem.
          legal log position above every dirty key"). *)
       iDestruct (TsoCtx.own_context_expose_w with "Hctx") as (W) "[#HWl Hctxw]".
       iDestruct (tso_interp_of_pin with "Htso") as %Hpin0.
-      iEval (rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+      iEval (rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                         sigma.(sregs) sigma.(mdev) Hpin0)) in "Htso".
       iDestruct (TsoCtx.tso_interp_llb_valid with "Htso HWl") as "[Htso %HWle]".
-      iEval (rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+      iEval (rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                          sigma.(sregs) sigma.(mdev) Hpin0)) in "Htso".
       cbn [glog gs_of] in HWle.
-      iMod (SmodeCorePt.word_pointsto_wpay_mint_c (KTR := KT0) img sigma log V
+      iMod (SmodeCorePt.word_pointsto_wpay_mint_c (KTR := KT0) img sigma log dl V
               ea ppn vold (zero_reg : mword 64) cp Hcan Hoff
               with "Hk Hmem Htso Hbw") as "(Hmem & Htso & #Hlb & Hpay & #Hmsg)".
       iMod (TsoCtx.ctx_wrote_register (CID := CIDw) TsoCtx.cur_ctx W (length log)

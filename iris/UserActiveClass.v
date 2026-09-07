@@ -1160,6 +1160,33 @@ Section UserActiveClass.
   (* state it started from, which is what lets the second run start from the *)
   (* frame the first handed back.                                            *)
   (* ===================================================================== *)
+  (* THE U-MODE FENCE LEAF (relaxed-ww).  A user fence is a barrier node:
+     [HartBarrier.wp_hart_barrier_core] pays it (a release fence self-loops
+     until the hart's own stores have drained; the view moves by
+     [fence_post]), and nothing the user frame holds is view-indexed the
+     wrong way -- so the frame comes back at the same register file.
+     relaxed-ww STAGE E: the leaf's assembly over [execute]'s fiom prologue;
+     tracked in claude-notes/projects/relaxed-ww.md. *)
+  Lemma swp_execute_fence_u (dq : dfrac) (t : ptree) (mm : PtBytes.pamap)
+      (rsx : regstate) (instr : instruction) (ib : mword 32)
+      (Pe : ExecutionResult -> mword 32 -> iProp Σ) :
+    u_fence_instr instr ->
+    exec (execute instr) (u_state rsx mm) = Some (RETIRE_SUCCESS, u_state rsx mm) ->
+    u_mem_ok pt t mm ->
+    gen_cert -∗ resv_any cpu_id -∗
+    hreg_frame rsx u_Drw -∗ hreg_frame_ro (u_Df dq) rsx u_Dro -∗
+    own_context cur_ctx -∗
+    bytes_own mm -∗
+    (∀ rs2 : regstate,
+       ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 rsx⌝ -∗
+       hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
+       own_context cur_ctx -∗
+       bytes_own mm -∗ resv_any cpu_id -∗
+       Pe RETIRE_SUCCESS ib) -∗
+    swp (execute instr) (run_exec_post Pe ib).
+  Proof.
+  Admitted.
+
   Lemma swp_execute_of_pure (dq : dfrac) (t t' : ptree) (mm : PtBytes.pamap)
       (rsx : regstate) (instr : instruction) (r : ExecutionResult)
       (s_x : mstate) (ib : mword 32)
@@ -1171,7 +1198,10 @@ Section UserActiveClass.
              = Some (ExecuteAs other, u_state rsx mm)
            /\ goodmb Du_r Du_w (execute instr) (u_state rsx mm) mm = true
            /\ exec (execute other) (u_state rsx mm) = Some (r, s_x)
-           /\ goodmb Du_r Du_w (execute other) (u_state rsx mm) mm = true)) ->
+           /\ goodmb Du_r Du_w (execute other) (u_state rsx mm) mm = true)
+     \/ (u_fence_instr instr
+         /\ exec (execute instr) (u_state rsx mm) = Some (RETIRE_SUCCESS, u_state rsx mm)
+         /\ r = RETIRE_SUCCESS /\ s_x = u_state rsx mm)) ->
     (match r with ExecuteAs _ => False | _ => True end) ->
     u_mem_ok pt t mm ->
     u_mem_step_ok pt t t' mm s_x.(mem) ->
@@ -1189,7 +1219,7 @@ Section UserActiveClass.
   Proof.
     intros Hexe Hnr Hwf Hstep.
     iIntros "#Hcert Hany Hrw Hro Hrun Hown Hk".
-    destruct Hexe as [(He & Hg) | (other & He1 & Hg1 & He2 & Hg2)].
+    destruct Hexe as [(He & Hg) | [(other & He1 & Hg1 & He2 & Hg2) | (Hf & He & -> & ->)]].
     - (* DIRECT: one execute, and the result is not a redirect *)
       iApply (swp_mono with "[Hk] [Hany Hrw Hro Hrun Hown]").
       2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
@@ -1236,6 +1266,11 @@ Section UserActiveClass.
       (* NO [run_exec_post_direct] here: [run_exec_post_redirect] already
          stripped the wrapper, so the second execute's continuation is
          [fun e' => Pe e' ib] and the goal IS [Pe r ib]. *)
+      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hrun Hown Hany"). exact Hag.
+    - (* FENCE: the barrier leaf, state unchanged *)
+      iApply (swp_execute_fence_u dq t mm rsx instr ib Pe Hf He Hwf
+                with "Hcert Hany Hrw Hro Hrun Hown").
+      iIntros (rs2) "%Hag Hrw Hro Hrun Hown Hany".
       iApply ("Hk" $! rs2 with "[%] Hrw Hro Hrun Hown Hany"). exact Hag.
   Qed.
 

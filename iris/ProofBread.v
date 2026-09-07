@@ -1045,7 +1045,7 @@ Section BreadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    llb loglen_name tl -∗
+    llb dlen_name tl -∗
     bcache_scan2 bn V Mg ord devs bnos tl cur_ctx -∗
     bslot -∗
     procs_inv γs -∗
@@ -1346,7 +1346,7 @@ Section BreadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    llb loglen_name tl -∗
+    llb dlen_name tl -∗
     bcache_scan2 bn V Mg ord devs bnos tl cur_ctx -∗
     bslot -∗
     procs_inv γs -∗
@@ -1531,7 +1531,7 @@ Section BreadBlocks.
        hook re-floors there from the llb the twin handed out *)
     iDestruct "Hafter" as (M' ord' devs' bnos' tl') "(%Htl' & #Hllbtl' & Hscan')".
     iApply (R.wp_release_hook_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string
-              (fun ξ => llb loglen_name tl' ∗ bcache_scan2 bn V M' ord' devs' bnos' tl' ξ)%I
+              (fun ξ => llb dlen_name tl' ∗ bcache_scan2 bn V M' ord' devs' bnos' tl' ξ)%I
               (fun ξ => bcache_res2 bn V ξ) C4
               0%nat eb (proc_addr j) (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HC4a0; apply bv_eq; vm_compute; reflexivity)
@@ -1691,7 +1691,7 @@ Section BreadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    llb loglen_name tl -∗
+    llb dlen_name tl -∗
     bcache_scan2 bn V Mg ord devs bnos tl cur_ctx -∗
     bslot -∗
     procs_inv γs -∗
@@ -1995,7 +1995,7 @@ Section BreadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    llb loglen_name tl -∗
+    llb dlen_name tl -∗
     bcache_scan2 bn V Mg ord devs bnos tl cur_ctx -∗
     bslot -∗
     procs_inv γs -∗
@@ -2217,7 +2217,7 @@ Section BreadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    llb loglen_name tl -∗
+    llb dlen_name tl -∗
     bcache_scan2 bn V Mg ord devs bnos tl cur_ctx -∗
     bslot -∗
     procs_inv γs -∗
@@ -2254,7 +2254,7 @@ Section BreadBlocks.
                cpu_claim_ext eb (proc_addr j) -∗
                locked (bn_lk bn) cpu_id -∗
                TsoCtx.ctx_floor cur_ctx tl -∗
-               llb loglen_name tl -∗
+               llb dlen_name tl -∗
                bcache_scan2 bn V Mg ord devs bnos tl cur_ctx -∗
                bslot -∗
                proc_priv_bare (proc_addr j) pidv Upr -∗

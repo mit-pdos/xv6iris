@@ -68,7 +68,7 @@ Definition wp_memset_free_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
   sie_cap_gpr kt m0 n b pcur -∗
   kernel_text -∗ pc_is pcE -∗
   ([∗ list] j ∈ seq 0 len,
-     TsoCtx.mem_free (KTR := ktb) (pa_add p j) (DfracOwn 1)) -∗
+     TsoCtx.mem_free (KTR := ktb) cur_ctx (pa_add p j) (DfracOwn 1)) -∗
   wp_next b pcur (fun (CID : CpuId) =>
     ∀ mfin,
     sie_cap_gpr kt mfin n b pcur -∗

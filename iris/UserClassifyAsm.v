@@ -469,6 +469,17 @@ Qed.
    result shape -- so it is the memory arms' contract too, and it is named
    here rather than in [UserTotalU] so P4 can code against it without paying
    that file. *)
+(* relaxed-ww: a FENCE is a LEAF at U-mode too -- a fence with a W
+   predecessor blocks until the hart's own stores have drained, so it is
+   not a walker step.  The totality carries the three fence instructions in
+   a third arm: the functional interpreter retires them without moving the
+   state, and the [swp] layer pays them with the barrier leaf. *)
+Definition u_fence_instr (i : instruction) : Prop :=
+  match i with
+  | FENCE _ | FENCEI _ | FENCE_TSO _ => True
+  | _ => False
+  end.
+
 Definition base_post (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
     (va : mword 64) (w : mword 32) : Prop :=
   exists (instr : instruction) (r : ExecutionResult) (s_x : mstate)
@@ -498,7 +509,12 @@ Definition base_post (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
               = Some (r, s_x)
            /\ goodmb Du_r Du_w (execute other)
                 (u_state (register_set nextPC (add_vec_int va 4) rsf) mm) mm
-              = true)) /\
+              = true)
+     \/ (u_fence_instr instr
+         /\ exec (execute instr) (u_state (register_set nextPC (add_vec_int va 4) rsf) mm)
+            = Some (RETIRE_SUCCESS, (u_state (register_set nextPC (add_vec_int va 4) rsf) mm))
+         /\ r = RETIRE_SUCCESS
+         /\ s_x = (u_state (register_set nextPC (add_vec_int va 4) rsf) mm))) /\
     u_result_ok r /\
     match r with ExecuteAs _ => False | _ => True end /\
     (* THE POST-STATE *)
@@ -536,7 +552,12 @@ Definition rvc_post (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
               = Some (r, s_x)
            /\ goodmb Du_r Du_w (execute other)
                 (u_state (register_set nextPC (add_vec_int va 2) rsf) mm) mm
-              = true)) /\
+              = true)
+     \/ (u_fence_instr instr
+         /\ exec (execute instr) (u_state (register_set nextPC (add_vec_int va 2) rsf) mm)
+            = Some (RETIRE_SUCCESS, (u_state (register_set nextPC (add_vec_int va 2) rsf) mm))
+         /\ r = RETIRE_SUCCESS
+         /\ s_x = (u_state (register_set nextPC (add_vec_int va 2) rsf) mm))) /\
     u_result_ok r /\
     match r with ExecuteAs _ => False | _ => True end /\
     reg_agree_on u_Dfix s_x.(sregs)

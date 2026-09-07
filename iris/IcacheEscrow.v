@@ -4660,10 +4660,10 @@ Section IcacheBox.
      lower bound.  [ic_slp_fold]'s statement is unchanged; per row the fold
      weakens the floor by [TsoCtx.ctx_floor_le]. *)
   Definition ic_slp_dep cn k (T : nat) : iProp Σ :=
-    (∃ Tp : nat, ⌜(Tp ≤ T)%nat⌝ ∗ llb loglen_name T ∗
+    (∃ Tp : nat, ⌜(Tp ≤ T)%nat⌝ ∗ llb dlen_name T ∗
        ic_tok cn k ∗ ic_regp k (L2Reg Tp None) ∗ ic_dep_neutral cn k ∗
        off_rows_dep off_cfg k T)%I.
-  Lemma ic_slp_dep_llb cn k T : ic_slp_dep cn k T -∗ llb loglen_name T.
+  Lemma ic_slp_dep_llb cn k T : ic_slp_dep cn k T -∗ llb dlen_name T.
   Proof. iIntros "(% & _ & #H & _)". iExact "H". Qed.
   Lemma ic_slp_fold cn k T (ξ : CtxId) :
     ic_slp_dep cn k T ∗ ctx_floor ξ T ⊢ ic_slp cn k ξ.
@@ -4690,7 +4690,7 @@ Section IcacheBox.
      re-opening the box lane's file.) *)
   Lemma off_rows_dep_le (i : nat) (T T' : nat) :
     (T <= T')%nat ->
-    llb loglen_name T' -∗ off_rows_dep off_cfg i T -∗ off_rows_dep off_cfg i T'.
+    llb dlen_name T' -∗ off_rows_dep off_cfg i T -∗ off_rows_dep off_cfg i T'.
   Proof.
     iIntros (Hle) "#Hllb (%L & Hauth & _ & Hset)".
     iExists L. iFrame "Hauth Hllb".
@@ -4708,13 +4708,13 @@ Section IcacheBox.
      hands it (items 35/36: the holder may have parked an off box and then
      has no floor to re-fold) *)
   Lemma ic_slp_dep_of_dep cn k (Tp T : nat) :
-    llb loglen_name Tp -∗
+    llb dlen_name Tp -∗
     ic_tok cn k -∗ ic_regp k (L2Reg Tp None) -∗ ic_dep_neutral cn k -∗
     off_rows_dep off_cfg k T -∗
-    ∃ Tc : nat, ⌜(Tp <= Tc)%nat⌝ ∗ llb loglen_name Tc ∗ ic_slp_dep cn k Tc.
+    ∃ Tc : nat, ⌜(Tp <= Tc)%nat⌝ ∗ llb dlen_name Tc ∗ ic_slp_dep cn k Tc.
   Proof.
     iIntros "#HllbP Ht Hrp Hn Hdep".
-    iAssert (llb loglen_name T) as "#HllbO".
+    iAssert (llb dlen_name T) as "#HllbO".
     { iDestruct "Hdep" as (L) "(_ & #H & _)". iExact "H". }
     iDestruct (llb_max with "HllbP HllbO") as "#HllbC".
     iDestruct (off_rows_dep_le k T (Nat.max Tp T) (Nat.le_max_r Tp T) with "HllbC Hdep") as "Hdep'".
@@ -4726,16 +4726,16 @@ Section IcacheBox.
   Qed.
 
   Lemma ic_slp_dep_of_rows cn k (Tp : nat) (ξ : CtxId) :
-    llb loglen_name Tp -∗
+    llb dlen_name Tp -∗
     ic_tok cn k -∗ ic_regp k (L2Reg Tp None) -∗ ic_dep_neutral cn k -∗
     off_rows off_cfg k ξ -∗
-    ∃ T : nat, ⌜(Tp <= T)%nat⌝ ∗ llb loglen_name T ∗ ic_slp_dep cn k T.
+    ∃ T : nat, ⌜(Tp <= T)%nat⌝ ∗ llb dlen_name T ∗ ic_slp_dep cn k T.
   Proof.
     iIntros "#HllbP Ht Hrp Hn Hoff".
     iDestruct (off_rows_to_dep off_cfg k ξ with "Hoff") as (T') "Hdep".
-    iAssert (llb loglen_name T') as "#HllbO".
+    iAssert (llb dlen_name T') as "#HllbO".
     { iDestruct "Hdep" as (L) "(_ & #H & _)". iExact "H". }
-    iDestruct (TsoGhost.llb_max loglen_name Tp T' with "HllbP HllbO") as "#HllbM".
+    iDestruct (TsoGhost.llb_max dlen_name Tp T' with "HllbP HllbO") as "#HllbM".
     iDestruct (off_rows_dep_le k T' (Nat.max Tp T') ltac:(lia) with "HllbM Hdep") as "Hdep".
     iExists (Nat.max Tp T'). iSplitR; [iPureIntro; lia |].
     iSplitR; [iExact "HllbM" |].
@@ -4752,7 +4752,7 @@ Section IcacheBox.
   Definition ic_slot_row k (oi : ic_bid) (c : nat) (tl : nat) : iProp Σ :=
     (∃ r : slot_reg ic_bid ic_x,
        ic_regd k r ∗ ⌜sr_win r = false⌝ ∗ ⌜sr_x r = None⌝ ∗ ⌜sr_ident r = oi⌝ ∗
-       llb loglen_name (sr_td r) ∗ ⌜(sr_td r ≤ tl)%nat⌝ ∗
+       llb dlen_name (sr_td r) ∗ ⌜(sr_td r ≤ tl)%nat⌝ ∗
        ic_cnt k c)%I.
   (* F17: [c] is M !! k's count (0 at None).  The table's DEAD row keeps
      today's [islot_free_at k dev inum] -- the identity halves complementary
@@ -4880,23 +4880,25 @@ Section IcacheBox.
      (the quarter and the [np] shape); the table's half at [true] selects
      the arm and comes back as [Q']. *)
   Lemma ic_recycle_deposit `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32) (g : gname) (T0 : nat) (E : coPset) :
+      (gs : RiscvLang.gstate) (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32) (g : gname) (T0 : nat) (E : coPset) :
     ↑icBoxN ⊆ E ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) gs.(RiscvLang.glog) gs.(RiscvLang.gdlog) ->
     sr_win r = true -> sr_x r = Some (IcRaw, T0) ->
     ic_box cn γfs γi cov logstart k -∗
+    tso_interp_at riscv_eraGS gs -∗
     own_context ξ -∗
     ic_regd k r -∗ ic_cnt k 0 -∗
     ic_hdr_bare k (Some (dev, inum)) (IcUnloaded g) ξ -∗
     ity_pending g -∗ ifreeze_off (bv_unsigned inum) -∗ live_gen k (1/2) g -∗
     ic_id cn k (1/2) true dev inum ={E}=∗
-    own_context ξ ∗ ic_id cn k (1/2) true dev inum ∗
+    tso_interp_at riscv_eraGS gs ∗ own_context ξ ∗ ic_id cn k (1/2) true dev inum ∗
     ∃ T' : nat,
       ic_regd k (SlotReg T' false (Some (dev, inum)) None) ∗
       ic_cnt k 1 ∗
       ic_ref_stamps k dev inum 1%Qp ∗
-      llb loglen_name T'.
+      llb dlen_name T'.
   Proof.
-    iIntros (HE Hw Hx) "#Hbox Hrun Hrd Hc Hbare Hpend Hfoff Hlvh Hgid".
+    iIntros (HE Hod Hw Hx) "#Hbox Hint Hrun Hrd Hc Hbare Hpend Hfoff Hlvh Hgid".
     assert (HEk : ↑(icBoxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
     assert (Hhook : ∀ ξb : CtxId,
               (ity_pending g ∗ ifreeze_off (bv_unsigned inum) ∗ live_gen k (1/2) g ∗
@@ -4922,14 +4924,14 @@ Section IcacheBox.
       iFrame "Hvld Hid Hnl Hq". iLeft. iFrame "Hnp Hpend Hfoff Hlvh". }
     iMod (CtxBox.box_deposit_L1_hook (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
             (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
-            (icBoxN .@ k) (icfg_box k) ξ r 0 (Some (dev, inum)) IcRaw (IcUnloaded g) T0
+            (icBoxN .@ k) (icfg_box k) gs ξ r 0 (Some (dev, inum)) IcRaw (IcUnloaded g) T0
             (ic_hdr_bare k)
             (ity_pending g ∗ ifreeze_off (bv_unsigned inum) ∗ live_gen k (1/2) g ∗
              ic_id cn k (1/2) true dev inum)%I
-            (ic_id cn k (1/2) true dev inum) E HEk Hw Hx Hhook
-            with "Hbox Hrun Hrd Hc [$Hpend $Hfoff $Hlvh $Hgid] Hbare")
-      as "(Hrun & Hgid & %T' & Hrd & Hc & Href & #Hllb)".
-    iModIntro. iFrame "Hrun Hgid". iExists T'. iFrame "Hrd Hllb".
+            (ic_id cn k (1/2) true dev inum) E HEk Hw Hx Hod Hhook
+            with "Hbox Hint Hrun Hrd Hc [$Hpend $Hfoff $Hlvh $Hgid] Hbare")
+      as "(Hint & Hrun & Hgid & %T' & Hrd & Hc & Href & #Hllb)".
+    iModIntro. iFrame "Hint Hrun Hgid". iExists T'. iFrame "Hrd Hllb".
     iSplitL "Hc"; [iExact "Hc"|].
     rewrite /ic_ref_stamps /ic_ref_stamps_at /ic_stamps. iExists _. iFrame "Href".
     iPureIntro. rewrite /qsum map_fold_singleton /qsum_step Qcplus_0_r.
@@ -4960,11 +4962,11 @@ Section IcacheBox.
     ↑icBoxN ⊆ E ->
     sr_win r = false ->
     ic_box cn γfs γi cov logstart k -∗
-    ic_regd k r -∗ llb loglen_name (sr_td r) -∗ ic_cnt k (S c) -∗
+    ic_regd k r -∗ llb dlen_name (sr_td r) -∗ ic_cnt k (S c) -∗
     ic_ref_stamps_at k i 1%Qp ={E}=∗
     ∃ td' : nat, ⌜(sr_td r <= td')%nat⌝ ∗
       ic_regd k (SlotReg td' false (sr_ident r) (sr_x r)) ∗ ic_cnt k c ∗
-      llb loglen_name td'.
+      llb dlen_name td'.
   Proof.
     iIntros (HE Hw) "#Hbox Hrd #Hllb Hc Href". iDestruct "Href" as (m) "[%Hm Href]".
     assert (HEk : ↑(icBoxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
@@ -5123,22 +5125,24 @@ Section IcacheBox.
      Two forms: over the handle row [ic_deposit2] (the descriptor's mass),
      and over a bare hold at mass μ. *)
   Lemma ic_park_hold `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (d : ic_dep) (dev inum : mword 32) (x0 : ic_x) (μ : Qp) (E : coPset) :
+      (gs : RiscvLang.gstate) (ξ : CtxId) (d : ic_dep) (dev inum : mword 32) (x0 : ic_x) (μ : Qp) (E : coPset) :
     ↑icBoxN ⊆ E ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) gs.(RiscvLang.glog) gs.(RiscvLang.gdlog) ->
     ic_dep_id d = Some (dev, inum) ->
     ic_box cn γfs γi cov logstart k -∗
+    tso_interp_at riscv_eraGS gs -∗
     own_context ξ -∗
     ic_hdr_held cn γfs γi cov logstart k (ic_dep_rd d) (Some (dev, inum)) x0 ξ -∗ ic_rest k x0 ξ -∗
     ic_deposit cn k d -∗
     ic_hold k dev inum μ ={E}=∗
-    own_context ξ ∗ ic_dep_neutral cn k ∗ ic_park_side γfs γi cov logstart k d ∗
+    tso_interp_at riscv_eraGS gs ∗ own_context ξ ∗ ic_dep_neutral cn k ∗ ic_park_side γfs γi cov logstart k d ∗
     ∃ T' : nat,
       ic_regp k (L2Reg T' None) ∗
       CtxBox.reference (X := ic_x) (icfg_box k) (Some (dev, inum))
         {[ (Some (dev, inum), T') := μ ]} ∗
-      llb loglen_name T'.
+      llb dlen_name T'.
   Proof.
-    iIntros (HE Hid) "#Hbox Hrun Hhdr Hrest Hd Hhold".
+    iIntros (HE Hod Hid) "#Hbox Hint Hrun Hhdr Hrest Hd Hhold".
     assert (HEk : ↑(icBoxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
     iDestruct "Hhold" as (m) "[%Hm Hhold]".
     assert (Hjoin : ∀ (x : ic_x) (ξ' : CtxId),
@@ -5159,38 +5163,40 @@ Section IcacheBox.
       - iEval (rewrite /ic_q_side) in "Hs".
         iDestruct (ic_hdr_amb_join_rd (XI := ξ') with "Hh Hq Hs") as "Hh". iFrame. }
     iMod (CtxBox.box_park_join (ic_hdr cn γfs γi cov logstart k) (ic_rest k) (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
-            (icBoxN .@ k) (icfg_box k) ξ (Some (dev, inum))
+            (icBoxN .@ k) (icfg_box k) gs ξ (Some (dev, inum))
             (ic_hdr_held cn γfs γi cov logstart k (ic_dep_rd d)) (ic_deposit cn k d)
             (ic_deposit cn k d ∗ ic_deposit cn k d ∗ ic_park_side γfs γi cov logstart k d)%I
-            m E HEk Hjoin
-            with "Hbox Hrun [Hhdr Hrest] Hd Hhold")
-      as "(Hrun & (Hd1 & Hd2 & Hs) & %T' & %q & %Hq & Hrp & Href & #Hllb)".
+            m E HEk Hod Hjoin
+            with "Hbox Hint Hrun [Hhdr Hrest] Hd Hhold")
+      as "(Hint & Hrun & (Hd1 & Hd2 & Hs) & %T' & %q & %Hq & Hrp & Href & #Hllb)".
     { iExists x0. iFrame "Hhdr Hrest". }
     iMod (ic_dep_park with "Hd1 Hd2") as "[_ Hn]".
     assert (q = μ) as ->. { apply Qp.to_Qc_inj_iff. by rewrite Hq Hm. }
-    iModIntro. iFrame "Hrun Hn Hs". iExists T'. iFrame "Hrp Href Hllb".
+    iModIntro. iFrame "Hint Hrun Hn Hs". iExists T'. iFrame "Hrp Href Hllb".
   Qed.
   Lemma ic_park `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (d : ic_dep) (dev inum : mword 32) (x0 : ic_x) (E : coPset) :
+      (gs : RiscvLang.gstate) (ξ : CtxId) (d : ic_dep) (dev inum : mword 32) (x0 : ic_x) (E : coPset) :
     ↑icBoxN ⊆ E ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) gs.(RiscvLang.glog) gs.(RiscvLang.gdlog) ->
     ic_dep_id d = Some (dev, inum) ->
     ic_box cn γfs γi cov logstart k -∗
+    tso_interp_at riscv_eraGS gs -∗
     own_context ξ -∗
     ic_hdr_held cn γfs γi cov logstart k (ic_dep_rd d) (Some (dev, inum)) x0 ξ -∗ ic_rest k x0 ξ -∗
     ic_deposit cn k d -∗
     ic_deposit2 k d ={E}=∗
-    own_context ξ ∗ ic_dep_neutral cn k ∗ ic_park_side γfs γi cov logstart k d ∗ ic_body k d ∗
+    tso_interp_at riscv_eraGS gs ∗ own_context ξ ∗ ic_dep_neutral cn k ∗ ic_park_side γfs γi cov logstart k d ∗ ic_body k d ∗
     ∃ T' : nat,
       ic_regp k (L2Reg T' None) ∗
       CtxBox.reference (X := ic_x) (icfg_box k) (Some (dev, inum))
         {[ (Some (dev, inum), T') := ic_dep_mass d ]} ∗
-      llb loglen_name T'.
+      llb dlen_name T'.
   Proof.
-    iIntros (HE Hid) "#Hbox Hrun Hhdr Hrest Hd Hdep".
+    iIntros (HE Hod Hid) "#Hbox Hint Hrun Hhdr Hrest Hd Hdep".
     rewrite /ic_deposit2 Hid. iDestruct "Hdep" as "[Hhold Hbody]".
-    iMod (ic_park_hold cn γfs γi cov logstart k ξ d dev inum x0 (ic_dep_mass d) E HE Hid
-            with "Hbox Hrun Hhdr Hrest Hd Hhold") as "(Hrun & Hn & Hs & Hout)".
-    iModIntro. iFrame "Hrun Hn Hs Hbody". iExact "Hout".
+    iMod (ic_park_hold cn γfs γi cov logstart k gs ξ d dev inum x0 (ic_dep_mass d) E HE Hod Hid
+            with "Hbox Hint Hrun Hhdr Hrest Hd Hhold") as "(Hint & Hrun & Hn & Hs & Hout)".
+    iModIntro. iFrame "Hint Hrun Hn Hs Hbody". iExact "Hout".
   Qed.
 
   (* iput's ref == 1 GUARD -- (a) at c = 1 with the WHOLE unit (inode_refp,
@@ -5293,22 +5299,24 @@ Section IcacheBox.
      (g) and the window pin the walk re-enters here -- and the residue's
      identification quarter; the residue's fragment and share come back. *)
   Lemma ic_park_frz `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (qf : Qp) (dev inum : mword 32) (t : nat) (qt : Qp) (g : gname) (E : coPset) :
+      (gs : RiscvLang.gstate) (ξ : CtxId) (qf : Qp) (dev inum : mword 32) (t : nat) (qt : Qp) (g : gname) (E : coPset) :
     ↑icBoxN ⊆ E ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) gs.(RiscvLang.glog) gs.(RiscvLang.gdlog) ->
     ic_box cn γfs γi cov logstart k -∗
+    tso_interp_at riscv_eraGS gs -∗
     own_context ξ -∗
     ic_hdr_bare k (Some (dev, inum)) (IcUnloaded g) ξ -∗ ic_rest k (IcUnloaded g) ξ -∗
     ic_deposit cn k (DepFrz qf dev inum t qt) -∗
     ic_pin_tx k -∗
     ic_hold k dev inum 1%Qp ={E}=∗
-    own_context ξ ∗ ic_dep_neutral cn k ∗ iref_frag k qf ∗ tx_pin icfg_log t qt ∗
+    tso_interp_at riscv_eraGS gs ∗ own_context ξ ∗ ic_dep_neutral cn k ∗ iref_frag k qf ∗ tx_pin icfg_log t qt ∗
     ∃ T' : nat,
       ic_regp k (L2Reg T' None) ∗
       CtxBox.reference (X := ic_x) (icfg_box k) (Some (dev, inum))
         {[ (Some (dev, inum), T') := 1%Qp ]} ∗
-      llb loglen_name T'.
+      llb dlen_name T'.
   Proof.
-    iIntros (HE) "#Hbox Hrun Hbare Hrest Hd Hpin Hhold".
+    iIntros (HE Hod) "#Hbox Hint Hrun Hbare Hrest Hd Hpin Hhold".
     assert (HEk : ↑(icBoxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
     iDestruct "Hhold" as (m) "[%Hm Hhold]".
     assert (Hjoin : ∀ (x : ic_x) (ξ' : CtxId),
@@ -5330,41 +5338,43 @@ Section IcacheBox.
       destruct x as [| g' | g' dn bm]; [exfalso; exact (Hne eq_refl) | |]; iRight; iFrame "Hsel Hpin". }
     iMod (CtxBox.box_park_join (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
             (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
-            (icBoxN .@ k) (icfg_box k) ξ (Some (dev, inum))
+            (icBoxN .@ k) (icfg_box k) gs ξ (Some (dev, inum))
             (ic_hdr_bare k) (ic_deposit cn k (DepFrz qf dev inum t qt) ∗ ic_pin_tx k)%I
             (ic_deposit cn k (DepFrz qf dev inum t qt) ∗ ic_deposit cn k (DepFrz qf dev inum t qt) ∗
              iref_frag k qf ∗ tx_pin icfg_log t qt)%I
-            m E HEk Hjoin
-            with "Hbox Hrun [Hbare Hrest] [$Hd $Hpin] Hhold")
-      as "(Hrun & (Hd1 & Hd2 & Hfrg & Htx) & %T' & %q & %Hq & Hrp & Href & #Hllb)".
+            m E HEk Hod Hjoin
+            with "Hbox Hint Hrun [Hbare Hrest] [$Hd $Hpin] Hhold")
+      as "(Hint & Hrun & (Hd1 & Hd2 & Hfrg & Htx) & %T' & %q & %Hq & Hrp & Href & #Hllb)".
     { iExists (IcUnloaded g). iFrame "Hbare Hrest". }
     iMod (ic_dep_park with "Hd1 Hd2") as "[_ Hn]".
     assert (q = 1%Qp) as ->. { apply Qp.to_Qc_inj_iff. by rewrite Hq Hm. }
-    iModIntro. iFrame "Hrun Hn Hfrg Htx". iExists T'. iFrame "Hrp Href Hllb".
+    iModIntro. iFrame "Hint Hrun Hn Hfrg Htx". iExists T'. iFrame "Hrp Href Hllb".
   Qed.
 
   Lemma ic_guard_deposit `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32) (x0 : ic_x) (T0 : nat) (E : coPset) :
+      (gs : RiscvLang.gstate) (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32) (x0 : ic_x) (T0 : nat) (E : coPset) :
     ↑icBoxN ⊆ E ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) gs.(RiscvLang.glog) gs.(RiscvLang.gdlog) ->
     sr_win r = true -> sr_x r = Some (x0, T0) -> sr_ident r = Some (dev, inum) ->
     ic_box cn γfs γi cov logstart k -∗
+    tso_interp_at riscv_eraGS gs -∗
     own_context ξ -∗
     ic_regd k r -∗ ic_cnt k 1 -∗
     ic_hdr cn γfs γi cov logstart k (Some (dev, inum)) x0 ξ ={E}=∗
-    own_context ξ ∗ ic_pin_tx k ∗
+    tso_interp_at riscv_eraGS gs ∗ own_context ξ ∗ ic_pin_tx k ∗
     ∃ T' : nat,
       ic_regd k (SlotReg T' false (Some (dev, inum)) None) ∗
       ic_cnt k 1 ∗
       ic_ref_stamps k dev inum 1%Qp ∗
-      llb loglen_name T'.
+      llb dlen_name T'.
   Proof.
-    iIntros (HE Hw Hx Hid) "#Hbox Hrun Hrd Hc Hhdr".
+    iIntros (HE Hod Hw Hx Hid) "#Hbox Hint Hrun Hrd Hc Hhdr".
     assert (HEk : ↑(icBoxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
     iMod (CtxBox.box_deposit_L1 (ic_hdr cn γfs γi cov logstart k) (ic_rest k) (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
-            (icBoxN .@ k) (icfg_box k) ξ r 1 (Some (dev, inum)) x0 T0 E HEk Hw Hx
-            with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & HQ & %T' & Hrd & Hc & Href & #Hllb)".
+            (icBoxN .@ k) (icfg_box k) gs ξ r 1 (Some (dev, inum)) x0 T0 E HEk Hw Hx Hod
+            with "Hbox Hint Hrun Hrd Hc Hhdr") as "(Hint & Hrun & HQ & %T' & Hrd & Hc & Href & #Hllb)".
     rewrite ic_q1_S.
-    iModIntro. iFrame "Hrun HQ". iExists T'. iFrame "Hrd Hllb". iSplitL "Hc"; [iExact "Hc"|].
+    iModIntro. iFrame "Hint Hrun HQ". iExists T'. iFrame "Hrd Hllb". iSplitL "Hc"; [iExact "Hc"|].
     rewrite /ic_ref_stamps /ic_ref_stamps_at /ic_stamps. iExists _. iFrame "Href". iPureIntro.
     rewrite /qsum map_fold_singleton /qsum_step Qcplus_0_r. change (unit_mass 1) with 1%Qp. reflexivity.
   Qed.
@@ -5375,29 +5385,31 @@ Section IcacheBox.
      register holds [IcLoaded g dn bm] -- (b') with the identity entailment
      on the rest (P_rest does not mention the generation). *)
   Lemma ic_guard_deposit_gen `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32)
+      (gs : RiscvLang.gstate) (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32)
       (g g' : gname) (dn : dinode) (bm : blkmap) (T0 : nat) (E : coPset) :
     ↑icBoxN ⊆ E ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) gs.(RiscvLang.glog) gs.(RiscvLang.gdlog) ->
     sr_win r = true -> sr_x r = Some (IcLoaded g dn bm, T0) -> sr_ident r = Some (dev, inum) ->
     ic_box cn γfs γi cov logstart k -∗
+    tso_interp_at riscv_eraGS gs -∗
     own_context ξ -∗
     ic_regd k r -∗ ic_cnt k 1 -∗
     ic_hdr cn γfs γi cov logstart k (Some (dev, inum)) (IcLoaded g' dn bm) ξ ={E}=∗
-    own_context ξ ∗ ic_pin_tx k ∗
+    tso_interp_at riscv_eraGS gs ∗ own_context ξ ∗ ic_pin_tx k ∗
     ∃ T' : nat,
       ic_regd k (SlotReg T' false (Some (dev, inum)) None) ∗
       ic_cnt k 1 ∗
       ic_ref_stamps k dev inum 1%Qp ∗
-      llb loglen_name T'.
+      llb dlen_name T'.
   Proof.
-    iIntros (HE Hw Hx Hid) "#Hbox Hrun Hrd Hc Hhdr".
+    iIntros (HE Hod Hw Hx Hid) "#Hbox Hint Hrun Hrd Hc Hhdr".
     assert (HEk : ↑(icBoxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
     iMod (CtxBox.box_deposit_L1_shape (ic_hdr cn γfs γi cov logstart k) (ic_rest k) (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
-            (icBoxN .@ k) (icfg_box k) ξ r 1 (Some (dev, inum)) (IcLoaded g dn bm) (IcLoaded g' dn bm) T0 E HEk Hw Hx
+            (icBoxN .@ k) (icfg_box k) gs ξ r 1 (Some (dev, inum)) (IcLoaded g dn bm) (IcLoaded g' dn bm) T0 E HEk Hw Hx Hod
             ltac:(intros ξb; rewrite /ic_rest; simpl; reflexivity)
-            with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & HQ & %T' & Hrd & Hc & Href & #Hllb)".
+            with "Hbox Hint Hrun Hrd Hc Hhdr") as "(Hint & Hrun & HQ & %T' & Hrd & Hc & Href & #Hllb)".
     rewrite ic_q1_S.
-    iModIntro. iFrame "Hrun HQ". iExists T'. iFrame "Hrd Hllb". iSplitL "Hc"; [iExact "Hc"|].
+    iModIntro. iFrame "Hint Hrun HQ". iExists T'. iFrame "Hrd Hllb". iSplitL "Hc"; [iExact "Hc"|].
     rewrite /ic_ref_stamps /ic_ref_stamps_at /ic_stamps. iExists _. iFrame "Href". iPureIntro.
     rewrite /qsum map_fold_singleton /qsum_step Qcplus_0_r. change (unit_mass 1) with 1%Qp. reflexivity.
   Qed.
@@ -5408,29 +5420,31 @@ Section IcacheBox.
      withdrawn shape, x1 = IcRaw, entailment ic_rest_to_raw): the slot is
      dead from here (M-1'), and (d) at None drops the unit (F18). *)
   Lemma ic_evict_deposit `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (x0 : ic_x) (T0 : nat) (E : coPset) :
+      (gs : RiscvLang.gstate) (ξ : CtxId) (r : slot_reg ic_bid ic_x) (x0 : ic_x) (T0 : nat) (E : coPset) :
     ↑icBoxN ⊆ E ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) gs.(RiscvLang.glog) gs.(RiscvLang.gdlog) ->
     sr_win r = true -> sr_x r = Some (x0, T0) ->
     ic_box cn γfs γi cov logstart k -∗
+    tso_interp_at riscv_eraGS gs -∗
     own_context ξ -∗
     ic_regd k r -∗ ic_cnt k 1 -∗
     ic_hdr cn γfs γi cov logstart k None IcRaw ξ ={E}=∗
-    own_context ξ ∗ ic_pin_tx k ∗
+    tso_interp_at riscv_eraGS gs ∗ own_context ξ ∗ ic_pin_tx k ∗
     ∃ T' : nat,
       ic_regd k (SlotReg T' false None None) ∗
       ic_cnt k 1 ∗
       (∃ m : gmap (ic_bid * nat) ufrac, ⌜qsum m = Qp_to_Qc 1⌝ ∗
          CtxBox.reference (X := ic_x) (icfg_box k) None m) ∗
-      llb loglen_name T'.
+      llb dlen_name T'.
   Proof.
-    iIntros (HE Hw Hx) "#Hbox Hrun Hrd Hc Hhdr".
+    iIntros (HE Hod Hw Hx) "#Hbox Hint Hrun Hrd Hc Hhdr".
     assert (HEk : ↑(icBoxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
     iMod (CtxBox.box_deposit_L1_shape (ic_hdr cn γfs γi cov logstart k) (ic_rest k) (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
-            (icBoxN .@ k) (icfg_box k) ξ r 1 None x0 IcRaw T0 E HEk Hw Hx
+            (icBoxN .@ k) (icfg_box k) gs ξ r 1 None x0 IcRaw T0 E HEk Hw Hx Hod
             ltac:(intros ξb; apply ic_rest_to_raw)
-            with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & HQ & %T' & Hrd & Hc & Href & #Hllb)".
+            with "Hbox Hint Hrun Hrd Hc Hhdr") as "(Hint & Hrun & HQ & %T' & Hrd & Hc & Href & #Hllb)".
     rewrite ic_q1_S.
-    iModIntro. iFrame "Hrun HQ". iExists T'. iFrame "Hrd Hllb". iSplitL "Hc"; [iExact "Hc"|].
+    iModIntro. iFrame "Hint Hrun HQ". iExists T'. iFrame "Hrd Hllb". iSplitL "Hc"; [iExact "Hc"|].
     iExists _. iFrame "Href". iPureIntro.
     rewrite /qsum map_fold_singleton /qsum_step Qcplus_0_r. change (unit_mass 1) with 1%Qp. reflexivity.
   Qed.
@@ -5473,7 +5487,9 @@ Section IcacheBox.
      PRE-MINTED names (CtxBox.box_alloc_at, as bio_init does): with F19 the
      box gnames are fields of ic_names, minted before MkIcNames -- the
      caller presents the fresh ghosts and receives the boxes. *)
-  Lemma ic_box_alloc_at `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (ξ : CtxId) (E : coPset) :
+  Lemma ic_box_alloc_at `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (gs : RiscvLang.gstate) (ξ : CtxId) (E : coPset) :
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) gs.(RiscvLang.glog) gs.(RiscvLang.gdlog) ->
+    tso_interp_at riscv_eraGS gs -∗
     own_context ξ -∗
     ([∗ list] k ∈ seq 0 NINODE,
        CtxBox.stamps_auth (X := ic_x) (icfg_box k) ∅ ∗
@@ -5481,34 +5497,34 @@ Section IcacheBox.
        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid) ∗
        ic_hdr cn γfs γi cov logstart k None IcRaw ξ ∗ ic_rest k IcRaw ξ) ={E}=∗
-    own_context ξ ∗
+    tso_interp_at riscv_eraGS gs ∗ own_context ξ ∗
     ic_boxes_all cn γfs γi cov logstart ∗
     ([∗ list] k ∈ seq 0 NINODE, ∃ T_boot : nat,
-       ic_regd k (SlotReg T_boot false None None) ∗ llb loglen_name T_boot ∗
+       ic_regd k (SlotReg T_boot false None None) ∗ llb dlen_name T_boot ∗
        ic_cnt k 0 ∗ ic_regp k (L2Reg 0 None)).
   Proof.
-    iIntros "Hrun Hall".
+    iIntros (Hod) "Hint Hrun Hall".
     iAssert ([∗ list] i↦k ∈ seq 0 NINODE,
-               own_context ξ -∗
+               (tso_interp_at riscv_eraGS gs ∗ own_context ξ) -∗
                (CtxBox.stamps_auth (X := ic_x) (icfg_box k) ∅ ∗
                 ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
                 ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
                 ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid) ∗
                 ic_hdr cn γfs γi cov logstart k None IcRaw ξ ∗ ic_rest k IcRaw ξ) ={E}=∗
-               own_context ξ ∗
+               (tso_interp_at riscv_eraGS gs ∗ own_context ξ) ∗
                (ic_box cn γfs γi cov logstart k ∗
                 ∃ T_boot : nat,
-                  ic_regd k (SlotReg T_boot false None None) ∗ llb loglen_name T_boot ∗
+                  ic_regd k (SlotReg T_boot false None None) ∗ llb dlen_name T_boot ∗
                   ic_cnt k 0 ∗ ic_regp k (L2Reg 0 None)))%I as "Hstep".
-    { iApply big_sepL_intro. iIntros "!>" (i k _) "Hrun (Hst & Hc & Hd & Hp & Hhdr & Hrest)".
+    { iApply big_sepL_intro. iIntros "!>" (i k _) "[Hint Hrun] (Hst & Hc & Hd & Hp & Hhdr & Hrest)".
       iMod (CtxBox.box_alloc_at (ic_hdr cn γfs γi cov logstart k) (ic_rest k) (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
-              (icBoxN .@ k) (icfg_box k) ξ None E with "Hst Hc Hd Hp Hrun [Hhdr Hrest]")
-        as "(Hrun & %Tb & #Hbx & Hrd & #Hllb & Hc2 & Hp2)".
+              (icBoxN .@ k) (icfg_box k) gs ξ None E Hod with "Hst Hc Hd Hp Hint Hrun [Hhdr Hrest]")
+        as "(Hint & Hrun & %Tb & #Hbx & Hrd & #Hllb & Hc2 & Hp2)".
       { iExists IcRaw. iFrame "Hhdr Hrest". }
-      iModIntro. iFrame "Hrun". iSplitR; [iExact "Hbx"|]. iExists Tb. iFrame "Hrd Hllb Hc2 Hp2". }
-    iMod (big_sepL_fupd_thread E (own_context ξ) _ _ (seq 0 NINODE) with "Hrun Hstep Hall")
-      as "[Hrun Hpost]".
-    iModIntro. iFrame "Hrun". rewrite big_sepL_sep. iDestruct "Hpost" as "[Hboxes Hrows]".
+      iModIntro. iFrame "Hint Hrun". iSplitR; [iExact "Hbx"|]. iExists Tb. iFrame "Hrd Hllb Hc2 Hp2". }
+    iMod (big_sepL_fupd_thread E (tso_interp_at riscv_eraGS gs ∗ own_context ξ) _ _ (seq 0 NINODE)
+            with "[$Hint $Hrun] Hstep Hall") as "[[Hint Hrun] Hpost]".
+    iModIntro. iFrame "Hint Hrun". rewrite big_sepL_sep. iDestruct "Hpost" as "[Hboxes Hrows]".
     iFrame "Hrows". iExact "Hboxes".
   Qed.
 
@@ -5678,12 +5694,12 @@ Section IcacheTable.
   Definition icM_count (M : gmap nat (Qp * positive)) (k : nat) : nat :=
     match M !! k with Some (_, n) => Pos.to_nat n | None => 0%nat end.
   Definition ic_slot_row_fl (ξ : TsoCtx.CtxId) (k : nat) (oi : ic_bid) (c : nat) : iProp Σ :=
-    (∃ tb : nat, ic_slot_row k oi c tb ∗ TsoGhost.llb loglen_name tb ∗
+    (∃ tb : nat, ic_slot_row k oi c tb ∗ TsoGhost.llb dlen_name tb ∗
                  TsoCtx.ctx_floor ξ tb)%I.
   Definition ic_slot_row_llb (k : nat) (oi : ic_bid) (c : nat) : iProp Σ :=
-    (∃ tb : nat, ic_slot_row k oi c tb ∗ TsoGhost.llb loglen_name tb)%I.
+    (∃ tb : nat, ic_slot_row k oi c tb ∗ TsoGhost.llb dlen_name tb)%I.
   Definition ic_slot_row_bare (tl k : nat) (oi : ic_bid) (c : nat) : iProp Σ :=
-    (∃ tb : nat, ⌜(tb <= tl)%nat⌝ ∗ ic_slot_row k oi c tb ∗ TsoGhost.llb loglen_name tb)%I.
+    (∃ tb : nat, ⌜(tb <= tl)%nat⌝ ∗ ic_slot_row k oi c tb ∗ TsoGhost.llb dlen_name tb)%I.
 
   Definition itable_slot_res (ξ : TsoCtx.CtxId)
       (M : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
@@ -5694,10 +5710,10 @@ Section IcacheTable.
         TsoCtx.ctx_word4_pointsto ξ (i_ref (ientry k))
           (DfracOwn 1) (mword_of_int 0 : mword 32) ∗
         mono_nat_auth_own (icfg_istmp k) 1 tst ∗
-        TsoGhost.llb loglen_name tst)%I
+        TsoGhost.llb dlen_name tst)%I
     | Some _ => (∃ tst : nat,
         mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
-        TsoGhost.llb loglen_name tst ∗
+        TsoGhost.llb dlen_name tst ∗
         TsoCtx.ctx_floor ξ tst)%I
     end.
 
@@ -5713,11 +5729,11 @@ Section IcacheTable.
         TsoCtx.ctx_word4_pointsto ξ (i_ref (ientry k))
           (DfracOwn 1) (mword_of_int 0 : mword 32) ∗
         mono_nat_auth_own (icfg_istmp k) 1 tst ∗
-        TsoGhost.llb loglen_name tst)%I
+        TsoGhost.llb dlen_name tst)%I
     | Some _ => (∃ tst : nat,
         ⌜(tst <= tl)%nat⌝ ∗
         mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
-        TsoGhost.llb loglen_name tst)%I
+        TsoGhost.llb dlen_name tst)%I
     end.
 
   Lemma itable_slot_res_of_bare (ξ : TsoCtx.CtxId) (tl : nat)
@@ -5750,10 +5766,10 @@ Section IcacheTable.
         TsoCtx.ctx_word4_pointsto ξ (i_ref (ientry k))
           (DfracOwn 1) (mword_of_int 0 : mword 32) ∗
         mono_nat_auth_own (icfg_istmp k) 1 tst ∗
-        TsoGhost.llb loglen_name tst)%I
+        TsoGhost.llb dlen_name tst)%I
     | Some _ => (∃ tst : nat,
         mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
-        TsoGhost.llb loglen_name tst)%I
+        TsoGhost.llb dlen_name tst)%I
     end.
 
   Global Instance itable_slot_res_llb_morph (M : gmap nat (Qp * positive))

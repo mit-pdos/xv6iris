@@ -76,16 +76,16 @@ Section UmodeFetchX.
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     R -∗
-    (∀ σ img log tv itv V,
+    (∀ σ img log dl tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
-        ⌜(itv <= length log)%nat⌝ -∗
+        ⌜(itv <= length dl)%nat⌝ -∗
         mstate_interp σ -∗
         hart_iview_auth cpu_id itv -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
         R ={⊤,∅}=∗
-        ⌜fobl_ifetch img log itv pa 4 bytes⌝ ∗
+        ⌜fobl_ifetch img log dl itv pa 4 bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V ∗ R)) -∗
     swp (checked_mem_read (InstructionFetch tt) PBMT_PMA User
            (Physaddr pa) 4 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -146,8 +146,8 @@ Section UmodeFetchX.
                 (hread_req_at_read_ram_ifetch pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro HR Hmem]").
-      iIntros (σ img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
-      iMod ("Hmem" $! σ img log tv itv V with "[//] [//] Hσ Hiv Htso HR")
+      iIntros (σ img log dl tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+      iMod ("Hmem" $! σ img log dl tv itv V with "[//] [//] Hσ Hiv Htso HR")
         as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Hiv & Htso & HR)". iModIntro. iFrame "Hσ Hiv Htso".
@@ -187,16 +187,16 @@ Section UmodeFetchX.
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     R -∗
-    (∀ σ img log tv itv V,
+    (∀ σ img log dl tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
-        ⌜(itv <= length log)%nat⌝ -∗
+        ⌜(itv <= length dl)%nat⌝ -∗
         mstate_interp σ -∗
         hart_iview_auth cpu_id itv -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
         R ={⊤,∅}=∗
-        ⌜fobl_ifetch img log itv pa 2 bytes⌝ ∗
+        ⌜fobl_ifetch img log dl itv pa 2 bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V ∗ R)) -∗
     swp (checked_mem_read (InstructionFetch tt) PBMT_PMA User
            (Physaddr pa) 2 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -257,8 +257,8 @@ Section UmodeFetchX.
                 (hread_req_at_read_ram2_ifetch pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro HR Hmem]").
-      iIntros (σ img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
-      iMod ("Hmem" $! σ img log tv itv V with "[//] [//] Hσ Hiv Htso HR")
+      iIntros (σ img log dl tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+      iMod ("Hmem" $! σ img log dl tv itv V with "[//] [//] Hσ Hiv Htso HR")
         as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Hiv & Htso & HR)". iModIntro. iFrame "Hσ Hiv Htso".

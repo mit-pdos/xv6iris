@@ -1500,8 +1500,12 @@ Section IcacheRefInv.
      [iref_live_load_au]. *)
   (* ================================================================== *)
 
+  (* relaxed-ww: a row's stamp is DRAINED under the lock's stamp [tst] and
+     carries its chain -- what the two-log pinw read gate
+     ([CtxPinw.ledger_read_pinw_latest]) consumes *)
   Definition iref_pin_rows (k : nat) (w : mword 32) (lo tst : nat) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, ∃ t : nat, ⌜(t <= tst)%nat⌝ ∗
+    ([∗ list] j ∈ seq 0 4, ∃ t : nat,
+        TsoGhost.dpos_ev dpos_name t tst ∗ TsoGhost.chain_ev chain_name t ∗
         TsoCtx.phys_ledger_pinw (pa_add (i_ref (ientry k)) j) (DfracOwn 1)
           (nth_byte w j) t
           (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set))%I.
@@ -3160,8 +3164,8 @@ Section IcacheRefInvReg.
                (mword_of_int (Z.pos (Pos.succ n)) : mword 32) lo
                (Nat.max tstp tst'))%I with "[Hpin]" as "Hpin".
     { iApply (big_sepL_mono with "Hpin"). iIntros (i j Hij) "H".
-      iDestruct "H" as (t) "[%Ht H]". iExists t. iFrame "H".
-      iPureIntro. lia. }
+      iDestruct "H" as (t) "(#Hd & #Hc & H)". iExists t. iFrame "H Hc".
+      iApply (TsoGhost.dpos_ev_mono with "Hd"). lia. }
     iMod ("Hclose" with "[Ha Hst Hpin Hres Hselh Hback]") as "_".
     { iNext. iExists (<[k := ((qt + qn)%Qp, Pos.succ n)]> M). iFrame "Ha".
       iSplitR.
@@ -3382,8 +3386,8 @@ Section IcacheRefInvReg.
     iAssert (iref_pin_rows k (mword_of_int (Z.pos n) : mword 32) lo0
                (Nat.max tstp tst'))%I with "[Hpin]" as "Hpin".
     { iApply (big_sepL_mono with "Hpin"). iIntros (i j Hij) "H".
-      iDestruct "H" as (t) "[%Ht H]". iExists t. iFrame "H".
-      iPureIntro. lia. }
+      iDestruct "H" as (t) "(#Hd & #Hc & H)". iExists t. iFrame "H Hc".
+      iApply (TsoGhost.dpos_ev_mono with "Hd"). lia. }
     iMod ("Hclose" with "[Ha Hst Hpin Hres Hselh Hback]") as "_".
     { iNext. iExists (<[k := (qr, n)]> M). iFrame "Ha".
       iSplitR.
@@ -3486,8 +3490,8 @@ Section IcacheRefInvReg.
                (mword_of_int (Z.pos (Pos.succ n)) : mword 32) lo0
                (Nat.max tstp tst'))%I with "[Hpin]" as "Hpin".
     { iApply (big_sepL_mono with "Hpin"). iIntros (i j Hij) "H".
-      iDestruct "H" as (t) "[%Ht H]". iExists t. iFrame "H".
-      iPureIntro. lia. }
+      iDestruct "H" as (t) "(#Hd & #Hc & H)". iExists t. iFrame "H Hc".
+      iApply (TsoGhost.dpos_ev_mono with "Hd"). lia. }
     iMod ("Hclose" with "[Ha Hst Hpin Hres Hselh Hback]") as "_".
     { iNext. iExists (<[k := (qt, Pos.succ n)]> M). iFrame "Ha".
       iSplitR.
@@ -3598,8 +3602,8 @@ Section IcacheRefInvReg.
                (mword_of_int (Z.pos (Pos.succ n)) : mword 32) lo0
                (Nat.max tstp tst'))%I with "[Hpin]" as "Hpin".
     { iApply (big_sepL_mono with "Hpin"). iIntros (i j Hij) "H".
-      iDestruct "H" as (t) "[%Ht H]". iExists t. iFrame "H".
-      iPureIntro. lia. }
+      iDestruct "H" as (t) "(#Hd & #Hc & H)". iExists t. iFrame "H Hc".
+      iApply (TsoGhost.dpos_ev_mono with "Hd"). lia. }
     iMod ("Hclose" with "[Ha Hst Hpin Hres Hselh Hback]") as "_".
     { iNext. iExists (<[k := ((qt + qn)%Qp, Pos.succ n)]> M). iFrame "Ha".
       iSplitR.
@@ -3889,8 +3893,8 @@ Section IcacheRefInvReg.
     iAssert (iref_pin_rows k (mword_of_int 1 : mword 32) loA
                (Nat.max tstp loA))%I with "[Hpin]" as "Hpin".
     { iApply (big_sepL_mono with "Hpin"). iIntros (i j Hij) "H".
-      iDestruct "H" as (t) "[%Ht H]". iExists t. iFrame "H".
-      iPureIntro. lia. }
+      iDestruct "H" as (t) "(#Hd & #Hc & H)". iExists t. iFrame "H Hc".
+      iApply (TsoGhost.dpos_ev_mono with "Hd"). lia. }
     iMod ("Hclose" with "[Ha Hstin Hpin Hres Hselin Hback]") as "_".
     { iNext. iExists (<[k := (q, 1%positive)]> M). iFrame "Ha".
       iSplitR.

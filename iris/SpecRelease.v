@@ -237,7 +237,7 @@ Definition wp_release_hook_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
   (* the payload at the caller's own context, unfinished, and the hook that
      finishes it at the lock's stamped context *)
   Rin cur_ctx -∗
-  lock_ctx_hook R Rin -∗
+  lock_ctx_hook (⊤ ∖ ↑minstretN) R Rin -∗
   cpu_own (S n) eb p false lks -∗
   arm_pay kt n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>

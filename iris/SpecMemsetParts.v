@@ -155,7 +155,7 @@ Definition wp_memset_loop_free_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId
   kernel_text -∗
   pc_is pc0 -∗
   ([∗ list] j ∈ seq off rem,
-     TsoCtx.mem_free (KTR := ktb) (ms_pa (ms_addr p j)) (DfracOwn 1)) -∗
+     TsoCtx.mem_free (KTR := ktb) cur_ctx (ms_pa (ms_addr p j)) (DfracOwn 1)) -∗
   wp_next b pcur (fun (CID : CpuId) =>
     sie_cap_gpr kt (<[Regidx ra5 := regval_into_reg (ms_addr p N)]> m) n b pcur -∗
     pc_is (add_vec_int pc6 4) -∗

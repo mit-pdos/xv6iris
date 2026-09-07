@@ -402,24 +402,21 @@ Section WpSconfCtlEng.
     iExact "H".
   Qed.
 
-  (* ---- fences: a barrier is a SILENT node, so the walker passes it ---- *)
+  (* ---- fences: a barrier is a SILENT leaf (relaxed-ww: not a walker step) ---- *)
   Lemma swp_barrier_ret (bk : barrier_kind) :
     gen_cert -∗
     swp (Defs.bind0 (sail_barrier bk) (returnM RETIRE_SUCCESS))
       (fun e => ⌜e = RETIRE_SUCCESS⌝).
   Proof.
+    (* relaxed-ww: a RELEASE fence is a leaf (the walker refuses it -- it
+       waits for the hart's own stores to drain), so every barrier goes
+       through the silent ghost-step leaf, which serves every kind *)
     iIntros "#Hcert".
-    iAssert (hreg_frame init_regstate ∅) as "Hrw".
-    { rewrite /hreg_frame. by rewrite big_sepS_empty. }
-    iAssert (hreg_frame_ro (fun _ => DfracDiscarded) init_regstate ∅) as "Hro".
-    { rewrite /hreg_frame_ro. by rewrite big_sepS_empty. }
-    iApply (swp_mono with "[] [-]");
-      [| iApply (swp_hfrun 2 ∅ ∅ (fun _ => DfracDiscarded)
-                   init_regstate init_regstate
-                   (Defs.bind0 (sail_barrier bk) (returnM RETIRE_SUCCESS))
-                   RETIRE_SUCCESS ltac:(set_solver) ltac:(reflexivity)
-                   with "Hcert Hrw Hro") ].
-    iIntros (e) "(-> & _ & _)". done.
+    iApply (swp_hart_barrier_gs bk (Defs.bind0 (sail_barrier bk) (returnM RETIRE_SUCCESS))
+              _ emp emp ltac:(reflexivity) with "Hcert [] []").
+    { iApply ghost_step_id. }
+    { done. }
+    iNext. iIntros "_". iApply swp_ret. done.
   Qed.
 
   Lemma swp_execute_FENCEI_s (imm : SailStdpp.Values.mword 12) (rs rd : regidx) :

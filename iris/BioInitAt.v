@@ -200,9 +200,13 @@ Section BioInitAt.
   (* A6.68: the honest creator deposit (A6.66) wants the running token; the
      NBUF sleeplock loop threads it with [SepThread.big_sepL_fupd_thread]
      because [own_context] is EXCLUSIVE ([BioInv.bio_init]'s shape). *)
-  Lemma bio_init_at `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ) E :
+  (* relaxed-ww: FENCE-BOUND like [BioInv.bio_init] -- the lock births and
+     the deposits run at a release fence *)
+  Lemma bio_init_at `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ) E (g : RiscvLang.gstate) :
     (0 ∉ bv_cov V) ->
+    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     own_context cur_ctx -∗
+    tso_interp_at riscv_eraGS g -∗
     bio_free_tok bn -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
@@ -211,9 +215,9 @@ Section BioInitAt.
     ([∗ list] k ∈ seq 0 NBUF, buf_raw k) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
     ([∗ set] b ∈ bv_cov V, pool_blk V b) ={E}=∗
-    own_context cur_ctx ∗ bio_ctx bn V ∗ bslots BSLOTS_FS.
+    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ bio_ctx bn V ∗ bslots BSLOTS_FS.
   Proof.
-    iIntros (Hnc0) "Hrun (Hlkg & Hauth & Hsa & Hsf & Hbg & Hregs) Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
+    iIntros (Hnc0 Hod) "Hrun Hint (Hlkg & Hauth & Hsa & Hsf & Hbg & Hregs) Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)
       by (vm_compute; reflexivity).
     iEval (rewrite !big_sepL_sep) in "Hregs".
@@ -223,23 +227,24 @@ Section BioInitAt.
     iDestruct (big_sepL_sep_2 with "Hfresh Hbg") as "Hsl".
     iDestruct (big_sepL_sep_2 with "Hsl Hregp1") as "Hsl".
     iAssert ([∗ list] idx↦k ∈ seq 0 NBUF,
-               own_context cur_ctx -∗
+               (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx) -∗
                ((sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
                  (sl_free_pair (bn_slk bn k) ∗ lock_tok_excl (bn_own bn k) ∗
                   lock_tok_excl (bn_mid bn k))) ∗
                 ghost_var (bn_regp bn k) (1/2) (L2Reg 0 None : l2_reg bio_id))
-               ={E}=∗ own_context cur_ctx ∗
+               ={E}=∗ (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx) ∗
                is_sleeplock_genl (fst (bn_slk bn k)) (snd (bn_slk bn k))
                  (buf_lock (bnode k)) "buffer"%string (bslp bn k) sl_untracked)%I
       as "Hstep".
-    { iApply big_sepL_intro. iIntros "!>" (idx k Hk) "Hrun [[Hf (Hp & Ho & _)] Hrp]".
-      iMod (sl_fresh_new_genl_at2 E (bn_slk bn k) (buf_lock (bnode k))
-              "buffer"%string (bslp bn k) sl_untracked with "Hp Hf Hrun [Ho Hrp]") as "[Hrun Hlk]".
+    { iApply big_sepL_intro. iIntros "!>" (idx k Hk) "[Hint Hrun] [[Hf (Hp & Ho & _)] Hrp]".
+      iMod (sl_fresh_new_genl_at2 E g (bn_slk bn k) (buf_lock (bnode k))
+              "buffer"%string (bslp bn k) sl_untracked Hod with "Hp Hf Hint Hrun [Ho Hrp]")
+        as "(Hint & Hrun & Hlk)".
       { rewrite /bslp /bslp_raw. iFrame "Ho". iExists (L2Reg 0 None). iFrame "Hrp".
         iSplitR; [done|]. simpl. iApply TsoCtx.ctx_floor_0. }
-      iModIntro. iFrame "Hrun Hlk". }
-    iMod (big_sepL_fupd_thread E (own_context cur_ctx)
-            with "Hrun Hstep Hsl") as "[Hrun #Hsls]".
+      iModIntro. iFrame "Hint Hrun Hlk". }
+    iMod (big_sepL_fupd_thread E (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx)
+            with "[$Hint $Hrun] Hstep Hsl") as "[[Hint Hrun] #Hsls]".
     assert (Hpay0 : forall k bs,
         buf_pay (XI := cur_ctx) bn V k false (mword_of_int 0 : mword 32)
           (mword_of_int 0 : mword 32) bs = emp%I).
@@ -253,10 +258,10 @@ Section BioInitAt.
     iDestruct (big_sepL_sep_2 with "Hregc2 Hbufs") as "Hslr".
     iDestruct (big_sepL_sep_2 with "Hap Hslr") as "Hall".
     iAssert ([∗ list] i↦k ∈ seq 0 NBUF,
-               own_context cur_ctx -∗ emp ={E}=∗
-               own_context cur_ctx ∗
+               (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx) -∗ emp ={E}=∗
+               (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx) ∗
                (buf_box bn V k ∗
-                ∃ Td : nat, llb loglen_name Td ∗
+                ∃ Td : nat, llb dlen_name Td ∗
                   (reg_drop bn k (SlotReg Td false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None) ∗
                    (brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
                     reg_cnt bn k 0 ∗
@@ -265,21 +270,21 @@ Section BioInitAt.
       with "[Hall]" as "Hstep2".
     { iApply (big_sepL_impl with "Hall").
       iIntros "!>" (i k Hk). rewrite /buf_raw.
-      iIntros "[(((Hst & Hrp) & Hrd) & Hc) [Hc2 (Hv & Hdk & Hdev & Hbno & Hrc & Hdata)]] Hrun _".
+      iIntros "[(((Hst & Hrp) & Hrd) & Hc) [Hc2 (Hv & Hdk & Hdev & Hbno & Hrc & Hdata)]] [Hint Hrun] _".
       iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
       iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
-      iMod (buf_box_alloc E bn V k with "Hrun Hst Hc Hrp [Hrd] Hv Hdev1 Hbno1 Hdk [Hdata]")
-        as "(Hrun & #Hbx & Hreg)".
+      iMod (buf_box_alloc E g bn V k Hod with "Hint Hrun Hst Hc Hrp [Hrd] Hv Hdev1 Hbno1 Hdk [Hdata]")
+        as "(Hint & Hrun & #Hbx & Hreg)".
       { iExists _. iExact "Hrd". }
       { iDestruct "Hdata" as (bs) "[%Hlen Hdata]". iExists bs. iFrame "Hdata".
         iSplitR; [done|]. rewrite Hpay0. done. }
-      iModIntro. iFrame "Hrun". iSplitR; [iExact "Hbx"|].
+      iModIntro. iFrame "Hint Hrun". iSplitR; [iExact "Hbx"|].
       iDestruct "Hreg" as (Td) "[Hrd0 #Hllb]". iExists Td. iFrame "Hllb Hrd0".
       iFrame "Hrc Hc2 Hdev2 Hbno2". }
     iAssert ([∗ list] i↦k ∈ seq 0 NBUF, emp)%I as "Hemp".
     { rewrite big_sepL_emp. iEmpIntro. }
-    iMod (big_sepL_fupd_thread E (own_context cur_ctx) (fun _ _ => emp%I)
-            with "Hrun Hstep2 Hemp") as "[Hrun Hboth]".
+    iMod (big_sepL_fupd_thread E (tso_interp_at riscv_eraGS g ∗ own_context cur_ctx) (fun _ _ => emp%I)
+            with "[$Hint $Hrun] Hstep2 Hemp") as "[[Hint Hrun] Hboth]".
     iEval (rewrite big_sepL_sep) in "Hboth".
     iDestruct "Hboth" as "[#Hboxs Hslots0]".
     iDestruct (CtxBox.big_sepL_llb_max (seq 0 NBUF)
@@ -314,17 +319,17 @@ Section BioInitAt.
       rewrite Hc0. iExact "Hpool". }
     (* the bcache lock at its published gname, minted WITH the fold at the
        boot floor slot *)
-    iMod (newlock_at_llb E (bn_lk bn) bcache_addr "bcache"%string
+    iMod (newlock_at_llb E g (bn_lk bn) bcache_addr "bcache"%string
             (fun ξ => bcache_res2 bn V ξ)
-            (fun ξ => llb loglen_name tl ∗
+            (fun ξ => llb dlen_name tl ∗
                       bcache_scan2 bn V ∅ (rev (seq 0 NBUF))
                         (fun _ => (mword_of_int 0 : mword 32))
                         (fun _ => (mword_of_int 0 : mword 32)) tl ξ)%I tl
             (bcache_res2_fold_in bn V ∅ (rev (seq 0 NBUF))
                (fun _ => (mword_of_int 0 : mword 32))
-               (fun _ => (mword_of_int 0 : mword 32)) tl)
-            with "Hlkg Hnm Hrun Hlkw Hcpu Hllbtl [Hauth Hsa Hslots Hlru Hpool]")
-      as "[Hrun #Hlock]".
+               (fun _ => (mword_of_int 0 : mword 32)) tl) Hod
+            with "Hlkg Hnm Hint Hrun Hlkw Hcpu Hllbtl [Hauth Hsa Hslots Hlru Hpool]")
+      as "(Hint & Hrun & #Hlock)".
     { iFrame "Hllbtl". rewrite /bcache_scan2.
       iFrame "Hauth Hsa".
       iSplitR.
@@ -340,7 +345,7 @@ Section BioInitAt.
       assert (Hml : map bnode (rev (seq 0 NBUF)) = blist 0 NBUF)
         by (rewrite /blist map_rev //).
       rewrite Hml. iFrame "Hlru Hslots Hpool". }
-    iModIntro. iSplitL "Hrun"; [iExact "Hrun" |]. rewrite /bio_ctx.
+    iModIntro. iFrame "Hint Hrun". rewrite /bio_ctx.
     iSplitR "Hsf"; [| iExact "Hsf"].
     iSplitL "Hlock"; [iExact "Hlock" |].
     rewrite big_sepL_sep. iSplitL "Hsls"; [iExact "Hsls" | iExact "Hboxs"].

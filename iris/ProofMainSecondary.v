@@ -327,7 +327,7 @@ Section ProofMainSecondary.
         pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
         (∃ pos : nat,
            P pos cur_ctx ∗
-           TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) pos) -∗
+           TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) pos) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -466,7 +466,7 @@ Section ProofMainSecondary.
         iDestruct ("Hcg" with "Hctx") as "Hcg".
         (* A6.138: the read receipt, weakened to the flag's own position *)
         iEval (rewrite hart_view_lb_unseal /hart_view_lb_def) in "Hlb".
-        iDestruct (TsoGhost.view_lb_le view_name loglen_name
+        iDestruct (TsoGhost.view_lb_le view_name dlen_name
                      (hart_agent cpu_id) V0 (S i) Hle with "Hlb") as "#Hvpos".
         iModIntro.
         iApply ("Hcont" $! M2 with "Hcg Hpc [ ]").
@@ -810,7 +810,7 @@ Section ProofMainSecondary.
     iDestruct "Hdepp" as "[#Hdepm Hbnd]".
     iDestruct "Hbnd" as (Bk) "[#Hbd %HBpos]".
     (* A6.138: THE CREDENTIALS, minted from the hart's own acquire *)
-    iDestruct (TsoGhost.view_lb_le view_name loglen_name
+    iDestruct (TsoGhost.view_lb_le view_name dlen_name
                  (hart_agent cpu_id) pos Bk ltac:(lia) with "Hvpos") as "#HvB".
     iDestruct (CtxValues.cv_boot_cred_view Bk with "HvB") as "#Hbc".
     iDestruct (KptShare.kpt_creds_intro Bk with "Hbd Hbc") as "#Hcreds".

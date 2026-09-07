@@ -162,7 +162,7 @@ Section WpMemsetArray.
     iIntros "Hcg #Htext Hpc Hbuf0 Hcont".
     (* --- bridge the [pa_add]-indexed buffer to memset's [ms_pa (ms_addr)] one --- *)
     iAssert ([∗ list] j ∈ seq 0 len,
-               TsoCtx.mem_free (KTR := ktb) (ms_pa (ms_addr p j)) (DfracOwn 1))%I
+               TsoCtx.mem_free (KTR := ktb) cur_ctx (ms_pa (ms_addr p j)) (DfracOwn 1))%I
       with "[Hbuf0]" as "Hbuf".
     { iApply (big_sepL_impl with "Hbuf0"). iIntros "!>" (k j _) "H".
       rewrite ms_pa_ms_addr. iExact "H". }

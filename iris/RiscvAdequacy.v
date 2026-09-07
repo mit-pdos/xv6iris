@@ -617,7 +617,7 @@ Section power.
       power_boot_res HE gen D nproc ndisk Mof (fun _ => emp)%I g'.
   Proof.
     rewrite /power_boot_res.
-    iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12 &
+    iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H6b & H7 & H8 & H9 & H10 & H11 & H12 &
               H13 & H14 & H15 & H16 & H17 & H18 & H19 & H20 & HRb & H22 & H23 &
               H24 & H25 & H26 & %H27)".
     iSplitL "HRb"; [ iExact "HRb" | ].
@@ -627,6 +627,7 @@ Section power.
     iSplitL "H4"; [ iExact "H4" | ].
     iSplitL "H5"; [ iExact "H5" | ].
     iSplitL "H6"; [ iExact "H6" | ].
+    iSplitL "H6b"; [ iExact "H6b" | ].
     iSplitL "H7"; [ iExact "H7" | ].
     iSplitL "H8"; [ iExact "H8" | ].
     iSplitL "H9"; [ iExact "H9" | ].
@@ -772,7 +773,7 @@ Section power.
              log and the views are the DURABLE record of RAM across a power
              cycle -- [RiscvLang]'s own arm spells it exactly this way. *)
           (GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv)
-             g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr)), [].
+             g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr) g.(gdlog)), [].
         do 4 right. split_and!; [done|done|].
         left. split_and!; done. }
       iIntros (e2 g2 efs Hstep) "!>".
@@ -921,17 +922,25 @@ Section power.
          starts at timestamp 0 with an empty log, exactly as the boot one
          does, and [boot_shape] gives [g2]'s memory as its own image. *)
       iMod kptb_ghost_alloc as (γkptb) "Hkptb2".
+      (* relaxed-ww: the table's DRAIN bound (the same one-shot shape) *)
+      iMod kptb_ghost_alloc as (γkptd) "Hkptd2".
       iMod (ghost_map_alloc
               ((fun _ : bv 8 => ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem)) <$> g2.(gmem)))
         as (γts) "[Htsauth2 Htsfrags2]".
       iMod (ghost_map_alloc_empty (K := nat) (V := TsoMemPa.pwmsg))
         as (γlogm) "Hlogmauth2".
       iMod (mono_nat_own_alloc 0%nat) as (γloglen) "[Hloglenauth2 _]".
+      (* relaxed-ww: the drain log's three mirrors and the chained set,
+         all born empty *)
+      iMod (ghost_map_alloc_empty (K := nat) (V := nat)) as (γdp) "Hdpauth2".
+      iMod (mono_nat_own_alloc 0%nat) as (γdlen) "[Hdlenauth2 _]".
+      iMod (ghost_map_alloc_empty (K := TsoMemPa.agent * nat) (V := nat)) as (γfr) "Hfrauth2".
+      iMod (ghost_map_alloc_empty (K := nat) (V := nat)) as (γch) "Hchauth2".
       iMod (view_auth_alloc (avf g2)) as (γview) "Hviewauth2".
       iMod (iview_alloc_cpus (enum CPU) (NoDup_enum CPU)) as (fiv) "Hivauths2".
       (* the read-watermark mirror (relaxed-rr.md): the same shape, born at 0 *)
       iMod (iview_alloc_cpus (enum CPU) (NoDup_enum CPU)) as (frv) "Hrvauths2".
-      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γkptb γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview g2.(gimg) fiv frv).
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γkptb γkptd γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview g2.(gimg) fiv frv γdp γdlen γfr γch).
       (* the started counter ticks (PowerOff had already bumped [ggen], so
          the count moves from [ggen + 0] to [ggen + 1]) *)
       iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
@@ -963,11 +972,11 @@ Section power.
       iMod ("Hclosesw" with "HPsw") as "_".
       iEval (rewrite big_sepM_fmap) in "Htsfrags2".
       iMod (Hboot HE g.(ggen) g2 Hbf Hpure with
-              "Hoinv [Helems Hbytes Hkauth Hkfrags Hkpt Hkptb2 Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
+              "Hoinv [Helems Hbytes Hkauth Hkfrags Hkpt Hkptb2 Hkptd2 Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
                 Hdfrags Hmir Hresvfrags HRb Htsfrags2]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
-        iFrame "Hbytes Hkauth Hkfrags Hkpt Hkptb2 Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir Hswlb".
+        iFrame "Hbytes Hkauth Hkfrags Hkpt Hkptb2 Hkptd2 Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir Hswlb".
         iFrame "Helems".
         iSplitL "Hresvfrags".
         { destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & Hnone).
@@ -991,11 +1000,13 @@ Section power.
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
       iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth
-               Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hivauths2 Hrvauths2 Hoauth".
+               Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hdpauth2 Hdlenauth2 Hfrauth2 Hchauth2
+               Hivauths2 Hrvauths2 Hoauth".
       { rewrite /state_interp /=.
         (* the trace conjunct, at the extended history *)
         iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth
-                 Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hivauths2 Hrvauths2";
+                 Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hdpauth2 Hdlenauth2 Hfrauth2 Hchauth2
+                 Hivauths2 Hrvauths2";
           last first.
         { iDestruct (obs_interp_close _ _ _ _ _ _ h κs Hstep0 Hwf Htot
                        with "Hoauth") as "Hobs". iExact "Hobs". }
@@ -1034,11 +1045,11 @@ Section power.
         (* [boot_shape]'s own reset clause supplies every one of them.    *)
         (* ============================================================ *)
         destruct Hbf as (_ & _ & Hramtot2 & _ & _ & _ & _ & Hreset).
-        destruct Hreset as (Hresv0 & Hlog0 & Himg0 & Htv0 & Hitv0 & Hghr0).
-        iSplitL "Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2".
+        destruct Hreset as (Hresv0 & Hlog0 & Himg0 & Htv0 & Hitv0 & Hghr0 & Hdl0).
+        iSplitL "Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hdpauth2 Hdlenauth2 Hfrauth2 Hchauth2".
         { rewrite /tso_interp_at.
           iExists ((fun _ : bv 8 => ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem))
-                     <$> g2.(gmem)), ∅.
+                     <$> g2.(gmem)), ∅, ∅, ∅, ∅.
           iFrame "Htsauth2".
           iSplitR; [iPureIntro; apply dom_fmap_L |].
           iSplitR.
@@ -1058,8 +1069,19 @@ Section power.
           iFrame "Hlogmauth2".
           iSplitR.
           { iPureIntro. intros i. rewrite lookup_empty Hlog0 //. }
-          rewrite Hlog0 /=. iFrame "Hloglenauth2 Hviewauth2".
-          iPureIntro. split; [| reflexivity].
+          rewrite Hlog0 Hdl0 /=.
+          iFrame "Hloglenauth2 Hviewauth2 Hdpauth2 Hdlenauth2 Hfrauth2 Hchauth2".
+          (* the drain log's empty mirrors: no copies, and every pure
+             conjunct at the empty lists *)
+          iSplitR; [iApply big_sepM_empty' |].
+          iSplitR; [iPureIntro; apply TsoMemPa.dpos_ok_nil |].
+          iSplitR; [iApply big_sepM_empty' |].
+          iSplitR; [iPureIntro; apply TsoMemPa.fr_ok_nil |].
+          iSplitR; [iPureIntro; apply TsoMemPa.chain_set_ok_nil |].
+          iPureIntro. split; [| split; [| reflexivity]]; last first.
+          { rewrite /dlog_ok /dev_drained Hlog0 Hdl0.
+            split_and!; [apply TsoMemPa.dl_ok_nil | apply TsoMemPa.fifo_ok_nil |].
+            intros i m Hi. rewrite lookup_nil in Hi. discriminate Hi. }
           rewrite /mm_ok Hlog0 Himg0 /TsoMemPa.flat /=.
           split_and!; [reflexivity | intros c; rewrite Htv0; lia |].
           (* [boot_facts]' RAM totality: the era image is created HERE and

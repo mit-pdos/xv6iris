@@ -325,9 +325,9 @@ Section WpUldPt.
                [HartMLoad.robl_ram_ctx] answers the view-indexed family
                from the running context's bound; its conclusion is pure,
                so the bytes, the token and the interp all survive. *)
-            iIntros "Htok" (sigma img log tvv V) "%Htvv Hsi Htso".
+            iIntros "Htok" (sigma img log dl tvv V) "%Htvv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-            iDestruct (HartMLoad.robl_ram_ctx img sigma log V XI tfpa v dqm
+            iDestruct (HartMLoad.robl_ram_ctx img sigma log dl V XI tfpa v dqm
                          tvv Htvv with "Hmem Htso Htok Hbw") as %Hobl.
             iMod (fupd_mask_subseteq ∅) as "Hclose"; [set_solver|].
             iModIntro. iSplitR; [iPureIntro; exact Hobl |].
