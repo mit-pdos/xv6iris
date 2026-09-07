@@ -88,6 +88,9 @@ QEMU/CoreRegsGprRun.v
 QEMU/CoreRegsGprTest.v
 QEMU/CoreRegsHpmHart1Run.v
 QEMU/CoreRegsHpmHart1Test.v
+QEMU/CoreRegsHpmLivePass.v
+QEMU/CoreRegsHpmLiveRun.v
+QEMU/CoreRegsHpmLiveTest.v
 QEMU/CoreRegsHpmPass.v
 QEMU/CoreRegsHpmRun.v
 QEMU/CoreRegsHpmTest.v
@@ -96,6 +99,9 @@ QEMU/CoreRegsMcsrHart1Test.v
 QEMU/CoreRegsMcsrPass.v
 QEMU/CoreRegsMcsrRun.v
 QEMU/CoreRegsMcsrTest.v
+QEMU/CoreRegsPmpFwPass.v
+QEMU/CoreRegsPmpFwRun.v
+QEMU/CoreRegsPmpFwTest.v
 QEMU/CoreRegsPmpHart1Run.v
 QEMU/CoreRegsPmpHart1Test.v
 QEMU/CoreRegsPmpPass.v
@@ -300,9 +306,15 @@ JH7110/CoreRegsFprTest.v
 JH7110/CoreRegsGprPass.v
 JH7110/CoreRegsGprRun.v
 JH7110/CoreRegsGprTest.v
+JH7110/CoreRegsHpmLivePass.v
+JH7110/CoreRegsHpmLiveRun.v
+JH7110/CoreRegsHpmLiveTest.v
 JH7110/CoreRegsHpmPass.v
 JH7110/CoreRegsHpmRun.v
 JH7110/CoreRegsHpmTest.v
+JH7110/CoreRegsPmpFwPass.v
+JH7110/CoreRegsPmpFwRun.v
+JH7110/CoreRegsPmpFwTest.v
 JH7110/CoreRegsPmpPass.v
 JH7110/CoreRegsPmpRun.v
 JH7110/CoreRegsPmpTest.v

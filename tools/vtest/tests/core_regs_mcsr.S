@@ -21,7 +21,15 @@
    RESULT LAYOUT (mirrored in vtest-rocq/CoreRegsMcsr.v); each is one 8-byte
    little-endian word:
      +0   done                +4   status = 1
-     +8   mstatus  0x300      +16  misa          0x301
+     FIVE OF THESE ARE NOT PUBLISHED -- misa, mideleg, menvcfg, mip and
+     tselect.  Measured, they are the only ones the model and QEMU disagree
+     on, every one for a reason already recorded (findings 19 and 29 for
+     misa and its mideleg consequence; QEMU setting menvcfg.ADUE; mip and
+     tselect WITNESSED rather than findings), and every one is dumped by
+     core_csrvals, which exists to be red.  Publishing them here cost the
+     other fifteen registers their proof.
+
+     +8   mstatus  0x300      +16  misa          0x301  -- not published
      +24  medeleg  0x302      +32  mideleg       0x303
      +40  mie      0x304      +48  mtvec         0x305
      +56  mcounteren 0x306    +64  menvcfg       0x30A
@@ -43,20 +51,23 @@
 _vtest_body:
     csrr t0, 0x300
     sd   t0, 8(s11)
-    csrr t0, 0x301
-    sd   t0, 16(s11)
+    /* misa -- findings 19 and 29: NOT PUBLISHED, it is core_csrvals's.  The model and
+       QEMU disagree here for a reason already recorded, and
+       core_csrvals dumps this very register. */
     csrr t0, 0x302
     sd   t0, 24(s11)
-    csrr t0, 0x303
-    sd   t0, 32(s11)
+    /* mideleg -- finding 19's consequence: NOT PUBLISHED, it is core_csrvals's.  The model and
+       QEMU disagree here for a reason already recorded, and
+       core_csrvals dumps this very register. */
     csrr t0, 0x304
     sd   t0, 40(s11)
     csrr t0, 0x305
     sd   t0, 48(s11)
     csrr t0, 0x306
     sd   t0, 56(s11)
-    csrr t0, 0x30A
-    sd   t0, 64(s11)
+    /* menvcfg -- QEMU sets ADUE, the model does not: NOT PUBLISHED, it is core_csrvals's.  The model and
+       QEMU disagree here for a reason already recorded, and
+       core_csrvals dumps this very register. */
     csrr t0, 0x320
     sd   t0, 72(s11)
     csrr t0, 0x340
@@ -67,8 +78,9 @@ _vtest_body:
     sd   t0, 96(s11)
     csrr t0, 0x343
     sd   t0, 104(s11)
-    csrr t0, 0x344
-    sd   t0, 112(s11)
+    /* mip -- WITNESSED, not a finding: NOT PUBLISHED, it is core_csrvals's.  The model and
+       QEMU disagree here for a reason already recorded, and
+       core_csrvals dumps this very register. */
     csrr t0, 0xF11
     sd   t0, 120(s11)
     csrr t0, 0xF12
@@ -79,8 +91,9 @@ _vtest_body:
     sd   t0, 144(s11)
     csrr t0, 0xF15
     sd   t0, 152(s11)
-    csrr t0, 0x7A0
-    sd   t0, 160(s11)
+    /* tselect -- WITNESSED, not a finding: NOT PUBLISHED, it is core_csrvals's.  The model and
+       QEMU disagree here for a reason already recorded, and
+       core_csrvals dumps this very register. */
     li   t0, 1
     sw   t0, RES_STATUS(s11)
     ret

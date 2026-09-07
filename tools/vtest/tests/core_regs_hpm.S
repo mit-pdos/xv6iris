@@ -4,6 +4,11 @@
    implemented HPM counters, read through both their M-mode and their
    unprivileged aliases, and their sixteen event selectors.
 
+   COUNTERS 3 AND 4 ARE NOT HERE -- they are core_regs_hpm_live's, because
+   the U74 implements exactly two programmable HPM counters and they are
+   RUNNING, so no two reads of them agree with anything.  What is left is
+   the thirty words on which a comparison is meaningful.
+
    THE RANGE IS THE INTERSECTION, established by probing one CSR per image
    first.  QEMU's default rv64 CPU implements counters 3..18 (0xB03..0xB12
    and 0xC03..0xC12) and traps on 19..31; the RV32-only high halves
@@ -15,15 +20,21 @@
    RESULT LAYOUT (mirrored in vtest-rocq/CoreRegsHpm.v); 8-byte words:
      +8   + 8*k   mhpmcounter<3+k>  (0xB03 + k), k = 0..15  ->  +8   .. +128
      +136 + 8*k   hpmcounter<3+k>   (0xC03 + k), k = 0..15  ->  +136 .. +256
-     +264 + 8*k   mhpmevent<3+k>    (0x323 + k), k = 0..15  ->  +264 .. +384 */
+     +264 + 8*k   mhpmevent<3+k>    (0x323 + k), k = 0..15  ->  +264 .. +384
+   k = 0 and k = 1 in the first two rows (+8, +16, +136, +144) are written
+   ONLY under -DCORE_REGS_HPM_LIVE. */
 #include "abi.h"
 
     .globl _vtest_body
 _vtest_body:
+#ifdef CORE_REGS_HPM_LIVE
     csrr t0, 0xB03          /* mhpmcounter3 */
     sd   t0, 8(s11)
+#endif
+#ifdef CORE_REGS_HPM_LIVE
     csrr t0, 0xB04          /* mhpmcounter4 */
     sd   t0, 16(s11)
+#endif
     csrr t0, 0xB05          /* mhpmcounter5 */
     sd   t0, 24(s11)
     csrr t0, 0xB06          /* mhpmcounter6 */
@@ -52,10 +63,14 @@ _vtest_body:
     sd   t0, 120(s11)
     csrr t0, 0xB12          /* mhpmcounter18 */
     sd   t0, 128(s11)
+#ifdef CORE_REGS_HPM_LIVE
     csrr t0, 0xC03          /* hpmcounter3 */
     sd   t0, 136(s11)
+#endif
+#ifdef CORE_REGS_HPM_LIVE
     csrr t0, 0xC04          /* hpmcounter4 */
     sd   t0, 144(s11)
+#endif
     csrr t0, 0xC05          /* hpmcounter5 */
     sd   t0, 152(s11)
     csrr t0, 0xC06          /* hpmcounter6 */

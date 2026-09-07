@@ -227,6 +227,9 @@ authority; they are written up here because they are what the board found.
 | 31 | CSRs the **U74 refuses** that both the model and QEMU implement | implemented | `menvcfg`, `mconfigptr`, `senvcfg` (privileged spec 1.12 additions the core predates) and `time` (SiFive leaves `rdtime` to firmware — OpenSBI emulates it) all take an illegal instruction | **model is WIDER than the board** | `core_csrprobe` |
 | 32 | **the model has no transition for `csrr mseccfg`** | proved, not read off `VStuck`: `VExecStuck.exec_r_no_step` plus `stuck_why = Some ENoStep` | an ordinary illegal-instruction trap, on both machines | **model NARROWER than both machines** | `core_csrwide` |
 | 33 | **the machine's identity** | `mvendorid`/`marchid`/`mimpid` all 0 — an anonymous machine (QEMU too) | `0x489` (SiFive's JEDEC id), `0x7`, `0x4210427` | incompleteness | `core_csrprobe` |
+| 34 | the fp control file is **not zero at boot** | `fcsr`/`fflags`/`frm` all 0, from the cold reset | `fcsr` = 0x44 -- `frm` = 2 (RDN), `fflags` = OF: firmware executed floating point and left the flags set.  The spec gives `fcsr` no reset value, so both are legal | board state, not a model defect -- see finding 35 | `core_regs_fcsr` |
+| 35 | **OpenSBI has already programmed PMP** when the payload starts | the whole file 0, from `reset_pmp` | `pmpcfg0` = 0x0F (entry 0: TOR, R+W+X) and `pmpaddr0..7` set; `pmpcfg2` and `pmpaddr8..15` still 0, which is why they stay in `core_regs_pmp` and it PASSES on the board | board state, not a model defect -- see finding 35 | `core_regs_pmp_fw` |
+| 36 | **two HPM counters, running** | all sixteen 0 | `mhpmcounter3`/`4` and their `hpmcounter` aliases are live (one boot: `0x64_8490_0744`, `0x19_0201_0210`); 5..18 read 0, and every `mhpmevent` selector agrees | incompleteness, unfixable -- see finding 36 | `core_regs_hpm_live` |
 
 ### The two that matter most
 
@@ -403,10 +406,43 @@ every one that actually drives an interrupt fails.  That is one cause and not
 five -- most likely firmware still owning the PLIC on hart 1 and claiming
 sources out from under the test, which `--takeover` would settle.
 
-WHAT IS ACTUALLY CHECKED AGAINST THE MODEL is a much shorter list than
-either of the above: `core_smoke`, `core_hart`, `clint_time`, `clint_msip`,
-`core_csrprobe`.  Everything else in the "finished" column is a program that
-ran, not a comparison that was made.
+**THAT PARAGRAPH IS NOW OUT OF DATE, and how it was wrong is worth
+keeping.**  It used to read "what is actually checked against the model is
+`core_smoke`, `core_hart`, `clint_time`, `clint_msip`, `core_csrprobe`;
+everything else in the finished column is a program that ran, not a
+comparison that was made."  Every board capture now carries a `Run` module
+and a proof attempt, so the comparison IS made for all of them -- and two of
+the five it named do not survive it:
+
+* **`clint_msip` does not pass on the board.**  It runs there on hart 2, so
+  its first access is CLINT+8, which the model does not decode (finding 28);
+  the model takes a load access fault and never publishes DONE.  Measured,
+  the run is `RBudget`, not `RStuck` -- so neither `TEST_PASSES_AGREE` nor
+  `TEST_PASSES_STUCK` applies and there is no proof to have.  The red row IS
+  finding 28.
+* **`core_csrprobe` does not pass on the board either**, and for finding 31:
+  the model completes and disagrees on four of the thirty-seven scoreboard
+  entries -- `menvcfg`, `mconfigptr`, `senvcfg` and `time` trap on the U74
+  and do not in the model or QEMU -- with the trap count at +0x800 (1 against
+  5) and the trap records following from that.
+
+**Twenty-three board runs now have a proof**: `core_smoke`, `core_hart`,
+`core_icache`, `core_regs_gpr`, `core_regs_hpm`, `core_regs_pmp`,
+`clint_time`, `plic_mctx`, `plic_prio0`, all eight `pt_` tests and all six
+`conc_` tests.  `core_regs_hpm` and `core_regs_pmp` are on that list only
+because findings 35 and 36 were split out into `core_regs_hpm_live` and
+`core_regs_pmp_fw`, which exist to be red.  **The `pt_` proofs do not repeal
+the warning above**: what they establish is that the model reproduces the
+board's capture, and on the board that capture is the 0x4D backstop.  The
+model agrees the trap happened; it does not say the page table worked.
+
+**Twelve are red, and every one is diagnosed.**  Seven are companions or value
+dumps that exist to be red on BOTH platforms -- `clint_raw`, `core_dtb`,
+`core_csrvals`, `core_regs_fpr` (the model has no encoding for the fp store
+this needs), `conc_mp_when`, `conc_sbx` and `pt_tlb_set0`.  The rest are
+board-only and each is a finding: `clint_msip` (28), `core_csrprobe` (31),
+`core_regs_fcsr` (35), `core_regs_pmp_fw` (35) and `core_regs_hpm_live`
+(36).
 
 ## What is not done
 
