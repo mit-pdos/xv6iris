@@ -153,7 +153,7 @@ def config(name):
            #               does not reach is one that NEEDS a named
            #               interleaving, which is a fact about the case
            #               worth stating in the case.
-           "csched": "",
+           "csched": "", "csched_hw": "",
            "budget": 2000, "tick": 0, "proj": "whole", "builder": "single"}
     for line in open(src):
         m = re.search(r"vtest:\s*(.*?)\s*\*/", line)
@@ -432,6 +432,40 @@ def verdict_of_file(mod, pl):
     return None
 
 
+def parse_csched(spec):
+    """The per-observation INTERLEAVINGS of a multi-hart case.
+
+    A race has one legal execution per outcome the hardware showed, and the
+    model must have each -- so a case gives ONE SCHEDULE PER OBSERVATION,
+    in the order the capture lists them, and the proof pairs them off.  One
+    schedule applied to every observation is what the first cut did and it
+    is wrong for any case that observed more than one thing.
+
+    Syntax, semicolons between schedules and commas inside one:
+
+        csched=20*0,23*1,33*0;20*0,23*1,11*0
+
+    [count*hart] is [count] whole instructions of that hart, run-length
+    encoded because an alignment prefix is a hundred instructions long and
+    nobody should read that as a list of bits.  Returns a list of Rocq
+    expressions, or [] when the case names no schedule -- which is not the
+    same as naming the empty one: it means "round-robin from the start",
+    the same schedule for every observation."""
+    out = []
+    for sched in spec.split(";"):
+        sched = sched.strip()
+        parts = []
+        for grp in sched.split(","):
+            grp = grp.strip()
+            if not grp:
+                continue
+            n, _, h = grp.partition("*")
+            parts.append("replicate %d %s"
+                         % (int(n), "true" if h.strip() == "1" else "false"))
+        out.append(("(" + " ++ ".join(parts) + ")%list") if parts else "[]")
+    return out
+
+
 def emit_passes(built=None, reset=False):
     """One proof per RUN, in ONE of the two forms.
 
@@ -475,10 +509,36 @@ def emit_passes(built=None, reset=False):
                and rrel(mod, pl) not in built:
                 v = "stuck" if was == "agree" else "agree"
             conc = int(cfg["smp"]) > 1
-            bits = "[" + "; ".join(
-                "true" if b.strip() in ("1", "true") else "false"
-                for b in cfg["csched"].split(",") if b.strip()) + "]"
-            if v == "agree" and conc:
+            spec = cfg["csched_hw"] if pl == "jh7110" and cfg["csched_hw"] \
+                   else cfg["csched"]
+            scheds = parse_csched(spec) if spec.strip() else []
+            if v == "agree" and conc and scheds:
+                # ONE BLOCK PER OBSERVATION, paired with its own schedule,
+                # in the order the capture lists them.  Not [repeat]: that
+                # applies one schedule to every observation, which is right
+                # only for a case that observed one thing.
+                blocks = "\n".join(
+                    f"""    destruct Ho as [<-|Ho];
+      [ apply (conc2_shows {tick} {sc} {budget});
+        vm_compute; repeat split |].""" for sc in scheds)
+                sig = f"""Module {mod}Pass <: TEST_PASSES_AGREE {mod} {mod}Run.
+  Lemma agrees :
+    run_agrees {mod}.hart {mod}.text {mod}.regions
+               {mod}.uart_input {mod}.disk_init {mod}Run.observed.
+  Proof.
+    intros o Ho.
+    cbn [{mod}Run.observed {mod}Run.results fmap list_fmap] in Ho.
+{blocks}
+    destruct Ho.
+  Qed."""
+                imports = ("From VTest Require Import VConcStep.\n"
+                           f"From VTest.{PLATDIR[pl]} Require Import "
+                           f"{mod}Test {mod}Run.")
+                what = ("the model EXHIBITS every observation the platform\n"
+                        "   produced, each under an INTERLEAVING of the two harts\n"
+                        "   named for it -- which is what a race has and what the\n"
+                        "   single-hart theorem cannot state")
+            elif v == "agree" and conc:
                 # THE MULTI-HART FORM.  Run such a case through the
                 # single-hart theorem and the second hart never executes at
                 # all: the DONE flag is never published and the run burns
@@ -491,7 +551,7 @@ def emit_passes(built=None, reset=False):
     intros o Ho.
     cbn [{mod}Run.observed {mod}Run.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (conc2_shows {tick} {bits} {budget});
+            [ apply (conc2_shows {tick} [] {budget});
               vm_compute; repeat split |]).
     destruct Ho.
   Qed."""

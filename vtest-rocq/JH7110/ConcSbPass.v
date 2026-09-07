@@ -5,9 +5,9 @@
    computation of the interpreter to it.
 
    THIS RUN PASSES BECAUSE the model EXHIBITS every observation the platform
-   produced, under an INTERLEAVING of the two harts --
-   which is what a race has and what the single-hart
-   theorem cannot state. *)
+   produced, each under an INTERLEAVING of the two harts
+   named for it -- which is what a race has and what the
+   single-hart theorem cannot state. *)
 From Stdlib Require Import List ZArith.
 From stdpp Require Import base list.
 Import ListNotations.
@@ -22,9 +22,9 @@ Module ConcSbPass <: TEST_PASSES_AGREE ConcSb ConcSbRun.
   Proof.
     intros o Ho.
     cbn [ConcSbRun.observed ConcSbRun.results fmap list_fmap] in Ho.
-    repeat (destruct Ho as [<-|Ho];
-            [ apply (conc2_shows false [] 20000);
-              vm_compute; repeat split |]).
+    destruct Ho as [<-|Ho];
+      [ apply (conc2_shows false (replicate 28 false ++ replicate 31 true ++ replicate 26 false ++ replicate 28 true ++ replicate 9 false ++ replicate 2 false ++ replicate 2 true)%list 20000);
+        vm_compute; repeat split |].
     destruct Ho.
   Qed.
 End ConcSbPass.
