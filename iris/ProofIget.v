@@ -1459,7 +1459,7 @@ Section ProofIget.
                                            Hicnt0 Hstf]").
             { (* the ARM obligation: bytes cross as [Res]; the member store
                  mints the window at its own log position. *)
-              intros CIDw img sigma log V ppn Hcan Hoff Hpin Hmig.
+              intros CIDw img sigma log dl V ppn Hcan Hoff Hpin Hmig.
               rewrite Hpa78 in Hpin |- *.
               rewrite Hsv78.
               iIntros "Hkm Hgh Htso Hown HRes".
@@ -1477,21 +1477,7 @@ Section ProofIget.
               assert (HSw : IcacheInv.iref_set
                               (nth_byte (mword_of_int 1 : mword 32))).
               { apply (IcacheInv.iref_set_count 1). vm_compute. congruence. }
-              (* the dirty watermark, BEFORE the append (the registration
-                 wants the new key absent) *)
-              iDestruct (TsoCtx.own_context_expose_w with "Hown")
-                as (W) "[#HWl Hctxw]".
-              iDestruct (tso_interp_of_pin with "Htso") as %Hpin0.
-              iEval (rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem)
-                                log V sigma.(sregs) sigma.(mdev) Hpin0))
-                in "Htso".
-              iDestruct (TsoCtx.tso_interp_llb_valid with "Htso HWl")
-                as "[Htso %HWle]".
-              iEval (rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem)
-                                 log V sigma.(sregs) sigma.(mdev) Hpin0))
-                in "Htso".
-              cbn [glog gs_of] in HWle.
-              iMod (CtxPinw.pinw_arm_write_c (CID := CIDw) img sigma log V
+              iMod (CtxPinw.pinw_arm_write_c (CID := CIDw) img sigma log dl V
                       (i_ref (ientry e)) (mword_of_int 0 : mword 32)
                       (mword_of_int 1 : mword 32) (Z.to_N 4)
                       IcacheInv.iref_set
@@ -1500,13 +1486,13 @@ Section ProofIget.
                 as "(Hgh & Htso & #Hmsg & #HllbS & Hrows)".
               (* A6.146: the author REGISTERS its own arm store -- the fresh
                  bundle's read credential ([cred_floor]'s wrote arm) *)
-              iMod (TsoCtx.ctx_wrote_register (CID := CIDw) TsoCtx.cur_ctx W
+              iMod (TsoCtx.ctx_wrote_register (CID := CIDw) TsoCtx.cur_ctx
                       (length log) (i_ref (ientry e))
                       (TsoMemPa.PWMsg
                          (snap_of (i_ref (ientry e)) (Z.to_N 4)
                             (mword_of_int 1 : mword 32))
                          (hart_agent (@cpu_id CIDw)))
-                      HWle eq_refl with "Hctxw HllbS Hmsg")
+                      eq_refl with "Hown Hmsg")
                 as "[Hown #Hwr]".
               rewrite (ktier_pin_id ppn _ Hpin).
               iModIntro. iFrame "Hgh Htso Hown".
@@ -1748,7 +1734,7 @@ Section ProofIget.
             iEval (rewrite Houtb) in "Hcg".
             iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
                       (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
-                      (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) V4
+                      (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) emp%I V4
                       n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
                       with "Hcg Htext Hpc [Hlock] Htok HRres [] Hcnt Hpay").
@@ -1756,7 +1742,7 @@ Section ProofIget.
             { (* A6.144: the hook re-floors every live row at the lock's
                  stamped context ([itable_ctx_hook]) *)
               iApply itable_ctx_hook. }
-            iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+            iIntros (CIDr Hsr mr) "_ Hcg Hpc %Hrelpins Hcnt".
             iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
             pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
             iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
@@ -1846,16 +1832,16 @@ Section ProofIget.
                   ltac:(nz) ltac:(rdok) ltac:(solve_ndisj) _
                   with "Hcg Hpc [] [] [Hhalf Hstj]").
         { (* the exact-read obligation *)
-          intros CIDw img sigma log V ppn Hcan Hoff Hpin Hmig.
+          intros CIDw img sigma log dl V ppn Hcan Hoff Hpin Hmig.
           rewrite Hpa44 in Hpin |- *.
           iIntros "Hkm Hm Htso Hctx [#Hfl HRes]".
           iDestruct "HRes" as (lo) "[Hrows _]".
           iDestruct (tso_interp_of_pin with "Htso") as %Hpin2.
-          rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+          rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                      sigma.(sregs) sigma.(mdev) Hpin2).
           rewrite (ktier_pin_id ppn _ Hpin).
           iDestruct (IcachePinwObl.iref_read_locked_all (CIDw := CIDw)
-                       (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                       (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                        j (iref_word M j) lo tstj tstj (Nat.le_refl tstj)
                        with "Htso Hm Hctx Hfl Hrows") as %HH.
           iPureIntro. intros tvr Htvr. exact (HH tvr Htvr). }
@@ -2221,7 +2207,7 @@ Section ProofIget.
                   with "Hcg Hpc [] [] [Hhalf Hisl Hselj Hlic Hicnt Hstj]").
         { (* the MEMBER-STORE obligation: rows in, rows at the new word out;
              the twin's closer rides Res -> Post untouched. *)
-          intros CIDw img sigma log V ppn Hcan Hoff Hpin Hmig.
+          intros CIDw img sigma log dl V ppn Hcan Hoff Hpin Hmig.
           rewrite Hpa58 in Hpin |- *.
           rewrite Hstv.
           iIntros "Hkm Hgh Htso Hown HRes".
@@ -2238,7 +2224,7 @@ Section ProofIget.
                           (nth_byte (mword_of_int (Z.pos (Pos.succ nj))
                                        : mword 32))).
           { apply (IcacheInv.iref_set_count (Pos.succ nj)). exact Hno422. }
-          iMod (CtxPinw.pinw_write_c (CID := CIDw) img sigma log V
+          iMod (CtxPinw.pinw_write_c (CID := CIDw) img sigma log dl V
                   (i_ref (ientry j)) (iref_word M j)
                   (mword_of_int (Z.pos (Pos.succ nj)) : mword 32)
                   (Z.to_N 4) lo IcacheInv.iref_set
@@ -2391,13 +2377,13 @@ Section ProofIget.
         iEval (rewrite Houtb) in "Hcg".
         iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
                   (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
-                  (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) L7
+                  (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) emp%I L7
                   n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
                   with "Hcg Htext Hpc [Hlock] Htok HRres [] Hcnt Hpay").
         { iExact "Hlock". }
         { iApply itable_ctx_hook. }
-        iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+        iIntros (CIDr Hsr mr) "_ Hcg Hpc %Hrelpins Hcnt".
         iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
         pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
         iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);

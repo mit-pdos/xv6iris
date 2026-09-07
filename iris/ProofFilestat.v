@@ -688,7 +688,7 @@ Section ProofFilestat.
                    with "Hcnt") as "Hcnt".
       (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)); the
          payload's slice already does, so nothing has to be introduced here. *)
-      iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
+      iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
       iApply (Ilock.wp_ilock_dep_sconf γs j γlp
  (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
 

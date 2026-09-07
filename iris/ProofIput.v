@@ -961,13 +961,13 @@ Section IputTail.
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HDsp).
     iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
               (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
-              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) D5
+              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) emp%I D5
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres [] Hcnt Hpay").
     { iApply (is_itable2_lock with "Hlock"). }
     { iApply itable_ctx_hook. }
-    iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CIDr Hsr mr) "_ Hcg Hpc %Hrelpins Hcnt".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
@@ -1333,14 +1333,14 @@ Section IputTail.
       { (* THE RETIRE OBLIGATION: the window's rows convert to ctx cells at
            the OLD value under the acquire floor, and the zeroing store is
            an ordinary ctx store ([CtxPinw.pinw_retire_write_c]). *)
-        intros CIDw img sigma log V ppn Hcan Hoff4 Hpin Hmig.
+        intros CIDw img sigma log dl V ppn Hcan Hoff4 Hpin Hmig.
         rewrite Hpa2 in Hcan Hpin |- *.
         rewrite Hstv.
         replace (Z.pos 1 - 1)%Z with 0%Z by lia.
         iIntros "Hkm Hgh Htso Hown HRes".
         iDestruct "HRes" as "(%Hlot & #Hfl & Hrows & Hcl)".
         iEval (rewrite /IcacheInv.iref_pin_rows) in "Hrows".
-        iMod (CtxPinw.pinw_retire_write_c (CID := CIDw) img sigma log V
+        iMod (CtxPinw.pinw_retire_write_c (CID := CIDw) img sigma log dl V
                 (i_ref (ientry k)) (iref_word Mt k)
                 (mword_of_int 0 : mword 32) (Z.to_N 4) loip tstk
                 IcacheInv.iref_set ltac:(lia)
@@ -1541,7 +1541,7 @@ Section IputTail.
                 ltac:(solve_ndisj) _
                 with "Hcg Hpc [] [] [Hhalf Hrtok Hisl Hru Hcnt1 Hstk]").
       { (* the MEMBER-STORE obligation *)
-        intros CIDw img sigma log V ppn Hcan Hoff4 Hpin Hmig.
+        intros CIDw img sigma log dl V ppn Hcan Hoff4 Hpin Hmig.
         rewrite Hpa2 in Hpin |- *.
         rewrite Hstv Hzs.
         iIntros "Hkm Hgh Htso Hown HRes".
@@ -1560,7 +1560,7 @@ Section IputTail.
           destruct Hwf as [_ Hcnt'].
           pose proof (Hcnt' k qt (Pos.succ npred) HMk') as Hb.
           rewrite Pos2Z.inj_succ in Hb. lia. }
-        iMod (CtxPinw.pinw_write_c (CID := CIDw) img sigma log V
+        iMod (CtxPinw.pinw_write_c (CID := CIDw) img sigma log dl V
                 (i_ref (ientry k)) (iref_word Mt k)
                 (mword_of_int (Z.pos npred) : mword 32)
                 (Z.to_N 4) loip IcacheInv.iref_set
@@ -2982,13 +2982,13 @@ Section IputFreePath.
     (* the hooked tier: the rows go back LLB-bare and the hook re-floors them *)
     iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
               (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
-              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) H3
+              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) emp%I H3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HH3a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hitlk] Htok HRres [] Hcnt Hpay").
     { iApply (is_itable2_lock with "Hitlk"). }
     { iApply itable_ctx_hook. }
-    iIntros (CIDrl Hsrl mr1) "Hcg Hpc %Hpins1 Hcnt".
+    iIntros (CIDrl Hsrl mr1) "_ Hcg Hpc %Hpins1 Hcnt".
     iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     pose proof Hpins1 as Hpins1_cs.
@@ -3407,16 +3407,16 @@ Section IputFreePath.
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj) _
               with "Hcg Hpc [] [] [Hhalf Hstk2]").
     { (* the exact-read obligation *)
-      intros CIDw img sigma log V ppn Hcan86 Hoff86 Hpin Hmig.
+      intros CIDw img sigma log dl V ppn Hcan86 Hoff86 Hpin Hmig.
       rewrite Hpa86 in Hpin |- *.
       iIntros "Hkm Hm Htso Hctx [#Hfl HRes]".
       iDestruct "HRes" as (lo) "[Hrows _]".
       iDestruct (tso_interp_of_pin with "Htso") as %Hpin2.
-      rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+      rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                  sigma.(sregs) sigma.(mdev) Hpin2).
       rewrite (ktier_pin_id ppn _ Hpin).
       iDestruct (IcachePinwObl.iref_read_locked_all (CIDw := CIDw)
-                   (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                   (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                    k (iref_word Mt2 k) lo tstk2 tstk2 (Nat.le_refl tstk2)
                    with "Htso Hm Hctx Hfl Hrows") as %HH.
       iPureIntro. intros tvr Htvr. exact (HH tvr Htvr). }
@@ -3552,7 +3552,7 @@ Section IputFreePath.
     { (* THE FROZEN RETIRE OBLIGATION: rows -> ctx cells at the OLD value
          under the acquire floor, the zeroing store an ordinary ctx store,
          the freed bytes re-entering as the ONE word cell. *)
-      intros CIDw img sigma log V ppn Hcan8a Hoff8a Hpin Hmig.
+      intros CIDw img sigma log dl V ppn Hcan8a Hoff8a Hpin Hmig.
       rewrite Hpa8a in Hcan8a Hpin |- *.
       rewrite Hstv2.
       replace (Z.pos 1 - 1)%Z with 0%Z by lia.
@@ -3560,7 +3560,7 @@ Section IputFreePath.
       iDestruct "HRes" as "(#Hfl & Hrowsx & Hcl)".
       iDestruct "Hrowsx" as (lo8a) "[%Hlot8a Hrows]".
       iEval (rewrite /IcacheInv.iref_pin_rows) in "Hrows".
-      iMod (CtxPinw.pinw_retire_write_c (CID := CIDw) img sigma log V
+      iMod (CtxPinw.pinw_retire_write_c (CID := CIDw) img sigma log dl V
               (i_ref (ientry k)) (iref_word Mt2 k)
               (mword_of_int 0 : mword 32) (Z.to_N 4) lo8a tstk2
               IcacheInv.iref_set ltac:(lia)
@@ -3767,13 +3767,13 @@ Section IputFreePath.
       rewrite /G2 upd_ne; [| regne]. rewrite /G1 upd_ne; [reflexivity | regne]. }
     iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
               (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
-              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) G3
+              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) emp%I G3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HG3a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hitlk] Htok HRres3 [] Hcnt Hpay").
     { iApply (is_itable2_lock with "Hitlk"). }
     { iApply itable_ctx_hook. }
-    iIntros (CIDrl2 Hsrl2 mr2) "Hcg Hpc %Hpins2 Hcnt".
+    iIntros (CIDrl2 Hsrl2 mr2) "_ Hcg Hpc %Hpins2 Hcnt".
     iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     assert (Hpc98 : ret_pc (G3 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x98))
@@ -5361,16 +5361,16 @@ Section ProofIput.
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj) _
               with "Hcg Hpc [] [] [Hhalf Hstk0]").
     { (* the exact-read obligation *)
-      intros CIDw img sigma log V ppn Hcan18 Hoff18 Hpin Hmig.
+      intros CIDw img sigma log dl V ppn Hcan18 Hoff18 Hpin Hmig.
       rewrite Hpa18 in Hpin |- *.
       iIntros "Hkm Hm Htso Hctx [#Hfl HRes]".
       iDestruct "HRes" as (lo) "[Hrows _]".
       iDestruct (tso_interp_of_pin with "Htso") as %Hpin2.
-      rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+      rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                  sigma.(sregs) sigma.(mdev) Hpin2).
       rewrite (ktier_pin_id ppn _ Hpin).
       iDestruct (IcachePinwObl.iref_read_locked_all (CIDw := CIDw)
-                   (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                   (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                    k (iref_word Mt k) lo tstk0 tstk0 (Nat.le_refl tstk0)
                    with "Htso Hm Hctx Hfl Hrows") as %HH.
       iPureIntro. intros tvr Htvr. exact (HH tvr Htvr). }

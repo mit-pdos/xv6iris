@@ -1942,8 +1942,8 @@ Section ProofMain.
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (pd pav pu : mword 64)
       (root : mword 44) (pas : nat -> mword 44)
-      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
-      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)} :
+      (γi γm : gname) (ξd : CtxId) (P : nat -> nat -> CtxId -> iProp Σ)
+      `{!∀ pos M ξ, Persistent (P pos M ξ)} `{!∀ pos M, CtxMorph (P pos M)} :
     (* the scheduler this block tail-calls enables interrupts at its loop head
        and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
     (kv_frame_slots + 22 <= n)%nat ->
@@ -1955,8 +1955,8 @@ Section ProofMain.
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     trap_csrs KT1 -∗
-    started_inv γi ξd P -∗ started_prim γi -∗
-    □ (∀ (pos : nat)
+    started_inv γi γm ξd P -∗ started_prim γi -∗
+    □ (∀ (pos M : nat)
          (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
@@ -1970,7 +1970,8 @@ Section ProofMain.
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas' i) KP_rw) -∗
          (∃ B : nat, KptGhost.kpt_bound B ∗ ⌜(B <= pos)%nat⌝) -∗
-         P pos cur_ctx) -∗
+         (∃ Bd : nat, CtxValues.kpt_dbound Bd ∗ ⌜(Bd <= M)%nat⌝) -∗
+         P pos M cur_ctx) -∗
     KptShare.kpt_creds -∗
     printk_env γpr γd γv -∗
     procs_inv γs -∗
@@ -1991,13 +1992,16 @@ Section ProofMain.
        flag store's own position, where [B ≤ pos] is the bound-below-flag
        tie the secondaries' credentials need. *)
     iDestruct "Hcreds" as (Bk) "[#Hbd #Hbc]".
-    iDestruct (CtxValues.cv_boot_cred_llb with "Hbc") as "#HllbB".
-    iAssert (□ (∀ pos : nat, ⌜(Bk <= pos)%nat⌝ -∗ P pos cur_ctx))%I as "#HPmk".
-    { iIntros "!>" (pos) "%Hpos".
-      iApply ("Hwand" $! pos γpr γs γk pd pav pu root pas
+    iDestruct (KptGhost.kpt_bound_llb with "Hbd") as "#HllbB".
+    iDestruct (CtxValues.cv_boot_cred_dbound with "Hbc") as (Bd) "[#Hdb #HvBd]".
+    iAssert (□ (∀ pos M : nat, ⌜(Bk <= pos)%nat⌝ -∗ ⌜(Bd <= M)%nat⌝ -∗ P pos M cur_ctx))%I
+      as "#HPmk".
+    { iIntros "!>" (pos M) "%Hpos %HM".
+      iApply ("Hwand" $! pos M γpr γs γk pd pav pu root pas
                 with "Hpenv Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx
-                      [ ]").
-      iExists Bk. iFrame "Hbd". by iPureIntro. }
+                      [ ] [ ]").
+      { iExists Bk. iFrame "Hbd". by iPureIntro. }
+      iExists Bd. iFrame "Hdb". by iPureIntro. }
     (* The release sequence.  Note the shape: the address is materialized
        BEFORE the barrier and the store is the compressed [c.sw], so the
        fence separates the whole deposit from the store alone -- and it is
@@ -2070,7 +2074,7 @@ Section ProofMain.
        persistent and says nothing about the VALUE, so one peek-open of the
        started invariant delivers it and puts the body straight back. *)
     iApply fupd_wp.
-    iMod (started_inv_claim ⊤ γi ξd P ltac:(solve_ndisj) with "Hsinv") as "#Hstcl".
+    iMod (started_inv_claim ⊤ γi γm ξd P ltac:(solve_ndisj) with "Hsinv") as "#Hstcl".
     iModIntro.
     (* THE RELEASE STORE (A6.132): the datum-form leaf, whose obligation
        runs [started_store_obl] -- the plain window becomes the armed one
@@ -2081,23 +2085,25 @@ Section ProofMain.
               (mword_of_int 0 : mword 12) S3 n
               (trunc32 (rget S3 (mword_of_int 14 : mword 5))) True%I
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
-              (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_stamped ξd 0 ∗
-               started_prim γi ∗
+              (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ started_unrec γm ∗
+               ctx_stamped ξd 0 ∗ started_prim γi ∗
                (llb loglen_name Bk ∗
-                □ (∀ pos : nat, ⌜(Bk <= pos)%nat⌝ -∗ P pos cur_ctx)))%I
-              (started_right γi ξd P)
+                TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) Bd ∗
+                □ (∀ pos M : nat, ⌜(Bk <= pos)%nat⌝ -∗ ⌜(Bd <= M)%nat⌝ -∗
+                     P pos M cur_ctx)))%I
+              (started_right γi γm ξd P)
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_write_ram_plain_4
               (store_ext_4 (rget S3 (mword_of_int 14 : mword 5)))
               ltac:(solve_ndisj)
               ltac:(cbv zeta; rewrite Hsa Hsvst;
-                    exact (started_store_obl γi ξd P Bk p0 Hcid))
+                    exact (started_store_obl γi γm ξd P Bk Bd p0 Hcid))
               with "Hcg Hpc [] [] [Hprim]").
     { iApply (mni_b0 with "Htext"). }
     { rewrite Hsa. iExact "Hstcl". }
-    { iApply (started_store_open (⊤ ∖ ↑minstretN) γi ξd P Bk ltac:(solve_ndisj)
+    { iApply (started_store_open (⊤ ∖ ↑minstretN) γi γm ξd P _ ltac:(solve_ndisj)
                 with "Hsinv Hprim [ ]").
-      iFrame "HllbB HPmk". }
+      iFrame "HllbB HvBd HPmk". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc _".
     iEval (change (if true then 2%Z else 4%Z) with 2%Z) in "Hpc".
@@ -2148,10 +2154,10 @@ Section ProofMain.
       (ndisk : nat)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
-      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)}
+      (γi γm : gname) (ξd : CtxId) (P : nat -> nat -> CtxId -> iProp Σ)
+      `{!∀ pos M ξ, Persistent (P pos M ξ)} `{!∀ pos M, CtxMorph (P pos M)}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi γm ξd P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hsnap Hp0.
@@ -2341,7 +2347,7 @@ Section ProofMain.
     { iEval (rewrite /kernelvec_env). iModIntro. iExact "Hcaps". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started fsc_printk γk fsc_kalloc γs γd γv m5 (K - 2)%nat p0 pd pav pu
-              root pas γi ξd P ltac:(lia) Hp0 Hcid
+              root pas γi γm ξd P ltac:(lia) Hp0 Hcid
               with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hprim Hwand
                     Hcreds Hpenv
                     Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").

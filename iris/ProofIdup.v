@@ -502,16 +502,16 @@ Section ProofIdup.
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(solve_ndisj) _
               with "Hcg Hpc [] [] [Hhalf Hstk]").
     { (* the exact-read obligation *)
-      intros CIDw img sigma log V ppn Hcan Hoff Hpin Hmig.
+      intros CIDw img sigma log dl V ppn Hcan Hoff Hpin Hmig.
       rewrite Hpa in Hpin |- *.
       iIntros "Hkm Hm Htso Hctx [#Hfl HRes]".
       iDestruct "HRes" as (lo) "[Hrows _]".
       iDestruct (tso_interp_of_pin with "Htso") as %Hpin2.
-      rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+      rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                  sigma.(sregs) sigma.(mdev) Hpin2).
       rewrite (ktier_pin_id ppn _ Hpin).
       iDestruct (IcachePinwObl.iref_read_locked_all (CIDw := CIDw)
-                   (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                   (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                    k (iref_word M k) lo tstk tstk (Nat.le_refl tstk)
                    with "Htso Hm Hctx Hfl Hrows") as %HH.
       iPureIntro. intros tvr Htvr. exact (HH tvr Htvr). }
@@ -619,7 +619,7 @@ Section ProofIdup.
               ltac:(solve_ndisj) _
               with "Hcg Hpc [] [] [Hhalf Hrlive Hisl Hmir Hru Hicnt Hstk]").
     { (* the MEMBER-STORE obligation *)
-      intros CIDw img sigma log V ppn Hcan Hoff Hpin Hmig.
+      intros CIDw img sigma log dl V ppn Hcan Hoff Hpin Hmig.
       rewrite Hpa2 in Hpin |- *.
       rewrite Hstv.
       iIntros "Hkm Hgh Htso Hown HRes".
@@ -636,7 +636,7 @@ Section ProofIdup.
                       (nth_byte (mword_of_int (Z.pos (Pos.succ cnt))
                                    : mword 32))).
       { apply (IcacheInv.iref_set_count (Pos.succ cnt)). exact Hno422. }
-      iMod (CtxPinw.pinw_write_c (CID := CIDw) img sigma log V
+      iMod (CtxPinw.pinw_write_c (CID := CIDw) img sigma log dl V
               (i_ref (ientry k)) (iref_word M k)
               (mword_of_int (Z.pos (Pos.succ cnt)) : mword 32)
               (Z.to_N 4) losh IcacheInv.iref_set
@@ -794,14 +794,14 @@ Section ProofIdup.
     iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_hook_sconf KT1 fsc_itlock itable_lock "itable"%string
               (fun ξ => itable_res2_llb ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
-              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) D5
+              (fun ξ => itable_res2 ξ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) emp%I D5
               n eb p (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres [] Hcnt Hpay").
     { iExact "Hlk2". }
     { iApply itable_ctx_hook. }
-    iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CIDr Hsr mr) "_ Hcg Hpc %Hrelpins Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
     (* release handed back the FULL entry set minus the rank it just gave up;
        [Hfresh]'s bound gives the non-membership that collapses it back to

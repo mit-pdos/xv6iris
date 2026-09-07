@@ -282,9 +282,9 @@ Section WpUsdPt.
                [HartMStore.wobl_ram_ctx]: one authored message appended to
                the log, the byte run re-registered in the running context's
                dirty set, the token handed back through the rider. *)
-            iIntros "Htok" (sigma img log tvv V) "%Htvv Hsi Htso".
+            iIntros "Htok" (sigma img log dl tvv V) "%Htvv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-            iMod (HartMStore.wobl_ram_ctx img sigma log V XI 8
+            iMod (HartMStore.wobl_ram_ctx img sigma log dl V XI 8
                     (mwrite_req8 tfpa (m !!! Regidx rs2)) wold
                     ltac:(reflexivity) ltac:(vm_compute; discriminate)
                     with "Hmem Htso Htok Hbw")

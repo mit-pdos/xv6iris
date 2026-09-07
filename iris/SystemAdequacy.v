@@ -542,7 +542,7 @@ Section SystemBoot.
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (MkAppcfg N A r) (fun _ => emp)%I gsn gln gtn Hbf Hbundle
             with "Hok Hlic Hxfer Hseamg Hdursnap Hres")
-      as (Hfd Hir Hpav Hbs HF γd γv Rspent γi ξd)
+      as (Hfd Hir Hpav Hbs HF γd γv Rspent γi γm ξd)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
         Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
@@ -620,7 +620,7 @@ Section SystemBoot.
            well as to goals: never leave a 30-premise [iApply] as the place a
            mismatch has to surface. *)
         iPoseProof (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
-                  (g.(gregs) 0%fin) iv DfracDiscarded γd γv γi ξd ps l0 b0 c0
+                  (g.(gregs) 0%fin) iv DfracDiscarded γd γv γi γm ξd ps l0 b0 c0
                   (v_disk (g.(gdev).(dvirtio))) (fss_sb S) (fs_nib S) cov
                   XV6_DISK_BYTES S Pb Rspent
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
@@ -672,7 +672,7 @@ Section SystemBoot.
       iMod (own_context_boot (CID := FS c)) as (ξc) "Hthrc".
       iModIntro.
       iApply (boot_hart_secondary (fileG0 := HF) (CID := FS c) (XI := ξc)
-                (g.(gregs) (FS c)) iv DfracDiscarded γd γv γi ξd
+                (g.(gregs) (FS c)) iv DfracDiscarded γd γv γi γm ξd
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
                 with "Htext Hdata Hh Hthrc Hstarted"). }
     iDestruct (Hperm γd with "Hoinv") as "#Hperm".

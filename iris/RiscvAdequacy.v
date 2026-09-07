@@ -774,16 +774,16 @@ Section power.
              cycle -- [RiscvLang]'s own arm spells it exactly this way. *)
           (GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv)
              g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr) g.(gdlog)), [].
-        do 4 right. split_and!; [done|done|].
+        do 5 right. split_and!; [done|done|].
         left. split_and!; done. }
       iIntros (e2 g2 efs Hstep) "!>".
       pose proof Hstep as Hstep0.
       destruct Hstep as
         [ (gen2 & cpu2 & m2 & Hc & _)
-        | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
-        | (_ & -> & [ (_ & -> & -> & ->) | (Hpw' & _) ]) ] ] ] ];
+        | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
+        | (_ & -> & [ (_ & -> & -> & ->) | (Hpw' & _) ]) ] ] ] ] ];
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
-        | | congruence ].
+        | discriminate Hc | | congruence ].
       iIntros "_".
       iMod (mono_nat_own_update (n := g.(ggen)) (S g.(ggen)) with "Hgauth")
         as "[Hgauth _]"; [lia|].
@@ -845,17 +845,17 @@ Section power.
            the loaded image, reset devices, the disk image preserved. *)
         (* ... and OBSERVED: a power-on is a trace event too (§3b') *)
         exists [ObsPowerOn], PowerLoopE, (boot_gstate g), (power_fork g.(ggen)).
-        do 4 right. split_and!; [done|done|].
+        do 5 right. split_and!; [done|done|].
         right. split_and!; [done|done|done|].
         apply boot_shape_boot_gstate. }
       iIntros (e2 g2 efs Hstep) "!>".
       pose proof Hstep as Hstep0.
       destruct Hstep as
         [ (gen2 & cpu2 & m2 & Hc & _)
-        | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
-        | (_ & -> & [ (Hpw' & _) | (_ & -> & -> & Hbs) ]) ] ] ] ];
+        | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
+        | (_ & -> & [ (Hpw' & _) | (_ & -> & -> & Hbs) ]) ] ] ] ] ];
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
-        | congruence | ].
+        | discriminate Hc | congruence | ].
       iIntros "_".
       destruct Hbs as (Hgen2 & Hvirt2 & Hbf).
       pose proof (proj1 Hbf) as Hpow2.
@@ -985,7 +985,7 @@ Section power.
              reservation clause alone -- take its first and last arms. *)
           destruct Hnone as (Hresv0 & _ & _ & _ & _ & Hghr0).
           rewrite (resv_map_none _ _ Hresv0
-                     (fun c => f_equal hr_acq (Hghr0 c))) big_sepM_gset_to_gmap.
+                     (fun c => f_equal hr_acq (proj1 Hghr0 c))) big_sepM_gset_to_gmap.
           iApply (big_sepS_mono with "Hresvfrags").
           iIntros (c _) "H". by iExists false. }
         (* the client's lent resource, at the RESET machine's disk --
@@ -1073,9 +1073,9 @@ Section power.
           iFrame "Hloglenauth2 Hviewauth2 Hdpauth2 Hdlenauth2 Hfrauth2 Hchauth2".
           (* the drain log's empty mirrors: no copies, and every pure
              conjunct at the empty lists *)
-          iSplitR; [iApply big_sepM_empty' |].
+          iSplitR; [rewrite big_sepM_empty; iEmpIntro |].
           iSplitR; [iPureIntro; apply TsoMemPa.dpos_ok_nil |].
-          iSplitR; [iApply big_sepM_empty' |].
+          iSplitR; [rewrite big_sepM_empty; iEmpIntro |].
           iSplitR; [iPureIntro; apply TsoMemPa.fr_ok_nil |].
           iSplitR; [iPureIntro; apply TsoMemPa.chain_set_ok_nil |].
           iPureIntro. split; [| split; [| reflexivity]]; last first.
@@ -1122,7 +1122,12 @@ Section power.
       iSplitL "Hwps"; [iExact "Hwps"|].
       iSplitL "Hwpu"; [iExact "Hwpu"|].
       iSplitL "Hwpd"; [iExact "Hwpd"|].
-      iSplitL "Hwpp"; [iExact "Hwpp"|done].
+      iSplitL "Hwpp"; [iExact "Hwpp"|].
+      (* the memory thread (relaxed-ww.md §1.1) needs no client: its WP is
+         [RiscvExec.wp_mem_loop], off the new era's certificate *)
+      iSplitL; [|done].
+      iApply (@RiscvExec.wp_mem_loop Σ (RiscvGS Σ _ HE) g.(ggen)).
+      rewrite /gen_cert. iSplit; [iExact "Hbornlb"|]. iSplit; [iExact "Hgst"|iExact "HRelem"].
   Qed.
 End power.
 

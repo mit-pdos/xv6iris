@@ -376,6 +376,22 @@ Section CtxValues.
   Global Instance kpt_pub_persistent `{CID : CpuId} B : Persistent (kpt_pub B).
   Proof. rewrite /kpt_pub. apply _. Qed.
 
+  (* THE CREDENTIAL OFF THE STARTED FLAG (relaxed-ww.md §2.16): the reader's
+     view receipt at [V]; hart 0's record at the flag ([fr_at 0 i M], the
+     flag's index [i] the fence's issue length, [M] its drain length); the
+     flag's own drain position [S q] under [V] and above [M]; the tree's
+     issue bound under [i] and its drain bound under [M]. *)
+  Lemma kpt_pub_intro `{CID : CpuId} (B V i M q Bd : nat) :
+    (B <= i)%nat -> (M <= q)%nat -> (S q <= V)%nat -> (Bd <= M)%nat ->
+    TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) V -∗
+    fr_at 0%nat i M -∗ dpos_at dpos_name i (S q) -∗ kpt_dbound Bd -∗
+    kpt_pub B.
+  Proof.
+    intros HBi HMq HqV HBd. iIntros "#HV #Hfr #Hdp #Hbd".
+    rewrite /kpt_pub. iExists V, i, M, i, (S q), Bd.
+    iFrame "HV Hfr Hdp Hbd". iPureIntro. split_and!; lia.
+  Qed.
+
   Definition cv_boot_cred `{CID : CpuId} (B : nat) : iProp Σ :=
     ((⌜hart_agent cpu_id = 0%nat⌝ ∗
       ∃ Bd : nat, kpt_dbound Bd ∗ TsoGhost.view_lb view_name dlen_name 0%nat Bd) ∨
@@ -397,6 +413,19 @@ Section CtxValues.
   Lemma cv_boot_cred_pub `{CID : CpuId} (B : nat) :
     kpt_pub B -∗ cv_boot_cred B.
   Proof. iIntros "H". iRight. iExact "H". Qed.
+
+  (* either credential carries the tree's drain bound under a view receipt
+     of THIS hart -- what the primary's started store needs to tie the
+     bound under the fence's drain length (StartedInv, relaxed-ww §2.16) *)
+  Lemma cv_boot_cred_dbound `{CID : CpuId} (B : nat) :
+    cv_boot_cred B -∗
+    ∃ Bd : nat, kpt_dbound Bd ∗ TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) Bd.
+  Proof.
+    iIntros "[[%H0 (%Bd & #Hd & #Hv)] | Hpub]".
+    - iExists Bd. iFrame "Hd". rewrite H0. iExact "Hv".
+    - iDestruct "Hpub" as (V L M s q Bd) "(#HV & _ & _ & _ & _ & #Hd & %HBdV)".
+      iExists Bd. iFrame "Hd". iApply (TsoGhost.view_lb_le _ _ _ V Bd HBdV with "HV").
+  Qed.
 
 
   (* a bounded choice principle: name the per-byte floors of a run *)

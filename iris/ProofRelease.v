@@ -279,7 +279,7 @@ Section ProofRelease.
               with "Hcg Hpc [] [Hpre] Hheld").
     { iApply (rli_16 with "Htext"). }
     { rewrite /flush_step. iIntros (Df) "Hfl Hheld".
-      iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hcl"; [solve_ndisj|].
+      iMod (fupd_mask_subseteq (⊤ ∖ ↑MinstretInv.minstretN)) as "Hcl"; [solve_ndisj|].
       iMod ("Hpre" with "Hfl Hheld") as "[Hfl HR]".
       iMod "Hcl" as "_". iModIntro. iFrame "Hfl HR". }
     iNext. iIntros "Hcg Hpc HR".

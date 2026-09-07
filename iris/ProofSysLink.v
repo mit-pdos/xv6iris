@@ -1376,7 +1376,7 @@ Section ProofSysLinkBody.
              the escrow's checked-out arm for the whole locked window,
              and the residue rides the descriptor conjunct home. *)
 
-          iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
+          iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
           iApply (Ilock.wp_ilock_tx_sconf (CID := CID27) gs j gl pd pav pu
  gil gisl
                     kk (qq/2)%Qp gsh losh tlsh PlainK inum pid (DfracOwn (1/4)) dqs
@@ -2243,7 +2243,7 @@ Section ProofSysLinkBody.
                       (durable-fs-plan.md section 3, [ilock];
                       durable-disk B''-tx) *)
 
-                   iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0b".   (* r25 lane (ii): nothing to present at this ilock *)
+                   iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0b".   (* r25 lane (ii): nothing to present at this ilock *)
                    iApply (Ilock.wp_ilock_tx_sconf (CID := CID51) gs j gl pd
                              pav pu gild gisld
  kd (qd/2)%Qp gyd lod tld PlainK dinum pid

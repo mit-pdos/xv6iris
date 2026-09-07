@@ -145,9 +145,14 @@ Section Lock.
      ARITY UNCHANGED and ξ AMBIENT, so no consumer's spelling moves -- the
      same treatment [is_lock] took under §0.35′, and the 69 files that
      mention [locked] are the verification, not the cost. <<< *)
+  (* TWO LOGS (relaxed-ww.md §2.8, §2.16): the pin's position [B] is an
+     ISSUE index -- the AMO's own timestamp, the pin's anchor -- and the
+     holder's floor a DRAIN position [D], the AMO's, tied by the anchor's
+     drain witness [dpos_ev B D].  [holding()]'s read of the word goes
+     through exactly that pair ([TsoCtx.ledger_read_pin_ok]). *)
   Definition locked_core (γ : gname) (i : CPU) : iProp Σ :=
-    (∃ B : nat, lock_frag_at γ (Some (i, true)) B ∗
-       TsoCtx.ctx_floor cur_ctx B)%I.
+    (∃ B D : nat, lock_frag_at γ (Some (i, true)) B ∗
+       TsoGhost.dpos_ev dpos_name B D ∗ TsoCtx.ctx_floor cur_ctx D)%I.
   (* THE LOCK'S CONTEXT, PARKED UNDER THE HOLDER
      (claude-notes/design/contexts.md §2, §6).  Every lock owns one context
      for its whole life: born at [newlock] as a running twin of the creator
@@ -171,8 +176,8 @@ Section Lock.
      it to the cpu store, release takes it back out at the cpu clear
      ([WpSconfLock]'s two exchanges). *)
   Definition locked_pre (γ : gname) (i : CPU) : iProp Σ :=
-    (∃ B : nat, lock_frag_at γ (Some (i, false)) B ∗
-       TsoCtx.ctx_floor cur_ctx B)%I.
+    (∃ B D : nat, lock_frag_at γ (Some (i, false)) B ∗
+       TsoGhost.dpos_ev dpos_name B D ∗ TsoCtx.ctx_floor cur_ctx D)%I.
 
   Global Instance locked_core_timeless γ i : Timeless (locked_core γ i).
   Proof. apply _. Qed.
@@ -261,7 +266,7 @@ Section Lock.
   Qed.
   Lemma locked_core_exclusive γ i j : locked_core γ i -∗ locked_core γ j -∗ False.
   Proof.
-    iIntros "(%B & H1 & _) (%B' & H2 & _)".
+    iIntros "(%B & %D & H1 & _ & _) (%B' & %D' & H2 & _ & _)".
     iApply (lock_frag_at_exclusive with "H1 H2").
   Qed.
   Lemma locked_exclusive γ i j : locked γ i -∗ locked γ j -∗ False.
@@ -293,24 +298,27 @@ Section Lock.
      invariant minted. *)
   Lemma locked_core_state_at γ st B i :
     lock_auth_at γ st B -∗ locked_core γ i -∗
-    ⌜st = Some (i, true)⌝ ∗ TsoCtx.ctx_floor cur_ctx B.
+    ⌜st = Some (i, true)⌝ ∗
+    ∃ D : nat, TsoGhost.dpos_ev dpos_name B D ∗ TsoCtx.ctx_floor cur_ctx D.
   Proof.
-    iIntros "Ha (%B' & Hf & #Hfl)".
+    iIntros "Ha (%B' & %D & Hf & #Hdp & #Hfl)".
     iDestruct (lock_pos_agree with "Ha Hf") as %[-> ->].
-    iSplitR; [done|]. iExact "Hfl".
+    iSplitR; [done|]. iExists D. iFrame "Hdp Hfl".
   Qed.
   Lemma locked_state_at γ st B i :
     lock_auth_at γ st B -∗ locked γ i -∗
-    ⌜st = Some (i, true)⌝ ∗ TsoCtx.ctx_floor cur_ctx B.
+    ⌜st = Some (i, true)⌝ ∗
+    ∃ D : nat, TsoGhost.dpos_ev dpos_name B D ∗ TsoCtx.ctx_floor cur_ctx D.
   Proof. iIntros "Ha [Hc _]". iApply (locked_core_state_at with "Ha Hc"). Qed.
 
   Lemma locked_pre_state_at γ st B i :
     lock_auth_at γ st B -∗ locked_pre γ i -∗
-    ⌜st = Some (i, false)⌝ ∗ TsoCtx.ctx_floor cur_ctx B.
+    ⌜st = Some (i, false)⌝ ∗
+    ∃ D : nat, TsoGhost.dpos_ev dpos_name B D ∗ TsoCtx.ctx_floor cur_ctx D.
   Proof.
-    iIntros "Ha (%B' & Hf & #Hfl)".
+    iIntros "Ha (%B' & %D & Hf & #Hdp & #Hfl)".
     iDestruct (lock_pos_agree with "Ha Hf") as %[-> ->].
-    iSplitR; [done|]. iExact "Hfl".
+    iSplitR; [done|]. iExists D. iFrame "Hdp Hfl".
   Qed.
 
   Lemma locked_state γ st i :
@@ -360,16 +368,16 @@ Section Lock.
 
   (* acquire's amoswap: a free lock becomes "held by i, cpu not yet written",
      AT THE POSITION THE AMO JUST OCCUPIED. *)
-  Lemma lock_take γ i (B : nat) :
-    TsoCtx.ctx_floor cur_ctx B -∗
+  Lemma lock_take γ i (B D : nat) :
+    TsoGhost.dpos_ev dpos_name B D -∗ TsoCtx.ctx_floor cur_ctx D -∗
     lock_auth γ None -∗ lock_frag γ None ==∗
     lock_auth_at γ (Some (i, false)) B ∗ locked_pre γ i.
   Proof.
-    iIntros "#Hfl (%B0 & Ha) (%B1 & Hf)".
+    iIntros "#Hdp #Hfl (%B0 & Ha) (%B1 & Hf)".
     iDestruct (lock_pos_agree with "Ha Hf") as %[_ ->].
     iMod (lock_state_update_at γ None (Some (i, false)) B1 B with "Ha Hf")
       as "[Ha Hf]".
-    iModIntro. iFrame "Ha". iExists B. iFrame "Hf Hfl".
+    iModIntro. iFrame "Ha". iExists B, D. iFrame "Hf Hdp Hfl".
   Qed.
 
   (* acquire's [lk->cpu = mycpu()]: the window closes, the holder gets THE
@@ -378,10 +386,10 @@ Section Lock.
     lock_auth_at γ st B -∗ locked_pre γ i ==∗
     ⌜st = Some (i, false)⌝ ∗ lock_auth_at γ (Some (i, true)) B ∗ locked_core γ i.
   Proof.
-    iIntros "Ha (%B' & Hf & #Hfl)".
+    iIntros "Ha (%B' & %D & Hf & #Hdp & #Hfl)".
     iDestruct (lock_pos_agree with "Ha Hf") as %[-> ->].
     iMod (lock_state_update_at γ (Some (i, false)) (Some (i, true)) B' B' with "Ha Hf") as "[Ha Hf]".
-    iModIntro. iSplitR; [done|]. iFrame "Ha". iExists B'. iFrame "Hf Hfl".
+    iModIntro. iSplitR; [done|]. iFrame "Ha". iExists B', D. iFrame "Hf Hdp Hfl".
   Qed.
 
   (* release's [lk->cpu = 0]: back into the window, position unmoved. *)
@@ -389,10 +397,10 @@ Section Lock.
     lock_auth_at γ st B -∗ locked_core γ i ==∗
     ⌜st = Some (i, true)⌝ ∗ lock_auth_at γ (Some (i, false)) B ∗ locked_pre γ i.
   Proof.
-    iIntros "Ha (%B' & Hf & #Hfl)".
+    iIntros "Ha (%B' & %D & Hf & #Hdp & #Hfl)".
     iDestruct (lock_pos_agree with "Ha Hf") as %[-> ->].
     iMod (lock_state_update_at γ (Some (i, true)) (Some (i, false)) B' B' with "Ha Hf") as "[Ha Hf]".
-    iModIntro. iSplitR; [done|]. iFrame "Ha". iExists B'. iFrame "Hf Hfl".
+    iModIntro. iSplitR; [done|]. iFrame "Ha". iExists B', D. iFrame "Hf Hdp Hfl".
   Qed.
 
   (* release's word clear: the lock goes free again, and the position goes
@@ -401,7 +409,7 @@ Section Lock.
     lock_auth_at γ st B -∗ locked_pre γ i ==∗
     ⌜st = Some (i, false)⌝ ∗ lock_auth γ None ∗ lock_frag γ None.
   Proof.
-    iIntros "Ha (%B' & Hf & _)".
+    iIntros "Ha (%B' & %D & Hf & _ & _)".
     iDestruct (lock_pos_agree with "Ha Hf") as %[-> ->].
     iMod (lock_state_update_at γ (Some (i, false)) None B' B'
             with "Ha Hf") as "[Ha Hf]".
@@ -1203,7 +1211,7 @@ Section Lock.
      word's stamp justified ([key_at] -- release's clear is the destroyer's
      own write) and chained; the ledger-tier lock word carries neither
      today.  The lock-word state is stage E's; tracked in the note. *)
-  Lemma lock_word_fresh_free `{CID : CpuId} (lk : mword 64) :
+  Lemma lock_word_fresh_free (lk : mword 64) :
     lock_word_fresh lk ⊢
     [∗ list] j ∈ seq 0 4,
       TsoCtx.mem_free (KTR := KT0) cur_ctx (pa_add lk j) (DfracOwn 1).
@@ -1218,7 +1226,7 @@ Section Lock.
      cell dropped; the payload supplies the fraction and the element.
      relaxed-ww STAGE E: as [lock_word_fresh_free] -- the free tier is
      ξ-indexed, and the wpay cell's stamp wants its [key_at] and chain. *)
-  Lemma lk_cpu_fresh_free `{CID : CpuId} (lo : nat) (lk : mword 64) :
+  Lemma lk_cpu_fresh_free (lo : nat) (lk : mword 64) :
     lk_cpu_fresh lo lk ⊢
     [∗ list] j ∈ seq 0 8,
       TsoCtx.mem_free (KTR := KT0) cur_ctx (pa_add (lock_cpu lk) j) (DfracOwn 1).

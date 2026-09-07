@@ -3709,10 +3709,10 @@ Section WpSconfMem.
     set (log' := (log ++ [PWMsg (snap_of a 8 vnew)
                             (hart_agent (@cpu_id CIDw))])%list).
     set (V' := vstep (hart_agent (@cpu_id CIDw))
-                 (V (hart_agent (@cpu_id CIDw))) log' V).
+                 (V (hart_agent (@cpu_id CIDw))) dl V).
     set (own' := fun h => if decide (h = hart_agent (@cpu_id CIDw))
                           then Some (S (length log)) else own h).
-    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl).
     { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
       - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CIDw)).
         rewrite /hart_agent in Hh. lia.
@@ -3724,14 +3724,13 @@ Section WpSconfMem.
         exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
     assert (Htvmono : forall c : CPU, (V (hart_agent c) <= V' (hart_agent c))%nat)
       by (intros c; rewrite Htvc; lia).
-    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
-    { intros c. rewrite Htvc /log' length_app /=.
-      have := Hbd (hart_agent c). lia. }
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length dl)%nat).
+    { intros c. rewrite Htvc. have := Hbd (hart_agent c). lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log dl V
                σ.(sregs) σ.(mdev) Hpin).
     iMod (TsoCtxLedger.ledger_store_win_wpay_ok (CID := CIDw)
             (gs_of img σ.(mem) log dl V σ.(sregs) σ.(mdev))
-            (gs_of img (write_bytes σ.(mem) a 8 vnew) log' V'
+            (gs_of img (write_bytes σ.(mem) a 8 vnew) log' dl V'
                σ.(sregs) σ.(mdev))
             a 8%N vold vnew lo z cp own own'
             ltac:(vm_compute; discriminate)
@@ -3739,11 +3738,11 @@ Section WpSconfMem.
                   [ intros j Hj; exact (Hz j Hj)
                   | rewrite /own'; by rewrite decide_True ])
             ltac:(intros h Hne; rewrite /own'; by rewrite decide_False)
-            eq_refl eq_refl eq_refl Htvmono Htvtop
+            eq_refl eq_refl eq_refl eq_refl Htvmono Htvtop
             with "Hm Htso Hold") as "(Hm & Htso & _ & Hnew)".
     iModIntro. iFrame "Hm Hnew".
     rewrite -(tso_interp_of_at_gs riscv_eraGS img
-                (write_bytes σ.(mem) a 8 vnew) log' V'
+                (write_bytes σ.(mem) a 8 vnew) log' dl V'
                 σ.(sregs) σ.(mdev) Hpin').
     iExact "Htso".
   Qed.
@@ -3794,8 +3793,8 @@ Section WpSconfMem.
     set (log' := (log ++ [PWMsg (snap_of a 8 vnew)
                             (hart_agent (@cpu_id CIDw))])%list).
     set (V' := vstep (hart_agent (@cpu_id CIDw))
-                 (V (hart_agent (@cpu_id CIDw))) log' V).
-    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+                 (V (hart_agent (@cpu_id CIDw))) dl V).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl).
     { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
       - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CIDw)).
         rewrite /hart_agent in Hh. lia.
@@ -3807,22 +3806,21 @@ Section WpSconfMem.
         exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
     assert (Htvmono : forall c : CPU, (V (hart_agent c) <= V' (hart_agent c))%nat)
       by (intros c; rewrite Htvc; lia).
-    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
-    { intros c. rewrite Htvc /log' length_app /=.
-      have := Hbd (hart_agent c). lia. }
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length dl)%nat).
+    { intros c. rewrite Htvc. have := Hbd (hart_agent c). lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log dl V
                σ.(sregs) σ.(mdev) Hpin).
     iMod (TsoCtxLedger.ledger_store_win_wpay_ok (CID := CIDw)
             (gs_of img σ.(mem) log dl V σ.(sregs) σ.(mdev))
-            (gs_of img (write_bytes σ.(mem) a 8 vnew) log' V'
+            (gs_of img (write_bytes σ.(mem) a 8 vnew) log' dl V'
                σ.(sregs) σ.(mdev))
             a 8%N vold vnew lo z cp own own'
             ltac:(vm_compute; discriminate) Harm Hoth
-            eq_refl eq_refl eq_refl Htvmono Htvtop
+            eq_refl eq_refl eq_refl eq_refl Htvmono Htvtop
             with "Hm Htso Hold") as "(Hm & Htso & #Hmsg & Hnew)".
     iModIntro. iFrame "Hm Hmsg Hnew".
     rewrite -(tso_interp_of_at_gs riscv_eraGS img
-                (write_bytes σ.(mem) a 8 vnew) log' V'
+                (write_bytes σ.(mem) a 8 vnew) log' dl V'
                 σ.(sregs) σ.(mdev) Hpin').
     iExact "Htso".
   Qed.
@@ -4004,22 +4002,16 @@ Section WpSconfMem.
       (* A6.120: the dirty watermark's bound, taken BEFORE the append (the
          registration wants the new key absent, and [W]'s only law is "a
          legal log position above every dirty key"). *)
-      iDestruct (TsoCtx.own_context_expose_w with "Hctx") as (W) "[#HWl Hctxw]".
-      iDestruct (tso_interp_of_pin with "Htso") as %Hpin0.
-      iEval (rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
-                        sigma.(sregs) sigma.(mdev) Hpin0)) in "Htso".
-      iDestruct (TsoCtx.tso_interp_llb_valid with "Htso HWl") as "[Htso %HWle]".
-      iEval (rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
-                         sigma.(sregs) sigma.(mdev) Hpin0)) in "Htso".
-      cbn [glog gs_of] in HWle.
+      (* TWO LOGS (relaxed-ww.md §2.2): no watermark -- the store's own
+         message registers as a dirty key of the running context directly *)
       iMod (SmodeCorePt.word_pointsto_wpay_mint_c (KTR := KT0) img sigma log dl V
               ea ppn vold (zero_reg : mword 64) cp Hcan Hoff
               with "Hk Hmem Htso Hbw") as "(Hmem & Htso & #Hlb & Hpay & #Hmsg)".
-      iMod (TsoCtx.ctx_wrote_register (CID := CIDw) TsoCtx.cur_ctx W (length log)
+      iMod (TsoCtx.ctx_wrote_register (CID := CIDw) TsoCtx.cur_ctx (length log)
               (pa_of ppn ea)
               (PWMsg (snap_of (pa_of ppn ea) 8 (zero_reg : mword 64))
                  (hart_agent (@cpu_id CIDw)))
-              HWle eq_refl with "Hctxw Hlb Hmsg") as "[Hctx #Hw]".
+              eq_refl with "Hctx Hmsg") as "[Hctx #Hw]".
       iModIntro. iFrame "Hmem Htso Hctx".
       iExists (pa_of ppn ea), (S (length log)).
       iSplitR; [ iPureIntro; exact (ktier_pin_id ppn ea Hid) | ].

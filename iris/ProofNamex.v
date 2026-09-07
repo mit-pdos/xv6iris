@@ -2781,7 +2781,7 @@ Section ProofNamexMain.
                       in the escrow's checked-out arm for that whole window;
                       the residue rides the descriptor conjunct home. *)
 
-                   iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
+                   iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
                    iApply (IL.wp_ilock_tx_sconf gs j gl pd pav pu
                              gilk gislk
                              ik (iq/2)%Qp gkp lokp tlkp PlainK iinum pidv dq dqs

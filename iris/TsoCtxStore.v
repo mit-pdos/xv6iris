@@ -1573,6 +1573,49 @@ Section ctx.
     iModIntro. by rewrite (phys_ledger_at_win_map pa n vnew _ _ Hn).
   Qed.
 
+  (* THE SAME, PERFORMED AT MEMORY (relaxed-ww.md §1.1, §2.15): the AMO's
+     write is appended to BOTH logs -- issued at [length glog], drained at
+     [length gdlog] in the same step -- so the window comes back at the new
+     timestamp WITH its drain witness [dpos_ev (S (length glog)) (S (length
+     gdlog))].  That witness is the pin's anchor drained at the AMO: a
+     holder reading its own lock word goes through it
+     ([TsoCtx.ledger_read_pin_ok]).  The own-FIFO premise is the node's
+     [¬ own_fp_pending] ([HartEvents.own_fp_pending_fifo]). *)
+  Lemma ledger_store_win_at_okf_amo `{CID : CpuId} (g g' : gstate)
+      (pa : Arch.pa) (n : N) {m : N} (vold vnew : bv m) :
+    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
+    (forall i mi, g.(glog) !! i = Some mi -> pm_tid mi = hart_agent cpu_id ->
+       msg_overlapb mi (PWMsg (snap_of pa n vnew) (hart_agent cpu_id)) = true ->
+       i ∈ g.(gdlog)) ->
+    g'.(gimg) = g.(gimg) ->
+    g'.(glog) = (g.(glog) ++ [PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list ->
+    g'.(gdlog) = (g.(gdlog) ++ [length g.(glog)])%list ->
+    g'.(gmem) = write_bytes g.(gmem) pa n vnew ->
+    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(gdlog))%nat) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       phys_ledger (pa_add pa j) (DfracOwn 1) (nth_byte vold j)) ==∗
+    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
+    tso_interp_at riscv_eraGS g' ∗
+    ledger_msg_at (length g.(glog))
+      (PWMsg (snap_of pa n vnew) (hart_agent cpu_id)) ∗
+    dpos_ev dpos_name (S (length g.(glog))) (S (length g.(gdlog))) ∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       phys_ledger_at (pa_add pa j) (DfracOwn 1) (nth_byte vnew j)
+         (S (length g.(glog)))).
+  Proof.
+    iIntros (Hn Hown Himg Hlog Hdl Hmem Htv Htvok') "Hgh Hint Hold".
+    rewrite (phys_ledger_win_map pa n vold _ Hn).
+    iMod (ledger_store_amo_ok g g' (hart_agent cpu_id)
+            (snap_of pa n vold) (snap_of pa n vnew)
+            ltac:(by rewrite !dom_snap_of) Hown Himg Hlog
+            Hdl ltac:(by rewrite Hmem write_bytes_union) Htv Htvok'
+            with "Hgh Hint Hold") as "($ & $ & $ & $ & Hnew)".
+    iModIntro. by rewrite (phys_ledger_at_win_map pa n vnew _ _ Hn).
+  Qed.
+
   Lemma ctx_phys_win_map (ξ : CtxId) (pa : Arch.pa) (n : N) {m : N}
       (v : bv m) (dq : dfrac) :
     (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->

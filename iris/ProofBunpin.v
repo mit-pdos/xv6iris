@@ -472,8 +472,8 @@ Section ProofBunpin.
     (* ENDGAME R2: the payload re-floors at the synced slot [tl'] -- the
        hook mints the floor from the llb the decrement handed out. *)
     iApply (Release.wp_release_hook_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string
-              (fun ξ => llb loglen_name tl' ∗ bcache_scan2 bn V M' ord' devs' bnos' tl' ξ)%I
-              (fun ξ => bcache_res2 bn V ξ) D5
+              (fun ξ => llb dlen_name tl' ∗ bcache_scan2 bn V M' ord' devs' bnos' tl' ξ)%I
+              (fun ξ => bcache_res2 bn V ξ) emp%I D5
               n eb p (K - 4)%nat
               ({["bcache"]} ∪ lks)
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
@@ -481,9 +481,9 @@ Section ProofBunpin.
               with "Hcg Htext Hpc [Hlock] Htok [Hscan'] [Hllbtl'] Hcnt Hpay").
     { iExact "Hlock". }
     { iFrame "Hllbtl' Hscan'". }
-    { iApply (lock_hook_llb _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
+    { iApply (lock_hook_llb _ _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
                 with "Hllbtl'"). }
-    iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CIDr Hsr mr) "_ Hcg Hpc %Hrelpins Hcnt".
     (* bunpin is BALANCED: the set release hands back collapses to the entry
        [lks] -- [Hfresh] is what makes the singleton insert/delete cancel. *)
     assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)

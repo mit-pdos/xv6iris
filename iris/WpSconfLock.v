@@ -251,7 +251,7 @@ Section WpSconfLock.
      [Hram] rides in front of the telescope the AU fixes. <<< *)
   Local Lemma lock_word_read_any (ea : mword 64) (b : bool)
       (Hram : forall j : nat, (j < 4)%nat -> addr_is_ram (pa_add ea j)) :
-    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 4 <= 4096)%Z ->
@@ -262,22 +262,22 @@ Section WpSconfLock.
       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       emp -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
          exists v : mword (8*4),
-           tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+           tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
              (pa_of ppn ea) (Z.to_N 4) v /\ True⌝.
   Proof.
-    intros CIDw img sigma log V ppn Hcan Hoff Hid _.
+    intros CIDw img sigma log dl V ppn Hcan Hoff Hid _.
     iIntros "#Hk Hmem Htso Hctx _".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
     rewrite (ktier_pin_id ppn ea Hid).
     iDestruct (TsoCtxLedger.ledger_read_any_word_ok (CID := CIDw)
-                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                 (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                  ea 4%nat 32 ltac:(lia) Hram with "Htso") as %Hrd4.
     iPureIntro. intros tvr _. destruct (Hrd4 tvr) as [w Hw].
     exists w. split; [exact Hw | done].
@@ -383,53 +383,42 @@ Section WpSconfLock.
 
      THE FLOOR is the acquire's own position, carried here by the holder token
      (§0.34′'s enrichment, A6.119) and discharged against [own_context]. *)
-  Local Lemma lock_word_read_pin (ea : mword 64) (b : bool) (B : nat)
+  (* relaxed-ww STAGE E (§2.7, §2.14): the pin is read THROUGH ITS ANCHOR'S
+     DRAIN -- [B] is the AMO's issue timestamp, [D] its drain position
+     ([dpos_ev B D] rides in the holder's token beside the floor at [D],
+     WpLock.locked_core), and the gate is [TsoCtx.ledger_read_pin_ok] with
+     the floor cashed against [own_context] ([own_context_floor_view] gives
+     [view_lb K], [D ≤ K]).  What the holder does NOT have is the chain at
+     [B]: an AMO cannot be chained in general (§2.10 -- the releaser's
+     [sw zero] may still be pending when a contender's AMO performs), so the
+     proof needs the lock protocol's "released, store pending" state, which
+     is stage E's.  Tracked in claude-notes/projects/relaxed-ww.md. *)
+  Local Lemma lock_word_read_pin (ea : mword 64) (b : bool) (B D : nat)
       (Hbp : b = false \/ p = zero_reg) :
     forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
-           (V : agent -> nat) (ppn : mword 44),
+           (dl : list nat) (V : agent -> nat) (ppn : mword 44),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 4 <= 4096)%Z ->
       ktier_pin KT0 ppn ea ->
       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
-      (TsoCtx.ctx_floor TsoCtx.cur_ctx B ∗
+      (TsoGhost.dpos_ev dpos_name B D ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx D ∗
        ∃ v : mword 32, ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝ ∗
          WpLock.lock_word_pin B ea v) -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
          exists v : mword (8*4),
-           tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+           tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
              (pa_of ppn ea) (Z.to_N 4) v /\
            neq_vec (sign_extend' 64 v) zero_reg = true⌝.
   Proof.
-    intros CIDw img sigma log V ppn Hcan Hoff Hid Hsame.
-    iIntros "#Hk Hmem Htso Hctx [#Hfl (%v & %Hvnz & %Hal & Hpin)]".
-    iDestruct (TsoCtx.own_context_floor_view (CID := CIDw) TsoCtx.cur_ctx B
-                 with "Hctx Hfl") as "[Hctx (%K & #HK & %HBK)]".
-    iDestruct (TsoGhost.view_lb_le _ _ _ K B ltac:(lia) with "HK") as "#HB".
-    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
-               sigma.(sregs) sigma.(mdev) Hpin).
-    rewrite (ktier_pin_id ppn ea Hid).
-    iDestruct (TsoCtxLedger.ledger_read_pin_bytes_ok (CID := CIDw)
-                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
-                 ea 4%nat (DfracOwn 1) (nth_byte v) B WpLock.lkw_set
-                 with "Htso HB Hpin") as %Hrd.
-    iPureIntro. intros tvr Htvr.
-    exists WpLock.lkw_one. split.
-    - intros j Hj.
-      destruct (Hrd (hart_agent (@cpu_id CIDw)) tvr ltac:(cbn; lia) j
-                  ltac:(lia)) as (bb & Hbb & Hin).
-      rewrite Hbb. f_equal. symmetry.
-      by apply TsoMemPa.elem_of_byteset_sing in Hin.
-    - rewrite /WpLock.lkw_one. by vm_compute.
-  Qed.
+  Admitted.
 
   Local Lemma lock_word_read_vis (ea : mword 64) (b : bool)
       (Hbp : b = false \/ p = zero_reg) :
-    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44) (v : mword (8*4)),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 4 <= 4096)%Z ->
@@ -437,14 +426,14 @@ Section WpSconfLock.
       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       TsoCtx.phys_ledger_word4_vis (hart_agent (@cpu_id CID)) 0 ea (DfracOwn 1) v -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
-         tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+         tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
            (pa_of ppn ea) (Z.to_N 4) v⌝.
   Proof.
-    intros CIDw img sigma log V ppn v Hcan Hoff Hid Hsame.
+    intros CIDw img sigma log dl V ppn v Hcan Hoff Hid Hsame.
     pose proof (Hsame Hbp) as Hcid.
     assert (Hcid' : (@cpu_id CIDw : CPU) = (@cpu_id CID : CPU)) by exact Hcid.
     assert (Hag : hart_agent (@cpu_id CIDw) = hart_agent (@cpu_id CID))
@@ -452,11 +441,11 @@ Section WpSconfLock.
     iIntros "#Hk Hmem Htso Hctx Hw".
     iEval (rewrite -Hag) in "Hw".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
     rewrite (ktier_pin_id ppn ea Hid).
     iDestruct (TsoCtxLedger.ledger_read_word4_vis_ok (CID := CIDw)
-                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                 (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                  ea (DfracOwn 1) v with "Hmem Htso Hw") as %Hrd.
     iPureIntro. intros tvr Hle. exact (Hrd tvr Hle).
   Qed.
@@ -481,7 +470,7 @@ Section WpSconfLock.
   Local Lemma lock_word_amo_keep (ea : mword 64) (vnew vold : mword 32)
       (B : nat)
       (CIDw : CpuId) (img : bytemap) (sigma : mstate)
-      (log : list pwmsg) (V : agent -> nat) :
+      (log : list pwmsg) (dl : list nat) (V : agent -> nat) :
       (* A6.119: the stored value is 1 -- xv6's acquire is
          [__sync_lock_test_and_set(&lk->locked, 1)] and the 1 is in the
          source.  It is FORCED, not chosen: [byteset] is per-byte, so no
@@ -489,16 +478,19 @@ Section WpSconfLock.
          spinner's store preserves. *)
       (forall j : nat, (j < 4)%nat ->
          nth_byte vnew j ∈ WpLock.lkw_set j) ->
+      (* TWO LOGS (relaxed-ww.md §1.1): the AMO is performed at memory, and
+         the node has this hart's own overlapping stores drained first *)
+      ~ own_fp_pending (hart_agent (@cpu_id CIDw)) log dl ea 4 ->
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       WpLock.lock_word_pin B ea vold ==∗
       gen_heap_interp (hG := riscv_memGS)
         (write_bytes sigma.(mem) ea 4%N vnew) ∗
       tso_interp_of riscv_eraGS img (write_bytes sigma.(mem) ea 4%N vnew)
         (log ++ [PWMsg (snap_of ea 4%N vnew) (hart_agent (@cpu_id CIDw))])%list
-        (vstep (hart_agent (@cpu_id CIDw)) (S (length log))
-           (log ++ [PWMsg (snap_of ea 4%N vnew) (hart_agent (@cpu_id CIDw))])%list V) ∗
+        (dl ++ [length log])%list
+        (vstep (hart_agent (@cpu_id CIDw)) (S (length dl)) (dl ++ [length log])%list V) ∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
       (* the pin SURVIVES, at the position it already had: the spinner's
          store is 1 and 1 is in the set, which is the whole reason a
@@ -509,15 +501,16 @@ Section WpSconfLock.
          incumbent holder's.  A loser leaves with nothing but the interp. *)
       WpLock.lock_word_pin B ea vnew.
   Proof.
-    intros Hset. iIntros "Hm Htso Hctx [%Hal Hb]".
+    intros Hset Hnp. iIntros "Hm Htso Hctx [%Hal Hb]".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     iDestruct (tso_interp_of_bound with "Htso") as %Hbd.
     set (log' := (log ++ [PWMsg (snap_of ea 4%N vnew)
                             (hart_agent (@cpu_id CIDw))])%list).
-    set (V' := vstep (hart_agent (@cpu_id CIDw)) (S (length log)) log' V).
-    assert (Hlen' : length log' = S (length log))
-      by (rewrite /log' length_app /=; lia).
-    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+    set (dl' := (dl ++ [length log])%list).
+    set (V' := vstep (hart_agent (@cpu_id CIDw)) (S (length dl)) dl' V).
+    assert (Hlen' : length dl' = S (length dl))
+      by (rewrite /dl' length_app /=; lia).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl').
     { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
       - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CIDw)).
         rewrite /hart_agent in Hh. lia.
@@ -527,31 +520,30 @@ Section WpSconfLock.
       - have := Hbd (hart_agent c). lia.
       - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first lia.
         exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
-    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length dl')%nat).
     { intros c. rewrite Hlen' /V' /vstep. case_decide as Hd; first lia.
       destruct (lt_dec (hart_agent c) NCPU) as [|Hge].
       - have := Hbd (hart_agent c). lia.
       - exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
-    iMod (TsoCtxLedger.ledger_store_win_pin_ok (CID := CIDw)
-            (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
-            (gs_of img (write_bytes sigma.(mem) ea 4%N vnew) log' V'
+    iMod (TsoCtxStore.ledger_store_win_pin_okf_amo (CID := CIDw)
+            (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
+            (gs_of img (write_bytes sigma.(mem) ea 4%N vnew) log' dl' V'
                sigma.(sregs) sigma.(mdev))
-            ea 4%N vold vnew B WpLock.lkw_set
-            (* the Sg premise, off [TsoCtx.tso_pa_off] -- the offset-from-
-               address bridge the window laws already had and only [Local]
-               kept from its first caller. *)
-            (fun a => WpLock.lkw_set (TsoCtx.tso_pa_off ea a))
+            ea 4%N vold vnew (fun _ => B) WpLock.lkw_set
+            (fun a => WpLock.lkw_set (TsoCtx.tso_pa_off ea a)) (fun _ => B)
             ltac:(vm_compute; discriminate)
             ltac:(intros j Hj; cbn beta;
                   rewrite TsoCtx.tso_pa_off_add; [reflexivity|lia])
-            Hset eq_refl eq_refl eq_refl Htvmono Htvtop
-            with "Hm Htso Hb") as "(Hm & Htso & Hnew)".
+            ltac:(intros j Hj; reflexivity)
+            Hset (HartEvents.own_fp_pending_fifo _ _ _ _ _ vnew Hnp)
+            eq_refl eq_refl eq_refl eq_refl Htvmono Htvtop
+            with "Hm Htso Hb") as "(Hm & Htso & _ & Hnew)".
     iModIntro. iFrame "Hm".
     iSplitL "Htso".
     { rewrite -(tso_interp_of_at_gs riscv_eraGS img
-                  (write_bytes sigma.(mem) ea 4%N vnew) log' V'
+                  (write_bytes sigma.(mem) ea 4%N vnew) log' dl' V'
                   sigma.(sregs) sigma.(mdev) Hpin').
       iExact "Htso". }
     iFrame "Hctx".
@@ -561,7 +553,7 @@ Section WpSconfLock.
 
   Local Lemma lock_word_amo_mint (ea : mword 64) (vnew : mword 32)
       (CIDw : CpuId) (img : bytemap) (sigma : mstate)
-      (log : list pwmsg) (V : agent -> nat) :
+      (log : list pwmsg) (dl : list nat) (V : agent -> nat) :
       (* A6.119: the stored value is 1 -- xv6's acquire is
          [__sync_lock_test_and_set(&lk->locked, 1)] and the 1 is in the
          source.  It is FORCED, not chosen: [byteset] is per-byte, so no
@@ -569,34 +561,41 @@ Section WpSconfLock.
          spinner's store preserves. *)
       (forall j : nat, (j < 4)%nat ->
          nth_byte vnew j ∈ WpLock.lkw_set j) ->
+      ~ own_fp_pending (hart_agent (@cpu_id CIDw)) log dl ea 4 ->
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       (∃ vold : mword 32, TsoCtx.phys_ledger_word4 ea (DfracOwn 1) vold) ==∗
       gen_heap_interp (hG := riscv_memGS)
         (write_bytes sigma.(mem) ea 4%N vnew) ∗
       tso_interp_of riscv_eraGS img (write_bytes sigma.(mem) ea 4%N vnew)
         (log ++ [PWMsg (snap_of ea 4%N vnew) (hart_agent (@cpu_id CIDw))])%list
-        (vstep (hart_agent (@cpu_id CIDw)) (S (length log))
-           (log ++ [PWMsg (snap_of ea 4%N vnew) (hart_agent (@cpu_id CIDw))])%list V) ∗
+        (dl ++ [length log])%list
+        (vstep (hart_agent (@cpu_id CIDw)) (S (length dl)) (dl ++ [length log])%list V) ∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
-      (* the held arm's pin, floored at the position this AMO just took... *)
+      (* the held arm's pin, AT the position this AMO just took -- its floor
+         is its own write, relaxed-ww.md §2.14's anchor... *)
       WpLock.lock_word_pin (S (length log)) ea vnew ∗
-      (* ...and the EXPORT: the acquirer's own view IS that position, so the
-         absorb needs no [llb] here -- [hart_view_lb_now] gives the receipt
-         free off the post-state and [ctx_bound_raise] turns it into the
-         floor the holder token carries away (§0.38′'s agreed one form). *)
-      TsoCtx.ctx_floor TsoCtx.cur_ctx (S (length log)).
+      (* ...the anchor's drain witness, the AMO having drained at
+         [S (length dl)] -- what the holder's own reads of the word go
+         through ([TsoCtx.ledger_read_pin_ok])... *)
+      TsoGhost.dpos_ev dpos_name (S (length log)) (S (length dl)) ∗
+      (* ...and the EXPORT: the acquirer's own view IS that drain position,
+         so the absorb needs no [llb] here -- [hart_view_lb_get] gives the
+         receipt free off the post-state and [ctx_bound_raise] turns it into
+         the floor the holder token carries away (§0.38′'s agreed one form). *)
+      TsoCtx.ctx_floor TsoCtx.cur_ctx (S (length dl)).
   Proof.
-    intros Hset. iIntros "Hm Htso Hctx (%vold & %Hal & Hb)".
+    intros Hset Hnp. iIntros "Hm Htso Hctx (%vold & %Hal & Hb)".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     iDestruct (tso_interp_of_bound with "Htso") as %Hbd.
     set (log' := (log ++ [PWMsg (snap_of ea 4%N vnew)
                             (hart_agent (@cpu_id CIDw))])%list).
-    set (V' := vstep (hart_agent (@cpu_id CIDw)) (S (length log)) log' V).
-    assert (Hlen' : length log' = S (length log))
-      by (rewrite /log' length_app /=; lia).
-    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+    set (dl' := (dl ++ [length log])%list).
+    set (V' := vstep (hart_agent (@cpu_id CIDw)) (S (length dl)) dl' V).
+    assert (Hlen' : length dl' = S (length dl))
+      by (rewrite /dl' length_app /=; lia).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl').
     { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
       - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CIDw)).
         rewrite /hart_agent in Hh. lia.
@@ -606,41 +605,43 @@ Section WpSconfLock.
       - have := Hbd (hart_agent c). lia.
       - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first lia.
         exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
-    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length dl')%nat).
     { intros c. rewrite Hlen' /V' /vstep. case_decide as Hd; first lia.
       destruct (lt_dec (hart_agent c) NCPU) as [|Hge].
       - have := Hbd (hart_agent c). lia.
       - exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
-    iMod (TsoCtxStore.ledger_store_win_at_ok (CID := CIDw)
-            (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
-            (gs_of img (write_bytes sigma.(mem) ea 4%N vnew) log' V'
+    iMod (TsoCtxStore.ledger_store_win_at_okf_amo (CID := CIDw)
+            (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
+            (gs_of img (write_bytes sigma.(mem) ea 4%N vnew) log' dl' V'
                sigma.(sregs) sigma.(mdev))
             ea 4%N vold vnew
-            ltac:(vm_compute; discriminate) eq_refl eq_refl eq_refl
-            Htvmono Htvtop with "Hm Htso Hb") as "(Hm & Htso & #Hmsg & Hnew)".
+            ltac:(vm_compute; discriminate)
+            (HartEvents.own_fp_pending_fifo _ _ _ _ _ vnew Hnp)
+            eq_refl eq_refl eq_refl eq_refl
+            Htvmono Htvtop with "Hm Htso Hb") as "(Hm & Htso & #Hmsg & #Hdp & Hnew)".
     (* the pin, at the store's own position *)
     iMod (pin_mint_run
-            (gs_of img (write_bytes sigma.(mem) ea 4%N vnew) log' V'
+            (gs_of img (write_bytes sigma.(mem) ea 4%N vnew) log' dl' V'
                sigma.(sregs) sigma.(mdev))
             ea 4 (nth_byte vnew) (S (length log))
             WpLock.lkw_set Hset with "Hm Htso Hnew")
       as "(Hm & Htso & Hpin)".
     (* the export.  [hart_view_lb_now] lives in the KPT lane's [CtxPinMint];
        [TsoCtx]'s own [hart_view_lb_get] gives the same receipt here without
-       coupling the two lanes' files -- its log-top premise is exactly what an
-       AMO establishes, and [T := 0] is free ([TsoGhost.llb_0]) because all we
-       want back is the receipt. *)
-    assert (HV'h : V' (hart_agent (@cpu_id CIDw)) = S (length log)).
+       coupling the two lanes' files -- its drain-top premise is exactly what
+       an AMO establishes, and [T := 0] is free ([TsoGhost.llb_0]) because
+       all we want back is the receipt. *)
+    assert (HV'h : V' (hart_agent (@cpu_id CIDw)) = S (length dl)).
     { rewrite /V' /vstep. case_decide as Hd;
         [ reflexivity | exfalso; by apply Hd ]. }
     assert (Htop : (length (gs_of img (write_bytes sigma.(mem) ea 4%N vnew)
-                              log' V' sigma.(sregs) sigma.(mdev)).(glog)
+                              log' dl' V' sigma.(sregs) sigma.(mdev)).(gdlog)
                     <= (gs_of img (write_bytes sigma.(mem) ea 4%N vnew)
-                          log' V' sigma.(sregs) sigma.(mdev)).(gtv)
+                          log' dl' V' sigma.(sregs) sigma.(mdev)).(gtv)
                          (@cpu_id CIDw))%nat).
-    { cbn [glog gtv gs_of]. rewrite Hlen' HV'h. lia. }
+    { cbn [gdlog gtv gs_of]. rewrite Hlen' HV'h. lia. }
     iDestruct (TsoCtxLedger.hart_view_lb_get (CID := CIDw) _ 0%nat Htop
                  with "Htso []") as "(Htso & #Hvlb & _)";
       [ iApply TsoGhost.llb_0 | ].
@@ -650,13 +651,14 @@ Section WpSconfLock.
     iModIntro. iFrame "Hm".
     iSplitL "Htso".
     { rewrite -(tso_interp_of_at_gs riscv_eraGS img
-                  (write_bytes sigma.(mem) ea 4%N vnew) log' V'
+                  (write_bytes sigma.(mem) ea 4%N vnew) log' dl' V'
                   sigma.(sregs) sigma.(mdev) Hpin').
       iExact "Htso". }
     iFrame "Hctx".
     iSplitL "Hpin".
     { rewrite /WpLock.lock_word_pin. iFrame "Hpin".
       iPureIntro. exact Hal. }
+    iSplitR; [ iExact "Hdp" | ].
     rewrite -HV'h. iExact "Hfl".
   Qed.
 
@@ -716,12 +718,12 @@ Section WpSconfLock.
        [lock_pos_agree], inside, is what says the token's [B] is the one the
        invariant minted. <<< *)
     iEval (rewrite locked_split) in "Htok".
-    iDestruct "Htok" as "[(%Btok & Htok & #Hflok) Hheld]".
+    iDestruct "Htok" as "[(%Btok & %Dtok & Htok & #Hdptok & #Hflok) Hheld]".
     iApply (wp_load_s_sconf_au_exv (kt := kt) (ktd := KT0) 4 true false pc rd rs1 imm m n
               (fun w => sign_extend' 64 w)
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
               (fun w => neq_vec (sign_extend' 64 w) zero_reg = true)
-              (TsoCtx.ctx_floor TsoCtx.cur_ctx Btok ∗
+              (TsoGhost.dpos_ev dpos_name Btok Dtok ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx Dtok ∗
                ∃ v : mword 32, ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝ ∗
                  WpLock.lock_word_pin Btok
                    (add_vec (rget m rs1) (sign_extend' 64 imm)) v)%I
@@ -730,7 +732,7 @@ Section WpSconfLock.
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
               ltac:(solve_ndisj)
               (lock_word_read_pin (add_vec (rget m rs1) (sign_extend' 64 imm))
-                 b Btok Hbp)
+                 b Btok Dtok Hbp)
               with "Hcg Hpc Hinstr [] [Htok Hheld] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
         by (symmetry; exact Hpalk). iApply (lk_addr_claim_wordw with "Hc4"). }
@@ -742,7 +744,7 @@ Section WpSconfLock.
         as "(Hbody & Htok & [Hclose _])";
         [solve_ndisj
         | iIntros "[Ht Hh]"; iApply Href; rewrite locked_split;
-          iFrame "Hh"; iExists Btok; iFrame "Ht Hflok"
+          iFrame "Hh"; iExists Btok, Dtok; iFrame "Ht Hdptok Hflok"
         | iFrame "Htok Hheld" |].
       iDestruct "Htok" as "[Htok Hheld]".
       iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
@@ -751,8 +753,8 @@ Section WpSconfLock.
       iDestruct "Hbr" as "[(>%Hnone & _) | (_ & >%Hwnz)]"; [ congruence | ].
       iModIntro.
       iSplitL "Hword".
-      { iFrame "Hflok". iExists w. iSplitR; [done|]. iExact "Hword". }
-      iIntros "[_ (%w' & %Hwnz' & Hword)]".
+      { iFrame "Hdptok Hflok". iExists w. iSplitR; [done|]. iExact "Hword". }
+      iIntros "(_ & _ & (%w' & %Hwnz' & Hword))".
       iMod ("Hclose" with "[Hword Hcpu Hg]") as "_".
       { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8".
         iExists w', (Some (h0, true)), Btok. iFrame "Hcpu Hg Hword".
@@ -763,7 +765,7 @@ Section WpSconfLock.
     iApply ("Hcont" $! v CID1 with "[] [] [Htok Hheld] Hcg Hpc").
     - iPureIntro. exact Hs1.
     - iPureIntro. exact Hvnz.
-    - rewrite locked_split. iFrame "Hheld". iExists Btok. iFrame "Htok Hflok".
+    - rewrite locked_split. iFrame "Hheld". iExists Btok, Dtok. iFrame "Htok Hdptok Hflok".
   Qed.
 
   (* >>> A6.92: THE LEDGER WORD, READ FLAT.  The AMO's exclusive read is
@@ -811,14 +813,14 @@ Section WpSconfLock.
      [lock_word_ex None]: a free lock's word is nobody's own write. <<< *)
   Local Lemma lock_word_store_plain (ea : mword 64) (vnew : mword 32) (b : bool) :
     forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
-           (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
+           (log : list pwmsg) (dl : list nat) (V : agent -> nat) (ppn : mword 44),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 4 <= 4096)%Z ->
       ktier_pin KT0 ppn ea ->
       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       (* A6.119: the datum is the HELD arm's pin.  Release stores 0 and 0 is
          not in [{1}], so the pin cannot be carried across -- it is RETRACTED
@@ -831,31 +833,29 @@ Section WpSconfLock.
       tso_interp_of riscv_eraGS img
         (write_bytes sigma.(mem) (pa_of ppn ea) (Z.to_N 4) vnew)
         (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N 4) vnew)
-                   (hart_agent (@cpu_id CIDw))])%list
-        (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
-           (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N 4) vnew)
-                      (hart_agent (@cpu_id CIDw))])%list V) ∗
+                   (hart_agent (@cpu_id CIDw))])%list dl
+        (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw))) dl V) ∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
       TsoCtx.phys_ledger_word4 ea (DfracOwn 1) vnew.
   Proof.
-    intros CIDw img sigma log V ppn Hcan Hoff Hid _.
+    intros CIDw img sigma log dl V ppn Hcan Hoff Hid _.
     rewrite (ktier_pin_id ppn ea Hid).
     iIntros "#Hk Hm Htso Hctx (%B0 & %vold & Hpin0)".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
     iMod (lock_word_pin_drop
-            (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+            (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
             B0 ea vold with "Hm Htso Hpin0") as "(Hm & Htso & Hw0)".
-    rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                 sigma.(sregs) sigma.(mdev) Hpin).
     iDestruct "Hw0" as "[%Hal Hb]".
     iDestruct (tso_interp_of_bound with "Htso") as %Hbd.
     set (log' := (log ++ [PWMsg (snap_of ea (Z.to_N 4) vnew)
                             (hart_agent (@cpu_id CIDw))])%list).
     set (V' := vstep (hart_agent (@cpu_id CIDw))
-                 (V (hart_agent (@cpu_id CIDw))) log' V).
-    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+                 (V (hart_agent (@cpu_id CIDw))) dl V).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl).
     { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
       - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CIDw)).
         rewrite /hart_agent in Hh. lia.
@@ -867,22 +867,21 @@ Section WpSconfLock.
         exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
     assert (Htvmono : forall c : CPU, (V (hart_agent c) <= V' (hart_agent c))%nat)
       by (intros c; rewrite Htvc; lia).
-    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
-    { intros c. rewrite Htvc /log' length_app /=.
-      have := Hbd (hart_agent c). lia. }
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length dl)%nat).
+    { intros c. rewrite Htvc. have := Hbd (hart_agent c). lia. }
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
     iMod (TsoCtxStore.ledger_store_win_at_ok (CID := CIDw)
-            (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
-            (gs_of img (write_bytes sigma.(mem) ea (Z.to_N 4) vnew) log' V'
+            (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
+            (gs_of img (write_bytes sigma.(mem) ea (Z.to_N 4) vnew) log' dl V'
                sigma.(sregs) sigma.(mdev))
             ea (Z.to_N 4) vold vnew
-            ltac:(vm_compute; discriminate) eq_refl eq_refl eq_refl
+            ltac:(vm_compute; discriminate) eq_refl eq_refl eq_refl eq_refl
             Htvmono Htvtop with "Hm Htso Hb") as "(Hm & Htso & _ & Hnew)".
     iModIntro. iFrame "Hm Hctx".
     iSplitL "Htso".
     { rewrite -(tso_interp_of_at_gs riscv_eraGS img
-                  (write_bytes sigma.(mem) ea (Z.to_N 4) vnew) log' V'
+                  (write_bytes sigma.(mem) ea (Z.to_N 4) vnew) log' dl V'
                   sigma.(sregs) sigma.(mdev) Hpin').
       iExact "Htso". }
     rewrite /TsoCtx.phys_ledger_word4. iSplitR; [done|].
@@ -1017,7 +1016,7 @@ Section WpSconfLock.
      which [lock_claims] peeks out without opening the body. <<< *)
   Local Lemma lock_cell_read_any (ea : mword 64) (b : bool)
       (Hram : forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) :
-    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 8 <= 4096)%Z ->
@@ -1028,22 +1027,22 @@ Section WpSconfLock.
       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       emp -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
          exists v : mword (8*8),
-           tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+           tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
              (pa_of ppn ea) (Z.to_N 8) v /\ True⌝.
   Proof.
-    intros CIDw img sigma log V ppn Hcan Hoff Hid _.
+    intros CIDw img sigma log dl V ppn Hcan Hoff Hid _.
     iIntros "#Hk Hmem Htso Hctx _".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
     rewrite (ktier_pin_id ppn ea Hid).
     iDestruct (TsoCtxLedger.ledger_read_any_word_ok (CID := CIDw)
-                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                 (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                  ea 8%nat 64 ltac:(lia) Hram with "Htso") as %Hrd8.
     iPureIntro. intros tvr _. destruct (Hrd8 tvr) as [w Hw].
     exists w. split; [exact Hw | done].
@@ -1119,7 +1118,7 @@ Section WpSconfLock.
   Local Lemma lock_cell_read_vis (ea lk : mword 64) (b : bool) (lo : nat)
       (Hea : ea = lock_cpu lk)
       (Hbp : b = false \/ p = zero_reg) :
-    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44) (v : mword (8*8)),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 8 <= 4096)%Z ->
@@ -1127,39 +1126,22 @@ Section WpSconfLock.
       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       lk_cpu_cell_ex lo lk v (Some (@cpu_id CID)) -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
-         tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+         tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
            (pa_of ppn ea) (Z.to_N 8) v⌝.
   Proof.
-    subst ea.
-    intros CIDw img sigma log V ppn v Hcan Hoff Hid Hsame.
-    pose proof (Hsame Hbp) as Hcid.
-    assert (Hcid' : (@cpu_id CIDw : CPU) = (@cpu_id CID : CPU)) by exact Hcid.
-    assert (Hag : hart_agent (@cpu_id CIDw) = hart_agent (@cpu_id CID))
-      by (rewrite Hcid'; reflexivity).
-    iIntros "#Hk Hmem Htso Hctx Hcell".
-    iEval (rewrite /lk_cpu_cell_ex) in "Hcell".
-    (* A6.115: the cell grew its per-agent anchor; the holder's exact read
-       does not consume it (its exactness comes from the author fragment). *)
-    iDestruct "Hcell" as (own) "(_ & _ & Hb)".
-    iEval (simpl) in "Hb".
-    iEval (rewrite -Hag) in "Hb".
-    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
-               sigma.(sregs) sigma.(mdev) Hpin).
-    rewrite (ktier_pin_id ppn (lock_cpu lk) Hid).
-    iDestruct (TsoCtxLedger.ledger_read_wpay_bytes_vis_ok (CID := CIDw)
-                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
-                 (lock_cpu lk) 8%nat v (DfracOwn 1) 0
-                 (fun j => TsoMemPa.TsWin (lock_cpu lk) 8 j lkcpu_z lkcpu_cp own lo)
-                 with "Hmem Htso [] [Hb]") as %Hrd.
-    { iApply TsoGhost.view_lb_0. }
-    { rewrite /lk_cpu_pay_vis. iExact "Hb". }
-    iPureIntro. intros tvr Hle. exact (Hrd tvr Hle).
-  Qed.
+    (* relaxed-ww STAGE E (§2.7, §2.10): the owner word's rows are a WPAY
+       window written by the acquirer's plain [sd], which the ledger store
+       gate does not chain; the two-log read gate
+       ([TsoCtxLedger.ledger_read_wpay_bytes_vis_ok]) wants the chain per
+       row.  This is the "held, cpu store pending" state of the lock
+       protocol -- a foreign [holding()] reads the word while the store is
+       still in the acquirer's buffer -- and it is stage E's.  Tracked in
+       claude-notes/projects/relaxed-ww.md. *)
+  Admitted.
 
   (* >>> A6.119: THE [notheld] READ'S OBLIGATION, ON THE COMPLETED KIT.
      The pre-flip generic concluded a predicate about the loaded word from a
@@ -1186,7 +1168,7 @@ Section WpSconfLock.
       (Hbp : b = false \/ p = zero_reg)
       (Hram : forall j : nat, (j < 8)%nat ->
                 addr_is_ram (pa_add (lock_cpu lk) j)) :
-    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 8 <= 4096)%Z ->
@@ -1194,7 +1176,7 @@ Section WpSconfLock.
       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       (* A6.119: the resource is the invariant's WHOLE BODY, not just the
          cell.  The atomic update hands [Res] over and takes [Res] back, so
@@ -1214,45 +1196,14 @@ Section WpSconfLock.
             ∨ ⌜st <> None⌝ ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝)) -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
          exists w : mword (8*8),
-           tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+           tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
              (pa_of ppn ea) (Z.to_N 8) w /\ w <> cpus_ptr (@cpu_id CID)⌝.
   Proof.
-    subst ea.
-    intros CIDw img sigma log V ppn Hcan Hoff Hid Hsame.
-    pose proof (Hsame Hbp) as Hcid.
-    assert (Hcid' : (@cpu_id CIDw : CPU) = (@cpu_id CID : CPU)) by exact Hcid.
-    assert (Hag : hart_agent (@cpu_id CIDw) = hart_agent (@cpu_id CID))
-      by (rewrite Hcid'; reflexivity).
-    iIntros "#Hk Hmem Htso Hctx [#Hfl (%v & %st & %B & %Hne & _ & Hcpures & _ & _)]".
-    iEval (rewrite /lk_cpu_res) in "Hcpures".
-    iDestruct "Hcpures" as "[Hcell _]".
-    (* the window, at either arm, plus the record and the anchor *)
-    iDestruct (lk_cpu_cell_ex_pay with "Hcell") as (own) "(%Hok & #Han & Hb)".
-    destruct (lk_own_ok_some (lk_ex st) own (@cpu_id CID) Hok Hne) as (t & Ht).
-    (* A6.120: the FLOOR, on either arm, against this hart's own token *)
-    iDestruct (WpLock.lk_floor_vis (CID := CIDw) TsoCtx.cur_ctx lo
-                 with "Hctx Hfl") as "[Hctx (%K & #HK & #Hfv)]".
-    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
-               sigma.(sregs) sigma.(mdev) Hpin).
-    rewrite (ktier_pin_id ppn (lock_cpu lk) Hid).
-    (* the anchor's [ledger_vis], off the cell's invariant *)
-    iAssert (TsoCtx.ledger_vis (hart_agent (@cpu_id CIDw)) lo t) as "#Hav".
-    { rewrite Hag. iApply ("Han" $! (hart_agent (@cpu_id CID)) t).
-      iPureIntro. exact Ht. }
-    iDestruct (lkcpu_read_not_mine (CID := CIDw)
-                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
-                 lk (DfracOwn 1) (fun j => nth_byte (lk_cpu_val st) j)
-                 own lo t K ltac:(rewrite Hag; exact Ht)
-                 with "Htso HK Hfv Hav [Hb]") as %Hne'.
-    { rewrite /lk_cpu_pay. iExact "Hb". }
-    iDestruct (TsoCtxLedger.ledger_read_any_word_ok (CID := CIDw)
-                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
-                 (lock_cpu lk) 8%nat 64 ltac:(lia) Hram with "Htso") as %Hrd.
-    iPureIntro. intros tvr Htvr.
-    destruct (Hrd tvr) as (w & Hw). exists w. split; [exact Hw|].
-    rewrite -Hcid'. exact (Hne' tvr ltac:(cbn; lia) w Hw).
-  Qed.
+    (* relaxed-ww STAGE E: as [lock_cell_read_vis] -- the owner word's
+       per-agent anchors ([TsoCtx.ledger_anchor], restated for two logs)
+       and the unchained WPAY rows are the lock protocol's "held, cpu store
+       pending" state.  Tracked in claude-notes/projects/relaxed-ww.md. *)
+  Admitted.
 
   (* the same read as the HOLDER: the token pins the word to mycpu(), so
      holding() returns 1. *)
@@ -1538,7 +1489,7 @@ Section WpSconfLock.
          \/ ((forall j : nat, (j < 8)%nat ->
                 nth_byte uval j = lkcpu_cp (hart_agent (@cpu_id CIDw)) j)
              /\ exnew = Some (@cpu_id CIDw) /\ exold = None)) :
-    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 8 <= 4096)%Z ->
@@ -1546,7 +1497,7 @@ Section WpSconfLock.
       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       lk_cpu_cell_ex lo lk uold exold ==∗
       gen_heap_interp (hG := riscv_memGS)
@@ -1554,15 +1505,13 @@ Section WpSconfLock.
       tso_interp_of riscv_eraGS img
         (write_bytes sigma.(mem) (pa_of ppn ea) (Z.to_N 8) unew)
         (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N 8) unew)
-                   (hart_agent (@cpu_id CIDw))])%list
-        (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
-           (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N 8) unew)
-                      (hart_agent (@cpu_id CIDw))])%list V) ∗
+                   (hart_agent (@cpu_id CIDw))])%list dl
+        (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw))) dl V) ∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
       lk_cpu_cell_ex lo lk unew exnew.
   Proof.
     subst ea. subst uval.
-    intros CIDw img sigma log V ppn Hcan Hoff Hid Hsame.
+    intros CIDw img sigma log dl V ppn Hcan Hoff Hid Hsame.
     pose proof (Harm CIDw Hsame) as Hcase.
     set (hw := hart_agent (@cpu_id CIDw)).
     iIntros "#Hk Hmem Htso Hctx Hcell".
@@ -1574,7 +1523,7 @@ Section WpSconfLock.
     - (* LEFT: the clear word goes down and the writer's record is RESTORED *)
       set (own' := fun h => if decide (h = hw)
                             then Some (S (length log)) else own h).
-      iMod (word_wpay_frame_store_gen_c (CIDw := CIDw) img sigma log V
+      iMod (word_wpay_frame_store_gen_c (CIDw := CIDw) img sigma log dl V
               (lock_cpu lk) uold unew lkcpu_z lkcpu_cp own own' lo
               ltac:(left; split;
                     [ exact Hz | rewrite /own'; by rewrite decide_True ])
@@ -1590,7 +1539,7 @@ Section WpSconfLock.
       iSplitR.
       { iIntros (h t) "%Ht". rewrite /own' in Ht. case_decide as Hd.
         - injection Ht as <-. subst h.
-          iApply (TsoCtxLedger.ledger_vis_own hw lo (length log)
+          iApply (TsoCtx.ledger_anchor_own hw lo (length log)
                     (PWMsg (snap_of (lock_cpu lk) 8 unew) hw) eq_refl).
           iExact "Hmsg".
         - iApply ("Han" $! h t). by iPureIntro. }
@@ -1599,7 +1548,7 @@ Section WpSconfLock.
       iExists (S (length log)). iExact "H".
     - (* RIGHT: the writer's own word goes down and its record is REVOKED *)
       set (own' := fun h => if decide (h = hw) then None else own h).
-      iMod (word_wpay_frame_store_gen_c (CIDw := CIDw) img sigma log V
+      iMod (word_wpay_frame_store_gen_c (CIDw := CIDw) img sigma log dl V
               (lock_cpu lk) uold unew lkcpu_z lkcpu_cp own own' lo
               ltac:(right; split;
                     [ exact Hcp | rewrite /own'; by rewrite decide_True ])
@@ -2016,7 +1965,7 @@ Section WpSconfLock.
     pc_is pc -∗
     instr pc false (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd)) -∗
     lock_openable γl lk s R Dc -∗
-    TsoGhost.llb loglen_name Tl -∗
+    TsoGhost.llb dlen_name Tl -∗
     Tc -∗
     ( ∀ w : mword 32,
       wp_next b p (fun (CID : CpuId) =>
@@ -2185,29 +2134,17 @@ Section WpSconfLock.
             + exact eq_refl.
             + exact Hcan.
             + exact Hid.
-          - (* the exclusive READ node: open the invariant, read FLAT, close.
-               A6.92: the word never comes apart -- [lock_word_ex_forget]
-               drops whichever arm the state selects to the plain ledger
-               word, and [lock_word_flat_bytes] reads its four cells off the
-               interp. *)
-            iIntros (sigma) "Hsi".
-            iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-            iMod ("Hopen" $! ⊤ Tc with "[%] [] HTc")
-              as "(Hbody & HTc & [Hcl _])"; [solve_ndisj | iApply Href |].
-            iDestruct "Hbody" as "(Hbody & >#Hcl4' & >#Hcl8')".
-            iDestruct "Hbody" as (v1 st1 B1) "(>Hw & Hcpu & Hg & Hbr)".
-            iDestruct (lock_word_flat_bytes st1 B1 lk v1 sigma.(mem)
-                         with "Hmem Hw") as %Hbf.
-            iMod ("Hcl" with "[Hw Hcpu Hg Hbr]") as "_".
-            { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4' Hcl8'". iExists v1, st1, B1.
-              iFrame "Hw Hcpu Hg Hbr". }
-            iMod (fupd_mask_subseteq ∅) as "Hclm"; [set_solver|].
-            iModIntro. iExists v1.
-            iSplitR.
-            { iPureIntro. intros j Hj.
-              rewrite (ktier_pin_id ppn pa Hid) Hpalk. apply Hbf. lia. }
-            iNext. iMod "Hclm" as "_". iModIntro.
-            iFrame "Hreg Hmem Hdev HTc".
+          - (* the exclusive READ node.  relaxed-ww STAGE E (§1.1, §2.7): under
+               two logs the AMO reads the DRAIN flat ([dmem img log dl]) after
+               its own stores drained ([¬ own_fp_pending]), not the ledger's
+               issue flat -- and the two differ exactly in the "released,
+               store pending" window, where a releaser's [sw zero] is still
+               buffered while the word reads 1 at memory.  Relating the lock
+               invariant's word to [dmem] needs that protocol state; the
+               node's obligation is left open here and tracked in
+               claude-notes/projects/relaxed-ww.md. *)
+            iIntros (sigma img log dl tv V) "%Htv %Hnp Hsi Htso #HVlb".
+            admit.
           - (* the conditional WRITE node *)
             (* >>> A6.119: THE AMO'S WRITE NODE, RE-CUT TO THE LEDGER TIER.
                This text had never been checked against the M4 flip -- the
@@ -2220,7 +2157,8 @@ Section WpSconfLock.
                what [lock_word_amo_mint] has wanted since A6.89 and never
                had a client for. <<< *)
             iIntros (bytes) "HTc".
-            iIntros (sigma img log tv V) "%Hrb %Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Hrb %Htv %Hnp Hsi Htso".
+            rewrite (ktier_pin_id ppn pa Hid) in Hnp.
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod ("Hopen" $! ⊤ Tc with "[%] [] HTc")
               as "(Hbody & HTc & [Hcl _])"; [solve_ndisj | iApply Href |].
@@ -2229,11 +2167,11 @@ Section WpSconfLock.
             iDestruct (lock_word_flat_bytes st2 B2 lk v2 sigma.(mem)
                          with "Hmem Hw") as %Hbf2.
             assert (Hv2 : v2 = bytes).
-            { pose proof (read_bytes_of_bytes sigma.(mem) (pa_of ppn pa) 4 v2
-                            ltac:(intros j Hj;
-                                  rewrite (ktier_pin_id ppn pa Hid) Hpalk;
-                                  apply Hbf2; lia)) as Hr2.
-              rewrite Hr2 in Hrb. by injection Hrb. }
+            { (* relaxed-ww STAGE E: [Hrb] reads the DRAIN flat ([dmem]) while
+                 the invariant's word ([Hbf2]) is the ISSUE flat; the two
+                 agree outside the "released, store pending" window, which is
+                 the protocol state stage E adds. *)
+              admit. }
             subst v2.
             (* A6.119: the value-set side condition, HOISTED out of
                application position.  An [ltac:] inside an [iMod (...)]
@@ -2253,35 +2191,28 @@ Section WpSconfLock.
                invariant's [B] while the holder's token still carries the old
                one, and [lock_pos_agree] would break.  So the two arms take
                different gates, and the state decides which. <<< *)
-            assert (HVamo : vstep (hart_agent (@cpu_id CID)) (S (length log))
-                              (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
-                                         (hart_agent (@cpu_id CID))])%list V
-                              (hart_agent (@cpu_id CID)) = S (length log)).
+            assert (HVamo : vstep (hart_agent (@cpu_id CID)) (S (length dl)) (dl ++ [length log])%list V
+                              (hart_agent (@cpu_id CID)) = S (length dl)).
             { rewrite /vstep. case_decide as Hd;
                 [ reflexivity | exfalso; by apply Hd ]. }
             assert (Htopa : (length (gs_of img
                         (write_bytes sigma.(mem) pa 4%N (amoswap_stored (rget m rs2)))
                         (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
                                    (hart_agent (@cpu_id CID))])%list
-                        (vstep (hart_agent (@cpu_id CID)) (S (length log))
-                           (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
-                                      (hart_agent (@cpu_id CID))])%list V)
-                        sigma.(sregs) sigma.(mdev)).(glog)
+                        (dl ++ [length log])%list
+                        (vstep (hart_agent (@cpu_id CID)) (S (length dl)) (dl ++ [length log])%list V)
+                        sigma.(sregs) sigma.(mdev)).(gdlog)
                      <= (gs_of img
                         (write_bytes sigma.(mem) pa 4%N (amoswap_stored (rget m rs2)))
                         (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
                                    (hart_agent (@cpu_id CID))])%list
-                        (vstep (hart_agent (@cpu_id CID)) (S (length log))
-                           (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
-                                      (hart_agent (@cpu_id CID))])%list V)
+                        (dl ++ [length log])%list
+                        (vstep (hart_agent (@cpu_id CID)) (S (length dl)) (dl ++ [length log])%list V)
                         sigma.(sregs) sigma.(mdev)).(gtv) (@cpu_id CID))%nat).
-            { cbn [glog gtv gs_of]. rewrite length_app HVamo. cbn [length]. lia. }
+            { cbn [gdlog gtv gs_of]. rewrite length_app HVamo. cbn [length]. lia. }
             assert (Hpina : forall h, (NCPU <= h)%nat ->
-                      vstep (hart_agent (@cpu_id CID)) (S (length log))
-                        (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
-                                   (hart_agent (@cpu_id CID))])%list V h
-                      = length (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
-                                          (hart_agent (@cpu_id CID))])%list).
+                      vstep (hart_agent (@cpu_id CID)) (S (length dl)) (dl ++ [length log])%list V h
+                      = length (dl ++ [length log])%list).
             { intros h Hh. rewrite /vstep. case_decide as Hd.
               - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CID)).
                 rewrite /hart_agent in Hh. lia.
@@ -2293,9 +2224,8 @@ Section WpSconfLock.
                          (write_bytes sigma.(mem) pa 4%N (amoswap_stored (rget m rs2)))
                          (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
                                     (hart_agent (@cpu_id CID))])%list
-                         (vstep (hart_agent (@cpu_id CID)) (S (length log))
-                            (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
-                                       (hart_agent (@cpu_id CID))])%list V) ∗
+                         (dl ++ [length log])%list
+                         (vstep (hart_agent (@cpu_id CID)) (S (length dl)) (dl ++ [length log])%list V) ∗
                        TsoCtx.own_context (CID := CID) TsoCtx.cur_ctx ∗
                        (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) ∗
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
@@ -2312,26 +2242,26 @@ Section WpSconfLock.
                    WITH its floor at that stamp ([WpLock.lock_pay_won]) --
                    the absorb's premise, minted where the evidence is. *)
                 iDestruct "HR" as (ξw Tw) "[>Hpkw HR]".
-                iDestruct (TsoCtx.ctx_stamped_llb with "Hpkw") as "[Hpkw #HTw]".
+                iDestruct (TsoCtx.ctx_stamped_dlb with "Hpkw") as "[Hpkw #HTw]".
                 iDestruct (tso_interp_of_pin with "Htso") as %Hpinw.
-                iEval (rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+                iEval (rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                                   sigma.(sregs) sigma.(mdev) Hpinw)) in "Htso".
-                iDestruct (TsoCtx.tso_interp_llb_valid with "Htso HTw") as "[Htso %HTwle]".
-                iEval (rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+                iDestruct (TsoCtx.tso_interp_dlb_valid with "Htso HTw") as "[Htso %HTwle]".
+                iEval (rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                                    sigma.(sregs) sigma.(mdev) Hpinw)) in "Htso".
-                cbn [glog gs_of] in HTwle.
-                iMod (lock_word_amo_mint pa (amoswap_stored (rget m rs2)) CID img sigma log V
-                        Hset1
+                cbn [gdlog gs_of] in HTwle.
+                iMod (lock_word_amo_mint pa (amoswap_stored (rget m rs2)) CID img sigma log dl V
+                        Hset1 Hnp
                         with "Hmem Htso Hctx [Hw]")
-                  as "(Hmem & Htso & Hctx & Hpin & #Hflw)".
+                  as "(Hmem & Htso & Hctx & Hpin & #Hdp & #Hflw)".
                 { iExists bytes. rewrite Hpalk. iExact "Hw". }
                 (* hoisted: an [ltac:] in application position elaborates
                    against an unfixed goal (A6.119's precedent) *)
-                assert (HTwS : (Tw <= S (length log))%nat) by lia.
-                iDestruct (TsoCtx.ctx_floor_le TsoCtx.cur_ctx (S (length log)) Tw HTwS
+                assert (HTwS : (Tw <= S (length dl))%nat) by lia.
+                iDestruct (TsoCtx.ctx_floor_le TsoCtx.cur_ctx (S (length dl)) Tw HTwS
                              with "Hflw") as "#Hflw0".
-                iMod (lock_take γl h0 (S (length log))
-                        with "Hflw [Hg] Hfrag2") as "[Hg Hpre]";
+                iMod (lock_take γl h0 (S (length log)) (S (length dl))
+                        with "Hdp Hflw [Hg] Hfrag2") as "[Hg Hpre]";
                   [ by iExists B2 | ].
                 iMod ("Hcl" with "[Hpin Hcpu Hg]") as "_".
                 { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4w Hcl8w".
@@ -2346,12 +2276,11 @@ Section WpSconfLock.
                                   (write_bytes sigma.(mem) pa 4%N (amoswap_stored (rget m rs2)))
                                   (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
                                                  (hart_agent (@cpu_id CID))])%list
-                                  (vstep (hart_agent (@cpu_id CID)) (S (length log))
-                                     (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
-                                                    (hart_agent (@cpu_id CID))])%list V)
+                                  (dl ++ [length log])%list
+                                  (vstep (hart_agent (@cpu_id CID)) (S (length dl)) (dl ++ [length log])%list V)
                                   sigma.(sregs) sigma.(mdev)))%I
                   with "[Htso]" as "Htso".
-                { rewrite -(tso_interp_of_at_gs riscv_eraGS img _ _ _
+                { rewrite -(tso_interp_of_at_gs riscv_eraGS img _ _ _ _
                                   sigma.(sregs) sigma.(mdev) Hpina).
                   iExact "Htso". }
                 iDestruct (TsoCtxLedger.hart_view_lb_get (CID := CID) _ Tl Htopa
@@ -2362,11 +2291,10 @@ Section WpSconfLock.
                            (write_bytes sigma.(mem) pa 4%N (amoswap_stored (rget m rs2)))
                            (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
                                           (hart_agent (@cpu_id CID))])%list
-                           (vstep (hart_agent (@cpu_id CID)) (S (length log))
-                                  (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
-                                                 (hart_agent (@cpu_id CID))])%list V))%I
+                           (dl ++ [length log])%list
+                           (vstep (hart_agent (@cpu_id CID)) (S (length dl)) (dl ++ [length log])%list V))%I
                   with "[Htso]" as "Htso".
-                { rewrite (tso_interp_of_at_gs riscv_eraGS img _ _ _
+                { rewrite (tso_interp_of_at_gs riscv_eraGS img _ _ _ _
                                  sigma.(sregs) sigma.(mdev) Hpina).
                   iExact "Htso". }
                 iAssert (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K)%I as "#Hpaira".
@@ -2375,8 +2303,8 @@ Section WpSconfLock.
                 iLeft. iFrame "Hpre". iSplitR; [ iPureIntro; exact Hw0 | ].
                 iNext. iExists ξw, Tw. iFrame "Hpkw HR". iExact "Hflw0".
               - (* THE LOSER: the pin survives, at the B it already had *)
-                iMod (lock_word_amo_keep pa (amoswap_stored (rget m rs2)) bytes B2 CID img sigma log V
-                        Hset1
+                iMod (lock_word_amo_keep pa (amoswap_stored (rget m rs2)) bytes B2 CID img sigma log dl V
+                        Hset1 Hnp
                         with "Hmem Htso Hctx [Hw]")
                   as "(Hmem & Htso & Hctx & Hpin)".
                 { destruct st2 as [[i o]|]; [| congruence ].
@@ -2393,12 +2321,11 @@ Section WpSconfLock.
                                   (write_bytes sigma.(mem) pa 4%N (amoswap_stored (rget m rs2)))
                                   (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
                                                  (hart_agent (@cpu_id CID))])%list
-                                  (vstep (hart_agent (@cpu_id CID)) (S (length log))
-                                     (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
-                                                    (hart_agent (@cpu_id CID))])%list V)
+                                  (dl ++ [length log])%list
+                                  (vstep (hart_agent (@cpu_id CID)) (S (length dl)) (dl ++ [length log])%list V)
                                   sigma.(sregs) sigma.(mdev)))%I
                   with "[Htso]" as "Htso".
-                { rewrite -(tso_interp_of_at_gs riscv_eraGS img _ _ _
+                { rewrite -(tso_interp_of_at_gs riscv_eraGS img _ _ _ _
                                   sigma.(sregs) sigma.(mdev) Hpina).
                   iExact "Htso". }
                 iDestruct (TsoCtxLedger.hart_view_lb_get (CID := CID) _ Tl Htopa
@@ -2409,11 +2336,10 @@ Section WpSconfLock.
                            (write_bytes sigma.(mem) pa 4%N (amoswap_stored (rget m rs2)))
                            (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
                                           (hart_agent (@cpu_id CID))])%list
-                           (vstep (hart_agent (@cpu_id CID)) (S (length log))
-                                  (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
-                                                 (hart_agent (@cpu_id CID))])%list V))%I
+                           (dl ++ [length log])%list
+                           (vstep (hart_agent (@cpu_id CID)) (S (length dl)) (dl ++ [length log])%list V))%I
                   with "[Htso]" as "Htso".
-                { rewrite (tso_interp_of_at_gs riscv_eraGS img _ _ _
+                { rewrite (tso_interp_of_at_gs riscv_eraGS img _ _ _ _
                                  sigma.(sregs) sigma.(mdev) Hpina).
                   iExact "Htso". }
                 iAssert (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K)%I as "#Hpaira".
@@ -2490,7 +2416,7 @@ Section WpSconfLock.
       iDestruct "Hpay" as (w) "(-> & -> & -> & HTc & #Hpaira & Hpay)".
       iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! w CID with "[%] HTc Hcg' Hpc' Hpaira Hpay"). exact Hs.
-  Qed.
+  Admitted.
 
 
   (* ------------------------------------------------------------------- *)

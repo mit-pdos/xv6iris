@@ -1254,7 +1254,7 @@ Section VtDevRam.
       (W : virtio_cfg -> nat -> nat -> list (nat * (nat -> bv 8)) -> iProp Σ)
       {P : CpuId -> Prop} :
     ea = (pa_add pu 2%nat : mword 64) ->
-    forall (CIDw : CpuId) (img : TsoMemPa.bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : TsoMemPa.bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 2 <= 4096)%Z ->
@@ -1262,26 +1262,26 @@ Section VtDevRam.
       P CIDw ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       vt_idx_res γd pu np nr F t0 t1 W -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
          exists v : mword 16,
-           tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+           tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
              (pa_of ppn ea) (Z.to_N 2) v⌝ ∗
       □ (∀ (tvr : nat) (v : mword 16),
            ⌜(V (hart_agent (@cpu_id CIDw)) <= tvr)%nat⌝ -∗
-           ⌜tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+           ⌜tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
               (pa_of ppn ea) (Z.to_N 2) v⌝ -∗
            vt_idx_q γd np nr v tvr).
   Proof.
-    intros -> CIDw img sigma log V ppn Hcan Hoff Hid _.
+    intros -> CIDw img sigma log dl V ppn Hcan Hoff Hid _.
     rewrite (ktier_pin_id ppn _ Hid).
     iIntros "#Hk Hgh Htso Hctx (#Hf0 & #Hf1 & #HfF & HR)".
     iDestruct "HR" as (c nc lo hist)
       "(%Hidx & %Hbnd & %Hho & %HF & #Hlbnc & #Hfrag & Hcells & _)".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
     (* the three floors, cashed at this hart and joined *)
     iDestruct (lk_floor_vis (CID := CIDw) with "Hctx Hf0") as "[Hctx (%K0 & #HK0 & #Hv0)]".
@@ -1297,7 +1297,7 @@ Section VtDevRam.
       iSplitR; [iApply (TsoCtx.ledger_vis_mono _ K0 with "Hv0"); lia |].
       iSplitR; [iApply (TsoCtx.ledger_vis_mono _ K1 with "Hv1"); lia | done]. }
     iDestruct (used_rel_read_ok (CID := CIDw)
-                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                 (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                  c nc lo nr F (Nat.max (Nat.max K0 K1) K2) (tf2 t0 t1) hist
                  Hho HF (proj1 Hbnd) ltac:(lia) with "Hgh Htso HK Hfv Hcells") as %Hrd.
     cbn in Hrd. rewrite Hidx in Hrd.
@@ -1459,7 +1459,7 @@ Section VtDevRam.
      past the completion's position, the four stamped cells ARE the word *)
   Local Lemma vt_used_elem_read_ok (ea : mword 64) (q0 V0 : nat) (head : bv 32)
       (pp : mword 64) (W : iProp Σ) :
-    forall (CIDw : CpuId) (img : TsoMemPa.bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : TsoMemPa.bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 4 <= 4096)%Z ->
@@ -1467,39 +1467,39 @@ Section VtDevRam.
       (false = false \/ pp = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       (TsoCtx.hart_view_lb (CID := CID) V0 ∗ ⌜(q0 <= V0)%nat⌝ ∗
        ([∗ list] j ∈ seq 0 4,
           ledger_le (pa_add ea j) (nth_byte head j) q0) ∗ W) -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
          (exists v : mword 32,
-            tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+            tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
               (pa_of ppn ea) (Z.to_N 4) v)
          /\ (forall v : mword 32,
-               tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+               tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
                  (pa_of ppn ea) (Z.to_N 4) v -> v = head)⌝.
   Proof.
-    intros CIDw img sigma log V ppn Hcan Hoff Hid Hcid.
+    intros CIDw img sigma log dl V ppn Hcan Hoff Hid Hcid.
     pose proof (Hcid (or_introl eq_refl)) as Hceq.
     rewrite (ktier_pin_id ppn _ Hid).
     iIntros "#Hk Hgh Htso Hctx (#HV0 & %Hq0V & Hcells & _)".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
     iEval (rewrite TsoCtx.hart_view_lb_unseal /TsoCtx.hart_view_lb_def) in "HV0".
     assert (Hagent : hart_agent (@cpu_id CID) = hart_agent (@cpu_id CIDw))
       by (unfold hart_agent; rewrite Hceq; reflexivity).
     iEval (rewrite Hagent) in "HV0".
     iAssert (⌜forall j, (j < 4)%nat -> forall tvr : nat,
-               ((gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev)).(gtv) (@cpu_id CIDw) <= tvr)%nat ->
+               ((gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev)).(gtv) (@cpu_id CIDw) <= tvr)%nat ->
                tso_read img log (hart_agent (@cpu_id CIDw)) tvr (pa_add ea j)
                = Some (nth_byte head j)⌝)%I as %Hrd.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
       iDestruct (big_sepL_lookup _ (seq 0 4) j j with "Hcells") as (t) "[%Ht Hc]".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (TsoCtx.ledger_read_at_vis_ok (CID := CIDw)
-                   (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                   (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                    (pa_add ea j) (DfracOwn 1) (nth_byte head j) t V0
                    with "Hgh Htso HV0 [] Hc") as %H.
       { iApply TsoCtx.ledger_vis_below. lia. }
@@ -1517,7 +1517,7 @@ Section VtDevRam.
   (* the same for a stamped BYTE (the status cell, chunk B) *)
   Local Lemma vt_byte_read_ok (ea : mword 64) (q0 V0 : nat) (b : bv 8)
       (pp : mword 64) (W : iProp Σ) :
-    forall (CIDw : CpuId) (img : TsoMemPa.bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : TsoMemPa.bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 1 <= 4096)%Z ->
@@ -1525,31 +1525,31 @@ Section VtDevRam.
       (false = false \/ pp = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       (TsoCtx.hart_view_lb (CID := CID) V0 ∗ ⌜(q0 <= V0)%nat⌝ ∗
        ledger_le ea b q0 ∗ W) -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
          (exists v : mword 8,
-            tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+            tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
               (pa_of ppn ea) (Z.to_N 1) v)
          /\ (forall v : mword 8,
-               tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+               tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
                  (pa_of ppn ea) (Z.to_N 1) v -> v = b)⌝.
   Proof.
-    intros CIDw img sigma log V ppn Hcan Hoff Hid Hcid.
+    intros CIDw img sigma log dl V ppn Hcan Hoff Hid Hcid.
     pose proof (Hcid (or_introl eq_refl)) as Hceq.
     rewrite (ktier_pin_id ppn _ Hid).
     iIntros "#Hk Hgh Htso Hctx (#HV0 & %Hq0V & (%t & %Ht & Hc) & _)".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
     iEval (rewrite TsoCtx.hart_view_lb_unseal /TsoCtx.hart_view_lb_def) in "HV0".
     assert (Hagent : hart_agent (@cpu_id CID) = hart_agent (@cpu_id CIDw))
       by (unfold hart_agent; rewrite Hceq; reflexivity).
     iEval (rewrite Hagent) in "HV0".
     iDestruct (TsoCtx.ledger_read_at_vis_ok (CID := CIDw)
-                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                 (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                  ea (DfracOwn 1) b t V0
                  with "Hgh Htso HV0 [] Hc") as %Hrd.
     { iApply TsoCtx.ledger_vis_below. lia. }

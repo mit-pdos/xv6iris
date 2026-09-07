@@ -3072,7 +3072,7 @@ Section ProofCreateMain.
       iDestruct (log_tx_open with "Htx") as (t) "Htw".
       iDestruct (log_tx_split icfg_log t 1 (1/2) (1/2)
                    (eq_sym Qp.half_half) with "Htw") as "[Htp Htx]".
-      iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
+      iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
       iApply (IL.wp_ilock_dep_sconf γs j γl pd pav pu
                 gild gisld kd (qd/2)%Qp gd lod tld
                 (DepTx (qd/2)%Qp icfg_dev dind gd lod t (1/2)) PlainK
@@ -3795,7 +3795,7 @@ Section ProofCreateMain.
              CHECKOUT ITSELF (B''-tx3).  The parent went home at +0x50, so
              this arm parks exactly the half that came back from its disarm,
              at the same transaction. *)
-          iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0b".   (* r25 lane (ii): nothing to present at this ilock *)
+          iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0b".   (* r25 lane (ii): nothing to present at this ilock *)
           iApply (IL.wp_ilock_dep_sconf γs j γl pd pav pu
                     gilc gislc kslot (qq/2)%Qp gc lock tlc
                     (DepTx (qq/2)%Qp icfg_dev cinum gc lock t (1/2)) PlainK

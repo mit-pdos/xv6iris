@@ -1428,9 +1428,15 @@ Section FileInv.
      publish's store RE-ESTABLISHES it ([wp_store_s_sconf_free_gen]).
      [off_free k 1] is [MemClaim.wordw_free 4 (a_foff k)] (stated where
      that file is in scope: FileOffProtocol.v). *)
-  Definition off_free (k : nat) (q : Qp) : iProp Σ :=
+  (* relaxed-ww §2.14: the free word is pinned to ONE context (the free
+     tier is ξ-indexed, §2.10); the ambient form is the section's [cur_ctx]
+     and the handle morph moves it like every other row. *)
+  Definition off_free_at (ξ : CtxId) (k : nat) (q : Qp) : iProp Σ :=
     (⌜is_aligned_paddr (Physaddr (a_foff k)) 4 = true⌝ ∗
-     [∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn q))%I.
+     [∗ list] j ∈ seq 0 4, TsoCtx.mem_free ξ (pa_add (a_foff k) j) (DfracOwn q))%I.
+  Definition off_free (k : nat) (q : Qp) : iProp Σ := off_free_at cur_ctx k q.
+  Global Instance off_free_at_morph k q : CtxMorph (λ ξ, off_free_at ξ k q).
+  Proof. rewrite /off_free_at. ctx_morph_solve. Qed.
   (* item 25 note 2: the fractional split/join, so [file_pay_split]
      distributes the non-INODE arm *)
   (* a resident word cell (the ftable's own [f->off], any fraction) is, at the
@@ -1439,7 +1445,7 @@ Section FileInv.
   Lemma off_free_of_word (k : nat) (q : Qp) (v : mword 32) :
     a_foff k ↦₄{DfracOwn q} v ⊢ off_free k q.
   Proof.
-    rewrite TsoCtx.ctx_word4_pointsto_unfold /off_free.
+    rewrite TsoCtx.ctx_word4_pointsto_unfold /off_free /off_free_at.
     iIntros "[$ Hb]". iApply (big_sepL_mono with "Hb").
     intros ? j _. iApply TsoCtx.ctx_pointsto_free.
   Qed.
@@ -1447,30 +1453,22 @@ Section FileInv.
   Lemma off_free_split (k : nat) (q1 q2 : Qp) :
     off_free k (q1 + q2) ⊣⊢ off_free k q1 ∗ off_free k q2.
   Proof.
-    rewrite /off_free. iSplit.
+    rewrite /off_free /off_free_at. iSplit.
     - iIntros "[#Hal H]".
       iAssert ([∗ list] j ∈ seq 0 4,
-                 TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn q1) ∗
-                 TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn q2))%I with "[H]" as "H".
+                 TsoCtx.mem_free cur_ctx (pa_add (a_foff k) j) (DfracOwn q1) ∗
+                 TsoCtx.mem_free cur_ctx (pa_add (a_foff k) j) (DfracOwn q2))%I with "[H]" as "H".
       { iApply (big_sepL_mono with "H"). iIntros (j x _) "H".
-        rewrite /TsoCtx.mem_free /TsoCtx.phys_free /phys_pointsto.
-        iDestruct "H" as (ppn) "(#Hk & %Hc & %Hp & %v & %e & [Hb %Hram] & He)".
-        iDestruct "Hb" as "[Hb1 Hb2]". iDestruct "He" as "[He1 He2]".
-        iSplitL "Hb1 He1"; iExists ppn; iFrame "Hk"; (iSplitR; [done|]); (iSplitR; [done|]);
-          iExists v, e; iFrame; done. }
+        rewrite /TsoCtx.mem_free. iDestruct "H" as (v) "H".
+        rewrite TsoCtx.ctx_pointsto_frac_split. iDestruct "H" as "[H1 H2]".
+        iSplitL "H1"; by iExists v. }
       rewrite big_sepL_sep. iDestruct "H" as "[H1 H2]". iFrame "H1 H2". by iSplit.
     - iIntros "[[#Hal H1] [_ H2]]". iSplitR; [done|].
       iCombine "H1 H2" as "H". rewrite -big_sepL_sep.
       iApply (big_sepL_mono with "H"). iIntros (j x _) "[H1 H2]".
-      rewrite /TsoCtx.mem_free /TsoCtx.phys_free /phys_pointsto.
-      iDestruct "H1" as (ppn1) "(#Hk1 & %Hc & %Hp1 & %v1 & %e1 & [Hb1 %Hram] & He1)".
-      iDestruct "H2" as (ppn2) "(#Hk2 & _ & %Hp2 & %v2 & %e2 & [Hb2 _] & He2)".
-      iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
-      iDestruct (pointsto_agree with "Hb1 Hb2") as %<-.
-      iDestruct (ghost_map_elem_agree with "He1 He2") as %<-.
-      iCombine "Hb1 Hb2" as "Hb". iCombine "He1 He2" as "He".
-      iExists _. iFrame "Hk1". iSplitR; [done|]. iSplitR; [done|].
-      iExists v1, e1. iFrame. done.
+      rewrite /TsoCtx.mem_free. iDestruct "H1" as (v1) "H1". iDestruct "H2" as (v2) "H2".
+      iDestruct (TsoCtx.ctx_pointsto_agree with "H1 H2") as %<-.
+      iExists v1. rewrite TsoCtx.ctx_pointsto_frac_split. iFrame "H1 H2".
   Qed.
 
   (* THE FD'S SHARE OF THE OFF BOX (item 24; note 3): every piece at the fd's
@@ -1540,6 +1538,13 @@ Section FileInv.
     (if bool_decide (fc_type C = FD_INODE)
      then off_fd k q (fp_obox pn) (fp_ooff pn) C
      else off_free k q)%I.
+
+  Global Instance file_core_off_morph k q pn C :
+    CtxMorph (λ ξ : CtxId,
+      (if bool_decide (fc_type C = FD_INODE)
+       then off_fd k q (fp_obox pn) (fp_ooff pn) C
+       else off_free_at ξ k q)%I).
+  Proof. case_bool_decide; [apply ctx_morph_const | apply off_free_at_morph]. Qed.
 
   Definition file_core (k : nat) (q : Qp) (pn : fpnames) (C : fcontent) : iProp Σ :=
     (file_core_noff q pn C ∗ file_core_off k q pn C)%I.
@@ -1856,7 +1861,8 @@ Section FilePayloadMorph.
   Global Instance file_core_morph k q pn C :
     CtxMorph (λ ξ : CtxId, file_core (XI := ξ) k q pn C).
   Proof.
-    rewrite /file_core. apply ctx_morph_sep; [apply file_core_noff_morph | apply ctx_morph_const].
+    rewrite /file_core /file_core_off /off_free.
+    apply ctx_morph_sep; [apply file_core_noff_morph | apply file_core_off_morph].
   Qed.
   Global Instance file_pay_morph γ k q C :
     CtxMorph (λ ξ : CtxId, file_pay (XI := ξ) γ k q C).

@@ -1258,7 +1258,7 @@ Section KexecABody.
        seam is the BUDGET half. *)
     iDestruct (log_op_split with "Hlog") as "[Hlog Htx]".
 
-    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
+    iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Ilock.wp_ilock_tx_sconf gs jp gl pd pav pu
               gilk gislk k (q/2)%Qp gy loy tly PlainK
  inum

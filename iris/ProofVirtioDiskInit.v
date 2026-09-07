@@ -694,7 +694,8 @@ Section VdiLease.
       ([∗ list] j ∈ seq 0 2,
          phys_ledger_at (pa_add (used_idx_pa (virtio_init_cfg pd pav pu)) j)
            (DfracOwn 1) byte_zero (tf2 t0 t1 j)) ∗
-      lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1.
+      lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1 ∗
+      TsoGhost.chain_ev chain_name t0 ∗ TsoGhost.chain_ev chain_name t1.
   Proof.
     iIntros (Hpv) "#Hkm H".
     iApply (used_split_init pd pav pu (vdi_page_static pu Hpv) with "Hkm H").
@@ -2586,7 +2587,7 @@ Section ProofVirtioDiskInit.
                   exact (vdi_page_static pav Hpavv (2 + j)%nat ltac:(lia)))
             with "Hkm Hidx") as "[Hidxp Havh]".
     iMod (vdi_used_split pd pav pu Hpuv with "Hkm Hbpu")
-      as (t0 t1) "(Hpup & Hcells & #Hfl0 & #Hfl1)".
+      as (t0 t1) "(Hpup & Hcells & #Hfl0 & #Hfl1 & #Hch0 & #Hch1)".
     iModIntro.
     iApply (wp_vdi_flip γv (mword_of_int (KernelSyms.virtio_disk_init + 0x170)) false (mword_of_int 18 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 112 : mword 12)
               H13 (K - 4)%nat Q14 pd pav pu (mword_of_int 0x10001070) 112 (Z_to_bv 32 15 : mword 32) pp t0 t1 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -2814,7 +2815,7 @@ Section ProofVirtioDiskInit.
     { try iPureIntro. exact Hpdv. }
     { try iPureIntro. exact Hpavv. }
     { try iPureIntro. exact Hpuv. }
-    { iExists t0, t1. iFrame "Hfl Hflr Hfl0 Hfl1". }
+    { iExists t0, t1. iFrame "Hfl Hflr Hfl0 Hfl1 Hch0 Hch1". }
   Qed.
 End ProofVirtioDiskInit.
 End VirtioDiskInitProof.

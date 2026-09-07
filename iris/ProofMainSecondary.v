@@ -313,21 +313,26 @@ Section ProofMainSecondary.
   (* 0x16 .. 0x1e -- [while (started == 0) ;] with the acquire fence.     *)
   (* =================================================================== *)
   Local Lemma ms_spin
-      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
-      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)}
+      (γi γm : gname) (ξd : CtxId) (P : nat -> nat -> CtxId -> iProp Σ)
+      `{!∀ pos M ξ, Persistent (P pos M ξ)} `{!∀ pos M, CtxMorph (P pos M)}
       (m : regfile) (n : nat) (p0 : mword 64) :
     add_vec (rget m (mword_of_int 14 : mword 5))
         (sign_extend' 64 (mword_of_int 0 : mword 12)) = started_addr ->
     cid_word <> (zero_reg : mword 64) ->
     sie_cap_gpr KT0 m n false p0 -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0x16) : mword 64) -∗
-    started_inv γi ξd P -∗
+    started_inv γi γm ξd P -∗
     ( ∀ m' : regfile,
         sie_cap_gpr KT0 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
-        (∃ pos : nat,
-           P pos cur_ctx ∗
-           TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) pos) -∗
+        (* relaxed-ww §2.16: the deposit at the flag's index [i] and record
+           length [M], with what the armed read learned -- the record, the
+           flag's drain position [S q] above [M], the view receipt above it *)
+        (∃ (i M q V0 : nat),
+           P i M cur_ctx ∗
+           TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) V0 ∗
+           fr_at 0%nat i M ∗ dpos_at dpos_name i (S q) ∗
+           ⌜(M <= q)%nat /\ (S q <= V0)%nat⌝) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -341,7 +346,7 @@ Section ProofMainSecondary.
        says nothing about the VALUE, so one peek-open of the started
        invariant delivers it and puts the body straight back. *)
     iApply fupd_wp.
-    iMod (started_inv_claim ⊤ γi ξd P ltac:(solve_ndisj) with "Hsinv") as "#Hstcl".
+    iMod (started_inv_claim ⊤ γi γm ξd P ltac:(solve_ndisj) with "Hsinv") as "#Hstcl".
     iModIntro.
     (* THE RACY READ (A6.132): the resource-post leaf.  What the
        continuation learns is [started_W] at SOME view [V0] the machine's
@@ -353,16 +358,16 @@ Section ProofMainSecondary.
               (mword_of_int 0 : mword 12) m n
               (fun v => sign_extend' 64 v)
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
-              (started_W γi ξd P) (started_res γi ξd P) True%I
+              (started_W γi γm ξd P) (started_res γi γm ξd P) True%I
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_read_ram_plain_4 data2_ext_4
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(solve_ndisj)
-              ltac:(cbv zeta; rewrite Ha4; exact (started_read_obl γi ξd P p0 Hcid))
+              ltac:(cbv zeta; rewrite Ha4; exact (started_read_obl γi γm ξd P p0 Hcid))
               with "Hcg Hpc [] [] []").
     { iApply (mni_16 with "Htext"). }
     { rewrite Ha4. iExact "Hstcl". }
-    { iApply (started_read_open (⊤ ∖ ↑minstretN) γi ξd P ltac:(solve_ndisj) with "Hsinv"). }
+    { iApply (started_read_open (⊤ ∖ ↑minstretN) γi γm ξd P ltac:(solve_ndisj) with "Hsinv"). }
     iIntros (v).
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc HW _".
@@ -453,24 +458,21 @@ Section ProofMainSecondary.
       iDestruct "HW" as "[%Hv0 | HW]".
       + (* the word read as 0 contradicts the branch having fallen through *)
         exfalso. rewrite HM2a5 Hv0 in Hbz. vm_compute in Hbz. discriminate.
-      + iDestruct "HW" as (i) "(%Hvi & #Hidx & #HPd)".
-        destruct Hvi as [Hv0 | [Hvs Hle]].
-        { exfalso. rewrite HM2a5 Hv0 in Hbz. vm_compute in Hbz. discriminate. }
-        (* THE ACQUIRE: the fence at +0x18 has run, the read's view is at
-           or past the release index, so the deposit context's facts
+      + iDestruct "HW" as (i M q) "(%Hvi & #Hidx & #Hrec & #Hfr & #Hdp & #HPd)".
+        destruct Hvi as (Hvs & Hq & Hle & HMq).
+        (* THE ACQUIRE: the fence at +0x18 has run, the read's view is past
+           the flag's drain position, hence past the record's drain length
+           the deposit is stamped under, so the deposit context's facts
            transport to this hart's own context. *)
         iApply fupd_wp.
         iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hctx Hcg]".
-        iMod (started_absorb ⊤ γi ξd P i V0 ltac:(solve_ndisj) Hle
-                with "Hsinv Hidx Hlb Hctx HPd") as "[Hctx #HP]".
+        iMod (started_absorb ⊤ γi γm ξd P i M V0 ltac:(solve_ndisj) ltac:(lia)
+                with "Hsinv Hidx Hrec Hlb Hctx HPd") as "[Hctx #HP]".
         iDestruct ("Hcg" with "Hctx") as "Hcg".
-        (* A6.138: the read receipt, weakened to the flag's own position *)
         iEval (rewrite hart_view_lb_unseal /hart_view_lb_def) in "Hlb".
-        iDestruct (TsoGhost.view_lb_le view_name dlen_name
-                     (hart_agent cpu_id) V0 (S i) Hle with "Hlb") as "#Hvpos".
         iModIntro.
         iApply ("Hcont" $! M2 with "Hcg Hpc [ ]").
-        iExists (S i). iFrame "HP Hvpos".
+        iExists i, M, q, V0. iFrame "HP Hlb Hfr Hdp". iPureIntro. split; lia.
   Qed.
 
   (* =================================================================== *)
@@ -787,10 +789,10 @@ Section ProofMainSecondary.
   (* =================================================================== *)
   Lemma wp_main_secondary_sconf 
       (m : regfile) (K : nat) (p0 : mword 64)
-      (γi : gname) (ξd : CtxId)
+      (γi γm : gname) (ξd : CtxId)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-    : wp_main_secondary_sconf_body m K p0 γi ξd γd γv tlbvec0.
+    : wp_main_secondary_sconf_body m K p0 γi γm ξd γd γv tlbvec0.
   (* [kallocG]/[fileG] are in [MAIN_SECONDARY]'s signature but this arm's proof
      never touches them, so the section would not generalize over them. *)
   Proof using All.
@@ -803,16 +805,17 @@ Section ProofMainSecondary.
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iApply (ms_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc %Ha4".
-    iApply (ms_spin γi ξd (main_dep γd γv) m1 (K - 2)%nat p0 Ha4 Hcid with "Hcg Htext Hpc Hsinv").
+    iApply (ms_spin γi γm ξd (main_dep γd γv) m1 (K - 2)%nat p0 Ha4 Hcid with "Hcg Htext Hpc Hsinv").
     iIntros (m2) "Hcg Hpc #Hdep".
-    iDestruct "Hdep" as (pos) "[#Hdepp #Hvpos]".
+    iDestruct "Hdep" as (i M q V0) "(#Hdepp & #HV & #Hfr & #Hdp & %HMq & %HqV)".
     iEval (rewrite /main_dep) in "Hdepp".
     iDestruct "Hdepp" as "[#Hdepm Hbnd]".
-    iDestruct "Hbnd" as (Bk) "[#Hbd %HBpos]".
-    (* A6.138: THE CREDENTIALS, minted from the hart's own acquire *)
-    iDestruct (TsoGhost.view_lb_le view_name dlen_name
-                 (hart_agent cpu_id) pos Bk ltac:(lia) with "Hvpos") as "#HvB".
-    iDestruct (CtxValues.cv_boot_cred_view Bk with "HvB") as "#Hbc".
+    iDestruct "Hbnd" as (Bk Bd) "(#Hbd & %HBpos & #Hdb & %HBdM)".
+    (* A6.138 / relaxed-ww §2.16: THE CREDENTIALS, minted from the hart's
+       own acquire of the flag *)
+    iDestruct (CtxValues.kpt_pub_intro Bk V0 i M q Bd HBpos HMq HqV HBdM
+                 with "HV Hfr Hdp Hdb") as "#Hpub".
+    iDestruct (CtxValues.cv_boot_cred_pub Bk with "Hpub") as "#Hbc".
     iDestruct (KptShare.kpt_creds_intro Bk with "Hbd Hbc") as "#Hcreds".
     iDestruct "Hdepm" as (γpr γk γs pd pav pu root pas)
       "(#Hpenv & #Hpinv & #Hccaps & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".

@@ -1470,11 +1470,11 @@ Section BootAlloc.
              (HBs : bioslotG Σ)
              (HF : fileG Σ) (γd : uart_names) (γv : disk_names)
              (Rspent : gset Z)
-             (γi : gname) (ξd : CtxId),
+             (γi γm : gname) (ξd : CtxId),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗
-      started_inv γi ξd (main_dep γd γv) ∗ started_prim γi ∗
+      started_inv γi γm ξd (main_dep γd γv) ∗ started_prim γi ∗
       dev_inv γd γv ∗ wire_inv ∗ crash_inv ∗ gen_cert ∗
       (* --- one bundle per hart --- *)
       ([∗ list] c ∈ enum CPU,
@@ -1846,13 +1846,13 @@ Section BootAlloc.
       rewrite boot_byte_bss; [| unfold img_end, KernelSyms.started; lia].
       f_equal. symmetry. apply nth_byte_zero. zeq. }
     iMod (started_alloc ⊤ ξd (main_dep γd γv) Hsimg with "Hstcl Hstw Hpkd")
-      as (γi) "[#Hstarted Hprim]".
+      as (γi γm) "[#Hstarted Hprim]".
     (* ================================================================ *)
     (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
     iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC APP), γd, γv,
-                       (snap_spent S nib), γi, ξd.
+                       (snap_spent S nib), γi, γm, ξd.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].

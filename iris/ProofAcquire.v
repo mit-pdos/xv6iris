@@ -108,7 +108,7 @@ Section ProofAcquire.
     sie_cap_gpr kt (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0) n false p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.acquire + 0x1a)) -∗
     lock_openable γl lk s R Dc -∗
-    TsoGhost.llb loglen_name Tl -∗
+    TsoGhost.llb dlen_name Tl -∗
     Tc -∗
     ( Tc -∗
       sie_cap_gpr kt (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n false p -∗

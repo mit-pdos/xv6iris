@@ -503,12 +503,31 @@ Section PipeInv.
      bytes between [lock.locked] and [lock.name], and everything past
      sizeof(struct pipe).  No code touches them; they are held so that the
      page can go back to kfree, which memsets the lot. *)
-  Definition pipe_slack (pi : mword 64) : iProp Σ :=
+  (* relaxed-ww §2.10: the free tier is ξ-INDEXED ([byte_any] is
+     [mem_free cur_ctx]), so the slack is stated at the payload's context
+     like every other row of [pipe_res_at] -- otherwise the payload is not
+     a λ and the handle cannot cross contexts ([is_pipe_morph]). *)
+  Definition pipe_slack_at (ξ : CtxId) (pi : mword 64) : iProp Σ :=
+    (([∗ list] j ∈ seq 4 4, TsoCtx.mem_free ξ (pa_add pi j) (DfracOwn 1)) ∗
+     ([∗ list] j ∈ seq pipe_sizeof (pipe_pgbytes - pipe_sizeof),
+        TsoCtx.mem_free ξ (pa_add pi j) (DfracOwn 1)))%I.
+  Definition pipe_slack (pi : mword 64) : iProp Σ := pipe_slack_at cur_ctx pi.
+
+  (* the ambient form is the old spelling, byte for byte *)
+  Lemma pipe_slack_byte_any (pi : mword 64) :
+    pipe_slack pi ⊣⊢
     (([∗ list] j ∈ seq 4 4, byte_any (pa_add pi j)) ∗
      ([∗ list] j ∈ seq pipe_sizeof (pipe_pgbytes - pipe_sizeof),
         byte_any (pa_add pi j)))%I.
+  Proof. reflexivity. Qed.
 
-  Typeclasses Opaque pipe_data_at pipe_data pipe_slack.
+  Global Instance pipe_slack_at_morph pi : CtxMorph (λ ξ, pipe_slack_at ξ pi).
+  Proof. rewrite /pipe_slack_at. ctx_morph_solve. Qed.
+
+  (* [pipe_slack] stays TRANSPARENT to instance search: it is the ambient
+     instance of [pipe_slack_at], and the two spellings must frame against
+     each other ([pipe_res] unfolds to the latter). *)
+  Typeclasses Opaque pipe_data_at pipe_data pipe_slack_at.
 
   (* ---- the resource pi->lock protects: every byte of the page except the
      lock's own two WORDS (which belong to [lock_inv]).  The lock's NAME field
@@ -531,7 +550,7 @@ Section PipeInv.
        pipe_endstate γp true wo ∗
        ⌜pipe_count_ok nr nw⌝ ∗
        ⌜length bs = PIPESIZE⌝ ∗ pipe_data_at ξ pi bs ∗
-       pipe_slack pi)%I.
+       pipe_slack_at ξ pi)%I.
   Definition pipe_res (γp : pipe_names) (pi : mword 64) : iProp Σ :=
     pipe_res_at γp pi cur_ctx.
 
@@ -591,12 +610,12 @@ Section PipeInv.
   Lemma locked_dead γl γp i : ⊢ locked γl i -∗ pipe_dead γl γp -∗ False.
   Proof.
     iIntros "Hl Hd". iEval (rewrite locked_split) in "Hl".
-    iDestruct "Hl" as "[(%B & Hf & _) _]".
+    iDestruct "Hl" as "[(%B & %D & Hf & _ & _) _]".
     iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
   Qed.
   Lemma locked_pre_dead γl γp i : ⊢ locked_pre γl i -∗ pipe_dead γl γp -∗ False.
   Proof.
-    iIntros "(%B & Hf & _) Hd".
+    iIntros "(%B & %D & Hf & _ & _) Hd".
     iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
   Qed.
 
@@ -619,7 +638,7 @@ Section PipeInv.
     iDestruct (pipe_endstate_shut_elim with "Hs1 Hst1") as "[-> H1]".
     iSplitL "Hfrag H0 H1"; [ by iFrame "Hfrag H0 H1" | ].
     iExists vname, nr, nw, (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32), bs.
-    rewrite /pipe_data. by iFrame.
+    rewrite /pipe_data /pipe_slack. by iFrame.
   Qed.
 
   (* ---- THE predicate: a well-formed [struct pipe] ----

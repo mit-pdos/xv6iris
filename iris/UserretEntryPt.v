@@ -391,7 +391,7 @@ Section UserretEntryPt.
                 (upt_tree_spec uroot tfp um) dq (uva 0xa8) mstatus0 satp3
                 mie_v mdv0 menvcfg0 pcfg3 paddr3 Hmenvval0 HSXL HMPRV Hsok3
                 Hpok3 (upt_pt2_tramp_spec uroot tfp um Hwf)
-                (upt_pt2_base uroot tfp um) with "Hclaim Hhw"). }
+                (upt_pt2_base uroot tfp um) with "Hclaim Hcreds Hhw"). }
     { iIntros (tv') "%Hpok4
         Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Htok Hclk HPC
         HnPC Hresv".

@@ -147,7 +147,7 @@ Section Au4Leaves.
     rd_ok rd ->
     ↑kptN ⊆ Em ->
     (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
-            (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
+            (log : list pwmsg) (dl : list nat) (V : agent -> nat) (ppn : mword 44),
        (uint (add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm)) < 274877906944)%Z ->
        (bv_unsigned (subrange_vec_dec
                        (add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm)) 11 0)
@@ -157,16 +157,16 @@ Section Au4Leaves.
        kmap_at (svpn_of (add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))) ppn
          KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
        Res -∗
        ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
           (exists v : mword 32,
-             tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+             tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
                (pa_of ppn (add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm)))
                (Z.to_N 4) v)
           /\ (forall v : mword 32,
-                tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+                tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
                   (pa_of ppn (add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm)))
                   (Z.to_N 4) v -> Q v tvr)⌝) ->
     sie_cap_gpr kt m av b p -∗
@@ -198,8 +198,8 @@ Section Au4Leaves.
               ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm _
               with "Hcg Hpc Hinstr Hclaim HAU Hcont").
-    intros CIDw img sigma log V ppn Hcan Hoff Hpin Hmig.
-    exact (Hobl CIDw img sigma log V ppn Hcan Hoff Hpin Hmig).
+    intros CIDw img sigma log dl V ppn Hcan Hoff Hpin Hmig.
+    exact (Hobl CIDw img sigma log dl V ppn Hcan Hoff Hpin Hmig).
   Qed.
 
   (* [sw rs2, imm(rs1)] the RAW-LEDGER way (A6.145): a value-independent
@@ -214,7 +214,7 @@ Section Au4Leaves.
       (Em : coPset) (b : bool) :
     ↑kptN ⊆ Em ->
     (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
-            (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
+            (log : list pwmsg) (dl : list nat) (V : agent -> nat) (ppn : mword 44),
        (uint (add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
           < 274877906944)%Z ->
        (bv_unsigned (subrange_vec_dec
@@ -227,7 +227,7 @@ Section Au4Leaves.
        kmap_at (svpn_of (add_vec (rget (CID := CID) m rs1)
                            (sign_extend' 64 imm))) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
        Res ==∗
        gen_heap_interp (hG := riscv_memGS)
@@ -244,13 +244,8 @@ Section Au4Leaves.
                     (snap_of (pa_of ppn (add_vec (rget (CID := CID) m rs1)
                                           (sign_extend' 64 imm)))
                        (Z.to_N 4) (trunc32 (rget (CID := CID) m rs2)))
-                    (hart_agent (@cpu_id CIDw))])%list
-         (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
-            (log ++ [TsoMemPa.PWMsg
-                       (snap_of (pa_of ppn (add_vec (rget (CID := CID) m rs1)
-                                             (sign_extend' 64 imm)))
-                          (Z.to_N 4) (trunc32 (rget (CID := CID) m rs2)))
-                       (hart_agent (@cpu_id CIDw))])%list V) ∗
+                    (hart_agent (@cpu_id CIDw))])%list dl
+         (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw))) dl V) ∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
        Post) ->
     sie_cap_gpr kt m av b p -∗
@@ -281,8 +276,8 @@ Section Au4Leaves.
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (rget m rs2)) HkptEm _
               with "Hcg Hpc Hinstr Hclaim HAU Hcont").
-    intros CIDw img sigma log V ppn Hcan Hoff Hpin Hmig.
-    exact (Hobl CIDw img sigma log V ppn Hcan Hoff Hpin Hmig).
+    intros CIDw img sigma log dl V ppn Hcan Hoff Hpin Hmig.
+    exact (Hobl CIDw img sigma log dl V ppn Hcan Hoff Hpin Hmig).
   Qed.
 
   (* [sw rs2, imm(rs1)], same discipline. *)

@@ -1497,7 +1497,7 @@ Section ProofSysUnlinkAUW3.
             ltac:(solve_ndisj) with "Hescd Hivalidd Hdepd")
       as "(Hivalidd & Hdepd & Htp)".
     iModIntro.
-    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0b".   (* r25 lane (ii): nothing to present at this ilock *)
+    iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0b".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Ilock.wp_ilock_dep_sconf (CID := CID2) gs jx gl pd pav pu
               gili gisli ks (qs/2)%Qp
               gyi loyi tlyi (DepTx (qs/2)%Qp icfg_dev

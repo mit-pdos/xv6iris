@@ -1698,7 +1698,7 @@ Section IreclaimOrphan.
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaims2".
-    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
+    iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (IL.wp_ilock_tx_sconf γs j γl pd pav pu gil gisl
  kslot (q/2)%Qp gsh losh tlsh PlainK inum
               pidv dq dqs OC (K - 8)%nat eb b lks Upr

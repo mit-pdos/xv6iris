@@ -370,17 +370,17 @@ Section ProofBrelse.
        the hook, minting the floor from the llb the count edge handed out *)
     iDestruct "Hafter" as (M' ord' devs' bnos' tl') "(%Htl' & #Hllbtl' & Hscan')".
     iApply (Rl.wp_release_hook_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string
-              (fun ξ => llb loglen_name tl' ∗ bcache_scan2 bn V M' ord' devs' bnos' tl' ξ)%I
-              (fun ξ => bcache_res2 bn V ξ) T3
+              (fun ξ => llb dlen_name tl' ∗ bcache_scan2 bn V M' ord' devs' bnos' tl' ξ)%I
+              (fun ξ => bcache_res2 bn V ξ) emp%I T3
               0%nat eb p (K - 4)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HT3a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok [Hscan'] [Hllbtl'] Hcnt Hpay").
     { iExact "Hlock". }
     { iFrame "Hllbtl' Hscan'". }
-    { iApply (lock_hook_llb _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
+    { iApply (lock_hook_llb _ _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
                 with "Hllbtl'"). }
-    iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CIDr Hsr mr) "_ Hcg Hpc %Hrelpins Hcnt".
     assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".

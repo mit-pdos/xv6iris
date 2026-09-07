@@ -6072,18 +6072,18 @@ Section IcacheTable.
      the hook RAISES the lock context's stamp once per live slot, minting
      each exact-read floor at that stamped context -- which is where the
      next acquirer's credentials transport from. *)
-  Lemma itable_ctx_hook (cn : ic_names) (γfs : fs_names)
+  Lemma itable_ctx_hook `{CID : RiscvLang.CpuId} (E : coPset) (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) :
-    ⊢ lock_ctx_hook (fun ξ => itable_res2 ξ cn γfs γi cov logstart nib dv)
-        (fun ξ => itable_res2_llb ξ cn γfs γi cov logstart nib dv).
+    ⊢ lock_ctx_hook E (fun ξ => itable_res2 ξ cn γfs γi cov logstart nib dv)
+        (fun ξ => itable_res2_llb ξ cn γfs γi cov logstart nib dv) emp.
   Proof.
-    rewrite /lock_ctx_hook. iIntros (ξ T) "Hpk HR".
+    rewrite /lock_ctx_hook. iIntros (ξ T Df) "Hrun Hpk HR".
     iDestruct "HR" as (M ci) "(Hhalf & Hrows & %Hwf & %Hciwf & Hia & Hip &
                                Hslots & Hpool)".
     iMod (itable_rows_raise ξ T M ci (seq 0 NINODE) with "Hpk Hrows")
       as (T') "[Hpk Hrows]".
-    iModIntro. iExists T'. iFrame "Hpk".
+    iModIntro. iFrame "Hrun". iExists T'. rewrite bi.sep_emp. iFrame "Hpk".
     rewrite /itable_res2. iExists M, ci.
     iFrame "Hhalf Hrows Hia Hip Hslots Hpool".
     iSplitR; [by iPureIntro|]. by iPureIntro.

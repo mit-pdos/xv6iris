@@ -380,7 +380,7 @@ Definition wp_ilock_dep_sconf_body
      covering it (R1).  A caller with nothing to present passes
      [TsoGhost.llb_0] and ignores the row.  The inode share's own llb is
      joined in by the proof ([TsoGhost.llb_max]). *)
-  ∀ Tl : nat, TsoGhost.llb loglen_name Tl -∗
+  ∀ Tl : nat, TsoGhost.llb dlen_name Tl -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (dn : dinode) (bm : blkmap) (filled : bool),
       ⌜callee_saved m mf⌝ -∗
@@ -638,7 +638,7 @@ Definition wp_ilock_tx_sconf_body
      covering it (R1).  A caller with nothing to present passes
      [TsoGhost.llb_0] and ignores the row.  The inode share's own llb is
      joined in by the proof ([TsoGhost.llb_max]). *)
-  ∀ Tl : nat, TsoGhost.llb loglen_name Tl -∗
+  ∀ Tl : nat, TsoGhost.llb dlen_name Tl -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (dn : dinode) (bm : blkmap) (filled : bool),
       ⌜callee_saved m mf⌝ -∗

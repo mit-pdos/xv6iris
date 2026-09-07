@@ -460,16 +460,16 @@ Section ProofIunlockMain.
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj) _
               with "Hcg Hpc [] [] [Hvalid Hdep]").
     { (* the read obligation *)
-      intros CIDw img sigma log V ppn Hcan Hoff Hpin Hmig.
+      intros CIDw img sigma log dl V ppn Hcan Hoff Hpin Hmig.
       rewrite Hrefadr Hipe in Hpin |- *.
       iIntros "Hkm Hm Htso Hctx [#Hfl HRes]".
       iDestruct "HRes" as (w tst) "[Hrows _]".
       iDestruct (tso_interp_of_pin with "Htso") as %Hpin2.
-      rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+      rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                  sigma.(sregs) sigma.(mdev) Hpin2).
       rewrite (ktier_pin_id ppn _ Hpin).
       iDestruct (IcachePinwObl.iref_read_obl (CIDw := CIDw)
-                   (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                   (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                    k w lo tst tl Hle
                    with "Htso Hctx Hfl Hrows") as %HH.
       iPureIntro. intros tvr Htvr.

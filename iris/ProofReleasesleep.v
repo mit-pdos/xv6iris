@@ -391,7 +391,7 @@ Section ProofReleasesleep.
        floor at [tl] inside the payload -- what the next winner's absorb
        hands over as [R cur_ctx] (the floor inside R, per the client). *)
     iApply (Release.wp_release_hook_sconf KT1 γl (sl_lk slk) "sleep lock"%string
-              (sl_pay γsl slk Rdep H) (sl_pay γsl slk R H) Krel
+              (sl_pay γsl slk Rdep H) (sl_pay γsl slk R H) emp%I Krel
               0%nat b pme (av - 4)%nat
               ({["sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)
@@ -399,12 +399,12 @@ Section ProofReleasesleep.
               with "Hcg Htext Hpc [] HtokL [HRsl] [Hllb] Hown Hpay").
     { iExact "Hlockinv". }
     { iApply (sl_pay_of_res with "HRsl"). }
-    { iApply (lock_hook_llb (sl_pay γsl slk Rdep H) (sl_pay γsl slk R H) tl
+    { iApply (lock_hook_llb _ (sl_pay γsl slk Rdep H) (sl_pay γsl slk R H) tl
                 (sl_body_fold γsl slk R Rdep H tl Hfold) with "Hllb"). }
     (* release's own exit index is [match 0 with O => eb | S _ => false end]
        -- the term [Hbmatch] equates with [b] -- so the hart it hands back is
        at [wp_next b], matching releasesleep's own top-level index. *)
-    iIntros (CIDrel Hsrel Mrel) "Hcg Hpc %Hrelcs Hown".
+    iIntros (CIDrel Hsrel Mrel) "_ Hcg Hpc %Hrelcs Hown".
     (* BALANCED: the rank acquire put in comes back out.  [Hno] is the ORDER
        premise; [locks_below_not_elem] turns it into the non-membership the
        set algebra needs, and then the round trip is the identity -- which is

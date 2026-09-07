@@ -674,7 +674,7 @@ Section VdrwdLeaves.
 
   Local Lemma vdrwd_avail_read_ok (ea pav : mword 64) (np : nat) {P : CpuId -> Prop} :
     ea = (pa_add pav 2%nat : mword 64) ->
-    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44) (v : mword 16),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 2 <= 4096)%Z ->
@@ -682,27 +682,27 @@ Section VdrwdLeaves.
       P CIDw ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       (⌜v = wrap16 np⌝ ∗ avail_half pav np) -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
-         tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+         tso_read_bytes img log dl (hart_agent (@cpu_id CIDw)) tvr
            (pa_of ppn ea) (Z.to_N 2) v⌝.
   Proof.
-    intros -> CIDw img sigma log V ppn v Hcan Hoff Hid _.
+    intros -> CIDw img sigma log dl V ppn v Hcan Hoff Hid _.
     rewrite (ktier_pin_id ppn _ Hid).
     iIntros "#Hk Hgh Htso Hctx [%Hv Havh]". subst v.
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
     iApply (avail_half_read_ok (CID := CIDw)
-              (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev)) pav np
+              (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev)) pav np
               with "Hgh Htso Hctx Havh").
   Qed.
 
   Local Lemma vdrwd_avail_store_ok (ea pav : mword 64) (np : nat) {P : CpuId -> Prop} :
     ea = (pa_add pav 2%nat : mword 64) ->
-    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg) (dl : list nat)
            (V : agent -> nat) (ppn : mword 44),
       (uint ea < 274877906944)%Z ->
       (bv_unsigned (subrange_vec_dec ea 11 0) + 2 <= 4096)%Z ->
@@ -710,7 +710,7 @@ Section VdrwdLeaves.
       P CIDw ->
       kmap_at (svpn_of ea) ppn KP_rw -∗
       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
-      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log dl V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       ([∗ list] j ∈ seq 0 2, phys_ledger (pa_add (pa_add pav 2%nat) j) (DfracOwn 1)
                                (nth_byte (wrap16 np) j)) ==∗
@@ -722,18 +722,15 @@ Section VdrwdLeaves.
            (wrap16 (S np) : SailStdpp.Values.mword 16))
         (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N 2)
                           (wrap16 (S np) : SailStdpp.Values.mword 16))
-                   (hart_agent (@cpu_id CIDw))])%list
-        (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
-           (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N 2)
-                             (wrap16 (S np) : SailStdpp.Values.mword 16))
-                      (hart_agent (@cpu_id CIDw))])%list V) ∗
+                   (hart_agent (@cpu_id CIDw))])%list dl
+        (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw))) dl V) ∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
       (∃ t : nat,
          ([∗ list] j ∈ seq 0 2, phys_ledger_at (pa_add (pa_add pav 2%nat) j) (DfracOwn 1)
                                   (nth_byte (wrap16 (S np)) j) t) ∗
          TsoCtx.ctx_wrote TsoCtx.cur_ctx t (pa_add pav 2%nat)).
   Proof.
-    intros -> CIDw img sigma log V ppn Hcan Hoff Hid _.
+    intros -> CIDw img sigma log dl V ppn Hcan Hoff Hid _.
     rewrite (ktier_pin_id ppn _ Hid).
     iIntros "#Hk Hm Htso Hctx Hres".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
@@ -742,8 +739,8 @@ Section VdrwdLeaves.
     set (log' := (log ++ [PWMsg (snap_of (pa_add pav 2%nat) (Z.to_N 2) vnew)
                             (hart_agent (@cpu_id CIDw))])%list).
     set (V' := vstep (hart_agent (@cpu_id CIDw))
-                 (V (hart_agent (@cpu_id CIDw))) log' V).
-    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+                 (V (hart_agent (@cpu_id CIDw))) dl V).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length dl).
     { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
       - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CIDw)).
         rewrite /hart_agent in Hh. lia.
@@ -755,33 +752,28 @@ Section VdrwdLeaves.
         exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
     assert (Htvmono : forall c : CPU, (V (hart_agent c) <= V' (hart_agent c))%nat)
       by (intros c; rewrite Htvc; lia).
-    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
-    { intros c. rewrite Htvc /log' length_app /=.
-      pose proof (Hbd (hart_agent c)). lia. }
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length dl)%nat).
+    { intros c. rewrite Htvc. pose proof (Hbd (hart_agent c)). lia. }
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log dl V
                sigma.(sregs) sigma.(mdev) Hpin).
-    (* the running context's write-set bound, BEFORE the append *)
-    iDestruct (TsoCtx.own_context_expose_w with "Hctx") as (W) "[#HWl Hctxw]".
-    iDestruct (TsoCtx.tso_interp_llb_valid with "Htso HWl") as "[Htso %HWle]".
-    cbn [glog gs_of] in HWle.
     iMod (TsoCtxStore.ledger_store_win_at_ok (CID := CIDw)
-            (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+            (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
             (gs_of img (write_bytes sigma.(mem) (pa_add pav 2%nat) (Z.to_N 2) vnew)
-               log' V' sigma.(sregs) sigma.(mdev))
+               log' dl V' sigma.(sregs) sigma.(mdev))
             (pa_add pav 2%nat) (Z.to_N 2) (wrap16 np) vnew
-            ltac:(vm_compute; discriminate) eq_refl eq_refl eq_refl
+            ltac:(vm_compute; discriminate) eq_refl eq_refl eq_refl eq_refl
             Htvmono Htvtop with "Hm Htso Hres") as "(Hm & Htso & #Hmsg & Hnew)".
     iDestruct (TsoCtx.tso_interp_loglen_llb with "Htso") as "[Htso #Hllb]".
     iEval (cbn [glog gs_of]; rewrite /log' length_app Nat.add_1_r) in "Hllb".
-    iMod (TsoCtx.ctx_wrote_register (CID := CIDw) TsoCtx.cur_ctx W (length log)
+    iMod (TsoCtx.ctx_wrote_register (CID := CIDw) TsoCtx.cur_ctx (length log)
             (pa_add pav 2%nat)
             (PWMsg (snap_of (pa_add pav 2%nat) (Z.to_N 2) vnew)
                (hart_agent (@cpu_id CIDw)))
-            HWle eq_refl with "Hctxw Hllb Hmsg") as "[Hctx #Hw]".
+            eq_refl with "Hctx Hmsg") as "[Hctx #Hw]".
     iModIntro. iFrame "Hm Hctx".
     iSplitL "Htso".
     { rewrite -(tso_interp_of_at_gs riscv_eraGS img
-                  (write_bytes sigma.(mem) (pa_add pav 2%nat) (Z.to_N 2) vnew) log' V'
+                  (write_bytes sigma.(mem) (pa_add pav 2%nat) (Z.to_N 2) vnew) log' dl V'
                   sigma.(sregs) sigma.(mdev) Hpin').
       iExact "Htso". }
     iExists (S (length log)). iFrame "Hw". iExact "Hnew".

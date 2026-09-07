@@ -721,16 +721,16 @@ Section UvOpen.
     uM_bytes M (uint pc) k iw ->
     uva_text pt (uint pc) ->
     hart_iview_lb_at cpu_id IK -∗
-    (∀ σ img log tv itv V,
+    (∀ σ img log dl tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
-        ⌜(itv <= length log)%nat⌝ -∗
+        ⌜(itv <= length dl)%nat⌝ -∗
         mstate_interp σ -∗
         hart_iview_auth cpu_id itv -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
         bytes_own_p (uv_F pt M IK) (uv_mm t (upa_map pt M)) ={⊤,∅}=∗
-        ⌜fobl_ifetch img log itv (u_walk_pa w_leaf pc) n iw⌝ ∗
+        ⌜fobl_ifetch img log dl itv (u_walk_pa w_leaf pc) n iw⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V ∗
              bytes_own_p (uv_F pt M IK) (uv_mm t (upa_map pt M)))).
   Proof.
     intros Hkn Hinj Htok Hl Hnc Hb Htx. subst n.
@@ -744,10 +744,10 @@ Section UvOpen.
       - exact (uv_win_text pt M IK w_leaf pc k _ iw Hinj Hl Hnc Hb Htx j
                  ltac:(lia)). }
     iIntros "#Hlb".
-    iIntros (σ img log tv itv V) "%Htv %Hitv Hσ Hiv Htso Hown".
+    iIntros (σ img log dl tv itv V) "%Htv %Hitv Hσ Hiv Htso Hown".
     iDestruct (hart_iview_lb_at_valid with "Hiv Hlb") as %HIK.
     rewrite /mstate_interp. iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
-    iDestruct (bytes_own_p_ifetch_of img σ.(mem) log V σ.(sregs) σ.(mdev)
+    iDestruct (bytes_own_p_ifetch_of img σ.(mem) log dl V σ.(sregs) σ.(mdev)
                  (uv_F pt M IK) (uv_mm t (upa_map pt M)) IK
                  (u_walk_pa w_leaf pc) (N.of_nat k) iw Hwin
                  with "Hmem Htso Hown") as %Hok.

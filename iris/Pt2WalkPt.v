@@ -1216,6 +1216,9 @@ Section Pt2SharedWalk.
     kmap_at (svpn_of va) ppn kp -∗
     kpt_inv kroot -∗
     kpt_lb t0 -∗
+    (* relaxed-ww §2.11: the leaf's canonical class is read through the
+       kernel-slot credential *)
+    KptShare.kpt_creds -∗
     gen_cert -∗
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
@@ -1231,7 +1234,8 @@ Section Pt2SharedWalk.
       HDb Hag HDlc Haglc Hcp Hsatp Htlb Hhtif Hpma Hpcfg Hpaddr Hmstag
       Hmisa Hmenv HPBMTE HADUE Heff Heffg Hss Hssg Htm Htmg Hppn Hasid
       Hcanon Hident HA Hord HR HW Hcov Hpallow Hchk Htlbok0.
-    iIntros "#Hat #Hkinv #Hlb0 #Hcert Hfrag Hrw Hro".
+    iIntros "#Hat #Hkinv #Hlb0 #Hcreds #Hcert Hfrag Hrw Hro".
+    iDestruct "Hcreds" as (Bk) "[#Hbd #Hbc]".
     assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro)
       by (apply elem_of_union_l; exact HWtlb).  (* NOT set_solver: 24 s each *)
     iApply swp_fupd.
@@ -1319,8 +1323,8 @@ Section Pt2SharedWalk.
                (u_pte_addr (u_next_base p1) (subrange_vec_dec (svpn_of va) 8 0))
                (fun w => pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp))))%I
       as "Hrdx".
-    { iApply (kpt_leaf_node_canon_obl kroot t0 (svpn_of va) p2 p1 _ a0 d0
-                Hmaps with "Hlb0 Hkinv"). }
+    { iApply (kpt_leaf_node_canon_obl kroot t0 (svpn_of va) p2 p1 _ a0 d0 Bk
+                Hmaps with "Hbd Hbc Hlb0 Hkinv"). }
     (* the WRITE seam, in the shape the [_ex] write-back takes *)
     iAssert (∀ (w w' : mword 64),
                ⌜pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp))⌝ -∗
@@ -1774,6 +1778,7 @@ Section Pt2Window.
       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
          (Z.sub pagesize_bits 1) 0)) = pa ->
     kmap_at (svpn_of va) ppn kp -∗
+    KptShare.kpt_creds -∗
     gen_cert -∗ resv_frag cpu_id rr -∗
     own_context XI -∗
     pt2_res_kprev rc kroot Sc tlbv -∗
@@ -1791,7 +1796,7 @@ Section Pt2Window.
            Hbc Hsel Hpres Hchk Hgchk Hcanon Hident.
     pose proof Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
     pose proof Hpmpok as (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "#Hat #Hcert Hfrag Htok Hres Hrw Hro".
+    iIntros "#Hat #Hcreds #Hcert Hfrag Htok Hres Hrw Hro".
     iDestruct "Hres" as (tp0 tc) "(%Hok2 & %HSc & Htc & #Hlb0 & #Hkinv)".
     destruct (Hsel tc HSc) as (uc2 & uc1 & au & du & Hmaps_c).
     assert (Hout : zero_extend' 64 (concat_vec
@@ -1874,7 +1879,7 @@ Section Pt2Window.
                        ltac:(vm_compute; reflexivity) LSXL Hsatp Hmode)
                     Hppn Hasid Hcanon Hident HA Hord HR HW Hcov
                     (pma_all_ram Hall) Hchk Hhit
-                    with "Hat Hkinv Hlb0 Hcert Hfrag Hrw Hro"). }
+                    with "Hat Hkinv Hlb0 Hcreds Hcert Hfrag Hrw Hro"). }
       iIntros (v) "(-> & Hf)".
       iDestruct "Hf" as (rsf) "(%Hland & Hrw & Hro & Hany)".
       iSplitR; [done|]. iExists rsf. iFrame "Hrw Hro Htok Hany".
@@ -2165,13 +2170,14 @@ Section Pt2Tramp.
     pt2_tramp_spec Sc ->
     (forall t, Sc t -> pt_base t = rc) ->
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    KptShare.kpt_creds -∗
     gen_cert -∗
     tramp_tr_obl Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
       mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0
       (pt2_res_kprev rc kroot Sc).
   Proof.
     intros Hmisa Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma HSc Hbc.
-    iIntros "#Hat #Hcert". rewrite /tramp_tr_obl. iModIntro.
+    iIntros "#Hat #Hcreds #Hcert". rewrite /tramp_tr_obl. iModIntro.
     iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag Htok HRes Hrw Hro".
     iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hatva".
     { rewrite Hvpn. iApply "Hat". }
@@ -2192,7 +2198,7 @@ Section Pt2Tramp.
                   Hsatpok Hpmpok Hpma Hbc
                   (rx_sel Sc va Hvpn HSc) (rx_pres Sc va Hvpn HSc)
                   rx_chk rx_gchk Hcanon Hident
-                  with "Hatva Hcert Hfrag Htok HRes Hrw Hro"). }
+                  with "Hatva Hcreds Hcert Hfrag Htok HRes Hrw Hro"). }
     iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Htok & Hany)".
     iSplitR; [done |].
     destruct Hshape as [-> | (tvx & ->)].
@@ -2252,12 +2258,13 @@ Section Pt2Tramp.
     pt2_tramp_spec Sc ->
     (forall t, Sc t -> pt_base t = rc) ->
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    KptShare.kpt_creds -∗
     hw_config -∗
     tramp_fetch_tr (s_Df_mix dq) (pt2_res_kprev rc kroot Sc) pc mst0 satp0 mie0
       mdv0 menv0 pcfg paddr.
   Proof.
     intros Hmenv HSXL HMPRV Hsatpok Hpmpok HSc Hbc.
-    iIntros "#Hat #Hhw".
+    iIntros "#Hat #Hcreds #Hhw".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     rewrite /tramp_fetch_tr.
     iIntros (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0).
@@ -2277,7 +2284,7 @@ Section Pt2Tramp.
     iDestruct (pt2_tramp_tr_obl_kprev rc kroot Sc (s_Df_mix dq) pc ms bmi cy ti ip
                  mst0 pcfg paddr mc micfg MISA_C mseccfg0 senv0 pmar0 elp0 satp0
                  mie0 mdv0 menv0 eq_refl Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma
-                 HSc Hbc with "Hat Hcert") as "#Hobl".
+                 HSc Hbc with "Hat Hcreds Hcert") as "#Hobl".
     iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag Htok HRes Hrw Hro");
       [ exact Hcanon | exact Hvpn | exact Hident ].
   Qed.
@@ -2443,6 +2450,7 @@ Section Pt2Engine.
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr pc) 4 ->
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    KptShare.kpt_creds -∗
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -2502,7 +2510,7 @@ Section Pt2Engine.
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HSc Hbc
            Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
-    iIntros "#Hat #Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv
+    iIntros "#Hat #Hcreds #Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv
              Htok Hpc Hinstr Hex Hcont".
     iDestruct (pt2_kprev_swp_open with "Hinv") as (satp0 tlbv pcfg paddr)
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & Hres)".
@@ -2516,7 +2524,7 @@ Section Pt2Engine.
                     Hpcfg Hpaddr Htlbc Hres Htok Hpc Hinstr [] [Hex] [Hcont]").
     - iApply (pt2_tramp_fetch_tr_kprev rc kroot Sc dq pc mstatus0 satp0 mie_v
                 mdv0 menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok
-                HSc Hbc with "Hat Hhw").
+                HSc Hbc with "Hat Hcreds Hhw").
     - iIntros (tv') "%Hpmp2 Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg
                      Hpaddr Htlbc HRes Htok Hclk Hpcc Hnpcc Hany".
       iApply ("Hex" $! satp0 pcfg paddr tv' with

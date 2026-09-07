@@ -459,8 +459,8 @@ Section SpecMain.
          [FsCfgBoot.fs_boot_snap_wf] says. *)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
-      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)} :=
+      (γi γm : gname) (ξd : CtxId) (P : nat -> nat -> CtxId -> iProp Σ)
+      `{!∀ pos M ξ, Persistent (P pos M ξ)} `{!∀ pos M, CtxMorph (P pos M)} :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
     (* the arm is decided by the ambient hart: [beqz a0] at main+0x14 takes
        the boot path exactly when cpuid() returns 0. *)
@@ -518,8 +518,8 @@ Section SpecMain.
     (* the handover channel, and the RECIPE for the deposit it will carry:
        main applies this wand at the [started = 1] store, to the [pr] lock, the
        64 proc locks and the vdisk_lock it has just allocated. *)
-    started_inv γi ξd P -∗ started_prim γi -∗
-    □ (∀ (pos : nat)
+    started_inv γi γm ξd P -∗ started_prim γi -∗
+    □ (∀ (pos M : nat)
          (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64)
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
@@ -532,10 +532,13 @@ Section SpecMain.
            (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
-         (* A6.138: the deposit learns the flag position and the tie that
-            the kernel table's bound is BELOW it *)
+         (* A6.138 / relaxed-ww §2.16: the deposit learns the flag store's
+            index [pos] and the fence record's drain length [M] at it, with
+            the ties that the kernel table's ISSUE bound is below the flag
+            and its DRAIN bound under the fence *)
          (∃ B : nat, KptGhost.kpt_bound B ∗ ⌜(B <= pos)%nat⌝) -∗
-         P pos cur_ctx) -∗
+         (∃ Bd : nat, CtxValues.kpt_dbound Bd ∗ ⌜(Bd <= M)%nat⌝) -∗
+         P pos M cur_ctx) -∗
     (* the boot supply *)
     main_locks_raw -∗
     main_globals_raw -∗
@@ -695,8 +698,8 @@ Module Type MAIN.
       (ndisk : nat)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
-      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)},
+      (γi γm : gname) (ξd : CtxId) (P : nat -> nat -> CtxId -> iProp Σ)
+      `{!∀ pos M ξ, Persistent (P pos M ξ)} `{!∀ pos M, CtxMorph (P pos M)},
       wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi γm ξd P.
 End MAIN.

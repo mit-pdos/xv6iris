@@ -602,7 +602,7 @@ Proof.
     iDestruct (inode_ref_short_shr_genlo_agree with "Hkeep Hshr") as %[-> ->].
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
+    iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Hil CID7 XI γs j γl pd pav pu gilc gislc
               kslot (q/2)%Qp gsh losh tlsh
               (DepTx (q/2)%Qp icfg_dev inum gsh losh t qt) (ClaimK ty t qc) inum pidv dq dqs

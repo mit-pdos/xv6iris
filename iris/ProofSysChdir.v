@@ -1548,7 +1548,7 @@ Section ProofSysChdirBody.
            residue rides home inside [IcacheEscrow.ic_tx_dep], so nothing but
            the descriptor conjunct crosses the window. *)
 
-        iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
+        iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
         iApply (Ilock.wp_ilock_tx_sconf (CID := CID23) gs j gl pd pav pu
  gil gisl
                   kk (qq/2)%Qp gsh losh tlsh PlainK inum pid (DfracOwn (1/4)) dqs

@@ -1071,6 +1071,131 @@ re-audited); the frontier sweep (`WpSconfLock`, `WpSconfMem`, the
 `ProofMain*`, the box instances in the code proofs, `RiscvAdequacy`'s
 first-boot era ghosts); the `dlen_name` audit.
 
+### 2.15b Frontier record (2026-09-06, night, second pass)
+
+Landed beyond §2.15 while the tree rebuilt (builds 19–22; `PipeInvDefs`
+hung for two hours in build19 and was killed -- see the pipe item):
+- `WpLock`: the holder token on two number lines -- `locked_core`/`locked_pre
+  := ∃ B D, lock_frag_at γ st B ∗ dpos_ev B D ∗ ctx_floor cur_ctx D` (the
+  pin's position [B] is the AMO's ISSUE timestamp, the floor its DRAIN
+  position); `lock_take γ i B D` takes the anchor's drain witness; the
+  `*_state_at` laws hand back `∃ D, dpos_ev B D ∗ ctx_floor cur_ctx D`.
+- `WpSconfLock`: `lock_word_amo_keep`/`lock_word_amo_mint` over the AMO's
+  both-log append (`TsoCtxStore.ledger_store_win_pin_okf_amo`, the new
+  `ledger_store_win_at_okf_amo`; premise `¬ own_fp_pending` from the node);
+  the mint exports `dpos_ev (S (length log)) (S (length dl))` and the floor
+  at `S (length dl)`; the AMO leaf's body converted; `pin_mint_run` at the
+  floor; `lock_word_read_pin` RESTATED through the anchor's drain and
+  `Admitted` STAGE E (an AMO cannot be chained in general, §2.10: the
+  "released, store pending" protocol state is stage E's).
+- `PipeInvDefs`: `pipe_slack_at ξ pi` (the slack is `mem_free ξ`, the free
+  tier being ξ-indexed) so `pipe_res_at` is a λ again and `is_pipe_morph`
+  holds; `pipe_slack pi := pipe_slack_at cur_ctx pi`,
+  `pipe_slack_byte_any` the old spelling.  The `iExact` that hung was the
+  symptom: the two `inv`s differed in `pipe_res_at`'s implicit `CurCtx`.
+- The watermark is gone (§2.2): `ctx_wrote_register ξ i a m` registers
+  directly (`WpSconfMem`, `ProofIget`, `ProofVirtioDiskRwD`).
+- `dl`-arity passes over `WpSconfMem`, `WpSmodePtMem`, `UservecPt`,
+  `WpUmodeFetch`, `WpUmodeTextLoad`, `WpSconfLock`, `WpAu4`,
+  `ProofVirtioDisk*`, `ProofI*`; `RiscvAdequacy`'s step-arm count (the
+  memory thread is the sixth arm) and boot-shape conjunct.
+- `Pt2WalkPt`: the kernel-table leaf's canonical class is read through
+  `kpt_creds` (`swp_translate_kpt_hit_slot`, `swp_translate_pt2_kprev`
+  gain the premise; their callers thread it).
+- `IcacheEscrow.itable_ctx_hook E … emp` over the new hook.
+
+Still open after this pass (build24's diagnostics, above `WpLock`):
+- the `initlock` callers (`ProofKinit`, `ProofInitlog`, …) and the boot
+  builders (`IcacheBoot`: `ic_box_alloc_at`, `newlock_at_llb`, the
+  sleeplock births): every birth now takes the creator's FLUSHED token,
+  and boot has no fence in hand -- RULING C (the owner's);
+- `ProofVirtioDiskIntr.vt_idx_q`: the completion row's `⌜q ≤ V0⌝` is a
+  one-log visibility; under two logs it is the drain witness
+  `dpos_ev (S q) V0` (the used-index read gate hands `msg_visible`, whose
+  ghost form the leaf can mint off the interp) -- VirtioProto lane;
+- the `ProofMain*` proofs against §2.16's `started_*` contracts;
+- `KptPublish` as a gate in the csrw-satp hook; `VirtioProto`'s interp
+  gates (re-audit); the lock protocol's stage-E states;
+- the `dlen` audit continues: the floor receipts `llb Tl`/`llb tl` of
+  `SpecAcquiresleep`, `SpecReleasesleep`, `SpecIlock`, the bcache release
+  payloads and the lock leaves moved to `dlen_name` (floors are drain
+  stamps; `SpecAcquire`'s already was); callers present `llb dlen_name`.
+- STAGE E admits added in `WpSconfLock` (the racy lock tier, §2.7):
+  `lock_word_read_pin` (restated through the anchor's drain),
+  `lock_cell_read_vis` and `lock_cell_read_notheld` (the owner word's WPAY
+  rows are not chained; "held, cpu store pending"), and inside
+  `wp_amoswap_lockopen_s_sconf` the exclusive READ node -- under two logs
+  the AMO reads `dmem` after its own stores drained, and `dmem` differs
+  from the ledger's issue flat exactly in the "released, store pending"
+  window; the read/word identification `v2 = bytes` is the same gap.
+- `PipeInv`'s pipealloc birth (`newlock_d`'s wand now takes the flushed
+  token) is a boot-birth-class item under RULING C.
+- `FileInvDefs.off_free_at ξ k q` (the free word pinned to one context,
+  §2.14) with `file_core_off_morph`; `off_free k q` is its ambient form.
+- `FileInv.file_core_off_close` still consumes `off_last_close`'s `∃ ξb`
+  form; §2.14 says the closer takes the free bytes at `cur_ctx` through
+  the stamped box context's dom (OffBox lane) -- open.
+
+### 2.16 The started flag over two logs (2026-09-06, night): the record's drain length, agreed
+
+**The problem.** `StartedInv.started_right` tied the deposit's stamp `T`
+to the flag's ISSUE position (`⌜T ≤ S i⌝`) and `started_absorb` asked the
+reader for `S i ≤ V0` -- an issue index against a drain view, which the
+reader cannot have: what it learns from seeing `started_set` is the
+flag's DRAIN position `S q` (`dl !! q = Some i`), and `q` bears no relation
+to `i`.  The secondary's kernel-table credential (`CtxValues.kpt_pub`)
+was assembled from the deleted `cv_boot_cred_view` off `view_lb (S i)`,
+the same confusion.
+
+**The ruling.**  The flag store is a leaf (it holds the interp), so it
+mints hart 0's fence record at the flag -- `fr_at 0 i M`, `i = length
+glog` the fence's issue length, `M = length gdlog` its drain length -- and
+stamps the deposit UNDER `M` (`⌜T ≤ M⌝`, `T` is the deposit's drain
+stamp).  A reader that saw the flag drained at `S q ≤ V0` learns `M ≤ q`
+from the record's clause (i) at its own read leaf (`fr_at_after`), so
+`T ≤ M ≤ q < S q ≤ V0` and the absorb goes through with the reader's
+receipt.  Since both sides must speak about the SAME `M` -- the record is
+a set of triples and the reader's copy is only existentially tied to the
+invariant's -- `M` is a one-shot AGREEMENT `started_rec γm M` (in
+`kptbR`'s shape, unset while the flag is clear, shot at the store), the
+second gname of the invariant beside the index authority `γi`.
+
+**The shapes (`StartedInv`).**
+- `started_right γi γm ξd P := ∃ i M T, started_win_rel i ∗ dset_auth γi 1
+  {[(S i, started_addr)]} ∗ started_rec γm M ∗ fr_at 0 i M ∗ ctx_stamped ξd
+  T ∗ ⌜T ≤ M⌝ ∗ P i M ξd`; the payload is indexed by the flag's INDEX `i`
+  (not `S i`) and by `M`.
+- `started_res` and `started_W` export `started_idx γi i ∗ started_rec γm M
+  ∗ fr_at 0 i M`; `started_W` on the set arm is `∃ i M q, ⌜v = set ∧ dl !! q
+  = Some i ∧ S q ≤ tv ∧ M ≤ q⌝ ∗ … ∗ dpos_at dpos_name i (S q) ∗ ▷ P i M ξd`
+  (the drain position also as a ghost fact, for `kpt_pub`).
+- `started_absorb … (i M V0) : M ≤ V0 → … started_idx γi i -∗ started_rec γm
+  M -∗ hart_view_lb V0 -∗ own_context cur_ctx -∗ P i M ξd ={E}=∗ own_context
+  cur_ctx ∗ P i M cur_ctx`.
+- `started_store_obl γi γm ξd P B0 Bd0 p`: the bundle carries `llb
+  loglen_name B0` (the payload's ISSUE bound -- the sed'd `dlen_name` is
+  gone), the primary's view receipt `view_lb … Bd0` and the builder `□ (∀
+  pos M, ⌜B0 ≤ pos⌝ -∗ ⌜Bd0 ≤ M⌝ -∗ P pos M cur_ctx)`; the leaf cashes `B0
+  ≤ length glog` (`tso_interp_llb_valid`) and `Bd0 ≤ gtv ≤ length gdlog`
+  (`view_lb_le_view`), fires the builder at `(length glog, length gdlog)`,
+  deposits, mints `fr_mint`, shoots `started_rec`.
+- `SpecMainSecondary.main_dep γd γv pos M ξ := main_deposit ∗ ∃ B Bd,
+  kpt_bound B ∗ ⌜B ≤ pos⌝ ∗ kpt_dbound Bd ∗ ⌜Bd ≤ M⌝`; `CtxValues.
+  kpt_pub_intro B V i M q Bd : B ≤ i → M ≤ q → S q ≤ V → Bd ≤ M → view_lb V
+  -∗ fr_at 0 i M -∗ dpos_at i (S q) -∗ kpt_dbound Bd -∗ kpt_pub B` assembles
+  the secondary's credential in `ProofMainSecondary` (the spin's
+  continuation now yields `∃ i M q V0, P i M cur_ctx ∗ view_lb V0 ∗ fr_at 0
+  i M ∗ dpos_at i (S q) ∗ ⌜M ≤ q ∧ S q ≤ V0⌝`); `CtxValues.cv_boot_cred_
+  dbound` gives the primary its `kpt_dbound Bd ∗ view_lb Bd` for the
+  builder.  `SpecMain`'s recipe takes `(∃ Bd, kpt_dbound Bd ∗ ⌜Bd ≤ M⌝)`
+  beside the issue-bound tie.
+- `γm` is threaded through `SpecMain`, `SpecMainSecondary`, `ProofMain`,
+  `ProofMainSecondary`, `BootShared`, `BootChain`, `SystemAdequacy`
+  (statement-level; those files are frontier).
+
+`started_read_obl` stays `Admitted` (STAGE E, the racy release read); its
+statement now produces the record facts and the drain witness.
+
 ## 3. Stages
 
 | stage | what | state |

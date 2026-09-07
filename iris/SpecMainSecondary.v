@@ -154,14 +154,20 @@ Section MainDepositMorph.
      BELOW it.  That pure tie is what turns a secondary's read receipt
      ([view_lb] at the flag's position) into the pin credentials
      ([KptShare.kpt_creds]) its kvminithart call needs. *)
+  (* relaxed-ww §2.16: the deposit is indexed by the flag store's index
+     [pos] and hart 0's fence record's drain length [M] at it; it carries
+     the kernel table's ISSUE bound under the flag and its DRAIN bound under
+     the fence -- the two ties a secondary's credential
+     ([CtxValues.kpt_pub]) is assembled from. *)
   Definition main_dep (γd : uart_names) (γv : disk_names)
-      : nat -> CtxId -> iProp Σ :=
-    λ pos ξ, (main_deposit (XI := ξ) γd γv ∗
-              ∃ B : nat, KptGhost.kpt_bound B ∗ ⌜(B <= pos)%nat⌝)%I.
-  Global Instance main_dep_persistent γd γv pos ξ :
-    Persistent (main_dep γd γv pos ξ).
+      : nat -> nat -> CtxId -> iProp Σ :=
+    λ pos M ξ, (main_deposit (XI := ξ) γd γv ∗
+                ∃ B Bd : nat, KptGhost.kpt_bound B ∗ ⌜(B <= pos)%nat⌝ ∗
+                              CtxValues.kpt_dbound Bd ∗ ⌜(Bd <= M)%nat⌝)%I.
+  Global Instance main_dep_persistent γd γv pos M ξ :
+    Persistent (main_dep γd γv pos M ξ).
   Proof. rewrite /main_dep. apply _. Qed.
-  Global Instance main_dep_morph γd γv pos : CtxMorph (main_dep γd γv pos).
+  Global Instance main_dep_morph γd γv pos M : CtxMorph (main_dep γd γv pos M).
   Proof. rewrite /main_dep /main_deposit. ctx_morph_solve. Qed.
 End MainDepositMorph.
 
@@ -172,7 +178,7 @@ Section SpecMainSecondaryBody.
   Definition wp_main_secondary_sconf_body
       (m : regfile) (K : nat)
       (p0 : mword 64)
-      (γi : gname) (ξd : CtxId)
+      (γi γm : gname) (ξd : CtxId)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
@@ -200,7 +206,7 @@ Section SpecMainSecondaryBody.
     (* HART-GENERIC, as on the boot arm: this arm reaches scheduler(), whose
        acquire wants them hart-generically. *)
     (* the handover channel, at the CONCRETE deposit *)
-    started_inv γi ξd (main_dep γd γv) -∗
+    started_inv γi γm ξd (main_dep γd γv) -∗
     (* this hart's own translation and trap resources *)
     (* THE TIMER CAPABILITY, this hart's.  [timer_cap] is the sstc pin plus the
        stimecmp invariant (TimerCap.v), allocated in the boot chain out of the
@@ -210,11 +216,11 @@ Section SpecMainSecondaryBody.
     timer_cap -∗
     (* A6.138: [KptShare.kpt_creds] is NO LONGER A PREMISE -- a secondary's
        honest source is its own acquire of [started], and that is now
-       exactly where it is DERIVED: the deposit carries
-       [∃B, kpt_bound B ∗ ⌜B ≤ pos⌝] at the flag's position, the armed
-       read hands a [view_lb] receipt at that position, and
-       [view_lb_le] + [cv_boot_cred_view] + [kpt_creds_intro] mint the
-       credentials inside the spin's continuation. *)
+       exactly where it is DERIVED: the deposit carries the two bounds at
+       the flag, the armed read hands the fence record, the flag's drain
+       position and a view receipt above it, and [CtxValues.kpt_pub_intro]
+       + [kpt_creds_intro] mint the credentials inside the spin's
+       continuation (relaxed-ww §2.16). *)
     main_hart_raw tlbvec0 -∗
     WP (Loop : expr riscv_lang).
 
@@ -225,8 +231,8 @@ Module Type MAIN_SECONDARY.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (m : regfile) (K : nat)
-      (p0 : mword 64) (γi : gname) (ξd : CtxId)
+      (p0 : mword 64) (γi γm : gname) (ξd : CtxId)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)),
-      wp_main_secondary_sconf_body m K p0 γi ξd γd γv tlbvec0.
+      wp_main_secondary_sconf_body m K p0 γi γm ξd γd γv tlbvec0.
 End MAIN_SECONDARY.

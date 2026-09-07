@@ -614,7 +614,7 @@ Section ProofSysOpenAUWalk.
        half of the token from here on. *)
 
     iDestruct (log_tx_halve with "Htx") as (t) "[Htp Htr]".
-    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
+    iPoseProof (TsoGhost.llb_0 dlen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Ilock.wp_ilock_dep_sconf (CID := CID6) gs jx gl pd pav pu
               gil gisl
               kk (qq/2)%Qp gy loy tly (DepTx (qq/2)%Qp icfg_dev inum gy loy t (1/2)) PlainK

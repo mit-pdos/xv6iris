@@ -159,7 +159,7 @@ Definition wp_acquiresleep_gen_llb_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R H -∗
-  TsoGhost.llb loglen_name Tl -∗
+  TsoGhost.llb dlen_name Tl -∗
   (* THE DEPOSIT, spent into the lock and recovered by releasesleep *)
   H q -∗
   (* THE RUNNING THREAD'S OWN PROCESS BLOCK, TAKEN HERE AND HANDED STRAIGHT
@@ -231,7 +231,7 @@ Definition wp_acquiresleep_genl_llb_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslot
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_genl γl γsl slk s R H -∗
-  TsoGhost.llb loglen_name Tl -∗
+  TsoGhost.llb dlen_name Tl -∗
   (* THE DEPOSIT, spent into the lock and recovered by releasesleep *)
   H q -∗
   (* THE RUNNING THREAD'S OWN PROCESS BLOCK, TAKEN HERE AND HANDED STRAIGHT
@@ -455,7 +455,7 @@ Definition wp_acquiresleep_nb_genl_llb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
   cpu_own (S n) eb pj false lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_genl γl γsl slk s R (slh_tok γt) -∗
-  TsoGhost.llb loglen_name Tl -∗
+  TsoGhost.llb dlen_name Tl -∗
   (* THE EVIDENCE THAT THE LOCK IS FREE *)
   slh_auth γt None -∗
   proc_priv_bare pj pidv Upr -∗

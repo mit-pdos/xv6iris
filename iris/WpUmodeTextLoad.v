@@ -148,24 +148,24 @@ Section UmodeTextLoad.
   (* ([TsoCtx.ctx_phys_xload_ok]).                                          *)
   (* =================================================================== *)
   Lemma bytes_own_p_load_of (img mem : PtBytes.pamap)
-      (log : list pwmsg) (V : agent -> nat) (rs : regstate) (d : dev_state)
+      (log : list pwmsg) (dl : list nat) (V : agent -> nat) (rs : regstate) (d : dev_state)
       (F : Arch.pa -> option nat) (mm : PtBytes.pamap) (IK : nat)
       (pa : Arch.pa) (n : N) (w : bv (8 * n)) :
     (forall j : nat, (N.of_nat j < n)%N ->
        mm !! pa_add pa j = Some (nth_byte w j) /\ F (pa_add pa j) = Some IK) ->
     gen_heap_interp (hG := riscv_memGS) mem -∗
-    tso_interp_of riscv_eraGS img mem log V -∗
+    tso_interp_of riscv_eraGS img mem log dl V -∗
     TsoCtx.own_context XI -∗
     bytes_own_p F mm -∗
     ⌜forall tv' : nat, (V (hart_agent cpu_id) <= tv')%nat ->
-       tso_read_bytes img log (hart_agent cpu_id) tv' pa n w⌝.
+       tso_read_bytes img log dl (hart_agent cpu_id) tv' pa n w⌝.
   Proof.
     intros Hwin. iIntros "Hgh Htso Hrun Hown".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img mem log V rs d Hpin).
+    rewrite (tso_interp_of_at_gs riscv_eraGS img mem log dl V rs d Hpin).
     iAssert (⌜forall j : nat, (N.of_nat j < n)%N ->
                forall tv' : nat, (V (hart_agent cpu_id) <= tv')%nat ->
-                 tso_read img log (hart_agent cpu_id) tv' (pa_add pa j)
+                 tso_read img log dl (hart_agent cpu_id) tv' (pa_add pa j)
                    = Some (nth_byte w j)⌝)%I
       with "[Hgh Htso Hrun Hown]" as %HH.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
@@ -174,7 +174,7 @@ Section UmodeTextLoad.
       rewrite /bytes_own_p.
       iDestruct (big_sepM_lookup _ _ _ _ Hmm with "Hown") as "Ha".
       rewrite /xbyte HF.
-      iDestruct (TsoCtx.ctx_phys_xload_ok (gs_of img mem log V rs d) XI IK
+      iDestruct (TsoCtx.ctx_phys_xload_ok (gs_of img mem log dl V rs d) XI IK
                    (pa_add pa j) (DfracOwn 1) (nth_byte w j)
                    with "Hgh Htso Hrun Ha") as %Hrd.
       iPureIntro. cbn [gimg glog gtv gs_of] in Hrd. exact (Hrd tv' Htv). }
@@ -189,18 +189,18 @@ Section UmodeTextLoad.
     ud_um pt !! svpn_of va = Some w_leaf ->
     uM_bytes M (uint va) 1 b ->
     uva_text pt (uint va) ->
-    ⊢ (∀ σ img log tv V,
+    ⊢ (∀ σ img log dl tv V,
          ⌜V (hart_agent cpu_id) = tv⌝ -∗
          mstate_interp σ -∗
-         tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+         tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
          (TsoCtx.own_context XI ∗
           bytes_own_p (uv_F pt M IK) (uv_mm t (upa_map pt M)) ∗
           resv_any cpu_id) ={⊤,∅}=∗
-         ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
-            tso_read_bytes img log (hart_agent cpu_id) tv'
+         ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length dl)%nat ->
+            tso_read_bytes img log dl (hart_agent cpu_id) tv'
               (u_walk_pa w_leaf va) 1 b⌝ ∗
          ▷ (|={∅,⊤}=> mstate_interp σ ∗
-              tso_interp_of riscv_eraGS img σ.(mem) log V ∗
+              tso_interp_of riscv_eraGS img σ.(mem) log dl V ∗
               (TsoCtx.own_context XI ∗
                bytes_own_p (uv_F pt M IK) (uv_mm t (upa_map pt M)) ∗
                resv_any cpu_id))).
@@ -219,9 +219,9 @@ Section UmodeTextLoad.
                  Hl Hnc Hb j ltac:(lia)).
       - exact (uv_win_text pt M IK w_leaf va 1 _ b Hinj Hl Hnc Hb Htx j
                  ltac:(lia)). }
-    iIntros (σ img log tv V) "%Htv Hσ Htso (Hrun & Hown & Hany)".
+    iIntros (σ img log dl tv V) "%Htv Hσ Htso (Hrun & Hown & Hany)".
     rewrite /mstate_interp. iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
-    iDestruct (bytes_own_p_load_of img σ.(mem) log V σ.(sregs) σ.(mdev)
+    iDestruct (bytes_own_p_load_of img σ.(mem) log dl V σ.(sregs) σ.(mdev)
                  (uv_F pt M IK) (uv_mm t (upa_map pt M)) IK
                  (u_walk_pa w_leaf va) 1 b Hwin
                  with "Hmem Htso Hrun Hown") as %Hok.
@@ -261,15 +261,15 @@ Section UmodeTextLoad.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ img log tv V,
+    (∀ σ img log dl tv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
         mstate_interp σ -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
         R ={⊤,∅}=∗
-        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
-           tso_read_bytes img log (hart_agent cpu_id) tv' pa 1 b⌝ ∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length dl)%nat ->
+           tso_read_bytes img log dl (hart_agent cpu_id) tv' pa 1 b⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+             tso_interp_of riscv_eraGS img σ.(mem) log dl V ∗ R)) -∗
     R -∗
     swp (checked_mem_read (Load Data) PBMT_PMA User
            (Physaddr pa) 1 false false false false)
@@ -328,8 +328,8 @@ Section UmodeTextLoad.
                 (hread_req_at_read_ram1 pa) (addr_is_ram_not_dev pa Hram)
                 ltac:(reflexivity) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem HR]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso HR") as "[%Hrd Hclose]".
+      iIntros (σ img log dl tv V) "%Htv Hσ Htso".
+      iMod ("Hmem" $! σ img log dl tv V with "[//] Hσ Htso HR") as "[%Hrd Hclose]".
       iModIntro. iExists b. iSplitR; [iPureIntro; exact Hrd|]. iNext.
       iMod "Hclose" as "(Hσ & Htso & HR)". iModIntro. iFrame "Hσ Htso".
       iIntros (tvn Hlo Hhi) "_".

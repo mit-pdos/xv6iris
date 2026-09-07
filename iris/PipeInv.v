@@ -168,7 +168,7 @@ Section PipeInv.
   Lemma page_filled_pipe_raw (pi : mword 64) (c : bv 8) :
     page_valid pi -> page_filled pi c ⊢ pipe_raw pi.
   Proof.
-    intro Hpv. rewrite pipe_windows_named /pipe_raw /pipe_slack.
+    intro Hpv. rewrite pipe_windows_named /pipe_raw. iEval (rewrite pipe_slack_byte_any).
     iIntros "(W0 & W4 & W8 & W16 & Wd & W536 & W540 & W544 & W548 & Wtail)".
     iSplitL "W0".
     { rewrite (page_field4_named pi 0 (fun _ => c) Hpv ltac:(lia) ltac:(exists 0; reflexivity)).
@@ -214,7 +214,7 @@ Section PipeInv.
   Lemma pipe_raw_page_own (pi : mword 64) :
     pipe_raw pi ⊢ page_own pi.
   Proof.
-    rewrite /page_own /pipe_raw /pipe_slack.
+    rewrite /page_own /pipe_raw. iEval (rewrite pipe_slack_byte_any).
     replace 4096%nat with (4 + 4092)%nat by lia.
     rewrite (bwin_split pi 0 4 4092). replace (0 + 4)%nat with 4%nat by lia.
     replace 4092%nat with (4 + 4088)%nat by lia.
@@ -287,7 +287,7 @@ Section PipeInv.
     iDestruct "Hready" as (lo) "[Hcpu _]".
     iDestruct "Hb" as (vname nr nw ro wo bs) "(Hnm & Hnr & Hnw & Hro & Hwo & %Hlen & Hdat & Hslack)".
     iDestruct (WpLock.lk_cpu_fresh_free with "Hcpu") as "Hcpu".
-    rewrite /page_own /pipe_slack.
+    rewrite /page_own. iEval (rewrite pipe_slack_byte_any) in "Hslack".
     replace 4096%nat with (4 + 4092)%nat by lia.
     rewrite (bwin_split pi 0 4 4092). replace (0 + 4)%nat with 4%nat by lia.
     replace 4092%nat with (4 + 4088)%nat by lia.

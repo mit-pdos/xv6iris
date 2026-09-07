@@ -2177,7 +2177,7 @@ Section ProofAcquiresleep.
     cpu_own (S n) eb pj false lks -∗
     kernel_text -∗ pc_is pcE -∗
     is_sleeplock_genl γl γsl slk s R H -∗
-    TsoGhost.llb loglen_name Tl -∗
+    TsoGhost.llb dlen_name Tl -∗
     H q -∗
     X -∗
     proc_priv_bare pj pidv Upr -∗

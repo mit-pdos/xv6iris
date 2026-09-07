@@ -1214,14 +1214,14 @@ Section WpSmodePtMemLeaves.
                through the running context's bound.  Its conclusion is
                PURE, so the window, the token and the interp bundle all
                survive the call and go straight back out in the post. *)
-            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iAssert (⌜forall tvr : nat, (V (hart_agent cpu_id) <= tvr)%nat ->
-                       TsoMemPa.tso_read_bytes img log (hart_agent cpu_id) tvr
+                       TsoMemPa.tso_read_bytes img log dl (hart_agent cpu_id) tvr
                          (pa_of ppn (add_vec (m !!! Regidx rs1)
                                        (sign_extend' 64 imm))) 4 v⌝)%I
               as %Hrb.
-            { iApply (wordw_win_load_c (KTR := kt') 4 img sigma log V
+            { iApply (wordw_win_load_c (KTR := kt') 4 img sigma log dl V
                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                         ppn v dqm Hcan
                         ltac:(apply Forall_forall; intros j Hj;
@@ -1563,14 +1563,14 @@ Section WpSmodePtMemLeaves.
                through the running context's bound.  Its conclusion is
                PURE, so the window, the token and the interp bundle all
                survive the call and go straight back out in the post. *)
-            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iAssert (⌜forall tvr : nat, (V (hart_agent cpu_id) <= tvr)%nat ->
-                       TsoMemPa.tso_read_bytes img log (hart_agent cpu_id) tvr
+                       TsoMemPa.tso_read_bytes img log dl (hart_agent cpu_id) tvr
                          (pa_of ppn (add_vec (m !!! Regidx rs1)
                                        (sign_extend' 64 imm))) 8 v⌝)%I
               as %Hrb.
-            { iApply (wordw_win_load_c (KTR := kt') 8 img sigma log V
+            { iApply (wordw_win_load_c (KTR := kt') 8 img sigma log dl V
                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                         ppn v dqm Hcan
                         ltac:(apply Forall_forall; intros j Hj;
@@ -1908,9 +1908,9 @@ Section WpSmodePtMemLeaves.
                bundle and the token and hands back the advanced pair.
                [word4_pointsto_write_c]'s conclusion IS [Wobl_ram]'s post,
                modulo the arm's own naming of [tv]. *)
-            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-            iMod (word4_pointsto_write_c (KTR := kt') img sigma log V
+            iMod (word4_pointsto_write_c (KTR := kt') img sigma log dl V
                     (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn
                     vold (trunc32 (m !!! Regidx rs2)) Hcan Hoff
                     with "Hk Hmem Htso Hrun Hword")
@@ -2239,9 +2239,9 @@ Section WpSmodePtMemLeaves.
                bundle and the token and hands back the advanced pair.
                [word_pointsto_write_c]'s conclusion IS [Wobl_ram]'s post,
                modulo the arm's own naming of [tv]. *)
-            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iIntros (sigma img log dl tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-            iMod (word_pointsto_write_c (KTR := kt') img sigma log V
+            iMod (word_pointsto_write_c (KTR := kt') img sigma log dl V
                     (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn
                     vold (m !!! Regidx rs2) Hcan Hoff
                     with "Hk Hmem Htso Hrun Hword")

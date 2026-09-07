@@ -105,7 +105,7 @@ Definition wp_releasesleep_genin_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
      releaser hands the payload UNFLOORED ([Rdep]) with a loglen receipt at
      [tl]; the hook mints the floor at the lock's stamped record and the
      entailment above re-floors the row inside it *)
-  TsoGhost.llb loglen_name tl -∗
+  TsoGhost.llb dlen_name tl -∗
   Rdep TsoCtx.cur_ctx -∗
   (* wakeup's resources *)
   procs_inv γs -∗
