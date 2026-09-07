@@ -1,8 +1,10 @@
 # Project: relaxing the memory model to allow store–store reordering (PSO)
 
-**STATUS 2026-09-06 (night): STAGE D IN PROGRESS on branch `relaxed-ww`
-(local; `main` + the three `relaxed-ww-twolog` commits rebased + the work
-below).  Done: the rebase (§3); the fourth twin `iris/TsoCtxTwin4.v`; the
+**STATUS 2026-09-06 (late): STAGE D IN PROGRESS on branch `relaxed-ww`,
+pushed as `origin/relaxed-ww-twolog` (force-updated over the pre-rebase
+stage-B head, which is kept as tag `relaxed-ww-twolog-prerebase`; the tip
+is the WIP frontier commit, uncompiled).  §2.13 is the checkpoint, §2.14
+the revised design (reviewed) that the next work implements first.  Done: the rebase (§3); the fourth twin `iris/TsoCtxTwin4.v`; the
 fence-record map (`fence_rec`/`fr_ok`/`era_fr_name`; `TsoGhost.dpos_ev`);
 §2.10's revision (the chain is a PER-FACT witness, the free tier is
 ξ-indexed) across `TsoMemPa` / `TsoGhost` / `RiscvPtsto` / `RiscvExec` /
