@@ -523,6 +523,7 @@ def emit_passes(built=None, reset=False):
             spec = cfg["csched_hw"] if pl == "jh7110" and cfg["csched_hw"] \
                    else cfg["csched"]
             scheds = parse_csched(spec) if spec.strip() else []
+            picks = [q.strip() for q in cfg.get("picks", "").split(",") if q.strip()]
             if v == "agree" and conc and scheds:
                 # ONE BLOCK PER OBSERVATION, paired with its own schedule,
                 # in the order the capture lists them.  Not [repeat]: that
@@ -573,6 +574,31 @@ def emit_passes(built=None, reset=False):
                         "   produced, under an INTERLEAVING of the two harts --\n"
                         "   which is what a race has and what the single-hart\n"
                         "   theorem cannot state")
+            elif v == "agree" and not conc and len(picks) > 1:
+                # ONE MODEL EXECUTION PER OBSERVATION, and here what varies
+                # is not an interleaving but WHICH IN-FLIGHT REQUEST THE
+                # DISK ANSWERS.  A case that declares several picks observed
+                # several completion orders and the model must have each;
+                # one pick applied to every observation can only ever
+                # exhibit one of them.
+                blocks = "\n".join(
+                    f"""    destruct Ho as [<-|Ho];
+      [ apply (run_shows {tick} {q} {budget});
+        vm_cast_no_check (eq_refl true) |].""" for q in picks)
+                sig = f"""Module {mod}Pass <: TEST_PASSES_AGREE {mod} {mod}Run.
+  Lemma agrees :
+    run_agrees {mod}.hart {mod}.text {mod}.regions
+               {mod}.uart_input {mod}.disk_init {mod}Run.observed.
+  Proof.
+    intros o Ho.
+    cbn [{mod}Run.observed {mod}Run.results fmap list_fmap] in Ho.
+{blocks}
+    destruct Ho.
+  Qed."""
+                imports = f"From VTest.{PLATDIR[pl]} Require Import {mod}Test {mod}Run."
+                what = ("the model EXHIBITS every observation the platform\n"
+                        "   produced, each under the disk completion order named\n"
+                        "   for it -- which is what a case with several picks has")
             elif v == "agree":
                 sig = f"""Module {mod}Pass <: TEST_PASSES_AGREE {mod} {mod}Run.
   Lemma agrees :
@@ -583,7 +609,7 @@ def emit_passes(built=None, reset=False):
     cbn [{mod}Run.observed {mod}Run.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
             [ apply (run_shows {tick} lowest_head {budget});
-              vm_compute; repeat split |]).
+              vm_cast_no_check (eq_refl true) |]).
     destruct Ho.
   Qed."""
                 imports = f"From VTest.{PLATDIR[pl]} Require Import {mod}Test {mod}Run."

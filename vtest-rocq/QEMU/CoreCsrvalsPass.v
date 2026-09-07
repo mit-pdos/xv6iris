@@ -21,7 +21,7 @@ Module CoreCsrvalsPass <: TEST_PASSES_AGREE CoreCsrvals CoreCsrvalsRun.
     cbn [CoreCsrvalsRun.observed CoreCsrvalsRun.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
             [ apply (run_shows false lowest_head 4000);
-              vm_compute; repeat split |]).
+              vm_cast_no_check (eq_refl true) |]).
     destruct Ho.
   Qed.
 End CoreCsrvalsPass.

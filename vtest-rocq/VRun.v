@@ -116,6 +116,57 @@ Definition img_of_sectors (ss : list (Z * list Z)) : gmap Z (bv 8) :=
 Definition disk_of_sectors (ss : list (Z * list Z)) : Z -> bv 8 :=
   disk_of (img_of_sectors ss).
 
+(* THE DISK, READ BACK WHERE THE CAPTURE LOOKED.
+
+   [o_disk] is the sectors the run CHANGED -- what the platform's runner can
+   read back afterwards -- and the claim is that reading each of them out of
+   the model's disk returns the same bytes.
+
+   IT IS NOT [v_disk = disk_of_sectors o_disk], and that is not a
+   simplification.  Those two are equal as FUNCTIONS and the equality is
+   UNPROVABLE here: the model's disk is a closure the drain built, and
+   [disk_of_sectors] is a lookup in a gmap, so nothing but extensionality
+   relates two functions that agree everywhere.  Measured, four runs --
+   disk_err, disk_intr, plic_arb, plic_tie -- agree with their capture on
+   every byte of every sector it recorded and could still not be proved.  A
+   list equality can be, and says what was actually measured.
+
+   WHAT IT DOES NOT SAY: that the model changed ONLY those sectors.  The
+   capture cannot say that either -- it records what changed on the
+   platform, and a sector neither machine touched is not an observation. *)
+Definition sector_at (d : Z -> bv 8) (i : Z) (n : nat) : list Z :=
+  (fun k => bv_unsigned (d (i * virtio_sector_size + Z.of_nat k)))
+    <$> seq 0 n.
+
+(* STRUCTURAL ON THE SECTOR LIST, and that is a performance decision.
+   Written as [(fun p => ...) <$> ss = ss] it is the same claim, but
+   [vm_compute] is call-by-value and normalises the mapped FUNCTION -- which
+   mentions [d], the disk, a closure the run built -- before it ever looks
+   at [ss].  Measured: conc_smoke went from 7s to over 200s, for a list that
+   is EMPTY.  Recursing on [ss] means an empty one is [True] and [d] is
+   never forced. *)
+Fixpoint disk_at (d : Z -> bv 8) (ss : list (Z * list Z)) : Prop :=
+  match ss with
+  | [] => True
+  | (i, bs) :: ss' => sector_at d i (length bs) = bs /\ disk_at d ss'
+  end.
+
+Fixpoint disk_at_b (d : Z -> bv 8) (ss : list (Z * list Z)) : bool :=
+  match ss with
+  | [] => true
+  | (i, bs) :: ss' => bool_decide (sector_at d i (length bs) = bs)
+                      && disk_at_b d ss'
+  end.
+
+Lemma disk_at_b_sound (d : Z -> bv 8) (ss : list (Z * list Z)) :
+  disk_at_b d ss = true -> disk_at d ss.
+Proof.
+  induction ss as [|[i bs] ss IH]; [done|].
+  cbn [disk_at_b disk_at]. intros H.
+  apply andb_prop in H as [H1 H2].
+  split; [by apply bool_decide_eq_true in H1|exact (IH H2)].
+Qed.
+
 
 Module Type TEST.
   (* labels *)
@@ -198,7 +249,7 @@ Fixpoint obs_in (l : list mobs) : list (bv 8) :=
 Definition observed_at (g : gstate) (o : observation) : Prop :=
   peek_mem (gmem g) result_base result_size = o.(o_result)
   /\ (bv_unsigned <$> u_wire (duart (gdev g))) = o.(o_uart)
-  /\ v_disk (dvirtio (gdev g)) = disk_of_sectors o.(o_disk).
+  /\ disk_at (v_disk (dvirtio (gdev g))) o.(o_disk).
 
 (* ...AND WHAT IT MEANS FOR THE MODEL TO BE STUCK THERE.  Not the whole
    configuration -- the device loops always have a step -- but ONE THREAD

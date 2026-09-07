@@ -5,7 +5,8 @@
    computation of the interpreter to it.
 
    THIS RUN PASSES BECAUSE the model EXHIBITS every observation the platform
-   produced, from this test's own configuration. *)
+   produced, each under the disk completion order named
+   for it -- which is what a case with several picks has. *)
 From Stdlib Require Import List ZArith.
 From stdpp Require Import base list.
 Import ListNotations.
@@ -19,9 +20,12 @@ Module DiskOrderPass <: TEST_PASSES_AGREE DiskOrder DiskOrderRun.
   Proof.
     intros o Ho.
     cbn [DiskOrderRun.observed DiskOrderRun.results fmap list_fmap] in Ho.
-    repeat (destruct Ho as [<-|Ho];
-            [ apply (run_shows false lowest_head 30000);
-              vm_compute; repeat split |]).
+    destruct Ho as [<-|Ho];
+      [ apply (run_shows false lowest_head 30000);
+        vm_cast_no_check (eq_refl true) |].
+    destruct Ho as [<-|Ho];
+      [ apply (run_shows false highest_head 30000);
+        vm_cast_no_check (eq_refl true) |].
     destruct Ho.
   Qed.
 End DiskOrderPass.

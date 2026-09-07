@@ -853,6 +853,16 @@ Definition conc_result (tick : bool) (sch round : list citem) (n : nat)
   | None => None
   end.
 
+(* THE PREMISE IS A CONJUNCTION HERE AND A BOOLEAN IN [VExecStep], and the
+   difference is measured, not stylistic.  The single-hart run's boolean
+   form is 1.7x faster (core_smoke 5.0s -> 2.9s): the tactic computes
+   nothing and the kernel checks once instead of twice.  The MULTI-HART
+   run's is 25x SLOWER (conc_smoke 7s -> over 180s), because a [cstate]
+   carries the write log and the per-hart coherence maps -- and the
+   coherence map is a NEST OF CLOSURES, one per plain read.  Reducing a
+   boolean forces the whole record to a value, closures and all;
+   [vm_compute] then [repeat split] forces only the three fields the
+   equations mention.  So this one keeps the conjunction. *)
 Theorem conc_shows (tick : bool) (c0 c1 : CPU) (sch round : list citem) (n : nat)
     (hart : Z) (text : list Z) (rs : list region)
     (disk_init : list (Z * list Z)) (o : observation) :
@@ -862,7 +872,7 @@ Theorem conc_shows (tick : bool) (c0 c1 : CPU) (sch round : list citem) (n : nat
   match conc_result tick sch round n hart text rs disk_init with
   | Some cs => peek_mem cs.(cmem) result_base result_size = o.(o_result)
                /\ serial_of (Some (cfocus cs hart_primary)) = o.(o_uart)
-               /\ v_disk (dvirtio cs.(cdev)) = disk_of_sectors o.(o_disk)
+               /\ disk_at (v_disk (dvirtio cs.(cdev))) o.(o_disk)
   | None => False
   end ->
   exists N l ts g,
@@ -955,7 +965,7 @@ Theorem conc2_shows (tick : bool) (bs : list (bool * bool)) (n : nat)
   match conc2_result tick bs n hart text rs disk_init with
   | Some cs => peek_mem cs.(cmem) result_base result_size = o.(o_result)
                /\ serial_of (Some (cfocus cs hart_primary)) = o.(o_uart)
-               /\ v_disk (dvirtio cs.(cdev)) = disk_of_sectors o.(o_disk)
+               /\ disk_at (v_disk (dvirtio cs.(cdev))) o.(o_disk)
   | None => False
   end ->
   exists N l ts g,

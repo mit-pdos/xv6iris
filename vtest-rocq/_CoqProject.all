@@ -15,12 +15,6 @@ VExecStep.v
 VConcStep.v
 VRun.v
 VModelFacts.v
-ConcAmoSched.v
-ConcByteSched.v
-ConcLostSched.v
-ConcMpSched.v
-ConcSbSched.v
-ConcSmokeSched.v
 QEMU/ClintMsipPass.v
 QEMU/ClintMsipRun.v
 QEMU/ClintMsipTest.v
@@ -42,6 +36,9 @@ QEMU/ConcLostTest.v
 QEMU/ConcMpPass.v
 QEMU/ConcMpRun.v
 QEMU/ConcMpTest.v
+QEMU/ConcMpWhenPass.v
+QEMU/ConcMpWhenRun.v
+QEMU/ConcMpWhenTest.v
 QEMU/ConcSbPass.v
 QEMU/ConcSbRun.v
 QEMU/ConcSbTest.v
@@ -259,6 +256,9 @@ JH7110/ConcLostTest.v
 JH7110/ConcMpPass.v
 JH7110/ConcMpRun.v
 JH7110/ConcMpTest.v
+JH7110/ConcMpWhenPass.v
+JH7110/ConcMpWhenRun.v
+JH7110/ConcMpWhenTest.v
 JH7110/ConcSbPass.v
 JH7110/ConcSbRun.v
 JH7110/ConcSbTest.v

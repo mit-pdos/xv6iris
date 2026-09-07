@@ -21,7 +21,7 @@ Module DiskIdentFeatselPass <: TEST_PASSES_AGREE DiskIdentFeatsel DiskIdentFeats
     cbn [DiskIdentFeatselRun.observed DiskIdentFeatselRun.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
             [ apply (run_shows false lowest_head 2000);
-              vm_compute; repeat split |]).
+              vm_cast_no_check (eq_refl true) |]).
     destruct Ho.
   Qed.
 End DiskIdentFeatselPass.

@@ -1768,7 +1768,7 @@ Lemma observed_at_of_hart_ok (cpu : CPU) (g : gstate) (s : mstate)
   hart_ok cpu g s ->
   result_of (Some s) = o.(o_result) ->
   serial_of (Some s) = o.(o_uart) ->
-  v_disk (dvirtio (mdev s)) = disk_of_sectors o.(o_disk) ->
+  disk_at (v_disk (dvirtio (mdev s))) o.(o_disk) ->
   observed_at g o.
 Proof.
   intros [_ Hm Hd _ _ _ _ _ _] Hres Hser Hdsk.
@@ -1895,7 +1895,7 @@ Theorem exec_run_exhibits (tick : bool) (pick : virtio_state -> option Z)
   eval_run_at pick tick n s1 = RDone sf ->
   result_of (Some sf) = o.(o_result) ->
   serial_of (Some sf) = o.(o_uart) ->
-  v_disk (dvirtio (mdev sf)) = disk_of_sectors o.(o_disk) ->
+  disk_at (v_disk (dvirtio (mdev sf))) o.(o_disk) ->
   exists N l ts g,
     @language.nsteps riscv_lang N
       (test_config hart text rs disk_init) l (ts, g)
@@ -2249,30 +2249,47 @@ Definition run_result (tick : bool) (pick : virtio_state -> option Z)
   | None => None
   end.
 
+(* THE PREMISE IS A BOOLEAN, and that is a performance decision with a
+   correctness flavour.  Stated as a conjunction of equations, a generated
+   proof discharges it with [vm_compute], which leaves a cast the KERNEL
+   then re-checks at [Qed] -- so the whole run is computed TWICE.  Measured
+   on core_smoke: 0.8 s to load the libraries, 1.2 s to build the byte map,
+   0.5 s to run 29 instructions, and 2.5 s more for the second computation.
+   As a boolean the proof is [vm_cast_no_check (eq_refl true)]: the tactic
+   computes nothing and the kernel checks once. *)
+Definition run_matches (tick : bool) (pick : virtio_state -> option Z) (n : nat)
+    (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
+    (o : observation) : bool :=
+  match run_result tick pick n hart text rs uart_input disk_init with
+  | Some sf =>
+      bool_decide (result_of (Some sf) = o.(o_result))
+      && bool_decide (serial_of (Some sf) = o.(o_uart))
+      && disk_at_b (v_disk (dvirtio (mdev sf))) o.(o_disk)
+  | None => false
+  end.
+
 Theorem run_shows (tick : bool) (pick : virtio_state -> option Z) (n : nat)
     (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
     (o : observation) :
-  match run_result tick pick n hart text rs uart_input disk_init with
-  | Some sf => result_of (Some sf) = o.(o_result)
-               /\ serial_of (Some sf) = o.(o_uart)
-               /\ v_disk (dvirtio (mdev sf)) = disk_of_sectors o.(o_disk)
-  | None => False
-  end ->
+  run_matches tick pick n hart text rs uart_input disk_init o = true ->
   exists N l ts g,
     @language.nsteps riscv_lang N
       (test_config hart text rs disk_init) l (ts, g)
     /\ obs_in l = uart_input
     /\ observed_at g o.
 Proof.
-  unfold run_result.
+  unfold run_matches, run_result.
   destruct (srun (uart_pre uart_input) (exec_start hart text rs disk_init))
-    as [s1|] eqn:Hpre; [|intros []].
+    as [s1|] eqn:Hpre; [|discriminate].
   destruct (eval_run_at pick tick n s1) as [sf|sf e|sf] eqn:Hrun;
-    [|intros []|intros []].
-  intros (Hres & Hser & Hdsk).
+    [|discriminate|discriminate].
+  intros H.
+  apply andb_prop in H as [H12 H3]. apply andb_prop in H12 as [H1 H2].
+  apply bool_decide_eq_true in H1, H2. apply disk_at_b_sound in H3.
   exact (exec_run_exhibits tick pick n hart text rs uart_input disk_init
-           s1 sf o Hpre Hrun Hres Hser Hdsk).
+           s1 sf o Hpre Hrun H1 H2 H3).
 Qed.
 
 Definition run_stuck (tick : bool) (pick : virtio_state -> option Z)
