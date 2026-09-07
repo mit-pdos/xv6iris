@@ -25,7 +25,7 @@
 > (commit 263098976; as-built record at the top of its brief in the briefs file), so E2-L is
 > UNBLOCKED.**  E2-C was launched the same day, in THIS checkout (lanes run one at a time in the
 > session's own directory — owner's rule of 2026-09-07; the build script takes the tree as its first
-> argument).  On resume: `git status` — a clean tree means the last lane landed (check
+> argument; log name `rE2C`; its first pass created `FsAbsCreateFire.v` and touched FsAbsDelta, FsAbsMknodFire, SpecCreate, SpecSysMknodAU and the ProofCreate* files — if the tree is dirty with those, E2-C did not finish: build with the script and continue against its brief, or `git checkout -- iris && git clean -f iris/FsAbsCreateFire.v` and redo).  On resume: `git status` — a clean tree means the last lane landed (check
 > `git log`); modified iris files are the next lane's partial work: run the build script (log name =
 > the lane) and finish to green against its brief, or `git checkout -- iris` and redo from the brief.
 >
