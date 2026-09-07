@@ -11,6 +11,7 @@ VTso.v
 VBoot.v
 VConc.v
 VNode.v
+VExecStep.v
 VRun.v
 VRunConc.v
 VIcache.v

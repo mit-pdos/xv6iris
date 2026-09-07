@@ -459,7 +459,8 @@ End {mod}Pass.
 # no capture comparison can express, which is why they outlived the per-case
 # files they came from.
 HARNESS = ["VSched.v", "VExecStuck.v", "VTest.v", "VTso.v", "VBoot.v", "VConc.v",
-           "VNode.v", "VRun.v", "VRunConc.v", "VIcache.v", "VModelFacts.v"]
+           "VNode.v", "VExecStep.v", "VRun.v", "VRunConc.v", "VIcache.v",
+           "VModelFacts.v"]
 
 PROJECT_HEAD = """-R . VTest
 -R ../iris xv6iris
