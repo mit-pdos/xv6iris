@@ -810,6 +810,55 @@ pinw_vis`.
    right seam for `bget` (the deposit happens under `bcache.lock`, whose
    release is the fence).
 
+**Review findings (Fable review of the §2.13 checkpoint, 2026-09-06, late)
+-- recorded verbatim in substance; nothing below is acted on yet:**
+
+- SOUNDNESS. `cv_key_read` is FALSE as stated: nothing ties the floor `B`
+  to a write OF the byte (`chain_ev B` is vacuous at bytes message `B-1`
+  does not write, and `pin_ok` is one-log); counterexample: a foreign
+  pending write below the floor, the image byte outside the family.  Fix:
+  the pin's tie or the row records "`B = 0` or message `B-1` writes `a`"
+  (the boot route has `latest` in hand at the mint; the top-mint route
+  cannot and should die with `ledger_read_pin_ok`).  `cv_own_read` TRUE
+  (`cv_own` carries `msg_byte`).  `cv_slot_dmem_ok` TRUE modulo the same
+  hole in the drained arm; the own arm needs no FIFO -- `¬own_fp_pending`
+  is per-byte `pend_read`.  `ledger_read_pin_ok` is FALSE (compares a
+  drain receipt with an issue floor): delete with its consumer
+  (`TsoCtxLedger.v:1162`).  `swp_execute_fence_u` provable (expect a
+  pure-vs-barrier split: some FENCE encodings emit no barrier node; and
+  `cur_privilege = User` from the frame).  `cred_floor`, `ledger_anchor`,
+  `kpt_anchor`'s own arm: not weakened.  `fr_ok` sound; the comment at
+  `TsoCtx.fr_mint` about the older `M` "weaker" is wrong for clause (ii).
+- DESIGN.  Q1: the reuse mint is a trap for a consumer needing `T ≤ M` with
+  `T` stamped at the same leaf; re-key the record as a set of triples
+  `(h, N, M) ↦ ()`.  Q2: yes, by per-byte `pend_read`.  Q3: `L ≤ s` and the
+  flag's drain floor `D` belong in `started_W`/`started_right` beside
+  `started_idx`; `StartedInv.v:482`'s `llb dlen_name B0` bounds an ISSUE
+  index -- a sed casualty, the wrong number line.  Q4: pin `f->off`'s free
+  word to ONE context -- `off_last_close`'s `∃ ξb` is unusable by the
+  next `filealloc` store; return the bytes at `cur_ctx` inside the
+  withdraw via the stamped-context dom.  Q5: the seam is right but
+  `lock_ctx_hook` has no export -- give it a `Q` the release hands to the
+  continuation (`bchain` must reach `acquiresleep`); the same shape recurs
+  at every deposit-under-lock site.  `fr_ok` keyed by hart: right shape.
+  `kpt_dbound` one-shot: sound and sufficient.
+- PROCESS.  Scriptable: the `(σ img log dl tv V)` spelling (78 sites, 11
+  files).  NOT scriptable: `llb loglen_name → dlen_name` (61 left in 22
+  files) -- classify each site (identity vs floor).  Wrong or stale in the
+  working tree: `ProofMainSecondary.v:815` calls the deleted
+  `cv_boot_cred_view` (the secondary's credential is `kpt_pub`);
+  `ProofBread.v:1470` consumes the recycle wand at the old arity; the
+  §2.13 "EDIT NOT YET APPLIED" note on `WpSconfEngine` is stale (the
+  ghost-step route is in the working tree); `RiscvAdequacy` -- confirm the
+  FIRST-boot era construction allocates the new ghosts, not only the power
+  arm; `IcachePinwObl.v:81` discards `dpos_ev`/`chain_ev` the admit will
+  want.
+- RISKS, in order: (1) fix the pin tie before any stage E work; (2) widen
+  `lock_ctx_hook` with an export before porting the twelve callers; (3)
+  triple-key `fr_at` while it has two consumers; (4) re-audit every sed
+  `llb dlen_name`; (5) `started_W` must carry `D` and `L ≤ i` before
+  `kpt_pub` can be assembled -- the boot chain's critical path.
+
 ## 3. Stages
 
 | stage | what | state |
