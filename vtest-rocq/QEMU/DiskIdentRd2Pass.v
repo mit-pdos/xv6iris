@@ -20,7 +20,7 @@ Module DiskIdentRd2Pass <: TEST_PASSES_AGREE DiskIdentRd2 DiskIdentRd2Run.
     intros o Ho.
     cbn [DiskIdentRd2Run.observed DiskIdentRd2Run.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (run_shows false lowest_head 2000);
+            [ apply (run_shows false lowest_head 2000 2000);
               vm_cast_no_check (eq_refl true) |]).
     destruct Ho.
   Qed.

@@ -20,7 +20,7 @@ Module DiskIdentQselPass <: TEST_PASSES_AGREE DiskIdentQsel DiskIdentQselRun.
     intros o Ho.
     cbn [DiskIdentQselRun.observed DiskIdentQselRun.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (run_shows false lowest_head 2000);
+            [ apply (run_shows false lowest_head 2000 2000);
               vm_cast_no_check (eq_refl true) |]).
     destruct Ho.
   Qed.

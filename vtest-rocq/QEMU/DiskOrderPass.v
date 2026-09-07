@@ -21,10 +21,10 @@ Module DiskOrderPass <: TEST_PASSES_AGREE DiskOrder DiskOrderRun.
     intros o Ho.
     cbn [DiskOrderRun.observed DiskOrderRun.results fmap list_fmap] in Ho.
     destruct Ho as [<-|Ho];
-      [ apply (run_shows false lowest_head 30000);
+      [ apply (run_shows false lowest_head 30000 30000);
         vm_cast_no_check (eq_refl true) |].
     destruct Ho as [<-|Ho];
-      [ apply (run_shows false highest_head 30000);
+      [ apply (run_shows false highest_head 30000 30000);
         vm_cast_no_check (eq_refl true) |].
     destruct Ho.
   Qed.

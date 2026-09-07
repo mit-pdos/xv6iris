@@ -20,7 +20,7 @@ Module UartRxPass <: TEST_PASSES_AGREE UartRx UartRxRun.
     intros o Ho.
     cbn [UartRxRun.observed UartRxRun.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (run_shows false lowest_head 50000);
+            [ apply (run_shows false lowest_head 50000 50000);
               vm_cast_no_check (eq_refl true) |]).
     destruct Ho.
   Qed.

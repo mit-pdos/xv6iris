@@ -148,13 +148,25 @@ Inductive eresult :=
   | RStuck  (s : mstate) (why : estuck) (* [exec] would not step, and why  *)
   | RBudget (s : mstate).               (* still running when time ran out *)
 
+(* [lk] IS THE GATEWAY'S CREDIT, in instructions.  [VSched.settle] is eager
+   -- it takes every enabled device arm -- and one of those arms is the PLIC
+   gateway re-forwarding a level source that is still asserted.  The
+   RELATION never requires that arm ([SLatch] is never forced), so a run
+   that does not take it is just as much a model execution; but eager is all
+   the harness could say, and plic_level's phase 2 is exactly the case where
+   taking it and not taking it differ.  So the latch is enabled for the
+   first [lk] instructions and disabled after: a case that wants the
+   gateway to forward ONCE names an [lk] between its two forwards, and every
+   other case passes its whole budget and is unaffected. *)
 Fixpoint eval_run_at (pick : virtio_state -> option Z) (tick : bool)
-    (n : nat) (s : mstate) : eresult :=
+    (lk : nat) (n : nat) (s : mstate) : eresult :=
   if flag_set s then RDone s else
   match n with
   | 0%nat => RBudget s
   | S n' => match exec_r (riscv_step tick) s with
-            | inl (_, s') => eval_run_at pick tick n' (settle_at pick dev_fuel s')
+            | inl (_, s') =>
+                eval_run_at pick tick (pred lk) n'
+                  (settle_gated pick (negb (Nat.eqb lk 0)) dev_fuel s')
             | inr e => RStuck s e
             end
   end.
@@ -164,16 +176,18 @@ Fixpoint eval_run_at (pick : virtio_state -> option Z) (tick : bool)
    [destruct] then has nothing syntactically matching
    [exec_r (riscv_step tick) s] to abstract. *)
 Lemma eval_run_at_O (pick : virtio_state -> option Z) (tick : bool)
-    (s : mstate) :
-  eval_run_at pick tick 0 s = if flag_set s then RDone s else RBudget s.
+    (lk : nat) (s : mstate) :
+  eval_run_at pick tick lk 0 s = if flag_set s then RDone s else RBudget s.
 Proof. cbn [eval_run_at]. destruct (flag_set s); reflexivity. Qed.
 
 Lemma eval_run_at_S (pick : virtio_state -> option Z) (tick : bool)
-    (n : nat) (s : mstate) :
-  eval_run_at pick tick (S n) s =
+    (lk : nat) (n : nat) (s : mstate) :
+  eval_run_at pick tick lk (S n) s =
     (if flag_set s then RDone s
      else match exec_r (riscv_step tick) s with
-          | inl (_, s') => eval_run_at pick tick n (settle_at pick dev_fuel s')
+          | inl (_, s') =>
+              eval_run_at pick tick (pred lk) n
+                (settle_gated pick (negb (Nat.eqb lk 0)) dev_fuel s')
           | inr e => RStuck s e
           end).
 Proof. reflexivity. Qed.
@@ -1511,9 +1525,9 @@ Qed.
    the goal are the ones this proof means to split.  Unfolding [settle1_gated]
    as well puts a composite match outermost, and a [repeat destruct] then
    takes the whole chain apart instead of one arm. *)
-Lemma settle1_item_w (pick : virtio_state -> option Z) (s s' : mstate)
-    (w : gmap Arch.pa (bv 8)) :
-  settle1_gated_w pick true s = Some (s', w) ->
+Lemma settle1_item_w (pick : virtio_state -> option Z) (latch : bool)
+    (s s' : mstate) (w : gmap Arch.pa (bv 8)) :
+  settle1_gated_w pick latch s = Some (s', w) ->
   exists i, dev_item i = true /\ item_no_input i = true
             /\ sapply_w i s = Some (s', w).
 Proof.
@@ -1526,6 +1540,7 @@ Proof.
           | context[lowest_cached (dvirtio (mdev s))] =>
               destruct (lowest_cached (dvirtio (mdev s))) as [?sec|] eqn:?
           | context[wire_needed s ?k] => destruct (wire_needed s k) eqn:?
+          | context[if latch then _ else None] => destruct latch
           end; try discriminate H);
     revert H; intros [= <- <-];
     match goal with
@@ -1536,33 +1551,34 @@ Proof.
     end.
 Qed.
 
-Lemma settle1_item (pick : virtio_state -> option Z) (s s' : mstate) :
-  settle1_at pick s = Some s' ->
+Lemma settle1_item (pick : virtio_state -> option Z) (latch : bool)
+    (s s' : mstate) :
+  settle1_gated pick latch s = Some s' ->
   exists i, dev_item i = true /\ item_no_input i = true
             /\ sapply i s = Some s'.
 Proof.
-  unfold settle1_at, settle1_gated. intros H.
-  destruct (settle1_gated_w pick true s) as [[s1 w1]|] eqn:E; [|discriminate H].
+  unfold settle1_gated. intros H.
+  destruct (settle1_gated_w pick latch s) as [[s1 w1]|] eqn:E; [|discriminate H].
   revert H; intros [= <-].
-  destruct (settle1_item_w pick s s1 w1 E) as (i & Hd & Hq & Hw).
+  destruct (settle1_item_w pick latch s s1 w1 E) as (i & Hd & Hq & Hw).
   exists i. split; [exact Hd|]. split; [exact Hq|].
   unfold sapply. rewrite Hw. reflexivity.
 Qed.
 
 Lemma settle1_nsteps (gen : nat) (ts : list mexpr) (g : gstate)
-    (s s' : mstate) (pick : virtio_state -> option Z) :
+    (s s' : mstate) (pick : virtio_state -> option Z) (latch : bool) :
   UartLoopE gen ∈ ts -> DiskLoopE gen ∈ ts -> PlicLoopE gen ∈ ts ->
   thread_live g gen ->
   hart_ok hart_primary g s ->
   all_resv g.(gresv) = ∅ ->
-  settle1_at pick s = Some s' ->
+  settle1_gated pick latch s = Some s' ->
   exists kappa g',
     @language.nsteps riscv_lang 1 (ts, g) kappa (ts, g')
     /\ hart_ok hart_primary g' s' /\ thread_live g' gen
     /\ all_resv g'.(gresv) = ∅ /\ obs_in kappa = [].
 Proof.
   intros Hu Hdk Hp Hlive Hok Hres Hset.
-  destruct (settle1_item pick s s' Hset) as (i & Hd & Hq & Hap).
+  destruct (settle1_item pick latch s s' Hset) as (i & Hd & Hq & Hap).
   destruct (sapply_dev_nsteps gen ts i g s s' Hu Hdk Hp Hlive Hok Hres Hd Hap)
     as (kappa & g' & Hn & Hok' & Hlv & Hres' & Hqu).
   exists kappa, g'. split; [exact Hn|]. split; [exact Hok'|].
@@ -1591,7 +1607,7 @@ Proof.
 Qed.
 
 Lemma settle_nsteps (gen : nat) (ts : list mexpr)
-    (pick : virtio_state -> option Z) (fuel : nat) :
+    (pick : virtio_state -> option Z) (latch : bool) (fuel : nat) :
   UartLoopE gen ∈ ts -> DiskLoopE gen ∈ ts -> PlicLoopE gen ∈ ts ->
   forall (g : gstate) (s : mstate),
   thread_live g gen ->
@@ -1599,25 +1615,26 @@ Lemma settle_nsteps (gen : nat) (ts : list mexpr)
   all_resv g.(gresv) = ∅ ->
   exists n kappa g',
     @language.nsteps riscv_lang n (ts, g) kappa (ts, g')
-    /\ hart_ok hart_primary g' (settle_at pick fuel s)
+    /\ hart_ok hart_primary g' (settle_gated pick latch fuel s)
     /\ thread_live g' gen /\ all_resv g'.(gresv) = ∅
     /\ obs_in kappa = [].
 Proof.
   intros Hu Hdk Hp. induction fuel as [|f IH]; intros g s Hlive Hok Hres.
   - exists 0%nat, [], g. split; [apply language.nsteps_refl|].
     split; [exact Hok|]. split; [assumption|]. split; [assumption|reflexivity].
-  - unfold settle_at, settle_gated. cbn [settle_gated_w].
-    destruct (settle1_gated_w pick true s) as [[s1 w1]|] eqn:E1.
-    + assert (Hs1 : settle1_at pick s = Some s1)
-        by (unfold settle1_at, settle1_gated; rewrite E1; reflexivity).
-      destruct (settle1_nsteps gen ts g s s1 pick Hu Hdk Hp Hlive Hok Hres Hs1)
+  - unfold settle_gated. cbn [settle_gated_w].
+    destruct (settle1_gated_w pick latch s) as [[s1 w1]|] eqn:E1.
+    + assert (Hs1 : settle1_gated pick latch s = Some s1)
+        by (unfold settle1_gated; rewrite E1; reflexivity).
+      destruct (settle1_nsteps gen ts g s s1 pick latch
+                  Hu Hdk Hp Hlive Hok Hres Hs1)
         as (k1 & g1 & Hn1 & Hok1 & Hlv1 & Hres1 & Hq1).
       destruct (IH g1 s1 Hlv1 Hok1 Hres1)
         as (n2 & k2 & g2 & Hn2 & Hok2 & Hlv2 & Hres2 & Hq2).
       exists (1 + n2)%nat, (k1 ++ k2), g2.
       split; [exact (nsteps_trans _ _ _ _ _ _ _ Hn1 Hn2)|].
-      destruct (settle_gated_w pick true f s1) as [s'' ws] eqn:E2.
-      cbn [fst]. unfold settle_at, settle_gated in Hok2. rewrite E2 in Hok2.
+      destruct (settle_gated_w pick latch f s1) as [s'' ws] eqn:E2.
+      cbn [fst]. unfold settle_gated in Hok2. rewrite E2 in Hok2.
       cbn [fst] in Hok2. split; [exact Hok2|]. split; [assumption|].
       split; [assumption|]. rewrite obs_in_app, Hq1, Hq2. reflexivity.
     + exists 0%nat, [], g. split; [apply language.nsteps_refl|].
@@ -1706,11 +1723,11 @@ Lemma eval_run_nsteps (tick : bool) (gen : nat)
   UartLoopE gen ∈ t1 ++ t2 ->
   DiskLoopE gen ∈ t1 ++ t2 ->
   PlicLoopE gen ∈ t1 ++ t2 ->
-  forall (g : gstate) (s sf : mstate),
+  forall (lk : nat) (g : gstate) (s sf : mstate),
   thread_live g gen ->
   hart_ok hart_primary g s ->
   all_resv g.(gresv) = ∅ ->
-  eval_run_at pick tick n s = RDone sf ->
+  eval_run_at pick tick lk n s = RDone sf ->
   exists N kappa g',
     @language.nsteps riscv_lang N
       (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2, g) kappa
@@ -1718,7 +1735,7 @@ Lemma eval_run_nsteps (tick : bool) (gen : nat)
     /\ hart_ok hart_primary g' sf /\ thread_live g' gen
     /\ obs_in kappa = [].
 Proof.
-  intros Hu Hdk Hp. induction n as [|n' IH]; intros g s sf Hlive Hok Hres Hev.
+  intros Hu Hdk Hp. induction n as [|n' IH]; intros lk g s sf Hlive Hok Hres Hev.
   - rewrite eval_run_at_O in Hev. destruct (flag_set s) eqn:Hf; [|discriminate].
     revert Hev; intros [= <-].
     exists 0%nat, [], g. split; [apply language.nsteps_refl|].
@@ -1739,12 +1756,12 @@ Proof.
     (* 3. the devices *)
     destruct (settle_nsteps gen
                 (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2)
-                pick dev_fuel
+                pick (negb (Nat.eqb lk 0)) dev_fuel
                 (elem_of_pool _ _ _ _ Hu) (elem_of_pool _ _ _ _ Hdk)
                 (elem_of_pool _ _ _ _ Hp) g2 s1 Hlv2 Hok2 Hres2)
       as (N3 & k3 & g3 & Hn3 & Hok3 & Hlv3 & Hres3 & Hq3).
     (* 4. and around again *)
-    destruct (IH g3 (settle_at pick dev_fuel s1) sf Hlv3 Hok3 Hres3 Hev)
+    destruct (IH (pred lk) g3 (settle_gated pick (negb (Nat.eqb lk 0)) dev_fuel s1) sf Hlv3 Hok3 Hres3 Hev)
       as (N4 & k4 & g4 & Hn4 & Hok4 & Hlv4 & Hq4).
     exists (N1 + S (N3 + N4))%nat, (k3 ++ k4), g4.
     split; [|split; [exact Hok4|split; [exact Hlv4|]]];
@@ -1890,11 +1907,11 @@ Proof.
 Qed.
 
 Theorem exec_run_exhibits (tick : bool) (pick : virtio_state -> option Z)
-    (n : nat) (hart : Z) (text : list Z) (rs : list region)
+    (lk n : nat) (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
     (s1 sf : mstate) (o : observation) :
   srun (uart_pre uart_input) (exec_start hart text rs disk_init) = Some s1 ->
-  eval_run_at pick tick n s1 = RDone sf ->
+  eval_run_at pick tick lk n s1 = RDone sf ->
   result_of (Some sf) = o.(o_result) ->
   serial_of (Some sf) = o.(o_uart) ->
   disk_at (v_disk (dvirtio (mdev sf))) o.(o_disk) ->
@@ -1924,7 +1941,7 @@ Proof.
               s1 Hlvb Hokb Hresb Hpre)
     as (N2 & g2 & Hn2 & Hok2 & Hlv2 & Hres2).
   (* 3. the run *)
-  destruct (eval_run_nsteps tick 0 pick t1 t2 n Hu Hdk Hp g2 s1 sf
+  destruct (eval_run_nsteps tick 0 pick t1 t2 n Hu Hdk Hp lk g2 s1 sf
               Hlv2 Hok2 Hres2 Hrun)
     as (N3 & k3 & g3 & Hn3 & Hok3 & Hlv3 & Hq3).
   exists (S (N2 + N3)), (List.map ObsUartIn uart_input ++ k3),
@@ -2119,11 +2136,11 @@ Lemma eval_run_stuck_nsteps (tick : bool) (gen : nat)
   UartLoopE gen ∈ t1 ++ t2 ->
   DiskLoopE gen ∈ t1 ++ t2 ->
   PlicLoopE gen ∈ t1 ++ t2 ->
-  forall (g : gstate) (s sx : mstate),
+  forall (lk : nat) (g : gstate) (s sx : mstate),
   thread_live g gen ->
   hart_ok hart_primary g s ->
   all_resv g.(gresv) = ∅ ->
-  eval_run_at pick tick n s = RStuck sx ENoStep ->
+  eval_run_at pick tick lk n s = RStuck sx ENoStep ->
   exists N kappa g' m2 s2,
     @language.nsteps riscv_lang N
       (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2, g) kappa
@@ -2132,7 +2149,7 @@ Lemma eval_run_stuck_nsteps (tick : bool) (gen : nat)
     /\ obs_in kappa = []
     /\ enode tick m2 s2 = None /\ exec_r m2 s2 = inr ENoStep.
 Proof.
-  intros Hu Hdk Hp. induction n as [|n' IH]; intros g s sx Hlive Hok Hres Hev.
+  intros Hu Hdk Hp. induction n as [|n' IH]; intros lk g s sx Hlive Hok Hres Hev.
   - rewrite eval_run_at_O in Hev. destruct (flag_set s); discriminate Hev.
   - rewrite eval_run_at_S in Hev. destruct (flag_set s) eqn:Hf;
       [discriminate Hev|].
@@ -2145,11 +2162,11 @@ Proof.
         as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & _ & _ & _ & _ & _).
       destruct (settle_nsteps gen
                   (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2)
-                  pick dev_fuel
+                  pick (negb (Nat.eqb lk 0)) dev_fuel
                   (elem_of_pool _ _ _ _ Hu) (elem_of_pool _ _ _ _ Hdk)
                   (elem_of_pool _ _ _ _ Hp) g2 s1 Hlv2 Hok2 Hres2)
         as (N3 & k3 & g3 & Hn3 & Hok3 & Hlv3 & Hres3 & Hq3).
-      destruct (IH g3 (settle_at pick dev_fuel s1) sx Hlv3 Hok3 Hres3 Hev)
+      destruct (IH (pred lk) g3 (settle_gated pick (negb (Nat.eqb lk 0)) dev_fuel s1) sx Hlv3 Hok3 Hres3 Hev)
         as (N4 & k4 & g4 & m2 & s2 & Hn4 & Hok4 & Hlv4 & Hq4 & Hen4 & Hst4).
       exists (N1 + S (N3 + N4))%nat, (k3 ++ k4), g4, m2, s2.
       split; [|split; [exact Hok4|split; [exact Hlv4|split;
@@ -2185,11 +2202,11 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Theorem exec_run_no_step (tick : bool) (pick : virtio_state -> option Z)
-    (n : nat) (hart : Z) (text : list Z) (rs : list region)
+    (lk n : nat) (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
     (s1 sx : mstate) :
   srun (uart_pre uart_input) (exec_start hart text rs disk_init) = Some s1 ->
-  eval_run_at pick tick n s1 = RStuck sx ENoStep ->
+  eval_run_at pick tick lk n s1 = RStuck sx ENoStep ->
   exists N l ts g e,
     @language.nsteps riscv_lang N
       (test_config hart text rs disk_init) l (ts, g)
@@ -2211,7 +2228,7 @@ Proof.
               (elem_of_pool _ _ _ _ Hp) gb (exec_start hart text rs disk_init)
               s1 Hlvb Hokb Hresb Hpre)
     as (N2 & g2 & Hn2 & Hok2 & Hlv2 & Hres2).
-  destruct (eval_run_stuck_nsteps tick 0 pick t1 t2 n Hu Hdk Hp g2 s1 sx
+  destruct (eval_run_stuck_nsteps tick 0 pick t1 t2 n Hu Hdk Hp lk g2 s1 sx
               Hlv2 Hok2 Hres2 Hrun)
     as (N3 & k3 & g3 & m2 & s2 & Hn3 & Hok3 & Hlv3 & Hq3 & Hen3 & Hst3).
   exists (S (N2 + N3)), (List.map ObsUartIn uart_input ++ k3),
@@ -2240,11 +2257,11 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Definition run_result (tick : bool) (pick : virtio_state -> option Z)
-    (n : nat) (hart : Z) (text : list Z) (rs : list region)
+    (lk : nat) (n : nat) (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
   : option mstate :=
   match srun (uart_pre uart_input) (exec_start hart text rs disk_init) with
-  | Some s1 => match eval_run_at pick tick n s1 with
+  | Some s1 => match eval_run_at pick tick lk n s1 with
                | RDone sf => Some sf
                | _ => None
                end
@@ -2259,11 +2276,11 @@ Definition run_result (tick : bool) (pick : virtio_state -> option Z)
    0.5 s to run 29 instructions, and 2.5 s more for the second computation.
    As a boolean the proof is [vm_cast_no_check (eq_refl true)]: the tactic
    computes nothing and the kernel checks once. *)
-Definition run_matches (tick : bool) (pick : virtio_state -> option Z) (n : nat)
-    (hart : Z) (text : list Z) (rs : list region)
+Definition run_matches (tick : bool) (pick : virtio_state -> option Z)
+    (lk : nat) (n : nat) (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
     (o : observation) : bool :=
-  match run_result tick pick n hart text rs uart_input disk_init with
+  match run_result tick pick lk n hart text rs uart_input disk_init with
   | Some sf =>
       bool_decide (result_of (Some sf) = o.(o_result))
       && bool_decide (serial_of (Some sf) = o.(o_uart))
@@ -2271,11 +2288,11 @@ Definition run_matches (tick : bool) (pick : virtio_state -> option Z) (n : nat)
   | None => false
   end.
 
-Theorem run_shows (tick : bool) (pick : virtio_state -> option Z) (n : nat)
-    (hart : Z) (text : list Z) (rs : list region)
+Theorem run_shows (tick : bool) (pick : virtio_state -> option Z)
+    (lk : nat) (n : nat) (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
     (o : observation) :
-  run_matches tick pick n hart text rs uart_input disk_init o = true ->
+  run_matches tick pick lk n hart text rs uart_input disk_init o = true ->
   exists N l ts g,
     @language.nsteps riscv_lang N
       (test_config hart text rs disk_init) l (ts, g)
@@ -2285,38 +2302,38 @@ Proof.
   unfold run_matches, run_result.
   destruct (srun (uart_pre uart_input) (exec_start hart text rs disk_init))
     as [s1|] eqn:Hpre; [|discriminate].
-  destruct (eval_run_at pick tick n s1) as [sf|sf e|sf] eqn:Hrun;
+  destruct (eval_run_at pick tick lk n s1) as [sf|sf e|sf] eqn:Hrun;
     [|discriminate|discriminate].
   intros H.
   apply andb_prop in H as [H12 H3]. apply andb_prop in H12 as [H1 H2].
   apply bool_decide_eq_true in H1, H2. apply disk_at_b_sound in H3.
-  exact (exec_run_exhibits tick pick n hart text rs uart_input disk_init
+  exact (exec_run_exhibits tick pick lk n hart text rs uart_input disk_init
            s1 sf o Hpre Hrun H1 H2 H3).
 Qed.
 
 Definition run_stuck (tick : bool) (pick : virtio_state -> option Z)
-    (n : nat) (hart : Z) (text : list Z) (rs : list region)
+    (lk : nat) (n : nat) (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list (bv 8)) (disk_init : list (Z * list Z)) : bool :=
   match srun (uart_pre uart_input) (exec_start hart text rs disk_init) with
-  | Some s1 => match eval_run_at pick tick n s1 with
+  | Some s1 => match eval_run_at pick tick lk n s1 with
                | RStuck _ ENoStep => true
                | _ => false
                end
   | None => false
   end.
 
-Theorem run_no_step (tick : bool) (pick : virtio_state -> option Z) (n : nat)
-    (hart : Z) (text : list Z) (rs : list region)
+Theorem run_no_step (tick : bool) (pick : virtio_state -> option Z)
+    (lk n : nat) (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list (bv 8)) (disk_init : list (Z * list Z)) :
-  run_stuck tick pick n hart text rs uart_input disk_init = true ->
+  run_stuck tick pick lk n hart text rs uart_input disk_init = true ->
   run_no_step_at hart text rs uart_input disk_init.
 Proof.
   unfold run_stuck.
   destruct (srun (uart_pre uart_input) (exec_start hart text rs disk_init))
     as [s1|] eqn:Hpre; [|discriminate].
-  destruct (eval_run_at pick tick n s1) as [sf|sf e|sf] eqn:Hrun;
+  destruct (eval_run_at pick tick lk n s1) as [sf|sf e|sf] eqn:Hrun;
     [discriminate| |discriminate].
   destruct e; [|discriminate]. intros _. unfold run_no_step_at.
-  exact (exec_run_no_step tick pick n hart text rs uart_input disk_init
+  exact (exec_run_no_step tick pick lk n hart text rs uart_input disk_init
            s1 sf Hpre Hrun).
 Qed.

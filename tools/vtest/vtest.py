@@ -171,6 +171,18 @@ def config(name):
            #               the model has (VIcacheStep, icache.md).
            #               [ipol_hw] overrides it for the board.
            "ipol": "", "ipol_hw": "",
+           #   latch=N     how many INSTRUCTIONS the PLIC gateway may keep
+           #               re-forwarding a still-asserted level source for.
+           #               [VSched.settle] is eager and takes every enabled
+           #               device arm, but the RELATION never requires the
+           #               gateway arm ([SLatch] is never forced), so a run
+           #               that stops taking it is just as much a model
+           #               execution.  plic_level phase 2 is the case where
+           #               that matters: with the latch on throughout, the
+           #               model re-forwards after the complete and QEMU
+           #               does not.  0 means "the whole run", which is what
+           #               every other case wants.
+           "latch": 0,
            "budget": 2000, "tick": 0, "proj": "whole", "builder": "single"}
     for line in open(src):
         m = re.search(r"vtest:\s*(.*?)\s*\*/", line)
@@ -179,7 +191,7 @@ def config(name):
                 k, _, v = kv.partition("=")
                 cfg[k] = int(v) if k in ("repeat", "smp", "budget", "tick",
                                      "board_repeat", "selfmod",
-                                     "crounds") else v
+                                     "crounds", "latch") else v
     return cfg
 
 def build(name, defines=(), march="rv64imafd", tag=""):
@@ -539,6 +551,7 @@ def emit_passes(built=None, reset=False):
         stuck_budget = min(int(budget), STUCK_BUDGET)
         conc_rounds = (int(cfg["crounds"]) if int(cfg["crounds"])
                        else min(int(budget), CONC_ROUNDS))
+        lk = int(cfg["latch"]) if int(cfg["latch"]) else int(budget)
         for pl in PLATFORMS:
             if pl not in platforms_of(n):
                 continue
@@ -652,7 +665,7 @@ def emit_passes(built=None, reset=False):
                 # exhibit one of them.
                 blocks = "\n".join(
                     f"""    destruct Ho as [<-|Ho];
-      [ apply (run_shows {tick} {q} {budget});
+      [ apply (run_shows {tick} {q} {lk} {budget});
         vm_cast_no_check (eq_refl true) |].""" for q in picks)
                 sig = f"""Module {mod}Pass <: TEST_PASSES_AGREE {mod} {mod}Run.
   Lemma agrees :
@@ -677,7 +690,7 @@ def emit_passes(built=None, reset=False):
     intros o Ho.
     cbn [{mod}Run.observed {mod}Run.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (run_shows {tick} lowest_head {budget});
+            [ apply (run_shows {tick} lowest_head {lk} {budget});
               vm_cast_no_check (eq_refl true) |]).
     destruct Ho.
   Qed."""
@@ -690,7 +703,7 @@ def emit_passes(built=None, reset=False):
     run_no_step_at {mod}.hart {mod}.text {mod}.regions
                    {mod}.uart_input {mod}.disk_init.
   Proof.
-    apply (run_no_step {tick} lowest_head {stuck_budget}).
+    apply (run_no_step {tick} lowest_head {lk} {stuck_budget}).
     vm_cast_no_check (eq_refl true).
   Qed."""
                 imports = f"From VTest.{PLATDIR[pl]} Require Import {mod}Test."
@@ -989,6 +1002,14 @@ def emit_capture(platform, vmod, case, hart, text, results, serial, disk):
     with no run has no proof; that is a gap the table should show, not one
     a green tick should paper over."""
     PL = PLATDIR[platform]
+    # A HAND-WRITTEN Test or Run SURVIVES REGENERATION.  [emit_passes] has
+    # always honoured [hand_written]; this did not, and that is how
+    # QEMU/PlicLevelRun.v -- hand-written with a device schedule, because no
+    # builder computed what that run needed -- was silently overwritten.
+    for f in (vmod + "Test.v", vmod + "Run.v"):
+        if os.path.exists(rp(f, platform)) and hand_written(f, platform):
+            print("  == %s/%s: HAND-WRITTEN, left alone" % (PL, f))
+            return rp(vmod + "Test.v", platform)
     if not results.strip() or results.strip() == "[]":
         for f in (vmod + "Test.v", vmod + "Run.v", vmod + "Pass.v"):
             if os.path.exists(rp(f, platform)) and not hand_written(f, platform):

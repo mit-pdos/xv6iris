@@ -20,7 +20,7 @@ Module DiskIdentWr1Pass <: TEST_PASSES_AGREE DiskIdentWr1 DiskIdentWr1Run.
     intros o Ho.
     cbn [DiskIdentWr1Run.observed DiskIdentWr1Run.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (run_shows false lowest_head 2000);
+            [ apply (run_shows false lowest_head 2000 2000);
               vm_cast_no_check (eq_refl true) |]).
     destruct Ho.
   Qed.

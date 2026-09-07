@@ -20,7 +20,7 @@ Module CoreCsrwidePass <: TEST_PASSES_STUCK CoreCsrwide.
     run_no_step_at CoreCsrwide.hart CoreCsrwide.text CoreCsrwide.regions
                    CoreCsrwide.uart_input CoreCsrwide.disk_init.
   Proof.
-    apply (run_no_step false lowest_head 500).
+    apply (run_no_step false lowest_head 2000 500).
     vm_cast_no_check (eq_refl true).
   Qed.
 End CoreCsrwidePass.

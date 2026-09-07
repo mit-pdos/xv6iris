@@ -20,7 +20,7 @@ Module PtTlbSet0Pass <: TEST_PASSES_AGREE PtTlbSet0 PtTlbSet0Run.
     intros o Ho.
     cbn [PtTlbSet0Run.observed PtTlbSet0Run.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (run_shows false lowest_head 2000);
+            [ apply (run_shows false lowest_head 2000 2000);
               vm_cast_no_check (eq_refl true) |]).
     destruct Ho.
   Qed.

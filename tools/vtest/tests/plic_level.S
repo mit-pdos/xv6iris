@@ -45,7 +45,7 @@
    PLIC_SCTX in abi.h.  There are exactly 9 contexts on this PLIC, measured:
    0..8 can claim, 9 cannot, which is the E24's M-only context followed by
    four U74s with an M and an S each.) */
-/* vtest: repeat=1 platforms=qemu */
+/* vtest: repeat=1 platforms=qemu latch=40 */
 #include "abi.h"
 
 #define PLIC        0x0c000000

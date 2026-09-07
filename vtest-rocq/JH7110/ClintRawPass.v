@@ -20,7 +20,7 @@ Module ClintRawPass <: TEST_PASSES_AGREE ClintRaw ClintRawRun.
     intros o Ho.
     cbn [ClintRawRun.observed ClintRawRun.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (run_shows true lowest_head 8000);
+            [ apply (run_shows true lowest_head 8000 8000);
               vm_cast_no_check (eq_refl true) |]).
     destruct Ho.
   Qed.
