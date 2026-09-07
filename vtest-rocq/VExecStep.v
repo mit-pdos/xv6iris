@@ -26,7 +26,7 @@
 (* era reads flat" -- is why the harness was left computing this way.       *)
 (* ====================================================================== *)
 From Stdlib Require Import List ZArith Lia.
-From stdpp Require Import base list gmap functions bitvector.definitions.
+From stdpp Require Import base list gmap functions relations bitvector.definitions.
 Import ListNotations.
 Require Import RiscvModelBytes RiscvExec VirtioModel DevModel ColdBoot.
 Require Import RiscvLang TsoMemPa.
@@ -452,12 +452,132 @@ Lemma enode_prim (tick : bool) (gen : nat) (cpu : CPU) (g : gstate)
   hart_ok cpu g s ->
   enode tick m s = Some (m', s') ->
   exists g', prim_step (HartE gen cpu m) g [] (HartE gen cpu m') g' []
-             /\ hart_ok cpu g' s'.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen.
 Proof.
   intros Hlive Hok Hen.
   destruct (enode_mnode tick cpu g s m m' s' Hok Hen)
     as (log' & tv' & itv' & hr' & r' & Hnode & Hok').
-  exists (wb cpu g s' log' tv' itv' hr' r'). split; [|exact Hok'].
-  apply mnode_prim; [exact Hlive|].
-  rewrite (hart_ok_proj cpu g s Hok). exact Hnode.
+  exists (wb cpu g s' log' tv' itv' hr' r').
+  split; [|split; [exact Hok'|]].
+  - apply mnode_prim; [exact Hlive|].
+    rewrite (hart_ok_proj cpu g s Hok). exact Hnode.
+  - (* the write-back touches neither the power nor the generation *)
+    unfold thread_live, wb in *; cbn [gpow ggen] in *. exact Hlive.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 7. [exec] IS [enode], ITERATED.                                         *)
+(*                                                                         *)
+(*    The harness computes with [exec], which runs a monad to its VALUE.   *)
+(*    Node by node it is doing exactly what [enode] does -- the two are    *)
+(*    the same match -- so an [exec] that succeeds is a CHAIN of [enode]   *)
+(*    steps ending at the instruction boundary.  With section 6 that chain *)
+(*    is a chain of [prim_step]s.                                          *)
+(* ---------------------------------------------------------------------- *)
+
+Definition estep (tick : bool) : relation (M unit * mstate) :=
+  fun p q => enode tick (fst p) (snd p) = Some q.
+
+(* one node, on both sides *)
+Lemma exec_enode_step (tick : bool) (T : Type)
+    (oc : Interface.outcome _ T) (k : T -> M unit) (s : mstate) :
+  exec (Interface.Next oc k) s
+  = match enode tick (Interface.Next oc k) s with
+    | Some (m', s'') => exec m' s''
+    | None => None
+    end.
+Proof.
+  destruct oc; cbn [exec enode]; try reflexivity.
+  - destruct (dev_addr (Interface.ReadReq.pa t)).
+    + destruct (dev_read (mdev s) (Interface.ReadReq.pa t) n) as [[w d']|];
+        reflexivity.
+    + destruct (read_bytes (mem s) (Interface.ReadReq.pa t) n) as [w|];
+        reflexivity.
+  - destruct (dev_addr (Interface.WriteReq.pa t)).
+    + destruct (dev_write (mdev s) (Interface.WriteReq.pa t) n
+                          (Interface.WriteReq.value t)) as [d'|]; reflexivity.
+    + reflexivity.
+Qed.
+
+(* ...and the successor is always a CONTINUATION, which is what lets the
+   induction on the monad reach it *)
+Lemma enode_next_shape (tick : bool) (T : Type)
+    (oc : Interface.outcome _ T) (k : T -> M unit) (s : mstate)
+    (m' : M unit) (s'' : mstate) :
+  enode tick (Interface.Next oc k) s = Some (m', s'') -> exists v : T, m' = k v.
+Proof.
+  intros H. destruct oc; cbn [enode] in H;
+    first
+      [ discriminate H
+      | revert H; intros [= <- <-]; eexists; reflexivity
+      | idtac ].
+  - destruct (dev_addr (Interface.ReadReq.pa t)) in H.
+    + destruct (dev_read (mdev s) (Interface.ReadReq.pa t) n) as [[w d']|] in H;
+        [revert H; intros [= <- <-]; eexists; reflexivity | discriminate H].
+    + destruct (read_bytes (mem s) (Interface.ReadReq.pa t) n) as [w|] in H;
+        [revert H; intros [= <- <-]; eexists; reflexivity | discriminate H].
+  - destruct (dev_addr (Interface.WriteReq.pa t)) in H.
+    + destruct (dev_write (mdev s) (Interface.WriteReq.pa t) n
+                          (Interface.WriteReq.value t)) as [d'|] in H;
+        [revert H; intros [= <- <-]; eexists; reflexivity | discriminate H].
+    + revert H; intros [= <- <-]; eexists; reflexivity.
+Qed.
+
+Lemma exec_enode_rtc (tick : bool) (m : M unit) (s : mstate) (x : unit)
+    (s' : mstate) :
+  exec m s = Some (x, s') ->
+  rtc (estep tick) (m, s) (Interface.Ret x, s').
+Proof.
+  revert s. induction m as [y|T oc k IH]; intros s Hex.
+  - cbn [exec] in Hex. revert Hex; intros [= <- <-]. apply rtc_refl.
+  - rewrite (exec_enode_step tick T oc k s) in Hex.
+    destruct (enode tick (Interface.Next oc k) s) as [[m' s'']|] eqn:He;
+      [|discriminate Hex].
+    destruct (enode_next_shape tick T oc k s m' s'' He) as [v ->].
+    eapply rtc_l; [unfold estep; cbn [fst snd]; exact He|].
+    exact (IH v s'' Hex).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 8. A WHOLE [exec] IS A CHAIN OF THIS HART'S [prim_step]s.               *)
+(* ---------------------------------------------------------------------- *)
+
+Definition hstep (gen : nat) (cpu : CPU) : relation (M unit * gstate) :=
+  fun p q => prim_step (HartE gen cpu (fst p)) (snd p) []
+                       (HartE gen cpu (fst q)) (snd q) [].
+
+Lemma estep_hstep (tick : bool) (gen : nat) (cpu : CPU) :
+  forall p q : M unit * mstate, rtc (estep tick) p q ->
+  forall g, thread_live g gen -> hart_ok cpu g (snd p) ->
+    exists g', rtc (hstep gen cpu) (fst p, g) (fst q, g')
+               /\ hart_ok cpu g' (snd q) /\ thread_live g' gen.
+Proof.
+  intros p q Hrtc. induction Hrtc as [p|p1 p2 p3 Hstep Hrtc IH];
+    intros g Hlive Hok.
+  - exists g. split; [apply rtc_refl|]. split; assumption.
+  - destruct p1 as [m1 s1], p2 as [m2 s2].
+    unfold estep in Hstep; cbn [fst snd] in Hstep, Hok.
+    destruct (enode_prim tick gen cpu g s1 m1 m2 s2 Hlive Hok Hstep)
+      as (g1 & Hps & Hok1 & Hlive1).
+    destruct (IH g1 Hlive1 Hok1) as (g' & Hrtc' & Hok' & Hlive').
+    exists g'. split; [|split; assumption].
+    assert (Hstep1 : hstep gen cpu (m1, g) (m2, g1))
+      by (unfold hstep; cbn [fst snd]; exact Hps).
+    cbn [fst snd]. cbn [fst snd] in Hrtc'.
+    eapply rtc_l; [exact Hstep1|exact Hrtc'].
+Qed.
+
+(* ...so an instruction the harness executed is a chain of this hart's own
+   [prim_step]s, ending at the instruction boundary. *)
+Lemma exec_hstep (tick : bool) (gen : nat) (cpu : CPU) (m : M unit)
+    (s : mstate) (x : unit) (s' : mstate) (g : gstate) :
+  exec m s = Some (x, s') ->
+  thread_live g gen ->
+  hart_ok cpu g s ->
+  exists g', rtc (hstep gen cpu) (m, g) (Interface.Ret x, g')
+             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+Proof.
+  intros Hex Hlive Hok.
+  exact (estep_hstep tick gen cpu (m, s) (Interface.Ret x, s')
+           (exec_enode_rtc tick m s x s' Hex) g Hlive Hok).
 Qed.
