@@ -42,7 +42,7 @@ gains `CCpuStale`; `VNode` steps through the same arms one node at a time
 `VIcache.itexec` threads the same read side beside the instruction view.
 
 **`ConcSbSched.sb_00` = `align ++ [CCpuStale hart0 2; CCpuStale hart1 2]`
-exhibits (0,0)**, and `ConcSbQemuPass` is in `_CoqProject`: the last red
+exhibits (0,0)**, and `QEMU/ConcSbPass` is in `_CoqProject`: the last red
 run on the QEMU side that was a genuine model unsoundness is green, and the
 finding moved to "Findings fixed".  (The model facts
 `model_plain_store_buffers` / `model_plain_load_may_read_stale` that once
@@ -98,7 +98,7 @@ by the device policy".)
 
 THE FIX, in two parts.  [VSched.settle1_gated] takes a [latch] flag and every
 existing caller passes [true], so nothing else moves.  And
-PlicLevelQemuRun.v is HAND-WRITTEN -- the first user of the generator's
+QEMU/PlicLevelRun.v is HAND-WRITTEN -- the first user of the generator's
 hand-written escape hatch -- with a device schedule.
 
 THE SCHEDULE IS A CREDIT, NOT A STEP COUNT, and that distinction is the whole
@@ -226,8 +226,8 @@ the board (no disk).
 The suite now runs on a **StarFive VisionFive 2** (JH7110) over JTAG, beside
 QEMU.  `tools/vtest/board.py` is `vtest.py`'s sibling — same question, same
 test sources, same ABI, same model side — and it writes
-`vtest-rocq/<Name>HwGen.v` beside `<Name>Gen.v`, so the SAME
-`vtest-rocq/<Name>.v` checks the model against both captures.  Targets:
+`vtest-rocq/JH7110/<Name>Gen.v` beside `QEMU/<Name>Gen.v`, each with its
+own run module and proof.  Targets:
 `make hwtest-probe`, `make hwtest-gen`, `make hwtest`.  `make vtest-check`
 checks hardware captures like any other, because they are checked-in
 literals; nothing new needs the board attached.
@@ -564,6 +564,15 @@ illegally; the only question is whether the model has a run that matches.
 
 ## 2. Architecture, in one pass
 
+- **The platform is the DIRECTORY, not the file name.**  `vtest-rocq/` holds
+  the shared harness (`V*.v`) and the hand-written interleavings
+  (`<Case>Sched.v`, the same list on both platforms) at the top, and
+  everything about one platform under `QEMU/` or `JH7110/`: the capture
+  `<Case>Gen.v`, the run module `<Case>Run.v` built from it offline, and the
+  proof `<Case>Pass.v`.  A cross-directory `Require` is qualified (`From
+  VTest.QEMU Require Import CoreSmokeRun`).  `tools/vtest/vtest.py`'s `rp` /
+  `rrel` / `rocq_listdir` take the platform as an argument -- it cannot be
+  recovered from a name, and nothing should try.
 - **One binary runs on both machines.** A bare-metal M-mode image linked at
   `0x80000000`, assembled from `tools/vtest/tests/<area>_<name>.S`.
 - **Two observation channels**, and the serial console is deliberately not

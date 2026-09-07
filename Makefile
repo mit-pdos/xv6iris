@@ -296,7 +296,7 @@ audit-only:
 # tools/vtest/README.md and vtest-rocq/VTest.v.
 #
 # TWO TARGETS, and the split matters.  `vtest-gen` RE-RUNS QEMU and rewrites
-# the captured vtest-rocq/*Gen.v; it needs qemu-system-riscv64 and the riscv64
+# the captured vtest-rocq/QEMU/*Gen.v; it needs qemu-system-riscv64 and the
 # toolchain.  `vtest-check` only checks the model against the captures already
 # checked in, so CI (and anyone without QEMU) can run it.  Neither is part of
 # `make proofs`: a red device test is a finding about the model, and it must
@@ -341,10 +341,11 @@ vtest: vtest-gen vtest-check
 #
 # tools/vtest/board.py is vtest.py's sibling: it asks the same
 # one-directional question of a development board (currently a StarFive
-# VisionFive 2) instead of QEMU, and writes vtest-rocq/<Name>HwGen.v beside
-# vtest.py's <Name>Gen.v.  The SAME vtest-rocq/<Name>.v checks the model
-# against both captures, so there is no separate check target: a hardware
-# capture is checked by `vtest-check` like everything else.
+# VisionFive 2) instead of QEMU, and writes vtest-rocq/JH7110/<Name>Gen.v
+# beside vtest.py's vtest-rocq/QEMU/<Name>Gen.v.  Each carries its own run
+# module and proof; the platform is the DIRECTORY.  There is no separate
+# check target: a board capture is checked by `vtest-check` like every
+# other one.
 #
 # READ tools/vtest/README-hw.md BEFORE USING THESE.  A board run claims
 # something NARROWER than a QEMU run -- the image is not the same image, the
