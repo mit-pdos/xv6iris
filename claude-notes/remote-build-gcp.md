@@ -18,6 +18,7 @@ compiling, so a Spot preemption costs you the machine, never the agent.
 ./gcp-rocq/run-on-gcp --proofs         # sync, then build the whole tree
 ./gcp-rocq/run-on-gcp --proofs -k      # ... don't stop at the first error
 ./gcp-rocq/run-on-gcp --proofs ProofIput.vo
+./gcp-rocq/vmbuild.sh xv6iris-2 mylog   # iris/ only: rebuild the dirty files' cone, summary + /tmp/mylog.log on the VM
 ```
 
 **Use `--proofs`, never a remote `make`.** A top-level `make` on the VM reaches

@@ -155,8 +155,7 @@ Decisions folded in, each inherited from a landed ruling:
   work below the surface.  Lampson's `isDirTree` states the global
   version — for a QUIESCENT state seen by one observer, which is the
   tree layer's business, not this one's.
-- **Orphans are NOT in the view** (reversed 2026-09-05, owner's ruling
-  Q-d of `projects/app-round-e2.md`; lane E2-V2 built it).  An
+- **Orphans are NOT in the view.**  An
   unlinked-but-open file is a real machine state (`fn_nlink = 0`, no entry
   names it) but it is no longer part of the file system a user can NAME,
   so `aview` drops it at the last unlink (`δ_unlink` deletes the target's
@@ -290,9 +289,7 @@ truncate syscall):
 δ_free   i             :  IDENTITY on aview (iput's free acts on a row already gone)
 ```
 
-**THE VIEW IS THE LIVE NAMESPACE (owner's ruling 2026-09-05, round E2 of
-`applications.md`; `projects/app-round-e2.md` "Q-d"; BUILT by lane E2-V2
-the same day):** `aview` holds an
+**THE VIEW IS THE LIVE NAMESPACE:** `aview` holds an
 inode iff it is allocated AND `nlink ≠ 0` (`FsAbsDefs.abs_of : fs_node ->
 option anode`, `abs_view := omap abs_of`).  As built: every fire whose
 node is reached through an fd or a re-locked path (read, write, trunc,

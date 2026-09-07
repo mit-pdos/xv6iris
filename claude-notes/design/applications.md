@@ -3,10 +3,8 @@
 An APPLICATION is a collection of user-level programs plus what it claims:
 an invariant on the abstract file-system state, WPs for its programs, and
 a pure property of the UART trace.  This file is the design of record for
-how an application plugs into the whole-system theorem, as BUILT (rounds
-A, C, D0 of [`../projects/app-instances.md`](../projects/app-instances.md),
-landed 2026-09-05; that file keeps the rulings, the as-built deviations
-and the remaining round E).  It builds on [`adequacy.md`](adequacy.md)
+how an application plugs into the whole-system theorem, as built.  It
+builds on [`adequacy.md`](adequacy.md)
 (the trace slot `Pt`, the hook `Hphi`, the crash slot `Pc`),
 [`crash.md`](crash.md) (the fixed layer, the PowerOn arm's lend),
 [`fs-syscall-specs.md`](fs-syscall-specs.md) (the AU forms, the deltas
@@ -160,8 +158,7 @@ on `m`, an update needs the whole:
   exactly one place: the GENERIC dischargers pay the AU fires' steps with
   it (`app_step_of_auto`/`app_step_acc`), because nothing from the process
   reaches the kernel yet.  L2 replaces it by per-syscall proofs from the
-  process and deletes it (owner, 2026-09-05: "we eventually need to kill
-  this blanket permission").  An application whose predicate is not
+  process and deletes it.  An application whose predicate is not
   preserved by arbitrary changes (echo) is therefore an instance only after
   L2.
 - **What a process sees at a syscall:** an AU fire lends the pre-map and
@@ -287,7 +284,7 @@ across reboots.
 ## 7. Rejected shapes
 
 - **The application predicate as a `Prop`** (the scaffold's first cut).
-  Corrected by the owner 2026-09-05: an application's claim is a
+  An application's claim is a
   resource.  `fscfg` cannot hold an `iProp` (no `Σ`, 166 files name it),
   so the predicate is its own class record `appcfg Σ` in `fileG`.
 - **A client COPY of the map with a re-sync license** (`FsAbsInv`, the
