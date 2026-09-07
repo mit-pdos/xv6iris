@@ -39,21 +39,21 @@
 (*     content-free, so it is stated -- [reaches_no_step] -- as a fact     *)
 (*     about [run] at a state THIS test's execution arrives at.            *)
 (*                                                                         *)
-(* STUCK MEANS [ENoStep], NOT [VStuck].  [exec] also declines on           *)
-(* [Interface.Choose] -- the Sail monad's nondeterminism -- where the      *)
-(* RELATION does have transitions and the interpreter merely will not pick *)
-(* one, and "our proofs can never run into this case" is FALSE there.      *)
-(* [VExecStuck.exec_r_no_step] is what makes [ENoStep] mean the relation;  *)
-(* [EChoice] is a GAP, and no pass.                                        *)
+(* THERE IS NO INTERPRETER IN THIS FILE, and that is the point.  [exec],   *)
+(* [VConc.crun], [VTso.texec] and [VIcache.itexec] are proof STRATEGIES:   *)
+(* each is a different way to establish the one statement below, and each  *)
+(* owes a bridge to [prim_step] before it establishes anything at all.     *)
+(* A fact about [exec] is a fact about the interpreter until then.         *)
 (* ====================================================================== *)
 From Stdlib Require Import List ZArith String Bool.
 From stdpp Require Import base list gmap bitvector.definitions.
 Import ListNotations.
+From iris.program_logic Require Import language.
 From VTest Require Import VTest.
 Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
-(* 1. THE TEST.                                                            *)
+(* 1. WHAT A TEST IS -- the fields, and why each is the machine.           *)
 (*                                                                         *)
 (*    [text], [hart] and [regions] are not labels, they are the machine:   *)
 (*                                                                         *)
@@ -76,7 +76,7 @@ Local Open Scope Z_scope.
 (* ---------------------------------------------------------------------- *)
 
 (* ---------------------------------------------------------------------- *)
-(* 0. WHAT ONE EXECUTION PRODUCED, on every channel a platform has.        *)
+(* 2. WHAT ONE EXECUTION PRODUCED, on every channel a platform has.        *)
 (*                                                                         *)
 (*    A test has three outputs and the suite used to judge one.  The other *)
 (*    two were CAPTURED and compared against nothing: the bytes that left  *)
@@ -118,8 +118,6 @@ Definition img_of_sectors (ss : list (Z * list Z)) : gmap Z (bv 8) :=
 Definition disk_of_sectors (ss : list (Z * list Z)) : Z -> bv 8 :=
   disk_of (img_of_sectors ss).
 
-Definition disk_of_state (s : mstate) : Z -> bv 8 :=
-  v_disk (dvirtio (mdev s)).
 
 Module Type TEST.
   (* labels *)
@@ -142,132 +140,68 @@ Module Type TEST.
   Parameter disk_init  : list (Z * list Z).
 End TEST.
 
-(* THE ONE INITIAL STATE OF A TEST.  Every proposition below is about this
-   state, and no run may build another. *)
-Definition test_start (hart : Z) (text : list Z) (rs : list region)
-    (disk_init : list (Z * list Z)) : mstate :=
-  MState (ColdBoot.cold_regs (SailStdpp.Values.mword_of_int hart))
-         (mem_of text rs) (dev_of (img_of_sectors disk_init)).
-
-(* ...AND ITS INPUT, as the model receives it.  A byte ARRIVING is a schedule
-   choice ([VSched.SUartRx]), not something the program performs, so the
-   input is delivered as a prefix before the program is stepped. *)
-Definition uart_pre (bs : list Z) : list sitem :=
-  List.map SUartRx bs.
-
 (* ---------------------------------------------------------------------- *)
-(* 2. Running the model once, keeping the state at every ending.           *)
+(* 3. THE MACHINE THE TEST IS, AS THE LANGUAGE SEES IT.                    *)
 (*                                                                         *)
-(*    [VTest] has [run_until], [run_status], [stuck_why] and [budget_left] *)
-(*    as four separate traversals; asking all four costs four runs of the  *)
-(*    program, and a run is seconds to a minute.  This is one traversal.   *)
+(*     Everything above is about [mstate] and [exec] -- ONE hart, stepped  *)
+(*     by the reflective interpreter.  That is a proof STRATEGY, not the   *)
+(*     claim: the model our proofs are about is [RiscvLang.prim_step] over *)
+(*     [gstate], and a fact about [exec] is a fact about the interpreter   *)
+(*     until something connects them.                                      *)
 (*                                                                         *)
-(*    EVERY ARM CARRIES ITS STATE, the stuck one included.  Without that,  *)
-(*    "the model has no transition" can only be said of SOME state -- the  *)
-(*    shape [VTest.stuck_why_no_step] is stuck with, and nearly vacuous,   *)
-(*    since any junk state with no transition witnesses it.  With it, the  *)
-(*    claim is about a state this test's own execution reaches.            *)
+(*     So the theorem is stated HERE, over [rtc erased_step] from the      *)
+(*     test's own configuration, and every interpreter -- [eval_run_at]    *)
+(*     for one hart, [VConc.crun]/[cfinish] for an interleaving,           *)
+(*     [VTso.texec] under the relaxed machine, [VIcache.itexec] for a      *)
+(*     fetch schedule -- becomes a different way to PROVE it.  That is     *)
+(*     also why the single-hart shape could never have covered VRunConc:   *)
+(*     they are two strategies for one statement, not two statements.      *)
 (*                                                                         *)
-(*    [pick] is which in-flight virtio request the disk answers.  It was a *)
-(*    global default ([lowest_head]) baked into [settle] and visible in no *)
-(*    run -- yet it resolves the model's nondeterminism, and for a case    *)
-(*    whose subject IS the completion order it is the whole content of the *)
-(*    run.  It is a parameter here, and an argument to the decision        *)
-(*    procedure -- never a field, because the claim is that the model      *)
-(*    ADMITS the outcome, not that it admits it at one chosen order.       *)
+(*     THE THREAD POOL IS THE LANGUAGE'S OWN.  A powered-on generation-0   *)
+(*     machine is [power_fork 0]: every hart at an instruction boundary,   *)
+(*     plus the UART, disk and PLIC loops.  A vtest has no power thread -- *)
+(*     the machine starts powered on -- so the configuration is that pool  *)
+(*     over the test's state, and nothing here invents a shape of its own. *)
 (* ---------------------------------------------------------------------- *)
 
-Inductive eresult :=
-  | RDone   (s : mstate)                (* published its result            *)
-  | RStuck  (s : mstate) (why : estuck) (* [exec] would not step, and why  *)
-  | RBudget (s : mstate).               (* still running when time ran out *)
+Definition test_gstate (hart : Z) (text : list Z) (rs : list region)
+    (disk_init : list (Z * list Z)) : gstate :=
+  GState (fun c => ColdBoot.cold_regs
+                     (SailStdpp.Values.mword_of_int (hart + Z.of_nat (fin_to_nat c))))
+         (mem_of text rs) (dev_of (img_of_sectors disk_init))
+         0%nat true (fun _ => None)
+         (mem_of text rs) [] (fun _ => 0%nat) (fun _ => 0%nat)
+         (fun _ => hread0).
 
-Fixpoint eval_run_at (pick : virtio_state -> option Z) (tick : bool)
-    (n : nat) (s : mstate) : eresult :=
-  if flag_set s then RDone s else
-  match n with
-  | 0%nat => RBudget s
-  | S n' => match exec_r (riscv_step tick) s with
-            | inl (_, s') => eval_run_at pick tick n' (settle_at pick dev_fuel s')
-            | inr e => RStuck s e
-            end
+Definition test_config (hart : Z) (text : list Z) (rs : list region)
+    (disk_init : list (Z * list Z)) : cfg riscv_lang :=
+  (power_fork 0, test_gstate hart text rs disk_init).
+
+(* THE BYTES THE HOST TYPED, out of an observation trace.  The language
+   lets a byte arrive at any time, so an execution that is merely REACHABLE
+   is one in which the model chose its own input -- which is why the
+   theorem below is over [nsteps], where the trace survives, and not over
+   [erased_step], where it does not.  ([ObsTrace.obs_wire] is the output
+   half of the same idea, and equals the [u_wire] read below.) *)
+Fixpoint obs_in (l : list mobs) : list Z :=
+  match l with
+  | [] => []
+  | ObsUartIn b :: l' => bv_unsigned b :: obs_in l'
+  | _ :: l' => obs_in l'
   end.
 
-(* The two unfolding equations, so no proof below has to [cbn]: any [cbn]
-   here also unfolds [riscv_step] into the whole monadic term, and the
-   [destruct] then has nothing syntactically matching
-   [exec_r (riscv_step tick) s] to abstract. *)
-Lemma eval_run_at_O (pick : virtio_state -> option Z) (tick : bool)
-    (s : mstate) :
-  eval_run_at pick tick 0 s = if flag_set s then RDone s else RBudget s.
-Proof. cbn [eval_run_at]. destruct (flag_set s); reflexivity. Qed.
+(* WHAT A CONFIGURATION SHOWS, on the three channels a platform has. *)
+Definition observed_at (g : gstate) (o : observation) : Prop :=
+  peek_mem (gmem g) result_base result_size = o.(o_result)
+  /\ (bv_unsigned <$> u_wire (duart (gdev g))) = o.(o_uart)
+  /\ v_disk (dvirtio (gdev g)) = disk_of_sectors o.(o_disk).
 
-Lemma eval_run_at_S (pick : virtio_state -> option Z) (tick : bool)
-    (n : nat) (s : mstate) :
-  eval_run_at pick tick (S n) s =
-    (if flag_set s then RDone s
-     else match exec_r (riscv_step tick) s with
-          | inl (_, s') => eval_run_at pick tick n (settle_at pick dev_fuel s')
-          | inr e => RStuck s e
-          end).
-Proof. reflexivity. Qed.
-
-(* what a platform observes, on the model side *)
-Definition result_region (s : mstate) : list Z :=
-  peek_mem (mem s) result_base result_size.
-
-(* ---------------------------------------------------------------------- *)
-(* 3. THE TWO WAYS A RUN CAN PASS, both stated about the test's state.     *)
-(*                                                                         *)
-(*    [pre] is the TEST's input, delivered before the program runs (see    *)
-(*    [test_pre]).  It is PINNED and never existential: a model free to    *)
-(*    choose its own input proves nothing about a receiving test.  The     *)
-(*    empty input is the ordinary case: [srun [] s = Some s].              *)
-(* ---------------------------------------------------------------------- *)
-
-(* "the model, from [s0], has an execution that publishes [o]" -- the WHOLE
-   result region, nothing trimmed, so a difference cannot hide in the tail.
-
-   THERE IS NO PROJECTION.  A test used to be able to name the words it
-   wanted compared, for the honest reason that a raw [mtime] or a cycle
-   counter differs between two runs of the SAME machine.  But a value that
-   varies is a value the program should not have PUBLISHED: the result
-   region is the test's answer, and the fix for a field that cannot agree
-   is to stop writing it, not to agree to ignore it.  An arbitrary
-   projection also let a test weaken its own claim invisibly, and hid from
-   the theorem which bytes were being compared. *)
-Definition exhibits (pre : list sitem) (pick : virtio_state -> option Z)
-    (tick : bool) (budget : nat) (s0 : mstate) (o : observation) : Prop :=
-  exists s1 s,
-    srun pre s0 = Some s1
-    /\ eval_run_at pick tick budget s1 = RDone s
-    /\ result_region s = o.(o_result)
-    /\ serial_of (Some s) = o.(o_uart)
-    /\ disk_of_state s = disk_of_sectors o.(o_disk).
-
-(* "the model, from [s0], reaches a state THE RELATION cannot step from".
-   [run] is RiscvModelLang's relation and not the interpreter: that is what
-   [VExecStuck.exec_r_no_step] buys, and it is the only reason a stuck run
-   is admissible at all. *)
-Definition reaches_no_step (pre : list sitem)
-    (pick : virtio_state -> option Z) (tick : bool) (budget : nat)
-    (s0 : mstate) : Prop :=
-  exists s1 s, srun pre s0 = Some s1
-               /\ eval_run_at pick tick budget s1 = RStuck s ENoStep
-               /\ forall x s', ~ run (riscv_step tick) s x s'.
-
-Lemma eval_run_at_stuck (pick : virtio_state -> option Z) (tick : bool)
-    (n : nat) : forall s0 s,
-  eval_run_at pick tick n s0 = RStuck s ENoStep ->
-  exec_r (riscv_step tick) s = inr ENoStep.
-Proof.
-  induction n as [|n IH]; intros s0 s H.
-  - rewrite eval_run_at_O in H. destruct (flag_set s0); discriminate.
-  - rewrite eval_run_at_S in H. destruct (flag_set s0); [discriminate|].
-    destruct (exec_r (riscv_step tick) s0) as [[u s1]|e] eqn:He.
-    + exact (IH _ _ H).
-    + destruct e; [|discriminate]. inversion H; subst. exact He.
-Qed.
+(* ...AND WHAT IT MEANS FOR THE MODEL TO BE STUCK THERE.  Not the whole
+   configuration -- the device loops always have a step -- but ONE THREAD
+   with no transition, which is what makes a stuck run admissible: no proof
+   over the model gets past that thread either. *)
+Definition thread_no_step (g : gstate) (e : mexpr) : Prop :=
+  forall κ e' g' efs, ~ prim_step e g κ e' g' efs.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. A RUN OF A TEST, and the theorem.                                    *)
@@ -303,25 +237,18 @@ End TEST_RUN.
 Definition run_passes (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list Z) (disk_init : list (Z * list Z))
     (observed : list observation) : Prop :=
-  let s0 := test_start hart text rs disk_init in
+  let c0 := test_config hart text rs disk_init in
   (forall o, In o observed ->
-     exists pick tick budget,
-       exhibits (uart_pre uart_input) pick tick budget s0 o)
-  \/ (exists pick tick budget,
-       reaches_no_step (uart_pre uart_input) pick tick budget s0).
+     exists n l ts g,
+       nsteps n c0 l (ts, g)
+       /\ obs_in l = uart_input
+       /\ observed_at g o)
+  \/ (exists n l ts g e,
+       nsteps n c0 l (ts, g)
+       /\ obs_in l = uart_input
+       /\ In e ts /\ thread_no_step g e).
 
 Module Type TEST_PASSES (T : TEST) (R : TEST_RUN T).
   Axiom passes :
     run_passes T.hart T.text T.regions T.uart_input T.disk_init R.observed.
 End TEST_PASSES.
-
-(* ---------------------------------------------------------------------- *)
-(* 5. WHAT A PROOF LOOKS LIKE.                                             *)
-(*                                                                         *)
-(*    [result_region] and [serial_of] are lists and settle by computation, *)
-(*    as they always did.  The disk clause is an equality of FUNCTIONS and *)
-(*    does not: it is discharged from [VirtioModel]'s pointwise lemmas.    *)
-(*    A test that touches no disk has [o_disk = disk_init], so the clause  *)
-(*    says the disk did not move -- itself worth saying, and for a blank   *)
-(*    start it is [eq_refl].                                               *)
-(* ---------------------------------------------------------------------- *)
