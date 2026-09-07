@@ -23,7 +23,7 @@ Module ConcBytePass <: TEST_PASSES_AGREE ConcByte ConcByteRun.
     intros o Ho.
     cbn [ConcByteRun.observed ConcByteRun.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (conc2_shows false [] 20000);
+            [ apply (conc2_shows false [] 1500);
               vm_compute; repeat split |]).
     destruct Ho.
   Qed.

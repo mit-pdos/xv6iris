@@ -23,7 +23,7 @@ Module ConcSmokePass <: TEST_PASSES_AGREE ConcSmoke ConcSmokeRun.
     intros o Ho.
     cbn [ConcSmokeRun.observed ConcSmokeRun.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (conc2_shows false [] 5000);
+            [ apply (conc2_shows false [] 1500);
               vm_compute; repeat split |]).
     destruct Ho.
   Qed.

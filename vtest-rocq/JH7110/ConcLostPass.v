@@ -23,10 +23,10 @@ Module ConcLostPass <: TEST_PASSES_AGREE ConcLost ConcLostRun.
     intros o Ho.
     cbn [ConcLostRun.observed ConcLostRun.results fmap list_fmap] in Ho.
     destruct Ho as [<-|Ho];
-      [ apply (conc2_shows false (replicate 22 (false, false) ++ replicate 25 (true, false) ++ replicate 33 (false, false) ++ replicate 33 (true, false) ++ replicate 3 (false, false) ++ replicate 3 (false, false) ++ replicate 3 (true, false) ++ replicate 6 (false, false) ++ replicate 6 (true, false) ++ replicate 3 (false, false) ++ replicate 3 (true, false) ++ replicate 6 (false, false) ++ replicate 6 (true, false))%list 20000);
+      [ apply (conc2_shows false (replicate 22 (false, false) ++ replicate 25 (true, false) ++ replicate 33 (false, false) ++ replicate 33 (true, false) ++ replicate 3 (false, false) ++ replicate 3 (false, false) ++ replicate 3 (true, false) ++ replicate 6 (false, false) ++ replicate 6 (true, false) ++ replicate 3 (false, false) ++ replicate 3 (true, false) ++ replicate 6 (false, false) ++ replicate 6 (true, false))%list 1500);
         vm_compute; repeat split |].
     destruct Ho as [<-|Ho];
-      [ apply (conc2_shows false (replicate 22 (false, false) ++ replicate 25 (true, false) ++ replicate 33 (false, false) ++ replicate 33 (true, false) ++ replicate 3 (false, false) ++ replicate 3 (false, false) ++ replicate 3 (true, false) ++ replicate 6 (false, false) ++ replicate 6 (true, false) ++ replicate 11 (false, false))%list 20000);
+      [ apply (conc2_shows false (replicate 22 (false, false) ++ replicate 25 (true, false) ++ replicate 33 (false, false) ++ replicate 33 (true, false) ++ replicate 3 (false, false) ++ replicate 3 (false, false) ++ replicate 3 (true, false) ++ replicate 6 (false, false) ++ replicate 6 (true, false) ++ replicate 11 (false, false))%list 1500);
         vm_compute; repeat split |].
     destruct Ho.
   Qed.

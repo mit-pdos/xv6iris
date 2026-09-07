@@ -13,6 +13,8 @@ VConc.v
 VNode.v
 VExecStep.v
 VConcStep.v
+VIcache.v
+VIcacheStep.v
 VRun.v
 VModelFacts.v
 QEMU/ClintMsipPass.v

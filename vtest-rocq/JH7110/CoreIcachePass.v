@@ -5,11 +5,14 @@
    computation of the interpreter to it.
 
    THIS RUN PASSES BECAUSE the model EXHIBITS every observation the platform
-   produced, from this test's own configuration. *)
+   produced, each under the FETCH VIEW named for it --
+   the top of the log, or the instruction view that
+   only fence.i raises. *)
 From Stdlib Require Import List ZArith.
 From stdpp Require Import base list.
 Import ListNotations.
 From VTest Require Import VTest VRun VExecStep.
+From VTest Require Import VIcache VIcacheStep.
 From VTest.JH7110 Require Import CoreIcacheTest CoreIcacheRun.
 
 Module CoreIcachePass <: TEST_PASSES_AGREE CoreIcache CoreIcacheRun.
@@ -19,9 +22,9 @@ Module CoreIcachePass <: TEST_PASSES_AGREE CoreIcache CoreIcacheRun.
   Proof.
     intros o Ho.
     cbn [CoreIcacheRun.observed CoreIcacheRun.results fmap list_fmap] in Ho.
-    repeat (destruct Ho as [<-|Ho];
-            [ apply (run_shows false lowest_head 4000);
-              vm_cast_no_check (eq_refl true) |]).
+    destruct Ho as [<-|Ho];
+      [ apply (icache_shows IStale false 4000);
+        vm_compute; repeat split |].
     destruct Ho.
   Qed.
 End CoreIcachePass.

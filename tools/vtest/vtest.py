@@ -154,6 +154,23 @@ def config(name):
            #               interleaving, which is a fact about the case
            #               worth stating in the case.
            "csched": "", "csched_hw": "",
+           #   crounds=N   raise the multi-hart round cap for a case that
+           #               genuinely needs more.  The cap exists so a run
+           #               that never reaches the DONE flag fails in seconds
+           #               instead of minutes; a run that DOES reach it stops
+           #               there and pays nothing for a high number, so
+           #               raising it costs only the failing case.
+           "crounds": 0,
+           #   ipol=fresh|stale;...   THE FETCH VIEW, for a case whose
+           #               subject is SELF-MODIFYING CODE: one per
+           #               observation.  [fresh] reads the fetch at the top
+           #               of the log -- a coherent I-cache, QEMU's answer;
+           #               [stale] reads it AT the instruction view, which
+           #               only the program's own fence.i raises -- a
+           #               non-coherent one, the U74's.  Both are executions
+           #               the model has (VIcacheStep, icache.md).
+           #               [ipol_hw] overrides it for the board.
+           "ipol": "", "ipol_hw": "",
            "budget": 2000, "tick": 0, "proj": "whole", "builder": "single"}
     for line in open(src):
         m = re.search(r"vtest:\s*(.*?)\s*\*/", line)
@@ -161,7 +178,8 @@ def config(name):
             for kv in m.group(1).split():
                 k, _, v = kv.partition("=")
                 cfg[k] = int(v) if k in ("repeat", "smp", "budget", "tick",
-                                                 "board_repeat", "selfmod") else v
+                                     "board_repeat", "selfmod",
+                                     "crounds") else v
     return cfg
 
 def build(name, defines=(), march="rv64imafd", tag=""):
@@ -408,6 +426,18 @@ VERDICTS = ("agree", "stuck")
 # how far a stuck proof looks; see [emit_passes]
 STUCK_BUDGET = 500
 
+# HOW MANY ROUNDS A MULTI-HART PROOF GETS, and it is a CAP on the damage
+# rather than a guess at what a case needs.  [VConcStep.cfinish] counts
+# ROUNDS, each of which is one instruction of every hart in the round -- so
+# a case's own `budget`, which is an instruction count from the old harness,
+# buys twice that many instructions here.  A run that reaches the DONE flag
+# stops at once and this costs nothing; a run that does NOT reach it burns
+# the whole budget, and at ~12ms an instruction conc_sb's 20000 was eight
+# MINUTES of compile for a proof that then fails.  1500 rounds is 3000
+# instructions, comfortably past every case that finishes, and a failure
+# now costs seconds.
+CONC_ROUNDS = 1500
+
 
 def verdict_of_file(mod, pl):
     """Which way a generated proof claims the run passes, read off its
@@ -507,6 +537,8 @@ def emit_passes(built=None, reset=False):
         # just as slow under this form, for nothing.  A test that only gets
         # stuck later than this stays unproved, which understates.
         stuck_budget = min(int(budget), STUCK_BUDGET)
+        conc_rounds = (int(cfg["crounds"]) if int(cfg["crounds"])
+                       else min(int(budget), CONC_ROUNDS))
         for pl in PLATFORMS:
             if pl not in platforms_of(n):
                 continue
@@ -524,6 +556,17 @@ def emit_passes(built=None, reset=False):
                    else cfg["csched"]
             scheds = parse_csched(spec) if spec.strip() else []
             picks = [q.strip() for q in cfg.get("picks", "").split(",") if q.strip()]
+            ipspec = cfg["ipol_hw"] if pl == "jh7110" and cfg["ipol_hw"] \
+                     else cfg["ipol"]
+            ipols = [("IStale" if q.strip() == "stale" else "IFresh")
+                     for q in ipspec.split(";") if q.strip()]
+            # ONE if/elif CHAIN, AND NOTHING BETWEEN ITS ARMS.  Twice now a
+            # new knob has been added as a fresh `if` with its own setup
+            # lines in front, which silently ends the chain: the later
+            # single-hart arm then runs too and overwrites [sig], so every
+            # multi-hart case was emitted with the single-hart theorem and
+            # burned its whole budget before failing.  Compute the knobs
+            # ABOVE, and keep the arms adjacent.
             if v == "agree" and conc and scheds:
                 # ONE BLOCK PER OBSERVATION, paired with its own schedule,
                 # in the order the capture lists them.  Not [repeat]: that
@@ -531,7 +574,7 @@ def emit_passes(built=None, reset=False):
                 # only for a case that observed one thing.
                 blocks = "\n".join(
                     f"""    destruct Ho as [<-|Ho];
-      [ apply (conc2_shows {tick} {sc} {budget});
+      [ apply (conc2_shows {tick} {sc} {conc_rounds});
         vm_compute; repeat split |].""" for sc in scheds)
                 sig = f"""Module {mod}Pass <: TEST_PASSES_AGREE {mod} {mod}Run.
   Lemma agrees :
@@ -563,7 +606,7 @@ def emit_passes(built=None, reset=False):
     intros o Ho.
     cbn [{mod}Run.observed {mod}Run.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (conc2_shows {tick} [] {budget});
+            [ apply (conc2_shows {tick} [] {conc_rounds});
               vm_compute; repeat split |]).
     destruct Ho.
   Qed."""
@@ -574,6 +617,32 @@ def emit_passes(built=None, reset=False):
                         "   produced, under an INTERLEAVING of the two harts --\n"
                         "   which is what a race has and what the single-hart\n"
                         "   theorem cannot state")
+            elif v == "agree" and not conc and ipols:
+                # ONE FETCH VIEW PER OBSERVATION.  A self-modifying-code
+                # case races a hart against ITSELF, so what varies between
+                # observations is not an interleaving but WHERE THE FETCH
+                # READS -- the top of the log, or the instruction view.
+                blocks = "\n".join(
+                    f"""    destruct Ho as [<-|Ho];
+      [ apply (icache_shows {q} {tick} {budget});
+        vm_compute; repeat split |].""" for q in ipols)
+                sig = f"""Module {mod}Pass <: TEST_PASSES_AGREE {mod} {mod}Run.
+  Lemma agrees :
+    run_agrees {mod}.hart {mod}.text {mod}.regions
+               {mod}.uart_input {mod}.disk_init {mod}Run.observed.
+  Proof.
+    intros o Ho.
+    cbn [{mod}Run.observed {mod}Run.results fmap list_fmap] in Ho.
+{blocks}
+    destruct Ho.
+  Qed."""
+                imports = ("From VTest Require Import VIcache VIcacheStep.\n"
+                           f"From VTest.{PLATDIR[pl]} Require Import "
+                           f"{mod}Test {mod}Run.")
+                what = ("the model EXHIBITS every observation the platform\n"
+                        "   produced, each under the FETCH VIEW named for it --\n"
+                        "   the top of the log, or the instruction view that\n"
+                        "   only fence.i raises")
             elif v == "agree" and not conc and len(picks) > 1:
                 # ONE MODEL EXECUTION PER OBSERVATION, and here what varies
                 # is not an interleaving but WHICH IN-FLIGHT REQUEST THE
@@ -662,7 +731,8 @@ End {mod}Pass.
 # here: they are written against the old [TEST_RUN] and carry an OFF THE
 # BUILD header saying so.
 HARNESS = ["VSched.v", "VExecStuck.v", "VTest.v", "VTso.v", "VBoot.v", "VConc.v",
-           "VNode.v", "VExecStep.v", "VConcStep.v", "VRun.v", "VModelFacts.v"]
+           "VNode.v", "VExecStep.v", "VConcStep.v", "VIcache.v", "VIcacheStep.v",
+           "VRun.v", "VModelFacts.v"]
 
 PROJECT_HEAD = """-R . VTest
 -R ../iris xv6iris

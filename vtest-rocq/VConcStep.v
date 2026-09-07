@@ -566,7 +566,7 @@ Proof.
               Hrtc) as [N1 Hn1]; cbn [fst snd] in Hn1.
   (* ...and the boundary that ends it, which drops the reservation *)
   destruct (boundary_prim tick gen c g1 s1 tt Hlv1 Hok1)
-    as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & Hk2 & Hbl & Hbv & Hbh).
+    as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & Hk2 & Hbl & Hbv & _ & Hbh).
   pose proof (others_kept_trans c g g1 g2 Hk1 Hk2) as Hk.
   exists (N1 + 1)%nat, g2.
   split.
@@ -716,7 +716,7 @@ Proof.
   intros Hacq Hlive Hgs Hcs.
   pose proof (cs_hart_ok cs g c Hgs Hcs) as Hok.
   destruct (boundary_prim tick gen c g (cfocus cs c) tt Hlive Hok)
-    as (g1 & Hps1 & Hok1 & Hlv1 & Hres1 & Hk1 & Hbl & Hbv & Hbh).
+    as (g1 & Hps1 & Hok1 & Hlv1 & Hres1 & Hk1 & Hbl & Hbv & _ & Hbh).
   pose proof (log_len_le g g1 c Hk1) as Hlen.
   pose proof Hok1 as [Hr1 Hm1 Hd1 Hfl1 Hal1 Htv1 Hitv1 Hrv1 Hcoh1].
   pose proof Hgs as [Hfl Hres Htv Hitv Hrv Hcoh].

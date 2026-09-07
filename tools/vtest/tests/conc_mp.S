@@ -135,7 +135,7 @@
    source under -DCONC_MP_WHEN, and is expected to be RED.  It is where to
    look for the magnitudes: a null FORBIDDEN count means little without the
    witness count beside it, and that number lives there now. */
-/* vtest: smp=2 repeat=20 builder=multi budget=6000 */
+/* vtest: smp=2 repeat=20 builder=multi budget=6000 crounds=6000 */
     .option norvc
 #include "abi.h"
 

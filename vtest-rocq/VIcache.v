@@ -1,10 +1,4 @@
 (* ====================================================================== *)
-(*  OFF THE BUILD, for the same reason as VRunConc.v: it names the old     *)
-(*  [model_outcome].  The fetch schedules it runs (CoreIcacheSched.v) are  *)
-(*  kept with it.                                                          *)
-(* ====================================================================== *)
-
-(* ====================================================================== *)
 (* VIcache.v -- ONE HART UNDER THE RELAXED MACHINE WITH ITS INSTRUCTION    *)
 (* VIEW, executably.                                                       *)
 (*                                                                         *)
@@ -34,9 +28,10 @@
 (*   [IStale]  the fetch reads AT the instruction view: nothing stored     *)
 (*             since the last fence.i is visible to it.                    *)
 (*                                                                         *)
-(* Both endpoints are admitted by [itv <= tvn <= length log].  As for      *)
-(* VTso/VConc, the soundness lemma tying [itexec] to [mnode_step] is not   *)
-(* written; the arms transcribe the relation one for one.                  *)
+(* Both endpoints are admitted by [itv <= tvn <= length log].  The lemma   *)
+(* tying this to [mnode_step] is [VIcacheStep.inode_mnode], over [inode]   *)
+(* -- [itexec] with the recursion removed, one node at a time, which is    *)
+(* the form an induction can use.                                          *)
 (* ====================================================================== *)
 From stdpp Require Import gmap bitvector.definitions list.
 Require Import SailStdpp.Operators_mwords.
@@ -229,31 +224,101 @@ Definition iobs_all (h : agent) (img : gmap Arch.pa (bv 8)) (budget : nat)
     (schs : list (list iitem)) (st : istate) : list (list Z) :=
   (fun sch => iobs h img budget sch st) <$> schs.
 
-(* ---------------------------------------------------------------------- *)
-(* 5. THE BUILDER, a [VRun.TEST_RUN] like any other: one model execution   *)
-(*    per named fetch schedule.                                            *)
-(* ---------------------------------------------------------------------- *)
-Module Type ICACHE_CASE.
-  Parameter case      : string.
-  Parameter platform  : string.
-  Parameter text      : list Z.
-  Parameter hart      : Z.
-  Parameter regions   : list region.
-  Parameter budget    : nat.
-  Parameter schedules : list (list iitem).
-  Parameter proj      : list Z -> list Z.
-  Parameter observed_raw : list (list Z).
-End ICACHE_CASE.
 
-Module IcacheRun (P : ICACHE_CASE) <: TEST_RUN.
-  Definition case := P.case.
-  Definition platform := P.platform.
-  Definition observed : list (list Z) := map P.proj P.observed_raw.
-  Definition start_s : mstate := start_hart_with P.hart P.text P.regions.
-  (* the TSO axis at power-on: the era image is the loaded memory, the log
-     is empty, both views are 0, the read side is at zero *)
-  Definition start : istate := IState start_s [] 0%nat 0%nat hread0.
-  Definition h : agent := Z.to_nat P.hart.
-  Definition outcome : model_outcome :=
-    MDone (map P.proj (iobs_all h (mem start_s) P.budget P.schedules start)).
-End IcacheRun.
+(* ---------------------------------------------------------------------- *)
+(* 5. ONE NODE AT A TIME, which is the form the bridge needs.              *)
+(*                                                                         *)
+(*    [itexec] recurses through the monad; an induction against            *)
+(*    [mnode_step] wants the single step.  [None] is "no node to take":    *)
+(*    the cycle is over ([Ret]) or the model is stuck.  Every arm is       *)
+(*    [itexec]'s, with the recursive call replaced by its arguments.       *)
+(* ---------------------------------------------------------------------- *)
+
+Definition inout : Type := M unit * mstate * list pwmsg * nat * nat * hread.
+
+Definition inode (ip : ipol) (h : agent) (img : gmap Arch.pa (bv 8))
+    (s : mstate) (log : list pwmsg) (tv itv : nat) (hr : hread) (m : M unit)
+  : option inout :=
+  match m with
+  | Interface.Ret _ => None
+  | Interface.Next oc k =>
+      (match oc in Interface.outcome _ T return (T -> M unit) -> option inout with
+       | Interface.RegRead r _ => fun k =>
+           Some (k (register_lookup r s.(sregs)), s, log, tv, itv, hr)
+       | Interface.RegWrite r _ v => fun k =>
+           Some (k tt, set_reg s r v, log, tv, itv, hr)
+       | Interface.MemRead n req => fun k =>
+           if dev_addr (Interface.ReadReq.pa req) then
+             match dev_read s.(mdev) (Interface.ReadReq.pa req) n with
+             | Some (w, d') =>
+                 Some (k (inl (w, None)), MState s.(sregs) s.(mem) d', log, tv, itv, hr)
+             | None => None
+             end
+           else if ak_ifetch (Interface.ReadReq.access_kind req) then
+             match ip with
+             | IFresh =>
+                 match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
+                 | Some w => Some (k (inl (w, None)), s, log, tv, itv, hr)
+                 | None => None
+                 end
+             | IStale =>
+                 match tso_read_bytes_f img log (ifetch_agent h) itv
+                         (Interface.ReadReq.pa req) n with
+                 | Some w => Some (k (inl (w, None)), s, log, tv, itv, hr)
+                 | None => None
+                 end
+             end
+           else if ak_excl (Interface.ReadReq.access_kind req) then
+             match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
+             | Some w =>
+                 Some (k (inl (w, None)), s, log,
+                       excl_tv (Interface.ReadReq.access_kind req) log tv, itv,
+                       hr_excl hr (Interface.ReadReq.access_kind req) log)
+             | None => None
+             end
+           else
+             match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
+             | Some w =>
+                 Some (k (inl (w, None)), s, log, tv, itv,
+                       hr_read hr (Interface.ReadReq.pa req) n (List.length log))
+             | None => None
+             end
+       | Interface.MemWrite n req => fun k =>
+           if dev_addr (Interface.WriteReq.pa req) then
+             match dev_write s.(mdev) (Interface.WriteReq.pa req) n
+                             (Interface.WriteReq.value req) with
+             | Some d' =>
+                 Some (k (inl None), MState s.(sregs) s.(mem) d', log, tv, itv,
+                       hr_clear hr)
+             | None => None
+             end
+           else
+             Some (k (inl None),
+                   MState s.(sregs)
+                     (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                                  (Interface.WriteReq.value req)) s.(mdev),
+                   (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                                     (Interface.WriteReq.value req)) h])%list,
+                   write_tv (Interface.WriteReq.access_kind req) hr log tv, itv,
+                   hr_clear hr)
+       | Interface.InstrAnnounce _    => fun k => Some (k tt, s, log, tv, itv, hr)
+       | Interface.BranchAnnounce _ _ => fun k => Some (k tt, s, log, tv, itv, hr)
+       | Interface.Barrier b          => fun k =>
+           Some (k tt, s, log,
+                 fence_post h log (fence_drains b) (fence_acq b) tv (hr_rv hr),
+                 (if fence_ifetch b
+                  then Nat.max itv (fence_post h log true false tv (hr_rv hr))
+                  else itv),
+                 hr)
+       | Interface.CacheOp _          => fun k => Some (k tt, s, log, tv, itv, hr)
+       | Interface.TlbOp _            => fun k => Some (k tt, s, log, tv, itv, hr)
+       | Interface.TakeException _    => fun k => Some (k tt, s, log, tv, itv, hr)
+       | Interface.ReturnException _  => fun k => Some (k tt, s, log, tv, itv, hr)
+       | Interface.TranslationStart _ => fun k => Some (k tt, s, log, tv, itv, hr)
+       | Interface.TranslationEnd _   => fun k => Some (k tt, s, log, tv, itv, hr)
+       | Interface.CycleCount         => fun k => Some (k tt, s, log, tv, itv, hr)
+       | Interface.Message _          => fun k => Some (k tt, s, log, tv, itv, hr)
+       | Interface.GetCycleCount      => fun k => Some (k 0%Z, s, log, tv, itv, hr)
+       | _ => fun _ => None
+       end) k
+  end.

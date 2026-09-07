@@ -23,7 +23,7 @@ Module ConcSbxPass <: TEST_PASSES_AGREE ConcSbx ConcSbxRun.
     intros o Ho.
     cbn [ConcSbxRun.observed ConcSbxRun.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (conc2_shows false [] 2000);
+            [ apply (conc2_shows false [] 1500);
               vm_compute; repeat split |]).
     destruct Ho.
   Qed.
