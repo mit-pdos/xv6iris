@@ -1585,3 +1585,107 @@ Proof.
                 (riscv_step tick) g1 g2 Hps2)).
     exact (nsteps_trans _ _ _ _ _ _ _ Hn3 Hn4).
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 18. WHAT THE CONFIGURATION SHOWS.                                       *)
+(*                                                                         *)
+(*     [VRun.observed_at] reads the three channels off the [gstate]; the   *)
+(*     harness reads them off its [mstate].  [hart_ok] says those are the  *)
+(*     same memory and the same device fabric, so this is immediate -- and *)
+(*     that is the point of having carried the invariant this far.         *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma observed_at_of_hart_ok (cpu : CPU) (g : gstate) (s : mstate)
+    (o : observation) :
+  hart_ok cpu g s ->
+  result_of (Some s) = o.(o_result) ->
+  serial_of (Some s) = o.(o_uart) ->
+  v_disk (dvirtio (mdev s)) = disk_of_sectors o.(o_disk) ->
+  observed_at g o.
+Proof.
+  intros [_ Hm Hd _ _ _ _ _ _] Hres Hser Hdsk.
+  unfold observed_at. split; [|split].
+  - unfold result_of in Hres. rewrite Hm. exact Hres.
+  - unfold serial_of in Hser. rewrite Hd. exact Hser.
+  - rewrite Hd. exact Hdsk.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 19. THE INPUT.                                                          *)
+(*                                                                         *)
+(*     [settle] never delivers a byte -- its nine arms do not include      *)
+(*     [SUartRx].  Input arrives ONLY through the test's own prefix, which *)
+(*     is why [VRun.run_passes] can pin it: every [ObsUartIn] in the trace *)
+(*     comes from an item the TEST supplied, and there is nowhere else for *)
+(*     one to come from.                                                   *)
+(* ---------------------------------------------------------------------- *)
+
+(* HOW THE INTERPRETER DELIVERS THE INPUT: a byte ARRIVING is a schedule
+   choice ([VSched.SUartRx]), not something the program performs, so the
+   test's bytes are handed over as a prefix before it is stepped.  The
+   THEOREM does not mention this -- it pins the input through the trace --
+   which is exactly why this is the interpreter's business and not
+   VRun.v's. *)
+Definition uart_pre (bs : list Z) : list sitem := List.map SUartRx bs.
+
+Lemma srun_cons (i : sitem) (is : list sitem) (s : mstate) :
+  srun (i :: is) s
+  = match sapply i s with Some s1 => srun is s1 | None => None end.
+Proof.
+  unfold srun. cbn [foldl]. destruct (sapply i s) as [s1|]; [reflexivity|].
+  induction is as [|j js IH]; [reflexivity|]. cbn [foldl]. exact IH.
+Qed.
+
+Lemma srun_uart_nsteps (gen : nat) (ts : list mexpr) (bs : list Z) :
+  UartLoopE gen ∈ ts -> DiskLoopE gen ∈ ts -> PlicLoopE gen ∈ ts ->
+  forall (g : gstate) (s s1 : mstate),
+  thread_live g gen ->
+  hart_ok hart_primary g s ->
+  all_resv g.(gresv) = ∅ ->
+  srun (uart_pre bs) s = Some s1 ->
+  exists N g',
+    @language.nsteps riscv_lang N (ts, g)
+      (List.map (fun b => ObsUartIn (Z_to_bv 8 b)) bs) (ts, g')
+    /\ hart_ok hart_primary g' s1 /\ thread_live g' gen
+    /\ all_resv g'.(gresv) = ∅.
+Proof.
+  intros Hu Hdk Hp. induction bs as [|b bs' IH];
+    intros g s s1 Hlive Hok Hres Hrun.
+  - unfold uart_pre in Hrun; cbn [List.map] in Hrun.
+    unfold srun in Hrun; cbn [foldl] in Hrun.
+    revert Hrun; intros [= <-].
+    exists 0%nat, g. cbn [List.map].
+    split; [exact (@language.nsteps_refl riscv_lang (ts, g))|].
+    split; [exact Hok|]. split; assumption.
+  - unfold uart_pre in Hrun; cbn [List.map] in Hrun.
+    rewrite srun_cons in Hrun.
+    destruct (sapply (SUartRx b) s) as [sa|] eqn:E; [|discriminate Hrun].
+    (* the item's OWN lemma, not the dispatcher: the trace of this step is
+       exactly this byte, and the dispatcher hides it behind an existential *)
+    destruct (sapply_uart_rx gen hart_primary b g s sa Hlive Hok E)
+      as (g1 & Hps & Hok1 & Hlv1 & Hg1).
+    pose proof (dev_prim_nsteps ts (UartLoopE gen) g g1 _ Hu Hps) as Hn1.
+    assert (Hres1 : all_resv g1.(gresv) = ∅)
+      by (unfold all_resv; rewrite Hg1; exact Hres).
+    destruct (IH g1 sa s1 Hlv1 Hok1 Hres1 Hrun)
+      as (N2 & g2 & Hn2 & Hok2 & Hlv2 & Hres2).
+    exists (1 + N2)%nat, g2. split; [|split; [exact Hok2|split; assumption]].
+    cbn [List.map].
+    replace (ObsUartIn (Z_to_bv 8 b)
+             :: List.map (fun b0 => ObsUartIn (Z_to_bv 8 b0)) bs')
+      with ([ObsUartIn (Z_to_bv 8 b)]
+            ++ List.map (fun b0 => ObsUartIn (Z_to_bv 8 b0)) bs')
+      by reflexivity.
+    apply (nsteps_trans _ _ _ _ _ _ _ Hn1 Hn2).
+Qed.
+
+(* ...and what that trace says the host typed.  The round trip is the
+   identity exactly on real BYTES -- which is what a test's input is, and
+   what makes this the right side condition to state rather than assume. *)
+Lemma obs_in_uart_pre (bs : list Z) :
+  obs_in (List.map (fun b => ObsUartIn (Z_to_bv 8 b)) bs)
+  = List.map (fun b => bv_unsigned (Z_to_bv 8 b)) bs.
+Proof.
+  induction bs as [|b bs' IH]; [reflexivity|]. cbn [List.map obs_in].
+  rewrite IH. reflexivity.
+Qed.
