@@ -1316,9 +1316,17 @@ Section VtDevRam.
     iSplitR. { rewrite /disk_done_lb. iApply (mono_nat_lb_own_le k with "Hlbnc"). lia. }
     iApply big_sepL_intro. iIntros "!>" (i p Hip). apply lookup_seq in Hip as [-> Hp].
     destruct (Hpos (0 + i)%nat Hp) as (q & g0 & Hq & Hqtv).
-    iExists q. iSplitR; [| iPureIntro; exact Hqtv].
+    iExists q. iSplitR.
+    2: { (* relaxed-ww STAGE E (VirtioProto lane): [vt_idx_q]'s ⌜q ≤ V0⌝ is a
+            one-log visibility.  Under two logs the completion row is the
+            drain witness [dpos_ev q V0]: [Hqtv : msg_visible log dl h tvr q]
+            has it in its drained arm (the interp's persistent drain copies),
+            and its own-message arm is vacuous for the device-written used
+            ring -- a fact the protocol does not yet carry.  The used-ring
+            gates take the witness when the row is restated. *)
+         clear -Hqtv. admit. }
     iDestruct (big_sepL_lookup _ hist (0 + i)%nat (q, g0) Hq with "Hfrag") as "Hp". iExact "Hp".
-  Qed.
+  Admitted.
 
   (* +0x36 lhu a5,2(a5) -- disk.used->idx, THE RELEASE READ (A6.126 §6).
      The word is the device's; what the handler learns is [vt_idx_q]: the
@@ -1493,7 +1501,7 @@ Section VtDevRam.
     iEval (rewrite Hagent) in "HV0".
     iAssert (⌜forall j, (j < 4)%nat -> forall tvr : nat,
                ((gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev)).(gtv) (@cpu_id CIDw) <= tvr)%nat ->
-               tso_read img log (hart_agent (@cpu_id CIDw)) tvr (pa_add ea j)
+               tso_read img log dl (hart_agent (@cpu_id CIDw)) tvr (pa_add ea j)
                = Some (nth_byte head j)⌝)%I as %Hrd.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
       iDestruct (big_sepL_lookup _ (seq 0 4) j j with "Hcells") as (t) "[%Ht Hc]".
@@ -1501,8 +1509,14 @@ Section VtDevRam.
       iDestruct (TsoCtx.ledger_read_at_vis_ok (CID := CIDw)
                    (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                    (pa_add ea j) (DfracOwn 1) (nth_byte head j) t V0
-                   with "Hgh Htso HV0 [] Hc") as %H.
-      { iApply TsoCtx.ledger_vis_below. lia. }
+                   with "Hgh Htso HV0 [] [] Hc") as %H.
+      { (* relaxed-ww STAGE E (VirtioProto lane): the row's ⌜t ≤ q0⌝ is a
+           one-log visibility; the two-log gate wants [ledger_vis] off the
+           row's drain witness *)
+        admit. }
+      { (* relaxed-ww STAGE E (VirtioProto lane): the used-ring element rows
+           carry no chain yet; the per-fact read gate wants it (§2.10) *)
+        admit. }
       iPureIntro. exact H. }
     cbn in Hrd.
     assert (H4N : Z.to_N 4 = 4%N) by reflexivity.
@@ -1512,7 +1526,7 @@ Section VtDevRam.
       pose proof (Hv j ltac:(rewrite H4N; lia)) as Hr. pose proof (Hrd j Hj tvr Htvr) as Hb.
       pose proof (eq_trans (eq_sym Hr) Hb) as He. injection He as He.
       apply bv_eq. exact He.
-  Qed.
+  Admitted.
 
   (* the same for a stamped BYTE (the status cell, chunk B) *)
   Local Lemma vt_byte_read_ok (ea : mword 64) (q0 V0 : nat) (b : bv 8)
@@ -1551,8 +1565,13 @@ Section VtDevRam.
     iDestruct (TsoCtx.ledger_read_at_vis_ok (CID := CIDw)
                  (gs_of img sigma.(mem) log dl V sigma.(sregs) sigma.(mdev))
                  ea (DfracOwn 1) b t V0
-                 with "Hgh Htso HV0 [] Hc") as %Hrd.
-    { iApply TsoCtx.ledger_vis_below. lia. }
+                 with "Hgh Htso HV0 [] [] Hc") as %Hrd.
+    { (* relaxed-ww STAGE E (VirtioProto lane): [ledger_vis] off the row's
+         drain witness; the device status row carries none yet *)
+      admit. }
+    { (* relaxed-ww STAGE E (VirtioProto lane): [chain_ev] for the device
+         status row (§2.10) *)
+      admit. }
     assert (H1N : Z.to_N 1 = 1%N) by reflexivity.
     iPureIntro. intros tvr Htvr. split.
     - exists b. intros j Hj. rewrite H1N in Hj.
@@ -1565,7 +1584,7 @@ Section VtDevRam.
       pose proof (Hrd tvr Htvr) as Hb.
       pose proof (eq_trans (eq_sym Hr) Hb) as He. injection He as He.
       rewrite He. symmetry. apply vt_nth_byte0.
-  Qed.
+  Admitted.
 
   (* +0x4e lw a5,4(a5) -- disk.used->ring[nr % 8].id, the head of the
      completed chain at record [u].  A6.126 §6 on the pop model: the element

@@ -568,7 +568,6 @@ Section ProofIunlockMain.
     (* THE PARK: one mask-balanced opening of the escrow puts the whole
        checked-out bundle back and takes the CHECKOUT TOKEN -- which is all
        the sleeplock protects now -- and the caller's reference out. *)
-    iApply fupd_wp.
     (* THE PARK (R3, endgame §4.2 (f′)): the checked-out bundle re-forms as
        the box's HELD header + rest at IcLoaded (by arm kind: the cells,
        [ic_dep_held], the shot one-shot, the freeze token and the liveness
@@ -582,38 +581,57 @@ Section ProofIunlockMain.
     iDestruct (ic_dep_held_intro_held fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k d s dev inum g lo dn' bm'
                  Hdshr Hlen with "[Hidev Hinumc] Hvalid Hlk Hshot Hfrz Hlg") as "[Hhdr Hrest]".
     { rewrite /inode_ident. iFrame "Hidev Hinumc". }
-    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (ic_park fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k TsoCtx.cur_ctx d dev inum
-            (IcLoaded g dn' bm') ⊤ ltac:(solve_ndisj) Hid
-            with "Hesc Hrun Hhdr Hrest Hd Hdep2")
-      as "(Hrun & Hn & Hs & Hbody & %Tp & Hrp & Href & #HllbT)".
-    iDestruct ("Hcgb" with "Hrun") as "Hcg".
-    iDestruct (ic_park_side_dep_side fsc_fs fsc_ireg fsc_cov fsc_logst k d s dev inum g lo Hdshr
-                 with "Hs") as "Hside".
-    iModIntro.
+    (* relaxed-ww §2.6: the park is FENCE-BOUND -- it runs inside
+       releasesleep's inner release hook, the checked-out bundle travelling
+       as the hook's extras; the side share, the body and the parked
+       reference come back out as the hook's Q *)
+    iDestruct "Hoffd" as (Tr) "Hoffd".
+    iAssert (lock_ctx_hook (CID := CID17) (⊤ ∖ ↑minstretN) (ic_slp fsc_ic k)
+               (fun _ => ic_tok fsc_ic k ∗ OffBox.off_rows_dep OffBox.off_cfg k Tr)%I
+               (ic_park_side fsc_fs fsc_ireg fsc_cov fsc_logst k d ∗ ic_body k d ∗
+                ∃ Tp : nat,
+                  CtxBox.reference (X := ic_x) (icfg_box k) (Some (dev, inum))
+                    {[ (Some (dev, inum), Tp) := ic_dep_mass d ]} ∗
+                  TsoGhost.llb dlen_name Tp))
+      with "[Hhdr Hrest Hd Hdep2]" as "Hhook".
+    { rewrite /lock_ctx_hook. iIntros (ξ T Df) "Hrun Hst [Htok Hoffd]".
+      iMod (ic_park fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k Df TsoCtx.cur_ctx d dev inum
+              (IcLoaded g dn' bm') (⊤ ∖ ↑minstretN) ltac:(solve_ndisj) Hid
+              with "Hesc Hrun Hhdr Hrest Hd Hdep2")
+        as "(Hrun & Hn & Hs & Hbody & %Tp & Hrp & Href & #HllbT)".
+      iDestruct (ic_slp_dep_of_dep fsc_ic k Tp Tr
+                   with "HllbT Htok Hrp Hn Hoffd") as (Tc) "(%HTpc & #HllbC & Hdepc)".
+      iMod (TsoCtx.ctx_stamped_raise ξ T Tc with "HllbC Hst") as "[Hst #Hflh]".
+      iModIntro. iFrame "Hrun". iExists (Nat.max T Tc). iFrame "Hst".
+      iSplitL "Hdepc". { iApply (ic_slp_fold fsc_ic k Tc). iFrame "Hdepc Hflh". }
+      iFrame "Hs Hbody". iExists Tp. iFrame "Href HllbT". }
     (* the genin release: the L2 row goes back UNFLOORED at the park stamp
        and the callee re-floors it at the parked context (M-6, R2) *)
     (* r25 pass 1 (correction 2): the release presents ONE bound, the
        maximum of the register's park stamp [Tp] and the off rows' own --
        [ic_slp_dep_of_rows] takes the rows out to [off_rows_dep] and joins
        the two [llb]s. *)
-    iDestruct "Hoffd" as (Tr) "Hoffd".
-    iDestruct (ic_slp_dep_of_dep fsc_ic k Tp Tr
-                 with "HllbT Htok Hrp Hn Hoffd") as (Tc) "(%HTpc & #HllbC & Hdepc)".
-    iApply (RS.wp_releasesleep_genin_sconf gs gil gisl "inode"%string (ic_slp fsc_ic k)
-              (fun _ => ic_slp_dep fsc_ic k Tc) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks Tc
+    iApply (RS.wp_releasesleep_genhook_sconf gs gil gisl "inode"%string (ic_slp fsc_ic k)
+              (fun _ => ic_tok fsc_ic k ∗ OffBox.off_rows_dep OffBox.off_cfg k Tr)%I
+              (ic_park_side fsc_fs fsc_ireg fsc_cov fsc_logst k d ∗ ic_body k d ∗
+               ∃ Tp : nat,
+                 CtxBox.reference (X := ic_x) (icfg_box k) (Some (dev, inum))
+                   {[ (Some (dev, inum), Tp) := ic_dep_mass d ]} ∗
+                 TsoGhost.llb dlen_name Tp)%I
+              (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks
               ltac:(lia)
               Hfresh
-              (ic_slp_fold fsc_ic k Tc)
-              with "Hcg Hcnt Htext Hpc [] [Hstok] HllbC [Hdepc] Hprocs").
+              with "Hcg Hcnt Htext Hpc [] [Hstok] [Htok Hoffd] Hhook Hprocs").
     all: try lkbelow.
     { iEval (rewrite HR9a0). iExact "Hslk". }
     { iEval (rewrite HR9a0). iExact "Hstok". }
-    { iExact "Hdepc". }
+    { iFrame "Htok Hoffd". }
     (* the lock hands the deposit back at the holder's OWN fraction, which is
        what rebuilds the caller's share: the handle's body kept the other two
        slices, and the park stamped its fragment at [Tp] (mass [s]). *)
-    iIntros (CID18 Hq18 mR) "%Hcs2 Hcg Hcnt Hpc Hslh".
+    iIntros (CID18 Hq18 mR) "%Hcs2 Hcg Hcnt Hpc (Hs & Hbody & %Tp & Href & #HllbT) Hslh".
+    iDestruct (ic_park_side_dep_side fsc_fs fsc_ireg fsc_cov fsc_logst k d s dev inum g lo Hdshr
+                 with "Hs") as "Hside".
     iAssert (IcacheRef.inode_shr_genlo k s dev inum g lo)
       with "[Hbody Href Hslh]" as "Href".
     { rewrite /IcacheRef.inode_shr_genlo (ic_body_of_shr k d s dev inum g lo Hdshr).

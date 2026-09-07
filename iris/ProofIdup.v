@@ -631,7 +631,7 @@ Section ProofIdup.
                IcacheInv.iref_set))%I
         with "[Hrows]" as "Hrows".
       { iApply (big_sepL_mono with "Hrows"). iIntros (i x Hix) "H".
-        iDestruct "H" as (t) "[_ H]". iExists t. iFrame "H". }
+        iDestruct "H" as (t) "(_ & _ & H)". iExists t. iFrame "H". }
       assert (HSw : IcacheInv.iref_set
                       (nth_byte (mword_of_int (Z.pos (Pos.succ cnt))
                                    : mword 32))).
@@ -643,11 +643,11 @@ Section ProofIdup.
               ltac:(lia) HSw with "Hgh Htso Hrows")
         as "(Hgh & Htso & _ & #HllbS & Hrows)".
       rewrite (ktier_pin_id ppn _ Hpin).
+      iMod (IcacheInv.iref_pin_rows_of_store_STAGE_E with "Hrows") as "Hrows".
       iModIntro. iFrame "Hgh Htso Hown".
       iFrame "Hcl".
       rewrite /IcacheInv.pinw_store_post.
-      iExists (S (length log)). iFrame "HllbS".
-      rewrite /IcacheInv.iref_pin_rows. iExact "Hrows". }
+      iExists (S (length log)). iFrame "HllbS". iExact "Hrows". }
     { iApply (idi_1c with "Htext"). }
     { rewrite Hpa2. iExact "Hclaim0". }
     { (* the AU: the upgrade twin at the SHARE's named (g, lo) *)

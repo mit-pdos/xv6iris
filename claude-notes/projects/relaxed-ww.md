@@ -1,18 +1,19 @@
 # Project: relaxing the memory model to allow store–store reordering (PSO)
 
-**STATUS 2026-09-06 (night): STAGE D IN PROGRESS on branch `relaxed-ww`,
+**STATUS 2026-09-07 (mid): STAGE D IN PROGRESS on branch `relaxed-ww`,
 pushed as `origin/relaxed-ww-twolog` (the pre-rebase stage-B head is tag
 `relaxed-ww-twolog-prerebase`).  §2.14 is the design of record (the
 interp stays below the protocol tier; the fence hands up a FLUSHED
-TOKEN) and §2.15 its implementation record: the flushed token, its laws
-and the release finisher through `WpSconfFencePub` COMPILE, as do
-`CtxBox`/`SleepLock*`/`TicksInv`/`BioInv`/`BioInitAt`/`OffBox` over the
-token; the base-tier amendments (fence-record triples, the pin's anchor,
-the floor mint) are edited and under build19.  §2.13 is the earlier
-checkpoint with the open frontier (build18's failing files); every
-racy-tier statement is restated over two logs and `Admitted` with
-`relaxed-ww STAGE E`.  Two rulings (C) remain the owner's, and the ~13
-`initlock` callers of the now fence-bound `newlock*` are blocked on them.
+TOKEN); §2.15/§2.15b/§2.17 its implementation record and §2.16 the
+started flag over two logs.  The base and protocol tiers through
+`WpSconfLock` compile; §2.6 (deposits inside the release hook) is landed
+at bread's recycle, brelse's park and iunlock's park through the HOOKED
+releasesleep form (§2.17); the ~13 `initlock` callers run over the
+RULING C bridge `CtxBirth.own_context_flushed_birth_RULING_C` (Admitted,
+STAGE E) until the owner rules; every racy-tier statement is restated
+over two logs and `Admitted` with `relaxed-ww STAGE E` (§2.17 lists the
+admits added this pass).  The remaining frontier is build32's list
+(§2.17).  Two rulings (C) remain the owner's.
 **  The companion of
 [`completed/relaxed-rr.md`](../completed/relaxed-rr.md) (load–load
 reordering).  §1 is the machine of record and §1.3 the rejected first
@@ -1195,6 +1196,128 @@ second gname of the invariant beside the index authority `γi`.
 
 `started_read_obl` stays `Admitted` (STAGE E, the racy release read); its
 statement now produces the record facts and the drain witness.
+
+### 2.17 Frontier record (2026-09-07, early, third pass): §2.6 landed, the birth bridge, the stage-E admits named
+
+**§2.6 landed at its three xv6 sites.**  The deposits run INSIDE the
+release hook, the depositor's bundle travelling as the hook's closure
+(the hook is a spatial wand, so its extras are simply the resources the
+`iAssert` captures; `Rin` carries only what may move into the lock's
+stamped context):
+- bread's recycle (b): `ProofBreadParts.bd_recycle_cells` (the four
+  header cells the three stores leave behind), `bd_recycle_close` (the
+  scan's closing wand, now the recycle lemma's conclusion) and
+  `bd_recycle_hook` -- `lock_ctx_hook E (bcache_res2 bn V) (λ _, cells ∗
+  close) (bchain bn k D B)`: it runs the wand at `Df`, deposits the
+  re-stamped scan into the lock's context (`TsoCtxLedger.ctx_deposit_
+  flushed`, whose `CtxMorph` wants the un-eta-expanded `bcache_scan2 …`),
+  raises the stamp to the scan's `tl'` (`ctx_stamped_raise`) and folds
+  (`bcache_res2_fold_in`).  `ProofBread` passes the cells and the wand as
+  `Rin` at `release(&bcache.lock)` (mask `⊤ ∖ ↑minstretN`, so the recycle
+  itself now runs there under `fupd_mask_subseteq`) and gets the chain's
+  reference back as `Q` in the continuation.
+- brelse's (f) and iunlock's park: a HOOKED releasesleep form,
+  `SpecReleasesleep.wp_releasesleep_genhook_sconf_body γs γl γsl s R Rin Q
+  H q …` -- premises `Rin cur_ctx` and `lock_ctx_hook (⊤ ∖ ↑minstretN) R
+  Rin Q`, continuation `… -∗ Q -∗ H q -∗ WP`.  `ProofReleasesleep`
+  proves it with `sl_body_free γ slk Rin ξ` (the FREE arm of the body
+  over the unfinished payload; the releaser just built it, so the hook
+  only ever meets that arm) and `sl_pay_hook_lift` (client hook → hook
+  over `sl_pay`); `_genin` is now its instance at `lock_hook_llb`, `Q :=
+  emp`.  `ProofBrelse` builds the hook from the bundle and the hold
+  (`bbox_park … Df cur_ctx` inside, `bslp_fold` after `ctx_stamped_raise`),
+  `Q := bref_ghost`; `ProofIunlock` from the checked-out bundle (`ic_park`
+  inside, `ic_slp_dep_of_dep`/`ic_slp_fold`), `Q := ic_park_side ∗
+  ic_body ∗ ∃ Tp, reference ∗ llb dlen Tp`.  GOTCHA: `lock_ctx_hook`'s
+  implicit `CpuId` must be the one the release lemma is applied at
+  (`CID14` in brelse, `CID17` in iunlock), so the `iAssert` sits right
+  before the call with `(CID := …)`; otherwise `iSpecialize` fails on two
+  visibly identical terms.
+
+**The birth bridge (RULING C, the owner's).**  `CtxBirth.v` (one lemma,
+imported ONLY by birth sites): `own_context_flushed_birth_RULING_C : own_
+context ξ ⊢ ∃ Df, own_context_flushed ξ Df ∗ (own_context_flushed ξ Df -∗
+own_context ξ)`, `Admitted`, STAGE E -- not derivable, nothing says the
+creator's stores drained.  Consumers: `ProofKinit`, `ProofInitlog`,
+`PipeInv` (pipealloc), `SpecProcinit` (the spec keeps its running-token
+wand; the bridge sits inside its proof), `IcacheBoot` (ONE borrowed token
+across the box alloc, the itable lock and the fifty inode sleeplocks,
+handed back before the return).  Replacing the bridge is exactly (c1) or
+(c2) of §2.4.  `CoqMakefile` was regenerated for the new file (`rocq
+makefile -f _CoqProject -o CoqMakefile`, under the right switch).
+
+**STAGE E admits added this pass** (each marked `relaxed-ww STAGE E` in
+place, with the lane):
+- `IcacheInv.iref_pin_rows_of_store_STAGE_E` (pinw window): the writer's
+  fresh rows carry an ISSUE bound out of `CtxPinw.pinw_write_c`; the
+  drain witness `dpos_ev t tst` exists only after the writer's release
+  fence.  The honest shape is a PENDING arm in `pinw_slot` (the writer's
+  `key_at cur_ctx (t, a)` registration) converted in the itable release
+  hook -- not in the invariant yet.  Consumers: `ProofIdup`, `ProofIget`.
+  `ProofIput`'s retire is SOUND: the rows' `dpos_ev t tstk` under the
+  acquire floor `ctx_floor cur_ctx tstk` is `key_at`'s clean arm, which
+  `CtxPinw.pinw_retire_write_c` now takes.
+- `ProofVirtioDiskIntr` (VirtioProto lane): `vt_idx_q`'s `⌜q ≤ V0⌝` is a
+  one-log visibility -- the two-log row is `dpos_ev q V0`, whose drained
+  arm the producer can mint off the interp's persistent drain copies and
+  whose own-message arm is vacuous for the device-written used ring (a
+  fact the protocol does not carry); admitted at the producer, and the
+  element read gate's `chain_ev`/`ledger_vis` premises for the used-ring
+  rows (which carry neither yet).  `ProofVirtioDiskRwD`: the avail
+  store's chain (`ledger_store_win_at_ok` does not mint it;
+  `ctx_store_ok` does) -- TsoCtxStore lane.
+- `FileInv.file_off_reclaim` (OffBox lane): the box hands the free bytes
+  out at its own stamped `ξb`; the closer wants them at `cur_ctx` --
+  the dom of `ξb` under a floor covering the reference's stamps, which
+  the fd row (`off_fd`) does not carry yet.
+
+**Also this pass:** `IcacheBoot`'s register receipts are `llb dlen_name`;
+`ProofVirtioDiskIntr`'s `tso_read` arity.
+
+**Build outcome (build32 -> the fixes above -> build33).**  build32 fell
+to 11 errors (from build31's ~15); the birth sites (`ProofKinit`,
+`ProofInitlog`, `PipeInv`, `SpecProcinit`, `IcacheBoot`) and `ProofBread`
+cleared.  The mechanical follow-ons were then fixed and each file compiles
+standalone: `ProofReleasesleep` (the genhook lemma; see below),
+`ProofBrelse` and `ProofIunlock` (the §2.6 parks), `ProofMain`'s three
+boot births (`pr`, `tx_lock`, `cons` over the [CtxBirth] bridge),
+`ProofMainSecondary`/`ProofIput`/`ProofIdup`/`ProofIget` name and
+qualifier fixes.
+
+**The releasesleep §2.6 lane is admitted at ONE step (STAGE E), a real
+CpuId problem.**  `wp_releasesleep_genhook_sconf` relays the caller's
+deposit hook to `wp_release_hook_sconf`, but releasesleep's own inner
+`acquire` moves the release fence to a fresh `CIDacq`, so the hook's
+`own_context_flushed cur_ctx Df` interface is wanted at `CIDacq` while the
+caller's `Hhook` carries it at the entry CpuId; the SafeCID condition
+(`b = false ∨ pme = zero_reg`) is not dischargeable there to identify
+them.  bread's §2.6 hook has NO intervening acquire, so it lands cleanly
+(`ProofBreadParts.bd_recycle_hook`, a pure `⊢`).  The fix for
+releasesleep is to carry the deposit resources in `Rin` (cur_ctx-based,
+CpuId-agnostic) with a pure re-instantiable hook -- the same shape as
+bread; `sl_pay_hook_lift` states the intended lift and `sl_body_free` the
+releaser's free arm.  Until then `wp_releasesleep_genhook_sconf` is
+`Admitted` at the lift; `ProofBrelse`/`ProofIunlock` compile against it,
+and their park bodies (the real §2.6 work) are complete.
+
+**Still open** after build33 (each documented, all §2.16 / off-box /
+racy-tier frontier, none regressions of this pass):
+- `ProofMainSecondary` started-read AU: `started_W` is now `(log, dl, v,
+  tv) -> iProp` but `wp_load_s_sconf_au_relr` wants `(v, tv) -> iProp` --
+  the two-log started read gate needs the AU restated (§2.16).
+- `ProofMain` csrw-satp: `CtxValues.kptd_unset -∗ ptree_own_at (UTier..)
+  ..` publish gate (`KptPublish`) -- §2.16.
+- `BootShared` the `era_kptd_name` one-shot's boot order -- §2.16.
+- `FileOffProtocol`/`ProofSysOpenParts`: `off_publish_park` is fence-bound
+  (takes `Df`); the off box's publish park must move into the ftable
+  release hook (the off-box §2.6 lane), same class as
+  `FileInv.file_off_reclaim`.
+- `ProofIget`/`ProofIdup` pinw store post: the writer's fresh rows carry
+  an issue bound; the drain witness is the pending arm (STAGE E, bridged
+  by `iref_pin_rows_of_store_STAGE_E` but the AU post shapes still differ
+  at these two sites).
+- `ProofVirtioDiskRwF` status read: `ctx_byte_of_at` now wants `key_at ∗
+  chain_ev`, the holder has a floor (STAGE E, the device status row).
 
 ## 3. Stages
 

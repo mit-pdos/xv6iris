@@ -1108,7 +1108,13 @@ Section VdrwdLeaves.
         iApply (big_sepL_impl with "Hnew"). iIntros "!>" (k j _) "Hc".
         iEval (rewrite phys_ledger_at_halves) in "Hc". iDestruct "Hc" as "[H1 H2]".
         iSplitL "H1"; [by iApply phys_ledger_at_ledger|].
-        iExists t. iFrame "H2". by iApply (lk_floor_of_wrote with "Hw"). }
+        iExists t. iFrame "H2". iSplitR; [by iApply (lk_floor_of_wrote with "Hw")|].
+        (* relaxed-ww STAGE E (TsoCtxStore lane): the plain window store gate
+           [ledger_store_win_at_ok] does not mint the new row's chain --
+           [ctx_store_ok] does, from the old rows' chain and latest facts;
+           the avail ring's store joins that gate when the racy tiers are
+           restated (§2.7). *)
+        admit. }
       iMod ("Hclose" with "Hah") as "(Hproto & Hpub & Hstg & Hpb & Hact)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iApply bi.later_intro. iExists vst. iFrame. iPureIntro. exact Hvok. }
@@ -1116,7 +1122,7 @@ Section VdrwdLeaves.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc (Hpub & Hstg & Hact & Havh & Hpb)". rgall.
     iApply ("Hcont" with "Hcg Hpc Hpub Hstg Hact Havh Hpb").
-  Qed.
+  Admitted.
 
 End VdrwdLeaves.
 

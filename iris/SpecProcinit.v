@@ -63,6 +63,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Require Import SepThread.   (* A6.69: the running token threaded through the sixty-four proc locks *)
+Require Import CtxBirth.   (* relaxed-ww RULING C: the birth bridge (STAGE E) *)
 Local Open Scope Z_scope.
 
 
@@ -297,6 +298,15 @@ Section ProcinitProcsInv.
     iDestruct "Hlast" as "[[Hfresh HQ] _]".
     iDestruct (lk_fresh_pieces with "Hfresh") as "(#Hnm & Hword & Hcpu)".
     iMod (newlock_delayed E (addr n) nm with "Hnm Hword Hcpu") as (g) "Hmk".
+    (* relaxed-ww RULING C: the spec keeps its running-token wand; the birth
+       borrows the flushed token through [CtxBirth] (STAGE E) *)
+    iAssert (∀ R : CtxId → iProp Σ, ⌜CtxMorph R⌝ -∗ own_context cur_ctx -∗
+               R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock g (addr n) nm R)%I
+      with "[Hmk]" as "Hmk".
+    { iIntros (R) "%HR Hrun HR".
+      iDestruct (CtxBirth.own_context_flushed_birth_RULING_C with "Hrun") as (Df) "[Hrun Hback]".
+      iMod ("Hmk" $! Df R with "[%] Hrun HR") as "[Hrun Hl]"; [exact HR|].
+      iModIntro. iFrame "Hl". by iApply "Hback". }
     iModIntro. iExists ((γl ++ [g])%list).
     iSplit.
     { iPureIntro. rewrite List.last_length. by rewrite Hlen. }

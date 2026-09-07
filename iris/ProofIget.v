@@ -1495,9 +1495,9 @@ Section ProofIget.
                       eq_refl with "Hown Hmsg")
                 as "[Hown #Hwr]".
               rewrite (ktier_pin_id ppn _ Hpin).
+              iMod (IcacheInv.iref_pin_rows_of_store_STAGE_E with "Hrows") as "Hrows".
               iModIntro. iFrame "Hgh Htso Hown".
-              iExists (S (length log)). iFrame "HllbS Hwr".
-              rewrite /IcacheInv.iref_pin_rows. iExact "Hrows". }
+              iExists (S (length log)). iFrame "HllbS Hwr". iExact "Hrows". }
             { iApply (igi_78 with "Htext"). }
             { rewrite Hpa78. iExact "Hclaim3". }
             { (* the AU: [Res] is the freed cell's bytes; the closing wand

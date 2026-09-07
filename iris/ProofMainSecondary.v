@@ -331,7 +331,7 @@ Section ProofMainSecondary.
         (∃ (i M q V0 : nat),
            P i M cur_ctx ∗
            TsoGhost.view_lb view_name dlen_name (hart_agent cpu_id) V0 ∗
-           fr_at 0%nat i M ∗ dpos_at dpos_name i (S q) ∗
+           fr_at 0%nat i M ∗ TsoGhost.dpos_at dpos_name i (S q) ∗
            ⌜(M <= q)%nat /\ (S q <= V0)%nat⌝) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

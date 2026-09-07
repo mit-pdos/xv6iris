@@ -36,6 +36,7 @@ Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import CtxBirth.   (* relaxed-ww RULING C: the birth bridge (STAGE E) *)
 
 Section PipeInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
@@ -396,7 +397,11 @@ Section PipeInv.
     iMod pipe_ends_alloc as (γp) "(Hrd & Hwr & Hm0 & Hm1)".
     (* A6.67: the DELAYED form takes [CtxMorph] as a pure premise and the
        running token beside the payload (A6.66); both come straight back. *)
-    iMod ("Hmake" $! (pipe_res_at γp pi) (pipe_dead γl γp) with "[%] Hrun
+    (* relaxed-ww RULING C: pipealloc's initlock is its last act, no fence
+       follows in this proof; the birth's flushed token is borrowed through
+       [CtxBirth] (STAGE E) *)
+    iDestruct (CtxBirth.own_context_flushed_birth_RULING_C with "Hrun") as (Df) "[Hrun Hback]".
+    iMod ("Hmake" $! Df (pipe_res_at γp pi) (pipe_dead γl γp) with "[%] Hrun
             [Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "[Hrun #Hlk]".
     { apply _. }
     { iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
@@ -405,6 +410,7 @@ Section PipeInv.
       iSplitL "Hm0"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm0")|].
       iSplitL "Hm1"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm1")|].
       iSplit; [iPureIntro; exact pipe_count_ok_00 | done]. }
+    iDestruct ("Hback" with "Hrun") as "Hrun".
     iModIntro. iFrame "Hrun". iExists γl, γp.
     rewrite /is_pipe. iFrame "Hrd Hwr".
     iSplit; [done|]. iExists lo. iFrame "Hlk Hfl".

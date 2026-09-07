@@ -663,15 +663,6 @@ Section ProofBrelse.
        before the store -- the parker's only credential; the chain's
        reference at the new stamp, the token and the park half come back
        out of Q ===== *)
-    iApply fupd_wp.
-    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (bbox_park bn V k cur_ctx dev bno th ⊤ ltac:(solve_ndisj)
-            with "Hbox Hrun [Hvalid Hbdev Hbuf Hbpayload] Hhold") as "(Hrun & Hr)".
-    { rewrite buf_bundle_at_own. iExists true, bs. rewrite /bpa.
-      iFrame "Hvalid Hbdev Hbuf Hbpayload". }
-    iDestruct ("Hcgb" with "Hrun") as "Hcg".
-    iDestruct "Hr" as (r) "(Hrp & Hgh & #Hllbr)".
-    iModIntro.
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.brelse + 0x02)) (mword_of_int 3 : mword 6) Rra
               R1 (K - 4)%nat vr24 b with "Hcg Hpc [] Hr24").
     { iApply (bri_02 with "Htext"). }
@@ -894,16 +885,31 @@ Section ProofBrelse.
       by (rewrite /H2; apply upd_eq).
     iDestruct (cpu_own_transport CID11 CID14 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Rsl.wp_releasesleep_genin_sconf γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bslp bn k) (bslp_dep bn k r) SleepLock.sl_untracked qsl
-              H2 pidv p (K - 4)%nat b b lks r
-              ltac:(lia) Hbelow_sl (bslp_fold bn k r)
-              with "Hcg Hcnt Htext Hpc [] [Hstok] Hllbr [Hbown Hrp] Hprocs").
+    (* relaxed-ww §2.6: the park is FENCE-BOUND -- it runs inside
+       releasesleep's inner release hook, the bundle and the hold travelling
+       as the hook's extras; the chain's reference comes back out as Q *)
+    iAssert (lock_ctx_hook (CID := CID14) (⊤ ∖ ↑minstretN) (bslp bn k) (fun _ => bown bn k)%I
+               (bref_ghost bn k dev bno))
+      with "[Hvalid Hbdev Hbuf Hbpayload Hhold]" as "Hhook".
+    { rewrite /lock_ctx_hook. iIntros (ξ T Df) "Hrun Hst Hown".
+      iMod (bbox_park bn V k Df cur_ctx dev bno th (⊤ ∖ ↑minstretN) ltac:(solve_ndisj)
+              with "Hbox Hrun [Hvalid Hbdev Hbuf Hbpayload] Hhold") as "(Hrun & Hr)".
+      { rewrite buf_bundle_at_own. iExists true, bs. rewrite /bpa.
+        iFrame "Hvalid Hbdev Hbuf Hbpayload". }
+      iDestruct "Hr" as (r) "(Hrp & Hgh & #Hllbr)".
+      iMod (TsoCtx.ctx_stamped_raise ξ T r with "Hllbr Hst") as "[Hst #Hfl]".
+      iModIntro. iFrame "Hrun Hgh". iExists (Nat.max T r). iFrame "Hst".
+      iApply (bslp_fold bn k r). rewrite /bslp_dep. iFrame "Hown Hrp Hfl". }
+    iApply (Rsl.wp_releasesleep_genhook_sconf γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
+              "buffer"%string (bslp bn k) (fun _ => bown bn k)%I (bref_ghost bn k dev bno)
+              SleepLock.sl_untracked qsl
+              H2 pidv p (K - 4)%nat b b lks
+              ltac:(lia) Hbelow_sl
+              with "Hcg Hcnt Htext Hpc [] [Hstok] Hbown Hhook Hprocs").
     all: try lkbelow.
     { iEval (rewrite HH2a0). iExact "Hslk". }
     { iEval (rewrite HH2a0). iExact "Hstok". }
-    { rewrite /bslp_dep /bown. iFrame "Hbown Hrp". }
-    iIntros (CID15 Hs15 mR) "%Hcs2 Hcg Hcnt Hpc _".
+    iIntros (CID15 Hs15 mR) "%Hcs2 Hcg Hcnt Hpc Hgh _".
     assert (Hpc20 : ret_pc (H2 !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x20)).
     { rewrite HH2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc20) in "Hpc".

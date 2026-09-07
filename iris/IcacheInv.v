@@ -1510,6 +1510,22 @@ Section IcacheRefInv.
           (nth_byte w j) t
           (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set))%I.
 
+  (* relaxed-ww STAGE E (the pinw window, §2.7): the writer's fresh rows come
+     out of [CtxPinw.pinw_write_c] under an ISSUE bound [t ≤ S (length log)];
+     the rows' drain witness [dpos_ev t tst] and chain exist only once the
+     writer's release fence has run.  The honest shape between the store and
+     the release is a PENDING arm -- the writer's [key_at cur_ctx (t, a)]
+     registration, converted in the itable release hook (§2.6) -- which is
+     not in the invariant yet.  Until it lands, the store post is bridged. *)
+  Lemma iref_pin_rows_of_store_STAGE_E (k : nat) (w : mword 32) (lo L : nat) :
+    ([∗ list] j ∈ seq 0 4, ∃ t : nat,
+        ⌜(t <= L)%nat⌝ ∗
+        TsoCtx.phys_ledger_pinw (pa_add (i_ref (ientry k)) j) (DfracOwn 1)
+          (nth_byte w j) t
+          (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set)) ==∗
+    iref_pin_rows k w lo L.
+  Admitted.
+
   (* the merged per-slot row: the pin custody AND the liveness arm, one
      (g, lo) binder over both.  Free slots keep only the liveness unit --
      their count cells ride itable.lock's payload as plain ctx cells (the

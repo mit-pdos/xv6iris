@@ -1390,9 +1390,12 @@ Section BreadBlocks.
        identity (lemma (b)) and mints the chain's reference there. *)
     iApply fupd_wp.
     iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (bcache_scan2_recycle bn V Mg ord devs bnos tl k dev bno ⊤ ltac:(solve_ndisj)
+    iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hmask"; [solve_ndisj|].
+    iMod (bcache_scan2_recycle bn V Mg ord devs bnos tl k dev bno (⊤ ∖ ↑minstretN)
+            ltac:(solve_ndisj)
             Hk HMk Hdv Hcov Htie with "Hbox Hrun Hfl Hllbtl Hscan Hbslot")
       as "(Hrun & Hcell & Hvld & Hdevw & Hbnow & Hclose)".
+    iMod "Hmask" as "_".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hvld" as (vld0) "Hvld".
     iModIntro.
@@ -1465,13 +1468,8 @@ Section BreadBlocks.
     assert (Hstv : trunc32 (rget C1 Ra5) = (mword_of_int 1 : mword 32)).
     { rgne. rewrite HC1a5. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hstv) in "Hcell".
-    iApply fupd_wp.
-    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod ("Hclose" with "Hrun Hcell Hvld Hdevw Hbnow") as "(Hrun & Hafter & Hch)".
-    iDestruct ("Hcgb" with "Hrun") as "Hcg".
-    iDestruct "Hch" as "[Hbr0 Hgh]". iDestruct "Hgh" as (t) "Href".
-    iDestruct (bd_ref_llb with "Href") as "[Href #Hllbt]".
-    iModIntro.
+    (* relaxed-ww §2.6: the (b) deposit no longer runs here -- the four
+       cells and the closing wand ride the bcache release hook below *)
     assert (Hppa0 : add_vec_int (mword_of_int (KernelSyms.bread + 0x9e) : mword 64) 2 = mword_of_int (KernelSyms.bread + 0xa0))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa0) in "Hpc".
@@ -1529,19 +1527,20 @@ Section BreadBlocks.
       by (rewrite /C4; apply upd_eq).
     (* ENDGAME R2: the recycle moved the floor slot to the deposit stamp; the
        hook re-floors there from the llb the twin handed out *)
-    iDestruct "Hafter" as (M' ord' devs' bnos' tl') "(%Htl' & #Hllbtl' & Hscan')".
     iApply (R.wp_release_hook_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string
-              (fun ξ => llb dlen_name tl' ∗ bcache_scan2 bn V M' ord' devs' bnos' tl' ξ)%I
-              (fun ξ => bcache_res2 bn V ξ) C4
+              (fun _ => bd_recycle_cells k dev bno ∗
+                        bd_recycle_close bn V tl k dev bno (⊤ ∖ ↑minstretN))%I
+              (fun ξ => bcache_res2 bn V ξ) (bchain bn k dev bno) C4
               0%nat eb (proc_addr j) (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HC4a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
-              with "Hcg Htext Hpc [Hlock] Htok [Hscan'] [Hllbtl'] Hcnt Hpay").
+              with "Hcg Htext Hpc [Hlock] Htok [Hcell Hvld Hdevw Hbnow Hclose] [] Hcnt Hpay").
     { iExact "Hlock". }
-    { iFrame "Hllbtl' Hscan'". }
-    { iApply (lock_hook_llb _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
-                with "Hllbtl'"). }
-    iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+    { rewrite /bd_recycle_cells. iFrame "Hcell Hvld Hdevw Hbnow Hclose". }
+    { iApply bd_recycle_hook. }
+    iIntros (CIDr Hsr mr) "Hch Hcg Hpc %Hrelpins Hcnt".
+    iDestruct "Hch" as "[Hbr0 Hgh]". iDestruct "Hgh" as (t) "Href".
+    iDestruct (bd_ref_llb with "Href") as "[Href #Hllbt]".
     assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".

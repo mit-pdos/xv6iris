@@ -1340,11 +1340,22 @@ Section IputTail.
         iIntros "Hkm Hgh Htso Hown HRes".
         iDestruct "HRes" as "(%Hlot & #Hfl & Hrows & Hcl)".
         iEval (rewrite /IcacheInv.iref_pin_rows) in "Hrows".
+        (* relaxed-ww §2.10: the retiring holder hands one [key_at] per row --
+           the row's drain witness under the acquire floor is its clean arm *)
+        iAssert ([∗ list] j ∈ seq 0 4, ∃ t : nat,
+            TsoCtx.key_at TsoCtx.cur_ctx (t, pa_add (i_ref (ientry k)) j) ∗
+            TsoGhost.chain_ev chain_name t ∗
+            TsoCtx.phys_ledger_pinw (pa_add (i_ref (ientry k)) j) (DfracOwn 1)
+              (nth_byte (iref_word Mt k) j) t
+              (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j loip IcacheInv.iref_set))%I
+          with "[Hrows]" as "Hrows".
+        { iApply (big_sepL_mono with "Hrows"). iIntros (ix jx Hijx) "(%t & #Hdp & #Hch & H)".
+          iExists t. iFrame "H Hch". rewrite /TsoCtx.key_at. iLeft. iExists tstk. iFrame "Hdp Hfl". }
         iMod (CtxPinw.pinw_retire_write_c (CID := CIDw) img sigma log dl V
                 (i_ref (ientry k)) (iref_word Mt k)
-                (mword_of_int 0 : mword 32) (Z.to_N 4) loip tstk
+                (mword_of_int 0 : mword 32) (Z.to_N 4) loip
                 IcacheInv.iref_set ltac:(lia)
-                with "Hgh Htso Hown Hfl Hrows")
+                with "Hgh Htso Hown Hrows")
           as "(Hgh & Htso & Hown & Hcells)".
         rewrite (ktier_pin_id ppn _ Hpin).
         iModIntro. iFrame "Hgh Htso Hown Hcl".

@@ -594,6 +594,26 @@ Section BreadScan2.
      values, evicts the old payload into the pool, withdraws the new block's
      bundle, deposits the (invalid) header at the new stamp, and mints the
      chain's reference there.  The floor slot grows to the new stamp. ---- *)
+  (* relaxed-ww §2.6/§2.14: the recycle's (b) deposit is FENCE-BOUND and runs
+     INSIDE the bcache release hook.  [bd_recycle_cells] are the four header
+     cells the three stores between the scan and the release leave behind;
+     [bd_recycle_close] is the closing wand the scan hands the code proof
+     (its (b) half); [bd_recycle_hook] is the hook that runs it at the fence,
+     deposits the re-stamped scan into the lock's stamped context and
+     exports the chain's reference as the hook's Q. *)
+  Definition bd_recycle_cells (k : nat) (D B : mword 32) : iProp Σ :=
+    (brefcnt k ↦₄ (mword_of_int 1 : mword 32) ∗
+     b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
+     b_dev (bpa k) ↦₄ D ∗
+     b_blockno (bpa k) ↦₄ B)%I.
+  Definition bd_recycle_close (bn : bio_names) (V : bio_view Σ) (tl k : nat)
+      (D B : mword 32) (E : coPset) : iProp Σ :=
+    (∀ Df : nat,
+     TsoCtx.own_context_flushed cur_ctx Df -∗
+     bd_recycle_cells k D B ={E}=∗
+     TsoCtx.own_context_flushed cur_ctx Df ∗
+     bd_scan2_after bn V tl ∗ bchain bn k D B)%I.
+
   Lemma bcache_scan2_recycle (bn : bio_names) (V : bio_view Σ)
       (M : gmap nat (option Qp * positive)) (ord : list nat)
       (devs bnos : nat -> mword 32) (tl k : nat) (D B : mword 32) (E : coPset) :
@@ -615,14 +635,7 @@ Section BreadScan2.
     b_blockno (bpa k) ↦₄ (bnos k) ∗
     (* relaxed-ww (§2.14): the (b) deposit is FENCE-BOUND -- the closer
        runs it at the bcache release fence, over the fence's flushed token *)
-    (∀ Df : nat,
-     TsoCtx.own_context_flushed cur_ctx Df -∗
-     brefcnt k ↦₄ (mword_of_int 1 : mword 32) -∗
-     b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) -∗
-     b_dev (bpa k) ↦₄ D -∗
-     b_blockno (bpa k) ↦₄ B ={E}=∗
-     TsoCtx.own_context_flushed cur_ctx Df ∗
-     bd_scan2_after bn V tl ∗ bchain bn k D B).
+    bd_recycle_close bn V tl k D B E.
   Proof.
     iIntros (HE Hk HMk HD HcovB Htie) "#Hbox Hrun #Hfl #Hllbtl Hscan Hbslot".
     rewrite /bcache_scan2.
@@ -647,7 +660,7 @@ Section BreadScan2.
     iDestruct (ctx_word4_pointsto_half_join with "Hbnob Hbno") as "Hbno".
     iModIntro. iFrame "Hrun Hcell Hdev Hbno".
     iSplitL "Hvld". { by iExists _. }
-    iIntros (Df) "Hrun Hcell Hvld Hdev Hbno".
+    rewrite /bd_recycle_close. iIntros (Df) "Hrun (Hcell & Hvld & Hdev & Hbno)".
     (* the old payload leaves for the pool; the new block's bundle comes out *)
     iDestruct (buf_pay_evict bn V k M v (devs k) (bnos k) bs HMk with "Hauth Hpay")
       as "[Hauth Hold]".
@@ -708,6 +721,25 @@ Section BreadScan2.
       { iPureIntro. exact (bd_devpin_upd V devs bnos k D B HD Hdevpin). }
       iFrame "Hlru Hpool Hslots".
     - rewrite /bchain /bref_tok0. iFrame "Htok Hgh".
+  Qed.
+
+  (* the hook: the (b) half at the fence, the scan into the lock's context,
+     the chain's reference out as Q *)
+  Lemma bd_recycle_hook (bn : bio_names) (V : bio_view Σ)
+      (tl k : nat) (D B : mword 32) (E : coPset) :
+    ⊢ WpLock.lock_ctx_hook E (fun ξ => bcache_res2 bn V ξ)
+        (fun _ => bd_recycle_cells k D B ∗ bd_recycle_close bn V tl k D B E)%I
+        (bchain bn k D B).
+  Proof.
+    rewrite /WpLock.lock_ctx_hook. iIntros (ξ T Df) "Hrun Hst [Hc Hclose]".
+    iMod ("Hclose" with "Hrun Hc") as "(Hrun & Hafter & Hch)".
+    iDestruct "Hafter" as (M' ord' devs' bnos' tl') "(%Htl' & #Hllbtl' & Hscan')".
+    iMod (TsoCtxLedger.ctx_deposit_flushed
+            (bcache_scan2 bn V M' ord' devs' bnos' tl') cur_ctx ξ Df T
+            with "Hrun Hst Hscan'") as "(Hrun & %T' & %HTT' & Hst & Hscan')".
+    iMod (TsoCtx.ctx_stamped_raise ξ T' tl' with "Hllbtl' Hst") as "[Hst #Hfl]".
+    iModIntro. iFrame "Hrun Hch". iExists (Nat.max T' tl'). iFrame "Hst".
+    iApply (bcache_res2_fold_in bn V M' ord' devs' bnos' tl'). iFrame "Hllbtl' Hscan' Hfl".
   Qed.
 
   (* ---- refs-- (box lemma (d)) for a FRACTIONED reference in hand (bunpin);

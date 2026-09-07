@@ -109,6 +109,7 @@ Require Import TsoCtx.
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creator's borrow *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import CtxBirth.   (* relaxed-ww RULING C: the birth bridge (STAGE E) *)
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -2741,9 +2742,13 @@ Section ProofInitlog.
        proof holds the kernel bundle, so it borrows its own and puts it back
        ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string
+    (* relaxed-ww RULING C: initlog's fences are inside bread/brelse; the
+       birth's flushed token is borrowed through [CtxBirth] (STAGE E) *)
+    iDestruct (CtxBirth.own_context_flushed_birth_RULING_C with "Hrun") as (Df) "[Hrun Hback]".
+    iMod (newlock_at ⊤ Df (ln_lk γ) log_addr "log"%string
             (log_res_at γ bn γfs cov logstart)
             with "Hlkf Hlnm Hrun Hlock Hcpu Hres") as "[Hrun #Hislk]".
+    iDestruct ("Hback" with "Hrun") as "Hrun".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* BLOCK 1'S PARK, ALLOCATED (durable-disk lane C-3a).  It is minted
        in the same ghost step as the lock's seal, which is the one place in

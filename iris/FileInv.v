@@ -333,8 +333,15 @@ Section FileInv.
     iDestruct "Hoff" as (i T0) "(%Hip & %Hi & Hbox & _ & Hregd & Hcnt & Hst)".
     rewrite /off_ref_stamps. iDestruct "Hst" as (m) "[%Hq Href]".
     iMod (off_last_close k _ _ T0 m E HE Hq with "Hbox Hregd Hcnt Href") as "[_ Hfree]".
-    iModIntro. rewrite /off_free. iFrame "Hfree". iPureIntro. apply a_foff_aligned.
-  Qed.
+    iDestruct "Hfree" as (ξb) "Hfree".
+    iModIntro. rewrite /off_free /off_free_at. iSplitR; [iPureIntro; apply a_foff_aligned|].
+    (* relaxed-ww STAGE E (OffBox lane, §2.14): the box hands the free bytes
+       out at its OWN stamped context [ξb]; the closer wants them at
+       [cur_ctx], which is the dom of the box's stamped context under the
+       closer's floor -- the fd row's floor over the reference's stamps
+       ([off_ref_stamps]) is not carried by the ftable payload yet. *)
+    admit.
+  Admitted.
 
   (* ------------------------------------------------------------------ *)
   (*  The three ghost steps, all performed under ftable.lock              *)

@@ -136,6 +136,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import CtxBirth.   (* relaxed-ww RULING C: the birth bridge (STAGE E) *)
 
 (* ===================================================================== *)
 (*  1.  THE PURE DECODE: every 1024-byte block IS sixteen dinodes         *)
@@ -1524,12 +1525,16 @@ Section IcacheBootTable.
     iDestruct "Hall" as "[Hbx Hrest]".
     iEval (rewrite big_sepL_sep) in "Hrest".
     iDestruct "Hrest" as "[Hslots Hquarters]".
-    iMod (ic_box_alloc_at cn γfs γi cov logstart cur_ctx E with "Hrun Hbx")
+    (* relaxed-ww RULING C: the boot folds hold no fence; every birth below
+       runs on ONE flushed token borrowed through [CtxBirth] (STAGE E) and
+       handed back before the return *)
+    iDestruct (CtxBirth.own_context_flushed_birth_RULING_C with "Hrun") as (Df) "[Hrun Hback]".
+    iMod (ic_box_alloc_at cn γfs γi cov logstart Df cur_ctx E with "Hrun Hbx")
       as "(Hrun & #Hescrows & Hregs)".
     (* the fifty registers: the L2 halves go to the sleeplocks, the L1 rows
        fold under ONE boot bound [tl] (CtxBox.big_sepL_llb_max) *)
     iAssert ([∗ list] k ∈ seq 0 NINODE,
-               (∃ Td : nat, TsoGhost.llb loglen_name Td ∗
+               (∃ Td : nat, TsoGhost.llb dlen_name Td ∗
                   (ic_regd k (SlotReg Td false None None) ∗ ic_cnt k 0)) ∗
                ic_regp k (L2Reg 0 None))%I with "[Hregs]" as "Hregs".
     { iApply (big_sepL_mono with "Hregs"). intros idx k _.
@@ -1570,7 +1575,7 @@ Section IcacheBootTable.
       { iApply (big_sepL_mono with "Hslots"). intros idx k _.
         rewrite /islot2 !lookup_empty. done. }
       rewrite ci_inums_empty difference_empty_L. iExact "Hpool". }
-    iMod (newlock_at_llb E γl itable_lock "itable"%string
+    iMod (newlock_at_llb E Df γl itable_lock "itable"%string
             (fun ξ => itable_res2 ξ cn γfs γi cov logstart nib dv)
             (fun ξ => itable_res2_bare ξ tl cn γfs γi cov logstart nib dv) tl
             (fun ξ => itable_res2_of_bare ξ tl cn γfs γi cov logstart nib dv)
@@ -1584,17 +1589,17 @@ Section IcacheBootTable.
     (* A6.68: SEQUENTIAL, not fifty independent fupds -- each
        [sl_fresh_new_genl] borrows the running token and returns it. *)
     iAssert ([∗ list] idx↦k ∈ seq 0 NINODE,
-               own_context cur_ctx -∗
+               own_context_flushed cur_ctx Df -∗
                ((((sl_fresh (i_lock (ientry k)) "inode"%string ∗ ic_tok cn k) ∗
                   ic_regp k (L2Reg 0 None)) ∗ ic_dep_neutral cn k) ∗
                 OffBox.off_set_auth off_cfg k ∅)
-               ={E}=∗ own_context cur_ctx ∗
+               ={E}=∗ own_context_flushed cur_ctx Df ∗
                ∃ γil γisl : gname,
                  is_sleeplock_genl γil γisl (i_lock (ientry k)) "inode"%string
                                    (ic_slp cn k) (slh_tok (icfg_isl k)))%I
       as "Hstep".
     { iApply big_sepL_intro. iIntros "!>" (idx k _) "Hrun [[[[Hf Ht] Hrp] Hn] Hoff]".
-      iMod (sl_fresh_new_genl E _ _ (ic_slp cn k) (fun _ q => slh_tok (icfg_isl k) q)
+      iMod (sl_fresh_new_genl E Df _ _ (ic_slp cn k) (fun _ q => slh_tok (icfg_isl k) q)
               with "Hf Hrun [Ht Hrp Hn Hoff]") as "[Hrun Hgen]".
       { rewrite /ic_slp. iExists (L2Reg 0 None).
         iSplitL "Hrp".
@@ -1606,8 +1611,9 @@ Section IcacheBootTable.
         iFrame "Hoff". by rewrite big_sepS_empty. }
       iDestruct "Hgen" as (γil γisl) "[#Hlk _]".
       iModIntro. iFrame "Hrun". iExists γil, γisl. iExact "Hlk". }
-    iMod (big_sepL_fupd_thread E (own_context cur_ctx)
+    iMod (big_sepL_fupd_thread E (own_context_flushed cur_ctx Df)
             with "Hrun Hstep Hsl") as "[Hrun Hsl]".
+    iDestruct ("Hback" with "Hrun") as "Hrun".
     iModIntro. iFrame "Hrun".
     (* structurally, NOT [iFrame "…"] (optimization.md's BioInv rule) *)
     rewrite /is_itable2.

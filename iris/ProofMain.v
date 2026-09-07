@@ -183,6 +183,7 @@ Proof. lia. Qed.
 
 (* ===================================================================== *)
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import CtxBirth.   (* relaxed-ww RULING C: the birth bridge (STAGE E) *)
 Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 Module MainProof
   (Cpuid : CPUID) (Consoleinit : CONSOLEINIT) (Printkinit : PRINTKINIT)
@@ -555,8 +556,12 @@ Section ProofMain.
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock_at ⊤ fsc_printk (mword_of_int KernelSyms.pr) "pr"%string <{ pr_res γd }> with "Hkprintk Hprnm Hrun Hprw Hprcpu []") as "[Hrun #Hprlk]".
+    (* relaxed-ww RULING C: pr.lock is created UNPUBLISHED before the first
+       fence; the birth's flushed token is borrowed through [CtxBirth] (STAGE E) *)
+    iDestruct (CtxBirth.own_context_flushed_birth_RULING_C with "Hrun") as (Dfpr) "[Hrun Hbackpr]".
+    iMod (newlock_at ⊤ Dfpr fsc_printk (mword_of_int KernelSyms.pr) "pr"%string <{ pr_res γd }> with "Hkprintk Hprnm Hrun Hprw Hprcpu []") as "[Hrun #Hprlk]".
     { rewrite /pr_res. done. }
+    iDestruct ("Hbackpr" with "Hrun") as "Hrun".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* ---- THE OTHER TWO [newlock]s, and this is the point of the group.
        consoleinit has just run [initlock] on cons.lock and, through uartinit,
@@ -573,9 +578,12 @@ Section ProofMain.
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock ⊤ UartTxInv.a_tx_lock "uart"%string <{ tx_res γd }>
+    (* relaxed-ww RULING C: tx_lock is created UNPUBLISHED at boot *)
+    iDestruct (CtxBirth.own_context_flushed_birth_RULING_C with "Hrun") as (Dftx) "[Hrun Hbacktx]".
+    iMod (newlock ⊤ Dftx UartTxInv.a_tx_lock "uart"%string <{ tx_res γd }>
             with "Htxnm Hrun Htxw Htxcpu [Htx]") as "[Hrun Htxi0]".
     { iApply (tx_res_intro γd l0 with "Htx"). }
+    iDestruct ("Hbacktx" with "Hrun") as "Hrun".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Htxi0" as (γtx) "#Htxinv".
     (* [is_txlock]'s two halves are exactly [Htxinv]/[Hdoff] -- the same pair
@@ -592,8 +600,11 @@ Section ProofMain.
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock ⊤ a_cons "cons"%string cons_res_at
+    (* relaxed-ww RULING C: cons.lock is created UNPUBLISHED at boot *)
+    iDestruct (CtxBirth.own_context_flushed_birth_RULING_C with "Hrun") as (Dfcl) "[Hrun Hbackcl]".
+    iMod (newlock ⊤ Dfcl a_cons "cons"%string cons_res_at
             with "Hclnm Hrun Hclw Hclcpu Hring") as "[Hrun Hcl0]".
+    iDestruct ("Hbackcl" with "Hrun") as "Hrun".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hcl0" as (γcl) "#Hconslk".
     iAssert (console_caps γd) as "#Hccaps".

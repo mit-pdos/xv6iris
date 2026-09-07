@@ -42,6 +42,7 @@ Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creator's borrow *)
+Require Import CtxBirth.   (* relaxed-ww RULING C: the birth bridge (STAGE E) *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -237,8 +238,12 @@ Section ProofKinit.
        [SieCapCtx.sie_cap_gpr_own_ctx_acc] -- and puts it straight back; no
        spec premise of this function changes shape. *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock_at ⊤ γl lk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl)
+    (* relaxed-ww RULING C: kinit holds no fence; the birth's flushed token
+       is borrowed through [CtxBirth] (STAGE E) *)
+    iDestruct (CtxBirth.own_context_flushed_birth_RULING_C with "Hrun") as (Df) "[Hrun Hback]".
+    iMod (newlock_at ⊤ Df γl lk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl)
             with "Hlkfree Hlnm Hrun Hlock Hcpu HR") as "[Hrun #Hkmem]".
+    iDestruct ("Hback" with "Hrun") as "Hrun".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
     pose proof Hilcs as Hilcs_full. unfold callee_saved in Hilcs.

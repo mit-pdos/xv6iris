@@ -33,6 +33,7 @@ Require Import WpNext.
 Require Import LockRank.
 Require Import FdSlots.
 Require Import CpuOwn.
+Require Import MinstretInv.   (* relaxed-ww §2.6: the hooked form runs at the finisher's mask *)
 Require Import SchedCtx.
 Require Import SleepLock.
 From Kernel Require KernelSyms.
@@ -120,6 +121,42 @@ Definition wp_releasesleep_genin_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
           WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* relaxed-ww §2.6: the HOOKED form.  The releaser hands the sleeplock's
+   payload UNFINISHED at its own context ([Rin cur_ctx]) together with a
+   hook that finishes it inside the inner spinlock's release fence -- the
+   site of the box parks (brelse's (f), iunlock's) -- whose export [Q]
+   (what the deposit tells the continuation: the chain's reference, the
+   side share) comes back with the return.  [_genin] is its instance at
+   [lock_hook_llb]. *)
+Definition wp_releasesleep_genhook_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γs : list gname)
+    (γl γsl : gname) (s : string) (R Rin : TsoCtx.CtxId -> iProp Σ) (Q : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
+  let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
+                   in
+  (22 <= av)%nat ->
+  locks_below lks "sleep lock" ->
+  sie_cap_gpr KT1 m av b pme -∗
+  cpu_own 0 eb pme b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  is_sleeplock_genl γl γsl slk s R H -∗
+  sleeplocked_q γsl q slk pd -∗
+  Rin TsoCtx.cur_ctx -∗
+  WpLock.lock_ctx_hook (⊤ ∖ ↑minstretN) R Rin Q -∗
+  procs_inv γs -∗
+  wp_next b pme (fun (CID : CpuId) =>
+    ∀ mf : regfile,
+      ⌜ callee_saved m mf ⌝ -∗
+      sie_cap_gpr KT1 mf av b pme -∗
+      cpu_own 0 eb pme b lks -∗
+      pc_is ret_tgt -∗
+      Q -∗
+      H q -∗
+          WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Definition wp_releasesleep_genl_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
@@ -202,6 +239,12 @@ Module Type RELEASESLEEP.
       (γl γsl : gname) (s : string) (R Rdep : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} `{HmRd : !TsoCtx.CtxMorph Rdep} (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string) (tl : nat),
       wp_releasesleep_genin_sconf_body γs γl γsl s R Rdep H q m pd pme av eb b lks tl.
+  Parameter wp_releasesleep_genhook_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γs : list gname)
+      (γl γsl : gname) (s : string) (R Rin : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} `{HmRin : !TsoCtx.CtxMorph Rin} (Q : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string),
+      wp_releasesleep_genhook_sconf_body γs γl γsl s R Rin Q H q m pd pme av eb b lks.
   Parameter wp_releasesleep_genl_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname)

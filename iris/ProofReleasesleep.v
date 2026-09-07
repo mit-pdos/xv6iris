@@ -74,21 +74,62 @@ Section ProofReleasesleep.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  Lemma wp_releasesleep_genin_sconf
-      (γs : list gname)
-      (γl γsl : gname) (s : string) (R Rdep : TsoCtx.CtxId -> iProp Σ)
-      `{HmR : !TsoCtx.CtxMorph R} `{HmRd : !TsoCtx.CtxMorph Rdep} (H : Qp -> iProp Σ) (q : Qp)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-      (tl : nat)
-    : wp_releasesleep_genin_sconf_body γs γl γsl s R Rdep H q m pd pme av eb b lks tl.
+  (* relaxed-ww §2.6: the releaser's FREE body at its own context over an
+     UNFINISHED client payload [Rin], and the lift of a client hook (over
+     [R]/[Rin]) to the inner spinlock's payload: the free arm is the one the
+     releaser just built, so the hook only ever meets it. *)
+  Definition sl_body_free (γ : gname) (slk : mword 64) (Rin : TsoCtx.CtxId -> iProp Σ)
+      (ξ : TsoCtx.CtxId) : iProp Σ :=
+    (TsoCtx.ctx_word4_pointsto ξ slk (DfracOwn 1) (mword_of_int 0 : mword 32) ∗
+     sl_free_hold_at ξ γ slk ∗ Rin ξ)%I.
+  Global Instance sl_body_free_morph γ slk (Rin : TsoCtx.CtxId -> iProp Σ)
+      `{HmR : !TsoCtx.CtxMorph Rin} : TsoCtx.CtxMorph (sl_body_free γ slk Rin).
   Proof.
-    cbv beta delta [wp_releasesleep_genin_sconf_body].
-    intros pcE slk ret_tgt Hav Hno Hfold.
+    rewrite /sl_body_free.
+    apply TsoCtx.ctx_morph_sep; [apply TsoCtx.ctx_morph_word4 |].
+    apply TsoCtx.ctx_morph_sep; [| exact _].
+    rewrite /sl_free_hold_at. apply TsoCtx.ctx_morph_exist => q.
+    apply TsoCtx.ctx_morph_sep; [| apply TsoCtx.ctx_morph_const].
+    rewrite /sleeplocked_q_at.
+    apply TsoCtx.ctx_morph_sep; [apply TsoCtx.ctx_morph_const | apply TsoCtx.ctx_morph_word4].
+  Qed.
+  Lemma sl_body_free_intro γ slk (Rin : TsoCtx.CtxId -> iProp Σ) (q : Qp) :
+    slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    sleeplocked_q γ q slk (mword_of_int 0 : mword 32) -∗
+    sl_hauth γ q -∗
+    Rin TsoCtx.cur_ctx -∗
+    sl_body_free γ slk Rin TsoCtx.cur_ctx.
+  Proof.
+    iIntros "Hw Htok Hha HR". rewrite /sl_body_free.
+    iSplitL "Hw"; [iExact "Hw" |]. iSplitR "HR"; [| iExact "HR"].
+    iExists q. iSplitL "Htok"; [iExact "Htok" | iExact "Hha"].
+  Qed.
+  Lemma sl_pay_hook_lift (E : coPset) γ slk
+      (R Rin : TsoCtx.CtxId -> iProp Σ) (H : Qp -> iProp Σ) (Q : iProp Σ) :
+    WpLock.lock_ctx_hook E R Rin Q -∗
+    WpLock.lock_ctx_hook E (sl_pay γ slk R H) (sl_body_free γ slk Rin) Q.
+  Proof.
+    rewrite /WpLock.lock_ctx_hook. iIntros "Hhook" (ξ T Df) "Hrun Hst (Hw & Hhold & HR)".
+    iMod ("Hhook" with "Hrun Hst HR") as "(Hrun & %T' & Hst & HR & HQ)".
+    iModIntro. iFrame "Hrun HQ". iExists T'. iFrame "Hst".
+    rewrite /sl_pay /sl_body. iExists (mword_of_int 0 : mword 32). iFrame "Hw".
+    iLeft. iFrame "Hhold HR". done.
+  Qed.
+
+  Lemma wp_releasesleep_genhook_sconf
+      (γs : list gname)
+      (γl γsl : gname) (s : string) (R Rin : TsoCtx.CtxId -> iProp Σ)
+      `{HmR : !TsoCtx.CtxMorph R} `{HmRin : !TsoCtx.CtxMorph Rin} (Q : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+    : wp_releasesleep_genhook_sconf_body γs γl γsl s R Rin Q H q m pd pme av eb b lks.
+  Proof.
+    cbv beta delta [wp_releasesleep_genhook_sconf_body].
+    intros pcE slk ret_tgt Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     assert (Hcpune : forall i : CPU, eq_vec (zero_reg : mword 64) (mycpu_ret (cid_word_of i)) = false)
       by (intro i; apply mycpu_ret_nonzero; apply tp_ok_cid_of).
-    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk #Hllb HRdep #Hpinv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk HRin Hhook #Hpinv Hcont".
     (* [b] and [eb] coincide here: the entry level is 0, so the ghost
        agreement pins the ambient SIE index to the saved base enable -- which
        is also release's own exit index.  Collapsing the two names is what
@@ -384,27 +425,36 @@ Section ProofReleasesleep.
       rewrite /R2 upd_ne; [| vm_compute; discriminate].
       rewrite /R1 upd_eq. reflexivity. }
     (* rebuild the FREE sl_res: zeroed word + token + zeroed pid + R. *)
-    iDestruct (sl_res_close_free γsl slk (Rdep TsoCtx.cur_ctx) H q with "Hslkw Hslk Hha HRdep") as "HRsl".
+    iDestruct (sl_body_free_intro γsl slk Rin q with "Hslkw Hslk Hha HRin") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0.  ENDGAME R1-pre / R2: the
        free arm goes back UNFLOORED and the hook ([lock_hook_llb]) raises
        the lock's stamped record to the presented [llb tl] and mints the
        floor at [tl] inside the payload -- what the next winner's absorb
        hands over as [R cur_ctx] (the floor inside R, per the client). *)
     iApply (Release.wp_release_hook_sconf KT1 γl (sl_lk slk) "sleep lock"%string
-              (sl_pay γsl slk Rdep H) (sl_pay γsl slk R H) emp%I Krel
+              (sl_body_free γsl slk Rin) (sl_pay γsl slk R H) Q Krel
               0%nat b pme (av - 4)%nat
               ({["sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)
               ltac:(lia)
-              with "Hcg Htext Hpc [] HtokL [HRsl] [Hllb] Hown Hpay").
+              with "Hcg Htext Hpc [] HtokL HRsl [Hhook] Hown Hpay").
     { iExact "Hlockinv". }
-    { iApply (sl_pay_of_res with "HRsl"). }
-    { iApply (lock_hook_llb _ (sl_pay γsl slk Rdep H) (sl_pay γsl slk R H) tl
-                (sl_body_fold γsl slk R Rdep H tl Hfold) with "Hllb"). }
+    { (* relaxed-ww STAGE E (§2.6, the releasesleep lane): the client hook
+         arrives at genhook's ENTRY CpuId, but releasesleep's own inner
+         [acquire] moves the release fence to a fresh [CIDacq]; the deposit's
+         [own_context_flushed cur_ctx Df] interface is therefore wanted at
+         [CIDacq] while [Hhook] carries it at the entry CpuId, and the
+         SafeCID condition ([b = false ∨ pme = zero_reg]) is not dischargeable
+         here to identify them.  bread's §2.6 hook has no intervening acquire
+         and lands cleanly; the fix here is to carry the deposit resources in
+         [Rin] (cur_ctx-based, CpuId-agnostic) with a pure re-instantiable
+         hook -- open.  [sl_pay_hook_lift] states the intended lift. *)
+      iClear "Hhook". iStopProof. rewrite /WpLock.lock_ctx_hook.
+      admit. }
     (* release's own exit index is [match 0 with O => eb | S _ => false end]
        -- the term [Hbmatch] equates with [b] -- so the hart it hands back is
        at [wp_next b], matching releasesleep's own top-level index. *)
-    iIntros (CIDrel Hsrel Mrel) "_ Hcg Hpc %Hrelcs Hown".
+    iIntros (CIDrel Hsrel Mrel) "HQ Hcg Hpc %Hrelcs Hown".
     (* BALANCED: the rank acquire put in comes back out.  [Hno] is the ORDER
        premise; [locks_below_not_elem] turns it into the non-membership the
        set algebra needs, and then the round trip is the identity -- which is
@@ -518,7 +568,7 @@ Section ProofReleasesleep.
     iDestruct (cpu_own_transport CIDrel CIDe6 0%nat b pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Q34 with "[%] Hcg Hown Hpc HHdep").
+    iApply ("Hcont" $! Q34 with "[%] Hcg Hown Hpc HQ HHdep").
     (* callee_saved m Q34 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
               c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
@@ -562,11 +612,31 @@ Section ProofReleasesleep.
       rewrite /Q32 upd_eq.
       rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
     repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate].
-  Qed.
+  Admitted.
 
   (* THE UNTRACKED INSTANCE, which is what every existing caller takes: the
      deposit is [emp], so the holder's fraction is irrelevant and its token
      is the fraction-free [sleeplocked]. *)
+  (* the _in relay: the hooked form at [lock_hook_llb], [Q := emp]. *)
+  Lemma wp_releasesleep_genin_sconf
+      (γs : list gname)
+      (γl γsl : gname) (s : string) (R Rdep : TsoCtx.CtxId -> iProp Σ)
+      `{HmR : !TsoCtx.CtxMorph R} `{HmRd : !TsoCtx.CtxMorph Rdep} (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+      (tl : nat)
+    : wp_releasesleep_genin_sconf_body γs γl γsl s R Rdep H q m pd pme av eb b lks tl.
+  Proof.
+    cbv beta delta [wp_releasesleep_genin_sconf_body].
+    intros pcE slk ret_tgt Hav Hno Hfold.
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk #Hllb HRdep #Hpinv Hcont".
+    iApply (wp_releasesleep_genhook_sconf γs γl γsl s R Rdep emp%I H q m pd pme av eb b lks
+              Hav Hno with "Hcg Hown Htext Hpc Hslp Hslk HRdep [] Hpinv").
+    { iApply (lock_hook_llb _ Rdep R tl Hfold with "Hllb"). }
+    iIntros (CIDf Hsf mf Hcs) "Hcg Hown Hpc _ HH".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
+    iApply ("Hcont" $! mf with "[%] Hcg Hown Hpc HH"). exact Hcs.
+  Qed.
+
   (* the plain λ relay: the _in relay at [tl := 0], [Rdep := R]. *)
   Lemma wp_releasesleep_genl_sconf
       (γs : list gname)

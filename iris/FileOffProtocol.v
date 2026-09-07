@@ -101,9 +101,9 @@ Section FileOffProtocol.
   (* ---- the store: the free word IS the store leaf's premise, and the
           leaf's result IS the resident cell at the storer's context ---- *)
   Lemma proto_store_free (k : nat) :
-    off_free k 1 ⊣⊢ wordw_free 4 (a_foff k).
+    off_free k 1 ⊣⊢ wordw_free TsoCtx.cur_ctx 4 (a_foff k).
   Proof.
-    rewrite /off_free /wordw_free. change (Z.to_nat 4) with 4%nat. reflexivity.
+    rewrite /off_free /off_free_at /wordw_free. change (Z.to_nat 4) with 4%nat. reflexivity.
   Qed.
   Lemma proto_store_remint (k : nat) :
     wordw_pointsto 4 (a_foff k) (DfracOwn 1) (mword_of_int 0 : mword 32) ==∗
