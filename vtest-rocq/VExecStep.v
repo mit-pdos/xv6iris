@@ -747,7 +747,8 @@ Lemma sapply_uart_tx (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate) :
   sapply SUartTx s = Some s' ->
   exists kappa g',
     prim_step (UartLoopE gen) g kappa (UartLoopE gen) g' []
-    /\ hart_ok cpu g' s' /\ thread_live g' gen.
+    /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hap.
   pose proof (ho_dev _ _ _ Hok) as Hd.
@@ -757,7 +758,7 @@ Proof.
   revert Hap; intros [= <-].
   exists (if uart_loopback (duart (gdev g)) then [] else [ObsUartOut b]),
          (wdev g (set_duart (gdev g) u')).
-  split; [|split].
+  split; [|split; [|split]].
   - unfold prim_step. right. left. exists gen.
     split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
     left. split; [exact Hlive|].
@@ -765,6 +766,7 @@ Proof.
     apply UartStepTx. rewrite Hd. exact Htx.
   - rewrite Hd at 1. apply (hart_ok_wdev cpu g s _ Hok Hd).
   - apply thread_live_wdev. exact Hlive.
+  - reflexivity.
 Qed.
 
 (* THE RECEIVE ARM: the host types a byte.  This is the step the test's
@@ -777,7 +779,8 @@ Lemma sapply_uart_rx (gen : nat) (cpu : CPU) (b : Z) (g : gstate)
   sapply (SUartRx b) s = Some s' ->
   exists g',
     prim_step (UartLoopE gen) g [ObsUartIn (Z_to_bv 8 b)] (UartLoopE gen) g' []
-    /\ hart_ok cpu g' s' /\ thread_live g' gen.
+    /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hap.
   pose proof (ho_dev _ _ _ Hok) as Hd.
@@ -786,7 +789,7 @@ Proof.
     [|discriminate Hap].
   revert Hap; intros [= <-].
   exists (wdev g (set_duart (gdev g) u')).
-  split; [|split].
+  split; [|split; [|split]].
   - unfold prim_step. right. left. exists gen.
     split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
     left. split; [exact Hlive|].
@@ -794,6 +797,7 @@ Proof.
     apply UartStepRx. rewrite Hd. exact Hrx.
   - rewrite Hd at 1. apply (hart_ok_wdev cpu g s _ Hok Hd).
   - apply thread_live_wdev. exact Hlive.
+  - reflexivity.
 Qed.
 
 (* THE LATCH: the UART's own interrupt source reaches the PLIC.  Silent. *)
@@ -803,7 +807,8 @@ Lemma sapply_uart_latch (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate) :
   sapply (SLatch uart_irq_id) s = Some s' ->
   exists g',
     prim_step (UartLoopE gen) g [] (UartLoopE gen) g' []
-    /\ hart_ok cpu g' s' /\ thread_live g' gen.
+    /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hap.
   pose proof (ho_dev _ _ _ Hok) as Hd.
@@ -813,7 +818,7 @@ Proof.
     [|discriminate Hap].
   revert Hap; intros [= <-].
   exists (wdev g (set_dplic (gdev g) p')).
-  split; [|split].
+  split; [|split; [|split]].
   - unfold prim_step. right. left. exists gen.
     split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
     left. split; [exact Hlive|].
@@ -821,6 +826,7 @@ Proof.
     apply UartStepLatch; rewrite Hd; assumption.
   - rewrite Hd at 1. apply (hart_ok_wdev cpu g s _ Hok Hd).
   - apply thread_live_wdev. exact Hlive.
+  - reflexivity.
 Qed.
 
 (* THE WIRE: the PLIC drives this hart's external S-interrupt pin.  It is
@@ -836,7 +842,8 @@ Lemma sapply_wire (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate) :
   sapply (SWire (fin_to_nat cpu)) s = Some s' ->
   exists g',
     prim_step (PlicLoopE gen) g [] (PlicLoopE gen) g' []
-    /\ hart_ok cpu g' s' /\ thread_live g' gen.
+    /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hap.
   pose proof Hok as [Hr Hm Hd Hfl Hal Htv Hitv Hrv Hcoh].
@@ -844,7 +851,7 @@ Proof.
   exists (wregs g (<[cpu := register_set sig_seip
                        (bool_to_bit (dev_seip g.(gdev) (fin_to_nat cpu)))
                        (g.(gregs) cpu)]> g.(gregs))).
-  split; [|split].
+  split; [|split; [|split]].
   - unfold prim_step. right. right. right. left. exists gen.
     split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
     split; [reflexivity|]. left. split; [exact Hlive|].
@@ -854,6 +861,7 @@ Proof.
       try assumption;
       rewrite greg_ins_eq; rewrite Hr; rewrite Hd; reflexivity.
   - unfold thread_live, wregs; cbn [gpow ggen]. exact Hlive.
+  - reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -905,13 +913,14 @@ Lemma sapply_disk_nil (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate)
   disk_step g.(gdev) g.(gmem) d' ∅ ->
   s' = with_dev s d' ->
   exists g', prim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' []
-             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hds ->.
   pose proof Hok as [Hr Hm Hd Hfl Hal Htv Hitv Hrv Hcoh].
   exists (GState g.(gregs) (∅ ∪ g.(gmem)) d' g.(ggen) g.(gpow) g.(gresv)
                  g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr)).
-  split; [|split].
+  split; [|split; [|split]].
   - unfold prim_step. right. right. left. exists gen.
     split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
     split; [reflexivity|]. left. split; [exact Hlive|].
@@ -923,6 +932,7 @@ Proof.
       try assumption; try reflexivity;
       rewrite map_union_empty_l; assumption.
   - unfold thread_live; cbn [gpow ggen]. exact Hlive.
+  - reflexivity.
 Qed.
 
 (* ...AND ONE THAT WRITES.  The write set becomes a message on the era log
@@ -935,7 +945,8 @@ Lemma sapply_disk_w (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate)
   disk_step g.(gdev) g.(gmem) d' w ->
   s' = MState s.(sregs) (w ∪ s.(mem)) d' ->
   exists g', prim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' []
-             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hres Hds ->.
   pose proof Hok as [Hr Hm Hd Hfl Hal Htv Hitv Hrv Hcoh].
@@ -943,7 +954,7 @@ Proof.
   - (* nothing published: the log does not move *)
     exists (GState g.(gregs) (∅ ∪ g.(gmem)) d' g.(ggen) g.(gpow) g.(gresv)
                    g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr)).
-    split; [|split].
+    split; [|split; [|split]].
     + unfold prim_step. right. right. left. exists gen.
       split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
       split; [reflexivity|]. left. split; [exact Hlive|].
@@ -955,11 +966,12 @@ Proof.
         try assumption; try reflexivity;
         repeat rewrite map_union_empty_l; assumption.
     + unfold thread_live; cbn [gpow ggen]. exact Hlive.
+    + reflexivity.
   - (* one message, authored by the disk *)
     exists (GState g.(gregs) (w ∪ g.(gmem)) d' g.(ggen) g.(gpow) g.(gresv)
                    g.(gimg) (g.(glog) ++ [PWMsg w disk_agent])
                    g.(gtv) g.(gitv) g.(ghr)).
-    split; [|split].
+    split; [|split; [|split]].
     + unfold prim_step. right. right. left. exists gen.
       split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
       split; [reflexivity|]. left. split; [exact Hlive|].
@@ -977,6 +989,7 @@ Proof.
       * intros a. rewrite length_app; cbn [length].
         pose proof (Hcoh a). lia.
     + unfold thread_live; cbn [gpow ggen]. exact Hlive.
+    + reflexivity.
 Qed.
 
 (* The six items, each one arm.  The bus VIEW the relation quantifies over
@@ -986,7 +999,8 @@ Lemma sapply_disk_pop (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate) :
   thread_live g gen -> hart_ok cpu g s ->
   sapply SDiskPop s = Some s' ->
   exists g', prim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' []
-             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hap.
   pose proof (ho_dev _ _ _ Hok) as Hd. pose proof (ho_mem _ _ _ Hok) as Hm.
@@ -1003,7 +1017,8 @@ Lemma sapply_disk_fetch (gen : nat) (cpu : CPU) (h : Z) (g : gstate)
   thread_live g gen -> hart_ok cpu g s ->
   sapply (SDiskFetch h) s = Some s' ->
   exists g', prim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' []
-             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hap.
   pose proof (ho_dev _ _ _ Hok) as Hd. pose proof (ho_mem _ _ _ Hok) as Hm.
@@ -1020,7 +1035,8 @@ Lemma sapply_disk_capture (gen : nat) (cpu : CPU) (h : Z) (g : gstate)
   thread_live g gen -> hart_ok cpu g s ->
   sapply (SDiskCapture h) s = Some s' ->
   exists g', prim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' []
-             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hap.
   pose proof (ho_dev _ _ _ Hok) as Hd. pose proof (ho_mem _ _ _ Hok) as Hm.
@@ -1037,7 +1053,8 @@ Lemma sapply_disk_drain (gen : nat) (cpu : CPU) (sec : Z) (g : gstate)
   thread_live g gen -> hart_ok cpu g s ->
   sapply (SDiskDrain sec) s = Some s' ->
   exists g', prim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' []
-             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hap.
   pose proof (ho_dev _ _ _ Hok) as Hd.
@@ -1055,7 +1072,8 @@ Lemma sapply_disk_write (gen : nat) (cpu : CPU) (h : Z) (g : gstate)
   thread_live g gen -> hart_ok cpu g s -> all_resv g.(gresv) = ∅ ->
   sapply (SDiskWrite h) s = Some s' ->
   exists g', prim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' []
-             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hres Hap.
   pose proof (ho_dev _ _ _ Hok) as Hd.
@@ -1072,7 +1090,8 @@ Lemma sapply_disk_dma (gen : nat) (cpu : CPU) (h : Z) (g : gstate)
   thread_live g gen -> hart_ok cpu g s -> all_resv g.(gresv) = ∅ ->
   sapply (SDiskDma h) s = Some s' ->
   exists g', prim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' []
-             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
 Proof.
   intros Hlive Hok Hres Hap.
   pose proof (ho_dev _ _ _ Hok) as Hd.
@@ -1082,4 +1101,190 @@ Proof.
   revert Hap; intros [= <-].
   eapply sapply_disk_w; [exact Hlive|exact Hok|exact Hres| |reflexivity].
   rewrite Hd. eapply DiskStepComplete. exact Hp.
+Qed.
+
+(* THE WILD ARM: a malformed queue lets the device write anything anywhere.
+   That is the model's own side condition ([virtio_stalled]), not a licence
+   to scribble whenever convenient, and it is the arm that makes "model UB
+   as ANYTHING, never as nothing" pay off. *)
+Lemma sapply_disk_wild (gen : nat) (cpu : CPU) (wl : list (Z * Z))
+    (g : gstate) (s s' : mstate) :
+  thread_live g gen -> hart_ok cpu g s -> all_resv g.(gresv) = ∅ ->
+  sapply (SDiskWild wl) s = Some s' ->
+  exists g', prim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' []
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
+Proof.
+  intros Hlive Hok Hres Hap.
+  pose proof (ho_dev _ _ _ Hok) as Hd. pose proof (ho_mem _ _ _ Hok) as Hm.
+  unfold sapply, sapply_w in Hap; cbn [mdev] in Hap.
+  destruct (virtio_stalled (dvirtio (mdev s)) (view_of (mem s))) eqn:Hst;
+    [|discriminate Hap].
+  revert Hap; intros [= <-].
+  eapply sapply_disk_w; [exact Hlive|exact Hok|exact Hres| |reflexivity].
+  rewrite Hd. eapply DiskStepWild; [rewrite Hm; apply view_of_ok|exact Hst].
+Qed.
+
+(* the DISK's own interrupt source reaching the PLIC *)
+Lemma sapply_disk_latch (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate) :
+  thread_live g gen -> hart_ok cpu g s ->
+  sapply (SLatch virtio_irq_id) s = Some s' ->
+  exists g', prim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' []
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ g'.(gresv) = g.(gresv).
+Proof.
+  intros Hlive Hok Hap.
+  pose proof (ho_dev _ _ _ Hok) as Hd.
+  unfold sapply, sapply_w in Hap; cbn [mdev] in Hap.
+  destruct (dev_irq_level (mdev s) virtio_irq_id) eqn:Hlvl; [|discriminate Hap].
+  destruct (plic_latch (dplic (mdev s)) virtio_irq_id) as [p'|] eqn:Hlat;
+    [|discriminate Hap].
+  revert Hap; intros [= <-].
+  eapply sapply_disk_nil; [exact Hlive|exact Hok| |reflexivity].
+  rewrite Hd. eapply DiskStepLatch; assumption.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 13. ONE SETTLE ROUND.                                                   *)
+(*                                                                         *)
+(*     Every device arm has [e' = e], so a device step leaves the THREAD   *)
+(*     POOL literally unchanged -- which makes the lift to the whole       *)
+(*     configuration uniform, and independent of which device stepped.     *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma dev_prim_nsteps (ts : list mexpr) (e : mexpr) (g g' : gstate)
+    (kappa : list mobs) :
+  e ∈ ts ->
+  prim_step e g kappa e g' [] ->
+  @language.nsteps riscv_lang 1 (ts, g) kappa (ts, g').
+Proof.
+  intros Hin Hps.
+  apply elem_of_list_split in Hin as (t1 & t2 & ->).
+  assert (Hst : @language.step riscv_lang (t1 ++ e :: t2, g) kappa
+                                          (t1 ++ e :: t2, g')).
+  { eapply language.step_atomic; [reflexivity| |exact Hps].
+    rewrite app_nil_r. reflexivity. }
+  pose proof (@language.nsteps_l riscv_lang 0 (t1 ++ e :: t2, g)
+                (t1 ++ e :: t2, g') (t1 ++ e :: t2, g') kappa [] Hst
+                (@language.nsteps_refl riscv_lang _)) as Hn.
+  rewrite app_nil_r in Hn. exact Hn.
+Qed.
+
+(* WHICH SCHEDULE ITEMS ARE THE DEVICES'.  [SCpu]/[SCpuTick] are the HART's
+   and go through [exec_nsteps]; a latch is a device's only for its own
+   interrupt source; and the wire is driven for a hart that exists.  Nothing
+   else is excluded -- these are all the arms the relations have. *)
+Definition dev_item (i : sitem) : bool :=
+  match i with
+  | SCpu _ | SCpuTick _ => false
+  | SLatch src => bool_decide (src = uart_irq_id)
+                  || bool_decide (src = virtio_irq_id)
+  | SWire h => bool_decide (h = fin_to_nat hart_primary)
+  | _ => true
+  end.
+
+(* [sapply_sound]: ONE SCHEDULE ITEM IS ONE DEVICE THREAD'S [prim_step].
+   The pool is unchanged because every device arm has [e' = e]. *)
+Lemma sapply_dev_nsteps (gen : nat) (ts : list mexpr) (i : sitem)
+    (g : gstate) (s s' : mstate) :
+  UartLoopE gen ∈ ts -> DiskLoopE gen ∈ ts -> PlicLoopE gen ∈ ts ->
+  thread_live g gen ->
+  hart_ok hart_primary g s ->
+  all_resv g.(gresv) = ∅ ->
+  dev_item i = true ->
+  sapply i s = Some s' ->
+  exists kappa g',
+    @language.nsteps riscv_lang 1 (ts, g) kappa (ts, g')
+    /\ hart_ok hart_primary g' s' /\ thread_live g' gen
+    /\ all_resv g'.(gresv) = ∅.
+Proof.
+  intros Hu Hdk Hp Hlive Hok Hres Hdev Hap.
+  (* every branch: replay that item's lemma, lift, and note [gresv] did not
+     move so [all_resv] survives into the next round *)
+  destruct i; cbn [dev_item] in Hdev; try discriminate Hdev.
+  - (* SUartTx *)
+    destruct (sapply_uart_tx gen hart_primary g s s' Hlive Hok Hap)
+      as (kap & g2 & Hps & Hok2 & Hlv2 & Hg2).
+    exists kap, g2. split; [exact (dev_prim_nsteps _ _ _ _ _ Hu Hps)|].
+    split; [exact Hok2|]. split; [exact Hlv2|].
+    unfold all_resv. rewrite Hg2. exact Hres.
+  - (* SUartRx *)
+    destruct (sapply_uart_rx gen hart_primary _ g s s' Hlive Hok Hap)
+      as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+    exists [ObsUartIn (Z_to_bv 8 b)], g2.
+    split; [exact (dev_prim_nsteps _ _ _ _ _ Hu Hps)|].
+    split; [exact Hok2|]. split; [exact Hlv2|].
+    unfold all_resv. rewrite Hg2. exact Hres.
+  - (* SDiskPop *)
+    destruct (sapply_disk_pop gen hart_primary g s s' Hlive Hok Hap)
+      as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+    exists (@nil mobs), g2.
+    split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
+    split; [exact Hok2|]. split; [exact Hlv2|].
+    unfold all_resv. rewrite Hg2. exact Hres.
+  - (* SDiskFetch *)
+    destruct (sapply_disk_fetch gen hart_primary _ g s s' Hlive Hok Hap)
+      as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+    exists (@nil mobs), g2.
+    split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
+    split; [exact Hok2|]. split; [exact Hlv2|].
+    unfold all_resv. rewrite Hg2. exact Hres.
+  - (* SDiskCapture *)
+    destruct (sapply_disk_capture gen hart_primary _ g s s' Hlive Hok Hap)
+      as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+    exists (@nil mobs), g2.
+    split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
+    split; [exact Hok2|]. split; [exact Hlv2|].
+    unfold all_resv. rewrite Hg2. exact Hres.
+  - (* SDiskWrite *)
+    destruct (sapply_disk_write gen hart_primary _ g s s' Hlive Hok Hres Hap)
+      as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+    exists (@nil mobs), g2.
+    split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
+    split; [exact Hok2|]. split; [exact Hlv2|].
+    unfold all_resv. rewrite Hg2. exact Hres.
+  - (* SDiskDma *)
+    destruct (sapply_disk_dma gen hart_primary _ g s s' Hlive Hok Hres Hap)
+      as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+    exists (@nil mobs), g2.
+    split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
+    split; [exact Hok2|]. split; [exact Hlv2|].
+    unfold all_resv. rewrite Hg2. exact Hres.
+  - (* SDiskDrain *)
+    destruct (sapply_disk_drain gen hart_primary _ g s s' Hlive Hok Hap)
+      as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+    exists (@nil mobs), g2.
+    split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
+    split; [exact Hok2|]. split; [exact Hlv2|].
+    unfold all_resv. rewrite Hg2. exact Hres.
+  - (* SDiskWild *)
+    destruct (sapply_disk_wild gen hart_primary _ g s s' Hlive Hok Hres Hap)
+      as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+    exists (@nil mobs), g2.
+    split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
+    split; [exact Hok2|]. split; [exact Hlv2|].
+    unfold all_resv. rewrite Hg2. exact Hres.
+  - (* SLatch: the UART's source or the disk's *)
+    apply orb_prop in Hdev. destruct Hdev as [Hsrc|Hsrc];
+      apply bool_decide_eq_true in Hsrc; subst.
+    + destruct (sapply_uart_latch gen hart_primary g s s' Hlive Hok Hap)
+        as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+      exists (@nil mobs), g2.
+      split; [exact (dev_prim_nsteps _ _ _ _ _ Hu Hps)|].
+      split; [exact Hok2|]. split; [exact Hlv2|].
+      unfold all_resv. rewrite Hg2. exact Hres.
+    + destruct (sapply_disk_latch gen hart_primary g s s' Hlive Hok Hap)
+        as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+      exists (@nil mobs), g2.
+      split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
+      split; [exact Hok2|]. split; [exact Hlv2|].
+      unfold all_resv. rewrite Hg2. exact Hres.
+  - (* SWire *)
+    apply bool_decide_eq_true in Hdev; subst.
+    destruct (sapply_wire gen hart_primary g s s' Hlive Hok Hap)
+      as (g2 & Hps & Hok2 & Hlv2 & Hg2).
+    exists (@nil mobs), g2.
+    split; [exact (dev_prim_nsteps _ _ _ _ _ Hp Hps)|].
+    split; [exact Hok2|]. split; [exact Hlv2|].
+    unfold all_resv. rewrite Hg2. exact Hres.
 Qed.
