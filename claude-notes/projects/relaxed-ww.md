@@ -1316,6 +1316,10 @@ racy-tier frontier, none regressions of this pass):
   an issue bound; the drain witness is the pending arm (STAGE E, bridged
   by `iref_pin_rows_of_store_STAGE_E` but the AU post shapes still differ
   at these two sites).
+- `ProofIput`: the retire arm now closes over `key_at`'s clean arm (the
+  row's `dpos_ev` under the acquire floor -- sound, landed); the EVICT
+  deposit `ic_evict_deposit` is fence-bound like iunlock's park and must
+  ride the itable release hook (icache §2.6 lane).
 - `ProofVirtioDiskRwF` status read: `ctx_byte_of_at` now wants `key_at ∗
   chain_ev`, the holder has a floor (STAGE E, the device status row).
 

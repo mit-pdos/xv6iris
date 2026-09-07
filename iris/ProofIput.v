@@ -1349,8 +1349,9 @@ Section IputTail.
               (nth_byte (iref_word Mt k) j) t
               (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j loip IcacheInv.iref_set))%I
           with "[Hrows]" as "Hrows".
-        { iApply (big_sepL_mono with "Hrows"). iIntros (ix jx Hijx) "(%t & #Hdp & #Hch & H)".
-          iExists t. iFrame "H Hch". rewrite /TsoCtx.key_at. iLeft. iExists tstk. iFrame "Hdp Hfl". }
+        { iApply (big_sepL_impl with "Hrows"). iIntros "!>" (ix jx Hijx) "(%t & #Hdp & #Hch & H)".
+          iExists t. iFrame "H Hch". rewrite /TsoCtx.key_at. iLeft. iExists tstk.
+          iSplitR; [iExact "Hdp" | iExact "Hfl"]. }
         iMod (CtxPinw.pinw_retire_write_c (CID := CIDw) img sigma log dl V
                 (i_ref (ientry k)) (iref_word Mt k)
                 (mword_of_int 0 : mword 32) (Z.to_N 4) loip
