@@ -34,7 +34,9 @@
      +0   done                    +4   status = 1
      +8   VA 0x40000300, first load -- fills set 0        (0x11223344)
      +16  VA 0x40007300, first load -- fills set 7        (0x11223344)
-     +24  VA 0x40000300 after the rewrite, NO sfence.vma
+     +24  VA 0x40000300 after the rewrite, NO sfence.vma -- pt_tlb_set0's,
+          because set 0 is evicted by the program's own fetches and the
+          model can never show it stale (see above); both machines do
      +32  VA 0x40007300 after the rewrite, NO sfence.vma
           (0x11223344 = the stale entry was used, 0x99887766 = re-walked)
      +40  VA 0x40000300 after sfence.vma                  (0x99887766)
@@ -149,7 +151,17 @@ smode:
     sd   t1, 56(t0)
 
     ld   s3, 0(s2)                 /* NO sfence.vma: stale or not, both legal */
+#ifdef PT_TLB_SET0
+    /* SET-0 ONLY, AND THE MODEL CANNOT MATCH IT.  Both machines keep the
+       stale entry here; the model provably cannot, for the reason this
+       file's header gives -- its TLB is direct-mapped and set 0 is evicted
+       by the very next instruction the program fetches.  So this slot is
+       not a question both machines answer, and publishing it makes the
+       whole case unprovable.  pt_tlb_set0 publishes it and is expected
+       RED; the SET-7 slot below is where the stale-translation question is
+       actually asked, and there the model and both machines agree. */
     sd   s3, 24(s11)
+#endif
     ld   s3, 0(s4)
     sd   s3, 32(s11)
 

@@ -212,6 +212,9 @@ QEMU/PtSuperRun.v
 QEMU/PtSuperTest.v
 QEMU/PtTlbPass.v
 QEMU/PtTlbRun.v
+QEMU/PtTlbSet0Pass.v
+QEMU/PtTlbSet0Run.v
+QEMU/PtTlbSet0Test.v
 QEMU/PtTlbTest.v
 QEMU/UartDlabPass.v
 QEMU/UartDlabRun.v
@@ -332,4 +335,7 @@ JH7110/PtSuperRun.v
 JH7110/PtSuperTest.v
 JH7110/PtTlbPass.v
 JH7110/PtTlbRun.v
+JH7110/PtTlbSet0Pass.v
+JH7110/PtTlbSet0Run.v
+JH7110/PtTlbSet0Test.v
 JH7110/PtTlbTest.v

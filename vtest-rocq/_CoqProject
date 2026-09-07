@@ -84,6 +84,7 @@ QEMU/PtIdentTest.v
 QEMU/PtLevelsTest.v
 QEMU/PtResvTest.v
 QEMU/PtSuperTest.v
+QEMU/PtTlbSet0Test.v
 QEMU/PtTlbTest.v
 QEMU/UartDlabTest.v
 QEMU/UartIrqRxTest.v
@@ -161,6 +162,7 @@ QEMU/PtLevelsRun.v
 QEMU/PtResvRun.v
 QEMU/PtSuperRun.v
 QEMU/PtTlbRun.v
+QEMU/PtTlbSet0Run.v
 QEMU/UartDlabRun.v
 QEMU/UartIrqRxRun.v
 QEMU/UartIrqTxRun.v
@@ -210,6 +212,7 @@ QEMU/PtIdentPass.v
 QEMU/PtLevelsPass.v
 QEMU/PtResvPass.v
 QEMU/PtSuperPass.v
+QEMU/PtTlbPass.v
 QEMU/UartDlabPass.v
 QEMU/UartIrqRxPass.v
 QEMU/UartIrqTxPass.v
@@ -249,6 +252,7 @@ JH7110/PtIdentTest.v
 JH7110/PtLevelsTest.v
 JH7110/PtResvTest.v
 JH7110/PtSuperTest.v
+JH7110/PtTlbSet0Test.v
 JH7110/PtTlbTest.v
 JH7110/ClintMsipRun.v
 JH7110/ClintRawRun.v
@@ -282,6 +286,7 @@ JH7110/PtLevelsRun.v
 JH7110/PtResvRun.v
 JH7110/PtSuperRun.v
 JH7110/PtTlbRun.v
+JH7110/PtTlbSet0Run.v
 JH7110/ClintTimePass.v
 JH7110/ConcAmoPass.v
 JH7110/ConcBytePass.v
@@ -301,3 +306,4 @@ JH7110/PtIdentPass.v
 JH7110/PtLevelsPass.v
 JH7110/PtResvPass.v
 JH7110/PtSuperPass.v
+JH7110/PtTlbPass.v
