@@ -72,10 +72,11 @@ generated module, so a run cannot claim a model execution it does not have.
 Every proof is then the same two tactics:
 
 ```coq
-Module CoreSmokeQemuPass <: TEST_PASSES CoreSmokeQemu.
-  Lemma passes : run_passes CoreSmokeQemu.observed CoreSmokeQemu.outcome.
+(* QEMU/CoreSmokePass.v *)
+Module CoreSmokePass <: TEST_PASSES CoreSmoke.
+  Lemma passes : run_passes CoreSmoke.observed CoreSmoke.outcome.
   Proof. apply run_passes_b_sound. vm_cast_no_check (eq_refl true). Qed.
-End CoreSmokeQemuPass.
+End CoreSmokePass.
 ```
 
 ### The table
@@ -688,7 +689,7 @@ is never forced), but `VSched.settle` is eager and takes every enabled arm, so
 the harness forced a forward the RELATION never required.
 
 **Now reproduced.**  `settle1_gated` takes a `latch` flag (every existing
-caller passes `true`, so nothing else moves), and `vtest-rocq/PlicLevelQemuRun.v`
+caller passes `true`, so nothing else moves), and `vtest-rocq/QEMU/PlicLevelRun.v`
 is HAND-WRITTEN with a device schedule -- the first user of the generator's
 hand-written escape hatch.  The schedule is a CREDIT, not a step count: what
 the execution is is "the gateway forwards ONCE", which is what an
@@ -768,7 +769,7 @@ is gone, so xv6's `__sync_synchronize()` in `acquire`/`release` is now
 OBSERVABLE.
 
 The model reproduces all four observed outcomes, whole result region each
-(`ConcSbQemuPass`).  The fresh policy (`CCpu`) is provably the old harness
+(`QEMU/ConcSbPass`).  The fresh policy (`CCpu`) is provably the old harness
 (`VTso.texec_fresh_exec`), so every other multi-hart run computes what it
 computed before.
 

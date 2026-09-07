@@ -10,10 +10,11 @@ The question is the same one, asked of a development board instead of QEMU:
 
 What changes is only how an image gets loaded, started and read back, so the
 test sources in `tests/`, the ABI in `abi.h` and the model side in
-`vtest-rocq/` are shared.  A board run writes `vtest-rocq/<Name>HwGen.v`
-beside `vtest.py`'s `<Name>Gen.v`, and **the same `vtest-rocq/<Name>.v`
-checks the model against both** -- so a divergence that shows up on only one
-machine is visible in one file, next to the other machine's answer.
+`vtest-rocq/` are shared.  **The platform is the DIRECTORY**: a board run
+writes `vtest-rocq/JH7110/<Name>Gen.v` beside `vtest.py`'s
+`vtest-rocq/QEMU/<Name>Gen.v`, and each capture carries its own run module
+and proof under the same name -- so `make vtest-table` puts the two
+machines' answers side by side, one column each.
 
     make hwtest-probe     talk to the board, print what is there
     make hwtest-gen HWTEST_TESTS="clint_time core_smoke"

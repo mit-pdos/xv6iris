@@ -394,7 +394,7 @@ jobs:
 
       # ---- 5. Device conformance (vtest-rocq/): the model against QEMU ----
       # The differential device tests, run against the QEMU captures that are
-      # CHECKED IN (`vtest-rocq/*Gen.v`) — no QEMU here, no riscv64 toolchain,
+      # CHECKED IN (`vtest-rocq/{QEMU,JH7110}/*Gen.v`) — no QEMU here, no toolchain,
       # nothing regenerated.  So this is not a hunt for new hardware behaviours
       # (that is `make vtest-gen`, run by hand); it is the regression test that
       # the executions already recorded from real hardware are still executions
