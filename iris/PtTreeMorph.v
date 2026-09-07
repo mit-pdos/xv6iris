@@ -13,7 +13,7 @@ From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvPtsto.
 Require Import TsoCtx CtxMorphTac PtTree.
 
 (* The tree along DOMINATION ([CtxMorph], the one transport class): a
