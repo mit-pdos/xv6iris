@@ -331,6 +331,67 @@ Section ctx.
   Proof. unfold own_context. by rewrite (proj2_sig own_context_aux). Qed.
 
   (* ================================================================== *)
+  (* THE FLUSHED TOKEN (relaxed-ww.md §2.14).  The running token as it   *)
+  (* comes out of a release fence: every dirty key has DRAINED under      *)
+  (* [Df], a legal drain position at or past the hart's view.  It is the  *)
+  (* ONE fact a fence hands up -- births, deposits and hooks take this    *)
+  (* and never the interp.  The original [dirty_ok] justifications ride   *)
+  (* along (they are persistent) so the token forgets back to             *)
+  (* [own_context] for free; [K ≤ Df] is what a stamp's bound update     *)
+  (* needs.  Made by ONE interp gate at the leaf ([TsoCtxLedger.          *)
+  (* ctx_flush]); propagated interp-free by the laws below.               *)
+  (* ================================================================== *)
+  Definition own_context_flushed_def `{CID : CpuId} (ξ : CtxId) (Df : nat) : iProp Σ :=
+    (∃ (B K : nat) (D : gset (nat * Arch.pa)),
+      ctx_at ξ 1 B D ∗
+      view_lb view_name dlen_name (hart_agent cpu_id) K ∗ ⌜(B ≤ K)%nat⌝ ∗ ⌜(K ≤ Df)%nat⌝ ∗
+      ([∗ set] k ∈ D, dirty_ok logm_name dpos_name (hart_agent cpu_id) B k) ∗
+      ([∗ set] k ∈ D, dpos_ev dpos_name k.1 Df) ∗
+      llb dlen_name Df)%I.
+  Lemma own_context_flushed_aux : { f | f = @own_context_flushed_def }.
+  Proof. by eexists. Qed.
+  Definition own_context_flushed `{CID : CpuId} (ξ : CtxId) (Df : nat) : iProp Σ :=
+    proj1_sig own_context_flushed_aux CID ξ Df.
+  Lemma own_context_flushed_unseal `{CID : CpuId} (ξ : CtxId) (Df : nat) :
+    own_context_flushed ξ Df = own_context_flushed_def ξ Df.
+  Proof. unfold own_context_flushed. by rewrite (proj2_sig own_context_flushed_aux). Qed.
+
+  Global Instance own_context_flushed_timeless `{CID : CpuId} ξ Df :
+    Timeless (own_context_flushed ξ Df).
+  Proof. rewrite own_context_flushed_unseal /own_context_flushed_def. apply _. Qed.
+
+  (* the forgetful direction *)
+  Lemma own_context_of_flushed `{CID : CpuId} (ξ : CtxId) (Df : nat) :
+    own_context_flushed ξ Df -∗ own_context ξ.
+  Proof.
+    rewrite own_context_flushed_unseal /own_context_flushed_def
+            own_context_unseal /own_context_def.
+    iIntros "(%B & %K & %D & Hat & #HK & %HBK & %HKD & #Hoks & _ & _)".
+    iExists B, K, D. iFrame "Hat HK Hoks". by iPureIntro.
+  Qed.
+
+  Lemma own_context_flushed_dlb `{CID : CpuId} (ξ : CtxId) (Df : nat) :
+    own_context_flushed ξ Df -∗ own_context_flushed ξ Df ∗ llb dlen_name Df.
+  Proof.
+    rewrite own_context_flushed_unseal /own_context_flushed_def.
+    iIntros "(%B & %K & %D & Hat & #HK & %HBK & %HKD & #Hoks & #Hdr & #Hdlb)".
+    iSplitL; [| iExact "Hdlb"]. iExists B, K, D. iFrame "Hat HK Hoks Hdr Hdlb". by iPureIntro.
+  Qed.
+
+  (* a flushed token is flushed at every larger legal position *)
+  Lemma own_context_flushed_mono `{CID : CpuId} (ξ : CtxId) (Df Df' : nat) :
+    (Df ≤ Df')%nat ->
+    llb dlen_name Df' -∗ own_context_flushed ξ Df -∗ own_context_flushed ξ Df'.
+  Proof.
+    intros Hle. rewrite !own_context_flushed_unseal /own_context_flushed_def.
+    iIntros "#Hdlb' (%B & %K & %D & Hat & #HK & %HBK & %HKD & #Hoks & #Hdr & _)".
+    iExists B, K, D. iFrame "Hat HK Hoks Hdlb'".
+    iSplitR; [by iPureIntro|]. iSplitR; [iPureIntro; lia|].
+    iApply (big_sepS_impl with "Hdr"). iIntros "!>" (k _) "Hev".
+    iApply (dpos_ev_mono with "Hev"). lia.
+  Qed.
+
+  (* ================================================================== *)
   (* §0.35′(i): THE CONTEXT FLOOR -- "my context's bound has passed [lo]". *)
   (*                                                                      *)
   (* This is the whole of the bound-relation the owner's ruling adds, and  *)
@@ -587,6 +648,23 @@ Section ctx.
     iExists B, K, ∅. rewrite /ctx_at. iFrame "Hb Hd HK".
     iSplitR; first done.
     by iApply big_sepS_empty.
+  Qed.
+
+  (* the twin of a FLUSHED context is flushed: it has no dirty keys *)
+  Lemma own_context_twin_flushed `{CID : CpuId} (ξ : CtxId) (Df : nat) :
+    own_context_flushed ξ Df ==∗
+    own_context_flushed ξ Df ∗ ∃ ξc : CtxId, own_context_flushed ξc Df.
+  Proof.
+    iIntros "H". rewrite !own_context_flushed_unseal /own_context_flushed_def.
+    iDestruct "H" as "(%B & %K & %D & Hat & #HK & %HBK & %HKD & #Hoks & #Hdr & #Hdlb)".
+    iMod (mono_nat_own_alloc B) as (γb) "[Hb _]".
+    iMod dset_alloc as (γd) "Hd".
+    iModIntro. iSplitL "Hat".
+    { iExists B, K, D. iFrame "Hat HK Hoks Hdr Hdlb". by iPureIntro. }
+    iExists (MkCtxId γb γd). rewrite own_context_flushed_unseal /own_context_flushed_def.
+    iExists B, K, ∅. rewrite /ctx_at. iFrame "Hb Hd HK Hdlb".
+    iSplitR; first done. iSplitR; first done.
+    iSplitR; by iApply big_sepS_empty.
   Qed.
 
 
@@ -1729,6 +1807,112 @@ Section ctx.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (* THE FLUSHED TOKEN PROPAGATES (relaxed-ww.md §2.14): the same three  *)
+  (* mints, interp-free.  Resume: the parked context's keys are either   *)
+  (* drained under the running one's bound (hence under [Df]) or among   *)
+  (* its dirty keys (flushed by hypothesis).  Run/move: the registered   *)
+  (* keys bring their own drain witnesses.                                *)
+  (* ---------------------------------------------------------------- *)
+  Lemma ctx_resume_flushed `{CID : CpuId} (ξ ξ' : CtxId) (Df : nat) :
+    own_context_flushed ξ' Df -∗ ctx_parked ξ ξ' ==∗
+    own_context_flushed ξ' Df ∗ own_context_flushed ξ Df.
+  Proof.
+    rewrite !own_context_flushed_unseal /own_context_flushed_def
+            ctx_parked_unseal /ctx_dom_at_def.
+    iIntros "(%B' & %K' & %D' & [Hb' Hd'] & #HK' & %HBK' & %HKD' & #Hoks' & #Hdr' & #Hdlb)
+             (%B & %D & [Hb Hd] & #Hfl & #Hks)".
+    iDestruct (llb_valid with "Hb' Hfl") as %HBB'.
+    iDestruct (keys_just ξ' 1 B' D' D with "[$Hb' $Hd'] Hks") as "[[Hb' Hd'] #Hjs]".
+    iMod (mono_nat_own_update B' with "Hb")  as "[Hb _]"; first exact HBB'.
+    iModIntro.
+    iSplitL "Hb' Hd'".
+    { iExists B', K', D'. iFrame "Hb' Hd' HK' Hoks' Hdr' Hdlb". by iPureIntro. }
+    iExists B', K', D. iFrame "Hb Hd HK' Hdlb".
+    iSplitR; first done. iSplitR; first done.
+    iSplitR.
+    { iApply big_sepS_intro. iIntros "!>" (k Hk).
+      iDestruct (big_sepS_elem_of _ _ k Hk with "Hjs") as "[Hev | %HkD']".
+      - rewrite /dirty_ok. by iLeft.
+      - iApply (big_sepS_elem_of with "Hoks'"). exact HkD'. }
+    iApply big_sepS_intro. iIntros "!>" (k Hk).
+    iDestruct (big_sepS_elem_of _ _ k Hk with "Hjs") as "[Hev | %HkD']".
+    - iApply (dpos_ev_mono with "Hev"). lia.
+    - iApply (big_sepS_elem_of with "Hdr'"). exact HkD'.
+  Qed.
+
+  Local Lemma ctx_dom_run_core_flushed `{CID : CpuId} (ξ' : CtxId) (B K Df : nat)
+      (D : gset (nat * Arch.pa)) :
+    (B ≤ K)%nat → (K ≤ Df)%nat →
+    own_context_flushed ξ' Df -∗
+    view_lb view_name dlen_name (hart_agent cpu_id) K -∗
+    ([∗ set] k ∈ D, dirty_ok logm_name dpos_name (hart_agent cpu_id) B k) -∗
+    ([∗ set] k ∈ D, dpos_ev dpos_name k.1 Df) ==∗
+    own_context_flushed ξ' Df ∗ ctx_floor ξ' B ∗ [∗ set] k ∈ D, key_at ξ' k.
+  Proof.
+    iIntros (HBK HKDf) "Hrun' #HK #Hoks #Hdr".
+    rewrite !own_context_flushed_unseal /own_context_flushed_def.
+    iDestruct "Hrun'" as "(%B' & %K' & %D' & [Hb' Hd'] & #HK' & %HBK' & %HKD' & #Hoks' & #Hdr' & #Hdlb)".
+    iDestruct (view_lb_join with "HK' HK") as "#HKK".
+    iMod (mono_nat_own_update (Nat.max B' B) with "Hb'") as "[Hb' #Hlb']"; first lia.
+    iMod (dset_insert_set (ctx_dirty_name ξ') D' D with "Hd'") as "[Hd' #Hins]".
+    iAssert ([∗ set] k ∈ D' ∪ D,
+               dirty_ok logm_name dpos_name (hart_agent cpu_id) (Nat.max B' B) k)%I
+      as "#Hoks''".
+    { iApply big_sepS_intro. iIntros "!>" (k Hk).
+      apply elem_of_union in Hk as [Hk|Hk].
+      - iApply (dirty_ok_mono _ _ _ B' with "[]"); [lia|].
+        iApply (big_sepS_elem_of with "Hoks'"). exact Hk.
+      - iApply (dirty_ok_mono _ _ _ B with "[]"); [lia|].
+        iApply (big_sepS_elem_of with "Hoks"). exact Hk. }
+    iAssert ([∗ set] k ∈ D' ∪ D, dpos_ev dpos_name k.1 Df)%I as "#Hdr''".
+    { iApply big_sepS_intro. iIntros "!>" (k Hk).
+      apply elem_of_union in Hk as [Hk|Hk].
+      - iApply (big_sepS_elem_of with "Hdr'"). exact Hk.
+      - iApply (big_sepS_elem_of with "Hdr"). exact Hk. }
+    iModIntro.
+    iSplitL "Hb' Hd'".
+    { iExists (Nat.max B' B), (Nat.max K' K), (D' ∪ D).
+      iFrame "Hb' Hd' HKK Hoks'' Hdr'' Hdlb". iPureIntro. lia. }
+    iSplitR.
+    { rewrite /ctx_floor. iApply (llb_le _ (Nat.max B' B)); [lia|].
+      rewrite /llb. iLeft. iExact "Hlb'". }
+    iApply big_sepS_intro. iIntros "!>" (k Hk).
+    rewrite /key_at. iRight. iApply (big_sepS_elem_of with "Hins"). exact Hk.
+  Qed.
+
+  Lemma ctx_dom_run_flushed `{CID : CpuId} (ξ ξ' : CtxId) (Df : nat) :
+    own_context_flushed ξ Df -∗ own_context_flushed ξ' Df ==∗
+    own_context_flushed ξ' Df ∗ ctx_dom ξ ξ' ∗
+    (ctx_dom ξ ξ' -∗ own_context_flushed ξ Df).
+  Proof.
+    iIntros "Hrun Hrun'".
+    iEval (rewrite own_context_flushed_unseal /own_context_flushed_def) in "Hrun".
+    iDestruct "Hrun" as "(%B & %K & %D & Hat & #HK & %HBK & %HKD & #Hoks & #Hdr & #Hdlb)".
+    iMod (ctx_dom_run_core_flushed ξ' B K Df D HBK HKD with "Hrun' HK Hoks Hdr")
+      as "(Hrun' & #Hfl & #Hks)".
+    iModIntro. iFrame "Hrun'".
+    rewrite ctx_dom_unseal /ctx_dom_at_def own_context_flushed_unseal /own_context_flushed_def.
+    iDestruct (ctx_at_halves with "Hat") as "[Hat1 Hat2]".
+    iSplitL "Hat1".
+    { iExists B, D. iFrame "Hat1 Hfl". iModIntro. iExact "Hks". }
+    iIntros "(%B0 & %D0 & Hat0 & _ & _)".
+    iDestruct (ctx_at_agree with "Hat0 Hat2") as %[-> ->].
+    iCombine "Hat0 Hat2" as "Hat". rewrite -ctx_at_halves.
+    iExists B, K, D. iFrame "Hat HK Hoks Hdr Hdlb". by iPureIntro.
+  Qed.
+
+  Lemma ctx_move_flushed `{CID : CpuId} {R : CtxId → iProp Σ} `{!CtxMorph R}
+      (ξ0 ξ1 : CtxId) (Df : nat) :
+    own_context_flushed ξ0 Df -∗ own_context_flushed ξ1 Df -∗ R ξ0 ==∗
+    own_context_flushed ξ0 Df ∗ own_context_flushed ξ1 Df ∗ R ξ1.
+  Proof.
+    iIntros "H0 H1 HR".
+    iMod (ctx_dom_run_flushed ξ0 ξ1 Df with "H0 H1") as "(H1 & Hdom & Hback)".
+    iMod (ctx_morph with "Hdom HR") as "[Hdom HR]".
+    iModIntro. iFrame "H1 HR". by iApply "Hback".
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (* Mint 4 and the algebra of the parked-under record                 *)
   (* ---------------------------------------------------------------- *)
 
@@ -2471,11 +2655,11 @@ Section ctx.
   (* hart's pre-fence stores -- the kernel page table's own-message       *)
   (* anchors -- from the started flag alone: the flag's drain position    *)
   (* sits above the receipt's [M], and the receipt says the anchors sit  *)
-  (* under it.  The map is keyed by the recording hart, so the mint is    *)
-  (* total: a second fence at the same issue length REUSES the entry      *)
-  (* (both clauses are stable, and the older [M] only makes them weaker). *)
+  (* under it.  The record is a monotone SET of triples (relaxed-ww.md     *)
+  (* §2.14): every fence mints its own [(h, N, M)], so the mint is total   *)
+  (* and never hands back an older, weaker [M].                           *)
   (* ---------------------------------------------------------------- *)
-  Definition fr_at (h N M : nat) : iProp Σ := ((h, N) ↪[fr_name]□ M)%I.
+  Definition fr_at (h N M : nat) : iProp Σ := ((h, N, M) ↪[fr_name]□ ())%I.
 
   Global Instance fr_at_persistent h N M : Persistent (fr_at h N M).
   Proof. rewrite /fr_at. apply _. Qed.
@@ -2485,19 +2669,19 @@ Section ctx.
   Lemma fr_mint (g : gstate) (h : agent) :
     own_drained h g.(glog) g.(gdlog) ->
     tso_interp_at riscv_eraGS g ==∗
-    tso_interp_at riscv_eraGS g ∗ ∃ M : nat, fr_at h (length g.(glog)) M.
+    tso_interp_at riscv_eraGS g ∗ fr_at h (length g.(glog)) (length g.(gdlog)).
   Proof.
     iIntros (Hdr) "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
               Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
-    destruct (FR !! (h, length g.(glog))) as [M|] eqn:HFR.
+    destruct (FR !! (h, length g.(glog), length g.(gdlog))) as [[]|] eqn:HFR.
     - iDestruct (big_sepM_lookup _ _ _ _ HFR with "Hfrs") as "#Hr".
-      iModIntro. iSplitL; last by iExists M.
+      iModIntro. iSplitL; last by iExact "Hr".
       iExists TM, LM, DP, FR, CH.
       iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch". by iPureIntro.
-    - iMod (ghost_map_insert_persist (h, length g.(glog)) (length g.(gdlog)) HFR
+    - iMod (ghost_map_insert_persist (h, length g.(glog), length g.(gdlog)) () HFR
               with "Hfr") as "[Hfr #Hr]".
-      iModIntro. iSplitL; last by iExists (length g.(gdlog)).
-      iExists TM, LM, DP, (<[(h, length g.(glog)) := length g.(gdlog)]> FR), CH.
+      iModIntro. iSplitL; last by iExact "Hr".
+      iExists TM, LM, DP, (<[(h, length g.(glog), length g.(gdlog)) := ()]> FR), CH.
       iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hch".
       iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
       iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
@@ -3304,27 +3488,31 @@ Section ctx.
   (* A6.9's "the ledger has no mint" rule stands.  The obligation is     *)
   (* exactly A6.47's refuted [t ≤ B] tie: false as a standing invariant, *)
   (* TRUE here, which is the whole re-framing.                           *)
+  (* relaxed-ww.md §2.14: the pin is minted AT THE FLOOR -- its bound is
+     the byte's latest write [t], which is the anchor the two-log reader
+     needs ([TsoMemPa.pin_anchor]).  A pin at a later bound would name a
+     position that need not write the byte, and could not be read. *)
   Lemma ledger_pin_mint (g : gstate) (a : Arch.pa) (v : bv 8)
-      (t B : nat) (Sv : gset (bv 8)) :
-    (t <= B)%nat -> v ∈ Sv ->
+      (t : nat) (Sv : gset (bv 8)) :
+    v ∈ Sv ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
     phys_ledger_at a (DfracOwn 1) v t ==∗
     gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
     tso_interp_at riscv_eraGS g ∗
-    phys_ledger_pin a (DfracOwn 1) v t B Sv.
+    phys_ledger_pin a (DfracOwn 1) v t t Sv.
   Proof.
-    iIntros (HtB Hv) "Hgh Hint [Hpt Htse]".
+    iIntros (Hv) "Hgh Hint [Hpt Htse]".
     iDestruct "Hint" as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv &
               Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
     iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
     iDestruct (ghost_map_lookup with "Hts Htse") as %HTM.
     destruct (ts_ok_latest _ _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
     rewrite Hgm in Hgm0. injection Hgm0 as <-.
-    iMod (ghost_map_update ((t, ts_pay_pin Sv B) : ts_elem) with "Hts Htse")
+    iMod (ghost_map_update ((t, ts_pay_pin Sv t) : ts_elem) with "Hts Htse")
       as "[Hts Htse]".
     iModIntro. iFrame "Hgh Hpt Htse".
-    iExists (<[a := ((t, ts_pay_pin Sv B) : ts_elem)]> TM), LM, DP, FR, CH.
+    iExists (<[a := ((t, ts_pay_pin Sv t) : ts_elem)]> TM), LM, DP, FR, CH.
     iFrame "Hts Hm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch".
     iSplitR.
     { iPureIntro. rewrite dom_insert_L Hdom.
@@ -3337,7 +3525,8 @@ Section ctx.
       split_and!; [ | | by move => W0 HW0 | by move => R0 HR0 | by move => Wp HWp ].
       + exists v. split; [exact Hgm | exact Hlat].
       + intros Sv' B' Heq. cbn in Heq. injection Heq as <- <-.
-        exact (pin_ok_mint _ _ _ _ _ t v Hlat HtB Hv).
+        split; [exact (pin_ok_mint _ _ _ _ _ t v Hlat (Nat.le_refl t) Hv)
+               | exact (pin_anchor_of_latest _ _ _ _ _ Hlat)].
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
   Qed.
 
@@ -3504,10 +3693,21 @@ Section ctx.
   (* relaxed-ww STAGE E: restated over (glog, gdlog); the proof waits for
      the two-log pin/window theory (TsoMemPa's [*1] legacy theory is over
      the issue log alone).  Tracked in claude-notes/projects/relaxed-ww.md. *)
+  (* relaxed-ww.md §2.14: THE PIN IS READ THROUGH ITS ANCHOR'S DRAIN.  A
+     receipt at the pin's bound alone is NOT enough under two logs: [B] is
+     an issue index and the reader's view a drain position, and an older
+     write of the byte may have drained while the anchor has not.  The gate
+     takes the anchor's drain witness [dpos_ev B p], the reader's view
+     receipt at [p] and the chain at [B] ([TsoMemPa.pin_anchor] in the tie
+     is what makes it true; [CtxValues.cv_key_read] is the same statement
+     in the credential's spelling).  relaxed-ww STAGE E: the racy-tier
+     proof over [tso_read]. *)
   Lemma ledger_read_pin_ok `{CID : CpuId} (g : gstate)
-      (a : Arch.pa) (dq : dfrac) (v : bv 8) (t B : nat) (Sv : gset (bv 8)) :
+      (a : Arch.pa) (dq : dfrac) (v : bv 8) (t B p : nat) (Sv : gset (bv 8)) :
     tso_interp_at riscv_eraGS g -∗
-    view_lb view_name dlen_name (hart_agent cpu_id) B -∗
+    dpos_ev dpos_name B p -∗
+    view_lb view_name dlen_name (hart_agent cpu_id) p -∗
+    chain_ev chain_name B -∗
     phys_ledger_pin a dq v t B Sv -∗
     ⌜forall (h : agent) (tv' : nat), (g.(gtv) cpu_id <= tv')%nat ->
        exists b, tso_read g.(gimg) g.(glog) g.(gdlog) h tv' a = Some b /\ b ∈ Sv⌝.

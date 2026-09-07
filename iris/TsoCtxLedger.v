@@ -220,6 +220,145 @@ Section ctx.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (* THE FLUSH (relaxed-ww.md §2.14): the ONE interp gate of the release *)
+  (* fence.  It turns the running token into [own_context_flushed ξ Df]  *)
+  (* -- every dirty key drained under [Df] -- for any [Df] between the    *)
+  (* hart's view and the drain top that also covers the hart's own        *)
+  (* drained messages ([own_pub]).  The release fence takes [Df := length *)
+  (* gdlog]; the [fence.i] path takes its instruction view.  Everything   *)
+  (* above the leaf consumes the token, never the interp.                 *)
+  (* ---------------------------------------------------------------- *)
+  Local Lemma flush_key `{CID : CpuId} (g : gstate) (B Df : nat)
+      (k : nat * Arch.pa) :
+    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
+    (B ≤ Df)%nat →
+    (own_pub (hart_agent cpu_id) g.(glog) g.(gdlog) ≤ Df)%nat →
+    tso_interp_at riscv_eraGS g -∗
+    dirty_ok logm_name dpos_name (hart_agent cpu_id) B k -∗
+    tso_interp_at riscv_eraGS g ∗ dpos_ev dpos_name k.1 Df.
+  Proof.
+    iIntros (Hod HB Hpub) "Hint [Hev|(%i & %m & %Hki & #Hm & %Htid)]".
+    { iFrame "Hint". iApply (dpos_ev_mono with "Hev"). lia. }
+    iDestruct "Hint"
+      as "(%TM & %LM & %DP & %FR & %CH & Hts & %Hdom & %Htie & Hlm & %HLM & Hlen & Hv &
+           Hdp & #Hdps & %Hdpo & Hdl & Hfr & #Hfrs & %Hfro & Hch & %Hcho & %Hmm)".
+    iDestruct (ghost_map_lookup with "Hlm Hm") as %HLMi. rewrite HLM in HLMi.
+    have Hin := Hod _ _ HLMi Htid.
+    apply elem_of_list_lookup_1 in Hin as [q Hq].
+    have HDP : DP !! i = Some (S q) by apply Hdpo; eauto.
+    iDestruct (big_sepM_lookup _ _ _ _ HDP with "Hdps") as "#Hat".
+    have Hqp := own_pub_ge _ _ _ _ _ _ Hq HLMi Htid.
+    iSplitL.
+    { iExists TM, LM, DP, FR, CH. iFrame "Hts Hlm Hlen Hv Hdp Hdps Hdl Hfr Hfrs Hch".
+      by iPureIntro. }
+    rewrite /dpos_ev. iRight. iExists i, (S q). iFrame "Hat". iPureIntro.
+    split; [done|]. lia.
+  Qed.
+
+  Lemma ctx_flush `{CID : CpuId} (g : gstate) (ξ : CtxId) (Df : nat) :
+    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
+    (g.(gtv) cpu_id ≤ Df)%nat →
+    (own_pub (hart_agent cpu_id) g.(glog) g.(gdlog) ≤ Df)%nat →
+    (Df ≤ length g.(gdlog))%nat →
+    tso_interp_at riscv_eraGS g -∗ own_context ξ -∗
+    tso_interp_at riscv_eraGS g ∗ own_context_flushed ξ Df.
+  Proof.
+    rewrite own_context_unseal /own_context_def
+            own_context_flushed_unseal /own_context_flushed_def.
+    iIntros (Hod Htv Hpub Hdl) "Hint (%B & %K & %D & Hat & #HK & %HBK & #Hoks)".
+    iDestruct (view_lb_le_view with "Hint HK") as %HKtvs.
+    iDestruct (tso_interp_dlen_llb with "Hint") as "[Hint #Hdlb]".
+    iAssert (tso_interp_at riscv_eraGS g ∗
+             [∗ set] k ∈ D, dpos_ev dpos_name k.1 Df)%I with "[Hint]" as "[Hint #Hdr]".
+    { iApply (thread_big_sepS with "Hint Hoks"). iIntros (k _).
+      iApply flush_key; [exact Hod | lia | exact Hpub]. }
+    iFrame "Hint". iExists B, K, D. iFrame "Hat HK Hoks Hdr".
+    iSplitR; [by iPureIntro |]. iSplitR; [iPureIntro; lia |].
+    iApply (llb_le _ (length g.(gdlog))); [exact Hdl | iExact "Hdlb"].
+  Qed.
+
+  (* the release fence's flush, at the drain top *)
+  Lemma ctx_flush_top `{CID : CpuId} (g : gstate) (ξ : CtxId) :
+    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
+    tso_interp_at riscv_eraGS g -∗ own_context ξ -∗
+    tso_interp_at riscv_eraGS g ∗ own_context_flushed ξ (length g.(gdlog)).
+  Proof.
+    iIntros (Hod) "Hint Hrun".
+    iAssert (⌜(g.(gtv) cpu_id ≤ length g.(gdlog))%nat⌝)%I as %Htop.
+    { iDestruct "Hint" as "(% & % & % & % & % & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmm)".
+      iPureIntro. exact (proj1 (proj2 (proj1 Hmm)) cpu_id). }
+    iApply (ctx_flush g ξ (length g.(gdlog)) Hod Htop (own_pub_le _ _ _) (Nat.le_refl _)
+              with "Hint Hrun").
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* THE STAMP, THE DEPOSIT AND THE DOM-TO-STAMPED, OVER THE FLUSHED    *)
+  (* TOKEN: interp-free.  The stamp lands at [Df]; a deposit into a       *)
+  (* stamped root raises the root to [max T Df] (both are mere lower      *)
+  (* bounds on the drain length).                                         *)
+  (* ---------------------------------------------------------------- *)
+  Lemma ctx_stamp_flushed `{CID : CpuId} (ξ : CtxId) (Df : nat) :
+    own_context_flushed ξ Df ==∗ ctx_stamped ξ Df.
+  Proof.
+    rewrite own_context_flushed_unseal /own_context_flushed_def
+            ctx_stamped_unseal /ctx_stamped_def.
+    iIntros "(%B & %K & %D & [Hb Hd] & #HK & %HBK & %HKD & #Hoks & #Hdr & #Hdlb)".
+    iMod (mono_nat_own_update Df with "Hb") as "[Hb _]"; first lia.
+    iModIntro. iExists D. iFrame "Hb Hd Hdlb". iModIntro. iExact "Hdr".
+  Qed.
+
+  Lemma ctx_dom_to_stamped_flushed `{CID : CpuId} (ξ ξ' : CtxId) (Df T : nat) :
+    own_context_flushed ξ Df -∗ ctx_stamped ξ' T ==∗
+    ∃ T', ⌜(T ≤ T')%nat⌝ ∗ ctx_stamped ξ' T' ∗ ctx_dom ξ ξ' ∗
+          (ctx_dom ξ ξ' -∗ own_context_flushed ξ Df).
+  Proof.
+    iIntros "Hrun Hpk".
+    iEval (rewrite own_context_flushed_unseal /own_context_flushed_def) in "Hrun".
+    iEval (rewrite ctx_stamped_unseal /ctx_stamped_def) in "Hpk".
+    iDestruct "Hrun" as "(%B & %K & %D & Hat & #HK & %HBK & %HKD & #Hoks & #Hdr & #Hdlb)".
+    iDestruct "Hpk" as "(%D' & [Hb' Hd'] & #HT & #Hks')".
+    set (T' := Nat.max T Df).
+    iMod (mono_nat_own_update T' with "Hb'") as "[Hb' #Hlb']"; first lia.
+    iModIntro. iExists T'.
+    rewrite ctx_stamped_unseal /ctx_stamped_def ctx_dom_unseal /ctx_dom_at_def
+            own_context_flushed_unseal /own_context_flushed_def.
+    iDestruct (ctx_at_halves with "Hat") as "[Hat1 Hat2]".
+    iSplitR; first (iPureIntro; lia).
+    iSplitL "Hb' Hd'".
+    { iExists D'. iFrame "Hb' Hd'".
+      iSplitR; first by iApply (llb_max with "HT Hdlb").
+      iModIntro. iApply (big_sepS_impl with "Hks'"). iIntros "!>" (k _) "Hev".
+      iApply (dpos_ev_mono with "Hev"). lia. }
+    iSplitL "Hat1".
+    { iExists B, D. iFrame "Hat1".
+      iSplitR.
+      { rewrite /ctx_floor /llb. iLeft. iApply (mono_nat_lb_own_le with "Hlb'"). lia. }
+      iModIntro. iApply big_sepS_intro. iIntros "!>" (k Hk).
+      rewrite /key_at. iLeft. iExists T'. iSplitL.
+      - iApply (dpos_ev_mono _ _ Df); [lia|].
+        iApply (big_sepS_elem_of with "Hdr"). exact Hk.
+      - rewrite /ctx_floor /llb. iLeft. iExact "Hlb'". }
+    iIntros "(%B0 & %D0 & Hat0 & _ & _)".
+    iDestruct (ctx_at_agree with "Hat0 Hat2") as %[-> ->].
+    iCombine "Hat0 Hat2" as "Hat". rewrite -ctx_at_halves.
+    iExists B, K, D. iFrame "Hat HK Hoks Hdr Hdlb". by iPureIntro.
+  Qed.
+
+  Lemma ctx_deposit_flushed `{CID : CpuId} (R : CtxId → iProp Σ) `{!CtxMorph R}
+      (ξ ξc : CtxId) (Df T : nat) :
+    own_context_flushed ξ Df -∗ ctx_stamped ξc T -∗ R ξ ==∗
+    own_context_flushed ξ Df ∗
+    ∃ T', ⌜(T ≤ T')%nat⌝ ∗ ctx_stamped ξc T' ∗ R ξc.
+  Proof.
+    iIntros "Hrun Hpk HR".
+    iMod (ctx_dom_to_stamped_flushed ξ ξc Df T with "Hrun Hpk")
+      as "(%T' & %HTT' & Hpk & Hdom & Hback)".
+    iMod (ctx_morph with "Hdom HR") as "[Hdom HR]".
+    iModIntro. iSplitL "Hback Hdom"; first by iApply "Hback".
+    iExists T'. by iFrame.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (* A6.66 THE ACQUIRE-SIDE GATE, and at THIS machine it is honest.      *)
   (* [ctx_deposit] above is the release side and is INTERP-FREE (a       *)
   (* parked target's stamp may be raised at will).  Its dual is not:     *)
@@ -597,8 +736,9 @@ Section ctx.
           { rewrite Hmem. by rewrite lookup_union_r. }
           rewrite Hlog Himg. by apply latest_app_frame.
         + intros Sv' B' He2. rewrite Hlog Himg.
-          apply (pin_ok_app_frame _ _ _ _ _ _
-                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb).
+          split; [ apply (pin_ok_app_frame _ _ _ _ _ _
+                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb)
+                   | apply pin_anchor_app; exact (ts_ok_pin_anchor _ _ _ _ _ _ _ _ Hok He2) ].
         (* the WINDOW arm frames on the SAME per-address side condition
            as the pin's (TsoMemPa §12c) *)
         + intros W0 HW0. rewrite Hlog Himg.
@@ -1140,10 +1280,12 @@ Section ctx.
 
   (* the window form: eight pinned bytes, one per-offset set *)
   Lemma ledger_read_pin_bytes_ok `{CID : CpuId} (g : gstate)
-      (a : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8) (B : nat)
+      (a : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8) (B p : nat)
       (Sf : nat -> gset (bv 8)) :
     tso_interp_at riscv_eraGS g -∗
-    view_lb view_name dlen_name (hart_agent cpu_id) B -∗
+    dpos_ev dpos_name B p -∗
+    view_lb view_name dlen_name (hart_agent cpu_id) p -∗
+    chain_ev chain_name B -∗
     ([∗ list] j ∈ seq 0 n, ∃ t : nat,
        phys_ledger_pin (pa_add a j) dq (f j) t B (Sf j)) -∗
     ⌜forall (h : agent) (tv' : nat), (g.(gtv) cpu_id <= tv')%nat ->
@@ -1151,7 +1293,7 @@ Section ctx.
          exists b, tso_read g.(gimg) g.(glog) g.(gdlog) h tv' (pa_add a j) = Some b
                    /\ b ∈ Sf j⌝.
   Proof.
-    iIntros "Hint #HB Hb".
+    iIntros "Hint #Hdp #HB #Hch Hb".
     iAssert (⌜forall j : nat, (j < n)%nat ->
                forall (h : agent) (tv' : nat), (g.(gtv) cpu_id <= tv')%nat ->
                  exists b, tso_read g.(gimg) g.(glog) g.(gdlog) h tv' (pa_add a j) = Some b
@@ -1159,8 +1301,8 @@ Section ctx.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
       iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hb") as (t) "Hbj".
       { rewrite lookup_seq_lt; [reflexivity|lia]. }
-      iApply (ledger_read_pin_ok g (pa_add a j) dq (f j) t B (Sf j)
-                with "Hint HB Hbj"). }
+      iApply (ledger_read_pin_ok g (pa_add a j) dq (f j) t B p (Sf j)
+                with "Hint Hdp HB Hch Hbj"). }
     iPureIntro. intros h tv' Htv' j Hj. exact (HH j Hj h tv' Htv').
   Qed.
 

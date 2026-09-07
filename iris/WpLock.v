@@ -1304,25 +1304,27 @@ Section Lock.
      between the stamp and the store.  The next winner cashes the row
      against its own running token ([TsoCtx.own_context_floor_view]) after
      [lock_pay_take] has moved the payload to it. *)
-  (* TWO LOGS (relaxed-ww.md §2.4): the hook runs AT THE RELEASE FENCE,
-     where the stamp it depends on is produced, so it is a FENCE-LEAF
-     CALLBACK -- a fupd at the lock's mask taking the bundle, the fence's
-     [own_drained] and the releaser's running token beside the record.
-     Two of its clients need exactly that (the boxes' deposits, §2.6). *)
+  (* TWO LOGS (relaxed-ww.md §2.14): the hook runs AT THE RELEASE FENCE,
+     where the stamp it depends on is produced.  What it sees of the fence
+     is the FLUSHED TOKEN [own_context_flushed cur_ctx Df] -- the
+     releaser's running token with every dirty key drained under [Df] --
+     and nothing of the machine: no [gstate], no [own_drained], no interp.
+     The hook hands the token back flushed (a client with more to deposit
+     at the same fence deposits again) and EXPORTS [Q]: what the deposit
+     tells the continuation (the boxes' chains, §2.6); the identity hook
+     exports [emp]. *)
   Definition lock_ctx_hook `{CID : CpuId} (E : coPset) (R Rin : CtxId -> iProp Σ)
-      : iProp Σ :=
-    (∀ (g : gstate) (ξ : CtxId) (T : nat),
-       ⌜own_drained (hart_agent cpu_id) g.(glog) g.(gdlog)⌝ -∗
-       tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗
-       ctx_stamped ξ T -∗ Rin ξ ={E}=∗
-       tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
-       ∃ T' : nat, ctx_stamped ξ T' ∗ R ξ)%I.
+      (Q : iProp Σ) : iProp Σ :=
+    (∀ (ξ : CtxId) (T Df : nat),
+       own_context_flushed cur_ctx Df -∗ ctx_stamped ξ T -∗ Rin ξ ={E}=∗
+       own_context_flushed cur_ctx Df ∗
+       ∃ T' : nat, ctx_stamped ξ T' ∗ R ξ ∗ Q)%I.
 
   Lemma lock_hook_id `{CID : CpuId} (E : coPset) (R : CtxId -> iProp Σ) :
-    ⊢ lock_ctx_hook E R R.
+    ⊢ lock_ctx_hook E R R emp.
   Proof.
-    rewrite /lock_ctx_hook. iIntros (g ξ T) "_ Hint Hrun Hs HR". iModIntro.
-    iFrame "Hint Hrun". iExists T. iFrame.
+    rewrite /lock_ctx_hook. iIntros (ξ T Df) "Hrun Hs HR". iModIntro.
+    iFrame "Hrun". iExists T. iFrame.
   Qed.
 
   (* the floor fold: the record's stamp rises to the receipt's position for
@@ -1330,69 +1332,70 @@ Section Lock.
      the floor it hands back completes the row *)
   Lemma lock_hook_llb `{CID : CpuId} (E : coPset) (Rin R : CtxId -> iProp Σ) (tl : nat) :
     (forall ξ : CtxId, Rin ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R ξ) ->
-    TsoGhost.llb dlen_name tl -∗ lock_ctx_hook E R Rin.
+    TsoGhost.llb dlen_name tl -∗ lock_ctx_hook E R Rin emp.
   Proof.
     iIntros (Hfold) "#Hllb". rewrite /lock_ctx_hook.
-    iIntros (g ξ T) "_ Hint Hrun Hs HR".
+    iIntros (ξ T Df) "Hrun Hs HR".
     iMod (TsoCtx.ctx_stamped_raise ξ T tl with "Hllb Hs") as "[Hs #Hfl]".
-    iModIntro. iFrame "Hint Hrun". iExists (Nat.max T tl). iFrame "Hs".
+    iModIntro. iFrame "Hrun". iExists (Nat.max T tl). rewrite bi.sep_emp. iFrame "Hs".
     iApply Hfold. iFrame "HR Hfl".
   Qed.
 
   (* THE CREATOR'S MINT: the lock's context is born as a RUNNING twin of the
-     creator ([TsoCtx.own_context_twin]), takes the payload by the same-hart
-     move, and is stamped.  [own_context] is CpuId-indexed and this section
-     binds no [CpuId], so the creator's hart is a parameter -- the token the
-     caller hands over is at ITS hart, not at some ambient one. *)
-  (* TWO LOGS (relaxed-ww.md §2.4, "Birth"): the record is the creator's
-     pending stores and has no position, so its stamp -- publication -- is
-     FENCE-BOUND: this runs at a fence on the creator's hart with the bundle
-     in hand.  Which fence, and how the born record travels to it, is
-     RULING C (the owner's; (c1) a born token, (c2) a born free arm).  The
-     statement below is the common core both rulings share. *)
-  Lemma lock_pay_born `{CID : CpuId} (E : coPset) (g : gstate)
-      (Rin R : CtxId -> iProp Σ) `{!CtxMorph Rin} :
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) ->
-    tso_interp_at riscv_eraGS g -∗
-    own_context cur_ctx -∗ Rin cur_ctx -∗ lock_ctx_hook E R Rin ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ lock_pay R.
+     creator ([TsoCtx.own_context_twin_flushed]), takes the payload by the
+     same-hart move, and is stamped.  [own_context] is CpuId-indexed and this
+     section binds no [CpuId], so the creator's hart is a parameter -- the
+     token the caller hands over is at ITS hart, not at some ambient one. *)
+  (* TWO LOGS (relaxed-ww.md §2.4, "Birth"; §2.14): the record is the
+     creator's pending stores and has no position, so its stamp --
+     publication -- is FENCE-BOUND: this runs with the creator's FLUSHED
+     token in hand, i.e. at a release fence on the creator's hart.  Which
+     fence, and how the born record travels to it, is RULING C (the
+     owner's; (c1) a born token, (c2) a born free arm).  The statement
+     below is the common core both rulings share. *)
+  Lemma lock_pay_born `{CID : CpuId} (E : coPset) (Df : nat)
+      (Rin R : CtxId -> iProp Σ) (Q : iProp Σ) `{!CtxMorph Rin} :
+    own_context_flushed cur_ctx Df -∗ Rin cur_ctx -∗ lock_ctx_hook E R Rin Q ={E}=∗
+    own_context_flushed cur_ctx Df ∗ lock_pay R ∗ Q.
   Proof.
-    iIntros (Hod) "Hint Hrun HR Hhook".
-    iMod (own_context_twin cur_ctx with "Hrun") as "[Hrun (%ξL & HξL)]".
-    iMod (ctx_move (R := Rin) cur_ctx ξL with "Hrun HξL HR") as "(Hrun & HξL & HR)".
-    iMod (ctx_stamp g ξL Hod with "Hint HξL") as "[Hint Hst]".
-    iMod ("Hhook" with "[//] Hint Hrun Hst HR") as "(Hint & Hrun & %T' & Hst & HR)".
-    iModIntro. iFrame "Hint Hrun". iExists ξL, T'. iFrame "Hst HR".
+    iIntros "Hrun HR Hhook".
+    iMod (own_context_twin_flushed cur_ctx Df with "Hrun") as "[Hrun (%ξL & HξL)]".
+    iMod (ctx_move_flushed (R := Rin) cur_ctx ξL Df with "Hrun HξL HR") as "(Hrun & HξL & HR)".
+    iMod (ctx_stamp_flushed ξL Df with "HξL") as "Hst".
+    iMod ("Hhook" with "Hrun Hst HR") as "(Hrun & %T' & Hst & HR & HQ)".
+    iModIntro. iFrame "Hrun HQ". iExists ξL, T'. iFrame "Hst HR".
   Qed.
 
-  Lemma lock_pay_born_id `{CID : CpuId} (E : coPset) (g : gstate)
+  Lemma lock_pay_born_id `{CID : CpuId} (E : coPset) (Df : nat)
       (R : CtxId -> iProp Σ) `{!CtxMorph R} :
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) ->
-    tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗ R cur_ctx ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ lock_pay R.
+    own_context_flushed cur_ctx Df -∗ R cur_ctx ={E}=∗
+    own_context_flushed cur_ctx Df ∗ lock_pay R.
   Proof.
-    iIntros (Hod) "Hint Hrun HR".
-    iApply (lock_pay_born E g R R Hod with "Hint Hrun HR"). iApply lock_hook_id.
+    iIntros "Hrun HR".
+    iMod (lock_pay_born E Df R R emp with "Hrun HR []") as "(Hrun & HR & _)";
+      [ iApply lock_hook_id | ].
+    iModIntro. iFrame.
   Qed.
 
   (* THE RELEASER'S MOVE: resume the lock's context from under the holder,
      move the payload into it, stamp it, run the hook.  What comes out is
-     the free arm's record. *)
+     the free arm's record, and the hook's export. *)
   (* TWO LOGS: the stamp is publication at release's fence, so the whole
-     move is a fence-leaf callback ([HartBarrier.rel_step]'s shape). *)
-  Lemma lock_pay_intro `{CID : CpuId} (E : coPset) (g : gstate)
-      (Rin R : CtxId -> iProp Σ) `{!CtxMorph Rin} :
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) ->
-    tso_interp_at riscv_eraGS g -∗
-    own_context cur_ctx -∗ lock_ctx_held -∗ Rin cur_ctx -∗ lock_ctx_hook E R Rin ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ lock_pay R.
+     move runs over the releaser's flushed token; the resumed lock context
+     inherits the flush ([TsoCtx.ctx_resume_flushed]) and the same-hart
+     move keeps it ([TsoCtx.ctx_move_flushed]). *)
+  Lemma lock_pay_intro `{CID : CpuId} (E : coPset) (Df : nat)
+      (Rin R : CtxId -> iProp Σ) (Q : iProp Σ) `{!CtxMorph Rin} :
+    own_context_flushed cur_ctx Df -∗ lock_ctx_held -∗ Rin cur_ctx -∗
+    lock_ctx_hook E R Rin Q ={E}=∗
+    own_context_flushed cur_ctx Df ∗ lock_pay R ∗ Q.
   Proof.
-    iIntros (Hod) "Hint Hrun (%ξL & Hpk) HR Hhook".
-    iMod (ctx_resume ξL cur_ctx with "Hrun Hpk") as "[Hrun HξL]".
-    iMod (ctx_move (R := Rin) cur_ctx ξL with "Hrun HξL HR") as "(Hrun & HξL & HR)".
-    iMod (ctx_stamp g ξL Hod with "Hint HξL") as "[Hint Hst]".
-    iMod ("Hhook" with "[//] Hint Hrun Hst HR") as "(Hint & Hrun & %T' & Hst & HR)".
-    iModIntro. iFrame "Hint Hrun". iExists ξL, T'. iFrame "Hst HR".
+    iIntros "Hrun (%ξL & Hpk) HR Hhook".
+    iMod (ctx_resume_flushed ξL cur_ctx Df with "Hrun Hpk") as "[Hrun HξL]".
+    iMod (ctx_move_flushed (R := Rin) cur_ctx ξL Df with "Hrun HξL HR") as "(Hrun & HξL & HR)".
+    iMod (ctx_stamp_flushed ξL Df with "HξL") as "Hst".
+    iMod ("Hhook" with "Hrun Hst HR") as "(Hrun & %T' & Hst & HR & HQ)".
+    iModIntro. iFrame "Hrun HQ". iExists ξL, T'. iFrame "Hst HR".
   Qed.
 
   (* THE WINNER'S MOVE: the AMO leaf hands the record with the winner's
@@ -1782,17 +1785,19 @@ Section Lock.
       |={E ∖ ↑lockN, E}=> Out)%I.
 
   (* the general finisher: the caller has closed over its payload, so the
-     prelude takes only the running token and the lock's parked context.
-     This is what the generic release is proved against. *)
+     prelude takes only the fence's flushed token and the lock's parked
+     context.  This is what the generic release is proved against. *)
+  (* TWO LOGS (relaxed-ww.md §2.14): the prelude runs AT release's
+     `fence rw,w`, over the flushed token the fence leaf produces -- the
+     lifting ([WpSconfFencePub.wp_fence_rel_flush_s_sconf]) does the flush;
+     nothing here sees the machine. *)
   Definition lock_finisher_pay `{CID : CpuId} (γ : gname) (lk : mword 64)
       (s : string) (R : CtxId → iProp Σ) (D Out : iProp Σ)
       (E : coPset) : iProp Σ :=
     (∃ Pay : iProp Σ,
-       (∀ g : gstate,
-          ⌜own_drained (hart_agent cpu_id) g.(glog) g.(gdlog)⌝ -∗
-          tso_interp_at riscv_eraGS g -∗
-          own_context cur_ctx -∗ lock_ctx_held ={E}=∗
-          tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ Pay) ∗
+       (∀ Df : nat,
+          own_context_flushed cur_ctx Df -∗ lock_ctx_held ={E}=∗
+          own_context_flushed cur_ctx Df ∗ Pay) ∗
        lock_finisher_body γ lk s R D Out E Pay)%I.
 
   (* the finisher with the payload still to be handed in, at the caller's own
@@ -1801,18 +1806,16 @@ Section Lock.
       (s : string) (R : CtxId → iProp Σ) (D Out : iProp Σ)
       (E : coPset) : iProp Σ :=
     (∃ Pay : iProp Σ,
-       (∀ g : gstate,
-          ⌜own_drained (hart_agent cpu_id) g.(glog) g.(gdlog)⌝ -∗
-          tso_interp_at riscv_eraGS g -∗
-          own_context cur_ctx -∗ lock_ctx_held -∗ R cur_ctx ={E}=∗
-          tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ Pay) ∗
+       (∀ Df : nat,
+          own_context_flushed cur_ctx Df -∗ lock_ctx_held -∗ R cur_ctx ={E}=∗
+          own_context_flushed cur_ctx Df ∗ Pay) ∗
        lock_finisher_body γ lk s R D Out E Pay)%I.
 
   Lemma lock_finisher_to_pay `{CID : CpuId} γ lk s R D Out E :
     R cur_ctx -∗ lock_finisher γ lk s R D Out E -∗ lock_finisher_pay γ lk s R D Out E.
   Proof.
     iIntros "HR (%Pay & Hpre & Hbody)". iExists Pay. iFrame "Hbody".
-    iIntros (g Hod) "Hint Hrun Hheld". iApply ("Hpre" with "[//] Hint Hrun Hheld HR").
+    iIntros (Df) "Hrun Hheld". iApply ("Hpre" with "Hrun Hheld HR").
   Qed.
 
   (* the closing body: the free arm is rebuilt from the pieces and the record *)
@@ -1828,17 +1831,33 @@ Section Lock.
     iLeft. by iFrame "Hfrag HR".
   Qed.
 
+  (* the same, with the hook's export riding beside the record and leaving
+     as the leaf's output *)
+  Lemma lock_finisher_close_body_q γ lk s R D (Q : iProp Σ) E :
+    ⊢ lock_finisher_body γ lk s R D Q E (lock_pay R ∗ Q).
+  Proof.
+    iIntros (lo) "[Hclose _] Hauth Hfrag [#Hc4 Hword] [#Hc8 Hcpu] _ [HR HQ]".
+    iDestruct "Hauth" as (B) "Hauth".
+    iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| iModIntro; iExact "HQ"].
+    iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8".
+    iExists (mword_of_int 0 : mword 32), None, B.
+    rewrite lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
+    iLeft. by iFrame "Hfrag HR".
+  Qed.
+
   (* put it back, with the payload finished by a hook at the lock's stamped
      context: the ordinary release at the identity hook, the floor fold at
-     [lock_hook_llb].  [D] is not used, only not taken. *)
+     [lock_hook_llb], a box deposit at its own hook.  The hook's export [Q]
+     is the leaf's output.  [D] is not used, only not taken. *)
   Lemma lock_finisher_close_hook `{CID : CpuId} γ lk s (Rin R : CtxId → iProp Σ)
-      `{!CtxMorph Rin} D E :
-    Rin cur_ctx -∗ lock_ctx_hook E R Rin -∗ lock_finisher_pay γ lk s R D emp E.
+      (Q : iProp Σ) `{!CtxMorph Rin} D E :
+    Rin cur_ctx -∗ lock_ctx_hook E R Rin Q -∗ lock_finisher_pay γ lk s R D Q E.
   Proof.
-    iIntros "HR Hhook". iExists (lock_pay R). iSplitL.
-    { iIntros (g Hod) "Hint Hrun Hheld".
-      iApply (lock_pay_intro E g Rin R Hod with "Hint Hrun Hheld HR Hhook"). }
-    iApply lock_finisher_close_body.
+    iIntros "HR Hhook". iExists (lock_pay R ∗ Q)%I. iSplitL.
+    { iIntros (Df) "Hrun Hheld".
+      iMod (lock_pay_intro E Df Rin R Q with "Hrun Hheld HR Hhook") as "(Hrun & HR & HQ)".
+      iModIntro. iFrame. }
+    iApply lock_finisher_close_body_q.
   Qed.
 
   (* put it back: today's release, and equally the release of an object that
@@ -1847,8 +1866,10 @@ Section Lock.
     ⊢ lock_finisher γ lk s R D emp E.
   Proof.
     iExists (lock_pay R). iSplitR.
-    { iIntros (g Hod) "Hint Hrun Hheld HR".
-      iApply (lock_pay_intro E g R R Hod with "Hint Hrun Hheld HR"). iApply lock_hook_id. }
+    { iIntros (Df) "Hrun Hheld HR".
+      iMod (lock_pay_intro E Df R R emp with "Hrun Hheld HR []") as "(Hrun & HR & _)";
+        [ iApply lock_hook_id | ].
+      iModIntro. iFrame. }
     iApply lock_finisher_close_body.
   Qed.
   (* destroy it and keep the storage.  The certificate [D] is assembled HERE,
@@ -1870,7 +1891,7 @@ Section Lock.
     lock_finisher γ lk s R D (lock_word_fresh lk ∗ lk_cpu_ready lk ∗ Out) E.
   Proof.
     iIntros "Hcomplete". iExists (R cur_ctx). iSplitR "Hcomplete".
-    { iIntros (g _) "Hint Hrun _ HR". iModIntro. iFrame "Hint Hrun HR". }
+    { iIntros (Df) "Hrun _ HR". iModIntro. iFrame "Hrun HR". }
     iIntros (lo) "[_ Hdispose] Hauth Hfrag Hword Hcpu #Hfl HR".
     iMod ("Hcomplete" with "Hfrag HR") as "[HD HOut]".
     iMod ("Hdispose" with "HD") as "_".
@@ -1895,24 +1916,22 @@ Section Lock.
   (* the free arm is the lock's stamped context with the payload in it, so
      the creator mints that context ([lock_pay_born]).  The token is taken
      and handed straight back. *)
-  (* TWO LOGS: every construction below runs at a FENCE on the creator's
-     hart (the record's publication, [lock_pay_born]); how the creator gets
-     there is RULING C's.  The fence context is the [gstate], [own_drained]
-     and the bundle. *)
-  Lemma lock_inv_alloc `{CID : CpuId} (E : coPset) (g : gstate) (lo : nat)
+  (* TWO LOGS (relaxed-ww.md §2.14): every construction below runs at a
+     FENCE on the creator's hart (the record's publication, [lock_pay_born])
+     and sees of it only the creator's FLUSHED token; how the creator gets
+     there is RULING C's. *)
+  Lemma lock_inv_alloc `{CID : CpuId} (E : coPset) (Df : nat) (lo : nat)
       (lk : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} :
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) ->
-    tso_interp_at riscv_eraGS g -∗
-    own_context cur_ctx -∗
+    own_context_flushed cur_ctx Df -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lk_cpu_fresh lo lk -∗
     R cur_ctx ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ ∃ γ : gname, lock_inv γ lk s R lo.
+    own_context_flushed cur_ctx Df ∗ ∃ γ : gname, lock_inv γ lk s R lo.
   Proof.
-    iIntros (Hod) "Hint Hrun Hword [#Hc8 Hcpu] HR".
+    iIntros "Hrun Hword [#Hc8 Hcpu] HR".
     iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
-    iMod (lock_pay_born_id E g R Hod with "Hint Hrun HR") as "(Hint & Hrun & HR)".
-    iFrame "Hint Hrun".
+    iMod (lock_pay_born_id E Df R with "Hrun HR") as "(Hrun & HR)".
+    iFrame "Hrun".
     iMod (own_alloc ((((●E (None : leibnizO lock_state)),
                        (●E (0%nat : leibnizO nat)))
                       ⋅ ((◯E (None : leibnizO lock_state)),
@@ -1935,11 +1954,10 @@ Section Lock.
   Lemma newlock_d `{CID : CpuId} E (lo : nat) (lk : mword 64) (s : string) :
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lk_cpu_fresh lo lk ==∗
-    ∃ γ : gname, ∀ (g : gstate) (R : CtxId → iProp Σ) (D : iProp Σ),
-      ⌜CtxMorph R⌝ -∗ ⌜own_drained (hart_agent cpu_id) g.(glog) g.(gdlog)⌝ -∗
-      tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗
+    ∃ γ : gname, ∀ (Df : nat) (R : CtxId → iProp Σ) (D : iProp Σ),
+      ⌜CtxMorph R⌝ -∗ own_context_flushed cur_ctx Df -∗
       R cur_ctx ={E}=∗
-      tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ inv lockN (lock_inv γ lk s R lo ∨ D).
+      own_context_flushed cur_ctx Df ∗ inv lockN (lock_inv γ lk s R lo ∨ D).
   Proof.
     iIntros "Hword [#Hc8 Hcpu]".
     iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
@@ -1949,9 +1967,9 @@ Section Lock.
                          (◯E (0%nat : leibnizO nat)))) : lockUR)) as (γ) "H";
       [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
-    iModIntro. iExists γ. iIntros (g R D) "%HmR %Hod Hint Hrun HR".
-    iMod (lock_pay_born_id (CtxMorph0 := HmR) E g R Hod with "Hint Hrun HR") as "(Hint & Hrun & HR)".
-    iFrame "Hint Hrun".
+    iModIntro. iExists γ. iIntros (Df R D) "%HmR Hrun HR".
+    iMod (lock_pay_born_id (CtxMorph0 := HmR) E Df R with "Hrun HR") as "(Hrun & HR)".
+    iFrame "Hrun".
     iApply (inv_alloc lockN E (lock_inv γ lk s R lo ∨ D)).
     iNext. iLeft. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None, 0%nat.
     iDestruct (lock_word_intro with "Hword") as "Hword".
@@ -1967,23 +1985,21 @@ Section Lock.
      the caller's next acquire).  A creator that hands back the bare INVARIANT
      ([lock_inv_alloc], [newlock_d]) owes nothing: the floor is a property of
      the handle, not of the lock. *)
-  Lemma newlock `{CID : CpuId} E (g : gstate) (lk : mword 64) (s : string)
+  Lemma newlock `{CID : CpuId} E (Df : nat) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) `{!CtxMorph R} :
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) ->
     lock_name lk s -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context cur_ctx -∗
+    own_context_flushed cur_ctx Df -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lk_cpu_ready lk -∗
     R cur_ctx ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ ∃ γ : gname, is_lock γ lk s R.
+    own_context_flushed cur_ctx Df ∗ ∃ γ : gname, is_lock γ lk s R.
   Proof.
-    iIntros (Hod) "#Hnm Hint Hrun Hword Hready HR".
+    iIntros "#Hnm Hrun Hword Hready HR".
     rewrite /lk_cpu_ready /lk_cpu_ready_at.
     iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
-    iMod (lock_inv_alloc E g lo lk s R Hod with "Hint Hrun Hword Hcpu HR") as "(Hint & Hrun & Hbody)".
+    iMod (lock_inv_alloc E Df lo lk s R with "Hrun Hword Hcpu HR") as "(Hrun & Hbody)".
     iDestruct "Hbody" as (γ) "Hbody".
-    iFrame "Hint Hrun".
+    iFrame "Hrun".
     iMod (inv_alloc lockN E (lock_inv γ lk s R lo) with "[Hbody]") as "#Hinv";
       [ by iNext | ].
     iModIntro. iExists γ.
@@ -2004,10 +2020,9 @@ Section Lock.
     lock_name lk s -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lk_cpu_ready lk ==∗
-    ∃ γ : gname, ∀ (g : gstate) (R : CtxId → iProp Σ),
-      ⌜CtxMorph R⌝ -∗ ⌜own_drained (hart_agent cpu_id) g.(glog) g.(gdlog)⌝ -∗
-      tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗
-      R cur_ctx ={E}=∗ tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ is_lock γ lk s R.
+    ∃ γ : gname, ∀ (Df : nat) (R : CtxId → iProp Σ),
+      ⌜CtxMorph R⌝ -∗ own_context_flushed cur_ctx Df -∗
+      R cur_ctx ={E}=∗ own_context_flushed cur_ctx Df ∗ is_lock γ lk s R.
   Proof.
     iIntros "#Hnm Hword Hready".
     rewrite /lk_cpu_ready /lk_cpu_ready_at.
@@ -2019,9 +2034,9 @@ Section Lock.
                          (◯E (0%nat : leibnizO nat)))) : lockUR)) as (γ) "H";
       [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
-    iModIntro. iExists γ. iIntros (g R) "%HmR %Hod Hint Hrun HR".
-    iMod (lock_pay_born_id (CtxMorph0 := HmR) E g R Hod with "Hint Hrun HR") as "(Hint & Hrun & HR)".
-    iFrame "Hint Hrun".
+    iModIntro. iExists γ. iIntros (Df R) "%HmR Hrun HR".
+    iMod (lock_pay_born_id (CtxMorph0 := HmR) E Df R with "Hrun HR") as "(Hrun & HR)".
+    iFrame "Hrun".
     iMod (inv_alloc lockN E (lock_inv γ lk s R lo) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None, 0%nat.
       iDestruct (lock_word_intro with "Hword") as "Hword".
@@ -2039,12 +2054,11 @@ Section Lock.
     lock_name lk s -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lk_cpu_ready lk ==∗
-    ∃ γ : gname, ∀ (g : gstate) (R Rdep : CtxId → iProp Σ) (tl : nat),
+    ∃ γ : gname, ∀ (Df : nat) (R Rdep : CtxId → iProp Σ) (tl : nat),
       ⌜CtxMorph Rdep⌝ -∗
       ⌜forall ξ : CtxId, Rdep ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R ξ⌝ -∗
-      ⌜own_drained (hart_agent cpu_id) g.(glog) g.(gdlog)⌝ -∗
-      TsoGhost.llb dlen_name tl -∗ tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗
-      Rdep cur_ctx ={E}=∗ tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ is_lock γ lk s R.
+      TsoGhost.llb dlen_name tl -∗ own_context_flushed cur_ctx Df -∗
+      Rdep cur_ctx ={E}=∗ own_context_flushed cur_ctx Df ∗ is_lock γ lk s R.
   Proof.
     iIntros "#Hnm Hword Hready".
     rewrite /lk_cpu_ready /lk_cpu_ready_at.
@@ -2056,10 +2070,10 @@ Section Lock.
                          (◯E (0%nat : leibnizO nat)))) : lockUR)) as (γ) "H";
       [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
-    iModIntro. iExists γ. iIntros (g R Rdep tl) "%HmR %Hfold %Hod #Hllb Hint Hrun HR".
-    iMod (lock_pay_born (CtxMorph0 := HmR) E g Rdep R Hod with "Hint Hrun HR [Hllb]") as "(Hint & Hrun & HR)".
+    iModIntro. iExists γ. iIntros (Df R Rdep tl) "%HmR %Hfold #Hllb Hrun HR".
+    iMod (lock_pay_born (CtxMorph0 := HmR) E Df Rdep R emp with "Hrun HR [Hllb]") as "(Hrun & HR & _)".
     { iApply (lock_hook_llb E Rdep R tl Hfold with "Hllb"). }
-    iFrame "Hint Hrun".
+    iFrame "Hrun".
     iMod (inv_alloc lockN E (lock_inv γ lk s R lo) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None, 0%nat.
       iDestruct (lock_word_intro with "Hword") as "Hword".

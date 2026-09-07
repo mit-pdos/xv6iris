@@ -430,18 +430,16 @@ Section OffBox.
      [FileInvDefs.off_fd]'s pieces at [q = 1]: the two register halves, the
      share, membership, the handle. *)
   (* relaxed-ww: the deposit is FENCE-BOUND (the release hook runs it) *)
-  Lemma off_publish_park `{CID : RiscvLang.CpuId} on i k γ (γo : gname) (g : RiscvLang.gstate) (ξ : CtxId) (E : coPset) :
+  Lemma off_publish_park `{CID : RiscvLang.CpuId} on i k γ (γo : gname) (Df : nat) (ξ : CtxId) (E : coPset) :
     ↑(offBoxN .@ k) ⊆ E ->
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     CtxBox.stamps_auth (X := unit) γ ∅ -∗
     ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γ) 1 0%nat -∗
     ghost_var (bx_slotd γ) 1 (inhabitant : slot_reg nat unit) -∗
     ghost_var (bx_slotp γ) 1 (inhabitant : l2_reg nat) -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
+    own_context_flushed ξ Df -∗
     off_resident (XI := ξ) γo k -∗
     off_rows on i ξ ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗ off_box k γ γo ∗
+    own_context_flushed ξ Df ∗ off_box k γ γo ∗
     ∃ (T0 T : nat),
       off_regd γ (SlotReg T0 false k None) ∗ llb dlen_name T0 ∗
       off_cnt γ 1 ∗
@@ -452,19 +450,19 @@ Section OffBox.
             off_rows_insert_row at [L2Reg 0 None] -- whose floor the lemma
             discharges itself with [ctx_floor_0], so what comes out is the
             next link's premise (item 31 (a)) *)
-    intros HE Hod.
+    intros HE.
     rewrite /off_box /off_regd /off_cnt /off_regp.
-    iIntros "Hst Hc Hd Hp Hint Hrun Hcell Hrows".
+    iIntros "Hst Hc Hd Hp Hrun Hcell Hrows".
     iMod (CtxBox.box_alloc_at (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ g ξ k E Hod with "Hst Hc Hd Hp Hint Hrun [Hcell]")
-      as "(Hint & Hrun & %Tb & #Hbx & Hrd & #Hllb & Hcnt & Hrp)".
+            (offBoxN .@ k) γ Df ξ k E with "Hst Hc Hd Hp Hrun [Hcell]")
+      as "(Hrun & %Tb & #Hbx & Hrd & #Hllb & Hcnt & Hrp)".
     { iExists tt. rewrite /off_rest. iSplitL; [iExact "Hcell"|done]. }
     iMod (CtxBox.box_ref_incr (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
             (offBoxN .@ k) γ (SlotReg Tb false k None) 0 E HE eq_refl
             with "Hbx Hrd Hcnt") as "(Hrd & Hcnt & %T & Href)".
     iMod (off_rows_insert_row on i γ 0 ξ with "Hrows Hrp []") as "[Hfold #Hmem]".
     { iApply llb_0. }
-    iModIntro. iFrame "Hint Hrun Hbx". iExists Tb, T.
+    iModIntro. iFrame "Hrun Hbx". iExists Tb, T.
     iFrame "Hrd Hllb Hcnt Href Hmem".
     iApply "Hfold". iApply TsoCtx.ctx_floor_0.
   Qed.
@@ -493,27 +491,26 @@ Section OffBox.
   Qed.
 
   (* relaxed-ww: the park is FENCE-BOUND (the release hook runs it) *)
-  Lemma off_read_park `{CID : RiscvLang.CpuId} k γ (γo : gname) (g : RiscvLang.gstate) (ξ : CtxId)
+  Lemma off_read_park `{CID : RiscvLang.CpuId} k γ (γo : gname) (Df : nat) (ξ : CtxId)
       (m : gmap (nat * nat) ufrac) (E : coPset) :
     ↑(offBoxN .@ k) ⊆ E ->
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
-    off_box k γ γo -∗ tso_interp_at riscv_eraGS g -∗ own_context ξ -∗
+    off_box k γ γo -∗ own_context_flushed ξ Df -∗
     off_resident (XI := ξ) γo k -∗
     CtxBox.l2_hold (X := unit) γ k m ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗
+    own_context_flushed ξ Df ∗
     ∃ (T' : nat) (q : ufrac),
       ⌜Qp_to_Qc q = qsum m⌝ ∗
       off_regp γ (L2Reg T' None) ∗
       CtxBox.reference (X := unit) γ k {[ (k, T') := q ]} ∗
       llb dlen_name T'.
   Proof. (* box_park at Q := emp *)
-    intros HE Hod. rewrite /off_box /off_regp.
-    iIntros "#Hbox Hint Hrun Hcell Hhold".
+    intros HE. rewrite /off_box /off_regp.
+    iIntros "#Hbox Hrun Hcell Hhold".
     iMod (CtxBox.box_park (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ g ξ k m E HE Hod with "Hbox Hint Hrun [Hcell] Hhold")
-      as "(Hint & Hrun & _ & %T' & %q & %Hq & Hrp & Href & #Hllb)".
+            (offBoxN .@ k) γ Df ξ k m E HE with "Hbox Hrun [Hcell] Hhold")
+      as "(Hrun & _ & %T' & %q & %Hq & Hrp & Href & #Hllb)".
     { iExists tt. rewrite /off_rest. iSplitL; [iExact "Hcell"|done]. }
-    iModIntro. iFrame "Hint Hrun". iExists T', q.
+    iModIntro. iFrame "Hrun". iExists T', q.
     iSplitR; [iPureIntro; exact Hq|].
     iFrame "Hrp Href Hllb".
   Qed.

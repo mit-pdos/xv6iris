@@ -37,6 +37,7 @@ Require Import WpSconfEngine.
 Require Import IntrDefs WpIntrInv WpSmodeIntr.
 Require Import Xv6G.
 Require Import TsoCtx.
+Require Import TsoCtxLedger.   (* [ctx_flush_top]: the release leaf flushes the running token *)
 Import Defs.
 
 (* THE DISPATCH FACT, once: `fence rw,rw`'s effective sets keep bits [1:0]
@@ -280,6 +281,169 @@ Section WpSconfFencePub.
       iIntros (e) "(-> & HQ & Hpriv & Hmenv)". iSplitR; [done|].
       iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
       iDestruct (sconf_at_priv_open with "Hsc") as (ms') "Hscp".
+      iExists (add_vec_int pc 4), ms', m, n.
+      iFrame "HPC HnPC Hresv Hscp Hcap Hfile HQ". by iPureIntro.
+    - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HQ)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iApply ("Hcont" with "Hcg' Hpc' HQ").
+  Qed.
+
+  (* ================================================================== *)
+  (* §4b THE RELEASE FENCE (relaxed-ww.md §2.3, §2.14): `fence rw,w` with  *)
+  (* [HartBarrier.rel_step] threaded through.  The node blocks until the  *)
+  (* hart's own stores have drained and runs the client's fupd at ⊤ with  *)
+  (* [own_drained] and the interp -- machine-shaped, as every leaf is.     *)
+  (* Lifted ONCE below ([wp_fence_rel_flush_s_sconf]) into the shape the  *)
+  (* protocol tier consumes: the leaf takes the running token out of      *)
+  (* [sie_cap], flushes it at the drain top ([TsoCtxLedger.ctx_flush_top]) *)
+  (* and hands the client's step [own_context_flushed cur_ctx Df] and      *)
+  (* nothing else -- no [gstate], no [own_drained], no interp above this   *)
+  (* line.  Release's finisher prelude ([WpLock.lock_finisher_pay]) is    *)
+  (* such a step.                                                          *)
+  (* ================================================================== *)
+  Lemma swp_barrier_rel (bk : rv64d_types.barrier_kind) (P Q : iProp Σ) :
+    fence_rel bk = true ->
+    gen_cert -∗ rel_step P Q -∗ P -∗
+    swp (Defs.bind0 (sail_barrier bk) (returnM RETIRE_SUCCESS))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ Q).
+  Proof.
+    iIntros (Hrel) "#Hcert Hrel HP".
+    iApply (swp_hart_barrier_rel (X := ExecutionResult) bk
+              (Defs.bind0 (sail_barrier bk) (returnM RETIRE_SUCCESS)) _ P Q
+              ltac:(reflexivity) Hrel with "Hcert Hrel HP").
+    iNext. iIntros "HQ". iApply swp_ret. by iFrame.
+  Qed.
+
+  Lemma swp_execute_FENCE_rel_S (fm : mword 4) (rs rd : regidx)
+      (menv : mword 64) (P Q : iProp Σ) :
+    gen_cert -∗ cur_privilege ↦ᵣ Supervisor -∗ menvcfg ↦ᵣ menv -∗
+    rel_step P Q -∗ P -∗
+    swp (execute (FENCE (fm, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
+                         rs, rd)))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ Q ∗
+                cur_privilege ↦ᵣ Supervisor ∗ menvcfg ↦ᵣ menv).
+  Proof.
+    iIntros "#Hcert Hpriv Hmenv Hrel HP".
+    change (execute (FENCE (fm, mword_of_int 3 : mword 4,
+                            mword_of_int 1 : mword 4, rs, rd)))
+      with (execute_FENCE fm (mword_of_int 3 : mword 4)
+              (mword_of_int 1 : mword 4) rs rd).
+    unfold execute_FENCE.
+    iApply (swp_bind_use (is_fiom_active tt) _
+              (fun v => ⌜v = eq_vec (_get_MEnvcfg_FIOM menv) ('b"1")⌝ ∗
+                        cur_privilege ↦ᵣ Supervisor ∗ menvcfg ↦ᵣ menv)%I _
+              with "[Hpriv Hmenv] [-]").
+    { iApply (swp_is_fiom_active_S menv with "Hcert Hpriv Hmenv"). }
+    iIntros (v) "(-> & Hpriv & Hmenv)".
+    cbn match.
+    rewrite (fence_rw_bits (eq_vec (_get_MEnvcfg_FIOM menv) ('b"1"))).
+    rewrite (fence_w_bits_11 (eq_vec (_get_MEnvcfg_FIOM menv) ('b"1"))).
+    rewrite (fence_w_bits_10 (eq_vec (_get_MEnvcfg_FIOM menv) ('b"1"))).
+    rewrite (fence_w_bits_01 (eq_vec (_get_MEnvcfg_FIOM menv) ('b"1"))).
+    cbn match.
+    iApply (swp_mono _ (fun e : ExecutionResult =>
+                          ⌜e = RETIRE_SUCCESS⌝ ∗ Q)%I _
+              with "[Hpriv Hmenv] [Hrel HP]").
+    - iIntros (e) "[-> HQ]". iSplitR; [done|]. iFrame.
+    - iApply (swp_barrier_rel rv64d_types.Barrier_RISCV_rw_w P Q ltac:(reflexivity)
+                with "Hcert Hrel HP").
+  Qed.
+
+  (* the machine-shaped leaf, for a client that is itself a gate *)
+  Lemma wp_fence_rel_s_sconf
+      (pc : mword 64) (fm : mword 4) (rs rd : regidx)
+      (m : regfile) (n : nat) (P Q : iProp Σ) :
+    sie_cap_gpr kt m n false p -∗
+    pc_is pc -∗
+    instr pc false (FENCE (fm, mword_of_int 3 : mword 4,
+                           mword_of_int 1 : mword 4, rs, rd)) -∗
+    rel_step P Q -∗ P -∗
+    ▷ (sie_cap_gpr kt m n false p -∗
+       pc_is (add_vec_int pc 4) -∗ Q -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "Hcg Hpc Hinstr Hrel HP Hcont".
+    iApply (wp_instr_s_sconf m n false false pc false
+              (FENCE (fm, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
+                      rs, rd))
+              (fun (_ : CpuId) npc _ms' m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ Q)%I
+              with "Hcg Hpc Hinstr [Hrel HP Hcont]").
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitR "Hcont".
+    - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct (sconf_ctl_acc with "Hsc")
+        as "(#Hcert & #Hmisa & Hpriv & Hmenv & Hback)".
+      iApply (swp_mono with
+                "[Hcap Hfile HPC HnPC Hresv Hback] [Hpriv Hmenv Hrel HP]");
+        [| iApply (swp_execute_FENCE_rel_S fm rs rd MENVCFG_S P Q
+                     with "Hcert Hpriv Hmenv Hrel HP") ].
+      iIntros (e) "(-> & HQ & Hpriv & Hmenv)". iSplitR; [done|].
+      iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
+      iDestruct (sconf_at_priv_open with "Hsc") as (ms') "Hscp".
+      iExists (add_vec_int pc 4), ms', m, n.
+      iFrame "HPC HnPC Hresv Hscp Hcap Hfile HQ". by iPureIntro.
+    - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HQ)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iApply ("Hcont" with "Hcg' Hpc' HQ").
+  Qed.
+
+  (* THE PROTOCOL TIER'S SHAPE of a release-fence step: a fupd over the
+     flushed token, at ⊤ (a client at a smaller mask lifts with
+     [fupd_mask_subseteq]).  The token comes back flushed, so one fence
+     can carry several deposits. *)
+  Definition flush_step (P Q : iProp Σ) : iProp Σ :=
+    (∀ Df : nat,
+       own_context_flushed cur_ctx Df -∗ P ={⊤}=∗
+       own_context_flushed cur_ctx Df ∗ Q)%I.
+
+  Lemma flush_step_id (P : iProp Σ) : ⊢ flush_step P P.
+  Proof. iIntros (Df) "$ $". done. Qed.
+
+  (* the release leaf, lifted: the flush is THIS call and nothing above
+     it sees the machine *)
+  Lemma wp_fence_rel_flush_s_sconf
+      (pc : mword 64) (fm : mword 4) (rs rd : regidx)
+      (m : regfile) (n : nat) (P Q : iProp Σ) :
+    sie_cap_gpr kt m n false p -∗
+    pc_is pc -∗
+    instr pc false (FENCE (fm, mword_of_int 3 : mword 4,
+                           mword_of_int 1 : mword 4, rs, rd)) -∗
+    flush_step P Q -∗ P -∗
+    ▷ (sie_cap_gpr kt m n false p -∗
+       pc_is (add_vec_int pc 4) -∗ Q -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "Hcg Hpc Hinstr Hstep HP Hcont".
+    iApply (wp_instr_s_sconf m n false false pc false
+              (FENCE (fm, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
+                      rs, rd))
+              (fun (_ : CpuId) npc _ms' m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ Q)%I
+              with "Hcg Hpc Hinstr [Hstep HP Hcont]").
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitR "Hcont".
+    - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct (sconf_ctl_acc with "Hsc")
+        as "(#Hcert & #Hmisa & Hpriv & Hmenv & Hback)".
+      (* the token, out of the capability and back into it around the node *)
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
+      iApply (swp_mono with
+                "[Hstk Htr Harm Hfile HPC HnPC Hresv Hback] [Hpriv Hmenv Hstep HP Hctx]");
+        [| iApply (swp_execute_FENCE_rel_S fm rs rd MENVCFG_S
+                     (own_context cur_ctx ∗ P) (own_context cur_ctx ∗ Q)
+                     with "Hcert Hpriv Hmenv [Hstep] [$Hctx $HP]") ].
+      2: { rewrite /rel_step. iIntros (g Hod) "Hgh Hint [Hctx HP]".
+           iDestruct (ctx_flush_top g cur_ctx Hod with "Hint Hctx") as "[Hint Hfl]".
+           iMod ("Hstep" with "Hfl HP") as "[Hfl HQ]".
+           iModIntro. iFrame "Hgh Hint HQ". iApply (own_context_of_flushed with "Hfl"). }
+      iIntros (e) "(-> & [Hctx HQ] & Hpriv & Hmenv)". iSplitR; [done|].
+      iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
+      iDestruct (sconf_at_priv_open with "Hsc") as (ms') "Hscp".
+      iAssert (sie_cap kt m n false p) with "[Hstk Htr Harm Hctx]" as "Hcap".
+      { rewrite /sie_cap. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
       iExists (add_vec_int pc 4), ms', m, n.
       iFrame "HPC HnPC Hresv Hscp Hcap Hfile HQ". by iPureIntro.
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HQ)".

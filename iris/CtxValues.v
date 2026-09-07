@@ -178,7 +178,7 @@ Section CtxValues.
     iDestruct "Hc" as (t) "(Hp & Hts & #Hkey & #Hchain)".
     iAssert (⌜TsoMemPa.latest g.(gimg) g.(glog) a t v⌝)%I as %Hlat.
     { iApply (cv_latest with "Hint Hgh Hp Hts"). }
-    iMod (ledger_pin_mint g a v t t Sv (le_n t) Hv with "Hgh Hint [Hp Hts]")
+    iMod (ledger_pin_mint g a v t Sv Hv with "Hgh Hint [Hp Hts]")
       as "(Hgh & Hint & Hpin)".
     { rewrite /phys_ledger_at. iFrame "Hp Hts". }
     iDestruct "Hkey" as "[(%p & #Hdp & #Hfl) | #Hdirty]".

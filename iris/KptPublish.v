@@ -170,7 +170,7 @@ Section KptPublish.
     cbn in Htlen.
     iDestruct (CtxValues.cv_latest g a (DfracOwn 1) v t
                  with "Hint Hgh Hpt Hts") as %Hlat.
-    iMod (ledger_pin_mint g a v t t Sv (Nat.le_refl t) Hv
+    iMod (ledger_pin_mint g a v t Sv Hv
             with "Hgh Hint [Hpt Hts]") as "(Hgh & Hint & Hpin)".
     { rewrite /phys_ledger_at. iFrame "Hpt Hts". }
     (* the anchor, off the key's justification *)

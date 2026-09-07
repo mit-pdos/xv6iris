@@ -701,126 +701,118 @@ Section SleepLock.
 
   (* A6.67: the honest creator deposit (A6.66) takes the running token and
      hands it straight back. *)
-  (* TWO LOGS (relaxed-ww.md §2.4, "Birth"): the inner lock's publication
-     is fence-bound, so every constructor below runs at a fence on the
-     creator's hart with the bundle in hand (RULING C, the owner's, decides
-     how the born record travels there). *)
-  Lemma new_sleeplock_gen_at `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate)
+  (* TWO LOGS (relaxed-ww.md §2.4, "Birth"; §2.14): the inner lock's
+     publication is fence-bound, so every constructor below runs at a fence
+     on the creator's hart and sees of it the creator's FLUSHED token
+     (RULING C, the owner's, decides how the born record travels there). *)
+  Lemma new_sleeplock_gen_at `{CID : RiscvLang.CpuId} E (Df : nat)
       (γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) (H : Qp -> iProp Σ) :
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     sl_free_tok γ -∗
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
-    tso_interp_at riscv_eraGS g -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready (sl_lk slk) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    own_context cur_ctx -∗
-    R ={E}=∗ tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+    own_context_flushed cur_ctx Df -∗
+    R ={E}=∗ own_context_flushed cur_ctx Df ∗
              ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
   Proof.
-    iIntros (Hod) "Hfree #Hlnm #Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR".
+    iIntros "Hfree #Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
     iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
-    iMod (newlock E g (sl_lk slk) "sleep lock"%string (sl_pay γ slk (fun _ => R) H) Hod
-            with "Hlnm Hint Hrun Hlkw Hcpu [Hw Htok Hha HR]") as "(Hint & Hrun & Hlk)".
+    iMod (newlock E Df (sl_lk slk) "sleep lock"%string (sl_pay γ slk (fun _ => R) H)
+            with "Hlnm Hrun Hlkw Hcpu [Hw Htok Hha HR]") as "(Hrun & Hlk)".
     { iApply (sl_pay_of_res γ slk (fun _ => R) H).
       iApply (sl_res_close_free with "Hw Htok Hha HR"). }
     iDestruct "Hlk" as (γl) "#Hlk".
-    iModIntro. iFrame "Hint Hrun". iExists γl.
+    iModIntro. iFrame "Hrun". iExists γl.
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
   Qed.
 
   (* A6.67: the honest creator deposit (A6.66) takes the running token and
      hands it straight back. *)
-  Lemma new_sleeplock_gen `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate)
+  Lemma new_sleeplock_gen `{CID : RiscvLang.CpuId} E (Df : nat)
       (slk : mword 64) (s : string) (R : iProp Σ)
       (H : gname -> Qp -> iProp Σ) :
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
-    tso_interp_at riscv_eraGS g -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready (sl_lk slk) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    own_context cur_ctx -∗
-    R ={E}=∗ tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+    own_context_flushed cur_ctx Df -∗
+    R ={E}=∗ own_context_flushed cur_ctx Df ∗
              ∃ γl γ : gname, is_sleeplock_gen γl γ slk s R (H γ) ∗ slh_auth γ None.
   Proof.
-    iIntros (Hod) "#Hlnm #Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR".
+    iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
     iMod (own_alloc (((●E (1%Qp : leibnizO Qp), ε) : slhUR)
                      ⋅ ((◯E (1%Qp : leibnizO Qp), ε) : slhUR)
                      ⋅ ((ε, ● (None : optionUR ufracR)) : slhUR))) as (γ) "Hg".
     { rewrite -!pair_op !left_id !right_id. apply pair_valid.
       split; [ by apply excl_auth_valid | by apply auth_auth_valid ]. }
     iDestruct "Hg" as "[[Hha Htok] Hauth]".
-    iMod (newlock E g (sl_lk slk) "sleep lock"%string (sl_pay γ slk (fun _ => R) (H γ)) Hod
-            with "Hlnm Hint Hrun Hlkw Hcpu [Hw Htok Hha Hpid HR]") as "(Hint & Hrun & Hlk)".
+    iMod (newlock E Df (sl_lk slk) "sleep lock"%string (sl_pay γ slk (fun _ => R) (H γ))
+            with "Hlnm Hrun Hlkw Hcpu [Hw Htok Hha Hpid HR]") as "(Hrun & Hlk)".
     { iApply (sl_pay_of_res γ slk (fun _ => R) (H γ)).
       iApply (sl_res_close_free with "Hw [Htok Hpid] Hha HR").
       iFrame "Htok Hpid". }
     iDestruct "Hlk" as (γl) "#Hlk".
-    iModIntro. iFrame "Hint Hrun". iExists γl, γ. iFrame "Hauth".
+    iModIntro. iFrame "Hrun". iExists γl, γ. iFrame "Hauth".
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
   Qed.
 
   (* ENDGAME R1-pre: the bound-indexed minting builder -- the client payload
      at bound 0 seals the free arm under the free floor. *)
-  Lemma new_sleeplock_genl `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate)
+  Lemma new_sleeplock_genl `{CID : RiscvLang.CpuId} E (Df : nat)
       (slk : mword 64) (s : string)
       (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : gname -> Qp -> iProp Σ) :
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
-    tso_interp_at riscv_eraGS g -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready (sl_lk slk) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    own_context cur_ctx -∗
-    R cur_ctx ={E}=∗ tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+    own_context_flushed cur_ctx Df -∗
+    R cur_ctx ={E}=∗ own_context_flushed cur_ctx Df ∗
     ∃ γl γ : gname, is_sleeplock_genl γl γ slk s R (H γ) ∗ slh_auth γ None.
   Proof.
-    iIntros (Hod) "#Hlnm #Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR".
+    iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
     iMod (own_alloc (((●E (1%Qp : leibnizO Qp), ε) : slhUR)
                      ⋅ ((◯E (1%Qp : leibnizO Qp), ε) : slhUR)
                      ⋅ ((ε, ● (None : optionUR ufracR)) : slhUR))) as (γ) "Hg".
     { rewrite -!pair_op !left_id !right_id. apply pair_valid.
       split; [ by apply excl_auth_valid | by apply auth_auth_valid ]. }
     iDestruct "Hg" as "[[Hha Htok] Hauth]".
-    iMod (newlock E g (sl_lk slk) "sleep lock"%string (sl_pay γ slk R (H γ)) Hod
-            with "Hlnm Hint Hrun Hlkw Hcpu [Hw Htok Hha Hpid HR]") as "(Hint & Hrun & Hlk)".
+    iMod (newlock E Df (sl_lk slk) "sleep lock"%string (sl_pay γ slk R (H γ))
+            with "Hlnm Hrun Hlkw Hcpu [Hw Htok Hha Hpid HR]") as "(Hrun & Hlk)".
     { iApply (sl_pay_of_res γ slk R (H γ)).
       iApply (sl_res_close_free with "Hw [Htok Hpid] Hha HR").
       iFrame "Htok Hpid". }
     iDestruct "Hlk" as (γl) "#Hlk".
-    iModIntro. iFrame "Hint Hrun". iExists γl, γ. iFrame "Hauth".
+    iModIntro. iFrame "Hrun". iExists γl, γ. iFrame "Hauth".
     iApply (is_sleeplock_genl_intro with "Hsnm Hlk").
   Qed.
 
   (* A6.67: the honest creator deposit (A6.66) takes the running token and
      hands it straight back. *)
-  Lemma new_sleeplock `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate)
+  Lemma new_sleeplock `{CID : RiscvLang.CpuId} E (Df : nat)
       (slk : mword 64) (s : string) (R : iProp Σ) :
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
-    tso_interp_at riscv_eraGS g -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready (sl_lk slk) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    own_context cur_ctx -∗
-    R ={E}=∗ tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+    own_context_flushed cur_ctx Df -∗
+    R ={E}=∗ own_context_flushed cur_ctx Df ∗
              ∃ γl γ : gname, is_sleeplock γl γ slk s R.
   Proof.
-    iIntros (Hod) "#Hlnm #Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR".
-    iMod (new_sleeplock_gen E g slk s R (fun _ => sl_untracked) Hod
-            with "Hlnm Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR") as "(Hint & Hrun & Hgen)".
+    iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
+    iMod (new_sleeplock_gen E Df slk s R (fun _ => sl_untracked)
+            with "Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR") as "(Hrun & Hgen)".
     iDestruct "Hgen" as (γl γ) "[#Hsl _]".
-    iModIntro. iFrame "Hint Hrun". iExists γl, γ. iExact "Hsl".
+    iModIntro. iFrame "Hrun". iExists γl, γ. iExact "Hsl".
   Qed.
 
   (* ---- the two ends of initsleeplock, bundled.
@@ -856,68 +848,63 @@ Section SleepLock.
   (* the ghost step from initsleeplock's output to a usable sleeplock: the cpu
      word of the inner spinlock goes INTO [lock_inv] (WpLock.v owns both lock
      words). *)
-  Lemma sl_fresh_new_gen `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate)
+  Lemma sl_fresh_new_gen `{CID : RiscvLang.CpuId} E (Df : nat)
       (slk : mword 64) (s : string)
       (R : iProp Σ) (H : gname -> Qp -> iProp Σ) :
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
-    sl_fresh slk s -∗ tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗ R ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+    sl_fresh slk s -∗ own_context_flushed cur_ctx Df -∗ R ={E}=∗
+    own_context_flushed cur_ctx Df ∗
     ∃ γl γ : gname, is_sleeplock_gen γl γ slk s R (H γ) ∗ slh_auth γ None.
   Proof.
-    iIntros (Hod) "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hint Hrun HR".
-    iApply (new_sleeplock_gen E g slk s R H Hod with "Hlnm Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR").
+    iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
+    iApply (new_sleeplock_gen E Df slk s R H with "Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
-  Lemma sl_fresh_new `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate)
+  Lemma sl_fresh_new `{CID : RiscvLang.CpuId} E (Df : nat)
       (slk : mword 64) (s : string) (R : iProp Σ) :
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
-    sl_fresh slk s -∗ tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗ R ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+    sl_fresh slk s -∗ own_context_flushed cur_ctx Df -∗ R ={E}=∗
+    own_context_flushed cur_ctx Df ∗
     ∃ γl γ : gname, is_sleeplock γl γ slk s R.
   Proof.
-    iIntros (Hod) "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hint Hrun HR".
-    iApply (new_sleeplock E g slk s R Hod with "Hlnm Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR").
+    iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
+    iApply (new_sleeplock E Df slk s R with "Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
-  Lemma sl_fresh_new_genl `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate)
+  Lemma sl_fresh_new_genl `{CID : RiscvLang.CpuId} E (Df : nat)
       (slk : mword 64) (s : string)
       (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : gname -> Qp -> iProp Σ) :
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
-    sl_fresh slk s -∗ tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗ R cur_ctx ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+    sl_fresh slk s -∗ own_context_flushed cur_ctx Df -∗ R cur_ctx ={E}=∗
+    own_context_flushed cur_ctx Df ∗
     ∃ γl γ : gname, is_sleeplock_genl γl γ slk s R (H γ) ∗ slh_auth γ None.
   Proof.
-    iIntros (Hod) "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hint Hrun HR".
-    iApply (new_sleeplock_genl E g slk s R H Hod with "Hlnm Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR").
+    iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
+    iApply (new_sleeplock_genl E Df slk s R H with "Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
 
   (* [sl_fresh_new_gen] at a PRE-ALLOCATED gname -- what an array
      initializer (iinit over itable.inode[]) uses when the gnames had to be
      fixed before the locks were built.  See [new_sleeplock_gen_at]. *)
-  Lemma sl_fresh_new_gen_at `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate) (γ : gname)
+  Lemma sl_fresh_new_gen_at `{CID : RiscvLang.CpuId} E (Df : nat) (γ : gname)
       (slk : mword 64) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) :
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
-    sl_free_tok γ -∗ sl_fresh slk s -∗ tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗ R ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
+    sl_free_tok γ -∗ sl_fresh slk s -∗ own_context_flushed cur_ctx Df -∗ R ={E}=∗
+    own_context_flushed cur_ctx Df ∗ ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
   Proof.
-    iIntros (Hod) "Hfree (Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hint Hrun HR".
-    iApply (new_sleeplock_gen_at E g γ slk s R H Hod
-              with "Hfree Hlnm Hsnm Hint Hlkw Hcpu Hw Hpid Hrun HR").
+    iIntros "Hfree (Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
+    iApply (new_sleeplock_gen_at E Df γ slk s R H
+              with "Hfree Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
   (* the TRACKED end: the caller keeps the authoritative zero and hands out
      shares from it.  [slh_auth γ None] in hand is exactly the evidence the
      non-blocking acquiresleep asks for. *)
-  Lemma sl_fresh_new_tok `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate) (slk : mword 64)
+  Lemma sl_fresh_new_tok `{CID : RiscvLang.CpuId} E (Df : nat) (slk : mword 64)
       (s : string) (R : iProp Σ) :
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
-    sl_fresh slk s -∗ tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗ R ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+    sl_fresh slk s -∗ own_context_flushed cur_ctx Df -∗ R ={E}=∗
+    own_context_flushed cur_ctx Df ∗
     ∃ γl γ : gname, is_sleeplock_tok γl γ slk s R ∗ slh_auth γ None.
   Proof.
-    iIntros (Hod) "Hf Hint Hrun HR".
-    iApply (sl_fresh_new_gen E g slk s R slh_tok Hod with "Hf Hint Hrun HR").
+    iIntros "Hf Hrun HR".
+    iApply (sl_fresh_new_gen E Df slk s R slh_tok with "Hf Hrun HR").
   Qed.
 
 

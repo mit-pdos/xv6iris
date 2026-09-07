@@ -207,7 +207,7 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
    row [ctx_floor ξ tl] above the releaser's view can only be minted on the
    hartless record, so the caller presents the receipt [llb tl] and the
    fold, and the hook raises the stamp and completes the row. *)
-Definition wp_release_hook_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (Rin R : CtxId → iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
+Definition wp_release_hook_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (Rin R : CtxId → iProp Σ) (Q : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -235,13 +235,16 @@ Definition wp_release_hook_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
   is_lock γl lka s R -∗
   locked γl cpu_id -∗
   (* the payload at the caller's own context, unfinished, and the hook that
-     finishes it at the lock's stamped context *)
+     finishes it at the lock's stamped context; the hook's EXPORT [Q]
+     (relaxed-ww.md §2.14: what the deposit tells the continuation) comes
+     out with the return *)
   Rin cur_ctx -∗
-  lock_ctx_hook (⊤ ∖ ↑minstretN) R Rin -∗
+  lock_ctx_hook (⊤ ∖ ↑minstretN) R Rin Q -∗
   cpu_own (S n) eb p false lks -∗
   arm_pay kt n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
+    Q -∗
     sie_cap_gpr kt mr av outb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -326,8 +329,8 @@ Module Type RELEASE.
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
       wp_release_sconf_body kt γl lka s R m n eb p av lks.
   Parameter wp_release_hook_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (Rin R : CtxId → iProp Σ) `{!CtxMorph Rin} (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
-      wp_release_hook_sconf_body kt γl lka s Rin R m n eb p av lks.
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (Rin R : CtxId → iProp Σ) (Q : iProp Σ) `{!CtxMorph Rin} (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
+      wp_release_hook_sconf_body kt γl lka s Rin R Q m n eb p av lks.
 End RELEASE.
 
 Module Type RELEASE_CANCEL.

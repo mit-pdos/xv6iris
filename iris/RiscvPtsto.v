@@ -395,9 +395,9 @@ Record riscvEraGS := RiscvEraGS {
   era_rv_name : CPU -> gname;
   (* THE DRAIN LOG'S MIRRORS (claude-notes/projects/relaxed-ww.md §2), three
      names, LAST: the drain-position map ([TsoGhost.dpos_at]), the drain
-     log's length (mono-nat; what [view_lb] and [fence_rec] bound against --
+     log's length (mono-nat; what [view_lb] and [TsoCtx.fr_at] bound against --
      every view is a DRAIN position now), and the release receipts
-     ([TsoGhost.fence_rec]). *)
+     ([TsoCtx.fr_at]). *)
   era_dpos_name : gname;
   era_dlen_name : gname;
   era_fr_name : gname;
@@ -2353,7 +2353,7 @@ Qed.
 Definition tso_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
     : iProp Σ :=
   (∃ (TM : gmap Arch.pa ts_elem) (LM : gmap nat pwmsg)
-     (DP : gmap nat nat) (FR : gmap (agent * nat) nat) (CH : gmap nat nat),
+     (DP : gmap nat nat) (FR : gmap (agent * nat * nat) unit) (CH : gmap nat nat),
      ghost_map_auth (era_ts_name E) 1 TM ∗
      ⌜dom TM = dom g.(gmem)⌝ ∗
      (* THE ELEMENT'S TIE, one conjunct (tso-pin-memo.md §5.1): the LATEST

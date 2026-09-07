@@ -1378,8 +1378,10 @@ Proof.
 Qed.
 
 (** [FR] holds the FENCE RECORDS (relaxed-ww.md §2.7, [TsoCtxTwin4.fr_ok]),
-    keyed by the RECORDING HART and the issue length at its release fence:
-    an entry at [(h, N)] with value [M] says
+    a monotone SET of triples (relaxed-ww.md §2.14: the review's
+    amendment -- a second fence at the same issue length mints its OWN
+    record rather than reusing an older, weaker [M]): a member [(h, N, M)]
+    says
       (i)  every message with issue index [≥ N] drains at a position [> M]
            -- sound at the mint because [N] is the issue length (no such
            message exists yet) and [M] the drain length; and
@@ -1390,8 +1392,8 @@ Qed.
     and an appended message has index [≥ length log ≥ N], so neither
     clause sees it.  The two bounds [N ≤ length log] and [M ≤ length dl]
     are what make the appends silent. *)
-Definition fr_ok (log : list pwmsg) (dl : list nat) (FR : gmap (agent * nat) nat) : Prop :=
-  ∀ h N M, FR !! (h, N) = Some M →
+Definition fr_ok (log : list pwmsg) (dl : list nat) (FR : gmap (agent * nat * nat) unit) : Prop :=
+  ∀ h N M, FR !! (h, N, M) = Some () →
     (N ≤ length log)%nat ∧ (M ≤ length dl)%nat ∧
     (∀ i q, dl !! q = Some i → (N ≤ i)%nat → (M < S q)%nat) ∧
     (∀ i m, (i < N)%nat → log !! i = Some m → pm_tid m = h →
@@ -1429,11 +1431,11 @@ Qed.
     arm's premise, and it is exactly clause (ii) at the current lengths. *)
 Lemma fr_ok_mint log dl FR h :
   dl_ok log dl → own_drained h log dl → fr_ok log dl FR →
-  fr_ok log dl (<[(h, length log) := length dl]> FR).
+  fr_ok log dl (<[(h, length log, length dl) := ()]> FR).
 Proof.
   move => [_ Hlt] Hdr Hfr h' N M.
-  destruct (decide ((h', N) = (h, length log))) as [[= -> ->]|Hne].
-  - rewrite lookup_insert. move => [= <-].
+  destruct (decide ((h', N, M) = (h, length log, length dl))) as [[= -> -> ->]|Hne].
+  - rewrite lookup_insert. move => _.
     split; [lia|]. split; [lia|]. split.
     + move => i q Hq HNi. exfalso.
       have := Hlt _ (elem_of_list_lookup_2 _ _ _ Hq). lia.
@@ -1441,7 +1443,7 @@ Proof.
       have Hin := Hdr _ _ Hm Htid.
       apply elem_of_list_lookup in Hin as [q Hq].
       exists q. split; [exact Hq|]. have := lookup_lt_Some _ _ _ Hq. lia.
-  - have Hne' : (h, length log) ≠ (h', N) by move => Heq; apply Hne; rewrite Heq.
+  - have Hne' : (h, length log, length dl) ≠ (h', N, M) by move => Heq; apply Hne; rewrite Heq.
     rewrite (lookup_insert_ne FR _ _ _ Hne'). by apply Hfr.
 Qed.
 
@@ -3982,11 +3984,36 @@ Definition ts_elem : Type := nat * ts_pay.
    functions (§9b's banner): true theorems about [img]/[log], preserved by
    every step because they name no drain position, and re-founded in stage
    E of relaxed-ww. *)
+(* THE PIN'S ANCHOR (relaxed-ww.md §2.14, the review's amendment): the
+   pin's floor [B] NAMES A WRITE OF THE BYTE -- [B = 0] (the image) or
+   message [B-1] writes [a].  Minted at the byte's latest write ([t = B],
+   [pin_anchor_of_latest]) and kept by every append.  It is what a two-log
+   reader needs: a pin is read through the DRAIN of its anchor ([dpos_ev B
+   p]), and with [fifo_ok] every later overlapping store drains after it,
+   so the drained value at any view past [p] is the anchor's own or a later
+   one -- all in [Sv]. *)
+Definition pin_anchor (log : list pwmsg) (a : Arch.pa) (B : nat) : Prop :=
+  B = 0%nat ∨ ∃ m, log !! (B - 1)%nat = Some m ∧ msg_byte m a ≠ None.
+
+Lemma pin_anchor_app log m a B : pin_anchor log a B → pin_anchor (log ++ [m]) a B.
+Proof.
+  move => [-> | [m0 [Hm0 Hb]]]; first by left.
+  right. exists m0. split; [|exact Hb].
+  have Hlt := lookup_lt_Some _ _ _ Hm0. by rewrite (lookup_app_l _ _ _ Hlt).
+Qed.
+
+Lemma pin_anchor_of_latest img log a t v : latest img log a t v → pin_anchor log a t.
+Proof.
+  move => [Hlb _]. destruct t as [|i]; first by left.
+  right. rewrite /log_byte in Hlb. destruct (log !! i) as [m|] eqn:Hm; last done.
+  exists m. replace (S i - 1)%nat with i by lia. split; [exact Hm | by rewrite Hlb].
+Qed.
+
 Definition ts_ok (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
     (a : Arch.pa) (e : ts_elem) : Prop :=
   (exists v, mem !! a = Some v /\ latest img log a e.1 v)
   /\ (forall (Sv : byteset) (B : nat),
-        tsp_pin e.2 = Some (Sv, B) -> pin_ok img log a B Sv)
+        tsp_pin e.2 = Some (Sv, B) -> pin_ok img log a B Sv /\ pin_anchor log a B)
   /\ (forall W : ts_win, tsp_win e.2 = Some W -> win_ok1 img log a W)
   /\ (forall R : ts_rel, tsp_rel e.2 = Some R -> rel_ok1 img log a R)
   /\ (forall W : ts_pinw, tsp_pinw e.2 = Some W -> pinw_ok1 img log a W).
@@ -3998,7 +4025,11 @@ Proof. by move => [H _]. Qed.
 
 Lemma ts_ok_pin img mem log dl a e Sv B :
   ts_ok img mem log dl a e -> tsp_pin e.2 = Some (Sv, B) -> pin_ok img log a B Sv.
-Proof. move => [_ [H _]]. by apply H. Qed.
+Proof. by move => [_ [H _]] He; move: (H _ _ He) => [Hp _]. Qed.
+
+Lemma ts_ok_pin_anchor img mem log dl a e Sv B :
+  ts_ok img mem log dl a e -> tsp_pin e.2 = Some (Sv, B) -> pin_anchor log a B.
+Proof. by move => [_ [H _]] He; move: (H _ _ He) => [_ Ha]. Qed.
 
 Lemma ts_ok_win img mem log dl a e W :
   ts_ok img mem log dl a e -> tsp_win e.2 = Some W -> win_ok1 img log a W.

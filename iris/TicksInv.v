@@ -82,19 +82,17 @@ Section TicksInv.
      fence-bound, so the construction runs at a fence on the creator's hart
      with the bundle in hand -- for a boot lock, hart 0's [started] fence
      (RULING C, the owner's, decides how the born record travels there). *)
-  Lemma new_tickslock `{CID : RiscvLang.CpuId} E (g : RiscvLang.gstate) (t : mword 32) :
-    TsoMemPa.own_drained (RiscvLang.hart_agent RiscvLang.cpu_id) g.(RiscvLang.glog) g.(RiscvLang.gdlog) ->
+  Lemma new_tickslock `{CID : RiscvLang.CpuId} E (Df : nat) (t : mword 32) :
     lock_name a_tickslock "time"%string -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context cur_ctx -∗
+    own_context_flushed cur_ctx Df -∗
     a_tickslock ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready a_tickslock -∗
     a_ticks ↦₄ t ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ ∃ γl : gname, is_tickslock γl.
+    own_context_flushed cur_ctx Df ∗ ∃ γl : gname, is_tickslock γl.
   Proof.
-    iIntros (Hod) "#Hnm Hint Hrun Hlkw Hcpu Hticks".
-    iApply (newlock E g a_tickslock "time"%string ticks_res_at Hod
-              with "Hnm Hint Hrun Hlkw Hcpu [Hticks]").
+    iIntros "#Hnm Hrun Hlkw Hcpu Hticks".
+    iApply (newlock E Df a_tickslock "time"%string ticks_res_at
+              with "Hnm Hrun Hlkw Hcpu [Hticks]").
     iApply (ticks_res_intro with "Hticks").
   Qed.
 

@@ -410,7 +410,7 @@ Section TsoBundle.
       (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg) (dl : list nat)
       (V : agent -> nat) : iProp Σ :=
     (∃ (TM : gmap Arch.pa ts_elem) (LM : gmap nat pwmsg)
-       (DP : gmap nat nat) (FR : gmap (agent * nat) nat) (CH : gmap nat nat),
+       (DP : gmap nat nat) (FR : gmap (agent * nat * nat) unit) (CH : gmap nat nat),
        ghost_map_auth (era_ts_name E) 1 TM ∗
        ⌜dom TM = dom mem⌝ ∗
        (* one conjunct; see [RiscvPtsto.tso_interp_at]'s note *)

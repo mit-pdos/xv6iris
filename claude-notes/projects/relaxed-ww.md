@@ -1,31 +1,19 @@
 # Project: relaxing the memory model to allow store–store reordering (PSO)
 
-**STATUS 2026-09-06 (late): STAGE D IN PROGRESS on branch `relaxed-ww`,
-pushed as `origin/relaxed-ww-twolog` (force-updated over the pre-rebase
-stage-B head, which is kept as tag `relaxed-ww-twolog-prerebase`; the tip
-is the WIP frontier commit, uncompiled).  §2.13 is the checkpoint, §2.14
-the revised design (reviewed) that the next work implements first.  Done: the rebase (§3); the fourth twin `iris/TsoCtxTwin4.v`; the
-fence-record map (`fence_rec`/`fr_ok`/`era_fr_name`; `TsoGhost.dpos_ev`);
-§2.10's revision (the chain is a PER-FACT witness, the free tier is
-ξ-indexed) across `TsoMemPa` / `TsoGhost` / `RiscvPtsto` / `RiscvExec` /
-`TsoCtx` / `TsoCtxStore` / `TsoCtxLedger` / `TsoCtxAbsorbLb`; the lifting
-layer over two logs (`HartLift`, `HartLift2`, `HartRegNode`, `HartSpan`,
-`HartSpanChar`, `HartEvents`, `HartBarrier` with the `fence_rel`-keyed
-publication leaf `rel_step`, `HartPilot`); the ownership-law files
-(`CtxValues`, `CtxPinMint`, `CtxPinw`, `CtxBox` with fence-bound deposits,
-`MemClaim`, `WpLock` §2.4 with the hook as a fence-leaf callback and
-`lk_floor` over `key_at`, `StartedInv`, `VirtioProto`, `WpUart` with the
-AMO-shaped gate `TsoCtxStore.ledger_store_amo_ok`).  Done too: the two-log
-kernel-slot credential (§2.11), the S-mode nodes and the kernel-table
-walker, the box tiers' fence-bound deposits, `SmodeCorePt`; §2.13 is the
-CHECKPOINT of the design as landed and the open frontier (build18's
-failing files, the uncommitted edits, the questions for review).
-IN FLIGHT: the sweep above these (the box instances in the code proofs,
-`StartedInv`'s drain floor, `ProofMain*`, the U-mode fence leaf,
-`RiscvAdequacy`); every racy-tier statement is
-restated over two logs and `Admitted` with `relaxed-ww STAGE E` (list
-below).  Two rulings (C) remain the owner's, and the ~13 `initlock` callers
-of the now fence-bound `newlock*` are blocked on them.**  The companion of
+**STATUS 2026-09-06 (night): STAGE D IN PROGRESS on branch `relaxed-ww`,
+pushed as `origin/relaxed-ww-twolog` (the pre-rebase stage-B head is tag
+`relaxed-ww-twolog-prerebase`).  §2.14 is the design of record (the
+interp stays below the protocol tier; the fence hands up a FLUSHED
+TOKEN) and §2.15 its implementation record: the flushed token, its laws
+and the release finisher through `WpSconfFencePub` COMPILE, as do
+`CtxBox`/`SleepLock*`/`TicksInv`/`BioInv`/`BioInitAt`/`OffBox` over the
+token; the base-tier amendments (fence-record triples, the pin's anchor,
+the floor mint) are edited and under build19.  §2.13 is the earlier
+checkpoint with the open frontier (build18's failing files); every
+racy-tier statement is restated over two logs and `Admitted` with
+`relaxed-ww STAGE E`.  Two rulings (C) remain the owner's, and the ~13
+`initlock` callers of the now fence-bound `newlock*` are blocked on them.
+**  The companion of
 [`completed/relaxed-rr.md`](../completed/relaxed-rr.md) (load–load
 reordering).  §1 is the machine of record and §1.3 the rejected first
 encoding, with the witnesses that kill it.
@@ -1002,6 +990,86 @@ files (`BioInv`, `BioInitAt`, `OffBox`, `IcacheEscrow`, `ProofBreadParts`,
   immediately the release finisher through `WpSconfFencePub` (where
   `K ≤ Df` and the `ξL` propagation bite); (3) the triple key before (2);
   then (4), (6), (7).
+
+### 2.15 Implementation record (2026-09-06, night): §2.14 landed through the release finisher; the base-tier amendments are in
+
+**The vertical slice, compiled.**
+- `TsoCtx`: `own_context_flushed ξ Df` (sealed; the §2.14-amended body with
+  the `dirty_ok` conjunct and `⌜K ≤ Df⌝`), `own_context_of_flushed`,
+  `own_context_flushed_dlb`, `own_context_flushed_mono`,
+  `own_context_twin_flushed`; the propagation laws `ctx_resume_flushed`
+  (via `keys_just`), `ctx_dom_run_flushed`, `ctx_move_flushed`.
+- `TsoCtxLedger`: `ctx_flush g ξ Df` (premises `own_drained`, `gtv ≤ Df`,
+  `own_pub ≤ Df`, `Df ≤ length gdlog`; the own arm through `own_pub_ge`),
+  `ctx_flush_top` (the release fence's instance at `length gdlog`),
+  `ctx_stamp_flushed`, `ctx_dom_to_stamped_flushed` (stamp at `max T Df`),
+  `ctx_deposit_flushed`.  The interp-shaped `ctx_stamp`/`ctx_deposit`/
+  `ctx_dom_to_stamped` stay for the leaf tier (`StartedInv`'s store node,
+  `ctx_dom_of_stamped`, `ctx_xstamp`).
+- `WpLock`: `lock_ctx_hook E R Rin Q` -- `∀ ξ T Df, own_context_flushed
+  cur_ctx Df -∗ ctx_stamped ξ T -∗ Rin ξ ={E}=∗ own_context_flushed cur_ctx
+  Df ∗ ∃ T', ctx_stamped ξ T' ∗ R ξ ∗ Q`; `lock_hook_id`/`lock_hook_llb`
+  export `emp`; `lock_pay_born E Df Rin R Q`, `lock_pay_born_id E Df R`,
+  `lock_pay_intro E Df Rin R Q` (returns `lock_pay R ∗ Q`); the finisher
+  preludes are `∀ Df, own_context_flushed cur_ctx Df -∗ … ={E}=∗
+  own_context_flushed cur_ctx Df ∗ Pay`; `lock_finisher_close_body_q`,
+  `lock_finisher_close_hook … Q` (Out := Q); `lock_inv_alloc E Df`,
+  `newlock E Df`, and `newlock_d`/`newlock_delayed`/`newlock_delayed_llb`
+  quantify `∀ Df` where they quantified `∀ g`.  `WpLockAt` likewise.
+  RULE: every flushed-token law takes AND returns `own_context_flushed
+  cur_ctx Df`; a caller with nothing more to deposit forgets with
+  `own_context_of_flushed`.
+- `WpSconfFencePub` §4b: `swp_barrier_rel`, `swp_execute_FENCE_rel_S` (the
+  `rw,w` dispatch through the four bit facts), `wp_fence_rel_s_sconf`
+  (machine-shaped, for a client that is itself a gate), `flush_step P Q :=
+  ∀ Df, own_context_flushed cur_ctx Df -∗ P ={⊤}=∗ own_context_flushed
+  cur_ctx Df ∗ Q`, and `wp_fence_rel_flush_s_sconf` -- THE one flush call:
+  the token comes out of `sie_cap` inside the step obligation, `ctx_flush_top`
+  runs under `rel_step`, the client's `flush_step` fires, the token goes
+  back.  Nothing above this lemma mentions `gstate`, `own_drained` or the
+  interp.
+- `SpecRelease`: `wp_release_hook_sconf_body … Q` with `Q -∗` in the
+  continuation; `ProofRelease`: the finisher's prelude moved from the
+  `sd zero,16(s1)` leaf to the `fence rw,w` at `release+0x16`, through
+  `wp_fence_rel_flush_s_sconf` and `fupd_mask_subseteq (⊤ ∖ ↑minstretN)`
+  (edited; compiles once `WpSconfLock`/`WpSconfMem` do).
+- Protocol tier over the token, COMPILED: `CtxBox` (the eight deposit/park/
+  alloc lemmas, `ctx_deposit_flushed` inside), `SleepLock`, `SleepLockAt`,
+  `TicksInv`, `BioInv` (`bbox_deposit_L1`, `bbox_park`, `buf_box_alloc`,
+  `bio_init` with the token threaded through both folds), `BioInitAt`,
+  `OffBox`.  EDITED, not yet compiled (frontier): `IcacheEscrow` (five
+  lemmas), `ProofBreadParts.bcache_scan2_recycle`'s closing wand.
+
+**The base-tier amendments (build19, in flight).**
+- The fence record is a monotone SET: `FR : gmap (agent * nat * nat) unit`
+  (`TsoGhost`, `RiscvPtsto`, `RiscvExec`, `RiscvAdequacy`), `fr_ok` over
+  `FR !! (h, N, M) = Some ()`, `fr_ok_mint` inserts `(h, length log,
+  length dl)`, `fr_at h N M := (h, N, M) ↪[fr_name]□ ()`, and `fr_mint`
+  returns EXACTLY `fr_at h (length glog) (length gdlog)` (no `∃ M`).
+- The pin's anchor: `TsoMemPa.pin_anchor log a B := B = 0 ∨ ∃ m, log !!
+  (B-1) = Some m ∧ msg_byte m a ≠ None`, in `ts_ok`'s pin clause beside
+  `pin_ok`; `ts_ok_pin` (unchanged statement), `ts_ok_pin_anchor`,
+  `pin_anchor_app`, `pin_anchor_of_latest`; the nine tie-preservation sites
+  (`TsoCtxLedger` ×1, `TsoCtxStore` ×8) split the clause.
+- `ledger_pin_mint g a v t Sv` mints AT THE FLOOR (`t = B`); `CtxValues`,
+  `KptPublish`, `WpSconfLock.pin_mint_run` (now `t` only; the AMO already
+  pinned at its own position) follow.  `CtxPinMint` §3b's log-top mints
+  (`ctx_phys_pin_mint_top`, `_bytes_`, `_word_`) are DELETED -- no
+  consumer.
+- `ledger_read_pin_ok` and `ledger_read_pin_bytes_ok` are RESTATED through
+  the anchor's drain: `dpos_ev B p ∗ view_lb p ∗ chain_ev B` (the shape of
+  `CtxValues.cv_key_read`), still `Admitted` STAGE E.  Their one consumer,
+  `WpSconfLock.lock_word_read_pin` (a frontier file), must supply the
+  witness or be `Admitted` STAGE E with the rest of the racy lock tier.
+
+**Left on §2.14's list.** `KptPublish` restated as a gate in the csrw-satp
+hook (the `kpt_dbound` shot and `cv_boot_cred` construction move there);
+`StartedInv`'s store node -- the drain floor `D`, `⌜L ≤ i⌝`, `fr_mint`
+beside the flush, `llb dlen_name B0` back to the issue line; `VirtioProto`'s
+interp gates (device-memory appends: leaf-shaped, left in place, to be
+re-audited); the frontier sweep (`WpSconfLock`, `WpSconfMem`, the
+`ProofMain*`, the box instances in the code proofs, `RiscvAdequacy`'s
+first-boot era ghosts); the `dlen_name` audit.
 
 ## 3. Stages
 

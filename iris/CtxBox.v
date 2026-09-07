@@ -82,8 +82,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import TsoGhost.
 Require Import TsoCtx.
 Require Import TsoCtxAbsorbLb.
-Require Import TsoMemPa.  (* [own_drained] *)
-Require Import TsoCtxLedger.  (* [ctx_deposit] is FENCE-BOUND under two logs (relaxed-ww.md §2.3/§2.6) *)
+Require Import TsoCtxLedger.  (* [ctx_deposit_flushed]: the deposit over the fence's flushed token (relaxed-ww.md §2.14) *)
 
 (* the registers' value types, the stamps camera, the class [boxG] and the
    names record [box_names] live in Xv6Cameras §15 (one camera bundle). *)
@@ -898,38 +897,36 @@ Section box.
      entailment and frame the rest.  The icache recycle (§6²⁴) rebuilds its
      header from Q1 0's live arm here; the residue's quarter is the one it
      could not otherwise reach. *)
-  (* TWO LOGS (relaxed-ww.md §2.6): a deposit is mint 2 and needs the
-     depositor's stores DRAINED, so it runs at a fence -- inside the release
-     hook of the lock it is made under -- with the live interp in hand
-     ([TsoCtxLedger.ctx_deposit]'s premise).  The fence context is the
-     [gstate] and [own_drained] below; nothing else in the transition
-     changes. *)
-  Lemma box_deposit_L1_hook `{CID : CpuId} (N : namespace) γ (g : gstate) (ξ : CtxId)
+  (* TWO LOGS (relaxed-ww.md §2.6, §2.14): a deposit is mint 2 and needs
+     the depositor's stores DRAINED, so it runs at a fence -- inside the
+     release hook of the lock it is made under.  What it sees of the fence
+     is the depositor's FLUSHED token [own_context_flushed ξ Df]
+     ([TsoCtxLedger.ctx_deposit_flushed]'s premise), handed back flushed;
+     nothing else in the transition changes. *)
+  Lemma box_deposit_L1_hook `{CID : CpuId} (N : namespace) γ (Df : nat) (ξ : CtxId)
       (r : slot_reg id X)
       (c : nat) (i' : id) (x0 x1 : X) (T0 : nat)
       (P_hdr' : id → X → CtxId → iProp Σ) (Qc Q' : iProp Σ) (E : coPset) :
     ↑N ⊆ E →
     sr_win r = true →
     sr_x r = Some (x0, T0) →
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
     (∀ ξb : CtxId,
         Qc ∗ Q1 c ∗ P_hdr' i' x1 ξ ∗ P_rest x0 ξb ={E ∖ ↑N}=∗
         P_hdr i' x1 ξ ∗ P_rest x1 ξb ∗ Q') →
     is_box N γ -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
+    own_context_flushed ξ Df -∗
     slotd_half γ r -∗
     cnt_half γ c -∗
     Qc -∗
     P_hdr' i' x1 ξ ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗ Q' ∗
+    own_context_flushed ξ Df ∗ Q' ∗
     ∃ T' : nat,
       slotd_half γ (SlotReg T' false i' None) ∗
       cnt_half γ (Nat.max 1 c) ∗
       reference γ i' {[ (i', T') := unit_mass c ]} ∗
       llb dlen_name T'.
   Proof.
-    iIntros (HE Hw Hx Hod Hhook) "#Hbox Hint Hrun Hrd0 Hcnt HQc Hhdr'".
+    iIntros (HE Hw Hx Hhook) "#Hbox Hrun Hrd0 Hcnt HQc Hhdr'".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.
     iDestruct (ghost_var_agree with "Hc Hcnt") as %->.
@@ -946,8 +943,8 @@ Section box.
     assert (m1 = ∅) as ->.
     { apply qsum_zero_empty. rewrite Hsum' in Hq1.
       apply (Qc_plus_cancel_l (qsum m)). by rewrite Hq1 Qcplus_0_r. }
-    iMod (ctx_deposit (P_hdr i' x1) g ξ ξb T Hod with "Hint Hrun Hpk Hhdr")
-      as "(Hint & Hrun & %T' & %HTT' & Hpk & Hhdr)".
+    iMod (ctx_deposit_flushed (P_hdr i' x1) ξ ξb Df T with "Hrun Hpk Hhdr")
+      as "(Hrun & %T' & %HTT' & Hpk & Hhdr)".
     iDestruct (ctx_stamped_dlb with "Hpk") as "[Hpk #Hllb']".
     iMod (own_update _ _ _ (stamps_alloc_upd ∅ (i', T') (unit_mass c)) with "Hst") as "[Hst Hfr]".
     iEval (rewrite right_id) in "Hst".
@@ -966,7 +963,7 @@ Section box.
           apply elem_of_singleton in Hp. subst p. simpl. lia.
         - left. cbn [sr_td]. lia. }
       rewrite /box_arm Hh. simpl. iExists x1. iFrame "Hhdr Hrest". }
-    iModIntro. iFrame "Hint Hrun HQ'". iExists T'. iFrame "Hrd0 Hcnt".
+    iModIntro. iFrame "Hrun HQ'". iExists T'. iFrame "Hrd0 Hcnt".
     iSplitL "Hfr"; [| iExact "Hllb'"].
     rewrite /reference. iFrame "Hfr".
     iSplitR; [iPureIntro; apply singleton_ne_empty_map|].
@@ -985,57 +982,53 @@ Section box.
      one from it (F10's "same x" was too strong).  Same case skeleton as
      (b); the only new step is the entailment applied to the arm's P_rest
      before the close. *)
-  Lemma box_deposit_L1_shape `{CID : CpuId} (N : namespace) γ (g : gstate) (ξ : CtxId)
+  Lemma box_deposit_L1_shape `{CID : CpuId} (N : namespace) γ (Df : nat) (ξ : CtxId)
       (r : slot_reg id X)
       (c : nat) (i' : id) (x0 x1 : X) (T0 : nat) (E : coPset) :
     ↑N ⊆ E →
     sr_win r = true →
     sr_x r = Some (x0, T0) →
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
     (∀ ξb : CtxId, P_rest x0 ξb ⊢ P_rest x1 ξb) →
     is_box N γ -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
+    own_context_flushed ξ Df -∗
     slotd_half γ r -∗
     cnt_half γ c -∗
     P_hdr i' x1 ξ ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗ Q1 c ∗
+    own_context_flushed ξ Df ∗ Q1 c ∗
     ∃ T' : nat,
       slotd_half γ (SlotReg T' false i' None) ∗
       cnt_half γ (Nat.max 1 c) ∗
       reference γ i' {[ (i', T') := unit_mass c ]} ∗
       llb dlen_name T'.
   Proof.
-    intros HE Hw Hx Hod Hent.
-    iIntros "#Hbox Hint Hrun Hrd0 Hcnt Hhdr".
-    iApply (box_deposit_L1_hook N γ g ξ r c i' x0 x1 T0 P_hdr emp (Q1 c) E HE Hw Hx Hod
-              with "Hbox Hint Hrun Hrd0 Hcnt [//] Hhdr").
+    intros HE Hw Hx Hent.
+    iIntros "#Hbox Hrun Hrd0 Hcnt Hhdr".
+    iApply (box_deposit_L1_hook N γ Df ξ r c i' x0 x1 T0 P_hdr emp (Q1 c) E HE Hw Hx
+              with "Hbox Hrun Hrd0 Hcnt [//] Hhdr").
     intros ξb. iIntros "(_ & HQ & Hh & Hr)". iModIntro. iFrame "Hh HQ". by iApply Hent.
   Qed.
 
   (* (b): the instance x1 := x0 (the reflexive entailment) *)
-  Lemma box_deposit_L1 `{CID : CpuId} (N : namespace) γ (g : gstate) (ξ : CtxId)
+  Lemma box_deposit_L1 `{CID : CpuId} (N : namespace) γ (Df : nat) (ξ : CtxId)
       (r : slot_reg id X)
       (c : nat) (i' : id) (x0 : X) (T0 : nat) (E : coPset) :
     ↑N ⊆ E →
     sr_win r = true →
     sr_x r = Some (x0, T0) →
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
     is_box N γ -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
+    own_context_flushed ξ Df -∗
     slotd_half γ r -∗
     cnt_half γ c -∗
     P_hdr i' x0 ξ ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗ Q1 c ∗
+    own_context_flushed ξ Df ∗ Q1 c ∗
     ∃ T' : nat,
       slotd_half γ (SlotReg T' false i' None) ∗
       cnt_half γ (Nat.max 1 c) ∗
       reference γ i' {[ (i', T') := unit_mass c ]} ∗
       llb dlen_name T'.
   Proof.
-    intros HE Hw Hx Hod.
-    apply (box_deposit_L1_shape N γ g ξ r c i' x0 x0 T0 E HE Hw Hx Hod).
+    intros HE Hw Hx.
+    apply (box_deposit_L1_shape N γ Df ξ r c i' x0 x0 T0 E HE Hw Hx).
     intros ξb. reflexivity.
   Qed.
 
@@ -1304,26 +1297,24 @@ Section box.
      P_hdr' and the arm's Q2, and returns the whole header and what the
      caller keeps, Q'.  Plain (f′): the entailment lifted; plain (f):
      Qc' := emp, P_hdr' := P_hdr, Q' := Q2. *)
-  Lemma box_park_hook `{CID : CpuId} (N : namespace) γ (g : gstate) (ξ : CtxId) (i : id)
+  Lemma box_park_hook `{CID : CpuId} (N : namespace) γ (Df : nat) (ξ : CtxId) (i : id)
       (P_hdr' : id → X → CtxId → iProp Σ) (Qc' Q' : iProp Σ)
       (mh : gmap (id * nat) ufrac) (E : coPset) :
     ↑N ⊆ E →
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
     (∀ (x : X) (ξ' : CtxId), Qc' ∗ P_hdr' i x ξ' ∗ Q2 ={E ∖ ↑N}=∗ P_hdr i x ξ' ∗ Q') →
     is_box N γ -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
+    own_context_flushed ξ Df -∗
     (∃ x, P_hdr' i x ξ ∗ P_rest x ξ) -∗
     Qc' -∗
     l2_hold γ i mh ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗ Q' ∗
+    own_context_flushed ξ Df ∗ Q' ∗
     ∃ (T' : nat) (q : ufrac),
       ⌜Qp_to_Qc q = qsum mh⌝ ∗
       slotp_half γ (L2Reg T' None) ∗
       reference γ i {[ (i, T') := q ]} ∗
       llb dlen_name T'.
   Proof.
-    iIntros (HE Hod Hhook) "#Hbox Hint Hrun Hbun HQc Hhold".
+    iIntros (HE Hhook) "#Hbox Hrun Hbun HQc Hhold".
     iDestruct "Hhold" as (tp) "[Hrp0 #Hllbh]".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrp Hrp0") as %->.
@@ -1337,8 +1328,8 @@ Section box.
     (* THE HOOK, at the holder's context, with the arm's residue *)
     iDestruct "Hbun" as (x) "[Hhdr' Hrest]".
     iMod (Hhook x ξ with "[$HQc $Hhdr' $HQ]") as "[Hhdr HQ']".
-    iMod (ctx_deposit (in_arm i) g ξ ξb T Hod with "Hint Hrun Hpk [Hhdr Hrest]")
-      as "(Hint & Hrun & %T' & %HTT' & Hpk & Hbun)".
+    iMod (ctx_deposit_flushed (in_arm i) ξ ξb Df T with "Hrun Hpk [Hhdr Hrest]")
+      as "(Hrun & %T' & %HTT' & Hpk & Hbun)".
     { rewrite /in_arm. iExists x. iFrame "Hhdr Hrest". }
     iDestruct (ctx_stamped_dlb with "Hpk") as "[Hpk #Hllb']".
     iMod (stamps_dealloc with "Hst Hf0") as (m1) "(Hst & %Hq1 & %Hdom1 & _)".
@@ -1356,7 +1347,7 @@ Section box.
         - right. exists (i, T'). split; [| done].
           rewrite dom_op dom_singleton_L. apply elem_of_union_l. by apply elem_of_singleton. }
       rewrite /box_arm. simpl. rewrite Hwf -Hid. iExact "Hbun". }
-    iModIntro. iFrame "Hint Hrun HQ'". iExists T', q. iFrame "Hrp0".
+    iModIntro. iFrame "Hrun HQ'". iExists T', q. iFrame "Hrp0".
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "Hfr"; [| iExact "Hllb'"].
     rewrite /reference. iFrame "Hfr".
@@ -1389,53 +1380,49 @@ Section box.
        close in_arm at sr_ident r; rows: (Σ) unchanged (same mass),
        (I) i = sr_ident r, (C) right disjunct T' ≤ tp = T', (D) T' ∈ dom.
        export llb T' for the genin releasesleep. *)
-  Lemma box_park_join `{CID : CpuId} (N : namespace) γ (g : gstate) (ξ : CtxId) (i : id)
+  Lemma box_park_join `{CID : CpuId} (N : namespace) γ (Df : nat) (ξ : CtxId) (i : id)
       (P_hdr' : id → X → CtxId → iProp Σ) (Qc' Q' : iProp Σ)
       (mh : gmap (id * nat) ufrac) (E : coPset) :
     ↑N ⊆ E →
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
     (* F43 (the mirror of F33's Qc): the join sees the CALLER's residue Qc'
        beside the split header and the arm's Q2 -- the icache's descriptor
        half, which is what selects the arm within Q2. *)
     (∀ (x : X) (ξ' : CtxId), Qc' ∗ P_hdr' i x ξ' ∗ Q2 ⊢ P_hdr i x ξ' ∗ Q') →
     is_box N γ -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
+    own_context_flushed ξ Df -∗
     (∃ x, P_hdr' i x ξ ∗ P_rest x ξ) -∗
     Qc' -∗
     l2_hold γ i mh ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗ Q' ∗
+    own_context_flushed ξ Df ∗ Q' ∗
     ∃ (T' : nat) (q : ufrac),
       ⌜Qp_to_Qc q = qsum mh⌝ ∗
       slotp_half γ (L2Reg T' None) ∗
       reference γ i {[ (i, T') := q ]} ∗
       llb dlen_name T'.
   Proof.
-    intros HE Hod Hjoin.
-    apply (box_park_hook N γ g ξ i P_hdr' Qc' Q' mh E HE Hod).
+    intros HE Hjoin.
+    apply (box_park_hook N γ Df ξ i P_hdr' Qc' Q' mh E HE).
     intros x ξ'. iIntros "H". iModIntro. by iApply Hjoin.
   Qed.
 
   (* (f): the instance P_hdr' := P_hdr, Qc' := emp, Q' := Q2 (the arm's Q2 handed back) *)
-  Lemma box_park `{CID : CpuId} (N : namespace) γ (g : gstate) (ξ : CtxId) (i : id)
+  Lemma box_park `{CID : CpuId} (N : namespace) γ (Df : nat) (ξ : CtxId) (i : id)
       (mh : gmap (id * nat) ufrac) (E : coPset) :
     ↑N ⊆ E →
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
     is_box N γ -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
+    own_context_flushed ξ Df -∗
     (∃ x, P_hdr i x ξ ∗ P_rest x ξ) -∗
     l2_hold γ i mh ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗ Q2 ∗
+    own_context_flushed ξ Df ∗ Q2 ∗
     ∃ (T' : nat) (q : ufrac),
       ⌜Qp_to_Qc q = qsum mh⌝ ∗
       slotp_half γ (L2Reg T' None) ∗
       reference γ i {[ (i, T') := q ]} ∗
       llb dlen_name T'.
   Proof.
-    intros HE Hod.
-    iIntros "#Hbox Hint Hrun Hbun Hhold".
-    iApply (box_park_hook N γ g ξ i P_hdr emp Q2 mh E HE Hod with "Hbox Hint Hrun Hbun [//] Hhold").
+    intros HE.
+    iIntros "#Hbox Hrun Hbun Hhold".
+    iApply (box_park_hook N γ Df ξ i P_hdr emp Q2 mh E HE with "Hbox Hrun Hbun [//] Hhold").
     intros x ξ'. iIntros "(_ & Hh & HQ)". iModIntro. iFrame.
   Qed.
 
@@ -1651,22 +1638,20 @@ Section box.
      Proof skeleton: ctx_stamped_alloc; ctx_deposit the bundle (T_boot);
      own_alloc (● ∅); ghost_var_alloc ×3; inv_alloc with m = ∅ (rows: Σ
      trivial, I vacuous, C vacuous-left, D td = T_boot). *)
-  Lemma box_alloc `{CID : CpuId} (N : namespace) (g : gstate) (ξ : CtxId) (i0 : id) (E : coPset) :
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
+  Lemma box_alloc `{CID : CpuId} (N : namespace) (Df : nat) (ξ : CtxId) (i0 : id) (E : coPset) :
+    own_context_flushed ξ Df -∗
     (∃ x, P_hdr i0 x ξ ∗ P_rest x ξ) ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗
+    own_context_flushed ξ Df ∗
     ∃ (γ : box_names) (T_boot : nat),
       is_box N γ ∗
       slotd_half γ (SlotReg T_boot false i0 None) ∗ llb dlen_name T_boot ∗
       cnt_half γ 0 ∗
       slotp_half γ (L2Reg 0 None).
   Proof.
-    iIntros (Hod) "Hint Hrun Hbun".
+    iIntros "Hrun Hbun".
     iMod ctx_stamped_alloc as (ξb) "Hpk".
-    iMod (ctx_deposit (in_arm i0) g ξ ξb 0 Hod with "Hint Hrun Hpk [Hbun]")
-      as "(Hint & Hrun & %Tb & _ & Hpk & Hbun)".
+    iMod (ctx_deposit_flushed (in_arm i0) ξ ξb Df 0 with "Hrun Hpk [Hbun]")
+      as "(Hrun & %Tb & _ & Hpk & Hbun)".
     { rewrite /in_arm. iExact "Hbun". }
     iDestruct (ctx_stamped_dlb with "Hpk") as "[Hpk #Hllb]".
     iMod (own_alloc (● (∅ : gmapUR (id * nat) ufracR))) as (γst) "Hst"; [by apply auth_auth_valid|].
@@ -1688,7 +1673,7 @@ Section box.
         - left. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp.
         - left. cbn [sr_td]. lia. }
       rewrite /box_arm. simpl. iExact "Hbun". }
-    iModIntro. iFrame "Hint Hrun". iExists γ, Tb. iFrame "Hinv Hd2 Hllb Hc2 Hp2".
+    iModIntro. iFrame "Hrun". iExists γ, Tb. iFrame "Hinv Hd2 Hllb Hc2 Hp2".
   Qed.
 
   (* ================================================================== *)
@@ -1697,26 +1682,24 @@ Section box.
   (*  and the cnt half arrive already split (the other halves seed the    *)
   (*  sleeplock payload and the L1 slot row); slot_d arrives whole.       *)
   (* ================================================================== *)
-  Lemma box_alloc_at `{CID : CpuId} (N : namespace) γ (g : gstate) (ξ : CtxId) (i0 : id) (E : coPset) :
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
+  Lemma box_alloc_at `{CID : CpuId} (N : namespace) γ (Df : nat) (ξ : CtxId) (i0 : id) (E : coPset) :
     stamps_auth γ ∅ -∗
     ghost_var (bx_cnt γ) 1 0%nat -∗
     ghost_var (bx_slotd γ) 1 (inhabitant : slot_reg id X) -∗
     ghost_var (bx_slotp γ) 1 (inhabitant : l2_reg id) -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
+    own_context_flushed ξ Df -∗
     (∃ x, P_hdr i0 x ξ ∗ P_rest x ξ) ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗
+    own_context_flushed ξ Df ∗
     ∃ T_boot : nat,
       is_box N γ ∗
       slotd_half γ (SlotReg T_boot false i0 None) ∗ llb dlen_name T_boot ∗
       cnt_half γ 0 ∗
       slotp_half γ (L2Reg 0 None).
   Proof.
-    iIntros (Hod) "Hst Hc Hd Hp Hint Hrun Hbun".
+    iIntros "Hst Hc Hd Hp Hrun Hbun".
     iMod ctx_stamped_alloc as (ξb) "Hpk".
-    iMod (ctx_deposit (in_arm i0) g ξ ξb 0 Hod with "Hint Hrun Hpk [Hbun]")
-      as "(Hint & Hrun & %Tb & _ & Hpk & Hbun)".
+    iMod (ctx_deposit_flushed (in_arm i0) ξ ξb Df 0 with "Hrun Hpk [Hbun]")
+      as "(Hrun & %Tb & _ & Hpk & Hbun)".
     { rewrite /in_arm. iExact "Hbun". }
     iDestruct (ctx_stamped_dlb with "Hpk") as "[Hpk #Hllb]".
     iMod (ghost_var_update (SlotReg Tb false i0 None) with "Hd") as "Hd".
@@ -1735,31 +1718,29 @@ Section box.
         - left. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp.
         - left. cbn [sr_td]. lia. }
       rewrite /box_arm. simpl. iExact "Hbun". }
-    iModIntro. iFrame "Hint Hrun". iExists Tb. iFrame "Hinv Hd2 Hllb Hc2 Hp2".
+    iModIntro. iFrame "Hrun". iExists Tb. iFrame "Hinv Hd2 Hllb Hc2 Hp2".
   Qed.
 
 
   (* boot at PRE-MINTED names with the cnt / L2 halves ALREADY split (the
      bcache's bio_init_at: the other halves seed the sleeplock payload and
      the L1 slot row before the boxes are built) *)
-  Lemma box_alloc_at_halves `{CID : CpuId} (N : namespace) γ (g : gstate) (ξ : CtxId) (i0 : id) (E : coPset) :
-    own_drained (hart_agent cpu_id) g.(glog) g.(gdlog) →
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
+  Lemma box_alloc_at_halves `{CID : CpuId} (N : namespace) γ (Df : nat) (ξ : CtxId) (i0 : id) (E : coPset) :
+    own_context_flushed ξ Df -∗
     stamps_auth γ ∅ -∗
     cnt_half γ 0 -∗
     (∃ r0 : slot_reg id X, ghost_var (bx_slotd γ) 1 r0) -∗
     slotp_half γ (L2Reg 0 None) -∗
     (∃ x, P_hdr i0 x ξ ∗ P_rest x ξ) ={E}=∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗
+    own_context_flushed ξ Df ∗
     ∃ T_boot : nat,
       is_box N γ ∗
       slotd_half γ (SlotReg T_boot false i0 None) ∗ llb dlen_name T_boot.
   Proof.
-    iIntros (Hod) "Hint Hrun Hst Hc Hd Hp Hbun". iDestruct "Hd" as (r0) "Hd".
+    iIntros "Hrun Hst Hc Hd Hp Hbun". iDestruct "Hd" as (r0) "Hd".
     iMod ctx_stamped_alloc as (ξb) "Hpk".
-    iMod (ctx_deposit (in_arm i0) g ξ ξb 0 Hod with "Hint Hrun Hpk [Hbun]")
-      as "(Hint & Hrun & %Tb & _ & Hpk & Hbun)".
+    iMod (ctx_deposit_flushed (in_arm i0) ξ ξb Df 0 with "Hrun Hpk [Hbun]")
+      as "(Hrun & %Tb & _ & Hpk & Hbun)".
     { rewrite /in_arm. iExact "Hbun". }
     iDestruct (ctx_stamped_dlb with "Hpk") as "[Hpk #Hllb]".
     iMod (ghost_var_update (SlotReg Tb false i0 None) with "Hd") as "Hd".
@@ -1775,7 +1756,7 @@ Section box.
         - left. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp.
         - left. cbn [sr_td]. lia. }
       rewrite /box_arm. simpl. iExact "Hbun". }
-    iModIntro. iFrame "Hint Hrun". iExists Tb. iFrame "Hinv Hd2 Hllb".
+    iModIntro. iFrame "Hrun". iExists Tb. iFrame "Hinv Hd2 Hllb".
   Qed.
   (* ---- the derived facts the client rows need ------------------------ *)
 

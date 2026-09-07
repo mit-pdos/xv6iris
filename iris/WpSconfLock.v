@@ -193,8 +193,7 @@ Section WpSconfLock.
 
   (* A6.119: the mint's run, the twin of [pin_drop_run] one direction over. *)
   Local Lemma pin_mint_run (g : gstate) (a : Arch.pa) (n : nat)
-      (f : nat -> bv 8) (t B : nat) (Sf : nat -> TsoMemPa.byteset) :
-    (t <= B)%nat ->
+      (f : nat -> bv 8) (t : nat) (Sf : nat -> TsoMemPa.byteset) :
     (forall j : nat, (j < n)%nat -> f j ∈ Sf j) ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗
@@ -203,15 +202,15 @@ Section WpSconfLock.
     gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
     tso_interp_at riscv_eraGS g ∗
     ([∗ list] j ∈ seq 0 n, ∃ t' : nat,
-       TsoCtx.phys_ledger_pin (pa_add a j) (DfracOwn 1) (f j) t' B (Sf j)).
+       TsoCtx.phys_ledger_pin (pa_add a j) (DfracOwn 1) (f j) t' t (Sf j)).
   Proof.
-    intros HtB. induction n as [|n IH]; intros Hf.
+    induction n as [|n IH]; intros Hf.
     - iIntros "Hgh Hint _". iModIntro. iFrame "Hgh Hint". done.
     - rewrite seq_S !big_sepL_app /=.
       iIntros "Hgh Hint [Hb [Hlast _]]".
       iMod (IH ltac:(intros j Hj; apply Hf; lia) with "Hgh Hint Hb")
         as "(Hgh & Hint & Hb)".
-      iMod (TsoCtx.ledger_pin_mint g (pa_add a n) (f n) t B (Sf n) HtB
+      iMod (TsoCtx.ledger_pin_mint g (pa_add a n) (f n) t (Sf n)
               (Hf n ltac:(lia)) with "Hgh Hint Hlast")
         as "(Hgh & Hint & Hlast)".
       iModIntro. iFrame "Hgh Hint Hb".
@@ -625,8 +624,8 @@ Section WpSconfLock.
     iMod (pin_mint_run
             (gs_of img (write_bytes sigma.(mem) ea 4%N vnew) log' V'
                sigma.(sregs) sigma.(mdev))
-            ea 4 (nth_byte vnew) (S (length log)) (S (length log))
-            WpLock.lkw_set ltac:(lia) Hset with "Hm Htso Hnew")
+            ea 4 (nth_byte vnew) (S (length log))
+            WpLock.lkw_set Hset with "Hm Htso Hnew")
       as "(Hm & Htso & Hpin)".
     (* the export.  [hart_view_lb_now] lives in the KPT lane's [CtxPinMint];
        [TsoCtx]'s own [hart_view_lb_get] gives the same receipt here without

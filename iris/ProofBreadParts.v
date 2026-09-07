@@ -613,17 +613,15 @@ Section BreadScan2.
     (∃ vld : mword 32, b_valid (bpa k) ↦₄ vld) ∗
     b_dev (bpa k) ↦₄ (devs k) ∗
     b_blockno (bpa k) ↦₄ (bnos k) ∗
-    (* relaxed-ww: the (b) deposit is FENCE-BOUND -- the closer runs it at
-       the bcache release fence with the interp and [own_drained] in hand *)
-    (∀ g : gstate,
-     ⌜TsoMemPa.own_drained (hart_agent cpu_id) g.(glog) g.(gdlog)⌝ -∗
-     tso_interp_at riscv_eraGS g -∗
-     TsoCtx.own_context cur_ctx -∗
+    (* relaxed-ww (§2.14): the (b) deposit is FENCE-BOUND -- the closer
+       runs it at the bcache release fence, over the fence's flushed token *)
+    (∀ Df : nat,
+     TsoCtx.own_context_flushed cur_ctx Df -∗
      brefcnt k ↦₄ (mword_of_int 1 : mword 32) -∗
      b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) -∗
      b_dev (bpa k) ↦₄ D -∗
      b_blockno (bpa k) ↦₄ B ={E}=∗
-     tso_interp_at riscv_eraGS g ∗ TsoCtx.own_context cur_ctx ∗
+     TsoCtx.own_context_flushed cur_ctx Df ∗
      bd_scan2_after bn V tl ∗ bchain bn k D B).
   Proof.
     iIntros (HE Hk HMk HD HcovB Htie) "#Hbox Hrun #Hfl #Hllbtl Hscan Hbslot".
@@ -649,7 +647,7 @@ Section BreadScan2.
     iDestruct (ctx_word4_pointsto_half_join with "Hbnob Hbno") as "Hbno".
     iModIntro. iFrame "Hrun Hcell Hdev Hbno".
     iSplitL "Hvld". { by iExists _. }
-    iIntros (g Hod) "Hint Hrun Hcell Hvld Hdev Hbno".
+    iIntros (Df) "Hrun Hcell Hvld Hdev Hbno".
     (* the old payload leaves for the pool; the new block's bundle comes out *)
     iDestruct (buf_pay_evict bn V k M v (devs k) (bnos k) bs HMk with "Hauth Hpay")
       as "[Hauth Hold]".
@@ -667,9 +665,9 @@ Section BreadScan2.
     iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbnob Hbnos]".
     (* (b): the (invalid) header enters the box at the new stamp; the chain's
        unit is minted there *)
-    iMod (bbox_deposit_L1 bn V k g cur_ctx (sr_td r) (sr_ident r) bs T0 D B E HE Hod
-            with "Hbox Hint Hrun Hrd Hc [Hvld Hdevb Hbnob Hpay]")
-      as "(Hint & Hrun & %T' & Hrd & Hc & Hgh & #Hllb')".
+    iMod (bbox_deposit_L1 bn V k Df cur_ctx (sr_td r) (sr_ident r) bs T0 D B E HE
+            with "Hbox Hrun Hrd Hc [Hvld Hdevb Hbnob Hpay]")
+      as "(Hrun & %T' & Hrd & Hc & Hgh & #Hllb')".
     { rewrite /bhdr. iExists false. cbn [fst snd]. rewrite /buf_hdr. cbv iota.
       iFrame "Hvld Hdevb Hbnob Hpay". }
     iMod (bio_first_ref_step bn M k None HMk I with "Hauth") as "[Hauth Htok]".
@@ -694,7 +692,7 @@ Section BreadScan2.
         | exact (bfun_upd_ne devs k D j Hj)
         | exact (bfun_upd_ne bnos k B j Hj) ]. }
     { rewrite (bfun_upd_eq devs k D) (bfun_upd_eq bnos k B). iExact "Hslot". }
-    iModIntro. iFrame "Hint Hrun". iSplitR "Htok Hgh".
+    iModIntro. iFrame "Hrun". iSplitR "Htok Hgh".
     - iExists (<[k := (None, 1%positive)]> M), ord, (bfun_upd devs k D), (bfun_upd bnos k B), (Nat.max tl T').
       iSplitR; [iPureIntro; lia|].
       iSplitR; [iApply (bd_llb_max with "Hllbtl Hllb'")|].

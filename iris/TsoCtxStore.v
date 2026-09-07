@@ -351,8 +351,9 @@ Section ctx.
             { rewrite Hmem. by rewrite lookup_union_r. }
             rewrite Hlog Himg. by apply latest_app_frame.
           + intros Sv Bp He2. rewrite Hlog Himg.
-            apply (pin_ok_app_frame _ _ _ _ _ _
-                     (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb).
+            split; [ apply (pin_ok_app_frame _ _ _ _ _ _
+                     (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb)
+                     | apply pin_anchor_app; exact (ts_ok_pin_anchor _ _ _ _ _ _ _ _ Hok He2) ].
           + intros W0 HW0. rewrite Hlog Himg.
             apply (win_ok1_app_frame _ _ _ _ _
                      (ts_ok_win _ _ _ _ _ _ _ Hok HW0) Hmb).
@@ -618,9 +619,11 @@ Section ctx.
         + intros Sv' B' Heq. cbn in Heq. injection Heq as <- <-.
           destruct (Hold2 a ltac:(by apply elem_of_dom)) as (told & HTMa).
           rewrite Hlog Himg.
-          apply pin_ok_app.
-          * exact (ts_ok_pin _ _ _ _ _ _ _ _ (Htie _ _ HTMa) eq_refl).
-          * right. exists vn. split; [exact Hmb | exact (Hin a vn Hpa)].
+          split.
+          * apply pin_ok_app.
+            { exact (ts_ok_pin _ _ _ _ _ _ _ _ (Htie _ _ HTMa) eq_refl). }
+            right. exists vn. split; [exact Hmb | exact (Hin a vn Hpa)].
+          * apply pin_anchor_app. exact (ts_ok_pin_anchor _ _ _ _ _ _ _ _ (Htie _ _ HTMa) eq_refl).
       - assert (Hl : pin_tm (length g.(glog)) Bg Sf Pnew !! a = None)
           by (rewrite pin_tm_lookup Hpa //).
         rewrite (lookup_union_r _ _ _ Hl) in Hlk.
@@ -632,8 +635,9 @@ Section ctx.
           { rewrite Hmem. by rewrite lookup_union_r. }
           rewrite Hlog Himg. by apply latest_app_frame.
         + intros Sv' B' He2. rewrite Hlog Himg.
-          apply (pin_ok_app_frame _ _ _ _ _ _
-                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb).
+          split; [ apply (pin_ok_app_frame _ _ _ _ _ _
+                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb)
+                   | apply pin_anchor_app; exact (ts_ok_pin_anchor _ _ _ _ _ _ _ _ Hok He2) ].
         (* the WINDOW arm frames on the SAME per-address side condition
            as the pin's (TsoMemPa §12c) *)
         + intros W0 HW0. rewrite Hlog Himg.
@@ -757,9 +761,11 @@ Section ctx.
         + intros Sv' B' Heq. cbn in Heq. injection Heq as <- <-.
           destruct (Hold2 a ltac:(by apply elem_of_dom)) as (told & HTMa).
           rewrite Hlog Himg.
-          apply pin_ok_app.
-          * exact (ts_ok_pin _ _ _ _ _ _ _ _ (Htie _ _ HTMa) eq_refl).
-          * right. exists vn. split; [exact Hmb | exact (Hin a vn Hpa)].
+          split.
+          * apply pin_ok_app.
+            { exact (ts_ok_pin _ _ _ _ _ _ _ _ (Htie _ _ HTMa) eq_refl). }
+            right. exists vn. split; [exact Hmb | exact (Hin a vn Hpa)].
+          * apply pin_anchor_app. exact (ts_ok_pin_anchor _ _ _ _ _ _ _ _ (Htie _ _ HTMa) eq_refl).
       - assert (Hl : pin_tm (length g.(glog)) Bg Sf Pnew !! a = None)
           by (rewrite pin_tm_lookup Hpa //).
         rewrite (lookup_union_r _ _ _ Hl) in Hlk.
@@ -771,8 +777,9 @@ Section ctx.
           { rewrite Hmem. by rewrite lookup_union_r. }
           rewrite Hlog Himg. by apply latest_app_frame.
         + intros Sv' B' He2. rewrite Hlog Himg.
-          apply (pin_ok_app_frame _ _ _ _ _ _
-                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb).
+          split; [ apply (pin_ok_app_frame _ _ _ _ _ _
+                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb)
+                   | apply pin_anchor_app; exact (ts_ok_pin_anchor _ _ _ _ _ _ _ _ Hok He2) ].
         + intros W0 HW0. rewrite Hlog Himg.
           apply (win_ok1_app_frame _ _ _ _ _
                    (ts_ok_win _ _ _ _ _ _ _ Hok HW0) Hmb).
@@ -899,8 +906,9 @@ Section ctx.
           { rewrite Hmem. by rewrite lookup_union_r. }
           rewrite Hlog Himg. by apply latest_app_frame.
         + intros Sv Bp He2. rewrite Hlog Himg.
-          apply (pin_ok_app_frame _ _ _ _ _ _
-                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb).
+          split; [ apply (pin_ok_app_frame _ _ _ _ _ _
+                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb)
+                   | apply pin_anchor_app; exact (ts_ok_pin_anchor _ _ _ _ _ _ _ _ Hok He2) ].
         (* the WINDOW arm frames on the SAME per-address side condition
            as the pin's (TsoMemPa §12c) *)
         + intros W0 HW0. rewrite Hlog Himg.
@@ -1031,8 +1039,9 @@ Section ctx.
           { rewrite Hmem. by rewrite lookup_union_r. }
           rewrite Hlog Himg. by apply latest_app_frame.
         + intros Sv Bp He2. rewrite Hlog Himg.
-          apply (pin_ok_app_frame _ _ _ _ _ _
-                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb).
+          split; [ apply (pin_ok_app_frame _ _ _ _ _ _
+                   (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb)
+                   | apply pin_anchor_app; exact (ts_ok_pin_anchor _ _ _ _ _ _ _ _ Hok He2) ].
         + intros W0 HW0. rewrite Hlog Himg.
           apply (win_ok1_app_frame _ _ _ _ _
                    (ts_ok_win _ _ _ _ _ _ _ Hok HW0) Hmb).
@@ -1199,8 +1208,9 @@ Section ctx.
             { rewrite Hmem. by rewrite lookup_union_r. }
             rewrite Hlog Himg. by apply latest_app_frame.
           + intros Sv Bp He2. rewrite Hlog Himg.
-            apply (pin_ok_app_frame _ _ _ _ _ _
-                     (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb).
+            split; [ apply (pin_ok_app_frame _ _ _ _ _ _
+                     (ts_ok_pin _ _ _ _ _ _ _ _ Hok He2) Hmb)
+                     | apply pin_anchor_app; exact (ts_ok_pin_anchor _ _ _ _ _ _ _ _ Hok He2) ].
           + intros W0 HW0. rewrite Hlog Himg.
             apply (win_ok1_app_frame _ _ _ _ _
                      (ts_ok_win _ _ _ _ _ _ _ Hok HW0) Hmb).

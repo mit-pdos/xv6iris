@@ -112,7 +112,7 @@ Class tsoMemG Σ := TsoMemG {
      the interp too: a drain is an environment step nobody's proof holds a
      fragment for, and a record is re-minted on demand. *)
   tsomem_dposG :: ghost_mapG Σ nat nat;
-  tsomem_frG :: ghost_mapG Σ (agent * nat) nat;
+  tsomem_frG :: ghost_mapG Σ (agent * nat * nat) unit;
 }.
 
 (* ---------------------------------------------------------------------- *)
@@ -135,7 +135,7 @@ Definition tsoMemΣ : gFunctors :=
      GFunctor (authR viewUR);
      GFunctor (authR (gsetUR (nat * Arch.pa)));
      ghost_mapΣ nat nat;
-     ghost_mapΣ (agent * nat) nat ].
+     ghost_mapΣ (agent * nat * nat) unit ].
 
 Global Instance subG_tsoMemG {Σ} : subG tsoMemΣ Σ -> tsoMemG Σ.
 Proof. solve_inG. Qed.
@@ -397,16 +397,9 @@ Section ghosts.
   Global Instance dpos_at_timeless γdp i p : Timeless (dpos_at γdp i p).
   Proof. apply _. Qed.
 
-  (** THE FENCE RECORD (relaxed-ww.md §2.7): every message with issue
-      index [≥ N] drains at a position [> M].  Author-free; mintable at ANY
-      leaf with [N] the issue length and [M] the drain length (a message
-      that does not exist yet drains later), and maintained by the interp
-      for free.  The racy tiers' one receipt.  The entry's value is
-      irrelevant. *)
-  Definition fence_rec (γfr : gname) (N M : nat) : iProp Σ :=
-    (∃ v, (N, M) ↪[γfr]□ v)%I.
-  Global Instance fence_rec_persistent γfr N M : Persistent (fence_rec γfr N M).
-  Proof. apply _. Qed.
+  (** THE FENCE RECORD lives in [TsoCtx.fr_at] (relaxed-ww.md §2.7, §2.14):
+      a persistent member [(h, N, M)] of the interp's record set, keyed by
+      the recording hart, its issue length and its drain length. *)
 
   (** THE CHAIN WITNESS (relaxed-ww.md §2.10): message [i] is in the
       interp's chained set -- its chain holds at every byte it writes, for

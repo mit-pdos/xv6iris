@@ -169,10 +169,8 @@ Section WpSconfMem.
     tso_interp_of riscv_eraGS img
       (write_bytes σ.(mem) (pa_of ppn a) (Z.to_N width) vnew)
       (log ++ [PWMsg (snap_of (pa_of ppn a) (Z.to_N width) vnew)
-                 (hart_agent (@cpu_id CIDw))])%list
-      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
-         (log ++ [PWMsg (snap_of (pa_of ppn a) (Z.to_N width) vnew)
-                    (hart_agent (@cpu_id CIDw))])%list V) ∗
+                 (hart_agent (@cpu_id CIDw))])%list dl
+      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw))) dl V) ∗
     TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
     wordw_pointsto width a (DfracOwn 1) vnew.
   Proof.
@@ -215,16 +213,14 @@ Section WpSconfMem.
     gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
     tso_interp_of riscv_eraGS img σ.(mem) log dl V -∗
     TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
-    wordw_free width a ==∗
+    wordw_free TsoCtx.cur_ctx width a ==∗
     gen_heap_interp (hG:=riscv_memGS)
       (write_bytes σ.(mem) (pa_of ppn a) (Z.to_N width) vnew) ∗
     tso_interp_of riscv_eraGS img
       (write_bytes σ.(mem) (pa_of ppn a) (Z.to_N width) vnew)
       (log ++ [PWMsg (snap_of (pa_of ppn a) (Z.to_N width) vnew)
-                 (hart_agent (@cpu_id CIDw))])%list
-      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
-         (log ++ [PWMsg (snap_of (pa_of ppn a) (Z.to_N width) vnew)
-                    (hart_agent (@cpu_id CIDw))])%list V) ∗
+                 (hart_agent (@cpu_id CIDw))])%list dl
+      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw))) dl V) ∗
     TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
     wordw_pointsto width a (DfracOwn 1) vnew.
   Proof.
@@ -238,7 +234,8 @@ Section WpSconfMem.
             vnew
             ltac:(pose proof (bv_unsigned_in_range _
                     (subrange_vec_dec a 11 0)) as [Hlo0 _];
-                  rewrite Hwn; lia) Hcan
+                  rewrite Hwn; lia)
+            ltac:(unfold MachineWord.Z_idx; rewrite !Z2N.id; lia) Hcan
             ltac:(rewrite Hwn; apply Forall_forall; intros j Hj;
                   apply elem_of_list_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hjw];
@@ -2745,10 +2742,8 @@ Section WpSconfMem.
        tso_interp_of riscv_eraGS img
          (write_bytes sigma.(mem) (pa_of ppn ea) (Z.to_N width) sv)
          (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N width) sv)
-                    (hart_agent (@cpu_id CIDw))])%list
-         (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
-            (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N width) sv)
-                       (hart_agent (@cpu_id CIDw))])%list V) ∗
+                    (hart_agent (@cpu_id CIDw))])%list dl
+         (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw))) dl V) ∗
        TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
        Post) ->
     sie_cap_gpr kt m n b p -∗
@@ -3087,7 +3082,7 @@ Section WpSconfMem.
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
-    wordw_free (KTR := ktd) width pa -∗
+    wordw_free (KTR := ktd) TsoCtx.cur_ctx width pa -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
@@ -3102,12 +3097,12 @@ Section WpSconfMem.
     assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc #Hinstr Hbytes Hcont".
-    iDestruct (wordw_free_claim (KTR := ktd) width pa Hw0
+    iDestruct (wordw_free_claim (KTR := ktd) TsoCtx.cur_ctx width pa Hw0
                  with "Hbytes") as "#Hclaim".
     iApply (wp_store_s_sconf_au_dat (ktd := ktd) width c pc rs2 rs1 imm m n sv
               (wordw_pointsto (KTR := ktd) width pa (DfracOwn 1) sv)
               (⊤ ∖ ↑minstretN) b
-              (wordw_free (KTR := ktd) width pa)
+              (wordw_free (KTR := ktd) TsoCtx.cur_ctx width pa)
               (wordw_pointsto (KTR := ktd) width pa (DfracOwn 1) sv)
               Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr Hclaim [Hbytes] [Hcont]").
@@ -3465,7 +3460,7 @@ Section WpSconfMem.
               ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_1 eq_refl
               with "Hcg Hpc Hinstr [Hbyte] [Hcont]").
-    { iApply (wordw1_free (KTR := ktd) ea). iExact "Hbyte". }
+    { iApply (wordw1_free (KTR := ktd) TsoCtx.cur_ctx ea). iExact "Hbyte". }
     iIntros (CID1 Hs1) "Hcg Hpc Hbw".
     iApply ("Hcont" $! CID1 with "[%] Hcg Hpc [Hbw]"); [ exact Hs1 | ].
     iEval (rewrite (wordw1_byte (KTR := ktd) ea (DfracOwn 1) storeval)) in "Hbw".
@@ -3698,10 +3693,8 @@ Section WpSconfMem.
     tso_interp_of riscv_eraGS img
       (write_bytes σ.(mem) a 8 (zero_reg : mword 64))
       (log ++ [PWMsg (snap_of a 8 (zero_reg : mword 64))
-                 (hart_agent (@cpu_id CIDw))])%list
-      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
-         (log ++ [PWMsg (snap_of a 8 (zero_reg : mword 64))
-                    (hart_agent (@cpu_id CIDw))])%list V) ∗
+                 (hart_agent (@cpu_id CIDw))])%list dl
+      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw))) dl V) ∗
     ([∗ list] j ∈ seq 0 8,
        TsoCtx.phys_ledger_wpay (pa_add a j) (DfracOwn 1)
          (nth_byte (zero_reg : mword 64) j) (S (length log))
@@ -3782,9 +3775,8 @@ Section WpSconfMem.
          (TsoMemPa.TsWin a 8 j z cp own lo)) ==∗
     gen_heap_interp (hG := riscv_memGS) (write_bytes σ.(mem) a 8 vnew) ∗
     tso_interp_of riscv_eraGS img (write_bytes σ.(mem) a 8 vnew)
-      (log ++ [PWMsg (snap_of a 8 vnew) (hart_agent (@cpu_id CIDw))])%list
-      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
-         (log ++ [PWMsg (snap_of a 8 vnew) (hart_agent (@cpu_id CIDw))])%list V) ∗
+      (log ++ [PWMsg (snap_of a 8 vnew) (hart_agent (@cpu_id CIDw))])%list dl
+      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw))) dl V) ∗
     (* A6.114: the store's OWN-MESSAGE FRAGMENT, kept rather than dropped.
        [TsoCtxLedger.ledger_vis_own] turns it into "the write at [S (length log)] is
        mine", which is what the owner cell's per-agent record needs in order to
@@ -4126,7 +4118,7 @@ Section WpSconfMem.
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
-    wordw_free (KTR := ktd) 4 ea -∗
+    wordw_free (KTR := ktd) TsoCtx.cur_ctx 4 ea -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗

@@ -934,7 +934,7 @@ Section power.
          all born empty *)
       iMod (ghost_map_alloc_empty (K := nat) (V := nat)) as (γdp) "Hdpauth2".
       iMod (mono_nat_own_alloc 0%nat) as (γdlen) "[Hdlenauth2 _]".
-      iMod (ghost_map_alloc_empty (K := TsoMemPa.agent * nat) (V := nat)) as (γfr) "Hfrauth2".
+      iMod (ghost_map_alloc_empty (K := TsoMemPa.agent * nat * nat) (V := unit)) as (γfr) "Hfrauth2".
       iMod (ghost_map_alloc_empty (K := nat) (V := nat)) as (γch) "Hchauth2".
       iMod (view_auth_alloc (avf g2)) as (γview) "Hviewauth2".
       iMod (iview_alloc_cpus (enum CPU) (NoDup_enum CPU)) as (fiv) "Hivauths2".

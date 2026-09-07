@@ -31,6 +31,7 @@ Require Import SpecPushOff.
 Require Import CodeRelease.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecRelease.
+Require Import WpSconfFencePub.   (* [wp_fence_rel_flush_s_sconf]: release's fence *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 (* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
@@ -252,21 +253,9 @@ Section ProofRelease.
     { iApply (rli_12 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Htoken Hheld Hlks %Hin".
-    (* THE FINISHER'S PRELUDE, and it runs HERE because this store is where
-       the lock's own context comes back out of [locked].  A closing finisher
-       resumes that context, moves the payload into it and stamps it
-       ([WpLock.lock_pay_intro]); a destroying one drops it and keeps the
-       payload at [cur_ctx], where its completion wand speaks.  [Pay] is
-       whatever the finisher chose; the leaf at +0x1a hands it to the
-       finisher's body.
-       The running token the prelude also needs is a component of [sie_cap]
-       (IntrDefs) and is borrowed with [SieCapCtx.sie_cap_gpr_own_ctx_acc],
-       so no downstream spec premise changes shape; this is straight-line
-       code, so the token never crosses [wp_next]. *)
+    (* the lock's own context comes back out of [locked] here; the
+       finisher's prelude consumes it at the fence below *)
     iDestruct "Hfin" as (Pay) "[Hpre Hfin]".
-    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod ("Hpre" with "Hrun Hheld") as "[Hrun HR]".
-    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* The rank WAS held ([Hin], out of the leaf's own [cpu_locks_delete]), so
        the set STRICTLY shrank: [size lks <= S n] becomes
        [size (lks ∖ {[rank s]}) <= n], which is exactly pop_off's unwind
@@ -275,12 +264,25 @@ Section ProofRelease.
                  ltac:(exact (size_del_le s lks (S n) Hsz)) with "Hlks") as "Hown".
     assert (Hpc16 : add_vec_int (mword_of_int (KernelSyms.release + 0x12) : mword 64) 4 = mword_of_int (KernelSyms.release + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
-    (* ---- 0x16: fence rw,w ---- *)
-    iApply (wp_fence_s_sconf (mword_of_int (KernelSyms.release + 0x16)) mh (trap_res outb + (av - 4))%nat false
-              with "Hcg Hpc []").
+    (* ---- 0x16: fence rw,w -- THE RELEASE FENCE (relaxed-ww.md §2.3,
+       §2.14).  The finisher's prelude runs HERE, over the flushed token the
+       leaf produces: the lock's context comes back out of [locked] at the
+       clear above, and its stamp is this fence's publication.  A closing
+       finisher resumes that context, moves the payload into it and stamps
+       it ([WpLock.lock_pay_intro]); a destroying one drops it and keeps the
+       payload at [cur_ctx].  [Pay] is whatever the finisher chose; the leaf
+       at +0x1a hands it to the finisher's body.  The running token never
+       leaves [sie_cap]: the lifting borrows it around the node. *)
+    iApply (wp_fence_rel_flush_s_sconf (mword_of_int (KernelSyms.release + 0x16))
+              (mword_of_int 0 : mword 4) zreg zreg mh (trap_res outb + (av - 4))%nat
+              lock_ctx_held Pay
+              with "Hcg Hpc [] [Hpre] Hheld").
     { iApply (rli_16 with "Htext"). }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    { rewrite /flush_step. iIntros (Df) "Hfl Hheld".
+      iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hcl"; [solve_ndisj|].
+      iMod ("Hpre" with "Hfl Hheld") as "[Hfl HR]".
+      iMod "Hcl" as "_". iModIntro. iFrame "Hfl HR". }
+    iNext. iIntros "Hcg Hpc HR".
     assert (Hpc1a : add_vec_int (mword_of_int (KernelSyms.release + 0x16) : mword 64) 4 = mword_of_int (KernelSyms.release + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sw zero,0(s1) : the lock word clears ---- *)
@@ -566,23 +568,24 @@ Section OfGen.
      stamped context, so this goes straight to the PAY tier -- the whole
      prelude is [WpLock.lock_finisher_close_hook]. *)
   Lemma wp_release_hook_sconf
-      (γl : gname) (lka : mword 64) (s : string) (Rin R : CtxId → iProp Σ) `{!CtxMorph Rin}
+      (γl : gname) (lka : mword 64) (s : string) (Rin R : CtxId → iProp Σ) (Q : iProp Σ)
+      `{!CtxMorph Rin}
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat)
       (lks : gset string)
-    : wp_release_hook_sconf_body kt γl lka s Rin R m n eb p av lks.
+    : wp_release_hook_sconf_body kt γl lka s Rin R Q m n eb p av lks.
   Proof.
     cbv beta delta [wp_release_hook_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hhook Hown Hpay Hcont".
-    iApply (G.wp_release_gen_pay_sconf kt γl lka s R False%I emp%I m n eb p av lks
+    iApply (G.wp_release_gen_pay_sconf kt γl lka s R False%I Q m n eb p av lks
               Hlka Hav (lock_refute_False _) (lock_refute_False _)
               with "Hcg Htext Hpc [] Htoken [HR Hhook] Hown Hpay").
     { iApply (is_lock_openable with "Hlock"). }
     { iApply (lock_finisher_close_hook with "HR Hhook"). }
-    iIntros (CIDg Hsg mr) "_ Hcg Hpc %Hcs Hown".
+    iIntros (CIDg Hsg mr) "HQ Hcg Hpc %Hcs Hown".
     iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].
-    iApply ("Hcont" $! mr with "Hcg Hpc [//] Hown").
+    iApply ("Hcont" $! mr with "HQ Hcg Hpc [//] Hown").
   Qed.
 
 End OfGen.
