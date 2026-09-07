@@ -182,6 +182,19 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
+(* THE APPLICATION'S SIDE (round E2, lane E2-L).  [FsTree] for the entry
+   name, [FsBytesGamma] for the live Gamma the commits are indexed by,
+   [AppInv] for [app_step]/[appE] and the parked license the [_unit]s pay
+   with, [SpecSysUnlinkAU] for [utgt_commit_at] -- link's failure arm's
+   count-down IS unlink's target step ([FsAbsDelta.delta_link_untgt] is
+   [delta_unl_tgt] on the nose), so it is REUSED and not cloned -- and
+   [FsAbsDelta] (which [SpecSysUnlinkAU] re-exports) for the three deltas.
+   [FsAbsDefs] LAST, by FsAbs's own rule. *)
+Require Import FsTree.          (* [fname]                                  *)
+Require Import FsBytesGamma.    (* [fs_gamma_L], [fs_view_names], [gamma_top] *)
+Require Import AppInv.          (* [app_step], [appN]/[appE], [app_step_acc] *)
+Require Import SpecSysUnlinkAU. (* [utgt_commit_at] + [FsAbsDelta] re-export *)
+Require Import FsAbsDefs.       (* LAST (FsAbs's own rule)                  *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -207,6 +220,260 @@ Definition sys_link_slots : nat := 3%nat.
 Definition sys_link_ret (r : mword 64) : Prop :=
   r = (mword_of_int (-1) : mword 64) \/ r = (zero_reg : mword 64).
 
+(* ===================================================================== *)
+(*  THE APPLICATION'S SIDE OF sys_link (round E2, lane E2-L)              *)
+(* ===================================================================== *)
+
+(* Owner ruling Q-c (2026-09-05): "strengthen in place -- we have a single
+   kernel proof".  There is no parallel AU twin of sys_link; this contract
+   IS the one the dispatcher runs, so it grows the commits rather than
+   being copied beside one (app-round-e2.md section 4's recommendation, and
+   the R10 waiver that goes with it).
+
+   THE DELTA IS THREE INSTANTS, and that is a machine fact -- the same
+   stance [SpecSysUnlinkAU]'s header takes for unlink's two:
+
+     instant 1 -- THE TARGET'S COUNT ([ip->nlink++; iupdate(ip)] at
+        +0x5e..+0x66, BEFORE the entry exists).  [FsAbsDelta.delta_link_tgt]
+        at the row the machine reads under [ip->lock].  Between it and
+        instant 2 the [iunlock(ip)] at +0x6c really releases the record and
+        a concurrent observer sees the raised count with no name for it.
+     instant 2 -- THE PARENT'S ENTRY ([dirlink(dp, name, ip->inum)] at
+        +0x9c).  [delta_link_ent]: the parent gains [nm |-> t]; link is for
+        files and devices only, so no count moves.
+     instant 3 -- THE UNDO, on every route to [bad:] ([ip->nlink--;
+        iupdate(ip)] at +0xfa..+0x106).  [delta_link_untgt] IS
+        [delta_unl_tgt], so ITS COMMIT IS [SpecSysUnlinkAU.utgt_commit_at],
+        REUSED VERBATIM rather than cloned.
+
+   [FsAbsDelta.delta_link_split] is the machine-checked composition and
+   [delta_link_untgt_tgt] is the fact that instant 3 restores the pre-view
+   exactly, in BOTH arms of the target row.
+
+   THE TARGET'S ROW IS A PARAMETER, not a lookup (lane E2-D's one
+   deviation): sys_link has NO [ip->nlink == 0] guard -- ProofSysLink.v's
+   "THE IIIc WALL" records that the count fact is genuinely unavailable
+   there -- so the target may be an unlinked-but-open file with no row at
+   all, and the bump RESURRECTS it.  [arow_at] is the side condition, one
+   insert either way. *)
+
+(* THE TARGET IS NEVER A DIRECTORY: ARM C's [ip->type == T_DIR] test at
+   +0x4c refused it before the bump, which is also why [delta_link_ent]
+   moves no count ([FsAbsDelta.acre_bump]'s reading of a non-dir child). *)
+Definition link_tgt_ok (c : absnode) : Prop :=
+  match c with ADir _ => False | _ => True end.
+
+Lemma link_tgt_ok_not_dir (n : fs_node) :
+  fn_is_dir n = false -> link_tgt_ok (an_node (abs_row n)).
+Proof.
+  intros Hd. rewrite /link_tgt_ok.
+  destruct (an_node (abs_row n)) as [bs | ents | ma mi] eqn:He;
+    [exact I | | exact I].
+  exfalso. destruct (abs_row_dir_inv n ents He) as [Hc _].
+  rewrite Hd in Hc. discriminate.
+Qed.
+
+Section SysLinkAbs.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  (* ------------------------------------------------------------------ *)
+  (*  The two NEW commits (the third is unlink's, reused)                *)
+  (* ------------------------------------------------------------------ *)
+
+  (* INSTANT 1 -- the target row, two-phase at the raw map
+     ([FsAbsCreateFire.acre_commit_at_gen]'s mold: phase 1 observes the
+     pre-state, phase 2 witnesses the delta applied and pays the receipt).
+     [is_Some (I !! t)] is what lets the generic discharger pay the step
+     off the parked license ([AppInv.app_step_acc]) although the VIEW may
+     have no row at [t]: the target's inum is a region row, and the fire
+     reads that off [ghost_map_lookup] at the instant. *)
+  Definition ltgt_commit_at Γ (E : coPset)
+      (Φ : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
+    (∀ (I : gmap Z fs_node) (t : Z) (a : anode),
+       ⌜arow_at (abs_view I) t a⌝ -∗
+       ⌜link_tgt_ok (an_node a)⌝ -∗
+       ⌜is_Some (I !! t)⌝ -∗
+       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗
+         (* THE CALLER'S STEP (app-instances.md section 7): its claim about
+            the pre-view survives the delta, at the RAW insert the mover
+            performs ([AppInv.app_step]; the delta is its reading) *)
+         app_step t I (delta_link_tgt t a (abs_view I)) ∗
+         (∀ I' : gmap Z fs_node,
+            ⌜abs_view I' = delta_link_tgt t a (abs_view I)⌝ -∗
+            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) t a))%I.
+
+  (* INSTANT 2 -- the parent row, [uent_commit_at]'s shape at
+     [delta_link_ent].  The parent is a LIVE directory (the orphan guard at
+     +0x84 refused an [nlink = 0] parent, so the row is in the view) and
+     the name is ABSENT ([dirlink]'s own [dirlookup] guard). *)
+  Definition lent_commit_at Γ (E : coPset)
+      (Φ : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+    (∀ (I : gmap Z fs_node) (d t : Z) (nm : fname)
+       (ents : gmap fname Z) (nl : nat),
+       ⌜abs_view I !! d = Some (MkAnode (ADir ents) nl)⌝ -∗
+       ⌜ents !! nm = None⌝ -∗
+       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗
+         app_step d I (delta_link_ent d nm t (abs_view I)) ∗
+         (∀ I' : gmap Z fs_node,
+            ⌜abs_view I' = delta_link_ent d nm t (abs_view I)⌝ -∗
+            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm t))%I.
+
+  (* ------------------------------------------------------------------ *)
+  (*  Satisfiability: the [_unit] dischargers                            *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma link_appN_appE : ↑appN ⊆ appE.
+  Proof. rewrite /appE. done. Qed.
+
+  Lemma ltgt_commit_at_unit (γfs : fs_names) E :
+    ↑appN ⊆ E ->
+    app_inv γfs -∗ ltgt_commit_at (fs_gamma_L γfs) E (fun _ _ _ => True%I).
+  Proof.
+    iIntros (HE) "#Hai". rewrite /ltgt_commit_at.
+    iIntros (I t a) "%Hrow %Hok %Hsome Ha".
+    iMod (app_step_acc E γfs t I _ HE Hsome with "Hai") as "Hstep".
+    iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
+    by iFrame "Ha'".
+  Qed.
+
+  Lemma lent_commit_at_unit (γfs : fs_names) E :
+    ↑appN ⊆ E ->
+    app_inv γfs -∗ lent_commit_at (fs_gamma_L γfs) E (fun _ _ _ _ => True%I).
+  Proof.
+    iIntros (HE) "#Hai". rewrite /lent_commit_at.
+    iIntros (I d t nm ents nl) "%Hd %Hnm Ha".
+    iMod (app_step_acc E γfs d I _ HE
+            (abs_view_lookup_is_Some I d _ Hd) with "Hai") as "Hstep".
+    iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
+    by iFrame "Ha'".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  The bundle, and the three receipts                                 *)
+  (* ------------------------------------------------------------------ *)
+
+  Definition link_commits Γ
+      (Φtgt : aview -> Z -> anode -> iProp Σ)
+      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φuntgt : aview -> Z -> iProp Σ) : iProp Σ :=
+    (ltgt_commit_at Γ appE Φtgt ∗ lent_commit_at Γ appE Φent
+     ∗ utgt_commit_at Γ appE Φuntgt)%I.
+
+  (* the whole bundle at the trivial families -- what the dispatcher hands
+     down ([FsAbsInvFire.fsabs_link_pre] is this beside [app_inv]) *)
+  Lemma link_commits_unit (γfs : fs_names) :
+    app_inv γfs -∗
+    link_commits (fs_gamma_L γfs) (fun _ _ _ => True%I)
+      (fun _ _ _ _ => True%I) (fun _ _ => True%I).
+  Proof.
+    iIntros "#Hai". rewrite /link_commits.
+    iSplitR; [iApply (ltgt_commit_at_unit γfs appE link_appN_appE with "Hai") |].
+    iSplitR; [iApply (lent_commit_at_unit γfs appE link_appN_appE with "Hai") |].
+    iApply (utgt_commit_at_unit γfs appE link_appN_appE with "Hai").
+  Qed.
+
+  (* each receipt with its instant's pure facts restated beside the
+     caller's own [Φ] *)
+  Definition ltgt_fired (Φ : aview -> Z -> anode -> iProp Σ) (t : Z) : iProp Σ :=
+    (∃ (av : aview) (a : anode),
+       ⌜arow_at av t a⌝ ∗ ⌜link_tgt_ok (an_node a)⌝ ∗ Φ av t a)%I.
+
+  Definition lent_fired (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (d : Z) (nm : fname) (t : Z) : iProp Σ :=
+    (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
+       ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗ ⌜ents !! nm = None⌝
+       ∗ Φ av d nm t)%I.
+
+  (* THE UNDO'S ROW IS AN EXISTENTIAL, and that is a machine fact too: the
+     [iunlock(ip)] at +0x6c releases the record, so the one the [bad:] arm
+     re-[ilock]s at +0xf6 need not be the one instant 1 bumped -- another
+     hart may have linked or unlinked it in between.  What the arm DOES
+     know is that the row is present at a live count (the walk's own
+     [FsStateLink.link_tok] pays for one link: [IregLinkNz.ireg_tok_nz]),
+     which is exactly [utgt_commit_at]'s premise. *)
+  Definition luntgt_fired (Φ : aview -> Z -> iProp Σ) (t : Z) : iProp Σ :=
+    (∃ (av : aview) (a : anode), ⌜av !! t = Some a⌝ ∗ Φ av t)%I.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE POST ARMS, keyed on the returned a0                            *)
+  (* ------------------------------------------------------------------ *)
+
+  (* ret 0  -- ARM G: the target's count went up and the parent gained the
+                name.  [t] is the target's inum, [d] the parent's, [nm] the
+                new path's last element.  The undo commit comes home.
+     ret -1 -- the honest fold of the landed blanket disjunction:
+                (i)  NOTHING fs-visible happened: the whole bundle back --
+                     ARM A (either argstr), ARM B (namei(old) missed),
+                     ARM C (the target is a directory), ARM D (NLINK_MAX);
+                (ii) the DO-THEN-UNDO PAIR -- every route to [bad:]: ARM E
+                     (nameiparent missed), ARM E2 (the orphan guard), ARM F
+                     (dirlink refused).  Both target receipts, the parent
+                     leg's commit back unspent. *)
+  Definition link_arms Γ
+      (Φtgt : aview -> Z -> anode -> iProp Σ)
+      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φuntgt : aview -> Z -> iProp Σ)
+      (r : mword 64) : iProp Σ :=
+    ((⌜r = (zero_reg : mword 64)⌝ ∗
+        ∃ (t d : Z) (nm : fname),
+          ltgt_fired Φtgt t ∗ lent_fired Φent d nm t
+          ∗ utgt_commit_at Γ appE Φuntgt)
+     ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
+          (link_commits Γ Φtgt Φent Φuntgt
+           ∨ (∃ t : Z, ltgt_fired Φtgt t ∗ luntgt_fired Φuntgt t
+                       ∗ lent_commit_at Γ appE Φent))))%I.
+
+  (* ...and the three introduction forms the walk's ten exits use *)
+  Lemma link_arms_none Γ Φtgt Φent Φuntgt (r : mword 64) :
+    r = (mword_of_int (-1) : mword 64) ->
+    link_commits Γ Φtgt Φent Φuntgt -∗ link_arms Γ Φtgt Φent Φuntgt r.
+  Proof.
+    intros ->. rewrite /link_arms. iIntros "H". iRight.
+    iSplitR; [done |]. by iLeft.
+  Qed.
+
+  Lemma link_arms_undone Γ Φtgt Φent Φuntgt (r : mword 64) (t : Z) :
+    r = (mword_of_int (-1) : mword 64) ->
+    ltgt_fired Φtgt t -∗ luntgt_fired Φuntgt t -∗
+    lent_commit_at Γ appE Φent -∗ link_arms Γ Φtgt Φent Φuntgt r.
+  Proof.
+    intros ->. rewrite /link_arms. iIntros "H1 H2 H3". iRight.
+    iSplitR; [done |]. iRight. iExists t. iFrame "H1 H2 H3".
+  Qed.
+
+  Lemma link_arms_ok Γ Φtgt Φent Φuntgt (r : mword 64)
+      (t d : Z) (nm : fname) :
+    r = (zero_reg : mword 64) ->
+    ltgt_fired Φtgt t -∗ lent_fired Φent d nm t -∗
+    utgt_commit_at Γ appE Φuntgt -∗ link_arms Γ Φtgt Φent Φuntgt r.
+  Proof.
+    intros ->. rewrite /link_arms. iIntros "H1 H2 H3". iLeft.
+    iSplitR; [done |]. iExists t, d, nm. iFrame "H1 H2 H3".
+  Qed.
+
+  (* the landed blanket [sys_link_ret] is IMPLIED by the arms, which is
+     what lets the dispatcher keep reading the old fact *)
+  Lemma link_arms_ret Γ Φtgt Φent Φuntgt (r : mword 64) :
+    link_arms Γ Φtgt Φent Φuntgt r -∗ ⌜sys_link_ret r⌝.
+  Proof.
+    rewrite /link_arms /sys_link_ret.
+    iIntros "[[-> _] | [-> _]]"; iPureIntro; [by right | by left].
+  Qed.
+
+End SysLinkAbs.
+
+(* the arms are a disjunction with existentials inside: sealed, as
+   [SpecSysMkdir.mkdir_arms] is, so an [iFrame] at syscall altitude does
+   not search through them *)
+Global Typeclasses Opaque link_arms.
+
 Definition wp_sys_link_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -218,7 +485,11 @@ Definition wp_sys_link_sconf_body
     (v0 v1 : mword 64)                        (* syscall arguments 0 and 1  *)
     (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string)
+    (* ---- the application's four families (round E2, lane E2-L) ---- *)
+    (Φtgt : aview -> Z -> anode -> iProp Σ)
+    (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+    (Φuntgt : aview -> Z -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_link in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -298,6 +569,11 @@ Definition wp_sys_link_sconf_body
   (* ---- the process, and the reference allowance the two walks need ---- *)
   iref_slots sys_link_slots -∗
   proc_priv γf pj pid U -∗
+  (* ---- THE APPLICATION'S SIDE: the three commits link's legs fire at
+     their three instants (round E2, lane E2-L).  The dispatcher passes the
+     [_unit] dischargers ([FsAbsInvFire.fsabs_link_pre]) exactly as it does
+     for unlink. ---- *)
+  link_commits (fs_gamma_L fsc_fs) Φtgt Φent Φuntgt -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_link parks in every
      one of its eleven distinct callees, so it can return on another hart
      whatever SIE was doing.
@@ -331,6 +607,9 @@ Definition wp_sys_link_sconf_body
       (* the process block, at the same everything but the page table *)
       proc_priv γf pj pid (us_upt U P') -∗
       ⌜sys_link_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+      (* ...and the legs' receipts, keyed on that answer *)
+      link_arms (fs_gamma_L fsc_fs) Φtgt Φent Φuntgt
+        (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -344,9 +623,12 @@ Module Type SYSLINK.
       (v0 v1 : mword 64)
       (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string)
+      (Φtgt : aview -> Z -> anode -> iProp Σ)
+      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φuntgt : aview -> Z -> iProp Σ),
       wp_sys_link_sconf_body γf gs j gl pd pav pu
 
  dqb dqs dqbs v0 v1 pid U
-                             m K eb b lks.
+                             m K eb b lks Φtgt Φent Φuntgt.
 End SYSLINK.

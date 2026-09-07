@@ -1802,6 +1802,14 @@ App.v
 # it unconditional -- assumption set = resv_matches, resv_is_valid, funext,
 # i.e. LinkNamexEra's, with nothing new entering the cone.
 FsAbsUnlinkFire.v
+# app round E2, lane E2-L: LINK IN PLACE.  SpecSysLink gains the three
+# commits (the target's count up, the parent's entry, and the undo -- which
+# IS SpecSysUnlinkAU's utgt_commit_at, reused) and FsAbsLinkFire is the fire
+# leaf for the first two, beside the abs_of wraps of the landed
+# dir_entries_dirlink_ins and of the count-raised record.  It sits here,
+# below FsAbsUnlinkFire, because the undo's fire is uf_utgt_fire itself;
+# ProofSysLink/ProofSysLinkTails (listed far above) consume it.
+FsAbsLinkFire.v
 FsAbsInvFire.v
 ProofSysUnlinkAUParts.v
 ProofSysUnlinkAUW1.v

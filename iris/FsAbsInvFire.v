@@ -84,6 +84,7 @@ Require Import SpecSysOpenAU.      (* [aopen/atrunc_commit_at], [open_walk_pre_e
 Require Import SpecSysChdirAU.     (* [chdir_au_pre]: the walk premise + open's commit (lane C3) *)
 Require Import SpecSysMknodAUEra.  (* [mknod_au_pre_era] *)
 Require Import SpecSysUnlinkAU.    (* [uent/utgt/dmiss_commit_at], [unlink_au_pre] *)
+Require Import SpecSysLink.        (* [link_commits] (round E2, lane E2-L) *)
 Require Import FsAbsReadFire.      (* [aread_commit_at] *)
 Require Import FsAbsWriteFire.     (* [awrite_full_at], [awrite_chain] *)
 Require Import OffGv.              (* [off_user_inv], the process's half *)
@@ -299,6 +300,18 @@ Section FsAbsInvFire.
     rewrite /chdir_au_pre.
     iSplitR; [iApply fsabs_open_walk | iApply fsabs_aopen].
   Qed.
+
+  (* LINK'S THREE LEGS (round E2, lane E2-L).  Unlike the AU bundles there
+     is no walk premise here: [wp_sys_link_sconf] is the LANDED contract
+     strengthened in place (ruling Q-c), so its two walks stay behind
+     [SpecNamei]/[SpecNameiparent] and only the commits cross.  The bundle's
+     own [_unit] proof lives in [SpecSysLink] beside the definitions; this
+     is the [fsabs_*]-family name the dispatcher's link arm reads. *)
+  Lemma fsabs_link_pre (γfs : fs_names) :
+    app_inv γfs -∗
+    link_commits (fs_gamma_L γfs) (fun _ _ _ => True%I)
+      (fun _ _ _ _ => True%I) (fun _ _ => True%I).
+  Proof. iIntros "#Hai". iApply (link_commits_unit γfs with "Hai"). Qed.
 
   Lemma fsabs_unlink_pre (γfs : fs_names) (cw : Z) :
     app_inv γfs -∗

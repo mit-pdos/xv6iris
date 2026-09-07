@@ -4944,6 +4944,10 @@ Section SyscallArms.
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     iDestruct (sysc_iref_split3 with "Hir") as "[Hirl Hirk]".
+    (* the three commits link's legs fire, at the trivial bundle
+       ([FsAbsInvFire.fsabs_link_pre]); the landed return blanket is still
+       stated purely beside the arms (round E2, lane E2-L). *)
+    iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
     iApply (SysLink.wp_sys_link_sconf γf γs j γl
 
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
@@ -4952,14 +4956,16 @@ Section SyscallArms.
 
               DfracDiscarded DfracDiscarded DfracDiscarded v0 v1 pid U M
               (av - 4)%nat true true ∅
+              (fun _ _ _ => True%I) (fun _ _ _ _ => True%I) (fun _ _ => True%I)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbg Hib (proj2 (proj2 (proj2 Hnin))) Hprg Hj Hgamma
               eq_refl Hv0 Hv1
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
-                    Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hirl Hpriv").
+                    Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hirl Hpriv []").
+    { iApply (fsabs_link_pre with "Hfsabs"). }
     iIntros (CIDy Hsy mf P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv _".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first

@@ -98,6 +98,17 @@ Require Import SpecIput.
 Require Import SpecIunlockput.
 Require Import CodeSysLink.
 Require Import ProofSysLinkParts.
+(* THE APPLICATION'S SIDE (round E2, lane E2-L).  The [bad:] tail's
+   [ip->nlink--] is sys_link's THIRD instant, and [FsAbsDelta.delta_link_untgt]
+   IS [FsAbsDelta.delta_unl_tgt] -- so its commit is unlink's
+   [utgt_commit_at] and its fire is [FsAbsUnlinkFire.uf_utgt_fire], both
+   REUSED VERBATIM.  [SpecSysLink] supplies the receipt [luntgt_fired] the
+   three [bad:]-bound tails hand their caller. *)
+Require Import AppInv.           (* [appE]: the commit mask               *)
+Require Import SpecSysUnlinkAU.  (* [utgt_commit_at]                      *)
+Require Import FsAbsUnlinkFire.  (* [uf_utgt_fire], [uf_nlink_row], [uf_nd_top] *)
+Require Import SpecSysLink.      (* [luntgt_fired]                        *)
+Require Import FsAbsDefs.        (* LAST (FsAbs's own rule)               *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -1035,7 +1046,9 @@ Section ProofSysLinkTails.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (bnm bw bo : nat -> bv 8) (Upr : ustate) :
+      (bnm bw bo : nat -> bv 8) (Upr : ustate)
+      (* the undo's receipt family (round E2, lane E2-L) *)
+      (Φuntgt : aview -> Z -> iProp Σ) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
@@ -1094,6 +1107,9 @@ Section ProofSysLinkTails.
        the token the [ip->nlink++] minted and the failed [dirlink] never
        filed in a directory's [FsStateInode.ent_toks]. *)
     FsStateLink.link_tok (fs_gamma_L fsc_fs) (bv_unsigned inum) uty -∗
+    (* ...AND THE COMMIT THAT INSTANT SPENDS (round E2, lane E2-L): the
+       count-down IS unlink's target step, so this is [utgt_commit_at]. *)
+    utgt_commit_at (fs_gamma_L fsc_fs) appE Φuntgt -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
@@ -1128,6 +1144,8 @@ Section ProofSysLinkTails.
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         iref_slot -∗
+        (* ...and the undo's receipt (round E2, lane E2-L) *)
+        luntgt_fired Φuntgt (bv_unsigned inum) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1135,7 +1153,7 @@ Section ProofSysLinkTails.
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem Hiu Hj Hgl
            Hlkempty Heb Hsp0 HMsp HMthr HMs1 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hireg #Hropen #Hslkk Hkeep Hru %Hley #Hfly #Hclaimsy Hshr #Hshotc Htoken Hsbb Hsbi #Hbmres Hpid
+              #Hesck #Hireg #Hropen #Hslkk Hkeep Hru %Hley #Hfly #Hclaimsy Hshr #Hshotc Htoken Hcmun Hsbb Hsbi #Hbmres Hpid
               #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1434,11 +1452,42 @@ Section ProofSysLinkTails.
             rewrite /dn' sl_setnl_type in Hd; exact Hd ].
       - apply dir_uniq_not_dir. rewrite /dn' sl_setnl_type. exact Hnotdir.
       - exact (sl_setnl_ddix _ dn dat _ Hnz Hddix). }
+    (* THE UNDO FIRES HERE (round E2, lane E2-L, site #4): the retag is
+       [FsAbsUnlinkFire.uf_utgt_fire]'s, because [delta_link_untgt] IS
+       [delta_unl_tgt] and no link twin of that fire exists or is wanted.
+       Its [1 <= nlink] premise is [Hnz], read back off the fragment this
+       tail is about to spend ([IregLinkNz.ireg_tok_nz] at +0xf6); its row
+       bridge is [uf_nlink_row], since [sl_setnl] moves one halfword. *)
+    assert (Htynz0 : fn_type (era_node dn bm dat) <> 0).
+    { rewrite /fn_type era_node_rec.
+      exact (proj1 (proj2 (proj2 (proj2 Hiok)))). }
+    assert (Hnl1 : (1 <= fn_nlink (era_node dn bm dat))%nat).
+    { rewrite /fn_nlink era_node_rec.
+      pose proof (bv_unsigned_in_range _ (di_nlink dn)) as Hrng16.
+      clear -Hnz Hrng16. lia. }
+    assert (Hnldec : (fn_nlink (era_node dn' bm dat)
+                      = fn_nlink (era_node dn bm dat) - 1)%nat).
+    { rewrite /fn_nlink !era_node_rec.
+      pose proof (bv_unsigned_in_range _ (di_nlink dn')) as Hrng16.
+      clear -Hdec Hrng16. lia. }
+    assert (Hmaj' : di_major dn' = di_major dn) by reflexivity.
+    assert (Hmin' : di_minor dn' = di_minor dn) by reflexivity.
+    assert (Hrow' := uf_nlink_row dn dn' bm dat
+                       (proj1 (proj2 (proj2 (proj2 Hiok))))
+                       (sl_setnl_type dn (sl_ndec (di_nlink dn)))
+                       (sl_setnl_size dn (sl_ndec (di_nlink dn)))
+                       Hmaj' Hmin' Hnldec).
     iApply fupd_wp.
-    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned inum)
+    iMod (uf_utgt_fire fsc_fs ⊤ Φuntgt (bv_unsigned inum)
             (era_node dn bm dat) (era_node dn' bm dat)
-            ltac:(solve_ndisj) Logic.I Hloc' with "[] [] Htop") as "Htop";
+            uf_nd_top Hloc' Hnl1 Hrow' Htynz0
+            with "[] [] Hcmun Htop") as "[Htop Huntgt]";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
+    iAssert (luntgt_fired Φuntgt (bv_unsigned inum)) with "[Huntgt]"
+      as "Huntgt".
+    { rewrite /luntgt_fired. iDestruct "Huntgt" as (av) "[%Hav HΦu]".
+      iExists av, (abs_row (era_node dn bm dat)).
+      iSplitR; [by iPureIntro |]. iExact "HΦu". }
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn' bm)
       with "[Hdlnk Hdiat Hmeta Hmap Hblocks Htop]" as "Hload".
@@ -1656,14 +1705,14 @@ Section ProofSysLinkTails.
               bnm bw bo
               HK38 Kpop Hsp0 HR3sp HR3thr HR3s1 HR3s2 Hal
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
-                    [Hown Hpid Hsbb Hsbi Hbsl Hislot Hcont]").
+                    [Hown Hpid Hsbb Hsbi Hbsl Hislot Huntgt Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
     iDestruct (cpu_own_transport CID14 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown [] [] Hpc Hpid
-              Hsbb Hsbi Hbsl Hislot").
+              Hsbb Hsbi Hbsl Hislot Huntgt").
     { exact Hcsf. }
     { rewrite Ha5f. exact HR3a5. }
     { rewrite Heb /trap_csrs_ext. done. }
@@ -1697,7 +1746,9 @@ Section ProofSysLinkTails.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (bnm bw bo : nat -> bv 8) (Upr : ustate) :
+      (bnm bw bo : nat -> bv 8) (Upr : ustate)
+      (* the undo's receipt family (round E2, lane E2-L) *)
+      (Φuntgt : aview -> Z -> iProp Σ) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
@@ -1769,6 +1820,9 @@ Section ProofSysLinkTails.
        the token the [ip->nlink++] minted and the failed [dirlink] never
        filed in a directory's [FsStateInode.ent_toks]. *)
     FsStateLink.link_tok (fs_gamma_L fsc_fs) (bv_unsigned inum) uty -∗
+    (* ...AND THE COMMIT THAT INSTANT SPENDS (round E2, lane E2-L): the
+       count-down IS unlink's target step, so this is [utgt_commit_at]. *)
+    utgt_commit_at (fs_gamma_L fsc_fs) appE Φuntgt -∗
     (* ---- the PARENT, still locked ---- *)
     sleeplocked_q gisld sd (i_lock (ientry kd)) pidv -∗
     ⌜(loyd <= tlyd)%nat⌝ -∗
@@ -1820,6 +1874,8 @@ Section ProofSysLinkTails.
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         iref_slots 2 -∗
+        (* ...and the undo's receipt, relayed from [sl_tail_bad] *)
+        luntgt_fired Φuntgt (bv_unsigned inum) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1828,7 +1884,7 @@ Section ProofSysLinkTails.
            Hcrb Hcru Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru %Hley #Hfly #Hclaimsy Hshr #Hshotc Htoken Hslkd
+              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru %Hley #Hfly #Hclaimsy Hshr #Hshotc Htoken Hcmun Hslkd
               %Hleyd #Hflyd #Hclaimsyd Hdep Hoffr Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
@@ -1922,21 +1978,21 @@ Section ProofSysLinkTails.
               gil gisl
               kk qi s gy loy tly inum ty u1 Sb1 uty pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
-              Upr HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
+              Upr Φuntgt HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hkeep Hru [//] Hfly Hclaimsy Hshr Hshotc Htoken Hsbb Hsbi Hbmres Hpid
+                    Hesck Hireg Hropen Hslkk Hkeep Hru [//] Hfly Hclaimsy Hshr Hshotc Htoken Hcmun Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf)
       "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl
-       Hislot2".
+       Hislot2 Huntgt".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iDestruct (iref_slots_combine 1 1 with "Hislot Hislot2") as "Hislots".
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
-              Hsbb Hsbi Hbsl Hislots").
+              Hsbb Hsbi Hbsl Hislots Huntgt").
     { exact Hcsf. }
     { exact Ha0f. }
   Qed.
@@ -1977,7 +2033,9 @@ Section ProofSysLinkTails.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (bnm bw bo : nat -> bv 8) (Upr : ustate) :
+      (bnm bw bo : nat -> bv 8) (Upr : ustate)
+      (* the undo's receipt family (round E2, lane E2-L) *)
+      (Φuntgt : aview -> Z -> iProp Σ) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
@@ -2048,6 +2106,9 @@ Section ProofSysLinkTails.
        the token the [ip->nlink++] minted and the failed [dirlink] never
        filed in a directory's [FsStateInode.ent_toks]. *)
     FsStateLink.link_tok (fs_gamma_L fsc_fs) (bv_unsigned inum) uty -∗
+    (* ...AND THE COMMIT THAT INSTANT SPENDS (round E2, lane E2-L): the
+       count-down IS unlink's target step, so this is [utgt_commit_at]. *)
+    utgt_commit_at (fs_gamma_L fsc_fs) appE Φuntgt -∗
     (* ---- the PARENT, still locked ---- *)
     sleeplocked_q gisld sd (i_lock (ientry kd)) pidv -∗
     ⌜(loyd <= tlyd)%nat⌝ -∗
@@ -2099,6 +2160,8 @@ Section ProofSysLinkTails.
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         iref_slots 2 -∗
+        (* ...and the undo's receipt, relayed from [sl_tail_bad] *)
+        luntgt_fired Φuntgt (bv_unsigned inum) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2107,7 +2170,7 @@ Section ProofSysLinkTails.
            Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru %Hley #Hfly #Hclaimsy Hshr #Hshotc Htoken Hslkd
+              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru %Hley #Hfly #Hclaimsy Hshr #Hshotc Htoken Hcmun Hslkd
               %Hleyd #Hflyd #Hclaimsyd Hdep Hoffr Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
@@ -2221,21 +2284,21 @@ Section ProofSysLinkTails.
               gil gisl
               kk qi s gy loy tly inum ty u1 Sb1 uty pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
-              Upr HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
+              Upr Φuntgt HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hkeep Hru [//] Hfly Hclaimsy Hshr Hshotc Htoken Hsbb Hsbi Hbmres Hpid
+                    Hesck Hireg Hropen Hslkk Hkeep Hru [//] Hfly Hclaimsy Hshr Hshotc Htoken Hcmun Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf)
       "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl
-       Hislot2".
+       Hislot2 Huntgt".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iDestruct (iref_slots_combine 1 1 with "Hislot Hislot2") as "Hislots".
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
-              Hsbb Hsbi Hbsl Hislots").
+              Hsbb Hsbi Hbsl Hislots Huntgt").
     { exact Hcsf. }
     { exact Ha0f. }
   Qed.
