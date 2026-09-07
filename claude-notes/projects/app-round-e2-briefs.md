@@ -2,25 +2,35 @@
 
 Companion to app-round-e2.md (the proposal and rulings).  Each brief below was written for a subagent lane; paths under /tmp/… in them refer to the ORIGINAL session's scratchpad — substitute this file and a copy of the script below.  The rules every lane follows: build only on the GCP VM through the script (never make by hand, never locally), never change git state inside a lane, no subagents inside a lane, absolute paths, batch edits (FsAbsDefs' cone is ~500 files, ~10 min), no Admitted/Axiom, and the statements of SystemAdequacy.xv6_fs_adequacy_xv6Σ and App.xv6_app_adequacy_triv_xv6Σ byte-identical.  After a lane is green: run `make audit-only` on the VM (13 axioms is the baseline), commit, fetch/rebase, rebuild if iris files came in, push.
 
-## The build script (vmbuild.sh <logname> [new iris files relative to iris/])
+## The build script (vmbuild.sh <tree> <logname> [new iris files relative to iris/])
+
+Run it for THE CHECKOUT THE SESSION RUNS IN (`<tree>` = its basename, e.g. `xv6iris-2`) and for no
+other: sibling checkouts under /shared belong to other sessions (owner, 2026-09-07: "do not touch
+anything other than YOUR OWN DIRECTORY").  Lanes therefore run SEQUENTIALLY in one tree, one build at
+a time.  Retries while the only errors are FastLia's `Error: Timeout!` flake (the `timeout 1` lia
+gate escaping `first` under VM load; seen 4 times on 2026-09-07, always at a trivial lia).
 
 ```bash
 #!/bin/bash
-# vmbuild.sh <logname> [extra files relative to iris/ ...]
-# Syncs /shared/xv6iris-3 to the VM, deletes the remote artifacts of every
-# locally-modified/untracked iris/*.v (and the extras), regenerates
-# CoqMakefile, builds iris with -k, writes a sentinel and prints the errors.
+# vmbuild.sh <tree> <logname> [extra files relative to iris/ ...]
 set -u
+TREE=${1:?tree, e.g. xv6iris-2}; shift
 LOG=${1:-build}; shift || true
-cd /shared/xv6iris-3
+cd /shared/$TREE || exit 9
 FILES=$( (git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard) \
          | grep '^iris/.*\.v$' | sed 's|^iris/||' | sort -u | tr '\n' ' ')
 FILES="$FILES $*"
-/shared/xv6iris-3/gcp-rocq/run-on-gcp opam exec --switch=/shared/xv6rocq -- bash -c "
-  cd /mnt/rocq/trees/_shared_xv6iris-3/iris || exit 9
+/shared/$TREE/gcp-rocq/run-on-gcp -q bash -c "
+  cd /mnt/rocq/trees/_shared_$TREE/iris || exit 9
   for f in $FILES; do rm -f \${f%.v}.vo \${f%.v}.vos \${f%.v}.vok \${f%.v}.glob; done
+  rm -f CoqMakefile CoqMakefile.conf
   coq_makefile -f _CoqProject -o CoqMakefile >/dev/null 2>&1
-  (make -f CoqMakefile -j180 -k > /tmp/$LOG.log 2>&1; echo EXIT=\$? >> /tmp/$LOG.log)
+  for attempt in 1 2 3; do
+    (make -f CoqMakefile -j180 -k > /tmp/$LOG.log 2>&1; echo EXIT=\$? >> /tmp/$LOG.log)
+    nerr=\$(grep -c '^Error' /tmp/$LOG.log); nto=\$(grep -c '^Error: Timeout!' /tmp/$LOG.log)
+    if [ \$nerr -gt 0 ] && [ \$nerr -eq \$nto ]; then echo \"RETRY \$attempt: \$nto lia Timeout flake(s) only\"; continue; fi
+    break
+  done
   echo COMPILED=\$(grep -c 'ROCQ compile\|COQC' /tmp/$LOG.log)
   grep -n 'Error' /tmp/$LOG.log | head -40
   tail -1 /tmp/$LOG.log"
@@ -120,7 +130,7 @@ existing lemma's statement.  No consumer outside FsAbsDelta.v changes in this la
 Green; both audited statements byte-identical; report the definitions verbatim and the lemma
 list.  Do not commit.
 
-## roundE2L-brief.md — BLOCKED (written 2026-09-05 after E2-D landed; blocker found the same day, see the end of this brief and roundE2L0-brief.md below)
+## roundE2L-brief.md — UNBLOCKED 2026-09-07 (E2-L0 landed, commit 263098976: `inode_held` carries `⌜0 < bv_unsigned inum⌝` right after the upper bound, so the target's positivity is one more binder in the link proof's namei unpacking; the BLOCKER paragraph at the end is history)
 
 ## Lane E2-L: link IN PLACE — `wp_sys_link_sconf` gains the three-commit bundle, its three retags become fires
 
@@ -203,7 +213,29 @@ post has `0 < inum`) but no contract carries it, so E2-L cannot land honestly un
 
 ORDER: E2-L0 (below) → E2-L.  E2-C does not depend on either.
 
-## roundE2L0-brief.md — the missing invariant: HELD INUMS ARE POSITIVE (prerequisite of E2-L)
+## roundE2L0-brief.md — LANDED 2026-09-07 (commit 263098976; 38 files; 2 builds; green, 13 axioms, both audited statements untouched)
+
+AS BUILT.  Spelling: TWO conjuncts, `⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗ ⌜0 < bv_unsigned inum⌝`,
+the lower bound placed AFTER the upper one everywhere (a single `0 < x < B` would have broken the ~25
+`exact Hinumc` sites that feed bare `x < B` premises; two conjuncts cost one binder per destructuring
+and every existing hypothesis name keeps its meaning).  Changed: `inode_held`, `inode_held_refp`,
+`inode_held_ty/_at/_short`, `SpecNparEra.inode_held_ty_at`, `FileInvDefs.inode_core` (NOT in the brief:
+the file table RE-FORMS `inode_held` at the last fileclose through `inode_pay_cancel`, so `inode_pay_alloc`,
+`ProofSysOpenParts.so_publish` and the eight sys_open tail lemmas `so_join → so_alloc → so_stores →
+so_tail_pub → so_publish` and their `_au` twins gained the premise, threaded from the walk's package or
+from create's `0 < inum`); `SpecIget.wp_iget_sconf` gained the premise `0 < bv_unsigned inum ->` after
+the upper bound.  Discharged at: the root (`ROOTINO = 1`) in ProofNamex/NamexTr/NamexEra/NparEra/
+NamexRoot; dirlookup's found arm by the new `ProofDirlookupParts.dlk_live_pos : dir_live data k -> 0 <
+bv_unsigned (zero_extend' 32 (dir_inum data k))` (SpecDirlookup states NO positivity, despite DirView.v's
+comment), at ProofDirlookup and at each walker's found arm; ialloc/ireclaim (`proj1` of ialloc's post);
+sys_open's O_CREATE arm (create's post).  No boot-pin producer exists (`cwd_ref_at` is only ever formed
+from namei's root arm and repackagings), so that brief item was a no-op.  `SpecNamex/SpecNamei/
+SpecNameiparent/SpecDirlookup/IgetLic` needed no edit (none states the bound; it lives inside
+`inode_held`).  One proof surprise: after `rewrite dlk_zext32_unsigned` the two `bv_unsigned`s (at
+`mword 16` vs `bv 16`) are convertible but not syntactically equal, so `lia` sees two atoms; proved by
+conversion (`Z.lt_eq_cases` + `bv_eq`).
+
+### The brief as written (for the record)
 
 Add `0 < bv_unsigned inum` beside the upper bound in `IcacheHeld.inode_held` (and its one-unfold
 view `inode_held_refp`), in `SpecIget`'s premise, and in every producer/consumer pattern.  Where it

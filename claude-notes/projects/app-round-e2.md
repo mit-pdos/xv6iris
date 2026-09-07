@@ -21,8 +21,11 @@
 > BLOCKED: its parent-leg fire needs the target's inum nonzero (`dir_entries_dirlink_ins`; a zero
 > inum is a free dirent) and no contract on namei's path carries it (`inode_held`/`SpecIget` have
 > only the upper bound) — the prerequisite lane E2-L0 ("held inums are positive", brief in the
-> briefs file) adds `0 < inum` to `inode_held` and iget's premise.  So the order is E2-C (independent)
-> and E2-L0 → E2-L.  On resume: `git status` — a clean tree means the last lane landed (check
+> briefs file) adds `0 < inum` to `inode_held` and iget's premise.  **E2-L0 LANDED 2026-09-07
+> (commit 263098976; as-built record at the top of its brief in the briefs file), so E2-L is
+> UNBLOCKED.**  E2-C was launched the same day, in THIS checkout (lanes run one at a time in the
+> session's own directory — owner's rule of 2026-09-07; the build script takes the tree as its first
+> argument).  On resume: `git status` — a clean tree means the last lane landed (check
 > `git log`); modified iris files are the next lane's partial work: run the build script (log name =
 > the lane) and finish to green against its brief, or `git checkout -- iris` and redo from the brief.
 >
