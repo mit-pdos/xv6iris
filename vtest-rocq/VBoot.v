@@ -46,34 +46,10 @@ Local Open Scope Z_scope.
 (* The machine after the model's OWN boot chain, run from an arbitrary
    power-on file.  [None] means the chain itself got stuck at [rs0], which
    is a fact about the chain worth seeing rather than hiding. *)
-Definition boot_from (hid : Z) (rs0 : regstate) : option regstate :=
-  match exec (ArchReset.boot_prog (SailStdpp.Values.mword_of_int hid) pma_boot)
-             (MState rs0 ∅ dev0_state) with
-  | Some (_, s) => Some (sregs s)
-  | None => None
-  end.
 
 (* [VTest.start_with], with the power-on file supplied instead of assumed. *)
-Definition start_from (hid : Z) (rs0 : regstate) (text : list Z)
-    (rs : list region) : option mstate :=
-  match boot_from hid rs0 with
-  | Some r => Some (MState r (mem_of text rs) dev0_state)
-  | None => None
-  end.
 
-Definition run_from (n : nat) (hid : Z) (rs0 : regstate) (text : list Z)
-    (rs : list region) : option mstate :=
-  match start_from hid rs0 text rs with
-  | Some s => run_until n s
-  | None => None
-  end.
 
-Definition status_from (n : nat) (hid : Z) (rs0 : regstate) (text : list Z)
-    (rs : list region) : vstatus :=
-  match start_from hid rs0 text rs with
-  | Some s => run_status n s
-  | None => VStuck
-  end.
 
 (* THE DEFAULT IS ONE POINT OF THE SPACE, not the specification.
    [start_default] is what [VTest.start] uses, spelled here so a test can say

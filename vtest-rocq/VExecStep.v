@@ -1513,13 +1513,6 @@ Qed.
 (*     here and the semantic step is [sapply_dev_nsteps] on the result.    *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma item_of (i : sitem) (s s' : mstate) (w : gmap Arch.pa (bv 8)) :
-  dev_item i = true -> sapply_w i s = Some (s', w) ->
-  exists j, dev_item j = true /\ sapply j s = Some s'.
-Proof.
-  intros Hd He. exists i. split; [exact Hd|].
-  unfold sapply. rewrite He. reflexivity.
-Qed.
 
 (* Stated on [settle1_gated_w] -- the raw round -- so the only matches in
    the goal are the ones this proof means to split.  Unfolding [settle1_gated]

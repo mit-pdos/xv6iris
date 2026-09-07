@@ -83,7 +83,7 @@
  *   +0x600 + 4*i   B[i], hart Q's observation of X[i]  (scratch)
  *   +0x100  the entry gate's counter,  +0x140 the exit gate's
  */
-/* vtest: smp=2 repeat=1 builder=multi */
+/* vtest: smp=2 repeat=1 */
     .option norvc
 #include "abi.h"
 

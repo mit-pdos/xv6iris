@@ -85,26 +85,8 @@ Definition hart1 : CPU := 1%fin.
    mhartid the cold state carries.  So the fix is here rather than in
    [cfinish] or in the hand-written schedules, which go on naming hart0 and
    hart1 and mean "the first and second hart of this run". *)
-Definition g0_of_at (base : Z) (text : list Z) (rs : list region) : gstate :=
-  let m := mem_of text rs in
-  GState (fun c => ColdBoot.cold_regs
-                     (SailStdpp.Values.mword_of_int
-                        (base + Z.of_nat (fin_to_nat c))))
-         m dev0_state 0%nat true (fun _ => None)
-         (* the TSO axis at power-on ([RiscvLang.boot_facts]): the era image
-            IS the loaded memory, the write log is empty, every view is 0 *)
-         m [] (fun _ => 0%nat)
-         (* ...and so is every hart's INSTRUCTION view (icache.md) *)
-         (fun _ => 0%nat)
-         (* ...and its READ SIDE (relaxed-rr.md): watermark 0, every
-            coherence floor 0, no pending acquire *)
-         (fun _ => hread0).
 
-Definition g0_of (text : list Z) (rs : list region) : gstate :=
-  g0_of_at 0 text rs.
 
-Definition g0     (text : list Z) : gstate := g0_of text std_regions.
-Definition g0_dma (text : list Z) : gstate := g0_of text dma_regions.
 
 Definition ghart (g : gstate) (c : CPU) : mstate :=
   MState (gregs g c) (gmem g) (gdev g).
@@ -188,29 +170,15 @@ Fixpoint cfinish (n : nat) (g : gstate) : option gstate :=
       end
   end.
 
-Definition cstatus (n : nat) (g : gstate) : vstatus :=
-  match cfinish n g with Some _ => VDone | None => VBudget end.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. The observation, in the same currency vtest.py captures.             *)
 (* ---------------------------------------------------------------------- *)
 
-Definition gresult_of (o : option gstate) : list Z :=
-  match o with
-  | None => []
-  | Some g => peek_mem (gmem g) result_base result_size
-  end.
 
 (* run the named interleaving, then let both harts finish, then look *)
-Definition cobs (n : nat) (sch : list citem) (g : gstate) : list Z :=
-  match crun sch g with
-  | None => []
-  | Some g' => gresult_of (cfinish n g')
-  end.
 
 (* A RACE HAS SEVERAL OUTCOMES AND THE MODEL MUST ADMIT EACH.  Give one
    schedule per observed outcome, in the same order the capture lists them,
    and compare the whole list in ONE lemma -- which is also one evaluation
    per schedule instead of one per lemma. *)
-Definition cobs_all (n : nat) (schs : list (list citem)) (g : gstate)
-  : list (list Z) := (fun sch => cobs n sch g) <$> schs.

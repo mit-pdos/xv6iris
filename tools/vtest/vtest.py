@@ -129,61 +129,45 @@ def config(name):
            #   tick=1      step the CLOCK-TICKING branch of the boundary's
            #               [exists tick : bool].  For a case whose subject is
            #               elapsed time; see VTest section 3a.
-           #   proj=whole                compare the entire result region
-           #   proj=fields:o1,o2,...     compare only these 4-byte words, for
-           #               a case some of whose fields legitimately differ
-           #               between two runs of the SAME machine (counters, a
-           #               raw mtime, an image-dependent mtvec, the hart id)
-           #
-           #   THE [builder=] AND [proj=] KEYS ARE DEAD.  A run used to be
-           #   re-presented from a capture by one of five builders, and a
-           #   test could name the words it wanted compared; neither exists.
-           #   A capture IS its Test and its Run, and the whole result region
-           #   is compared -- a value that varies between two runs of the
-           #   same machine is one the program should not publish.  The keys
-           #   are still parsed so an old .S does not fail to read; nothing
-           #   reads them.
-           #   csched=b,b,...  THE INTERLEAVING, for a MULTI-HART case: one
-           #               bit per instruction, 0 for the first hart and 1
-           #               for the second, run before the two are left to
-           #               round-robin to the DONE flag (VConcStep).  The
-           #               default is empty -- round-robin from the start --
-           #               and that is not a cop-out: it is a real model
-           #               execution, and a race whose observed outcome it
-           #               does not reach is one that NEEDS a named
-           #               interleaving, which is a fact about the case
-           #               worth stating in the case.
+           #   budget=N    steps the model is given.  Too small reads as a
+           #               failure; too large only costs time, and only for a
+           #               case that does not finish.
+           #   tick=1      step the CLOCK-TICKING branch of the boundary's
+           #               [exists tick : bool].  For a case whose subject is
+           #               elapsed time; see VTest section 3a.
+           "budget": 2000, "tick": 0,
+           #   csched=...  the per-observation INTERLEAVINGS of a multi-hart
+           #               case, semicolons between and run-length encoded
+           #               inside; a trailing `s` marks a stretch STALE.
+           #               [csched_hw] overrides it for the board, whose
+           #               image does not share the instruction counts.
            "csched": "", "csched_hw": "",
            #   crounds=N   raise the multi-hart round cap for a case that
            #               genuinely needs more.  The cap exists so a run
            #               that never reaches the DONE flag fails in seconds
            #               instead of minutes; a run that DOES reach it stops
-           #               there and pays nothing for a high number, so
-           #               raising it costs only the failing case.
+           #               there and pays nothing for a high number.
            "crounds": 0,
            #   ipol=fresh|stale;...   THE FETCH VIEW, for a case whose
-           #               subject is SELF-MODIFYING CODE: one per
+           #               subject is self-modifying code: one per
            #               observation.  [fresh] reads the fetch at the top
-           #               of the log -- a coherent I-cache, QEMU's answer;
-           #               [stale] reads it AT the instruction view, which
-           #               only the program's own fence.i raises -- a
-           #               non-coherent one, the U74's.  Both are executions
-           #               the model has (VIcacheStep, icache.md).
-           #               [ipol_hw] overrides it for the board.
+           #               of the log -- a coherent I-cache; [stale] reads it
+           #               AT the instruction view, which only fence.i
+           #               raises.  Both are executions the model has
+           #               (VIcacheStep, icache.md).  [ipol_hw] is the
+           #               board's.
            "ipol": "", "ipol_hw": "",
+           #   picks=a,b   one disk completion order per observation, for a
+           #               case that observed several.
+           "picks": "",
            #   latch=N     how many INSTRUCTIONS the PLIC gateway may keep
            #               re-forwarding a still-asserted level source for.
-           #               [VSched.settle] is eager and takes every enabled
-           #               device arm, but the RELATION never requires the
-           #               gateway arm ([SLatch] is never forced), so a run
-           #               that stops taking it is just as much a model
-           #               execution.  plic_level phase 2 is the case where
-           #               that matters: with the latch on throughout, the
-           #               model re-forwards after the complete and QEMU
-           #               does not.  0 means "the whole run", which is what
-           #               every other case wants.
-           "latch": 0,
-           "budget": 2000, "tick": 0, "proj": "whole", "builder": "single"}
+           #               [VSched.settle] is eager, but the RELATION never
+           #               requires the gateway arm, so a run that stops
+           #               taking it is just as much a model execution --
+           #               which is what lets plic_level match QEMU.  0 means
+           #               "the whole run", which every other case wants.
+           "latch": 0}
     for line in open(src):
         m = re.search(r"vtest:\s*(.*?)\s*\*/", line)
         if m:
@@ -353,17 +337,6 @@ def regions_of(name):
     if "DMA_BASE" in src:
         return "dma_regions"
     return "std_regions"
-
-
-def proj_of(name):
-    """The Rocq projection term for this case's `proj=` directive."""
-    v = config(name).get("proj", "whole")
-    if v == "whole":
-        return "whole"
-    if v.startswith("fields:"):
-        offs = [o for o in v[len("fields:"):].split(",") if o]
-        return "(fields [%s]%%nat)" % "; ".join(offs)
-    sys.exit("%s: unknown proj=%s" % (name, v))
 
 
 FORCE = [False]      # set from --force in main()

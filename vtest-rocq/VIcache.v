@@ -168,61 +168,17 @@ Record istate := IState {
 }.
 
 (* one instruction, then every enabled device action (the eager default) *)
-Definition istep (ip : ipol) (h : agent) (img : gmap Arch.pa (bv 8))
-    (st : istate) : option istate :=
-  match itexec ip h img (riscv_step false) st.(i_s) st.(i_log) st.(i_tv) st.(i_itv)
-               st.(i_hr) with
-  | Some (_, s', log', tv', itv', hr') =>
-      Some (IState (settle dev_fuel s') log' tv' itv' hr')
-  | None => None
-  end.
 
 (* [n] instructions under policy [ip], stopping early at the DONE flag *)
-Fixpoint irun_pol (ip : ipol) (h : agent) (img : gmap Arch.pa (bv 8))
-    (n : nat) (st : istate) : option istate :=
-  if flag_set st.(i_s) then Some st else
-  match n with
-  | 0%nat => Some st
-  | S n' => match istep ip h img st with
-            | Some st' => irun_pol ip h img n' st'
-            | None => None
-            end
-  end.
 
-Inductive iitem :=
-  | IPol (ip : ipol) (n : nat).   (* n whole instructions fetched under ip *)
 
-Definition iapply (h : agent) (img : gmap Arch.pa (bv 8)) (i : iitem)
-    (st : istate) : option istate :=
-  match i with IPol ip n => irun_pol ip h img n st end.
-
-Definition irun (h : agent) (img : gmap Arch.pa (bv 8)) (sch : list iitem)
-    (st : istate) : option istate :=
-  foldl (fun o i => match o with Some st' => iapply h img i st' | None => None end)
-        (Some st) sch.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. The observation, in the currency the captures are in.  After the     *)
 (*    schedule the hart finishes under the fresh policy; an execution that *)
 (*    does not reach DONE, or that the model refuses, contributes nothing. *)
 (* ---------------------------------------------------------------------- *)
-Definition iobs (h : agent) (img : gmap Arch.pa (bv 8)) (budget : nat)
-    (sch : list iitem) (st : istate) : list Z :=
-  match irun h img sch st with
-  | None => []
-  | Some st' =>
-      match irun_pol IFresh h img budget st' with
-      | Some st'' =>
-          if flag_set st''.(i_s)
-          then peek_mem (mem st''.(i_s)) result_base result_size
-          else []
-      | None => []
-      end
-  end.
 
-Definition iobs_all (h : agent) (img : gmap Arch.pa (bv 8)) (budget : nat)
-    (schs : list (list iitem)) (st : istate) : list (list Z) :=
-  (fun sch => iobs h img budget sch st) <$> schs.
 
 
 (* ---------------------------------------------------------------------- *)

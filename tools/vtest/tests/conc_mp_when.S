@@ -32,6 +32,6 @@
  * FORBIDDEN count moving off zero -- and that is conc_mp's business, not
  * this test's.
  */
-/* vtest: smp=2 repeat=20 builder=multi budget=6000 */
+/* vtest: smp=2 repeat=20 budget=6000 */
 #define CONC_MP_WHEN 1
 #include "conc_mp.S"

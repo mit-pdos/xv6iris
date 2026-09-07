@@ -260,8 +260,6 @@ Definition drain_one_w (s : mstate) : option (mstate * gmap Arch.pa (bv 8)) :=
   | None => None
   end.
 
-Definition drain_one (s : mstate) : option mstate :=
-  match drain_one_w s with Some (s', _) => Some s' | None => None end.
 
 (* THE WIRE NEEDS A GUARD THAT THE OTHER ARMS DO NOT.  [plic_step] has no
    premise -- propagating the PLIC's EIP level onto a hart's pin is always a
@@ -276,8 +274,6 @@ Definition wire_needed (s : mstate) (h : nat) : bool :=
 Definition settle_wire_w (s : mstate) : option (mstate * gmap Arch.pa (bv 8)) :=
   if wire_needed s 0 then sapply_w (SWire 0) s else None.
 
-Definition settle_wire (s : mstate) : option mstate :=
-  match settle_wire_w s with Some (s', _) => Some s' | None => None end.
 
 (* WHICH IN-FLIGHT REQUEST THE EAGER SCHEDULE PICKS UP.  The device may
    complete any head it has popped and not yet completed, so an eager
@@ -315,9 +311,6 @@ Definition pick_at_w (pick : virtio_state -> option Z)
   | None => None
   end.
 
-Definition pick_at (pick : virtio_state -> option Z)
-    (f : Z -> sitem) (s : mstate) : option mstate :=
-  match pick_at_w pick f s with Some (s', _) => Some s' | None => None end.
 
 (* first enabled arm wins.  Nested rather than a list, so a later arm is not
    even evaluated once an earlier one fires -- [settle] runs after EVERY

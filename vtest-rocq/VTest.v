@@ -103,14 +103,9 @@ Definition start_with (text : list Z) (rs : list region) : mstate :=
   MState (ColdBoot.cold_regs (SailStdpp.Values.mword_of_int 0))
          (mem_of text rs) dev0_state.
 
-Definition start_disk (text : list Z) (rs : list region)
-    (img : gmap Z (bv 8)) : mstate :=
-  MState (ColdBoot.cold_regs (SailStdpp.Values.mword_of_int 0))
-         (mem_of text rs) (dev_of img).
 
 Definition start     (text : list Z) : mstate := start_with text std_regions.
 Definition start_dma (text : list Z) : mstate := start_with text dma_regions.
-Definition start_pt  (text : list Z) : mstate := start_with text pt_regions.
 
 (* ---------------------------------------------------------------------- *)
 (* 2b. THE SAME MACHINE, ON A HART THAT IS NOT HART 0.                     *)
@@ -143,8 +138,6 @@ Definition start_hart_with (h : Z) (text : list Z) (rs : list region) : mstate :
 
 Definition start_hart    (h : Z) (text : list Z) : mstate :=
   start_hart_with h text std_regions.
-Definition start_hart_pt (h : Z) (text : list Z) : mstate :=
-  start_hart_with h text pt_regions.
 
 (* ---------------------------------------------------------------------- *)
 (* 3. Stepping.                                                            *)
@@ -210,15 +203,6 @@ Definition run_until (n : nat) (s : mstate) : option mstate :=
 (*     parameterise this the way [run_until_at] parameterises the disk.     *)
 (* ---------------------------------------------------------------------- *)
 
-Fixpoint run_until_tick (n : nat) (s : mstate) : option mstate :=
-  if flag_set s then Some s else
-  match n with
-  | 0%nat => None
-  | S n' => match exec (riscv_step true) s with
-            | Some (_, s') => run_until_tick n' (settle dev_fuel s')
-            | None => None
-            end
-  end.
 
 
 (* ...and the run in which a LATER request overtakes an earlier one: the same
@@ -226,8 +210,6 @@ Fixpoint run_until_tick (n : nat) (s : mstate) : option mstate :=
    pop in order) and then completes the higher head first.  Only
    [DiskOrder.v] uses it, and what it demonstrates is that the model has
    BOTH of the executions the hardware has. *)
-Definition run_until_rev (n : nat) (s : mstate) : option mstate :=
-  run_until_at highest_head n s.
 
 (* how much of the budget was left -- the diagnostic that tells "the budget
    was too small" apart from "the machine got stuck" *)
@@ -289,15 +271,6 @@ Fixpoint run_status (n : nat) (s : mstate) : vstatus :=
 
 (* ...and the same, on the TICKING branch of the boundary's [exists tick] --
    see section 3a. *)
-Fixpoint run_status_tick (n : nat) (s : mstate) : vstatus :=
-  if flag_set s then VDone else
-  match n with
-  | 0%nat => VBudget
-  | S n' => match exec (riscv_step true) s with
-            | Some (_, s') => run_status_tick n' (settle dev_fuel s')
-            | None => VStuck
-            end
-  end.
 
 (* ---------------------------------------------------------------------- *)
 (* 3c. WHY it was stuck, which [VStuck] alone does not say.                *)
@@ -403,15 +376,7 @@ Definition serial_of (o : option mstate) : list Z :=
   end.
 
 (* the disk, per 512-byte sector, in the shape [<name>_qemu_disk] carries *)
-Definition sector_of (o : option mstate) (i : Z) : list Z :=
-  match o with
-  | None => []
-  | Some s => bv_unsigned <$>
-      disk_read (v_disk (dvirtio (mdev s))) (i * virtio_sector_size) 512
-  end.
 
-Definition disk_of_run (o : option mstate) (is : list Z) : list (Z * list Z) :=
-  (fun i => (i, sector_of o i)) <$> is.
 
 (* ---------------------------------------------------------------------- *)
 (* 4b. Reading ONE FIELD out of either side.                               *)
@@ -427,25 +392,14 @@ Definition disk_of_run (o : option mstate) (is : list Z) : list (Z * list Z) :=
 (*     should be revisited.                                                 *)
 (* ---------------------------------------------------------------------- *)
 
-Definition le_word (bs : list Z) : Z :=
-  foldr (fun b acc => acc * 256 + b) 0 (take 4 bs).
 
 (* a 4-byte little-endian word at [off] in the model's result region *)
-Definition res_word (o : option mstate) (off : nat) : Z :=
-  le_word (drop off (result_of o)).
 
 (* ...and the same word in what vtest.py captured from QEMU *)
-Definition cap_word (cap : list Z) (off : nat) : Z := le_word (drop off cap).
 
-Definition res_bytes (o : option mstate) (off n : nat) : list Z :=
-  take n (drop off (result_of o)).
-Definition cap_bytes (cap : list Z) (off n : nat) : list Z :=
-  take n (drop off cap).
 
 (* the sectors a run changed, in the shape [<name>_qemu_disk] carries, so a
    test can compare the two disks with one equation *)
-Definition disk_like (o : option mstate) (cap : list (Z * list Z))
-  : list (Z * list Z) := disk_of_run o (fst <$> cap).
 
 (* ---------------------------------------------------------------------- *)
 (* 5. The tactic every test closes with.                                   *)
