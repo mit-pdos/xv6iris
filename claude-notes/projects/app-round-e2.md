@@ -31,6 +31,12 @@
 > fd-row follow-up the nlink-0 ruling created (reads through an fd of an unlinked file get their
 > contents from a per-fd resource, not the view).  Owner's standing preferences: narrate, don't ask;
 > checkpoint at green (commit, rebase, push); briefs are law, no in-proof instrument invention.
+>
+> E2-W's brief is WRITTEN (`roundE2W-brief.md`, last in the briefs file): W-b (the raw step on the
+> landed write, #5 → `_step`), W-a (the AU chain's partial arm becomes a NON-DETERMINISTIC state
+> fire covering writei's disturbed region, #6), W-c (the dispatcher's write arm splits on the fd's
+> state out of `fd_frags` and dispatches the AU write for inode fds — the fragments ARE at the
+> dispatcher, `sysc_arm_pre` carries `fd_frags`).  Launch it after E2-L lands.
 
 
 STATUS: PROPOSAL; RULINGS SO FAR (owner, 2026-09-05): Q-a YES (view = allocated rows; lane E2-V

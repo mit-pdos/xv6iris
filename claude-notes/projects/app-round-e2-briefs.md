@@ -330,3 +330,113 @@ Green; audit 13; both audited statements byte-identical; no Admitted/Axiom; the 
 dispatcher arms pass `_unit`s.  Report: the commits verbatim, every changed post arm, the fires'
 statements, the 13 site diffs, deviations.  Do not commit.  Expect ~3-4 VM builds: the SpecCreate*
 cone is the whole create family (ProofCreateAU/AUF ~7k lines each; ~2 min per file).
+
+## roundE2W-brief.md — written 2026-09-07 (after E2-C landed; launch after E2-L)
+
+## Lane E2-W: write — the short chunk's state fire (#6), the raw step on the landed write (#5), the dispatch (W1)
+
+Rulings: Q-i YES ("a bug in the sys_write spec; the whole write spec may be non-deterministic but
+must account for the short write"); Q-e W1 ("doesn't matter" between W1 and W2 — W1 it is: the
+landed sconf and the AU form both stay, the dispatcher picks); Q-d (live view: `delta_write` is the
+identity at an absent row, `FsAbsDelta.delta_write_absent`).  Read app-round-e2.md §1 (sites #5, #6)
+and §7, "E2-V2 AS BUILT" (`arow_at`, `app_step_acc_view`), "E2-C AS BUILT" (the freshest two-phase
+commit/receipt mold); FsAbsWriteFire.v (§2 `awrite_full_at`/`awrite_part_at`/`awrite_chain`, the
+units, §3 `wrf_awrite_fire`); SpecSysWriteAU.v §2 (`wri_pre`, the arms) and SpecSysWriteAUEra.v
+(the chain-shaped arms, the fail arm's `x <= 1` slack); SpecFilewriteAU.v (`fw_au_raw_*`, the chain
+node's two arms); ProofFilewriteAU.v ~2670-2700 (`Hjoin`) and ~2950-3010 (the three sub-arms after
+writei: the chunk fires / SHORT: offset moved / NOTHING MOVED); SpecWritei.v :40-110 and ~740-760
+(THE DISTURBED REGION: after a short write, `dist <= BSIZE` bytes at `off + tot` hold unspecified
+`dstb`; `tot = n -> dist = 0`; the -1 return is the pre-write guards, nothing written); the landed
+side: SpecFilewrite.v (the FD_INODE arm, ~415-560), ProofFilewrite.v ~2296-2320 (site #5, the
+`ireg_top_retag_auto … Logic.I` after writei), SpecSysWrite.v, ProofSysWrite.v, ProofSyscall.v
+~4360-4440 (the write arm; it holds `fd_frags (pv_fdg (us_V U)) sts` in `sysc_arm_pre`, :1588) and
+FdSlots.v :509-545 (`foff_row (FdOpen _ _ (FdInode _ γo)) = off_user_inv γo`, persistent) and :798
+(`fd_frags_acc`: one fragment out, its `foff_row`, and the give-back); FsAbsInvFire.v
+`fsabs_awrite_chain` (the dispatcher-side chain unit, off `off_user_inv`).  Build via the script
+(log `rE2W`).
+
+### W-b FIRST (small, the landed cone): #5 becomes `_step`
+
+- `SpecFilewrite`'s FD_INODE arm gains ONE premise, the raw step at the inode the arm discovers:
+  `∀ (I : gmap Z fs_node) (off : nat) (bs : list (bv 8)), app_step i I (delta_write i off bs
+  (abs_view I))` — quantified over `i` too where the inum is not a parameter of the contract
+  (`∀ i I off bs, …`); it is threaded in and RETURNED (it is a plain wand family, use it as many
+  times as writei runs).  `SpecSysWrite` threads the same premise; `ProofSysWrite` passes it down.
+- Site #5 (ProofFilewrite.v ~2314): `ireg_top_retag_auto … Logic.I Hlocw` → `ireg_top_retag_step`
+  (InodeRegion.v:3393) with the step built from the premise at the bytes writei landed.  The
+  reading after writei is `delta_write i off bsw (abs_view I)` at SOME `bsw` — the written run plus
+  whatever of the DISTURBED region lies inside the new size — so the site proves
+  `abs_view (<[i := n']> I) = delta_write i off bsw (abs_view I)` for that `bsw` (the mold is
+  `wrf_awrite_fire`'s `Hdelta` via `abs_view_insert_row`/`wrf_write_row`, generalized to a run that
+  is not the caller's chunk); at an absent row (`abs_of n = None`: the file was unlinked while
+  open) both sides are the identity (`delta_write_absent`, and `abs_of n' = None` by
+  `fn_nlink` unchanged).  If the record readings the site needs were thrown away by the landed
+  join (the AU EDIT comment at ProofFilewriteAU.v ~2676 lists what the AU join re-kept: `tot`,
+  `wi_dinode`, `off <= length bs0`), re-keep them in ProofFilewrite's join the same way.
+- The consumers pay: ProofSyscall's write arm (~4402) supplies the premise from `app_inv` —
+  `AppInv.app_step_acc_view` (license where the row is, identity where it is not) at
+  `delta_write_absent`; that is exactly what `awrite_chain_unit`'s full arm does — and every other
+  caller of `wp_sys_write_sconf`/`wp_filewrite_sconf` (grep: LinkSysWrite, ProofFilewriteCons,
+  SpecFilewriteCons/ProofSysWriteConsAU?, SpecFileread's shared frame — several are comments)
+  threads or supplies it likewise.  The ConsAU write (console) does not reach the inode arm: it
+  supplies the premise trivially if its frame is shared, else nothing changes.
+
+### W-a: #6 — the chain's PARTIAL arm becomes a state fire (the contract hole, Q-i)
+
+- `FsAbsWriteFire.awrite_part_at` today moves only the offset half ("no delta this contract can
+  receipt").  That is the hole: the machine DID move the row.  Replace it by a two-phase commit in
+  `awrite_full_at`'s mold, NON-DETERMINISTIC in the bytes:
+
+      awrite_part_at Γ E i γo k Φ REST :=
+        ∀ I off bs bs0 nl (r : nat) (junk : list (bv 8)),
+          ⌜wri_pre (abs_view I) i off bs bs0 nl⌝ -∗
+          ⌜r < length bs⌝ -∗ ⌜length junk <= BSIZE⌝ -∗
+          auth(1/2) I -∗ off_gv γo (1/2) off ={E}=∗
+          auth(1/2) I ∗ app_step i I (delta_write i off (take r bs ++ junk) (abs_view I))
+          ∗ (∀ I', ⌜abs_view I' = delta_write i off (take r bs ++ junk) (abs_view I)⌝ -∗ auth I' ={E}=∗
+                   auth I' ∗ off_gv γo (1/2) (off + r) ∗ Φ k (abs_view I) off (take r bs ++ junk) ∗ REST)
+
+  `r` is what writei returned (`0 <= r < the chunk`: the `rz = 0` sub-arm — the first copy failed,
+  `tot = 0`, the offset does not move, the disturbed chunk MAY be committed — is `r = 0`; the
+  `rz = -1` sub-arm is writei's pre-write guards, NOTHING moved: use `r = 0`, `junk = []`, and
+  `delta_write_nil`/the identity, or keep it on the `_same` reading `abs_of n' = abs_of n` if the
+  re-kept join facts give it — say which); `junk` is the disturbed region's bytes that lie inside
+  the new size (`dist <= BSIZE` — SpecWritei's bound is what makes the clause statable).  The
+  receipt spells its shape purely: add `wri_part_receipt` (the `∃ r junk` facts beside `Φ`) and
+  let the fail arm carry it: `SpecSysWriteAU.write_post_fail` / `SpecSysWriteAUEra`'s chain form
+  gain `(wri_part_receipt … ∨ nothing fired past the prefix)` in place of the silent `x <= 1`
+  slack (the slack becomes: the partial node fired and receipted, or the chain resumes at the
+  prefix).  `awrite_chain_unit` and `FsAbsInvFire.fsabs_awrite_chain` pay the new arm with
+  `app_step_acc_view` at `delta_write_absent`, like the full arm.  If `wri_pre` cannot be
+  established on the short arm (it wants `off <= length bs0` and the count), state the partial
+  commit's pre-row with `arow_at` and the facts the arm HAS — report the exact statement.
+- `wrf_awrite_fire` gets a partial twin `wrf_apart_fire` (same ftopN section; the offset's half in
+  at `off`, out at `off + r`); `SpecFilewriteAU.fw_au_raw_spend_part` hands the new arm;
+  ProofFilewriteAU.v's SHORT sub-arm (~2990-3010) fires it in place of `wrf_partial_move` + the
+  `ireg_top_retag_auto`, and the NOTHING-MOVED sub-arm (~3011-3020) either fires it at `r = 0,
+  junk = []` or goes `_same` — the `Logic.I` at ~2985 disappears either way.  `wrf_partial_move`
+  is then unused: delete it.
+
+### W-c LAST: the dispatch (W1)
+
+- ProofSyscall's write arm (~4402) case-splits BEFORE choosing the callee: `destruct (arg_fd v0
+  (pv_ofile (us_V U))) as [[fd fv] |] eqn:Hafd` — `None` → the landed `wp_sys_write_sconf` (as
+  today); `Some (fd, fv)` → `fd_frags_acc` at `fd` (`sts !! fd = Some st` from `arg_fd`'s shape,
+  `fd < NOFILE`) gives `fd_st … fd st`, `foff_row st` and the give-back; `destruct st`: `FdOpen rb
+  true (FdInode i γo)` → `wp_sys_write_au` (SpecSysWriteAU / its Era seal — use the one the tree
+  proves, `SYSWRITE_AU_ERA` via LinkSysWriteAU) with EXTRA := the chain unit
+  (`fsabs_awrite_chain` off `foff_row st = off_user_inv γo`) and the True receipt family, then the
+  fragment back into `fd_frags`; every other `st` (closed, read-only, pipe, device) → the landed
+  sconf.  Both callees' posts imply `sys_write_ret` (SpecSysWriteAU header item 4), so the arm's
+  landed post is unchanged.
+- After W-c, site #5 is off the theorem's path (the sconf only serves non-inode fds and the argfd
+  failure) but stays `_step` in the build (W-b); do NOT delete `wp_sys_write_sconf`'s inode arm
+  (E2-X's business, and the cons/pipe arms live there).
+
+### Gate
+
+Green; `make audit-only` 13 (from the tree root); both audited statements byte-identical; no
+Admitted/Axiom; every `Logic.I` at #5 and #6 gone; the dispatcher's write arm passes units.
+Report: the partial commit verbatim, the changed fail arms (AU and Era), the step premise's final
+placement, the three site diffs, the dispatch's case split, deviations.  Do not commit.  Expect
+3-5 VM builds (the SpecFilewrite cone is the write family + ProofSyscall).
