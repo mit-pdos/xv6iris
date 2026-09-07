@@ -477,7 +477,7 @@ Section ProofIget.
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
-    intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1 Hfresh.
+    intros pcE ret_tgt HK HnZ Hnib Hpos Ha0 Ha1 Hfresh.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     (* [Hlic] is the LICENCE (increment C'-lite, fs-fragments.md §7.1).

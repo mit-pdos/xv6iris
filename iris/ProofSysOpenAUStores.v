@@ -199,6 +199,7 @@ Section ProofSysOpenAUStores.
     (24 <= K)%nat -> ((K - 24) + 24 = K)%nat ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    0 < bv_unsigned inum ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
     0 <= fsc_bmapstart ->
@@ -327,7 +328,7 @@ Section ProofSysOpenAUStores.
                dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize Hbm0
+    intros Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize Hbm0
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty Hkf
            Hfdlt Hlen Hfrees Htyor Hdir Hwf Hom Htd Hti Hal23 Hsp0 HNsp HNthr
            HNs0 HNs1 HNs2 HNs3 Hal.
@@ -604,7 +605,7 @@ Section ProofSysOpenAUStores.
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U sts m N6 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t g
-                Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
+                Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
                 Hsp0 HN6sp HN6thr HN6s1 HN6s3 Hal
@@ -713,7 +714,7 @@ Section ProofSysOpenAUStores.
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U sts m N8 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t g
-                Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
+                Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
                 Hsp0 HN8sp HN8thr HN8s1 HN8s3 Hal
@@ -943,7 +944,7 @@ Section ProofSysOpenAUStores.
               om voff nsj u3 pidv dqb dqs U sts m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
               vom P Pmiss Φo Φt t g
-              Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
+              Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
               Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
               Hom Hfdty
               Hsp0 Hitsp Hitthr Hits1 Hits3 Hal

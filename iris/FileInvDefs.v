@@ -835,6 +835,7 @@ Section InodeCore.
     (∃ k : nat,
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       ⌜0 < bv_unsigned inum⌝ ∗
        iref_frag k (Q + Q)%Qp ∗
        ic_lent_stamps k (Q + Q)%Qp Q icfg_dev inum ∗
        runit_any (bv_unsigned inum))%I.
@@ -1180,7 +1181,7 @@ Section FileInv.
     iIntros (HE) "(#Hi & Hown & Hside & Hs & _)".
     iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
     iMod "H". iModIntro. rewrite !Qp.mul_1_l.
-    iDestruct "H" as (k) "(%Hv & %Hk & %Hb & Hf & Hlent & Hru)".
+    iDestruct "H" as (k) "(%Hv & %Hk & %Hb & %Hp & Hf & Hlent & Hru)".
     iDestruct "Hside" as (k1 lo) "(%Hv1 & %Hk1 & Hid & Hl & Hslh)".
     iDestruct "Hs" as (k2 lo2 tl) "(%Hv2 & %Hk2 & %Hb2 & %Hle & #Hfl & Hshr)".
     assert (k1 = k) as -> by (apply ientry_inj; [lia | lia | congruence]).
@@ -1194,7 +1195,7 @@ Section FileInv.
     { rewrite /inode_shr_genlo. iFrame. }
     iDestruct (inode_ref_gather_genlo with "Hshort Hshr") as "Href".
     rewrite /inode_held. iExists k, (Q + Q)%Qp, inum.
-    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     rewrite /inode_refp. iFrame "Hru".
     rewrite /inode_ref_genlo /inode_ref. iDestruct "Href" as "(Hf & Hl & Hid & Hslh & Hst)".
     iFrame "Hf Hid Hslh Hst". rewrite /live_fracc. iExists g, lo, tl. iFrame "Hl Hfl". done.
@@ -1250,6 +1251,7 @@ Section FileInv.
       (inum : mword 32) (fdty : mword 32) (wr : bool) (ty : bv 16) :
     (k < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    0 < bv_unsigned inum ->
     (wr = true -> bv_unsigned ty <> T_DIR_z) ->
     (fdty = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z) ->
     inode_ref_short_genlo k (Q + Q)%Qp Q icfg_dev inum g lo -∗
@@ -1257,7 +1259,7 @@ Section FileInv.
     inode_shr_held_gen (ientry k) Q g inum -∗ ity_shot g ty
     ={E}=∗ ∃ γx : gname, inode_pay γx Q g inum (ientry k) fdty wr 1.
   Proof.
-    iIntros (Hk Hb Hwr Hdv) "Hshort Hru Hs #Hty".
+    iIntros (Hk Hb Hp Hwr Hdv) "Hshort Hru Hs #Hty".
     rewrite /inode_ref_short_genlo. iDestruct "Hshort" as "(Hf & Hl & Hid & Hslh & Hlent)".
     iMod (cinv_alloc E fileipN (inode_core (ientry k) Q inum) with "[Hf Hlent Hru]")
       as (γx) "[#Hi Hown]".

@@ -174,6 +174,7 @@ Section ProofSysOpenAUJoin.
     (K_sys_open <= K)%nat ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    0 < bv_unsigned inum ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
     0 <= fsc_bmapstart ->
@@ -275,7 +276,7 @@ Section ProofSysOpenAUJoin.
                dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hqs HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
+    intros Hqs HK Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom Hal23 Hsp0 HMsp HMthr
            HMs0 HMs1 HMs2 HMs3 Hal Hnspos.
     pose proof HK as HKfull.
@@ -373,7 +374,7 @@ Section ProofSysOpenAUJoin.
  kk qi s gy loy tly inum dn bm om lo nsj u
                 pidv dqb dqs U sts m M2 sp0 K eb b lks w4 w5 w6 w24 bp
                 data vom pl P Pmiss Φo Φt
-                Hqs HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                Hqs HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom
                 ltac:(intros Hq; exfalso; apply Hnd3; apply bv_eq;
                       rewrite Hq; vm_compute; reflexivity)
@@ -548,7 +549,7 @@ Section ProofSysOpenAUJoin.
  kk qi s gy loy tly inum dn bm om lo nsj u
                pidv dqb dqs U sts m M4 sp0 K eb b lks w4 w5 w6 w24 bp
                data vom pl P Pmiss Φo Φt
-               Hqs HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
+               Hqs HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
                Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom
                Hmajb
                Hal23 Hsp0

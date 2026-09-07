@@ -910,6 +910,7 @@ Section ProofSysOpenPublish.
     ↑fileipN ⊆ E ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    0 < bv_unsigned inum ->
     fc_ip C = ientry kk ->
     (fc_type C = FD_INODE \/ fc_type C = FD_DEVICE) ->
     (* THE THEOREM OF THE WALK, in the form the two arms prove it: the
@@ -961,7 +962,7 @@ Section ProofSysOpenPublish.
        than a projection because [fdstate_ok] is a relation -- see its note. *)
     |={E}=> ∃ st : fdstate, ⌜fdstate_ok inum γo C st⌝ ∗ file_ref gf kf 1 st.
   Proof.
-    intros Hqs HEi Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hdvw Hle. subst qi.
+    intros Hqs HEi Hkk Hinb Hipos Hip Hty Hwrb Hrdb Hwdb Hdir Hdvw Hle. subst qi.
     iIntros "#Hfl Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hcoff".
     rewrite inode_shr_gen_intro.
     iDestruct "Hshr" as (g2 lo2 tl2) "(%Hle2 & #Hfl2 & Hshr)".
@@ -977,7 +978,7 @@ Section ProofSysOpenPublish.
     (* r25 (inode_pay D1): the parent's SHORT reference itself is parked --
        its ghost-only core behind the cinv, its ident side beside it. *)
     iMod (inode_pay_alloc E kk s gy lo inum (fc_type C) (fc_wbool C) ty
-            Hkk Hinb (so_pay_witness om ty C Hwrb Hdir) Hdvw
+            Hkk Hinb Hipos (so_pay_witness om ty C Hwrb Hdir) Hdvw
             with "Hkeep Hru Hs Hshot")
       as (gx) "Hpay".
     iMod (fpay_tok_update gf kf pn

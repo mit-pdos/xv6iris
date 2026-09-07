@@ -1151,7 +1151,7 @@ Section KexecABody.
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- the inode: slot, share, and the region facts ---- *)
-    iDestruct "Hheld" as (k q inum) "(%Hie & %Hk & %Hib & %Hz & Href & Hru)".
+    iDestruct "Hheld" as (k q inum) "(%Hie & %Hk & %Hib & %Hipos & %Hz & Href & Hru)".
 
     rewrite inode_ref_shed. iDestruct "Href" as "[Hkeep Hshr]".
     (* SpecIlock v5 takes the share at a NAMED generation

@@ -311,11 +311,12 @@ Section KforkB4Proof.
        child's [cwd_ref] wants back -- but the package itself now travels
        WHOLE.  What used to stand here (the shed, and the gather after the
        call) is idup's own business since [SpecIdup] took [inode_held]. *)
-    iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & %Hcinz & Hrefp)".
+    iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & %Hcpos & %Hcinz & Hrefp)".
     iAssert (inode_held_at (ientry ck) (pv_cwi (us_V Up))) with "[Hrefp]" as "Hpheld".
     { iExists ck, cq, cinum.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hcklt |].
-      iSplitR; [iPureIntro; exact Hcinumb |]. iSplitR; [iPureIntro; exact Hcinz |].
+      iSplitR; [iPureIntro; exact Hcinumb |]. iSplitR; [iPureIntro; exact Hcpos |].
+      iSplitR; [iPureIntro; exact Hcinz |].
       iExact "Hrefp". }
     (* THE SHED THAT USED TO STAND HERE IS GONE (SIMP-2).  idup still runs
        on a count-0 share and still mints the child's reference from the

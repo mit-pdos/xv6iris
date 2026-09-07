@@ -176,6 +176,7 @@ Section ProofSysOpenAUAlloc.
     (K_sys_open <= K)%nat ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    0 < bv_unsigned inum ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
     0 <= fsc_bmapstart ->
@@ -285,7 +286,7 @@ Section ProofSysOpenAUAlloc.
                dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hqs HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
+    intros Hqs HK Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom Hmajb Hal23 Hsp0 HNsp
            HNthr HNs0 HNs1 HNs2 HNs3 Hal Hnspos.
     destruct (so_kb K HK) as (HKcr & HKna & HKai & HKas & HKbo & HKeo & HKil &
@@ -849,7 +850,7 @@ Section ProofSysOpenAUAlloc.
                 lks w6 w24 bp
                 data vom pl P Pmiss Φo Φt
                 (FdDevice (bv_unsigned (di_major dn))) 1%positive
-                Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
+                Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl
                 Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir
                 (so_wf_dev (mword_of_int 0 : mword 32))
@@ -976,7 +977,7 @@ Section ProofSysOpenAUAlloc.
               (fc_major Cf) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb
               dqs U sts m M8 sp0 K eb b lks w6 w24 bp
               data vom pl P Pmiss Φo Φt (FdInode (bv_unsigned inum) γo) γo
-              Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
+              Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize
               Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty
               Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir
               (fun _ => off_wf_zero)

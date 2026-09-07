@@ -505,6 +505,11 @@ Section ProofNamexRoot.
       assert (Hu : bv_unsigned (mword_of_int 1 : mword 32) = 1)
         by (vm_compute; reflexivity).
       rewrite Hu. assert (Hnz : 1 <= Z.of_nat icfg_nib) by lia. lia. }
+    assert (Hrpos : 0 < bv_unsigned ROOTINO).
+    { unfold ROOTINO.
+      assert (Hu : bv_unsigned (mword_of_int 1 : mword 32) = 1)
+        by (vm_compute; reflexivity).
+      rewrite Hu. lia. }
     iDestruct (cpu_own_transport CID CID23 n eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID23)
@@ -524,7 +529,7 @@ Section ProofNamexRoot.
     iApply (IG.wp_iget_sconf ROOTINO
               RootL
               A3 n eb p (K - 12)%nat b lks
-              Kig Hn Hrino HA3a0 HA3a1 Hbelow
+              Kig Hn Hrino Hrpos HA3a0 HA3a1 Hbelow
               with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hisl Hlic").
     iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp [Href Hru] _".
     destruct Higp as (Hcsig & Hkig & Higa0).
@@ -535,7 +540,8 @@ Section ProofNamexRoot.
     iAssert (inode_held_at (ientry kig) (bv_unsigned ROOTINO)) with "[Href Hru]" as "Hip".
     { rewrite /inode_held_at. iExists kig, qig, ROOTINO.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkig |].
-      iSplitR; [iPureIntro;exact Hrino |]. iSplitR; [iPureIntro; reflexivity |].
+      iSplitR; [iPureIntro;exact Hrino |]. iSplitR; [iPureIntro; exact Hrpos |].
+      iSplitR; [iPureIntro; reflexivity |].
       iFrame "Hru". iExact "Href". }
     (* ===== +0x050 c.mv s4,a0 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x50)) Rs4 Ra0 mig (K - 12)%nat b

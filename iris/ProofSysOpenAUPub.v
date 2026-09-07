@@ -156,6 +156,7 @@ Section ProofSysOpenAUPub.
     (24 <= K)%nat -> ((K - 24) + 24 = K)%nat ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    0 < bv_unsigned inum ->
     log_geom_ok fsc_cov fsc_logst ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     lks = ∅ ->
@@ -282,7 +283,7 @@ Section ProofSysOpenAUPub.
                dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf Hfdlt
+    intros Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf Hfdlt
            Hlen Hfrees Hip Htyor Hwrb Hrdw Hdir Hdvw Hwf Hom Htyt Hsp0 HMsp HMthr
            HMs1 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
@@ -352,7 +353,7 @@ Section ProofSysOpenAUPub.
     iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
     iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn γb g om rb wb
             loK tlK
-            Hqs ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
+            Hqs ltac:(solve_ndisj) Hkk Hinb Hipos Hip Htyor Hwrb
             ltac:(rewrite Hrdw; exact Hrdb) ltac:(rewrite Hwrb; exact Hwdb)
             Hdir Hdvw HleK
             with "HflK Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hcoff")

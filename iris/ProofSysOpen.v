@@ -257,6 +257,7 @@ Section ProofSysOpenBody.
     (24 <= K)%nat -> ((K - 24) + 24 = K)%nat ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    0 < bv_unsigned inum ->
     log_geom_ok fsc_cov fsc_logst ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     lks = ∅ ->
@@ -367,7 +368,7 @@ Section ProofSysOpenBody.
                dqb dqs (proc_addr jx) pidv U sts om m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf Hfdlt
+    intros Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf Hfdlt
            Hlen Hfrees Hip Htyor Hwrb Hrdw Hdir Hdvw Hwf Hsp0 HMsp HMthr HMs1
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
@@ -459,7 +460,7 @@ Section ProofSysOpenBody.
     iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
     iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn γb γo om
             (so_rd_of om) (so_wr_of om) loK tlK
-            Hqs ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
+            Hqs ltac:(solve_ndisj) Hkk Hinb Hipos Hip Htyor Hwrb
             Hrdc Hwrc
             Hdir Hdvw HleK
             with "HflK Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hcoff")
@@ -597,6 +598,7 @@ Section ProofSysOpenBody.
     (24 <= K)%nat -> ((K - 24) + 24 = K)%nat ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    0 < bv_unsigned inum ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
     0 <= fsc_bmapstart ->
@@ -714,7 +716,7 @@ Section ProofSysOpenBody.
                dqb dqs (proc_addr jx) pidv U sts om m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize Hbm0
+    intros Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize Hbm0
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty Hkf
            Hfdlt Hlen Hfrees Htyor Hdir Hdvw Hwf Hal23 Hsp0 HNsp HNthr HNs0 HNs1
            HNs2 HNs3 Hal.
@@ -940,7 +942,7 @@ Section ProofSysOpenBody.
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U sts m N6 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp
-                Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
+                Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hsp0 HN6sp HN6thr HN6s1 HN6s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -1038,7 +1040,7 @@ Section ProofSysOpenBody.
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U sts m N8 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp
-                Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
+                Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hsp0 HN8sp HN8thr HN8s1 HN8s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -1231,7 +1233,7 @@ Section ProofSysOpenBody.
  kk qi s gy loy tly inum (di_trunc dn) bm_empty kf fd l C pn
               om voff nsj u3 pidv dqb dqs U sts m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
-              Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
+              Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
               Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
               Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -1276,6 +1278,7 @@ Section ProofSysOpenBody.
     (K_sys_open <= K)%nat ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    0 < bv_unsigned inum ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
     0 <= fsc_bmapstart ->
@@ -1376,7 +1379,7 @@ Section ProofSysOpenBody.
                dqb dqs (proc_addr jx) pidv U sts om m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hqs HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
+    intros Hqs HK Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hal23 Hsp0 HNsp HNthr HNs0
            HNs1 HNs2 HNs3 Hal Hnspos.
     destruct (so_kb K HK) as (HKcr & HKna & HKai & HKas & HKbo & HKeo & HKil &
@@ -1928,7 +1931,7 @@ Section ProofSysOpenBody.
                 (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
                 (di_major dn) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb dqs U sts m M7 sp0 K eb b
                 lks w6 w24 bp
-                Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
+                Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl
                 Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir
                 (so_dev_vac (di_type dn)) (so_wf_dev (mword_of_int 0 : mword 32))
@@ -2036,7 +2039,7 @@ Section ProofSysOpenBody.
               (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
               (fc_major Cf) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb
               dqs U sts m M8 sp0 K eb b lks w6 w24 bp
-              Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
+              Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize
               Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty
               Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir
               (fun _ => so_tdev_zne (di_type dn) Hnd3) (fun _ => off_wf_zero)
@@ -2083,6 +2086,7 @@ Section ProofSysOpenBody.
     (K_sys_open <= K)%nat ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    0 < bv_unsigned inum ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
     0 <= fsc_bmapstart ->
@@ -2178,7 +2182,7 @@ Section ProofSysOpenBody.
                dqb dqs (proc_addr jx) pidv U sts om m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hqs HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
+    intros Hqs HK Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hal23 Hsp0 HMsp HMthr HMs0
            HMs1 HMs2 HMs3 Hal Hnspos.
     pose proof HK as HKfull.
@@ -2275,7 +2279,7 @@ Section ProofSysOpenBody.
                 gil gisl
  kk qi s gy loy tly inum dn bm om lo nsj u
                 pidv dqb dqs U sts m M2 sp0 K eb b lks w4 w5 w6 w24 bp
-                Hqs HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                Hqs HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hal23 Hsp0
                 HM2sp HM2thr HM2s0 HM2s1 HM2s2 HM2s3 Hal Hnspos
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
@@ -2430,7 +2434,7 @@ Section ProofSysOpenBody.
               gil gisl
  kk qi s gy loy tly inum dn bm om lo nsj u
               pidv dqb dqs U sts m M4 sp0 K eb b lks w4 w5 w6 w24 bp
-              Hqs HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              Hqs HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hal23 Hsp0
               HM4sp HM4thr HM4s0 HM4s1 HM4s2 HM4s3 Hal Hnspos
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
@@ -2951,7 +2955,7 @@ Section ProofSysOpenBody.
               gil gisl
  kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
               U sts m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
-              Hqs HKfull Hkk ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              Hqs HKfull Hkk ltac:(lia) (proj1 Hinum) Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hibcov Hiblog Hcovb
               ltac:(exact (proj2 (proj2 Hu1) eq_refl)) Hj Hgl Hlkempty Hdirw
               Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3 Hal ltac:(cbn in Hns1; unfold sys_open_slots, create_slots in *; lia)
@@ -3312,7 +3316,7 @@ Section ProofSysOpenBody.
                     = mword_of_int (SO + 0xe8)) by pcw.
     iEval (rewrite Hppe6) in "Hpc".
     (* ===== BLOCKER 2's FOUR LINES ===== *)
-    iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & Hrefip & Hru)".
+    iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & %Hipos & Hrefip & Hru)".
 
     assert (Hinb : bv_unsigned inum < 16 * Z.of_nat icfg_nib)
       by (exact Hinumc).
@@ -3529,7 +3533,7 @@ Section ProofSysOpenBody.
  kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm om lo
                 (ns - 1)%nat n1 pidv dqb dqs U sts m Q2 sp0 K eb b lks w4 w5 w6 w24
                 bp1
-                eq_refl HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                eq_refl HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdirw
                 Hal23 Hsp0 HQ2sp HQ2thr HQ2s0 HQ2s1 HQ2s2 HQ2s3 Hal ltac:(unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
@@ -3616,7 +3620,7 @@ Section ProofSysOpenBody.
  kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm om lo
                 (ns - 1)%nat n1 pidv dqb dqs U sts m Q3 sp0 K eb b lks w4 w5 w6 w24
                 bp1
-                eq_refl HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                eq_refl HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty
                 ltac:(intros _; exact Hom0)
                 Hal23 Hsp0 HQ3sp HQ3thr HQ3s0 HQ3s1 HQ3s2 HQ3s3 Hal ltac:(unfold sys_open_slots, create_slots in *; lia)

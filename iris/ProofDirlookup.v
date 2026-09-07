@@ -2074,6 +2074,10 @@ Section ProofDirlookupMain.
                       < 16 * Z.of_nat icfg_nib).
             { rewrite (dlk_zext32_unsigned (dir_inum data i)).
               exact (Hinums i Hilt Hlive). }
+            (* ...and POSITIVE: the record is live (round E2-L0) *)
+            assert (Hinumpos : 0 < bv_unsigned
+                      (zero_extend' 32 (dir_inum data i : mword 16) : mword 32))
+              by exact (dlk_live_pos data i Hlive).
             (* TWO HOPS, not one: the chain is composed link by link at the
                free index [b], where the old [rewrite Hb] shortcut used to
                make one wide hop free. *)
@@ -2196,7 +2200,7 @@ Section ProofDirlookupMain.
                       lic
                       N7 0%nat eb pj (K - 12)%nat b lks
                       ltac:(lia)
-                      ltac:(vm_compute; reflexivity) Hinumb HN7a0
+                      ltac:(vm_compute; reflexivity) Hinumb Hinumpos HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
                       ltac:(lkbelow)
                       with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hiregr Hpenv Hislot

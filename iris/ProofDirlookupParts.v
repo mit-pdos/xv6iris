@@ -139,6 +139,24 @@ Proof.
   apply bv_zero_extend_unsigned. vm_compute. discriminate.
 Qed.
 
+(* A LIVE RECORD'S INUM IS POSITIVE (round E2-L0): [dir_live] is
+   [dir_inum <> bv_0 16], and the zero-extension to the 32-bit inum iget is
+   handed keeps the value.  This is where [inode_held]'s lower bound is
+   discharged on the found arm of dirlookup and of every walker. *)
+Lemma dlk_live_pos (data : nat -> list (bv 8)) (k : nat) :
+  dir_live data k ->
+  0 < bv_unsigned (zero_extend' 32 (dir_inum data k : mword 16) : mword 32).
+Proof.
+  intros Hlive. rewrite dlk_zext32_unsigned.
+  (* no [lia]: the two [bv_unsigned]s (at [mword 16] and at [bv 16]) are
+     convertible but not syntactically equal, so an arithmetic solver sees
+     two atoms; conversion does the whole job. *)
+  destruct (proj1 (Z.lt_eq_cases 0 (bv_unsigned (dir_inum data k)))
+              (proj1 (bv_unsigned_in_range _ (dir_inum data k)))) as [Hlt | Heq];
+    [exact Hlt |].
+  exfalso. apply Hlive. apply bv_eq. symmetry. exact Heq.
+Qed.
+
 Lemma dlk_zext_zero_iff (x : mword 16) :
   (zero_extend' 64 x : mword 64) = (zero_reg : mword 64) <-> x = bv_0 16.
 Proof.

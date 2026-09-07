@@ -2566,7 +2566,7 @@ Section ProofNamexTrMain.
                                     & W24 & W25 & Wthr).
                    (* ---- THE SHED: ilock takes a share ---- *)
                    iDestruct "Hip" as (ik iq iinum)
-                     "(%Hie & %Hik & %Hib & %Hiz & Href & Hru)".
+                     "(%Hie & %Hik & %Hib & %Hipos & %Hiz & Href & Hru)".
 
                    rewrite inode_ref_shed.
                    iDestruct "Href" as "[Hkeep Hshr]".
@@ -3373,6 +3373,8 @@ Section ProofNamexTrMain.
                              iSplitR; [iPureIntro; exact Hkslot |].
                              iSplitR; [iPureIntro;
                                        exact Hcinb |].
+                             iSplitR; [iPureIntro;
+                                       exact (dlk_live_pos datl kdir Hklive) |].
                              iSplitR; [iPureIntro;
                                        exact (dlk_zext32_unsigned
                                                 (dir_inum datl kdir)) |].
@@ -4781,6 +4783,11 @@ Section ProofNamexTrMain.
         assert (Hu : bv_unsigned (mword_of_int 1 : mword 32) = 1)
           by (vm_compute; reflexivity).
         rewrite Hu. assert (Hnz : 1 <= Z.of_nat icfg_nib) by lia. lia. }
+      assert (Hrpos : 0 < bv_unsigned ROOTINO).
+      { unfold ROOTINO.
+        assert (Hu : bv_unsigned (mword_of_int 1 : mword 32) = 1)
+          by (vm_compute; reflexivity).
+        rewrite Hu. lia. }
       iDestruct (cpu_own_transport CID CID23 0%nat eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID CID23 eb (proc_addr j)
@@ -4805,7 +4812,7 @@ Section ProofNamexTrMain.
                 RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
-                Hrino HA3a0 HA3a1 ltac:(lkbelow)
+                Hrino Hrpos HA3a0 HA3a1 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hiregr Hpenv Hisl1
                       Hlicr").
       all: try lkbelow.
@@ -4885,6 +4892,7 @@ Section ProofNamexTrMain.
       { rewrite /inode_held_at. iExists kig, qig, ROOTINO.
         iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkig |].
         iSplitR; [iPureIntro;exact Hrino |].
+        iSplitR; [iPureIntro; exact Hrpos |].
         iSplitR; [iPureIntro; reflexivity |].
         iFrame "Hru". iExact "Href". }
       (* ===== +0x3c .. +0x46 : the four constants, then [c.j +0xf4] ===== *)

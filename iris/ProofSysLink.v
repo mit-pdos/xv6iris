@@ -1322,7 +1322,7 @@ Section ProofSysLinkBody.
           iEval (rewrite Hpp42) in "Hpc".
           (* THE REFERENCE namei MADE, taken apart: the slot it names is what
              ilock / iunlock / iupdate / iunlockput are all indexed by. *)
-          iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & Hrefip & Hru)".
+          iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & %Hipos & Hrefip & Hru)".
 
           assert (Hinb : bv_unsigned inum < 16 * Z.of_nat icfg_nib)
             by (exact Hinumc).
@@ -2164,7 +2164,7 @@ Section ProofSysLinkBody.
                 ** (* ---------- the parent RESOLVED ---------- *)
                    iDestruct "Hres2" as "(%Hnpe & Hhelddp & Hir1c)".
                    iDestruct "Hhelddp" as (kd qd dinum gyd lod tld)
-                     "(%Hdpe & %Hkd & %Hdinumc & %Hled & #Hfld &
+                     "(%Hdpe & %Hkd & %Hdinumc & %Hdpos & %Hled & #Hfld &
                        Hrefdp & #Hshotd & Hrud)".
                    assert (Hdpnz : dpv <> (zero_reg : mword 64))
                      by (rewrite Hdpe; apply ientry_ne_zero; lia).

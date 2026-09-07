@@ -2991,7 +2991,7 @@ Section ProofCreateMain.
                  nameiparent_of (bview plen pfun) es e /\ bname 14 nfp = e)
         by (exists esL, eL; exact Hnpname0).
       iDestruct "Hipty" as (kd qd dind gd lod tld)
-        "(%Hie & %Hkd & %Hdib & %HdiL & %Hled & #Hfld & Href & #Hshotd & Hrud)".
+        "(%Hie & %Hkd & %Hdib & %Hdpos & %HdiL & %Hled & #Hfld & Href & #Hshotd & Hrud)".
       (* the cursor is at the parent's OWN inum: the era walk exposes it
          beside the reference ([SpecNparEra.inode_held_ty_at]), which is
          what makes [P] and the payload speak about the same [d]. *)

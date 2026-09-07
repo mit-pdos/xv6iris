@@ -1333,7 +1333,7 @@ Section IreclaimOrphan.
     iApply (IG.wp_iget_sconf inum
               (BufL (uint bno) ds)
               O6 0%nat eb (proc_addr j) (K - 8)%nat b lks
-              ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
+              ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin (proj1 Hinum)
               HO6a0 HO6a1
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hiregr Hpanenv Hiref Hlic").

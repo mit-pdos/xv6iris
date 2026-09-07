@@ -1003,7 +1003,7 @@ Section ProofIdup.
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hrinv Hislot Hheld Hcont".
     iDestruct (is_itable2_lock with "Hlock") as "#Hlk2".
     iDestruct (is_itable2_claims with "Hlock") as "#Hclaims".
-    iDestruct "Hheld" as (k0 q inum) "(%Hent & %Hk0 & %Hinb & %Hinz & Href & Hru)".
+    iDestruct "Hheld" as (k0 q inum) "(%Hent & %Hk0 & %Hinb & %Hipos & %Hinz & Href & Hru)".
     assert (Hkk : k0 = k).
     { symmetry. apply (ientry_inj k k0); [lia | lia | exact Hent]. }
     subst k0.
@@ -1029,11 +1029,13 @@ Section ProofIdup.
     { exact Hpost. }
     - iExists k, q, inum.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hk |].
-      iSplitR; [iPureIntro; exact Hinb |]. iSplitR; [iPureIntro; exact Hinz |].
+      iSplitR; [iPureIntro; exact Hinb |]. iSplitR; [iPureIntro; exact Hipos |].
+      iSplitR; [iPureIntro; exact Hinz |].
       rewrite /inode_refp. iFrame "Hold Hru".
     - iExists k, qn, inum.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hk |].
-      iSplitR; [iPureIntro; exact Hinb |]. iSplitR; [iPureIntro; exact Hinz |].
+      iSplitR; [iPureIntro; exact Hinb |]. iSplitR; [iPureIntro; exact Hipos |].
+      iSplitR; [iPureIntro; exact Hinz |].
       rewrite /inode_refp. iFrame "Hnew Hru2".
   Qed.
 

@@ -152,6 +152,7 @@ Section NparEraDefs.
     (∃ (k : nat) (q : Qp) (inum : mword 32) (g : gname) (lo tl : nat),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       ⌜0 < bv_unsigned inum⌝ ∗
        ⌜bv_unsigned inum = z⌝ ∗
        (* A6.145 (tso-flip): the reference at its epoch, under a floor *)
        ⌜(lo <= tl)%nat⌝ ∗ cred_floor lo tl ∗
@@ -162,7 +163,7 @@ Section NparEraDefs.
     inode_held_ty_at v ty z ⊢ inode_held_ty v ty.
   Proof.
     iIntros "H". iDestruct "H" as (k q inum g lo tl)
-      "(%Hv & %Hk & %Hb & %Hz & %Hle & #Hfl & Hr & Hs & Hu)".
+      "(%Hv & %Hk & %Hb & %Hp & %Hz & %Hle & #Hfl & Hr & Hs & Hu)".
     rewrite /inode_held_ty. iExists k, q, inum, g, lo, tl.
     (* named rather than [by iFrame "% ..."]: the frame searched the whole
        context for each of the four pure conjuncts and the goal for each of
@@ -170,6 +171,7 @@ Section NparEraDefs.
     iSplitR; [iPureIntro; exact Hv|].
     iSplitR; [iPureIntro; exact Hk|].
     iSplitR; [iPureIntro; exact Hb|].
+    iSplitR; [iPureIntro; exact Hp|].
     iSplitR; [iPureIntro; exact Hle|].
     iSplitR; [iExact "Hfl"|].
     iSplitL "Hr"; [iExact "Hr"|].
@@ -187,10 +189,11 @@ Section NparEraDefs.
   Lemma inode_held_ty_at_at (v : mword 64) (ty : bv 16) (z : Z) :
     inode_held_ty_at v ty z ⊢ inode_held_at v z.
   Proof.
-    iIntros "H". iDestruct "H" as (k q inum g lo tl) "(%Hv & %Hk & %Hb & %Hz & %Hle & #Hfl & Hr & _ & Hu)".
+    iIntros "H". iDestruct "H" as (k q inum g lo tl) "(%Hv & %Hk & %Hb & %Hp & %Hz & %Hle & #Hfl & Hr & _ & Hu)".
     rewrite /inode_held_at. iExists k, q, inum.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+    iSplitR; [by iPureIntro |].
     rewrite /inode_refp. iFrame "Hu".
     rewrite inode_ref_gen_intro. iExists g, lo, tl. iFrame "Hfl Hr". by iPureIntro.
   Qed.

@@ -1530,7 +1530,7 @@ Section ProofSysChdirBody.
         iEval (rewrite Hpp34) in "Hpc".
         (* THE REFERENCE namei MADE, taken apart: the slot it names is what
            ilock / iunlock / iunlockput are all indexed by. *)
-        iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & %HiL & Hrefip & Hruip)".
+        iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & %Hipos & %HiL & Hrefip & Hruip)".
         (* the cursor, at the reference's own inum *)
         iEval (rewrite -HiL) in "HP".
 
@@ -1883,7 +1883,7 @@ Section ProofSysChdirBody.
           { intros c Hc N2' N8 N9 N18. rewrite /P6 upd_ne; [| regne].
             exact (HP5thr c Hc N2' N8 N9 N18). }
           (* THE OLD WORKING DIRECTORY's reference, taken apart *)
-          iDestruct "Hcwdref" as (kc qc inumc) "(%Hcwde & %Hkc & %Hinumcc & %Hcwdz & Hrefc & Hruc)".
+          iDestruct "Hcwdref" as (kc qc inumc) "(%Hcwde & %Hkc & %Hinumcc & %Hcpos & %Hcwdz & Hrefc & Hruc)".
 
           assert (Hinbc : bv_unsigned inumc < 16 * Z.of_nat icfg_nib)
             by (exact Hinumcc).
@@ -2006,7 +2006,8 @@ Section ProofSysChdirBody.
           iAssert (inode_held_at (ientry kk) (bv_unsigned inum)) with "[Hrefnew Hruip]" as "Hheldnew".
           { rewrite /inode_held_at. iExists kk, (qq/2 + qq/2)%Qp, inum.
             iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkk |].
-            iSplitR; [iPureIntro; exact Hinumc |]. iSplitR; [iPureIntro; reflexivity |].
+            iSplitR; [iPureIntro; exact Hinumc |]. iSplitR; [iPureIntro; exact Hipos |].
+            iSplitR; [iPureIntro; reflexivity |].
             iFrame "Hruip". iExact "Hrefnew". }
           iDestruct ("Hcwdbk" $! (ientry kk) with "Hcwd") as "Hpbare".
           iAssert (proc_priv_nocwd gf pj pid

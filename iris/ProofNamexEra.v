@@ -2544,7 +2544,7 @@ Section ProofNamexTrMain.
                                     & W24 & W25 & Wthr).
                    (* ---- THE SHED: ilock takes a share ---- *)
                    iDestruct "Hip" as (ik iq iinum)
-                     "(%Hie & %Hik & %Hib & %Hiz & Href & Hru)".
+                     "(%Hie & %Hik & %Hib & %Hipos & %Hiz & Href & Hru)".
 
                    rewrite inode_ref_shed.
                    iDestruct "Href" as "[Hkeep Hshr]".
@@ -3367,6 +3367,8 @@ Section ProofNamexTrMain.
                              iSplitR; [iPureIntro; exact Hkslot |].
                              iSplitR; [iPureIntro;
                                        exact Hcinb |].
+                             iSplitR; [iPureIntro;
+                                       exact (dlk_live_pos datl kdir Hklive) |].
                              iSplitR; [iPureIntro;
                                        exact (dlk_zext32_unsigned
                                                 (dir_inum datl kdir)) |].
@@ -4778,6 +4780,11 @@ Section ProofNamexTrMain.
         assert (Hu : bv_unsigned (mword_of_int 1 : mword 32) = 1)
           by (vm_compute; reflexivity).
         rewrite Hu. assert (Hnz : 1 <= Z.of_nat icfg_nib) by lia. lia. }
+      assert (Hrpos : 0 < bv_unsigned ROOTINO).
+      { unfold ROOTINO.
+        assert (Hu : bv_unsigned (mword_of_int 1 : mword 32) = 1)
+          by (vm_compute; reflexivity).
+        rewrite Hu. lia. }
       iDestruct (cpu_own_transport CID CID23 0%nat eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID CID23 eb (proc_addr j)
@@ -4802,7 +4809,7 @@ Section ProofNamexTrMain.
                 RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
-                Hrino HA3a0 HA3a1 ltac:(lkbelow)
+                Hrino Hrpos HA3a0 HA3a1 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hiregr Hpenv Hisl1
                       Hlicr").
       all: try lkbelow.
@@ -4882,6 +4889,7 @@ Section ProofNamexTrMain.
       { rewrite /inode_held_at. iExists kig, qig, ROOTINO.
         iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkig |].
         iSplitR; [iPureIntro;exact Hrino |].
+        iSplitR; [iPureIntro; exact Hrpos |].
         iSplitR; [iPureIntro; reflexivity |].
         iFrame "Hru". iExact "Href". }
       (* ===== +0x3c .. +0x46 : the four constants, then [c.j +0xf4] ===== *)
@@ -5080,11 +5088,12 @@ Section ProofNamexTrMain.
          the SLOT (the pointer [a0] is set to) and the two pure facts; the
          carve and the gather that used to bracket the call are inside
          [SpecIdup] now, and the cwd's fraction is untouched either way. *)
-      iDestruct "Hcwdr" as (ck cq cinum) "(%Hcwde & %Hckl & %Hcinb & %Hcinz & Hcrefp)".
+      iDestruct "Hcwdr" as (ck cq cinum) "(%Hcwde & %Hckl & %Hcinb & %Hcpos & %Hcinz & Hcrefp)".
       iAssert (inode_held_at (ientry ck) (pv_cwi (us_V Upr))) with "[Hcrefp]" as "Hcheld".
       { iExists ck, cq, cinum.
         iSplitR; [done |]. iSplitR; [iPureIntro; exact Hckl |].
-        iSplitR; [iPureIntro; exact Hcinb |]. iSplitR; [iPureIntro; exact Hcinz |].
+        iSplitR; [iPureIntro; exact Hcinb |]. iSplitR; [iPureIntro; exact Hcpos |].
+        iSplitR; [iPureIntro; exact Hcinz |].
         iExact "Hcrefp". }
       (* +0x36 jal ra,idup *)
       assert (Htgtid : add_vec (mword_of_int (NX + 0x36) : mword 64)
@@ -5148,13 +5157,14 @@ Section ProofNamexTrMain.
          with the witness named, which is exactly the currency the era
          loop's invariant carries ([inode_held_at ipv dcur]).  No new
          reading of [ProcInv.cwd_ref] is needed, and none exists. *)
-      iDestruct "Hip0" as (ik iq iinum) "(%Hipe & %Hikl & %Hiinb & %Hiinz & Hirefp)".
+      iDestruct "Hip0" as (ik iq iinum) "(%Hipe & %Hikl & %Hiinb & %Hiipos & %Hiinz & Hirefp)".
       iAssert (inode_held_at (ientry ck) (bv_unsigned iinum))
         with "[Hirefp]" as "Hip".
       { rewrite /inode_held_at. iExists ik, iq, iinum.
         iSplitR; [iPureIntro; exact Hipe |].
         iSplitR; [iPureIntro; exact Hikl |].
         iSplitR; [iPureIntro; exact Hiinb |].
+        iSplitR; [iPureIntro; exact Hiipos |].
         iSplitR; [iPureIntro; reflexivity |]. iExact "Hirefp". }
       (* THE ONE SHOT, FIRED AT THE CWD.  The tie is REFUTED on this arm
          rather than used: [pfun 0 <> SLASH] and the buffer's head IS

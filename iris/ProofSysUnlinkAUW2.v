@@ -633,7 +633,7 @@ Section ProofSysUnlinkAUW2.
        nameiparent's promise into [di_type dnd = T_DIR] at ilock's own
        record, which is dirlookup's first premise. ---- *)
     iDestruct "Hheld" as (kd qd dinum gyd lod tld)
-      "(%Hdpe & %Hkd & %Hdinumc & %HiL & %Hled & #Hfld &
+      "(%Hdpe & %Hkd & %Hdinumc & %Hdpos & %HiL & %Hled & #Hfld &
         Hrefdp & #Hshotd & Hrud)".
     (* the cursor's index IS the parent's inum, which is what makes every
        arm below able to name the abstract row [ilock] just resolved *)

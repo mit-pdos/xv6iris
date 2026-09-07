@@ -925,7 +925,7 @@ Section ProofSysUnlinkW2.
        nameiparent's promise into [di_type dnd = T_DIR] at ilock's own
        record, which is dirlookup's first premise. ---- *)
     iDestruct "Hheld" as (kd qd dinum gyd lod tld)
-      "(%Hdpe & %Hkd & %Hdinumc & %Hled & #Hfld &
+      "(%Hdpe & %Hkd & %Hdinumc & %Hdpos & %Hled & #Hfld &
         Hrefdp & #Hshotd & Hrud)".
     assert (Hdinb : bv_unsigned dinum < 16 * Z.of_nat icfg_nib)
       by (exact Hdinumc).

@@ -1752,7 +1752,7 @@ Section IallocClaim.
               (ClaimL ty t qt)
               WA 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity)
-              Hnib HWAa0 HWAa1
+              Hnib (proj1 Hinum) HWAa0 HWAa1
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hiregr Hpanenv Hiref
                     Hclaim").

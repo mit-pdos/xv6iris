@@ -253,7 +253,7 @@ Section NameiInitPinned.
       inode_refp k q icfg_dev inum.
   Proof.
     rewrite /inode_held_at. iIntros "H".
-    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hlt & %Hz & H)".
+    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hlt & %Hp & %Hz & H)".
     iExists k, q, inum.
     iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iExact "H".
   Qed.

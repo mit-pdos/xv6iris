@@ -1334,7 +1334,7 @@ Section ProofFileclose.
           iMod (inode_pay_cancel ⊤ (fp_icv pn) (fp_iq pn) (fp_ig pn) (fp_inum pn)
                   (fc_ip Cf) (fc_type Cf) (fc_wbool Cf) ltac:(solve_ndisj)
                   with "Hpl") as "Hheld".
-          iDestruct "Hheld" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href & Hru)".
+          iDestruct "Hheld" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & %Hipos & Href & Hru)".
           iModIntro.
           rewrite /fileclose_fs_env /fileclose_fs_env_nopid.
           (* FIVE pure conjuncts, not six: the bundle no longer pins

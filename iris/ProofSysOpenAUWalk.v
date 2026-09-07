@@ -526,7 +526,7 @@ Section ProofSysOpenAUWalk.
     (* the package comes apart HERE rather than after the branch: its own
        [ipv = ientry kk] is what refutes the [c.beqz]. *)
     iDestruct "Hheldip" as (kk qq inum)
-      "(%Hipe & %Hkk & %Hinumc & %Hinumz & Hrefip & Hru)".
+      "(%Hipe & %Hkk & %Hinumc & %Hipos & %Hinumz & Hrefip & Hru)".
     assert (Hipnz : ipv <> (zero_reg : mword 64)).
     { rewrite Hipe. apply ientry_ne_zero. lia. }
     (* the cursor's inum IS the reference's ([SpecNameiTr.inode_held_at]'s
@@ -781,7 +781,7 @@ Section ProofSysOpenAUWalk.
                 (ns - 1)%nat n1 pidv dqb dqs U sts m Q2 sp0 K eb b lks w4 w5 w6 w24
                 bp1
                 data vom (bview plen bp) P Pmiss Φo Φt
-                eq_refl HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                eq_refl HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdirw Hom
                 Hal23 Hsp0 HQ2sp HQ2thr HQ2s0 HQ2s1 HQ2s2 HQ2s3 Hal ltac:(unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
@@ -873,7 +873,7 @@ Section ProofSysOpenAUWalk.
                 (ns - 1)%nat n1 pidv dqb dqs U sts m Q3 sp0 K eb b lks w4 w5 w6 w24
                 bp1
                 data vom (bview plen bp) P Pmiss Φo Φt
-                eq_refl HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                eq_refl HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty
                 ltac:(intros _; exact Hom0) Hom
                 ltac:(intros Hq; exfalso; rewrite Hty in Hq;

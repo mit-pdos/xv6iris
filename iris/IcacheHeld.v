@@ -97,10 +97,17 @@ Section IcacheHeld.
      [inode_refp], on the nose -- [inode_refp]'s single delta step is the
      pair that used to be spelled here, so every landed positional
      unpacking of [inode_held] reads exactly as before. *)
+  (* HELD INUMS ARE POSITIVE (round E2-L0): a dirent whose inum is 0 is a
+     FREE slot ([DirView.dir_live]), so a reference to inode 0 never exists
+     -- the root is 1, dirlookup skips free records, ialloc's post has
+     [0 < inum].  The lower bound rides beside the upper one, as its own
+     pure conjunct, so every landed positional unpacking gains exactly one
+     binder right after the bound it already names. *)
   Definition inode_held (v : mword 64) : iProp Σ :=
     (∃ (k : nat) (q : Qp) (inum : mword 32),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       ⌜0 < bv_unsigned inum⌝ ∗
        inode_refp k q icfg_dev inum)%I.
 
   (* the one-unfold view: [inode_held] IS a package with its indices hidden *)
@@ -109,6 +116,7 @@ Section IcacheHeld.
     ∃ (k : nat) (q : Qp) (inum : mword 32),
       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+      ⌜0 < bv_unsigned inum⌝ ∗
       inode_refp k q icfg_dev inum.
   Proof. reflexivity. Qed.
 
@@ -129,6 +137,7 @@ Section IcacheHeld.
     (∃ (k : nat) (q : Qp) (inum : mword 32) (g : gname) (lo tl : nat),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       ⌜0 < bv_unsigned inum⌝ ∗
        ⌜(lo <= tl)%nat⌝ ∗ cred_floor lo tl ∗
        inode_ref_genlo k q icfg_dev inum g lo ∗ ity_shot g ty ∗
        runit_any (bv_unsigned inum))%I.
@@ -136,13 +145,13 @@ Section IcacheHeld.
   Lemma inode_held_ty_forget v ty : inode_held_ty v ty -∗ inode_held v.
   Proof.
     iIntros "(%k & %q & %inum & %g & %lo & %tl &
-              %Hv & %Hk & %Hb & %Hle & #Hfl & Href & _ & Hru)".
+              %Hv & %Hk & %Hb & %Hpos & %Hle & #Hfl & Href & _ & Hru)".
     iDestruct "Href" as "(Hf & Hg & Hid & Hs & Hst)".
     iAssert (live_fracc k q) with "[Hg]" as "Hlv".
     { rewrite /live_fracc. iExists g, lo, tl. iFrame "Hg Hfl". by iPureIntro. }
     iExists k, q, inum.
     iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     rewrite /inode_refp /inode_ref. by iFrame "Hru Hf Hs Hid Hlv Hst".
   Qed.
 
@@ -153,7 +162,7 @@ Section IcacheHeld.
      need it only to tell the two arms of [cwd_ref] apart. *)
   Lemma inode_held_ne_zero v : inode_held v -∗ ⌜v <> (zero_reg : mword 64)⌝.
   Proof.
-    iIntros "(%k & %q & %inum & -> & %Hk & _ & _ & _)". iPureIntro.
+    iIntros "(%k & %q & %inum & -> & %Hk & _ & _ & _ & _)". iPureIntro.
     apply ientry_ne_zero. lia.
   Qed.
 
@@ -168,23 +177,27 @@ Section IcacheHeld.
     (∃ (k : nat) (q : Qp) (inum : mword 32),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       ⌜0 < bv_unsigned inum⌝ ∗
        ⌜bv_unsigned inum = z⌝ ∗
        inode_refp k q icfg_dev inum)%I.
 
   Lemma inode_held_at_held (v : mword 64) (z : Z) :
     inode_held_at v z ⊢ inode_held v.
   Proof.
-    iIntros "H". iDestruct "H" as (k q inum) "(%&%&%&%&Hr)".
-    rewrite /inode_held. eauto 10 with iFrame.
+    iIntros "H". iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hb & %Hp & %Hz & Hr)".
+    rewrite /inode_held. iExists k, q, inum.
+    iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
+    iExact "Hr".
   Qed.
 
   Lemma inode_held_zi (v : mword 64) :
     inode_held v ⊢ ∃ z : Z, inode_held_at v z.
   Proof.
     rewrite /inode_held /inode_held_at. iIntros "H".
-    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hlt & Hr)".
+    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hlt & %Hp & Hr)".
     iExists (bv_unsigned inum), k, q, inum.
     iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
+    iSplit; [done |].
     iExact "Hr".
   Qed.
 
@@ -227,6 +240,7 @@ Section IcacheHeld.
     (∃ (k : nat) (qt qi : Qp) (inum : mword 32),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       ⌜0 < bv_unsigned inum⌝ ∗
        ⌜qt = (qi + s)%Qp⌝ ∗
        inode_refp_short k qt qi icfg_dev inum)%I.
 
@@ -342,7 +356,7 @@ Section IcacheHeld.
   Lemma inode_held_shed (v : mword 64) :
     inode_held v -∗ ∃ s : Qp, inode_held_short v s ∗ inode_shr_held v s.
   Proof.
-    iIntros "(%k & %q & %inum & -> & %Hk & %Hb & Href & Hru)".
+    iIntros "(%k & %q & %inum & -> & %Hk & %Hb & %Hp & Href & Hru)".
     rewrite inode_ref_shed. iDestruct "Href" as "[Hsh Hs]".
     iExists (q/2)%Qp. iSplitR "Hs".
     - iExists k, (q/2 + q/2)%Qp, (q/2)%Qp, inum. by iFrame.
@@ -352,7 +366,7 @@ Section IcacheHeld.
   Lemma inode_held_gather (v : mword 64) (s : Qp) :
     inode_held_short v s -∗ inode_shr_held v s -∗ inode_held v.
   Proof.
-    iIntros "(%k1 & %qt & %qi & %n1 & %Hv1 & %Hk1 & %Hb1 & -> & Hsh & Hru)".
+    iIntros "(%k1 & %qt & %qi & %n1 & %Hv1 & %Hk1 & %Hb1 & %Hp1 & -> & Hsh & Hru)".
     iIntros "(%k2 & %n2 & %Hv2 & %Hk2 & %Hb2 & Hs)".
     assert (Hkk : k1 = k2).
     { apply ientry_inj; [lia | lia |]. rewrite -Hv1 -Hv2. reflexivity. }
@@ -558,22 +572,23 @@ Section IcacheHeldAny.
     CtxMorph (λ ξ, inode_held_short (XI := ξ) v s).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /inode_held_short.
-    iDestruct "H" as (k qt qi inum) "(%Hv & %Hk & %Hb & %Hq & Hs)".
+    iDestruct "H" as (k qt qi inum) "(%Hv & %Hk & %Hb & %Hp & %Hq & Hs)".
     iMod (inode_refp_short_morph k qt qi icfg_dev inum ξ ξ'
                  with "Hd Hs") as "[Hd Hs]".
     iModIntro. iFrame "Hd". iExists k, qt, qi, inum.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-    iSplitR; [done|]. iExact "Hs".
+    iSplitR; [done|]. iSplitR; [done|]. iExact "Hs".
   Qed.
 
   Global Instance inode_held_morph (v : mword 64) :
     CtxMorph (λ ξ, inode_held (XI := ξ) v).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /inode_held.
-    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hb & Hs)".
+    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hb & %Hp & Hs)".
     iMod (inode_refp_morph k q icfg_dev inum ξ ξ' with "Hd Hs") as "[Hd Hs]".
     iModIntro. iFrame "Hd". iExists k, q, inum.
-    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hs".
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iExact "Hs".
   Qed.
 
 End IcacheHeldAny.

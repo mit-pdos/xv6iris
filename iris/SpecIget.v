@@ -224,6 +224,12 @@ Definition wp_iget_sconf_body
   (* the requested inum is inside the inode region: [ipool_acc]'s premise on
      the recycle arm, and the ONLY constraint on either argument *)
   bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+  (* ...and POSITIVE (round E2-L0): inode 0 is never referenced -- a dirent
+     naming it is a free slot -- and [inode_held] now carries the fact, so
+     iget's post ([inode_refb], repackaged by every caller) must be able to
+     hand it on.  Every caller has it: the root is 1, dirlookup returns
+     only live records, ialloc's post says [0 < inum]. *)
+  0 < bv_unsigned inum ->
   (* a0 = dev, a1 = inum, sign-extended -- the scan's 64-bit [bne]s at
      +0x4c / +0x52 compare them against the [c.lw] of a cell *)
   m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 icfg_dev : mword 64) ->

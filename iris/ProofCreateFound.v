@@ -649,7 +649,7 @@ Section ProofCreateFound.
       (* ============================================================== *)
       iDestruct "Hres" as "((%Hnpa0 & %Hnpname) & Hipty & Hisl1)".
       iDestruct "Hipty" as (kd qd dind gd lod tld)
-        "(%Hie & %Hkd & %Hdib & %Hled & #Hfld & Href & #Hshotd & Hrud)".
+        "(%Hie & %Hkd & %Hdib & %Hdpos & %Hled & #Hfld & Href & #Hshotd & Hrud)".
       assert (Hdib' : bv_unsigned dind < 16 * Z.of_nat icfg_nib)
         by (exact Hdib).
       destruct (Hiregb dind Hdib') as [Hdblk Hdblog].

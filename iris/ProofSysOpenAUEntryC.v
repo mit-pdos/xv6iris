@@ -687,7 +687,7 @@ Section ProofSysOpenAUEntryC.
                    (MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
                             (fn_nlink (era_node dn bm data))))
                 socr_Phit_triv
-                Hqs HKfull Hkk ltac:(exact (proj2 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                Hqs HKfull Hkk ltac:(exact (proj2 Hinum)) ltac:(exact (proj1 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hibcov Hiblog Hcovb
                 ltac:(exact (proj2 (proj2 Hu1) eq_refl)) Hj Hgl Hlkempty
                 Hdirw Hom Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3
@@ -772,7 +772,7 @@ Section ProofSysOpenAUEntryC.
                 (socr_Phio_tag (bv_unsigned inum)
                    (abs_row (era_node dn bm data)) Phio)
                 Phit
-                Hqs HKfull Hkk ltac:(exact (proj2 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                Hqs HKfull Hkk ltac:(exact (proj2 Hinum)) ltac:(exact (proj1 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hibcov Hiblog Hcovb
                 ltac:(exact (proj2 (proj2 Hu1) eq_refl)) Hj Hgl Hlkempty
                 Hdirw Hom Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3
