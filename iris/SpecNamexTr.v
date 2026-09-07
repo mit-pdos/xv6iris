@@ -1,6 +1,6 @@
 (* SpecNamexTr.v -- N-3: namex WITH THE GHOST TRACE, the contract
    [SpecNameiTr.wp_namei_tr_body] is a 26-byte wrapper over
-   (claude-notes/projects/namei-pinned-lookup.md §4; rulings in that file's
+   (claude-notes/completed/namei-pinned-lookup.md §4; rulings in that file's
    STATUS header and §11.4).
 
    WHAT THIS IS.  [SpecNamex.wp_namex_gen] returns [inode_held ipv] -- a

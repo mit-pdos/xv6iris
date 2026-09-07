@@ -1,5 +1,5 @@
 (* UmodeText.v -- A VERIFIED PROCESS'S TEXT AS STAMPED BYTES
-   (claude-notes/projects/icache.md, "The verified tier: text OUTSIDE the
+   (claude-notes/design/icache.md, "The verified tier: text OUTSIDE the
    walker").
 
    The verified user-mode tier fetches the program's OWN word, so its fetch

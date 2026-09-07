@@ -1,6 +1,6 @@
 (* ===================================================================== *)
 (*  KexecOkQ.v -- kexec's RESULT RELATION, GENERIC IN THE ENTRY POINT     *)
-(*  (claude-notes/projects/namei-pinned-lookup.md §13.3)                  *)
+(*  (claude-notes/completed/namei-pinned-lookup.md §13.3)                 *)
 (* ===================================================================== *)
 
 (*  WHY THIS EXISTS.  [SpecKexec.kexec_ok] is spelled in thirty-one places

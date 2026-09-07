@@ -1,5 +1,9 @@
 # Project: trace-level UART/power properties out of adequacy
 
+> COMPLETE (phases 1-4), and archived for its narrative only.  The durable
+> design is [`../design/adequacy.md`](../design/adequacy.md) ("The trace
+> invariant"); the device side is [`../design/device.md`](../design/device.md).
+
 **Goal.** Prove Iris-level invariants about the UART device and have the
 adequacy theorem export them as a PURE property of the OBSERVABLE TRACE of
 the CSL-free execution — the list of `RiscvLang.mobs` events a run emits:

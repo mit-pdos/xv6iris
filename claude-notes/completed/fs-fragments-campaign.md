@@ -7,7 +7,7 @@
 > "`create_fresh_ty` stands" wall is gone (it is a lemma); IgetLic's row-14
 > premise growth was re-supplied by namei's N-2/N-3 on the `dv_of` tie. The
 > one stopped item, F3's tree-delta half, was STOPPED BY RULING and its
-> carrier question answered by `dview` (`projects/namei-pinned-lookup.md`).
+> carrier question answered by `dview` (`completed/namei-pinned-lookup.md`).
 > Cosmetic: fold `IregLinkNz.v`/`IregDirBit.v` into `InodeRegion.v` at a
 > milestone (`design/code-organization.md`).
 

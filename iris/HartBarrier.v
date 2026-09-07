@@ -302,7 +302,7 @@ Section barrier.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* THE FENCE.I LEAF (claude-notes/projects/icache.md).  [fence.i]      *)
+  (* THE FENCE.I LEAF (claude-notes/design/icache.md).  [fence.i]        *)
   (* drains nothing on the data side ([fence_drains] is false), but it    *)
   (* raises this hart's INSTRUCTION view past its data view and its own  *)
   (* last store ([RiscvLang.mnode_step]'s Barrier arm), and that is the   *)

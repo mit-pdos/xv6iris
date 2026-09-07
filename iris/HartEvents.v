@@ -314,7 +314,7 @@ Section events.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* THE INSTRUCTION FETCH (claude-notes/projects/icache.md).  The machine  *)
+  (* THE INSTRUCTION FETCH (claude-notes/design/icache.md).  The machine    *)
   (* reads through the icache: every byte latest-visible TO THE ICACHE     *)
   (* AGENT (no store forwarding) at some view at or above the hart's       *)
   (* INSTRUCTION view, and moves neither view -- so a caller that wants    *)

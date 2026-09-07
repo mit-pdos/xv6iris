@@ -929,7 +929,7 @@ Proof.
   - exact (u_mem_step_ok_refl P t mm Hwf).
 Qed.
 
-(* THE FAULTING WALK ALONE (claude-notes/projects/icache.md): the Iris
+(* THE FAULTING WALK ALONE (claude-notes/design/icache.md): the Iris
    composers of the safety tier drive [fetch] node by node, so the page-fault
    translation is wanted WITHOUT the [fetch] shell around it. *)
 Lemma u_walk_fetch_fault_pure (P : uptd) (t : ptree) (mm : PtBytes.pamap)

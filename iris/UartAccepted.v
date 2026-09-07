@@ -5,7 +5,7 @@
    and ties the current cycle's output projection to the device's [u_wire]
    ([obs_wf]'s third conjunct).  This file adds the other half of the
    sentence a console spec needs, in the direction the owner ruled for
-   [claude-notes/projects/uart-trace.md] -- SAFETY, "no unaccepted byte
+   [claude-notes/completed/uart-trace.md] -- SAFETY, "no unaccepted byte
    ever appears":
 
      every [ObsUartOut] byte of the current power cycle is a byte the

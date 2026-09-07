@@ -396,7 +396,7 @@ Section UkLoadPostFetch.
     pose proof (vmem_width_dvd kk Hvw) as Hkdvd.
     pose proof (vmem_width_uint kk Hvw) as Huintk.
     (* THE WALKER'S MAP IS THE DATA HALF: the text image is stamped and
-       framed (claude-notes/projects/icache.md) *)
+       framed (claude-notes/design/icache.md) *)
     set (md := upa_map pt (uM_data pt Mp)).
     pose proof (uva_inj_sub pt Mp _ (uM_data_sub pt Mp) Hinj) as Hinjd.
     pose proof (uv_tree_ok_data pt Mp t' Hinj Htok') as Htokd'.
@@ -1235,7 +1235,7 @@ Section UkLoad.
      projection.  R needs NO bit of its own -- [UserPerm.perm_leaf] is
      [None] unless both U and R are set, and [upt_acc_wf] excludes the
      execute-only and write-only shapes, so every page of [π] is readable. *)
-  (* a DATA page of the key: W, hence (claude-notes/projects/icache.md) not
+  (* a DATA page of the key: W, hence (claude-notes/design/icache.md) not
      text, so the walker owns its bytes; the one text-page load of the
      engine, vprintf's format-string [lbu], is driven at the node instead *)
   Definition uk_load_ok (va : mword 64) : Prop :=

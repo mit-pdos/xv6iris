@@ -3572,7 +3572,7 @@ proving the multi-hop arm, which is false.
 Files: `iris/UartAccepted.v` (pure leaf, beside `ObsTrace.v`),
 `iris/UartSentResidue.v` (Iris, above `UartSentLoc`),
 `iris/SystemUartAccepted.v` (the export, above `SystemAdequacy`).  Nothing
-of `claude-notes/projects/uart-trace.md`'s phases 1–4 was touched (R10):
+of `claude-notes/completed/uart-trace.md`'s phases 1–4 was touched (R10):
 all three files are new leaves.
 
 **THE TIE (`UartAccepted.run_out_accepted`).**  For every run of the machine

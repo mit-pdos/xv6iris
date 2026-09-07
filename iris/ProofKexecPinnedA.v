@@ -7,12 +7,12 @@
 (*  the boot chain (era 0 included).  The source is KEPT, unedited below,  *)
 (*  to be PORTED by the file-system behaviour project onto its abstract    *)
 (*  state; the handoff banner at the top of                                *)
-(*  claude-notes/projects/namei-pinned-lookup.md is the owner's ruling and *)
+(*  claude-notes/completed/namei-pinned-lookup.md is the owner's ruling and *)
 (*  the full list of files taken off the build.                            *)
 (* ====================================================================== *)
 (* ===================================================================== *)
 (*  ProofKexecPinnedA.v -- PHASE A's FIRST HALF, WALKED AT THE PINNED      *)
-(*  namei (claude-notes/projects/namei-pinned-lookup.md §13, N-5.2B)       *)
+(*  namei (claude-notes/completed/namei-pinned-lookup.md §13, N-5.2B)      *)
 (* ===================================================================== *)
 
 (*  THE ONE GENUINELY NEW PHASE PROOF OF N-5.2B, and it is [kxc_a1] with

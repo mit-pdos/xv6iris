@@ -148,7 +148,7 @@ Defined.
 (* ===================================================================== *)
 
 (* the page of [va] is a readable page of the key *)
-(* icache (claude-notes/projects/icache.md): a readable window of the
+(* icache (claude-notes/design/icache.md): a readable window of the
    ENGINE is a WRITABLE one -- a text page's bytes are stamped and outside
    the walker, and the one text read the engine speaks goes through
    UkLoadText.v -- so [uk_rpage] now demands the W bit, exactly as

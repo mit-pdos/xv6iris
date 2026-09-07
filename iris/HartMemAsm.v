@@ -382,7 +382,7 @@ Qed.
    [internal_error] placeholders, or the instruction fetch).  [Read_ttw] is
    the fork's walk kind (a non-reserved page-table-entry load, see
    [RiscvExtras.rk_select]) and reaches RAM like a data load.  [Read_ifetch]
-   is deliberately NOT here (claude-notes/projects/icache.md): a fetch reads
+   is deliberately NOT here (claude-notes/design/icache.md): a fetch reads
    through the icache, at the instruction view, and [goodmb]/[hmrun] refuse
    it -- a fetch node is stepped by [HartEvents.swp_hart_ram_read_ifetch],
    never answered off the walker's map.  Note the hazard the wildcard

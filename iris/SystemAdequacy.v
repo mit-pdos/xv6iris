@@ -403,7 +403,7 @@ Section SystemBoot.
        snapshot's map name beside the application's durable claim at that
        name ([FsCrash.P_fs_comp] at the guest [app_dur_raw A]). *)
     riscv_crash_pred = P_fs_comp (app_dur_raw A) cov (FsImg.sb_logstart sb) ->
-    (* THE TRACE SLOT'S VALUE, likewise (claude-notes/projects/uart-trace.md):
+    (* THE TRACE SLOT'S VALUE, likewise (claude-notes/completed/uart-trace.md):
        this boot states no trace property, so the slot holds the trivial
        predicate, and that is what discharges the UART thread's permit. *)
     (* THE UART THREAD'S TRACE PERMIT (uart-trace.md): what this boot cannot

@@ -430,7 +430,7 @@ Section WpSconfCtlEng.
   (* THE FENCE.I LEAF THAT MINTS.  [swp_execute_FENCEI_s] above is the
      identity; [userret] STEP 0 instead runs a ghost step at the barrier
      node ([HartBarrier.swp_hart_fence_i]) -- the stamp on the process's
-     text image is minted there (claude-notes/projects/icache.md). *)
+     text image is minted there (claude-notes/design/icache.md). *)
   Lemma swp_execute_FENCEI_mint (imm : SailStdpp.Values.mword 12)
       (rs rd : regidx) (P Q : iProp Σ) :
     gen_cert -∗ ifence_step P Q -∗ P -∗

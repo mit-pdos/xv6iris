@@ -312,7 +312,7 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
        next round.  [user_ptm_inv] at the post's OWN index [U'] is what the
        round's image half above relates to, and it is the conjunct
        [UexecRet.uvb] carries. *)
-    (* ...STAMPED (claude-notes/projects/icache.md): the round ends past
+    (* ...STAMPED (claude-notes/design/icache.md): the round ends past
        userret's fence.i, so the text bytes carry the receipt the verified
        tier's slot bundle ([UexecRet.uvb]) expects *)
     user_ptm_inv_x pt' (uint (pv_sz (us_V U'))) (us_M U') -∗

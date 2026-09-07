@@ -5,7 +5,7 @@
    cycle's [ObsUartOut] projection is a SUBLIST of [uart_acc] -- the bytes
    the kernel accepted into the UART.  This file states it beside the
    adequacy theorem's own conclusion at the xv6 image, which is where a
-   reader of [claude-notes/projects/uart-trace.md] expects a trace property
+   reader of [claude-notes/completed/uart-trace.md] expects a trace property
    to be delivered: reducibility, the trace's shape ([ObsTrace.obs_wf]),
    and the acceptance tie, about ONE run.
 

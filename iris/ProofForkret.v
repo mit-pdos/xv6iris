@@ -789,7 +789,7 @@ Qed.
    which inode ["/init"] names or what bytes it holds: the era-0 pinned
    theorems ([NameiInitPinned], [SpecKexecPinned]/[ProofKexecPinned]) are a
    standalone story, and durable-disk lane E-unpin took them off the build
-   entirely -- see claude-notes/projects/namei-pinned-lookup.md's banner. *)
+   entirely -- see claude-notes/completed/namei-pinned-lookup.md's banner. *)
 (* ---- the trapframe page is a real page: the fact [pt_node_claim_from_static]
        needs before the physical trapframe words can be read as MEMORY.  It
        rides inside the descriptor's well-formedness, so [proc_priv] has it.

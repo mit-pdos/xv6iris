@@ -142,7 +142,7 @@ Section ctx.
 
 
   (* ---------------------------------------------------------------- *)
-  (* THE STAMPED BYTE (claude-notes/projects/icache.md): a context's    *)
+  (* THE STAMPED BYTE (claude-notes/design/icache.md): a context's      *)
   (* fact PLUS a pure stamp -- its latest write is at or below [IK], an *)
   (* INSTRUCTION-view position.  Paired with the hart's [hart_iview_lb  *)
   (* IK] receipt this is what an instruction fetch pays with            *)

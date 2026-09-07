@@ -3117,7 +3117,7 @@ Section SmodeCorePt.
 
 
   (* =================================================================== *)
-  (* PART G -- THE NONDETERMINISTIC FETCH (claude-notes/projects/icache.md,  *)
+  (* PART G -- THE NONDETERMINISTIC FETCH (claude-notes/design/icache.md,    *)
   (* the safety tier).  The generic any-user-code proof is total over the  *)
   (* fetched word, so it pays NO stability obligation: the node rule       *)
   (* quantifies the continuation over every word and needs only that the  *)

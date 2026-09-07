@@ -1092,7 +1092,7 @@ Section WPDev.
 
 
   (* THE ONE RULE WHOSE STEP IS OBSERVED (RiscvLang §3b', claude-notes/
-     projects/uart-trace.md): the tx/rx arms emit the console I/O events, so
+     completed/uart-trace.md): the tx/rx arms emit the console I/O events, so
      this rule hands its callback [state_interp]'s half of the HISTORY ghost
      at the history so far -- together with the two facts about it the
      callback can use, that the power is on ([trace_shape h true]) and the

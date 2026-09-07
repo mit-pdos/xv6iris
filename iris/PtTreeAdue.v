@@ -416,7 +416,7 @@ Proof.
   rewrite Hl. cbn. split; [reflexivity | exact Hag13].
 Qed.
 
-(* the same grant at USER (claude-notes/projects/icache.md: the U-mode fetch
+(* the same grant at USER (claude-notes/design/icache.md: the U-mode fetch
    composer steps its fetch node outside the walker): no PMP entry is a
    Machine entry here either, so the proof is the Supervisor one verbatim *)
 Lemma upmp_hval_grant (D Drw : gset register)

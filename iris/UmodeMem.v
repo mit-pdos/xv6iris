@@ -123,7 +123,7 @@ Definition uva_fetch_leaf (pt : uptd) (pc : mword 64) : Prop :=
     ud_um pt !! svpn_of pc = Some w /\
     uleaf_ok (InstructionFetch tt) w.
 
-(* THE TEXT PAGES (claude-notes/projects/icache.md): [va] is on a page the
+(* THE TEXT PAGES (claude-notes/design/icache.md): [va] is on a page the
    table maps EXECUTABLE AND NOT WRITABLE -- PTE bit 3 set, bit 2 clear
    ([UserHeap.utext_part]'s class, read off the leaf word so that no
    permission projection and no [sz] is needed).  A verified process holds

@@ -723,7 +723,7 @@ Section fetch.
      above it the NEW one.  So the ∃ moves INSIDE, and what a caller pins
      is a PREDICATE.  This is exactly [HartEvents.wp_hart_ram_read_plain_ex]'s
      first premise, and [fobl_ram_ex_of] is why no existing payer moves. *)
-  (* THE FETCH OBLIGATION (claude-notes/projects/icache.md): the machine
+  (* THE FETCH OBLIGATION (claude-notes/design/icache.md): the machine
      reads an instruction through the icache -- at the icache AGENT (no store
      forwarding), at any view from the hart's INSTRUCTION view to the top --
      so a pinned fetch owns its bytes at every such view.  Kernel text pays

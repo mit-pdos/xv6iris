@@ -45,7 +45,7 @@
 > seven files above are NOT re-enabled and could not be — their
 > `dv_lend_mint`/`dv_pin_redeem`/`fv_pin_redeem` were deleted at
 > `226aaab5` — and re-enabling remains the owner's call.  See lane P of
-> [`fs-syscall-specs.md`](fs-syscall-specs.md) for the statements, the
+> [`fs-syscall-specs.md`](../projects/fs-syscall-specs.md) for the statements, the
 > consumer-site map and the one remaining transport gap.
 
 # namei, pinned: a ghost-state spec for WHICH inode the walk returns

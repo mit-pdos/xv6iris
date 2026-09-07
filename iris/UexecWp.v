@@ -130,7 +130,7 @@ Section UexecWp.
        ⌜user_mstatus_ok ms_v⌝ -∗
        hw_config (CID := h) -∗ minstret_inv -∗ wire_inv -∗
        u_regs (CID := h) (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
-       (* the image STAMPED (claude-notes/projects/icache.md): the text
+       (* the image STAMPED (claude-notes/design/icache.md): the text
           bytes at an instruction-view position the hart has passed, minted
           at userret's fence.i and carried in by the slot's bundle *)
           user_pt_inv_x (CID := h) (XI := xi) pt M -∗

@@ -1,5 +1,5 @@
 (* UmodeFetchX.v -- THE VERIFIED TIER'S FETCH SHELLS, WITH A PAYER THREADED
-   (claude-notes/projects/icache.md, "The verified tier: text OUTSIDE the
+   (claude-notes/design/icache.md, "The verified tier: text OUTSIDE the
    walker").
 
    The fixed-word U-mode fetch shells of SmodeCorePt PART D/E

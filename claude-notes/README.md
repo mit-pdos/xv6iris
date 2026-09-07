@@ -41,6 +41,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   exec stack, the clock tick, the minstret invariant, the register file, memory
   points-to & dfrac, config bundles, fetch geometry, the concrete-state decode
   bridge.
+- **[`icache.md`](design/icache.md)** — the non-coherent instruction fetch: the
+  per-hart instruction view and what `fence.i` moves, why the walker never
+  answers a fetch, the two tiers' prices, and why text lives outside the
+  walker's map (with the refuted alternative).
 - **[`code-organization.md`](design/code-organization.md)** — where a function's
   decode facts live vs. its WP leaf lemmas, import discipline, lemma-altitude
   rules, specific-vs-generic leaves.

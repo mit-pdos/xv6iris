@@ -1,5 +1,5 @@
 (* ProofNameiTr.v -- namei at the TRACE contract
-   (claude-notes/projects/namei-pinned-lookup.md, stage N-3).
+   (claude-notes/completed/namei-pinned-lookup.md, stage N-3).
 
      struct inode*
      namei(char *path)

@@ -19,7 +19,7 @@
        power cycles.  The old single-generation theorem (a machine that
        starts powered ON with no power thread) is gone: it was a special
        case, nothing used it, and the trace conjunct of [state_interp]
-       parses the history from OFF (claude-notes/projects/uart-trace.md).
+       parses the history from OFF (claude-notes/completed/uart-trace.md).
        The META-level conclusion has no Iris judgment in it: "the system
        executes correctly" is whatever the client's invariants + WPs
        enforce, discharged down to the bare operational semantics.
@@ -710,7 +710,7 @@ Section power.
                    the crash predicate, not just where the mirror's other
                    half goes in. *)
                 Rb dk))
-      (* THE TRACE HOOK (claude-notes/projects/uart-trace.md).  Both power
+      (* THE TRACE HOOK (claude-notes/completed/uart-trace.md).  Both power
          arms are OBSERVED (RiscvLang §3b'), and the history ghost can only
          move with the client's half, which lives in its trace predicate --
          so each arm opens [obsN] and runs this: given the shape of the
@@ -1461,7 +1461,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
               (* ...and the client's lent resource (durable-disk BT-1), at
                  the application's fixed part (app-instances.md §6) *)
               Rb c dk))
-    (* THE TRACE PREDICATE (claude-notes/projects/uart-trace.md): the SECOND
+    (* THE TRACE PREDICATE (claude-notes/completed/uart-trace.md): the SECOND
        fixed-layer named slot, beside the crash predicate and for a
        different job.  The crash predicate is the file system's durable
        record and says nothing about observations; this one owns the

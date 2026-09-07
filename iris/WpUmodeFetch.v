@@ -1,6 +1,6 @@
 (* WpUmodeFetch.v -- THE BYTE MAP, THE WALK AND THE FETCH of the VERIFIED
    user-execution tier: WpUmodeStep.v's sections 1-4, split out so that the
-   fetch bridges compile on their own (claude-notes/projects/icache.md).
+   fetch bridges compile on their own (claude-notes/design/icache.md).
 
    (The original header follows.)
 
@@ -293,7 +293,7 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §3 THE VALUE-PRECISE FETCH, AT THE NODE (claude-notes/projects/icache.md, *)
+(* §3 THE VALUE-PRECISE FETCH, AT THE NODE (claude-notes/design/icache.md, *)
 (* "The verified tier: text OUTSIDE the walker").                          *)
 (*                                                                        *)
 (* A verified process must fetch the word its image says is there, and    *)

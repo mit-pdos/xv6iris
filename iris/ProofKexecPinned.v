@@ -7,12 +7,12 @@
 (*  the boot chain (era 0 included).  The source is KEPT, unedited below,  *)
 (*  to be PORTED by the file-system behaviour project onto its abstract    *)
 (*  state; the handoff banner at the top of                                *)
-(*  claude-notes/projects/namei-pinned-lookup.md is the owner's ruling and *)
+(*  claude-notes/completed/namei-pinned-lookup.md is the owner's ruling and *)
 (*  the full list of files taken off the build.                            *)
 (* ====================================================================== *)
 (* ===================================================================== *)
 (*  ProofKexecPinned.v -- kexec("/init") AT THE IMAGE'S BYTES              *)
-(*  (claude-notes/projects/namei-pinned-lookup.md §13, stage N-5.2B)       *)
+(*  (claude-notes/completed/namei-pinned-lookup.md §13, stage N-5.2B)      *)
 (* ===================================================================== *)
 
 (*  [SpecKexecPinned.wp_kexec_pinned], assembled.  Almost nothing here is

@@ -7,12 +7,12 @@
 (*  the boot chain (era 0 included).  The source is KEPT, unedited below,  *)
 (*  to be PORTED by the file-system behaviour project onto its abstract    *)
 (*  state; the handoff banner at the top of                                *)
-(*  claude-notes/projects/namei-pinned-lookup.md is the owner's ruling and *)
+(*  claude-notes/completed/namei-pinned-lookup.md is the owner's ruling and *)
 (*  the full list of files taken off the build.                            *)
 (* ====================================================================== *)
 (* ===================================================================== *)
 (*  NameiInitPinned.v -- THE CAMPAIGN'S FIRST PRIZE, AS A THEOREM         *)
-(*  (claude-notes/projects/namei-pinned-lookup.md §12, stage N-5.1 W5b)   *)
+(*  (claude-notes/completed/namei-pinned-lookup.md §12, stage N-5.1 W5b)  *)
 (* ===================================================================== *)
 
 (*  WHAT IT IS.  [DirViewPin.NameiPinnedProof]'s [wp_namei_pinned] is the

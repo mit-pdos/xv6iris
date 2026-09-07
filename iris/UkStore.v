@@ -472,7 +472,7 @@ Section UkStorePostFetch.
     pose proof (uvw_dvd kk Hvw) as Hkdvd.
     pose proof (uvw_uint kk Hvw) as Huintk.
     (* THE WALKER'S MAP IS THE DATA HALF: the text image is stamped and
-       framed (claude-notes/projects/icache.md) *)
+       framed (claude-notes/design/icache.md) *)
     set (md := upa_map pt (uM_data pt Mp)).
     pose proof (uva_inj_sub pt Mp _ (uM_data_sub pt Mp) Hinj) as Hinjd.
     pose proof (uv_tree_ok_data pt Mp t' Hinj Htok') as Htokd'.

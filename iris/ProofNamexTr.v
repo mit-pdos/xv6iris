@@ -1,5 +1,5 @@
 (* ProofNamexTr.v -- the whole-function proof of namex AT THE TRACE
-   CONTRACT (claude-notes/projects/namei-pinned-lookup.md, stage N-3).
+   CONTRACT (claude-notes/completed/namei-pinned-lookup.md, stage N-3).
 
    WHAT THIS IS, AND WHAT IT IS NOT.  [ProofNamex.wp_namex_gen] is the
    landed walk; it does not move (R10) and this file does not touch it.

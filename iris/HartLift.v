@@ -161,7 +161,7 @@ Definition hsil_tv {X : Type} (h : agent) (log : list pwmsg) (m : M X)
   | Interface.Next oc _ => hbar_tv h log oc tv rv
   end.
 
-(* ... and the INSTRUCTION view (claude-notes/projects/icache.md): among the
+(* ... and the INSTRUCTION view (claude-notes/design/icache.md): among the
    silent nodes only [fence.i] moves it, past the hart's data view and its
    own last store, and only ever forward. *)
 Definition hbar_itv {T : Type} (h : agent) (log : list pwmsg)

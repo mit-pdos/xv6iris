@@ -3069,7 +3069,7 @@ Section ctx.
   Qed.
 
   (* ================================================================== *)
-  (* THE PHYSICAL STAMPED BYTE (claude-notes/projects/icache.md):        *)
+  (* THE PHYSICAL STAMPED BYTE (claude-notes/design/icache.md):          *)
   (* [ctx_phys_pointsto]'s body plus the pure stamp "latest write at or  *)
   (* below [IK]", an instruction-view position.  [ctx_xpointsto]'s twin  *)
   (* at the tier [HartMemRun.bytes_own] is stated over.  The gates: a    *)

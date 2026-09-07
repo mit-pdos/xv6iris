@@ -80,7 +80,7 @@
 (* [UkShParse.ushp_clw_text_ok] carries verbatim.  It is a genuine gap in  *)
 (* the engine, not a spelling: [UkLoad.uk_load_ok] demands a WRITABLE      *)
 (* target page (text bytes are stamped and outside the walker's map,       *)
-(* claude-notes/projects/icache.md) and the tier's one text reader,        *)
+(* claude-notes/design/icache.md) and the tier's one text reader,          *)
 (* [UkRunMem.wp_uk_lbu_text], is width-1 all the way down                  *)
 (* (WpUmodeTextLoad.v).  One engine leaf discharges both files.            *)
 (* ===================================================================== *)
@@ -587,7 +587,7 @@ Section UkShRun.
      this leaf is a genuine gap in the engine rather than a spelling of an
      existing one: [UkLoad.uk_load_ok] demands a WRITABLE target page (the
      walker owns data bytes; text bytes are stamped and outside its map --
-     claude-notes/projects/icache.md), which a .rodata address is not.
+     claude-notes/design/icache.md), which a .rodata address is not.
 
      IT IS A HYPOTHESIS UNTIL THE ENGINE HAS THE WIDTH-4 TEXT LOAD, and
      the statement below is [UkShParse.ushp_clw_text_ok] VERBATIM, so the

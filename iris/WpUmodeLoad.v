@@ -735,7 +735,7 @@ Section UvLoadPostFetch.
     pose proof (vmem_width_dvd kk Hvw) as Hkdvd.
     pose proof (vmem_width_uint kk Hvw) as Huintk.
     (* THE WALKER'S MAP IS THE DATA HALF: the text image is stamped and
-       framed (claude-notes/projects/icache.md) *)
+       framed (claude-notes/design/icache.md) *)
     set (md := upa_map pt (uM_data pt M)).
     pose proof (uva_inj_sub pt M _ (uM_data_sub pt M) Hinj) as Hinjd.
     pose proof (uv_tree_ok_data pt M t' Hinj Htok') as Htokd'.

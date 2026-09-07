@@ -1,7 +1,7 @@
 (* ====================================================================== *)
 (*  FsInitPin.v -- THE ERA-0 /init PINS, RE-DERIVED ON THE ABSTRACT STATE  *)
 (*  (fs-syscall-specs lane P; the port the banner at the top of            *)
-(*   claude-notes/projects/namei-pinned-lookup.md asks for)                *)
+(*   claude-notes/completed/namei-pinned-lookup.md asks for)               *)
 (* ====================================================================== *)
 
 (*  WHAT THIS FILE IS.  The namei-pinned-lookup campaign once proved two

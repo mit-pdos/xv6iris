@@ -304,7 +304,7 @@ Record gstate := GState {
   gimg : gmap Arch.pa (bv 8);
   glog : list pwmsg;
   gtv : CPU -> nat;
-  (* THE INSTRUCTION VIEW (claude-notes/projects/icache.md): the icache
+  (* THE INSTRUCTION VIEW (claude-notes/design/icache.md): the icache
      floor of each hart.  An instruction fetch reads at ANY view at or above
      it and moves neither view; only [fence.i] raises it (past the hart's
      data view AND its own last store).  Nothing ties it to [gtv]:
@@ -382,7 +382,7 @@ Definition mm_ok (g : gstate) : Prop :=
         (ram_lo <= SailStdpp.Operators_mwords.uint a < ram_hi)%Z ->
         is_Some (g.(gimg) !! a)).
 
-(* THE INSTRUCTION VIEW'S BOUND (claude-notes/projects/icache.md), a pure
+(* THE INSTRUCTION VIEW'S BOUND (claude-notes/design/icache.md), a pure
    conjunct of the era interp beside the view mirror -- NOT inside [mm_ok],
    because the gstate-free bundle ([RiscvExec.tso_interp_of]) restates
    [mm_ok] without a [gitv] to speak of. *)
@@ -970,7 +970,7 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                m' = k (inl (w, None)) /\ s' = MState s.(sregs) s.(mem) d' /\
                log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
            else
-             (* THE INSTRUCTION FETCH (claude-notes/projects/icache.md): the
+             (* THE INSTRUCTION FETCH (claude-notes/design/icache.md): the
                 icache is not coherent with the data side.  The fetch reads
                 every byte latest-visible TO THE ICACHE AGENT (no store
                 forwarding: [ifetch_agent] authors nothing) at some view at

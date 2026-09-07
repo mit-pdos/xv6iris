@@ -3,7 +3,7 @@
    [UkLoad.wp_uk_load] serves every load whose target page is WRITABLE --
    a data page, whose bytes the walker owns.  A program's string literals
    live in its text page (X, not W), whose bytes are STAMPED and outside the
-   walker's map (claude-notes/projects/icache.md), so the one text-page load
+   walker's map (claude-notes/design/icache.md), so the one text-page load
    the engine speaks -- vprintf's format-string [lbu] --  is driven at the
    node ([WpUmodeTextLoad.uv_swp_lbu_text]).  This file is [UkLoad]'s
    post-fetch / obligation / driver tower for exactly that instruction:

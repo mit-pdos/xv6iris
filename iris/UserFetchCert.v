@@ -59,7 +59,7 @@ Import Defs.
 (* ===================================================================== *)
 (* 1. THE FETCH READ IS NOT CERTIFIED HERE ANY MORE.                       *)
 (*                                                                        *)
-(* claude-notes/projects/icache.md: an instruction fetch reads through a  *)
+(* claude-notes/design/icache.md: an instruction fetch reads through a    *)
 (* NON-coherent icache, so the walker ([HartMemRun.hmrun]/[goodmb])       *)
 (* refuses [AK_ifetch] reads and no [goodmb] certificate of a [fetch]     *)
 (* that reaches its read can exist.  The safety tier drives [fetch] node  *)

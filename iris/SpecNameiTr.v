@@ -1,5 +1,5 @@
 (* SpecNameiTr.v -- N-3: namei WITH THE GHOST TRACE, the pinned-lookup
-   campaign's general contract (claude-notes/projects/namei-pinned-lookup.md
+   campaign's general contract (claude-notes/completed/namei-pinned-lookup.md
    §4; rulings in its STATUS header and §11.4).
 
    ===== TOMBSTONE (fs-syscall-specs, THE DVIEW RETIREMENT, 2026-08-30) =====

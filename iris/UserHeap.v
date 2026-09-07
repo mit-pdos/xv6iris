@@ -573,7 +573,7 @@ Section UserHeap.
        ⌜ forall a : Z, is_Some (Mt !! a) -> ux_addr (pm) a ⌝ ∗
        (* ... and NOT writable: the text half is [utext_part]'s class, and
           the verified tier's fetch pays with STAMPED text bytes that the
-          walker must never own (claude-notes/projects/icache.md) *)
+          walker must never own (claude-notes/design/icache.md) *)
        ⌜ forall a : Z, is_Some (Mt !! a) -> ~ uw_addr (pm) a ⌝ ∗
        ⌜ forall a : Z, is_Some (Md !! a) -> uw_addr (pm) a ⌝ ∗
        ghost_map_auth γt 1 Mt ∗ ghost_map_auth γd 1 Md ∗

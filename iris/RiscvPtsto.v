@@ -377,7 +377,7 @@ Record riscvEraGS := RiscvEraGS {
      from the image; a pure tie in the interpretation ([tso_interp_at],
      [tso_interp_of]) makes every image byte a persistent pure fact. *)
   era_img : gmap Arch.pa (bv 8);
-  (* THE INSTRUCTION-VIEW MIRROR (claude-notes/projects/icache.md): one
+  (* THE INSTRUCTION-VIEW MIRROR (claude-notes/design/icache.md): one
      monotone counter per hart, at the machine's [gitv]; its lower bound
      [hart_iview_lb] is the [fence.i] receipt.  Per hart like
      [era_reg_name], and LAST so the positional mint in RiscvAdequacy only
@@ -502,7 +502,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      SQUEEZE the arm's generation onto the ambient one, which is what
      identifies the arm's mirror gname. *)
   riscv_swap_name : gname;
-  (* THE OBSERVABLE TRACE (claude-notes/projects/uart-trace.md).  The
+  (* THE OBSERVABLE TRACE (claude-notes/completed/uart-trace.md).  The
      language emits console I/O and power events ([RiscvLang.mobs], §3b')
      and Iris threads them through [state_interp]; these three fields are
      what lets the logic READ them.  [riscv_obs_name] is a [ghost_var] over
@@ -695,7 +695,7 @@ Definition crashN : namespace := nroot .@ "crash".
 Definition crash_inv `{!riscvFixedGS Σ} : iProp Σ :=
   inv crashN riscv_crash_pred.
 
-(* THE TRACE INVARIANT (claude-notes/projects/uart-trace.md): the client's
+(* THE TRACE INVARIANT (claude-notes/completed/uart-trace.md): the client's
    trace predicate, in its own fixed-layer slot.  Opened by the power arms
    (through the [Hobs] hook) and by the UART thread's tx/rx arms (through
    [WpUart.uart_obs_permit]); [obsN], [crashN] and [devN] are pairwise
@@ -2081,7 +2081,7 @@ Lemma resv_frag_of_fragb `{!riscvGS Σ} (c : CPU) (r : option resv) (b : bool) :
 Proof. iIntros "H". by iExists b. Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* THE INSTRUCTION-VIEW MIRROR (claude-notes/projects/icache.md).           *)
+(* THE INSTRUCTION-VIEW MIRROR (claude-notes/design/icache.md).             *)
 (* [iview_auth_at E f] is the era's authority over every hart's instruction *)
 (* view [gitv]; the lifting rule lends the focused hart's counter to the    *)
 (* node's callback as [hart_iview_auth] (the fetch rule reads it, the       *)
@@ -2394,7 +2394,7 @@ Definition power_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
       (if g.(gpow) then (∃ E, ⌜R !! g.(ggen) = Some E⌝ ∗ era_interp E g)%I
        else True%I)))%I.
 
-(* THE TRACE CONJUNCT OF [state_interp] (claude-notes/projects/uart-trace.md).
+(* THE TRACE CONJUNCT OF [state_interp] (claude-notes/completed/uart-trace.md).
    [κs] is Iris's FUTURE observation list; [h] is the PAST.  Three facts:
    the two concatenate to the run's whole trace (heap_lang's prophecy-interp
    trick, applied to the past: at the end of the run [κs = []] and the

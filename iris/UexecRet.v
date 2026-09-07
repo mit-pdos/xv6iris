@@ -702,7 +702,7 @@ Section UexecRet.
       (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
     (uv_amb ∗ uv_regs ∗ ⌜usz_ok sz⌝ ∗
-     (* the image STAMPED (claude-notes/projects/icache.md): text bytes at an
+     (* the image STAMPED (claude-notes/design/icache.md): text bytes at an
         instruction-view position this hart has passed, minted at [userret]'s
         [fence.i]; the trapped frame hands the plain image back *)
      user_ptm_inv_x pt sz M ∗

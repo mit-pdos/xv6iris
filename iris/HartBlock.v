@@ -90,7 +90,7 @@ Local Open Scope Z_scope.
 (* the only thing the fold-back needs to know about it.                    *)
 (* ====================================================================== *)
 
-(* THE THIRD TIE (claude-notes/projects/icache.md): an instruction fetch
+(* THE THIRD TIE (claude-notes/design/icache.md): an instruction fetch
    reads through the icache -- at ANY view at or above the hart's
    instruction view, with no store forwarding -- so a block folds back onto
    the flat [run] only if the bytes it FETCHES are UNWRITTEN in the log

@@ -77,7 +77,7 @@ Section UmodeFrames.
      utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
      (* the image STAMPED: text bytes at some instruction-view position this
         hart has passed, minted at [userret]'s [fence.i]
-        (claude-notes/projects/icache.md); the trap frame below hands the
+        (claude-notes/design/icache.md); the trap frame below hands the
         kernel the plain image back *)
      umem_x pt M ∗
      user_cfg C ∗

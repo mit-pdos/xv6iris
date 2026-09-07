@@ -59,7 +59,7 @@ Facts about the current architecture that shape every option below.
   leaf's `pc_is`, a function proof's `gpr_file`) are invisible to `Hphi`;
   only `state_interp` (physical state + the ghost histories it carries) and
   the two fixed-layer invariants `Pc`/`Pt` are. `design/adequacy.md` item
-  (d) and `projects/uart-trace.md` ruling 5 already record that liveness is
+  (d) and `completed/uart-trace.md` ruling 5 already record that liveness is
   out of `wp_strong_adequacy`'s reach.
 - **The trace plumbing exists.** `RiscvLang.mobs` (`ObsUartOut/In`,
   `ObsPowerOn/Off`) is emitted by `prim_step`; `obs_interp` keeps the past

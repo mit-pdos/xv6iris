@@ -1,5 +1,5 @@
 (* HartMemRunX.v -- THE PAYLOAD-INDEXED BYTE MAP AND THE WALKER'S COROLLARY
-   (claude-notes/projects/icache.md, "The verified tier: text OUTSIDE the
+   (claude-notes/design/icache.md, "The verified tier: text OUTSIDE the
    walker").
 
    A verified process holds its TEXT as stamped bytes

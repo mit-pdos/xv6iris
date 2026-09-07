@@ -1,5 +1,8 @@
 # Project: the non-coherent instruction cache
 
+> COMPLETE, and archived for its narrative only.  The durable design is
+> [`../design/icache.md`](../design/icache.md); read that, not this.
+
 **Goal.** Make the Ztso machine (`RiscvLang.mnode_step` over
 `TsoMemPa`) honest about RISC-V instruction fetch: fetches are NOT
 coherent with the data side, and `fence.i` is what re-establishes order.

@@ -1417,7 +1417,7 @@ Section UserActiveClass.
     \/ (exists (ex : ExceptionType) (xv : mword 64),
           fr = F_Error (ex, xv) /\ user_exc ex = true).
 
-  (* ---- THE BRIDGE POST (claude-notes/projects/icache.md).  What ANY fetch
+  (* ---- THE BRIDGE POST (claude-notes/design/icache.md).  What ANY fetch
      composer hands the generic tail: the landing tree/map/file, with the
      pins carried on [u_Dfix] and the TLB fact AT THE LANDING FILE ITSELF --
      once a walk starts from an Iris landing there is no pure landing file
@@ -1718,7 +1718,7 @@ Section UserActiveClass.
   Qed.
 
   (* ===================================================================== *)
-  (* §6a'  THE ANY-WORD FETCH BRIDGES (claude-notes/projects/icache.md).     *)
+  (* §6a'  THE ANY-WORD FETCH BRIDGES (claude-notes/design/icache.md).       *)
   (*                                                                        *)
   (* A [fetch] that reaches its instruction read has NO [goodmb]             *)
   (* certificate any more (the walker refuses [AK_ifetch] reads: the icache  *)

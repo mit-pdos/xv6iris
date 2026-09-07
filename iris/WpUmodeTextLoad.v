@@ -4,7 +4,7 @@
    they are stamped ([TsoCtx.ctx_phys_xpointsto], minted by userret's
    fence.i), the fetch reads them at the memory node, and the walker
    ([HartMemRunX.swp_hmrun_of_exec_p]) only ever sees the unstamped data half
-   (claude-notes/projects/icache.md, "text outside the walker").  A user
+   (claude-notes/design/icache.md, "text outside the walker").  A user
    program does load from its text page -- every string literal lives there
    -- and that load is the ONE data access the walker cannot run.  This file
    drives it at the node instead, exactly as the fetch is driven:

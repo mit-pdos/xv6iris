@@ -782,7 +782,7 @@ Section DevLoops.
   (*  the latch arm -- never both, because no single UART transition      *)
   (*  touches both halves.                                               *)
   (* ------------------------------------------------------------------ *)
-  (* THE TRACE PERMIT (claude-notes/projects/uart-trace.md).  [wp_uart_step]
+  (* THE TRACE PERMIT (claude-notes/completed/uart-trace.md).  [wp_uart_step]
      hands the UART thread [state_interp]'s half of the HISTORY ghost and
      wants it back at [h ++ κ]; the other half lives in the client's trace
      predicate ([obs_inv]), so the move is the CLIENT's step, and this is

@@ -13,7 +13,7 @@
 (*                                                                          *)
 (*  [prim_step_obs_wf] re-establishes it across every arm of [prim_step],   *)
 (*  and [nsteps_obs_wf] lifts that to a whole run.  The Iris side           *)
-(*  (claude-notes/projects/uart-trace.md) carries [obs_wf h g] as a pure     *)
+(*  (claude-notes/completed/uart-trace.md) carries [obs_wf h g] as a pure    *)
 (*  conjunct of [state_interp] beside [resv_ok], where [h] is the history    *)
 (*  so far: the alternation is what lets a client segment [h] into power     *)
 (*  cycles, and the wire tie is how a client that owns the UART's state      *)
