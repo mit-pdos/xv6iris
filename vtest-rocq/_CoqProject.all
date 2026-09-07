@@ -23,6 +23,9 @@ ConcSmokeSched.v
 QEMU/ClintMsipPass.v
 QEMU/ClintMsipRun.v
 QEMU/ClintMsipTest.v
+QEMU/ClintRawPass.v
+QEMU/ClintRawRun.v
+QEMU/ClintRawTest.v
 QEMU/ClintTimePass.v
 QEMU/ClintTimeRun.v
 QEMU/ClintTimeTest.v
@@ -50,9 +53,15 @@ QEMU/ConcSmokeTest.v
 QEMU/CoreCsrprobePass.v
 QEMU/CoreCsrprobeRun.v
 QEMU/CoreCsrprobeTest.v
+QEMU/CoreCsrvalsPass.v
+QEMU/CoreCsrvalsRun.v
+QEMU/CoreCsrvalsTest.v
 QEMU/CoreCsrwidePass.v
 QEMU/CoreCsrwideRun.v
 QEMU/CoreCsrwideTest.v
+QEMU/CoreDtbPass.v
+QEMU/CoreDtbRun.v
+QEMU/CoreDtbTest.v
 QEMU/CoreHartHart1Run.v
 QEMU/CoreHartHart1Test.v
 QEMU/CoreHartPass.v

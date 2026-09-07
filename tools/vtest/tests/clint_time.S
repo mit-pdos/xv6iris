@@ -31,36 +31,34 @@
  * question of QEMU's hart 0 and of the board's hart 2.  clint_msip and
  * clint_mtimecmp are the ones that need the index; see those.
  *
- * RESULT layout (mirrored in vtest-rocq/ClintTime.v):
- *   +8    mtime, 8-byte read, low word              RAW -- diverges
- *   +12   mtime, 8-byte read, high word             RAW -- diverges
- *   +16   mtime after the delay loop, low word      RAW -- diverges
- *   +20   mtime after the delay loop, high word     RAW -- diverges
+ * ONLY THE FLAGS ARE RECORDED, and that is the whole reason this test is
+ * shaped the way it is.  A raw mtime, a raw minstret delta and a raw mcycle
+ * delta are values no two machines can be asked to agree on -- measured,
+ * the model and QEMU differ at every one of them (+8, +16, +32, +44, +52) --
+ * so putting them in the result region makes this test unprovable while
+ * telling nobody anything a comparison of the flags does not.  The
+ * questions "did it advance?", "did it go backwards?" and "do the 4-byte
+ * halves bracket the 8-byte read?" are questions both machines and the
+ * model answer, and they are the ones this test is about.
+ *
+ * The raw words are not thrown away: clint_raw publishes exactly them, and
+ * is expected to be RED for as long as the divergence stands.
+ *
+ * RESULT layout (the gaps are deliberate; the region is zero-filled, so an
+ * unwritten word reads 0 on both machines):
  *   +24   1 if mtime STRICTLY advanced              <- THE FINDING
  *   +28   1 if mtime did not go BACKWARDS           <- both machines: 1
- *   +32   4-byte read of MTIME    (lo half)         RAW
- *   +36   4-byte read of MTIME_HI (hi half)         RAW
  *   +40   1 if the 4-byte halves bracket the 8-byte read
- *   +44   minstret delta over the delay loop        <- control: advances in both
  *   +48   1 if minstret advanced                    <- control: 1 in both
- *   +52   mcycle delta over the delay loop, low     RAW
  *   +56   1 if mcycle advanced                      <- driven by the same clock
  */
-/* vtest: repeat=1 proj=fields:4,24,28,40,48,56 tick=1 budget=8000 */
+/* vtest: repeat=1 tick=1 budget=8000 */
 #include "abi.h"
 
-#define R_T0LO    8
-#define R_T0HI    12
-#define R_T1LO    16
-#define R_T1HI    20
 #define R_ADV     24
 #define R_NOBACK  28
-#define R_W4LO    32
-#define R_W4HI    36
 #define R_BRACKET 40
-#define R_INSTR   44
 #define R_INSTRADV 48
-#define R_CYCLE   52
 #define R_CYCLEADV 56
 
 /* THE CAP IS A DEAD-CLOCK BACKSTOP, NOT THE WAIT.  The loop below spins
@@ -81,10 +79,6 @@ _vtest_body:
     ld   s1, 0(s0)                   /* s1 = mtime before */
     csrr s2, minstret                /* s2 = minstret before */
     csrr s3, mcycle                  /* s3 = mcycle before */
-
-    sw   s1, R_T0LO(s11)
-    srli t0, s1, 32
-    sw   t0, R_T0HI(s11)
 
 /* ---- WAIT FOR THE CLOCK TO MOVE, rather than spinning a fixed count ----
  *
@@ -114,10 +108,6 @@ _vtest_body:
     csrr s5, minstret
     csrr s6, mcycle
 
-    sw   s4, R_T1LO(s11)
-    srli t0, s4, 32
-    sw   t0, R_T1HI(s11)
-
 /* ---- THE FINDING: did the clock advance at all? ---- */
     sltu t0, s1, s4                  /* before <u after */
     sw   t0, R_ADV(s11)
@@ -133,8 +123,6 @@ _vtest_body:
     lwu  t1, 0(s0)                   /* 4-byte lo    */
     lwu  t2, 4(s0)                   /* 4-byte hi    */
     ld   s8, 0(s0)                   /* bracket high */
-    sw   t1, R_W4LO(s11)
-    sw   t2, R_W4HI(s11)
     slli t2, t2, 32
     or   t1, t1, t2                  /* the reassembled 64-bit value */
     sltu t3, t1, s7                  /* below the bracket? */
@@ -145,11 +133,9 @@ _vtest_body:
 
 /* ---- the controls ---- */
     sub  t0, s5, s2
-    sw   t0, R_INSTR(s11)
     snez t0, t0
     sw   t0, R_INSTRADV(s11)
     sub  t0, s6, s3
-    sw   t0, R_CYCLE(s11)
     snez t0, t0
     sw   t0, R_CYCLEADV(s11)
 

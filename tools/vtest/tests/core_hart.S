@@ -22,25 +22,27 @@
  * registers), so they have to be moved out of the way before the body uses a
  * temporary for anything.
  *
- * a1 IS EXPECTED TO DIVERGE and is recorded for that reason: finding 18 --
- * the model writes a hardcoded 0x1000 where QEMU passes the real device-tree
- * pointer, which moves with -m and with the image.  It is here so that the
- * hart-1 capture says whether the boot contract's OTHER register behaves the
- * same way off hart 0, which nothing had asked.
+ * a1 IS NOT RECORDED HERE, and that is deliberate.  It is the one entry
+ * register that diverges -- finding 18: the model writes a hardcoded 0x1000
+ * where QEMU passes the real device-tree pointer, which moves with -m and
+ * with the image -- and measured, +32 is the ONLY word of this test's
+ * result region the model and QEMU disagree on.  Publishing it here makes
+ * the boot contract's six agreeing claims unprovable in order to record one
+ * divergence that is already written down.  core_dtb publishes a1 instead,
+ * and is expected to be RED for as long as finding 18 stands.
  *
- * RESULT layout (mirrored in vtest-rocq/CoreHart.v):
+ * RESULT layout (the gap is deliberate; the region is zero-filled, so an
+ * unwritten word reads 0 on both machines):
  *   +8    mhartid, read with csrr           hart 0: 0    hart 1: 1
  *   +12   a0 at entry (the boot contract)   hart 0: 0    hart 1: 1
  *   +16   1 if a0 == mhartid                both: 1
  *   +20   the prologue's SLOT (t0 at entry) both: 0 -- the primary is slot 0
  *   +24   sp at entry                       both: STACK_BASE + STACK_SIZE
  *   +28   s11 at entry                      both: RESULT_BASE
- *   +32   a1 at entry, low word             DIVERGES -- finding 18
- *   +36   a1 at entry, high word
  *   +40   mstatus, low word
  *   +44   mstatus, high word
  */
-/* vtest: repeat=1 proj=fields:4,8,12,16,20,24,28,40,44 tick=0 budget=2000 */
+/* vtest: repeat=1 tick=0 budget=2000 */
 #include "abi.h"
 
 #define R_HARTID   8
@@ -49,17 +51,14 @@
 #define R_SLOT     20
 #define R_SP       24
 #define R_S11      28
-#define R_A1LO     32
-#define R_A1HI     36
 #define R_MSTLO    40
 #define R_MSTHI    44
 
     .globl _vtest_body
 _vtest_body:
     /* sample everything that is still an ENTRY value, before touching a
-       temporary.  t0 is the prologue's slot; a0/a1 are the boot contract's. */
+       temporary.  t0 is the prologue's slot; a0 is the boot contract's. */
     mv   s1, a0
-    mv   s2, a1
     mv   s3, t0
     mv   s4, sp
     mv   s5, s11
@@ -81,10 +80,6 @@ _vtest_body:
     sw   s3, R_SLOT(s11)
     sw   s4, R_SP(s11)
     sw   s5, R_S11(s11)
-
-    sw   s2, R_A1LO(s11)
-    srli t0, s2, 32
-    sw   t0, R_A1HI(s11)
 
     sw   s7, R_MSTLO(s11)
     srli t0, s7, 32

@@ -724,6 +724,14 @@ def print_table(fmt="text"):
         print(line)
 
 
+def lit(bs, per=20):
+    """A byte list as Rocq source, wrapped so a 4 KB region is readable in a
+    diff rather than one enormous line."""
+    xs = [str(b) for b in bs]
+    rows = ["; ".join(xs[i:i+per]) for i in range(0, len(xs), per)]
+    return ";\n   ".join(rows)
+
+
 def gen(r, alts=None, hart=0):
     """alts: every DISTINCT result region observed, sorted, when the test is
     nondeterministic on the QEMU side.
