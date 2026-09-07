@@ -501,7 +501,7 @@ compare with the last green run's summary).  Report: the file list deleted, the 
 every seal/body kept and why, the coverage numbers before/after.  Do not commit.  One or two
 VM builds.
 
-## roundE2Z-brief.md — written 2026-09-07 (launch after E2-X; E2-W must have landed)
+## roundE2Z-brief.md — LANDED 2026-09-07 (as-built record: app-round-e2.md "E2-Z AS BUILT"; one deviation: neither site's pre-node count was in the context, so `InodeRegion.ireg_top_park` gained a count clause guarded by the record's `nlink` and `EscrowInode.escA_body`'s EMPTY arm gained `fn_nlink n = 0`, each proved where the fragment is parked).  ROUND E IS CLOSED.
 
 ## Lane E2-Z: the last two blanket movers become `_same`; delete `top_move` and the `_auto` movers
 

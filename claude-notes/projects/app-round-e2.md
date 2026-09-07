@@ -1,46 +1,24 @@
 # Round E2 — design proposal (2026-09-05): AU forms for create's legs, link, mkdir, iput's free, write; the view; the rulings needed
 
-> **RESUME HERE (checkpoint 2026-09-07, after lane E2-C landed).**
-> Design of record: `design/applications.md` (as built).  Rounds record: `app-instances.md` §7.
-> This file: the E2 proposal + every ruling (status block below; all nine questions are RULED,
-> Q-b reversed: nlink-0 inodes LEAVE the view).  Briefs and the VM build script:
-> `app-round-e2-briefs.md`; E1's census: `app-round-e1-census.md`.
+> **ROUND E2 IS CLOSED (2026-09-07).**  Every lane landed on origin/main, in order: E2-V2, E2-D,
+> E2-L0, E2-C, E2-L, E2-W, E2-X, E2-Z — each with an "AS BUILT" section below and its brief marked
+> LANDED in `app-round-e2-briefs.md`.  Design of record: `design/applications.md` (as built; §2 now
+> states the two mover forms).  Rounds record: `app-instances.md` §7.  What the round established:
+> every view move on a dispatched path is an AU fire (the caller's `app_step` paid inside the
+> mover's critical section) or a `_same` between absent rows; `top_move` and the `_auto` movers are
+> gone; `app_auto`/`Happ_auto` (the blanket promise) remain ONLY as what the generic dischargers
+> pay the AU fires' steps with — app-echo.md's L2 (the step moves to the process) retires them.
+> E2-F was cancelled by the nlink-0 ruling (Q-d); the fd-row follow-up the ruling created (reads
+> through an fd of an unlinked file get their contents from a per-fd resource) is open.
 >
-> STATE OF THE TREE: origin/main is green through lane E2-X.  Landed in order: E2-V2 (the view is
-> the live namespace; "E2-V2 AS BUILT" below), E2-D (the delta vocabulary; "E2-D AS BUILT"), E2-L0
-> (held inums are positive; as-built record atop its brief in the briefs file), E2-C (create's
-> legs as fires; "E2-C AS BUILT" below), E2-L (link in place; "E2-L AS BUILT" below), E2-W (write;
-> "E2-W AS BUILT" below), E2-X (the dead non-AU forms deleted; "E2-X AS BUILT" below).  NEXT LANE:
-> E2-Z (`roundE2Z-brief.md` in the briefs file; log `rE2Z`) — the LAST lane of round E2.  Lanes run ONE AT
-> A TIME in the session's own checkout (owner's rule of 2026-09-07); the build script takes the
-> tree as its first argument and a log name.  On resume: `git status` — a clean tree means the
-> last lane landed (check `git log`); modified iris files are the next lane's partial work: run
-> the build script (log name = the lane) and finish to green against its brief, or
-> `git checkout -- iris` and redo from the brief.
->
-> ORDER AFTER E2-W (each a green gate, then audit/commit/push): (E2-W LANDED) E2-W (write: dispatch the AU write for inode fds, raw step premise on the non-AU write, the
-> short-chunk arm's state fire — Q-i: "a bug in the sys_write spec, fix it; the spec may be
-> non-deterministic"; §7) → E2-X (delete the dead non-AU unlink walk, non-AU mknod, non-AU open's
-> create arm, `so_stores`; Q-f; §1) → E2-Z (ProofIlock's claim and EscrowDeposit's free become
-> `_same` since the row is absent on both sides; delete `top_move`, `ireg_top_retag_auto`,
-> `_armed_auto`, `app_top_update_auto`; `app_auto`/`Happ_auto` STAY — L2 deletes them).  E2-F
-> (threading a free obligation to iput) is CANCELLED by the nlink-0 ruling.
->
-> AFTER E2: app-echo.md's lanes L2 (per-process steps; deletes `Happ_auto`), L5, L6, L7; and the
-> fd-row follow-up the nlink-0 ruling created (reads through an fd of an unlinked file get their
-> contents from a per-fd resource, not the view).  Owner's standing preferences: narrate, don't ask;
-> checkpoint at green (commit, rebase, push); briefs are law, no in-proof instrument invention.
->
-> E2-W's brief is WRITTEN (`roundE2W-brief.md`, last in the briefs file): W-b (the raw step on the
-> landed write, #5 → `_step`), W-a (the AU chain's partial arm becomes a NON-DETERMINISTIC state
-> fire covering writei's disturbed region, #6), W-c (the dispatcher's write arm splits on the fd's
-> state out of `fd_frags` and dispatches the AU write for inode fds — the fragments ARE at the
-> dispatcher, `sysc_arm_pre` carries `fd_frags`).  E2-W LANDED 2026-09-07.  E2-X's
-> and E2-Z's briefs are WRITTEN too (`roundE2X-brief.md`, `roundE2Z-brief.md`, last in the briefs
-> file, with the 2026-09-07 census: ProofSysMknod and the three non-AU Link files are already off
-> the build; the AU open reuses three pure helpers of ProofSysOpen.v and the AU unlink only
-> ProofSysUnlink.v's pure layer, so the W-files and both functors are deletable).  Order: E2-W →
-> E2-X → E2-Z.
+> NEXT: app-echo.md's lanes L2, L5, L6, L7.  L2 is the owner-scoped seam design
+> (`design/fd-row-pilot.md` §2's deposit disjunct at a persistent payload carrying `app_step`);
+> write the proposal before any lane brief.  Standing rules: lanes run ONE AT A TIME in the
+> session's own checkout; build only through the script atop the briefs file; verify a lane by
+> checksumming its files against the VM's copy, zero `Error` lines, `make audit-only` = 13 from the
+> tree root, both audited statements byte-identical, no Admitted/Axiom; then commit iris and
+> notes separately, rebase, push.  Owner's standing preferences: narrate, don't ask; checkpoint
+> at green; briefs are law, no in-proof instrument invention.
 
 
 STATUS: PROPOSAL; RULINGS SO FAR (owner, 2026-09-05): Q-a YES (view = allocated rows; lane E2-V
@@ -365,6 +343,50 @@ Three measured facts that shape everything below:
 - Docs: `design/file-table.md` ×2 and `design/proc-struct.md` ×1 re-pointed to the AU files;
   `app-round-e1-census.md` (pinned to its HEAD) and `fs-syscall-specs.md`'s edit counts left as
   historical snapshots.
+
+## E2-Z AS BUILT (landed 2026-09-07; 14 iris files; green, 13 axioms, both audited statements untouched)
+
+- THE TWO SITES ARE `_same`.  #2 `ProofIlock.v` :1287 (the fresh-inode fill at
+  `ClaimK ty`): `abs_of n0 = abs_of (era_node dn bm_empty zeros)`, both `None` by
+  `FsAbsDefs.abs_of_none` — left from the withdrawn fragment's count, right from
+  `fresh_shape_nlink dn` through `era_node_rec`.  #1 `EscrowDeposit.v` :252
+  (`ireg_free_deposit_au`, orphan → free): `abs_of ntop = abs_of (free_node dn')`,
+  left `None` from the escrow's count, right by `abs_of_bare` of
+  `fn_bare_free_node dn' Hbare Hnl0'`.  Neither caller's statement changed.
+- THE FACT THE BRIEF EXPECTED TO FIND, SOURCED (the lane's one deviation).  Neither
+  pre-node's count was in the context: the region parks a claim box's fragment
+  UNTIED (`ireg_top_park`'s tie is guarded by `di_type = 0`, vacuous at a box) and
+  the escrow's EMPTY arm carried a bare `∃ n, top_frag`.  Both now carry the count,
+  each at the place the shape is proved:
+  * `InodeRegion.ireg_top_park` gains a second pure clause
+    `bv_unsigned (di_nlink d) = 0 -> fn_nlink n = 0%nat`, GUARDED BY THE COUNT so it
+    survives the claim (both shapes of the IN arm have a zero count — a free record
+    by (L3), a claim box by `fresh_shape`).  `ireg_top_park_nz` takes it as a
+    premise (two callers: `ireg_claim_au`, which reads it off the incoming free
+    park, and `FsCollect.col_claim_box_untied`, which gains `fn_nlink n = 0`);
+    `ireg_top_park_free` proves it from `free_node_rec` and needs NO new premise, so
+    the six `_free` producers (FsCollect ×4, IcacheBoot, FsCollectImg,
+    EscrowDeposit) are untouched.  `ireg_withdraw`'s payout is now
+    `∃ n, ⌜fn_nlink n = 0%nat⌝ ∗ top_frag …` (one caller, ProofIlock).
+  * `EscrowInode.escA_body`'s EMPTY arm, `escA_alloc`'s premise and
+    `escA_deposit_acc`'s payout carry `⌜fn_nlink n = 0%nat⌝`; ProofIput's mint at
+    +0x8a pays it with `era_node_rec` and its own `Hnl0` (iput frees at `nlink == 0`).
+- DELETED: `InodeRegion.ireg_top_retag_auto`, `ireg_top_retag_armed_auto`;
+  `AppInv.top_move`, `AppInv.app_top_update_auto`, and the vacuous
+  `⌜top_move n n'⌝ premise of `app_auto_raw` (with the two `Logic.I`s that
+  discharged it, in `app_auto_raw_triv` and `app_step_of_auto`).
+  `app_auto`/`app_auto_raw`/`Happ_auto`/`app_step_of_auto`/`app_step_acc` STAY: the
+  generic dischargers pay every AU fire's step with them, and app-echo.md's L2
+  retires them.
+- HEADERS REWORDED (three forms → two, and "round A's everything" → the as-built
+  fact): AppInv.v :27 / :78 / :350, InodeRegion.v :191 / :2514 / :2580 / :3359 /
+  :4804, App.v :43, AppEcho.v :47, FsAbsInvFire.v :24, FsAbsLinkFire.v :234,
+  FsCollect.v :1633, ProofFilewrite.v :2384, ProofFilewriteAU.v :2998,
+  SpecFilewrite.v :687, EscrowDeposit.v :47.
+  Notes: `design/applications.md` §2 (the mover, two forms, where each `_same`
+  reads its count), `app-instances.md` §7 (the "three mover forms" refinement and a
+  round-E line), `app-echo.md`'s L3 (landed) and L2 (it now owns the license's
+  retirement).
 
 ## 1. The 22 sites: view change, dispatcher arm, twin, liveness
 

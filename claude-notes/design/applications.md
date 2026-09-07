@@ -134,27 +134,36 @@ on `m`, an update needs the whole:
 - **THE MOVER** (`InodeRegion.ireg_top_retag_*`, plus `_armed_` twins):
   the one operation that changes the map needs the whole authority, so it
   opens BOTH invariants (masks `↑ftopN ∪ ↑appN`) and re-establishes the
-  claim.  Three forms:
+  claim.  Two forms:
     * `_same` — `abs_of n = abs_of n'`: the view did not move, the claim
       is returned untouched;
     * `_step` — the caller supplies the step
       `∀ I, ⌜I !! i = Some n⌝ -∗ app_pred app_run (abs_view I) -∗ app_pred app_run (abs_view (<[i:=n']> I))`
-      (raw at the mover, ruling 4); the six AU write fires take it from
-      the contract's `app_step` (delta-indexed at the fire, where the
-      process's payload proves it);
-    * `_auto` — the KERNEL-DEFINED `top_move n n'` (today `True`), paid by
-      the application's era-wide `app_auto`.  Round E converts every
-      `_auto` site to `_same` or `_step` (the landed non-AU contracts —
-      link, mkdir, `iput`'s free — move onto AU forms with their deltas)
-      and then deletes `top_move` and the `_auto` movers.  `app_auto` /
-      `Happ_auto` — the BLANKET PROMISE that the predicate survives every
-      kernel change — STAYS until lane L2: today every step the kernel
-      proof demands, at the AU fires included, is paid off this promise,
-      because nothing from the process reaches the kernel yet.  L2
-      replaces it by per-syscall proofs from the process and deletes it
-      (owner, 2026-09-05: "we eventually need to kill this blanket
-      permission").  An application whose predicate is not preserved by
-      arbitrary changes (echo) is therefore an instance only after L2.
+      (raw at the mover, ruling 4); the AU fires take it from the
+      contract's `app_step` (delta-indexed at the fire, where the process's
+      payload proves it).
+
+  There is no blanket form.  **Every view move on a dispatched path is an
+  AU fire or a `_step`, and the only `_same` movers are the two that run
+  between ABSENT rows** — `ilock`'s fresh-inode fill (free row → claim box)
+  and the escrow deposit's free (orphan → free record).  Both read the
+  pre-node's zero count off the ghost structure that parked it: the
+  region's `ireg_top_park` carries "`di_nlink d = 0` ⟹ `fn_nlink n = 0`"
+  (both shapes of its IN arm have a zero count — a free record by (L3), a
+  claim box by `fresh_shape`), and `EscrowInode.escA_body`'s EMPTY arm
+  carries `fn_nlink n = 0` outright (iput mints it at `nlink == 0`).  Under
+  the live view (a row exists only at nonzero type AND nonzero count) that
+  makes both moves view-preserving.
+
+  `app_auto` / `Happ_auto` — the BLANKET PROMISE that the predicate
+  survives every one-row move — STAYS until lane L2, but is now spent in
+  exactly one place: the GENERIC dischargers pay the AU fires' steps with
+  it (`app_step_of_auto`/`app_step_acc`), because nothing from the process
+  reaches the kernel yet.  L2 replaces it by per-syscall proofs from the
+  process and deletes it (owner, 2026-09-05: "we eventually need to kill
+  this blanket permission").  An application whose predicate is not
+  preserved by arbitrary changes (echo) is therefore an instance only after
+  L2.
 - **What a process sees at a syscall:** an AU fire lends the pre-map and
   the claim and takes the claim at the post-map back; read-kind fires
   lend and return it untouched.  `FsAbs.astate` is fraction-agnostic

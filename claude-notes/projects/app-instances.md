@@ -248,16 +248,12 @@ the end.  Two refinements from the site survey, both rulings-consistent:
   map), never over raw nodes: block addresses and records are invisible
   to user code.  A retag that preserves `abs_of` therefore needs nothing
   from the application.
-- **Three mover forms**, because two view-changing retags sit outside
-  any AU fire and inside contracts every path calls (`ilock`'s fresh-inode
-  claim: free → typed; the escrow deposit: orphan → free):
-  `ireg_top_retag_same` (`abs_of n = abs_of n'`, no application input),
-  `ireg_top_retag_step` (a step wand from the caller's contract — the AU
-  fires), and `ireg_top_retag_auto` (`⌜app_auto_ok (abs_of n) (abs_of n')⌝`,
-  paid by a persistent license the application parks in its invariant
-  for the deltas it admits from anyone; `fun _ _ => True` for the generic
-  application).  Non-AU sites use the third form now and move to the
-  second as their AU forms land (round E).
+- **Two mover forms** (a third, blanket one existed while round E ran and
+  is gone with E2-Z): `ireg_top_retag_same` (`abs_of n = abs_of n'`, no
+  application input) and `ireg_top_retag_step` (a step wand from the
+  caller's contract — the AU fires).  The two retags that sit outside any
+  AU fire (`ilock`'s fresh-inode claim, the escrow deposit's free) are
+  `_same`: under the live view both run between ABSENT rows.
 
 Rounds, each a green gate:
 
@@ -459,3 +455,15 @@ Rounds, each a green gate:
   17k lines; coverage unchanged, the AU links carry sys_open/unlink/mknod);
   `ProofSysUnlink.v` is the pure layer under the AU walk.  Record in
   app-round-e2.md "E2-X AS BUILT".
+- **E2-Z LANDED 2026-09-07** (round E closed): the last two blanket movers
+  are `_same` and `top_move`/`ireg_top_retag_auto`/`_armed_auto`/
+  `app_top_update_auto` are deleted.  Every view move on a dispatched path
+  is an AU fire or a `_step`; the only `_same` movers are the two between
+  absent rows (`ilock`'s fresh-inode fill, the escrow deposit's free), each
+  reading the pre-node's zero count off the structure that parked it
+  (`InodeRegion.ireg_top_park` gained a count clause guarded by the
+  record's `nlink`; `EscrowInode.escA_body`'s EMPTY arm carries
+  `fn_nlink n = 0`).  `app_auto`/`app_auto_raw`/`Happ_auto`/
+  `app_step_of_auto`/`app_step_acc` STAY — the generic dischargers pay the
+  AU fires' steps with them, and lane L2 retires them.  Record in
+  app-round-e2.md "E2-Z AS BUILT".

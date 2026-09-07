@@ -25,17 +25,20 @@ binaries at every reboot).
 
 - [ ] **L2 — the step moves to the process.**  The returning-ecall arm's
   persistent give carrying `app_step`, the AU fires taking it from there,
-  the generic slot at `taint -∗ □ uexec_wp`.  Unblocks: every non-generic
-  step.  Gate: L3 (a site still on `_auto` is paid era-wide by `app_auto`,
-  which only the generic application has).  Shape: `fd-row-pilot.md` §2's
+  the generic slot at `taint -∗ □ uexec_wp`; then `app_auto`/`app_auto_raw`/
+  `Happ_auto`/`app_step_of_auto`/`app_step_acc` — the era-wide blanket
+  promise the GENERIC dischargers still pay every AU fire's step with, and
+  which only the generic application can pay — are deleted.  Unblocks: every
+  non-generic step.  Gate: none (L3 landed).  Shape: `fd-row-pilot.md` §2's
   deposit disjunct at a persistent payload; `UexecRetExec.uexecXG` for
   the ambient class.
-- [ ] **L3 — round E of `app-instances.md`** (kernel side, application-
-  independent).  Every `ireg_top_retag_auto` site becomes `_same` (view
-  unchanged) or `_step` (paid from an AU contract's `app_step`); link,
-  mkdir and `iput`'s free move onto AU forms with their deltas
-  (`fs-syscall-specs.md` §4); then `top_move`, the `_auto` movers and
-  `Happ_auto` are deleted.  Gate: none.
+- [x] ~~**L3 — round E of `app-instances.md`**~~ (kernel side, application-
+  independent).  LANDED: every view move on a dispatched path is an AU fire
+  or a `_step`; link, mkdir, create's legs, the write and `iput`'s free are
+  AU forms with their deltas (`fs-syscall-specs.md` §4); the only `_same`
+  movers left are the two between absent rows (ilock's fresh-inode fill,
+  the escrow deposit's free); `top_move` and the `_auto` movers are gone.
+  `Happ_auto` stays for L2, which is what it is now the only payer of.
 - [x] ~~**L4 — the crash predicate's application conjunct.**~~  Dissolved
   into the durable instance and the transport (round C): the claim rides
   the crash slot beside the snapshot and crosses at commit/clone/boot as a
