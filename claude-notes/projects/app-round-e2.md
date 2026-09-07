@@ -34,7 +34,12 @@
 > landed write, #5 → `_step`), W-a (the AU chain's partial arm becomes a NON-DETERMINISTIC state
 > fire covering writei's disturbed region, #6), W-c (the dispatcher's write arm splits on the fd's
 > state out of `fd_frags` and dispatches the AU write for inode fds — the fragments ARE at the
-> dispatcher, `sysc_arm_pre` carries `fd_frags`).  Launch it after E2-L lands.
+> dispatcher, `sysc_arm_pre` carries `fd_frags`).  E2-W LAUNCHED 2026-09-07 (log `rE2W`).  E2-X's
+> and E2-Z's briefs are WRITTEN too (`roundE2X-brief.md`, `roundE2Z-brief.md`, last in the briefs
+> file, with the 2026-09-07 census: ProofSysMknod and the three non-AU Link files are already off
+> the build; the AU open reuses three pure helpers of ProofSysOpen.v and the AU unlink only
+> ProofSysUnlink.v's pure layer, so the W-files and both functors are deletable).  Order: E2-W →
+> E2-X → E2-Z.
 
 
 STATUS: PROPOSAL; RULINGS SO FAR (owner, 2026-09-05): Q-a YES (view = allocated rows; lane E2-V

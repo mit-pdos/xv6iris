@@ -440,3 +440,98 @@ Admitted/Axiom; every `Logic.I` at #5 and #6 gone; the dispatcher's write arm pa
 Report: the partial commit verbatim, the changed fail arms (AU and Era), the step premise's final
 placement, the three site diffs, the dispatch's case split, deviations.  Do not commit.  Expect
 3-5 VM builds (the SpecFilewrite cone is the write family + ProofSyscall).
+
+## roundE2X-brief.md — written 2026-09-07 (launch after E2-W)
+
+## Lane E2-X: delete the dead non-AU forms (ruling Q-f) — the unlink walk, the open walk, mknod, `so_stores`
+
+Ruling Q-f YES: "dead pre-AU proofs not linked into the kernel and superseded by an AU spec are
+deleted."  The dispatcher (ProofSyscall.v :4847/:5639/:5799/:5823) runs unlink, mknod and open on
+their AU contracts; `_CoqProject` :1453-1458 already parks `ProofSysMknod.v`, `LinkSysMknod.v`,
+`LinkSysOpen.v`, `LinkSysUnlink.v` off the build with the note "ProofSysOpen*/ProofSysUnlink* stay:
+the AU proofs reuse them as lemma libraries".  CENSUS (2026-09-07, `Require` lines and lemma
+uses): the reuse is far smaller than the note says —
+- `ProofSysOpen.v` (4453 lines): the AU open (ProofSysOpenAUWalk/Join) imports it for THREE pure
+  helpers only, `so_neq_of_eq` / `so_neq_of_ne` / `so_bud_iput` (:133-150, ABOVE the functor);
+  every other name the AU files mention (`so_tail_pub`, `so_alloc`, `so_join`, `so_entry_c/n`,
+  `so_stores`) is inside the sealed functor `SysOpenProof` (:151-4453) and is mentioned in COMMENTS
+  only.  `SysOpenBudget.v` mentions `so_join` in prose.
+- `ProofSysUnlink.v` (667 lines): the AU unlink (AUW1/2/3/5F/5D, AUParts) imports it for its
+  PURE LAYER (`su_*`, :140-460); the sealed walk `SysUnlinkProof` below it is what imports
+  `ProofSysUnlinkW1/W2/W3/W5File/W5Dir` (which import `ProofSysUnlinkShared`); NOTHING else
+  imports those six files.  `ProofSysUnlinkParts.v` / `ProofSysUnlinkTails.v` ARE shared with the
+  AU walk and stay.
+- `ProofSysMknod.v` (1963 lines, off the build; E2-C's edits to it are unverified) has no importer.
+- The three Link files are off the build and have no importer.
+
+### Delete (files) and split (functors)
+
+1. `git rm`: `ProofSysMknod.v`, `LinkSysMknod.v`, `LinkSysOpen.v`, `LinkSysUnlink.v`,
+   `ProofSysUnlinkW1.v`, `ProofSysUnlinkW2.v`, `ProofSysUnlinkW3.v`, `ProofSysUnlinkW5File.v`,
+   `ProofSysUnlinkW5Dir.v`, `ProofSysUnlinkShared.v` (confirm each has no importer first:
+   `grep -l "Require.*\bNAME\b" iris/*.v`); their `_CoqProject` lines and the parked comment block.
+2. `ProofSysOpen.v`: MOVE the three pure helpers to `ProofSysOpenParts.v` (their names unchanged;
+   the two AU importers' `Require Import ProofSysOpen` becomes `ProofSysOpenParts` if not already
+   there), then `git rm ProofSysOpen.v` (the functor and `so_stores`, site #3, go with it).
+   `ProofSysOpenTails.v`: check its importers; if only `ProofSysOpen.v` used it, delete it too.
+3. `ProofSysUnlink.v`: delete the functor `SysUnlinkProof` and its `Require Import` of the W
+   files; keep the pure layer (rename the file `ProofSysUnlinkPure.v`? NO — keep the name, the six
+   AU importers name it; just cut the walk).
+4. The specs STAY: `SpecSysMknod.v` (`K_sys_mknod`, the frame the Era form restates),
+   `SpecSysOpen.v` (`sys_open_post_any` at ProofSyscall :5857, the frame `SpecSysOpenAU` reuses),
+   `SpecSysUnlink.v` (`K_sys_unlink`, `sys_unlink_slots`, the frame at SpecSysUnlinkAU :673).
+   Their `Module Type SYSMKNOD/SYSOPEN/SYSUNLINK` seals are dead once the proofs are gone: delete
+   a seal only if nothing references it (`grep -n "SYSOPEN\b\|SYSUNLINK\b\|SYSMKNOD\b" iris/*.v`);
+   keep every `wp_sys_*_sconf_body` a live file applies or restates.  `SysOpenBudget.v` /
+   `SysUnlinkBudget.v` (the machine-checked ledger notes) stay; fix their prose if it names a
+   deleted lemma.
+5. Doc pointers: `claude-notes/design/*.md` and `projects/*.md` lines that cite a deleted file
+   by name — one grep, fix the citation to the AU twin or drop the line (durable-notes: "a fact
+   about something that no longer exists is deleted").  `tools/proof_coverage.py`'s comment at
+   :301 is history and stays.
+
+### Gate
+
+Green (the deletions shrink the cone; the dead-imports CI workflow must stay green:
+`grep -n "" .github/workflows/dead-imports.yml` to see what it checks and run its script locally
+if it has one); `make audit-only` 13; both audited statements byte-identical; `tools/
+proof_coverage.py`'s sysfile.c count unchanged (sys_open/sys_unlink/sys_mknod are credited to
+their AU links — run it as CI does, `.github/workflows/ci.yml` "Proof coverage report", and
+compare with the last green run's summary).  Report: the file list deleted, the helpers moved,
+every seal/body kept and why, the coverage numbers before/after.  Do not commit.  One or two
+VM builds.
+
+## roundE2Z-brief.md — written 2026-09-07 (launch after E2-X; E2-W must have landed)
+
+## Lane E2-Z: the last two blanket movers become `_same`; delete `top_move` and the `_auto` movers
+
+Under the live view (E2-V2) a row exists only at nonzero type AND nonzero count, so both remaining
+non-AU sites move between two ABSENT rows:
+- #2 ProofIlock.v ~1271 (the fresh-inode fill at `ClaimK ty`): `n0` (the region's free-row
+  fragment from `ireg_withdraw`; its type is 0 — find the fact in the withdrawn box, `Hlocbox` /
+  `fresh_shape`) → `era_node dn bm_empty zeros` with `di_nlink dn = 0` (`fresh_shape`).
+  `ireg_top_retag_auto … Logic.I Hlocbox` → `ireg_top_retag_same` with `abs_of n0 = None`
+  (`abs_of_none`, left) and `abs_of (era_node dn …) = None` (`abs_of_none`, right;
+  `FsAbsCreateFire.caf_era_none_nl0` is the one-liner).
+- #1 EscrowDeposit.v ~243 (`ireg_free_deposit_au`, orphan → free): `ntop` at count 0 (`Hnl0'`) →
+  `free_node dn'` (type 0).  Same move: `_same` with `abs_of_none` on both sides.  Its caller
+  `ireg_free_deposit_au`'s statement does not change.
+Then DELETE, in this order, rebuilding once: `InodeRegion.ireg_top_retag_auto`,
+`ireg_top_retag_armed_auto` (E2-C left them unused; `grep` must show only definitions and the
+comment mentions at FsAbsInvFire.v :28 and FsAbsLinkFire.v :234, which you reword);
+`AppInv.app_top_update_auto`; `AppInv.top_move` and its vacuous `⌜top_move n n'⌝` premise in
+`app_auto_raw` (:95; the two `Logic.I`s that discharge it in `app_step_of_auto` and
+`app_top_update_auto` go with it; `app_auto_raw_triv` loses one `_`).  `app_auto`/`app_auto_raw`/
+`Happ_auto`/`app_step_of_auto`/`app_step_acc` STAY (they are what the `_unit` dischargers pay
+with; app-echo.md's L2 retires them).  Reword the headers that describe round A's "everything"
+license: AppInv.v :30-40 and :70-77, App.v :42-46, AppEcho.v :47-48, FsAbsInvFire.v :24-28,
+InodeRegion.v at the deleted lemmas; `design/applications.md` §2 (the movers) and
+`app-instances.md` §7's round-E line — state the as-built fact: every view move on a dispatched
+path is an AU fire or a `_step`; the only `_same` movers are the ones between absent rows.
+
+### Gate
+
+Green; audit 13; both audited statements byte-identical; `grep -n "top_move\|retag_auto\|
+app_top_update_auto" iris/*.v` empty.  Report: the two site diffs, the deletions, the reworded
+notes.  Do not commit.  One or two VM builds (AppInv's cone is the whole application layer;
+InodeRegion's is most of the fs).
