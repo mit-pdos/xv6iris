@@ -120,14 +120,22 @@
  * costs two instructions per iteration and does not disturb the timing that
  * makes the witness count high -- verified: the witness stayed at 100%.
  */
-/* THE PROJECTION IS THE THREE FIELDS THIS TEST IS ABOUT.  The witness counts
-   and the writer's end-of-pass sequence numbers say WHEN the reader happened
-   to sample, which differs between two runs of the same machine and differs
-   again between QEMU's scheduler and the model's round-robin.  Demanding
-   those agree would be demanding the wrong thing.  What the test claims is
-   status, NITER, and the two FORBIDDEN counts -- and those are the fields a
-   reordering would move. */
-/* vtest: smp=2 repeat=20 builder=multi budget=6000 proj=fields:0,8,16,24 */
+/* THIS TEST PUBLISHES THE FIELDS A REORDERING WOULD MOVE, AND NOTHING ELSE.
+   The witness counts, the writer's end-of-pass sequence numbers and the raw
+   sample log all say WHEN the reader happened to sample.  That differs
+   between two runs of the same machine -- measured, QEMU's eight captured
+   observations of this case differ in exactly one word, the pass-2 witness
+   at +20, and the board's differ in five more and the whole sample array --
+   and it differs again between QEMU's scheduler and the model's
+   round-robin.  Asking the model to reproduce them is asking the wrong
+   question, and it is what made this case unprovable once the projection
+   that used to hide them was retired.
+
+   conc_mp_when is the same program with them published, built from this
+   source under -DCONC_MP_WHEN, and is expected to be RED.  It is where to
+   look for the magnitudes: a null FORBIDDEN count means little without the
+   witness count beside it, and that number lives there now. */
+/* vtest: smp=2 repeat=20 builder=multi budget=6000 */
     .option norvc
 #include "abi.h"
 
@@ -239,16 +247,21 @@
     xor  t2, t0, t1
     snez t2, t2
     add  s7, s7, t2
+#ifdef CONC_MP_WHEN
     /* the RAW sample log: the first SMPMAX observations of this pass,
        unconditionally, so the numbers are visible even when nothing is
        forbidden.  Guarded by a counter, so it costs one branch after the
-       first SMPMAX iterations. */
+       first SMPMAX iterations.  WHEN-ONLY: which sequence numbers the
+       reader happened to see is a fact about the SAMPLING, and no two runs
+       of the same machine agree on it. */
     beqz a2, 7f
     sw   t0, 0(a3)
     sw   t1, 4(a3)
     addi a3, a3, 8
     addi a2, a2, -1
-7:  addi s2, s2, 1
+7:
+#endif
+    addi s2, s2, 1
     li   t1, NITER
     blt  s2, t1, 2b
 .endm
@@ -277,12 +290,14 @@ _vtest_body:                     /* the PRIMARY is the READER: it publishes */
     beqz t0, 4b
 
     RLOOP 0
-    sw   s7, R_P1WIT(s11)
     sw   s8, R_P1BAD(s11)
+#ifdef CONC_MP_WHEN
+    sw   s7, R_P1WIT(s11)
     lw   t0, 0(s3)
     sw   t0, 28(s11)              /* DIAG: X as pass 1 ended */
     lw   t0, YOFFR(s3)
     sw   t0, 32(s11)              /* DIAG: Y as pass 1 ended */
+#endif
     li   t0, 1
     sw   t0, STOP1(s11)           /* release the writer's first loop */
 
@@ -295,8 +310,10 @@ _vtest_body:                     /* the PRIMARY is the READER: it publishes */
 
     li   s6, 2
     RLOOP 1
-    sw   s7, R_P2WIT(s11)
     sw   s8, R_P2BAD(s11)
+#ifdef CONC_MP_WHEN
+    sw   s7, R_P2WIT(s11)
+#endif
     li   t0, LOGMAX
     sub  t0, t0, s5
     sw   t0, R_LOGN(s11)
