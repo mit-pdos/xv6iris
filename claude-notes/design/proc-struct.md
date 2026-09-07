@@ -1060,8 +1060,8 @@ IS the current `f->off`: the whole ghost rides beside the word inside the
 file's off box header (`off_resident γo k`), so the two cannot drift, and the
 one place the ghost moves is the checkin after an advance
 (`off_resident_intro`).  The name is minted FRESH at every FD_INODE publish —
-by `ProofSysOpen` at its deposit, by `ProofSysOpenAUAlloc` right after the
-`f->off = 0` store (the AU's `t` has to name it before the tail runs) — and is
+by `ProofSysOpenAUAlloc`, right after the `f->off = 0` store (the AU's `t` has
+to name it before the tail runs) — and is
 never reused: a closed file's name goes dead with its box and the next open of
 the slot mints a new one, so nothing is garbage-collected.  It is tied to the
 payload through `fpnames.fp_ooff` by `fdstate_ok`'s FD_INODE arm, exactly as

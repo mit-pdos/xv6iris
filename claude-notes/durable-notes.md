@@ -78,7 +78,8 @@ pointer line per top-level and `design/` file and does NOT list `projects/` or
 - **Pick `-j` by RAM, not cores** — a `Code*.v` worker peaks near 2 GB, and `-j`
   above `RAM_GB/2` gets workers OOM-killed, which make reports as `Error 137`
   with no Coq error at all.
-- **`make audit-only`, not `make audit`** for the assumption audit; it lives in
+- **`make audit-only`, not `make audit`** for the assumption audit, run from the TREE ROOT
+  (`iris/` has no Makefile; the target is in the top-level one); it lives in
   `iris/SystemAssumptions.v`, deliberately outside `_CoqProject`. Do not add a
   second `Print Assumptions` beside it — consecutive calls share nothing.
 - **Every device-conformance test must pass.** `make vtest-check-ci` compiles

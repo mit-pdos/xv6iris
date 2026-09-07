@@ -6,12 +6,12 @@
 > Q-b reversed: nlink-0 inodes LEAVE the view).  Briefs and the VM build script:
 > `app-round-e2-briefs.md`; E1's census: `app-round-e1-census.md`.
 >
-> STATE OF THE TREE: origin/main is green through lane E2-W.  Landed in order: E2-V2 (the view is
+> STATE OF THE TREE: origin/main is green through lane E2-X.  Landed in order: E2-V2 (the view is
 > the live namespace; "E2-V2 AS BUILT" below), E2-D (the delta vocabulary; "E2-D AS BUILT"), E2-L0
 > (held inums are positive; as-built record atop its brief in the briefs file), E2-C (create's
 > legs as fires; "E2-C AS BUILT" below), E2-L (link in place; "E2-L AS BUILT" below), E2-W (write;
-> "E2-W AS BUILT" below).  NEXT LANE: E2-X (delete the dead non-AU forms; brief `roundE2X-brief.md`
-> in the briefs file; log `rE2X`), then E2-Z (`roundE2Z-brief.md`).  Lanes run ONE AT
+> "E2-W AS BUILT" below), E2-X (the dead non-AU forms deleted; "E2-X AS BUILT" below).  NEXT LANE:
+> E2-Z (`roundE2Z-brief.md` in the briefs file; log `rE2Z`) — the LAST lane of round E2.  Lanes run ONE AT
 > A TIME in the session's own checkout (owner's rule of 2026-09-07); the build script takes the
 > tree as its first argument and a log name.  On resume: `git status` — a clean tree means the
 > last lane landed (check `git log`); modified iris files are the next lane's partial work: run
@@ -343,6 +343,28 @@ Three measured facts that shape everything below:
   SpecFilewrite, SpecSysWrite, ProofFilewrite, ProofFilewriteAU, ProofSysWrite, ProofSyscall,
   LinkSyscall.  Remaining `_auto` users: EscrowDeposit (#1), ProofIlock (#2), ProofSysOpen (#3,
   dead → E2-X), ProofSysUnlinkW5File/Dir (dead → E2-X) — then E2-Z.
+
+## E2-X AS BUILT (landed 2026-09-07; 11 files deleted, 24 iris files touched; green, 13 axioms, both audited statements untouched)
+
+- DELETED (17,163 lines): `ProofSysOpen.v`, `ProofSysMknod.v`, `ProofSysUnlinkW1/W2/W3/W5File/
+  W5Dir.v`, `ProofSysUnlinkShared.v`, `LinkSysUnlink.v`, `LinkSysOpen.v`, `LinkSysMknod.v` — with
+  them sites #3 (`so_stores`), #31-#34, and the dead callers of create's non-dir helpers (#7/#16's
+  helpers in ProofCreateAlloc/Fail STAY: mkdir is live through them).  The seals `SYSOPEN`/
+  `SYSUNLINK`/`SYSMKNOD` are gone (nothing referenced them); each spec file keeps its
+  `wp_sys_*_sconf_body` as the AU contract's frame and says so.
+- MOVED, not cloned: `so_neq_of_eq`/`so_neq_of_ne`/`so_bud_iput` → `ProofSysOpenParts.v` (the
+  latter with qualified constants: Parts pins its import order).  `ProofSysUnlink.v` keeps its
+  name and is now the pure `su_*` layer under the AU walk (the functor and 19 imports it alone
+  needed are cut).  `ProofSysOpenTails.v` stays (five AU importers — the brief guessed wrong).
+- Coverage unchanged (`tools/proof_coverage.py --check`: sysfile.c 16/16; sys_open/unlink/mknod
+  are credited to their AU links, evidence string now "spec definition, not exported as a Module
+  Type"); the dead-imports check is clean on the touched files.  Two pre-existing dead imports
+  left for the nightly sweep: `ProofSysOpenAUCreArm.v:84` (`FsAbsMknodFire` → `FsAbsCreateFire`,
+  an E2-C leftover) and `ProofSyscall.v:376` (`FsAbsWriteFire`, an E2-W leftover).
+- Remaining `_auto` users: `EscrowDeposit` (#1) and `ProofIlock` (#2) only — E2-Z.
+- Docs: `design/file-table.md` ×2 and `design/proc-struct.md` ×1 re-pointed to the AU files;
+  `app-round-e1-census.md` (pinned to its HEAD) and `fs-syscall-specs.md`'s edit counts left as
+  historical snapshots.
 
 ## 1. The 22 sites: view change, dispatcher arm, twin, liveness
 

@@ -454,3 +454,8 @@ Rounds, each a green gate:
   premise (`fw_app_write_step`) and its retag is `_gen`/`_same`; the
   dispatcher's write arm splits on the fd state out of `fd_frags` and runs
   the AU write for inode fds.  Record in app-round-e2.md "E2-W AS BUILT".
+- **E2-X LANDED 2026-09-07** (ruling Q-f): the non-AU open walk, mknod
+  proof, unlink W-files and their three Link seals are deleted (11 files,
+  17k lines; coverage unchanged, the AU links carry sys_open/unlink/mknod);
+  `ProofSysUnlink.v` is the pure layer under the AU walk.  Record in
+  app-round-e2.md "E2-X AS BUILT".

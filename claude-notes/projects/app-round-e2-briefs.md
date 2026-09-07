@@ -441,7 +441,7 @@ Report: the partial commit verbatim, the changed fail arms (AU and Era), the ste
 placement, the three site diffs, the dispatch's case split, deviations.  Do not commit.  Expect
 3-5 VM builds (the SpecFilewrite cone is the write family + ProofSyscall).
 
-## roundE2X-brief.md — written 2026-09-07 (launch after E2-W)
+## roundE2X-brief.md — LANDED 2026-09-07 (as-built record: app-round-e2.md "E2-X AS BUILT"; deviations: ProofSysOpenTails kept, 19 newly-dead imports trimmed from ProofSysUnlink, `so_bud_iput` qualified)
 
 ## Lane E2-X: delete the dead non-AU forms (ruling Q-f) — the unlink walk, the open walk, mknod, `so_stores`
 

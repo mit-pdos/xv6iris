@@ -578,9 +578,9 @@ Rules:
   two.  The box handle is `off_box k γb γo` — the header is closed over the
   name, so a checkout at the fd's handle hands back the ghost the fd names.
 - **Mint per publish, never reuse, never collect.**  Fresh at every FD_INODE
-  publish (`ProofSysOpen`'s deposit block; `ProofSysOpenAUAlloc` mints it
-  right after the `f->off = 0` store because the AU's `t` names it and the
-  tail's arms are stated at `t`); dropped by the last close's hook inside
+  publish (`ProofSysOpenAUAlloc` mints it right after the `f->off = 0` store,
+  because the AU's `t` names it and the tail's arms are stated at `t`);
+  dropped by the last close's hook inside
   `OffBox.off_last_close`.  A dead name says nothing about the slot's next
   file, which has a fresh one.
 - **The ghost moves only inside the `ip->lock` hold, between checkout and
@@ -630,8 +630,8 @@ Rules:
   family is a function of the list the bundle is already indexed by and every
   site that threads the bundle opaquely is untouched; `fd_frags_acc`'s closer
   takes the NEW row's entry, so a retype pays for its row: open mints the
-  invariant from the half `so_publish`'s caller split off (`ProofSysOpen` /
-  `ProofSysOpenAUPub`'s deposit block, `foff_row_of_ok`), dup copies the
+  invariant from the half `so_publish`'s caller split off
+  (`ProofSysOpenAUPub`'s deposit block, `foff_row_of_ok`), dup copies the
   source's, kfork copies the parent's (`ProofKforkB3`: one file, one shadow,
   the child inherits it for free), close / pipe / exit owe `True`.  The landed
   `wp_sys_read_sconf` / `wp_sys_write_sconf` take the bundle in and out
