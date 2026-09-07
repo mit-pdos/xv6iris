@@ -219,6 +219,8 @@ QEMU/DiskIdentRd2Pass.v
 QEMU/DiskIdentShmselPass.v
 QEMU/DiskIdentWr1Pass.v
 QEMU/DiskIntrPass.v
+QEMU/DiskOrderPass.v
+QEMU/DiskRwPass.v
 QEMU/PlicArbPass.v
 QEMU/PlicLevelPass.v
 QEMU/PlicMaskPass.v

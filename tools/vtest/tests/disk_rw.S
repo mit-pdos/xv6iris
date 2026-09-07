@@ -61,7 +61,15 @@ _vtest_body:
                                         |INDIRECT_DESC|EVENT_IDX -- what xv6 clears */
     not  t1, t1
     and  t0, t0, t1
-    sw   t0, R_FEATURES(s11)         /* what we negotiated */
+    /* NOT PUBLISHED.  What the driver negotiates is a function of what the
+       device OFFERS, and the model offers a different set than QEMU --
+       finding 2, `FLUSH|CONFIG_WCE` against QEMU's 0x30006e54, so the
+       negotiated word is 0 here and 0x6454 there.  That is a fact about the
+       device's identity, not about the read/write path this test is for,
+       and it is already asked -- and answered on both sides -- by
+       disk_ident_featsel, which publishes DeviceFeatures itself.
+       Publishing it here made the whole read/write comparison unprovable
+       for a divergence recorded elsewhere. */
     sw   t0, 0x20(s0)                /* DriverFeatures */
     li   t0, 11                      /* | FEATURES_OK */
     sw   t0, 0x70(s0)
