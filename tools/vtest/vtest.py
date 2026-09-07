@@ -429,7 +429,7 @@ def verdict_of_file(mod, pl):
     return None
 
 
-def emit_passes(flip_unbuilt=False):
+def emit_passes(built=None, reset=False):
     """One proof per RUN, in ONE of the two forms.
 
     NOT [first [agree | stuck]]: that pays for the agree branch and then the
@@ -437,10 +437,12 @@ def emit_passes(flip_unbuilt=False):
     minutes either way.  Each file does ONE computation, and which one is
     recorded in its header.
 
-    [flip_unbuilt] switches a proof that did not compile to the other form,
-    which is how the build classifies them: emit [agree] for everything,
-    build, flip what failed, build again.  What still fails after that is a
-    run that does not pass at all -- the table's "no proof"."""
+    [built] is the set of "<PLAT>/<Mod>" that DID compile; everything else
+    is re-emitted in the other form.  That is how the build classifies a
+    run -- emit [agree] for everything, build, flip what failed, build
+    again -- and it is passed IN rather than read off the local tree,
+    because the .vo live wherever the build ran, which is not here.
+    [reset] forces every proof back to [agree]."""
     made, kept = [], []
     for n in all_tests():
         mod = modname(n)
@@ -455,9 +457,9 @@ def emit_passes(flip_unbuilt=False):
             if hand_written(mod + "Pass.v", pl):
                 kept.append(rrel(mod, pl)); continue
             was = verdict_of_file(mod, pl)
-            v = was or "agree"
-            if flip_unbuilt and was is not None \
-               and not os.path.exists(rp(mod + "Pass.vo", pl)):
+            v = "agree" if reset else (was or "agree")
+            if built is not None and was is not None \
+               and rrel(mod, pl) not in built:
                 v = "stuck" if was == "agree" else "agree"
             if v == "agree":
                 body = f"""    left. intros o Ho.
@@ -867,6 +869,13 @@ def main():
                    help="run N times and report distinct observations")
     p.add_argument("--drive-opts", default="cache=writeback",
                    help="extra -drive options, e.g. aio=threads,cache=none")
+    p.add_argument("--built", metavar="FILE",
+                   help="file listing the <PLAT>/<Mod> whose proof compiled; "
+                        "every other proof is re-emitted in the OTHER "
+                        "verdict.  This is how the build classifies a run: "
+                        "emit agree, build, flip what failed, build again.")
+    p.add_argument("--reset", action="store_true",
+                   help="force every generated proof back to [agree]")
     p.add_argument("--from-build", action="store_true",
                    help="take the passing set from the .vo on disk (what "
                         "`make vtest-try` leaves) rather than from the "
@@ -920,8 +929,14 @@ def main():
         print("_CoqProject: %d files (%d run proofs)" % (len(files), len(passes)))
         return
     if a.cmd == "passes":
-        made = emit_passes()
+        built = None
+        if a.built:
+            built = {l.strip() for l in open(a.built) if l.strip()}
+        made = emit_passes(built=built, reset=a.reset)
         print("wrote %d per-run Pass file(s)" % len(made))
+        for m in made:
+            if "(stuck)" in m:
+                print("  stuck: %s" % m.split(" ")[0])
         return
     names = all_tests() if a.all else a.names
     if not names: sys.exit("name a test, or pass --all")
