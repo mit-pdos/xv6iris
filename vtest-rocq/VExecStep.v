@@ -2098,3 +2098,82 @@ Proof.
   - exact (thread_no_step_hart tick 0 hart_primary g3 s2 m2 Hlv3 Hok3
              Hen3 Hst3).
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 23. THE FORM A GENERATED PROOF USES.                                    *)
+(*                                                                         *)
+(*     [exec_run_exhibits] wants the two intermediate states named, which  *)
+(*     a generated file cannot do -- they are the run's own output, tens   *)
+(*     of thousands of bytes.  These fold them into a MATCH, so the        *)
+(*     premise mentions nothing a generator has to write down and reduces  *)
+(*     by computation, exactly as the old one-line proofs did.             *)
+(* ---------------------------------------------------------------------- *)
+
+Definition run_result (tick : bool) (pick : virtio_state -> option Z)
+    (n : nat) (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
+  : option mstate :=
+  match srun (uart_pre uart_input) (exec_start hart text rs disk_init) with
+  | Some s1 => match eval_run_at pick tick n s1 with
+               | RDone sf => Some sf
+               | _ => None
+               end
+  | None => None
+  end.
+
+Theorem run_shows (tick : bool) (pick : virtio_state -> option Z) (n : nat)
+    (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
+    (o : observation) :
+  match run_result tick pick n hart text rs uart_input disk_init with
+  | Some sf => result_of (Some sf) = o.(o_result)
+               /\ serial_of (Some sf) = o.(o_uart)
+               /\ v_disk (dvirtio (mdev sf)) = disk_of_sectors o.(o_disk)
+  | None => False
+  end ->
+  exists N l ts g,
+    @language.nsteps riscv_lang N
+      (test_config hart text rs disk_init) l (ts, g)
+    /\ obs_in l = uart_input
+    /\ observed_at g o.
+Proof.
+  unfold run_result.
+  destruct (srun (uart_pre uart_input) (exec_start hart text rs disk_init))
+    as [s1|] eqn:Hpre; [|intros []].
+  destruct (eval_run_at pick tick n s1) as [sf|sf e|sf] eqn:Hrun;
+    [|intros []|intros []].
+  intros (Hres & Hser & Hdsk).
+  exact (exec_run_exhibits tick pick n hart text rs uart_input disk_init
+           s1 sf o Hpre Hrun Hres Hser Hdsk).
+Qed.
+
+Definition run_stuck (tick : bool) (pick : virtio_state -> option Z)
+    (n : nat) (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z)) : bool :=
+  match srun (uart_pre uart_input) (exec_start hart text rs disk_init) with
+  | Some s1 => match eval_run_at pick tick n s1 with
+               | RStuck _ ENoStep => true
+               | _ => false
+               end
+  | None => false
+  end.
+
+Theorem run_no_step (tick : bool) (pick : virtio_state -> option Z) (n : nat)
+    (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z)) :
+  run_stuck tick pick n hart text rs uart_input disk_init = true ->
+  exists N l ts g e,
+    @language.nsteps riscv_lang N
+      (test_config hart text rs disk_init) l (ts, g)
+    /\ obs_in l = uart_input
+    /\ In e ts /\ thread_no_step g e.
+Proof.
+  unfold run_stuck.
+  destruct (srun (uart_pre uart_input) (exec_start hart text rs disk_init))
+    as [s1|] eqn:Hpre; [|discriminate].
+  destruct (eval_run_at pick tick n s1) as [sf|sf e|sf] eqn:Hrun;
+    [discriminate| |discriminate].
+  destruct e; [|discriminate]. intros _.
+  exact (exec_run_no_step tick pick n hart text rs uart_input disk_init
+           s1 sf Hpre Hrun).
+Qed.
