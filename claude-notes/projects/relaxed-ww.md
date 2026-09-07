@@ -957,6 +957,50 @@ the release finisher/the started node do the flush; (6) the protocol
 files (`BioInv`, `BioInitAt`, `OffBox`, `IcacheEscrow`, `ProofBreadParts`,
 `StartedInv`) over the flushed token; (7) then the frontier resumes.
 
+**§2.14 amended by the review (accepted):**
+- The flushed token keeps the original `dirty_ok` conjunct (the forgetful
+  direction is otherwise not derivable: at `fence rw,w` the view does not
+  move, so `Df` may exceed the bound `B`) and carries `⌜K ≤ Df⌝` (what
+  `ctx_stamp`'s `mono_nat_own_update B → Df` needs; today it comes from
+  `view_lb_le_view` + `mm_ok`'s `gtv ≤ length gdlog`, both interp facts):
+
+      own_context_flushed ξ Df :=
+        ∃ B K D, ctx_at ξ 1 B D ∗ view_lb view_name dlen_name h K ∗ ⌜B ≤ K⌝ ∗
+                 ⌜K ≤ Df⌝ ∗ ([∗ set] k ∈ D, dirty_ok logm_name dpos_name h B k) ∗
+                 ([∗ set] k ∈ D, dpos_ev dpos_name k.1 Df) ∗ llb dlen_name Df
+
+- `ctx_flush g ξ Df` takes `Df` as a parameter with `gtv ≤ Df`, `own_pub ≤
+  Df`, `Df ≤ length gdlog`: the release fence instantiates `length gdlog`,
+  the `ifence_step` path `IK`, so `ctx_xstamp`'s consumers (`UmodeText`,
+  `IcacheRef`) come out over the same token.
+- `ctx_dom_to_stamped`/`ctx_deposit` over the token return the stamp at
+  `max T Df` (`T` and `Df` are both mere `llb` lower bounds).
+- Propagation laws, interp-free: `ctx_resume_flushed` (`own_context_flushed
+  ξ' Df -∗ ctx_parked ξ ξ' ==∗ … ∗ own_context_flushed ξ Df`, via
+  `keys_just`), `ctx_move_flushed`, `ctx_dom_run_flushed` -- `lock_pay_
+  intro` stamps the LOCK's context `ξL`, not `cur_ctx`.
+- Genuinely interp-level and left there: `ctx_dom_of_stamped` (the AMO
+  side), `fr_mint`, `ctx_xstamp`, and the started fence's `⌜B ≤ L⌝`
+  (compares `llb loglen_name B` with the current length) -- minted at the
+  leaf beside the flush.
+- Hook export: `lock_finisher_body` already has `Out`; `lock_pay_intro`
+  returns `lock_pay R ∗ Q`, a `lock_finisher_close_hook` variant sets
+  `Out := Q`, `wp_release_hook_sconf_body` gains `Q -∗` in its
+  continuation.  The recycle wand's mask is `⊤ ∖ ↑minstretN`, not `⊤`.
+- Leaves stay machine-shaped; the flush is one call in
+  `WpSconfFencePub`'s lifting (through `rel_step`, not `pub_step`: `rw,w`
+  is `fence_rel` but not `fence_drains`), and the token exchange lives in
+  `sie_cap_gpr_own_ctx_acc`.
+- `ledger_pin_mint` requires `t = B` (`latest` at the floor);
+  `WpSconfLock.pin_mint_run` (a lock-word pin at an arbitrary `B ≥ t`)
+  goes or pins at `t`, beside `CtxPinMint`'s log-top mint.
+- `ProofMainSecondary.v:815` (deleted `cv_boot_cred_view`) is on step (7).
+- ORDER: a vertical slice first -- (1) token, `ctx_flush`, the restated
+  stamp/deposit/dom_to_stamped and the three propagation laws, then
+  immediately the release finisher through `WpSconfFencePub` (where
+  `K ≤ Df` and the `ξL` propagation bite); (3) the triple key before (2);
+  then (4), (6), (7).
+
 ## 3. Stages
 
 | stage | what | state |
