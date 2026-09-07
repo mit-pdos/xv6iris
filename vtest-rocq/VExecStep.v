@@ -2162,18 +2162,14 @@ Theorem run_no_step (tick : bool) (pick : virtio_state -> option Z) (n : nat)
     (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list (bv 8)) (disk_init : list (Z * list Z)) :
   run_stuck tick pick n hart text rs uart_input disk_init = true ->
-  exists N l ts g e,
-    @language.nsteps riscv_lang N
-      (test_config hart text rs disk_init) l (ts, g)
-    /\ obs_in l = uart_input
-    /\ In e ts /\ thread_no_step g e.
+  run_no_step_at hart text rs uart_input disk_init.
 Proof.
   unfold run_stuck.
   destruct (srun (uart_pre uart_input) (exec_start hart text rs disk_init))
     as [s1|] eqn:Hpre; [|discriminate].
   destruct (eval_run_at pick tick n s1) as [sf|sf e|sf] eqn:Hrun;
     [discriminate| |discriminate].
-  destruct e; [|discriminate]. intros _.
+  destruct e; [|discriminate]. intros _. unfold run_no_step_at.
   exact (exec_run_no_step tick pick n hart text rs uart_input disk_init
            s1 sf Hpre Hrun).
 Qed.

@@ -240,20 +240,76 @@ Module Type TEST_RUN (T : TEST).
 End TEST_RUN.
 
 (* THE THEOREM, over the test's own initial state. *)
-Definition run_passes (hart : Z) (text : list Z) (rs : list region)
+(* THE TWO WAYS A RUN PASSES, as two separate claims.  They are the
+   disjuncts of [run_passes], and a run proves ONE of them -- which one is
+   then part of what its file SAYS, in its module ascription, rather than a
+   remark in a header.
+
+   THEY ARE NOT THE SAME KIND OF FACT.  [run_agrees] is about the
+   observations: the model exhibits each of them, from this test's own
+   configuration, along an execution that typed exactly this test's input.
+   [run_no_step_at] is about REACH: this test's execution arrives at a
+   thread the RELATION cannot step from, so no proof over the model gets
+   past it either.  That is a genuine pass -- it costs reach, not soundness
+   -- and it is why [TEST_PASSES_STUCK] below takes no run at all: there is
+   no observation anywhere in the statement, and pretending otherwise by
+   passing one in would be the misleading part. *)
+
+Definition run_agrees (hart : Z) (text : list Z) (rs : list region)
     (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
     (observed : list observation) : Prop :=
   let c0 := test_config hart text rs disk_init in
-  (forall o, In o observed ->
-     exists n l ts g,
-       nsteps n c0 l (ts, g)
-       /\ obs_in l = uart_input
-       /\ observed_at g o)
-  \/ (exists n l ts g e,
-       nsteps n c0 l (ts, g)
-       /\ obs_in l = uart_input
-       /\ In e ts /\ thread_no_step g e).
+  forall o, In o observed ->
+    exists n l ts g,
+      nsteps n c0 l (ts, g)
+      /\ obs_in l = uart_input
+      /\ observed_at g o.
 
+Definition run_no_step_at (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z)) : Prop :=
+  let c0 := test_config hart text rs disk_init in
+  exists n l ts g e,
+    nsteps n c0 l (ts, g)
+    /\ obs_in l = uart_input
+    /\ In e ts /\ thread_no_step g e.
+
+Definition run_passes (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
+    (observed : list observation) : Prop :=
+  run_agrees hart text rs uart_input disk_init observed
+  \/ run_no_step_at hart text rs uart_input disk_init.
+
+Lemma passes_of_agrees (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
+    (observed : list observation) :
+  run_agrees hart text rs uart_input disk_init observed ->
+  run_passes hart text rs uart_input disk_init observed.
+Proof. intros H. left. exact H. Qed.
+
+Lemma passes_of_no_step (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
+    (observed : list observation) :
+  run_no_step_at hart text rs uart_input disk_init ->
+  run_passes hart text rs uart_input disk_init observed.
+Proof. intros H. right. exact H. Qed.
+
+(* A run that AGREES.  Its statement names the run, because it is about
+   what the run measured. *)
+Module Type TEST_PASSES_AGREE (T : TEST) (R : TEST_RUN T).
+  Axiom agrees :
+    run_agrees T.hart T.text T.regions T.uart_input T.disk_init R.observed.
+End TEST_PASSES_AGREE.
+
+(* A run that is STUCK.  Its statement does NOT name the run: nothing about
+   the measurement is claimed, and the module type says so by not taking
+   one.  A reader who wants to know whether the model reproduced anything
+   can tell from the ascription alone. *)
+Module Type TEST_PASSES_STUCK (T : TEST).
+  Axiom no_step :
+    run_no_step_at T.hart T.text T.regions T.uart_input T.disk_init.
+End TEST_PASSES_STUCK.
+
+(* ...and the disjunction, for a caller that does not care which. *)
 Module Type TEST_PASSES (T : TEST) (R : TEST_RUN T).
   Axiom passes :
     run_passes T.hart T.text T.regions T.uart_input T.disk_init R.observed.
