@@ -131,6 +131,54 @@ Definition enode (tick : bool) (m : M unit) (s : mstate)
   end.
 
 (* ---------------------------------------------------------------------- *)
+(* 2b. THE HARNESS'S RUN, which is what the suite actually computes.       *)
+(*                                                                         *)
+(*     One instruction, then every enabled device action, until the guest  *)
+(*     publishes its result or the budget runs out.  It lives HERE and not *)
+(*     in VRun.v: it is an interpreter, and VRun.v states the theorem.     *)
+(*                                                                         *)
+(*     EVERY ARM CARRIES ITS STATE, the stuck one included.  Without that, *)
+(*     "the model has no transition" can only be said of SOME state -- the *)
+(*     shape [VTest.stuck_why_no_step] is stuck with, and nearly vacuous,  *)
+(*     since any junk state with no transition witnesses it.               *)
+(* ---------------------------------------------------------------------- *)
+
+Inductive eresult :=
+  | RDone   (s : mstate)                (* published its result            *)
+  | RStuck  (s : mstate) (why : estuck) (* [exec] would not step, and why  *)
+  | RBudget (s : mstate).               (* still running when time ran out *)
+
+Fixpoint eval_run_at (pick : virtio_state -> option Z) (tick : bool)
+    (n : nat) (s : mstate) : eresult :=
+  if flag_set s then RDone s else
+  match n with
+  | 0%nat => RBudget s
+  | S n' => match exec_r (riscv_step tick) s with
+            | inl (_, s') => eval_run_at pick tick n' (settle_at pick dev_fuel s')
+            | inr e => RStuck s e
+            end
+  end.
+
+(* The two unfolding equations, so no proof below has to [cbn]: any [cbn]
+   here also unfolds [riscv_step] into the whole monadic term, and the
+   [destruct] then has nothing syntactically matching
+   [exec_r (riscv_step tick) s] to abstract. *)
+Lemma eval_run_at_O (pick : virtio_state -> option Z) (tick : bool)
+    (s : mstate) :
+  eval_run_at pick tick 0 s = if flag_set s then RDone s else RBudget s.
+Proof. cbn [eval_run_at]. destruct (flag_set s); reflexivity. Qed.
+
+Lemma eval_run_at_S (pick : virtio_state -> option Z) (tick : bool)
+    (n : nat) (s : mstate) :
+  eval_run_at pick tick (S n) s =
+    (if flag_set s then RDone s
+     else match exec_r (riscv_step tick) s with
+          | inl (_, s') => eval_run_at pick tick n (settle_at pick dev_fuel s')
+          | inr e => RStuck s e
+          end).
+Proof. reflexivity. Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* 3. THE BOOKKEEPING, once.                                               *)
 (*                                                                         *)
 (*    Every arm of [hart_node_step] writes the same shape back: this       *)
@@ -613,6 +661,17 @@ Lemma nsteps_l_nil (n : nat) (r1 r2 r3 : language.cfg riscv_lang) :
   @language.nsteps riscv_lang n r2 [] r3 ->
   @language.nsteps riscv_lang (S n) r1 [] r3.
 Proof. intros H1 H2. exact (language.nsteps_l _ _ _ _ _ _ H1 H2). Qed.
+
+(* ...and the same when only the STEP is silent: [[] ++ ks] is [ks] by
+   conversion, so the observation list of the tail survives unchanged. *)
+Lemma nsteps_l_silent (n : nat) (r1 r2 r3 : language.cfg riscv_lang)
+    (ks : list mobs) :
+  @language.step riscv_lang r1 [] r2 ->
+  @language.nsteps riscv_lang n r2 ks r3 ->
+  @language.nsteps riscv_lang (S n) r1 ks r3.
+Proof.
+  intros H1 H2. exact (@language.nsteps_l riscv_lang n r1 r2 r3 [] ks H1 H2).
+Qed.
 
 Lemma hstep_nsteps (gen : nat) (cpu : CPU) (t1 t2 : list mexpr) :
   forall p q : M unit * gstate, rtc (hstep gen cpu) p q ->
@@ -1412,4 +1471,117 @@ Proof.
       cbn [fst] in Hok2. split; [exact Hok2|]. split; assumption.
     + exists 0%nat, [], g. split; [apply language.nsteps_refl|].
       cbn [fst]. split; [exact Hok|]. split; assumption.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 16. THE INSTRUCTION BOUNDARY, AND WHY THE DEVICES MAY THEN RUN.         *)
+(*                                                                         *)
+(*     The boundary is the [Ret] arm: the cycle is over, the next one      *)
+(*     begins, and A DANGLING RESERVATION IS DROPPED -- it never crosses   *)
+(*     an instruction.  That is what makes [all_resv = ∅] true for the     *)
+(*     settle that follows, and it is why the harness's order (instruction,*)
+(*     then devices) is replayed here as instruction, BOUNDARY, devices.   *)
+(*     The language admits that interleaving; the boundary is a step the   *)
+(*     hart has available and nothing else depends on when it is taken.    *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma gresv_ins_eq (f : CPU -> option resv) (cpu : CPU) (v : option resv) :
+  <[cpu := v]> f cpu = v.
+Proof.
+  unfold insert, gresv_insert.
+  destruct (decide (cpu = cpu)) as [_|H]; [reflexivity|contradiction (H eq_refl)].
+Qed.
+
+Lemma boundary_prim (tick : bool) (gen : nat) (cpu : CPU) (g : gstate)
+    (s : mstate) (u : unit) :
+  thread_live g gen -> hart_ok cpu g s ->
+  exists g',
+    prim_step (HartE gen cpu (Interface.Ret u)) g []
+              (HartE gen cpu (riscv_step tick)) g' []
+    /\ hart_ok cpu g' s /\ thread_live g' gen /\ all_resv g'.(gresv) = ∅.
+Proof.
+  intros Hlive Hok.
+  pose proof Hok as [Hr Hm Hd Hfl Hal Htv Hitv Hrv Hcoh].
+  exists (wb cpu g s g.(glog) (g.(gtv) cpu) (g.(gitv) cpu)
+             (HRead (hr_rv (g.(ghr) cpu)) (hr_coh (g.(ghr) cpu)) false) None).
+  split; [|split; [|split]].
+  - apply mnode_prim; [exact Hlive|].
+    rewrite (hart_ok_proj cpu g s Hok).
+    cbn [mnode_step]. exists tick. repeat (split; [reflexivity|]). reflexivity.
+  - apply (hart_ok_wb_same cpu g s s); try assumption; cbn; hok_bounds.
+  - unfold thread_live, wb; cbn [gpow ggen]. exact Hlive.
+  - unfold wb; cbn [gresv]. apply (all_resv_of_none _ cpu).
+    + rewrite others_resv_insert. exact Hal.
+    + apply gresv_ins_eq.
+Qed.
+
+Lemma elem_of_pool (e x : mexpr) (t1 t2 : list mexpr) :
+  e ∈ t1 ++ t2 -> e ∈ t1 ++ x :: t2.
+Proof.
+  intros H. apply elem_of_app. apply elem_of_app in H.
+  destruct H as [H|H]; [by left|right]. apply elem_of_cons. by right.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 17. THE HARNESS'S OWN LOOP.                                             *)
+(*                                                                         *)
+(*     [eval_run_at] is: publish?  no -- one instruction, then settle the  *)
+(*     devices, and again.  Each round is now three chains of [prim_step]s *)
+(*     -- the instruction (section 8), the boundary (section 16), the      *)
+(*     settle (section 15) -- composed by [nsteps_trans].  The hart is     *)
+(*     back at [riscv_step tick] at the end of every round, so the pool is *)
+(*     the same one the next round starts from, and the induction closes.  *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma eval_run_nsteps (tick : bool) (gen : nat)
+    (pick : virtio_state -> option Z) (t1 t2 : list mexpr) (n : nat) :
+  UartLoopE gen ∈ t1 ++ t2 ->
+  DiskLoopE gen ∈ t1 ++ t2 ->
+  PlicLoopE gen ∈ t1 ++ t2 ->
+  forall (g : gstate) (s sf : mstate),
+  thread_live g gen ->
+  hart_ok hart_primary g s ->
+  all_resv g.(gresv) = ∅ ->
+  eval_run_at pick tick n s = RDone sf ->
+  exists N kappa g',
+    @language.nsteps riscv_lang N
+      (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2, g) kappa
+      (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2, g')
+    /\ hart_ok hart_primary g' sf /\ thread_live g' gen.
+Proof.
+  intros Hu Hdk Hp. induction n as [|n' IH]; intros g s sf Hlive Hok Hres Hev.
+  - rewrite eval_run_at_O in Hev. destruct (flag_set s) eqn:Hf; [|discriminate].
+    revert Hev; intros [= <-].
+    exists 0%nat, [], g. split; [apply language.nsteps_refl|].
+    split; [exact Hok|exact Hlive].
+  - rewrite eval_run_at_S in Hev. destruct (flag_set s) eqn:Hf.
+    { revert Hev; intros [= <-].
+      exists 0%nat, [], g. split; [apply language.nsteps_refl|].
+      split; [exact Hok|exact Hlive]. }
+    destruct (exec_r (riscv_step tick) s) as [[u s1]|e] eqn:Hex;
+      [|discriminate Hev].
+    (* 1. the instruction *)
+    destruct (exec_nsteps tick gen hart_primary t1 t2 (riscv_step tick) s u s1 g
+                (exec_r_inl _ _ _ Hex) Hlive Hok)
+      as (N1 & g1 & Hn1 & Hok1 & Hlv1).
+    (* 2. the boundary, which drops the reservation *)
+    destruct (boundary_prim tick gen hart_primary g1 s1 u Hlv1 Hok1)
+      as (g2 & Hps2 & Hok2 & Hlv2 & Hres2).
+    (* 3. the devices *)
+    destruct (settle_nsteps gen
+                (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2)
+                pick dev_fuel
+                (elem_of_pool _ _ _ _ Hu) (elem_of_pool _ _ _ _ Hdk)
+                (elem_of_pool _ _ _ _ Hp) g2 s1 Hlv2 Hok2 Hres2)
+      as (N3 & k3 & g3 & Hn3 & Hok3 & Hlv3 & Hres3).
+    (* 4. and around again *)
+    destruct (IH g3 (settle_at pick dev_fuel s1) sf Hlv3 Hok3 Hres3 Hev)
+      as (N4 & k4 & g4 & Hn4 & Hok4 & Hlv4).
+    exists (N1 + S (N3 + N4))%nat, (k3 ++ k4), g4.
+    split; [|split; assumption].
+    apply (nsteps_trans _ _ _ _ _ _ _ Hn1).
+    apply (nsteps_l_silent _ _ _ _ _
+             (hstep_step gen hart_primary t1 t2 (Interface.Ret u)
+                (riscv_step tick) g1 g2 Hps2)).
+    exact (nsteps_trans _ _ _ _ _ _ _ Hn3 Hn4).
 Qed.
