@@ -859,6 +859,104 @@ pinw_vis`.
   `llb dlen_name`; (5) `started_W` must carry `D` and `L ≤ i` before
   `kpt_pub` can be assembled -- the boot chain's critical path.
 
+### 2.14 Revised design (ruling, 2026-09-06, late): the interp stays below the protocol tier; the fence hands up a FLUSHED TOKEN
+
+**The smell.** Stage D threaded `(g : gstate)`, `own_drained` and
+`tso_interp_at g` into every fence-bound birth and deposit -- WpLock (23
+sites), KptPublish (22), IcacheEscrow (19), SleepLock (18), CtxBox (18),
+BioInv (14), VirtioProto (11), and a dozen more protocol-level files.  An
+invariant definition or a protocol lemma looking at the state interp is
+the wrong abstraction: those lemmas need ONE fact of the fence, not the
+machine.  The fact is: every dirty key of the running context has drained
+(`ctx_stamp`, TsoCtxLedger.v:138, opens the interp only to turn the
+token's `dirty_ok` arms into `dpos_ev … (length gdlog)` for the
+own-message keys, plus `llb dlen_name`).
+
+**The ruling.**  The interp is confined to the machine, interp, gate and
+node-leaf tiers: `TsoMemPa`, `RiscvPtsto`/`RiscvExec`, `TsoCtx`/
+`TsoCtxStore`/`TsoCtxLedger`, `CtxPinMint`, `Hart*`, `SmodeCorePt`, the
+`WpMmode*`/`WpSconf*` leaves.  Nothing in the box, lock, bio, icache,
+file, bread, started or virtio protocols mentions `gstate`,
+`own_drained` or `tso_interp_at`.  What crosses the boundary is a ghost
+resource the fence leaf produces:
+
+    own_context_flushed ξ Df  :=
+      ∃ B K D, ctx_at ξ 1 B D ∗ view_lb view_name dlen_name h K ∗ ⌜B ≤ K⌝ ∗
+               ([∗ set] k ∈ D, dpos_ev dpos_name k.1 Df) ∗ llb dlen_name Df
+
+"the running token, every dirty key drained under `Df`, and `Df` a legal
+drain position".  One interp gate makes it, at a release fence:
+
+    ctx_flush g ξ : own_drained h g.(glog) g.(gdlog) →
+      tso_interp_at g -∗ own_context ξ -∗
+      tso_interp_at g ∗ own_context_flushed ξ (length g.(gdlog))
+
+(each own-message dirty key `(S i, a)` is in `gdlog` by `own_drained`, so
+its `dpos_at` copy in the interp gives `dpos_ev (S i) (length gdlog)`; a
+clean key is drained under `B ≤ K ≤ gtv ≤ length gdlog`).  The forgetful
+direction `own_context_flushed ξ Df -∗ own_context ξ` is free.
+
+**Restated over the flushed token, with no `g`, no `own_drained`, no
+interp:** `ctx_stamp ξ Df : own_context_flushed ξ Df ==∗ ctx_stamped ξ
+Df`; `ctx_dom_to_stamped`, `ctx_deposit`; the `CtxBox` deposits, parks and
+allocs (`box_deposit_L1*`, `box_park*`, `box_alloc_at*`); `WpLock`'s
+`lock_pay_born*`, `lock_pay_intro`, the finisher preludes, `newlock*`;
+`WpLockAt.newlock_at*`; `SleepLock`/`SleepLockAt`'s births;
+`TicksInv.new_tickslock`; `BioInv.bio_init`, `buf_box_alloc`,
+`bbox_deposit_L1`, `bbox_park`; `BioInitAt.bio_init_at`; `OffBox`'s
+publish/park; `IcacheEscrow`'s deposits and parks; `ProofBreadParts.
+bcache_scan2_recycle`'s closing wand; `StartedInv`'s deposit.  Each takes
+`own_context_flushed cur_ctx Df` where it took `g`/`own_drained`/interp,
+and returns `own_context cur_ctx` (or the flushed token again, if the
+caller has more to deposit at the same fence).
+
+**The hook, with an export.**  `lock_ctx_hook E R Rin Q := ∀ ξ T Df,
+own_context_flushed cur_ctx Df -∗ ctx_stamped ξ T -∗ Rin ξ ={E}=∗
+own_context cur_ctx ∗ ∃ T', ctx_stamped ξ T' ∗ R ξ ∗ Q`.  `Q` is what the
+deposit hands the continuation (the reviewer's Q5: `bchain bn k D B` must
+reach `bget`'s `acquiresleep`); the identity hook has `Q := emp`.
+`wp_release_hook_sconf` delivers `Q` to its continuation.  `pub_step`,
+`ifence_step` and `rel_step` keep their machine-state shape INSIDE
+`HartBarrier` (they are the leaf); the sconf lifting (`WpSconfFencePub`,
+the release finisher, the started store node) runs `ctx_flush` and calls
+the flushed-token hook.  `fr_mint` (the fence record) is likewise run at
+the leaf; `fr_at` is a plain persistent fact above it.
+
+**The kernel-table publication.**  `KptPublish` converts context bytes
+into pins, which updates the interp's tie: it is a `CtxPinMint`-class
+GATE and stays interp-level, run inside kvminithart's `csrw satp` hook --
+but stated as the gate it is (one lemma over the opened token), not as
+protocol code.  The `kpt_dbound` shot and `cv_boot_cred` construction
+move to that hook.
+
+**Folded in from the review (§2.13):**
+- The pin's tie records that the floor writes the byte: `ts_ok`'s pin
+  clause (or the row) carries "`B = 0 ∨ ∃ m, glog !! (B-1) = Some m ∧
+  msg_byte m a ≠ None`", so `cv_key_read`'s hole closes; the boot route
+  has `latest` at the mint.  `ledger_read_pin_ok` and the log-top mints
+  are deleted with their one consumer.
+- The fence record is a monotone SET: `FR : gmap (agent * nat * nat)
+  unit`, key `(h, N, M)`; the mint never reuses an older `M`.
+- `StartedInv.started_W` carries the flag store's drain floor `D` and the
+  issue bound `L ≤ i`; `fr_at 0 L M`, `⌜B ≤ L⌝`, `kpt_dbound Bd`, `⌜Bd ≤
+  D⌝` ride beside `started_idx`, not in the generic payload.  The sed
+  `llb dlen_name B0` at `started_store_obl` goes back to the issue line.
+- `f->off`'s free word is pinned to ONE context: `off_last_close` returns
+  the bytes at `cur_ctx` (through the stamped context's dom), no `∃ ξb`;
+  `FileInvDefs.off_free k q` is `wordw_free cur_ctx 4 (a_foff k)` at
+  fraction `q`.
+- Every sed-introduced `llb dlen_name` is re-audited: identity (issue)
+  bounds stay on `loglen_name`, floors move to `dlen_name`.
+
+**Order of work.**  (1) `own_context_flushed`/`ctx_flush` in TsoCtx and
+the restated `ctx_stamp`/`ctx_deposit`/`ctx_dom_to_stamped`; (2) the
+pin tie's write witness; (3) the triple-keyed record; (4) `CtxBox`,
+`WpLock` (hook with export), `WpLockAt`, `SleepLock*`, `TicksInv` over
+the flushed token, un-threading `g`; (5) `HartBarrier`/`WpSconfFencePub`/
+the release finisher/the started node do the flush; (6) the protocol
+files (`BioInv`, `BioInitAt`, `OffBox`, `IcacheEscrow`, `ProofBreadParts`,
+`StartedInv`) over the flushed token; (7) then the frontier resumes.
+
 ## 3. Stages
 
 | stage | what | state |
