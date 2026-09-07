@@ -14,6 +14,9 @@
      +56  sepc     0x141     +64  scause   0x142
      +72  stval    0x143     +80  sip      0x144
      +88  satp     0x180     +96  stimecmp 0x14D  */
+/* vtest: platforms=qemu */
+/* NOT ON THE BOARD: same as core_regs_mcsr -- the run traps on menvcfg
+   and never publishes, so no board capture exists to compare against. */
 #include "abi.h"
 
     .globl _vtest_body

@@ -16,6 +16,11 @@
      +24  cycle   0xC00 +32  time     0xC01
      +40  instret 0xC02 +48  mcycle again, read after the first four, so the
                              two samples say whether the counter MOVED */
+/* vtest: platforms=qemu */
+/* NOT ON THE BOARD: the U74 traps executing `csrr menvcfg` (finding 31),
+   and with mtvec=0 the second trap overwrites mcause/mepc/mtval, so the
+   run never publishes and there is nothing to capture.  This case would
+   also never agree there: its fields are counters. */
 #include "abi.h"
 
     .globl _vtest_body

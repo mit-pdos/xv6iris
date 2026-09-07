@@ -134,29 +134,15 @@ def config(name):
            #               a case some of whose fields legitimately differ
            #               between two runs of the SAME machine (counters, a
            #               raw mtime, an image-dependent mtvec, the hart id)
-           #   builder=single   the model side is one hart from [start_hart]
-           #                    (the default, and most cases)
-           #   builder=sched    the case needs a SCHEDULE PREFIX before it
-           #                    runs -- a serial byte ARRIVING is a schedule
-           #                    choice, not something run_until performs.
-           #                    The `serial_in=` bytes are the prefix.
-           #   builder=picks    the case's several outcomes come from the
-           #                    DEVICE rather than from two harts: the disk
-           #                    may answer two in-flight requests in either
-           #                    order.  `picks=lowest_head,highest_head`
-           #                    names one run per order.
-           #   builder=icache   the case stores over its OWN code, so its
-           #                    outcomes are the FETCH VIEW's choice (the
-           #                    icache is not coherent: icache.md).  One
-           #                    model run per fetch schedule of the
-           #                    hand-written <Case>Sched.v; VIcache.v.
-           #   builder=multi    the case races two harts, so its model side
-           #                    needs a VConc SCHEDULE.  VRun has no builder
-           #                    for that yet, so no run module is emitted and
-           #                    the table says so -- which is honest, where
-           #                    running such a case through the single-hart
-           #                    builder would compute an outcome in which the
-           #                    second hart never ran at all.
+           #
+           #   THE [builder=] AND [proj=] KEYS ARE DEAD.  A run used to be
+           #   re-presented from a capture by one of five builders, and a
+           #   test could name the words it wanted compared; neither exists.
+           #   A capture IS its Test and its Run, and the whole result region
+           #   is compared -- a value that varies between two runs of the
+           #   same machine is one the program should not publish.  The keys
+           #   are still parsed so an old .S does not fail to read; nothing
+           #   reads them.
            "budget": 2000, "tick": 0, "proj": "whole", "builder": "single"}
     for line in open(src):
         m = re.search(r"vtest:\s*(.*?)\s*\*/", line)
@@ -617,23 +603,28 @@ def _passing(platform):
 
 
 def _run_state(n, pl):
-    """The ONE state of (case, platform).  They are mutually exclusive, so a
-    single column says everything.
+    """The ONE state of (case, platform).  Four of them, and each says
+    something a reader can act on:
 
-    THE ORDER MATTERS, and it is the order in which the answers are actually
-    determined.  A RUN THAT EXISTS is judged, whatever produced it -- a
-    builder or a hand-written module -- so that question comes first.  Only
-    then is it worth asking why one does not: nothing was captured, or the
-    capture is there but no builder knows how to run the model on it.
-    Asking "no builder" first mislabelled a case that had never been
-    captured at all."""
+      pass (agrees)  the model exhibits what this platform produced
+      pass (stuck)   this test's execution reaches a thread the relation
+                     cannot step from -- also a pass, but it claims nothing
+                     about the observation
+      no proof       there is a run and no proof of it
+      --             the case does not declare this platform
+
+    THE TWO THAT WENT.  "no builder" meant the capture existed but nothing
+    knew how to make a run module from it, which was an artefact of the old
+    Gen -> Run derivation; a capture is now written as its Test AND its Run
+    together, so it cannot happen, and if it did it would just be no proof.
+    "not captured" meant a case declared a platform it had never run on --
+    which is not a state, it is a case whose `platforms=` is wrong, and it
+    is fixed where it is wrong."""
     if pl not in platforms_of(n):
         return "excluded"
     mod = modname(n)
     if not os.path.exists(rp(mod + "Run.v", pl)):
-        if not os.path.exists(rp(mod + "Test.v", pl)):
-            return "uncaptured"
-        return "no-builder"
+        return "no-proof"
     # THE .vo IS THE EVIDENCE.  Membership in _CoqProject is only an
     # ASSERTION that the proof holds -- a Pass.v listed there that does not
     # actually compile would read as "pass" until a build caught it, i.e.
@@ -647,17 +638,14 @@ def _run_state(n, pl):
     return "no-proof"
 
 
-_MD = {"pass":       "**pass**",
-       "agree":      "**pass** (agrees)",
-       "stuck":      "**pass** (stuck)",
-       "unbuilt":    "*not built*",
-       "no-proof":   "no proof",
-       "uncaptured": "*not captured*",
-       "no-builder": "*no builder*",
-       "excluded":   "—"}
-_TXT = {"pass": "PASS", "agree": "PASS agrees", "stuck": "PASS stuck", "unbuilt": "not built",
-        "no-proof": "no proof", "uncaptured": "not captured",
-        "no-builder": "no builder", "excluded": "--"}
+_MD = {"pass":     "**pass**",
+       "agree":    "**pass** (agrees)",
+       "stuck":    "**pass** (stuck)",
+       "unbuilt":  "*not built*",
+       "no-proof": "no proof",
+       "excluded": "—"}
+_TXT = {"pass": "PASS", "agree": "PASS agrees", "stuck": "PASS stuck",
+        "unbuilt": "not built", "no-proof": "no proof", "excluded": "--"}
 
 
 def print_table(fmt="text"):
@@ -691,16 +679,13 @@ def print_table(fmt="text"):
     # BOTH VERDICTS ARE PASSES; the split says what each one claims.
     def npass(i): return c(i, "pass") + c(i, "agree") + c(i, "stuck")
     line = ("%d cases.  QEMU: %d pass (%d agree, %d stuck), %d no proof, "
-            "%d not captured, %d no builder, %d excluded.  "
-            "JH7110: %d pass (%d agree, %d stuck), %d no proof, "
-            "%d not captured, %d no builder, %d excluded."
+            "%d excluded.  "
+            "JH7110: %d pass (%d agree, %d stuck), %d no proof, %d excluded."
             % (len(rows),
                npass(1), c(1, "agree"), c(1, "stuck"),
-               c(1, "no-proof"), c(1, "uncaptured"),
-               c(1, "no-builder"), c(1, "excluded"),
+               c(1, "no-proof"), c(1, "excluded"),
                npass(2), c(2, "agree"), c(2, "stuck"),
-               c(2, "no-proof"), c(2, "uncaptured"),
-               c(2, "no-builder"), c(2, "excluded")))
+               c(2, "no-proof"), c(2, "excluded")))
     if fmt == "md":
         print("\n" + line)
         print("""
@@ -709,9 +694,7 @@ def print_table(fmt="text"):
 | **pass** (agrees) | the model EXHIBITS every observation this platform produced, from the test's own configuration |
 | **pass** (stuck) | this test's execution reaches a thread the RELATION cannot step from.  Also a pass, and a real one — a state the model cannot leave is one no proof can reach, so it costs REACH and not soundness — but it says nothing about what the platform observed |
 | no proof | the run exists, but its `TEST_PASSES` instantiation does not compile: the model does not exhibit what the platform observed |
-| *not captured* | the case declares this platform, but nothing has been run there yet, so there is no run to judge |
-| *no builder* | the case is captured, but its model side needs something `VRun` cannot yet compute — a race whose interleavings are not written |
-| — | the case excludes this platform: the question cannot be asked there (no disk on the board, a QEMU-only device) |""")
+| — | the case does not declare this platform: the question cannot be asked there (no disk on the board, a program the board traps on) |""")
     else:
         print(line)
 
