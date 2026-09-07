@@ -130,7 +130,7 @@ existing lemma's statement.  No consumer outside FsAbsDelta.v changes in this la
 Green; both audited statements byte-identical; report the definitions verbatim and the lemma
 list.  Do not commit.
 
-## roundE2L-brief.md — UNBLOCKED 2026-09-07 (E2-L0 landed, commit 263098976: `inode_held` carries `⌜0 < bv_unsigned inum⌝` right after the upper bound, so the target's positivity is one more binder in the link proof's namei unpacking; the BLOCKER paragraph at the end is history)
+## roundE2L-brief.md — LANDED 2026-09-07 (as-built record: app-round-e2.md "E2-L AS BUILT"; deviations: `luntgt_fired`'s pre-row is existential, instant 3 reuses `utgt_commit_at`/`uf_utgt_fire` with no `luntgt_*` names, `sys_link_ret` kept beside `link_arms`, only the three tails past the bump gained binders).  History: UNBLOCKED 2026-09-07 (E2-L0 landed, commit 263098976: `inode_held` carries `⌜0 < bv_unsigned inum⌝` right after the upper bound, so the target's positivity is one more binder in the link proof's namei unpacking; the BLOCKER paragraph at the end is history)
 
 ## Lane E2-L: link IN PLACE — `wp_sys_link_sconf` gains the three-commit bundle, its three retags become fires
 

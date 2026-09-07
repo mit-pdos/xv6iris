@@ -442,3 +442,9 @@ Rounds, each a green gate:
   and `wp_sys_mkdir_sconf` strengthened in place, the AU twins carry the arm
   receipt and the fail-side child pair; every `top_move` argument is gone from
   ProofCreate*.  Record in app-round-e2.md "E2-C AS BUILT".
+- **E2-L LANDED 2026-09-07** (6 files + new FsAbsLinkFire.v): `wp_sys_link_sconf`
+  strengthened in place with `link_commits` (tgt/ent commits, unlink's
+  `utgt_commit_at` reused for the undo) and `link_arms` (ret 0: tgt + ent
+  fired; ret −1: nothing, or the tgt/untgt pair); the three retags are
+  `lf_tgt_fire`/`lf_ent_fire`/`uf_utgt_fire`.  Record in app-round-e2.md
+  "E2-L AS BUILT".

@@ -6,20 +6,18 @@
 > Q-b reversed: nlink-0 inodes LEAVE the view).  Briefs and the VM build script:
 > `app-round-e2-briefs.md`; E1's census: `app-round-e1-census.md`.
 >
-> STATE OF THE TREE: origin/main is green through lane E2-C.  Landed in order: E2-V2 (the view is
+> STATE OF THE TREE: origin/main is green through lane E2-L.  Landed in order: E2-V2 (the view is
 > the live namespace; "E2-V2 AS BUILT" below), E2-D (the delta vocabulary; "E2-D AS BUILT"), E2-L0
 > (held inums are positive; as-built record atop its brief in the briefs file), E2-C (create's
-> legs as fires; "E2-C AS BUILT" below).  NEXT LANE: E2-L (link in place; §4 below; brief
-> `roundE2L-brief.md` in the briefs file, UNBLOCKED by E2-L0; launch brief for a subagent at the
-> session scratchpad or rewrite it from the brief).  Lanes run ONE AT A TIME in the session's own
-> checkout (owner's rule of 2026-09-07); the build script takes the tree as its first argument and
-> a log name (`rE2L` next).  On resume: `git status` — a clean tree means the last lane landed
-> (check `git log`); modified iris files are the next lane's partial work: run the build script
-> (log name = the lane) and finish to green against its brief, or `git checkout -- iris` and redo
-> from the brief.
+> legs as fires; "E2-C AS BUILT" below), E2-L (link in place; "E2-L AS BUILT" below).  NEXT LANE:
+> E2-W (write; brief `roundE2W-brief.md`, last in the briefs file; log `rE2W`).  Lanes run ONE AT
+> A TIME in the session's own checkout (owner's rule of 2026-09-07); the build script takes the
+> tree as its first argument and a log name.  On resume: `git status` — a clean tree means the
+> last lane landed (check `git log`); modified iris files are the next lane's partial work: run
+> the build script (log name = the lane) and finish to green against its brief, or
+> `git checkout -- iris` and redo from the brief.
 >
-> ORDER AFTER E2-C (each a green gate, then audit/commit/push): E2-L (link in place: three fires;
-> §4) → E2-W (write: dispatch the AU write for inode fds, raw step premise on the non-AU write, the
+> ORDER AFTER E2-L (each a green gate, then audit/commit/push): E2-W (write: dispatch the AU write for inode fds, raw step premise on the non-AU write, the
 > short-chunk arm's state fire — Q-i: "a bug in the sys_write spec, fix it; the spec may be
 > non-deterministic"; §7) → E2-X (delete the dead non-AU unlink walk, non-AU mknod, non-AU open's
 > create arm, `so_stores`; Q-f; §1) → E2-Z (ProofIlock's claim and EscrowDeposit's free become
@@ -263,6 +261,39 @@ Three measured facts that shape everything below:
   ProofCreateAUF, ProofSysMkdir, ProofSysMknod, ProofSysMknodAU, ProofSysMknodAUEraStable,
   ProofSysOpen, ProofSysOpenAUCreArm, ProofSysOpenAUEntryC, ProofSysOpenAUFull, ProofSyscall,
   FsSyscalls.
+
+## E2-L AS BUILT (landed 2026-09-07; 6 iris files + new FsAbsLinkFire.v + _CoqProject; green, 13 axioms, both audited statements untouched)
+
+- `SpecSysLink.v` (Q-c, strengthened in place): `link_tgt_ok c` (a named predicate: not a dir;
+  `link_tgt_ok_not_dir` bridges ARM C's guard); the commits `ltgt_commit_at Γ E Φtgt` (premises
+  `arow_at (abs_view I) t a`, `link_tgt_ok (an_node a)`, `is_Some (I !! t)`; step
+  `delta_link_tgt t a`) and `lent_commit_at Γ E Φent` (parent dir row, `ents !! nm = None`; step
+  `delta_link_ent d nm t`); instant 3 IS `SpecSysUnlinkAU.utgt_commit_at`, reused verbatim (no
+  `luntgt_*` commit or fire exists).  Bundle `link_commits Γ Φtgt Φent Φuntgt`; receipts
+  `ltgt_fired`, `lent_fired`, `luntgt_fired` (pre-row EXISTENTIAL `av !! t = Some a` — the `bad:`
+  path re-ilocks after `iunlock`, so the row instant 1 bumped is not what instant 3 reads: a
+  DEVIATION from the brief's `an_nlink a + 1` row, which is unprovable); `link_arms` (ret 0: tgt +
+  ent fired, untgt back; ret −1: nothing fired ∨ the tgt/untgt pair with ent back) with the intro
+  forms `link_arms_none/_undone/_ok` and `link_arms_ret` (implies `sys_link_ret`, which is KEPT in
+  the post beside the arms — mkdir's shape); `link_commits_unit` (beside the definitions);
+  `wp_sys_link_sconf`/`SYSLINK` take `Φtgt Φent Φuntgt`, the premise `link_commits`, and the post
+  gains `link_arms … (mf !!! a0)`.
+- NEW `FsAbsLinkFire.v` (listed after FsAbsUnlinkFire, above FsAbsInvFire — it needs
+  `uf_utgt_fire`/`uf_nlink_row`/`uf_nd_top`): `lf_era_type/_not_dir`, `lf_inum_nz` (E2-L0's
+  payoff), `lf_nlink_row` (`uf_nlink_row` at +1), `lf_tgt_delta`, `lf_parent_row` (the `abs_of`
+  wrap of `dir_entries_dirlink_ins`); fires `lf_tgt_fire` (premises `inode_local`, `fn_type nt <>
+  0`, `link_tgt_ok`, the +1 row) and `lf_ent_fire` (parent dir, `fn_nlink np <> 0`, name absent,
+  post row); site #4 applies `uf_utgt_fire` directly.  `FsAbsInvFire.fsabs_link_pre` wraps the
+  unit; ProofSyscall's link arm passes three `True` families + it.
+- SITES: #28 ProofSysLink.v:1999 `lf_tgt_fire` (receipt threaded to all seven post-bump exits);
+  #29 ProofSysLink.v:3233 (ARM G) `lf_ent_fire`; #4 ProofSysLinkTails.v:1481 (`sl_tail_bad`)
+  `uf_utgt_fire`; `sl_tail_bad/_f/_e2` gained the `Φuntgt` binder, the `utgt_commit_at` premise
+  and the `luntgt_fired` continuation argument (`sl_tail_b/c/d` branch above the bump: untouched).
+  `ireg_top_retag_same` stays at ProofSysLink.v:3753 (the empty-append arm, view-preserving).  No
+  `Logic.I`/`top_move` argument is left in the link files.
+- Proof surprise (durable-notes' "widths that differ only up to conversion"): two `lia`s at
+  `Z.to_nat (bv_unsigned (di_nlink dn) + 1)` see the `mword 16` and `bv 16` spellings of the
+  same `bv_unsigned` as distinct atoms; proved by `Z2Nat.inj_add`/`Z2Nat.id` at one spelling.
 
 ## 1. The 22 sites: view change, dispatcher arm, twin, liveness
 
