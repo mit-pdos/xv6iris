@@ -362,7 +362,7 @@ Section ProofSysWrite.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): filewrite
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hcaps #Htbl Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hcaps #Htbl #Hastep Hcont".
     (* THE DEVICE COLUMN, PROJECTED out of the console table.  The CAPS are
        separate -- consolewrite drives the UART, so they are [dev_inv] and
        the tx lock, both from [printk_env] -- and both halves are persistent,
@@ -965,7 +965,7 @@ Section ProofSysWrite.
                 S4 (av - 6)%nat eb (sys_rw_count v2) b lks
                 ltac:(lia) Hkk Hj Hgs Hlens
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
-                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hprow").
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hprow Hastep").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".

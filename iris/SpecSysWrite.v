@@ -224,6 +224,12 @@ Definition wp_sys_write_sconf_body
   filewrite_fs_env γf fn -∗
   filewrite_dev_caps fn -∗
   ConsoleInv.devsw_table -∗
+  (* THE APPLICATION'S RAW WRITE STEP (round E2, lane E2-W), threaded down
+     to filewrite's FD_INODE arm, where the chunk retag pays the
+     application's claim with it instead of the parked blanket license.
+     Persistent; a dispatcher holding [AppInv.app_inv] supplies it in one
+     fupd ([SpecFilewrite.fw_app_write_step_acc]). *)
+  fw_app_write_step -∗
   (* THE CROSSING IS THE LITERAL [true]: filewrite parks. *)
   wp_next true pj (fun (CID : CpuId) =>
   (* write() does not write user memory -- filewrite only READS the user

@@ -42,11 +42,16 @@
       resident cell from the returned half ([FileOffCell.off_resident_of])
       at the word [fw_offupd] now pins.
 
-   4. THE FIRE IS KEYED ON [rz = c] -- the chunk was FULL, so writei's
-      [dist] is 0 and the bytes really are the splice; a SHORT chunk
-      ([0 < rz < c]) spends the chain's PARTIAL arm instead (the offset
-      moved, the row retags plainly, no receipt; [x] becomes 1 and the loop
-      exits), and writei's -1 / 0 move nothing.
+   4. THE FULL FIRE IS KEYED ON [rz = c] -- the chunk was FULL, so writei's
+      [dist] is 0 and the bytes really are the splice.  OFF THAT KEY THE
+      ROW STILL MOVES (round E2, lane E2-W; ruling Q-i): a chunk that
+      stopped short landed the bytes it counted PLUS the visible part of
+      writei's disturbed tail ([FsAbsWriteFire.wrf_landed]), so it spends
+      the chain's PARTIAL arm, which is now a two-phase fire like the full
+      one -- receipt and all -- with [f->off] advancing by the COUNT rather
+      than by the run ([x] becomes 1 and the loop exits).  Only two cases
+      spend no node: writei's [-1] (nothing ran) and a chunk that landed
+      nothing at all; both are [_same].
       [wri_pre]'s other side condition, [off <= length bs0], is not a key
       but a READING: [SpecWritei]'s success arm reports [off <= di_size] of
       the pre-write record (owner's ruling, 2026-08-29), so [Hjoin] carries
@@ -1053,6 +1058,7 @@ Require Import FsAbsWriteFire.     (* the fire, the splice bridge, item 4  *)
 Require Import SpecSysWriteAUEra.  (* [write_arms_at]                      *)
 Require Import SpecCopyin.         (* [ubytes_at], [add_vec_moi_comm]      *)
 Require Import SpecFilewriteAU.    (* the contract this file seals         *)
+Require Import FsAbsDelta.         (* [blk_splice_nil], [delta_write]      *)
 Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)              *)
 
 Module FilewriteAUProof (Ilock : ILOCK) (Writei : WRITEI)
@@ -2688,13 +2694,20 @@ Section ProofFilewriteAU.
                  does: [wrf_write_row] wants the SPLICE, hence [tot] and
                  hence [wi_dinode], and it wants [wri_pre]'s own side
                  condition [off <= length bs0], which is the arm's EOF
-                 guard read at the pre-write record.  Guarded by [0 < rz],
-                 which is exactly "we are not on writei's [-1] arm". *)
-              /\ ((0 < rz)%Z ->
+                 guard read at the pre-write record.  Guarded by [0 <= rz],
+                 which is exactly "we are not on writei's [-1] arm" -- a
+                 ZERO-count success may still have moved the row, since
+                 writei COMMITS a chunk whose copy failed part-way (round
+                 E2, lane E2-W; ruling Q-i). *)
+              /\ ((0 <= rz)%Z ->
                   rz = Z.of_nat tot
                   /\ dn' = wi_dinode dnl bm' (Z.to_nat (bv_unsigned v)) tot
                   /\ (Z.to_nat (bv_unsigned v)
-                      <= Z.to_nat (bv_unsigned (di_size dnl)))%nat)).
+                      <= Z.to_nat (bv_unsigned (di_size dnl)))%nat)
+              (* ...and the -1 arm's: NOTHING moved, which is what makes
+                 that retag a [_same]. *)
+              /\ ((rz < 0)%Z ->
+                  bm' = bml /\ data' = datal /\ dn' = dnl)).
     { destruct Harms as
         [(Hm1 & _ & Htot0 & _ & Hbmq & Hdataq & Hdnq & Hdn0q & _)
         | (Hcnt2 & Hoffle & Htotle & Hdnq & Hdn0q)].
@@ -2712,6 +2725,7 @@ Section ProofFilewriteAU.
         + reflexivity.
         + reflexivity.
         + intros Hp. exfalso. lia.
+        + intros _. split_and!; reflexivity.
       - exists (Z.of_nat tot). subst dn' dn0'.
         assert (Htotc : (Z.of_nat tot <= c)%Z)
           by (rewrite -Hcz; apply Nat2Z.inj_le; exact Htotle).
@@ -2743,9 +2757,10 @@ Section ProofFilewriteAU.
         + reflexivity.
         + intros _. split_and!; [reflexivity | reflexivity |].
           (* the EOF guard, off the arm and at the pre-write record *)
-          lia. }
+          lia.
+        + intros Hneg. exfalso. lia. }
     destruct Hjoin as (rz & Hrza0 & Hrzr & Hrzadv & Hiok2 & Hdok2 & Htyq & Hnlq
-                       & Hdn0q & Hsucc).
+                       & Hdn0q & Hsucc & Hfailq).
     (* the RESOURCE twin of [Hdok2] (design §20.3).  filewrite cannot reach a
        T_DIR inode -- sys_open refuses writable directories, which is what
        [Hnodir] records -- so the twin is [emp] at the record writei
@@ -2834,11 +2849,14 @@ Section ProofFilewriteAU.
        [f->off <= ip->size], is not a second key -- writei's success arm
        reports it and [Hsucc] hands it over (file header, difference 4).
 
-       Off the key the offset is what decides: a SHORT chunk ([0 < rz < c])
-       moved [f->off] by [rz] and spends the chain's PARTIAL arm (the fs
-       row retags plainly; there is no receipt); writei's -1 and 0 move
-       nothing and the carried state does not move either.  The three
-       cases are what the tag below records for the exits.
+       OFF THE KEY THE ROW STILL MOVES (round E2, lane E2-W; ruling Q-i).
+       A chunk that stopped short landed the bytes it COUNTED plus the
+       visible part of writei's disturbed tail ([FsAbsWriteFire.wrf_landed]),
+       so it spends the chain's PARTIAL arm -- a two-phase fire like the
+       full one, receipt and all, differing only in that [f->off] advances
+       by the count rather than by the run.  Two cases spend no node and
+       are honestly [_same]: writei's [-1] (nothing ran) and a chunk that
+       landed nothing at all.  The tag below records which, for the exits.
 
        THE OFFSET HALF comes out of every case at the word [fw_offupd]
        left in the cell ([Hv2]), which is what the checkin re-forms the
@@ -2849,8 +2867,8 @@ Section ProofFilewriteAU.
                        (era_node dn' bm' data')
              ∗ off_gv γo0 (1/2) (bv_unsigned v2)
              ∗ ∃ (tf : Z) (pf xf : nat),
-                 ⌜(tf = t /\ pf = p /\ xf = 0%nat /\ (rz <= 0)%Z)
-                  \/ (tf = t /\ pf = p /\ xf = 1%nat /\ (0 < rz < c)%Z)
+                 ⌜(tf = t /\ pf = p /\ xf = 0%nat /\ (rz < c)%Z)
+                  \/ (tf = t /\ pf = p /\ xf = 1%nat /\ (rz < c)%Z)
                   \/ (tf = (t + c)%Z /\ pf = S p /\ xf = 0%nat /\ rz = c)⌝
                  ∗ fw_au_raw (fs_gamma_L fsc_fs) nx γx n (us_M U) (m !!! Regidx Ra1) Φw tf pf xf)%I
       with "[Htop Hau Hgv]" as ">(Htop & Hgv & Hst)".
@@ -2858,7 +2876,7 @@ Section ProofFilewriteAU.
       destruct (decide (rz = c)) as [Hfc | Hnokey].
       - (* ---- THE CHUNK FIRES ---- *)
         assert (Hrzpos : (0 < rz)%Z) by (zlia Hfc Hcrange).
-        destruct (Hsucc Hrzpos) as (Hrztot & Hdnwi & Hfo).
+        destruct (Hsucc ltac:(zlia Hrzpos)) as (Hrztot & Hdnwi & Hfo).
         assert (Htotc : (tot = Z.to_nat c)%nat) by (zlia Hfc Hrztot).
         assert (Hd0 : dist = 0%nat) by (apply Hdistn; exact Htotc).
         assert (Htotpos : (0 < tot)%nat) by (zlia Htotc Hcrange).
@@ -2975,42 +2993,189 @@ Section ProofFilewriteAU.
                        (fn_nlink (era_node dnl bml datal)) with "[] []");
           [iPureIntro; exact Hpre | iPureIntro; exact Hchunkb |].
         rewrite -Hlenc. iApply ("Hback" with "HΦ Htail").
-      - (* ---- THE CHUNK DOES NOT FIRE: the landed retag, unchanged ---- *)
-        iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned inum)
-                (era_node dnl bml datal) (era_node dn' bm' data')
-                ltac:(solve_ndisj) Logic.I Hlocw with "[] [] Htop") as "Htop";
-          [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
-        destruct (decide (0 < rz)%Z) as [Hrzpos | Hrzle].
-        + (* ---- ...BUT THE OFFSET MOVED: the SHORT chunk spends the
-             chain's partial arm ---- *)
-          assert (Htge0 : (0 <= t)%Z) by (zlia Htiz Hiz).
-          assert (Htltn : (t < n)%Z) by (zlia Htiz Hiz).
-          iDestruct (fw_au_raw_spend_part (fs_gamma_L fsc_fs) (bv_unsigned inum) γx n
-                       (us_M U) (m !!! Regidx Ra1) Φw t p Htge0 Htltn Hmul with "Hau")
-            as "[Hpart Hback]".
-          iMod (wrf_partial_move ⊤ γx _ (Z.to_nat (bv_unsigned v)) (Z.to_nat rz)
-                  ltac:(solve_ndisj) with "Hpart [Hgv]") as "[Hgv Htail]";
-            [rewrite Hgxo Hoffz; iExact "Hgv" |].
+      - (* ---- THE CHUNK DOES NOT FIRE IN FULL ---------------------------
+           ROUND E2, LANE E2-W (ruling Q-i): AND THE ROW STILL MOVED.  This
+           arm used to take [ireg_top_retag_auto] and pay only the offset,
+           which is the contract hole the lane closes: writei COMMITS a
+           chunk whose [either_copyin] failed part-way, so what landed at
+           [f->off] is the bytes it COUNTED plus the visible part of its
+           DISTURBED TAIL ([FsAbsWriteFire.wrf_landed]; [SpecWritei]'s
+           [dist <= BSIZE] is what bounds it).  The chain's PARTIAL arm
+           fires at that run -- NON-DETERMINISTIC in the bytes -- while the
+           offset advances only by the count.
+
+           TWO ARMS DO NOT SPEND A NODE, and both are honestly [_same]: on
+           writei's [-1] nothing ran at all, and a chunk that landed NOTHING
+           leaves the view where it was. ---- *)
+        destruct (decide (0 <= rz)%Z) as [Hrzge | Hrzneg].
+        + (* ---- WRITEI RAN (short, possibly counting nothing) ---- *)
+          destruct (Hsucc Hrzge) as (Hrztot & Hdnwi & Hfo).
+          assert (Hcapt : (Z.to_nat (bv_unsigned v) + tot <= MAXFILE * BSIZE)%nat)
+            by (zlia Hrzadv Hrztot Hoffz Hmb).
+          assert (Hszb' : (Z.to_nat (bv_unsigned (di_size dnl))
+                           <= MAXFILE * BSIZE)%nat) by (zlia Hszb Hmb).
+          assert (Hoff32 : (Z.of_nat (Z.to_nat (bv_unsigned v) + tot)
+                            < 2 ^ 32)%Z).
+          { change (2 ^ 32)%Z with 4294967296%Z. zlia Hcapt Hmb. }
+          assert (Hszwi : Z.to_nat (bv_unsigned (di_size dn'))
+                    = Nat.max (Z.to_nat (bv_unsigned v) + tot)
+                              (Z.to_nat (bv_unsigned (di_size dnl))))
+            by (rewrite Hdnwi; exact (wrf_wi_size dnl bm'
+                  (Z.to_nat (bv_unsigned v)) tot Hoff32)).
+          assert (Hnzl : fn_type (era_node dnl bml datal) <> 0)
+            by exact (opf_era_file_typed dnl bml datal Htyfile).
+          assert (Hrowl : abs_row (era_node dnl bml datal)
+                    = MkAnode (AFile (fn_file_bytes (era_node dnl bml datal)))
+                              (fn_nlink (era_node dnl bml datal)))
+            by exact (opf_era_file_row dnl bml datal Htyfile).
+          assert (Htyfile' : bv_unsigned (di_type dn') = FsImg.T_FILE_z)
+            by (rewrite Htyq; exact Htyfile).
+          assert (Hnz' : fn_type (era_node dn' bm' data') <> 0)
+            by exact (opf_era_file_typed dn' bm' data' Htyfile').
+          assert (Hrow' : abs_row (era_node dn' bm' data')
+                    = MkAnode (AFile (blk_splice (Z.to_nat (bv_unsigned v))
+                                        (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist)
+                                        (fn_file_bytes (era_node dnl bml datal))))
+                              (fn_nlink (era_node dnl bml datal)))
+            by exact (wrf_write_row_dist dnl dn' bml bm' datal data'
+                        (Z.to_nat (bv_unsigned v)) tot dist wrote dstb
+                        Htyfile Htyq Hnlq Hholes Hholes2 Hszwi Hfo Hcapt Hszb'
+                        ltac:(intros kk _; exact (Hrange kk))).
+          assert (Hbslen : length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist)
+                    = (tot + Nat.min dist
+                         (Z.to_nat (bv_unsigned (di_size dnl))
+                          - (Z.to_nat (bv_unsigned v) + tot)))%nat)
+            by apply wrf_landed_length.
+          assert (Hbs0len : length (fn_file_bytes (era_node dnl bml datal))
+                    = Z.to_nat (bv_unsigned (di_size dnl)))
+            by (rewrite (wrf_era_bytes dnl bml datal); apply wrf_fb_length).
+          destruct (decide (0 < length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist))%nat) as [Hbspos | Hbsz].
+          * (* ---- THE PARTIAL NODE FIRES, at the run that landed ---- *)
+            assert (Htge0 : (0 <= t)%Z) by (zlia Htiz Hiz).
+            assert (Htltn : (t < n)%Z) by (zlia Htiz Hiz).
+            assert (Hoffbs : (Z.to_nat (bv_unsigned v)
+                      <= length (fn_file_bytes (era_node dnl bml datal)))%nat)
+              by (rewrite Hbs0len; exact Hfo).
+            assert (Hcapbs : (Z.to_nat (bv_unsigned v)
+                      + length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist) <= MAXFILE * BSIZE)%nat)
+              by (rewrite Hbslen; zlia Hcapt Hszb').
+            assert (Hrle : (Z.to_nat rz <= length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist))%nat)
+              by (rewrite Hbslen; zlia Hrztot).
+            assert (Hgap : (length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist) <= Z.to_nat rz + BSIZE)%nat)
+              by (rewrite Hbslen; zlia Hrztot Hdist).
+            iDestruct (fw_au_raw_spend_part (fs_gamma_L fsc_fs)
+                         (bv_unsigned inum) γx n
+                         (us_M U) (m !!! Regidx Ra1) Φw t p Htge0 Htltn Hmul
+                         with "Hau") as "[Hpart Hback]".
+            iMod (wrf_apart_fire fsc_fs ⊤ (bv_unsigned inum) γx p Φw _
+                    (Z.to_nat (bv_unsigned v)) (Z.to_nat rz)
+                    (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist)
+                    (fn_file_bytes (era_node dnl bml datal))
+                    (fn_nlink (era_node dnl bml datal))
+                    (era_node dnl bml datal) (era_node dn' bm' data')
+                    ltac:(solve_ndisj) Hlocw Hbspos Hoffbs Hcapbs Hrle Hgap
+                    Hnzl Hrowl Hnz' Hrow'
+                    with "[] [] Hpart Htop [Hgv]")
+              as "(Htop & Hgv & Htail & Hrec)";
+              [iApply (ireg_inv_ftop with "Hireg")
+              | iApply (ireg_inv_app with "Hireg")
+              | rewrite Hgxo Hoffz; iExact "Hgv" |].
+            iDestruct "Hrec" as (av) "[%Hpre HΦ]".
+            iModIntro. iFrame "Htop".
+            iSplitL "Hgv".
+            { (* the offset advances by the COUNT, which may be zero *)
+              destruct (decide (0 < rz)%Z) as [Hrzpos | Hrzz].
+              - destruct Hv2 as [[Hrzle _] | [_ Hv2']];
+                  [exfalso; zlia Hrzle Hrzpos |].
+                rewrite Hv2' moi32_unsigned bvw32_small;
+                  [| split; [zlia Hvr Hrzpos
+                            | change (2 ^ 32)%Z with 4294967296%Z;
+                              zlia Hrzadv Hmb]].
+                assert (Hrzid : Z.of_nat (Z.to_nat rz) = rz)
+                  by (apply Z2Nat.id; zlia Hrzpos).
+                iEval (rewrite Hgxo Nat2Z.inj_add Hoffz Hrzid) in "Hgv".
+                iExact "Hgv".
+              - destruct Hv2 as [[_ Hv2'] | [Hpos _]];
+                  [| exfalso; zlia Hpos Hrzz].
+                assert (Hrzz0 : Z.to_nat rz = 0%nat) by (zlia Hrzge Hrzz).
+                rewrite Hv2'.
+                iEval (rewrite Hgxo Hrzz0 Nat.add_0_r Hoffz) in "Hgv".
+                iExact "Hgv". }
+            iExists t, p, 1%nat.
+            iSplitR; [iPureIntro; right; left; split_and!;
+                      [reflexivity | reflexivity | reflexivity
+                      | zlia Hrzr Hnokey] |].
+            iApply ("Hback" $! av (Z.to_nat (bv_unsigned v)) (Z.to_nat rz)
+                      (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist)
+                      (fn_file_bytes (era_node dnl bml datal))
+                      (fn_nlink (era_node dnl bml datal))
+                      with "[] [] [] HΦ Htail");
+              [iPureIntro; exact Hpre | iPureIntro; exact Hrle
+              | iPureIntro; exact Hgap].
+          * (* ---- NOTHING LANDED: the view does not move ---- *)
+            assert (Hlen0 : length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist) = 0%nat) by (zlia Hbsz).
+            assert (Hnil : (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist) = []) by (apply nil_length_inv; exact Hlen0).
+            assert (Hnlq' : fn_nlink (era_node dn' bm' data')
+                            = fn_nlink (era_node dnl bml datal))
+              by (rewrite /fn_nlink !era_node_rec Hnlq //).
+            assert (Hsame : FsAbsDefs.abs_of (era_node dnl bml datal)
+                            = FsAbsDefs.abs_of (era_node dn' bm' data')).
+            { rewrite (abs_of_counted _ Hnzl) (abs_of_counted _ Hnz')
+                      Hnlq' Hrowl Hrow' Hnil blk_splice_nil //. }
+            iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned inum)
+                    (era_node dnl bml datal) (era_node dn' bm' data')
+                    ltac:(solve_ndisj) Hsame Hlocw with "[] [] Htop") as "Htop";
+              [iApply (ireg_inv_ftop with "Hireg")
+              | iApply (ireg_inv_app with "Hireg") |].
+            assert (Hrz0 : (rz <= 0)%Z) by (zlia Hrztot Hbslen Hlen0).
+            iModIntro. iFrame "Htop".
+            iSplitL "Hgv".
+            { destruct Hv2 as [[_ Hv2'] | [Hpos _]]; [| exfalso; zlia Hpos Hrz0].
+              rewrite Hv2'. iExact "Hgv". }
+            iExists t, p, 0%nat.
+            iSplitR; [iPureIntro; left; split_and!;
+                      [reflexivity | reflexivity | reflexivity
+                      | zlia Hrzr Hnokey] |].
+            iExact "Hau".
+        + (* ---- WRITEI'S -1: the up-front guards failed, nothing ran ---- *)
+          destruct (Hfailq ltac:(zlia Hrzneg)) as (Hbmq & Hdataq & Hdnq).
+          assert (Hsame : FsAbsDefs.abs_of (era_node dnl bml datal)
+                          = FsAbsDefs.abs_of (era_node dn' bm' data'))
+            by (rewrite Hbmq Hdataq Hdnq; reflexivity).
+          iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned inum)
+                  (era_node dnl bml datal) (era_node dn' bm' data')
+                  ltac:(solve_ndisj) Hsame Hlocw with "[] [] Htop") as "Htop";
+            [iApply (ireg_inv_ftop with "Hireg")
+            | iApply (ireg_inv_app with "Hireg") |].
           iModIntro. iFrame "Htop".
           iSplitL "Hgv".
-          { destruct Hv2 as [[Hrzle _] | [_ Hv2']]; [exfalso; zlia Hrzle Hrzpos |].
-            rewrite Hv2' moi32_unsigned bvw32_small;
-              [| split; [zlia Hvr Hrzpos | change (2 ^ 32)%Z with 4294967296%Z;
-                                            zlia Hrzadv Hmb]].
-            assert (Hrzid : Z.of_nat (Z.to_nat rz) = rz) by (apply Z2Nat.id; zlia Hrzpos).
-            iEval (rewrite Hgxo Nat2Z.inj_add Hoffz Hrzid) in "Hgv". iExact "Hgv". }
-          iExists t, p, 1%nat.
-          iSplitR; [iPureIntro; right; left; split_and!;
-                    [reflexivity | reflexivity | reflexivity | zlia Hrzpos | zlia Hrzr Hnokey] |].
-          iApply ("Hback" with "Htail").
-        + (* ---- NOTHING MOVED: writei's -1 or 0 ---- *)
-          iModIntro. iFrame "Htop".
-          iSplitL "Hgv".
-          { destruct Hv2 as [[_ Hv2'] | [Hpos _]]; [| exfalso; zlia Hpos Hrzle].
+          { destruct Hv2 as [[_ Hv2'] | [Hpos _]];
+              [| exfalso; zlia Hpos Hrzneg].
             rewrite Hv2'. iExact "Hgv". }
           iExists t, p, 0%nat.
           iSplitR; [iPureIntro; left; split_and!;
-                    [reflexivity | reflexivity | reflexivity | zlia Hrzle] |].
+                    [reflexivity | reflexivity | reflexivity
+                    | zlia Hrzr Hnokey] |].
           iExact "Hau". }
     iDestruct "Hst" as (tf pf xf) "[%Hfire Hau]".
     (* ---- CHECK IN the cell: the half came back at exactly its word ---- *)

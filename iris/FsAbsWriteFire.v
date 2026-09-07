@@ -45,9 +45,11 @@
    commits -- each would have to own the half -- and the bundle is a CHAIN
    ([awrite_chain]): one node at a time, each node an [∧] of the FULL arm
    ([awrite_full_at], receipt + the rest of the chain) and the PARTIAL arm
-   ([awrite_part_at]: a short chunk advanced [f->off] by what it wrote,
-   with no receipt, and the chain resumes one node on).  The kernel picks
-   the arm; the partial arm ends the loop, so it is spent at most once.
+   ([awrite_part_at]: a SHORT chunk, whose row moved by the run that
+   LANDED -- the counted bytes plus writei's disturbed tail -- while
+   [f->off] advanced only by the count, receipted all the same).  The
+   kernel picks the arm; the partial arm ends the loop, so it is spent at
+   most once.
    Satisfiability is [awrite_chain_unit] (a client holding its half) and
    [FsAbsInvFire.fsabs_awrite_chain] (a client holding only the existential
    invariant).
@@ -94,9 +96,10 @@
    chunk that continues the loop is a FULL chunk with [dist = 0] and the
    short chunk that ends it is not fired at all (its bytes are simply not
    in [bss], and the fail arm's total falls short by exactly that much) --
-   only its OFFSET move is paid, through the chain's partial arm.  This is
-   the one place the contract's honest silence about WHERE the loop died is
-   load-bearing.
+   its bytes are NOT the splice of the caller's chunk -- but it is not
+   silent either: the chain's PARTIAL arm fires at the run that really
+   landed ([wrf_landed]), which is what ruling Q-i asked for.  The
+   contract's honest silence is only about WHERE the loop died.
 
    ==== ITEM 4: THE INSTANT COUNT =======================================
 
@@ -189,11 +192,130 @@ Proof.
   rewrite Hs //.
 Qed.
 
+(* ---- THE LANDED RUN: THE WRITTEN CHUNK PLUS THE VISIBLE DISTURBANCE ---
+
+   writei's post admits a DISTURBED REGION of at most [BSIZE] bytes
+   immediately after the written range ([SpecWritei]'s [dist]/[dstb]): the
+   prefix of a chunk whose [either_copyin] faulted part-way, committed to
+   the log rather than stranded in the cache.  Those bytes are NOT counted
+   in [tot], but they ARE in the file -- as far as the new size reaches.
+   The new size is [max (off + tot) sz], so exactly
+   [min dist (sz - (off + tot))] of them are visible and the rest is past
+   EOF.  [wrf_landed] is what the row really became at [off], and it is
+   what makes the short chunk's state move STATABLE (round E2, ruling
+   Q-i): the delta is non-deterministic in these bytes, never silent about
+   them. *)
+Definition wrf_landed (wrote dstb : nat -> bv 8) (sz off tot dist : nat)
+    : list (bv 8) :=
+  (wrf_run wrote tot ++ wrf_run dstb (Nat.min dist (sz - (off + tot))))%list.
+
+Lemma wrf_run_0 (f : nat -> bv 8) : wrf_run f 0 = [].
+Proof. reflexivity. Qed.
+
+Lemma wrf_landed_length (wrote dstb : nat -> bv 8) (sz off tot dist : nat) :
+  length (wrf_landed wrote dstb sz off tot dist)
+  = (tot + Nat.min dist (sz - (off + tot)))%nat.
+Proof. rewrite /wrf_landed length_app !wrf_run_length //. Qed.
+
+(* the clean chunk's reading: no disturbance, so the landed run IS the
+   written run -- which is why [wrf_write_row] below is this file's
+   [_dist] form at [dist = 0] *)
+Lemma wrf_landed_0 (wrote dstb : nat -> bv 8) (sz off tot : nat) :
+  wrf_landed wrote dstb sz off tot 0 = wrf_run wrote tot.
+Proof.
+  rewrite /wrf_landed.
+  assert (Hm : Nat.min 0 (sz - (off + tot))%nat = 0%nat) by lia.
+  rewrite Hm wrf_run_0 app_nil_r //.
+Qed.
+
 (* ---- ITEM 2's PURE HEART: THE RANGE CLAUSE IS THE SPLICE ------------- *)
 
 (* The hypothesis is BOUNDED ([k] below the new size) on purpose: at the era
    node the pointwise reading only transports below [MAXFILE * BSIZE], which
    the file cap makes exactly the range this lemma consults. *)
+(* THE GENERAL FORM: writei's THREE-WAY range clause -- written run,
+   disturbed tail, unchanged -- IS the splice of the LANDED RUN.  The
+   hypothesis is BOUNDED ([k] below the new size) on purpose: at the era
+   node the pointwise reading only transports below [MAXFILE * BSIZE],
+   which the file cap makes exactly the range this lemma consults. *)
+Lemma wrf_file_bytes_splice_dist (data data' : nat -> list (bv 8))
+    (sz off tot dist : nat) (wrote dstb : nat -> bv 8) :
+  (off <= sz)%nat ->
+  (forall k : nat, (k < Nat.max (off + tot) sz)%nat ->
+     file_byte data' k
+     = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
+       then wrote (k - off)%nat
+       else if decide ((off + tot <= k)%nat /\ (k < off + tot + dist)%nat)
+            then dstb (k - (off + tot))%nat
+            else file_byte data k) ->
+  file_bytes data' (Nat.max (off + tot) sz)
+  = blk_splice off (wrf_landed wrote dstb sz off tot dist)
+      (file_bytes data sz).
+Proof.
+  intros Hoff Hbytes.
+  assert (Hsub : length (wrf_landed wrote dstb sz off tot dist)
+                 = (tot + Nat.min dist (sz - (off + tot)))%nat)
+    by apply wrf_landed_length.
+  assert (Hbs : length (file_bytes data sz) = sz) by apply wrf_fb_length.
+  assert (Hlen : length (blk_splice off (wrf_landed wrote dstb sz off tot dist)
+                           (file_bytes data sz))
+                 = Nat.max (off + tot) sz).
+  { rewrite (blk_splice_length_grow off (wrf_landed wrote dstb sz off tot dist)
+               (file_bytes data sz) ltac:(rewrite Hbs; exact Hoff)).
+    rewrite Hsub Hbs. lia. }
+  apply list_eq. intros j.
+  destruct (decide (j < Nat.max (off + tot) sz)%nat) as [Hj | Hj];
+    [| rewrite lookup_ge_None_2; [| rewrite wrf_fb_length; lia];
+       symmetry; apply lookup_ge_None_2; rewrite Hlen; lia].
+  rewrite (wrf_fb_lookup data' _ j Hj) (Hbytes j Hj).
+  destruct (decide (j < off)%nat) as [Hlt | Hge].
+  - rewrite (blk_splice_lookup_lt off (wrf_landed wrote dstb sz off tot dist)
+               (file_bytes data sz) j ltac:(rewrite Hbs; exact Hoff) Hlt).
+    rewrite (wrf_fb_lookup data sz j ltac:(lia)).
+    destruct (decide ((off <= j)%nat /\ (j < off + tot)%nat)) as [[H1 _] | _];
+      [lia |].
+    destruct (decide ((off + tot <= j)%nat /\ (j < off + tot + dist)%nat))
+      as [[H2 _] | _]; [lia | reflexivity].
+  - destruct (decide (j < off + tot)%nat) as [Hmid | Hgi].
+    + rewrite (blk_splice_lookup_mid off (wrf_landed wrote dstb sz off tot dist)
+                 (file_bytes data sz) j ltac:(rewrite Hbs; exact Hoff)
+                 ltac:(lia) ltac:(rewrite Hsub; lia)).
+      rewrite /wrf_landed lookup_app_l;
+        [| rewrite (wrf_run_length wrote tot); lia].
+      rewrite (wrf_run_lookup wrote tot (j - off)%nat ltac:(lia)).
+      destruct (decide ((off <= j)%nat /\ (j < off + tot)%nat)) as [_ | Hno];
+        [reflexivity | exfalso; apply Hno; lia].
+    + destruct (decide (j < off + tot
+                          + Nat.min dist (sz - (off + tot)))%nat)
+        as [Hmid2 | Hgi2].
+      * rewrite (blk_splice_lookup_mid off
+                   (wrf_landed wrote dstb sz off tot dist)
+                   (file_bytes data sz) j ltac:(rewrite Hbs; exact Hoff)
+                   ltac:(lia) ltac:(rewrite Hsub; lia)).
+        rewrite /wrf_landed lookup_app_r;
+          [| rewrite (wrf_run_length wrote tot); lia].
+        rewrite (wrf_run_length wrote tot).
+        replace (j - off - tot)%nat with (j - (off + tot))%nat by lia.
+        rewrite (wrf_run_lookup dstb (Nat.min dist (sz - (off + tot)))
+                   (j - (off + tot))%nat ltac:(lia)).
+        destruct (decide ((off <= j)%nat /\ (j < off + tot)%nat))
+          as [[_ H2] | _]; [lia |].
+        destruct (decide ((off + tot <= j)%nat /\ (j < off + tot + dist)%nat))
+          as [_ | Hno]; [reflexivity | exfalso; apply Hno; lia].
+      * rewrite (blk_splice_lookup_ge off
+                   (wrf_landed wrote dstb sz off tot dist)
+                   (file_bytes data sz) j ltac:(rewrite Hbs; exact Hoff)
+                   ltac:(rewrite Hsub; lia)).
+        rewrite (wrf_fb_lookup data sz j ltac:(lia)).
+        destruct (decide ((off <= j)%nat /\ (j < off + tot)%nat))
+          as [[_ H2] | _]; [lia |].
+        destruct (decide ((off + tot <= j)%nat /\ (j < off + tot + dist)%nat))
+          as [[_ H3] | _]; [lia | reflexivity].
+Qed.
+
+(* ---- ITEM 2's PURE HEART: THE RANGE CLAUSE IS THE SPLICE ------------- *)
+
+(* the CLEAN chunk's reading, the general form at [dist = 0]. *)
 Lemma wrf_file_bytes_splice (data data' : nat -> list (bv 8))
     (sz off tot : nat) (wrote : nat -> bv 8) :
   (off <= sz)%nat ->
@@ -206,38 +328,13 @@ Lemma wrf_file_bytes_splice (data data' : nat -> list (bv 8))
   = blk_splice off (wrf_run wrote tot) (file_bytes data sz).
 Proof.
   intros Hoff Hbytes.
-  assert (Hsub : length (wrf_run wrote tot) = tot) by apply wrf_run_length.
-  assert (Hbs : length (file_bytes data sz) = sz) by apply wrf_fb_length.
-  assert (Hlen : length (blk_splice off (wrf_run wrote tot)
-                           (file_bytes data sz))
-                 = Nat.max (off + tot) sz).
-  { rewrite (blk_splice_length_grow off (wrf_run wrote tot)
-               (file_bytes data sz) ltac:(rewrite Hbs; exact Hoff)).
-    rewrite Hsub Hbs //. }
-  apply list_eq. intros j.
-  destruct (decide (j < Nat.max (off + tot) sz)%nat) as [Hj | Hj];
-    [| rewrite lookup_ge_None_2; [| rewrite wrf_fb_length; lia];
-       symmetry; apply lookup_ge_None_2; rewrite Hlen; lia].
-  rewrite (wrf_fb_lookup data' _ j Hj) (Hbytes j Hj).
-  destruct (decide (j < off)%nat) as [Hlt | Hge].
-  - rewrite (blk_splice_lookup_lt off (wrf_run wrote tot) (file_bytes data sz)
-               j ltac:(rewrite Hbs; exact Hoff) Hlt).
-    rewrite (wrf_fb_lookup data sz j ltac:(lia)).
-    destruct (decide ((off <= j)%nat /\ (j < off + tot)%nat)) as [[H1 _] | _];
-      [lia | reflexivity].
-  - destruct (decide (j < off + tot)%nat) as [Hmid | Hgi].
-    + rewrite (blk_splice_lookup_mid off (wrf_run wrote tot)
-                 (file_bytes data sz) j ltac:(rewrite Hbs; exact Hoff)
-                 ltac:(lia) ltac:(rewrite Hsub; lia)).
-      rewrite (wrf_run_lookup wrote tot (j - off)%nat ltac:(lia)).
-      destruct (decide ((off <= j)%nat /\ (j < off + tot)%nat)) as [_ | Hno];
-        [reflexivity | exfalso; apply Hno; lia].
-    + rewrite (blk_splice_lookup_ge off (wrf_run wrote tot)
-                 (file_bytes data sz) j ltac:(rewrite Hbs; exact Hoff)
-                 ltac:(rewrite Hsub; lia)).
-      rewrite (wrf_fb_lookup data sz j ltac:(lia)).
-      destruct (decide ((off <= j)%nat /\ (j < off + tot)%nat)) as [[_ H2] | _];
-        [lia | reflexivity].
+  rewrite -(wrf_landed_0 wrote wrote sz off tot).
+  apply (wrf_file_bytes_splice_dist data data' sz off tot 0 wrote wrote Hoff).
+  intros k Hk. rewrite (Hbytes k Hk).
+  destruct (decide ((off <= k)%nat /\ (k < off + tot)%nat)) as [_ | _];
+    [reflexivity |].
+  destruct (decide ((off + tot <= k)%nat /\ (k < off + tot + 0)%nat))
+    as [[H1 H2] | _]; [lia | reflexivity].
 Qed.
 
 (* ---- THE ERA NODE's TRANSPORT --------------------------------------- *)
@@ -293,6 +390,65 @@ Qed.
    payloads normalise their holes, the size grew to the [max], the range
    clause is writei's own (with [dist = 0], see the header), and the start
    is inside the old bytes. *)
+(* THE GENERAL FORM (round E2, lane E2-W): the row at ANY writei outcome,
+   disturbed tail included.  [wrf_write_row] below is this at [dist = 0] --
+   the clean chunk the loop continues on. *)
+Lemma wrf_write_row_dist `{XI : TsoCtx.CurCtx} (dn dn' : dinode)
+    (bm bm' : blkmap) (data data' : nat -> list (bv 8))
+    (off tot dist : nat) (wrote dstb : nat -> bv 8) :
+  bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
+  di_type dn' = di_type dn ->
+  di_nlink dn' = di_nlink dn ->
+  blk_holes_zero bm data ->
+  blk_holes_zero bm' data' ->
+  Z.to_nat (bv_unsigned (di_size dn'))
+    = Nat.max (off + tot) (Z.to_nat (bv_unsigned (di_size dn))) ->
+  (off <= Z.to_nat (bv_unsigned (di_size dn)))%nat ->
+  (off + tot <= MAXFILE * BSIZE)%nat ->
+  (Z.to_nat (bv_unsigned (di_size dn)) <= MAXFILE * BSIZE)%nat ->
+  (forall k : nat, (k < MAXFILE * BSIZE)%nat ->
+     file_byte data' k
+     = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
+       then wrote (k - off)%nat
+       else if decide ((off + tot <= k)%nat /\ (k < off + tot + dist)%nat)
+            then dstb (k - (off + tot))%nat
+            else file_byte data k) ->
+  abs_row (era_node dn' bm' data')
+  = MkAnode (AFile (blk_splice off
+                      (wrf_landed wrote dstb
+                         (Z.to_nat (bv_unsigned (di_size dn))) off tot dist)
+                      (fn_file_bytes (era_node dn bm data))))
+            (fn_nlink (era_node dn bm data)).
+Proof.
+  intros Hty Hty' Hnl' Hh Hh' Hsz' Hoff Hcap Hcap0 Hrange.
+  assert (Hty2 : bv_unsigned (di_type dn') = FsImg.T_FILE_z)
+    by (rewrite Hty'; exact Hty).
+  assert (Hnl : fn_nlink (era_node dn' bm' data')
+                = fn_nlink (era_node dn bm data))
+    by (rewrite /fn_nlink !era_node_rec Hnl' //).
+  assert (Hb : fn_file_bytes (era_node dn' bm' data')
+               = blk_splice off
+                   (wrf_landed wrote dstb
+                      (Z.to_nat (bv_unsigned (di_size dn))) off tot dist)
+                   (fn_file_bytes (era_node dn bm data))).
+  { rewrite (wrf_era_bytes dn' bm' data') (wrf_era_bytes dn bm data) Hsz'.
+    apply (wrf_file_bytes_splice_dist (fn_data (era_node dn bm data))
+             (fn_data (era_node dn' bm' data'))
+             (Z.to_nat (bv_unsigned (di_size dn))) off tot dist wrote dstb
+             Hoff).
+    intros k Hk.
+    assert (Hkb : (k < MAXFILE * BSIZE)%nat) by lia.
+    rewrite (wrf_era_file_byte dn' bm' data' k Hh' Hkb)
+            (wrf_era_file_byte dn bm data k Hh Hkb).
+    exact (Hrange k Hkb). }
+  rewrite (opf_era_file_row dn' bm' data' Hty2) Hb Hnl //.
+Qed.
+
+(* The premises are exactly what filewrite's inode arm holds when writei
+   returns on its success arm with a CLEAN chunk: the record's type is
+   [T_FILE], the two payloads normalise their holes, the size grew to the
+   [max], the range clause is writei's own at [dist = 0] (see the header),
+   and the start is inside the old bytes. *)
 Lemma wrf_write_row `{XI : TsoCtx.CurCtx} (dn dn' : dinode) (bm bm' : blkmap)
     (data data' : nat -> list (bv 8)) (off tot : nat) (wrote : nat -> bv 8) :
   bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
@@ -316,24 +472,15 @@ Lemma wrf_write_row `{XI : TsoCtx.CurCtx} (dn dn' : dinode) (bm bm' : blkmap)
             (fn_nlink (era_node dn bm data)).
 Proof.
   intros Hty Hty' Hnl' Hh Hh' Hsz' Hoff Hcap Hcap0 Hrange.
-  assert (Hty2 : bv_unsigned (di_type dn') = FsImg.T_FILE_z)
-    by (rewrite Hty'; exact Hty).
-  assert (Hnl : fn_nlink (era_node dn' bm' data')
-                = fn_nlink (era_node dn bm data))
-    by (rewrite /fn_nlink !era_node_rec Hnl' //).
-  assert (Hb : fn_file_bytes (era_node dn' bm' data')
-               = blk_splice off (wrf_run wrote tot)
-                   (fn_file_bytes (era_node dn bm data))).
-  { rewrite (wrf_era_bytes dn' bm' data') (wrf_era_bytes dn bm data) Hsz'.
-    apply (wrf_file_bytes_splice (fn_data (era_node dn bm data))
-             (fn_data (era_node dn' bm' data'))
-             (Z.to_nat (bv_unsigned (di_size dn))) off tot wrote Hoff).
-    intros k Hk.
-    assert (Hkb : (k < MAXFILE * BSIZE)%nat) by lia.
-    rewrite (wrf_era_file_byte dn' bm' data' k Hh' Hkb)
-            (wrf_era_file_byte dn bm data k Hh Hkb).
-    exact (Hrange k Hkb). }
-  rewrite (opf_era_file_row dn' bm' data' Hty2) Hb Hnl //.
+  rewrite -(wrf_landed_0 wrote wrote
+              (Z.to_nat (bv_unsigned (di_size dn))) off tot).
+  apply (wrf_write_row_dist dn dn' bm bm' data data' off tot 0 wrote wrote
+           Hty Hty' Hnl' Hh Hh' Hsz' Hoff Hcap Hcap0).
+  intros k Hk. rewrite (Hrange k Hk).
+  destruct (decide ((off <= k)%nat /\ (k < off + tot)%nat)) as [_ | _];
+    [reflexivity |].
+  destruct (decide ((off + tot <= k)%nat /\ (k < off + tot + 0)%nat))
+    as [[H1 H2] | _]; [lia | reflexivity].
 Qed.
 
 (* ===================================================================== *)
@@ -415,16 +562,38 @@ Section WriteFire.
             off_gv γo (1/2) (Z.of_nat (off + length bs)) ∗
             Φ k (abs_view I) off bs ∗ REST))%I.
 
-  (* THE PARTIAL-CHUNK MOVE: writei stopped short (0 < r < the chunk) and
-     filewrite advanced [f->off] by [r] anyway.  Those bytes are writei's
-     DISTURBED tail, not the splice, so there is no delta this contract can
-     receipt -- but the offset DID move, and the kernel's half must follow
-     it.  The client lets it, from any offset by any amount, and gets no
-     receipt; the fs state is what the fs invariant says it is. *)
-  Definition awrite_part_at (E : coPset) (γo : gname) (REST : iProp Σ) : iProp Σ :=
-    (∀ (off d : nat),
-       off_gv γo (1/2) (Z.of_nat off) ={E}=∗
-       off_gv γo (1/2) (Z.of_nat (off + d)) ∗ REST)%I.
+  (* THE PARTIAL-CHUNK COMMIT (round E2, lane E2-W; ruling Q-i).  It used
+     to move the OFFSET ONLY -- "those bytes are writei's DISTURBED tail,
+     not the splice, so there is no delta this contract can receipt".  That
+     was the hole: the machine DID move the row.  writei commits the
+     partially copied block rather than stranding it, so after a short
+     chunk the file holds the counted bytes AND up to one block of
+     unspecified tail, as far as the new size reaches
+     ([SpecWritei]'s [dist <= BSIZE]; [wrf_landed] is the run).
+
+     So this is now [awrite_full_at]'s two phases at a run the KERNEL
+     picks -- NON-DETERMINISTIC in the bytes, which is exactly what makes
+     the clause statable -- with two things the full arm does not have:
+     the offset comes out advanced by [r], the count writei RETURNED,
+     which may be strictly less than the run that landed; and the pure
+     shape of that gap ([r <= length bs <= r + BSIZE]) rides beside the
+     receipt so the fail arm can spell it ([wri_part_receipt]). *)
+  Definition awrite_part_at Γ (E : coPset) (i : Z) (γo : gname) (k : nat)
+      (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
+      (REST : iProp Σ) : iProp Σ :=
+    (∀ (I : gmap Z fs_node) (off r : nat) (bs bs0 : list (bv 8)) (nl : nat),
+       ⌜wri_pre (abs_view I) i off bs bs0 nl⌝ -∗
+       ⌜(r <= length bs)%nat⌝ -∗
+       ⌜(length bs <= r + BSIZE)%nat⌝ -∗
+       ghost_map_auth (γtop Γ) (1/2) I -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗
+         app_step i I (delta_write i off bs (abs_view I)) ∗
+         (∀ I' : gmap Z fs_node,
+            ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
+            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth (γtop Γ) (1/2) I' ∗
+            off_gv γo (1/2) (Z.of_nat (off + r)) ∗
+            Φ k (abs_view I) off bs ∗ REST))%I.
 
   (* THE CHAIN -- what replaced the per-chunk bundle when the offset was
      folded in.  A bundle of independent commits cannot work: every commit
@@ -441,7 +610,7 @@ Section WriteFire.
     | O => True%I
     | S cnt' =>
         (awrite_full_at Γ E i γo k Φ (awrite_chain Γ E i γo Φ (S k) cnt')
-         ∧ awrite_part_at E γo (awrite_chain Γ E i γo Φ (S k) cnt'))%I
+         ∧ awrite_part_at Γ E i γo k Φ (awrite_chain Γ E i γo Φ (S k) cnt'))%I
     end.
 
   Lemma awrite_chain_0 Γ E i γo Φ k : awrite_chain Γ E i γo Φ k 0 ⊣⊢ True.
@@ -450,7 +619,7 @@ Section WriteFire.
   Lemma awrite_chain_S Γ E i γo Φ k cnt :
     awrite_chain Γ E i γo Φ k (S cnt) ⊣⊢
       awrite_full_at Γ E i γo k Φ (awrite_chain Γ E i γo Φ (S k) cnt)
-      ∧ awrite_part_at E γo (awrite_chain Γ E i γo Φ (S k) cnt).
+      ∧ awrite_part_at Γ E i γo k Φ (awrite_chain Γ E i γo Φ (S k) cnt).
   Proof. reflexivity. Qed.
 
   (* satisfiability: a client holding its half of the shadow, at ANY value
@@ -477,10 +646,15 @@ Section WriteFire.
               (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
       iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
       iFrame "Ha' Hk". iSplitR; [done |]. iApply (IH with "Hai Hu").
-    - rewrite /awrite_part_at. iIntros (off d) "Hk".
+    - rewrite /awrite_part_at.
+      iIntros (I off r bs bs0 nl) "%Hpre %Hr %Hgap Ha Hk".
       iDestruct (off_gv_agree with "Hk Hu") as %<-.
-      iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk Hu]".
-      iModIntro. iFrame "Hk". iApply (IH with "Hai Hu").
+      iMod (off_gv_update_halves (Z.of_nat (off + r)) with "Hk Hu")
+        as "[Hk Hu]".
+      iMod (app_step_acc_view E γfs i I _ HE
+              (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
+      iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
+      iFrame "Ha' Hk". iSplitR; [done |]. iApply (IH with "Hai Hu").
   Qed.
 
   (* =================================================================== *)
@@ -561,18 +735,73 @@ Section WriteFire.
     iSplitR; [by iPureIntro |]. iExact "HΦ".
   Qed.
 
-  (* THE PARTIAL ARM, at the caller's mask: the short chunk's offset move,
-     lifted from the commit mask exactly as the fire lifts its phases. *)
-  Lemma wrf_partial_move (E : coPset) (γo : gname) (REST : iProp Σ) (off d : nat) :
-    ↑appN ⊆ E ->
-    awrite_part_at appE γo REST -∗
+  (* THE PARTIAL ARM'S FIRE (round E2, lane E2-W): [wrf_awrite_fire] at the
+     partial commit.  Same critical section, same [inode_local] premise,
+     same payout -- the ONE difference is the offset, which comes out
+     advanced by the COUNT writei returned rather than by the run that
+     landed.  ([wrf_partial_move], the offset-only move this replaces, is
+     gone with the hole it papered over.) *)
+  Lemma wrf_apart_fire (γfs : fs_names) (E : coPset) (i : Z) (γo : gname)
+      (k : nat) (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
+      (REST : iProp Σ) (off r : nat) (bs bs0 : list (bv 8)) (nl : nat)
+      (n n' : fs_node) :
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    inode_local i n' ->
+    (0 < length bs)%nat ->
+    (off <= length bs0)%nat ->
+    (off + length bs <= MAXFILE * BSIZE)%nat ->
+    (r <= length bs)%nat ->
+    (length bs <= r + BSIZE)%nat ->
+    fn_type n <> 0 ->
+    abs_row n = MkAnode (AFile bs0) nl ->
+    fn_type n' <> 0 ->
+    abs_row n' = MkAnode (AFile (blk_splice off bs bs0)) nl ->
+    ftop_inv γfs -∗ app_inv γfs -∗
+    awrite_part_at (fs_gamma_L γfs) appE i γo k Φ REST -∗
+    top_frag (fs_gamma_L γfs) i n -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗
-      off_gv γo (1/2) (Z.of_nat (off + d)) ∗ REST.
+      top_frag (fs_gamma_L γfs) i n'
+      ∗ off_gv γo (1/2) (Z.of_nat (off + r))
+      ∗ REST
+      ∗ ∃ av : aview, ⌜wri_pre av i off bs bs0 nl⌝ ∗ Φ k av off bs.
   Proof.
-    intros HE. iIntros "Hp Hg". rewrite /awrite_part_at.
-    iMod (fupd_mask_subseteq appE) as "Hcl"; [rewrite /appE; solve_ndisj |].
-    iMod ("Hp" $! off d with "Hg") as "[Hg Hrest]".
-    iMod "Hcl". iModIntro. iFrame "Hg Hrest".
+    intros HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs'.
+    iIntros "#Hi #Hai Hcm Hf Hg".
+    rewrite /top_frag /fs_gamma_L /=.
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
+    iDestruct "Hbody" as ">Hb".
+    iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
+    iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
+    assert (Hrow : arow_at (abs_view I) i (MkAnode (AFile bs0) nl)).
+    { rewrite -Habs. exact (abs_view_arow I i n Hlk Hnz). }
+    assert (Hpre : wri_pre (abs_view I) i off bs bs0 nl).
+    { rewrite /wri_pre. split_and!; [exact Hrow | exact Hpos | exact Hoff |
+                                     exact Hcap]. }
+    assert (Hdelta : abs_view (<[i := n']> I)
+                     = delta_write i off bs (abs_view I)).
+    { rewrite (abs_view_insert_row I i n' _ Hnz' Habs') /=.
+      case_decide as Hz.
+      - pose proof (arow_at_gone _ _ _ Hrow Hz) as Hnone.
+        rewrite (delta_write_absent _ _ _ _ Hnone). exact (delete_notin _ _ Hnone).
+      - by rewrite (delta_write_file (abs_view I) i off bs bs0 nl
+                      (arow_at_live _ _ _ Hrow Hz)). }
+    iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
+    iMod ("Hcm" $! I off r bs bs0 nl with "[//] [//] [//] Hta Hg")
+      as "(Hta & Hstep & Hph2)".
+    iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
+            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+    { iIntros (_) "_ Hp". iApply (app_step_at i I _ n' Hdelta with "Hstep Hp"). }
+    iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "(Hta & Hg & HΦ & Hrest)".
+    iMod "Hcl2".
+    iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
+    { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
+      iFrame "Hta Hla Hpark". iPureIntro.
+      intros jj mm Hj Hun. destruct (decide (jj = i)) as [-> | Hne].
+      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
+        exact (Hcl jj mm Hj Hun). }
+    iModIntro. iFrame "Hf Hg Hrest". iExists (abs_view I).
+    iSplitR; [by iPureIntro |]. iExact "HΦ".
   Qed.
 
   (* =================================================================== *)

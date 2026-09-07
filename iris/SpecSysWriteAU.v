@@ -489,6 +489,24 @@ Section SysWriteAU.
                                   nl)⌝ ∗
          Φ k av (woff off0 bss k) bs)%I.
 
+  (* THE SHORT CHUNK'S RECEIPT (round E2, lane E2-W; ruling Q-i).  writei
+     may stop part-way and, having COMMITTED the partially copied block,
+     leave a DISTURBED TAIL of at most [BSIZE] bytes inside the new size
+     ([SpecWritei]'s [dist]).  Those bytes moved the row, so the instant is
+     real and gets a receipt -- but what landed is not what the caller
+     asked for, so the receipt is NON-DETERMINISTIC in the bytes: it names
+     a run [bs] the fire chose, says how much of it the kernel COUNTED
+     ([r], which is what [f->off] advanced by), and bounds the rest by one
+     block.  This is what replaced the silent "the total falls short"
+     slack the fail arm used to carry alone. *)
+  Definition wri_part_receipt (i : Z)
+      (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) (k : nat) : iProp Σ :=
+    (∃ (av : aview) (off r : nat) (bs bs0 : list (bv 8)) (nl : nat),
+       ⌜wri_pre av i off bs bs0 nl⌝ ∗
+       ⌜(r <= length bs)%nat⌝ ∗
+       ⌜(length bs <= r + BSIZE)%nat⌝ ∗
+       Φ k av off bs)%I.
+
   (* ------------------------------------------------------------------ *)
   (*  2c.  The arms                                                       *)
   (* ------------------------------------------------------------------ *)
@@ -518,13 +536,19 @@ Section SysWriteAU.
   Definition write_post_fail Γ (i : Z) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
-    (∃ bss : list (list (bv 8)),
+    (∃ (bss : list (list (bv 8))) (x : nat),
        ⌜Z.of_nat (length (concat bss)) < n \/ (n < 0 /\ bss = [])⌝ ∗
-       ⌜(length bss <= wchunks n)%nat⌝ ∗
+       ⌜(length bss + x <= wchunks n)%nat⌝ ∗
+       ⌜(x <= 1)%nat⌝ ∗
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
-       awrite_commits Γ appE i Φ (length bss)
-         (wchunks n - length bss)%nat)%I.
+       (* THE SHORT CHUNK THAT ENDED THE LOOP (round E2, lane E2-W): either
+          nothing fired past the prefix ([x = 0]) or the one instant that
+          did is RECEIPTED -- the bytes it landed, and how many of them the
+          kernel counted.  The old form left that instant silent. *)
+       (⌜x = 0%nat⌝ ∨ wri_part_receipt i Φ (length bss)) ∗
+       awrite_commits Γ appE i Φ (length bss + x)
+         (wchunks n - length bss - x)%nat)%I.
 
   (* the armed disjunction the continuation receives, keyed on a0.  TWO
      arms only: the fd premises refute argfd's and the writable test's
@@ -572,7 +596,7 @@ End SysWriteAU.
    optimization.md, "a big-op body is the predictor").  [awrite_commit]
    is a match-free single wand and stays transparent, as mknod's do. *)
 Global Typeclasses Opaque awrite_commits wri_receipts wri_receipts_chained
-  write_post_ok write_post_fail write_arms write_stable_arms.
+  wri_part_receipt write_post_ok write_post_fail write_arms write_stable_arms.
 
 (* ===================================================================== *)
 (*  3.  THE MACHINE CONTRACT: SpecSysWrite's frame + the AU               *)

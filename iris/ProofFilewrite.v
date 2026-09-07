@@ -843,6 +843,18 @@ Require Import ProcAvail.
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the off checkout borrows the running token *)
 Require Import FileOffProtocol.   (* proto_read_llb / _checkout / _park (r25 item 24) *)
+(* ---- ROUND E2, LANE E2-W: the FD_INODE arm's row retag is a [_step] now,
+   paid by the contract's own [SpecFilewrite.fw_app_write_step] instead of
+   the blanket license.  These are what the delta and the row reading at
+   writei's FULL output (disturbed tail included) need; the campaign's usual
+   order, [FsAbsDefs] LAST. ---- *)
+Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import      *)
+Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ               *)
+Require Import AppInv.           (* [app_step], [app_step_at]              *)
+Require Import FsAbsOpenFire.    (* [opf_era_file_row]/[_typed]            *)
+Require Import FsAbsWriteFire.   (* [wrf_landed], [wrf_write_row_dist]     *)
+Require Import FsAbsDelta.       (* [delta_write], [delta_write_file]      *)
+Require Import FsAbsDefs.        (* LAST (FsAbs's own rule)                *)
 
 Set Printing Depth 40.
 
@@ -982,6 +994,15 @@ Section ProofFilewrite.
   Notation Rs9 := (mword_of_int 25 : mword 5).
 
   Local Ltac regne := reg_ne_side.
+
+  (* ---- [lia] MUST NOT SEE THIS FILE'S AMBIENT CONTEXT ------------------
+     [fw_loop]'s body carries ~300 hypotheses, and [lia] reifies every one
+     of them at every call (optimization.md, "[lia] IS A GENERAL-PURPOSE
+     CLOSER TOO, AND 180 HYPOTHESES IS A LARGE CONTEXT").  [zlia H1 H2 ..]
+     keeps exactly the named facts and closes.  [XI] is always kept because
+     [SpecFilewrite.FW_MAX] is stated over it.  ([ProofFilewriteAU]'s copy,
+     verbatim -- the row site below is the same arithmetic.) *)
+  Tactic Notation "zlia" hyp_list(Hs) := clear - XI Hs; lia.
 
   (* ---- the type-indexed environment, opened at the type the code read.
      fileread's [fr_env_*] block, one arm at a time.  Nothing about the
@@ -1556,6 +1577,10 @@ Section ProofFilewrite.
     (* the process's leave to move the offset's shadow ([OffGv.off_permit]),
        out of the state-keyed environment's inode arm *)
     off_permit γx -∗
+    (* THE APPLICATION'S RAW WRITE STEP (round E2, lane E2-W), forwarded
+       from the contract.  Persistent, so the induction carries it for free
+       and each round's retag fires it once. *)
+    fw_app_write_step -∗
     filewrite_fs_out fn -∗
     (* ---- and the contract's own continuation ---- *)
     (* [true], verbatim from [SpecFilewrite]: this IS the contract's crossing,
@@ -1595,7 +1620,7 @@ Section ProofFilewrite.
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hclaimsfw #Hescs #Hireg
-             #Hslks #Hdev #Hgeo #Hdlk #Hbm #Hperm Hout Hcont".
+             #Hslks #Hdev #Hgeo #Hdlk #Hbm #Hperm #Hstepw Hout Hcont".
     (* ---- THE REFERENCE, OPENED, AND THE TWO FIELD FACTS OFF THE STATE ----
        The loop reads [f->type] and [f->writable] off the field cells, so it
        needs equations about the [fcontent] the reference carries -- but not
@@ -1934,11 +1959,27 @@ Section ProofFilewrite.
     iDestruct (ity_shot_agree with "Hshot Hty") as %Htyeq.
     assert (Hnodir : bv_unsigned (di_type dnl) <> T_DIR_z)
       by (rewrite Htyeq; exact (P10 Hwb)).
+    (* ROUND E2, LANE E2-W: ...AND NOT A DEVICE EITHER.  The owner's
+       [file_payload] strengthening (2026-08-29), read through the carve's
+       fifth output at the SAME generation -- what refutes [FsAbs.abs_node]'s
+       [ADev] arm and lets the retag below read the row as an [AFile]. *)
+    assert (Hnodev : bv_unsigned (di_type dnl) <> FsImg.T_DEVICE_z)
+      by (rewrite Htyeq; exact (P10d Htyi)).
     (* ---- PEEL the checked-out bundle.  The valid cell is beside the
            content (SpecIlock v2) and it IS [FileInvDefs.off_mark]. ---- *)
     rewrite /ic_loaded.
     iDestruct (ic_loaded_open with "Hlk") as (datal)"(%Hiok & %Hrl_datal & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks & Htopl)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
+    (* ROUND E2, LANE E2-W: THE ROW READS AS A FILE, and here is the whole
+       derivation: [inode_rec_local] enumerates the four legal type words,
+       [inode_ok] rules out the free one, the carve's fourth output rules out
+       the directory and its fifth the device. *)
+    assert (Htyfile : bv_unsigned (di_type dnl) = FsImg.T_FILE_z).
+    { destruct (proj1 Hrl_datal) as [Hz0 | [Hzd | [Hzf | Hzv]]].
+      - exfalso. exact (Hdty Hz0).
+      - exfalso. exact (Hnodir Hzd).
+      - exact Hzf.
+      - exfalso. exact (Hnodev Hzv). }
     iAssert (inode_map fsc_fs (ientry ik) bml)
       with "[Haddrs Hindres]" as "Hmap".
     { rewrite /inode_map. iFrame. }
@@ -2179,12 +2220,30 @@ Section ProofFilewrite.
               /\ dir_ok icfg_nib dn' data'
               /\ di_type dn' = di_type dnl
               /\ di_nlink dn' = di_nlink dnl
-              /\ dn0' = dn').
+              /\ dn0' = dn'
+              (* ROUND E2, LANE E2-W: the SUCCESS arm's three extra readings,
+                 which the landed join used to throw away because only the
+                 retag needed the record and the [_auto] retag does not look
+                 inside it.  The [_step] retag does: the row is the SPLICE,
+                 hence [tot] and hence [wi_dinode], and its splice needs
+                 [off <= length bs0], which is the arm's EOF guard read at
+                 the pre-write record.  Guarded by [0 <= rz] -- "we are not
+                 on writei's [-1] arm" -- because a ZERO-count success may
+                 still have moved the row (writei's DISTURBED TAIL). *)
+              /\ ((0 <= rz)%Z ->
+                  rz = Z.of_nat tot
+                  /\ dn' = wi_dinode dnl bm' (Z.to_nat (bv_unsigned v)) tot
+                  /\ (Z.to_nat (bv_unsigned v)
+                      <= Z.to_nat (bv_unsigned (di_size dnl)))%nat)
+              (* ...and the -1 arm's: NOTHING moved, which is what makes that
+                 retag a [_same]. *)
+              /\ ((rz < 0)%Z ->
+                  bm' = bml /\ data' = datal /\ dn' = dnl)).
     { destruct Harms as
         [(Hm1 & _ & Htot0 & _ & Hbmq & Hdataq & Hdnq & Hdn0q & _)
-        (* the writing arm's second conjunct is SpecWritei's EOF guard,
-           which this landed walk does not need (the AU walk does) *)
-        | (Hcnt2 & _ & Htotle & Hdnq & Hdn0q)].
+        (* the writing arm's second conjunct is SpecWritei's EOF guard: the
+           landed walk needs it for the row the retag now proves *)
+        | (Hcnt2 & Hoffle & Htotle & Hdnq & Hdn0q)].
       - exists (-1)%Z. subst bm' data' dn' dn0'. split_and!.
         (* EIGHT branches, not seven: [split_and!] splits the chained
            [-1 <= rz <= c] into TWO goals (the recorded trap). *)
@@ -2198,6 +2257,8 @@ Section ProofFilewrite.
         + reflexivity.
         + reflexivity.
         + reflexivity.
+        + intros Hp. exfalso. lia.
+        + intros _. split_and!; reflexivity.
       - exists (Z.of_nat tot). subst dn' dn0'.
         assert (Htotc : (Z.of_nat tot <= c)%Z)
           by (rewrite -Hcz; apply Nat2Z.inj_le; exact Htotle).
@@ -2226,9 +2287,13 @@ Section ProofFilewrite.
                    data' Hnodir).
         + apply fw_wi_type.
         + reflexivity.
-        + reflexivity. }
+        + reflexivity.
+        + intros _. split_and!; [reflexivity | reflexivity |].
+          (* the EOF guard, off the arm and at the pre-write record *)
+          lia.
+        + intros Hneg. exfalso. lia. }
     destruct Hjoin as (rz & Hrza0 & Hrzr & Hrzadv & Hiok2 & Hdok2 & Htyq & Hnlq
-                       & Hdn0q).
+                       & Hdn0q & Hsucc & Hfailq).
     (* the RESOURCE twin of [Hdok2] (design §20.3).  filewrite cannot reach a
        T_DIR inode -- sys_open refuses writable directories, which is what
        [Hnodir] records -- so the twin is [emp] at the record writei
@@ -2311,10 +2376,114 @@ Section ProofFilewrite.
                fsc_logst dn' bm' data' Hiok2 Hrl2).
       - exact (dir_uniq_not_dir dn' data' Hnodir').
       - exact (dir_dots_ix_not_dir (bv_unsigned inum) dn' data' Hnodir'). }
-    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned inum)
-            (era_node dnl bml datal) (era_node dn' bm' data')
-            ltac:(solve_ndisj) Logic.I Hlocw with "[] [] Htop") as "Htop";
-      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
+    (* =================================================================
+       ROUND E2, LANE E2-W (site #5): THE RETAG IS A [_step] NOW.
+
+       The row this walk moves is the FILE'S, and the application's claim
+       about it is paid by the contract's own
+       [SpecFilewrite.fw_app_write_step] rather than by the blanket license
+       [ireg_top_retag_auto] used to read off [AppInv.app_auto].  The delta
+       is [FsAbsDelta.delta_write] at the LANDED RUN -- the bytes writei
+       counted, PLUS whatever of its DISTURBED TAIL lies inside the new size
+       ([FsAbsWriteFire.wrf_landed]).  That is ruling Q-i's honesty: a short
+       chunk really does move bytes the caller did not ask for, and the
+       delta is non-deterministic in them rather than silent about them.
+
+       TWO CASES, and the split is writei's own return: on [0 <= rz] the
+       record is [wi_dinode] and the row is the splice; on [-1] the up-front
+       guards failed, nothing moved at all, and the retag is [_same]. *)
+    iAssert (|={⊤}=> top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum)
+                       (era_node dn' bm' data'))%I
+      with "[Htop]" as ">Htop".
+    { destruct (decide (0 <= rz)%Z) as [Hrzge | Hrzneg].
+      - (* ---- WRITEI RAN: the row moved to the landed run ---- *)
+        destruct (Hsucc Hrzge) as (Hrztot & Hdnwi & Hfo).
+        assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
+          by apply fw_maxfile_bsize.
+        assert (Hcapt : (Z.to_nat (bv_unsigned v) + tot <= MAXFILE * BSIZE)%nat)
+          by (zlia Hrzadv Hrztot Hoffz Hmb).
+        assert (Hszb' : (Z.to_nat (bv_unsigned (di_size dnl))
+                         <= MAXFILE * BSIZE)%nat) by (zlia Hszb Hmb).
+        assert (Hoff32 : (Z.of_nat (Z.to_nat (bv_unsigned v) + tot)
+                          < 2 ^ 32)%Z).
+        { change (2 ^ 32)%Z with 4294967296%Z. zlia Hcapt Hmb. }
+        assert (Hszwi : Z.to_nat (bv_unsigned (di_size dn'))
+                  = Nat.max (Z.to_nat (bv_unsigned v) + tot)
+                            (Z.to_nat (bv_unsigned (di_size dnl))))
+          by (rewrite Hdnwi; exact (wrf_wi_size dnl bm'
+                (Z.to_nat (bv_unsigned v)) tot Hoff32)).
+        assert (Hnzl : fn_type (era_node dnl bml datal) <> 0)
+          by exact (opf_era_file_typed dnl bml datal Htyfile).
+        assert (Hrowl : abs_row (era_node dnl bml datal)
+                  = MkAnode (AFile (fn_file_bytes (era_node dnl bml datal)))
+                            (fn_nlink (era_node dnl bml datal)))
+          by exact (opf_era_file_row dnl bml datal Htyfile).
+        assert (Htyfile' : bv_unsigned (di_type dn') = FsImg.T_FILE_z)
+          by (rewrite Htyq; exact Htyfile).
+        assert (Hnz' : fn_type (era_node dn' bm' data') <> 0)
+          by exact (opf_era_file_typed dn' bm' data' Htyfile').
+        assert (Hrow' : abs_row (era_node dn' bm' data')
+                  = MkAnode (AFile (blk_splice (Z.to_nat (bv_unsigned v))
+                                      (wrf_landed wrote dstb
+                                         (Z.to_nat (bv_unsigned (di_size dnl)))
+                                         (Z.to_nat (bv_unsigned v)) tot dist)
+                                      (fn_file_bytes (era_node dnl bml datal))))
+                            (fn_nlink (era_node dnl bml datal)))
+          by exact (wrf_write_row_dist dnl dn' bml bm' datal data'
+                      (Z.to_nat (bv_unsigned v)) tot dist wrote dstb
+                      Htyfile Htyq Hnlq Hholes Hholes2 Hszwi Hfo Hcapt Hszb'
+                      ltac:(intros kk _; exact (Hrange kk))).
+        iApply (ireg_top_retag_gen ⊤ fsc_fs (bv_unsigned inum)
+                  (era_node dnl bml datal) (era_node dn' bm' data')
+                  ltac:(solve_ndisj) Hlocw with "[] [] [] Htop");
+          [ iApply (ireg_inv_ftop with "Hireg")
+          | iApply (ireg_inv_app with "Hireg")
+          | ].
+        iIntros (I Hlk) "_ Hp".
+        assert (Hrowat : arow_at (abs_view I) (bv_unsigned inum)
+                  (MkAnode (AFile (fn_file_bytes (era_node dnl bml datal)))
+                           (fn_nlink (era_node dnl bml datal)))).
+        { rewrite -Hrowl.
+          exact (abs_view_arow I (bv_unsigned inum)
+                   (era_node dnl bml datal) Hlk Hnzl). }
+        assert (Hdelta : abs_view (<[bv_unsigned inum
+                                     := era_node dn' bm' data']> I)
+                  = delta_write (bv_unsigned inum) (Z.to_nat (bv_unsigned v))
+                      (wrf_landed wrote dstb
+                         (Z.to_nat (bv_unsigned (di_size dnl)))
+                         (Z.to_nat (bv_unsigned v)) tot dist)
+                      (abs_view I)).
+        { rewrite (abs_view_insert_row I (bv_unsigned inum)
+                     (era_node dn' bm' data') _ Hnz' Hrow') /=.
+          case_decide as Hz.
+          - pose proof (arow_at_gone _ _ _ Hrowat Hz) as Hnone.
+            rewrite (delta_write_absent _ _ _ _ Hnone).
+            exact (delete_notin _ _ Hnone).
+          - by rewrite (delta_write_file (abs_view I) (bv_unsigned inum)
+                          (Z.to_nat (bv_unsigned v))
+                          (wrf_landed wrote dstb
+                             (Z.to_nat (bv_unsigned (di_size dnl)))
+                             (Z.to_nat (bv_unsigned v)) tot dist)
+                          (fn_file_bytes (era_node dnl bml datal))
+                          (fn_nlink (era_node dnl bml datal))
+                          (arow_at_live _ _ _ Hrowat Hz)). }
+        iApply (app_step_at (bv_unsigned inum) I _ (era_node dn' bm' data')
+                  Hdelta with "[] Hp").
+        iApply (fw_app_write_step_at (bv_unsigned inum) I
+                  (Z.to_nat (bv_unsigned v))
+                  (wrf_landed wrote dstb
+                     (Z.to_nat (bv_unsigned (di_size dnl)))
+                     (Z.to_nat (bv_unsigned v)) tot dist) with "Hstepw").
+      - (* ---- WRITEI'S -1: the up-front guards failed, nothing moved ---- *)
+        destruct (Hfailq ltac:(zlia Hrzneg)) as (Hbmq & Hdataq & Hdnq).
+        assert (Hsame : FsAbsDefs.abs_of (era_node dnl bml datal)
+                        = FsAbsDefs.abs_of (era_node dn' bm' data'))
+          by (rewrite Hbmq Hdataq Hdnq; reflexivity).
+        iApply (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned inum)
+                  (era_node dnl bml datal) (era_node dn' bm' data')
+                  ltac:(solve_ndisj) Hsame Hlocw with "[] [] Htop");
+          [ iApply (ireg_inv_ftop with "Hireg")
+          | iApply (ireg_inv_app with "Hireg") ]. }
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".
@@ -2667,7 +2836,7 @@ Section ProofFilewrite.
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
                         Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hclaimsfw Hescs Hireg
-                        Hslks Hdev Hgeo Hdlk Hbm Hperm Hout Hcont").
+                        Hslks Hdev Hgeo Hdlk Hbm Hperm Hstepw Hout Hcont").
     - (* ====== THE SHORT WRITE (and writei's -1): straight to +0xe2 ======
          Before 31f115a this arm ran its own five restores at +0xea first;
          gcc now sends both loop exits into the tail, which owns them. *)
@@ -2724,7 +2893,7 @@ Section ProofFilewrite.
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb
            Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hprow Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hprow #Hstepw Hcont".
     (* PIN THE INDEX.  This contract carries [eb = true ->] and [cpu_own] at
        level 0, so [cpu_own_eb_agree] forces [b] to be the literal [true].
        That is what reconciles the [true]-spelled crossings (this contract's
@@ -4362,7 +4531,7 @@ Section ProofFilewrite.
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv
                                  E8 E9 E10 E11 E12 E13 E14 E26 E15 E16 E17
-                                 E22 E23 E24 E21 Hperm [E18 E19 E20 E25]").
+                                 E22 E23 E24 E21 Hperm Hstepw [E18 E19 E20 E25]").
                  { rewrite /file_ref /file_fields. iExists Cf.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                  { rewrite HVid. iExact "Hpriv". }

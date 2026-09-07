@@ -231,10 +231,17 @@ Section FsAbsInvFire.
       iMod (off_user_inv_move appE γo _ (Z.of_nat (off + length bs)) foffN_appE
               with "Hoinv Hk") as "Hk".
       iModIntro. iFrame "Ha' Hk". iSplitR; [done |]. iApply "IH".
-    - rewrite /awrite_part_at. iIntros (off d) "Hk".
-      iMod (off_user_inv_move appE γo _ (Z.of_nat (off + d)) foffN_appE
+    - (* the PARTIAL arm is a state fire too now (round E2, lane E2-W):
+         same two phases as the full arm, at the run the short chunk landed,
+         with the offset advanced by the COUNT rather than by the run *)
+      rewrite /awrite_part_at.
+      iIntros (I off r bs bs0 nl) "%Hpre %Hr %Hgap Ha Hk".
+      iMod (app_step_acc_view appE γfs i I _ appN_appE
+              (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
+      iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'".
+      iMod (off_user_inv_move appE γo _ (Z.of_nat (off + r)) foffN_appE
               with "Hoinv Hk") as "Hk".
-      iModIntro. iFrame "Hk". iApply "IH".
+      iModIntro. iFrame "Ha' Hk". iSplitR; [done |]. iApply "IH".
   Qed.
 
   (* ------------------------------------------------------------------ *)

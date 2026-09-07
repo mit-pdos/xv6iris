@@ -144,11 +144,13 @@ Section SysWriteAUEra.
      the count.  The short chunk that ENDED the loop is deliberately not in
      [bss]: writei's disturbed tail is not the splice, so its instant is not
      one this contract's receipts can speak about (FsAbsWriteFire's second
-     finding).  That is exactly the slack "< n" leaves.  BUT ITS OFFSET
-     MOVE IS REAL: if it wrote anything, [f->off] advanced by it, and the
-     kernel took the chain's PARTIAL arm to move the half -- so the chain
-     resumes one node past the receipts ([x = 1]); on writei's -1 and the
-     never-entered loop nothing moved ([x = 0]). *)
+     finding).  That is exactly the slack "< n" leaves.  BUT IT IS NOT
+     SILENT (round E2, lane E2-W; ruling Q-i): if anything landed, the
+     kernel took the chain's PARTIAL arm, the ROW moved by the run that
+     landed, [f->off] advanced by the COUNT, and the instant is receipted
+     below -- so the chain resumes one node past the receipts ([x = 1]); on
+     writei's -1, on a chunk that landed nothing, and on the never-entered
+     loop nothing moved ([x = 0]). *)
   Definition write_post_fail_at Γ (i : Z) (γo : gname) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
@@ -160,6 +162,13 @@ Section SysWriteAUEra.
           delivers a PREFIX of the caller's buffer, and now says so *)
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
+       (* ...AND IT IS RECEIPTED (round E2, lane E2-W; ruling Q-i).  Either
+          nothing fired past the prefix ([x = 0]) or the one instant that did
+          says what landed: a run of bytes at some offset, of which the
+          kernel COUNTED [r] and the rest is writei's disturbed tail, at most
+          one block ([SpecSysWriteAU.wri_part_receipt]).  What used to be
+          here was the bare [x <= 1] slack and nothing else. *)
+       (⌜x = 0%nat⌝ ∨ wri_part_receipt i Φ (length bss)) ∗
        awrite_chain Γ appE i γo Φ (length bss + x)
          (wchunks n - length bss - x)%nat)%I.
 
@@ -213,6 +222,23 @@ Section SysWriteAUEra.
              (wchunks n - length bss)%nat)
       ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
          ∗ write_post_fail_at Γ i γo n M ua Φ)))%I.
+
+  (* THE LANDED BLANKET, READ BACK OFF THE ARMS (round E2, lane E2-W).
+     Each arm pins [r] -- the count on the ok arm, [-1] on the fail arm --
+     so [SpecFilewrite.filewrite_ret] follows, and with the contract's own
+     [arg_fd] premise so does [SpecSysWrite.sys_write_ret].  It is what
+     lets the dispatcher run this contract on an inode fd and the landed
+     one everywhere else without its own post moving.  ([unlink_arms_ret]'s
+     shape, at the write.) *)
+  Lemma write_arms_at_ret Γ (i : Z) (γo : gname) (n : Z)
+      (M : gmap Z (bv 8)) (ua : mword 64)
+      (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) (r : mword 64) :
+    write_arms_at Γ i γo n M ua Φ r -∗ ⌜filewrite_ret n r⌝.
+  Proof.
+    rewrite /write_arms_at. iIntros "[[%Hok _] | [%Hm1 _]]"; iPureIntro.
+    - destruct Hok as [Hr Hn]. rewrite Hr. exact (filewrite_ret_all n Hn).
+    - rewrite Hm1. exact (filewrite_ret_m1 n).
+  Qed.
 
 End SysWriteAUEra.
 

@@ -173,6 +173,12 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import FsNode.      (* [fs_node]                                *)
+Require Import AppInv.      (* [app_step]/[app_auto]/[app_inv]: the
+                               application's claim and its parked license
+                               (round E2, lane E2-W)                     *)
+Require Import FsAbsDelta.  (* [delta_write], [delta_write_absent]       *)
+Require Import FsAbsDefs.   (* LAST (FsAbs's own rule)                   *)
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.
@@ -548,6 +554,67 @@ Section SpecFilewrite.
     iApply filewrite_fs_env_out.
   Qed.
 
+  (* ---- THE APPLICATION'S RAW WRITE STEP (round E2, lane E2-W) ---------
+
+     The one AU-shaped premise the LANDED contract takes.  filewrite's
+     FD_INODE arm moves the abstract row at every chunk's retag, and the
+     mover owes the application's claim in one of three forms
+     ([InodeRegion]'s [_same] / [_step] / [_auto]).  Until this lane the
+     site paid with [_auto] -- the blanket license the application parks in
+     its own invariant -- which is exactly the thing round E is retiring.
+     So the contract asks for the step instead, RAW: at any inum, any map
+     and any run of bytes at any offset, the caller's claim survives
+     [FsAbsDelta.delta_write].
+
+     PERSISTENT ([□]), because the loop fires it ONCE PER CHUNK and a
+     linear wand could serve only the first.  That costs nothing: it is
+     derivable from the parked license, which is itself persistent
+     ([fw_app_write_step_of_auto] below), and a client that has retired the
+     license supplies the family from whatever replaces it.
+
+     NOT NARROWED TO THE CALLER'S CHUNK.  writei may leave a DISTURBED
+     TAIL inside the new size ([SpecWritei]'s [dist]), so the run the row
+     really moved by is not always the run the caller asked for -- the
+     premise quantifies over the bytes for that reason (ruling Q-i). *)
+  Definition fw_app_write_step : iProp Σ :=
+    (□ ∀ (i : Z) (I : gmap Z fs_node) (off : nat) (bs : list (bv 8)),
+        app_step i I (delta_write i off bs (abs_view I)))%I.
+
+  Global Instance fw_app_write_step_persistent : Persistent fw_app_write_step.
+  Proof. rewrite /fw_app_write_step. apply _. Qed.
+
+  (* SATISFIABILITY, at the license round A parks: where the view has a row
+     the license admits the move ([AppInv.app_step_of_auto]); where it does
+     not, [delta_write] is the IDENTITY ([FsAbsDelta.delta_write_absent])
+     and nothing is owed ([AppInv.app_step_id]).  The seal cannot be
+     vacuously blocked on the caller's side. *)
+  Lemma fw_app_write_step_of_auto : ▷ app_auto -∗ fw_app_write_step.
+  Proof.
+    iIntros "#Ha". rewrite /fw_app_write_step. iModIntro.
+    iIntros (i I off bs).
+    destruct (abs_view I !! i) as [a |] eqn:Hav.
+    - iApply (app_step_of_auto i I _ (abs_view_lookup_is_Some I i a Hav)
+                with "Ha").
+    - rewrite (delta_write_absent (abs_view I) i off bs Hav).
+      iApply app_step_id.
+  Qed.
+
+  (* the reading a mover wants: one step, at its own row, offset and run *)
+  Lemma fw_app_write_step_at (i : Z) (I : gmap Z fs_node) (off : nat)
+      (bs : list (bv 8)) :
+    fw_app_write_step -∗ app_step i I (delta_write i off bs (abs_view I)).
+  Proof. rewrite /fw_app_write_step. iIntros "#H". iApply "H". Qed.
+
+  (* ...and off the application's invariant, which is where a dispatcher
+     reads it ([InodeRegion.ireg_inv_app]). *)
+  Lemma fw_app_write_step_acc (E : coPset) (γfs : fs_names) :
+    ↑appN ⊆ E -> app_inv γfs ={E}=∗ fw_app_write_step.
+  Proof.
+    iIntros (HE) "#Hai".
+    iMod (app_auto_acc E γfs HE with "Hai") as "#Ha".
+    iModIntro. iApply (fw_app_write_step_of_auto with "Ha").
+  Qed.
+
   (* A file that is neither a pipe, nor a device, nor an inode costs its
      writer nothing -- the arm is [panic] at +0x11e (decode note 3), and
      [SpecPanic] discharges it. *)
@@ -615,6 +682,13 @@ Definition wp_filewrite_sconf_body
   (* ...and the offset permit on an inode descriptor -- see
      [SpecFileread.wp_fileread_sconf_body] *)
   foff_permit_row st -∗
+  (* THE APPLICATION'S RAW WRITE STEP (round E2, lane E2-W).  The FD_INODE
+     arm's row retag pays the application's claim with THIS, in place of the
+     blanket license [ireg_top_retag_auto] used to read off [app_auto].
+     Persistent, so the chunk loop may fire it once per chunk; trivially
+     supplied by any caller holding the license ([fw_app_write_step_acc]),
+     and vacuous for the pipe/device/closed arms, which move no row. *)
+  fw_app_write_step -∗
   (* THE CROSSING IS [true], NOT [b].  Every arm of this function parks, and
      the porting guide's rule is that a PARKING function's [wp_next] index is
      [true] unconditionally -- a swtch moves the hart whatever SIE was doing.

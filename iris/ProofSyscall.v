@@ -368,6 +368,13 @@ Require Import SpecSysOpen.
    invariant [FirstTok.fsabs_env] with receipts that say nothing. *)
 Require Import SpecSysMknodAUEra SpecSysOpenAU SpecSysUnlinkAU.
 Require Import SpecSysChdirAU.   (* [SYSCHDIR_AU], [chdir_arms_landed], [fsabs_chdir_pre] (C3) *)
+(* ...and the write's (round E2, lane E2-W, W1): the dispatch case-splits
+   on the descriptor's own state and runs the AU write for an open,
+   WRITABLE inode fd; every other descriptor keeps the landed sconf. *)
+Require Import SpecSysWriteAU.     (* [wchunks], [wri_receipts]              *)
+Require Import SpecSysWriteAUEra.  (* [SYSWRITE_AU_ERA], [write_arms_at]     *)
+Require Import FsAbsWriteFire.     (* [awrite_chain]                         *)
+Require Import OffGv.              (* [off_user_inv]: the fd row's offset     *)
 Require Import FsAbsInvFire.
 Require Import SpecMyproc.
 (* the content-independent bundles the non-closer fs entries state their
@@ -410,12 +417,55 @@ Set Printing Depth 40.
    from the invariant, so nothing had to be assumed. *)
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+
+(* ---- THE WRITE ARM'S DISPATCH KEY (round E2, lane E2-W, ruling Q-e W1) --
+   sys_write has TWO proved contracts: the landed [SYSWRITE], which walks
+   every descriptor kind, and the ATOMIC-UPDATE [SYSWRITE_AU_ERA], whose
+   premise pins the descriptor to an OPEN, WRITABLE INODE and whose post is
+   the per-chunk armed one.  The dispatch runs the AU form wherever it
+   applies and the landed one everywhere else, so this is the key: a PURE
+   function of syscall argument 0 and the caller's own descriptor states,
+   computed so the arm is ONE [destruct] with two branches rather than a
+   case per [fdstate] constructor. *)
+Definition sysc_write_inode (v : mword 64) (fs : list (mword 64))
+    (sts : list fdstate) : option (nat * mword 64 * fdstate) :=
+  match arg_fd v fs with
+  | Some (fd, fv) =>
+      match sts !! fd with
+      | Some (FdOpen rb true (FdInode i go)) =>
+          Some (fd, fv, FdOpen rb true (FdInode i go))
+      | _ => None
+      end
+  | None => None
+  end.
+
+Lemma sysc_write_inode_some (v : mword 64) (fs : list (mword 64))
+    (sts : list fdstate) (fd : nat) (fv : mword 64) (st : fdstate) :
+  sysc_write_inode v fs sts = Some (fd, fv, st) ->
+  arg_fd v fs = Some (fd, fv)
+  /\ sts !! fd = Some st
+  /\ exists (rb : bool) (i : Z) (go : gname), st = FdOpen rb true (FdInode i go).
+Proof.
+  intros Hpk. rewrite /sysc_write_inode in Hpk.
+  destruct (arg_fd v fs) as [[fd0 fv0] |] eqn:Ha; [| discriminate Hpk].
+  destruct (sts !! fd0) as [st0 |] eqn:Hs; [| discriminate Hpk].
+  (* the writable bit is matched BEFORE the type, so a pipe/device row does
+     not reduce until [wb] is a constructor: peel it on every arm. *)
+  destruct st0 as [| rb wb [i go | | mj]]; try (destruct wb);
+    try discriminate Hpk.
+  injection Hpk as <- <- <-.
+  split_and!;
+    [ first [exact Ha | reflexivity] | first [exact Hs | reflexivity] |].
+  by exists rb, i, go.
+Qed.
+
 Module SyscallProof
     (SysFork : SYSFORK) (SysExit : SYSEXIT) (SysWait : SYSWAIT)
     (SysPipe : SYSPIPE) (SysRead : SYSREAD) (SysKill : SYSKILL)
     (SysExecAU : SYSEXEC_AU) (SysFstat : SYSFSTAT) (SysChdirAU : SYSCHDIR_AU)
     (SysDup : SYSDUP) (SysGetpid : SYSGETPID) (SysSbrk : SYSSBRK)
     (SysPause : SYSPAUSE) (SysUptime : SYSUPTIME) (SysWrite : SYSWRITE)
+    (SysWriteAU : SYSWRITE_AU_ERA)
     (SysMknod : SYSMKNOD_AU_ERA) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
     (SysClose : SYSCLOSE) (SysSync : SYS_SYNC)
     (SysOpen : SYSOPEN_AU) (SysUnlink : SYSUNLINK_AU)
@@ -4399,13 +4449,123 @@ Section SyscallArms.
       iSplitR; [iExact "Hdevi" | iExact "Htx"]. }
     iDestruct (sysc_filewrite_env γf γtxl γs j γl (proc_addr j) fn
                  with "Hdata Htx Hfsenv Hbs") as "Hfse".
+    (* ROUND E2, LANE E2-W: the landed write's FD_INODE arm now asks for the
+       application's RAW WRITE STEP instead of paying its row retag out of
+       the blanket license.  The dispatcher supplies it off the application's
+       own invariant, in one fupd -- which is where the license still lives
+       ([SpecFilewrite.fw_app_write_step_acc]). *)
+    iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
+    iApply fupd_wp.
+    iMod (SpecFilewrite.fw_app_write_step_acc ⊤ fsc_fs ltac:(solve_ndisj)
+            with "Hfsabs") as "#Hastep".
+    iModIntro.
+    (* ===============================================================
+       ROUND E2, LANE E2-W (W1, ruling Q-e): THE DISPATCH.
+
+       sys_write has two proved contracts.  [SYSWRITE_AU_ERA]'s premise
+       pins the descriptor to an OPEN, WRITABLE INODE and its post is the
+       per-chunk armed one -- the fd-row pilot's contract, and the one that
+       belongs on the theorem's path; the landed [SYSWRITE] walks every
+       descriptor kind and answers the blanket.  The arm picks between them
+       on the descriptor's own state, which the dispatcher CAN read: it
+       holds the fragment bundle ([sysc_arm_pre]'s last row).
+       [sysc_write_inode] is that choice as a pure function, so the split
+       is one [destruct] rather than a case per [fdstate] constructor.
+
+       THE ARM'S POST DOES NOT MOVE: each of the AU arms pins [r], so
+       [SpecSysWriteAUEra.write_arms_at_ret] gives back exactly the landed
+       [sys_write_ret] the epilogue is written against. *)
+    destruct (sysc_write_inode v0 (pv_ofile (us_V U)) sts)
+      as [[[fd fv] st] |] eqn:Hpick.
+    - (* ---- AN OPEN, WRITABLE INODE FD: the ATOMIC-UPDATE write ---- *)
+      destruct (sysc_write_inode_some _ _ _ _ _ _ Hpick)
+        as (Hafd & Hstq & rb & i & γo & Hsteq).
+      subst st.
+      (* the row's own fragment out of the bundle, with its offset entry;
+         a write moves neither, so the same state goes straight back *)
+      iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd
+                   (FdOpen rb true (FdInode i γo)) Hstq with "Hufrag")
+        as "(Hfr & #Hrow & Hfrback)".
+      iAssert (off_user_inv γo) as "#Hoinv"; [iExact "Hrow" |].
+      iApply (SysWriteAU.wp_sys_write_au_era γf γs j γl
+                (sysc_fwrite_names γtxl γs j γl fn)
+                pid U v0 v1 v2 M (av - 4)%nat true true ∅
+                fd fv rb i γo (fun _ _ _ _ => True%I)
+                ltac:(lia) Hj Hgamma Hlen eq_refl eq_refl Hv0 Hv1 Hv2
+                eq_refl eq_refl eq_refl Hafd
+                with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs
+                      Hfse Hcaps Htbl Hfr []").
+      { (* THE CHAIN, at the trivial receipt family
+           ([FsAbsInvFire.fsabs_awrite_chain]): every node's step is paid
+           out of the parked license and every offset move out of the fd
+           row's own invariant. *)
+        iApply (fsabs_awrite_chain fsc_fs i γo 0%nat
+                  (wchunks (sys_rw_count v2)) with "Hfsabs Hoinv"). }
+      iIntros (CIDy Hsy mf r P')
+        "%Hcs %Hextz %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout Hfr Harms".
+      iDestruct (write_arms_at_ret with "Harms") as "%Hfwret".
+      assert (Hret' : sys_write_ret (us_V U) v0 (sys_rw_count v2) r)
+        by (right; exists fd, fv; split; [exact Hafd | exact Hfwret]).
+      iDestruct ("Hfrback" $! (FdOpen rb true (FdInode i γo))
+                   with "Hfr Hrow") as "Hufrag".
+      iEval (rewrite (list_insert_id sts fd (FdOpen rb true (FdInode i γo))
+                        Hstq)) in "Hufrag".
+    (* [Hextz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
+    (* NOTHING ABOUT THE BITMAP COMES BACK any more -- filewrite's FD_INODE
+       arm ballocs, and the pool it draws from is an invariant now, so the
+       postcondition says nothing about which blocks are in use.  The three
+       superblock cells are DISCARDED, hence dropped here; the three block
+       slots are the whole of the out-bundle the arm still needs. *)
+    rewrite /SpecFilewrite.filewrite_fs_out /sysc_fwrite_names; cbn.
+    iDestruct "Hout" as "(_ & _ & _ & Hbs)".
+    assert (Htfp' : ud_tfp (pv_upt (upd_upt (us_V U) P')) = ud_tfp (pv_upt (us_V U))).
+    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt pv_fdg]. exact Htf. }
+    assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
+    { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
+    assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt (us_V U) P')))).
+    { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
+      rewrite Htfp'. exact HMs2. }
+    assert (Hmfrest : forall r' : mword 5, is_cs_idx r' = true ->
+              r' <> csp_rs1 -> r' <> Rs0 -> r' <> Rs1 -> r' <> Rs2 ->
+              mf !!! Regidx r' = m !!! Regidx r').
+    { intros r' Hr Ncsp N8 N9 N18.
+      rewrite (callee_saved_lookup Hcs r' Hr). exact (HMother r' Hr Ncsp N8 N9 N18). }
+    assert (Hret : ret_pc (M !!! Regidx Rra)
+                   = (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64))
+      by (rewrite HMra; apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hret) in "Hpc".
+    assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
+      by wp_next_chain.
+    iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
+              (us_upt U P') sts sts ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* this entry never receives the fragment bundle, so its
+                 descriptor row is the identity, at its own number *)
+              ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
+              ltac:(right; reflexivity)
+              ltac:(right; right; exact Hextz)
+              ltac:(right; right; reflexivity)
+              Htfp' ltac:(reflexivity)
+              ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (sysc_num_ne2 _ _ Hnum eq_refl)
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
+    iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    - (* ---- EVERY OTHER DESCRIPTOR: the landed contract ---- *)
     iApply (SysWrite.wp_sys_write_sconf γf γs j γl
               (sysc_fwrite_names γtxl γs j γl fn)
               pid U sts v0 v2 M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma Hlen eq_refl eq_refl Hv0
               (ex_intro _ v1 Hv1) Hv2 eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs
-                    Hfse Hcaps Htbl").
+                    Hfse Hcaps Htbl Hastep").
     iIntros (CIDy Hsy mf r P') "%Hcs %Hextz %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv Hufrag _ Hout".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the

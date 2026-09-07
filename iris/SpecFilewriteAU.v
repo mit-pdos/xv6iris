@@ -109,6 +109,7 @@ Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import Xv6Cameras.
+Require Import BioDefs.         (* [BSIZE]: the disturbed tail's bound      *)
 Require Import SpecFilewrite.   (* the landed contract this parallels       *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -259,6 +260,11 @@ Section FilewriteAUState.
           included -- and both exits read it off unchanged. *)
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
+       (* THE SHORT CHUNK'S RECEIPT (round E2, lane E2-W): [x] is 1 exactly
+          when the chain's PARTIAL arm was spent, and that arm now moves the
+          row as well as the offset, so the instant it fired is receipted
+          ([SpecSysWriteAU.wri_part_receipt]) instead of being silent. *)
+       (⌜x = 0%nat⌝ ∨ wri_part_receipt i Φ p) ∗
        awrite_chain Γ appE i γo Φ (p + x) (wchunks n - p - x)%nat)%I.
 
   Lemma fw_au_raw_init Γ (i : Z) γo (n : Z) M ua Φ :
@@ -270,6 +276,7 @@ Section FilewriteAUState.
     iSplitR; [iPureIntro; lia |].
     iSplitR; [iPureIntro; apply ubytes_at_nil |].
     iSplitR; [iApply wri_receipts_nil |].
+    iSplitR; [iLeft; done |].
     rewrite !Nat.sub_0_r (Nat.add_0_r 0). iExact "Hcm".
   Qed.
 
@@ -298,7 +305,7 @@ Section FilewriteAUState.
     assert (Hsp : (S p <= wchunks n)%nat)
       by exact (wri_count_step n t p Ht Htn Htie).
     rewrite /fw_au_raw.
-    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hx & %Hby & Hrs & Hcm)".
+    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hx & %Hby & Hrs & _ & Hcm)".
     (* the peel: the chain has at least one node left *)
     assert (Hcnt : (wchunks n - p - 0 = S (wchunks n - S p))%nat) by lia.
     rewrite Hcnt (Nat.add_0_r p) awrite_chain_S.
@@ -321,33 +328,46 @@ Section FilewriteAUState.
     iSplitL "Hrs HΦ".
     { iApply (wri_receipts_snoc i Φ bss bs av off bs0 nl Hpre
                 with "Hrs [HΦ]"). rewrite Hlen. iExact "HΦ". }
+    iSplitR; [iLeft; done |].
     rewrite (Nat.add_0_r (S p)) (Nat.sub_0_r (wchunks n - S p)). iExact "Htail".
   Qed.
 
-  (* ONE SHORT CHUNK'S OFFSET MOVE: the head node's PARTIAL arm comes out,
-     and the closer takes the rest of the chain back one node further on,
-     with no receipt -- the state the fail exit reads off. *)
+  (* ONE SHORT CHUNK'S INSTANT (round E2, lane E2-W): the head node's
+     PARTIAL arm comes out, and the closer takes its RECEIPT and the rest of
+     the chain back one node further on.  Before ruling Q-i this arm moved
+     only [f->off] and handed back nothing; it moves the row too now, so the
+     state the fail exit reads off carries what landed. *)
   Lemma fw_au_raw_spend_part Γ (i : Z) γo (n : Z) M ua Φ (t : Z) (p : nat) :
     (0 <= t)%Z -> (t < n)%Z -> t = FW_MAX * Z.of_nat p ->
     fw_au_raw Γ i γo n M ua Φ t p 0%nat -∗
-      awrite_part_at appE γo
+      awrite_part_at Γ appE i γo p Φ
         (awrite_chain Γ appE i γo Φ (S p) (wchunks n - S p)) ∗
-      (awrite_chain Γ appE i γo Φ (S p) (wchunks n - S p) -∗
-       fw_au_raw Γ i γo n M ua Φ t p 1%nat).
+      (∀ (av : aview) (off r : nat) (bs bs0 : list (bv 8)) (nl : nat),
+         ⌜wri_pre av i off bs bs0 nl⌝ -∗
+         ⌜(r <= length bs)%nat⌝ -∗
+         ⌜(length bs <= r + BSIZE)%nat⌝ -∗
+         Φ p av off bs -∗
+         awrite_chain Γ appE i γo Φ (S p) (wchunks n - S p) -∗
+         fw_au_raw Γ i γo n M ua Φ t p 1%nat).
   Proof.
     intros Ht Htn Htie. iIntros "Hst".
     assert (Hsp : (S p <= wchunks n)%nat)
       by exact (wri_count_step n t p Ht Htn Htie).
     rewrite /fw_au_raw.
-    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hx & %Hby & Hrs & Hcm)".
+    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hx & %Hby & Hrs & _ & Hcm)".
     assert (Hcnt : (wchunks n - p - 0 = S (wchunks n - S p))%nat) by lia.
     rewrite Hcnt (Nat.add_0_r p) awrite_chain_S.
     iDestruct "Hcm" as "[_ Hpart]".
-    iFrame "Hpart". iIntros "Htail".
+    iFrame "Hpart". iIntros (av off r bs bs0 nl) "%Hpre %Hr %Hgap HΦ Htail".
     iExists bss.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
     iSplitR; [by iPureIntro |]. iFrame "Hrs".
+    iSplitL "HΦ".
+    { iRight. rewrite /wri_part_receipt.
+      iExists av, off, r, bs, bs0, nl.
+      iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+      iSplitR; [by iPureIntro |]. iExact "HΦ". }
     assert (Hcnt' : (wchunks n - p - 1 = wchunks n - S p)%nat) by lia.
     rewrite Hcnt' Nat.add_1_r. iExact "Htail".
   Qed.
@@ -357,7 +377,7 @@ Section FilewriteAUState.
     fw_au_raw Γ i γo n M ua Φ n p 0%nat -∗ write_post_ok_at Γ i γo n M ua Φ.
   Proof.
     iIntros "Hst". rewrite /fw_au_raw /write_post_ok_at.
-    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hx & %Hby & Hrs & Hcm)".
+    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hx & %Hby & Hrs & _ & Hcm)".
     iExists bss. iSplitR; [by iPureIntro |].
     iSplitR; [iPureIntro; lia |]. iSplitR; [by iPureIntro |].
     iFrame "Hrs". rewrite Hlen (Nat.add_0_r p) (Nat.sub_0_r (wchunks n - p)). iExact "Hcm".
@@ -372,7 +392,7 @@ Section FilewriteAUState.
     fw_au_raw Γ i γo n M ua Φ t p x -∗ write_post_fail_at Γ i γo n M ua Φ.
   Proof.
     intros Hex. iIntros "Hst". rewrite /fw_au_raw /write_post_fail_at.
-    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hx & %Hby & Hrs & Hcm)".
+    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hx & %Hby & Hrs & Hpr & Hcm)".
     iExists bss, x. iSplitR.
     { iPureIntro. destruct Hex as [Htn | [Hneg Hp0]].
       - left. lia.
@@ -380,7 +400,7 @@ Section FilewriteAUState.
         apply nil_length_inv. rewrite Hlen. exact Hp0. }
     iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
     iSplitR; [by iPureIntro |].
-    iFrame "Hrs". rewrite Hlen. iExact "Hcm".
+    iFrame "Hrs". rewrite Hlen. iSplitL "Hpr"; [iExact "Hpr" |]. iExact "Hcm".
   Qed.
 
 End FilewriteAUState.
