@@ -375,12 +375,13 @@ hwtest: hwtest-gen-all vtest-check
 # ONE SET OF CASES (tools/vtest/tests/*.S), each declaring in its own
 # `vtest:` directive which PLATFORMS it is meaningful on.  A case executed
 # on a platform is a test RUN; every run is a [VRun.TEST_RUN] and is judged
-# by [VRun.TEST_PASSES], which is stated ONCE and parametric in the run.
+# by [VRun.TEST_PASSES_AGREE] or [VRun.TEST_PASSES_STUCK], each stated once
+# and parametric in the test.
 #
 #   make vtest-runs    rebuild the run modules from the checked-in captures
 #                      (no QEMU, no board -- a run module is a
 #                      re-presentation of a capture, not a measurement)
-#   make vtest-passes  ATTEMPT every run's TEST_PASSES instantiation, then
+#   make vtest-passes  ATTEMPT every run's proof, then
 #                      rewrite _CoqProject with the ones that held
 #   make vtest-table   THE TABLE: every case, its runs on each platform, and
 #                      whether that run has a passing proof

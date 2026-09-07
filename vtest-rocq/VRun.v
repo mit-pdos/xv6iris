@@ -17,12 +17,10 @@
 (*   the model's own nondeterminism are WITNESSES, so they live in the     *)
 (*   proof and appear in no statement.                                     *)
 (*                                                                         *)
-(*   THE MODEL'S BEHAVIOUR IS NEITHER, and used to be a FIELD of the run   *)
-(*   ([outcome : model_outcome]).  That is why the top-level theorem said  *)
-(*   nothing: [run_passes observed outcome] related two data, named no     *)
-(*   program, no state and no step relation, and on the stuck branch was   *)
-(*   literally [True].  It is now QUANTIFIED OVER, in a proposition that   *)
-(*   names the test's own initial state.                                   *)
+(*   THE MODEL'S BEHAVIOUR IS NEITHER.  It is not a field of the run: a    *)
+(*   claim relating two stored values names no program, no state and no    *)
+(*   step relation.  It is QUANTIFIED OVER, out of the initial state the   *)
+(*   test fixes.                                                           *)
 (*                                                                         *)
 (* THE JUDGEMENT is unchanged and one-directional: is what the real        *)
 (* machine did an execution our model ALLOWS?  A run passes when           *)
@@ -213,13 +211,13 @@ Definition thread_no_step (g : gstate) (e : mexpr) : Prop :=
 (* 4. A RUN OF A TEST, and the theorem.                                    *)
 (*                                                                         *)
 (*    A run has no [outcome].  What the model does is not data the run     *)
-(*    carries; it is what [run_passes] quantifies over, out of the initial *)
+(*    carries; it is what the two claims below quantify over, out of the   *)
 (*    state [T] fixes -- and [start] is a DEFINITION here, not a           *)
 (*    parameter, so a run of [T] has [T]'s machine by construction.        *)
 (*                                                                         *)
 (*    [picks], [tick] and [budget] are fields because a proof has to name  *)
 (*    the witnesses it computed with, but NONE of them appears in the      *)
-(*    theorem: [run_passes] quantifies them existentially.  What is        *)
+(*    theorem: the claims quantify them existentially.  What is            *)
 (*    claimed is "the model has such an execution", not "it has one within *)
 (*    2000 steps with the clock held still and the disk answering its      *)
 (*    lowest in-flight head".                                              *)
@@ -234,16 +232,15 @@ Module Type TEST_RUN (T : TEST).
      experiment rather than its result), and the resolutions of the MODEL's
      own nondeterminism -- how long to run, whether the clock ticks, which
      in-flight request the disk answers.  Those are witnesses for the
-     existentials in [run_passes], so they live in the PROOF, as arguments
-     to [run_passes_b_sound], and appear in no statement. *)
+     existentials in the claims below, so they live in the PROOF, as
+     arguments to [VExecStep]'s wrappers, and appear in no statement. *)
   Parameter observed : list observation.
 End TEST_RUN.
 
 (* THE THEOREM, over the test's own initial state. *)
-(* THE TWO WAYS A RUN PASSES, as two separate claims.  They are the
-   disjuncts of [run_passes], and a run proves ONE of them -- which one is
-   then part of what its file SAYS, in its module ascription, rather than a
-   remark in a header.
+(* THE TWO WAYS A RUN PASSES, as two separate claims.  A run proves ONE of
+   them, and which one is part of what its file SAYS -- its module
+   ascription -- rather than a remark in a header.
 
    THEY ARE NOT THE SAME KIND OF FACT.  [run_agrees] is about the
    observations: the model exhibits each of them, from this test's own
@@ -273,26 +270,6 @@ Definition run_no_step_at (hart : Z) (text : list Z) (rs : list region)
     /\ obs_in l = uart_input
     /\ In e ts /\ thread_no_step g e.
 
-Definition run_passes (hart : Z) (text : list Z) (rs : list region)
-    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
-    (observed : list observation) : Prop :=
-  run_agrees hart text rs uart_input disk_init observed
-  \/ run_no_step_at hart text rs uart_input disk_init.
-
-Lemma passes_of_agrees (hart : Z) (text : list Z) (rs : list region)
-    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
-    (observed : list observation) :
-  run_agrees hart text rs uart_input disk_init observed ->
-  run_passes hart text rs uart_input disk_init observed.
-Proof. intros H. left. exact H. Qed.
-
-Lemma passes_of_no_step (hart : Z) (text : list Z) (rs : list region)
-    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
-    (observed : list observation) :
-  run_no_step_at hart text rs uart_input disk_init ->
-  run_passes hart text rs uart_input disk_init observed.
-Proof. intros H. right. exact H. Qed.
-
 (* A run that AGREES.  Its statement names the run, because it is about
    what the run measured. *)
 Module Type TEST_PASSES_AGREE (T : TEST) (R : TEST_RUN T).
@@ -309,8 +286,3 @@ Module Type TEST_PASSES_STUCK (T : TEST).
     run_no_step_at T.hart T.text T.regions T.uart_input T.disk_init.
 End TEST_PASSES_STUCK.
 
-(* ...and the disjunction, for a caller that does not care which. *)
-Module Type TEST_PASSES (T : TEST) (R : TEST_RUN T).
-  Axiom passes :
-    run_passes T.hart T.text T.regions T.uart_input T.disk_init R.observed.
-End TEST_PASSES.

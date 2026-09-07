@@ -381,9 +381,8 @@ def hand_written(fname, platform=None):
     not: a race whose interleavings nobody has worked out, or one whose model
     side is not an evaluation at all.  Rather than emit something wrong, the
     generator emits NOTHING for those and a hand-written file supplies the
-    run or its proof -- still a [VRun.TEST_RUN] and a [VRun.TEST_PASSES], so
-    the table judges it exactly like any other and nothing about the theorem
-    changes.
+    run or its proof -- still a [VRun.TEST_RUN] and one of the two pass
+    module types, so the table judges it exactly like any other.
 
     The marker is the generator's own header, so this cannot drift: a file
     the generator wrote says so, and anything else is somebody's work."""
@@ -600,7 +599,7 @@ def _built_at_all():
 
 
 def _passing(platform):
-    """The runs whose [TEST_PASSES] instantiation compiles.
+    """The runs whose proof compiles.
 
     THE PROJECT IS THE RECORD.  A Pass module is listed in _CoqProject
     exactly when it holds, and `make vtest-check` -- which CI runs -- fails
@@ -666,7 +665,7 @@ def print_table(fmt="text"):
     that run has a passing proof.
 
     Everything is read off the tree -- the case's own directive, whether a
-    run module exists, whether its [TEST_PASSES] instantiation compiles --
+    run module exists, whether its proof compiles --
     so it cannot drift."""
     rows = [(n, _run_state(n, "qemu"), _run_state(n, "jh7110"))
             for n in all_tests()]
@@ -706,7 +705,7 @@ def print_table(fmt="text"):
 |---|---|
 | **pass** (agrees) | the model EXHIBITS every observation this platform produced, from the test's own configuration |
 | **pass** (stuck) | this test's execution reaches a thread the RELATION cannot step from.  Also a pass, and a real one — a state the model cannot leave is one no proof can reach, so it costs REACH and not soundness — but it says nothing about what the platform observed |
-| no proof | the run exists, but its `TEST_PASSES` instantiation does not compile: the model does not exhibit what the platform observed |
+| no proof | there is a run and no proof of it |
 | — | the case does not declare this platform: the question cannot be asked there (no disk on the board, a program the board traps on) |""")
     else:
         print(line)
