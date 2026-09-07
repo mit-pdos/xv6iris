@@ -23,7 +23,10 @@ binaries at every reboot).
 
 ## Lanes (design §6), with what each unblocks
 
-- [ ] **L2 — the step moves to the process.**  The returning-ecall arm's
+- [ ] **L2 — the step moves to the process.**  PROPOSAL WRITTEN 2026-09-07:
+  [`app-round-l2.md`](app-round-l2.md) (a persistent per-call give on the ecall
+  arm, dischargers off it, `Happ_auto` deleted, echo's taint disjunct); four
+  owner questions at its end.  The returning-ecall arm's
   persistent give carrying `app_step`, the AU fires taking it from there,
   the generic slot at `taint -∗ □ uexec_wp`; then `app_auto`/`app_auto_raw`/
   `Happ_auto`/`app_step_of_auto`/`app_step_acc` — the era-wide blanket

@@ -11,9 +11,9 @@
 > E2-F was cancelled by the nlink-0 ruling (Q-d); the fd-row follow-up the ruling created (reads
 > through an fd of an unlinked file get their contents from a per-fd resource) is open.
 >
-> NEXT: app-echo.md's lanes L2, L5, L6, L7.  L2 is the owner-scoped seam design
-> (`design/fd-row-pilot.md` §2's deposit disjunct at a persistent payload carrying `app_step`);
-> write the proposal before any lane brief.  Standing rules: lanes run ONE AT A TIME in the
+> NEXT: app-echo.md's lanes L2, L5, L6, L7.  L2's PROPOSAL IS WRITTEN (`app-round-l2.md`: a
+> persistent per-call give on the ecall arm; four owner questions at its end) — no lane brief
+> until the owner rules.  Standing rules: lanes run ONE AT A TIME in the
 > session's own checkout; build only through the script atop the briefs file; verify a lane by
 > checksumming its files against the VM's copy, zero `Error` lines, `make audit-only` = 13 from the
 > tree root, both audited statements byte-identical, no Admitted/Axiom; then commit iris and
