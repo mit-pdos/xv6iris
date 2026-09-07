@@ -132,8 +132,14 @@ Module Type TEST.
      were free to choose them, "the model can produce this output for SOME
      input" is what would be proved, which for a receiving test is no check
      at all.  The UART is the only input a test has; when there is another
-     it gets its own field rather than being folded in here. *)
-  Parameter uart_input : list Z.
+     it gets its own field rather than being folded in here.
+
+     BYTES, not [Z].  What the host types is a byte, and saying so is what
+     makes [obs_in] of a delivered input the identity rather than the
+     identity-on-values-that-happen-to-fit; the alternative is a range side
+     condition on the theorem, which would be the same fact written where
+     it cannot be checked. *)
+  Parameter uart_input : list (bv 8).
   (* ...AND THE DISK IT STARTS FROM, by absolute sector number.  Blank for
      every test written so far, and unrepresentable until now: a test that
      reads a sector it did not itself write could not be stated at all. *)
@@ -183,10 +189,10 @@ Definition test_config (hart : Z) (text : list Z) (rs : list region)
    theorem below is over [nsteps], where the trace survives, and not over
    [erased_step], where it does not.  ([ObsTrace.obs_wire] is the output
    half of the same idea, and equals the [u_wire] read below.) *)
-Fixpoint obs_in (l : list mobs) : list Z :=
+Fixpoint obs_in (l : list mobs) : list (bv 8) :=
   match l with
   | [] => []
-  | ObsUartIn b :: l' => bv_unsigned b :: obs_in l'
+  | ObsUartIn b :: l' => b :: obs_in l'
   | _ :: l' => obs_in l'
   end.
 
@@ -235,7 +241,7 @@ End TEST_RUN.
 
 (* THE THEOREM, over the test's own initial state. *)
 Definition run_passes (hart : Z) (text : list Z) (rs : list region)
-    (uart_input : list Z) (disk_init : list (Z * list Z))
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
     (observed : list observation) : Prop :=
   let c0 := test_config hart text rs disk_init in
   (forall o, In o observed ->

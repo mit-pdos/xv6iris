@@ -807,7 +807,9 @@ Lemma sapply_uart_tx (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate) :
   exists kappa g',
     prim_step (UartLoopE gen) g kappa (UartLoopE gen) g' []
     /\ hart_ok cpu g' s' /\ thread_live g' gen
-             /\ g'.(gresv) = g.(gresv).
+    /\ g'.(gresv) = g.(gresv)
+    (* a transmitted byte is an OUTPUT: it types nothing *)
+    /\ obs_in kappa = [].
 Proof.
   intros Hlive Hok Hap.
   pose proof (ho_dev _ _ _ Hok) as Hd.
@@ -817,7 +819,7 @@ Proof.
   revert Hap; intros [= <-].
   exists (if uart_loopback (duart (gdev g)) then [] else [ObsUartOut b]),
          (wdev g (set_duart (gdev g) u')).
-  split; [|split; [|split]].
+  split; [|split; [|split; [|split]]].
   - unfold prim_step. right. left. exists gen.
     split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
     left. split; [exact Hlive|].
@@ -826,6 +828,7 @@ Proof.
   - rewrite Hd at 1. apply (hart_ok_wdev cpu g s _ Hok Hd).
   - apply thread_live_wdev. exact Hlive.
   - reflexivity.
+  - destruct (uart_loopback (duart (gdev g))); reflexivity.
 Qed.
 
 (* THE RECEIVE ARM: the host types a byte.  This is the step the test's
@@ -1242,6 +1245,18 @@ Definition dev_item (i : sitem) : bool :=
   | _ => true
   end.
 
+Lemma obs_in_app (l1 l2 : list mobs) :
+  obs_in (l1 ++ l2) = obs_in l1 ++ obs_in l2.
+Proof.
+  induction l1 as [|e l1' IH]; [reflexivity|].
+  destruct e; cbn [obs_in app]; rewrite IH; reflexivity.
+Qed.
+
+(* WHICH ITEMS TYPE.  Only [SUartRx] puts an [ObsUartIn] in the trace, which
+   is what lets a run report that it consumed no input of its own. *)
+Definition item_no_input (i : sitem) : bool :=
+  match i with SUartRx _ => false | _ => true end.
+
 (* [sapply_sound]: ONE SCHEDULE ITEM IS ONE DEVICE THREAD'S [prim_step].
    The pool is unchanged because every device arm has [e' = e]. *)
 Lemma sapply_dev_nsteps (gen : nat) (ts : list mexpr) (i : sitem)
@@ -1255,7 +1270,8 @@ Lemma sapply_dev_nsteps (gen : nat) (ts : list mexpr) (i : sitem)
   exists kappa g',
     @language.nsteps riscv_lang 1 (ts, g) kappa (ts, g')
     /\ hart_ok hart_primary g' s' /\ thread_live g' gen
-    /\ all_resv g'.(gresv) = ∅.
+    /\ all_resv g'.(gresv) = ∅
+    /\ (item_no_input i = true -> obs_in kappa = []).
 Proof.
   intros Hu Hdk Hp Hlive Hok Hres Hdev Hap.
   (* every branch: replay that item's lemma, lift, and note [gresv] did not
@@ -1263,66 +1279,75 @@ Proof.
   destruct i; cbn [dev_item] in Hdev; try discriminate Hdev.
   - (* SUartTx *)
     destruct (sapply_uart_tx gen hart_primary g s s' Hlive Hok Hap)
-      as (kap & g2 & Hps & Hok2 & Hlv2 & Hg2).
+      as (kap & g2 & Hps & Hok2 & Hlv2 & Hg2 & Hq2).
     exists kap, g2. split; [exact (dev_prim_nsteps _ _ _ _ _ Hu Hps)|].
     split; [exact Hok2|]. split; [exact Hlv2|].
-    unfold all_resv. rewrite Hg2. exact Hres.
+    split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. exact Hq2.
   - (* SUartRx *)
     destruct (sapply_uart_rx gen hart_primary _ g s s' Hlive Hok Hap)
       as (g2 & Hps & Hok2 & Hlv2 & Hg2).
     exists [ObsUartIn (Z_to_bv 8 b)], g2.
     split; [exact (dev_prim_nsteps _ _ _ _ _ Hu Hps)|].
     split; [exact Hok2|]. split; [exact Hlv2|].
-    unfold all_resv. rewrite Hg2. exact Hres.
+    split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros H. discriminate H.
   - (* SDiskPop *)
     destruct (sapply_disk_pop gen hart_primary g s s' Hlive Hok Hap)
       as (g2 & Hps & Hok2 & Hlv2 & Hg2).
     exists (@nil mobs), g2.
     split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
     split; [exact Hok2|]. split; [exact Hlv2|].
-    unfold all_resv. rewrite Hg2. exact Hres.
+    split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. reflexivity.
   - (* SDiskFetch *)
     destruct (sapply_disk_fetch gen hart_primary _ g s s' Hlive Hok Hap)
       as (g2 & Hps & Hok2 & Hlv2 & Hg2).
     exists (@nil mobs), g2.
     split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
     split; [exact Hok2|]. split; [exact Hlv2|].
-    unfold all_resv. rewrite Hg2. exact Hres.
+    split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. reflexivity.
   - (* SDiskCapture *)
     destruct (sapply_disk_capture gen hart_primary _ g s s' Hlive Hok Hap)
       as (g2 & Hps & Hok2 & Hlv2 & Hg2).
     exists (@nil mobs), g2.
     split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
     split; [exact Hok2|]. split; [exact Hlv2|].
-    unfold all_resv. rewrite Hg2. exact Hres.
+    split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. reflexivity.
   - (* SDiskWrite *)
     destruct (sapply_disk_write gen hart_primary _ g s s' Hlive Hok Hres Hap)
       as (g2 & Hps & Hok2 & Hlv2 & Hg2).
     exists (@nil mobs), g2.
     split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
     split; [exact Hok2|]. split; [exact Hlv2|].
-    unfold all_resv. rewrite Hg2. exact Hres.
+    split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. reflexivity.
   - (* SDiskDma *)
     destruct (sapply_disk_dma gen hart_primary _ g s s' Hlive Hok Hres Hap)
       as (g2 & Hps & Hok2 & Hlv2 & Hg2).
     exists (@nil mobs), g2.
     split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
     split; [exact Hok2|]. split; [exact Hlv2|].
-    unfold all_resv. rewrite Hg2. exact Hres.
+    split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. reflexivity.
   - (* SDiskDrain *)
     destruct (sapply_disk_drain gen hart_primary _ g s s' Hlive Hok Hap)
       as (g2 & Hps & Hok2 & Hlv2 & Hg2).
     exists (@nil mobs), g2.
     split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
     split; [exact Hok2|]. split; [exact Hlv2|].
-    unfold all_resv. rewrite Hg2. exact Hres.
+    split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. reflexivity.
   - (* SDiskWild *)
     destruct (sapply_disk_wild gen hart_primary _ g s s' Hlive Hok Hres Hap)
       as (g2 & Hps & Hok2 & Hlv2 & Hg2).
     exists (@nil mobs), g2.
     split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
     split; [exact Hok2|]. split; [exact Hlv2|].
-    unfold all_resv. rewrite Hg2. exact Hres.
+    split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. reflexivity.
   - (* SLatch: the UART's source or the disk's *)
     apply orb_prop in Hdev. destruct Hdev as [Hsrc|Hsrc];
       apply bool_decide_eq_true in Hsrc; subst.
@@ -1331,13 +1356,15 @@ Proof.
       exists (@nil mobs), g2.
       split; [exact (dev_prim_nsteps _ _ _ _ _ Hu Hps)|].
       split; [exact Hok2|]. split; [exact Hlv2|].
-      unfold all_resv. rewrite Hg2. exact Hres.
+      split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. reflexivity.
     + destruct (sapply_disk_latch gen hart_primary g s s' Hlive Hok Hap)
         as (g2 & Hps & Hok2 & Hlv2 & Hg2).
       exists (@nil mobs), g2.
       split; [exact (dev_prim_nsteps _ _ _ _ _ Hdk Hps)|].
       split; [exact Hok2|]. split; [exact Hlv2|].
-      unfold all_resv. rewrite Hg2. exact Hres.
+      split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. reflexivity.
   - (* SWire *)
     apply bool_decide_eq_true in Hdev; subst.
     destruct (sapply_wire gen hart_primary g s s' Hlive Hok Hap)
@@ -1345,7 +1372,8 @@ Proof.
     exists (@nil mobs), g2.
     split; [exact (dev_prim_nsteps _ _ _ _ _ Hp Hps)|].
     split; [exact Hok2|]. split; [exact Hlv2|].
-    unfold all_resv. rewrite Hg2. exact Hres.
+    split; [unfold all_resv; rewrite Hg2; exact Hres|].
+    intros _. reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1372,7 +1400,8 @@ Qed.
 Lemma settle1_item_w (pick : virtio_state -> option Z) (s s' : mstate)
     (w : gmap Arch.pa (bv 8)) :
   settle1_gated_w pick true s = Some (s', w) ->
-  exists i, dev_item i = true /\ sapply_w i s = Some (s', w).
+  exists i, dev_item i = true /\ item_no_input i = true
+            /\ sapply_w i s = Some (s', w).
 Proof.
   unfold settle1_gated_w, pick_at_w, drain_one_w, settle_wire_w. intros H.
   repeat (match type of H with
@@ -1388,19 +1417,22 @@ Proof.
     match goal with
     | Heq : sapply_w ?i s = Some (_, _) |- _ =>
         exists i; split;
-        [ first [reflexivity | vm_compute; reflexivity] | exact Heq ]
+        [ first [reflexivity | vm_compute; reflexivity] | split;
+          [ first [reflexivity | vm_compute; reflexivity] | exact Heq ] ]
     end.
 Qed.
 
 Lemma settle1_item (pick : virtio_state -> option Z) (s s' : mstate) :
   settle1_at pick s = Some s' ->
-  exists i, dev_item i = true /\ sapply i s = Some s'.
+  exists i, dev_item i = true /\ item_no_input i = true
+            /\ sapply i s = Some s'.
 Proof.
   unfold settle1_at, settle1_gated. intros H.
   destruct (settle1_gated_w pick true s) as [[s1 w1]|] eqn:E; [|discriminate H].
   revert H; intros [= <-].
-  destruct (settle1_item_w pick s s1 w1 E) as (i & Hd & Hw).
-  exists i. split; [exact Hd|]. unfold sapply. rewrite Hw. reflexivity.
+  destruct (settle1_item_w pick s s1 w1 E) as (i & Hd & Hq & Hw).
+  exists i. split; [exact Hd|]. split; [exact Hq|].
+  unfold sapply. rewrite Hw. reflexivity.
 Qed.
 
 Lemma settle1_nsteps (gen : nat) (ts : list mexpr) (g : gstate)
@@ -1413,11 +1445,14 @@ Lemma settle1_nsteps (gen : nat) (ts : list mexpr) (g : gstate)
   exists kappa g',
     @language.nsteps riscv_lang 1 (ts, g) kappa (ts, g')
     /\ hart_ok hart_primary g' s' /\ thread_live g' gen
-    /\ all_resv g'.(gresv) = ∅.
+    /\ all_resv g'.(gresv) = ∅ /\ obs_in kappa = [].
 Proof.
   intros Hu Hdk Hp Hlive Hok Hres Hset.
-  destruct (settle1_item pick s s' Hset) as (i & Hd & Hap).
-  exact (sapply_dev_nsteps gen ts i g s s' Hu Hdk Hp Hlive Hok Hres Hd Hap).
+  destruct (settle1_item pick s s' Hset) as (i & Hd & Hq & Hap).
+  destruct (sapply_dev_nsteps gen ts i g s s' Hu Hdk Hp Hlive Hok Hres Hd Hap)
+    as (kappa & g' & Hn & Hok' & Hlv & Hres' & Hqu).
+  exists kappa, g'. split; [exact Hn|]. split; [exact Hok'|].
+  split; [exact Hlv|]. split; [exact Hres'|]. exact (Hqu Hq).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1451,26 +1486,29 @@ Lemma settle_nsteps (gen : nat) (ts : list mexpr)
   exists n kappa g',
     @language.nsteps riscv_lang n (ts, g) kappa (ts, g')
     /\ hart_ok hart_primary g' (settle_at pick fuel s)
-    /\ thread_live g' gen /\ all_resv g'.(gresv) = ∅.
+    /\ thread_live g' gen /\ all_resv g'.(gresv) = ∅
+    /\ obs_in kappa = [].
 Proof.
   intros Hu Hdk Hp. induction fuel as [|f IH]; intros g s Hlive Hok Hres.
   - exists 0%nat, [], g. split; [apply language.nsteps_refl|].
-    split; [exact Hok|]. split; assumption.
+    split; [exact Hok|]. split; [assumption|]. split; [assumption|reflexivity].
   - unfold settle_at, settle_gated. cbn [settle_gated_w].
     destruct (settle1_gated_w pick true s) as [[s1 w1]|] eqn:E1.
     + assert (Hs1 : settle1_at pick s = Some s1)
         by (unfold settle1_at, settle1_gated; rewrite E1; reflexivity).
       destruct (settle1_nsteps gen ts g s s1 pick Hu Hdk Hp Hlive Hok Hres Hs1)
-        as (k1 & g1 & Hn1 & Hok1 & Hlv1 & Hres1).
+        as (k1 & g1 & Hn1 & Hok1 & Hlv1 & Hres1 & Hq1).
       destruct (IH g1 s1 Hlv1 Hok1 Hres1)
-        as (n2 & k2 & g2 & Hn2 & Hok2 & Hlv2 & Hres2).
+        as (n2 & k2 & g2 & Hn2 & Hok2 & Hlv2 & Hres2 & Hq2).
       exists (1 + n2)%nat, (k1 ++ k2), g2.
       split; [exact (nsteps_trans _ _ _ _ _ _ _ Hn1 Hn2)|].
       destruct (settle_gated_w pick true f s1) as [s'' ws] eqn:E2.
       cbn [fst]. unfold settle_at, settle_gated in Hok2. rewrite E2 in Hok2.
-      cbn [fst] in Hok2. split; [exact Hok2|]. split; assumption.
+      cbn [fst] in Hok2. split; [exact Hok2|]. split; [assumption|].
+      split; [assumption|]. rewrite obs_in_app, Hq1, Hq2. reflexivity.
     + exists 0%nat, [], g. split; [apply language.nsteps_refl|].
-      cbn [fst]. split; [exact Hok|]. split; assumption.
+      cbn [fst]. split; [exact Hok|]. split; [assumption|].
+      split; [assumption|reflexivity].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1547,17 +1585,18 @@ Lemma eval_run_nsteps (tick : bool) (gen : nat)
     @language.nsteps riscv_lang N
       (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2, g) kappa
       (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2, g')
-    /\ hart_ok hart_primary g' sf /\ thread_live g' gen.
+    /\ hart_ok hart_primary g' sf /\ thread_live g' gen
+    /\ obs_in kappa = [].
 Proof.
   intros Hu Hdk Hp. induction n as [|n' IH]; intros g s sf Hlive Hok Hres Hev.
   - rewrite eval_run_at_O in Hev. destruct (flag_set s) eqn:Hf; [|discriminate].
     revert Hev; intros [= <-].
     exists 0%nat, [], g. split; [apply language.nsteps_refl|].
-    split; [exact Hok|exact Hlive].
+    split; [exact Hok|]. split; [exact Hlive|reflexivity].
   - rewrite eval_run_at_S in Hev. destruct (flag_set s) eqn:Hf.
     { revert Hev; intros [= <-].
       exists 0%nat, [], g. split; [apply language.nsteps_refl|].
-      split; [exact Hok|exact Hlive]. }
+      split; [exact Hok|]. split; [exact Hlive|reflexivity]. }
     destruct (exec_r (riscv_step tick) s) as [[u s1]|e] eqn:Hex;
       [|discriminate Hev].
     (* 1. the instruction *)
@@ -1573,12 +1612,13 @@ Proof.
                 pick dev_fuel
                 (elem_of_pool _ _ _ _ Hu) (elem_of_pool _ _ _ _ Hdk)
                 (elem_of_pool _ _ _ _ Hp) g2 s1 Hlv2 Hok2 Hres2)
-      as (N3 & k3 & g3 & Hn3 & Hok3 & Hlv3 & Hres3).
+      as (N3 & k3 & g3 & Hn3 & Hok3 & Hlv3 & Hres3 & Hq3).
     (* 4. and around again *)
     destruct (IH g3 (settle_at pick dev_fuel s1) sf Hlv3 Hok3 Hres3 Hev)
-      as (N4 & k4 & g4 & Hn4 & Hok4 & Hlv4).
+      as (N4 & k4 & g4 & Hn4 & Hok4 & Hlv4 & Hq4).
     exists (N1 + S (N3 + N4))%nat, (k3 ++ k4), g4.
-    split; [|split; assumption].
+    split; [|split; [exact Hok4|split; [exact Hlv4|]]];
+      [|rewrite obs_in_app, Hq3, Hq4; reflexivity].
     apply (nsteps_trans _ _ _ _ _ _ _ Hn1).
     apply (nsteps_l_silent _ _ _ _ _
              (hstep_step gen hart_primary t1 t2 (Interface.Ret u)
@@ -1626,7 +1666,8 @@ Qed.
    THEOREM does not mention this -- it pins the input through the trace --
    which is exactly why this is the interpreter's business and not
    VRun.v's. *)
-Definition uart_pre (bs : list Z) : list sitem := List.map SUartRx bs.
+Definition uart_pre (bs : list (bv 8)) : list sitem :=
+  List.map (fun b => SUartRx (bv_unsigned b)) bs.
 
 Lemma srun_cons (i : sitem) (is : list sitem) (s : mstate) :
   srun (i :: is) s
@@ -1636,7 +1677,7 @@ Proof.
   induction is as [|j js IH]; [reflexivity|]. cbn [foldl]. exact IH.
 Qed.
 
-Lemma srun_uart_nsteps (gen : nat) (ts : list mexpr) (bs : list Z) :
+Lemma srun_uart_nsteps (gen : nat) (ts : list mexpr) (bs : list (bv 8)) :
   UartLoopE gen ∈ ts -> DiskLoopE gen ∈ ts -> PlicLoopE gen ∈ ts ->
   forall (g : gstate) (s s1 : mstate),
   thread_live g gen ->
@@ -1644,8 +1685,7 @@ Lemma srun_uart_nsteps (gen : nat) (ts : list mexpr) (bs : list Z) :
   all_resv g.(gresv) = ∅ ->
   srun (uart_pre bs) s = Some s1 ->
   exists N g',
-    @language.nsteps riscv_lang N (ts, g)
-      (List.map (fun b => ObsUartIn (Z_to_bv 8 b)) bs) (ts, g')
+    @language.nsteps riscv_lang N (ts, g) (List.map ObsUartIn bs) (ts, g')
     /\ hart_ok hart_primary g' s1 /\ thread_live g' gen
     /\ all_resv g'.(gresv) = ∅.
 Proof.
@@ -1659,11 +1699,13 @@ Proof.
     split; [exact Hok|]. split; assumption.
   - unfold uart_pre in Hrun; cbn [List.map] in Hrun.
     rewrite srun_cons in Hrun.
-    destruct (sapply (SUartRx b) s) as [sa|] eqn:E; [|discriminate Hrun].
+    destruct (sapply (SUartRx (bv_unsigned b)) s) as [sa|] eqn:E;
+      [|discriminate Hrun].
     (* the item's OWN lemma, not the dispatcher: the trace of this step is
        exactly this byte, and the dispatcher hides it behind an existential *)
-    destruct (sapply_uart_rx gen hart_primary b g s sa Hlive Hok E)
-      as (g1 & Hps & Hok1 & Hlv1 & Hg1).
+    destruct (sapply_uart_rx gen hart_primary (bv_unsigned b) g s sa
+                Hlive Hok E) as (g1 & Hps & Hok1 & Hlv1 & Hg1).
+    rewrite Z_to_bv_bv_unsigned in Hps.
     pose proof (dev_prim_nsteps ts (UartLoopE gen) g g1 _ Hu Hps) as Hn1.
     assert (Hres1 : all_resv g1.(gresv) = ∅)
       by (unfold all_resv; rewrite Hg1; exact Hres).
@@ -1671,21 +1713,98 @@ Proof.
       as (N2 & g2 & Hn2 & Hok2 & Hlv2 & Hres2).
     exists (1 + N2)%nat, g2. split; [|split; [exact Hok2|split; assumption]].
     cbn [List.map].
-    replace (ObsUartIn (Z_to_bv 8 b)
-             :: List.map (fun b0 => ObsUartIn (Z_to_bv 8 b0)) bs')
-      with ([ObsUartIn (Z_to_bv 8 b)]
-            ++ List.map (fun b0 => ObsUartIn (Z_to_bv 8 b0)) bs')
-      by reflexivity.
+    replace (ObsUartIn b :: List.map ObsUartIn bs')
+      with ([ObsUartIn b] ++ List.map ObsUartIn bs') by reflexivity.
     apply (nsteps_trans _ _ _ _ _ _ _ Hn1 Hn2).
 Qed.
 
-(* ...and what that trace says the host typed.  The round trip is the
-   identity exactly on real BYTES -- which is what a test's input is, and
-   what makes this the right side condition to state rather than assume. *)
-Lemma obs_in_uart_pre (bs : list Z) :
-  obs_in (List.map (fun b => ObsUartIn (Z_to_bv 8 b)) bs)
-  = List.map (fun b => bv_unsigned (Z_to_bv 8 b)) bs.
+(* ...and the trace says exactly what the host typed.  Because the input is
+   BYTES the round trip is the identity outright, with no range side
+   condition anywhere. *)
+Lemma obs_in_uart_pre (bs : list (bv 8)) :
+  obs_in (List.map ObsUartIn bs) = bs.
 Proof.
   induction bs as [|b bs' IH]; [reflexivity|]. cbn [List.map obs_in].
   rewrite IH. reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 20. THE WHOLE THING.                                                    *)
+(*                                                                         *)
+(*     What the suite computes for a test -- deliver the input, then run   *)
+(*     until it publishes -- is an execution of the language from the      *)
+(*     test's own configuration, whose trace types exactly the test's      *)
+(*     input and whose final state shows what the harness saw.  That is    *)
+(*     the first disjunct of [VRun.run_passes], for one observation.       *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma power_fork_split (gen : nat) :
+  exists t1 t2,
+    power_fork gen = t1 ++ HartE gen hart_primary (Interface.Ret tt) :: t2
+    /\ UartLoopE gen ∈ t1 ++ t2
+    /\ DiskLoopE gen ∈ t1 ++ t2
+    /\ PlicLoopE gen ∈ t1 ++ t2.
+Proof.
+  unfold power_fork.
+  assert (Hin : LoopE gen hart_primary ∈ (LoopE gen <$> finite.enum CPU)).
+  { apply elem_of_list_fmap. exists hart_primary.
+    split; [reflexivity|apply finite.elem_of_enum]. }
+  apply elem_of_list_split in Hin as (u1 & u2 & Heq).
+  exists u1, (u2 ++ [UartLoopE gen; DiskLoopE gen; PlicLoopE gen]).
+  split; [rewrite Heq, <- app_assoc; reflexivity|].
+  split; [|split];
+    apply elem_of_app; right; apply elem_of_app; right;
+    apply elem_of_cons; [by left| right; apply elem_of_cons; by left
+                        | right; apply elem_of_cons; right;
+                          apply elem_of_cons; by left].
+Qed.
+
+Theorem exec_run_exhibits (tick : bool) (pick : virtio_state -> option Z)
+    (n : nat) (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
+    (s1 sf : mstate) (o : observation) :
+  srun (uart_pre uart_input) (exec_start hart text rs disk_init) = Some s1 ->
+  eval_run_at pick tick n s1 = RDone sf ->
+  result_of (Some sf) = o.(o_result) ->
+  serial_of (Some sf) = o.(o_uart) ->
+  v_disk (dvirtio (mdev sf)) = disk_of_sectors o.(o_disk) ->
+  exists N l ts g,
+    @language.nsteps riscv_lang N
+      (test_config hart text rs disk_init) l (ts, g)
+    /\ obs_in l = uart_input
+    /\ observed_at g o.
+Proof.
+  intros Hpre Hrun Hres Hser Hdsk.
+  destruct (power_fork_split 0) as (t1 & t2 & Hpool & Hu & Hdk & Hp).
+  (* the machine the theorem starts from, and the invariant at it *)
+  pose proof (hart_ok_test_start hart text rs disk_init) as Hok0.
+  assert (Hlive0 : thread_live (test_gstate hart text rs disk_init) 0)
+    by (unfold thread_live, test_gstate; cbn [gpow ggen]; split; reflexivity).
+  (* 1. the boundary: the pool's hart starts AT one, and taking it is what
+        empties the reservation set the devices need *)
+  destruct (boundary_prim tick 0 hart_primary
+              (test_gstate hart text rs disk_init)
+              (exec_start hart text rs disk_init) tt Hlive0 Hok0)
+    as (gb & Hpsb & Hokb & Hlvb & Hresb).
+  (* 2. the input *)
+  destruct (srun_uart_nsteps 0
+              (t1 ++ HartE 0 hart_primary (riscv_step tick) :: t2) uart_input
+              (elem_of_pool _ _ _ _ Hu) (elem_of_pool _ _ _ _ Hdk)
+              (elem_of_pool _ _ _ _ Hp) gb (exec_start hart text rs disk_init)
+              s1 Hlvb Hokb Hresb Hpre)
+    as (N2 & g2 & Hn2 & Hok2 & Hlv2 & Hres2).
+  (* 3. the run *)
+  destruct (eval_run_nsteps tick 0 pick t1 t2 n Hu Hdk Hp g2 s1 sf
+              Hlv2 Hok2 Hres2 Hrun)
+    as (N3 & k3 & g3 & Hn3 & Hok3 & Hlv3 & Hq3).
+  exists (S (N2 + N3)), (List.map ObsUartIn uart_input ++ k3),
+         (t1 ++ HartE 0 hart_primary (riscv_step tick) :: t2), g3.
+  split; [|split].
+  - unfold test_config. rewrite Hpool.
+    apply (nsteps_l_silent _ _ _ _ _
+             (hstep_step 0 hart_primary t1 t2 (Interface.Ret tt)
+                (riscv_step tick) _ gb Hpsb)).
+    exact (nsteps_trans _ _ _ _ _ _ _ Hn2 Hn3).
+  - rewrite obs_in_app, obs_in_uart_pre, Hq3. apply app_nil_r.
+  - exact (observed_at_of_hart_ok hart_primary g3 sf o Hok3 Hres Hser Hdsk).
 Qed.
