@@ -240,6 +240,9 @@ QEMU/UartWidthTest.v
 JH7110/ClintMsipPass.v
 JH7110/ClintMsipRun.v
 JH7110/ClintMsipTest.v
+JH7110/ClintRawPass.v
+JH7110/ClintRawRun.v
+JH7110/ClintRawTest.v
 JH7110/ClintTimePass.v
 JH7110/ClintTimeRun.v
 JH7110/ClintTimeTest.v
@@ -267,6 +270,12 @@ JH7110/ConcSmokeTest.v
 JH7110/CoreCsrprobePass.v
 JH7110/CoreCsrprobeRun.v
 JH7110/CoreCsrprobeTest.v
+JH7110/CoreCsrvalsPass.v
+JH7110/CoreCsrvalsRun.v
+JH7110/CoreCsrvalsTest.v
+JH7110/CoreDtbPass.v
+JH7110/CoreDtbRun.v
+JH7110/CoreDtbTest.v
 JH7110/CoreHartPass.v
 JH7110/CoreHartRun.v
 JH7110/CoreHartTest.v

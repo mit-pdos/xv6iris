@@ -235,6 +235,21 @@ Module Type TEST_RUN (T : TEST).
      existentials in the claims below, so they live in the PROOF, as
      arguments to [VExecStep]'s wrappers, and appear in no statement. *)
   Parameter observed : list observation.
+
+  (* A RUN THAT OBSERVED NOTHING IS NOT A RUN, and this is the field that
+     says so.  [run_agrees] quantifies over the observations, so an empty
+     list makes it VACUOUSLY TRUE -- a Pass module ascribing to
+     TEST_PASSES_AGREE would compile, be listed in _CoqProject, and be
+     counted as a proof, while claiming nothing whatever about the model.
+
+     That is not hypothetical: it is how 25 of the board's runs came to
+     have green proofs.  The capture side had emptied them and nothing
+     downstream could tell, because there is nothing to tell -- a vacuous
+     proof and a real one look the same from outside.  Requiring the
+     witness here makes the module type reject the case at the point where
+     the run is DECLARED, which is the only place the difference is still
+     visible. *)
+  Axiom observed_ne : observed <> [].
 End TEST_RUN.
 
 (* THE THEOREM, over the test's own initial state. *)

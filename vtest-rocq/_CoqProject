@@ -170,23 +170,8 @@ QEMU/UartRegsRun.v
 QEMU/UartRxRun.v
 QEMU/UartTxRun.v
 QEMU/UartWidthRun.v
-JH7110/ClintMsipPass.v
 JH7110/ClintTimePass.v
-JH7110/ConcAmoPass.v
-JH7110/ConcBytePass.v
-JH7110/ConcLostPass.v
-JH7110/ConcMpPass.v
-JH7110/ConcSbPass.v
-JH7110/ConcSbxPass.v
-JH7110/ConcSmokePass.v
-JH7110/CoreCsrprobePass.v
 JH7110/CoreHartPass.v
-JH7110/CoreIcachePass.v
-JH7110/CoreRegsFcsrPass.v
-JH7110/CoreRegsFprPass.v
-JH7110/CoreRegsGprPass.v
-JH7110/CoreRegsHpmPass.v
-JH7110/CoreRegsPmpPass.v
 JH7110/CoreSmokePass.v
 JH7110/PlicMctxPass.v
 JH7110/PlicPrio0Pass.v
@@ -197,7 +182,6 @@ JH7110/PtIdentPass.v
 JH7110/PtLevelsPass.v
 JH7110/PtResvPass.v
 JH7110/PtSuperPass.v
-JH7110/PtTlbPass.v
 QEMU/ClintMsipPass.v
 QEMU/ClintTimePass.v
 QEMU/CoreCsrprobePass.v
@@ -238,6 +222,7 @@ QEMU/UartRxPass.v
 QEMU/UartTxPass.v
 QEMU/UartWidthPass.v
 JH7110/ClintMsipTest.v
+JH7110/ClintRawTest.v
 JH7110/ClintTimeTest.v
 JH7110/ConcAmoTest.v
 JH7110/ConcByteTest.v
@@ -247,6 +232,8 @@ JH7110/ConcSbTest.v
 JH7110/ConcSbxTest.v
 JH7110/ConcSmokeTest.v
 JH7110/CoreCsrprobeTest.v
+JH7110/CoreCsrvalsTest.v
+JH7110/CoreDtbTest.v
 JH7110/CoreHartTest.v
 JH7110/CoreIcacheTest.v
 JH7110/CoreRegsFcsrTest.v
@@ -266,6 +253,7 @@ JH7110/PtResvTest.v
 JH7110/PtSuperTest.v
 JH7110/PtTlbTest.v
 JH7110/ClintMsipRun.v
+JH7110/ClintRawRun.v
 JH7110/ClintTimeRun.v
 JH7110/ConcAmoRun.v
 JH7110/ConcByteRun.v
@@ -275,6 +263,8 @@ JH7110/ConcSbRun.v
 JH7110/ConcSbxRun.v
 JH7110/ConcSmokeRun.v
 JH7110/CoreCsrprobeRun.v
+JH7110/CoreCsrvalsRun.v
+JH7110/CoreDtbRun.v
 JH7110/CoreHartRun.v
 JH7110/CoreIcacheRun.v
 JH7110/CoreRegsFcsrRun.v

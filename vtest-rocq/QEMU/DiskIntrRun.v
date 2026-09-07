@@ -248,4 +248,8 @@ Module DiskIntrRun <: TEST_RUN DiskIntr.
 
   Definition observed : list observation :=
     (fun r => Obs r o_serial o_sectors) <$> results.
+
+  (* the run is non-empty; see TEST_RUN's [observed_ne] *)
+  Lemma observed_ne : observed <> [].
+  Proof. vm_compute. discriminate. Qed.
 End DiskIntrRun.
