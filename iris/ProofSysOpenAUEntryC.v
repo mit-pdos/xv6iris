@@ -161,6 +161,7 @@ Section ProofSysOpenAUEntryCCont.
       (pj : mword 64) (pidv : mword 32) (vom : mword 64) (U : ustate)
       (sts : list fdstate)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Phiarm Phiun : aview -> Z -> iProp Σ)
       (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
       (Phio : aview -> Z -> anode -> iProp Σ)
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
@@ -182,7 +183,8 @@ Section ProofSysOpenAUEntryCCont.
          bslots 3 -∗
          iref_slots ns' -∗
          open_arms_create (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
-           P Pmiss Phiok Phiex Phio Phit sts U (mf !!! Regidx Ra0 : mword 64) -∗
+           P Pmiss Phiarm Phiun Phiok Phiex Phio Phit sts U
+           (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
 End ProofSysOpenAUEntryCCont.
@@ -225,6 +227,7 @@ Section ProofSysOpenAUEntryC.
       (* ---- the AU side ---- *)
       (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Phiarm Phiun : aview -> Z -> iProp Σ)
       (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
       (Phio : aview -> Z -> anode -> iProp Σ)
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ) :
@@ -306,10 +309,12 @@ Section ProofSysOpenAUEntryC.
     dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
     aopen_commit_at (fs_gamma_L fsc_fs) appE Phio -∗
     atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit -∗
+    (* ...and create's CHILD legs (round E2, lane E2-C) *)
+    cre_child_unfired (fs_gamma_L fsc_fs) (AFile []) Phiarm Phiun -∗
     wp_next true (proc_addr jx)
       (so_cont0_au_create gf ns
                 dqb dqs dqbs dqn (proc_addr jx) pidv vom U sts
-                P Pmiss Phiok Phiex Phio Phit m K eb b lks) -∗
+                P Pmiss Phiarm Phiun Phiok Phiex Phio Phit m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
@@ -326,7 +331,7 @@ Section ProofSysOpenAUEntryC.
               #Hropen
               Hsbn Hsbi Hsbs Hsbb #Hbmres Hpriv #Hprocs #Hdev #Hgeo #Hdlk HopS Htx
               Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
-              Hwp Hac Hdl Hoc Htc Hcont".
+              Hwp Hac Hdl Hoc Htc Hclegs Hcont".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     (* ===== +0x38 c.li a3,0 -- minor ===== *)
@@ -466,7 +471,7 @@ Section ProofSysOpenAUEntryC.
               SpecCreate.T_FILE (mword_of_int 0) (mword_of_int 0)
               (upd_usM U _) MAXOPBLOCKS Sb ns pidv dqb dqs dqbs dqn
               N5 (K - 24)%nat eb b lks
-              P Pmiss Phiok Phiex
+              P Pmiss Phiarm Phiun Phiok Phiex
               HKcr HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
               Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
               ltac:(assert (E31 : (2 ^ 31 = 2147483648)%Z)
@@ -479,7 +484,7 @@ Section ProofSysOpenAUEntryC.
                     Hitinv Hescrows Hslks Hireg Hropen Hsbn Hsbi Hsbs Hsbb
                     Hbmres
                     Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hisl HopS Htx
-                    [Hwp] Hac Hdl").
+                    [Hwp] Hac Hdl Hclegs").
     { iEval (rewrite HN5a0). iExact "Hbufk". }
     { iApply (np_start_of_mknod with "Hwp"). }
     iIntros (CID6 Hq6 mcr ok made kk qi ss gy inum dn bm u1 Sb1 ns1)
@@ -634,15 +639,16 @@ Section ProofSysOpenAUEntryC.
                       = MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
                                 (fn_nlink (era_node dn bm data)))
         by exact (opf_era_file_row dn bm data Htyf).
-      iAssert (socr_fresh P Phiok Phiex Phio Phit (bview plen bp)
+      iAssert (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit (bview plen bp)
                  (bv_unsigned inum))
         with "[Hcauf Hoc Htc]" as "HR".
       { rewrite /socr_fresh.
         iDestruct (cauf_ok_fresh with "Hcauf") as (d nm av ents nl)
-          "(%Hl & %Hpre & HP & HPhi & Hdl)".
+          "(%Hl & %Hpre & HP & HPhi & Hdl & Harmr & Hun)".
         iExists d, nm, av, ents, nl.
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-        iSplitR; [iPureIntro; lia |]. iFrame "HP HPhi Hdl Hoc Htc". }
+        iSplitR; [iPureIntro; lia |].
+        iFrame "HP HPhi Hdl Hoc Htc Harmr Hun". }
       iAssert (so_obs (socr_Phio_pure (bv_unsigned inum)
                          (MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
                                   (fn_nlink (era_node dn bm data))))
@@ -650,10 +656,10 @@ Section ProofSysOpenAUEntryC.
       { rewrite -Harow. iApply socr_obs_pure. }
       iAssert (wp_next true (proc_addr jx)
                  (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv vom U sts
-                    (socr_P (socr_fresh P Phiok Phiex Phio Phit
+                    (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit
                                (bview plen bp) (bv_unsigned inum))
                             (bv_unsigned inum))
-                    (socr_Pm (socr_fresh P Phiok Phiex Phio Phit
+                    (socr_Pm (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit
                                 (bview plen bp) (bv_unsigned inum)))
                     (socr_Phio_pure (bv_unsigned inum)
                        (MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
@@ -666,7 +672,7 @@ Section ProofSysOpenAUEntryC.
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply fupd_wp.
         iMod (socr_arms_fresh gf (proc_addr jx) pidv vom P Pmiss
-                Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
+                Phiarm Phiun Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
                 (fn_file_bytes (era_node dn bm data))
                 (fn_nlink (era_node dn bm data)) with "Hpost") as "Hpost".
         iModIntro.
@@ -678,10 +684,10 @@ Section ProofSysOpenAUEntryC.
                 gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
                 U sts m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
                 data vom (bview plen bp)
-                (socr_P (socr_fresh P Phiok Phiex Phio Phit
+                (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit
                            (bview plen bp) (bv_unsigned inum))
                         (bv_unsigned inum))
-                (socr_Pm (socr_fresh P Phiok Phiex Phio Phit
+                (socr_Pm (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit
                             (bview plen bp) (bv_unsigned inum)))
                 (socr_Phio_pure (bv_unsigned inum)
                    (MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
@@ -730,19 +736,20 @@ Section ProofSysOpenAUEntryC.
       iDestruct ("Hflatb" with "Htop") as "Hflat".
       iDestruct (socr_obs_tag (bv_unsigned inum) (era_node dn bm data) Phio
                    with "Hobs0") as "Hobs".
-      iAssert (socr_exists P Phiok Phiex (bview plen bp) (bv_unsigned inum))
+      iAssert (socr_exists P Phiarm Phiun Phiok Phiex (bview plen bp)
+                 (bv_unsigned inum))
         with "[Hcauf]" as "HR".
       { rewrite /socr_exists.
         iDestruct (cauf_ok_exists with "Hcauf") as (d nm av ents nl)
-          "(%Hl & %Hrow & %Hent & HP & HPhi & Hac)".
+          "(%Hl & %Hrow & %Hent & HP & HPhi & Hac & Hcl)".
         iExists d, nm, av, ents, nl.
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-        iSplitR; [by iPureIntro |]. iFrame "HP HPhi Hac". }
+        iSplitR; [by iPureIntro |]. iFrame "HP HPhi Hac Hcl". }
       iAssert (wp_next true (proc_addr jx)
                  (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv vom U sts
-                    (socr_P (socr_exists P Phiok Phiex (bview plen bp)
+                    (socr_P (socr_exists P Phiarm Phiun Phiok Phiex (bview plen bp)
                                (bv_unsigned inum)) (bv_unsigned inum))
-                    (socr_Pm (socr_exists P Phiok Phiex (bview plen bp)
+                    (socr_Pm (socr_exists P Phiarm Phiun Phiok Phiex (bview plen bp)
                                 (bv_unsigned inum)))
                     (socr_Phio_tag (bv_unsigned inum)
                        (abs_row (era_node dn bm data)) Phio)
@@ -754,7 +761,7 @@ Section ProofSysOpenAUEntryC.
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply fupd_wp.
         iMod (socr_arms_exists gf (proc_addr jx) pidv vom P Pmiss
-                Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
+                Phiarm Phiun Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
                 (abs_row (era_node dn bm data)) Hnd with "Hpost") as "Hpost".
         iModIntro.
         iApply ("Hcont" $! mf ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
@@ -765,9 +772,9 @@ Section ProofSysOpenAUEntryC.
                 gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
                 U sts m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
                 data vom (bview plen bp)
-                (socr_P (socr_exists P Phiok Phiex (bview plen bp)
+                (socr_P (socr_exists P Phiarm Phiun Phiok Phiex (bview plen bp)
                            (bv_unsigned inum)) (bv_unsigned inum))
-                (socr_Pm (socr_exists P Phiok Phiex (bview plen bp)
+                (socr_Pm (socr_exists P Phiarm Phiun Phiok Phiex (bview plen bp)
                             (bv_unsigned inum)))
                 (socr_Phio_tag (bv_unsigned inum)
                    (abs_row (era_node dn bm data)) Phio)

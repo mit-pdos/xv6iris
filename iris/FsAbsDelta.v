@@ -127,6 +127,66 @@ Proof.
   by rewrite lookup_insert_ne; [| congruence].
 Qed.
 
+(* THE SIDE CONDITIONS, as one proposition (moved here from
+   SpecSysMknodAU.v in round E2, lane E2-C, so that [SpecCreate]'s bundle
+   can name the parent-leg commit -- SpecSysMknodAU requires SpecCreate):
+   the parent is a directory whose map lacks the name, and the child's row
+   already reads as the freshly-minted node (SpecSysMknodAU's header, THE
+   FRESHNESS SHAPE) *)
+Definition cre_pre (av : aview) (d : Z) (nm : fname)
+    (ents : gmap fname Z) (nl : nat) (i : Z) (c : absnode) : Prop :=
+  av !! d = Some (MkAnode (ADir ents) nl)
+  /\ ents !! nm = None
+  /\ av !! i = Some (MkAnode c 1%nat).
+
+(* a non-directory child forces parent <> child: their observed rows
+   differ *)
+Lemma cre_pre_ne (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z)
+    (nl : nat) (i : Z) (c : absnode) :
+  cre_pre av d nm ents nl i c -> (forall e, c <> ADir e) -> d <> i.
+Proof.
+  intros (Hd & _ & Hi) Hc Heq. subst i. rewrite Hd in Hi.
+  injection Hi as Hc' _. exact (Hc ents (eq_sym Hc')).
+Qed.
+
+(* THE COLLAPSE (SpecSysMknodAU's header's freshness argument,
+   machine-checked): under [cre_pre] with a device child, the fused delta
+   IS the one-row parent insert -- the child's insert is the identity on
+   its already-minted row.  This is what makes the AU dischargeable at
+   ONE instant. *)
+Lemma delta_create_dev (av : aview) (d : Z) (nm : fname)
+    (ents : gmap fname Z) (nl : nat) (i : Z) (ma mi : Z) :
+  cre_pre av d nm ents nl i (ADev ma mi) ->
+  delta_create d nm i (ADev ma mi) av
+  = <[d := MkAnode (ADir (<[nm := i]> ents)) nl]> av.
+Proof.
+  intros Hp.
+  assert (Hne : d <> i).
+  { eapply (cre_pre_ne av d nm ents nl i); [exact Hp |].
+    intros e He. discriminate He. }
+  destruct Hp as (Hd & Hnm & Hi).
+  rewrite /delta_create Hd /= Nat.add_0_r.
+  rewrite (insert_commute _ i d); [| congruence].
+  by rewrite (insert_id av i (MkAnode (ADev ma mi) 1%nat) Hi).
+Qed.
+
+(* ...AND AT ANY CHILD KIND (round E2, lane E2-C): with the child ARMED --
+   in the view at count 1, dots included -- and distinct from its parent,
+   the fused delta is the one-row parent insert whatever [c] is, the
+   parent's count moving by [acre_bump c].  The two fragments a parent fire
+   holds are at distinct keys, so [d <> i] costs the fire nothing. *)
+Lemma delta_create_armed (av : aview) (d : Z) (nm : fname)
+    (ents : gmap fname Z) (nl : nat) (i : Z) (c : absnode) :
+  cre_pre av d nm ents nl i c -> d <> i ->
+  delta_create d nm i c av
+  = <[d := MkAnode (ADir (<[nm := i]> ents)) (nl + acre_bump c)%nat]> av.
+Proof.
+  intros (Hd & Hnm & Hi) Hne.
+  rewrite /delta_create Hd /=.
+  rewrite (insert_commute _ i d); [| congruence].
+  by rewrite (insert_id av i (MkAnode c 1%nat) Hi).
+Qed.
+
 (* ===================================================================== *)
 (*  1b.  CREATE'S LEGS (round E2, lane E2-D)                             *)
 (* ===================================================================== *)
@@ -236,6 +296,64 @@ Qed.
 Lemma delta_dots_absent (av : aview) (i d : Z) :
   av !! i = None -> delta_dots i d av = av.
 Proof. intros Hi. rewrite /delta_dots Hi //. Qed.
+
+(* THE FIRST DOT ALONE (round E2, lane E2-C): mkdir's [dirlink(ip, ".",
+   ip->inum)] landed and its [dirlink(ip, "..", dp->inum)] fell short --
+   the child's row moves once, to a directory holding only ["."], before
+   the failure arm unarms it.  Total, as [delta_dots] is. *)
+Definition delta_dot (i : Z) (av : aview) : aview :=
+  match av !! i with
+  | Some a =>
+      match an_node a with
+      | ADir ents => <[i := MkAnode (ADir (<[DOT := i]> ents)) (an_nlink a)]> av
+      | _ => av
+      end
+  | None => av
+  end.
+
+Lemma delta_dot_dir (av : aview) (i : Z) (ents : gmap fname Z) (nl : nat) :
+  av !! i = Some (MkAnode (ADir ents) nl) ->
+  delta_dot i av = <[i := MkAnode (ADir (<[DOT := i]> ents)) nl]> av.
+Proof. intros Hi. rewrite /delta_dot Hi //=. Qed.
+
+Lemma delta_dot_lookup_at (av : aview) (i : Z) (ents : gmap fname Z) (nl : nat) :
+  av !! i = Some (MkAnode (ADir ents) nl) ->
+  delta_dot i av !! i = Some (MkAnode (ADir (<[DOT := i]> ents)) nl).
+Proof. intros Hi. rewrite (delta_dot_dir _ _ _ _ Hi) lookup_insert //. Qed.
+
+Lemma delta_dot_lookup_same (av : aview) (i j : Z) :
+  j <> i -> delta_dot i av !! j = av !! j.
+Proof.
+  intros Hj. rewrite /delta_dot.
+  destruct (av !! i) as [a |]; [| done].
+  destruct (an_node a) as [bs | ents | ma mi]; [done | | done].
+  rewrite lookup_insert_ne //.
+Qed.
+
+Lemma delta_dot_absent (av : aview) (i : Z) :
+  av !! i = None -> delta_dot i av = av.
+Proof. intros Hi. rewrite /delta_dot Hi //. Qed.
+
+(* THE DOTS COMMIT'S TWO READINGS, indexed by whether the second dot landed
+   ([full]): the entry map a fresh directory holds after mkdir's interior
+   links, and the delta that put it there.  The commit ([FsAbsCreateFire.
+   adots_commit_at]) fires at whichever the machine wrote. *)
+Definition dots_ents (full : bool) (i d : Z) : gmap fname Z :=
+  if full then <[DOT := i]> (<[DOTDOT := d]> ∅) else <[DOT := i]> ∅.
+
+Definition dots_delta (full : bool) (i d : Z) : aview -> aview :=
+  if full then delta_dots i d else delta_dot i.
+
+(* at the fresh directory (an [ADir ∅] at count 1) both readings are the
+   one-row insert of [dots_ents] *)
+Lemma dots_delta_fresh (av : aview) (i d : Z) (full : bool) :
+  av !! i = Some (MkAnode (ADir ∅) 1%nat) ->
+  dots_delta full i d av = <[i := MkAnode (ADir (dots_ents full i d)) 1%nat]> av.
+Proof.
+  intros Hi. destruct full; rewrite /dots_delta /dots_ents.
+  - exact (delta_dots_dir av i d ∅ 1%nat Hi).
+  - exact (delta_dot_dir av i ∅ 1%nat Hi).
+Qed.
 
 Lemma delta_ent_dir (av : aview) (d : Z) (nm : fname) (i : Z)
     (ents : gmap fname Z) (nl : nat) (c : absnode) (k : nat) :
@@ -810,6 +928,7 @@ Definition fs_delta `{XI : CurCtx} (av av' : aview) : Prop :=
   \/ (exists i c, av' = delta_arm i c av)
   \/ (exists i, av' = delta_unarm i av)
   \/ (exists i d, av' = delta_dots i d av)
+  \/ (exists i, av' = delta_dot i av)
   \/ (exists d nm i, av' = delta_ent d nm i av)
   \/ (exists t a, av' = delta_link_tgt t a av)
   \/ (exists d nm t, av' = delta_link_ent d nm t av).

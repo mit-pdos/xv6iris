@@ -1657,6 +1657,13 @@ Section ProofSysMknodBody.
                 SpecCreate.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
                 (upd_usM (us_upt U P') _) MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
                 N4 (K - 20)%nat eb b lks
+                (* THE APPLICATION'S SIDE (round E2, lane E2-C): this create
+                   is DEAD for the theorem (round E2 section 1: reachable
+                   only through a non-dispatched contract), so it takes the
+                   TRIVIAL families and pays the bundle off the parked
+                   license; the receipts it gets back are dropped. *)
+                (fun _ _ => True)%I (fun _ _ _ _ => True)%I
+                (fun _ _ => True)%I (fun _ _ _ _ => True)%I
                 ltac:(lia) HdevR Hnib0 Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
                 (mn_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush mn_tdev_nz SpecCreate.T_DEVICE_ty_ok Hpkc
@@ -1665,8 +1672,11 @@ Section ProofSysMknodBody.
                 with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv
                       Hitab Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs
                       Hsbb
-                      Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS Htx").
+                      Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS Htx
+                      []").
       { iEval (rewrite HN4a0). iExact "Hbufk". }
+      { iApply SpecCreate.cre_commits_unit.
+        iApply (InodeRegion.ireg_inv_app with "Hireg"). }
       iIntros (CID26 Hq26 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
         "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
          %Hns1 Hir %Hun1 HopS Hok".
@@ -1683,7 +1693,7 @@ Section ProofSysMknodBody.
       (* ============ +0x2c c.beqz a0 -> ARM B ============ *)
       destruct ok.
       + (* ---------- create SUCCEEDED: the LOCKED inode ---------- *)
-        iDestruct "Hok" as "[%Hokf Hlocked]".
+        iDestruct "Hok" as "[%Hokf [Hlocked _]]".
         destruct Hokf as (Hcra0 & Hkk & Hinum & _).
         assert (Hipnz : ientry kk <> (zero_reg : mword 64))
           by (apply ientry_ne_zero; lia).
@@ -1862,7 +1872,7 @@ Section ProofSysMknodBody.
         { cbn in Hns1. lia. }
         { rewrite /sys_mknod_ret. left. rewrite Ha0f. exact HP2a0. }
       + (* ---------- ARM B: create returned 0 ---------- *)
-        iDestruct "Hok" as "[%Hcrz Htx]".
+        iDestruct "Hok" as "[%Hcrz [Htx _]]".
         iApply (wp_cbeqz_taken_s_sconf (CID := CID26) (mword_of_int (MN + 0x44))
                   (mword_of_int 10 : mword 8) (Cregidx (mword_of_int 2)) Ra0
                   mcr (K - 20)%nat b

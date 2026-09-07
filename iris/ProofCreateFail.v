@@ -135,6 +135,8 @@ Require Import SpecPanic.
 Require Import SpecIput SpecIupdate.
 Require Import SpecIunlockput.
 Require Import SpecCreate.
+Require Import FsAbsCreateFire.  (* the UNARM fire [caf_unarm_fire] and its row readings (round E2, lane E2-C) *)
+Require Import FsAbsDefs.        (* [aview], [abs_of], [abs_node] *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
    OWN body rather than a callee, so it is NOT a functor argument -- the
@@ -203,7 +205,12 @@ Section ProofCreateFail.
       (b : bool) (lks : gset string)
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
-      (nf nsl : nat -> bv 8) (t : nat) :
+      (nf nsl : nat -> bv 8) (t : nat)
+      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -239,7 +246,8 @@ Section ProofCreateFail.
 
                    plen pfun pv ty major minor U u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
-                   kd qd gd γil γisl dind dn bm data nf nsl t CIDf).
+                   kd qd gd γil γisl dind dn bm data nf nsl t CIDf
+                   Φarm Φdots Φun Φok).
   Proof.
     intros HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcovb
            Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb.
@@ -264,7 +272,7 @@ Section ProofCreateFail.
              #Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk
              Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz %Hlek #Hflk Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Htx
-             Hcont".
+             Harmr Hdots Hun Hacre Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -470,13 +478,33 @@ Section ProofCreateFail.
                  Hrl_datc cr_nl_short_0).
       - apply dir_uniq_not_dir. rewrite cr_setf_type. exact Htdirz.
       - apply dir_dots_ix_not_dir. rewrite cr_setf_type. exact Htdirz. }
+    (* THE UNARM FIRES HERE (round E2, lane E2-C, site #16): the child was
+       armed at +0xc4 and the parent's [dirlink] failed, so its row -- at
+       whatever content the type asked for -- DISAPPEARS (ruling Q-h: the
+       failed create is the honest do-then-undo PAIR).  The child is NOT
+       under the registry on this arm, so the plain fire applies and the
+       zeroed record owes [inode_local], which [Hlocz] already is. *)
+    assert (Hrow1 : abs_of (era_node (cr_setf dnc major minor
+                              (mword_of_int 1 : mword 16)) bmc datc)
+            = Some (MkAnode (abs_node (era_node (cr_setf dnc major minor
+                                (mword_of_int 1 : mword 16)) bmc datc)) 1%nat))
+      by exact (caf_era_row_nl1
+                  (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc
+                  ltac:(rewrite cr_setf_type; exact Htyz)
+                  ltac:(rewrite cr_setf_nlink; vm_compute; reflexivity)).
+    assert (Hnone0 : abs_of (era_node (cr_setf dnc major minor
+                               (mword_of_int 0 : mword 16)) bmc datc) = None)
+      by exact (caf_era_none_nl0
+                  (cr_setf dnc major minor (mword_of_int 0 : mword 16)) bmc datc
+                  ltac:(rewrite cr_setf_nlink; vm_compute; reflexivity)).
     iApply fupd_wp.
-    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned cinum)
+    iMod (caf_unarm_fire fsc_fs ⊤ (bv_unsigned cinum) _ Φun
             (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                       bmc datc)
             (era_node (cr_setf dnc major minor (mword_of_int 0 : mword 16))
                       bmc datc)
-            ltac:(solve_ndisj) Logic.I Hlocz with "[] [] Hctop") as "Hctop";
+            ltac:(solve_ndisj) Hlocz Hrow1 Hnone0
+            with "[] [] Hun Hctop") as "(Hctop & Hunr)";
       [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.
     iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
@@ -850,7 +878,7 @@ Section ProofCreateFail.
               (mword_of_int 0 : mword 32) dn bm n6 Sb6
               (1 + (1 + (ns - 2)))%nat
               with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
-                    Hbsl [%] Hisl [%] Hop [$Htx]").
+                    Hbsl [%] Hisl [%] Hop [$Htx Harmr Hdots Hunr Hacre]").
     { exact Hcsf. }
     { exact (cr_slots_2 _ ns eq_refl Hns). }
     { split_and!.
@@ -860,7 +888,16 @@ Section ProofCreateFail.
       - pose proof (proj2 Hn6) as HB1. pose proof (proj2 Hn5) as HB2.
         pose proof (proj2 Hn4) as HB3. lia.
       - discriminate. }
-    { iPureIntro. rewrite Ha0f. exact HG7s2. }
+    { iSplitR; [iPureIntro; rewrite Ha0f; exact HG7s2 |].
+      (* ARM FAIL: the do-then-undo PAIR (ruling Q-h) -- the arm fired at
+         +0xc4 and the unarm at +0x146; no dot ever landed on a
+         non-directory child, so the dots commit goes home unfired, and so
+         does the parent leg. *)
+      rewrite /cre_fail_arms. iRight.
+      iExists (bv_unsigned cinum), (bv_unsigned dind).
+      iSplitL "Harmr"; [iExact "Harmr" |].
+      iSplitL "Hdots"; [iRight; iExact "Hdots" |].
+      iSplitL "Hunr"; [iExact "Hunr" | iExact "Hacre"]. }
   Qed.
 
 End ProofCreateFail.

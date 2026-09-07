@@ -90,32 +90,36 @@ Section CreateAUFOpen.
      failures. *)
   Lemma cauf_fail_to_open Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (pl : list (bv 8)) :
-    cauf_fail Γ γfs P Pmiss Φok Φex pl -∗
+    cauf_fail Γ γfs P Pmiss Φarm Φun Φok Φex pl -∗
     aopen_commit_at Γ appE Φo -∗
     atrunc_commit_at Γ appE Φt -∗
-    open_post_fail_create Γ γfs cw P Pmiss Φok Φex Φo Φt.
+    open_post_fail_create Γ γfs cw P Pmiss Φarm Φun Φok Φex Φo Φt.
   Proof.
     iIntros "Hcf Ho Ht".
     rewrite /cauf_fail /open_post_fail_create.
     iRight. iExists pl.
-    iDestruct "Hcf" as "[(Hd & Hac & Hdl) | Hr]".
-    - iLeft. iFrame "Hd Hac Hdl Ho Ht".
-    - iRight. iDestruct "Hr" as (d) "(HP & Hac & Hrest)".
+    iDestruct "Hcf" as "[(Hd & Hac & Hdl & Hcl) | Hr]".
+    - iLeft. iFrame "Hd Hac Hdl Ho Ht Hcl".
+    - iRight. iDestruct "Hr" as (d) "(HP & Hac & Hrest & Hcl)".
       iExists d. iFrame "HP Ht".
       iDestruct "Hrest" as "[Hfired | Hdl]".
-      + (* (b): the name was there and the observation fired *)
+      + (* (b): the name was there and the observation fired -- so create's
+           child legs never moved (round E2, lane E2-C) *)
         iRight. iLeft.
         iDestruct "Hfired" as (av i nm ents nl) "(%Hl & %Hrow & %Hent & HΦ)".
         iExists av, i, nm, ents, nl.
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
         iSplitR; [by iPureIntro |].
-        iFrame "HΦ Hac". iLeft. iExact "Ho".
+        iFrame "HΦ Hac".
+        iSplitL "Hcl"; [iExact "Hcl" |].
+        iLeft. iExact "Ho".
       + (* (c): nothing observed *)
-        iRight. iRight. iFrame "Hac Hdl Ho".
+        iRight. iRight. iFrame "Hac Hdl Ho Hcl".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -129,9 +133,10 @@ Section CreateAUFOpen.
      against the consumer -- named here so that a drift in either contract
      breaks a proof rather than a prover. *)
   Lemma cauf_ok_shape Γ (P : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (pl : list (bv 8)) (made : bool) (i : Z) :
-    cauf_ok Γ P Φok Φex pl made i ⊢
+    cauf_ok Γ P Φarm Φun Φok Φex pl made i ⊢
       ∃ (d : Z) (nm : fname),
         ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
         P (length (mknod_parent_elems pl)) d ∗
@@ -140,29 +145,31 @@ Section CreateAUFOpen.
          (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
             Φok av d nm i ∗
-            dlookup_commit_at Γ appE Φex)
+            dlookup_commit_at Γ appE Φex ∗
+            cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun)
          ∨ (* ...and the EXISTS-OPENS half, ahead of the found node's own
               observation *)
          (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
             ⌜ents !! nm = Some i⌝ ∗
             Φex av d nm i ∗
-            acre_commit_at Γ appE (AFile []) Φok)).
+            acre_commit_at Γ appE (AFile []) Φok ∗
+            cre_child_unfired Γ (AFile []) Φarm Φun)).
   Proof.
     destruct made.
     - iIntros "H".
       iDestruct (cauf_ok_fresh with "H") as (d nm av ents nl)
-        "(%Hl & %Hpre & HP & HΦ & Hdl)".
+        "(%Hl & %Hpre & HP & HΦ & Hdl & Harmr & Hun)".
       iExists d, nm. iSplitR; [by iPureIntro |]. iFrame "HP".
       iLeft. iExists av, ents, nl.
-      iSplitR; [by iPureIntro |]. iFrame "HΦ Hdl".
+      iSplitR; [by iPureIntro |]. iFrame "HΦ Hdl Harmr Hun".
     - iIntros "H".
       iDestruct (cauf_ok_exists with "H") as (d nm av ents nl)
-        "(%Hl & %Hrow & %Hent & HP & HΦ & Hac)".
+        "(%Hl & %Hrow & %Hent & HP & HΦ & Hac & Hcl)".
       iExists d, nm. iSplitR; [by iPureIntro |]. iFrame "HP".
       iRight. iExists av, ents, nl.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-      iFrame "HΦ Hac".
+      iFrame "HΦ Hac Hcl".
   Qed.
 
 End CreateAUFOpen.

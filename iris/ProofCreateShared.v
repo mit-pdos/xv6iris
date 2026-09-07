@@ -137,6 +137,9 @@ Require Import SpecIput.
 Require Import SpecDirlookup SpecDirlink.
 Require Import SpecNamex.
 Require Import SpecCreate.
+Require Import FsAbsDelta.       (* [dots_ents]: the entry map the dots fire lands (round E2, lane E2-C) *)
+Require Import FsAbsCreateFire.  (* the legs' commits, receipts and fires (round E2, lane E2-C) *)
+Require Import FsAbsDefs.        (* [abs_of], [MkAnode]: the rows the fires are stated at *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
    OWN body rather than a callee, so it is NOT a functor argument -- the
@@ -1616,60 +1619,100 @@ Section ProofCreateMain.
      and hand the transaction token back -- create's four exits (the FILE
      arm, the two mkdir failures, the mkdir success) each take exactly one
      of these. *)
-  (* ...EACH A NON-AU MOVE of the suspended child (app-instances.md section
-     7): the application's parked license pays it ([ireg_top_retag_armed_auto],
-     [top_move] being everything in round A) until round E gives create's
-     directory child its AU form. *)
-  Lemma cr_dirty_arm (E : coPset) (t : nat) (i : Z)
-      (n n' : fs_node) :
+  (* ...EACH A LEG OF create's AU (round E2, lane E2-C; applications.md
+     section 2): the caller's commit fires INSIDE the armed retag
+     ([FsAbsCreateFire]'s fires), and the receipt comes back beside the
+     moved fragment.  ARM: hand the transaction token over, fire the arm
+     commit at the row that appears ([cre_c0 ty]).  DOTS: fire the dots
+     commit -- both dots or the first alone -- and stay armed (the two
+     mkdir [fail:] entries that wrote a dot) or disarm and hand the token
+     back (the success arm).  UNARM: fire the unarm commit at the row that
+     disappears, disarm, hand the token back (mkdir's [fail:] tail). *)
+  Lemma cr_dirty_arm (E : coPset) (t : nat) (i : Z) (c : absnode)
+      (Φ : aview -> Z -> iProp Σ) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
+    abs_of n = None ->
+    abs_of n' = Some (MkAnode c 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
+    aarm_commit_at (fs_gamma_L fsc_fs) appE c Φ -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
-      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
+      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n' ∗ cre_arm_fired Φ i.
   Proof.
-    iIntros (HE) "#Hi #Hai Htx Hf".
+    iIntros (HE Hnone Hrow) "#Hi #Hai Htx Hcm Hf".
     iMod (ireg_arm E fsc_fs i t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Htx")
       as (k) "Harm".
-    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
-      as "[Harm Hf]".
-    iModIntro. iFrame "Hf". rewrite /cr_dirty. iExists k. iExact "Harm".
+    iMod (caf_arm_fire fsc_fs E k t (1/2)%Qp {[i]} i c Φ n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Hnone Hrow
+            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+    iModIntro. iFrame "Hf Hr". rewrite /cr_dirty. iExists k. iExact "Harm".
   Qed.
 
-  Lemma cr_dirty_retag (E : coPset) (t : nat) (i : Z)
-      (n n' : fs_node) :
+  Lemma cr_dirty_dots (E : coPset) (t : nat) (i d : Z) (full : bool)
+      (Φ : aview -> Z -> Z -> bool -> iProp Σ) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
+    abs_of n = Some (MkAnode (ADir ∅) 1%nat) ->
+    abs_of n' = Some (MkAnode (ADir (dots_ents full i d)) 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
+    adots_commit_at (fs_gamma_L fsc_fs) appE Φ -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
-      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
+      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n' ∗ cre_dots_fired Φ i d full.
   Proof.
-    iIntros (HE) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
+    iIntros (HE Hrow Hrow') "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
-    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
-      as "[Harm Hf]".
-    iModIntro. iFrame "Hf". iExists k. iExact "Harm".
+    iMod (caf_dots_fire fsc_fs E k t (1/2)%Qp {[i]} i d full Φ n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Hrow Hrow'
+            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+    iModIntro. iFrame "Hf Hr". iExists k. iExact "Harm".
   Qed.
 
-  Lemma cr_dirty_clear (E : coPset) (t : nat) (i : Z)
-      (n n' : fs_node) :
+  Lemma cr_dirty_clear_dots (E : coPset) (t : nat) (i d : Z) (full : bool)
+      (Φ : aview -> Z -> Z -> bool -> iProp Σ) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
+    abs_of n = Some (MkAnode (ADir ∅) 1%nat) ->
+    abs_of n' = Some (MkAnode (ADir (dots_ents full i d)) 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
+    adots_commit_at (fs_gamma_L fsc_fs) appE Φ -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
-      t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'.
+      t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
+      ∗ cre_dots_fired Φ i d full.
   Proof.
-    iIntros (HE Hloc) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
+    iIntros (HE Hloc Hrow Hrow') "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
-    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
-      as "[Harm Hf]".
+    iMod (caf_dots_fire fsc_fs E k t (1/2)%Qp {[i]} i d full Φ n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Hrow Hrow'
+            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
             with "Hi Harm Hf") as "[Harm Hf]".
     iEval (rewrite difference_diag_L) in "Harm".
     iMod (ireg_release E fsc_fs k t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Harm")
       as "Htx".
-    iModIntro. iFrame "Htx Hf".
+    iModIntro. iFrame "Htx Hf Hr".
+  Qed.
+
+  Lemma cr_dirty_clear_unarm (E : coPset) (t : nat) (i : Z) (c : absnode)
+      (Φ : aview -> Z -> iProp Σ) (n n' : fs_node) :
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    inode_local i n' ->
+    abs_of n = Some (MkAnode c 1%nat) ->
+    abs_of n' = None ->
+    ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
+    aunarm_commit_at (fs_gamma_L fsc_fs) appE Φ -∗
+    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+      t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
+      ∗ cre_unarm_fired Φ i.
+  Proof.
+    iIntros (HE Hloc Hrow Hnone) "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
+    iDestruct "Hd" as (k) "Harm".
+    iMod (caf_unarm_fire_armed fsc_fs E k t (1/2)%Qp {[i]} i c Φ n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Hrow Hnone
+            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+    iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
+            with "Hi Harm Hf") as "[Harm Hf]".
+    iEval (rewrite difference_diag_L) in "Harm".
+    iMod (ireg_release E fsc_fs k t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Harm")
+      as "Htx".
+    iModIntro. iFrame "Htx Hf Hr".
   Qed.
 
   (* ...AND THE VIEW-PRESERVING TWINS (app-instances.md section 7, round
@@ -1726,7 +1769,12 @@ Section ProofCreateMain.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (j : nat) (ret_tgt : mword 64)
-      (CIDc : CpuId) : iProp Σ :=
+      (CIDc : CpuId)
+      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∀ (mf : regfile) (ok made : bool)
        (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
        (dn : dinode) (bm : blkmap)
@@ -1766,8 +1814,12 @@ Section ProofCreateMain.
                            dn = create_made ty major minor)
                   else ty = T_FILE
                        /\ (di_type dn = T_FILE \/ di_type dn = T_DEVICE))⌝ ∗
-          create_locked pidv k qi s g inum dn bm
-        else ⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗ log_tx icfg_log) -∗
+          create_locked pidv k qi s g inum dn bm ∗
+          cre_ok_arms (fs_gamma_L fsc_fs) (bv_unsigned ty) (bv_unsigned major)
+            (bv_unsigned minor) Φarm Φdots Φun Φok made (bv_unsigned inum)
+        else ⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗ log_tx icfg_log ∗
+          cre_fail_arms (fs_gamma_L fsc_fs) (bv_unsigned ty) (bv_unsigned major)
+            (bv_unsigned minor) Φarm Φdots Φun Φok) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* THE EPILOGUE FUNNEL at +0x70: [mv a0,s2], the seven [c.ldsp]s, the
@@ -2094,7 +2146,11 @@ Section ProofCreateMain.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (CIDa : CpuId) : iProp Σ :=
+      (CIDa : CpuId)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∀ (Ma : regfile) (w5 : mword 64)
        (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
        (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
@@ -2194,6 +2250,11 @@ Section ProofCreateMain.
           escrow holds the other half of this transaction's element, and
           this arm's child needs the residue to suspend its row with. *)
        t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
+       (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C): the four
+          commits, NONE fired on this path -- the found half moved
+          nothing ---- *)
+       cre_commits (fs_gamma_L fsc_fs) (bv_unsigned ty) (bv_unsigned major)
+         (bv_unsigned minor) Φarm Φdots Φun Φok -∗
        (* and the contract's own continuation, ANCHORED AT THE ENTRY HART
           (ProofDirlink's [dl_after_body]): the block's own proof does the
           retargeting, so this file hands over [Hcont] untouched. *)
@@ -2202,7 +2263,7 @@ Section ProofCreateMain.
             cr_cont_body γf
  plen pfun pv ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                         ret_tgt CIDc) -∗
+                         ret_tgt CIDc Φarm Φdots Φun Φok) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
@@ -2245,7 +2306,11 @@ Section ProofCreateMain.
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
       (nf nsl : nat -> bv 8) (t : nat)
-      (CIDm : CpuId) : iProp Σ :=
+      (CIDm : CpuId)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∀ (Mx : regfile) (kslot : nat) (q : Qp) (g gil gisl : gname) (lo tl : nat)
        (cinum : mword 32) (dnc : dinode) (bmc : blkmap)
        (datc : nat -> list (bv 8)) (n3 : nat) (Sb3 : gset Z),
@@ -2404,12 +2469,19 @@ Section ProofCreateMain.
           count and no dots until the interior dirlinks land, so the arm
           carries the registry's receipt (durable-disk lane A) *)
        cr_dirty t (bv_unsigned cinum) -∗
+       (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C): the ARM fired
+          at +0xc4 (its receipt), the other three commits unspent ---- *)
+       cre_arm_fired Φarm (bv_unsigned cinum) -∗
+       adots_commit_at (fs_gamma_L fsc_fs) appE Φdots -∗
+       aunarm_commit_at (fs_gamma_L fsc_fs) appE Φun -∗
+       acre_commit_at_gen (fs_gamma_L fsc_fs) appE
+         (cre_child (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor)) Φok -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
  plen pfun pv ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                         ret_tgt CIDc) -∗
+                         ret_tgt CIDc Φarm Φdots Φun Φok) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition cr_fail_body
@@ -2425,7 +2497,11 @@ Section ProofCreateMain.
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
       (nf nsl : nat -> bv 8) (t : nat)
-      (CIDf : CpuId) : iProp Σ :=
+      (CIDf : CpuId)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∀ (Mx : regfile) (kslot : nat) (q : Qp) (g gil gisl : gname) (lo tl : nat)
        (cinum : mword 32) (dnc : dinode) (bmc : blkmap)
        (datc : nat -> list (bv 8))
@@ -2613,12 +2689,20 @@ Section ProofCreateMain.
        (* ...and the transaction token, which this arm's child needs to
           suspend its row with (durable-disk lane A) *)
        t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
+       (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C): the ARM fired
+          at +0xc4 (its receipt), the other three commits unspent -- the
+          [sh zero,74(s3)] below fires the unarm ---- *)
+       cre_arm_fired Φarm (bv_unsigned cinum) -∗
+       adots_commit_at (fs_gamma_L fsc_fs) appE Φdots -∗
+       aunarm_commit_at (fs_gamma_L fsc_fs) appE Φun -∗
+       acre_commit_at_gen (fs_gamma_L fsc_fs) appE
+         (cre_child (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor)) Φok -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
  plen pfun pv ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                         ret_tgt CIDc) -∗
+                         ret_tgt CIDc Φarm Φdots Φun Φok) -∗
        WP (Loop : expr riscv_lang))%I.
 
 
@@ -2723,7 +2807,11 @@ Section ProofCreateMain.
       (b : bool) (lks : gset string)
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
       (nf nsl : nat -> bv 8) (t : nat)
-      (CIDf : CpuId) : iProp Σ :=
+      (CIDf : CpuId)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∀ (Mx : regfile) (kslot : nat) (q : Qp) (g gil gisl : gname) (lo tl : nat)
        (cinum : mword 32)
        (dp : dinode) (bmp : blkmap) (datap : nat -> list (bv 8))
@@ -2873,12 +2961,21 @@ Section ProofCreateMain.
           count and no dots until the interior dirlinks land, so the arm
           carries the registry's receipt (durable-disk lane A) *)
        cr_dirty t (bv_unsigned cinum) -∗
+       (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C): the ARM fired,
+          the DOTS fired at whatever the entry wrote (or not at all), the
+          unarm and the parent leg unspent ---- *)
+       cre_arm_fired Φarm (bv_unsigned cinum) -∗
+       ((∃ full : bool, cre_dots_fired Φdots (bv_unsigned cinum) (bv_unsigned dind) full)
+        ∨ adots_commit_at (fs_gamma_L fsc_fs) appE Φdots) -∗
+       aunarm_commit_at (fs_gamma_L fsc_fs) appE Φun -∗
+       acre_commit_at_gen (fs_gamma_L fsc_fs) appE
+         (cre_child (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor)) Φok -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
  plen pfun pv ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                         ret_tgt CIDc) -∗
+                         ret_tgt CIDc Φarm Φdots Φun Φok) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* ---- (c) THE HALF -------------------------------------------------- *)

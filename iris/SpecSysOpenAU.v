@@ -567,6 +567,7 @@ Section SysOpenAU.
      the exists observation, and open's own two commits *)
   Definition open_au_pre_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
@@ -574,7 +575,9 @@ Section SysOpenAU.
      ∗ acre_commit_at Γ appE (AFile []) Φok
      ∗ dlookup_commit_at Γ appE Φex
      ∗ aopen_commit_at Γ appE Φo
-     ∗ atrunc_commit_at Γ appE Φt)%I.
+     ∗ atrunc_commit_at Γ appE Φt
+     (* ...and create's CHILD legs (round E2, lane E2-C) *)
+     ∗ cre_child_unfired Γ (AFile []) Φarm Φun)%I.
 
   (* ------------------------------------------------------------------ *)
   (*  2e.  The descriptor story                                           *)
@@ -708,6 +711,7 @@ Section SysOpenAU.
   Definition open_post_ok_create `{XI : CurCtx} Γ (γf : gname) (p : mword 64)
       (pid : mword 32) (vom : mword 64)
       (P : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
@@ -723,6 +727,9 @@ Section SysOpenAU.
            dlookup_commit_at Γ appE Φex ∗
            aopen_commit_at Γ appE Φo ∗
            atrunc_commit_at Γ appE Φt ∗
+           (* the child's row APPEARED at this inum; the unarm comes home
+              (round E2, lane E2-C) *)
+           cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun ∗
            ∃ γo : gname,
              open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
                (FdInode i γo) sts r)
@@ -732,6 +739,8 @@ Section SysOpenAU.
            ⌜entsx !! nm = Some i⌝ ∗
            Φex avx d nm i ∗
            acre_commit_at Γ appE (AFile []) Φok ∗
+           (* the name was already there: create's child legs are whole *)
+           cre_child_unfired Γ (AFile []) Φarm Φun ∗
            (∃ (av : aview) (nl : nat),
               ((* the found node is a FILE *)
                (∃ bs0 : list (bv 8),
@@ -760,16 +769,18 @@ Section SysOpenAU.
      receipt is delivered -- the fs mutation of a failed open is real. *)
   Definition open_post_fail_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
-    (open_au_pre_create Γ γfs cw P Pmiss Φok Φex Φo Φt
+    (open_au_pre_create Γ γfs cw P Pmiss Φarm Φun Φok Φex Φo Φt
      ∨ (∃ pl : list (bv 8),
           (mknod_walk_dead_era γfs P Pmiss pl
              ∗ acre_commit_at Γ appE (AFile []) Φok
              ∗ dlookup_commit_at Γ appE Φex
              ∗ aopen_commit_at Γ appE Φo
-             ∗ atrunc_commit_at Γ appE Φt)
+             ∗ atrunc_commit_at Γ appE Φt
+             ∗ cre_child_unfired Γ (AFile []) Φarm Φun)
           ∨ (∃ d : Z,
                P (length (mknod_parent_elems pl)) d
                ∗ atrunc_commit_at Γ appE Φt
@@ -781,7 +792,9 @@ Section SysOpenAU.
                      ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
                      Φok av d nm i
                      ∗ dlookup_commit_at Γ appE Φex
-                     ∗ aopen_commit_at Γ appE Φo)
+                     ∗ aopen_commit_at Γ appE Φo
+                     (* the child's row APPEARED and STANDS *)
+                     ∗ cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun)
                   ∨ (* (b) the name existed: found DIR (F-BAD), a bad
                        found-device major, or table full past a good
                        found node; -1 does not say which *)
@@ -792,6 +805,11 @@ Section SysOpenAU.
                      ⌜ents !! nm = Some i⌝ ∗
                      Φex av d nm i
                      ∗ acre_commit_at Γ appE (AFile []) Φok
+                     (* create's child legs: whole, or the do-then-undo
+                        PAIR -- the fold does not separate the two here
+                        (round E2, lane E2-C) *)
+                     ∗ (cre_child_unfired Γ (AFile []) Φarm Φun
+                        ∨ ∃ ic : Z, cre_child_pair Φarm Φun ic)
                      ∗ (aopen_commit_at Γ appE Φo
                         ∨ (∃ (av' : aview) (a : anode),
                              ⌜arow_at av' i a⌝ ∗ Φo av' i a)))
@@ -799,11 +817,16 @@ Section SysOpenAU.
                        inodes, dirlink failure, "/" *)
                   (acre_commit_at Γ appE (AFile []) Φok
                    ∗ dlookup_commit_at Γ appE Φex
-                   ∗ aopen_commit_at Γ appE Φo)))))%I.
+                   ∗ aopen_commit_at Γ appE Φo
+                   (* the guards and "out of inodes" fired nothing; a failed
+                      [dirlink] fired the do-then-undo PAIR (ruling Q-h) *)
+                   ∗ (cre_child_unfired Γ (AFile []) Φarm Φun
+                      ∨ ∃ ic : Z, cre_child_pair Φarm Φun ic))))))%I.
 
   Definition open_arms_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
       (p : mword 64) (pid : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
@@ -811,8 +834,8 @@ Section SysOpenAU.
     (((⌜r = (mword_of_int (-1) : mword 64)⌝
        ∗ proc_priv γf p pid UW
        ∗ fd_frags (pv_fdg (us_V UW)) sts
-       ∗ open_post_fail_create Γ γfs cw P Pmiss Φok Φex Φo Φt)
-      ∨ open_post_ok_create Γ γf p pid vom P Φok Φex Φo Φt sts UW r)
+       ∗ open_post_fail_create Γ γfs cw P Pmiss Φarm Φun Φok Φex Φo Φt)
+      ∨ open_post_ok_create Γ γf p pid vom P Φarm Φun Φok Φex Φo Φt sts UW r)
      ∗ fd_slot)%I.
 
   (* ------------------------------------------------------------------ *)
@@ -909,11 +932,12 @@ Section SysOpenAU.
   Lemma open_arms_create_landed `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
       (p : mword 64) (pid : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (sts : list fdstate) (UW : ustate) (r : mword 64) :
-    open_arms_create Γ γfs cw γf p pid vom P Pmiss Φok Φex Φo Φt sts UW r ⊢
+    open_arms_create Γ γfs cw γf p pid vom P Pmiss Φarm Φun Φok Φex Φo Φt sts UW r ⊢
       sys_open_post γf p pid UW sts (trunc32 vom) r.
   Proof.
     destruct (om_modes_landed vom) as [Hrd Hwr].
@@ -922,11 +946,11 @@ Section SysOpenAU.
     - iLeft. by iFrame "Hp Hb".
     - iRight.
       iDestruct "H" as (pl d i nm) "(_ & _ & [H | H])".
-      + iDestruct "H" as (av ents nl) "(_ & _ & _ & _ & _ & _ & H)".
+      + iDestruct "H" as (av ents nl) "(_ & _ & _ & _ & _ & _ & _ & _ & H)".
         iDestruct "H" as (γo) "H".
         iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
           [exact Hrd | exact Hwr].
-      + iDestruct "H" as (avx entsx nlx) "(_ & _ & _ & _ & H)".
+      + iDestruct "H" as (avx entsx nlx) "(_ & _ & _ & _ & _ & H)".
         iDestruct "H" as (av nl) "[H | H]".
         * iDestruct "H" as (bs0) "(_ & _ & _ & H)". iDestruct "H" as (γo) "H".
           iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
@@ -1102,6 +1126,7 @@ Definition wp_sys_open_au_create_body
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (P Pmiss : nat -> Z -> iProp Σ)
+    (Φarm Φun : aview -> Z -> iProp Σ)
     (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
     (Φo : aview -> Z -> anode -> iProp Σ)
     (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :=
@@ -1109,9 +1134,9 @@ Definition wp_sys_open_au_create_body
   om_create vom = true ->
   wp_sys_open_au_frame γfl γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v vom pid U sts m K eb b lks
-    (open_au_pre_create Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φok Φex Φo Φt)
+    (open_au_pre_create Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φarm Φun Φok Φex Φo Φt)
     (open_arms_create Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid vom P Pmiss
-       Φok Φex Φo Φt sts).
+       Φarm Φun Φok Φex Φo Φt sts).
 
 (* ===================================================================== *)
 (*  4.  THE SEAL                                                          *)
@@ -1154,9 +1179,11 @@ Module Type SYSOPEN_AU.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ),
       wp_sys_open_au_create_body γfl γf gs j gl pd pav pu ns
-        dqb dqs dqbs dqn v vom pid U sts m K eb b lks P Pmiss Φok Φex Φo Φt.
+        dqb dqs dqbs dqn v vom pid U sts m K eb b lks P Pmiss Φarm Φun
+        Φok Φex Φo Φt.
 End SYSOPEN_AU.

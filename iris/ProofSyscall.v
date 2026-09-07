@@ -5510,14 +5510,25 @@ Section SyscallArms.
  IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
               v0 pid U M (av - 4)%nat true true ∅
+              (* THE APPLICATION'S SIDE (round E2, lane E2-C): the generic
+                 app asks nothing of create's legs, so the four families are
+                 [True] and the bundle is [SpecCreate.cre_commits_unit] off
+                 the parked license -- the same shape unlink's and mknod's
+                 arms use ([FsAbsInvFire.fsabs_*]).  The receipts come back
+                 at [True] and are dropped. *)
+              (fun _ _ => True)%I (fun _ _ _ _ => True)%I
+              (fun _ _ => True)%I (fun _ _ _ _ => True)%I
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
               ltac:(compute; lia) Hj Hgamma eq_refl Hv0
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
-                    Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv").
+                    Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv
+                    []").
+    { iApply SpecCreate.cre_commits_unit.
+      iApply (InodeRegion.ireg_inv_app with "Hireg"). }
     iIntros (CIDy Hsy mf ns' P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0 _".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -5623,6 +5634,9 @@ Section SyscallArms.
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
               v0 v1 v2 pid U M (av - 4)%nat true true ∅
+              (fun _ _ => True%I) (fun _ _ => True%I)
+              (* create's child legs, at the trivial families too
+                 (round E2, lane E2-C) *)
               (fun _ _ => True%I) (fun _ _ => True%I)
               (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
@@ -5780,6 +5794,9 @@ Section SyscallArms.
                   (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
                   DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
                   v0 v1 pid U sts M (av - 4)%nat true true ∅
+                  (fun _ _ => True%I) (fun _ _ => True%I)
+                  (* create's child legs, at the trivial families too
+                     (round E2, lane E2-C) *)
                   (fun _ _ => True%I) (fun _ _ => True%I)
                   (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
                   (fun _ _ _ => True%I) (fun _ _ _ => True%I)

@@ -133,6 +133,9 @@ Require Import SpecPanic.
 Require Import SpecIput SpecIupdate.
 Require Import SpecIunlockput.
 Require Import SpecCreate.
+Require Import FsAbsDelta.       (* [dots_ents]: the entry map the dots left (round E2, lane E2-C) *)
+Require Import FsAbsCreateFire.  (* the UNARM fire's commit and receipt (round E2, lane E2-C) *)
+Require Import FsAbsDefs.        (* [aview], [abs_of], [abs_node] *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
    OWN body rather than a callee, so it is NOT a functor argument -- the
@@ -200,7 +203,12 @@ Section ProofCreateFailMkdir.
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
-      (nf nsl : nat -> bv 8) (t : nat) :
+      (nf nsl : nat -> bv 8) (t : nat)
+      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -236,7 +244,8 @@ Section ProofCreateFailMkdir.
 
                    plen pfun pv ty major minor U u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
-                   kd qd gd γil γisl dind nf nsl t CIDf).
+                   kd qd gd γil γisl dind nf nsl t CIDf
+                   Φarm Φdots Φun Φok).
   Proof.
     intros HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcovb
            Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb.
@@ -260,7 +269,7 @@ Section ProofCreateFailMkdir.
              #Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
              Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz %Hlek #Hflk Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Hdirty
-             Hcont".
+             Harmr Hdotsx Hun Hacre Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -490,13 +499,25 @@ Section ProofCreateFailMkdir.
       - exact (dir_uniq_cong dc _ datc (cr_setf_type _ _ _ _)
                  (cr_setf_size _ _ _ _) Hcduq).
       - exact (dir_dots_ix_orphan (bv_unsigned cinum) _ datc Hznl). }
+    (* THE UNARM FIRES HERE (round E2, lane E2-C, site #13b): the dotless
+       or half-dotted directory the shared prologue armed at +0xc4 goes to
+       count 0, so its row DISAPPEARS (ruling Q-h: the do-then-undo PAIR),
+       the registry arm comes home and the transaction token with it. *)
+    assert (Hrow1 : abs_of (era_node dc bmc datc)
+            = Some (MkAnode (abs_node (era_node dc bmc datc)) 1%nat))
+      by exact (caf_era_row_nl1 dc bmc datc
+                  Htyz ltac:(rewrite Hcnl1; vm_compute; reflexivity)).
+    assert (Hnone0 : abs_of (era_node (cr_setf dc major minor
+                               (mword_of_int 0 : mword 16)) bmc datc) = None)
+      by exact (caf_era_none_nl0 _ bmc datc Hznl).
     iApply fupd_wp.
-    iMod (cr_dirty_clear ⊤ t (bv_unsigned cinum)
+    iMod (cr_dirty_clear_unarm ⊤ t (bv_unsigned cinum) _ Φun
             (era_node dc bmc datc)
             (era_node (cr_setf dc major minor (mword_of_int 0 : mword 16))
                       bmc datc)
-            ltac:(solve_ndisj) Hlocorph with "[] [] Hdirty Hctop")
-      as "[Htx Hctop]";
+            ltac:(solve_ndisj) Hlocorph Hrow1 Hnone0
+            with "[] [] Hdirty Hun Hctop")
+      as "(Htx & Hctop & Hunr)";
       [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
@@ -762,7 +783,7 @@ Section ProofCreateFailMkdir.
               (mword_of_int 0 : mword 32) dp bmp n6 Sb6
               (1 + (1 + (ns - 2)))%nat
               with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
-                    Hbsl [%] Hisl [%] Hop [$Htx]").
+                    Hbsl [%] Hisl [%] Hop [$Htx Harmr Hdotsx Hunr Hacre]").
     { exact Hcsf. }
     { exact (cr_slots_2 _ ns eq_refl Hns). }
     { split_and!.
@@ -772,7 +793,15 @@ Section ProofCreateFailMkdir.
       - pose proof (proj2 Hn6) as HB1. pose proof (proj2 Hn5) as HB2.
         pose proof (proj2 Hn4) as HB3. lia.
       - discriminate. }
-    { iPureIntro. rewrite Ha0f. exact HG7s2. }
+    { iSplitR; [iPureIntro; rewrite Ha0f; exact HG7s2 |].
+      (* mkdir's three [fail:] entries: the do-then-undo PAIR (ruling Q-h),
+         with the dots receipt the entry brought -- both dots, the first
+         alone, or none at all -- carried through unchanged. *)
+      rewrite /cre_fail_arms. iRight.
+      iExists (bv_unsigned cinum), (bv_unsigned dind).
+      iSplitL "Harmr"; [iExact "Harmr" |].
+      iSplitL "Hdotsx"; [iExact "Hdotsx" |].
+      iSplitL "Hunr"; [iExact "Hunr" | iExact "Hacre"]. }
   Qed.
 
 End ProofCreateFailMkdir.

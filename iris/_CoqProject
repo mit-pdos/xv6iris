@@ -1416,6 +1416,11 @@ LinkSysExecAU.v
 SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v
+# create's legs as commits and fires (round E2, lane E2-C): the authority-
+# shaped commits of the create family (moved down from FsAbsMknodFire so
+# SpecCreate's bundle can name them), the arm/dots/unarm fires under the
+# armed registry.  Below SpecCreate; FsAbsMknodFire re-exports it.
+FsAbsCreateFire.v
 SpecCreate.v
 CreateBudget.v
 ProofCreateParts.v

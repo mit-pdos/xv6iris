@@ -137,6 +137,11 @@ Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup.
 Require Import SpecNameiparent.
 Require Import SpecCreate.
+Require Import FsTree.           (* [fname] *)
+Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ the commits are at *)
+Require Import AppInv.           (* [appE]: the commit mask *)
+Require Import FsAbsCreateFire.  (* the legs' commits and receipts (round E2, lane E2-C) *)
+Require Import FsAbsDefs.        (* [aview]: the receipts' view argument (round E2, lane E2-C) *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
    OWN body rather than a callee, so it is NOT a functor argument -- the
@@ -204,7 +209,12 @@ Section ProofCreateFound.
       (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) :
+      (b : bool) (lks : gset string)
+      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->
@@ -266,6 +276,10 @@ Section ProofCreateFound.
     (* the transaction token, for the child's suspended row inside
        (durable-disk lane A) *)
     log_tx icfg_log -∗
+    (* ---- THE APPLICATION'S SIDE: the four commits, NONE fired on this
+       half (round E2, lane E2-C) ---- *)
+    cre_commits (fs_gamma_L fsc_fs) (bv_unsigned ty) (bv_unsigned major)
+      (bv_unsigned minor) Φarm Φdots Φun Φok -∗
     (* ---- THE PARKED ALLOCATE HALF, as a HYPOTHESIS ---- *)
     wp_next true (proc_addr j) (fun CIDa : CpuId =>
       cr_alloc_body (CID := CID) γs j γl pd pav pu γf
@@ -273,13 +287,15 @@ Section ProofCreateFound.
                     plen pfun (m !!! Regidx Ra0 : mword 64)
                     ty major minor U u Sb ns pidv dqb dqs dqbs dqn m
                     (m !!! Regidx csp_rs1 : mword 64)
-                    (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks CIDa) -∗
+                    (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks CIDa
+                    Φarm Φdots Φun Φok) -∗
     (* ---- the contract's own continuation ---- *)
     wp_next true (proc_addr j) (fun CIDc : CpuId =>
       cr_cont_body γf
  plen pfun (m !!! Regidx Ra0 : mword 64)
                    ty major minor U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                   (ret_pc (m !!! Regidx Rra : mword 64)) CIDc) -∗
+                   (ret_pc (m !!! Regidx Rra : mword 64)) CIDc
+                   Φarm Φdots Φun Φok) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc Hbmsl
@@ -290,7 +306,7 @@ Section ProofCreateFound.
     iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hkenv
              #Hitb2 #Hitbl #Hesc #Hslks #Hiregi #Hiopen
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath #Hprocs #Hdevi #Hgeom #Hdlk
-             Hbsl Hislots Hop Htx Halloc Hcont".
+             Hbsl Hislots Hop Htx Hcre Halloc Hcont".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     (* PIN THE INDEX: at level 0 [cpu_own_eb_agree] gives [eb = b], and the
        crossings below are the literal [true] (create parks everywhere). *)
@@ -951,13 +967,15 @@ Section ProofCreateFound.
         iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
                   (mword_of_int 0 : mword 32) dnl bml n2 Sb2 ns
                   with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
-                        Hbsl [%] Hisl [%] Hop [$Htx]").
+                        Hbsl [%] Hisl [%] Hop [$Htx Hcre]").
         { exact Hcsf. }
         { exact (cr_slots_ns _ ns eq_refl Hns). }
         { split_and!; [exact (cr_sub2 _ _ _ Hsb1 Hsb2)
                       | exact (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))
                       | discriminate]. }
-        { iPureIntro. rewrite Ha0f. exact HG3s2. }
+        { iSplitR; [iPureIntro; rewrite Ha0f; exact HG3s2 |].
+          (* nothing fired on this arm: the four commits come home *)
+          rewrite /cre_fail_arms. iLeft. iExact "Hcre". }
       + (* ====== THE GUARD FALLS THROUGH: dp->nlink <> 0 ============== *)
         iApply (wp_cbeqz_fall_s_sconf (mword_of_int (CK + 0x2e))
                   (mword_of_int 43 : mword 8) (Cregidx (mword_of_int 7)) Ra5
@@ -1485,13 +1503,16 @@ Section ProofCreateFound.
                        iref_slots 1 -∗ iref_slots (ns - 2) -∗
                        log_opS icfg_log n2 Sb2 -∗
                        t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
+                       (* the four commits, unspent: F-BAD moves nothing *)
+                       cre_commits (fs_gamma_L fsc_fs) (bv_unsigned ty)
+                         (bv_unsigned major) (bv_unsigned minor) Φarm Φdots Φun Φok -∗
                        wp_next (CID0 := CID) true (proc_addr j)
                          (fun CIDc : CpuId =>
                             cr_cont_body γf
  plen pfun
                               (m !!! Regidx Ra0 : mword 64) ty major minor U u Sb
                               ns pidv dqb dqs dqbs dqn m K eb b lks j ret_tgt
-                              CIDc) -∗
+                              CIDc Φarm Φdots Φun Φok) -∗
                        WP (Loop : expr riscv_lang)))%I
             with "[]" as "#Hfbad".
           { iModIntro.
@@ -1499,7 +1520,7 @@ Section ProofCreateFound.
               "%HBr Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
                Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcload Hcshotb
                Hcfrz Hckeep Hruc Hsbn Hsbi Hsbs Hsbb Hppid Hppback Hpath Hbsl
-               Hisl Hislr Hop Htx Hcontb".
+               Hisl Hislr Hop Htx Hcre Hcontb".
             pose proof HBr as HBr2.
             destruct HBr2 as (X2 & X8 & X9 & X18 & X20 & X21 & X22 & Xthr).
             (* +0x98 c.mv a0,s2 : the CHILD *)
@@ -1635,14 +1656,16 @@ Section ProofCreateFound.
                       (mword_of_int 0 : mword 32) dnc bmc n3 Sb3
                       (1 + (1 + (ns - 2)))%nat
                       with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv
-                            Hpath Hbsl [%] Hisl [%] Hop [$Htx]").
+                            Hpath Hbsl [%] Hisl [%] Hop [$Htx Hcre]").
             { exact Hcsf. }
             { exact (cr_slots_2 _ ns eq_refl Hns). }
             { split_and!;
                 [exact (cr_sub3 _ _ _ _ Hsb1 Hsb2 Hsb3)
                 | exact (cr_le3 _ _ _ _ (proj2 Hn3) (proj2 Hn2) (proj2 Hnp1))
                 | discriminate]. }
-            { iPureIntro. rewrite Ha0f. exact HB3s2. } }
+            { iSplitR; [iPureIntro; rewrite Ha0f; exact HB3s2 |].
+              (* nothing fired on this arm: the four commits come home *)
+              rewrite /cre_fail_arms. iLeft. iExact "Hcre". } }
           (* ===== +0x5a c.li a5,2 ===================================== *)
           iApply (wp_cli_s_sconf (mword_of_int (CK + 0x5a)) Ra5
                     (mword_of_int 2 : mword 6) (mword_of_int 2 : mword 64)
@@ -1870,7 +1893,7 @@ Section ProofCreateFound.
                            Hnb14 Hnb2 Hcslkd Hcdep Hoffrc Hcidev Hciinum
                            Hcivalid Hcload Hcshot Hcfrz Hckeep Hruc Hsbn Hsbi Hsbs
                            Hsbb
-                           Hppid Hppback Hpath Hbsl Hisl Hislr Hop Htx Hcont").
+                           Hppid Hppback Hpath Hbsl Hisl Hislr Hop Htx Hcre Hcont").
                 { exact HFBregs. }
              ++ (* ===== ARM F-OK: the found inode is a file or a device *)
                 iApply (wp_bltu_fall_s_sconf (mword_of_int (CK + 0x6c))
@@ -1901,7 +1924,8 @@ Section ProofCreateFound.
                           cinum dnc bmc n2 Sb2 (1 + (ns - 2))%nat
                           with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv
                                 Hpath Hbsl [%] Hisl [%] Hop [Hcslkd Hcdep Hoffrc
-                                Hcidev Hciinum Hcivalid Hcload Hcfrz Hckeep Hruc]").
+                                Hcidev Hciinum Hcivalid Hcload Hcfrz Hckeep Hruc
+                                Hcre]").
                 { exact Hcsf. }
                 { exact (cr_slots_1 _ ns eq_refl Hns). }
                 { split_and!;
@@ -1914,14 +1938,17 @@ Section ProofCreateFound.
                   split; [split; [exact Hcpos | exact Hcinb] |].
                   split; [exact Htyf |].
                   exact (cr_trange_in (di_type dnc) Hrng). }
-                iApply (create_locked_mk
-                          _ _ _ _ _ _ _ _ gilc gislc eq_refl
-                          with "Hslkc Hcslkd [Hcdep] Hoffrc Hcidev Hciinum
-                                Hcivalid Hcload Hcshot Hcfrz [Hckeep] Hruc").
-                { iExists lock, tlc. iSplitR; [by iPureIntro|].
-                  iFrame "Hflc Hcdep". }
-                { iExists lock, tlck. iSplitR; [by iPureIntro|].
-                  iFrame "Hflck Hckeep". }
+                iSplitR "Hcre".
+                { iApply (create_locked_mk
+                            _ _ _ _ _ _ _ _ gilc gislc eq_refl
+                            with "Hslkc Hcslkd [Hcdep] Hoffrc Hcidev Hciinum
+                                  Hcivalid Hcload Hcshot Hcfrz [Hckeep] Hruc").
+                  { iExists lock, tlc. iSplitR; [by iPureIntro|].
+                    iFrame "Hflc Hcdep". }
+                  { iExists lock, tlck. iSplitR; [by iPureIntro|].
+                    iFrame "Hflck Hckeep". } }
+                (* ARM F-OK moved nothing: the four commits come home *)
+                rewrite /cre_ok_arms /=. iExact "Hcre".
           -- (* ===== ARM F-BAD (first entry): type != T_FILE ========== *)
              iApply (wp_bne_taken_s_sconf (mword_of_int (CK + 0x5c))
                        (mword_of_int 60 : mword 13) Ra5 Rs4 F6 (K - 10)%nat b
@@ -1944,7 +1971,7 @@ Section ProofCreateFound.
                         Hnb14 Hnb2 Hcslkd Hcdep Hoffrc Hcidev Hciinum
                         Hcivalid Hcload Hcshot Hcfrz Hckeep Hruc Hsbn Hsbi Hsbs
                         Hsbb
-                        Hppid Hppback Hpath Hbsl Hisl Hislr Hop Htx Hcont").
+                        Hppid Hppback Hpath Hbsl Hisl Hislr Hop Htx Hcre Hcont").
              { exact HF6regs. }
         * (* ========================================================== *)
           (*  THE NAME IS NOT THERE -- the ALLOCATE half, PARKED         *)
@@ -2009,7 +2036,7 @@ Section ProofCreateFound.
                           Hnb14 Hnb2 Hslkd Hslkdd [Hdep] Hoffr Hidev Hiinum
                           Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath Hbsl Hisl Hop Htx
-                          Hcont").
+                          Hcre Hcont").
           { rewrite -Hie. exact HA1regs. }
           { exact Hkd. }
           { exact Hdib'. }
@@ -2185,13 +2212,15 @@ Section ProofCreateFound.
         iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
                   (mword_of_int 0 : mword 32) dnl bml n2 Sb2 ns
                   with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
-                        Hbsl [%] Hisl [%] Hop [$Htx]").
+                        Hbsl [%] Hisl [%] Hop [$Htx Hcre]").
         { exact Hcsf. }
         { exact (cr_slots_ns _ ns eq_refl Hns). }
         { split_and!; [exact (cr_sub2 _ _ _ Hsb1 Hsb2)
                       | exact (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))
                       | discriminate]. }
-        { iPureIntro. rewrite Ha0f. exact HJ3s2. }
+        { iSplitR; [iPureIntro; rewrite Ha0f; exact HJ3s2 |].
+          (* nothing fired on this arm: the four commits come home *)
+          rewrite /cre_fail_arms. iLeft. iExact "Hcre". }
         }
         (* ===== +0x30 c.lui a4,0xffff8 ================================= *)
         iApply (wp_clui_s_sconf (mword_of_int (CK + 0x30)) Ra4
@@ -2430,11 +2459,13 @@ Section ProofCreateFound.
                           (replicate 13 (bv_0 32)))
                 bm_empty n1 Sb1 ns
                 with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
-                      Hbsl [%] Hisl [%] Hop [$Htx]").
+                      Hbsl [%] Hisl [%] Hop [$Htx Hcre]").
       { exact Hcsf. }
       { exact (cr_slots_ns _ ns eq_refl Hns). }
       { split_and!; [exact Hsb1 | exact (proj2 Hnp1) | discriminate]. }
-      { iPureIntro. rewrite Ha0f. exact HN1s2. }
+      { iSplitR; [iPureIntro; rewrite Ha0f; exact HN1s2 |].
+        (* nothing fired on this arm: the four commits come home *)
+        rewrite /cre_fail_arms. iLeft. iExact "Hcre". }
   Qed.
 
 End ProofCreateFound.

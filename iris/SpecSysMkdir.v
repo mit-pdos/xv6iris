@@ -154,7 +154,14 @@ Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import SpecPrintk.      (* [printk_env], [printk_gen_contract] *)
 Require Import SpecDirlink.     (* [ic_sleeplocks], [ireg_blocks_ok] *)
-Require Import SpecCreate.      (* [create_slots], [create_units], [K_create] *)
+Require Import SpecDirlookup.   (* [T_DIR]: the type mkdir's create is at *)
+Require Import SpecCreate.      (* [create_slots], [create_units], [K_create],
+                                   and (round E2, lane E2-C) the create
+                                   bundle [cre_commits] with the two receipt
+                                   arms [cre_ok_arms]/[cre_fail_arms] *)
+Require Import FsTree.          (* [fname]: the parent-leg receipt's name *)
+Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
+Require Import FsAbsDefs.       (* [aview]: the receipts' view argument *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -181,6 +188,39 @@ Section SpecSysMkdir.
 
 End SpecSysMkdir.
 
+(* THE LEGS' RECEIPTS AT sys_mkdir'S TWO ANSWERS (round E2, lane E2-C;
+   owner ruling Q-c: [wp_sys_mkdir_sconf] is strengthened IN PLACE, since
+   the dispatcher is its only consumer).  A ZERO return means create MADE
+   the directory: its ARM fired, its two interior [dirlink]s fired the DOTS
+   commit, and its PARENT leg fired.  A -1 means either that NOTHING fired
+   -- argstr failed, or create's walk/guards refused before the claim -- or
+   the do-then-undo PAIR (ruling Q-h): the row appeared and disappeared.
+   mkdir's create is at [T_DIR] with both device halfwords zero, which is
+   what pins the type index of the two arms. *)
+Definition mkdir_arms
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    (Φarm : aview -> Z -> iProp Σ)
+    (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+    (Φun : aview -> Z -> iProp Σ)
+    (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+    (r : mword 64) : iProp Σ :=
+  ((⌜r = (zero_reg : mword 64)⌝ ∗
+      ∃ i : Z,
+        cre_ok_arms (fs_gamma_L fsc_fs)
+          (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
+          (bv_unsigned (mword_of_int 0 : mword 16))
+          (bv_unsigned (mword_of_int 0 : mword 16))
+          Φarm Φdots Φun Φok true i)
+   ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
+        cre_fail_arms (fs_gamma_L fsc_fs)
+          (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
+          (bv_unsigned (mword_of_int 0 : mword 16))
+          (bv_unsigned (mword_of_int 0 : mword 16))
+          Φarm Φdots Φun Φok))%I.
+
+Global Typeclasses Opaque mkdir_arms.
+
 Definition wp_sys_mkdir_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -193,7 +233,12 @@ Definition wp_sys_mkdir_sconf_body
     (v : mword 64)                                      (* syscall argument 0  *)
     (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string)
+    (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+    (Φarm : aview -> Z -> iProp Σ)
+    (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+    (Φun : aview -> Z -> iProp Σ)
+    (Φok : aview -> Z -> fname -> Z -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_mkdir in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -274,6 +319,13 @@ Definition wp_sys_mkdir_sconf_body
   (* ---- the process, whole, and the reference allowance ---- *)
   iref_slots ns -∗
   proc_priv γf pj pid U -∗
+  (* ---- THE APPLICATION'S SIDE: the four commits create's legs fire
+     (round E2, lane E2-C), at mkdir's own type index ---- *)
+  cre_commits (fs_gamma_L fsc_fs)
+    (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
+    (bv_unsigned (mword_of_int 0 : mword 16))
+    (bv_unsigned (mword_of_int 0 : mword 16))
+    Φarm Φdots Φun Φok -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_mkdir sleeps (begin_op,
      argstr's fault path, create and end_op all park), so it can return on
      another hart whatever SIE was doing. *)
@@ -313,6 +365,9 @@ Definition wp_sys_mkdir_sconf_body
       iref_slots ns' -∗
       proc_priv γf pj pid (us_upt U P') -∗
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+      (* ...and the legs' receipts, keyed on that answer *)
+      mkdir_arms Φarm Φdots Φun Φok
+        (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -327,9 +382,13 @@ Module Type SYSMKDIR.
       (v : mword 64)
       (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ),
       wp_sys_mkdir_sconf_body γf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v
-                              pid U m K eb b lks.
+                              pid U m K eb b lks Φarm Φdots Φun Φok.
 End SYSMKDIR.

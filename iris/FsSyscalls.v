@@ -356,24 +356,32 @@ Module FsSysMkdir (M : SYSMKDIR).
         Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc & #Hbmi)".
     iDestruct "Hdisk" as (pd pav pu) "[#Hdgeom #Hdlk]".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
+    iDestruct "Hireg" as "#Hireg".
     iApply (M.wp_sys_mkdir_sconf γf γs j γl
  pd pav pu
 
  ns dqb dqs dqbs dqn v pid U m K true
               b lks
+              (* the friendly packaging is not on the dispatched path, so it
+                 hands create's legs the TRIVIAL families and pays the
+                 bundle off the parked license (round E2, lane E2-C) *)
+              (fun _ _ => True)%I (fun _ _ _ _ => True)%I
+              (fun _ _ => True)%I (fun _ _ _ _ => True)%I
               HK Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus Hprg Hns Hj Hgs
               eq_refl Htf
               with "Hcg Hown [] [] Htext Hdata Hpc Hpr Hbio Hlogc
                     Hseam Hgc Hdev Hdgeom Hdlk Hbsl Hitb2 Hitbl Hesc Hisl
                     Hireg Hiopen Hsbn Hsbi Hsbs Hsbb Hbmi Hkenv Hprocs Hir
-                    Hpriv").
+                    Hpriv []").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
+    { iApply SpecCreate.cre_commits_unit.
+      iApply (InodeRegion.ireg_inv_app with "Hireg"). }
     iIntros (CIDn) "%Hgd".
     iIntros (mf ns' P')
       "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbn Hsbi Hsbs Hsbb %Hns' Hir
-       Hpriv %Hret".
+       Hpriv %Hret _".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
                  with "Hcont") as "Hcont".
     iApply ("Hcont" $! mf ns' P'

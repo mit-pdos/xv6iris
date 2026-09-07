@@ -2785,6 +2785,13 @@ Section ProofSysOpenBody.
               SpecCreate.T_FILE (mword_of_int 0) (mword_of_int 0)
               (upd_usM U _) MAXOPBLOCKS Sb ns pidv dqb dqs dqbs dqn
               N5 (K - 24)%nat eb b lks
+              (* THE APPLICATION'S SIDE (round E2, lane E2-C): the non-AU
+                 open's create arm is DEAD for the theorem (the AU open is
+                 what the dispatcher runs), so it takes the TRIVIAL families
+                 and pays the bundle off the parked license; the receipts it
+                 gets back are dropped. *)
+              (fun _ _ => True)%I (fun _ _ _ _ => True)%I
+              (fun _ _ => True)%I (fun _ _ _ _ => True)%I
               HKcr HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
               Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
               ltac:(assert (E31 : (2 ^ 31 = 2147483648)%Z)
@@ -2797,8 +2804,10 @@ Section ProofSysOpenBody.
               with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv Hitab
                     Hitinv Hescrows Hslks Hireg Hropen Hsbn Hsbi Hsbs Hsbb
                     Hbmres
-                    Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hisl HopS Htx").
+                    Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hisl HopS Htx []").
     { iEval (rewrite HN5a0). iExact "Hbufk". }
+    { iApply SpecCreate.cre_commits_unit.
+      iApply (InodeRegion.ireg_inv_app with "Hireg"). }
     iIntros (CID6 Hq6 mcr ok made kk qi ss gy inum dn bm u1 Sb1 ns1)
       "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
        %Hns1 Hisl %Hu1 HopS Hok".
@@ -2853,7 +2862,7 @@ Section ProofSysOpenBody.
     (* ===== +0x48 c.beqz a0, +0xd2  [ARM A-FAIL] ===== *)
     destruct ok.
     2:{ (* ---- create refused: nothing is locked and nothing is held ---- *)
-      iDestruct "Hok" as "[%Hcra0 Htx]".
+      iDestruct "Hok" as "[%Hcra0 [Htx _]]".
       iApply (wp_cbeqz_taken_s_sconf (CID := CID7) (mword_of_int (SO + 0x48))
                 (mword_of_int 69 : mword 8) (Cregidx (mword_of_int 2)) Ra0
                 P1 (K - 24)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
@@ -2895,7 +2904,7 @@ Section ProofSysOpenBody.
       { rewrite /sys_open_post. iSplitR "Hfds"; [| iFrame "Hfds"].
         iLeft. iSplitR; [iPureIntro; exact Ha0f |]. iFrame "Hpriv Hfrag". } }
     (* ---- create SUCCEEDED: the locked inode, straight to the join ---- *)
-    iDestruct "Hok" as "[%Hokf Hlocked]".
+    iDestruct "Hok" as "[%Hokf [Hlocked _]]".
     destruct Hokf as (Hcra0 & Hkk & Hinum & Hrep).
     assert (Hipnz : ientry kk <> (zero_reg : mword 64))
       by (apply ientry_ne_zero; lia).

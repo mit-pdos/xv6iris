@@ -143,6 +143,7 @@ Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]     *)
 Require Import Xv6G.
 Require Import SpecCreate.       (* [create_made], [T_DEVICE]               *)
 Require Import SpecSysMknodAU.   (* the frozen statement this parallels     *)
+Require Export FsAbsCreateFire.  (* the commits ([acre_commit_at], [dlookup_commit_at], the legs' -- moved there in round E2 so SpecCreate can name them), their units and seeds, [mkf_auth_nview] *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 
@@ -155,39 +156,12 @@ Section MknodFire.
   Implicit Types Γ : fs_view_names Σ.
 
   (* =================================================================== *)
-  (*  1.  THE AUTHORITY-SHAPED COMMITS                                    *)
+  (*  1.  THE AUTHORITY-SHAPED COMMITS -- moved to FsAbsCreateFire.v      *)
+  (*      (round E2, lane E2-C: [SpecCreate]'s bundle names them and this *)
+  (*      file sits above SpecCreate).  Re-exported above, so every name  *)
+  (*      resolves as before; only the one relation to the FROZEN shape  *)
+  (*      stays here, because [SpecSysMknodAU.dlookup_commit] does.       *)
   (* =================================================================== *)
-
-  (* the read-only sibling, at the raw map.  Note the receipt is handed
-     the READING [abs_view I], so a client never sees a record. *)
-  Definition dlookup_commit_at Γ (E : coPset)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    (∀ (I : gmap Z fs_node) (d i : Z) (nm : fname) (ents : gmap fname Z)
-       (nl : nat),
-       ⌜abs_view I !! d = Some (MkAnode (ADir ents) nl)⌝ -∗
-       ⌜ents !! nm = Some i⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗ Φ (abs_view I) d nm i)%I.
-
-  (* the success commit, two-phase, at the raw map.  Phase 2 is quantified
-     over the POST map and constrained by its READING alone -- so the
-     client still witnesses exactly "the delta was applied" and nothing
-     about the record the mover chose. *)
-  Definition acre_commit_at Γ (E : coPset) (c : absnode)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    (∀ (I : gmap Z fs_node) (d i : Z) (nm : fname) (ents : gmap fname Z)
-       (nl : nat),
-       ⌜cre_pre (abs_view I) d nm ents nl i c⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
-         (* THE CALLER'S STEP (app-instances.md section 7): its claim about
-            the pre-view survives the delta, at the RAW insert the mover
-            performs ([AppInv.app_step]; the delta is its reading) *)
-         app_step d I (delta_create d nm i c (abs_view I)) ∗
-         (∀ I' : gmap Z fs_node,
-            ⌜abs_view I' = delta_create d nm i c (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm i))%I.
 
   (* THE ONE RELATION THAT HOLDS: the read-only form is stronger. *)
   Lemma dlookup_commit_at_weaken Γ E Φ :
@@ -198,89 +172,6 @@ Section MknodFire.
     iDestruct (astate_q_elim with "Hst") as (I) "[Ha %Hav]". subst av.
     iMod ("Hcm" $! I d i nm ents nl with "[//] [//] Ha") as "[Ha HΦ]".
     iModIntro. iFrame "HΦ". iApply astate_q_intro. iExact "Ha".
-  Qed.
-
-  (* satisfiability: neither commit can be vacuously blocked on the
-     caller's side (the frozen file's [*_unit] pair, restated) *)
-  Lemma dlookup_commit_at_unit Γ E :
-    ⊢ dlookup_commit_at Γ E (fun _ _ _ _ => True%I).
-  Proof.
-    rewrite /dlookup_commit_at. iIntros (I d i nm ents nl) "%Hd %Hnm Ha".
-    iModIntro. by iFrame "Ha".
-  Qed.
-
-  (* ...the write-kind one owing the caller's step, paid at the live Γ out
-     of the parked license ([AppInv.app_step_acc]) *)
-  Lemma acre_commit_at_unit (γfs : fs_names) E c :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ acre_commit_at (fs_gamma_L γfs) E c (fun _ _ _ _ => True%I).
-  Proof.
-    iIntros (HE) "#Hai". rewrite /acre_commit_at. iIntros (I d i nm ents nl) "%Hpre Ha".
-    iMod (app_step_acc E γfs d I _ HE
-            (abs_view_lookup_is_Some I d _ (proj1 Hpre)) with "Hai") as "Hstep".
-    iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
-    by iFrame "Ha'".
-  Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (*  1a.  Agreement against the authority, without spending it          *)
-  (* ------------------------------------------------------------------ *)
-
-  (* at ANY fraction of the authority: agreement is all a reading needs *)
-  Lemma mkf_auth_frag Γ (q : Qp) (I : gmap Z fs_node) (dq : dfrac) (i : Z)
-      (n : fs_node) :
-    ghost_map_auth (γtop Γ) q I -∗ top_frag_q Γ dq i n -∗ ⌜I !! i = Some n⌝.
-  Proof.
-    rewrite /top_frag_q. iIntros "Ha Hf".
-    by iDestruct (ghost_map_lookup with "Ha Hf") as %Hl.
-  Qed.
-
-  Lemma mkf_auth_nview Γ (q : Qp) (I : gmap Z fs_node) (dq : dfrac) (i : Z)
-      (a : anode) :
-    ghost_map_auth (γtop Γ) q I -∗ nview_dq Γ dq i a -∗
-      ⌜abs_view I !! i = Some a⌝.
-  Proof.
-    rewrite /nview_dq. iIntros "Ha Hn". iDestruct "Hn" as (n) "[Hf %Han]".
-    iDestruct (mkf_auth_frag with "Ha Hf") as %Hl.
-    iPureIntro. exact (abs_view_lookup I i n a Hl Han).
-  Qed.
-
-  (* THE STABLE SEEDS at this shape -- the frozen file's [_pinned] pair,
-     restated so the stable corollary's derivation stays assembly. *)
-  Lemma dlookup_commit_at_pinned Γ E (q : Qp) (dpin : Z) (a : anode)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ) :
-    nview Γ q dpin a -∗
-    (∀ (av : aview) (d : Z) (nm : fname) (i : Z),
-       ⌜d = dpin -> av !! dpin = Some a⌝ -∗ nview Γ q dpin a -∗
-       Φ av d nm i) -∗
-    dlookup_commit_at Γ E Φ.
-  Proof.
-    iIntros "Hn HΦ". rewrite /dlookup_commit_at.
-    iIntros (I d i nm ents nl) "%Hd %Hnm Ha".
-    destruct (decide (d = dpin)) as [-> | Hne].
-    - iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
-      iModIntro. iFrame "Ha".
-      iApply ("HΦ" $! (abs_view I) dpin nm i with "[%] Hn"). auto.
-    - iModIntro. iFrame "Ha".
-      iApply ("HΦ" $! (abs_view I) d nm i with "[%] Hn"). congruence.
-  Qed.
-
-  Lemma acre_commit_at_pinned (γfs : fs_names) E (c : absnode) (q : Qp) (jpin : Z)
-      (a : anode) (Φ : aview -> Z -> fname -> Z -> iProp Σ) :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗
-    nview (fs_gamma_L γfs) q jpin a -∗
-    (∀ (av : aview) (d : Z) (nm : fname) (i : Z),
-       ⌜av !! jpin = Some a⌝ -∗ nview (fs_gamma_L γfs) q jpin a -∗ Φ av d nm i) -∗
-    acre_commit_at (fs_gamma_L γfs) E c Φ.
-  Proof.
-    iIntros (HE) "#Hai Hn HΦ". rewrite /acre_commit_at.
-    iIntros (I d i nm ents nl) "%Hpre Ha".
-    iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
-    iMod (app_step_acc E γfs d I _ HE
-            (abs_view_lookup_is_Some I d _ (proj1 Hpre)) with "Hai") as "Hstep".
-    iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
-    iFrame "Ha'". iApply ("HΦ" $! (abs_view I) d nm i with "[%] Hn"). done.
   Qed.
 
   (* =================================================================== *)
@@ -970,50 +861,55 @@ Section CreateFire.
      one [ftopN] critical section with the caller's two phases on either
      side of it, same payout.  The device instance is [mkf_acre_fire]
      itself and is NOT rerouted through this (R10). *)
-  Lemma caf_acre_fire (γfs : fs_names) (E : coPset) (c : absnode)
+  Lemma caf_acre_fire (γfs : fs_names) (E : coPset) (cf : Z -> Z -> absnode)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
-    (forall e, c <> ADir e) ->
     inode_local d np' ->
     fn_is_dir np = true ->
     fn_nlink np <> 0%nat ->
     dir_entries np !! nm = None ->
-    abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np)) ->
-    abs_of nc = Some (MkAnode c 1%nat) ->
+    abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np)))
+                               (fn_nlink np + acre_bump (cf d i))%nat) ->
+    abs_of nc = Some (MkAnode (cf d i) 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    acre_commit_at (fs_gamma_L γfs) appE c Φ -∗
+    acre_commit_at_gen (fs_gamma_L γfs) appE cf Φ -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ top_frag_q (fs_gamma_L γfs) dqc i nc
       ∗ ∃ av : aview,
-          ⌜cre_pre av d nm (dir_entries np) (fn_nlink np) i c⌝
+          ⌜cre_pre av d nm (dir_entries np) (fn_nlink np) i (cf d i)⌝
           ∗ Φ av d nm i.
   Proof.
-    intros HE Hc Hloc Hdir Hnl Hnone Habsp' Habsc.
+    intros HE Hloc Hdir Hnl Hnone Habsp' Habsc.
     iIntros "#Hi #Hai Hcm Hfp Hfc".
     (* the same re-spelling [mkf_acre_fire] does, and for the same reason:
        [γtop (fs_gamma_L γfs)] and [fs_top γfs] are the SAME gname
        ([FsAbs.ftop_gamma_top], by reflexivity) but the unifier cannot
        solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag /top_frag_q /fs_gamma_L /=.
+    (* PARENT AND CHILD ARE DISTINCT KEYS: the parent's fragment is whole,
+       so the two cannot share an element *)
+    iDestruct (ghost_map_elem_ne with "Hfp Hfc") as %Hne.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hfp") as %Hlkp.
     iDestruct (ghost_map_lookup with "Hta Hfc") as %Hlkc.
     assert (Hpre : cre_pre (abs_view I) d nm (dir_entries np)
-                     (fn_nlink np) i c).
+                     (fn_nlink np) i (cf d i)).
     { rewrite /cre_pre. split_and!.
       - by rewrite (abs_view_lookup_of I d np Hlkp) (mkf_abs_of_dir np Hdir Hnl).
       - exact Hnone.
       - by rewrite (abs_view_lookup_of I i nc Hlkc) Habsc. }
+    (* the fused delta collapses to the ONE-ROW parent insert at the ARMED
+       child ([FsAbsDelta.delta_create_armed]) *)
     assert (Hdelta : abs_view (<[d := np']> I)
-                     = delta_create d nm i c (abs_view I)).
+                     = delta_create d nm i (cf d i) (abs_view I)).
     { rewrite (abs_view_insert I d np' _ Habsp').
-      by rewrite (caf_delta_create_nondir (abs_view I) d nm (dir_entries np)
-                    (fn_nlink np) i c Hc Hpre). }
+      by rewrite (delta_create_armed (abs_view I) d nm (dir_entries np)
+                    (fn_nlink np) i (cf d i) Hpre Hne). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I d i nm (dir_entries np) (fn_nlink np)
             with "[//] Hta") as "(Hta & Hstep & Hph2)".
@@ -1028,9 +924,9 @@ Section CreateFire.
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists (<[d := np']> I), A.
       iFrame "Hta Hla Hpark". iPureIntro.
-      intros jj mm Hj Hun. destruct (decide (jj = d)) as [-> | Hne].
+      intros jj mm Hj Hun. destruct (decide (jj = d)) as [-> | Hne'].
       - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
-      - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
+      - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne')].
         exact (Hcl jj mm Hj Hun). }
     iModIntro. iFrame "Hfp Hfc". iExists (abs_view I).
     iSplitR; [by iPureIntro |]. iExact "HΦ".
@@ -1060,9 +956,65 @@ Section CreateFire.
   Proof.
     intros HE Hloc Hdir Hnl Hnone Habsp' Habsc.
     iIntros "Hi Hai Hcm Hfp Hfc".
-    iApply (caf_acre_fire γfs E (AFile []) Φ d i nm dqc np np' nc HE
-              ltac:(intros e Hc; discriminate Hc)
-              Hloc Hdir Hnl Hnone Habsp' Habsc with "Hi Hai Hcm Hfp Hfc").
+    iApply (caf_acre_fire γfs E (fun _ _ => AFile []) Φ d i nm dqc np np' nc HE
+              Hloc Hdir Hnl Hnone
+              ltac:(rewrite Habsp'; cbn [acre_bump]; by rewrite Nat.add_0_r)
+              Habsc with "Hi Hai Hcm Hfp Hfc").
+  Qed.
+
+  (* THE MINTED CHILD'S ROW AT ANY TYPE: [SpecCreate.create_made] at a
+     nonzero type reads as [cre_c0] of the type and the two halfwords --
+     the row the general create's ARM fires at ([FsAbsCreateFire.cre_c0]). *)
+  Lemma caf_made_row_node (n : fs_node) (ty major minor : mword 16) :
+    fn_rec n = create_made ty major minor ->
+    bv_unsigned ty <> 0 ->
+    abs_of n
+    = Some (MkAnode (cre_c0 (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor))
+                    1%nat).
+  Proof.
+    intros Hr Hty.
+    assert (Hnty : fn_type n = bv_unsigned ty)
+      by (rewrite /fn_type Hr; reflexivity).
+    assert (Hnl : fn_nlink n = 1%nat) by (rewrite /fn_nlink Hr; reflexivity).
+    (* the three arms are [FsAbsDefs]'s three named readings, so the row's
+       [decide]s are never unfolded here -- only [cre_c0]'s, which
+       [case_decide] takes at the goal's own instance (durable-notes:
+       [destruct (decide P)] does not reduce a [decide] baked into another
+       file's definition) *)
+    rewrite /cre_c0. case_decide as Hd.
+    - rewrite (abs_of_dir n
+                 ltac:(rewrite /fn_is_dir Hnty; by apply bool_decide_eq_true_2)
+                 ltac:(rewrite Hnl; discriminate)).
+      rewrite (dir_entries_size_0 n
+                 ltac:(rewrite /fn_size Hr; reflexivity)) Hnl. reflexivity.
+    - assert (Hnd : fn_is_dir n = false)
+        by (rewrite /fn_is_dir Hnty; by apply bool_decide_eq_false_2).
+      case_decide as Hf.
+      + rewrite (abs_of_file n Hnd ltac:(rewrite Hnty; exact Hf)
+                   ltac:(rewrite Hnl; discriminate)).
+        assert (Hb : fn_file_bytes n = [])
+          by (rewrite /fn_file_bytes /fn_size Hr; reflexivity).
+        rewrite Hb Hnl. reflexivity.
+      + rewrite (abs_of_dev n Hnd ltac:(rewrite Hnty; exact Hf)
+                   ltac:(rewrite Hnty; exact Hty)
+                   ltac:(rewrite Hnl; discriminate)).
+        assert (Hma : fn_major n = bv_unsigned major)
+          by (rewrite /fn_major Hr; reflexivity).
+        assert (Hmi : fn_minor n = bv_unsigned minor)
+          by (rewrite /fn_minor Hr; reflexivity).
+        rewrite Hma Hmi Hnl. reflexivity.
+  Qed.
+
+  Lemma caf_made_row (ty major minor : mword 16) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    bv_unsigned ty <> 0 ->
+    abs_of (era_node (create_made ty major minor) bm data)
+    = Some (MkAnode (cre_c0 (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor))
+                    1%nat).
+  Proof.
+    intros Hty.
+    exact (caf_made_row_node _ ty major minor
+             (era_node_rec (create_made ty major minor) bm data) Hty).
   Qed.
 
 End CreateFire.

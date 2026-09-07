@@ -175,6 +175,18 @@ Section FsAbsInvFire.
     app_inv γfs -∗ acre_commit_at (fs_gamma_L γfs) appE c (fun _ _ _ _ => True%I).
   Proof. iIntros "#Hai". iApply (acre_commit_at_unit γfs appE c appN_appE with "Hai"). Qed.
 
+  (* CREATE'S CHILD LEGS (round E2, lane E2-C): the arm and the unarm, both
+     unfired, at the trivial families -- what the dispatcher's mknod and
+     open(O_CREATE) arms hand the AU create. *)
+  Lemma fsabs_child (γfs : fs_names) (c : absnode) :
+    app_inv γfs -∗
+    cre_child_unfired (fs_gamma_L γfs) c (fun _ _ => True%I) (fun _ _ => True%I).
+  Proof.
+    iIntros "#Hai". rewrite /cre_child_unfired.
+    iSplitR; [iApply (aarm_commit_at_unit γfs appE c appN_appE with "Hai") |].
+    iApply (aunarm_commit_at_unit γfs appE appN_appE with "Hai").
+  Qed.
+
   Lemma fsabs_uent (γfs : fs_names) :
     app_inv γfs -∗ uent_commit_at (fs_gamma_L γfs) appE (fun _ _ _ _ => True%I).
   Proof. iIntros "#Hai". iApply (uent_commit_at_unit γfs appE appN_appE with "Hai"). Qed.
@@ -253,6 +265,7 @@ Section FsAbsInvFire.
   Lemma fsabs_open_pre_create (γfs : fs_names) (cw : Z) :
     app_inv γfs -∗
     open_au_pre_create (fs_gamma_L γfs) γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
+      (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
       (fun _ _ _ => True%I) (fun _ _ _ => True%I).
   Proof.
@@ -260,17 +273,20 @@ Section FsAbsInvFire.
     iSplitR; [iApply fsabs_mknod_walk |].
     iSplitR; [iApply (fsabs_acre with "Hai") |].
     iSplitR; [iApply fsabs_dlookup |].
-    iSplitR; [iApply fsabs_aopen | iApply (fsabs_atrunc with "Hai")].
+    iSplitR; [iApply fsabs_aopen |].
+    iSplitR; [iApply (fsabs_atrunc with "Hai") | iApply (fsabs_child with "Hai")].
   Qed.
 
   Lemma fsabs_mknod_pre_era (γfs : fs_names) (cw : Z) (ma mi : Z) :
     app_inv γfs -∗
     mknod_au_pre_era (fs_gamma_L γfs) γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
+      (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I).
   Proof.
     iIntros "#Hai". rewrite /mknod_au_pre_era.
     iSplitR; [iApply fsabs_mknod_walk |].
-    iSplitR; [iApply (fsabs_acre with "Hai") | iApply fsabs_dlookup].
+    iSplitR; [iApply (fsabs_acre with "Hai") |].
+    iSplitR; [iApply fsabs_dlookup | iApply (fsabs_child with "Hai")].
   Qed.
 
   (* ...and chdir's (lane C3): open's walk premise at any start beside

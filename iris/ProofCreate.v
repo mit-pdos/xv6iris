@@ -110,6 +110,8 @@ Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
 Require Import SpecNameiparent.
 Require Import SpecCreate.
+Require Import FsTree.           (* [fname]: the receipts' name argument *)
+Require Import FsAbsDefs.        (* [aview]: the receipts' view argument (round E2, lane E2-C) *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
    OWN body rather than a callee, so it is NOT a functor argument -- the
@@ -181,11 +183,17 @@ Section ProofCreateMain.
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) :
+      (b : bool) (lks : gset string)
+      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
     wp_create_sconf_body γs j γl pd pav pu
  γf
  plen pfun ty major minor
-                         U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.
+                         U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
+                         Φarm Φdots Φun Φok.
   Proof.
     rewrite /wp_create_sconf_body.
     intros HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc Hbmsl
@@ -197,27 +205,29 @@ Section ProofCreateMain.
       as (HK10 & HKnp & HKil & HKdlu & HKiup & HKia & HKiu & HKdlk & HKsum).
     iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hkenv
              #Hitb2 #Hitbl #Hesc #Hslks #Hiregi #Hiopen Hsbn Hsbi Hsbs Hsbb #Hbmr
-             Hpriv Hpath #Hprocs #Hdevi #Hgeom #Hdlk Hbsl Hisl Hop Htx Hcont".
+             Hpriv Hpath #Hprocs #Hdevi #Hgeom #Hdlk Hbsl Hisl Hop Htx Hcre
+             Hcont".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     iDestruct (cr_cap_align m K b (proc_addr j) HK10 with "Hcg")
       as %[Hal10 Hal9].
     iApply (cr_found_half (CID := CID) γs j γl pd pav pu
  γf
  plen pfun ty major minor U u Sb ns pidv
-              dqb dqs dqbs dqn m K eb b lks
+              dqb dqs dqbs dqn m K eb b lks Φarm Φdots Φun Φok
               HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc
               Hbmsl Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hni1 Hni2 Hni3
               Htynz Htyk Hpkc Hu Hns Hj Hgs Ha1 Ha2 Ha3 Heb
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                     Hitb2 Hitbl Hesc Hslks Hiregi Hiopen Hsbn Hsbi Hsbs Hsbb Hbmr
                     Hpriv Hpath Hprocs Hdevi Hgeom Hdlk Hbsl Hisl Hop Htx
-                    [] Hcont").
+                    Hcre [] Hcont").
     iApply (cr_alloc_half (CID := CID) γs j γl pd pav pu
  γf
  plen pfun (m !!! Regidx Ra0 : mword 64)
               ty major minor U u Sb ns pidv dqb dqs dqbs dqn m
               (m !!! Regidx csp_rs1 : mword 64)
               (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
+              Φarm Φdots Φun Φok
               HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl
               Hist0 Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Htynz Htyk Hpkc
               Hu Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
@@ -231,6 +241,7 @@ Section ProofCreateMain.
                 (m !!! Regidx csp_rs1 : mword 64)
                 (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
                 kd qd gd γil γisl dind dn bm data nf nsl t
+                Φarm Φdots Φun Φok
                 HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl
                 Hist0 Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Hpkc
                 Hu Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
@@ -244,6 +255,7 @@ Section ProofCreateMain.
                 (m !!! Regidx csp_rs1 : mword 64)
                 (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
                 kd qd gd γil γisl dind dn bm data nf nsl t
+                Φarm Φdots Φun Φok
                 HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                 Hist0 Hcovb Hiregb Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
                 with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen

@@ -155,29 +155,34 @@ Section SysMknodAUEra.
   (* everything the AU caller hands in, at the commit mask [appE] *)
   Definition mknod_au_pre_era Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (mknod_walk_pre_era γfs cw P Pmiss
      ∗ acre_commit_at Γ appE (ADev ma mi) Φok
-     ∗ dlookup_commit_at Γ appE Φex)%I.
+     ∗ dlookup_commit_at Γ appE Φex
+     (* ...and the CHILD's two legs, unfired (round E2, lane E2-C) *)
+     ∗ cre_child_unfired Γ (ADev ma mi) Φarm Φun)%I.
 
   (* ret 0's real arm: [SpecSysMknodAU.mknod_post_ok], which is
      [SpecCreateAU.cau_ok] at the fetched path beside the region bound
      create's own post already states. *)
   Definition mknod_post_ok_era Γ (ma mi : Z) (P : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∃ (pl : list (bv 8)) (i : Z),
        ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
-       cau_ok Γ ma mi P Φok Φex pl i)%I.
+       cau_ok Γ ma mi P Φarm Φun Φok Φex pl i)%I.
 
   (* ret -1's three-way fold, the frozen file's verbatim: nothing
      fs-visible happened (argstr failed, or the path was relative -- see
      the header), or the walk died, or create failed at the parent. *)
   Definition mknod_post_fail_era Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    (mknod_au_pre_era Γ γfs cw ma mi P Pmiss Φok Φex
+    (mknod_au_pre_era Γ γfs cw ma mi P Pmiss Φarm Φun Φok Φex
      ∨ (∃ pl : list (bv 8),
-          cau_fail Γ γfs ma mi P Pmiss Φok Φex pl))%I.
+          cau_fail Γ γfs ma mi P Pmiss Φarm Φun Φok Φex pl))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0.  NO
      ESCAPE on the [ret = 0] arm since lane A-iii: the walk takes the
@@ -185,20 +190,22 @@ Section SysMknodAUEra.
      looked like.  See the header. *)
   Definition mknod_arms_era Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (r : mword 64) : iProp Σ :=
     ((⌜r = (zero_reg : mword 64)⌝
-      ∗ mknod_post_ok_era Γ ma mi P Φok Φex)
+      ∗ mknod_post_ok_era Γ ma mi P Φarm Φun Φok Φex)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ mknod_post_fail_era Γ γfs cw ma mi P Pmiss Φok Φex))%I.
+        ∗ mknod_post_fail_era Γ γfs cw ma mi P Pmiss Φarm Φun Φok Φex))%I.
 
   (* the landed return blanket, read off the arms: this is the one
      conjunct of [SpecSysMknod.wp_sys_mknod_sconf_body]'s continuation the
      AU form replaces, and it is implied *)
   Lemma mknod_arms_era_ret Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) (r : mword 64) :
-    mknod_arms_era Γ γfs cw ma mi P Pmiss Φok Φex r ⊢ ⌜sys_mknod_ret r⌝.
+    mknod_arms_era Γ γfs cw ma mi P Pmiss Φarm Φun Φok Φex r ⊢ ⌜sys_mknod_ret r⌝.
   Proof.
     rewrite /mknod_arms_era /sys_mknod_ret.
     iIntros "[[%Hr _] | [%Hr _]]"; iPureIntro; [left | right]; exact Hr.
@@ -261,6 +268,7 @@ Section SysMknodAUEra.
      a conjunct, so the refund weakens back. *)
   Definition mknod_stable_ok_era Γ (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
        (ents : gmap fname Z) (nl : nat),
@@ -269,7 +277,9 @@ Section SysMknodAUEra.
        ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜arun av root ps ds⌝ ∗
        dlookup_commit_at Γ appE Φex ∗
-       Φok av d nm i)%I.
+       Φok av d nm i ∗
+       (* the child's row APPEARED at this inum (round E2, lane E2-C) *)
+       cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun)%I.
 
   (* ret -1: TWO arms where the AU form has three folds, and the collapse
      is the cursor's disappearance -- "the walk died at hop k" and "nothing
@@ -279,8 +289,14 @@ Section SysMknodAUEra.
      exists-observation fired at a name the parent already held. *)
   Definition mknod_stable_fail_era Γ (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    ((acre_commit_at Γ appE (ADev ma mi) Φok ∗ dlookup_commit_at Γ appE Φex)
+    ((acre_commit_at Γ appE (ADev ma mi) Φok ∗ dlookup_commit_at Γ appE Φex
+      (* the child's legs: whole, or the do-then-undo PAIR (ruling Q-h) --
+         "nothing fired" and "the walk died" collapse into one arm here, and
+         the [fail:] tail lands in it too (round E2, lane E2-C) *)
+      ∗ (cre_child_unfired Γ (ADev ma mi) Φarm Φun
+         ∨ ∃ ic : Z, cre_child_pair Φarm Φun ic))
      ∨ (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
           (ents : gmap fname Z) (nl : nat),
           ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
@@ -288,16 +304,21 @@ Section SysMknodAUEra.
           ⌜ents !! nm = Some i⌝ ∗
           ⌜arun av root ps ds⌝ ∗
           acre_commit_at Γ appE (ADev ma mi) Φok ∗
-          Φex av d nm i))%I.
+          Φex av d nm i
+          (* ...and the child's legs: whole, or the do-then-undo PAIR
+             (ruling Q-h; round E2, lane E2-C) *)
+          ∗ (cre_child_unfired Γ (ADev ma mi) Φarm Φun
+             ∨ ∃ ic : Z, cre_child_pair Φarm Φun ic)))%I.
 
   Definition mknod_stable_arms_era Γ (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (r : mword 64) : iProp Σ :=
     ((⌜r = (zero_reg : mword 64)⌝
-      ∗ mknod_stable_ok_era Γ ma mi root ps ds Φok Φex)
+      ∗ mknod_stable_ok_era Γ ma mi root ps ds Φarm Φun Φok Φex)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ mknod_stable_fail_era Γ ma mi root ps ds Φok Φex))%I.
+        ∗ mknod_stable_fail_era Γ ma mi root ps ds Φarm Φun Φok Φex))%I.
 
 End SysMknodAUEra.
 
@@ -471,14 +492,15 @@ Definition wp_sys_mknod_au_era_body
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (P Pmiss : nat -> Z -> iProp Σ)
+    (Φarm Φun : aview -> Z -> iProp Σ)
     (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let ma := dev_arg v1 in
   let mi := dev_arg v2 in
   wp_sys_mknod_au_era_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v0 v1 v2 pid U m K eb b lks
-    (mknod_au_pre_era Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Φok Φex)
-    (mknod_arms_era Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Φok Φex).
+    (mknod_au_pre_era Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Φarm Φun Φok Φex)
+    (mknod_arms_era Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Φarm Φun Φok Φex).
 
 (* ===================================================================== *)
 (*  THE STABLE COROLLARY'S BODY                                           *)
@@ -513,6 +535,7 @@ Definition wp_sys_mknod_au_era_stable_body
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (root : Z) (avc : aview) (ds : list Z) (ps : list fname)
+    (Φarm Φun : aview -> Z -> iProp Σ)
     (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let ma := dev_arg v1 in
@@ -522,8 +545,9 @@ Definition wp_sys_mknod_au_era_stable_body
     v0 v1 v2 pid U m K eb b lks
     (mkr_chain Γfs avc ds ps
      ∗ acre_commit_at Γfs appE (ADev ma mi) Φok
-     ∗ dlookup_commit_at Γfs appE Φex)%I
-    (mknod_stable_arms_era Γfs ma mi root ps ds Φok Φex).
+     ∗ dlookup_commit_at Γfs appE Φex
+     ∗ cre_child_unfired Γfs (ADev ma mi) Φarm Φun)%I
+    (mknod_stable_arms_era Γfs ma mi root ps ds Φarm Φun Φok Φex).
 
 Module Type SYSMKNOD_AU_ERA.
   Parameter wp_sys_mknod_au_era :
@@ -539,9 +563,10 @@ Module Type SYSMKNOD_AU_ERA.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ),
       wp_sys_mknod_au_era_body γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-        v0 v1 v2 pid U m K eb b lks P Pmiss Φok Φex.
+        v0 v1 v2 pid U m K eb b lks P Pmiss Φarm Φun Φok Φex.
 End SYSMKNOD_AU_ERA.
 
 (* owed as a DERIVATION from [wp_sys_mknod_au_era] + the agreement seeds
@@ -562,9 +587,10 @@ Module Type SYSMKNOD_AU_ERA_STABLE.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (root : Z) (avc : aview) (ds : list Z) (ps : list fname)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ),
       wp_sys_mknod_au_era_stable_body γf gs j gl pd pav pu ns dqb dqs dqbs
-        dqn v0 v1 v2 pid U m K eb b lks root avc ds ps Φok Φex.
+        dqn v0 v1 v2 pid U m K eb b lks root avc ds ps Φarm Φun Φok Φex.
 End SYSMKNOD_AU_ERA_STABLE.
 
 (* ===================================================================== *)

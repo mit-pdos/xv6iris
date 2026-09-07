@@ -1018,11 +1018,12 @@ Section ProofSysMknodBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :
     wp_sys_mknod_au_era_body gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v0 v1 v2
-                            pid U m K eb b lks P Pmiss Φok Φex.
+                            pid U m K eb b lks P Pmiss Φarm Φun Φok Φex.
   Proof.
     (* the BODY's own three [let]s go first (ZETA), so the device numbers
        are the literal [dev_arg v1] / [dev_arg v2]; the FRAME's [let]s
@@ -1044,7 +1045,7 @@ Section ProofSysMknodBody.
              #Hireg #Hiopen Hsbn Hsbi Hsbs Hsbb #Hbmres #Hkenv #Hprocs Hir
              Hpriv Hau Hcont".
     iEval (rewrite /mknod_au_pre_era) in "Hau".
-    iDestruct "Hau" as "(Hwp & Hacre & Hdlkc)".
+    iDestruct "Hau" as "(Hwp & Hacre & Hdlkc & Hchild)".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
@@ -1705,7 +1706,7 @@ Section ProofSysMknodBody.
       pk bf
                      SpecCreate.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
                      (upd_usM (us_upt U P') _) MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
-                     N4 (K - 20)%nat eb b lks P Pmiss Φok Φex
+                     N4 (K - 20)%nat eb b lks P Pmiss Φarm Φun Φok Φex
                      ltac:(lia) HdevR Hnib0 Hgeom Hsize
                      Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
                      (mn_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush eq_refl Hpkc
@@ -1715,7 +1716,7 @@ Section ProofSysMknodBody.
                            Hitab Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs
                            Hsbb
                            Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS Htx
-                           Htr Hacre Hdlkc").
+                           Htr Hacre Hdlkc Hchild").
            { iEval (rewrite HN4a0). iExact "Hbufk". }
         iIntros (CID26 Hq26 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
           "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
@@ -1991,7 +1992,8 @@ Section ProofSysMknodBody.
                 ltac:(reflexivity) Hassp Hasthr Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf19 Hf20 Hbuf
-                      [Hpback Hbsl Hsbn Hsbi Hsbs Hsbb Hir Hcont Hwp Hacre Hdlkc]").
+                      [Hpback Hbsl Hsbn Hsbi Hsbs Hsbb Hir Hcont Hwp Hacre Hdlkc
+                       Hchild]").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
@@ -2000,7 +2002,7 @@ Section ProofSysMknodBody.
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf ns P' with "[%] [%] Hcg Hown
                 [] [] Hpc Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hir Hpriv
-                [Hwp Hacre Hdlkc]").
+                [Hwp Hacre Hdlkc Hchild]").
       { exact Hcsf. }
       { exact Hupt. }
       { rewrite Heb /trap_csrs_ext. done. }
@@ -2010,7 +2012,7 @@ Section ProofSysMknodBody.
            whole AU bundle comes home *)
         rewrite /mknod_arms_era. iRight. iSplitR; [by iPureIntro |].
         rewrite /mknod_post_fail_era. iLeft.
-        rewrite /mknod_au_pre_era. iFrame "Hwp Hacre Hdlkc". }
+        rewrite /mknod_au_pre_era. iFrame "Hwp Hacre Hdlkc Hchild". }
   Qed.
 
 End ProofSysMknodBody.

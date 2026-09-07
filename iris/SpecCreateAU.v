@@ -150,6 +150,7 @@ Section CreateAUSpec.
      commit refunded -- [SpecSysMknodAU.mknod_post_ok]'s content at the
      inum create's post already names. *)
   Definition cau_ok Γ (ma mi : Z) (P : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (pl : list (bv 8)) (i : Z) : iProp Σ :=
     (∃ (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z) (nl : nat),
@@ -157,7 +158,11 @@ Section CreateAUSpec.
        ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
        dlookup_commit_at Γ appE Φex ∗
-       Φok av d nm i)%I.
+       Φok av d nm i ∗
+       (* ...AND THE CHILD'S OWN LEG (round E2, lane E2-C): the row APPEARED
+          at this inum before the parent's entry went in, so the ARM's
+          receipt rides beside [cre_pre]; the UNARM comes home unfired. *)
+       cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun)%I.
 
   (* ------------------------------------------------------------------ *)
   (*  THE FAILURE FOLD (ARMS N / G / F-BAD / A-FAIL / FAIL)              *)
@@ -165,11 +170,14 @@ Section CreateAUSpec.
 
   Definition cau_fail Γ (γfs : fs_names) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (pl : list (bv 8)) : iProp Σ :=
     ((mknod_walk_dead_era γfs P Pmiss pl
         ∗ acre_commit_at Γ appE (ADev ma mi) Φok
-        ∗ dlookup_commit_at Γ appE Φex)
+        ∗ dlookup_commit_at Γ appE Φex
+        (* the walk died before ialloc: the child's two commits are whole *)
+        ∗ cre_child_unfired Γ (ADev ma mi) Φarm Φun)
      ∨ (∃ d : Z,
           P (length (mknod_parent_elems pl)) d
           ∗ acre_commit_at Γ appE (ADev ma mi) Φok
@@ -179,7 +187,12 @@ Section CreateAUSpec.
                 ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                 ⌜ents !! nm = Some i⌝ ∗
                 Φex av d nm i)
-             ∨ dlookup_commit_at Γ appE Φex)))%I.
+             ∨ dlookup_commit_at Γ appE Φex)
+          (* THE CHILD'S LEG (round E2, lane E2-C, ruling Q-h): the name was
+             there, or ialloc refused, and nothing moved -- or the arm and
+             the unarm BOTH fired, a row that appeared and disappeared. *)
+          ∗ (cre_child_unfired Γ (ADev ma mi) Φarm Φun
+             ∨ ∃ i : Z, cre_child_pair Φarm Φun i)))%I.
 
 End CreateAUSpec.
 
@@ -205,6 +218,8 @@ Definition wp_create_au_body
     (b : bool) (lks : gset string)
     (* ---- THE AU SIDE ---- *)
     (P Pmiss : nat -> Z -> iProp Σ)
+    (* the child's own two legs (round E2, lane E2-C) *)
+    (Φarm Φun : aview -> Z -> iProp Σ)
     (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.create in
   let pj := proc_addr j in
@@ -286,6 +301,11 @@ Definition wp_create_au_body
   ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss pl -∗
   acre_commit_at Γfs appE (ADev ma mi) Φok -∗
   dlookup_commit_at Γfs appE Φex -∗
+  (* ...and the CHILD's two legs (round E2, lane E2-C): the ARM at the row
+     the three halfword stores leave, the UNARM at the failure arm's
+     [ip->nlink = 0].  mknod's child is a device, so no dots ever land and
+     no dots commit is asked for. *)
+  cre_child_unfired Γfs (ADev ma mi) Φarm Φun -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (ok made : bool)
     (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
@@ -316,11 +336,11 @@ Definition wp_create_au_body
           /\ made = true
           /\ dn = create_made ty major minor⌝ ∗
          create_locked pidv k qi s g inum dn bm ∗
-         cau_ok Γfs ma mi P Φok Φex pl (bv_unsigned inum)
+         cau_ok Γfs ma mi P Φarm Φun Φok Φex pl (bv_unsigned inum)
        else
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
           = (mword_of_int 0 : mword 64)⌝ ∗ log_tx icfg_log ∗
-         cau_fail Γfs fsc_fs ma mi P Pmiss Φok Φex pl) -∗
+         cau_fail Γfs fsc_fs ma mi P Pmiss Φarm Φun Φok Φex pl) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -340,10 +360,11 @@ Module Type CREATE_AU.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ),
       wp_create_au_body γs j γl pd pav pu
  γf
  plen pfun ty major minor
                         U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
-                        P Pmiss Φok Φex.
+                        P Pmiss Φarm Φun Φok Φex.
 End CREATE_AU.

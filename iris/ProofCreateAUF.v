@@ -60,7 +60,7 @@
        The seven exits are otherwise where they were: [cr_cont_body],
        [cr_alloc_body], [cr_fail_body], [cr_found_half], [cr_alloc_half]
        and [cr_fail_half] carry the same four parameters
-       [P Pmiss Φok Φex].
+       [P Pmiss Φarm Φun Φok Φex].
 
    ==== the ProofCreateAU header's own diff note follows =================
 
@@ -1721,24 +1721,27 @@ Section ProofCreateMain.
      and hand the transaction token back -- create's four exits (the FILE
      arm, the two mkdir failures, the mkdir success) each take exactly one
      of these. *)
-  (* ...EACH A NON-AU MOVE of the suspended child (app-instances.md section
-     7): the application's parked license pays it ([ireg_top_retag_armed_auto],
-     [top_move] being everything in round A) until round E gives create's
-     directory child its AU form. *)
-  Lemma cr_dirty_arm (E : coPset) (t : nat) (i : Z)
-      (n n' : fs_node) :
+  (* ...THE ARM IS A LEG OF create's AU (round E2, lane E2-C; the twin of
+     [ProofCreateShared.cr_dirty_arm]): the caller's arm commit fires INSIDE
+     the armed retag ([FsAbsCreateFire.caf_arm_fire]) and its receipt comes
+     back beside the moved fragment. *)
+  Lemma cr_dirty_arm (E : coPset) (t : nat) (i : Z) (c : absnode)
+      (Φ : aview -> Z -> iProp Σ) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
+    FsAbsDefs.abs_of n = None ->
+    FsAbsDefs.abs_of n' = Some (MkAnode c 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
+    aarm_commit_at (fs_gamma_L fsc_fs) appE c Φ -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
-      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
+      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n' ∗ cre_arm_fired Φ i.
   Proof.
-    iIntros (HE) "#Hi #Hai Htx Hf".
+    iIntros (HE Hnone Hrow) "#Hi #Hai Htx Hcm Hf".
     iMod (ireg_arm E fsc_fs i t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Htx")
       as (k) "Harm".
-    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
-      as "[Harm Hf]".
-    iModIntro. iFrame "Hf". rewrite /cr_dirty. iExists k. iExact "Harm".
+    iMod (caf_arm_fire fsc_fs E k t (1/2)%Qp {[i]} i c Φ n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Hnone Hrow
+            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+    iModIntro. iFrame "Hf Hr". rewrite /cr_dirty. iExists k. iExact "Harm".
   Qed.
 
   (* ROUND E1: the non-directory create has no interior-link retag, so
@@ -1779,6 +1782,7 @@ Section ProofCreateMain.
       (CIDc : CpuId)
       (* ---- THE AU SIDE (SpecCreateAU) ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∀ (mf : regfile) (ok made : bool)
        (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
@@ -1814,10 +1818,10 @@ Section ProofCreateMain.
                   then dn = create_made ty major minor
                   else di_type dn = T_FILE \/ di_type dn = T_DEVICE)⌝ ∗
           create_locked pidv k qi s g inum dn bm ∗
-          cauf_ok (fs_gamma_L fsc_fs) P Φok Φex (bview plen pfun) made
+          cauf_ok (fs_gamma_L fsc_fs) P Φarm Φun Φok Φex (bview plen pfun) made
                   (bv_unsigned inum)
         else ⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗ log_tx icfg_log ∗
-          cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φok Φex (bview plen pfun)) -∗
+          cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φarm Φun Φok Φex (bview plen pfun)) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* THE EPILOGUE FUNNEL at +0x70: [mv a0,s2], the seven [c.ldsp]s, the
@@ -2147,6 +2151,7 @@ Section ProofCreateMain.
       (CIDa : CpuId)
       (* ---- THE AU SIDE (SpecCreateAU) ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∀ (Ma : regfile) (w5 : mword 64)
        (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
@@ -2254,6 +2259,9 @@ Section ProofCreateMain.
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
        acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Φok -∗
        dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
+       (* ...and the CHILD's two legs, both unfired: the allocate half is
+          entered before ialloc (round E2, lane E2-C) *)
+       cre_child_unfired (fs_gamma_L fsc_fs) (AFile []) Φarm Φun -∗
        (* and the contract's own continuation, ANCHORED AT THE ENTRY HART
           (ProofDirlink's [dl_after_body]): the block's own proof does the
           retargeting, so this file hands over [Hcont] untouched. *)
@@ -2262,7 +2270,7 @@ Section ProofCreateMain.
             cr_cont_body γf
  plen pfun pv ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                         ret_tgt CIDc P Pmiss Φok Φex) -∗
+                         ret_tgt CIDc P Pmiss Φarm Φun Φok Φex) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
@@ -2307,6 +2315,7 @@ Section ProofCreateMain.
       (CIDf : CpuId)
       (* ---- THE AU SIDE (SpecCreateAU) ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∀ (Mx : regfile) (kslot : nat) (q : Qp) (g gil gisl : gname) (lo tl : nat)
        (cinum : mword 32) (dnc : dinode) (bmc : blkmap)
@@ -2501,12 +2510,17 @@ Section ProofCreateMain.
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
        acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Φok -∗
        dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
+       (* ...and the CHILD's legs (round E2, lane E2-C): the ARM fired at
+          +0xc4 -- this arm is reached only through it -- and the UNARM is
+          what the [sh zero,74(s3)] below fires *)
+       cre_arm_fired Φarm (bv_unsigned cinum) -∗
+       aunarm_commit_at (fs_gamma_L fsc_fs) appE Φun -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
  plen pfun pv ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                         ret_tgt CIDc P Pmiss Φok Φex) -∗
+                         ret_tgt CIDc P Pmiss Φarm Φun Φok Φex) -∗
        WP (Loop : expr riscv_lang))%I.
 
 
@@ -2528,6 +2542,7 @@ Section ProofCreateMain.
       (b : bool) (lks : gset string)
       (* ---- THE AU SIDE (SpecCreateAU) ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     icfg_dev = ROOTDEV ->
@@ -2598,6 +2613,8 @@ Section ProofCreateMain.
     ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen pfun) -∗
     acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Φok -∗
     dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
+    (* ...and the CHILD's two legs, unfired (round E2, lane E2-C) *)
+    cre_child_unfired (fs_gamma_L fsc_fs) (AFile []) Φarm Φun -∗
     (* ---- THE PARKED ALLOCATE HALF, as a HYPOTHESIS ---- *)
     wp_next true (proc_addr j) (fun CIDa : CpuId =>
       cr_alloc_body γs j γl pd pav pu γf
@@ -2606,14 +2623,14 @@ Section ProofCreateMain.
                     ty major minor U u Sb ns pidv dqb dqs dqbs dqn m
                     (m !!! Regidx csp_rs1 : mword 64)
                     (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks CIDa
-                    P Pmiss Φok Φex) -∗
+                    P Pmiss Φarm Φun Φok Φex) -∗
     (* ---- the contract's own continuation ---- *)
     wp_next true (proc_addr j) (fun CIDc : CpuId =>
       cr_cont_body γf
  plen pfun (m !!! Regidx Ra0 : mword 64)
                    ty major minor U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                    (ret_pc (m !!! Regidx Rra : mword 64)) CIDc
-                   P Pmiss Φok Φex) -∗
+                   P Pmiss Φarm Φun Φok Φex) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc Hbmsl
@@ -2625,7 +2642,7 @@ Section ProofCreateMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hkenv
              #Hitb2 #Hitbl #Hesc #Hslks #Hiregi #Hiopen
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath #Hprocs #Hdevi #Hgeom #Hdlk
-             Hbsl Hislots Hop Htx Htr Hacre Hdlkc Halloc Hcont".
+             Hbsl Hislots Hop Htx Htr Hacre Hdlkc Hclegs Halloc Hcont".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     (* PIN THE INDEX: at level 0 [cpu_own_eb_agree] gives [eb = b], and the
        crossings below are the literal [true] (create parks everywhere). *)
@@ -3295,10 +3312,12 @@ Section ProofCreateMain.
         iEval (rewrite -Hnsplit) in "Hisl".
         (* ARM G reports NO abstract observation: the walk reached the
            parent (so the cursor comes home) and nothing else happened. *)
-        iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φok Φex (bview plen pfun))
-          with "[HPpar Hacre Hdlkc]" as "Hcf".
+        iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φarm Φun Φok Φex (bview plen pfun))
+          with "[HPpar Hacre Hdlkc Hclegs]" as "Hcf".
         { rewrite /cauf_fail. iRight. iExists (bv_unsigned dind).
-          iFrame "HPpar Hacre". iRight. iExact "Hdlkc". }
+          iFrame "HPpar Hacre". iSplitL "Hdlkc"; [iRight; iExact "Hdlkc" |].
+          (* the child's two legs are whole on this arm *)
+          iLeft. iExact "Hclegs". }
         iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
         iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
                   (mword_of_int 0 : mword 32) dnl bml n2 Sb2 ns
@@ -3879,7 +3898,7 @@ Section ProofCreateMain.
                        (* the AU payout, ALREADY BUILT by the caller: the
                           observation fired at the exists-lookup, which is
                           above this block and shared by its two entries *)
-                       cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φok Φex
+                       cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φarm Φun Φok Φex
                          (bview plen pfun) -∗
                        wp_next (CID0 := CID) true (proc_addr j)
                          (fun CIDc : CpuId =>
@@ -3887,7 +3906,7 @@ Section ProofCreateMain.
  plen pfun
                               (m !!! Regidx Ra0 : mword 64) ty major minor U u Sb
                               ns pidv dqb dqs dqbs dqn m K eb b lks j ret_tgt
-                              CIDc P Pmiss Φok Φex) -∗
+                              CIDc P Pmiss Φarm Φun Φok Φex) -∗
                        WP (Loop : expr riscv_lang)))%I
             with "[]" as "#Hfbad".
           { iModIntro.
@@ -4269,17 +4288,20 @@ Section ProofCreateMain.
                    -- [cauf_fail]'s right disjunct, LEFT alternative, which
                    is where [ProofCreateAU]'s single F-BAD entry puts it. *)
                 iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss
-                           Φok Φex (bview plen pfun))
-                  with "[HPpar Hacre HFex]" as "Hcf".
+                           Φarm Φun Φok Φex (bview plen pfun))
+                  with "[HPpar Hacre HFex Hclegs]" as "Hcf".
                 { rewrite /cauf_fail. iRight. iExists (bv_unsigned dind).
-                  iFrame "HPpar Hacre". iLeft.
-                  iExists avx, (bv_unsigned cinum), (bname 14 nfp),
-                          (dir_entries (era_node dnl bml datl)),
-                          (fn_nlink (era_node dnl bml datl)).
-                  iSplitR;
-                    [iPureIntro; exact (cr_last_of_npar _ nfp Hnpname) |].
-                  iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-                  iExact "HFex". }
+                  iFrame "HPpar Hacre". iSplitL "HFex".
+                  { iLeft.
+                    iExists avx, (bv_unsigned cinum), (bname 14 nfp),
+                            (dir_entries (era_node dnl bml datl)),
+                            (fn_nlink (era_node dnl bml datl)).
+                    iSplitR;
+                      [iPureIntro; exact (cr_last_of_npar _ nfp Hnpname) |].
+                    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+                    iExact "HFex". }
+                  (* the name was already there, so ialloc never ran *)
+                  iLeft. iExact "Hclegs". }
                 iPoseProof ("Hfbad" $! CID37) as "Hfb".
                 iSpecialize ("Hfb" with "[%]"); [wp_next_chain |].
                 iApply ("Hfb" $! FB with
@@ -4320,7 +4342,7 @@ Section ProofCreateMain.
                           with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv
                                 Hpath Hbsl [%] Hisl [%] Hop [Hcslkd Hcdep Hoffrc
                                 Hcidev Hciinum Hcivalid Hcload Hcfrz Hckeep Hruc
-                                HPpar Hacre HFex]").
+                                HPpar Hacre HFex Hclegs]").
                 { exact Hcsf. }
                 { exact (cr_slots_1 _ ns eq_refl Hns). }
                 { split_and!;
@@ -4345,7 +4367,7 @@ Section ProofCreateMain.
                 (*  is the arm [SpecCreateAU] refutes and the one                *)
                 (*  [SpecSysOpenAU]'s create arm calls EXISTS-OPENS.            *)
                 (* ============================================================ *)
-                iSplitR "HPpar Hacre HFex".
+                iSplitR "HPpar Hacre HFex Hclegs".
                 { iApply (create_locked_mk
                             _ _ _ _ _ _ _ _ gilc gislc eq_refl
                             with "Hslkc Hcslkd [Hcdep] Hoffrc Hcidev Hciinum
@@ -4361,7 +4383,8 @@ Section ProofCreateMain.
                 iExists avx, (dir_entries (era_node dnl bml datl)),
                         (fn_nlink (era_node dnl bml datl)).
                 iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-                iFrame "Hacre". iExact "HFex".
+                (* ARM F-OK moved nothing: the child's two legs come home *)
+                iFrame "Hacre HFex". iExact "Hclegs".
           -- (* [ty = T_FILE] REFUTES ARM F-BAD's FIRST ENTRY: the [bne
                 s2,2] at +0x5c compares the REQUESTED type against T_FILE,
                 and the pin makes it fall through.  This is the bullet
@@ -4431,7 +4454,7 @@ Section ProofCreateMain.
                           Hnb14 Hnb2 Hslkd Hslkdd [Hdep] Hoffr Hidev Hiinum
                           Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath Hbsl Hisl Hop Htx
-                          HPpar Hacre Hdlkc Hcont").
+                          HPpar Hacre Hdlkc Hclegs Hcont").
           { rewrite -Hie. exact HA1regs. }
           { exact Hkd. }
           { exact Hdib'. }
@@ -4604,10 +4627,12 @@ Section ProofCreateMain.
         iDestruct (iref_slots_combine with "Hisl Hislr") as "Hisl".
         iEval (rewrite -Hnsplit) in "Hisl".
         (* ARM G2, like ARM G: cursor home, no observation. *)
-        iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φok Φex (bview plen pfun))
-          with "[HPpar Hacre Hdlkc]" as "Hcf".
+        iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φarm Φun Φok Φex (bview plen pfun))
+          with "[HPpar Hacre Hdlkc Hclegs]" as "Hcf".
         { rewrite /cauf_fail. iRight. iExists (bv_unsigned dind).
-          iFrame "HPpar Hacre". iRight. iExact "Hdlkc". }
+          iFrame "HPpar Hacre". iSplitL "Hdlkc"; [iRight; iExact "Hdlkc" |].
+          (* the child's two legs are whole on this arm *)
+          iLeft. iExact "Hclegs". }
         iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
         iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
                   (mword_of_int 0 : mword 32) dnl bml n2 Sb2 ns
@@ -4794,13 +4819,15 @@ Section ProofCreateMain.
          guard there too, and "nameiparent of /" is the same shape at k = 0)
          hands the cursor back instead, which is the fold's THIRD arm.  Both
          commits are unspent on this path. *)
-      iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φok Φex (bview plen pfun))
-        with "[Hdead Hacre Hdlkc]" as "Hcf".
+      iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φarm Φun Φok Φex (bview plen pfun))
+        with "[Hdead Hacre Hdlkc Hclegs]" as "Hcf".
       { iDestruct (np_dead_to_mknod fsc_fs P Pmiss (bview plen pfun)
                      with "Hdead") as "[Hd | Hp]".
-        - rewrite /cauf_fail. iLeft. iFrame "Hd Hacre Hdlkc".
+        - rewrite /cauf_fail. iLeft. iFrame "Hd Hacre Hdlkc Hclegs".
         - iDestruct "Hp" as (dpar) "HPd". rewrite /cauf_fail. iRight.
-          iExists dpar. iFrame "HPd Hacre". iRight. iExact "Hdlkc". }
+          iExists dpar. iFrame "HPd Hacre".
+          iSplitL "Hdlkc"; [iRight; iExact "Hdlkc" |].
+          iLeft. iExact "Hclegs". }
       iApply (wp_beqz_x0_taken_s_sconf (mword_of_int (CK + 0x22))
                 (mword_of_int 318 : mword 13) Ra0 Q1 (K - 10)%nat b
                 ltac:(nz)
@@ -4912,6 +4939,7 @@ Section ProofCreateMain.
       (b : bool) (lks : gset string)
       (* ---- THE AU SIDE (SpecCreateAU) ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     icfg_dev = ROOTDEV ->
@@ -4976,7 +5004,7 @@ Section ProofCreateMain.
                       plen pfun pv ty major minor U u Sb ns pidv
                       dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                       kd qd gd γil γisl dind dn bm data nf nsl t CIDf
-                      P Pmiss Φok Φex)) -∗
+                      P Pmiss Φarm Φun Φok Φex)) -∗
     (* THE CONCLUSION IS [wp_next]-WRAPPED, and it has to be.  The two parked
        bodies and [cr_alloc_body]'s own [Hcont] are all anchored at the
        SECTION hart, while the allocate half's resources arrive at whatever
@@ -4989,7 +5017,7 @@ Section ProofCreateMain.
       cr_alloc_body γs j γl pd pav pu γf
 
                     plen pfun pv ty major minor U u Sb ns pidv dqb dqs dqbs dqn
-                    m sp0 ret_tgt K eb b lks CIDa P Pmiss Φok Φex).
+                    m sp0 ret_tgt K eb b lks CIDa P Pmiss Φarm Φun Φok Φex).
   Proof.
     intros HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
            Hcovb Hbmgeo Hiregb Hty Hni1 Hni2 Hni3 Hnib16 Htynz Htyk Hpkc Hu Hns Hj Hgs
@@ -5014,7 +5042,10 @@ Section ProofCreateMain.
              #Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath Hbsl Hisl Hop Htx
-             HPpar Hacre Hdlkc Hcont".
+             HPpar Hacre Hdlkc Hclegs Hcont".
+    (* the child's two legs, one per commit (round E2, lane E2-C) *)
+    iEval (rewrite /cre_child_unfired) in "Hclegs".
+    iDestruct "Hclegs" as "[Harm Hun]".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -5152,13 +5183,26 @@ Section ProofCreateMain.
       iDestruct (cr_esc_acc kslot Hkslt with "Hesc")
         as "#Hescc".
 
+      (* THE ARM FIRES HERE (round E2, lane E2-C, site #23): the claim box
+         has no row ([fresh_shape]: count 0), and the record the count store
+         leaves reads as the empty FILE at count 1 ([caf_child_file] off
+         [cr_setf_fresh_made]). *)
+      assert (Hrow0 : abs_of (era_node dnc bmc datc) = None)
+        by exact (caf_era_none_nl0 dnc bmc datc
+                    (proj2 (proj2 (proj2 Hfresh)))).
+      assert (Hrowc : abs_of (era_node (cr_setf dnc major minor
+                                          (mword_of_int 1 : mword 16)) bmc datc)
+                      = Some (MkAnode (AFile []) 1%nat)).
+      { apply (caf_child_file _ bmc datc major minor).
+        rewrite (cr_setf_fresh_made dnc ty major minor Hfresh Htyc).
+        by rewrite Hty. }
       iApply fupd_wp.
-      iMod (cr_dirty_arm ⊤ t (bv_unsigned cinum)
+      iMod (cr_dirty_arm ⊤ t (bv_unsigned cinum) (AFile []) Φarm
               (era_node dnc bmc datc)
               (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                         bmc datc)
-              ltac:(solve_ndisj) with "[] [] Htx Hctop")
-        as "[Hdirty Hctop]";
+              ltac:(solve_ndisj) Hrow0 Hrowc with "[] [] Htx Harm Hctop")
+        as "(Hdirty & Hctop & Harmr)";
         [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
       iModIntro.
       iDestruct "Hcmeta" as "(Hcity & Hcimaj & Hcimin & Hcinl & Hcisz)".
@@ -5950,9 +5994,9 @@ Section ProofCreateMain.
              iEval (rewrite -top_frag_1) in "Hctop".
              iModIntro.
              iDestruct "Hokr" as (avy) "(%Hprey & HFok)".
-             iAssert (cauf_ok (fs_gamma_L fsc_fs) P Φok Φex
+             iAssert (cauf_ok (fs_gamma_L fsc_fs) P Φarm Φun Φok Φex
                         (bview plen pfun) true (bv_unsigned cinum))
-               with "[HPpar Hdlkc HFok]" as "Hcok".
+               with "[HPpar Hdlkc HFok Harmr Hun]" as "Hcok".
              { rewrite /cauf_ok.
                iExists (bv_unsigned dind), (bname 14 nf).
                iSplitR; [iPureIntro; exact (cr_last_of_npar _ nf Hnpname) |].
@@ -5960,7 +6004,9 @@ Section ProofCreateMain.
                iExists avy, (dir_entries (era_node dn bm data)),
                        (fn_nlink (era_node dn bm data)).
                iSplitR; [by iPureIntro |].
-               iFrame "Hdlkc". iExact "HFok". }
+               (* ...and the child's own leg: the ARM fired at +0xc4, the
+                  UNARM comes home unfired (round E2, lane E2-C) *)
+               iFrame "Hdlkc Harmr Hun". iExact "HFok". }
              iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn' bm')
                with "[Hdlnk Hdiat Hmeta Hmap Hblocks Htop]"
                as "Hload".
@@ -6312,7 +6358,7 @@ Section ProofCreateMain.
                              Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta Hcmap
                              Hcblocks Hctop Hcshot Hcfrz [%] [] Hckeep Hruc Htoken Hsbn Hsbi Hsbs Hsbb Hbmr
                              Hppid Hppback Hpath Hbsl Hislr Hop Htx
-                             HPpar Hacre Hdlkc Hcont").
+                             HPpar Hacre Hdlkc Harmr Hun Hcont").
              { exact Hmdlregs. }
              { exact Htdir. }
              { exact Hkdlt. }
@@ -6557,10 +6603,12 @@ Section ProofCreateMain.
       iDestruct (iref_slots_combine with "Hisl Hislr") as "Hisl".
       (* ARM A-FAIL reports NO abstract observation either: the exists
          lookup missed and ialloc never got as far as a delta. *)
-      iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φok Φex (bview plen pfun))
-        with "[HPpar Hacre Hdlkc]" as "Hcf".
+      iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φarm Φun Φok Φex (bview plen pfun))
+        with "[HPpar Hacre Hdlkc Harm Hun]" as "Hcf".
       { rewrite /cauf_fail. iRight. iExists (bv_unsigned dind).
-        iFrame "HPpar Hacre". iRight. iExact "Hdlkc". }
+        iFrame "HPpar Hacre". iSplitL "Hdlkc"; [iRight; iExact "Hdlkc" |].
+        (* ialloc refused: the child's two commits are whole *)
+        iLeft. rewrite /cre_child_unfired. iFrame "Harm Hun". }
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
                 (mword_of_int 0 : mword 32) dn bm n2 Sb2
@@ -6631,6 +6679,7 @@ Section ProofCreateMain.
       (nf nsl : nat -> bv 8) (t : nat)
       (* ---- THE AU SIDE (SpecCreateAU) ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
@@ -6668,7 +6717,7 @@ Section ProofCreateMain.
                    plen pfun pv ty major minor U u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                    kd qd gd γil γisl dind dn bm data nf nsl t CIDf
-                   P Pmiss Φok Φex).
+                   P Pmiss Φarm Φun Φok Φex).
   Proof.
     intros HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcovb
            Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb.
@@ -6693,7 +6742,7 @@ Section ProofCreateMain.
              #Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk
              Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz %Hlek #Hflk Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Htx
-             HPpar Hacre Hdlkc Hcont".
+             HPpar Hacre Hdlkc Harmr Hun Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
 
@@ -6900,13 +6949,31 @@ Section ProofCreateMain.
                  Hrl_datc cr_nl_short_0).
       - apply dir_uniq_not_dir. rewrite cr_setf_type. exact Htdirz.
       - apply dir_dots_ix_not_dir. rewrite cr_setf_type. exact Htdirz. }
+    (* THE UNARM FIRES HERE (round E2, lane E2-C, site #26): the file child
+       the arm minted goes to count 0, so its row DISAPPEARS -- the second
+       half of ruling Q-h's do-then-undo pair, at a PLAIN fragment (this
+       walk disarmed at the count). *)
+    assert (Hrow1 : abs_of (era_node (cr_setf dnc major minor
+                              (mword_of_int 1 : mword 16)) bmc datc)
+            = Some (MkAnode (abs_node (era_node (cr_setf dnc major minor
+                                (mword_of_int 1 : mword 16)) bmc datc)) 1%nat))
+      by exact (caf_era_row_nl1
+                  (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc
+                  ltac:(rewrite cr_setf_type; exact Htyz)
+                  ltac:(rewrite cr_setf_nlink; vm_compute; reflexivity)).
+    assert (Hnone0 : abs_of (era_node (cr_setf dnc major minor
+                               (mword_of_int 0 : mword 16)) bmc datc) = None)
+      by exact (caf_era_none_nl0
+                  (cr_setf dnc major minor (mword_of_int 0 : mword 16)) bmc datc
+                  ltac:(rewrite cr_setf_nlink; vm_compute; reflexivity)).
     iApply fupd_wp.
-    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned cinum)
+    iMod (caf_unarm_fire fsc_fs ⊤ (bv_unsigned cinum) _ Φun
             (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                       bmc datc)
             (era_node (cr_setf dnc major minor (mword_of_int 0 : mword 16))
                       bmc datc)
-            ltac:(solve_ndisj) Logic.I Hlocz with "[] [] Hctop") as "Hctop";
+            ltac:(solve_ndisj) Hlocz Hrow1 Hnone0
+            with "[] [] Hun Hctop") as "(Hctop & Hunr)";
       [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.
     iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
@@ -7278,10 +7345,13 @@ Section ProofCreateMain.
     (* ARM FAIL reports no abstract observation: the dirlink that got here
        returned -1, i.e. before the entry write, so both commits go home
        beside the cursor. *)
-    iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φok Φex (bview plen pfun))
-      with "[HPpar Hacre Hdlkc]" as "Hcf".
+    iAssert (cauf_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φarm Φun Φok Φex (bview plen pfun))
+      with "[HPpar Hacre Hdlkc Harmr Hunr]" as "Hcf".
     { rewrite /cauf_fail. iRight. iExists (bv_unsigned dind).
-      iFrame "HPpar Hacre". iRight. iExact "Hdlkc". }
+      iFrame "HPpar Hacre". iSplitL "Hdlkc"; [iRight; iExact "Hdlkc" |].
+      (* ruling Q-h: the row APPEARED at +0xc4 and DISAPPEARED at +0x146 *)
+      iRight. iExists (bv_unsigned cinum).
+      rewrite /cre_child_pair. iFrame "Harmr Hunr". }
     iSpecialize ("Hcont" $! CIDfin with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
               (mword_of_int 0 : mword 32) dn bm n6 Sb6
@@ -7351,12 +7421,13 @@ Section ProofCreateMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :
     wp_create_auf_body γs j γl pd pav pu
  γf
  plen pfun ty major minor
                       U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
-                      P Pmiss Φok Φex.
+                      P Pmiss Φarm Φun Φok Φex.
   Proof.
     rewrite /wp_create_auf_body.
     intros HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc Hbmsl
@@ -7374,14 +7445,14 @@ Section ProofCreateMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hkenv
              #Hitb2 #Hitbl #Hesc #Hslks #Hiregi #Hiopen Hsbn Hsbi Hsbs Hsbb #Hbmr
              Hpriv Hpath #Hprocs #Hdevi #Hgeom #Hdlk Hbsl Hisl Hop Htx
-             Htr Hacre Hdlkc Hcont".
+             Htr Hacre Hdlkc Hclegs Hcont".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     iDestruct (cr_cap_align m K b (proc_addr j) HK10 with "Hcg")
       as %[Hal10 Hal9].
     iApply (cr_found_half γs j γl pd pav pu
  γf
  plen pfun ty major minor U u Sb ns pidv
-              dqb dqs dqbs dqn m K eb b lks P Pmiss Φok Φex
+              dqb dqs dqbs dqn m K eb b lks P Pmiss Φarm Φun Φok Φex
               HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc
               Hbmsl Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hty
               Hni1 Hni2 Hni3
@@ -7389,14 +7460,14 @@ Section ProofCreateMain.
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                     Hitb2 Hitbl Hesc Hslks Hiregi Hiopen Hsbn Hsbi Hsbs Hsbb Hbmr
                     Hpriv Hpath Hprocs Hdevi Hgeom Hdlk Hbsl Hisl Hop Htx
-                    Htr Hacre Hdlkc [] Hcont").
+                    Htr Hacre Hdlkc Hclegs [] Hcont").
     iApply (cr_alloc_half γs j γl pd pav pu
  γf
  plen pfun (m !!! Regidx Ra0 : mword 64)
               ty major minor U u Sb ns pidv dqb dqs dqbs dqn m
               (m !!! Regidx csp_rs1 : mword 64)
               (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
-              P Pmiss Φok Φex
+              P Pmiss Φarm Φun Φok Φex
               HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl
               Hist0 Hcovb Hbmgeo Hiregb Hty Hni1 Hni2 Hni3 Hnib16 Htynz Htyk Hpkc
               Hu Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
@@ -7410,7 +7481,7 @@ Section ProofCreateMain.
               (m !!! Regidx csp_rs1 : mword 64)
               (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
               kd qd gd γil γisl dind dn bm data nf nsl t
-              P Pmiss Φok Φex
+              P Pmiss Φarm Φun Φok Φex
               HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
               Hist0 Hcovb Hiregb Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
               with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen

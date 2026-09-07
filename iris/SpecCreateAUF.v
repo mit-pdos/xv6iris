@@ -143,6 +143,7 @@ Section CreateAUFSpec.
      arms -- both ran nameiparent, and both are at the path's last element.
      What differs is which of the two commits fired. *)
   Definition cauf_ok Γ (P : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (pl : list (bv 8)) (made : bool) (i : Z) : iProp Σ :=
     (∃ (d : Z) (nm : fname),
@@ -150,19 +151,23 @@ Section CreateAUFSpec.
        P (length (mknod_parent_elems pl)) d ∗
        (if made
         then (* ARM C-OK: the fused delta fired at the entry write, at the
-                child [AFile []]; the exists commit is refunded UNFIRED. *)
+                child [AFile []]; the exists commit is refunded UNFIRED.
+                The child's ARM fired first (round E2, lane E2-C) and the
+                UNARM comes home. *)
           ∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜ cre_pre av d nm ents nl i (AFile []) ⌝ ∗
             dlookup_commit_at Γ appE Φex ∗
-            Φok av d nm i
+            Φok av d nm i ∗
+            cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun
         else (* ARM F-OK: the exists observation fired at the found
                 instant and NOTHING MOVED, so the create commit is
-                refunded UNFIRED. *)
+                refunded UNFIRED -- and so are the child's two. *)
           ∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜ av !! d = Some (MkAnode (ADir ents) nl) ⌝ ∗
             ⌜ ents !! nm = Some i ⌝ ∗
             acre_commit_at Γ appE (AFile []) Φok ∗
-            Φex av d nm i))%I.
+            Φex av d nm i ∗
+            cre_child_unfired Γ (AFile []) Φarm Φun))%I.
 
   (* ------------------------------------------------------------------ *)
   (*  THE FAILURE FOLD (ARMS N / G / F-BAD / A-FAIL / FAIL)              *)
@@ -171,11 +176,13 @@ Section CreateAUFSpec.
   (* [SpecCreateAU.cau_fail] at the file child, arm for arm. *)
   Definition cauf_fail Γ (gfs : fs_names)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (pl : list (bv 8)) : iProp Σ :=
     ((mknod_walk_dead_era gfs P Pmiss pl
         ∗ acre_commit_at Γ appE (AFile []) Φok
-        ∗ dlookup_commit_at Γ appE Φex)
+        ∗ dlookup_commit_at Γ appE Φex
+        ∗ cre_child_unfired Γ (AFile []) Φarm Φun)
      ∨ (∃ d : Z,
           P (length (mknod_parent_elems pl)) d
           ∗ acre_commit_at Γ appE (AFile []) Φok
@@ -185,7 +192,11 @@ Section CreateAUFSpec.
                 ⌜ av !! d = Some (MkAnode (ADir ents) nl) ⌝ ∗
                 ⌜ ents !! nm = Some i ⌝ ∗
                 Φex av d nm i)
-             ∨ dlookup_commit_at Γ appE Φex)))%I.
+             ∨ dlookup_commit_at Γ appE Φex)
+          (* the child's legs (ruling Q-h): whole, or the do-then-undo
+             PAIR (round E2, lane E2-C) *)
+          ∗ (cre_child_unfired Γ (AFile []) Φarm Φun
+             ∨ ∃ ic : Z, cre_child_pair Φarm Φun ic)))%I.
 
   (* ------------------------------------------------------------------ *)
   (*  THE TWO PROJECTIONS THE CONSUMER'S PROVER USES                     *)
@@ -193,41 +204,43 @@ Section CreateAUFSpec.
 
   (* [SpecSysOpenAU.open_post_ok_create]'s FRESH disjunct, minus the
      descriptor bundle and the inum bound. *)
-  Lemma cauf_ok_fresh Γ P Φok Φex pl (i : Z) :
-    cauf_ok Γ P Φok Φex pl true i ⊢
+  Lemma cauf_ok_fresh Γ P Φarm Φun Φok Φex pl (i : Z) :
+    cauf_ok Γ P Φarm Φun Φok Φex pl true i ⊢
       ∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
         ⌜ list_basics.last (path_elems pl) = Some nm ⌝ ∗
         ⌜ cre_pre av d nm ents nl i (AFile []) ⌝ ∗
         P (length (mknod_parent_elems pl)) d ∗
         Φok av d nm i ∗
-        dlookup_commit_at Γ appE Φex.
+        dlookup_commit_at Γ appE Φex ∗
+        cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun.
   Proof.
     rewrite /cauf_ok. iIntros "H".
     iDestruct "H" as (d nm) "(%Hlast & HP & Harm)".
-    iDestruct "Harm" as (av ents nl) "(%Hpre & Hdl & HF)".
+    iDestruct "Harm" as (av ents nl) "(%Hpre & Hdl & HF & Harmr & Hun)".
     iExists d, nm, av, ents, nl.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-    iFrame "HP HF Hdl".
+    iFrame "HP HF Hdl Harmr Hun".
   Qed.
 
   (* ...and the EXISTS-OPENS disjunct. *)
-  Lemma cauf_ok_exists Γ P Φok Φex pl (i : Z) :
-    cauf_ok Γ P Φok Φex pl false i ⊢
+  Lemma cauf_ok_exists Γ P Φarm Φun Φok Φex pl (i : Z) :
+    cauf_ok Γ P Φarm Φun Φok Φex pl false i ⊢
       ∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
         ⌜ list_basics.last (path_elems pl) = Some nm ⌝ ∗
         ⌜ av !! d = Some (MkAnode (ADir ents) nl) ⌝ ∗
         ⌜ ents !! nm = Some i ⌝ ∗
         P (length (mknod_parent_elems pl)) d ∗
         Φex av d nm i ∗
-        acre_commit_at Γ appE (AFile []) Φok.
+        acre_commit_at Γ appE (AFile []) Φok ∗
+        cre_child_unfired Γ (AFile []) Φarm Φun.
   Proof.
     rewrite /cauf_ok. iIntros "H".
     iDestruct "H" as (d nm) "(%Hlast & HP & Harm)".
-    iDestruct "Harm" as (av ents nl) "(%Hrow & %Hent & Hac & HF)".
+    iDestruct "Harm" as (av ents nl) "(%Hrow & %Hent & Hac & HF & Hchild)".
     iExists d, nm, av, ents, nl.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |].
-    iFrame "HP HF Hac".
+    iFrame "HP HF Hac Hchild".
   Qed.
 
 End CreateAUFSpec.
@@ -254,6 +267,8 @@ Definition wp_create_auf_body
     (b : bool) (lks : gset string)
     (* ---- THE AU SIDE ---- *)
     (P Pmiss : nat -> Z -> iProp Σ)
+    (* the child's own two legs (round E2, lane E2-C) *)
+    (Φarm Φun : aview -> Z -> iProp Σ)
     (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.create in
   let pj := proc_addr j in
@@ -337,6 +352,9 @@ Definition wp_create_auf_body
   ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss pl -∗
   acre_commit_at Γfs appE (AFile []) Φok -∗
   dlookup_commit_at Γfs appE Φex -∗
+  (* ...and the CHILD's two legs (round E2, lane E2-C): the ARM at the row
+     the count store leaves, the UNARM at the failure arm's zeroing *)
+  cre_child_unfired Γfs (AFile []) Φarm Φun -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (ok made : bool)
     (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
@@ -370,11 +388,11 @@ Definition wp_create_auf_body
               then dn = create_made ty major minor
               else di_type dn = T_FILE \/ di_type dn = T_DEVICE)⌝ ∗
          create_locked pidv k qi s g inum dn bm ∗
-         cauf_ok Γfs P Φok Φex pl made (bv_unsigned inum)
+         cauf_ok Γfs P Φarm Φun Φok Φex pl made (bv_unsigned inum)
        else
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
           = (mword_of_int 0 : mword 64)⌝ ∗ log_tx icfg_log ∗
-         cauf_fail Γfs fsc_fs P Pmiss Φok Φex pl) -∗
+         cauf_fail Γfs fsc_fs P Pmiss Φarm Φun Φok Φex pl) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -394,10 +412,11 @@ Module Type CREATE_AUF.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ),
       wp_create_auf_body γs j γl pd pav pu
  γf
  plen pfun ty major minor
                         U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
-                        P Pmiss Φok Φex.
+                        P Pmiss Φarm Φun Φok Φex.
 End CREATE_AUF.

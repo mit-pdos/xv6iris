@@ -138,6 +138,9 @@ Require Import SpecIput SpecIalloc SpecIupdate.
 Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
 Require Import SpecCreate.
+Require Import FsAbsDelta.       (* [acre_bump], [dots_ents]: the deltas the legs' rows are stated at (round E2, lane E2-C) *)
+Require Import FsAbsMknodFire.   (* the parent-leg fire [caf_acre_fire], [caf_made_row], [mkf_parent_row] (round E2, lane E2-C) *)
+Require Import FsAbsDefs.        (* [aview], [abs_of] *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
    OWN body rather than a callee, so it is NOT a functor argument -- the
@@ -204,7 +207,12 @@ Section ProofCreateAlloc.
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) :
+      (b : bool) (lks : gset string)
+      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     icfg_dev = ROOTDEV ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -263,7 +271,8 @@ Section ProofCreateAlloc.
 
                        plen pfun pv ty major minor U u Sb ns pidv
                        dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
-                       kd qd gd γil γisl dind dn bm data nf nsl t CIDm)) -∗
+                       kd qd gd γil γisl dind dn bm data nf nsl t CIDm
+                       Φarm Φdots Φun Φok)) -∗
     (* ---- ARM FAIL's NON-DIRECTORY ENTRY, PARKED ---- *)
     (∀ (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
        (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
@@ -273,7 +282,8 @@ Section ProofCreateAlloc.
 
                       plen pfun pv ty major minor U u Sb ns pidv
                       dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
-                      kd qd gd γil γisl dind dn bm data nf nsl t CIDf)) -∗
+                      kd qd gd γil γisl dind dn bm data nf nsl t CIDf
+                      Φarm Φdots Φun Φok)) -∗
     (* THE CONCLUSION IS [wp_next]-WRAPPED, and it has to be.  The two parked
        bodies and [cr_alloc_body]'s own [Hcont] are all anchored at the
        SECTION hart, while the allocate half's resources arrive at whatever
@@ -286,7 +296,7 @@ Section ProofCreateAlloc.
       cr_alloc_body (CID := CID) γs j γl pd pav pu γf
 
                     plen pfun pv ty major minor U u Sb ns pidv dqb dqs dqbs dqn
-                    m sp0 ret_tgt K eb b lks CIDa).
+                    m sp0 ret_tgt K eb b lks CIDa Φarm Φdots Φun Φok).
   Proof.
     intros HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
            Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Htynz Htyk Hpkc Hu Hns Hj Hgs
@@ -310,8 +320,11 @@ Section ProofCreateAlloc.
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
              #Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
-             Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath Hbsl Hisl Hop Htx Hcont".
+             Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath Hbsl Hisl Hop Htx Hcre Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
+    (* the four commits, one per leg (round E2, lane E2-C) *)
+    iEval (rewrite /cre_commits) in "Hcre".
+    iDestruct "Hcre" as "(Harm & Hdots & Hun & Hacre)".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hb : b = true) by (rewrite -Hbm; exact Heb). clear Hbm.
@@ -448,13 +461,26 @@ Section ProofCreateAlloc.
       iDestruct (cr_esc_acc kslot Hkslt with "Hesc")
         as "#Hescc".
 
+      (* THE ARM FIRES HERE (round E2, lane E2-C): the claim box has no row
+         ([fresh_shape]: count 0), the record the three [sh]s leave reads
+         as the requested type's empty content at count 1
+         ([FsAbsMknodFire.caf_made_row]) *)
+      assert (Hrow0 : abs_of (era_node dnc bmc datc) = None)
+        by exact (caf_era_none_nl0 dnc bmc datc (proj2 (proj2 (proj2 Hfresh)))).
+      assert (Hrowc : abs_of (era_node (cr_setf dnc major minor
+                                          (mword_of_int 1 : mword 16)) bmc datc)
+                      = Some (MkAnode (cre_c0 (bv_unsigned ty) (bv_unsigned major)
+                                              (bv_unsigned minor)) 1%nat)).
+      { rewrite (cr_setf_fresh_made dnc ty major minor Hfresh Htyc).
+        exact (caf_made_row ty major minor bmc datc Htynz). }
       iApply fupd_wp.
       iMod (cr_dirty_arm ⊤ t (bv_unsigned cinum)
+              (cre_c0 (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor)) Φarm
               (era_node dnc bmc datc)
               (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                         bmc datc)
-              ltac:(solve_ndisj) with "[] [] Htx Hctop")
-        as "[Hdirty Hctop]";
+              ltac:(solve_ndisj) Hrow0 Hrowc with "[] [] Htx Harm Hctop")
+        as "(Hdirty & Hctop & Harmr)";
         [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
       iModIntro.
       iDestruct "Hcmeta" as "(Hcity & Hcimaj & Hcimin & Hcinl & Hcisz)".
@@ -757,7 +783,7 @@ Section ProofCreateAlloc.
                         Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
                         Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot Hcfrz [%] []
                         Hckeep Hruc Htoken Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath
-                        Hbsl Hislr Hop Hdirty Hcont").
+                        Hbsl Hislr Hop Hdirty Harmr Hdots Hun Hacre Hcont").
         { exact HW4regs. }
         { exact Htdir. }
         { exact Hkdlt. }
@@ -1233,21 +1259,90 @@ Section ProofCreateAlloc.
                  + exists (Z.of_nat (dir_slot data
                              (dir_nrec (bv_unsigned (di_size dn)))) + 1)%Z.
                    rewrite Ht16 Nat2Z.inj_add Nat2Z.inj_mul. lia. }
-             (* ...AND THE ERA'S ABSTRACT VALUE IS RETAGGED: dirlink MOVED
-                the parent's record and its bytes, and
-                [InodeRegion.ireg_top_retag_*] opens [ftopN] alone. *)
+             (* ============================================================ *)
+             (*  THE PARENT LEG FIRES (round E2, lane E2-C): dirlink's entry  *)
+             (*  write landed WHOLE, the child was armed at +0xc4, and the    *)
+             (*  parent's row moves from [ADir ents] to [ADir (<[nm := i]>    *)
+             (*  ents)] -- which, under [cre_pre] at the ARMED child, IS the  *)
+             (*  fused delta ([FsAbsDelta.delta_create_armed]).                *)
+             (*  [FsAbsMknodFire.caf_acre_fire] REPLACES the                  *)
+             (*  [InodeRegion.ireg_top_retag_*] the walk called here: it owes  *)
+             (*  the SAME row and performs the SAME [ghost_map_update], with   *)
+             (*  the caller's two phases on either side of it inside ONE      *)
+             (*  [ftopN] critical section.                                    *)
+             (* ============================================================ *)
+             assert (Hzero16 : bv_unsigned (bv_0 16) = 0)
+               by (vm_compute; reflexivity).
+             assert (Hnz16 : cr_low16 cinum <> bv_0 16).
+             { intros Hc. pose proof Hcl16 as Hc2.
+               rewrite Hc Hzero16 in Hc2. clear -Hc2 Hcpos. lia. }
+             (* the written parent record's entry map is the old one with
+                the name inserted ([FsStateEra.dir_entries_dirlink_ins]) *)
+             assert (Hins0 : dir_entries (era_node dn' bm' data')
+                     = <[bname 14 nf := bv_unsigned (cr_low16 cinum)]>
+                         (dir_entries (era_node dn bm data)))
+               by exact (dir_entries_dirlink_ins dn dn' bm bm' data data'
+                           (cr_low16 cinum) (bname 14 nf)
+                           (dir_nrec (bv_unsigned (di_size dn)))
+                           (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
+                           eq_refl eq_refl
+                           (bname_length_le 14 nf) (cut_nul_nonul _) Hnz16
+                           Hdz Hty'
+                           ltac:(rewrite Hszmax Ht16; reflexivity)
+                           ltac:(pose proof Hrng as Hr16;
+                                 rewrite Ht16 in Hr16; exact Hr16) Hnone
+                           Hholes Hholes' Hszcap (Hcapp Hszcap)).
+             assert (Hins : dir_entries (era_node dn' bm' data')
+                     = <[bname 14 nf := bv_unsigned cinum]>
+                         (dir_entries (era_node dn bm data)))
+               by (rewrite Hins0 Hcl16; reflexivity).
+             (* the child is NOT a directory on this arm, so the parent's
+                count does not move and the child's content is the arm's *)
+             assert (HtyzD : bv_unsigned ty <> T_DIR_z)
+               by (rewrite -Htyc; exact Htdirz).
+             assert (Habsp' : abs_of (era_node dn' bm' data')
+                     = Some (MkAnode (ADir (<[bname 14 nf := bv_unsigned cinum]>
+                                              (dir_entries (era_node dn bm data))))
+                                     (fn_nlink (era_node dn bm data)
+                                      + acre_bump (cre_child (bv_unsigned ty)
+                                                     (bv_unsigned major) (bv_unsigned minor)
+                                                     (bv_unsigned dind) (bv_unsigned cinum)))%nat)).
+             { rewrite (cre_child_nondir _ _ _ _ _ HtyzD) (acre_bump_cre_c0 _ _ _ HtyzD)
+                       Nat.add_0_r.
+               exact (mkf_parent_row dn dn' bm bm' data data'
+                        (bname 14 nf) (bv_unsigned cinum)
+                        Hdz Hty' Hnl' (cr_nl0z dn Hnl0) Hins). }
+             assert (Habsc : abs_of (era_node
+                       (cr_setf dnc major minor (mword_of_int 1 : mword 16))
+                       bmc datc)
+                     = Some (MkAnode (cre_child (bv_unsigned ty) (bv_unsigned major)
+                                        (bv_unsigned minor) (bv_unsigned dind)
+                                        (bv_unsigned cinum)) 1%nat))
+               by (rewrite (cre_child_nondir _ _ _ _ _ HtyzD); exact Hrowc).
+             assert (Hnonep : dir_entries (era_node dn bm data)
+                              !! (bname 14 nf) = None).
+             { rewrite (dir_entries_era_node dn bm data Hholes Hszcap)
+                 (bool_decide_eq_true_2 _ Hdz).
+               by apply dir_view_lookup_None. }
              iApply fupd_wp.
-             (* THE RETAG OWES THE ROW (durable-disk lane A): an appended
-                entry leaves the parent well-formed, and these are the four
-                facts the re-pack below proves anyway. *)
-             iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dind)
+             iEval (rewrite top_frag_1) in "Hctop".
+             iMod (caf_acre_fire fsc_fs ⊤
+                     (cre_child (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor))
+                     Φok (bv_unsigned dind) (bv_unsigned cinum) (bname 14 nf) (DfracOwn 1)
                      (era_node dn bm data) (era_node dn' bm' data')
-                     ltac:(solve_ndisj) Logic.I
+                     (era_node (cr_setf dnc major minor
+                                  (mword_of_int 1 : mword 16)) bmc datc)
+                     ltac:(solve_ndisj)
                      (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst
                         dn' bm' data' Hiok' Hrl' Hduq' Hddix')
-                     with "[] [] Htop") as "Htop";
+                     (mkf_era_is_dir dn bm data Hdz)
+                     (mkf_era_live dn bm data (cr_nl0z dn Hnl0))
+                     Hnonep Habsp' Habsc
+                     with "[] [] Hacre Htop Hctop") as "(Htop & Hctop & Hokr)";
                [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
+             iEval (rewrite -top_frag_1) in "Hctop".
              iModIntro.
+             iDestruct "Hokr" as (avy) "(%Hprey & HFok)".
              iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn' bm')
                with "[Hdlnk Hdiat Hmeta Hmap Hblocks Htop]"
                as "Hload".
@@ -1455,7 +1550,8 @@ Section ProofCreateAlloc.
                        with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv
                              Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
                              Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta
-                             Hcmap Hcblocks Hctop Hcfrz Hckeep Hruc]").
+                             Hcmap Hcblocks Hctop Hcfrz Hckeep Hruc
+                             Harmr Hdots Hun HFok]").
              { exact Hcsf. }
              { exact (cr_slots_3 _ ns eq_refl Hns). }
              { split_and!.
@@ -1487,6 +1583,16 @@ Section ProofCreateAlloc.
                split; [rewrite cr_setf_nlink; vm_compute; reflexivity |].
                intros _. exact (cr_setf_fresh_made dnc ty major minor
                                   Hfresh Htyc). }
+             iSplitR "Harmr Hdots Hun HFok"; last first.
+             { (* ARM C-OK-FILE's receipts: the arm and the parent leg fired,
+                  no dots on a non-directory, the unarm comes home *)
+               rewrite /cre_ok_arms /=.
+               iExists (bv_unsigned dind), (bname 14 nf).
+               iFrame "Harmr Hun". iSplitL "Hdots"; [iRight; iExact "Hdots" |].
+               rewrite /cre_acre_fired.
+               iExists avy, (dir_entries (era_node dn bm data)),
+                       (fn_nlink (era_node dn bm data)).
+               iSplitR; [by iPureIntro |]. iExact "HFok". }
              (* the CHILD is not a directory on this arm, so its [dlinks]
                 is [emp] at either dinode ([dlinks_not_dir]) and the
                 flush's [nlink] bump is invisible to it. *)
@@ -1599,7 +1705,7 @@ Section ProofCreateAlloc.
                              Hfrzl Hkeep Hrud Hslkc Hcslkd Hcdep Hoffrc Hcidev
                              Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta Hcmap
                              Hcblocks Hctop Hcshot Hcfrz [%] [] Hckeep Hruc Htoken Hsbn Hsbi Hsbs Hsbb Hbmr
-                             Hppid Hppback Hpath Hbsl Hislr Hop Htx Hcont").
+                             Hppid Hppback Hpath Hbsl Hislr Hop Htx Harmr Hdots Hun Hacre Hcont").
              { exact Hmdlregs. }
              { exact Htdir. }
              { exact Hkdlt. }
@@ -1847,13 +1953,16 @@ Section ProofCreateAlloc.
                 (mword_of_int 0 : mword 32) dn bm n2 Sb2
                 (1 + (1 + (ns - 2)))%nat
                 with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
-                      Hbsl [%] Hisl [%] Hop [$Htx]").
+                      Hbsl [%] Hisl [%] Hop [$Htx Harm Hdots Hun Hacre]").
       { exact Hcsf. }
       { exact (cr_slots_2 _ ns eq_refl Hns). }
       { split_and!; [exact (cr_sub2 _ _ _ Hsb1 Hsb2)
                     | exact (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))
                     | discriminate]. }
-      { iPureIntro. rewrite Ha0f. exact HZ4s2. }
+      { iSplitR; [iPureIntro; rewrite Ha0f; exact HZ4s2 |].
+        (* ARM A-FAIL: ialloc refused, nothing fired *)
+        rewrite /cre_fail_arms. iLeft. rewrite /cre_commits.
+        iFrame "Harm Hdots Hun Hacre". }
   Qed.
 
 End ProofCreateAlloc.

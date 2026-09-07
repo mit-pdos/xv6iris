@@ -134,6 +134,7 @@ Section ProofSysOpenAUCreArm.
   (* ARM C-OK's payout, plus the two commits [SpecSysOpenAU]'s FRESH arms
      refund and the inum bound they assert. *)
   Definition socr_fresh (P : nat -> Z -> iProp Σ)
+      (Phiarm Phiun : aview -> Z -> iProp Σ)
       (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
       (Phio : aview -> Z -> anode -> iProp Σ)
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
@@ -146,12 +147,17 @@ Section ProofSysOpenAUCreArm.
        Phiok av d nm i0 ∗
        dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex ∗
        aopen_commit_at (fs_gamma_L fsc_fs) appE Phio ∗
-       atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit)%I.
+       atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit ∗
+       (* ...and create's CHILD leg (round E2, lane E2-C): the row APPEARED
+          at this inum, the unarm comes home *)
+       cre_arm_fired Phiarm i0 ∗
+       aunarm_commit_at (fs_gamma_L fsc_fs) appE Phiun)%I.
 
   (* ARM F-OK's payout: the exists observation fired, the create commit
      refunded.  Both of open's own commits are SPENT by the tail on this
      flavour, so neither rides here. *)
   Definition socr_exists (P : nat -> Z -> iProp Σ)
+      (Phiarm Phiun : aview -> Z -> iProp Σ)
       (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
       (pl : list (bv 8)) (i0 : Z) : iProp Σ :=
     (∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
@@ -160,7 +166,9 @@ Section ProofSysOpenAUCreArm.
        ⌜ents !! nm = Some i0⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
        Phiex av d nm i0 ∗
-       acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Phiok)%I.
+       acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Phiok ∗
+       (* the name was already there: create's child legs are whole *)
+       cre_child_unfired (fs_gamma_L fsc_fs) (AFile []) Phiarm Phiun)%I.
 
   (* ================================================================== *)
   (*  3.  THE TWO OBSERVATION SEEDS                                      *)
@@ -315,18 +323,19 @@ Section ProofSysOpenAUCreArm.
   Lemma socr_arms_fresh `{GEN : GenId}
       (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Phiarm Phiun : aview -> Z -> iProp Σ)
       (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
       (Phio : aview -> Z -> anode -> iProp Σ)
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
       (U : ustate) (sts : list fdstate) (r : mword 64) (pl : list (bv 8)) (i0 : Z)
       (bs : list (bv 8)) (nl0 : nat) :
     open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
-      (socr_P (socr_fresh P Phiok Phiex Phio Phit pl i0) i0)
-      (socr_Pm (socr_fresh P Phiok Phiex Phio Phit pl i0))
+      (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit pl i0) i0)
+      (socr_Pm (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit pl i0))
       (socr_Phio_pure i0 (MkAnode (AFile bs) nl0))
       socr_Phit_triv sts U r
     ={⊤}=∗ open_arms_create (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
-             P Pmiss Phiok Phiex Phio Phit sts U r.
+             P Pmiss Phiarm Phiun Phiok Phiex Phio Phit sts U r.
   Proof.
     rewrite /open_arms_plain /open_arms_create.
     iIntros "[Harms $]".
@@ -336,37 +345,38 @@ Section ProofSysOpenAUCreArm.
       iModIntro. iLeft. iSplitR; [by iPureIntro |]. iFrame "Hpriv Hfrag".
       rewrite /open_post_fail_create /socr_fresh.
       iDestruct "HR" as (d nm av ents nl)
-        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Htc)".
+        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Htc & Harmr & Hun)".
       iRight. iExists pl. iRight. iExists d. iFrame "HP Htc".
       iLeft. iExists av, i0, nm, ents, nl.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-      iSplitR; [by iPureIntro |]. iFrame "HPhi Hdl Hoc".
+      iSplitR; [by iPureIntro |]. iFrame "HPhi Hdl Hoc Harmr Hun".
     - iDestruct (socr_ok_fresh_arm with "Hok") as "[HR Hfd]".
       rewrite /socr_fresh.
       iDestruct "HR" as (d nm av ents nl)
-        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Htc)".
+        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Htc & Harmr & Hun)".
       iModIntro. iRight. rewrite /open_post_ok_create.
       iExists pl, d, i0, nm.
       iSplitR; [by iPureIntro |]. iFrame "HP".
       iLeft. iExists av, ents, nl.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-      iFrame "HPhi Hdl Hoc Htc Hfd".
+      iFrame "HPhi Hdl Hoc Htc Harmr Hun Hfd".
   Qed.
 
   Lemma socr_arms_exists `{GEN : GenId}
       (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Phiarm Phiun : aview -> Z -> iProp Σ)
       (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
       (Phio : aview -> Z -> anode -> iProp Σ)
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
       (U : ustate) (sts : list fdstate) (r : mword 64) (pl : list (bv 8)) (i0 : Z) (a0 : anode) :
     (forall (ents : gmap fname Z) (nl : nat), a0 <> MkAnode (ADir ents) nl) ->
     open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
-      (socr_P (socr_exists P Phiok Phiex pl i0) i0)
-      (socr_Pm (socr_exists P Phiok Phiex pl i0))
+      (socr_P (socr_exists P Phiarm Phiun Phiok Phiex pl i0) i0)
+      (socr_Pm (socr_exists P Phiarm Phiun Phiok Phiex pl i0))
       (socr_Phio_tag i0 a0 Phio) Phit sts U r
     ={⊤}=∗ open_arms_create (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
-             P Pmiss Phiok Phiex Phio Phit sts U r.
+             P Pmiss Phiarm Phiun Phiok Phiex Phio Phit sts U r.
   Proof.
     intros Hnd.
     rewrite /open_arms_plain /open_arms_create.
@@ -377,11 +387,12 @@ Section ProofSysOpenAUCreArm.
       iModIntro. iLeft. iSplitR; [by iPureIntro |]. iFrame "Hpriv Hfrag".
       rewrite /open_post_fail_create /socr_exists.
       iDestruct "HR" as (d nm av ents nl)
-        "(%Hl & %Hrow & %Hent & HP & HPhi & Hac)".
+        "(%Hl & %Hrow & %Hent & HP & HPhi & Hac & Hcl)".
       iRight. iExists pl. iRight. iExists d. iFrame "HP Htc".
       iRight. iLeft. iExists av, i0, nm, ents, nl.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
       iSplitR; [by iPureIntro |]. iFrame "HPhi Hac".
+      iSplitL "Hcl"; [iLeft; iExact "Hcl" |].
       iDestruct "Hob" as "[Hoc | Hfired]".
       + iLeft. rewrite /aopen_commit_at /socr_Phio_tag.
         iIntros (I ix a) "%Hix Ha".
@@ -391,18 +402,18 @@ Section ProofSysOpenAUCreArm.
         iDestruct "Hfired" as (ix avx ax) "(%Hax & [%Heq HP2])".
         destruct Heq as [Hix _]. subst ix.
         iExists avx, ax. iSplitR; [by iPureIntro |]. iExact "HP2".
-    - iDestruct (socr_ok_exists_arm (socr_exists P Phiok Phiex pl i0) i0 a0
-                   Phio Phit gf pj pidv vom U sts r Hnd with "Hok")
+    - iDestruct (socr_ok_exists_arm (socr_exists P Phiarm Phiun Phiok Phiex pl i0)
+                   i0 a0 Phio Phit gf pj pidv vom U sts r Hnd with "Hok")
         as "[HR Hrest]".
       rewrite /socr_exists.
       iDestruct "HR" as (d nm av ents nl)
-        "(%Hl & %Hrow & %Hent & HP & HPhi & Hac)".
+        "(%Hl & %Hrow & %Hent & HP & HPhi & Hac & Hcl)".
       iModIntro. iRight. rewrite /open_post_ok_create.
       iExists pl, d, i0, nm.
       iSplitR; [by iPureIntro |]. iFrame "HP".
       iRight. iExists av, ents, nl.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-      iFrame "HPhi Hac Hrest".
+      iFrame "HPhi Hac Hcl Hrest".
   Qed.
 
 End ProofSysOpenAUCreArm.

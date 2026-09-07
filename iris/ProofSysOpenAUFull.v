@@ -168,13 +168,14 @@ Section ProofSysOpenAUFullBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
     wp_sys_open_au_create_body gfl gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v vom
-                           pid U sts m K eb b lks P Pmiss Φok Φex Φo Φt.
+                           pid U sts m K eb b lks P Pmiss Φarm Φun Φok Φex Φo Φt.
   Proof.
     cbv beta zeta delta [wp_sys_open_au_create_body wp_sys_open_au_frame].
     intros Hcr HK HdevR Hnib0 Hgeom Hsize
@@ -190,7 +191,7 @@ Section ProofSysOpenAUFullBody.
              #Hireg #Hropen Hsbn Hsbi Hsbs Hsbb #Hbmres #Hkenv #Hprocs Hisl
              Hfds Hpriv Hfrag Hau Hcont".
     iEval (rewrite /open_au_pre_create) in "Hau".
-    iDestruct "Hau" as "(Hwp & Hac & Hdl & Hoc & Htc)".
+    iDestruct "Hau" as "(Hwp & Hac & Hdl & Hoc & Htc & Hclegs)".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
@@ -644,7 +645,7 @@ Section ProofSysOpenAUFullBody.
                 HK24 Kpop ltac:(reflexivity) HR2sp HR2thr HR2s1 HR2s2 HR2s3 Hal
                 with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23 H24
                       [Hown Hpriv Hisl Hfds Hbsl Hsbn Hsbi Hsbs Hsbb
-                       Hfrag Hwp Hac Hdl Hoc Htc Hcont]").
+                       Hfrag Hwp Hac Hdl Hoc Htc Hclegs Hcont]").
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CID16 CIDy 0 eb (proc_addr j) b
@@ -652,7 +653,7 @@ Section ProofSysOpenAUFullBody.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf ns P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
                 Hsbn Hsbi Hsbs Hsbb [%] Hisl
-                [Hpriv Hfds Hfrag Hwp Hac Hdl Hoc Htc]").
+                [Hpriv Hfds Hfrag Hwp Hac Hdl Hoc Htc Hclegs]").
       { exact Hcsf. }
       { exact Huptz. }
       { rewrite Heb /trap_csrs_ext. done. }
@@ -668,7 +669,7 @@ Section ProofSysOpenAUFullBody.
         rewrite /open_arms_create. iFrame "Hfds". iLeft.
         iSplitR; [iPureIntro; exact Ha0m1 |]. iFrame "Hpriv Hfrag".
         rewrite /open_post_fail_create. iLeft.
-        rewrite /open_au_pre_create. iFrame "Hwp Hac Hdl Hoc Htc". } }
+        rewrite /open_au_pre_create. iFrame "Hwp Hac Hdl Hoc Htc Hclegs". } }
     (* ---- the string fetched: the [bltz] falls through ---- *)
     iApply (wp_blt_x0_fall_s_sconf (CID := CID15) (mword_of_int (SO + 0x24))
               (mword_of_int 166 : mword 13) Ra5 R2 (K - 24)%nat b
@@ -809,7 +810,7 @@ Section ProofSysOpenAUFullBody.
     iAssert (wp_next (CID0 := CID21) true (proc_addr j)
                (so_cont0_au_create gf
  ns dqb dqs dqbs dqn (proc_addr j) pid vom
-                         (us_upt U P') sts P Pmiss Φok Φex Φo Φt m K eb b lks))
+                         (us_upt U P') sts P Pmiss Φarm Φun Φok Φex Φo Φt m K eb b lks))
       with "[Hcont]" as "Hcont0".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
       iEval (rewrite /so_cont0_au_create). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -857,7 +858,7 @@ Section ProofSysOpenAUFullBody.
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
               pid dqb dqs dqbs dqn (us_upt U P') sts m S2 sp0 K eb b lks
               u4 u5 u6 u24
-              vom P Pmiss Φok Φex Φo Φt
+              vom P Pmiss Φarm Φun Φok Φex Φo Φt
               HKfull HdevR Hnib0 Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hpk Hni1 Hni2
               Hni3 Hush Hprkc Hnsb Hj Hgl Heb Hlkempty eq_refl Hal23
@@ -866,7 +867,7 @@ Section ProofSysOpenAUFullBody.
                     Hlog Hseam Hgen Hkenv Hitab Hitinv Hescrows Hslks Hireg Hropen
                     Hsbn Hsbi Hsbs Hsbb Hbmres Hpriv Hprocs Hdev Hgeo Hdlk
                     HopS Htx Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
-                    H23hi H24 Hwp Hac Hdl Hoc Htc Hcont0").
+                    H23hi H24 Hwp Hac Hdl Hoc Htc Hclegs Hcont0").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
   Qed.

@@ -299,44 +299,11 @@ Proof. apply Z.mod_pos_bound. lia. Qed.
 
 Require Export FsAbsDelta.   (* [acre_bump], [delta_create] + its row algebra (hoisted 2026-09-04) *)
 
-(* THE SIDE CONDITIONS, as one proposition: the parent is a directory
-   whose map lacks the name, and the child's row already reads as the
-   freshly-minted node (see the header's FRESHNESS SHAPE) *)
-Definition cre_pre (av : aview) (d : Z) (nm : fname)
-    (ents : gmap fname Z) (nl : nat) (i : Z) (c : absnode) : Prop :=
-  av !! d = Some (MkAnode (ADir ents) nl)
-  /\ ents !! nm = None
-  /\ av !! i = Some (MkAnode c 1%nat).
-
-(* a non-directory child forces parent <> child: their observed rows
-   differ *)
-Lemma cre_pre_ne (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z)
-    (nl : nat) (i : Z) (c : absnode) :
-  cre_pre av d nm ents nl i c -> (forall e, c <> ADir e) -> d <> i.
-Proof.
-  intros (Hd & _ & Hi) Hc Heq. subst i. rewrite Hd in Hi.
-  injection Hi as Hc' _. exact (Hc ents (eq_sym Hc')).
-Qed.
-
-(* THE COLLAPSE (the header's freshness argument, machine-checked): under
-   [cre_pre] with a device child, the fused delta IS the one-row parent
-   insert -- the child's insert is the identity on its already-minted
-   row.  This is what makes the AU dischargeable at ONE instant. *)
-Lemma delta_create_dev (av : aview) (d : Z) (nm : fname)
-    (ents : gmap fname Z) (nl : nat) (i : Z) (ma mi : Z) :
-  cre_pre av d nm ents nl i (ADev ma mi) ->
-  delta_create d nm i (ADev ma mi) av
-  = <[d := MkAnode (ADir (<[nm := i]> ents)) nl]> av.
-Proof.
-  intros Hp.
-  assert (Hne : d <> i).
-  { eapply (cre_pre_ne av d nm ents nl i); [exact Hp |].
-    intros e He. discriminate He. }
-  destruct Hp as (Hd & Hnm & Hi).
-  rewrite /delta_create Hd /= Nat.add_0_r.
-  rewrite (insert_commute _ i d); [| congruence].
-  by rewrite (insert_id av i (MkAnode (ADev ma mi) 1%nat) Hi).
-Qed.
+(* [cre_pre] (THE SIDE CONDITIONS, one proposition), [cre_pre_ne] and the
+   collapse [delta_create_dev] moved to FsAbsDelta.v section 1 in round E2
+   (lane E2-C): [SpecCreate]'s bundle names the parent-leg commit, and this
+   file requires [SpecCreate].  Exported from there through the
+   [Require Export FsAbsDelta] above, so every consumer sees the same names. *)
 
 (* the reading bridge's trivial half (the prover's item 2) -- pushing one
    raw-map insert through [abs_view] -- is [FsAbsDefs.abs_view_insert]

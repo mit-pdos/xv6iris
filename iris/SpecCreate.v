@@ -355,6 +355,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+(* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ                *)
+Require Import AppInv.           (* [appE]: the commit mask                 *)
+Require Import FsTree.           (* [fname]: the entry names the receipts carry *)
+Require Import FsAbsCreateFire.  (* the legs' commits and receipts          *)
+Require Import FsAbsDefs.        (* LAST (FsAbs's own rule)                 *)
 Import Defs.
 Require Import TsoCtx.
 Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
@@ -557,7 +563,91 @@ Section CreateSpec.
     iSplitL "Hfrz"; [iExact "Hfrz" |].
     iSplitL "Href"; [iExact "Href" | iExact "Hru"].
   Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE APPLICATION'S SIDE OF create (round E2, lane E2-C; design of    *)
+  (*  record applications.md section 2, the delta legs fs-syscall-specs   *)
+  (*  section 4).  create performs [delta_create] as LEGS -- the ARM      *)
+  (*  (the child's row appears), mkdir's DOTS, the PARENT leg, and on     *)
+  (*  failure the UNARM (the row disappears; ruling Q-h: the do-then-undo *)
+  (*  PAIR is the honest form) -- and each leg fires a two-phase commit   *)
+  (*  the caller supplies here ([FsAbsCreateFire]).  The child's content  *)
+  (*  is indexed by the requested type ([cre_c0]/[cre_child]); the        *)
+  (*  receipts come back in the post, each with its instant's row facts.  *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the four commits, at the child's type-indexed content *)
+  Definition cre_commits (Γ : fs_view_names Σ) (tyz ma mi : Z)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+    (aarm_commit_at Γ appE (cre_c0 tyz ma mi) Φarm
+     ∗ adots_commit_at Γ appE Φdots
+     ∗ aunarm_commit_at Γ appE Φun
+     ∗ acre_commit_at_gen Γ appE (cre_child tyz ma mi) Φok)%I.
+
+  (* SATISFIABILITY, and the discharger the dispatcher and the two dead
+     non-AU callers hand down: the GENERIC application asks nothing of
+     create's legs, so every commit is its own unit and the whole bundle is
+     paid off the parked license ([AppInv.app_step_acc], through
+     [FsAbsCreateFire]'s four [_unit]s).  It sits here rather than in
+     [FsAbsInvFire]'s [fsabs_*] family because three of its four consumers
+     ([ProofSysMkdir], [ProofSysOpen], [ProofSysMknod]) are BELOW that file
+     in the cone. *)
+  Local Lemma cre_appN_appE : ↑appN ⊆ appE.
+  Proof. rewrite /appE. done. Qed.
+
+  Lemma cre_commits_unit (γfs : fs_names) (tyz ma mi : Z) :
+    app_inv γfs -∗
+    cre_commits (fs_gamma_L γfs) tyz ma mi (fun _ _ => True%I)
+      (fun _ _ _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ _ => True%I).
+  Proof.
+    iIntros "#Hai". rewrite /cre_commits.
+    iSplitR; [iApply (aarm_commit_at_unit γfs appE _ cre_appN_appE with "Hai") |].
+    iSplitR; [iApply (adots_commit_at_unit γfs appE cre_appN_appE with "Hai") |].
+    iSplitR; [iApply (aunarm_commit_at_unit γfs appE cre_appN_appE with "Hai") |].
+    iApply (acre_commit_at_gen_unit γfs appE _ cre_appN_appE with "Hai").
+  Qed.
+
+  (* ARM C-OK / F-OK, keyed on [made]: a FRESH child had its arm, [its
+     dots -- a directory --] and its parent leg fired, the unarm comes home
+     unfired; a FOUND node moved nothing and every commit comes home. *)
+  Definition cre_ok_arms (Γ : fs_view_names Σ) (tyz ma mi : Z)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+      (made : bool) (i : Z) : iProp Σ :=
+    (if made
+     then ∃ (d : Z) (nm : fname),
+       cre_arm_fired Φarm i
+       ∗ (cre_dots_fired Φdots i d true ∨ adots_commit_at Γ appE Φdots)
+       ∗ cre_acre_fired Φok d nm i (cre_child tyz ma mi d i)
+       ∗ aunarm_commit_at Γ appE Φun
+     else cre_commits Γ tyz ma mi Φarm Φdots Φun Φok)%I.
+
+  (* ARMS N / G / F-BAD / A-FAIL: nothing fired; ARM FAIL and mkdir's three
+     [fail:] entries: the PAIR -- the arm fired, [the dots -- both or the
+     first alone -- fired,] the unarm fired, the parent leg comes home *)
+  Definition cre_fail_arms (Γ : fs_view_names Σ) (tyz ma mi : Z)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+    (cre_commits Γ tyz ma mi Φarm Φdots Φun Φok
+     ∨ (∃ (i d : Z),
+          cre_arm_fired Φarm i
+          ∗ ((∃ full : bool, cre_dots_fired Φdots i d full)
+             ∨ adots_commit_at Γ appE Φdots)
+          ∗ cre_unarm_fired Φun i
+          ∗ acre_commit_at_gen Γ appE (cre_child tyz ma mi) Φok))%I.
 End CreateSpec.
+
+(* the two arm bodies are disjunctions with existentials inside: sealed, as
+   [SpecCreateAU.cau_ok]/[cau_fail] are, so an [iFrame] at syscall altitude
+   does not search through them *)
+Global Typeclasses Opaque cre_ok_arms cre_fail_arms.
 
 Definition wp_create_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -573,12 +663,21 @@ Definition wp_create_sconf_body
     (ns : nat)                                        (* the iref ledger     *)
     (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string)
+    (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C): the receipts ---- *)
+    (Φarm : aview -> Z -> iProp Σ)
+    (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+    (Φun : aview -> Z -> iProp Σ)
+    (Φok : aview -> Z -> fname -> Z -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.create in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   let pl := bview plen pfun in
+  let Γfs := fs_gamma_L fsc_fs in
+  let tyz := bv_unsigned ty in
+  let ma := bv_unsigned major in
+  let mi := bv_unsigned minor in
   (K_create <= K)%nat ->
   icfg_dev = ROOTDEV ->
   (0 < icfg_nib)%nat ->
@@ -690,6 +789,9 @@ Definition wp_create_sconf_body
      THE TOKEN COMES BACK ON EVERY ARM: create's caller ends the operation,
      and end_op takes the whole [LogInv.log_op]. *)
   log_tx icfg_log -∗
+  (* ---- THE APPLICATION'S SIDE: the four commits create's legs fire
+     (round E2, lane E2-C), at the child's type-indexed content ---- *)
+  cre_commits Γfs tyz ma mi Φarm Φdots Φun Φok -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: create parks (ilock,
      bread, the whole fs cone), and a park moves the hart with interrupts
      off, so the crossing has nothing to do with SIE. *)
@@ -760,11 +862,15 @@ Definition wp_create_sconf_body
                       tests at +0x4c / +0x5c passed. *)
                 ty = T_FILE
                 /\ (di_type dn = T_FILE \/ di_type dn = T_DEVICE))⌝ ∗
-         create_locked pidv k qi s g inum dn bm
+         create_locked pidv k qi s g inum dn bm ∗
+         (* ...and the legs' receipts (round E2, lane E2-C) *)
+         cre_ok_arms Γfs tyz ma mi Φarm Φdots Φun Φok made (bv_unsigned inum)
        else (* ARMS N / F-BAD / A-FAIL / FAIL: a0 = 0 and create holds
                nothing -- every inode it touched has been iunlockput. *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
-          = (mword_of_int 0 : mword 64)⌝ ∗ log_tx icfg_log) -∗
+          = (mword_of_int 0 : mword 64)⌝ ∗ log_tx icfg_log ∗
+         (* nothing fired, or the do-then-undo pair (ruling Q-h) *)
+         cre_fail_arms Γfs tyz ma mi Φarm Φdots Φun Φok) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -782,9 +888,14 @@ Module Type CREATE.
       (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ),
       wp_create_sconf_body γs j γl pd pav pu
  γf
  plen pfun ty major minor
-                           U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.
+                           U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
+                           Φarm Φdots Φun Φok.
 End CREATE.
