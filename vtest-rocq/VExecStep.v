@@ -581,3 +581,70 @@ Proof.
   exact (estep_hstep tick gen cpu (m, s) (Interface.Ret x, s')
            (exec_enode_rtc tick m s x s' Hex) g Hlive Hok).
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 9. ...AND THAT CHAIN IS [nsteps] OF THE WHOLE CONFIGURATION.            *)
+(*                                                                         *)
+(*    A hart step forks nothing and observes nothing, so the rest of the   *)
+(*    pool rides along untouched and the observation list stays empty.     *)
+(*    The pool is left ABSTRACT here ([t1], [t2]): what a vtest's pool     *)
+(*    actually is -- [RiscvLang.power_fork 0], every hart at an            *)
+(*    instruction boundary plus the three device loops -- is the caller's  *)
+(*    business, and this lemma should not know it.                         *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma hstep_step (gen : nat) (cpu : CPU) (t1 t2 : list mexpr)
+    (m1 m2 : M unit) (g1 g2 : gstate) :
+  prim_step (HartE gen cpu m1) g1 [] (HartE gen cpu m2) g2 [] ->
+  @language.step riscv_lang (t1 ++ HartE gen cpu m1 :: t2, g1) []
+                            (t1 ++ HartE gen cpu m2 :: t2, g2).
+Proof.
+  intros Hps.
+  eapply language.step_atomic; [reflexivity| |exact Hps].
+  rewrite app_nil_r. reflexivity.
+Qed.
+
+(* [nsteps_l] concatenates the observation lists; both are empty here, and
+   [[] ++ [] = []] holds by conversion, so this is the same constructor with
+   the concatenation already done. *)
+Lemma nsteps_l_nil (n : nat) (r1 r2 r3 : language.cfg riscv_lang) :
+  @language.step riscv_lang r1 [] r2 ->
+  @language.nsteps riscv_lang n r2 [] r3 ->
+  @language.nsteps riscv_lang (S n) r1 [] r3.
+Proof. intros H1 H2. exact (language.nsteps_l _ _ _ _ _ _ H1 H2). Qed.
+
+Lemma hstep_nsteps (gen : nat) (cpu : CPU) (t1 t2 : list mexpr) :
+  forall p q : M unit * gstate, rtc (hstep gen cpu) p q ->
+    exists n, @language.nsteps riscv_lang n
+                (t1 ++ HartE gen cpu (fst p) :: t2, snd p) []
+                (t1 ++ HartE gen cpu (fst q) :: t2, snd q).
+Proof.
+  intros p q Hrtc. induction Hrtc as [p|p1 p2 p3 Hstep Hrtc IH].
+  - exists 0%nat. apply language.nsteps_refl.
+  - destruct IH as [n Hn]. exists (S n).
+    destruct p1 as [m1 g1], p2 as [m2 g2]; cbn [fst snd] in *.
+    eapply nsteps_l_nil; [|exact Hn].
+    apply hstep_step. unfold hstep in Hstep; cbn [fst snd] in Hstep.
+    exact Hstep.
+Qed.
+
+(* THE STATEMENT THE SUITE HAS NEVER HAD: what the harness computed for one
+   instruction is an execution of the language, from a configuration whose
+   only distinguished part is the hart it ran. *)
+Lemma exec_nsteps (tick : bool) (gen : nat) (cpu : CPU) (t1 t2 : list mexpr)
+    (m : M unit) (s : mstate) (x : unit) (s' : mstate) (g : gstate) :
+  exec m s = Some (x, s') ->
+  thread_live g gen ->
+  hart_ok cpu g s ->
+  exists n g',
+    @language.nsteps riscv_lang n (t1 ++ HartE gen cpu m :: t2, g) []
+                     (t1 ++ HartE gen cpu (Interface.Ret x) :: t2, g')
+    /\ hart_ok cpu g' s' /\ thread_live g' gen.
+Proof.
+  intros Hex Hlive Hok.
+  destruct (exec_hstep tick gen cpu m s x s' g Hex Hlive Hok)
+    as (g' & Hrtc & Hok' & Hlive').
+  destruct (hstep_nsteps gen cpu t1 t2 (m, g) (Interface.Ret x, g') Hrtc)
+    as [n Hn]; cbn [fst snd] in Hn.
+  exists n, g'. split; [exact Hn|]. split; assumption.
+Qed.
