@@ -161,7 +161,7 @@ trivially discharging a goal you can read at a glance.
 `iris/FastLia.v` overrides `lia`/`nia` tree-wide from the same hook as the
 `set_solver` one: before solving it clears every hypothesis `zify` could not
 have read, so cost tracks the arithmetic in scope, not the context. Read that
-file's header; every `set_solver` bullet below applies to it too. Two rules are
+file's header; every `set_solver` bullet below applies to it too. The rules
 specific to it:
 
 - **Never clear a hypothesis that is not a `Prop`.** Clearing one RESTRICTS the
@@ -170,13 +170,11 @@ specific to it:
   closer. (This is what the hand-written keep-lists' `XI` was really for.)
 - **Do not write new `clear -H..; lia`** — the override does it, and it reaches
   the argument-position case a hand-written `clear -` cannot.
-- **A context filter must be GATED BEHIND THE UNFILTERED TACTIC, not run ahead
-  of it.** Most calls of a general-purpose closer are already cheap, and there
-  are tens of thousands of them; charging every one an analysis to rescue the
-  few hundred expensive ones is a net loss. `first [ timeout 1 tac | shrink; tac
-  | tac ]` — cheap calls never pay the analysis, and the unbounded unfiltered
-  arm last is what keeps the override from turning a provable goal into a
-  failing one. Same filter, opposite sign, purely from the order.
+- **A tactic filter runs on EVERY call, so nothing on its per-hypothesis or
+  per-node path may be a `constr:` quotation (re-elaborated at every
+  evaluation), a `constr list` scan, or a `SetShrink.vars_of`.** Gating one
+  behind a `timeout` instead is refuted: it makes which arm proves a goal
+  depend on machine load, and it measured slower than no override at all.
 - **Derive a tactic's vocabulary from SAMPLE TERMS, never from constant names.**
   `(0 <= 0)%nat` is `Peano.le`; `Nat.le` is a different constant no goal carries,
   so a list naming it drops every nat inequality while looking right.

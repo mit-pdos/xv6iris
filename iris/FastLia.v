@@ -33,9 +33,10 @@
 (* dropped: clearing a non-Prop restricts every undefined evar's context   *)
 (* and breaks sibling goals silently -- see [keeps_for_lia] below.  What   *)
 (* the filter is not is                                                    *)
-(* COMPLETE with respect to zify's extension classes (this tree loads      *)
-(* [bitvector.tactics]'s hook), which is why the vocabulary below is       *)
-(* deliberately generous and why the fallback exists.                      *)
+(* COMPLETE with respect to zify's extension classes, which is why the     *)
+(* vocabulary below is deliberately generous and why the fallback exists.  *)
+(* (This tree registers no zify instances of its own, and neither does     *)
+(* stdpp: [bitvector.tactics] replaces only [zify_post_hook].)             *)
 (*                                                                        *)
 (* THE FALLBACK IS NOT A SAFETY NET, AND A GREEN TREE PROVES NOTHING.      *)
 (* [lia] is [first [ lia_fast | lia_slow ]], so a filter that drops        *)
@@ -47,18 +48,116 @@
 (* So: check the filter with the fallback DELETED (FastLiaTests.v proves    *)
 (* one inequality per numeric type that way), and never hand-write a       *)
 (* constant name into the vocabulary -- see [arith_ops].                   *)
+(*                                                                        *)
+(* THE FILTER RUNS ON EVERY CALL, AND WHAT PAYS FOR THAT IS §"COST".       *)
+(* An earlier version ran the filter only for a call that had already      *)
+(* proved itself slow, behind a [timeout 1] gate.  That gate is gone.  It  *)
+(* made WHICH ARM proved a given goal a function of wall-clock time, so    *)
+(* the same source could build here and fail there and a timing wobble     *)
+(* could move a proof between arms with no source change to explain it --  *)
+(* and it did not even pay: it existed to hide a filter costing ~60 ms a   *)
+(* call, and measured against upstream over two cold full builds of        *)
+(* iris/ (1533 files, per-file min of two) it was worth +0.06%.  Making    *)
+(* the filter cost ~6 ms instead is worth -0.41%, and -0.48% against the   *)
+(* gated version.  Read §"COST" before changing any of the data structures *)
+(* that got it there.                                                      *)
 (* ====================================================================== *)
 
 From Ltac2 Require Import Ltac2.
-From Ltac2 Require Constr Control Std List Array Ident Int Bool.
+From Ltac2 Require Constr Control Std List Array Ident Int Bool FSet.
 From Stdlib Require Import ZArith Lia.
 Require Export SetShrink.
+
+(* ---------------------------------------------------------------------- *)
+(** ** COST
+
+    The filter is charged to all ~20k [lia] call sites in this tree, so its
+    per-call cost is the whole design constraint.  Measured on ProofBmap.v
+    (96 calls, mean context 190 hypotheses), the first version cost 60 ms a
+    call against a filtered [lia] of 10 ms, and every millisecond of it was
+    Ltac2 interpretation of one of three loops:
+
+      - 18 ms  the skeleton walk, because recognising a head meant
+               [List.exist Constr.equal] down a 78-element [constr list] AT
+               EVERY NODE.  Now the vocabulary is three [FSet]s keyed by
+               [constant]/[inductive]/[constructor] and a head costs one
+               [Constr.Unsafe.kind] and one [FSet.mem].
+      - 19 ms  [SetShrink.vars_of] over the type of every hypothesis KEPT, to
+               build the live-variable set.  Gone: only the GOAL is scanned
+               (it is small, and [vars_of] skips an evar's instance), and a
+               hypothesis-to-hypothesis dependency -- rare, and the only
+               other way a [clear] can be ill-formed -- is left to
+               [SetShrink.clear_greedily], which bisects and keeps the halves
+               that do go.  That is the same answer Coq's own [clear] check
+               gives, obtained without traversing the context in Ltac2.
+      - 14 ms  the [doomed] scan, [List.mem] over a keep-list and a
+               live-list that had grown to every variable in the context.
+               With the live set down to the goal's variables this is a scan
+               over a handful of names.
+
+      -  7 ms  [is_prop], one [Constr.type] retyping per non-arithmetic
+               hypothesis -- load-bearing, so it could not go, but it could
+               get cheaper: retyping the HEAD of an application and reading
+               the sort off its arity settles the question for almost every
+               hypothesis at a ninth of the price.  See [is_prop].
+
+    That is 60 ms a call down to ~6, against a filtered [lia] of ~10.
+
+    THE RULE THIS LEAVES BEHIND: never put a [constr:(...)] quotation, a
+    [constr list] scan, or a [SetShrink.vars_of] on a path that runs once per
+    hypothesis or once per node.  A quotation is re-elaborated at every
+    evaluation, so [Constr.equal f constr:(@eq)] inside the walk was a
+    pretyping call per node; every such term is now hoisted into the
+    per-call [vocab] built once at the top of [lia_shrink]. *)
 
 (** [head_of c] — the head of an application, [c] itself otherwise. *)
 Ltac2 head_of (c : constr) : constr :=
   match Constr.Unsafe.kind c with
   | Constr.Unsafe.App f _ => f
   | _ => c
+  end.
+
+(** A vocabulary is a set of global heads, split by what kind of global each
+    one is because [FSet] is keyed by type.  Membership is then one
+    [Constr.Unsafe.kind] and one lookup, independent of the vocabulary size. *)
+Ltac2 Type vocab := {
+  mutable vconst : constant FSet.t;
+  mutable vind   : inductive FSet.t;
+  mutable vctor  : constructor FSet.t;
+}.
+
+Ltac2 empty_vocab () : vocab :=
+  { vconst := FSet.empty FSet.Tags.constant_tag;
+    vind   := FSet.empty FSet.Tags.inductive_tag;
+    vctor  := FSet.empty FSet.Tags.constructor_tag }.
+
+(** Add the HEAD of a sample term to a vocabulary.
+
+    A sample whose head is neither a constant, an inductive nor a constructor
+    is a mistake in the list below rather than a term this filter could ever
+    meet, so it is thrown rather than silently ignored -- a silently ignored
+    entry is a hypothesis class dropped tree-wide, which the header explains
+    is a hang. *)
+Ltac2 vocab_add (v : vocab) (c : constr) : unit :=
+  match Constr.Unsafe.kind (head_of c) with
+  | Constr.Unsafe.Constant k _ => v.(vconst) := FSet.add k (v.(vconst))
+  | Constr.Unsafe.Ind i _      => v.(vind)   := FSet.add i (v.(vind))
+  | Constr.Unsafe.Constructor k _ => v.(vctor) := FSet.add k (v.(vctor))
+  | _ => Control.throw
+           (Tactic_failure (Some (Message.of_string
+              "FastLia: vocabulary sample whose head is not a global")))
+  end.
+
+Ltac2 mk_vocab (cs : constr list) : vocab :=
+  let v := empty_vocab () in List.iter (fun c => vocab_add v c) cs; v.
+
+(** Is [c]'s own head in [v]?  [c] is expected to be a head already. *)
+Ltac2 in_vocab (v : vocab) (c : constr) : bool :=
+  match Constr.Unsafe.kind c with
+  | Constr.Unsafe.Constant k _ => FSet.mem k (v.(vconst))
+  | Constr.Unsafe.Ind i _      => FSet.mem i (v.(vind))
+  | Constr.Unsafe.Constructor k _ => FSet.mem k (v.(vctor))
+  | _ => false
   end.
 
 (** The types whose (in)equations [zify] can read.  [bool] is here because
@@ -81,7 +180,6 @@ Ltac2 num_types () : constr list :=
     entry here is a HANG, not a slowdown, so do not hand-write constant names.
     FastLiaTests.v pins one inequality per numeric type for this reason. *)
 Ltac2 arith_ops () : constr list :=
-  List.map head_of
     [ constr:((0 <= 0)%nat); constr:((0 < 0)%nat); constr:((0 >= 0)%nat);
       constr:((0 > 0)%nat); constr:((0 + 0)%nat); constr:((0 - 0)%nat);
       constr:((0 * 0)%nat); constr:(Nat.div 0 0); constr:(Nat.modulo 0 0);
@@ -110,34 +208,50 @@ Ltac2 arith_ops () : constr list :=
       constr:(Pos.of_nat 0); constr:(Pos.of_succ_nat 0) ].
 
 (** The connectives the skeleton walk descends through.  Sample-derived for the
-    same reason.  [@eq] is here as in SetShrink's list, and additionally because
-    an equation is arithmetic by its TYPE argument rather than by its sides:
-    [H : m = n] over [Z] is a fact [lia] uses though neither side mentions an
-    operator. *)
+    same reason. *)
 Ltac2 logic_conn () : constr list :=
-  List.map head_of
     [ constr:(~ True); constr:(True /\ True); constr:(True \/ True);
       constr:(True <-> True); constr:(exists _ : nat, True) ].
 
-Ltac2 mem_c (ops : constr list) (c : constr) : bool :=
-  List.exist (fun o => Constr.equal o c) ops.
+(** Everything the walk needs, elaborated ONCE per [lia] call.
 
-(** [eq_at_num nums f args] — is this an equation at a numeric type? *)
-Ltac2 eq_at_num (nums : constr list) (f : constr) (args : constr array) : bool :=
-  match Bool.and (Constr.equal f constr:(@eq)) (Int.ge (Array.length args) 1) with
-  | true => mem_c nums (Array.get args 0)
+    [heq], [hfalse] and [hprop] are here rather than written as [constr:(@eq)] /
+    [constr:(Prop)] at their use sites because a [constr:] quotation is
+    re-elaborated at every evaluation and those sites run once per node or
+    once per hypothesis.  See §COST. *)
+Ltac2 Type kit := {
+  ops  : vocab;                 (* arithmetic heads *)
+  conn : vocab;                 (* connectives to descend through *)
+  nums : vocab;                 (* the types an equation may be at *)
+  heq  : constr;                (* [@eq] *)
+  hfalse : constr;              (* [False] *)
+  hprop  : constr;              (* [Prop] *)
+}.
+
+Ltac2 mk_kit () : kit :=
+  { ops  := mk_vocab (arith_ops ());
+    conn := mk_vocab (logic_conn ());
+    nums := mk_vocab (num_types ());
+    heq  := constr:(@eq);
+    hfalse := constr:(False);
+    hprop  := constr:(Prop) }.
+
+(** [eq_at_num k f args] — is this an equation at a numeric type?
+
+    An equation is arithmetic by its TYPE argument rather than by its sides:
+    [H : m = n] over [Z] is a fact [lia] uses though neither side mentions an
+    operator. *)
+Ltac2 eq_at_num (k : kit) (f : constr) (args : constr array) : bool :=
+  match Bool.and (Constr.equal f (k.(heq))) (Int.ge (Array.length args) 1) with
+  | true => in_vocab (k.(nums)) (Array.get args 0)
   | false => false
   end.
 
-(** The three vocabularies are passed in rather than rebuilt per node: each is a
-    list of [constr]s that would otherwise be reconstructed once for every
-    subterm of every hypothesis. *)
-Ltac2 rec mentions_arith_aux (ops : constr list) (conn : constr list)
-                             (nums : constr list) (fuel : int) (c : constr) : bool :=
+Ltac2 rec mentions_arith_aux (k : kit) (fuel : int) (c : constr) : bool :=
   match Int.le fuel 0 with
   | true => true            (* out of fuel: KEEP, never drop on ignorance *)
   | false =>
-      let rec_ := mentions_arith_aux ops conn nums (Int.sub fuel 1) in
+      let rec_ := mentions_arith_aux k (Int.sub fuel 1) in
       match Constr.Unsafe.kind c with
       | Constr.Unsafe.Cast c _ _ => rec_ c
       | Constr.Unsafe.Prod b body =>
@@ -149,19 +263,19 @@ Ltac2 rec mentions_arith_aux (ops : constr list) (conn : constr list)
       | Constr.Unsafe.Lambda _ body => rec_ body
       | Constr.Unsafe.LetIn _ _ body => rec_ body
       | Constr.Unsafe.App f args =>
-          match mem_c ops f with
+          match in_vocab (k.(ops)) f with
           | true => true
           | false =>
-              match eq_at_num nums f args with
+              match eq_at_num k f args with
               | true => true
               | false =>
-                  match mem_c conn f with
+                  match in_vocab (k.(conn)) f with
                   | true => List.exist rec_ (Array.to_list args)
                   | false => false
                   end
               end
           end
-      | _ => mem_c ops c
+      | _ => in_vocab (k.(ops)) c
       end
   end.
 
@@ -193,64 +307,106 @@ Ltac2 rec mentions_arith_aux (ops : constr list) (conn : constr list)
     tests are nested as [match]es instead, and [is_prop] -- a retyping call, the
     dearest of the three -- runs only on a hypothesis already headed for the
     doomed list. *)
-Ltac2 is_prop (ty : constr) : bool :=
+(** [retype_is_prop] is the honest question, and the dear one: [Constr.type]
+    over a whole hypothesis type is ~30 us, and it is asked of every
+    non-arithmetic hypothesis.  [is_prop] below asks it of the HEAD instead
+    wherever that settles the matter, which is ~9x cheaper (measured: 6.1 ms
+    against 0.7 ms over a 203-hypothesis context). *)
+Ltac2 retype_is_prop (k : kit) (ty : constr) : bool :=
   match Control.case (fun () => Constr.type ty) with
-  | Val (s, _) => Constr.equal s constr:(Prop)
+  | Val (s, _) => Constr.equal s (k.(hprop))
   | Err _ => false            (* cannot tell: keep *)
   end.
 
-Ltac2 keeps_for_lia (ops : constr list) (conn : constr list) (nums : constr list)
-                    (ty : constr) : bool :=
-  match Constr.equal ty constr:(False) with
+(** [codomain n t] — strip [n] leading [Prod]s off [t] and return what is
+    under them, or [None] if [t] does not have that many.  What comes back is
+    under [n] binders, so it is usable ONLY when it is closed -- which is why
+    the caller looks at it only to ask whether it is a [Sort]. *)
+Ltac2 rec codomain (n : int) (t : constr) : constr option :=
+  match Int.le n 0 with
+  | true => Some t
+  | false =>
+      match Constr.Unsafe.kind t with
+      | Constr.Unsafe.Cast t _ _ => codomain n t
+      | Constr.Unsafe.Prod _ body => codomain (Int.sub n 1) body
+      | _ => None
+      end
+  end.
+
+(** [is_prop k ty] — is [ty] a [Prop]?
+
+    FALSE MUST MEAN "NOT A PROP", NEVER "DID NOT WORK OUT": a false positive
+    clears a non-Prop, which is the silent evar corruption [keeps_for_lia]
+    exists to prevent.  A false NEGATIVE only keeps a hypothesis, so every
+    inconclusive path here falls back to the retyping.
+
+    The shortcut: if [ty] is [f a1..an] and [f]'s type is [forall x1..xn, s]
+    with [s] a SORT, then [s] is closed and no substitution can change it, so
+    [ty]'s sort is [s] exactly.  Anything else -- too few [Prod]s (a partial
+    application, whose sort is a [Type] anyway), a codomain that is not a
+    sort, a head that will not retype -- goes to [retype_is_prop]. *)
+Ltac2 is_prop (k : kit) (ty : constr) : bool :=
+  match Constr.Unsafe.kind ty with
+  | Constr.Unsafe.App f args =>
+      match Control.case (fun () => Constr.type f) with
+      | Val (tf, _) =>
+          match codomain (Array.length args) tf with
+          | Some s =>
+              match Constr.Unsafe.kind s with
+              | Constr.Unsafe.Sort _ => Constr.equal s (k.(hprop))
+              | _ => retype_is_prop k ty
+              end
+          | None => retype_is_prop k ty
+          end
+      | Err _ => retype_is_prop k ty
+      end
+  | _ => retype_is_prop k ty   (* atomic: the retyping is cheap anyway *)
+  end.
+
+Ltac2 keeps_for_lia (k : kit) (ty : constr) : bool :=
+  match Constr.equal ty (k.(hfalse)) with
   | true => true
   | false =>
-      match mentions_arith_aux ops conn nums 12 ty with
+      match mentions_arith_aux k 12 ty with
       | true => true
-      | false => Bool.neg (is_prop ty)
+      | false => Bool.neg (is_prop k ty)
       end
   end.
 
 (** [lia_shrink ()] — clear every hypothesis [zify] could not read.
 
     Unlike [set_shrink] this needs no relevance closure: the criterion is a
-    property of the hypothesis alone, so there is nothing to iterate.  What it
-    does still need is the live-variable set, so that the [clear] is
-    well-formed -- a dropped hypothesis must not be named by the goal, by a
-    surviving hypothesis's type, or by such a hypothesis's body. *)
+    property of the hypothesis alone, so there is nothing to iterate.
+
+    WHAT MAKES THE [clear] WELL-FORMED.  A dropped hypothesis must be named by
+    nothing that stays.  Only the GOAL is scanned for that here; a dependency
+    from a surviving HYPOTHESIS onto a dropped one -- which needs a
+    [Prop]-typed hypothesis to appear in another's type or body, so it is rare
+    -- is not looked for, and [SetShrink.clear_greedily] catches it instead by
+    bisecting on the failure Coq raises and keeping the halves that do go.
+    Scanning every kept type in Ltac2 to predict that answer cost more than
+    the whole rest of the filter; see §COST. *)
 Ltac2 lia_shrink () : unit :=
   let hyps := Control.hyps () in
   match Int.le (List.length hyps) 2 with
   | true => ()
   | false =>
-      let ops := arith_ops () in
-      let conn := logic_conn () in
-      let nums := num_types () in
-      let keep := { contents := [] } in
-      let live := { contents := [] } in
-      SetShrink.vars_of (Control.goal ()) live;
-      List.iter
-        (fun (id, body, ty) =>
-           match keeps_for_lia ops conn nums ty with
-           | true =>
-               keep.(contents) := id :: keep.(contents);
-               SetShrink.vars_of ty live;
-               match body with
-               | Some b => SetShrink.vars_of b live
-               | None => ()
-               end
-           | false => ()
-           end)
-        hyps;
+      let k := mk_kit () in
       let doomed :=
-        List.filter_out
-          (fun (id, _, _) =>
-             match List.mem Ident.equal id (keep.(contents)) with
-             | true => true
-             | false => List.mem Ident.equal id (live.(contents))
-             end)
-          hyps in
-      Control.once
-        (fun () => SetShrink.clear_greedily (List.map (fun (id,_,_) => id) doomed))
+        List.filter_out (fun (_, _, ty) => keeps_for_lia k ty) hyps in
+      match doomed with
+      | [] => ()          (* nothing to drop: do not even look at the goal *)
+      | _ :: _ =>
+          let live := { contents := [] } in
+          SetShrink.vars_of (Control.goal ()) live;
+          let names :=
+            List.filter_out
+              (fun (id, _, _) => List.mem Ident.equal id (live.(contents)))
+              doomed in
+          Control.once
+            (fun () =>
+               SetShrink.clear_greedily (List.map (fun (id,_,_) => id) names))
+      end
   end.
 
 (** [Control.enter] for the reason SetShrink records: [Control.hyps] demands
@@ -271,37 +427,35 @@ Ltac nia_slow := Lia.nia.
 Ltac lia_fast := lia_shrink; Lia.lia.
 Ltac nia_fast := lia_shrink; Lia.nia.
 
-(** THE FILTER IS TRIED SECOND, NOT FIRST, AND THAT ORDER IS THE WHOLE DESIGN.
+(** THE SECOND ARM IS LOAD-BEARING.  If the filter drops something [zify] could
+    have read, the first arm fails (or, per the header, hangs); the unfiltered
+    arm is what keeps this override from turning a provable goal into a failing
+    one.  Do not drop it to save a retry.
 
-    Nearly every [lia] in this tree is already cheap; the ~20k call sites are
-    dominated by one-hop goals that upstream closes in milliseconds.  The filter
-    is not free -- it walks every hypothesis's type and then [clear]s -- so
-    charging it to all of them to rescue the few hundred expensive ones is a
-    LOSING trade: measured over a clean tree-wide build, filtering every call
-    cost more than it saved (ΣCPU +0.7%, 100 files slower against 51 faster).
+    THERE IS NO TIMEOUT HERE, AND THERE MUST NOT BE.  The version this replaced
+    ran [first [ timeout 1 lia | lia_fast | lia_slow ]] so that a call upstream
+    closes in milliseconds never paid for the analysis.  Two things are wrong
+    with that.
 
-    So the unfiltered tactic runs first under a short timeout, and the filter
-    runs only for a call that has already proved itself slow.  A cheap call
-    never pays the analysis; an expensive one pays a bounded [lia_gate] second
-    before the filter takes over.  Same filter, same tree, only the order
-    changed: ΣCPU -1.6%, 82 files faster against 22 slower.
+    It is a WALL-CLOCK reading, so which arm proves a given goal depends on how
+    loaded the machine is: the same source can build here and fail there, and a
+    timing wobble moves a proof between arms with nothing in the source to
+    explain it.  The margin is not comfortable either -- five interleaved
+    compiles of ProofBmap.v under the gate ranged over 54.3-59.5 s, so calls
+    sitting near one second cross the gate or not depending on the run.
 
-    The gate cannot go below a second -- [timeout] counts whole seconds -- so a
-    call that trips it has already spent one before the filter starts.  That is
-    priced in above.
+    AND IT DID NOT PAY.  Over two cold full builds of iris/ (1533 files,
+    per-file min of the two, all arms sequential on one machine): upstream
+    9596 s, gated 9602 s (+0.06%), this ungated filter 9556 s (-0.41%).  The
+    gate loses on the arm-count alone -- a [lia] the tree EXPECTS to fail (a
+    [try lia], a [first [ lia | ... ]]) runs the decision procedure three times
+    under the gate and twice here.  Tree-wide it fired 1568 times, and 1565 of
+    those were such a failing call: it rescued three.
 
-    THE THIRD ARM IS LOAD-BEARING.  If the filter drops something [zify] could
-    have read, the second arm fails (or, per the header, hangs); the unbounded
-    unfiltered arm is what keeps this override from turning a provable goal into
-    a failing one.  Do not drop it to save a retry.
-
-    The gate is wall-clock, so which arm proves a given goal is not reproducible
-    across machines.  That is sound here -- every arm is the same decision
-    procedure and the result is a proof or a failure either way -- but it does
-    mean a timing regression can move between builds. *)
-Ltac lia_gate := timeout 1 Lia.lia.
-Ltac nia_gate := timeout 1 Lia.nia.
+    So the gate was hiding a ~60 ms filter, not buying anything.  The filter now
+    costs ~6 ms.  If it ever gets expensive again, make it cheap -- do not
+    reintroduce a clock. *)
 
 (** The drop-ins.  Shadow Lia's notations for every importer of this file. *)
-Tactic Notation "lia" := first [ lia_gate | lia_fast | lia_slow ].
-Tactic Notation "nia" := first [ nia_gate | nia_fast | nia_slow ].
+Tactic Notation "lia" := first [ lia_fast | lia_slow ].
+Tactic Notation "nia" := first [ nia_fast | nia_slow ].

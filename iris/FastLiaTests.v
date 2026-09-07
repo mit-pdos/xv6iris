@@ -12,6 +12,10 @@ Section Probe.
   Variable P : T -> Prop.
   Variables x y z : T.
   Variable U : Type.
+  (* a data family and a function indexed by a proof, for the two
+     dependent-survivor probes below *)
+  Variable R : P x -> Type.
+  Variable f : P x -> Z.
 
   (* Every lemma below uses lia_fast, i.e. THE FALLBACK IS DELETED: if the
      filter drops something needed, these fail rather than silently pass. *)
@@ -82,6 +86,25 @@ Section Probe.
     Fail lazymatch goal with _ : P x |- _ => idtac end.
     lia_slow.
   Qed.
+
+  (* THE [clear] MUST STAY WELL-FORMED WITHOUT A PER-HYPOTHESIS LIVE SCAN.
+     [lia_shrink] scans only the GOAL for names it must not drop; a SURVIVING
+     hypothesis whose type names a dropped one is not predicted, it is left to
+     [SetShrink.clear_greedily] to discover from the failure Coq raises and to
+     bisect around.  Here [Hnoise : P x] is a non-arithmetic Prop, so it is
+     doomed -- but [r : R Hnoise] is not a Prop, so it stays and still names it.
+     A [clear] that took the whole doomed list at once fails; what must happen
+     is that the rest still goes and the solve still closes. *)
+  Lemma probe_dependent_survivor (a b : Z) (Hnoise : P x) (r : R Hnoise)
+    (Ha : a = b + 1) (Hb : 0 <= b) : 0 <= a.
+  Proof. lia_fast. Qed.
+
+  (* ... and the same shape where the survivor is an ARITHMETIC Prop, so the
+     bisection runs with the hypothesis [lia] actually needs on the far side
+     of the failing [clear]. *)
+  Lemma probe_dependent_arith (a : Z) (Hnoise : P x) (Hb : 0 <= f Hnoise)
+    (Ha : a = f Hnoise) : 0 <= a.
+  Proof. lia_fast. Qed.
 
   (* a hypothesis under a binder.  lia does not instantiate a universally
      quantified hypothesis, so NEITHER arm proves this -- the check is that
