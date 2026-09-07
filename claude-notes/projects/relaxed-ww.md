@@ -14,12 +14,13 @@ publication leaf `rel_step`, `HartPilot`); the ownership-law files
 `MemClaim`, `WpLock` §2.4 with the hook as a fence-leaf callback and
 `lk_floor` over `key_at`, `StartedInv`, `VirtioProto`, `WpUart` with the
 AMO-shaped gate `TsoCtxStore.ledger_store_amo_ok`).  Done too: the two-log
-kernel-slot credential (§2.11: the fence record keyed by hart with its
-flush clause, `kpt_dbound`, `kpt_anchor`/`kpt_pub`, `KptPublish` as the
-boot route alone).  IN FLIGHT: build13 (the whole tree, `-k`) and the
-sweep above these (`WpSconfLock`, `KptShare`, `HartSKpt`, the box
-instances, `StartedInv`'s drain floor, `ProofMain*`, `RiscvAdequacy`'s era
-record); every racy-tier statement is
+kernel-slot credential (§2.11), the S-mode nodes and the kernel-table
+walker, the box tiers' fence-bound deposits, `SmodeCorePt`; §2.13 is the
+CHECKPOINT of the design as landed and the open frontier (build18's
+failing files, the uncommitted edits, the questions for review).
+IN FLIGHT: the sweep above these (the box instances in the code proofs,
+`StartedInv`'s drain floor, `ProofMain*`, the U-mode fence leaf,
+`RiscvAdequacy`); every racy-tier statement is
 restated over two logs and `Admitted` with `relaxed-ww STAGE E` (list
 below).  Two rulings (C) remain the owner's, and the ~13 `initlock` callers
 of the now fence-bound `newlock*` are blocked on them.**  The companion of
@@ -655,6 +656,159 @@ box's own (existential) context; `bio_init`, `buf_box_alloc`,
 the `SleepLockAt` births are fence-bound; `RiscvAdequacy`'s power arm
 allocates the drain log's mirrors, the chained set and the drain-bound
 one-shot and builds the two-log interp at the reset machine.
+
+### 2.13 Stage D checkpoint (2026-09-06, late): the design as it landed, and the open frontier
+
+This section is the record to review stage D against.  Everything above
+it is design; this is what the code now says, where it stops, and what
+the reviewer should push on.
+
+**The machine (unchanged since §1).**  Two logs: the ISSUE log `glog`
+(every store, in issue order, per-hart pending until drained) and the
+DRAIN log `gdlog` (a list of issue indices, the order stores reach
+memory).  A hart's view `gtv h` is a DRAIN position.  `dmem img log dl`
+is the drain flat; `gmem` stays the issue flat (what `pointsto` tracks).
+Per-hart FIFO holds only for OVERLAPPING stores (`fifo_ok`): that is PSO's
+W→W half, and it is why nothing below may argue "my earlier store drained
+before my later one" without a fence.  A `fence_rel` barrier (any kind
+with a W predecessor, plus `fence.i` and `fence.tso`) is blocked until
+`own_drained h log dl`; a `fence_drains` barrier moves the view to
+`fence_post` (`max tv (own_pub h log dl) rv`).  The exclusive read reads
+`dmem` and needs `¬own_fp_pending` on its footprint; the conditional write
+appends to BOTH logs.
+
+**Principle 1 -- every racy fact names its drain witness.**  A stamp `t`
+(issue index + 1) is never compared with a view.  What crosses harts is
+`dpos_ev dpos_name t p` ("t drained at a position < p") beside a
+`view_lb view_name dlen_name h p` receipt, or ownership (`ledger_msg_at i
+m ∗ pm_tid m = h`: store forwarding).  `TsoCtx.key_at ξ (t, a) := (∃ p,
+dpos_ev t p ∗ ctx_floor ξ p) ∨ ctx_wrote ξ t a` is the ctx tier's per-fact
+justification; `chain_ev chain_name t` (§2.10) puts every earlier write
+to the byte below `t` in the drain order.  Floors: `lk_floor ξ lo := ∃ a,
+key_at ξ (lo, a)` (WpLock); `IcacheRef.cred_floor lo tl := lk_floor
+cur_ctx lo` (the `tl` half is vestigial, kept for arity).
+
+**Principle 2 -- births and deposits are fence-bound.**  A lock's birth
+(`newlock*`, `new_sleeplock*`, `newlock_at*`), a box deposit/park/alloc
+(`CtxBox`), the started deposit, the bcache/icache boot folds (`bio_init`,
+`bio_init_at`, `ic_box_alloc_at`), the bread recycle's (b) deposit
+(`ProofBreadParts.bcache_scan2_recycle`'s closing wand) and the icache
+escrow's deposits/parks (`ic_recycle_deposit`, `ic_park*`, `ic_guard_
+deposit*`, `ic_evict_deposit`) all take `(g : gstate)`, `own_drained
+(hart_agent cpu_id) g.(glog) g.(gdlog)` and `tso_interp_at riscv_eraGS g`,
+and return the interp.  Their SITE is the release fence's leaf:
+`HartBarrier.rel_step` (a fupd at ⊤ with the interp and `own_drained`),
+which `WpSconfFencePub` lifts; a lock's own hook is `WpLock.lock_ctx_hook
+E R Rin` (E is the finisher's mask, `⊤ ∖ ↑minstretN` at the sconf
+release).  The code proofs (ProofBread, ProofIget, ProofIput, ...) that
+used to deposit at a store node must move the deposit into the enclosing
+lock's release hook -- that is the open plumbing (below).
+
+**Principle 3 -- the free tier is ξ-indexed** (§2.10): `mem_free ξ a dq :=
+∃ v, ctx_pointsto ξ a dq v`, `phys_free ξ …`, `wordw_free ξ w a`.  A free
+byte is a ctx byte with its value closed, so the free STORE is the
+registered store after naming the bytes (`SmodeCorePt.phys_free_win_word`
+-- no free gate).  memset/kalloc use `cur_ctx`; a box's free bytes come
+out at the box's own (existential) context (`OffBox.off_last_close`);
+`FileInvDefs.off_free` (the fd's free `f->off` word, fractional) is NOT
+yet re-indexed -- its join must pick one side's key (dropping the other's
+persistent key is sound) and needs a `ctx_pointsto` join law across ξ.
+
+**Principle 4 -- pins are floor-based.**  `phys_ledger_pin a dq v t B Sv`:
+`t` the current stamp, `B` the publication FLOOR (the stamp the family was
+pinned at; A/D write-backs restamp `t` and keep `B`).  Reads are
+`CtxValues.cv_key_read` (floor drained under the reader's view, floor's
+chain) and `cv_own_read` (the floor is the reader's own message) -- both
+stage E; `ledger_read_pin_ok` (view receipt at the pin's bound) has one
+consumer left (`TsoCtxLedger`'s pinw word gate) and goes with it.  The
+A/D write-back's exclusive re-read is at the DRAIN flat:
+`cv_slot_dmem_ok` (stage E) -- the reader's `¬own_fp_pending` makes its
+own anchors drained, so every anchor is under its view and the flat's
+byte is in the family.
+
+**Principle 5 -- the fence record certifies the boot hart's stores**
+(§2.11).  `fr_ok log dl FR`: `(h, N) ↦ M` says (i) every message with
+index ≥ N drains above M, (ii) every message OF h below N drained at or
+under M.  Minted at a release fence (`TsoCtx.fr_mint`, total: a second
+fence at the same issue length reuses the entry), re-established at every
+append (`fr_ok_app_log`) and drain (`fr_ok_drain`).  The kernel table's
+rows are `∃ Ba t, ⌜Ba ≤ B⌝ ∗ pin … t Ba ∗ chain_ev Ba ∗ kpt_anchor a Ba`
+with anchors {image floor, `cv_own 0 a Ba`, `∃ Bd, kpt_dbound Bd ∗
+dpos_ev Ba Bd`}; `kpt_dbound` is a one-shot agreement (`era_kptd_name`)
+shot at the boot publisher's view receipt; `cv_boot_cred B` is hart 0's
+view receipt at `Bd` or a secondary's `kpt_pub B` (view receipt V, `fr_at
+0 L M` with `B ≤ L`, a message `s ≥ L` drained under V, `Bd ≤ V`).  What
+the boot chain still owes: `kptd_unset` threaded from `BootShared` to
+`ProofMain`; hart 0 minting `fr_at` at the started fence and depositing it
+with `⌜B ≤ L⌝`/`⌜Bd ≤ D⌝` in the started payload; `StartedInv.started_W`
+recording the flag store's drain floor; `ProofMainSecondary` assembling
+`kpt_pub`.
+
+**Principle 6 -- fences are leaves at every privilege.**  `goodb`/`goodmb`/
+`hfrun`/`hval`-style walkers refuse `fence_rel` barriers (`DecodeSetU.
+goodbP`, `PtWalkCert`, `UserTotalU.goodb_agree_congr`, `goodbP_goodb`).
+S-mode: `WpSconfEngine.swp_barrier_ret` is to go through the silent
+ghost-step leaf `HartBarrier.swp_hart_barrier_gs` (serves every kind; a
+release kind self-loops until drained) -- EDIT NOT YET APPLIED.  U-mode:
+the totality's third arm (§2.12) and the stage-E leaf
+`UserActiveClass.swp_execute_fence_u`.
+
+**Landed (committed) since the night STATUS:** the fence-record redesign
+(`TsoMemPa`, `RiscvPtsto`, `RiscvExec`, `TsoCtx`, the store gates in
+`TsoCtxStore`/`TsoCtxLedger`); `CtxValues` (`kpt_dbound`, `kpt_anchor`,
+`kpt_pub`, `cv_anchor_read`, `cv_slot_read_ok`, `cv_slot_dmem_ok`);
+`PtTree` rows; `KptPublish` (boot route only, threading the opened token
+`ctx_tok`); `KptShare`; `HartSKpt` (two-log path obligations, the leaf
+seam at the drain flat, the flat-cache node family deleted); `HartSMem`
+(all node shapes; the AMO chain reads the drain flat); `SmodeCorePt`
+(`wordw_win_store_core`, the free window, the total any-word fetch);
+`InstrBytes`, `PtTreeAdue`, `DecodeSetU`, `PtWalkCert`, `WpMmodeLoad`,
+`WpMmodeStore`, `SleepLockAt`, `IcacheRef`, `PipeInvDefs`, `BioInv`,
+`OffBox`; `UserExecFacts` minus the false fence certificates.
+
+**Edited, UNCOMMITTED, not yet compiled together** (the working tree at
+this checkpoint): `BioInitAt` (fence-bound boot), `IcacheHeld`
+(`lk_floor_morph`), `IcacheInv` (`iref_pin_rows` over `dpos_ev ∗
+chain_ev`), `IcachePinwObl`, `IcacheEscrow` (only the `dlen_name` sed;
+the fence-bound port of its seven deposit/park lemmas was drafted and
+not applied), `ProofBread`/`ProofBreadParts`/`SpecAcquire`/
+`ProofMainSecondary` (`dlen_name`; the recycle's closing wand
+fence-bound), `Pt2WalkPt`, `RiscvAdequacy` (era record + two-log interp
+at the reset machine; `GState` arity), `SpecMemset*`/`WpMemsetArray`/
+`WpSconfMem` (free tier at `cur_ctx`; the `dl` spelling), `SpecRelease`
+(hook mask), `UmodeFetchX`, `UmodeText`, `UserretPt`, `WpSmodePtLeaves`,
+`WpSconfEngine` (only the comment; see Principle 6), the U-mode files
+(`UserClassifyAsm`, `UserActiveClass`, `UserMemTotal`, `UserTotalU`).
+build18 (`-k`) reported these as the frontier: `IcacheEscrow`,
+`IcachePinwObl`, `Pt2WalkPt`, `RiscvAdequacy`, `UmodeFetchX`,
+`UserTotalU`, `UserretPt`, `WpMemsetArray`, `WpSconfEngine`, `WpSconfMem`,
+`WpSmodePtLeaves` -- most already re-edited, none re-verified.
+
+**Stage E debt added this pass:** `CtxValues.cv_key_read` (restated on
+the floor), `cv_own_read` (author arm at the floor), `cv_slot_dmem_ok`,
+`UserActiveClass.swp_execute_fence_u`; the U-mode fetch/AMO/fence leaves'
+fine print; `IcachePinwObl.iref_read_obl`'s pinw read over `ledger_read_
+pinw_vis`.
+
+**Questions for the reviewer (what I am least sure of):**
+1. `fr_ok`'s flush clause keyed by hart with the "reuse the older entry"
+   mint: is the weaker record ever a problem for a SECOND consumer (a lock
+   release that fences twice at the same issue length)?
+2. `cv_slot_dmem_ok`: is `¬own_fp_pending` on the 8-byte footprint enough
+   to make the BOOT hart's own anchors drained, given PSO drains
+   non-overlapping own stores in any order (the anchor's message overlaps
+   the slot byte -- so `fifo_ok` applies to it, I believe)?
+3. `kpt_pub` as stated needs `B ≤ L` with `L` the issue length at hart 0's
+   started fence and `s ≥ L` for the flag store: both are pure facts at
+   the fence/store and travel in the started payload -- is the payload
+   the right vehicle, or should `StartedInv.started_W` carry them?
+4. `off_free`'s cross-ξ join and `off_last_close`'s `∃ ξb`: acceptable, or
+   should the fd's free word be pinned to ONE context?
+5. Fence-bound deposits inside code proofs: the plan is to move each
+   deposit into the enclosing lock's release hook; the reviewer should
+   check `ProofBreadParts.bcache_scan2_recycle`'s new closing wand is the
+   right seam for `bget` (the deposit happens under `bcache.lock`, whose
+   release is the fence).
 
 ## 3. Stages
 
