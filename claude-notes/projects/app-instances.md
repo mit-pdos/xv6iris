@@ -430,3 +430,15 @@ Rounds, each a green gate:
   carry only the upper bound.  Prerequisite lane E2-L0 (briefs file) threads
   `0 < inum` through `inode_held` and iget's premise (discharged at namex's
   root, dirlookup's `dir_live`, ialloc's post).  E2-C is unaffected.
+- **E2-L0 LANDED 2026-09-07** (38 files): `inode_held` and its views carry
+  `⌜0 < bv_unsigned inum⌝` after the upper bound; `wp_iget_sconf` takes it as a
+  premise; discharged at the root, dirlookup's found arm
+  (`ProofDirlookupParts.dlk_live_pos`), ialloc/ireclaim, open's create arm.
+  E2-L is unblocked.  Record atop its brief in the briefs file.
+- **E2-C LANDED 2026-09-07** (31 files + new FsAbsCreateFire.v): create's
+  four legs are fires from a four-commit bundle (`cre_commits`: arm at
+  `cre_c0 ty`, dots indexed by whether `..` landed, unarm, the parent leg at
+  `cre_child` with the content a function of (parent, child)); `wp_create_sconf`
+  and `wp_sys_mkdir_sconf` strengthened in place, the AU twins carry the arm
+  receipt and the fail-side child pair; every `top_move` argument is gone from
+  ProofCreate*.  Record in app-round-e2.md "E2-C AS BUILT".

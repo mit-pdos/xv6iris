@@ -1,40 +1,28 @@
 # Round E2 — design proposal (2026-09-05): AU forms for create's legs, link, mkdir, iput's free, write; the view; the rulings needed
 
-> **RESUME HERE (checkpoint 2026-09-05, end of the session that built rounds A–E1 and E2-V).**
+> **RESUME HERE (checkpoint 2026-09-07, after lane E2-C landed).**
 > Design of record: `design/applications.md` (as built).  Rounds record: `app-instances.md` §7.
 > This file: the E2 proposal + every ruling (status block below; all nine questions are RULED,
 > Q-b reversed: nlink-0 inodes LEAVE the view).  Briefs and the VM build script:
 > `app-round-e2-briefs.md`; E1's census: `app-round-e1-census.md`.
 >
-> STATE OF THE TREE: origin/main is green through lane E2-V2 (the view is the live namespace:
-> `abs_of` is `None` at type 0 OR nlink 0; the read/write/open/trunc/miss observations state their
-> row on the count, `FsAbsDefs.arow_at`; `delta_unl_tgt` deletes at 0).  Its as-built record is the
-> "E2-V2 AS BUILT" section right below this block and app-instances.md §7.  LANE E2-D HAS ALSO
-> LANDED (FsAbsDelta.v §1b/§4b: `delta_arm`/`delta_unarm`/`delta_dots`/`delta_ent` +
-> `delta_create_split`; `delta_link_tgt t a`/`delta_link_ent`/`delta_link_untgt := delta_unl_tgt`/
-> `delta_link` + `delta_link_split`/`delta_link_untgt_tgt`; `fs_delta` gained six disjuncts; see
-> "E2-D AS BUILT" below — ONE deviation: `delta_link_tgt` takes the observed row because sys_link has
-> no nlink-0 guard on its target, so E2-L's target fire must state `arow_at`).  NEXT LANES: E2-C
-> (create's legs as fires; §2(b), §3, §5 below — §8's claim is E2-Z's `_same` under the live view) and
-> E2-L (link in place; §4 below) — BOTH BRIEFS ARE WRITTEN in the briefs file (roundE2L-brief.md,
-> roundE2C-brief.md), with the site list, the commit shapes, the fire molds and the gates.  E2-L IS
-> BLOCKED: its parent-leg fire needs the target's inum nonzero (`dir_entries_dirlink_ins`; a zero
-> inum is a free dirent) and no contract on namei's path carries it (`inode_held`/`SpecIget` have
-> only the upper bound) — the prerequisite lane E2-L0 ("held inums are positive", brief in the
-> briefs file) adds `0 < inum` to `inode_held` and iget's premise.  **E2-L0 LANDED 2026-09-07
-> (commit 263098976; as-built record at the top of its brief in the briefs file), so E2-L is
-> UNBLOCKED.**  E2-C was launched the same day, in THIS checkout (lanes run one at a time in the
-> session's own directory — owner's rule of 2026-09-07; the build script takes the tree as its first
-> argument; log name `rE2C`; its first pass created `FsAbsCreateFire.v` and touched FsAbsDelta, FsAbsMknodFire, SpecCreate, SpecSysMknodAU and the ProofCreate* files — if the tree is dirty with those, E2-C did not finish: build with the script and continue against its brief, or `git checkout -- iris && git clean -f iris/FsAbsCreateFire.v` and redo).  On resume: `git status` — a clean tree means the last lane landed (check
-> `git log`); modified iris files are the next lane's partial work: run the build script (log name =
-> the lane) and finish to green against its brief, or `git checkout -- iris` and redo from the brief.
+> STATE OF THE TREE: origin/main is green through lane E2-C.  Landed in order: E2-V2 (the view is
+> the live namespace; "E2-V2 AS BUILT" below), E2-D (the delta vocabulary; "E2-D AS BUILT"), E2-L0
+> (held inums are positive; as-built record atop its brief in the briefs file), E2-C (create's
+> legs as fires; "E2-C AS BUILT" below).  NEXT LANE: E2-L (link in place; §4 below; brief
+> `roundE2L-brief.md` in the briefs file, UNBLOCKED by E2-L0; launch brief for a subagent at the
+> session scratchpad or rewrite it from the brief).  Lanes run ONE AT A TIME in the session's own
+> checkout (owner's rule of 2026-09-07); the build script takes the tree as its first argument and
+> a log name (`rE2L` next).  On resume: `git status` — a clean tree means the last lane landed
+> (check `git log`); modified iris files are the next lane's partial work: run the build script
+> (log name = the lane) and finish to green against its brief, or `git checkout -- iris` and redo
+> from the brief.
 >
-> ORDER AFTER E2-V2 (each a green gate, then audit/commit/push): E2-D (LANDED) → E2-C (create's legs: arm/
-> unarm/dots/ent as fires from the contract bundle; §2(b), §3, §5, §8 below) and E2-L (link in
-> place: three fires; §4) in parallel → E2-W (write: dispatch the AU write for inode fds, raw step
-> premise on the non-AU write, the short-chunk arm's state fire — Q-i: "a bug in the sys_write
-> spec, fix it; the spec may be non-deterministic"; §7) → E2-X (delete the dead non-AU unlink walk,
-> non-AU mknod, `so_stores`; Q-f; §1) → E2-Z (ProofIlock's claim and EscrowDeposit's free become
+> ORDER AFTER E2-C (each a green gate, then audit/commit/push): E2-L (link in place: three fires;
+> §4) → E2-W (write: dispatch the AU write for inode fds, raw step premise on the non-AU write, the
+> short-chunk arm's state fire — Q-i: "a bug in the sys_write spec, fix it; the spec may be
+> non-deterministic"; §7) → E2-X (delete the dead non-AU unlink walk, non-AU mknod, non-AU open's
+> create arm, `so_stores`; Q-f; §1) → E2-Z (ProofIlock's claim and EscrowDeposit's free become
 > `_same` since the row is absent on both sides; delete `top_move`, `ireg_top_retag_auto`,
 > `_armed_auto`, `app_top_update_auto`; `app_auto`/`Happ_auto` STAY — L2 deletes them).  E2-F
 > (threading a free obligation to iput) is CANCELLED by the nlink-0 ruling.
@@ -195,6 +183,80 @@ Three measured facts that shape everything below:
   until L2 gives it a per-ecall one.  E2 can delete `top_move`, `ireg_top_retag_auto`,
   `_armed_auto` and `app_top_update_auto`; it CANNOT delete `app_auto`/`Happ_auto` without L2.
   applications.md §2/§6 L3 say "then … `Happ_auto` are deleted" — that clause belongs to L2.
+
+## E2-C AS BUILT (landed 2026-09-07; 31 iris files + _CoqProject; green, 13 axioms, both audited statements untouched)
+
+- NEW `FsAbsCreateFire.v` (below SpecCreate, re-exported by FsAbsMknodFire so every old name
+  resolves): the create family's authority-shaped commits moved here from FsAbsMknodFire —
+  `dlookup_commit_at`; `acre_commit_at_gen Γ E cf Φ` (the parent leg with the child's content a
+  FUNCTION `cf : Z -> Z -> absnode` of (parent, child) — a directory's dots name both inums);
+  `acre_commit_at c := _gen (fun _ _ => c)` (the constant instance the two AU twins carry);
+  `aarm_commit_at c` (premises `abs_view I !! i = None` AND `is_Some (I !! i)`: the view has no row
+  but the map does, which is what lets the `_unit` pay with `app_step_acc`; step `delta_arm i c`);
+  `adots_commit_at` (row `ADir ∅` at count 1; step `dots_delta full i d`, `full : bool` quantified
+  inside and reported in Φ); `aunarm_commit_at` (row `MkAnode c 1` with `c` quantified inside; step
+  `delta_unarm i`).  Receipts `cre_arm_fired`, `cre_dots_fired`, `cre_unarm_fired`,
+  `cre_acre_fired`; the child pair `cre_child_unfired Γ c Φarm Φun` / `cre_child_pair Φarm Φun i`;
+  `_unit` and `_pinned` seeds for every commit.  Engines `caf_armed_retag`/`caf_retag` (one ftopN
+  critical section with the caller's two phases around the `ghost_map_update`); fires
+  `caf_arm_fire`, `caf_dots_fire`, `caf_unarm_fire_armed` (under the armed registry) and
+  `caf_unarm_fire` (plain fragment, owes `inode_local`).  Pure: `cre_c0 tyz ma mi` (what the arm
+  writes), `cre_child tyz ma mi d i` (what the parent leg reads: a dir child has its dots),
+  `caf_era_type/_nlink/_none_nl0/_row_nl1/_dir_row`.
+- `FsAbsMknodFire.caf_acre_fire` generalized to `cf` with NO content side condition (`d <> i` is
+  derived from the two fragments' disjointness, `ghost_map_elem_ne`); parent post row
+  `fn_nlink np + acre_bump (cf d i)`; collapse `FsAbsDelta.delta_create_armed`;
+  `caf_acre_fire_file` stays as its wrapper; `caf_made_row(_node)` (`create_made` at any nonzero
+  type reads as `cre_c0`).
+- `FsAbsDelta.v`: `cre_pre`/`cre_pre_ne`/`delta_create_dev` moved here from SpecSysMknodAU (which
+  re-exports it); `delta_create_armed`; `delta_dot` (the first dot alone: mkdir's `".."` can fall
+  short after `"."` landed), `dots_ents full i d`, `dots_delta full i d`, `dots_delta_fresh`;
+  `fs_delta` gained a `delta_dot` disjunct.
+- CONTRACTS.  `SpecCreate.wp_create_sconf` (Q-c, strengthened in place): four Φs and the premise
+  `cre_commits Γfs tyz ma mi Φarm Φdots Φun Φok` (= arm at `cre_c0` ∗ dots ∗ unarm ∗ parent leg at
+  `cre_child`); OK arm `cre_ok_arms … made inum` (`made` ⇒ ∃ d nm, arm fired ∗ (dots fired `true` ∨
+  dots commit back) ∗ parent leg fired ∗ unarm back; else the whole bundle back); FAIL arm
+  `cre_fail_arms` (bundle back ∨ ∃ i d, arm fired ∗ ((∃ full, dots fired) ∨ dots back) ∗ unarm
+  fired ∗ parent leg back — ruling Q-h's do-then-undo pair); `cre_commits_unit` (lives in
+  SpecCreate: three of its consumers sit below FsAbsInvFire).  `SpecSysMkdir.wp_sys_mkdir_sconf`
+  (Q-c): four Φs + `cre_commits` at `T_DIR/0/0`; post gains `mkdir_arms … (mf !!! a0)` =
+  `(⌜r = 0⌝ ∗ ∃ i, cre_ok_arms … true i) ∨ (⌜r = -1⌝ ∗ cre_fail_arms …)` as the last conjunct.
+  `SpecCreateAU.cau_ok` / `SpecCreateAUF.cauf_ok` gain `cre_arm_fired Φarm i ∗ aunarm_commit_at
+  Φun` beside `cre_pre` (the `¬made` arm: `cre_child_unfired`); `cau_fail`/`cauf_fail`: the
+  walk-dead disjunct returns `cre_child_unfired`, the second disjunct carries ONE conjunct
+  `(cre_child_unfired ∨ ∃ i, cre_child_pair Φarm Φun i)` (not split arm-by-arm against the
+  Φex disjunction — honest, one bit weaker; a purely local strengthening later if wanted); the
+  bodies/module types gain `Φarm Φun` and the premise `cre_child_unfired Γfs c Φarm Φun`.
+  `SpecSysMknodAUEra` (`mknod_au_pre_era` + the arms/stable corollaries) and `SpecSysOpenAU`
+  (`open_au_pre_create`, `open_post_ok_create` FRESH/EXISTS, `open_post_fail_create` (a)/(b)/(c),
+  `open_arms_create(_landed)`, `SYSOPEN_AU`) thread `Φarm Φun` the same way; the stable/open-side
+  residues carry the child receipts unenriched (they name an inum, not a walk run).
+  `FsAbsInvFire`: `fsabs_child` (the child units); `fsabs_mknod_pre_era`/`fsabs_open_pre_create`
+  gain them.  Dispatcher (ProofSyscall): mkdir arm passes `True` families + `cre_commits_unit`;
+  mknod/open-create arms pass two more `True` families; shapes otherwise unchanged.
+- SITES (final lines): #7 ProofCreateAlloc.v:1329 and #14 ProofCreateMkdir.v:2253 — the one
+  `caf_acre_fire` (non-dir `acre_bump 0`; dir `cre_child T_DIR = ADir (dots_ents true i d)`, bump 1);
+  #8 Alloc:477 → `ProofCreateShared.cr_dirty_arm` (arm at `cre_c0`, pre `caf_era_none_nl0`, post
+  `caf_made_row`); #9 Mkdir:2661 and #10 Mkdir:2829 → `cr_dirty_dots` at `full = true` / `false`
+  (DEVIATION from the brief, which filed them under the unarm: these retags are the child's DOTS
+  write; the unarm for all three mkdir `fail:` entries is the single site #13b); #13 Mkdir:2191 →
+  `cr_dirty_clear_dots … true` (fire, disarm, release); #13b ProofCreateFailMkdir.v:514 →
+  `cr_dirty_clear_unarm`; Mkdir:2982 (no dot landed) stays `cr_dirty_retag_same`; #16
+  ProofCreateFail.v:501, #21 ProofCreateAU.v:6697, #26 ProofCreateAUF.v:6970 → `caf_unarm_fire`;
+  #18 AU:4922 / #23 AUF:5200 → their own `cr_dirty_arm` at `ADev ma mi` / `AFile []`.  Every
+  `Logic.I` (`top_move`) argument is gone from ProofCreate*; `ireg_top_retag_auto`/`_armed_auto`/
+  `top_move` still exist for #1/#2/#3/#5/#6 and the link/unlink sites (E2-L/E2-W/E2-X/E2-Z).
+- The two DEAD non-AU callers (ProofSysMknod.v:1654, ProofSysOpen.v ~2782) and the friendly
+  wrapper `FsSyscalls.FsSysMkdir` take the trivial families and `cre_commits_unit` off
+  `ireg_inv_app` and drop the receipts; `wp_sys_mknod_sconf`/`wp_sys_open_sconf` NOT strengthened
+  (E2-X deletes them).
+- Files (31 + _CoqProject): FsAbsCreateFire (new), FsAbsDelta, FsAbsMknodFire, FsAbsInvFire,
+  SpecCreate, SpecCreateAU, SpecCreateAUF, SpecCreateAUFOpen, SpecSysMkdir, SpecSysMknodAU,
+  SpecSysMknodAUEra, SpecSysOpenAU, ProofCreate, ProofCreateShared, ProofCreateFound,
+  ProofCreateAlloc, ProofCreateMkdir, ProofCreateFail, ProofCreateFailMkdir, ProofCreateAU,
+  ProofCreateAUF, ProofSysMkdir, ProofSysMknod, ProofSysMknodAU, ProofSysMknodAUEraStable,
+  ProofSysOpen, ProofSysOpenAUCreArm, ProofSysOpenAUEntryC, ProofSysOpenAUFull, ProofSyscall,
+  FsSyscalls.
 
 ## 1. The 22 sites: view change, dispatcher arm, twin, liveness
 

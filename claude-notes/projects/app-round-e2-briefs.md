@@ -251,7 +251,7 @@ SpecNamex/SpecNamei/SpecNameiparent/IgetLic mention `inode_held` 24 times.
 Mechanical; batch the edits (the IcacheHeld cone is most of the syscall proofs).  Gate: green,
 audit 13, both audited statements byte-identical, no Admitted/Axiom.  Do not commit.
 
-## roundE2C-brief.md — NEXT, in parallel with E2-L (written 2026-09-05)
+## roundE2C-brief.md — LANDED 2026-09-07 (as-built record: app-round-e2.md "E2-C AS BUILT"; deviations: sites #9/#10 fire the DOTS leg, the unarm is #13b alone; `acre_commit_at_gen` takes the content as a function of (parent, child); the dots commit is indexed by whether the `..` landed; `cre_commits_unit` lives in SpecCreate).  NEXT: E2-L.
 
 ## Lane E2-C: create's legs as fires — arm / dots / ent / unarm from the contract bundle
 
