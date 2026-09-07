@@ -28,9 +28,10 @@
 From Stdlib Require Import List ZArith Lia.
 From stdpp Require Import base list gmap functions relations bitvector.definitions.
 Import ListNotations.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvExec VirtioModel DevModel ColdBoot.
 Require Import RiscvLang TsoMemPa.
-From VTest Require Import VTest.
+From VTest Require Import VTest VRun.
 Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
@@ -647,4 +648,210 @@ Proof.
   destruct (hstep_nsteps gen cpu t1 t2 (m, g) (Interface.Ret x, g') Hrtc)
     as [n Hn]; cbn [fst snd] in Hn.
   exists n, g'. split; [exact Hn|]. split; assumption.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 10. THE TEST'S OWN STARTING POINT.                                      *)
+(*                                                                         *)
+(*     [VRun.test_gstate] is the machine the theorem starts from and       *)
+(*     [VRun.test_start] is the one the harness computes from; the         *)
+(*     invariant holds between them at HART 0, which is the primary.  The  *)
+(*     hart the PROGRAM sees is [hart] either way -- the gstate gives hart *)
+(*     index [c] the id [hart + c], and the harness's single hart is       *)
+(*     index 0 -- so this is where "the model must be started on the SAME  *)
+(*     hart" becomes a proof obligation rather than a comment.             *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma others_resv_none (cpu : CPU) : others_resv (fun _ => None) cpu = ∅.
+Proof.
+  unfold others_resv.
+  assert (H : forall c : CPU,
+            (if decide (c = cpu) then ∅ else resv_dom (fun _ => None) c)
+            = (∅ : gset Arch.pa)).
+  { intros c. unfold resv_dom. destruct (decide (c = cpu)); reflexivity. }
+  induction (finite.enum CPU) as [|c cs IH]; [reflexivity|].
+  rewrite fmap_cons. rewrite union_list_cons. rewrite H. rewrite IH.
+  set_solver.
+Qed.
+
+(* the PRIMARY: index 0 of the pool, whose mhartid is the test's [hart] *)
+Definition hart_primary : CPU := 0%fin.
+
+(* The [mstate] the interpreter starts a test from.  [VTest.start_hart_with]
+   is this with a BLANK disk; a test that seeds sectors needs the device
+   fabric built from them, which nothing could express before. *)
+Definition exec_start (hart : Z) (text : list Z) (rs : list region)
+    (disk_init : list (Z * list Z)) : mstate :=
+  MState (ColdBoot.cold_regs (SailStdpp.Values.mword_of_int hart))
+         (mem_of text rs) (dev_of (img_of_sectors disk_init)).
+
+Lemma hart_ok_test_start (hart : Z) (text : list Z) (rs : list region)
+    (disk_init : list (Z * list Z)) :
+  hart_ok hart_primary (test_gstate hart text rs disk_init)
+                       (exec_start hart text rs disk_init).
+Proof.
+  unfold test_gstate, exec_start, hart_primary. constructor;
+    cbn [gregs gmem gdev gimg glog gtv gitv ghr gresv sregs mem mdev].
+  - (* the primary is index 0, and [hart + 0] is [hart] *)
+    rewrite Z.add_0_r. reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - (* the flat cache of an empty log is the image *)
+    reflexivity.
+  - apply others_resv_none.
+  - apply Nat.le_refl.
+  - apply Nat.le_refl.
+  - cbn [hr_rv]. apply Nat.le_refl.
+  - intros a. cbn [hr_coh]. apply Nat.le_refl.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 11. THE DEVICES.  A SCHEDULE ITEM IS A DEVICE LOOP'S [prim_step].       *)
+(*                                                                         *)
+(*     The harness drives the fabric with [VSched.sapply], one [sitem] at  *)
+(*     a time, through the fine-grained functions ([uart_tx_pop],          *)
+(*     [plic_latch], ...).  The language drives it with the aggregate      *)
+(*     RELATIONS ([uart_step], [disk_step], [plic_step]) at three device   *)
+(*     threads.  Each item is one arm of one relation -- and this is where *)
+(*     the OBSERVATIONS enter, since the UART's transmit and receive arms  *)
+(*     are the only steps in the machine that emit any.                    *)
+(*                                                                         *)
+(*     A UART item moves [gdev] and nothing else, so the hart's invariant  *)
+(*     rides through untouched: same registers, same memory, same log.     *)
+(* ---------------------------------------------------------------------- *)
+
+Definition wdev (g : gstate) (d : dev_state) : gstate :=
+  GState g.(gregs) g.(gmem) d g.(ggen) g.(gpow) g.(gresv)
+         g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr).
+
+Lemma hart_ok_wdev (cpu : CPU) (g : gstate) (s : mstate) (d : dev_state) :
+  hart_ok cpu g s -> gdev g = mdev s ->
+  hart_ok cpu (wdev g d) (with_dev s d).
+Proof.
+  intros [Hr Hm Hd Hfl Hal Htv Hitv Hrv Hcoh] _.
+  unfold wdev, with_dev. constructor;
+    cbn [gregs gmem gdev gimg glog gresv gtv gitv ghr sregs mem mdev];
+    assumption || reflexivity.
+Qed.
+
+Lemma thread_live_wdev (g : gstate) (d : dev_state) (gen : nat) :
+  thread_live g gen -> thread_live (wdev g d) gen.
+Proof. unfold thread_live, wdev; cbn [gpow ggen]. exact id. Qed.
+
+(* THE TRANSMIT ARM: the byte leaves the port, and unless the UART is in
+   LOOPBACK that is an observation.  [uart_step]'s own arm chooses the
+   observation list, so the bridge does not get to. *)
+Lemma sapply_uart_tx (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate) :
+  thread_live g gen ->
+  hart_ok cpu g s ->
+  sapply SUartTx s = Some s' ->
+  exists kappa g',
+    prim_step (UartLoopE gen) g kappa (UartLoopE gen) g' []
+    /\ hart_ok cpu g' s' /\ thread_live g' gen.
+Proof.
+  intros Hlive Hok Hap.
+  pose proof (ho_dev _ _ _ Hok) as Hd.
+  unfold sapply, sapply_w in Hap; cbn [mdev] in Hap.
+  destruct (uart_tx_pop (duart (mdev s))) as [[b u']|] eqn:Htx;
+    [|discriminate Hap].
+  revert Hap; intros [= <-].
+  exists (if uart_loopback (duart (gdev g)) then [] else [ObsUartOut b]),
+         (wdev g (set_duart (gdev g) u')).
+  split; [|split].
+  - unfold prim_step. right. left. exists gen.
+    split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
+    left. split; [exact Hlive|].
+    exists (set_duart (gdev g) u'). split; [|reflexivity].
+    apply UartStepTx. rewrite Hd. exact Htx.
+  - rewrite Hd at 1. apply (hart_ok_wdev cpu g s _ Hok Hd).
+  - apply thread_live_wdev. exact Hlive.
+Qed.
+
+(* THE RECEIVE ARM: the host types a byte.  This is the step the test's
+   [uart_input] is PINNED against -- [VRun.obs_in] reads exactly these
+   events out of the trace. *)
+Lemma sapply_uart_rx (gen : nat) (cpu : CPU) (b : Z) (g : gstate)
+    (s s' : mstate) :
+  thread_live g gen ->
+  hart_ok cpu g s ->
+  sapply (SUartRx b) s = Some s' ->
+  exists g',
+    prim_step (UartLoopE gen) g [ObsUartIn (Z_to_bv 8 b)] (UartLoopE gen) g' []
+    /\ hart_ok cpu g' s' /\ thread_live g' gen.
+Proof.
+  intros Hlive Hok Hap.
+  pose proof (ho_dev _ _ _ Hok) as Hd.
+  unfold sapply, sapply_w in Hap; cbn [mdev] in Hap.
+  destruct (uart_rx_push (duart (mdev s)) (Z_to_bv 8 b)) as [u'|] eqn:Hrx;
+    [|discriminate Hap].
+  revert Hap; intros [= <-].
+  exists (wdev g (set_duart (gdev g) u')).
+  split; [|split].
+  - unfold prim_step. right. left. exists gen.
+    split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
+    left. split; [exact Hlive|].
+    exists (set_duart (gdev g) u'). split; [|reflexivity].
+    apply UartStepRx. rewrite Hd. exact Hrx.
+  - rewrite Hd at 1. apply (hart_ok_wdev cpu g s _ Hok Hd).
+  - apply thread_live_wdev. exact Hlive.
+Qed.
+
+(* THE LATCH: the UART's own interrupt source reaches the PLIC.  Silent. *)
+Lemma sapply_uart_latch (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate) :
+  thread_live g gen ->
+  hart_ok cpu g s ->
+  sapply (SLatch uart_irq_id) s = Some s' ->
+  exists g',
+    prim_step (UartLoopE gen) g [] (UartLoopE gen) g' []
+    /\ hart_ok cpu g' s' /\ thread_live g' gen.
+Proof.
+  intros Hlive Hok Hap.
+  pose proof (ho_dev _ _ _ Hok) as Hd.
+  unfold sapply, sapply_w in Hap; cbn [mdev] in Hap.
+  destruct (dev_irq_level (mdev s) uart_irq_id) eqn:Hlvl; [|discriminate Hap].
+  destruct (plic_latch (dplic (mdev s)) uart_irq_id) as [p'|] eqn:Hlat;
+    [|discriminate Hap].
+  revert Hap; intros [= <-].
+  exists (wdev g (set_dplic (gdev g) p')).
+  split; [|split].
+  - unfold prim_step. right. left. exists gen.
+    split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
+    left. split; [exact Hlive|].
+    exists (set_dplic (gdev g) p'). split; [|reflexivity].
+    apply UartStepLatch; rewrite Hd; assumption.
+  - rewrite Hd at 1. apply (hart_ok_wdev cpu g s _ Hok Hd).
+  - apply thread_live_wdev. exact Hlive.
+Qed.
+
+(* THE WIRE: the PLIC drives this hart's external S-interrupt pin.  It is
+   the one device step that writes a HART's register file, so the write-back
+   is the register one and the invariant is re-established at [cpu]. *)
+Definition wregs (g : gstate) (gr : CPU -> regstate) : gstate :=
+  GState gr g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)
+         g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr).
+
+Lemma sapply_wire (gen : nat) (cpu : CPU) (g : gstate) (s s' : mstate) :
+  thread_live g gen ->
+  hart_ok cpu g s ->
+  sapply (SWire (fin_to_nat cpu)) s = Some s' ->
+  exists g',
+    prim_step (PlicLoopE gen) g [] (PlicLoopE gen) g' []
+    /\ hart_ok cpu g' s' /\ thread_live g' gen.
+Proof.
+  intros Hlive Hok Hap.
+  pose proof Hok as [Hr Hm Hd Hfl Hal Htv Hitv Hrv Hcoh].
+  unfold sapply, sapply_w in Hap. revert Hap; intros [= <-].
+  exists (wregs g (<[cpu := register_set sig_seip
+                       (bool_to_bit (dev_seip g.(gdev) (fin_to_nat cpu)))
+                       (g.(gregs) cpu)]> g.(gregs))).
+  split; [|split].
+  - unfold prim_step. right. right. right. left. exists gen.
+    split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
+    split; [reflexivity|]. left. split; [exact Hlive|].
+    eexists. split; [apply PlicStepWire|reflexivity].
+  - unfold wregs. constructor;
+      cbn [gregs gmem gdev gimg glog gresv gtv gitv ghr sregs mem mdev];
+      try assumption;
+      rewrite greg_ins_eq; rewrite Hr; rewrite Hd; reflexivity.
+  - unfold thread_live, wregs; cbn [gpow ggen]. exact Hlive.
 Qed.
