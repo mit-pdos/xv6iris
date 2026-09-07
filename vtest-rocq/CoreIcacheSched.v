@@ -1,3 +1,8 @@
+(* ====================================================================== *)
+(*  OFF THE BUILD: its only consumer is VIcache.v, which is.  The          *)
+(*  interleavings below are hand-worked and are what the port will need.   *)
+(* ====================================================================== *)
+
 (* CoreIcacheSched.v -- the FETCH POLICIES for the self-modifying-code case.
 
    One schedule per outcome a platform can show, in the order the captures

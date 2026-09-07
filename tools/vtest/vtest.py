@@ -511,9 +511,11 @@ End {mod}Pass.
 # VModelFacts -- the universally quantified statements about the model that
 # no capture comparison can express, which is why they outlived the per-case
 # files they came from.
+# The model side that is not per-case.  VRunConc.v and VIcache.v are NOT
+# here: they are written against the old [TEST_RUN] and carry an OFF THE
+# BUILD header saying so.
 HARNESS = ["VSched.v", "VExecStuck.v", "VTest.v", "VTso.v", "VBoot.v", "VConc.v",
-           "VNode.v", "VExecStep.v", "VRun.v", "VRunConc.v", "VIcache.v",
-           "VModelFacts.v"]
+           "VNode.v", "VExecStep.v", "VRun.v", "VModelFacts.v"]
 
 PROJECT_HEAD = """-R . VTest
 -R ../iris xv6iris
@@ -554,9 +556,15 @@ def write_project(from_build=False):
     # the shared harness and interleavings first, then each platform's
     # captures, runs and proofs -- which is also how they are read.
     top = rocq_listdir()
-    shared = ([h for h in HARNESS if os.path.exists(rp(h))]
+    # a file carrying an OFF THE BUILD header is kept in the tree and left
+    # out of the project, which is how this repo parks something unported
+    def on_build(f):
+        p = rp(f)
+        return os.path.exists(p) and "OFF THE BUILD" not in open(p).read(600)
+    shared = ([h for h in HARNESS if on_build(h)]
               + sorted(f for f in top
-                       if f.endswith("Sched.v") and f != "VSched.v"))
+                       if f.endswith("Sched.v") and f != "VSched.v"
+                       and on_build(f)))
     files, passes = [rrel(f) for f in shared], []
     for pl in PLATFORMS:
         here = rocq_listdir(pl)

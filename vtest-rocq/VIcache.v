@@ -1,4 +1,10 @@
 (* ====================================================================== *)
+(*  OFF THE BUILD, for the same reason as VRunConc.v: it names the old     *)
+(*  [model_outcome].  The fetch schedules it runs (CoreIcacheSched.v) are  *)
+(*  kept with it.                                                          *)
+(* ====================================================================== *)
+
+(* ====================================================================== *)
 (* VIcache.v -- ONE HART UNDER THE RELAXED MACHINE WITH ITS INSTRUCTION    *)
 (* VIEW, executably.                                                       *)
 (*                                                                         *)

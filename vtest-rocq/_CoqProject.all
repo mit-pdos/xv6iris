@@ -13,8 +13,6 @@ VConc.v
 VNode.v
 VExecStep.v
 VRun.v
-VRunConc.v
-VIcache.v
 VModelFacts.v
 ConcAmoSched.v
 ConcByteSched.v
@@ -22,7 +20,6 @@ ConcLostSched.v
 ConcMpSched.v
 ConcSbSched.v
 ConcSmokeSched.v
-CoreIcacheSched.v
 QEMU/ClintMsipPass.v
 QEMU/ClintMsipRun.v
 QEMU/ClintMsipTest.v
