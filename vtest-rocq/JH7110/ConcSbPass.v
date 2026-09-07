@@ -23,7 +23,7 @@ Module ConcSbPass <: TEST_PASSES_AGREE ConcSb ConcSbRun.
     intros o Ho.
     cbn [ConcSbRun.observed ConcSbRun.results fmap list_fmap] in Ho.
     destruct Ho as [<-|Ho];
-      [ apply (conc2_shows false (replicate 28 false ++ replicate 31 true ++ replicate 26 false ++ replicate 28 true ++ replicate 9 false ++ replicate 2 false ++ replicate 2 true)%list 20000);
+      [ apply (conc2_shows false (replicate 28 (false, false) ++ replicate 31 (true, false) ++ replicate 26 (false, false) ++ replicate 28 (true, false) ++ replicate 9 (false, false) ++ replicate 2 (false, false) ++ replicate 2 (true, false))%list 20000);
         vm_compute; repeat split |].
     destruct Ho.
   Qed.

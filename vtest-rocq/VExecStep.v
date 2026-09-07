@@ -1651,13 +1651,18 @@ Lemma boundary_prim (tick : bool) (gen : nat) (cpu : CPU) (g : gstate)
     prim_step (HartE gen cpu (Interface.Ret u)) g []
               (HartE gen cpu (riscv_step tick)) g' []
     /\ hart_ok cpu g' s /\ thread_live g' gen /\ all_resv g'.(gresv) = ∅
-    /\ others_kept cpu g g'.
+    /\ others_kept cpu g g'
+    (* ...and what it left where it was, which a relaxed run has to know:
+       the boundary is not a memory event *)
+    /\ g'.(glog) = g.(glog) /\ g'.(gtv) cpu = g.(gtv) cpu
+    /\ g'.(ghr) cpu
+       = HRead (hr_rv (g.(ghr) cpu)) (hr_coh (g.(ghr) cpu)) false.
 Proof.
   intros Hlive Hok.
   pose proof Hok as [Hr Hm Hd Hfl Hal Htv Hitv Hrv Hcoh].
   exists (wb cpu g s g.(glog) (g.(gtv) cpu) (g.(gitv) cpu)
              (HRead (hr_rv (g.(ghr) cpu)) (hr_coh (g.(ghr) cpu)) false) None).
-  split; [|split; [|split; [|split]]].
+  split; [|split; [|split; [|split; [|split; [|split; [|split]]]]]].
   - apply mnode_prim; [exact Hlive|].
     rewrite (hart_ok_proj cpu g s Hok).
     cbn [mnode_step]. exists tick. repeat (split; [reflexivity|]). reflexivity.
@@ -1671,6 +1676,9 @@ Proof.
       cbn [gregs gmem gdev ggen gpow gresv gimg glog gtv gitv ghr];
       try reflexivity; try ins_ne.
     exists []. rewrite app_nil_r. reflexivity.
+  - unfold wb; cbn [glog]. reflexivity.
+  - unfold wb; cbn [gtv]. apply gtv_ins_eq.
+  - unfold wb; cbn [ghr]. apply ghr_ins_eq.
 Qed.
 
 Lemma elem_of_pool (e x : mexpr) (t1 t2 : list mexpr) :
@@ -1725,7 +1733,7 @@ Proof.
       as (N1 & g1 & Hn1 & Hok1 & Hlv1 & _).
     (* 2. the boundary, which drops the reservation *)
     destruct (boundary_prim tick gen hart_primary g1 s1 u Hlv1 Hok1)
-      as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & _).
+      as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & _ & _ & _ & _).
     (* 3. the devices *)
     destruct (settle_nsteps gen
                 (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2)
@@ -1905,7 +1913,7 @@ Proof.
   destruct (boundary_prim tick 0 hart_primary
               (test_gstate hart text rs disk_init)
               (exec_start hart text rs disk_init) tt Hlive0 Hok0)
-    as (gb & Hpsb & Hokb & Hlvb & Hresb & _).
+    as (gb & Hpsb & Hokb & Hlvb & Hresb & _ & _ & _ & _).
   (* 2. the input *)
   destruct (srun_uart_nsteps 0
               (t1 ++ HartE 0 hart_primary (riscv_step tick) :: t2) uart_input
@@ -2132,7 +2140,7 @@ Proof.
                   g (exec_r_inl _ _ _ Hex) Hlive Hok)
         as (N1 & g1 & Hn1 & Hok1 & Hlv1 & _).
       destruct (boundary_prim tick gen hart_primary g1 s1 u Hlv1 Hok1)
-        as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & _).
+        as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & _ & _ & _ & _).
       destruct (settle_nsteps gen
                   (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2)
                   pick dev_fuel
@@ -2194,7 +2202,7 @@ Proof.
   destruct (boundary_prim tick 0 hart_primary
               (test_gstate hart text rs disk_init)
               (exec_start hart text rs disk_init) tt Hlive0 Hok0)
-    as (gb & Hpsb & Hokb & Hlvb & Hresb & _).
+    as (gb & Hpsb & Hokb & Hlvb & Hresb & _ & _ & _ & _).
   destruct (srun_uart_nsteps 0
               (t1 ++ HartE 0 hart_primary (riscv_step tick) :: t2) uart_input
               (elem_of_pool _ _ _ _ Hu) (elem_of_pool _ _ _ _ Hdk)

@@ -23,13 +23,13 @@ Module ConcLostPass <: TEST_PASSES_AGREE ConcLost ConcLostRun.
     intros o Ho.
     cbn [ConcLostRun.observed ConcLostRun.results fmap list_fmap] in Ho.
     destruct Ho as [<-|Ho];
-      [ apply (conc2_shows false (replicate 20 false ++ replicate 23 true ++ replicate 33 false ++ replicate 33 true ++ replicate 3 false ++ replicate 3 false ++ replicate 3 true ++ replicate 6 false ++ replicate 6 true ++ replicate 3 false ++ replicate 3 true ++ replicate 6 false ++ replicate 6 true)%list 20000);
+      [ apply (conc2_shows false (replicate 20 (false, false) ++ replicate 23 (true, false) ++ replicate 33 (false, false) ++ replicate 33 (true, false) ++ replicate 3 (false, false) ++ replicate 3 (false, false) ++ replicate 3 (true, false) ++ replicate 6 (false, false) ++ replicate 6 (true, false) ++ replicate 3 (false, false) ++ replicate 3 (true, false) ++ replicate 6 (false, false) ++ replicate 6 (true, false))%list 20000);
         vm_compute; repeat split |].
     destruct Ho as [<-|Ho];
-      [ apply (conc2_shows false (replicate 20 false ++ replicate 23 true ++ replicate 33 false ++ replicate 33 true ++ replicate 3 false ++ replicate 3 false ++ replicate 3 true ++ replicate 6 false ++ replicate 6 true ++ replicate 11 false)%list 20000);
+      [ apply (conc2_shows false (replicate 20 (false, false) ++ replicate 23 (true, false) ++ replicate 33 (false, false) ++ replicate 33 (true, false) ++ replicate 3 (false, false) ++ replicate 3 (false, false) ++ replicate 3 (true, false) ++ replicate 6 (false, false) ++ replicate 6 (true, false) ++ replicate 11 (false, false))%list 20000);
         vm_compute; repeat split |].
     destruct Ho as [<-|Ho];
-      [ apply (conc2_shows false (replicate 20 false ++ replicate 23 true ++ replicate 33 false ++ replicate 33 true ++ replicate 3 false ++ replicate 20 false)%list 20000);
+      [ apply (conc2_shows false (replicate 20 (false, false) ++ replicate 23 (true, false) ++ replicate 33 (false, false) ++ replicate 33 (true, false) ++ replicate 3 (false, false) ++ replicate 20 (false, false))%list 20000);
         vm_compute; repeat split |].
     destruct Ho.
   Qed.

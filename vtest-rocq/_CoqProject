@@ -194,6 +194,7 @@ QEMU/ConcAmoPass.v
 QEMU/ConcBytePass.v
 QEMU/ConcLostPass.v
 QEMU/ConcMpPass.v
+QEMU/ConcSbPass.v
 QEMU/ConcSmokePass.v
 QEMU/CoreCsrprobePass.v
 QEMU/CoreCsrwidePass.v

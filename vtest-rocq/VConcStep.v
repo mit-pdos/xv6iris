@@ -284,57 +284,106 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 (* 1. THE STATE THE INTERPRETER CAN COMPUTE.                               *)
 (*                                                                         *)
-(*    A [gstate] carries the write log and every hart's views; the         *)
-(*    interpreter computes none of that -- in the single-hart theorem the  *)
-(*    [gstate] is existential from beginning to end and only the [mstate]  *)
-(*    is evaluated.  The multi-hart analogue of [mstate] is this: every    *)
-(*    hart's registers beside ONE memory and ONE device fabric.            *)
+(*    A [gstate] carries the write log and every hart's views, and a       *)
+(*    RELAXED run needs all of it: a stale read is a read at a view, and   *)
+(*    the view is only meaningful against the log.  So unlike the          *)
+(*    single-hart theorem -- where the [gstate] is existential from        *)
+(*    beginning to end and only the [mstate] is evaluated -- this state is *)
+(*    a [gstate] in all but name.  What it leaves out is what no schedule  *)
+(*    here moves: the generation, the power, the instruction view, and the *)
+(*    reservation (dropped at every boundary, which is where this driver   *)
+(*    switches harts).                                                     *)
+(*                                                                         *)
+(*    The register files and the views are FUNCTIONS, and [cs_ok] compares *)
+(*    them POINTWISE.  That is deliberate: comparing them as functions     *)
+(*    would need extensionality, and nothing here has to.                  *)
 (* ---------------------------------------------------------------------- *)
 
 Record cstate := CState {
   cregs : CPU -> regstate;
   cmem  : gmap Arch.pa (bv 8);
   cdev  : dev_state;
+  cimg  : gmap Arch.pa (bv 8);
+  clog  : list pwmsg;
+  ctv   : CPU -> nat;
+  chr   : CPU -> hread;
 }.
 
 Definition cfocus (cs : cstate) (c : CPU) : mstate :=
   MState (cs.(cregs) c) cs.(cmem) cs.(cdev).
 
-Definition cput (cs : cstate) (c : CPU) (s : mstate) : cstate :=
-  CState (<[c := s.(sregs)]> cs.(cregs)) s.(mem) s.(mdev).
-
 Definition cflag (cs : cstate) : bool := flag_set (cfocus cs hart_primary).
 
 (* ---------------------------------------------------------------------- *)
-(* 2. THE SCHEDULE.  A list of harts, one whole instruction each.          *)
+(* 2. THE SCHEDULE.  A list of (hart, read policy), one whole instruction  *)
+(*    each.                                                                *)
+(*                                                                         *)
+(*    [trun] is [VTso.texec] with the recursion made explicit and the      *)
+(*    boundary left OFF: it stops at [Ret] without clearing the acquire    *)
+(*    bit, because the boundary is a [prim_step] of its own here           *)
+(*    ([boundary_prim]) and [cinstr] applies its effect after.             *)
 (* ---------------------------------------------------------------------- *)
 
-Definition cinstr (tick : bool) (c : CPU) (cs : cstate) : option cstate :=
-  match exec (riscv_step tick) (cfocus cs c) with
-  | Some (_, s') => Some (cput cs c s')
+Fixpoint trun (fuel : nat) (pol : rpol) (h : agent)
+    (img : gmap Arch.pa (bv 8)) (m : M unit) (s : mstate)
+    (log : list pwmsg) (tv : nat) (hr : hread) {struct fuel}
+  : option (mstate * list pwmsg * nat * hread) :=
+  match m with
+  | Interface.Ret _ => Some (s, log, tv, hr)
+  | _ =>
+      match fuel with
+      | 0%nat => None
+      | S f =>
+          match tnode pol h img s log tv hr m with
+          | Some (m', s', log', tv', hr') => trun f pol h img m' s' log' tv' hr'
+          | None => None
+          end
+      end
+  end.
+
+(* one whole instruction of hart [c], and the boundary that ends it: the
+   pending acquire is consumed and the reservation dropped *)
+Definition cinstr (pol : rpol) (fuel : nat) (tick : bool) (c : CPU)
+    (cs : cstate) : option cstate :=
+  match trun fuel pol (hart_agent c) cs.(cimg) (riscv_step tick) (cfocus cs c)
+             cs.(clog) (cs.(ctv) c) (cs.(chr) c) with
+  | Some (s', log', tv', hr') =>
+      Some (CState (<[c := s'.(sregs)]> cs.(cregs)) s'.(mem) s'.(mdev)
+                   cs.(cimg) log' (<[c := tv']> cs.(ctv))
+                   (<[c := hr_clear hr']> cs.(chr)))
   | None => None
   end.
 
-Fixpoint crun (tick : bool) (sch : list CPU) (cs : cstate) : option cstate :=
+(* A SCHEDULE ITEM NAMES THE HART AND HOW IT READS.  [PFresh] is the top of
+   the log -- the flat cache, and the strongest read TSO allows.  [PStale]
+   is the LOWEST view the arm admits, which is where the other hart's later
+   message is invisible: store buffering's (0,0), and the only reason this
+   file carries the log at all. *)
+Definition citem : Type := CPU * rpol.
+
+Fixpoint crun (tick : bool) (fuel : nat) (sch : list citem) (cs : cstate)
+  : option cstate :=
   match sch with
   | [] => Some cs
-  | c :: sch' => match cinstr tick c cs with
-                 | Some cs' => crun tick sch' cs'
-                 | None => None
-                 end
+  | (c, pol) :: sch' =>
+      match cinstr pol fuel tick c cs with
+      | Some cs' => crun tick fuel sch' cs'
+      | None => None
+      end
   end.
 
 (* After the interleaving a case cares about, both harts just have to reach
    the DONE flag; [cfinish] repeats [round] until one of them publishes. *)
-Fixpoint cfinish (tick : bool) (round : list CPU) (n : nat) (cs : cstate)
-  : option cstate :=
+Fixpoint cfinish (tick : bool) (fuel : nat) (round : list citem) (n : nat)
+    (cs : cstate) : option cstate :=
   if cflag cs then Some cs else
   match n with
   | 0%nat => None
-  | S n' => match crun tick round cs with
-            | Some cs' => cfinish tick round n' cs'
-            | None => None
-            end
+  | S n' =>
+      match crun tick fuel round cs with
+      | Some cs' => cfinish tick fuel round n' cs'
+      | None => None
+      end
   end.
 
 (* ---------------------------------------------------------------------- *)
@@ -354,6 +403,10 @@ Record cs_ok (cs : cstate) (g : gstate) : Prop := CsOk {
   cs_regs : forall c, g.(gregs) c = cs.(cregs) c;
   cs_mem  : g.(gmem) = cs.(cmem);
   cs_dev  : g.(gdev) = cs.(cdev);
+  cs_img  : g.(gimg) = cs.(cimg);
+  cs_log  : g.(glog) = cs.(clog);
+  cs_tv   : forall c, g.(gtv) c = cs.(ctv) c;
+  cs_hr   : forall c, g.(ghr) c = cs.(chr) c;
 }.
 
 Lemma others_resv_of_all (gr : CPU -> option resv) (cpu : CPU) :
@@ -369,11 +422,11 @@ Proof.
 Qed.
 
 (* every hart of a [gs_ok] state satisfies the SINGLE-hart invariant
-   against its own projection, which is what lets [VExecStep] step it *)
+   against its own projection, which is what lets [tnode_mnode] step it *)
 Lemma cs_hart_ok (cs : cstate) (g : gstate) (c : CPU) :
   gs_ok g -> cs_ok cs g -> hart_ok c g (cfocus cs c).
 Proof.
-  intros [Hfl Hres Htv Hitv Hrv Hcoh] [Hr Hm Hd].
+  intros [Hfl Hres Htv Hitv Hrv Hcoh] [Hr Hm Hd Hi Hl Hv Hh].
   constructor; cbn [cfocus sregs mem mdev].
   - apply Hr.
   - exact Hm.
@@ -412,10 +465,78 @@ Lemma nsteps_trans_nil (n m : nat) (r1 r2 r3 : language.cfg riscv_lang) :
   @language.nsteps riscv_lang (n + m) r1 [] r3.
 Proof. intros H1 H2. exact (nsteps_trans n m r1 r2 r3 [] [] H1 H2). Qed.
 
-Lemma cinstr_nsteps (tick : bool) (gen : nat) (c : CPU)
-    (t1 t2 : list mexpr) (cs cs' : cstate) (g : gstate) :
+Lemma trun_hstep (pol : rpol) (gen : nat) (cpu : CPU) (fuel : nat) :
+  forall (m : M unit) (g : gstate) (s' : mstate) (log' : list pwmsg)
+         (tv' : nat) (hr' : hread),
+  thread_live g gen ->
+  hart_ok cpu g (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) ->
+  trun fuel pol (hart_agent cpu) g.(gimg) m
+       (MState (g.(gregs) cpu) g.(gmem) g.(gdev))
+       g.(glog) (g.(gtv) cpu) (g.(ghr) cpu) = Some (s', log', tv', hr') ->
+  exists g',
+    rtc (hstep gen cpu) (m, g) (Interface.Ret tt, g')
+    /\ thread_live g' gen /\ others_kept cpu g g' /\ hart_ok cpu g' s'
+    /\ g'.(gimg) = g.(gimg) /\ g'.(glog) = log'
+    /\ g'.(gtv) cpu = tv' /\ g'.(ghr) cpu = hr'.
+Proof.
+  induction fuel as [|f IH]; intros m g s' log' tv' hr' Hlive Hok Ht.
+  - destruct m as [y|T oc k]; cbn [trun] in Ht; [|discriminate Ht].
+    revert Ht; intros [= <- <- <- <-]. destruct y.
+    exists g. split; [apply rtc_refl|].
+    split; [assumption|]. split; [apply others_kept_refl|].
+    split; [exact Hok|]. repeat split.
+  - destruct m as [y|T oc k]; cbn [trun] in Ht.
+    { revert Ht; intros [= <- <- <- <-]. destruct y.
+      exists g. split; [apply rtc_refl|].
+      split; [assumption|]. split; [apply others_kept_refl|].
+      split; [exact Hok|]. repeat split. }
+    destruct (tnode pol (hart_agent cpu) g.(gimg)
+                (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) g.(glog)
+                (g.(gtv) cpu) (g.(ghr) cpu) (Interface.Next oc k))
+      as [[[[[m1 s1] log1] tv1] hr1]|] eqn:Hn; [|discriminate Ht].
+    destruct (tnode_mnode pol cpu g _ (Interface.Next oc k) m1 s1 log1 tv1 hr1
+                Hok Hn) as (itv1 & r1 & Hnode & Hok1).
+    pose proof (mnode_prim gen cpu g (Interface.Next oc k) m1 s1 log1 tv1 itv1
+                  hr1 r1 Hlive Hnode) as Hps.
+    set (g1 := wb cpu g s1 log1 tv1 itv1 hr1 r1) in *.
+    assert (Hlv1 : thread_live g1 gen)
+      by (unfold thread_live, g1, wb in *; cbn [gpow ggen] in *; exact Hlive).
+    (* the focus of the written-back state IS the state the node produced *)
+    assert (Hfoc : MState (g1.(gregs) cpu) g1.(gmem) g1.(gdev) = s1).
+    { unfold g1, wb; cbn [gregs gmem gdev]. rewrite greg_ins_eq.
+      destruct s1; reflexivity. }
+    assert (Hok1' : hart_ok cpu g1 (MState (g1.(gregs) cpu) g1.(gmem) g1.(gdev)))
+      by (rewrite Hfoc; exact Hok1).
+    assert (Ht1 : trun f pol (hart_agent cpu) g1.(gimg) m1
+                    (MState (g1.(gregs) cpu) g1.(gmem) g1.(gdev))
+                    g1.(glog) (g1.(gtv) cpu) (g1.(ghr) cpu)
+                  = Some (s', log', tv', hr')).
+    { rewrite Hfoc. unfold g1, wb; cbn [gimg glog gtv ghr].
+      rewrite gtv_ins_eq, ghr_ins_eq. exact Ht. }
+    destruct (IH m1 g1 s' log' tv' hr' Hlv1 Hok1' Ht1)
+      as (g' & Hrtc & Hlv' & Hkept' & Hok' & Hi' & Hl' & Hv' & Hh').
+    exists g'. split.
+    { assert (Hstep1 : hstep gen cpu (Interface.Next oc k, g) (m1, g1))
+        by (unfold hstep; cbn [fst snd]; exact Hps).
+      eapply rtc_l; [exact Hstep1|exact Hrtc]. }
+    assert (Hkept1 : others_kept cpu g g1).
+    { destruct (mnode_log_grows _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hnode)
+        as [ext Hext].
+      unfold g1, wb. constructor;
+        cbn [gregs gmem gdev ggen gpow gresv gimg glog gtv gitv ghr];
+        try reflexivity; try ins_ne.
+      exists ext. exact Hext. }
+    split; [assumption|].
+    split; [exact (others_kept_trans cpu g g1 g' Hkept1 Hkept')|].
+    split; [exact Hok'|].
+    split; [rewrite Hi'; unfold g1, wb; reflexivity|].
+    split; [exact Hl'|]. split; [exact Hv'|]. exact Hh'.
+Qed.
+
+Lemma cinstr_nsteps (pol : rpol) (fuel : nat) (tick : bool) (gen : nat)
+    (c : CPU) (t1 t2 : list mexpr) (cs cs' : cstate) (g : gstate) :
   thread_live g gen -> gs_ok g -> cs_ok cs g ->
-  cinstr tick c cs = Some cs' ->
+  cinstr pol fuel tick c cs = Some cs' ->
   exists N g',
     @language.nsteps riscv_lang N
       (t1 ++ HartE gen c (riscv_step tick) :: t2, g) []
@@ -424,16 +545,28 @@ Lemma cinstr_nsteps (tick : bool) (gen : nat) (c : CPU)
 Proof.
   intros Hlive Hgs Hcs Hci.
   pose proof (cs_hart_ok cs g c Hgs Hcs) as Hok.
+  pose proof Hcs as [Hr Hm Hd Hi Hl Hv Hh].
+  (* the focus of [g] at [c] is the focus of [cs] at [c] *)
+  assert (Hfoc : MState (g.(gregs) c) g.(gmem) g.(gdev) = cfocus cs c)
+    by (unfold cfocus; rewrite (Hr c), Hm, Hd; reflexivity).
   unfold cinstr in Hci.
-  destruct (exec (riscv_step tick) (cfocus cs c)) as [[u s1]|] eqn:Hex;
-    [|discriminate Hci].
+  destruct (trun fuel pol (hart_agent c) cs.(cimg) (riscv_step tick)
+              (cfocus cs c) cs.(clog) (cs.(ctv) c) (cs.(chr) c))
+    as [[[[s1 log1] tv1] hr1]|] eqn:Ht; [|discriminate Hci].
   revert Hci; intros [= <-].
-  (* the instruction *)
-  destruct (exec_nsteps tick gen c t1 t2 (riscv_step tick) (cfocus cs c) u s1 g
-              Hex Hlive Hok) as (N1 & g1 & Hn1 & Hok1 & Hlv1 & Hk1).
+  assert (Ht' : trun fuel pol (hart_agent c) g.(gimg) (riscv_step tick)
+                  (MState (g.(gregs) c) g.(gmem) g.(gdev))
+                  g.(glog) (g.(gtv) c) (g.(ghr) c) = Some (s1, log1, tv1, hr1))
+    by (rewrite Hfoc, Hi, Hl, (Hv c), (Hh c); exact Ht).
+  rewrite <- Hfoc in Hok.
+  destruct (trun_hstep pol gen c fuel (riscv_step tick) g s1 log1 tv1 hr1
+              Hlive Hok Ht')
+    as (g1 & Hrtc & Hlv1 & Hk1 & Hok1 & Hi1 & Hl1 & Hv1 & Hh1).
+  destruct (hstep_nsteps gen c t1 t2 (riscv_step tick, g) (Interface.Ret tt, g1)
+              Hrtc) as [N1 Hn1]; cbn [fst snd] in Hn1.
   (* ...and the boundary that ends it, which drops the reservation *)
-  destruct (boundary_prim tick gen c g1 s1 u Hlv1 Hok1)
-    as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & Hk2).
+  destruct (boundary_prim tick gen c g1 s1 tt Hlv1 Hok1)
+    as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & Hk2 & Hbl & Hbv & Hbh).
   pose proof (others_kept_trans c g g1 g2 Hk1 Hk2) as Hk.
   exists (N1 + 1)%nat, g2.
   split.
@@ -444,9 +577,8 @@ Proof.
   split; [exact Hlv2|].
   pose proof Hok2 as [Hr2 Hm2 Hd2 Hfl2 Hal2 Htv2 Hitv2 Hrv2 Hcoh2].
   pose proof Hgs as [Hfl Hres Htv Hitv Hrv Hcoh].
-  pose proof Hcs as [Hr Hm Hd].
   pose proof (log_len_le g g2 c Hk) as Hlen.
-  destruct Hk as [_ _ Hkregs Hkresv Hktv Hkitv Hkhr].
+  pose proof Hk as [_ Hkimg Hkregs Hkresv Hktv Hkitv Hkhr].
   split.
   - constructor; try assumption.
     + intros c'. destruct (decide (c' = c)) as [->|Hne]; [exact Htv2|].
@@ -457,12 +589,23 @@ Proof.
       rewrite (Hkhr c' Hne). exact (Nat.le_trans _ _ _ (Hrv c') Hlen).
     + intros c' a. destruct (decide (c' = c)) as [->|Hne]; [exact (Hcoh2 a)|].
       rewrite (Hkhr c' Hne). exact (Nat.le_trans _ _ _ (Hcoh c' a) Hlen).
-  - constructor; cbn [cput cregs cmem cdev].
+  - (* the boundary keeps the memory and the log where the instruction left
+       them, and clears this hart's acquire bit -- which is what [cinstr]
+       wrote down *)
+    constructor; cbn [cregs cmem cdev cimg clog ctv chr].
     + intros c'. destruct (decide (c' = c)) as [->|Hne].
       * rewrite greg_ins_eq. exact Hr2.
       * rewrite (greg_ins_ne _ c c' _ Hne). rewrite (Hkregs c' Hne). apply Hr.
     + exact Hm2.
     + exact Hd2.
+    + rewrite Hkimg. exact Hi.
+    + rewrite Hbl. exact Hl1.
+    + intros c'. destruct (decide (c' = c)) as [->|Hne].
+      * rewrite gtv_ins_eq, Hbv. exact Hv1.
+      * rewrite (gtv_ins_ne _ c c' _ Hne). rewrite (Hktv c' Hne). apply Hv.
+    + intros c'. destruct (decide (c' = c)) as [->|Hne].
+      * rewrite ghr_ins_eq, Hbh. unfold hr_clear. rewrite Hh1. reflexivity.
+      * rewrite (ghr_ins_ne _ c c' _ Hne). rewrite (Hkhr c' Hne). apply Hh.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -472,39 +615,39 @@ Qed.
 (*    schedule names is IN it, at the uniform point.                       *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma crun_nsteps (tick : bool) (gen : nat) (ts : list mexpr) :
-  forall (sch : list CPU) (cs cs' : cstate) (g : gstate),
-  (forall c, c ∈ sch -> HartE gen c (riscv_step tick) ∈ ts) ->
+Lemma crun_nsteps (tick : bool) (fuel : nat) (gen : nat) (ts : list mexpr) :
+  forall (sch : list citem) (cs cs' : cstate) (g : gstate),
+  (forall c pol, (c, pol) ∈ sch -> HartE gen c (riscv_step tick) ∈ ts) ->
   thread_live g gen -> gs_ok g -> cs_ok cs g ->
-  crun tick sch cs = Some cs' ->
+  crun tick fuel sch cs = Some cs' ->
   exists N g',
     @language.nsteps riscv_lang N (ts, g) [] (ts, g')
     /\ thread_live g' gen /\ gs_ok g' /\ cs_ok cs' g'.
 Proof.
-  induction sch as [|c sch IH]; intros cs cs' g Hin Hlive Hgs Hcs Hrun.
+  induction sch as [|[c pol] sch IH]; intros cs cs' g Hin Hlive Hgs Hcs Hrun.
   - cbn [crun] in Hrun. revert Hrun; intros [= <-].
     exists 0%nat, g. split; [apply language.nsteps_refl|]. auto.
   - cbn [crun] in Hrun.
-    destruct (cinstr tick c cs) as [cs1|] eqn:Hci; [|discriminate Hrun].
+    destruct (cinstr pol fuel tick c cs) as [cs1|] eqn:Hci; [|discriminate Hrun].
     assert (Hc : HartE gen c (riscv_step tick) ∈ ts)
-      by (apply Hin; apply elem_of_list_here).
+      by (apply (Hin c pol); apply elem_of_list_here).
     apply elem_of_list_split in Hc as (t1 & t2 & Hts).
-    destruct (cinstr_nsteps tick gen c t1 t2 cs cs1 g Hlive Hgs Hcs Hci)
+    destruct (cinstr_nsteps pol fuel tick gen c t1 t2 cs cs1 g Hlive Hgs Hcs Hci)
       as (N1 & g1 & Hn1 & Hlv1 & Hgs1 & Hcs1).
     rewrite <- Hts in Hn1.
     destruct (IH cs1 cs' g1
-                (fun c' Hc' => Hin c' (elem_of_list_further _ _ _ Hc'))
+                (fun c' pol' Hc' => Hin c' pol' (elem_of_list_further _ _ _ Hc'))
                 Hlv1 Hgs1 Hcs1 Hrun) as (N2 & g2 & Hn2 & Hlv2 & Hgs2 & Hcs2).
     exists (N1 + N2)%nat, g2.
     split; [exact (nsteps_trans_nil _ _ _ _ _ Hn1 Hn2)|auto].
 Qed.
 
-Lemma cfinish_nsteps (tick : bool) (gen : nat) (ts : list mexpr)
-    (round : list CPU) :
-  (forall c, c ∈ round -> HartE gen c (riscv_step tick) ∈ ts) ->
+Lemma cfinish_nsteps (tick : bool) (fuel : nat) (gen : nat) (ts : list mexpr)
+    (round : list citem) :
+  (forall c pol, (c, pol) ∈ round -> HartE gen c (riscv_step tick) ∈ ts) ->
   forall (n : nat) (cs cs' : cstate) (g : gstate),
   thread_live g gen -> gs_ok g -> cs_ok cs g ->
-  cfinish tick round n cs = Some cs' ->
+  cfinish tick fuel round n cs = Some cs' ->
   exists N g',
     @language.nsteps riscv_lang N (ts, g) [] (ts, g')
     /\ thread_live g' gen /\ gs_ok g' /\ cs_ok cs' g'.
@@ -516,15 +659,14 @@ Proof.
   - cbn [cfinish] in Hfin. destruct (cflag cs).
     { revert Hfin; intros [= <-].
       exists 0%nat, g. split; [apply language.nsteps_refl|]. auto. }
-    destruct (crun tick round cs) as [cs1|] eqn:Hrun; [|discriminate Hfin].
-    destruct (crun_nsteps tick gen ts round cs cs1 g Hin Hlive Hgs Hcs Hrun)
+    destruct (crun tick fuel round cs) as [cs1|] eqn:Hrun; [|discriminate Hfin].
+    destruct (crun_nsteps tick fuel gen ts round cs cs1 g Hin Hlive Hgs Hcs Hrun)
       as (N1 & g1 & Hn1 & Hlv1 & Hgs1 & Hcs1).
     destruct (IH cs1 cs' g1 Hlv1 Hgs1 Hcs1 Hfin)
       as (N2 & g2 & Hn2 & Hlv2 & Hgs2 & Hcs2).
     exists (N1 + N2)%nat, g2.
     split; [exact (nsteps_trans_nil _ _ _ _ _ Hn1 Hn2)|auto].
 Qed.
-
 
 (* ---------------------------------------------------------------------- *)
 (* 6. THE POOL.                                                            *)
@@ -560,6 +702,10 @@ Qed.
    computation's state untouched *)
 Lemma boot_one (tick : bool) (gen : nat) (c : CPU)
     (t1 t2 : list mexpr) (cs : cstate) (g : gstate) :
+  (* the boundary consumes a pending acquire, so a state that HAS one is
+     not one the computation still describes; at the pool's own start
+     every hart is at [hread0], which has none *)
+  (forall d, hr_acq (cs.(chr) d) = false) ->
   thread_live g gen -> gs_ok g -> cs_ok cs g ->
   exists g',
     @language.nsteps riscv_lang 1
@@ -567,16 +713,16 @@ Lemma boot_one (tick : bool) (gen : nat) (c : CPU)
       (t1 ++ HartE gen c (riscv_step tick) :: t2, g')
     /\ thread_live g' gen /\ gs_ok g' /\ cs_ok cs g'.
 Proof.
-  intros Hlive Hgs Hcs.
+  intros Hacq Hlive Hgs Hcs.
   pose proof (cs_hart_ok cs g c Hgs Hcs) as Hok.
   destruct (boundary_prim tick gen c g (cfocus cs c) tt Hlive Hok)
-    as (g1 & Hps1 & Hok1 & Hlv1 & Hres1 & Hk1).
+    as (g1 & Hps1 & Hok1 & Hlv1 & Hres1 & Hk1 & Hbl & Hbv & Hbh).
   pose proof (log_len_le g g1 c Hk1) as Hlen.
   pose proof Hok1 as [Hr1 Hm1 Hd1 Hfl1 Hal1 Htv1 Hitv1 Hrv1 Hcoh1].
   pose proof Hgs as [Hfl Hres Htv Hitv Hrv Hcoh].
-  pose proof Hcs as [Hr Hm Hd].
+  pose proof Hcs as [Hr Hm Hd Hi Hl Hv Hh].
   cbn [cfocus sregs mem mdev] in Hr1, Hm1, Hd1.
-  destruct Hk1 as [_ _ Hkr Hkv Hktv Hkitv Hkhr].
+  pose proof Hk1 as [_ Hkimg Hkr Hkv Hktv Hkitv Hkhr].
   exists g1. split.
   { apply (nsteps_l_nil 0%nat _ (t1 ++ HartE gen c (riscv_step tick) :: t2, g1));
       [exact (hstep_step gen c t1 t2 _ _ g g1 Hps1)
@@ -596,6 +742,15 @@ Proof.
         [exact Hr1|rewrite (Hkr c' Hne); apply Hr].
     + exact Hm1.
     + exact Hd1.
+    + rewrite Hkimg. exact Hi.
+    + rewrite Hbl. exact Hl.
+    + intros c'. destruct (decide (c' = c)) as [->|Hne];
+        [rewrite Hbv; apply Hv|rewrite (Hktv c' Hne); apply Hv].
+    + intros c'. destruct (decide (c' = c)) as [->|Hne].
+      * rewrite Hbh, (Hh c). specialize (Hacq c).
+        destruct (cs.(chr) c) as [rv coh acq]; cbn [hr_rv hr_coh hr_acq] in *.
+        rewrite Hacq. reflexivity.
+      * rewrite (Hkhr c' Hne). apply Hh.
 Qed.
 
 (* ...and the TWO harts a litmus test races.  Two rather than a fold over a
@@ -605,6 +760,7 @@ Qed.
 Lemma pool_boot2 (tick : bool) (gen : nat) (c0 c1 : CPU) (ts : list mexpr)
     (cs : cstate) (g : gstate) :
   c0 <> c1 ->
+  (forall d, hr_acq (cs.(chr) d) = false) ->
   thread_live g gen -> gs_ok g -> cs_ok cs g ->
   HartE gen c0 (Interface.Ret tt) ∈ ts ->
   HartE gen c1 (Interface.Ret tt) ∈ ts ->
@@ -614,16 +770,16 @@ Lemma pool_boot2 (tick : bool) (gen : nat) (c0 c1 : CPU) (ts : list mexpr)
     /\ HartE gen c0 (riscv_step tick) ∈ ts'
     /\ HartE gen c1 (riscv_step tick) ∈ ts'.
 Proof.
-  intros Hne Hlive Hgs Hcs H0 H1.
+  intros Hne Hacq Hlive Hgs Hcs H0 H1.
   apply elem_of_list_split in H0 as (t1 & t2 & Hts). subst ts.
-  destruct (boot_one tick gen c0 t1 t2 cs g Hlive Hgs Hcs)
+  destruct (boot_one tick gen c0 t1 t2 cs g Hacq Hlive Hgs Hcs)
     as (g1 & Hn1 & Hlv1 & Hgs1 & Hcs1).
   assert (H1' : HartE gen c1 (Interface.Ret tt)
                   ∈ t1 ++ HartE gen c0 (riscv_step tick) :: t2).
   { apply (elem_of_replace _ (HartE gen c0 (Interface.Ret tt)));
       [exact H1|intros Heq; congruence]. }
   apply elem_of_list_split in H1' as (u1 & u2 & Hts1).
-  destruct (boot_one tick gen c1 u1 u2 cs g1 Hlv1 Hgs1 Hcs1)
+  destruct (boot_one tick gen c1 u1 u2 cs g1 Hacq Hlv1 Hgs1 Hcs1)
     as (g2 & Hn2 & Hlv2 & Hgs2 & Hcs2).
   rewrite Hts1 in Hn1.
   exists (1 + 1)%nat, (u1 ++ HartE gen c1 (riscv_step tick) :: u2), g2.
@@ -640,18 +796,21 @@ Qed.
 (* 7. THE TEST'S OWN STARTING POINT.                                       *)
 (*                                                                         *)
 (*    [VRun.test_gstate] is the machine the theorem starts from; this is   *)
-(*    what the driver computes from.  Every hart lands where ITS OWN boot  *)
-(*    chain leaves it -- [cold_regs] is parametric in the hart id and the  *)
-(*    gstate gives index [c] the id [hart + c] -- so a two-hart program    *)
-(*    that reads [mhartid] to tell the harts apart sees what it sees on    *)
-(*    the machine.                                                         *)
+(*    what the driver computes from, field for field.  Every hart lands    *)
+(*    where ITS OWN boot chain leaves it -- [cold_regs] is parametric in   *)
+(*    the hart id and the gstate gives index [c] the id [hart + c] -- so a *)
+(*    two-hart program that reads [mhartid] to tell the harts apart sees   *)
+(*    what it sees on the machine.  The era begins with an EMPTY log, so   *)
+(*    every floor and every coherence floor starts at 0, which is why a    *)
+(*    stale read is admissible at all.                                     *)
 (* ---------------------------------------------------------------------- *)
 
 Definition conc_start (hart : Z) (text : list Z) (rs : list region)
     (disk_init : list (Z * list Z)) : cstate :=
   CState (fun c => ColdBoot.cold_regs
                      (SailStdpp.Values.mword_of_int (hart + Z.of_nat (fin_to_nat c))))
-         (mem_of text rs) (dev_of (img_of_sectors disk_init)).
+         (mem_of text rs) (dev_of (img_of_sectors disk_init))
+         (mem_of text rs) [] (fun _ => 0%nat) (fun _ => hread0).
 
 Lemma gs_ok_test_gstate (hart : Z) (text : list Z) (rs : list region)
     (disk_init : list (Z * list Z)) :
@@ -671,7 +830,7 @@ Qed.
 Lemma cs_ok_conc_start (hart : Z) (text : list Z) (rs : list region)
     (disk_init : list (Z * list Z)) :
   cs_ok (conc_start hart text rs disk_init) (test_gstate hart text rs disk_init).
-Proof. constructor; reflexivity. Qed.
+Proof. constructor; intros; reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 8. THE FORM A GENERATED PROOF USES.                                     *)
@@ -682,20 +841,24 @@ Proof. constructor; reflexivity. Qed.
 (*    MATCH so a generator writes down nothing but the schedule.           *)
 (* ---------------------------------------------------------------------- *)
 
-Definition conc_result (tick : bool) (sch round : list CPU) (n : nat)
+(* the per-instruction node budget: an instruction is tens of nodes, and
+   this only has to be bigger than the longest one *)
+Definition node_fuel : nat := 2000%nat.
+
+Definition conc_result (tick : bool) (sch round : list citem) (n : nat)
     (hart : Z) (text : list Z) (rs : list region)
     (disk_init : list (Z * list Z)) : option cstate :=
-  match crun tick sch (conc_start hart text rs disk_init) with
-  | Some cs => cfinish tick round n cs
+  match crun tick node_fuel sch (conc_start hart text rs disk_init) with
+  | Some cs => cfinish tick node_fuel round n cs
   | None => None
   end.
 
-Theorem conc_shows (tick : bool) (c0 c1 : CPU) (sch round : list CPU) (n : nat)
+Theorem conc_shows (tick : bool) (c0 c1 : CPU) (sch round : list citem) (n : nat)
     (hart : Z) (text : list Z) (rs : list region)
     (disk_init : list (Z * list Z)) (o : observation) :
   c0 <> c1 ->
-  (forall c, c ∈ sch -> c = c0 \/ c = c1) ->
-  (forall c, c ∈ round -> c = c0 \/ c = c1) ->
+  (forall c pol, (c, pol) ∈ sch -> c = c0 \/ c = c1) ->
+  (forall c pol, (c, pol) ∈ round -> c = c0 \/ c = c1) ->
   match conc_result tick sch round n hart text rs disk_init with
   | Some cs => peek_mem cs.(cmem) result_base result_size = o.(o_result)
                /\ serial_of (Some (cfocus cs hart_primary)) = o.(o_uart)
@@ -709,30 +872,33 @@ Theorem conc_shows (tick : bool) (c0 c1 : CPU) (sch round : list CPU) (n : nat)
 Proof.
   intros Hne Hsch Hround.
   unfold conc_result.
-  destruct (crun tick sch (conc_start hart text rs disk_init)) as [cs1|] eqn:Hrun;
-    [|intros []].
-  destruct (cfinish tick round n cs1) as [cs2|] eqn:Hfin; [|intros []].
+  destruct (crun tick node_fuel sch (conc_start hart text rs disk_init))
+    as [cs1|] eqn:Hrun; [|intros []].
+  destruct (cfinish tick node_fuel round n cs1) as [cs2|] eqn:Hfin; [|intros []].
   intros (Hres & Hser & Hdsk).
   assert (Hlive0 : thread_live (test_gstate hart text rs disk_init) 0)
     by (split; reflexivity).
   pose proof (gs_ok_test_gstate hart text rs disk_init) as Hgs0.
   pose proof (cs_ok_conc_start hart text rs disk_init) as Hcs0.
-  (* 1. every hart the schedule uses, from [Ret tt] to the uniform point *)
+  assert (Hacq : forall d, hr_acq ((conc_start hart text rs disk_init).(chr) d)
+                           = false) by (intros d; reflexivity).
+  (* 1. the two harts the schedule uses, from [Ret tt] to the uniform point *)
   destruct (pool_boot2 tick 0 c0 c1 (power_fork 0)
               (conc_start hart text rs disk_init)
               (test_gstate hart text rs disk_init)
-              Hne Hlive0 Hgs0 Hcs0 (loop_in_pool 0 c0) (loop_in_pool 0 c1))
+              Hne Hacq Hlive0 Hgs0 Hcs0 (loop_in_pool 0 c0) (loop_in_pool 0 c1))
     as (N0 & ts' & gb & Hn0 & Hlvb & Hgsb & Hcsb & Hin0 & Hin1).
   assert (Hin : forall c, c = c0 \/ c = c1 ->
                   HartE 0 c (riscv_step tick) ∈ ts')
     by (intros c Hc; destruct Hc as [Hc|Hc]; subst c; assumption).
   (* 2. the named interleaving *)
-  destruct (crun_nsteps tick 0 ts' sch (conc_start hart text rs disk_init) cs1 gb
-              (fun c Hc => Hin c (Hsch c Hc)) Hlvb Hgsb Hcsb Hrun)
+  destruct (crun_nsteps tick node_fuel 0 ts' sch
+              (conc_start hart text rs disk_init) cs1 gb
+              (fun c pol Hc => Hin c (Hsch c pol Hc)) Hlvb Hgsb Hcsb Hrun)
     as (N1 & g1 & Hn1 & Hlv1 & Hgs1 & Hcs1).
   (* 3. ...and both harts to the flag *)
-  destruct (cfinish_nsteps tick 0 ts' round
-              (fun c Hc => Hin c (Hround c Hc)) n cs1 cs2 g1
+  destruct (cfinish_nsteps tick node_fuel 0 ts' round
+              (fun c pol Hc => Hin c (Hround c pol Hc)) n cs1 cs2 g1
               Hlv1 Hgs1 Hcs1 Hfin)
     as (N2 & g2 & Hn2 & Hlv2 & Hgs2 & Hcs2).
   exists (N0 + (N1 + N2))%nat, [], ts', g2.
@@ -741,7 +907,6 @@ Proof.
     exact (nsteps_trans_nil _ _ _ _ _ Hn0
              (nsteps_trans_nil _ _ _ _ _ Hn1 Hn2)). }
   split; [reflexivity|].
-  (* the observation, read off the hart that published it *)
   pose proof (cs_hart_ok cs2 g2 hart_primary Hgs2 Hcs2) as Hok2.
   apply (observed_at_of_hart_ok hart_primary g2 (cfocus cs2 hart_primary) o Hok2).
   - unfold result_of. cbn [cfocus mem]. exact Hres.
@@ -752,34 +917,39 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 (* 9. THE TWO-HART FORM, which is every case in this suite.                *)
 (*                                                                         *)
-(*    A schedule is a list of BITS rather than of harts -- [false] is the  *)
-(*    first hart, [true] the second -- so "this schedule only names the    *)
-(*    two harts the pool booted" holds by construction and a generated     *)
-(*    proof carries no side conditions at all.                             *)
+(*    A schedule item is a PAIR OF BITS rather than a hart and a policy --  *)
+(*    the first says which of the two harts, the second whether it reads   *)
+(*    STALE -- so "this schedule only names the two harts the pool booted" *)
+(*    holds by construction and a generated proof carries no side          *)
+(*    conditions at all.                                                   *)
 (* ---------------------------------------------------------------------- *)
 
 Definition chart0 : CPU := 0%fin.
 Definition chart1 : CPU := 1%fin.
 
 Definition hof (b : bool) : CPU := if b then chart1 else chart0.
-Definition csch (bs : list bool) : list CPU := hof <$> bs.
+Definition pof (b : bool) : rpol := if b then PStale else PFresh.
+Definition citem_of (p : bool * bool) : citem := (hof p.1, pof p.2).
+Definition csch (bs : list (bool * bool)) : list citem := citem_of <$> bs.
 
 Lemma chart_ne : chart0 <> chart1.
 Proof. discriminate. Qed.
 
-Lemma csch_in (bs : list bool) (c : CPU) :
-  c ∈ csch bs -> c = chart0 \/ c = chart1.
+Lemma csch_in (bs : list (bool * bool)) (c : CPU) (pol : rpol) :
+  (c, pol) ∈ csch bs -> c = chart0 \/ c = chart1.
 Proof.
-  intros H. apply elem_of_list_fmap in H as (b & -> & _).
-  destruct b; [by right|by left].
+  intros H. apply elem_of_list_fmap in H as (b & Heq & _).
+  unfold citem_of in Heq. destruct b as [hb sb]; cbn [fst snd] in Heq.
+  injection Heq as Hc _. subst c. destruct hb; [right|left]; reflexivity.
 Qed.
 
-Definition conc2_result (tick : bool) (bs : list bool) (n : nat)
+Definition conc2_result (tick : bool) (bs : list (bool * bool)) (n : nat)
     (hart : Z) (text : list Z) (rs : list region)
     (disk_init : list (Z * list Z)) : option cstate :=
-  conc_result tick (csch bs) (csch [false; true]) n hart text rs disk_init.
+  conc_result tick (csch bs) (csch [(false, false); (true, false)]) n
+              hart text rs disk_init.
 
-Theorem conc2_shows (tick : bool) (bs : list bool) (n : nat)
+Theorem conc2_shows (tick : bool) (bs : list (bool * bool)) (n : nat)
     (hart : Z) (text : list Z) (rs : list region)
     (disk_init : list (Z * list Z)) (o : observation) :
   match conc2_result tick bs n hart text rs disk_init with
@@ -793,7 +963,8 @@ Theorem conc2_shows (tick : bool) (bs : list bool) (n : nat)
       (test_config hart text rs disk_init) l (ts, g)
     /\ obs_in l = [] /\ observed_at g o.
 Proof.
-  apply (conc_shows tick chart0 chart1 (csch bs) (csch [false; true]) n
+  apply (conc_shows tick chart0 chart1 (csch bs)
+           (csch [(false, false); (true, false)]) n
            hart text rs disk_init o chart_ne
-           (csch_in bs) (csch_in [false; true])).
+           (csch_in bs) (csch_in [(false, false); (true, false)])).
 Qed.

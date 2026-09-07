@@ -443,14 +443,21 @@ def parse_csched(spec):
 
     Syntax, semicolons between schedules and commas inside one:
 
-        csched=20*0,23*1,33*0;20*0,23*1,11*0
+        csched=20*0,23*1,33*0;20*0,23*1,11*0s
 
     [count*hart] is [count] whole instructions of that hart, run-length
     encoded because an alignment prefix is a hundred instructions long and
-    nobody should read that as a list of bits.  Returns a list of Rocq
-    expressions, or [] when the case names no schedule -- which is not the
-    same as naming the empty one: it means "round-robin from the start",
-    the same schedule for every observation."""
+    nobody should read that as a list of bits.  A trailing `s` marks the
+    stretch STALE: its loads read at the LOWEST view the model admits
+    rather than at the top of the log, which is where the other hart's
+    later store is invisible.  That is store buffering's (0,0) and it is
+    the only reason the driver carries the write log at all; everything
+    else reads fresh, which is the strongest read TSO allows.
+
+    Returns a list of Rocq expressions, or [] when the case names no
+    schedule -- which is not the same as naming the empty one: it means
+    "round-robin from the start", the same schedule for every
+    observation."""
     out = []
     for sched in spec.split(";"):
         sched = sched.strip()
@@ -460,8 +467,12 @@ def parse_csched(spec):
             if not grp:
                 continue
             n, _, h = grp.partition("*")
-            parts.append("replicate %d %s"
-                         % (int(n), "true" if h.strip() == "1" else "false"))
+            h = h.strip()
+            stale = h.endswith("s")
+            hart = h[:-1] if stale else h
+            parts.append("replicate %d (%s, %s)"
+                         % (int(n), "true" if hart == "1" else "false",
+                            "true" if stale else "false"))
         out.append(("(" + " ++ ".join(parts) + ")%list") if parts else "[]")
     return out
 
