@@ -1,17 +1,18 @@
 /* disk_ident_cap -- THE DEVICE CAPACITY.  The virtio-blk CONFIG SPACE starts
  * at offset 0x100 of the mmio window and its first eight bytes are the
- * capacity in 512-byte sectors.  [VirtioModel.virtio_read] has no case for
- * 0x100, so the load is [None] and the MODEL IS STUCK; QEMU answers with the
- * real size of the backing file.
+ * capacity in 512-byte sectors.
  *
- * This is the entry in the stuck matrix that the repo owner has ruled should
- * be FIXED rather than merely recorded: asking the disk how big it is is a
- * perfectly reasonable thing for a driver to do, and today no such driver
- * has a model execution at all.  See vtest-rocq/DiskIdentCap.v for QEMU's
- * value and a sketch of the fix.
+ * THIS HEADER USED TO SAY THE MODEL WAS STUCK HERE -- [VirtioModel.virtio_read]
+ * had no case for 0x100, so the load was [None] -- and that it was the entry
+ * in the stuck matrix the owner had ruled should be FIXED.  It HAS been:
+ * measured, the model decodes the config space, answers 128 sectors, and
+ * AGREES with QEMU on both halves of the capacity and on size_max.  A driver
+ * that asks the disk how big it is now has a model execution.
  *
- * The stuck access is the FIRST load of 0x100; everything after it runs on
- * QEMU only, which is how the capacity gets recorded at all.
+ * What still diverges is seg_max: QEMU reports 254 and the model 0.  That is
+ * disk_ident_segmax's, published there and nowhere else, so that the
+ * capacity -- this test's subject, and the thing that was fixed -- can be
+ * proved.
  */
 /* vtest: platforms=qemu */
 #include "abi.h"
@@ -20,7 +21,7 @@
 #define R_CAPLO      8    /* capacity, low 32 bits -- MODEL STUCK HERE */
 #define R_CAPHI      12    /* capacity, high 32 bits */
 #define R_SIZEMAX    16    /* config+8: size_max (only if F_SIZE_MAX) */
-#define R_SEGMAX     20    /* config+12: seg_max */
+#define R_SEGMAX     20    /* config+12: seg_max -- disk_ident_segmax's */
 
     .globl _vtest_body
 _vtest_body:
@@ -54,7 +55,9 @@ _vtest_body:
     lw   t0, 0x108(s0)
     sw   t0, R_SIZEMAX(s11)
     lw   t0, 0x10c(s0)
+#ifdef DISK_IDENT_SEGMAX
     sw   t0, R_SEGMAX(s11)
+#endif
     li   t0, 2
     sw   t0, RES_STATUS(s11)
     mv   ra, s10

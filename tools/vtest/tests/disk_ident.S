@@ -28,7 +28,7 @@
 #define R_VERSION    12
 #define R_DEVID      16
 #define R_VENDOR     20
-#define R_FEATURES   24    /* DIVERGES -- finding 2 */
+#define R_FEATURES   24    /* NOT PUBLISHED -- finding 2, see below */
 #define R_ST_DRIVER  28    /* Status after ACKNOWLEDGE|DRIVER      = 3  */
 #define R_ST_FEATOK  32    /* Status after FEATURES_OK             = 11 */
 #define R_QNM0       36    /* QueueNumMax, QueueSel = 0  DIVERGES -- finding 1 */
@@ -40,7 +40,7 @@
 #define R_ST_DRVOK   60    /* Status after DRIVER_OK               = 15 */
 #define R_ST_RESET   64    /* Status after Status <- 0             = 0  */
 #define R_QRDY_RST   68    /* QueueReady after the reset           = 0  */
-#define R_FEAT_RST   72    /* DeviceFeatures after the reset (unchanged) */
+#define R_FEAT_RST   72    /* NOT PUBLISHED -- the same word again */
 #define R_ISR_RST    76    /* InterruptStatus after the reset      = 0  */
 
     .globl _vtest_body
@@ -68,7 +68,13 @@ _vtest_body:
     lw   t0, 0x70(s0)
     sw   t0, R_ST_DRIVER(s11)
     lw   t0, 0x10(s0)                /* DeviceFeatures */
-    sw   t0, R_FEATURES(s11)
+    /* NOT PUBLISHED.  The offered feature word is finding 2 -- the model
+       offers FLUSH|CONFIG_WCE (0x00000a00) where QEMU offers 0x30006e54 --
+       and it is the ONLY word of this test the two disagree on.  It is
+       asked, and answered on both sides, by disk_ident_featsel, whose
+       subject IS the feature registers; publishing it here made every
+       other identification register unprovable for a divergence recorded
+       elsewhere.  (R_QNM0, marked as finding 1 below, now AGREES.) */
     li   t1, 0x38001AA0              /* what xv6 clears */
     not  t1, t1
     and  t0, t0, t1
@@ -126,7 +132,6 @@ _vtest_body:
     lw   t0, 0x44(s0)                /* QueueReady must be back to 0 */
     sw   t0, R_QRDY_RST(s11)
     lw   t0, 0x10(s0)                /* the offered features do not reset */
-    sw   t0, R_FEAT_RST(s11)
     lw   t0, 0x60(s0)
     sw   t0, R_ISR_RST(s11)
     li   t0, 2

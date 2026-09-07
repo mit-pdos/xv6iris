@@ -22,6 +22,7 @@
      +4    status = 1
      +8    x1 ..  +248 x31, one 8-byte little-endian word each:
            x_i is at RES_PAYLOAD + 8*(i-1) = 8*i.
+           x11 and x12 are left ZERO -- they are core_dtb's; see below.
    (x0 is not stored: it is architecturally zero.) */
 #include "abi.h"
 
@@ -37,8 +38,13 @@ _vtest_body:
     sd  x8,  64(s11)
     sd  x9,  72(s11)
     sd  x10, 80(s11)
-    sd  x11, 88(s11)
-    sd  x12, 96(s11)
+    /* x11 (a1) and x12 (a2) ARE NOT PUBLISHED.  Measured, they are the only
+       two of the 31 the model and QEMU disagree on: a1 is the device-tree
+       pointer -- finding 18, the model writes a hardcoded 0x1000 where QEMU
+       passes the real one, which moves with -m and with the image -- and a2
+       is a second boot value QEMU passes that the model does not set at all.
+       Both are facts about the boot CONTRACT, not about the register file
+       this test is for, and core_dtb publishes both. */
     sd  x13, 104(s11)
     sd  x14, 112(s11)
     sd  x15, 120(s11)

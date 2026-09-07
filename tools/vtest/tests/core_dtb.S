@@ -17,19 +17,32 @@
  * touched -- the prologue writes t0, t1, t2, sp and s11 and nothing else,
  * and the `jal` does not touch the argument registers.
  *
+ * a2 IS HERE TOO, for the same reason.  core_regs_gpr publishes all 31
+ * general registers as the machine handed them over, and measured, a1 (x11)
+ * and a2 (x12) are the ONLY two it and the model disagree on -- a1 by
+ * finding 18, a2 because QEMU passes a second boot value the model does not
+ * set at all (model 0).  Both are facts about the boot CONTRACT rather than
+ * about the register file, so both live here and core_regs_gpr publishes
+ * neither.
+ *
  * RESULT layout (core_hart's old offsets, so the two captures read the same):
  *   +32   a1 at entry, low word
  *   +36   a1 at entry, high word
+ *   +40   a2 at entry, low word
+ *   +44   a2 at entry, high word
  */
 /* vtest: repeat=1 tick=0 budget=2000 */
 #include "abi.h"
 
 #define R_A1LO     32
 #define R_A1HI     36
+#define R_A2LO     40
+#define R_A2HI     44
 
     .globl _vtest_body
 _vtest_body:
     mv   s2, a1
+    mv   s3, a2
 
     li   t0, 1
     sw   t0, RES_STATUS(s11)
@@ -37,6 +50,9 @@ _vtest_body:
     sw   s2, R_A1LO(s11)
     srli t0, s2, 32
     sw   t0, R_A1HI(s11)
+    sw   s3, R_A2LO(s11)
+    srli t0, s3, 32
+    sw   t0, R_A2HI(s11)
 
     li   t0, 2
     sw   t0, RES_STATUS(s11)

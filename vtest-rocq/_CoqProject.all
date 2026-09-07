@@ -149,6 +149,9 @@ QEMU/DiskIdentRd2Pass.v
 QEMU/DiskIdentRd2Run.v
 QEMU/DiskIdentRd2Test.v
 QEMU/DiskIdentRun.v
+QEMU/DiskIdentSegmaxPass.v
+QEMU/DiskIdentSegmaxRun.v
+QEMU/DiskIdentSegmaxTest.v
 QEMU/DiskIdentShmselPass.v
 QEMU/DiskIdentShmselRun.v
 QEMU/DiskIdentShmselTest.v
