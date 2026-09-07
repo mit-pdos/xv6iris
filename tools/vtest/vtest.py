@@ -394,6 +394,9 @@ def hand_written(fname, platform=None):
 
 VERDICTS = ("agree", "stuck")
 
+# how far a stuck proof looks; see [emit_passes]
+STUCK_BUDGET = 500
+
 
 def verdict_of_file(mod, pl):
     """Which way a generated proof claims the run passes, read off its
@@ -438,6 +441,16 @@ def emit_passes(built=None, reset=False):
         cfg = config(n)
         tick = "true" if str(cfg.get("tick", 0)) == "1" else "false"
         budget = cfg["budget"]
+        # A STUCK PROOF DOES NOT NEED THE CASE'S BUDGET.  [run_no_step_at]
+        # quantifies the step count existentially: the proof needs only
+        # enough steps to REACH the stuck node, and a model that refuses an
+        # undecoded MMIO access does so within a few hundred instructions of
+        # boot.  Running the case's own budget instead would cost exactly
+        # what the agree form costs -- [eval_run_at] has to run the whole
+        # thing before it can answer "not stuck" -- so a slow case would be
+        # just as slow under this form, for nothing.  A test that only gets
+        # stuck later than this stays unproved, which understates.
+        stuck_budget = min(int(budget), STUCK_BUDGET)
         for pl in PLATFORMS:
             if pl not in platforms_of(n):
                 continue
@@ -472,7 +485,7 @@ def emit_passes(built=None, reset=False):
     run_no_step_at {mod}.hart {mod}.text {mod}.regions
                    {mod}.uart_input {mod}.disk_init.
   Proof.
-    apply (run_no_step {tick} lowest_head {budget}).
+    apply (run_no_step {tick} lowest_head {stuck_budget}).
     vm_cast_no_check (eq_refl true).
   Qed."""
                 imports = f"From VTest.{PLATDIR[pl]} Require Import {mod}Test."
@@ -934,7 +947,17 @@ def main():
     if a.cmd == "passes":
         built = None
         if a.built:
-            built = {l.strip() for l in open(a.built) if l.strip()}
+            # accept "<PLAT>/<Mod>", "<PLAT>/<Mod>Pass", "<PLAT>/<Mod>Pass.v"
+            # or the .vo -- the caller is usually piping an ls
+            def norm(x):
+                x = x.strip()
+                for suf in (".vo", ".v"):
+                    if x.endswith(suf):
+                        x = x[:-len(suf)]
+                if x.endswith("Pass"):
+                    x = x[:-len("Pass")]
+                return x
+            built = {norm(l) for l in open(a.built) if l.strip()}
         made = emit_passes(built=built, reset=a.reset)
         print("wrote %d per-run Pass file(s)" % len(made))
         for m in made:

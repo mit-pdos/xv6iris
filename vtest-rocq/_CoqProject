@@ -249,6 +249,7 @@ JH7110/PtResvPass.v
 JH7110/PtSuperPass.v
 JH7110/PtTlbPass.v
 QEMU/ClintMsipPass.v
+QEMU/CoreCsrwidePass.v
 QEMU/CoreIcachePass.v
 QEMU/CoreRegsFcsrPass.v
 QEMU/CoreRegsHpmPass.v
