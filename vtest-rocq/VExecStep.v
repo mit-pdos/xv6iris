@@ -220,6 +220,27 @@ Proof.
   destruct (decide (c = cpu)) as [->|_]; [contradiction (Hne eq_refl)|reflexivity].
 Qed.
 
+Lemma greg_ins_ne (f : CPU -> regstate) (cpu c : CPU) (v : regstate) :
+  c <> cpu -> <[cpu := v]> f c = f c.
+Proof.
+  intros Hne. unfold insert, greg_insert.
+  destruct (decide (c = cpu)) as [->|_]; [contradiction (Hne eq_refl)|reflexivity].
+Qed.
+
+Lemma gtv_ins_ne (f : CPU -> nat) (cpu c : CPU) (v : nat) :
+  c <> cpu -> <[cpu := v]> f c = f c.
+Proof.
+  intros Hne. unfold insert, gtv_insert.
+  destruct (decide (c = cpu)) as [->|_]; [contradiction (Hne eq_refl)|reflexivity].
+Qed.
+
+Lemma ghr_ins_ne (f : CPU -> hread) (cpu c : CPU) (v : hread) :
+  c <> cpu -> <[cpu := v]> f c = f c.
+Proof.
+  intros Hne. unfold insert, ghr_insert.
+  destruct (decide (c = cpu)) as [->|_]; [contradiction (Hne eq_refl)|reflexivity].
+Qed.
+
 Lemma others_resv_insert (gr : CPU -> option resv) (cpu : CPU)
     (r : option resv) :
   others_resv (<[cpu := r]> gr) cpu = others_resv gr cpu.
@@ -258,6 +279,86 @@ Proof.
   - rewrite ghr_ins_eq. exact Hrv.
   - intros a. rewrite ghr_ins_eq. exact (Hcoh a).
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 3b. WHAT ONE HART'S STEP LEAVES ALONE.                                  *)
+(*                                                                         *)
+(*     Everything above is about ONE hart, and [hart_ok] is a statement    *)
+(*     about one hart's projection.  A run with more than one hart needs   *)
+(*     the other half: that stepping THIS hart does not invalidate what    *)
+(*     was known about the OTHERS.  [mnode_log_grows] is the fact that     *)
+(*     does it -- every other hart's bound is [<= length log] -- and       *)
+(*     [others_kept] is the shape a chain of steps composes it in.         *)
+(*                                                                         *)
+(*     THE RESERVATION IS NOT AMONG THEM, and that is [boundary_prim]'s    *)
+(*     doing: the instruction boundary drops a dangling reservation, so a  *)
+(*     schedule that switches harts BETWEEN instructions never meets one   *)
+(*     held by the hart it is leaving.  That is why [VConcStep]'s schedule *)
+(*     item is the instruction AND the boundary after it.                  *)
+(* ---------------------------------------------------------------------- *)
+
+(* THE LOG ONLY GROWS.  Every arm of [mnode_step] either leaves the write
+   log alone or appends to it; nothing rewrites or truncates it.  That is
+   what carries the OTHER harts' view bounds -- all of them [<= length log]
+   -- across a step they did not take. *)
+Lemma mnode_log_grows (oth : gset Arch.pa) (h : agent)
+    (img : gmap Arch.pa (bv 8)) (s : mstate) (log : list pwmsg)
+    (tv itv : nat) (hr : hread) (r : option resv) (m m' : M unit)
+    (s' : mstate) (log' : list pwmsg) (tv' itv' : nat) (hr' : hread)
+    (r' : option resv) :
+  mnode_step oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' ->
+  exists ext, log' = log ++ ext.
+Proof.
+  intros H.
+  destruct m as [y|T oc k]; [|destruct oc]; cbn [mnode_step] in H;
+    repeat match goal with
+           | H : context[if ?c then _ else _] |- _ => destruct c
+           | H : exists _, _ |- _ => destruct H as [? H]
+           | H : _ /\ _ |- _ => destruct H as [? ?]
+           | H : _ \/ _ |- _ => destruct H as [H|H]
+           | H : False |- _ => destruct H
+           end;
+    first [ exists []; rewrite app_nil_r; assumption | eexists; eassumption ].
+Qed.
+
+(* ...and the shape of "left alone", as one record so a chain of steps can
+   compose it.  [cpu] is the hart whose step this was: ITS views may move,
+   and no one else's does.  Registers are here too, because a multi-hart
+   run computes every hart's registers and has to know the ones it is not
+   stepping stayed put. *)
+Record others_kept (cpu : CPU) (g g' : gstate) : Prop := OthersKept {
+  ok_log  : exists ext, g'.(glog) = g.(glog) ++ ext;
+  ok_img  : g'.(gimg) = g.(gimg);
+  ok_regs : forall c, c <> cpu -> g'.(gregs) c = g.(gregs) c;
+  ok_resv : forall c, c <> cpu -> g'.(gresv) c = g.(gresv) c;
+  ok_tv   : forall c, c <> cpu -> g'.(gtv) c = g.(gtv) c;
+  ok_itv  : forall c, c <> cpu -> g'.(gitv) c = g.(gitv) c;
+  ok_hr   : forall c, c <> cpu -> g'.(ghr) c = g.(ghr) c;
+}.
+
+Lemma others_kept_refl (cpu : CPU) (g : gstate) : others_kept cpu g g.
+Proof.
+  constructor; try reflexivity; try (intros; reflexivity).
+  exists []. rewrite app_nil_r. reflexivity.
+Qed.
+
+Lemma others_kept_trans (cpu : CPU) (g1 g2 g3 : gstate) :
+  others_kept cpu g1 g2 -> others_kept cpu g2 g3 -> others_kept cpu g1 g3.
+Proof.
+  intros [[e1 Hl1] Hi1 Hg1 Hr1 Ht1 Hit1 Hh1]
+         [[e2 Hl2] Hi2 Hg2 Hr2 Ht2 Hit2 Hh2].
+  constructor; try (intros c Hc; rewrite ?Hg2, ?Hr2, ?Ht2, ?Hit2, ?Hh2 by exact Hc;
+                    auto).
+  - exists (e1 ++ e2). rewrite Hl2, Hl1, app_assoc. reflexivity.
+  - rewrite Hi2. exact Hi1.
+Qed.
+
+(* every field of [others_kept] but the log is "the write-back inserted at
+   [cpu], and this is not [cpu]" *)
+Ltac ins_ne :=
+  intros ? Hne;
+  first [ apply greg_ins_ne | apply gresv_ins_ne
+        | apply gtv_ins_ne  | apply ghr_ins_ne ]; exact Hne.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. ONE NODE IS ONE [prim_step].                                         *)
@@ -501,17 +602,25 @@ Lemma enode_prim (tick : bool) (gen : nat) (cpu : CPU) (g : gstate)
   hart_ok cpu g s ->
   enode tick m s = Some (m', s') ->
   exists g', prim_step (HartE gen cpu m) g [] (HartE gen cpu m') g' []
-             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ others_kept cpu g g'.
 Proof.
   intros Hlive Hok Hen.
   destruct (enode_mnode tick cpu g s m m' s' Hok Hen)
     as (log' & tv' & itv' & hr' & r' & Hnode & Hok').
+  assert (Hgrow : exists ext, log' = g.(glog) ++ ext).
+  { apply (mnode_log_grows _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hnode). }
   exists (wb cpu g s' log' tv' itv' hr' r').
-  split; [|split; [exact Hok'|]].
+  split; [|split; [exact Hok'|split]].
   - apply mnode_prim; [exact Hlive|].
     rewrite (hart_ok_proj cpu g s Hok). exact Hnode.
   - (* the write-back touches neither the power nor the generation *)
     unfold thread_live, wb in *; cbn [gpow ggen] in *. exact Hlive.
+  - (* ...and it inserts at [cpu] and nowhere else *)
+    destruct Hgrow as [ext Hext]. unfold wb. constructor;
+      cbn [gregs gmem gdev ggen gpow gresv gimg glog gtv gitv ghr];
+      try reflexivity; try ins_ne.
+    exists ext. exact Hext.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -599,17 +708,21 @@ Lemma estep_hstep (tick : bool) (gen : nat) (cpu : CPU) :
   forall p q : M unit * mstate, rtc (estep tick) p q ->
   forall g, thread_live g gen -> hart_ok cpu g (snd p) ->
     exists g', rtc (hstep gen cpu) (fst p, g) (fst q, g')
-               /\ hart_ok cpu g' (snd q) /\ thread_live g' gen.
+               /\ hart_ok cpu g' (snd q) /\ thread_live g' gen
+               /\ others_kept cpu g g'.
 Proof.
   intros p q Hrtc. induction Hrtc as [p|p1 p2 p3 Hstep Hrtc IH];
     intros g Hlive Hok.
-  - exists g. split; [apply rtc_refl|]. split; assumption.
+  - exists g. split; [apply rtc_refl|]. split; [assumption|].
+    split; [assumption|apply others_kept_refl].
   - destruct p1 as [m1 s1], p2 as [m2 s2].
     unfold estep in Hstep; cbn [fst snd] in Hstep, Hok.
     destruct (enode_prim tick gen cpu g s1 m1 m2 s2 Hlive Hok Hstep)
-      as (g1 & Hps & Hok1 & Hlive1).
-    destruct (IH g1 Hlive1 Hok1) as (g' & Hrtc' & Hok' & Hlive').
-    exists g'. split; [|split; assumption].
+      as (g1 & Hps & Hok1 & Hlive1 & Hkept1).
+    destruct (IH g1 Hlive1 Hok1) as (g' & Hrtc' & Hok' & Hlive' & Hkept').
+    exists g'. split;
+      [|split; [assumption|split;
+                 [assumption|exact (others_kept_trans cpu g g1 g' Hkept1 Hkept')]]].
     assert (Hstep1 : hstep gen cpu (m1, g) (m2, g1))
       by (unfold hstep; cbn [fst snd]; exact Hps).
     cbn [fst snd]. cbn [fst snd] in Hrtc'.
@@ -624,7 +737,8 @@ Lemma exec_hstep (tick : bool) (gen : nat) (cpu : CPU) (m : M unit)
   thread_live g gen ->
   hart_ok cpu g s ->
   exists g', rtc (hstep gen cpu) (m, g) (Interface.Ret x, g')
-             /\ hart_ok cpu g' s' /\ thread_live g' gen.
+             /\ hart_ok cpu g' s' /\ thread_live g' gen
+             /\ others_kept cpu g g'.
 Proof.
   intros Hex Hlive Hok.
   exact (estep_hstep tick gen cpu (m, s) (Interface.Ret x, s')
@@ -699,14 +813,14 @@ Lemma exec_nsteps (tick : bool) (gen : nat) (cpu : CPU) (t1 t2 : list mexpr)
   exists n g',
     @language.nsteps riscv_lang n (t1 ++ HartE gen cpu m :: t2, g) []
                      (t1 ++ HartE gen cpu (Interface.Ret x) :: t2, g')
-    /\ hart_ok cpu g' s' /\ thread_live g' gen.
+    /\ hart_ok cpu g' s' /\ thread_live g' gen /\ others_kept cpu g g'.
 Proof.
   intros Hex Hlive Hok.
   destruct (exec_hstep tick gen cpu m s x s' g Hex Hlive Hok)
-    as (g' & Hrtc & Hok' & Hlive').
+    as (g' & Hrtc & Hok' & Hlive' & Hkept).
   destruct (hstep_nsteps gen cpu t1 t2 (m, g) (Interface.Ret x, g') Hrtc)
     as [n Hn]; cbn [fst snd] in Hn.
-  exists n, g'. split; [exact Hn|]. split; assumption.
+  exists n, g'. split; [exact Hn|]. split; [assumption|split; assumption].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1536,13 +1650,14 @@ Lemma boundary_prim (tick : bool) (gen : nat) (cpu : CPU) (g : gstate)
   exists g',
     prim_step (HartE gen cpu (Interface.Ret u)) g []
               (HartE gen cpu (riscv_step tick)) g' []
-    /\ hart_ok cpu g' s /\ thread_live g' gen /\ all_resv g'.(gresv) = ∅.
+    /\ hart_ok cpu g' s /\ thread_live g' gen /\ all_resv g'.(gresv) = ∅
+    /\ others_kept cpu g g'.
 Proof.
   intros Hlive Hok.
   pose proof Hok as [Hr Hm Hd Hfl Hal Htv Hitv Hrv Hcoh].
   exists (wb cpu g s g.(glog) (g.(gtv) cpu) (g.(gitv) cpu)
              (HRead (hr_rv (g.(ghr) cpu)) (hr_coh (g.(ghr) cpu)) false) None).
-  split; [|split; [|split]].
+  split; [|split; [|split; [|split]]].
   - apply mnode_prim; [exact Hlive|].
     rewrite (hart_ok_proj cpu g s Hok).
     cbn [mnode_step]. exists tick. repeat (split; [reflexivity|]). reflexivity.
@@ -1551,6 +1666,11 @@ Proof.
   - unfold wb; cbn [gresv]. apply (all_resv_of_none _ cpu).
     + rewrite others_resv_insert. exact Hal.
     + apply gresv_ins_eq.
+  - (* the boundary writes back at [cpu] and leaves the log where it was *)
+    unfold wb. constructor;
+      cbn [gregs gmem gdev ggen gpow gresv gimg glog gtv gitv ghr];
+      try reflexivity; try ins_ne.
+    exists []. rewrite app_nil_r. reflexivity.
 Qed.
 
 Lemma elem_of_pool (e x : mexpr) (t1 t2 : list mexpr) :
@@ -1602,10 +1722,10 @@ Proof.
     (* 1. the instruction *)
     destruct (exec_nsteps tick gen hart_primary t1 t2 (riscv_step tick) s u s1 g
                 (exec_r_inl _ _ _ Hex) Hlive Hok)
-      as (N1 & g1 & Hn1 & Hok1 & Hlv1).
+      as (N1 & g1 & Hn1 & Hok1 & Hlv1 & _).
     (* 2. the boundary, which drops the reservation *)
     destruct (boundary_prim tick gen hart_primary g1 s1 u Hlv1 Hok1)
-      as (g2 & Hps2 & Hok2 & Hlv2 & Hres2).
+      as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & _).
     (* 3. the devices *)
     destruct (settle_nsteps gen
                 (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2)
@@ -1785,7 +1905,7 @@ Proof.
   destruct (boundary_prim tick 0 hart_primary
               (test_gstate hart text rs disk_init)
               (exec_start hart text rs disk_init) tt Hlive0 Hok0)
-    as (gb & Hpsb & Hokb & Hlvb & Hresb).
+    as (gb & Hpsb & Hokb & Hlvb & Hresb & _).
   (* 2. the input *)
   destruct (srun_uart_nsteps 0
               (t1 ++ HartE 0 hart_primary (riscv_step tick) :: t2) uart_input
@@ -2010,9 +2130,9 @@ Proof.
     + (* the instruction ran; the refusal is later *)
       destruct (exec_nsteps tick gen hart_primary t1 t2 (riscv_step tick) s u s1
                   g (exec_r_inl _ _ _ Hex) Hlive Hok)
-        as (N1 & g1 & Hn1 & Hok1 & Hlv1).
+        as (N1 & g1 & Hn1 & Hok1 & Hlv1 & _).
       destruct (boundary_prim tick gen hart_primary g1 s1 u Hlv1 Hok1)
-        as (g2 & Hps2 & Hok2 & Hlv2 & Hres2).
+        as (g2 & Hps2 & Hok2 & Hlv2 & Hres2 & _).
       destruct (settle_nsteps gen
                   (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2)
                   pick dev_fuel
@@ -2035,7 +2155,7 @@ Proof.
         as (m2 & s2 & Hrtc & Hen2 & Hst2).
       destruct (estep_hstep tick gen hart_primary (riscv_step tick, s)
                   (m2, s2) Hrtc g Hlive Hok)
-        as (g' & Hh & Hok' & Hlv'); cbn [fst snd] in Hh, Hok'.
+        as (g' & Hh & Hok' & Hlv' & _); cbn [fst snd] in Hh, Hok'.
       destruct (hstep_nsteps gen hart_primary t1 t2
                   (riscv_step tick, g) (m2, g') Hh) as [N Hn];
         cbn [fst snd] in Hn.
@@ -2074,7 +2194,7 @@ Proof.
   destruct (boundary_prim tick 0 hart_primary
               (test_gstate hart text rs disk_init)
               (exec_start hart text rs disk_init) tt Hlive0 Hok0)
-    as (gb & Hpsb & Hokb & Hlvb & Hresb).
+    as (gb & Hpsb & Hokb & Hlvb & Hresb & _).
   destruct (srun_uart_nsteps 0
               (t1 ++ HartE 0 hart_primary (riscv_step tick) :: t2) uart_input
               (elem_of_pool _ _ _ _ Hu) (elem_of_pool _ _ _ _ Hdk)

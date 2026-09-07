@@ -5,11 +5,14 @@
    computation of the interpreter to it.
 
    THIS RUN PASSES BECAUSE the model EXHIBITS every observation the platform
-   produced, from this test's own configuration. *)
+   produced, under an INTERLEAVING of the two harts --
+   which is what a race has and what the single-hart
+   theorem cannot state. *)
 From Stdlib Require Import List ZArith.
 From stdpp Require Import base list.
 Import ListNotations.
 From VTest Require Import VTest VRun VExecStep.
+From VTest Require Import VConcStep.
 From VTest.QEMU Require Import ConcByteTest ConcByteRun.
 
 Module ConcBytePass <: TEST_PASSES_AGREE ConcByte ConcByteRun.
@@ -20,7 +23,7 @@ Module ConcBytePass <: TEST_PASSES_AGREE ConcByte ConcByteRun.
     intros o Ho.
     cbn [ConcByteRun.observed ConcByteRun.results fmap list_fmap] in Ho.
     repeat (destruct Ho as [<-|Ho];
-            [ apply (run_shows false lowest_head 20000);
+            [ apply (conc2_shows false [] 20000);
               vm_compute; repeat split |]).
     destruct Ho.
   Qed.

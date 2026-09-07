@@ -12,6 +12,7 @@ VBoot.v
 VConc.v
 VNode.v
 VExecStep.v
+VConcStep.v
 VRun.v
 VModelFacts.v
 ConcAmoSched.v

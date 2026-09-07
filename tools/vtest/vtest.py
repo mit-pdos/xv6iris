@@ -143,6 +143,17 @@ def config(name):
            #   same machine is one the program should not publish.  The keys
            #   are still parsed so an old .S does not fail to read; nothing
            #   reads them.
+           #   csched=b,b,...  THE INTERLEAVING, for a MULTI-HART case: one
+           #               bit per instruction, 0 for the first hart and 1
+           #               for the second, run before the two are left to
+           #               round-robin to the DONE flag (VConcStep).  The
+           #               default is empty -- round-robin from the start --
+           #               and that is not a cop-out: it is a real model
+           #               execution, and a race whose observed outcome it
+           #               does not reach is one that NEEDS a named
+           #               interleaving, which is a fact about the case
+           #               worth stating in the case.
+           "csched": "",
            "budget": 2000, "tick": 0, "proj": "whole", "builder": "single"}
     for line in open(src):
         m = re.search(r"vtest:\s*(.*?)\s*\*/", line)
@@ -463,7 +474,35 @@ def emit_passes(built=None, reset=False):
             if built is not None and was is not None \
                and rrel(mod, pl) not in built:
                 v = "stuck" if was == "agree" else "agree"
-            if v == "agree":
+            conc = int(cfg["smp"]) > 1
+            bits = "[" + "; ".join(
+                "true" if b.strip() in ("1", "true") else "false"
+                for b in cfg["csched"].split(",") if b.strip()) + "]"
+            if v == "agree" and conc:
+                # THE MULTI-HART FORM.  Run such a case through the
+                # single-hart theorem and the second hart never executes at
+                # all: the DONE flag is never published and the run burns
+                # its budget on a program that cannot finish.
+                sig = f"""Module {mod}Pass <: TEST_PASSES_AGREE {mod} {mod}Run.
+  Lemma agrees :
+    run_agrees {mod}.hart {mod}.text {mod}.regions
+               {mod}.uart_input {mod}.disk_init {mod}Run.observed.
+  Proof.
+    intros o Ho.
+    cbn [{mod}Run.observed {mod}Run.results fmap list_fmap] in Ho.
+    repeat (destruct Ho as [<-|Ho];
+            [ apply (conc2_shows {tick} {bits} {budget});
+              vm_compute; repeat split |]).
+    destruct Ho.
+  Qed."""
+                imports = ("From VTest Require Import VConcStep.\n"
+                           f"From VTest.{PLATDIR[pl]} Require Import "
+                           f"{mod}Test {mod}Run.")
+                what = ("the model EXHIBITS every observation the platform\n"
+                        "   produced, under an INTERLEAVING of the two harts --\n"
+                        "   which is what a race has and what the single-hart\n"
+                        "   theorem cannot state")
+            elif v == "agree":
                 sig = f"""Module {mod}Pass <: TEST_PASSES_AGREE {mod} {mod}Run.
   Lemma agrees :
     run_agrees {mod}.hart {mod}.text {mod}.regions
@@ -526,7 +565,7 @@ End {mod}Pass.
 # here: they are written against the old [TEST_RUN] and carry an OFF THE
 # BUILD header saying so.
 HARNESS = ["VSched.v", "VExecStuck.v", "VTest.v", "VTso.v", "VBoot.v", "VConc.v",
-           "VNode.v", "VExecStep.v", "VRun.v", "VModelFacts.v"]
+           "VNode.v", "VExecStep.v", "VConcStep.v", "VRun.v", "VModelFacts.v"]
 
 PROJECT_HEAD = """-R . VTest
 -R ../iris xv6iris

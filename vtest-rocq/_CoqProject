@@ -12,6 +12,7 @@ VBoot.v
 VConc.v
 VNode.v
 VExecStep.v
+VConcStep.v
 VRun.v
 VModelFacts.v
 ConcAmoSched.v
@@ -171,6 +172,9 @@ QEMU/UartRxRun.v
 QEMU/UartTxRun.v
 QEMU/UartWidthRun.v
 JH7110/ClintTimePass.v
+JH7110/ConcAmoPass.v
+JH7110/ConcBytePass.v
+JH7110/ConcSmokePass.v
 JH7110/CoreHartPass.v
 JH7110/CoreSmokePass.v
 JH7110/PlicMctxPass.v
@@ -184,6 +188,9 @@ JH7110/PtResvPass.v
 JH7110/PtSuperPass.v
 QEMU/ClintMsipPass.v
 QEMU/ClintTimePass.v
+QEMU/ConcAmoPass.v
+QEMU/ConcBytePass.v
+QEMU/ConcSmokePass.v
 QEMU/CoreCsrprobePass.v
 QEMU/CoreCsrwidePass.v
 QEMU/CoreHartPass.v
