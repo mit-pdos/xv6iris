@@ -1288,3 +1288,128 @@ Proof.
     split; [exact Hok2|]. split; [exact Hlv2|].
     unfold all_resv. rewrite Hg2. exact Hres.
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 14. A SETTLE ROUND IS ONE ITEM.                                         *)
+(*                                                                         *)
+(*     [settle1] tries nine arms in a fixed priority order and takes the   *)
+(*     first that fires.  WHICH one fired is a fact about the harness      *)
+(*     alone -- no [gstate], no [prim_step] -- so it is proved separately  *)
+(*     here and the semantic step is [sapply_dev_nsteps] on the result.    *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma item_of (i : sitem) (s s' : mstate) (w : gmap Arch.pa (bv 8)) :
+  dev_item i = true -> sapply_w i s = Some (s', w) ->
+  exists j, dev_item j = true /\ sapply j s = Some s'.
+Proof.
+  intros Hd He. exists i. split; [exact Hd|].
+  unfold sapply. rewrite He. reflexivity.
+Qed.
+
+(* Stated on [settle1_gated_w] -- the raw round -- so the only matches in
+   the goal are the ones this proof means to split.  Unfolding [settle1_gated]
+   as well puts a composite match outermost, and a [repeat destruct] then
+   takes the whole chain apart instead of one arm. *)
+Lemma settle1_item_w (pick : virtio_state -> option Z) (s s' : mstate)
+    (w : gmap Arch.pa (bv 8)) :
+  settle1_gated_w pick true s = Some (s', w) ->
+  exists i, dev_item i = true /\ sapply_w i s = Some (s', w).
+Proof.
+  unfold settle1_gated_w, pick_at_w, drain_one_w, settle_wire_w. intros H.
+  repeat (match type of H with
+          | context[sapply_w ?i s] =>
+              destruct (sapply_w i s) as [[?a ?wa]|] eqn:?
+          | context[pick (dvirtio (mdev s))] =>
+              destruct (pick (dvirtio (mdev s))) as [?h|] eqn:?
+          | context[lowest_cached (dvirtio (mdev s))] =>
+              destruct (lowest_cached (dvirtio (mdev s))) as [?sec|] eqn:?
+          | context[wire_needed s ?k] => destruct (wire_needed s k) eqn:?
+          end; try discriminate H);
+    revert H; intros [= <- <-];
+    match goal with
+    | Heq : sapply_w ?i s = Some (_, _) |- _ =>
+        exists i; split;
+        [ first [reflexivity | vm_compute; reflexivity] | exact Heq ]
+    end.
+Qed.
+
+Lemma settle1_item (pick : virtio_state -> option Z) (s s' : mstate) :
+  settle1_at pick s = Some s' ->
+  exists i, dev_item i = true /\ sapply i s = Some s'.
+Proof.
+  unfold settle1_at, settle1_gated. intros H.
+  destruct (settle1_gated_w pick true s) as [[s1 w1]|] eqn:E; [|discriminate H].
+  revert H; intros [= <-].
+  destruct (settle1_item_w pick s s1 w1 E) as (i & Hd & Hw).
+  exists i. split; [exact Hd|]. unfold sapply. rewrite Hw. reflexivity.
+Qed.
+
+Lemma settle1_nsteps (gen : nat) (ts : list mexpr) (g : gstate)
+    (s s' : mstate) (pick : virtio_state -> option Z) :
+  UartLoopE gen ∈ ts -> DiskLoopE gen ∈ ts -> PlicLoopE gen ∈ ts ->
+  thread_live g gen ->
+  hart_ok hart_primary g s ->
+  all_resv g.(gresv) = ∅ ->
+  settle1_at pick s = Some s' ->
+  exists kappa g',
+    @language.nsteps riscv_lang 1 (ts, g) kappa (ts, g')
+    /\ hart_ok hart_primary g' s' /\ thread_live g' gen
+    /\ all_resv g'.(gresv) = ∅.
+Proof.
+  intros Hu Hdk Hp Hlive Hok Hres Hset.
+  destruct (settle1_item pick s s' Hset) as (i & Hd & Hap).
+  exact (sapply_dev_nsteps gen ts i g s s' Hu Hdk Hp Hlive Hok Hres Hd Hap).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 15. ...AND A WHOLE SETTLE IS A CHAIN OF THEM.                           *)
+(*                                                                         *)
+(*     [settle] is TOTAL -- it stops when no arm fires or the fuel runs    *)
+(*     out -- so this needs no side condition: whatever the harness's      *)
+(*     rounds did, the language did too.                                   *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma nsteps_trans (n m : nat) (r1 r2 r3 : language.cfg riscv_lang)
+    (k1 k2 : list mobs) :
+  @language.nsteps riscv_lang n r1 k1 r2 ->
+  @language.nsteps riscv_lang m r2 k2 r3 ->
+  @language.nsteps riscv_lang (n + m) r1 (k1 ++ k2) r3.
+Proof.
+  intros H1. revert m r3 k2. induction H1 as [r|n' r1' r2' r3' k ks Hst Hns IH];
+    intros m r3 k2 H2.
+  - exact H2.
+  - cbn [Nat.add]. rewrite <- app_assoc.
+    exact (@language.nsteps_l riscv_lang _ _ _ _ _ _ Hst (IH _ _ _ H2)).
+Qed.
+
+Lemma settle_nsteps (gen : nat) (ts : list mexpr)
+    (pick : virtio_state -> option Z) (fuel : nat) :
+  UartLoopE gen ∈ ts -> DiskLoopE gen ∈ ts -> PlicLoopE gen ∈ ts ->
+  forall (g : gstate) (s : mstate),
+  thread_live g gen ->
+  hart_ok hart_primary g s ->
+  all_resv g.(gresv) = ∅ ->
+  exists n kappa g',
+    @language.nsteps riscv_lang n (ts, g) kappa (ts, g')
+    /\ hart_ok hart_primary g' (settle_at pick fuel s)
+    /\ thread_live g' gen /\ all_resv g'.(gresv) = ∅.
+Proof.
+  intros Hu Hdk Hp. induction fuel as [|f IH]; intros g s Hlive Hok Hres.
+  - exists 0%nat, [], g. split; [apply language.nsteps_refl|].
+    split; [exact Hok|]. split; assumption.
+  - unfold settle_at, settle_gated. cbn [settle_gated_w].
+    destruct (settle1_gated_w pick true s) as [[s1 w1]|] eqn:E1.
+    + assert (Hs1 : settle1_at pick s = Some s1)
+        by (unfold settle1_at, settle1_gated; rewrite E1; reflexivity).
+      destruct (settle1_nsteps gen ts g s s1 pick Hu Hdk Hp Hlive Hok Hres Hs1)
+        as (k1 & g1 & Hn1 & Hok1 & Hlv1 & Hres1).
+      destruct (IH g1 s1 Hlv1 Hok1 Hres1)
+        as (n2 & k2 & g2 & Hn2 & Hok2 & Hlv2 & Hres2).
+      exists (1 + n2)%nat, (k1 ++ k2), g2.
+      split; [exact (nsteps_trans _ _ _ _ _ _ _ Hn1 Hn2)|].
+      destruct (settle_gated_w pick true f s1) as [s'' ws] eqn:E2.
+      cbn [fst]. unfold settle_at, settle_gated in Hok2. rewrite E2 in Hok2.
+      cbn [fst] in Hok2. split; [exact Hok2|]. split; assumption.
+    + exists 0%nat, [], g. split; [apply language.nsteps_refl|].
+      cbn [fst]. split; [exact Hok|]. split; assumption.
+Qed.
