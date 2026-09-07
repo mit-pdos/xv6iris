@@ -1808,3 +1808,293 @@ Proof.
   - rewrite obs_in_app, obs_in_uart_pre, Hq3. apply app_nil_r.
   - exact (observed_at_of_hart_ok hart_primary g3 sf o Hok3 Hres Hser Hdsk).
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 21. THE OTHER ENDING: A NODE THE RELATION CANNOT STEP FROM.             *)
+(*                                                                         *)
+(*     A stuck run is a PASS, and a real one -- a state the relation       *)
+(*     cannot leave is a state no proof over the model can reach.  What it *)
+(*     is not is free: [exec_r] refusing a node is a fact about the        *)
+(*     INTERPRETER, and turning it into "[mnode_step] has no transition"   *)
+(*     is the converse of section 5.                                       *)
+(*                                                                         *)
+(*     The RAM read is the only arm where that converse has content.  The  *)
+(*     interpreter read the flat map and found a byte missing; the         *)
+(*     relation may read at ANY admissible view, so the argument has to be *)
+(*     that the byte is missing at every one -- which it is, because a     *)
+(*     byte absent from the flat cache is absent from the image AND from   *)
+(*     every message, i.e. [unwritten].                                    *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma flat_none_unwritten (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (a : Arch.pa) :
+  flat img log !! a = None -> unwritten log a /\ img !! a = None.
+Proof.
+  induction log as [|m log IH] using rev_ind; intros H.
+  - split; [|exact H]. intros m0 Hm0. apply elem_of_nil in Hm0. contradiction.
+  - rewrite flat_snoc in H. apply lookup_union_None in H as [Hm Hf].
+    destruct (IH Hf) as [Hu Himg]. split; [|exact Himg].
+    intros m0 Hm0. apply elem_of_app in Hm0 as [Hm0|Hm0].
+    + exact (Hu m0 Hm0).
+    + apply elem_of_list_singleton in Hm0 as ->. exact Hm.
+Qed.
+
+Lemma tso_read_none (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (h : agent) (tv : nat) (a : Arch.pa) :
+  flat img log !! a = None -> tso_read img log h tv a = None.
+Proof.
+  intros H. destruct (flat_none_unwritten img log a H) as [Hu Himg].
+  rewrite (tso_read_unwritten img log h tv a Hu). exact Himg.
+Qed.
+
+Lemma read_bytes_none (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa) (n : N) :
+  read_bytes mm pa n = None ->
+  exists j : nat, (N.of_nat j < n)%N /\ mm !! pa_add pa j = None.
+Proof.
+  unfold read_bytes.
+  destruct (mapM (fun j : nat => mm !! pa_add pa j) (seq 0 (N.to_nat n)))
+    as [bs|] eqn:Hm; [discriminate|intros _].
+  apply mapM_None_1 in Hm.
+  apply Exists_exists in Hm as (j & Hj & Hnone).
+  apply elem_of_list_In, elem_of_seq in Hj.
+  exists j. split; [lia|exact Hnone].
+Qed.
+
+(* [exec_r] walks the same nodes [enode] does *)
+Lemma exec_r_enode_step (tick : bool) (T : Type)
+    (oc : Interface.outcome _ T) (k : T -> M unit) (s : mstate)
+    (m' : M unit) (s'' : mstate) :
+  enode tick (Interface.Next oc k) s = Some (m', s'') ->
+  exec_r (Interface.Next oc k) s = exec_r m' s''.
+Proof.
+  destruct oc; cbn [exec_r enode];
+    try (intros [= <- <-]; reflexivity).
+  - destruct (dev_addr (Interface.ReadReq.pa t)).
+    + destruct (dev_read (mdev s) (Interface.ReadReq.pa t) n) as [[w d']|];
+        [intros [= <- <-]; reflexivity|discriminate].
+    + destruct (read_bytes (mem s) (Interface.ReadReq.pa t) n) as [w|];
+        [intros [= <- <-]; reflexivity|discriminate].
+  - destruct (dev_addr (Interface.WriteReq.pa t)).
+    + destruct (dev_write (mdev s) (Interface.WriteReq.pa t) n
+                          (Interface.WriteReq.value t)) as [d'|];
+        [intros [= <- <-]; reflexivity|discriminate].
+    + intros [= <- <-]; reflexivity.
+Qed.
+
+(* ...so a refusal is reached by a chain of nodes it DID step *)
+Lemma exec_r_stuck_node (tick : bool) (m : M unit) (s : mstate) :
+  exec_r m s = inr ENoStep ->
+  exists m2 s2, rtc (estep tick) (m, s) (m2, s2)
+                /\ enode tick m2 s2 = None
+                /\ exec_r m2 s2 = inr ENoStep.
+Proof.
+  revert s. induction m as [y|T oc k IH]; intros s H.
+  - cbn [exec_r] in H. discriminate H.
+  - destruct (enode tick (Interface.Next oc k) s) as [[m' s'']|] eqn:He.
+    + destruct (enode_next_shape tick T oc k s m' s'' He) as [v ->].
+      rewrite (exec_r_enode_step tick T oc k s _ s'' He) in H.
+      destruct (IH v s'' H) as (m2 & s2 & Hrtc & Hnone & Hstuck).
+      exists m2, s2. split; [|split; assumption].
+      eapply rtc_l; [unfold estep; cbn [fst snd]; exact He|exact Hrtc].
+    + exists (Interface.Next oc k), s. split; [apply rtc_refl|].
+      split; [exact He|exact H].
+Qed.
+
+(* THE CONVERSE OF SECTION 5, at one node.  [ENoStep] rules out [Choose],
+   which is the one refusal where the relation DOES have transitions and
+   only the interpreter will not pick one -- that is the whole reason
+   [VExecStuck] separates the two. *)
+Lemma enode_none_no_mnode (tick : bool) (cpu : CPU) (g : gstate)
+    (s : mstate) (m : M unit) :
+  hart_ok cpu g s ->
+  enode tick m s = None ->
+  exec_r m s = inr ENoStep ->
+  forall m' s' log' tv' itv' hr' r',
+    ~ mnode_step (others_resv g.(gresv) cpu) (hart_agent cpu) g.(gimg) s
+        g.(glog) (g.(gtv) cpu) (g.(gitv) cpu) (g.(ghr) cpu) (g.(gresv) cpu)
+        m m' s' log' tv' itv' hr' r'.
+Proof.
+  intros Hok Hen Hst m' s' log' tv' itv' hr' r' Hnode.
+  pose proof Hok as [Hr Hm Hd Hfl Hal Htv Hitv Hrv Hcoh].
+  (* the flat cache, as the relation's reads see it *)
+  assert (Hflat : forall a, s.(mem) !! a = None ->
+                    forall (h : agent) (tv : nat),
+                      tso_read g.(gimg) g.(glog) h tv a = None).
+  { intros a Ha h tv. apply tso_read_none. rewrite <- Hfl. rewrite Hm. exact Ha. }
+  destruct m as [y|T oc k]; [cbn [enode] in Hen; discriminate Hen|].
+  destruct oc; cbn [enode] in Hen; try discriminate Hen;
+    cbn [mnode_step] in Hnode;
+    (* [Choose]: the relation HAS transitions and [exec_r] said so, which is
+       the whole reason [VExecStuck] separates it from [ENoStep].
+       GenericFail / Discard / ExtraOutcome: [mnode_step] is [False]. *)
+    try (first [ contradiction Hnode
+               | cbn [exec_r] in Hst; discriminate Hst ]).
+  - (* A LOAD that found nothing *)
+    destruct (dev_addr (Interface.ReadReq.pa t)) eqn:Hda.
+    + (* MMIO: the device declined, and the arm needs it to answer *)
+      destruct (dev_read (mdev s) (Interface.ReadReq.pa t) n)
+        as [[w d']|] eqn:Hdr; [discriminate Hen|].
+      destruct Hnode as (w & d' & Hdr' & _).
+      discriminate Hdr'.
+    + (* RAM: some byte is in no message and not in the image, so it is
+         missing at EVERY view, and all three sub-arms want it *)
+      destruct (read_bytes (mem s) (Interface.ReadReq.pa t) n) as [w|] eqn:Hrb;
+        [discriminate Hen|].
+      destruct (read_bytes_none _ _ _ Hrb) as (j & Hj & Hnone).
+      destruct Hnode as [(_ & tvn & w0 & _ & _ & Hby & _)
+                        |[(_ & _ & tvn & w0 & _ & _ & _ & Hby & _)
+                         |(_ & [(Hblk & _)|(_ & w0 & Hby & _)])]].
+      * specialize (Hby j Hj). rewrite (Hflat _ Hnone _ tvn) in Hby.
+        discriminate Hby.
+      * specialize (Hby j Hj). rewrite (Hflat _ Hnone _ tvn) in Hby.
+        discriminate Hby.
+      * apply Hblk. rewrite Hal. set_solver.
+      * specialize (Hby j Hj). rewrite Hnone in Hby. discriminate Hby.
+  - (* A STORE the device declined *)
+    destruct (dev_addr (Interface.WriteReq.pa t)) eqn:Hda;
+      [|discriminate Hen].
+    destruct (dev_write (mdev s) (Interface.WriteReq.pa t) n
+                        (Interface.WriteReq.value t)) as [d'|] eqn:Hdw;
+      [discriminate Hen|].
+    destruct Hnode as (d' & Hdw' & _).
+    discriminate Hdw'.
+Qed.
+
+(* ...and that IS "this thread has no transition": the other four arms of
+   [prim_step] want a different expression, and the corpse arm wants a dead
+   generation, which [thread_live] rules out. *)
+Lemma thread_no_step_hart (tick : bool) (gen : nat) (cpu : CPU) (g : gstate)
+    (s : mstate) (m : M unit) :
+  thread_live g gen -> hart_ok cpu g s ->
+  enode tick m s = None -> exec_r m s = inr ENoStep ->
+  thread_no_step g (HartE gen cpu m).
+Proof.
+  intros Hlive Hok Hen Hst kappa e' g' efs Hps.
+  unfold prim_step in Hps.
+  destruct Hps as [(gen2 & cpu2 & m2 & Heq & _ & _ & Harm)
+                  |[(gen2 & Heq & _)
+                   |[(gen2 & Heq & _)|[(gen2 & Heq & _)|(Heq & _)]]]];
+    try discriminate Heq.
+  injection Heq as <- <- <-.
+  destruct Harm as [(_ & Hnode)|(Hdead & _)].
+  - unfold hart_node_step in Hnode.
+    destruct Hnode as (m3 & s3 & log3 & tv3 & itv3 & hr3 & r3 & Hmn & _ & _).
+    rewrite (hart_ok_proj cpu g s Hok) in Hmn.
+    exact (enode_none_no_mnode tick cpu g s m Hok Hen Hst _ _ _ _ _ _ _ Hmn).
+  - exact (Hdead Hlive).
+Qed.
+
+Lemma eval_run_stuck_nsteps (tick : bool) (gen : nat)
+    (pick : virtio_state -> option Z) (t1 t2 : list mexpr) (n : nat) :
+  UartLoopE gen ∈ t1 ++ t2 ->
+  DiskLoopE gen ∈ t1 ++ t2 ->
+  PlicLoopE gen ∈ t1 ++ t2 ->
+  forall (g : gstate) (s sx : mstate),
+  thread_live g gen ->
+  hart_ok hart_primary g s ->
+  all_resv g.(gresv) = ∅ ->
+  eval_run_at pick tick n s = RStuck sx ENoStep ->
+  exists N kappa g' m2 s2,
+    @language.nsteps riscv_lang N
+      (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2, g) kappa
+      (t1 ++ HartE gen hart_primary m2 :: t2, g')
+    /\ hart_ok hart_primary g' s2 /\ thread_live g' gen
+    /\ obs_in kappa = []
+    /\ enode tick m2 s2 = None /\ exec_r m2 s2 = inr ENoStep.
+Proof.
+  intros Hu Hdk Hp. induction n as [|n' IH]; intros g s sx Hlive Hok Hres Hev.
+  - rewrite eval_run_at_O in Hev. destruct (flag_set s); discriminate Hev.
+  - rewrite eval_run_at_S in Hev. destruct (flag_set s) eqn:Hf;
+      [discriminate Hev|].
+    destruct (exec_r (riscv_step tick) s) as [[u s1]|e] eqn:Hex.
+    + (* the instruction ran; the refusal is later *)
+      destruct (exec_nsteps tick gen hart_primary t1 t2 (riscv_step tick) s u s1
+                  g (exec_r_inl _ _ _ Hex) Hlive Hok)
+        as (N1 & g1 & Hn1 & Hok1 & Hlv1).
+      destruct (boundary_prim tick gen hart_primary g1 s1 u Hlv1 Hok1)
+        as (g2 & Hps2 & Hok2 & Hlv2 & Hres2).
+      destruct (settle_nsteps gen
+                  (t1 ++ HartE gen hart_primary (riscv_step tick) :: t2)
+                  pick dev_fuel
+                  (elem_of_pool _ _ _ _ Hu) (elem_of_pool _ _ _ _ Hdk)
+                  (elem_of_pool _ _ _ _ Hp) g2 s1 Hlv2 Hok2 Hres2)
+        as (N3 & k3 & g3 & Hn3 & Hok3 & Hlv3 & Hres3 & Hq3).
+      destruct (IH g3 (settle_at pick dev_fuel s1) sx Hlv3 Hok3 Hres3 Hev)
+        as (N4 & k4 & g4 & m2 & s2 & Hn4 & Hok4 & Hlv4 & Hq4 & Hen4 & Hst4).
+      exists (N1 + S (N3 + N4))%nat, (k3 ++ k4), g4, m2, s2.
+      split; [|split; [exact Hok4|split; [exact Hlv4|split;
+        [rewrite obs_in_app, Hq3, Hq4; reflexivity|split; assumption]]]].
+      apply (nsteps_trans _ _ _ _ _ _ _ Hn1).
+      apply (nsteps_l_silent _ _ _ _ _
+               (hstep_step gen hart_primary t1 t2 (Interface.Ret u)
+                  (riscv_step tick) g1 g2 Hps2)).
+      exact (nsteps_trans _ _ _ _ _ _ _ Hn3 Hn4).
+    + (* THIS round is where it stopped *)
+      revert Hev; intros [= <- ->].
+      destruct (exec_r_stuck_node tick (riscv_step tick) s Hex)
+        as (m2 & s2 & Hrtc & Hen2 & Hst2).
+      destruct (estep_hstep tick gen hart_primary (riscv_step tick, s)
+                  (m2, s2) Hrtc g Hlive Hok)
+        as (g' & Hh & Hok' & Hlv'); cbn [fst snd] in Hh, Hok'.
+      destruct (hstep_nsteps gen hart_primary t1 t2
+                  (riscv_step tick, g) (m2, g') Hh) as [N Hn];
+        cbn [fst snd] in Hn.
+      exists N, [], g', m2, s2.
+      split; [exact Hn|]. split; [exact Hok'|]. split; [exact Hlv'|].
+      split; [reflexivity|]. split; assumption.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 22. THE OTHER DISJUNCT, WHOLE.                                          *)
+(*                                                                         *)
+(*     A run the interpreter refused is a configuration of the language    *)
+(*     with a thread that has no transition -- which is the second         *)
+(*     disjunct of [VRun.run_passes], and the honest form of "stuck is a   *)
+(*     pass": not [True], but a fact about [prim_step] at a state THIS     *)
+(*     test's execution arrives at.                                        *)
+(* ---------------------------------------------------------------------- *)
+
+Theorem exec_run_no_step (tick : bool) (pick : virtio_state -> option Z)
+    (n : nat) (hart : Z) (text : list Z) (rs : list region)
+    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
+    (s1 sx : mstate) :
+  srun (uart_pre uart_input) (exec_start hart text rs disk_init) = Some s1 ->
+  eval_run_at pick tick n s1 = RStuck sx ENoStep ->
+  exists N l ts g e,
+    @language.nsteps riscv_lang N
+      (test_config hart text rs disk_init) l (ts, g)
+    /\ obs_in l = uart_input
+    /\ In e ts /\ thread_no_step g e.
+Proof.
+  intros Hpre Hrun.
+  destruct (power_fork_split 0) as (t1 & t2 & Hpool & Hu & Hdk & Hp).
+  pose proof (hart_ok_test_start hart text rs disk_init) as Hok0.
+  assert (Hlive0 : thread_live (test_gstate hart text rs disk_init) 0)
+    by (unfold thread_live, test_gstate; cbn [gpow ggen]; split; reflexivity).
+  destruct (boundary_prim tick 0 hart_primary
+              (test_gstate hart text rs disk_init)
+              (exec_start hart text rs disk_init) tt Hlive0 Hok0)
+    as (gb & Hpsb & Hokb & Hlvb & Hresb).
+  destruct (srun_uart_nsteps 0
+              (t1 ++ HartE 0 hart_primary (riscv_step tick) :: t2) uart_input
+              (elem_of_pool _ _ _ _ Hu) (elem_of_pool _ _ _ _ Hdk)
+              (elem_of_pool _ _ _ _ Hp) gb (exec_start hart text rs disk_init)
+              s1 Hlvb Hokb Hresb Hpre)
+    as (N2 & g2 & Hn2 & Hok2 & Hlv2 & Hres2).
+  destruct (eval_run_stuck_nsteps tick 0 pick t1 t2 n Hu Hdk Hp g2 s1 sx
+              Hlv2 Hok2 Hres2 Hrun)
+    as (N3 & k3 & g3 & m2 & s2 & Hn3 & Hok3 & Hlv3 & Hq3 & Hen3 & Hst3).
+  exists (S (N2 + N3)), (List.map ObsUartIn uart_input ++ k3),
+         (t1 ++ HartE 0 hart_primary m2 :: t2), g3,
+         (HartE 0 hart_primary m2).
+  split; [|split; [|split]].
+  - unfold test_config. rewrite Hpool.
+    apply (nsteps_l_silent _ _ _ _ _
+             (hstep_step 0 hart_primary t1 t2 (Interface.Ret tt)
+                (riscv_step tick) _ gb Hpsb)).
+    exact (nsteps_trans _ _ _ _ _ _ _ Hn2 Hn3).
+  - rewrite obs_in_app, obs_in_uart_pre, Hq3. apply app_nil_r.
+  - apply in_or_app. right. apply in_eq.
+  - exact (thread_no_step_hart tick 0 hart_primary g3 s2 m2 Hlv3 Hok3
+             Hen3 Hst3).
+Qed.
