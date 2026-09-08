@@ -94,6 +94,7 @@ Require Import SpecPrintk.
 Require Import SpecKernelvec.
 Require Import SpecSyscall.
 Require Import SpecUsertrap UsertrapRes UtResFits ParkCap.
+Require Import UexecSG.   (* [uexecSG]: [sfam] -- the deposit's families *)
 Require Import UsysMemOk.   (* [uecall_scause] -- the dispatch branch fact *)
 Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked residue drops *)
 Require Import ProcPtOwn.  (* [proc_pt] / [ud_norm] -- the bare residue drops the address space *)
@@ -743,7 +744,7 @@ Section UtDispatch.
   Lemma ut_dispatch (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (ep sc st : mword 64)
-      (mie_v menvcfg0 : mword 64) (sts : list fdstate) :
+      (mie_v menvcfg0 : mword 64) (sts : list fdstate) (fdep : sfam) :
     printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     (* THE PROLOGUE'S MOVE (milestone J1a): [U0] is the state usertrap was
        entered at and [U] the one the +0x28..+0x2e block handed on, so the
@@ -773,7 +774,7 @@ Section UtDispatch.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* the process's exec bundle, at the ENTRY record -- the ecall arm's
        alone ([SpecUsertrap.ut_sys_in]) *)
-    (∀ n : Z, ut_sys_in n sc (pv_tf (us_V U0)) U0 sts) -∗
+    (∀ n : Z, ut_sys_in n fdep sc (pv_tf (us_V U0)) U0 sts) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') SY.syscall_env) pt ksp m0
                      mie_v menvcfg0 U0 sts ep sc) -∗
@@ -881,7 +882,7 @@ Section UtDispatch.
       assert (Hscec : sc = (uecall_scause : mword 64)).
       { apply eq_vec_true_iff in Hsys. rewrite HD2a4 HD2a5 in Hsys. exact Hsys. }
       iApply (S.ut_90 N U0 U pt ksp m0 D2 av nx
-                mie_v menvcfg0 ep sc ∅ sts
+                mie_v menvcfg0 ep sc ∅ sts fdep
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HD2sp HD2s1 HD2a0 HcsD2
                 Hmiev Hmenvv Hpro Hscec
                 with "Htext Hpc Hcg Hhold Hframe Hxin Hcont").
@@ -1358,9 +1359,10 @@ Section UtSeal.
 
   Lemma wp_usertrap (pt : uptd) (j : nat) (m : regfile)
       (ms_v sc_v stval_v sepc_v ksp : mword 64)
-      (mie_v mdv0 menvcfg0 : mword 64) (U : ustate) (sts : list fdstate) :
+      (mie_v mdv0 menvcfg0 : mword 64) (U : ustate) (sts : list fdstate)
+      (fdep : sfam) :
     wp_usertrap_body (fun h : CpuId => usertrap_res (CID := h))
-      pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0 U sts.
+      pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0 U sts fdep.
   Proof.
     cbv beta delta [wp_usertrap_body].
     intros pcE pj Hms Hj Hsp Htp Hmiev Hmask Hmenvv.
@@ -1381,7 +1383,7 @@ Section UtSeal.
                     Hmie Hmdl Hmenv Hgpr Htc Htrap Henv [Hcont Hxin]").
     iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV %HcwiV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
     iApply (ut_dispatch N (MkUstate V Mu) (MkUstate V' Mu) pt ksp m M av (av - 4)%nat sepc_v sc_v stval_v
-              mie_v menvcfg0 sts
+              mie_v menvcfg0 sts fdep
               (ut_printk (fsc_printk) (fsc_uart) (fsc_disk))
               (conj HtfV (conj HuptV (conj HszV (conj eq_refl HcwiV))))
               Hwf Hav

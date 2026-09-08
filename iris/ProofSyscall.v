@@ -398,9 +398,9 @@ Require Import SpecSyscall.
    [Typeclasses Opaque], so they are imported here directly. *)
 Require Import SpecKexecAU.      (* [exec_post_ok], [exec_key], [kexec_ok_exec] *)
 Require Import SpecSysExecAU.    (* [SYSEXEC], [sys_exec_arms]              *)
-Require Import UexecSG.          (* [uexecSG]: [sbundle]                        *)
+Require Import UexecSG.          (* [uexecSG]: [sbundle_at]                     *)
 Require Import UexecRet.         (* [uslot] -- the slot the exec channel returns *)
-Require Import UexecExecInst.    (* [sbundle_exec_elim] -- the instance's reader *)
+Require Import UexecExecInst.    (* [sbundle_at_exec_elim] -- the reader        *)
 Require Import UexecSlot UserPerm FsBytesGamma.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -1799,7 +1799,7 @@ Section SyscallVocab.
       (γs : list gname) (j : nat) (γl : gname)
  (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) : Prop :=
+      (m M : regfile) (fdep : sfam) : Prop :=
     (* WHICH process this is, in the vocabulary the per-process entries state
        their own contracts in: [sys_wait]/[sys_kill]/[sys_pause]/... take the
        proc array's ghost names and an INDEX, and address the running process
@@ -1836,7 +1836,7 @@ Section SyscallVocab.
     sysc_exit_ty γf pj fn dqi ip pid U sts lks av m (ret_pc (m !!! Regidx Rra)) -∗
     (* the process's exec bundle, offered only on exec; every other arm
        drops it *)
-    sysc_exec_in U sts -∗
+    sysc_exec_in U sts fdep -∗
     WP (Loop : expr riscv_lang).
 
   (* ------------------------------------------------------------------- *)
@@ -2863,10 +2863,11 @@ Section SyscallArms.
      the trapping key's own projections, which at the dispatcher's record are
      the image, trapframe argument 1 and the descriptor view it holds; its
      slot wand concludes at [uslot], the slot the channel returns *)
-  Lemma sysc_exec_in_open (U : ustate) (sts : list fdstate) (v1 : mword 64) :
+  Lemma sysc_exec_in_open (U : ustate) (sts : list fdstate) (f : sfam)
+      (v1 : mword 64) :
     sysc_num (us_V U) = 7 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
-    sysc_exec_in U sts -∗
+    sysc_exec_in U sts f -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (gmap Z FsAbsDefs.anode -> Z -> FsAbsDefs.anode -> iProp Σ))
       (Rs : iProp Σ),
@@ -2875,8 +2876,8 @@ Section SyscallArms.
   Proof.
     intros Hn Hv1. rewrite /sysc_exec_in. iIntros "H".
     iDestruct ("H" with "[%]") as "H"; [exact Hn |].
-    iDestruct (sbundle_exec_elim with "H") as (P Pmiss Fo Rs) "H".
-    iExists P, Pmiss, Fo, Rs.
+    iDestruct (sbundle_at_exec_elim uslot f _ with "H") as "H".
+    iExists (xf_P f), (xf_Pmiss f), (xf_Fo f), (xf_Rs f).
     rewrite /uvis_of /tf_w. cbn [uvis_M uvis_tf uvis_fd].
     rewrite (list_lookup_total_correct _ _ _ Hv1). iExact "H".
   Qed.
@@ -3005,8 +3006,8 @@ Section SyscallArms.
   Lemma sysc_arm_getpid (γf : gname) (pj : mword 64)
       (γs : list gname) (j : nat) (γl : gname) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 11 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 11 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -3257,8 +3258,8 @@ Section SyscallArms.
   Lemma sysc_arm_sbrk (γf : gname) (pj : mword 64)
       (γs : list gname) (j : nat) (γl : gname) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 12 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 12 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -3364,8 +3365,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 3 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 3 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -3466,8 +3467,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 14 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 14 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -3537,8 +3538,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 6 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 6 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -3612,8 +3613,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 13 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 13 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -3782,8 +3783,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 10 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 10 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -3864,8 +3865,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 1 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 1 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -4008,8 +4009,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 7 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 7 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -4057,7 +4058,7 @@ Section SyscallArms.
        PROCESS (the trapping key's own era predicates), not from the
        environment, so nothing of [syscall_env]'s fs-abstract side is
        opened here. ---- *)
-    iDestruct (sysc_exec_in_open U sts v1 ltac:(rewrite Hnum; reflexivity) Hv1
+    iDestruct (sysc_exec_in_open U sts fdep v1 ltac:(rewrite Hnum; reflexivity) Hv1
                  with "Hxin") as (P Pmiss Fo Rs) "Hau".
     iApply (SysExec.wp_sys_exec_sconf (MkPfam uslot Rs) γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
@@ -4208,8 +4209,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 2 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 2 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -4285,8 +4286,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 22 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 22 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -4370,8 +4371,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 16 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 16 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -4513,8 +4514,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 5 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 5 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -4633,8 +4634,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 8 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 8 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -4733,8 +4734,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 9 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 9 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -4873,8 +4874,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 18 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 18 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -4977,8 +4978,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 19 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 19 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -5092,8 +5093,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 21 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 21 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -5262,8 +5263,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 4 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 4 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -5544,8 +5545,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 20 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 20 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -5668,8 +5669,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 17 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 17 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -5801,8 +5802,8 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
-    sysc_arm_goal 15 γf pj γs j γl fn dqi ip pid U sts lks av m M.
+      (m M : regfile) (fdep : sfam) :
+    sysc_arm_goal 15 γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
@@ -6016,55 +6017,55 @@ Section SyscallArms.
   Lemma sysc_arm_dispatch (k : nat) (γf : gname) (pj : mword 64)
       (γs : list gname) (j : nat) (γl : gname) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
+      (m M : regfile) (fdep : sfam) :
     (1 <= k <= 22)%nat ->
-    sysc_arm_goal k γf pj γs j γl fn dqi ip pid U sts lks av m M.
+    sysc_arm_goal k γf pj γs j γl fn dqi ip pid U sts lks av m M fdep.
   Proof.
     intro Hk.
     destruct (decide (k = 1%nat)) as [-> | Hne1].
-    { exact (sysc_arm_fork γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_fork γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 2%nat)) as [-> | Hne2].
-    { exact (sysc_arm_exit γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_exit γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 3%nat)) as [-> | Hne3].
-    { exact (sysc_arm_wait γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_wait γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 6%nat)) as [-> | Hne4].
-    { exact (sysc_arm_kill γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_kill γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 7%nat)) as [-> | Hne5].
-    { exact (sysc_arm_exec γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_exec γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 10%nat)) as [-> | Hne6].
-    { exact (sysc_arm_dup γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_dup γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 11%nat)) as [-> | Hne7].
-    { exact (sysc_arm_getpid γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_getpid γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 12%nat)) as [-> | Hne8].
-    { exact (sysc_arm_sbrk γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_sbrk γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 13%nat)) as [-> | Hne9].
-    { exact (sysc_arm_pause γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_pause γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 14%nat)) as [-> | Hne10].
-    { exact (sysc_arm_uptime γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_uptime γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 8%nat)) as [-> | Hne11].
-    { exact (sysc_arm_fstat γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_fstat γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 9%nat)) as [-> | Hne12].
-    { exact (sysc_arm_chdir γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_chdir γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 18%nat)) as [-> | Hne13].
-    { exact (sysc_arm_unlink γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_unlink γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 19%nat)) as [-> | Hne14].
-    { exact (sysc_arm_link γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_link γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 21%nat)) as [-> | Hne15].
-    { exact (sysc_arm_close γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_close γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 22%nat)) as [-> | Hne16].
-    { exact (sysc_arm_sync γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_sync γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 4%nat)) as [-> | Hne17].
-    { exact (sysc_arm_pipe γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_pipe γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 20%nat)) as [-> | Hne18].
-    { exact (sysc_arm_mkdir γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_mkdir γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 17%nat)) as [-> | Hne19].
-    { exact (sysc_arm_mknod γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_mknod γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 15%nat)) as [-> | Hne20].
-    { exact (sysc_arm_open γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_open γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 5%nat)) as [-> | Hne21].
-    { exact (sysc_arm_read γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_read γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     destruct (decide (k = 16%nat)) as [-> | Hne22].
-    { exact (sysc_arm_write γf pj γs j γl fn dqi ip pid U sts lks av m M). }
+    { exact (sysc_arm_write γf pj γs j γl fn dqi ip pid U sts lks av m M fdep). }
     (* EVERY ONE of the 22 is above, so with [Hk] this case is empty.  This
        is what retires [sysc_arm_placeholder] -- the tree's only [Admitted]. *)
     exfalso. lia.
@@ -6103,7 +6104,7 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (fn : fclose_names)
       (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string) (av : nat)
-      (m M : regfile) :
+      (m M : regfile) (fdep : sfam) :
     (j < NPROC)%nat ->
     pj = proc_addr j ->
     M !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4 ->
@@ -6124,7 +6125,7 @@ Section SyscallArms.
     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
     sysc_hcont_ty γf pj fn dqi ip pid U sts lks av m (ret_pc (m !!! Regidx Rra)) -∗
-    sysc_exec_in U sts -∗
+    sysc_exec_in U sts fdep -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hj Hpj HMsp HMs1 HMother Hav Hrange.
@@ -6440,7 +6441,9 @@ Section SyscallMain.
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (sts : list fdstate) (lks : gset string)
-    : wp_syscall_sconf_body syscall_env γf γs j γl fn ip dqi m av pid U sts lks.
+      (fdep : sfam)
+    : wp_syscall_sconf_body syscall_env γf γs j γl fn ip dqi m av pid U sts lks
+        fdep.
   Proof.
     cbv beta delta [wp_syscall_sconf_body].
     intros pcE pj ret_tgt Hj Hgamma Hav Hpidt.
@@ -6910,7 +6913,7 @@ Section SyscallMain.
       assert (Hcr8_22 : true = false \/ pj = zero_reg -> (CID22 : CPU) = (CID8 : CPU))
         by wp_next_chain.
       iDestruct (cpu_own_transport CID8 CID22 0%nat true pj true Hcr8_22 with "Hcpu") as "Hcpu".
-      iApply (sysc_arm_dispatch (CID := CID22) k γf pj γs j γl fn dqi ip pid U sts lks av m D0 Hk
+      iApply (sysc_arm_dispatch (CID := CID22) k γf pj γs j γl fn dqi ip pid U sts lks av m D0 fdep Hk
                 Hj Hgamma eq_refl HD0armsp HD0s2 HD0ra HD0other HD0avb Hpidt Hsysc_num
                 with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag] Hr24 Hr16 Hr8 Hr0 Hdata Hcont Hxin").
       { iApply (sysc_arm_pre_intro with
@@ -7003,7 +7006,7 @@ Section SyscallMain.
         rewrite bv_sign_extend_signed; [reflexivity | apply N.leb_le; vm_compute; reflexivity]. }
       assert (Hrange' : ~ (1 <= sysc_num (us_V U) <= 22)%Z)
         by (rewrite Hsysc_num2; exact Hrange).
-      iApply (sysc_fallback (CID := CID15) γf pj γs j fn dqi ip pid U sts lks av m B5
+      iApply (sysc_fallback (CID := CID15) γf pj γs j fn dqi ip pid U sts lks av m B5 fdep
                 Hj eq_refl HB5armsp HB5s1 HB5other HB5avb Hrange'
                 with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag] Hr24 Hr16 Hr8 Hr0 Hdata Hcont Hxin").
       { iApply (sysc_arm_pre_intro with

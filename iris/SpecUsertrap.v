@@ -360,11 +360,14 @@ Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
 (* THE SYSCALL CHANNEL THROUGH USERTRAP.  Two readers, and the loop picks   *)
 (* by number.                                                              *)
 (*                                                                          *)
-(* [ut_sys_in n] / [ut_sys_out n] are the PER-NUMBER pair: the process      *)
-(* deposits its bundle for the number it trapped at                         *)
-(* ([UexecSG.sbundle], which at [UexecExecInst]'s instance is exec's AU     *)
-(* bundle at 7 and [emp] elsewhere) and gets the syscall's armed post back  *)
-(* under the arm's own return value ([UexecSG.spost]).  This is the shape   *)
+(* [ut_sys_in n f] / [ut_sys_out n f] are the PER-NUMBER pair, AT THE       *)
+(* DEPOSIT'S OWN FAMILIES: the process deposits its bundle for the number   *)
+(* it trapped at ([UexecSG.sbundle_at], which at [UexecExecInst]'s instance *)
+(* is exec's AU bundle at 7 and [emp] elsewhere) and gets the syscall's     *)
+(* armed post back under the arm's own return value ([UexecSG.spost_at]) at *)
+(* THE SAME [f] -- the contract takes it once and both rows read it, which  *)
+(* is what makes the post worth anything to the depositor.  This is the     *)
+(* shape                                                                    *)
 (* [UexecRet.uexec_ret_F]'s returning arm is stated at, and the shape the   *)
 (* next round fills as each syscall's contract is turned on.                *)
 (*                                                                          *)
@@ -389,26 +392,29 @@ Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
    process deposits nothing and the row must not ask for one. *)
 Definition ut_sys_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
-    (n : Z) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
+    (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) : iProp Σ :=
   (⌜sc_v = uecall_scause /\ usys_num tf = n
     /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
-     sbundle uslot n (uvis_of U sts))%I.
+     sbundle_at uslot n f (uvis_of U sts))%I.
 
-(* ...AND THE ARMED POST BACK, at the same key and the round's return value.
-   NOT YET A ROW OF [usertrap_post]: at [UexecExecInst]'s instance [spost] is
-   [emp] at every number, so the loop's consumer
+(* ...AND THE ARMED POST BACK, at the same key, THE SAME FAMILIES and the
+   round's return value.  [f] is the deposit's own: the trap contract takes
+   it once and both rows read it, which is what makes the post worth
+   anything to the process that deposited ([UexecSG.v]'s header).
+   NOT YET A ROW OF [usertrap_post]: at [UexecExecInst]'s instance [spost_at]
+   is [emp] at every number, so the loop's consumer
    ([UexecApply.uexec_ret_round_slot_of]'s premise) discharges it from the
    instance and no kernel-side producer owes anything.  Turning a syscall's
    contract on is what makes this a row -- the dispatcher hands it back and
    the round relays it, beside [ut_exec_out]. *)
 Definition ut_sys_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
-    (n : Z) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
+    (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) (r : mword 64) : iProp Σ :=
   (⌜sc_v = uecall_scause /\ usys_num tf = n
     /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
-     spost uslot n (uvis_of U sts) r)%I.
+     spost_at uslot n f (uvis_of U sts) r)%I.
 
 Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
@@ -428,18 +434,18 @@ Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
 (* the quiet readings, for the four non-ecall causes *)
 Lemma ut_sys_in_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
-    (n : Z) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
+    (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) :
-  sc_v <> uecall_scause -> ⊢ ut_sys_in n sc_v tf U sts.
+  sc_v <> uecall_scause -> ⊢ ut_sys_in n f sc_v tf U sts.
 Proof.
   intros Hne. rewrite /ut_sys_in. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
 Qed.
 
 Lemma ut_sys_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
-    (n : Z) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
+    (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) (r : mword 64) :
-  sc_v <> uecall_scause -> ⊢ ut_sys_out n sc_v tf U sts r.
+  sc_v <> uecall_scause -> ⊢ ut_sys_out n f sc_v tf U sts r.
 Proof.
   intros Hne. rewrite /ut_sys_out. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
 Qed.
@@ -457,24 +463,24 @@ Qed.
 (* the pre row's key congruence: the bundle reads its key at
    [UexecSG.skey_eq]'s six rows and the guard reads the number -- which is
    what carries it across the prologue's epc rewrite and uservec's save
-   walk ([UexecSG.sbundle_cong]) *)
+   walk ([UexecSG.sbundle_at_cong]) *)
 Lemma ut_sys_in_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
-    (n : Z) (sc_v : mword 64) (tf tf' : list (mword 64)) (U U' : ustate)
-    (sts : list fdstate) :
+    (n : Z) (f : sfam) (sc_v : mword 64) (tf tf' : list (mword 64))
+    (U U' : ustate) (sts : list fdstate) :
   usys_num tf = usys_num tf' ->
   us_M U = us_M U' ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 0) = tf_w (pv_tf (us_V U')) (tf_arg_idx 0) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 1) = tf_w (pv_tf (us_V U')) (tf_arg_idx 1) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 2) = tf_w (pv_tf (us_V U')) (tf_arg_idx 2) ->
   pv_cwi (us_V U) = pv_cwi (us_V U') ->
-  ut_sys_in n sc_v tf U sts -∗ ut_sys_in n sc_v tf' U' sts.
+  ut_sys_in n f sc_v tf U sts -∗ ut_sys_in n f sc_v tf' U' sts.
 Proof.
   intros Hn HM Ha0 Ha1 Ha2 Hcw. rewrite /ut_sys_in. iIntros "H %Hc".
   destruct Hc as (Hce & Hcn & Hcx & Hcf).
   iDestruct ("H" with "[%]") as "H";
     [ split_and!; [ exact Hce | rewrite Hn; exact Hcn | exact Hcx | exact Hcf ] |].
-  iEval (rewrite (sbundle_cong uslot n (uvis_of U sts) (uvis_of U' sts)
+  iEval (rewrite (sbundle_at_cong uslot n f (uvis_of U sts) (uvis_of U' sts)
                     ltac:(rewrite /skey_eq; split_and!;
                           [ exact HM | exact Ha0 | exact Ha1 | exact Ha2
                           | reflexivity | exact Hcw ]))) in "H".
@@ -482,24 +488,24 @@ Proof.
 Qed.
 
 (* ...and the post row's, at the same six rows: what comes back is read at
-   the same key ([UexecSG.spost_cong]) *)
+   the same key ([UexecSG.spost_at_cong]) *)
 Lemma ut_sys_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
-    (n : Z) (sc_v : mword 64) (tf tf' : list (mword 64)) (U U' : ustate)
-    (sts : list fdstate) (r : mword 64) :
+    (n : Z) (f : sfam) (sc_v : mword 64) (tf tf' : list (mword 64))
+    (U U' : ustate) (sts : list fdstate) (r : mword 64) :
   usys_num tf' = usys_num tf ->
   us_M U = us_M U' ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 0) = tf_w (pv_tf (us_V U')) (tf_arg_idx 0) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 1) = tf_w (pv_tf (us_V U')) (tf_arg_idx 1) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 2) = tf_w (pv_tf (us_V U')) (tf_arg_idx 2) ->
   pv_cwi (us_V U) = pv_cwi (us_V U') ->
-  ut_sys_out n sc_v tf U sts r -∗ ut_sys_out n sc_v tf' U' sts r.
+  ut_sys_out n f sc_v tf U sts r -∗ ut_sys_out n f sc_v tf' U' sts r.
 Proof.
   intros Hn HM Ha0 Ha1 Ha2 Hcw. rewrite /ut_sys_out. iIntros "H %Hc".
   destruct Hc as (Hce & Hcn & Hcx & Hcf).
   iDestruct ("H" with "[%]") as "H";
     [ split_and!; [ exact Hce | rewrite <- Hn; exact Hcn | exact Hcx | exact Hcf ] |].
-  iEval (rewrite (spost_cong uslot n (uvis_of U sts) (uvis_of U' sts) r
+  iEval (rewrite (spost_at_cong uslot n f (uvis_of U sts) (uvis_of U' sts) r
                     ltac:(rewrite /skey_eq; split_and!;
                           [ exact HM | exact Ha0 | exact Ha1 | exact Ha2
                           | reflexivity | exact Hcw ]))) in "H".
@@ -763,7 +769,11 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
     (R : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (pt : uptd) (j : nat)
     (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
-    (mie_v mdv0 menvcfg0 : mword 64) (U : ustate) (sts : list fdstate) :=
+    (mie_v mdv0 menvcfg0 : mword 64) (U : ustate) (sts : list fdstate)
+    (* THE DEPOSIT'S FAMILIES, taken ONCE and read by both syscall rows:
+       the process chose them when it built its bundle, and the post it
+       gets back is at the same ones ([UexecSG.v]'s header). *)
+    (f : sfam) :=
   let pcE : mword 64 := mword_of_int KernelSyms.usertrap in
   let pj := proc_addr j in
   (* the trap delivered a legal S-mode configuration -- see above *)
@@ -813,7 +823,7 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
   R CID pt ksp U sts -∗
   (* the process's deposit for the number it trapped at, owed only at an
      ecall -- [ut_sys_in] *)
-  (∀ n : Z, ut_sys_in n sc_v (pv_tf (us_V U)) U sts) -∗
+  (∀ n : Z, ut_sys_in n f sc_v (pv_tf (us_V U)) U sts) -∗
   (* THE CROSSING: usertrap parks (yield, and every sleeping syscall), so it
      may return on a different hart -- and the bundle comes back at THAT
      hart, which is why [R] is a family (see the note above). *)
@@ -1089,7 +1099,8 @@ Module Type USERTRAP.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (pt : uptd) (j : nat)
       (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
-      (mie_v mdv0 menvcfg0 : mword 64) (U : ustate) (sts : list fdstate),
+      (mie_v mdv0 menvcfg0 : mword 64) (U : ustate) (sts : list fdstate)
+      (f : sfam),
       wp_usertrap_body (fun h : CpuId => usertrap_res (CID := h))
-        pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0 U sts.
+        pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0 U sts f.
 End USERTRAP.

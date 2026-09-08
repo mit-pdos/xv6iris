@@ -411,7 +411,7 @@ Section UkRunSys.
     intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -435,7 +435,11 @@ Section UkRunSys.
        and has nowhere to say it.  Named and discarded here; the leaves that
        will read it are open/close/dup, once [urun] carries the program's
        own descriptor authority. *)
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _ Hexec Hsbrk H3 H4 H5 H8 Hok)
       as [-> [-> ->]].
@@ -507,7 +511,7 @@ Section UkRunSys.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -527,7 +531,11 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_open = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     (* the IMAGE half is the quiet row: open touches no user byte *)
     destruct (usys_mem_ok_quiet USYS_open _ r _ _ _ _ _ _
@@ -615,7 +623,7 @@ Section UkRunSys.
     intros Hn Harg Hstne Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hh0 Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -642,7 +650,11 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_dup = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     destruct (usys_mem_ok_quiet USYS_dup _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
@@ -718,7 +730,7 @@ Section UkRunSys.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -738,7 +750,11 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_dup = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     destruct (usys_mem_ok_quiet USYS_dup _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
@@ -850,7 +866,7 @@ Section UkRunSys.
     intros Hn Harg Hal4.
     iIntros "#Hi Hrun Hsb Hh Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -872,7 +888,11 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_close = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     destruct (usys_mem_ok_quiet USYS_close _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
@@ -916,7 +936,7 @@ Section UkRunSys.
     intros Hn Harg Hs Hkl Hne Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -939,7 +959,11 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_close = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     destruct (usys_mem_ok_quiet USYS_close _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
@@ -1001,7 +1025,7 @@ Section UkRunSys.
     intros Hn Ha1 Hcnt Hal4.
     iIntros "#Hi Hbs Hrun Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1023,7 +1047,11 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_read = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     (* unfold the row down to its read arm *)
     unfold usys_mem_ok in Hok.
@@ -1113,7 +1141,7 @@ Section UkRunSys.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1133,7 +1161,11 @@ Section UkRunSys.
       [ exfalso; unfold USYS_exec, USYS_exit in He; discriminate He | ].
     destruct (decide (USYS_exec = USYS_fork)) as [He | _];
       [ exfalso; unfold USYS_exec, USYS_fork in He; discriminate He | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     destruct (usys_mem_ok_exec_row USYS_exec _ r _ _ _ _ _ _ eq_refl Hok)
       as [-> [-> [-> ->]]].
@@ -1178,7 +1210,7 @@ Section UkRunSys.
     intros Hn Hz Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1200,7 +1232,11 @@ Section UkRunSys.
       [ exfalso; unfold USYS_wait, USYS_exit in He; discriminate He | ].
     destruct (decide (USYS_wait = USYS_fork)) as [He | _];
       [ exfalso; unfold USYS_wait, USYS_fork in He; discriminate He | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     destruct (usys_mem_ok_wait_null USYS_wait _ r _ _ _ _ _ _
                 eq_refl Ha0 Hok) as [-> [-> ->]].
@@ -1286,7 +1322,7 @@ Section UkRunSys.
     intros Hn Hwin Hcapk Hcl Hdp Hop Hpp Hal4.
     iIntros "#Hi Hrun Hsb Hbuf Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1317,7 +1353,11 @@ Section UkRunSys.
     rewrite Hnum. cbv zeta.
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
     destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     destruct (usys_mem_ok_window n _ r _ _ _ _ _ _ dst cap Hw Hok)
       as ((d & bs & Hdcap & HM') & -> & ->).
@@ -1441,7 +1481,7 @@ Section UkRunSys.
     set (dst := m !!! Regidx (mword_of_int 10)).
     iIntros "#Hi Hrun Hsb Hstd Hbuf Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1482,7 +1522,11 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_pipe = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     destruct (usys_mem_ok_window USYS_pipe _ r _ _ _ _ _ _ dst 8%nat Hw Hok)
       as ((d & bs & Hdcap & HM') & -> & ->).
@@ -1773,7 +1817,7 @@ Section UkRunSys.
     iIntros "#Hi Hrun Hsb Hsz Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut szk M pm fdv cw)
       "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iDestruct (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     (* the key's break IS the program's *)
     iDestruct (uheap_usz with "Hheap Hsz") as %->.
@@ -1818,7 +1862,11 @@ Section UkRunSys.
       [ exfalso; discriminate He | ].
     destruct (decide (USYS_sbrk = USYS_fork)) as [He | _];
       [ exfalso; discriminate He | ].
-    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
     cbn [uvis_M uvis_perm uvis_sz uvis_fd uvis_cwd uvis_of_run] in Hok |- *.
     (* the row, in three pieces *)

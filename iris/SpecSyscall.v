@@ -152,7 +152,7 @@ Require Import UserPerm.         (* [perm_of] -- the exec channel's failure row 
 Require Import UsysMemOk.        (* [usys_sbrk_arg] -- sbrk's argument, read back *)
 Require Import UexecSlot.        (* [uvis_of] *)
 Require Import UexecRet.         (* [uslot] -- the slot the exec channel returns *)
-Require Import UexecSG.          (* [uexecSG]: [sbundle] / [spost] *)
+Require Import UexecSG.          (* [uexecSG]: [sbundle_at] / [spost_at] *)
 Require Import UexecExecInst.    (* the class INSTANCE: exec's bundle at 7 *)
 Import Defs.
 
@@ -315,7 +315,7 @@ Qed.
 (*  THE EXEC CHANNEL.                                                     *)
 (* ===================================================================== *)
 (* A caller that offers the process's exec bundle
-   ([UexecSG.sbundle uslot USYS_exec] -- [UexecExecInst.exec_sbundle], the
+   ([UexecSG.sbundle_at uslot USYS_exec f] -- [UexecExecInst.exec_sbundle], the
    [SpecSysExecAU] AU precondition at the trapping key, its slot wand
    concluding at the U-mode slot) gets back, on exec, either the failure
    facts or [UexecRet.uslot] of the NEW image.  Every non-exec arm owes
@@ -326,8 +326,13 @@ Section SyscExec.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
   (* the process's exec bundle, offered only on exec *)
-  Definition sysc_exec_in (U : ustate) (sts : list fdstate) : iProp Σ :=
-    (⌜sysc_num (us_V U) = 7⌝ -∗ sbundle uslot USYS_exec (uvis_of U sts))%I.
+  (* ...AT THE FAMILIES THE PROCESS DEPOSITED AT ([UexecSG.sfam]), which the
+     trap route carries in beside the bundle: what comes back to the process
+     is a post at the very receipts it chose, so the two legs cannot be
+     stated at independent witnesses ([UexecSG.v]'s header). *)
+  Definition sysc_exec_in (U : ustate) (sts : list fdstate) (f : sfam)
+      : iProp Σ :=
+    (⌜sysc_num (us_V U) = 7⌝ -∗ sbundle_at uslot USYS_exec f (uvis_of U sts))%I.
 
   (* r = -1 and nothing of the process moved but a0: the trapframe up to
      the a0 slot, the image, the permission projection (a copy-in's lazy
@@ -376,7 +381,10 @@ Definition wp_syscall_sconf_body
     (pid : mword 32) (U : ustate)
     (* THE DESCRIPTOR STATES syscall() IS ENTERED AT.  The post below states
        [sysc_fd_ok] against them, beside [sysc_mem_ok] against the image. *)
-    (sts : list fdstate) (lks : gset string) :=
+    (sts : list fdstate) (lks : gset string)
+    (* the deposit's FAMILIES, relayed from the trap route -- see
+       [sysc_exec_in] *)
+    (f : sfam) :=
   let pcE : mword 64 := mword_of_int KernelSyms.syscall in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -432,7 +440,7 @@ Definition wp_syscall_sconf_body
      AT A NAMED TABLE, so the post can say which descriptors moved. *)
   fd_frags (pv_fdg (us_V U)) sts -∗
   (* the process's exec bundle, offered only on exec -- see [sysc_exec_in] *)
-  sysc_exec_in U sts -∗
+  sysc_exec_in U sts f -∗
   (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
      TABLE ENTRY NOT RETURN WITHOUT THE CONTRACT SAYING WHICH ONE.
 
@@ -713,6 +721,7 @@ Module Type SYSCALL.
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
-      (lks : gset string),
-      wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid U sts lks.
+      (lks : gset string) (f : sfam),
+      wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid U sts
+        lks f.
 End SYSCALL.

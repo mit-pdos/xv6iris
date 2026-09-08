@@ -94,10 +94,10 @@ Require Import UexecRet.     (* [uslot] / [uexec_ret] / [ukb] / [ukc] /
                                 does not travel through a re-export
                                 (durable-notes). *)
 Require Import UexecApply.   (* the round's tail, as named lemmas *)
-Require Import UexecSG.       (* [uexecSG]: [sbundle] / [spost] / [skey_eq] -- the loop runs on the
+Require Import UexecSG.       (* [uexecSG]: [sbundle_at] / [spost_at] / [skey_eq] -- the loop runs on the
                                  enriched slot (lane E3b) *)
 Require Import UexecExecMint. (* [uslot_mint] -- the loop's generic slot *)
-Require Import UexecExecInst. (* the class INSTANCE: [spost] is [emp] here *)
+Require Import UexecExecInst. (* the class INSTANCE: [spost_at] is [emp] here *)
 Require Import FirstTok.      (* [fsabs_env] -- what the mint needs *)
 Require Import UserretUser.
 Require Import TfPage36.
@@ -322,11 +322,12 @@ Section UserretClosed.
            ecall, and at [UexecExecInst]'s instance non-[emp] only at exec
            -- goes DOWN to the kernel as uservec's pre row; the arm without
            it stays for the round ([UexecRet.uexec_ret_split]). ---- *)
-    iDestruct (uexec_ret_split sc W with "Hret") as "[Hxin Hret]".
+    iDestruct (uexec_ret_split sc W with "Hret") as (fdep) "[Hxin Hret]".
     (* ---- one round.  [Hret] -- the linear return user execution handed
            back -- is FRAMED across the crossing (R-a / K8). ---- *)
     iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp
-              (us_upt U0 pt) (uvis_fd W) (uvis_M W) (tf_resume_gpr0 (uvis_tf W))
+              (us_upt U0 pt) (uvis_fd W) fdep (uvis_M W)
+              (tf_resume_gpr0 (uvis_tf W))
               ms_v sc stv (tf_w (uvis_tf W) tf_epc_idx)
               Hstv Hdqc Hmie Hj Hnorm Hptwf
               with "Hkt Hhw Hmin Hclaim Hcreds Hframe Hures [Hxin] [-]").
@@ -346,8 +347,8 @@ Section UserretClosed.
       destruct (decide (n = USYS_fork)) as [He | _];
         [ exfalso; exact (Hgf He) | ].
       match goal with
-      | |- environments.envs_entails _ (sbundle _ _ ?W') =>
-          rewrite <- (sbundle_cong uslot n W W'
+      | |- environments.envs_entails _ (sbundle_at _ _ _ ?W') =>
+          rewrite <- (sbundle_at_cong uslot n fdep W W'
                         ltac:(rewrite /skey_eq; split_and!;
                               [ reflexivity
                               | exact (eq_sym (uvis_run_arg0 W))
@@ -432,7 +433,7 @@ Section UserretClosed.
        unfolded IS the round lemma's row once the entry permission map and
        break are the key's own *)
     iEval (rewrite /SpecUsertrap.ut_exec_out Hpi0 Hsz0) in "Hxo".
-    iDestruct (uexec_ret_round_slot_of sc W (tf_resume_gpr0 (uvis_tf W))
+    iDestruct (uexec_ret_round_slot_of sc W fdep (tf_resume_gpr0 (uvis_tf W))
                  (tf_w (uvis_tf W) tf_epc_idx) U2 sts2
                  Hlen eq_refl eq_refl Hfdkept
                  (* ...and the ECALL arm's row, which is what stops the
@@ -446,12 +447,13 @@ Section UserretClosed.
                     and stated at the same trapframe pair *)
                  Hpipecall Hround'
                  (* ...AND THE SYSCALL'S ARMED POST, back under the arm's own
-                    [∀ r].  At [UexecExecInst]'s instance [spost] is [emp] at
-                    every number, so the kernel owes nothing yet; the row that
-                    carries it once a contract is turned on is
-                    [SpecUsertrap.ut_sys_out]. *)
+                    [∀ r], AT THE FAMILIES THE DEPOSIT WAS MADE AT ([fdep],
+                    the witness the split handed out).  At [UexecExecInst]'s
+                    instance [spost_at] is [emp] at every number, so the
+                    kernel owes nothing yet; the row that carries it once a
+                    contract is turned on is [SpecUsertrap.ut_sys_out]. *)
                  with "Hmk Hxo [] Hret") as "Hslot";
-      [ iIntros "_"; rewrite /spost /= /xv6_spost; done | ].
+      [ iIntros "_"; rewrite /spost_at /= /xv6_spost; done | ].
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)
     assert (Hpi2 : uvis_perm (uvis_of U2 sts2)

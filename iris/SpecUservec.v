@@ -99,6 +99,7 @@ Require Import ProcDefs.    (* [ustate] -- the residue's index *)
 Require Import UexecRet.   (* [tf_of] -- the saved 36-word frame of a running machine *)
 Require Import UexecRound. (* [uround_ok] -- the round, image half included *)
 Require Import UexecSlot.  (* [tf_resume_pc] *)
+Require Import UexecSG.    (* [uexecSG]: [sfam] -- the deposit's families *)
 Require Import UserPerm.   (* [perm_of] *)
 Require Import TfUser.     (* [tf_ueq] *)
 Require Import Xv6Cameras.
@@ -363,6 +364,9 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} 
     (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
     (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
+    (* the deposit's FAMILIES, relayed to usertrap's own row -- see
+       [SpecUsertrap.wp_usertrap_body] *)
+    (f : sfam)
     (* THE DELIVERED FRAME, AT NAMED VALUES AND A NAMED IMAGE.
        [user_trap_frame] is definitionally the ∃ over [user_trap_frame_at],
        so the five data are the same premise with names -- which is what
@@ -463,7 +467,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} 
      entry image -- the run projection of the record the loop holds
      ([SpecUsertrap.ut_sys_in]) *)
   (∀ n : Z,
-     ut_sys_in n sc_v (tf_of g (ret_pc sepc_v))
+     ut_sys_in n f sc_v (tf_of g (ret_pc sepc_v))
        (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts) -∗
   wp_next true (proc_addr j) (fun CID' : CpuId =>
     uservec_post (CID := CID') (URes CID') C pt vksp U M g sts sepc_v sc_v) -∗
@@ -482,7 +486,7 @@ Module Type USERVEC.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
-      (M : gmap Z (bv 8))
+      (f : sfam) (M : gmap Z (bv 8))
       (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64),
       (* THE BARE RESIDUE, not [usertrap_res] and not even the parked form.
          [usertrap_res] and this spec's own [user_trap_frame] premise claim
@@ -498,5 +502,5 @@ Module Type USERVEC.
          the same two moves in reverse.  See
          claude-notes/projects/uservec.md. *)
       wp_uservec_pt_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt Rut j vksp U sts M g ms_v sc_v stval_v sepc_v.
+        C pt Rut j vksp U sts f M g ms_v sc_v stval_v sepc_v.
 End USERVEC.

@@ -49,6 +49,7 @@ Require Import LogInv.
 Require Import IrefSlots.
 Require Import IntrDefs.   (* [hart_csrs]: the residue's per-hart CSR bundle *)
 Require Import SpecUsertrap.
+Require Import UexecSG.   (* [uexecSG]: [sfam] -- the deposit's families *)
 Require Import SpecUserret.
 Require Import SpecUservec.
 From Kernel Require Import KernelInstrs.
@@ -137,7 +138,7 @@ Section UservecAllPt.
 
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
-      (M : gmap Z (bv 8))
+      (fdep : sfam) (M : gmap Z (bv 8))
       (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64) :
     (* [UT.]-qualified, not the section alias: inside a section that FIXES
        [CID], the alias has no [CID] implicit left to instantiate (section
@@ -145,7 +146,7 @@ Section UservecAllPt.
        still does, and the two are convertible, so the [: USERVEC] check
        accepts it. *)
     wp_uservec_pt_body (fun h : CpuId => UT.usertrap_res_bare (CID := h))
-      C pt Rut j vksp U sts M g ms_v sc_v stval_v sepc_v.
+      C pt Rut j vksp U sts fdep M g ms_v sc_v stval_v sepc_v.
   Proof.
     cbv beta zeta delta [wp_uservec_pt_body].
     (* [tf_pa] deliberately NOT unfolded here: its 35 trapframe cells ride in
@@ -1632,6 +1633,7 @@ Section UservecAllPt.
     iEval (rewrite Hstvec) in "Hstvec".
     iApply (UT.wp_usertrap pt j (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
               ms_v sc_v stval_v sepc_v vksp (uc_mie C) (uc_mideleg C) MENVCFG_S _ sts
+              fdep
               Hums Hjlt Hspv' Htpv' Hmie Hmm Hmenvval0
               with "Hkt Hpc Hhw Hinv Hhs Hpriv Hms Hsc Hstval Hsepc Hstvec Hmie Hmdl Hmenv Hfile Hures' [Hxin]").
     { (* THE BUNDLE ACROSS THE SAVE WALK: the saved frame is [g]'s registers
@@ -1640,8 +1642,8 @@ Section UservecAllPt.
          definitional; the image is the frame's own [M] on both sides *)
       iIntros (n). iSpecialize ("Hxin" $! n).
       match goal with
-      | |- environments.envs_entails _ (SpecUsertrap.ut_sys_in _ _ _ ?UU _) =>
-          iApply (ut_sys_in_cong n sc_v (tf_of g (ret_pc sepc_v))
+      | |- environments.envs_entails _ (SpecUsertrap.ut_sys_in _ _ _ _ ?UU _) =>
+          iApply (ut_sys_in_cong n fdep sc_v (tf_of g (ret_pc sepc_v))
                     (pv_tf (us_V UU))
                     (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU sts
                     ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];

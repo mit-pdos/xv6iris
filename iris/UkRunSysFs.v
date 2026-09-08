@@ -391,6 +391,14 @@ Section UkRunSysFs.
     iDestruct (uheap_ustrq with "Hheap Hstr") as %Hread.
     assert (Hread0 : ustr_read M (uint (ufs_arg (tf_of m pc) 0)) = Some pl)
       by exact Hread.
+    (* THE DEPOSIT, MINTED HERE and not at the arm: the law is bupd-shaped
+       ([UexecSG.v]'s header) and this is the last point where the goal is
+       still a WP, which is what absorbs the update -- the arm itself
+       demands a plain bundle. *)
+    destruct (uenr_dom_rows n Hdom)
+      as (Hexit & Hfork & Hexec & Hsbrk & Hwait & Hpipe & Hrd & Hfst).
+    iMod (udep_dep n (uvis_of_run m pc M pm sz fdv cw) Hok Hexec
+            with "Hdep") as "Hb0".
     iApply (STEP γm h C pt Rfd Rut pm sz M fdv cw m pc Hlo Hpm HRut Hui with "Hb").
     (* ---- the ENRICHED return, at the trap-out key ---- *)
     rewrite /uexec_ret_fs /uexec_ret_fs_F.
@@ -400,20 +408,19 @@ Section UkRunSysFs.
     assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = n).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum.
-    destruct (uenr_dom_rows n Hdom)
-      as (Hexit & Hfork & Hexec & Hsbrk & Hwait & Hpipe & Hrd & Hfst).
     destruct (decide (n = USYS_exit)) as [He | _];
       [ exfalso; exact (Hexit He) |].
     destruct (decide (n = USYS_fork)) as [He | _];
       [ exfalso; exact (Hfork He) |].
     rewrite Hdom.
     (* THE DEPOSIT, minted from the supplier and carried to THIS tier's
-       family by [UexecSG.sbundle_mono] ([UexecRetFs.uslot_uslot_fs] is the
-       upgrader); then the process takes the arm's RIGHT disjunct. *)
-    iSplitR.
-    { iPoseProof (udep_dep n (uvis_of_run m pc M pm sz fdv cw) Hok Hexec
-                    with "Hdep") as "Hb0".
-      iApply (sbundle_mono uslot (uslot_fs γm) n
+       family by [UexecSG.sbundle_at_mono] ([UexecRetFs.uslot_uslot_fs] is
+       the upgrader); the arm binds the deposit's own FAMILIES, and the law
+       mints at some [f] which this leaf hands straight over.  Then the
+       process takes the arm's RIGHT disjunct. *)
+    iDestruct "Hb0" as (fdep) "Hb0".
+    iExists fdep. iSplitL "Hb0".
+    { iApply (sbundle_at_mono uslot (uslot_fs γm) n fdep
                 (uvis_of_run m pc M pm sz fdv cw) with "[] Hb0").
       iIntros "!>" (W') "Hs". iApply uslot_uslot_fs. iExact "Hs". }
     iRight. iExists u. iFrame "Hmc".

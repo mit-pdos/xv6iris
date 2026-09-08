@@ -109,7 +109,7 @@ Require Import UmodeRegs.    (* [uv_regs] / [uv_amb] *)
 Require Import UmodeText.    (* [user_ptm_inv_x]: the image STAMPED while the process runs *)
 Require Import UserPerm.     (* [uperm] / [perm_of] *)
 Require Import FdSlots.      (* [fdstate] -- the descriptor view in the key *)
-Require Import UexecSG.      (* [uexecSG]: [sbundle] / [spost] / [ssupply] --
+Require Import UexecSG.      (* [uexecSG]: [sbundle_at] / [spost_at] / [ssupply] --
                                 the per-syscall DEPOSIT the returning arm
                                 carries; see that file's header *)
 Local Open Scope Z_scope.
@@ -591,10 +591,10 @@ Section UexecRet.
              fdv' cw')))%I.
 
   (* the returning arm's CONTINUATION: the four pure rows, the syscall's
-     armed post [spost] -- what the process gets back for the bundle it
+     armed post [spost_at] -- what the process gets back for the bundle it
      deposited -- and the next slot at the bumped key. *)
-  Definition uexec_ret_ret_F (X : uvis -d> iPropO Σ) (n : Z) (W : uvis)
-      : iProp Σ :=
+  Definition uexec_ret_ret_F (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
+      (W : uvis) : iProp Σ :=
     (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
        (szv' : Z) (fdv' : list fdstate) (cw' : Z),
        ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
@@ -629,8 +629,12 @@ Section UexecRet.
           pieces of the bundle the process deposited, its receipts and its
           cursors.  [emp] at every number without a contract, and at exec,
           whose bundle is consumed and whose process never resumes on
-          success. *)
-       spost X n W r -∗
+          success.
+          AT THE FAMILIES THE DEPOSIT WAS MADE AT: [f] is bound by the
+          arm's own [∃], outside both legs, so what comes back is a post
+          about the receipts and refunds the process CHOSE
+          ([UexecSG.v]'s header). *)
+       spost_at X n f W r -∗
        X (bump W r M' π' szv' fdv' cw'))%I.
 
   (* THE ARM WITHOUT THE DEPOSIT -- today's return, read at the fixpoint
@@ -638,12 +642,12 @@ Section UexecRet.
      ([UexecApply.uexec_ret_round_slot]): the loop splits the deposit off
      before the excursion and re-keys what is left afterwards. *)
   Definition uexec_arm_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
-      : iProp Σ :=
+      (f : sfam) : iProp Σ :=
     (if decide (sc = uecall_scause) then
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
        else if decide (n = USYS_fork) then uexec_fork_F X W
-       else uexec_ret_ret_F X n W
+       else uexec_ret_ret_F X n f W
      else X W)%I.
 
   (* ...AND THE DEPOSIT ALONE: what the process owes at this trap.  [emp]
@@ -651,21 +655,27 @@ Section UexecRet.
      contract -- and [emp] at every returning number the instance has no
      contract for. *)
   Definition uexec_dep_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
-      : iProp Σ :=
+      (f : sfam) : iProp Σ :=
     (if decide (sc = uecall_scause) then
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
        else if decide (n = USYS_fork) then emp
-       else sbundle X n W
+       else sbundle_at X n f W
      else emp)%I.
 
+  (* ...AND THE TWO TOGETHER, WITH THE FAMILIES BOUND ONCE, OUTSIDE BOTH.
+     That [∃] is the deposit shape: what comes back is a post at the
+     receipts and refunds the process chose, not at some other set
+     ([UexecSG.v]'s header).  Its price is that the two halves can no
+     longer be split blind -- [uexec_ret_F_split] hands out the witness
+     beside them and every consumer carries it. *)
   Definition uexec_ret_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
       : iProp Σ :=
     (if decide (sc = uecall_scause) then
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
        else if decide (n = USYS_fork) then uexec_fork_F X W
-       else (sbundle X n W ∗ uexec_ret_ret_F X n W)
+       else (∃ f : sfam, sbundle_at X n f W ∗ uexec_ret_ret_F X n f W)
      else X W)%I.
 
   (* (B) the kernel obligation: its later-free BODY, and the guarded form *)
@@ -796,8 +806,8 @@ Section UexecRet.
   Definition uexec_ret : mword 64 -> uvis -> iProp Σ := uexec_ret_F uslot.
   (* the two halves at the fixpoint: [uexec_arm] is what the loop's round
      consumes, [uexec_dep] what it splits off and sends down *)
-  Definition uexec_arm : mword 64 -> uvis -> iProp Σ := uexec_arm_F uslot.
-  Definition uexec_dep : mword 64 -> uvis -> iProp Σ := uexec_dep_F uslot.
+  Definition uexec_arm : mword 64 -> uvis -> sfam -> iProp Σ := uexec_arm_F uslot.
+  Definition uexec_dep : mword 64 -> uvis -> sfam -> iProp Σ := uexec_dep_F uslot.
   Definition ukb `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ)
       (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) : iProp Σ :=
@@ -939,11 +949,14 @@ Section UexecRet.
            uslot (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
                     fdv' cw')))
      else
-       (* THE DEPOSIT, beside the arm: the process's bundle for this number
-          at this key ([UexecSG]).  It is [emp] at every number the instance
-          has no contract for, but a leaf below the file-system tower cannot
-          see that -- it pays with [uexec_dep_of_supply_ne] instead. *)
-       (sbundle uslot n W ∗
+       (* THE DEPOSIT, beside the arm and AT THE SAME FAMILIES: the
+          process's bundle for this number at this key ([UexecSG]), the
+          families bound once outside both legs.  It is [emp] at every
+          number the instance has no contract for, but a leaf below the
+          file-system tower cannot see that -- it pays with
+          [uexec_dep_of_supply_ne] instead. *)
+       (∃ f : sfam,
+        sbundle_at uslot n f W ∗
         (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
            (szv' : Z) (fdv' : list fdstate) (cw' : Z),
            ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
@@ -956,7 +969,7 @@ Section UexecRet.
               of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
            ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
            ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
-           spost uslot n W r -∗
+           spost_at uslot n f W r -∗
            uslot (bump W r M' π' szv' fdv' cw')))).
   Proof.
     intros ->. rewrite /uexec_ret /uexec_ret_F.
@@ -965,13 +978,13 @@ Section UexecRet.
 
   (* ...and the same at the DEPOSIT-FREE arm, which is what the loop's round
      is stated over *)
-  Lemma uexec_arm_ecall (sc : mword 64) (W : uvis) :
+  Lemma uexec_arm_ecall (sc : mword 64) (W : uvis) (f : sfam) :
     sc = uecall_scause ->
-    uexec_arm sc W ⊣⊢
+    uexec_arm sc W f ⊣⊢
     (let n := usys_num (uvis_tf W) in
      if decide (n = USYS_exit) then emp
      else if decide (n = USYS_fork) then uexec_fork_F uslot W
-     else uexec_ret_ret_F uslot n W).
+     else uexec_ret_ret_F uslot n f W).
   Proof.
     intros ->. rewrite /uexec_arm /uexec_arm_F.
     destruct (decide (uecall_scause = uecall_scause)); [ reflexivity | contradiction ].
@@ -985,9 +998,9 @@ Section UexecRet.
     destruct (decide (sc = uecall_scause)); [ contradiction | reflexivity ].
   Qed.
 
-  Lemma uexec_arm_transparent (sc : mword 64) (W : uvis) :
+  Lemma uexec_arm_transparent (sc : mword 64) (W : uvis) (f : sfam) :
     sc <> uecall_scause ->
-    uexec_arm sc W ⊣⊢ uslot W.
+    uexec_arm sc W f ⊣⊢ uslot W.
   Proof.
     intros Hne. rewrite /uexec_arm /uexec_arm_F.
     destruct (decide (sc = uecall_scause)); [ contradiction | reflexivity ].
@@ -998,37 +1011,44 @@ Section UexecRet.
   (* kernel excursion and sends it down to the dispatcher; an ecall leaf   *)
   (* joins the two when it hands the return back.                         *)
   (* ------------------------------------------------------------------- *)
+  (* THE SPLIT HANDS OUT THE WITNESS: the families are the arm's own [∃],
+     so what the loop learns when it takes the deposit apart is WHICH
+     families the process chose, and it carries that witness to the
+     dispatcher and back to the return. *)
   Lemma uexec_ret_F_split (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis) :
-    uexec_ret_F X sc W -∗ uexec_dep_F X sc W ∗ uexec_arm_F X sc W.
+    uexec_ret_F X sc W -∗
+    ∃ f : sfam, uexec_dep_F X sc W f ∗ uexec_arm_F X sc W f.
   Proof.
     rewrite /uexec_ret_F /uexec_dep_F /uexec_arm_F. cbv zeta.
     iIntros "H".
-    destruct (decide (sc = uecall_scause)); [| iSplitR; [done | iExact "H"]].
+    destruct (decide (sc = uecall_scause));
+      [| iExists sfam_pt; iSplitR; [done | iExact "H"]].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit));
-      [ iSplitR; [done | iExact "H"] |].
+      [ iExists sfam_pt; iSplitR; [done | iExact "H"] |].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork));
-      [ iSplitR; [done | iExact "H"] |].
-    iDestruct "H" as "[Hd Ha]". iFrame "Hd Ha".
+      [ iExists sfam_pt; iSplitR; [done | iExact "H"] |].
+    iDestruct "H" as (f) "[Hd Ha]". iExists f. iFrame "Hd Ha".
   Qed.
 
-  Lemma uexec_ret_F_join (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis) :
-    uexec_dep_F X sc W -∗ uexec_arm_F X sc W -∗ uexec_ret_F X sc W.
+  Lemma uexec_ret_F_join (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
+      (f : sfam) :
+    uexec_dep_F X sc W f -∗ uexec_arm_F X sc W f -∗ uexec_ret_F X sc W.
   Proof.
     rewrite /uexec_ret_F /uexec_dep_F /uexec_arm_F. cbv zeta.
     iIntros "Hd Ha".
     destruct (decide (sc = uecall_scause)); [| iExact "Ha"].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ iExact "Ha" |].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)); [ iExact "Ha" |].
-    iFrame "Hd Ha".
+    iExists f. iFrame "Hd Ha".
   Qed.
 
   Lemma uexec_ret_split (sc : mword 64) (W : uvis) :
-    uexec_ret sc W -∗ uexec_dep sc W ∗ uexec_arm sc W.
+    uexec_ret sc W -∗ ∃ f : sfam, uexec_dep sc W f ∗ uexec_arm sc W f.
   Proof. exact (uexec_ret_F_split uslot sc W). Qed.
 
-  Lemma uexec_ret_join (sc : mword 64) (W : uvis) :
-    uexec_dep sc W -∗ uexec_arm sc W -∗ uexec_ret sc W.
-  Proof. exact (uexec_ret_F_join uslot sc W). Qed.
+  Lemma uexec_ret_join (sc : mword 64) (W : uvis) (f : sfam) :
+    uexec_dep sc W f -∗ uexec_arm sc W f -∗ uexec_ret sc W.
+  Proof. exact (uexec_ret_F_join uslot sc W f). Qed.
 
   (* ------------------------------------------------------------------- *)
   (* PAYING THE DEPOSIT OUT OF THE SUPPLY.                                *)
@@ -1038,41 +1058,53 @@ Section UexecRet.
      supply alone pays -- exec is the one syscall whose bundle carries a
      slot wand (UexecSG.v's header), and [n <> USYS_exec] is a premise the
      leaves already carry. *)
+  (* BUPD-SHAPED, since the class's laws are ([UexecSG.v]'s header): the
+     update belongs to the LAW, so a consumer runs it where it has a
+     modality -- every one of them does, the deposit being minted inside a
+     WP step. *)
+  (* ...AT SOME FAMILIES, which the caller then carries to the arm: the
+     supply pays a bundle, and the arm's [∃] is filled by the witness this
+     hands back. *)
   Lemma uexec_dep_F_of_supply_ne (X : uvis -d> iPropO Σ) (sc : mword 64)
       (W : uvis) :
     (sc = uecall_scause -> usys_num (uvis_tf W) <> USYS_exec) ->
-    □ ssupply -∗ uexec_dep_F X sc W.
+    □ ssupply ==∗ ∃ f : sfam, uexec_dep_F X sc W f.
   Proof.
     intros Hne. rewrite /uexec_dep_F. cbv zeta. iIntros "#Hsup".
-    destruct (decide (sc = uecall_scause)) as [Hec |]; [| done].
-    destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [done |].
-    destruct (decide (usys_num (uvis_tf W) = USYS_fork)); [done |].
+    destruct (decide (sc = uecall_scause)) as [Hec |];
+      [| iModIntro; by iExists sfam_pt].
+    destruct (decide (usys_num (uvis_tf W) = USYS_exit));
+      [iModIntro; by iExists sfam_pt |].
+    destruct (decide (usys_num (uvis_tf W) = USYS_fork));
+      [iModIntro; by iExists sfam_pt |].
     iApply (sbundle_of_supply_ne X (usys_num (uvis_tf W)) W (Hne Hec)).
     iExact "Hsup".
   Qed.
 
   Lemma uexec_dep_of_supply_ne (sc : mword 64) (W : uvis) :
     (sc = uecall_scause -> usys_num (uvis_tf W) <> USYS_exec) ->
-    □ ssupply -∗ uexec_dep sc W.
+    □ ssupply ==∗ ∃ f : sfam, uexec_dep sc W f.
   Proof. exact (uexec_dep_F_of_supply_ne uslot sc W). Qed.
 
   (* ...and what the GENERIC inhabitants use: the supply beside a generic
      slot family, which is what answers exec's wand *)
   Lemma uexec_dep_F_of_supply (X : uvis -d> iPropO Σ) (sc : mword 64)
       (W : uvis) :
-    □ ssupply -∗ □ (∀ W' : uvis, X W') -∗ uexec_dep_F X sc W.
+    □ ssupply -∗ □ (∀ W' : uvis, X W') ==∗ ∃ f : sfam, uexec_dep_F X sc W f.
   Proof.
     rewrite /uexec_dep_F. cbv zeta. iIntros "#Hsup #Hall".
-    destruct (decide (sc = uecall_scause)); [| done].
-    destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [done |].
-    destruct (decide (usys_num (uvis_tf W) = USYS_fork)); [done |].
+    destruct (decide (sc = uecall_scause)); [| iModIntro; by iExists sfam_pt].
+    destruct (decide (usys_num (uvis_tf W) = USYS_exit));
+      [iModIntro; by iExists sfam_pt |].
+    destruct (decide (usys_num (uvis_tf W) = USYS_fork));
+      [iModIntro; by iExists sfam_pt |].
     iApply (sbundle_of_supply X (usys_num (uvis_tf W)) W with "Hsup Hall").
   Qed.
 
   (* every arm of the return is inhabited by a slot at every key -- and, on
      the returning arm, by the supply *)
-  Lemma uexec_arm_of_all (sc : mword 64) (W : uvis) :
-    □ (∀ W' : uvis, uslot W') -∗ uexec_arm sc W.
+  Lemma uexec_arm_of_all (sc : mword 64) (W : uvis) (f : sfam) :
+    □ (∀ W' : uvis, uslot W') -∗ uexec_arm sc W f.
   Proof.
     iIntros "#H". rewrite /uexec_arm /uexec_arm_F.
     destruct (decide (sc = uecall_scause)); [ | iApply "H" ].
@@ -1085,12 +1117,13 @@ Section UexecRet.
   Qed.
 
   Lemma uexec_ret_of_all (sc : mword 64) (W : uvis) :
-    □ ssupply -∗ □ (∀ W' : uvis, uslot W') -∗ uexec_ret sc W.
+    □ ssupply -∗ □ (∀ W' : uvis, uslot W') ==∗ uexec_ret sc W.
   Proof.
     iIntros "#Hsup #H".
-    iApply (uexec_ret_join sc W with "[] []").
-    - iApply (uexec_dep_F_of_supply uslot sc W with "Hsup H").
-    - iApply (uexec_arm_of_all sc W with "H").
+    iMod (uexec_dep_F_of_supply uslot sc W with "Hsup H") as (f) "Hdep".
+    iModIntro.
+    iApply (uexec_ret_join sc W f with "Hdep []").
+    iApply (uexec_arm_of_all sc W f with "H").
   Qed.
 
 End UexecRet.
@@ -1156,13 +1189,17 @@ Section UexecRetGen.
     iDestruct (user_trap_frame_trapped C pt Rut (uvis_sz W) (uvis_perm W)
                  (uvis_fd W) (uvis_cwd W) with "Hframe")
       as (W' sc stv) "[%Hperm [%Hszw [%Hfdw [%Hcww Htm]]]]".
-    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [%] [Htm Hfrag]");
+    (* THE RETURN, MINTED HERE: the supply law is bupd-shaped
+       ([UexecSG.v]'s header) and this is the last point at which the goal
+       is a WP, which is what absorbs the update.  [Hk]'s payload takes a
+       plain [uexec_ret]. *)
+    iMod (uexec_ret_of_all sc W' with "Hsup []") as "Hret".
+    { iModIntro. iIntros (W''). iApply "IH". }
+    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [%] [Htm Hfrag Hret]");
       [ exact Hperm | exact Hszw | exact Hfdw | exact Hcww | ].
     (* the fragments were carried across the excursion and go back at the
        trap-out key's view, which [Hfdw] says is the one they are held at *)
-    rewrite Hfdw. iFrame "Htm Hfrag".
-    iApply (uexec_ret_of_all sc W' with "Hsup").
-    iModIntro. iIntros (W''). iApply "IH".
+    rewrite Hfdw. iFrame "Htm Hfrag". iExact "Hret".
   Qed.
 
 End UexecRetGen.

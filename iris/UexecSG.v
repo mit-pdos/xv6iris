@@ -5,8 +5,9 @@
 (* Design of record: claude-notes/projects/app-echo.md, "THE ARM,         *)
 (* concretely".  [UexecRet.uexec_ret_F]'s returning-syscall arm is        *)
 (*                                                                        *)
-(*    sbundle X n W ∗ (∀ r …, <the four pure rows> -∗ spost X n W r       *)
-(*                            -∗ X (bump W r …))                          *)
+(*    ∃ f, sbundle_at X n f W                                             *)
+(*         ∗ (∀ r …, <the four pure rows> -∗ spost_at X n f W r           *)
+(*                   -∗ X (bump W r …))                                   *)
 (*                                                                        *)
 (* -- a DEPOSIT: the process's one-shot AU bundle for syscall [n] goes    *)
 (* down, the syscall's armed post comes back.  Both families are fields   *)
@@ -15,6 +16,30 @@
 (* tower ([SpecSysOpen.open_in], [SpecSysExecAU.sys_exec_au_pre], …) and  *)
 (* threading them as arguments would drag that tower's binders through    *)
 (* every U-mode form below.  The one instance is [UexecExecInst.v].       *)
+(*                                                                        *)
+(* THE FAMILY [f] IS SCOPED OVER BOTH LEGS, and that is the whole point   *)
+(* of the deposit shape: a bundle is built at the CALLER'S OWN receipt,   *)
+(* refund and cursor families, and the armed post is only worth anything  *)
+(* to that caller if it comes back AT THE SAME ONES.  Two independent     *)
+(* existentials -- one inside the bundle, one inside the post -- would    *)
+(* hand a program a post about families it never chose.  So the [∃] sits  *)
+(* on the ARM, outside both, and the two class fields are INDEXED by it:  *)
+(* this is [FdRowPilot]'s mirror shape ([∃ u, mcur u ∗ (∀ …, mcur u' -∗ …)*)
+(* ]) at the families instead of the mirror.                              *)
+(*                                                                        *)
+(* [sfam] IS ONE TYPE, NOT A [Z]-INDEXED FAMILY, and the reason is        *)
+(* mechanical rather than aesthetic.  With [sfam : Z -> Type] the         *)
+(* deposit's index has type [sfam n], so (a) [Proper]/[respectful] cannot *)
+(* be stated past the [n] binder -- the arrow is dependent -- and the     *)
+(* fixpoint's [solve_contractive] has nothing to apply; (b) the instance's *)
+(* [sfam] would be a [match] on [n] and every reader would coerce its [f] *)
+(* through an [eq_rect]; and (c) every contract that carries the deposit  *)
+(* ([SpecUsertrap], [SpecUservec], [SpecSyscall]) would have to carry a   *)
+(* TOTAL function [∀ n, sfam n] rather than one value, because its rows   *)
+(* are quantified over the number.  A single type whose instance is a     *)
+(* RECORD with one field per contracted syscall says the same thing with  *)
+(* no dependency at all: [sbundle_at X n f W] reads only the field [n]    *)
+(* names, and the fields no number reads are inert.                       *)
 (*                                                                        *)
 (* WHY THE FAMILIES TAKE [X].  exec's bundle contains a SLOT WAND -- the  *)
 (* caller's WP for the program exec loads ([SpecKexecAU.exec_slot_pre]    *)
@@ -42,6 +67,19 @@
 (*        inhabitants use ([UexecRet.uexec_wp_uslot],                     *)
 (*        [UexecCond.cond_entry_slot]), where the family is the Löb       *)
 (*        hypothesis.                                                     *)
+(*                                                                        *)
+(* BOTH LAWS ARE BUPD-SHAPED, and that is not a convenience.  A bundle    *)
+(* can contain a resource that is FREE but not derivable from [emp]:      *)
+(* write's console arm carries the trace seed [UartSentLoc.uart_sent γu   *)
+(* []], a mono-list lower bound at the empty list, which is the algebra's *)
+(* unit and is therefore mintable by ANYONE -- under a basic update.      *)
+(* Putting that update in the LAW rather than in some particular supplier *)
+(* is what makes it available to a program whose supplier is [emp]        *)
+(* (echo, pre-taint, which also writes to the console), and it covers any *)
+(* future piece that needs a ghost allocation.  The MODALITY IS THE       *)
+(* LAW'S, NOT THE ARM'S: [UexecRet.uexec_dep_F] still demands a plain     *)
+(* [sbundle], and every leaf mints under the update inside its own WP     *)
+(* step, where a WP absorbs it.                                          *)
 (*                                                                        *)
 (* [ssupply] IS NOT IN [uvb], AND MUST NOT BE.  A bundle conjunct would   *)
 (* make the KERNEL owe it to resume ANY process, and an application whose *)
@@ -104,10 +142,11 @@
 (* sites -- which see the instance -- discharge both.                       *)
 (* ===================================================================== *)
 
-(* [sbundle_mono] is what an ENRICHED parallel fixpoint's injection needs *)
-(* ([UexecRetFs.uexec_ret_fs_of] carries the deposit from [uslot] to      *)
-(* [uslot_fs γm]): the bundles are covariant in the slot family, because  *)
-(* the only place the family occurs is exec's wand CONCLUSION.            *)
+(* [sbundle_at_mono] is what an ENRICHED parallel fixpoint's injection    *)
+(* needs ([UexecRetFs.uexec_ret_fs_of] carries the deposit from [uslot]   *)
+(* to [uslot_fs γm]): the bundles are covariant in the SLOT family,       *)
+(* because the only place it occurs is exec's wand CONCLUSION.  (Not to   *)
+(* be confused with [sfam], the DEPOSIT's families, which the mover fixes.)*)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -163,44 +202,100 @@ Proof.
 Qed.
 
 Class uexecSG (Σ : gFunctors) := {
-  (* what the process deposits at an ecall of number [n] from key [W] --
-     [emp] at every number without a contract *)
-  sbundle : (uvis -d> iPropO Σ) -> Z -> uvis -> iProp Σ;
-  (* ...and what the kernel hands back under the arm's [∀ r]: the syscall's
-     armed post -- the unfired pieces as [PieceFam.pf_at], the receipts, the
-     cursors.  [emp] at every number without a contract, and at exec, whose
-     bundle is CONSUMED and whose process never resumes on success. *)
-  spost : (uvis -d> iPropO Σ) -> Z -> uvis -> mword 64 -> iProp Σ;
+  (* THE PROCESS'S CHOICE OF FAMILIES: its receipt, refund and cursor
+     families for every syscall at once, as one value (the header says why
+     it is not indexed by the number).  The arm binds it existentially and
+     both legs read it. *)
+  sfam : Type;
+  (* ...and a point of it, for the arms that carry no deposit: the four
+     non-ecall causes, exit and fork.  A consumer that must NAME a family
+     where the process deposited none takes this one; nothing reads it. *)
+  sfam_pt : sfam;
 
-  sbundle_ne : forall k, Proper (dist k ==> eq ==> eq ==> dist k) sbundle;
-  spost_ne : forall k, Proper (dist k ==> eq ==> eq ==> eq ==> dist k) spost;
+  (* what the process deposits at an ecall of number [n] from key [W], at
+     ITS OWN families [f] -- [emp] at every number without a contract *)
+  sbundle_at : (uvis -d> iPropO Σ) -> Z -> sfam -> uvis -> iProp Σ;
+  (* ...and what the kernel hands back under the arm's [∀ r], AT THE SAME
+     [f]: the syscall's armed post -- the unfired pieces as
+     [PieceFam.pf_at], the receipts, the cursors.  [emp] at every number
+     without a contract, and at exec, whose bundle is CONSUMED and whose
+     process never resumes on success. *)
+  spost_at : (uvis -d> iPropO Σ) -> Z -> sfam -> uvis -> mword 64 -> iProp Σ;
 
-  sbundle_cong : forall (X : uvis -d> iPropO Σ) (n : Z) (W W' : uvis),
-    skey_eq W W' -> sbundle X n W ⊣⊢ sbundle X n W';
-  spost_cong : forall (X : uvis -d> iPropO Σ) (n : Z) (W W' : uvis)
-      (r : mword 64),
-    skey_eq W W' -> spost X n W r ⊣⊢ spost X n W' r;
+  sbundle_at_ne : forall k,
+    Proper (dist k ==> eq ==> eq ==> eq ==> dist k) sbundle_at;
+  spost_at_ne : forall k,
+    Proper (dist k ==> eq ==> eq ==> eq ==> eq ==> dist k) spost_at;
+
+  sbundle_at_cong : forall (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
+      (W W' : uvis),
+    skey_eq W W' -> sbundle_at X n f W ⊣⊢ sbundle_at X n f W';
+  spost_at_cong : forall (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
+      (W W' : uvis) (r : mword 64),
+    skey_eq W W' -> spost_at X n f W r ⊣⊢ spost_at X n f W' r;
 
   (* the bundles are covariant in the slot family: the only place it occurs
      is exec's wand CONCLUSION *)
-  sbundle_mono : forall (X Y : uvis -d> iPropO Σ) (n : Z) (W : uvis),
-    ⊢ □ (∀ W' : uvis, X W' -∗ Y W') -∗ sbundle X n W -∗ sbundle Y n W;
+  sbundle_at_mono : forall (X Y : uvis -d> iPropO Σ) (n : Z) (f : sfam)
+      (W : uvis),
+    ⊢ □ (∀ W' : uvis, X W' -∗ Y W') -∗ sbundle_at X n f W -∗ sbundle_at Y n f W;
 
   (* THE SUPPLY: opaque here, persistent by its use ([□ ssupply] in both
      laws), instantiated at "the application's predicate holds of every
      view" *)
   ssupply : iProp Σ;
 
-  (* the half every ecall leaf uses: no slot wand, hence no family *)
+  (* the half every ecall leaf uses: no slot wand, hence no slot family.
+     AT SOME [f], which is all a program that discards its post wants --
+     the generic one does, and a program that does not takes the EXPLICIT
+     route with its own families.  BUPD-SHAPED (the header): a bundle may
+     hold a resource that is free but not derivable from [emp]. *)
   sbundle_of_supply_ne : forall (X : uvis -d> iPropO Σ) (n : Z) (W : uvis),
-    n <> USYS_exec -> ⊢ □ ssupply -∗ sbundle X n W;
+    n <> USYS_exec -> ⊢ □ ssupply ==∗ ∃ f : sfam, sbundle_at X n f W;
   (* ...and the half the generic inhabitants use *)
   sbundle_of_supply : forall (X : uvis -d> iPropO Σ) (n : Z) (W : uvis),
-    ⊢ □ ssupply -∗ □ (∀ W' : uvis, X W') -∗ sbundle X n W;
+    ⊢ □ ssupply -∗ □ (∀ W' : uvis, X W') ==∗ ∃ f : sfam, sbundle_at X n f W;
 }.
 
-Global Existing Instance sbundle_ne.
-Global Existing Instance spost_ne.
+Global Existing Instance sbundle_at_ne.
+Global Existing Instance spost_at_ne.
+
+(* ===================================================================== *)
+(* THE FAMILY-FREE READER, derived: "a bundle for [n] at this key, at     *)
+(* SOME families".  It is what a program that does not read its post      *)
+(* deals in -- the two supply laws produce it, [UkRun.udep]'s law is      *)
+(* stated at it, and every ecall leaf destructs it to fill the arm's [∃]. *)
+(* A program that DOES read its post never goes through this: it deposits *)
+(* [sbundle_at] at its own [f] and takes [spost_at] back at that [f].     *)
+(* ===================================================================== *)
+Section SBundle.
+  Context `{SG : uexecSG Σ}.
+
+  Definition sbundle (X : uvis -d> iPropO Σ) (n : Z) (W : uvis) : iProp Σ :=
+    (∃ f : sfam, sbundle_at X n f W)%I.
+
+  Global Instance sbundle_ne (k : nat) :
+    Proper (dist k ==> eq ==> eq ==> dist k) sbundle.
+  Proof.
+    intros X Y HXY n ? <- W ? <-. rewrite /sbundle.
+    apply bi.exist_ne; intros f. exact (sbundle_at_ne k X Y HXY n n eq_refl
+                                          f f eq_refl W W eq_refl).
+  Qed.
+
+  Lemma sbundle_cong (X : uvis -d> iPropO Σ) (n : Z) (W W' : uvis) :
+    skey_eq W W' -> sbundle X n W ⊣⊢ sbundle X n W'.
+  Proof.
+    intros Hk. rewrite /sbundle. apply bi.exist_proper; intros f.
+    exact (sbundle_at_cong X n f W W' Hk).
+  Qed.
+
+  Lemma sbundle_mono (X Y : uvis -d> iPropO Σ) (n : Z) (W : uvis) :
+    ⊢ □ (∀ W' : uvis, X W' -∗ Y W') -∗ sbundle X n W -∗ sbundle Y n W.
+  Proof.
+    iIntros "#Hup Hb". rewrite /sbundle. iDestruct "Hb" as (f) "Hb".
+    iExists f. iApply (sbundle_at_mono X Y n f W with "Hup Hb").
+  Qed.
+End SBundle.
 
 (* ===================================================================== *)
 (* THE PROGRAM'S OWN DEPOSIT DATA, as a second ambient class.             *)

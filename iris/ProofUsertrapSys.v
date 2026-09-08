@@ -63,7 +63,7 @@ Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecSyscall.
 Require Import SpecUsertrap UsertrapRes.
 Require Import UsysMemOk UsysMemOkSpec UexecRound UexecSlot UexecRet UserPerm.  (* the round's vocabulary *)
-Require Import UexecSG.        (* [sbundle_cong] / [skey_eq] -- the deposit across
+Require Import UexecSG.        (* [sbundle_at_cong] / [skey_eq] -- the deposit across
                                   the epc rewrites *)
 Require Import ProofUsertrapParts ProofPrepareReturnParts.
 Require Import ProofUsertrapTail.
@@ -117,7 +117,8 @@ Section UtSysBlock.
 
   Lemma ut_90 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
-      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) (sts : list fdstate) :
+      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) (sts : list fdstate)
+      (fdep : sfam) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -147,7 +148,7 @@ Section UtSysBlock.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* the process's deposit at the ENTRY record: what the dispatcher's
        exec channel is offered, read at 7 ([SpecUsertrap.ut_sys_in]) *)
-    (∀ n : Z, ut_sys_in n scv (pv_tf (us_V U0)) U0 sts) -∗
+    (∀ n : Z, ut_sys_in n fdep scv (pv_tf (us_V U0)) U0 sts) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
                      mie_v menvcfg0 U0 sts epv scv) -∗
@@ -507,7 +508,7 @@ Section UtSysBlock.
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
  (un_fn N) (un_ip N) (un_dqi N)
-                S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) sts lks
+                S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) sts lks fdep
                 Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
                 with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [Hufr] [Hxin] [-]").
     (* the syscall channel takes the bundle AT ITS NAMED STATES now, and
@@ -531,7 +532,7 @@ Section UtSysBlock.
              | exact (Hargw 2%nat ltac:(lia))
              | reflexivity
              | exact (eq_sym Hpr5) ]. }
-         rewrite <- (sbundle_cong uslot USYS_exec (uvis_of U0 sts)
+         rewrite <- (sbundle_at_cong uslot USYS_exec fdep (uvis_of U0 sts)
                        (uvis_of (MkUstate V1 (us_M U)) sts) Hkey).
          iExact "Hx". }
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]

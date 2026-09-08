@@ -123,7 +123,7 @@ Section UkRun.
   (* THE DEPOSIT SUPPLIER AND ITS MINTING LAW.  Since the ARM, the trap
      contract's returning arm demands the process's bundle for the number it
      is at ([UexecRet.uexec_dep_F]); a leaf below the file-system tower
-     cannot see that the instance's [sbundle] is [emp] at its number, so it
+     cannot see that the instance's [sbundle_at] is [emp] at its number, so it
      pays with the law below.
 
      WHY IT RIDES IN [urun] AND NOT IN [uvb], AND WHY IT IS ABSTRACT.  A
@@ -155,18 +155,25 @@ Section UkRun.
      trace seed minted from unit -- goes through the law.  THE HONEST
      CONSEQUENCE: a program admitting a number pays that number's bundle at
      EVERY key, not only at the call it is about to make. *)
+  (* BUPD-SHAPED, like the class's own two laws ([UexecSG.v]'s header): a
+     bundle may hold a resource that is free but not derivable from [emp]
+     -- write's console arm carries the trace seed, the mono-list unit --
+     and putting the update in the LAW rather than in a particular supplier
+     is what keeps such a piece payable by a program whose supplier is
+     [emp].  The ARM still demands a plain [sbundle]; the leaf runs the
+     update inside its own WP step. *)
   Definition udep : iProp Σ :=
     (□ Dsup ∗
      ⌜ forall (n : Z) (W : uvis),
          psok n -> n <> USYS_exec ->
-         ⊢ □ Dsup -∗ sbundle uslot n W ⌝)%I.
+         ⊢ □ Dsup ==∗ sbundle uslot n W ⌝)%I.
 
   Global Instance udep_persistent : Persistent udep.
   Proof. rewrite /udep. apply _. Qed.
 
   (* what a leaf does with it: mint the deposit the ecall arm asks for *)
   Lemma udep_dep (n : Z) (W : uvis) :
-    psok n -> n <> USYS_exec -> udep -∗ sbundle uslot n W.
+    psok n -> n <> USYS_exec -> udep -∗ |==> sbundle uslot n W.
   Proof.
     intros Hok Hne. iIntros "[#Hs %Hlaw]".
     iApply (Hlaw n W Hok Hne). iExact "Hs".
@@ -218,11 +225,13 @@ Section UkRun.
   (* THE LEAF'S USE OF IT, at every number including exec: the left
      disjunct carries [n <> USYS_exec] itself, so at exec only the explicit
      deposit can have been taken and no side condition is owed here. *)
+  (* ...UNDER A BASIC UPDATE, since the law is (UexecSG.v's header).  Every
+     call site is inside its leaf's own WP goal, which absorbs it. *)
   Lemma udepw_mint (γt γd γs γfd : gname) (m : regfile) (pc : mword 64)
       (n : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
       (fdv : list fdstate) (cw : Z) :
     udep -∗ udepw γt γd γs γfd m pc n -∗
-    uheap γt γd γs M pm sz -∗ ufd_auth γfd fdv -∗
+    uheap γt γd γs M pm sz -∗ ufd_auth γfd fdv ==∗
     uheap γt γd γs M pm sz ∗ ufd_auth γfd fdv ∗
     sbundle uslot n (uvis_of_run m pc M pm sz fdv cw).
   Proof.
@@ -230,7 +239,7 @@ Section UkRun.
     iDestruct ("Hsb" $! M pm sz fdv cw with "Hheap Hufd")
       as "(Hheap & Hufd & [%Hok | Hb])"; iFrame "Hheap Hufd";
       [ iApply (udep_dep n _ (proj1 Hok) (proj2 Hok) with "Hdep")
-      | iExact "Hb" ].
+      | by iModIntro ].
   Qed.
 
   (* THE EXEC DEPOSIT'S CARRIER, and why it is key-free too.  exec is the

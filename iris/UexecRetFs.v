@@ -132,9 +132,12 @@ Section UexecRetFs.
          (* THE DEPOSIT, in front of the whole disjunction: the enriched arm
             is a CHOICE OF RETURN, not a different contract, so the process
             owes the same bundle on either branch -- and it owes it at THIS
-            tier's family, which is what [UexecSG.sbundle_mono] carries it
-            to ([uexec_ret_fs_of]). *)
-         (sbundle X n W ∗
+            tier's family, which is what [UexecSG.sbundle_at_mono] carries
+            it to ([uexec_ret_fs_of]) -- and AT THE FAMILIES the process
+            chose, bound once in front of both legs, exactly as the plain
+            arm binds them ([UexecSG.v]'s header). *)
+         (∃ f : sfam,
+          sbundle_at X n f W ∗
           ((∀ (r : mword 64) (M' : gmap Z (bv 8))
              (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate)
              (cw' : Z),
@@ -150,7 +153,7 @@ Section UexecRetFs.
                 of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
              ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
              ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
-             spost uslot n W r -∗
+             spost_at uslot n f W r -∗
              X (bump W r M' π' szv' fdv' cw'))
           ∨ (∃ u : umirror,
                mcur γm u ∗
@@ -173,9 +176,10 @@ Section UexecRetFs.
                      enriches the RETURN CHANNEL, not the deposit's contents,
                      so what comes back is what [UexecRet.uexec_ret_ret_F]
                      hands back and [uexec_ret_fs_of] passes it straight on *)
-                  spost uslot n W r -∗
+                  spost_at uslot n f W r -∗
                   X (bump W r M' π' szv' fdv' cw')))))
-       else (sbundle X n W ∗
+       else (∃ f : sfam,
+             sbundle_at X n f W ∗
              (∀ (r : mword 64) (M' : gmap Z (bv 8))
                (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate)
                (cw' : Z),
@@ -189,7 +193,7 @@ Section UexecRetFs.
                   of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
                ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
                ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
-               spost uslot n W r -∗
+               spost_at uslot n f W r -∗
                X (bump W r M' π' szv' fdv' cw')))
      else X W)%I.
 
@@ -319,21 +323,21 @@ Section UexecRetFs.
           [ exact Hr | exact Hfv | exact Hcv ].
       - iIntros (fdv' cw') "%Hfvl %Hcvl". iApply "Hup".
         iApply ("Hc" $! fdv' cw' with "[%] [%]"); [ exact Hfvl | exact Hcvl ]. }
-    (* THE DEPOSIT CROSSES BY [UexecSG.sbundle_mono]: the bundles are
+    (* THE DEPOSIT CROSSES BY [UexecSG.sbundle_at_mono]: the bundles are
        covariant in the slot family (their only occurrence of it is exec's
        wand CONCLUSION), so the upgrader that carries the returned keys
        carries the bundle too.  The armed post is at the plain family on
        both sides and passes straight through. *)
-    iDestruct "Hret" as "[Hb Hret]".
-    iDestruct (sbundle_mono uslot (uslot_fs γm) (usys_num (uvis_tf W)) W
+    iDestruct "Hret" as (f) "[Hb Hret]".
+    iDestruct (sbundle_at_mono uslot (uslot_fs γm) (usys_num (uvis_tf W)) f W
                  with "Hup Hb") as "Hb".
     destruct (uenr_dom (usys_num (uvis_tf W))) eqn:He.
-    - iFrame "Hb". iLeft.
+    - iExists f. iFrame "Hb". iLeft.
       iIntros (r M' π' szv' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow Hpost".
       iApply "Hup".
       iApply ("Hret" $! r M' π' szv' fdv' cw' with "[%] [%] [%] [%] Hpost");
         [exact Hok | exact Hfdok | exact Hpiperow | exact Hcwrow].
-    - iFrame "Hb".
+    - iExists f. iFrame "Hb".
       iIntros (r M' π' szv' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow Hpost".
       iApply "Hup".
       iApply ("Hret" $! r M' π' szv' fdv' cw' with "[%] [%] [%] [%] Hpost");

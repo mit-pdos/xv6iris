@@ -59,7 +59,7 @@ Require Import UsysMemOk.    (* [usys_num] / [usys_mem_ok] / [bump_tf] *)
 Require Import SpecUserret.  (* [userret_gpr] -- the 31-insert register file *)
 Require Import UexecSlot.    (* [uvis] / [tf_w] / [tf_resume_gpr] / [ret_pc_idem] *)
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
-Require Import UexecSG.      (* [uexecSG]: [sbundle] / [spost] / [skey_eq] *)
+Require Import UexecSG.      (* [uexecSG]: [sbundle_at] / [spost_at] / [skey_eq] *)
 Require Import UexecRet.     (* [tf_resume_gpr0] / [tf_of] / [uslot] / [uexec_ret] *)
 Require Import UexecRound.   (* the round this vocabulary is applied under *)
 Require Import TsoCtx.
@@ -390,7 +390,7 @@ Section Apply.
               uvis_fd W = uvis_fd W' ->
               uvis_cwd W = uvis_cwd W' ->
               (S W : iProp Σ) ⊣⊢ S W')
-      (sc : mword 64) (W W' : uvis) :
+      (sc : mword 64) (W W' : uvis) (f : sfam) :
     length (uvis_tf W) = TFWORDS ->
     length (uvis_tf W') = TFWORDS ->
     usys_num (uvis_tf W) = usys_num (uvis_tf W') ->
@@ -404,7 +404,7 @@ Section Apply.
     uvis_sz W = uvis_sz W' ->
     uvis_fd W = uvis_fd W' ->
     uvis_cwd W = uvis_cwd W' ->
-    (uexec_arm_F S sc W : iProp Σ) ⊣⊢ uexec_arm_F S sc W'.
+    (uexec_arm_F S sc W f : iProp Σ) ⊣⊢ uexec_arm_F S sc W' f.
   Proof.
     intros HlW HlW' Hn Ha0 Ha1 Ha2 Hg Hp HM Hpi Hsz Hfd Hcw.
     assert (Hsk : skey_eq W W')
@@ -479,7 +479,7 @@ Section Apply.
         * exact Hco.
         (* ...and the armed post transports by the SAME six key rows the
            deposit does ([UexecSG.skey_eq]) *)
-        * iEval (rewrite (spost_cong S (usys_num (uvis_tf W')) W' W r
+        * iEval (rewrite (spost_at_cong S (usys_num (uvis_tf W')) f W' W r
                             (skey_eq_sym W W' Hsk))) in "Hsp".
           iExact "Hsp".
       + iIntros "H" (r M' pi' szv' fdv' cw') "%Hmo %Hfo %Hpo %Hco Hsp".
@@ -492,11 +492,11 @@ Section Apply.
         * exact (usys_pipe_ok_arg_cong _ (uvis_tf W) (uvis_tf W') _ _ _ _ _
                    Ha0 Hpo).
         * exact Hco.
-        * iEval (rewrite (spost_cong S (usys_num (uvis_tf W')) W W' r Hsk))
+        * iEval (rewrite (spost_at_cong S (usys_num (uvis_tf W')) f W W' r Hsk))
             in "Hsp". iExact "Hsp".
   Qed.
 
-  Lemma uexec_arm_key_cong (sc : mword 64) (W W' : uvis) :
+  Lemma uexec_arm_key_cong (sc : mword 64) (W W' : uvis) (f : sfam) :
     length (uvis_tf W) = TFWORDS ->
     length (uvis_tf W') = TFWORDS ->
     usys_num (uvis_tf W) = usys_num (uvis_tf W') ->
@@ -510,8 +510,8 @@ Section Apply.
     uvis_sz W = uvis_sz W' ->
     uvis_fd W = uvis_fd W' ->
     uvis_cwd W = uvis_cwd W' ->
-    (uexec_arm sc W : iProp Σ) ⊣⊢ uexec_arm sc W'.
-  Proof. exact (uexec_arm_F_key_cong uslot uslot_key_cong sc W W'). Qed.
+    (uexec_arm sc W f : iProp Σ) ⊣⊢ uexec_arm sc W' f.
+  Proof. exact (uexec_arm_F_key_cong uslot uslot_key_cong sc W W' f). Qed.
 
   (* THE INSTANCE THE LOOP USES: the key the kernel trapped with and the
      key its own resume projection describes are the same key, so a
@@ -527,22 +527,22 @@ Section Apply.
               uvis_fd W = uvis_fd W' ->
               uvis_cwd W = uvis_cwd W' ->
               (S W : iProp Σ) ⊣⊢ S W')
-      (sc : mword 64) (W : uvis) :
+      (sc : mword 64) (W : uvis) (f : sfam) :
     length (uvis_tf W) = TFWORDS ->
-    (uexec_arm_F S sc W : iProp Σ) ⊣⊢ uexec_arm_F S sc (uvis_run W).
+    (uexec_arm_F S sc W f : iProp Σ) ⊣⊢ uexec_arm_F S sc (uvis_run W) f.
   Proof.
     intros Hl.
-    apply (uexec_arm_F_key_cong S HS sc W (uvis_run W) Hl (uvis_run_length W)
+    apply (uexec_arm_F_key_cong S HS sc W (uvis_run W) f Hl (uvis_run_length W)
              (eq_sym (uvis_run_num W)) (eq_sym (uvis_run_arg0 W))
              (eq_sym (uvis_run_arg1 W)) (eq_sym (uvis_run_arg2 W))
              (eq_sym (uvis_run_gpr W))
              (eq_sym (uvis_run_pc W)) eq_refl eq_refl eq_refl eq_refl eq_refl).
   Qed.
 
-  Lemma uexec_arm_run (sc : mword 64) (W : uvis) :
+  Lemma uexec_arm_run (sc : mword 64) (W : uvis) (f : sfam) :
     length (uvis_tf W) = TFWORDS ->
-    (uexec_arm sc W : iProp Σ) ⊣⊢ uexec_arm sc (uvis_run W).
-  Proof. exact (uexec_arm_F_run uslot uslot_key_cong sc W). Qed.
+    (uexec_arm sc W f : iProp Σ) ⊣⊢ uexec_arm sc (uvis_run W) f.
+  Proof. exact (uexec_arm_F_run uslot uslot_key_cong sc W f). Qed.
 
 End Apply.
 
@@ -704,7 +704,7 @@ Section LoopApply.
               uvis_fd W = uvis_fd W' ->
               uvis_cwd W = uvis_cwd W' ->
               (S W : iProp Σ) ⊣⊢ S W')
-      (W W' : uvis) (r : mword 64) :
+      (W W' : uvis) (f : sfam) (r : mword 64) :
     length (uvis_tf W) = TFWORDS ->
     uround_bump_ok (uvis_tf (uvis_run W)) (uvis_tf W') r ->
     usys_mem_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W)) r
@@ -719,13 +719,14 @@ Section LoopApply.
        conjunct, so it arrives at [r] rather than at the a0 word *)
     usys_cwd_ok (usys_num (uvis_tf (uvis_run W))) r (uvis_cwd W) (uvis_cwd W') ->
     (* THE ARMED POST, at the value the round bound: what the kernel gives
-       back for the deposit the process made ([UexecSG.spost]).  The loop
+       back for the deposit the process made ([UexecSG.spost_at], at the
+       families the arm bound).  The loop
        reads it off the dispatcher's own answer, exactly as it reads the
        four pure rows. *)
     (* ...READ AT THE OUTGOING a0 WORD, which is where the dispatcher stored
        the return value and where both callers hold it; [Ha0] below is what
        identifies it with the round's own [r]. *)
-    spost S (usys_num (uvis_tf (uvis_run W))) (uvis_run W)
+    spost_at S (usys_num (uvis_tf (uvis_run W))) f (uvis_run W)
       (uvis_tf W' !!! tf_arg_idx 0) -∗
     (∀ (r' : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
        (szv' : Z) (fdv' : list fdstate) (cw' : Z),
@@ -736,7 +737,7 @@ Section LoopApply.
        ⌜usys_pipe_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W))
                      r' (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
        ⌜usys_cwd_ok (usys_num (uvis_tf (uvis_run W))) r' (uvis_cwd W) cw'⌝ -∗
-       spost S (usys_num (uvis_tf (uvis_run W))) (uvis_run W) r' -∗
+       spost_at S (usys_num (uvis_tf (uvis_run W))) f (uvis_run W) r' -∗
        S (bump (uvis_run W) r' M' π' szv' fdv' cw')) -∗
     S W'.
   Proof.
@@ -789,7 +790,7 @@ Section LoopApply.
     iExact "Hs".
   Qed.
 
-  Lemma uexec_ret_round_slot (sc : mword 64) (W W' : uvis) :
+  Lemma uexec_ret_round_slot (sc : mword 64) (W W' : uvis) (f : sfam) :
     length (uvis_tf W) = TFWORDS ->
     (sc <> uecall_scause -> uvis_fd W' = uvis_fd W) ->
     (* ...AND ON THE ECALL ARM, THE SYSCALL'S OWN ROW.  This is the premise
@@ -838,17 +839,17 @@ Section LoopApply.
        bound.  Owed only on the returning arm; every other arm of the round
        is a mint or the transparent key. *)
     (⌜sc = uecall_scause⌝ -∗
-       spost uslot (usys_num (uvis_tf (uvis_run W))) (uvis_run W)
+       spost_at uslot (usys_num (uvis_tf (uvis_run W))) f (uvis_run W)
          (uvis_tf W' !!! tf_arg_idx 0)) -∗
-    uexec_arm sc W -∗ uslot W'.
+    uexec_arm sc W f -∗ uslot W'.
   Proof.
     intros Hl Hfd Hfdrow Hpiperow Hr.
     iIntros "Hmk Hxo Hsp Hret".
     (* STEP A: the trapped key and its run projection are the same key *)
-    iEval (rewrite (uexec_arm_run sc W Hl)) in "Hret".
+    iEval (rewrite (uexec_arm_run sc W f Hl)) in "Hret".
     destruct (decide (sc = uecall_scause)) as [Hec | Hne].
     - (* ---- ECALL ---- *)
-      rewrite (uexec_arm_ecall sc (uvis_run W) Hec).
+      rewrite (uexec_arm_ecall sc (uvis_run W) f Hec).
       iDestruct ("Hsp" with "[%]") as "Hsp"; [ exact Hec |].
       rewrite Hec in Hr.
       destruct (uround_ok_ecall (uvis_tf (uvis_run W)) (uvis_M W) (uvis_M W')
@@ -872,7 +873,7 @@ Section LoopApply.
           assert (Hc : usys_cwd_ok (usys_num (uvis_tf (uvis_run W))) r
                          (uvis_cwd W) (uvis_cwd W')).
           { rewrite Hcwx. exact (usys_cwd_ok_refl_at _ USYS_exec r _ Hexec Hnec). }
-          iApply (uexec_ret_F_returning uslot uslot_key_cong W W' r Hl Hb Hm
+          iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r Hl Hb Hm
                     (Hfdrow Hec) (Hpiperow Hec) Hc with "[Hsp] Hret").
           (* the post is at the a0 word, which the failure arm pins to [r] *)
           iExact "Hsp".
@@ -903,11 +904,11 @@ Section LoopApply.
              mint into an instantiation. *)
           iApply "Hmk".
         * (* the returning arms: the row is the round's own conjunct *)
-          iApply (uexec_ret_F_returning uslot uslot_key_cong W W' r Hl Hb Hm
+          iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r Hl Hb Hm
                     (Hfdrow Hec) (Hpiperow Hec) Hc with "[Hsp] Hret").
           iExact "Hsp".
     - (* ---- TRANSPARENT: interrupt, page fault, anything else ---- *)
-      rewrite (uexec_arm_transparent sc (uvis_run W) Hne).
+      rewrite (uexec_arm_transparent sc (uvis_run W) f Hne).
       destruct (uround_ok_transparent sc (uvis_tf (uvis_run W))
                   (uvis_M W) (uvis_M W') (uvis_perm W) (uvis_perm W')
                   (uvis_sz W) (uvis_sz W') (uvis_cwd W) (uvis_cwd W')
@@ -930,7 +931,8 @@ Section LoopApply.
      hardwiring the trapped one.  The loop passes the states the round
      actually left ([SpecUservec.uservec_post]'s [sts']); on a transparent
      trap those ARE the trapped ones, and [ut_fd_kept] is what says so. *)
-  Lemma uexec_ret_round_slot_of (sc : mword 64) (W : uvis) (g : regfile)
+  Lemma uexec_ret_round_slot_of (sc : mword 64) (W : uvis) (f : sfam)
+      (g : regfile)
       (sepc_v : mword 64) (U' : ustate) (fdv' : list fdstate) :
     length (uvis_tf W) = TFWORDS ->
     g = tf_resume_gpr0 (uvis_tf W) ->
@@ -969,13 +971,13 @@ Section LoopApply.
         ∨ uslot (uvis_of U' fdv')
         ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝)) -∗
     (⌜sc = uecall_scause⌝ -∗
-       spost uslot (usys_num (tf_of g (ret_pc sepc_v)))
+       spost_at uslot (usys_num (tf_of g (ret_pc sepc_v))) f
          (uvis_run W) (pv_tf (us_V U') !!! tf_arg_idx 0)) -∗
-    uexec_arm sc W -∗
+    uexec_arm sc W f -∗
     uslot (uvis_of U' fdv').
   Proof.
     intros Hl -> -> Hfd Hfdrow Hpiperow Hr.
-    exact (uexec_ret_round_slot sc W (uvis_of U' fdv') Hl Hfd Hfdrow
+    exact (uexec_ret_round_slot sc W (uvis_of U' fdv') f Hl Hfd Hfdrow
              Hpiperow Hr).
   Qed.
 
