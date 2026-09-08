@@ -23,8 +23,7 @@
                 discipline itself: every retag ([InodeRegion.ireg_top_retag_*])
                 needs the WHOLE element, so an outstanding share pins the
                 node.  That is why there is no cancellation arm anywhere
-                below -- contrast [DirViewPin.dvp_lost], which exists because
-                a [dv_pin] is a CANCELLABLE lend.
+                below: a share is not a cancellable lend.
      [astate]   is THE γtop AUTHORITY ITSELF, read through [abs_of]
                 ([abs_view]): [astate Γ av] is [ghost_map_auth (γtop Γ) 1 I]
                 for the [I] whose reading is [av].  No new invariant, no
@@ -462,9 +461,8 @@ Section FsAbsWalk.
   (* ------------------------------------------------------------------ *)
 
   (* ONE PIN: the client's share of a directory on the chain, beside the row
-     of [av] it names.  There is NO cancellation arm (contrast
-     [DirViewPin.dvp_lost]): a [top_frag_q] share is not a lend, and every
-     mover needs the whole element. *)
+     of [av] it names.  There is NO cancellation arm: a [top_frag_q] share
+     is not a lend, and every mover needs the whole element. *)
   Definition apn_pin Γ (q : Qp) (av : aview) (d : Z) : iProp Σ :=
     (∃ a, ⌜av !! d = Some a⌝ ∗ nview Γ q d a)%I.
 

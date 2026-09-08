@@ -53,9 +53,8 @@
     reasoning of its own.  NOTHING IS RE-ENABLED: the boot chain is not
     touched by this file, and no file requires it.
 
-    THE LEAF RULE ([FsImgCheck.v]'s header, and [NameiInitPinned.v]'s
-    precedent): this file requires [FsImgCheck], so it is an image-check
-    CONSUMER and must stay a leaf.  [SystemAdequacy] already requires
+    THE LEAF RULE ([FsImgCheck.v]'s header): this file requires
+    [FsImgCheck], so it is an image-check CONSUMER and must stay a leaf.  [SystemAdequacy] already requires
     [FsImgCheck] (SystemAdequacy.v:68), so nothing new enters any cone.     *)
 
 From Stdlib Require Import ZArith Lia List.
@@ -106,8 +105,7 @@ Local Ltac vm_eq :=
 (*  1.  THE TWO IMAGE READINGS OF [abs_of], AT AN ARBITRARY IMAGE          *)
 (*                                                                        *)
 (*  Stated at an ARBITRARY [(P, sb)] so that the literal-image corollaries *)
-(*  of section 4 are the only sentences that pay for a computation --      *)
-(*  [NameiInitPinned.dv_of_path_at]'s discipline, kept.                     *)
+(*  of section 4 are the only sentences that pay for a computation.        *)
 (* ====================================================================== *)
 
 (* ---- 1a.  A DIRECTORY: one hop at the abstract view IS one hop in the
@@ -115,9 +113,8 @@ Local Ltac vm_eq :=
 
    Both sides are literally [DirView.dir_first]'s scan: [FsTree.dir_view_lookup]
    on the left (through [FsDurImg.img_root_entries], which is [dir_entries] at
-   the image's root), [FsImg.path_at_disk_dir] on the right.  This is
-   [NameiInitPinned.dv_of_path_at] restated at [FsAbs]'s [astep] instead of at
-   the deleted [dv_pin]'s [dv_of]. *)
+   the image's root), [FsImg.path_at_disk_dir] on the right.  It is stated at
+   [FsAbs]'s [astep]. *)
 Lemma img_astep_root (P : Z -> list (bv 8)) (sb : fs_sb) (av : aview)
     (f : fname) :
   fsimg_wf P sb = true ->
@@ -469,9 +466,9 @@ Qed.
 (* ====================================================================== *)
 (*  5.  THE ERA-WALK INSTANTIATION                                         *)
 (*                                                                        *)
-(*  [FsAbsPins.apr_walk] -- lane A(iii)'s LIVE replacement for the deleted *)
-(*  [DirViewPin.wp_namei_pinned] -- takes exactly one pure premise about   *)
-(*  the abstract state: [FsAbs.arun av root ps ds], the list of inums the  *)
+(*  [FsAbsPins.apr_walk] -- lane A(iii)'s pinned walk -- takes exactly one *)
+(*  pure premise about the abstract state:                                 *)
+(*  [FsAbs.arun av root ps ds], the list of inums the                      *)
 (*  walk visits.  At era 0 that list is [[ROOTINO; 7]], and this is it.    *)
 (*  A client holding one [nview] share per hop gets                        *)
 (*  [apath_at av ROOTINO ["init"] = Some 7] out of the walk with no image  *)

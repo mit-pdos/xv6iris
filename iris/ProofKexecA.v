@@ -136,7 +136,7 @@
    So [kxc_a1] is proved TODAY and will need no edit once the Specs are
    fixed.  What CANNOT be built until they are is the capstone: discharging
    [KEXEC]'s Parameter requires the body at an ARBITRARY standalone
-   [icacheG], and at a mismatched one [wp_kexec_sconf_body] is not merely
+   [icacheG], and at a mismatched one kexec's frame is not merely
    unprovable but incoherent -- it asks for FS invariants at one icache and
    a process whose cwd reference is at another.
 
@@ -1085,10 +1085,9 @@ Section KexecABody.
        oracle used to be handed [fv_ride] beside the leg; that ghost had no
        tie to gamma-top outside the payload, which is why the widening of
        2026-08-29 put the leg here in the first place -- and the leg is what
-       the pinned verdict actually reads
-       ([ProofKexecPinTrace.kxt_pin_bytes], off the authority's row).
-       Nothing above [ProofKexec.v] moves: [SpecKexec]'s and [KexecOkQ]'s
-       statements are untouched. ---- *)
+       a verdict about the file's bytes actually reads, off the authority's
+       row.  Nothing above [ProofKexec.v] moves: [SpecKexec]'s and
+       [KexecOkQ]'s statements are untouched. ---- *)
     (∀ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
         ⌜inode_ok fsc_cov fsc_logst dn bm data⌝ -∗
         FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
@@ -2068,10 +2067,9 @@ Section KexecABody.
        oracle used to be handed [fv_ride] beside the leg; that ghost had no
        tie to gamma-top outside the payload, which is why the widening of
        2026-08-29 put the leg here in the first place -- and the leg is what
-       the pinned verdict actually reads
-       ([ProofKexecPinTrace.kxt_pin_bytes], off the authority's row).
-       Nothing above [ProofKexec.v] moves: [SpecKexec]'s and [KexecOkQ]'s
-       statements are untouched. ---- *)
+       a verdict about the file's bytes actually reads, off the authority's
+       row.  Nothing above [ProofKexec.v] moves: [SpecKexec]'s and
+       [KexecOkQ]'s statements are untouched. ---- *)
     (∀ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
         ⌜inode_ok fsc_cov fsc_logst dn bm data⌝ -∗
         FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi

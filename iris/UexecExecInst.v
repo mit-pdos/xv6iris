@@ -15,11 +15,11 @@
    WHAT THE BUNDLE IS.  [SpecSysExecAU.sys_exec_au_pre] at the TRAPPING
    KEY's own data:
      - the image [uvis_M W]: the arguments are read off the image the
-       process trapped at ([wp_sys_exec_au_body] takes the bundle at
+       process trapped at ([wp_sys_exec_sconf_body] takes the bundle at
        [us_M U], and the trap-out key's image IS that image -- the loop
        hands [uvis_M W] to the dispatcher);
      - the argv pointer [tf_w (uvis_tf W) (tf_arg_idx 1)]: sys_exec's
-       argument 1, read off the key's trapframe.  ([wp_sys_exec_au_body]
+       argument 1, read off the key's trapframe.  ([wp_sys_exec_sconf_body]
        names it [v1] and pins it by [pv_tf (us_V U) !! tf_arg_idx 1 =
        Some v1]; [tf_w] is the total reader of the same word, and the
        dispatch route (stage E2) is where the two are joined.)
@@ -37,7 +37,7 @@
 
    [Γ] and [γfs] are NOT existential: the whole tree runs at the single
    ambient file system ([FsCfg.fsc_fs] with the derived view names
-   [FsBytesGamma.fs_gamma_L fsc_fs]), exactly as [wp_sys_exec_au_body]
+   [FsBytesGamma.fs_gamma_L fsc_fs]), exactly as [wp_sys_exec_sconf_body]
    pins them. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.

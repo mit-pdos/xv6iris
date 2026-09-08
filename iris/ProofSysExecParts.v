@@ -54,11 +54,11 @@
    copy-in/allocator callees -- the head, the setup, the free loop, the
    fill loop and its step, the reload, the [bad:] tail, the success tail
    and the break's change-of-view lemmas.  [Kexec] is deliberately NOT a
-   functor argument here: that is what lets ProofSysExec.v (the landed
-   composition) and ProofSysExecAU.v (the atomic-update one) share every
-   block below and re-derive only the kexec call site.  durable-notes.md's
-   rule on resource-generic block continuations is why the sharing works:
-   no block below names sys_exec's own postcondition. *)
+   functor argument here: that is what keeps every block below free of the
+   abstract-state bundle the contract threads, so ProofSysExec.v derives
+   only the kexec call site.  durable-notes.md's rule on resource-generic
+   block continuations is why that works: no block below names sys_exec's
+   own postcondition. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -4557,9 +4557,9 @@ End SysExecSuccTail.
 (*  plus whatever is left over.  [sx_argv_kx] is that one equivalence, and *)
 (*  it is what makes [avf := sx_avf pg i] -- the pointers with a zero       *)
 (*  written at [i] -- the vector kexec is handed.  The block itself lives  *)
-(*  with the composition that names its kexec ([sx_break] in               *)
-(*  ProofSysExec.v, [sx_break_au] in ProofSysExecAU.v); these lemmas are    *)
-(*  shared by both.                                                        *)
+(*  with the composition that names its kexec ([sx_break_au] in            *)
+(*  ProofSysExec.v); these lemmas are stated here so this file stays free  *)
+(*  of [Kexec].                                                            *)
 (* ===================================================================== *)
 Section SysExecBreakParts.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.

@@ -43,21 +43,15 @@ Require Import LinkSysFork LinkSysExit LinkSysWait LinkSysPipe LinkSysRead
    dispatch takes SYSMKNOD / SYSOPEN / SYSUNLINK and derives the
    landed posts itself. *)
 Require Import LinkSysMknod LinkSysOpen LinkSysUnlink.
-(* ...and the WRITE's (round E2, lane E2-W, ruling Q-e W1): the dispatch
-   runs the AU write on an open, writable INODE descriptor and the landed
-   contract on every other one, so both are on the functor's list. *)
-(* ...and exec's AU contract (lane E2/E3b): the exec arm runs on it, the
-   caller always offering the process's bundle.  [LinkSysExec] stays a
-   linked proof of the landed contract, no longer on this functor's
-   argument list. *)
-Require Import LinkSysExecAU.
+(* exec's own contract carries the process's bundle, and [LinkSysExec] in
+   the list above is the linked proof of it. *)
 (* ...and the three the dispatch itself needs: myproc, printk's general path
    for the unknown-number fallback, and the [p->name] fact below. *)
 Require Import LinkMyproc LinkPrintk.
 
 Module Syscall :=
   SyscallProof SysFork SysExit SysWait SysPipe SysRead SysKill
-               SysExecAU SysFstat SysChdir SysDup SysGetpid SysSbrk
+               SysExec SysFstat SysChdir SysDup SysGetpid SysSbrk
                SysPause SysUptime SysWrite SysMknod SysLink SysMkdir
                SysClose SysSync SysOpen SysUnlink
                Myproc PrintkGen.

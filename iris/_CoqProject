@@ -325,9 +325,10 @@ UCodeEcho.v
 # (33k lines, zero Admitted/Axiom, closing at wp_sh_execs_echo) -- is
 # DELETED on port, per the precedent (4f088971f).  The port's stack is
 # UCodeShK.v/UCodeShP.v + UkSh.v/UkShParse.v/UkShRun.v; the pure parser
-# vocabulary was transposed into UkShParse.v (ushp_*), and the one fact
-# the pinned-exec contract consumed (sh_img_sub + halves) moved verbatim
-# into SpecKexecPin.v.  Design of record: claude-notes/completed/user-sh.md.
+# vocabulary was transposed into UkShParse.v (ushp_*), and the image
+# inclusion is UCodeShK.v's shk_img_sub, bridged to the exec contract's
+# own image conjunct in UShKernel.v (shk_img_sub_of_elf).
+# Design of record: claude-notes/completed/user-sh.md.
 UCodeInit.v
 # CAT.  The first verified program whose SYSCALLS WRITE ITS MEMORY: its
 # inner loop is read(fd, buf, 512) into a 512-byte global, and the theorem
@@ -1306,19 +1307,6 @@ LinkNamei.v
 # LinkNamexTr.v
 # ProofNameiTr.v
 # LinkNameiTr.v
-# OFF THE BUILD (durable-disk lane E-unpin): the era-0 pinned-/init story.
-# Source kept; it rides the [dview]/[fview] ghosts, which THE DVIEW RETIREMENT
-# (fs-syscall-specs, 2026-08-30) deleted -- so this source is now historical:
-# the port lane P asks for is a re-derivation on the abstract state
-# ([FsAbs]/[FsInitPin]), not a rebuild of these files.  See the banner at the
-# top of claude-notes/projects/namei-pinned-lookup.md.
-# DirViewPin.v
-# NameiInitPinned.v
-# LinkNameiPinned.v
-# SpecKexecPinned.v
-# ProofKexecPinnedA.v
-# ProofKexecPinned.v
-# LinkKexecPinned.v
 ProofNameiRoot.v
 LinkNameiRoot.v
 SpecNameiRootBoot.v
@@ -1404,16 +1392,10 @@ SpecKexecB3.v
 ProofKexecB3.v
 ProofKexecC.v
 ProofKexecD.v
-ProofKexec.v
-LinkKexec.v
 SpecSysExec.v
-# The blocks, split off so the atomic-update composition (ProofSysExecAU.v)
-# can reuse them: everything that does not name [Kexec].
+# sys_exec's blocks, split off from the composition (ProofSysExec.v, which
+# is up beside the contract it seals): everything that does not name [Kexec].
 ProofSysExecParts.v
-ProofSysExec.v
-LinkSysExec.v
-# ...and the same shell at the ATOMIC-UPDATE contract, over LinkKexecAU.
-LinkSysExecAU.v
 SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v
@@ -1612,15 +1594,15 @@ LinkConsolewriteLoc.v
 
 # The era-0 SHELL pins: FsInitPin's /init pair (path pin, content pin,
 # arun walk) and FsInitPinBoot's boot transport, replayed at inum 13 with
-# ElfUser.sh_elf's bytes -- the inputs the pinned-exec statement lane
-# parameterises over for /init's exec("/sh").  A THIRD LEAF over the same
-# cone: it reuses both files' generic layers and restates nothing (R10),
-# so only its own two dinode vm_eq's compute.
+# ElfUser.sh_elf's bytes -- what a verified /init answers kexec's contract
+# with at its exec("/sh").  A THIRD LEAF over the same cone: it reuses
+# both files' generic layers and restates nothing, so only its own two
+# dinode vm_eq's compute.
 FsShPin.v
 AppEcho.v
-SpecKexecPin.v
-# exec's ATOMIC-UPDATE contract: the walk, one observation of the file, and
-# the caller's own u-mode WP for the program observed (SpecKexecAU.v's header).
+# kexec's ONE contract: the walk, one observation of the file, and the
+# caller's own u-mode WP for the program observed (SpecKexecAU.v's header).
+# SpecKexec.v, far below, is the vocabulary leaf it is stated over.
 SpecKexecAU.v
 # THE PURE LOADER ALGEBRA the exec proofs' loop invariants consume: the
 # image inclusion laws ([uimg_sub] over [elf_image]), the loadseg window,
@@ -1642,7 +1624,8 @@ UexecExecInst.v
 # of the application-side fs invariant ([FirstTok.fsabs_env]) alone, and the
 # lift of a plain slot to the enriched one by Loeb (lane E3b).
 UexecExecMint.v
-ProofSysExecAU.v
+ProofSysExec.v
+LinkSysExec.v
 # THE CHUNK LOOP, AND THE SEAL IT CLOSES (lane W, FILEWRITE-AU).
 #   ProofFilewriteAU is ProofFilewrite's walk on the inode arm only, with
 # FsAbsWriteFire.wrf_awrite_fire in place of the ireg_top_retag; the three
@@ -1668,28 +1651,17 @@ ProofSysExecAU.v
 # false as the row stands (finding (3)) and true of the kernel, so the
 # three theorems that take it are conditional; everything below them is
 # not.  Read the header before extending.
-# THE PINNED-EXEC PROVER LANE (fs-syscall-specs; SpecKexecPin.v sect. 8).
-#   ProofKexecPinTrace is the walk's trace built out of the contract's pin
-# -- and the file that records WHY the pin needs its chain conjunct back
-# (its header carries the counterexample: an endpoint pin does not survive
-# a multi-hop walk).  ProofKexecPinA is ProofKexecA's two lemmas with the
-# namei call swapped for SpecNameiEra's and the header oracle ANSWERED
-# rather than relayed; ProofKexecPin is ProofKexec's own composition at
-# [Q := Q_pin pb], where the one paying site is kxc_cd's [Q (kxq_entry ef)];
-# LinkKexecPin closes the functor over LinkNameiEra beside LinkNamei.
-ProofKexecPinTrace.v
-ProofKexecPinA.v
+# THE EXEC COMPOSITION.
+#   ProofKexecAUA is phase A with the namei call at SpecNameiEra's era walk
+# and the header oracle ANSWERED rather than relayed; ProofKexec composes it
+# with the shared blocks B..D at
+# [Q := KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef ...], where the one
+# paying site is discharged by exec_built_Q_intro and the exit is converted
+# twice (kxau_close_fail below +0x090, kxau_close at the receipt above it).
+# LinkKexec closes the functor over LinkNameiEra beside LinkNamei.
 ProofKexecAUA.v
-# ProofKexecAU is ProofKexecPin's composition once more, at
-# [Q := KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef ...]: phase A is the
-# AU one, the one paying site is discharged by exec_built_Q_intro, and the
-# exit is converted twice (kxau_close_fail below +0x090, kxau_close at the
-# receipt above it).  LinkKexecAU closes the functor over LinkNameiEra
-# beside LinkNamei, exactly as LinkKexecPin does.
-ProofKexecAU.v
-ProofKexecPin.v
-LinkKexecPin.v
-LinkKexecAU.v
+ProofKexec.v
+LinkKexec.v
 
 # THE CONSOLE TRACE CONNECTION (fs-syscall-specs; claude-notes/projects/
 # uart-trace.md, the SAFETY direction).

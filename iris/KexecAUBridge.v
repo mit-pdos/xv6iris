@@ -2,7 +2,7 @@
 (*  KexecAUBridge.v -- THE PURE CLOSER OF THE exec ATOMIC UPDATE          *)
 (* ===================================================================== *)
 
-(*  WHAT THIS FILE IS FOR.  [ProofKexecAU]'s composition arrives at the
+(*  WHAT THIS FILE IS FOR.  [ProofKexec]'s composition arrives at the
     syscall's commit point holding two things about the process it just
     built, and neither is the shape the exec CONTRACT is stated in:
 

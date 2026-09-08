@@ -961,7 +961,7 @@ End KexecA.
    whoever needs it rather than threaded.
 
    THE PATH BUFFER IS AT [dqpv] AND THE ARGUMENT STRINGS AT [dqas], the two
-   fractions [wp_kexec_sconf_body] takes them at.  Both are only READ here --
+   fractions kexec's frame takes them at.  Both are only READ here --
    the path goes to namei and to safestrcpy, each argument to strlen and to
    copyout -- and all four of those callees are dfrac-generic on their source,
    so the fraction goes straight through.  What this bundle still holds WHOLE

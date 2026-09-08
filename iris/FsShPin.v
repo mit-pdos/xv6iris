@@ -17,11 +17,10 @@
     [ElfUser.sh_elf]'s bytes, plus the transport corollaries -- and it is
     written to REUSE both files rather than to restate them.
 
-    WHY IT IS WANTED.  /init's whole job is [exec("/sh")]: the pinned-exec
-    statement lane parameterises over the shell's image facts exactly the
-    way [SpecKexecPinned] parameterises over /init's, so the lemma names
-    below are that lane's inputs, and they are deliberately [FsInitPin]'s
-    shapes with [init] replaced by [sh] throughout.
+    WHY IT IS WANTED.  /init's whole job is [exec("/sh")], and a verified
+    /init answers kexec's contract for the shell out of its own pins, so
+    the lemma names below are that bundle's inputs -- deliberately
+    [FsInitPin]'s shapes with [init] replaced by [sh] throughout.
 
     WHAT IS REUSED, AND WHY NOTHING IS RESTATED.
       - [FsInitPin] section 1's [img_*] lemmas ([img_astep_root],
@@ -125,11 +124,10 @@ Definition SH_INO : Z := 13.
 Definition sh_path : list fname := [fname_sh].
 Definition sh_bytes : list (bv 8) := ElfUser.sh_elf.
 
-(* THE TIE TO THE ELF LAYER.  [SpecKexecPinned] names /init's bytes
-   [init_bytes] and proves [init_bytes_elf] to join them to [ElfUser];
-   the kexec-pinned salvage names NO constant for the shell (checked:
-   [sh_elf] occurs only in [ElfUser] and [FsImgCheck]), so [sh_bytes] is
-   defined fresh here and this is its join. *)
+(* THE TIE TO THE ELF LAYER.  [FsInitPin] names /init's bytes as
+   [init_bytes]; no file names one for the shell (checked: [sh_elf] occurs
+   only in [ElfUser] and [FsImgCheck]), so [sh_bytes] is defined fresh here
+   and this is its join. *)
 Lemma sh_bytes_elf : sh_bytes = ElfUser.sh_elf.
 Proof. reflexivity. Qed.
 
@@ -255,10 +253,10 @@ Qed.
 
 (* ---- THE WALK ------------------------------------------------------- *)
 
-(*  [FsAbsPins.apr_walk] -- lane A(iii)'s live replacement for the deleted
-    [DirViewPin.wp_namei_pinned] -- takes exactly one pure premise about
-    the abstract state: [FsAbs.arun av root ps ds], the list of inums the
-    walk visits.  At era 0, for the shell, that list is [[ROOTINO; 13]].  *)
+(*  [FsAbsPins.apr_walk] -- lane A(iii)'s pinned walk -- takes exactly one
+    pure premise about the abstract state: [FsAbs.arun av root ps ds], the
+    list of inums the walk visits.  At era 0, for the shell, that list is
+    [[ROOTINO; 13]].  *)
 Theorem era0_sh_arun (S : fs_state_rec) :
   snap_ok S era0_D ->
   arun (abs_view (fss_inodes S)) FsImg.ROOTINO sh_path

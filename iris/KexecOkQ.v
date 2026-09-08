@@ -37,10 +37,11 @@
     A client of [SpecKexecAU.v] needs to say things about the image the run
     built ([us_M U'], its size), and only the closer can see it.
 
-    [SpecKexec.v] IS UNTOUCHED: [kexec_ok] stays what it is and
-    [kexec_ok_q_True] below is the row that keeps [wp_kexec_sconf] the
-    theorem it has always been -- the cone is instantiated at
-    [Q := fun _ _ => True] and the two relations are then equivalent.     *)
+    [SpecKexec.v] IS UNTOUCHED: [kexec_ok] stays what it is, and
+    [kexec_ok_q_True] below is the row that says so -- at
+    [Q := fun _ _ => True] the two relations are equivalent, which is what
+    makes the hole a refinement of the landed relation rather than a
+    different one.                                                        *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -116,8 +117,8 @@ Definition kexec_ok_q (Q : mword 64 -> Prop) (V V' : pprivate) (r : mword 64)
    (uint szv' - 4096 <= uint spv)%Z /\
    (uint spv <= uint szv')%Z).
 
-(* THE ROW THAT KEEPS [SpecKexec.wp_kexec_sconf] WHAT IT IS: the landed
-   relation IS the vacuous instance. *)
+(* THE ROW THAT TIES THE HOLE TO THE LANDED RELATION: at a vacuous [Q] the
+   two are the same claim. *)
 Lemma kexec_ok_q_True (V V' : pprivate) (r entry spv szv' : mword 64)
     (na : nat) (alen : nat -> nat) :
   kexec_ok_q (fun _ => True) V V' r entry spv szv' na alen
@@ -264,11 +265,10 @@ Proof. intro H. apply kexec_ok_qf_of_q, kexec_ok_q_of_True, H. Qed.
     is a phase lemma RELAYING kexec's own exit continuation" -- and then
     names the RELATION, leaving the CONTINUATION spelled out at all of
     them.  It is thirteen rows, ~800 printed characters, and a count over
-    the cone finds THIRTY-NINE copies in twelve files (ProofKexecC x13,
-    B3 x6, B x5, Pinned x4, Tail x4, A x3, SpecKexecB2 x3, SpecKexecB3 x3,
-    Kexec x2, D x2, PinnedA x2, SpecKexecPinned x1), differing only in
-    bound-variable names and in which of [b]/[eb] and [lks]/[emptyset] the
-    caller passes.
+    the cone found dozens of copies across the phase files (ProofKexecC
+    x13, B3 x6, B x5, Tail x4, A x3, SpecKexecB2 x3, SpecKexecB3 x3,
+    Kexec x2, D x2), differing only in bound-variable names and in which
+    of [b]/[eb] and [lks]/[emptyset] the caller passes.
 
     claude-notes/optimization.md, "Seal a whole-function proof's
     continuation" and the ProofSysUnlink case study beside it: an inline

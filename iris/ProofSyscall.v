@@ -396,7 +396,7 @@ Require Import SpecSyscall.
    stated in.  [sys_exec_au_pre]/[sys_exec_arms]/[exec_post_ok] are
    [Typeclasses Opaque], so they are imported here directly. *)
 Require Import SpecKexecAU.      (* [exec_post_ok], [exec_key], [kexec_ok_exec] *)
-Require Import SpecSysExecAU.    (* [SYSEXEC_AU], [sys_exec_arms]              *)
+Require Import SpecSysExecAU.    (* [SYSEXEC], [sys_exec_arms]              *)
 Require Import UexecExecInst.    (* [xbundle_elim]                              *)
 Require Import UexecRetExec.     (* [uslot_x] -- the slot the exec channel returns *)
 Require Import UexecSlot UserPerm FsBytesGamma.
@@ -431,7 +431,7 @@ Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module SyscallProof
     (SysFork : SYSFORK) (SysExit : SYSEXIT) (SysWait : SYSWAIT)
     (SysPipe : SYSPIPE) (SysRead : SYSREAD) (SysKill : SYSKILL)
-    (SysExecAU : SYSEXEC_AU) (SysFstat : SYSFSTAT) (SysChdir : SYSCHDIR)
+    (SysExec : SYSEXEC) (SysFstat : SYSFSTAT) (SysChdir : SYSCHDIR)
     (SysDup : SYSDUP) (SysGetpid : SYSGETPID) (SysSbrk : SYSSBRK)
     (SysPause : SYSPAUSE) (SysUptime : SYSUPTIME) (SysWrite : SYSWRITE)
     (SysMknod : SYSMKNOD) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
@@ -4055,7 +4055,7 @@ Section SyscallArms.
        opened here. ---- *)
     iDestruct (sysc_exec_in_open U sts v1 ltac:(rewrite Hnum; reflexivity) Hv1
                  with "Hxin") as (P Pmiss Φo) "Hau".
-    iApply (SysExecAU.wp_sys_exec_au uslot_x γf γs j γl
+    iApply (SysExec.wp_sys_exec_sconf uslot_x γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 v1 pid U sts M (av - 4)%nat true true lks
               P Pmiss Φo

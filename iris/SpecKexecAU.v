@@ -1,4 +1,4 @@
-(* SpecKexecAU.v -- exec()'s ATOMIC-UPDATE contract: the walk, ONE
+(* SpecKexecAU.v -- kexec()'s ONE CONTRACT [KEXEC]: the walk, ONE
    observation of the file, and -- if what was observed is a program xv6
    will load -- the caller's OWN WP for running it.  A STATEMENT FILE:
    definitions, structural lemmas, and a [Module Type] seal; no walk, no
@@ -17,19 +17,23 @@
    u-mode slot wants -- and that is how u-mode WPs chain: init proving
    the fupds for exec("sh") concludes in the WP for running sh."
 
-   The molds are SpecSysOpenAU.v (the era walk premise, the single-phase
-   whole-[anode] observation, the exclusion-by-premise pattern) and
-   SpecKexecPin.v (the landed kexec frame with a file-side premise beside
-   it; its [kxp_image_ok] is the image target this contract finally puts
-   in a post).
+   The mold is SpecSysOpenAU.v (the era walk premise, the single-phase
+   whole-[anode] observation, the exclusion-by-premise pattern).
 
    ==== WHAT THIS CONTRACT IS ==========================================
 
-   A PARALLEL FORM beside [SpecKexec.wp_kexec_sconf] (R10: the landed
-   contract does not move).  Same calling convention, same premises,
-   same threaded resources -- the frame below is
-   [SpecKexec.wp_kexec_sconf_body] row for row -- with THREE things
-   added on the caller's side and ONE on the kernel's:
+   THE ONLY CONTRACT kexec has, and the only seal any caller may take:
+   [SpecKexec.v] one file down is the vocabulary leaf ([K_kexec],
+   [kexec_ok], the [kxc_*] stack algebra, [fs_fabric]), and the frame
+   below is that file's own premise list row for row -- with THREE things
+   added on the caller's side and ONE on the kernel's.  A caller that
+   wants nothing of the abstract state instantiates [S] at [emp] and the
+   bundle at [exec_au_pre_triv] (forkret's boot arm does exactly that) and
+   reads [kexec_ok] back off the arms with [exec_arms_landed]; a caller
+   that pins the file it is willing to run answers [exec_slot_pre] with
+   that program's slot.  Stable and pinned readings are the CALLER's
+   business -- derived at the call site from its own [P]/[Phio], never a
+   second seal against the code.
 
    IN (the AU bundle, [exec_au_pre]):
    1. THE WALK PREMISE, [SpecSysOpenAU.open_walk_pre_era] REUSED: kexec
@@ -193,38 +197,34 @@
    about the file runs under the generic user-mode safety WP, which
    does not care what the image holds, and takes arm (b).
 
-   ==== WHAT THE PROVER OWES ===========================================
+   ==== WHERE THE PROOF PAYS EACH PIECE ================================
 
    1. THE WALK: [SpecNameiEra.wp_namei_era] at [open_walk_pre_era]'s
-      one-shot, as ProofKexecPinA already does at its namei site
-      ([ProofKexecPinA.v] fires the era walk; the landed ProofKexecA
-      fires the set form).
+      one-shot, fired at phase A's namei site ([ProofKexecAUA]).
    2. THE OBSERVATION: [FsAbsOpenFire.opf_open_fire] (the whole-[anode]
-      fire off the lock window's [top_frag]) at the header-oracle hook
-      of phase A ([ProofKexecA.kxc_a2]'s fupd), generalized to deliver
-      [Φo]'s receipt instead of a header claim.
+      fire off the lock window's [top_frag]) at the header-oracle hook of
+      phase A, delivering [Φo]'s receipt.
    3. THE BYTES: each readi's [rd_bytes data off] IS a window of the
       observed [f] ([era_node]'s [fn_file_bytes] = [file_byte data] over
       the size), so the header the commit block reads, the program
       headers the loop reads and the segments loadseg copies are
       [f]'s -- one bridge lemma per readi site.
-   4. THE IMAGE: [kexec_image_ok] from the walk's own facts: [kxc_tf]
-      for the trapframe words, the uvmalloc/loadseg loop for
-      [uimg_sub (elf_image f)] (this is the "M-threading of the cone"
-      SpecKexecPin.v section 8 prices), copyout's post for
-      [kexec_args_at].
-   5. THE HAND-OFF: instantiate [exec_slot_pre] at the observed [f] and
-      the built key, and return the [S]-slot on arm (a); refund the
+   4. THE IMAGE: [kexec_image_ok] out of [KexecBuilt]'s cone facts:
+      [kxc_tf] for the trapframe words, the uvmalloc/loadseg loop for
+      [uimg_sub (elf_image f)], copyout's post for [kexec_args_at]; the
+      composition is [KexecAUBridge.exec_built_Q].
+   5. THE HAND-OFF: [exec_slot_pre] instantiated at the observed [f] and
+      the built key, returning the [S]-slot on arm (a) and refunding the
       premise on every other arm.  The proofs never open [S].
-   6. THE DISPATCH SIDE (a separate seam, sys_exec -> ProofSyscall ->
-      the trap loop): carry the returned slot to the deposit instead
-      of minting ([UexecApply.uexec_ret_round_slot]'s exec case), and
-      let the U-mode side's [uexec_ret] exec arm SUPPLY [exec_au_pre]
-      -- that is the seam through which init's proof hands over sh's WP.
+   6. THE DISPATCH SIDE: the exec channel carries the returned slot to
+      the deposit instead of minting, and the U-mode side's [uexec_ret]
+      exec arm SUPPLIES [exec_au_pre] ([UexecRetExec]'s payload class,
+      instantiated in [UexecExecInst]) -- the seam through which a
+      verified program hands over its successor's WP.
 
-   BINDERS: SpecKexecPin's list plus [ufdG] (the slot's section binds
-   it, and the dispatcher instantiates [S] there).  [GenId] because the
-   arms carry [proc_priv]. *)
+   BINDERS: SpecKexec's list plus [ufdG] (the slot's section binds it,
+   and the dispatcher instantiates [S] there).  [GenId] because the arms
+   carry [proc_priv]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -262,7 +262,7 @@ Require Import FileInvDefs.
 Require Import SpecDirlink.
 Require Import PathElems.       (* [SLASH], [path_elems]                     *)
 Require Import FsBlocks.        (* [fs_names]                                *)
-Require Import SpecKexec.       (* the landed frame this file parallels:
+Require Import SpecKexec.       (* the vocabulary leaf this frame is over:
                                    [K_kexec], [kexec_ok], [kxc_sp],
                                    [kxc_sp_final], [kxc_tf_sp_idx], [MAXARG] *)
 Require Import PageGeom.        (* [PGSIZE]                                  *)
@@ -275,6 +275,7 @@ Require Import KexecBuilt.      (* [kxb_perm_ok], [kexec_seg_perm], [kexec_pg]: 
                                    permission projection kexec builds (its home) *)
 Require Import UserFd.          (* [ufdG] -- UexecRet's section binds it     *)
 Require Import UexecSlot.       (* [uvis], [uvis_of], [tf_w]                 *)
+Require Import FsAbsEra.        (* [ax_hops_triv]: the trivial hop family  *)
 Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [open_walk_dead_era],
                                    [aopen_commit_at] -- REUSED, see header  *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
@@ -560,6 +561,30 @@ Section KexecAU.
      ∗ aopen_commit_at Γ appE Φo
      ∗ exec_slot_pre S Φo na alen afun sts)%I.
 
+  (* THE BUNDLE A CALLER THAT TRACKS NOTHING HANDS IN, and it is free:
+     every hop says yes at a [True] cursor, the observation hands the
+     lent half straight back with a [True] receipt, and the slot wand
+     concludes at [emp].  This is what forkret's boot arm supplies at its
+     [kexec("/init")] -- it wants only [kexec_ok] back
+     ([exec_arms_landed]), and its own slot comes from the park closer,
+     not from exec.  Nothing of the abstract state is spent, so no
+     invariant is needed on either side. *)
+  Lemma exec_au_pre_triv Γ (γfs : fs_names) (cw : Z)
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) :
+    ⊢ exec_au_pre (fun _ => emp%I) Γ γfs cw
+        (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I)
+        na alen afun sts.
+  Proof.
+    rewrite /exec_au_pre. iSplitR.
+    { rewrite /open_walk_pre_era. iIntros (pl r) "_". iModIntro.
+      iSplit; [done |]. iApply ax_hops_triv. }
+    iSplitR.
+    { rewrite /aopen_commit_at. iIntros (I i a) "%Hi Ha".
+      iModIntro. by iFrame "Ha". }
+    rewrite /exec_slot_pre. by iIntros (av i f nl W') "_ _ _".
+  Qed.
+
   (* non-expansive in the slot predicate: UexecExecInst.v instantiates
      [S] at a fixpoint variable, and the fixpoint's contractivity proof
      needs this of the bundle *)
@@ -688,12 +713,12 @@ Global Typeclasses Opaque exec_au_pre exec_post_ok exec_post_fail exec_arms.
 (*  3.  THE MACHINE CONTRACT: SpecKexec's frame + the AU                  *)
 (* ===================================================================== *)
 
-(* [SpecKexec.wp_kexec_sconf_body]'s premises and threaded resources
-   VERBATIM (R10), with the bundle [EXTRA] after the process block and
-   the armed post in place of the landed [kexec_ok] conjunct.  The
-   continuation's binders lose [entry spv szv'] -- they are the success
-   arm's existentials now -- and keep every resource row. *)
-Definition wp_kexec_au_frame
+(* THE MACHINE FRAME: kexec's premises and threaded resources, with the
+   bundle [EXTRA] after the process block and the armed post in the pure
+   slot ([exec_arms_landed] reads [SpecKexec.kexec_ok] back out of it).
+   The continuation's binders carry no [entry spv szv'] -- they are the
+   success arm's existentials -- and keep every resource row. *)
+Definition wp_kexec_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
@@ -751,7 +776,7 @@ Definition wp_kexec_au_frame
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
   bslots 3 -∗
   iref_slots 2 -∗
-  (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
+  (* ---- THE BUNDLE (the one addition to the premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (U' : ustate),
@@ -780,7 +805,7 @@ Definition wp_kexec_au_frame
 (* THE CONTRACT.  The abstract state is read at the LIVE Γ; the
    descriptor view [sts] is the caller's (kexec never opens the
    descriptor block, so the key's fd leg is whatever the caller holds). *)
-Definition wp_kexec_au_body
+Definition wp_kexec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (S : uvis -> iProp Σ)
@@ -798,7 +823,7 @@ Definition wp_kexec_au_body
     (P Pmiss : nat -> Z -> iProp Σ)
     (Φo : aview -> Z -> anode -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
-  wp_kexec_au_frame gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
+  wp_kexec_frame gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
     pidv U dqb dqs dqa dqpv dqas m K eb b lks
     (exec_au_pre S Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts)
     (exec_arms S Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts U).
@@ -807,8 +832,8 @@ Definition wp_kexec_au_body
 (*  4.  THE SEAL                                                          *)
 (* ===================================================================== *)
 
-Module Type KEXEC_AU.
-  Parameter wp_kexec_au :
+Module Type KEXEC.
+  Parameter wp_kexec_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (S : uvis -> iProp Σ)
@@ -825,6 +850,6 @@ Module Type KEXEC_AU.
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ),
-      wp_kexec_au_body S gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
+      wp_kexec_sconf_body S gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
         pidv U sts dqb dqs dqa dqpv dqas m K eb b lks P Pmiss Φo.
-End KEXEC_AU.
+End KEXEC.

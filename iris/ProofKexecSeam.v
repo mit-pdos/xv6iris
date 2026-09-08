@@ -731,7 +731,7 @@ Section KexecBSeam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) /\
        (* ---- THE IMAGE INVARIANT (S3c).  Conditional on the walk's own
-          guard, because the unconditional cone ([SpecKexec.wp_kexec_sconf])
+          guard, because the unconditional cone (kexec's own contract)
           carries no premise about the file: after [i] headers the running
           [sz] is the [uvmalloc] fold over the PT_LOADs seen so far and each
           of their segments is already in the process's image. ---- *)

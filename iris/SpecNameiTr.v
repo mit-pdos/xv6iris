@@ -24,7 +24,7 @@
    [IcacheHeld.inode_held] with the inum exposed -- is the currency of the ERA
    walk that replaced this contract as the consumed form: [SpecNameiEra],
    [SpecNamexEra], [SpecNparEra], [SpecNparWrapEra] state their pins in it,
-   their provers and [ProofSysOpenAU*] / [ProofKexecPin*] read it, and
+   their provers and [ProofSysOpenAU*] / [ProofKexecAUA] read it, and
    [NameiTrDefs]'s binder list is quoted by half the era cone (understating it
    is a documented 255 GB memory bomb).  So the file stays on the build as that
    vocabulary, minus the trace.

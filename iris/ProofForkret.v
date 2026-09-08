@@ -75,8 +75,13 @@ Require Import CodeForkret.
 Require Import SpecMyproc SpecRelease SpecPrepareReturn.
 (* the boot arm's three callees.  [FSINIT] and [KEXEC] became callable from
    here only once their contracts stopped demanding [eb = true]: this arm
-   runs with interrupts OFF (see [SpecForkret.v]'s header). *)
+   runs with interrupts OFF (see [SpecForkret.v]'s header).
+   [SpecKexec] for the vocabulary ([K_kexec], [kexec_ok], [fs_fabric]);
+   [SpecKexecAU] for the contract itself -- kexec has ONE, and this arm
+   takes it at the trivial bundle (see [fkr_boot]'s kexec call). *)
 Require Import SpecFsinit SpecKexec SpecPanic.
+Require Import SpecKexecAU.  (* [KEXEC], [exec_au_pre_triv], [exec_arms_landed] *)
+Require Import FsBytesGamma.  (* [fs_gamma_L]: the live Gamma the bundle is at *)
 Require Import PrintkArgs.  (* [PkAStr] / [pk_desc_res] -- panic's message shape *)
 Require Import FsReady.
 Require Import SpecUserretClosed.
@@ -100,7 +105,7 @@ Set Printing Depth 40.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module ForkretProof (MP : MYPROC) (RL : RELEASE) (PR : PREPARE_RETURN)
-                    (FS : FSINIT) (KX : KEXEC) (PN : PANIC)
+                    (FS : FSINIT) (KX : SpecKexecAU.KEXEC) (PN : PANIC)
                     (UC : USERRET_CLOSED) : FORKRET.
 
 (* register indices and the two scripts, at MODULE level: an [Ltac] defined
@@ -785,11 +790,12 @@ Qed.
    is that port's recipe, and claude-notes/completed/forkret-boot-arm.md is
    the record of what this arm cost.
 
-   IT USES THE UNPINNED [SpecKexec.wp_kexec_sconf].  Nothing here says
-   which inode ["/init"] names or what bytes it holds: the era-0 pinned
-   theorems ([NameiInitPinned], [SpecKexecPinned]/[ProofKexecPinned]) are a
-   standalone story, and durable-disk lane E-unpin took them off the build
-   entirely -- see claude-notes/completed/namei-pinned-lookup.md's banner. *)
+   IT TAKES kexec's CONTRACT AT THE TRIVIAL BUNDLE, so nothing here says
+   which inode ["/init"] names or what bytes it holds.  Saying it is the
+   caller's own business under the same contract: a bundle whose hop
+   cursors and observation receipt pin the path and the file makes the
+   arms name that program's entry and image, which is what a verified
+   /init will supply here. *)
 (* ---- the trapframe page is a real page: the fact [pt_node_claim_from_static]
        needs before the physical trapframe words can be read as MEMORY.  It
        rides inside the descriptor's well-formedness, so [proc_priv] has it.
@@ -1432,15 +1438,29 @@ Proof.
                ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
   iDestruct (cpu_claim_ext_transport CIDf1 CIDb19 eb p
                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-  iApply (KX.wp_kexec_sconf γs j γl pd pav pu
+  (* THE BUNDLE, AT NOTHING.  kexec has ONE contract and its caller-supplied
+     part is an abstract-state bundle; this arm tracks nothing about the
+     file system, so it hands in the trivial one ([exec_au_pre_triv]: every
+     hop says yes at a [True] cursor, the observation's receipt is [True])
+     with the slot predicate at [emp] -- forkret's own user WP comes from
+     the park closer at the tail, not from exec.  The descriptor view the
+     key would be built at is likewise unconstrained here, so [nil]: it
+     reaches only arm (a)'s [exec_key], and that arm's payload is [emp].
+     What comes back is [exec_arms], and [exec_arms_landed] reads the
+     landed [kexec_ok] straight out of it. *)
+  iPoseProof (exec_au_pre_triv (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+                1%nat (fun _ => 5%nat) (fun _ => fkr_init_bytes)
+                (@nil fdstate)) as "Hxpre".
+  iApply (KX.wp_kexec_sconf (fun _ => emp%I) γs j γl pd pav pu
 
  γf
 
             5%nat fkr_init_bytes 1%nat fkr_argv
             (fun _ => 5%nat) (fun _ => 6%nat) (fun _ => fkr_init_bytes)
-            pid U
+            pid U (@nil fdstate)
             DfracDiscarded DfracDiscarded (DfracOwn 1) DfracDiscarded DfracDiscarded
             D5 av2 eb eb ∅
+            (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I)
             Hkx Hdev Hnib0 Hlg Hsize Hbm0
             Hbmcov Hbmlog Hist0 Hcovb Hiregb
             fkr_init_path_cstr ltac:(kxarith)
@@ -1449,14 +1469,17 @@ Proof.
             ltac:(intros; kxarith)
             Hjlt Hgl
             with "Hcg Hcpu Hextc Hclmc Htext Hpc Hfab Hkaenv Hbms Hist HbitsS
-                  Hpriv Hpath Hargv Hargs Hsl3 Hirs2").
+                  Hpriv Hpath Hargv Hargs Hsl3 Hirs2 Hxpre").
   (* ================================================================== *)
   (*  +0x56 .. +0x60: [p->trapframe->a0 = kexec(...)], then the test.     *)
   (* ================================================================== *)
-  iIntros (CIDk Hkk mf Ux entry spv szv')
-    "%Hcsk %Hkok Hcg Hcpu Hextc Hclmc Hpc Hbms2 Hist2 Hka2 Hpriv
+  iIntros (CIDk Hkk mf Ux)
+    "%Hcsk Harms Hcg Hcpu Hextc Hclmc Hpc Hbms2 Hist2 Hka2 Hpriv
      Hpath2 Hargv Hargs2 Hsl3 Hirs2".
   destruct Ux as [V' M'].
+  (* the armed post carries the landed result relation at SOME entry and
+     stack pointer -- the three the plain frame used to bind universally *)
+  iDestruct (exec_arms_landed with "Harms") as %(entry & spv & szv' & Hkok).
   (* kexec keeps the descriptor block, hence the fd-state ghost name it is
      keyed on -- [SpecKexec.kexec_ok] states it. *)
   assert (Hfgk : pv_fdg V' = pv_fdg (us_V U)).

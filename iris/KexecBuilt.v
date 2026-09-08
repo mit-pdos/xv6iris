@@ -29,10 +29,9 @@
    down whole so the argv loop can name it.)
 
    §4 is [kexec_built]: the fact bundle the kexec cone's [Q]-premise is
-   asked at, stated ONCE so that [ProofKexecD.kxd_phaseD],
-   [ProofKexec.kxc_d_tail] / [kxc_cd] and [ProofKexecPin] all quote the
-   same Prop.  Read its own header for what it does and does NOT yet
-   carry.                                                                  *)
+   asked at, stated ONCE so that [ProofKexecD.kxd_phaseD] and
+   [ProofKexec.kxc_d_tail] / [kxc_cd] all quote the same Prop.  Read its
+   own header for what it does and does NOT yet carry.                     *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -1941,9 +1940,9 @@ Qed.
     the S2 image threading the ONE site that pays it -- the commit block's
     [ld a4,-408(s0)] -- knows [U'] rather than quantifying over it.  This
     is what it knows ABOUT THE IMAGE IT BUILT, stated once so that
-    [ProofKexecD.kxd_phaseD], [ProofKexec.kxc_d_tail] / [kxc_cd] and
-    [ProofKexecPin]'s two premise sites all quote the same Prop instead of
-    the unguarded [forall U', Q (kxq_entry ef) U'] they used to.
+    [ProofKexecD.kxd_phaseD] and [ProofKexec.kxc_d_tail] / [kxc_cd] all
+    quote the same Prop instead of the unguarded
+    [forall U', Q (kxq_entry ef) U'] they used to.
 
     WHAT IT CARRIES.  [sz1] is the size the run reached ([p->sz] at the
     exit), and over the stack page at [uint sz1] the argument block is
@@ -1991,9 +1990,9 @@ Qed.
         [ProofKexecSeam.kxc_at_12c] (index [i], unguarded) and
         [ProofKexecB3.kxc_at_11a] (index [S i], guarded by
         [S i <= phnum], which the back edge's own test discharges), both
-        CONDITIONAL on [kxb_walk_ok] -- the landed
-        [SpecKexec.wp_kexec_sconf] carries no premise about the file, so
-        the guard may not become a premise of the cone.  Below,
+        CONDITIONAL on [kxb_walk_ok] -- kexec's contract carries no
+        premise about the file, so the guard may not become a premise of
+        the cone.  Below,
         [kxb_phdr_fields] turns the body's three informative blind splits
         (the PT_LOAD type test, the vaddr+memsz wrap test, the vaddr
         alignment test) into statements about the file's own fields, and
@@ -2027,8 +2026,8 @@ Qed.
         kxb_walk_ok f ef ->
           uint sz1 = pgroundup (kexec_sz_after (elf_loads f)) + 2 * PGSIZE
 
-    are named at the five premise sites ([ProofKexecD.kxd_phaseD],
-    [ProofKexec.kxc_d_tail] / [kxc_cd], [ProofKexecPin]'s two).  The
+    are named at the three premise sites ([ProofKexecD.kxd_phaseD],
+    [ProofKexec.kxc_d_tail] / [kxc_cd]).  The
     right-hand side is spelled to match [KexecImageAlg.kexec_sz_of_sz_after],
     which is S4's (identity) bridge to [SpecKexecAU.kexec_sz f].            *)
 Definition kexec_built (f : elf_bytes) (ef : nat -> bv 8) (sz1 : mword 64)

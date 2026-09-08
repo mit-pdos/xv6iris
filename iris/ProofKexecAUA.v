@@ -1,10 +1,10 @@
 (* ===================================================================== *)
-(*  ProofKexecAUA.v -- PHASE A OF kexec, AT THE ATOMIC-UPDATE CONTRACT.   *)
-(*  (fs-syscall-specs, exec AU lane, stage S4a; SpecKexecAU.v sect. 2)    *)
+(*  ProofKexecAUA.v -- PHASE A OF kexec, AT ITS CONTRACT.                 *)
+(*  (SpecKexecAU.v section 2; design/fs-syscall-specs.md)                 *)
 (* ===================================================================== *)
 
-(*  [ProofKexecPinA] REPLAYED AT THE CALLER'S OWN WALK PREMISE AND THE
-    CALLER'S OWN OBSERVATION, which is the whole of what the AU contract
+(*  PHASE A AT THE CALLER'S OWN WALK PREMISE AND THE CALLER'S OWN
+    OBSERVATION, which is the whole of what the abstract-state bundle
     costs phase A:
 
       * [kxc_a1_au] is [kxc_a1p] with the pin removed: the era walk fires
@@ -28,9 +28,8 @@
         [kxc_a2_r] (the oracle's payout generic in [R]) and why the landed
         [kxc_a2] is now that lemma's corollary at the header claim.
 
-    EVERYTHING ELSE IS ProofKexecA's.  The landed blocks are opened as [LA]
-    and instantiated, never duplicated; the copy stops at the namei call
-    exactly as ProofKexecPinA's does.                                     *)
+    EVERYTHING ELSE IS ProofKexecA's.  Its blocks are opened as [LA] and
+    instantiated, never duplicated; the copy stops at the namei call.    *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -107,10 +106,9 @@ Require Import SpecNamex.
 Require Import ProofKexecTail.
 Require Import CodeKexec.
 Require Import SpecNameiEra.   (* THE ERA WALK: the one call swapped *)
-(* NOT [SpecKexecPin]: that file's own chain reaches the boot composition
-   (FsInitPin -> ... -> LinkKexec), and a phase-A leaf must not.  Its one
-   pure lemma this file wants ([fn_file_bytes_era_ok]) is nine lines and is
-   restated below as [kxa_file_bytes_ok]. *)
+(* A phase-A leaf must stay below the boot composition, so the byte-reading
+   fact it wants is stated here rather than imported from a file whose own
+   chain reaches [FsInitPin]: [kxa_file_bytes_ok], nine lines, below. *)
 Require Import ProofKexecA.    (* the LANDED blocks, opened as [LA]  *)
 (* THE ELF SIDE: [elf_wf] / [elf_magic_ok] / [elf_le_at] (ElfFile) and the
    readi-window bridge [le_at_of_file_bytes] plus [elf_parse_ehdr_fields]
@@ -164,7 +162,7 @@ Module LA := ProofKexecA.KexecAProof Myproc BeginOp Namei Ilock Readi
                                      Iunlockput EndOp.
 
 Section KexecAUABody.
-  (* [!ufdG Σ] beside ProofKexecPinA's list: [SpecKexecAU.exec_slot_pre]
+  (* [!ufdG Σ] beside the plain phase A's list: [SpecKexecAU.exec_slot_pre]
      names [UexecRet.uslot], whose key's descriptor leg lives there. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ,
             !pavG Σ, !ufdG Σ}.
@@ -946,9 +944,8 @@ Section KexecAUAMain.
   Qed.
 
   (* ---- the pure row the receipt carries ----------------------------- *)
-  (* [SpecKexecPin.fn_file_bytes_era_ok], restated (see the import note):
-     on an ilock payload's node the byte reading IS the record's own
-     [FsTree.file_bytes] of the payload's bytes. *)
+  (* on an ilock payload's node the byte reading IS the record's own
+     [FsTree.file_bytes] of the payload's bytes (see the import note). *)
   Lemma kxa_file_bytes_ok (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) :
     inode_ok fsc_cov fsc_logst dn bm data ->

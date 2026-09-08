@@ -1,4 +1,4 @@
-(* SpecSysExecAU.v -- sys_exec's ATOMIC-UPDATE contract: [SpecKexecAU]'s
+(* SpecSysExecAU.v -- sys_exec's ONE CONTRACT [SYSEXEC]: [SpecKexecAU]'s
    bundle and arms lifted to the syscall boundary, where the arguments
    are READ OFF THE USER IMAGE rather than handed in.  A STATEMENT FILE.
 
@@ -9,12 +9,13 @@
 
    ==== WHAT THIS CONTRACT IS ==========================================
 
-   A PARALLEL FORM beside [SpecSysExec.wp_sys_exec_sconf] (R10: the
-   landed contract does not move): the same frame row for row -- the
-   block-layer geometry relayed to kexec, the two trapframe arguments,
-   [eb = true], the fabric, the process -- with the bundle [EXTRA] after
-   the process block and the armed post in place of the landed
-   [sys_exec_post].
+   THE ONLY CONTRACT sys_exec has, and the only seal the dispatcher may
+   take: [SpecSysExec.v] one file down is the vocabulary leaf
+   ([K_sys_exec], [sys_exec_post]).  The frame is that file's own premise
+   list row for row -- the block-layer geometry relayed to kexec, the two
+   trapframe arguments, [eb = true], the fabric, the process -- with the
+   bundle [EXTRA] after the process block and the armed post in the pure
+   slot ([sys_exec_arms_landed] reads [sys_exec_post] back out of it).
 
    THE ONE THING THIS LEVEL ADDS: the argument vector is not a
    parameter.  sys_exec [fetchaddr]s each [argv[i]] out of the user's
@@ -44,13 +45,11 @@
    [sys_exec_slot_pre] moves from [exec_args_shape] to [exec_args_of]
    and every arm below is unchanged.
 
-   THE CONTINUATION keeps the landed shape: [(mf, P', M')] with the
-   page-table growth report and an EXISTENTIAL image, exactly as
-   [SpecSysExec] states it today (milestone J item 1's staging).  The
+   THE CONTINUATION binds [(mf, P', M')] with the page-table growth
+   report and an EXISTENTIAL image (milestone J item 1's staging).  The
    U-mode side's row for exec's failure is [r = -1 /\ M' = M]
-   ([UsysMemOk]); tightening this frame's failure arm to same-M is the
-   landed contract's own open item and is not taken here -- the AU form
-   parallels, it does not overtake.
+   ([UsysMemOk]); tightening this frame's failure arm to same-M is an
+   open item, recorded and not taken.
 
    ==== THE ARMS ========================================================
 
@@ -67,14 +66,15 @@
    pages), with the whole bundle back unspent -- indistinguishable from
    kexec's (i) by the return value, so folded into the same [∨].
 
-   ==== WHAT THE PROVER OWES ===========================================
+   ==== WHERE THE PROOF PAYS EACH PIECE ================================
 
    1. The argv shape: [exec_args_shape] is the walk's own loop invariant
       ([fetchstr]'s [bb_cstr] and length, the MAXARG bound) -- free.
       The reading [exec_args_of] is the upgrade (header).
-   2. [SpecKexecAU]'s contract at the reading, with the bundle
-      specialized by [sys_exec_slot_pre]'s ∀.
-   3. The kfree/kalloc bookkeeping of the landed proof, verbatim.
+   2. [SpecKexecAU.KEXEC] at that reading, with the bundle specialized by
+      [sys_exec_slot_pre]'s ∀.
+   3. The kfree/kalloc bookkeeping, shared with the blocks in
+      [ProofSysExecParts].
 
    BINDERS: SpecSysExec's plus [ufdG] (the slot). *)
 From Stdlib Require Import ZArith Lia List.
@@ -113,7 +113,7 @@ Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import ByteBuf.        (* [bb_cstr]                          *)
 Require Import FsBlocks.       (* [fs_names]                         *)
 Require Import SpecKexec.      (* [MAXARG], [kexec_ok]               *)
-Require Import SpecSysExec.    (* the landed frame this file parallels: [K_sys_exec] *)
+Require Import SpecSysExec.    (* the vocabulary leaf: [K_sys_exec], [sys_exec_post] *)
 Require Import UserFd.         (* [ufdG]                             *)
 Require Import UexecSlot.      (* [uvis]                             *)
 Require Import SpecSysOpenAU.  (* [open_walk_pre_era], [aopen_commit_at] *)
@@ -281,7 +281,7 @@ Global Typeclasses Opaque sys_exec_au_pre sys_exec_post_fail sys_exec_arms.
 (*  3.  THE MACHINE CONTRACT: SpecSysExec's frame + the AU                *)
 (* ===================================================================== *)
 
-Definition wp_sys_exec_au_body
+Definition wp_sys_exec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (S : uvis -> iProp Σ)                  (* the slot predicate the caller's WP concludes at *)
@@ -328,8 +328,9 @@ Definition wp_sys_exec_au_body
   kalloc_env fsc_kalloc None -∗
   iref_slots 2 -∗
   proc_priv γf pj pid U -∗
-  (* ---- THE AU SIDE (the one addition to the landed premise list): the
-     arguments are read off THIS image at argument 1 ---- *)
+  (* ---- THE BUNDLE, the one addition to the premise list the vocabulary
+     leaf's header describes: the arguments are read off THIS image at
+     argument 1 ---- *)
   sys_exec_au_pre S Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φo (us_M U) v1 sts -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
@@ -358,8 +359,8 @@ Definition wp_sys_exec_au_body
 (*  4.  THE SEAL                                                          *)
 (* ===================================================================== *)
 
-Module Type SYSEXEC_AU.
-  Parameter wp_sys_exec_au :
+Module Type SYSEXEC.
+  Parameter wp_sys_exec_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (S : uvis -> iProp Σ)
@@ -373,6 +374,6 @@ Module Type SYSEXEC_AU.
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ),
-      wp_sys_exec_au_body S γf gs j gl pd pav pu dqb dqs v0 v1 pid U sts
+      wp_sys_exec_sconf_body S γf gs j gl pd pav pu dqb dqs v0 v1 pid U sts
         m K eb b lks P Pmiss Φo.
-End SYSEXEC_AU.
+End SYSEXEC.

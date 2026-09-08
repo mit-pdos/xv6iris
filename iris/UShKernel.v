@@ -35,7 +35,7 @@
 (* THE BRIDGE ([sh_slot_of_kexec]) discharges every key premise from        *)
 (* [kexec_image_ok ElfUser.sh_elf …]: the pc off [kexec_image_ok_pc] and   *)
 (* [ElfUser.sh_elf_entry]; the image off [uimg_sub (elf_image sh_elf)]     *)
-(* through [SpecKexecPin.kxp_image_sh]; the pages off [KexecBuilt.kxb_perm *)
+(* through [shk_img_sub_of_elf] below; the pages off [KexecBuilt.kxb_perm  *)
 (* _ok] at sh's two PT_LOADs (R-X at 0x0/0x1000, RW- at 0x2000) and the    *)
 (* RW stack page; the frame's bytes off [kexec_stack_at] (below the        *)
 (* argument block every stack-page byte is zero, hence present); the .bss  *)
@@ -44,8 +44,8 @@
 (* the segment table and the image split are ElfUser.v's already-reduced   *)
 (* facts, and the PT_LOAD headers are read off [sh_elf_segments] for a     *)
 (* VARIABLE file ([elf_segments_loads]) so the kernel never reduces the    *)
-(* 29 KB constant.  ElfUser.v is a declared leaf; importing it here is the *)
-(* same use SpecKexecPin.v makes of it.                                    *)
+(* 29 KB constant.  ElfUser.v is a declared leaf, so importing it here is  *)
+(* in order.                                                               *)
 (*                                                                        *)
 (* THE ONE PREMISE THE IMAGE FACT DOES NOT GIVE: room for sh's frames.     *)
 (* [kxc_stack_ok] only says the argument block fits the stack page, so     *)
@@ -79,7 +79,7 @@ Require Import ElfFile.
 Require Import SpecKexec.      (* [kxc_sp_final] / [kxc_round16] *)
 Require Import KexecBuilt.     (* [kxb_perm_ok] / [kexec_pg] / [kexec_seg_perm] *)
 Require Import SpecKexecAU.    (* [kexec_image_ok] *)
-Require Import SpecKexecPin.   (* [kxp_image_sh] -- the image inclusion at sh *)
+Require Import UmodeAbi.       (* [uimg_sub] -- the image inclusion *)
 Require Import ElfUser.        (* [sh_elf] and its reduced facts (leaf, see header) *)
 Require User.ShSyms User.ShData User.ShInstrs.
 Local Open Scope Z_scope.
@@ -88,6 +88,41 @@ Import Defs.
 (* ===================================================================== *)
 (* SS0 THE PURE FACTS OF sh's IMAGE, off ElfUser.v's reduced constants.   *)
 (* ===================================================================== *)
+
+(* THE IMAGE INCLUSION AT sh.  The exec contract's image conjunct is
+   [uimg_sub (elf_image sh_elf) M]; sh's own program-side premise is
+   [UCodeShK.shk_img_sub M], the two dumped maps separately.  [elf_image]
+   folds them into a union with the bss zeros, so the bridge is one
+   inclusion-of-a-union projection per half -- the right half through a
+   COMPUTED commutation of the two dumped maps rather than a disjointness
+   side condition, so no set reasoning happens at an image consumer's
+   altitude. *)
+Lemma uimg_sub_union_l (m1 m2 M : gmap Z (bv 8)) :
+  uimg_sub (m1 ∪ m2) M -> uimg_sub m1 M.
+Proof.
+  intros H a b Hb. apply H. by apply lookup_union_Some_l.
+Qed.
+
+Lemma sh_union_comm_bool :
+  bool_decide (ShInstrs.sh_bytes ∪ ShData.sh_data
+               = ShData.sh_data ∪ ShInstrs.sh_bytes) = true.
+Proof.
+  lazymatch goal with
+  | |- _ = ?r => vm_cast_no_check (@eq_refl _ r)
+  end.
+Qed.
+
+Lemma shk_img_sub_of_elf (M : gmap Z (bv 8)) :
+  uimg_sub (elf_image ElfUser.sh_elf) M -> shk_img_sub M.
+Proof.
+  intros H. rewrite ElfUser.sh_elf_image in H.
+  split.
+  - exact (uimg_sub_union_l _ _ _ (uimg_sub_union_l _ _ _ H)).
+  - pose proof (uimg_sub_union_l _ _ _ H) as Hfd.
+    intros a b Hb. apply Hfd.
+    rewrite (bool_decide_eq_true_1 _ sh_union_comm_bool).
+    by apply lookup_union_Some_l.
+Qed.
 
 (* the PT_LOAD table read off [elf_segments], for a VARIABLE file: the
    [destruct] never touches the constant, so the kernel never reduces it *)
@@ -433,7 +468,7 @@ Section UShKernel.
       by (intros j Hj; clear -Hj Hroom; lia).
     iApply (sh_uexec_slot_x R W' n0).
     - rewrite Hpc. exact sh_start_pc.
-    - exact (kxp_image_sh nil 0 M Himg).
+    - exact (shk_img_sub_of_elf M Himg).
     - exact Hx.
     - rewrite Hsp'. exact (kxc_sp_final_mod8 _ _ _).
     - rewrite Hsp'. clear -Hroom; lia.

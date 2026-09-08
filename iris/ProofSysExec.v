@@ -1,17 +1,17 @@
-(* ProofSysExecAU.v -- sys_exec at SpecSysExecAU's ATOMIC-UPDATE contract.
+(* ProofSysExec.v -- sys_exec at its contract, [SpecSysExecAU.SYSEXEC].
 
-   THE SAME WALK, ONE CALL SITE DIFFERENT.  Every block of sys_exec lives in
-   ProofSysExecParts.v and is reused here VERBATIM: the prologue, the lazy
+   ONE CALL SITE, AND THE REST IS SHARED.  Every block of sys_exec lives in
+   ProofSysExecParts.v and is used here VERBATIM: the prologue, the lazy
    spills and memset, the fill loop and its step, the two free loops, the
    reload, the [bad:] tail and the success tail.  ProofSysExecParts exists
    for exactly this -- none of its blocks names [Kexec] and none names
-   sys_exec's own postcondition, so the AU walk frames its bundle straight
+   sys_exec's own postcondition, so the walk frames its bundle straight
    through them (durable-notes.md: a block lemma with a resource-generic
-   continuation gets a second proof for free).
+   continuation costs the composition nothing).
 
-   WHAT IS RE-DERIVED, and it is only this: [sx_break_au], the six
-   instructions at +0x0b6 .. +0x0cc with [SpecKexecAU.KEXEC_AU]'s contract
-   in place of [SpecKexec.KEXEC]'s, and the composition.
+   WHAT THIS FILE ADDS: [sx_break_au], the six instructions at
+   +0x0b6 .. +0x0cc that call kexec at [SpecKexecAU.KEXEC], and the
+   composition.
 
    ---- THE TWO SEAMS ---------------------------------------------------
 
@@ -157,26 +157,24 @@ End SysExecAUBridge.
 
 (* ===================================================================== *)
 (*  THE SEAL.  The seven copy-in / allocator callees go straight to        *)
-(*  [SysExecParts]; [KX] is kexec's AU contract, and it is the only        *)
-(*  argument this file uses on its own.                                   *)
+(*  [SysExecParts]; [KX] is kexec's contract, and it is the only argument  *)
+(*  this file uses on its own.                                            *)
 (* ===================================================================== *)
-Module SysExecAUProof (Argaddr : ARGADDR) (Argstr : ARGSTR) (Memset : MEMSET)
+Module SysExecProof (Argaddr : ARGADDR) (Argstr : ARGSTR) (Memset : MEMSET)
                       (Fetchaddr : FETCHADDR) (Kalloc : KALLOC)
                       (Fetchstr : FETCHSTR) (Kfree : KFREE)
-                      (KX : SpecKexecAU.KEXEC_AU)
-                      : SpecSysExecAU.SYSEXEC_AU.
+                      (KX : SpecKexecAU.KEXEC)
+                      : SpecSysExecAU.SYSEXEC.
 
 Module Import Parts :=
   SysExecParts Argaddr Argstr Memset Fetchaddr Kalloc Fetchstr Kfree.
 
 (* ===================================================================== *)
-(*  +0x0b6 .. +0x0cc -- THE BREAK, AND THE CALL TO kexec, AT THE AU       *)
-(*  CONTRACT.  Instruction for instruction [ProofSysExec.sx_break]; what  *)
-(*  changes is the callee ([KX.wp_kexec_au] for [Kexec.wp_kexec_sconf]),  *)
-(*  the bundle handed across it, and the armed post that comes back.  The *)
-(*  change-of-view lemmas the six instructions need ([sx_avf],            *)
-(*  [sx_argv_kx], [sx_pages_ext], [sx_scaled]) are shared, in             *)
-(*  ProofSysExecParts.                                                    *)
+(*  +0x0b6 .. +0x0cc -- THE BREAK, AND THE CALL TO kexec.  These six      *)
+(*  instructions are the only ones this file walks: they hand [KX.        *)
+(*  wp_kexec_sconf] the bundle and take the armed post back.  The         *)
+(*  change-of-view lemmas they need ([sx_avf], [sx_argv_kx],              *)
+(*  [sx_pages_ext], [sx_scaled]) are shared, in ProofSysExecParts.        *)
 (* ===================================================================== *)
 Section SysExecBreakAU.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -436,7 +434,7 @@ Section SysExecBreakAU.
     iEval (rewrite -HN6a0) in "Hpb".
     iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (KX.wp_kexec_au S gs jp gl pd pav pu γf
+    iApply (KX.wp_kexec_sconf S gs jp gl pd pav pu γf
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
               pid (us_upt U P) sts dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
               N6 (K - 60)%nat eb b lks Pw Pmiss Φo
@@ -551,7 +549,7 @@ Section SysExecWhole.
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
   Qed.
 
-  Lemma wp_sys_exec_au
+  Lemma wp_sys_exec_sconf
       (S : uvis -> iProp Σ)
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
@@ -563,10 +561,10 @@ Section SysExecWhole.
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ) :
-      wp_sys_exec_au_body S γf gs j gl pd pav pu dqb dqs v0 v1 pid U sts
+      wp_sys_exec_sconf_body S γf gs j gl pd pav pu dqb dqs v0 v1 pid U sts
         m K eb b lks P Pmiss Φo.
   Proof.
-    cbv beta zeta delta [wp_sys_exec_au_body].
+    cbv beta zeta delta [wp_sys_exec_sconf_body].
     intros HK Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
            Hcb Hireg Hjp Hgl Hebt Harg0 Harg1.
     subst eb.
@@ -708,4 +706,4 @@ Section SysExecWhole.
   Qed.
 End SysExecWhole.
 
-End SysExecAUProof.
+End SysExecProof.

@@ -1,5 +1,14 @@
-(* SpecSysExec.v -- the public interface of sys_exec(), stated independently
-   of its proof.
+(* SpecSysExec.v -- sys_exec()'s VOCABULARY LEAF: the frame budget
+   [K_sys_exec] and the RESULT RELATION [sys_exec_post], stated
+   independently of any proof.
+
+   THE CONTRACT ITSELF IS [SpecSysExecAU.SYSEXEC] ([wp_sys_exec_sconf]),
+   one file up: sys_exec has ONE contract, and it is the atomic-update one
+   -- kexec's bundle and arms lifted to the syscall boundary
+   (fs-syscall-specs.md, "ONE CONTRACT PER SYSCALL").  Its frame is the
+   premise list this header describes row for row, and its armed post
+   implies the [sys_exec_post] below
+   ([SpecSysExecAU.sys_exec_arms_landed]).
 
      uint64 sys_exec(void) {
        char path[MAXPATH], *argv[MAXARG];
@@ -30,9 +39,9 @@
    ---- WHAT IT IS FOR --------------------------------------------------
 
    sys_exec exists to MARSHAL: it turns two user words in the trapframe
-   into exactly the resources [SpecKexec.wp_kexec_sconf_body] demands, and
-   it is the only caller kexec has.  Read the two contracts together --
-   almost every premise below is one of kexec's, paid here:
+   into exactly the resources [SpecKexecAU.wp_kexec_frame] demands, and it
+   is the only caller kexec has.  Read the two contracts together -- almost
+   every premise of the contract above is one of kexec's, paid here:
 
    * kexec wants the PATH as [S plen] owned bytes with [bb_cstr pfun plen].
      [argstr] copies the user string into this function's own
@@ -176,109 +185,3 @@ Section SpecSysExec.
 
 End SpecSysExec.
 
-Definition wp_sys_exec_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γf : gname)                           (* ftable, kalloc      *)
-    (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
-    (* disk fabric + lock  *)
-    (pd pav pu : mword 64)
-    (dqb dqs : dfrac)
-    (v0 v1 : mword 64)                        (* syscall arguments 0 and 1 *)
-    (pid : mword 32) (U : ustate)
-    (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.sys_exec in
-  let pj := proc_addr j in
-  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (K_sys_exec <= K)%nat ->
-  icfg_dev = ROOTDEV ->
-  (0 < icfg_nib)%nat ->
-  (* ---- the block-layer geometry, threaded verbatim to kexec ---- *)
-  log_geom_ok fsc_cov fsc_logst ->
-  0 < fsc_size <= BPB ->
-  0 <= fsc_bmapstart ->
-  fsc_bmapstart ∈ fsc_cov ->
-  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= icfg_ist ->
-  cov_below fsc_cov fsc_size ->
-  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
-  (j < NPROC)%nat ->
-  gs !! j = Some gl ->
-  (* kexec's own premise, inherited: the FS layer's contracts are callable
-     only with the interrupt base enabled.  [b = true] is NOT a premise --
-     at depth 0 the SIE eighth and [cpu_own]'s hart agree, so it follows
-     (SpecKexec.v's note on the interrupt index). *)
-  eb = true ->
-  (* argaddr / argstr read syscall arguments 1 and 0 out of the trapframe
-     page [proc_priv] carries *)
-  pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
-  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
-  sie_cap_gpr KT1 m K b pj -∗
-  (* ENTERED WITH NO LOCK HELD: the depth is pinned at ZERO, so
-     [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
-     callees raise -- kexec's whole FS cone at "log"/"bcache"/"sleep lock",
-     argstr and kalloc and kfree at "kmem" -- is [locks_below ∅ _]. *)
-  cpu_own 0 eb pj b lks -∗
-  (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], which this
-     contract's own premise forces, so no caller gains an obligation. *)
-  trap_csrs_ext KT1 eb -∗
-  cpu_claim_ext eb pj -∗
-  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  (* ---- the file system, as kexec's own bundle: thirteen persistent
-         resources this function only relays ---- *)
-  fs_fabric gs pd pav pu
- -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  bslots 3 -∗
-  (* the loop's own [kalloc]s, argstr's page faults, and kexec's page-table
-     builder all run in the UNCOUNTED regime *)
-  kalloc_env fsc_kalloc None -∗
-  (* ---- the process, and the reference allowance kexec's walk needs ---- *)
-  iref_slots 2 -∗
-  proc_priv γf pj pid U -∗
-  (* THE CROSSING IS THE LITERAL [true]: this function sleeps in kexec (and
-     in argstr's page faults), so it can return on another hart. *)
-  wp_next true pj (fun (CID : CpuId) =>
-  (* the image moves: the copies fault user pages in and write them --
-     milestone J item 1's ∃-weakened staging *)
-  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
-      ⌜callee_saved m mf⌝ -∗
-      (* the page table may have GROWN before kexec ran: argstr's and each
-         fetchstr's copy-in faults user pages in.  [uptd_ext] is their own
-         report, relayed. *)
-      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
-      sie_cap_gpr KT1 mf K b pj -∗
-      cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext KT1 eb -∗
-      cpu_claim_ext eb pj -∗
-      pc_is ret_tgt -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      (* the free pool only SHRINKS -- kexec's cone is the only mover *)
-      bslots 3 -∗
-      kalloc_env fsc_kalloc None -∗
-      (* the allowance, whole: kexec gives back what it took *)
-      iref_slots 2 -∗
-      sys_exec_post γf pj pid (upd_upt (us_V U) P')
-        (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
-
-Module Type SYSEXEC.
-  Parameter wp_sys_exec_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γf : gname)
-      (gs : list gname) (j : nat) (gl : gname)
-      (pd pav pu : mword 64)
-      (dqb dqs : dfrac)
-      (v0 v1 : mword 64)
-      (pid : mword 32) (U : ustate)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
-      wp_sys_exec_sconf_body γf gs j gl pd pav pu
-
- dqb dqs v0 v1 pid U m K eb b lks.
-End SYSEXEC.

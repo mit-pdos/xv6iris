@@ -1,21 +1,20 @@
 (* ===================================================================== *)
-(*  ProofKexecAU.v -- kexec AT THE ATOMIC-UPDATE CONTRACT, ASSEMBLED.     *)
-(*  (fs-syscall-specs, exec AU lane, stage S4b; SpecKexecAU.v sect. 3-4)  *)
+(*  ProofKexec.v -- kexec's contract, ASSEMBLED.                          *)
+(*  (SpecKexecAU.v sections 3-4; design/fs-syscall-specs.md)              *)
 (* ===================================================================== *)
 
-(*  [ProofKexecPin.v]'s composition, replayed once more: the cone has been
-    generic in [Q] since the exit-generic sweep, so phases B / B2 / B3 /
-    C / D and all eight [bad:] tails apply UNCHANGED and the file below is
-    ProofKexecPin's two sections with three differences and no fourth.
+(*  THE COMPOSITION.  The cone has been generic in [Q] since the
+    exit-generic sweep, so phases B / B2 / B3 / C / D and all eight [bad:]
+    tails apply UNCHANGED; this file is the two sections that assemble
+    them, with three things of its own.
 
       (1) PHASE A IS THE AU ONE ([ProofKexecAUA.kxc_phaseA_au]), which
-          spends the caller's walk premise and its ONE observation where
-          the pinned block reads a pin.  That is the only block that is
-          not the landed one.
+          spends the caller's walk premise and its ONE observation.  That
+          is the only block written for this contract.
 
-      (2) THE ONE PAYING SITE.  [kxc_cd] takes [Q (kxq_entry ef)]; the
-          pinned run discharges it from a header claim and this one from
-          WHAT THE RUN BUILT -- [KexecAUBridge.exec_built_Q_intro], at
+      (2) THE ONE PAYING SITE.  [kxc_cd] takes [Q (kxq_entry ef)], and
+          this run discharges it from WHAT THE RUN BUILT --
+          [KexecAUBridge.exec_built_Q_intro], at
           [Q := KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef ...].
 
       (3) THE EXIT IS CONVERTED, TWICE, and that is the whole of the AU
@@ -136,17 +135,17 @@ Set Printing Depth 40.
 Notation KX := KernelSyms.kexec (only parsing).
 
 (* ===================================================================== *)
-(*  THE PROOF.  [ProofKexecPin.KexecPinProof]'s functor argument for       *)
-(*  argument, with [ProofKexecAUA]'s phase A in place of the pinned one.   *)
+(*  THE PROOF.  The sixteen callee contracts plus the era walk, with       *)
+(*  [ProofKexecAUA]'s phase A over the shared blocks B..D.                 *)
 (* ===================================================================== *)
-Module KexecAUProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
+Module KexecProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                     (NE : NAMEI_ERA)
                     (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
                     (EndOp : END_OP) (PPT : PROC_PAGETABLE_GEN)
                     (PFP : PROC_FREEPAGETABLE) (Walkaddr : WALKADDR)
                     (Flags2perm : FLAGS2PERM) (Uvmalloc : UVMALLOC)
                     (Uvmclear : UVMCLEAR) (Strlen : STRLEN) (Copyout : COPYOUT)
-                    (SS : SAFESTRCPY) (PN : PANIC) : SpecKexecAU.KEXEC_AU.
+                    (SS : SAFESTRCPY) (PN : PANIC) : SpecKexecAU.KEXEC.
 
 Module PA := ProofKexecAUA.KexecAUAProof Myproc BeginOp Namei NE Ilock Readi
                                          Iunlockput EndOp.
@@ -163,9 +162,8 @@ Module PC := ProofKexecC.KexecCProof Myproc BeginOp Namei Ilock Readi
 Module PD := ProofKexecD.KexecDProof PFP SS.
 
 (* ===================================================================== *)
-(*  PHASES C AND D, over phase B's output state -- ProofKexecPin's two     *)
-(*  relays verbatim (they are [Local] there, so they are re-stated here    *)
-(*  rather than shared; nothing in them is AU-specific).                   *)
+(*  PHASES C AND D, over phase B's output state -- two relays that name    *)
+(*  nothing of the abstract state.                                         *)
 (* ===================================================================== *)
 Section KexecAUTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -390,7 +388,7 @@ Section KexecAUExit.
   Notation ΓL := (FsBytesGamma.fs_gamma_L fsc_fs).
 
   (* [KexecOkQ.kexec_closer]'s resource rows with the ARMED POST in place
-     of the pure [kexec_ok_q] -- i.e. [SpecKexecAU.wp_kexec_au_frame]'s
+     of the pure [kexec_ok_q] -- i.e. [SpecKexecAU.wp_kexec_frame]'s
      own continuation, named so the two conversions below can quote it. *)
   Definition kxau_ret `{CID : CpuId}
       (ARMS : ustate -> mword 64 -> iProp Σ)
@@ -778,7 +776,7 @@ Section KexecAUMain.
 
   Notation ΓL := (FsBytesGamma.fs_gamma_L fsc_fs).
 
-  Lemma wp_kexec_au
+  Lemma wp_kexec_sconf
       (Sl : uvis -> iProp Σ)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -792,10 +790,10 @@ Section KexecAUMain.
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ) :
-    SpecKexecAU.wp_kexec_au_body Sl gs jp gl pd pav pu gf plen pfun na avf alen
+    SpecKexecAU.wp_kexec_sconf_body Sl gs jp gl pd pav pu gf plen pfun na avf alen
       aslen afun pidv U sts dqb dqs dqa dqpv dqas m K eb b lks P Pmiss Φo.
   Proof.
-    rewrite /SpecKexecAU.wp_kexec_au_body /SpecKexecAU.wp_kexec_au_frame.
+    rewrite /SpecKexecAU.wp_kexec_sconf_body /SpecKexecAU.wp_kexec_frame.
     intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0
            Hcovb Hiregb Hcstr Hplen Havf_nz Havf_na Hnamax
            Halen_b Halen_c Halen_4 Hjp Hgs.
@@ -859,7 +857,7 @@ Section KexecAUMain.
     destruct Hregs90 as (HM90sp & HM90s0 & HM90s1 & HM90s2 & HM90s4 & Hkf &
                          Hinumf & HM90thr).
     (* ---- THE EXIT, CONVERTED AT THE RECEIPT.  Below this line the file
-       is ProofKexecPin's composition on the nose, at
+       is the [Q]-generic composition on the nose, at
        [Q := exec_built_Q (kxc_fb datl dnf) ef ...]. ---- *)
     iDestruct (kxau_exit_conv (CIDx := CIDa) (proc_addr jp) _
                  (fun CID : CpuId =>
@@ -1007,4 +1005,4 @@ Section KexecAUMain.
 
 End KexecAUMain.
 
-End KexecAUProof.
+End KexecProof.

@@ -68,9 +68,9 @@ Require Import FirstTok.    (* [fs_extent_of_image] *)
    [FsImgCheck] is what the image MEANS as a file system.  [FsImgCheck] is
    ~120 s of [vm_compute] and used to be kept off this file's cone for that
    reason ([FsAdequacyImg.v], retired); it costs nothing on the critical
-   path, because it is already required by [NameiInitPinned] /
-   [ProofKexecPinnedA] / [SpecKexecPinned] and so is built long before this
-   file's own dependencies are ready. *)
+   path, because the era-0 pin files ([FsInitPin] / [FsInitPinBoot] /
+   [FsShPin]) already require it, so it is built long before this file's
+   own dependencies are ready. *)
 Require Import FsImgDisk.
 Require Import FsImgCheck.
 Require Import VirtioModel.  (* [v_disk] *)
