@@ -433,7 +433,10 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   use them).
 
 - ~~**EXEC-UNIFY**~~ LANDED 2026-09-08 (Opus lane; 16 files deleted, 4
-  renamed, net about 8,300 lines removed).  kexec and sys_exec each have
+  renamed, net about 8,300 lines removed; the change spans commits
+  `3366682cc` — the lane's pre-staged deletions/renames, swept into a
+  notes commit — and `4dca397a2`; the tree at `4dca397a2` is the gated
+  state).  kexec and sys_exec each have
   ONE contract: the AU statements are the seals `SpecKexecAU.KEXEC` /
   `SpecSysExecAU.SYSEXEC` (`wp_kexec_sconf`, `wp_sys_exec_sconf`; the
   bundle names `exec_au_pre`/`sys_exec_au_pre` kept); `SpecKexec.v` and
