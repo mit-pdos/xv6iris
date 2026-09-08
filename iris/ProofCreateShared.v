@@ -1871,7 +1871,7 @@ Section ProofCreateMain.
     pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE (cre_child tyz ma mi)) Fok -∗
     cre_arm_fired Farm i -∗
     ((∃ full : bool, cre_dots_fired Fdots i d full)
-     ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots) -∗
+     ∨ cre_dots_leg (fs_gamma_L fsc_fs) tyz Fdots) -∗
     cre_unarm_fired Fun i -∗
     cre_fail_arms (fs_gamma_L fsc_fs) γfs tyz ma mi P Pmiss
       Farm Fdots Fun Fok Fex pl.
@@ -1914,7 +1914,7 @@ Section ProofCreateMain.
     P (length (mknod_parent_elems pl)) d -∗
     cre_arm_fired Farm i -∗
     (cre_dots_fired Fdots i d true
-     ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots) -∗
+     ∨ cre_dots_leg (fs_gamma_L fsc_fs) tyz Fdots) -∗
     cre_acre_fired Fok d nm i (cre_child tyz ma mi d i) -∗
     pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
     pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
@@ -2871,7 +2871,7 @@ Section ProofCreateMain.
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
        pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
        cre_arm_fired Farm (bv_unsigned cinum) -∗
-       pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
+       cre_dots_leg (fs_gamma_L fsc_fs) (bv_unsigned ty) Fdots -∗
        pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
        pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
                 (cre_child (bv_unsigned ty) (bv_unsigned major)
@@ -3150,7 +3150,7 @@ Section ProofCreateMain.
        pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
        cre_arm_fired Farm (bv_unsigned cinum) -∗
        ((∃ full : bool, cre_dots_fired Fdots (bv_unsigned cinum) (bv_unsigned dind) full)
-        ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots) -∗
+        ∨ cre_dots_leg (fs_gamma_L fsc_fs) (bv_unsigned ty) Fdots) -∗
        pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
        pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
                 (cre_child (bv_unsigned ty) (bv_unsigned major)

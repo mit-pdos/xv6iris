@@ -156,7 +156,9 @@
              int against O_RDONLY, not a bit -- so the fragment is
              [FdOpen true false (FdInode i)].
    ret = fd, CREATE side: FRESH (the fused delta fired at the entry write;
-   [cre_pre] restated purely; unfired commits refunded) or EXISTS-OPENS
+   [cre_pre] restated purely; the terminal observation refunded and the
+   TRUNC receipt delivered at the empty child iff O_TRUNC -- see
+   [open_post_ok_create]) or EXISTS-OPENS
    (the exists observation fired, then the terminal observation on the
    FOUND node -- an [AFile] or [ADev] split, never [ADir], per F-OK).
    ret = -1 -- residue returned per arm; the value does not say which arm
@@ -572,8 +574,9 @@ Section SysOpenArms.
   (* ------------------------------------------------------------------ *)
 
   (* ret = fd: FRESH (the fused delta fired at the entry write; the
-     terminal observation and the trunc commit refunded -- the child is
-     [AFile []] and itrunc's delta is the identity) or EXISTS-OPENS (the
+     terminal observation refunded, the TRUNC COMMIT FIRED at the empty
+     child iff O_TRUNC -- itrunc's delta is the identity there, which is
+     why the caller pays nothing for it) or EXISTS-OPENS (the
      exists observation fired at the parent, then the terminal
      observation on the FOUND node -- [AFile] or [ADev] only, per
      SpecCreate's F-OK) *)
@@ -595,7 +598,22 @@ Section SysOpenArms.
            Fok.(pf_recv) av d nm i ∗
            pf_at (dlookup_commit_at Γ appE) Fex ∗
            pf_at (aopen_commit_at Γ appE) Fo ∗
-           pf_at (atrunc_commit_at Γ appE) Ft ∗
+           (* THE TRUNC COMMIT FIRES ON THIS ARM TOO, at the empty child.
+              It used to be REFUNDED here and the kernel ran its own
+              throw-away commit over the [itrunc] instead -- a piece it had
+              to conjure, and the last thing in the tree whose
+              [AppInv.app_step] could only come from the application's
+              parked license.  The honest reading is that the code really
+              does truncate (the fresh child is a [T_FILE], so the
+              [(omode & O_TRUNC) && ip->type == T_FILE] test decides on the
+              mode bit alone), and the delta is the IDENTITY because the
+              child is [AFile []] -- so the caller's own piece fires and its
+              receipt comes back at the empty byte list. *)
+           (if om_trunc vom
+            then ∃ (av' : aview) (nl' : nat),
+                   ⌜arow_at av' i (MkAnode (AFile []) nl')⌝ ∗
+                   Ft.(pf_recv) av' i []
+            else pf_at (atrunc_commit_at Γ appE) Ft) ∗
            (* the child's row APPEARED at this inum; the unarm comes home
               (round E2, lane E2-C) *)
            cre_arm_fired Farm i

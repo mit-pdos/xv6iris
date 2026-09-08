@@ -1703,18 +1703,15 @@ Section ProofSysMknodBody.
            iDestruct (np_start_of_mknod fsc_fs (pv_cwi (us_V U)) P Pmiss (bview pk bf)
                         with "Hwp") as "Htr".
            (* THE BUNDLE AT THE DEVICE TYPE ([SpecCreate.cre_commits_of_dev]):
-              mknod's caller owes no DOTS leg -- at [T_DEVICE] the [beq
-              s4,a4] at +0xca is never taken -- so the one create asks for
-              is discharged here, at its own unit, off the region's copy of
-              the application invariant. *)
-           iAssert (pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE)
-                      (pfam_triv (fun _ _ _ _ => True%I))) as "Hdots".
-           { iApply SpecCreate.cre_dots_unit.
-             iApply (InodeRegion.ireg_inv_app with "Hireg"). }
+              mknod's caller owes no DOTS leg AND NEITHER DOES THIS PROOF --
+              at [T_DEVICE] the [beq s4,a4] at +0xca is never taken, and
+              create's dots leg is guarded on exactly that test
+              ([SpecCreate.cre_dots_leg]), so the builder produces it out of
+              the type inequality and nothing has to be manufactured here. *)
            iDestruct (cre_commits_of_dev (fs_gamma_L fsc_fs)
                         (bv_unsigned (hw_lo (arg_int32 v1)))
                         (bv_unsigned (hw_lo (arg_int32 v2)))
-                        Farm Fun Fok with "Hacre Hdots Hchild") as "Hcre".
+                        Farm Fun Fok with "Hacre Hchild") as "Hcre".
            iApply (Create.wp_create_sconf (CID := CID25) gs j gl pd pav pu
       gf
       pk bf

@@ -287,10 +287,10 @@ Section SysLinkAbs.
   (* INSTANT 1 -- the target row, two-phase at the raw map
      ([FsAbsCreateFire.acre_commit_at_gen]'s mold: phase 1 observes the
      pre-state, phase 2 witnesses the delta applied and pays the receipt).
-     [is_Some (I !! t)] is what lets the generic discharger pay the step
-     off the parked license ([AppInv.app_step_acc]) although the VIEW may
-     have no row at [t]: the target's inum is a region row, and the fire
-     reads that off [ghost_map_lookup] at the instant. *)
+     [is_Some (I !! t)] is the MOVER's premise: the target's inum is a
+     region row, and the fire reads that off [ghost_map_lookup] at the
+     instant.  The generic discharger's step comes off the supply, which
+     holds of every view ([AppInv.app_step_acc]). *)
   Definition ltgt_commit_at Γ (E : coPset)
       (Φ : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (t : Z) (a : anode),
@@ -330,28 +330,22 @@ Section SysLinkAbs.
   (*  Satisfiability: the [_unit] dischargers                            *)
   (* ------------------------------------------------------------------ *)
 
-  Lemma link_appN_appE : ↑appN ⊆ appE.
-  Proof. rewrite /appE. done. Qed.
-
   Lemma ltgt_commit_at_unit (γfs : fs_names) E :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ ltgt_commit_at (fs_gamma_L γfs) E (fun _ _ _ => True%I).
+    app_sup -∗ ltgt_commit_at (fs_gamma_L γfs) E (fun _ _ _ => True%I).
   Proof.
-    iIntros (HE) "#Hai". rewrite /ltgt_commit_at.
+    iIntros "#Hsup". rewrite /ltgt_commit_at.
     iIntros (I t a) "%Hrow %Hok %Hsome Ha".
-    iMod (app_step_acc E γfs t I _ HE Hsome with "Hai") as "Hstep".
+    iDestruct (app_step_acc t I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
 
   Lemma lent_commit_at_unit (γfs : fs_names) E :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ lent_commit_at (fs_gamma_L γfs) E (fun _ _ _ _ => True%I).
+    app_sup -∗ lent_commit_at (fs_gamma_L γfs) E (fun _ _ _ _ => True%I).
   Proof.
-    iIntros (HE) "#Hai". rewrite /lent_commit_at.
+    iIntros "#Hsup". rewrite /lent_commit_at.
     iIntros (I d t nm ents nl) "%Hd %Hnm Ha".
-    iMod (app_step_acc E γfs d I _ HE
-            (abs_view_lookup_is_Some I d _ Hd) with "Hai") as "Hstep".
+    iDestruct (app_step_acc d I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
@@ -368,20 +362,20 @@ Section SysLinkAbs.
      ∗ pf_at (utgt_commit_at Γ appE) Funt)%I.
 
   (* the whole bundle at the trivial families -- what the dispatcher hands
-     down ([FsAbsInvFire.fsabs_link_pre] is this beside [app_inv]) *)
+     down ([FsAbsInvFire.fsabs_link_pre] is this beside the supply) *)
   Lemma link_commits_unit (γfs : fs_names) :
-    app_inv γfs -∗
+    app_sup -∗
     link_commits (fs_gamma_L γfs) (pfam_triv (fun _ _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ => True%I)).
   Proof.
-    iIntros "#Hai". rewrite /link_commits.
+    iIntros "#Hsup". rewrite /link_commits.
     iSplitR.
     { iApply pf_at_triv.
-      iApply (ltgt_commit_at_unit γfs appE link_appN_appE with "Hai"). }
+      iApply (ltgt_commit_at_unit γfs appE with "Hsup"). }
     iSplitR.
     { iApply pf_at_triv.
-      iApply (lent_commit_at_unit γfs appE link_appN_appE with "Hai"). }
+      iApply (lent_commit_at_unit γfs appE with "Hsup"). }
     iApply pf_at_triv.
-    iApply (utgt_commit_at_unit γfs appE link_appN_appE with "Hai").
+    iApply (utgt_commit_at_unit γfs appE with "Hsup").
   Qed.
 
   (* each receipt with its instant's pure facts restated beside the

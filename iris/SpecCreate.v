@@ -360,6 +360,7 @@ Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ                *)
 Require Import AppInv.           (* [appE]: the commit mask                 *)
 Require Import FsTree.           (* [fname]: the entry names the receipts carry *)
 Require Import PathElems.        (* [path_elems]: the walk's hop names       *)
+Require Import DirView.          (* [T_DIR_z] -- the dots leg's guard *)
 Require Import FsAbsCreateFire.  (* the legs' commits and receipts, the type
                                     literals and [create_made]              *)
 Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix  *)
@@ -542,6 +543,48 @@ Section CreateSpec.
   (*  receipts come back in the post, each with its instant's row facts.  *)
   (* ------------------------------------------------------------------ *)
 
+  (* ------------------------------------------------------------------ *)
+  (*  THE DOTS LEG IS GUARDED BY THE TYPE.                                *)
+  (*                                                                      *)
+  (*  Only a DIRECTORY gets dots: the [beq s4,a4] at +0xca is taken        *)
+  (*  exactly on [type == T_DIR], and at any other type create's dots      *)
+  (*  commit can never fire.  So the contract does not ask a caller at     *)
+  (*  another type for one -- a caller owes nothing for a move its call    *)
+  (*  cannot make, and that is the contract's honesty, not a convenience.  *)
+  (*  Before the guard, mknod's and open(O_CREATE)'s provers had to         *)
+  (*  MANUFACTURE a dots piece for a leg they knew was dead, and the only   *)
+  (*  thing they could pay its [AppInv.app_step] from was the parked        *)
+  (*  license -- which is what kept the license alive after every other     *)
+  (*  fire moved to the deposit or the supply.                              *)
+  (*                                                                      *)
+  (*  It is ONE definition rather than the implication spelled at each of   *)
+  (*  its five occurrences (the bundle, and the unfired-return position in  *)
+  (*  each arm) so that a proof that merely PASSES the leg on -- which is   *)
+  (*  almost all of them -- treats it as one atom.                          *)
+  (* ------------------------------------------------------------------ *)
+  Definition cre_dots_leg (Γ : fs_view_names Σ) (tyz : Z)
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ)) : iProp Σ :=
+    (⌜tyz = T_DIR_z⌝ -∗ pf_at (adots_commit_at Γ appE) Fdots)%I.
+
+  (* a caller that HAS the piece owes the leg *)
+  Lemma cre_dots_leg_of (Γ : fs_view_names Σ) (tyz : Z)
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ)) :
+    pf_at (adots_commit_at Γ appE) Fdots -∗ cre_dots_leg Γ tyz Fdots.
+  Proof. iIntros "H" (_). iExact "H". Qed.
+
+  (* ...and create reads the piece back out where the branch is taken *)
+  Lemma cre_dots_leg_at (Γ : fs_view_names Σ) (tyz : Z)
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ)) :
+    tyz = T_DIR_z ->
+    cre_dots_leg Γ tyz Fdots -∗ pf_at (adots_commit_at Γ appE) Fdots.
+  Proof. intros Hty. iIntros "H". iApply ("H" $! Hty). Qed.
+
+  (* THE POINT: at any other type the leg is free *)
+  Lemma cre_dots_leg_nodir (Γ : fs_view_names Σ) (tyz : Z)
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ)) :
+    tyz <> T_DIR_z -> ⊢ cre_dots_leg Γ tyz Fdots.
+  Proof. intros Hne. iIntros (Hty). exfalso. exact (Hne Hty). Qed.
+
   (* the four commits, at the child's type-indexed content *)
   Definition cre_commits (Γ : fs_view_names Σ) (tyz ma mi : Z)
       (Farm : pfam Σ (aview -> Z -> iProp Σ))
@@ -549,37 +592,34 @@ Section CreateSpec.
       (Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (pf_at (aarm_commit_at Γ appE (cre_c0 tyz ma mi)) Farm
-     ∗ pf_at (adots_commit_at Γ appE) Fdots
+     ∗ cre_dots_leg Γ tyz Fdots
      ∗ pf_at (aunarm_commit_at Γ appE) Fun
      ∗ pf_at (acre_commit_at_gen Γ appE (cre_child tyz ma mi)) Fok)%I.
 
   (* SATISFIABILITY, and the discharger every caller of the landed create
      hands down: the GENERIC application asks nothing of create's legs, so
      every commit is its own unit and the whole bundle is paid off the
-     parked license ([AppInv.app_step_acc], through [FsAbsCreateFire]'s
-     four [_unit]s).  It sits here rather than in [FsAbsInvFire]'s
+     SUPPLY ([AppInv.app_step_acc], through [FsAbsCreateFire]'s four
+     [_unit]s).  It sits here rather than in [FsAbsInvFire]'s
      [fsabs_*] family because [ProofSysMkdir], one of its consumers, is
      BELOW that file in the cone. *)
-  Local Lemma cre_appN_appE : ↑appN ⊆ appE.
-  Proof. rewrite /appE. done. Qed.
-
   Lemma cre_commits_unit (γfs : fs_names) (tyz ma mi : Z) :
-    app_inv γfs -∗
+    app_sup -∗
     cre_commits (fs_gamma_L γfs) tyz ma mi (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I))
       (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)).
   Proof.
-    iIntros "#Hai". rewrite /cre_commits.
+    iIntros "#Hsup". rewrite /cre_commits.
     iSplitR.
     { iApply pf_at_triv.
-      iApply (aarm_commit_at_unit γfs appE _ cre_appN_appE with "Hai"). }
+      iApply (aarm_commit_at_unit γfs appE _ with "Hsup"). }
+    iSplitR.
+    { iApply cre_dots_leg_of. iApply pf_at_triv.
+      iApply (adots_commit_at_unit γfs appE with "Hsup"). }
     iSplitR.
     { iApply pf_at_triv.
-      iApply (adots_commit_at_unit γfs appE cre_appN_appE with "Hai"). }
-    iSplitR.
-    { iApply pf_at_triv.
-      iApply (aunarm_commit_at_unit γfs appE cre_appN_appE with "Hai"). }
+      iApply (aunarm_commit_at_unit γfs appE with "Hsup"). }
     iApply pf_at_triv.
-    iApply (acre_commit_at_gen_unit γfs appE _ cre_appN_appE with "Hai").
+    iApply (acre_commit_at_gen_unit γfs appE _ with "Hsup").
   Qed.
 
   (* ARM C-OK / F-OK, keyed on [made].  Both success arms ran nameiparent,
@@ -602,7 +642,7 @@ Section CreateSpec.
        ∗ P (length (mknod_parent_elems pl)) d
        ∗ (if made
           then cre_arm_fired Farm i
-               ∗ (cre_dots_fired Fdots i d true ∨ pf_at (adots_commit_at Γ appE) Fdots)
+               ∗ (cre_dots_fired Fdots i d true ∨ cre_dots_leg Γ tyz Fdots)
                ∗ cre_acre_fired Fok d nm i (cre_child tyz ma mi d i)
                ∗ pf_at (aunarm_commit_at Γ appE) Fun
                ∗ pf_at (dlookup_commit_at Γ appE) Fex
@@ -636,12 +676,12 @@ Section CreateSpec.
              ∨ pf_at (dlookup_commit_at Γ appE) Fex)
           ∗ pf_at (acre_commit_at_gen Γ appE (cre_child tyz ma mi)) Fok
           ∗ ((pf_at (aarm_commit_at Γ appE (cre_c0 tyz ma mi)) Farm
-                ∗ pf_at (adots_commit_at Γ appE) Fdots
+                ∗ cre_dots_leg Γ tyz Fdots
                 ∗ pf_at (aunarm_commit_at Γ appE) Fun)
              ∨ (∃ i : Z,
                   cre_arm_fired Farm i
                   ∗ ((∃ full : bool, cre_dots_fired Fdots i d full)
-                     ∨ pf_at (adots_commit_at Γ appE) Fdots)
+                     ∨ cre_dots_leg Γ tyz Fdots)
                   ∗ cre_unarm_fired Fun i))))%I.
 
   (* ------------------------------------------------------------------ *)
@@ -727,29 +767,25 @@ Section CreateSpec.
   (*  THE BUNDLE, ASSEMBLED AT A PINNED TYPE                              *)
   (*                                                                      *)
   (*  A type-pinned caller holds the child's content as a CONSTANT and    *)
-  (*  owes no dots leg -- at a device or a file the [beq s4,a4] at +0xca   *)
-  (*  is never taken, so the dots commit it hands in is its own unit.     *)
-  (*  These two turn what such a caller has into what create asks for.    *)
+  (*  OWES NO DOTS LEG AT ALL -- at a device or a file the [beq s4,a4] at  *)
+  (*  +0xca is never taken, and [cre_dots_leg] is guarded on exactly that  *)
+  (*  test, so these two produce it out of the type inequality and take    *)
+  (*  no dots piece from anyone.                                          *)
   (* ------------------------------------------------------------------ *)
-
-  Lemma cre_dots_unit (γfs : fs_names) :
-    app_inv γfs -∗
-    pf_at (adots_commit_at (fs_gamma_L γfs) appE) (pfam_triv (fun _ _ _ _ => True%I)).
-  Proof.
-    iIntros "#Hai". iApply pf_at_triv.
-    iApply (adots_commit_at_unit γfs appE cre_appN_appE with "Hai").
-  Qed.
 
   Lemma cre_commits_of_dev (Γ : fs_view_names Σ) (ma mi : Z)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok -∗
-    pf_at (adots_commit_at Γ appE) (pfam_triv (fun _ _ _ _ => True%I)) -∗
     cre_child_unfired Γ (ADev ma mi) Farm Fun -∗
     cre_commits Γ (bv_unsigned T_DEVICE) ma mi Farm (pfam_triv (fun _ _ _ _ => True%I)) Fun Fok.
   Proof.
     rewrite /cre_commits /cre_child_unfired (cre_c0_dev ma mi).
-    iIntros "Hac Hd [Ha Hu]". iFrame "Ha Hd Hu".
+    iIntros "Hac [Ha Hu]".
+    iDestruct (cre_dots_leg_nodir Γ (bv_unsigned T_DEVICE)
+                 (pfam_triv (fun _ _ _ _ => True%I))
+                 ltac:(rewrite T_DEVICE_value /T_DIR_z; lia)) as "Hd".
+    iFrame "Ha Hd Hu".
     (* THE MOVER RIDES THE PAIR: [acre_commit_at_gen_ext] is stated on the
        AU side alone, and [refund_mono] lifts it over the conjunction. *)
     iApply (pf_at_mono with "[] Hac"). iIntros "Hac".
@@ -762,12 +798,15 @@ Section CreateSpec.
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     pf_at (acre_commit_at Γ appE (AFile [])) Fok -∗
-    pf_at (adots_commit_at Γ appE) (pfam_triv (fun _ _ _ _ => True%I)) -∗
     cre_child_unfired Γ (AFile []) Farm Fun -∗
     cre_commits Γ (bv_unsigned T_FILE) ma mi Farm (pfam_triv (fun _ _ _ _ => True%I)) Fun Fok.
   Proof.
     rewrite /cre_commits /cre_child_unfired (cre_c0_file ma mi).
-    iIntros "Hac Hd [Ha Hu]". iFrame "Ha Hd Hu".
+    iIntros "Hac [Ha Hu]".
+    iDestruct (cre_dots_leg_nodir Γ (bv_unsigned T_FILE)
+                 (pfam_triv (fun _ _ _ _ => True%I))
+                 ltac:(rewrite T_FILE_value /T_DIR_z; lia)) as "Hd".
+    iFrame "Ha Hd Hu".
     iApply (pf_at_mono with "[] Hac"). iIntros "Hac".
     iApply (acre_commit_at_gen_ext Γ appE (fun _ _ => AFile [])
               (cre_child (bv_unsigned T_FILE) ma mi) Fok.(pf_recv)

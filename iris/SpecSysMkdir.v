@@ -160,7 +160,7 @@ Require Import SpecCreate.      (* [create_slots], [create_units], [K_create],
                                    two receipt arms [cre_ok_arms] /
                                    [cre_fail_arms], and their units *)
 Require Import FsBlocks.        (* [fs_names] *)
-Require Import AppInv.          (* [appE], [app_inv] *)
+Require Import AppInv.          (* [appE], [app_sup] *)
 Require Import PathElems.       (* [path_elems] *)
 Require Import FsAbsEra.        (* [ep_start_triv] *)
 Require Import FsAbsMknodFire.  (* [mknod_walk_pre_era], the walk premise *)
@@ -234,24 +234,24 @@ Definition mkdir_au_pre
 (* SATISFIABILITY, and what the dispatcher and the friendly packaging hand
    down: the generic application asks nothing of mkdir's walk or its legs,
    so every hop says yes, every cursor is [True] and every commit is its own
-   unit, paid off the parked license.  It sits here rather than in
+   unit, paid off the SUPPLY.  It sits here rather than in
    [FsAbsInvFire]'s [fsabs_*] family because both consumers reach this file
    and only one of them reaches that one. *)
 Lemma mkdir_au_pre_unit
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (γfs : fs_names) (cw : Z) :
-  app_inv γfs -∗
+  app_sup -∗
   mkdir_au_pre (fs_gamma_L γfs) γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
     (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I))
     (pfam_triv (fun _ _ _ _ => True%I)).
 Proof.
-  iIntros "#Hai". rewrite /mkdir_au_pre.
+  iIntros "#Hsup". rewrite /mkdir_au_pre.
   iSplitR.
   { rewrite /mknod_walk_pre_era. iIntros (pl r) "_". iModIntro.
     iSplit; [done |]. iApply ax_hops_triv. }
   iSplitR; [iApply cre_dlookup_unit |].
-  iApply (cre_commits_unit γfs with "Hai").
+  iApply (cre_commits_unit γfs with "Hsup").
 Qed.
 
 Definition mkdir_arms

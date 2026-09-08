@@ -389,7 +389,9 @@ Require Import SpecFilestat.
 Require Import BioInv.
 Require Import FsReady FsCfg.
 Require Import FirstTok.  (* [first_done] -- syscall_env's last conjunct *)
-Require Import SyscParkEnv.  (* [sysc_park_extra] -- what the producer below takes *)
+Require Import SyscParkEnv.  (* [sysc_park_extra] -- what the producer below takes;
+                                [park_world_sup] -- the supply, off the world *)
+Require Import AppInv.       (* [app_sup] -- the credential the fs arms pay with *)
 Require Import ParkCap.      (* [park_token] -- the park, handed down through [syscall_env] *)
 Require Import SpecSyscall.
 (* THE EXEC CHANNEL (lane E2): the AU contract the exec arm runs on when the
@@ -1058,6 +1060,17 @@ Section SyscallVocab.
  (fn : fclose_names) :
     syscall_env γf pj fn -∗ park_token (fcn_procs fn).
   Proof. by iIntros "(_ & _ & _ & _ & _ & $)". Qed.
+
+  (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]), off the world a
+     child's park needs -- which is where it rides ([SyscParkEnv.park_world],
+     whose note says why).  It is what the fs arms below pay the write-kind
+     commits' [AppInv.app_step] with while the process deposits nothing. *)
+  Lemma syscall_env_sup (γf : gname) (pj : mword 64) (fn : fclose_names) :
+    syscall_env γf pj fn -∗ app_sup.
+  Proof.
+    iIntros "H". iApply SyscParkEnv.park_world_sup.
+    iApply (syscall_env_world with "H").
+  Qed.
 
   (* ...and the OLD shape, as a projection.  Same reason [sysc_fs_env_all]
      keeps its order: an arm's [iDestruct] pattern is an interface, and
@@ -4442,11 +4455,11 @@ Section SyscallArms.
 
        THE APPLICATION'S PER-CHUNK STEP IS NOT MINTED HERE: filewrite's
        FD_INODE arm pays its row retag out of the chain's own node. *)
-    iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
+    iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
     iApply fupd_wp.
     iMod (fsabs_sys_write_in ⊤
             (us_V U) v0 sts (sys_rw_count v2) (us_M U) v1
-            ltac:(solve_ndisj) with "Hfsabs") as "Hswin".
+            with "Hsup") as "Hswin".
     iModIntro.
     iApply (SysWrite.wp_sys_write_sconf γf γs j γl
               (sysc_fwrite_names γtxl γs j γl fn)
@@ -4768,7 +4781,6 @@ Section SyscallArms.
     (* THE ONE CONTRACT, at the trivial bundle
        ([FsAbsInvFire.fsabs_chdir_pre]); the blanket post is read back off
        the arms ([chdir_arms_landed]) and the tail below consumes it. *)
-    iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
     iApply (SysChdir.wp_sys_chdir γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 pid U M (av - 4)%nat true true ∅
@@ -4909,7 +4921,7 @@ Section SyscallArms.
     (* THE ONE CONTRACT, at the trivial bundle
        ([FsAbsInvFire.fsabs_unlink_pre]); the return blanket is read back
        off the arms ([unlink_arms_ret]). *)
-    iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
+    iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
     iApply (SysUnlink.wp_sys_unlink γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded DfracDiscarded v0 pid U M
@@ -4925,7 +4937,7 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hiru Hpriv []").
-    { iApply (fsabs_unlink_pre with "Hfsabs"). }
+    { iApply (fsabs_unlink_pre with "Hsup"). }
     iIntros (CIDy Hsy mf P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv Harms".
     iDestruct (unlink_arms_ret with "Harms") as %Hrv.
@@ -5015,7 +5027,7 @@ Section SyscallArms.
     (* the three commits link's legs fire, at the trivial bundle
        ([FsAbsInvFire.fsabs_link_pre]); the landed return blanket is still
        stated purely beside the arms (round E2, lane E2-L). *)
-    iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
+    iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
     iApply (SysLink.wp_sys_link_sconf γf γs j γl
 
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
@@ -5033,7 +5045,7 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hirl Hpriv []").
-    { iApply (fsabs_link_pre with "Hfsabs"). }
+    { iApply (fsabs_link_pre with "Hsup"). }
     iIntros (CIDy Hsy mf P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv _".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
@@ -5589,7 +5601,7 @@ Section SyscallArms.
               (* THE APPLICATION'S SIDE: the generic app asks nothing of
                  mkdir's walk or create's legs, so every family is [True]
                  and the bundle is [SpecSysMkdir.mkdir_au_pre_unit] off the
-                 parked license -- the same shape unlink's and mknod's arms
+                 SUPPLY -- the same shape unlink's and mknod's arms
                  use ([FsAbsInvFire.fsabs_*]).  The receipts come back at
                  [True] and are dropped. *)
               (fun _ _ => True)%I (fun _ _ => True)%I
@@ -5605,8 +5617,8 @@ Section SyscallArms.
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv
                     []").
-    { iApply SpecSysMkdir.mkdir_au_pre_unit.
-      iApply (InodeRegion.ireg_inv_app with "Hireg"). }
+    { iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
+      iApply (SpecSysMkdir.mkdir_au_pre_unit with "Hsup"). }
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0 _".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
@@ -5709,7 +5721,7 @@ Section SyscallArms.
        commits discharged out of the abstract-state invariant
        ([FsAbsInvFire.fsabs_mknod_pre]); the return blanket is read back
        off the arms ([mknod_arms_ret]). *)
-    iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
+    iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
     iApply (SysMknod.wp_sys_mknod γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
@@ -5725,7 +5737,7 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv []").
-    { iApply (fsabs_mknod_pre with "Hfsabs"). }
+    { iApply (fsabs_mknod_pre with "Hsup"). }
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv Harms".
     iDestruct (mknod_arms_ret with "Harms") as %Hret0.
@@ -5847,7 +5859,7 @@ Section SyscallArms.
        hands the trivial input ([FsAbsInvFire.fsabs_open_in]) and reads the
        landed [sys_open_post] back off the arms
        ([SpecSysOpen.open_arms_landed]). *)
-    iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
+    iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
     iAssert (wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (ns' : nat) (P' : uptd),
         ⌜callee_saved M mf⌝ -∗
@@ -5888,7 +5900,7 @@ Section SyscallArms.
                       Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
                       Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
                       Hfd0 Hpriv Hufrag []").
-      { iApply (fsabs_open_in with "Hfsabs"). }
+      { iApply (fsabs_open_in with "Hsup"). }
       iIntros (CIDy Hsy mf ns' P')
         "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
       iDestruct (open_arms_landed with "Harms") as "Hpost".

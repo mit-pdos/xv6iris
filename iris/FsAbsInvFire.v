@@ -18,19 +18,18 @@
 
    THE STEP, AND WHERE A CLIENT THAT KNOWS NOTHING GETS IT.  A write-kind
    shape owes [AppInv.app_step]: "the application's claim about the
-   pre-view survives the delta" (app-instances.md section 7).  At an
-   arbitrary application record nothing is trivial -- and nothing has to
-   be: the application PARKS a license in its own invariant
-   ([AppInv.app_auto], the BLANKET PROMISE that its claim survives every
-   one-row move), and a commit fires at [appE] with that invariant closed,
-   so the discharger opens it INSIDE its own fupd, reads the license
-   [▷]-shaped and persistent ([app_step_acc]) and pays.  It is the ONLY
-   thing the license is still spent on: every view move on a dispatched path
-   is an AU fire or a [_step], and the two movers outside a fire are
-   [_same].  What changes in lane L2 is only WHO pays -- the process's
-   payload, per syscall -- and the shapes do not move.  So every discharger below takes
-   [AppInv.app_inv] and NO invariant of its own: the client copy this file
-   used to re-sync ([FsAbsInv], deleted) is gone with its license.
+   pre-view survives the delta" (app-instances.md section 7).  A client that
+   answers for NO abstract state pays it out of [AppInv.app_sup], the
+   SUPPLY: the application's claim held of every view, which is exactly what
+   makes every delta free ([AppInv.app_step_acc], one line, no side
+   condition).  So every write-kind discharger below takes the supply -- a
+   PERSISTENT CREDENTIAL, born at boot and carried down the trap round -- and
+   NO invariant at all: it opens nothing, and it needs neither the row to
+   exist nor the mask to admit [appN].  A VERIFIED program pays the same
+   [app_step] from its own deposit instead, at its own families; these
+   lemmas are what the DISPATCHER hands the contracts in the meantime, and
+   what the deposit class's supply law is proved from
+   ([UexecExecInst]).
 
    THE MASK.  Every commit is at [appE] = [↑appN] ([AppInv]'s note).  The
    read/write dischargers open NOTHING of their own: the offset shadow is
@@ -90,7 +89,7 @@ Require Import SpecSysLink.        (* [link_commits] (round E2, lane E2-L) *)
 Require Import FsAbsReadFire.      (* [aread_commit_at] *)
 Require Import FsAbsWriteFire.     (* [awrite_full_at], [awrite_chain] *)
 Require Import OffGv.              (* [off_user_inv]: the row the FIRE moves *)
-Require Import AppInv.             (* [app_inv], [appN]/[appE], [app_step_acc]: the parked license *)
+Require Import AppInv.             (* [appN]/[appE], [app_sup], [app_step_acc]: the supply and the step it pays *)
 Require Import FsAbsDefs.          (* [abs_view_lookup_is_Some] *)
 Require Import FsCfg.              (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import ConsoleInv.         (* [devsw_write_val_console]: the cell's pin *)
@@ -163,56 +162,53 @@ Section FsAbsInvFire.
     iModIntro. by iFrame "Ha".
   Qed.
 
-  (* the write-kind commits owe the step: paid out of the parked license,
-     read off the application's invariant inside the commit's own fupd *)
-  Lemma appN_appE : ↑appN ⊆ appE.
-  Proof. rewrite /appE. done. Qed.
-
+  (* the write-kind commits owe the step: paid out of the SUPPLY, the
+     credential a client that answers for no abstract state runs on *)
   Lemma fsabs_atrunc (γfs : fs_names) :
-    app_inv γfs -∗
+    app_sup -∗
     pf_at (atrunc_commit_at (fs_gamma_L γfs) appE) (pfam_triv (fun _ _ _ => True%I)).
   Proof.
-    iIntros "#Hai". iApply pf_at_triv.
-    iApply (atrunc_commit_at_unit γfs appE appN_appE with "Hai").
+    iIntros "#Hsup". iApply pf_at_triv.
+    iApply (atrunc_commit_at_unit γfs appE with "Hsup").
   Qed.
 
   Lemma fsabs_acre (γfs : fs_names) (c : absnode) :
-    app_inv γfs -∗
+    app_sup -∗
     pf_at (acre_commit_at (fs_gamma_L γfs) appE c) (pfam_triv (fun _ _ _ _ => True%I)).
   Proof.
-    iIntros "#Hai". iApply pf_at_triv.
-    iApply (acre_commit_at_unit γfs appE c appN_appE with "Hai").
+    iIntros "#Hsup". iApply pf_at_triv.
+    iApply (acre_commit_at_unit γfs appE c with "Hsup").
   Qed.
 
   (* CREATE'S CHILD LEGS (round E2, lane E2-C): the arm and the unarm, both
      unfired, at the trivial families -- what the dispatcher's mknod and
      open(O_CREATE) arms hand the AU create. *)
   Lemma fsabs_child (γfs : fs_names) (c : absnode) :
-    app_inv γfs -∗
+    app_sup -∗
     cre_child_unfired (fs_gamma_L γfs) c (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I)).
   Proof.
-    iIntros "#Hai". rewrite /cre_child_unfired.
+    iIntros "#Hsup". rewrite /cre_child_unfired.
     iSplitR.
     { iApply pf_at_triv.
-      iApply (aarm_commit_at_unit γfs appE c appN_appE with "Hai"). }
+      iApply (aarm_commit_at_unit γfs appE c with "Hsup"). }
     iApply pf_at_triv.
-    iApply (aunarm_commit_at_unit γfs appE appN_appE with "Hai").
+    iApply (aunarm_commit_at_unit γfs appE with "Hsup").
   Qed.
 
   Lemma fsabs_uent (γfs : fs_names) :
-    app_inv γfs -∗
+    app_sup -∗
     pf_at (uent_commit_at (fs_gamma_L γfs) appE) (pfam_triv (fun _ _ _ _ => True%I)).
   Proof.
-    iIntros "#Hai". iApply pf_at_triv.
-    iApply (uent_commit_at_unit γfs appE appN_appE with "Hai").
+    iIntros "#Hsup". iApply pf_at_triv.
+    iApply (uent_commit_at_unit γfs appE with "Hsup").
   Qed.
 
   Lemma fsabs_utgt (γfs : fs_names) :
-    app_inv γfs -∗
+    app_sup -∗
     pf_at (utgt_commit_at (fs_gamma_L γfs) appE) (pfam_triv (fun _ _ => True%I)).
   Proof.
-    iIntros "#Hai". iApply pf_at_triv.
-    iApply (utgt_commit_at_unit γfs appE appN_appE with "Hai").
+    iIntros "#Hsup". iApply pf_at_triv.
+    iApply (utgt_commit_at_unit γfs appE with "Hsup").
   Qed.
 
   (* THE READ AND WRITE COMMITS LEND THE OFFSET TOO (OffGv.v), AND TAKE IT
@@ -236,11 +232,11 @@ Section FsAbsInvFire.
 
   Lemma fsabs_awrite_chain (γfs : fs_names) (i : Z) (γo : gname)
       (M : gmap Z (bv 8)) (ua : mword 64) (k cnt : nat) :
-    app_inv γfs -∗
+    app_sup -∗
     awrite_chain (fs_gamma_L γfs) appE i γo M ua (fun _ => True%I) k cnt.
   Proof.
-    iIntros "#Hai".
-    iApply (awrite_chain_unit γfs appE i γo M ua k cnt appN_appE with "Hai").
+    iIntros "#Hsup".
+    iApply (awrite_chain_unit γfs appE i γo M ua k cnt with "Hsup").
   Qed.
 
   (* SYS_READ'S WHOLE INPUT, at the trivial receipt and the trivial refund
@@ -282,11 +278,10 @@ Section FsAbsInvFire.
   Lemma fsabs_sys_write_in (E : coPset)
       (V : pprivate) (v : mword 64) (sts : list fdstate) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64) :
-    ↑appN ⊆ E ->
-    app_inv fsc_fs ={E}=∗
+    app_sup ={E}=∗
       sys_write_in V v sts n M ua (fun _ => True%I) [].
   Proof.
-    intros HE. iIntros "#Hai".
+    iIntros "#Hsup".
     rewrite /sys_write_in /filewrite_in.
     destruct (sys_fd_st v (pv_ofile V) sts) as [| rb wb ty] eqn:Hst;
       [by iModIntro |].
@@ -294,7 +289,7 @@ Section FsAbsInvFire.
     destruct ty as [i γo | | ma].
     - iModIntro.
       iApply (fsabs_awrite_chain fsc_fs i γo M ua 0%nat (wchunks n)
-                with "Hai").
+                with "Hsup").
     - by iModIntro.
     - case_decide as Hc; [| by iModIntro].
       iMod (uart_sent_nil fsc_uart) as "#Hseed". iModIntro. iExact "Hseed".
@@ -305,13 +300,13 @@ Section FsAbsInvFire.
   (* ------------------------------------------------------------------ *)
 
   Lemma fsabs_open_pre_plain (γfs : fs_names) (cw : Z) :
-    app_inv γfs -∗
+    app_sup -∗
     open_au_pre_plain (fs_gamma_L γfs) γfs cw (fun _ _ => True%I)
       (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I)) (pfam_triv (fun _ _ _ => True%I)).
   Proof.
-    iIntros "#Hai". rewrite /open_au_pre_plain.
+    iIntros "#Hsup". rewrite /open_au_pre_plain.
     iSplitR; [iApply fsabs_open_walk |].
-    iSplitR; [iApply fsabs_aopen | iApply (fsabs_atrunc with "Hai")].
+    iSplitR; [iApply fsabs_aopen | iApply (fsabs_atrunc with "Hsup")].
   Qed.
 
   (* ...and the fs-facing half of exec's AU bundle
@@ -327,42 +322,42 @@ Section FsAbsInvFire.
   Qed.
 
   Lemma fsabs_open_pre_create (γfs : fs_names) (cw : Z) :
-    app_inv γfs -∗
+    app_sup -∗
     open_au_pre_create (fs_gamma_L γfs) γfs cw (fun _ _ => True%I)
       (fun _ _ => True%I) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I))
       (pfam_triv (fun _ _ _ => True%I)) (pfam_triv (fun _ _ _ => True%I)).
   Proof.
-    iIntros "#Hai". rewrite /open_au_pre_create.
+    iIntros "#Hsup". rewrite /open_au_pre_create.
     iSplitR; [iApply fsabs_mknod_walk |].
-    iSplitR; [iApply (fsabs_acre with "Hai") |].
+    iSplitR; [iApply (fsabs_acre with "Hsup") |].
     iSplitR; [iApply fsabs_dlookup |].
     iSplitR; [iApply fsabs_aopen |].
-    iSplitR; [iApply (fsabs_atrunc with "Hai") | iApply (fsabs_child with "Hai")].
+    iSplitR; [iApply (fsabs_atrunc with "Hsup") | iApply (fsabs_child with "Hsup")].
   Qed.
 
   (* ...AND THE ONE INPUT sys_open's contract takes, at the key the code
      branches on: the dispatcher hands this and never chooses an arm
      itself ([SpecSysOpen.open_in]). *)
   Lemma fsabs_open_in (γfs : fs_names) (cw : Z) (vom : mword 64) :
-    app_inv γfs -∗
+    app_sup -∗
     open_in (fs_gamma_L γfs) γfs cw vom (fun _ _ => True%I) (fun _ _ => True%I)
       (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ _ => True%I))
       (pfam_triv (fun _ _ _ => True%I)).
   Proof.
-    iIntros "#Hai". rewrite /open_in. destruct (om_create vom).
-    - iApply (fsabs_open_pre_create with "Hai").
-    - iApply (fsabs_open_pre_plain with "Hai").
+    iIntros "#Hsup". rewrite /open_in. destruct (om_create vom).
+    - iApply (fsabs_open_pre_create with "Hsup").
+    - iApply (fsabs_open_pre_plain with "Hsup").
   Qed.
 
   Lemma fsabs_mknod_pre (γfs : fs_names) (cw : Z) (ma mi : Z) :
-    app_inv γfs -∗
+    app_sup -∗
     mknod_au_pre (fs_gamma_L γfs) γfs cw ma mi (fun _ _ => True%I)
       (fun _ _ => True%I) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)).
   Proof.
-    iIntros "#Hai". rewrite /mknod_au_pre.
+    iIntros "#Hsup". rewrite /mknod_au_pre.
     iSplitR; [iApply fsabs_mknod_walk |].
-    iSplitR; [iApply (fsabs_acre with "Hai") |].
-    iSplitR; [iApply fsabs_dlookup | iApply (fsabs_child with "Hai")].
+    iSplitR; [iApply (fsabs_acre with "Hsup") |].
+    iSplitR; [iApply fsabs_dlookup | iApply (fsabs_child with "Hsup")].
   Qed.
 
   (* ...and chdir's (lane C3): open's walk premise at any start beside
@@ -383,19 +378,19 @@ Section FsAbsInvFire.
      own [_unit] proof lives in [SpecSysLink] beside the definitions; this
      is the [fsabs_*]-family name the dispatcher's link arm reads. *)
   Lemma fsabs_link_pre (γfs : fs_names) :
-    app_inv γfs -∗
+    app_sup -∗
     link_commits (fs_gamma_L γfs) (pfam_triv (fun _ _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ => True%I)).
-  Proof. iIntros "#Hai". iApply (link_commits_unit γfs with "Hai"). Qed.
+  Proof. iIntros "#Hsup". iApply (link_commits_unit γfs with "Hsup"). Qed.
 
   Lemma fsabs_unlink_pre (γfs : fs_names) (cw : Z) :
-    app_inv γfs -∗
+    app_sup -∗
     unlink_au_pre (fs_gamma_L γfs) γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
       (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ _ => True%I)).
   Proof.
-    iIntros "#Hai". rewrite /unlink_au_pre.
+    iIntros "#Hsup". rewrite /unlink_au_pre.
     iSplitR; [iApply fsabs_mknod_walk |].
-    iSplitR; [iApply (fsabs_uent with "Hai") |].
-    iSplitR; [iApply (fsabs_utgt with "Hai") |].
+    iSplitR; [iApply (fsabs_uent with "Hsup") |].
+    iSplitR; [iApply (fsabs_utgt with "Hsup") |].
     iSplitR; [iApply fsabs_dlookup | iApply fsabs_dmiss].
   Qed.
 

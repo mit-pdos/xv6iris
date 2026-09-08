@@ -322,8 +322,9 @@ Section CreateFire.
 
   (* THE ARM: the row APPEARS.  The view has no row at [i] (the claim box
      is at count 0) but the MAP has one -- the child's inum is a region
-     row -- which is what lets the generic discharger pay the step off the
-     parked license ([AppInv.app_step_acc] wants [is_Some (I !! i)]). *)
+     row.  The [is_Some] premise is the MOVER's, not the step's: the
+     generic discharger pays the step off the supply, which holds of every
+     view ([AppInv.app_step_acc]). *)
   Definition aarm_commit_at Γ (E : coPset) (c : absnode)
       (Φ : aview -> Z -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i : Z),
@@ -429,56 +430,49 @@ Section CreateFire.
   Qed.
 
   (* the write-kind ones owe the caller's step, paid at the live Γ out of
-     the parked license ([AppInv.app_step_acc]) *)
+     the SUPPLY ([AppInv.app_step_acc]) *)
   Lemma acre_commit_at_gen_unit (γfs : fs_names) E (cf : Z -> Z -> absnode) :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ acre_commit_at_gen (fs_gamma_L γfs) E cf (fun _ _ _ _ => True%I).
+    app_sup -∗ acre_commit_at_gen (fs_gamma_L γfs) E cf (fun _ _ _ _ => True%I).
   Proof.
-    iIntros (HE) "#Hai". rewrite /acre_commit_at_gen.
+    iIntros "#Hsup". rewrite /acre_commit_at_gen.
     iIntros (I d i nm ents nl) "%Hpre Ha".
-    iMod (app_step_acc E γfs d I _ HE
-            (abs_view_lookup_is_Some I d _ (proj1 Hpre)) with "Hai") as "Hstep".
+    iDestruct (app_step_acc d I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
 
   Lemma acre_commit_at_unit (γfs : fs_names) E c :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ acre_commit_at (fs_gamma_L γfs) E c (fun _ _ _ _ => True%I).
+    app_sup -∗ acre_commit_at (fs_gamma_L γfs) E c (fun _ _ _ _ => True%I).
   Proof.
-    iIntros (HE) "#Hai". rewrite /acre_commit_at.
-    iApply (acre_commit_at_gen_unit γfs E _ HE with "Hai").
+    iIntros "#Hsup". rewrite /acre_commit_at.
+    iApply (acre_commit_at_gen_unit γfs E _ with "Hsup").
   Qed.
 
-  (* the arm's step is paid although the VIEW has no row: the MAP has one *)
+  (* the arm's step is paid although the VIEW has no row: the supply holds
+     of every view *)
   Lemma aarm_commit_at_unit (γfs : fs_names) E c :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ aarm_commit_at (fs_gamma_L γfs) E c (fun _ _ => True%I).
+    app_sup -∗ aarm_commit_at (fs_gamma_L γfs) E c (fun _ _ => True%I).
   Proof.
-    iIntros (HE) "#Hai". rewrite /aarm_commit_at. iIntros (I i) "%Hnone %Hsome Ha".
-    iMod (app_step_acc E γfs i I _ HE Hsome with "Hai") as "Hstep".
+    iIntros "#Hsup". rewrite /aarm_commit_at. iIntros (I i) "%Hnone %Hsome Ha".
+    iDestruct (app_step_acc i I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
 
   Lemma adots_commit_at_unit (γfs : fs_names) E :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ adots_commit_at (fs_gamma_L γfs) E (fun _ _ _ _ => True%I).
+    app_sup -∗ adots_commit_at (fs_gamma_L γfs) E (fun _ _ _ _ => True%I).
   Proof.
-    iIntros (HE) "#Hai". rewrite /adots_commit_at. iIntros (I i d full) "%Hrow Ha".
-    iMod (app_step_acc E γfs i I _ HE
-            (abs_view_lookup_is_Some I i _ Hrow) with "Hai") as "Hstep".
+    iIntros "#Hsup". rewrite /adots_commit_at. iIntros (I i d full) "%Hrow Ha".
+    iDestruct (app_step_acc i I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
 
   Lemma aunarm_commit_at_unit (γfs : fs_names) E :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ aunarm_commit_at (fs_gamma_L γfs) E (fun _ _ => True%I).
+    app_sup -∗ aunarm_commit_at (fs_gamma_L γfs) E (fun _ _ => True%I).
   Proof.
-    iIntros (HE) "#Hai". rewrite /aunarm_commit_at. iIntros (I i c) "%Hrow Ha".
-    iMod (app_step_acc E γfs i I _ HE
-            (abs_view_lookup_is_Some I i _ Hrow) with "Hai") as "Hstep".
+    iIntros "#Hsup". rewrite /aunarm_commit_at. iIntros (I i c) "%Hrow Ha".
+    iDestruct (app_step_acc i I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
@@ -527,84 +521,76 @@ Section CreateFire.
 
   Lemma acre_commit_at_gen_pinned (γfs : fs_names) E (cf : Z -> Z -> absnode)
       (q : Qp) (jpin : Z) (a : anode) (Φ : aview -> Z -> fname -> Z -> iProp Σ) :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗
+    app_sup -∗
     nview (fs_gamma_L γfs) q jpin a -∗
     (∀ (av : aview) (d : Z) (nm : fname) (i : Z),
        ⌜av !! jpin = Some a⌝ -∗ nview (fs_gamma_L γfs) q jpin a -∗ Φ av d nm i) -∗
     acre_commit_at_gen (fs_gamma_L γfs) E cf Φ.
   Proof.
-    iIntros (HE) "#Hai Hn HΦ". rewrite /acre_commit_at_gen.
+    iIntros "#Hsup Hn HΦ". rewrite /acre_commit_at_gen.
     iIntros (I d i nm ents nl) "%Hpre Ha".
     iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
-    iMod (app_step_acc E γfs d I _ HE
-            (abs_view_lookup_is_Some I d _ (proj1 Hpre)) with "Hai") as "Hstep".
+    iDestruct (app_step_acc d I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     iFrame "Ha'". iApply ("HΦ" $! (abs_view I) d nm i with "[%] Hn"). done.
   Qed.
 
   Lemma acre_commit_at_pinned (γfs : fs_names) E (c : absnode) (q : Qp) (jpin : Z)
       (a : anode) (Φ : aview -> Z -> fname -> Z -> iProp Σ) :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗
+    app_sup -∗
     nview (fs_gamma_L γfs) q jpin a -∗
     (∀ (av : aview) (d : Z) (nm : fname) (i : Z),
        ⌜av !! jpin = Some a⌝ -∗ nview (fs_gamma_L γfs) q jpin a -∗ Φ av d nm i) -∗
     acre_commit_at (fs_gamma_L γfs) E c Φ.
   Proof.
-    iIntros (HE) "#Hai Hn HΦ". rewrite /acre_commit_at.
-    iApply (acre_commit_at_gen_pinned γfs E _ q jpin a Φ HE with "Hai Hn HΦ").
+    iIntros "#Hsup Hn HΦ". rewrite /acre_commit_at.
+    iApply (acre_commit_at_gen_pinned γfs E _ q jpin a Φ with "Hsup Hn HΦ").
   Qed.
 
   Lemma aarm_commit_at_pinned (γfs : fs_names) E (c : absnode) (q : Qp) (jpin : Z)
       (a : anode) (Φ : aview -> Z -> iProp Σ) :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗
+    app_sup -∗
     nview (fs_gamma_L γfs) q jpin a -∗
     (∀ (av : aview) (i : Z),
        ⌜av !! jpin = Some a⌝ -∗ nview (fs_gamma_L γfs) q jpin a -∗ Φ av i) -∗
     aarm_commit_at (fs_gamma_L γfs) E c Φ.
   Proof.
-    iIntros (HE) "#Hai Hn HΦ". rewrite /aarm_commit_at.
+    iIntros "#Hsup Hn HΦ". rewrite /aarm_commit_at.
     iIntros (I i) "%Hnone %Hsome Ha".
     iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
-    iMod (app_step_acc E γfs i I _ HE Hsome with "Hai") as "Hstep".
+    iDestruct (app_step_acc i I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     iFrame "Ha'". iApply ("HΦ" $! (abs_view I) i with "[%] Hn"). done.
   Qed.
 
   Lemma adots_commit_at_pinned (γfs : fs_names) E (q : Qp) (jpin : Z)
       (a : anode) (Φ : aview -> Z -> Z -> bool -> iProp Σ) :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗
+    app_sup -∗
     nview (fs_gamma_L γfs) q jpin a -∗
     (∀ (av : aview) (i d : Z) (full : bool),
        ⌜av !! jpin = Some a⌝ -∗ nview (fs_gamma_L γfs) q jpin a -∗ Φ av i d full) -∗
     adots_commit_at (fs_gamma_L γfs) E Φ.
   Proof.
-    iIntros (HE) "#Hai Hn HΦ". rewrite /adots_commit_at.
+    iIntros "#Hsup Hn HΦ". rewrite /adots_commit_at.
     iIntros (I i d full) "%Hrow Ha".
     iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
-    iMod (app_step_acc E γfs i I _ HE
-            (abs_view_lookup_is_Some I i _ Hrow) with "Hai") as "Hstep".
+    iDestruct (app_step_acc i I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     iFrame "Ha'". iApply ("HΦ" $! (abs_view I) i d full with "[%] Hn"). done.
   Qed.
 
   Lemma aunarm_commit_at_pinned (γfs : fs_names) E (q : Qp) (jpin : Z)
       (a : anode) (Φ : aview -> Z -> iProp Σ) :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗
+    app_sup -∗
     nview (fs_gamma_L γfs) q jpin a -∗
     (∀ (av : aview) (i : Z),
        ⌜av !! jpin = Some a⌝ -∗ nview (fs_gamma_L γfs) q jpin a -∗ Φ av i) -∗
     aunarm_commit_at (fs_gamma_L γfs) E Φ.
   Proof.
-    iIntros (HE) "#Hai Hn HΦ". rewrite /aunarm_commit_at.
+    iIntros "#Hsup Hn HΦ". rewrite /aunarm_commit_at.
     iIntros (I i c) "%Hrow Ha".
     iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
-    iMod (app_step_acc E γfs i I _ HE
-            (abs_view_lookup_is_Some I i _ Hrow) with "Hai") as "Hstep".
+    iDestruct (app_step_acc i I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     iFrame "Ha'". iApply ("HΦ" $! (abs_view I) i with "[%] Hn"). done.
   Qed.

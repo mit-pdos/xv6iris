@@ -472,16 +472,13 @@ Section ProofSysOpenAUEntryC.
     iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     (* THE BUNDLE AT THE FILE TYPE ([SpecCreate.cre_commits_of_file]):
-       open's caller owes no DOTS leg -- at [T_FILE] the [beq s4,a4] at
-       +0xca is never taken -- so the one create asks for is discharged
-       here, at its own unit, off the region's copy of the application
-       invariant. *)
-    iAssert (pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE)
-               (pfam_triv (fun _ _ _ _ => True%I))) as "Hdots".
-    { iApply SpecCreate.cre_dots_unit.
-      iApply (InodeRegion.ireg_inv_app with "Hireg"). }
+       open's caller owes no DOTS leg AND NEITHER DOES THIS PROOF -- at
+       [T_FILE] the [beq s4,a4] at +0xca is never taken, and create's dots
+       leg is guarded on exactly that test ([SpecCreate.cre_dots_leg]), so
+       the builder produces it out of the type inequality and nothing has to
+       be manufactured here. *)
     iDestruct (cre_commits_of_file (fs_gamma_L fsc_fs) 0 0
-                 Phiarm Phiun Phiok with "Hac Hdots Hclegs") as "Hcre".
+                 Phiarm Phiun Phiok with "Hac Hclegs") as "Hcre".
     iApply (Create.wp_create_sconf (CID := CID5) gs jx gl pd pav pu
               gf plen bp
               FsAbsCreateFire.T_FILE (mword_of_int 0) (mword_of_int 0)
@@ -651,41 +648,49 @@ Section ProofSysOpenAUEntryC.
     iDestruct (so_flat_open with "Hload") as (data) "Hflat".
     destruct made.
     - (* ============ ARM C-OK: a FRESH child ==========================
-         The contract REFUNDS both of open's commits here, so neither
-         fires: they ride the shim residue and the plain tail runs at a
-         pure row receipt. *)
+         The contract REFUNDS the terminal observation here, so it does not
+         fire: it rides the shim residue and the plain tail runs at a pure
+         row receipt.  The TRUNC commit is the caller's own and DOES fire --
+         the child is [AFile []], so itrunc's delta is the identity
+         (B-trunc). *)
       assert (Htyf : bv_unsigned (di_type dn) = FsImg.T_FILE_z).
       { rewrite Hrep create_made_type. vm_compute. reflexivity. }
+      (* THE FRESH CHILD IS EMPTY, and that is what makes the caller's own
+         trunc commit fire for free here: create's [T_FILE] record is
+         [create_made], whose size word is zero, so the era node's byte
+         list is [[]] and itrunc's delta is the identity. *)
+      assert (Hbsnil : fn_file_bytes (era_node dn bm data) = []).
+      { rewrite /fn_file_bytes /fn_size era_node_rec Hrep create_made_size.
+        reflexivity. }
       assert (Harow : abs_row (era_node dn bm data)
-                      = MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
-                                (fn_nlink (era_node dn bm data)))
-        by exact (opf_era_file_row dn bm data Htyf).
-      iAssert (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit (bview plen bp)
+                      = MkAnode (AFile []) (fn_nlink (era_node dn bm data))).
+      { rewrite (opf_era_file_row dn bm data Htyf) Hbsnil. reflexivity. }
+      iAssert (socr_fresh P Phiarm Phiun Phiok Phiex Phio (bview plen bp)
                  (bv_unsigned inum))
-        with "[Hcauf Hoc Htc]" as "HR".
+        with "[Hcauf Hoc]" as "HR".
       { rewrite /socr_fresh.
         iDestruct (cre_ok_file_fresh with "Hcauf") as (d nm av ents nl)
           "(%Hl & %Hpre & HP & HPhi & Hdl & Harmr & Hun)".
         iExists d, nm, av, ents, nl.
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
         iSplitR; [iPureIntro; lia |].
-        iFrame "HP HPhi Hdl Hoc Htc Harmr Hun". }
+        iFrame "HP HPhi Hdl Hoc Harmr Hun". }
       iAssert (so_obs (socr_Phio_pure (bv_unsigned inum)
-                         (MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
+                         (MkAnode (AFile [])
                                   (fn_nlink (era_node dn bm data))))
                       (bv_unsigned inum) (era_node dn bm data)) as "Hobs".
       { rewrite -Harow. iApply socr_obs_pure. }
       iAssert (wp_next true (proc_addr jx)
                  (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv vom U sts
-                    (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit
+                    (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio
                                (bview plen bp) (bv_unsigned inum))
                             (bv_unsigned inum))
-                    (socr_Pm (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit
+                    (socr_Pm (socr_fresh P Phiarm Phiun Phiok Phiex Phio
                                 (bview plen bp) (bv_unsigned inum)))
                     (socr_Phio_pure (bv_unsigned inum)
-                       (MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
+                       (MkAnode (AFile [])
                                 (fn_nlink (era_node dn bm data))))
-                    socr_Phit_triv m K eb b lks))
+                    Phit m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
         iEval (rewrite /so_cont_au). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -694,7 +699,6 @@ Section ProofSysOpenAUEntryC.
         iApply fupd_wp.
         iMod (socr_arms_fresh gf (proc_addr jx) pidv vom P Pmiss
                 Phiarm Phiun Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
-                (fn_file_bytes (era_node dn bm data))
                 (fn_nlink (era_node dn bm data)) with "Hpost") as "Hpost".
         iModIntro.
         iApply ("Hcont" $! mf ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
@@ -705,15 +709,15 @@ Section ProofSysOpenAUEntryC.
                 gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
                 U sts m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
                 data vom (bview plen bp)
-                (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit
+                (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio
                            (bview plen bp) (bv_unsigned inum))
                         (bv_unsigned inum))
-                (socr_Pm (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit
+                (socr_Pm (socr_fresh P Phiarm Phiun Phiok Phiex Phio
                             (bview plen bp) (bv_unsigned inum)))
                 (socr_Phio_pure (bv_unsigned inum)
-                   (MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
+                   (MkAnode (AFile [])
                             (fn_nlink (era_node dn bm data))))
-                socr_Phit_triv
+                Phit
                 Hqs HKfull Hkk ltac:(exact (proj2 Hinum)) ltac:(exact (proj1 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hibcov Hiblog Hcovb
                 ltac:(exact (proj2 (proj2 Hu1) eq_refl)) Hj Hgl Hlkempty
@@ -724,13 +728,13 @@ Section ProofSysOpenAUEntryC.
                       [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid Hflat Hshot Hfrz Href Hru Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
-                      [HR] Hobs [] Hcontj").
+                      [HR] Hobs Htc Hcontj").
+      (* THE CALLER'S OWN TRUNC PIECE goes straight through now ([Htc] in
+         the list above): the tail fires it over the [itrunc] and its
+         receipt comes back at [[]] (B-trunc).  Nothing is conjured. *)
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { rewrite /socr_P. iSplitR; [by iPureIntro |]. iExact "HR". }
-      { rewrite /socr_Phit_triv. iApply pf_at_triv.
-        iApply (atrunc_commit_at_unit fsc_fs appE ltac:(rewrite /appE; done)).
-        iApply (ireg_inv_app with "Hireg"). }
     - (* ============ ARM F-OK: the name was there =====================
          The contract wants the terminal observation FIRED at the found
          node, so it fires here, off the payload's own [top_frag]. *)

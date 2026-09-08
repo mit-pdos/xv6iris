@@ -147,6 +147,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import FsCfg.     (* the ambient fs names [fs_ready] is stated at *)
 Require Import FsReady.   (* the file system's world, and its geometry *)
+Require Import AppInv.    (* [app_sup] -- the friendly layer's credential *)
 Import Defs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
@@ -283,6 +284,12 @@ Definition wp_sys_mkdir_friendly_body
      body no longer takes [pd]/[pav]/[pu] either: the proof unpacks them
      out of [FsReady.fs_ready_disk] and hands the witness to the seal. *)
   FsReady.fs_ready -∗
+  (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]): this packaging is
+     for a client that answers for NO abstract state, so mkdir's create legs
+     are handed at the trivial families and their steps are paid out of the
+     credential.  A client with a claim of its own supplies the bundle
+     instead, at its own families, and does not come through here. *)
+  app_sup -∗
   (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
      persistent, and every caller already holds it. *)
   procs_inv γs -∗
@@ -343,7 +350,7 @@ Module FsSysMkdir (M : SYSMKDIR).
     pose proof (FsReady.fgo_nin_hi   Hg) as Hn2.
     pose proof (FsReady.fgo_nin_31   Hg) as Hn3.
     pose proof (FsReady.fgo_ushort   Hg) as Hus.
-    iIntros "Hcg Hown Hpc #Hw Hprocs Hres Hpriv Hcont".
+    iIntros "Hcg Hown Hpc #Hw #Hsup Hprocs Hres Hpriv Hcont".
     (* SIMP-2: the unpack is [FsReady]'s own projection rather than a raw
        [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
        that file's two seals and the measurement behind them), so the
@@ -367,7 +374,7 @@ Module FsSysMkdir (M : SYSMKDIR).
               b lks
               (* the friendly packaging is not on the dispatched path, so it
                  hands mkdir's walk and create's legs the TRIVIAL families
-                 and pays the bundle off the parked license *)
+                 and pays the bundle off the SUPPLY *)
               (fun _ _ => True)%I (fun _ _ => True)%I
               (pfam_triv (fun _ _ => True%I))
               (pfam_triv (fun _ _ _ _ => True%I))
@@ -383,8 +390,7 @@ Module FsSysMkdir (M : SYSMKDIR).
                     Hpriv []").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
-    { iApply SpecSysMkdir.mkdir_au_pre_unit.
-      iApply (InodeRegion.ireg_inv_app with "Hireg"). }
+    { iApply (SpecSysMkdir.mkdir_au_pre_unit with "Hsup"). }
     iIntros (CIDn) "%Hgd".
     iIntros (mf ns' P')
       "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbn Hsbi Hsbs Hsbb %Hns' Hir

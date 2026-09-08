@@ -33,8 +33,9 @@
                says so ([InodeRegion.ireg_top_park],
                [EscrowInode.escA_body]);
       [_step]  a step wand from the caller's contract -- the AU fires, whose
-               bundles carry it (today: paid by the generic dischargers out
-               of [app_auto]; lane L2: by the process's payload).
+               bundles carry it (paid by the generic dischargers out of
+               [app_sup], the credential a process that answers for nothing
+               runs on; a verified program pays it from its own payload).
     There is no blanket form: every view move on a dispatched path is an AU
     fire or a [_step], and the only [_same] movers are the ones between
     absent rows.
@@ -373,9 +374,8 @@ Section AppInv.
      performs, with the abstract delta as its READING, so the fire can hand
      it to [app_top_update] verbatim; and UNDER THE LATER, because that is
      where the mover applies it -- a plain wand lifts to this for free
-     (section 6, ruling 5), and it is what lets a generic discharger pay it
-     out of the parked license, which it can only read [▷]-shaped
-     ([app_step_acc]). *)
+     (section 6, ruling 5).  A generic discharger pays it out of the SUPPLY
+     ([app_step_acc]), whose conclusion it reads straight under the later. *)
   Definition app_step (i : Z) (I : gmap Z fs_node) (av' : aview) : iProp Σ :=
     (∀ n' : fs_node,
        ⌜abs_view (<[i := n']> I) = av'⌝ -∗
@@ -417,18 +417,6 @@ Section AppInv.
     iApply ("Ha" $! I i n n' with "[//] Hp").
   Qed.
 
-  (* the supply pays any step, at any row, with no side condition: a claim
-     that holds of every view holds of the moved one.  This is what the
-     dischargers will run on once every fire is paid from the deposit or
-     the supply; today [app_step_of_auto] beside it is what the parked
-     license pays. *)
-  Lemma app_step_of_sup (i : Z) (I : gmap Z fs_node) (av' : aview) :
-    app_sup -∗ app_step i I av'.
-  Proof.
-    iIntros "#Hs". rewrite /app_step. iIntros (n' Heq) "_". iNext.
-    rewrite /app_sup /app_sup_raw. iApply "Hs".
-  Qed.
-
   (* THE LICENSE, READ OFF THE INVARIANT: [▷]-shaped and persistent, so the
      body closes unchanged.  A generic discharger runs this inside the
      commit's own fupd (the commits fire at [appE], with [appN] closed). *)
@@ -463,30 +451,20 @@ Section AppInv.
     iModIntro. iExact "Hx".
   Qed.
 
-  Lemma app_step_acc (E : coPset) (γfs : fs_names) (i : Z)
-      (I : gmap Z fs_node) (av' : aview) :
-    ↑appN ⊆ E ->
-    is_Some (I !! i) ->
-    app_inv γfs ={E}=∗ app_step i I av'.
+  (* THE STEP, OFF THE SUPPLY.  A claim that holds of every view survives
+     every move of the map, so a discharger holding [app_sup] pays a
+     write-kind commit's [app_step] by throwing the pre-view claim away and
+     reading the post-view one straight off the credential.  There is no
+     side condition left, and that is why this is ONE lemma: the license
+     form needs the row to EXIST ([app_step_of_auto]'s [is_Some]) because it
+     promises only what a one-row MOVE preserves, so it needed a second
+     reading beside it that took [app_step_id]'s arm where the view had no
+     row.  The supply needs neither. *)
+  Lemma app_step_acc (i : Z) (I : gmap Z fs_node) (av' : aview) :
+    app_sup -∗ app_step i I av'.
   Proof.
-    iIntros (HE Hi) "#Hinv".
-    iMod (app_auto_acc E γfs HE with "Hinv") as "#Ha".
-    iModIntro. iApply (app_step_of_auto i I av' Hi with "Ha").
-  Qed.
-
-  (* ...and the two joined (E2-V2): a write-kind delta that is the IDENTITY
-     where the view has no row -- every landed one is -- is paid by the
-     license where the row is and by [app_step_id] where it is not.  The
-     fd-side dischargers use this: the node an fd reaches may be unlinked. *)
-  Lemma app_step_acc_view (E : coPset) (γfs : fs_names) (i : Z)
-      (I : gmap Z fs_node) (av' : aview) :
-    ↑appN ⊆ E ->
-    (abs_view I !! i = None -> av' = abs_view I) ->
-    app_inv γfs ={E}=∗ app_step i I av'.
-  Proof.
-    intros HE Hid. destruct (abs_view I !! i) as [a |] eqn:Hav.
-    - exact (app_step_acc E γfs i I av' HE (abs_view_lookup_is_Some I i a Hav)).
-    - rewrite (Hid eq_refl). iIntros "_". iModIntro. iApply app_step_id.
+    iIntros "#Hs". rewrite /app_step. iIntros (n' Heq) "_". iNext.
+    rewrite /app_sup /app_sup_raw. iApply "Hs".
   Qed.
 
 End AppInv.

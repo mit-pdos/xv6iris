@@ -2680,7 +2680,7 @@ Section ProofCreateMkdir.
             [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           iModIntro.
           iAssert ((∃ full : bool, cre_dots_fired Fdots (bv_unsigned cinum) (bv_unsigned dind) full)
-                   ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots)%I
+                   ∨ cre_dots_leg (fs_gamma_L fsc_fs) (bv_unsigned ty) Fdots)%I
             with "[Hdotsr]" as "Hdotsx".
           { iLeft. iExists true. iExact "Hdotsr". }
           (* THE ["."] UNIT COMES BACK OUT OF THE CHILD'S PAYLOAD (lane
@@ -2850,7 +2850,7 @@ Section ProofCreateMkdir.
           [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
         iModIntro.
         iAssert ((∃ full : bool, cre_dots_fired Fdots (bv_unsigned cinum) (bv_unsigned dind) full)
-                 ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots)%I
+                 ∨ cre_dots_leg (fs_gamma_L fsc_fs) (bv_unsigned ty) Fdots)%I
           with "[Hdotsr]" as "Hdotsx".
         { iLeft. iExists false. iExact "Hdotsr". }
         (* THE ["."] UNIT COMES BACK OUT OF THE CHILD'S PAYLOAD (lane
@@ -3005,9 +3005,9 @@ Section ProofCreateMkdir.
       iModIntro.
       (* no dot landed: the dots commit comes home unfired (round E2) *)
       iAssert ((∃ full : bool, cre_dots_fired Fdots (bv_unsigned cinum) (bv_unsigned dind) full)
-               ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots)%I
+               ∨ cre_dots_leg (fs_gamma_L fsc_fs) (bv_unsigned ty) Fdots)%I
         with "[Hdots]" as "Hdotsx".
-      { iRight. iExact "Hdots". }
+      { iRight. iApply (cre_dots_leg_of with "Hdots"). }
       iPoseProof (cr_fail_mkdir_half (CID := CID) γs j γl pd pav pu
  γf
  plen pfun pv ty major minor U u Sb ns pidv

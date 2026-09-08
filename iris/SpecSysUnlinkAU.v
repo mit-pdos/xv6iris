@@ -354,26 +354,22 @@ Section SysUnlinkAU.
   (* sanity: none of the three new commits can be vacuously blocked on
      the caller's side (the family's [*_unit] discipline) *)
   (* the two write-kind shapes owe the caller's step, paid here out of the
-     parked license ([AppInv.app_step_acc]) at the live Γ *)
+     SUPPLY ([AppInv.app_step_acc]) at the live Γ *)
   Lemma uent_commit_at_unit (γfs : fs_names) E :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ uent_commit_at (fs_gamma_L γfs) E (fun _ _ _ _ => True%I).
+    app_sup -∗ uent_commit_at (fs_gamma_L γfs) E (fun _ _ _ _ => True%I).
   Proof.
-    iIntros (HE) "#Hai". rewrite /uent_commit_at.
+    iIntros "#Hsup". rewrite /uent_commit_at.
     iIntros (I d t nm ents nl a) "%Hpre Ha".
-    iMod (app_step_acc E γfs d I _ HE
-            (abs_view_lookup_is_Some I d _ (proj1 Hpre)) with "Hai") as "Hstep".
+    iDestruct (app_step_acc d I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
 
   Lemma utgt_commit_at_unit (γfs : fs_names) E :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ utgt_commit_at (fs_gamma_L γfs) E (fun _ _ => True%I).
+    app_sup -∗ utgt_commit_at (fs_gamma_L γfs) E (fun _ _ => True%I).
   Proof.
-    iIntros (HE) "#Hai". rewrite /utgt_commit_at. iIntros (I t a) "%Ht %Hnl Ha".
-    iMod (app_step_acc E γfs t I _ HE
-            (abs_view_lookup_is_Some I t _ Ht) with "Hai") as "Hstep".
+    iIntros "#Hsup". rewrite /utgt_commit_at. iIntros (I t a) "%Ht %Hnl Ha".
+    iDestruct (app_step_acc t I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.

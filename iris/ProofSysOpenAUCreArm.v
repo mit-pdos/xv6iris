@@ -26,14 +26,19 @@
    AND THE FLAVOUR IS DECIDED BY create's OWN [made] BIT, which is why the
    arm needs no lookahead:
 
-     made = true (FRESH).  [SpecSysOpenAU]'s FRESH arms -- success AND the
-       -1 fold's arm (a) -- REFUND the terminal observation and the trunc
-       commit ([delta_trunc_nil]: the child is [AFile []] and itrunc's
-       delta is the identity).  So the real [Phio] / [Phit] are never
-       fired: they ride inside [R], and the plain tail runs at the PURE
-       [socr_Phio_pure] (a row equation, no resource) and at [True].  The
-       pure receipt is what refutes the tail's DEVICE and DIRECTORY arms --
-       create was called with T_FILE, so the row is an [AFile].
+     made = true (FRESH).  [SpecSysOpenAU]'s FRESH arms REFUND the terminal
+       observation, so the real [Phio] is never fired: it rides inside [R]
+       and the plain tail runs at the PURE [socr_Phio_pure] (a row
+       equation, no resource).  The pure receipt is what refutes the tail's
+       DEVICE and DIRECTORY arms -- create was called with T_FILE, so the
+       row is an [AFile] -- and, since the create arm names the child's
+       bytes as [[]], it is also what identifies the tail's [bs0] with the
+       empty list.  THE TRUNC COMMIT IS THE CALLER'S OWN AND FIRES: the
+       tail runs at [Phit] itself, and its receipt comes back at [[]]
+       because itrunc's delta on an empty file is the identity.  It used to
+       run at a throw-away [True] piece this file conjured, which was the
+       last fire in the tree payable only out of the application's parked
+       license.
      made = false (EXISTS-OPENS).  The spec's arms want the real [Phio]
        FIRED at the found node and the real trunc behaviour, which is
        exactly what the plain tail does.  So the tail runs at
@@ -130,9 +135,6 @@ Section ProofSysOpenAUCreArm.
               (⌜x = i0 /\ a = a0⌝ ∗ Phio.(pf_recv) av x a)%I)
            Phio.(pf_refund).
 
-  Definition socr_Phit_triv : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ) :=
-    pfam_triv (fun (_ : aview) (_ : Z) (_ : list (bv 8)) => True%I).
-
   (* ================================================================== *)
   (*  2.  THE TWO RESIDUES (create's payout, held for the tail)          *)
   (* ================================================================== *)
@@ -143,7 +145,6 @@ Section ProofSysOpenAUCreArm.
       (Phiarm Phiun : pfam Σ (aview -> Z -> iProp Σ))
       (Phiok Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (pl : list (bv 8)) (i0 : Z) : iProp Σ :=
     (∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
@@ -153,7 +154,10 @@ Section ProofSysOpenAUCreArm.
        Phiok.(pf_recv) av d nm i0 ∗
        pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Phiex ∗
        pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Phio ∗
-       pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit ∗
+       (* THE TRUNC COMMIT DOES NOT RIDE HERE ANY MORE: the tail runs at the
+          CALLER'S OWN [Phit] and fires it over the [itrunc], which is the
+          honest reading and is what removed the one piece this proof used
+          to conjure. *)
        (* ...and create's CHILD leg (round E2, lane E2-C): the row APPEARED
           at this inum, the unarm comes home *)
        cre_arm_fired Phiarm i0 ∗
@@ -250,26 +254,42 @@ Section ProofSysOpenAUCreArm.
   (* THE FRESH READING.  The tail's DEVICE and DIRECTORY arms are refuted
      by the pure receipt: create ran at T_FILE, so the observed row is an
      [AFile]. *)
+  (* ...AND THE TRUNC COMPONENT COMES OUT WITH IT, at the caller's own
+     [Phit]: the tail's FILE arm delivers the receipt iff O_TRUNC, and the
+     pure observation receipt is what identifies the bytes it is at with
+     the [bs] the create arm named. *)
   Lemma socr_ok_fresh_arm `{GEN : GenId}
       (R : iProp Σ) (i0 : Z) (bs : list (bv 8)) (nl0 : nat)
+      (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
       (U : ustate) (sts : list fdstate) (r : mword 64) :
     open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom
       (socr_P R i0) (socr_Phio_pure i0 (MkAnode (AFile bs) nl0))
-      socr_Phit_triv sts U r
-    ⊢ R ∗ ∃ γo : gname,
+      Phit sts U r
+    ⊢ R
+      ∗ (if om_trunc vom
+         then ∃ (av' : aview) (nl' : nat),
+                ⌜arow_at av' i0 (MkAnode (AFile bs) nl')⌝ ∗
+                Phit.(pf_recv) av' i0 bs
+         else pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit)
+      ∗ ∃ γo : gname,
             open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
               (FdInode i0 γo) sts r.
   Proof.
-    rewrite /open_post_ok_plain /socr_P /socr_Phio_pure /pfam_triv.
+    rewrite /open_post_ok_plain /socr_P /socr_Phio_pure.
     cbn [pf_recv pf_refund].
     iIntros "H". iDestruct "H" as (pl av i) "[[%Hi HR] Harm]".
     subst i.
     iDestruct "Harm" as "[Hdev | [Hfil | Hdir]]".
     - iDestruct "Hdev" as (ma mi nl) "(_ & _ & %Hbad & _)".
       destruct Hbad as [_ Hbad]. inversion Hbad.
-    - iDestruct "Hfil" as (bs0 nl) "(_ & %Heq & _ & Hfd)".
-      iFrame "HR Hfd".
+    - iDestruct "Hfil" as (bs0 nl) "(%Hrow & %Heq & Htr & Hfd)".
+      destruct Heq as [_ Heq]. injection Heq as Hbs Hnl.
+      subst bs0. iFrame "HR Hfd".
+      destruct (om_trunc vom).
+      + iDestruct "Htr" as (av') "[%Hrow' HP]".
+        iExists av', nl. iSplitR; [by iPureIntro |]. iExact "HP".
+      + iExact "Htr".
     - iDestruct "Hdir" as (ents nl) "(_ & _ & %Hbad & _)".
       destruct Hbad as [_ Hbad]. inversion Hbad.
   Qed.
@@ -336,12 +356,12 @@ Section ProofSysOpenAUCreArm.
       (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (U : ustate) (sts : list fdstate) (r : mword 64) (pl : list (bv 8)) (i0 : Z)
-      (bs : list (bv 8)) (nl0 : nat) :
+      (nl0 : nat) :
     open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
-      (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit pl i0) i0)
-      (socr_Pm (socr_fresh P Phiarm Phiun Phiok Phiex Phio Phit pl i0))
-      (socr_Phio_pure i0 (MkAnode (AFile bs) nl0))
-      socr_Phit_triv sts U r
+      (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio pl i0) i0)
+      (socr_Pm (socr_fresh P Phiarm Phiun Phiok Phiex Phio pl i0))
+      (socr_Phio_pure i0 (MkAnode (AFile []) nl0))
+      Phit sts U r
     ={⊤}=∗ open_arms_create (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
              P Pmiss Phiarm Phiun Phiok Phiex Phio Phit sts U r.
   Proof.
@@ -349,25 +369,29 @@ Section ProofSysOpenAUCreArm.
     iIntros "[Harms $]".
     iDestruct "Harms" as "[Hfail | Hok]".
     - iDestruct "Hfail" as "(%Hr & Hpriv & Hfrag & Hf)".
-      iMod (socr_res_of_fail with "Hf") as "(HR & _ & _)".
+      (* THE FAIL SIDE IS UNCHANGED BY B-TRUNC: every post-walk failure sits
+         BEFORE the [itrunc] (the two table-full arms return at +0x...,
+         above it), so the caller's trunc piece comes home unfired and arm
+         (a) is stated at the piece exactly as it was. *)
+      iMod (socr_res_of_fail with "Hf") as "(HR & _ & Htc)".
       iModIntro. iLeft. iSplitR; [by iPureIntro |]. iFrame "Hpriv Hfrag".
       rewrite /open_post_fail_create /socr_fresh.
       iDestruct "HR" as (d nm av ents nl)
-        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Htc & Harmr & Hun)".
+        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Harmr & Hun)".
       iRight. iExists pl. iRight. iExists d. iFrame "HP Htc".
       iLeft. iExists av, i0, nm, ents, nl.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
       iSplitR; [by iPureIntro |]. iFrame "HPhi Hdl Hoc Harmr Hun".
-    - iDestruct (socr_ok_fresh_arm with "Hok") as "[HR Hfd]".
+    - iDestruct (socr_ok_fresh_arm with "Hok") as "(HR & Htr & Hfd)".
       rewrite /socr_fresh.
       iDestruct "HR" as (d nm av ents nl)
-        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Htc & Harmr & Hun)".
+        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Harmr & Hun)".
       iModIntro. iRight. rewrite /open_post_ok_create.
       iExists pl, d, i0, nm.
       iSplitR; [by iPureIntro |]. iFrame "HP".
       iLeft. iExists av, ents, nl.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-      iFrame "HPhi Hdl Hoc Htc Harmr Hun Hfd".
+      iFrame "HPhi Hdl Hoc Htr Harmr Hun Hfd".
   Qed.
 
   Lemma socr_arms_exists `{GEN : GenId}

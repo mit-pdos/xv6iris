@@ -781,6 +781,15 @@ Section ProofCreateAlloc.
             ic_handle fsc_ic kd (DepTx (qd/2)%Qp icfg_dev dind gd lodc t (1/4)))%I
           with "[Hdep]" as "Hdep".
         { iExists lodc, tldc. iSplitR; [by iPureIntro|]. iFrame "Hfldc Hdep". }
+        (* THE DOTS LEG, OPENED: [cr_mkdir_body] is the [beq s4,a4] TAKEN, so
+           the type IS the directory and [SpecCreate.cre_dots_leg]'s guard is
+           discharged here -- which is the one place in the tree that
+           discharges it, and the reason no caller at another type owes a
+           dots piece at all. *)
+        iDestruct (SpecCreate.cre_dots_leg_at (fs_gamma_L fsc_fs)
+                     (bv_unsigned ty) Fdots
+                     ltac:(rewrite Htdir; vm_compute; reflexivity)
+                     with "Hdots") as "Hdots".
         iApply ("Hm" $! W4 kslot q g gil gisl loC tlC cinum dnc bmc datc
                   (S q2) (Sb1 ∪ {[IBLOCK cinum icfg_ist]}
                           ∪ {[IBLOCK cinum icfg_ist]})

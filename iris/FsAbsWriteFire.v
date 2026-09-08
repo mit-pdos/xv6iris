@@ -679,26 +679,23 @@ Section WriteFire.
      every key.  [FsAbsInvFire.fsabs_awrite_chain] is the same lemma at the
      live Γ's dischargers. *)
   (* ...at the live Γ, since the full arm owes the caller's step, paid here
-     out of the parked license ([AppInv.app_step_acc]) *)
+     out of the SUPPLY ([AppInv.app_step_acc]) *)
   Lemma awrite_chain_unit (γfs : fs_names) E i γo M ua k cnt :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗
+    app_sup -∗
     awrite_chain (fs_gamma_L γfs) E i γo M ua (fun _ => True%I) k cnt.
   Proof.
-    intros HE. revert k. induction cnt as [| cnt IH]; intros k.
+    revert k. induction cnt as [| cnt IH]; intros k.
     { rewrite awrite_chain_0. by iIntros "_". }
-    rewrite awrite_chain_S. iIntros "#Hai". iSplit; [done |]. iSplit.
+    rewrite awrite_chain_S. iIntros "#Hsup". iSplit; [done |]. iSplit.
     - rewrite /awrite_full_at. iIntros (I off bs bs0 nl) "%Hpre %Hby Ha Hk".
-      iMod (app_step_acc_view E γfs i I _ HE
-              (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
+      iDestruct (app_step_acc i I _ with "Hsup") as "Hstep".
       iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
-      iFrame "Ha' Hk". iApply (IH with "Hai").
+      iFrame "Ha' Hk". iApply (IH with "Hsup").
     - rewrite /awrite_part_at.
       iIntros (I off r bs bs0 nl) "%Hpre %Hr %Hgap %Hby Ha Hk".
-      iMod (app_step_acc_view E γfs i I _ HE
-              (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
+      iDestruct (app_step_acc i I _ with "Hsup") as "Hstep".
       iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
-      iFrame "Ha' Hk". iApply (IH with "Hai").
+      iFrame "Ha' Hk". iApply (IH with "Hsup").
   Qed.
 
   (* =================================================================== *)

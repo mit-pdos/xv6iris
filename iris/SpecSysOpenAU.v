@@ -366,33 +366,31 @@ Section SysOpenAU.
             ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i bs0))%I.
 
   (* satisfiability, at the live Γ: a write-kind shape owes the caller's
-     step, which a client that knows nothing pays out of the parked license
-     ([AppInv.app_step_acc], inside the commit's own fupd) *)
+     step, which a client that answers for no abstract state pays out of
+     the SUPPLY ([AppInv.app_step_acc]) *)
   Lemma atrunc_commit_at_unit `{XI : CurCtx} (γfs : fs_names) E :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗ atrunc_commit_at (fs_gamma_L γfs) E (fun _ _ _ => True%I).
+    app_sup -∗ atrunc_commit_at (fs_gamma_L γfs) E (fun _ _ _ => True%I).
   Proof.
-    iIntros (HE) "#Hai". rewrite /atrunc_commit_at. iIntros (I i bs0 nl) "%Hpre Ha".
-    iMod (app_step_acc_view E γfs i I (delta_trunc i (abs_view I)) HE
-            (delta_trunc_absent (abs_view I) i) with "Hai") as "Hstep".
+    iIntros "#Hsup". rewrite /atrunc_commit_at. iIntros (I i bs0 nl) "%Hpre Ha".
+    iDestruct (app_step_acc i I (delta_trunc i (abs_view I))
+                 with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
 
   Lemma atrunc_commit_at_pinned `{XI : CurCtx} (γfs : fs_names) E (q : Qp) (jpin : Z) (b : anode)
       (Φ : aview -> Z -> list (bv 8) -> iProp Σ) :
-    ↑appN ⊆ E ->
-    app_inv γfs -∗
+    app_sup -∗
     nview (fs_gamma_L γfs) q jpin b -∗
     (∀ (av : aview) (i : Z) (bs : list (bv 8)),
        ⌜av !! jpin = Some b⌝ -∗ nview (fs_gamma_L γfs) q jpin b -∗ Φ av i bs) -∗
     atrunc_commit_at (fs_gamma_L γfs) E Φ.
   Proof.
-    iIntros (HE) "#Hai Hn HΦ". rewrite /atrunc_commit_at.
+    iIntros "#Hsup Hn HΦ". rewrite /atrunc_commit_at.
     iIntros (I i bs0 nl) "%Hpre Ha".
     iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
-    iMod (app_step_acc_view E γfs i I (delta_trunc i (abs_view I)) HE
-            (delta_trunc_absent (abs_view I) i) with "Hai") as "Hstep".
+    iDestruct (app_step_acc i I (delta_trunc i (abs_view I))
+                 with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     iFrame "Ha'".
     iApply ("HΦ" $! (abs_view I) i bs0 with "[%] Hn"). done.
