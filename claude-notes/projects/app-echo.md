@@ -167,6 +167,73 @@ kernel-side instance.
   the kernel's proof ever takes `exec_post_ok`'s "(b) generic mint" arm
   for an x-tier process must be checked (`ProofKexecAU`).
 
+#### THE ARM, concretely (design 2026-09-08, after the folds; the ARM lane's brief is cut from this)
+
+Landed mechanism to generalise: the exec GIVE.  `UexecRetExec.uexecXG` is
+an ambient class with `xbundle : (uvis -d> iPropO Σ) -> uvis -> iProp Σ`
+(the payload at the RECURSIVE OCCURRENCE, so the slot wand inside it
+concludes at the fixpoint) plus `xbundle_ne`/`xbundle_cong`;
+`uexec_ret_x_F` splits `USYS_exec` off the returning arm and demands
+`xbundle X W` beside it; `UexecExecInst.v` instantiates the class at
+`SpecSysExecAU.sys_exec_au_pre` (the families existential in the arm,
+re-bound by the dispatch); `SpecSyscall`'s dispatcher contract TAKES
+`xbundle uslot_x (uvis_of U sts)` from the trap loop; the x-tier loop
+(`UexecApplyX`) holds `∀ W'', uslot_x W''` — the generic slot as a
+persistent SUPPLY over every key.  The return former's cone has no fs
+class (`fileG`/`appcfg` do not occur in UexecRet/UexecSlot/UexecWp).
+
+The ARM lane = that mechanism at EVERY fs syscall, in the DEPOSIT shape:
+
+1. **One class, `uexecSG Σ`**, replacing `uexecXG`: `sbundle X n W` (the
+   process's bundle for syscall number `n` at trapping key `W`; `emp`
+   for numbers without a contract), `spost X n W r` (what comes BACK
+   under the arm's `∀ r`: the syscall's armed post — unfired pieces as
+   `AU ∧ R`, receipts, cursors; `emp` for exec, whose bundle is consumed
+   and whose process never resumes on success), `sbundle_ne`,
+   `sbundle_cong` (the bundle reads only the image, the arguments, the
+   descriptor view and the cwd off its key), and the SUPPLY LAW
+   `ssupply : iProp Σ` (persistent, opaque here) with
+   `sbundle_of_supply : □ ssupply -∗ ∀ X n W, sbundle X n W`.  Instance
+   (above the fs tower, `UexecExecInst.v` grown or a sibling):
+   `sbundle X n W := match n with 15 => open_in …; 17 => mknod_au_pre …;
+   16 => the write chain at the trivial…` — NO: at the process's OWN
+   families, existential in the arm exactly as exec's are; `spost` the
+   matching `*_arms`; `ssupply := □ ∀ av, app_pred app_run av` (the
+   predicate is trivially true — `app_triv` by definition, echo from the
+   taint), and `sbundle_of_supply` is today's `fsabs_*_in`/`fsabs_*_pre`
+   dischargers with the license read replaced by the supply (each write-
+   kind `app_step` is `iLeft`/trivial under it).
+2. **The arm** (`UexecRet.uexec_ret_F`, absorbing `UexecRetExec` and
+   `UexecRetFs`, as both headers promise): the returning-syscall arm
+   becomes `sbundle X n W ∗ (∀ r M' π' szv' fdv' cw', <the four pure
+   rows> -∗ spost X n W r -∗ X (bump …))`; exec's arm keeps its give
+   (`spost` = `emp`); the fd-row MIRROR (`mcur`) is a second component
+   of the same payload when the pilot's P4 lands, not a second arm.
+3. **The generic inhabitants** `uexec_wp_uslot`/`cond_entry_slot` take
+   `□ ssupply` and mint `sbundle` per call from it; `UEXEC_GEN` carries
+   `ssupply`'s discharge for the theorem's instantiation (`app_triv`:
+   trivial).  The x-tier's `∀ W'', uslot_x W''` supply becomes the one
+   tier.  Every verified program's ecall leaf (`UkStep`/`UkRunSys*`/
+   `UkFork`/`UkInit*`/`UkSh*`/`UkEcho`) deposits its bundle at its own
+   families and receives `spost`; today's leaves take the plain arm, so
+   the conservativity direction is `UexecRetExec`'s (the enrichment
+   DEMANDS a resource): each leaf gains the deposit as a premise, and a
+   program that owns nothing about the fs passes the supply-minted bundle.
+4. **The dispatcher** (`ProofSyscall`) takes `sbundle uslot n (uvis_of U
+   sts)` for each fs arm — exec's mold at SpecSyscall.v:331 — and hands
+   `spost` back; the `fsabs_*` dischargers are then only the supply law's
+   proof.  `app_inv` keeps the half authority and the claim; `app_auto`,
+   `app_auto_raw`, `app_step_of_auto`, `app_step_acc(_view)`, the mint's
+   license premise (`FsCfgSnap`, `BootShared`), the movers' `▷ app_auto`
+   binder (`InodeRegion.ireg_top_retag_gen` and twin) and `Happ_auto`
+   (`App`, `SystemAdequacy`) are deleted.
+5. **Staging.**  ARM-a: the class, the arm fold, the generic inhabitants,
+   the Uk leaves (kernel untouched; ripple = the 54 slot/return-channel
+   files).  ARM-b: the dispatcher, the supply law's instance, the
+   deletions, the two statement changes (`Happ_auto` leaves the theorems;
+   `UEXEC_GEN` gains the supply).  ARM-c: echo's `ssupply` from the taint
+   and `echo_pred := taint ∨ pins` (Q4).
+
 #### What is actually left to decide for L2-a
 
 - ~~D-A~~ **REFUNDS, RULED 2026-09-07 (owner): every piece of a bundle is
