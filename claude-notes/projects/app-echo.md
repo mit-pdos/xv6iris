@@ -326,18 +326,19 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
 
 ## Lanes in flight
 
-- **W-UNIFY (opened 2026-09-07, Opus lane, two phases).**  sys_write's
-  three contracts (`SpecSysWrite` plain / `SpecSysWriteAUEra` chain /
-  `SpecSysWriteConsAU` console; filewrite's three likewise) fold into ONE
-  `FILEWRITE` and ONE `SYSWRITE`, arms keyed on the descriptor state; the
-  chain's receipt family `Φ` becomes the prefix cursor `Q`, base case
-  `Q k`, the per-chunk buffer tie `ubytes_at M (ua + FW_MAX*k) bs` (partial
-  arm: `take r bs`) in phase 1; `fw_app_write_step` and the receipt
-  definitions deleted; the dispatcher calls the one contract with the
-  trivial cursor (still paying `app_step` from the license — the license
-  leaves in a later lane).  Phase 1 = statement, reported for review before
-  proofs.  Out of scope: a pipe-write AU (the pipe arm keeps the landed
-  blanket).
+- ~~**W-UNIFY**~~ LANDED 2026-09-08 (commit `c1d4268d8`; Opus lane, two
+  phases, 14 files deleted, +2069/−10994).  sys_write has ONE spec; the
+  chain is the prefix-cursor form with the per-chunk buffer tie; the
+  design of record is `design/fs-syscall-specs.md` §4 ("AS BUILT" and
+  "ONE CONTRACT PER SYSCALL").  `fw_app_write_step` and the receipt
+  families are gone; the dispatcher's input is
+  `FsAbsInvFire.fsabs_sys_write_in` at the trivial cursor (still paying
+  each node's `app_step` from the license — that leaves with the license).
+  Follow-up in flight: the dead `foff_permit_row` premise and the stale
+  source comments naming the deleted forms.  §(iv) item 2 is thereby
+  resolved.  Next lanes cut from the same mold: read (×3 → 1), mknod
+  (×3 → 1), open/unlink/chdir/dup/exec (×2 → 1), create (×4 → 1), sync
+  (×2 → 1); then the one-shot pieces gain `∧ R`; then the arm change.
 
 ## Decisions outstanding after the 2026-09-07 rulings
 

@@ -48,6 +48,17 @@ things, and the answer differs:
 
 ## The lanes
 
+**2026-09-08: the WRITE records below are superseded.**  Lane W's files
+(`SpecSysWriteAU`'s contract, `SpecSysWriteAUEra`, `SpecFilewriteAU`,
+`ProofSysWriteAU`, `ProofFilewriteAU`, the `_STABLE` pair), FILEWRITE-CONS's
+(`SpecFilewriteCons`, `SpecSysWriteConsAU`, their proofs and links) and the
+write items of RULING A describe parallel forms that lane W-UNIFY folded into
+the ONE `FILEWRITE`/`SYSWRITE` (commit `c1d4268d8`).  The as-built shape —
+arms keyed on the descriptor state, the chain with the prefix cursor `Q`,
+the per-chunk buffer tie in phase 1, no receipt family, no stable seal — is
+`design/fs-syscall-specs.md` §4 ("AS BUILT", "ONE CONTRACT PER SYSCALL").
+The records are kept only for the proof techniques they describe.
+
 - [x] **S0 — the carrier ruling + doc v3.**  DONE 2026-08-27, on the
   user's ruling "we can change the design to match better the kernel
   specs": the carrier is a READING of `γtop`'s `top_frag_q` (no new

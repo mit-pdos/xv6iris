@@ -641,10 +641,10 @@ Rules:
 - **Pin the class.**  `ghost_varG Σ Z` has two members in `xv6G`
   (`offbox_offG`, `uioG`'s break ghost); every statement uses `off_gv`, never
   a bare `ghost_var` at `Z`.
-- **The legacy astate-shaped write family (`SpecSysWriteAU.awrite_commit`,
-  `awrite_commits`, `write_arms`) does not carry the offset** and has no
-  prover (its `astate` shape was already undischargeable — `SpecSysWriteAUEra`'s
-  header); the proven family is the `_at` one.
+- **Every write commit is authority-shaped and carries the offset shadow's
+  half** (`FsAbsWriteFire.awrite_full_at`/`awrite_part_at`: phase 1 borrows
+  `off_gv γo (1/2) off` beside the kernel's half of the inode map and
+  returns it advanced).  There is no astate-shaped write commit.
 - **A verified process that keeps its half** needs a per-row POLICY where
   `foff_row` now puts the invariant; the enriched open row (the fd-row
   pilot's deposit disjunct) is where that choice is made.  Not built.

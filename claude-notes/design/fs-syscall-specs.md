@@ -367,16 +367,53 @@ read(fd):  fd f ↦ (i,off,O_RD) ∗ ⟨av. state av ∗ ⌜av!!i = AFile bs⌝�
 few-blocks-per-tx loop), unlocking the inode between chunks, so a
 concurrent reader may observe any chunk boundary: the AU form is
 per-chunk — a sequence of `δ_write` deltas, each with its own instant.
-The friendly single-delta form is the STABLE corollary when the client
-holds the file's `↦ₐ` half (nobody else observes the intermediates).
-And that is the ENTIRE write spec: v1 additionally specified that a
-crash may retain a prefix of the chunks, as write-specific durable
-content.  Under v2 that sentence is not written anywhere, because it is
-an instance of SNAPSHOT — each chunk boundary WAS a current state, so
-"recovery = some past current state" already says exactly that a chunk
-prefix (aligned to a batch boundary) may survive.  Lampson's
-`Op`/`done`/`mix` machinery for non-atomic writes collapses into the
-one global principle.
+AS BUILT (`FsAbsWriteFire.awrite_chain`, `SpecFilewrite`/`SpecSysWrite`):
+the caller hands in a CHAIN of nodes, one per possible chunk (`wchunks n`
+bounds the count; the decomposition stays existential).  Node k is
+`Q k ∧ (full_k ∧ part_k)` and the base case is `Q k`, where `Q : nat ->
+iProp` is the caller's PREFIX CURSOR — what it knows or owns after k
+chunks fired.  Each arm is a two-phase commit: phase 1 borrows the kernel's
+half of the inode map and the offset shadow's half at THIS instant (each
+chunk consults `f->off` and the file-system state afresh; nothing relates
+chunk k+1's offset to chunk k's, since another holder of the same `struct
+file` may move `f->off` between chunks), carries the pure premise that the
+chunk's bytes are the caller's buffer at `ua + FW_MAX*k` (the partial arm:
+only the counted `r` bytes, `take r bs`; the rest is writei's disturbed
+tail), and returns the caller's `app_step` for the delta; phase 2 borrows
+the post-map and returns the NEXT node — which the caller builds there,
+with the post-map witness in hand, so `Q (k+1)` can record that chunk k
+landed.  The kernel eliminates to an arm when it fires chunk k and hands
+the node back when it stops; the caller eliminates to `Q` at the stop
+position (`awrite_chain_cursor`).  The posts say only the pure totals
+(`|concat bss| = n` or `< n`, `ubytes_at M ua (concat bss)`) and return the
+node where the loop stopped.  There is no separate receipt family and no
+"stable" form: a caller holding the file's `↦ₐ` half chains the rows
+inside its own `Q`.
+
+The friendly single-delta reading is what such a `Q` states when nobody
+else observes the intermediates.  And that is the ENTIRE write spec: v1
+additionally specified that a crash may retain a prefix of the chunks, as
+write-specific durable content.  Under v2 that sentence is not written
+anywhere, because it is an instance of SNAPSHOT — each chunk boundary WAS a
+current state, so "recovery = some past current state" already says exactly
+that a chunk prefix (aligned to a batch boundary) may survive.  Lampson's
+`Op`/`done`/`mix` machinery for non-atomic writes collapses into the one
+global principle.
+
+**ONE CONTRACT PER SYSCALL.**  `sys_write` is the model: `SpecFilewrite.
+FILEWRITE` and `SpecSysWrite.SYSWRITE` are its only seals.  Each keeps the
+whole-function frame and takes a caller INPUT and returns an armed OUTPUT,
+both ONE `match` on the descriptor's state (`SpecSysWrite.sys_write_st`):
+an open writable inode supplies the chain and receives its arms; the
+console device supplies a trace seed and the devsw pin and receives the
+console arms (`write_cons_arms`, the receipt being `UartSentLoc.
+uart_sent_from`); every other descriptor supplies `emp` and receives only
+the landed return relation (a pipe-write AU is not yet stated).  The
+blanket (`filewrite_ret` / `sys_write_ret`) is a conjunct of EVERY arm, so
+the unified contract implies each former parallel form by construction.
+The dispatcher supplies the input at the trivial cursor and the empty seed
+(`FsAbsInvFire.fsabs_sys_write_in`).  Stable forms are derived corollaries
+where a client wants them, never a second proof against the code.
 
 ## 5. The durable aspect: one history, three principles, zero per-syscall content
 
