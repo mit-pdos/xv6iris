@@ -25,13 +25,10 @@
 
    What this file adds is what the blocks cannot share through those three:
 
-     - [su_au_closer], the AU return continuation.  It is
-       [SpecSysUnlink.sys_unlink_closer] with [ARMS] on the returned a0 in
-       place of the pure ⌜sys_unlink_ret⌝ -- i.e. exactly the block
-       [SpecSysUnlinkAU.wp_sys_unlink_au_frame] inlines, named once for the
-       same reason the landed closer is named once (optimization.md: it was
-       879 printed characters at EVERY step of the walk).  TRANSPARENT, so
-       the tails' [iApply ("Hcont" $! ...)] unifies through it.
+     - THE RETURN CONTINUATION IS NOT HERE: it is the contract's own
+       [SpecSysUnlink.sys_unlink_closer], the one closer, which takes the
+       armed post [ARMS] where a blanket-only reading would put
+       ⌜sys_unlink_ret⌝.
      - the module-internal projections of [ProofSysUnlink]'s walk, hoisted:
        they live inside that file's functor and are therefore invisible,
        but none of them mentions a functor parameter.
@@ -99,42 +96,11 @@ Require Import TsoCtx.
 
 Set Printing Depth 40.
 
-(* ===================================================================== *)
-(*  THE AU RETURN CONTINUATION                                            *)
-(* ===================================================================== *)
-
-(* [SpecSysUnlink.sys_unlink_closer]'s rows VERBATIM, with [ARMS] on the
-   returned a0 in place of ⌜sys_unlink_ret⌝ -- the block
-   [SpecSysUnlinkAU.wp_sys_unlink_au_frame] inlines, named.  THE IMAGE DOES
-   NOT MOVE (the statement's banner): binders [(mf, P')], no [M'].
-
-   TRANSPARENT on purpose, for the landed closer's own reason: the exit
-   sites apply it with [iApply ("Hcont" $! ...)], which unifies through a
-   transparent constant and fails through an opaque one. *)
-Definition su_au_closer
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (gf : gname) (pj : mword 64) (pid : mword 32) (U : ustate)
-    (m : regfile) (ret_tgt : mword 64) (K : nat) (eb b : bool)
-    (lks : gset string) (dqb dqs dqbs : dfrac)
-    (ARMS : mword 64 -> iProp Σ)
- : iProp Σ :=
-  (∀ (mf : regfile) (P' : uptd),
-      ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
-      sie_cap_gpr KT1 mf K b pj -∗
-      cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext KT1 eb -∗
-      cpu_claim_ext eb pj -∗
-      pc_is ret_tgt -∗
-      bslots 3 -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
-      iref_slots SpecSysUnlink.sys_unlink_slots -∗
-      proc_priv gf pj pid (us_upt U P') -∗
-      ARMS (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      WP (Loop : expr riscv_lang))%I.
+(* THE RETURN CONTINUATION is [SpecSysUnlink.sys_unlink_closer], the ONE
+   closer: the contract's frame applies it and every exit site here and in
+   the five block files hands it back.  It takes the armed post [ARMS]
+   where a blanket-only reading would put ⌜sys_unlink_ret⌝, so there is no
+   second copy of its fifteen rows anywhere. *)
 
 (* ===================================================================== *)
 (*  THE NAME TIE                                                          *)

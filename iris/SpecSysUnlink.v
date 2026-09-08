@@ -199,11 +199,89 @@
    DETERMINISM: none is claimed, and none is available.  Which of the six
    arms runs is a function of the FILE SYSTEM and of the user's path, and no
    caller of this contract knows any of that.  The postcondition is the
-   honest disjunction on the returned a0. *)
+   honest disjunction on the returned a0.
+
+   ==== ONE CONTRACT ====================================================
+
+   [Module Type SYSUNLINK] is sys_unlink's only seal.  Its body is the
+   whole-function FRAME below plus ONE caller INPUT ([unlink_au_pre], the
+   atomic-update bundle) and ONE armed OUTPUT ([unlink_arms], keyed on the
+   returned a0).  The landed return blanket [sys_unlink_ret] is a
+   consequence of the arms ([unlink_arms_ret]) rather than a second
+   conjunct, because the arms already split on the two words a0 can hold.
+   There is no stable corollary and no parallel form.
+
+   THERE IS ONE RETURN CONTINUATION, [sys_unlink_closer], and it takes the
+   armed post [ARMS] where a blanket-only reading would put
+   ⌜sys_unlink_ret⌝ -- which the arms imply.  It is named rather than
+   spelled inline for optimization.md's reason ("Seal a whole-function
+   proof's continuation"): inline it is fifteen rows, and a mid-walk dump
+   of [Delta] measured it at 879 printed characters -- 7.5 % of the Iris
+   context inside W3 and 13-15 % inside W5, at EVERY step of the walk, in
+   every block lemma, plus one more copy inside each block's own seam
+   continuation.  It stays TRANSPARENT on purpose (same section's rule 1):
+   the tails apply it with [iApply ("Hcont" $! ...)], which unifies through
+   a transparent constant and fails through an opaque one.  It is defined
+   OUTSIDE any [Section] because it is a premise of the contract below and
+   its rows are applied at the hart the caller picks.
+
+   ==== WHAT THE CALLER HANDS IN =======================================
+
+   [unlink_au_pre] is the one-shot bundle of this syscall's linearization
+   instants, at the commit mask [appE]: the nameiparent PARENT-PREFIX walk
+   premise ([FsAbsEraMknod.mknod_walk_pre_era], reused verbatim -- it is
+   nameiparent-generic) and [SpecSysUnlinkAU]'s four commits.  That file's
+   header carries the delta's two-instant shape, [unl_pre]'s side
+   conditions and why the pair reads as one delta anyway.
+
+   ==== THE ARMS ========================================================
+
+   ret 0  -- [unlink_post_ok]: the fetched path (existential, as always:
+             no premise can pin user bytes), the cursor [P Lp d] at the
+             parent, [unl_pre] restated purely at instant 1 beside the
+             caller's own receipts [Φent]/[Φtgt], the instant-2 target
+             pin, the region bound on [t], and the two observation
+             commits refunded (the found fact is subsumed by [unl_pre],
+             so firing [Φex] would be a second receipt at an earlier
+             instant).
+   ret -1 -- [unlink_post_fail], residue returned per arm:
+             (i)   nothing fs-visible happened (argstr failed): the
+                   whole bundle back unspent;
+             (ii)  the walk died at hop [k]: [mknod_walk_dead_era]'s
+                   refund shape, all four commits back;
+             (iii) the walk delivered the parent ([P Lp d] back, both
+                   delta commits back) and the transaction refused:
+                   (a) THE NAME IS A DOT -- refused BY NAME, before any
+                       lookup: a PURE fact about the fetched string
+                       ([last (path_elems pl)] is [DOT] or [DOTDOT]),
+                       both observation commits refunded (the kernel
+                       looked at nothing abstract);
+                   (b) GONE -- dirlookup ran and MISSED: the miss
+                       observation [Φmiss] FIRED at the instant, with
+                       the parent's row and the absent name stated
+                       purely beside it;
+                   (c) DIR NON-EMPTY -- dirlookup FOUND [t] and
+                       isdirempty refuted emptiness: the found
+                       observation [Φex] FIRED, at the instant where
+                       BOTH locks are held, so the same [av] purely
+                       carries the parent's row, the entry, the
+                       target's dir row and its non-dots witness;
+                   (d) no abstract observation to report -- the k = Lp
+                       deaths (namex's type test and nlink guard at the
+                       parent's own level, and "unlink of /"), with both
+                       observation commits refunded.  -1 deliberately
+                       does not say which arm (DETERMINISM: none).
+
+   ==== NOTHING ABOUT DURABILITY =======================================
+
+   No durable clause of any kind appears below (design/fs-syscall-specs.md
+   section 5); the per-syscall certificates are [FsDurSyscall]'s and the
+   composition is the consumer's.
+ *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac.
+From iris.algebra Require Import auth gmap frac dfrac.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -216,7 +294,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import SpecPrintk.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -240,12 +317,24 @@ Require Import FileInvDefs.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
+Require Import SpecPrintk.      (* [printk_env], [printk_gen_contract] *)
+Require Import SpecDirlink.     (* [ic_sleeplocks], [ireg_blocks_ok] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import SpecSysUnlinkAU.  (* THE STATEMENT LEAF: the delta's side
+                                    conditions and the four commits *)
+Require Import PathElems.       (* [path_elems], [SLASH] *)
+Require Import FsTree.          (* [fname], [DOT], [DOTDOT] *)
+Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
+Require Import SpecSysMknodAU.  (* [mknod_parent_elems]                  *)
+Require Import FsAbsEraMknod.   (* the era walk-premise pair, reused
+                                   verbatim (nameiparent-generic) *)
+Require Import FsAbsMknodFire.  (* [dlookup_commit_at]; the [_at] mold *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 
@@ -267,30 +356,18 @@ Definition sys_unlink_slots : nat := 2%nat.
    ([bad:]) and +0x170 (ARM A). *)
 Definition sys_unlink_ret (r : mword 64) : Prop :=
   r = (mword_of_int (-1) : mword 64) \/ r = (zero_reg : mword 64).
-
-(* THE RETURN CONTINUATION, NAMED ONCE.
-
-   claude-notes/optimization.md, "Seal a whole-function proof's
-   continuation": spelled inline this is fifteen rows, and a mid-walk dump of
-   [Delta] in the unlink walk measured it at 879 printed characters --
-   7.5 % of the Iris context inside W3 and 13-15 % inside W5, at EVERY step
-   of the walk, in every block lemma, plus one more copy inside each block's
-   own seam continuation.  One [Definition] names it in this contract and in
-   every block statement of [ProofSysUnlinkAUW1/W2/W3/W5F/W5D].
-
-   It stays TRANSPARENT on purpose (same section's rule 1): the tails apply
-   it with [iApply ("Hcont" $! ...)], which unifies through a transparent
-   constant and fails through an opaque one.
-
-   It is defined OUTSIDE any [Section] because it is a premise of the
-   contract below and its rows are applied at the hart the
-   caller picks; see the same note's last paragraph. *)
+(* THE RETURN CONTINUATION, NAMED ONCE, AND IT TAKES THE ARMED POST.
+   [ARMS] sits where a blanket-only reading would put ⌜sys_unlink_ret⌝ --
+   which the arms imply ([unlink_arms_ret]), so there is one closer and not
+   two.  Why it is named at all, and why it is transparent and outside every
+   [Section], is in the header's ONE CONTRACT block. *)
 Definition sys_unlink_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gf : gname) (pj : mword 64) (pid : mword 32) (U : ustate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (eb b : bool)
     (lks : gset string) (dqb dqs dqbs : dfrac)
+    (ARMS : mword 64 -> iProp Σ)
  : iProp Σ :=
   (* THE IMAGE DOES NOT MOVE.  This syscall only READS user memory (argstr,
      through fetchstr and copyinstr); the pages it faults in on the way were
@@ -317,21 +394,165 @@ Definition sys_unlink_closer
       iref_slots sys_unlink_slots -∗
       (* the process block, at the same everything but the page table *)
       proc_priv gf pj pid (us_upt U P') -∗
-      ⌜sys_unlink_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+      (* the armed post on the returned a0 (implies [sys_unlink_ret],
+         through [unlink_arms_ret]) *)
+      ARMS (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang))%I.
 
-Definition wp_sys_unlink_sconf_body
+(* ===================================================================== *)
+(*  THE BUNDLE AND THE ARMS                                               *)
+(* ===================================================================== *)
+
+Section SysUnlinkArms.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  (* Everything the caller hands in, at the commit mask [appE].  The walk
+     premise is [FsAbsEraMknod.mknod_walk_pre_era]
+     REUSED VERBATIM (it is nameiparent-generic -- the one-shot
+     ∀ pl r with only the SLASH -> ROOTINO tie, the hop family at the
+     era lend over the parent prefix [mknod_parent_elems pl]; it is what
+     [FsAbsStart.ep_start] instantiates to at the fetched string). *)
+  Definition unlink_au_pre Γ (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φtgt : aview -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φmiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
+    (mknod_walk_pre_era γfs cw P Pmiss
+     ∗ uent_commit_at Γ appE Φent
+     ∗ utgt_commit_at Γ appE Φtgt
+     ∗ dlookup_commit_at Γ appE Φex
+     ∗ dmiss_commit_at Γ appE Φmiss)%I.
+
+  (* ret 0: the fetched path, the cursor at the parent, [unl_pre]
+     restated purely at instant 1, BOTH fired receipts, the instant-2
+     pin on the target's row (its lock is held across the gap), the
+     region bound on the target, and the two observation commits
+     refunded. *)
+  Definition unlink_post_ok Γ (P : nat -> Z -> iProp Σ)
+      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φtgt : aview -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φmiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
+    (∃ (pl : list (bv 8)) (av0 av1 : aview) (d t : Z) (nm : fname)
+       (ents : gmap fname Z) (nl : nat) (a : anode),
+       ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+       ⌜unl_pre av0 d nm ents nl t a⌝ ∗
+       ⌜0 < t < 16 * Z.of_nat icfg_nib⌝ ∗
+       ⌜av1 !! t = Some a⌝ ∗
+       P (length (mknod_parent_elems pl)) d ∗
+       dlookup_commit_at Γ appE Φex ∗
+       dmiss_commit_at Γ appE Φmiss ∗
+       Φent av0 d nm t ∗
+       Φtgt av1 t)%I.
+
+  (* ret -1: the header's fold -- (i) bundle back, (ii) walk dead,
+     (iii) refused at the parent with the observation each refusal IS *)
+  Definition unlink_post_fail Γ (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φtgt : aview -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φmiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
+    (unlink_au_pre Γ γfs cw P Pmiss Φent Φtgt Φex Φmiss
+     ∨ (∃ pl : list (bv 8),
+          (mknod_walk_dead_era γfs P Pmiss pl
+             ∗ uent_commit_at Γ appE Φent
+             ∗ utgt_commit_at Γ appE Φtgt
+             ∗ dlookup_commit_at Γ appE Φex
+             ∗ dmiss_commit_at Γ appE Φmiss)
+          ∨ (∃ d : Z,
+               P (length (mknod_parent_elems pl)) d
+               ∗ uent_commit_at Γ appE Φent
+               ∗ utgt_commit_at Γ appE Φtgt
+               ∗ ((* (iii-a) the name is a dot: refused BY NAME, before
+                     any lookup -- pure, both observations refunded *)
+                  (∃ nm : fname,
+                     ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                     ⌜nm = DOT \/ nm = DOTDOT⌝ ∗
+                     dlookup_commit_at Γ appE Φex ∗
+                     dmiss_commit_at Γ appE Φmiss)
+                  ∨ (* (iii-b) gone: the miss observation FIRED *)
+                  (∃ (av : aview) (nm : fname) (ents : gmap fname Z)
+                     (nl : nat),
+                     ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                     ⌜arow_at av d (MkAnode (ADir ents) nl)⌝ ∗
+                     ⌜ents !! nm = None⌝ ∗
+                     Φmiss av d nm ∗
+                     dlookup_commit_at Γ appE Φex)
+                  ∨ (* (iii-c) dir non-empty: the found observation
+                       FIRED, both rows pinned at the one instant *)
+                  (∃ (av : aview) (t : Z) (nm : fname)
+                     (ents est : gmap fname Z) (nl nlt : nat),
+                     ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                     ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
+                     ⌜ents !! nm = Some t⌝ ∗
+                     ⌜av !! t = Some (MkAnode (ADir est) nlt)⌝ ∗
+                     ⌜~ dots_only est⌝ ∗
+                     Φex av d nm t ∗
+                     dmiss_commit_at Γ appE Φmiss)
+                  ∨ (* (iii-d) no abstract observation to report: the
+                       k = Lp deaths (parent-level type/nlink guards,
+                       "unlink of /") -- everything back *)
+                  (dlookup_commit_at Γ appE Φex ∗
+                   dmiss_commit_at Γ appE Φmiss)))))%I.
+
+  (* the armed disjunction the continuation receives, keyed on a0
+     (implies the landed [sys_unlink_ret]) *)
+  Definition unlink_arms Γ (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φtgt : aview -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φmiss : aview -> Z -> fname -> iProp Σ)
+      (r : mword 64) : iProp Σ :=
+    ((⌜r = (zero_reg : mword 64)⌝
+      ∗ unlink_post_ok Γ P Φent Φtgt Φex Φmiss)
+     ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
+        ∗ unlink_post_fail Γ γfs cw P Pmiss Φent Φtgt Φex Φmiss))%I.
+
+  (* the landed return blanket, read off the arms: the one conjunct of
+     [SpecSysUnlink.sys_unlink_closer] the AU form replaces, implied *)
+  Lemma unlink_arms_ret Γ (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φtgt : aview -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φmiss : aview -> Z -> fname -> iProp Σ) (r : mword 64) :
+    unlink_arms Γ γfs cw P Pmiss Φent Φtgt Φex Φmiss r ⊢ ⌜sys_unlink_ret r⌝.
+  Proof.
+    rewrite /unlink_arms /sys_unlink_ret.
+    iIntros "[[%Hr _] | [%Hr _]]"; iPureIntro; [right | left]; exact Hr.
+  Qed.
+
+End SysUnlinkArms.
+
+(* big-op bodies behind definitions: seal them (durable-notes;
+   optimization.md, "a big-op body is the predictor"). *)
+Global Typeclasses Opaque unlink_au_pre unlink_post_ok unlink_post_fail
+  unlink_arms.
+
+(* ===================================================================== *)
+(*  THE WHOLE-FUNCTION FRAME, abstracted over the caller's bundle and the *)
+(*  armed post.  There is no second body: this frame is the only one, and *)
+(*  the body below instantiates it.                                       *)
+(* ===================================================================== *)
+
+Definition wp_sys_unlink_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)      (* ftable, kalloc, printk   *)
-    (gs : list gname) (j : nat) (gl : gname)     (* the running process      *)
-   (* disk fabric + lock *)
-    (pd pav pu : mword 64)
+    (gs : list gname) (j : nat) (gl : gname)     (* the running process *)
+    (pd pav pu : mword 64)                       (* disk fabric + lock  *)
     (dqb dqs dqbs : dfrac)
-    (v0 : mword 64)                           (* syscall argument 0         *)
+    (v0 : mword 64)                              (* syscall argument 0  *)
     (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string)
+    (EXTRA : iProp Σ) (ARMS : mword 64 -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_unlink in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -348,31 +569,19 @@ Definition wp_sys_unlink_sconf_body
   cov_below fsc_cov fsc_size ->
   bitmap_geom_ok fsc_cov fsc_logst fsc_bmapstart fsc_size ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
-  (* mkfs's [ushort] geometry: the zeroed record's [de.inum] is a halfword
-     and [dirlookup]'s answer is read back against the region's inum range,
-     so the two have to agree on the width.  create's and sys_link's premise
-     verbatim. *)
+  (* mkfs's [ushort] geometry, the landed contract's premise verbatim *)
   16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
-  (* ---- balloc's out-of-blocks arm (under the zeroing writei) calls
-     printk, not panic ---- *)
+  (* ---- balloc's out-of-blocks arm calls printk, not panic ---- *)
   printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
-  (* nameiparent's own premise, inherited: the walker runs with the base
-     enabled *)
+  (* nameiparent's own premise, inherited *)
   eb = true ->
-  (* the single [argstr] call reads syscall argument 0 out of the trapframe
-     page [proc_priv] carries.  Nothing is assumed about it: argstr checks
-     the string itself. *)
+  (* argstr reads syscall argument 0 out of the trapframe page *)
   pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
   sie_cap_gpr KT1 m K b pj -∗
-  (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
-     premise here: the depth is pinned at ZERO, so [CpuOwn.cpu_own_zero_empty]
-     DERIVES [lks = ∅] and every order goal the ten callees raise is
-     [locks_below ∅ _]. *)
+  (* entered with no lock held: depth pinned at zero *)
   cpu_own 0 eb pj b lks -∗
-  (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
-     contract's own premise forces -- so no caller gains an obligation. *)
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -392,39 +601,80 @@ Definition wp_sys_unlink_sconf_body
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
-  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
-     Persistent, borrowed and never spent; it rides the SAME channel
-     [ireg_inv] does.  It is here because this contract reaches iput, whose
-     free path FREEZES the inode, and §2.3's boot-shelter clause makes a
-     freezer exhibit the regime it freezes under.  A runtime caller hands
-     [SpecIput] the LEFT arm of its borrowed disjunction and discards what
-     comes back; only ireclaim, which freezes before the seal is fired,
-     lends [ireg_boot] instead. *)
+  (* the sealed regime, riding [ireg_inv]'s channel (the landed
+     contract's row and reason: this contract reaches iput's freezer) *)
   ireg_open -∗
-  (* ---- the three superblock cells the zeroing's writei / bmap / balloc
-     and the walk's own iunlockputs read ---- *)
+  (* ---- the three superblock cells ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  (* argstr's page-table side, and the walk's (iget's ipool arm allocates) *)
   kalloc_env fsc_kalloc None -∗
-  (* the running-thread bundle *)
   procs_inv gs -∗
   (* ---- the process, and the reference allowance the walk needs ---- *)
   iref_slots sys_unlink_slots -∗
   proc_priv γf pj pid U -∗
-  (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_unlink parks in every
-     one of its ten distinct callees, so it can return on another hart
-     whatever SIE was doing.
-     Vacuous at [true], so consuming it costs the caller nothing. *)
-  (* the return continuation, named: see [sys_unlink_closer] above *)
+  (* ---- THE CALLER'S BUNDLE (the one addition to the premise list) ---- *)
+  EXTRA -∗
+  (* the return continuation, named: see [sys_unlink_closer] above.  The
+     crossing is the literal [true]: sys_unlink parks in all ten callees. *)
   wp_next true pj (fun (CID : CpuId) =>
     sys_unlink_closer (CID := CID) γf pj pid U m ret_tgt K eb b lks
-                      dqb dqs dqbs) -∗
+                      dqb dqs dqbs ARMS) -∗
   WP (Loop : expr riscv_lang).
 
-(* NO [Module Type SYSUNLINK].  The landed walk it sealed is gone (round E2,
-   lane E2-X): the dispatch runs this syscall on its atomic-update
-   contract, and [wp_sys_unlink_sconf_body] survives as the FRAME that
-   contract restates. *)
+(* THE CONTRACT.  The abstract state is read at the LIVE Γ,
+   [fs_gamma_L fsc_fs] -- the gname tie to [ftop_body]'s authority is
+   definitional ([FsAbs.ftop_gamma_top]). *)
+Definition wp_sys_unlink_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γf : gname)
+    (gs : list gname) (j : nat) (gl : gname)
+    (pd pav pu : mword 64)
+    (dqb dqs dqbs : dfrac)
+    (v0 : mword 64)
+    (pid : mword 32) (U : ustate)
+    (m : regfile) (K : nat) (eb : bool)
+    (b : bool) (lks : gset string)
+    (P Pmiss : nat -> Z -> iProp Σ)
+    (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+    (Φtgt : aview -> Z -> iProp Σ)
+    (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+    (Φmiss : aview -> Z -> fname -> iProp Σ) :=
+  let Γfs := fs_gamma_L fsc_fs in
+  wp_sys_unlink_frame γf gs j gl pd pav pu dqb dqs dqbs
+    v0 pid U m K eb b lks
+    (unlink_au_pre Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φent Φtgt Φex Φmiss)
+    (unlink_arms Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φent Φtgt Φex Φmiss).
+
+(* ===================================================================== *)
+(*  ONE MODULE TYPE                                                       *)
+(* ===================================================================== *)
+
+(* There is no parallel statement for the walk, the commits or the arms,
+   and no second proof against the code.  No stable corollary is sealed:
+   unlink retags BOTH the parent and the target, so both would refuse a
+   client pin; the stable reading arrives with the tree layer's
+   exclusivity fact, where [delta_unlink_split] makes the two instants one
+   delta. *)
+Module Type SYSUNLINK.
+  Parameter wp_sys_unlink :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γf : gname)
+      (gs : list gname) (j : nat) (gl : gname)
+      (pd pav pu : mword 64)
+      (dqb dqs dqbs : dfrac)
+      (v0 : mword 64)
+      (pid : mword 32) (U : ustate)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φtgt : aview -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φmiss : aview -> Z -> fname -> iProp Σ),
+      wp_sys_unlink_body γf gs j gl pd pav pu dqb dqs dqbs
+        v0 pid U m K eb b lks P Pmiss Φent Φtgt Φex Φmiss.
+End SYSUNLINK.

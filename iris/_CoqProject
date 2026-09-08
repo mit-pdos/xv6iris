@@ -1742,24 +1742,26 @@ App.v
 # the double-headed loop induction that closes 0x32 and 0x44 under one
 # iLoeb.
 
-# fs-syscall-specs lane W: THE UNLINK AU.  FsAbsUnlinkFire is the fire
+# fs-syscall-specs lane W: THE UNLINK WALK.  FsAbsUnlinkFire is the fire
 # leaf (FsAbsMknodFire / FsAbsOpenFire / FsAbsWriteFire are the one-per-
-# syscall precedent): the four fire points of SpecSysUnlinkAU's two-instant
+# syscall precedent): the four fire points of sys_unlink's two-instant
 # contract, plus the abs_of wrap of the landed dir_entries_unlink_eq, the
 # count-lowered bridge at both iupdates, and the isdirempty bridge in both
-# directions.  R10: SpecSysUnlinkAU and FsAbsMknodFire are untouched.
-#   The walk is ProofSysUnlink's, block for block, at the AU contract:
-# ProofSysUnlinkAUParts is the shared layer (the AU closer, the hoisted
-# projections, the name tie, the fire sites' pure side conditions) and the
-# five blocks are the copy-adapts.  ProofSysUnlinkParts, ProofSysUnlinkTails
-# (every exit block) and ProofSysUnlink's top-level pure layer are REUSED
-# VERBATIM.  ProofSysUnlinkAU seals SYSUNLINK_AU and LinkSysUnlinkAU makes
-# it unconditional -- assumption set = resv_matches, resv_is_valid, funext,
-# i.e. LinkNamexEra's, with nothing new entering the cone.
+# directions.
+#   ProofSysUnlinkAUParts is the shared layer (the hoisted projections, the
+# name tie, the fire sites' pure side conditions) and the five blocks are
+# the walk.  ProofSysUnlinkParts, ProofSysUnlinkTails (every exit block) and
+# ProofSysUnlink's top-level pure layer sit below them.  ProofSysUnlinkAU
+# seals SpecSysUnlink.SYSUNLINK -- its one parameter wp_sys_unlink -- and
+# LinkSysUnlink makes it unconditional: assumption set = resv_matches,
+# resv_is_valid, funext, i.e. LinkNamexEra's, with nothing new entering the
+# cone.  (The file keeps its AU suffix because ProofSysUnlink.v is the pure
+# layer this cone requires.)
 FsAbsUnlinkFire.v
 # app round E2, lane E2-L: LINK IN PLACE.  SpecSysLink gains the three
 # commits (the target's count up, the parent's entry, and the undo -- which
-# IS SpecSysUnlinkAU's utgt_commit_at, reused) and FsAbsLinkFire is the fire
+# IS SpecSysUnlinkAU's utgt_commit_at, reused from the statement leaf) and
+# FsAbsLinkFire is the fire
 # leaf for the first two, beside the abs_of wraps of the landed
 # dir_entries_dirlink_ins and of the count-raised record.  It sits here,
 # below FsAbsUnlinkFire, because the undo's fire is uf_utgt_fire itself;
@@ -1773,7 +1775,7 @@ ProofSysUnlinkAUW3.v
 ProofSysUnlinkAUW5F.v
 ProofSysUnlinkAUW5D.v
 ProofSysUnlinkAU.v
-LinkSysUnlinkAU.v
+LinkSysUnlink.v
 # sys_chdir's AU contract (lane C3): the walk-only mold (SpecSysUnlinkAU)
 # plus open's observation receipt, so the success arm names the new cwd's
 # inum as the walk's cursor.  ProofSysChdirAU is ProofSysChdir re-walked at

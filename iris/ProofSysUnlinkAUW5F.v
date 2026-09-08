@@ -356,7 +356,7 @@ Section ProofSysUnlinkAUW5F.
     ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] bex jj) -∗
     (pa_stk sp0 30) ↦₈[KT1] w30 -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      su_au_closer (CID := CIDx) gf (proc_addr jx) pid U m
+      sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid U m
         (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
         dqb dqs dqbs (unlink_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss
                         Phient Phitgt Phiex Phimiss)) -∗

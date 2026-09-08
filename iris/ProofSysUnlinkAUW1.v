@@ -176,9 +176,8 @@ Section ProofSysUnlinkAUW1.
      dump).  Spelled inline this one was 58 lines.
 
      TRANSPARENT on purpose: the [iApply ("Hseamk" $! ...)] sites and the
-     [iIntros] that discharges this goal in [wp_sys_unlink_sconf] unify
-     straight through a transparent constant, so NOT ONE LINE of proof script
-     changed.  [CIDs] is an explicit binder because the body writes
+     [iIntros] that discharges this goal in the walk unify straight through
+     a transparent constant.  [CIDs] is an explicit binder because the body writes
      [wp_next (CID0 := CIDs)], and its other rows resolve their [CpuId]
      instance to the innermost one. *)
   Definition su_w1_seam_au `{GEN : GenId} `{CIDs : CpuId} `{XI : CurCtx}
@@ -269,7 +268,7 @@ Section ProofSysUnlinkAUW1.
        (pa_stk (m !!! Regidx csp_rs1 : mword 64) 30) ↦₈[KT1] w30 -∗
        (* the caller's own exit, handed BACK *)
        wp_next (CID0 := CIDs) true (proc_addr jx) (fun (CIDx : CpuId) =>
-         su_au_closer (CID := CIDx) gf (proc_addr jx) pid U m
+         sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid U m
            (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
            dqb dqs dqbs
            (unlink_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss
@@ -343,7 +342,7 @@ Section ProofSysUnlinkAUW1.
           m K eb b lks Ms P1 n1 Sb1 w1 dpv nf bp1 bnm0 bd0 be0 w4 w5 w6 w27
           w30 pl iL P Pmiss Phient Phitgt Phiex Phimiss) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      su_au_closer (CID := CIDx) gf (proc_addr jx) pid U m
+      sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid U m
         (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
         dqb dqs dqbs
         (unlink_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss

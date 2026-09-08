@@ -40,9 +40,9 @@ Require Import LinkSysFork LinkSysExit LinkSysWait LinkSysPipe LinkSysRead
                 LinkSysWrite LinkSysLink LinkSysMkdir
                 LinkSysClose LinkSysSync.
 (* THE THREE FS-MUTATING ENTRIES RUN ON THEIR ATOMIC-UPDATE CONTRACTS: the
-   dispatch takes SYSMKNOD / SYSOPEN / SYSUNLINK_AU and derives the
+   dispatch takes SYSMKNOD / SYSOPEN / SYSUNLINK and derives the
    landed posts itself. *)
-Require Import LinkSysMknod LinkSysOpen LinkSysUnlinkAU.
+Require Import LinkSysMknod LinkSysOpen LinkSysUnlink.
 (* ...and the WRITE's (round E2, lane E2-W, ruling Q-e W1): the dispatch
    runs the AU write on an open, writable INODE descriptor and the landed
    contract on every other one, so both are on the functor's list. *)
@@ -59,5 +59,5 @@ Module Syscall :=
   SyscallProof SysFork SysExit SysWait SysPipe SysRead SysKill
                SysExecAU SysFstat SysChdirAU SysDup SysGetpid SysSbrk
                SysPause SysUptime SysWrite SysMknod SysLink SysMkdir
-               SysClose SysSync SysOpen SysUnlinkAU
+               SysClose SysSync SysOpen SysUnlink
                Myproc PrintkGen.

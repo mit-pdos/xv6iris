@@ -1,17 +1,23 @@
 (* ProofSysUnlinkAU.v -- **THE SEAL.**  W1 o W2 o W3 o {W5-FILE, W5-DIR},
-   and nothing else, ascribed [SpecSysUnlinkAU.SYSUNLINK_AU].
+   and nothing else, ascribed [SpecSysUnlink.SYSUNLINK] -- the syscall's
+   ONE contract, its one parameter [wp_sys_unlink].
 
-   [ProofSysUnlink.wp_sys_unlink_sconf]'s copy-adapt, and it composes
-   rather than proves: every block is a landed lemma of this lane and
-   every seam is the next block's premise list verbatim, so the only work
-   is naming the seam's forall-bound bundle (which now carries [pl], [iL],
-   the name tie, the cursor and the four commits) and handing the caller's
-   exit BACK at each stage.
+   It composes rather than proves: every block is a landed lemma of this
+   lane and every seam is the next block's premise list verbatim, so the
+   only work is naming the seam's forall-bound bundle (which carries [pl],
+   [iL], the name tie, the cursor and the four commits) and handing the
+   caller's exit BACK at each stage.
 
-   The result is [SpecSysUnlinkAU]'s Module Type, SEALED: the two-instant
-   AU is an unconditional theorem about the machine, given the twelve
-   callees' contracts.  [LinkSysUnlinkAU.v] instantiates it against their
-   proofs. *)
+   The result is an unconditional theorem about the machine, given the
+   twelve callees' contracts: the two-instant delta, its arms, and the
+   return blanket read off them ([unlink_arms_ret]).  [LinkSysUnlink.v]
+   instantiates it against the callees' proofs.
+
+   THE FILE NAME KEEPS ITS [AU] SUFFIX because [ProofSysUnlink.v] is
+   taken: that is sys_unlink's PURE layer (names, registers, ledger,
+   arithmetic), which this cone's six block files require and which
+   therefore has to stay below.  Renaming either is a hygiene sweep, not
+   a change to what is proved. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -46,6 +52,7 @@ Require Import SpecReadi.
 Require Import SpecWritei.
 Require Import SpecNparWrapEra.   (* [NPAR_WRAP_ERA]: the era walk         *)
 Require Import SpecSysUnlinkAU.
+Require Import SpecSysUnlink.   (* the ONE contract: the closer, the arms, [SYSUNLINK] *)
 Require Import ProofSysUnlinkAUW1.
 Require Import ProofSysUnlinkAUW2.
 Require Import ProofSysUnlinkAUW3.
@@ -69,12 +76,12 @@ Local Ltac regne :=
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
 
-Module SysUnlinkAUProof (Argstr : ARGSTR) (BeginOp : BEGIN_OP)
+Module SysUnlinkProof (Argstr : ARGSTR) (BeginOp : BEGIN_OP)
                         (NparEra : NPAR_WRAP_ERA) (Ilock : ILOCK)
                         (Namecmp : NAMECMP) (Dirlookup : DIRLOOKUP)
                         (Memset : MEMSET) (Readi : READI) (Writei : WRITEI)
                         (Iupdate : IUPDATE) (Iunlockput : IUNLOCKPUT)
-                        (EndOp : END_OP) (PN : PANIC) : SYSUNLINK_AU.
+                        (EndOp : END_OP) (PN : PANIC) : SYSUNLINK.
 
 Module W1  := SysUnlinkAUW1  Argstr BeginOp NparEra Iunlockput EndOp PN.
 Module W2  := SysUnlinkAUW2  Ilock Namecmp Dirlookup Iunlockput EndOp PN.
@@ -97,7 +104,7 @@ Section ProofSysUnlinkAU.
   Notation Ra4 := (mword_of_int 14 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
-  Lemma wp_sys_unlink_au `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma wp_sys_unlink `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -109,12 +116,12 @@ Section ProofSysUnlinkAU.
       (Phitgt : aview -> Z -> iProp Σ)
       (Phiex : aview -> Z -> fname -> Z -> iProp Σ)
       (Phimiss : aview -> Z -> fname -> iProp Σ) :
-    wp_sys_unlink_au_body gf gs jx gl pd pav
+    wp_sys_unlink_body gf gs jx gl pd pav
       pu
       dqb dqs dqbs v0 pid U m K eb b lks P Pmiss
       Phient Phitgt Phiex Phimiss.
   Proof.
-    cbv beta zeta delta [wp_sys_unlink_au_body wp_sys_unlink_au_frame].
+    cbv beta zeta delta [wp_sys_unlink_body wp_sys_unlink_frame].
     intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
            Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hnib16 Hprk Hj Hgl Heb Harg0.
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hprenv #Hbio #Hlog
@@ -122,7 +129,7 @@ Section ProofSysUnlinkAU.
              #Hslks #Hireg #Hropen Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hir Hpriv
              Hau Hcont".
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpenv".
-    (* The contract's own inlined return continuation IS [su_au_closer]
+    (* The contract's own inlined return continuation IS [sys_unlink_closer]
        row for row (the descriptor report has been the sized [uptd_ext_sz]
        on both sides since the landed row), so [Hcont] is handed to W1 as
        it stands: this proof is composition and nothing else. *)
@@ -264,4 +271,4 @@ Section ProofSysUnlinkAU.
 
 End ProofSysUnlinkAU.
 
-End SysUnlinkAUProof.
+End SysUnlinkProof.

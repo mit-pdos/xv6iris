@@ -295,7 +295,7 @@
      `K_sys_xxx <= av - 4` premise falls out of `K_syscall <= av` by `lia`.
 
    ALL 22 sys_* FUNCTIONS ARE PROVEN AND LINKED (sysfile.c is 16/16 and
-   file.c 7/7), sys_unlink included -- LinkSysUnlinkAU.v retired the last
+   file.c 7/7), sys_unlink included -- LinkSysUnlink.v retired the last
    stub axiom.  So nothing below this file is missing: both remaining
    unwired entries are blocked on debt (C) in the STATUS block, and on
    nothing else. *)
@@ -362,12 +362,15 @@ Require Import SpecSysFork SpecSysExit SpecSysWait SpecSysPipe SpecSysRead SpecS
                SpecSysClose SpecSysSync.
 Require Import SpecSysOpen.
 (* THE ATOMIC-UPDATE CONTRACTS the three fs-mutating entries run on (their
-   return blankets are corollaries: [open_arms_plain_landed],
-   [mknod_arms_ret], [unlink_arms_ret]), and the dischargers that satisfy
-   their bundles out of the application-side abstract-state invariant
-   [FirstTok.fsabs_env] with receipts that say nothing.  mknod's is
-   [SpecSysMknod]'s own [SYSMKNOD], required above. *)
+   return blankets are corollaries: [open_arms_landed], [mknod_arms_ret],
+   [unlink_arms_ret]), and the dischargers that satisfy their bundles out
+   of the application-side abstract-state invariant [FirstTok.fsabs_env]
+   with receipts that say nothing.  mknod's is [SpecSysMknod]'s own
+   [SYSMKNOD], required above; open's and unlink's are [SpecSysOpen]'s
+   [SYSOPEN] and [SpecSysUnlink]'s [SYSUNLINK], over their statement
+   leaves. *)
 Require Import SpecSysOpenAU SpecSysUnlinkAU.
+Require Import SpecSysUnlink.    (* [SYSUNLINK], [unlink_arms_ret] *)
 Require Import SpecSysChdirAU.   (* [SYSCHDIR_AU], [chdir_arms_landed], [fsabs_chdir_pre] (C3) *)
 (* ...and the write's (round E2, lane E2-W, W1): the dispatch case-splits
    on the descriptor's own state and runs the AU write for an open,
@@ -433,7 +436,7 @@ Module SyscallProof
     (SysPause : SYSPAUSE) (SysUptime : SYSUPTIME) (SysWrite : SYSWRITE)
     (SysMknod : SYSMKNOD) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
     (SysClose : SYSCLOSE) (SysSync : SYS_SYNC)
-    (SysOpen : SYSOPEN) (SysUnlink : SYSUNLINK_AU)
+    (SysOpen : SYSOPEN) (SysUnlink : SYSUNLINK)
     (Myproc : MYPROC) (Printk : PRINTK_GEN) : SYSCALL.
 
 (* ONE SECTION PER HART EPOCH.  Every piece below concludes in [WP Loop],
@@ -3955,7 +3958,7 @@ Section SyscallArms.
      [Print Assumptions] name sys_unlink rather than the dispatch's own
      placeholder. *)
   (* sys_unlink's ARM IS WITHDRAWN, not written.  Origin's arm applied
-     [SysUnlink.wp_sys_unlink_sconf] at a leading [syscall_env] bundle;
+     [SysUnlink.wp_sys_unlink] at a leading [syscall_env] bundle;
      our line's b284fecb replaced the syscall-shaped placeholder with a
      REAL contract taking [(γf) (γa) (γpr) (gs) (j) (gl) (gu) (gd) (gk)
      (pd pav pu) ...].  Both are real, the shapes disagree, and index 18
@@ -4891,11 +4894,11 @@ Section SyscallArms.
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     iDestruct (sysc_iref_split with "Hir") as "[Hirk Hiru]".
-    (* THE AU CONTRACT, at the trivial bundle ([FsAbsInvFire.fsabs_unlink_pre]);
-       the landed return blanket is read back off the arms
-       ([unlink_arms_ret]). *)
+    (* THE ONE CONTRACT, at the trivial bundle
+       ([FsAbsInvFire.fsabs_unlink_pre]); the return blanket is read back
+       off the arms ([unlink_arms_ret]). *)
     iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
-    iApply (SysUnlink.wp_sys_unlink_au γf γs j γl
+    iApply (SysUnlink.wp_sys_unlink γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded DfracDiscarded v0 pid U M
               (av - 4)%nat true true ∅
