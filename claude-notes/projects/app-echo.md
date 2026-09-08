@@ -234,6 +234,41 @@ The ARM lane = that mechanism at EVERY fs syscall, in the DEPOSIT shape:
    `UEXEC_GEN` gains the supply).  ARM-c: echo's `ssupply` from the taint
    and `echo_pred := taint ∨ pins` (Q4).
 
+**Corrections from ARM's phase-0 inventory (2026-09-08), ruled in:**
+(i) the supply law takes the slot family — `□ ssupply -∗ □ (∀ W', X W')
+-∗ ∀ n W, sbundle X n W` — because exec's bundle carries the slot wand at
+the recursive occurrence; (ii) `sbundle_mono` is a class field (the fd
+mirror's tier `uslot_fs` stays alive for P4 and injects through it);
+(iii) `ssupply` is opaque in the class — `appcfg` is not in the return
+former's cone; (iv) STAGING: `spost` is in the class from ARM-a at `emp`
+for every number and the tier fold (`uslot_x` → `uslot`, the kernel-side
+renames in SpecSyscall/SpecUsertrap/SpecUservec/ProofUsertrap*/
+ProofUservec/ProofSyscall/ProofUserretClosed) is ARM-a's, so the 51-file
+ripple lands once; ARM-b changes the class INSTANCE (real `sbundle`/
+`spost` at the process's families for read 5, exec 7, chdir 9, open 15,
+write 16, mknod 17, unlink 18, link 19, mkdir 20; sync 22 is free), the
+dispatcher's arms, `uexec_ret_round_slot`'s `spost` premise, and the
+license deletions (19 files / 122 hits; `app_step_acc` mostly in
+`FsAbsCreateFire`, not `FsAbsInvFire`; `app_auto` is a structural
+conjunct of `app_body`); (v) `UEXEC_GEN` splits: it gains `ssupply_gen :
+⊢ □ ssupply` and its inhabitant becomes a functor over the application's
+supply (`True` at `app_triv`) — `Happ_auto`'s REPLACEMENT; (vi) the park
+does NOT bite: `park_token_F`'s fixpoint is over the token, `uslot`
+enters it as a constant of type `uvis → iProp`, and `UexecRetFs` already
+proved a linear deposit-and-return in the arm is contractiveness-neutral
+— fd-row-pilot §6 item 3's obstruction was `uslot_fs`'s `gname` INDEX,
+which the class routes around; the one real cost is the `uexecSG` binder
+on every park consumer resolving the same instance (the "two instances
+printing identically" hazard); (vii) two key gaps, both fixable without a
+shape change: write's `⌜fwn_wp fn ma = consolewrite⌝` moves from the
+input into FILEWRITE/SYSWRITE's premise list; read/write get
+`sys_fd_st_of_key` from `ProcInv.ofile_slot`; (viii) the generic
+inhabitants AND sync's/echo's gate branches take `□ ssupply` (both
+programs write(2)); (ix) today's x-tier supply `∀ W'', uslot_x W''` is
+minted from nothing but the generic family (`fsabs_exec_pre`'s
+`fsabs_env` premise is dead), which is why the real supply must be the
+application predicate's.
+
 #### What is actually left to decide for L2-a
 
 - ~~D-A~~ **REFUNDS, RULED 2026-09-07 (owner): every piece of a bundle is
