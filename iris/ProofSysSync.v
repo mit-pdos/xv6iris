@@ -48,13 +48,13 @@
      between +0x46 and +0x50 this thread holds no lock at all, and that
      window is where the park lives.
 
-   WHAT THE PROOF DOES NOT DO.  The contract is empty (SpecSysSync.v's
-   header says why), so [log_res] is opened only to READ the three cells the
-   guard and the loop test look at, and closed again verbatim -- no ghost
-   step anywhere.  The three reads are [committing], [outstanding] and
-   [ncommit], and the only thing the proof needs from the invariant is
-   [outstanding <= 3], which makes the [bge zero,a5] guard a comparison of
-   64-bit literals.
+   NO GHOST STEP ANYWHERE.  [log_res] is opened to READ the three cells the
+   guard and the loop test look at -- [committing], [outstanding] and
+   [ncommit] -- and to COPY the bank out ([SpecSysSync.flushed_sync_of_res],
+   everything it hands over being persistent); it closes verbatim in both
+   cases.  The only thing the proof needs from the invariant besides the
+   bank is [outstanding <= 3], which makes the [bge zero,a5] guard a
+   comparison of 64-bit literals.
 
    A functor over ACQUIRE / RELEASE / SLEEP_PREPARE / SLEEP. *)
 From Stdlib Require Import ZArith Lia List.
@@ -86,15 +86,6 @@ Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep.
 Require Import SpecSysSync.
-(* THE DURABILITY FORM (fs-syscall-specs lane Y, owner-ruled banking).  This
-   file now proves [SYS_SYNC_FLUSH] and the LANDED [SYS_SYNC] is derived
-   from it by [SpecSysSyncFlush.SysSyncFlushWeaken] at the link site -- so
-   [SpecSysSync.v] is byte-identical, [ProofSyscall]'s arm 22 is unchanged,
-   and "the postcondition only grows" stayed a theorem rather than becoming
-   an edit.  [SpecSysSyncFlush] is importable HERE only because its receipt
-   is taken at the leaf ([FsFlushedCore]) rather than at [FsFlushed], which
-   sits above the whole tree. *)
-Require Import SpecSysSyncFlush.
 Require Import CodeSysSync.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -377,7 +368,7 @@ End SsProps.
 
 Module SysSyncProof (Acquire : ACQUIRE) (Release : RELEASE)
                     (SleepPrepare : SLEEP_PREPARE) (Sleep : SLEEP)
-                    : SYS_SYNC_FLUSH.
+                    : SYS_SYNC.
 
 Local Ltac reg_neq :=
   lazymatch goal with |- ?a <> ?b =>
@@ -1149,18 +1140,15 @@ Section ProofSysSync.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  (* THE DURABILITY FORM (fs-syscall-specs lane Y).  Two things are added to
-     the landed statement and nothing is removed: the caller's
-     invocation-time batch witness [log_epoch_lb γ e] in, and the receipt
-     [flushed_sync γ e] out.  The WALK IS THE LANDED ONE, INSTRUCTION FOR
-     INSTRUCTION -- the receipt is minted ONCE, at the first acquire, off
-     [LogInv.log_res] itself ([SpecSysSyncFlush.flushed_sync_of_res]), and
-     being persistent it rides the intuitionistic context past the guard,
-     through the Löb-closed wait loop and out at the tail.
+  (* THE CAPSTONE.  The contract's durability half costs the walk one step:
+     the receipt is minted ONCE, at the first acquire, off [LogInv.log_res]
+     itself ([SpecSysSync.flushed_sync_of_res]), and being persistent it
+     rides the intuitionistic context past the guard, through the
+     Löb-closed wait loop and out at the tail.
 
-     WHY THAT IS ENOUGH FOR BOTH ARMS, and why the wait loop needed no new
+     WHY THAT IS ENOUGH FOR BOTH ARMS, and why the wait loop needs no new
      invariant.  The post asks for a bank at some [e' >= e] and NOT for a
-     strict increase (SpecSysSyncFlush's header argues at length that [S e]
+     strict increase (SpecSysSync's header argues at length that [S e]
      would be unprovable on the fast path and would make no consumer
      stronger).  So the receipt does not have to be taken at the LAST
      acquire: the counter only grows, so a copy taken at the FIRST one
@@ -1168,16 +1156,16 @@ Section ProofSysSync.
      what keeps the loop's raw case split -- the [log.ncommit] cell's value
      is still unconstrained by [log_res], and this proof still never needs
      it. *)
-  Lemma wp_sys_sync_flush_sconf
+  Lemma wp_sys_sync_sconf
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (e : nat)
-    : wp_sys_sync_flush_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks e.
+    : wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks e.
   Proof.
-    cbv beta delta [wp_sys_sync_flush_sconf_body].
+    cbv beta delta [wp_sys_sync_sconf_body].
     intros pcE pj ret_tgt HK Hj Hjl Hbelow.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -1361,9 +1349,10 @@ Section ProofSysSync.
       iApply (ss_tail_body (CID := CIDx) CID j γ bn γfs cov logstart dev m Mx K eb lks spd sp0
                 HK Hsx Hspd Hsp0 HssE Hbelow
                 with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc [Hcont]").
-      (* the tail wants the LANDED continuation; this is
-         [SysSyncFlushWeaken]'s step, run here with the receipt in hand
-         rather than thrown away *)
+      (* [ss_tail_body] promises the RECEIPT-FREE continuation -- an
+         abstract exit, so the same tail serves whatever the contract adds
+         above it -- and the receipt is injected here, on the way into the
+         contract's own continuation *)
       iIntros (CIDret) "%Hgret". iIntros (mfret) "%Hcsret %Ha0ret Hcgf Hcntf Hextcf Hextmf Hpcf".
       iDestruct ("Hcont" $! CIDret with "[%]") as "Hc"; [exact Hgret |].
       iSpecialize ("Hc" $! mfret).

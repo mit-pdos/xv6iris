@@ -4273,10 +4273,10 @@ Section SyscallArms.
   (* ------------------------------------------------------------------- *)
   (* THE TWELFTH ARM: k = 22, [sys_sync] -- the narrowest fs entry there is.
      It wants ONE resource, [log_ctx], plus the running-thread triple its
-     interior [sleep] needs; no process block, no bitmap, no allowance.  It
-     was on the GAP list only because [syscall_env] held the log at a fresh
-     existential; at [fn]'s own names (which is what [sysc_proc_ties] makes the
-     ambient ones) it is a two-line call. *)
+     interior [sleep] needs; no process block, no bitmap, no allowance.  The
+     log's names are [fn]'s own, which is what [sysc_proc_ties] makes the
+     ambient ones.  The only thing the arm builds is the contract's batch
+     witness, at zero, and the only thing it discards is the receipt. *)
   Lemma sysc_arm_sync (γf : gname) (pj : mword 64)
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
@@ -4301,12 +4301,21 @@ Section SyscallArms.
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hlog & _)".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
+    (* THE WITNESS AND THE RECEIPT, AT THE TRIVIAL END.  sys_sync's contract
+       is the durability one: it asks for the caller's invocation-time batch
+       witness and hands back [flushed_sync].  A dispatch has no batch
+       history to speak of, so it takes the witness at zero -- free from
+       nothing ([SpecSysSync.sync_witness_0]) -- and drops the receipt at the
+       return, which is the whole of what a receipt-free reading costs. *)
+    iApply fupd_wp.
+    iMod (sync_witness_0 icfg_log) as "#Hlb".
+    iModIntro.
     iApply (SysSync.wp_sys_sync_sconf γs j γl fsc_bio icfg_log fsc_fs
               fsc_cov fsc_logst icfg_dev
-              M (av - 4)%nat true true ∅
+              M (av - 4)%nat true true ∅ 0%nat
               ltac:(lia) Hj Hgamma (locks_below_empty "log")
-              with "Hcg Hcpu Htcx Hccx Htext Hpc Hlog Hprocs").
-    iIntros (CIDy Hsy mf) "%Hcs %Hr0 Hcg Hcpu _ _ Hpc".
+              with "Hcg Hcpu Htcx Hccx Htext Hpc Hlog Hlb Hprocs").
+    iIntros (CIDy Hsy mf) "%Hcs %Hr0 Hcg Hcpu _ _ _ Hpc".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (us_V U)))).

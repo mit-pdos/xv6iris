@@ -17,29 +17,104 @@
        return 0;
      }
 
-   THE CONTRACT IS EMPTY, AND THAT IS THE HONEST STATE OF THE INTERFACE.
-   sys_sync takes nothing log-specific in and gives nothing log-specific
-   back: it opens no operation, holds no batch, and touches no client
-   resource.  What it does is WAIT, and a waiting statement is only worth
-   making once the thing waited for can be NAMED -- which for this function
-   means a durability receipt indexed by the commit that produced it.  That
-   receipt does not exist yet: [ProofEndOp] holds the commit's
-   [FsCrash.fs_receipt_any] (what the commit's own durability fupd,
-   [FsCrash.fs_commit_L_seq_permit], hands back) and
-   drops it, and nothing in [LogInv] records which commit a client's writes
-   landed in.  The design note (claude-notes/design/fs-log.md, item 5) has
-   the two additions that would let this postcondition say something --
-   [LogInv.log_mirror_at]'s partial slot record, and a faithful commit
-   counter with the committer's receipt deposited beside it -- together with
-   the reason a naive "the epoch advanced" postcondition is NOT enough on
-   its own: sys_sync's FAST PATH returns without any commit at all, so a
-   receipt about progress is unavailable on the arm where nothing was
-   pending.
+   ========================== ONE CONTRACT ============================
 
-   So this file states what is proved TODAY: sys_sync runs to completion,
-   preserves every callee-saved register, and returns 0 -- with the return
-   value in a0 the one thing the caller can actually use.  Nothing here has
-   to change when the receipt lands; the postcondition only grows.
+   [Module Type SYS_SYNC] is sys_sync's only seal, and it is the DURABILITY
+   form: the caller hands in its invocation-time batch witness
+   [log_epoch_lb γ e] and gets the receipt [flushed_sync γ e] back beside
+   the machine half.  There is no second, receipt-free statement and no
+   weakening functor.  A caller that wants neither takes the witness at zero
+   from nothing ([sync_witness_0]) and drops the receipt at the return --
+   two lines, which is exactly what the syscall dispatcher's arm 22 does.
+   The witness therefore constrains no caller: it is persistent, free at
+   [0], and available at the caller's own batch from [begin_op]'s mint.
+
+   ============================ THE SHAPE =============================
+
+   WHAT SYS_SYNC RETURNS is [FsFlushed.flushed b D] -- design section 5
+   principle 2's persistent, monotone, STATE-shaped receipt ("batches <= b
+   are durable"), whose value is a copy of the frozen snapshot certificate
+   (plan 4^9.3, "sync-style receipts are copies").  The state-shaped form is
+   FORCED: sys_sync's FAST PATH (!committing && outstanding == 0) returns
+   with NO commit occurring during the call, so an EVENT-shaped receipt --
+   "a commit happened" -- is unavailable on that arm.  A receipt ABOUT THE
+   STATE is available on both.
+
+   THE TWO ARMS, and what each proves (design section 5 principle 2's case
+   split, and the code's own reason for waiting exactly one commit):
+
+   - FAST PATH, the guard false.  [committing = 0] and [outstanding = 0]
+     together say the log is EMPTY: the last [end_op] committed its group
+     and cleared the header, and no operation has opened since.  So the
+     durable state IS the logged state at the current batch counter, and
+     the receipt is handed out directly by the invariant -- no commit, no
+     wait, nothing to wake up for.
+   - SLOW PATH, the guard true.  The caller reads [n = log.ncommit + 1] and
+     sleeps until the counter reaches it.  ONE commit suffices, by a case
+     split at the lock: [committing] implies [outstanding = 0] ([begin_op]
+     blocks while committing), so the in-progress commit's batch already
+     contains every delta linearized before the call; and with the group
+     merely open, all older batches are committed and every remaining
+     pre-invocation delta sits in (or joins) the current group, which the
+     next commit writes IN FULL -- the log only grows between commits.  So
+     [ncommit + 1] is "the commit covering the invocation-time batch".
+
+   Note that sys_sync never runs [begin_op]: it is not a transaction, it
+   only watches the counter, which is what keeps it from delaying the very
+   group it waits on.  SAFETY ONLY: with operations outstanding, quiescence
+   needs [out = 0] and [begin_op] admits new operations into the open group,
+   so a continuous operation stream defers the commit unboundedly.  There is
+   NO termination claim here and none is intended; the WP is a parking WP.
+
+   ============================== THE BANK ============================
+
+   THE RECEIPT'S CLIENT-REACHABLE PRODUCER is [flushed_sync_of_res] below:
+   with the "log" spinlock held and the caller's witness in hand,
+   [LogInv.log_res] yields [flushed_sync γ e] and closes UNCHANGED.  That is
+   the whole of the design's derivation chain item (iii).
+
+   What makes it reachable is the conjunct [LogInv.log_flushed_bank γ E],
+   last before [LogInv.log_res]'s committing arm.  Its two deposits are the
+   two places the log's batch counter is ever SET:
+
+     - [ProofEndOp]'s [eo_tail], where [log_epoch_bump] runs.  The copy is
+       the one [FsCrash.fs_rec_permit_bank] takes at the commit's LAST disk
+       write -- the preserving CLEAR that follows the install -- so it is
+       the state THAT batch made durable, on either sector order.  On the
+       empty-log path, where no commit body runs at all, the invariant's own
+       copy is recycled, which is the literal truth there: nothing was made
+       durable because nothing needed to be.
+     - [ProofInitlog]'s seal, at genesis (E = 1).  Same copy, off the same
+       clear -- the one write [initlog] makes after recovery has caught the
+       home blocks up -- so the bank is full from the first instant the log
+       exists and sys_sync has an answer before any transaction has run.
+
+   The bank costs no arity: not [log_ctx]'s, not [wp_end_op]'s, not
+   [log_names]'.
+
+   ==================== WHY THE BOUND IS NOT [S e] =====================
+
+   The post says the counter has reached some [e' >= e] and hands back the
+   receipt standing there.  It does NOT say [e < e'], and that is not slack
+   -- it is the fast path, honestly stated.  A caller whose witness [e] was
+   taken in the CURRENT batch and whose operations have all ended finds the
+   log empty exactly when that batch is empty too, so nothing of the
+   caller's is waiting and [e' = e] is the right answer; demanding [S e]
+   would make the contract unprovable on that arm without making any
+   consumer stronger.  What a consumer actually uses is the receipt:
+   [FsFlushed.dur_at] reads its rows, and [FsFlushed.flushed_earlier] orders
+   it against every earlier one.
+
+   THE WAIT LOOP NEEDS NOTHING, and it is worth saying why, because the
+   opposite was expected.  [log_res] binds the [log.ncommit] CELL
+   existentially and says nothing about its value ([LogInv.v]'s
+   [l_ncommit ↦₄ nc]), so [ProofSysSync]'s wait loop carries no [nc] binder
+   and its back edge is a raw case split.  That does not matter here: the
+   post asks for a bank at some [e' >= e], the counter only grows, so a copy
+   taken at the FIRST acquire already answers on every path.  The tie
+   [⌜uint nc = Z.of_nat E⌝] would only be needed by a contract claiming the
+   wait ENDED at a later batch than it started -- which this one does not
+   claim, and no consumer of the receipt asks for.
 
    NO DISK FABRIC, NO BIO_CTX, NO OPERATION TOKEN.  Like begin_op, sys_sync
    touches only the "log" spinlock and sleeps on the log itself; it never
@@ -57,11 +132,12 @@
    only come from the caller, who holds it because the TRAP handed it over.
    Since it PARKS, its crossing is the literal [true], not [b]
    (SpecAcquiresleep.v's note). *)
+
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap frac.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
+From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -84,6 +160,16 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+(* THE RECEIPT AT ITS LOW ALTITUDE, and this is load-bearing: the obvious
+   imports for the two names below are [FsDurSyscall] and [FsFlushed], and
+   BOTH sit above [SystemAdequacy] -- i.e. above the whole proof tree,
+   [ProofSysSync] included -- so a contract stated over them could never be
+   PROVED.  The same two names come out of the leaves ([FsDurSnap.snap_holds],
+   [FsFlushedCore.flushed]), and nothing here needs anything else from
+   either: [FsFlushed.dur_at] is named in comments only, as the thing a
+   CONSUMER of the receipt composes with. *)
+Require Import FsDurSnap.      (* [snap_holds] -- the commit's certificate *)
+Require Import FsFlushedCore.  (* [flushed] -- the receipt itself          *)
 Require Import TsoCtx.
 Import Defs.
 
@@ -92,6 +178,145 @@ Import Defs.
    (SpecSleep.v's [22 <= av]).  acquire / release / sleep_prepare want only
    10.  Same budget as begin_op, and for the same reason. *)
 Notation K_sys_sync := (26%nat) (only parsing).
+Section sys_sync.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE RECEIPT, AT THE WAL'S OWN BATCH SCALE                           *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE BANK LIVES IN [LogInv]: [LogInv.log_flushed_bank], the last
+     non-arm conjunct of [LogInv.log_res], reads
+
+       log_flushed_bank γ e :=
+         ∃ b D, log_epoch_lb γ e ∗ flushed b D ∗ ⌜snap_holds D⌝
+
+     Read it as: THE BATCH COUNTER STANDS AT [e], AND THE STATE THE LAST
+     WRITE MADE DURABLE IS [D] -- the [b]-th committed state, and a file
+     system.  Both conjuncts are persistent, so the bank is free to copy out
+     of the invariant and free to leave in it.  Their JOINT reading -- that
+     [D] is the state as of batch [e] and not some older one -- is
+     established where the two are minted TOGETHER, and that is where the
+     deposits are: [ProofEndOp]'s [eo_tail], which runs [log_epoch_bump]
+     with the commit's own copy in hand, and [ProofInitlog]'s seal at
+     genesis, which takes its copy off the header CLEAR that ends recovery.
+     A consumer never compares [e] with [b]: it reads [D]'s rows
+     ([FsFlushed.dur_at]) and orders its receipts by [b]
+     ([FsFlushedCore.flushed_earlier]). *)
+
+  (* THE POSTCONDITION.  "By the time this call returned, the batch counter
+     had reached some [e'] at or past the caller's own [e], and here is the
+     durable state standing there."  Monotone and persistent, so a caller
+     keeps it across everything it does next. *)
+  Definition flushed_sync (γ : log_names) (e : nat) : iProp Σ :=
+    (∃ e' : nat, ⌜(e <= e')%nat⌝ ∗ log_flushed_bank γ e')%I.
+
+  Global Instance flushed_sync_persistent γ e : Persistent (flushed_sync γ e).
+  Proof. rewrite /flushed_sync. apply _. Qed.
+
+  (* THE CASE SPLIT, DISCHARGED ONCE.  Both arms of sys_sync end at the same
+     place -- holding the log lock, with the bank readable at the counter's
+     current value -- and both are covered by this one entailment: the fast
+     path reads it at the [E >= e] it finds ([LogDefs.log_epoch_lb_le] against
+     the caller's witness), the slow path at the [E' >= E + 1] it waited for.
+     So item (iii) of the design's derivation chain reduces to item (ii),
+     the bank, and nothing else. *)
+  Lemma flushed_sync_of_bank (γ : log_names) (e E : nat) :
+    (e <= E)%nat -> log_flushed_bank γ E -∗ flushed_sync γ e.
+  Proof.
+    intros Hle. iIntros "H". rewrite /flushed_sync. iExists E.
+    iSplitR; [by iPureIntro | iExact "H"].
+  Qed.
+
+  (* ...and the receipt itself, off the postcondition: this is what a
+     consumer composes with [FsFlushed.dur_at] (design section 5
+     principle 3).  The [e'] is dropped on the way out because no per-node
+     reading mentions the batch counter -- the bound a certificate carries
+     is the receipt's own [b]. *)
+  Lemma flushed_sync_receipt (γ : log_names) (e : nat) :
+    flushed_sync γ e -∗
+      ∃ (b : nat) (D : gmap Z (list (bv 8))),
+        flushed b D ∗ ⌜snap_holds D⌝.
+  Proof.
+    rewrite /flushed_sync /log_flushed_bank. iIntros "H".
+    iDestruct "H" as (e' _) "H". iDestruct "H" as (b D) "(_ & Hf & %Hh)".
+    iExists b, D. iSplitL; [iExact "Hf" | by iPureIntro].
+  Qed.
+
+  (* the caller's witness is always obtainable, so the contract's premise
+     costs nothing: a client with no operation history takes it at zero. *)
+  Lemma sync_witness_0 (γ : log_names) : ⊢ |==> log_epoch_lb γ 0.
+  Proof. iApply log_epoch_lb_0. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE PRODUCER                                                      *)
+  (* ------------------------------------------------------------------ *)
+
+  (* WHAT SYS_SYNC ACTUALLY DOES, in the logic, on BOTH arms.  With the
+     "log" spinlock held and the caller's invocation-time batch witness in
+     hand, the lock's resource yields this contract's postcondition and
+     CLOSES UNCHANGED -- no fupd, no disk write, no operation token, nothing
+     given up, because everything handed out is persistent.
+
+     THIS IS THE WHOLE OF THE DERIVATION CHAIN's item (iii), in one line,
+     and the bank is what makes it reachable: the other route,
+     [FsFlushedCore.P_fs_flushed_now], needs the crash predicate OPEN, which
+     is a disk write's own fupd, and sys_sync writes no block.  The bank is
+     what a reader can see instead.
+
+     BOTH ARMS REACH IT.  The FAST path (the guard false: nothing
+     committing, nothing outstanding) reads it at the [E] it finds, which
+     [LogInv.log_res_flushed] proves is at or past the caller's [e] off the
+     counter's own auth.  The SLOW path re-enters the critical section at a
+     LATER counter value and reads it there -- the same lemma, no extra
+     premise, because the post below asks for [e <= e'] and not for a
+     strict increase (see the header's last section for why that is the
+     honest bound and not slack). *)
+  Lemma flushed_sync_of_res (γ : log_names) (bn : bio_names)
+      (γfs : fs_names) (cov : gset Z) (logstart : Z) (e : nat) :
+    log_epoch_lb γ e -∗ log_res γ bn γfs cov logstart -∗
+      flushed_sync γ e ∗ log_res γ bn γfs cov logstart.
+  Proof.
+    iIntros "#Hlb Hres".
+    iDestruct (log_res_flushed γ bn γfs cov logstart e with "Hlb Hres")
+      as "[Hb Hres]".
+    rewrite /flushed_sync. iSplitL "Hb"; [iExact "Hb" | iExact "Hres"].
+  Qed.
+
+  (* ...and the same reading straight through to the certificate a consumer
+     composes with [FsFlushed.dur_at]: the durable state the log stands at,
+     off nothing but the lock's resource and a witness that costs nothing. *)
+  Lemma log_res_receipt (γ : log_names) (bn : bio_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (e : nat) :
+    log_epoch_lb γ e -∗ log_res γ bn γfs cov logstart -∗
+      (∃ (b : nat) (D : gmap Z (list (bv 8))),
+         flushed b D ∗ ⌜snap_holds D⌝) ∗ log_res γ bn γfs cov logstart.
+  Proof.
+    iIntros "#Hlb Hres".
+    iDestruct (flushed_sync_of_res with "Hlb Hres") as "[Hs Hres]".
+    iDestruct (flushed_sync_receipt with "Hs") as (b D) "[Hf %Hh]".
+    iSplitR "Hres"; [| iExact "Hres"].
+    iExists b, D. iSplitL; [iExact "Hf" | by iPureIntro].
+  Qed.
+End sys_sync.
+
+(* ====================================================================== *)
+(*  THE CONTRACT                                                          *)
+(*                                                                        *)
+(*  The machine half is the whole-function frame: the budget              *)
+(*  [K_sys_sync], the order premise, the parking crossing (the literal     *)
+(*  [true], because sys_sync sleeps), the callee-saved and [a0 = 0]        *)
+(*  postconditions, and the [trap_csrs_ext] / [cpu_claim_ext] complement   *)
+(*  in and out.  The durability half is two clauses:                       *)
+(*    (in)  [log_epoch_lb γ e] -- the caller's invocation-time batch       *)
+(*          witness.  Persistent, obtainable at [0] from nothing           *)
+(*          ([sync_witness_0]) and at the caller's own batch from          *)
+(*          [begin_op]'s mint, so it constrains no caller.                 *)
+(*    (out) [flushed_sync γ e] -- the receipt.                            *)
+(*  No disk fabric, no [bio_ctx], no operation token: this takes           *)
+(*  [log_ctx] plus the running-process bundle and nothing else.            *)
+(* ====================================================================== *)
 Definition wp_sys_sync_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -99,41 +324,35 @@ Definition wp_sys_sync_sconf_body
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string)
+    (e : nat) :=                                      (* the caller's batch *)
   let pcE : mword 64 := mword_of_int KernelSyms.sys_sync in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_sys_sync <= K)%nat ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  (* acquire's order premise: sys_sync acquires and releases [log.lock]
-     (possibly many times, around each wait iteration's [sleep]) but is
-     BALANCED overall, so [lks] is unchanged end to end. *)
   locks_below lks "log" ->
   sie_cap_gpr KT1 m K b pj -∗
-  (* enters at noff 0; the acquire raises it to what sleep demands *)
   cpu_own 0 eb pj b lks -∗
-  (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM: see the header note, and
-     SpecBeginOp.v, whose wait loop this one is a transcription of. *)
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   log_ctx γ bn γfs cov logstart dev -∗
-  (* the running-thread bundle threaded through the interior sleep *)
+  (* THE CALLER'S BATCH WITNESS.  Persistent; the contract reads it only to
+     name the bound its receipt has to reach. *)
+  log_epoch_lb γ e -∗
   procs_inv γs -∗
-  (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_sync PARKS (its wait
-     loop sleeps), and a park moves the hart with interrupts off, which has
-     nothing to do with SIE (the porting guide's "a PARKING function's
-     [wp_next] index is [true] UNCONDITIONALLY"). *)
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      (* the syscall's return value: [return 0] *)
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
+      (* THE RECEIPT *)
+      flushed_sync γ e -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -146,6 +365,6 @@ Module Type SYS_SYNC.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
-      wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks.
+      (b : bool) (lks : gset string) (e : nat),
+      wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks e.
 End SYS_SYNC.

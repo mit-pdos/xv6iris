@@ -2,16 +2,11 @@
    proofs (acquire / release / sleep_prepare / sleep).  Sealed, so this is
    the only place the five ever meet.
 
-   TWO MODULES SINCE THE BANKING (fs-syscall-specs lane Y).  The walk proves
-   the DURABILITY form [SYS_SYNC_FLUSH] -- the landed statement plus the
-   caller's batch witness in and the receipt [flushed_sync γ e] out -- and
-   the landed [SYS_SYNC] is derived from it, not re-proved, by the
-   weakening functor that has stood beside the contract since lane Y landed
-   it.  So [SpecSysSync.v] is byte-identical, [ProofSyscall]'s arm 22 takes
-   [SysSync.wp_sys_sync_sconf] exactly as it did, and "the postcondition
-   only grows" (R10) is a theorem rather than an intention. *)
+   ONE MODULE: [SpecSysSync.SYS_SYNC] is sys_sync's only contract -- the
+   machine frame plus the caller's batch witness in and the durability
+   receipt [flushed_sync γ e] out -- so the walk seals it directly and
+   nothing is derived here.  [ProofSyscall]'s arm 22 takes the witness at
+   zero and drops the receipt at its own call site. *)
 Require Import LinkAcquire LinkRelease LinkSleepPrepare LinkSleep ProofSysSync.
-Require Import SpecSysSyncFlush.
 
-Module SysSyncFlush := SysSyncProof Acquire Release SleepPrepare Sleep.
-Module SysSync := SysSyncFlushWeaken SysSyncFlush.
+Module SysSync := SysSyncProof Acquire Release SleepPrepare Sleep.

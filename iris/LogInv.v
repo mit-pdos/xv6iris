@@ -1299,7 +1299,7 @@ Section LogInv.
 
      THE ORDER PREMISE IS THE ONLY THING THE CLIENT SUPPLIES, and it costs
      nothing: [log_epoch_lb γ 0] is free from nothing
-     ([SpecSysSyncFlush.sync_witness_0]) and a client that has run
+     ([SpecSysSync.sync_witness_0]) and a client that has run
      transactions already holds a sharper one out of [log_opSe]. *)
   Lemma log_res_flushed (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (e : nat) :

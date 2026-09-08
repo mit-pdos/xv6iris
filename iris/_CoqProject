@@ -1548,16 +1548,13 @@ FsInitPin.v
 SpecSysOpenAU.v
 FsAbsStart.v
 
-# fs-syscall-specs lane Y: sys_sync's durability receipt.
-# FsFlushedCore builds [flushed b D] out of the crash record's mono-list
-# history (no new ghost, no arity moved) and is a LEAF over FsCrash +
-# FsDurSnap -- deliberately BELOW LogInv, which banks it as a conjunct of
-# log_res (the owner-ruled banking; see that file's header for why the
-# receipt could not stay above the WAL).  FsFlushed re-exports it and adds
-# the per-node composition over FsDurSyscall's certificates;
-# SpecSysSyncFlush is the R10 parallel contract stated beside the landed
-# empty one, which does not move.  Its row is listed with the WAL's files.
-SpecSysSyncFlush.v
+# sys_sync's durability receipt.  FsFlushedCore builds [flushed b D] out of
+# the crash record's mono-list history (no new ghost, no arity moved) and is
+# a LEAF over FsCrash + FsDurSnap -- deliberately BELOW LogInv, which banks
+# it as a conjunct of log_res (see that file's header for why the receipt
+# cannot sit above the WAL).  FsFlushed re-exports it and adds the per-node
+# composition over FsDurSyscall's certificates.  sys_sync's own contract
+# states the receipt at these leaves; its row is listed above.
 FsAbsOpenFire.v
 ProofSysOpenAUBits.v
 ProofSysOpenAUParts.v
