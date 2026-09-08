@@ -410,6 +410,29 @@ the families instead of the mirror; the dispatcher destructs `f`, runs
 the contract at those families and returns `spost_at f r`; `ut_sys_in/
 out` carry `f`; `sysc_exec_in` folds into `sysc_sys_in`.
 
+**Three fires paid from neither the deposit nor the supply (found by the
+credential step, 2026-09-08) — and the two contract corrections they
+force.**  The discharger tower bottoms out in `app_step_acc` at `app_inv`;
+re-basing it on `□ app_sup` is a premise rename EXCEPT at three sites
+inside the fs proofs that manufacture pieces the PROCESS never deposited:
+create's DOTS leg at pinned `T_FILE` (`ProofSysOpenAUEntryC` ~481) and
+`T_DEVICE` (`ProofSysMknod` ~1712) — a leg that can never fire but which
+`cre_commits` demands — and sys_open's FRESH-create arm, which refunds the
+client's trunc piece and conjures its own (`socr_Phit_triv`) for the
+`O_TRUNC` the code runs on the just-created file.  Threading the supply
+into `SYSOPEN`/`SYSMKNOD` would make two syscalls unrunnable for a
+constraining application (the GAP trap one level down) — refused.  RULED
+(B): (i) the dots leg is GUARDED BY THE TYPE — `cre_commits` carries
+`⌜tyz = T_DIR⌝ -∗ pf_at (adots_commit_at …) Fdots`, likewise the dots
+disjunct of `cre_ok_arms`/`cre_fail_arms`; `cre_dots_unit` and both sites
+go; a caller whose type cannot write dots owes nothing for that move;
+(ii) on the fresh arm the CLIENT'S trunc piece FIRES at `bs0 = []`
+(identity delta, `app_step_id`) and its receipt `Φt av i []` comes back;
+the manufactured piece and the refund into `socr_fresh` go;
+`open_post_ok_create`'s fresh arm carries the fired receipt.  Order:
+the credential half first (green), then the tower re-base with (i)/(ii)
+(green), then the instance, the post row, B2.
+
 #### What is actually left to decide for L2-a
 
 - ~~D-A~~ **REFUNDS, RULED 2026-09-07 (owner): every piece of a bundle is

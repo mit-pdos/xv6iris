@@ -425,6 +425,18 @@ returning the offset shadow's half ADVANCED is not (it needs the per-row
 commits lend the shadow and take it back unmoved, and the kernel's fire
 lemma moves it afterwards from the row invariant it holds.  Read's `aread_commit_at` and the write chain's two arms lend the shadow's half and return it at the same offset; `arf_read_fire` and the two write fires advance it from `off_user_inv`, which reaches them through the descriptor's `foff_row`.
 
+**A CONTRACT ASKS ONLY FOR THE MOVES ITS CALL CAN MAKE.**  create's dots
+leg is guarded by the type (`⌜tyz = T_DIR⌝ -∗ …` in `cre_commits` and in
+the arms' dots disjunct): a `T_FILE`/`T_DEVICE` caller owes no piece for
+the "."/".." writes its call never performs.  And a kernel proof never
+CONJURES a piece the client did not deposit: sys_open's fresh-create arm
+fires the client's own trunc piece on the just-created file (at
+`bs0 = []`, the identity delta) and returns its receipt, rather than
+refunding the client's piece and manufacturing a trivial one.  Both were
+found when the fires had to be paid from the process's deposit or the
+application's supply instead of the kernel-held license: a piece the
+kernel pays for itself is a piece nobody but the kernel could pay.
+
 **ONE CONTRACT PER SYSCALL.**  `sys_write` is the model: `SpecFilewrite.
 FILEWRITE` and `SpecSysWrite.SYSWRITE` are its only seals.  Each keeps the
 whole-function frame and takes a caller INPUT and returns an armed OUTPUT,
