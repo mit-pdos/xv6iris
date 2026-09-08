@@ -1,19 +1,19 @@
-(* FsAbsReadFire.v -- sys_read's ONE FIRE POINT, DISCHARGED AGAINST THE
-   INVARIANT, plus the row readings and the count bridge
-   [SpecSysReadAU]'s header owes its prover (items 1, 2 and 6).
+(* FsAbsReadFire.v -- sys_read's ONE COMMIT, ITS ARMS, AND ITS ONE FIRE
+   POINT, discharged against the invariant, plus the row readings and the
+   count bridge the walk needs.
 
-   Worklist: claude-notes/projects/fs-syscall-specs.md, lane W.  A NEW LEAF
-   rather than an append to [FsAbsOpenFire.v] / [FsAbsMknodFire.v], for the
-   mirror's reason every campaign leaf records: the build mirror forbids
-   touching a tracked file.  Fuse the fire leaves when one of them is next
-   edited.
+   The pure vocabulary the arms are stated in -- [ard_count], [ard_pre],
+   [ard_ret_tie] and the slice/readi bridges -- is [SpecSysReadAU.v], the
+   leaf below this one; the CONTRACT the arms key into is
+   [SpecFileread.FILEREAD] / [SpecSysRead.SYSREAD], the one contract per
+   syscall, above it.  Design of record:
+   claude-notes/design/fs-syscall-specs.md section 4.
 
-   ==== WHY THE COMMIT HERE IS THE RAW-MAP ONE =========================
+   ==== WHY THE COMMIT IS THE RAW-MAP ONE ==============================
 
-   [SpecSysReadAU.aread_commit] is stated over [FsAbs.astate], and that
-   shape is NOT DISCHARGEABLE -- this is [FsAbsMknodFire.v]'s recorded
-   raw-map finding, and its statement of the obstacle names the read-only
-   borrow by name:
+   An [FsAbs.astate]-shaped commit is NOT DISCHARGEABLE -- this is
+   [FsAbsMknodFire.v]'s recorded raw-map finding, and its statement of the
+   obstacle names the read-only borrow by name:
 
      "[ftop_astate_ro]'s [give-back] wants the SAME [I] the borrow named,
       and nothing in [astate Γ av] says the returned map is that one"
@@ -25,26 +25,22 @@
    SOME map with the right READING -- while [InodeRegion.ftop_body]'s
    [ftop_clean] is a statement about the RECORDS.  Read-onlyness does not
    help: the loss happens on the way OUT, in the existential of [astate],
-   before the client does anything at all.
+   before the client does anything at all.  So [aread_commit_at] borrows
+   the [ghost_map_auth] itself, exactly as [SpecSysOpenAU]'s
+   [aopen_commit_at] and [FsAbsMknodFire]'s [dlookup_commit_at] do.
 
-   [SpecSysReadAU] was authored before that finding (its header still says
-   "shaped for [FsAbs.ftop_astate_ro]").  Every contract authored after it
-   -- [SpecSysOpenAU]'s [aopen_commit_at]/[atrunc_commit_at],
-   [FsAbsMknodFire]'s [dlookup_commit_at]/[acre_commit_at] -- carries the
-   RAW-MAP form in the contract and offers the astate reading beside it as
-   a weakening.  This file does the same for read: [aread_commit_at] is the
-   dischargeable form, [aread_commit_at_weaken] is the one direction that
-   holds ([FsAbsMknodFire.dlookup_commit_at_weaken]'s argument verbatim --
-   a client that can serve the authority form can serve the [astate] form
-   by unfolding it), and [arf_read_fire] fires it.
+   ==== THE ONE PIECE, AND ITS REFUND ==================================
 
-   R10 IS INTACT: [SpecSysReadAU.v] is untouched, and everything the frozen
-   file offers a client is offered here at the same strength (the
-   trivial-receipt unit, and the two agreement seeds the stable corollary
-   is derived from).  What is NOT possible is the reverse weakening, so a
-   machine contract whose EXTRA is the frozen [aread_commit] cannot be
-   sealed; sealing read wants a parallel body at [aread_commit_at], exactly
-   as [SpecSysOpenAU] carries one.
+   Read's whole caller-supplied input is ONE one-shot piece: a single-phase
+   commit that borrows the kernel's half of the inode map AND the offset
+   shadow's half at the instant, returns the receipt [Φ av off a d] and the
+   shadow advanced by [d].  Per the REFUNDS ruling the caller hands it in
+   as [aread_commit_at … Φ ∧ R], with [R] its own chosen refund; the kernel
+   eliminates to the AU side at the fire, and returns the whole conjunction
+   on the ONE arm that does not fire (the sign guard), where the caller
+   eliminates to [R].  [read_post_ok] / [read_post_fail] / [read_arms] are
+   that disposition, and they are the EXTRA the unified read contract pays
+   on an open, readable inode descriptor.
 
    ==== WHAT THE FIRE DOES =============================================
 
@@ -53,22 +49,34 @@
    FIRING FUNCTION'S OWN fragment.  That fragment is fileread's: the inode
    arm holds [IcacheEscrow.ic_loaded]'s [top_frag] for the file's inum from
    its [ilock] to its [iunlock], and the whole transfer happens inside that
-   window (SpecSysReadAU's THE ONE INSTANT), so no walk lend is involved
-   and the fragment goes straight back.  The two caps [ard_pre] asks for
-   ride as premises about the SAME node, which is where the caller has
-   them: the offset's from [FileInvDefs.off_wf], the row's from the loaded
-   record's size ([arf_size_ok] turns [fn_size <= MAXFILE*BSIZE] into
-   [anode_size_ok]).
+   window -- ONE lock hold, no per-chunk unlocking, so the observation is a
+   free choice of instruction boundary inside it and no walk lend is
+   involved.  The two caps [ard_pre] asks for ride as premises about the
+   SAME node, which is where the caller has them: the offset's from
+   [FileInvDefs.off_wf], the row's from the loaded record's size
+   ([arf_size_ok] turns [fn_size <= MAXFILE*BSIZE] into [anode_size_ok]).
 
-   ==== THE COUNT BRIDGE (item 2) ======================================
+   ==== THE COUNT BRIDGE ===============================================
 
    [arf_count_bridge] is the pure half of the return tie: readi's arm 2
    answers [rd_clamp (di_size dn) off n'], and over a row that READS as
    [AFile bs] that IS [ard_count n' off (length bs)] -- [rd_clamp_ard]
    composed with [length_fn_file_bytes] through the [abs_of] file arm.
    [arf_ret_tie_file] / [arf_ret_tie_other] are the two arms of
-   [ard_ret_tie] assembled from it and from [SpecFileread.fileread_ret]'s
-   bounds.
+   [ard_ret_tie] assembled from it and from the return blanket's bounds.
+
+   ==== THE STABLE COROLLARY ===========================================
+
+   [arf_stable_of_arms] is the "YOUR bytes" reading, DERIVED: a client
+   presenting the file's own [nview] share composes it into the commit
+   ([arf_pin_compose]) and every arm then lands at the client's value.  Its
+   [0 <= nz] premise is what refutes the guard arm, which is why the
+   derivation never has to say anything about the refund [R].  THE USUAL
+   VACUITY CAVEAT: today the payload arms hold the element WHOLE
+   ([FsAbsSeam]'s finding 3), so a client [nview] share against a live inum
+   is refuted and the form is vacuous until the tree layer's cross-syscall
+   exclusivity fact exists -- but a read fires NO retag, so the statement
+   needs no re-cut when the custody seam moves.
 
    BINDERS: [FsAbsOpenFire]'s section list, verbatim (which is
    [FsAbsMknodFire]'s, which is [SpecSysMknodAU]'s) -- [fileG] is bound and
@@ -99,7 +107,8 @@ Require Import FsStateEra.       (* [era_node], [era_node_rec]              *)
 Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]     *)
 Require Import Xv6G.
 Require Import SpecReadi.        (* [rd_clamp]                              *)
-Require Import SpecSysReadAU.    (* the contract this file serves           *)
+Require Import PipeInvDefs.      (* [pipe_rw_ret]: the return blanket       *)
+Require Import SpecSysReadAU.    (* the read observation's pure vocabulary  *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import
                                     ([FsAbsOpenFire]'s reason)              *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
@@ -158,7 +167,7 @@ Proof.
   intros Hsz. apply arf_size_ok. rewrite /fn_size era_node_rec. exact Hsz.
 Qed.
 
-(* ---- THE COUNT BRIDGE (prover item 2) ------------------------------- *)
+(* ---- THE COUNT BRIDGE ------------------------------------------------ *)
 
 (* readi's arm 2 answers [rd_clamp] over the SIZE WORD; over a row that
    reads as a file that IS [ard_count] over the OBSERVED bytes. *)
@@ -219,9 +228,10 @@ Section ReadFire.
   (* SINGLE-PHASE AND READ-ONLY at the RAW MAP: the caller hands the very
      same [ghost_map_auth] back, which is what [ftop_astate_ro]'s give-back
      wants and what [astate]'s existential destroys (header). *)
-  (* ...WITH THE OFFSET'S HALF LENT AND RETURNED ADVANCED, exactly as
-     [SpecSysReadAU.aread_commit] -- the one fupd covers the bytes and the
-     offset (the offset-shadow fold; OffGv.v). *)
+  (* ...WITH THE OFFSET'S HALF LENT AND RETURNED ADVANCED: the one fupd
+     covers the bytes and the offset together (the offset-shadow fold;
+     OffGv.v), so what a client observes of the state and what it learns
+     about its offset cannot be torn apart. *)
   Definition aread_commit_at Γ (E : coPset) (i : Z) (γo : gname)
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (off : nat) (a : anode) (d : nat),
@@ -229,19 +239,6 @@ Section ReadFire.
        ghost_map_auth (γtop Γ) (1/2) I -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
        ghost_map_auth (γtop Γ) (1/2) I ∗ off_gv γo (1/2) (Z.of_nat (off + d)) ∗
        Φ (abs_view I) off a d)%I.
-
-  (* THE ONE RELATION THAT HOLDS -- [FsAbsMknodFire.dlookup_commit_at_weaken]'s
-     argument verbatim.  The reverse does not: nothing ties the authority a
-     client returns to the map the borrow named. *)
-  Lemma aread_commit_at_weaken Γ E i γo Φ :
-    aread_commit_at Γ E i γo Φ ⊢ aread_commit Γ E i γo Φ.
-  Proof.
-    iIntros "Hcm". rewrite /aread_commit.
-    iIntros (av off a d) "%Hpre Hst Hg".
-    iDestruct (astate_q_elim with "Hst") as (I) "[Ha %Hav]". subst av.
-    iMod ("Hcm" $! I off a d with "[//] Ha Hg") as "(Ha & Hg & HΦ)".
-    iModIntro. iFrame "HΦ Hg". iApply astate_q_intro. iExact "Ha".
-  Qed.
 
   (* satisfiability: a client holding its half of the shadow, at any value,
      can build the trivial-receipt commit -- the seal cannot be vacuously
@@ -270,8 +267,8 @@ Section ReadFire.
     iApply (astate_nview with "Hst Hn").
   Qed.
 
-  (* THE STABLE SEEDS at the raw map, both of the frozen file's, so the
-     stable corollary's derivation stays assembly rather than proof. *)
+  (* THE STABLE SEEDS at the raw map, so the stable corollary's derivation
+     stays assembly rather than proof. *)
   (* the seeds take the client's half: a commit moves the offset *)
   Lemma aread_commit_at_pinned Γ E (i : Z) γo (z : Z) (q : Qp) (jpin : Z) (b : anode)
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) :
@@ -313,6 +310,109 @@ Section ReadFire.
     iApply ("HΦ" $! (abs_view I) off d with "[%] Hn").
     exact Hav.
   Qed.
+
+  (* =================================================================== *)
+  (*  1b.  THE ARMS -- WHAT THE ONE PIECE'S DISPOSITION IS                 *)
+  (* =================================================================== *)
+
+  (* Read has ONE one-shot piece, the observation commit above, and per the
+     REFUNDS ruling every one-shot piece a caller hands in is [AU /\ R] with
+     [R] the caller-chosen REFUND -- provable from the same resources the
+     caller spent building the AU, so both conjuncts come out of one
+     context.  The kernel eliminates to the AU side when it fires and to [R]
+     when it hands the piece back unfired.  There is exactly one arm where
+     that happens (the sign guard), and it returns the SAME conjunction it
+     was given, so a caller eliminates to [R] there. *)
+
+  (* ret >= 0: the observation fired and the value IS the tie's -- keyed
+     by the equation itself rather than by a constant (the count depends
+     on the instant's offset and the observed bytes; readi's exactness
+     is what makes it an equality and not a bound on the file arm).
+     [0 <= n] rides because this arm is only reachable past the fork's
+     sign guard.
+     ...AND THE ADVANCE IS THE ANSWER: the receipt's [d] is the count the
+     read delivered and the offset moved by exactly it.
+     NO REFUND HERE: the piece is SPENT, and whatever the caller invested
+     in building it comes back through the receipt [Φ] it chose. *)
+  Definition read_post_ok Γ (i : Z) (n : Z)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) : iProp Σ :=
+    (∃ (av : aview) (off : nat) (a : anode) (d : nat),
+       ⌜ard_pre av i off a⌝ ∗ ⌜0 <= n⌝ ∗ ⌜ard_ret_tie n a off r⌝ ∗
+       ⌜Z.of_nat d = bv_unsigned r⌝ ∗
+       Φ av off a d)%I.
+
+  (* ret -1: the fork's two live failure arms, keyed by the sign the
+     caller already knows.  The guard arm ([n < 0], pre-lock) hands the
+     piece BACK UNFIRED -- the same [AU /\ R] the caller supplied, so it
+     eliminates to [R]; the copyout-fault arm delivers the FIRED receipt
+     -- the transfer's source value was observed even though the copy died
+     -- with no count tie (readi answers -1, the offset does not move, the
+     user bytes are unstated), at advance 0. *)
+  Definition read_post_fail Γ (i : Z) (γo : gname) (n : Z)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ) : iProp Σ :=
+    ((⌜n < 0⌝ ∗ (aread_commit_at Γ appE i γo Φ ∧ R))
+     ∨ (⌜0 <= n⌝
+        ∗ ∃ (av : aview) (off : nat) (a : anode),
+            ⌜ard_pre av i off a⌝ ∗ Φ av off a 0%nat))%I.
+
+  (* the armed disjunction the continuation receives, keyed on a0 *)
+  Definition read_arms Γ (i : Z) (γo : gname) (n : Z)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (r : mword 64) : iProp Σ :=
+    (read_post_ok Γ i n Φ r
+     ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
+        ∗ read_post_fail Γ i γo n Φ R))%I.
+
+  (* the arms refine the unified contract's unconditional return clause --
+     [SpecFileread.fileread_ret] IS [pipe_rw_ret], and [ard_ret_tie_ret] is
+     the ok arm's half.  Stated here so nothing above has to unfold the
+     disjunction to see it. *)
+  Lemma read_arms_ret Γ (i : Z) γo (n : Z) Φ R (r : mword 64) :
+    read_arms Γ i γo n Φ R r -∗ ⌜pipe_rw_ret n r⌝.
+  Proof.
+    rewrite /read_arms /read_post_ok. iIntros "[Hok | [%Hm1 _]]".
+    - iDestruct "Hok" as (av off a d) "(_ & %Hn & %Htie & _ & _)".
+      iPureIntro. exact (ard_ret_tie_ret n a off r Hn Htie).
+    - iPureIntro. rewrite Hm1 /pipe_rw_ret. by left.
+  Qed.
+
+  (* THE SIGN GUARD'S EXIT: the piece goes back exactly as it came in.
+     fileread's [n < 0] test fires before the type dispatch, so nothing
+     fs-visible has happened and the caller eliminates the returned
+     conjunction to its own [R]. *)
+  Lemma read_arms_neg Γ (i : Z) γo (n : Z)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ) :
+    (n < 0)%Z ->
+    (aread_commit_at Γ appE i γo Φ ∧ R) -∗
+    read_arms Γ i γo n Φ R (mword_of_int (-1) : mword 64).
+  Proof.
+    intros Hn. iIntros "Hc". rewrite /read_arms. iRight.
+    iSplitR; [done |]. rewrite /read_post_fail. iLeft.
+    iSplitR; [by iPureIntro |]. iExact "Hc".
+  Qed.
+
+  (* ---- the stable corollary's arms ------------------------------------
+     the client's share comes back on every arm, and every arm's receipt
+     is at the client's OWN value: [r] is the exact count over [bs0] at
+     the instant's offset, or -1 (the fault) with the receipt still
+     fired.  No escape arm, no unfired residue -- the [0 <= n] premise of
+     the derivation is what removes the refund arm, and with it the
+     refund [R]. *)
+  Definition read_stable_arms Γ (i : Z) (n : Z) (q : Qp)
+      (bs0 : list (bv 8)) (nl : nat)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) : iProp Σ :=
+    (nview Γ q i (MkAnode (AFile bs0) nl) ∗
+     (∃ (av : aview) (off d : nat),
+        ⌜av !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
+        ⌜(off <= MAXFILE * BSIZE)%nat⌝ ∗
+        ⌜(length bs0 <= MAXFILE * BSIZE)%nat⌝ ∗
+        (* the advance IS the exact count on the ok arm and 0 on the fault *)
+        ⌜(r = (mword_of_int
+                 (Z.of_nat (ard_count (Z.to_nat n) off (length bs0)))
+               : mword 64)
+          /\ d = ard_count (Z.to_nat n) off (length bs0))
+         \/ (r = (mword_of_int (-1) : mword 64) /\ d = 0%nat)⌝ ∗
+        Φ av off (MkAnode (AFile bs0) nl) d))%I.
 
   (* =================================================================== *)
   (*  2.  THE FIRE                                                        *)
@@ -388,7 +488,7 @@ Section ReadFire.
   Qed.
 
   (* =================================================================== *)
-  (*  3.  THE STABLE COROLLARY, ASSEMBLED (prover item 7)                 *)
+  (*  3.  THE STABLE COROLLARY, ASSEMBLED                                 *)
   (* =================================================================== *)
 
   (* THE RECEIPT THE STABLE DERIVATION INSTANTIATES THE AU AT: the client's
@@ -423,14 +523,13 @@ Section ReadFire.
     iFrame "Hn HΦ".
   Qed.
 
-  (* ...AND THE ARMS COLLAPSE.  This is the whole of item 7 that does not
-     touch the machine: instantiate the AU at [arf_pin_recv] and every arm
-     lands at the client's own value.  NOTE WHERE [0 <= n] IS SPENT -- and
-     it is spent exactly where the frozen header says it is: on the GUARD
-     arm, whose refund would otherwise strand the wrapped share inside the
-     returned closure.  With the premise that disjunct is refuted and both
-     surviving arms carry a FIRED receipt, which is why read needs no
-     escape arm where write does. *)
+  (* ...AND THE ARMS COLLAPSE: instantiate the commit at [arf_pin_recv]
+     and every arm lands at the client's own value.  NOTE WHERE [0 <= n] IS
+     SPENT -- on the GUARD arm, whose unfired piece would otherwise strand
+     the wrapped share inside the returned conjunction.  With the premise
+     that disjunct is refuted and both surviving arms carry a FIRED
+     receipt, which is why read needs no escape arm where write does, and
+     why the derivation says nothing about the refund [R]. *)
   (* ONE LEMMA PER ARM, and the split is not cosmetic: proved as a single
      two-arm entailment the tactics all run in about a second and the
      [Qed] then does not come back (measured: >20 min, 2.6 GB, killed).
@@ -478,11 +577,12 @@ Section ReadFire.
      which is why read needs no escape arm where write does. *)
   Lemma arf_stable_fail_arm Γ (i : Z) γo (nz : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) :
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (r : mword 64) :
     0 <= nz ->
     r = (mword_of_int (-1) : mword 64) ->
     read_post_fail Γ i γo nz
-      (arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr)
+      (arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr) R
     ⊢ read_stable_arms Γ i nz q bs0 nl Φr r.
   Proof.
     intros Hnz Hr.
@@ -499,21 +599,26 @@ Section ReadFire.
     iExact "HΦ".
   Qed.
 
-  (* ...AND THE ARMS COLLAPSE.  This is the whole of item 7 that does not
-     touch the machine: instantiate the AU at [arf_pin_recv] and every arm
-     lands at the client's own value. *)
+  (* the two arms, joined *)
   Lemma arf_stable_of_arms Γ (i : Z) γo (nz : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) :
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (r : mword 64) :
     0 <= nz ->
     read_arms Γ i γo nz
-      (arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr) r
+      (arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr) R r
     ⊢ read_stable_arms Γ i nz q bs0 nl Φr r.
   Proof.
     intros Hnz. rewrite /read_arms.
     iIntros "[Hok | [%Hr Hfail]]".
     - iApply (arf_stable_ok_arm with "Hok").
-    - iApply (arf_stable_fail_arm Γ i γo nz q bs0 nl Φr r Hnz Hr with "Hfail").
+    - iApply (arf_stable_fail_arm Γ i γo nz q bs0 nl Φr R r Hnz Hr with "Hfail").
   Qed.
 
 End ReadFire.
+
+(* Sealed for family uniformity with the write side's arm families.
+   [aread_commit_at] is a match-free single wand and stays transparent, as
+   the sibling fires' commits do. *)
+Global Typeclasses Opaque read_post_ok read_post_fail read_arms
+  read_stable_arms.

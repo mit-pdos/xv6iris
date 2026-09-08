@@ -153,6 +153,36 @@ Proof.
   rewrite Hz. apply sext32_64_moi.
 Qed.
 
+(* ---- THE DESCRIPTOR-STATE KEY THE FD SYSCALLS' ARMS ARE ON ----------
+   ONE SPEC PER SYSCALL: a syscall whose first argument is a descriptor has
+   ONE contract, and what its caller-supplied INPUT and its armed OUTPUT are
+   keyed on is this pure function of syscall argument 0 and the caller's own
+   descriptor states -- the state of the descriptor argument 0 names, or
+   [FdClosed] when it names none (argfd's own -1, whose arm is the landed
+   return blanket and nothing more).  ONE key, and both sys_read and
+   sys_write are stated at it; the dispatcher above computes nothing of its
+   own -- it supplies the input at the same key. *)
+Definition sys_fd_st (v : mword 64) (fs : list (mword 64))
+    (sts : list fdstate) : fdstate :=
+  match arg_fd v fs with
+  | Some (fd, _) => default FdClosed (sts !! fd)
+  | None => FdClosed
+  end.
+
+(* what an OPEN key gives its consumer back: the descriptor argument 0
+   named, and its row in the caller's own table *)
+Lemma sys_fd_st_open (v : mword 64) (fs : list (mword 64))
+    (sts : list fdstate) (rb wb : bool) (ty : fdtype) :
+  sys_fd_st v fs sts = FdOpen rb wb ty ->
+  exists (fd : nat) (fv : mword 64),
+    arg_fd v fs = Some (fd, fv) /\ sts !! fd = Some (FdOpen rb wb ty).
+Proof.
+  rewrite /sys_fd_st. destruct (arg_fd v fs) as [[fd fv] |] eqn:Ha;
+    [| discriminate].
+  destruct (sts !! fd) as [st |] eqn:Hs; [| discriminate].
+  cbn. intros <-. by exists fd, fv.
+Qed.
+
 Section SpecArgfd.
   Context `{!riscvGS Σ}.
   (* the out-parameters are the CALLER's own locals -- stack cells on its

@@ -524,22 +524,10 @@ Section FdSlots.
     off_user_inv γo -∗ foff_row (FdOpen r w (FdInode i γo)).
   Proof. iIntros "$". Qed.
 
-  (* the obligation a state's row yields to the file layer ([SpecFileread]'s
-     state-keyed environment): the permit on an inode row, nothing else *)
-  Definition foff_permit_row (st : fdstate) : iProp Σ :=
-    match st with
-    | FdOpen _ _ (FdInode _ γo) => off_permit γo
-    | _ => True
-    end.
-  Global Instance foff_permit_row_persistent st : Persistent (foff_permit_row st).
-  Proof. destruct st as [|? ? [? ?| |?]]; apply _. Qed.
-
-  Lemma foff_row_permit (st : fdstate) : foff_row st -∗ foff_permit_row st.
-  Proof.
-    destruct st as [|? ? [? ?| |?]]; cbn;
-      [by iIntros "_" | | by iIntros "_" | by iIntros "_"].
-    iApply off_user_inv_permit.
-  Qed.
+  (* NO PERMIT ROW.  fileread and filewrite each move the offset shadow's
+     half inside their own commit, so no contract asks a descriptor's row for
+     the bare permit; a holder that wants one opens [off_user_inv] itself
+     ([OffGv.off_user_inv_permit]). *)
 
   Definition foff_rows (sts : list fdstate) : iProp Σ :=
     ([∗ list] st ∈ sts, foff_row st)%I.

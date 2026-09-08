@@ -3,7 +3,7 @@
    about the abstract state, at receipts that say nothing.
 
    WHAT THIS IS FOR.  The AU contracts ([SpecSysOpenAU], [SpecSysMknodAUEra],
-   [SpecSysUnlinkAU], [SpecSysReadAU]/[SpecFilereadAU], [SpecSysWrite]/
+   [SpecSysUnlinkAU], [SpecSysRead]/[SpecFileread], [SpecSysWrite]/
    [SpecFilewrite], [SpecCreateAU]/[SpecCreateAUF]) take, beside the
    landed frame, a bundle of caller-supplied fupds: the walk premise (one
    [ax_hop] per path element, fired at the era lend) and the commits (one
@@ -95,7 +95,10 @@ Require Import FsCfg.              (* [fscfg]: the fs configuration is AMBIENT *
 Require Import ConsoleInv.         (* [devsw_write_val_console]: the cell's pin *)
 Require Import UartSentLoc.        (* [uart_sent_nil]: the free trace seed *)
 Require Import SpecFilewrite.      (* [filewrite_in]: the one keyed input *)
-Require Import SpecSysWrite.       (* [sys_write_in], [sys_write_st] *)
+Require Import SpecArgfd.          (* [sys_fd_st]: the descriptor-state key *)
+Require Import SpecFileread.       (* [fileread_in]: read's keyed input *)
+Require Import SpecSysRead.        (* [sys_read_in] *)
+Require Import SpecSysWrite.       (* [sys_write_in] *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
@@ -211,11 +214,14 @@ Section FsAbsInvFire.
   Lemma foffN_appE : ↑foffN ⊆ appE.
   Proof. rewrite /appE /appN /foffN. solve_ndisj. Qed.
 
+  (* READ'S ONE PIECE, at the trivial receipt AND the trivial refund: the
+     conjunction the unified contract's inode arm takes ([AU /\ R]), so the
+     kernel may eliminate to either side. *)
   Lemma fsabs_aread Γ (i : Z) (γo : gname) :
     off_user_inv γo -∗
-    aread_commit_at Γ appE i γo (fun _ _ _ _ => True%I).
+    (aread_commit_at Γ appE i γo (fun _ _ _ _ => True%I) ∧ True).
   Proof.
-    iIntros "#Hoinv". rewrite /aread_commit_at.
+    iIntros "#Hoinv". iSplit; [| done]. rewrite /aread_commit_at.
     iIntros (I off a d) "%Hpre Ha Hk".
     iMod (off_user_inv_move appE γo _ (Z.of_nat (off + d)) foffN_appE
             with "Hoinv Hk") as "Hk".
@@ -251,10 +257,44 @@ Section FsAbsInvFire.
       iModIntro. iFrame "Ha' Hk". iApply "IH".
   Qed.
 
+  (* SYS_READ'S WHOLE INPUT, at the trivial receipt and the trivial refund
+     -- what the DISPATCHER hands the ONE [SpecSysRead.SYSREAD] contract in
+     place of the three forms it used to choose between.  Keyed on the same
+     pure function the contract's arms are ([SpecArgfd.sys_fd_st]).
+
+     IT COSTS THE DISPATCHER NOTHING IT DOES NOT ALREADY THREAD: read's one
+     piece needs only the offset invariant, and that comes off the
+     descriptor bundle's own persistent row family ([FdSlots.foff_row] at an
+     [FdInode] IS [OffGv.off_user_inv]).  No application step is paid -- a
+     read moves no row. *)
+  Lemma fsabs_sys_read_in (γfd : gname) (V : pprivate) (v : mword 64)
+      (sts : list fdstate) :
+    fd_frags γfd sts -∗
+      fd_frags γfd sts ∗
+      sys_read_in V v sts (fun _ _ _ _ => True%I) True%I.
+  Proof.
+    iIntros "Hfr".
+    (* the row family is PERSISTENT, so the bundle goes straight back: this
+       syscall moves no descriptor. *)
+    iAssert (foff_rows sts ∗ fd_frags γfd sts)%I with "[Hfr]"
+      as "[#Hrows Hfr]".
+    { rewrite /fd_frags. iDestruct "Hfr" as "(%Hl & Hs & #Hr)".
+      iSplitR; [iExact "Hr" |]. iSplitR; [by iPureIntro |].
+      iFrame "Hs". iExact "Hr". }
+    iFrame "Hfr".
+    rewrite /sys_read_in /fileread_in.
+    destruct (sys_fd_st v (pv_ofile V) sts) as [| rb wb ty] eqn:Hst; [done |].
+    destruct rb; [| done].
+    destruct ty as [i γo | | ma]; [| done | done].
+    destruct (sys_fd_st_open _ _ _ _ _ _ Hst) as (fd & fv & Hafd & Hrow).
+    iDestruct (foff_rows_lookup _ _ _ Hrow with "Hrows") as "#Hoinv".
+    iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo with "Hoinv").
+  Qed.
+
   (* SYS_WRITE'S WHOLE INPUT, at the trivial cursor and the free seed --
      what the DISPATCHER hands the ONE [SpecSysWrite.SYSWRITE] contract in
      place of the three it used to choose between.  It is keyed on the same
-     pure function the contract's arms are ([SpecSysWrite.sys_write_st]), so
+     pure function the contract's arms are ([SpecArgfd.sys_fd_st]), so
      the dispatcher's [destruct] is on THE KEY and not on a choice of
      contract.
 
@@ -286,11 +326,11 @@ Section FsAbsInvFire.
       iFrame "Hs". iExact "Hr". }
     iFrame "Hfr".
     rewrite /sys_write_in /filewrite_in.
-    destruct (sys_write_st v (pv_ofile V) sts) as [| rb wb ty] eqn:Hst;
+    destruct (sys_fd_st v (pv_ofile V) sts) as [| rb wb ty] eqn:Hst;
       [by iModIntro |].
     destruct wb; [| by iModIntro].
     destruct ty as [i γo | | ma].
-    - destruct (sys_write_st_open _ _ _ _ _ _ Hst) as (fd & fv & Hafd & Hrow).
+    - destruct (sys_fd_st_open _ _ _ _ _ _ Hst) as (fd & fv & Hafd & Hrow).
       iDestruct (foff_rows_lookup _ _ _ Hrow with "Hrows") as "#Hoinv".
       iModIntro.
       iApply (fsabs_awrite_chain fsc_fs i γo M ua 0%nat (wchunks n)

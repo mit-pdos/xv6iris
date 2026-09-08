@@ -127,32 +127,10 @@ Definition sys_write_ret (V : pprivate) (v : mword 64) (n : Z) (r : mword 64) : 
         arg_fd v (pv_ofile V) = Some (fd, fv) /\ filewrite_ret n r).
 
 (* ---- THE ARMS' KEY --------------------------------------------------
-   sys_write has ONE contract, and its arms are keyed on this pure function
-   of syscall argument 0 and the caller's own descriptor states: the state
-   of the descriptor argument 0 names, or [FdClosed] when it names none
-   (argfd's own -1, whose arm is the landed blanket and nothing more).  The
-   dispatcher above computes nothing of its own -- it supplies the input at
-   the same key. *)
-Definition sys_write_st (v : mword 64) (fs : list (mword 64))
-    (sts : list fdstate) : fdstate :=
-  match arg_fd v fs with
-  | Some (fd, _) => default FdClosed (sts !! fd)
-  | None => FdClosed
-  end.
-
-(* what an OPEN key gives its consumer back: the descriptor argument 0
-   named, and its row in the caller's own table *)
-Lemma sys_write_st_open (v : mword 64) (fs : list (mword 64))
-    (sts : list fdstate) (rb wb : bool) (ty : fdtype) :
-  sys_write_st v fs sts = FdOpen rb wb ty ->
-  exists (fd : nat) (fv : mword 64),
-    arg_fd v fs = Some (fd, fv) /\ sts !! fd = Some (FdOpen rb wb ty).
-Proof.
-  rewrite /sys_write_st. destruct (arg_fd v fs) as [[fd fv] |] eqn:Ha;
-    [| discriminate].
-  destruct (sts !! fd) as [st |] eqn:Hs; [| discriminate].
-  cbn. intros <-. by exists fd, fv.
-Qed.
+   sys_write has ONE contract, and its arms are keyed on the SHARED
+   descriptor-state key [SpecArgfd.sys_fd_st] -- the state of the descriptor
+   argument 0 names, or [FdClosed] when it names none.  sys_read's arms are
+   keyed on the same function: one key, two consumers. *)
 
 Section SpecSysWrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -196,7 +174,7 @@ Section SpecSysWrite.
   Definition sys_write_in (fn : fwrite_names) (V : pprivate) (v : mword 64)
       (sts : list fdstate) (n : Z) (M : gmap Z (bv 8)) (ua : mword 64)
       (Q : nat -> iProp Σ) (tr0 : list (bv 8)) : iProp Σ :=
-    filewrite_in fn (sys_write_st v (pv_ofile V) sts) n M ua Q tr0.
+    filewrite_in fn (sys_fd_st v (pv_ofile V) sts) n M ua Q tr0.
 
   (* the LANDED return clause, verbatim, plus the arm's extra.  Stating the
      blanket unconditionally is what makes "the unified contract implies the
@@ -206,7 +184,7 @@ Section SpecSysWrite.
       (sts : list fdstate) (n : Z) (M : gmap Z (bv 8)) (ua : mword 64)
       (Q : nat -> iProp Σ) (tr0 : list (bv 8)) (r : mword 64) : iProp Σ :=
     (⌜sys_write_ret V v n r⌝ ∗
-     filewrite_extra (sys_write_st v (pv_ofile V) sts) n M ua Q tr0 r)%I.
+     filewrite_extra (sys_fd_st v (pv_ofile V) sts) n M ua Q tr0 r)%I.
 
   Lemma sys_write_arms_ret V v sts n M ua Q tr0 r :
     sys_write_arms V v sts n M ua Q tr0 r -∗ ⌜sys_write_ret V v n r⌝.
@@ -222,7 +200,7 @@ Section SpecSysWrite.
     r = (mword_of_int (-1) : mword 64) ->
     ⊢ sys_write_arms V v sts n M ua Q tr0 r.
   Proof.
-    intros Hnone Hr. rewrite /sys_write_arms /sys_write_st Hnone.
+    intros Hnone Hr. rewrite /sys_write_arms /sys_fd_st Hnone.
     iSplitR; [| done]. iPureIntro. left. split; [exact Hr | exact Hnone].
   Qed.
 
@@ -234,7 +212,7 @@ Section SpecSysWrite.
     sts !! fd = Some st ->
     sys_write_in fn V v sts n M ua Q tr0 -∗ filewrite_in fn st n M ua Q tr0.
   Proof.
-    intros Hsome Hst. rewrite /sys_write_in /sys_write_st Hsome Hst /=.
+    intros Hsome Hst. rewrite /sys_write_in /sys_fd_st Hsome Hst /=.
     by iIntros "$".
   Qed.
 
@@ -246,7 +224,7 @@ Section SpecSysWrite.
     sts !! fd = Some st ->
     filewrite_arms st n M ua Q tr0 r -∗ sys_write_arms V v sts n M ua Q tr0 r.
   Proof.
-    intros Hsome Hst. rewrite /sys_write_arms /sys_write_st Hsome Hst /=.
+    intros Hsome Hst. rewrite /sys_write_arms /sys_fd_st Hsome Hst /=.
     iIntros "[%Hret $]". iPureIntro. right. by exists fd, fv.
   Qed.
 
@@ -325,7 +303,7 @@ Definition wp_sys_write_sconf_body
   ConsoleInv.devsw_table -∗
   (* ---- THE CALLER'S INPUT, KEYED ON THE DESCRIPTOR ARGUMENT 0 NAMES
      ([sys_write_in], which is [SpecFilewrite.filewrite_in] at
-     [sys_write_st]): the commit chain on an open writable inode, the trace
+     [sys_fd_st]): the commit chain on an open writable inode, the trace
      seed and the devsw pin on the console, [emp] everywhere else.  THE
      APPLICATION'S PER-CHUNK STEP RIDES IN IT: the FD_INODE arm's retag pays
      the application's claim out of the chain's own node, so this contract

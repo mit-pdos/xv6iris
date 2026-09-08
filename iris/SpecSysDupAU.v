@@ -5,7 +5,7 @@
 
    Design of record: claude-notes/design/fs-syscall-specs.md and lane W of
    claude-notes/projects/fs-syscall-specs.md.  The molds are
-   SpecSysReadAU.v and the write side (the fd-premise threading: [arg_fd]
+   SpecSysRead.v and the write side (the fd-premise threading: [arg_fd]
    as a pure premise, the caller's own fragment knowledge in, exclusion by
    premise) and SpecSysOpenAU.v's [open_fd_ok] (the fd-success tail: the
    LEAST free descriptor, an EXPLICIT state list, the [us_ofile] cell

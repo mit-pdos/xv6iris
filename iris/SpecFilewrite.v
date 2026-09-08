@@ -996,12 +996,11 @@ Definition wp_filewrite_sconf_body
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   filewrite_env γf fn st -∗
-  (* NO OFFSET PERMIT.  fileread takes one ([SpecFileread]'s
-     [foff_permit_row st]) because its walk moves [f->off] through the
-     process's leave; filewrite's FD_INODE arm moves the shadow's half
-     inside the chain's own node ([FsAbsWriteFire.awrite_full_at] lends it
-     at the chunk's offset and takes it back advanced), so the permit is
-     nothing this contract asks for. *)
+  (* NO OFFSET PERMIT.  filewrite's FD_INODE arm moves the offset shadow's
+     half inside the chain's own node ([FsAbsWriteFire.awrite_full_at] lends
+     it at the chunk's offset and takes it back advanced), so the permit is
+     nothing this contract asks for.  fileread is the same one size down --
+     its one commit lends and returns the half. *)
   (* ---- THE CALLER'S INPUT, KEYED ON [st] ([filewrite_in]) ----
      The chain on an inode descriptor, the trace seed and the devsw pin on
      the console, [emp] everywhere else.  This REPLACES the persistent

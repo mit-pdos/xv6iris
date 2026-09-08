@@ -166,11 +166,15 @@ Require Import FileInvDefs.
 Require Import SpecArgfd.
 Require Import ConsoleInv.
 Require Import SpecFileread.
+Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ                 *)
+Require Import AppInv.           (* [appN]/[appE]: the commit's mask         *)
+Require Import FsAbsReadFire.    (* [read_arms]: the inode arm's disposition *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import FsAbs.  (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 
@@ -265,6 +269,68 @@ Section SpecSysRead.
       iApply (fileread_fs_env_out with "Hfs"). }
   Qed.
 
+  (* ---- THE ONE INPUT AND THE ONE OUTPUT ------------------------------
+     Both are [SpecFileread]'s, keyed on [SpecArgfd.sys_fd_st] -- the state
+     of the descriptor argument 0 names, or [FdClosed] when it names none
+     (argfd's own -1, whose arm is the landed blanket and nothing more).
+     The callee's arms ARE this caller's arms, because sys_read relays
+     fileread's return value untouched, so there is one match in the tree,
+     not two.  sys_write is stated at the same key. *)
+  Definition sys_read_in (V : pprivate) (v : mword 64) (sts : list fdstate)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ) : iProp Σ :=
+    fileread_in (sys_fd_st v (pv_ofile V) sts) Φ R.
+
+  (* the LANDED return clause, verbatim, plus the arm's extra.  Stating the
+     blanket unconditionally is what makes "the unified contract implies the
+     landed one" true by construction -- and it is also what the epilogue in
+     [ProofSyscall] is written against. *)
+  Definition sys_read_arms (V : pprivate) (v : mword 64) (sts : list fdstate)
+      (n : Z) (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (r : mword 64) : iProp Σ :=
+    (⌜sys_read_ret V v n r⌝ ∗
+     fileread_extra (sys_fd_st v (pv_ofile V) sts) n Φ R r)%I.
+
+  Lemma sys_read_arms_ret V v sts n Φ R r :
+    sys_read_arms V v sts n Φ R r -∗ ⌜sys_read_ret V v n r⌝.
+  Proof. iIntros "[%H _]". by iPureIntro. Qed.
+
+  (* ---- the key, read at the two shapes the walk reaches it in --------
+     argfd answered NONE (the -1 above the branch), or it answered a
+     descriptor whose row the caller's own bundle names. *)
+  Lemma sys_read_arms_none (V : pprivate) (v : mword 64) (sts : list fdstate)
+      (n : Z) (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (r : mword 64) :
+    arg_fd v (pv_ofile V) = None ->
+    r = (mword_of_int (-1) : mword 64) ->
+    ⊢ sys_read_arms V v sts n Φ R r.
+  Proof.
+    intros Hnone Hr. rewrite /sys_read_arms /sys_fd_st Hnone.
+    iSplitR; [| done]. iPureIntro. left. split; [exact Hr | exact Hnone].
+  Qed.
+
+  Lemma sys_read_in_of (V : pprivate) (v : mword 64) (sts : list fdstate)
+      (fd : nat) (fv : mword 64) (st : fdstate)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ) :
+    arg_fd v (pv_ofile V) = Some (fd, fv) ->
+    sts !! fd = Some st ->
+    sys_read_in V v sts Φ R -∗ fileread_in st Φ R.
+  Proof.
+    intros Hsome Hst. rewrite /sys_read_in /sys_fd_st Hsome Hst /=.
+    by iIntros "$".
+  Qed.
+
+  Lemma sys_read_arms_of (V : pprivate) (v : mword 64) (sts : list fdstate)
+      (fd : nat) (fv : mword 64) (st : fdstate) (n : Z)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (r : mword 64) :
+    arg_fd v (pv_ofile V) = Some (fd, fv) ->
+    sts !! fd = Some st ->
+    fileread_arms st n Φ R r -∗ sys_read_arms V v sts n Φ R r.
+  Proof.
+    intros Hsome Hst. rewrite /sys_read_arms /sys_fd_st Hsome Hst /=.
+    iIntros "[%Hret $]". iPureIntro. right. by exists fd, fv.
+  Qed.
+
 End SpecSysRead.
 
 Definition wp_sys_read_sconf_body
@@ -276,7 +342,10 @@ Definition wp_sys_read_sconf_body
     (pidv : mword 32) (U : ustate)
     (sts : list fdstate)                         (* the process's descriptor view *)
     (v v1 v2 : mword 64)                         (* syscall arguments 0, 1, 2 *)
-    (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
+    (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+    (* ---- the inode arm's observation RECEIPT and its REFUND, both
+       [SpecFileread]'s ---- *)
+    (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_read in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -318,12 +387,11 @@ Definition wp_sys_read_sconf_body
   panic_env -∗
   proc_priv γf pj pidv U -∗
   (* THE DESCRIPTOR BUNDLE, in and out UNCHANGED: a read moves no descriptor.
-     It is here for its OFFSET ROW ([FdSlots.foff_row]): fileread advances
-     [f->off], the kernel holds only half of the offset's shadow, and the
-     process's half -- parked in the row's existential invariant for a
-     process the generic WP manages -- is what pays fileread's permit
-     ([fileread_env]'s inode arm).  Which row is read off the loaned
-     descriptor's authority ([fd_st_agree]). *)
+     It is here because the arms are KEYED on it -- [sys_fd_st] reads the
+     state of the descriptor argument 0 names out of this very list -- and
+     because a process whose half of the offset shadow is parked in the
+     row's existential invariant ([FdSlots.foff_row]) builds the inode arm's
+     commit out of that row ([FsAbsInvFire.fsabs_aread]). *)
   fd_frags (pv_fdg (us_V U)) sts -∗
   kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
@@ -337,6 +405,11 @@ Definition wp_sys_read_sconf_body
      the table's own values. *)
   fileread_fs_env γf fn -∗
   ConsoleInv.console_inv (frn_cons fn) -∗
+  (* ---- THE CALLER'S INPUT, KEYED ON THE DESCRIPTOR ARGUMENT 0 NAMES
+     ([sys_read_in], which is [SpecFileread.fileread_in] at [sys_fd_st]):
+     the observation commit conjoined with the caller's refund on an open,
+     readable inode, [emp] everywhere else. ---- *)
+  sys_read_in (us_V U) v sts Φ R -∗
   (* THE CROSSING IS THE LITERAL [true]: fileread parks, and a park moves the
      hart with interrupts off, so the crossing has nothing to do with SIE. *)
   wp_next true pj (fun (CID : CpuId) =>
@@ -355,7 +428,6 @@ Definition wp_sys_read_sconf_body
     ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
-      ⌜sys_read_ret (us_V U) v (sys_rw_count v2) r⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 (sys_rw_count v2))%Z⌝ -∗
       (* ...AND A NON-NEGATIVE ANSWER IS EXACTLY THE COUNT WRITTEN.  This is
          fileread's, relayed: every arm copies a chunk at a time and a
@@ -379,9 +451,17 @@ Definition wp_sys_read_sconf_body
       fileread_fs_out fn -∗
       (* the device column is NOT returned: it is persistent, and the caller
          still holds the invariant it was projected from. *)
+      (* ---- THE ARMED OUTPUT ([sys_read_arms]): the blanket
+         ⌜sys_read_ret⌝, and beside it what the arm the descriptor selects
+         proved. ---- *)
+      sys_read_arms (us_V U) v sts (sys_rw_count v2) Φ R r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ONE MODULE TYPE: there is no parallel statement for the observation and
+   no second walk against the code.  A STABLE form, when one is wanted, is a
+   derived lemma ([FsAbsReadFire.arf_stable_of_arms]) and never a second
+   proof. *)
 Module Type SYSREAD.
   Parameter wp_sys_read_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -391,6 +471,8 @@ Module Type SYSREAD.
       (fn : fread_names)
       (pidv : mword 32) (U : ustate) (sts : list fdstate)
       (v v1 v2 : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_read_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks.
+      (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ),
+      wp_sys_read_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks
+        Φ R.
 End SYSREAD.

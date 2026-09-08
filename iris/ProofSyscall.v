@@ -419,7 +419,7 @@ Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 
 (* THE WRITE ARM'S DISPATCH KEY IS THE CONTRACT'S OWN.  sys_write has ONE
    contract, whose arms are keyed on the descriptor's state
-   ([SpecSysWrite.sys_write_st], a pure function of syscall argument 0 and
+   ([SpecArgfd.sys_fd_st], a pure function of syscall argument 0 and
    the caller's own descriptor states), so this file computes no key and
    splits on nothing: it supplies the input at that same key and relays the
    armed post. *)
@@ -4538,13 +4538,26 @@ Section SyscallArms.
     iDestruct (syscall_env_console with "Henvc") as (γc) "#Hci".
     iDestruct (sysc_fileread_env γf γc (proc_addr j) fn with "Hfsenv Hsl")
       as "[Hfse Hback]".
+    (* ---- THE CALLER'S INPUT, AT THE TRIVIAL RECEIPT AND REFUND ----
+       ONE CONTRACT: [SYSREAD]'s arms are keyed on the descriptor's state
+       themselves, so this arm picks nothing -- it owes the matching input,
+       whatever the key turns out to be.  [FsAbsInvFire.fsabs_sys_read_in]
+       builds it from the descriptor bundle's own persistent row family (the
+       inode arm's offset invariant) and nothing else: a read moves no row,
+       so no application step is paid here. *)
+    iDestruct (fsabs_sys_read_in (pv_fdg (us_V U)) (us_V U) v0 sts
+                 with "Hufrag") as "[Hufrag Hsrin]".
     iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γc fn)
               pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
+              (fun _ _ _ _ => True%I) True%I
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
-              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci").
+              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Hsrin").
     iIntros (CIDy Hsy mf r P' dw bsw)
-      "%Hcs %Hextz %Hret' %Hdwle %Htie %Hmfa0 Hcg Hcpu Hpc Hpriv Hufrag _ Hout".
+      "%Hcs %Hextz %Hdwle %Htie %Hmfa0 Hcg Hcpu Hpc Hpriv Hufrag _ Hout Harms".
+    (* the armed post CONTAINS the landed return clause, which is what the
+       epilogue below is written against ([sys_read_arms_ret]). *)
+    iDestruct (sys_read_arms_ret with "Harms") as "%Hret'".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first

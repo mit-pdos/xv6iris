@@ -181,11 +181,17 @@ Require Import ProcInv.
 Require Import ConsoleInv.
 Require Import FileInvDefs.
 Require Import SpecReadi.
+Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ                 *)
+Require Import AppInv.           (* [appN]/[appE]: the commit's mask         *)
+Require Import SpecSysReadAU.    (* the read observation's pure vocabulary   *)
+Require Import FsAbsReadFire.    (* [aread_commit_at], [read_arms]: the one
+                                    piece and its arms                       *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import FsAbs.   (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 
@@ -639,7 +645,7 @@ Section SpecFileread.
      [IcacheRefDefs.ity_shot_agree] and the row is a FILE or a DIRECTORY --
      which is what refutes [FsAbs.abs_node]'s [ADev] arm on a write (and so
      keeps [SpecFilewrite]'s post at two arms) and gives read its
-     "FdInode => AFile or ADir" tie ([SpecSysReadAU]'s owner question 2).  The invariant-level
+     "FdInode => AFile or ADir" tie.  The invariant-level
      statement of the same fact is [FileInvDefs.inode_pay_not_dev]. *)
   (* THE OFF OUTPUT IS TYPE-INDEXED (r25 item 24, the visibility-free
      off cell): the FD_INODE arm hands out the file's OFF BOX HANDLE
@@ -739,6 +745,182 @@ Section SpecFileread.
     iSplit; iPureIntro; [exact Hnd | exact Hdv].
   Qed.
 
+  (* =================================================================== *)
+  (*  THE ONE INPUT AND THE ONE OUTPUT, KEYED ON THE DESCRIPTOR STATE     *)
+  (* =================================================================== *)
+
+  (* ONE SPEC PER SYSCALL.  fileread has ONE contract, over every descriptor
+     kind, and what the descriptor's STATE keys is a caller-supplied INPUT
+     ([fileread_in]) and an armed OUTPUT ([fileread_arms]) -- the same key
+     the CODE branches on ([f->type], after the [f->readable] test).
+
+     - an open, READABLE INODE: the observation commit at this file's inum,
+       conjoined with the caller's own REFUND [R] (the REFUNDS ruling: every
+       one-shot piece is [AU /\ R], both conjuncts out of one context).  Read
+       has exactly ONE such piece -- one lock hold, the whole transfer inside
+       it, so one instant and no chain.  The arms are
+       [FsAbsReadFire.read_arms]: the receipt on a non-negative answer, the
+       piece back UNSPENT on the sign guard, the FIRED receipt at advance 0
+       on a copyout fault.
+     - everything else -- a pipe, a device (the console read included), an
+       unreadable or closed descriptor -- costs nothing and gets the landed
+       blanket back.  A PIPE AU and a CONSOLE-INPUT tie are out of scope and
+       deliberately not invented here; the console arm is where the
+       console-input receipt will land when it does.
+
+     THE OFFSET RIDES IN THE PIECE.  fileread advances [f->off] and the
+     kernel owns only half of the offset's shadow; the commit lends the
+     kernel's half at the offset the read used and takes it back advanced by
+     the count delivered ([FsAbsReadFire.aread_commit_at]), so this contract
+     asks for no separate offset permit. *)
+  Definition fileread_in (st : fdstate)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ) : iProp Σ :=
+    match st with
+    | FdOpen true _ (FdInode i γo) =>
+        aread_commit_at (fs_gamma_L fsc_fs) appE i γo Φ ∧ R
+    | _ => emp
+    end%I.
+
+  (* WHAT THE ARM PAYS BEYOND THE LANDED BLANKET, at the same key.  Split
+     out from [fileread_arms] so [SpecSysRead] can reuse it under its own
+     blanket ([sys_read_ret]) without restating the match. *)
+  Definition fileread_extra (st : fdstate) (n : Z)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (r : mword 64) : iProp Σ :=
+    match st with
+    | FdOpen true _ (FdInode i γo) =>
+        read_arms (fs_gamma_L fsc_fs) i γo n Φ R r
+    | _ => emp
+    end%I.
+
+  (* ...and the whole post: the landed return clause, verbatim, PLUS the
+     arm's extra.  Stating the blanket unconditionally rather than deriving
+     it per arm is what makes "the unified contract implies each landed
+     form" true BY CONSTRUCTION -- there is nothing to check. *)
+  Definition fileread_arms (st : fdstate) (n : Z)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (r : mword 64) : iProp Σ :=
+    (⌜fileread_ret n r⌝ ∗ fileread_extra st n Φ R r)%I.
+
+  Lemma fileread_arms_ret st n Φ R r :
+    fileread_arms st n Φ R r -∗ ⌜fileread_ret n r⌝.
+  Proof. iIntros "[%H _]". by iPureIntro. Qed.
+
+  (* ---- READING THE KEYED INPUT, BUILDING THE KEYED OUTPUT -------------
+     One-liners, so that no walk ever has to unfold the two matches and
+     every arm names the fact it is standing on. *)
+
+  Lemma fileread_in_inode wb i γo Φ R :
+    fileread_in (FdOpen true wb (FdInode i γo)) Φ R -∗
+    aread_commit_at (fs_gamma_L fsc_fs) appE i γo Φ ∧ R.
+  Proof. by iIntros "$". Qed.
+
+  Lemma fileread_extra_inode wb i γo n Φ R r :
+    read_arms (fs_gamma_L fsc_fs) i γo n Φ R r -∗
+    fileread_extra (FdOpen true wb (FdInode i γo)) n Φ R r.
+  Proof. by iIntros "$". Qed.
+
+  (* ...and the two at a state the walk holds only through an EQUATION: a
+     descriptor's shape is derived from its content, not matched on. *)
+  Lemma fileread_in_inode_of (st : fdstate) (wb : bool) (i : Z) (γo : gname)
+      Φ R :
+    st = FdOpen true wb (FdInode i γo) ->
+    fileread_in st Φ R -∗ aread_commit_at (fs_gamma_L fsc_fs) appE i γo Φ ∧ R.
+  Proof. intros ->. by iIntros "$". Qed.
+
+  Lemma fileread_extra_inode_of (st : fdstate) (wb : bool) (i : Z) (γo : gname)
+      n Φ R r :
+    st = FdOpen true wb (FdInode i γo) ->
+    read_arms (fs_gamma_L fsc_fs) i γo n Φ R r -∗ fileread_extra st n Φ R r.
+  Proof. intros ->. by iIntros "$". Qed.
+
+  (* the three arms that pay nothing beyond the blanket *)
+  Lemma fileread_extra_pipe rb wb n Φ R r :
+    ⊢ fileread_extra (FdOpen rb wb FdPipe) n Φ R r.
+  Proof. rewrite /fileread_extra. by destruct rb. Qed.
+
+  Lemma fileread_extra_dev rb wb (mj : Z) n Φ R r :
+    ⊢ fileread_extra (FdOpen rb wb (FdDevice mj)) n Φ R r.
+  Proof. rewrite /fileread_extra. by destruct rb. Qed.
+
+  Lemma fileread_extra_closed n Φ R r :
+    ⊢ fileread_extra FdClosed n Φ R r.
+  Proof. done. Qed.
+
+  (* ...at the key the WALK holds after the [f->type] branch: the descriptor's
+     TYPE, not a state shape it would have to re-derive. *)
+  Lemma fileread_extra_of_pipe (inum : mword 32) (γo : gname) (C : fcontent)
+      (st : fdstate) n Φ R r :
+    fdstate_ok inum γo C st -> fc_type C = FD_PIPE ->
+    ⊢ fileread_extra st n Φ R r.
+  Proof.
+    intros Hok Ht.
+    destruct (fdstate_ok_pipe inum γo C st Hok Ht) as (rb & wb & ->).
+    iApply fileread_extra_pipe.
+  Qed.
+
+  Lemma fileread_extra_of_dev (inum : mword 32) (γo : gname) (C : fcontent)
+      (st : fdstate) n Φ R r :
+    fdstate_ok inum γo C st -> fc_type C = FD_DEVICE ->
+    ⊢ fileread_extra st n Φ R r.
+  Proof.
+    intros Hok Ht.
+    destruct (fdstate_ok_device inum γo C st Hok Ht) as (rb & wb & ->).
+    iApply fileread_extra_dev.
+  Qed.
+
+  (* THE INODE ARM'S KEY, in one step.  Past the [f->readable] test and the
+     [f->type] branch the descriptor IS the armed one, at the payload's own
+     inum and offset shadow -- which is what makes the walk's commit and the
+     contract's index the same [i] with nothing to bridge. *)
+  Lemma fileread_st_inode_rd (inum : mword 32) (γo : gname) (C : fcontent)
+      (st : fdstate) :
+    fdstate_ok inum γo C st -> fc_type C = FD_INODE ->
+    eq_vec (zero_extend' 64 (fc_readable C : mword 8) : mword 64)
+           (zero_reg : mword 64) = false ->
+    exists wb : bool, st = FdOpen true wb (FdInode (bv_unsigned inum) γo).
+  Proof.
+    intros Hok Ht Hrd.
+    destruct (fdstate_ok_inode inum γo C st Hok Ht) as (rb & wb & Hst).
+    destruct rb; [by exists wb | exfalso].
+    rewrite Hst in Hok. destruct Hok as (Hr & _ & _).
+    rewrite Hr in Hrd. vm_compute in Hrd. discriminate.
+  Qed.
+
+  (* the [f->readable == 0] early return: no arm of the match is armed
+     there, because the only armed one is a READABLE descriptor *)
+  Lemma fileread_extra_unreadable (inum : mword 32) (γo : gname)
+      (C : fcontent) (st : fdstate) n Φ R r :
+    fdstate_ok inum γo C st ->
+    (* the WORD the code tested, not a re-reading of it: the walk arrives
+       with [beq a5,x0]'s own boolean *)
+    eq_vec (zero_extend' 64 (fc_readable C : mword 8) : mword 64)
+           (zero_reg : mword 64) = true ->
+    ⊢ fileread_extra st n Φ R r.
+  Proof.
+    destruct st as [| rb wb ty]; [by iIntros |].
+    destruct rb; [| rewrite /fileread_extra; by iIntros].
+    cbn. intros (Hr & _ & _) Hz. exfalso.
+    rewrite Hr in Hz. vm_compute in Hz. discriminate.
+  Qed.
+
+  (* THE SIGN GUARD'S EXIT, at every arm at once.  fileread's [n < 0] test
+     at +0x1a fires BEFORE the type dispatch, so this exit must answer for a
+     descriptor whose kind the walk has not read yet -- and it can, for
+     free: the inode arm hands the piece back UNSPENT (which is the whole
+     point of the refund), and every other arm is [emp]. *)
+  Lemma fileread_extra_neg st n Φ R :
+    (n < 0)%Z ->
+    fileread_in st Φ R -∗
+    fileread_extra st n Φ R (mword_of_int (-1) : mword 64).
+  Proof.
+    intros Hn. destruct st as [| rb wb ty]; [by iIntros |].
+    destruct rb; [| by iIntros].
+    destruct ty as [i γo | | mj]; rewrite /fileread_in /fileread_extra;
+      [| by iIntros | by iIntros].
+    iIntros "Hc". by iApply (read_arms_neg with "Hc").
+  Qed.
+
 End SpecFileread.
 
 Definition wp_fileread_sconf_body
@@ -749,7 +931,13 @@ Definition wp_fileread_sconf_body
     (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
     (fn : fread_names)                           (* the heavy arms' ghosts  *)
     (pidv : mword 32) (U : ustate)
-    (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string) :=
+    (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
+    (* ---- THE ARM PARAMETERS ----
+       [Φ] is the inode arm's observation RECEIPT and [R] its REFUND -- what
+       the caller gets back on the one arm that does not fire.  Both are
+       ignored by every other arm, so a caller that does not care
+       instantiates them trivially ([fun _ _ _ _ => True] and [True]). *)
+    (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileread in
   let pj := proc_addr j in
   (* a1 = addr, the user destination all three arms copy to *)
@@ -796,11 +984,16 @@ Definition wp_fileread_sconf_body
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   fileread_env γf fn st -∗
-  (* ...AND THE OFFSET PERMIT ON AN INODE DESCRIPTOR: fileread advances
-     [f->off], the kernel owns only half of the offset's shadow (OffGv.v),
-     and the process's half is moved by this obligation.  The AU form takes
-     the offset transition INSIDE its commit instead ([SpecFilereadAU]). *)
-  foff_permit_row st -∗
+  (* NO OFFSET PERMIT.  fileread advances [f->off] and the kernel owns only
+     half of the offset's shadow (OffGv.v); the FD_INODE arm moves the
+     process's half INSIDE the observation commit
+     ([FsAbsReadFire.aread_commit_at] lends it at the offset the read used
+     and takes it back advanced by the count delivered), so the permit is
+     nothing this contract asks for.
+     ---- THE CALLER'S INPUT, KEYED ON [st] ([fileread_in]) ----
+     The observation commit conjoined with the caller's refund on an open,
+     readable inode descriptor, [emp] everywhere else. *)
+  fileread_in st Φ R -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -827,7 +1020,6 @@ Definition wp_fileread_sconf_body
   ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
-      ⌜fileread_ret n r⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
       (* ...AND A NON-NEGATIVE ANSWER IS EXACTLY THE COUNT WRITTEN.  All
          three arms copy a chunk at a time and a failing copy moves none of
@@ -847,9 +1039,17 @@ Definition wp_fileread_sconf_body
       proc_priv_core pj pidv
         (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
       fileread_env_out fn st -∗
+      (* ---- THE ARMED OUTPUT, KEYED ON [st] ([fileread_arms]) ----
+         The blanket [⌜fileread_ret n r⌝], and beside it what the arm the
+         descriptor selects proved: the observation's receipt, its unspent
+         return or its fault reading on an inode, nothing anywhere else. *)
+      fileread_arms st n Φ R r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ONE MODULE TYPE: there is no parallel statement pinned to an inode, and
+   no second walk against the code.  The arms are keyed on the descriptor's
+   state inside this one. *)
 Module Type FILEREAD.
   Parameter wp_fileread_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -859,6 +1059,7 @@ Module Type FILEREAD.
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fread_names)
       (pidv : mword 32) (U : ustate)
-      (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
-      wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks.
+      (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ),
+      wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks Φ R.
 End FILEREAD.

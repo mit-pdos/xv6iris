@@ -109,6 +109,12 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the off checkout borrows the running token *)
 Require Import FileOffProtocol.   (* proto_read_llb / _checkout / _park (r25 item 24) *)
+Require Import FsStateEra.        (* [era_node]                              *)
+Require Import AppInv.            (* [appN]/[appE]: the commit's mask        *)
+Require Import FsBytesGamma.      (* [fs_gamma_L]: the live Γ                *)
+Require Import SpecSysReadAU.     (* [ard_pre], [ard_ret_tie]                *)
+Require Import FsAbsReadFire.     (* [arf_read_fire], [read_arms]            *)
+Require Import FsAbsDefs.         (* LAST (FsAbs's own rule)                 *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -306,6 +312,34 @@ Section FilereadMsg.
   Qed.
 End FilereadMsg.
 
+(* ===================================================================== *)
+(*  THE RETURN TIE, at the spelling the walk holds it                     *)
+(* ===================================================================== *)
+
+(* readi's arm 2 answers [rd_clamp] over the LOADED RECORD's size word, and
+   [ard_ret_tie] asks about the OBSERVED row.  On a file the two are one
+   equation ([FsAbsReadFire.arf_count_bridge_era]); on a directory or a
+   device the wildcard arm wants only the bounds, and the clamp supplies
+   them. *)
+Lemma fr_ret_tie (nz : Z) (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) (off tot : nat) :
+  (0 <= nz)%Z ->
+  tot = rd_clamp (di_size dn) off (Z.to_nat nz) ->
+  ard_ret_tie nz (abs_row (era_node dn bm data)) off
+    (mword_of_int (Z.of_nat tot) : mword 64).
+Proof.
+  intros Hnn Htot.
+  assert (Hle : (tot <= Z.to_nat nz)%nat)
+    by (rewrite Htot; apply fr_clamp_le).
+  rewrite /ard_ret_tie.
+  destruct (an_node (abs_row (era_node dn bm data))) as [bs | ents | ma mi]
+    eqn:Hrow.
+  - do 2 f_equal. rewrite Htot.
+    exact (arf_count_bridge_era dn bm data bs off (Z.to_nat nz) Hrow).
+  - exists (Z.of_nat tot). split; [reflexivity | lia].
+  - exists (Z.of_nat tot). split; [reflexivity | lia].
+Qed.
+
 Module FilereadProof (Piperead : PIPEREAD) (Ilock : ILOCK) (Readi : READI)
                      (Iunlock : IUNLOCK) (Consoleread : CONSOLEREAD)
                      (PN : PANIC) : FILEREAD.
@@ -422,13 +456,14 @@ Section ProofFileread.
       (k : nat) (q : Qp) (st : fdstate) (fn : fread_names)
       (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
-    : wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks.
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (Rf : iProp Σ)
+    : wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks Φr Rf.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj addr ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn Heb Hbelow.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hprow Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hau Hcont".
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the four content cells the dispatch reads
        are fractions of it, and it is rebuilt unchanged at every exit. *)
@@ -571,12 +606,23 @@ Section ProofFileread.
     iEval (rewrite HR1ra) in "Hb1". iEval (rewrite HR1s0) in "Hb2".
     iEval (rewrite HR1s2) in "Hb4".
     (* +0x0e c.beqz a5 -> +0xaa *)
+    (* the WORD the branch tests, named: it is the content's own readable
+       byte, and both arms' keyed extras are read off it. *)
+    assert (HR3a5 : rget R3 Ra5
+                    = (zero_extend' 64 (fc_readable Cf : mword 8) : mword 64)).
+    { rewrite (rget_ne R3 Ra5 ltac:(vm_compute; discriminate)).
+      rewrite /R3. apply upd_eq. }
     destruct (eq_vec (rget R3 Ra5) (zero_reg : mword 64)) eqn:Hrdz.
     - (* ===============================================================
          NOT READABLE: return -1.  s1 and s3 were never spilled, and the
          caller's values are still in the registers -- which is why the
          epilogue takes frame slots 3 and 5 as arbitrary words.
          =============================================================== *)
+      (* the tested word, at the content's own spelling: no arm of the
+         output's match is armed on an unreadable descriptor. *)
+      assert (Hrdz0 : eq_vec (zero_extend' 64 (fc_readable Cf : mword 8) : mword 64)
+                             (zero_reg : mword 64) = true)
+        by (rewrite -HR3a5; exact Hrdz).
       assert (Htgtb4 : add_vec (mword_of_int (FR + 0x0e) : mword 64)
                 (sign_extend' 64 (sign_extend' 13
                    (concat_vec (mword_of_int 83 : mword 8) ('b"0"))))
@@ -653,11 +699,10 @@ Section ProofFileread.
       assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite us_upt_id; apply upd_usM_id).
       iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
-                with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                      [Hpriv] [Henv]").
+                with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
+                      [Hpriv] [Henv] []").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
-      { apply fileread_ret_m1. }
       { apply Z.le_max_l. }
       { first [ right; reflexivity
                 | left; reflexivity
@@ -672,11 +717,19 @@ Section ProofFileread.
       { rewrite /file_ref /file_fields. iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
       { cbn [umem_wr]. rewrite HVid. iExact "Hpriv". }
       { by iApply fileread_env_out_of_env. }
+      { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
+        iApply (fileread_extra_unreadable inumx γox Cf st n Φr Rf
+                  (mword_of_int (-1) : mword 64) Hok Hrdz0). }
     - (* ===============================================================
          READABLE: spill s1/s3, park the three arguments, dispatch on the
          file's TYPE -- which is read out of the reference's own content
          fraction, so the loaded word IS [fc_type Cf].
          =============================================================== *)
+      (* the tested word, at the content's own spelling: what the FD_INODE
+         arm reads its descriptor's mode bit off ([fileread_st_inode_rd]). *)
+      assert (Hrdnz : eq_vec (zero_extend' 64 (fc_readable Cf : mword 8) : mword 64)
+                             (zero_reg : mword 64) = false)
+        by (rewrite -HR3a5; exact Hrdz).
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (FR + 0x0e))
                 (mword_of_int 83 : mword 8) (Cregidx (mword_of_int 7)) Ra5
                 R3 (K - 6)%nat b Hc7 ltac:(vm_compute; discriminate) Hrdz
@@ -961,11 +1014,10 @@ Section ProofFileread.
         assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite us_upt_id; apply upd_usM_id).
         iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
-                  with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                        [Hpriv] [Henv]").
+                  with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
+                        [Hpriv] [Henv] [Hau]").
         { exact Hcsf. }
         { apply uptd_ext_sz_refl. }
-        { apply fileread_ret_m1. }
         { apply Z.le_max_l. }
         { first [ right; reflexivity
                   | left; reflexivity
@@ -979,7 +1031,12 @@ Section ProofFileread.
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { rewrite /file_ref /file_fields. iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
         { cbn [umem_wr]. rewrite HVid. iExact "Hpriv". }
-        { by iApply fileread_env_out_of_env. } }
+        { by iApply fileread_env_out_of_env. }
+        (* THE GUARD'S EXIT: nothing fs-visible happened, so the caller's one
+           piece goes back exactly as it came in and the caller eliminates the
+           returned conjunction to its own refund. *)
+        { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
+          iApply (fileread_extra_neg st n Φr Rf Hneg with "Hau"). } }
       (* [Z_lt_dec] leaves the negation; every use below wants the [<=]. *)
       assert (Hn0 : (0 <= n)%Z) by lia.
       (* ===========================================================
@@ -1232,12 +1289,11 @@ Section ProofFileread.
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P' dpr bspr
-                  with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                  with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hiru Hoh Hrlv]
-                        Hpriv [Henv]").
+                        Hpriv [Henv] []").
         { exact Hcsf. }
         { exact Hupt. }
-        { exact Hretpr. }
         { exact Hdpr. }
         { first [ right; reflexivity
                   | left; reflexivity
@@ -1256,6 +1312,8 @@ Section ProofFileread.
             [| reflexivity].
           iFrame "Hpipe Hpref Hiru Hoh". }
         { by iApply fileread_env_out_of_env. }
+        { iSplitR; [iPureIntro; exact Hretpr |].
+          iApply (fileread_extra_of_pipe inumx γox Cf st n Φr Rf _ Hok Htyp). }
       + (* ---- +0x22 c.li a4,3 ; +0x24 beq a5,a4 -> FD_DEVICE ---- *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x24))
                   (mword_of_int 70 : mword 13) Ra4 Ra5 B5 (K - 6)%nat b
@@ -1637,12 +1695,11 @@ Section ProofFileread.
                 assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite us_upt_id; apply upd_usM_id).
                 iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
-                          with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                [Hpriv] [Hslot]").
+                                [Hpriv] [Hslot] []").
                 { exact Hcsf. }
                 { apply uptd_ext_sz_refl. }
-                { apply fileread_ret_m1. }
                 { apply Z.le_max_l. }
                 { first [ right; reflexivity
                           | left; reflexivity
@@ -1660,6 +1717,8 @@ Section ProofFileread.
                 { iApply (fr_env_out_dev fn st Cf inumx _ Hok Htyd).
                   iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
                   by left. }
+                { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
+                  iApply (fileread_extra_of_dev inumx γox Cf st n Φr Rf _ Hok Htyd). }
              ** (* ---- the console's read: the INDIRECT CALL at +0x94 ---- *)
                 iApply (wp_cbeqz_fall_s_sconf (mword_of_int (FR + 0x96))
                           (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 7)) Ra5
@@ -1820,12 +1879,11 @@ Section ProofFileread.
                              with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mword_of_int r) P' dcr bscr
-                          with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                Hpriv [Hslot]").
+                                Hpriv [Hslot] []").
                 { exact Hcsf. }
                 { exact Hupt. }
-                { apply (fr_ret_of_cons n r Hn0). rewrite Z.max_r in Hrr; lia. }
                 { exact Hdcr. }
                 { first [ right; reflexivity
                           | left; reflexivity
@@ -1842,6 +1900,10 @@ Section ProofFileread.
                 { iApply (fr_env_out_dev fn st Cf inumx _ Hok Htyd).
                   iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
                   by right. }
+                { iSplitR; [iPureIntro;
+                            apply (fr_ret_of_cons n r Hn0);
+                            rewrite Z.max_r in Hrr; lia |].
+                  iApply (fileread_extra_of_dev inumx γox Cf st n Φr Rf _ Hok Htyd). }
           ++ (* --------- the major is OUT OF RANGE: return -1 ------------
                 The [bltu] is taken before the table is ever indexed, so the
                 environment is [emp] and the caller owed nothing. *)
@@ -1902,12 +1964,11 @@ Section ProofFileread.
              assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite us_upt_id; apply upd_usM_id).
              iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
-                       with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                       with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                              [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                             [Hpriv] [Henv]").
+                             [Hpriv] [Henv] []").
              { exact Hcsf. }
              { apply uptd_ext_sz_refl. }
-             { apply fileread_ret_m1. }
              { apply Z.le_max_l. }
              { first [ right; reflexivity
                        | left; reflexivity
@@ -1923,6 +1984,8 @@ Section ProofFileread.
                iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
              { cbn [umem_wr]. rewrite HVid. iExact "Hpriv". }
              { by iApply (fr_env_out_dev fn st Cf inumx _ Hok Htyd). }
+             { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
+               iApply (fileread_extra_of_dev inumx γox Cf st n Φr Rf _ Hok Htyd). }
         * (* ---- +0x28 c.li a4,2 ; +0x2a bne a5,a4 -> panic ---- *)
           iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x2a))
                     (mword_of_int 78 : mword 13) Ra4 Ra5 B6 (K - 6)%nat b
@@ -1964,8 +2027,12 @@ Section ProofFileread.
              assert (Htyi : fc_type Cf = FD_INODE)
                by (apply eq_vec_true_iff; exact Hp2).
              iDestruct (fr_env_fs γf fn st Cf inumx _ Hok Htyi with "Henv") as "Henv".
-             (* the process's leave to move the offset's shadow, off the row *)
-             iDestruct (foff_permit_row_inode _ _ _ _ Hok Htyi with "Hprow") as "#Hperm".
+             (* THE DESCRIPTOR THE WALK IS STANDING ON: open, READABLE, an
+                inode at the payload's own inum and offset shadow -- which is
+                what makes the caller's commit and this arm's row the same
+                [i], with nothing to bridge. *)
+             destruct (fileread_st_inode_rd inumx γox Cf st Hok Htyi Hrdnz)
+               as (wbx & Hst).
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
                                    #Hbio & #Hitbl & #Hclaimsfr & #Hescs &
@@ -1991,6 +2058,23 @@ Section ProofFileread.
                 both names are read off one payload record *)
              assert (Hgo : γox = γo0)
                by exact (proj2 (fdstate_ok_inode_names _ _ _ _ _ _ Hok Hokc Htyi)).
+             (* THE INUM BRIDGE: the carve's [fdstate_ok] output and the
+                descriptor's own read the SAME payload record, so the [i] the
+                caller's commit is indexed by IS the inum whose row the fire
+                observes. *)
+             assert (Hieq : bv_unsigned inumx = bv_unsigned inm)
+               by exact (proj1 (fdstate_ok_inode_names _ _ _ _ _ _ Hok Hokc Htyi)).
+             (* the descriptor at the CARVE's names, which is where the fire
+                reads the row -- one equation, and the caller's piece is at
+                the same key. *)
+             assert (Hstm : st = FdOpen true wbx (FdInode (bv_unsigned inm) γo0))
+               by (rewrite Hst Hieq Hgo; reflexivity).
+             (* THE CALLER'S ONE PIECE.  The refund half is spent only on the
+                sign guard, which is behind us, so this arm eliminates to the
+                commit and keeps nothing. *)
+             iDestruct (fileread_in_inode_of st wbx (bv_unsigned inm) γo0 Φr Rf
+                          Hstm with "Hau") as "Hau".
+             iDestruct "Hau" as "[Hau _]".
              assert (Hibcov : IBLOCK inm icfg_ist ∈ fsc_cov)
                by (apply Hgeo; exact Hinlt).
              iDestruct (ic_escrows_acc2
@@ -2224,12 +2308,38 @@ Section ProofFileread.
                      ltac:(solve_ndisj) Hipk Hik HKt with "Hrun Hflt Hat Hoffr")
                as "(Hrun & Hres & #Hbox0 & #Hmem0 & %T0 & Hhold & Hd0 & Hc0 & %Tr & Hrest)".
              iDestruct ("Hcgb" with "Hrun") as "Hcg".
-             iModIntro.
              iDestruct "Hres" as (v) "(Hoff & %Hwf & Hgv)".
              pose proof (bv_unsigned_in_range _ v) as Hvr.
              assert (Hoffz : Z.of_nat (Z.to_nat (bv_unsigned v)) = bv_unsigned v)
                by (apply Z2Nat.id; exact (proj1 Hvr)).
              assert (Hnz : Z.of_nat (Z.to_nat n) = n) by (apply Z2Nat.id; exact Hn0).
+             (* ==============================================================
+                THE OBSERVATION FIRES AT THE CHECKIN, below, once per exit --
+                [FsAbsReadFire.arf_read_fire] opens [ftopN] off the payload's
+                OWN [top_frag] quarter, fires the caller's commit once with
+                the kernel's half of the offset shadow lent and returned
+                advanced by the count, and gives the quarter straight back.  A
+                read retags no row, so this is an INSERTION into the landed
+                walk, where the write walk's fire STANDS IN for the retag.
+
+                WHY THERE.  The offset's half moves by the count readi
+                delivered, known only after readi.  The state does not move
+                between the checkout and the checkin -- the lock window IS the
+                one instant -- so the readings [ard_pre] needs are the
+                checkout's: the offset respects [FileInvDefs.off_wf] (the cell
+                just produced it), the row's bytes respect the size cap (the
+                loaded record's [Hszb]), and the row is the authority's (the
+                fire proves that itself).
+                ============================================================== *)
+             assert (Hoffcap : (Z.to_nat (bv_unsigned v) <= MAXFILE * BSIZE)%nat).
+             { assert (Hwfz : (bv_unsigned v
+                               <= Z.of_nat MAXFILE * Z.of_nat BSIZE)%Z)
+                 by exact Hwf.
+               pose proof (proj1 Hvr) as Hv0. lia. }
+             assert (Hszn : (bv_unsigned (di_size dnl)
+                             <= Z.of_nat (MAXFILE * BSIZE)%nat)%Z)
+               by (rewrite Nat2Z.inj_mul; exact Hszb).
+             iModIntro.
              (* ---- +0x34 c.mv a4,s3 : a4 := n ---- *)
              iApply (wp_cmv_s_sconf (mword_of_int (FR + 0x3a)) Ra4 Rs3 mil (K - 6)%nat b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2503,18 +2613,28 @@ Section ProofFileread.
                        = mword_of_int (FR + 0x54))
                by (apply bv_eq; vm_compute; reflexivity).
              (* [blez a0]: the update runs on a STRICTLY POSITIVE count only,
-                and readi's -1 arm and its zero arm both take the branch. *)
-             assert (Hcase : zopz0zKzJ_s (zero_reg : mword 64) (mrd !!! Regidx Ra0) = true
+                and readi's -1 arm and its zero arm both take the branch.  The
+                skip disjunct carries WHICH of the two, and the run disjunct
+                carries readi's own EQUATION, because the observation's return
+                tie is read off them and nothing below mentions [Hrdret] again
+                on the run side. *)
+             assert (Hcase : (zopz0zKzJ_s (zero_reg : mword 64) (mrd !!! Regidx Ra0) = true
+                              /\ (mrd !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
+                                  \/ (mrd !!! Regidx Ra0
+                                        = (mword_of_int (Z.of_nat tot) : mword 64)
+                                      /\ tot = 0%nat)))
                              \/ (mrd !!! Regidx Ra0
                                  = (mword_of_int (Z.of_nat tot) : mword 64)
-                                 /\ (0 < tot)%nat)).
-             { destruct Hrdret as [[H1 _] | [H1 _]].
-               - left. rewrite H1. exact fr_blez_m1.
+                                 /\ (0 < tot)%nat
+                                 /\ tot = rd_clamp (di_size dnl)
+                                            (Z.to_nat (bv_unsigned v)) (Z.to_nat n))).
+             { destruct Hrdret as [[H1 _] | [H1 Hteq]].
+               - left. split; [rewrite H1; exact fr_blez_m1 | left; exact H1].
                - destruct (decide (tot = 0%nat)) as [Ht0 | Htne].
-                 + left. rewrite H1 Ht0. exact fr_blez_zero.
-                 + right. split; [exact H1 |].
+                 + left. split; [rewrite H1 Ht0; exact fr_blez_zero | right; by split].
+                 + right. split; [exact H1 |]. split; [| exact Hteq].
                    destruct tot as [| t']; [contradiction | apply Nat.lt_0_succ]. }
-             destruct Hcase as [Htk | [Hra0 Htotpos]].
+             destruct Hcase as [[Htk Hskip] | (Hra0 & Htotpos & Htoteq)].
              ++ (* ---- the update is SKIPPED: the cell goes back unchanged ---- *)
                 iApply (wp_bge_x0_taken_s_sconf (mword_of_int (FR + 0x4a))
                           (mword_of_int 10 : mword 13) Ra0 M1 (K - 6)%nat b
@@ -2525,11 +2645,27 @@ Section ProofFileread.
                 { iApply (fri_4a with "Htext"). }
                 iApply bi.later_intro. iIntros (CID80 Hs80) "Hcg Hpc".
                 iEval (rewrite Htgt54) in "Hpc".
-                (* CHECK IN the cell, at the value it went out with *)
                 iApply fupd_wp.
+                (* THE FIRE, at advance 0: the offset did not move *)
+                iMod (arf_read_fire fsc_fs ⊤ (DfracOwn (1/4)) Φr
+                        (bv_unsigned inm) γo0 (Z.to_nat (bv_unsigned v)) 0%nat
+                        (era_node dnl bml data)
+                        ltac:(solve_ndisj) Hoffcap
+                        (arf_size_ok_era dnl bml data Hszn)
+                        (arf_era_typed dnl bml data Hdty)
+                        with "[] [Hau] [Htop] [Hgv]") as "(Htop & Hgv & Hfired)";
+                  [iApply (ireg_inv_ftop with "Hireg") | iExact "Hau"
+                  | iExact "Htop" | rewrite Hoffz; iExact "Hgv" |].
+                iDestruct "Hfired" as (avf) "[%Hrowf HΦf]".
+                assert (Hpref : ard_pre avf (bv_unsigned inm)
+                                  (Z.to_nat (bv_unsigned v))
+                                  (abs_row (era_node dnl bml data))).
+                { split; [exact Hrowf | split;
+                    [exact Hoffcap | exact (arf_size_ok_era dnl bml data Hszn)]]. }
+                (* CHECK IN the cell, at the value it went out with *)
                 iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-                iMod (off_resident_intro γo0 k v _ Hwf with "Hoff Hgv []") as "Hres".
-                { rewrite -Hgo. iExact "Hperm". }
+                iEval (rewrite Nat.add_0_r Hoffz) in "Hgv".
+                iDestruct (off_resident_of γo0 k v Hwf with "Hoff Hgv") as "Hres".
                 iMod (proto_read_park ⊤ ikk k q γb0 γo0 Cf mo T0 Tr TsoCtx.cur_ctx
                         ltac:(solve_ndisj) Hipk Hik Hqmo
                         with "Hrun Hres Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
@@ -2691,13 +2827,12 @@ Section ProofFileread.
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mrd !!! Regidx Ra0) P' tot
                           (rd_bytes data (Z.to_nat (bv_unsigned v)))
-                          with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv
-                                [Hsb Hbslot]").
+                                [Hsb Hbslot] [HΦf]").
                 { exact Hcsf. }
                 { exact Hupt. }
-                { exact Hretok. }
                 { exact Hfrdtot. }
                 { first [ right; reflexivity
                           | left; reflexivity
@@ -2713,6 +2848,35 @@ Section ProofFileread.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { iApply (fr_env_out_fs fn st Cf inumx _ Hok Htyi). rewrite /fileread_fs_out.
                   iFrame "Hsb Hbslot". }
+                (* THE SKIP COVERS TWO ARMS, and readi's own disjunction is
+                   what separates them.  The COPYOUT FAULT lands in
+                   [read_post_fail]'s FIRED disjunct -- the lock window
+                   happened and the source value was observed even though the
+                   copy died -- and readi's zero-count return is an ordinary
+                   ok arm at the exact count. *)
+                { iSplitR; [iPureIntro; exact Hretok |].
+                  iApply (fileread_extra_inode_of st wbx (bv_unsigned inm) γo0
+                            n Φr Rf _ Hstm).
+                  destruct Hskip as [H1 | [H1 Ht0]].
+                  { rewrite /read_arms /read_post_fail. iRight.
+                    iSplitR; [iPureIntro; exact H1 |]. iRight.
+                    iSplitR; [iPureIntro; exact Hn0 |].
+                    iExists avf, (Z.to_nat (bv_unsigned v)),
+                      (abs_row (era_node dnl bml data)).
+                    iSplitR; [iPureIntro; exact Hpref |]. iExact "HΦf". }
+                  { destruct Hrdret as [[H1' _] | [_ Hteq]].
+                    { exfalso. rewrite H1' in H1. apply (f_equal bv_unsigned) in H1.
+                      rewrite Ht0 in H1. vm_compute in H1. discriminate. }
+                    rewrite /read_arms /read_post_ok. iLeft.
+                    iExists avf, (Z.to_nat (bv_unsigned v)),
+                      (abs_row (era_node dnl bml data)), 0%nat.
+                    iSplitR; [iPureIntro; exact Hpref |].
+                    iSplitR; [iPureIntro; exact Hn0 |].
+                    iSplitR; [iPureIntro; rewrite H1;
+                              exact (fr_ret_tie n dnl bml data
+                                       (Z.to_nat (bv_unsigned v)) tot Hn0 Hteq) |].
+                    iSplitR; [iPureIntro; rewrite H1 Ht0; vm_compute; reflexivity |].
+                    iExact "HΦf". } }
              ++ (* ---- the update RUNS: f->off += r ---- *)
                 assert (Hadv : (Z.of_nat (Z.to_nat (bv_unsigned v)) + Z.of_nat tot
                                 <= Z.of_nat MAXFILE * Z.of_nat BSIZE)%Z).
@@ -2825,12 +2989,33 @@ Section ProofFileread.
                                 = mword_of_int (FR + 0x54))
                   by (apply bv_eq; vm_compute; reflexivity).
                 iEval (rewrite Hpp54) in "Hpc".
-                (* CHECK IN the advanced cell *)
                 iApply fupd_wp.
+                (* THE FIRE, at advance [tot]: the bytes and the offset move
+                   in the one fupd *)
+                iMod (arf_read_fire fsc_fs ⊤ (DfracOwn (1/4)) Φr
+                        (bv_unsigned inm) γo0 (Z.to_nat (bv_unsigned v)) tot
+                        (era_node dnl bml data)
+                        ltac:(solve_ndisj) Hoffcap
+                        (arf_size_ok_era dnl bml data Hszn)
+                        (arf_era_typed dnl bml data Hdty)
+                        with "[] [Hau] [Htop] [Hgv]") as "(Htop & Hgv & Hfired)";
+                  [iApply (ireg_inv_ftop with "Hireg") | iExact "Hau"
+                  | iExact "Htop" | rewrite Hoffz; iExact "Hgv" |].
+                iDestruct "Hfired" as (avf) "[%Hrowf HΦf]".
+                assert (Hpref : ard_pre avf (bv_unsigned inm)
+                                  (Z.to_nat (bv_unsigned v))
+                                  (abs_row (era_node dnl bml data))).
+                { split; [exact Hrowf | split;
+                    [exact Hoffcap | exact (arf_size_ok_era dnl bml data Hszn)]]. }
+                (* CHECK IN the advanced cell: the half came back at exactly
+                   the word the store wrote *)
                 iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-                iMod (off_resident_intro γo0 k (mword_of_int (bv_unsigned v + Z.of_nat tot))
-                        _ Hwf2 with "Hoff Hgv []") as "Hres".
-                { rewrite -Hgo. iExact "Hperm". }
+                iEval (rewrite Nat2Z.inj_add Hoffz) in "Hgv".
+                iDestruct (off_resident_of γo0 k (mword_of_int (bv_unsigned v + Z.of_nat tot))
+                             Hwf2 with "Hoff [Hgv]") as "Hres".
+                { rewrite moi32_unsigned bvw32_small; [iExact "Hgv" |].
+                  split; [lia |]. apply (Z.le_lt_trans _ (Z.of_nat MAXFILE * Z.of_nat BSIZE));
+                    [exact Hadv | vm_compute; reflexivity]. }
                 iMod (proto_read_park ⊤ ikk k q γb0 γo0 Cf mo T0 Tr TsoCtx.cur_ctx
                         ltac:(solve_ndisj) Hipk Hik Hqmo
                         with "Hrun Hres Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
@@ -2992,13 +3177,12 @@ Section ProofFileread.
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mword_of_int (Z.of_nat tot)) P' tot
                           (rd_bytes data (Z.to_nat (bv_unsigned v)))
-                          with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv
-                                [Hsb Hbslot]").
+                                [Hsb Hbslot] [HΦf]").
                 { exact Hcsf. }
                 { exact Hupt. }
-                { exact Hretok2. }
                 { exact Hfrdtot. }
                 { first [ right; reflexivity
                           | left; reflexivity
@@ -3014,6 +3198,23 @@ Section ProofFileread.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { iApply (fr_env_out_fs fn st Cf inumx _ Hok Htyi). rewrite /fileread_fs_out.
                   iFrame "Hsb Hbslot". }
+                (* THE SUCCESS ARM, at the exact count: [Htoteq] is readi's
+                   own equation, carried down by [Hcase]. *)
+                { iSplitR; [iPureIntro; exact Hretok2 |].
+                  iApply (fileread_extra_inode_of st wbx (bv_unsigned inm) γo0
+                            n Φr Rf _ Hstm).
+                  rewrite /read_arms /read_post_ok. iLeft.
+                  iExists avf, (Z.to_nat (bv_unsigned v)),
+                    (abs_row (era_node dnl bml data)), tot.
+                  iSplitR; [iPureIntro; exact Hpref |].
+                  iSplitR; [iPureIntro; exact Hn0 |].
+                  iSplitR; [iPureIntro;
+                            exact (fr_ret_tie n dnl bml data
+                                     (Z.to_nat (bv_unsigned v)) tot Hn0 Htoteq) |].
+                  iSplitR; [iPureIntro; rewrite moi64_unsigned bvw64_small;
+                            [reflexivity
+                            | change (2 ^ 64)%Z with 18446744073709551616%Z; lia] |].
+                  iExact "HΦf". }
           -- (* ================ NOT A FILE AT ALL: panic ==========
                 [SpecPanic] discharges the arm; panic never
                 returns, so there is nothing after the [jal]. *)

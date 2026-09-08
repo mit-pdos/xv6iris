@@ -72,6 +72,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import AppInv.            (* [appE]: the commit's mask                *)
+Require Import FsBytesGamma.      (* [fs_gamma_L]: the live Γ                 *)
+Require Import FsAbs.             (* [aview], [anode]: the receipt's shape    *)
 Require Import ByteBuf.  (* A6.58: the CONTEXT tower\'s 8<->4 halving ([ctx_word_pointsto_split4]/[_join4]) *)
 Import Defs.
 Local Open Scope Z_scope.
@@ -318,7 +321,9 @@ Section ProofSysRead.
       (fn : fread_names) (pidv : mword 32) (U : ustate) (sts : list fdstate)
       (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_sys_read_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks.
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (Rf : iProp Σ)
+    : wp_sys_read_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks
+        Φr Rf.
   Proof.
     cbv beta delta [wp_sys_read_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq Heb.
@@ -338,7 +343,7 @@ Section ProofSysRead.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): fileread
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hci Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hci Hin Hcont".
     (* THE DEVICE COLUMN, PROJECTED.  What the contract holds is the console
        invariant -- one persistent proposition out of [syscall_env]; what
        fileread asks for is the read column, and this is the projection.  It
@@ -796,15 +801,18 @@ Section ProofSysRead.
          nose. *)
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
                 0%nat (fun _ => bv_0 8)
-                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv]").
+                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv] []").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
-      { left. split; [reflexivity | exact Hnone]. }
       { apply Z.le_max_l. }
       { right. reflexivity. }
       { exact Hmfa0. }
       { rewrite us_upt_id. cbn [umem_wr]. rewrite upd_usM_id. iExact "Hpriv". }
       { iApply (fileread_fs_env_out with "Henv"). }
+      (* argfd answered NONE: the key is [FdClosed] and the arm is the landed
+         blanket and nothing more. *)
+      { iApply (sys_read_arms_none (us_V U) v sts (sys_rw_count v2) Φr Rf
+                  (mword_of_int (-1) : mword 64) Hnone eq_refl). }
     - (* ================= SUCCESS: the descriptor resolved ============= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & _ & Hfcell)".
       pose proof (arg_fd_lookup v (pv_ofile (us_V U)) fd fv Hsome)
@@ -943,18 +951,22 @@ Section ProofSysRead.
       iDestruct (fd_st_agree with "Hauth Hfr") as %<-.
       iDestruct ("Hfrback" with "Hfr Hrow") as "Hufrag".
       iEval (rewrite (list_insert_id sts fd stf Hstq)) in "Hufrag".
-      iDestruct (foff_row_permit with "Hrow") as "#Hprow".
+      (* THE KEYED INPUT, RELAYED: the caller's is at [sys_fd_st], this
+         descriptor's row is what that key computes to, and the callee's is
+         the same proposition at the same key. *)
+      iDestruct (sys_read_in_of (us_V U) v sts fd fv stf Φr Rf Hsome Hstq
+                   with "Hin") as "Hin".
       iDestruct (read_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Fileread.wp_fileread_sconf γf γs j γlp kk qq stf fn pidv U
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
-                _ ltac:(lia) Hkk Hj Hgs Hlens
+                _ Φr Rf ltac:(lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 (sys_rw_count_range v2) Heb
-                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hprow").
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hin").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P' dw bsw)
-        "%Hcsf %Hupt %Hrvok %Hdwle %Htie %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
+        "%Hcsf %Hupt %Hdwle %Htie %Hrva Hcg Hcpu Hpc Href Hcore Hfout Harms".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
@@ -1009,13 +1021,17 @@ Section ProofSysRead.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P' dw bsw
-                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv").
+                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv [Harms]").
       { exact Hcsg. }
       { exact Hupt. }
-      { right. exists fd, fv. split; [exact Hsome | exact Hrvok]. }
       { exact Hdwle. }
       { exact Htie. }
       { exact Hmga0. }
+      (* THE ARMED OUTPUT: the callee's arms ARE this caller's, because
+         sys_read relays fileread's return value untouched -- one match in
+         the tree, not two. *)
+      { iApply (sys_read_arms_of (us_V U) v sts fd fv stf (sys_rw_count v2)
+                  Φr Rf rv Hsome Hstq with "Harms"). }
   Qed.
 
 End ProofSysRead.

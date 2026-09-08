@@ -13,7 +13,7 @@
    shape FROM THE START (SpecSysMknodAUEra / FsAbsMknodFire: the frozen
    dv_half walk-pre made the original unsealable, and the astate-shaped
    commits proved non-give-backable against [InodeRegion.ftop_body]) --
-   plus SpecSysReadAU.v (the single-phase whole-[anode] observation) and
+   plus FsAbsReadFire.v (the single-phase whole-[anode] observation) and
    the write side (the delta vocabulary, the exclusion-by-premise
    pattern).
 

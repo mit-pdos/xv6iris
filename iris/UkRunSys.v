@@ -120,7 +120,7 @@ Qed.
    else moved.  Note what is NOT here: the row says nothing tying the
    written length to the RETURN VALUE, so a read's caller learns
    [d <= count] and not [d = r].  That link lives on the kernel side
-   ([SpecSysReadAU]) and would have to be carried into this table before a
+   ([SpecSysRead]) and would have to be carried into this table before a
    leaf could state it. *)
 Lemma usys_mem_ok_window (n : Z) (tf : list (mword 64)) (r : mword 64)
     (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
@@ -1195,7 +1195,7 @@ Section UkRunSys.
   (* WHAT THE ROW DOES NOT SAY.  [d] is existential, bounded by the cap and *)
   (* tied to nothing else -- in particular NOT to the return value, so a    *)
   (* read's caller learns [d <= count] and not [d = r].  That link is real  *)
-  (* on the kernel side ([SpecSysReadAU]) but has never been carried into   *)
+  (* on the kernel side ([SpecSysRead]) but has never been carried into     *)
   (* [usys_mem_ok]'s read row, so it cannot be stated here.  [d] is exposed *)
   (* anyway: the day the row carries it, this statement takes it without   *)
   (* moving.                                                                *)

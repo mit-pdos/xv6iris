@@ -1282,8 +1282,8 @@ Section FileInv.
      generation seeing at most one fill).  So a function that has locked the
      inode behind an FD_INODE descriptor can refute the device row outright:
      [FsAbs.abs_node]'s [ADev] arm is unreachable there, which is what
-     [SpecFilewrite]'s two-arm post and [SpecSysReadAU]'s owner question 2
-     both rest on.
+     [SpecFilewrite]'s two-arm post and read's "FdInode => AFile or ADir"
+     tie both rest on.
 
      PURE CONCLUSION, so it costs the payload nothing: the caller keeps the
      reference it read the fact off.  A holder of a [file_pay_st] reaches
@@ -1965,15 +1965,4 @@ Section FoffRow.
     rewrite (bool_decide_eq_true_2 _ Ht). iIntros "$".
   Qed.
 
-  (* fileread takes [foff_permit_row st] and learns its descriptor's shape
-     from [fdstate_ok]: on an inode file the row IS the permit at the
-     payload's shadow name.  (filewrite does not: its FD_INODE arm moves the
-     offset shadow inside the write chain's own node.) *)
-  Lemma foff_permit_row_inode (inum : mword 32) (γo : gname) (C : fcontent) (st : fdstate) :
-    fdstate_ok inum γo C st -> fc_type C = FD_INODE ->
-    foff_permit_row st -∗ off_permit γo.
-  Proof.
-    intros Hok Ht. destruct (fdstate_ok_inode inum γo C st Hok Ht) as (r & w & ->).
-    rewrite /foff_permit_row /=. iIntros "$".
-  Qed.
 End FoffRow.
