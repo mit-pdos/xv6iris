@@ -411,6 +411,27 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   deleted, the dispatcher passes `sync_witness_0` inline and drops the
   receipt; one `Module SysSync`.
 
+- ~~**CREATE-UNIFY**~~ LANDED 2026-09-08 (Opus lane, three phases; 7 files
+  deleted, net about 14.7k lines removed).  create has ONE contract over
+  all inode types: `SpecCreate.wp_create_sconf` takes the parent-prefix
+  era walk (`ep_start`), the exists observation (`dlookup_commit_at`) and
+  the four legs (`cre_commits`, dots included), and returns
+  `cre_ok_arms`/`cre_fail_arms` with the cursor at the parent and every
+  instant fired or refunded; the pure success reading is `cre_ok_pure`.
+  The type-pinned twins (`SpecCreateAU` T_DEVICE, `SpecCreateAUF` T_FILE,
+  `SpecCreateAUFOpen`, their proofs and links) are gone; what mknod and
+  open want are LEMMAS over the one contract (`cre_{ok,fail}_arms_{dev,
+  file}`, `cre_ok_pure_{dev,file}`), and each discharges create's dots leg
+  trivially (it cannot fire at their types).  mkdir carries the real
+  families (`mkdir_au_pre`, `mkdir_arms` with the cursor and the
+  observation).  The general proof gained the era walk at its one
+  nameiparent call site, the observation fire at dirlookup, the bundle
+  threaded through the halves, and SIX ARM BUILDERS in
+  `ProofCreateShared.v` so the arms are spelled once.  Cone fix:
+  `T_FILE`/`T_DEVICE`/`create_made` moved down into `FsAbsCreateFire.v`.
+  `SpecNameiparent`/`SpecNamex` stay (link, unlink and the era wrapper
+  use them).
+
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
   their old names although no AU is left in them — `SpecSysWriteAU.v`,
