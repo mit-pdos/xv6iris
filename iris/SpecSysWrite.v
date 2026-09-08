@@ -102,6 +102,8 @@ Require Import SpecArgfd.
 Require Import SpecSysRead.
 Require Import ConsoleInv.
 Require Import SpecFilewrite.
+Require Import SpecCopyin.   (* [ubytes_at]: the content seam (RULING A)   *)
+Require Import WpUart.       (* [uart_names]: the console arm's seed       *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -123,6 +125,37 @@ Definition sys_write_ret (V : pprivate) (v : mword 64) (n : Z) (r : mword 64) : 
   (r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile V) = None)
   \/ (exists (fd : nat) (fv : mword 64),
         arg_fd v (pv_ofile V) = Some (fd, fv) /\ filewrite_ret n r).
+
+(* ---- THE ARMS' KEY (the fold, owner 2026-09-07) ----------------------
+   sys_write had THREE proved contracts -- this one over every descriptor
+   kind, the chain-carrying [SYSWRITE_AU_ERA] and the console
+   [SYSWRITE_CONS_AU] -- and [ProofSyscall] chose between them with a pure
+   function of argument 0 and the caller's descriptor states.  ONE CONTRACT
+   NOW, and that function is where its arms are keyed: the state of the
+   descriptor argument 0 names, or [FdClosed] when it names none (argfd's
+   own -1, whose arm is the landed blanket and nothing more).  It is the
+   landed [ProofSyscall.sysc_write_inode] generalised from "an inode or
+   not" to the state itself. *)
+Definition sys_write_st (v : mword 64) (fs : list (mword 64))
+    (sts : list fdstate) : fdstate :=
+  match arg_fd v fs with
+  | Some (fd, _) => default FdClosed (sts !! fd)
+  | None => FdClosed
+  end.
+
+(* what an OPEN key gives its consumer back: the descriptor argument 0
+   named, and its row in the caller's own table *)
+Lemma sys_write_st_open (v : mword 64) (fs : list (mword 64))
+    (sts : list fdstate) (rb wb : bool) (ty : fdtype) :
+  sys_write_st v fs sts = FdOpen rb wb ty ->
+  exists (fd : nat) (fv : mword 64),
+    arg_fd v fs = Some (fd, fv) /\ sts !! fd = Some (FdOpen rb wb ty).
+Proof.
+  rewrite /sys_write_st. destruct (arg_fd v fs) as [[fd fv] |] eqn:Ha;
+    [| discriminate].
+  destruct (sts !! fd) as [st |] eqn:Hs; [| discriminate].
+  cbn. intros <-. by exists fd, fv.
+Qed.
 
 Section SpecSysWrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -159,6 +192,68 @@ Section SpecSysWrite.
       iSplitL "Hfo"; [iExact "Hfo" | iFrame "Hdev"]. }
   Qed.
 
+  (* ---- THE ONE INPUT AND THE ONE OUTPUT ------------------------------
+     Both are [SpecFilewrite]'s, at the key above: the callee's arms ARE
+     this caller's arms, because sys_write relays filewrite's return value
+     untouched.  So there is one match in the tree, not two. *)
+  Definition sys_write_in (fn : fwrite_names) (V : pprivate) (v : mword 64)
+      (sts : list fdstate) (n : Z) (M : gmap Z (bv 8)) (ua : mword 64)
+      (Q : nat -> iProp Σ) (tr0 : list (bv 8)) : iProp Σ :=
+    filewrite_in fn (sys_write_st v (pv_ofile V) sts) n M ua Q tr0.
+
+  (* the LANDED return clause, verbatim, plus the arm's extra.  Stating the
+     blanket unconditionally is what makes "the unified contract implies the
+     landed one" true by construction -- and it is also what the epilogue in
+     [ProofSyscall] is written against. *)
+  Definition sys_write_arms (V : pprivate) (v : mword 64)
+      (sts : list fdstate) (n : Z) (M : gmap Z (bv 8)) (ua : mword 64)
+      (Q : nat -> iProp Σ) (tr0 : list (bv 8)) (r : mword 64) : iProp Σ :=
+    (⌜sys_write_ret V v n r⌝ ∗
+     filewrite_extra (sys_write_st v (pv_ofile V) sts) n M ua Q tr0 r)%I.
+
+  Lemma sys_write_arms_ret V v sts n M ua Q tr0 r :
+    sys_write_arms V v sts n M ua Q tr0 r -∗ ⌜sys_write_ret V v n r⌝.
+  Proof. iIntros "[%H _]". by iPureIntro. Qed.
+
+  (* ---- the key, read at the two shapes the walk reaches it in --------
+     argfd answered NONE (the -1 above the branch), or it answered a
+     descriptor whose row the caller's own bundle names. *)
+  Lemma sys_write_arms_none (V : pprivate) (v : mword 64)
+      (sts : list fdstate) (n : Z) (M : gmap Z (bv 8)) (ua : mword 64)
+      (Q : nat -> iProp Σ) (tr0 : list (bv 8)) (r : mword 64) :
+    arg_fd v (pv_ofile V) = None ->
+    r = (mword_of_int (-1) : mword 64) ->
+    ⊢ sys_write_arms V v sts n M ua Q tr0 r.
+  Proof.
+    intros Hnone Hr. rewrite /sys_write_arms /sys_write_st Hnone.
+    iSplitR; [| done]. iPureIntro. left. split; [exact Hr | exact Hnone].
+  Qed.
+
+  Lemma sys_write_in_of (fn : fwrite_names) (V : pprivate) (v : mword 64)
+      (sts : list fdstate) (fd : nat) (fv : mword 64) (st : fdstate)
+      (n : Z) (M : gmap Z (bv 8)) (ua : mword 64)
+      (Q : nat -> iProp Σ) (tr0 : list (bv 8)) :
+    arg_fd v (pv_ofile V) = Some (fd, fv) ->
+    sts !! fd = Some st ->
+    sys_write_in fn V v sts n M ua Q tr0 -∗ filewrite_in fn st n M ua Q tr0.
+  Proof.
+    intros Hsome Hst. rewrite /sys_write_in /sys_write_st Hsome Hst /=.
+    by iIntros "$".
+  Qed.
+
+  Lemma sys_write_arms_of (V : pprivate) (v : mword 64) (sts : list fdstate)
+      (fd : nat) (fv : mword 64) (st : fdstate) (n : Z)
+      (M : gmap Z (bv 8)) (ua : mword 64) (Q : nat -> iProp Σ)
+      (tr0 : list (bv 8)) (r : mword 64) :
+    arg_fd v (pv_ofile V) = Some (fd, fv) ->
+    sts !! fd = Some st ->
+    filewrite_arms st n M ua Q tr0 r -∗ sys_write_arms V v sts n M ua Q tr0 r.
+  Proof.
+    intros Hsome Hst. rewrite /sys_write_arms /sys_write_st Hsome Hst /=.
+    iIntros "[%Hret $]". iPureIntro. right. by exists fd, fv.
+  Qed.
+
+
 End SpecSysWrite.
 
 Definition wp_sys_write_sconf_body
@@ -168,8 +263,11 @@ Definition wp_sys_write_sconf_body
     (fn : fwrite_names)                          (* the file system's ghosts *)
     (pidv : mword 32) (U : ustate)
     (sts : list fdstate)                         (* the process's descriptor view *)
-    (v v2 : mword 64)                            (* syscall arguments 0, 2  *)
-    (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
+    (v v1 v2 : mword 64)                         (* syscall arguments 0, 1, 2 *)
+    (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+    (* ---- the two parameters the fold adds: the inode arm's PREFIX CURSOR
+       and the console arm's trace seed ([SpecFilewrite]'s) ---- *)
+    (Q : nat -> iProp Σ) (tr0 : list (bv 8)) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_write in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -184,7 +282,11 @@ Definition wp_sys_write_sconf_body
   (* the three syscall arguments; argument 1 (the user source) is fetched
      but never inspected here *)
   pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
-  (exists v1 : mword 64, pv_tf (us_V U) !! tf_arg_idx 1 = Some v1) ->
+  (* NAMED, not existential, since RULING A: the arms speak about the bytes
+     at THIS address.  The landed contract fetched argument 1 and never
+     inspected it, so it left the word existential; the console and inode
+     arms both pin their receipts to it. *)
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
   pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
   (* NO NUMERIC PREMISE.  [SpecFilewrite] takes [-2^31 <= n < 2^31] and a
      trapframe word satisfies that unconditionally
@@ -224,12 +326,14 @@ Definition wp_sys_write_sconf_body
   filewrite_fs_env γf fn -∗
   filewrite_dev_caps fn -∗
   ConsoleInv.devsw_table -∗
-  (* THE APPLICATION'S RAW WRITE STEP (round E2, lane E2-W), threaded down
-     to filewrite's FD_INODE arm, where the chunk retag pays the
-     application's claim with it instead of the parked blanket license.
-     Persistent; a dispatcher holding [AppInv.app_inv] supplies it in one
-     fupd ([SpecFilewrite.fw_app_write_step_acc]). *)
-  fw_app_write_step -∗
+  (* ---- THE CALLER'S INPUT, KEYED ON THE DESCRIPTOR ARGUMENT 0 NAMES
+     ([sys_write_in], which is [SpecFilewrite.filewrite_in] at
+     [sys_write_st]): the commit chain on an open writable inode, the trace
+     seed and the devsw pin on the console, [emp] everywhere else.  This
+     REPLACES the persistent [fw_app_write_step] premise: the FD_INODE arm's
+     per-chunk retag pays the application's claim out of the chain's own
+     node, so the blanket license premise is retired. *)
+  sys_write_in fn (us_V U) v sts (sys_rw_count v2) (us_M U) v1 Q tr0 -∗
   (* THE CROSSING IS THE LITERAL [true]: filewrite parks. *)
   wp_next true pj (fun (CID : CpuId) =>
   (* write() does not write user memory -- filewrite only READS the user
@@ -241,7 +345,6 @@ Definition wp_sys_write_sconf_body
     ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
-      ⌜sys_write_ret (us_V U) v (sys_rw_count v2) r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
@@ -253,9 +356,16 @@ Definition wp_sys_write_sconf_body
       filewrite_fs_out fn -∗
       (* the device column is NOT returned: it is persistent, and the caller
          still holds the table it was projected from. *)
+      (* ---- THE ARMED OUTPUT ([sys_write_arms]).  It CONTAINS the landed
+         ⌜sys_write_ret⌝ (which used to sit third above) and adds, per arm,
+         what that arm proved. ---- *)
+      sys_write_arms (us_V U) v sts (sys_rw_count v2) (us_M U) v1 Q tr0 r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ONE MODULE TYPE.  [SYSWRITE_AU_ERA], [SYSWRITE_AU_ERA_STABLE] and
+   [SYSWRITE_CONS_AU] are folded into this one and deleted, with their
+   proofs and links. *)
 Module Type SYSWRITE.
   Parameter wp_sys_write_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -263,7 +373,9 @@ Module Type SYSWRITE.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
       (pidv : mword 32) (U : ustate) (sts : list fdstate)
-      (v v2 : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_write_sconf_body γf γs j γlp fn pidv U sts v v2 m av eb b lks.
+      (v v1 v2 : mword 64)
+      (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+      (Q : nat -> iProp Σ) (tr0 : list (bv 8)),
+      wp_sys_write_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks
+        Q tr0.
 End SYSWRITE.

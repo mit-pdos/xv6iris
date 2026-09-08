@@ -1,12 +1,14 @@
 (* LinkFilewrite.v -- instantiates the Filewrite proof against its callees'.
    Sealed, so this is the only place the seven ever meet.
 
-   [Consolewrite] is the one that is ASSUMED (LinkConsolewrite.v supplies its
-   contract with an [Axiom], the single assumption this cone rests on: the
-   FD_DEVICE arm dispatches through [devsw[f->major].write], the console is
-   the only device xv6 installs, and consolewrite has no proof).  The other
-   six -- pipewrite, ilock, writei, iunlock, begin_op and end_op -- are real
-   proofs.
+   THE CONSOLE CALLEE IS THE LOCATED ONE, and it is a PROOF.  Since the
+   write family was folded into one contract, filewrite's FD_DEVICE arm
+   relays the UART's accepted-trace receipt on the console major, so it
+   calls [SpecConsolewriteLoc.CONSOLEWRITE_LOC] -- and the located contract
+   is the general form at every OTHER major too (its seed premise is free
+   there), which is why the walk needs no second call site and this functor
+   no [CONSOLEWRITE] argument.  All eight callees are real proofs; nothing
+   in this cone is assumed.
 
    NOTE WHAT DOES *NOT* APPEAR, and it is the one thing a reader is likely
    to expect: balloc's Axiom.  filewrite's writei is the ALLOCATING one
@@ -16,11 +18,11 @@
    axioms and funext and nothing else.
 
    The functor's parameter ORDER is Pipewrite, Ilock, Writei, Iunlock,
-   BeginOp, EndOp, Consolewrite -- see [ProofFilewrite.v]'s [Module
-   FilewriteProof] line, which is the only authority on it. *)
+   BeginOp, EndOp, ConsolewriteLoc, Panic -- see [ProofFilewrite.v]'s
+   [Module FilewriteProof] line, which is the only authority on it. *)
 Require Import LinkPipewrite LinkIlock LinkWritei LinkIunlock LinkBeginOp
-                LinkEndOp LinkConsolewrite LinkPanic
+                LinkEndOp LinkConsolewriteLoc LinkPanic
                 ProofFilewrite.
 
 Module Filewrite := FilewriteProof Pipewrite Ilock Writei Iunlock BeginOp
-                                   EndOp Consolewrite Panic.
+                                   EndOp ConsolewriteLoc Panic.

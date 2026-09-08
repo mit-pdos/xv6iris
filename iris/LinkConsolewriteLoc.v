@@ -10,8 +10,11 @@
    assumption beyond either_copyin's and the four the uartwrite instance
    already carries.
 
-   What is still a functor above this is [SpecFilewriteCons.FILEWRITE_CONS]
-   -- filewrite's device arm, which is where this instance gets consumed. *)
+   What is still a functor above this is [SpecFilewrite.FILEWRITE] --
+   filewrite itself, whose FD_DEVICE arm is where this instance gets
+   consumed, at EVERY major and not only the console's: the cell is "null or
+   consolewrite" everywhere, and the located contract is the general form
+   because its seed premise is free where the caller supplied none. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.

@@ -1,18 +1,14 @@
 (* UartSentLoc.v -- THE LOCATED ACCEPTED-TRACE RECEIPT, at the altitude of
    the transmitter invariant it is about ([UartTxInv.v]).
 
-   [SpecSysWriteConsAU.v] states this same receipt at SYSCALL altitude,
-   where its consumer reads it; this file is the same definition where its
-   PRODUCERS live -- the uartwrite and consolewrite walks, which sit far
-   below the syscall cone and must not require it (SpecSysWriteConsAU pulls
-   in SpecFilewrite / SpecSysWrite / the whole fs configuration; a device
-   driver's proof requiring the write syscall's statement file would invert
-   the layering for no gain).  The two definitions are literally the same
-   term at the same context, and [ProofSysWriteConsAU.v] -- the one file
-   that sees both -- carries the one-line identification.  R10 forbids
-   editing SpecSysWriteConsAU.v, so the duplication is the ruled shape, not
-   an accident; when that seal's consumer set settles, the campaign's
-   retirement step points it at this file and the copy comes out.
+   THIS IS THE ONLY COPY.  A second one lived at SYSCALL altitude, in
+   [SpecSysWriteConsAU.v], because that seal could not be edited and a
+   device driver's proof must not require the write syscall's statement
+   file (which pulls in SpecFilewrite / SpecSysWrite / the whole fs
+   configuration -- the layering inverted for no gain).  The write family's
+   fold into ONE contract per function retired that seal, and its copy came
+   out with it: [SpecFilewrite]'s console arms are stated on the definition
+   below.
 
    WHAT IT SAYS.  [uart_sent_from γu tr0 bs]: the bytes [bs] were accepted
    by the UART, IN ORDER, at positions STRICTLY AFTER a trace that had

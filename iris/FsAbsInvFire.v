@@ -3,8 +3,8 @@
    about the abstract state, at receipts that say nothing.
 
    WHAT THIS IS FOR.  The AU contracts ([SpecSysOpenAU], [SpecSysMknodAUEra],
-   [SpecSysUnlinkAU], [SpecSysReadAU]/[SpecFilereadAU], [SpecSysWriteAU]/
-   [SpecFilewriteAU], [SpecCreateAU]/[SpecCreateAUF]) take, beside the
+   [SpecSysUnlinkAU], [SpecSysReadAU]/[SpecFilereadAU], [SpecSysWrite]/
+   [SpecFilewrite], [SpecCreateAU]/[SpecCreateAUF]) take, beside the
    landed frame, a bundle of caller-supplied fupds: the walk premise (one
    [ax_hop] per path element, fired at the era lend) and the commits (one
    per linearization instant, handed the kernel's HALF of the abstract
@@ -91,6 +91,11 @@ Require Import FsAbsWriteFire.     (* [awrite_full_at], [awrite_chain] *)
 Require Import OffGv.              (* [off_user_inv], the process's half *)
 Require Import AppInv.             (* [app_inv], [appN]/[appE], [app_step_acc]: the parked license *)
 Require Import FsAbsDefs.          (* [abs_view_lookup_is_Some] *)
+Require Import FsCfg.              (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import ConsoleInv.         (* [devsw_write_val_console]: the cell's pin *)
+Require Import UartSentLoc.        (* [uart_sent_nil]: the free trace seed *)
+Require Import SpecFilewrite.      (* [filewrite_in]: the one keyed input *)
+Require Import SpecSysWrite.       (* [sys_write_in], [sys_write_st] *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
@@ -217,32 +222,84 @@ Section FsAbsInvFire.
     iModIntro. by iFrame "Ha Hk".
   Qed.
 
-  Lemma fsabs_awrite_chain (γfs : fs_names) (i : Z) (γo : gname) (k cnt : nat) :
+  Lemma fsabs_awrite_chain (γfs : fs_names) (i : Z) (γo : gname)
+      (M : gmap Z (bv 8)) (ua : mword 64) (k cnt : nat) :
     app_inv γfs -∗ off_user_inv γo -∗
-    awrite_chain (fs_gamma_L γfs) appE i γo (fun _ _ _ _ => True%I) k cnt.
+    awrite_chain (fs_gamma_L γfs) appE i γo M ua (fun _ => True%I) k cnt.
   Proof.
     iIntros "#Hai #Hoinv".
     iInduction cnt as [| cnt] "IH" forall (k).
     { rewrite awrite_chain_0. done. }
-    rewrite awrite_chain_S. iSplit.
-    - rewrite /awrite_full_at. iIntros (I off bs bs0 nl) "%Hpre Ha Hk".
+    rewrite awrite_chain_S. iSplit; [done |]. iSplit.
+    - rewrite /awrite_full_at. iIntros (I off bs bs0 nl) "%Hpre %Hby Ha Hk".
       iMod (app_step_acc_view appE γfs i I _ appN_appE
               (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
       iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'".
       iMod (off_user_inv_move appE γo _ (Z.of_nat (off + length bs)) foffN_appE
               with "Hoinv Hk") as "Hk".
-      iModIntro. iFrame "Ha' Hk". iSplitR; [done |]. iApply "IH".
+      iModIntro. iFrame "Ha' Hk". iApply "IH".
     - (* the PARTIAL arm is a state fire too now (round E2, lane E2-W):
          same two phases as the full arm, at the run the short chunk landed,
          with the offset advanced by the COUNT rather than by the run *)
       rewrite /awrite_part_at.
-      iIntros (I off r bs bs0 nl) "%Hpre %Hr %Hgap Ha Hk".
+      iIntros (I off r bs bs0 nl) "%Hpre %Hr %Hgap %Hby Ha Hk".
       iMod (app_step_acc_view appE γfs i I _ appN_appE
               (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
       iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'".
       iMod (off_user_inv_move appE γo _ (Z.of_nat (off + r)) foffN_appE
               with "Hoinv Hk") as "Hk".
-      iModIntro. iFrame "Ha' Hk". iSplitR; [done |]. iApply "IH".
+      iModIntro. iFrame "Ha' Hk". iApply "IH".
+  Qed.
+
+  (* SYS_WRITE'S WHOLE INPUT, at the trivial cursor and the free seed --
+     what the DISPATCHER hands the ONE [SpecSysWrite.SYSWRITE] contract in
+     place of the three it used to choose between.  It is keyed on the same
+     pure function the contract's arms are ([SpecSysWrite.sys_write_st]), so
+     the dispatcher's [destruct] is on THE KEY and not on a choice of
+     contract.
+
+     THE CONSOLE ARM IS CONSTRUCTIBLE FROM WHAT THE DISPATCHER HOLDS, and
+     that is the thing worth checking before the walk is written: the devsw
+     pin is the [fwn_wp fn = devsw_write_val] equation every consumer of
+     this cone already discharges by [reflexivity], read at [CONSOLE]; the
+     trace seed is free ([UartSentLoc.uart_sent_nil] mints [uart_sent γu []]
+     from the unit of the mono-list algebra).  THE INODE ARM's offset
+     invariant comes off the descriptor bundle's own persistent row family
+     ([FdSlots.foff_row] at an [FdInode] IS [OffGv.off_user_inv]), so the
+     dispatcher needs no resource it does not already thread. *)
+  Lemma fsabs_sys_write_in (fn : fwrite_names) (E : coPset) (γfd : gname)
+      (V : pprivate) (v : mword 64) (sts : list fdstate) (n : Z)
+      (M : gmap Z (bv 8)) (ua : mword 64) :
+    ↑appN ⊆ E ->
+    fwn_wp fn = ConsoleInv.devsw_write_val ->
+    app_inv fsc_fs -∗ fd_frags γfd sts ={E}=∗
+      fd_frags γfd sts ∗
+      sys_write_in fn V v sts n M ua (fun _ => True%I) [].
+  Proof.
+    intros HE Hwp. iIntros "#Hai Hfr".
+    (* the row family is PERSISTENT, so the bundle goes straight back: this
+       syscall moves no descriptor. *)
+    iAssert (foff_rows sts ∗ fd_frags γfd sts)%I with "[Hfr]"
+      as "[#Hrows Hfr]".
+    { rewrite /fd_frags. iDestruct "Hfr" as "(%Hl & Hs & #Hr)".
+      iSplitR; [iExact "Hr" |]. iSplitR; [by iPureIntro |].
+      iFrame "Hs". iExact "Hr". }
+    iFrame "Hfr".
+    rewrite /sys_write_in /filewrite_in.
+    destruct (sys_write_st v (pv_ofile V) sts) as [| rb wb ty] eqn:Hst;
+      [by iModIntro |].
+    destruct wb; [| by iModIntro].
+    destruct ty as [i γo | | ma].
+    - destruct (sys_write_st_open _ _ _ _ _ _ Hst) as (fd & fv & Hafd & Hrow).
+      iDestruct (foff_rows_lookup _ _ _ Hrow with "Hrows") as "#Hoinv".
+      iModIntro.
+      iApply (fsabs_awrite_chain fsc_fs i γo M ua 0%nat (wchunks n)
+                with "Hai Hoinv").
+    - by iModIntro.
+    - case_decide as Hc; [| by iModIntro].
+      iMod (uart_sent_nil fsc_uart) as "#Hseed".
+      iModIntro. iSplitR; [| iExact "Hseed"].
+      iPureIntro. rewrite Hwp Hc. exact ConsoleInv.devsw_write_val_console.
   Qed.
 
   (* ------------------------------------------------------------------ *)

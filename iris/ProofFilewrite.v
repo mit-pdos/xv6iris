@@ -1,3 +1,65 @@
+(* ProofFilewrite.v -- THE ONE filewrite() walk.  Seals
+   [SpecFilewrite.FILEWRITE], whose arms are keyed on the descriptor's
+   state: the per-chunk two-phase commit FUSED INTO THE ROW RETAG on an
+   inode, the UART's accepted-trace receipt on the console, and the landed
+   blanket everywhere else.
+
+   ==== THE FOLD (owner's ONE SPEC PER SYSCALL ruling, 2026-09-07) =======
+
+   There were THREE proofs of this walk: this one (every descriptor kind,
+   answering [filewrite_ret]), [ProofFilewriteAU] (the inode arm only, with
+   the chunk chain), and [ProofFilewriteCons] (the console device arm only,
+   with the located receipt) -- three statement files, three seals, three
+   links, and a dispatcher choosing between them.  They are folded here.
+   What each contributed:
+
+   * the WALK and the three arms the AU form refuted -- the [f->writable]
+     early return, the pipe arm, the [panic] arm and the out-of-range /
+     null-slot device exits -- are this file's own, unchanged;
+   * the FD_INODE loop is [ProofFilewriteAU]'s, with the receipt family [Φ]
+     replaced by the chain's PREFIX CURSOR [Q]: [fw_loop] carries
+     [ProofFilewriteChain.fw_au_raw], the fire
+     ([FsAbsWriteFire.wrf_awrite_fire]) stands where the retag stood, and
+     the offset shadow's half goes in at the chunk's offset and comes back
+     advanced -- all inside the one [ftopN] critical section, which is what
+     makes the pair ONE instant per chunk;
+   * the FD_DEVICE arm calls the LOCATED consolewrite
+     ([SpecConsolewriteLoc.CONSOLEWRITE_LOC]) rather than the landed one.
+     THAT IS THE ONE PLACE THE FOLD CHANGED A CALL, and it is what let the
+     two device walks become one: [filewrite_dev_env] says the cell is
+     "null or consolewrite" at EVERY major, so the arm must be able to call
+     consolewrite where the descriptor's major is not the console's -- and
+     the located contract is the general form for that, its seed premise
+     being free ([UartSentLoc.uart_sent_nil]) where the caller supplied
+     none.  At the console the seed is the caller's own [tr0], out of the
+     keyed input; off it the receipt is simply dropped.  The functor
+     therefore takes [CONSOLEWRITE_LOC] and NOT [CONSOLEWRITE].
+
+   ==== WHAT THE APPLICATION'S STEP COSTS NOW ===========================
+
+   Nothing: the premise is gone.  The FD_INODE arm's per-chunk row retag
+   used to be paid by the persistent [fw_app_write_step] the contract took
+   (itself minted from the parked blanket license); it is paid by the
+   chain's own node ([FsAbsWriteFire.awrite_full_at]'s [app_step]) now, so
+   the premise, the family and the mint at the dispatcher all went.
+
+   ==== THE TYPE READING, AND WHY IT IS AVAILABLE =======================
+
+   The fire needs [bv_unsigned (di_type dnl) = T_FILE_z].
+   [inode_rec_local] enumerates the four legal type words;
+   [InodeLock.inode_ok] rules out 0; the carve's fourth output rules out
+   T_DIR on a writable fd; and the carve's FIFTH output -- the owner's
+   [file_payload] strengthening -- rules out T_DEVICE on an FD_INODE fd.
+
+   THE INUM BRIDGE.  [fdstate_ok]'s [FdInode] arm ties the contract's inum
+   to the payload's, but [file_pay_st_ok] and
+   [SpecFileread.fileread_pay_carve] bind that [inum] under two SEPARATE
+   existentials.  [fwau_pay_carve] below is the carve with the state fact as
+   a sixth output -- the two read off ONE [pn] -- so the loop gets the tie
+   once per iteration and the cursor speaks about the caller's file. *)
+
+
+
 (* ProofFilewrite.v -- filewrite's own control flow and ghost steps.
    ========================== COMPLETE, S3t ============================
 
@@ -208,7 +270,7 @@
 
    S3n SURPRISE, and the one thing that will bite the walk mechanically:
    THERE ARE TWO CONSTANTS NAMED [FW_MAX] AND THIS FILE MUST IMPORT BOTH.
-   [SpecFilewrite.FW_MAX : Z] (the chunk size as the [lui]/[addi] pairs
+   [SpecSysWriteAU.FW_MAX : Z] (the chunk size as the [lui]/[addi] pairs
    materialise it) and [WriteiBudget.FW_MAX : nat] (the same 3072 as the
    budget lemmas' hypothesis) are DIFFERENT CONSTANTS AT DIFFERENT TYPES,
    and whichever file is [Require Import]ed second shadows the other.  Every
@@ -365,6 +427,7 @@ Require Import WriteiBudget.
 Require Import SpecPipewrite.
 Require Import SpecConsolewrite.
 Require Import ConsoleInv.  (* [NDEV_max], [a_devsw_write] *)
+Require Import SpecSysWriteAU.  (* [FW_MAX], [wchunks], [wri_pre] *)
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.
 Require Import TsoCtx.
@@ -427,7 +490,7 @@ Proof. lia. Qed.
 (* ---------------------------------------------------------------------- *)
 
 (* The two [FW_MAX]s, related once.  See the header's SURPRISE. *)
-Lemma fw_max_bridge `{XI : CurCtx} : Z.of_nat WriteiBudget.FW_MAX = SpecFilewrite.FW_MAX.
+Lemma fw_max_bridge `{XI : CurCtx} : Z.of_nat WriteiBudget.FW_MAX = SpecSysWriteAU.FW_MAX.
 Proof. vm_compute. reflexivity. Qed.
 
 (* ...and the chunk bound in the shape the WALK has it: the code compares
@@ -435,7 +498,7 @@ Proof. vm_compute. reflexivity. Qed.
    call is a [Z] fact about the register, while the budget lemma wants a
    [nat] one about writei's argument. *)
 Lemma fw_budget_ok `{XI : CurCtx} (off n1 : nat) :
-  (Z.of_nat n1 <= SpecFilewrite.FW_MAX) ->
+  (Z.of_nat n1 <= SpecSysWriteAU.FW_MAX) ->
   (wi_cost_bmonly off n1 <= MAXOPBLOCKS)%nat.
 Proof.
   intro Hn. apply WriteiBudget.wi_cost_bmonly_fits.
@@ -448,7 +511,7 @@ Qed.
 Lemma fw_budget_ok_empty `{XI : CurCtx} (off : nat) :
   (wi_cost_bmonly off 0 <= MAXOPBLOCKS)%nat.
 Proof.
-  apply fw_budget_ok. unfold SpecFilewrite.FW_MAX. cbn. lia.
+  apply fw_budget_ok. unfold SpecSysWriteAU.FW_MAX. cbn. lia.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -463,21 +526,21 @@ Qed.
 
 (* the [bge] falls: the chunk is the whole remainder *)
 Lemma fw_chunk_rem `{XI : CurCtx} (n i : Z) :
-  (0 <= i < n) -> (n - i <= SpecFilewrite.FW_MAX) ->
-  (0 < n - i <= SpecFilewrite.FW_MAX).
+  (0 <= i < n) -> (n - i <= SpecSysWriteAU.FW_MAX) ->
+  (0 < n - i <= SpecSysWriteAU.FW_MAX).
 Proof. lia. Qed.
 
 (* the [bge] is taken: the chunk is the cap itself *)
 Lemma fw_chunk_cap `{XI : CurCtx} (n i : Z) :
-  (0 <= i < n) -> (SpecFilewrite.FW_MAX < n - i) ->
-  (0 < SpecFilewrite.FW_MAX <= SpecFilewrite.FW_MAX).
-Proof. unfold SpecFilewrite.FW_MAX. lia. Qed.
+  (0 <= i < n) -> (SpecSysWriteAU.FW_MAX < n - i) ->
+  (0 < SpecSysWriteAU.FW_MAX <= SpecSysWriteAU.FW_MAX).
+Proof. unfold SpecSysWriteAU.FW_MAX. lia. Qed.
 
 (* ...and either way the chunk is in int range, which is what the
    [sext.w s3,s3] at +0x82 needs ([fw_sextw_moi]'s hypothesis). *)
 Lemma fw_chunk_lt31 `{XI : CurCtx} (c : Z) :
-  (0 < c <= SpecFilewrite.FW_MAX) -> (0 <= c < 2 ^ 31).
-Proof. unfold SpecFilewrite.FW_MAX. lia. Qed.
+  (0 < c <= SpecSysWriteAU.FW_MAX) -> (0 <= c < 2 ^ 31).
+Proof. unfold SpecSysWriteAU.FW_MAX. lia. Qed.
 
 (* THE DECREASE.  [addw s4,s4,s1] at +0xc4 advances [i] by the count writei
    returned, and the loop is left when [i >= n].  The fuel is [n - i] and
@@ -658,6 +721,7 @@ Lemma fw_zext8_zero `{XI : CurCtx} :
          (zero_reg : mword 64) = true.
 Proof. apply eq_vec_true_iff. apply bv_eq; vm_compute; reflexivity. Qed.
 
+
 Lemma fw_wbool_of_fall `{XI : CurCtx} (C : fcontent) :
   eq_vec (zero_extend' 64 (fc_writable C : mword 8) : mword 64)
          (zero_reg : mword 64) = false ->
@@ -755,7 +819,6 @@ End FwSlots.
    of a hand-reduced paraphrase of it: if SpecWritei's bracket ever changes
    shape again, this stops compiling.  ------------------------------------- *)
 Section FwWriteiSrc.
-  Context `{XI : CurCtx}.
   (* exactly [ProcInv]'s own context for [proc_priv].  [lockG] IS QUALIFIED
      ON PURPOSE: this file does not [Require Import WpLock], so the plain
      spelling does not fail -- Rocq's backtick binders generalize, and it
@@ -778,7 +841,7 @@ Section FwWriteiSrc.
      it GETS BACK at +0xa4 (instantiate [V := upd_upt V P']), which is what
      lets the loop re-park [proc_priv] and carry it into the next iteration
      without ever holding [p_pid] itself. *)
-  Lemma fw_writei_src (γf : gname) (j : nat) (pidv : mword 32) (U : ustate)
+  Lemma fw_writei_src `{XI : CurCtx} (γf : gname) (j : nat) (pidv : mword 32) (U : ustate)
       (dq : dfrac) (src : mword 64) (n : nat) (src_bytes : nat -> bv 8) :
     (if true
      then proc_priv_core (proc_addr j) pidv U
@@ -843,18 +906,6 @@ Require Import ProcAvail.
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the off checkout borrows the running token *)
 Require Import FileOffProtocol.   (* proto_read_llb / _checkout / _park (r25 item 24) *)
-(* ---- ROUND E2, LANE E2-W: the FD_INODE arm's row retag is a [_step] now,
-   paid by the contract's own [SpecFilewrite.fw_app_write_step] instead of
-   the blanket license.  These are what the delta and the row reading at
-   writei's FULL output (disturbed tail included) need; the campaign's usual
-   order, [FsAbsDefs] LAST. ---- *)
-Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import      *)
-Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ               *)
-Require Import AppInv.           (* [app_step], [app_step_at]              *)
-Require Import FsAbsOpenFire.    (* [opf_era_file_row]/[_typed]            *)
-Require Import FsAbsWriteFire.   (* [wrf_landed], [wrf_write_row_dist]     *)
-Require Import FsAbsDelta.       (* [delta_write], [delta_write_file]      *)
-Require Import FsAbsDefs.        (* LAST (FsAbs's own rule)                *)
 
 Set Printing Depth 40.
 
@@ -967,9 +1018,30 @@ Lemma fw_panic_K `{XI : CurCtx} (K : nat) :
   (filewrite_stack <= K)%nat -> (panic_stack <= K - 12)%nat.
 Proof. lia. Qed.
 
+(* ---- THE AU LAYER'S OWN IMPORTS.  Everything above this line is
+   [ProofFilewrite.v] verbatim; these six are what the fire and the carried
+   state need, in the campaign's usual order with [FsAbs] LAST. ---- *)
+Require FsImg.                     (* [T_FILE_z] -- Require, NOT Import    *)
+Require Import FsBytesGamma.       (* [fs_gamma_L]: the live Γ             *)
+Require Import AppInv.             (* [app_step], [appE]                   *)
+Require Import FsAbsOpenFire.      (* [opf_era_file_row]                   *)
+Require Import FsAbsWriteFire.     (* the fire, the splice bridge, item 4  *)
+Require Import SpecCopyin.         (* [ubytes_at], [add_vec_moi_comm]      *)
+Require Import UartSentLoc.        (* [uart_sent_nil]: the free seed       *)
+Require Import SpecConsolewriteLoc. (* the LOCATED callee's contract       *)
+Require Import ProofFilewriteChain. (* [fw_au_raw] and its five moves      *)
+Require Import FsAbsDelta.         (* [blk_splice_nil], [delta_write]      *)
+Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)              *)
+
+(* THE FUNCTOR TAKES EIGHT CALLEES, and the seventh is the LOCATED
+   consolewrite: the device arm relays an accepted-trace receipt on the
+   console major, and the located contract is the general form at every
+   other major too (its seed is free there).  [CONSOLEWRITE] has no
+   consumer left in the tree. *)
 Module FilewriteProof (Pipewrite : PIPEWRITE) (Ilock : ILOCK) (Writei : WRITEI)
                       (Iunlock : IUNLOCK) (BeginOp : BEGIN_OP) (EndOp : END_OP)
-                      (Consolewrite : CONSOLEWRITE) (PN : PANIC) : FILEWRITE.
+                      (ConsolewriteLoc : CONSOLEWRITE_LOC) (PN : PANIC)
+                      : FILEWRITE.
 
 Section ProofFilewrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -996,13 +1068,336 @@ Section ProofFilewrite.
   Local Ltac regne := reg_ne_side.
 
   (* ---- [lia] MUST NOT SEE THIS FILE'S AMBIENT CONTEXT ------------------
-     [fw_loop]'s body carries ~300 hypotheses, and [lia] reifies every one
-     of them at every call (optimization.md, "[lia] IS A GENERAL-PURPOSE
-     CLOSER TOO, AND 180 HYPOTHESES IS A LARGE CONTEXT").  [zlia H1 H2 ..]
-     keeps exactly the named facts and closes.  [XI] is always kept because
-     [SpecFilewrite.FW_MAX] is stated over it.  ([ProofFilewriteAU]'s copy,
-     verbatim -- the row site below is the same arithmetic.) *)
+     [fw_loop]'s body carries ~300 hypotheses, ~40 of them arithmetic over
+     [Z.to_nat]/[bv_unsigned]/[MAXFILE * BSIZE], and [lia] reifies every one
+     of them at every call: twelve one-line side conditions were 200 s of a
+     234 s cold compile (optimization.md, "[lia] IS A GENERAL-PURPOSE CLOSER
+     TOO, AND 180 HYPOTHESES IS A LARGE CONTEXT").  [zlia H1 H2 ..] keeps
+     exactly the named facts and closes; [fwclear] is its bare half for the
+     sites that run another tactic first.  [XI] is always kept because
+     [SpecSysWriteAU.FW_MAX] is stated over it, so a [Hcrange]-style bound
+     does not typecheck without it. *)
+  Tactic Notation "fwclear" hyp_list(Hs) := clear - XI Hs.
   Tactic Notation "zlia" hyp_list(Hs) := clear - XI Hs; lia.
+
+  (* =================================================================== *)
+  (*  THE CARVE, PLUS THE ONE FACT [SpecFileread]'s DOES NOT HAND OUT     *)
+  (* =================================================================== *)
+
+  (* [SpecFileread.fileread_pay_carve] binds the payload's names under its
+     own [∃ pn], and [FileInvDefs.file_pay_st_ok] binds them under a SECOND
+     one -- so a caller that calls both gets two unrelated [inum]s and
+     cannot say that the one the carve named is the one the descriptor's
+     STATE names.  The landed walk never had to: it reads [f->type] off
+     [Cf] and the inum off the carve, and nothing ties them.  THE AU FORM
+     MUST, because [FILEWRITE_AU]'s receipts are indexed by the [i] of
+     [FdInode i] while the fire retags the row at [bv_unsigned inum].
+
+     This is that carve with [fdstate_ok] as a SIXTH output, read off the
+     SAME [pn]; every other output, and the whole proof, is
+     [fileread_pay_carve] verbatim.  R10: SpecFileread does not move, and
+     the AU lane is the only consumer of the extra fact. *)
+  Lemma fwau_pay_carve (γf' : gname) (kk : nat) (qq : Qp) (Cf' : fcontent)
+      (st' : fdstate) :
+    fc_type Cf' = FD_INODE \/ fc_type Cf' = FD_DEVICE ->
+    file_pay_st γf' kk qq Cf' st' -∗
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16)
+      (lo tl : nat) (γb : Xv6Cameras.box_names) (γo : gname),
+      ⌜fdstate_ok inum γo Cf' st'⌝ ∗
+      ⌜fc_ip Cf' = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
+      ⌜(bv_unsigned inum < 16 * Z.of_nat icfg_nib)%Z⌝ ∗
+      ⌜fc_wbool Cf' = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
+      ⌜fc_type Cf' = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝ ∗
+      ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
+      IcacheRefDefs.ity_shot g ty ∗
+      IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
+      SpecFileread.carve_off (fc_type Cf') kk qq γb γo Cf' ∗
+      (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗
+         SpecFileread.carve_off (fc_type Cf') kk qq γb γo Cf' -∗
+         file_pay_st γf' kk qq Cf' st').
+  Proof.
+    intros Hty. iIntros "(%pn & %Hst & Hpn & Hpl)".
+    assert (Hnp : bool_decide (fc_type Cf' = FD_PIPE) = false).
+    { apply bool_decide_eq_false_2.
+      destruct Hty as [Hc | Hc]; rewrite Hc; by vm_compute. }
+    assert (Hyes : (bool_decide (fc_type Cf' = FD_INODE)
+                    || bool_decide (fc_type Cf' = FD_DEVICE))%bool = true).
+    { destruct Hty as [Hc | Hc]; rewrite Hc.
+      - by rewrite (bool_decide_eq_true_2 (FD_INODE = FD_INODE) eq_refl).
+      - by rewrite (bool_decide_eq_true_2 (FD_DEVICE = FD_DEVICE) eq_refl)
+                   orb_true_r. }
+    rewrite {1}/file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
+    (* r25 (inode_pay D1): the reference's IDENT SIDE ([inode_ref_side])
+       rides between the cancel token and the travelling share; the carve
+       carries it across and puts it back. *)
+    iDestruct "Hpl" as "((#Hci & Hown & Hside & Hs & Hwt) & Hop)".
+    iDestruct "Hs" as (ik lo tl) "(%Hipk & %Hik & %Hinb & %Hle & #Hfl & Hshr)".
+    iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
+    iExists ik, (fp_inum pn), (qq * fp_iq pn)%Qp, (fp_ig pn), ty, lo, tl,
+      (fp_obox pn), (fp_ooff pn).
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [iExact "Hfl"|].
+    iSplitR; [iExact "Hshot"|].
+    iSplitL "Hshr"; [iExact "Hshr"|].
+    (* the arm's off conjunct IS the carve at the payload's own box names *)
+    iSplitL "Hop"; [iExact "Hop"|].
+    iIntros "Hshr Hop". iExists pn. iFrame "%". iFrame "Hpn".
+    rewrite /file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
+    iSplitR "Hop"; [| iExact "Hop"].
+    iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
+    iSplitL "Hside"; [iExact "Hside"|].
+    iSplitL "Hshr".
+    { iExists ik, lo, tl.
+      iSplitR; [iPureIntro; exact Hipk|].
+      iSplitR; [iPureIntro; exact Hik|].
+      iSplitR; [iPureIntro; exact Hinb|].
+      iSplitR; [iPureIntro; exact Hle|].
+      iSplitR; [iExact "Hfl"|].
+      iExact "Hshr". }
+    iExists ty. iSplitR; [iExact "Hshot"|].
+    iSplit; iPureIntro; [exact Hnd | exact Hdv].
+  Qed.
+
+  (* =================================================================== *)
+  (*  THE TAIL, AT A KEYED POSTCONDITION                                  *)
+  (* =================================================================== *)
+
+  (* [ProofFilewriteParts.fw_tail] VERBATIM -- same block, same six
+     restores, same [fw_epi] -- with its post's disjunction KEYED on the
+     compare the block itself performs:
+
+       (iz = nz /\ rv = nz)  \/  (iz <> nz /\ rv = -1)
+
+     instead of [rv = -1 \/ (iz = nz /\ rv = nz)].  The landed form is
+     enough for [filewrite_ret] (both disjuncts are inside it) but NOT for
+     an ARMED post: at the exhausted exit [iz = nz] holds and the landed
+     disjunction still permits [-1], which is the one return value the ok
+     arm cannot carry.  Both branches prove the sharper form for free --
+     the equal branch already proved [iz = nz], and the other has
+     [(nz =? iz) = false] in hand.  R10: ProofFilewriteParts does not move;
+     this is the parallel form, and the two proofs are diffable. *)
+  Local Lemma fwau_tail `{CID0 : CpuId}
+      (m Mt : regfile) (K : nat)
+      (sp0 ra0 s00 s20 s40 s50 s60 : mword 64)
+      (cs1 cs3 cs7 cs8 cs9 : mword 64)
+      (nz iz : Z) (w12 : mword 64)
+      (pp : mword 64) (b : bool) :
+    (12 <= K)%nat ->
+    (0 <= nz < 2 ^ 31)%Z ->
+    (0 <= iz < 2 ^ 31)%Z ->
+    m !!! Regidx csp_rs1 = sp0 ->
+    m !!! Regidx Rra = ra0 ->
+    m !!! Regidx Rs0 = s00 ->
+    m !!! Regidx Rs1 = cs1 ->
+    m !!! Regidx Rs2 = s20 ->
+    m !!! Regidx Rs3 = cs3 ->
+    m !!! Regidx Rs4 = s40 ->
+    m !!! Regidx Rs5 = s50 ->
+    m !!! Regidx Rs6 = s60 ->
+    m !!! Regidx Rs7 = cs7 ->
+    m !!! Regidx Rs8 = cs8 ->
+    m !!! Regidx Rs9 = cs9 ->
+    Mt !!! Regidx csp_rs1 = pa_stk sp0 12 ->
+    Mt !!! Regidx Rs5 = (mword_of_int nz : mword 64) ->
+    Mt !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
+    (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
+        r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 ->
+        r <> Rs5 -> r <> Rs6 -> r <> Rs7 -> r <> Rs8 -> r <> Rs9 ->
+        Mt !!! Regidx r = m !!! Regidx r) ->
+    sie_cap_gpr KT1 Mt (K - 12)%nat b pp -∗
+    kernel_text -∗
+    InstrBytes.pc_is (mword_of_int (FW + 0xe2) : mword 64) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) cs1 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) cs3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) cs7 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) cs8 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) cs9 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    wp_next b pp (fun (CID : CpuId) =>
+      ∀ (mf : regfile) (rv : mword 64),
+        ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv
+          /\ ((iz = nz /\ rv = (mword_of_int nz : mword 64))
+              \/ (iz <> nz /\ rv = (mword_of_int (-1) : mword 64)))⌝ -∗
+        sie_cap_gpr KT1 mf K b pp -∗
+        InstrBytes.pc_is (ret_pc ra0) -∗
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HK Hnz Hiz Hsp0 Hra0 Hs00 Hcs1 Hs20 Hcs3 Hs40 Hs50 Hs60 Hcs7 Hcs8 Hcs9
+           Hmtsp Hmts5 Hmts4 Hthr.
+    iIntros "Hcg #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12 Hcont".
+    assert (Hcmp : neq_vec (rget Mt Rs5) (rget Mt Rs4) = negb (Z.eqb nz iz)).
+    { rewrite (rget_ne Mt Rs5 ltac:(vm_compute; discriminate)).
+      rewrite (rget_ne Mt Rs4 ltac:(vm_compute; discriminate)).
+      rewrite Hmts5 Hmts4. exact (fw_neq_moi nz iz Hnz Hiz). }
+    destruct (Z.eqb nz iz) eqn:Hqe.
+    - (* ---- i = n : the FULL write.  [c.mv a0,s5], then the six ---- *)
+      assert (Hzi : iz = nz) by (symmetry; apply Z.eqb_eq; exact Hqe).
+      iApply (wp_bne_fall_s_sconf (mword_of_int (FW + 0xe2))
+                (mword_of_int 72 : mword 13) Rs4 Rs5 Mt (K - 12)%nat b
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hcmp; reflexivity)
+                with "Hcg Hpc []").
+      { iApply (fwri_0e2 with "Htext"). }
+      iIntros (CID1 Hq1) "Hcg Hpc".
+      assert (Hppe6 : add_vec_int (mword_of_int (FW + 0xe2) : mword 64) 4
+                      = mword_of_int (FW + 0xe6)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hppe6) in "Hpc".
+      iApply (wp_cmv_s_sconf (mword_of_int (FW + 0xe6)) Ra0 Rs5 Mt (K - 12)%nat b
+                ltac:(vm_compute; discriminate) ltac:(rdok)
+                with "Hcg Hpc []").
+      { iApply (fwri_0e6 with "Htext"). }
+      iIntros (CID2 Hq2) "Hcg Hpc". iEval (rgne) in "Hcg".
+      set (E1 := <[Regidx Ra0 := regval_into_reg
+                    (add_vec zero_reg (Mt !!! Regidx Rs5))]> Mt).
+      assert (HE1a0 : E1 !!! Regidx Ra0 = (mword_of_int nz : mword 64)).
+      { rewrite /E1 upd_eq. unfold regval_into_reg.
+        rewrite add_vec_zero_l. exact Hmts5. }
+      assert (HE1sp : E1 !!! Regidx csp_rs1 = pa_stk sp0 12)
+        by (rewrite /E1 upd_ne; [exact Hmtsp | vm_compute; discriminate]).
+      assert (Hppe8 : add_vec_int (mword_of_int (FW + 0xe6) : mword 64) 2
+                      = mword_of_int (FW + 0xe8)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hppe8) in "Hpc".
+      iApply (fw_rest6 (CID0 := CID2) E1 (K - 12)%nat sp0 cs1 cs3 s40 cs7 cs8 cs9
+                (FW + 0xe8) (FW + 0xea) (FW + 0xec) (FW + 0xee) (FW + 0xf0)
+                (FW + 0xf2) (FW + 0xf4) pp b HE1sp
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                with "Hcg Hpc [] [] [] [] [] []
+                      Hb3 Hb5 Hb6 Hb9 Hb10 Hb11").
+      { iApply (fwri_0e8 with "Htext"). }
+      { iApply (fwri_0ea with "Htext"). }
+      { iApply (fwri_0ec with "Htext"). }
+      { iApply (fwri_0ee with "Htext"). }
+      { iApply (fwri_0f0 with "Htext"). }
+      { iApply (fwri_0f2 with "Htext"). }
+      iIntros (CIDr Hqr Mr) "%Hmr Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
+      destruct Hmr as (HMrsp & HMra0' & HMr1 & HMr3 & HMr4 & HMr7 & HMr8 & HMr9 & HMrthr).
+      assert (HMra0 : Mr !!! Regidx Ra0 = (mword_of_int nz : mword 64))
+        by (rewrite HMra0'; exact HE1a0).
+      assert (HMrthr2 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
+                r <> Rs0 -> r <> Rs2 -> r <> Rs5 -> r <> Rs6 ->
+                Mr !!! Regidx r = m !!! Regidx r).
+      { intros r Hr Nsp Ns0 Ns2 Ns5 Ns6.
+        destruct (decide (r = Rs1)) as [-> | Ns1]; [by rewrite HMr1 Hcs1 |].
+        destruct (decide (r = Rs3)) as [-> | Ns3]; [by rewrite HMr3 Hcs3 |].
+        destruct (decide (r = Rs4)) as [-> | Ns4]; [by rewrite HMr4 Hs40 |].
+        destruct (decide (r = Rs7)) as [-> | Ns7]; [by rewrite HMr7 Hcs7 |].
+        destruct (decide (r = Rs8)) as [-> | Ns8]; [by rewrite HMr8 Hcs8 |].
+        destruct (decide (r = Rs9)) as [-> | Ns9]; [by rewrite HMr9 Hcs9 |].
+        rewrite (HMrthr r Hr Ns1 Ns3 Ns4 Ns7 Ns8 Ns9).
+        rewrite /E1 upd_ne; [| regne].
+        exact (Hthr r Hr Nsp Ns0 Ns1 Ns2 Ns3 Ns4 Ns5 Ns6 Ns7 Ns8 Ns9). }
+      iApply (fw_epi (CID0 := CIDr) m Mr K sp0 ra0 s00 s20 s50 s60
+                (mword_of_int nz) cs1 cs3 s40 cs7 cs8 cs9 w12 pp b
+                HK Hsp0 Hra0 Hs00 Hs20 Hs50 Hs60 HMrsp HMra0 HMrthr2
+                with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
+      iIntros (CIDe Hse mf) "%Hcsr Hcg Hpc".
+      destruct Hcsr as [Hcsf Hrv].
+      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iApply ("Hcont" $! mf (mword_of_int nz) with "[%] Hcg Hpc").
+      split_and!; [exact Hcsf | exact Hrv |].
+      left. split; [exact Hzi | reflexivity].
+    - (* ---- i <> n : the SHORT write ---- *)
+      assert (Hne : iz <> nz).
+      { intros He. rewrite He Z.eqb_refl in Hqe. discriminate. }
+      assert (Htgt12a : add_vec (mword_of_int (FW + 0xe2) : mword 64)
+                (sign_extend' 64 (mword_of_int 72 : mword 13))
+                = mword_of_int (FW + 0x12a))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (wp_bne_taken_s_sconf (mword_of_int (FW + 0xe2))
+                (mword_of_int 72 : mword 13) Rs4 Rs5 Mt (K - 12)%nat b
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hcmp; reflexivity)
+                ltac:(rewrite Htgt12a; vm_compute; reflexivity)
+                with "Hcg Hpc []").
+      { iApply (fwri_0e2 with "Htext"). }
+      iApply bi.later_intro. iIntros (CID1 Hq1) "Hcg Hpc".
+      iEval (rewrite Htgt12a) in "Hpc".
+      iApply (wp_cli_s_sconf (mword_of_int (FW + 0x12a)) Ra0
+                (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64)
+                Mt (K - 12)%nat b
+                ltac:(vm_compute; discriminate) ltac:(rdok) fr_lim1
+                with "Hcg Hpc []").
+      { iApply (fwri_12a with "Htext"). }
+      iIntros (CID2 Hq2) "Hcg Hpc".
+      set (E1 := <[Regidx Ra0 := regval_into_reg (mword_of_int (-1) : mword 64)]> Mt).
+      assert (HE1a0 : E1 !!! Regidx Ra0 = (mword_of_int (-1) : mword 64))
+        by (rewrite /E1; apply upd_eq).
+      assert (HE1sp : E1 !!! Regidx csp_rs1 = pa_stk sp0 12)
+        by (rewrite /E1 upd_ne; [exact Hmtsp | vm_compute; discriminate]).
+      assert (Hpp12c : add_vec_int (mword_of_int (FW + 0x12a) : mword 64) 2
+                       = mword_of_int (FW + 0x12c)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp12c) in "Hpc".
+      iApply (fw_rest6 (CID0 := CID2) E1 (K - 12)%nat sp0 cs1 cs3 s40 cs7 cs8 cs9
+                (FW + 0x12c) (FW + 0x12e) (FW + 0x130) (FW + 0x132) (FW + 0x134)
+                (FW + 0x136) (FW + 0x138) pp b HE1sp
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                with "Hcg Hpc [] [] [] [] [] []
+                      Hb3 Hb5 Hb6 Hb9 Hb10 Hb11").
+      { iApply (fwri_12c with "Htext"). }
+      { iApply (fwri_12e with "Htext"). }
+      { iApply (fwri_130 with "Htext"). }
+      { iApply (fwri_132 with "Htext"). }
+      { iApply (fwri_134 with "Htext"). }
+      { iApply (fwri_136 with "Htext"). }
+      iIntros (CIDr Hqr Mr) "%Hmr Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
+      destruct Hmr as (HMrsp & HMra0' & HMr1 & HMr3 & HMr4 & HMr7 & HMr8 & HMr9 & HMrthr).
+      assert (HMra0 : Mr !!! Regidx Ra0 = (mword_of_int (-1) : mword 64))
+        by (rewrite HMra0'; exact HE1a0).
+      assert (HMrthr2 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
+                r <> Rs0 -> r <> Rs2 -> r <> Rs5 -> r <> Rs6 ->
+                Mr !!! Regidx r = m !!! Regidx r).
+      { intros r Hr Nsp Ns0 Ns2 Ns5 Ns6.
+        destruct (decide (r = Rs1)) as [-> | Ns1]; [by rewrite HMr1 Hcs1 |].
+        destruct (decide (r = Rs3)) as [-> | Ns3]; [by rewrite HMr3 Hcs3 |].
+        destruct (decide (r = Rs4)) as [-> | Ns4]; [by rewrite HMr4 Hs40 |].
+        destruct (decide (r = Rs7)) as [-> | Ns7]; [by rewrite HMr7 Hcs7 |].
+        destruct (decide (r = Rs8)) as [-> | Ns8]; [by rewrite HMr8 Hcs8 |].
+        destruct (decide (r = Rs9)) as [-> | Ns9]; [by rewrite HMr9 Hcs9 |].
+        rewrite (HMrthr r Hr Ns1 Ns3 Ns4 Ns7 Ns8 Ns9).
+        rewrite /E1 upd_ne; [| regne].
+        exact (Hthr r Hr Nsp Ns0 Ns1 Ns2 Ns3 Ns4 Ns5 Ns6 Ns7 Ns8 Ns9). }
+      assert (Htgtf4 : add_vec (mword_of_int (FW + 0x138) : mword 64)
+                (sign_extend' 64 (sign_extend' 21
+                   (concat_vec (mword_of_int 2014 : mword 11) ('b"0"))))
+                = mword_of_int (FW + 0xf4))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (wp_cj_s_sconf (mword_of_int (FW + 0x138))
+                (sign_extend' 21 (concat_vec (mword_of_int 2014 : mword 11) ('b"0")))
+                Mr (K - 12)%nat b
+                ltac:(rewrite Htgtf4; vm_compute; reflexivity)
+                with "Hcg Hpc []").
+      { iApply (fwri_138 with "Htext"). }
+      iIntros (CIDj Hqj). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iEval (rewrite Htgtf4) in "Hpc".
+      iApply (fw_epi (CID0 := CIDj) m Mr K sp0 ra0 s00 s20 s50 s60
+                (mword_of_int (-1)) cs1 cs3 s40 cs7 cs8 cs9 w12 pp b
+                HK Hsp0 Hra0 Hs00 Hs20 Hs50 Hs60 HMrsp HMra0 HMrthr2
+                with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
+      iIntros (CIDe Hse mf) "%Hcsr Hcg Hpc".
+      destruct Hcsr as [Hcsf Hrv].
+      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iApply ("Hcont" $! mf (mword_of_int (-1)) with "[%] Hcg Hpc").
+      split_and!; [exact Hcsf | exact Hrv |].
+      right. split; [exact Hne | reflexivity].
+  Qed.
 
   (* ---- the type-indexed environment, opened at the type the code read.
      fileread's [fr_env_*] block, one arm at a time.  Nothing about the
@@ -1115,14 +1510,21 @@ Section ProofFilewrite.
     (0 <= iz < nz)%Z -> (nz < 2 ^ 31)%Z ->
     M !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
     M !!! Regidx Rs5 = (mword_of_int nz : mword 64) ->
-    M !!! Regidx Rs7 = (mword_of_int SpecFilewrite.FW_MAX : mword 64) ->
-    M !!! Regidx Rs9 = (mword_of_int SpecFilewrite.FW_MAX : mword 64) ->
+    M !!! Regidx Rs7 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64) ->
+    M !!! Regidx Rs9 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64) ->
     sie_cap_gpr KT1 M Kn b p -∗
     kernel_text -∗
     InstrBytes.pc_is (mword_of_int (FW + 0xd4) : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (c : Z) (P : regfile),
-        ⌜(0 < c <= SpecFilewrite.FW_MAX)%Z /\ (c <= nz - iz)%Z
+        ⌜(0 < c <= SpecSysWriteAU.FW_MAX)%Z /\ (c <= nz - iz)%Z
+          (* AU EDIT (difference 5): the chunk is one of the two the code
+             can pick, and NOT merely bounded by both.  Free at both exits
+             -- they instantiate [c] with exactly these -- and it is what
+             the back edge needs: a chunk that leaves [i < n] cannot be
+             [nz - iz], so it is the cap, so the fired total stays
+             [FW_MAX * p]. *)
+          /\ (c = nz - iz \/ c = SpecSysWriteAU.FW_MAX)%Z
           /\ P !!! Regidx Rs3 = (mword_of_int c : mword 64)
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
                 P !!! Regidx r = M !!! Regidx r)⌝ -∗
@@ -1164,11 +1566,11 @@ Section ProofFilewrite.
     assert (HT2a5 : T2 !!! Regidx Ra5 = (mword_of_int (nz - iz) : mword 64))
       by (rewrite /T2 upd_ne; [exact HT1a5 | vm_compute; discriminate]).
     assert (HT2s7 : T2 !!! Regidx Rs7
-                    = (mword_of_int SpecFilewrite.FW_MAX : mword 64)).
+                    = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
     { rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1 upd_ne; [exact HMs7 | vm_compute; discriminate]. }
     assert (HT2s9 : T2 !!! Regidx Rs9
-                    = (mword_of_int SpecFilewrite.FW_MAX : mword 64)).
+                    = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
     { rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1 upd_ne; [exact HMs9 | vm_compute; discriminate]. }
     assert (HT2thr : forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
@@ -1181,19 +1583,19 @@ Section ProofFilewrite.
     iEval (rewrite Hppda) in "Hpc".
     (* ---- +0xd2 bge s7,a5 : is 3072 >= n - i ? ---- *)
     assert (Hcmp : zopz0zKzJ_s (rget T2 Rs7) (rget T2 Ra5)
-                   = Z.geb SpecFilewrite.FW_MAX (nz - iz)).
+                   = Z.geb SpecSysWriteAU.FW_MAX (nz - iz)).
     { rewrite (rget_ne T2 Rs7 ltac:(vm_compute; discriminate)).
       rewrite (rget_ne T2 Ra5 ltac:(vm_compute; discriminate)).
       rewrite HT2s7 HT2a5.
-      apply fw_bge_moi; unfold SpecFilewrite.FW_MAX;
+      apply fw_bge_moi; unfold SpecSysWriteAU.FW_MAX;
         change (2 ^ 31)%Z with 2147483648%Z; lia. }
     assert (Htgt82 : add_vec (mword_of_int (FW + 0xda) : mword 64)
               (sign_extend' 64 (mword_of_int 8112 : mword 13))
               = mword_of_int (FW + 0x8a))
       by (apply bv_eq; vm_compute; reflexivity).
-    destruct (Z.geb SpecFilewrite.FW_MAX (nz - iz)) eqn:Hge.
+    destruct (Z.geb SpecSysWriteAU.FW_MAX (nz - iz)) eqn:Hge.
     - (* ---- TAKEN: the chunk is the whole remainder ([fw_chunk_rem]) ---- *)
-      assert (Hrem : (0 < nz - iz <= SpecFilewrite.FW_MAX)%Z).
+      assert (Hrem : (0 < nz - iz <= SpecSysWriteAU.FW_MAX)%Z).
       { apply fw_chunk_rem; [lia | apply Z.geb_le; exact Hge]. }
       iApply (wp_bge_taken_s_sconf (mword_of_int (FW + 0xda))
                 (mword_of_int 8112 : mword 13) Ra5 Rs7 T2 Kn b
@@ -1206,16 +1608,16 @@ Section ProofFilewrite.
       iEval (rewrite Htgt82) in "Hpc".
       iSpecialize ("Hcont" $! CID3 with "[]"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! (nz - iz)%Z T2 with "[%] Hcg Hpc").
-      split_and!; [lia | lia | lia | exact HT2s3 | exact HT2thr].
+      split_and!; [lia | lia | lia | lia | exact HT2s3 | exact HT2thr].
     - (* ---- FALL: the chunk is the CAP ([fw_chunk_cap]).  [Z.geb_le] is
              the only direction that exists; the strict one is derived by
              cases, NOT by a [Z.geb_gt] (there is no such lemma). ---- *)
-      assert (Hgt : (SpecFilewrite.FW_MAX < nz - iz)%Z).
-      { destruct (Z.le_gt_cases (nz - iz) SpecFilewrite.FW_MAX) as [Hle | Hgt']; [| lia].
+      assert (Hgt : (SpecSysWriteAU.FW_MAX < nz - iz)%Z).
+      { destruct (Z.le_gt_cases (nz - iz) SpecSysWriteAU.FW_MAX) as [Hle | Hgt']; [| lia].
         exfalso.
-        rewrite (proj2 (Z.geb_le SpecFilewrite.FW_MAX (nz - iz)) Hle) in Hge.
+        rewrite (proj2 (Z.geb_le SpecSysWriteAU.FW_MAX (nz - iz)) Hle) in Hge.
         discriminate. }
-      assert (Hcap : (0 < SpecFilewrite.FW_MAX <= SpecFilewrite.FW_MAX)%Z)
+      assert (Hcap : (0 < SpecSysWriteAU.FW_MAX <= SpecSysWriteAU.FW_MAX)%Z)
         by (apply (fw_chunk_cap nz iz); [lia | exact Hgt]).
       iApply (wp_bge_fall_s_sconf (mword_of_int (FW + 0xda))
                 (mword_of_int 8112 : mword 13) Ra5 Rs7 T2 Kn b
@@ -1237,7 +1639,7 @@ Section ProofFilewrite.
       set (T3 := <[Regidx Rs3 := regval_into_reg
                     (add_vec zero_reg (T2 !!! Regidx Rs9))]> T2).
       assert (HT3s3 : T3 !!! Regidx Rs3
-                      = (mword_of_int SpecFilewrite.FW_MAX : mword 64)).
+                      = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
       { rewrite /T3 upd_eq. unfold regval_into_reg.
         rewrite add_vec_zero_l. exact HT2s9. }
       assert (HT3thr : forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
@@ -1264,8 +1666,8 @@ Section ProofFilewrite.
       iIntros (CID5 Hq5). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt82b) in "Hpc".
       iSpecialize ("Hcont" $! CID5 with "[]"); [iPureIntro; wp_next_chain|].
-      iApply ("Hcont" $! SpecFilewrite.FW_MAX T3 with "[%] Hcg Hpc").
-      split_and!; [lia | lia | lia | exact HT3s3 | exact HT3thr].
+      iApply ("Hcont" $! SpecSysWriteAU.FW_MAX T3 with "[%] Hcg Hpc").
+      split_and!; [lia | lia | lia | lia | exact HT3s3 | exact HT3thr].
   Qed.
 
   (* =================================================================== *)
@@ -1303,6 +1705,13 @@ Section ProofFilewrite.
     wp_next b p (fun (CID : CpuId) =>
       ∀ (P : regfile) (v' : mword 32),
         ⌜off_wf v'
+          (* AU EDIT: THE WORD IS PINNED -- the fire below hands the offset
+             half back at exactly it, so the checkin needs its value.  A
+             disjunction, not an [if decide]: a [decide] in the CONTEXT is
+             what stdpp's [case_decide] picks first, and the loop's range
+             bridge below relies on [case_decide] finding the goal's. *)
+          /\ ((rz <= 0)%Z /\ v' = v
+              \/ (0 < rz)%Z /\ v' = (mword_of_int (bv_unsigned v + rz) : mword 32))
           /\ (forall r : mword 5, is_cs_idx r = true ->
                 P !!! Regidx r = Mt !!! Regidx r)⌝ -∗
         sie_cap_gpr KT1 P Kn b p -∗
@@ -1337,7 +1746,8 @@ Section ProofFilewrite.
       iEval (rewrite Htgtb4) in "Hpc".
       iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! Mt v with "[%] Hcg Hpc Hcell").
-      split; [exact Hwf | intros r _; reflexivity].
+      split; [exact Hwf |]. split; [| intros r _; reflexivity].
+      left. split; [exact Hle | reflexivity].
     - (* ---- FALL: [f->off += r], at a strictly positive count ---- *)
       assert (Hrb : (1 <= rz < 2 ^ 63)%Z).
       { split; [lia | exact (fw_r_lt63 (bv_unsigned v) rz (proj1 Hvr) Hadv)]. }
@@ -1423,7 +1833,8 @@ Section ProofFilewrite.
                 with "[%] Hcg Hpc Hcell").
       split.
       + apply fw_off_wf_new; [exact (proj1 Hvr) | lia | exact Hadv].
-      + intros r Hr. rewrite /U2 upd_ne; [| regne].
+      + split; [right; split; [exact Hgt | reflexivity] |].
+        intros r Hr. rewrite /U2 upd_ne; [| regne].
         rewrite /U1 upd_ne; [reflexivity | regne].
   Qed.
 
@@ -1465,7 +1876,11 @@ Section ProofFilewrite.
       (fn : fwrite_names)
       (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
-      (sp0 w12 pj : mword 64) (lks : gset string) :
+      (sp0 w12 pj : mword 64) (lks : gset string)
+      (* AU EDIT (difference 2): the caller's receipt family.  Fixed for the
+         whole loop -- only [t] and [p] move -- so it rides here and not on
+         the fuel. *)
+      (Q : nat -> iProp Σ) :
     (* ---- the contract's own premises, unchanged ---- *)
     (filewrite_stack <= K)%nat ->
     (kx < NFILE)%nat ->
@@ -1503,18 +1918,26 @@ Section ProofFilewrite.
     (* ---- THE FUEL, and everything the loop carries under it ---- *)
     (* the ROUND'S image: writei's user arm faults pages in, so the block
        comes back at a fresh one and [MI] is carried like [PI]. *)
-    forall (W : nat) (iz : Z) (PI : uptd) (M : regfile),
+    forall (W : nat) (iz t : Z) (p : nat) (PI : uptd) (M : regfile),
     (n - iz <= Z.of_nat W)%Z ->
     (0 <= iz < n)%Z ->
+    (* AU EDIT (difference 2): THE ENTRY TIE.  [t] bytes have been FIRED in
+       [p] full chunks, and they are exactly the bytes the running offset
+       has passed -- every completed chunk fires, because writei's success
+       arm reports the EOF guard the fire needs (file header, difference 4).
+       [t = FW_MAX * p] because a chunk that did not exhaust the count IS
+       the cap ([Hcpick]). *)
+    t = iz ->
+    t = (SpecSysWriteAU.FW_MAX * Z.of_nat p)%Z ->
     uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) PI ->
     M !!! Regidx csp_rs1 = pa_stk sp0 12 ->
     M !!! Regidx Rs2 = fnode kx ->
     M !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
     M !!! Regidx Rs5 = (mword_of_int n : mword 64) ->
     M !!! Regidx Rs6 = m !!! Regidx Ra1 ->
-    M !!! Regidx Rs7 = (mword_of_int SpecFilewrite.FW_MAX : mword 64) ->
+    M !!! Regidx Rs7 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64) ->
     M !!! Regidx Rs8 = (mword_of_int 1 : mword 64) ->
-    M !!! Regidx Rs9 = (mword_of_int SpecFilewrite.FW_MAX : mword 64) ->
+    M !!! Regidx Rs9 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64) ->
     (* s1 and s3 are the loop's own scratch and are EXCLUDED here as well
        as the eight the entry set: [fw_rest5] puts the caller's values
        back out of slots 3 and 5 before [fw_tail] ever looks. *)
@@ -1564,7 +1987,6 @@ Section ProofFilewrite.
       fsc_logst -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ic_sleeplocks fsc_ic -∗
-    (* ...and the off LEDGERS (off-ledger ruling) *)
     dev_inv (fsc_uart) (fsc_disk) -∗
     DiskInv.disk_geom (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
     is_lock (fsc_dlock) DiskAddrs.d_lock "virtio_disk"%string
@@ -1574,14 +1996,11 @@ Section ProofFilewrite.
     BitmapInv.bitmap_inv fsc_fs (fsc_bmapstart) fsc_cov
       fsc_logst (fsc_size) -∗
     (* ---- the EXCLUSIVE half ---- *)
-    (* the process's leave to move the offset's shadow ([OffGv.off_permit]),
-       out of the state-keyed environment's inode arm *)
-    off_permit γx -∗
-    (* THE APPLICATION'S RAW WRITE STEP (round E2, lane E2-W), forwarded
-       from the contract.  Persistent, so the induction carries it for free
-       and each round's retag fires it once. *)
-    fw_app_write_step -∗
     filewrite_fs_out fn -∗
+    (* ---- AU EDIT (difference 2): the carried commit state, at the
+       descriptor's own offset shadow; [x = 0] on every entry (a short
+       chunk exits) ---- *)
+    fw_au_raw (fs_gamma_L fsc_fs) nx γx n (us_M U) (m !!! Regidx Ra1) Q t p 0%nat -∗
     (* ---- and the contract's own continuation ---- *)
     (* [true], verbatim from [SpecFilewrite]: this IS the contract's crossing,
        forwarded, so the two must be spelled the same or [iExact] fails. *)
@@ -1591,7 +2010,8 @@ Section ProofFilewrite.
       ∀ (mf : regfile) (r : mword 64) (P' : uptd),
         ⌜callee_saved m mf⌝ -∗
         ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
-        ⌜filewrite_ret n r⌝ -∗
+        (* AU EDIT: [⌜filewrite_ret n r⌝] is GONE -- each arm of
+           [write_arms_at] pins [r], so the landed blanket is implied. *)
         ⌜mf !!! Regidx Ra0 = r⌝ -∗
         sie_cap_gpr KT1 mf K b pj -∗
         cpu_own 0%nat eb pj b lks -∗
@@ -1599,6 +2019,7 @@ Section ProofFilewrite.
         file_ref gf kx qx stx -∗
         proc_priv_core pj pidv (us_upt U P') -∗
         filewrite_env_out fn stx -∗
+        write_arms_at (fs_gamma_L fsc_fs) nx γx n (us_M U) (m !!! Regidx Ra1) Q r -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1611,7 +2032,7 @@ Section ProofFilewrite.
     subst pj.
     intro W. revert CID0.
     induction W as [| W IH];
-      intros CID0 iz PI M Hfuel Hiz Hext
+      intros CID0 iz t p PI M Hfuel Hiz Htiz Hmul Hext
              HMsp HMs2 HMs4 HMs5 HMs6 HMs7 HMs8 HMs9 HMthr Hbelow.
     { (* NO FUEL.  The loop is entered only at [i < n], so [n - i] is at
          least one and the zero case is vacuous. *)
@@ -1620,7 +2041,7 @@ Section ProofFilewrite.
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hclaimsfw #Hescs #Hireg
-             #Hslks #Hdev #Hgeo #Hdlk #Hbm #Hperm #Hstepw Hout Hcont".
+             #Hslks #Hdev #Hgeo #Hdlk #Hbm Hout Hau Hcont".
     (* ---- THE REFERENCE, OPENED, AND THE TWO FIELD FACTS OFF THE STATE ----
        The loop reads [f->type] and [f->writable] off the field cells, so it
        needs equations about the [fcontent] the reference carries -- but not
@@ -1652,7 +2073,7 @@ Section ProofFilewrite.
               Hiz (proj2 Hn) HMs4 HMs5 HMs7 HMs9
               with "Hcg Htext Hpc").
     iIntros (CIDt Hst c P) "%Hc Hcg Hpc".
-    destruct Hc as (Hcrange & Hcrem & HPs3 & HPthr).
+    destruct Hc as (Hcrange & Hcrem & Hcpick & HPs3 & HPthr).
     (* the register facts travel through the test untouched *)
     assert (HPsp : P !!! Regidx csp_rs1 = pa_stk sp0 12)
       by (rewrite (HPthr csp_rs1 ltac:(vm_compute; reflexivity)
@@ -1670,14 +2091,14 @@ Section ProofFilewrite.
       by (rewrite (HPthr Rs6 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HMs6).
     assert (HPs7 : P !!! Regidx Rs7
-                   = (mword_of_int SpecFilewrite.FW_MAX : mword 64))
+                   = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64))
       by (rewrite (HPthr Rs7 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HMs7).
     assert (HPs8 : P !!! Regidx Rs8 = (mword_of_int 1 : mword 64))
       by (rewrite (HPthr Rs8 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HMs8).
     assert (HPs9 : P !!! Regidx Rs9
-                   = (mword_of_int SpecFilewrite.FW_MAX : mword 64))
+                   = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64))
       by (rewrite (HPthr Rs9 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HMs9).
     assert (HPthr' : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -1744,14 +2165,14 @@ Section ProofFilewrite.
       by (rewrite (HB0thr Rs6 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HPs6).
     assert (HB0s7 : B0 !!! Regidx Rs7
-                    = (mword_of_int SpecFilewrite.FW_MAX : mword 64))
+                    = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64))
       by (rewrite (HB0thr Rs7 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HPs7).
     assert (HB0s8 : B0 !!! Regidx Rs8 = (mword_of_int 1 : mword 64))
       by (rewrite (HB0thr Rs8 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HPs8).
     assert (HB0s9 : B0 !!! Regidx Rs9
-                    = (mword_of_int SpecFilewrite.FW_MAX : mword 64))
+                    = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64))
       by (rewrite (HB0thr Rs9 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HPs9).
     assert (HB0thr2 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -1763,7 +2184,7 @@ Section ProofFilewrite.
       exact (HPthr' r Hr Nsp N0 N1 N2 N3 N4 N5 N6 N7 N8 N9). }
     (* the chunk's two [Z] shapes, and the [nat] the callee takes it at *)
     assert (Hcz : Z.of_nat (Z.to_nat c) = c) by (apply Z2Nat.id; lia).
-    assert (Hcb : (Z.of_nat (Z.to_nat c) <= SpecFilewrite.FW_MAX)%Z)
+    assert (Hcb : (Z.of_nat (Z.to_nat c) <= SpecSysWriteAU.FW_MAX)%Z)
       by (rewrite Hcz; lia).
     assert (Hclt31 : (0 <= c < 2 ^ 31)%Z) by (apply fw_chunk_lt31; lia).
     assert (Hizlt31 : (0 <= iz < 2 ^ 31)%Z) by (apply (fw_i_lt31 n iz); lia).
@@ -1779,15 +2200,19 @@ Section ProofFilewrite.
        once per ITERATION because the loop threads the reference whole; the
        names below are local to the iteration and everything derived from
        them is re-derived on the next one. ---- *)
-    iDestruct (fileread_pay_carve gf kx qx Cf _ (or_introl Htyi) with "Hrpay")
+    iDestruct (fwau_pay_carve gf kx qx Cf _ (or_introl Htyi) with "Hrpay")
       as (ik inum sh g ty lox tlx γb0 γo0)
-         "(%Pst & %P8 & %P9 & %P5 & %P10 & %P10d & %Hlex & #Hflx & #Hty & Hshr & Hoh &
-           Hpayback)".
-    (* the off output IS the ledger fragment on this arm *)
-    iEval (rewrite (carve_off_inode _ _ _ _ _ _ Htyi)) in "Hoh".
-    (* the box's shadow IS the state's, hence the permit's *)
+         "(%Pst & %P8 & %P9 & %P5 & %P10 & %P10d & %Hlex & #Hflx & #Hty & Hshr &
+           Hoh & Hpayback)".
+    (* the off output IS the fd's off box handle on this arm *)
+    iEval (rewrite (SpecFileread.carve_off_inode _ _ _ _ _ _ Htyi)) in "Hoh".
+    (* AU EDIT: THE INUM BRIDGE.  The row the fire retags ([bv_unsigned inum])
+       IS the row the contract's receipts are indexed by ([nx]) -- the sixth
+       output is what makes the two the same existential. *)
     pose proof Pst as Pstx. rewrite Hstx in Pstx.
-    destruct Pstx as (_ & _ & _ & _ & Hgo0).
+    destruct Pstx as (_ & _ & _ & Hnum & Hgo0).
+    (* the box's shadow IS the contract's: the descriptor's state names it *)
+    assert (Hgxo : γx = γo0) by exact Hgo0.
     assert (P3 : IBLOCK inum icfg_ist ∈ fsc_cov)
       by (apply P3q; exact P5).
     assert (P4 : IBLOCK inum icfg_ist
@@ -1959,10 +2384,10 @@ Section ProofFilewrite.
     iDestruct (ity_shot_agree with "Hshot Hty") as %Htyeq.
     assert (Hnodir : bv_unsigned (di_type dnl) <> T_DIR_z)
       by (rewrite Htyeq; exact (P10 Hwb)).
-    (* ROUND E2, LANE E2-W: ...AND NOT A DEVICE EITHER.  The owner's
-       [file_payload] strengthening (2026-08-29), read through the carve's
-       fifth output at the SAME generation -- what refutes [FsAbs.abs_node]'s
-       [ADev] arm and lets the retag below read the row as an [AFile]. *)
+    (* AU EDIT: ...AND NOT A DEVICE EITHER.  The owner's [file_payload]
+       strengthening (2026-08-29), read through the carve's fifth output at
+       the SAME generation.  This is what refutes [FsAbs.abs_node]'s [ADev]
+       arm and hence what deleted [SpecSysWriteAUEra]'s third arm. *)
     assert (Hnodev : bv_unsigned (di_type dnl) <> FsImg.T_DEVICE_z)
       by (rewrite Htyeq; exact (P10d Htyi)).
     (* ---- PEEL the checked-out bundle.  The valid cell is beside the
@@ -1970,10 +2395,10 @@ Section ProofFilewrite.
     rewrite /ic_loaded.
     iDestruct (ic_loaded_open with "Hlk") as (datal)"(%Hiok & %Hrl_datal & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks & Htopl)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
-    (* ROUND E2, LANE E2-W: THE ROW READS AS A FILE, and here is the whole
-       derivation: [inode_rec_local] enumerates the four legal type words,
-       [inode_ok] rules out the free one, the carve's fourth output rules out
-       the directory and its fifth the device. *)
+    (* AU EDIT: THE ROW READS AS A FILE, and here is the whole derivation:
+       [inode_rec_local] enumerates the four legal type words, [inode_ok]
+       rules out the free one, the carve's fourth output rules out the
+       directory and its fifth the device. *)
     assert (Htyfile : bv_unsigned (di_type dnl) = FsImg.T_FILE_z).
     { destruct (proj1 Hrl_datal) as [Hz0 | [Hzd | [Hzf | Hzv]]].
       - exfalso. exact (Hdty Hz0).
@@ -1984,8 +2409,7 @@ Section ProofFilewrite.
       with "[Haddrs Hindres]" as "Hmap".
     { rewrite /inode_map. iFrame. }
     (* ---- CHECK OUT the offset cell, from the inode's LEDGER (off-ledger
-           ruling): the fragment proves membership, ilock's valid cell is
-           the marker, and one liveness unit is parked. ---- *)
+           ruling) ---- *)
     iApply fupd_wp.
     (* r25 item 24: CHECK OUT the fd's off box (see ProofFileread) *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
@@ -2047,6 +2471,27 @@ Section ProofFilewrite.
     iIntros (CIDa6 Hsa6) "Hcg Hpc".
     set (Q3 := <[Regidx Ra2 := regval_into_reg
                   (add_vec (rget Q2 Rs4) (rget Q2 Rs6))]> Q2).
+    (* a2 IS [addr + i], NAMED (RULING A).  The landed walk left it
+       unconstrained -- either_copyin promised nothing about the bytes there
+       -- and the content seam is stated at exactly this address.  Proved
+       HERE rather than at the fire because [rget] carries the ambient
+       [CpuId] and the two blocks sit at different harts' instances. *)
+    assert (HQ2s4 : Q2 !!! Regidx Rs4 = (mword_of_int iz : mword 64)).
+    { rewrite /Q2 upd_ne; [| vm_compute; discriminate].
+      rewrite /Q1 upd_ne; [| vm_compute; discriminate].
+      rewrite (Hilcs Rs4 ltac:(vm_compute; reflexivity)). exact HB0s4. }
+    assert (HQ2s6 : Q2 !!! Regidx Rs6 = (m !!! Regidx Ra1 : mword 64)).
+    { rewrite /Q2 upd_ne; [| vm_compute; discriminate].
+      rewrite /Q1 upd_ne; [| vm_compute; discriminate].
+      rewrite (Hilcs Rs6 ltac:(vm_compute; reflexivity)). exact HB0s6. }
+    assert (Hq3v : add_vec (rget Q2 Rs4) (rget Q2 Rs6)
+                   = add_vec (mword_of_int iz : mword 64) (m !!! Regidx Ra1)).
+    { rewrite (rget_ne Q2 Rs4 ltac:(vm_compute; discriminate)).
+      rewrite (rget_ne Q2 Rs6 ltac:(vm_compute; discriminate)).
+      rewrite HQ2s4 HQ2s6. reflexivity. }
+    assert (HQ3a2 : Q3 !!! Regidx Ra2
+                    = add_vec (mword_of_int iz : mword 64) (m !!! Regidx Ra1)).
+    { rewrite /Q3 upd_eq. unfold regval_into_reg. exact Hq3v. }
     assert (Hppa2 : add_vec_int (mword_of_int (FW + 0x9e) : mword 64) 4
                     = mword_of_int (FW + 0xa2))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -2221,28 +2666,28 @@ Section ProofFilewrite.
               /\ di_type dn' = di_type dnl
               /\ di_nlink dn' = di_nlink dnl
               /\ dn0' = dn'
-              (* ROUND E2, LANE E2-W: the SUCCESS arm's three extra readings,
-                 which the landed join used to throw away because only the
-                 retag needed the record and the [_auto] retag does not look
-                 inside it.  The [_step] retag does: the row is the SPLICE,
-                 hence [tot] and hence [wi_dinode], and its splice needs
-                 [off <= length bs0], which is the arm's EOF guard read at
-                 the pre-write record.  Guarded by [0 <= rz] -- "we are not
-                 on writei's [-1] arm" -- because a ZERO-count success may
-                 still have moved the row (writei's DISTURBED TAIL). *)
+              (* AU EDIT: the SUCCESS arm's three extra readings, which the
+                 landed join threw away because only the retag needed the
+                 record and the retag does not look inside it.  The fire
+                 does: [wrf_write_row] wants the SPLICE, hence [tot] and
+                 hence [wi_dinode], and it wants [wri_pre]'s own side
+                 condition [off <= length bs0], which is the arm's EOF
+                 guard read at the pre-write record.  Guarded by [0 <= rz],
+                 which is exactly "we are not on writei's [-1] arm" -- a
+                 ZERO-count success may still have moved the row, since
+                 writei COMMITS a chunk whose copy failed part-way (round
+                 E2, lane E2-W; ruling Q-i). *)
               /\ ((0 <= rz)%Z ->
                   rz = Z.of_nat tot
                   /\ dn' = wi_dinode dnl bm' (Z.to_nat (bv_unsigned v)) tot
                   /\ (Z.to_nat (bv_unsigned v)
                       <= Z.to_nat (bv_unsigned (di_size dnl)))%nat)
-              (* ...and the -1 arm's: NOTHING moved, which is what makes that
-                 retag a [_same]. *)
+              (* ...and the -1 arm's: NOTHING moved, which is what makes
+                 that retag a [_same]. *)
               /\ ((rz < 0)%Z ->
                   bm' = bml /\ data' = datal /\ dn' = dnl)).
     { destruct Harms as
         [(Hm1 & _ & Htot0 & _ & Hbmq & Hdataq & Hdnq & Hdn0q & _)
-        (* the writing arm's second conjunct is SpecWritei's EOF guard: the
-           landed walk needs it for the row the retag now proves *)
         | (Hcnt2 & Hoffle & Htotle & Hdnq & Hdn0q)].
       - exists (-1)%Z. subst bm' data' dn' dn0'. split_and!.
         (* EIGHT branches, not seven: [split_and!] splits the chained
@@ -2270,7 +2715,7 @@ Section ProofFilewrite.
                [FileInvDefs.off_wf_lt31] instead, which is already in [Z]. *)
             rewrite Hoffz.
             pose proof (off_wf_lt31 v Hwf) as Hw31.
-            unfold SpecFilewrite.FW_MAX in Hcrange.
+            unfold SpecSysWriteAU.FW_MAX in Hcrange.
             change (2 ^ 31)%Z with 2147483648%Z in Hw31.
             change (2 ^ 32)%Z with 4294967296%Z. lia.
           - apply Hcap2. exact Hszb. }
@@ -2336,7 +2781,7 @@ Section ProofFilewrite.
               HW1a0 HW1s2 ltac:(lia) Hwf Hrzadv
               with "Hcg Htext Hpc Hcell").
     iIntros (CIDb2 Hsb2 X0 v2) "%Hx Hcg Hpc Hcell".
-    destruct Hx as [Hwf2 Hxcs].
+    destruct Hx as (Hwf2 & Hv2 & Hxcs).
     assert (HX0s1 : X0 !!! Regidx Rs1 = (mword_of_int rz : mword 64))
       by (rewrite (Hxcs Rs1 ltac:(vm_compute; reflexivity)); exact HW1s1).
     assert (HX0s2 : X0 !!! Regidx Rs2 = fnode kx)
@@ -2344,16 +2789,10 @@ Section ProofFilewrite.
     assert (HX0cs : forall r : mword 5, is_cs_idx r = true -> r <> Rs1 ->
               X0 !!! Regidx r = B0 !!! Regidx r).
     { intros r Hr N1. rewrite (Hxcs r Hr). exact (HW1cs r Hr N1). }
-    (* ---- CHECK IN the cell and REBUILD the checked-out bundle ---- *)
+    (* ---- THE FIRE, then CHECK IN the cell and REBUILD the checked-out
+       bundle: the fire moves the offset's half, and the checkin needs it
+       back at the word the cell now holds ---- *)
     iApply fupd_wp.
-    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (off_resident_intro γo0 kx v2 _ Hwf2 with "Hcell Hgv []") as "Hres".
-    { rewrite -Hgo0. iExact "Hperm". }
-    iMod (proto_read_park ⊤ ik kx qx γb0 γo0 Cf mo T0 Tr TsoCtx.cur_ctx
-            ltac:(solve_ndisj) P8 P9 Hqmo
-            with "Hrun Hres Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
-      as "(Hrun & Hoh & Hoffd)".
-    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* the marker was never consumed: the box needs no marker *)
     iRename "Hvalid" into "Hmark".
     (* THE MOVER (namei-pinned-lookup.md §9 W3, the file-write row): writei
@@ -2377,44 +2816,75 @@ Section ProofFilewrite.
       - exact (dir_uniq_not_dir dn' data' Hnodir').
       - exact (dir_dots_ix_not_dir (bv_unsigned inum) dn' data' Hnodir'). }
     (* =================================================================
-       ROUND E2, LANE E2-W (site #5): THE RETAG IS A [_step] NOW.
+       AU EDIT (differences 3 and 4): THE FIRE, IN PLACE OF THE RETAG.
 
-       The row this walk moves is the FILE'S, and the application's claim
-       about it is paid by the contract's own
-       [SpecFilewrite.fw_app_write_step] rather than by the blanket retag
-       that used to read [AppInv.app_auto] off the invariant.  The delta
-       is [FsAbsDelta.delta_write] at the LANDED RUN -- the bytes writei
-       counted, PLUS whatever of its DISTURBED TAIL lies inside the new size
-       ([FsAbsWriteFire.wrf_landed]).  That is ruling Q-i's honesty: a short
-       chunk really does move bytes the caller did not ask for, and the
-       delta is non-deterministic in them rather than silent about them.
+       [FsAbsWriteFire.wrf_awrite_fire] IS [ireg_top_retag_*] with the
+       caller's two phases on either side of the [ghost_map_update], inside
+       the ONE [ftopN] critical section -- so the chunk's commit and the
+       row's move are one instant.  It is taken on the ONE KEY [rz = c]:
+       the chunk was full, so writei's disturbed tail is empty and the
+       bytes ARE the splice.  [wri_pre]'s other side condition,
+       [f->off <= ip->size], is not a second key -- writei's success arm
+       reports it and [Hsucc] hands it over (file header, difference 4).
 
-       TWO CASES, and the split is writei's own return: on [0 <= rz] the
-       record is [wi_dinode] and the row is the splice; on [-1] the up-front
-       guards failed, nothing moved at all, and the retag is [_same]. *)
+       OFF THE KEY THE ROW STILL MOVES (round E2, lane E2-W; ruling Q-i).
+       A chunk that stopped short landed the bytes it COUNTED plus the
+       visible part of writei's disturbed tail ([FsAbsWriteFire.wrf_landed]),
+       so it spends the chain's PARTIAL arm -- a two-phase fire like the
+       full one, receipt and all, differing only in that [f->off] advances
+       by the count rather than by the run.  Two cases spend no node and
+       are honestly [_same]: writei's [-1] (nothing ran) and a chunk that
+       landed nothing at all.  The tag below records which, for the exits.
+
+       THE OFFSET HALF comes out of every case at the word [fw_offupd]
+       left in the cell ([Hv2]), which is what the checkin re-forms the
+       resident cell from ([FileOffCell.off_resident_of]). *)
+    assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
+      by apply fw_maxfile_bsize.
     iAssert (|={⊤}=> top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum)
-                       (era_node dn' bm' data'))%I
-      with "[Htop]" as ">Htop".
-    { destruct (decide (0 <= rz)%Z) as [Hrzge | Hrzneg].
-      - (* ---- WRITEI RAN: the row moved to the landed run ---- *)
-        destruct (Hsucc Hrzge) as (Hrztot & Hdnwi & Hfo).
-        assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
-          by apply fw_maxfile_bsize.
+                       (era_node dn' bm' data')
+             ∗ off_gv γo0 (1/2) (bv_unsigned v2)
+             ∗ ∃ (tf : Z) (pf xf : nat),
+                 ⌜(tf = t /\ pf = p /\ xf = 0%nat /\ (rz < c)%Z)
+                  \/ (tf = t /\ pf = p /\ xf = 1%nat /\ (rz < c)%Z)
+                  \/ (tf = (t + c)%Z /\ pf = S p /\ xf = 0%nat /\ rz = c)⌝
+                 ∗ fw_au_raw (fs_gamma_L fsc_fs) nx γx n (us_M U) (m !!! Regidx Ra1) Q tf pf xf)%I
+      with "[Htop Hau Hgv]" as ">(Htop & Hgv & Hst)".
+    { rewrite Hnum.
+      destruct (decide (rz = c)) as [Hfc | Hnokey].
+      - (* ---- THE CHUNK FIRES ---- *)
+        assert (Hrzpos : (0 < rz)%Z) by (zlia Hfc Hcrange).
+        destruct (Hsucc ltac:(zlia Hrzpos)) as (Hrztot & Hdnwi & Hfo).
+        assert (Htotc : (tot = Z.to_nat c)%nat) by (zlia Hfc Hrztot).
+        assert (Hd0 : dist = 0%nat) by (apply Hdistn; exact Htotc).
+        assert (Htotpos : (0 < tot)%nat) by (zlia Htotc Hcrange).
+        (* the two numeric side conditions, both off [Hrzadv] *)
         assert (Hcapt : (Z.to_nat (bv_unsigned v) + tot <= MAXFILE * BSIZE)%nat)
           by (zlia Hrzadv Hrztot Hoffz Hmb).
         assert (Hszb' : (Z.to_nat (bv_unsigned (di_size dnl))
                          <= MAXFILE * BSIZE)%nat) by (zlia Hszb Hmb).
-        assert (Hoff32 : (Z.of_nat (Z.to_nat (bv_unsigned v) + tot)
-                          < 2 ^ 32)%Z).
+        assert (Hoff32 : (Z.of_nat (Z.to_nat (bv_unsigned v) + tot) < 2 ^ 32)%Z).
         { change (2 ^ 32)%Z with 4294967296%Z. zlia Hcapt Hmb. }
+        (* writei's range clause at [dist = 0] IS the pointwise splice *)
+        assert (Hrng : forall kk : nat, (kk < MAXFILE * BSIZE)%nat ->
+                  file_byte data' kk
+                  = if decide ((Z.to_nat (bv_unsigned v) <= kk)%nat
+                               /\ (kk < Z.to_nat (bv_unsigned v) + tot)%nat)
+                    then wrote (kk - Z.to_nat (bv_unsigned v))%nat
+                    else file_byte datal kk).
+        { intros kk _. rewrite (Hrange kk) Hd0.
+          case_decide as HA; [reflexivity |].
+          case_decide as HB; [destruct HB; exfalso; lia | reflexivity]. }
         assert (Hszwi : Z.to_nat (bv_unsigned (di_size dn'))
                   = Nat.max (Z.to_nat (bv_unsigned v) + tot)
                             (Z.to_nat (bv_unsigned (di_size dnl))))
           by (rewrite Hdnwi; exact (wrf_wi_size dnl bm'
                 (Z.to_nat (bv_unsigned v)) tot Hoff32)).
+        (* the rows as [abs_row], with the type beside them (E2-V2: the fire
+           states the view's row on the count itself) *)
         assert (Hnzl : fn_type (era_node dnl bml datal) <> 0)
           by exact (opf_era_file_typed dnl bml datal Htyfile).
-        assert (Hrowl : abs_row (era_node dnl bml datal)
+        assert (Hrow : abs_row (era_node dnl bml datal)
                   = MkAnode (AFile (fn_file_bytes (era_node dnl bml datal)))
                             (fn_nlink (era_node dnl bml datal)))
           by exact (opf_era_file_row dnl bml datal Htyfile).
@@ -2424,66 +2894,301 @@ Section ProofFilewrite.
           by exact (opf_era_file_typed dn' bm' data' Htyfile').
         assert (Hrow' : abs_row (era_node dn' bm' data')
                   = MkAnode (AFile (blk_splice (Z.to_nat (bv_unsigned v))
-                                      (wrf_landed wrote dstb
-                                         (Z.to_nat (bv_unsigned (di_size dnl)))
-                                         (Z.to_nat (bv_unsigned v)) tot dist)
+                                      (wrf_run wrote tot)
                                       (fn_file_bytes (era_node dnl bml datal))))
                             (fn_nlink (era_node dnl bml datal)))
-          by exact (wrf_write_row_dist dnl dn' bml bm' datal data'
-                      (Z.to_nat (bv_unsigned v)) tot dist wrote dstb
+          by exact (wrf_write_row dnl dn' bml bm' datal data'
+                      (Z.to_nat (bv_unsigned v)) tot wrote
                       Htyfile Htyq Hnlq Hholes Hholes2 Hszwi Hfo Hcapt Hszb'
-                      ltac:(intros kk _; exact (Hrange kk))).
-        iApply (ireg_top_retag_gen ⊤ fsc_fs (bv_unsigned inum)
+                      Hrng).
+        assert (Hbs0len : length (fn_file_bytes (era_node dnl bml datal))
+                  = Z.to_nat (bv_unsigned (di_size dnl)))
+          by (rewrite (wrf_era_bytes dnl bml datal); apply wrf_fb_length).
+        assert (Hposbs : (0 < length (wrf_run wrote tot))%nat)
+          by (rewrite wrf_run_length; exact Htotpos).
+        assert (Hoffbs : (Z.to_nat (bv_unsigned v)
+                          <= length (fn_file_bytes (era_node dnl bml datal)))%nat)
+          by (rewrite Hbs0len; exact Hfo).
+        assert (Hcapbs : (Z.to_nat (bv_unsigned v)
+                          + length (wrf_run wrote tot) <= MAXFILE * BSIZE)%nat)
+          by (rewrite wrf_run_length; exact Hcapt).
+        assert (Hlenc : (t + Z.of_nat (length (wrf_run wrote tot)))%Z
+                        = (t + c)%Z)
+          by (rewrite wrf_run_length; zlia Htotc Hcz).
+        (* THE CHUNK'S CONTENT (RULING A).  writei's user-arm clause pins
+           the run it wrote to the process's image at ITS a2, which the
+           [add a2,s4,s6] at +0x9e made [i + addr]; [add_vec_moi_comm] turns
+           that into the base-bumped form [fw_au_raw_take] asks for, and
+           [t = iz] is the loop's own tie.  [wrf_run] is the [f <$> seq 0 t]
+           spelling [ubytes_at_of_got] bridges. *)
+        assert (HQ6a2 : Q6 !!! Regidx Ra2
+                        = add_vec (mword_of_int iz : mword 64)
+                            (m !!! Regidx Ra1)).
+        { rewrite /Q6 upd_ne; [| vm_compute; discriminate].
+          rewrite /Q5 upd_ne; [| vm_compute; discriminate].
+          rewrite /Q4 upd_ne; [exact HQ3a2 | vm_compute; discriminate]. }
+        assert (Hchunkb : ubytes_at (us_M U) (add_vec_int (m !!! Regidx Ra1) t)
+                            (wrf_run wrote tot)).
+        { rewrite Htiz -add_vec_moi_comm -HQ6a2.
+          exact (ubytes_at_of_got _ _ tot wrote (Hubytes eq_refl)). }
+        (* ONE COMMIT OUT OF THE BUNDLE, at this chunk's index *)
+        (* the two bounds the peel wants, HOISTED out of argument position:
+           an inline [ltac:(lia)] there is priced by the depth of the call
+           site and reifies this block's whole 300-hypothesis context
+           (optimization.md, "Inline [ltac:] in argument position"). *)
+        assert (Htge0 : (0 <= t)%Z) by (zlia Htiz Hiz).
+        assert (Htltn : (t < n)%Z) by (zlia Htiz Hiz).
+        iDestruct (fw_au_raw_take (fs_gamma_L fsc_fs) (bv_unsigned inum) γx n (us_M U)
+                     (m !!! Regidx Ra1) Q
+                     t p Htge0 Htltn Hmul with "Hau")
+          as "[Hcm Hback]".
+        (* the kernel's half goes in at the offset the chunk was written at
+           and comes out advanced by the chunk *)
+        (* THE PER-CHUNK BUFFER TIE IS PHASE 1'S NOW (owner, 2026-09-07),
+           and the chunk's source offset is [FW_MAX * p] because every chunk
+           that reaches node [p] was FULL -- which is exactly the loop's own
+           tie [Hmul]. *)
+        assert (Hchunkp : ubytes_at (us_M U)
+                  (add_vec_int (m !!! Regidx Ra1) (FW_MAX * Z.of_nat p))
+                  (wrf_run wrote tot))
+          by (rewrite -Hmul; exact Hchunkb).
+        iMod (wrf_awrite_fire fsc_fs ⊤ (bv_unsigned inum) γx (us_M U)
+                (m !!! Regidx Ra1) p _
+                (Z.to_nat (bv_unsigned v)) (wrf_run wrote tot)
+                (fn_file_bytes (era_node dnl bml datal))
+                (fn_nlink (era_node dnl bml datal))
+                (era_node dnl bml datal) (era_node dn' bm' data')
+                ltac:(solve_ndisj) Hlocw Hposbs Hoffbs Hcapbs Hnzl Hrow Hnz' Hrow'
+                Hchunkp
+                with "[] [] Hcm Htop [Hgv]") as "(Htop & Hgv & Htail)";
+          [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") | rewrite Hgxo Hoffz; iExact "Hgv" |].
+        iModIntro. iFrame "Htop".
+        iSplitL "Hgv".
+        { (* the advanced half IS the stored word: [v + rz], unwrapped *)
+          destruct Hv2 as [[Hrzle _] | [_ Hv2']]; [exfalso; zlia Hrzle Hrzpos |].
+          rewrite Hv2' moi32_unsigned bvw32_small;
+            [| split; [zlia Hvr Hrzpos | change (2 ^ 32)%Z with 4294967296%Z;
+                                          zlia Hrzadv Hmb]].
+          iEval (rewrite Hgxo wrf_run_length Nat2Z.inj_add Hoffz) in "Hgv".
+          rewrite Hrztot. iExact "Hgv". }
+        iExists (t + c)%Z, (S p), 0%nat.
+        iSplitR; [iPureIntro; right; right; split_and!;
+                  [reflexivity | reflexivity | reflexivity | exact Hfc] |].
+        iSpecialize ("Hback" $! (wrf_run wrote tot) with "[]");
+          [iPureIntro; exact Hchunkb |].
+        rewrite -Hlenc. iApply ("Hback" with "Htail").
+      - (* ---- THE CHUNK DOES NOT FIRE IN FULL ---------------------------
+           ROUND E2, LANE E2-W (ruling Q-i): AND THE ROW STILL MOVED.  This
+           arm used to take the blanket retag and pay only the offset,
+           which is the contract hole the lane closes: writei COMMITS a
+           chunk whose [either_copyin] failed part-way, so what landed at
+           [f->off] is the bytes it COUNTED plus the visible part of its
+           DISTURBED TAIL ([FsAbsWriteFire.wrf_landed]; [SpecWritei]'s
+           [dist <= BSIZE] is what bounds it).  The chain's PARTIAL arm
+           fires at that run -- NON-DETERMINISTIC in the bytes -- while the
+           offset advances only by the count.
+
+           TWO ARMS DO NOT SPEND A NODE, and both are honestly [_same]: on
+           writei's [-1] nothing ran at all, and a chunk that landed NOTHING
+           leaves the view where it was. ---- *)
+        destruct (decide (0 <= rz)%Z) as [Hrzge | Hrzneg].
+        + (* ---- WRITEI RAN (short, possibly counting nothing) ---- *)
+          destruct (Hsucc Hrzge) as (Hrztot & Hdnwi & Hfo).
+          assert (Hcapt : (Z.to_nat (bv_unsigned v) + tot <= MAXFILE * BSIZE)%nat)
+            by (zlia Hrzadv Hrztot Hoffz Hmb).
+          assert (Hszb' : (Z.to_nat (bv_unsigned (di_size dnl))
+                           <= MAXFILE * BSIZE)%nat) by (zlia Hszb Hmb).
+          assert (Hoff32 : (Z.of_nat (Z.to_nat (bv_unsigned v) + tot)
+                            < 2 ^ 32)%Z).
+          { change (2 ^ 32)%Z with 4294967296%Z. zlia Hcapt Hmb. }
+          assert (Hszwi : Z.to_nat (bv_unsigned (di_size dn'))
+                    = Nat.max (Z.to_nat (bv_unsigned v) + tot)
+                              (Z.to_nat (bv_unsigned (di_size dnl))))
+            by (rewrite Hdnwi; exact (wrf_wi_size dnl bm'
+                  (Z.to_nat (bv_unsigned v)) tot Hoff32)).
+          assert (Hnzl : fn_type (era_node dnl bml datal) <> 0)
+            by exact (opf_era_file_typed dnl bml datal Htyfile).
+          assert (Hrowl : abs_row (era_node dnl bml datal)
+                    = MkAnode (AFile (fn_file_bytes (era_node dnl bml datal)))
+                              (fn_nlink (era_node dnl bml datal)))
+            by exact (opf_era_file_row dnl bml datal Htyfile).
+          assert (Htyfile' : bv_unsigned (di_type dn') = FsImg.T_FILE_z)
+            by (rewrite Htyq; exact Htyfile).
+          assert (Hnz' : fn_type (era_node dn' bm' data') <> 0)
+            by exact (opf_era_file_typed dn' bm' data' Htyfile').
+          assert (Hrow' : abs_row (era_node dn' bm' data')
+                    = MkAnode (AFile (blk_splice (Z.to_nat (bv_unsigned v))
+                                        (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist)
+                                        (fn_file_bytes (era_node dnl bml datal))))
+                              (fn_nlink (era_node dnl bml datal)))
+            by exact (wrf_write_row_dist dnl dn' bml bm' datal data'
+                        (Z.to_nat (bv_unsigned v)) tot dist wrote dstb
+                        Htyfile Htyq Hnlq Hholes Hholes2 Hszwi Hfo Hcapt Hszb'
+                        ltac:(intros kk _; exact (Hrange kk))).
+          assert (Hbslen : length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist)
+                    = (tot + Nat.min dist
+                         (Z.to_nat (bv_unsigned (di_size dnl))
+                          - (Z.to_nat (bv_unsigned v) + tot)))%nat)
+            by apply wrf_landed_length.
+          assert (Hbs0len : length (fn_file_bytes (era_node dnl bml datal))
+                    = Z.to_nat (bv_unsigned (di_size dnl)))
+            by (rewrite (wrf_era_bytes dnl bml datal); apply wrf_fb_length).
+          destruct (decide (0 < length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist))%nat) as [Hbspos | Hbsz].
+          * (* ---- THE PARTIAL NODE FIRES, at the run that landed ---- *)
+            assert (Htge0 : (0 <= t)%Z) by (zlia Htiz Hiz).
+            assert (Htltn : (t < n)%Z) by (zlia Htiz Hiz).
+            assert (Hoffbs : (Z.to_nat (bv_unsigned v)
+                      <= length (fn_file_bytes (era_node dnl bml datal)))%nat)
+              by (rewrite Hbs0len; exact Hfo).
+            assert (Hcapbs : (Z.to_nat (bv_unsigned v)
+                      + length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist) <= MAXFILE * BSIZE)%nat)
+              by (rewrite Hbslen; zlia Hcapt Hszb').
+            assert (Hrle : (Z.to_nat rz <= length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist))%nat)
+              by (rewrite Hbslen; zlia Hrztot).
+            assert (Hgap : (length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist) <= Z.to_nat rz + BSIZE)%nat)
+              by (rewrite Hbslen; zlia Hrztot Hdist).
+            iDestruct (fw_au_raw_spend_part (fs_gamma_L fsc_fs)
+                         (bv_unsigned inum) γx n
+                         (us_M U) (m !!! Regidx Ra1) Q t p Htge0 Htltn Hmul
+                         with "Hau") as "[Hpart Hback]".
+            (* THE COUNTED PREFIX IS THE CALLER'S, AND ONLY IT.  What
+               landed is [wrf_run wrote tot] followed by writei's disturbed
+               tail; the kernel COUNTED [rz = tot] of it, and
+               [take (Z.to_nat rz)] of the landed run is exactly the run
+               writei's user-arm clause pins to the caller's buffer.  The
+               tail is nobody's, which is why the partial arm's premise is
+               on the prefix and not on [bs]. *)
+            assert (HQ6a2 : Q6 !!! Regidx Ra2
+                            = add_vec (mword_of_int iz : mword 64)
+                                (m !!! Regidx Ra1)).
+            { rewrite /Q6 upd_ne; [| vm_compute; discriminate].
+              rewrite /Q5 upd_ne; [| vm_compute; discriminate].
+              rewrite /Q4 upd_ne; [exact HQ3a2 | vm_compute; discriminate]. }
+            assert (Hchunkb : ubytes_at (us_M U)
+                      (add_vec_int (m !!! Regidx Ra1) t) (wrf_run wrote tot)).
+            { rewrite Htiz -add_vec_moi_comm -HQ6a2.
+              exact (ubytes_at_of_got _ _ tot wrote (Hubytes eq_refl)). }
+            assert (Hrztotn : Z.to_nat rz = tot) by (zlia Hrztot).
+            assert (Htakep : ubytes_at (us_M U)
+                      (add_vec_int (m !!! Regidx Ra1) (FW_MAX * Z.of_nat p))
+                      (take (Z.to_nat rz)
+                         (wrf_landed wrote dstb
+                            (Z.to_nat (bv_unsigned (di_size dnl)))
+                            (Z.to_nat (bv_unsigned v)) tot dist))).
+            { rewrite Hrztotn /wrf_landed take_app_length';
+                [| exact (eq_sym (wrf_run_length wrote tot))].
+              rewrite -Hmul. exact Hchunkb. }
+            iMod (wrf_apart_fire fsc_fs ⊤ (bv_unsigned inum) γx (us_M U)
+                    (m !!! Regidx Ra1) p _
+                    (Z.to_nat (bv_unsigned v)) (Z.to_nat rz)
+                    (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist)
+                    (fn_file_bytes (era_node dnl bml datal))
+                    (fn_nlink (era_node dnl bml datal))
+                    (era_node dnl bml datal) (era_node dn' bm' data')
+                    ltac:(solve_ndisj) Hlocw Hbspos Hoffbs Hcapbs Hrle Hgap
+                    Hnzl Hrowl Hnz' Hrow' Htakep
+                    with "[] [] Hpart Htop [Hgv]")
+              as "(Htop & Hgv & Htail)";
+              [iApply (ireg_inv_ftop with "Hireg")
+              | iApply (ireg_inv_app with "Hireg")
+              | rewrite Hgxo Hoffz; iExact "Hgv" |].
+            iModIntro. iFrame "Htop".
+            iSplitL "Hgv".
+            { (* the offset advances by the COUNT, which may be zero *)
+              destruct (decide (0 < rz)%Z) as [Hrzpos | Hrzz].
+              - destruct Hv2 as [[Hrzle _] | [_ Hv2']];
+                  [exfalso; zlia Hrzle Hrzpos |].
+                rewrite Hv2' moi32_unsigned bvw32_small;
+                  [| split; [zlia Hvr Hrzpos
+                            | change (2 ^ 32)%Z with 4294967296%Z;
+                              zlia Hrzadv Hmb]].
+                assert (Hrzid : Z.of_nat (Z.to_nat rz) = rz)
+                  by (apply Z2Nat.id; zlia Hrzpos).
+                iEval (rewrite Hgxo Nat2Z.inj_add Hoffz Hrzid) in "Hgv".
+                iExact "Hgv".
+              - destruct Hv2 as [[_ Hv2'] | [Hpos _]];
+                  [| exfalso; zlia Hpos Hrzz].
+                assert (Hrzz0 : Z.to_nat rz = 0%nat) by (zlia Hrzge Hrzz).
+                rewrite Hv2'.
+                iEval (rewrite Hgxo Hrzz0 Nat.add_0_r Hoffz) in "Hgv".
+                iExact "Hgv". }
+            iExists t, p, 1%nat.
+            iSplitR; [iPureIntro; right; left; split_and!;
+                      [reflexivity | reflexivity | reflexivity
+                      | zlia Hrzr Hnokey] |].
+            iApply ("Hback" with "Htail").
+          * (* ---- NOTHING LANDED: the view does not move ---- *)
+            assert (Hlen0 : length (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist) = 0%nat) by (zlia Hbsz).
+            assert (Hnil : (wrf_landed wrote dstb
+                              (Z.to_nat (bv_unsigned (di_size dnl)))
+                              (Z.to_nat (bv_unsigned v)) tot dist) = []) by (apply nil_length_inv; exact Hlen0).
+            assert (Hnlq' : fn_nlink (era_node dn' bm' data')
+                            = fn_nlink (era_node dnl bml datal))
+              by (rewrite /fn_nlink !era_node_rec Hnlq //).
+            assert (Hsame : FsAbsDefs.abs_of (era_node dnl bml datal)
+                            = FsAbsDefs.abs_of (era_node dn' bm' data')).
+            { rewrite (abs_of_counted _ Hnzl) (abs_of_counted _ Hnz')
+                      Hnlq' Hrowl Hrow' Hnil blk_splice_nil //. }
+            iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned inum)
+                    (era_node dnl bml datal) (era_node dn' bm' data')
+                    ltac:(solve_ndisj) Hsame Hlocw with "[] [] Htop") as "Htop";
+              [iApply (ireg_inv_ftop with "Hireg")
+              | iApply (ireg_inv_app with "Hireg") |].
+            assert (Hrz0 : (rz <= 0)%Z) by (zlia Hrztot Hbslen Hlen0).
+            iModIntro. iFrame "Htop".
+            iSplitL "Hgv".
+            { destruct Hv2 as [[_ Hv2'] | [Hpos _]]; [| exfalso; zlia Hpos Hrz0].
+              rewrite Hv2'. iExact "Hgv". }
+            iExists t, p, 0%nat.
+            iSplitR; [iPureIntro; left; split_and!;
+                      [reflexivity | reflexivity | reflexivity
+                      | zlia Hrzr Hnokey] |].
+            iExact "Hau".
+        + (* ---- WRITEI'S -1: the up-front guards failed, nothing ran ---- *)
+          destruct (Hfailq ltac:(zlia Hrzneg)) as (Hbmq & Hdataq & Hdnq).
+          assert (Hsame : FsAbsDefs.abs_of (era_node dnl bml datal)
+                          = FsAbsDefs.abs_of (era_node dn' bm' data'))
+            by (rewrite Hbmq Hdataq Hdnq; reflexivity).
+          iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned inum)
                   (era_node dnl bml datal) (era_node dn' bm' data')
-                  ltac:(solve_ndisj) Hlocw with "[] [] [] Htop");
-          [ iApply (ireg_inv_ftop with "Hireg")
-          | iApply (ireg_inv_app with "Hireg")
-          | ].
-        iIntros (I Hlk) "_ Hp".
-        assert (Hrowat : arow_at (abs_view I) (bv_unsigned inum)
-                  (MkAnode (AFile (fn_file_bytes (era_node dnl bml datal)))
-                           (fn_nlink (era_node dnl bml datal)))).
-        { rewrite -Hrowl.
-          exact (abs_view_arow I (bv_unsigned inum)
-                   (era_node dnl bml datal) Hlk Hnzl). }
-        assert (Hdelta : abs_view (<[bv_unsigned inum
-                                     := era_node dn' bm' data']> I)
-                  = delta_write (bv_unsigned inum) (Z.to_nat (bv_unsigned v))
-                      (wrf_landed wrote dstb
-                         (Z.to_nat (bv_unsigned (di_size dnl)))
-                         (Z.to_nat (bv_unsigned v)) tot dist)
-                      (abs_view I)).
-        { rewrite (abs_view_insert_row I (bv_unsigned inum)
-                     (era_node dn' bm' data') _ Hnz' Hrow') /=.
-          case_decide as Hz.
-          - pose proof (arow_at_gone _ _ _ Hrowat Hz) as Hnone.
-            rewrite (delta_write_absent _ _ _ _ Hnone).
-            exact (delete_notin _ _ Hnone).
-          - by rewrite (delta_write_file (abs_view I) (bv_unsigned inum)
-                          (Z.to_nat (bv_unsigned v))
-                          (wrf_landed wrote dstb
-                             (Z.to_nat (bv_unsigned (di_size dnl)))
-                             (Z.to_nat (bv_unsigned v)) tot dist)
-                          (fn_file_bytes (era_node dnl bml datal))
-                          (fn_nlink (era_node dnl bml datal))
-                          (arow_at_live _ _ _ Hrowat Hz)). }
-        iApply (app_step_at (bv_unsigned inum) I _ (era_node dn' bm' data')
-                  Hdelta with "[] Hp").
-        iApply (fw_app_write_step_at (bv_unsigned inum) I
-                  (Z.to_nat (bv_unsigned v))
-                  (wrf_landed wrote dstb
-                     (Z.to_nat (bv_unsigned (di_size dnl)))
-                     (Z.to_nat (bv_unsigned v)) tot dist) with "Hstepw").
-      - (* ---- WRITEI'S -1: the up-front guards failed, nothing moved ---- *)
-        destruct (Hfailq ltac:(zlia Hrzneg)) as (Hbmq & Hdataq & Hdnq).
-        assert (Hsame : FsAbsDefs.abs_of (era_node dnl bml datal)
-                        = FsAbsDefs.abs_of (era_node dn' bm' data'))
-          by (rewrite Hbmq Hdataq Hdnq; reflexivity).
-        iApply (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned inum)
-                  (era_node dnl bml datal) (era_node dn' bm' data')
-                  ltac:(solve_ndisj) Hsame Hlocw with "[] [] Htop");
-          [ iApply (ireg_inv_ftop with "Hireg")
-          | iApply (ireg_inv_app with "Hireg") ]. }
+                  ltac:(solve_ndisj) Hsame Hlocw with "[] [] Htop") as "Htop";
+            [iApply (ireg_inv_ftop with "Hireg")
+            | iApply (ireg_inv_app with "Hireg") |].
+          iModIntro. iFrame "Htop".
+          iSplitL "Hgv".
+          { destruct Hv2 as [[_ Hv2'] | [Hpos _]];
+              [| exfalso; zlia Hpos Hrzneg].
+            rewrite Hv2'. iExact "Hgv". }
+          iExists t, p, 0%nat.
+          iSplitR; [iPureIntro; left; split_and!;
+                    [reflexivity | reflexivity | reflexivity
+                    | zlia Hrzr Hnokey] |].
+          iExact "Hau". }
+    iDestruct "Hst" as (tf pf xf) "[%Hfire Hau]".
+    (* ---- CHECK IN the cell: the half came back at exactly its word ---- *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iDestruct (off_resident_of γo0 kx v2 Hwf2 with "Hcell Hgv") as "Hres".
+    iMod (proto_read_park ⊤ ik kx qx γb0 γo0 Cf mo T0 Tr TsoCtx.cur_ctx
+            ltac:(solve_ndisj) P8 P9 Hqmo
+            with "Hrun Hres Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
+      as "(Hrun & Hoh & Hoffd)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".
@@ -2591,7 +3296,7 @@ Section ProofFilewrite.
     { rewrite (IcacheRef.inode_shr_genlo_halve ik sh). iFrame. }
     (* ...and back into the payload it came from.  From here the reference is
        intact again and the postcondition carries no share at all. *)
-    iEval (rewrite -(carve_off_inode _ _ _ _ _ _ Htyi)) in "Hoh".
+    iEval (rewrite -(SpecFileread.carve_off_inode _ _ _ _ _ _ Htyi)) in "Hoh".
     iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
     (* ---- +0xbc jal ra,end_op : the transaction closes at whatever the
            chunk left of its reservation ([SpecEndOp] takes any [u]) ---- *)
@@ -2680,7 +3385,7 @@ Section ProofFilewrite.
                      = negb (Z.eqb c rz)).
     { rewrite (rget_ne meo Rs3 ltac:(vm_compute; discriminate)).
       rewrite (rget_ne meo Rs1 ltac:(vm_compute; discriminate)).
-      rewrite Heos3 Heos1. apply fw_neq_r; [exact Hclt31 | lia]. }
+      rewrite Heos3 Heos1. apply fw_neq_r; [exact Hclt31 | zlia Hrzr Hclt31]. }
     assert (Htgtea : add_vec (mword_of_int (FW + 0xc8) : mword 64)
               (sign_extend' 64 (mword_of_int 26 : mword 13))
               = mword_of_int (FW + 0xe2))
@@ -2711,12 +3416,18 @@ Section ProofFilewrite.
                        (subrange_vec_dec (meo !!! Regidx Rs1) 31 0 : mword 32)
                        (subrange_vec_dec (meo !!! Regidx Rs4) 31 0 : mword 32)))]> meo).
       assert (Hstep : (0 <= iz + c <= n)%Z /\ (n - (iz + c) < n - iz)%Z)
-        by (apply fw_i_advance; lia).
+        by (fwclear Hiz Hcrange Hcrem; apply fw_i_advance; lia).
+      (* the three width side conditions, NAMED rather than spliced: see
+         [Htge0] above for why an [ltac:(lia)] in argument position is
+         priced by this loop's whole context. *)
+      assert (Hiz0 : (0 <= iz)%Z) by (zlia Hiz).
+      assert (Hc0 : (0 <= c)%Z) by (zlia Hcrange).
+      assert (Hic31 : (iz + c < 2 ^ 31)%Z) by (zlia Hcrem Hn).
       assert (HY1s4 : Y1 !!! Regidx Rs4 = (mword_of_int (iz + c) : mword 64)).
       { rewrite /Y1 upd_eq. unfold regval_into_reg.
         rewrite Heos1 Heos4 Hcrz.
-        rewrite (fw_addw_moi iz c ltac:(lia) ltac:(lia) ltac:(lia)).
-        f_equal. lia. }
+        rewrite (fw_addw_moi iz c Hiz0 Hc0 Hic31).
+        f_equal. exact (Z.add_comm c iz). }
       assert (HY1s5 : Y1 !!! Regidx Rs5 = (mword_of_int n : mword 64))
         by (rewrite /Y1 upd_ne; [exact Heos5 | vm_compute; discriminate]).
       assert (HY1sp : Y1 !!! Regidx csp_rs1 = pa_stk sp0 12)
@@ -2730,7 +3441,8 @@ Section ProofFilewrite.
                        = Z.geb (iz + c) n).
       { rewrite (rget_ne Y1 Rs4 ltac:(vm_compute; discriminate)).
         rewrite (rget_ne Y1 Rs5 ltac:(vm_compute; discriminate)).
-        rewrite HY1s4 HY1s5. apply fw_bge_moi; lia. }
+        rewrite HY1s4 HY1s5.
+        apply fw_bge_moi; zlia Hiz Hcrange Hcrem Hn Hic31. }
       assert (Htgtda : add_vec (mword_of_int (FW + 0xd0) : mword 64)
                 (sign_extend' 64 (mword_of_int 18 : mword 13))
                 = mword_of_int (FW + 0xe2))
@@ -2738,7 +3450,7 @@ Section ProofFilewrite.
       destruct (Z.geb (iz + c) n) eqn:Hex.
       + (* ---- EXHAUSTED: i = n, the write completed ---- *)
         assert (Hizn : (iz + c = n)%Z)
-          by (pose proof (proj1 (Z.geb_le _ _) Hex); lia).
+          by (fwclear Hex Hcrem; pose proof (proj1 (Z.geb_le _ _) Hex); lia).
         (* NO RESTORES HERE any more: 31f115a's gcc lets the exhaustion
            test branch straight into the tail, which owns the six. *)
         iApply (wp_bge_taken_s_sconf (mword_of_int (FW + 0xd0))
@@ -2750,6 +3462,8 @@ Section ProofFilewrite.
         { iApply (fwri_0d0 with "Htext"). }
         iApply bi.later_intro. iIntros (CIDc3 Hsc3) "Hcg Hpc".
         iEval (rewrite Htgtda) in "Hpc".
+        assert (Hizc31 : (0 <= iz + c < 2 ^ 31)%Z)
+          by (zlia Hiz Hcrange Hcrem Hn).
         assert (HY1thr2 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                   r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 ->
                   r <> Rs5 -> r <> Rs6 -> r <> Rs7 -> r <> Rs8 -> r <> Rs9 ->
@@ -2757,34 +3471,50 @@ Section ProofFilewrite.
         { intros r Hr Nsp N0 N1 N2 N3 N4 N5 N6 N7 N8 N9.
           rewrite (HY1cs r Hr N1 N4).
           exact (HB0thr2 r Hr Nsp N0 N1 N2 N3 N4 N5 N6 N7 N8 N9). }
-        iApply (fw_tail (CID0 := CIDc3) m Y1 K sp0 (m !!! Regidx Rra)
+        iApply (fwau_tail (CID0 := CIDc3) m Y1 K sp0 (m !!! Regidx Rra)
                   (m !!! Regidx Rs0) (m !!! Regidx Rs2) (m !!! Regidx Rs4)
                   (m !!! Regidx Rs5) (m !!! Regidx Rs6)
                   (m !!! Regidx Rs1) (m !!! Regidx Rs3) (m !!! Regidx Rs7)
                   (m !!! Regidx Rs8) (m !!! Regidx Rs9)
                   n (iz + c)%Z w12 (proc_addr jx) b
-                  (fw_K12 K HK) Hn ltac:(lia) Hspm eq_refl eq_refl eq_refl
+                  (fw_K12 K HK) Hn Hizc31 Hspm eq_refl eq_refl eq_refl
                   eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                   eq_refl HY1sp HY1s5 HY1s4 HY1thr2
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                         Hb10 Hb11 Hb12").
         iIntros (CIDe Hse mfin rv) "%Hcsr Hcg Hpc".
         destruct Hcsr as (Hcsf & Hrv & Hdisj).
+        (* AU EDIT: the tail's KEYED post.  [iz + c = n] here, so the
+           answer is [n] and not [-1] -- which is the whole reason
+           [fwau_tail] exists. *)
+        assert (Hrvn : rv = (mword_of_int n : mword 64)).
+        { destruct Hdisj as [[_ Hq] | [Hne _]];
+            [exact Hq | exfalso; exact (Hne Hizn)]. }
         iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin rv P'
-                  with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout]").
+                  with "[%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout] [Hau]").
         { exact Hcsf. }
         { exact Hupt2. }
-        { exact (fw_ret_of_tail n n (iz + c)%Z rv (proj1 Hn) eq_refl Hdisj). }
         { exact Hrv. }
         { iApply (fw_env_out_fs fn stx Cf inumx _ Hokx Htyi). iExact "Hout". }
+        { (* THE ARMS, AT THE EXHAUSTED EXIT.  The chunk that reached it was
+             FULL ([Hcrz]), so it FIRED, so [tf = t + c = iz + c = n]: this
+             exit takes the ok arm and no other. *)
+          assert (Htfn : tf = n /\ xf = 0%nat).
+          { destruct Hfire as [(_ & _ & _ & E4) | [(_ & _ & _ & E4) | (E1 & _ & E3 & _)]];
+              [exfalso; zlia E4 Hcrz Hcrange | exfalso; zlia E4 Hcrz
+               | split; [rewrite E1; zlia Htiz Hizn | exact E3]]. }
+          destruct Htfn as [Htfn Hxf0].
+          rewrite /write_arms_at. subst tf xf. iLeft.
+          iSplitR; [iPureIntro; split; [exact Hrvn | zlia Hn] |].
+          iApply (fw_au_raw_ok (fs_gamma_L fsc_fs) nx γx n (us_M U) (m !!! Regidx Ra1) Q pf with "Hau"). }
       + (* ---- NOT EXHAUSTED: the FALL is the back edge to +0xcc ---- *)
         assert (Hlt : (iz + c < n)%Z).
-        { destruct (Z.le_gt_cases n (iz + c)) as [Hle | Hgt]; [| lia].
+        { destruct (Z.le_gt_cases n (iz + c)) as [Hle | Hgt]; [| exact Hgt].
           exfalso. rewrite (proj2 (Z.geb_le (iz + c)%Z n) Hle) in Hex.
-          discriminate. }
+          discriminate Hex. }
         iApply (wp_bge_fall_s_sconf (mword_of_int (FW + 0xd0))
                   (mword_of_int 18 : mword 13) Rs5 Rs4 Y1 (K - 12)%nat b
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -2809,8 +3539,33 @@ Section ProofFilewrite.
            still refuses. *)
         iDestruct (wp_next_retarget CID0 CIDc3 true (proc_addr jx) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply (IH CIDc3 (iz + c)%Z P' Y1
-                  ltac:(lia) ltac:(lia) Hupt2
+        (* AU EDIT: the chunk that did NOT exhaust the count IS the cap
+           ([Hcpick]), which is what re-proves the tie at the new [pf]. *)
+        assert (Hcfm : c = SpecSysWriteAU.FW_MAX)
+          by (fwclear Hcpick Hlt; destruct Hcpick as [Hp1 | Hp2]; lia).
+        (* THE BACK EDGE'S FOUR ARITHMETIC PREMISES, NAMED.  Spliced as
+           [ltac:(lia)] into [IH]'s argument list they were the single most
+           expensive sentence in the file (43 s of 234 cold): the goal is an
+           evar, so [clear] is not available inside the splice and every one
+           of them reified this loop's ~300-hypothesis context. *)
+        assert (Hfuel2 : (n - (iz + c) <= Z.of_nat W)%Z)
+          by (zlia Hfuel Hcrange).
+        assert (Hiz2 : (0 <= iz + c < n)%Z) by (zlia Hiz Hcrange Hlt).
+        assert (Htiz2 : tf = (iz + c)%Z).
+        { destruct Hfire as [(_ & _ & _ & E4) | [(_ & _ & _ & E4) | (E1 & _)]];
+            [exfalso; zlia E4 Hcrz Hcrange | exfalso; zlia E4 Hcrz | rewrite E1; zlia Htiz]. }
+        assert (Hmul2 : tf = (SpecSysWriteAU.FW_MAX * Z.of_nat pf)%Z).
+        { destruct Hfire as [(_ & _ & _ & E4) | [(_ & _ & _ & E4) | (E1 & E2 & _)]];
+            [exfalso; zlia E4 Hcrz Hcrange | exfalso; zlia E4 Hcrz
+             | rewrite E1 E2; zlia Hmul Hcfm]. }
+        (* the FULL chunk spent no partial arm: the state re-enters at [x = 0] *)
+        assert (Hxf2 : xf = 0%nat).
+        { destruct Hfire as [(_ & _ & _ & E4) | [(_ & _ & _ & E4) | (_ & _ & E3 & _)]];
+            [exfalso; zlia E4 Hcrz Hcrange | exfalso; zlia E4 Hcrz | exact E3]. }
+        subst xf.
+        iApply (IH CIDc3 (iz + c)%Z tf pf P' Y1
+                  Hfuel2 Hiz2 Htiz2 Hmul2
+                  Hupt2
                   HY1sp
                   ltac:(rewrite (HY1cs Rs2 ltac:(vm_compute; reflexivity)
                                   ltac:(vm_compute; discriminate)
@@ -2836,7 +3591,7 @@ Section ProofFilewrite.
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
                         Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hclaimsfw Hescs Hireg
-                        Hslks Hdev Hgeo Hdlk Hbm Hperm Hstepw Hout Hcont").
+                        Hslks Hdev Hgeo Hdlk Hbm Hout Hau Hcont").
     - (* ====== THE SHORT WRITE (and writei's -1): straight to +0xe2 ======
          Before 31f115a this arm ran its own five restores at +0xea first;
          gcc now sends both loop exits into the tail, which owns them. *)
@@ -2856,7 +3611,7 @@ Section ProofFilewrite.
       { intros r Hr Nsp N0 N1 N2 N3 N4 N5 N6 N7 N8 N9.
         rewrite (Heocs r Hr N1).
         exact (HB0thr2 r Hr Nsp N0 N1 N2 N3 N4 N5 N6 N7 N8 N9). }
-      iApply (fw_tail (CID0 := CIDc2) m meo K sp0 (m !!! Regidx Rra)
+      iApply (fwau_tail (CID0 := CIDc2) m meo K sp0 (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs2) (m !!! Regidx Rs4)
                 (m !!! Regidx Rs5) (m !!! Regidx Rs6)
                 (m !!! Regidx Rs1) (m !!! Regidx Rs3) (m !!! Regidx Rs7)
@@ -2869,31 +3624,46 @@ Section ProofFilewrite.
                       Hb10 Hb11 Hb12").
       iIntros (CIDe Hse mfin rv) "%Hcsr Hcg Hpc".
       destruct Hcsr as (Hcsf & Hrv & Hdisj).
+      (* AU EDIT: [iz < n] on this arm, so the tail's keyed post answers
+         [-1]; and the chunk that ended the loop was not full, so it did
+         not fire and the carried total is still [t]. *)
+      assert (Hrvm1 : rv = (mword_of_int (-1) : mword 64)).
+      { destruct Hdisj as [[Hq _] | [_ Hq]];
+          [exfalso; zlia Hq Hiz | exact Hq]. }
+      assert (Htft : tf = t).
+      { destruct Hfire as [(E1 & _) | [(E1 & _) | (_ & _ & _ & E4)]]; [exact E1 | exact E1 |].
+        exfalso. rewrite E4 Z.eqb_refl in Hce. discriminate Hce. }
       iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mfin rv P'
-                with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout]").
+                with "[%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout] [Hau]").
       { exact Hcsf. }
       { exact Hupt2. }
-      { exact (fw_ret_of_tail n n iz rv (proj1 Hn) eq_refl Hdisj). }
       { exact Hrv. }
       { iApply (fw_env_out_fs fn stx Cf inumx _ Hokx Htyi). iExact "Hout". }
+      { rewrite /write_arms_at. iRight.
+        iSplitR; [iPureIntro; exact Hrvm1 |].
+        assert (Hfailex : (tf < n)%Z \/ (n < 0)%Z /\ pf = 0%nat)
+          by (fwclear Htft Htiz Hiz; left; lia).
+        iApply (fw_au_raw_fail (fs_gamma_L fsc_fs) nx γx n (us_M U) (m !!! Regidx Ra1) Q tf pf xf
+                  Hfailex with "Hau"). }
   Qed.
-
   Lemma wp_filewrite_sconf
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate) (fn : fwrite_names)
       (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
-      (lks : gset string)
-    : wp_filewrite_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks.
+      (lks : gset string) (Q : nat -> iProp Σ) (tr0 : list (bv 8))
+    : wp_filewrite_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks Q tr0.
   Proof.
     cbv beta delta [wp_filewrite_sconf_body].
-    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb
+    intros pcE pj ret_tgt uaddr HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb
            Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hprow #Hstepw Hcont".
+    (* "Hfin" -- NOT "Hin": the device arm already binds that name for its
+       major-range fact. *)
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hprow Hfin Hcont".
     (* PIN THE INDEX.  This contract carries [eb = true ->] and [cpu_own] at
        level 0, so [cpu_own_eb_agree] forces [b] to be the literal [true].
        That is what reconciles the [true]-spelled crossings (this contract's
@@ -2999,18 +3769,24 @@ Section ProofFilewrite.
       iSpecialize ("Hcont" $! CID4 with "[]"); [iPureIntro; wp_next_chain|].
       assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
       iApply ("Hcont" $! A1 (mword_of_int (-1)) (pv_upt (us_V U))
-                with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
+                with "[%] [%] [%] Hcg Hcnt [Hpc]
                       [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                      [Hpriv] [Henv]").
+                      [Hpriv] [Henv] []").
       { exact Hcs1. }
       { apply uptd_ext_sz_refl. }
-      { apply filewrite_ret_m1. }
       { exact HA1a0. }
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { rewrite /file_ref /file_fields.
         iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
       { rewrite HVid. iExact "Hpriv". }
       { by iApply filewrite_env_out_of_env. }
+      { (* THE ARMED POST at the [f->writable == 0] exit: the landed
+           blanket, and NO arm -- every armed arm of [filewrite_extra] is a
+           WRITABLE descriptor, which [fdstate_ok] refutes here. *)
+        rewrite /filewrite_arms.
+        iSplitR; [iPureIntro; apply filewrite_ret_m1 |].
+        iApply (filewrite_extra_unwritable inumx γox Cf st n (us_M U) uaddr
+                  Q tr0 (mword_of_int (-1)) Hok Hwrz). }
     - (* ===============================================================
          WRITABLE.  [fw_wbool_of_fall] turns the FALL into the boolean
          [filewrite_fs_env]'s last pure field is conditioned on -- the
@@ -3213,18 +3989,26 @@ Section ProofFilewrite.
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
         iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U))
-                  with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
+                  with "[%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                        [Hpriv] [Henv]").
+                        [Hpriv] [Henv] [Hfin]").
         { exact Hcsf. }
         { apply uptd_ext_sz_refl. }
-        { apply filewrite_ret_m1. }
         { exact Hrv. }
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { rewrite /file_ref /file_fields.
           iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
         { rewrite HVid. iExact "Hpriv". }
-        { by iApply filewrite_env_out_of_env. } }
+        { by iApply filewrite_env_out_of_env. }
+        { (* THE SIGN GUARD'S EXIT, before the type dispatch: every arm at
+             once ([SpecFilewrite.filewrite_extra_neg]).  At [n < 0] the
+             chunk count is zero, so an inode descriptor's input IS the
+             cursor at the empty prefix and the fail arm's refund is that
+             same cursor; the console arm's NEG disjunct is pure. *)
+          rewrite /filewrite_arms.
+          iSplitR; [iPureIntro; apply filewrite_ret_m1 |].
+          iApply (filewrite_extra_neg fn st n (us_M U) uaddr Q tr0 Hneg
+                    with "Hfin"). } }
       (* ---- 0 <= n : [Hn0] is now a fact of the code, not a premise ---- *)
       assert (Hn0 : (0 <= n)%Z) by lia.
       assert (Hn01 : (0 <= n < 2 ^ 31)%Z) by lia.
@@ -3307,6 +4091,9 @@ Section ProofFilewrite.
            a0 is the return, and [c.j +0xa2] goes straight to [fw_epi]. *)
         assert (Htyp : fc_type Cf = FD_PIPE)
           by (apply eq_vec_true_iff; exact Hp1).
+        (* the STATE's shape, for the armed post: a pipe descriptor arms
+           nothing ([filewrite_extra_pipe]) -- a pipe AU is out of scope. *)
+        destruct (fdstate_ok_pipe inumx γox Cf st Hok Htyp) as (rp & wp2 & Hstpp).
         iDestruct "Hrpay" as (pn) "(%Hstp & Hpn & Hpl)".
         iEval (rewrite /file_core /file_core_noff Htyp bool_decide_eq_true_2;
                [| reflexivity]) in "Hpl".
@@ -3429,12 +4216,11 @@ Section ProofFilewrite.
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P'
-                  with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
+                  with "[%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hiru Hoh Hrlv]
-                        Hpriv [Henv]").
+                        Hpriv [Henv] []").
         { exact Hcsf. }
         { exact Hupt. }
-        { by apply fw_ret_of_pipe. }
         { exact Hrv. }
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { rewrite /file_ref /file_fields /file_pay_st.
@@ -3444,6 +4230,9 @@ Section ProofFilewrite.
             [| reflexivity].
           iFrame "Hpipe Hpref Hiru Hoh". }
         { by iApply filewrite_env_out_of_env. }
+        { rewrite /filewrite_arms.
+          iSplitR; [iPureIntro; by apply fw_ret_of_pipe |].
+          rewrite Hstpp. iApply filewrite_extra_pipe. }
       + (* ---- +0x24 c.li a4,3 ; +0x26 beq a5,a4 -> +0x5c (FD_DEVICE) ---- *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (FW + 0x28))
                   (mword_of_int 52 : mword 13) Ra4 Ra5 G5 (K - 12)%nat b
@@ -3504,6 +4293,50 @@ Section ProofFilewrite.
           assert (Htyd : fc_type Cf = FD_DEVICE)
             by (apply eq_vec_true_iff; exact Hp3).
           iDestruct (fw_env_dev γf fn st Cf inumx _ Hok Htyd with "Henv") as "Henv".
+          (* ---- THE STATE'S SHAPE, THE SEED AND THE PIN ------------------
+             The armed post is keyed on [st], so the arm names it; the
+             write mode comes off the [f->writable] fall.  Then, ONCE for
+             the arm's three exits:
+
+             THE CELL IS "NULL OR CONSOLEWRITE" AT EVERY MAJOR
+             ([filewrite_dev_env]), so the walk must be able to CALL
+             consolewrite at a major that is not the console's -- and the
+             LOCATED contract is the general form for that, its seed being
+             free where the caller supplied none
+             ([UartSentLoc.uart_sent_nil]).  That is what lets one walk
+             serve both, and what retired the landed [CONSOLEWRITE]
+             parameter.  At the console the seed is the caller's own [tr0],
+             out of the keyed input -- persistent, so the pin rides with it
+             to the null-slot exit, where it is what refutes the -1. *)
+          destruct (fdstate_ok_device inumx γox Cf st Hok Htyd)
+            as (rd & wd & Hstd).
+          assert (Hwd : wd = true).
+          { destruct (fdstate_ok_rw inumx γox Cf rd wd
+                        (FdDevice (bv_unsigned (fc_major Cf)))
+                        ltac:(rewrite -Hstd; exact Hok)) as [_ Hwrc].
+            destruct wd; [reflexivity |]. exfalso.
+            rewrite /fc_wbool Hwrc in Hwb. by vm_compute in Hwb. }
+          subst wd.
+          iApply fupd_wp.
+          iMod (uart_sent_nil (fsc_uart)) as "#Hnil".
+          iAssert (∃ trs : list (bv 8),
+                     ⌜bv_unsigned (fc_major Cf) = ConsoleInv.CONSOLE ->
+                        trs = tr0⌝ ∗
+                     ⌜bv_unsigned (fc_major Cf) = ConsoleInv.CONSOLE ->
+                        fwn_wp fn (bv_unsigned (fc_major Cf))
+                          = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
+                     uart_sent (fsc_uart) trs)%I with "[Hfin]" as "#Hsd".
+          { destruct (decide (bv_unsigned (fc_major Cf) = ConsoleInv.CONSOLE))
+              as [Hc | Hnc].
+            - iDestruct (filewrite_in_cons fn rd (bv_unsigned (fc_major Cf)) n
+                           (us_M U) uaddr Q tr0 Hc with "[Hfin]") as "[%Hp Hs]";
+                [rewrite Hstd; iExact "Hfin" |].
+              iExists tr0. iSplitR; [done |].
+              iSplitR; [iPureIntro; intros _; exact Hp |]. iExact "Hs".
+            - iExists []. iSplitR; [iPureIntro; intros Hc; by exfalso |].
+              iSplitR; [iPureIntro; intros Hc; by exfalso |]. iExact "Hnil". }
+          iModIntro.
+          iDestruct "Hsd" as (trs) "(%Htrs & %Hpin & #Hseed)".
           pose proof (fw_major_range (fc_major Cf : mword 16)) as Hmjr.
           assert (Htgt5c : add_vec (mword_of_int (FW + 0x2e) : mword 64)
                     (sign_extend' 64 (mword_of_int 54 : mword 13))
@@ -3718,12 +4551,11 @@ Section ProofFilewrite.
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
                 iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U))
-                          with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                [Hpriv] [Hslot]").
+                                [Hpriv] [Hslot] []").
                 { exact Hcsf. }
                 { apply uptd_ext_sz_refl. }
-                { apply filewrite_ret_m1. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
@@ -3732,6 +4564,19 @@ Section ProofFilewrite.
                 { iApply (fw_env_out_dev fn st Cf inumx _ Hok Htyd).
                   iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk").
                   by left. }
+                { (* THE NULL SLOT.  At the console the PIN refutes it; at
+                     any other major nothing is armed. *)
+                  rewrite /filewrite_arms.
+                  iSplitR; [iPureIntro; apply filewrite_ret_m1 |].
+                  rewrite Hstd.
+                  destruct (decide (bv_unsigned (fc_major Cf)
+                                    = ConsoleInv.CONSOLE)) as [Hc | Hnc].
+                  - exfalso. rewrite /dev_major (Hpin Hc) in Hwp0.
+                    apply (f_equal (@bv_unsigned 64)) in Hwp0.
+                    by vm_compute in Hwp0.
+                  - iApply (filewrite_extra_dev_other rd true
+                              (bv_unsigned (fc_major Cf)) n (us_M U) uaddr Q
+                              tr0 (mword_of_int (-1)) Hnc). }
              ** (* ---- consolewrite: the INDIRECT CALL at +0x7e ---- *)
                 iApply (wp_cbeqz_fall_s_sconf (mword_of_int (FW + 0x82))
                           (mword_of_int 80 : mword 8) (Cregidx (mword_of_int 7)) Ra5
@@ -3793,6 +4638,25 @@ Section ProofFilewrite.
                   rewrite /G3g upd_ne; [| vm_compute; discriminate].
                   rewrite /G2 upd_ne; [| vm_compute; discriminate].
                   rewrite /G1 upd_ne; [exact HMa2 | vm_compute; discriminate]. }
+                (* THE RECEIPT'S ADDRESS (RULING A): the located callee
+                   states its receipt at ITS a1, and filewrite hands a1 down
+                   untouched, so that IS this contract's [uaddr].  Same
+                   register tower as [HE2a2] one assert above. *)
+                assert (HE2a1 : E2 !!! Regidx Ra1 = (m !!! Regidx Ra1 : mword 64)).
+                { rewrite /E2 upd_ne; [| vm_compute; discriminate].
+                  rewrite /E1 upd_ne; [| vm_compute; discriminate].
+                  rewrite (HDrthr Ra1 ltac:(vm_compute; discriminate)
+                            ltac:(vm_compute; discriminate)).
+                  rewrite /D4 upd_ne; [| vm_compute; discriminate].
+                  rewrite /D3 upd_ne; [| vm_compute; discriminate].
+                  rewrite /D2 upd_ne; [| vm_compute; discriminate].
+                  rewrite /D1 upd_ne; [| vm_compute; discriminate].
+                  rewrite /G6 upd_ne; [| vm_compute; discriminate].
+                  rewrite /G5 upd_ne; [| vm_compute; discriminate].
+                  rewrite /G4 upd_ne; [| vm_compute; discriminate].
+                  rewrite /G3g upd_ne; [| vm_compute; discriminate].
+                  rewrite /G2 upd_ne; [| vm_compute; discriminate].
+                  rewrite /G1 upd_ne; [exact HMa1 | vm_compute; discriminate]. }
                 assert (HE2ra : E2 !!! Regidx Rra
                                 = add_vec_int (mword_of_int (FW + 0x86) : mword 64) 2)
                   by (rewrite /E2; apply upd_eq).
@@ -3808,18 +4672,20 @@ Section ProofFilewrite.
                   exact (HDrthrm c Hcs N2 N8 N18 N21 N22). }
                 iDestruct (cpu_own_transport CID CID20 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iApply (Consolewrite.wp_consolewrite_sconf fsc_kalloc γf γs j γlp
+                iApply (ConsolewriteLoc.wp_consolewrite_loc_sconf fsc_kalloc γf γs j γlp
                           (fsc_uart) (fsc_disk) (fwn_txlock fn)
-                          E2 (K - 12)%nat eb pidv U n b lks
+                          E2 (K - 12)%nat eb pidv U n b lks trs
                           Hj Hgs Hlens HE2a0 HE2a2 (fw_n_range n Hn01)
                           (fw_av_cons K HK) Heb
                           with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hdevinv Htxlk
-                                Hprocs").
+                                Hprocs Hseed").
                 all: try lkbelow.
                 (* consolewrite copies FROM user memory, so its post hands
-                   the block back at a fresh image [Mcw] *)
+                   the block back at a fresh image [Mcw] -- and, since the
+                   contract is the LOCATED one, the accepted-trace receipt
+                   at the seed. *)
                 iIntros (CIDcw Hscw mf r P')
-                  "%Hcscw %Hupt %Hrr %Hra0 Hcg Hcnt Hpc Hpriv".
+                  "%Hcscw %Hupt %Hrr %Hra0 Hcg Hcnt Hpc Hpriv #Hrcpt".
                 assert (Hpc80 : ret_pc (E2 !!! Regidx Rra) = mword_of_int (FW + 0x88)).
                 { rewrite HE2ra. apply bv_eq; vm_compute; reflexivity. }
                 iEval (rewrite Hpc80) in "Hpc".
@@ -3861,13 +4727,11 @@ Section ProofFilewrite.
                              with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mword_of_int r) P'
-                          with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                Hpriv [Hslot]").
+                                Hpriv [Hslot] []").
                 { exact Hcsf. }
                 { exact Hupt. }
-                { apply (fw_ret_of_dev n r (mword_of_int r) Hn0);
-                    [pose proof Hn0; lia | reflexivity]. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
@@ -3875,9 +4739,36 @@ Section ProofFilewrite.
                 { iApply (fw_env_out_dev fn st Cf inumx _ Hok Htyd).
                   iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk").
                   by right. }
+                { (* THE COUNT-TO-ARMS BRIDGE.  The FD_DEVICE arm relays [r]
+                     untouched, so the located receipt IS the console arm's
+                     post at that [r]; at any other major nothing is armed
+                     and the receipt is simply dropped. *)
+                  rewrite /filewrite_arms.
+                  iSplitR.
+                  { iPureIntro. apply (fw_ret_of_dev n r (mword_of_int r) Hn0);
+                      [pose proof Hn0; lia | reflexivity]. }
+                  rewrite Hstd.
+                  destruct (decide (bv_unsigned (fc_major Cf)
+                                    = ConsoleInv.CONSOLE)) as [Hc | Hnc].
+                  - assert (Hmaxn : Z.max 0 n = n) by lia.
+                    assert (Hrn : (0 <= r <= n)%Z) by (rewrite Hmaxn in Hrr; lia).
+                    rewrite Hc.
+                    iApply (filewrite_extra_cons rd ConsoleInv.CONSOLE n (us_M U)
+                              uaddr Q tr0 (mword_of_int r) eq_refl).
+                    rewrite /uaddr -HE2a1 -(Htrs Hc).
+                    iApply (write_cons_arms_of_cnt (fsc_uart) trs (us_M U)
+                              (E2 !!! Regidx Ra1 : mword 64) n r Hn0 Hrn
+                              with "Hrcpt").
+                  - iApply (filewrite_extra_dev_other rd true
+                              (bv_unsigned (fc_major Cf)) n (us_M U) uaddr Q tr0
+                              (mword_of_int r) Hnc). }
           ++ (* ---------- OUT OF RANGE: the [bltu] is taken to +0x126 ------- *)
              assert (Hmjgt : (9 < bv_unsigned (fc_major Cf))%Z)
                by (unfold dev_major, NDEV_max in Hout; lia).
+             (* [CONSOLE] is 1, so an out-of-range major is not the console
+                and nothing is armed on this exit. *)
+             assert (Hnconr : bv_unsigned (fc_major Cf) <> ConsoleInv.CONSOLE).
+             { intros Hc. rewrite Hc in Hmjgt. vm_compute in Hmjgt. discriminate. }
              assert (Htgt126 : add_vec (mword_of_int (FW + 0x70) : mword 64)
                        (sign_extend' 64 (mword_of_int 174 : mword 13))
                        = mword_of_int (FW + 0x11e))
@@ -3925,18 +4816,23 @@ Section ProofFilewrite.
              iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
              assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
              iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U))
-                       with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
+                       with "[%] [%] [%] Hcg Hcnt [Hpc]
                              [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                             [Hpriv] [Henv]").
+                             [Hpriv] [Henv] []").
              { exact Hcsf. }
              { apply uptd_ext_sz_refl. }
-             { apply filewrite_ret_m1. }
              { exact Hrv. }
              { iEval (rewrite /ret_tgt). iExact "Hpc". }
              { rewrite /file_ref /file_fields.
                iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
              { rewrite HVid. iExact "Hpriv". }
              { by iApply (fw_env_out_dev fn st Cf inumx _ Hok Htyd). }
+             { rewrite /filewrite_arms.
+               iSplitR; [iPureIntro; apply filewrite_ret_m1 |].
+               rewrite Hstd.
+               iApply (filewrite_extra_dev_other rd true
+                         (bv_unsigned (fc_major Cf)) n (us_M U) uaddr Q tr0
+                         (mword_of_int (-1)) Hnconr). }
         * (* ---- +0x2a c.li a4,2 ; +0x2c bne a5,a4 -> +0x10a (panic) ---- *)
           iApply (wp_beq_fall_s_sconf (mword_of_int (FW + 0x2e))
                     (mword_of_int 54 : mword 13) Ra4 Ra5 G6 (K - 12)%nat b
@@ -4003,6 +4899,18 @@ Section ProofFilewrite.
                 arbitrary words. *)
              assert (Htyi : fc_type Cf = FD_INODE)
                by (apply eq_vec_true_iff; exact Hp2).
+             (* THE STATE'S SHAPE, HOISTED ABOVE THE ZERO-TRIP SPLIT.  Both
+                sub-branches need it now: the armed post is keyed on [st],
+                and the loop takes the state rather than the content. *)
+             destruct (fdstate_ok_inode inumx γox Cf st Hok Htyi)
+               as (rx & wx & Hstx).
+             assert (Hwx : wx = true).
+             { destruct (fdstate_ok_rw inumx γox Cf rx wx
+                           (FdInode (bv_unsigned inumx) γox)
+                           ltac:(rewrite -Hstx; exact Hok)) as [_ Hwrc].
+               destruct wx; [reflexivity |]. exfalso.
+               rewrite /fc_wbool Hwrc in Hwb. by vm_compute in Hwb. }
+             subst wx.
              (* the BNE FALLS exactly when the two are equal *)
              iApply (wp_bne_fall_s_sconf (mword_of_int (FW + 0x34))
                        (mword_of_int 206 : mword 13) Ra4 Ra5 G7 (K - 12)%nat b
@@ -4109,18 +5017,32 @@ Section ProofFilewrite.
                  iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                  assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
                  iApply ("Hcont" $! mfin (mword_of_int n) (pv_upt (us_V U))
-                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
+                           with "[%] [%] [%] Hcg Hcnt [Hpc]
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                 [Hpriv] [Henv]").
+                                 [Hpriv] [Henv] [Hfin]").
                  { exact Hcsf. }
                  { apply uptd_ext_sz_refl. }
-                 { apply filewrite_ret_all. exact Hn0. }
                  { exact Hrv. }
                  { iEval (rewrite /ret_tgt). iExact "Hpc". }
                  { rewrite /file_ref /file_fields.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                  { rewrite HVid. iExact "Hpriv". }
                  { by iApply filewrite_env_out_of_env. }
+                 { (* THE ZERO TRIP.  [n = 0], so the write is complete
+                      before it starts: no chunks ([wchunks 0 = 0]), the
+                      total IS the count, and the chain the caller handed in
+                      IS the cursor at the empty prefix. *)
+                   rewrite Hstx. rewrite /filewrite_arms.
+                   iSplitR; [iPureIntro; apply filewrite_ret_all; exact Hn0 |].
+                   iDestruct (filewrite_in_inode with "Hfin") as "Hch".
+                   iApply filewrite_extra_inode.
+                   rewrite /write_arms_at. iLeft.
+                   iSplitR; [iPureIntro; split; [reflexivity | lia] |].
+                   (* [rewrite] reaches the proofmode context too, so "Hch"
+                      arrives at [wchunks 0] with the goal. *)
+                   rewrite Hnz0.
+                   iApply (fw_au_raw_ok _ _ _ 0%Z _ _ _ 0%nat).
+                   iApply (fw_au_raw_init with "Hch"). }
                - (* ---- 0 < n: the five late spills, the two 3072s, and
                       the jump to the BOTTOM test at +0xcc ---- *)
                  (* [0 < n] here, from [Hz0 : (0 >=? n) = false]; the loop
@@ -4299,7 +5221,7 @@ Section ProofFilewrite.
                                (add_vec (L2 !!! Regidx Rs7)
                                   (sign_extend' 64 (mword_of_int 3072 : mword 12)))]> L2).
                  assert (HL3s7 : L3 !!! Regidx Rs7
-                                 = (mword_of_int SpecFilewrite.FW_MAX : mword 64)).
+                                 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
                  { rewrite /L3 upd_eq. unfold regval_into_reg.
                    rewrite /L2 upd_eq. exact fw_addi_m1024. }
                  assert (Hpp50 : add_vec_int (mword_of_int (FW + 0x4c) : mword 64) 4
@@ -4332,7 +5254,7 @@ Section ProofFilewrite.
                                      (sign_extend' 64 (mword_of_int 3072 : mword 12)))
                                   31 0))]> L4).
                  assert (HL5a5 : L5 !!! Regidx Ra5
-                                 = (mword_of_int SpecFilewrite.FW_MAX : mword 64)).
+                                 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
                  { rewrite /L5 upd_eq. unfold regval_into_reg.
                    rewrite /L4 upd_eq. exact fw_addiw_m1024. }
                  assert (Hpp56 : add_vec_int (mword_of_int (FW + 0x52) : mword 64) 4
@@ -4349,7 +5271,7 @@ Section ProofFilewrite.
                  set (L6 := <[Regidx Rs9 := regval_into_reg
                                (add_vec zero_reg (L5 !!! Regidx Ra5))]> L5).
                  assert (HL6s9 : L6 !!! Regidx Rs9
-                                 = (mword_of_int SpecFilewrite.FW_MAX : mword 64)).
+                                 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
                  { rewrite /L6 upd_eq. unfold regval_into_reg.
                    rewrite add_vec_zero_l. exact HL5a5. }
                  assert (Hpp58 : add_vec_int (mword_of_int (FW + 0x56) : mword 64) 2
@@ -4368,10 +5290,10 @@ Section ProofFilewrite.
                  assert (HL7s8 : L7 !!! Regidx Rs8 = (mword_of_int 1 : mword 64))
                    by (rewrite /L7; apply upd_eq).
                  assert (HL7s9 : L7 !!! Regidx Rs9
-                                 = (mword_of_int SpecFilewrite.FW_MAX : mword 64))
+                                 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64))
                    by (rewrite /L7 upd_ne; [exact HL6s9 | vm_compute; discriminate]).
                  assert (HL7s7 : L7 !!! Regidx Rs7
-                                 = (mword_of_int SpecFilewrite.FW_MAX : mword 64)).
+                                 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
                  { rewrite /L7 upd_ne; [| vm_compute; discriminate].
                    rewrite /L6 upd_ne; [| vm_compute; discriminate].
                    rewrite /L5 upd_ne; [| vm_compute; discriminate].
@@ -4477,8 +5399,6 @@ Section ProofFilewrite.
                  { destruct (Z.le_gt_cases n 0) as [Hle | Hgt]; [| exact Hgt].
                    exfalso. rewrite (proj2 (Z.geb_le 0 n) Hle) in Hz0. discriminate. }
                  iPoseProof (fw_env_fs _ _ st Cf inumx _ Hok Htyi with "Henv") as "Henv".
-                 (* the process's leave to move the offset's shadow, off the row *)
-                 iDestruct (foff_permit_row_inode _ _ _ _ Hok Htyi with "Hprow") as "#Hperm".
                  iEval (rewrite /filewrite_fs_env) in "Henv".
                  (* 25 conjuncts, not 31: the six per-inode fields (the two
                     slot facts, the two point geometry facts, the share and
@@ -4499,27 +5419,21 @@ Section ProofFilewrite.
                     One transport, exactly as the -1 exit does before [Hcont]. *)
                  iDestruct (cpu_own_transport CID CID28 0%nat eb pj b
                               ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-                 (* THE LOOP TAKES THE STATE, NOT THE CONTENT.  Both facts it
-                    used to be handed -- the type and the write mode -- are
-                    read off [st] here and re-derived from [fdstate_ok] inside
-                    the loop, so the reference crosses packed. *)
-                 destruct (fdstate_ok_inode inumx γox Cf st Hok Htyi)
-                   as (rx & wx & Hstx).
-                 assert (Hwx : wx = true).
-                 { destruct (fdstate_ok_rw inumx γox Cf rx wx
-                               (FdInode (bv_unsigned inumx) γox)
-                               ltac:(rewrite -Hstx; exact Hok)) as [_ Hwrc].
-                   destruct wx; [reflexivity|]. exfalso.
-                   rewrite /fc_wbool Hwrc in Hwb. by vm_compute in Hwb. }
-                 subst wx.
+                 (* THE LOOP TAKES THE STATE, NOT THE CONTENT: the type and
+                    the write mode come off [st] (hoisted above the zero-trip
+                    split) and are re-derived from [fdstate_ok] inside the
+                    loop, so the reference crosses packed.  It also takes the
+                    caller's CHAIN, at the entry state of [fw_au_raw]. *)
                  iApply (fw_loop (CID0 := CID28) γf γs j γlp k q st rx
                            (bv_unsigned inumx) γox fn pidv U
-                           m K eb n b sp0 w12 pj lks
+                           m K eb n b sp0 w12 pj lks Q
                            HK Hk Hj Hgs Hlens Hfnj Hfnps Hn01 Heb Hstx Hspm
                            ltac:(reflexivity)
                            E1 E2 E3 E4 E5 E6
-                           (Z.to_nat n) 0%Z (pv_upt (us_V U)) L7
+                           (Z.to_nat n) 0%Z 0%Z 0%nat (pv_upt (us_V U)) L7
                            ltac:(rewrite (Z2Nat.id n Hn0); lia)
+                           ltac:(lia)
+                           ltac:(lia)
                            ltac:(lia)
                            ltac:(apply uptd_ext_sz_refl)
                            HL7sp HL7s2 HL7s4 HL7s5 HL7s6 HL7s7 HL7s8 HL7s9
@@ -4531,21 +5445,33 @@ Section ProofFilewrite.
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv
                                  E8 E9 E10 E11 E12 E13 E14 E26 E15 E16 E17
-                                 E22 E23 E24 E21 Hperm Hstepw [E18 E19 E20 E25]").
+                                 E22 E23 E24 E21 [E18 E19 E20 E25] [Hfin]").
                  { rewrite /file_ref /file_fields. iExists Cf.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                  { rewrite HVid. iExact "Hpriv". }
                  { rewrite /filewrite_fs_out.
                    iFrame "E18 E19 E20 E25". }
+                 { (* the chain, at the loop's entry state *)
+                   iApply fw_au_raw_init.
+                   iApply (filewrite_in_inode fn rx (bv_unsigned inumx) γox n
+                             (us_M U) uaddr Q tr0 with "[Hfin]").
+                   rewrite Hstx. iExact "Hfin". }
                  iIntros (CIDx Hsx mf rv P')
-                   "%Hcs %Hup %Hret %Hra Hcg Hcnt Hpc Href Hpriv Henvo".
+                   "%Hcs %Hup %Hra Hcg Hcnt Hpc Href Hpriv Henvo Harms".
                  iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; wp_next_chain|].
                  iApply ("Hcont" $! mf rv P'
-                           with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv Henvo").
+                           with "[%] [%] [%] Hcg Hcnt Hpc Href Hpriv Henvo
+                                 [Harms]").
                  { exact Hcs. }
                  { exact Hup. }
-                 { exact Hret. }
-                 { exact Hra. } }
+                 { exact Hra. }
+                 { (* the loop hands back [write_arms_at]; the contract's
+                      post is that under the landed blanket, which each arm
+                      implies ([write_arms_at_ret] -- an [as %] destruct, so
+                      the arms themselves survive it). *)
+                   iDestruct (write_arms_at_ret with "Harms") as "%Hret".
+                   rewrite /filewrite_arms. iSplitR; [by iPureIntro |].
+                   rewrite Hstx. by iApply filewrite_extra_inode. } }
           -- (* ==================== THE ELSE ARM ======================
                 Neither pipe, nor device, nor inode: [panic("filewrite")]
                 at +0x11e, and [fw_panic] is the whole block from +0x10a. *)

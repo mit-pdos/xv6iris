@@ -1381,6 +1381,7 @@ SpecConsolewrite.v
 ProofConsolewrite.v
 LinkConsolewrite.v
 ProofFilewriteParts.v
+ProofFilewriteChain.v
 ProofFilewrite.v
 LinkFilewrite.v
 ProcdumpAux.v
@@ -1549,7 +1550,6 @@ FsInitPin.v
 SpecSysOpenAU.v
 FsAbsStart.v
 SpecSysDupAU.v
-SpecSysWriteConsAU.v
 
 # fs-syscall-specs lane Y: sys_sync's durability receipt.
 # FsFlushedCore builds [flushed b D] out of the crash record's mono-list
@@ -1612,10 +1612,6 @@ ProofSysOpenAUEntryC.v
 ProofSysOpenAUFull.v
 LinkSysOpenAUFull.v
 FsAbsWriteFire.v
-SpecSysWriteAUEra.v
-SpecFilewriteAU.v
-ProofSysWriteAU.v
-ProofSysWriteAUStable.v
 # fs-syscall-specs, THE CONSOLE-WRITE LANE: init.c's printf path, and the
 # campaign's last device-side gap on init.  The observable is ACCEPTANCE --
 # the bytes reached the UART transmitter, in order, after a seed the caller
@@ -1641,8 +1637,6 @@ LinkUartwriteLoc.v
 SpecConsolewriteLoc.v
 ProofConsolewriteLoc.v
 LinkConsolewriteLoc.v
-SpecFilewriteCons.v
-ProofSysWriteConsAU.v
 
 # The era-0 SHELL pins: FsInitPin's /init pair (path pin, content pin,
 # arun walk) and FsInitPinBoot's boot transport, replayed at inum 13 with
@@ -1652,9 +1646,6 @@ ProofSysWriteConsAU.v
 # so only its own two dinode vm_eq's compute.
 FsShPin.v
 AppEcho.v
-ProofFilewriteCons.v
-LinkFilewriteCons.v
-LinkSysWriteConsAU.v
 SpecKexecPin.v
 # exec's ATOMIC-UPDATE contract: the walk, one observation of the file, and
 # the caller's own u-mode WP for the program observed (SpecKexecAU.v's header).
@@ -1686,10 +1677,6 @@ ProofSysExecAU.v
 # Link files below make SYSWRITE_AU_ERA (and its stable corollary) an
 # unconditional theorem, WITHOUT LinkConsolewrite's Axiom -- the device arm
 # is refuted by the contract's premise rather than walked.
-ProofFilewriteAU.v
-LinkFilewriteAU.v
-LinkSysWriteAU.v
-LinkSysWriteAUStable.v
 # THE READ SEAL, CLOSED END TO END (lane W, SYSREAD_AU_AT).
 #   SpecFilereadAU is SpecFileread's body with the descriptor pinned to
 # [FdOpen true wb (FdInode i)] and the armed post in place of the return

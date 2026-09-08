@@ -47,7 +47,6 @@ Require Import LinkSysMknodAU LinkSysOpenAUFull LinkSysUnlinkAU.
 (* ...and the WRITE's (round E2, lane E2-W, ruling Q-e W1): the dispatch
    runs the AU write on an open, writable INODE descriptor and the landed
    contract on every other one, so both are on the functor's list. *)
-Require Import LinkSysWriteAU.
 (* ...and exec's AU contract (lane E2/E3b): the exec arm runs on it, the
    caller always offering the process's bundle.  [LinkSysExec] stays a
    linked proof of the landed contract, no longer on this functor's
@@ -60,6 +59,6 @@ Require Import LinkMyproc LinkPrintk.
 Module Syscall :=
   SyscallProof SysFork SysExit SysWait SysPipe SysRead SysKill
                SysExecAU SysFstat SysChdirAU SysDup SysGetpid SysSbrk
-               SysPause SysUptime SysWrite SysWriteAU SysMknodAU SysLink SysMkdir
+               SysPause SysUptime SysWrite SysMknodAU SysLink SysMkdir
                SysClose SysSync SysOpenAUFull SysUnlinkAU
                Myproc PrintkGen.

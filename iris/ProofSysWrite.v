@@ -331,9 +331,11 @@ Section ProofSysWrite.
   Lemma wp_sys_write_sconf
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names) (pidv : mword 32) (U : ustate) (sts : list fdstate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_sys_write_sconf_body γf γs j γlp fn pidv U sts v v2 m av eb b lks.
+      (Q : nat -> iProp Σ) (tr0 : list (bv 8))
+    : wp_sys_write_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks
+        Q tr0.
   Proof.
     cbv beta delta [wp_sys_write_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Hfj Hfprocs
@@ -352,7 +354,6 @@ Section ProofSysWrite.
        a power (durable-notes.md). *)
     assert (Hnoff : (Z.of_nat 0 + 1 < 2 ^ 31)%Z)
       by (change (2 ^ 31)%Z with 2147483648%Z; lia).
-    destruct Harg1 as [v1 Harg1].
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).
@@ -362,7 +363,7 @@ Section ProofSysWrite.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): filewrite
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hcaps #Htbl #Hastep Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hcaps #Htbl Hswin Hcont".
     (* THE DEVICE COLUMN, PROJECTED out of the console table.  The CAPS are
        separate -- consolewrite drives the UART, so they are [dev_inv] and
        the tx lock, both from [printk_env] -- and both halves are persistent,
@@ -817,13 +818,16 @@ Section ProofSysWrite.
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
-                with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv]").
+                with "[%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv] []").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
-      { left. split; [reflexivity | exact Hnone]. }
       { exact Hmfa0. }
       { rewrite us_upt_id. iExact "Hpriv". }
       { iApply (filewrite_fs_env_out with "Henv"). }
+      { (* ARGFD ANSWERED NONE: the key is [FdClosed], so nothing is armed
+           and the post is the landed blanket's first disjunct. *)
+        iApply (sys_write_arms_none (us_V U) v sts (sys_rw_count v2) (us_M U)
+                  v1 Q tr0 _ Hnone eq_refl). }
     - (* ================= SUCCESS: the descriptor resolved ============= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & _ & Hfcell)".
       pose proof (arg_fd_lookup v (pv_ofile (us_V U)) fd fv Hsome)
@@ -934,6 +938,11 @@ Section ProofSysWrite.
       assert (HS4ra : S4 !!! Regidx Rra
                       = add_vec_int (mword_of_int (KernelSyms.sys_write + 0x3c) : mword 64) 4)
         by (rewrite /S4 upd_eq; reflexivity).
+      (* THE USER SOURCE (RULING A): a1 still holds the word argaddr(1)
+         fetched, and filewrite hands it down untouched. *)
+      assert (HS4a1 : S4 !!! Regidx Ra1 = v1).
+      { rewrite /S4 upd_ne; [| reg_neq]. rewrite /S3 upd_ne; [| reg_neq].
+        rewrite /S2 upd_eq. reflexivity. }
       assert (HS4a0 : S4 !!! Regidx Ra0 = fv).
       { rewrite /S4 upd_ne; [| reg_neq]. rewrite /S3 upd_eq. reflexivity. }
       assert (HS4a2 : S4 !!! Regidx Ra2 = (mword_of_int (sys_rw_count v2) : mword 64))
@@ -962,13 +971,18 @@ Section ProofSysWrite.
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filewrite.wp_filewrite_sconf γf γs j γlp kk qq stf fn pidv U
-                S4 (av - 6)%nat eb (sys_rw_count v2) b lks
+                S4 (av - 6)%nat eb (sys_rw_count v2) b lks Q tr0
                 ltac:(lia) Hkk Hj Hgs Hlens
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
-                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hprow Hastep").
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hprow [Hswin]").
       all: try lkbelow.
+      { (* THE CALLER'S INPUT, at the descriptor argfd resolved: the key
+           this contract's arms are stated on IS the row the loan named. *)
+        rewrite HS4a1.
+        iApply (sys_write_in_of fn (us_V U) v sts fd fv stf (sys_rw_count v2)
+                  (us_M U) v1 Q tr0 Hsome Hstq with "Hswin"). }
       iIntros (CID25 Hs25 mf rv P')
-        "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
+        "%Hcsf %Hupt %Hrva Hcg Hcpu Hpc Href Hcore Hfout Harms".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
@@ -1016,11 +1030,17 @@ Section ProofSysWrite.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P'
-                with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv").
+                with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv
+                      [Harms]").
       { exact Hcsg. }
       { exact Hupt. }
-      { right. exists fd, fv. split; [exact Hsome | exact Hrvok]. }
       { exact Hmga0. }
+      { (* the callee's arms ARE this contract's, at the same key: sys_write
+           relays filewrite's return value untouched. *)
+        rewrite -HS4a1.
+        iApply (sys_write_arms_of (us_V U) v sts fd fv stf (sys_rw_count v2)
+                  (us_M U) (S4 !!! Regidx Ra1) Q tr0 rv Hsome Hstq
+                  with "Harms"). }
   Qed.
 
 End ProofSysWrite.
