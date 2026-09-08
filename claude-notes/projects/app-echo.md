@@ -804,7 +804,18 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   open's receipts matter).  Read's and write's returned posts drop the pure
   blanket (it reads `pv_ofile V`; the round carries `usys_*`).  Order:
   (ii) `Happ_sup` + the re-based tower → (i) the instance at the nine
-  bundles → (iii) `ut_sys_out` as a post row → B2.
+  bundles → (iii) `ut_sys_out` as a post row → B2.  The CREDENTIAL HALF
+  LANDED (`84af6179e`): `AppInv.app_sup` (raw and pinned, `app_step_of_sup`),
+  `Happ_sup` on the two adequacy theorems and `xv6_app_adequacy` at the
+  raw record, discharged trivially at `app_triv`; `boot_shared_alloc` takes
+  it at the literal record and returns it at the era's `fileG` (the one
+  place the record is a literal — the boot hart's chain runs at the
+  existential `fileG`, so the credential cannot be handed to it directly);
+  threaded to the userinit mint, through the park package and forkret to
+  the closed loop's Löb, and to the fork mint as a conjunct of
+  `SyscParkEnv.park_world` (no syscall contract changed).  `xv6_ssupply :=
+  app_sup`; `udep_gen`/`uslot_mint` take it.  Headers: no supply field on
+  `UEXEC_GEN`; why `Happ_sup` is not the GAP trap.
 
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
