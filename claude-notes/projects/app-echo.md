@@ -334,11 +334,30 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   families are gone; the dispatcher's input is
   `FsAbsInvFire.fsabs_sys_write_in` at the trivial cursor (still paying
   each node's `app_step` from the license — that leaves with the license).
-  Follow-up in flight: the dead `foff_permit_row` premise and the stale
-  source comments naming the deleted forms.  §(iv) item 2 is thereby
-  resolved.  Next lanes cut from the same mold: read (×3 → 1), mknod
+  Follow-up landed (`1d85aa28b`): filewrite's dead `foff_permit_row`
+  premise removed; no comment in `iris/*.v` names a folded write form.
+  §(iv) item 2 is resolved.  Loose end for a small lane (CONS-FOLD):
+  consolewrite itself has two forms (`SpecConsolewrite` plain,
+  `SpecConsolewriteLoc` located); the located one is the general (a seed
+  premise and a receipt) and the write cone now uses only it, so
+  `LinkConsolewrite.v` is dead — fold the plain form into the located
+  one and delete the link.  Next lanes cut from the same mold: read (×3 → 1), mknod
   (×3 → 1), open/unlink/chdir/dup/exec (×2 → 1), create (×4 → 1), sync
   (×2 → 1); then the one-shot pieces gain `∧ R`; then the arm change.
+
+- ~~**READ-UNIFY**~~ LANDED 2026-09-08 (Opus lane, two phases; 7 files
+  deleted, +931/−4579).  sys_read has ONE spec: `FILEREAD`/`SYSREAD` keep
+  their frames and take `Φ` (the observation receipt) and `R` (the refund);
+  the inode arm's input is `aread_commit_at … Φ ∧ R` — the first piece
+  stated in the `AU ∧ R` shape — and the `n < 0` guard, the one arm that
+  does not fire, returns that conjunction; every other descriptor kind gets
+  the landed blanket only.  The descriptor-state key `sys_fd_st` is shared
+  with write (`SpecArgfd.v`).  Read's arms live beside its commit in
+  `FsAbsReadFire.v`; `SpecSysReadAU.v` is the pure vocabulary leaf (its
+  name and `SpecSysWriteAU.v`'s are a later rename).  `foff_permit_row`
+  and its three lemmas are deleted: both fileread and filewrite move the
+  offset shadow inside the piece.  The console READ arm is where the input
+  tag (L5) will land; untouched here.
 
 ## Decisions outstanding after the 2026-09-07 rulings
 
