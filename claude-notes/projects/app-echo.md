@@ -370,7 +370,7 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   (no consumer), the astate-shaped commits and their three prose-only
   bridges.  `SpecSysMknodAU.v` is a 135-line pure leaf.
 
-- **PATH-UNIFY** (Opus lane, 2026-09-08, one syscall at a time):
+- ~~**PATH-UNIFY**~~ LANDED 2026-09-08 (Opus lane, one syscall at a time):
   ~~OPEN~~ LANDED — one `SYSOPEN`/`wp_sys_open` keyed on `om_create vom`
   (`open_in`/`open_arms` are an `if` over the two landed arm families);
   the blanket `sys_open_post` is DERIVED (`open_arms_landed`) because it
@@ -387,7 +387,14 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   the proof layer's byte-identical twin `su_au_closer` retired),
   `LinkSysUnlink.v`.  `ProofSysUnlinkAU.v` keeps its name because
   `ProofSysUnlink.v` is the pure layer below it (hygiene backlog).
-  CHDIR: in flight.
+  ~~CHDIR~~ LANDED — the AU form IS the contract (`SYSCHDIR`/
+  `wp_sys_chdir`, blanket derived by `chdir_arms_landed`);
+  `SpecSysChdirAU.v` folded whole (chdir mints no vocabulary: its pieces
+  are the open leaf's); the duplicate 2402-line plain walk deleted and the
+  era walk takes `ProofSysChdir.v`'s name; one `LinkSysChdir.v`; the
+  friendly packaging in `FsSyscalls.v` §4 runs over the one contract with
+  `fsabs_chdir_pre` (a bare `⊢`) and the bridge, needing nothing more.
+  Lane total: 6 files deleted, about 4300 lines net removed.
 
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
