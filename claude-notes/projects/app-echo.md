@@ -359,6 +359,27 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   offset shadow inside the piece.  The console READ arm is where the input
   tag (L5) will land; untouched here.
 
+- ~~**MKNOD-UNIFY**~~ LANDED 2026-09-08 (Opus lane, two phases; net about
+  740 lines removed).  sys_mknod has ONE contract in `SpecSysMknod.v`:
+  the frame, `mknod_au_pre` (walk ∗ create commit ∗ exists observation ∗
+  the child's two legs), `mknod_arms`, the blanket as the derived
+  `mknod_arms_ret`, `SYSMKNOD`.  `ProofSysMknod.v` seals it against six
+  callees (the dead plain `Create` argument is off) and derives the stable
+  form as the lemma `wp_sys_mknod_stable_of`; `LinkSysMknod.v` links it.
+  Gone: the era/stable parallel forms and their links, the plain frame
+  (no consumer), the astate-shaped commits and their three prose-only
+  bridges.  `SpecSysMknodAU.v` is a 135-line pure leaf.
+
+- **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
+  syscall folds; not a lane by itself): (a) the vocabulary leaves keep
+  their old names although no AU is left in them — `SpecSysWriteAU.v`,
+  `SpecSysReadAU.v`, `SpecSysMknodAU.v` (18 requiring files) — rename to
+  what they hold; (b) `FsAbsMknodFire.mknod_walk_pre_era` /
+  `mknod_walk_dead_era` are the nameiparent family's walk premise (open,
+  unlink, create, mknod all consume them) — the misleading half is the
+  `mknod_` prefix, rename family-wide; (c) consolewrite's two forms
+  (CONS-FOLD, above).
+
 ## Decisions outstanding after the 2026-09-07 rulings
 
 For L2-a: only D-B (which syscalls in the first cut; the inventory is
