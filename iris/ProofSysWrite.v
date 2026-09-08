@@ -350,6 +350,13 @@ Section ProofSysWrite.
        durable-notes' divergence trap. *)
     assert (Hnrange : - 2 ^ 31 <= sys_rw_count v2 < 2 ^ 31)
       by apply sys_rw_count_range.
+    (* THE DEVSW PIN, which left filewrite's caller-supplied input for its
+       Coq premise list (the piece-shape rule's corollary at the console
+       arm): the record's write column IS the console table's, read at
+       CONSOLE.  NAMED, not an inline [ltac:] in argument position. *)
+    assert (Hconw : fwn_wp fn ConsoleInv.CONSOLE
+                    = (mword_of_int KernelSyms.consolewrite : mword 64))
+      by (rewrite Hwp; exact ConsoleInv.devsw_write_val_console).
     (* the push_off bound, with [2^31] evaluated by hand: [lia] cannot reduce
        a power (durable-notes.md). *)
     assert (Hnoff : (Z.of_nat 0 + 1 < 2 ^ 31)%Z)
@@ -972,13 +979,13 @@ Section ProofSysWrite.
       iApply (Filewrite.wp_filewrite_sconf γf γs j γlp kk qq stf fn pidv U
                 S4 (av - 6)%nat eb (sys_rw_count v2) b lks Q tr0
                 ltac:(lia) Hkk Hj Hgs Hlens
-                Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
-                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv [Hswin]").
+                Hfj Hfprocs Hconw HS4a0' HS4a2 Hnrange Heb
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hrow [Hswin]").
       all: try lkbelow.
       { (* THE CALLER'S INPUT, at the descriptor argfd resolved: the key
            this contract's arms are stated on IS the row the loan named. *)
         rewrite HS4a1.
-        iApply (sys_write_in_of fn (us_V U) v sts fd fv stf (sys_rw_count v2)
+        iApply (sys_write_in_of (us_V U) v sts fd fv stf (sys_rw_count v2)
                   (us_M U) v1 Q tr0 Hsome Hstq with "Hswin"). }
       iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrva Hcg Hcpu Hpc Href Hcore Hfout Harms".

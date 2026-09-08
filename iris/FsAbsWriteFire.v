@@ -37,10 +37,12 @@
 
    ==== THE OFFSET FOLD, AND WHY THE BUNDLE BECAME A CHAIN ==============
 
-   Every commit moves the ONE half of the descriptor's offset shadow the
-   client owns ([off_gv γo ½]): in at the chunk's offset, out advanced by
-   the chunk.  So the client cannot pre-build [wchunks n] independent
-   commits -- each would have to own the half -- and the bundle is a CHAIN
+   Every commit LENDS the ONE half of the descriptor's offset shadow the
+   kernel owns ([off_gv γo ½]): in at the chunk's offset, out at the SAME
+   offset (the piece-shape rule -- the fire lemma does the advance, out of
+   the row's [off_user_inv]).  So the client cannot pre-build [wchunks n]
+   independent commits -- each would have to hold the half -- and the
+   bundle is a CHAIN
    ([awrite_chain]): one node at a time, each node the PREFIX CURSOR [Q k]
    beside an [∧] of the FULL arm ([awrite_full_at], whose phase 2 returns
    the rest of the chain) and the PARTIAL arm ([awrite_part_at]: a SHORT
@@ -49,9 +51,9 @@
    The kernel picks the arm; the partial arm ends the loop, so it is spent
    at most once.  The caller reads the cursor off at the stop position
    ([awrite_chain_cursor]).
-   Satisfiability is [awrite_chain_unit] (a client holding its half) and
-   [FsAbsInvFire.fsabs_awrite_chain] (a client holding only the existential
-   invariant).
+   Satisfiability is [awrite_chain_unit] / [FsAbsInvFire.fsabs_awrite_chain]:
+   a client holding NOTHING but the application's step, since the shadow
+   comes back unmoved.
 
    ==== THE FIRE POINT: ONE PER CHUNK, AT THAT CHUNK'S RETAG =============
 
@@ -540,9 +542,14 @@ Section WriteFire.
      READING alone -- AND WITH THE OFFSET FOLDED IN (OffGv.v).  The kernel
      lends its half of the descriptor's offset shadow at the offset the chunk
      was written at (the box ties the half to [f->off]) and takes it back at
-     phase 2 advanced by the chunk's length: the bytes and the offset move in
-     the one fupd, inside [ip->lock], at the row's retag.  [REST] is what the
-     client hands back at phase 2 -- the rest of the chain, below.
+     phase 2 UNMOVED: the bytes and the offset are observed in the one fupd,
+     inside [ip->lock], at the row's retag, and [wrf_awrite_fire] does the
+     ADVANCE afterwards.  THE PIECE-SHAPE RULE
+     (design/fs-syscall-specs.md section 4): a piece may not ask the client to
+     return a kernel-owned ghost moved, because after the ARM the client is
+     an arbitrary user process holding no [off_user_inv] at an arbitrary key.
+     [REST] is what the client hands back at phase 2 -- the rest of the
+     chain, below.
 
      THE PER-CHUNK BUFFER TIE IS PHASE 1'S.  Every chunk
      that reaches node [k] was FULL (a short one ends filewrite's loop), so
@@ -572,7 +579,7 @@ Section WriteFire.
             ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
             ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
             ghost_map_auth (γtop Γ) (1/2) I' ∗
-            off_gv γo (1/2) (Z.of_nat (off + length bs)) ∗
+            off_gv γo (1/2) (Z.of_nat off) ∗
             REST))%I.
 
   (* THE PARTIAL-CHUNK COMMIT (round E2, lane E2-W; ruling Q-i).  It used
@@ -586,9 +593,10 @@ Section WriteFire.
 
      So this is [awrite_full_at]'s two phases at a run the KERNEL picks --
      NON-DETERMINISTIC in the bytes, which is exactly what makes the clause
-     statable -- with two things the full arm does not have: the offset
-     comes out advanced by [r], the count writei RETURNED, which may be
-     strictly less than the run that landed; and ONLY THE COUNTED PREFIX is
+     statable -- with two things the full arm does not have: the KERNEL
+     advances the offset by [r], the count writei RETURNED, which may be
+     strictly less than the run that landed ([wrf_apart_fire]); and ONLY
+     THE COUNTED PREFIX is
      the caller's ([take r bs]), the rest of [bs] being writei's disturbed
      tail, which no [ubytes_at] can claim. *)
   Definition awrite_part_at Γ (E : coPset) (i : Z) (γo : gname)
@@ -606,7 +614,7 @@ Section WriteFire.
             ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
             ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
             ghost_map_auth (γtop Γ) (1/2) I' ∗
-            off_gv γo (1/2) (Z.of_nat (off + r)) ∗
+            off_gv γo (1/2) (Z.of_nat off) ∗
             REST))%I.
 
   (* THE CHAIN, AT A PREFIX CURSOR.  A bundle of
@@ -664,39 +672,33 @@ Section WriteFire.
     - rewrite awrite_chain_S. iIntros "[$ _]".
   Qed.
 
-  (* satisfiability: a client holding its half of the shadow, at ANY value
-     (agreement inside each fupd pins it to the kernel's), builds the
-     TRIVIAL-CURSOR chain of any length -- the seal cannot be vacuously
-     blocked on the caller's side.  [FsAbsInvFire.fsabs_awrite_chain] is
-     the same for a client that owns the half only through the existential
-     invariant. *)
+  (* satisfiability, WITHOUT A SHADOW OF THE CLIENT'S: every node returns
+     the borrow unmoved, so the TRIVIAL-CURSOR chain of any length costs
+     its client nothing but the application's step -- the seal cannot be
+     vacuously blocked on the caller's side, and the chain is payable at
+     every key.  [FsAbsInvFire.fsabs_awrite_chain] is the same lemma at the
+     live Γ's dischargers. *)
   (* ...at the live Γ, since the full arm owes the caller's step, paid here
      out of the parked license ([AppInv.app_step_acc]) *)
-  Lemma awrite_chain_unit (γfs : fs_names) E i γo M ua (z : Z) k cnt :
+  Lemma awrite_chain_unit (γfs : fs_names) E i γo M ua k cnt :
     ↑appN ⊆ E ->
-    app_inv γfs -∗ off_gv γo (1/2) z -∗
+    app_inv γfs -∗
     awrite_chain (fs_gamma_L γfs) E i γo M ua (fun _ => True%I) k cnt.
   Proof.
-    intros HE. revert k z. induction cnt as [| cnt IH]; intros k z.
-    { rewrite awrite_chain_0. by iIntros "_ _". }
-    rewrite awrite_chain_S. iIntros "#Hai Hu". iSplit; [done |]. iSplit.
+    intros HE. revert k. induction cnt as [| cnt IH]; intros k.
+    { rewrite awrite_chain_0. by iIntros "_". }
+    rewrite awrite_chain_S. iIntros "#Hai". iSplit; [done |]. iSplit.
     - rewrite /awrite_full_at. iIntros (I off bs bs0 nl) "%Hpre %Hby Ha Hk".
-      iDestruct (off_gv_agree with "Hk Hu") as %<-.
-      iMod (off_gv_update_halves (Z.of_nat (off + length bs)) with "Hk Hu")
-        as "[Hk Hu]".
       iMod (app_step_acc_view E γfs i I _ HE
               (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
       iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
-      iFrame "Ha' Hk". iApply (IH with "Hai Hu").
+      iFrame "Ha' Hk". iApply (IH with "Hai").
     - rewrite /awrite_part_at.
       iIntros (I off r bs bs0 nl) "%Hpre %Hr %Hgap %Hby Ha Hk".
-      iDestruct (off_gv_agree with "Hk Hu") as %<-.
-      iMod (off_gv_update_halves (Z.of_nat (off + r)) with "Hk Hu")
-        as "[Hk Hu]".
       iMod (app_step_acc_view E γfs i I _ HE
               (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
       iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
-      iFrame "Ha' Hk". iApply (IH with "Hai Hu").
+      iFrame "Ha' Hk". iApply (IH with "Hai").
   Qed.
 
   (* =================================================================== *)
@@ -707,7 +709,11 @@ Section WriteFire.
      after writei returns: same [inode_local] premise, same payout (the
      moved fragment), plus the caller's two phases inside the one [ftopN]
      critical section, AND the offset's half in at the chunk's offset and
-     out advanced by its length.  The receipt's pre-state row is the
+     out ADVANCED BY THIS LEMMA -- the client returns it unmoved (the
+     piece-shape rule) and the advance comes off the descriptor row's own
+     existential invariant ([OffGv.off_user_inv], persistent, carried by
+     [FdSlots.foff_row] and threaded down from sys_write's descriptor
+     bundle).  The receipt's pre-state row is the
      OBSERVED one -- the fragment read is the one the fire retags, so
      nothing can move between the observation and the update. *)
   Lemma wrf_awrite_fire (γfs : fs_names) (E : coPset) (i : Z) (γo : gname)
@@ -723,7 +729,7 @@ Section WriteFire.
     fn_type n' <> 0 ->
     abs_row n' = MkAnode (AFile (blk_splice off bs bs0)) nl ->
     ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k)) bs ->
-    ftop_inv γfs -∗ app_inv γfs -∗
+    ftop_inv γfs -∗ app_inv γfs -∗ off_user_inv γo -∗
     awrite_full_at (fs_gamma_L γfs) appE i γo M ua k REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗
@@ -732,7 +738,9 @@ Section WriteFire.
       ∗ REST.
   Proof.
     intros HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs' Hby.
-    iIntros "#Hi #Hai Hcm Hf Hg".
+    iIntros "#Hi #Hai #Hoinv Hcm Hf Hg".
+    assert (Hfoff : ↑foffN ⊆ E).
+    { etrans; [| exact HE]. rewrite /foffN /appN. solve_ndisj. }
     (* the re-spelling [mkf_acre_fire] does, and for the same reason: the
        unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag /fs_gamma_L /=.
@@ -774,6 +782,10 @@ Section WriteFire.
       - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl jj mm Hj Hun). }
+    (* THE ADVANCE IS THE KERNEL'S: the process's half comes out of the
+       row's existential invariant and both halves move together. *)
+    iMod (off_user_inv_move E γo (Z.of_nat off) (Z.of_nat (off + length bs))
+            Hfoff with "Hoinv Hg") as "Hg".
     iModIntro. iFrame "Hf Hg Hrest".
   Qed.
 
@@ -799,7 +811,7 @@ Section WriteFire.
     fn_type n' <> 0 ->
     abs_row n' = MkAnode (AFile (blk_splice off bs bs0)) nl ->
     ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k)) (take r bs) ->
-    ftop_inv γfs -∗ app_inv γfs -∗
+    ftop_inv γfs -∗ app_inv γfs -∗ off_user_inv γo -∗
     awrite_part_at (fs_gamma_L γfs) appE i γo M ua k REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗
@@ -808,7 +820,9 @@ Section WriteFire.
       ∗ REST.
   Proof.
     intros HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs' Hby.
-    iIntros "#Hi #Hai Hcm Hf Hg".
+    iIntros "#Hi #Hai #Hoinv Hcm Hf Hg".
+    assert (Hfoff : ↑foffN ⊆ E).
+    { etrans; [| exact HE]. rewrite /foffN /appN. solve_ndisj. }
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -842,6 +856,9 @@ Section WriteFire.
       - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl jj mm Hj Hun). }
+    (* THE ADVANCE IS THE KERNEL'S, at the COUNT writei returned. *)
+    iMod (off_user_inv_move E γo (Z.of_nat off) (Z.of_nat (off + r))
+            Hfoff with "Hoinv Hg") as "Hg".
     iModIntro. iFrame "Hf Hg Hrest".
   Qed.
 

@@ -20,13 +20,14 @@
      minted at sys_open's publish from the returned half, and being
      persistent it is copied for free to a forked child (whose table IS
      the parent's).  A closed descriptor's invariant is dead and harmless.
-   - [off_permit γo]: the CLIENT OBLIGATION the file layer's landed specs
-     take -- "the process lets the kernel move the offset to any value" --
-     derived from the invariant by [off_user_inv_permit].  It is the
-     receipt-free stub of the AU-side commit that will replace it: the
-     fs AU fupd, fired at the same instant inside [ip->lock], will lend
-     the kernel half and return it advanced by the count, with a receipt
-     tying bytes and offset.  Nothing in this file is that commit.
+   - [off_permit γo]: the receipt-free CLIENT OBLIGATION -- "the process
+     lets the kernel move the offset to any value" -- derived from the
+     invariant by [off_user_inv_permit].  fileread and filewrite do not
+     take it: their fs AU commits LEND the kernel half at the offset the
+     transfer used and take it back UNMOVED (a piece may not ask a client
+     to move a kernel-owned ghost, design/fs-syscall-specs.md section 4),
+     and the fire lemma then advances it against the invariant above,
+     which those contracts take as [FdSlots.foff_row].
 
    PINNED CLASS.  [ghost_varG Σ Z] has a second member in [xv6G] ([uioG]'s
    break ghost), so every statement about the shadow goes through [off_gv],

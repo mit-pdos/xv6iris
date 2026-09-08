@@ -171,10 +171,13 @@ Section SpecSysWrite.
      Both are [SpecFilewrite]'s, at the key above: the callee's arms ARE
      this caller's arms, because sys_write relays filewrite's return value
      untouched.  So there is one match in the tree, not two. *)
-  Definition sys_write_in (fn : fwrite_names) (V : pprivate) (v : mword 64)
+  (* IT NAMES NO KERNEL GHOST RECORD (the ARM): the devsw pin left the
+     input for the Coq premise list, so this input is a proposition an
+     arbitrary user process can state at its own key. *)
+  Definition sys_write_in (V : pprivate) (v : mword 64)
       (sts : list fdstate) (n : Z) (M : gmap Z (bv 8)) (ua : mword 64)
       (Q : nat -> iProp Σ) (tr0 : list (bv 8)) : iProp Σ :=
-    filewrite_in fn (sys_fd_st v (pv_ofile V) sts) n M ua Q tr0.
+    filewrite_in (sys_fd_st v (pv_ofile V) sts) n M ua Q tr0.
 
   (* the LANDED return clause, verbatim, plus the arm's extra.  Stating the
      blanket unconditionally is what makes "the unified contract implies the
@@ -204,13 +207,13 @@ Section SpecSysWrite.
     iSplitR; [| done]. iPureIntro. left. split; [exact Hr | exact Hnone].
   Qed.
 
-  Lemma sys_write_in_of (fn : fwrite_names) (V : pprivate) (v : mword 64)
+  Lemma sys_write_in_of (V : pprivate) (v : mword 64)
       (sts : list fdstate) (fd : nat) (fv : mword 64) (st : fdstate)
       (n : Z) (M : gmap Z (bv 8)) (ua : mword 64)
       (Q : nat -> iProp Σ) (tr0 : list (bv 8)) :
     arg_fd v (pv_ofile V) = Some (fd, fv) ->
     sts !! fd = Some st ->
-    sys_write_in fn V v sts n M ua Q tr0 -∗ filewrite_in fn st n M ua Q tr0.
+    sys_write_in V v sts n M ua Q tr0 -∗ filewrite_in st n M ua Q tr0.
   Proof.
     intros Hsome Hst. rewrite /sys_write_in /sys_fd_st Hsome Hst /=.
     by iIntros "$".
@@ -304,11 +307,13 @@ Definition wp_sys_write_sconf_body
   (* ---- THE CALLER'S INPUT, KEYED ON THE DESCRIPTOR ARGUMENT 0 NAMES
      ([sys_write_in], which is [SpecFilewrite.filewrite_in] at
      [sys_fd_st]): the commit chain on an open writable inode, the trace
-     seed and the devsw pin on the console, [emp] everywhere else.  THE
+     seed on the console, [emp] everywhere else -- and NOTHING NAMING A
+     KERNEL GHOST RECORD, the devsw pin having moved into the premise list
+     above.  THE
      APPLICATION'S PER-CHUNK STEP RIDES IN IT: the FD_INODE arm's retag pays
      the application's claim out of the chain's own node, so this contract
      asks for no blanket license of its own. *)
-  sys_write_in fn (us_V U) v sts (sys_rw_count v2) (us_M U) v1 Q tr0 -∗
+  sys_write_in (us_V U) v sts (sys_rw_count v2) (us_M U) v1 Q tr0 -∗
   (* THE CROSSING IS THE LITERAL [true]: filewrite parks. *)
   wp_next true pj (fun (CID : CpuId) =>
   (* write() does not write user memory -- filewrite only READS the user

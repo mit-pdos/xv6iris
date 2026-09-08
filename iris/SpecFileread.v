@@ -770,11 +770,12 @@ Section SpecFileread.
        deliberately not invented here; the console arm is where the
        console-input receipt will land when it does.
 
-     THE OFFSET RIDES IN THE PIECE.  fileread advances [f->off] and the
-     kernel owns only half of the offset's shadow; the commit lends the
-     kernel's half at the offset the read used and takes it back advanced by
-     the count delivered ([FsAbsReadFire.aread_commit_at]), so this contract
-     asks for no separate offset permit. *)
+     THE OFFSET RIDES IN THE PIECE, BUT THE ADVANCE DOES NOT.  fileread
+     advances [f->off] and the kernel owns only half of the offset's
+     shadow; the commit lends the kernel's half at the offset the read used
+     and takes it back UNMOVED ([FsAbsReadFire.aread_commit_at]), and the
+     fire lemma advances it out of the descriptor's [foff_row], which this
+     contract takes beside the input. *)
   Definition fileread_in (st : fdstate)
       (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) : iProp Σ :=
     match st with
@@ -986,13 +987,17 @@ Definition wp_fileread_sconf_body
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   fileread_env γf fn st -∗
-  (* NO OFFSET PERMIT.  fileread advances [f->off] and the kernel owns only
-     half of the offset's shadow (OffGv.v); the FD_INODE arm moves the
-     process's half INSIDE the observation commit
-     ([FsAbsReadFire.aread_commit_at] lends it at the offset the read used
-     and takes it back advanced by the count delivered), so the permit is
-     nothing this contract asks for.
-     ---- THE CALLER'S INPUT, KEYED ON [st] ([fileread_in]) ----
+  (* THE DESCRIPTOR'S OFFSET ROW, and it is what ADVANCES [f->off].  The
+     observation commit lends the shadow's kernel half at the offset the
+     read used and takes it back UNMOVED (the piece-shape rule,
+     design/fs-syscall-specs.md section 4), so the advance is the fire
+     lemma's ([FsAbsReadFire.arf_read_fire]) and it is paid out of this
+     row: [FdSlots.foff_row] at an [FdInode] IS [OffGv.off_user_inv], and
+     it is [True] at every other descriptor kind.  PERSISTENT, and sys_read
+     already holds it inside its descriptor bundle, so it costs the caller
+     nothing. *)
+  foff_row st -∗
+  (* ---- THE CALLER'S INPUT, KEYED ON [st] ([fileread_in]) ----
      The observation commit conjoined with the caller's refund on an open,
      readable inode descriptor, [emp] everywhere else. *)
   fileread_in st F -∗

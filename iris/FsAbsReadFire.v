@@ -34,7 +34,8 @@
    Read's whole caller-supplied input is ONE one-shot piece: a single-phase
    commit that borrows the kernel's half of the inode map AND the offset
    shadow's half at the instant, returns the receipt [F.(pf_recv) av off a d]
-   and the shadow advanced by [d].  Per the REFUNDS ruling the caller hands
+   and the shadow UNMOVED (the piece-shape rule -- the kernel's fire lemma
+   does the advance).  Per the REFUNDS ruling the caller hands
    it in as [pf_at (aread_commit_at Γ appE i γo) F], the receipt beside the
    refund in the one pair [PieceFam.pfam]; the kernel eliminates
    to the AU side at the fire, and returns the whole conjunction on the ONE
@@ -230,27 +231,33 @@ Section ReadFire.
   (* SINGLE-PHASE AND READ-ONLY at the RAW MAP: the caller hands the very
      same [ghost_map_auth] back, which is what [ftop_astate_ro]'s give-back
      wants and what [astate]'s existential destroys (header). *)
-  (* ...WITH THE OFFSET'S HALF LENT AND RETURNED ADVANCED: the one fupd
+  (* ...WITH THE OFFSET'S HALF LENT AND RETURNED UNMOVED: the one fupd
      covers the bytes and the offset together (the offset-shadow fold;
      OffGv.v), so what a client observes of the state and what it learns
-     about its offset cannot be torn apart. *)
+     about its offset cannot be torn apart -- and the ADVANCE is the
+     kernel's, not the client's.  THE PIECE-SHAPE RULE
+     (design/fs-syscall-specs.md section 4): a piece may not ask the client to
+     return a KERNEL-OWNED ghost moved, because after the ARM the client is
+     an arbitrary user process whose only resource is its supplier and which
+     holds no [off_user_inv] at an arbitrary key.  So the client observes
+     the offset [off] and the count [d] and hands the half straight back;
+     [arf_read_fire] moves it afterwards, out of the per-row invariant the
+     kernel holds. *)
   Definition aread_commit_at Γ (E : coPset) (i : Z) (γo : gname)
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (off : nat) (a : anode) (d : nat),
        ⌜ard_pre (abs_view I) i off a⌝ -∗
        ghost_map_auth (γtop Γ) (1/2) I -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗ off_gv γo (1/2) (Z.of_nat (off + d)) ∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗ off_gv γo (1/2) (Z.of_nat off) ∗
        Φ (abs_view I) off a d)%I.
 
-  (* satisfiability: a client holding its half of the shadow, at any value,
-     can build the trivial-receipt commit -- the seal cannot be vacuously
-     blocked on the caller *)
-  Lemma aread_commit_at_unit Γ E i γo (z : Z) :
-    off_gv γo (1/2) z ⊢ aread_commit_at Γ E i γo (fun _ _ _ _ => True%I).
+  (* satisfiability, FROM NOTHING: the borrow comes back exactly as it was
+     lent, so the trivial-receipt commit costs its client not one resource
+     -- which is what makes read's bundle payable at every key. *)
+  Lemma aread_commit_at_unit Γ E i γo :
+    ⊢ aread_commit_at Γ E i γo (fun _ _ _ _ => True%I).
   Proof.
-    rewrite /aread_commit_at. iIntros "Hu" (I off a d) "%Hpre Ha Hk".
-    iDestruct (off_gv_agree with "Hk Hu") as %->.
-    iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
+    rewrite /aread_commit_at. iIntros (I off a d) "%Hpre Ha Hk".
     iModIntro. by iFrame "Ha Hk".
   Qed.
 
@@ -271,20 +278,18 @@ Section ReadFire.
 
   (* THE STABLE SEEDS at the raw map, so the stable corollary's derivation
      stays assembly rather than proof. *)
-  (* the seeds take the client's half: a commit moves the offset *)
-  Lemma aread_commit_at_pinned Γ E (i : Z) γo (z : Z) (q : Qp) (jpin : Z) (b : anode)
+  (* the seeds spend NO shadow of the client's: the borrow is returned
+     unmoved and the kernel does the advance *)
+  Lemma aread_commit_at_pinned Γ E (i : Z) γo (q : Qp) (jpin : Z) (b : anode)
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) :
-    off_gv γo (1/2) z -∗
     nview Γ q jpin b -∗
     (∀ (av : aview) (off : nat) (a : anode) (d : nat),
        ⌜av !! jpin = Some b⌝ -∗ nview Γ q jpin b -∗ Φ av off a d) -∗
     aread_commit_at Γ E i γo Φ.
   Proof.
-    iIntros "Hu Hn HΦ". rewrite /aread_commit_at.
+    iIntros "Hn HΦ". rewrite /aread_commit_at.
     iIntros (I off a d) "%Hpre Ha Hk".
     iDestruct (arf_auth_nview with "Ha Hn") as %Hav.
-    iDestruct (off_gv_agree with "Hk Hu") as %->.
-    iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
     (* the reading is all the seed needs, and it is the borrow's own *)
     iModIntro. iFrame "Ha Hk".
     iApply ("HΦ" $! (abs_view I) off a d with "[%] Hn").
@@ -293,21 +298,18 @@ Section ReadFire.
 
   (* read's own collapse: the pin is on the READ row, so agreement forces
      the observed node to be the client's *)
-  Lemma aread_commit_at_pinned_self Γ E (i : Z) γo (z : Z) (q : Qp) (b : anode)
+  Lemma aread_commit_at_pinned_self Γ E (i : Z) γo (q : Qp) (b : anode)
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) :
-    off_gv γo (1/2) z -∗
     nview Γ q i b -∗
     (∀ (av : aview) (off : nat) (d : nat),
        ⌜av !! i = Some b⌝ -∗ nview Γ q i b -∗ Φ av off b d) -∗
     aread_commit_at Γ E i γo Φ.
   Proof.
-    iIntros "Hu Hn HΦ". rewrite /aread_commit_at.
+    iIntros "Hn HΦ". rewrite /aread_commit_at.
     iIntros (I off a d) "%Hpre Ha Hk".
     iDestruct (arf_auth_nview with "Ha Hn") as %Hav.
     destruct Hpre as (Hrow & _ & _).
     assert (a = b) as -> by exact (arow_at_pinned _ _ _ _ Hrow Hav).
-    iDestruct (off_gv_agree with "Hk Hu") as %->.
-    iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
     iModIntro. iFrame "Ha Hk".
     iApply ("HΦ" $! (abs_view I) off d with "[%] Hn").
     exact Hav.
@@ -424,8 +426,12 @@ Section ReadFire.
   (* [FsAbsOpenFire.opf_open_fire]'s mold at the read commit.  Any share
      suffices: the commit only reads.  The two caps are premises about the
      SAME node, which is where fileread has them (header). *)
-  (* ...AND IT MOVES THE OFFSET: the kernel's half goes in at the offset
-     the read used and comes back advanced by [d], the count it delivered.
+  (* ...AND IT MOVES THE OFFSET, ITSELF: the kernel's half goes in at the
+     offset the read used, the client hands it back UNMOVED (the
+     piece-shape rule), and THIS LEMMA advances it by [d], the count
+     delivered, out of the descriptor row's own existential invariant
+     ([OffGv.off_user_inv], persistent, carried by [FdSlots.foff_row] and
+     threaded down from sys_read's descriptor bundle).
      Fired at the CHECKIN of the cell, after readi -- the one instant of
      the hold where the count is known; the row cannot move between the
      lock's acquire and there. *)
@@ -436,7 +442,7 @@ Section ReadFire.
     (off <= MAXFILE * BSIZE)%nat ->
     anode_size_ok (abs_row n) ->
     fn_type n <> 0 ->
-    ftop_inv γfs -∗
+    ftop_inv γfs -∗ off_user_inv γo -∗
     pf_at (aread_commit_at (fs_gamma_L γfs) appE i γo) F -∗
     top_frag_q (fs_gamma_L γfs) dq i n -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗
@@ -445,7 +451,9 @@ Section ReadFire.
       ∗ ∃ av : aview,
           ⌜arow_at av i (abs_row n)⌝ ∗ F.(pf_recv) av off (abs_row n) d.
   Proof.
-    intros HE Hoff Hsz Hnz. iIntros "#Hi Hcm Hf Hg".
+    intros HE Hoff Hsz Hnz. iIntros "#Hi #Hoinv Hcm Hf Hg".
+    assert (Hfoff : ↑foffN ⊆ E).
+    { etrans; [| exact HE]. rewrite /foffN /appN. solve_ndisj. }
     (* THE PIECE IS SPENT: the fire eliminates to the AU side. *)
     iDestruct (pf_at_au with "Hcm") as "Hcm".
     (* the same re-spelling [opf_open_fire] does, and for the same reason:
@@ -466,6 +474,10 @@ Section ReadFire.
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists I, A. by iFrame. }
+    (* THE ADVANCE IS THE KERNEL'S: the process's half comes out of the
+       row's existential invariant and both halves move together. *)
+    iMod (off_user_inv_move E γo (Z.of_nat off) (Z.of_nat (off + d)) Hfoff
+            with "Hoinv Hg") as "Hg".
     iModIntro. iFrame "Hf Hg". iExists (abs_view I).
     iSplitR; [by iPureIntro |]. iExact "HΦ".
   Qed.
@@ -479,7 +491,7 @@ Section ReadFire.
     (off <= MAXFILE * BSIZE)%nat ->
     anode_size_ok (abs_row n) ->
     fn_type n <> 0 ->
-    ftop_inv γfs -∗
+    ftop_inv γfs -∗ off_user_inv γo -∗
     pf_at (aread_commit_at (fs_gamma_L γfs) appE i γo) F -∗
     top_frag (fs_gamma_L γfs) i n -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗

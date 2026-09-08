@@ -964,7 +964,7 @@ Section ProofSysRead.
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
                 _ Fr ltac:(lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 (sys_rw_count_range v2) Heb
-                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hin").
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hrow Hin").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P' dw bsw)
         "%Hcsf %Hupt %Hdwle %Htie %Hrva Hcg Hcpu Hpc Href Hcore Hfout Harms".

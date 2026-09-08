@@ -4433,21 +4433,19 @@ Section SyscallArms.
        ONE CONTRACT: [SYSWRITE]'s arms are keyed on the descriptor's state
        themselves, so this arm picks nothing -- it owes the matching input,
        whatever the key turns out to be.
-       [FsAbsInvFire.fsabs_sys_write_in] builds it from what the arm already
-       holds: the application's invariant (every chunk node's [app_step],
-       out of the parked license), the descriptor bundle's own persistent
-       row family (the inode arm's offset invariant), the [devsw_write_val]
-       equation (the console arm's cell pin) and nothing else (the trace
-       seed is free).
+       [FsAbsInvFire.fsabs_sys_write_in] builds it from the application's
+       invariant alone (every chunk node's [app_step], out of the parked
+       license): the inode arm needs no offset resource (its nodes take the
+       shadow back unmoved) and the console arm's trace seed is free, the
+       devsw pin having moved into SYSWRITE's Coq premise list.
 
        THE APPLICATION'S PER-CHUNK STEP IS NOT MINTED HERE: filewrite's
        FD_INODE arm pays its row retag out of the chain's own node. *)
     iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
     iApply fupd_wp.
-    iMod (fsabs_sys_write_in (sysc_fwrite_names γtxl γs j γl fn) ⊤
-            (pv_fdg (us_V U)) (us_V U) v0 sts (sys_rw_count v2) (us_M U) v1
-            ltac:(solve_ndisj) eq_refl with "Hfsabs Hufrag")
-      as "[Hufrag Hswin]".
+    iMod (fsabs_sys_write_in ⊤
+            (us_V U) v0 sts (sys_rw_count v2) (us_M U) v1
+            ltac:(solve_ndisj) with "Hfsabs") as "Hswin".
     iModIntro.
     iApply (SysWrite.wp_sys_write_sconf γf γs j γl
               (sysc_fwrite_names γtxl γs j γl fn)
@@ -4559,11 +4557,10 @@ Section SyscallArms.
        ONE CONTRACT: [SYSREAD]'s arms are keyed on the descriptor's state
        themselves, so this arm picks nothing -- it owes the matching input,
        whatever the key turns out to be.  [FsAbsInvFire.fsabs_sys_read_in]
-       builds it from the descriptor bundle's own persistent row family (the
-       inode arm's offset invariant) and nothing else: a read moves no row,
-       so no application step is paid here. *)
-    iDestruct (fsabs_sys_read_in (pv_fdg (us_V U)) (us_V U) v0 sts
-                 with "Hufrag") as "[Hufrag Hsrin]".
+       builds it FROM NOTHING: the observation commit takes the offset
+       shadow back unmoved, so no descriptor row is needed, and a read
+       moves no row, so no application step is paid either. *)
+    iDestruct (fsabs_sys_read_in (us_V U) v0 sts) as "Hsrin".
     iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γc fn)
               pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
               (pfam_triv (fun _ _ _ _ => True%I))

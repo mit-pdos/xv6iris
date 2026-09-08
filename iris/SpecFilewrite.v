@@ -773,17 +773,23 @@ Section SpecFilewrite.
 
      - an open, writable INODE: the commit CHAIN at the cursor [Q], one node
        per possible chunk ([wchunks n] of them);
-     - an open, writable CONSOLE DEVICE: the trace seed, plus the cell's
-       value.  THE PIN IS NOT DECORATION: [filewrite_dev_env] carries the
-       honest disjunction "the slot is null or it is consolewrite"
+     - an open, writable CONSOLE DEVICE: the trace seed, and nothing else.
+       THE DEVSW PIN IS NOT HERE: [filewrite_dev_env] carries the honest
+       disjunction "the slot is null or it is consolewrite"
        ([ConsoleInv.devsw_write_val_cases]) and a null slot is a -1 return at
-       +0x12a that no console arm allows.  A caller discharges it
-       from the table it already owns ([fwn_wp fn = devsw_write_val] plus
+       +0x12a that no console arm allows, so the pin is REQUIRED -- but it
+       is a PURE fact about the names record and it rides this contract's
+       Coq premise list ([Hconw] below), not its caller-supplied input.
+       That is the piece-shape rule's corollary at the console arm: an
+       arbitrary user process supplying this bundle under the ARM knows
+       nothing of the kernel's [fwrite_names], so the input may not mention
+       one.  A caller discharges the premise from the table it already owns
+       ([fwn_wp fn = devsw_write_val] plus
        [ConsoleInv.devsw_write_val_console]).
      - everything else -- a pipe, another device major, an unwritable or
        closed descriptor -- costs nothing and gets the landed blanket back.
        A PIPE AU IS OUT OF SCOPE and deliberately not invented here. *)
-  Definition filewrite_in (fn : fwrite_names) (st : fdstate) (n : Z)
+  Definition filewrite_in (st : fdstate) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64) (Q : nat -> iProp Σ)
       (tr0 : list (bv 8)) : iProp Σ :=
     match st with
@@ -791,9 +797,7 @@ Section SpecFilewrite.
         awrite_chain (fs_gamma_L fsc_fs) appE i γo M ua Q 0%nat (wchunks n)
     | FdOpen _ true (FdDevice ma) =>
         if decide (ma = ConsoleInv.CONSOLE)
-        then ⌜fwn_wp fn ma
-              = (mword_of_int KernelSyms.consolewrite : mword 64)⌝
-             ∗ uart_sent fsc_uart tr0
+        then uart_sent fsc_uart tr0
         else emp
     | _ => emp
     end%I.
@@ -831,16 +835,15 @@ Section SpecFilewrite.
      Eight one-liners, so that no walk ever has to unfold the two matches
      and every arm names the fact it is standing on. *)
 
-  Lemma filewrite_in_inode fn rb i γo n M ua Q tr0 :
-    filewrite_in fn (FdOpen rb true (FdInode i γo)) n M ua Q tr0 -∗
+  Lemma filewrite_in_inode rb i γo n M ua Q tr0 :
+    filewrite_in (FdOpen rb true (FdInode i γo)) n M ua Q tr0 -∗
     awrite_chain (fs_gamma_L fsc_fs) appE i γo M ua Q 0%nat (wchunks n).
   Proof. by iIntros "$". Qed.
 
-  Lemma filewrite_in_cons fn rb (mj : Z) n M ua Q tr0 :
+  Lemma filewrite_in_cons rb (mj : Z) n M ua Q tr0 :
     mj = ConsoleInv.CONSOLE ->
-    filewrite_in fn (FdOpen rb true (FdDevice mj)) n M ua Q tr0 -∗
-    ⌜fwn_wp fn mj = (mword_of_int KernelSyms.consolewrite : mword 64)⌝
-    ∗ uart_sent fsc_uart tr0.
+    filewrite_in (FdOpen rb true (FdDevice mj)) n M ua Q tr0 -∗
+    uart_sent fsc_uart tr0.
   Proof.
     intros Hmj. rewrite /filewrite_in.
     case_decide as Hc; [by iIntros "$" | by exfalso].
@@ -914,9 +917,9 @@ Section SpecFilewrite.
     simpl. iExact "Hc".
   Qed.
 
-  Lemma filewrite_extra_neg fn st n M ua Q tr0 :
+  Lemma filewrite_extra_neg st n M ua Q tr0 :
     (n < 0)%Z ->
-    filewrite_in fn st n M ua Q tr0 -∗
+    filewrite_in st n M ua Q tr0 -∗
     filewrite_extra st n M ua Q tr0 (mword_of_int (-1) : mword 64).
   Proof.
     intros Hn. destruct st as [| rb wb ty]; [by iIntros |].
@@ -962,6 +965,14 @@ Definition wp_filewrite_sconf_body
      environment can be stated without them *)
   fwn_j fn = j ->
   fwn_procs fn = γs ->
+  (* THE DEVSW PIN, as a PURE premise rather than as part of the caller's
+     input ([filewrite_in]'s header): the console arm has to refute the
+     null-slot disjunct [filewrite_dev_env] carries, and the fact that does
+     it is an equation about the names record the CALLER builds.  Every
+     caller discharges it off [fwn_wp fn = ConsoleInv.devsw_write_val] and
+     [ConsoleInv.devsw_write_val_console]. *)
+  fwn_wp fn ConsoleInv.CONSOLE
+    = (mword_of_int KernelSyms.consolewrite : mword 64) ->
   (* a0 = f, a1 = addr (the user source, never inspected here), a2 = n *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   m !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int n : mword 64) ->
@@ -996,19 +1007,27 @@ Definition wp_filewrite_sconf_body
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   filewrite_env γf fn st -∗
-  (* NO OFFSET PERMIT.  filewrite's FD_INODE arm moves the offset shadow's
-     half inside the chain's own node ([FsAbsWriteFire.awrite_full_at] lends
-     it at the chunk's offset and takes it back advanced), so the permit is
-     nothing this contract asks for.  fileread is the same one size down --
-     its one commit lends and returns the half. *)
+  (* THE DESCRIPTOR'S OFFSET ROW, and it is what ADVANCES [f->off].  The
+     chain's nodes lend the shadow's kernel half at the chunk's offset and
+     take it back UNMOVED (the piece-shape rule,
+     design/fs-syscall-specs.md section 4), so the advance is the fire
+     lemma's ([FsAbsWriteFire.wrf_awrite_fire]/[wrf_apart_fire]) and it is
+     paid out of this row: [FdSlots.foff_row] at an [FdInode] IS
+     [OffGv.off_user_inv], and it is [True] at every other descriptor kind.
+     PERSISTENT, and sys_write already holds it inside its descriptor
+     bundle, so it costs the caller nothing.  fileread is the same one size
+     down. *)
+  foff_row st -∗
   (* ---- THE CALLER'S INPUT, KEYED ON [st] ([filewrite_in]) ----
-     The chain on an inode descriptor, the trace seed and the devsw pin on
-     the console, [emp] everywhere else.  This REPLACES the persistent
+     The chain on an inode descriptor, the trace seed on the console,
+     [emp] everywhere else.  IT NAMES NO KERNEL GHOST RECORD: the devsw pin
+     is the Coq premise above, so an arbitrary user process can state this
+     input at its own key (the ARM).
      THE APPLICATION'S PER-CHUNK STEP RIDES IN IT: the FD_INODE arm's row
      retag pays the application's claim out of the chain's own node
      ([FsAbsWriteFire.awrite_full_at]'s [app_step]), so this contract asks
      for no blanket license of its own. *)
-  filewrite_in fn st n (us_M U) uaddr Q tr0 -∗
+  filewrite_in st n (us_M U) uaddr Q tr0 -∗
   (* THE CROSSING IS [true], NOT [b].  Every arm of this function parks, and
      the porting guide's rule is that a PARKING function's [wp_next] index is
      [true] unconditionally -- a swtch moves the hart whatever SIE was doing.

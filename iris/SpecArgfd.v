@@ -169,6 +169,50 @@ Definition sys_fd_st (v : mword 64) (fs : list (mword 64))
   | None => FdClosed
   end.
 
+(* ---- THE SAME KEY WITHOUT THE OFILE ARRAY ---------------------------
+   [sys_fd_st] reads the process's [ofile] POINTER array to decide whether
+   argfd answers at all, and that array is a kernel-side reading no user
+   process has.  But it does not have to: [ProcInv.ofile_slot] pins each
+   cell's nullity to its descriptor's ghost state ("[v = zero_reg] iff
+   [st = FdClosed]"), so the pointer array carries no information the
+   STATE list does not already carry.  [fd_st_of_key] is the key-level
+   reading -- a function of syscall argument 0 and the descriptor states
+   alone -- and [sys_fd_st_of_key] is the equation.  It is what makes
+   sys_read's and sys_write's bundles statable at the ARM's key
+   ([UexecSG]'s [sbundle X n W], whose [W] carries the descriptor view and
+   not the ofile array). *)
+Definition fd_st_of_key (v : mword 64) (sts : list fdstate) : fdstate :=
+  let z := bv_signed (trunc32 v) in
+  if decide (0 <= z < Z.of_nat NOFILE)
+  then default FdClosed (sts !! Z.to_nat z)
+  else FdClosed.
+
+Lemma sys_fd_st_of_key (v : mword 64) (fs : list (mword 64))
+    (sts : list fdstate) :
+  length fs = NOFILE -> length sts = NOFILE ->
+  (forall (j : nat) (w : mword 64) (st : fdstate),
+     fs !! j = Some w -> sts !! j = Some st ->
+     (w = (zero_reg : mword 64) <-> st = FdClosed)) ->
+  sys_fd_st v fs sts = fd_st_of_key v sts.
+Proof.
+  intros Hfs Hsts Hag. rewrite /sys_fd_st /fd_st_of_key /arg_fd.
+  destruct (decide (0 <= bv_signed (trunc32 v) < Z.of_nat NOFILE))
+    as [Hr | Hr]; [| reflexivity].
+  set (k := Z.to_nat (bv_signed (trunc32 v))).
+  assert (Hklt : (k < NOFILE)%nat).
+  { apply Nat2Z.inj_lt. rewrite /k Z2Nat.id; [exact (proj2 Hr) | exact (proj1 Hr)]. }
+  assert (Hw : is_Some (fs !! k))
+    by (apply lookup_lt_is_Some_2; rewrite Hfs; exact Hklt).
+  destruct Hw as [w Hw]. rewrite Hw.
+  assert (Hs : is_Some (sts !! k))
+    by (apply lookup_lt_is_Some_2; rewrite Hsts; exact Hklt).
+  destruct Hs as [st Hs].
+  destruct (Hag k w st Hw Hs) as [Hfwd _].
+  destruct (decide (w = (zero_reg : mword 64))) as [Hz | Hnz].
+  - cbn. rewrite Hs /=. symmetry. exact (Hfwd Hz).
+  - cbn. reflexivity.
+Qed.
+
 (* what an OPEN key gives its consumer back: the descriptor argument 0
    named, and its row in the caller's own table *)
 Lemma sys_fd_st_open (v : mword 64) (fs : list (mword 64))

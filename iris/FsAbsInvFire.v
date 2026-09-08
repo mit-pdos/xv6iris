@@ -32,9 +32,10 @@
    [AppInv.app_inv] and NO invariant of its own: the client copy this file
    used to re-sync ([FsAbsInv], deleted) is gone with its license.
 
-   THE MASK.  Every commit is at [appE] = [↑appN] ([AppInv]'s note); the
-   read/write dischargers ALSO open the process's offset shadow
-   ([OffGv.off_user_inv], under [appN]) inside the commit. *)
+   THE MASK.  Every commit is at [appE] = [↑appN] ([AppInv]'s note).  The
+   read/write dischargers open NOTHING of their own: the offset shadow is
+   lent and returned unmoved (the piece-shape rule), and the kernel's fire
+   lemma advances it out of the descriptor row's [OffGv.off_user_inv]. *)
 (* Require block: SpecSysOpenAU.v's, VERBATIM (durable-notes: trimmed imports
    have OOM'd the build, and a class name that is not in scope silently becomes
    a section VARIABLE), plus this file's own lines. *)
@@ -88,7 +89,7 @@ Require Import SpecSysUnlink.      (* [unlink_au_pre]: the one contract's bundle
 Require Import SpecSysLink.        (* [link_commits] (round E2, lane E2-L) *)
 Require Import FsAbsReadFire.      (* [aread_commit_at] *)
 Require Import FsAbsWriteFire.     (* [awrite_full_at], [awrite_chain] *)
-Require Import OffGv.              (* [off_user_inv], the process's half *)
+Require Import OffGv.              (* [off_user_inv]: the row the FIRE moves *)
 Require Import AppInv.             (* [app_inv], [appN]/[appE], [app_step_acc]: the parked license *)
 Require Import FsAbsDefs.          (* [abs_view_lookup_is_Some] *)
 Require Import FsCfg.              (* [fscfg]: the fs configuration is AMBIENT *)
@@ -214,55 +215,32 @@ Section FsAbsInvFire.
     iApply (utgt_commit_at_unit γfs appE appN_appE with "Hai").
   Qed.
 
-  (* THE READ AND WRITE COMMITS TAKE THE OFFSET TOO (OffGv.v): a process
-     whose half of the descriptor's offset shadow lives in the existential
-     [off_user_inv] -- the generic user-mode process, whose descriptor rows
-     carry exactly that ([FdSlots.foff_row]) -- opens it INSIDE the commit,
-     at the commit's own mask ([foffN] sits under [appN] for this), and
-     lets the kernel's half go anywhere. *)
-  Lemma foffN_appE : ↑foffN ⊆ appE.
-  Proof. rewrite /appE /appN /foffN. solve_ndisj. Qed.
+  (* THE READ AND WRITE COMMITS LEND THE OFFSET TOO (OffGv.v), AND TAKE IT
+     BACK UNMOVED: the piece-shape rule (design/fs-syscall-specs.md section
+     4) forbids a piece from asking its client to return a kernel-owned
+     ghost moved, so the advance is the kernel fire lemma's
+     ([FsAbsReadFire.arf_read_fire], [FsAbsWriteFire.wrf_awrite_fire]/
+     [wrf_apart_fire]), out of the descriptor row's own [off_user_inv].
+     What that buys here is the whole point of the ARM: the dischargers
+     below need NO offset resource, so read's and write's bundles are
+     payable at every key from nothing. *)
 
   (* READ'S ONE PIECE, at the trivial receipt AND the trivial refund: the
      conjunction the unified contract's inode arm takes ([AU /\ R]), so the
-     kernel may eliminate to either side. *)
+     kernel may eliminate to either side.  FROM NOTHING. *)
   Lemma fsabs_aread Γ (i : Z) (γo : gname) :
-    off_user_inv γo -∗ pf_at (aread_commit_at Γ appE i γo) (pfam_triv (fun _ _ _ _ => True%I)).
+    ⊢ pf_at (aread_commit_at Γ appE i γo) (pfam_triv (fun _ _ _ _ => True%I)).
   Proof.
-    iIntros "#Hoinv". iApply pf_at_triv. rewrite /aread_commit_at.
-    iIntros (I off a d) "%Hpre Ha Hk".
-    iMod (off_user_inv_move appE γo _ (Z.of_nat (off + d)) foffN_appE
-            with "Hoinv Hk") as "Hk".
-    iModIntro. by iFrame "Ha Hk".
+    iApply pf_at_triv. iApply aread_commit_at_unit.
   Qed.
 
   Lemma fsabs_awrite_chain (γfs : fs_names) (i : Z) (γo : gname)
       (M : gmap Z (bv 8)) (ua : mword 64) (k cnt : nat) :
-    app_inv γfs -∗ off_user_inv γo -∗
+    app_inv γfs -∗
     awrite_chain (fs_gamma_L γfs) appE i γo M ua (fun _ => True%I) k cnt.
   Proof.
-    iIntros "#Hai #Hoinv".
-    iInduction cnt as [| cnt] "IH" forall (k).
-    { rewrite awrite_chain_0. done. }
-    rewrite awrite_chain_S. iSplit; [done |]. iSplit.
-    - rewrite /awrite_full_at. iIntros (I off bs bs0 nl) "%Hpre %Hby Ha Hk".
-      iMod (app_step_acc_view appE γfs i I _ appN_appE
-              (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
-      iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'".
-      iMod (off_user_inv_move appE γo _ (Z.of_nat (off + length bs)) foffN_appE
-              with "Hoinv Hk") as "Hk".
-      iModIntro. iFrame "Ha' Hk". iApply "IH".
-    - (* the PARTIAL arm is a state fire too now (round E2, lane E2-W):
-         same two phases as the full arm, at the run the short chunk landed,
-         with the offset advanced by the COUNT rather than by the run *)
-      rewrite /awrite_part_at.
-      iIntros (I off r bs bs0 nl) "%Hpre %Hr %Hgap %Hby Ha Hk".
-      iMod (app_step_acc_view appE γfs i I _ appN_appE
-              (delta_write_absent (abs_view I) i off bs) with "Hai") as "Hstep".
-      iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'".
-      iMod (off_user_inv_move appE γo _ (Z.of_nat (off + r)) foffN_appE
-              with "Hoinv Hk") as "Hk".
-      iModIntro. iFrame "Ha' Hk". iApply "IH".
+    iIntros "#Hai".
+    iApply (awrite_chain_unit γfs appE i γo M ua k cnt appN_appE with "Hai").
   Qed.
 
   (* SYS_READ'S WHOLE INPUT, at the trivial receipt and the trivial refund
@@ -270,33 +248,20 @@ Section FsAbsInvFire.
      place of the three forms it used to choose between.  Keyed on the same
      pure function the contract's arms are ([SpecArgfd.sys_fd_st]).
 
-     IT COSTS THE DISPATCHER NOTHING IT DOES NOT ALREADY THREAD: read's one
-     piece needs only the offset invariant, and that comes off the
-     descriptor bundle's own persistent row family ([FdSlots.foff_row] at an
-     [FdInode] IS [OffGv.off_user_inv]).  No application step is paid -- a
-     read moves no row. *)
-  Lemma fsabs_sys_read_in (γfd : gname) (V : pprivate) (v : mword 64)
+     IT COSTS ITS CLIENT NOTHING AT ALL, at every key: read's one piece
+     lends the offset shadow and takes it back unmoved, so no descriptor
+     row and no offset invariant is needed, and no application step is paid
+     -- a read moves no row.  This is what makes read's bundle payable by
+     an arbitrary user process under the ARM. *)
+  Lemma fsabs_sys_read_in (V : pprivate) (v : mword 64)
       (sts : list fdstate) :
-    fd_frags γfd sts -∗
-      fd_frags γfd sts ∗
-      sys_read_in V v sts (pfam_triv (fun _ _ _ _ => True%I)).
+    ⊢ sys_read_in V v sts (pfam_triv (fun _ _ _ _ => True%I)).
   Proof.
-    iIntros "Hfr".
-    (* the row family is PERSISTENT, so the bundle goes straight back: this
-       syscall moves no descriptor. *)
-    iAssert (foff_rows sts ∗ fd_frags γfd sts)%I with "[Hfr]"
-      as "[#Hrows Hfr]".
-    { rewrite /fd_frags. iDestruct "Hfr" as "(%Hl & Hs & #Hr)".
-      iSplitR; [iExact "Hr" |]. iSplitR; [by iPureIntro |].
-      iFrame "Hs". iExact "Hr". }
-    iFrame "Hfr".
     rewrite /sys_read_in /fileread_in.
     destruct (sys_fd_st v (pv_ofile V) sts) as [| rb wb ty] eqn:Hst; [done |].
     destruct rb; [| done].
     destruct ty as [i γo | | ma]; [| done | done].
-    destruct (sys_fd_st_open _ _ _ _ _ _ Hst) as (fd & fv & Hafd & Hrow).
-    iDestruct (foff_rows_lookup _ _ _ Hrow with "Hrows") as "#Hoinv".
-    iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo with "Hoinv").
+    iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo).
   Qed.
 
   (* SYS_WRITE'S WHOLE INPUT, at the trivial cursor and the free seed --
@@ -306,48 +271,33 @@ Section FsAbsInvFire.
      the dispatcher's [destruct] is on THE KEY and not on a choice of
      contract.
 
-     THE CONSOLE ARM IS CONSTRUCTIBLE FROM WHAT THE DISPATCHER HOLDS, and
-     that is the thing worth checking before the walk is written: the devsw
-     pin is the [fwn_wp fn = devsw_write_val] equation every consumer of
-     this cone already discharges by [reflexivity], read at [CONSOLE]; the
-     trace seed is free ([UartSentLoc.uart_sent_nil] mints [uart_sent γu []]
-     from the unit of the mono-list algebra).  THE INODE ARM's offset
-     invariant comes off the descriptor bundle's own persistent row family
-     ([FdSlots.foff_row] at an [FdInode] IS [OffGv.off_user_inv]), so the
-     dispatcher needs no resource it does not already thread. *)
-  Lemma fsabs_sys_write_in (fn : fwrite_names) (E : coPset) (γfd : gname)
+     THE CONSOLE ARM IS FREE: the devsw pin left the input for
+     FILEWRITE/SYSWRITE's Coq premise list (a dispatcher discharges it by
+     [reflexivity] off [fwn_wp fn = devsw_write_val]), so what is left is
+     the trace seed, and that is the unit of the mono-list algebra
+     ([UartSentLoc.uart_sent_nil]).  THE INODE ARM needs no offset resource
+     any more: the chain's nodes take the shadow back unmoved.  So this
+     input is payable at EVERY key out of the application step alone --
+     which is what the ARM asks of it. *)
+  Lemma fsabs_sys_write_in (E : coPset)
       (V : pprivate) (v : mword 64) (sts : list fdstate) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64) :
     ↑appN ⊆ E ->
-    fwn_wp fn = ConsoleInv.devsw_write_val ->
-    app_inv fsc_fs -∗ fd_frags γfd sts ={E}=∗
-      fd_frags γfd sts ∗
-      sys_write_in fn V v sts n M ua (fun _ => True%I) [].
+    app_inv fsc_fs ={E}=∗
+      sys_write_in V v sts n M ua (fun _ => True%I) [].
   Proof.
-    intros HE Hwp. iIntros "#Hai Hfr".
-    (* the row family is PERSISTENT, so the bundle goes straight back: this
-       syscall moves no descriptor. *)
-    iAssert (foff_rows sts ∗ fd_frags γfd sts)%I with "[Hfr]"
-      as "[#Hrows Hfr]".
-    { rewrite /fd_frags. iDestruct "Hfr" as "(%Hl & Hs & #Hr)".
-      iSplitR; [iExact "Hr" |]. iSplitR; [by iPureIntro |].
-      iFrame "Hs". iExact "Hr". }
-    iFrame "Hfr".
+    intros HE. iIntros "#Hai".
     rewrite /sys_write_in /filewrite_in.
     destruct (sys_fd_st v (pv_ofile V) sts) as [| rb wb ty] eqn:Hst;
       [by iModIntro |].
     destruct wb; [| by iModIntro].
     destruct ty as [i γo | | ma].
-    - destruct (sys_fd_st_open _ _ _ _ _ _ Hst) as (fd & fv & Hafd & Hrow).
-      iDestruct (foff_rows_lookup _ _ _ Hrow with "Hrows") as "#Hoinv".
-      iModIntro.
+    - iModIntro.
       iApply (fsabs_awrite_chain fsc_fs i γo M ua 0%nat (wchunks n)
-                with "Hai Hoinv").
+                with "Hai").
     - by iModIntro.
     - case_decide as Hc; [| by iModIntro].
-      iMod (uart_sent_nil fsc_uart) as "#Hseed".
-      iModIntro. iSplitR; [| iExact "Hseed"].
-      iPureIntro. rewrite Hwp Hc. exact ConsoleInv.devsw_write_val_console.
+      iMod (uart_sent_nil fsc_uart) as "#Hseed". iModIntro. iExact "Hseed".
   Qed.
 
   (* ------------------------------------------------------------------ *)

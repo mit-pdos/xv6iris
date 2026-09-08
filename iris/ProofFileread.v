@@ -464,7 +464,7 @@ Section ProofFileread.
     intros pcE pj addr ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn Heb Hbelow.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hau Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv #Hfoff Hau Hcont".
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the four content cells the dispatch reads
        are fractions of it, and it is rebuilt unchanged at every exit. *)
@@ -2075,6 +2075,11 @@ Section ProofFileread.
                 refund's one arm (the sign guard) is behind us. *)
              iDestruct (fileread_in_inode_of st wbx (bv_unsigned inm) γo0 Fr
                           Hstm with "Hau") as "Hau".
+             (* ...and the descriptor's offset row, which is what the FIRE
+                advances [f->off] out of (the piece-shape rule: the client
+                hands the shadow back unmoved). *)
+             iDestruct (foff_row_inode_of st true wbx (bv_unsigned inm) γo0
+                          Hstm with "Hfoff") as "#Hoinv".
              assert (Hibcov : IBLOCK inm icfg_ist ∈ fsc_cov)
                by (apply Hgeo; exact Hinlt).
              iDestruct (ic_escrows_acc2
@@ -2318,7 +2323,9 @@ Section ProofFileread.
                 [FsAbsReadFire.arf_read_fire] opens [ftopN] off the payload's
                 OWN [top_frag] quarter, fires the caller's commit once with
                 the kernel's half of the offset shadow lent and returned
-                advanced by the count, and gives the quarter straight back.  A
+                UNMOVED -- the fire itself then advances it by the count,
+                out of the descriptor's [OffGv.off_user_inv] -- and gives
+                the quarter straight back.  A
                 read retags no row, so this is an INSERTION into the landed
                 walk, where the write walk's fire STANDS IN for the retag.
 
@@ -2653,7 +2660,7 @@ Section ProofFileread.
                         ltac:(solve_ndisj) Hoffcap
                         (arf_size_ok_era dnl bml data Hszn)
                         (arf_era_typed dnl bml data Hdty)
-                        with "[] [Hau] [Htop] [Hgv]") as "(Htop & Hgv & Hfired)";
+                        with "[] Hoinv [Hau] [Htop] [Hgv]") as "(Htop & Hgv & Hfired)";
                   [iApply (ireg_inv_ftop with "Hireg") | iExact "Hau"
                   | iExact "Htop" | rewrite Hoffz; iExact "Hgv" |].
                 iDestruct "Hfired" as (avf) "[%Hrowf HΦf]".
@@ -2998,7 +3005,7 @@ Section ProofFileread.
                         ltac:(solve_ndisj) Hoffcap
                         (arf_size_ok_era dnl bml data Hszn)
                         (arf_era_typed dnl bml data Hdty)
-                        with "[] [Hau] [Htop] [Hgv]") as "(Htop & Hgv & Hfired)";
+                        with "[] Hoinv [Hau] [Htop] [Hgv]") as "(Htop & Hgv & Hfired)";
                   [iApply (ireg_inv_ftop with "Hireg") | iExact "Hau"
                   | iExact "Htop" | rewrite Hoffz; iExact "Hgv" |].
                 iDestruct "Hfired" as (avf) "[%Hrowf HΦf]".

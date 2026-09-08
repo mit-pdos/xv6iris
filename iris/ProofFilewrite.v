@@ -10,10 +10,11 @@
      the device arm's out-of-range and null-slot exits answer the landed
      blanket and arm nothing;
    * the FD_INODE loop carries [ProofFilewriteChain.fw_au_raw]: the fire
-     ([FsAbsWriteFire.wrf_awrite_fire]) STANDS WHERE THE RETAG STANDS, and
-     the offset shadow's half goes in at the chunk's offset and comes back
-     advanced -- all inside the one [ftopN] critical section, which is what
-     makes the pair ONE instant per chunk.  There is no receipt family; the
+     ([FsAbsWriteFire.wrf_awrite_fire]) STANDS WHERE THE RETAG STANDS; the
+     offset shadow's half goes in at the chunk's offset, the client hands
+     it back unmoved and the fire advances it out of the descriptor's
+     [OffGv.off_user_inv] -- all inside the one [ftopN] critical section,
+     which is what makes the pair ONE instant per chunk.  There is no receipt family; the
      caller's PREFIX CURSOR [Q] is what each node's phase 2 advances;
    * the FD_DEVICE arm calls the LOCATED consolewrite
      ([SpecConsolewriteLoc.CONSOLEWRITE_LOC]) at EVERY major, and that is
@@ -1960,6 +1961,12 @@ Section ProofFilewrite.
     file_ref gf kx qx stx -∗
     proc_priv_core pj pidv (us_upt U PI) -∗
     KvmSpec.kalloc_env fsc_kalloc None -∗
+    (* THE DESCRIPTOR'S OFFSET ROW.  The chain's nodes take the shadow's
+       kernel half back UNMOVED (the piece-shape rule), so the ADVANCE at
+       each chunk's fire comes out of this persistent invariant; the
+       contract takes it as [FdSlots.foff_row stx] and the walk reads it at
+       [Hstx]. *)
+    off_user_inv γx -∗
     (* ---- the PERSISTENT half of [filewrite_fs_env] ---- *)
     bio_ctx (fsc_bio)
       (fs_view fsc_fs (fsc_disk) icfg_dev fsc_cov) -∗
@@ -2029,7 +2036,7 @@ Section ProofFilewrite.
       exfalso. lia. }
     iIntros "Hcg Hcnt #Htext Hpc #Hprocs
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
-             Href Hpriv #Hkenv
+             Href Hpriv #Hkenv #Hoinv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hclaimsfw #Hescs #Hireg
              #Hslks #Hdev #Hgeo #Hdlk #Hbm Hout Hau Hcont".
     (* ---- THE REFERENCE, OPENED, AND THE TWO FIELD FACTS OFF THE STATE ----
@@ -2933,7 +2940,8 @@ Section ProofFilewrite.
                      t p Htge0 Htltn Hmul with "Hau")
           as "[Hcm Hback]".
         (* the kernel's half goes in at the offset the chunk was written at
-           and comes out advanced by the chunk *)
+           and comes out advanced by the chunk -- the ADVANCE is the fire's,
+           off [Hoinv], since the client returns the borrow unmoved *)
         (* THE PER-CHUNK BUFFER TIE IS PHASE 1'S, and the chunk's source
            offset is [FW_MAX * p] because every chunk
            that reaches node [p] was FULL -- which is exactly the loop's own
@@ -2950,7 +2958,7 @@ Section ProofFilewrite.
                 (era_node dnl bml datal) (era_node dn' bm' data')
                 ltac:(solve_ndisj) Hlocw Hposbs Hoffbs Hcapbs Hnzl Hrow Hnz' Hrow'
                 Hchunkp
-                with "[] [] Hcm Htop [Hgv]") as "(Htop & Hgv & Htail)";
+                with "[] [] Hoinv Hcm Htop [Hgv]") as "(Htop & Hgv & Htail)";
           [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") | rewrite Hgxo Hoffz; iExact "Hgv" |].
         iModIntro. iFrame "Htop".
         iSplitL "Hgv".
@@ -3091,7 +3099,7 @@ Section ProofFilewrite.
                     (era_node dnl bml datal) (era_node dn' bm' data')
                     ltac:(solve_ndisj) Hlocw Hbspos Hoffbs Hcapbs Hrle Hgap
                     Hnzl Hrowl Hnz' Hrow' Htakep
-                    with "[] [] Hpart Htop [Hgv]")
+                    with "[] [] Hoinv Hpart Htop [Hgv]")
               as "(Htop & Hgv & Htail)";
               [iApply (ireg_inv_ftop with "Hireg")
               | iApply (ireg_inv_app with "Hireg")
@@ -3579,7 +3587,7 @@ Section ProofFilewrite.
                   Hbelow
                   with "Hcg Hcnt Htext Hpc Hprocs
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
-                        Href Hpriv Hkenv
+                        Href Hpriv Hkenv Hoinv
                         Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hclaimsfw Hescs Hireg
                         Hslks Hdev Hgeo Hdlk Hbm Hout Hau Hcont").
     - (* ====== THE SHORT WRITE (and writei's -1): straight to +0xe2 ======
@@ -3648,12 +3656,12 @@ Section ProofFilewrite.
     : wp_filewrite_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks Q tr0.
   Proof.
     cbv beta delta [wp_filewrite_sconf_body].
-    intros pcE pj ret_tgt uaddr HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb
-           Hbelow.
+    intros pcE pj ret_tgt uaddr HK Hk Hj Hgs Hlens Hfnj Hfnps Hconw
+           Ha0 Ha2 Hn Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     (* "Hfin" -- NOT "Hin": the device arm already binds that name for its
        major-range fact. *)
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hfin Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv #Hfoff Hfin Hcont".
     (* PIN THE INDEX.  This contract carries [eb = true ->] and [cpu_own] at
        level 0, so [cpu_own_eb_agree] forces [b] to be the literal [true].
        That is what reconciles the [true]-spelled crossings (this contract's
@@ -3997,7 +4005,7 @@ Section ProofFilewrite.
              same cursor; the console arm's NEG disjunct is pure. *)
           rewrite /filewrite_arms.
           iSplitR; [iPureIntro; apply filewrite_ret_m1 |].
-          iApply (filewrite_extra_neg fn st n (us_M U) uaddr Q tr0 Hneg
+          iApply (filewrite_extra_neg st n (us_M U) uaddr Q tr0 Hneg
                     with "Hfin"). } }
       (* ---- 0 <= n : [Hn0] is now a fact of the code, not a premise ---- *)
       assert (Hn0 : (0 <= n)%Z) by lia.
@@ -4317,11 +4325,14 @@ Section ProofFilewrite.
                      uart_sent (fsc_uart) trs)%I with "[Hfin]" as "#Hsd".
           { destruct (decide (bv_unsigned (fc_major Cf) = ConsoleInv.CONSOLE))
               as [Hc | Hnc].
-            - iDestruct (filewrite_in_cons fn rd (bv_unsigned (fc_major Cf)) n
-                           (us_M U) uaddr Q tr0 Hc with "[Hfin]") as "[%Hp Hs]";
+            - iDestruct (filewrite_in_cons rd (bv_unsigned (fc_major Cf)) n
+                           (us_M U) uaddr Q tr0 Hc with "[Hfin]") as "Hs";
                 [rewrite Hstd; iExact "Hfin" |].
               iExists tr0. iSplitR; [done |].
-              iSplitR; [iPureIntro; intros _; exact Hp |]. iExact "Hs".
+              (* the pin is the CONTRACT'S OWN premise now, read at the
+                 major this arm is on *)
+              iSplitR; [iPureIntro; intros _; rewrite Hc; exact Hconw |].
+              iExact "Hs".
             - iExists []. iSplitR; [iPureIntro; intros Hc; by exfalso |].
               iSplitR; [iPureIntro; intros Hc; by exfalso |]. iExact "Hnil". }
           iModIntro.
@@ -4900,6 +4911,11 @@ Section ProofFilewrite.
                destruct wx; [reflexivity |]. exfalso.
                rewrite /fc_wbool Hwrc in Hwb. by vm_compute in Hwb. }
              subst wx.
+             (* ...and the descriptor's offset row, which is what the chain's
+                fires advance [f->off] out of (the piece-shape rule: each
+                node hands the shadow back unmoved). *)
+             iDestruct (foff_row_inode_of st rx true (bv_unsigned inumx) γox
+                          Hstx with "Hfoff") as "#Hoinvw".
              (* the BNE FALLS exactly when the two are equal *)
              iApply (wp_bne_fall_s_sconf (mword_of_int (FW + 0x34))
                        (mword_of_int 206 : mword 13) Ra4 Ra5 G7 (K - 12)%nat b
@@ -5432,7 +5448,7 @@ Section ProofFilewrite.
                            with "Hcg Hcnt Htext Hpc Hprocs
                                  Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                 [Hpriv] Hkenv
+                                 [Hpriv] Hkenv Hoinvw
                                  E8 E9 E10 E11 E12 E13 E14 E26 E15 E16 E17
                                  E22 E23 E24 E21 [E18 E19 E20 E25] [Hfin]").
                  { rewrite /file_ref /file_fields. iExists Cf.
@@ -5442,7 +5458,7 @@ Section ProofFilewrite.
                    iFrame "E18 E19 E20 E25". }
                  { (* the chain, at the loop's entry state *)
                    iApply fw_au_raw_init.
-                   iApply (filewrite_in_inode fn rx (bv_unsigned inumx) γox n
+                   iApply (filewrite_in_inode rx (bv_unsigned inumx) γox n
                              (us_M U) uaddr Q tr0 with "[Hfin]").
                    rewrite Hstx. iExact "Hfin". }
                  iIntros (CIDx Hsx mf rv P')

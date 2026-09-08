@@ -524,9 +524,19 @@ Section FdSlots.
     off_user_inv γo -∗ foff_row (FdOpen r w (FdInode i γo)).
   Proof. iIntros "$". Qed.
 
-  (* NO PERMIT ROW.  fileread and filewrite each move the offset shadow's
-     half inside their own commit, so no contract asks a descriptor's row for
-     the bare permit; a holder that wants one opens [off_user_inv] itself
+  (* ...and the reading a walk needs, at a state it holds only through an
+     EQUATION: a descriptor's shape is derived from its content, never
+     matched on.  This is what hands [FsAbsReadFire.arf_read_fire] /
+     [FsAbsWriteFire.wrf_awrite_fire] the invariant they advance the
+     offset out of. *)
+  Lemma foff_row_inode_of (st : fdstate) (r w : bool) (i : Z) (γo : gname) :
+    st = FdOpen r w (FdInode i γo) -> foff_row st -∗ off_user_inv γo.
+  Proof. intros ->. iIntros "$". Qed.
+
+  (* NO PERMIT ROW.  fileread and filewrite take the INVARIANT itself --
+     [foff_row] beside their caller-supplied input -- and advance the
+     shadow inside their own fire lemma, so no contract asks a descriptor's
+     row for the bare permit; a holder that wants one derives it
      ([OffGv.off_user_inv_permit]). *)
 
   Definition foff_rows (sts : list fdstate) : iProp Σ :=
