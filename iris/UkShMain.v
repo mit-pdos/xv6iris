@@ -71,6 +71,9 @@ Require User.ShSyms User.ShInstrs.
 Local Open Scope Z_scope.
 Import Defs.
 
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkShMain.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -80,6 +83,15 @@ Section UkShMain.
   (* the four ghost names a program proof runs at, as every file in the
      lane binds them *)
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
   Local Notation a5_idx := (mword_of_int 15 : mword 5).
@@ -481,7 +493,11 @@ Section UkShMain.
     ushp_tokens len f 0 toks ->
     (length toks < 10)%nat ->
     0 < s0 -> s0 + Z.of_nat len + 1 < Z64 -> s0 + Z.of_nat len < 2 ^ 38 ->
-    shk_code γt -∗ shp_code γt -∗ shp_rodata γt -∗ ush_jtab γt -∗
+    shk_code γt -∗
+    (* the exec deposit's supplier -- [UkRun.uxsup], see
+       [UkShRun.wp_kshr_runcmd]: this walk reaches runcmd's EXEC arm *)
+    uxsup -∗
+    shp_code γt -∗ shp_rodata γt -∗ ush_jtab γt -∗
     ustr γd (DfracOwn 1) s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
@@ -491,7 +507,7 @@ Section UkShMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38.
-    iIntros "#Hcode #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd HM Hrun".
+    iIntros "#Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd HM Hrun".
     (* the line's own bytes are non-NUL, which is what makes each token a
        string once the cut lands *)
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
@@ -584,11 +600,11 @@ Section UkShMain.
                                 (ushp_nulfold toks (ushp_ext len f)) toks))
             + (2 + (UkShDiag.ush_Dg + (60 + n))))%nat
       by (cbn [ush_ht]; lia).
-    iApply (UkShDiag.wp_kshr_runcmd_final Hclw
+    iApply (UkShDiag.wp_kshr_runcmd_final Hpsok Hclw
               (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks))
               ltac:(cbn [ush_simple]; exact I)
               γt γd γs γfd h4 m4 p szv ld (60 + n) Ha0_4
-              with "Hcode Hjt Htree Hsz Hstd Hrun").
+              with "Hcode Hxs Hjt Htree Hsz Hstd Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -626,7 +642,11 @@ Section UkShMain.
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
-    shk_code γt -∗ shp_code γt -∗ shp_rodata γt -∗ ush_jtab γt -∗
+    shk_code γt -∗
+    (* the exec deposit's supplier -- [UkRun.uxsup], see
+       [UkShRun.wp_kshr_runcmd]: this walk reaches runcmd's EXEC arm *)
+    uxsup -∗
+    shp_code γt -∗ shp_rodata γt -∗ ush_jtab γt -∗
     ustr γd (DfracOwn 1) s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
@@ -637,13 +657,13 @@ Section UkShMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38 Hszlo Hszal Hszok.
-    iIntros "#Hcode #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd HM Hrun".
+    iIntros "#Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd HM Hrun".
     iApply (wp_kshm_child (UkShMalloc.ushm_fresh γd γs sz) (sz + 65536)
-              (UkShMalloc.ushm_malloc_ok_holds γt γd γs γfd Hsbrk sz
+              (UkShMalloc.ushm_malloc_ok_holds γt γd γs γfd Hpsok Hsbrk sz
                  Hszlo Hszal Hszok)
               Hclw h m dw dv s0 len f toks ld n
               Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38
-              with "Hcode Hpcode Hpro Hjt Hline Hws Hsy Hstd HM Hrun").
+              with "Hcode Hxs Hpcode Hpro Hjt Hline Hws Hsy Hstd HM Hrun").
   Qed.
 
 End UkShMain.

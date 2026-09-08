@@ -79,6 +79,8 @@ Require Import FsFdMirror.   (* [umirror]/[mcur]/[ufs_step]/[uenr_dom] *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UexecRetFs.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -90,6 +92,8 @@ Section UexecRetFs.
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context `{!ghost_varG Σ umirror}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* =================================================================== *)
   (* SS1 THE CONTRACT, as one guarded fixpoint -- UexecRet.v SS3 with the *)
@@ -97,11 +101,13 @@ Section UexecRetFs.
   (* =================================================================== *)
 
   (* (A) what user execution hands back, at the fixpoint variable [X].
-     Differences from [UexecRet.uexec_ret_F], and there are exactly two:
-     the returning-syscall arm case-splits on [uenr_dom n], and where that
-     bit is set the arm is [plain ∨ enriched] -- the PROCESS supplies the
-     return, so the disjunction is the process's choice and the plain
-     branch is today's arm verbatim. *)
+     The one difference from [UexecRet.uexec_ret_F]: the returning-syscall
+     arm case-splits on [uenr_dom n], and where that bit is set the RETURN
+     is [plain ∨ enriched] -- the PROCESS supplies it, so the disjunction is
+     the process's choice and the plain branch is [UexecRet]'s arm verbatim.
+     The DEPOSIT sits in front of the disjunction and the syscall's armed
+     post comes back under each branch's [∀ r], exactly as in the plain
+     arm. *)
   Definition uexec_ret_fs_F (γm : gname) (X : uvis -d> iPropO Σ)
       (sc : mword 64) (W : uvis) : iProp Σ :=
     (if decide (sc = uecall_scause) then
@@ -123,7 +129,13 @@ Section UexecRetFs.
              X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
                   fdv' cw')))
        else if uenr_dom n then
-         ((∀ (r : mword 64) (M' : gmap Z (bv 8))
+         (* THE DEPOSIT, in front of the whole disjunction: the enriched arm
+            is a CHOICE OF RETURN, not a different contract, so the process
+            owes the same bundle on either branch -- and it owes it at THIS
+            tier's family, which is what [UexecSG.sbundle_mono] carries it
+            to ([uexec_ret_fs_of]). *)
+         (sbundle X n W ∗
+          ((∀ (r : mword 64) (M' : gmap Z (bv 8))
              (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate)
              (cw' : Z),
              ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
@@ -138,6 +150,7 @@ Section UexecRetFs.
                 of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
              ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
              ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
+             spost uslot n W r -∗
              X (bump W r M' π' szv' fdv' cw'))
           ∨ (∃ u : umirror,
                mcur γm u ∗
@@ -156,8 +169,14 @@ Section UexecRetFs.
                   ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
                   ⌜ufs_step n (uvis_tf W) (uvis_M W) r u u'⌝ -∗
                   mcur γm u' -∗
-                  X (bump W r M' π' szv' fdv' cw'))))
-       else (∀ (r : mword 64) (M' : gmap Z (bv 8))
+                  (* the syscall's armed post, at the PLAIN family: this tier
+                     enriches the RETURN CHANNEL, not the deposit's contents,
+                     so what comes back is what [UexecRet.uexec_ret_ret_F]
+                     hands back and [uexec_ret_fs_of] passes it straight on *)
+                  spost uslot n W r -∗
+                  X (bump W r M' π' szv' fdv' cw')))))
+       else (sbundle X n W ∗
+             (∀ (r : mword 64) (M' : gmap Z (bv 8))
                (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate)
                (cw' : Z),
                ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
@@ -170,7 +189,8 @@ Section UexecRetFs.
                   of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
                ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
                ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
-               X (bump W r M' π' szv' fdv' cw'))
+               spost uslot n W r -∗
+               X (bump W r M' π' szv' fdv' cw')))
      else X W)%I.
 
   (* (B) the kernel obligation, and (C) the bundle -- UexecRet.v verbatim
@@ -299,14 +319,24 @@ Section UexecRetFs.
           [ exact Hr | exact Hfv | exact Hcv ].
       - iIntros (fdv' cw') "%Hfvl %Hcvl". iApply "Hup".
         iApply ("Hc" $! fdv' cw' with "[%] [%]"); [ exact Hfvl | exact Hcvl ]. }
+    (* THE DEPOSIT CROSSES BY [UexecSG.sbundle_mono]: the bundles are
+       covariant in the slot family (their only occurrence of it is exec's
+       wand CONCLUSION), so the upgrader that carries the returned keys
+       carries the bundle too.  The armed post is at the plain family on
+       both sides and passes straight through. *)
+    iDestruct "Hret" as "[Hb Hret]".
+    iDestruct (sbundle_mono uslot (uslot_fs γm) (usys_num (uvis_tf W)) W
+                 with "Hup Hb") as "Hb".
     destruct (uenr_dom (usys_num (uvis_tf W))) eqn:He.
-    - iLeft. iIntros (r M' π' szv' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow".
+    - iFrame "Hb". iLeft.
+      iIntros (r M' π' szv' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow Hpost".
       iApply "Hup".
-      iApply ("Hret" $! r M' π' szv' fdv' cw' with "[%] [%] [%] [%]");
+      iApply ("Hret" $! r M' π' szv' fdv' cw' with "[%] [%] [%] [%] Hpost");
         [exact Hok | exact Hfdok | exact Hpiperow | exact Hcwrow].
-    - iIntros (r M' π' szv' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow".
+    - iFrame "Hb".
+      iIntros (r M' π' szv' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow Hpost".
       iApply "Hup".
-      iApply ("Hret" $! r M' π' szv' fdv' cw' with "[%] [%] [%] [%]");
+      iApply ("Hret" $! r M' π' szv' fdv' cw' with "[%] [%] [%] [%] Hpost");
         [exact Hok | exact Hfdok | exact Hpiperow | exact Hcwrow].
   Qed.
 
@@ -400,6 +430,11 @@ Section UexecRetFs.
           needs that slot's fragment.  Bundling the two is what keeps every
           lemma that opens and closes a [urun_fs] unchanged. *)
        ufd_state γfd fdv ∗
+       (* the program's deposit supplier and its key-free minting law, exactly
+          as [UkRun.urun] carries them: the enriched arm demands the same
+          bundle the plain one does, and [urun_fs_urun] hands this straight
+          over *)
+       udep ∗
        uvb_fs (CID := h) γm C pt Rfd Rut sz pm fdv cw M m pc)%I.
 
   (* ...AND THE LEDGER COMES OUT WITH IT.  [urun_fs] bundles the ledger with
@@ -414,7 +449,7 @@ Section UexecRetFs.
   Proof.
     iIntros "H".
     iDestruct "H" as (C pt Rfd Rut sz M pm fdv cw)
-      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct "Hufd" as "[Hufd Hstd]".
     iSplitR "Hstd"; [| iExact "Hstd"].
     (* the fs bundle's pieces are pinned at the ambient (its ∃ xi is
@@ -423,7 +458,7 @@ Section UexecRetFs.
     iSplitR; [iPureIntro; exact Hlo |].
     iSplitR; [iPureIntro; exact Hpm |].
     iSplitR; [iPureIntro; exact HRut |].
-    iFrame "Hheap Hstk Hufd".
+    iFrame "Hheap Hstk Hufd Hdep".
     rewrite /uvb /uvb_F /uvb_fs /uvb_fs_F.
     iDestruct "Hb" as
       "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -519,10 +554,17 @@ Module Type FDROW_UKFS_ENGINE.
   Parameter wp_uk_ecall_fs :
     forall `{!riscvGS Σ} `{GEN : GenId} `{XI : CurCtx}
            `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror} `{!ufdG Σ}
+           `{SG : uexecSG Σ} `{PS : uprogSG Σ}
       (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (n : Z) (u : umirror) (pl : list (bv 8)) (dq : dfrac) (avail : nat),
       usys_num (tf_of m pc) = n ->
       uenr_dom n = true ->
+      (* THE DEPOSIT'S ADMISSION.  The arm demands the process's bundle for
+         this number, and the leaf mints it from the supplier [urun_fs]
+         carries ([UkRun.udep]); every enriched row is a number the caller's
+         program undertakes to pay for.  A pure premise, so it costs the
+         caller one application of its own blanket. *)
+      psok n ->
       is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
       ⊢ wp_uk_ecall_fs_body γm γt γd γs γfd h m pc n u pl dq avail.
 End FDROW_UKFS_ENGINE.

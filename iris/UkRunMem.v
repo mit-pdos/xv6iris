@@ -129,11 +129,15 @@ Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkRunMem.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* ===================================================================== *)
   (* THE ACCESS BRIDGE.  Every premise a UkStore/UkLoad leaf asks for,      *)
@@ -184,7 +188,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -201,7 +205,7 @@ Section UkRunMem.
                     rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     rewrite Hua uM_store8_umem_write.
-    iApply (urun_close with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_sw (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -218,7 +222,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 4 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -235,7 +239,7 @@ Section UkRunMem.
                     rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     rewrite Hua (uM_store_umem_write M a 4%nat (m !!! Regidx rs2)).
-    iApply (urun_close with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_csdsp (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -252,7 +256,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -270,7 +274,7 @@ Section UkRunMem.
                     rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     rewrite Hua uM_store8_umem_write.
-    iApply (urun_close with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_csd (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -289,7 +293,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros He1 He2 Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -307,7 +311,7 @@ Section UkRunMem.
                     rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     rewrite Hua uM_store8_umem_write.
-    iApply (urun_close with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_csw (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -326,7 +330,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros He1 He2 Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 4 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -344,7 +348,7 @@ Section UkRunMem.
                     rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     rewrite Hua (uM_store_umem_write M a 4%nat (m !!! Regidx rs2)).
-    iApply (urun_close with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   (* sb rs2, imm(rs1) -- the BYTE store.  No alignment to ask for, and the
@@ -362,7 +366,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_ubyte with "Hheap Hw") as %(HM & Hok & Hbnd).
     destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
@@ -377,7 +381,7 @@ Section UkRunMem.
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     rewrite Hua (uM_store_umem_write M a 1%nat (m !!! Regidx rs2)).
     cbn [umem_write]. rewrite Z.add_0_r.
-    iApply (urun_close with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_ld (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -398,7 +402,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -413,7 +417,7 @@ Section UkRunMem.
                     rewrite Hua; exact (Hmap j Hj))
               ltac:(rewrite Hua; exact (eq_sym (uM_word_w8 M a w Hmap)))
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_cldsp (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -433,7 +437,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -449,7 +453,7 @@ Section UkRunMem.
                     rewrite Hua; exact (Hmap j Hj))
               ltac:(rewrite Hua; exact (eq_sym (uM_word_w8 M a w Hmap)))
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_cld (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -472,7 +476,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -486,7 +490,7 @@ Section UkRunMem.
               Hok Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap)
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_lw (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -506,7 +510,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -519,7 +523,7 @@ Section UkRunMem.
               Hok Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_lwu (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -539,7 +543,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -552,7 +556,7 @@ Section UkRunMem.
               Hok Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_clw (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -575,7 +579,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz _ a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -589,7 +593,7 @@ Section UkRunMem.
               Hok Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   (* lbu rd, imm(rs1) -- the BYTE load.  This is what a string walk runs on. *)
@@ -611,7 +615,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_ubyte with "Hheap Hw") as %(HM & Hok & Hbnd).
     destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
@@ -623,7 +627,7 @@ Section UkRunMem.
               Hok Hcan
               ltac:(rewrite Hua; exact HM) eq_refl
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep"). iApply ("Hcont" with "Hw").
   Qed.
 
   (* A LOAD OUT OF THE TEXT HALF.  [wp_uk_lbu] above reads a [γd] byte, and
@@ -654,7 +658,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hrd. iIntros "#Hi #Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_text with "Hheap Hw") as %(HM & Hok & Hbnd).
     iDestruct (uheap_text_nw with "Hheap Hw") as %Hnw.
@@ -674,7 +678,7 @@ Section UkRunMem.
               Htok Hcan
               ltac:(rewrite Hua; exact HM) eq_refl
               with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep").
     iApply "Hcont".
   Qed.
 

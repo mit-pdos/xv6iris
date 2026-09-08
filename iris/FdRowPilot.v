@@ -178,8 +178,12 @@ Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section PilotPure.
   Context `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* step 1's forcing: at the seed, "console" does not resolve *)
   Lemma era0_resolve_console_miss (u : umirror) :
@@ -453,6 +457,13 @@ Section Walk.
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context `{!ghost_varG Σ umirror}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it; the program's
+     kernel-side constructor discharges it (ARM-a's generic instance is
+     [psok := fun _ => True]).  exec is excluded by the minting law itself. *)
+  Hypothesis Hpsok : forall k : Z, k <> UsysMemOk.USYS_exec -> psok k.
 
   (* the mode word the row reads is a1, off the trapframe the key carries *)
   Lemma ufs_arg1_tf_of (m : regfile) (pc : mword 64) :
@@ -498,7 +509,8 @@ Section Walk.
     intros Hseed Hop1 Hmk Hma Hmi Hn Hom Hal.
     iIntros "#Hi Hrun Hm Hstr Hcont".
     iPoseProof (E.wp_uk_ecall_fs γm γt γd γs γfd h m pc FsFdMirror.USYS_open
-                  u2 console_str dq avail Hn uenr_open Hal) as "Hleaf".
+                  u2 console_str dq avail Hn uenr_open
+                  ltac:(apply Hpsok; vm_compute; discriminate) Hal) as "Hleaf".
     iEval (rewrite /wp_uk_ecall_fs_body) in "Hleaf".
     iApply ("Hleaf" with "Hi Hrun Hm Hstr [Hcont]").
     iIntros (h' r u3) "%Hstep Hm Hstr Hrun".

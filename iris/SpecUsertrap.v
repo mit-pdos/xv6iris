@@ -123,8 +123,9 @@ Require Import TfUser.     (* [tf_ueq] *)
 Require Import UserPerm.   (* [perm_of] -- the per-page permission view *)
 Require Import UsysMemOk.  (* [uecall_scause] *)
 Require Import UexecRet.   (* [tf_ueq_resume_gpr0] / [tf_ueq_resume_pc] -- the exec rows' congruences *)
-Require Import UexecRetExec.   (* [uslot_x] / [xbundle] -- the exec channel's slot and bundle *)
-Require Import UexecExecInst.  (* the [xbundle] instance: the process's exec bundle *)
+Require Import UexecSG.        (* [uexecSG]: [sbundle] / [spost] / [skey_eq] *)
+Require Import UexecApply.     (* [uslot_key_cong] -- the slot across the re-key *)
+Require Import UexecExecInst.  (* the class INSTANCE: the process's exec bundle *)
 Require Import FirstTok.       (* [fsabs_env] -- what the loop mints the bundle from *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -356,28 +357,61 @@ Lemma ut_pipe_ecall_quiet (sc_v : mword 64) (tf tf' : list (mword 64))
 Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
 
 (* ===================================================================== *)
-(* THE EXEC CHANNEL THROUGH USERTRAP (lane E3b).  The process offers its    *)
-(* exec bundle at an exec ecall ([ut_exec_in]: [UexecExecInst.exec_xbundle]  *)
-(* at the trapping key, i.e. [SpecSyscall.sysc_exec_in] at the record       *)
-(* usertrap was entered at) and gets the kernel's answer back               *)
-(* ([ut_exec_out]: [SpecSyscall.sysc_exec_out] re-spelled at the round's    *)
-(* entry trapframe).  Both are guarded on the CAUSE and the NUMBER, so the  *)
-(* four transparent arms discharge them by refuting the guard.              *)
+(* THE SYSCALL CHANNEL THROUGH USERTRAP.  Two readers, and the loop picks   *)
+(* by number.                                                              *)
+(*                                                                          *)
+(* [ut_sys_in n] / [ut_sys_out n] are the PER-NUMBER pair: the process      *)
+(* deposits its bundle for the number it trapped at                         *)
+(* ([UexecSG.sbundle], which at [UexecExecInst]'s instance is exec's AU     *)
+(* bundle at 7 and [emp] elsewhere) and gets the syscall's armed post back  *)
+(* under the arm's own return value ([UexecSG.spost]).  This is the shape   *)
+(* [UexecRet.uexec_ret_F]'s returning arm is stated at, and the shape the   *)
+(* next round fills as each syscall's contract is turned on.                *)
+(*                                                                          *)
+(* [ut_exec_out] is EXEC'S OWN out-shape and stays beside them: exec is the *)
+(* one entry whose round says nothing, because the record it leaves is a    *)
+(* DIFFERENT program's.  Its three disjuncts -- the failure facts, the new  *)
+(* image's slot, the loadability gap -- have no per-number reading.         *)
+(*                                                                          *)
+(* All three are guarded on the CAUSE and the NUMBER, so the four           *)
+(* transparent arms discharge them by refuting the guard.                   *)
 (*                                                                          *)
 (* THE FAILURE ARM IS DELIBERATELY [UexecRound.uround_ok]'s returning       *)
 (* disjunct at [r = -1] -- the bump plus [UsysMemOk.usys_mem_ok]'s exec     *)
 (* row -- so the U-mode loop pays it with the returning-arm proof it        *)
-(* already has ([UexecApplyX.uexec_ret_x_round_slot]).  It is stated at    *)
+(* already has ([UexecApply.uexec_ret_round_slot]).  It is stated at        *)
 (* the round's OWN entry trapframe (the prologue's epc rewrite applied,    *)
 (* exactly [ut_round]'s) because the bump reads the epc.                   *)
 (* ===================================================================== *)
-Definition ut_exec_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (sc_v : mword 64) (tf : list (mword 64)) (U : ustate) (sts : list fdstate)
-    : iProp Σ :=
-  (⌜sc_v = uecall_scause /\ usys_num tf = USYS_exec⌝ -∗
-     xbundle uslot_x (uvis_of U sts))%I.
+(* THE GUARD IS [UexecRet.uexec_dep_F]'s OWN CASE ANALYSIS, spelled out:
+   the cause is an ecall, the number is [n], and [n] is a RETURNING one --
+   exit returns nothing and fork runs no contract, so at those two the
+   process deposits nothing and the row must not ask for one. *)
+Definition ut_sys_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (n : Z) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
+    (sts : list fdstate) : iProp Σ :=
+  (⌜sc_v = uecall_scause /\ usys_num tf = n
+    /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
+     sbundle uslot n (uvis_of U sts))%I.
+
+(* ...AND THE ARMED POST BACK, at the same key and the round's return value.
+   NOT YET A ROW OF [usertrap_post]: at [UexecExecInst]'s instance [spost] is
+   [emp] at every number, so the loop's consumer
+   ([UexecApply.uexec_ret_round_slot_of]'s premise) discharges it from the
+   instance and no kernel-side producer owes anything.  Turning a syscall's
+   contract on is what makes this a row -- the dispatcher hands it back and
+   the round relays it, beside [ut_exec_out]. *)
+Definition ut_sys_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (n : Z) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
+    (sts : list fdstate) (r : mword 64) : iProp Σ :=
+  (⌜sc_v = uecall_scause /\ usys_num tf = n
+    /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
+     spost uslot n (uvis_of U sts) r)%I.
 
 Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
     (sc_v : mword 64) (tf : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
     (U' : ustate) (sts sts' : list fdstate) : iProp Σ :=
@@ -388,18 +422,30 @@ Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
               (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
               (uint (pv_sz (us_V U')))
          /\ sts' = sts⌝                       (* failed: the returning shape at r = -1 *)
-      ∨ uslot_x (uvis_of U' sts')                     (* loadable: the new image's slot *)
+      ∨ uslot (uvis_of U' sts')                       (* loadable: the new image's slot *)
       ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝))%I.   (* the gap *)
 
 (* the quiet readings, for the four non-ecall causes *)
-Lemma ut_exec_in_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (sc_v : mword 64) (tf : list (mword 64)) (U : ustate) (sts : list fdstate) :
-  sc_v <> uecall_scause -> ⊢ ut_exec_in sc_v tf U sts.
+Lemma ut_sys_in_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (n : Z) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
+    (sts : list fdstate) :
+  sc_v <> uecall_scause -> ⊢ ut_sys_in n sc_v tf U sts.
 Proof.
-  intros Hne. rewrite /ut_exec_in. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
+  intros Hne. rewrite /ut_sys_in. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
+Qed.
+
+Lemma ut_sys_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (n : Z) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
+    (sts : list fdstate) (r : mword 64) :
+  sc_v <> uecall_scause -> ⊢ ut_sys_out n sc_v tf U sts r.
+Proof.
+  intros Hne. rewrite /ut_sys_out. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
 Qed.
 
 Lemma ut_exec_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
     (sc_v : mword 64) (tf : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
     (U' : ustate) (sts sts' : list fdstate) :
@@ -408,24 +454,55 @@ Proof.
   intros Hne. rewrite /ut_exec_out. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
 Qed.
 
-(* the pre row's key congruence: the bundle reads the image, the a1 word
-   and the descriptor view off its key, and the guard the number -- which
-   is what carries it across the prologue's epc rewrite and uservec's save
-   walk ([UexecRetExec.xbundle_cong]) *)
-Lemma ut_exec_in_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (sc_v : mword 64) (tf tf' : list (mword 64)) (U U' : ustate)
+(* the pre row's key congruence: the bundle reads its key at
+   [UexecSG.skey_eq]'s six rows and the guard reads the number -- which is
+   what carries it across the prologue's epc rewrite and uservec's save
+   walk ([UexecSG.sbundle_cong]) *)
+Lemma ut_sys_in_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (n : Z) (sc_v : mword 64) (tf tf' : list (mword 64)) (U U' : ustate)
     (sts : list fdstate) :
   usys_num tf = usys_num tf' ->
   us_M U = us_M U' ->
+  tf_w (pv_tf (us_V U)) (tf_arg_idx 0) = tf_w (pv_tf (us_V U')) (tf_arg_idx 0) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 1) = tf_w (pv_tf (us_V U')) (tf_arg_idx 1) ->
+  tf_w (pv_tf (us_V U)) (tf_arg_idx 2) = tf_w (pv_tf (us_V U')) (tf_arg_idx 2) ->
   pv_cwi (us_V U) = pv_cwi (us_V U') ->
-  ut_exec_in sc_v tf U sts -∗ ut_exec_in sc_v tf' U' sts.
+  ut_sys_in n sc_v tf U sts -∗ ut_sys_in n sc_v tf' U' sts.
 Proof.
-  intros Hn HM Ha1 Hcw. rewrite /ut_exec_in. iIntros "H %Hc".
+  intros Hn HM Ha0 Ha1 Ha2 Hcw. rewrite /ut_sys_in. iIntros "H %Hc".
+  destruct Hc as (Hce & Hcn & Hcx & Hcf).
   iDestruct ("H" with "[%]") as "H";
-    [ split; [exact (proj1 Hc) | rewrite Hn; exact (proj2 Hc)] |].
-  iEval (rewrite (xbundle_cong uslot_x (uvis_of U sts) (uvis_of U' sts)
-                    HM Ha1 eq_refl Hcw)) in "H".
+    [ split_and!; [ exact Hce | rewrite Hn; exact Hcn | exact Hcx | exact Hcf ] |].
+  iEval (rewrite (sbundle_cong uslot n (uvis_of U sts) (uvis_of U' sts)
+                    ltac:(rewrite /skey_eq; split_and!;
+                          [ exact HM | exact Ha0 | exact Ha1 | exact Ha2
+                          | reflexivity | exact Hcw ]))) in "H".
+  iExact "H".
+Qed.
+
+(* ...and the post row's, at the same six rows: what comes back is read at
+   the same key ([UexecSG.spost_cong]) *)
+Lemma ut_sys_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (n : Z) (sc_v : mword 64) (tf tf' : list (mword 64)) (U U' : ustate)
+    (sts : list fdstate) (r : mword 64) :
+  usys_num tf' = usys_num tf ->
+  us_M U = us_M U' ->
+  tf_w (pv_tf (us_V U)) (tf_arg_idx 0) = tf_w (pv_tf (us_V U')) (tf_arg_idx 0) ->
+  tf_w (pv_tf (us_V U)) (tf_arg_idx 1) = tf_w (pv_tf (us_V U')) (tf_arg_idx 1) ->
+  tf_w (pv_tf (us_V U)) (tf_arg_idx 2) = tf_w (pv_tf (us_V U')) (tf_arg_idx 2) ->
+  pv_cwi (us_V U) = pv_cwi (us_V U') ->
+  ut_sys_out n sc_v tf U sts r -∗ ut_sys_out n sc_v tf' U' sts r.
+Proof.
+  intros Hn HM Ha0 Ha1 Ha2 Hcw. rewrite /ut_sys_out. iIntros "H %Hc".
+  destruct Hc as (Hce & Hcn & Hcx & Hcf).
+  iDestruct ("H" with "[%]") as "H";
+    [ split_and!; [ exact Hce | rewrite <- Hn; exact Hcn | exact Hcx | exact Hcf ] |].
+  iEval (rewrite (spost_cong uslot n (uvis_of U sts) (uvis_of U' sts) r
+                    ltac:(rewrite /skey_eq; split_and!;
+                          [ exact HM | exact Ha0 | exact Ha1 | exact Ha2
+                          | reflexivity | exact Hcw ]))) in "H".
   iExact "H".
 Qed.
 
@@ -437,6 +514,7 @@ Qed.
    a0 word, image, permission map and break -- all inside [tf_ueq]'s
    reach. *)
 Lemma ut_exec_out_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
     (sc_v : mword 64) (tf tf' : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
     (U' U'' : ustate) (sts sts' : list fdstate) :
@@ -464,7 +542,7 @@ Proof.
     + split; [| exact Hst]. rewrite HM Hpi Hsz.
       exact (usys_mem_ok_ueq _ _ _ _ _ _ _ _ _ _ Hu Hm).
   - iRight. iLeft.
-    iEval (rewrite (uslot_x_key_cong (uvis_of U' sts') (uvis_of U'' sts')
+    iEval (rewrite (uslot_key_cong (uvis_of U' sts') (uvis_of U'' sts')
                       (tf_ueq_resume_gpr0 _ _ Hu') (tf_ueq_resume_pc _ _ Hu')
                       (eq_sym HM) (eq_sym Hpi) (f_equal uint (eq_sym Hsz)) eq_refl
                       (eq_sym Hcwi)))
@@ -661,8 +739,8 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
     hw_config -∗
     minstret_inv -∗
     R pt' ksp U' sts' -∗
-    (* THE EXEC CHANNEL'S ANSWER (lane E3b), at the round's entry trapframe
-       and the record the round left -- see [ut_exec_out] *)
+    (* THE EXEC CHANNEL'S ANSWER, at the round's entry trapframe and the
+       record the round left -- see [ut_exec_out] *)
     ut_exec_out sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
       (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
       (uint (pv_sz (us_V U))) U' sts sts' -∗
@@ -733,8 +811,9 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
   gpr_file m -∗
   (* everything kernel-side, abstractly, AT THE ENTRY HART *)
   R CID pt ksp U sts -∗
-  (* the process's exec bundle, owed only at an exec ecall -- [ut_exec_in] *)
-  ut_exec_in sc_v (pv_tf (us_V U)) U sts -∗
+  (* the process's deposit for the number it trapped at, owed only at an
+     ecall -- [ut_sys_in] *)
+  (∀ n : Z, ut_sys_in n sc_v (pv_tf (us_V U)) U sts) -∗
   (* THE CROSSING: usertrap parks (yield, and every sleeping syscall), so it
      may return on a different hart -- and the bundle comes back at THAT
      hart, which is why [R] is a family (see the note above). *)

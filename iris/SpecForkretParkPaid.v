@@ -266,6 +266,8 @@ Definition forkret_park_paid_body
     |==> own_context cur_ctx ∗ proc_ctx γs pa.
 
 Require Import UserFd.   (* [ufdG] -- carried through the park/forkret seals *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Module Type FORKRET_PARK_PAID.
   (* the residue is the module-type parameter it is everywhere else *)
   (* ...AND THE PARK'S ONE PRODUCER-SIDE ENTRY, threaded with the rest.

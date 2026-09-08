@@ -123,12 +123,24 @@ Proof.
       rewrite E2. exact Hnul.
 Qed.
 
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkShCd.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation x0_idx := (mword_of_int 0 : mword 5).
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -303,8 +315,10 @@ Section UkShCd.
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun []").
     { iApply (uis_shk_cf8 with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0xcf8 : mword 64) 4
                  = mword_of_int 0xcfc)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1020,7 +1034,7 @@ Section UkShCd.
                    with "Hro") as "#Hfstr".
       replace (16 + (80 + n))%nat
         with (10 + (12 + (4 + (70 + n))))%nat by lia.
-      iApply (UkShDiag.wp_kshd_fprintf_s γt γd γs γfd false (DfracOwn 1)
+      iApply (UkShDiag.wp_kshd_fprintf_s γt γd γs γfd false (DfracOwn 1) Hpsok
                 4992 13%nat 10%nat (UkShDiag.shd_lit 4992)
                 (sh_buf + Z.of_nat k + 3) plen
                 (fun j : nat => g (k + 3 + j)%nat) h23 mI (70 + n)%nat

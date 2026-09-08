@@ -42,12 +42,24 @@ Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkCat.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -128,8 +140,10 @@ Section UkCat.
                                (mword_of_int 15 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun Hstd").
+              with "[] Hrun [] Hstd").
     { iApply (uis_cat_3ee with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1open : add_vec_int (mword_of_int 0x3ee : mword 64) 4
                    = mword_of_int 0x3f2)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -222,8 +236,10 @@ Section UkCat.
                                ltac:(vm_compute; discriminate));
                     exact Harg)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun Hfdh").
+              with "[] Hrun [] Hfdh").
     { iApply (uis_cat_3d6 with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1close : add_vec_int (mword_of_int 0x3d6 : mword 64) 4
                    = mword_of_int 0x3da)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -295,8 +311,10 @@ Section UkCat.
               (* ...and the three descriptor-moving numbers *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun []").
     { iApply (uis_cat_3ce with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1write : add_vec_int (mword_of_int 0x3ce : mword 64) 4
                    = mword_of_int 0x3d2)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -422,8 +440,10 @@ Section UkCat.
                                (mword_of_int 5 : mword 64));
                     vm_compute; reflexivity)
               Ha1r Hcntr ltac:(vm_compute; reflexivity)
-              with "[] Hbs Hrun").
+              with "[] Hbs Hrun []").
     { iApply (uis_cat_3c6 with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1r : add_vec_int (mword_of_int 0x3c6 : mword 64) 4
                   = mword_of_int 0x3ca)
       by (apply bv_eq; vm_compute; reflexivity).

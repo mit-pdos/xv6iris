@@ -112,12 +112,23 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
 Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkSh.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -261,7 +272,7 @@ Section UkSh.
     urun γt γd γs γfd h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _ & _)".
     iDestruct (uheap_ubyte with "Hh Hb") as %(_ & _ & Hbnd).
     iPureIntro. exact Hbnd.
   Qed.
@@ -292,11 +303,11 @@ Section UkSh.
     ⌜ m !!! Regidx x0_idx = zero_reg ⌝ ∗ urun γt γd γs γfd h m pc avail.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
     iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
-    iFrame "Hheap Hstk Hufd Hb".
+    iFrame "Hheap Hstk Hufd Hdep Hb".
     iPureIntro. split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
@@ -391,7 +402,9 @@ Section UkSh.
     iApply (wp_uk_ecall_quiet γt γd γs γfd h1 m1 (mword_of_int pc1) n avail
               Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop
               ltac:(rewrite E12; exact Hal2)
-              with "Ci1 Hrun").
+              with "Ci1 Hrun []").
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     rewrite E12.
     iIntros (h2 ret) "Hrun".
     set (m2 := <[Regidx a0_idx := ret]> m1).
@@ -461,7 +474,9 @@ Section UkSh.
     (* ---- pc1  ecall -- OPEN, which moves the descriptor table ---- *)
     iApply (wp_uk_ecall_open γt γd γs γfd h1 m1 (mword_of_int pc1) l avail
               Hno ltac:(rewrite E12; exact Hal2)
-              with "Ci1 Hrun Hstd").
+              with "Ci1 Hrun [] Hstd").
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     rewrite E12.
     (* the handle is FORWARDED: sh's console loop closes what it opened *)
     iIntros (h2 ret) "Hal Hrun".
@@ -543,7 +558,9 @@ Section UkSh.
                                ltac:(vm_compute; discriminate));
                     exact Harg)
               ltac:(rewrite E12; exact Hal2)
-              with "Ci1 Hrun Hfdh").
+              with "Ci1 Hrun [] Hfdh").
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     rewrite E12.
     (* close of an OPEN descriptor returns 0; sh does not read it *)
     iIntros (h2 ret) "_ Hrun".
@@ -2881,8 +2898,7 @@ Section UkSh.
     iApply (wp_uk_caddi16sp_up γt γd γs γfd h32 r10 (mword_of_int 0xb1c)
               (mword_of_int 6 : mword 6) 12 nn
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "[] [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12]
-                    Hrun").
+              with "[] [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12] Hrun").
     { iApply (uis_shk_b1c with "Hcode"). }
     { rewrite Hspr10 Hup.
       iApply (ush_stack_12_close sp0 with
@@ -5619,6 +5635,15 @@ Section UkShLeaf.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Lemma ush_read_leaf_holds :
     forall (h : CpuId) (m : regfile) (pc : mword 64) (a : Z) (k : nat)
@@ -5648,7 +5673,9 @@ Section UkShLeaf.
               (bv_signed (subrange_vec_dec
                             (m !!! Regidx (mword_of_int 12 : mword 5)) 31 0
                           : mword 32))
-              k f avail Hn eq_refl Hbound Hal with "Hi Hrun Hbuf").
+              k f avail Hn eq_refl Hbound Hal with "Hi Hrun [] Hbuf").
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
     iApply ("Hcont" $! h' r d g with "[%] [%] Hbuf Hrun");
       [ lia | exact Hgf ].

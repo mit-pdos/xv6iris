@@ -124,11 +124,16 @@ Require Import FdSlots.  (* [fdstate] -- the descriptor ledger's states *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkShDiagStr.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* ONE BYTE OF A STRING, IN WHICHEVER HALF IT LIVES -- AND AT WHATEVER
      SHARE.  [tx] picks the half; [dq] is the DATA half's share and the text
@@ -268,7 +273,7 @@ Section UkShDiagStr.
     ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _ & _)".
     destruct tx.
     - iDestruct "Hb" as "#Hb".
       iDestruct (uheap_text with "Hh Hb") as %(_ & _ & Hbnd).
@@ -359,6 +364,8 @@ Section UkShDiagLit.
   Context `{!riscvGS Σ}.
 
   Context `{!ufdG Σ}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
   (* the literal, as the resource vprintf reads *)
   Lemma shd_lit_str (γt : gname) (base : Z) (len : nat) :
     shd_lit_ok base len = true ->
@@ -396,6 +403,15 @@ Section UkShDiagPutc.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -648,7 +664,7 @@ Section UkShDiagPutc.
     assert (Hra5 : m5 !!! Regidx ra_idx = (mword_of_int 0xd44 : mword 64))
       by exact (upd_eq m4 (Regidx ra_idx) (regval_into_reg _)).
     (* ---- write(fd, sp0-17, 1) -- the QUIET row: no heap effect at all ---- *)
-    iApply (wp_ksh_write γt γd γs γfd h8 m5 n with "Hcode Hrun").
+    iApply (wp_ksh_write γt γd γs γfd Hpsok h8 m5 n with "Hcode Hrun").
     iIntros (h9 ret) "Hrun".
     assert (Eret : ret_pc (m5 !!! Regidx ra_idx) = (mword_of_int 0xd44 : mword 64))
       by (rewrite Hra5; apply bv_eq; vm_compute; reflexivity).
@@ -829,6 +845,15 @@ Section UkShDiagVprintf.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -1813,7 +1838,7 @@ Section UkShDiagVprintf.
     assert (Hra4 : m4 !!! Regidx ra_idx = (mword_of_int 0xe28 : mword 64))
       by exact (upd_eq m3 (Regidx ra_idx) (regval_into_reg _)).
     (* ---- putc(fd, c) ---- *)
-    iApply (wp_kshd_putc γt γd γs γfd h6 m4 n with "Hcode Hrun").
+    iApply (wp_kshd_putc γt γd γs γfd Hpsok h6 m4 n with "Hcode Hrun").
     iIntros (h7 m5) "%Hcs Hrun".
     assert (Eret : ret_pc (m4 !!! Regidx ra_idx) = (mword_of_int 0xe28 : mword 64))
       by (rewrite Hra4; apply bv_eq; vm_compute; reflexivity).
@@ -2928,6 +2953,15 @@ Section UkShDiagVprintfS.
   Context (tx : bool).
   (* the share the DATA half is borrowed at; the text half ignores it *)
   Context (dqs : dfrac).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -2985,7 +3019,7 @@ Section UkShDiagVprintfS.
     - (* one plain round, then the rest *)
       assert (Hslt : (S i0 < len)%nat) by lia.
       iDestruct (utext_str_byte γt a len f (S i0) Hslt with "Hstr") as "#Hb1".
-      iApply (wp_kshd_vprintf_step γt γd γs γfd m0 sp0 fd ap a i0 (f i0)
+      iApply (wp_kshd_vprintf_step γt γd γs γfd Hpsok m0 sp0 fd ap a i0 (f i0)
                 (f (S i0)) h m n Ha0 ltac:(lia) (Hpct i0 ltac:(lia)) Hinv Hs1
                 with "Hcode Hb1 Hrun").
       iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
@@ -3064,7 +3098,7 @@ Section UkShDiagVprintfS.
     urun γt γd γs γfd h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _ & _)".
     iDestruct (uheap_ubyte with "Hh Hb") as %(_ & _ & Hbnd).
     iPureIntro. exact Hbnd.
   Qed.
@@ -3260,7 +3294,7 @@ Section UkShDiagVprintfS.
                  := regval_into_reg (mword_of_int 0xfe2 : mword 64)]> m1).
     assert (Hra2 : m2 !!! Regidx ra_idx = (mword_of_int 0xfe2 : mword 64))
       by exact (upd_eq m1 (Regidx ra_idx) (regval_into_reg _)).
-    iApply (wp_kshd_putc γt γd γs γfd h2 m2 n with "Hcode Hrun").
+    iApply (wp_kshd_putc γt γd γs γfd Hpsok h2 m2 n with "Hcode Hrun").
     iIntros (h3 m3) "%Hcs Hrun".
     assert (Eret : ret_pc (m2 !!! Regidx ra_idx)
                    = (mword_of_int 0xfe2 : mword 64))
@@ -5445,7 +5479,7 @@ Section UkShDiagVprintfS.
     rewrite E562.
     iIntros (h5) "Hrun".
     (* ---- and the rest of the string, which has no '%' left in it ---- *)
-    iApply (wp_kshd_vprintf_loop γt γd γs γfd m (m !!! Regidx csp_rs1) fd
+    iApply (wp_kshd_vprintf_loop γt γd γs γfd Hpsok m (m !!! Regidx csp_rs1) fd
               (mword_of_int (apz + 8)) a len f (S (S q))
               (len - S (S (S q)))%nat Ha0 Habnd
               ltac:(intros j Hj; apply Hpct; lia) eq_refl Hal8 Hlo
@@ -5485,6 +5519,15 @@ Section UkShDiagFprintf.
   Context (tx : bool).
   (* the share the DATA half is borrowed at; the text half ignores it *)
   Context (dqs : dfrac).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -6671,7 +6714,7 @@ Section UkShDiagFprintf.
     2:{ iIntros (h' m') "_ %Hcs Hrun".
         iApply ("Hcont" $! h' m' with "[] Hrun"). iPureIntro. exact Hcs. }
     iIntros (h' m') "%Ha1' %Ha2' %Hra' Hu6 Hrun Hk".
-    iApply (wp_kshd_vprintf γt γd γs γfd a len f h' m' n
+    iApply (wp_kshd_vprintf γt γd γs γfd Hpsok a len f h' m' n
               Ha0 Habnd Hlen Hpct Ha1' with "Hcode Hstr Hrun").
     iIntros (h'' m'') "%Hcs Hrun".
     assert (Eret : ret_pc (m' !!! Regidx ra_idx)
@@ -6720,7 +6763,7 @@ Section UkShDiagFprintf.
               a h m n Ha1 with "Hcode [Hsstr] Hrun Hcont").
     iIntros (h' m') "%Ha1' %Ha2' %Hra' Hu6 Hrun Hk".
     rewrite Ha2.
-    iApply (wp_kshd_vprintf_s γt γd γs γfd tx dqs a len q f
+    iApply (wp_kshd_vprintf_s γt γd γs γfd tx dqs Hpsok a len q f
               (uint (m !!! Regidx csp_rs1) - 48) sa (DfracOwn 1) slen sf
               h' m' n Ha0 Habnd Hq2 Hfq Hfsq Hpct Hc1d Hc1u Hc1x Hc2set
               Hapal Hsanz Ha1' Ha2'
@@ -6786,6 +6829,15 @@ Section UkShDiagFmt.
   Context `{!riscvGS Σ}.
 
   Context `{!ufdG Σ}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
   (* the literal, cut out of the image the caller holds *)
   Lemma shd_fmt_str (γt : gname) (base : Z) (len : nat) :
     shd_fmt_ok base len = true ->
@@ -6828,6 +6880,15 @@ Section UkShDiagRun.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -6967,7 +7028,7 @@ Section UkShDiagRun.
                      ltac:(vm_compute; discriminate)).
       exact Ha2. }
     (* ---- fprintf(2, <fmt>, <the string>) ---- *)
-    iApply (wp_kshd_fprintf_s γt γd γs γfd tx dqs fa flen fq (shd_lit fa)
+    iApply (wp_kshd_fprintf_s γt γd γs γfd tx dqs Hpsok fa flen fq (shd_lit fa)
               sa slen sf h4 m4 n
               Hfa0 Hfahi Hq2 Hpq Hps
               (fun j Hj Hne => shd_nopct_ok fa flen fq j Hnp Hj Hne)
@@ -7183,6 +7244,15 @@ Section UkShDiagLeaf.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation s1_idx := (mword_of_int 9 : mword 5).
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
@@ -7230,21 +7300,21 @@ Section UkShDiagLeaf.
       + iDestruct (shd_msg_str γt γd DfracDiscarded 0x1298 4%nat
                      ltac:(vm_compute; reflexivity) ltac:(lia)
                      with "Hro") as "#Hs".
-        iApply (wp_kshd_panic γt γd γs γfd true DfracDiscarded 0x1298 4%nat (shd_lit 0x1298)
+        iApply (wp_kshd_panic γt γd γs γfd Hpsok true DfracDiscarded 0x1298 4%nat (shd_lit 0x1298)
                   h m n ltac:(lia)
                   (Hmoi 0x1298 Hm1)
                   with "Hcode Hro Hs Hrun").
       + iDestruct (shd_msg_str γt γd DfracDiscarded 0x12a0 6%nat
                      ltac:(vm_compute; reflexivity) ltac:(lia)
                      with "Hro") as "#Hs".
-        iApply (wp_kshd_panic γt γd γs γfd true DfracDiscarded 0x12a0 6%nat (shd_lit 0x12a0)
+        iApply (wp_kshd_panic γt γd γs γfd Hpsok true DfracDiscarded 0x12a0 6%nat (shd_lit 0x12a0)
                   h m n ltac:(lia)
                   (Hmoi 0x12a0 Hm1)
                   with "Hcode Hro Hs Hrun").
       + iDestruct (shd_msg_str γt γd DfracDiscarded 0x12c8 4%nat
                      ltac:(vm_compute; reflexivity) ltac:(lia)
                      with "Hro") as "#Hs".
-        iApply (wp_kshd_panic γt γd γs γfd true DfracDiscarded 0x12c8 4%nat (shd_lit 0x12c8)
+        iApply (wp_kshd_panic γt γd γs γfd Hpsok true DfracDiscarded 0x12c8 4%nat (shd_lit 0x12c8)
                   h m n ltac:(lia)
                   (Hmoi 0x12c8 Hm1)
                   with "Hcode Hro Hs Hrun").
@@ -7279,7 +7349,7 @@ Section UkShDiagLeaf.
       iDestruct (shd_str_of_ustr γt γd DfracDiscarded (ua_ptr x) (ua_len x)
                    (ua_bytes x)
                    with "Hxs") as "#Hs".
-      iApply (wp_kshd_die γt γd γs γfd false DfracDiscarded
+      iApply (wp_kshd_die γt γd γs γfd Hpsok false DfracDiscarded
                 0xdc 0xe0 0xe4 0xe6 0xea 0xec
                 (mword_of_int 1 : mword 20) (mword_of_int 460 : mword 12)
                 (mword_of_int 4036 : mword 21) (mword_of_int 2970 : mword 21)
@@ -7346,7 +7416,7 @@ Section UkShDiagLeaf.
       iDestruct (shd_str_of_ustr γt γd DfracDiscarded (ua_ptr x) (ua_len x)
                    (ua_bytes x)
                    with "Hxs") as "#Hs".
-      iApply (wp_kshd_die γt γd γs γfd false DfracDiscarded
+      iApply (wp_kshd_die γt γd γs γfd Hpsok false DfracDiscarded
                 0x110 0x114 0x118 0x11a 0x11e 0x120
                 (mword_of_int 1 : mword 20) (mword_of_int 424 : mword 12)
                 (mword_of_int 3984 : mword 21) (mword_of_int 2918 : mword 21)
@@ -7419,12 +7489,15 @@ Section UkShDiagLeaf.
     forall (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (t szv : Z)
            (ld : list fdstate) (n : nat),
       m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
-      shk_code γt -∗ ush_jtab γt -∗ ush_cmd γd t c -∗ usz γs szv -∗
+      shk_code γt -∗
+      (* the exec deposit's supplier -- [UkRun.uxsup], see [wp_kshr_runcmd] *)
+      uxsup -∗
+      ush_jtab γt -∗ ush_cmd γd t c -∗ usz γs szv -∗
       UserFd.ustd γfd ld -∗
       urun γt γd γs γfd h m (mword_of_int ShSyms.runcmd)
         (6 * ush_ht c + (2 + (ush_Dg + n))) -∗
       WP (Loop : expr riscv_lang).
-  Proof. exact (wp_kshr_runcmd ush_Dg Hclw ush_diag_leaf_holds c). Qed.
+  Proof. exact (wp_kshr_runcmd ush_Dg Hpsok Hclw ush_diag_leaf_holds c). Qed.
 
   Lemma wp_kshr_fork1_final (γt γd γs γfd : gname)
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}

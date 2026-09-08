@@ -345,8 +345,8 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
        it, and this round's proof holds it off the kernel residue it just
        released ([tlb_res_pt]'s own conjunct). *)
     KptShare.kpt_creds -∗
-    (* THE EXEC CHANNEL'S ANSWER (lane E3b), forwarded from usertrap's post
-       at this boundary's own entry trapframe -- [SpecUsertrap.ut_exec_out] *)
+    (* THE EXEC CHANNEL'S ANSWER, forwarded from usertrap's post at this
+       boundary's own entry trapframe -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out sc_v (tf_of g (ret_pc sepc_v)) M
       (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
       (uint (pv_sz (us_V U))) U' sts sts' -∗
@@ -458,11 +458,13 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} 
      reason and with the same escape: at a REAL proc ([j < NPROC], hence
      [proc_addr j <> zero_reg]) the pinning condition is vacuous, so the
      caller owes the post at every hart. *)
-  (* the process's exec bundle, owed only at an exec ecall and keyed at the
-     saved frame [tf_of g (ret_pc sepc_v)] over the entry image -- the run
-     projection of the record the loop holds ([SpecUsertrap.ut_exec_in]) *)
-  ut_exec_in sc_v (tf_of g (ret_pc sepc_v))
-    (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts -∗
+  (* the process's deposit for the number it trapped at, owed only at an
+     ecall and keyed at the saved frame [tf_of g (ret_pc sepc_v)] over the
+     entry image -- the run projection of the record the loop holds
+     ([SpecUsertrap.ut_sys_in]) *)
+  (∀ n : Z,
+     ut_sys_in n sc_v (tf_of g (ret_pc sepc_v))
+       (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts) -∗
   wp_next true (proc_addr j) (fun CID' : CpuId =>
     uservec_post (CID := CID') (URes CID') C pt vksp U M g sts sepc_v sc_v) -∗
   WP (Loop : expr riscv_lang).

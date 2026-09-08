@@ -1,32 +1,24 @@
 (* ===================================================================== *)
-(* UShKernel.v -- sh's WHOLE-PROCESS WP as a CONSTRUCTOR of the ENRICHED  *)
-(* slot ([UexecRetExec.uslot_x]), and the bridge from the kernel's own    *)
-(* image fact ([SpecKexecAU.kexec_image_ok]) to it.                        *)
+(* UShKernel.v -- sh's WHOLE-PROCESS WP as a CONSTRUCTOR of the U-mode     *)
+(* slot ([UexecRet.uslot]), and the bridge from the kernel's own image      *)
+(* fact ([SpecKexecAU.kexec_image_ok]) to it.                              *)
 (*                                                                        *)
-(* USyncKernel.v / UEchoKernel.v build the PLAIN slot from a program's     *)
+(* USyncKernel.v / UEchoKernel.v build their slot from a program's         *)
 (* [urun]-level theorem through [UkRun.uslot_of_urun].  sh is the process  *)
-(* init execs and the one that execs everything else, so its slot has to   *)
-(* be the enriched one the exec dispatcher hands out -- and that changes   *)
-(* two things about the entry:                                            *)
+(* init execs and the one that execs everything else, and one thing about  *)
+(* its entry differs:                                                      *)
 (*                                                                        *)
-(*  (1) THE RUN THE ENTRY HANDS OVER IS [urun_x], and [UkSh.wp_ksh_start]  *)
-(*      consumes [urun].  UkSh's leaves are all stated at [urun] (UkRunLeaf *)
-(*      / UkRunMem / UkRunSys / UkRunBr), not generically in the running   *)
-(*      predicate, and re-walking 5600 lines of sh at [urun_x] is not the  *)
-(*      cheap route.  The cheap HONEST route is [UkRunX.urun_x_urun_of_    *)
-(*      bundle]: an enriched run is a plain one GIVEN a persistent supplier *)
-(*      of the exec bundle at every key -- which is exactly what the       *)
-(*      enriched tier demands of sh beyond its plain proof (a bundle at    *)
-(*      the child's exec ecall), so the supplier is an explicit premise    *)
-(*      here, beside sh's own remaining proof [UkSh.ush_rest].  When sh's  *)
-(*      proof is finished at [urun_x] through [UkRunSysX.wp_uk_ecall_exec_ *)
-(*      x] the premise goes away with the conversion.                      *)
+(*  THE STATIC DATA.  sh reads and writes its .bss line buffer             *)
+(*  ([UkSh.sh_buf], 100 bytes at 0x2020), which the lossy entry would      *)
+(*  drop.  [UkRun.uslot_of_urun_all] hands the data outside the frame over *)
+(*  exclusively, and the buffer is carved out of the half below the        *)
+(*  frame's base.                                                          *)
 (*                                                                        *)
-(*  (2) THE STATIC DATA: sh reads and writes its .bss line buffer          *)
-(*      ([UkSh.sh_buf], 100 bytes at 0x2020), which the lossy plain entry  *)
-(*      would drop.  [UkRunX.uslot_x_of_urun_all] hands the data outside   *)
-(*      the frame over exclusively, and the buffer is carved out of the    *)
-(*      half below the frame's base.                                       *)
+(*  THE EXEC BUNDLE does NOT cross here.  sh's exec ecall is inside        *)
+(*  [UkSh.ush_rest], and the supplier it needs ([UkRun.uxsup]) is a        *)
+(*  premise of that obligation's discharge ([UkShFork.ushf_rest_of_body]), *)
+(*  not of this entry.  What this entry owes is the ordinary deposit       *)
+(*  supplier [UkRun.udep], exactly as sync's and echo's do.                *)
 (*                                                                        *)
 (* Also discharged here, from [UkRunSys.wp_uk_ecall_read_win]: UkSh's one  *)
 (* Hypothesis, the read-window leaf [UkSh.ush_read_leaf] (the general      *)
@@ -71,8 +63,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import UserFd.
 Require Import UCodeShK UkSh.
-Require Import UexecRetExec.   (* [uslot_x] / [urun_x]: REQUIRED DIRECTLY *)
-Require Import UkRunX.
+Require Import UkRun.          (* [udep] / [uslot_of_urun_all] / [urun] *)
 Require Import PageGeom.       (* [PGSIZE] *)
 Require Import UserPtTree.     (* [pgroundup] *)
 Require Import ElfFile.
@@ -246,12 +237,20 @@ Proof.
   lia.
 Qed.
 
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UShKernel.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
-  Context `{XG : uexecXG Σ}.
   Context `{!ghost_varG Σ Z}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS SH ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis here as it is in the program files, and the exec dispatcher
+     -- which sees the instance -- discharges it, exactly as it discharges
+     [UexecCond.cond_entry_slot]'s. *)
+  Hypothesis Hpsok : forall k : Z, k <> UsysMemOk.USYS_exec -> psok k.
 
   (* NO [Context {CID : CpuId}] and no ambient [CurCtx]: the slot binds the
      hart itself, and the run binds its own context. *)
@@ -283,7 +282,8 @@ Section UShKernel.
     subst a.
     pose proof (sh_rdcount_le _ k Hk) as Hcnt.
     iApply (wp_uk_ecall_read_win γt γd γs γfd h m pc _ k f avail Hn eq_refl
-              Hcnt Hal4 with "Hi Hrun Hbuf").
+              Hcnt Hal4 with "Hi Hrun [] Hbuf").
+    { iApply udepw_of_psok; [ apply Hpsok | ]; (vm_compute; discriminate). }
     iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
     iApply ("Hcont" $! h' r d g with "[%] [%] Hbuf Hrun");
       [ lia | exact Hgf ].
@@ -292,7 +292,7 @@ Section UShKernel.
   (* ------------------------------------------------------------------- *)
   (* SS2 THE DEPOSIT (header (1), (2)).                                   *)
   (* ------------------------------------------------------------------- *)
-  Lemma sh_uexec_slot_x (R : gname -> gname -> gname -> iProp Σ)
+  Lemma sh_uexec_slot (R : gname -> gname -> gname -> iProp Σ)
       (W : uvis) (n0 : nat) :
     tf_resume_pc (uvis_tf W) = (mword_of_int ShSyms.start : mword 64) ->
     shk_img_sub (uvis_M W) ->
@@ -329,27 +329,35 @@ Section UShKernel.
               (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
            ubyte γd k b) -∗
         ∃ f : nat -> bv 8, R γt γd γs ∗ ubytes γd sh_buf sh_nbuf f) -∗
-    □ (∀ W' : uvis, xbundle uslot_x W') -∗
+    (* THE DEPOSIT SUPPLIER, the one obligation the ARM adds to an entry
+       constructor: whoever hands sh a [UkRun.urun] says which syscall
+       bundles it can pay and out of what.  (Before the fold this slot held
+       a supplier of the EXEC bundle at every key, because the entry handed
+       over an ENRICHED run and a plain program proof could not build one.
+       There is one tier now, so what is left is the ordinary deposit
+       obligation; the exec bundle rides in through [ush_rest], whose
+       discharge takes [UkRun.uxsup].) *)
+    udep -∗
     (∀ γt γd γs γfd : gname, ush_rest γt γd γs γfd (R γt γd γs)) -∗
-    uslot_x W.
+    uslot W.
   Proof.
     intros Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hfdnone Hstop.
-    iIntros "#Hpay #Hxb #Hrest".
-    iApply (uslot_x_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Hal8
-              Hroom Hstk Hfdlen Hstop).
+    iIntros "#Hpay #Hdep #Hrest".
+    iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Hal8
+              Hroom Hstk Hfdlen Hstop with "Hdep").
     iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht Hstd Dlo _ Hrun".
     rewrite Hpc.
     (* [R] and the line buffer, out of the data below the frame *)
     iDestruct ("Hpay" $! γt γd γs with "Hszf Dlo") as (f) "[HR Hbs]".
     iPoseProof ("Hrest" $! γt γd γs γfd) as "#Hr".
-    iApply (wp_ksh_start γt γd γs γfd (ush_read_leaf_of_win γt γd γs γfd)
+    iApply (wp_ksh_start γt γd γs γfd Hpsok (ush_read_leaf_of_win γt γd γs γfd)
               (R γt γd γs) h _ f n0 (take NSTD (uvis_fd W))
               with "Hr [] [Hstd] HR Hbs [Hrun]").
     - iApply (shk_code_of_text γt (uvis_M W) (uvis_perm W)
                 (shk_img_text _ Hsub) Hx with "Ht").
     - rewrite /ush_std. iFrame "Hstd". iPureIntro.
       exact (fd_lowest_closed_take_none _ _ Hfdnone).
-    - iApply (urun_x_urun_of_bundle with "Hxb Hrun").
+    - iExact "Hrun".
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -372,7 +380,7 @@ Section UShKernel.
        ([UserHeap.uheap]'s map-stop clause). *)
     (forall (p : mword 27) (q : uperm), uvis_perm W' !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W')) ->
-    (* the payload, passed straight through: see [sh_uexec_slot_x] *)
+    (* the payload, passed straight through: see [sh_uexec_slot] *)
     □ (∀ γt γd γs : gname,
         usz γs (uvis_sz W') -∗
         ([∗ map] k ↦ b ∈ base.filter
@@ -382,9 +390,10 @@ Section UShKernel.
               (udata_lo (uvis_M W') (uvis_perm W') (uvis_sz W')),
            ubyte γd k b) -∗
         ∃ f : nat -> bv 8, R γt γd γs ∗ ubytes γd sh_buf sh_nbuf f) -∗
-    □ (∀ W : uvis, xbundle uslot_x W) -∗
+    (* the deposit supplier, passed straight through *)
+    udep -∗
     (∀ γt γd γs γfd : gname, ush_rest γt γd γs γfd (R γt γd γs)) -∗
-    uslot_x W'.
+    uslot W'.
   Proof.
     intros Hok Hroom Hlen Hnone Hstop.
     destruct sh_loads as (p0 & p1 & Hld & Hv0 & Hm0 & Hf0 & Hv1 & Hm1 & Hf1).
@@ -466,7 +475,7 @@ Section UShKernel.
               0x4000 <= spv - 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
                         + Z.of_nat j < spv)
       by (intros j Hj; clear -Hj Hroom; lia).
-    iApply (sh_uexec_slot_x R W' n0).
+    iApply (sh_uexec_slot R W' n0).
     - rewrite Hpc. exact sh_start_pc.
     - exact (shk_img_sub_of_elf M Himg).
     - exact Hx.

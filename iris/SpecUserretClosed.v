@@ -69,6 +69,9 @@ Require Import UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its produc
    (claude-notes/projects/user-wp-slot.md SS1.1). *)
 Require Export UexecWp.
 Require Import UserPerm.   (* [perm_of] -- the key's permission projection *)
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import UexecSG.       (* [uexecSG]: the deposit class [uslot]/[ukc] are indexed by *)
+Require Import UexecExecInst. (* the class INSTANCE, so the body resolves it directly -- this file sits above the instance and binds no class of its own; its binder list matches the seal's *)
 Require Import UexecRet.   (* [ukc] -- the U-mode continuation the entry runs.
                               REQUIRED DIRECTLY: [ukc]'s body is the sealed
                               [uvb], and the seal does not travel through a
@@ -126,7 +129,7 @@ Proof.
     split; [reflexivity | split; [exact H1 | exact H2]]]]].
 Qed.
 
-Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* the kernel-side residue, abstract exactly as [SpecUservec] takes it *)
     (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (C : ucfg) (pt : uptd)
@@ -200,7 +203,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
   URes CID pt ksp U sts -∗
   WP (Loop : expr riscv_lang).
 
-Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+
 Module Type USERRET_CLOSED.
   (* the residue is the module-type parameter it is everywhere else *)
   (* ...AND THE PARK'S ONE PRODUCER-SIDE ENTRY, threaded with the rest.

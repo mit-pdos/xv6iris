@@ -65,6 +65,9 @@ Require User.ShSyms User.ShInstrs.
 Local Open Scope Z_scope.
 Import Defs.
 
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkShMalloc.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -72,6 +75,15 @@ Section UkShMalloc.
   Context `{!ghost_varG Σ Z}.
 
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -255,8 +267,10 @@ Section UkShMalloc.
               ltac:(rewrite Ha0_1; exact Harg)
               Hn0 Hsz0 Hszok Hal
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun Hsz").
+              with "[] Hrun [] Hsz").
     { iApply (uis_shm_d10 with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0xd10 : mword 64) 4
                  = mword_of_int 0xd14)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1201,11 +1215,11 @@ Section UkShMalloc.
   Proof.
     iIntros "Hrun".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw)
-      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (UkStep.uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
     iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
-    iFrame "Hheap Hstk Hufd Hb".
+    iFrame "Hheap Hstk Hufd Hdep Hb".
     iPureIntro. split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 

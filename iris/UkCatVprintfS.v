@@ -46,12 +46,24 @@ Require Import UkRunBr.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkCatVprintfS.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -109,7 +121,7 @@ Section UkCatVprintfS.
     - (* one plain round, then the rest *)
       assert (Hslt : (S i0 < len)%nat) by lia.
       iDestruct (utext_str_byte γt a len f (S i0) Hslt with "Hstr") as "#Hb1".
-      iApply (wp_kcat_vprintf_step γt γd γs γfd m0 sp0 fd ap a i0 (f i0)
+      iApply (wp_kcat_vprintf_step γt γd γs γfd Hpsok m0 sp0 fd ap a i0 (f i0)
                 (f (S i0)) h m n Ha0 ltac:(lia) (Hpct i0 ltac:(lia)) Hinv Hs1
                 with "Hcode Hb1 Hrun").
       iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
@@ -188,7 +200,7 @@ Section UkCatVprintfS.
     urun γt γd γs γfd h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _ & _)".
     iDestruct (uheap_ubyte with "Hh Hb") as %(_ & _ & Hbnd).
     iPureIntro. exact Hbnd.
   Qed.
@@ -402,7 +414,7 @@ Section UkCatVprintfS.
                  := regval_into_reg (mword_of_int 0x708 : mword 64)]> m1).
     assert (Hra2 : m2 !!! Regidx ra_idx = (mword_of_int 0x708 : mword 64))
       by exact (upd_eq m1 (Regidx ra_idx) (regval_into_reg _)).
-    iApply (wp_kcat_putc γt γd γs γfd h2 m2 n with "Hcode Hrun").
+    iApply (wp_kcat_putc γt γd γs γfd Hpsok h2 m2 n with "Hcode Hrun").
     iIntros (h3 m3) "%Hcs Hrun".
     assert (Eret : ret_pc (m2 !!! Regidx ra_idx)
                    = (mword_of_int 0x708 : mword 64))
@@ -2573,7 +2585,7 @@ Section UkCatVprintfS.
     rewrite E562.
     iIntros (h5) "Hrun".
     (* ---- and the rest of the string, which has no '%' left in it ---- *)
-    iApply (wp_kcat_vprintf_loop γt γd γs γfd m (m !!! Regidx csp_rs1) fd
+    iApply (wp_kcat_vprintf_loop γt γd γs γfd Hpsok m (m !!! Regidx csp_rs1) fd
               (mword_of_int (apz + 8)) a len f (S (S q))
               (len - S (S (S q)))%nat Ha0 Habnd
               ltac:(intros j Hj; apply Hpct; lia) eq_refl Hal8 Hlo

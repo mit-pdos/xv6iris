@@ -282,7 +282,13 @@ Section SysOpenAU.
      obligation arises.  Fired once, inside the opened node's lock
      window; agreement against caller-held [nview] shares happens here.
      [E] for reuse; the machine contract instantiates the floor [∅]. *)
-  Definition aopen_commit_at `{XI : CurCtx} Γ (E : coPset)
+  (* NO [`{XI : CurCtx}].  Nothing here reads the hart context -- the piece
+     is a ghost-map borrow and a fupd -- and the binder is not free: it makes
+     every form stated over this piece CONTEXT-INDEXED, up through
+     [SpecSysExecAU.sys_exec_au_pre] to [UexecSG]'s class instance and hence
+     to [UexecRet.uslot], and then two proofs at two contexts hold slots that
+     print identically and do not match. *)
+  Definition aopen_commit_at Γ (E : coPset)
       (Φ : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i : Z) (a : anode),
        ⌜arow_at (abs_view I) i a⌝ -∗
@@ -403,7 +409,8 @@ Section SysOpenAU.
      pins [FsImg.ROOTINO], a relative one starts at [cw], the calling
      process's cwd inum -- the contract passes its block's [pv_cwi]
      (header, THE WALK PREMISE; lane C3). *)
-  Definition open_walk_pre_era `{XI : CurCtx} (γfs : fs_names) (cw : Z)
+  (* NO [`{XI : CurCtx}] -- see [aopen_commit_at]. *)
+  Definition open_walk_pre_era (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ) : iProp Σ :=
     (∀ (pl : list (bv 8)) (r : Z),
        ⌜r = um_start_of cw pl⌝ ={⊤}=∗

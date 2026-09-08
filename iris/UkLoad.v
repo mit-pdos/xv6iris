@@ -233,9 +233,12 @@ Proof.
 Qed.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkLoadExecErr.
   Context (k : Z).
   Context (Hkw : vmem_width k).
+  Context `{SG : uexecSG Σ}.
 
   (* the [execute (LOAD ...)] fact when the access FAULTS: WpUmodeLoad's
      [exec_execute_LOAD_k_u_walk] with [Ok dv] read as [Err er].  No
@@ -312,6 +315,7 @@ Section UkLoadPostFetch.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
+  Context `{SG : uexecSG Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* The geometry-agnostic middle: from the FETCHED file, write nextPC,    *)
@@ -893,6 +897,7 @@ Section UkLoadObl.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
+  Context `{SG : uexecSG Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* §5 THE OBLIGATION, once per FETCH SHAPE -- the load twins of          *)
@@ -1212,6 +1217,7 @@ Section UkLoad.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
+  Context `{SG : uexecSG Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,

@@ -50,11 +50,14 @@ Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
 
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkBranch.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
+  Context `{SG : uexecSG Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,

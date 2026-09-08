@@ -163,6 +163,9 @@ Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Module UkInitFsWalk (R : FDROW_UKFS_RETIRE) (S : FDROW_UKFS_STEP).
 
 Module L := FdRowUkfsLeaf R S.
@@ -174,6 +177,15 @@ Section UkInitFs.
   Context `{!ghost_varG Σ Z}.
   Context `{!ghost_varG Σ umirror}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
@@ -265,6 +277,7 @@ Section UkInitFs.
                                (mword_of_int 15 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
+              ltac:(apply Hpsok; vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun Hmc Hstr1").
     { iApply (uis_init_3b4 with "Hcode"). }
@@ -364,6 +377,7 @@ Section UkInitFs.
                                (mword_of_int 17 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
+              ltac:(apply Hpsok; vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun Hmc Hstr1").
     { iApply (uis_init_3bc with "Hcode"). }
@@ -457,6 +471,7 @@ Section UkInitFs.
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
+              ltac:(apply Hpsok; vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun Hmc").
     { iApply (uis_init_3ec with "Hcode"). }
@@ -1134,18 +1149,22 @@ Section UkInitFs.
   Lemma wp_kinit_console_arm_then_loop (γm : gname) (szv : Z) (h : CpuId)
       (m : regfile) (u0 : umirror) (n : nat) :
     era0_seed u0 ->
-    init_code γt -∗ init_rodata γt -∗ usz γs szv -∗
+    init_code γt -∗
+    (* the exec deposit's supplier -- [UkRun.uxsup]: the plain restart loop
+       this hands over to reaches init's child arm, which ecalls exec *)
+    uxsup -∗
+    init_rodata γt -∗ usz γs szv -∗
     urun_fs γm γt γd γs γfd h m (mword_of_int 0xc) (12 + (12 + (4 + n))) -∗
     mcur γm u0 -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hseed. iIntros "#Hcode #Hro Hsz Hrun Hmc".
+    intros Hseed. iIntros "#Hcode #Hxs #Hro Hsz Hrun Hmc".
     iApply (wp_kinit_console_arm_fs γm h m u0 (12 + (12 + (4 + n))) Hseed
               with "Hcode Hro Hrun Hmc").
     iIntros (h' m' u2 u3 r3 rd1 rd2) "_ %Hs2 Hmc Hrun".
     iDestruct (urun_fs_urun with "Hrun") as "[Hrun Hstd]".
-    iDestruct (UkInitMain.wp_kinit_main_loop γt γd γs γfd szv n
-                 with "Hcode Hro") as "[Hloop _]".
+    iDestruct (UkInitMain.wp_kinit_main_loop γt γd γs γfd Hpsok szv n
+                 with "Hcode Hxs Hro") as "[Hloop _]".
     iApply ("Hloop" $! h' m' with "[] Hsz Hstd Hrun").
     iPureIntro. exact Hs2.
   Qed.

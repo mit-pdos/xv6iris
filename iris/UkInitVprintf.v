@@ -28,12 +28,24 @@ Require Import UkRunBr.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkInitVprintf.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -1001,7 +1013,7 @@ Section UkInitVprintf.
     assert (Hra4 : m4 !!! Regidx ra_idx = (mword_of_int 0x514 : mword 64))
       by exact (upd_eq m3 (Regidx ra_idx) (regval_into_reg _)).
     (* ---- putc(fd, c) ---- *)
-    iApply (wp_kinit_putc γt γd γs γfd h6 m4 n with "Hcode Hrun").
+    iApply (wp_kinit_putc γt γd γs γfd Hpsok h6 m4 n with "Hcode Hrun").
     iIntros (h7 m5) "%Hcs Hrun".
     assert (Eret : ret_pc (m4 !!! Regidx ra_idx) = (mword_of_int 0x514 : mword 64))
       by (rewrite Hra4; apply bv_eq; vm_compute; reflexivity).

@@ -124,8 +124,15 @@ Proof. lia. Qed.
 (*  ([unclaimed_USED : unclaimed USED = false]).                       *)
 (* ------------------------------------------------------------------ *)
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section PstateUsedHelper.
   Context `{!riscvGS Σ}.
+  (* NO [Context `{SG : uexecSG Σ}]: this file sits ABOVE
+     [UexecExecInst], so the deposit class it speaks is that file's
+     INSTANCE, and so is the one the specs it inhabits were stated at.  A
+     section variable here would be a SECOND class of the same type, and the
+     two [UexecRet.uslot]s print identically -- the unifier does not stop. *)
   Lemma kfkb5_pwhole_used (pa : mword 64) :
     pstate_whole pa USED ⊣⊢ pstate_lock pa USED ∗ pstate_at_hlf pa USED.
   Proof. rewrite pstate_whole_split unclaimed_USED. done. Qed.

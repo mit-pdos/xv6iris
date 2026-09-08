@@ -53,14 +53,13 @@
       kexec may build from it ([kexec_image_ok f na alen afun sts W']),
       the caller supplies [S W'] -- [S] a SLOT PREDICATE every form
       below is parametric in, instantiated by the dispatcher at the
-      trapframe-keyed user-execution WP ([UexecRetExec.uslot_x]: the very
+      trapframe-keyed user-execution WP ([UexecRet.uslot]: the very
       proposition the trap loop deposits and runs; design note, "the two
       WP forms").  [S] is a parameter and not [uslot] because the exec
-      bundle the process hands over ([UexecExecInst.exec_xbundle]) is an
+      bundle the process hands over ([UexecExecInst.exec_sbundle]) is an
       [exec_au_pre] whose slot wand concludes at the FIXPOINT VARIABLE of
       the enriched trap contract, which is what lets the kernel return
-      the enriched slot rather than the plain one (UexecRetExec.v header:
-      [uslot W -∗ uslot_x W] is not provable).  The caller receives its own
+      the U-mode slot.  The caller receives its own
       observation receipt [Fo av i (AFile f)] first, so the WP it owes is
       only for the file it observed: init, whose receipt says
       [f = sh_bytes], owes only sh's start WP at sh's key.
@@ -218,7 +217,7 @@
       premise on every other arm.  The proofs never open [S].
    6. THE DISPATCH SIDE: the exec channel carries the returned slot to
       the deposit instead of minting, and the U-mode side's [uexec_ret]
-      exec arm SUPPLIES [exec_au_pre] ([UexecRetExec]'s payload class,
+      exec arm SUPPLIES [exec_au_pre] ([UexecSG]'s deposit class,
       instantiated in [UexecExecInst]) -- the seam through which a
       verified program hands over its successor's WP.
 

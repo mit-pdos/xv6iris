@@ -59,12 +59,15 @@ Require Import UkStepGen.     (* the X-generic engine *)
 
 Local Open Scope Z_scope.
 
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkGenFs.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context `{!ghost_varG Σ umirror}.
+  Context `{SG : uexecSG Σ}.
 
   (* ---- FACT (i) at the enriched family ---------------------------------
      [UexecRetFs.uslot_fs_unfold], with the ambient-context binder put back
@@ -203,6 +206,7 @@ Module FdRowUkfsStepGen <: FDROW_UKFS_STEP.
   Lemma wp_uk_ecall_fs_step :
     forall `{!riscvGS Σ} `{GEN : GenId} `{XI : CurCtx}
            `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror}
+           `{SG : uexecSG Σ}
       (γm : gname) (h : CpuId) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (π : gmap (mword 27) uperm) (sz : Z)
@@ -232,7 +236,7 @@ Module FdRowUkfsEngineGen := FdRowUkfsEngineOfStep FdRowUkfsStepGen.
 Module FdRowUkfsRetireGen <: FDROW_UKFS_RETIRE.
   Lemma wp_uk_retire_fs_later :
     forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-           `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror}
+           `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror} `{SG : uexecSG Σ}
       (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (π : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate) (cw : Z),

@@ -46,11 +46,16 @@ Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk.
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section USyncKernel.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* NO [Context {CID : CpuId}]: the slot binds the hart itself. *)
 
@@ -148,14 +153,16 @@ Section USyncKernel.
        ([UserHeap.uheap]'s own clause). *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
-    ⊢ uslot W.
+    (forall k : Z, k <> USYS_exec -> psok k) ->
+    udep -∗ uslot W.
   Proof.
-    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen Hstop.
-    iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata Hfdlen Hstop).
+    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen Hstop Hpsok.
+    iIntros "#Hdep".
+    iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata Hfdlen Hstop with "Hdep").
     (* sync makes no descriptor call, so its ledger is dropped here *)
     iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht _ Hrun".
     rewrite Hpc.
-    iApply (wp_ksync_start γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W))
+    iApply (wp_ksync_start γt γd γs γfd Hpsok h (tf_resume_gpr0 (uvis_tf W))
               (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0
               eq_refl with "[] Hrun").
     iApply (sync_code_of_text γt (uvis_M W) (uvis_perm W) Hsub Hx with "Ht").

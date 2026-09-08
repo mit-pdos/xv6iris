@@ -49,6 +49,9 @@ Require Import WpMmodeLeafBase.
 Require Import UptTree.
 Require Import WpUmodeStore.
 Require Import WpUmodeStep.
+Require Import UsysMemOk. (* [USYS_exec] -- the number the minting law excludes *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the deposit class and
+                             the program's supplier + admitted numbers *)
 Require Import UkStep.
 Require Import RiscvExtras.
 Require Import UserHeap.
@@ -95,6 +98,8 @@ Section UkRun.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
   (* NO ambient [CpuId]: the hart is an explicit argument of [urun], and the
      [WP] under that binder resolves to the one bound there -- the trick
      [UexecRet.ukc] uses. *)
@@ -115,6 +120,150 @@ Section UkRun.
      them.  A leaf that IS closing back up has just destructed the
      existential, so it can say which view it is at -- the same discipline
      [sz] follows, and the reason [urun_close] takes [fdv] as a parameter. *)
+  (* THE DEPOSIT SUPPLIER AND ITS MINTING LAW.  Since the ARM, the trap
+     contract's returning arm demands the process's bundle for the number it
+     is at ([UexecRet.uexec_dep_F]); a leaf below the file-system tower
+     cannot see that the instance's [sbundle] is [emp] at its number, so it
+     pays with the law below.
+
+     WHY IT RIDES IN [urun] AND NOT IN [uvb], AND WHY IT IS ABSTRACT.  A
+     [uvb] conjunct would make the KERNEL owe the supply to resume ANY
+     process, and an application whose predicate is not trivially true
+     cannot pay that -- echo's is [taint ∨ pins], true of every view only
+     after the taint is minted -- so every pre-taint trap round would be
+     unsatisfiable: the GAP-premise trap sitting in the trap loop.  Carrying
+     a CONCRETE [□ ssupply] here instead is the SAME refutation one level
+     down: echo could not build a [urun] at all before the taint.  So what
+     rides here is an ABSTRACT supplier the program chooses, the way [Rut]
+     and [Rfd] are abstract, with the numbers it undertakes to pay for
+     ([psok]) beside it -- both fields of the ambient [UexecSG.uprogSG],
+     which is what keeps every program lemma statement from naming either.
+
+     THE LAW IS KEY-FREE, AND THAT IS FORCED, NOT CHOSEN.  A law stated at
+     [urun]'s own bound key would have to survive every move the program
+     makes to that key, because [urun] is re-established after every
+     instruction: a store moves [M] ([urun_close] at
+     [umem_write M …]), sbrk moves [pm] and [sz], open / dup / close / pipe
+     move [fdv], and every returning ecall moves [cw].  Closed under all
+     five, a key-indexed law IS the key-free one.  So the admission [psok]
+     is a set of NUMBERS, and a bundle whose content reads the key -- exec's,
+     which reads argv out of the image -- is not payable through this law at
+     all: it goes the EXPLICIT-PREMISE route the exec leaf already uses
+     ([UkRunSys.wp_uk_ecall_exec] takes the deposit as a hypothesis), which
+     is why [USYS_exec] is excluded here.  A bundle that IS key-free once
+     the descriptor view is fixed -- echo's console write, whose input is a
+     trace seed minted from unit -- goes through the law.  THE HONEST
+     CONSEQUENCE: a program admitting a number pays that number's bundle at
+     EVERY key, not only at the call it is about to make. *)
+  Definition udep : iProp Σ :=
+    (□ Dsup ∗
+     ⌜ forall (n : Z) (W : uvis),
+         psok n -> n <> USYS_exec ->
+         ⊢ □ Dsup -∗ sbundle uslot n W ⌝)%I.
+
+  Global Instance udep_persistent : Persistent udep.
+  Proof. rewrite /udep. apply _. Qed.
+
+  (* what a leaf does with it: mint the deposit the ecall arm asks for *)
+  Lemma udep_dep (n : Z) (W : uvis) :
+    psok n -> n <> USYS_exec -> udep -∗ sbundle uslot n W.
+  Proof.
+    intros Hok Hne. iIntros "[#Hs %Hlaw]".
+    iApply (Hlaw n W Hok Hne). iExact "Hs".
+  Qed.
+
+  (* [avail] is the FREE STACK, in words, below the current sp -- the
+     user-mode twin of [sie_cap_gpr]'s counting argument.  The process owns
+     it; an sp-adjust hands a frame out of it or takes one back; every other
+     instruction threads it unchanged, which is why every leaf that writes a
+     register takes [unot_sp] as a premise (a write to sp would move the
+     index this ownership is keyed by). *)
+  (* THE DESCRIPTOR VIEW IS HIDDEN HERE, exactly as the break and the image
+     are: [urun] is what a PROGRAM proof carries between instructions, and a
+     program that never looks at its descriptors should not have to name
+     them.  A leaf that IS closing back up has just destructed the
+     existential, so it can say which view it is at -- the same discipline
+     [sz] follows, and the reason [urun_close] takes [fdv] as a parameter. *)
+  (* THE ECALL LEAF'S DEPOSIT PREMISE, as a WAND OFF THE AUTHORITIES the
+     leaf already holds -- and it has to be a wand and not a bare premise:
+     the key the deposit is at is [uvis_of_run m pc M pm sz fdv cw], and
+     [M] / [pm] / [sz] / [fdv] / [cw] are bound by [urun]'s own existential,
+     so a leaf has them only AFTER it destructs and can never name them in
+     its own statement.  Same wall as the key-free law above, one level out.
+
+     THE DISJUNCTION IS THE TWO ROUTES.  Left: the number is one the program
+     admits ([psok]), and the leaf mints the bundle from [udep] --
+     [udepw_mint].  Right: the program hands an EXPLICIT deposit at this
+     key, which is what exec takes always, and what a program with a
+     key-reading bundle (init's mknod, a constraining application's write)
+     takes at its own numbers. *)
+  Definition udepw (γt γd γs γfd : gname) (m : regfile) (pc : mword 64)
+      (n : Z) : iProp Σ :=
+    (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+       (fdv : list fdstate) (cw : Z),
+       uheap γt γd γs M pm sz -∗ ufd_auth γfd fdv -∗
+       uheap γt γd γs M pm sz ∗ ufd_auth γfd fdv ∗
+       (⌜psok n /\ n <> USYS_exec⌝
+        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv cw)))%I.
+
+  (* the GENERIC route's supplier: a number the program admits *)
+  Lemma udepw_of_psok (γt γd γs γfd : gname) (m : regfile) (pc : mword 64)
+      (n : Z) :
+    psok n -> n <> USYS_exec -> ⊢ udepw γt γd γs γfd m pc n.
+  Proof.
+    intros Hok Hne. rewrite /udepw. iIntros (M pm sz fdv cw) "Hh Hf".
+    iFrame "Hh Hf". iLeft. iPureIntro. exact (conj Hok Hne).
+  Qed.
+
+  (* THE LEAF'S USE OF IT, at every number including exec: the left
+     disjunct carries [n <> USYS_exec] itself, so at exec only the explicit
+     deposit can have been taken and no side condition is owed here. *)
+  Lemma udepw_mint (γt γd γs γfd : gname) (m : regfile) (pc : mword 64)
+      (n : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+      (fdv : list fdstate) (cw : Z) :
+    udep -∗ udepw γt γd γs γfd m pc n -∗
+    uheap γt γd γs M pm sz -∗ ufd_auth γfd fdv -∗
+    uheap γt γd γs M pm sz ∗ ufd_auth γfd fdv ∗
+    sbundle uslot n (uvis_of_run m pc M pm sz fdv cw).
+  Proof.
+    iIntros "#Hdep Hsb Hheap Hufd".
+    iDestruct ("Hsb" $! M pm sz fdv cw with "Hheap Hufd")
+      as "(Hheap & Hufd & [%Hok | Hb])"; iFrame "Hheap Hufd";
+      [ iApply (udep_dep n _ (proj1 Hok) (proj2 Hok) with "Hdep")
+      | iExact "Hb" ].
+  Qed.
+
+  (* THE EXEC DEPOSIT'S CARRIER, and why it is key-free too.  exec is the
+     one number the law above excludes -- its bundle reads argv out of the
+     key's image -- so its deposit takes the EXPLICIT route.  But the key an
+     exec ecall traps from is built by the walk that reaches it ([M], [pm],
+     [sz], [fdv], [cw] bound by [urun]'s existential, the register file by
+     the caller's own instruction sequence), so no lemma up the chain can
+     NAME it: what a program that execs carries is the bundle AT EVERY KEY,
+     persistently.  This is the ARM's spelling of the enriched tier's own
+     supplier: a program that execs takes it as an explicit premise and
+     hands it down to its exec leaf, and the kernel-side constructor -- which
+     sits above the file-system tower and holds the process's exec bundle --
+     is what pays it.
+
+     NOT IN [urun].  A conjunct there would make EVERY program owe the exec
+     bundle at every key, which is the GAP-premise trap [udep]'s note
+     refutes one number over: a constraining application (echo, at
+     [Dsup := emp]) could not build a [urun] at all. *)
+  Definition uxsup : iProp Σ := (□ ∀ W : uvis, sbundle uslot USYS_exec W)%I.
+
+  Global Instance uxsup_persistent : Persistent uxsup.
+  Proof. rewrite /uxsup. apply _. Qed.
+
+  (* what an exec leaf's caller does with it: the explicit disjunct of
+     [udepw], at whatever key the walk has reached *)
+  Lemma udepw_of_uxsup (γt γd γs γfd : gname) (m : regfile) (pc : mword 64) :
+    uxsup -∗ udepw γt γd γs γfd m pc USYS_exec.
+  Proof.
+    iIntros "#Hx" (M pm sz fdv cw) "Hh Hf". iFrame "Hh Hf". iRight.
+    iApply "Hx".
+  Qed.
+
   Definition urun (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) : iProp Σ :=
     (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
@@ -145,6 +294,7 @@ Section UkRun.
           fragment bundle, chosen by the loop and handed back whole at every
           trap, and a program never learns its ghost name. *)
        ufd_auth γfd fdv ∗
+       udep ∗
        uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw M m pc)%I.
 
   (* "this instruction does not write sp".  Every leaf that writes a general
@@ -168,13 +318,16 @@ Section UkRun.
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     (* ...and the descriptor authority, at the same [fdv] the key is at *)
     ufd_auth γfd fdv -∗
+    (* the deposit supplier and its law, back at the same key -- persistent,
+       so a leaf that destructed [urun] hands the very copy it read *)
+    udep -∗
     (∀ h : CpuId, urun γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
     ukc pm M sz fdv cw m pc.
   Proof.
-    iIntros "Hheap Hstk Hufd Hcont".
+    iIntros "Hheap Hstk Hufd #Hdep Hcont".
     rewrite /ukc. iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
-    iFrame "Hheap Hstk Hufd Hb". iPureIntro.
+    iFrame "Hheap Hstk Hufd Hdep Hb". iPureIntro.
     split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
@@ -203,12 +356,13 @@ Section UkRun.
     uheap γt γd γs M pm sz -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     ufd_auth γfd fdv -∗
+    udep -∗
     (∀ h : CpuId, urun γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
                   WP (Loop : expr riscv_lang)) -∗
     ukc pm M sz fdv cw (<[Regidx rd := v]> m) pc'.
   Proof.
-    intros Hns. iIntros "Hheap Hstk Hufd Hcont".
-    iApply (urun_close with "Hheap [Hstk] Hufd Hcont").
+    intros Hns. iIntros "Hheap Hstk Hufd #Hdep Hcont".
+    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
     rewrite (unot_sp_upd rd v m Hns). iExact "Hstk".
   Qed.
 
@@ -467,7 +621,7 @@ Section UkRun.
       /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (ustack_align with "Hstk") as %Hal.
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
     iPureIntro. exact (conj Hal Hroom).
@@ -516,6 +670,138 @@ Section UkRun.
      the vocabulary of the heap: enough room below sp, and the bytes there
      actually present in the data half.  [sz] is bound by the slot, so the
      second is stated for every [sz] the bundle could carry. *)
+  (* [UserHeap.umap_split_at] at an arbitrary decidable cut: the data map
+     split into the part satisfying [P] and its complement *)
+  Local Lemma umap_split_pred (γd : gname) (D : gmap Z (bv 8)) (P : Z -> Prop)
+      `{!forall a : Z, Decision (P a)} :
+    ([∗ map] k ↦ b ∈ D, ubyte γd k b) -∗
+      ([∗ map] k ↦ b ∈ base.filter (fun kv : Z * bv 8 => P kv.1) D,
+         ubyte γd k b) ∗
+      ([∗ map] k ↦ b ∈ base.filter (fun kv : Z * bv 8 => ~ P kv.1) D,
+         ubyte γd k b).
+  Proof.
+    iIntros "H".
+    rewrite -(big_sepM_union (fun k b => ubyte γd k b)
+                (base.filter (fun kv : Z * bv 8 => P kv.1) D)
+                (base.filter (fun kv : Z * bv 8 => ~ P kv.1) D)
+                (map_disjoint_filter_complement _ D)).
+    rewrite (map_filter_union_complement (fun kv : Z * bv 8 => P kv.1) D).
+    iExact "H".
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE GENERAL FORM: [uslot_of_urun]'s mint and carve with the data      *)
+  (* OUTSIDE the frame handed over EXCLUSIVELY -- the bytes below the      *)
+  (* frame's base and the bytes at or above sp.  A program whose static    *)
+  (* data (a .bss buffer, say) lies below its stack takes it out of the    *)
+  (* first half; an argument area is in the second.  [UShKernel.v] is what *)
+  (* needs it: sh reads and writes its line buffer, which the lossy entry  *)
+  (* would drop.                                                          *)
+  (* ------------------------------------------------------------------- *)
+  Lemma uslot_of_urun_all (W : uvis) (avail : nat) :
+    uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
+    8 * Z.of_nat avail
+      <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
+    (forall j : nat, (j < 8 * avail)%nat ->
+       is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
+                 !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+                     - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
+    length (uvis_fd W) = NOFILE ->
+    (* the map stops at the break -- [uslot_of_urun]'s own premise *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* ...and the deposit supplier, exactly as [uslot_of_urun] takes it *)
+    udep -∗
+    (∀ (γt γd γs γfd : gname) (h : CpuId),
+       ⌜ usz_ok (uvis_sz W) ⌝ -∗
+       usz γs (uvis_sz W) -∗
+       utext_all γt (uvis_M W) (uvis_perm W) -∗
+       ustd γfd (take NSTD (uvis_fd W)) -∗
+       ([∗ map] k ↦ b ∈ base.filter
+             (fun kv : Z * bv 8 =>
+                kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+                       - 8 * Z.of_nat avail)
+             (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
+          ubyte γd k b) -∗
+       ([∗ map] k ↦ b ∈ base.filter
+             (fun kv : Z * bv 8 =>
+                ~ (kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)))
+             (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
+          ubyte γd k b) -∗
+       urun γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W))
+         (tf_resume_pc (uvis_tf W)) avail -∗
+       WP (Loop : expr riscv_lang))
+    -∗ uslot W.
+  Proof.
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep Hprog".
+    rewrite uslot_ukc /ukc.
+    iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
+    set (sz := uvis_sz W).
+    assert (Hwf : proc_pt_wf pt)
+      by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
+    rewrite /uvb /uvb_F /user_ptm_inv_x.
+    iDestruct "Hb" as
+      "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
+        Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
+    iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
+    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan Hstop)
+      as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
+    iMod (ufd_alloc_std (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _))
+      as (γfd) "(Hufd & Hstd & _)".
+    rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
+    (* ---- the two cuts: at the frame's base, then at sp ---- *)
+    set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
+    set (D := udata_lo (uvis_M W) (uvis_perm W) sz).
+    set (base := (uint sp - 8 * Z.of_nat avail)%Z).
+    iDestruct (umap_split_at γd D base with "Hd") as "[Dlo Dhi]".
+    iDestruct (umap_split_pred γd _ (fun a : Z => a < uint sp) with "Dhi")
+      as "[Dmid Dtop]".
+    (* the upper half is [~ (k < sp)] on [D] itself: a key at or above sp
+       is not below [base] *)
+    iAssert ([∗ map] k ↦ b ∈ base.filter
+                 (fun kv : Z * bv 8 => ~ (kv.1 < uint sp)) D, ubyte γd k b)%I
+      with "[Dtop]" as "Dtop".
+    { assert (E : base.filter (fun kv : Z * bv 8 => ~ (kv.1 < uint sp))
+                    (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
+                  = base.filter (fun kv : Z * bv 8 => ~ (kv.1 < uint sp)) D).
+      { rewrite map_filter_filter. apply map_filter_ext.
+        intros k b _. cbn.
+        split; [ intros [H _]; exact H
+               | intro H; split; [ exact H | unfold base; lia ] ]. }
+      rewrite E. iExact "Dtop". }
+    (* ---- the frame, out of the middle ---- *)
+    set (f := fun j : nat =>
+                default (bv_0 8)
+                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp)
+                     (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
+                     !! (base + Z.of_nat j)%Z)).
+    assert (Hf : forall j : nat, (j < 8 * avail)%nat ->
+                   base.filter (fun kv : Z * bv 8 => kv.1 < uint sp)
+                     (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
+                     !! (base + Z.of_nat j)%Z = Some (f j)).
+    { intros j Hj. destruct (Hstk j Hj) as [b Hb].
+      assert (Hb' : base.filter (fun kv : Z * bv 8 => kv.1 < uint sp)
+                      (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
+                      !! (base + Z.of_nat j)%Z = Some b).
+      { apply umap_filter_lookup_lt; [ unfold base; lia | ].
+        apply umap_filter_lookup_ge; [ lia | exact Hb ]. }
+      unfold f. rewrite Hb'. reflexivity. }
+    iDestruct (ubytes_of_map γd _ base (8 * avail) f Hf with "Dmid") as "Hbs".
+    iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
+    iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Hstd Dlo Dtop");
+      [ exact Hsz | ].
+    iApply "Hprog".
+    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
+      (uvis_cwd W).
+    iSplitR; [ iPureIntro; exact Hlo | ].
+    iSplitR; [ iPureIntro; exact Hpm | ].
+    iSplitR; [ iPureIntro; exact HRut | ].
+    iFrame "Hheap Hstk Hufd Hdep".
+    rewrite /uvb /uvb_F /user_ptm_inv_x.
+    iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
+    iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
+  Qed.
+
   Lemma uslot_of_urun (W : uvis) (avail : nat) :
     (* the resume sp is word-aligned -- what [ustack] now asserts, and the
        one place it is an obligation rather than a consequence, since it is
@@ -541,6 +827,13 @@ Section UkRun.
        what makes [sbrk]'s new run FRESH ([UserHeap]'s own clause). *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* THE DEPOSIT SUPPLIER, at the key the slot is being built for.  This
+       is the one obligation the ARM adds to an entry constructor: whoever
+       hands a program a [urun] says which syscall bundles it can pay and
+       out of what.  [UexecCond.cond_entry_slot] passes the generic one
+       ([Dsup := ssupply], every number admitted); a verified program's
+       constructor passes its own. *)
+    udep -∗
     (∀ (γt γd γs γfd : gname) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
@@ -559,7 +852,7 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep Hprog". rewrite uslot_ukc /ukc.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -597,7 +890,7 @@ Section UkRun.
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd".
+    iFrame "Hheap Hstk Hufd Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
@@ -636,6 +929,13 @@ Section UkRun.
        what makes [sbrk]'s new run FRESH ([UserHeap]'s own clause). *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* THE DEPOSIT SUPPLIER, at the key the slot is being built for.  This
+       is the one obligation the ARM adds to an entry constructor: whoever
+       hands a program a [urun] says which syscall bundles it can pay and
+       out of what.  [UexecCond.cond_entry_slot] passes the generic one
+       ([Dsup := ssupply], every number admitted); a verified program's
+       constructor passes its own. *)
+    udep -∗
     (∀ (γt γd γs γfd : gname) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
@@ -659,7 +959,7 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep Hprog". rewrite uslot_ukc /ukc.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -709,7 +1009,7 @@ Section UkRun.
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd".
+    iFrame "Hheap Hstk Hufd Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].

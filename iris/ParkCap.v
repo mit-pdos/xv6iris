@@ -65,11 +65,14 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section ParkCap.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
 
   (* the saved-context head the park installs: forkret's entry, and the
      kernel stack's top -- [SpecAllocproc.forkret_pc]'s value *)

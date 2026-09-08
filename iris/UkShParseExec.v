@@ -39,12 +39,16 @@ Require Import UkShParseLex.
 Require Import UkShParseTok.
 Require Import UkShParseRedir.
 
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkShParseExec.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   Local Notation x0_idx := (mword_of_int 0 : mword 5).
   Local Notation ra_idx := (mword_of_int 1 : mword 5).

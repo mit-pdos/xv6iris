@@ -151,7 +151,9 @@ Require Import UserFd.           (* [ufdG] -- the class a minted user slot needs
 Require Import UserPerm.         (* [perm_of] -- the exec channel's failure row *)
 Require Import UsysMemOk.        (* [usys_sbrk_arg] -- sbrk's argument, read back *)
 Require Import UexecSlot.        (* [uvis_of] *)
-Require Import UexecRetExec.     (* [uslot_x] / [xbundle] -- the enriched slot *)
+Require Import UexecRet.         (* [uslot] -- the slot the exec channel returns *)
+Require Import UexecSG.          (* [uexecSG]: [sbundle] / [spost] *)
+Require Import UexecExecInst.    (* the class INSTANCE: exec's bundle at 7 *)
 Import Defs.
 
 (* ===================================================================== *)
@@ -312,15 +314,12 @@ Qed.
 (* ===================================================================== *)
 (*  THE EXEC CHANNEL.                                                     *)
 (* ===================================================================== *)
-(* A caller that offers the process's exec bundle ([xbundle uslot_x] --
-   [UexecExecInst.exec_xbundle], the [SpecSysExecAU] AU precondition at
-   the trapping key, its slot wand concluding at the ENRICHED slot) gets
-   back, on exec, either the failure facts or the enriched U-mode slot
-   [uslot_x] of the NEW image.  It is [uslot_x] and not [uslot] because
-   the U-mode loop that consumes it runs on the enriched fixpoint (only
-   [uexec_ret_x] carries the bundle at the process's next exec), and
-   [uslot W -∗ uslot_x W] is not provable (UexecRetExec.v header).
-   Every non-exec arm owes nothing ([sysc_exec_out_ne]). *)
+(* A caller that offers the process's exec bundle
+   ([UexecSG.sbundle uslot USYS_exec] -- [UexecExecInst.exec_sbundle], the
+   [SpecSysExecAU] AU precondition at the trapping key, its slot wand
+   concluding at the U-mode slot) gets back, on exec, either the failure
+   facts or [UexecRet.uslot] of the NEW image.  Every non-exec arm owes
+   nothing ([sysc_exec_out_ne]). *)
 Section SyscExec.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ, !ufdG Σ}.
@@ -328,7 +327,7 @@ Section SyscExec.
 
   (* the process's exec bundle, offered only on exec *)
   Definition sysc_exec_in (U : ustate) (sts : list fdstate) : iProp Σ :=
-    (⌜sysc_num (us_V U) = 7⌝ -∗ xbundle uslot_x (uvis_of U sts))%I.
+    (⌜sysc_num (us_V U) = 7⌝ -∗ sbundle uslot USYS_exec (uvis_of U sts))%I.
 
   (* r = -1 and nothing of the process moved but a0: the trapframe up to
      the a0 slot, the image, the permission projection (a copy-in's lazy
@@ -347,7 +346,7 @@ Section SyscExec.
   Definition sysc_exec_out (U U' : ustate) (sts sts' : list fdstate) : iProp Σ :=
     (⌜sysc_num (us_V U) = 7⌝ -∗
        (⌜sysc_exec_failed U U' sts sts'⌝
-        ∨ uslot_x (uvis_of U' sts')                     (* the new image's slot *)
+        ∨ uslot (uvis_of U' sts')                       (* the new image's slot *)
         ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝))%I.  (* the loadability gap *)
 
   (* every other entry owes nothing *)

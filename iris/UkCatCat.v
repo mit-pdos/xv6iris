@@ -51,12 +51,24 @@ Import Defs.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkCatCat.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -451,7 +463,7 @@ Section UkCatCat.
     { rewrite <- Ha1ccw.
       exact (upd_ne cwc (Regidx ra_idx) (Regidx a1_idx) _
                ltac:(vm_compute; discriminate)). }
-    iApply (wp_kcat_fprintf γt γd γs γfd 0x9b0 17%nat (cat_lit 0x9b0)
+    iApply (wp_kcat_fprintf γt γd γs γfd Hpsok 0x9b0 17%nat (cat_lit 0x9b0)
               hcwd cwd n
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity) ltac:(lia)
@@ -577,7 +589,7 @@ Section UkCatCat.
     { rewrite <- Ha1ccr.
       exact (upd_ne crc (Regidx ra_idx) (Regidx a1_idx) _
                ltac:(vm_compute; discriminate)). }
-    iApply (wp_kcat_fprintf γt γd γs γfd 0x9c8 16%nat (cat_lit 0x9c8)
+    iApply (wp_kcat_fprintf γt γd γs γfd Hpsok 0x9c8 16%nat (cat_lit 0x9c8)
               hcrd crd n
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity) ltac:(lia)
@@ -1107,7 +1119,7 @@ Section UkCatCat.
       rewrite /ma (upd_eq m (Regidx a2_idx) (regval_into_reg _)).
       rewrite Hs4 add_vec_zero_l. vm_compute. reflexivity. }
     (* ---- read(fd, buf, 512) -- THE ROW THAT MOVES THE IMAGE ---- *)
-    iApply (wp_kcat_read γt γd γs γfd CatSyms.buf 512 f h4 md
+    iApply (wp_kcat_read γt γd γs γfd Hpsok CatSyms.buf 512 f h4 md
               (10 + (12 + (4 + n))) Ha1d Ha2d with "Hcode Hbuf Hrun").
     iIntros (h5 ret g) "Hbuf Hrun".
     assert (Eretr : ret_pc (md !!! Regidx ra_idx)
@@ -1269,7 +1281,7 @@ Section UkCatCat.
       assert (Hraj : mj !!! Regidx ra_idx = (mword_of_int 0x3c : mword 64))
         by exact (upd_eq mi (Regidx ra_idx) (regval_into_reg _)).
       (* ---- write(1, buf, n) -- the QUIET row ---- *)
-      iApply (wp_kcat_write γt γd γs γfd h11 mj (10 + (12 + (4 + n)))
+      iApply (wp_kcat_write γt γd γs γfd Hpsok h11 mj (10 + (12 + (4 + n)))
                 with "Hcode Hrun").
       iIntros (h12 wret) "Hrun".
       assert (Eretw : ret_pc (mj !!! Regidx ra_idx)

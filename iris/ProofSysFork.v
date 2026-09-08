@@ -46,6 +46,7 @@ Require Import UexecWp.   (* [UEXEC_GEN] -- the mint's [box] *)
 Require Import UexecSlot. (* [uvis] *)
 Require Import UexecRet.  (* [uslot] -- DIRECT, the seal does not travel *)
 Require Import UexecCond. (* [cond_entry_slot] -- the conditional mint *)
+Require Import UexecExecMint. (* [uslot_mint] -- it, at the kernel's instance *)
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -91,11 +92,18 @@ Qed.
    claude-notes/design/user-wp-slot.md. *)
 Require Import UserFd.   (* [ufdG] -- the program's descriptor-table class,
                             needed to mint a user slot *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Module SysForkProof (Kfork : KFORK) (UG : UEXEC_GEN) : SYSFORK.
 
 Section ProofSysFork.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
             !irefslotG Σ, !pavG Σ}.
+  (* NO [Context `{SG : uexecSG Σ}]: this file sits ABOVE
+     [UexecExecInst], so the deposit class it speaks is that file's
+     INSTANCE, and so is the one the specs it inhabits were stated at.  A
+     section variable here would be a SECOND class of the same type, and the
+     two [UexecRet.uslot]s print identically -- the unifier does not stop. *)
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
@@ -212,7 +220,8 @@ Section ProofSysFork.
     iAssert (∀ W : uvis, ⌜uvis_fd W = sts /\ uvis_cwd W = pv_cwi (us_V U)⌝ -∗ uslot W)%I
       as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      iIntros (W) "_". iApply (UexecCond.cond_entry_slot W with "Hgen"). }
+      iDestruct (UexecExecMint.uslot_mint with "Hgen") as "#Hmk".
+      iIntros (W) "_". iApply "Hmk". }
     iApply (Kfork.wp_kfork_sconf γp γw γl γf γs
 
               Bj lvl (av - 2)%nat eb p b pid U sts lks

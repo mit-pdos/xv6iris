@@ -209,6 +209,8 @@ Require Import FdSlots.   (* [fdstate] / [fdtype] -- pipe's two ends *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkShRun.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -219,6 +221,15 @@ Section UkShRun.
   (* whole printf-and-exit subtree as one premise; whoever discharges it      *)
   (* fixes this constant, and every budget in the file carries it.           *)
   Context (Dg : nat).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -475,7 +486,7 @@ Section UkShRun.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz dq a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal
@@ -493,7 +504,7 @@ Section UkShRun.
               Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap)
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep").
     iApply ("Hcont" with "Hw").
   Qed.
 
@@ -518,7 +529,7 @@ Section UkShRun.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz dq a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal
@@ -536,7 +547,7 @@ Section UkShRun.
               Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep").
     iApply ("Hcont" with "Hw").
   Qed.
 
@@ -559,7 +570,7 @@ Section UkShRun.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm sz dq a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal
@@ -574,7 +585,7 @@ Section UkShRun.
               Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd").
+    iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hdep").
     iApply ("Hcont" with "Hw").
   Qed.
 
@@ -860,7 +871,9 @@ Section UkShRun.
     iApply (wp_uk_ecall_quiet γt γd γs γfd h1 m1 (mword_of_int pc1) n avail
               Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop
               ltac:(rewrite E12; exact Hal2)
-              with "Ci1 Hrun").
+              with "Ci1 Hrun []").
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     rewrite E12.
     iIntros (h2 ret) "Hrun".
     set (m2 := <[Regidx a0_idx := ret]> m1).
@@ -925,8 +938,10 @@ Section UkShRun.
                     vm_compute; reflexivity)
               Ha0_1
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun []").
     { iApply (uis_shk_c90 with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0xc90 : mword 64) 4
                  = mword_of_int 0xc94)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -956,6 +971,10 @@ Section UkShRun.
   Lemma wp_kshr_exec (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (avail : nat) :
     shk_code γt -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.exec) avail -∗
+    (* the exec deposit, on the EXPLICIT route -- see [UkInit.wp_kinit_exec] *)
+    udepw γt γd γs γfd
+      (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m)
+      (mword_of_int 0xcc0) USYS_exec -∗
     (∀ h' : CpuId,
        urun γt γd γs γfd h'
          (<[Regidx a0_idx := (mword_of_int (-1) : mword 64)]>
@@ -964,7 +983,7 @@ Section UkShRun.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hcode Hrun Hsbx Hcont".
     rewrite shr_exec.
     iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0xcbe)
               (mword_of_int 7 : mword 6) a7_idx avail
@@ -986,7 +1005,7 @@ Section UkShRun.
                       (upd_eq m (Regidx a7_idx) (mword_of_int 7 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun Hsbx").
     { iApply (uis_shk_cc0 with "Hcode"). }
     assert (E1 : add_vec_int (mword_of_int 0xcc0 : mword 64) 4
                  = mword_of_int 0xcc4)
@@ -2658,7 +2677,12 @@ Section UkShRun.
     forall (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (t szv : Z)
            (ld : list fdstate) (n : nat),
       m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
-      shk_code γt -∗ ush_jtab γt -∗ ush_cmd γd t c -∗ usz γs szv -∗
+      shk_code γt -∗
+      (* THE EXEC DEPOSIT'S SUPPLIER.  runcmd's EXEC arm ecalls exec, whose
+         bundle the key-free minting law cannot pay ([UkRun.uxsup]); sh takes
+         it as an explicit premise and its kernel-side constructor pays it. *)
+      uxsup -∗
+      ush_jtab γt -∗ ush_cmd γd t c -∗ usz γs szv -∗
       UserFd.ustd γfd ld -∗
       urun γt γd γs γfd h m (mword_of_int ShSyms.runcmd)
         (6 * ush_ht c + (2 + (Dg + n))) -∗
@@ -2667,7 +2691,7 @@ Section UkShRun.
     induction c as [ args | c1 IH file mode fd | l IHl r IHr
                    | l IHl r IHr | c1 IH ];
       intros Hs γt γd γs γfd h m t szv ld n Ha0;
-      iIntros "#Hcode #Hjt #Htree Hsz Hstd Hrun";
+      iIntros "#Hcode #Hexs #Hjt #Htree Hsz Hstd Hrun";
       iDestruct (ush_jtab_ro with "Hjt") as "#Hro";
       iDestruct (ush_cmd_addr with "Htree") as %[Htr Ht8];
       assert (Ht4 : t mod 4 = 0)
@@ -2802,7 +2826,8 @@ Section UkShRun.
           by (rewrite /k3 (upd_eq k2 (Regidx ra_idx) _);
               apply bv_eq; vm_compute; reflexivity).
         iApply (wp_kshr_exec γt γd γs γfd h5 k3 (2 + (Dg + n))
-                  with "Hcode Hrun").
+                  with "Hcode Hrun []").
+        { iApply (udepw_of_uxsup with "Hexs"). }
         rewrite Hrk3. iIntros (h6) "Hrun".
         (* ---- 0xda: "exec %s failed" -- THE DIAGNOSTIC CUT ---- *)
         set (k4 := <[Regidx a0_idx := (mword_of_int (-1) : mword 64)]>
@@ -2949,7 +2974,7 @@ Section UkShRun.
                                    - ush_ht r) + n))))%nat by lia.
         iApply (IHr (proj2 Hs) γt γd γs γfd hE g3 qr szv ld
                   ((6 * (Nat.max (ush_ht l) (ush_ht r) - ush_ht r) + n)%nat)
-                  Ha0_g3 with "Hcode Hjt2 Hqrc Hsz Hstd Hrun").
+                  Ha0_g3 with "Hcode Hexs Hjt2 Hqrc Hsz Hstd Hrun").
       + (* ---- the CHILD: runcmd(lcmd->left) ---- *)
         iIntros (gt gd gs gfd hA mA) "%HcsA %Ha0A #Hck (#Hjt2 & #Ht2) Hsz Hstd _ Hrun".
         iDestruct (ush_cmd_list with "Ht2") as "[#Hsl2 _]".
@@ -3011,7 +3036,7 @@ Section UkShRun.
                                    - ush_ht l) + n))))%nat by lia.
         iApply (IHl (proj1 Hs) gt gd gs gfd hD g3 ql2 szv ld
                   ((6 * (Nat.max (ush_ht l) (ush_ht r) - ush_ht l) + n)%nat)
-                  Ha0_g3 with "Hck Hjt2 Hqlc2 Hsz Hstd Hrun").
+                  Ha0_g3 with "Hck Hexs Hjt2 Hqlc2 Hsz Hstd Hrun").
 
     - (* =================== BACK =================== *)
       iDestruct (ush_cmd_back with "Htree") as (q) "[#Hqp #Hqc]".
@@ -3131,7 +3156,7 @@ Section UkShRun.
         replace (2 + (Dg + (6 * ush_ht c1 + n)))%nat
           with (6 * ush_ht c1 + (2 + (Dg + n)))%nat by lia.
         iApply (IH Hs gt gd gs gfd hD b3 q2 szv ld n Ha0_b3
-                  with "Hck Hjt2 Hqc2 Hsz Hstd Hrun").
+                  with "Hck Hexs Hjt2 Hqc2 Hsz Hstd Hrun").
   Qed.
 
 End UkShRun.

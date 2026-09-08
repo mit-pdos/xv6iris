@@ -1638,13 +1638,19 @@ Section UservecAllPt.
          at the two words the bundle's key and guard read (a1, a7) -- the
          agreement the round crosses by, restricted to two indices, hence
          definitional; the image is the frame's own [M] on both sides *)
+      iIntros (n). iSpecialize ("Hxin" $! n).
       match goal with
-      | |- environments.envs_entails _ (SpecUsertrap.ut_exec_in _ _ ?UU _) =>
-          iApply (ut_exec_in_cong sc_v (tf_of g (ret_pc sepc_v)) (pv_tf (us_V UU))
+      | |- environments.envs_entails _ (SpecUsertrap.ut_sys_in _ _ _ ?UU _) =>
+          iApply (ut_sys_in_cong n sc_v (tf_of g (ret_pc sepc_v))
+                    (pv_tf (us_V UU))
                     (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU sts
                     ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
                           unfold UsysMemOk.usys_num, tf_arg_idx, tf_of; reflexivity)
                     eq_refl
+                    ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
+                          unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
+                    ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
+                          unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
                     ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
                           unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
                     eq_refl

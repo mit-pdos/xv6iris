@@ -119,12 +119,19 @@ Require Import TsoCtx.   (* [own_context_twin] / [ctx_move] -- the child's own c
 (* ===================================================================== *)
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Module ForkretParkProof (FR : FORKRET) : FORKRET_PARK_PAID.
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  (* NO [Context `{SG : uexecSG Σ}]: this file sits ABOVE
+     [UexecExecInst], so the deposit class it speaks is that file's
+     INSTANCE, and so is the one the specs it inhabits were stated at.  A
+     section variable here would be a SECOND class of the same type, and the
+     two [UexecRet.uslot]s print identically -- the unifier does not stop. *)
 
   (* the residue is forkret's, re-exported unchanged *)
   Definition usertrap_res := FR.usertrap_res.

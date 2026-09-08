@@ -34,12 +34,24 @@ Require Import UkInitVprintf.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkInitPrintf.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -454,7 +466,7 @@ Section UkInitPrintf.
       exact (upd_ne mq5 (Regidx ra_idx) (Regidx a1_idx) _
                ltac:(vm_compute; discriminate)). }
     (* ---- vprintf(1, fmt, ap) ---- *)
-    iApply (wp_kinit_vprintf γt γd γs γfd a len f h15 mq6 n
+    iApply (wp_kinit_vprintf γt γd γs γfd Hpsok a len f h15 mq6 n
               Ha0 Habnd Hlen Hpct Ha1q6 with "Hcode Hstr Hrun").
     iIntros (h16 mq7) "%Hcs Hrun".
     assert (Eret : ret_pc (mq6 !!! Regidx ra_idx)

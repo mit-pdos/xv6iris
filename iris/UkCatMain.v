@@ -56,12 +56,24 @@ Require Import ProcGeom.  (* [NOFILE] *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkCatMain.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -211,7 +223,7 @@ Section UkCatMain.
     urun γt γd γs γfd h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _ & _)".
     iDestruct (uheap_ubyte with "Hh Hb") as %(_ & _ & Hbnd).
     iPureIntro. exact Hbnd.
   Qed.
@@ -372,7 +384,7 @@ Section UkCatMain.
                      ltac:(vm_compute; discriminate)).
       rewrite /m1. exact (upd_eq m (Regidx a2_idx) (regval_into_reg _)). }
     (* ---- fprintf(2, "cat: cannot open %s\n", argv[i]) ---- *)
-    iApply (wp_kcat_fprintf_s γt γd γs γfd cm_msg cm_msg_len cm_msg_q cm_lit
+    iApply (wp_kcat_fprintf_s γt γd γs γfd Hpsok cm_msg cm_msg_len cm_msg_q cm_lit
               (ua_ptr g) (ua_len g) (ua_bytes g) h5 m5 n
               ltac:(unfold cm_msg; lia)
               ltac:(unfold cm_msg, cm_msg_len; lia)
@@ -541,7 +553,7 @@ Section UkCatMain.
     assert (Hinv3 : cm_inv sp0 av (length args) i m3)
       by exact (cm_inv_upd sp0 av (length args) i m2 ra_idx _
                   ltac:(vm_compute; reflexivity) Hinv2).
-    iApply (wp_kcat_open γt γd γs γfd h3 m3 l (8 + (10 + (12 + (4 + n))))
+    iApply (wp_kcat_open γt γd γs γfd Hpsok h3 m3 l (8 + (10 + (12 + (4 + n))))
               Hnone with "Hcode Hrun Hstd").
     (* THE HANDLE FOR THE FILE CAT JUST OPENED.  Carried from here to the
        close at 0xbe -- it is a separate resource, so it simply rides in the
@@ -649,7 +661,7 @@ Section UkCatMain.
         exact (upd_ne m5 (Regidx ra_idx) (Regidx s1_idx) _
                  ltac:(vm_compute; discriminate)). }
       (* ---- cat(fd) ---- *)
-      iApply (wp_kcat_cat γt γd γs γfd ret f h7 m6 n Ha0_6
+      iApply (wp_kcat_cat γt γd γs γfd Hpsok ret f h7 m6 n Ha0_6
                 with "Hcode Hro Hbuf Hrun").
       iIntros (h8 m7 f') "%Hcs Hbuf Hrun".
       assert (Ecat : ret_pc (m6 !!! Regidx ra_idx)
@@ -729,7 +741,7 @@ Section UkCatMain.
         assert (Hh32 : bv_half_modulus 32 = 2147483648%Z)
           by (vm_compute; reflexivity).
         rewrite Hh32. lia. }
-      iApply (wp_kcat_close γt γd γs γfd h10 m9 fd (FdOpen rd wr t)
+      iApply (wp_kcat_close γt γd γs γfd Hpsok h10 m9 fd (FdOpen rd wr t)
                 (8 + (10 + (12 + (4 + n)))) Ha0_9
                 with "Hcode Hrun Hh").
       iIntros (h11 ret2) "Hrun".
@@ -1164,7 +1176,7 @@ Section UkCatMain.
       { rewrite /m5 (upd_ne m4 (Regidx ra_idx) (Regidx a0_idx) _
                        ltac:(vm_compute; discriminate)).
         rewrite /m4. exact (upd_eq m3 (Regidx a0_idx) (regval_into_reg _)). }
-      iApply (wp_kcat_cat γt γd γs γfd _ f h10 m5 n Ha0_5
+      iApply (wp_kcat_cat γt γd γs γfd Hpsok _ f h10 m5 n Ha0_5
                 with "Hcode Hro Hbuf Hrun").
       iIntros (h11 m6 f') "_ Hbuf Hrun".
       rewrite (_ : ret_pc (m5 !!! Regidx ra_idx)

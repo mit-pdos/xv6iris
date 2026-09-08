@@ -81,11 +81,14 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Module UserretUser (R : USERRET).
 Section UserretUser.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
 
   Lemma wp_userret_user (C : ucfg) (pt : uptd)
       (* THE PROCESS'S MEMORY, NAMED AT THE LAZY TIER (milestone J, S3).  The

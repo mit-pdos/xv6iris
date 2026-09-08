@@ -142,11 +142,15 @@ Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkFork.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* the conversion: a big-op over the run's map IS the big-op over the run *)
   Local Lemma big_seq_map (Φ : Z -> bv 8 -> iProp Σ) (a : Z) (n : nat)
@@ -802,7 +806,7 @@ Section UkFork.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hal4. iIntros "#Hi HP Hsz Hstd HD Hrun [Hpar Hchild]".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* the caller's handles ARE the parent's table, at the slots they name --
@@ -854,7 +858,7 @@ Section UkFork.
       iApply (urun_close_upd γt γd γs γfd M pm m (mword_of_int 10) r sz fdv cw
                 (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd").
+                with "Hheap Hstk Hufd Hdep").
       iIntros (h') "Hrun".
       iApply ("Hpar" $! h' r with "[%] HP Hsz Hstd HD Hrun"). exact Hr.
     (* ---- the child: fresh heap, r = 0, payload rebuilt at the new names *)
@@ -880,7 +884,7 @@ Section UkFork.
       iApply (urun_close_upd γt' γd' γs' γfd' M pm m (mword_of_int 10)
                 (mword_of_int 0) sz fdv cw (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap' Hstk' Hufd'").
+                with "Hheap' Hstk' Hufd' Hdep").
       iIntros (h') "Hrun".
       iApply ("Hchild" $! γt' γd' γs' γfd' h'
                 with "HP' Hsz' Hstd' Hfrag' Hrun").

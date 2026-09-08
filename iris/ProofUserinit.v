@@ -117,6 +117,7 @@ Require Import UexecWp.               (* [UEXEC_GEN] -- the mint's [box] *)
 Require Import UexecSlot.             (* [uvis] *)
 Require Import UexecRet.              (* [uslot] -- DIRECT, the seal does not
                                          travel through a re-export *)
+Require Import UexecExecMint.         (* [uslot_mint] -- the mint at the kernel's instance *)
 Require Import UexecCond.             (* [cond_entry_slot] -- the conditional
                                          mint: sync's constructor when the
                                          key qualifies, the generic one else *)
@@ -211,9 +212,16 @@ Proof. intro H. split_and!; lia. Qed.
    claimed state. *)
 Require Import UserFd.   (* [ufdG] -- the program's descriptor-table class,
                             needed to mint a user slot *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section PstateRunnableHelper.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
+  (* NO [Context `{SG : uexecSG Σ}]: this file sits ABOVE
+     [UexecExecInst], so the deposit class it speaks is that file's
+     INSTANCE, and so is the one the specs it inhabits were stated at.  A
+     section variable here would be a SECOND class of the same type, and the
+     two [UexecRet.uslot]s print identically -- the unifier does not stop. *)
   Lemma uin_pwhole_runnable (pa : mword 64) :
     pstate_whole pa RUNNABLE ⊣⊢ pstate_lock pa RUNNABLE.
   Proof.
@@ -797,7 +805,8 @@ Section ProofUserinit.
                -∗ uslot W)%I
       as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      iIntros (W) "_". iApply (UexecCond.cond_entry_slot W with "Hgen"). }
+      iDestruct (UexecExecMint.uslot_mint with "Hgen") as "#Hmkgen".
+      iIntros (W) "_". iApply "Hmkgen". }
     (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (park_token_park N rest

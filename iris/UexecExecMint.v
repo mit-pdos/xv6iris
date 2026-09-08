@@ -1,24 +1,22 @@
-(* UexecExecMint.v -- THE GENERIC MINT AT THE ENRICHED SLOT: what the U-mode
-   trap loop needs of the kernel to run on [UexecRetExec.uslot_x], and it is
-   ONE persistent fact -- the application-side abstract-state invariant
-   [FirstTok.fsabs_env], projected off the residue the loop already holds.
+(* UexecExecMint.v -- THE GENERIC MINT: the U-mode trap loop's own slot at
+   every key, and it costs the kernel nothing.
 
-   WHAT IS MINTED, AND WHY IT IS FREE.  The exec bundle a process hands over
-   at its exec ecall ([UexecExecInst.exec_xbundle]) is
-   [SpecSysExecAU.sys_exec_au_pre] at the trapping key: open's walk premise
-   and open's commit -- both at [True] receipts out of [fsabs_inv] alone
-   ([FsAbsInvFire.fsabs_exec_half]) -- beside the slot wand the kernel fires
-   for the NEW image.  A generic slot family ([∀ W', uslot_x W']) pays that
-   wand at every key, so a generic bundle costs nothing but the invariant.
+   WHY IT IS FREE.  Since the ARM the returning arm demands the process's
+   bundle for the number it is at ([UexecSG.sbundle]).  At the kernel's
+   instance ([UexecExecInst]) the only number with a bundle is exec, and
+   exec's is [SpecSysExecAU.sys_exec_au_pre] at the trapping key: open's walk
+   premise and open's commit -- both handed back at [True] receipts by
+   [FsAbsInvFire.fsabs_exec_half], which is a closed fact -- beside the slot
+   wand the kernel fires for the NEW image.  A generic slot family pays that
+   wand at every key.  So the class's [ssupply] is [True] there and its
+   [sbundle_of_supply] asks for nothing.
 
-   THE LIFT.  UexecRetExec.v's header says [uslot W -∗ uslot_x W] is not
-   provable outright: lifting a plain program would have to conjure a bundle
-   at every future exec trap.  WITH the generic bundle in hand it is, by Loeb
-   through the ▷ in [ukont_x]: under the later, the enriched kernel promise
-   is met from the plain one by converting the incoming plain return with
-   [uexec_ret_x_of_bundle], the bundle minted here and the slot upgrader
-   being the Loeb hypothesis itself.  So the loop's mint ([uslot_x_mint]) is
-   the plain generic slot ([UexecCond.cond_entry_slot]) lifted once. *)
+   SO THERE IS NO LIFT LEFT.  The exec channel was once a SECOND parallel
+   fixpoint and this file's work was carrying a plain slot up to it by Loeb.
+   The two tiers are one: what remains is [UexecCond.cond_entry_slot] with
+   its two premises discharged from the instance -- [psok] is [True] at every
+   number, and [UkRun.udep]'s key-free law is the class's
+   [UexecSG.sbundle_of_supply_ne]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -37,7 +35,6 @@ Require Import UserFd.
 Require Import UexecSlot.
 Require Import UexecWp.
 Require Import UexecRet.
-Require Import UexecRetExec.
 Require Import UexecCond.       (* [cond_entry_slot] -- the plain generic slot *)
 Require Import SpecKexecAU.
 Require Import SpecSysExecAU.
@@ -46,7 +43,8 @@ Require Import FirstTok.        (* [FirstTok.fsabs_env] -- spelled QUALIFIED bel
                                    [FsAbsInv] (imported after it) exports a
                                    Γ-indexed [fsabs_env] of its own *)
 Require Import PieceFam.       (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
-Require Import UexecExecInst.   (* the [xbundle] instance, [xbundle_intro] *)
+Require Import UexecExecInst.   (* the class INSTANCE: [uexecSG_xv6] / [uprogSG_gen] *)
+Require Import UkRun.           (* [udep] -- the supplier and its key-free law *)
 Require Import FsBytesGamma.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -58,117 +56,35 @@ Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UexecExecMint.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
+  Context `{!ghost_varG Σ Z}.
 
-  (* exec's AU bundle at a generic slot family: the fs half out of the
-     invariant, the slot half out of the family *)
-  (* The slot piece's pair is [S] beside the TRIVIAL refund: a generic
-     process answers for no abstract state, so it takes nothing back if
-     its exec never fires. *)
-  Lemma fsabs_exec_pre (S : uvis -> iProp Σ) :
-    FirstTok.fsabs_env -∗
-    (∀ W' : uvis, S W') -∗
-    ∀ (cw : Z) (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate),
-      sys_exec_au_pre (MkPfam S True%I) (fs_gamma_L fsc_fs) fsc_fs cw
-        (fun _ _ => True%I) (fun _ _ => True%I)
-        (pfam_triv (fun _ _ _ => True%I)) M av sts.
+  (* THE PROGRAM-SIDE DEPOSIT DATA the generic slot runs on, and at this
+     instance it costs nothing: the supplier is [True] and the key-free
+     minting law is the class's own [sbundle_of_supply_ne]. *)
+  Lemma udep_gen : ⊢ udep.
   Proof.
-    iIntros "#Henv Hs" (cw M av sts).
-    (* read-kind only ([fsabs_exec_half]): the environment is carried, not
-       spent *)
-    iDestruct (fsabs_exec_half (fs_gamma_L fsc_fs) fsc_fs cw)
-      as "[#Hwalk #Hcommit]".
-    rewrite /sys_exec_au_pre.
-    iSplitR; [iExact "Hwalk" |].
-    iSplitR; [iExact "Hcommit" |].
-    rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [| done].
-    rewrite /sys_exec_slot_pre. iIntros (na alen afun) "_".
-    rewrite /exec_slot_pre. iIntros (av' i f nl W') "_ _ _".
-    iApply "Hs".
+    rewrite /udep /Dsup /= /xv6_ssupply.
+    iSplitR; [ done | ].
+    iPureIntro. intros n W _ Hne.
+    exact (sbundle_of_supply_ne uslot n W Hne).
   Qed.
 
-  (* the process's exec bundle, at any key *)
-  Lemma xbundle_mint (W : uvis) :
-    FirstTok.fsabs_env -∗ (∀ W' : uvis, uslot_x W') -∗ xbundle uslot_x W.
+  (* the loop's mint: the generic slot at every key.  Both of
+     [UexecCond.cond_entry_slot]'s premises are the instance's own --
+     every number is admitted, and the supply is free. *)
+  Lemma uslot_mint : □ uexec_wp -∗ □ (∀ W : uvis, uslot W).
   Proof.
-    iIntros "#Henv Hs".
-    iApply (xbundle_intro uslot_x W (fun _ _ => True%I) (fun _ _ => True%I)
-              (pfam_triv (fun _ _ _ => True%I)) True%I).
-    iApply (fsabs_exec_pre uslot_x with "Henv Hs").
+    iIntros "#Hgen".
+    iDestruct udep_gen as "#Hdep".
+    iIntros "!>" (W).
+    iApply (UexecCond.cond_entry_slot W ltac:(intros k _; exact I)
+              with "Hdep [] Hgen").
+    rewrite /ssupply /= /xv6_ssupply. done.
   Qed.
-
-  (* THE LIFT (header): a plain slot is an enriched one, given a generic
-     plain family to mint the bundle's slot wand from.  Loeb through the
-     ▷ in [ukont_x]. *)
-  Lemma uslot_x_lift_of :
-    FirstTok.fsabs_env -∗
-    □ (∀ W : uvis, uslot W) -∗
-    □ (∀ W : uvis, uslot W -∗ uslot_x W).
-  Proof.
-    iIntros "#Henv #Hgen".
-    iLöb as "IH".
-    iIntros "!>" (W) "Hs".
-    rewrite uslot_x_unfold.
-    iEval (rewrite uslot_unfold) in "Hs".
-    iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
-    iApply ("Hs" $! h xi C pt Rfd Rut HRut with "[%] [%] [-]");
-      [exact Hlo | exact Hpm |].
-    rewrite /uvb /uvb_F.
-    iEval (rewrite /uvb_x /uvb_x_F) in "Hb".
-    iDestruct "Hb" as
-      "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
-    iFrame "Hamb Hur Hpt Hfrag Hcfg Hg Hpc Hrut".
-    iSplitR; [iPureIntro; exact Hsz |].
-    (* the plain kernel promise, from the enriched one: precompose the
-       return with the bundle-supplied injection *)
-    rewrite /ukont_F.
-    iEval (rewrite /ukont_x_F) in "Hk".
-    iNext.
-    rewrite /ukb_F.
-    iEval (rewrite /ukb_x_F) in "Hk".
-    iIntros (W' sc stv) "%Hp %Hs' %Hf' %Hc' (Htm & Hfr & Hret)".
-    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [%] [Htm Hfr Hret]");
-      [exact Hp | exact Hs' | exact Hf' | exact Hc' |].
-    iFrame "Htm Hfr".
-    iApply (uexec_ret_x_of_bundle with "IH [] Hret").
-    iApply (xbundle_mint with "Henv").
-    iIntros (W''). iApply "IH". iApply "Hgen".
-  Qed.
-
-  Lemma uslot_x_lift :
-    FirstTok.fsabs_env -∗ □ uexec_wp -∗ □ (∀ W : uvis, uslot W -∗ uslot_x W).
-  Proof.
-    iIntros "#Henv #Hgen".
-    iApply (uslot_x_lift_of with "Henv").
-    iIntros "!>" (W). iApply (UexecCond.cond_entry_slot W with "Hgen").
-  Qed.
-
-  (* the loop's mint: the plain generic slot, lifted *)
-  Lemma uslot_x_mint :
-    FirstTok.fsabs_env -∗ □ uexec_wp -∗ □ (∀ W : uvis, uslot_x W).
-  Proof.
-    iIntros "#Henv #Hgen".
-    iDestruct (uslot_x_lift with "Henv Hgen") as "#Hlift".
-    iIntros "!>" (W). iApply "Hlift".
-    iApply (UexecCond.cond_entry_slot W with "Hgen").
-  Qed.
-
-  (* ...and the return channel lifted with it: what the loop's ENTRY
-     needs, where userret's dovetail hands it a plain return *)
-  Lemma uexec_ret_x_lift :
-    FirstTok.fsabs_env -∗ □ uexec_wp -∗
-    □ (∀ (sc : mword 64) (W : uvis), uexec_ret sc W -∗ uexec_ret_x sc W).
-  Proof.
-    iIntros "#Henv #Hgen".
-    iDestruct (uslot_x_lift with "Henv Hgen") as "#Hlift".
-    iDestruct (uslot_x_mint with "Henv Hgen") as "#Hmk".
-    iIntros "!>" (sc W) "Hret".
-    iApply (uexec_ret_x_of_bundle with "Hlift [] Hret").
-    iApply (xbundle_mint with "Henv").
-    iIntros (W''). iApply "Hmk".
-  Qed.
-
 End UexecExecMint.

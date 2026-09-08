@@ -257,6 +257,9 @@ TfUser.v
 UsysMemOk.v
 UexecWp.v
 UexecSlot.v
+# UexecSG = the per-syscall DEPOSIT class the trap contract's returning arm
+# is stated over (the process's bundle in, the syscall's armed post back).
+UexecSG.v
 UserStep.v
 UserTrap.v
 UserTranslate.v
@@ -270,9 +273,6 @@ UmodeRegs.v
 UexecRet.v
 UexecRound.v
 UexecApply.v
-# UexecApplyX = UexecApply's round lemmas at the ENRICHED slot (UexecRetExec's
-# [uslot_x]), with the kernel's exec result row deciding the exec arm (lane E3b).
-UexecApplyX.v
 UmodeCap.v
 UmodeFetch.v
 UmodeAbi.v
@@ -300,20 +300,13 @@ UkRun.v
 UkRunLeaf.v
 UkRunMem.v
 UkRunSys.v
-# UkRunX = the data-run constructors at UexecRetExec's enriched slot
-# ([uslot_x_of_urun] / [_ro] / [_all]), the bundle-supplied downgrade
-# [urun_x -∗ urun], and the [_x] close/bump helpers; UkRunSysX = the
-# enriched exec ecall leaf [wp_uk_ecall_exec_x] on UkStepGen's X-generic
-# engine at [(uexec_ret_x_F, uslot_x)].
-UkRunX.v
-UkRunSysX.v
 UkFork.v
 UkSync.v
 USyncKernel.v
 UkEcho.v
 UEchoKernel.v
-# UShKernel = sh's slot at the ENRICHED tier ([sh_uexec_slot_x], via
-# UkRunX.uslot_x_of_urun_all + UkSh.wp_ksh_start, with UkSh's read-leaf
+# UShKernel = sh's slot ([sh_uexec_slot], via UkRun.uslot_of_urun_all +
+# UkSh.wp_ksh_start, with UkSh's read-leaf
 # Hypothesis discharged) and the bridge from the kernel's image fact
 # ([sh_slot_of_kexec], off SpecKexecAU.kexec_image_ok at ElfUser.sh_elf).
 UShKernel.v
@@ -1614,16 +1607,16 @@ SpecKexecAU.v
 KexecImageAlg.v
 KexecAUBridge.v
 SpecSysExecAU.v
-# UexecExecInst = the kernel-side instance of UexecRetExec's [uexecXG]:
-# [xbundle W] := some [sys_exec_au_pre] at the trapping key's image, argv
-# pointer (trapframe argument 1) and descriptor view.  Required by
-# SpecSyscall (the dispatcher's exec channel, lane E2); listed here, beside
-# the spec it names, rather than beside UexecRetExec.v (coqdep orders the
-# build).
+# UexecExecInst = the kernel-side instance of UexecSG's [uexecSG] and
+# [uprogSG]: [sbundle X 7 W] := some [sys_exec_au_pre] at the trapping key's
+# image, argv pointer (trapframe argument 1) and descriptor view, [emp] at
+# every other number, [spost] [emp] everywhere, and [ssupply] the
+# application-side fs invariant [FirstTok.fsabs_env] -- which is why it sits
+# above FsAbsInvFire (the supply law's exec case IS that mint).
 UexecExecInst.v
-# UexecExecMint = the generic mint at [uslot_x]: the process's exec bundle out
-# of the application-side fs invariant ([FirstTok.fsabs_env]) alone, and the
-# lift of a plain slot to the enriched one by Loeb (lane E3b).
+# UexecExecMint = the generic mint: the loop's slot at every key, from the
+# invariant and UexecCond.cond_entry_slot with both premises discharged from
+# the instance.
 UexecExecMint.v
 ProofSysExec.v
 LinkSysExec.v
@@ -1990,19 +1983,6 @@ UkShFork.v
 # nothing may require IT).
 FsFdMirror.v
 UexecRetFs.v
-# UexecRetExec = the SAME parallel-fixpoint device for the EXEC row
-# (exec-au route, stage E1): the returning-syscall arm splits off
-# USYS_exec, where the process ALSO hands over [xbundle W] -- a pure GIVE,
-# consumed by the kernel on success (the new process runs under the slot
-# the kernel derived from it and this one never resumes) and simply lost
-# on failure, where the generic arm returns -1 exactly as today.  The
-# payload family is the ambient class [uexecXG], so the fixpoint's cone
-# gains no fs import; UexecExecInst.v (beside SpecSysExecAU.v) is its one
-# instance.  Receipts run the OPPOSITE way from UexecRetFs's, because this
-# arm DEMANDS rather than offers: uslot_x_uslot / uexec_ret_x_to /
-# ukont_ukont_x / uvb_uvb_x / urun_urun_x; [uslot -∗ uslot_x] is NOT
-# provable and the header says why.
-UexecRetExec.v
 UkRunSysFs.v
 UkRunFsLeaf.v
 UkStepGenFs.v

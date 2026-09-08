@@ -47,11 +47,14 @@ Set Printing Depth 40.
 (* §1 THE POST-FETCH MIDDLE: [UkLoad.uk_load_post_fetch] with the node   *)
 (* route in place of the walker.                                          *)
 (* ===================================================================== *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkLbuTextPostFetch.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
+  Context `{SG : uexecSG Σ}.
 
   Lemma uk_lbu_text_post_fetch (R : iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm)
@@ -255,6 +258,7 @@ Section UkLbuTextObl.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
+  Context `{SG : uexecSG Σ}.
 
   Lemma uk_lbu_text_obl_base (R : iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm)
@@ -379,6 +383,7 @@ Section UkLbuText.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
+  Context `{SG : uexecSG Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   Hypothesis (HRut : forall pt' : uptd,
                        ⊢ Rut pt' -∗ TsoCtx.own_context XI ∗

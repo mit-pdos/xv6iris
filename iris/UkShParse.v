@@ -802,12 +802,16 @@ Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkShParse.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   Local Notation x0_idx := (mword_of_int 0 : mword 5).
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -945,11 +949,11 @@ Section UkShParse.
   Proof.
     iIntros "Hrun".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw)
-      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
     iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
-    iFrame "Hheap Hstk Hufd Hb".
+    iFrame "Hheap Hstk Hufd Hdep Hb".
     iPureIntro. split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 

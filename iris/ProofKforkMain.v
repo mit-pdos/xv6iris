@@ -198,6 +198,8 @@ Proof.
   intro Hb. rewrite (Hs Hb). exact (Hch Hb).
 Qed.
 
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Module KforkProof (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
              (FP : FREEPROC) (RL : RELEASE) (AQ : ACQUIRE)
              (FD : FILEDUP) (ID : IDUP) (SS : SAFESTRCPY)
@@ -213,6 +215,11 @@ Section KforkArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
+  (* NO [Context `{SG : uexecSG Σ}]: this file sits ABOVE
+     [UexecExecInst], so the deposit class it speaks is that file's
+     INSTANCE, and so is the one the specs it inhabits were stated at.  A
+     section variable here would be a SECOND class of the same type, and the
+     two [UexecRet.uslot]s print identically -- the unifier does not stop. *)
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

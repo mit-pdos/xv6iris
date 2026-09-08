@@ -224,6 +224,10 @@ Proof. unfold echo_gate. apply _. Defined.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk.
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import UkRun.    (* [udep] -- the program's supplier and its law *)
+
 Section UexecCond.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -232,6 +236,8 @@ Section UexecCond.
      tree -- [Xv6Cameras.uioG]'s [uio_brkG] is the same [ghost_varG Σ Z] --
      so nothing new enters Σ. *)
   Context `{!ghost_varG Σ Z}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* THE CONDITIONAL CONSTRUCTOR: a verified program's slot when its gate
      holds, the generic one otherwise -- and nothing is assumed on any
@@ -240,37 +246,52 @@ Section UexecCond.
      so a key that somehow satisfied two gates would simply take the first.
      Adding the next verified program is one more [destruct]. *)
   (* the gate's yes branch: sync's own slot *)
-  Lemma sync_gate_slot (W : uvis) : sync_gate W -> ⊢ uslot W.
+  Lemma sync_gate_slot (W : uvis) :
+    (forall k : Z, k <> USYS_exec -> psok k) ->
+    sync_gate W -> udep -∗ uslot W.
   Proof.
-    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen & Hstop).
+    intros Hpsok (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen & Hstop).
     exact (sync_uexec_slot W Hpc
              (text_region_eq_uimg_sub (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
              Hroom Hal8 (sync_stkdata_all W Hstk) Hfdlen
-             (ustop_gate_at W Hstop)).
+             (ustop_gate_at W Hstop) Hpsok).
   Qed.
 
   (* ...and echo's *)
-  Lemma echo_gate_slot (W : uvis) : echo_gate W -> ⊢ uslot W.
+  Lemma echo_gate_slot (W : uvis) :
+    (forall k : Z, k <> USYS_exec -> psok k) ->
+    echo_gate W -> udep -∗ uslot W.
   Proof.
-    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs
+    intros Hpsok (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs
             & Hfdlen & Hstop).
     exact (echo_uexec_slot W Hpc
              (text_region_eq_of_uimg_sub EchoInstrs.echo_bytes (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
              Hroom Hal8 (echo_stkdata_all W Hstk) Hargs
              (echo_avd_arr_all W Havd) (echo_avd_str_all W Havs) Hfdlen
-             (ustop_gate_at W Hstop)).
+             (ustop_gate_at W Hstop) Hpsok).
   Qed.
 
-  Lemma cond_entry_slot (W : uvis) : □ uexec_wp -∗ uslot W.
+  (* THE SUPPLY REACHES EVERY BRANCH, not only the generic tail: sync and
+     echo both ecall [write], which HAS a contract, so their own slots owe
+     the deposit too and take it as [UkRun.udep] -- the program's supplier
+     and its minting law.  The generic tail additionally needs [□ ssupply]
+     itself, because [uexec_wp_uslot] mints a bundle at EVERY number
+     ([UexecRet.uexec_ret_of_all]). *)
+  Lemma cond_entry_slot (W : uvis) :
+    (* the numbers every branch may route through the supplier; the mint
+       sites see the instance and discharge it ([UexecSG.v]'s header for why
+       it travels beside [udep] rather than inside its law) *)
+    (forall k : Z, k <> USYS_exec -> psok k) ->
+    udep -∗ □ ssupply -∗ □ uexec_wp -∗ uslot W.
   Proof.
-    iIntros "#Hgen".
+    intros Hpsok. iIntros "#Hdep #Hsup #Hgen".
     destruct (decide (sync_gate W)) as [Hgate | _].
-    { iApply (sync_gate_slot W Hgate). }
+    { iApply (sync_gate_slot W Hpsok Hgate with "Hdep"). }
     destruct (decide (echo_gate W)) as [Hgate | _].
-    { iApply (echo_gate_slot W Hgate). }
-    iApply (uexec_wp_uslot W with "Hgen").
+    { iApply (echo_gate_slot W Hpsok Hgate with "Hdep"). }
+    iApply (uexec_wp_uslot W with "Hsup Hgen").
   Qed.
 
 End UexecCond.
@@ -292,6 +313,8 @@ Section UexecCondCongr.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   Lemma uslot_congr (U1 U2 : ustate) (sts : list fdstate) :
     pv_tf (us_V U1) = pv_tf (us_V U2) ->

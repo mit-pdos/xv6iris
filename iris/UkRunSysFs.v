@@ -148,8 +148,12 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
 Require Import UkRunSys.  (* [ufd_state_move] -- the untracked authority step *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section StepPin.
   Context `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* the honest blanket, at either enriched row: -1 moves nothing *)
   Lemma ufs_step_at_blanket (n : Z) (pl : list (bv 8)) (tf : list (mword 64))
@@ -231,6 +235,8 @@ Section UkRunSysFs.
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context `{!ghost_varG Σ umirror}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* =================================================================== *)
   (* §2 THE ENRICHED BUNDLE'S FACTS AND THE ENRICHED CONTINUATION.        *)
@@ -304,15 +310,18 @@ Section UkRunSysFs.
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     (* the descriptor authority, exactly as [UkRun.urun_close] takes it *)
     ufd_state γfd fdv -∗
+    (* ...and the deposit supplier, which [urun_fs] carries as [UkRun.urun]
+       does *)
+    udep -∗
     (∀ h : CpuId,
        urun_fs γm γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
     ukc_fs γm pm M sz fdv cw m pc.
   Proof.
-    iIntros "Hheap Hstk Hufd Hcont".
+    iIntros "Hheap Hstk Hufd #Hdep Hcont".
     rewrite /ukc_fs. iIntros (h C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). rewrite /urun_fs.
     iExists C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
-    iFrame "Hheap Hstk Hufd Hb". iPureIntro.
+    iFrame "Hheap Hstk Hufd Hdep Hb". iPureIntro.
     split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
@@ -324,13 +333,14 @@ Section UkRunSysFs.
     uheap γt γd γs M pm sz -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     ufd_state γfd fdv -∗
+    udep -∗
     (∀ h : CpuId,
        urun_fs γm γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
        WP (Loop : expr riscv_lang)) -∗
     ukc_fs γm pm M sz fdv cw (<[Regidx rd := v]> m) pc'.
   Proof.
-    intros Hns. iIntros "Hheap Hstk Hufd Hcont".
-    iApply (urun_fs_close with "Hheap [Hstk] Hufd Hcont").
+    intros Hns. iIntros "Hheap Hstk Hufd #Hdep Hcont".
+    iApply (urun_fs_close with "Hheap [Hstk] Hufd Hdep Hcont").
     rewrite (unot_sp_upd rd v m Hns). iExact "Hstk".
   Qed.
 
@@ -364,14 +374,17 @@ Section UkRunSysFs.
       (n : Z) (u : umirror) (pl : list (bv 8)) (dq : dfrac) (avail : nat) :
     usys_num (tf_of m pc) = n ->
     uenr_dom n = true ->
+    (* the number is one the program admits, so the leaf mints the arm's
+       deposit from [urun_fs]'s own supplier *)
+    psok n ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     ⊢ wp_uk_ecall_fs_body γm γt γd γs γfd h m pc n u pl dq avail.
   Proof.
-    intros Hn Hdom Hal4.
+    intros Hn Hdom Hok Hal4.
     rewrite /wp_uk_ecall_fs_body.
     iIntros "#Hi Hrun Hmc Hstr Hcont".
     iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv cw)
-      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_fs_x0 with "Hb") as "[%Hx0 Hb]".
     (* THE PATH, PINNED: the caller's string is the one the row reads *)
@@ -394,12 +407,20 @@ Section UkRunSysFs.
     destruct (decide (n = USYS_fork)) as [He | _];
       [ exfalso; exact (Hfork He) |].
     rewrite Hdom.
-    (* THE DEPOSIT: the process takes the arm's RIGHT disjunct *)
+    (* THE DEPOSIT, minted from the supplier and carried to THIS tier's
+       family by [UexecSG.sbundle_mono] ([UexecRetFs.uslot_uslot_fs] is the
+       upgrader); then the process takes the arm's RIGHT disjunct. *)
+    iSplitR.
+    { iPoseProof (udep_dep n (uvis_of_run m pc M pm sz fdv cw) Hok Hexec
+                    with "Hdep") as "Hb0".
+      iApply (sbundle_mono uslot (uslot_fs γm) n
+                (uvis_of_run m pc M pm sz fdv cw) with "[] Hb0").
+      iIntros "!>" (W') "Hs". iApply uslot_uslot_fs. iExact "Hs". }
     iRight. iExists u. iFrame "Hmc".
-    iIntros (r M' pm' sz' fdv' cw' u') "%Hok %Hfdok %Hpiperow %Hcwrow %Hstep Hmc".
+    iIntros (r M' pm' sz' fdv' cw' u') "%Hok' %Hfdok %Hpiperow %Hcwrow %Hstep Hmc _".
     (* the enriched rows are QUIET: nothing about the image moved *)
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _
-                Hexec Hsbrk Hwait Hpipe Hrd Hfst Hok) as [-> [-> ->]].
+                Hexec Hsbrk Hwait Hpipe Hrd Hfst Hok') as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
     (* THE ENRICHED ROWS INCLUDE open AND dup, so the table may have moved.
        The program is not tracking these descriptors, so the authority moves
@@ -415,7 +436,7 @@ Section UkRunSysFs.
     iApply (urun_fs_close_upd γm γt γd γs γfd M pm m (mword_of_int 10) r sz fdv' cw'
               (add_vec_int pc 4) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              with "Hheap Hstk Hufd").
+              with "Hheap Hstk Hufd Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r u' with "[%] Hmc Hstr Hrun").
     (* ...and the tie, read at the caller's own string *)
@@ -438,6 +459,7 @@ Module Type FDROW_UKFS_STEP.
   Parameter wp_uk_ecall_fs_step :
     forall `{!riscvGS Σ} `{GEN : GenId} `{XI : CurCtx}
            `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror}
+           `{SG : uexecSG Σ}
       (γm : gname) (h : CpuId) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (π : gmap (mword 27) uperm) (sz : Z)
@@ -460,10 +482,12 @@ Module FdRowUkfsEngineOfStep (S : FDROW_UKFS_STEP) <: FDROW_UKFS_ENGINE.
   Lemma wp_uk_ecall_fs :
     forall `{!riscvGS Σ} `{GEN : GenId} `{XI : CurCtx}
            `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror} `{!ufdG Σ}
+           `{SG : uexecSG Σ} `{PS : uprogSG Σ}
       (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (n : Z) (u : umirror) (pl : list (bv 8)) (dq : dfrac) (avail : nat),
       usys_num (tf_of m pc) = n ->
       uenr_dom n = true ->
+      psok n ->
       is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
       ⊢ wp_uk_ecall_fs_body γm γt γd γs γfd h m pc n u pl dq avail.
   Proof.

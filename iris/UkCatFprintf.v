@@ -36,12 +36,24 @@ Import Defs.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkCatFprintf.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -1215,7 +1227,7 @@ Section UkCatFprintf.
     iIntros "#Hcode #Hstr Hrun Hcont".
     iApply (wp_kcat_fprintf_gen a h m n Ha1 with "Hcode [] Hrun Hcont").
     iIntros (h' m') "%Ha1' %Ha2' %Hra' Hu6 Hrun Hk".
-    iApply (wp_kcat_vprintf γt γd γs γfd a len f h' m' n
+    iApply (wp_kcat_vprintf γt γd γs γfd Hpsok a len f h' m' n
               Ha0 Habnd Hlen Hpct Ha1' with "Hcode Hstr Hrun").
     iIntros (h'' m'') "%Hcs Hrun".
     assert (Eret : ret_pc (m' !!! Regidx ra_idx)
@@ -1261,7 +1273,7 @@ Section UkCatFprintf.
     iApply (wp_kcat_fprintf_gen a h m n Ha1 with "Hcode [] Hrun Hcont").
     iIntros (h' m') "%Ha1' %Ha2' %Hra' Hu6 Hrun Hk".
     rewrite Ha2.
-    iApply (wp_kcat_vprintf_s γt γd γs γfd a len q f
+    iApply (wp_kcat_vprintf_s γt γd γs γfd Hpsok a len q f
               (uint (m !!! Regidx csp_rs1) - 48) sa (DfracOwn 1) slen sf
               h' m' n Ha0 Habnd Hq2 Hfq Hfsq Hpct Hc1d Hc1u Hc1x Hc2set
               Hapal Hsanz Ha1' Ha2'

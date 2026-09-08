@@ -246,9 +246,12 @@ Proof.
 Qed.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkStoreExecErr.
   Context (k : Z).
   Context (Hkw : vmem_width k).
+  Context `{SG : uexecSG Σ}.
 
   (* the [execute (STORE ...)] fact when the access FAULTS: WpUmodeStore's
      [exec_execute_STORE_k_u_walk] with [Ok true] read as [Err er] *)
@@ -326,6 +329,7 @@ Section UkStoreTrapWrap.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
 
   (* [WpUmodeStore.uv_swp_exec_mem] for an execute that TRAPS: the result is
      an arbitrary non-[ExecuteAs] [er] and the byte map does not move (a
@@ -389,6 +393,7 @@ Section UkStorePostFetch.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
+  Context `{SG : uexecSG Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* The geometry-agnostic middle: from the FETCHED file, write nextPC,    *)
@@ -1015,6 +1020,7 @@ Section UkStoreObl.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
+  Context `{SG : uexecSG Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* §6 THE OBLIGATION, once per FETCH SHAPE -- the store twins of         *)
@@ -1325,6 +1331,7 @@ Section UkStore.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
+  Context `{SG : uexecSG Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,

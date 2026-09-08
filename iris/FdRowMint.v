@@ -153,11 +153,14 @@ Proof. exact (era0_seed_boot S). Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section MirrorLegs.
   Context {Σ : gFunctors}.
   Context `{!fdslotG Σ}.
   (* the bundle's offset rows ([FdSlots.foff_rows]) name an invariant *)
   Context `{!riscvGS Σ, !offboxG Σ}.
+  Context `{SG : uexecSG Σ}.
 
   (* DESIGN SECTION 5 FACT 1, AT ITS GHOST.  [ProcInv]'s slot-open mint
      runs [FdSlots.fd_st_alloc NOFILE] and reads the fragment side with
@@ -207,6 +210,7 @@ Section MirrorHomes.
   Context `{!riscvGS Σ, !offboxG Σ}.
   Context `{!fsLinkG Σ, !fsTopG Σ}.
   Implicit Types Γ : fs_view_names Σ.
+  Context `{SG : uexecSG Σ}.
 
   (* ---- 3a.  INIT'S ENTRY PACKAGE ------------------------------------ *)
 
@@ -368,6 +372,7 @@ Section MirrorMint.
   Context `{!fdslotG Σ}.
   Context `{!fsLinkG Σ, !fsTopG Σ}.
   Implicit Types Γ : fs_view_names Σ.
+  Context `{SG : uexecSG Σ}.
 
   (* ---- 4a.  THE MINT, BARE ------------------------------------------- *)
 
@@ -484,6 +489,7 @@ Section MirrorPark.
   Context `{!fdslotG Σ}.
   Context `{!fsLinkG Σ, !fsTopG Σ}.
   Implicit Types Γ : fs_view_names Σ.
+  Context `{SG : uexecSG Σ}.
 
   (* THE ARM IS CONSERVATIVE AT THE PARK.  Whatever the park is handed
      today -- the generic family, or sync's/echo's through

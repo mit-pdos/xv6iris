@@ -42,12 +42,24 @@ Import Defs.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkInit.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
+  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
+     hypothesis, so no lemma statement in this file names it and the ~570
+     [urun] sites did not move; the program's kernel-side constructor
+     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
+     exec is excluded by the minting law itself -- its bundle reads the key,
+     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
+  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -133,8 +145,10 @@ Section UkInit.
                                (mword_of_int 15 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun Hstd").
+              with "[] Hrun [] Hstd").
     { iApply (uis_init_3b4 with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0x3b4 : mword 64) 4
                  = mword_of_int 0x3b8)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -207,8 +221,10 @@ Section UkInit.
               (* ...and the three descriptor-moving numbers *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun []").
     { iApply (uis_init_3bc with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0x3bc : mword 64) 4
                  = mword_of_int 0x3c0)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -281,8 +297,10 @@ Section UkInit.
                                (mword_of_int 10 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun Hstd").
+              with "[] Hrun [] Hstd").
     { iApply (uis_init_3ec with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0x3ec : mword 64) 4
                  = mword_of_int 0x3f0)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -350,8 +368,10 @@ Section UkInit.
               (* ...and the three descriptor-moving numbers *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun []").
     { iApply (uis_init_394 with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0x394 : mword 64) 4
                  = mword_of_int 0x398)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -411,6 +431,13 @@ Section UkInit.
   Lemma wp_kinit_exec (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
     urun γt γd γs γfd h m (mword_of_int InitSyms.exec) avail -∗
+    (* THE EXEC DEPOSIT, on the EXPLICIT route: exec's bundle reads the key
+       (argv, out of the image), so it is not payable from the supplier and
+       [UkRun.udepw]'s left disjunct excludes it by construction.  The
+       caller hands it in, at the key the ecall traps from. *)
+    udepw γt γd γs γfd
+      (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m)
+      (mword_of_int 0x3ac) USYS_exec -∗
     (* exec only comes back when it FAILED, and then it returns -1 *)
     (∀ h' : CpuId,
        urun γt γd γs γfd h'
@@ -420,7 +447,7 @@ Section UkInit.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hcode Hrun Hsbx Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hexec.
     iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3aa)
               (mword_of_int 7 : mword 6) a7_idx avail
@@ -443,7 +470,7 @@ Section UkInit.
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 7 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun Hsbx").
     { iApply (uis_init_3ac with "Hcode"). }
     assert (E1 : add_vec_int (mword_of_int 0x3ac : mword 64) 4
                  = mword_of_int 0x3b0)
@@ -513,8 +540,10 @@ Section UkInit.
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 3 : mword 64));
                     vm_compute; reflexivity)
               Ha0 ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun []").
     { iApply (uis_init_37c with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0x37c : mword 64) 4
                  = mword_of_int 0x380)
       by (apply bv_eq; vm_compute; reflexivity).

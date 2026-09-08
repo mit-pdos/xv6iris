@@ -772,8 +772,8 @@ Section UtDispatch.
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* the process's exec bundle, at the ENTRY record -- the ecall arm's
-       alone ([SpecUsertrap.ut_exec_in]) *)
-    ut_exec_in sc (pv_tf (us_V U0)) U0 sts -∗
+       alone ([SpecUsertrap.ut_sys_in]) *)
+    (∀ n : Z, ut_sys_in n sc (pv_tf (us_V U0)) U0 sts) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') SY.syscall_env) pt ksp m0
                      mie_v menvcfg0 U0 sts ep sc) -∗

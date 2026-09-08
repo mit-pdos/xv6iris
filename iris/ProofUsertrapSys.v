@@ -63,7 +63,8 @@ Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecSyscall.
 Require Import SpecUsertrap UsertrapRes.
 Require Import UsysMemOk UsysMemOkSpec UexecRound UexecSlot UexecRet UserPerm.  (* the round's vocabulary *)
-Require Import UexecRetExec.   (* [xbundle_cong] -- the exec bundle across the epc rewrites *)
+Require Import UexecSG.        (* [sbundle_cong] / [skey_eq] -- the deposit across
+                                  the epc rewrites *)
 Require Import ProofUsertrapParts ProofPrepareReturnParts.
 Require Import ProofUsertrapTail.
 From Kernel Require KernelInstrs.
@@ -144,9 +145,9 @@ Section UtSysBlock.
     ut_hold (SY.syscall_env) N U false lks sts -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
-    (* the process's exec bundle, at the ENTRY record: what the dispatcher's
-       exec channel is offered ([SpecUsertrap.ut_exec_in]) *)
-    ut_exec_in scv (pv_tf (us_V U0)) U0 sts -∗
+    (* the process's deposit at the ENTRY record: what the dispatcher's
+       exec channel is offered, read at 7 ([SpecUsertrap.ut_sys_in]) *)
+    (∀ n : Z, ut_sys_in n scv (pv_tf (us_V U0)) U0 sts) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
                      mie_v menvcfg0 U0 sts epv scv) -∗
@@ -431,16 +432,19 @@ Section UtSysBlock.
       assert (Hnumeq0 : sysc_num V1 = usys_num (pv_tf (us_V U))).
       { rewrite (sysc_num_usys V1). rewrite HV1tf0. apply usys_num_epc. }
       pose proof Hpro as Hpro'. destruct Hpro' as (Hpr1 & Hpr2 & Hpr3 & Hpr4 & Hpr5).
-      (* the entry record's number and a1 word are the dispatcher's: neither
-         epc rewrite reads them -- the exec bundle's key congruence
-         ([SpecUsertrap.ut_exec_in_cong]) *)
+      (* the entry record's number and argument words are the dispatcher's:
+         neither epc rewrite reads them -- the deposit's key congruence
+         ([SpecUsertrap.ut_sys_in_cong]) *)
       assert (Hn0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
       { rewrite Hnumeq0 Hpr1 usys_num_epc. reflexivity. }
-      assert (Ha1w : tf_w (pv_tf (us_V U0)) (tf_arg_idx 1)
-                     = tf_w (pv_tf V1) (tf_arg_idx 1)).
-      { rewrite HV1tf0 Hpr1. unfold tf_w.
-        rewrite list_lookup_total_insert_ne; [| unfold tf_epc_idx, tf_arg_idx; lia].
-        rewrite list_lookup_total_insert_ne; [| unfold tf_epc_idx, tf_arg_idx; lia].
+      assert (Hargw : forall i : nat, (i < 3)%nat ->
+                tf_w (pv_tf (us_V U0)) (tf_arg_idx i)
+                = tf_w (pv_tf V1) (tf_arg_idx i)).
+      { intros i Hi. rewrite HV1tf0 Hpr1. unfold tf_w.
+        rewrite list_lookup_total_insert_ne;
+          [| unfold tf_epc_idx, tf_arg_idx; lia].
+        rewrite list_lookup_total_insert_ne;
+          [| unfold tf_epc_idx, tf_arg_idx; lia].
         reflexivity. }
       (* ---- +0x9e: csrsi sstatus,2 -- intr_on(), and the reserve is paid ---- *)
       iDestruct (ut_flip_pre (un_pj N) with "Hcpu") as "(Hcnt & Hcells)".
@@ -514,11 +518,21 @@ Section UtSysBlock.
        dispatcher's: the prologue's and the epilogue's epc rewrites move
        neither the image nor the a1 word nor the number *)
     2: { rewrite /sysc_exec_in. iIntros "%Hk7". cbn [us_V] in Hk7.
-         iDestruct ("Hxin" with "[%]") as "Hx".
-         { split; [exact Hscec | rewrite Hn0; exact Hk7]. }
-         iEval (rewrite (xbundle_cong uslot_x (uvis_of U0 sts)
-                           (uvis_of (MkUstate V1 (us_M U)) sts)
-                           (eq_sym Hpr4) Ha1w eq_refl (eq_sym Hpr5))) in "Hx".
+         iDestruct ("Hxin" $! USYS_exec with "[%]") as "Hx".
+         { split_and!;
+             [ exact Hscec | rewrite Hn0; exact Hk7
+             | vm_compute; discriminate | vm_compute; discriminate ]. }
+         assert (Hkey : skey_eq (uvis_of U0 sts)
+                          (uvis_of (MkUstate V1 (us_M U)) sts)).
+         { rewrite /skey_eq. split_and!;
+             [ exact (eq_sym Hpr4)
+             | exact (Hargw 0%nat ltac:(lia))
+             | exact (Hargw 1%nat ltac:(lia))
+             | exact (Hargw 2%nat ltac:(lia))
+             | reflexivity
+             | exact (eq_sym Hpr5) ]. }
+         rewrite <- (sbundle_cong uslot USYS_exec (uvis_of U0 sts)
+                       (uvis_of (MkUstate V1 (us_M U)) sts) Hkey).
          iExact "Hx". }
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now

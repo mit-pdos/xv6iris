@@ -82,6 +82,8 @@ Require Import UmodeText.
 (* ===================================================================== *)
 (* SS0 THE SLOT FAMILY, and the bundle re-stated at it.                    *)
 (* ===================================================================== *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkGen.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
@@ -93,6 +95,7 @@ Section UkGen.
   Context (X : uvis -d> iPropO Σ).
   (* ...and which ambient TSO contexts the family's slot covers (header) *)
   Context (Q : TsoCtx.CurCtx -> Prop).
+  Context `{SG : uexecSG Σ}.
 
   (* UexecRet.[ukb_F] at [RetF] *)
   Definition ukb_F' `{CID : CpuId} `{XI : TsoCtx.CurCtx}
@@ -1763,6 +1766,7 @@ End UkGen.
 Section UkGenPlain.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  Context `{SG : uexecSG Σ}.
 
   (* fact (i) at [uslot]: the fixpoint unfolding.  [Q] is [True] here, so
      the only difference from [uslot_unfold] is one vacuous premise. *)

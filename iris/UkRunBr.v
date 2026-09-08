@@ -49,11 +49,15 @@ Import Defs.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkRunBr.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* the base branch against x0 -- [bltz]/[bgez]/[beqz]/[bnez].  The second
      operand is not read off [m]: it is [zero_reg], off the bundle. *)
@@ -73,12 +77,12 @@ Section UkRunBr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkBranch.wp_uk_btype0 C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs1 op taken tgt
               Hui H1 H2 H3
               with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap Hstk Hufd Hcont").
+    iApply (urun_close with "Hheap Hstk Hufd Hdep Hcont").
   Qed.
 
 
@@ -101,12 +105,12 @@ Section UkRunBr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkBranch.wp_uk_btype0_later C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs1 op
               taken tgt Hui H1 H2 H3
               with "Hb [Hheap Hstk Hufd Hcont]").
-    iNext. iApply (urun_close with "Hheap Hstk Hufd Hcont").
+    iNext. iApply (urun_close with "Hheap Hstk Hufd Hdep Hcont").
   Qed.
 
   (* ...and the branch whose x0 is on the LEFT.  [blez a0] is [bge x0,a0],
@@ -128,14 +132,14 @@ Section UkRunBr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iApply (UkBranch.wp_uk_btype C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs2
               (mword_of_int 0 : mword 5) op taken tgt Hui
               ltac:(rewrite Hx0; exact H1) H2 H3
               with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap Hstk Hufd Hcont").
+    iApply (urun_close with "Hheap Hstk Hufd Hdep Hcont").
   Qed.
 
 End UkRunBr.

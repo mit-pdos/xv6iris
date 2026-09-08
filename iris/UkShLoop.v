@@ -45,12 +45,16 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkShLoop.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs γfd : gname).
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* the DATA a turn of the loop needs and does not create.  [8208] is
      [freep] (0x2010) and [8328] is [base] (0x2088) -- the two literals

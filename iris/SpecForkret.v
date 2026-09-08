@@ -216,10 +216,13 @@ Import Defs.
    budget cannot silently leave this one behind. *)
 Notation K_forkret := ((6 + K_kexec)%nat) (only parsing).
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section SpecForkret.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
 
   (* WHAT forkret'S TAIL HANDS THE TRAP LOOP.  [ut_trap_parked] is the
      trap-side residue with the translation slot dropped (the switch inside

@@ -88,11 +88,16 @@ Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UsysMemOk.
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UEchoKernel.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  Context `{SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* §2 THE VECTOR, OUT OF THE PERSISTED AREA.                            *)
@@ -412,18 +417,21 @@ Section UEchoKernel.
     (* the map stops at the break -- see [UkRun.uslot_of_urun]'s premise *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
-    ⊢ uslot W.
+    (forall k : Z, k <> USYS_exec -> psok k) ->
+    udep -∗ uslot W.
   Proof.
-    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen Hstop.
+    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen Hstop Hpsok.
+    iIntros "#Hdep".
     assert (Hsp0 : 0 <= uint (uvis_sp W)) by lia.
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
     iApply (uslot_of_urun_ro W 12 Hal8
-              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop).
+              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop
+              with "Hdep").
     (* echo makes no descriptor call, so its ledger is dropped here *)
     iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht _ #HA Hrun".
     rewrite Hpc.
-    iApply (wp_kecho_start γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W))
+    iApply (wp_kecho_start γt γd γs γfd Hpsok h (tf_resume_gpr0 (uvis_tf W))
               (uvis_av W)
               (echo_args (uvis_M W) (uvis_av W) (Z.to_nat (uvis_argc W))) 0
               ltac:(rewrite echo_args_length;

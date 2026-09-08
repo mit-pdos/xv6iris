@@ -109,6 +109,9 @@ Require Import UmodeRegs.    (* [uv_regs] / [uv_amb] *)
 Require Import UmodeText.    (* [user_ptm_inv_x]: the image STAMPED while the process runs *)
 Require Import UserPerm.     (* [uperm] / [perm_of] *)
 Require Import FdSlots.      (* [fdstate] -- the descriptor view in the key *)
+Require Import UexecSG.      (* [uexecSG]: [sbundle] / [spost] / [ssupply] --
+                                the per-syscall DEPOSIT the returning arm
+                                carries; see that file's header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -534,81 +537,135 @@ Section UexecRet.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
+  (* THE DEPOSIT CLASS.  The returning-syscall arm carries the process's
+     bundle for the number it is at and hands the syscall's armed post back
+     under its own [∀ r] -- see UexecSG.v.  A class and not a parameter for
+     the reason this file's cone is the reason: the concrete bundles live
+     above the whole file-system tower. *)
+  Context `{SG : uexecSG Σ}.
 
-  (* (A) what user execution hands back, at the fixpoint variable [X] *)
+  (* (A) what user execution hands back, at the fixpoint variable [X].
+     THREE PIECES, spelled apart so the trap loop can read the arm back
+     WITHOUT the deposit ([uexec_arm_F], which is what the round lemmas in
+     UexecApply.v are stated over) and an ecall leaf can build the deposit
+     on its own ([uexec_dep_F]).  [uexec_ret_F] -- the one the fixpoint is
+     taken of -- is the two together on the returning arm. *)
+
+  (* fork's two slots: the parent's at a nonzero return, the child's at 0 *)
+  Definition uexec_fork_F (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
+    ((∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z),
+        ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
+        (* THE PARENT'S OWN TABLE DOES NOT MOVE.  fork copies the
+           parent's descriptors INTO THE CHILD and leaves the parent's
+           array alone, so the process that gets a nonzero return
+           resumes at the view it trapped at.  Free to add: the kernel
+           MINTS at this arm ([UexecApply.uexec_ret_round_slot]'s fork
+           case) rather than instantiating it, so nothing has to prove
+           the guard -- but it is what the code does, and without it a
+           program cannot keep a descriptor handle across its own
+           fork. *)
+        ⌜fdv' = uvis_fd W⌝ -∗
+        (* ...NOR ITS WORKING DIRECTORY: fork does not chdir. *)
+        ⌜cw' = uvis_cwd W⌝ -∗
+        X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv' cw')) ∗
+     (∀ (fdv' : list fdstate) (cw' : Z),
+        (* THE CHILD'S TABLE IS THE PARENT'S.  fork() copies it --
+           [np->ofile[i] = filedup(p->ofile[i])] -- and this is the arm
+           that says so.  It used to say only [length fdv' = NOFILE], a
+           table of the right SHAPE and nothing else, and that is what
+           made a forked child hold no handle for anything: not the
+           pipe ends its parent had just made, not the standard streams
+           it inherited.  THE DIRECTION MATTERS FOR WHO PAYS: the
+           PROGRAM proves this arm and the KERNEL instantiates it, so a
+           stronger guard is easier for the program (it learns the
+           table) and harder for the kernel (it must exhibit the copy).
+           [UkFork.wp_uk_ecall_fork] is what the program does with it;
+           the FORK ROW note in [UexecApply.uexec_ret_round_slot] is
+           what the kernel still owes. *)
+        ⌜fdv' = uvis_fd W⌝ -∗
+        (* ...AND SO IS ITS WORKING DIRECTORY: [np->cwd = idup(p->cwd)],
+           and the child's block is built at the parent's inum
+           ([SpecKfork]'s post says so; lane C1). *)
+        ⌜cw' = uvis_cwd W⌝ -∗
+        X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
+             fdv' cw')))%I.
+
+  (* the returning arm's CONTINUATION: the four pure rows, the syscall's
+     armed post [spost] -- what the process gets back for the bundle it
+     deposited -- and the next slot at the bumped key. *)
+  Definition uexec_ret_ret_F (X : uvis -d> iPropO Σ) (n : Z) (W : uvis)
+      : iProp Σ :=
+    (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
+       (szv' : Z) (fdv' : list fdstate) (cw' : Z),
+       ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
+                    M' π' szv'⌝ -∗
+       (* ...AND THE DESCRIPTOR VIEW IS NOT ARBITRARY EITHER.  [fdv']
+          used to be ∀-bound with nothing said about it -- "the
+          process is safe at every descriptor view the kernel hands
+          back" -- which is sound but is the reason a program could
+          not carry a fact about its own descriptors across a
+          syscall: after [open] it knew a fd had been returned and
+          nothing at all about the table.  The row is the same table
+          the kernel proves ([SpecSyscall.sysc_fd_ok], carried out
+          through [SpecUsertrap.ut_fd_ecall] and
+          [SpecUservec]'s post), read at the RETURN VALUE [r] --
+          which is what the kernel stored into the a0 slot, so the
+          two readings are the same word.  Eighteen entries say
+          [fdv' = uvis_fd W]; open, close, dup and pipe say which
+          slot moved and to what. *)
+       ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
+       (* ...AND PIPE'S JOIN, the one row neither of the two above can
+          state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
+          SOME function, [usys_fd_ok] says it opened two free slots, and
+          only this says the bytes NAME the slots -- which is the whole
+          of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
+       ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
+       (* ...AND THE WORKING DIRECTORY, off the same return value:
+          chdir may move it (and the plain tier says only that a
+          FAILED chdir does not), every other entry keeps it.
+          [UsysMemOk.v] SS2d. *)
+       ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
+       (* THE SYSCALL'S ARMED POST, back under the same ∀: the unfired
+          pieces of the bundle the process deposited, its receipts and its
+          cursors.  [emp] at every number without a contract, and at exec,
+          whose bundle is consumed and whose process never resumes on
+          success. *)
+       spost X n W r -∗
+       X (bump W r M' π' szv' fdv' cw'))%I.
+
+  (* THE ARM WITHOUT THE DEPOSIT -- today's return, read at the fixpoint
+     variable.  The trap loop's round is stated over this
+     ([UexecApply.uexec_ret_round_slot]): the loop splits the deposit off
+     before the excursion and re-keys what is left afterwards. *)
+  Definition uexec_arm_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
+      : iProp Σ :=
+    (if decide (sc = uecall_scause) then
+       let n := usys_num (uvis_tf W) in
+       if decide (n = USYS_exit) then emp
+       else if decide (n = USYS_fork) then uexec_fork_F X W
+       else uexec_ret_ret_F X n W
+     else X W)%I.
+
+  (* ...AND THE DEPOSIT ALONE: what the process owes at this trap.  [emp]
+     off the returning arm -- exit returns nothing and fork runs no
+     contract -- and [emp] at every returning number the instance has no
+     contract for. *)
+  Definition uexec_dep_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
+      : iProp Σ :=
+    (if decide (sc = uecall_scause) then
+       let n := usys_num (uvis_tf W) in
+       if decide (n = USYS_exit) then emp
+       else if decide (n = USYS_fork) then emp
+       else sbundle X n W
+     else emp)%I.
+
   Definition uexec_ret_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
       : iProp Σ :=
     (if decide (sc = uecall_scause) then
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
-       else if decide (n = USYS_fork) then
-         ((∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z),
-             ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
-             (* THE PARENT'S OWN TABLE DOES NOT MOVE.  fork copies the
-                parent's descriptors INTO THE CHILD and leaves the parent's
-                array alone, so the process that gets a nonzero return
-                resumes at the view it trapped at.  Free to add: the kernel
-                MINTS at this arm ([UexecApply.uexec_ret_round_slot]'s fork
-                case) rather than instantiating it, so nothing has to prove
-                the guard -- but it is what the code does, and without it a
-                program cannot keep a descriptor handle across its own
-                fork. *)
-             ⌜fdv' = uvis_fd W⌝ -∗
-             (* ...NOR ITS WORKING DIRECTORY: fork does not chdir. *)
-             ⌜cw' = uvis_cwd W⌝ -∗
-             X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv' cw')) ∗
-          (∀ (fdv' : list fdstate) (cw' : Z),
-             (* THE CHILD'S TABLE IS THE PARENT'S.  fork() copies it --
-                [np->ofile[i] = filedup(p->ofile[i])] -- and this is the arm
-                that says so.  It used to say only [length fdv' = NOFILE], a
-                table of the right SHAPE and nothing else, and that is what
-                made a forked child hold no handle for anything: not the
-                pipe ends its parent had just made, not the standard streams
-                it inherited.  THE DIRECTION MATTERS FOR WHO PAYS: the
-                PROGRAM proves this arm and the KERNEL instantiates it, so a
-                stronger guard is easier for the program (it learns the
-                table) and harder for the kernel (it must exhibit the copy).
-                [UkFork.wp_uk_ecall_fork] is what the program does with it;
-                the FORK ROW note in [UexecApply.uexec_ret_round_slot] is
-                what the kernel still owes. *)
-             ⌜fdv' = uvis_fd W⌝ -∗
-             (* ...AND SO IS ITS WORKING DIRECTORY: [np->cwd = idup(p->cwd)],
-                and the child's block is built at the parent's inum
-                ([SpecKfork]'s post says so; lane C1). *)
-             ⌜cw' = uvis_cwd W⌝ -∗
-             X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
-                  fdv' cw')))
-       else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
-               (szv' : Z) (fdv' : list fdstate) (cw' : Z),
-               ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
-                            M' π' szv'⌝ -∗
-               (* ...AND THE DESCRIPTOR VIEW IS NOT ARBITRARY EITHER.  [fdv']
-                  used to be ∀-bound with nothing said about it -- "the
-                  process is safe at every descriptor view the kernel hands
-                  back" -- which is sound but is the reason a program could
-                  not carry a fact about its own descriptors across a
-                  syscall: after [open] it knew a fd had been returned and
-                  nothing at all about the table.  The row is the same table
-                  the kernel proves ([SpecSyscall.sysc_fd_ok], carried out
-                  through [SpecUsertrap.ut_fd_ecall] and
-                  [SpecUservec]'s post), read at the RETURN VALUE [r] --
-                  which is what the kernel stored into the a0 slot, so the
-                  two readings are the same word.  Eighteen entries say
-                  [fdv' = uvis_fd W]; open, close, dup and pipe say which
-                  slot moved and to what. *)
-               ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
-               (* ...AND PIPE'S JOIN, the one row neither of the two above can
-                  state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
-                  SOME function, [usys_fd_ok] says it opened two free slots, and
-                  only this says the bytes NAME the slots -- which is the whole
-                  of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
-               ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
-               (* ...AND THE WORKING DIRECTORY, off the same return value:
-                  chdir may move it (and the plain tier says only that a
-                  FAILED chdir does not), every other entry keeps it.
-                  [UsysMemOk.v] SS2d. *)
-               ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
-               X (bump W r M' π' szv' fdv' cw'))
+       else if decide (n = USYS_fork) then uexec_fork_F X W
+       else (sbundle X n W ∗ uexec_ret_ret_F X n W)
      else X W)%I.
 
   (* (B) the kernel obligation: its later-free BODY, and the guarded form *)
@@ -730,12 +787,17 @@ Section UexecRet.
 
   Local Instance uslot_F_contractive : Contractive uslot_F.
   Proof.
-    rewrite /uslot_F /uvb_F /ukont_F /ukb_F /uexec_ret_F.
+    rewrite /uslot_F /uvb_F /ukont_F /ukb_F /uexec_ret_F /uexec_fork_F
+            /uexec_ret_ret_F.
     solve_contractive.
   Qed.
 
   Definition uslot : uvis -> iProp Σ := fixpoint uslot_F.
   Definition uexec_ret : mword 64 -> uvis -> iProp Σ := uexec_ret_F uslot.
+  (* the two halves at the fixpoint: [uexec_arm] is what the loop's round
+     consumes, [uexec_dep] what it splits off and sends down *)
+  Definition uexec_arm : mword 64 -> uvis -> iProp Σ := uexec_arm_F uslot.
+  Definition uexec_dep : mword 64 -> uvis -> iProp Σ := uexec_dep_F uslot.
   Definition ukb `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ)
       (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) : iProp Σ :=
@@ -845,6 +907,20 @@ Section UexecRet.
     ukont C pt Rfd Rut sz π fdv cw ⊣⊢ ▷ ukb C pt Rfd Rut sz π fdv cw.
   Proof. reflexivity. Qed.
 
+  (* ...and the body's own rows, spelled out: what the trap loop reads the
+     kernel obligation back at once it has stripped the guard's later *)
+  Lemma ukb_unfold `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg) (pt : uptd)
+      (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
+      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) :
+    ukb C pt Rfd Rut sz π fdv cw ⊣⊢
+    (∀ (W' : uvis) (sc stv : mword 64),
+       ⌜uvis_perm W' = π⌝ -∗ ⌜uvis_sz W' = sz⌝ -∗ ⌜uvis_fd W' = fdv⌝ -∗
+       ⌜uvis_cwd W' = cw⌝ -∗
+       trapped_machine C pt Rut sz sc stv W' ∗ Rfd (uvis_fd W') ∗
+       uexec_ret sc W' -∗
+       WP (Loop : expr riscv_lang)).
+  Proof. reflexivity. Qed.
+
   (* the arms, read at the fixpoint *)
   Lemma uexec_ret_ecall (sc : mword 64) (W : uvis) :
     sc = uecall_scause ->
@@ -862,21 +938,42 @@ Section UexecRet.
            ⌜cw' = uvis_cwd W⌝ -∗
            uslot (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
                     fdv' cw')))
-     else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
-             (szv' : Z) (fdv' : list fdstate) (cw' : Z),
-             ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
-                          M' π' szv'⌝ -∗
-             ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
-             (* ...AND PIPE'S JOIN, the one row neither of the two above can
-                state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
-                SOME function, [usys_fd_ok] says it opened two free slots, and
-                only this says the bytes NAME the slots -- which is the whole
-                of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
-             ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
-             ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
-             uslot (bump W r M' π' szv' fdv' cw'))).
+     else
+       (* THE DEPOSIT, beside the arm: the process's bundle for this number
+          at this key ([UexecSG]).  It is [emp] at every number the instance
+          has no contract for, but a leaf below the file-system tower cannot
+          see that -- it pays with [uexec_dep_of_supply_ne] instead. *)
+       (sbundle uslot n W ∗
+        (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
+           (szv' : Z) (fdv' : list fdstate) (cw' : Z),
+           ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
+                        M' π' szv'⌝ -∗
+           ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
+           (* ...AND PIPE'S JOIN, the one row neither of the two above can
+              state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
+              SOME function, [usys_fd_ok] says it opened two free slots, and
+              only this says the bytes NAME the slots -- which is the whole
+              of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
+           ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
+           ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
+           spost uslot n W r -∗
+           uslot (bump W r M' π' szv' fdv' cw')))).
   Proof.
     intros ->. rewrite /uexec_ret /uexec_ret_F.
+    destruct (decide (uecall_scause = uecall_scause)); [ reflexivity | contradiction ].
+  Qed.
+
+  (* ...and the same at the DEPOSIT-FREE arm, which is what the loop's round
+     is stated over *)
+  Lemma uexec_arm_ecall (sc : mword 64) (W : uvis) :
+    sc = uecall_scause ->
+    uexec_arm sc W ⊣⊢
+    (let n := usys_num (uvis_tf W) in
+     if decide (n = USYS_exit) then emp
+     else if decide (n = USYS_fork) then uexec_fork_F uslot W
+     else uexec_ret_ret_F uslot n W).
+  Proof.
+    intros ->. rewrite /uexec_arm /uexec_arm_F.
     destruct (decide (uecall_scause = uecall_scause)); [ reflexivity | contradiction ].
   Qed.
 
@@ -888,16 +985,112 @@ Section UexecRet.
     destruct (decide (sc = uecall_scause)); [ contradiction | reflexivity ].
   Qed.
 
-  (* every arm of the return is inhabited by a slot at every key *)
-  Lemma uexec_ret_of_all (sc : mword 64) (W : uvis) :
-    □ (∀ W' : uvis, uslot W') -∗ uexec_ret sc W.
+  Lemma uexec_arm_transparent (sc : mword 64) (W : uvis) :
+    sc <> uecall_scause ->
+    uexec_arm sc W ⊣⊢ uslot W.
   Proof.
-    iIntros "#H". rewrite /uexec_ret /uexec_ret_F.
+    intros Hne. rewrite /uexec_arm /uexec_arm_F.
+    destruct (decide (sc = uecall_scause)); [ contradiction | reflexivity ].
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE SPLIT AND THE JOIN.  The loop splits the deposit off before the   *)
+  (* kernel excursion and sends it down to the dispatcher; an ecall leaf   *)
+  (* joins the two when it hands the return back.                         *)
+  (* ------------------------------------------------------------------- *)
+  Lemma uexec_ret_F_split (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis) :
+    uexec_ret_F X sc W -∗ uexec_dep_F X sc W ∗ uexec_arm_F X sc W.
+  Proof.
+    rewrite /uexec_ret_F /uexec_dep_F /uexec_arm_F. cbv zeta.
+    iIntros "H".
+    destruct (decide (sc = uecall_scause)); [| iSplitR; [done | iExact "H"]].
+    destruct (decide (usys_num (uvis_tf W) = USYS_exit));
+      [ iSplitR; [done | iExact "H"] |].
+    destruct (decide (usys_num (uvis_tf W) = USYS_fork));
+      [ iSplitR; [done | iExact "H"] |].
+    iDestruct "H" as "[Hd Ha]". iFrame "Hd Ha".
+  Qed.
+
+  Lemma uexec_ret_F_join (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis) :
+    uexec_dep_F X sc W -∗ uexec_arm_F X sc W -∗ uexec_ret_F X sc W.
+  Proof.
+    rewrite /uexec_ret_F /uexec_dep_F /uexec_arm_F. cbv zeta.
+    iIntros "Hd Ha".
+    destruct (decide (sc = uecall_scause)); [| iExact "Ha"].
+    destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ iExact "Ha" |].
+    destruct (decide (usys_num (uvis_tf W) = USYS_fork)); [ iExact "Ha" |].
+    iFrame "Hd Ha".
+  Qed.
+
+  Lemma uexec_ret_split (sc : mword 64) (W : uvis) :
+    uexec_ret sc W -∗ uexec_dep sc W ∗ uexec_arm sc W.
+  Proof. exact (uexec_ret_F_split uslot sc W). Qed.
+
+  Lemma uexec_ret_join (sc : mword 64) (W : uvis) :
+    uexec_dep sc W -∗ uexec_arm sc W -∗ uexec_ret sc W.
+  Proof. exact (uexec_ret_F_join uslot sc W). Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* PAYING THE DEPOSIT OUT OF THE SUPPLY.                                *)
+  (* ------------------------------------------------------------------- *)
+
+  (* what every ecall leaf uses: at any trap that is not an exec ecall, the
+     supply alone pays -- exec is the one syscall whose bundle carries a
+     slot wand (UexecSG.v's header), and [n <> USYS_exec] is a premise the
+     leaves already carry. *)
+  Lemma uexec_dep_F_of_supply_ne (X : uvis -d> iPropO Σ) (sc : mword 64)
+      (W : uvis) :
+    (sc = uecall_scause -> usys_num (uvis_tf W) <> USYS_exec) ->
+    □ ssupply -∗ uexec_dep_F X sc W.
+  Proof.
+    intros Hne. rewrite /uexec_dep_F. cbv zeta. iIntros "#Hsup".
+    destruct (decide (sc = uecall_scause)) as [Hec |]; [| done].
+    destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [done |].
+    destruct (decide (usys_num (uvis_tf W) = USYS_fork)); [done |].
+    iApply (sbundle_of_supply_ne X (usys_num (uvis_tf W)) W (Hne Hec)).
+    iExact "Hsup".
+  Qed.
+
+  Lemma uexec_dep_of_supply_ne (sc : mword 64) (W : uvis) :
+    (sc = uecall_scause -> usys_num (uvis_tf W) <> USYS_exec) ->
+    □ ssupply -∗ uexec_dep sc W.
+  Proof. exact (uexec_dep_F_of_supply_ne uslot sc W). Qed.
+
+  (* ...and what the GENERIC inhabitants use: the supply beside a generic
+     slot family, which is what answers exec's wand *)
+  Lemma uexec_dep_F_of_supply (X : uvis -d> iPropO Σ) (sc : mword 64)
+      (W : uvis) :
+    □ ssupply -∗ □ (∀ W' : uvis, X W') -∗ uexec_dep_F X sc W.
+  Proof.
+    rewrite /uexec_dep_F. cbv zeta. iIntros "#Hsup #Hall".
+    destruct (decide (sc = uecall_scause)); [| done].
+    destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [done |].
+    destruct (decide (usys_num (uvis_tf W) = USYS_fork)); [done |].
+    iApply (sbundle_of_supply X (usys_num (uvis_tf W)) W with "Hsup Hall").
+  Qed.
+
+  (* every arm of the return is inhabited by a slot at every key -- and, on
+     the returning arm, by the supply *)
+  Lemma uexec_arm_of_all (sc : mword 64) (W : uvis) :
+    □ (∀ W' : uvis, uslot W') -∗ uexec_arm sc W.
+  Proof.
+    iIntros "#H". rewrite /uexec_arm /uexec_arm_F.
     destruct (decide (sc = uecall_scause)); [ | iApply "H" ].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { iSplitR; [ iIntros (r fdv' cw' _ _ _); iApply "H" | iIntros (fdv' cw' _ _); iApply "H" ]. }
-    iIntros (r M' π' szv' fdv' cw' _ _ _ _). iApply "H".
+    { rewrite /uexec_fork_F.
+      iSplitR; [ iIntros (r fdv' cw' _ _ _); iApply "H" | iIntros (fdv' cw' _ _); iApply "H" ]. }
+    rewrite /uexec_ret_ret_F.
+    iIntros (r M' π' szv' fdv' cw' _ _ _ _) "_". iApply "H".
+  Qed.
+
+  Lemma uexec_ret_of_all (sc : mword 64) (W : uvis) :
+    □ ssupply -∗ □ (∀ W' : uvis, uslot W') -∗ uexec_ret sc W.
+  Proof.
+    iIntros "#Hsup #H".
+    iApply (uexec_ret_join sc W with "[] []").
+    - iApply (uexec_dep_F_of_supply uslot sc W with "Hsup H").
+    - iApply (uexec_arm_of_all sc W with "H").
   Qed.
 
 End UexecRet.
@@ -926,10 +1119,23 @@ Section UexecRetGen.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
+  Context `{SG : uexecSG Σ}.
 
-  Lemma uexec_wp_uslot (W : uvis) : □ uexec_wp -∗ uslot W.
+  (* THE SUPPLY IS A PREMISE, and it has to be.  The generic inhabitant is
+     safe from every state, so at every ecall it owes the number's deposit
+     -- and it can only pay one out of [ssupply], "the application's claim
+     holds of every view".  The premise does NOT belong in [uvb]: a bundle
+     conjunct would make the KERNEL owe it to resume ANY process, and an
+     application whose predicate is not trivially true cannot pay that
+     (echo's is [taint ∨ pins], which holds of every view only after the
+     taint is minted), so a pre-taint trap round would be unsatisfiable --
+     the GAP-premise trap in the trap loop.  A VERIFIED program pays its own
+     bundles instead and needs no supply; it carries one only to answer
+     exec's wand, and then through its own entry constructor
+     ([UexecCond.cond_entry_slot]). *)
+  Lemma uexec_wp_uslot (W : uvis) : □ ssupply -∗ □ uexec_wp -∗ uslot W.
   Proof.
-    iIntros "#Hwp".
+    iIntros "#Hsup #Hwp".
     iLöb as "IH" forall (W).
     rewrite uslot_unfold.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
@@ -955,7 +1161,8 @@ Section UexecRetGen.
     (* the fragments were carried across the excursion and go back at the
        trap-out key's view, which [Hfdw] says is the one they are held at *)
     rewrite Hfdw. iFrame "Htm Hfrag".
-    iApply uexec_ret_of_all. iModIntro. iIntros (W''). iApply "IH".
+    iApply (uexec_ret_of_all sc W' with "Hsup").
+    iModIntro. iIntros (W''). iApply "IH".
   Qed.
 
 End UexecRetGen.

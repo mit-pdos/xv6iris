@@ -398,8 +398,9 @@ Require Import SpecSyscall.
    [Typeclasses Opaque], so they are imported here directly. *)
 Require Import SpecKexecAU.      (* [exec_post_ok], [exec_key], [kexec_ok_exec] *)
 Require Import SpecSysExecAU.    (* [SYSEXEC], [sys_exec_arms]              *)
-Require Import UexecExecInst.    (* [xbundle_elim]                              *)
-Require Import UexecRetExec.     (* [uslot_x] -- the slot the exec channel returns *)
+Require Import UexecSG.          (* [uexecSG]: [sbundle]                        *)
+Require Import UexecRet.         (* [uslot] -- the slot the exec channel returns *)
+Require Import UexecExecInst.    (* [sbundle_exec_elim] -- the instance's reader *)
 Require Import UexecSlot UserPerm FsBytesGamma.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -2858,10 +2859,10 @@ Section SyscallArms.
     split; discriminate.
   Qed.
 
-  (* the bundle, opened at the arm: [exec_xbundle] is stated at the trapping
-     key's own projections, which at the dispatcher's record are the image,
-     trapframe argument 1 and the descriptor view it holds; its slot wand
-     concludes at [uslot_x], the slot the channel returns *)
+  (* the bundle, opened at the arm: [UexecExecInst.exec_sbundle] is stated at
+     the trapping key's own projections, which at the dispatcher's record are
+     the image, trapframe argument 1 and the descriptor view it holds; its
+     slot wand concludes at [uslot], the slot the channel returns *)
   Lemma sysc_exec_in_open (U : ustate) (sts : list fdstate) (v1 : mword 64) :
     sysc_num (us_V U) = 7 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
@@ -2869,12 +2870,12 @@ Section SyscallArms.
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (gmap Z FsAbsDefs.anode -> Z -> FsAbsDefs.anode -> iProp Σ))
       (Rs : iProp Σ),
-      sys_exec_au_pre (MkPfam uslot_x Rs) (fs_gamma_L fsc_fs) fsc_fs
+      sys_exec_au_pre (MkPfam uslot Rs) (fs_gamma_L fsc_fs) fsc_fs
         (pv_cwi (us_V U)) P Pmiss Fo (us_M U) v1 sts.
   Proof.
     intros Hn Hv1. rewrite /sysc_exec_in. iIntros "H".
     iDestruct ("H" with "[%]") as "H"; [exact Hn |].
-    iDestruct (xbundle_elim with "H") as (P Pmiss Fo Rs) "H".
+    iDestruct (sbundle_exec_elim with "H") as (P Pmiss Fo Rs) "H".
     iExists P, Pmiss, Fo, Rs.
     rewrite /uvis_of /tf_w. cbn [uvis_M uvis_tf uvis_fd].
     rewrite (list_lookup_total_correct _ _ _ Hv1). iExact "H".
@@ -4058,7 +4059,7 @@ Section SyscallArms.
        opened here. ---- *)
     iDestruct (sysc_exec_in_open U sts v1 ltac:(rewrite Hnum; reflexivity) Hv1
                  with "Hxin") as (P Pmiss Fo Rs) "Hau".
-    iApply (SysExec.wp_sys_exec_sconf (MkPfam uslot_x Rs) γf γs j γl
+    iApply (SysExec.wp_sys_exec_sconf (MkPfam uslot Rs) γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 v1 pid U sts M (av - 4)%nat true true lks
               P Pmiss Fo

@@ -308,10 +308,13 @@ Qed.
 (* §2 The bundle, opened and closed.                                      *)
 (* ===================================================================== *)
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+
 Section UkBundle.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
 
   Lemma uvb_elim (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (sz : Z)
@@ -449,6 +452,7 @@ End UkBundle.
 Section UkObl.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
 
   (* [sz] is a PARAMETER, not quantified: an instruction step does not call
      sbrk, so the process's break is the same on re-entry.  It used to be
@@ -527,6 +531,7 @@ Section UkArms.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
+  Context `{SG : uexecSG Σ}.
 
   (* the RETIRING payload: the process runs on, at the new file and pc,
      under the bundle rebuilt from the landing *)
@@ -711,6 +716,7 @@ End UkArms.
 Section UkStepEngine.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
+  Context `{SG : uexecSG Σ}.
 
   Lemma wp_uk_step_gen (π : gmap (mword 27) uperm) (Kc : iProp Σ)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) :
@@ -937,6 +943,7 @@ Section UkFunnel.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
+  Context `{SG : uexecSG Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,
@@ -961,6 +968,7 @@ Section UkPostFetch.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
+  Context `{SG : uexecSG Σ}.
 
   (* everything from the FETCHED file on: the leaf's value-precise execute,
      and the payload that rebuilds [uvb] at the new file *)
@@ -1150,6 +1158,7 @@ Section UkObligation.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
+  Context `{SG : uexecSG Σ}.
 
   Lemma uk_obl_base (R : iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (M Mp : gmap Z (bv 8))
@@ -1435,6 +1444,7 @@ Section UkRetire.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
+  Context `{SG : uexecSG Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,
@@ -1596,6 +1606,7 @@ Section UkEcallPost.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
+  Context `{SG : uexecSG Σ}.
 
   Lemma uk_ecall_post_fetch (R : iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm)
@@ -1840,6 +1851,7 @@ Section UkEcall.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
+  Context `{SG : uexecSG Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,
