@@ -719,6 +719,23 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   `uexec_ret` or `udep` needs the class in its own binder list, and the
   class must be imported before it.
 
+- **ARM-b** (in flight, 2026-09-08): ~~B0~~ LANDED and pushed
+  (`6060c4442`) — the three offset-shadow pieces return the shadow
+  unmoved and the fire lemmas advance it from the row invariant (which
+  reaches them through `foff_row st`, already in the descriptor bundle);
+  write's console conjunct is a contract premise and `filewrite_in` /
+  `sys_write_in` name no kernel ghost record; `SpecArgfd.fd_st_of_key` +
+  `sys_fd_st_of_key` bridge the descriptor key; `fsabs_sys_read_in` is a
+  bare `⊢` at every key, `fsabs_sys_write_in` needs only the license (B2
+  replaces it) and a fupd for the console seed.  RULED for B1: the
+  minting law is BUPD-SHAPED (`⊢ □ Dsup ==∗ sbundle uslot n W`, the class
+  laws and `udep`'s conjunct alike) — a lower bound at the empty trace is
+  mintable from the unit by anyone, so the seed belongs to the law's
+  modality, not to a supplier; the instance's read/write bundles are
+  spelled at `fd_st_of_key`.  B1 (the real bundles, the `UEXEC_GEN` split,
+  `ut_sys_out` as a post row) and B2 (the deletions, `Happ_auto` leaves)
+  in flight.
+
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
   their old names although no AU is left in them — `SpecSysWriteAU.v`,
