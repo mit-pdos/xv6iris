@@ -202,6 +202,7 @@ Require Import SpecKexec.
 Require Import UsertrapRes UtResFits.
 Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, see the header *)
 Require Import UexecSlot.  (* [uvis] / [uvis_of] *)
+Require Import AppInv.     (* [app_sup] -- the supply the tail's loop mints on *)
 Require Import UexecRet.   (* [uslot] -- the closer's new second output.
                               Required DIRECTLY: the seal does not travel. *)
 From Kernel Require KernelSyms.
@@ -342,6 +343,11 @@ Definition wp_forkret_gen_body
   m !!! Regidx (mword_of_int 2 : mword 5) = ksp ->
   kernel_text -∗
   wire_inv -∗
+  (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]): forkret's tail is
+     the closed trap loop's entrant, and the loop mints the round's generic
+     slot out of this credential ([SpecUserretClosed]'s premise list).  It
+     reaches the parker through [ParkCap.park_pkg]. *)
+  app_sup -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   pc_is pcE -∗
   (* the process table: [is_lock] for the lock released at +0x10, and what

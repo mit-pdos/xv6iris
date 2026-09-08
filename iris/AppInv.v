@@ -84,7 +84,8 @@ Section AppAutoRaw.
      are ARGUMENTS -- so the system theorem can state it under
      [riscvGpreS], before the fixed record exists
      ([SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_auto]); [app_auto]
-     below is the pinned form. *)
+     below is the pinned form.  [app_sup_raw] beside it is the ARM's
+     credential -- a DIFFERENT promise; see its own note. *)
   Definition app_auto_raw {N : Type}
       (A : N -> aview -> iProp Σ) (r : N) : iProp Σ :=
     (□ (∀ (I : gmap Z fs_node) (i : Z) (n n' : fs_node),
@@ -103,6 +104,50 @@ Section AppAutoRaw.
     intros Htriv. rewrite /app_auto_raw. iIntros "!>" (I i n n') "_ _".
     iApply (bi.equiv_entails_1_2 _ _ (Htriv r (abs_view (<[i := n']> I)))).
     iPureIntro. exact Logic.I.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  1a.  THE SUPPLY: the claim holds of EVERY view                      *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE CREDENTIAL A PROCESS THAT ANSWERS FOR NOTHING RUNS ON (the ARM;
+     claude-notes/projects/app-echo.md, "THE ARM, concretely").  It says
+     the application's claim is TRIVIALLY TRUE -- it holds of every view at
+     all -- which is what makes every view-moving commit's [app_step] free
+     and is therefore what an UNVERIFIED program's syscall bundles are paid
+     out of.  It is what [UexecSG.ssupply] is instantiated at
+     ([UexecExecInst]).
+
+     IT IS NOT PARKED IN [app_body] BELOW, and that is the difference
+     between it and the license.  The license is a promise about MOVES,
+     which every application can make about its own claim; the supply is a
+     statement that the claim says nothing, which a CONSTRAINING
+     application cannot make -- echo's is [taint ∨ pins], provable at every
+     view only after the taint is minted.  An era mint that had to found it
+     would be unfoundable for such an application.  So it travels as a
+     PERSISTENT CREDENTIAL of the generic system theorem
+     ([SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]), born at boot
+     and handed to the two slot mints and the closed trap loop, and it
+     stays out of every era-owned resource so that a constraining
+     application's own theorem simply does not carry it.
+
+     RAW -- the predicate and the instance are ARGUMENTS -- so the system
+     theorem can state it under [riscvGpreS], before the fixed record
+     exists; [app_sup] below is the pinned form. *)
+  Definition app_sup_raw {N : Type}
+      (A : N -> aview -> iProp Σ) (r : N) : iProp Σ :=
+    (□ (∀ av : aview, A r av))%I.
+
+  Global Instance app_sup_raw_persistent {N} (A : N -> aview -> iProp Σ) r :
+    Persistent (app_sup_raw A r).
+  Proof. rewrite /app_sup_raw. apply _. Qed.
+
+  (* the generic application's: its predicate IS [True] *)
+  Lemma app_sup_raw_triv {N} (A : N -> aview -> iProp Σ) (r : N) :
+    (forall r av, A r av ⊣⊢ True) -> ⊢ app_sup_raw A r.
+  Proof.
+    intros Htriv. rewrite /app_sup_raw. iIntros "!>" (av).
+    iApply (bi.equiv_entails_1_2 _ _ (Htriv r av)). iPureIntro. exact Logic.I.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -173,6 +218,18 @@ Section AppInv.
   Lemma app_auto_of_triv :
     (forall r av, app_pred r av ⊣⊢ True) -> ⊢ app_auto.
   Proof. intros Htriv. rewrite /app_auto. by apply app_auto_raw_triv. Qed.
+
+  (* THE SUPPLY, PINNED: what the deposit class's [UexecSG.ssupply] is at
+     the kernel's instance.  A CREDENTIAL, not a parked resource -- see
+     [app_sup_raw] above for why it cannot live in [app_body]. *)
+  Definition app_sup : iProp Σ := app_sup_raw app_pred app_run.
+
+  Global Instance app_sup_persistent : Persistent app_sup.
+  Proof. rewrite /app_sup. apply _. Qed.
+
+  Lemma app_sup_of_triv :
+    (forall r av, app_pred r av ⊣⊢ True) -> ⊢ app_sup.
+  Proof. intros Htriv. rewrite /app_sup. by apply app_sup_raw_triv. Qed.
 
   (* THE TRANSPORT, PINNED (round C): parked in the body so the era owns
      it, and a premise of the era mint beside [app_auto]. *)
@@ -358,6 +415,18 @@ Section AppInv.
     iIntros (n' Heq) "Hp". iNext.
     iEval (rewrite /app_auto /app_auto_raw) in "Ha".
     iApply ("Ha" $! I i n n' with "[//] Hp").
+  Qed.
+
+  (* the supply pays any step, at any row, with no side condition: a claim
+     that holds of every view holds of the moved one.  This is what the
+     dischargers will run on once every fire is paid from the deposit or
+     the supply; today [app_step_of_auto] beside it is what the parked
+     license pays. *)
+  Lemma app_step_of_sup (i : Z) (I : gmap Z fs_node) (av' : aview) :
+    app_sup -∗ app_step i I av'.
+  Proof.
+    iIntros "#Hs". rewrite /app_step. iIntros (n' Heq) "_". iNext.
+    rewrite /app_sup /app_sup_raw. iApply "Hs".
   Qed.
 
   (* THE LICENSE, READ OFF THE INVARIANT: [▷]-shaped and persistent, so the

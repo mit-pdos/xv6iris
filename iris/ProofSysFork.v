@@ -47,6 +47,8 @@ Require Import UexecSlot. (* [uvis] *)
 Require Import UexecRet.  (* [uslot] -- DIRECT, the seal does not travel *)
 Require Import UexecCond. (* [cond_entry_slot] -- the conditional mint *)
 Require Import UexecExecMint. (* [uslot_mint] -- it, at the kernel's instance *)
+Require Import SyscParkEnv.   (* [park_world_sup] -- the supply, off the world *)
+Require Import AppInv.        (* [app_sup] -- the credential the mint runs on *)
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -220,7 +222,11 @@ Section ProofSysFork.
     iAssert (∀ W : uvis, ⌜uvis_fd W = sts /\ uvis_cwd W = pv_cwi (us_V U)⌝ -∗ uslot W)%I
       as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      iDestruct (UexecExecMint.uslot_mint with "Hgen") as "#Hmk".
+      (* the supply the mint runs on rides the world a park needs
+         ([SyscParkEnv.park_world]) -- the premise that already threads
+         usertrap -> syscall -> sys_fork -> kfork *)
+      iDestruct (SyscParkEnv.park_world_sup with "Hworld") as "#Hsup".
+      iDestruct (UexecExecMint.uslot_mint with "Hsup Hgen") as "#Hmk".
       iIntros (W) "_". iApply "Hmk". }
     iApply (Kfork.wp_kfork_sconf γp γw γl γf γs
 

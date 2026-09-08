@@ -45,6 +45,7 @@ Require Import MstatusFacts.
 Require Import KptPt.
 Require Import IntrDefs.
 Require Import WireInv.   (* [wire_inv] *)
+Require Import AppInv.    (* [app_sup] -- forwarded to main *)
 Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.
 Require Import BootConfig BootBridge.
@@ -398,6 +399,10 @@ Section BootPrimary.
     FsCrash.fs_crash_seam cov (FsImg.sb_logstart sb) -∗
     dev_inv γd γv -∗
     wire_inv -∗
+    (* THE APPLICATION'S SUPPLY ([AppInv.app_sup]): this chain neither reads
+       nor spends it -- main forwards it to userinit, whose park captures it
+       into the world every child inherits. *)
+    app_sup -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
@@ -417,7 +422,7 @@ Section BootPrimary.
     intros Hreset Hz Hprun Hlen Hlive Himg.
     iIntros "#Htext #Hdata Hres Hthr #Hstarted Hprim Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
              Hfs Hmir Hirslot Hirauth #Hcert #Hseam
-             #Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim Hcmauth #Hdone Hkpt Hkptb Hkmap Hpages".
+             #Hdev #Hwire #Hsup Htx Hsent Hlb Hdlab Hcfg Hclaim Hcmauth #Hdone Hkpt Hkptb Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres Hthr").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps
@@ -431,7 +436,7 @@ Section BootPrimary.
               with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted Hprim [] Hlk Hgl
                     Hfirst Hnext Hpark Hpst Hpav Hfs Hmir Hirslot Hirauth
                     Hcert Hseam
-                    Hdev Hwire Htx Hsent Hlb Hdlab
+                    Hdev Hwire Hsup Htx Hsent Hlb Hdlab
                     Hcfg Hclaim Hcmauth Hdone Htimc Hraw Hkpt Hkptb Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
        nine conjuncts at exactly its eight existential witnesses, plus

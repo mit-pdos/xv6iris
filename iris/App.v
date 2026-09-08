@@ -39,6 +39,13 @@
      name ([AppDur.app_dur_raw]) -- the PowerOn arm clones it onto the
      lend by the TRANSPORT [Happ_xfer], and the boot founds the era from
      the lent claim.  Era 0's claim is [Happ_init], at the image's state.
+   - [Happ_sup] is the application's SUPPLY ([AppInv.app_sup]): its claim
+     holds of EVERY view.  That is what makes a view-moving commit's step
+     free, and hence what an UNVERIFIED program's syscall bundles are paid
+     out of; boot hands it to the two slot mints (userinit's park and
+     sys_fork's kfork call) and to the closed trap loop.  A constraining
+     application cannot pay it and does not have to -- it does not
+     instantiate this theorem (see [SystemAdequacy]'s [Happ_sup]).
    - [Happ_auto] is the application's PARKED LICENSE ([AppInv.app_auto]):
      the BLANKET PROMISE that its claim survives every one-row move of the
      map, which is why a constraining application cannot pay it yet
@@ -68,7 +75,9 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import FsState.
 Require Import FsAbsDefs.        (* [aview], [abs_view]: the claim is over the view *)
-Require Import AppInv.           (* [app_auto_raw]: the parked license, at the raw gname *)
+Require Import AppInv.           (* [app_auto_raw]: the parked license, and
+                                    [app_sup_raw]: the supply, both at the
+                                    raw gname *)
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import WpUart.
@@ -172,6 +181,14 @@ Theorem xv6_app_adequacy Σ
               (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib))))
     (Happ_auto : forall (c : app_fixed A) (r : app_names A),
        ⊢ app_auto_raw (app_pred A c) r)
+    (* ...and the SUPPLY (the ARM; [AppInv.app_sup_raw]): the claim holds of
+       EVERY view.  It is the credential an unverified program's syscall
+       bundles are paid out of, born at boot and carried to the two slot
+       mints and the closed trap loop.
+       [SystemAdequacy.xv6_power_adequacy_gen]'s own [Happ_sup] carries the
+       paragraph on why it is not the GAP-premise trap. *)
+    (Happ_sup : forall (c : app_fixed A) (r : app_names A),
+       ⊢ app_sup_raw (app_pred A c) r)
     (* ---- the conclusion's proof, at the end of the run: it holds the
        COMPOSITE crash slot ([SystemAdequacy.xv6_slot]: the file system's
        record beside the application's durable claim at the same snapshot
@@ -214,7 +231,7 @@ Proof.
     rewrite Heq. reflexivity. }
   exact (xv6_power_adequacy_gen Σ g sb nib cov
            (app_fixed A) (app_cl A) Hbirth
-           (app_names A) (app_pred A) Happ_xfer Happ_init Happ_auto
+           (app_names A) (app_pred A) Happ_xfer Happ_init Happ_auto Happ_sup
            (fun γobs c => obs_ledger_at (app_R A c) γobs)
            (fun γobs c =>
               obs_ledger_at_alloc_cl (app_R A c) γobs (app_cl A c) (HR0 c))
@@ -263,6 +280,15 @@ Section AppTriv.
     intros r' av. reflexivity.
   Qed.
 
+  (* the supply: the generic application's predicate IS [True], which is
+     exactly what "unconstrained abstract state" means as a premise *)
+  Lemma app_triv_sup (c : app_fixed (app_triv Σ)) (r : app_names (app_triv Σ)) :
+    ⊢ app_sup_raw (app_pred (app_triv Σ) c) r.
+  Proof.
+    cbn [app_triv app_pred]. apply app_sup_raw_triv.
+    intros r' av. reflexivity.
+  Qed.
+
   Lemma app_triv_R0 (c : app_fixed (app_triv Σ)) :
     app_cl (app_triv Σ) c ⊢ |==> app_R (app_triv Σ) c [].
   Proof. iIntros "_". by iModIntro. Qed.
@@ -300,6 +326,7 @@ Proof.
            app_triv_xfer
            ltac:(intros c; exact (app_triv_init c _))
            app_triv_auto
+           app_triv_sup
            ltac:(intros Hinv γgen γstart γreg γd γsw γobs c T g' h;
                  iIntros "_ _ _ _ _"; iModIntro; iPureIntro; exact Logic.I)
            Hgen0 Hpow0 _ n κs t2 g2 Hn)).

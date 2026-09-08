@@ -46,7 +46,7 @@ Require FsAbsDefs.          (* [anode], [abs_view]: the application's claim is o
                                (Require, not Import: it re-exports FsState) *)
 Require Import AppDur.      (* [app_dur_raw]: the application's DURABLE claim beside the snapshot,
                                tied by the guest half of its map (app-instances.md round C) *)
-Require Import AppInv.      (* [app_auto_raw]: the application's parked license, at the raw gname; the
+Require Import AppInv.      (* [app_auto_raw]: the application's parked license, and [app_sup_raw]: its supply, both at the raw gname; the
                                application's boot obligation and license (applications.md) *)
 Require Import ProcGeom.
 Require Import FdSlots.
@@ -369,7 +369,27 @@ Section SystemBoot.
       (Happ_xfer : ⊢ app_xfer_raw A)
       (* THE PARKED LICENSE, at every instance: the moves the application
          admits from anyone, parked in its invariant by the mint *)
-      (Happ_auto : forall r : N, ⊢ app_auto_raw A r) :
+      (Happ_auto : forall r : N, ⊢ app_auto_raw A r)
+      (* THE SUPPLY (the ARM; [AppInv.app_sup_raw]): the application's claim
+         holds of EVERY view.  It is the credential an UNVERIFIED program's
+         syscall bundles are paid out of, and this boot hands it to the boot
+         hart's chain -- main forwards it to userinit, whose park captures it
+         into [SyscParkEnv.park_world], the world every child inherits, and
+         the closed trap loop mints each round's generic slot out of it.
+
+         WHY THIS IS NOT THE GAP-PREMISE TRAP.  [Happ_auto] promises that the
+         claim SURVIVES every one-row move of the map -- a promise no
+         constraining application can make about an arbitrary mover, even
+         with every program verified, which is what makes it a gap premise.
+         [Happ_sup] says something else: the claim is trivially true.  That
+         is the honest premise of the GENERIC theorem, whose whole subject is
+         a machine running UNVERIFIED user programs, and it is discharged by
+         [app_sup_raw_triv] at [App.app_triv].  A constraining application
+         does not instantiate the generic theorem at all: its mint sites park
+         VERIFIED slots, fork copies the parent's slot, and the supply a
+         tainted generic slot needs arrives through the exec bundle the
+         tainted process deposits -- never from a boot hypothesis. *)
+      (Happ_sup : forall r : N, ⊢ app_sup_raw A r) :
     boot_facts g ->
     (* THE PROJECTION THE POWER THEOREM PROVES AT THIS ERA, AND IT IS THE
        WHOLE OF WHAT THIS BOOT KNOWS ABOUT ITS DISK (durable-disk lane
@@ -538,13 +558,17 @@ Section SystemBoot.
        fsinit on the kit.  All of it goes into the mint through
        [boot_shared_alloc]. *)
     iPoseProof (Happ_auto r) as "#Hlic".
+    (* ...and the SUPPLY, which no invariant owns: it goes straight down the
+       boot hart's chain as a persistent credential (the hypothesis above
+       says why it is not a gap premise). *)
+    iPoseProof (Happ_sup r) as "#Hsup0".
     iPoseProof Happ_xfer as "#Hxfer".
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (MkAppcfg N A r) (fun _ => emp)%I gsn gln gtn Hbf Hbundle
-            with "Hok Hlic Hxfer Hseamg Hdursnap Hres")
+            with "Hok Hlic Hsup0 Hxfer Hseamg Hdursnap Hres")
       as (Hfd Hir Hpav Hbs HF γd γv Rspent γi ξd)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
-        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
+        #Hcinv & #Hcert & #Hsup & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
         Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
     (* THE FILE SYSTEM'S BOOT KITS ARE NO LONGER DROPPED (stage (e)).
@@ -649,6 +673,8 @@ Section SystemBoot.
         iSpecialize ("HP" with "Hseam").
         iSpecialize ("HP" with "Hdev").
         iSpecialize ("HP" with "Hwinv").
+        (* THE APPLICATION'S SUPPLY (the ARM), off [Happ_sup] above *)
+        iSpecialize ("HP" with "Hsup").
         iSpecialize ("HP" with "Htx").
         iSpecialize ("HP" with "Hsent").
         iSpecialize ("HP" with "Hlb").
@@ -702,8 +728,9 @@ Theorem xv6_power_adequacy_gen Σ
        claim onto each fresh durable instance -- the PowerOn clone in
        [Hswap] below, the commit's snapshot in the file system's law), its
        ERA-0 claim ([Happ_init], packed into the initial composite slot
-       beside the image's snapshot) and the license ([Happ_auto]).  The
-       durable claim rides the crash slot ([xv6_slot]) and the lend
+       beside the image's snapshot), the license ([Happ_auto]) and the
+       SUPPLY ([Happ_sup], the ARM's credential -- see its own paragraph).
+       The durable claim rides the crash slot ([xv6_slot]) and the lend
        ([Rb] below); the boot founds the era's running one from the lend.
        All at the RAW forms over an arbitrary value of the application's
        FIXED PART (app-instances.md section 6 ruling 1, round D0: its
@@ -712,8 +739,8 @@ Theorem xv6_power_adequacy_gen Σ
        fixed record does not exist yet; once its shape is destructed below,
        the raw forms at the record's [c] ARE [xv6_boot_era]'s pinned ones
        by iota.  The generic application is [unit] / [fun _ => True] /
-       [fun _ _ _ => True] / [emp] / [app_auto_raw_triv] (the instances
-       after this theorem). *)
+       [fun _ _ _ => True] / [emp] / [app_auto_raw_triv] /
+       [app_sup_raw_triv] (the instances after this theorem). *)
     (CT : Type) (Cl : CT -> iProp Σ)
     (Hbirth : ⊢ |==> ∃ c : CT, Cl c)
     (app_names : Type) (app_fs : CT -> app_names -> gmap Z FsAbsDefs.anode -> iProp Σ)
@@ -734,6 +761,14 @@ Theorem xv6_power_adequacy_gen Σ
                 (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib))))
     (Happ_auto : forall (c : CT) (r : app_names),
        ⊢ app_auto_raw (app_fs c) r)
+    (* THE SUPPLY (the ARM; [AppInv.app_sup_raw]): the application's claim
+       holds of EVERY view.  It is what an unverified program's syscall
+       bundles are paid out of, and it is born here and carried to the boot
+       hart's chain as a persistent credential.  [xv6_boot_era]'s own
+       [Happ_sup] carries the paragraph on why this is not the GAP-premise
+       trap; the generic application discharges it by [app_sup_raw_triv]. *)
+    (Happ_sup : forall (c : CT) (r : app_names),
+       ⊢ app_sup_raw (app_fs c) r)
     (* THE TRACE INVARIANT, PASSED THROUGH TO
        [RiscvAdequacy.riscv_power_adequacy] (whose header is the full
        story).  [phi] is any pure statement about the OPERATIONAL state, and
@@ -998,6 +1033,7 @@ Proof.
      [riscv_client], so they are terms here, not holes *)
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ Hufd _ _ _ _ _ gen g' sb nib cov
             app_names (app_fs Gcl) (Happ_xfer Gcl) (Happ_auto Gcl)
+            (Happ_sup Gcl)
             Hbf Hpure Hcovin Hlogsub Hls2 _ _).
   (* the descriptor class comes back as a GOAL here rather than being
      shelved, because the application is explicit ([@]); it is the section's
@@ -1056,6 +1092,8 @@ Proof.
                   iPureIntro; exact Logic.I)
             ltac:(intros c r; apply app_auto_raw_triv; intros r' av;
                   reflexivity)
+            ltac:(intros c r; apply app_sup_raw_triv; intros r' av;
+                  reflexivity)
             (fun γobs _ => obs_pred_at γobs)
             (obs_pred_at_alloc_cl (fun _ : unit => True%I))
             (fun γd γobs _ => obs_pred_at_step XV6_DISK_BYTES γd γobs)
@@ -1113,6 +1151,8 @@ Proof.
             ltac:(intros c; cbv beta; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
             ltac:(intros c r; apply app_auto_raw_triv; intros r' av;
+                  reflexivity)
+            ltac:(intros c r; apply app_sup_raw_triv; intros r' av;
                   reflexivity)
             (fun γobs _ => obs_ledger_at R γobs)
             (fun γobs _ => obs_ledger_at_alloc_cl R γobs True%I
@@ -1500,6 +1540,8 @@ Proof.
             ltac:(intros c; cbv beta; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
             ltac:(intros c r; apply app_auto_raw_triv; intros r' av;
+                  reflexivity)
+            ltac:(intros c r; apply app_sup_raw_triv; intros r' av;
                   reflexivity)
             (fun γobs _ => obs_pred_at γobs)
             (obs_pred_at_alloc_cl (fun _ : unit => True%I))

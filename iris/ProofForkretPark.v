@@ -218,7 +218,7 @@ Proof.
      under the parker. *)
   iMod (own_context_twin cur_ctx with "Hrun") as "[Hrun (%XIc & Hthr)]".
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hsup & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
   iMod (ctx_move (R := λ ξ, ctx_cells (XI := ξ) (p_context (proc_addr j))
                               (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest))
           cur_ctx XIc with "Hrun Hthr Hctx") as "(Hrun & Hthr & Hctx)".
@@ -335,7 +335,7 @@ Proof.
   iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γw γft γf γtl pid U ks m av
             (av - 6 - trap_res eb')%nat eb'
             Hj Hgl Hbud Hkx Hut Hsp
-          with "Htext Hwire Hkmap Hpc [] [] Hcg Hcpu Htc Hclm
+          with "Htext Hwire Hsup Hkmap Hpc [] [] Hcg Hcpu Htc Hclm
                 Hlocked HR Hksc [Hpriv] HW Hclose").
   (* THE THREE MOVED ROWS -- [procs_inv], [park_globals]'s handles and the
      child's private block through [BioInv.buf_escrow] -- are at the
@@ -369,8 +369,8 @@ Proof.
   iApply (forkret_park_paid (CID := hp) (XI := ξp) (park_token γs) γs γw γft γf γtl pa ks rest pid
             (MkUstate V M) av Hrest Hj Hav with "Hrun [Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
   iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
-  iFrame "Htext Hwire Hkmap Hmk Hstk".
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hsup & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  iFrame "Htext Hwire Hsup Hkmap Hmk Hstk".
   (* [procs_inv] and the globals by [iExact]: the persistent [Hpinv] would
      otherwise be framed INTO the transparent globals bundle's first row *)
   iSplitR; [iExact "Hpinv"|].

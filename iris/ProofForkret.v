@@ -45,6 +45,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RiscvModelBytes.   (* [pa_add] -- how kexec indexes its byte runs *)
 Require Import PageGeom.
 Require Import InstrBytes WireInv.   (* [wire_inv] -- named by [fkr_tail]'s statement *)
+Require Import AppInv.   (* [app_sup] -- named by [fkr_tail]'s statement too *)
 Require Import KernelText.           (* [kernel_text] *)
 Require Import KptExecMap.           (* [kmap_at] / [tramp_vpn] / [KP_rx] *)
 Require Import WpLock.               (* [is_lock] / [locked] *)
@@ -225,6 +226,10 @@ Lemma fkr_tail
   mt !!! Regidx Rs1 = p ->
   kernel_text -∗
   wire_inv -∗
+  (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]): forkret's tail
+     enters the closed trap loop, which mints the round's generic slot out
+     of this credential -- [SpecUserretClosed]'s premise list, verbatim. *)
+  app_sup -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   pc_is (mword_of_int (FR + 0x64) : mword 64) -∗
   sie_cap_gpr KT1 mt av2 eb p -∗
@@ -261,7 +266,7 @@ Lemma fkr_tail
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1.
-  iIntros "#Htext #Hwire #Hclaimmap Hpc Hcg Hcpu Hext Hcx #Hks Hf16 Hpv #Hdone HW #Hpg Hyield".
+  iIntros "#Htext #Hwire #Hsup #Hclaimmap Hpc Hcg Hcpu Hext Hcx #Hks Hf16 Hpv #Hdone HW #Hpg Hyield".
   (*  +0x64: jal ra, prepare_return.                                     *)
   (* ================================================================== *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x64)) Rra
@@ -765,7 +770,7 @@ Proof.
             Hretms Hmapwf HSEa0
             (conj (kvi_satp_mode _) (conj (kvi_satp_asid _) (kvi_satp_ppn _)))
             Hcov Haccwf
-            with "Htext Hhw Hmin Hwire Hclaimmap Hkptinv Hhs Hprivc Hms Hmie
+            with "Htext Hhw Hmin Hwire Hsup Hclaimmap Hkptinv Hhs Hprivc Hms Hmie
                  Hmdl Hmenv Hsenvc Hsepc Hscause Hstval Hstvec Hmedlc Hmsec
                  Hssec Hkres Hufr Hdata Hpc Hfile Hslot Hures").
 Qed.
@@ -845,6 +850,10 @@ Lemma fkr_boot
   mr !!! Regidx Rs1 = p ->
   kernel_text -∗
   wire_inv -∗
+  (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]): forkret's tail
+     enters the closed trap loop, which mints the round's generic slot out
+     of this credential -- [SpecUserretClosed]'s premise list, verbatim. *)
+  app_sup -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   pc_is (mword_of_int (FR + 0x14) : mword 64) -∗
   procs_inv γs -∗
@@ -888,7 +897,7 @@ Proof.
   (* fsinit's 88 sits under kexec's 184, which is what this arm is budgeted
      at; both are [Notation]s for literals, so [lia] sees them directly. *)
   assert (Hav2fs : (K_fsinit <= av2)%nat) by lia.
-  iIntros "#Htext #Hwire #Hclaimmap Hpc #Hpinv Hcg Hcpu Hextc Hclmc #Hks
+  iIntros "#Htext #Hwire #Hsup #Hclaimmap Hpc #Hpinv Hcg Hcpu Hextc Hclmc #Hks
            Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi HW #Hpg Hyield".
   iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hebb.
   (* ================================================================== *)
@@ -1701,7 +1710,7 @@ Proof.
     iApply (fkr_tail W j γs γw γft γf γtl pid
               (MkUstate (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V'))) M')
               ks E4 av av2 eb Hjlt Hav2k Havsum HE4sp HE4s1
-              with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
+              with "Htext Hwire Hsup Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
                     Hpriv Hdone HW Hpg [Hyield]").
     (* [upd_tf] does not touch [pv_fdg], so the closer the caller handed in
        at the ENTRY record's name is the one this tail wants. *)
@@ -1728,7 +1737,7 @@ Proof.
   
   (* the frame's six slots come off the top and go back on at the exit *)
   assert (Havsum : av = (6 + (trap_res eb + av2))%nat) by lia.
-  iIntros "#Htext #Hwire #Hclaimmap Hpc #Hpinv #Hpg Hcg Hcpu Htc Hclm
+  iIntros "#Htext #Hwire #Hsup #Hclaimmap Hpc #Hpinv #Hpg Hcg Hcpu Htc Hclm
            Hlocked HR #Hks Hpv HW Hyield".
   (* p->lock IS the process table's slot [j] -- which is why this contract
      takes [procs_inv] and no longer takes an [is_lock] of its own. *)
@@ -1948,7 +1957,7 @@ Proof.
                  ltac:(wp_next_chain) with "Hcx") as "Hcx".
     iApply (fkr_boot (CID := CIDr) W j γs γl γw γft γf γtl pid U ks mr av av2 eb
               Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1
-            with "Htext Hwire Hclaimmap Hpc Hpinv Hcg Hcpu Hext Hcx Hks
+            with "Htext Hwire Hsup Hclaimmap Hpc Hpinv Hcg Hcpu Hext Hcx Hks
                   Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hpg Hyield"). }
   (* ---------------- THE STEADY ARM: [first] is 0, the boot arm is dead -- *)
   iDestruct (first_tok_of_done with "Hdone") as "#Hftok".
@@ -2065,7 +2074,7 @@ Proof.
      disjunct, read at +0x24; it goes straight to the tail. *)
   iApply (fkr_tail (CID := CID6) W j γs γw γft γf γtl pid U ks T4 av av2 eb
             Hjlt Hpr Havsum HT4sp HT4s1
-          with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv
+          with "Htext Hwire Hsup Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv
                 Hdone2 HW Hpg Hyield").
 Qed.
 

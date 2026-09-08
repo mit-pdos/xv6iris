@@ -125,6 +125,7 @@ Require Import FirstTok.
 Require Import SpecForkret.
 Require Import SpecForkretPark.
 Require Import ParkCap.   (* [park_token] *)
+Require Import AppInv.    (* [app_sup] -- the supply the package captures *)
 Require Import UexecSlot. (* [uvis] / [uvis_of] *)
 Require Import UexecRet.  (* [uslot] -- required DIRECTLY, the seal does not
                              travel through a re-export (durable-notes) *)
@@ -159,6 +160,10 @@ Definition forkret_park_pkg
   ((* ---- the persistent world the parked closure captures ---- *)
    kernel_text ∗
    wire_inv ∗
+   (* ...INCLUDING THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]):
+      forkret's tail enters the closed trap loop, whose generic-slot mint
+      runs on this credential.  [ParkCap.park_pkg] is this verbatim. *)
+   app_sup ∗
    kmap_at tramp_vpn tramp_ppn KP_rx ∗
    procs_inv γs ∗
    UsertrapRes.park_globals cur_ctx γs γw γft γf γtl ∗

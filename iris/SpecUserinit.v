@@ -86,6 +86,7 @@ Require Import SpecProcinit.  (* [wait_lock_addr] *)
 Require Import FileInv.       (* [is_ftable] *)
 Require Import ConsoleInv.    (* [console_ready] *)
 Require Import KptExecMap.   (* [kmap_at tramp_vpn tramp_ppn KP_rx] *)
+Require Import AppInv.       (* [app_sup] -- the supply the park captures *)
 Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
@@ -216,6 +217,13 @@ Definition wp_userinit_sconf_body
   is_ftable γft γf -∗
   ConsoleInv.console_ready -∗
   wire_inv -∗
+  (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]).  userinit MINTS
+     the first process's slot family and parks it, and a generic slot's
+     syscall bundles are paid out of this credential -- so it is one of the
+     rows [ParkCap.park_token_park] captures into the package, beside
+     [kernel_text] and [wire_inv].  Boot hands it down from
+     [SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]. *)
+  app_sup -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   (* ---- the two counted regimes ----
      AT THE AMBIENT [fsc_kalloc], not at a threaded [γa], and that is what

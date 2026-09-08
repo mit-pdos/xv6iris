@@ -177,6 +177,19 @@ Global Typeclasses Opaque uexec_wp.
 (* park_world] used to, which made one duplicable from inside every trap    *)
 (* round.  See claude-notes/design/user-wp-slot.md.                         *)
 (* ===================================================================== *)
+(* THE APPLICATION'S SUPPLY IS NOT A FIELD OF THIS MODULE TYPE, and cannot   *)
+(* be.  Since the ARM a generic slot's syscall bundles are paid out of        *)
+(* [UexecSG.ssupply], which at the kernel's instance is [AppInv.app_sup] --   *)
+(* the application's predicate held of every view.  Naming that needs         *)
+(* [AppCfg.appcfg], and THAT RECORD IS BUILT INSIDE THE BOOT FUPD             *)
+(* ([SystemAdequacy.xv6_boot_era]'s [MkAppcfg N A r], at the instance the     *)
+(* boot obligation witnesses), so no module-level inhabitant of a supply      *)
+(* field exists for a Link to supply: the Link chain never sees a concrete    *)
+(* record, and a [Parameter] of that type would be an axiom.  The supply      *)
+(* therefore travels the way [SystemAdequacy]'s other boot-born credentials   *)
+(* do -- a Coq hypothesis of the generic system theorem, handed down to the   *)
+(* two mint sites and the closed trap loop -- and [UEXEC_GEN] stays what it   *)
+(* was: the program-generic WP and nothing about the file system.             *)
 Module Type UEXEC_GEN.
   Parameter uexec_wp_gen :
     forall `{!riscvGS Σ} `{GEN : GenId}, ⊢ □ uexec_wp.

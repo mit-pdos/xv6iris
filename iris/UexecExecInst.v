@@ -51,15 +51,27 @@
    wand, so the upgrader walks in under [sys_exec_slot_pre]'s ∀s and
    [PieceFam.pf_at]'s [∧]-refund.
 
-   THE SUPPLY [ssupply] is [True] at this instance, and that is the honest
-   reading: a generic process's exec bundle is FREE.
-   [FsAbsInvFire.fsabs_exec_half] hands back the walk premise and open's
-   commit at [True] receipts as a closed fact, and a generic slot family
-   answers the slot wand at every key, so nothing has to be supplied.  The
-   application's own predicate is what goes here once a syscall with a
-   constraining contract is turned on.  That mint is also why this file sits
-   ABOVE the fire tower rather than beside SpecSysExecAU.v: the supply law is
-   a class field, and its exec case is that mint.
+   THE SUPPLY [ssupply] IS THE APPLICATION'S PREDICATE HELD OF EVERY VIEW
+   ([AppInv.app_sup]).  That is the credential an UNVERIFIED program runs
+   on: it is what makes a view-moving commit's [AppInv.app_step] free, and
+   so what every syscall bundle with a write-kind commit is paid out of.
+   Exec's own bundle needs none of it -- [FsAbsInvFire.fsabs_exec_half]
+   hands back the walk premise and open's commit at [True] receipts as a
+   closed fact, and a generic slot family answers the slot wand at every
+   key -- which is why both supply laws below still ignore their argument.
+   The supply is spelled here anyway, because it is what the OTHER numbers'
+   bundles will be paid from when they are turned on, and because the
+   credential has to exist before the dischargers can be re-based on it.
+   That is also why this file sits ABOVE the fire tower rather than beside
+   SpecSysExecAU.v: the supply law is a class field, and its exec case is
+   [fsabs_exec_half].
+
+   WHERE THE SUPPLY COMES FROM, AND WHY IT IS NOT PARKED.  It is a Coq
+   hypothesis of the generic system theorem
+   ([SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]), born at boot and
+   carried as a persistent credential to the two slot mints and the closed
+   trap loop.  It cannot ride an era-owned resource -- see [AppInv]'s
+   [app_sup_raw] -- because a constraining application cannot found it.
 
    [Γ] and [γfs] are NOT existential: the whole tree runs at the single
    ambient file system ([FsCfg.fsc_fs] with the derived view names
@@ -91,7 +103,10 @@ Require Import SpecKexecAU.    (* [exec_slot_pre] -- the piece the
                                   monotonicity walks through          *)
 Require Import FsAbsInvFire.   (* [fsabs_exec_half] -- the fs half of the
                                   bundle, free out of the invariant   *)
-Require Import FirstTok.       (* [FirstTok.fsabs_env] -- THE SUPPLY   *)
+Require Import FirstTok.       (* [FirstTok.fsabs_env]                *)
+Require Import AppInv.         (* [app_sup] -- THE SUPPLY.  Required
+                                  DIRECTLY: the definition is named in a
+                                  class field's body                   *)
 Require Import PieceFam.       (* [pfam]: the one-shot piece's pair *)
 Require Import FsAbsDefs.          (* LAST (FsAbs's own rule)             *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]                        *)
@@ -245,15 +260,15 @@ Section UexecExecInst.
       [ exact Hld | exact Him ].
   Qed.
 
-  (* THE SUPPLY.  Opaque in the class, and at THIS instance it is [True]:
-     the only number with a bundle is exec, and exec's fs half comes out of
-     [FsAbsInvFire.fsabs_exec_half], which is a closed fact -- it reads the
-     abstract-state invariant's SHAPE and spends nothing, so a generic
-     process's bundle costs the kernel nothing at all.  The application's
-     own predicate is what goes here once a syscall with a constraining
-     contract is turned on; until then there is nothing for a supplier to
-     supply. *)
-  Definition xv6_ssupply : iProp Σ := True%I.
+  (* THE SUPPLY.  Opaque in the class, and at THIS instance it is the
+     application's predicate held of EVERY view ([AppInv.app_sup]) -- the
+     credential that makes a write-kind commit's [AppInv.app_step] free, and
+     hence the one an unverified program's bundles are paid from.  The two
+     laws below ignore it because the only number with a bundle today is
+     exec, whose fs half comes out of [FsAbsInvFire.fsabs_exec_half] -- a
+     closed fact that reads the abstract-state invariant's SHAPE and spends
+     nothing.  The numbers whose bundles do spend it are the next round's. *)
+  Definition xv6_ssupply : iProp Σ := app_sup.
 
   (* the half every ecall leaf uses: no other number has a bundle *)
   Lemma xv6_sbundle_of_supply_ne (X : uvis -d> iPropO Σ) (n : Z) (W : uvis) :

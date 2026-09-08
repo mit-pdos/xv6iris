@@ -98,7 +98,8 @@ Require Import UexecSG.       (* [uexecSG]: [sbundle_at] / [spost_at] / [skey_eq
                                  enriched slot (lane E3b) *)
 Require Import UexecExecMint. (* [uslot_mint] -- the loop's generic slot *)
 Require Import UexecExecInst. (* the class INSTANCE: [spost_at] is [emp] here *)
-Require Import FirstTok.      (* [fsabs_env] -- what the mint needs *)
+Require Import FirstTok.      (* the syscall environment's own file *)
+Require Import AppInv.        (* [app_sup] -- the credential the mint runs on *)
 Require Import UserretUser.
 Require Import TfPage36.
 From Kernel Require KernelSyms.
@@ -241,6 +242,13 @@ Section UserretClosed.
     kernel_text -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     wire_inv -∗
+    (* THE APPLICATION'S SUPPLY, the fourth kernel-wide persistent
+       credential (the ARM; [AppInv.app_sup]).  The loop MINTS the generic
+       slot below, and a generic slot's syscall bundles are paid out of it.
+       A premise rather than anything the loop owns: see [UexecSG.v]'s
+       "[ssupply] IS NOT IN [uvb]" -- putting it in the round's bundle would
+       make the kernel owe it to resume ANY process. *)
+    app_sup -∗
     (* THE ROUND'S ENTRY, NAMED (milestone J).  It used to be the ∃-hidden
        [user_trap_frame] paired with a [uexec_wp]; it is now the trapped
        machine at the user-visible record [W] that trapped, with the cause
@@ -272,17 +280,18 @@ Section UserretClosed.
          WP (Loop : expr riscv_lang)).
   Proof.
     intros Hj.
-    iIntros "#Hkt #Hclaim #Hwire".
+    iIntros "#Hkt #Hclaim #Hwire #Hsup".
     (* THE LOOP MINTS (refutation R-c).  Two of the round's arms are kernel
        mints by design -- exec's loadability gap, and fork, where nothing
        yet says [r <> 0] (K2) -- so [UserretClosed] takes a [UEXEC_GEN]
        again.  Through [UexecCond.cond_entry_slot], not the bare generic
        inhabitant, so a process whose key qualifies picks up sync's own
-       constructor.  Its two premises are the instance's own ([psok] admits
-       every number, [ssupply] is [fsabs_env]) -- [UexecExecMint.uslot_mint]. *)
+       constructor.  Its [psok] premise is the instance's own (every number
+       is admitted) and its supply is the credential above --
+       [UexecExecMint.uslot_mint]. *)
     iAssert (□ (∀ W : uvis, uslot W))%I as "#Hmk".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      iApply (uslot_mint with "Hgen"). }
+      iApply (uslot_mint with "Hsup Hgen"). }
     iLöb as "IH".
     iIntros "!>" (h C pt sz γfd cw W sc stv)
       "%Hok %Hperm %Hszw %Hcww #Hhw #Hmin #Hcreds (Hframe & Hfrag & Hret)".
@@ -569,11 +578,11 @@ End Res.
                                 bullet and the premise list want the pieces *)
     destruct Hok as (Hstv & Hdqc & Hmie & Hmedl & Hnorm & Hptwf).
     destruct Hsatpr as (HuMode & Huasid & Huppn).
-    iIntros "#Hkt #Hhw #Hmin #Hwire #Hclaim #Hkpt Hhs Hpriv Hms Hmiec Hmdlc
+    iIntros "#Hkt #Hhw #Hmin #Hwire #Hsup #Hclaim #Hkpt Hhs Hpriv Hms Hmiec Hmdlc
              Hmenvc #Hsenvc Hsepc Hsc Hstval Hstvec #Hmedlc #Hmsec #Hssec
              Hktlb Hufr Hdata Hpc Hfile Hkc Hures".
     (* the loop, once: it is [□], so one instance serves every round *)
-    iDestruct (LP.stvec_handler_loop j Hj with "Hkt Hclaim Hwire") as "#Hloop".
+    iDestruct (LP.stvec_handler_loop j Hj with "Hkt Hclaim Hwire Hsup") as "#Hloop".
     (* THE SAVE SLOTS COME OUT OF THE RESIDUE, not from the caller: the
        residue owns the trapframe page, so a boundary that asked for both
        would be unsatisfiable (SpecUserretClosed.v's header).  userret READS

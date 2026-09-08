@@ -71,6 +71,7 @@ Require Export UexecWp.
 Require Import UserPerm.   (* [perm_of] -- the key's permission projection *)
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Require Import UexecSG.       (* [uexecSG]: the deposit class [uslot]/[ukc] are indexed by *)
+Require Import AppInv.        (* [app_sup]: the supply credential the loop's mint runs on *)
 Require Import UexecExecInst. (* the class INSTANCE, so the body resolves it directly -- this file sits above the instance and binds no class of its own; its binder list matches the seal's *)
 Require Import UexecRet.   (* [ukc] -- the U-mode continuation the entry runs.
                               REQUIRED DIRECTLY: [ukc]'s body is the sealed
@@ -157,6 +158,17 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   hw_config -∗
   minstret_inv -∗
   wire_inv -∗
+  (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]): the fourth
+     kernel-wide persistent credential, beside the kernel's text and its
+     wiring.  The loop mints the per-round generic slot, and a generic
+     slot's syscall bundles are paid out of the supply -- so the loop's
+     entrant hands it over exactly as it hands over [kernel_text].  It is a
+     PREMISE and not a conjunct of the round's own bundle for the reason
+     [UexecSG.v]'s header gives: a bundle conjunct would make the kernel owe
+     the supply to resume ANY process, which a constraining application
+     cannot pay.  Born at boot from
+     [SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]. *)
+  app_sup -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   kpt_inv kroot -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗

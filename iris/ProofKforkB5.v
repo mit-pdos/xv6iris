@@ -251,7 +251,7 @@ Section ProofKforkB5.
     (* of by main.                                                         *)
     (* -------------------------------------------------------------- *)
     iDestruct (park_world_open with "Hworld") as (γtl pd pav pu)
-      "(#Hdcaps & #Hextra & #Hwire & #Htramp & #Hipx)".
+      "(#Hdcaps & #Hextra & #Hwire & #Htramp & #Hsup & #Hipx)".
     iDestruct "Hipx" as (iv1) "#Hip1".
     iDestruct (SchedCtx.procs_inv_len with "Hpinv") as %Hnproc.
     iAssert (⌜FsReady.fs_geom_ok⌝)%I as %Hgeomok.
@@ -290,7 +290,7 @@ Section ProofKforkB5.
     (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (park_token_park N rest Uc stsP Hwf Hrest
-            with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag Hjslot
+            with "Hrun Htoken Htext Hwire Hsup Htramp Hmk Hstack Henv Hown_park Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "[Hrun Hpctx]".
     (* built in [park_child]'s own conjunct order rather than framed: its

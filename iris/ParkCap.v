@@ -66,6 +66,7 @@ Import Defs.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import AppInv.    (* [app_sup] -- the supply the package captures *)
 
 Section ParkCap.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -94,6 +95,11 @@ Section ParkCap.
       (pid : mword 32) (av : nat) : iProp Σ :=
     (kernel_text ∗
      wire_inv ∗
+     (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]): forkret's tail
+        enters the closed trap loop, whose generic-slot mint runs on this
+        credential, so the parker captures it with the rest of the
+        persistent world.  Persistent, so capturing it costs nothing. *)
+     app_sup ∗
      kmap_at tramp_vpn tramp_ppn KP_rx ∗
      procs_inv γs ∗
      (* THE PARKER'S GLOBALS, at ITS context (L8, A12.19): the cap moves
@@ -258,6 +264,7 @@ Section ParkCap.
     park_token (un_s N) -∗
     kernel_text -∗
     wire_inv -∗
+    app_sup -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     pslot_used_at (un_pj N) -∗
     stack_own (KTR := KT1) (add_vec (un_ks N) (mword_of_int 4096)) KSTACK_AV -∗
@@ -302,7 +309,7 @@ Section ParkCap.
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U -∗
     |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
   Proof.
-    iIntros (Hwf Hrest) "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Hslot Hchild".
+    iIntros (Hwf Hrest) "Hrun #Htok #Htext #Hwire #Hsup #Hkmap #Hmk Hstack #Henv Hown Hfrag Hslot Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
@@ -322,7 +329,7 @@ Section ParkCap.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
     - exact Hkav.
     - rewrite /park_pkg.
-      iFrame "Htext Hwire Hkmap Hmk Hstack".
+      iFrame "Htext Hwire Hsup Hkmap Hmk Hstack".
       (* [procs_inv] and the globals by [iExact], not [iFrame]: the persistent
          [Hprocs] would otherwise be framed INTO the (transparent) globals
          bundle's own first row and leave the bundle half-built *)

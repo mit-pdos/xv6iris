@@ -124,6 +124,7 @@ Require Import KptPt.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WireInv.   (* [wire_inv] *)
+Require Import AppInv.    (* [app_sup] -- the supply, handed to userinit *)
 Require Import HartTp.
 (* the shared kernel page table: [kpt_unset] is a boot token, [kpt_inv] and
    the 65 claims are what the deposit wand carries to the secondaries *)
@@ -634,6 +635,13 @@ Section SpecMain.
        the rows the first process's park captures
        ([SpecForkretParkPaid.forkret_park_pkg]), handed to userinit. *)
     wire_inv -∗
+    (* ...and beside it the APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]),
+       for exactly the same reason: main does not read it, but userinit's
+       park captures it into the world every child inherits
+       ([SyscParkEnv.park_world]) and the first process's trap loop mints
+       its generic slot out of it.  Born at boot, from
+       [SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]. *)
+    app_sup -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗

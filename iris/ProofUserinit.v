@@ -111,6 +111,7 @@ Require Import SpecForkretPark.
 Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID] -- [park_token_intro] *)
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the running token (L8) *)
 Require Import ParkCap.               (* [park_token_park] *)
+Require Import AppInv.                (* [app_sup] -- the supply the park carries *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
 Require Import UexecWp.               (* [UEXEC_GEN] -- the mint's [box] *)
@@ -288,7 +289,7 @@ Section ProofUserinit.
     iIntros "Hcg Hcpu #Htext #Hkd Hpc #Hpenv #Hitl #Hitinv #Hesc #Hireg
              Hfirst #Hpersist Hfsinit
              #Hpinv #Hlpid
-             #Hdcaps #Hwaitlk #Hftable #Hcready #Hwire #Htramp
+             #Hdcaps #Hwaitlk #Hftable #Hcready #Hwire #Hsup #Htramp
              Hkenv Hpav Hinitproc Hcont".
     (* the boot arm: at nesting level 0 the exit arm IS the entry base *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Heb. cbn in Heb. subst eb.
@@ -769,7 +770,7 @@ Section ProofUserinit.
         (* the world a child's park will need, handed down from here *)
         rewrite /park_world. iExists γtl, pd, pav, pu.
         iDestruct "Hdcaps" as "(#Hd1 & #Hd2 & #Hd3 & #Hd4 & #Hd5 & #Hd6)".
-        iFrame "Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hcready Hwire Htramp Hpav".
+        iFrame "Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hcready Hwire Htramp Hsup Hpav".
         iSplitR; [iExists γp; iExact "Hlpid"|].
         iExists iv1; iExact "Hip1". }
       iSplitR; [iExists γp; iExact "Hlpid"|].
@@ -805,13 +806,13 @@ Section ProofUserinit.
                -∗ uslot W)%I
       as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      iDestruct (UexecExecMint.uslot_mint with "Hgen") as "#Hmkgen".
+      iDestruct (UexecExecMint.uslot_mint with "Hsup Hgen") as "#Hmkgen".
       iIntros (W) "_". iApply "Hmkgen". }
     (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (park_token_park N rest
             (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M) fdt0 Hwf Hrest
-            with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hjslot
+            with "Hrun Htoken Htext Hwire Hsup Htramp Hmk Hstack Henv Hown Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "[Hrun Hpctx]".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirs". iExact "Hctx". }

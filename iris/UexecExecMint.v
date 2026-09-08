@@ -1,15 +1,21 @@
 (* UexecExecMint.v -- THE GENERIC MINT: the U-mode trap loop's own slot at
    every key, and it costs the kernel nothing.
 
-   WHY IT IS FREE.  Since the ARM the returning arm demands the process's
-   bundle for the number it is at ([UexecSG.sbundle]).  At the kernel's
-   instance ([UexecExecInst]) the only number with a bundle is exec, and
-   exec's is [SpecSysExecAU.sys_exec_au_pre] at the trapping key: open's walk
-   premise and open's commit -- both handed back at [True] receipts by
+   WHAT IT COSTS: THE SUPPLY, AND NOTHING ELSE.  Since the ARM the returning
+   arm demands the process's bundle for the number it is at
+   ([UexecSG.sbundle]).  At the kernel's instance ([UexecExecInst]) the only
+   number with a bundle is exec, and exec's is
+   [SpecSysExecAU.sys_exec_au_pre] at the trapping key: open's walk premise
+   and open's commit -- both handed back at [True] receipts by
    [FsAbsInvFire.fsabs_exec_half], which is a closed fact -- beside the slot
    wand the kernel fires for the NEW image.  A generic slot family pays that
-   wand at every key.  So the class's [ssupply] is [True] there and its
-   [sbundle_of_supply] asks for nothing.
+   wand at every key, so exec's bundle spends nothing.  What the two lemmas
+   below take is the class's [ssupply] itself ([AppInv.app_sup]): a generic
+   process may make ANY syscall, and the numbers whose bundles move the
+   abstract state are paid out of that credential.  It is a PREMISE and not
+   a closed fact -- see [UexecSG.v]'s "[ssupply] IS NOT IN [uvb]" and
+   [AppInv]'s [app_sup_raw]: it is born at boot as a Coq hypothesis of the
+   generic system theorem and handed to each mint site.
 
    SO THERE IS NO LIFT LEFT.  The exec channel was once a SECOND parallel
    fixpoint and this file's work was carrying a plain slot up to it by Loeb.
@@ -39,12 +45,12 @@ Require Import UexecCond.       (* [cond_entry_slot] -- the plain generic slot *
 Require Import SpecKexecAU.
 Require Import SpecSysExecAU.
 Require Import FsAbsInvFire.    (* [fsabs_exec_half] *)
-Require Import FirstTok.        (* [FirstTok.fsabs_env] -- spelled QUALIFIED below:
-                                   [FsAbsInv] (imported after it) exports a
-                                   Γ-indexed [fsabs_env] of its own *)
+Require Import FirstTok.        (* in the require block for FsAbsInvFire's
+                                   sake; nothing here names its [fsabs_env] *)
 Require Import PieceFam.       (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
 Require Import UexecExecInst.   (* the class INSTANCE: [uexecSG_xv6] / [uprogSG_gen] *)
 Require Import UkRun.           (* [udep] -- the supplier and its key-free law *)
+Require Import AppInv.          (* [app_sup] -- the credential both mints take *)
 Require Import FsBytesGamma.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -64,27 +70,28 @@ Section UexecExecMint.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
 
-  (* THE PROGRAM-SIDE DEPOSIT DATA the generic slot runs on, and at this
-     instance it costs nothing: the supplier is [True] and the key-free
-     minting law is the class's own [sbundle_of_supply_ne]. *)
-  Lemma udep_gen : ⊢ udep.
+  (* THE PROGRAM-SIDE DEPOSIT DATA the generic slot runs on: the supplier IS
+     the supply ([UexecExecInst.uprogSG_gen]'s [Dsup]) and the key-free
+     minting law is the class's own [sbundle_of_supply_ne], which admits
+     every number but exec. *)
+  Lemma udep_gen : app_sup -∗ udep.
   Proof.
     rewrite /udep /Dsup /= /xv6_ssupply.
-    iSplitR; [ done | ].
+    iIntros "#Hsup". iSplitR; [ iModIntro; iExact "Hsup" | ].
     iPureIntro. intros n W _ Hne.
     exact (sbundle_of_supply_ne uslot n W Hne).
   Qed.
 
-  (* the loop's mint: the generic slot at every key.  Both of
-     [UexecCond.cond_entry_slot]'s premises are the instance's own --
-     every number is admitted, and the supply is free. *)
-  Lemma uslot_mint : □ uexec_wp -∗ □ (∀ W : uvis, uslot W).
+  (* the loop's mint: the generic slot at every key, out of the supply.
+     [UexecCond.cond_entry_slot]'s [psok] premise is the instance's own
+     (every number is admitted); its [□ ssupply] is the credential. *)
+  Lemma uslot_mint : app_sup -∗ □ uexec_wp -∗ □ (∀ W : uvis, uslot W).
   Proof.
-    iIntros "#Hgen".
-    iDestruct udep_gen as "#Hdep".
+    iIntros "#Hsup #Hgen".
+    iDestruct (udep_gen with "Hsup") as "#Hdep".
     iIntros "!>" (W).
     iApply (UexecCond.cond_entry_slot W ltac:(intros k _; exact I)
               with "Hdep [] Hgen").
-    rewrite /ssupply /= /xv6_ssupply. done.
+    rewrite /ssupply /= /xv6_ssupply. iModIntro. iExact "Hsup".
   Qed.
 End UexecExecMint.

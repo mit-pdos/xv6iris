@@ -77,6 +77,7 @@ Require Import FsCfg.    (* [fsc_printk] etc -- the ambient names the ties point
 Require Import FirstTok.     (* [first_done] -- what the park's closer is handed *)
 Require Import SyscParkEnv.  (* [sysc_park_extra] / [park_world] -- the park's syscall-side rows *)
 Require Import WireInv KptExecMap.   (* [park_world_open]'s rows *)
+Require Import AppInv.               (* [app_sup] -- another of them *)
 Require Import FsReady.
 Require Import SpecConsoleintr.  (* [console_caps] -- devintr's console row *)
 Require Import TicksInv.         (* [is_tickslock] -- the tick keeper's real arm *)
@@ -575,12 +576,12 @@ Section UsertrapRes.
     ∃ (γtl : gname) (pd pav pu : mword 64),
       devintr_caps_any fsc_uart fsc_disk fsc_dlock γtl γs pd pav pu ∗
       sysc_park_extra γtl ∗
-      wire_inv ∗ kmap_at tramp_vpn tramp_ppn KP_rx ∗
+      wire_inv ∗ kmap_at tramp_vpn tramp_ppn KP_rx ∗ app_sup ∗
       (∃ ip : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈□ ip).
   Proof.
     iIntros "H". iDestruct "H" as (γtl pd pav pu)
-      "(#Hdev & #Hcc & #Hgeom & #Hdlk & #Htl & #Hpi & #Hcr & #Hnp & #Hpav & #Hwire & #Hkmap & #Hip)".
-    iExists γtl, pd, pav, pu. iFrame "Hwire Hkmap Hip".
+      "(#Hdev & #Hcc & #Hgeom & #Hdlk & #Htl & #Hpi & #Hcr & #Hnp & #Hpav & #Hwire & #Hkmap & #Hsup & #Hip)".
+    iExists γtl, pd, pav, pu. iFrame "Hwire Hkmap Hsup Hip".
     iSplitR; [rewrite /devintr_caps_any; iFrame "Hdev Hcc Hgeom Hdlk Htl Hpi"|].
     rewrite /sysc_park_extra. iFrame "Hnp Hpav Htl Hcr".
   Qed.
@@ -2031,7 +2032,7 @@ Proof.
                 (#Hprocs & #Hwl & #Hft & #Hcc & #Hcr & #Htl & #Hnp & #Hipx) #Hfs".
   destruct Hwf as (Hj & Hlk & _ & _).
   iDestruct (park_world_open with "Hpw0") as (γtl0 pd0 pav0 pu0)
-    "(_ & #Hextra0 & #Hwire & #Hkmap & _)".
+    "(_ & #Hextra0 & #Hwire & #Hkmap & #Hsup & _)".
   iDestruct "Hextra0" as "(_ & #Hpav & _ & _)".
   iDestruct (fs_ready_disk with "Hfs") as "[#Hdinv Hdex]".
   iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
@@ -2064,6 +2065,7 @@ Proof.
     iSplitR; [iExact "Hpav"|].
     iSplitR; [iExact "Hwire"|].
     iSplitR; [iExact "Hkmap"|].
+    iSplitR; [iExact "Hsup"|].
     iExact "Hipx". }
   rewrite /ut_caps.
   iSplitR; [iExact "Hprocs"|].
@@ -2096,7 +2098,7 @@ Lemma park_globals_of_park_env `{XI : CurCtx} `{!riscvGS Σ, !xv6G Σ, !bioslotG
 Proof.
   iIntros "(_ & #Hprocs & _ & #Hdev & #Hwl & #Hft & _ & #Hpw) (#Hnp & _ & #Htl & #Hcr)".
   iDestruct "Hdev" as "(_ & #Hcc & _)".
-  iDestruct (park_world_open with "Hpw") as (γtl0 pd0 pav0 pu0) "(_ & _ & _ & _ & #Hipx)".
+  iDestruct (park_world_open with "Hpw") as (γtl0 pd0 pav0 pu0) "(_ & _ & _ & _ & _ & #Hipx)".
   rewrite /park_globals. iFrame "Hprocs Hwl Hft Hcc Hcr Htl Hnp". iExact "Hipx".
 Qed.
 
