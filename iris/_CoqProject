@@ -1547,7 +1547,6 @@ LinkSysMknod.v
 FsInitPin.v
 SpecSysOpenAU.v
 FsAbsStart.v
-SpecSysDupAU.v
 
 # fs-syscall-specs lane Y: sys_sync's durability receipt.
 # FsFlushedCore builds [flushed b D] out of the crash record's mono-list
@@ -1575,9 +1574,6 @@ ProofSysOpenAU.v
 # a LEAF: its import cone is FsInitPin's own and nothing requires it.
 FsInitPinBoot.v
 SpecSysUnlinkAU.v
-ProofSysDupAUTail.v
-ProofSysDupAU.v
-LinkSysDupAU.v
 FsAbsReadFire.v
 # fs-syscall-specs lane W: the T_FILE CREATE CARRY, which unlocks
 # sys_open's O_CREATE arm.  FsAbsCreateFire is FIRE 2 at a
