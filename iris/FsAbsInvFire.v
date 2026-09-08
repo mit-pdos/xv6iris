@@ -4,7 +4,7 @@
 
    WHAT THIS IS FOR.  The AU contracts ([SpecSysOpenAU], [SpecSysMknod],
    [SpecSysUnlinkAU], [SpecSysRead]/[SpecFileread], [SpecSysWrite]/
-   [SpecFilewrite], [SpecCreateAU]/[SpecCreateAUF]) take, beside the
+   [SpecFilewrite], [SpecCreate]) take, beside the
    landed frame, a bundle of caller-supplied fupds: the walk premise (one
    [ax_hop] per path element, fired at the era lend) and the commits (one
    per linearization instant, handed the kernel's HALF of the abstract
@@ -114,35 +114,22 @@ Section FsAbsInvFire.
   (*  1.  The walk premises: every hop says yes, every cursor is [True]   *)
   (* ------------------------------------------------------------------ *)
 
-  Lemma fsabs_hops (F : Z -> dfrac -> gmap fname Z -> iProp Σ)
-      (ps : list fname) (n : nat) :
-    ⊢ ax_hops_from F (fun _ _ => True%I) (fun _ _ => True%I) ps n.
-  Proof.
-    rewrite /ax_hops_from. iApply big_sepL_intro.
-    iIntros "!>" (j s _). rewrite /ax_hop.
-    iIntros (d ents dqv) "_ Hl". iModIntro. iFrame "Hl".
-    by destruct (ents !! s).
-  Qed.
+  (* the trivial hop family is [FsAbsEra.ax_hops_triv], and the trivial
+     [ep_start] is [ep_start_triv] beside it: they live there because
+     [SpecCreate]'s own bundle unit needs them and sits below this file. *)
 
   Lemma fsabs_open_walk (γfs : fs_names) (cw : Z) :
     ⊢ open_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
   Proof.
     rewrite /open_walk_pre_era. iIntros (pl r) "_". iModIntro.
-    iSplit; [done |]. iApply fsabs_hops.
+    iSplit; [done |]. iApply ax_hops_triv.
   Qed.
 
   Lemma fsabs_mknod_walk (γfs : fs_names) (cw : Z) :
     ⊢ mknod_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
   Proof.
     rewrite /mknod_walk_pre_era. iIntros (pl r) "_". iModIntro.
-    iSplit; [done |]. iApply fsabs_hops.
-  Qed.
-
-  Lemma fsabs_ep_start (γfs : fs_names) (cw : Z) (pl : list (bv 8)) :
-    ⊢ ep_start γfs cw (fun _ _ => True%I) (fun _ _ => True%I) pl.
-  Proof.
-    rewrite /ep_start. iIntros (r) "_". iModIntro.
-    iSplit; [done |]. rewrite /ep_hops_from. iApply fsabs_hops.
+    iSplit; [done |]. iApply ax_hops_triv.
   Qed.
 
   (* ------------------------------------------------------------------ *)

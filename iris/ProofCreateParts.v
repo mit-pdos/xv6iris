@@ -51,6 +51,7 @@ Require Import DirView.
 Require Import BlkmapDefs.
 Require Import InodeLock.
 Require Import SpecIalloc.
+Require Import FsAbsCreateFire. (* [T_FILE], [T_DEVICE], [create_made] *)
 Require Import SpecCreate.
 (* [nx_sext16_inj] -- the halfword-decision cluster B' hoisted out of
    ProofNamex precisely so create could name it. *)
@@ -148,7 +149,7 @@ Lemma cr_setf_clear dn mj mn nl :
 Proof. reflexivity. Qed.
 
 (* THE ALLOCATE ARM'S RECORD, as [cr_setf] over ialloc's claim: this is
-   the identity that ties [SpecCreate.create_made] to the walk, and it is
+   the identity that ties [FsAbsCreateFire.create_made] to the walk, and it is
    the reason [create_made] was worth naming. *)
 Lemma cr_made_setf (ty mj mn : mword 16) :
   cr_setf (ialloc_fresh ty) mj mn (mword_of_int 1 : mword 16)

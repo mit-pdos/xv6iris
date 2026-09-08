@@ -309,7 +309,8 @@ Require Import ProcInv.
 Require Import SpecPrintk.      (* [printk_env], [printk_gen_contract] *)
 Require Import SpecDirlink.     (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import SpecFdalloc.     (* [fd_frees] *)
-Require Import SpecCreate.      (* [create_slots] *)
+Require Import SpecCreate.      (* [create_slots], the create arms and their
+                                   T_FILE readings *)
 Require Import ConsoleInv.      (* [NDEV_max] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -879,6 +880,63 @@ Section SysOpenArms.
     rewrite /open_arms. destruct (om_create vom).
     - apply open_arms_create_landed.
     - apply open_arms_plain_landed.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  create's FAILURE FOLD, READ INTO THIS FILE'S OWN ARMS               *)
+  (*                                                                      *)
+  (*  [SpecCreate.cre_fail_arms] at [T_FILE] IS [open_post_fail_create]'s  *)
+  (*  inner three, arm for arm, and the only thing the fold adds is        *)
+  (*  sys_open's own two commits, which on every one of create's failure   *)
+  (*  arms are still UNFIRED (create returned 0 and sys_open has not yet   *)
+  (*  touched the child).  Stated as a wand taking those two so that the   *)
+  (*  consumer's prover applies it with no case analysis at all.           *)
+  (*                                                                      *)
+  (*  Arm (a) -- a FRESH create that succeeded and an open that failed     *)
+  (*  past it -- is unreachable from the failure fold by construction,     *)
+  (*  because create returning 0 is exactly what that fold is the payout   *)
+  (*  of.  sys_open builds (a) from the [made = true] arm at its OWN later *)
+  (*  failures.  The SUCCESS correspondence is                            *)
+  (*  [SpecCreate.cre_ok_arms_file] and its two projections; nothing of it *)
+  (*  belongs here, since both of open's success disjuncts end in          *)
+  (*  [open_fd_ok], which create never sees.                              *)
+  (* ------------------------------------------------------------------ *)
+  Lemma cre_fail_to_open `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
+      (ma mi : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
+      (pl : list (bv 8)) :
+    cre_fail_arms Γ γfs (bv_unsigned T_FILE) ma mi P Pmiss
+      Φarm Φdots Φun Φok Φex pl -∗
+    aopen_commit_at Γ appE Φo -∗
+    atrunc_commit_at Γ appE Φt -∗
+    open_post_fail_create Γ γfs cw P Pmiss Φarm Φun Φok Φex Φo Φt.
+  Proof.
+    iIntros "Hcf Ho Ht".
+    iDestruct (cre_fail_arms_file with "Hcf") as "Hcf".
+    rewrite /open_post_fail_create.
+    iRight. iExists pl.
+    iDestruct "Hcf" as "[(Hd & Hac & Hdl & Hcl) | Hr]".
+    - iLeft. iFrame "Hd Hac Hdl Ho Ht Hcl".
+    - iRight. iDestruct "Hr" as (d) "(HP & Hac & Hrest & Hcl)".
+      iExists d. iFrame "HP Ht".
+      iDestruct "Hrest" as "[Hfired | Hdl]".
+      + (* (b): the name was there and the observation fired *)
+        iRight. iLeft.
+        iDestruct "Hfired" as (av i nm ents nl) "(%Hl & %Hrow & %Hent & HΦ)".
+        iExists av, i, nm, ents, nl.
+        iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+        iSplitR; [by iPureIntro |].
+        iFrame "HΦ Hac".
+        iSplitL "Hcl"; [iExact "Hcl" |].
+        iLeft. iExact "Ho".
+      + (* (c): nothing observed *)
+        iRight. iRight. iFrame "Hac Hdl Ho Hcl".
   Qed.
 
 End SysOpenArms.

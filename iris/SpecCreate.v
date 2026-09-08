@@ -359,7 +359,12 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ                *)
 Require Import AppInv.           (* [appE]: the commit mask                 *)
 Require Import FsTree.           (* [fname]: the entry names the receipts carry *)
-Require Import FsAbsCreateFire.  (* the legs' commits and receipts          *)
+Require Import PathElems.        (* [path_elems]: the walk's hop names       *)
+Require Import FsAbsCreateFire.  (* the legs' commits and receipts, the type
+                                    literals and [create_made]              *)
+Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix  *)
+Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start    *)
+Require Import FsAbsMknodFire.   (* [mknod_walk_dead_era]: the walk's death  *)
 Require Import FsAbsDefs.        (* LAST (FsAbs's own rule)                 *)
 Import Defs.
 Require Import TsoCtx.
@@ -398,57 +403,17 @@ Definition create_units : nat := MAXOPBLOCKS.
 Lemma create_units_value : create_units = 10%nat.
 Proof. reflexivity. Qed.
 
-(* the two type literals the found arm's tests decide against, as the
-   halfwords the [li a5,2] / [bltu a4,a5] pair compares.  [T_DIR] is
-   SpecDirlookup's. *)
-Definition T_FILE : mword 16 := mword_of_int 2.
-Definition T_DEVICE : mword 16 := mword_of_int 3.
+(* The two type literals ([T_FILE] / [T_DEVICE]) and the record the
+   non-directory allocate arm leaves behind ([create_made]) are
+   [FsAbsCreateFire]'s, re-exported here: the era walk's fires and the
+   mknod vocabulary leaf read them and sit below this contract, which
+   names their walk package in turn. *)
 
-Lemma T_FILE_value : bv_unsigned T_FILE = 2.
-Proof. reflexivity. Qed.
-
-Lemma T_DEVICE_value : bv_unsigned T_DEVICE = 3.
-Proof. reflexivity. Qed.
-
-(* (L5) at the three literal types the three entries pass.  NAMED rather
-   than spliced at each call site: [ireg_ty_ok_w] is a four-way
-   disjunction and an inline [ltac:] would pick its arm before the
-   argument is unified (durable-disk 2b-inode-3). *)
-Lemma T_FILE_ty_ok : InodeRegion.ireg_ty_ok_w T_FILE.
-Proof. right. right. left. reflexivity. Qed.
-
-Lemma T_DEVICE_ty_ok : InodeRegion.ireg_ty_ok_w T_DEVICE.
-Proof. right. right. right. reflexivity. Qed.
-
+(* (L5) at the third literal type the entries pass; its two siblings are
+   [FsAbsCreateFire.T_FILE_ty_ok] / [T_DEVICE_ty_ok], and this one lives
+   here because [SpecDirlookup] is in scope here. *)
 Lemma T_DIR_ty_ok : InodeRegion.ireg_ty_ok_w SpecDirlookup.T_DIR.
 Proof. right. left. reflexivity. Qed.
-
-(* THE RECORD THE NON-DIRECTORY ALLOCATE ARM LEAVES BEHIND: ialloc's
-   claimed record with the three halfword stores at +0x90 / +0x94 / +0x9a
-   applied, and nothing else -- create never touches size or addrs, and
-   on the non-directory arm no dirlink runs on [ip].  Named so that
-   sys_open (S6) and sys_mknod can state their own posts against it.  On
-   the DIRECTORY arm the same three fields hold, but the size is 32 and
-   [addrs !!! 0] is the block the two entries went into, so only the
-   FIELD facts are claimed there. *)
-Definition create_made (ty major minor : mword 16) : dinode :=
-  MkDinode ty major minor (mword_of_int 1 : mword 16) (bv_0 32)
-           (replicate 13 (bv_0 32)).
-
-Lemma create_made_type ty major minor :
-  di_type (create_made ty major minor) = ty.
-Proof. reflexivity. Qed.
-
-Lemma create_made_nlink ty major minor :
-  bv_unsigned (di_nlink (create_made ty major minor)) = 1.
-Proof. reflexivity. Qed.
-
-Lemma create_made_size ty major minor :
-  bv_unsigned (di_size (create_made ty major minor)) = 0.
-Proof. reflexivity. Qed.
-
-Lemma create_made_wf ty major minor : dinode_wf (create_made ty major minor).
-Proof. rewrite /dinode_wf /create_made /=. reflexivity. Qed.
 
 (* NO STANDALONE [icacheG] / [icfg] IN ANY CONTEXT BELOW, and that is
    load-bearing rather than tidy.  [FileInvDefs.fileG] CARRIES both as
@@ -609,43 +574,436 @@ Section CreateSpec.
     iApply (acre_commit_at_gen_unit γfs appE _ cre_appN_appE with "Hai").
   Qed.
 
-  (* ARM C-OK / F-OK, keyed on [made]: a FRESH child had its arm, [its
-     dots -- a directory --] and its parent leg fired, the unarm comes home
-     unfired; a FOUND node moved nothing and every commit comes home. *)
+  (* ARM C-OK / F-OK, keyed on [made].  Both success arms ran nameiparent,
+     so both return the WALK CURSOR at the parent index and tie the name to
+     the path's last element; what differs is which instant fired.  A FRESH
+     child had its arm, [its dots -- a directory --] and its parent leg
+     fired, the unarm and the exists observation come home unfired; a FOUND
+     node moved nothing, so the observation fired and every commit comes
+     home. *)
   Definition cre_ok_arms (Γ : fs_view_names Σ) (tyz ma mi : Z)
+      (P : nat -> Z -> iProp Σ)
       (Φarm : aview -> Z -> iProp Σ)
       (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
       (Φun : aview -> Z -> iProp Σ)
       (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (made : bool) (i : Z) : iProp Σ :=
-    (if made
-     then ∃ (d : Z) (nm : fname),
-       cre_arm_fired Φarm i
-       ∗ (cre_dots_fired Φdots i d true ∨ adots_commit_at Γ appE Φdots)
-       ∗ cre_acre_fired Φok d nm i (cre_child tyz ma mi d i)
-       ∗ aunarm_commit_at Γ appE Φun
-     else cre_commits Γ tyz ma mi Φarm Φdots Φun Φok)%I.
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (pl : list (bv 8)) (made : bool) (i : Z) : iProp Σ :=
+    (∃ (d : Z) (nm : fname),
+       ⌜list_basics.last (path_elems pl) = Some nm⌝
+       ∗ P (length (mknod_parent_elems pl)) d
+       ∗ (if made
+          then cre_arm_fired Φarm i
+               ∗ (cre_dots_fired Φdots i d true ∨ adots_commit_at Γ appE Φdots)
+               ∗ cre_acre_fired Φok d nm i (cre_child tyz ma mi d i)
+               ∗ aunarm_commit_at Γ appE Φun
+               ∗ dlookup_commit_at Γ appE Φex
+          else cre_ex_fired Φex d nm i
+               ∗ cre_commits Γ tyz ma mi Φarm Φdots Φun Φok))%I.
 
-  (* ARMS N / G / F-BAD / A-FAIL: nothing fired; ARM FAIL and mkdir's three
-     [fail:] entries: the PAIR -- the arm fired, [the dots -- both or the
-     first alone -- fired,] the unarm fired, the parent leg comes home *)
-  Definition cre_fail_arms (Γ : fs_view_names Σ) (tyz ma mi : Z)
+  (* ARM N: the walk died before create saw a parent, so the death receipt
+     comes home and every commit is whole.  ARMS G / F-BAD / A-FAIL / FAIL
+     and mkdir's three [fail:] entries: the walk REACHED the parent, so the
+     cursor comes home; the exists observation fired (F-BAD read the name)
+     or comes home; and the child's legs are whole, or the do-then-undo PAIR
+     fired -- the arm, [the dots, both or the first alone,] the unarm -- with
+     the parent leg always coming home. *)
+  Definition cre_fail_arms (Γ : fs_view_names Σ) (γfs : fs_names)
+      (tyz ma mi : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
       (Φarm : aview -> Z -> iProp Σ)
       (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
       (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    (cre_commits Γ tyz ma mi Φarm Φdots Φun Φok
-     ∨ (∃ (i d : Z),
-          cre_arm_fired Φarm i
-          ∗ ((∃ full : bool, cre_dots_fired Φdots i d full)
-             ∨ adots_commit_at Γ appE Φdots)
-          ∗ cre_unarm_fired Φun i
-          ∗ acre_commit_at_gen Γ appE (cre_child tyz ma mi) Φok))%I.
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (pl : list (bv 8)) : iProp Σ :=
+    ((mknod_walk_dead_era γfs P Pmiss pl
+        ∗ dlookup_commit_at Γ appE Φex
+        ∗ cre_commits Γ tyz ma mi Φarm Φdots Φun Φok)
+     ∨ (∃ d : Z,
+          P (length (mknod_parent_elems pl)) d
+          ∗ ((∃ (nm : fname) (i : Z),
+                ⌜list_basics.last (path_elems pl) = Some nm⌝
+                ∗ cre_ex_fired Φex d nm i)
+             ∨ dlookup_commit_at Γ appE Φex)
+          ∗ acre_commit_at_gen Γ appE (cre_child tyz ma mi) Φok
+          ∗ ((aarm_commit_at Γ appE (cre_c0 tyz ma mi) Φarm
+                ∗ adots_commit_at Γ appE Φdots
+                ∗ aunarm_commit_at Γ appE Φun)
+             ∨ (∃ i : Z,
+                  cre_arm_fired Φarm i
+                  ∗ ((∃ full : bool, cre_dots_fired Φdots i d full)
+                     ∨ adots_commit_at Γ appE Φdots)
+                  ∗ cre_unarm_fired Φun i))))%I.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE POST'S PURE SUCCESS READING, AND THE TWO PINNED SPECIALISATIONS *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [ARM C-OK]: this inode was just allocated.  The type is ialloc's, the
+     three halfword stores are create's, and on the NON-directory arm the
+     record is exactly [create_made]; on the directory arm the size is 32
+     and block 0 holds "." and "..".
+     [ARM F-OK]: the name was already there, and the two tests at +0x4c /
+     +0x5c passed -- which is where [ty = T_FILE] comes from, and it is what
+     lets a caller at any OTHER type read [ok = true -> made = true] off the
+     post. *)
+  Definition cre_ok_pure (ty major minor : mword 16) (made : bool)
+      (dn : dinode) : Prop :=
+    if made
+    then di_type dn = ty
+         /\ di_major dn = major
+         /\ di_minor dn = minor
+         /\ bv_unsigned (di_nlink dn) = 1
+         /\ (ty <> SpecDirlookup.T_DIR -> dn = create_made ty major minor)
+    else ty = T_FILE
+         /\ (di_type dn = T_FILE \/ di_type dn = T_DEVICE).
+
+  (* create returns a FRESH inode at every type but [T_FILE]. *)
+  Lemma cre_made_of_ne_file (ty major minor : mword 16) (made : bool)
+      (dn : dinode) :
+    ty <> T_FILE -> cre_ok_pure ty major minor made dn -> made = true.
+  Proof.
+    intros Hne Hp. destruct made; [reflexivity |].
+    destruct Hp as [Hty _]. exfalso. exact (Hne Hty).
+  Qed.
+
+  (* mknod's reading: the device type forces the fresh arm and the record. *)
+  Lemma cre_ok_pure_dev (major minor : mword 16) (made : bool) (dn : dinode) :
+    cre_ok_pure T_DEVICE major minor made dn ->
+    made = true /\ dn = create_made T_DEVICE major minor.
+  Proof.
+    intros Hp.
+    assert (Hm : made = true).
+    { eapply cre_made_of_ne_file; [| exact Hp].
+      intros Hc. by vm_compute in Hc. }
+    subst made. split; [reflexivity |].
+    destruct Hp as (_ & _ & _ & _ & Hrec). apply Hrec.
+    intros Hc. by vm_compute in Hc.
+  Qed.
+
+  (* sys_open's reading: both arms survive, keyed on [made]. *)
+  Lemma cre_ok_pure_file (major minor : mword 16) (made : bool) (dn : dinode) :
+    cre_ok_pure T_FILE major minor made dn ->
+    if made then dn = create_made T_FILE major minor
+    else di_type dn = T_FILE \/ di_type dn = T_DEVICE.
+  Proof.
+    intros Hp. destruct made.
+    - destruct Hp as (_ & _ & _ & _ & Hrec). apply Hrec.
+      intros Hc. by vm_compute in Hc.
+    - exact (proj2 Hp).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE INPUT BUNDLE AT THE TRIVIAL FAMILIES                           *)
+  (* ------------------------------------------------------------------ *)
+
+  (* The whole of what a caller hands create, for a caller that tracks
+     nothing: every hop says yes, every cursor is [True], and each commit
+     is its own unit paid off the parked license.  It sits here rather than
+     in [FsAbsInvFire]'s [fsabs_*] family because [ProofSysMkdir], one of
+     its consumers, is BELOW that file in the cone. *)
+  Lemma cre_start_unit (γfs : fs_names) (cw : Z) (pl : list (bv 8)) :
+    ⊢ ep_start γfs cw (fun _ _ => True%I) (fun _ _ => True%I) pl.
+  Proof. iApply ep_start_triv. Qed.
+
+  Lemma cre_dlookup_unit (Γ : fs_view_names Σ) :
+    ⊢ dlookup_commit_at Γ appE (fun _ _ _ _ => True%I).
+  Proof. iApply dlookup_commit_at_unit. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE BUNDLE, ASSEMBLED AT A PINNED TYPE                              *)
+  (*                                                                      *)
+  (*  A type-pinned caller holds the child's content as a CONSTANT and    *)
+  (*  owes no dots leg -- at a device or a file the [beq s4,a4] at +0xca   *)
+  (*  is never taken, so the dots commit it hands in is its own unit.     *)
+  (*  These two turn what such a caller has into what create asks for.    *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma cre_dots_unit (γfs : fs_names) :
+    app_inv γfs -∗
+    adots_commit_at (fs_gamma_L γfs) appE (fun _ _ _ _ => True%I).
+  Proof.
+    iIntros "#Hai".
+    iApply (adots_commit_at_unit γfs appE cre_appN_appE with "Hai").
+  Qed.
+
+  Lemma cre_commits_of_dev (Γ : fs_view_names Σ) (ma mi : Z)
+      (Φarm Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
+    acre_commit_at Γ appE (ADev ma mi) Φok -∗
+    adots_commit_at Γ appE (fun _ _ _ _ => True%I) -∗
+    cre_child_unfired Γ (ADev ma mi) Φarm Φun -∗
+    cre_commits Γ (bv_unsigned T_DEVICE) ma mi Φarm
+      (fun _ _ _ _ => True%I) Φun Φok.
+  Proof.
+    rewrite /cre_commits /cre_child_unfired (cre_c0_dev ma mi).
+    iIntros "Hac Hd [Ha Hu]". iFrame "Ha Hd Hu".
+    iApply (acre_commit_at_gen_ext Γ appE (fun _ _ => ADev ma mi)
+              (cre_child (bv_unsigned T_DEVICE) ma mi) Φok
+              (fun d i => eq_sym (cre_child_dev ma mi d i)) with "Hac").
+  Qed.
+
+  Lemma cre_commits_of_file (Γ : fs_view_names Σ) (ma mi : Z)
+      (Φarm Φun : aview -> Z -> iProp Σ)
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
+    acre_commit_at Γ appE (AFile []) Φok -∗
+    adots_commit_at Γ appE (fun _ _ _ _ => True%I) -∗
+    cre_child_unfired Γ (AFile []) Φarm Φun -∗
+    cre_commits Γ (bv_unsigned T_FILE) ma mi Φarm
+      (fun _ _ _ _ => True%I) Φun Φok.
+  Proof.
+    rewrite /cre_commits /cre_child_unfired (cre_c0_file ma mi).
+    iIntros "Hac Hd [Ha Hu]". iFrame "Ha Hd Hu".
+    iApply (acre_commit_at_gen_ext Γ appE (fun _ _ => AFile [])
+              (cre_child (bv_unsigned T_FILE) ma mi) Φok
+              (fun d i => eq_sym (cre_child_file ma mi d i)) with "Hac").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE TWO PINNED READINGS OF THE ARMS                                 *)
+  (*                                                                      *)
+  (*  A type-pinned caller does not want the [made] key or the general    *)
+  (*  child index: at [T_DEVICE] the found arm is unreachable and the     *)
+  (*  child is the device; at [T_FILE] both arms live and the child is    *)
+  (*  the empty file.  Each reading is a LEMMA over the one contract, so  *)
+  (*  a drift in the arms breaks a proof rather than a prover.            *)
+  (* ------------------------------------------------------------------ *)
+
+  (* sys_mknod's success payout.  [cre_made_of_ne_file] is what hands the
+     caller the [made = true] this is stated at. *)
+  Lemma cre_ok_arms_dev (Γ : fs_view_names Σ) (ma mi : Z)
+      (P : nat -> Z -> iProp Σ)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (pl : list (bv 8)) (i : Z) :
+    cre_ok_arms Γ (bv_unsigned T_DEVICE) ma mi P Φarm Φdots Φun Φok Φex pl
+      true i ⊢
+      ∃ (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z) (nl : nat),
+        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+        ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
+        P (length (mknod_parent_elems pl)) d ∗
+        dlookup_commit_at Γ appE Φex ∗
+        Φok av d nm i ∗
+        cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun.
+  Proof.
+    rewrite /cre_ok_arms. iIntros "H".
+    iDestruct "H" as (d nm) "(%Hlast & HP & Harm & _ & Hacre & Hun & Hdl)".
+    rewrite /cre_acre_fired.
+    iDestruct "Hacre" as (av ents nl) "(%Hpre & HΦ)".
+    iExists av, d, nm, ents, nl.
+    iSplitR; [by iPureIntro |].
+    iSplitR; [iPureIntro; exact Hpre |].
+    iFrame "HP Hdl HΦ Harm Hun".
+  Qed.
+
+  (* ...and its failure fold. *)
+  Lemma cre_fail_arms_dev (Γ : fs_view_names Σ) (γfs : fs_names) (ma mi : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (pl : list (bv 8)) :
+    cre_fail_arms Γ γfs (bv_unsigned T_DEVICE) ma mi P Pmiss
+      Φarm Φdots Φun Φok Φex pl ⊢
+      ((mknod_walk_dead_era γfs P Pmiss pl
+          ∗ acre_commit_at Γ appE (ADev ma mi) Φok
+          ∗ dlookup_commit_at Γ appE Φex
+          ∗ cre_child_unfired Γ (ADev ma mi) Φarm Φun)
+       ∨ (∃ d : Z,
+            P (length (mknod_parent_elems pl)) d
+            ∗ acre_commit_at Γ appE (ADev ma mi) Φok
+            ∗ ((∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
+                  (nl : nat),
+                  ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                  ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
+                  ⌜ents !! nm = Some i⌝ ∗
+                  Φex av d nm i)
+               ∨ dlookup_commit_at Γ appE Φex)
+            ∗ (cre_child_unfired Γ (ADev ma mi) Φarm Φun
+               ∨ ∃ i : Z, cre_child_pair Φarm Φun i))).
+  Proof.
+    rewrite /cre_fail_arms /cre_commits /cre_child_unfired /cre_child_pair.
+    iIntros "[(Hd & Hdl & Harm & _ & Hun & Hac) | Hr]".
+    - iLeft. iFrame "Hd Hdl". iSplitL "Hac"; [iExact "Hac" |].
+      iSplitL "Harm"; [iExact "Harm" | iExact "Hun"].
+    - iRight. iDestruct "Hr" as (d) "(HP & Hex & Hac & Hlegs)".
+      iExists d. iFrame "HP". iSplitL "Hac"; [iExact "Hac" |].
+      iSplitL "Hex".
+      { iDestruct "Hex" as "[Hf | Hdl]"; [| by iRight].
+        iLeft. iDestruct "Hf" as (nm i) "(%Hlast & Hf)".
+        rewrite /cre_ex_fired. iDestruct "Hf" as (av ents nl) "(%Hrow & %Hent & HΦ)".
+        iExists av, i, nm, ents, nl.
+        iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+        iSplitR; [by iPureIntro |]. iExact "HΦ". }
+      iDestruct "Hlegs" as "[(Ha & _ & Hu) | Hpair]".
+      + iLeft. iSplitL "Ha"; [iExact "Ha" | iExact "Hu"].
+      + iRight. iDestruct "Hpair" as (i) "(Ha & _ & Hu)".
+        iExists i. iFrame "Ha Hu".
+  Qed.
+
+  (* sys_open's O_CREATE success payout: both arms survive the pin, keyed on
+     [made], with the cursor and the name tie SHARED (both ran
+     nameiparent). *)
+  Lemma cre_ok_arms_file (Γ : fs_view_names Σ) (ma mi : Z)
+      (P : nat -> Z -> iProp Σ)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (pl : list (bv 8)) (made : bool) (i : Z) :
+    cre_ok_arms Γ (bv_unsigned T_FILE) ma mi P Φarm Φdots Φun Φok Φex pl
+      made i ⊢
+      ∃ (d : Z) (nm : fname),
+        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+        P (length (mknod_parent_elems pl)) d ∗
+        ((∃ (av : aview) (ents : gmap fname Z) (nl : nat),
+            ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
+            Φok av d nm i ∗
+            dlookup_commit_at Γ appE Φex ∗
+            cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun)
+         ∨ (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
+            ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
+            ⌜ents !! nm = Some i⌝ ∗
+            Φex av d nm i ∗
+            acre_commit_at Γ appE (AFile []) Φok ∗
+            cre_child_unfired Γ (AFile []) Φarm Φun)).
+  Proof.
+    rewrite /cre_ok_arms /cre_commits /cre_child_unfired. iIntros "H".
+    iDestruct "H" as (d nm) "(%Hlast & HP & Hrest)".
+    iExists d, nm. iSplitR; [by iPureIntro |]. iFrame "HP".
+    destruct made.
+    - iDestruct "Hrest" as "(Harm & _ & Hacre & Hun & Hdl)".
+      rewrite /cre_acre_fired.
+      iDestruct "Hacre" as (av ents nl) "(%Hpre & HΦ)".
+      iLeft. iExists av, ents, nl.
+      iSplitR; [iPureIntro; exact Hpre |]. iFrame "HΦ Hdl Harm Hun".
+    - iDestruct "Hrest" as "(Hex & Ha & _ & Hu & Hac)".
+      rewrite /cre_ex_fired.
+      iDestruct "Hex" as (av ents nl) "(%Hrow & %Hent & HΦ)".
+      iRight. iExists av, ents, nl.
+      iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+      iSplitL "HΦ"; [iExact "HΦ" |].
+      iSplitL "Hac"; [iExact "Hac" |].
+      iSplitL "Ha"; [iExact "Ha" | iExact "Hu"].
+  Qed.
+
+  (* ...and the two PROJECTIONS sys_open's prover takes, so it destructs
+     [made] once and frames. *)
+  Lemma cre_ok_file_fresh (Γ : fs_view_names Σ) (ma mi : Z)
+      (P : nat -> Z -> iProp Σ)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (pl : list (bv 8)) (i : Z) :
+    cre_ok_arms Γ (bv_unsigned T_FILE) ma mi P Φarm Φdots Φun Φok Φex pl
+      true i ⊢
+      ∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
+        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+        ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
+        P (length (mknod_parent_elems pl)) d ∗
+        Φok av d nm i ∗
+        dlookup_commit_at Γ appE Φex ∗
+        cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun.
+  Proof.
+    rewrite /cre_ok_arms /cre_acre_fired. iIntros "H".
+    iDestruct "H" as (d nm) "(%Hl & HP & Ha & _ & Hac & Hu & Hdl)".
+    iDestruct "Hac" as (av ents nl) "(%Hpre & HΦ)".
+    rewrite (cre_child_file ma mi d i) in Hpre.
+    iExists d, nm, av, ents, nl.
+    iSplitR; [by iPureIntro |]. iSplitR; [iPureIntro; exact Hpre |].
+    iFrame "HP HΦ Hdl Ha Hu".
+  Qed.
+
+  Lemma cre_ok_file_exists (Γ : fs_view_names Σ) (ma mi : Z)
+      (P : nat -> Z -> iProp Σ)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (pl : list (bv 8)) (i : Z) :
+    cre_ok_arms Γ (bv_unsigned T_FILE) ma mi P Φarm Φdots Φun Φok Φex pl
+      false i ⊢
+      ∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
+        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+        ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
+        ⌜ents !! nm = Some i⌝ ∗
+        P (length (mknod_parent_elems pl)) d ∗
+        Φex av d nm i ∗
+        acre_commit_at Γ appE (AFile []) Φok ∗
+        cre_child_unfired Γ (AFile []) Φarm Φun.
+  Proof.
+    rewrite /cre_ok_arms /cre_ex_fired /cre_commits /cre_child_unfired
+            (cre_c0_file ma mi).
+    iIntros "H".
+    iDestruct "H" as (d nm) "(%Hl & HP & Hex & Ha & _ & Hu & Hac)".
+    iDestruct "Hex" as (av ents nl) "(%Hrow & %Hent & HΦ)".
+    iExists d, nm, av, ents, nl.
+    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+    iSplitR; [by iPureIntro |].
+    iSplitL "HP"; [iExact "HP" |]. iSplitL "HΦ"; [iExact "HΦ" |].
+    iSplitL "Hac".
+    { rewrite /acre_commit_at.
+      iApply (acre_commit_at_gen_ext Γ appE
+                (cre_child (bv_unsigned T_FILE) ma mi) (fun _ _ => AFile [])
+                Φok (fun d0 i0 => cre_child_file ma mi d0 i0) with "Hac"). }
+    iSplitL "Ha"; [iExact "Ha" | iExact "Hu"].
+  Qed.
+
+  (* ...and its failure fold, which sys_open folds into its own create arms. *)
+  Lemma cre_fail_arms_file (Γ : fs_view_names Σ) (γfs : fs_names) (ma mi : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm : aview -> Z -> iProp Σ)
+      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+      (Φun : aview -> Z -> iProp Σ)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (pl : list (bv 8)) :
+    cre_fail_arms Γ γfs (bv_unsigned T_FILE) ma mi P Pmiss
+      Φarm Φdots Φun Φok Φex pl ⊢
+      ((mknod_walk_dead_era γfs P Pmiss pl
+          ∗ acre_commit_at Γ appE (AFile []) Φok
+          ∗ dlookup_commit_at Γ appE Φex
+          ∗ cre_child_unfired Γ (AFile []) Φarm Φun)
+       ∨ (∃ d : Z,
+            P (length (mknod_parent_elems pl)) d
+            ∗ acre_commit_at Γ appE (AFile []) Φok
+            ∗ ((∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
+                  (nl : nat),
+                  ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                  ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
+                  ⌜ents !! nm = Some i⌝ ∗
+                  Φex av d nm i)
+               ∨ dlookup_commit_at Γ appE Φex)
+            ∗ (cre_child_unfired Γ (AFile []) Φarm Φun
+               ∨ ∃ i : Z, cre_child_pair Φarm Φun i))).
+  Proof.
+    rewrite /cre_fail_arms /cre_commits /cre_child_unfired /cre_child_pair.
+    iIntros "[(Hd & Hdl & Harm & _ & Hun & Hac) | Hr]".
+    - iLeft. iFrame "Hd Hdl". iSplitL "Hac"; [iExact "Hac" |].
+      iSplitL "Harm"; [iExact "Harm" | iExact "Hun"].
+    - iRight. iDestruct "Hr" as (d) "(HP & Hex & Hac & Hlegs)".
+      iExists d. iFrame "HP". iSplitL "Hac"; [iExact "Hac" |].
+      iSplitL "Hex".
+      { iDestruct "Hex" as "[Hf | Hdl]"; [| by iRight].
+        iLeft. iDestruct "Hf" as (nm i) "(%Hlast & Hf)".
+        rewrite /cre_ex_fired. iDestruct "Hf" as (av ents nl) "(%Hrow & %Hent & HΦ)".
+        iExists av, i, nm, ents, nl.
+        iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+        iSplitR; [by iPureIntro |]. iExact "HΦ". }
+      iDestruct "Hlegs" as "[(Ha & _ & Hu) | Hpair]".
+      + iLeft. iSplitL "Ha"; [iExact "Ha" | iExact "Hu"].
+      + iRight. iDestruct "Hpair" as (i) "(Ha & _ & Hu)".
+        iExists i. iFrame "Ha Hu".
+  Qed.
 End CreateSpec.
 
-(* the two arm bodies are disjunctions with existentials inside: sealed, as
-   [SpecCreateAU.cau_ok]/[cau_fail] are, so an [iFrame] at syscall altitude
-   does not search through them *)
+(* the two arm bodies are disjunctions with existentials inside, over a
+   walk family: sealed, so an [iFrame] at syscall altitude does not search
+   through them *)
 Global Typeclasses Opaque cre_ok_arms cre_fail_arms.
 
 Definition wp_create_sconf_body
@@ -663,11 +1021,14 @@ Definition wp_create_sconf_body
     (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
-    (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C): the receipts ---- *)
+    (* ---- THE APPLICATION'S SIDE: the walk's cursor pair, the four legs'
+       receipts and the exists observation's ---- *)
+    (P Pmiss : nat -> Z -> iProp Σ)
     (Φarm : aview -> Z -> iProp Σ)
     (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
     (Φun : aview -> Z -> iProp Σ)
-    (Φok : aview -> Z -> fname -> Z -> iProp Σ) :=
+    (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+    (Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.create in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -788,8 +1149,21 @@ Definition wp_create_sconf_body
      THE TOKEN COMES BACK ON EVERY ARM: create's caller ends the operation,
      and end_op takes the whole [LogInv.log_op]. *)
   log_tx icfg_log -∗
-  (* ---- THE APPLICATION'S SIDE: the four commits create's legs fire
-     (round E2, lane E2-C), at the child's type-indexed content ---- *)
+  (* ---- THE APPLICATION'S SIDE ----
+     THE WALK: the PARENT-PREFIX one-shot at create's own path buffer
+     ([FsAbsEra.ep_start]).  The syscall hands its [mknod_walk_pre_era]
+     straight down ([FsAbsMknodFire.np_start_of_mknod]) and the START INUM
+     is decided inside the walk: ROOTINO on an absolute fetch, the calling
+     process's [pv_cwi] on a relative one.  The hop family is over the
+     PARENT PREFIX, which is [SpecSysMknodAU.mknod_parent_elems]
+     definitionally.
+     THE EXISTS OBSERVATION: fired at create's own [dirlookup] when the name
+     is already in the parent's entry map, and refunded on every arm that
+     does not read it.
+     THE FOUR COMMITS create's legs fire (round E2, lane E2-C), at the
+     child's type-indexed content. *)
+  ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss pl -∗
+  dlookup_commit_at Γfs appE Φex -∗
   cre_commits Γfs tyz ma mi Φarm Φdots Φun Φok -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: create parks (ilock,
      bread, the whole fs cone), and a park moves the hart with interrupts
@@ -846,30 +1220,19 @@ Definition wp_create_sconf_body
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ientry k
           /\ (k < NINODE)%nat
           /\ 0 < bv_unsigned inum < 16 * Z.of_nat icfg_nib
-          /\ (if made
-              then (* [ARM C-OK]: this inode was just allocated.  The type
-                      is ialloc's, the three halfword stores are create's,
-                      and on the NON-directory arm the record is exactly
-                      [create_made]; on the directory arm the size is 32
-                      and block 0 holds "." and "..". *)
-                di_type dn = ty
-                /\ di_major dn = major
-                /\ di_minor dn = minor
-                /\ bv_unsigned (di_nlink dn) = 1
-                /\ (ty <> T_DIR -> dn = create_made ty major minor)
-              else (* [ARM F-OK]: the name was already there, and the two
-                      tests at +0x4c / +0x5c passed. *)
-                ty = T_FILE
-                /\ (di_type dn = T_FILE \/ di_type dn = T_DEVICE))⌝ ∗
+          /\ cre_ok_pure ty major minor made dn⌝ ∗
          create_locked pidv k qi s g inum dn bm ∗
-         (* ...and the legs' receipts (round E2, lane E2-C) *)
-         cre_ok_arms Γfs tyz ma mi Φarm Φdots Φun Φok made (bv_unsigned inum)
+         (* ...the walk cursor, the legs' receipts and the observation *)
+         cre_ok_arms Γfs tyz ma mi P Φarm Φdots Φun Φok Φex pl made
+           (bv_unsigned inum)
        else (* ARMS N / F-BAD / A-FAIL / FAIL: a0 = 0 and create holds
                nothing -- every inode it touched has been iunlockput. *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
           = (mword_of_int 0 : mword 64)⌝ ∗ log_tx icfg_log ∗
-         (* nothing fired, or the do-then-undo pair (ruling Q-h) *)
-         cre_fail_arms Γfs tyz ma mi Φarm Φdots Φun Φok) -∗
+         (* the walk died, or the cursor comes home with the observation
+            fired or not and the legs whole or the do-then-undo pair
+            (ruling Q-h) *)
+         cre_fail_arms Γfs fsc_fs tyz ma mi P Pmiss Φarm Φdots Φun Φok Φex pl) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -888,13 +1251,15 @@ Module Type CREATE.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
+      (P Pmiss : nat -> Z -> iProp Σ)
       (Φarm : aview -> Z -> iProp Σ)
       (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
       (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ),
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ),
       wp_create_sconf_body γs j γl pd pav pu
  γf
  plen pfun ty major minor
                            U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
-                           Φarm Φdots Φun Φok.
+                           P Pmiss Φarm Φdots Φun Φok Φex.
 End CREATE.

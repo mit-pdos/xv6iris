@@ -55,7 +55,7 @@
    record is [<[nm := i]>] of the old one -- is ALREADY LANDED as
    [FsStateEra.dir_entries_dirlink_ins], so this lemma takes that equation
    as a premise and does the [abs_of] arithmetic around it.
-   [mkf_child_dev] is item 4's abstract half ([SpecCreate.create_made]
+   [mkf_child_dev] is item 4's abstract half ([FsAbsCreateFire.create_made]
    read through [abs_of]) and [mkf_low16_mod] / [mkf_dev_arg] are its
    bit-level half: the low halfword of the [argint]'d word, read unsigned,
    IS [SpecSysMknodAU.dev_arg].
@@ -124,7 +124,6 @@ Require Import ProcAvail.        (* [pavG]                                  *)
 Require Import FsStateEra.       (* [era_node], [era_node_rec]              *)
 Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]     *)
 Require Import Xv6G.
-Require Import SpecCreate.       (* [create_made], [T_DEVICE]               *)
 Require Import SpecSysMknodAU.   (* [dev_arg], [mknod_parent_elems]         *)
 Require Export FsAbsCreateFire.  (* the commits ([acre_commit_at], [dlookup_commit_at], the legs' -- moved there in round E2 so SpecCreate can name them), their units and seeds, [mkf_auth_nview] *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
@@ -514,7 +513,7 @@ Global Typeclasses Opaque mknod_walk_pre_era mknod_walk_dead_era.
        the path has no elements at all (case (2)).  So the honest
        statement is a DISJUNCTION: either the predicate above, or the
        cursor at the parent index -- and the second alternative is exactly
-       what [SpecCreateAU.cau_fail]'s walk-death arm carries, which a
+       what [SpecCreate.cre_fail_arms]'s walk-death arm carries, which a
        create that never got to dirlink refunds anyway.  So mknod's post is
        dischargeable as it stands; what is NOT true is that
        [mknod_walk_dead_era] alone covers the walk's failures. *)
@@ -646,7 +645,7 @@ Require Import TsoCtx.
      [caf_acre_fire]            -- [mkf_acre_fire] at any non-[ADir] [c]
 
    and [caf_child_file] is the [T_FILE] instance of the minted child's row
-   ([FsAbsMknodFire.mkf_child_dev]'s twin): [SpecCreate.create_made T_FILE
+   ([FsAbsMknodFire.mkf_child_dev]'s twin): [FsAbsCreateFire.create_made T_FILE
    major minor] reads as [AFile []] at nlink 1, because that record's size
    is zero and [fn_file_bytes] of a zero-size node is [file_bytes _ 0 = []]
    -- the same arithmetic [FsAbsOpenFire.opf_trunc_bytes] does at itrunc's
@@ -847,7 +846,7 @@ Section CreateFire.
               Habsc with "Hi Hai Hcm Hfp Hfc").
   Qed.
 
-  (* THE MINTED CHILD'S ROW AT ANY TYPE: [SpecCreate.create_made] at a
+  (* THE MINTED CHILD'S ROW AT ANY TYPE: [FsAbsCreateFire.create_made] at a
      nonzero type reads as [cre_c0] of the type and the two halfwords --
      the row the general create's ARM fires at ([FsAbsCreateFire.cre_c0]). *)
   Lemma caf_made_row_node (n : fs_node) (ty major minor : mword 16) :

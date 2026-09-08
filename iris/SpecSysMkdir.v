@@ -156,9 +156,14 @@ Require Import SpecPrintk.      (* [printk_env], [printk_gen_contract] *)
 Require Import SpecDirlink.     (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import SpecDirlookup.   (* [T_DIR]: the type mkdir's create is at *)
 Require Import SpecCreate.      (* [create_slots], [create_units], [K_create],
-                                   and (round E2, lane E2-C) the create
-                                   bundle [cre_commits] with the two receipt
-                                   arms [cre_ok_arms]/[cre_fail_arms] *)
+                                   the create bundle [cre_commits] with the
+                                   two receipt arms [cre_ok_arms] /
+                                   [cre_fail_arms], and their units *)
+Require Import FsBlocks.        (* [fs_names] *)
+Require Import AppInv.          (* [appE], [app_inv] *)
+Require Import PathElems.       (* [path_elems] *)
+Require Import FsAbsEra.        (* [ep_start_triv] *)
+Require Import FsAbsMknodFire.  (* [mknod_walk_pre_era], the walk premise *)
 Require Import FsTree.          (* [fname]: the parent-leg receipt's name *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
 Require Import FsAbsDefs.       (* [aview]: the receipts' view argument *)
@@ -196,30 +201,88 @@ End SpecSysMkdir.
    -- argstr failed, or create's walk/guards refused before the claim -- or
    the do-then-undo PAIR (ruling Q-h): the row appeared and disappeared.
    mkdir's create is at [T_DIR] with both device halfwords zero, which is
-   what pins the type index of the two arms. *)
-Definition mkdir_arms
+   what pins the type index of the two arms.
+
+   THE FAMILIES ARE THE CALLER'S, as they are for sys_mknod: the walk's
+   cursor pair and the exists observation come in beside the four legs and
+   the arms report them, so the AU form IS the contract and nothing here is
+   pinned at [True].  The FETCHED STRING stays existential in the arms --
+   argstr picks it, not the caller. *)
+
+(* everything the caller hands in, at the commit mask [appE].  mkdir's
+   create is at [T_DIR] with both device halfwords zero, which is what pins
+   the type index of the bundle and of the two arms below. *)
+Definition mkdir_au_pre
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    (Γ : fs_view_names Σ) (γfs : fs_names) (cw : Z)
+    (P Pmiss : nat -> Z -> iProp Σ)
     (Φarm : aview -> Z -> iProp Σ)
     (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
     (Φun : aview -> Z -> iProp Σ)
     (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+    (Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+  (mknod_walk_pre_era γfs cw P Pmiss
+   ∗ dlookup_commit_at Γ appE Φex
+   ∗ cre_commits Γ
+       (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
+       (bv_unsigned (mword_of_int 0 : mword 16))
+       (bv_unsigned (mword_of_int 0 : mword 16))
+       Φarm Φdots Φun Φok)%I.
+
+(* SATISFIABILITY, and what the dispatcher and the friendly packaging hand
+   down: the generic application asks nothing of mkdir's walk or its legs,
+   so every hop says yes, every cursor is [True] and every commit is its own
+   unit, paid off the parked license.  It sits here rather than in
+   [FsAbsInvFire]'s [fsabs_*] family because both consumers reach this file
+   and only one of them reaches that one. *)
+Lemma mkdir_au_pre_unit
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    (γfs : fs_names) (cw : Z) :
+  app_inv γfs -∗
+  mkdir_au_pre (fs_gamma_L γfs) γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
+    (fun _ _ => True%I) (fun _ _ _ _ => True%I) (fun _ _ => True%I)
+    (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I).
+Proof.
+  iIntros "#Hai". rewrite /mkdir_au_pre.
+  iSplitR.
+  { rewrite /mknod_walk_pre_era. iIntros (pl r) "_". iModIntro.
+    iSplit; [done |]. iApply ax_hops_triv. }
+  iSplitR; [iApply cre_dlookup_unit |].
+  iApply (cre_commits_unit γfs with "Hai").
+Qed.
+
+Definition mkdir_arms
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    (Γ : fs_view_names Σ) (γfs : fs_names) (cw : Z)
+    (P Pmiss : nat -> Z -> iProp Σ)
+    (Φarm : aview -> Z -> iProp Σ)
+    (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
+    (Φun : aview -> Z -> iProp Σ)
+    (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+    (Φex : aview -> Z -> fname -> Z -> iProp Σ)
     (r : mword 64) : iProp Σ :=
   ((⌜r = (zero_reg : mword 64)⌝ ∗
-      ∃ i : Z,
-        cre_ok_arms (fs_gamma_L fsc_fs)
+      ∃ (pl : list (bv 8)) (i : Z),
+        cre_ok_arms Γ
           (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
           (bv_unsigned (mword_of_int 0 : mword 16))
           (bv_unsigned (mword_of_int 0 : mword 16))
-          Φarm Φdots Φun Φok true i)
+          P Φarm Φdots Φun Φok Φex pl true i)
    ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
-        cre_fail_arms (fs_gamma_L fsc_fs)
-          (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
-          (bv_unsigned (mword_of_int 0 : mword 16))
-          (bv_unsigned (mword_of_int 0 : mword 16))
-          Φarm Φdots Φun Φok))%I.
+        (* argstr failed and create never ran, so the WHOLE bundle comes
+           back; or create refused and its own failure fold is the payout *)
+        (mkdir_au_pre Γ γfs cw P Pmiss Φarm Φdots Φun Φok Φex
+         ∨ ∃ pl : list (bv 8),
+             cre_fail_arms Γ γfs
+               (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
+               (bv_unsigned (mword_of_int 0 : mword 16))
+               (bv_unsigned (mword_of_int 0 : mword 16))
+               P Pmiss Φarm Φdots Φun Φok Φex pl)))%I.
 
-Global Typeclasses Opaque mkdir_arms.
+Global Typeclasses Opaque mkdir_au_pre mkdir_arms.
 
 Definition wp_sys_mkdir_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -234,11 +297,13 @@ Definition wp_sys_mkdir_sconf_body
     (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
-    (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+    (* ---- THE APPLICATION'S SIDE ---- *)
+    (P Pmiss : nat -> Z -> iProp Σ)
     (Φarm : aview -> Z -> iProp Σ)
     (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
     (Φun : aview -> Z -> iProp Σ)
-    (Φok : aview -> Z -> fname -> Z -> iProp Σ) :=
+    (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+    (Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_mkdir in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -319,13 +384,11 @@ Definition wp_sys_mkdir_sconf_body
   (* ---- the process, whole, and the reference allowance ---- *)
   iref_slots ns -∗
   proc_priv γf pj pid U -∗
-  (* ---- THE APPLICATION'S SIDE: the four commits create's legs fire
-     (round E2, lane E2-C), at mkdir's own type index ---- *)
-  cre_commits (fs_gamma_L fsc_fs)
-    (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
-    (bv_unsigned (mword_of_int 0 : mword 16))
-    (bv_unsigned (mword_of_int 0 : mword 16))
-    Φarm Φdots Φun Φok -∗
+  (* ---- THE APPLICATION'S SIDE: the walk's cursor pair, the exists
+     observation and the four commits create's legs fire, at mkdir's own
+     type index ---- *)
+  mkdir_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+    P Pmiss Φarm Φdots Φun Φok Φex -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_mkdir sleeps (begin_op,
      argstr's fault path, create and end_op all park), so it can return on
      another hart whatever SIE was doing. *)
@@ -366,7 +429,8 @@ Definition wp_sys_mkdir_sconf_body
       proc_priv γf pj pid (us_upt U P') -∗
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       (* ...and the legs' receipts, keyed on that answer *)
-      mkdir_arms Φarm Φdots Φun Φok
+      mkdir_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+        P Pmiss Φarm Φdots Φun Φok Φex
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -383,12 +447,15 @@ Module Type SYSMKDIR.
       (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
+      (P Pmiss : nat -> Z -> iProp Σ)
       (Φarm : aview -> Z -> iProp Σ)
       (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
       (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ),
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ),
       wp_sys_mkdir_sconf_body γf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v
-                              pid U m K eb b lks Φarm Φdots Φun Φok.
+                              pid U m K eb b lks
+                              P Pmiss Φarm Φdots Φun Φok Φex.
 End SYSMKDIR.

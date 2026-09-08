@@ -978,4 +978,30 @@ Section FsAbsStart.
     iModIntro. iFrame.
   Qed.
 
+  (* =================================================================== *)
+  (*  3.  THE TRIVIAL FAMILIES                                            *)
+  (* =================================================================== *)
+
+  (* Every hop says yes and every cursor is [True]: what a caller that
+     tracks nothing about the walk hands in.  [FsAbsInvFire]'s dischargers
+     and [SpecCreate]'s bundle unit are both this lemma, and the create
+     contract sits BELOW that file, which is why it lives here beside the
+     definitions rather than there. *)
+  Lemma ax_hops_triv (F : Z -> dfrac -> gmap fname Z -> iProp Σ)
+      (ps : list fname) (n : nat) :
+    ⊢ ax_hops_from F (fun _ _ => True%I) (fun _ _ => True%I) ps n.
+  Proof.
+    rewrite /ax_hops_from. iApply big_sepL_intro.
+    iIntros "!>" (j s _). rewrite /ax_hop.
+    iIntros (d ents dqv) "_ Hl". iModIntro. iFrame "Hl".
+    by destruct (ents !! s).
+  Qed.
+
+  Lemma ep_start_triv (γfs : fs_names) (cw : Z) (pl : list (bv 8)) :
+    ⊢ ep_start γfs cw (fun _ _ => True%I) (fun _ _ => True%I) pl.
+  Proof.
+    rewrite /ep_start. iIntros (r) "_". iModIntro.
+    iSplit; [done |]. rewrite /ep_hops_from. iApply ax_hops_triv.
+  Qed.
+
 End FsAbsStart.

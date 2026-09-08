@@ -117,6 +117,11 @@ Require Import SpecEndOp.
 Require Import SpecIunlockput.
 Require Import SpecDirlookup.
 Require Import SpecCreate.
+Require Import DirentEnc.        (* [bview]                               *)
+Require Import PathElems.        (* [path_elems]                          *)
+Require Import SpecSysMknodAU.   (* [mknod_parent_elems]                  *)
+Require Import FsAbsEra.         (* [ep_start]                            *)
+Require Import FsAbsMknodFire.   (* [np_start_of_mknod], the walk premise *)
 Require Import CodeSysMkdir.
 Require Import SpecSysMkdir.
 Require Import FsTree.          (* [fname]: the parent-leg receipt's name *)
@@ -759,15 +764,18 @@ Section ProofSysMkdirBody.
       (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (* ---- THE APPLICATION'S SIDE ---- *)
+      (P Pmiss : nat -> Z -> iProp Σ)
       (Φarm : aview -> Z -> iProp Σ)
       (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
       (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ) :
     wp_sys_mkdir_sconf_body gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v
-                            pid U m K eb b lks Φarm Φdots Φun Φok.
+                            pid U m K eb b lks
+                            P Pmiss Φarm Φdots Φun Φok Φex.
   Proof.
     cbv beta delta [wp_sys_mkdir_sconf_body].
     intros pcE pj ret_tgt HK HdevR Hnib0 Hgeom
@@ -778,7 +786,10 @@ Section ProofSysMkdirBody.
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpre #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
              #Hireg #Hiopen Hsbn Hsbi Hsbs Hsbb #Hbmres #Hkenv #Hprocs Hir
-             Hpriv Hcre Hcont".
+             Hpriv Hpre0 Hcont".
+    (* the bundle, in the three pieces create's own contract takes *)
+    iEval (rewrite /mkdir_au_pre) in "Hpre0".
+    iDestruct "Hpre0" as "(Hwp & Hdlkc & Hcre)".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
@@ -1189,13 +1200,19 @@ Section ProofSysMkdirBody.
       iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
       iDestruct (cpu_own_transport CID11 CID17 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
+      (* THE ONE-SHOT, HANDED DOWN UNFIRED: [ep_start] at the string this
+         call fetched IS [mknod_walk_pre_era] at that string, so nothing is
+         fired here -- the WALK picks the start inum (ROOTINO, or the cwd's)
+         and fires it there. *)
+      iDestruct (np_start_of_mknod fsc_fs (pv_cwi (us_V U)) P Pmiss (bview pk bf)
+                   with "Hwp") as "Htr".
       iApply (Create.wp_create_sconf (CID := CID17) gs j gl pd pav pu
  gf
  pk bf
                 SpecDirlookup.T_DIR (mword_of_int 0) (mword_of_int 0)
                 (upd_usM (us_upt U P') _) MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
                 N4 (K - 18)%nat eb b lks
-                Φarm Φdots Φun Φok
+                P Pmiss Φarm Φdots Φun Φok Φex
                 ltac:(lia) HdevR Hnib0 Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
                 (md_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush md_tdir_nz SpecCreate.T_DIR_ty_ok Hpkc
@@ -1205,7 +1222,7 @@ Section ProofSysMkdirBody.
                       Hitab Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs
                       Hsbb
                       Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS Htx
-                      Hcre").
+                      Htr Hdlkc Hcre").
       { iEval (rewrite HN4a0). iExact "Hbufk". }
       iIntros (CID18 Hq18 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
         "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
@@ -1232,7 +1249,7 @@ Section ProofSysMkdirBody.
         { destruct made; [reflexivity | exfalso].
           destruct Hmk as (Hft & _).
           assert (Hz : bv_unsigned (SpecDirlookup.T_DIR : mword 16) = 2)
-            by (rewrite Hft; exact SpecCreate.T_FILE_value).
+            by (rewrite Hft; exact FsAbsCreateFire.T_FILE_value).
           vm_compute in Hz. discriminate Hz. }
         subst made.
         assert (Hipnz : ientry kk <> (zero_reg : mword 64))
@@ -1417,7 +1434,7 @@ Section ProofSysMkdirBody.
         { (* the legs' receipts at a zero return: the directory was MADE *)
           rewrite /mkdir_arms. iLeft.
           iSplitR; [iPureIntro; rewrite Ha0f; exact HP2a0 |].
-          iExists (bv_unsigned inum). iExact "Harms". }
+          iExists (bview pk bf), (bv_unsigned inum). iExact "Harms". }
       + (* ---------- ARM B: create returned 0 ---------- *)
         iDestruct "Hok" as "[%Hcrz [Htx Harms]]".
         iApply (wp_cbeqz_taken_s_sconf (CID := CID18) (mword_of_int (MD + 0x2c))
@@ -1464,9 +1481,11 @@ Section ProofSysMkdirBody.
         { rewrite Heb /cpu_claim_ext. done. }
         { cbn in Hns1. exact Hns1. }
         { rewrite /sys_mkdir_ret. right. exact Ha0f. }
-        { (* create refused: nothing fired, or the do-then-undo PAIR *)
+        { (* create refused: the walk died, or the cursor comes home with
+             nothing fired or the do-then-undo PAIR *)
           rewrite /mkdir_arms. iRight.
-          iSplitR; [iPureIntro; exact Ha0f |]. iExact "Harms". }
+          iSplitR; [iPureIntro; exact Ha0f |].
+          iRight. iExists (bview pk bf). iExact "Harms". }
     - (* ================= ARM A: argstr returned -1 =================
          The [bltz] is TAKEN, straight to the shared "-1" tail at +0x40. *)
       iApply (wp_blt_x0_taken_s_sconf (CID := CID11) (mword_of_int (MD + 0x1a))
@@ -1490,7 +1509,7 @@ Section ProofSysMkdirBody.
                 ltac:(reflexivity) Hassp Hasthr Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hbuf
-                      [Hpback Hbsl Hsbn Hsbi Hsbs Hsbb Hir Hcre Hcont]").
+                      [Hpback Hbsl Hsbn Hsbi Hsbs Hsbb Hir Hwp Hdlkc Hcre Hcont]").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
@@ -1499,17 +1518,17 @@ Section ProofSysMkdirBody.
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf ns P' with "[%] [%] Hcg Hown
                 [] [] Hpc Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hir Hpriv [%]
-                [Hcre]").
+                [Hwp Hdlkc Hcre]").
       { exact Hcsf. }
       { exact Hupt. }
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { reflexivity. }
       { rewrite /sys_mkdir_ret. right. exact Ha0f. }
-      { (* argstr failed: create never ran, so the four commits come home *)
+      { (* argstr failed: create never ran, so the WHOLE bundle comes home *)
         rewrite /mkdir_arms. iRight.
         iSplitR; [iPureIntro; exact Ha0f |].
-        rewrite /cre_fail_arms. iLeft. iExact "Hcre". }
+        iLeft. rewrite /mkdir_au_pre. iFrame "Hwp Hdlkc Hcre". }
   Qed.
 
 End ProofSysMkdirBody.

@@ -128,6 +128,8 @@ Require Import SpecBeginOp.
 Require Import SpecEndOp.
 Require Import SpecIunlockput.
 Require Import SpecArgint.
+Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ            *)
+Require Import AppInv.           (* [appE]: the commit mask             *)
 Require Import SpecCreate.
 Require Import CodeSysMknod.
 Require Import SpecSysMknod.     (* the contract this file seals        *)
@@ -135,7 +137,6 @@ Require Import DirentEnc.        (* [bview]                             *)
 Require Import FsTree.
 Require Import SpecSysMknodAU.   (* [dev_arg]                           *)
 Require Import FsAbsMknodFire.   (* the commits and [mkf_dev_arg]       *)
-Require Import SpecCreateAU.     (* [CREATE_AU], [cau_ok] / [cau_fail]  *)
 Require Import FsAbsDefs.            (* LAST of the abstract stack          *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -309,7 +310,7 @@ Lemma mn_m1_neg `{XI : CurCtx} :
 Proof. vm_compute; reflexivity. Qed.
 
 (* create's live type premise at [ty := T_DEVICE] *)
-Lemma mn_tdev_nz `{XI : CurCtx} : bv_unsigned SpecCreate.T_DEVICE <> 0.
+Lemma mn_tdev_nz `{XI : CurCtx} : bv_unsigned FsAbsCreateFire.T_DEVICE <> 0.
 Proof. vm_compute. discriminate. Qed.
 
 (* ===================================================================== *)
@@ -807,7 +808,7 @@ End ProofSysMknodEpilogue.
 (*  so it lives inside the module the seal instantiates.                   *)
 (* ===================================================================== *)
 Module SysMknodProof (BeginOp : BEGIN_OP) (Argint : ARGINT) (Argstr : ARGSTR)
-                     (CreateAU : CREATE_AU)
+                     (Create : CREATE)
                      (Iunlockput : IUNLOCKPUT) (EndOp : END_OP)
   : SYSMKNOD.
 
@@ -1589,14 +1590,14 @@ Section ProofSysMknodBody.
       (* ============ +0x3a c.li a1,3 : T_DEVICE ============ *)
       iApply (wp_cli_s_sconf (CID := CID22) (mword_of_int (MN + 0x3a)) Ra1
                 (mword_of_int 3 : mword 6)
-                (sign_extend' 64 SpecCreate.T_DEVICE) N1 (K - 20)%nat b
+                (sign_extend' 64 FsAbsCreateFire.T_DEVICE) N1 (K - 20)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
       { iApply (smni_3a with "Htext"). }
       iIntros (CID23 Hq23) "Hcg Hpc".
       set (N2 := <[Regidx Ra1 := regval_into_reg
-                    (sign_extend' 64 SpecCreate.T_DEVICE)]> N1).
+                    (sign_extend' 64 FsAbsCreateFire.T_DEVICE)]> N1).
       assert (HN2a1 : (N2 !!! Regidx Ra1 : mword 64)
-                      = (sign_extend' 64 SpecCreate.T_DEVICE))
+                      = (sign_extend' 64 FsAbsCreateFire.T_DEVICE))
         by (rewrite /N2; apply upd_eq).
       assert (HN2a2 : (N2 !!! Regidx Ra2 : mword 64)
                       = (sign_extend' 64 (hw_lo (arg_int32 v1))))
@@ -1627,7 +1628,7 @@ Section ProofSysMknodBody.
       { etransitivity; [ rewrite /N3; apply upd_eq |].
         rewrite HN2s0. apply mn_buf. }
       assert (HN3a1 : (N3 !!! Regidx Ra1 : mword 64)
-                      = (sign_extend' 64 SpecCreate.T_DEVICE))
+                      = (sign_extend' 64 FsAbsCreateFire.T_DEVICE))
         by (rewrite /N3 upd_ne; [exact HN2a1 | nz]).
       assert (HN3a2 : (N3 !!! Regidx Ra2 : mword 64)
                       = (sign_extend' 64 (hw_lo (arg_int32 v1))))
@@ -1673,7 +1674,7 @@ Section ProofSysMknodBody.
         assert (HN4a0 : (N4 !!! Regidx Ra0 : mword 64) = pa_stk sp0 18)
           by (rewrite /N4 upd_ne; [exact HN3a0 | nz]).
         assert (HN4a1 : (N4 !!! Regidx Ra1 : mword 64)
-                        = (sign_extend' 64 SpecCreate.T_DEVICE))
+                        = (sign_extend' 64 FsAbsCreateFire.T_DEVICE))
           by (rewrite /N4 upd_ne; [exact HN3a1 | nz]).
         assert (HN4a2 : (N4 !!! Regidx Ra2 : mword 64)
                         = (sign_extend' 64 (hw_lo (arg_int32 v1))))
@@ -1700,22 +1701,37 @@ Section ProofSysMknodBody.
               inum (ROOTINO, or the cwd's) and fires it there. *)
            iDestruct (np_start_of_mknod fsc_fs (pv_cwi (us_V U)) P Pmiss (bview pk bf)
                         with "Hwp") as "Htr".
-           iApply (CreateAU.wp_create_au (CID := CID25) gs j gl pd pav pu
+           (* THE BUNDLE AT THE DEVICE TYPE ([SpecCreate.cre_commits_of_dev]):
+              mknod's caller owes no DOTS leg -- at [T_DEVICE] the [beq
+              s4,a4] at +0xca is never taken -- so the one create asks for
+              is discharged here, at its own unit, off the region's copy of
+              the application invariant. *)
+           iAssert (adots_commit_at (fs_gamma_L fsc_fs) appE
+                      (fun _ _ _ _ => True%I)) as "Hdots".
+           { iApply SpecCreate.cre_dots_unit.
+             iApply (InodeRegion.ireg_inv_app with "Hireg"). }
+           iDestruct (cre_commits_of_dev (fs_gamma_L fsc_fs)
+                        (bv_unsigned (hw_lo (arg_int32 v1)))
+                        (bv_unsigned (hw_lo (arg_int32 v2)))
+                        Φarm Φun Φok with "Hacre Hdots Hchild") as "Hcre".
+           iApply (Create.wp_create_sconf (CID := CID25) gs j gl pd pav pu
       gf
       pk bf
-                     SpecCreate.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
+                     FsAbsCreateFire.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
                      (upd_usM (us_upt U P') _) MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
-                     N4 (K - 20)%nat eb b lks P Pmiss Φarm Φun Φok Φex
+                     N4 (K - 20)%nat eb b lks
+                     P Pmiss Φarm (fun _ _ _ _ => True%I) Φun Φok Φex
                      ltac:(lia) HdevR Hnib0 Hgeom Hsize
                      Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
-                     (mn_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush eq_refl Hpkc
+                     (mn_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush
+                     mn_tdev_nz FsAbsCreateFire.T_DEVICE_ty_ok Hpkc
                      ltac:(unfold create_units; lia) Hnsb Hj Hgl
                      HN4a1 HN4a2 HN4a3 Heb
                      with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv
                            Hitab Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs
                            Hsbb
                            Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS Htx
-                           Htr Hacre Hdlkc Hchild").
+                           Htr Hdlkc Hcre").
            { iEval (rewrite HN4a0). iExact "Hbufk". }
         iIntros (CID26 Hq26 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
           "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
@@ -1734,7 +1750,12 @@ Section ProofSysMknodBody.
         destruct ok.
         + (* ---------- create SUCCEEDED: the LOCKED inode ---------- *)
             iDestruct "Hok" as "(%Hokf & Hlocked & Hcauok)".
-          destruct Hokf as (Hcra0 & Hkk & Hinum & _).
+          destruct Hokf as (Hcra0 & Hkk & Hinum & Hpure).
+          (* AT A DEVICE TYPE THE FOUND ARM CANNOT SUCCEED: create's ARM F-OK
+             needs [ty = T_FILE], so [ok = true] forces [made = true]
+             ([SpecCreate.cre_ok_pure_dev]) and the payout is ARM C-OK. *)
+          destruct (cre_ok_pure_dev _ _ made dn Hpure) as [Hmade _].
+          subst made.
           assert (Hipnz : ientry kk <> (zero_reg : mword 64))
             by (apply ientry_ne_zero; lia).
           iApply (wp_cbeqz_fall_s_sconf (CID := CID26) (mword_of_int (MN + 0x44))
@@ -1917,7 +1938,8 @@ Section ProofSysMknodBody.
              iSplitR; [iPureIntro; rewrite Ha0f; exact HP2a0 |].
              rewrite /mknod_post_ok.
              iExists (bview pk bf), (bv_unsigned inum).
-             iSplitR; [iPureIntro; exact Hinum |]. iExact "Hcauok". }
+             iSplitR; [iPureIntro; exact Hinum |].
+             iApply (cre_ok_arms_dev with "Hcauok"). }
         + (* ---------- ARM B: create returned 0 ---------- *)
            iDestruct "Hok" as "(%Hcrz & Htx & Hcf)".
           iApply (wp_cbeqz_taken_s_sconf (CID := CID26) (mword_of_int (MN + 0x44))
@@ -1965,7 +1987,8 @@ Section ProofSysMknodBody.
           { cbn in Hns1. exact Hns1. }
            { rewrite /mknod_arms. iRight. iSplitR; [by iPureIntro |].
              rewrite /mknod_post_fail. iRight.
-             iExists (bview pk bf). iExact "Hcf". }
+             iExists (bview pk bf).
+             iApply (cre_fail_arms_dev with "Hcf"). }
       }
     - (* ================= ARM A: argstr returned -1 =================
          The [bltz] is TAKEN, straight to the shared "-1" tail at +0x40. *)
@@ -2246,7 +2269,7 @@ Section MknodStable.
       (mkr_recv root ps ds Φok) (mkr_recv root ps ds Φex)
     ⊢ mknod_stable_ok Γ ma mi root ps ds Φarm Φun Φok Φex.
   Proof.
-    rewrite /mknod_post_ok /mknod_stable_ok /cau_ok.
+    rewrite /mknod_post_ok /mknod_stable_ok.
     iIntros "H". iDestruct "H" as (pl i) "[%Hi H]".
     iDestruct "H" as (av d nm ents nl)
       "(%Hlast & %Hpre & _ & Hcm & HΦ & Harmr & Hun)".
@@ -2269,8 +2292,7 @@ Section MknodStable.
       Φarm Φun (mkr_recv root ps ds Φok) (mkr_recv root ps ds Φex)
     ⊢ mknod_stable_fail Γ ma mi root ps ds Φarm Φun Φok Φex.
   Proof.
-    rewrite /mknod_post_fail /mknod_stable_fail /mknod_au_pre
-            /cau_fail.
+    rewrite /mknod_post_fail /mknod_stable_fail /mknod_au_pre.
     iIntros "[(_ & Hacre & Hdl & Hchild) | H]".
     { iLeft. iSplitL "Hacre".
       - iApply (mkr_acre_forget with "Hacre").

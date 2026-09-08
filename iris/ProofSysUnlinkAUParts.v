@@ -32,8 +32,8 @@
      - the module-internal projections of [ProofSysUnlink]'s walk, hoisted:
        they live inside that file's functor and are therefore invisible,
        but none of them mentions a functor parameter.
-     - [su_last_of_npar], the name tie ([ProofCreateAU.cr_last_of_npar]'s
-       shape): nameiparent's landed name clause is [nameiparent_of pl es e]
+     - [su_last_of_npar], the name tie
+       ([ProofCreateShared.cr_last_of_npar]'s shape): nameiparent's landed name clause is [nameiparent_of pl es e]
        and the AU's arms speak of [last (path_elems pl)], which is one
        [last_snoc]. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.

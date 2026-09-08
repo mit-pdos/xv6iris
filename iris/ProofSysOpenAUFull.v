@@ -100,9 +100,9 @@ Local Open Scope Z_scope.
 Require Import FsTree.
 Require Import SpecNameiEra.
 Require Import SpecSysOpenAU.
+Require Import SpecCreate.           (* [CREATE]: create's one contract   *)
 Require Import SpecSysOpen.   (* the ONE contract: the frame, the arms, [SYSOPEN] *)
 Require Import ProofSysOpenAUBits.
-Require Import SpecCreateAUF.        (* the T_FILE create-AU carry        *)
 Require Import ProofSysOpenAU.       (* [SysOpenPlainProof]: the plain arm *)
 Require Import ProofSysOpenAUEntryC. (* [so_entry_c_au], [so_cont0_au_create] *)
 Require Import FsAbsDefs.
@@ -127,7 +127,7 @@ Module SysOpenProof (Argint : ARGINT) (Argstr : ARGSTR)
                       (Iunlockput : IUNLOCKPUT) (EndOp : END_OP)
                       (Fileclose : FILECLOSE) (Itrunc : ITRUNC)
                       (Filealloc : FILEALLOC) (Fdalloc : FDALLOC)
-                      (CreateAUF : CREATE_AUF)
+                      (Create : CREATE)
   : SYSOPEN.
 
 (* THE PLAIN ARM, at the twelve callees it shares with the create arm:
@@ -136,7 +136,7 @@ Module Plain := SysOpenPlainProof Argint Argstr BeginOp NameiEra Ilock
                                     Iunlock Iunlockput EndOp Fileclose
                                     Itrunc Filealloc Fdalloc.
 
-Module EntryC := SysOpenAUEntryC CreateAUF Iunlock Iunlockput EndOp
+Module EntryC := SysOpenAUEntryC Create Iunlock Iunlockput EndOp
                                  Fileclose Itrunc Filealloc Fdalloc.
 
 

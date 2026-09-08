@@ -139,6 +139,10 @@ Require Import SpecIput SpecIupdate.
 Require Import SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
 Require Import SpecCreate.
+Require Import PathElems.        (* [path_elems]: the name tie's list      *)
+Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix *)
+Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
+Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import AppInv.           (* [appE]: the commit mask the dots receipt names *)
 Require Import FsAbsDelta.       (* [acre_bump], [dots_ents]: the deltas the legs' rows are stated at (round E2, lane E2-C) *)
 Require Import FsAbsMknodFire.   (* the parent-leg fire [caf_acre_fire], [mkf_era_is_dir]/[mkf_era_live] (round E2, lane E2-C) *)
@@ -215,11 +219,13 @@ Section ProofCreateMkdir.
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
       (nf nsl : nat -> bv 8) (t : nat)
-      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (* ---- THE APPLICATION'S SIDE ---- *)
+      (P Pmiss : nat -> Z -> iProp Σ)
       (Φarm : aview -> Z -> iProp Σ)
       (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
       (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     icfg_dev = ROOTDEV ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -266,7 +272,7 @@ Section ProofCreateMkdir.
                     plen pfun pv ty major minor U u Sb ns pidv
                     dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                     kd qd gd γil γisl dind dn bm data nf nsl t CIDm
-                    Φarm Φdots Φun Φok).
+                    P Pmiss Φarm Φdots Φun Φok Φex).
   Proof.
     intros HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
            Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Hpkc Hu Hns Hj Hgs
@@ -295,7 +301,7 @@ Section ProofCreateMkdir.
              #Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
              Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz %Hlek #Hflk Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Hdirty
-             Harmr Hdots Hun Hacre Hcont".
+             HPpar Hdlkc Harmr Hdots Hun Hacre Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -2504,7 +2510,7 @@ Section ProofCreateMkdir.
                           Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
                           Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk2 Hcdiat Hcmeta
                           Hcmap Hcblocks Hctop Hcfrz Hckeep
-                          Hruc Harmr Hdotsr Hun HFok]").
+                          Hruc HPpar Hdlkc Harmr Hdotsr Hun HFok]").
           { exact Hcsf. }
           { exact (cr_slots_3 _ ns eq_refl Hns). }
           { split_and!.
@@ -2531,21 +2537,27 @@ Section ProofCreateMkdir.
           { iPureIntro. split; [rewrite Ha0f; exact HT4s2 |].
             split; [exact Hkslt |].
             split; [split; [exact (proj1 Hcpos) | exact Hcinb] |].
+            rewrite /cre_ok_pure.
             split; [exact Hc2ty |].
             split; [exact Hc2mj |].
             split; [exact Hc2mn |].
             split; [exact Hc2nlz |].
             intro Hnd. exfalso. exact (Hnd Htdir). }
-          iSplitR "Harmr Hdotsr Hun HFok"; last first.
+          iSplitR "HPpar Harmr Hdotsr Hun HFok Hdlkc"; last first.
           { (* ARM C-OK's receipts at a directory: the arm, the dots and the
-               parent leg fired; the unarm comes home *)
-            rewrite /cre_ok_arms /=.
-            iExists (bv_unsigned dind), (bname 14 nf).
-            iFrame "Harmr Hun". iSplitL "Hdotsr"; [iLeft; iExact "Hdotsr" |].
-            rewrite /cre_acre_fired.
-            iExists avy, (dir_entries (era_node dn bm data)),
-                    (fn_nlink (era_node dn bm data)).
-            iSplitR; [by iPureIntro |]. iExact "HFok". }
+               parent leg fired; the unarm and the exists observation come
+               home and the cursor is at the parent. *)
+            iApply (cr_ok_of_made (bv_unsigned ty) (bv_unsigned major)
+                      (bv_unsigned minor) P Φarm Φdots Φun Φok Φex
+                      (bview plen pfun) (bv_unsigned dind) (bname 14 nf)
+                      (bv_unsigned cinum)
+                      (cr_last_of_npar _ nf Hnpname)
+                      with "HPpar Harmr [Hdotsr] [HFok] Hun Hdlkc").
+            { iLeft. iExact "Hdotsr". }
+            { rewrite /cre_acre_fired.
+              iExists avy, (dir_entries (era_node dn bm data)),
+                      (fn_nlink (era_node dn bm data)).
+              iSplitR; [by iPureIntro |]. iExact "HFok". } }
           iApply (create_locked_mk
  _ _ _ _ _ _ _ _ gil gisl eq_refl
                     with "Hslkc Hcslkd [Hcdep] Hoffrc Hcidev Hciinum
@@ -2700,7 +2712,8 @@ Section ProofCreateMkdir.
  γf
  plen pfun pv ty major minor U u
                         Sb ns pidv dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
-                        kd qd gd γil γisl dind nf nsl t Φarm Φdots Φun Φok
+                        kd qd gd γil γisl dind nf nsl t
+                        P Pmiss Φarm Φdots Φun Φok Φex
                         HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                         Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
                         with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
@@ -2734,7 +2747,8 @@ Section ProofCreateMkdir.
                           Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot2 Hcfrz [%] Hflk Hckeep Hruc
                           Htoken
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
-                          Hislr Hop Hdirty Harmr Hdotsx Hun Hacre Hcont").
+                          Hislr Hop Hdirty HPpar Hdlkc
+                          Harmr Hdotsx Hun Hacre Hcont").
           { exact Hmd3regs. }
           { exact Htdir. }
           { exact Hkdlt. }
@@ -2868,7 +2882,8 @@ Section ProofCreateMkdir.
  γf
  plen pfun pv ty major minor U u Sb ns pidv
                       dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
-                      kd qd gd γil γisl dind nf nsl t Φarm Φdots Φun Φok
+                      kd qd gd γil γisl dind nf nsl t
+                      P Pmiss Φarm Φdots Φun Φok Φex
                       HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                       Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
                       with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
@@ -2895,7 +2910,8 @@ Section ProofCreateMkdir.
                         Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
                         Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot2 Hcfrz [%] Hflk Hckeep Hruc Htoken
                         Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
-                        Hislr Hop Hdirty Harmr Hdotsx Hun Hacre Hcont").
+                        Hislr Hop Hdirty HPpar Hdlkc
+                        Harmr Hdotsx Hun Hacre Hcont").
         { exact Hmd2regs. }
         { exact Htdir. }
         { exact Hkdlt. }
@@ -2995,7 +3011,8 @@ Section ProofCreateMkdir.
  γf
  plen pfun pv ty major minor U u Sb ns pidv
                     dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
-                    kd qd gd γil γisl dind nf nsl t Φarm Φdots Φun Φok
+                    kd qd gd γil γisl dind nf nsl t
+                    P Pmiss Φarm Φdots Φun Φok Φex
                     HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                     Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
                     with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
@@ -3022,7 +3039,8 @@ Section ProofCreateMkdir.
                       Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
                       Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot1 Hcfrz [%] Hflk Hckeep Hruc Htoken
                       Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
-                      Hislr Hop Hdirty Harmr Hdotsx Hun Hacre Hcont").
+                      Hislr Hop Hdirty HPpar Hdlkc
+                      Harmr Hdotsx Hun Hacre Hcont").
       { exact Hmd1regs. }
       { exact Htdir. }
       { exact Hkdlt. }

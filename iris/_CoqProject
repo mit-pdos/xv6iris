@@ -1530,9 +1530,6 @@ ProofNparWrapEra.v
 LinkNparWrapEra.v
 SpecSysReadAU.v
 FsAbsMknodFire.v
-SpecCreateAU.v
-ProofCreateAU.v
-LinkCreateAU.v
 # sys_mknod's ONE contract, its proof and its link.  The stable corollary
 # is DERIVED inside the proof file (no second walk, no second seal); its
 # arms cannot key on the fetched string, and SpecSysMknod's closing note
@@ -1572,17 +1569,6 @@ ProofSysOpenAU.v
 FsInitPinBoot.v
 SpecSysUnlinkAU.v
 FsAbsReadFire.v
-# fs-syscall-specs lane W: the T_FILE CREATE CARRY, which unlocks
-# sys_open's O_CREATE arm.  FsAbsCreateFire is FIRE 2 at a
-# NON-DIRECTORY child ([mkf_acre_fire] is device-pinned only through
-# [delta_create_dev], whose proof needs nothing but "not a directory");
-# SpecCreateAUF/ProofCreateAUF/LinkCreateAUF are SpecCreateAU's twin at
-# [ty = T_FILE], where the mkdir arm stays refuted but ARM F-OK comes back;
-# SpecCreateAUFOpen is the bridge into SpecSysOpen's create arms.
-SpecCreateAUF.v
-ProofCreateAUF.v
-LinkCreateAUF.v
-SpecCreateAUFOpen.v
 # ...and lane W's O_CREATE ARM itself, which the carry unlocks.
 # ProofSysOpenAUCreArm is the SHIM: the blocks from the join down are
 # parametric in the four caller predicates, so the create arm runs them at

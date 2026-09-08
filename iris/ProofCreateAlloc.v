@@ -138,6 +138,10 @@ Require Import SpecIput SpecIalloc SpecIupdate.
 Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
 Require Import SpecCreate.
+Require Import PathElems.        (* [path_elems]: the name tie's list      *)
+Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix *)
+Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
+Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsAbsDelta.       (* [acre_bump], [dots_ents]: the deltas the legs' rows are stated at (round E2, lane E2-C) *)
 Require Import FsAbsMknodFire.   (* the parent-leg fire [caf_acre_fire], [caf_made_row], [mkf_parent_row] (round E2, lane E2-C) *)
 Require Import FsAbsDefs.        (* [aview], [abs_of] *)
@@ -208,11 +212,13 @@ Section ProofCreateAlloc.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (* ---- THE APPLICATION'S SIDE ---- *)
+      (P Pmiss : nat -> Z -> iProp Σ)
       (Φarm : aview -> Z -> iProp Σ)
       (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
       (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     icfg_dev = ROOTDEV ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -272,7 +278,7 @@ Section ProofCreateAlloc.
                        plen pfun pv ty major minor U u Sb ns pidv
                        dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                        kd qd gd γil γisl dind dn bm data nf nsl t CIDm
-                       Φarm Φdots Φun Φok)) -∗
+                       P Pmiss Φarm Φdots Φun Φok Φex)) -∗
     (* ---- ARM FAIL's NON-DIRECTORY ENTRY, PARKED ---- *)
     (∀ (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
        (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
@@ -283,7 +289,7 @@ Section ProofCreateAlloc.
                       plen pfun pv ty major minor U u Sb ns pidv
                       dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                       kd qd gd γil γisl dind dn bm data nf nsl t CIDf
-                      Φarm Φdots Φun Φok)) -∗
+                      P Pmiss Φarm Φdots Φun Φok Φex)) -∗
     (* THE CONCLUSION IS [wp_next]-WRAPPED, and it has to be.  The two parked
        bodies and [cr_alloc_body]'s own [Hcont] are all anchored at the
        SECTION hart, while the allocate half's resources arrive at whatever
@@ -296,7 +302,8 @@ Section ProofCreateAlloc.
       cr_alloc_body (CID := CID) γs j γl pd pav pu γf
 
                     plen pfun pv ty major minor U u Sb ns pidv dqb dqs dqbs dqn
-                    m sp0 ret_tgt K eb b lks CIDa Φarm Φdots Φun Φok).
+                    m sp0 ret_tgt K eb b lks CIDa
+                    P Pmiss Φarm Φdots Φun Φok Φex).
   Proof.
     intros HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
            Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Htynz Htyk Hpkc Hu Hns Hj Hgs
@@ -320,7 +327,8 @@ Section ProofCreateAlloc.
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
              #Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
-             Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath Hbsl Hisl Hop Htx Hcre Hcont".
+             Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath Hbsl Hisl Hop Htx
+             HPpar Hdlkc Hcre Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
     (* the four commits, one per leg (round E2, lane E2-C) *)
     iEval (rewrite /cre_commits) in "Hcre".
@@ -783,7 +791,8 @@ Section ProofCreateAlloc.
                         Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
                         Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot Hcfrz [%] []
                         Hckeep Hruc Htoken Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath
-                        Hbsl Hislr Hop Hdirty Harmr Hdots Hun Hacre Hcont").
+                        Hbsl Hislr Hop Hdirty HPpar Hdlkc
+                        Harmr Hdots Hun Hacre Hcont").
         { exact HW4regs. }
         { exact Htdir. }
         { exact Hkdlt. }
@@ -1551,7 +1560,7 @@ Section ProofCreateAlloc.
                              Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
                              Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta
                              Hcmap Hcblocks Hctop Hcfrz Hckeep Hruc
-                             Harmr Hdots Hun HFok]").
+                             HPpar Hdlkc Harmr Hdots Hun HFok]").
              { exact Hcsf. }
              { exact (cr_slots_3 _ ns eq_refl Hns). }
              { split_and!.
@@ -1577,22 +1586,28 @@ Section ProofCreateAlloc.
              { iPureIntro. split; [rewrite Ha0f; exact HY4s2 |].
                split; [exact Hkslt |].
                split; [split; [exact (proj1 Hcpos) | exact Hcinb] |].
+               rewrite /cre_ok_pure.
                split; [rewrite cr_setf_type; exact Htyc |].
                split; [reflexivity |].
                split; [reflexivity |].
                split; [rewrite cr_setf_nlink; vm_compute; reflexivity |].
                intros _. exact (cr_setf_fresh_made dnc ty major minor
                                   Hfresh Htyc). }
-             iSplitR "Harmr Hdots Hun HFok"; last first.
+             iSplitR "HPpar Harmr Hdots Hun HFok Hdlkc"; last first.
              { (* ARM C-OK-FILE's receipts: the arm and the parent leg fired,
-                  no dots on a non-directory, the unarm comes home *)
-               rewrite /cre_ok_arms /=.
-               iExists (bv_unsigned dind), (bname 14 nf).
-               iFrame "Harmr Hun". iSplitL "Hdots"; [iRight; iExact "Hdots" |].
-               rewrite /cre_acre_fired.
-               iExists avy, (dir_entries (era_node dn bm data)),
-                       (fn_nlink (era_node dn bm data)).
-               iSplitR; [by iPureIntro |]. iExact "HFok". }
+                  no dots on a non-directory, the unarm and the exists
+                  observation come home, and the cursor is at the parent. *)
+               iApply (cr_ok_of_made (bv_unsigned ty) (bv_unsigned major)
+                         (bv_unsigned minor) P Φarm Φdots Φun Φok Φex
+                         (bview plen pfun) (bv_unsigned dind) (bname 14 nf)
+                         (bv_unsigned cinum)
+                         (cr_last_of_npar _ nf Hnpname)
+                         with "HPpar Harmr [Hdots] [HFok] Hun Hdlkc").
+               { iRight. iExact "Hdots". }
+               { rewrite /cre_acre_fired.
+                 iExists avy, (dir_entries (era_node dn bm data)),
+                         (fn_nlink (era_node dn bm data)).
+                 iSplitR; [by iPureIntro |]. iExact "HFok". } }
              (* the CHILD is not a directory on this arm, so its [dlinks]
                 is [emp] at either dinode ([dlinks_not_dir]) and the
                 flush's [nlink] bump is invisible to it. *)
@@ -1705,7 +1720,8 @@ Section ProofCreateAlloc.
                              Hfrzl Hkeep Hrud Hslkc Hcslkd Hcdep Hoffrc Hcidev
                              Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta Hcmap
                              Hcblocks Hctop Hcshot Hcfrz [%] [] Hckeep Hruc Htoken Hsbn Hsbi Hsbs Hsbb Hbmr
-                             Hppid Hppback Hpath Hbsl Hislr Hop Htx Harmr Hdots Hun Hacre Hcont").
+                             Hppid Hppback Hpath Hbsl Hislr Hop Htx HPpar Hdlkc
+                             Harmr Hdots Hun Hacre Hcont").
              { exact Hmdlregs. }
              { exact Htdir. }
              { exact Hkdlt. }
@@ -1948,21 +1964,29 @@ Section ProofCreateAlloc.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (iref_slots_combine with "Hislg Hisl") as "Hisl".
       iDestruct (iref_slots_combine with "Hisl Hislr") as "Hisl".
+      (* ARM A-FAIL reports NO abstract observation either: the exists
+         lookup missed and ialloc never got as far as a delta, so the
+         cursor comes home with all four commits. *)
+      iAssert (cre_commits (fs_gamma_L fsc_fs) (bv_unsigned ty)
+                 (bv_unsigned major) (bv_unsigned minor) Φarm Φdots Φun Φok)
+        with "[Harm Hdots Hun Hacre]" as "Hcre".
+      { rewrite /cre_commits. iFrame "Harm Hdots Hun Hacre". }
+      iDestruct (cr_fail_of_cursor fsc_fs (bv_unsigned ty) (bv_unsigned major)
+                   (bv_unsigned minor) P Pmiss Φarm Φdots Φun Φok Φex
+                   (bview plen pfun) (bv_unsigned dind)
+                   with "HPpar Hdlkc Hcre") as "Hcf".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
                 (mword_of_int 0 : mword 32) dn bm n2 Sb2
                 (1 + (1 + (ns - 2)))%nat
                 with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
-                      Hbsl [%] Hisl [%] Hop [$Htx Harm Hdots Hun Hacre]").
+                      Hbsl [%] Hisl [%] Hop [$Htx $Hcf]").
       { exact Hcsf. }
       { exact (cr_slots_2 _ ns eq_refl Hns). }
       { split_and!; [exact (cr_sub2 _ _ _ Hsb1 Hsb2)
                     | exact (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))
                     | discriminate]. }
-      { iSplitR; [iPureIntro; rewrite Ha0f; exact HZ4s2 |].
-        (* ARM A-FAIL: ialloc refused, nothing fired *)
-        rewrite /cre_fail_arms. iLeft. rewrite /cre_commits.
-        iFrame "Harm Hdots Hun Hacre". }
+      { iPureIntro. rewrite Ha0f. exact HZ4s2. }
   Qed.
 
 End ProofCreateAlloc.

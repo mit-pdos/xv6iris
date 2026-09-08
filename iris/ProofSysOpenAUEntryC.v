@@ -1,24 +1,27 @@
 (* ProofSysOpenAUEntryC.v -- sys_open's O_CREATE ARM at the ARMED post:
-   +0x38 .. +0x48 and ARM A-FAIL, with the T_FILE create-AU carry
-   ([SpecCreateAUF.CREATE_AUF]) in place of the landed create, and the join
-   at +0x4a entered through [ProofSysOpenAUCreArm]'s SHIM.
+   +0x38 .. +0x48 and ARM A-FAIL, calling create's ONE contract
+   ([SpecCreate.CREATE]) at [T_FILE], with the join at +0x4a entered
+   through [ProofSysOpenAUCreArm]'s SHIM.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
    prover), create arm.  The create-entry block; every AU block below
    the join stays exactly where it is.  ARM A-FAIL is
    [ProofSysOpenTails.so_tail_a] VERBATIM (it moves no fs-abstract state)
-   and the abstract payout there is [SpecCreateAUFOpen.cauf_fail_to_open],
-   which is the WHOLE failure fold in one wand.
+   and the abstract payout there is [SpecSysOpen.cre_fail_to_open], which
+   is the WHOLE failure fold in one wand.
 
    ==== WHAT THIS BLOCK OWES, AND WHERE IT PAYS ========================
 
      c.li a3,0 ; c.li a2,0 ; c.li a1,2 ; addi a0,s0,-176 ;
      jal create ; c.mv s1,a0 ; c.beqz a0 -> +0xd2
 
-   ITEM 1 (create form): the carry is [CreateAUF.wp_create_auf] and the
-   walk one-shot the contract hands down is [mknod_walk_pre_era], which is
-   create's [FsAbsStart.ep_start] at the fetched string by
-   [FsAbsNparMknod.np_start_of_mknod] -- a rename, no proof.
+   ITEM 1 (create form): the call is [Create.wp_create_sconf] at [T_FILE],
+   and the walk one-shot the contract hands down is [mknod_walk_pre_era],
+   which is create's [FsAbsEra.ep_start] at the fetched string by
+   [FsAbsMknodFire.np_start_of_mknod] -- a rename, no proof.  The child's
+   content is the CONSTANT [AFile []] at this type, so the bundle create
+   asks for is assembled by [SpecCreate.cre_commits_of_file] and the two
+   arms are read back through [cre_ok_arms_file] / [cre_fail_arms_file].
 
    ITEM 2 (the terminal fire) SPLITS ON [made], and that is the arm's
    whole abstract content:
@@ -121,8 +124,6 @@ Require Import FsAbsMknodFire.
 Require Import FsAbsOpenFire.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUJoin.
-Require Import SpecCreateAUF.     (* the T_FILE create-AU carry            *)
-Require Import SpecCreateAUFOpen. (* [cauf_fail_to_open]                   *)
 Require Import ProofSysOpenAUCreArm.
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
@@ -188,7 +189,7 @@ Section ProofSysOpenAUEntryCCont.
 
 End ProofSysOpenAUEntryCCont.
 
-Module SysOpenAUEntryC (CreateAUF : CREATE_AUF) (Iunlock : IUNLOCK)
+Module SysOpenAUEntryC (Create : CREATE) (Iunlock : IUNLOCK)
                        (Iunlockput : IUNLOCKPUT) (EndOp : END_OP)
                        (Fileclose : FILECLOSE) (Itrunc : ITRUNC)
                        (Filealloc : FILEALLOC) (Fdalloc : FDALLOC).
@@ -212,6 +213,10 @@ Section ProofSysOpenAUEntryC.
   Notation Ra4 := (mword_of_int 14 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
   Notation Rz  := (mword_of_int 0 : mword 5).
+
+  (* create's live-type premise at the literal open passes (2b-inode-3). *)
+  Lemma soc_tfile_nz : bv_unsigned FsAbsCreateFire.T_FILE <> 0.
+  Proof. rewrite FsAbsCreateFire.T_FILE_value. lia. Qed.
 
   Lemma so_entry_c_au `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
@@ -369,14 +374,14 @@ Section ProofSysOpenAUEntryC.
     (* ===== +0x3c c.li a1,2 -- T_FILE ===== *)
     iApply (wp_cli_s_sconf (CID := CID2) (mword_of_int (SO + 0x3c)) Ra1
               (mword_of_int 2 : mword 6)
-              (sign_extend' 64 (SpecCreate.T_FILE : mword 16)) N2 (K - 24)%nat b
+              (sign_extend' 64 (FsAbsCreateFire.T_FILE : mword 16)) N2 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
     { iApply (soi_03c with "Htext"). }
     iIntros (CID3 Hq3) "Hcg Hpc".
     set (N3 := <[Regidx Ra1 := regval_into_reg
-                  (sign_extend' 64 (SpecCreate.T_FILE : mword 16))]> N2).
+                  (sign_extend' 64 (FsAbsCreateFire.T_FILE : mword 16))]> N2).
     assert (HN3a1 : (N3 !!! Regidx Ra1 : mword 64)
-                    = (sign_extend' 64 (SpecCreate.T_FILE : mword 16)))
+                    = (sign_extend' 64 (FsAbsCreateFire.T_FILE : mword 16)))
       by (rewrite /N3; apply upd_eq).
     assert (HN3a2 : (N3 !!! Regidx Ra2 : mword 64)
                     = (sign_extend' 64 (mword_of_int 0 : mword 16)))
@@ -403,7 +408,7 @@ Section ProofSysOpenAUEntryC.
     { etransitivity; [ rewrite /N4; apply upd_eq |].
       rewrite HN3s0. apply so_bufpath. }
     assert (HN4a1 : (N4 !!! Regidx Ra1 : mword 64)
-                    = (sign_extend' 64 (SpecCreate.T_FILE : mword 16)))
+                    = (sign_extend' 64 (FsAbsCreateFire.T_FILE : mword 16)))
       by (rewrite /N4 upd_ne; [exact HN3a1 | nz]).
     assert (HN4a2 : (N4 !!! Regidx Ra2 : mword 64)
                     = (sign_extend' 64 (mword_of_int 0 : mword 16)))
@@ -433,7 +438,7 @@ Section ProofSysOpenAUEntryC.
     assert (HN5a0 : (N5 !!! Regidx Ra0 : mword 64) = pa_stk sp0 22)
       by (rewrite /N5 upd_ne; [exact HN4a0 | nz]).
     assert (HN5a1 : (N5 !!! Regidx Ra1 : mword 64)
-                    = (sign_extend' 64 (SpecCreate.T_FILE : mword 16)))
+                    = (sign_extend' 64 (FsAbsCreateFire.T_FILE : mword 16)))
       by (rewrite /N5 upd_ne; [exact HN4a1 | nz]).
     assert (HN5a2 : (N5 !!! Regidx Ra2 : mword 64)
                     = (sign_extend' 64 (mword_of_int 0 : mword 16)))
@@ -465,25 +470,36 @@ Section ProofSysOpenAUEntryC.
       as "[Hbufk Hbufrest]".
     iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (CreateAUF.wp_create_auf (CID := CID5) gs jx gl pd pav pu
+    (* THE BUNDLE AT THE FILE TYPE ([SpecCreate.cre_commits_of_file]):
+       open's caller owes no DOTS leg -- at [T_FILE] the [beq s4,a4] at
+       +0xca is never taken -- so the one create asks for is discharged
+       here, at its own unit, off the region's copy of the application
+       invariant. *)
+    iAssert (adots_commit_at (fs_gamma_L fsc_fs) appE (fun _ _ _ _ => True%I))
+      as "Hdots".
+    { iApply SpecCreate.cre_dots_unit.
+      iApply (InodeRegion.ireg_inv_app with "Hireg"). }
+    iDestruct (cre_commits_of_file (fs_gamma_L fsc_fs) 0 0
+                 Phiarm Phiun Phiok with "Hac Hdots Hclegs") as "Hcre".
+    iApply (Create.wp_create_sconf (CID := CID5) gs jx gl pd pav pu
               gf plen bp
-              SpecCreate.T_FILE (mword_of_int 0) (mword_of_int 0)
+              FsAbsCreateFire.T_FILE (mword_of_int 0) (mword_of_int 0)
               (upd_usM U _) MAXOPBLOCKS Sb ns pidv dqb dqs dqbs dqn
               N5 (K - 24)%nat eb b lks
-              P Pmiss Phiarm Phiun Phiok Phiex
+              P Pmiss Phiarm (fun _ _ _ _ => True%I) Phiun Phiok Phiex
               HKcr HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
               Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
               ltac:(assert (E31 : (2 ^ 31 = 2147483648)%Z)
                       by (vm_compute; reflexivity); lia)
               Hni1 Hni2 Hni3 Hush
-              eq_refl Hprkc
+              soc_tfile_nz FsAbsCreateFire.T_FILE_ty_ok Hprkc
               ltac:(unfold create_units; lia) Hnsb Hj Hgl
               HN5a1 HN5a2 HN5a3 Heb
               with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv Hitab
                     Hitinv Hescrows Hslks Hireg Hropen Hsbn Hsbi Hsbs Hsbb
                     Hbmres
                     Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hisl HopS Htx
-                    [Hwp] Hac Hdl Hclegs").
+                    [Hwp] Hdl Hcre").
     { iEval (rewrite HN5a0). iExact "Hbufk". }
     { iApply (np_start_of_mknod with "Hwp"). }
     iIntros (CID6 Hq6 mcr ok made kk qi ss gy inum dn bm u1 Sb1 ns1)
@@ -540,7 +556,8 @@ Section ProofSysOpenAUEntryC.
     (* ===== +0x48 c.beqz a0, +0xd2  [ARM A-FAIL] ===== *)
     destruct ok.
     2:{ (* ---- create refused: NOTHING of open's own fired, and
-             [cauf_fail_to_open] is the whole fold in one wand ---- *)
+             [SpecSysOpen.cre_fail_to_open] is the whole fold in one
+             wand ---- *)
       iDestruct "Hok" as "(%Hcra0 & Htx & Hcf)".
       iApply (wp_cbeqz_taken_s_sconf (CID := CID7) (mword_of_int (SO + 0x48))
                 (mword_of_int 69 : mword 8) (Cregidx (mword_of_int 2)) Ra0
@@ -582,20 +599,23 @@ Section ProofSysOpenAUEntryC.
       { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. }
       { rewrite /open_arms_create. iFrame "Hfds". iLeft.
         iSplitR; [iPureIntro; exact Ha0f |]. iFrame "Hpriv Hfrag".
-        iApply (cauf_fail_to_open with "Hcf Hoc Htc"). } }
+        iApply (cre_fail_to_open with "Hcf Hoc Htc"). } }
     (* ---- create SUCCEEDED: the locked inode, straight to the join ---- *)
     iDestruct "Hok" as "(%Hokf & Hlocked & Hcauf)".
-    destruct Hokf as (Hcra0 & Hkk & Hinum & Hrep).
+    destruct Hokf as (Hcra0 & Hkk & Hinum & Hpure).
+    (* the post's pure success reading at [T_FILE]: both arms survive the
+       pin, keyed on [made] ([SpecCreate.cre_ok_pure_file]). *)
+    pose proof (cre_ok_pure_file _ _ made dn Hpure) as Hrep.
     assert (Hipnz : ientry kk <> (zero_reg : mword 64))
       by (apply ientry_ne_zero; lia).
     (* THE WITNESS, free on this arm: create ran at T_FILE, so the record
        it reports is never a directory. *)
     assert (Htyne : di_type dn <> (mword_of_int 1 : mword 16)).
     { destruct made.
-      - rewrite Hrep create_made_type. unfold SpecCreate.T_FILE.
+      - rewrite Hrep create_made_type. unfold FsAbsCreateFire.T_FILE.
         intro Hc. apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
       - destruct Hrep as [Hty | Hty]; rewrite Hty;
-          [unfold SpecCreate.T_FILE | unfold SpecCreate.T_DEVICE];
+          [unfold FsAbsCreateFire.T_FILE | unfold FsAbsCreateFire.T_DEVICE];
           intro Hc; apply (f_equal bv_unsigned) in Hc; by vm_compute in Hc. }
     assert (Hdirw : bv_unsigned (di_type dn) = T_DIR_z ->
                     om = (mword_of_int 0 : mword 32)).
@@ -642,7 +662,7 @@ Section ProofSysOpenAUEntryC.
                  (bv_unsigned inum))
         with "[Hcauf Hoc Htc]" as "HR".
       { rewrite /socr_fresh.
-        iDestruct (cauf_ok_fresh with "Hcauf") as (d nm av ents nl)
+        iDestruct (cre_ok_file_fresh with "Hcauf") as (d nm av ents nl)
           "(%Hl & %Hpre & HP & HPhi & Hdl & Harmr & Hun)".
         iExists d, nm, av, ents, nl.
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
@@ -739,7 +759,7 @@ Section ProofSysOpenAUEntryC.
                  (bv_unsigned inum))
         with "[Hcauf]" as "HR".
       { rewrite /socr_exists.
-        iDestruct (cauf_ok_exists with "Hcauf") as (d nm av ents nl)
+        iDestruct (cre_ok_file_exists with "Hcauf") as (d nm av ents nl)
           "(%Hl & %Hrow & %Hent & HP & HPhi & Hac & Hcl)".
         iExists d, nm, av, ents, nl.
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].

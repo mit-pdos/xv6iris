@@ -135,6 +135,10 @@ Require Import SpecPanic.
 Require Import SpecIput SpecIupdate.
 Require Import SpecIunlockput.
 Require Import SpecCreate.
+Require Import PathElems.        (* [path_elems]: the name tie's list      *)
+Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix *)
+Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
+Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsAbsCreateFire.  (* the UNARM fire [caf_unarm_fire] and its row readings (round E2, lane E2-C) *)
 Require Import FsAbsDefs.        (* [aview], [abs_of], [abs_node] *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
@@ -206,11 +210,13 @@ Section ProofCreateFail.
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
       (nf nsl : nat -> bv 8) (t : nat)
-      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (* ---- THE APPLICATION'S SIDE ---- *)
+      (P Pmiss : nat -> Z -> iProp Σ)
       (Φarm : aview -> Z -> iProp Σ)
       (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
       (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -247,7 +253,7 @@ Section ProofCreateFail.
                    plen pfun pv ty major minor U u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                    kd qd gd γil γisl dind dn bm data nf nsl t CIDf
-                   Φarm Φdots Φun Φok).
+                   P Pmiss Φarm Φdots Φun Φok Φex).
   Proof.
     intros HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcovb
            Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb.
@@ -272,7 +278,7 @@ Section ProofCreateFail.
              #Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk
              Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz %Hlek #Hflk Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Htx
-             Harmr Hdots Hun Hacre Hcont".
+             HPpar Hdlkc Harmr Hdots Hun Hacre Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -873,12 +879,22 @@ Section ProofCreateFail.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (iref_slots_combine with "Hisl1 Hisl2") as "Hisl".
     iDestruct (iref_slots_combine with "Hisl Hislr") as "Hisl".
+    (* ARM FAIL: the dirlink that got here returned -1, i.e. before the
+       entry write, so the cursor and the exists observation go home and
+       the payout is ruling Q-h's do-then-undo PAIR -- the row APPEARED at
+       +0xc4 and DISAPPEARED at +0x146.  No dot ever landed on a
+       non-directory child, so the dots commit goes home unfired. *)
+    iDestruct (cr_fail_of_pair fsc_fs (bv_unsigned ty) (bv_unsigned major)
+                 (bv_unsigned minor) P Pmiss Φarm Φdots Φun Φok Φex
+                 (bview plen pfun) (bv_unsigned dind) (bv_unsigned cinum)
+                 with "HPpar Hdlkc Hacre Harmr [Hdots] Hunr") as "Hcf".
+    { iRight. iExact "Hdots". }
     iSpecialize ("Hcont" $! CIDfin with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
               (mword_of_int 0 : mword 32) dn bm n6 Sb6
               (1 + (1 + (ns - 2)))%nat
               with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
-                    Hbsl [%] Hisl [%] Hop [$Htx Harmr Hdots Hunr Hacre]").
+                    Hbsl [%] Hisl [%] Hop [$Htx $Hcf]").
     { exact Hcsf. }
     { exact (cr_slots_2 _ ns eq_refl Hns). }
     { split_and!.
@@ -888,16 +904,7 @@ Section ProofCreateFail.
       - pose proof (proj2 Hn6) as HB1. pose proof (proj2 Hn5) as HB2.
         pose proof (proj2 Hn4) as HB3. lia.
       - discriminate. }
-    { iSplitR; [iPureIntro; rewrite Ha0f; exact HG7s2 |].
-      (* ARM FAIL: the do-then-undo PAIR (ruling Q-h) -- the arm fired at
-         +0xc4 and the unarm at +0x146; no dot ever landed on a
-         non-directory child, so the dots commit goes home unfired, and so
-         does the parent leg. *)
-      rewrite /cre_fail_arms. iRight.
-      iExists (bv_unsigned cinum), (bv_unsigned dind).
-      iSplitL "Harmr"; [iExact "Harmr" |].
-      iSplitL "Hdots"; [iRight; iExact "Hdots" |].
-      iSplitL "Hunr"; [iExact "Hunr" | iExact "Hacre"]. }
+    { iPureIntro. rewrite Ha0f. exact HG7s2. }
   Qed.
 
 End ProofCreateFail.

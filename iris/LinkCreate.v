@@ -2,8 +2,9 @@
 
    Seven functor arguments, every one of them a real proof:
 
-   - nameiparent arrives through LinkNameiparent.v (namex, and under it
-     dirlookup / iget / iput / ilock / iunlock);
+   - the ERA nameiparent arrives through LinkNparWrapEra.v ([NparWrap]:
+     nameiparent at the trace-carrying walk, and under it namex, dirlookup,
+     iget, iput, ilock and iunlock);
    - ilock arrives through LinkIlock.v (acquiresleep / bread / memmove /
      brelse);
    - iunlockput arrives through LinkIunlockput.v (iunlock / iput), and it
@@ -30,9 +31,9 @@
 
    So this cone's assumption count is the five platform axioms plus
    funext, and nothing else. *)
-Require Import LinkNameiparent LinkIlock LinkIunlockput LinkDirlookup
+Require Import LinkNparWrapEra LinkIlock LinkIunlockput LinkDirlookup
         LinkIalloc LinkIupdate LinkDirlink
         ProofCreate.
 
-Module Create := CreateProof Nameiparent Ilock Iunlockput Dirlookup
+Module Create := CreateProof NparWrap Ilock Iunlockput Dirlookup
                              Ialloc Iupdate Dirlink.

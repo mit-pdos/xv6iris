@@ -5579,14 +5579,16 @@ Section SyscallArms.
  IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
               v0 pid U M (av - 4)%nat true true ∅
-              (* THE APPLICATION'S SIDE (round E2, lane E2-C): the generic
-                 app asks nothing of create's legs, so the four families are
-                 [True] and the bundle is [SpecCreate.cre_commits_unit] off
-                 the parked license -- the same shape unlink's and mknod's
-                 arms use ([FsAbsInvFire.fsabs_*]).  The receipts come back
-                 at [True] and are dropped. *)
+              (* THE APPLICATION'S SIDE: the generic app asks nothing of
+                 mkdir's walk or create's legs, so every family is [True]
+                 and the bundle is [SpecSysMkdir.mkdir_au_pre_unit] off the
+                 parked license -- the same shape unlink's and mknod's arms
+                 use ([FsAbsInvFire.fsabs_*]).  The receipts come back at
+                 [True] and are dropped. *)
+              (fun _ _ => True)%I (fun _ _ => True)%I
               (fun _ _ => True)%I (fun _ _ _ _ => True)%I
               (fun _ _ => True)%I (fun _ _ _ _ => True)%I
+              (fun _ _ _ _ => True)%I
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
               ltac:(compute; lia) Hj Hgamma eq_refl Hv0
@@ -5594,7 +5596,7 @@ Section SyscallArms.
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv
                     []").
-    { iApply SpecCreate.cre_commits_unit.
+    { iApply SpecSysMkdir.mkdir_au_pre_unit.
       iApply (InodeRegion.ireg_inv_app with "Hireg"). }
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0 _".

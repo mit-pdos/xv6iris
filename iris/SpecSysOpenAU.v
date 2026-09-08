@@ -33,8 +33,8 @@
    - [aopen_commit_at] / [atrunc_commit_at]: FsAbsOpenFire.v (the fire
      lemmas), FsAbsInvFire.v (the trivial-family dischargers),
      SpecKexecAU.v, SpecSysExecAU.v, SpecSysChdir.v.
-   - [open_fd_ok]: SpecCreateAUFOpen.v, and SpecSysDup.v's own success arm
-     is cut from it.
+   - [open_fd_ok]: SpecSysOpen.v's own create arms, and SpecSysDup.v's
+     success arm is cut from it.
 
    ==== THE TWO BUNDLES ================================================
 

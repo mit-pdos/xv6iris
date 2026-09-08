@@ -133,6 +133,12 @@ Require Import SpecPanic.
 Require Import SpecIput SpecIupdate.
 Require Import SpecIunlockput.
 Require Import SpecCreate.
+Require Import DirentEnc.        (* [bview]: the path buffer's reading     *)
+Require Import PathElems.        (* [path_elems]: the name tie's list      *)
+Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix *)
+Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
+Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
+Require Import FsAbsDelta.       (* [dots_ents]: the entry map the dots left (round E2, lane E2-C) *)
 Require Import FsAbsCreateFire.  (* the UNARM fire's commit and receipt (round E2, lane E2-C) *)
 Require Import FsAbsDefs.        (* [aview], [abs_of], [abs_node] *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
@@ -203,11 +209,13 @@ Section ProofCreateFailMkdir.
       (b : bool) (lks : gset string)
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
       (nf nsl : nat -> bv 8) (t : nat)
-      (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
+      (* ---- THE APPLICATION'S SIDE ---- *)
+      (P Pmiss : nat -> Z -> iProp Σ)
       (Φarm : aview -> Z -> iProp Σ)
       (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
       (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ) :
     (K_create <= K)%nat ->
     16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -244,7 +252,7 @@ Section ProofCreateFailMkdir.
                    plen pfun pv ty major minor U u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                    kd qd gd γil γisl dind nf nsl t CIDf
-                   Φarm Φdots Φun Φok).
+                   P Pmiss Φarm Φdots Φun Φok Φex).
   Proof.
     intros HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcovb
            Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb.
@@ -268,7 +276,7 @@ Section ProofCreateFailMkdir.
              #Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
              Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz %Hlek #Hflk Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Hdirty
-             Harmr Hdotsx Hun Hacre Hcont".
+             HPpar Hdlkc Harmr Hdotsx Hun Hacre Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -777,12 +785,20 @@ Section ProofCreateFailMkdir.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (iref_slots_combine with "Hisl1 Hisl2") as "Hisl".
     iDestruct (iref_slots_combine with "Hisl Hislr") as "Hisl".
+    (* mkdir's three [fail:] entries: the cursor and the exists observation
+       come home, and the payout is ruling Q-h's do-then-undo PAIR, with the
+       dots receipt the entry brought -- both dots, the first alone, or none
+       at all -- carried through unchanged. *)
+    iDestruct (cr_fail_of_pair fsc_fs (bv_unsigned ty) (bv_unsigned major)
+                 (bv_unsigned minor) P Pmiss Φarm Φdots Φun Φok Φex
+                 (bview plen pfun) (bv_unsigned dind) (bv_unsigned cinum)
+                 with "HPpar Hdlkc Hacre Harmr Hdotsx Hunr") as "Hcf".
     iSpecialize ("Hcont" $! CIDfin with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
               (mword_of_int 0 : mword 32) dp bmp n6 Sb6
               (1 + (1 + (ns - 2)))%nat
               with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
-                    Hbsl [%] Hisl [%] Hop [$Htx Harmr Hdotsx Hunr Hacre]").
+                    Hbsl [%] Hisl [%] Hop [$Htx $Hcf]").
     { exact Hcsf. }
     { exact (cr_slots_2 _ ns eq_refl Hns). }
     { split_and!.
@@ -792,15 +808,7 @@ Section ProofCreateFailMkdir.
       - pose proof (proj2 Hn6) as HB1. pose proof (proj2 Hn5) as HB2.
         pose proof (proj2 Hn4) as HB3. lia.
       - discriminate. }
-    { iSplitR; [iPureIntro; rewrite Ha0f; exact HG7s2 |].
-      (* mkdir's three [fail:] entries: the do-then-undo PAIR (ruling Q-h),
-         with the dots receipt the entry brought -- both dots, the first
-         alone, or none at all -- carried through unchanged. *)
-      rewrite /cre_fail_arms. iRight.
-      iExists (bv_unsigned cinum), (bv_unsigned dind).
-      iSplitL "Harmr"; [iExact "Harmr" |].
-      iSplitL "Hdotsx"; [iExact "Hdotsx" |].
-      iSplitL "Hunr"; [iExact "Hunr" | iExact "Hacre"]. }
+    { iPureIntro. rewrite Ha0f. exact HG7s2. }
   Qed.
 
 End ProofCreateFailMkdir.

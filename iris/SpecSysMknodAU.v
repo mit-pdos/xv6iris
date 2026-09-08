@@ -1,6 +1,6 @@
 (* SpecSysMknodAU.v -- the mknod/create family's PURE VOCABULARY LEAF: the
    device-number reading of a syscall argument, the abstract child
-   [SpecCreate.create_made] leaves behind, and nameiparent's hop-name
+   [FsAbsCreateFire.create_made] leaves behind, and nameiparent's hop-name
    family.  It re-exports [FsAbsDelta], so every consumer of the create
    delta and its row algebra sees the same names through this file.
 
@@ -73,7 +73,7 @@ Require Import IrefSlots.
 Require Import IcacheEscrow.
 Require Import FileInvDefs.
 Require Import ProcInv.
-Require Import SpecCreate.      (* [create_slots], [T_DEVICE], [create_made] *)
+Require Import FsAbsCreateFire. (* [T_DEVICE], [create_made]                *)
 Require Import PathElems.       (* [path_elems], [SLASH] *)
 Require Import FsTree.          (* [fname] *)
 Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
@@ -117,7 +117,7 @@ Require Export FsAbsDelta.   (* [acre_bump], [delta_create] + its row algebra *)
    the insert needs the node's row) *)
 
 (* the abstract child create's non-directory success arm leaves behind:
-   [SpecCreate.create_made] read through [abs_of] *)
+   [FsAbsCreateFire.create_made] read through [abs_of] *)
 Lemma abs_of_create_dev (n : fs_node) (major minor : mword 16) :
   fn_rec n = create_made T_DEVICE major minor ->
   abs_of n

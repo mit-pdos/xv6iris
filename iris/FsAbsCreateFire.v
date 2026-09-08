@@ -39,9 +39,9 @@
    the content the parent leg reads -- for a directory the dots are in, and
    they NAME THE TWO INUMS, which is why [acre_commit_at_gen] takes the
    content as a function of (parent, child) and [acre_commit_at c] is its
-   constant instance.  The AU twins ([SpecCreateAU] at a device,
-   [SpecCreateAUF] at a file) stay on the constant form; the general create
-   ([SpecCreate], mkdir's only path) takes the function.
+   constant instance.  A TYPE-PINNED CALLER holds the constant form and
+   [SpecCreate.cre_commits_of_dev] / [cre_commits_of_file] move it to the
+   function; a directory child needs the function itself.
 
    ==== THE DOTS COMMIT IS INDEXED BY WHAT LANDED =======================
 
@@ -88,6 +88,65 @@ Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
+(*  0-.  THE TYPE LITERALS AND THE RECORD create LEAVES BEHIND (pure)     *)
+(*                                                                        *)
+(*  create's own vocabulary, stated here rather than in [SpecCreate]      *)
+(*  because the era walk's fires ([FsAbsMknodFire]) and the mknod          *)
+(*  vocabulary leaf ([SpecSysMknodAU]) both read it and both sit BELOW     *)
+(*  the create contract, which names their walk package in turn.          *)
+(* ===================================================================== *)
+
+(* the two type literals the found arm's tests decide against, as the
+   halfwords the [li a5,2] / [bltu a4,a5] pair compares.  [T_DIR] is
+   SpecDirlookup's. *)
+Definition T_FILE : mword 16 := mword_of_int 2.
+Definition T_DEVICE : mword 16 := mword_of_int 3.
+
+Lemma T_FILE_value : bv_unsigned T_FILE = 2.
+Proof. reflexivity. Qed.
+
+Lemma T_DEVICE_value : bv_unsigned T_DEVICE = 3.
+Proof. reflexivity. Qed.
+
+(* (L5) at two of the three literal types the three entries pass ([T_DIR]'s
+   is [SpecCreate.T_DIR_ty_ok], where [SpecDirlookup] is in scope).  NAMED
+   rather than spliced at each call site: [ireg_ty_ok_w] is a four-way
+   disjunction and an inline [ltac:] would pick its arm before the argument
+   is unified (durable-disk 2b-inode-3). *)
+Lemma T_FILE_ty_ok : InodeRegion.ireg_ty_ok_w T_FILE.
+Proof. right. right. left. reflexivity. Qed.
+
+Lemma T_DEVICE_ty_ok : InodeRegion.ireg_ty_ok_w T_DEVICE.
+Proof. right. right. right. reflexivity. Qed.
+
+(* THE RECORD THE NON-DIRECTORY ALLOCATE ARM LEAVES BEHIND: ialloc's
+   claimed record with the three halfword stores at +0x90 / +0x94 / +0x9a
+   applied, and nothing else -- create never touches size or addrs, and
+   on the non-directory arm no dirlink runs on [ip].  Named so that
+   sys_open (S6) and sys_mknod can state their own posts against it.  On
+   the DIRECTORY arm the same three fields hold, but the size is 32 and
+   [addrs !!! 0] is the block the two entries went into, so only the
+   FIELD facts are claimed there. *)
+Definition create_made (ty major minor : mword 16) : dinode :=
+  MkDinode ty major minor (mword_of_int 1 : mword 16) (bv_0 32)
+           (replicate 13 (bv_0 32)).
+
+Lemma create_made_type ty major minor :
+  di_type (create_made ty major minor) = ty.
+Proof. reflexivity. Qed.
+
+Lemma create_made_nlink ty major minor :
+  bv_unsigned (di_nlink (create_made ty major minor)) = 1.
+Proof. reflexivity. Qed.
+
+Lemma create_made_size ty major minor :
+  bv_unsigned (di_size (create_made ty major minor)) = 0.
+Proof. reflexivity. Qed.
+
+Lemma create_made_wf ty major minor : dinode_wf (create_made ty major minor).
+Proof. rewrite /dinode_wf /create_made /=. reflexivity. Qed.
+
+(* ===================================================================== *)
 (*  0.  THE CHILD'S CONTENT, BY TYPE (pure)                               *)
 (* ===================================================================== *)
 
@@ -125,6 +184,23 @@ Qed.
 Lemma acre_bump_cre_child_dir (ma mi d i : Z) :
   acre_bump (cre_child T_DIR_z ma mi d i) = 1%nat.
 Proof. rewrite cre_child_dir //. Qed.
+
+(* ...and the two PINNED readings the type-pinned consumers take: at the
+   file and the device literals the child's content does not depend on the
+   two inums at all, so the general commit is the constant one. *)
+Lemma cre_c0_file (ma mi : Z) : cre_c0 (bv_unsigned T_FILE) ma mi = AFile [].
+Proof. reflexivity. Qed.
+
+Lemma cre_child_file (ma mi d i : Z) :
+  cre_child (bv_unsigned T_FILE) ma mi d i = AFile [].
+Proof. reflexivity. Qed.
+
+Lemma cre_c0_dev (ma mi : Z) : cre_c0 (bv_unsigned T_DEVICE) ma mi = ADev ma mi.
+Proof. reflexivity. Qed.
+
+Lemma cre_child_dev (ma mi d i : Z) :
+  cre_child (bv_unsigned T_DEVICE) ma mi d i = ADev ma mi.
+Proof. reflexivity. Qed.
 
 (* ===================================================================== *)
 (*  0b.  THE ERA NODE'S ROW, AT THE THREE COUNTS A LEG SEES (pure)        *)
@@ -227,6 +303,22 @@ Section CreateFire.
       (Φ : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     acre_commit_at_gen Γ E (fun _ _ => c) Φ.
 
+  (* the child-content index is used POINTWISE, so a pointwise equality
+     moves the commit.  Named because the two type-pinned readings of
+     [cre_child] are equalities between FUNCTIONS that print identically
+     and are only convertible (durable-notes, "Terms that print
+     identically"): [iApply] this rather than [rewrite]. *)
+  Lemma acre_commit_at_gen_ext Γ (E : coPset) (cf cf' : Z -> Z -> absnode)
+      (Φ : aview -> Z -> fname -> Z -> iProp Σ) :
+    (forall d i, cf d i = cf' d i) ->
+    acre_commit_at_gen Γ E cf Φ -∗ acre_commit_at_gen Γ E cf' Φ.
+  Proof.
+    intros Hext. rewrite /acre_commit_at_gen. iIntros "H".
+    iIntros (I d i nm ents nl) "%Hpre Ha".
+    rewrite -(Hext d i) in Hpre. rewrite -(Hext d i).
+    iApply ("H" with "[//] Ha").
+  Qed.
+
   (* THE ARM: the row APPEARS.  The view has no row at [i] (the claim box
      is at count 0) but the MAP has one -- the child's inum is a region
      row -- which is what lets the generic discharger pay the step off the
@@ -293,6 +385,15 @@ Section CreateFire.
       (d : Z) (nm : fname) (i : Z) (c : absnode) : iProp Σ :=
     (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
        ⌜cre_pre av d nm ents nl i c⌝ ∗ Φ av d nm i)%I.
+
+  (* ...and the EXISTS OBSERVATION's receipt: the name WAS in the parent's
+     entry map at the instant create's own [dirlookup] read it, and nothing
+     moved. *)
+  Definition cre_ex_fired (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (d : Z) (nm : fname) (i : Z) : iProp Σ :=
+    (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
+       ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗ ⌜ents !! nm = Some i⌝ ∗
+       Φ av d nm i)%I.
 
   (* the child's two legs, as the AU twins' arms carry them: both commits
      back UNFIRED, or the do-then-undo PAIR (ruling Q-h) *)

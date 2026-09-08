@@ -72,9 +72,9 @@
 
    ==== THE ARMS ========================================================
 
-   ret 0  -- [mknod_post_ok]: [SpecCreateAU.cau_ok] at the fetched path,
-             under an [exists i] beside the region bound create's own post
-             states.  A [ret = 0] is a RECEIPT UNCONDITIONALLY: the era
+   ret 0  -- [mknod_post_ok]: create's ARM C-OK read at [T_DEVICE]
+             ([SpecCreate.cre_ok_arms_dev]) at the fetched path, under an
+             [exists i] beside the region bound create's own post states.  A [ret = 0] is a RECEIPT UNCONDITIONALLY: the era
              walk takes a relative start ([FsAbsStart.ep_start] -- the
              trace deferred in the START INUM), so the proof calls ONE
              create contract for every fetched string and there is no
@@ -83,7 +83,9 @@
              (relative, cwd = ROOTINO).
    ret -1 -- [mknod_post_fail]: nothing fs-visible happened (argstr
              failed) and the whole bundle comes back unspent, or
-             [SpecCreateAU.cau_fail] under an [exists pl] (the walk died,
+             create's failure fold read at [T_DEVICE]
+             ([SpecCreate.cre_fail_arms_dev]) under an [exists pl] (the
+             walk died,
              or create failed at the parent -- either the
              exists-observation fired at a name the parent already held,
              or no abstract observation is available to report).
@@ -213,7 +215,6 @@ Require Import FsTree.
 Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.   (* [dev_arg]: the device numbers' reading *)
 Require Import FsAbsMknodFire.   (* the commits and the walk premise     *)
-Require Import SpecCreateAU.     (* [cau_ok] / [cau_fail]                *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)              *)
 Require Import PathElems.        (* [path_elems]                         *)
@@ -256,14 +257,26 @@ Section SysMknod.
      (* ...and the CHILD's two legs, unfired *)
      ∗ cre_child_unfired Γ (ADev ma mi) Φarm Φun)%I.
 
-  (* ret 0's real arm: [SpecCreateAU.cau_ok] at the fetched path, beside
-     the region bound create's own post already states. *)
+  (* ret 0's real arm: create's ARM C-OK read at [T_DEVICE]
+     ([SpecCreate.cre_ok_arms_dev]) at the fetched path, beside the region
+     bound create's own post already states.  [made] does not key it: at a
+     device type the found arm cannot succeed ([cre_made_of_ne_file]), so
+     the fresh arm is the only one a zero return can come from. *)
   Definition mknod_post_ok Γ (ma mi : Z) (P : nat -> Z -> iProp Σ)
       (Φarm Φun : aview -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∃ (pl : list (bv 8)) (i : Z),
        ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
-       cau_ok Γ ma mi P Φarm Φun Φok Φex pl i)%I.
+       ∃ (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z) (nl : nat),
+         ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+         ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
+         P (length (mknod_parent_elems pl)) d ∗
+         dlookup_commit_at Γ appE Φex ∗
+         Φok av d nm i ∗
+         (* ...AND THE CHILD'S OWN LEG: the row APPEARED at this inum before
+            the parent's entry went in, so the ARM's receipt rides beside
+            [cre_pre]; the UNARM comes home unfired. *)
+         cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun)%I.
 
   (* ret -1's two-way fold: nothing fs-visible happened (argstr failed)
      and the whole bundle comes back, or create's own failure fold (the
@@ -274,7 +287,27 @@ Section SysMknod.
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (mknod_au_pre Γ γfs cw ma mi P Pmiss Φarm Φun Φok Φex
      ∨ (∃ pl : list (bv 8),
-          cau_fail Γ γfs ma mi P Pmiss Φarm Φun Φok Φex pl))%I.
+          (* create's own failure fold read at [T_DEVICE]
+             ([SpecCreate.cre_fail_arms_dev]): the walk died and everything
+             is whole, or the cursor comes home with the exists observation
+             fired (ARM F-BAD) or not, and the child's legs whole or the
+             do-then-undo PAIR (ruling Q-h). *)
+          ((mknod_walk_dead_era γfs P Pmiss pl
+              ∗ acre_commit_at Γ appE (ADev ma mi) Φok
+              ∗ dlookup_commit_at Γ appE Φex
+              ∗ cre_child_unfired Γ (ADev ma mi) Φarm Φun)
+           ∨ (∃ d : Z,
+                P (length (mknod_parent_elems pl)) d
+                ∗ acre_commit_at Γ appE (ADev ma mi) Φok
+                ∗ ((∃ (av : aview) (i : Z) (nm : fname)
+                      (ents : gmap fname Z) (nl : nat),
+                      ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                      ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
+                      ⌜ents !! nm = Some i⌝ ∗
+                      Φex av d nm i)
+                   ∨ dlookup_commit_at Γ appE Φex)
+                ∗ (cre_child_unfired Γ (ADev ma mi) Φarm Φun
+                   ∨ ∃ i : Z, cre_child_pair Φarm Φun i)))))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0.  NO
      ESCAPE on the [ret = 0] arm: the walk takes the relative start, so a
