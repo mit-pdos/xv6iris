@@ -1,6 +1,6 @@
 (* ProofSysOpenAUPub.v -- ARM S (+0xb8) AND THE PUBLICATION, at the ARMED
    post: the publication tail with [SpecSysOpen.sys_open_post]
-   replaced by [SpecSysOpenAU.open_post_ok_plain]'s success arm.
+   replaced by [SpecSysOpen.open_post_ok_plain]'s success arm.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
    prover).  A PARALLEL block beside the landed one; the failure tails
@@ -95,6 +95,7 @@ Local Open Scope Z_scope.
 
 Require Import FsBytesGamma.
 Require Import SpecSysOpenAU.
+Require Import SpecSysOpen.   (* the arms this block builds *)
 Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
 Require Import FsAbsDefs.

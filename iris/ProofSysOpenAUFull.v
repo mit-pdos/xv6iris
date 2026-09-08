@@ -1,42 +1,40 @@
-(* ProofSysOpenAUFull.v -- sys_open's ATOMIC-UPDATE walk, O_CREATE ARM, and
-   THE WHOLE SEAL: [SpecSysOpenAU.SYSOPEN_AU], both parameters.
+(* ProofSysOpenAUFull.v -- sys_open's walk, O_CREATE ARM, and THE SEAL:
+   [SpecSysOpen.SYSOPEN], its one parameter [wp_sys_open].
 
-   Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
-   prover).  R10: [SpecSysOpenAU] does not move, the landed plain walk does
-   not move, and neither does any block below the join.
+   ==== THE ONE PARAMETER, AND HOW IT IS DISCHARGED ====================
 
-   ==== THE TWO PARAMETERS, AND HOW EACH IS DISCHARGED =================
+   [wp_sys_open_body] is the frame at [open_in] and [open_arms], both an
+   [if om_create vom] -- the key the [andi a5,a5,512] / [c.beqz] pair at
+   +0x36 decides.  [wp_sys_open] destructs that bool and hands each side
+   to its arm's theorem.  There are two arm theorems and no more:
 
-   [wp_sys_open_au_plain] is NOT re-proved.  [ProofSysOpenAU]'s
-   [SysOpenAUPlainProof] is a real theorem at a statement that is
-   [SpecSysOpenAU.wp_sys_open_au_plain_body] BYTE FOR BYTE, so the full
-   seal instantiates
-   that functor at the same twelve callees and RE-EXPORTS it.  The two
-   arms therefore cannot drift: there is one proof of the plain arm in the
-   tree, not two.
+   The plain arm is NOT re-proved here.  [ProofSysOpenAU]'s
+   [SysOpenPlainProof] is a real theorem at [wp_sys_open_plain_body], so
+   this functor instantiates it at the same twelve callees ([Plain]) and
+   applies it.  The two arms therefore cannot drift: there is one proof of
+   the plain arm in the tree, not two.
 
-   [wp_sys_open_au_create] is this file's own walk.  It is
-   [ProofSysOpenAU]'s entry -- +0x00 .. +0x36, ARM 0, the omode split --
-   with the branch at +0x36 read the OTHER WAY: [om_create vom = true]
-   makes the [andi]'s mask nonzero, so the [c.beqz] FALLS THROUGH, the
-   plain arm is refuted rather than proved, and control reaches
-   [ProofSysOpenAUEntryC.so_entry_c_au] at +0x38.  ARM 0 is the same
-   branch above begin_op and hands the WHOLE AU bundle back -- create's
-   two commits included, which is exactly [open_post_fail_create]'s first
-   disjunct.
+   [wp_sys_open_create] is this file's own walk.  It is [ProofSysOpenAU]'s
+   entry -- +0x00 .. +0x36, ARM 0, the omode split -- with the branch at
+   +0x36 read the OTHER WAY: [om_create vom = true] makes the [andi]'s mask
+   nonzero, so the [c.beqz] FALLS THROUGH, the plain arm is refuted rather
+   than proved, and control reaches [ProofSysOpenAUEntryC.so_entry_c_au] at
+   +0x38.  ARM 0 is the same branch above begin_op and hands the WHOLE
+   bundle back -- create's two commits included, which is exactly
+   [open_post_fail_create]'s first disjunct.
 
-   ==== WHAT THIS FILE ADDS TO THE PLAIN ENTRY, AND NOTHING ELSE =======
+   ==== WHAT THE CREATE ARM ADDS TO THE PLAIN ENTRY, AND NOTHING ELSE ==
 
      - two more caller predicates ([Φok], [Φex]) on the binder list;
      - the bundle destructed at [open_au_pre_create] (five pieces, not
        three);
-     - the exit continuation at [so_cont0_au_create] -- [so_cont0_au]
-       with [open_arms_plain] replaced by [open_arms_create];
+     - the exit continuation at [so_cont0_au_create] -- [so_cont0_au] with
+       [open_arms_plain] replaced by [open_arms_create];
      - the branch, mirrored.
 
    Everything else -- argint, argstr, the frame carve, the omode slot
-   split, the shrink-wrapped s1 save, begin_op, the [lw]/[andi] pair --
-   is the plain entry's text, because it is the same machine code.
+   split, the shrink-wrapped s1 save, begin_op, the [lw]/[andi] pair -- is
+   the plain entry's text, because it is the same machine code.
 
    BINDERS: [ProofSysOpenAU]'s list verbatim. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
@@ -102,9 +100,10 @@ Local Open Scope Z_scope.
 Require Import FsTree.
 Require Import SpecNameiEra.
 Require Import SpecSysOpenAU.
+Require Import SpecSysOpen.   (* the ONE contract: the frame, the arms, [SYSOPEN] *)
 Require Import ProofSysOpenAUBits.
 Require Import SpecCreateAUF.        (* the T_FILE create-AU carry        *)
-Require Import ProofSysOpenAU.       (* [SysOpenAUPlainProof]: the plain arm *)
+Require Import ProofSysOpenAU.       (* [SysOpenPlainProof]: the plain arm *)
 Require Import ProofSysOpenAUEntryC. (* [so_entry_c_au], [so_cont0_au_create] *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
@@ -122,24 +121,24 @@ Local Ltac regne :=
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
 
-Module SysOpenAUProof (Argint : ARGINT) (Argstr : ARGSTR)
+Module SysOpenProof (Argint : ARGINT) (Argstr : ARGSTR)
                       (BeginOp : BEGIN_OP) (NameiEra : NAMEI_ERA)
                       (Ilock : ILOCK) (Iunlock : IUNLOCK)
                       (Iunlockput : IUNLOCKPUT) (EndOp : END_OP)
                       (Fileclose : FILECLOSE) (Itrunc : ITRUNC)
                       (Filealloc : FILEALLOC) (Fdalloc : FDALLOC)
                       (CreateAUF : CREATE_AUF)
-  : SYSOPEN_AU.
+  : SYSOPEN.
 
-(* THE PLAIN ARM, RE-EXPORTED (header): one proof, two seals. *)
-Module Plain := SysOpenAUPlainProof Argint Argstr BeginOp NameiEra Ilock
+(* THE PLAIN ARM, at the twelve callees it shares with the create arm:
+   one proof, applied under the key. *)
+Module Plain := SysOpenPlainProof Argint Argstr BeginOp NameiEra Ilock
                                     Iunlock Iunlockput EndOp Fileclose
                                     Itrunc Filealloc Fdalloc.
 
 Module EntryC := SysOpenAUEntryC CreateAUF Iunlock Iunlockput EndOp
                                  Fileclose Itrunc Filealloc Fdalloc.
 
-Definition wp_sys_open_au_plain := @Plain.wp_sys_open_au_plain.
 
 Section ProofSysOpenAUFullBody.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -157,7 +156,7 @@ Section ProofSysOpenAUFullBody.
   Notation Ra5 := (mword_of_int 15 : mword 5).
   Notation Rz  := (mword_of_int 0 : mword 5).
 
-  Lemma wp_sys_open_au_create `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma wp_sys_open_create `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -172,12 +171,12 @@ Section ProofSysOpenAUFullBody.
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
-    wp_sys_open_au_create_body gfl gf gs j gl pd pav pu
+    wp_sys_open_create_body gfl gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v vom
                            pid U sts m K eb b lks P Pmiss Φarm Φun Φok Φex Φo Φt.
   Proof.
-    cbv beta zeta delta [wp_sys_open_au_create_body wp_sys_open_au_frame].
+    cbv beta zeta delta [wp_sys_open_create_body wp_sys_open_frame].
     intros Hcr HK HdevR Hnib0 Hgeom Hsize
            Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hush
            Hprkc Hnsb Hj Hgl Heb Hargv Hargvom.
@@ -873,6 +872,40 @@ Section ProofSysOpenAUFullBody.
   Qed.
 
 
+  (* ===================================================================== *)
+  (*  THE ONE PARAMETER: the two arms under the code's own key             *)
+  (* ===================================================================== *)
+
+  (* [SpecSysOpen.open_in] and [open_arms] are the [if om_create vom] the
+     [andi]/[c.beqz] at +0x36 decides; each side is one of the two arm
+     statements above, so the seal is the destruct and nothing else.  The
+     plain arm is [Plain]'s theorem, not a second proof. *)
+  Lemma wp_sys_open `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+      (gfl gf : gname)
+      (gs : list gname) (j : nat) (gl : gname)
+      (pd pav pu : mword 64)
+      (ns : nat)
+      (dqb dqs dqbs dqn : dfrac)
+      (v vom : mword 64)
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φarm Φun : aview -> Z -> iProp Σ)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
+    wp_sys_open_body gfl gf gs j gl pd pav pu ns dqb dqs dqbs dqn v vom
+                     pid U sts m K eb b lks P Pmiss Φarm Φun Φok Φex Φo Φt.
+  Proof.
+    rewrite /wp_sys_open_body /open_in /open_arms.
+    destruct (om_create vom) eqn:Hcr.
+    - exact (wp_sys_open_create gfl gf gs j gl pd pav pu ns dqb dqs dqbs dqn
+               v vom pid U sts m K eb b lks P Pmiss Φarm Φun Φok Φex Φo Φt Hcr).
+    - exact (Plain.wp_sys_open_plain gfl gf gs j gl pd pav pu ns dqb dqs dqbs
+               dqn v vom pid U sts m K eb b lks P Pmiss Φo Φt Hcr).
+  Qed.
+
 End ProofSysOpenAUFullBody.
 
-End SysOpenAUProof.
+End SysOpenProof.

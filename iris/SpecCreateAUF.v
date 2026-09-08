@@ -4,7 +4,7 @@
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the T_FILE
    create-AU carry).  A PARALLEL FORM beside [SpecCreate.wp_create_sconf]
    and beside [SpecCreateAU.wp_create_au] -- R10: neither landed contract
-   moves, and neither does [SpecSysOpenAU].
+   moves, and neither does sys_open's contract.
 
    ==== WHY A SECOND AU CONTRACT, AND NOT A GENERAL-[ty] ONE ============
 
@@ -59,7 +59,7 @@
 
    ==== WHAT THE CONSUMER TAKES =========================================
 
-   [SpecSysOpenAU.open_post_ok_create]'s two disjuncts are [cauf_ok]'s two
+   [SpecSysOpen.open_post_ok_create]'s two disjuncts are [cauf_ok]'s two
    arms verbatim modulo the descriptor: FRESH wants [cre_pre av d nm ents
    nl i (AFile [])] with the create receipt and the exists commit back,
    EXISTS-OPENS wants the parent's row, the entry, the exists receipt and
@@ -202,7 +202,7 @@ Section CreateAUFSpec.
   (*  THE TWO PROJECTIONS THE CONSUMER'S PROVER USES                     *)
   (* ------------------------------------------------------------------ *)
 
-  (* [SpecSysOpenAU.open_post_ok_create]'s FRESH disjunct, minus the
+  (* [SpecSysOpen.open_post_ok_create]'s FRESH disjunct, minus the
      descriptor bundle and the inum bound. *)
   Lemma cauf_ok_fresh Γ P Φarm Φun Φok Φex pl (i : Z) :
     cauf_ok Γ P Φarm Φun Φok Φex pl true i ⊢

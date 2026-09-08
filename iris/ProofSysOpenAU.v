@@ -1,30 +1,28 @@
-(* ProofSysOpenAU.v -- sys_open's ATOMIC-UPDATE walk, PLAIN ARM.  The
-   theorem is [wp_sys_open_au_plain], at [SpecSysOpenAU]'s own
-   [wp_sys_open_au_plain_body]; the functor carries NO signature of its
-   own since [LinkSysOpenAUFull] seals [SYSOPEN_AU] whole (see the note
-   under WHAT IS NOT HERE).
+(* ProofSysOpenAU.v -- sys_open's walk, PLAIN ARM.  The theorem is
+   [wp_sys_open_plain], at [SpecSysOpen]'s own [wp_sys_open_plain_body] --
+   the ONE contract's body with the O_CREATE key decided [false].  The
+   functor carries no signature of its own: [ProofSysOpenAUFull] puts the
+   two arms under [SpecSysOpen.SYSOPEN]'s single parameter, so there is one
+   proof of this arm in the tree and no second module type to keep in step.
 
-   Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
-   prover).  THE walk: every failure tail ([ProofSysOpenTails]) and every
-   parts lemma ([ProofSysOpenParts]) is REUSED VERBATIM, because none of
-   them moves an fs-abstract resource.
+   THE walk: every failure tail ([ProofSysOpenTails]) and every parts lemma
+   ([ProofSysOpenParts]) is REUSED VERBATIM, because none of them moves an
+   fs-abstract resource.
 
    ==== THE FIVE BLOCKS, AND WHICH ONE OWES WHAT =======================
 
-     [ProofSysOpenAUWalk]    the else arm: the ERA namei walk (item 1) and
-                             THE TERMINAL OBSERVATION (item 2), fired the
-                             instant the child is locked; ARMs B-FAIL and
-                             C-FAIL.
-     [ProofSysOpenAUJoin]    the T_DEVICE test and the major bound (item
-                             6); ARM D-FAIL.
+     [ProofSysOpenAUWalk]    the else arm: the ERA namei walk and THE
+                             TERMINAL OBSERVATION, fired the instant the
+                             child is locked; ARMs B-FAIL and C-FAIL.
+     [ProofSysOpenAUJoin]    the T_DEVICE test and the major bound; ARM
+                             D-FAIL.
      [ProofSysOpenAUAlloc]   filealloc / fdalloc and the descriptor's TYPE;
                              ARMs E-FAIL and F-FAIL.
-     [ProofSysOpenAUStores]  the field stores and THE O_TRUNC FIRE (item
-                             3), fused with the retag; the three success
-                             arms.
+     [ProofSysOpenAUStores]  the field stores and THE O_TRUNC FIRE, fused
+                             with the retag; the three success arms.
      [ProofSysOpenAUPub]     ARM S: the publication, with the descriptor
-                             TYPED (item 4) and the mode bits read off the
-                             caller's own omode word (item 5).
+                             TYPED and the mode bits read off the caller's
+                             own omode word.
 
    ==== THIS FILE: THE ENTRY, ARM 0, AND THE O_CREATE SPLIT =============
 
@@ -32,20 +30,15 @@
    makes the [andi a5,a5,512] leave zero
    ([ProofSysOpenAUBits.soau_create_zero]), so the [c.beqz] is TAKEN and
    the create arm is refuted rather than proved -- which is what makes this
-   file 300 lines shorter than the landed walk's entry and is the whole
+   file 300 lines shorter than a walk that proves both and is the whole
    content of the exclusion-by-premise pattern at this altitude.
 
-   ARM 0 (argstr refused) hands the WHOLE AU bundle back unspent: nothing
+   ARM 0 (argstr refused) hands the WHOLE bundle back unspent: nothing
    fs-visible happened, and the branch is above begin_op.
 
    ==== WHAT IS NOT HERE ===============================================
 
-   The O_CREATE arm, which is [ProofSysOpenAUFull]'s.  That file
-   INSTANTIATES this functor for its plain parameter and seals
-   [SpecSysOpenAU.SYSOPEN_AU] whole, so there is one proof of this arm in
-   the tree and no second module type to keep in step: the split-off
-   [SYSOPEN_AU_PLAIN], which existed only while the create arm was
-   unproved, is retired and this module is unascribed. *)
+   The O_CREATE arm, which is [ProofSysOpenAUFull]'s. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -108,6 +101,7 @@ Local Open Scope Z_scope.
 
 Require Import SpecNameiEra.
 Require Import SpecSysOpenAU.
+Require Import SpecSysOpen.   (* the ONE contract: the frame, the arms, [SYSOPEN] *)
 Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUWalk.
@@ -127,7 +121,7 @@ Local Ltac regne :=
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
 
-Module SysOpenAUPlainProof (Argint : ARGINT) (Argstr : ARGSTR)
+Module SysOpenPlainProof (Argint : ARGINT) (Argstr : ARGSTR)
                            (BeginOp : BEGIN_OP) (NameiEra : NAMEI_ERA)
                            (Ilock : ILOCK) (Iunlock : IUNLOCK)
                            (Iunlockput : IUNLOCKPUT) (EndOp : END_OP)
@@ -189,7 +183,7 @@ Section ProofSysOpenAUBody.
   (*  an ordinary [destruct] on the mask's [eq_vec] and no bit lemma is  *)
   (*  spent here.                                                       *)
   (* ================================================================== *)
-  Lemma wp_sys_open_au_plain `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma wp_sys_open_plain `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -202,12 +196,12 @@ Section ProofSysOpenAUBody.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
-    wp_sys_open_au_plain_body gfl gf gs j gl pd pav pu
+    wp_sys_open_plain_body gfl gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v vom
                            pid U sts m K eb b lks P Pmiss Φo Φt.
   Proof.
-    cbv beta zeta delta [wp_sys_open_au_plain_body wp_sys_open_au_frame].
+    cbv beta zeta delta [wp_sys_open_plain_body wp_sys_open_frame].
     intros Hncr HK HdevR Hnib0 Hgeom Hsize
            Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hush
            Hprkc Hnsb Hj Hgl Heb Hargv Hargvom.
@@ -903,4 +897,4 @@ Section ProofSysOpenAUBody.
 
 End ProofSysOpenAUBody.
 
-End SysOpenAUPlainProof.
+End SysOpenPlainProof.

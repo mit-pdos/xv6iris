@@ -2956,7 +2956,7 @@ Section InodeRegion.
      claude-notes/projects/durable-disk.md item 1c.  Measured before
      deviating: [ireg_inv] appears in the STATEMENT of 203 definitions
      across 74 files, nearly all of them syscall-level contracts
-     ([wp_sys_open_sconf_body], [SpecKexec.fs_fabric],
+     ([SpecSysOpen.wp_sys_open_frame], [SpecKexec.fs_fabric],
      [FsSyscalls.fs_world_all]) that have no business naming the block
      layer's home set and no way to obtain one; IcacheRef.v's own header
      already records that "[ireg_inv], whose arity is fixed by 30-odd fs

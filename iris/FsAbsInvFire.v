@@ -57,9 +57,8 @@ Require Import BitmapInv.
 Require Import IrefSlots.
 Require Import FileInvDefs.               (* [is_ftable], [fnode] *)
 Require Import ProcInv.
-Require Import SpecSysOpen.     (* the landed contract this file states a
-                                   parallel form beside; [K_sys_open],
-                                   [sys_open_slots] *)
+Require Import SpecSysOpen.     (* sys_open's ONE contract: [open_in], the
+                                   key its input is stated at *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -381,6 +380,21 @@ Section FsAbsInvFire.
     iSplitR; [iApply fsabs_dlookup |].
     iSplitR; [iApply fsabs_aopen |].
     iSplitR; [iApply (fsabs_atrunc with "Hai") | iApply (fsabs_child with "Hai")].
+  Qed.
+
+  (* ...AND THE ONE INPUT sys_open's contract takes, at the key the code
+     branches on: the dispatcher hands this and never chooses an arm
+     itself ([SpecSysOpen.open_in]). *)
+  Lemma fsabs_open_in (γfs : fs_names) (cw : Z) (vom : mword 64) :
+    app_inv γfs -∗
+    open_in (fs_gamma_L γfs) γfs cw vom (fun _ _ => True%I) (fun _ _ => True%I)
+      (fun _ _ => True%I) (fun _ _ => True%I)
+      (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
+      (fun _ _ _ => True%I) (fun _ _ _ => True%I).
+  Proof.
+    iIntros "#Hai". rewrite /open_in. destruct (om_create vom).
+    - iApply (fsabs_open_pre_create with "Hai").
+    - iApply (fsabs_open_pre_plain with "Hai").
   Qed.
 
   Lemma fsabs_mknod_pre (γfs : fs_names) (cw : Z) (ma mi : Z) :

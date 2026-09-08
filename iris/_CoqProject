@@ -1568,7 +1568,6 @@ ProofSysOpenAUAlloc.v
 ProofSysOpenAUJoin.v
 ProofSysOpenAUWalk.v
 ProofSysOpenAU.v
-LinkSysOpenAU.v
 
 # fs-syscall-specs lane P, transport half: the era-0 identification that
 # closes lane P GAP (1) -- the map the boot mint founds the era at IS
@@ -1581,13 +1580,12 @@ ProofSysDupAU.v
 LinkSysDupAU.v
 FsAbsReadFire.v
 # fs-syscall-specs lane W: the T_FILE CREATE CARRY, which unlocks
-# SpecSysOpenAU's O_CREATE arm.  FsAbsCreateFire is FIRE 2 at a
+# sys_open's O_CREATE arm.  FsAbsCreateFire is FIRE 2 at a
 # NON-DIRECTORY child ([mkf_acre_fire] is device-pinned only through
 # [delta_create_dev], whose proof needs nothing but "not a directory");
 # SpecCreateAUF/ProofCreateAUF/LinkCreateAUF are SpecCreateAU's twin at
 # [ty = T_FILE], where the mkdir arm stays refuted but ARM F-OK comes back;
-# SpecCreateAUFOpen is the bridge into SpecSysOpenAU's create arms.
-# R10: SpecCreate, SpecCreateAU and SpecSysOpenAU are untouched.
+# SpecCreateAUFOpen is the bridge into SpecSysOpen's create arms.
 SpecCreateAUF.v
 ProofCreateAUF.v
 LinkCreateAUF.v
@@ -1598,16 +1596,14 @@ SpecCreateAUFOpen.v
 # shim predicates and converts the armed post afterwards.
 # ProofSysOpenAUEntryC is +0x38..+0x48 and ARM A-FAIL; ProofSysOpenAUFull
 # is the entry with the +0x36 branch mirrored, and it SEALS
-# SpecSysOpenAU.SYSOPEN_AU WHOLE -- the plain parameter is the landed
-# ProofSysOpenAU proof, re-exported through its own functor, so there is
-# one proof of that arm in the tree and not two.  That is also what
-# RETIRED SpecSysOpenAUPlain.v: with the whole contract sealed, the
-# split-off module type had no consumer, and ProofSysOpenAU's functor is
+# SpecSysOpen.SYSOPEN -- ONE parameter, keyed on om_create, with the plain
+# arm applied from ProofSysOpenAU's own functor, so there is one proof of
+# that arm in the tree and not two, and ProofSysOpenAU's functor is
 # unascribed.
 ProofSysOpenAUCreArm.v
 ProofSysOpenAUEntryC.v
 ProofSysOpenAUFull.v
-LinkSysOpenAUFull.v
+LinkSysOpen.v
 FsAbsWriteFire.v
 # fs-syscall-specs, THE CONSOLE-WRITE LANE: init.c's printf path, and the
 # campaign's last device-side gap on init.  The observable is ACCEPTANCE --

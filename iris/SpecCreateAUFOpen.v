@@ -1,9 +1,9 @@
 (* SpecCreateAUFOpen.v -- the T_FILE create carry's payouts, FOLDED INTO
-   [SpecSysOpenAU]'s O_CREATE arms.
+   [SpecSysOpen]'s O_CREATE arms.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the T_FILE
    create-AU carry).  A BRIDGE LEAF: it requires both [SpecCreateAUF] and
-   [SpecSysOpenAU] and moves neither (R10).  It is a separate file rather
+   sys_open's contract, and moves neither.  It is a separate file rather
    than a section of [SpecCreateAUF] because the carry is not open's --
    [SpecCreateAUF] must not depend on the syscall that happens to consume
    it first (sys_link and sys_mkdir will want the same carry at their own
@@ -31,7 +31,7 @@
    that correspondence as a theorem about the parts create DOES own, so
    the consumer's prover can see it fail if the contract ever drifts.
 
-   BINDERS: [SpecSysOpenAU]'s section list ([SpecCreate]'s plus [GenId],
+   BINDERS: [SpecSysOpen]'s arms section list ([SpecCreate]'s plus [GenId],
    which the open arms carry for [proc_priv]) -- but nothing here mentions
    a process, so [GenId] is NOT bound: the definitions this file speaks
    about are the AU sides alone. *)
@@ -56,7 +56,9 @@ Require Import Xv6G.
 Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]         *)
 Require Import FsAbsCreateFire.   (* the two commits                         *)
 Require Import SpecCreateAUF.    (* [cauf_ok], [cauf_fail]                  *)
-Require Import SpecSysOpenAU.    (* the consumer, which does NOT move       *)
+Require Import SpecSysOpenAU.    (* the family's statement leaf             *)
+Require Import SpecSysOpen.      (* [open_post_fail_create]/[open_post_ok_create],
+                                    the arms this file feeds                *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.
@@ -75,7 +77,7 @@ Section CreateAUFOpen.
 
   (* create failed, so sys_open fails past it with NOTHING of its own
      fired.  The three alternatives land as follows -- and the numbering is
-     [SpecSysOpenAU]'s own:
+     [SpecSysOpen.open_post_fail_create]'s own:
 
        cauf_fail LEFT (the walk died)      -> the dead-walk disjunct
        cauf_fail RIGHT, Φex FIRED (F-BAD)  -> (b), with [aopen_commit_at]

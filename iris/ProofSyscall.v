@@ -433,7 +433,7 @@ Module SyscallProof
     (SysPause : SYSPAUSE) (SysUptime : SYSUPTIME) (SysWrite : SYSWRITE)
     (SysMknod : SYSMKNOD) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
     (SysClose : SYSCLOSE) (SysSync : SYS_SYNC)
-    (SysOpen : SYSOPEN_AU) (SysUnlink : SYSUNLINK_AU)
+    (SysOpen : SYSOPEN) (SysUnlink : SYSUNLINK_AU)
     (Myproc : MYPROC) (Printk : PRINTK_GEN) : SYSCALL.
 
 (* ONE SECTION PER HART EPOCH.  Every piece below concludes in [WP Loop],
@@ -5818,11 +5818,11 @@ Section SyscallArms.
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     (* the array's length, which bounds the descriptor open returns *)
     iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
-    (* THE AU CONTRACT, keyed by the O_CREATE bit of the caller's own
-       omode word (the two sealed forms of [SpecSysOpenAU]), at the trivial
-       bundle ([FsAbsInvFire.fsabs_open_pre_plain] / [_create]); the landed
-       [sys_open_post] this arm consumes is read back off the arms
-       ([open_arms_plain_landed] / [open_arms_create_landed]). *)
+    (* THE ONE CONTRACT.  Its input and its arms are keyed on the O_CREATE
+       bit of the caller's own omode word, so this arm chooses nothing: it
+       hands the trivial input ([FsAbsInvFire.fsabs_open_in]) and reads the
+       landed [sys_open_post] back off the arms
+       ([SpecSysOpen.open_arms_landed]). *)
     iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
     iAssert (wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (ns' : nat) (P' : uptd),
@@ -5845,51 +5845,30 @@ Section SyscallArms.
         WP (Loop : expr riscv_lang)) -∗ WP (Loop : expr riscv_lang))%I
       with "[Hcg Hcpu Htcx Hccx Hpc Hbs Hir Hfd0 Hpriv Hufrag]" as "Hk".
     { iIntros "Hcont'".
-      destruct (om_create v1) eqn:Hcre.
-      - iApply (SysOpen.wp_sys_open_au_create γft γf γs j γl
-                  (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
-                  DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
-                  v0 v1 pid U sts M (av - 4)%nat true true ∅
-                  (fun _ _ => True%I) (fun _ _ => True%I)
-                  (* create's child legs, at the trivial families too
-                     (round E2, lane E2-C) *)
-                  (fun _ _ => True%I) (fun _ _ => True%I)
-                  (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
-                  (fun _ _ _ => True%I) (fun _ _ _ => True%I)
-                  Hcre ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
-                  Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
-                  ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1
-                  with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hftable Hbio Hlog
-                        Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
-                        Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
-                        Hfd0 Hpriv Hufrag []").
-        { iApply (fsabs_open_pre_create with "Hfsabs"). }
-        iIntros (CIDy Hsy mf ns' P')
-          "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
-        iDestruct (open_arms_create_landed with "Harms") as "Hpost".
-        iSpecialize ("Hcont'" $! CIDy with "[//]").
-        iApply ("Hcont'" $! mf ns' P' with "[//] [//] Hcg Hcpu Htcx2 Hccx2 Hpc Hbs
-                  Hsbn Hisp Hsbs Hbmp [//] Hir Hpost").
-      - iApply (SysOpen.wp_sys_open_au_plain γft γf γs j γl
-                  (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
-                  DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
-                  v0 v1 pid U sts M (av - 4)%nat true true ∅
-                  (fun _ _ => True%I) (fun _ _ => True%I)
-                  (fun _ _ _ => True%I) (fun _ _ _ => True%I)
-                  Hcre ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
-                  Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
-                  ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1
-                  with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hftable Hbio Hlog
-                        Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
-                        Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
-                        Hfd0 Hpriv Hufrag []").
-        { iApply (fsabs_open_pre_plain with "Hfsabs"). }
-        iIntros (CIDy Hsy mf ns' P')
-          "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
-        iDestruct (open_arms_plain_landed with "Harms") as "Hpost".
-        iSpecialize ("Hcont'" $! CIDy with "[//]").
-        iApply ("Hcont'" $! mf ns' P' with "[//] [//] Hcg Hcpu Htcx2 Hccx2 Hpc Hbs
-                  Hsbn Hisp Hsbs Hbmp [//] Hir Hpost"). }
+      iApply (SysOpen.wp_sys_open γft γf γs j γl
+                (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
+                DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
+                v0 v1 pid U sts M (av - 4)%nat true true ∅
+                (fun _ _ => True%I) (fun _ _ => True%I)
+                (* create's child legs, at the trivial families too
+                   (round E2, lane E2-C) *)
+                (fun _ _ => True%I) (fun _ _ => True%I)
+                (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
+                (fun _ _ _ => True%I) (fun _ _ _ => True%I)
+                ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
+                Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
+                ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1
+                with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hftable Hbio Hlog
+                      Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
+                      Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
+                      Hfd0 Hpriv Hufrag []").
+      { iApply (fsabs_open_in with "Hfsabs"). }
+      iIntros (CIDy Hsy mf ns' P')
+        "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
+      iDestruct (open_arms_landed with "Harms") as "Hpost".
+      iSpecialize ("Hcont'" $! CIDy with "[//]").
+      iApply ("Hcont'" $! mf ns' P' with "[//] [//] Hcg Hcpu Htcx2 Hccx2 Hpc Hbs
+                Hsbn Hisp Hsbs Hbmp [//] Hir Hpost"). }
     iApply "Hk".
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpost".

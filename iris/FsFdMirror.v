@@ -14,7 +14,7 @@
    NOTHING HERE IS A NEW SPEC OF THE KERNEL.  Every arm of [ufs_step] is
    a reading of a landed AU contract's arm at the mirror:
 
-   - open's success arm is [SpecSysOpenAU.open_post_ok_plain]'s three-way
+   - open's success arm is [SpecSysOpen.open_post_ok_plain]'s three-way
      split (device / file / dir-at-O_RDONLY) with the fd pinned to the
      LEAST CLOSED row -- fdalloc's own scan order, [SpecFdalloc.fd_frees]'s
      head read at the mirror -- and the trunc delta is the contract's own
@@ -366,7 +366,7 @@ Section Steps.
   (* which failure fired and success is never promised); then the success *)
   (* arm: the walk resolved, the fd is the least closed row, and the arm  *)
   (* is keyed by the observed [anode] exactly as                          *)
-  (* [SpecSysOpenAU.open_post_ok_plain] keys its three.                   *)
+  (* [SpecSysOpen.open_post_ok_plain] keys its three.                   *)
   (* ------------------------------------------------------------------ *)
   Definition ufs_open_at (pl : list (bv 8)) (vom : mword 64)
       (r : mword 64) (u u' : umirror) : Prop :=

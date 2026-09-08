@@ -1,6 +1,8 @@
 (* FsAbsOpenFire.v -- sys_open's TWO FIRE POINTS, DISCHARGED AGAINST THE
    INVARIANT, plus the row readings and the walk-premise bridge
-   [SpecSysOpenAU]'s header owes its prover (items 1, 2 and 3).
+   the open family's statement leaf ([SpecSysOpenAU]) leaves to a
+   prover: the walk premise's start, the terminal observation's fire and
+   the trunc fire.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
    prover).  A NEW LEAF rather than an append to [FsAbsMknodFire.v], for the
@@ -10,8 +12,7 @@
 
    ==== ITEM 1: THE WALK PREMISE, RECONCILED ============================
 
-   [SpecSysOpenAU] was authored the same day the relative start landed, so
-   its [open_walk_pre_era] is the ONE-SHOT OVER ALL PATHS
+   [SpecSysOpenAU]'s [open_walk_pre_era] is the ONE-SHOT OVER ALL PATHS
    ([FsAbsEraMknod.mknod_walk_pre_era]'s shape at the FULL element list)
    while the era contracts now take [FsAbsStart.ex_start] -- the same shot
    at a FIXED [pl].  The reconciliation is therefore the namei-side twin of

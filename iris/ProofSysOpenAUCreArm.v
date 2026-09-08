@@ -2,11 +2,11 @@
    lets the landed plain blocks (+0x4a downward: [ProofSysOpenAUJoin],
    [ProofSysOpenAUAlloc], [ProofSysOpenAUStores], [ProofSysOpenAUPub]) run
    UNDER the create arm, and the conversion of what they deliver into
-   [SpecSysOpenAU.open_arms_create].
+   [SpecSysOpen.open_arms_create].
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
-   prover), create arm.  R10: nothing landed moves -- not [SpecSysOpenAU],
-   not the four blocks below the join, not [ProofSysOpenAU]'s plain walk.
+   prover), create arm.  Nothing below it moves: not the four blocks below
+   the join, not [ProofSysOpenAU]'s plain walk.
 
    ==== THE SHIM, AND WHY IT IS THE WHOLE DESIGN =======================
 
@@ -81,7 +81,8 @@ Require Import FsTree.
 Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.
 Require Import SpecSysOpenAU.
-Require Import FsAbsCreateFire.   (* [acre_commit_at], [dlookup_commit_at]   *)
+Require Import SpecSysOpen.   (* the arms this block builds *)
+Require Import FsAbsMknodFire.   (* [acre_commit_at], [dlookup_commit_at]   *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule) *)
 From Kernel Require KernelSyms.

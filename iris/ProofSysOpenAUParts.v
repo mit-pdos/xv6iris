@@ -72,6 +72,7 @@ Require Import PathElems.
 Require Import FsTree.
 Require Import FsBytesGamma.
 Require Import SpecSysOpenAU.
+Require Import SpecSysOpen.   (* the arms this block builds *)
 Require Import FsAbsOpenFire.
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule) *)
@@ -277,8 +278,8 @@ Section ProofSysOpenAUParts.
   (*  3.  THE TWO EXIT CONTINUATIONS, AT THE ARMED POST                  *)
   (* ================================================================== *)
 
-  (* The landed exit continuation with [SpecSysOpen.sys_open_post] replaced by
-     [SpecSysOpenAU.open_arms_plain] -- and that is the ONLY difference.
+  (* The exit continuation at [SpecSysOpen.open_arms_plain] rather than the
+     blanket [sys_open_post] -- and that is the ONLY difference.
      The abstract state is read at the LIVE Γ, as the contract states it. *)
   Definition so_cont_au `{GEN : GenId}
       (gf : gname)
