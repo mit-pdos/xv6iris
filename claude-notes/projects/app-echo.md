@@ -700,6 +700,23 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   with milestone reports (green after the 7 files; green after deletions +
   renames; the gate).  Nothing committed until a milestone is green.
 
+- **ARM-a, after the second agent's cut-off (2026-09-08).**  Its last edits
+  were the ruled fix (the exec chain's dead `{XI : CurCtx}` binders on
+  `aopen_commit_at`/`open_walk_pre_era` dropped; the class instance made
+  context-free).  The one remaining red file, `SpecUserretClosed.v`, was
+  being OOM-KILLED (one worker at ~478 GB RSS): durable-notes' "a lemma's
+  binder list shorter than its definition's makes Coq synthesise the
+  missing instance through the bundling and explode" — its
+  `wp_userret_closed_body` bound `{riscvGS, xv6G, bioslotG}` and its body
+  now needs `uexecSG Σ` (through `ukc`/`uslot`).  Fix: the `{SG : uexecSG
+  Σ}` binder on the definition and the seal's Parameter, and the class
+  import moved ABOVE the first use (it sat below it, where the backtick
+  would have invented a fresh type).  Single-file compile green under a
+  16 GB cap; the cone rebuild is `armb15`.  Rule of thumb for the next
+  sweep: every Definition/Parameter whose body reaches `uslot`, `ukc`,
+  `uexec_ret` or `udep` needs the class in its own binder list, and the
+  class must be imported before it.
+
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
   their old names although no AU is left in them — `SpecSysWriteAU.v`,
