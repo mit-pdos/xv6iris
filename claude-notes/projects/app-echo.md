@@ -561,25 +561,19 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   the one used), `KEXECB3`'s consumer-less seal, `KexecOkQ`'s single-
   instantiation `Q` hole.
 
-## Decisions outstanding after the 2026-09-07 rulings
+## Decisions outstanding (refreshed 2026-09-08)
 
-For L2-a: only D-B (which syscalls in the first cut; the inventory is
-above and is mine).  D-A and D-C are RULED (refund by `AU ∧ R` / the
-prefix cursor; one spec per syscall).
-For later lanes: the rx wand's tag output (L5), read's receipt (L5),
-fork's real row (L6), init's wait null-window row (L6).  The exec-site
-forcing function (`kexec_ok`'s success arm) is RESOLVED IN PRINCIPLE
-2026-09-08: it is the AU exec contract's slot wand
-(`SpecKexecAU.exec_slot_pre` with `kexec_image_ok` — the new key's image
-is the observed file's ELF decode, its entry pc, the argument block and
-stack pinned), already on the theorem's path; what remains is echo's own
-bundle proving from its pins that the observed file is `/echo`'s bytes
-(L6).  The PINNED kexec forms (`SpecKexecPin`, Lane X; the off-build
-`SpecKexecPinned` four) are ORPHANS: EXEC-UNIFY's inventory showed the AU
-proof never consumed them (`ProofKexecAUA` is an independent replay of
-phase A), `wp_kexec_pinned*` has no caller (forkret applies the unpinned
-form), and the AU form's `kexec_image_ok` closes the pinned layer's own
-"upgrade gap" (`uimg_sub (elf_image f) (uvis_M W')`); the AU form is
-strictly stronger (a pinning `Φo` refutes the not-loadable arms).  They
-are deleted by EXEC-UNIFY; Lane X's `kxp_chain` question is moot.  Ordering: L2-a → the park
-→ L5 → L2-b → L6 → L7.  Q4 stays provisional.
+Everything ruled on 2026-09-07/08 is implemented up to and including the
+refund record; the ten syscall folds and R-CONJ are on main.  Still open:
+
+- **ARM (L2-a/L2-b)** — in flight; its phase-0 inventory may surface the
+  park-channel question (fd-row-pilot §6 item 3) as a real decision.
+- **L5** — the rx wand's TAG output and the console ledger (the design
+  sketch is under "The two options for the generic slot's supply"); the
+  console READ arm's receipt is where the tag reaches sh.
+- **L6** — fork's real row (mandatory: re-minting needs the supply);
+  init's `wait(0)` null-window row; echo's own bundles (its pins as
+  cursor/receipt families; the exec slot wand answered from
+  `kexec_image_ok`).
+- **Q4** stays provisional (`echo_pred := taint ∨ pins`).
+- Hygiene backlog (above) after ARM.
