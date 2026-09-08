@@ -370,6 +370,17 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   (no consumer), the astate-shaped commits and their three prose-only
   bridges.  `SpecSysMknodAU.v` is a 135-line pure leaf.
 
+- **PATH-UNIFY** (Opus lane, 2026-09-08, one syscall at a time):
+  ~~OPEN~~ LANDED — one `SYSOPEN`/`wp_sys_open` keyed on `om_create vom`
+  (`open_in`/`open_arms` are an `if` over the two landed arm families);
+  the blanket `sys_open_post` is DERIVED (`open_arms_landed`) because it
+  carries resources; the two arm bodies stay as unsealed definitions with
+  one proof each; `SpecSysOpenAU.v` survives as the statement leaf with
+  the dependency inverted (`SpecSysOpen` requires it); the plain frame
+  and the two AU links are gone, `LinkSysOpen.v` is the link, the
+  dispatcher's omode destruct is one call with `fsabs_open_in`.
+  UNLINK, CHDIR: in flight.
+
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
   their old names although no AU is left in them — `SpecSysWriteAU.v`,
