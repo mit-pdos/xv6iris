@@ -691,14 +691,16 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   `d90560642`).  `pf_at_mono_pair` is the mover when an enrichment
   wrapper re-proves the AU side under the caller's own refund.
 
-- **ARM-a** (in flight, 2026-09-08): the first agent landed the class
-  (`UexecSG.v`), the three-piece arm, the folded round, `udep`/`udepw` in
-  `UkRun`, the 12 arm sites and the whole leaf/engine tier (40 files
-  green), then ran out of context with 7 files red (premises not yet
-  threaded) and the deletions / tier renames / `UEXEC_GEN` split /
-  instance not started; a second agent finishes from the uncommitted tree
-  with milestone reports (green after the 7 files; green after deletions +
-  renames; the gate).  Nothing committed until a milestone is green.
+- ~~**ARM-a**~~ LANDED 2026-09-08 (two Opus agents plus coordinator
+  finishing; 84 files, 4 deleted, +2.5k/−2.5k).  The step moves to the
+  process: `UexecSG.v` (the deposit class and the program class), the
+  three-piece arm in `UexecRet`, `udep`/`udepw`/`uxsup` in `UkRun`, the 12
+  arm sites, the folded round, `ut_sys_in n`, the CurCtx-free instance at
+  `spost := emp` with the exec bundle at 7 and `ssupply := True`, the gate
+  slots and `cond_entry_slot` at `udep`/the `psok` blanket/`□ ssupply`,
+  the exec tier folded into the one `uslot`.  The license is still in
+  place; ARM-b turns the real bundles on and deletes it.  Gate: nothing
+  left to build, the thirteen, zero Admitted, no folded name anywhere.
 
 - **ARM-a, after the second agent's cut-off (2026-09-08).**  Its last edits
   were the ruled fix (the exec chain's dead `{XI : CurCtx}` binders on
