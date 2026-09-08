@@ -340,6 +340,24 @@ pre-taint, could not instantiate it at all).  Program files carry the
 hypothesis `Hpsok` as a section variable; their kernel-side constructors
 discharge it.
 
+**Three more ARM-a rulings (2026-09-08, milestone A).**  (a) Exec's
+deposit is supplied EXPLICITLY: `uxsup := □ ∀ W, sbundle uslot USYS_exec
+W`, threaded from the kernel-side constructors down to the exec leaves
+(sh's `runcmd` chain, init's exec arm) and never placed in `urun` (the
+GAP-premise trap one number over); this is the explicit route, stopping
+where the sh kernel file's exec-bundle premise stops today.  (b) The fd-
+mirror tier (`uexec_ret_fs_F`) carries the deposit at the recursive `X`
+through `sbundle_mono` and the post at the plain family; `urun_fs` gains
+`udep`; its three ecall leaves take `psok n` as a pure premise.  (c) The
+trap contract has TWO readers per returning ecall: exec's three-disjunct
+out-shape stays exec's own (its `spost` is `emp`; the new-image slot and
+the a0 gap are exec-specific), and the per-number `ut_sys_in n` /
+`ut_sys_out n` carry `sbundle uslot n (uvis_of U sts)` in and `spost
+uslot n (uvis_of U sts) r` out for every other syscall; the loop picks by
+number.  Sweep hazard recorded: a section `Hypothesis` lands after the
+USED explicit section variables and a same-section caller takes no
+argument — position it by a closure check, not by a fixed offset.
+
 #### What is actually left to decide for L2-a
 
 - ~~D-A~~ **REFUNDS, RULED 2026-09-07 (owner): every piece of a bundle is
