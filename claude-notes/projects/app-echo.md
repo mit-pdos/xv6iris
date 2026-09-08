@@ -396,6 +396,16 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   `fsabs_chdir_pre` (a bare `⊢`) and the bridge, needing nothing more.
   Lane total: 6 files deleted, about 4300 lines net removed.
 
+- **DUPSYNC-UNIFY** (Opus lane, 2026-09-08): ~~DUP~~ LANDED — the landed
+  `SYSDUP`/`wp_sys_dup_sconf` was ALREADY the sharp form (commit
+  `a00e59a30` had moved the copy post into it), so the AU family was the
+  redundant one: `SpecSysDupAU`, `ProofSysDupAU`, `ProofSysDupAUTail`,
+  `LinkSysDupAU` deleted (about 1600 lines); `SpecSysDup.v` gains the
+  pure "one pointer, two names" ties and the derived sharpened reading
+  `sys_dup_post_sharp` as a lemma; dispatcher untouched.  The brief's
+  premise was stale — check `git log` on a file before briefing a fold.
+  SYNC: in flight.
+
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
   their old names although no AU is left in them — `SpecSysWriteAU.v`,
