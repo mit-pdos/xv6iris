@@ -91,9 +91,21 @@ the park channel, and adding a third is one more `destruct`.
 
 **WHAT IS LEFT, in the order it is worth doing.**
 
-1. **The exec-site forcing function (§3 item 5).**  This is now THE
-   blocker, and it is the only thing between `echo_gate` and a verified
-   echo inside the whole-system theorem.  `SpecKexec.kexec_ok`'s success
+1. **The exec-site forcing function (§3 item 5) — LANDED IN THE AU FORM,
+   not in `kexec_ok`.**  `SpecKexecAU.exec_slot_pre S Φo …` hands the
+   caller its observation receipt for the file kexec read and
+   `kexec_image_ok f na alen afun sts W'`, which pins the NEW key: epc =
+   `elf_entry f`, `uimg_sub (elf_image f) (uvis_M W')` (the loaded
+   segments ARE the ELF decode of the observed bytes), a0/a1/sp, the
+   argument block and zeroed stack page, the permission map, the fd view.
+   The caller answers with `S W'` — the slot for the program those bytes
+   are.  The exec AU contract is on the theorem's path
+   (`ProofSyscall` → `SysExecAU.wp_sys_exec_au uslot_x`; the process
+   deposits the bundle through `UexecRetExec`'s payload class).  So what
+   echo owes is `Φo`/cursor work in ITS OWN bundle (its pins say the
+   observed file is `/echo`'s bytes), not a kernel contract change.  The
+   plain `SpecKexec.kexec_ok` note below is about the superseded form.
+   [2026-09-08]  Formerly: `SpecKexec.kexec_ok`'s success
    arm pins a0/a1/sp but leaves `us_M U'` in NO clause — nothing is said
    about the argv array, the strings, or even the program text.
    **OWNER RULING (still standing): `kexec_ok` is the fs-syscall-specs

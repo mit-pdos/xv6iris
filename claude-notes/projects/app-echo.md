@@ -427,6 +427,14 @@ For L2-a: only D-B (which syscalls in the first cut; the inventory is
 above and is mine).  D-A and D-C are RULED (refund by `AU ∧ R` / the
 prefix cursor; one spec per syscall).
 For later lanes: the rx wand's tag output (L5), read's receipt (L5),
-`kexec_ok`'s success arm and Lane X's chain conjunct (L6), fork's real
-row (L6), init's wait null-window row (L6).  Ordering: L2-a → the park
+fork's real row (L6), init's wait null-window row (L6).  The exec-site
+forcing function (`kexec_ok`'s success arm) is RESOLVED IN PRINCIPLE
+2026-09-08: it is the AU exec contract's slot wand
+(`SpecKexecAU.exec_slot_pre` with `kexec_image_ok` — the new key's image
+is the observed file's ELF decode, its entry pc, the argument block and
+stack pinned), already on the theorem's path; what remains is echo's own
+bundle proving from its pins that the observed file is `/echo`'s bytes
+(L6), and folding the PINNED kexec forms (EXEC-UNIFY phase 0 inventories
+the re-layering, since `ProofKexecAU` is composed over `ProofKexecPin*`'s
+blocks); Lane X's `kxp_chain` question is moot once the pinned seal goes.  Ordering: L2-a → the park
 → L5 → L2-b → L6 → L7.  Q4 stays provisional.
