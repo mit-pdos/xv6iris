@@ -358,6 +358,29 @@ number.  Sweep hazard recorded: a section `Hypothesis` lands after the
 USED explicit section variables and a same-section caller takes no
 argument — position it by a closure check, not by a fixed offset.
 
+**ARM-a, steps 2–3 (2026-09-08): as landed, and the park blocker.**  The
+four transitional files are deleted and the tier is one (`uslot`); the
+class instance grew `UexecExecInst.v` (above `FsAbsInvFire`, since the
+supply law's exec case is `fsabs_exec_half`) with `ssupply := True` for
+ARM-a — the landed mint's `fsabs_env` premise was dead, so the
+`UEXEC_GEN` split is ARM-b's, where the supply becomes the application
+predicate; no `Context SG` above the instance (a section variable there
+is a second class of the same type: `ProofSysFork` HUNG on it, a stable
+multi-GB RSS for an hour — the "two instances printing identically"
+hazard); `ut_sys_in n` replaces `ut_exec_in` through the round,
+`ut_sys_out n` is defined but threaded by ARM-b (nothing to carry while
+`spost` is `emp`).  THE BLOCKER: `park_token`'s fixpoint reads `uslot`,
+so it is class-indexed, and the instance was `CurCtx`-indexed (the exec
+bundle's definitions carry `{XI : CurCtx}`), so `UtResFits`'s park lemma
+resolved the instance at its own `XI` in the statement and at the
+resumer's `Xc` in the proof — identical print, not convertible.  RULED:
+the deposit instance must be CurCtx-FREE — a process's deposit cannot
+depend on the hart context of the kernel proof consuming it; the `{XI :
+CurCtx}` binders on the exec chain's definitions are the TSO rebase's
+mechanical appends and are removed where the bodies never use the
+context (fallback only if a body genuinely does: the slot family as an
+explicit index of `park_pkg`/`park_token`).
+
 #### What is actually left to decide for L2-a
 
 - ~~D-A~~ **REFUNDS, RULED 2026-09-07 (owner): every piece of a bundle is
