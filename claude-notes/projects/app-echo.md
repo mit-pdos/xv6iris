@@ -529,6 +529,21 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   left (`KexecAUBridge.exec_built_Q`) — retiring it touches the eight
   phase files.
 
+- ~~**R-CONJ**~~ LANDED 2026-09-08 (Opus lane, two phases; 64 files, +1754/
+  −1444, one new leaf).  Every one-shot piece of every fs syscall bundle is
+  `pf_at AU F` — `AU F.(pf_recv) ∧ F.(pf_refund)` — with `F : pfam Σ A`
+  the per-piece pair of receipt and refund (`iris/PieceFam.v`); every
+  unfired-return arm returns the same `pf_at`; receipt-only definitions
+  take the pair and project; the 16 fire lemmas eliminate through
+  `pf_at_au`; cursors stay bare; nine seals re-typed in place at their
+  old arities; the dispatcher, the friendly packaging and forkret pass
+  `pfam_triv`; read converted to the record.  Refuted on the way: a
+  class-indexed trivial constant (resolution guesses `A` before
+  unification); `iDestruct … as "[H _]"` on `∧` (pick a side with
+  `pf_at_au` instead); a bare `/=` at syscall altitude (durable note
+  `d90560642`).  `pf_at_mono_pair` is the mover when an enrichment
+  wrapper re-proves the AU side under the caller's own refund.
+
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
   their old names although no AU is left in them — `SpecSysWriteAU.v`,

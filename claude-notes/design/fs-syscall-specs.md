@@ -400,6 +400,21 @@ that a chunk prefix (aligned to a batch boundary) may survive.  Lampson's
 `Op`/`done`/`mix` machinery for non-atomic writes collapses into the one
 global principle.
 
+**EVERY ONE-SHOT PIECE IS `AU ∧ R`, AND THE PAIR IS A RECORD.**  A bundle
+is a `∗` of independent pieces: hops and the write chain's nodes are
+SEQUENCED and carry their refund as a cursor (`P k d`, `Q k`); every
+other piece — the observation and mutating commits, create's legs, the
+exec slot wand — is one-shot, and its caller's receipt `Φ` and refund `R`
+travel together as `F : pfam Σ A` (`PieceFam.v`: `{ pf_recv ; pf_refund
+}`).  The bundle conjoins `pf_at AU F := AU F.(pf_recv) ∧ F.(pf_refund)`;
+the kernel eliminates to the AU when it fires the piece (`pf_at_au`, one
+line in each fire lemma) and returns the whole `pf_at` on every arm where
+the piece did not fire, so the caller eliminates to `R`.  A fired piece
+returns its investment through `Φ` only.  Piece DEFINITIONS take a bare
+receipt and never mention `R`; the pair lives at the assembly.  The
+trivial family is `pfam_triv Φ` (refund `True`), which is what the
+dispatcher and the friendly layer pass.
+
 **ONE CONTRACT PER SYSCALL.**  `sys_write` is the model: `SpecFilewrite.
 FILEWRITE` and `SpecSysWrite.SYSWRITE` are its only seals.  Each keeps the
 whole-function frame and takes a caller INPUT and returns an armed OUTPUT,
