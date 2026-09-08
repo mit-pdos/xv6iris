@@ -314,9 +314,9 @@ Qed.
 (* ===================================================================== *)
 (*  THE EXEC CHANNEL.                                                     *)
 (* ===================================================================== *)
-(* A caller that offers the process's exec bundle
-   ([UexecSG.sbundle_at uslot USYS_exec f] -- [UexecExecInst.exec_sbundle], the
-   [SpecSysExecAU] AU precondition at the trapping key, its slot wand
+(* A caller that offers the process's deposit ([UexecSG.sbundle_at uslot n f]
+   at the number it trapped with -- at exec, [UexecExecInst.exec_sbundle],
+   the [SpecSysExecAU] AU precondition at the trapping key, its slot wand
    concluding at the U-mode slot) gets back, on exec, either the failure
    facts or [UexecRet.uslot] of the NEW image.  Every non-exec arm owes
    nothing ([sysc_exec_out_ne]). *)
@@ -325,14 +325,24 @@ Section SyscExec.
             !irefslotG Σ, !pavG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
-  (* the process's exec bundle, offered only on exec *)
-  (* ...AT THE FAMILIES THE PROCESS DEPOSITED AT ([UexecSG.sfam]), which the
+  (* THE PROCESS'S DEPOSIT, AT WHATEVER NUMBER IT TRAPPED WITH.  It used to
+     be exec's alone; since the real bundles it is one row over every
+     contracted number, which is what lets the dispatcher's fs
+     arms take the process's own AU bundle instead of paying it out of the
+     supply themselves.  [SpecUsertrap.ut_sys_in] is the same row one hop
+     up, and the trap route carries the two together.
+     ...AT THE FAMILIES THE PROCESS DEPOSITED AT ([UexecSG.sfam]), which the
      trap route carries in beside the bundle: what comes back to the process
      is a post at the very receipts it chose, so the two legs cannot be
-     stated at independent witnesses ([UexecSG.v]'s header). *)
-  Definition sysc_exec_in (U : ustate) (sts : list fdstate) (f : sfam)
+     stated at independent witnesses ([UexecSG.v]'s header).
+     EXIT AND FORK ARE EXCLUDED, exactly as they are one hop up: exit
+     returns nothing and fork runs no contract, so the process deposits
+     nothing there and the row must not ask for one. *)
+  Definition sysc_sys_in (U : ustate) (sts : list fdstate) (f : sfam)
       : iProp Σ :=
-    (⌜sysc_num (us_V U) = 7⌝ -∗ sbundle_at uslot USYS_exec f (uvis_of U sts))%I.
+    (∀ n : Z,
+       ⌜sysc_num (us_V U) = n /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
+       sbundle_at uslot n f (uvis_of U sts))%I.
 
   (* r = -1 and nothing of the process moved but a0: the trapframe up to
      the a0 slot, the image, the permission projection (a copy-in's lazy
@@ -383,7 +393,7 @@ Definition wp_syscall_sconf_body
        [sysc_fd_ok] against them, beside [sysc_mem_ok] against the image. *)
     (sts : list fdstate) (lks : gset string)
     (* the deposit's FAMILIES, relayed from the trap route -- see
-       [sysc_exec_in] *)
+       [sysc_sys_in] *)
     (f : sfam) :=
   let pcE : mword 64 := mword_of_int KernelSyms.syscall in
   let pj := proc_addr j in
@@ -439,8 +449,9 @@ Definition wp_syscall_sconf_body
 
      AT A NAMED TABLE, so the post can say which descriptors moved. *)
   fd_frags (pv_fdg (us_V U)) sts -∗
-  (* the process's exec bundle, offered only on exec -- see [sysc_exec_in] *)
-  sysc_exec_in U sts f -∗
+  (* the process's deposit for whatever number it trapped with -- see
+     [sysc_sys_in] *)
+  sysc_sys_in U sts f -∗
   (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
      TABLE ENTRY NOT RETURN WITHOUT THE CONTRACT SAYING WHICH ONE.
 

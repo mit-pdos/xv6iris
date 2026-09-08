@@ -214,8 +214,7 @@ End SpecSysMkdir.
    create is at [T_DIR] with both device halfwords zero, which is what pins
    the type index of the bundle and of the two arms below. *)
 Definition mkdir_au_pre
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId}
     (Γ : fs_view_names Σ) (γfs : fs_names) (cw : Z)
     (P Pmiss : nat -> Z -> iProp Σ)
     (Farm : pfam Σ (aview -> Z -> iProp Σ))
@@ -238,8 +237,7 @@ Definition mkdir_au_pre
    [FsAbsInvFire]'s [fsabs_*] family because both consumers reach this file
    and only one of them reaches that one. *)
 Lemma mkdir_au_pre_unit
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId}
     (γfs : fs_names) (cw : Z) :
   app_sup -∗
   mkdir_au_pre (fs_gamma_L γfs) γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
@@ -255,8 +253,7 @@ Proof.
 Qed.
 
 Definition mkdir_arms
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId}
     (Γ : fs_view_names Σ) (γfs : fs_names) (cw : Z)
     (P Pmiss : nat -> Z -> iProp Σ)
     (Farm : pfam Σ (aview -> Z -> iProp Σ))

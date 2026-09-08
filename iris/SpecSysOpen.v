@@ -857,7 +857,7 @@ Section SysOpenArms.
      argument; the machine reads it with the [andi a5,a5,512] / [c.beqz]
      pair at +0x36.  A caller that knows its own omode knows which side it
      is on and owes only that side's pieces. *)
-  Definition open_in `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
+  Definition open_in Γ (γfs : fs_names) (cw : Z)
       (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))

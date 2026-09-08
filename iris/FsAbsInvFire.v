@@ -97,8 +97,9 @@ Require Import UartSentLoc.        (* [uart_sent_nil]: the free trace seed *)
 Require Import SpecFilewrite.      (* [filewrite_in]: the one keyed input *)
 Require Import SpecArgfd.          (* [sys_fd_st]: the descriptor-state key *)
 Require Import SpecFileread.       (* [fileread_in]: read's keyed input *)
-Require Import SpecSysRead.        (* [sys_read_in] *)
-Require Import SpecSysWrite.       (* [sys_write_in] *)
+Require Import SpecSysRead.        (* in the require block; the dischargers
+                                      are stated at the BARE descriptor state *)
+Require Import SpecSysWrite.
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
@@ -239,33 +240,33 @@ Section FsAbsInvFire.
     iApply (awrite_chain_unit γfs appE i γo M ua k cnt with "Hsup").
   Qed.
 
-  (* SYS_READ'S WHOLE INPUT, at the trivial receipt and the trivial refund
-     -- what the DISPATCHER hands the ONE [SpecSysRead.SYSREAD] contract in
-     place of the three forms it used to choose between.  Keyed on the same
-     pure function the contract's arms are ([SpecArgfd.sys_fd_st]).
+  (* READ'S WHOLE INPUT, at the trivial receipt and the trivial refund, AND
+     AT A BARE DESCRIPTOR STATE -- which is the form the ARM's deposit class
+     needs: a process's key names its descriptor STATES
+     ([SpecArgfd.fd_st_of_key]) and never the kernel's [ofile] pointer
+     array, so the discharger cannot be stated at [SpecArgfd.sys_fd_st].
+     The dispatcher's arm bridges the two with
+     [SpecArgfd.sys_fd_st_of_key].
 
      IT COSTS ITS CLIENT NOTHING AT ALL, at every key: read's one piece
      lends the offset shadow and takes it back unmoved, so no descriptor
      row and no offset invariant is needed, and no application step is paid
      -- a read moves no row.  This is what makes read's bundle payable by
      an arbitrary user process under the ARM. *)
-  Lemma fsabs_sys_read_in (V : pprivate) (v : mword 64)
-      (sts : list fdstate) :
-    ⊢ sys_read_in V v sts (pfam_triv (fun _ _ _ _ => True%I)).
+  Lemma fsabs_fileread_in (st : fdstate) :
+    ⊢ fileread_in st (pfam_triv (fun _ _ _ _ => True%I)).
   Proof.
-    rewrite /sys_read_in /fileread_in.
-    destruct (sys_fd_st v (pv_ofile V) sts) as [| rb wb ty] eqn:Hst; [done |].
+    rewrite /fileread_in.
+    destruct st as [| rb wb ty]; [done |].
     destruct rb; [| done].
     destruct ty as [i γo | | ma]; [| done | done].
     iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo).
   Qed.
 
-  (* SYS_WRITE'S WHOLE INPUT, at the trivial cursor and the free seed --
-     what the DISPATCHER hands the ONE [SpecSysWrite.SYSWRITE] contract in
-     place of the three it used to choose between.  It is keyed on the same
-     pure function the contract's arms are ([SpecArgfd.sys_fd_st]), so
-     the dispatcher's [destruct] is on THE KEY and not on a choice of
-     contract.
+
+
+  (* WRITE'S WHOLE INPUT, at the trivial cursor and the free seed, and at a
+     BARE descriptor state for [fsabs_fileread_in]'s reason.
 
      THE CONSOLE ARM IS FREE: the devsw pin left the input for
      FILEWRITE/SYSWRITE's Coq premise list (a dispatcher discharges it by
@@ -274,17 +275,19 @@ Section FsAbsInvFire.
      ([UartSentLoc.uart_sent_nil]).  THE INODE ARM needs no offset resource
      any more: the chain's nodes take the shadow back unmoved.  So this
      input is payable at EVERY key out of the application step alone --
-     which is what the ARM asks of it. *)
-  Lemma fsabs_sys_write_in (E : coPset)
-      (V : pprivate) (v : mword 64) (sts : list fdstate) (n : Z)
+     which is what the ARM asks of it.
+
+     BUPD-SHAPED, not fupd: the ARM's minting law is a basic update
+     ([UexecSG.v]'s header -- the trace seed is the mono-list algebra's unit
+     and belongs to the LAW's modality, not to a supplier), and the console
+     arm's seed is the only thing here that needs one at all. *)
+  Lemma fsabs_filewrite_in (st : fdstate) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64) :
-    app_sup ={E}=∗
-      sys_write_in V v sts n M ua (fun _ => True%I) [].
+    app_sup -∗ |==> filewrite_in st n M ua (fun _ => True%I) [].
   Proof.
     iIntros "#Hsup".
-    rewrite /sys_write_in /filewrite_in.
-    destruct (sys_fd_st v (pv_ofile V) sts) as [| rb wb ty] eqn:Hst;
-      [by iModIntro |].
+    rewrite /filewrite_in.
+    destruct st as [| rb wb ty]; [by iModIntro |].
     destruct wb; [| by iModIntro].
     destruct ty as [i γo | | ma].
     - iModIntro.
@@ -294,6 +297,8 @@ Section FsAbsInvFire.
     - case_decide as Hc; [| by iModIntro].
       iMod (uart_sent_nil fsc_uart) as "#Hseed". iModIntro. iExact "Hseed".
   Qed.
+
+
 
   (* ------------------------------------------------------------------ *)
   (*  3.  The bundles the sealed contracts take, at the live Γ            *)

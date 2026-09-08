@@ -25,10 +25,14 @@
    is FsAbsDefs (the pure abstract state), FsBlocks ([blk_splice]) and
    TsoCtx ([CurCtx], the binder [delta_trunc] carries).
 
-   [delta_trunc]'s `{XI : CurCtx}` binder is kept EXACTLY: consumers apply
-   it under an ambient [CurCtx], and dropping the binder would change the
-   constant's arity.  [fs_delta] carries the same binder for the same
-   reason.
+   [delta_trunc] CARRIES NO [`{XI : CurCtx}`] BINDER, and that is load-
+   bearing since the ARM: the deposit class's instance
+   ([UexecExecInst]) must be CONTEXT-FREE -- a process's bundle cannot
+   depend on the hart context of the kernel proof consuming it, or the two
+   [UexecRet.uslot]s the park relates print identically and do not unify --
+   and open's bundle reaches this delta through [atrunc_commit_at].  The
+   binder was a TSO-rebase append that the body never read.  [fs_delta]
+   keeps one of its own; nothing above the class names it.
 
    ROUND E2, LANE E2-D (2026-09-05; claude-notes/projects/app-round-e2.md
    sections 2(b)-5, briefs file): the fused deltas are what a QUIESCENT
@@ -517,7 +521,7 @@ Proof. intros Hi. rewrite /delta_write Hi //. Qed.
    purpose -- applied where the row is not an [AFile] it is the identity;
    the side condition lives in the commit's premise, not in the function
    (the family rule). *)
-Definition delta_trunc `{XI : CurCtx} (i : Z) (av : aview) : aview :=
+Definition delta_trunc (i : Z) (av : aview) : aview :=
   match av !! i with
   | Some a =>
       match an_node a with
@@ -528,13 +532,13 @@ Definition delta_trunc `{XI : CurCtx} (i : Z) (av : aview) : aview :=
   end.
 
 (* the delta's row algebra *)
-Lemma delta_trunc_file `{XI : CurCtx} (av : aview) (i : Z) (bs0 : list (bv 8))
+Lemma delta_trunc_file (av : aview) (i : Z) (bs0 : list (bv 8))
     (nl : nat) :
   av !! i = Some (MkAnode (AFile bs0) nl) ->
   delta_trunc i av = <[i := MkAnode (AFile []) nl]> av.
 Proof. intros Hi. rewrite /delta_trunc Hi //=. Qed.
 
-Lemma delta_trunc_lookup `{XI : CurCtx} (av : aview) (i : Z) (bs0 : list (bv 8))
+Lemma delta_trunc_lookup (av : aview) (i : Z) (bs0 : list (bv 8))
     (nl : nat) :
   av !! i = Some (MkAnode (AFile bs0) nl) ->
   delta_trunc i av !! i = Some (MkAnode (AFile []) nl).
@@ -542,7 +546,7 @@ Proof.
   intros Hi. rewrite (delta_trunc_file av i bs0 nl Hi) lookup_insert //.
 Qed.
 
-Lemma delta_trunc_other `{XI : CurCtx} (av : aview) (i j : Z) :
+Lemma delta_trunc_other (av : aview) (i j : Z) :
   j <> i -> delta_trunc i av !! j = av !! j.
 Proof.
   intros Hj. rewrite /delta_trunc.
@@ -553,7 +557,7 @@ Qed.
 
 (* truncating an EMPTY file is the identity -- why the CREATE-fresh arm
    refunds the trunc commit instead of firing it vacuously (header) *)
-Lemma delta_trunc_nil `{XI : CurCtx} (av : aview) (i : Z) (nl : nat) :
+Lemma delta_trunc_nil (av : aview) (i : Z) (nl : nat) :
   av !! i = Some (MkAnode (AFile []) nl) -> delta_trunc i av = av.
 Proof.
   intros Hi. rewrite (delta_trunc_file av i [] nl Hi).
@@ -562,7 +566,7 @@ Qed.
 
 (* ...and so is truncating a row the view does not have: O_TRUNC on a
    file unlinked between namei and the open's lock (E2-V2) *)
-Lemma delta_trunc_absent `{XI : CurCtx} (av : aview) (i : Z) :
+Lemma delta_trunc_absent (av : aview) (i : Z) :
   av !! i = None -> delta_trunc i av = av.
 Proof. intros Hi. rewrite /delta_trunc Hi //. Qed.
 

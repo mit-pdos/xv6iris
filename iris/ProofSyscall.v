@@ -385,6 +385,8 @@ Require Import SpecMyproc.
    environments over -- [filestat_fs_env]/[fread_names] and friends. *)
 Require Import UartTxInv.
 Require Import SpecFileread SpecFilewrite.
+Require Import SpecSysMknodAU.   (* [dev_arg] -- mknod's device numbers, as
+                                    the deposit's key spells them *)
 Require Import SpecFilestat.
 Require Import BioInv.
 Require Import FsReady FsCfg.
@@ -1847,9 +1849,9 @@ Section SyscallVocab.
     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
     sysc_exit_ty γf pj fn dqi ip pid U sts lks av m (ret_pc (m !!! Regidx Rra)) -∗
-    (* the process's exec bundle, offered only on exec; every other arm
-       drops it *)
-    sysc_exec_in U sts fdep -∗
+    (* the process's deposit for the number it trapped with; an arm without
+       a contract drops it *)
+    sysc_sys_in U sts fdep -∗
     WP (Loop : expr riscv_lang).
 
   (* ------------------------------------------------------------------- *)
@@ -2876,19 +2878,176 @@ Section SyscallArms.
      the trapping key's own projections, which at the dispatcher's record are
      the image, trapframe argument 1 and the descriptor view it holds; its
      slot wand concludes at [uslot], the slot the channel returns *)
+  (* THE ARM'S OWN BRANCH, out of the one deposit row.  An arm knows its
+     number ([sysc_arm_goal]'s [Hnum]) and reads that branch and no other;
+     [UexecExecInst]'s eight [sbundle_at_*_elim] readers are the branches. *)
+  Lemma sysc_sys_in_at (U : ustate) (sts : list fdstate) (f : sfam) (k : Z) :
+    sysc_num (us_V U) = k -> k <> USYS_exit -> k <> USYS_fork ->
+    sysc_sys_in U sts f -∗ sbundle_at uslot k f (uvis_of U sts).
+  Proof.
+    intros Hn H1 H2. rewrite /sysc_sys_in. iIntros "H".
+    iApply ("H" $! k with "[%]"). split_and!; assumption.
+  Qed.
+
+  (* ================================================================== *)
+  (* THE ARM-SIDE READERS: the one deposit row, opened at each contracted   *)
+  (* number into exactly the INPUT that number's contract takes.  Each is   *)
+  (* [sysc_sys_in_at] followed by [UexecExecInst]'s branch reader and the   *)
+  (* key's projections -- the arm's own [Hnum] picks the branch and the     *)
+  (* arm's own [Hv0]/[Hv1]/[Hv2] name the argument words.                   *)
+  (*                                                                        *)
+  (* READ AND WRITE COME OUT AT [SpecArgfd.fd_st_of_key], the descriptor key *)
+  (* a PROCESS can name; [sysc_fd_key] is the equation that turns it into    *)
+  (* the contract's [sys_fd_st], and its three premises are the kernel       *)
+  (* resources the arm is holding anyway.                                    *)
+  (* ================================================================== *)
+  Lemma sysc_fd_key (γf : gname) (pa : mword 64) (pid : mword 32)
+      (U : ustate) (sts : list fdstate) (v : mword 64) :
+    proc_priv γf pa pid U -∗ fd_frags (pv_fdg (us_V U)) sts -∗
+    ⌜sys_fd_st v (pv_ofile (us_V U)) sts = fd_st_of_key v sts⌝.
+  Proof.
+    iIntros "Hpriv Hfr".
+    iDestruct (proc_priv_ofile_len with "Hpriv") as %Hlen.
+    iDestruct (fd_frags_len with "Hfr") as %Hslen.
+    iDestruct (proc_priv_states_agree with "Hpriv Hfr") as %Hag.
+    iPureIntro. exact (sys_fd_st_of_key v _ sts Hlen Hslen Hag).
+  Qed.
+
+  Lemma sysc_dep_read (U : ustate) (sts : list fdstate) (f : sfam)
+      (v0 : mword 64) :
+    sysc_num (us_V U) = 5 ->
+    pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
+    sysc_sys_in U sts f -∗ fileread_in (fd_st_of_key v0 sts) (rf_F f).
+  Proof.
+    intros Hn Hv0. iIntros "H".
+    iDestruct (sysc_sys_in_at U sts f 5 Hn ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "H".
+    iDestruct (sbundle_at_read_elim uslot f _ with "H") as "H".
+    rewrite /uvis_of /tf_w. cbn [uvis_tf uvis_fd].
+    rewrite (list_lookup_total_correct _ _ _ Hv0). iExact "H".
+  Qed.
+
+  Lemma sysc_dep_write (U : ustate) (sts : list fdstate) (f : sfam)
+      (v0 v1 v2 : mword 64) :
+    sysc_num (us_V U) = 16 ->
+    pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
+    pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
+    pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
+    sysc_sys_in U sts f -∗
+    filewrite_in (fd_st_of_key v0 sts) (sys_rw_count v2) (us_M U) v1
+      (wf_Q f) (wf_tr0 f).
+  Proof.
+    intros Hn Hv0 Hv1 Hv2. iIntros "H".
+    iDestruct (sysc_sys_in_at U sts f 16 Hn ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "H".
+    iDestruct (sbundle_at_write_elim uslot f _ with "H") as "H".
+    rewrite /uvis_of /tf_w. cbn [uvis_tf uvis_fd uvis_M].
+    rewrite (list_lookup_total_correct _ _ _ Hv0)
+            (list_lookup_total_correct _ _ _ Hv1)
+            (list_lookup_total_correct _ _ _ Hv2). iExact "H".
+  Qed.
+
+  Lemma sysc_dep_chdir (U : ustate) (sts : list fdstate) (f : sfam) :
+    sysc_num (us_V U) = 9 ->
+    sysc_sys_in U sts f -∗
+    chdir_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+      (cf_P f) (cf_Pmiss f) (cf_Fo f).
+  Proof.
+    intros Hn. iIntros "H".
+    iDestruct (sysc_sys_in_at U sts f 9 Hn ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "H".
+    iDestruct (sbundle_at_chdir_elim uslot f _ with "H") as "H".
+    rewrite /uvis_of. cbn [uvis_cwd]. iExact "H".
+  Qed.
+
+  Lemma sysc_dep_open (U : ustate) (sts : list fdstate) (f : sfam)
+      (v1 : mword 64) :
+    sysc_num (us_V U) = 15 ->
+    pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
+    sysc_sys_in U sts f -∗
+    open_in (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) v1
+      (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
+      (of_Fo f) (of_Ft f).
+  Proof.
+    intros Hn Hv1. iIntros "H".
+    iDestruct (sysc_sys_in_at U sts f 15 Hn ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "H".
+    iDestruct (sbundle_at_open_elim uslot f _ with "H") as "H".
+    rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf].
+    rewrite (list_lookup_total_correct _ _ _ Hv1). iExact "H".
+  Qed.
+
+  Lemma sysc_dep_mknod (U : ustate) (sts : list fdstate) (f : sfam)
+      (v1 v2 : mword 64) :
+    sysc_num (us_V U) = 17 ->
+    pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
+    pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
+    sysc_sys_in U sts f -∗
+    mknod_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+      (dev_arg v1) (dev_arg v2)
+      (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f).
+  Proof.
+    intros Hn Hv1 Hv2. iIntros "H".
+    iDestruct (sysc_sys_in_at U sts f 17 Hn ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "H".
+    iDestruct (sbundle_at_mknod_elim uslot f _ with "H") as "H".
+    rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf].
+    rewrite (list_lookup_total_correct _ _ _ Hv1)
+            (list_lookup_total_correct _ _ _ Hv2). iExact "H".
+  Qed.
+
+  Lemma sysc_dep_unlink (U : ustate) (sts : list fdstate) (f : sfam) :
+    sysc_num (us_V U) = 18 ->
+    sysc_sys_in U sts f -∗
+    unlink_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+      (uf_P f) (uf_Pmiss f) (uf_Fent f) (uf_Ftgt f) (uf_Fex f) (uf_Fmiss f).
+  Proof.
+    intros Hn. iIntros "H".
+    iDestruct (sysc_sys_in_at U sts f 18 Hn ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "H".
+    iDestruct (sbundle_at_unlink_elim uslot f _ with "H") as "H".
+    rewrite /uvis_of. cbn [uvis_cwd]. iExact "H".
+  Qed.
+
+  Lemma sysc_dep_link (U : ustate) (sts : list fdstate) (f : sfam) :
+    sysc_num (us_V U) = 19 ->
+    sysc_sys_in U sts f -∗
+    link_commits (fs_gamma_L fsc_fs) (lf_Ftgt f) (lf_Fent f) (lf_Funt f).
+  Proof.
+    intros Hn. iIntros "H".
+    iDestruct (sysc_sys_in_at U sts f 19 Hn ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "H".
+    iApply (sbundle_at_link_elim uslot f _ with "H").
+  Qed.
+
+  Lemma sysc_dep_mkdir (U : ustate) (sts : list fdstate) (f : sfam) :
+    sysc_num (us_V U) = 20 ->
+    sysc_sys_in U sts f -∗
+    mkdir_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+      (df_P f) (df_Pmiss f) (df_Farm f) (df_Fdots f) (df_Fun f)
+      (df_Fok f) (df_Fex f).
+  Proof.
+    intros Hn. iIntros "H".
+    iDestruct (sysc_sys_in_at U sts f 20 Hn ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "H".
+    iDestruct (sbundle_at_mkdir_elim uslot f _ with "H") as "H".
+    rewrite /uvis_of. cbn [uvis_cwd]. iExact "H".
+  Qed.
+
   Lemma sysc_exec_in_open (U : ustate) (sts : list fdstate) (f : sfam)
       (v1 : mword 64) :
     sysc_num (us_V U) = 7 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
-    sysc_exec_in U sts f -∗
+    sysc_sys_in U sts f -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (gmap Z FsAbsDefs.anode -> Z -> FsAbsDefs.anode -> iProp Σ))
       (Rs : iProp Σ),
       sys_exec_au_pre (MkPfam uslot Rs) (fs_gamma_L fsc_fs) fsc_fs
         (pv_cwi (us_V U)) P Pmiss Fo (us_M U) v1 sts.
   Proof.
-    intros Hn Hv1. rewrite /sysc_exec_in. iIntros "H".
-    iDestruct ("H" with "[%]") as "H"; [exact Hn |].
+    intros Hn Hv1. iIntros "H".
+    iDestruct (sysc_sys_in_at U sts f 7 Hn ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_exec_elim uslot f _ with "H") as "H".
     iExists (xf_P f), (xf_Pmiss f), (xf_Fo f), (xf_Rs f).
     rewrite /uvis_of /tf_w. cbn [uvis_M uvis_tf uvis_fd].
@@ -4391,7 +4550,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 16) : mword 64)
                    = mword_of_int KernelSyms.sys_write) by reflexivity.
@@ -4443,28 +4602,28 @@ Section SyscallArms.
       iSplitR; [iExact "Hdevi" | iExact "Htx"]. }
     iDestruct (sysc_filewrite_env γf γtxl γs j γl (proc_addr j) fn
                  with "Hdata Htx Hfsenv Hbs") as "Hfse".
-    (* ---- THE CALLER'S INPUT, AT THE TRIVIAL CURSOR AND THE FREE SEED ---
+    (* ---- THE CALLER'S INPUT IS THE PROCESS'S OWN DEPOSIT ----
        ONE CONTRACT: [SYSWRITE]'s arms are keyed on the descriptor's state
-       themselves, so this arm picks nothing -- it owes the matching input,
-       whatever the key turns out to be.
-       [FsAbsInvFire.fsabs_sys_write_in] builds it from the application's
-       invariant alone (every chunk node's [app_step], out of the parked
-       license): the inode arm needs no offset resource (its nodes take the
-       shadow back unmoved) and the console arm's trace seed is free, the
-       devsw pin having moved into SYSWRITE's Coq premise list.
-
-       THE APPLICATION'S PER-CHUNK STEP IS NOT MINTED HERE: filewrite's
-       FD_INODE arm pays its row retag out of the chain's own node. *)
-    iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
-    iApply fupd_wp.
-    iMod (fsabs_sys_write_in ⊤
-            (us_V U) v0 sts (sys_rw_count v2) (us_M U) v1
-            with "Hsup") as "Hswin".
-    iModIntro.
+       themselves, so this arm picks nothing -- it takes the matching input,
+       whatever the key turns out to be, out of [SpecSyscall.sysc_sys_in] at
+       the process's own cursor and seed.  The deposit is stated at
+       [SpecArgfd.fd_st_of_key], the descriptor key a PROCESS can name;
+       [sysc_fd_key] turns it into the contract's [sys_fd_st] out of the
+       three kernel facts this arm is holding anyway.
+       THE APPLICATION'S PER-CHUNK STEP IS NOT MINTED HERE AND NOT PAID
+       HERE: it rides the client's own chain node. *)
+    iDestruct (sysc_fd_key γf (proc_addr j) pid U sts v0 with "Hpriv Hufrag")
+      as %Hfdk.
+    iDestruct (sysc_dep_write U sts fdep v0 v1 v2
+                 ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hxin")
+      as "Hdep".
+    iAssert (sys_write_in (us_V U) v0 sts (sys_rw_count v2) (us_M U) v1
+               (wf_Q fdep) (wf_tr0 fdep)) with "[Hdep]" as "Hswin".
+    { rewrite /sys_write_in Hfdk. iExact "Hdep". }
     iApply (SysWrite.wp_sys_write_sconf γf γs j γl
               (sysc_fwrite_names γtxl γs j γl fn)
               pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
-              (fun _ => True%I) []
+              (wf_Q fdep) (wf_tr0 fdep)
               ltac:(lia) Hj Hgamma Hlen eq_refl eq_refl Hv0
               Hv1 Hv2 eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs
@@ -4534,7 +4693,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 5) : mword 64)
                    = mword_of_int KernelSyms.sys_read) by reflexivity.
@@ -4567,17 +4726,22 @@ Section SyscallArms.
     iDestruct (syscall_env_console with "Henvc") as (γc) "#Hci".
     iDestruct (sysc_fileread_env γf γc (proc_addr j) fn with "Hfsenv Hsl")
       as "[Hfse Hback]".
-    (* ---- THE CALLER'S INPUT, AT THE TRIVIAL RECEIPT AND REFUND ----
+    (* ---- THE CALLER'S INPUT IS THE PROCESS'S OWN DEPOSIT ----
        ONE CONTRACT: [SYSREAD]'s arms are keyed on the descriptor's state
-       themselves, so this arm picks nothing -- it owes the matching input,
-       whatever the key turns out to be.  [FsAbsInvFire.fsabs_sys_read_in]
-       builds it FROM NOTHING: the observation commit takes the offset
-       shadow back unmoved, so no descriptor row is needed, and a read
-       moves no row, so no application step is paid either. *)
-    iDestruct (fsabs_sys_read_in (us_V U) v0 sts) as "Hsrin".
+       themselves, so this arm picks nothing -- it takes the matching input,
+       whatever the key turns out to be, out of [SpecSyscall.sysc_sys_in] at
+       the process's own receipt.  The deposit is stated at
+       [SpecArgfd.fd_st_of_key], the descriptor key a PROCESS can name;
+       [sysc_fd_key] turns it into the contract's [sys_fd_st]. *)
+    iDestruct (sysc_fd_key γf (proc_addr j) pid U sts v0 with "Hpriv Hufrag")
+      as %Hfdk.
+    iDestruct (sysc_dep_read U sts fdep v0
+                 ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin") as "Hdep".
+    iAssert (sys_read_in (us_V U) v0 sts (rf_F fdep)) with "[Hdep]" as "Hsrin".
+    { rewrite /sys_read_in Hfdk. iExact "Hdep". }
     iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γc fn)
               pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
-              (pfam_triv (fun _ _ _ _ => True%I))
+              (rf_F fdep)
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Hsrin").
@@ -4754,7 +4918,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 9) : mword 64)
                    = mword_of_int KernelSyms.sys_chdir) by reflexivity.
@@ -4778,20 +4942,20 @@ Section SyscallArms.
     iDestruct (sysc_iref_split with "Hir") as "[Hirk Hirc]".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    (* THE ONE CONTRACT, at the trivial bundle
-       ([FsAbsInvFire.fsabs_chdir_pre]); the blanket post is read back off
+    (* THE ONE CONTRACT, at the PROCESS'S OWN bundle
+       ([SpecSyscall.sysc_sys_in] at 9); the blanket post is read back off
        the arms ([chdir_arms_landed]) and the tail below consumes it. *)
     iApply (SysChdir.wp_sys_chdir γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 pid U M (av - 4)%nat true true ∅
-              (fun _ _ => True%I) (fun _ _ => True%I)
-              (pfam_triv (fun _ _ _ => True%I))
+              (cf_P fdep) (cf_Pmiss fdep) (cf_Fo fdep)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hib Hj Hgamma eq_refl Hv0
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
-                    Hropen Hbmp Hisp Hbmr Hkalloc Hprocs Hirc Hpriv []").
-    { iApply fsabs_chdir_pre. }
+                    Hropen Hbmp Hisp Hbmr Hkalloc Hprocs Hirc Hpriv [Hxin]").
+    { iApply (sysc_dep_chdir U sts fdep ltac:(rewrite Hnum; reflexivity)
+                with "Hxin"). }
     iIntros (CIDy Hsy mf P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ Hirc Harms".
     iDestruct (chdir_arms_landed with "Harms") as "Hpost".
@@ -4893,7 +5057,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 18) : mword 64)
                    = mword_of_int KernelSyms.sys_unlink) by reflexivity.
@@ -4918,26 +5082,24 @@ Section SyscallArms.
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     iDestruct (sysc_iref_split with "Hir") as "[Hirk Hiru]".
-    (* THE ONE CONTRACT, at the trivial bundle
-       ([FsAbsInvFire.fsabs_unlink_pre]); the return blanket is read back
-       off the arms ([unlink_arms_ret]). *)
-    iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
+    (* THE ONE CONTRACT, at the PROCESS'S OWN bundle
+       ([SpecSyscall.sysc_sys_in] at 18); the return blanket is read back
+       off the arms ([unlink_arms_ret]) and the armed post itself is
+       dropped -- the row that carries it back is the next step's. *)
     iApply (SysUnlink.wp_sys_unlink γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded DfracDiscarded v0 pid U M
               (av - 4)%nat true true ∅
-              (fun _ _ => True%I) (fun _ _ => True%I)
-              (pfam_triv (fun _ _ _ _ => True%I))
-              (pfam_triv (fun _ _ => True%I))
-              (pfam_triv (fun _ _ _ _ => True%I))
-              (pfam_triv (fun _ _ _ => True%I))
+              (uf_P fdep) (uf_Pmiss fdep)
+              (uf_Fent fdep) (uf_Ftgt fdep) (uf_Fex fdep) (uf_Fmiss fdep)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbg Hib (proj2 (proj2 (proj2 Hnin))) Hprg Hj Hgamma
               eq_refl Hv0
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
-                    Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hiru Hpriv []").
-    { iApply (fsabs_unlink_pre with "Hsup"). }
+                    Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hiru Hpriv [Hxin]").
+    { iApply (sysc_dep_unlink U sts fdep ltac:(rewrite Hnum; reflexivity)
+                with "Hxin"). }
     iIntros (CIDy Hsy mf P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv Harms".
     iDestruct (unlink_arms_ret with "Harms") as %Hrv.
@@ -4997,7 +5159,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 19) : mword 64)
                    = mword_of_int KernelSyms.sys_link) by reflexivity.
@@ -5024,10 +5186,9 @@ Section SyscallArms.
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     iDestruct (sysc_iref_split3 with "Hir") as "[Hirl Hirk]".
-    (* the three commits link's legs fire, at the trivial bundle
-       ([FsAbsInvFire.fsabs_link_pre]); the landed return blanket is still
+    (* the three commits link's legs fire, at the PROCESS'S OWN bundle
+       ([SpecSyscall.sysc_sys_in] at 19); the landed return blanket is still
        stated purely beside the arms (round E2, lane E2-L). *)
-    iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
     iApply (SysLink.wp_sys_link_sconf γf γs j γl
 
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
@@ -5036,16 +5197,15 @@ Section SyscallArms.
 
               DfracDiscarded DfracDiscarded DfracDiscarded v0 v1 pid U M
               (av - 4)%nat true true ∅
-              (pfam_triv (fun _ _ _ => True%I))
-              (pfam_triv (fun _ _ _ _ => True%I))
-              (pfam_triv (fun _ _ => True%I))
+              (lf_Ftgt fdep) (lf_Fent fdep) (lf_Funt fdep)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbg Hib (proj2 (proj2 (proj2 Hnin))) Hprg Hj Hgamma
               eq_refl Hv0 Hv1
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
-                    Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hirl Hpriv []").
-    { iApply (fsabs_link_pre with "Hsup"). }
+                    Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hirl Hpriv [Hxin]").
+    { iApply (sysc_dep_link U sts fdep ltac:(rewrite Hnum; reflexivity)
+                with "Hxin"). }
     iIntros (CIDy Hsy mf P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv _".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
@@ -5564,7 +5724,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 20) : mword 64)
                    = mword_of_int KernelSyms.sys_mkdir) by reflexivity.
@@ -5598,27 +5758,24 @@ Section SyscallArms.
  IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
               v0 pid U M (av - 4)%nat true true ∅
-              (* THE APPLICATION'S SIDE: the generic app asks nothing of
-                 mkdir's walk or create's legs, so every family is [True]
-                 and the bundle is [SpecSysMkdir.mkdir_au_pre_unit] off the
-                 SUPPLY -- the same shape unlink's and mknod's arms
-                 use ([FsAbsInvFire.fsabs_*]).  The receipts come back at
-                 [True] and are dropped. *)
-              (fun _ _ => True)%I (fun _ _ => True)%I
-              (pfam_triv (fun _ _ => True%I))
-              (pfam_triv (fun _ _ _ _ => True%I))
-              (pfam_triv (fun _ _ => True%I))
-              (pfam_triv (fun _ _ _ _ => True%I))
-              (pfam_triv (fun _ _ _ _ => True%I))
+              (* THE APPLICATION'S SIDE IS THE PROCESS'S: mkdir's walk
+                 cursor and create's four legs come in at the families the
+                 deposit was made at ([SpecSyscall.sysc_sys_in] at 20), the
+                 same shape unlink's and mknod's arms use.  The armed post
+                 comes back at those families and is DROPPED here -- the row
+                 that carries it to the process is the next step's. *)
+              (df_P fdep) (df_Pmiss fdep)
+              (df_Farm fdep) (df_Fdots fdep) (df_Fun fdep)
+              (df_Fok fdep) (df_Fex fdep)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
               ltac:(compute; lia) Hj Hgamma eq_refl Hv0
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv
-                    []").
-    { iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
-      iApply (SpecSysMkdir.mkdir_au_pre_unit with "Hsup"). }
+                    [Hxin]").
+    { iApply (sysc_dep_mkdir U sts fdep ltac:(rewrite Hnum; reflexivity)
+                with "Hxin"). }
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0 _".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
@@ -5688,7 +5845,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 17) : mword 64)
                    = mword_of_int KernelSyms.sys_mknod) by reflexivity.
@@ -5718,26 +5875,25 @@ Section SyscallArms.
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     (* THE CONTRACT, at the trivial bundle: every receipt [True], the
-       commits discharged out of the abstract-state invariant
-       ([FsAbsInvFire.fsabs_mknod_pre]); the return blanket is read back
+       commits taken from the PROCESS'S OWN bundle
+       ([SpecSyscall.sysc_sys_in] at 17); the return blanket is read back
        off the arms ([mknod_arms_ret]). *)
-    iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
     iApply (SysMknod.wp_sys_mknod γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
               v0 v1 v2 pid U M (av - 4)%nat true true ∅
-              (fun _ _ => True%I) (fun _ _ => True%I)
-              (* create's child legs, at the trivial families too *)
-              (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I))
-              (pfam_triv (fun _ _ _ _ => True%I))
-              (pfam_triv (fun _ _ _ _ => True%I))
+              (nf_P fdep) (nf_Pmiss fdep)
+              (* create's child legs, at the process's families too *)
+              (nf_Farm fdep) (nf_Fun fdep)
+              (nf_Fok fdep) (nf_Fex fdep)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
               ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1 Hv2
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
-                    Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv []").
-    { iApply (fsabs_mknod_pre with "Hsup"). }
+                    Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv [Hxin]").
+    { iApply (sysc_dep_mknod U sts fdep v1 v2
+                ltac:(rewrite Hnum; reflexivity) Hv1 Hv2 with "Hxin"). }
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv Harms".
     iDestruct (mknod_arms_ret with "Harms") as %Hret0.
@@ -5821,7 +5977,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 15) : mword 64)
                    = mword_of_int KernelSyms.sys_open) by reflexivity.
@@ -5856,10 +6012,9 @@ Section SyscallArms.
     iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
     (* THE ONE CONTRACT.  Its input and its arms are keyed on the O_CREATE
        bit of the caller's own omode word, so this arm chooses nothing: it
-       hands the trivial input ([FsAbsInvFire.fsabs_open_in]) and reads the
-       landed [sys_open_post] back off the arms
+       hands the PROCESS'S OWN input ([SpecSyscall.sysc_sys_in] at 15) and
+       reads the landed [sys_open_post] back off the arms
        ([SpecSysOpen.open_arms_landed]). *)
-    iDestruct (syscall_env_sup with "Henvc") as "#Hsup".
     iAssert (wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (ns' : nat) (P' : uptd),
         ⌜callee_saved M mf⌝ -∗
@@ -5879,28 +6034,27 @@ Section SyscallArms.
         sys_open_post γf (proc_addr j) pid (us_upt U P') sts (trunc32 v1)
           (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
         WP (Loop : expr riscv_lang)) -∗ WP (Loop : expr riscv_lang))%I
-      with "[Hcg Hcpu Htcx Hccx Hpc Hbs Hir Hfd0 Hpriv Hufrag]" as "Hk".
+      with "[Hcg Hcpu Htcx Hccx Hpc Hbs Hir Hfd0 Hpriv Hufrag Hxin]" as "Hk".
     { iIntros "Hcont'".
       iApply (SysOpen.wp_sys_open γft γf γs j γl
                 (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
                 DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
                 v0 v1 pid U sts M (av - 4)%nat true true ∅
-                (fun _ _ => True%I) (fun _ _ => True%I)
-                (* create's child legs, at the trivial families too
+                (of_P fdep) (of_Pmiss fdep)
+                (* create's child legs, at the process's families too
                    (round E2, lane E2-C) *)
-                (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I))
-                (pfam_triv (fun _ _ _ _ => True%I))
-                (pfam_triv (fun _ _ _ _ => True%I))
-                (pfam_triv (fun _ _ _ => True%I))
-                (pfam_triv (fun _ _ _ => True%I))
+                (of_Farm fdep) (of_Fun fdep)
+                (of_Fok fdep) (of_Fex fdep)
+                (of_Fo fdep) (of_Ft fdep)
                 ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
                 Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
                 ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1
                 with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hftable Hbio Hlog
                       Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
                       Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
-                      Hfd0 Hpriv Hufrag []").
-      { iApply (fsabs_open_in with "Hsup"). }
+                      Hfd0 Hpriv Hufrag [Hxin]").
+      { iApply (sysc_dep_open U sts fdep v1
+                  ltac:(rewrite Hnum; reflexivity) Hv1 with "Hxin"). }
       iIntros (CIDy Hsy mf ns' P')
         "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
       iDestruct (open_arms_landed with "Harms") as "Hpost".
@@ -6137,7 +6291,7 @@ Section SyscallArms.
     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
     sysc_hcont_ty γf pj fn dqi ip pid U sts lks av m (ret_pc (m !!! Regidx Rra)) -∗
-    sysc_exec_in U sts fdep -∗
+    sysc_sys_in U sts fdep -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hj Hpj HMsp HMs1 HMother Hav Hrange.

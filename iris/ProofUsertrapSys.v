@@ -518,11 +518,12 @@ Section UtSysBlock.
     (* THE BUNDLE OFFERED, re-keyed from the entry record to the
        dispatcher's: the prologue's and the epilogue's epc rewrites move
        neither the image nor the a1 word nor the number *)
-    2: { rewrite /sysc_exec_in. iIntros "%Hk7". cbn [us_V] in Hk7.
-         iDestruct ("Hxin" $! USYS_exec with "[%]") as "Hx".
+    2: { rewrite /sysc_sys_in. iIntros (n) "%Hk". cbn [us_V] in Hk.
+         destruct Hk as (Hkn & Hkex & Hkfk).
+         iDestruct ("Hxin" $! n with "[%]") as "Hx".
          { split_and!;
-             [ exact Hscec | rewrite Hn0; exact Hk7
-             | vm_compute; discriminate | vm_compute; discriminate ]. }
+             [ exact Hscec | rewrite Hn0; exact Hkn
+             | exact Hkex | exact Hkfk ]. }
          assert (Hkey : skey_eq (uvis_of U0 sts)
                           (uvis_of (MkUstate V1 (us_M U)) sts)).
          { rewrite /skey_eq. split_and!;
@@ -532,7 +533,7 @@ Section UtSysBlock.
              | exact (Hargw 2%nat ltac:(lia))
              | reflexivity
              | exact (eq_sym Hpr5) ]. }
-         rewrite <- (sbundle_at_cong uslot USYS_exec fdep (uvis_of U0 sts)
+         rewrite <- (sbundle_at_cong uslot n fdep (uvis_of U0 sts)
                        (uvis_of (MkUstate V1 (us_M U)) sts) Hkey).
          iExact "Hx". }
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]

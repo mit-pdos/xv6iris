@@ -203,27 +203,27 @@ Local Open Scope Z_scope.
 (* the mode-flag reading of syscall argument 1: argint keeps the low int,
    and the C's bit tests read that int's bits -- O_WRONLY = 1, O_RDWR = 2,
    O_CREATE = 0x200 (bit 9), O_TRUNC = 0x400 (bit 10) *)
-Definition om_arg `{XI : CurCtx} (v : mword 64) : Z := (bv_unsigned v) mod (2 ^ 32).
+Definition om_arg (v : mword 64) : Z := (bv_unsigned v) mod (2 ^ 32).
 
-Definition om_wronly `{XI : CurCtx} (v : mword 64) : bool := Z.testbit (om_arg v) 0.
-Definition om_rdwr `{XI : CurCtx} (v : mword 64) : bool := Z.testbit (om_arg v) 1.
-Definition om_create `{XI : CurCtx} (v : mword 64) : bool := Z.testbit (om_arg v) 9.
-Definition om_trunc `{XI : CurCtx} (v : mword 64) : bool := Z.testbit (om_arg v) 10.
+Definition om_wronly (v : mword 64) : bool := Z.testbit (om_arg v) 0.
+Definition om_rdwr (v : mword 64) : bool := Z.testbit (om_arg v) 1.
+Definition om_create (v : mword 64) : bool := Z.testbit (om_arg v) 9.
+Definition om_trunc (v : mword 64) : bool := Z.testbit (om_arg v) 10.
 
 (* the two mode booleans the walk stores into the new file, read straight
    off the C: [f->readable = !(omode & O_WRONLY)],
    [f->writable = (omode & O_WRONLY) || (omode & O_RDWR)] *)
-Definition om_readable `{XI : CurCtx} (v : mword 64) : bool := negb (om_wronly v).
-Definition om_writable `{XI : CurCtx} (v : mword 64) : bool := om_wronly v || om_rdwr v.
+Definition om_readable (v : mword 64) : bool := negb (om_wronly v).
+Definition om_writable (v : mword 64) : bool := om_wronly v || om_rdwr v.
 
-Lemma om_arg_range `{XI : CurCtx} (v : mword 64) : 0 <= om_arg v < 2 ^ 32.
+Lemma om_arg_range (v : mword 64) : 0 <= om_arg v < 2 ^ 32.
 Proof. apply Z.mod_pos_bound. lia. Qed.
 
 (* the dir arm's key is the WHOLE-int equality [omode = O_RDONLY = 0];
    under it the stored modes are read-only-read-write-not -- which is what
    makes the dir arm consistent with the landed
    writable-fd-is-not-a-directory theorem *)
-Lemma om_rdonly_modes `{XI : CurCtx} (v : mword 64) :
+Lemma om_rdonly_modes (v : mword 64) :
   om_arg v = 0 -> om_readable v = true /\ om_writable v = false.
 Proof.
   rewrite /om_readable /om_writable /om_wronly /om_rdwr.
@@ -231,14 +231,14 @@ Proof.
 Qed.
 
 (* init's omode, decoded (the header's two-line instantiation) *)
-Lemma om_rdwr_modes `{XI : CurCtx} (v : mword 64) :
+Lemma om_rdwr_modes (v : mword 64) :
   om_arg v = 2 -> om_readable v = true /\ om_writable v = true.
 Proof.
   rewrite /om_readable /om_writable /om_wronly /om_rdwr.
   intros ->. done.
 Qed.
 
-Lemma om_rdwr_plain `{XI : CurCtx} (v : mword 64) :
+Lemma om_rdwr_plain (v : mword 64) :
   om_arg v = 2 -> om_create v = false /\ om_trunc v = false.
 Proof. rewrite /om_create /om_trunc. intros ->. done. Qed.
 
@@ -350,7 +350,7 @@ Section SysOpenAU.
      phase 2 is quantified over the post map and constrained by its
      READING alone, so the caller witnesses exactly "the row is empty
      now" and nothing about the record the mover chose. *)
-  Definition atrunc_commit_at `{XI : CurCtx} Γ (E : coPset)
+  Definition atrunc_commit_at Γ (E : coPset)
       (Φ : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i : Z) (bs0 : list (bv 8)) (nl : nat),
        ⌜arow_at (abs_view I) i (MkAnode (AFile bs0) nl)⌝ -∗
@@ -368,7 +368,7 @@ Section SysOpenAU.
   (* satisfiability, at the live Γ: a write-kind shape owes the caller's
      step, which a client that answers for no abstract state pays out of
      the SUPPLY ([AppInv.app_step_acc]) *)
-  Lemma atrunc_commit_at_unit `{XI : CurCtx} (γfs : fs_names) E :
+  Lemma atrunc_commit_at_unit (γfs : fs_names) E :
     app_sup -∗ atrunc_commit_at (fs_gamma_L γfs) E (fun _ _ _ => True%I).
   Proof.
     iIntros "#Hsup". rewrite /atrunc_commit_at. iIntros (I i bs0 nl) "%Hpre Ha".
@@ -378,7 +378,7 @@ Section SysOpenAU.
     by iFrame "Ha'".
   Qed.
 
-  Lemma atrunc_commit_at_pinned `{XI : CurCtx} (γfs : fs_names) E (q : Qp) (jpin : Z) (b : anode)
+  Lemma atrunc_commit_at_pinned (γfs : fs_names) E (q : Qp) (jpin : Z) (b : anode)
       (Φ : aview -> Z -> list (bv 8) -> iProp Σ) :
     app_sup -∗
     nview (fs_gamma_L γfs) q jpin b -∗
@@ -441,7 +441,7 @@ Section SysOpenAU.
      refund, so the list stays the length it had.  The walk's cursor pair
      [P]/[Pmiss] stays BARE: a sequenced piece carries its refund as its
      cursor and owes no second one. *)
-  Definition open_au_pre_plain `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
+  Definition open_au_pre_plain Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
@@ -452,7 +452,7 @@ Section SysOpenAU.
   (* ...and the O_CREATE caller: the parent-prefix one-shot REUSED from
      the mknod era file, create's fused delta at the child [AFile []],
      the exists observation, and open's own two commits *)
-  Definition open_au_pre_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
+  Definition open_au_pre_create Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
