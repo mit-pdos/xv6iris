@@ -324,6 +324,22 @@ unmoved and observes, and the kernel's fire lemma moves it from the row
 invariant it holds.  ARM-b re-shapes those two pieces (and any other with
 the same dependence) before turning the real bundles on.
 
+**Two more ARM-a rulings (2026-09-08).**  (a) The leaf's premise is a
+WAND off the two authorities the leaf holds, not a bare premise (the key
+is bound by `urun`'s existential): `udepw … m pc n := ∀ M pm sz fdv cw,
+uheap … -∗ ufd_auth … -∗ uheap … ∗ ufd_auth … ∗ (⌜psok n ∧ n <> USYS_exec⌝
+∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv cw))`; the left disjunct
+carries `n <> USYS_exec`, so one minting lemma serves every number and
+exec is the ordinary leaf whose disjunct is always the right one.  (b)
+`psok`'s discharge travels beside `udep`: the gate slots and
+`cond_entry_slot` take `⌜∀ k, k <> USYS_exec -> psok k⌝` with `□ Dsup`,
+and the mint sites, which see the instance, discharge both.  The law
+stays PER-NUMBER (refuted: folding `psok` out of the law into the leaf
+gate — then the law is `∀ n`, and a program with `Dsup := emp`, echo
+pre-taint, could not instantiate it at all).  Program files carry the
+hypothesis `Hpsok` as a section variable; their kernel-side constructors
+discharge it.
+
 #### What is actually left to decide for L2-a
 
 - ~~D-A~~ **REFUNDS, RULED 2026-09-07 (owner): every piece of a bundle is
