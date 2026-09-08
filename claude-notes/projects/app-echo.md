@@ -381,6 +381,35 @@ mechanical appends and are removed where the bodies never use the
 context (fallback only if a body genuinely does: the slot family as an
 explicit index of `park_pkg`/`park_token`).
 
+**Two B1 rulings (2026-09-08).**  (a) THE SUPPLY'S CARRIER.  `ssupply`
+reads `app_pred`/`app_run`, fields of `appcfg`, and that record is BUILT
+INSIDE THE BOOT FUPD (`SystemAdequacy.xv6_boot_era`'s `MkAppcfg N A r`),
+so no module-level inhabitant of a `UEXEC_GEN` supply field can exist
+without an axiom (the Link chain never sees a concrete record).  The
+supply therefore travels as `Happ_auto` did: a Coq hypothesis `Happ_sup :
+∀ c r, ⊢ □ ∀ av, app_pred A c r av` of `xv6_power_adequacy_gen`, trivial
+at `app_triv`, born at boot as a FOURTH kernel-wide persistent credential
+beside `kernel_text`/`cpu_claim`/`wire_inv`, threaded into the closed
+loop's premise list and to the userinit and sys_fork mints.  B2 EXCHANGES
+`Happ_auto` for `Happ_sup` and deletes the per-step license.  Why this is
+not the GAP-premise trap: `Happ_auto` promised the predicate survives
+every one-row move — unpayable by any constraining application even with
+all programs verified; `Happ_sup` says the predicate is trivially true,
+the honest premise of the GENERIC theorem, which runs unverified
+programs.  A constraining application does not instantiate the generic
+theorem: its mint sites park verified slots (L6), fork copies the parent's
+slot, and the tainted generic slot's supply arrives through the exec
+bundle the tainted process deposits.  (b) FAMILIES SCOPED OVER BOTH
+LEGS.  With `sbundle` and `spost` existential separately, the post a
+program gets back is at SOME families and tells it nothing about its own
+receipts.  The class gains `sfam : Z -> Type`, `sbundle_at`, `spost_at`
+(indexed by the family witness `f : sfam n`; `unit` for numbers without
+a contract), and the arm is `∃ f, sbundle_at X n W f ∗ (∀ r …, rows -∗
+spost_at X n W f r -∗ X (bump …))` — the fd-row pilot's deposit shape at
+the families instead of the mirror; the dispatcher destructs `f`, runs
+the contract at those families and returns `spost_at f r`; `ut_sys_in/
+out` carry `f`; `sysc_exec_in` folds into `sysc_sys_in`.
+
 #### What is actually left to decide for L2-a
 
 - ~~D-A~~ **REFUNDS, RULED 2026-09-07 (owner): every piece of a bundle is
