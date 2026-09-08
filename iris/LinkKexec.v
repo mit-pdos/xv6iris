@@ -1,41 +1,22 @@
-(* LinkKexec.v -- the only file where kexec's proof meets its callees'.
+(* LinkKexecAU.v -- the AU kexec's callees, discharged.
 
-   Sixteen functor arguments, and kexec is the one function in the tree that
-   reaches all three subsystems at once, so this is where the FS cone, the
-   page-table cone and the string/copy cone finally join:
+   [LinkKexecPin.v]'s list exactly: [LinkKexec.v]'s sixteen plus
+   [LinkNameiEra.NameiEra], the era-traced namei ([SpecNameiEra.NAMEI_ERA])
+   the AU walk calls where the landed walk calls [Namei].  BOTH are
+   supplied -- the landed one because the blocks this cone opens as
+   [PA.LA] / [PA.T] / [PB..PD] are functors over it, the era one because
+   [ProofKexecAUA.kxc_a1_au] makes the call.
 
-   - the FS transaction: begin_op / end_op (LinkBeginOp.v, LinkEndOp.v) and,
-     inside it, namei -> ilock -> readi -> iunlockput (LinkNamei.v,
-     LinkIlock.v, LinkReadi.v, LinkIunlockput.v) -- iunlockput is kexec's
-     only route to iput, and hence the one that used to carry iput's
-     [iput_acquiresleep_order_ADMITTED] into this cone (that axiom is gone --
-     claude-notes/projects/iput-acquiresleep.md);
-   - the address space: proc_pagetable (LinkProcPagetable.v) at its GENERAL
-     [PROC_PAGETABLE_GEN] instantiation, uvmalloc / uvmclear / walkaddr
-     (LinkUvmalloc.v, LinkUvmclear.v, LinkWalkaddr.v) and, on every [bad:]
-     path plus the commit, proc_freepagetable (LinkProcFreepagetable.v);
-   - the arguments: strlen and copyout per argument (LinkStrlen.v,
-     LinkCopyout.v), safestrcpy for p->name (LinkSafestrcpy.v);
-   - plus myproc (LinkMyproc.v) and flags2perm (LinkFlags2perm.v).
+   So this cone's assumption count is [LinkKexec]'s union [LinkNameiEra]'s,
+   which is what the pinned lane's Link file already records. *)
+Require Import LinkMyproc LinkBeginOp LinkNamei LinkNameiEra LinkIlock
+        LinkReadi LinkIunlockput LinkEndOp LinkProcPagetable
+        LinkProcFreepagetable LinkWalkaddr LinkFlags2perm LinkUvmalloc
+        LinkUvmclear LinkStrlen LinkCopyout LinkSafestrcpy
+        LinkPanic ProofKexecAU.
 
-   [ProcPagetableGen], NOT [ProcPagetable]: kexec runs at
-   [kalloc_env ga None] (uvmalloc and proc_freepagetable both require it)
-   and tests proc_pagetable's result against 0, so it is the caller that can
-   use the uncounted arm -- see claude-notes/projects/kexec.md, "What is NOT
-   blocked".
-
-   panic is not a module argument.  The one live panic kexec can reach is
-   ilock's [ilock: no type], which [SpecIlock] does not refute; the contract
-   takes [kernel_data] / [panic_env] -- inside [SpecKexec.fs_fabric] -- and
-   loadseg's own panic("loadseg: address should exist") is discharged against
-   [Panic]. *)
-Require Import LinkMyproc LinkBeginOp LinkNamei LinkIlock LinkReadi
-        LinkIunlockput LinkEndOp LinkProcPagetable LinkProcFreepagetable
-        LinkWalkaddr LinkFlags2perm LinkUvmalloc LinkUvmclear LinkStrlen
-        LinkCopyout LinkSafestrcpy
-        LinkPanic ProofKexec.
-
-Module Kexec := KexecProof Myproc BeginOp Namei Ilock Readi Iunlockput EndOp
-                           ProcPagetableGen ProcFreepagetable Walkaddr
-                           Flags2perm Uvmalloc Uvmclear Strlen Copyout
-                           Safestrcpy Panic.
+Module KexecAU := KexecAUProof Myproc BeginOp Namei NameiEra Ilock Readi
+                               Iunlockput EndOp
+                               ProcPagetableGen ProcFreepagetable Walkaddr
+                               Flags2perm Uvmalloc Uvmclear Strlen Copyout
+                               Safestrcpy Panic.

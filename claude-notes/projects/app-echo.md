@@ -432,6 +432,23 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   `SpecNameiparent`/`SpecNamex` stay (link, unlink and the era wrapper
   use them).
 
+- ~~**EXEC-UNIFY**~~ LANDED 2026-09-08 (Opus lane; 16 files deleted, 4
+  renamed, net about 8,300 lines removed).  kexec and sys_exec each have
+  ONE contract: the AU statements are the seals `SpecKexecAU.KEXEC` /
+  `SpecSysExecAU.SYSEXEC` (`wp_kexec_sconf`, `wp_sys_exec_sconf`; the
+  bundle names `exec_au_pre`/`sys_exec_au_pre` kept); `SpecKexec.v` and
+  `SpecSysExec.v` are vocabulary leaves.  Deleted: the plain compositions
+  and links, the PINNED prover layer (`SpecKexecPin`, `ProofKexecPin*`,
+  `LinkKexecPin` — an orphan: no caller, and the AU form's `kexec_image_ok`
+  is strictly stronger), and the off-build pinned seven (`SpecKexecPinned`
+  four, `DirViewPin`, `NameiInitPinned`, `LinkNameiPinned`).  forkret's
+  boot arm calls the one kexec contract with `exec_au_pre_triv` (a bare
+  `⊢`) at `S := fun _ => emp`, zero cone growth.  `UShKernel.v` absorbed
+  its ~35 lines from the pinned file.  Follow-ons, not touched: `KEXECB3`
+  has no consumer by design; `KexecOkQ`'s `Q` hole has one instantiation
+  left (`KexecAUBridge.exec_built_Q`) — retiring it touches the eight
+  phase files.
+
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
   their old names although no AU is left in them — `SpecSysWriteAU.v`,
@@ -455,7 +472,12 @@ forcing function (`kexec_ok`'s success arm) is RESOLVED IN PRINCIPLE
 is the observed file's ELF decode, its entry pc, the argument block and
 stack pinned), already on the theorem's path; what remains is echo's own
 bundle proving from its pins that the observed file is `/echo`'s bytes
-(L6), and folding the PINNED kexec forms (EXEC-UNIFY phase 0 inventories
-the re-layering, since `ProofKexecAU` is composed over `ProofKexecPin*`'s
-blocks); Lane X's `kxp_chain` question is moot once the pinned seal goes.  Ordering: L2-a → the park
+(L6).  The PINNED kexec forms (`SpecKexecPin`, Lane X; the off-build
+`SpecKexecPinned` four) are ORPHANS: EXEC-UNIFY's inventory showed the AU
+proof never consumed them (`ProofKexecAUA` is an independent replay of
+phase A), `wp_kexec_pinned*` has no caller (forkret applies the unpinned
+form), and the AU form's `kexec_image_ok` closes the pinned layer's own
+"upgrade gap" (`uimg_sub (elf_image f) (uvis_M W')`); the AU form is
+strictly stronger (a pinning `Φo` refutes the not-loadable arms).  They
+are deleted by EXEC-UNIFY; Lane X's `kxp_chain` question is moot.  Ordering: L2-a → the park
 → L5 → L2-b → L6 → L7.  Q4 stays provisional.
