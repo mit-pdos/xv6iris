@@ -257,6 +257,16 @@ The ARM lane = that mechanism at EVERY fs syscall, in the DEPOSIT shape:
   hands the `nview` share back inside `Φ`).  CONSEQUENCE: the arm must be
   the DEPOSIT shape (the post read back under the arm's ∀, the fd-row
   pilot's route) and not `UexecRetExec`'s give, which drops the post.
+  SHAPE RULED 2026-09-08 (R-CONJ phase 0): receipt and refund travel as
+  ONE generic per-piece record `pfam Σ A := { pf_recv : A ; pf_refund :
+  iProp Σ }` (one field per piece in every bundle and arm, 1:1 with the
+  pieces, arities unchanged; cursors `P`/`Pmiss`/the write chain's `Q`
+  stay bare — the TYPE says which families are one-shot pieces); the `∧`
+  sits at the ASSEMBLY (`piece … F.(pf_recv) ∧ F.(pf_refund)` in the
+  bundle and in every unfired-return arm; piece definitions untouched;
+  fire lemmas eliminate in one line; dischargers at the named trivial
+  pair).  Read's landed flat `Φ, R` converts to the record in the same
+  pass.
 - **THE WRITE CHAIN'S REFUND IS A PREFIX CURSOR (owner, 2026-09-07).**  Node
   k of the chain becomes `Q k ∧ (full_k ∧ part_k)` and the base case
   `chain k 0 := Q k`, with `Q k` the caller's predicate "after the prefix
@@ -527,7 +537,14 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   `mknod_walk_dead_era` are the nameiparent family's walk premise (open,
   unlink, create, mknod all consume them) — the misleading half is the
   `mknod_` prefix, rename family-wide; (c) consolewrite's two forms
-  (CONS-FOLD, above).
+  (CONS-FOLD, above); (d) `ProofSysUnlinkAU.v` seals the one unlink
+  contract while `ProofSysUnlink.v` is the pure layer below it, and
+  `SpecKexecAU.v`/`SpecSysExecAU.v`/`ProofKexecAUA.v` hold the one exec
+  contracts — rename; (e) dead after the folds: `SpecSysOpenAU.
+  aopen_commit` and `aopen_commit_at_weaken` (no consumer),
+  `FsAbsMknodFire.mkf_acre_fire` (no application site; `caf_acre_fire` is
+  the one used), `KEXECB3`'s consumer-less seal, `KexecOkQ`'s single-
+  instantiation `Q` hole.
 
 ## Decisions outstanding after the 2026-09-07 rulings
 
