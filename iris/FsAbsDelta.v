@@ -6,7 +6,7 @@
    statement changed, no proof touched, R10):
 
      [acre_bump], [delta_create] + row algebra      from SpecSysMknodAU.v
-     splice algebra, [delta_write] + row algebra    from SpecSysWriteAU.v
+     splice algebra, [delta_write] + row algebra    from the write cone
      [delta_trunc] + row algebra                    from SpecSysOpenAU.v
      [unl_dec], [delta_unl_ent], [delta_unl_tgt],
        [delta_unlink] + row algebra                 from SpecSysUnlinkAU.v
@@ -410,7 +410,7 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(*  2.  WRITE (from SpecSysWriteAU.v)                                    *)
+(*  2.  WRITE                                                            *)
 (* ===================================================================== *)
 
 (* THE SPLICE IS [FsBlocks.blk_splice], REUSED: [blk_splice off sub bs] is

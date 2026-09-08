@@ -14,7 +14,7 @@
    dv_half walk-pre made the original unsealable, and the astate-shaped
    commits proved non-give-backable against [InodeRegion.ftop_body]) --
    plus SpecSysReadAU.v (the single-phase whole-[anode] observation) and
-   SpecSysWriteAU.v (the delta vocabulary, the exclusion-by-premise
+   the write side (the delta vocabulary, the exclusion-by-premise
    pattern).
 
    THE DRIVING CONSUMER is xv6's init.c: [open("console", O_RDWR)],
@@ -94,7 +94,7 @@
    type test itself (even with O_TRUNC set), directories never reach it
    (the O_RDONLY guard), and every failure arm returns before it runs.
 
-   [delta_trunc] is MINTED, in [SpecSysWriteAU.delta_write]'s total-
+   [delta_trunc] is MINTED, in [FsAbsDelta.delta_write]'s total-
    function mold, because the write delta cannot express truncation:
    [blk_splice] never shrinks ([delta_write_no_shrink] below is the
    machine-checked justification for the mint).  The commit
@@ -305,8 +305,8 @@ Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    ADDRESSES the frame below threads *)
 Require Import SpecSysMknodAU.  (* [delta_create], [cre_pre],
                                    [mknod_parent_elems], [abs_view_insert] *)
-Require Import SpecSysWriteAU.  (* [delta_write] + the splice algebra the
-                                   mint justification below is cut from *)
+Require Import SpecSysWriteAU.  (* the splice algebra it re-exports, which
+                                   the mint justification below is cut from *)
 Require Import FsAbsEra.        (* [elend]: the era lend the hops fire *)
 Require Import FsAbsEraMknod.   (* [mknod_walk_pre_era], [mknod_walk_dead_era]
                                    -- the parent-prefix one-shot, REUSED *)

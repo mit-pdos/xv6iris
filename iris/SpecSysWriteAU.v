@@ -3,26 +3,19 @@
    instant-count bound.  A LEAF: pure Coq, no [iProp], no [Module Type],
    no contract.
 
-   WHAT THIS FILE USED TO BE, AND WHY IT IS NOT ANY MORE.  It carried
-   sys_write's ATOMIC-UPDATE contract stated over [FsAbs.astate] -- a
-   parallel form beside the landed [SpecSysWrite.SYSWRITE], with its own
-   frame, its own receipts and its own [Module Type SYSWRITE_AU].  The
-   owner's ONE SPEC PER SYSCALL ruling (2026-09-07) folded every parallel
-   write form into a single [SpecFilewrite.FILEWRITE] and a single
-   [SpecSysWrite.SYSWRITE], so the contract, the astate commits
-   ([awrite_commit]/[awrite_commits], never dischargeable at the authority
-   -- FsAbsWriteFire's header) and the per-chunk receipt family
-   ([wri_receipts], [wri_receipts_chained], [wri_part_receipt], subsumed by
-   the chain's PREFIX CURSOR) all left with it.
+   WHY THE WRITE'S CONSTANTS LIVE IN A LEAF OF THEIR OWN.  Both the
+   INVARIANT layer ([FsAbsWriteFire.v], the fire point) and the CONTRACT
+   ([SpecFilewrite.v]) need [FW_MAX] and [wchunks], and a spec file may not
+   own a definition the invariant layer needs
+   (design/code-organization.md), so they sit here, below both.  [FW_MAX]'s
+   derivation from the log's budget stays in [SpecFilewrite.fw_max_value],
+   where [MAXOPBLOCKS] is in scope.
 
-   WHAT IS LEFT IS WHAT THE LAYERS BELOW THE CONTRACT NEED, and that is why
-   the file survives at all: [FsAbsWriteFire.v] (the fire point, an
-   invariant leaf) and the contract itself both need [FW_MAX] and
-   [wchunks], and a spec file may not own a definition the invariant layer
-   needs (design/code-organization.md).  So this is the small leaf they
-   both import.  [FW_MAX] moved here from [SpecFilewrite.v] for exactly
-   that reason; its derivation from the log's budget stays there
-   ([SpecFilewrite.fw_max_value], where [MAXOPBLOCKS] is in scope).
+   sys_write itself has ONE contract, [SpecSysWrite.SYSWRITE], whose arms
+   are keyed on the descriptor's state; the abstract commits it is stated
+   over are [FsAbsWriteFire]'s, at the γtop AUTHORITY (an [FsAbs.astate]-
+   shaped commit is not dischargeable in either phase -- that file's header
+   is the argument).
 
    Design of record: claude-notes/design/fs-syscall-specs.md sections 0-4
    (the sys_write paragraph of section 4). *)

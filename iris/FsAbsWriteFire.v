@@ -33,9 +33,7 @@
    2 names the POST map, which no [astate] at the delta determines).
 
    [awrite_full_at] below is therefore stated at the AUTHORITY, and it is
-   the ONLY form: the astate family that used to sit beside it in
-   [SpecSysWriteAU] is gone with that file's contract (ONE SPEC PER
-   SYSCALL, owner 2026-09-07).
+   the ONLY form the write contract carries.
 
    ==== THE OFFSET FOLD, AND WHY THE BUNDLE BECAME A CHAIN ==============
 
@@ -546,7 +544,7 @@ Section WriteFire.
      the one fupd, inside [ip->lock], at the row's retag.  [REST] is what the
      client hands back at phase 2 -- the rest of the chain, below.
 
-     THE PER-CHUNK BUFFER TIE IS PHASE 1'S (owner, 2026-09-07).  Every chunk
+     THE PER-CHUNK BUFFER TIE IS PHASE 1'S.  Every chunk
      that reaches node [k] was FULL (a short one ends filewrite's loop), so
      chunk [k]'s source offset is [FW_MAX * k] and its bytes are the caller's
      own run there ([SpecCopyin.ubytes_at] at the image [M] the caller lent
@@ -611,7 +609,7 @@ Section WriteFire.
             off_gv γo (1/2) (Z.of_nat (off + r)) ∗
             REST))%I.
 
-  (* THE CHAIN, AT A PREFIX CURSOR (owner, 2026-09-07).  A bundle of
+  (* THE CHAIN, AT A PREFIX CURSOR.  A bundle of
      independent commits cannot work: every commit moves the ONE half the
      client owns, so the client cannot pre-build [wchunks n] of them side by
      side.  The chain hands out one node at a time; each node offers the
@@ -623,9 +621,9 @@ Section WriteFire.
 
      THE KERNEL eliminates to an arm when it fires chunk [k] and returns the
      node when it stops; THE CALLER eliminates to [Q k] at the stop position
-     ([awrite_chain_cursor]).  That is what replaced the receipt family
-     [Φ]/[wri_receipts]/[wri_part_receipt]: the three returns of the posts
-     collapse to "here is the node at the stop position".
+     ([awrite_chain_cursor]).  That is why the posts carry no per-chunk
+     receipt bundle: their three returns collapse to "here is the node at
+     the stop position".
 
      The partial arm ends filewrite's loop ([r != n1] breaks), so it is taken
      at most once, last -- the posts' [x <= 1] slack. *)

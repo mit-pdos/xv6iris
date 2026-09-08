@@ -1,14 +1,12 @@
 (* UartSentLoc.v -- THE LOCATED ACCEPTED-TRACE RECEIPT, at the altitude of
    the transmitter invariant it is about ([UartTxInv.v]).
 
-   THIS IS THE ONLY COPY.  A second one lived at SYSCALL altitude, in
-   [SpecSysWriteConsAU.v], because that seal could not be edited and a
-   device driver's proof must not require the write syscall's statement
-   file (which pulls in SpecFilewrite / SpecSysWrite / the whole fs
-   configuration -- the layering inverted for no gain).  The write family's
-   fold into ONE contract per function retired that seal, and its copy came
-   out with it: [SpecFilewrite]'s console arms are stated on the definition
-   below.
+   THIS IS THE ONLY COPY, and it lives here because its PRODUCERS do -- the
+   uartwrite and consolewrite walks, which sit far below the syscall cone
+   and must not require its statement files (SpecFilewrite / SpecSysWrite
+   pull in the whole fs configuration; a device driver's proof requiring
+   them would invert the layering for no gain).  [SpecFilewrite]'s console
+   arms are stated on the definition below.
 
    WHAT IT SAYS.  [uart_sent_from γu tr0 bs]: the bytes [bs] were accepted
    by the UART, IN ORDER, at positions STRICTLY AFTER a trace that had
@@ -30,8 +28,9 @@
    * [uart_sent_from_snoc] -- one more byte at the end of that trace
      extends the receipt ([UartTxInv.uart_sent_sub_snoc]'s located twin).
 
-   Design of record: SpecSysWriteConsAU.v's header (THE OBSERVABLE, and WHY
-   THERE IS NO COMMIT BUNDLE) -- nothing is restated here. *)
+   WHY THERE IS NO COMMIT BUNDLE HERE: the UART's accepted trace is an
+   OBSERVABLE, not a piece of the abstract file-system state, so a console
+   write has nothing to fire and its receipt is history a caller keeps. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -47,10 +46,8 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
-(* THE COMPOSITION FACT (SpecSysWriteConsAU.sublist_drop_chain, under a
-   lane-local name so a file that imports both keeps two unambiguous
-   spellings): a sublist of one trace extension followed by a sublist of
-   the next IS a sublist of the joint extension. *)
+(* THE COMPOSITION FACT: a sublist of one trace extension followed by a
+   sublist of the next IS a sublist of the joint extension. *)
 Lemma usl_sublist_drop_chain {A : Type} (tr0 tr1 tr2 bs1 bs2 : list A) :
   tr0 `prefix_of` tr1 -> tr1 `prefix_of` tr2 ->
   bs1 `sublist_of` drop (length tr0) tr1 ->
@@ -68,7 +65,7 @@ Section UartSentLoc.
   Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* ------------------------------------------------------------------ *)
-  (*  The receipt (SpecSysWriteConsAU.v section 2, verbatim).             *)
+  (*  The receipt.                                                        *)
   (* ------------------------------------------------------------------ *)
 
   Definition uart_sent_from (γu : uart_names) (tr0 bs : list (bv 8))

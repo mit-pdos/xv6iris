@@ -966,7 +966,6 @@ Section ProofSysWrite.
       iDestruct (fd_st_agree with "Hauth Hfr") as %<-.
       iDestruct ("Hfrback" with "Hfr Hrow") as "Hufrag".
       iEval (rewrite (list_insert_id sts fd stf Hstq)) in "Hufrag".
-      iDestruct (foff_row_permit with "Hrow") as "#Hprow".
       iDestruct (write_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
@@ -974,7 +973,7 @@ Section ProofSysWrite.
                 S4 (av - 6)%nat eb (sys_rw_count v2) b lks Q tr0
                 ltac:(lia) Hkk Hj Hgs Hlens
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
-                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hprow [Hswin]").
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv [Hswin]").
       all: try lkbelow.
       { (* THE CALLER'S INPUT, at the descriptor argfd resolved: the key
            this contract's arms are stated on IS the row the loan named. *)

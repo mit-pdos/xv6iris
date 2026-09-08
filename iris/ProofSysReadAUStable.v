@@ -11,9 +11,9 @@
 
    ==== THE SHAPE, AND WHY IT NEEDS AN [Include] ========================
 
-   [ProofSysWriteAUStable] could be a pure functor over the AU module because
-   the write side has TWO module types ([SYSWRITE_AU_ERA] and
-   [..._ERA_STABLE]), one field each.  [SYSREAD_AU_AT] carries BOTH fields,
+   A stable corollary can be a pure functor over the AU module when the two
+   forms sit in module types of their own, one field each.  [SYSREAD_AU_AT]
+   carries BOTH fields,
    so the sealed module has to contain both proofs: [ProofSysReadAU] exports
    the walk UNSEALED as [SysReadAUWalk], this file [Include]s an application
    of it, adds the corollary beside it, and the seal is applied once at the

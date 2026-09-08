@@ -72,8 +72,8 @@ Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    ADDRESSES the frame below threads *)
 Require Import SpecSysMknodAU.  (* [delta_create], [cre_pre],
                                    [mknod_parent_elems], [abs_view_insert] *)
-Require Import SpecSysWriteAU.  (* [delta_write] + the splice algebra the
-                                   mint justification below is cut from *)
+Require Import SpecSysWriteAU.  (* [wchunks]: the chain's node count, and
+                                   the splice algebra it re-exports *)
 Require Import FsAbsEra.        (* [elend]: the era lend the hops fire *)
 Require Import FsAbsEraMknod.   (* [mknod_walk_pre_era], [mknod_walk_dead_era]
                                    -- the parent-prefix one-shot, REUSED *)

@@ -5,10 +5,9 @@
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the read AU
    prover).  A PARALLEL FORM beside [ProofSysRead.SysReadProof] -- R10: the
    landed proof and its contract do not move, and this file's walk is that
-   proof's, instruction for instruction.  The template is
-   [ProofSysWriteAU.v], and the deltas are the same four; the object code of
-   sys_read and sys_write is identical instruction for instruction, so the two
-   shells are line-for-line twins here as they are there.
+   proof's, instruction for instruction.  The object code of sys_read and
+   sys_write is identical instruction for instruction, so this shell and
+   [ProofSysWrite]'s are line-for-line twins.
 
    ==== WHAT IS ACTUALLY DIFFERENT ======================================
 

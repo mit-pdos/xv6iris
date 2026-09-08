@@ -8,8 +8,8 @@
    INSTANT below) and lane W of claude-notes/projects/fs-syscall-specs.md.
    The abstract vocabulary is FsAbs.v (lane A, landed); the molds are
    SpecSysMknodAU.v (the family conventions; [dlookup_commit] is this
-   commit's single-phase shape) and SpecSysWriteAU.v (the fd threading,
-   the offset honesty, the exclusion-by-premise pattern).
+   commit's single-phase shape) and the write side (the fd threading, the
+   offset honesty, the exclusion-by-premise pattern).
 
    ==== WHAT THIS CONTRACT IS ==========================================
 
@@ -31,8 +31,8 @@
    -- ONE lock hold, the WHOLE transfer inside it, no per-chunk unlocking
    (verified against the object code: the only calls between the arm's
    ilock and its iunlock are readi's own; contrast filewrite's
-   begin_op/ilock/writei/iunlock/end_op LOOP, which is what forced
-   SpecSysWriteAU's chunk bundle).  The doc's section-7 row said
+   begin_op/ilock/writei/iunlock/end_op LOOP, which is what forces the
+   write contract's chunk chain).  The doc's section-7 row said
    "per-chunk AU (readi)" -- PESSIMISTIC relative to the code: readi's
    interior bread/brelse per block are invisible to any concurrent
    fs-state observer because the INODE stays locked and the state never

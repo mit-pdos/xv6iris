@@ -1,8 +1,7 @@
 (* ProofFilewriteChain.v -- filewrite's CHUNK LOOP INVARIANT, and its five
    moves.  A PROOF-SIDE LEAF: nothing above [ProofFilewrite.v] needs any of
-   it, so it does not belong in a statement file (owner's ruling,
-   2026-09-07; statement files stay statements).  It sat in
-   [SpecFilewriteAU.v] before the write family was folded into one contract.
+   it, so it does not belong in a statement file -- statement files stay
+   statements.
 
    [fw_au_raw Γ i γo n M ua Q t p x] is "[p] chunks have fired, they wrote
    [t] bytes in total, their concatenation is the caller's own run at [ua],
@@ -26,12 +25,11 @@
    is a truth about every LOOP ENTRY, not about every state.  Keeping it
    Coq-level is what lets the five moves below be tie-free.
 
-   WHAT THE PREFIX CURSOR CHANGED.  The receipt family [Φ] and its
-   accumulator [wri_receipts] are gone: the state carries the chain and the
-   BYTES, and everything a caller wanted per chunk it recorded in [Q] inside
-   the phase 2 that built the next node.  So [_take] no longer takes a
-   receipt back (only the chunk's bytes and its content premise), and
-   [_spend_part] takes nothing back but the tail.
+   THERE IS NO RECEIPT ACCUMULATOR.  The state carries the chain and the
+   BYTES; everything a caller wants per chunk it records in the PREFIX
+   CURSOR [Q], inside the phase 2 that builds the next node.  So [_take]
+   takes back only the chunk's bytes and its content premise, and
+   [_spend_part] takes back nothing but the tail.
 
    THE FIVE MOVES, one per thing the loop does with it: start it ([_init]),
    spend one node's FULL arm at a chunk's fire ([_take]), spend one node's

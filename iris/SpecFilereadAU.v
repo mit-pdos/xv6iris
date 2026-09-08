@@ -6,8 +6,8 @@
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the read AU
    prover).  A PARALLEL FORM beside [SpecFileread.FILEREAD] -- R10: that file
    does not move, and a caller that wants the landed blanket keeps calling the
-   landed contract.  The mold is [SpecFilewriteAU.v] one size down: read has
-   no bundle, no loop and no carried state, so this file is the body and the
+   landed contract.  It is the write side one size down: read has no
+   bundle, no loop and no carried state, so this file is the body and the
    seal and nothing else.
 
    ==== WHY THE SEAM IS AT FILEREAD AND NOT AT READI ====================

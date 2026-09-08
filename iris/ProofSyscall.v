@@ -417,14 +417,12 @@ Set Printing Depth 40.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 
-(* THE WRITE ARM'S DISPATCH KEY IS THE CONTRACT'S OWN NOW.  sys_write had
-   three proved contracts and this file chose between them with a pure
-   function of argument 0 and the caller's descriptor states
-   ([sysc_write_inode]).  The owner's ONE SPEC PER SYSCALL ruling folded the
-   three into one whose ARMS are keyed on that same function, generalised
-   from "an inode or not" to the descriptor's state
-   ([SpecSysWrite.sys_write_st]) -- so the key moved into the statement, the
-   split disappeared from the walk, and this file's copy went with it. *)
+(* THE WRITE ARM'S DISPATCH KEY IS THE CONTRACT'S OWN.  sys_write has ONE
+   contract, whose arms are keyed on the descriptor's state
+   ([SpecSysWrite.sys_write_st], a pure function of syscall argument 0 and
+   the caller's own descriptor states), so this file computes no key and
+   splits on nothing: it supplies the input at that same key and relays the
+   armed post. *)
 
 Module SyscallProof
     (SysFork : SYSFORK) (SysExit : SYSEXIT) (SysWait : SYSWAIT)
@@ -4415,21 +4413,18 @@ Section SyscallArms.
     iDestruct (sysc_filewrite_env γf γtxl γs j γl (proc_addr j) fn
                  with "Hdata Htx Hfsenv Hbs") as "Hfse".
     (* ---- THE CALLER'S INPUT, AT THE TRIVIAL CURSOR AND THE FREE SEED ---
-       ONE CONTRACT NOW (owner's ONE SPEC PER SYSCALL ruling, 2026-09-07):
-       the arm no longer picks between [SYSWRITE] and [SYSWRITE_AU_ERA] on
-       the descriptor's state -- the ONE [SYSWRITE]'s arms are keyed on that
-       state themselves, and what the dispatcher owes is the matching input,
-       whatever the key turns out to be.  [FsAbsInvFire.fsabs_sys_write_in]
-       builds it from what this arm already holds: the application's
-       invariant (every chunk node's [app_step], out of the parked
-       license), the descriptor bundle's own persistent row family (the
-       inode arm's offset invariant), the [devsw_write_val] equation (the
-       console arm's cell pin) and nothing else (the trace seed is free).
+       ONE CONTRACT: [SYSWRITE]'s arms are keyed on the descriptor's state
+       themselves, so this arm picks nothing -- it owes the matching input,
+       whatever the key turns out to be.
+       [FsAbsInvFire.fsabs_sys_write_in] builds it from what the arm already
+       holds: the application's invariant (every chunk node's [app_step],
+       out of the parked license), the descriptor bundle's own persistent
+       row family (the inode arm's offset invariant), the [devsw_write_val]
+       equation (the console arm's cell pin) and nothing else (the trace
+       seed is free).
 
-       THAT RETIRED THE [fw_app_write_step] MINT: filewrite's FD_INODE arm
-       pays its per-chunk row retag out of the chain's own node now, so the
-       persistent step premise, its accessor and the fupd that minted it
-       here are all gone. *)
+       THE APPLICATION'S PER-CHUNK STEP IS NOT MINTED HERE: filewrite's
+       FD_INODE arm pays its row retag out of the chain's own node. *)
     iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
     iApply fupd_wp.
     iMod (fsabs_sys_write_in (sysc_fwrite_names γtxl γs j γl fn) ⊤

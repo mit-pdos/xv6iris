@@ -2,7 +2,7 @@
    LOCATED TRACE CONTRACT ([SpecUartwriteLoc.wp_uartwrite_loc_sconf_body]).
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, the console-write
-   lane; the plan is [SpecSysWriteConsAU.v]'s "WHAT THE PROVER OWES" item 3.
+   lane; the contract it seals is [SpecUartwriteLoc.UARTWRITE_LOC].
 
    THIS FILE IS A COPY-ADAPT, and that is the ruled approach (the precedent
    is [ProofNamexEra.v], which is [ProofNamexTr.v] with its fire sites

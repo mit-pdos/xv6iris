@@ -3,7 +3,7 @@
    ([SpecConsolewriteLoc.wp_consolewrite_loc_sconf_body]).
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, the console-write
-   lane; the plan is [SpecSysWriteConsAU.v]'s "WHAT THE PROVER OWES" item 4.
+   lane; the contract it seals is [SpecConsolewriteLoc.CONSOLEWRITE_LOC].
 
    THIS FILE IS A COPY-ADAPT, and that is the ruled approach (the precedent
    is [ProofNamexEra.v]).  It is [ProofConsolewrite.v] with the RECEIPT

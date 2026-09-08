@@ -338,9 +338,10 @@ Section SpecFilewrite.
   (* ONE cell, and only when the major is in range.  The disjunction is the
      honest statement of what the kernel installs: [consoleinit] fills
      [devsw[CONSOLE]] and nothing fills any other entry, so a write slot is
-     either null (and the code returns -1) or [consolewrite] (whose contract
-     is ASSUMED -- LinkConsolewrite.v, the write side's twin of
-     LinkConsoleread.v).  The address is [a_devsw_write], NOT
+     either null (and the code returns -1) or [consolewrite] (whose LOCATED
+     contract, [SpecConsolewriteLoc.CONSOLEWRITE_LOC], is what the walk
+     calls -- at every major, since this disjunction pins none).  The
+     address is [a_devsw_write], NOT
      [SpecFileread.a_devsw_read]: decode note 2. *)
   (* keyed on the MAJOR, [SpecFileread.fileread_dev_env]'s twin -- see its
      note for why the lower bound joined the range test. *)
@@ -575,20 +576,16 @@ Section SpecFilewrite.
   (*  THE ARMED POSTS, ONE PER DESCRIPTOR STATE                           *)
   (* =================================================================== *)
 
-  (* ONE SPEC PER SYSCALL (owner, 2026-09-07).  filewrite had THREE proved
-     contracts -- this one over every descriptor kind, [FILEWRITE_AU] pinned
-     to an open writable inode, [FILEWRITE_CONS] pinned to the console
-     device -- and a dispatcher choosing between them on the descriptor's
-     state.  They are folded here: the contract's frame is unchanged, and
-     what the descriptor's state keys is a caller-supplied INPUT and an
-     armed OUTPUT.  The two parallel statement files and their seals are
-     gone.
+  (* ONE SPEC PER SYSCALL.  filewrite has ONE contract, over every
+     descriptor kind, and what the descriptor's STATE keys is a
+     caller-supplied INPUT ([filewrite_in]) and an armed OUTPUT
+     ([filewrite_arms]) -- the same key the CODE branches on.  The arms are
+     below: the chunk chain's two posts on an inode, the UART's
+     accepted-trace receipt on the console, the landed blanket and nothing
+     more anywhere else.
 
-     Everything below is the two folded files' vocabulary, verbatim except
-     for the receipt-to-cursor change and the ONE deduplication the fold
-     makes available: the console receipt is [UartSentLoc.uart_sent_from],
-     not a syscall-altitude copy of it (that file's header asked for exactly
-     this when the seal's consumer set settled). *)
+     The console receipt is [UartSentLoc.uart_sent_from] -- the one
+     definition in the tree, stated where its PRODUCERS live. *)
 
   (* ---- THE INODE ARM ------------------------------------------------- *)
 
@@ -598,11 +595,11 @@ Section SpecFilewrite.
      hands back the cursor.  Every chunk was FULL (a short one ends the loop
      at -1), so the chain resumes exactly at [length bss].
 
-     THE RECEIPTS CONJUNCT IS GONE.  [wri_receipts i Φ bss] used to sit here
-     beside the refund; the PREFIX CURSOR subsumes it -- whatever the caller
-     wanted to record per chunk it recorded in [Q], inside the phase 2 that
-     built the next node, and [awrite_chain … Q (length bss) _] IS [Q
-     (length bss)] at the stop ([FsAbsWriteFire.awrite_chain_cursor]). *)
+     THERE IS NO PER-CHUNK RECEIPT BUNDLE, and none is needed: whatever the
+     caller wants to record per chunk it records in the PREFIX CURSOR [Q],
+     inside the phase 2 that builds the next node, and
+     [awrite_chain … Q (length bss) _] IS [Q (length bss)] at the stop
+     ([FsAbsWriteFire.awrite_chain_cursor]). *)
   Definition write_post_ok_at Γ (i : Z) (γo : gname) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64) (Q : nat -> iProp Σ) : iProp Σ :=
     (∃ bss : list (list (bv 8)),
@@ -620,9 +617,9 @@ Section SpecFilewrite.
      the row moved, so the chain resumes ONE node past the prefix ([x = 1])
      and the cursor at that position is what the caller built inside that
      arm's phase 2; on writei's -1, on a chunk that landed nothing, and on
-     the never-entered loop nothing moved ([x = 0]).  The
-     [(⌜x = 0⌝ ∨ wri_part_receipt …)] conjunct that used to say this is gone
-     with the receipts. *)
+     the never-entered loop nothing moved ([x = 0]).  The cursor's position
+     is the whole of what says which of the two happened -- there is no
+     separate short-chunk receipt. *)
   Definition write_post_fail_at Γ (i : Z) (γo : gname) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64) (Q : nat -> iProp Σ) : iProp Σ :=
     (∃ (bss : list (list (bv 8))) (x : nat),
@@ -941,7 +938,7 @@ Definition wp_filewrite_sconf_body
     (fn : fwrite_names)                          (* the heavy arms' ghosts  *)
     (pidv : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
-    (* ---- THE TWO PARAMETERS THE FOLD ADDS (owner, 2026-09-07) ----
+    (* ---- THE TWO ARM PARAMETERS ----
        [Q] is the inode arm's PREFIX CURSOR ("what the caller knows after k
        chunks"), [tr0] the console arm's trace seed.  Each is ignored by
        every arm but its own, so a caller that does not care instantiates
@@ -999,17 +996,19 @@ Definition wp_filewrite_sconf_body
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   filewrite_env γf fn st -∗
-  (* ...and the offset permit on an inode descriptor -- see
-     [SpecFileread.wp_fileread_sconf_body] *)
-  foff_permit_row st -∗
+  (* NO OFFSET PERMIT.  fileread takes one ([SpecFileread]'s
+     [foff_permit_row st]) because its walk moves [f->off] through the
+     process's leave; filewrite's FD_INODE arm moves the shadow's half
+     inside the chain's own node ([FsAbsWriteFire.awrite_full_at] lends it
+     at the chunk's offset and takes it back advanced), so the permit is
+     nothing this contract asks for. *)
   (* ---- THE CALLER'S INPUT, KEYED ON [st] ([filewrite_in]) ----
      The chain on an inode descriptor, the trace seed and the devsw pin on
      the console, [emp] everywhere else.  This REPLACES the persistent
-     [fw_app_write_step] the landed contract took: the FD_INODE arm's
-     per-chunk row retag now pays the application's claim out of the chain's
-     own node ([FsAbsWriteFire.awrite_full_at]'s [app_step]), so the blanket
-     license premise -- and the whole [fw_app_write_step] family -- is
-     retired. *)
+     THE APPLICATION'S PER-CHUNK STEP RIDES IN IT: the FD_INODE arm's row
+     retag pays the application's claim out of the chain's own node
+     ([FsAbsWriteFire.awrite_full_at]'s [app_step]), so this contract asks
+     for no blanket license of its own. *)
   filewrite_in fn st n (us_M U) uaddr Q tr0 -∗
   (* THE CROSSING IS [true], NOT [b].  Every arm of this function parks, and
      the porting guide's rule is that a PARKING function's [wp_next] index is
@@ -1035,17 +1034,17 @@ Definition wp_filewrite_sconf_body
       proc_priv_core pj pidv (us_upt U P') -∗
       filewrite_env_out fn st -∗
       (* ---- THE ARMED OUTPUT, KEYED ON [st] ([filewrite_arms]) ----
-         It CONTAINS the landed [⌜filewrite_ret n r⌝] (which used to sit
-         third in this list) and adds, per arm, what that arm proved: the
-         chunk arms and the cursor at the stop position on an inode, the
-         accepted-trace receipt on the console, nothing anywhere else. *)
+         The blanket [⌜filewrite_ret n r⌝], and beside it what the arm the
+         descriptor selects proved: the chunk arms and the cursor at the
+         stop position on an inode, the accepted-trace receipt on the
+         console, nothing anywhere else. *)
       filewrite_arms st n (us_M U) uaddr Q tr0 r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-(* ONE MODULE TYPE.  [FILEWRITE_AU] and [FILEWRITE_CONS] -- the parallel
-   statements pinned to an inode and to the console -- are folded into this
-   one and deleted, together with their proofs and links. *)
+(* ONE MODULE TYPE: there is no parallel statement pinned to an inode or to
+   the console, and no second walk against the code.  The arms are keyed on
+   the descriptor's state inside this one. *)
 Module Type FILEWRITE.
   Parameter wp_filewrite_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

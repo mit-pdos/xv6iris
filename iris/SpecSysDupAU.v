@@ -5,7 +5,7 @@
 
    Design of record: claude-notes/design/fs-syscall-specs.md and lane W of
    claude-notes/projects/fs-syscall-specs.md.  The molds are
-   SpecSysReadAU.v / SpecSysWriteAU.v (the fd-premise threading: [arg_fd]
+   SpecSysReadAU.v and the write side (the fd-premise threading: [arg_fd]
    as a pure premise, the caller's own fragment knowledge in, exclusion by
    premise) and SpecSysOpenAU.v's [open_fd_ok] (the fd-success tail: the
    LEAST free descriptor, an EXPLICIT state list, the [us_ofile] cell
@@ -67,8 +67,8 @@
      offset seam's business (owner question 3).
    - THE SHARED OFFSET has no client-facing carrier to state it on:
      [f->off] lives in [fcontent] behind [file_ref] (lane A item (iv),
-     the offset seam, still owed).  Its CONSUMER is already landed:
-     SpecSysWriteAU's per-chunk-EXISTENTIAL offset honesty is priced
+     the offset seam, still owed).  Its CONSUMER is already landed: the
+     write chain's per-chunk-EXISTENTIAL offset honesty is priced
      exactly on "the struct file is SHARED (dup, fork)" -- this contract
      is the syscall that makes that sharing real, and the write AU's
      stance is the one that stays honest against it.

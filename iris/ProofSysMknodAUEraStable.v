@@ -5,8 +5,8 @@
    prover's follow-on).  [SpecSysMknodAU]'s header is explicit that the
    stable form is owed "FROM the AU form + agreement, never as a second
    walk", and this file is that: NO instruction is stepped, no invariant is
-   opened, and the syscall-level half is [ProofSysWriteAUStable]'s assembly
-   with one more binder.
+   opened, and the syscall-level half is assembly off the AU form with one
+   more binder.
 
    ==== WHAT THE DERIVATION SPENDS, AND WHERE ===========================
 

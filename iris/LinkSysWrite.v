@@ -7,13 +7,12 @@
    slot-independent and gave the device table's write column its own owner
    ([SpecFilewrite.filewrite_devsw]).
 
-   THE ASSUMPTION THIS ADDS over sys_fstat's is exactly one, and it comes in
-   through [LinkFilewrite]:
-   [LinkConsolewrite.Consolewrite.wp_consolewrite_sconf] is an Axiom (the
-   FD_DEVICE arm dispatches through [devsw[major].write], the console is the
-   only device xv6 installs, and consolewrite has no proof).  Note what does
-   NOT appear even though it runs underneath: balloc's Axiom.  filewrite's
-   writei is the ALLOCATING one, but [LinkBalloc.v] is a proof. *)
+   THIS CONE ASSUMES NOTHING of its own.  Its FD_DEVICE arm dispatches
+   through [devsw[major].write] into the LOCATED consolewrite
+   ([LinkConsolewriteLoc]), which is a proof down to the UART's THR store;
+   and note what does not appear even though it runs underneath: balloc's
+   Axiom.  filewrite's writei is the ALLOCATING one, but [LinkBalloc.v] is a
+   proof. *)
 Require Import LinkArgaddr LinkArgint LinkArgfd LinkFilewrite ProofSysWrite.
 
 Module SysWrite := SysWriteProof Argaddr Argint Argfd Filewrite.

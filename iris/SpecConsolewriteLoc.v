@@ -4,12 +4,10 @@
    beside it).
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, the console-write
-   lane; the plan is [SpecSysWriteConsAU.v]'s "WHAT THE PROVER OWES" item 4:
-
-       a located parallel form of SpecConsolewrite threading the seed
-       through the chunk loop ([uart_sent_from_chain] is the glue; the
-       count bookkeeping [i += nn] only after a full chunk push gives the
-       arms' length equations).
+   lane.  It is a located parallel form of SpecConsolewrite threading the
+   seed through the chunk loop ([UartSentLoc.uart_sent_from_chain] is the
+   glue; the count bookkeeping [i += nn] only after a full chunk push gives
+   the length equation).
 
    WHAT IT ADDS TO THE LANDED CONTRACT, and it is the whole diff: the seed
    [uart_sent γu tr0] as a premise, and [cons_sent_cnt γu tr0 r] as a
@@ -21,9 +19,9 @@
    only AFTER [uartwrite(buf, nn)] returned, i.e. only after all [nn] bytes
    of that chunk were accepted.  So at every exit the returned [r] is
    exactly the number of bytes this call handed the UART -- which is the
-   equation [SpecSysWriteConsAU]'s OK and SHORT arms are stated on
-   ([wcons_ok] at [r = n], [wcons_short] at [r < n]; one predicate serves
-   both because consolewrite cannot tell them apart and does not need to).
+   equation [SpecFilewrite]'s console arms are stated on ([wcons_ok] at
+   [r = n], [wcons_short] at [r < n]; one predicate serves both because
+   consolewrite cannot tell them apart and does not need to).
 
    ...AND SINCE RULING A (2026-08-31) IT SAYS WHICH BYTES.  The receipt used
    to claim LENGTH and ORDER only, because [either_copyin]'s user arm handed
@@ -36,8 +34,8 @@
    run IS the caller's buffer, byte for byte, at the image it lent.
 
    WHAT IS STILL NOT CLAIMED is the WIRE, not the bytes: this is an
-   ACCEPTANCE receipt (SpecSysWriteConsAU.v's header is the design of
-   record for why), and SpecConsolewrite.v's landed header keeps the old
+   ACCEPTANCE receipt (UartSentLoc.v's header is the design of record for
+   what it says), and SpecConsolewrite.v's landed header keeps the old
    stance because the landed contract does not carry the seed at all.
 
    EVERYTHING ELSE IS [SpecConsolewrite.v] LINE FOR LINE -- same binders,
@@ -89,8 +87,8 @@ Section ConsSentCnt.
      UART, in order, after the seed -- AND THEY ARE THE CALLER'S OWN BYTES,
      the process's run at user va [ua] in the image [M] it lent (RULING A,
      the content seam; [SpecCopyin.ubytes_at]).  This is
-     [SpecSysWriteConsAU.wcons_ok]'s body at [n := r], which is how the
-     syscall's OK and SHORT arms are both read off it.
+     [SpecFilewrite.wcons_ok]'s body at [n := r], which is how the console
+     arm's OK and SHORT disjuncts are both read off it.
 
      THE BYTE STRING IS STILL BOUND EXISTENTIALLY and that is not a
      weakness: [M] is a PARTIAL map, so "the bytes at [ua]" is not a

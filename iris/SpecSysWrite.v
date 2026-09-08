@@ -126,16 +126,13 @@ Definition sys_write_ret (V : pprivate) (v : mword 64) (n : Z) (r : mword 64) : 
   \/ (exists (fd : nat) (fv : mword 64),
         arg_fd v (pv_ofile V) = Some (fd, fv) /\ filewrite_ret n r).
 
-(* ---- THE ARMS' KEY (the fold, owner 2026-09-07) ----------------------
-   sys_write had THREE proved contracts -- this one over every descriptor
-   kind, the chain-carrying [SYSWRITE_AU_ERA] and the console
-   [SYSWRITE_CONS_AU] -- and [ProofSyscall] chose between them with a pure
-   function of argument 0 and the caller's descriptor states.  ONE CONTRACT
-   NOW, and that function is where its arms are keyed: the state of the
-   descriptor argument 0 names, or [FdClosed] when it names none (argfd's
-   own -1, whose arm is the landed blanket and nothing more).  It is the
-   landed [ProofSyscall.sysc_write_inode] generalised from "an inode or
-   not" to the state itself. *)
+(* ---- THE ARMS' KEY --------------------------------------------------
+   sys_write has ONE contract, and its arms are keyed on this pure function
+   of syscall argument 0 and the caller's own descriptor states: the state
+   of the descriptor argument 0 names, or [FdClosed] when it names none
+   (argfd's own -1, whose arm is the landed blanket and nothing more).  The
+   dispatcher above computes nothing of its own -- it supplies the input at
+   the same key. *)
 Definition sys_write_st (v : mword 64) (fs : list (mword 64))
     (sts : list fdstate) : fdstate :=
   match arg_fd v fs with
@@ -265,8 +262,8 @@ Definition wp_sys_write_sconf_body
     (sts : list fdstate)                         (* the process's descriptor view *)
     (v v1 v2 : mword 64)                         (* syscall arguments 0, 1, 2 *)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    (* ---- the two parameters the fold adds: the inode arm's PREFIX CURSOR
-       and the console arm's trace seed ([SpecFilewrite]'s) ---- *)
+    (* ---- the inode arm's PREFIX CURSOR and the console arm's trace
+       seed, both [SpecFilewrite]'s ---- *)
     (Q : nat -> iProp Σ) (tr0 : list (bv 8)) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_write in
   let pj := proc_addr j in
@@ -329,10 +326,10 @@ Definition wp_sys_write_sconf_body
   (* ---- THE CALLER'S INPUT, KEYED ON THE DESCRIPTOR ARGUMENT 0 NAMES
      ([sys_write_in], which is [SpecFilewrite.filewrite_in] at
      [sys_write_st]): the commit chain on an open writable inode, the trace
-     seed and the devsw pin on the console, [emp] everywhere else.  This
-     REPLACES the persistent [fw_app_write_step] premise: the FD_INODE arm's
-     per-chunk retag pays the application's claim out of the chain's own
-     node, so the blanket license premise is retired. *)
+     seed and the devsw pin on the console, [emp] everywhere else.  THE
+     APPLICATION'S PER-CHUNK STEP RIDES IN IT: the FD_INODE arm's retag pays
+     the application's claim out of the chain's own node, so this contract
+     asks for no blanket license of its own. *)
   sys_write_in fn (us_V U) v sts (sys_rw_count v2) (us_M U) v1 Q tr0 -∗
   (* THE CROSSING IS THE LITERAL [true]: filewrite parks. *)
   wp_next true pj (fun (CID : CpuId) =>
@@ -356,16 +353,16 @@ Definition wp_sys_write_sconf_body
       filewrite_fs_out fn -∗
       (* the device column is NOT returned: it is persistent, and the caller
          still holds the table it was projected from. *)
-      (* ---- THE ARMED OUTPUT ([sys_write_arms]).  It CONTAINS the landed
-         ⌜sys_write_ret⌝ (which used to sit third above) and adds, per arm,
-         what that arm proved. ---- *)
+      (* ---- THE ARMED OUTPUT ([sys_write_arms]): the blanket
+         ⌜sys_write_ret⌝, and beside it what the arm the descriptor selects
+         proved. ---- *)
       sys_write_arms (us_V U) v sts (sys_rw_count v2) (us_M U) v1 Q tr0 r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-(* ONE MODULE TYPE.  [SYSWRITE_AU_ERA], [SYSWRITE_AU_ERA_STABLE] and
-   [SYSWRITE_CONS_AU] are folded into this one and deleted, with their
-   proofs and links. *)
+(* ONE MODULE TYPE: there is no parallel statement for the chain or for the
+   console, and no second walk against the code.  A STABLE form, when one is
+   wanted, is a derived lemma over the cursor and never a second proof. *)
 Module Type SYSWRITE.
   Parameter wp_sys_write_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

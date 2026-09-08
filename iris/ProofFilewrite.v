@@ -4,44 +4,34 @@
    inode, the UART's accepted-trace receipt on the console, and the landed
    blanket everywhere else.
 
-   ==== THE FOLD (owner's ONE SPEC PER SYSCALL ruling, 2026-09-07) =======
+   ==== ONE WALK, FOUR ARMS =============================================
 
-   There were THREE proofs of this walk: this one (every descriptor kind,
-   answering [filewrite_ret]), [ProofFilewriteAU] (the inode arm only, with
-   the chunk chain), and [ProofFilewriteCons] (the console device arm only,
-   with the located receipt) -- three statement files, three seals, three
-   links, and a dispatcher choosing between them.  They are folded here.
-   What each contributed:
-
-   * the WALK and the three arms the AU form refuted -- the [f->writable]
-     early return, the pipe arm, the [panic] arm and the out-of-range /
-     null-slot device exits -- are this file's own, unchanged;
-   * the FD_INODE loop is [ProofFilewriteAU]'s, with the receipt family [Φ]
-     replaced by the chain's PREFIX CURSOR [Q]: [fw_loop] carries
-     [ProofFilewriteChain.fw_au_raw], the fire
-     ([FsAbsWriteFire.wrf_awrite_fire]) stands where the retag stood, and
+   * the [f->writable] early return, the FD_PIPE arm, the [panic] arm and
+     the device arm's out-of-range and null-slot exits answer the landed
+     blanket and arm nothing;
+   * the FD_INODE loop carries [ProofFilewriteChain.fw_au_raw]: the fire
+     ([FsAbsWriteFire.wrf_awrite_fire]) STANDS WHERE THE RETAG STANDS, and
      the offset shadow's half goes in at the chunk's offset and comes back
      advanced -- all inside the one [ftopN] critical section, which is what
-     makes the pair ONE instant per chunk;
+     makes the pair ONE instant per chunk.  There is no receipt family; the
+     caller's PREFIX CURSOR [Q] is what each node's phase 2 advances;
    * the FD_DEVICE arm calls the LOCATED consolewrite
-     ([SpecConsolewriteLoc.CONSOLEWRITE_LOC]) rather than the landed one.
-     THAT IS THE ONE PLACE THE FOLD CHANGED A CALL, and it is what let the
-     two device walks become one: [filewrite_dev_env] says the cell is
-     "null or consolewrite" at EVERY major, so the arm must be able to call
-     consolewrite where the descriptor's major is not the console's -- and
-     the located contract is the general form for that, its seed premise
-     being free ([UartSentLoc.uart_sent_nil]) where the caller supplied
-     none.  At the console the seed is the caller's own [tr0], out of the
-     keyed input; off it the receipt is simply dropped.  The functor
-     therefore takes [CONSOLEWRITE_LOC] and NOT [CONSOLEWRITE].
+     ([SpecConsolewriteLoc.CONSOLEWRITE_LOC]) at EVERY major, and that is
+     why one walk serves both: [filewrite_dev_env] says the cell is "null or
+     consolewrite" everywhere, so the arm must be able to call consolewrite
+     where the descriptor's major is not the console's -- and the located
+     contract is the general form for that, its seed premise being free
+     ([UartSentLoc.uart_sent_nil]) where the caller supplied none.  At the
+     console the seed is the caller's own [tr0], out of the keyed input, and
+     the pin that comes with it is what refutes the null-slot -1; off the
+     console the receipt is dropped.  The functor takes [CONSOLEWRITE_LOC]
+     and there is no consumer of [CONSOLEWRITE] left.
 
-   ==== WHAT THE APPLICATION'S STEP COSTS NOW ===========================
+   ==== WHAT THE APPLICATION'S STEP COSTS ===============================
 
-   Nothing: the premise is gone.  The FD_INODE arm's per-chunk row retag
-   used to be paid by the persistent [fw_app_write_step] the contract took
-   (itself minted from the parked blanket license); it is paid by the
-   chain's own node ([FsAbsWriteFire.awrite_full_at]'s [app_step]) now, so
-   the premise, the family and the mint at the dispatcher all went.
+   Nothing this contract asks its caller for: the FD_INODE arm's per-chunk
+   row retag pays the application's claim out of the chain's own node
+   ([FsAbsWriteFire.awrite_full_at]'s [app_step]).
 
    ==== THE TYPE READING, AND WHY IT IS AVAILABLE =======================
 
@@ -1036,8 +1026,8 @@ Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)              *
 (* THE FUNCTOR TAKES EIGHT CALLEES, and the seventh is the LOCATED
    consolewrite: the device arm relays an accepted-trace receipt on the
    console major, and the located contract is the general form at every
-   other major too (its seed is free there).  [CONSOLEWRITE] has no
-   consumer left in the tree. *)
+   other major too (its seed is free there), so one walk serves both and
+   the landed [CONSOLEWRITE] is not a parameter of this functor. *)
 Module FilewriteProof (Pipewrite : PIPEWRITE) (Ilock : ILOCK) (Writei : WRITEI)
                       (Iunlock : IUNLOCK) (BeginOp : BEGIN_OP) (EndOp : END_OP)
                       (ConsolewriteLoc : CONSOLEWRITE_LOC) (PN : PANIC)
@@ -1090,7 +1080,7 @@ Section ProofFilewrite.
      cannot say that the one the carve named is the one the descriptor's
      STATE names.  The landed walk never had to: it reads [f->type] off
      [Cf] and the inum off the carve, and nothing ties them.  THE AU FORM
-     MUST, because [FILEWRITE_AU]'s receipts are indexed by the [i] of
+     MUST, because the chain's nodes are indexed by the [i] of
      [FdInode i] while the fire retags the row at [bv_unsigned inum].
 
      This is that carve with [fdstate_ok] as a SIXTH output, read off the
@@ -2387,7 +2377,7 @@ Section ProofFilewrite.
     (* AU EDIT: ...AND NOT A DEVICE EITHER.  The owner's [file_payload]
        strengthening (2026-08-29), read through the carve's fifth output at
        the SAME generation.  This is what refutes [FsAbs.abs_node]'s [ADev]
-       arm and hence what deleted [SpecSysWriteAUEra]'s third arm. *)
+       arm, and hence what keeps this post at TWO arms. *)
     assert (Hnodev : bv_unsigned (di_type dnl) <> FsImg.T_DEVICE_z)
       by (rewrite Htyeq; exact (P10d Htyi)).
     (* ---- PEEL the checked-out bundle.  The valid cell is beside the
@@ -2944,8 +2934,8 @@ Section ProofFilewrite.
           as "[Hcm Hback]".
         (* the kernel's half goes in at the offset the chunk was written at
            and comes out advanced by the chunk *)
-        (* THE PER-CHUNK BUFFER TIE IS PHASE 1'S NOW (owner, 2026-09-07),
-           and the chunk's source offset is [FW_MAX * p] because every chunk
+        (* THE PER-CHUNK BUFFER TIE IS PHASE 1'S, and the chunk's source
+           offset is [FW_MAX * p] because every chunk
            that reaches node [p] was FULL -- which is exactly the loop's own
            tie [Hmul]. *)
         assert (Hchunkp : ubytes_at (us_M U)
@@ -3663,7 +3653,7 @@ Section ProofFilewrite.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     (* "Hfin" -- NOT "Hin": the device arm already binds that name for its
        major-range fact. *)
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hprow Hfin Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hfin Hcont".
     (* PIN THE INDEX.  This contract carries [eb = true ->] and [cpu_own] at
        level 0, so [cpu_own_eb_agree] forces [b] to be the literal [true].
        That is what reconciles the [true]-spelled crossings (this contract's
@@ -4304,8 +4294,7 @@ Section ProofFilewrite.
              LOCATED contract is the general form for that, its seed being
              free where the caller supplied none
              ([UartSentLoc.uart_sent_nil]).  That is what lets one walk
-             serve both, and what retired the landed [CONSOLEWRITE]
-             parameter.  At the console the seed is the caller's own [tr0],
+             serve both.  At the console the seed is the caller's own [tr0],
              out of the keyed input -- persistent, so the pin rides with it
              to the null-slot exit, where it is what refutes the -1. *)
           destruct (fdstate_ok_device inumx γox Cf st Hok Htyd)

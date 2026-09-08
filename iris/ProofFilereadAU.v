@@ -67,8 +67,8 @@
       [SpecFileread.fileread_pay_carve] bind that [inum] under two SEPARATE
       existentials.  [frau_pay_carve] below is the carve with the state fact
       as a SIXTH output -- the two read off ONE [pn] -- so the fire observes
-      the row the descriptor names.  It is [ProofFilewriteAU.fwau_pay_carve]
-      verbatim; both lanes needed the same missing output, and neither may
+      the row the descriptor names.  It is [ProofFilewrite.fwau_pay_carve]
+      verbatim; both walks need the same missing output, and neither may
       edit [SpecFileread] (R10).
 
    ==== WHERE EACH ARM LANDS ============================================
@@ -155,8 +155,8 @@ Set Printing Depth 40.
 (*  THE TWO PURE FACTS THE AU ARM ADDS                                    *)
 (* ===================================================================== *)
 
-(* the [f->readable] byte the premise pins is not zero.  [ProofFilewriteAU]'s
-   [fw_zext8_one] at the readable field instead of the writable one. *)
+(* the [f->readable] byte the premise pins is not zero -- the writable
+   field's counterpart of this fact is what filewrite's own arm tests. *)
 Lemma frau_zext8_one `{XI : CurCtx} :
   eq_vec (zero_extend' 64 (mword_of_int 1 : mword 8) : mword 64)
          (zero_reg : mword 64) = false.
@@ -259,10 +259,10 @@ Section ProofFilereadAU.
 
      This is that carve with [fdstate_ok] as a SIXTH output, read off the SAME
      [pn]; every other output, and the whole proof, is [fileread_pay_carve]
-     verbatim.  R10: SpecFileread does not move, and the two AU lanes are the
-     only consumers of the extra fact ([ProofFilewriteAU.fwau_pay_carve] is
-     this lemma; the write lane cannot be [Require]d from here without
-     dragging its cone in, so the copy is deliberate). *)
+     verbatim.  R10: SpecFileread does not move, and the read and write
+     walks are the only consumers of the extra fact
+     ([ProofFilewrite.fwau_pay_carve] is this lemma; the write cone cannot be
+     [Require]d from here, so the copy is deliberate). *)
   Lemma frau_pay_carve (γf' : gname) (kk : nat) (qq : Qp) (Cf' : fcontent)
       (st' : fdstate) :
     fc_type Cf' = FD_INODE \/ fc_type Cf' = FD_DEVICE ->
@@ -1234,8 +1234,8 @@ Section ProofFilereadAU.
                 fupd once with the kernel's half of the offset shadow lent
                 and returned advanced by the count, and gives the quarter
                 straight back.  A read retags no row, so this is an
-                INSERTION, not a replacement (contrast [ProofFilewriteAU]'s
-                difference 3).
+                INSERTION, not a replacement -- where the write walk's fire
+                STANDS IN for the retag.
 
                 WHY THERE.  The offset's half is what the commit moves, and
                 it moves by the count readi delivered -- known only after

@@ -637,9 +637,9 @@ Section SpecFileread.
      on is the payload's own [fp_ig] and nothing above this carve names it.
      A caller joins the [ity_shot] output to ilock's copy with
      [IcacheRefDefs.ity_shot_agree] and the row is a FILE or a DIRECTORY --
-     which is what refutes [FsAbs.abs_node]'s [ADev] arm on a write
-     ([SpecSysWriteAUEra]'s third arm) and gives read its "FdInode => AFile
-     or ADir" tie ([SpecSysReadAU]'s owner question 2).  The invariant-level
+     which is what refutes [FsAbs.abs_node]'s [ADev] arm on a write (and so
+     keeps [SpecFilewrite]'s post at two arms) and gives read its
+     "FdInode => AFile or ADir" tie ([SpecSysReadAU]'s owner question 2).  The invariant-level
      statement of the same fact is [FileInvDefs.inode_pay_not_dev]. *)
   (* THE OFF OUTPUT IS TYPE-INDEXED (r25 item 24, the visibility-free
      off cell): the FD_INODE arm hands out the file's OFF BOX HANDLE

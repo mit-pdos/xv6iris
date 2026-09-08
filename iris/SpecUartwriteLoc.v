@@ -3,8 +3,7 @@
    contract does not move, and this file adds a second one beside it).
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, the console-write
-   lane; the plan is [SpecSysWriteConsAU.v]'s "WHAT THE PROVER OWES" item 3,
-   verbatim:
+   lane.  What it owes the console arm above it:
 
        premise [uart_sent γu tr0], post [uart_sent_from γu tr0
        (f <$> seq 0 n)] in place of the landed [uart_sent_sub γu

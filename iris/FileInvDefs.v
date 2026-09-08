@@ -1089,11 +1089,13 @@ Section FileInv.
      descriptor's parked inode is a regular file or a directory -- never a
      device.  The fact was true of the code and dropped at the store, which
      left the fourth conjunct as the payload's only type witness: it
-     excludes a DIRECTORY on a writable fd and nothing else.  That gap cost
-     [SpecSysWriteAUEra] a whole spurious third arm (a T_DEVICE inode behind
-     an FD_INODE fd, on which [FsAbs.abs_node] reads [ADev] and writei moves
-     no field the abstract view can see) and blocked read's
-     "FdInode => AFile or ADir" custody tie.  This is where it crosses.
+     excludes a DIRECTORY on a writable fd and nothing else.  That gap is
+     what forced a spurious third arm on the write contract (a T_DEVICE
+     inode behind an FD_INODE fd, on which [FsAbs.abs_node] reads [ADev] and
+     writei moves no field the abstract view can see) and blocked read's
+     "FdInode => AFile or ADir" custody tie.  This is where it crosses, and
+     [SpecFilewrite]'s two arms are keyed on the return value alone
+     because of it.
 
      IT IS KEYED ON THE DESCRIPTOR'S TYPE, WHICH IS WHY [fdty] IS A
      PARAMETER.  One payload serves both typed arms ([file_core] selects it
@@ -1280,8 +1282,8 @@ Section FileInv.
      generation seeing at most one fill).  So a function that has locked the
      inode behind an FD_INODE descriptor can refute the device row outright:
      [FsAbs.abs_node]'s [ADev] arm is unreachable there, which is what
-     [SpecSysWriteAUEra]'s third arm and [SpecSysReadAU]'s owner question 2
-     were both waiting on.
+     [SpecFilewrite]'s two-arm post and [SpecSysReadAU]'s owner question 2
+     both rest on.
 
      PURE CONCLUSION, so it costs the payload nothing: the caller keeps the
      reference it read the fact off.  A holder of a [file_pay_st] reaches
@@ -1963,9 +1965,10 @@ Section FoffRow.
     rewrite (bool_decide_eq_true_2 _ Ht). iIntros "$".
   Qed.
 
-  (* the landed fileread/filewrite take [foff_permit_row st] and learn their
-     descriptor's shape from [fdstate_ok]: on an inode file the row IS the
-     permit at the payload's shadow name *)
+  (* fileread takes [foff_permit_row st] and learns its descriptor's shape
+     from [fdstate_ok]: on an inode file the row IS the permit at the
+     payload's shadow name.  (filewrite does not: its FD_INODE arm moves the
+     offset shadow inside the write chain's own node.) *)
   Lemma foff_permit_row_inode (inum : mword 32) (γo : gname) (C : fcontent) (st : fdstate) :
     fdstate_ok inum γo C st -> fc_type C = FD_INODE ->
     foff_permit_row st -∗ off_permit γo.
