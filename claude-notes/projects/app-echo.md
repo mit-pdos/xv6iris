@@ -650,6 +650,15 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   `d90560642`).  `pf_at_mono_pair` is the mover when an enrichment
   wrapper re-proves the AU side under the caller's own refund.
 
+- **ARM-a** (in flight, 2026-09-08): the first agent landed the class
+  (`UexecSG.v`), the three-piece arm, the folded round, `udep`/`udepw` in
+  `UkRun`, the 12 arm sites and the whole leaf/engine tier (40 files
+  green), then ran out of context with 7 files red (premises not yet
+  threaded) and the deletions / tier renames / `UEXEC_GEN` split /
+  instance not started; a second agent finishes from the uncommitted tree
+  with milestone reports (green after the 7 files; green after deletions +
+  renames; the gate).  Nothing committed until a milestone is green.
+
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
   their old names although no AU is left in them — `SpecSysWriteAU.v`,
