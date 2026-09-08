@@ -815,7 +815,15 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   the closed loop's Löb, and to the fork mint as a conjunct of
   `SyscParkEnv.park_world` (no syscall contract changed).  `xv6_ssupply :=
   app_sup`; `udep_gen`/`uslot_mint` take it.  Headers: no supply field on
-  `UEXEC_GEN`; why `Happ_sup` is not the GAP trap.
+  `UEXEC_GEN`; why `Happ_sup` is not the GAP trap.  The TOWER HALF LANDED
+  (`83616aee6`): `app_step_acc : app_sup -∗ app_step i I av'` (one lemma,
+  `_view` folded in, no mask, no side condition); the rename through the
+  `_unit` layers and the fourteen `fsabs_*` wrappers; the dispatcher reads
+  the credential off `park_world` (`syscall_env_sup`); B-dots as the atom
+  `cre_dots_leg` guarded by `T_DIR`, discharged once at create's taken
+  directory branch, `cre_dots_unit` gone; B-trunc: the fresh arm's fired
+  trunc receipt at `bs0 = []`, `socr_Phit_triv` gone.  No fire on any
+  dispatched path is paid from the license any more.
 
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
