@@ -1092,6 +1092,11 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
 - **`iSpecialize`/`$!` cannot instantiate a `∀ h : CPU` whose body is a bare
   CID-indexed atom** (a wand chain is fine). Use `bi.forall_elim`.
 - **`bi.emp_intro` does not exist in this iris** — `done` closes `⊢ emp`.
+- **A bare `/=` (or `simpl`) on a syscall-altitude goal is a `Stack overflow`,
+  not a slow step** — the goal carries a 4096-conjunct big-op and `simpl` walks
+  it. To reduce the projections of a LITERAL record (e.g. a `pfam` pair's
+  `pf_recv`/`pf_refund`), use `cbn [pf_recv pf_refund]`, naming exactly the
+  projections; never `/=`.
 - **`ghost_map_lookup` against an auth over a UNION is `lookup_union_Some_raw`**
   — do not `rewrite lookup_union` and `cbn`.
 - **Reassembling a record after an `upd_*` can hang even though every unchanged
