@@ -761,9 +761,16 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   laws and `udep`'s conjunct alike) — a lower bound at the empty trace is
   mintable from the unit by anyone, so the seed belongs to the law's
   modality, not to a supplier; the instance's read/write bundles are
-  spelled at `fd_st_of_key`.  B1 (the real bundles, the `UEXEC_GEN` split,
-  `ut_sys_out` as a post row) and B2 (the deletions, `Happ_auto` leaves)
-  in flight.
+  spelled at `fd_st_of_key`.  B1 first slice LANDED (`f5f0a59b4`): the bupd-shaped law; `sfam` as
+  ONE RECORD TYPE (one field per contracted syscall) rather than `Z ->
+  Type` — a dependent family cannot state `Proper` past the number binder
+  and would put an `eq_rect` at the trap seam we touch once; `sbundle_at`/
+  `spost_at` indexed by the witness `f`, the arm `∃ f, deposit at f ∗
+  post at f`, `uexec_ret_F_split` handing out the witness, `f` a plain
+  parameter of the trap/uservec/syscall bodies and their module types;
+  `sbundle` survives as a derived reader, `spost` gone.  Next slices: the
+  instance at the nine real bundles; `Happ_sup` as the fourth credential;
+  `ut_sys_out` as a post row; then B2.
 
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
