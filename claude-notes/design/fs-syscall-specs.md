@@ -423,9 +423,7 @@ kernel's half of the inode map and returning it unchanged is fine;
 returning the offset shadow's half ADVANCED is not (it needs the per-row
 `off_user_inv`, a kernel-side invariant).  So the observation and chunk
 commits lend the shadow and take it back unmoved, and the kernel's fire
-lemma moves it afterwards from the row invariant it holds.  (As of the
-ARM lane: read's `aread_commit_at` and the write chain's nodes are the
-two pieces being re-shaped to this rule.)
+lemma moves it afterwards from the row invariant it holds.  Read's `aread_commit_at` and the write chain's two arms lend the shadow's half and return it at the same offset; `arf_read_fire` and the two write fires advance it from `off_user_inv`, which reaches them through the descriptor's `foff_row`.
 
 **ONE CONTRACT PER SYSCALL.**  `sys_write` is the model: `SpecFilewrite.
 FILEWRITE` and `SpecSysWrite.SYSWRITE` are its only seals.  Each keeps the
