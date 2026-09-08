@@ -65,9 +65,10 @@
    [(L + 1) * iput_units <= n] and its spend is the same figure, so at a
    three-component path it would demand twelve of the ten, and even at
    L = 2 it would hand back one where the following [iput] needs three.
-   The SET form ([SpecNamei.wp_namei_gen] over [LogInv.log_opS]) prices the
-   walk at [SpecNamex.walk_need L <= 4] regardless of depth and spends at
-   most one, which leaves nine for an [iput] that needs three.  That is the
+   The SET form -- [SpecNameiEra.wp_namei_era], the era trace walk this
+   contract's proof runs, over [LogInv.log_opSt] -- prices the walk at
+   [SpecNamex.walk_need L <= 4] regardless of depth and spends at most
+   one, which leaves nine for an [iput] that needs three.  That is the
    whole reason this proof threads [log_opS] rather than [log_op]: chdir is
    the first syscall whose path length is unbounded and whose tail still
    has to pay for an inode free.
@@ -92,11 +93,59 @@
    faults, whether the path resolves, whether what it resolves to is a
    directory -- and no caller of this contract knows any of that.  The
    postcondition is therefore the honest disjunction [SpecNamei]'s own
-   two-armed result forces, keyed by the returned a0. *)
+   two-armed result forces, keyed by the returned a0.
+
+   ==== ONE CONTRACT ====================================================
+
+   [Module Type SYSCHDIR] is sys_chdir's only seal.  Its body is the
+   whole-function FRAME below plus ONE caller INPUT ([chdir_au_pre]) and
+   ONE armed OUTPUT ([chdir_arms], keyed on a0).  The blanket
+   [sys_chdir_post] is a CONSEQUENCE of the arms ([chdir_arms_landed])
+   rather than a second conjunct -- it carries [proc_priv], which every
+   arm already carries -- and it survives as the shape the friendly
+   packaging above this contract states ([FsSyscalls] section 4, whose
+   functor calls this seal at the trivial families and converts through
+   that one bridge).
+
+   ==== WHAT THE CALLER HANDS IN, AND WHAT IT BUYS =====================
+
+   [chdir_au_pre] is the walk-only bundle at the commit mask [appE]:
+   [SpecSysOpenAU.open_walk_pre_era] handed down unfired, plus
+   [SpecSysOpenAU.aopen_commit_at], open's plain read-only observation,
+   fired under the node's lock exactly where the walk tests [T_DIR].
+   sys_chdir MINTS NO VOCABULARY OF ITS OWN: every piece it names is the
+   open family's, which is why the pieces live in [SpecSysOpenAU] and only
+   the bundle, the arms and the frame live here.
+
+   What it buys is the inum.  A blanket-only success arm is
+   [∃ ipv z, proc_priv .. (us_cwi (us_cwd U ipv) z)]: [z] is the real inum
+   of the installed inode, but nothing above the icache could say WHICH
+   inode that was.  Here [z] IS the walk's cursor, so a caller that
+   supplied a cursor it understands learns where its cwd went.
+
+   THE START: the walk premise is [open_walk_pre_era] at
+   [pv_cwi (us_V U)], the calling process's cwd inum at entry, so a
+   relative chdir's walk starts where the block says it does.
+
+   ==== THE ARMS ========================================================
+
+   ret 0  -- [chdir_post_ok]: the walk landed on a DIRECTORY, observed as
+             such, and the block's cwd moved to it -- pointer and inum
+             both, the inum being the walk's own cursor [i].
+   ret -1 -- [chdir_post_fail], the three-way fold with the block back
+             unchanged on every arm:
+             (i)   nothing fs-visible happened (argstr failed): the whole
+                   bundle comes back;
+             (ii)  the walk died: [open_walk_dead_era]'s refund shape
+                   beside the unfired commit;
+             (iii) the walk landed and the node was OBSERVED to be
+                   something other than a directory -- the cursor [P L i]
+                   and the receipt [Φo av i a] at that node.
+ *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac.
+From iris.algebra Require Import auth gmap frac dfrac.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -139,6 +188,13 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import PathElems.       (* [path_elems] *)
+Require Import FsTree.          (* [fname] *)
+Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [open_walk_dead_era],
+                                   [aopen_commit_at] *)
+Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 
@@ -168,26 +224,123 @@ Section SpecSysChdir.
     (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf pa pid U
      ∨ ∃ (ipv : mword 64) (z : Z),
          ⌜r = (zero_reg : mword 64)⌝ ∗
-         (* ...at the pointer AND its inum (lane C1).  [z] is existential
+         (* ...at the pointer AND its inum.  [z] is existential
             here as [ipv] is; it is the REAL inum of the installed inode --
-            the one [ProcInv.cwd_ref_at] ties the pointer to -- and lane C3
-            names it through the era walk. *)
+            the one [ProcInv.cwd_ref_at] ties the pointer to.  The ARMS
+            below name it: it is the walk's own cursor. *)
          proc_priv γf pa pid (us_cwi (us_cwd U ipv) z))%I.
 
 End SpecSysChdir.
 
-Definition wp_sys_chdir_sconf_body
+(* ===================================================================== *)
+(*  THE BUNDLE AND THE ARMS                                               *)
+(* ===================================================================== *)
+
+Section SysChdirArms.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  (* everything the caller hands in, at the commit mask [appE]:
+     open's walk premise at the process's cwd inum, and open's plain
+     observation commit *)
+  Definition chdir_au_pre Γ (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
+    (open_walk_pre_era γfs cw P Pmiss
+     ∗ aopen_commit_at Γ appE Φo)%I.
+
+  (* ret -1: the three-way fold -- (i) nothing fs-visible happened (argstr
+     failed: the bundle back whole), (ii) the walk died (the era refund
+     beside the unfired commit), (iii) the walk landed and the node was
+     observed to be something other than a directory *)
+  Definition chdir_post_fail Γ (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
+    (chdir_au_pre Γ γfs cw P Pmiss Φo
+     ∨ (∃ pl : list (bv 8),
+          (open_walk_dead_era γfs P Pmiss pl
+             ∗ aopen_commit_at Γ appE Φo)
+          ∨ (∃ (i : Z) (av : aview) (a : anode),
+               P (length (path_elems pl)) i
+               ∗ ⌜arow_at av i a⌝ ∗ Φo av i a
+               ∗ ⌜forall (e : gmap fname Z) (nl : nat),
+                    a <> MkAnode (ADir e) nl⌝)))%I.
+
+  (* ret 0: the walk landed on a DIRECTORY, observed as such, and the
+     block's cwd moved to it -- pointer and inum both, the inum being the
+     walk's own cursor [i] *)
+  Definition chdir_post_ok Γ (γf : gname) (pj : mword 64) (pid : mword 32)
+      (P : nat -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (U : ustate) : iProp Σ :=
+    (∃ (ipv : mword 64) (pl : list (bv 8)) (i : Z)
+       (e : gmap fname Z) (nl : nat) (av : aview),
+       P (length (path_elems pl)) i
+       ∗ ⌜arow_at av i (MkAnode (ADir e) nl)⌝
+       ∗ Φo av i (MkAnode (ADir e) nl)
+       ∗ proc_priv γf pj pid (us_cwi (us_cwd U ipv) i))%I.
+
+  (* the armed disjunction the continuation receives, keyed on a0, at the
+     block the syscall returns ([us_upt U P']) *)
+  Definition chdir_arms Γ (γfs : fs_names) (γf : gname)
+      (pj : mword 64) (pid : mword 32) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (U : ustate) (r : mword 64) : iProp Σ :=
+    ((⌜r = (mword_of_int (-1) : mword 64)⌝
+      ∗ proc_priv γf pj pid U
+      ∗ chdir_post_fail Γ γfs cw P Pmiss Φo)
+     ∨ (⌜r = (zero_reg : mword 64)⌝
+        ∗ chdir_post_ok Γ γf pj pid P Φo U))%I.
+
+  (* THE RETURN BLANKET, READ OFF THE ARMS.  It is a consequence and not a
+     second conjunct: [sys_chdir_post] carries [proc_priv], and each arm
+     already carries it.  This is the bridge [FsSyscalls]'s friendly
+     packaging is stated over. *)
+  Lemma chdir_arms_landed Γ (γfs : fs_names) (γf : gname)
+      (pj : mword 64) (pid : mword 32) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (U : ustate) (r : mword 64) :
+    chdir_arms Γ γfs γf pj pid cw P Pmiss Φo U r ⊢
+      sys_chdir_post γf pj pid U r.
+  Proof.
+    rewrite /chdir_arms /chdir_post_ok /sys_chdir_post.
+    iIntros "[(%Hr & Hpriv & _) | (%Hr & H)]".
+    - iLeft. iFrame "Hpriv". by iPureIntro.
+    - iRight. iDestruct "H" as (ipv pl i e nl av) "(_ & _ & _ & Hpriv)".
+      iExists ipv, i. iFrame "Hpriv". by iPureIntro.
+  Qed.
+
+End SysChdirArms.
+
+(* big-op bodies behind definitions: sealed, per the family convention *)
+Global Typeclasses Opaque chdir_au_pre chdir_post_fail chdir_post_ok
+  chdir_arms.
+
+(* ===================================================================== *)
+(*  THE WHOLE-FUNCTION FRAME, abstracted over the caller's bundle and the *)
+(*  armed post.  There is no second body: this frame is the only one, and *)
+(*  the body below instantiates it.                                       *)
+(* ===================================================================== *)
+
+(* [ARMS] is on the block and the returned a0 and REPLACES a blanket-only
+   [sys_chdir_post], which it implies ([chdir_arms_landed]).  The binder
+   list is [(mf, P')]: the image does not move (the header). *)
+Definition wp_sys_chdir_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)                          (* ftable, kalloc      *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
-    (* disk fabric + lock  *)
-    (pd pav pu : mword 64)
+    (pd pav pu : mword 64)                              (* disk fabric + lock  *)
     (dqb dqs : dfrac)
     (v : mword 64)                                      (* syscall argument 0  *)
     (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string)
+    (EXTRA : iProp Σ) (ARMS : ustate -> mword 64 -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_chdir in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -207,23 +360,11 @@ Definition wp_sys_chdir_sconf_body
   gs !! j = Some gl ->
   (* namei's own premise, inherited: the walker runs with the base enabled *)
   eb = true ->
-  (* argstr reads syscall argument 0 out of the trapframe page [proc_priv]
-     carries *)
+  (* argstr reads syscall argument 0 out of the trapframe page *)
   pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
   sie_cap_gpr KT1 m K b pj -∗
-  (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
-     premise here where sys_close has one: the depth is pinned at ZERO, so
-     [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
-     nine callees raise -- begin_op / iput / iunlockput / end_op at "log",
-     ilock at "bcache", iunlock at "sleep lock", argstr at "kmem" -- is
-     [locks_below ∅ _].  Taking the premise anyway would push an obligation
-     out into [SpecSyscall] for nothing. *)
+  (* entered with no lock held: depth pinned at zero *)
   cpu_own 0 eb pj b lks -∗
-  (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
-     contract's own premise forces -- so no caller gains an obligation; it
-     is threaded rather than framed because begin_op / ilock / iput /
-     iunlockput / end_op each take it and each crosses at the literal
-     [true].  See claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -243,14 +384,7 @@ Definition wp_sys_chdir_sconf_body
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
-  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
-     Persistent, borrowed and never spent; it rides the SAME channel
-     [ireg_inv] does.  It is here because this contract reaches iput, whose
-     free path FREEZES the inode, and §2.3's boot-shelter clause makes a
-     freezer exhibit the regime it freezes under.  A runtime caller hands
-     [SpecIput] the LEFT arm of its borrowed disjunction and discards what
-     comes back; only ireclaim, which freezes before the seal is fired,
-     lends [ireg_boot] instead. *)
+  (* the sealed regime, riding [ireg_inv]'s channel; see the header *)
   ireg_open -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -262,20 +396,15 @@ Definition wp_sys_chdir_sconf_body
   (* ---- the process, and the reference allowance its walk needs ---- *)
   iref_slots 2 -∗
   proc_priv γf pj pid U -∗
-  (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_chdir sleeps (begin_op,
-     namei, ilock, iput and end_op all park), so it can return on another
-     hart whatever SIE was doing.  Vacuous at [true], so consuming it costs
-     the caller nothing. *)
+  (* ---- THE CALLER'S BUNDLE (the one addition to the premise list) ---- *)
+  EXTRA -∗
+  (* the crossing is the literal [true]: sys_chdir parks in five callees *)
   wp_next true pj (fun (CID : CpuId) =>
-  (* THE IMAGE DOES NOT MOVE.  This syscall only READS user memory (argstr,
-     through fetchstr and copyinstr); the pages it faults in on the way were
-     already in the block's view, as lazy pages reading 0, so vmfault does
-     not move it either.  Only the DESCRIPTOR grows, and the block comes
-     back at the image it was handed. *)
+  (* THE IMAGE DOES NOT MOVE (the header): only the descriptor
+     grows, so the binders are [(mf, P')] and the block returns at
+     [us_upt U P'] -- no [M']. *)
   ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
-      (* the page table may have GROWN: argstr's fetchstr faults user pages
-         in.  [uptd_ext_sz] is argstr's own report, relayed. *)
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -285,17 +414,46 @@ Definition wp_sys_chdir_sconf_body
       bslots 3 -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      (* the free pool only SHRINKS -- iput's truncate arm is the only mover *)
-      (* the allowance, whole: see the header's ledger *)
+      (* the allowance, whole: the header's reference ledger *)
       iref_slots 2 -∗
-      sys_chdir_post γf pj pid (us_upt U P')
-        (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      (* the armed post on the final process state and the returned a0
+         (implies [sys_chdir_post], through [chdir_arms_landed]) *)
+      ARMS (us_upt U P') (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* THE ONE BODY.  The abstract state is read at the LIVE Γ,
+   [fs_gamma_L fsc_fs]; the walk starts at the block's own cwd inum. *)
+Definition wp_sys_chdir_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γf : gname)
+    (gs : list gname) (j : nat) (gl : gname)
+    (pd pav pu : mword 64)
+    (dqb dqs : dfrac)
+    (v : mword 64)
+    (pid : mword 32) (U : ustate)
+    (m : regfile) (K : nat) (eb : bool)
+    (b : bool) (lks : gset string)
+    (P Pmiss : nat -> Z -> iProp Σ)
+    (Φo : aview -> Z -> anode -> iProp Σ) :=
+  let Γfs := fs_gamma_L fsc_fs in
+  wp_sys_chdir_frame γf gs j gl pd pav pu dqb dqs
+    v pid U m K eb b lks
+    (chdir_au_pre Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φo)
+    (chdir_arms Γfs fsc_fs γf (proc_addr j) pid (pv_cwi (us_V U)) P Pmiss Φo).
+
+(* ===================================================================== *)
+(*  ONE MODULE TYPE                                                       *)
+(* ===================================================================== *)
+
+(* There is no parallel statement and no second proof against the code: a
+   client that wants the blanket-only reading takes [chdir_arms_landed],
+   which is what [FsSyscalls]'s friendly packaging does. *)
 Module Type SYSCHDIR.
-  Parameter wp_sys_chdir_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+  Parameter wp_sys_chdir :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -303,8 +461,9 @@ Module Type SYSCHDIR.
       (v : mword 64)
       (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
-      wp_sys_chdir_sconf_body γf gs j gl pd pav pu
-
- dqb dqs v pid U m K eb b lks.
+      (b : bool) (lks : gset string)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ),
+      wp_sys_chdir_body γf gs j gl pd pav pu dqb dqs
+        v pid U m K eb b lks P Pmiss Φo.
 End SYSCHDIR.

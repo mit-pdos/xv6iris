@@ -139,6 +139,8 @@ Require Import SpecPrintk.
 Require Import SpecCreate.
 Require Import SpecSysMkdir.
 Require Import SpecSysChdir.
+Require Import FsAbsInvFire.   (* [fsabs_chdir_pre]: the trivial bundle the
+                                  friendly layer hands the seal *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -400,7 +402,7 @@ End FsSysMkdir.
 (*  4.  sys_chdir, FRIENDLY -- AND COMPOSABLE                              *)
 (* ====================================================================== *)
 
-(*  The same packaging over [SpecSysChdir.wp_sys_chdir_sconf_body], and the
+(*  The same packaging over [SpecSysChdir.SYSCHDIR], and the
     contrast with mkdir is the point of building both:
 
     THE LEDGERS CLOSE.  [fs_res] goes in at [ns = 2] and comes back at
@@ -434,7 +436,16 @@ End FsSysMkdir.
 
     So chdir's friendly post is [sys_chdir_post] verbatim.  It is already
     the friendly shape: a two-armed disjunction over the process block, with
-    nothing machine-level in it. *)
+    nothing machine-level in it.
+
+    WHERE IT COMES FROM NOW.  [SpecSysChdir.SYSCHDIR] is the syscall's ONE
+    contract and its output is [chdir_arms] -- the same two arms with a
+    walk cursor and an observation receipt on them.  This packaging hands
+    the seal the TRIVIAL bundle ([FsAbsInvFire.fsabs_chdir_pre]: every hop
+    says yes, every cursor is [True], the observation returns nothing) and
+    forgets the receipts through the one bridge [chdir_arms_landed].  So
+    the friendly post below is unchanged, and there is no second proof
+    against the code behind it. *)
 Definition wp_sys_chdir_friendly_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -520,20 +531,24 @@ Module FsSysChdir (M : SYSCHDIR).
     iDestruct "Hdisk" as (pd pav pu) "[#Hdgeom #Hdlk]".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
-    iApply (M.wp_sys_chdir_sconf γf γs j γl
- pd pav pu
-
- dqb dqs v pid U m K true b lks
+    (* THE SEAL, at the TRIVIAL families: the friendly layer answers for no
+       abstract state, so every cursor is [True] and the observation
+       returns nothing. *)
+    iApply (M.wp_sys_chdir γf γs j γl pd pav pu dqb dqs v pid U m K true b lks
+              (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I)
               HK Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hib Hj Hgs eq_refl Htf
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlogc
                     Hseam Hgc Hdev Hdgeom Hdlk Hbsl Hitb2 Hitbl Hesc Hisl
-                    Hireg Hiopen Hsbb Hsbi Hbmi Hkenv Hprocs Hir Hpriv").
+                    Hireg Hiopen Hsbb Hsbi Hbmi Hkenv Hprocs Hir Hpriv []").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
+    { iApply fsabs_chdir_pre. }
     iIntros (CIDn) "%Hgd".
     iIntros (mf P')
-      "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbb Hsbi Hir Hpost".
+      "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbb Hsbi Hir Harms".
+    (* THE BRIDGE, once: the arms imply the blanket the friendly post is. *)
+    iDestruct (chdir_arms_landed with "Harms") as "Hpost".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
                  with "Hcont") as "Hcont".
     iApply ("Hcont" $! mf P'

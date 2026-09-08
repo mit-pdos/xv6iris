@@ -1,4 +1,25 @@
-(* ProofSysChdir.v -- sys_chdir over the SIE-agnostic sconf world.
+(* ProofSysChdir.v -- **THE SEAL.**  sys_chdir's ONE contract,
+   [SpecSysChdir.SYSCHDIR], its one parameter [wp_sys_chdir].
+
+   The walk runs at [SpecNameiEra.wp_namei_era], with the walk premise
+   handed DOWN unfired (the walk picks the start inum -- ROOTINO on an
+   absolute path, the block's [pv_cwi] on a relative one -- and fires it
+   there, as [ProofSysOpenAUWalk] does), the observation commit fired
+   under the node's lock exactly where the [T_DIR] test reads the type
+   ([FsAbsOpenFire.opf_open_fire_1]), and the three arms of [chdir_arms]
+   paid: the era refund on the dead arm, the cursor and the receipt at a
+   non-directory on the refused arm, and the cursor, the receipt at
+   [MkAnode (ADir e) nl] and the block at the cursor's inum on the
+   success arm.  [LinkSysChdir] closes it over [LinkNameiEra].
+
+   THERE IS ONE WALK.  The blanket-only reading of the post is the derived
+   [SpecSysChdir.chdir_arms_landed], which is what [FsSyscalls]'s friendly
+   packaging takes; nothing re-proves this function against the code.
+
+   The rest of this header is the reading of the code.
+
+   ======================================================================
+   sys_chdir over the SIE-agnostic sconf world.
 
      uint64 sys_chdir(void) {
        char path[MAXPATH];  struct inode *ip;
@@ -130,7 +151,13 @@ Require Import SpecNamex.
 Require Import SpecPanic.
 Require Import SpecNamei.
 Require Import CodeSysChdir.
-Require Import SpecSysChdir.
+Require Import SpecSysChdir.   (* the ONE contract this file seals *)
+Require Import FsStateEra.      (* [era_node] *)
+Require Import DirentEnc.       (* [bview]: the fetched string as a list *)
+Require Import FsTree.          (* [fname] *)
+Require Import SpecNameiEra.    (* the era walk *)
+Require Import FsAbsOpenFire.   (* [opf_start_of_open], [opf_open_fire_1] *)
+Require Import FsAbsDefs.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -687,8 +714,8 @@ End ProofSysChdirEpilogue.
 (*  so it lives inside the module the seal instantiates.                   *)
 (* ===================================================================== *)
 Module SysChdirProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Argstr : ARGSTR)
-                     (Namei : NAMEI) (Ilock : ILOCK) (Iunlock : IUNLOCK)
-                     (Iput : IPUT) (Iunlockput : IUNLOCKPUT) (EndOp : END_OP)
+                       (NameiEra : NAMEI_ERA) (Ilock : ILOCK) (Iunlock : IUNLOCK)
+                       (Iput : IPUT) (Iunlockput : IUNLOCKPUT) (EndOp : END_OP)
   : SYSCHDIR.
 
 Section ProofSysChdirM1Tail.
@@ -909,7 +936,7 @@ Section ProofSysChdirBody.
     (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
-  Lemma wp_sys_chdir_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma wp_sys_chdir `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -917,20 +944,25 @@ Section ProofSysChdirBody.
       (v : mword 64)
       (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) :
-    wp_sys_chdir_sconf_body gf gs j gl pd pav pu
-
- dqb dqs v pid U m K eb b lks.
+      (b : bool) (lks : gset string)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ) :
+    wp_sys_chdir_body gf gs j gl pd pav pu dqb dqs v pid U m K eb b lks
+      P Pmiss Φo.
   Proof.
-    cbv beta delta [wp_sys_chdir_sconf_body].
-    intros pcE pj ret_tgt HK HdevR Hnib0 Hgeom
+    cbv beta delta [wp_sys_chdir_body wp_sys_chdir_frame].
+    intros Γfs pcE pj ret_tgt HK HdevR Hnib0 Hgeom
            Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb Hargv.
     destruct (sc_kb K HK) as (Kna & Kar & Kbo & Keo & Kil & Kiu & Kip & Kiup
                               & K10 & K20 & Kpop).
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
-             #Hireg #Hropen Hsbb Hsbi #Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
+             #Hireg #Hropen Hsbb Hsbi #Hbmres #Hkenv #Hprocs Hir Hpriv Hau Hcont".
+    (* the bundle is opened once, at the top: the walk premise is handed
+       down unfired at namei, the commit is fired after ilock *)
+    iEval (rewrite /chdir_au_pre) in "Hau".
+    iDestruct "Hau" as "[Hwp Hoc]".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
     { intro r. rewrite Hlkempty. apply locks_below_empty. }
@@ -1410,9 +1442,15 @@ Section ProofSysChdirBody.
       iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
       iDestruct (cpu_own_transport CID15 CID19 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
-      iApply (Namei.wp_namei_gen (CID := CID19) gs j gl pd pav pu
+      (* THE ONE-SHOT, HANDED DOWN UNFIRED ([FsAbsOpenFire.opf_start_of_open]):
+         [ex_start] at the string argstr fetched IS the contract's premise
+         at that string, at the block's own cwd inum -- the WALK picks the
+         start and fires it there (lane C3). *)
+      iDestruct (opf_start_of_open fsc_fs (pv_cwi (us_V U)) P Pmiss (bview pk bf)
+                   with "Hwp") as "Htrace".
+      iApply (NameiEra.wp_namei_era (CID := CID19) gs j gl pd pav pu
  gf
- pk bf MAXOPBLOCKS Sb0
+ pk bf MAXOPBLOCKS Sb0 P Pmiss
                 pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                 N1 (K - 20)%nat eb b lks
                 (us_upt U P') ltac:(lia) HdevR Hnib0 Hgeom Hsize
@@ -1420,7 +1458,7 @@ Section ProofSysChdirBody.
                 (sc_plen_lt pk Hpk) (sc_bud_walk _) Hj Hgl
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                       Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
-                      Hbmres Hpbare Hcwdref [Hbufk] Hbsl Hir [$HopS $Htx]").
+                      Hbmres Hpbare Hcwdref [Hbufk] Hbsl Hir [$HopS $Htx] Htrace").
       (* namei is eb-generic now; sys_chdir is still at [eb = true]. *)
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
@@ -1475,8 +1513,8 @@ Section ProofSysChdirBody.
       (* ============ +0x32 c.beqz a0 -> ARM B ============ *)
       destruct ok.
       + (* ---- the path RESOLVED ---- *)
-        iDestruct "Hres" as "(%Hnaip & Hheldip & Hir)".
-        iDestruct (inode_held_ne_zero with "Hheldip") as %Hipnz.
+        iDestruct "Hres" as (iL) "(%Hnaip & Hheldip & HP & Hir)".
+        iDestruct (inode_held_at_ne_zero with "Hheldip") as %Hipnz.
         (* ---- the path RESOLVED: the [c.beqz] falls through ---- *)
         iApply (wp_cbeqz_fall_s_sconf (CID := CID21) (mword_of_int (SC + 0x32))
                   (mword_of_int 26 : mword 8) (Cregidx (mword_of_int 2)) Ra0
@@ -1492,7 +1530,9 @@ Section ProofSysChdirBody.
         iEval (rewrite Hpp34) in "Hpc".
         (* THE REFERENCE namei MADE, taken apart: the slot it names is what
            ilock / iunlock / iunlockput are all indexed by. *)
-        iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & %Hipos & Hrefip & Hruip)".
+        iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & %Hipos & %HiL & Hrefip & Hruip)".
+        (* the cursor, at the reference's own inum *)
+        iEval (rewrite -HiL) in "HP".
 
         assert (Hinb : bv_unsigned inum < 16 * Z.of_nat icfg_nib)
           by (exact Hinumc).
@@ -1583,6 +1623,15 @@ Section ProofSysChdirBody.
         { intros c Hc N2' N8 N9 N18. rewrite (callee_saved_lookup Hcsil c Hc).
           exact (HP0thr c Hc N2' N8 N9 N18). }
         iDestruct (ic_loaded_open with "Hload") as (dat)"(%Hiok & %Hrl_dat & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Htopl)".
+        (* ---- THE OBSERVATION (lane C3): fired the instant the node is
+           locked, off the payload's own era fragment -- the row the
+           [T_DIR] test below reads the type of ---- *)
+        iApply fupd_wp.
+        iMod (opf_open_fire_1 fsc_fs ⊤ Φo (bv_unsigned inum) (era_node dn bm dat)
+                ltac:(solve_ndisj) (opf_era_typed_ok _ _ dn bm dat Hiok)
+                with "[] Hoc Htopl") as "[Htopl Hobs]";
+          [iApply (ireg_inv_ftop with "Hireg") |].
+        iModIntro.
         iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
         iEval (rewrite /i_type) in "Hity".
         (* ============ +0x38 lh a4,68(s1) -- ip->type ============ *)
@@ -1647,6 +1696,14 @@ Section ProofSysChdirBody.
         (* ============ +0x3e bne a4,a5 -> ARM C ============ *)
         destruct (decide (di_type dn = (mword_of_int 1 : mword 16))) as [Hty | Hty].
         * (* ======== IT IS A DIRECTORY: the success tail ======== *)
+          (* the observed row IS a directory ([FsAbs.abs_of_dir]): name its
+             entries and nlink once, for the receipt the success arm pays *)
+          assert (Hisdir : fn_is_dir (era_node dn bm dat) = true).
+          { apply bool_decide_eq_true. rewrite /fn_type era_node_rec Hty.
+            vm_compute. reflexivity. }
+          pose proof (abs_row_dir _ Hisdir) as Hnode.
+          set (an0 := abs_row (era_node dn bm dat)) in *. clearbody an0.
+          destruct an0 as [an nl]. cbn in Hnode. subst an.
           iApply (wp_bne_fall_s_sconf (CID := CID26) (mword_of_int (SC + 0x3e))
                     (mword_of_int 50 : mword 13) Ra5 Ra4 P2 (K - 20)%nat b
                     ltac:(nz) ltac:(nz)
@@ -2025,21 +2082,38 @@ Section ProofSysChdirBody.
                     (m !!! Regidx Rs1 : mword 64) bf1
                     ltac:(lia) Kpop ltac:(reflexivity) HP9sp HP9thr HP9s1 Hal
                     with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf
-                          [Hown Hbsl Hsbb Hsbi Hir Hpriv Hcont]").
+                          [Hown Hbsl Hsbb Hsbi Hir Hpriv HP Hobs Hcont]").
           iEval (rewrite /wp_next).
           iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
           iDestruct (cpu_own_transport CID35 CIDz 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
           iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
-                    Hsbb Hsbi Hir [Hpriv]").
+                    Hsbb Hsbi Hir [Hpriv HP Hobs]").
           { exact Hcsf. }
           { exact Hupt. }
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { rewrite /sys_chdir_post. iRight. iExists (ientry kk), (bv_unsigned inum).
-            iSplitR; [iPureIntro; rewrite Ha0f; exact HP9a0 |]. iExact "Hpriv". }
+          { (* THE SUCCESS ARM: the cursor, the receipt at the directory
+               row, and the block at the cursor's inum *)
+            rewrite /chdir_arms. iRight.
+            iSplitR; [iPureIntro; rewrite Ha0f; exact HP9a0 |].
+            rewrite /chdir_post_ok.
+            iDestruct "Hobs" as (av) "(%Hav & HΦ)".
+            iExists (ientry kk), (bview pk bf), (bv_unsigned inum),
+              (dir_entries (era_node dn bm dat)), nl, av.
+            iFrame "HP HΦ". iSplitR; [iPureIntro; exact Hav |]. iExact "Hpriv". }
         * (* ======== ARM C: NOT a directory ======== *)
+          (* ...and the observed row is NOT one ([FsAbs.abs_of_dir_inv]):
+             what the refused arm's receipt says *)
+          assert (Hnotdir : forall (e : gmap fname Z) (nl : nat),
+                    abs_row (era_node dn bm dat) <> MkAnode (ADir e) nl).
+          { intros e nl He. apply Hty.
+            destruct (abs_row_dir_inv (era_node dn bm dat) e
+                        ltac:(rewrite He; reflexivity)) as [Hd _].
+            rewrite /fn_is_dir in Hd. apply bool_decide_eq_true_1 in Hd.
+            rewrite /fn_type era_node_rec in Hd.
+            apply bv_eq. rewrite Hd. vm_compute. reflexivity. }
           iApply (wp_bne_taken_s_sconf (CID := CID26) (mword_of_int (SC + 0x3e))
                     (mword_of_int 50 : mword 13) Ra5 Ra4 P2 (K - 20)%nat b
                     ltac:(nz) ltac:(nz)
@@ -2266,23 +2340,29 @@ Section ProofSysChdirBody.
                     (m !!! Regidx Rs1 : mword 64) bf1
                     ltac:(lia) Kpop ltac:(reflexivity) HQ4sp HQ4thr HQ4s1 Hal
                     with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf
-                          [Hown Hbsl Hsbb Hsbi Hir Hpriv Hcont]").
+                          [Hown Hbsl Hsbb Hsbi Hir Hpriv HP Hobs Hcont]").
           iEval (rewrite /wp_next).
           iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
           iDestruct (cpu_own_transport CID35 CIDz 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
           iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
-                    Hsbb Hsbi Hir [Hpriv]").
+                    Hsbb Hsbi Hir [Hpriv HP Hobs]").
           { exact Hcsf. }
           { exact Hupt. }
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { rewrite /sys_chdir_post. iLeft. iFrame "Hpriv". iPureIntro.
-            rewrite Ha0f. exact HQ4a0. }
+          { (* THE REFUSED ARM: the cursor and the receipt, at a row that
+               is not a directory *)
+            rewrite /chdir_arms. iLeft. iFrame "Hpriv".
+            iSplitR; [iPureIntro; rewrite Ha0f; exact HQ4a0 |].
+            rewrite /chdir_post_fail. iRight. iExists (bview pk bf). iRight.
+            iDestruct "Hobs" as (av) "(%Hav & HΦ)".
+            iExists (bv_unsigned inum), av, (abs_row (era_node dn bm dat)).
+            iFrame "HP HΦ". iPureIntro. split; [exact Hav | exact Hnotdir]. }
       + (* ================= ARM B: namei returned 0 =================
            +0x66 restores s1 and falls into the shared "-1" tail. *)
-        iDestruct "Hres" as "(%Hnaz & Hir)".
+        iDestruct "Hres" as "(%Hnaz & Hir & Hdead)".
         iApply (wp_cbeqz_taken_s_sconf (CID := CID21) (mword_of_int (SC + 0x32))
                   (mword_of_int 26 : mword 8) (Cregidx (mword_of_int 2)) Ra0
                   N2 (K - 20)%nat b
@@ -2333,7 +2413,7 @@ Section ProofSysChdirBody.
                   ltac:(reflexivity) HN3sp HN3thr HN3s1 Hal
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                         Hpbare Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hf3 Hf4 Hbuf
-                        [Hofiles Hcwdref Hbsl Hsbb Hsbi Hir Hftok Hcont]").
+                        [Hofiles Hcwdref Hbsl Hsbb Hsbi Hir Hftok Hdead Hoc Hcont]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { iApply (log_opS_op with "HopS Htx"). }
@@ -2349,12 +2429,16 @@ Section ProofSysChdirBody.
           - iEval (cbn [upd_upt pv_cwd pv_fdg]). iFrame "Href Hftok". }
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
-                  Hsbb Hsbi Hir [Hpriv]").
+                  Hsbb Hsbi Hir [Hpriv Hdead Hoc]").
         { exact Hcsf. }
         { exact Hupt. }
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        { rewrite /sys_chdir_post. iLeft. iFrame "Hpriv". iPureIntro. exact Ha0f. }
+        { (* THE DEAD ARM: the era refund beside the unfired commit *)
+          rewrite /chdir_arms. iLeft. iFrame "Hpriv".
+          iSplitR; [iPureIntro; exact Ha0f |].
+          rewrite /chdir_post_fail. iRight. iExists (bview pk bf). iLeft.
+          iSplitL "Hdead"; [iExact "Hdead" | iExact "Hoc"]. }
     - (* ================= ARM A: argstr returned -1 =================
          The [bltz] is TAKEN, straight to the shared "-1" tail at +0x68.
          s1 was never written on this path, so slot 3 rides through as the
@@ -2381,7 +2465,7 @@ Section ProofSysChdirBody.
                 ltac:(reflexivity) Hassp Hasthr Hass1 Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hbuf
-                      [Hpback Hbsl Hsbb Hsbi Hir Hcont]").
+                      [Hpback Hbsl Hsbb Hsbi Hir Hwp Hoc Hcont]").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
@@ -2389,12 +2473,16 @@ Section ProofSysChdirBody.
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
-                Hsbb Hsbi Hir [Hpriv]").
+                Hsbb Hsbi Hir [Hpriv Hwp Hoc]").
       { exact Hcsf. }
       { exact Hupt. }
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
-      { rewrite /sys_chdir_post. iLeft. iFrame "Hpriv". iPureIntro. exact Ha0f. }
+      { (* THE ARGSTR ARM: nothing fs-visible happened, the bundle back whole *)
+        rewrite /chdir_arms. iLeft. iFrame "Hpriv".
+        iSplitR; [iPureIntro; exact Ha0f |].
+        rewrite /chdir_post_fail. iLeft. rewrite /chdir_au_pre.
+        iSplitL "Hwp"; [iExact "Hwp" | iExact "Hoc"]. }
   Qed.
 
 End ProofSysChdirBody.

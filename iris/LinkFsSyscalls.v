@@ -1,7 +1,9 @@
 (* LinkFsSyscalls.v -- instantiates F3's friendly wrappers against the two
    sealed syscall contracts they repackage.
 
-   The wrappers in FsSyscalls.v are FUNCTORS over [SYSMKDIR] / [SYSCHDIR],
+   The wrappers in FsSyscalls.v are FUNCTORS over [SYSMKDIR] / [SYSCHDIR]
+   -- chdir's being the syscall's ONE contract, whose armed post the
+   wrapper converts through [SpecSysChdir.chdir_arms_landed] --
    F2's [FsLookupTree] pattern: the tree layer never enters a Link cone, so
    FsSyscalls.v itself compiles against the definitional layer alone and can
    be checked in parallel with every proof file.  This is the one place the
@@ -12,7 +14,8 @@
        -> the five platform axioms + funext (LinkSysMkdir.v's own set,
           unchanged)
      Print Assumptions FsChdir.wp_sys_chdir_friendly.
-       -> the five platform axioms + funext (LinkSysChdir.v's set, unchanged)
+       -> the five platform axioms + funext (LinkSysChdir.v's set, unchanged
+          -- the era walk adds nothing to it)
 
    THE LIFT ADDS NOTHING TO EITHER SET, which is F2's bar and this cone's
    only quantitative claim: the friendly layer is a repackaging, not a new

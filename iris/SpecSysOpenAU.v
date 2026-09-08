@@ -28,11 +28,11 @@
    - [om_arg] and the four bit readings: FdRowPilot.v, UkInitFs.v,
      FsFdMirror.v, ProofSysOpenAUBits.v.
    - [open_walk_pre_era] / [open_walk_dead_era]: SpecKexecAU.v,
-     SpecSysExecAU.v, SpecSysChdirAU.v, ProofKexecAUA.v -- every full-path
+     SpecSysExecAU.v, SpecSysChdir.v, ProofKexecAUA.v -- every full-path
      era walk states its premise at this shape.
    - [aopen_commit_at] / [atrunc_commit_at]: FsAbsOpenFire.v (the fire
      lemmas), FsAbsInvFire.v (the trivial-family dischargers),
-     SpecKexecAU.v, SpecSysExecAU.v, SpecSysChdirAU.v.
+     SpecKexecAU.v, SpecSysExecAU.v, SpecSysChdir.v.
    - [open_fd_ok]: SpecCreateAUFOpen.v, and SpecSysDupAU.v's own tail is
      cut from it.
 

@@ -81,7 +81,7 @@ Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at],
 (* ...and this file's own: the other commit definitions and the invariant.
    FsAbs stays LAST (its own rule), so these go above the block's tail. *)
 Require Import SpecSysOpenAU.      (* [aopen/atrunc_commit_at], [open_walk_pre_era], [open_au_pre_*] *)
-Require Import SpecSysChdirAU.     (* [chdir_au_pre]: the walk premise + open's commit (lane C3) *)
+Require Import SpecSysChdir.       (* [chdir_au_pre]: the walk premise + open's commit *)
 Require Import SpecSysMknod.       (* [mknod_au_pre]: the one contract's bundle *)
 Require Import SpecSysUnlinkAU.    (* [uent/utgt/dmiss_commit_at] *)
 Require Import SpecSysUnlink.      (* [unlink_au_pre]: the one contract's bundle *)

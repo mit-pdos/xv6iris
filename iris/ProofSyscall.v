@@ -371,7 +371,7 @@ Require Import SpecSysOpen.
    leaves. *)
 Require Import SpecSysOpenAU SpecSysUnlinkAU.
 Require Import SpecSysUnlink.    (* [SYSUNLINK], [unlink_arms_ret] *)
-Require Import SpecSysChdirAU.   (* [SYSCHDIR_AU], [chdir_arms_landed], [fsabs_chdir_pre] (C3) *)
+Require Import SpecSysChdir.     (* [SYSCHDIR], [chdir_arms_landed] *)
 (* ...and the write's (round E2, lane E2-W, W1): the dispatch case-splits
    on the descriptor's own state and runs the AU write for an open,
    WRITABLE inode fd; every other descriptor keeps the landed sconf. *)
@@ -431,7 +431,7 @@ Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module SyscallProof
     (SysFork : SYSFORK) (SysExit : SYSEXIT) (SysWait : SYSWAIT)
     (SysPipe : SYSPIPE) (SysRead : SYSREAD) (SysKill : SYSKILL)
-    (SysExecAU : SYSEXEC_AU) (SysFstat : SYSFSTAT) (SysChdirAU : SYSCHDIR_AU)
+    (SysExecAU : SYSEXEC_AU) (SysFstat : SYSFSTAT) (SysChdir : SYSCHDIR)
     (SysDup : SYSDUP) (SysGetpid : SYSGETPID) (SysSbrk : SYSSBRK)
     (SysPause : SYSPAUSE) (SysUptime : SYSUPTIME) (SysWrite : SYSWRITE)
     (SysMknod : SYSMKNOD) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
@@ -4754,11 +4754,11 @@ Section SyscallArms.
     iDestruct (sysc_iref_split with "Hir") as "[Hirk Hirc]".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    (* THE AU CONTRACT (lane C3), at the trivial bundle
-       ([FsAbsInvFire.fsabs_chdir_pre]); the landed post is read back off
-       the arms ([chdir_arms_landed]) and the tail below is the landed one. *)
+    (* THE ONE CONTRACT, at the trivial bundle
+       ([FsAbsInvFire.fsabs_chdir_pre]); the blanket post is read back off
+       the arms ([chdir_arms_landed]) and the tail below consumes it. *)
     iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
-    iApply (SysChdirAU.wp_sys_chdir_au γf γs j γl
+    iApply (SysChdir.wp_sys_chdir γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 pid U M (av - 4)%nat true true ∅
               (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I)
