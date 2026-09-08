@@ -25,7 +25,7 @@
     namei-null tail at +0x088 lives inside [kxc_a1p] exactly as it lives
     inside [kxc_a1], and the +0x064 one is [kxc_a2]'s and is not copied at
     all.  The landed blocks are opened as [LA] below and instantiated, not
-    duplicated (the copy-adapt discipline of ProofSysMknodAU /
+    duplicated (the copy-adapt discipline of ProofSysMknod /
     ProofCreateAUF: copy the WALK, never the block).
 
     WHY [kxc_a1] CANNOT SIMPLY BE REUSED.  Its post says [inode_held ipv] --

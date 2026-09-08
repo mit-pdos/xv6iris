@@ -10,10 +10,8 @@
    arithmetic, same loop invariant modulo the name of one trace row, same
    five exits, line for line.  Review it as the diff against
    [ProofNamexTr.v], which is what it was produced as.  The duplication is
-   TRANSITIONAL BY DESIGN: when the consumers ([SpecSysMknodAU] first) have
-   moved to the era contract, the campaign's retirement step deletes the
-   dv-firing original and the [dv_*] column comes off the payloads, at
-   which point this file is the only walk.
+   TRANSITIONAL BY DESIGN: the dv-firing original and the [dv_*] column
+   are gone from the payloads, so this file is the only namex walk.
 
    THE DIFF, EXHAUSTIVELY (there is nothing else to look for).
 
@@ -29,8 +27,8 @@
        [nxt_hops_cons] / [nxt_hop_hit] / [nxt_hop_miss] are
        [FsAbsEra.ex_hops_cons] / [elend_fire_hit] / [elend_fire_miss];
        they live in the spec layer now because the era lend has clients
-       ([SpecSysMknodAU]) that need them without this file's 4990-line
-       cone.  So this file's own "genuinely new proof content" is empty.
+       ([SpecSysMknod] and the other path syscalls' contracts) that need
+       them without this file's 4990-line cone.  So this file's own "genuinely new proof content" is empty.
 
    (3) THE FIRE LENDS THE ERA LEG, NOT THE CONTENTS.  At dirlookup's
        continuation the walk holds [ic_loaded_flat_body]'s LAST TWO

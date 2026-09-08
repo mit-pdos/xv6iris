@@ -361,12 +361,13 @@ Require Import SpecSysFork SpecSysExit SpecSysWait SpecSysPipe SpecSysRead SpecS
                SpecSysPause SpecSysUptime SpecSysWrite SpecSysMknod SpecSysLink SpecSysMkdir
                SpecSysClose SpecSysSync.
 Require Import SpecSysOpen.
-(* THE AU CONTRACTS the three fs-mutating entries run on since 2026-09-03
-   (their landed contracts are corollaries: [open_arms_plain_landed],
-   [mknod_arms_era_ret], [unlink_arms_ret]), and the dischargers that
-   satisfy their bundles out of the application-side abstract-state
-   invariant [FirstTok.fsabs_env] with receipts that say nothing. *)
-Require Import SpecSysMknodAUEra SpecSysOpenAU SpecSysUnlinkAU.
+(* THE ATOMIC-UPDATE CONTRACTS the three fs-mutating entries run on (their
+   return blankets are corollaries: [open_arms_plain_landed],
+   [mknod_arms_ret], [unlink_arms_ret]), and the dischargers that satisfy
+   their bundles out of the application-side abstract-state invariant
+   [FirstTok.fsabs_env] with receipts that say nothing.  mknod's is
+   [SpecSysMknod]'s own [SYSMKNOD], required above. *)
+Require Import SpecSysOpenAU SpecSysUnlinkAU.
 Require Import SpecSysChdirAU.   (* [SYSCHDIR_AU], [chdir_arms_landed], [fsabs_chdir_pre] (C3) *)
 (* ...and the write's (round E2, lane E2-W, W1): the dispatch case-splits
    on the descriptor's own state and runs the AU write for an open,
@@ -430,7 +431,7 @@ Module SyscallProof
     (SysExecAU : SYSEXEC_AU) (SysFstat : SYSFSTAT) (SysChdirAU : SYSCHDIR_AU)
     (SysDup : SYSDUP) (SysGetpid : SYSGETPID) (SysSbrk : SYSSBRK)
     (SysPause : SYSPAUSE) (SysUptime : SYSUPTIME) (SysWrite : SYSWRITE)
-    (SysMknod : SYSMKNOD_AU_ERA) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
+    (SysMknod : SYSMKNOD) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
     (SysClose : SYSCLOSE) (SysSync : SYS_SYNC)
     (SysOpen : SYSOPEN_AU) (SysUnlink : SYSUNLINK_AU)
     (Myproc : MYPROC) (Printk : PRINTK_GEN) : SYSCALL.
@@ -5681,18 +5682,17 @@ Section SyscallArms.
     iDestruct (sysc_bm_cells with "Hfsenv") as "(#Hbmp & #Hisp & #Hbmr)".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    (* THE AU CONTRACT, at the trivial bundle: every receipt [True], the
+    (* THE CONTRACT, at the trivial bundle: every receipt [True], the
        commits discharged out of the abstract-state invariant
-       ([FsAbsInvFire.fsabs_mknod_pre_era]); the landed return blanket is
-       read back off the arms ([mknod_arms_era_ret]). *)
+       ([FsAbsInvFire.fsabs_mknod_pre]); the return blanket is read back
+       off the arms ([mknod_arms_ret]). *)
     iDestruct (syscall_env_fsabs with "Henvc") as "#Hfsabs".
-    iApply (SysMknod.wp_sys_mknod_au_era γf γs j γl
+    iApply (SysMknod.wp_sys_mknod γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
               v0 v1 v2 pid U M (av - 4)%nat true true ∅
               (fun _ _ => True%I) (fun _ _ => True%I)
-              (* create's child legs, at the trivial families too
-                 (round E2, lane E2-C) *)
+              (* create's child legs, at the trivial families too *)
               (fun _ _ => True%I) (fun _ _ => True%I)
               (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
@@ -5701,10 +5701,10 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv []").
-    { iApply (fsabs_mknod_pre_era with "Hfsabs"). }
+    { iApply (fsabs_mknod_pre with "Hfsabs"). }
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv Harms".
-    iDestruct (mknod_arms_era_ret with "Harms") as %Hret0.
+    iDestruct (mknod_arms_ret with "Harms") as %Hret0.
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first

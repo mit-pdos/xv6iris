@@ -28,8 +28,8 @@
    era fragment is the carrier's own ghost, so at the fire instant the
    caller can read the parent directory's row off the AUTHORITY
    ([FsAbsEra.elend_astate], via [FsAbs.ftop_astate_ro]) with no
-   client-held share at all -- which is what [SpecSysMknodAU]'s
-   [dlookup_commit] / [acre_commit] need.
+   client-held share at all -- which is what [FsAbsCreateFire]'s
+   [dlookup_commit_at] / [acre_commit_at] need.
 
    THE VOCABULARY IS NOT RESTATED HERE.  [inode_held_at] is
    [SpecNameiTr]'s and is imported; the hop family is [FsAbsEra]'s.  This

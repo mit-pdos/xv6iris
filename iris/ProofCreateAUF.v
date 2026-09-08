@@ -3591,7 +3591,7 @@ Section ProofCreateMain.
             exfalso. apply Hklive. apply bv_eq. rewrite Hz. reflexivity. }
           destruct (Hiregb cinum Hcinb) as [Hcblk Hcblog].
           (* ============================================================ *)
-          (*  FIRE 1: [dlookup_commit] AT THE EXISTS-LOOKUP'S FOUND       *)
+          (*  FIRE 1: [dlookup_commit_at] AT THE EXISTS-LOOKUP'S FOUND    *)
           (*  INSTANT, under the parent's lock.  The row is read off the  *)
           (*  PARENT'S OWN era fragment -- the one [IcacheEscrow.         *)
           (*  ic_loaded] carries and which create still holds here, the   *)

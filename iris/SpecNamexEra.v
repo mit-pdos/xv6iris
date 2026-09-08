@@ -29,8 +29,9 @@
    INSIDE the payload the walk is holding.  The era fragment is the same
    ghost as the carrier, so the hop's caller can read the parent's row off
    the AUTHORITY at the fire instant ([FsAbsEra.elend_astate]) with no
-   client-held share at all -- which is what [SpecSysMknodAU]'s
-   [dlookup_commit] / [acre_commit] need and what [nx_hop] cannot give.
+   client-held share at all -- which is what [FsAbsCreateFire]'s
+   [dlookup_commit_at] / [acre_commit_at] need and what [nx_hop] cannot
+   give.
 
    COPY-ADAPT IS THE RULED APPROACH (lane brief, 2026-08-28), and it is
    TRANSITIONAL BY DESIGN: when the consumers have moved to this contract,

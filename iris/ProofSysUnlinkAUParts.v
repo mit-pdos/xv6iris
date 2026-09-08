@@ -4,7 +4,7 @@
 
    THE AU WALK IS sys_unlink's WALK AGAIN, at [SpecSysUnlinkAU]'s contract
    instead of [SpecSysUnlink]'s.  The blocks are copy-adapts of
-   [ProofSysUnlink]'s ([ProofSysMknodAU] is the family's template: the AU
+   [ProofSysUnlink]'s ([ProofSysMknod] is the family's template: the AU
    proof of a syscall is its landed proof with the walk premise swapped for
    the era one and the fire points fused in).  Three things are REUSED
    VERBATIM rather than copied, and each has a reason:

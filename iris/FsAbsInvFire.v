@@ -2,7 +2,7 @@
    contract asks its caller for, satisfied by a client that knows nothing
    about the abstract state, at receipts that say nothing.
 
-   WHAT THIS IS FOR.  The AU contracts ([SpecSysOpenAU], [SpecSysMknodAUEra],
+   WHAT THIS IS FOR.  The AU contracts ([SpecSysOpenAU], [SpecSysMknod],
    [SpecSysUnlinkAU], [SpecSysRead]/[SpecFileread], [SpecSysWrite]/
    [SpecFilewrite], [SpecCreateAU]/[SpecCreateAUF]) take, beside the
    landed frame, a bundle of caller-supplied fupds: the walk premise (one
@@ -83,7 +83,7 @@ Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at],
    FsAbs stays LAST (its own rule), so these go above the block's tail. *)
 Require Import SpecSysOpenAU.      (* [aopen/atrunc_commit_at], [open_walk_pre_era], [open_au_pre_*] *)
 Require Import SpecSysChdirAU.     (* [chdir_au_pre]: the walk premise + open's commit (lane C3) *)
-Require Import SpecSysMknodAUEra.  (* [mknod_au_pre_era] *)
+Require Import SpecSysMknod.       (* [mknod_au_pre]: the one contract's bundle *)
 Require Import SpecSysUnlinkAU.    (* [uent/utgt/dmiss_commit_at], [unlink_au_pre] *)
 Require Import SpecSysLink.        (* [link_commits] (round E2, lane E2-L) *)
 Require Import FsAbsReadFire.      (* [aread_commit_at] *)
@@ -383,13 +383,13 @@ Section FsAbsInvFire.
     iSplitR; [iApply (fsabs_atrunc with "Hai") | iApply (fsabs_child with "Hai")].
   Qed.
 
-  Lemma fsabs_mknod_pre_era (γfs : fs_names) (cw : Z) (ma mi : Z) :
+  Lemma fsabs_mknod_pre (γfs : fs_names) (cw : Z) (ma mi : Z) :
     app_inv γfs -∗
-    mknod_au_pre_era (fs_gamma_L γfs) γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
+    mknod_au_pre (fs_gamma_L γfs) γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I).
   Proof.
-    iIntros "#Hai". rewrite /mknod_au_pre_era.
+    iIntros "#Hai". rewrite /mknod_au_pre.
     iSplitR; [iApply fsabs_mknod_walk |].
     iSplitR; [iApply (fsabs_acre with "Hai") |].
     iSplitR; [iApply fsabs_dlookup | iApply (fsabs_child with "Hai")].

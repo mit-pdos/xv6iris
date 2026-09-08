@@ -28,7 +28,7 @@
    down BEFORE argstr has fetched anything -- while [ex_start] is at the
    string already in the buffer.  A syscall-level caller cannot name that
    string, so the contract has to quantify; the walk is where the two meet.
-   ([SpecSysMknodAUEra] carries the same asymmetry for the same reason.)
+   ([SpecSysMknod] carries the same asymmetry for the same reason.)
 
    ==== ITEM 2: THE TERMINAL FIRE =======================================
 

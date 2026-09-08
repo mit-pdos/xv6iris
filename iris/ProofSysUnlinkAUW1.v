@@ -4,7 +4,7 @@
      W1  +0x00 .. +0x2e   (ARM A at +0x16, ARM B at +0x2e)
 
    [ProofSysUnlink.su_w1]'s copy-adapt, at [SpecSysUnlinkAU]'s contract.
-   [ProofSysMknodAU] is the family's template and the diff against the
+   [ProofSysMknod] is the family's template and the diff against the
    landed block is exactly four things:
 
      1. nameiparent is applied at [SpecNparWrapEra.wp_npar_wrap_era], not

@@ -8,14 +8,12 @@
    column is CORRECTED below, see THE ONE DELTA) and lane W of
    claude-notes/projects/fs-syscall-specs.md.  The abstract vocabulary is
    FsAbs.v (lane A, landed); the molds are SpecSysMknodAU.v (the family
-   conventions) READ THROUGH ITS TWO PROVER FINDINGS -- this file states
-   the walk premise at the ERA HOPS and the commits at the RAW-MAP [_at]
-   shape FROM THE START (SpecSysMknodAUEra / FsAbsMknodFire: the frozen
-   dv_half walk-pre made the original unsealable, and the astate-shaped
-   commits proved non-give-backable against [InodeRegion.ftop_body]) --
-   plus FsAbsReadFire.v (the single-phase whole-[anode] observation) and
-   the write side (the delta vocabulary, the exclusion-by-premise
-   pattern).
+   conventions) and SpecSysMknod.v (the one-contract shape) -- this file
+   states the walk premise at the ERA HOPS and the commits at the RAW-MAP
+   [_at] shape, which is what [FsAbsMknodFire]'s header shows is the only
+   dischargeable one against [InodeRegion.ftop_body] -- plus FsAbsReadFire.v
+   (the single-phase whole-[anode] observation) and the write side (the
+   delta vocabulary, the exclusion-by-premise pattern).
 
    THE DRIVING CONSUMER is xv6's init.c: [open("console", O_RDWR)],
    called twice in init's preamble -- the PLAIN (no-O_CREATE) arm opening
@@ -80,11 +78,12 @@
    inode, whose inum no landed reading exposes -- so the premise shape is
    consumable by BOTH the absolute era walks landed today and the
    relative-start arm the concurrent walk lane is building.  NO ESCAPE
-   DISJUNCT rides the success arms (contrast [SpecSysMknodAUEra]'s
-   ret-0 escape): init's own path is the RELATIVE "console", so an
-   absolute-only escape would gut the driving consumer -- the relative
-   walk consumption is instead RECORDED as the prover's dependency
-   (item 1 below), and when that lane lands nothing here moves.
+   DISJUNCT rides the success arms: init's own path is the RELATIVE
+   "console", so an absolute-only escape would gut the driving consumer --
+   the relative walk consumption is instead RECORDED as the prover's
+   dependency (item 1 below), and when that lane lands nothing here
+   moves.  ([SpecSysMknod] carries no escape either, for the same
+   reason.)
 
    ==== THE ONE DELTA (correcting doc section 7's no-CREATE row) ========
 
@@ -197,7 +196,7 @@
       record update inside its transaction ([ftopN] critical section,
       [inode_local] give-back), the reading bridge (the truncated record
       reads [AFile []] -- the zero-size [fn_file_bytes] -- through
-      [SpecSysMknodAU.abs_view_insert]), and the observed-row tie via
+      [FsAbsDefs.abs_view_insert]), and the observed-row tie via
       the lock-hold custody (header, THE ONE DELTA).
    4. THE FD BOOKKEEPING: sys_open's landed proof already runs
       [proc_priv_settle]; restate its payout through
@@ -413,10 +412,10 @@ Section SysOpenAU.
        ghost_map_auth (γtop Γ) (1/2) I ∗ Φ (abs_view I) i a)%I.
 
   (* the astate-shaped reading, for a client that reasons abstractly --
-     the read-only direction holds ([FsAbsMknodFire]'s
-     [dlookup_commit_at_weaken] argument, verbatim); the reverse does not
-     (nothing ties the returned authority to the borrowed map), which is
-     why the CONTRACT carries the [_at] form *)
+     the read-only direction holds (a client that can serve the
+     authority form can serve this one by unfolding [astate]); the reverse
+     does not (nothing ties the returned authority to the borrowed map),
+     which is why the CONTRACT carries the [_at] form *)
   Definition aopen_commit `{XI : CurCtx} Γ (E : coPset)
       (Φ : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
     (∀ (av : aview) (i : Z) (a : anode),

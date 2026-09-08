@@ -16,7 +16,7 @@
      the plain arm's own link, kept because it is the cheaper cone.
 
    Every remaining callee is linked elsewhere and the era walk by
-   [LinkSysMknodAU.v]'s cone, so this composition assumes nothing new. *)
+   [LinkSysMknod.v]'s cone, so this composition assumes nothing new. *)
 Require Import LinkArgint LinkArgstr LinkBeginOp LinkNameiEra
         LinkIlock LinkIunlock LinkIunlockput LinkEndOp LinkFileclose
         LinkItrunc LinkFilealloc LinkFdalloc

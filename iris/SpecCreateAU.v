@@ -3,14 +3,15 @@
    the walk, the exists-lookup and the entry write.
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the mknod
-   AU prover).  A PARALLEL FORM beside [SpecCreate.wp_create_sconf] -- R10:
-   the landed contract does not move, and neither does [SpecSysMknodAU].
+   AU prover).  A PARALLEL FORM beside [SpecCreate.wp_create_sconf]: the
+   landed contract does not move.
 
    ==== WHY A PARALLEL create CONTRACT EXISTS AT ALL ====================
 
    Every instant the mknod AU speaks about is INSIDE create's cone: the
-   walk's hops happen in nameiparent, [dlookup_commit] fires at create's
-   own [dirlookup] (the exists test), and [acre_commit]'s two phases
+   walk's hops happen in nameiparent, [dlookup_commit_at] fires at
+   create's own [dirlookup] (the exists test), and [acre_commit_at]'s two
+   phases
    bracket the parent-row retag create performs after its [dirlink]
    returns.  None of that is derivable from the SEALED
    [wp_create_sconf], whose post says nothing about the abstract state or
@@ -43,17 +44,15 @@
        [SpecSysMknodAU.acre_bump]); nothing here is in its way.
 
    (3) THE COMMITS ARE THE AUTHORITY-SHAPED ONES.  [FsAbsMknodFire]'s
-       [dlookup_commit_at] / [acre_commit_at], not the frozen
-       [astate]-shaped pair -- see that file's header for why the frozen
-       shape cannot be discharged against [InodeRegion.ftop_body] at all
-       ([abs_view] is not injective, so no give-back wand can be paid).
-       The read-only one IMPLIES the frozen form, so a client that can
-       serve the frozen [dlookup_commit] is not being asked for more
-       there.
+       [dlookup_commit_at] / [acre_commit_at] -- see that file's header
+       for why an [astate]-shaped pair cannot be discharged against
+       [InodeRegion.ftop_body] at all ([abs_view] is not injective, so no
+       give-back wand can be paid).  A client that reasons abstractly is
+       not asked for more: the read-only form unfolds an [astate] one.
 
    ==== THE ARMS ========================================================
 
-   [cau_ok] is [SpecSysMknodAU.mknod_post_ok]'s content at the inum
+   [cau_ok] is [SpecSysMknod.mknod_post_ok]'s content at the inum
    create returns, minus the two facts create's own post already states
    ([0 < i < 16 * icfg_nib] is there verbatim).  [cau_fail] is
    [mknod_post_fail]'s SECOND disjunct at create's own path -- the
@@ -147,7 +146,7 @@ Section CreateAUSpec.
 
   (* the cursor at the parent index, the fired success receipt with its
      instant's facts restated purely, the name tie, and the UNFIRED lookup
-     commit refunded -- [SpecSysMknodAU.mknod_post_ok]'s content at the
+     commit refunded -- [SpecSysMknod.mknod_post_ok]'s content at the
      inum create's post already names. *)
   Definition cau_ok Γ (ma mi : Z) (P : nat -> Z -> iProp Σ)
       (Φarm Φun : aview -> Z -> iProp Σ)

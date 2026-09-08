@@ -347,8 +347,8 @@ Section FsAbsEra.
      No client-held share is needed: the lent fragment agrees with the
      [ghost_map_auth] [FsAbs.ftop_astate_ro] hands out, so a consumer that
      opens ftopN INSIDE the hop's [={T}=*] reads the parent's row as an
-     [ADir] at the lent entry map.  That is [SpecSysMknodAU]'s
-     [dlookup_commit] shape on the nose. *)
+     [ADir] at the lent entry map.  That is [FsAbsCreateFire]'s
+     [dlookup_commit_at] shape on the nose. *)
   Lemma elend_astate_q Γ (q : Qp) (av : aview) (d : Z) (dq : dfrac)
       (ents : gmap fname Z) :
     astate_q Γ q av -∗ elend Γ d dq ents -∗

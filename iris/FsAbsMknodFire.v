@@ -1,52 +1,36 @@
-(* FsAbsMknodFire.v -- THE MKNOD AU's TWO FIRE POINTS, DISCHARGED AGAINST
-   THE INVARIANT, plus the two bridges [SpecSysMknodAU]'s header owes its
-   prover (items 2 and 4).
+(* FsAbsMknodFire.v -- THE mknod/create AU's FIRE POINTS, DISCHARGED
+   AGAINST THE INVARIANT, plus the two bridges the contract's prover needs:
+   the reading bridge at the parent-row update and the halfword tie on the
+   device numbers.
 
-   Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the mknod
-   AU prover).  (It was a NEW LEAF rather than an append to
-   [FsAbsEraMknod.v] for the mirror's reason the campaign's other leaves
-   record: the build mirror forbids touching a tracked file.  The two --
-   and the other two mknod leaves -- ARE FUSED as of 2026-08-30, which is
-   what this paragraph asked for; see the next note.)
+   ==== WHY THE COMMITS ARE SHAPED AT THE AUTHORITY ======================
 
-   ==== WHY THE COMMITS HAD TO BE RESTATED AT THE AUTHORITY ==============
-
-   THIS IS THE LANE'S FIRST FINDING, and it is a shape finding, not a
-   proof gap.  [SpecSysMknodAU]'s two commit steps are stated over
-   [FsAbs.astate]:
+   A commit stated over [FsAbs.astate],
 
        astate Γ av ={E}=∗ astate Γ av ∗ Φ ...                (dlookup)
        astate Γ av ={E}=∗ astate Γ av ∗ (astate Γ (δ av) ={E}=∗ ...)  (acre)
 
-   and the prover's only source of [astate] is the γtop authority inside
-   [InodeRegion.ftop_inv].  Borrowing it ([FsAbs.ftop_astate_ro] /
-   [ftop_astate_acc]) is fine; GIVING IT BACK is not.  [astate Γ av] is
-   [∃ I, ghost_map_auth (γtop Γ) 1 I ∗ ⌜av = abs_view I⌝], and [abs_view]
-   IS NOT INJECTIVE ([abs_of] forgets the record: the block map, the
-   size's slack, every field [inode_local] constrains).  So what comes
-   back out of a caller's fupd is an authority at SOME map with the right
-   reading -- and [ftop_body]'s row ([ftop_clean I A]) is a statement
-   about the RECORDS.  Neither give-back wand can be paid:
+   is NOT dischargeable, and the obstruction is a shape finding rather
+   than a proof gap.  The prover's only source of [astate] is the γtop
+   authority inside [InodeRegion.ftop_inv].  Borrowing it
+   ([FsAbs.ftop_astate_ro] / [ftop_astate_acc]) is fine; GIVING IT BACK is
+   not.  [astate Γ av] is [∃ I, ghost_map_auth (γtop Γ) 1 I ∗
+   ⌜av = abs_view I⌝], and [abs_view] IS NOT INJECTIVE ([abs_of] forgets
+   the record: the block map, the size's slack, every field [inode_local]
+   constrains).  So what comes back out of a caller's fupd is an authority
+   at SOME map with the right reading -- and [ftop_body]'s row
+   ([ftop_clean I A]) is a statement about the RECORDS.  Neither give-back
+   wand can be paid:
 
      - [ftop_astate_ro]'s wants the SAME [I] the borrow named, and nothing
        in [astate Γ av] says the returned map is that one;
      - [ftop_astate_acc]'s wants [inode_local] at EVERY entry of whatever
        map comes back, which is exactly the fact [abs_view] threw away.
 
-   The fix is one step down: the commits below take the RAW MAP and hand
-   the very same [ghost_map_auth] back.  [dlookup_commit_at] IMPLIES the
-   landed [dlookup_commit] ([dlookup_commit_at_weaken]) -- the read-only
-   direction goes through, because a client that can serve the authority
-   form can serve the [astate] form by unfolding it.  The success commit's
-   two phases do NOT relate that way in either direction (phase 2 names
-   the post-state map, and no [astate] at the delta determines it), so
-   [acre_commit_at] is a PARALLEL FORM beside the frozen one, in the
-   campaign's usual sense: R10 leaves [SpecSysMknodAU] byte-identical and
-   the era-side contract ([SpecSysMknodAUEra]) carries these.
-
-   Everything the frozen file offers a client is offered here at the same
-   strength: the trivial-receipt units, and the agreement seeds
-   ([_pinned]) the stable corollary is derived from.
+   So the commits ([FsAbsCreateFire], re-exported below) take the RAW MAP
+   and hand the very same [ghost_map_auth] back.  Everything a client
+   wants of them is offered at that shape: the trivial-receipt units, and
+   the agreement seeds ([_pinned]) the stable corollaries are derived from.
 
    ==== WHAT THE TWO FIRE LEMMAS DO ====================================
 
@@ -58,9 +42,8 @@
    no seam is needed at these two instants at all (that is why they are
    dischargeable while [FsAbsEraMknod]'s hop-side twins needed the era
    walk).  [mkf_acre_fire] FUSES the parent-row retag: the two phases and
-   the [ghost_map_update] are one [ftopN] critical section, which is what
-   the frozen header asks for ("the pair is ONE instant to every other
-   party"), and it pays the row obligation [InodeRegion.ireg_top_retag_*]
+   the [ghost_map_update] are one [ftopN] critical section, so the pair is
+   ONE instant to every other party, and it pays the row obligation [InodeRegion.ireg_top_retag_*]
    charges every mover -- so a walk that used to call [ireg_top_retag_*] at
    the parent calls THIS instead, with one extra premise (the caller's
    commit) and one extra payout (the receipt).
@@ -95,8 +78,8 @@
 
      sections 1-4  the authority-shaped commits, the two fires and the
                    halfword bridge -- this file's own.
-     section 5     the era-lend fire points and lane W's two walk
-                   predicates -- WAS iris/FsAbsEraMknod.v.
+     section 5     the era-lend walk predicates -- WAS
+                   iris/FsAbsEraMknod.v.
      section 6     the nameiparent acceptance test -- WAS
                    iris/FsAbsNparMknod.v.
      section 7     FIRE 2 at a non-directory child -- WAS
@@ -142,7 +125,7 @@ Require Import FsStateEra.       (* [era_node], [era_node_rec]              *)
 Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]     *)
 Require Import Xv6G.
 Require Import SpecCreate.       (* [create_made], [T_DEVICE]               *)
-Require Import SpecSysMknodAU.   (* the frozen statement this parallels     *)
+Require Import SpecSysMknodAU.   (* [dev_arg], [mknod_parent_elems]         *)
 Require Export FsAbsCreateFire.  (* the commits ([acre_commit_at], [dlookup_commit_at], the legs' -- moved there in round E2 so SpecCreate can name them), their units and seeds, [mkf_auth_nview] *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
@@ -159,20 +142,8 @@ Section MknodFire.
   (*  1.  THE AUTHORITY-SHAPED COMMITS -- moved to FsAbsCreateFire.v      *)
   (*      (round E2, lane E2-C: [SpecCreate]'s bundle names them and this *)
   (*      file sits above SpecCreate).  Re-exported above, so every name  *)
-  (*      resolves as before; only the one relation to the FROZEN shape  *)
-  (*      stays here, because [SpecSysMknodAU.dlookup_commit] does.       *)
+  (*      resolves as before.                                             *)
   (* =================================================================== *)
-
-  (* THE ONE RELATION THAT HOLDS: the read-only form is stronger. *)
-  Lemma dlookup_commit_at_weaken Γ E Φ :
-    dlookup_commit_at Γ E Φ ⊢ dlookup_commit Γ E Φ.
-  Proof.
-    iIntros "Hcm". rewrite /dlookup_commit.
-    iIntros (av d i nm ents nl) "%Hd %Hnm Hst".
-    iDestruct (astate_q_elim with "Hst") as (I) "[Ha %Hav]". subst av.
-    iMod ("Hcm" $! I d i nm ents nl with "[//] [//] Ha") as "[Ha HΦ]".
-    iModIntro. iFrame "HΦ". iApply astate_q_intro. iExact "Ha".
-  Qed.
 
   (* =================================================================== *)
   (*  2.  THE ROW READINGS                                                *)
@@ -376,7 +347,7 @@ End MknodFire.
 (* ===================================================================== *)
 
 (* sys_mknod's [lh a2,-148(s0)] reads back the low HALFWORD of the [int]
-   [argint] wrote, i.e. [hw_lo (arg_int32 v)] in [ProofSysMknodAU]'s
+   [argint] wrote, i.e. [hw_lo (arg_int32 v)] in [ProofSysMknod]'s
    vocabulary; the record field reads back UNSIGNED.  So the abstract
    child's major number is the low sixteen bits of the trapframe word --
    [SpecSysMknodAU.dev_arg] on the nose.  Stated over the byte spelling
@@ -435,7 +406,7 @@ Qed.
 
 
 (* ===================================================================== *)
-(*  5.  THE ERA-LEND FIRE POINTS AND THE WALK PREDICATES                  *)
+(*  5.  THE ERA-LEND WALK PREDICATES                                      *)
 (*      (was iris/FsAbsEraMknod.v, fused 2026-08-30)                       *)
 (* ===================================================================== *)
 
@@ -450,40 +421,23 @@ Require Import FsAbsEra.        (* [elend], [ex_hops_from], [elend_astate],
                                    and (since the era leaves fused) the
                                    parent prefix and the deferred start *)
 
-(* FsAbsEraMknod.v -- THE FIRST CONSUMER, WIRED: [SpecSysMknodAU]'s two
-   commit steps consumed at an ERA hop's fire instant, and the era-lend
-   twins of its two walk predicates.
+(* THE WALK PREDICATES THE PARENT-PREFIX ONE-SHOT IS BUILT FROM (was
+   iris/FsAbsEraMknod.v).  They ride the ERA LEND, and that is what makes
+   every fire point below reachable: [FsAbsEra.elend_astate] reads the row
+   straight off the authority, because the lent fragment and the carrier
+   are THE SAME GHOST.  A lend that says nothing about gamma-top cannot do
+   it -- no amount of opening ftopN at the fire instant would identify the
+   authority's row for the directory the walk is standing on ([FsAbsSeam],
+   findings 2 and 3).
 
-   Worklist: claude-notes/projects/fs-syscall-specs.md, lane A item (iii)
-   (the era-fragment walk) meeting lane W (the mknod AU statement).  The
-   landed statement file does not move (its own R10-parallel discipline);
-   these are the PARALLEL forms beside it.
+   WHAT IS NOT HERE.  The nameiparent WALK.  These predicates are about the
+   HOP, and the hop is the same on both sides of namex's [a1] test; the
+   walk itself is [SpecNparEra] / [SpecNparWrapEra].
 
-   WHY THIS FILE.  Lane W's header records what its prover owes, and the
-   first item is "the two fire points: dirlookup via [ftop_astate_ro]".
-   With the LANDED trace contract that item was not merely unproven, it was
-   unprovable: [SpecNameiTr.nx_hop] lent [DirViewG.dv_half] (both retired
-   2026-08-30; the history is kept because it is why THIS file exists), which
-   says
-   nothing about gamma-top, so no amount of opening ftopN at the fire
-   instant identifies the authority's row for the directory the walk is
-   standing on ([FsAbsSeam], findings 2 and 3).  [SpecSysMknodAU]'s
-   [mknod_walk_pre] therefore rides [ax_hops_from dv_half] and its prover
-   has no way to reach [dlookup_commit]'s premises.
-
-   With the era lend it is three lines: [FsAbsEra.elend_astate] reads the
-   row straight off the authority, because the lent fragment and the
-   carrier are THE SAME GHOST.  [era_dlookup_fire] below is that step,
-   whole; [era_acre_fire] is the success commit's phase 1 at the same
-   instant, which needs the parent's row for exactly the same reason.
-
-   WHAT IS NOT HERE.  The nameiparent WALK.  These lemmas are about the
-   HOP, and the hop is the same on both sides of namex's [a1] test; what
-   the nameiparent side still needs is namex's two npar exits proven at a
-   trace contract, which is a walk-proof item and not a lend item (see
-   [ProofNamexEra]'s header).  So this file makes the mknod prover's fire
-   points discharged-in-advance, and leaves it waiting on the walk that
-   delivers them. *)
+   The two predicates are the walk premise of EVERY path syscall that
+   resolves with nameiparent -- mknod, unlink, open's create arm, create
+   itself -- so their [mknod_] prefix names the family's mold, not one
+   caller. *)
 Section EraMknod.
   (* [SpecSysMknodAU]'s binder list, verbatim. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -491,78 +445,15 @@ Section EraMknod.
   Implicit Types Γ : fs_view_names Σ.
 
   (* =================================================================== *)
-  (*  1.  THE READ-ONLY FIRE                                              *)
+  (*  THE WALK PREDICATES OVER THE ERA LEND                               *)
   (* =================================================================== *)
 
-  (* THE STEP LANE W's PROVER OWES, discharged.  At the hop instant the
-     caller holds three things: its own [dlookup_commit] (the AU's
-     read-only arm), the ERA LEND the walk just handed it, and [astate]
-     (borrowed out of ftopN by [FsAbs.ftop_astate_ro] -- the borrow is
-     not repeated here because it is [FsAbs]'s and the caller does it
-     once around this step).  It gets the receipt, and BOTH the lend and
-     the state back: nothing of the walk's is consumed, so the hop's
-     "hand the fragment back at the same dfrac" obligation is met by the
-     same [HF] that came in.
-
-     The [ents !! nm = Some i] premise is dirlookup's own answer, which
-     is what the hop's match is computed from -- so a caller inside
-     [ax_hop]'s fupd has it by construction. *)
-  Lemma era_dlookup_fire Γ (E : coPset)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
-      (av : aview) (d : Z) (dq : dfrac) (ents : gmap fname Z)
-      (nm : fname) (i : Z) :
-    ents !! nm = Some i ->
-    dlookup_commit Γ E Φ -∗ elend Γ d dq ents -∗ astate_q Γ (1/2) av ={E}=∗
-      astate_q Γ (1/2) av ∗ elend Γ d dq ents ∗ Φ av d nm i.
-  Proof.
-    intros Hnm. iIntros "Hcm HF Hst".
-    iDestruct (elend_astate_q with "Hst HF") as %(nl & Hav).
-    iMod ("Hcm" $! av d i nm ents nl with "[//] [//] Hst") as "[Hst HΦ]".
-    iModIntro. iFrame "Hst HF HΦ".
-  Qed.
-
-  (* =================================================================== *)
-  (*  2.  THE SUCCESS COMMIT'S PHASE 1                                    *)
-  (* =================================================================== *)
-
-  (* [acre_commit]'s first phase asks for [cre_pre av d nm ents nl i c],
-     which is THREE facts: the parent's row read as an [ADir] at the entry
-     map the walk lent, the name's absence from it, and the minted child's
-     row.  The first is the one only the lend can supply -- and it is
-     exactly what the [dv_half] fire could not -- so the era lend supplies
-     it and the [nl] the row carries is existential to the caller.  The
-     other two are the caller's own (dirlookup's miss and the mint's
-     observation) and are premises here. *)
-  Lemma era_acre_fire Γ (E : coPset) (c : absnode)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
-      (av : aview) (d i : Z) (dq : dfrac) (ents : gmap fname Z)
-      (nm : fname) :
-    ents !! nm = None ->
-    av !! i = Some (MkAnode c 1%nat) ->
-    acre_commit Γ E c Φ -∗ elend Γ d dq ents -∗ astate_q Γ (1/2) av ={E}=∗
-      elend Γ d dq ents ∗ astate_q Γ (1/2) av
-      ∗ (astate_q Γ (1/2) (delta_create d nm i c av) ={E}=∗
-         astate_q Γ (1/2) (delta_create d nm i c av) ∗ Φ av d nm i).
-  Proof.
-    intros Hnm Hi. iIntros "Hcm HF Hst".
-    iDestruct (elend_astate_q with "Hst HF") as %(nl & Hav).
-    iMod ("Hcm" $! av d i nm ents nl with "[%] Hst") as "[Hst Hph2]".
-    { rewrite /cre_pre. split; [exact Hav | split; [exact Hnm | exact Hi]]. }
-    iModIntro. iFrame "HF Hst Hph2".
-  Qed.
-
-  (* =================================================================== *)
-  (*  3.  THE ERA TWINS OF LANE W's TWO WALK PREDICATES                   *)
-  (* =================================================================== *)
-
-  (* [SpecSysMknodAU.mknod_walk_pre] with [dv_half] replaced by the era
-     lend and NOTHING else -- same one-shot fupd, same fetched-path
-     shape, same start rule.  When the nameiparent era walk lands, THIS is
-     the premise the syscall contract carries; the landed one stays for
-     the dv-firing walk until the retirement step.
-       THE START (lane C3): [FsAbsStart.um_start_of cw pl] -- ROOTINO on
-     an absolute fetch, the calling process's cwd inum [cw] on a relative
-     one; the syscall contract passes its block's [pv_cwi]. *)
+  (* THE PARENT-PREFIX ONE-SHOT: one fupd, universally quantified over the
+     fetched string, yielding the cursor at the start and one [ax_hop] per
+     parent element.
+       THE START: [FsAbsStart.um_start_of cw pl] -- ROOTINO on an absolute
+     fetch, the calling process's cwd inum [cw] on a relative one; the
+     syscall contract passes its block's [pv_cwi]. *)
   Definition mknod_walk_pre_era (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ) : iProp Σ :=
     (∀ (pl : list (bv 8)) (r : Z),
@@ -581,8 +472,7 @@ Section EraMknod.
            ∗ ax_hops_from (elend (fs_gamma_L γfs)) P Pmiss
                (mknod_parent_elems pl) (S k))))%I.
 
-  (* the same two seals lane W puts on its own pair, and for the same
-     reason (they are big-ops behind Definitions at syscall altitude) *)
+  (* sealed: they are big-ops behind Definitions at syscall altitude *)
 
 End EraMknod.
 
@@ -593,14 +483,9 @@ Global Typeclasses Opaque mknod_walk_pre_era mknod_walk_dead_era.
 (*      (was iris/FsAbsNparMknod.v, fused 2026-08-30)                      *)
 (* ===================================================================== *)
 
-(* FsAbsNparMknod.v -- THE LANE'S ACCEPTANCE TEST, DISCHARGED: lane W's two
-   walk predicates ([FsAbsEraMknod.mknod_walk_pre_era] /
-   [mknod_walk_dead_era]) are exactly what the nameiparent era walk's
+(* THE ACCEPTANCE TEST, DISCHARGED (was iris/FsAbsNparMknod.v): the two
+   walk predicates above are exactly what the nameiparent era walk's
    contract ([SpecNparEra]) consumes and produces.
-
-   Worklist: claude-notes/projects/fs-syscall-specs.md, lane A item (iii),
-   REMAINING item.  (WAS A LEAF, iris/FsAbsNparMknod.v, for the mirror's
-   reason; FUSED IN 2026-08-30, stub at the old name.)
 
    THREE FACTS, and two of them are [reflexivity].
 
@@ -612,11 +497,13 @@ Global Typeclasses Opaque mknod_walk_pre_era mknod_walk_dead_era.
        This is not a coincidence to be maintained: it is why the npar
        contract ranges over the parent prefix at all (FsAbsNpar's header).
 
-   (2) THE PRE.  [np_pre_of_mknod] fires lane W's one-shot at the string
-       the walk fetched and at [ROOTINO], which is what the absolute-path
-       scope of this contract pins the start to.  The two [ROOTINO]s --
-       [InodeInv.ROOTINO : mword 32], read off namex's [li a1,1], and
-       [FsImg.ROOTINO : Z], the image's -- agree by computation.
+   (2) THE PRE.  [np_pre_of_mknod] fires the one-shot at the string the
+       walk fetched and at [ROOTINO], which is where an ABSOLUTE fetch
+       starts.  The two [ROOTINO]s -- [InodeInv.ROOTINO : mword 32], read
+       off namex's [li a1,1], and [FsImg.ROOTINO : Z], the image's --
+       agree by computation.  [np_start_of_mknod] is the general form the
+       walk actually takes: the START INUM is the walk's to choose, so no
+       firing happens at all.
 
    (3) THE DEAD.  This one is NOT an identity, and the mismatch is worth
        recording rather than papering over.  [mknod_walk_dead_era] bounds
@@ -625,14 +512,12 @@ Global Typeclasses Opaque mknod_walk_pre_era mknod_walk_dead_era.
        type test and nlink guard at the PARENT's own level too
        ([FsAbsNpar]'s header, case (1)), and at [k = 0 = length ps] when
        the path has no elements at all (case (2)).  So the honest
-       statement is a DISJUNCTION: either lane W's predicate, or the
+       statement is a DISJUNCTION: either the predicate above, or the
        cursor at the parent index -- and the second alternative is exactly
-       [SpecSysMknodAU.mknod_post_fail]'s THIRD fold arm
-       ([exists d, P (length (mknod_parent_elems pl)) d * acre_commit *
-       (... \/ dlookup_commit)]), which a create that never got to
-       dirlink refunds anyway.  So mknod's post is dischargeable as it
-       stands; what is NOT true is that [mknod_walk_dead_era] alone covers
-       the walk's failures. *)
+       what [SpecCreateAU.cau_fail]'s walk-death arm carries, which a
+       create that never got to dirlink refunds anyway.  So mknod's post is
+       dischargeable as it stands; what is NOT true is that
+       [mknod_walk_dead_era] alone covers the walk's failures. *)
 
 Section NparMknod.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -767,9 +652,9 @@ Require Import TsoCtx.
    -- the same arithmetic [FsAbsOpenFire.opf_trunc_bytes] does at itrunc's
    own zeroing.
 
-   R10: neither [FsAbsMknodFire] nor [SpecSysMknodAU] moves.  The device
-   fire keeps its own name and its own proof; a caller that wants the
-   device instance is not asked to route through the general form.
+   The device fire keeps its own name and its own proof; a caller that
+   wants the device instance is not asked to route through the general
+   form.
 
    BINDERS: [FsAbsMknodFire]'s section list VERBATIM (which is
    [SpecSysMknodAU]'s) -- [fileG] is bound and [icacheG]/[icfg] resolve
@@ -860,7 +745,7 @@ Section CreateFire.
      arbitrary non-[ADir] [c]: same premises, same [ghost_map_update], same
      one [ftopN] critical section with the caller's two phases on either
      side of it, same payout.  The device instance is [mkf_acre_fire]
-     itself and is NOT rerouted through this (R10). *)
+     itself and is NOT rerouted through this. *)
   Lemma caf_acre_fire (γfs : fs_names) (E : coPset) (cf : Z -> Z -> absnode)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
