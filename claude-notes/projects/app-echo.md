@@ -823,7 +823,19 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   `cre_dots_leg` guarded by `T_DIR`, discharged once at create's taken
   directory branch, `cre_dots_unit` gone; B-trunc: the fresh arm's fired
   trunc receipt at `bs0 = []`, `socr_Phit_triv` gone.  No fire on any
-  dispatched path is paid from the license any more.
+  dispatched path is paid from the license any more.  STEP (i) LANDED
+  (`d4e1a388b`): `xfam` is one record over all nine contracts' families;
+  `sbundle_at` is one match on the number at the process's own input and
+  key (read/write at `fd_st_of_key`; the instance CurCtx-free at every
+  branch — more dead `{XI : CurCtx}` binders dropped on open's chain and
+  mkdir's, plus mkdir's dead capacity binders); the two supply laws hand
+  back `FsAbsInvFire`'s dischargers (write's console seed is the one bupd);
+  `sysc_exec_in` folded into the per-number `sysc_sys_in`; all eight fs
+  arms take their input from the deposit and drop the armed post they get
+  back.  `spost_at` stays `emp` until `ut_sys_out` is a post row: the
+  round's premise is PRODUCED by the loop and has no producer before that
+  row — turning the posts on first made `ProofUserretClosed` unprovable.
+  Remaining: (iii) the post row + the six real `spost_at` branches, B2.
 
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
