@@ -64,7 +64,7 @@
    both fires read the row off the SAME [top_frag], and sys_open holds it
    whole across the window (ilock ... filealloc/fdalloc ... itrunc), so the
    pre-row phase 1 sees IS the row the terminal observation saw.  The
-   caller's [Φt] receipt is delivered at that state.
+   caller's [Ft] receipt is delivered at that state.
 
    BINDERS: [FsAbsMknodFire]'s section list VERBATIM (which is
    [SpecSysMknodAU]'s) -- [fileG] is bound and [icacheG]/[icfg] resolve only
@@ -100,6 +100,7 @@ Require Import FsAbsMknodFire.   (* [mkf_abs_of_dir], [mkf_era_is_dir]      *)
 Require FsImg.                   (* [T_FILE_z], [ROOTINO] -- Require, NOT
                                     Import (SpecSysOpenAU's reason)         *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                 *)
 Require TsoCtx.   (* qualified: the class only, no notation flip *)
 
@@ -305,17 +306,19 @@ Section OpenFire.
   (* [mkf_dlookup_fire]'s mold, at the WHOLE row.  Any share suffices: the
      commit only reads. *)
   Lemma opf_open_fire `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset) (dq : dfrac)
-      (Φ : aview -> Z -> anode -> iProp Σ) (i : Z) (n : fs_node) :
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (i : Z) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     fn_type n <> 0 ->
     ftop_inv γfs -∗
-    aopen_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (aopen_commit_at (fs_gamma_L γfs) appE) Fo -∗
     top_frag_q (fs_gamma_L γfs) dq i n ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq i n
       ∗ ∃ av : aview,
-          ⌜arow_at av i (abs_row n)⌝ ∗ Φ av i (abs_row n).
+          ⌜arow_at av i (abs_row n)⌝ ∗ Fo.(pf_recv) av i (abs_row n).
   Proof.
     intros HE Hnz. iIntros "#Hi Hcm Hf".
+    (* THE PIECE IS SPENT: the fire eliminates to the AU side. *)
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     (* the same re-spelling [mkf_dlookup_fire] does, and for the same
        reason: the unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag_q /fs_gamma_L /=.
@@ -339,17 +342,17 @@ Section OpenFire.
   (* the [DfracOwn 1] reading, which is the spelling sys_open holds
      ([top_frag] whole, from its [ilock] to its [iunlock]) *)
   Lemma opf_open_fire_1 `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset)
-      (Φ : aview -> Z -> anode -> iProp Σ) (i : Z) (n : fs_node) :
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (i : Z) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     fn_type n <> 0 ->
     ftop_inv γfs -∗
-    aopen_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (aopen_commit_at (fs_gamma_L γfs) appE) Fo -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       top_frag (fs_gamma_L γfs) i n
       ∗ ∃ av : aview,
-          ⌜arow_at av i (abs_row n)⌝ ∗ Φ av i (abs_row n).
+          ⌜arow_at av i (abs_row n)⌝ ∗ Fo.(pf_recv) av i (abs_row n).
   Proof.
-    intros HE Hnz. rewrite top_frag_1. exact (opf_open_fire γfs E _ Φ i n HE Hnz).
+    intros HE Hnz. rewrite top_frag_1. exact (opf_open_fire γfs E _ Fo i n HE Hnz).
   Qed.
 
   (* =================================================================== *)
@@ -363,7 +366,7 @@ Section OpenFire.
      is the OBSERVED one -- the fragment is the same one the terminal
      observation read. *)
   Lemma opf_atrunc_fire `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset)
-      (Φ : aview -> Z -> list (bv 8) -> iProp Σ)
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (i : Z) (bs0 : list (bv 8)) (nl : nat) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
@@ -372,13 +375,14 @@ Section OpenFire.
     fn_type n' <> 0 ->
     abs_row n' = MkAnode (AFile []) nl ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    atrunc_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (atrunc_commit_at (fs_gamma_L γfs) appE) Ft -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ ∃ av : aview,
-          ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝ ∗ Φ av i bs0.
+          ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝ ∗ Ft.(pf_recv) av i bs0.
   Proof.
     intros HE Hloc Hnz Habs Hnz' Habs'. iIntros "#Hi #Hai Hcm Hf".
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".

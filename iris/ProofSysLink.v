@@ -140,6 +140,7 @@ Require Import ProofSysLinkTails.
    -- unlink's, because [FsAbsDelta.delta_link_untgt] IS [delta_unl_tgt]. *)
 Require Import FsAbsUnlinkFire.  (* [uf_nd_top]                           *)
 Require Import FsAbsLinkFire.    (* [lf_tgt_fire], [lf_ent_fire] + bridges *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.        (* LAST (FsAbs's own rule)               *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -761,13 +762,13 @@ Section ProofSysLinkBody.
       (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (Φtgt : aview -> Z -> anode -> iProp Σ)
-      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φuntgt : aview -> Z -> iProp Σ) :
+      (Ftgt : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Funtgt : pfam Σ (aview -> Z -> iProp Σ)) :
     wp_sys_link_sconf_body γf gs j gl pd pav pu
 
  dqb dqs dqbs v0 v1 pid U
-                           m K eb b lks Φtgt Φent Φuntgt.
+                           m K eb b lks Ftgt Fent Funtgt.
   Proof.
     cbv beta delta [wp_sys_link_sconf_body].
     intros pcE pj ret_tgt HK HdevR Hnib0 Hgeom Hsize
@@ -1994,14 +1995,14 @@ Section ProofSysLinkBody.
                           (Z2Nat.inj_add _ _ Hnn H01).
                   reflexivity. }
                 iApply fupd_wp.
-                iMod (lf_tgt_fire fsc_fs ⊤ Φtgt (bv_unsigned inum)
+                iMod (lf_tgt_fire fsc_fs ⊤ Ftgt (bv_unsigned inum)
                         (era_node dn bm dat) (era_node (sl_incnl dn) bm dat)
                         uf_nd_top Hlocnl Htynz0 Hokt
                         (lf_nlink_row dn (sl_incnl dn) bm dat Htynz
                            Hityi Hiszi Himaji Himini Hnlinc)
                         with "[] [] Hltgt Htop") as "[Htop Htgtr0]";
                   [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
-                iAssert (ltgt_fired Φtgt (bv_unsigned inum)) with "[Htgtr0]"
+                iAssert (ltgt_fired Ftgt (bv_unsigned inum)) with "[Htgtr0]"
                   as "Htgtr".
                 { rewrite /ltgt_fired.
                   iDestruct "Htgtr0" as (av) "(%Hav & %Hokav & HΦt)".
@@ -2459,7 +2460,7 @@ Section ProofSysLinkBody.
                                kd (qd/2)%Qp (qd/2)%Qp gyd lod tld dinum dnd bmd
                                n2 Sb2 e0 _ pid (DfracOwn (1/4)) dqb dqs
                                m Ug sp0 K eb b lks bn1 bw2 bo2
-                               (us_upt U P2) Φuntgt ltac:(exact Kil) ltac:(exact Kiupd)
+                               (us_upt U P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd)
                                ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                Hkk Hkd Hgeom Hsize Hbm0 Hbmcov
                                Hbmlog Hist0 Hiblk Hiblog Hinb
@@ -2874,7 +2875,7 @@ Section ProofSysLinkBody.
                                  n3 Sb3 (bool_decide (fsc_bmapstart ∈ Sb3)) false e0
                                  _ pid (DfracOwn (1/4)) dqb dqs
                                  m mdl sp0 K eb b lks bn1 bw2 bo2
-                                 (us_upt U P2) Φuntgt ltac:(exact Kil) ltac:(exact Kiupd)
+                                 (us_upt U P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd)
                                  ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                  Hkk Hkd Hgeom Hsize Hbm0 Hbmcov
                                  Hbmlog Hist0 Hiblk Hiblog Hinb
@@ -3228,7 +3229,7 @@ Section ProofSysLinkBody.
                                          Hdiok')))))).
                             rewrite Hlow16u in Hparentrow.
                             iApply fupd_wp.
-                            iMod (lf_ent_fire fsc_fs ⊤ Φent
+                            iMod (lf_ent_fire fsc_fs ⊤ Fent
                                     (bv_unsigned dinum) (bv_unsigned inum)
                                     (bname 14 nf)
                                     (era_node dnd bmd datd)
@@ -3241,7 +3242,7 @@ Section ProofSysLinkBody.
                                     with "[] [] Hlent Htopd")
                               as "[Htopd Hentr0]";
                               [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
-                            iAssert (lent_fired Φent (bv_unsigned dinum)
+                            iAssert (lent_fired Fent (bv_unsigned dinum)
                                        (bname 14 nf) (bv_unsigned inum))
                               with "[Hentr0]" as "Hentr".
                             { rewrite /lent_fired.
@@ -3808,7 +3809,7 @@ Section ProofSysLinkBody.
                                       n3 Sb3 (bool_decide (fsc_bmapstart ∈ Sb3)) false e0
                                       _ pid (DfracOwn (1/4)) dqb dqs
                                       m mdl sp0 K eb b lks bn1 bw2 bo2
-                                      (us_upt U P2) Φuntgt ltac:(exact Kil) ltac:(exact Kiupd)
+                                      (us_upt U P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd)
                                       ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                       Hkk Hkd Hgeom Hsize Hbm0 Hbmcov
                                       Hbmlog Hist0 Hiblk Hiblog Hinb
@@ -3903,7 +3904,7 @@ Section ProofSysLinkBody.
                              (di_type (sl_incnl dn)) c2 Sb2
                              _ pid (DfracOwn (1/4)) dqb dqs
                              m T3 sp0 K eb b lks bn1 bw2 bo2
-                             (us_upt U P2) Φuntgt ltac:(exact Kil) ltac:(exact Kiupd) ltac:(exact Kiup)
+                             (us_upt U P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd) ltac:(exact Kiup)
                              ltac:(exact Keo) K38 Kpop Hkk Hgeom
                              Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb
                              Hcovb Hmem2'

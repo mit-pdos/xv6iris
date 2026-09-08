@@ -105,6 +105,7 @@ Require Import SpecSysOpen.   (* the ONE contract: the frame, the arms, [SYSOPEN
 Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUWalk.
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -194,12 +195,12 @@ Section ProofSysOpenAUBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
-      (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     wp_sys_open_plain_body gfl gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v vom
-                           pid U sts m K eb b lks P Pmiss Φo Φt.
+                           pid U sts m K eb b lks P Pmiss Fo Ft.
   Proof.
     cbv beta zeta delta [wp_sys_open_plain_body wp_sys_open_frame].
     intros Hncr HK HdevR Hnib0 Hgeom Hsize
@@ -687,7 +688,7 @@ Section ProofSysOpenAUBody.
         assert (Ha0m1 : (mf !!! Regidx Ra0 : mword 64)
                         = (mword_of_int (-1) : mword 64))
           by (rewrite Ha0f; exact HR2a0).
-        iApply (so_arm_unspent gf (proc_addr j) pid vom P Pmiss Φo Φt _ sts
+        iApply (so_arm_unspent gf (proc_addr j) pid vom P Pmiss Fo Ft _ sts
                   (mf !!! Regidx Ra0 : mword 64) Ha0m1
                   with "Hpriv Hfrag Hfds [Hwp Hoc Htc]").
         rewrite /open_au_pre_plain. iFrame "Hwp Hoc Htc". } }
@@ -831,7 +832,7 @@ Section ProofSysOpenAUBody.
     iAssert (wp_next (CID0 := CID21) true (proc_addr j)
                (so_cont0_au gf
  ns dqb dqs dqbs dqn (proc_addr j) pid vom
-                         (us_upt U P') sts P Pmiss Φo Φt m K eb b lks))
+                         (us_upt U P') sts P Pmiss Fo Ft m K eb b lks))
       with "[Hcont]" as "Hcont0".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
       iEval (rewrite /so_cont0_au). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -871,7 +872,7 @@ Section ProofSysOpenAUBody.
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
                 pid dqb dqs dqbs dqn (us_upt U P') sts m S2 sp0 K eb b lks
                 u4 u5 u6 u24
-                vom P Pmiss Φo Φt
+                vom P Pmiss Fo Ft
                 HKfull HdevR Hnib0 Hgeom Hsize Hbm0
                 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hpk Hni1 Hni2
                 Hni3 Hush Hprkc Hnsb Hj Hgl Heb Hlkempty eq_refl Hal23

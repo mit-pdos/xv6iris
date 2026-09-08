@@ -118,7 +118,7 @@
 
    [dmiss_commit_at] is new in [dlookup_commit_at]'s single-phase mold:
    mknod's miss was its success path; unlink's is a failure the kernel
-   OBSERVED, so it gets a fired receipt.  [Φtgt] is binary
+   OBSERVED, so it gets a fired receipt.  [Ftgt]'s receipt is binary
    ([aview -> Z -> iProp]) because instant 2 has no name in hand (the
    name buffer is dead by then) and no parent.
 
@@ -183,6 +183,7 @@ Require Import FsAbsEraMknod.   (* the era walk-premise pair, reused
                                    verbatim (nameiparent-generic) *)
 Require Import FsAbsMknodFire.  (* [dlookup_commit_at]; the [_at] mold *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.

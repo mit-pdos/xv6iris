@@ -61,7 +61,7 @@
       the enriched trap contract, which is what lets the kernel return
       the enriched slot rather than the plain one (UexecRetExec.v header:
       [uslot W -∗ uslot_x W] is not provable).  The caller receives its own
-      observation receipt [Φo av i (AFile f)] first, so the WP it owes is
+      observation receipt [Fo av i (AFile f)] first, so the WP it owes is
       only for the file it observed: init, whose receipt says
       [f = sh_bytes], owes only sh's start WP at sh's key.
 
@@ -203,7 +203,7 @@
       one-shot, fired at phase A's namei site ([ProofKexecAUA]).
    2. THE OBSERVATION: [FsAbsOpenFire.opf_open_fire] (the whole-[anode]
       fire off the lock window's [top_frag]) at the header-oracle hook of
-      phase A, delivering [Φo]'s receipt.
+      phase A, delivering [Fo]'s receipt.
    3. THE BYTES: each readi's [rd_bytes data off] IS a window of the
       observed [f] ([era_node]'s [fn_file_bytes] = [file_byte data] over
       the size), so the header the commit block reads, the program
@@ -279,6 +279,7 @@ Require Import FsAbsEra.        (* [ax_hops_triv]: the trivial hop family  *)
 Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [open_walk_dead_era],
                                    [aopen_commit_at] -- REUSED, see header  *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule)                   *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ                  *)
 From Kernel Require KernelSyms.
@@ -537,9 +538,9 @@ Section KexecAU.
 
   (* THE CALLER'S WP (header, IN 3): handed its own receipt for the node
      kexec read, and told the file is loadable and which key kexec built,
-     the caller supplies the slot at that key.  [Φo] is the observation
+     the caller supplies the slot at that key.  [Fo] is the observation
      receipt's shape ([aopen_commit_at]'s), so a caller pins the file it
-     is willing to answer for through [Φo] -- init answers only for
+     is willing to answer for through [Fo] -- init answers only for
      [f = sh_bytes], with sh's start WP. *)
   Definition exec_slot_pre (S : uvis -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
@@ -552,14 +553,21 @@ Section KexecAU.
        S W')%I.
 
   (* everything the caller hands in *)
-  Definition exec_au_pre (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
+  (* Everything the caller hands in.  Both one-shot pieces arrive as their
+     AU conjoined with their own refund, the pair being [PieceFam.pfam]:
+     [Fo] is the terminal observation's receipt beside its refund, [Fs] is
+     the SLOT's -- the caller's own WP is that piece's "receipt", so the
+     slot wand's payload and its refund pair exactly as an observation's
+     do.  The walk's cursor pair stays bare. *)
+  Definition exec_au_pre (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
+      (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
     (open_walk_pre_era γfs cw P Pmiss
-     ∗ aopen_commit_at Γ appE Φo
-     ∗ exec_slot_pre S Φo na alen afun sts)%I.
+     ∗ pf_at (aopen_commit_at Γ appE) Fo
+     ∗ pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts) Fs)%I.
 
   (* THE BUNDLE A CALLER THAT TRACKS NOTHING HANDS IN, and it is free:
      every hop says yes at a [True] cursor, the observation hands the
@@ -572,16 +580,20 @@ Section KexecAU.
   Lemma exec_au_pre_triv Γ (γfs : fs_names) (cw : Z)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
-    ⊢ exec_au_pre (fun _ => emp%I) Γ γfs cw
-        (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I)
+    ⊢ exec_au_pre (MkPfam (fun _ => emp%I) True%I) Γ γfs cw
+        (fun _ _ => True%I) (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I))
         na alen afun sts.
   Proof.
     rewrite /exec_au_pre. iSplitR.
     { rewrite /open_walk_pre_era. iIntros (pl r) "_". iModIntro.
       iSplit; [done |]. iApply ax_hops_triv. }
     iSplitR.
-    { rewrite /aopen_commit_at. iIntros (I i a) "%Hi Ha".
+    { iApply pf_at_triv. rewrite /aopen_commit_at. iIntros (I i a) "%Hi Ha".
       iModIntro. by iFrame "Ha". }
+    (* the slot's pair is not the trivial one -- its receipt is [emp], not
+       [True] -- so its two halves are split here rather than by
+       [pf_at_triv]. *)
+    rewrite /pf_at /=. iSplit; [| done].
     rewrite /exec_slot_pre. by iIntros (av i f nl W') "_ _ _".
   Qed.
 
@@ -596,17 +608,20 @@ Section KexecAU.
     exec_slot_pre S Φo na alen afun sts ≡{n}≡ exec_slot_pre S' Φo na alen afun sts.
   Proof. intros HS. rewrite /exec_slot_pre. solve_proper. Qed.
 
-  Lemma exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) Γ (γfs : fs_names) (cw : Z)
+  (* ...and at the PAIR the bundle takes: the refund does not move with the
+     fixpoint, so it is an ordinary binder here. *)
+  Lemma exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
+      Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
     S ≡{n}≡ S' ->
-    exec_au_pre S Γ γfs cw P Pmiss Φo na alen afun sts
-    ≡{n}≡ exec_au_pre S' Γ γfs cw P Pmiss Φo na alen afun sts.
+    exec_au_pre (MkPfam S Rs) Γ γfs cw P Pmiss Fo na alen afun sts
+    ≡{n}≡ exec_au_pre (MkPfam S' Rs) Γ γfs cw P Pmiss Fo na alen afun sts.
   Proof.
-    intros HS. rewrite /exec_au_pre.
-    by rewrite (exec_slot_pre_ne n S S' Φo na alen afun sts HS).
+    intros HS. rewrite /exec_au_pre /pf_at. cbn [pf_recv pf_refund].
+    by rewrite (exec_slot_pre_ne n S S' Fo.(pf_recv) na alen afun sts HS).
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -616,8 +631,9 @@ Section KexecAU.
   (* ret = argc (header, OUT): the walk completed at [i], a FILE was
      observed there, the landed success conjuncts hold at its entry, and
      the slot is the caller's (a) or the generic mint's (b). *)
-  Definition exec_post_ok (S : uvis -> iProp Σ) Γ (P : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+  Definition exec_post_ok (Fs : pfam Σ (uvis -> iProp Σ)) Γ
+      (P : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U U' : ustate) (r : mword 64) : iProp Σ :=
     (∃ (pl : list (bv 8)) (i : Z) (av : aview) (a : anode),
@@ -631,7 +647,7 @@ Section KexecAU.
            ⌜kexec_loadable f⌝ ∗
            ⌜kexec_ok_exec f (us_V U) (us_V U') r na alen⌝ ∗
            ⌜kexec_image_ok f na alen afun sts (exec_key U' sts na)⌝ ∗
-           S (exec_key U' sts na))
+           Fs.(pf_recv) (exec_key U' sts na))
         ∨ (* (b) anything else the code accepted (header): the landed
              success conjuncts at some entry, the receipt and the WP
              premise back *)
@@ -639,53 +655,58 @@ Section KexecAU.
          ⌜exists (entry spv szv' : mword 64),
             r <> (mword_of_int (-1) : mword 64)
             /\ kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝ ∗
-         Φo av i a ∗
-         exec_slot_pre S Φo na alen afun sts)))%I.
+         Fo.(pf_recv) av i a ∗
+         pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts) Fs)))%I.
 
   (* ret = -1 (header, OUT): the three-way fold of the bundle *)
-  Definition exec_post_fail (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
+  Definition exec_post_fail (Fs : pfam Σ (uvis -> iProp Σ)) Γ
+      (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
     ((* (i) nothing fs-visible happened *)
-     exec_au_pre S Γ γfs cw P Pmiss Φo na alen afun sts
+     exec_au_pre Fs Γ γfs cw P Pmiss Fo na alen afun sts
      ∨ (∃ pl : list (bv 8),
           (* (ii) the walk died at some hop: the era refund shape *)
           (open_walk_dead_era γfs P Pmiss pl
-             ∗ aopen_commit_at Γ appE Φo
-             ∗ exec_slot_pre S Φo na alen afun sts)
+             ∗ pf_at (aopen_commit_at Γ appE) Fo
+             ∗ pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts)
+                 Fs)
           ∨ (* (iii) the walk completed and the node was observed; exec
                failed past the lock, and the arm says WHY (header,
                LOADABLE MEANS SUCCESS): not a loadable file, the
                arguments did not fit, or out of memory *)
           (∃ (i : Z) (av : aview) (a : anode) (c : exec_fail_cause),
              P (length (path_elems pl)) i
-             ∗ ⌜arow_at av i a⌝ ∗ Φo av i a
+             ∗ ⌜arow_at av i a⌝ ∗ Fo.(pf_recv) av i a
              ∗ ⌜exec_fail_ok a na alen c⌝
-             ∗ exec_slot_pre S Φo na alen afun sts)))%I.
+             ∗ pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts)
+                 Fs)))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, beside
      the landed result relation's own failure equation *)
-  Definition exec_arms (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
+  Definition exec_arms (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
+      (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U U' : ustate) (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U /\ us_M U' = us_M U⌝
-      ∗ exec_post_fail S Γ γfs cw P Pmiss Φo na alen afun sts)
-     ∨ exec_post_ok S Γ P Φo na alen afun sts U U' r)%I.
+      ∗ exec_post_fail Fs Γ γfs cw P Pmiss Fo na alen afun sts)
+     ∨ exec_post_ok Fs Γ P Fo na alen afun sts U U' r)%I.
 
   (* SANITY: the arms imply the landed result relation, so the parallel
      form never contradicts [SpecKexec.kexec_ok] -- the failure arm is the
      landed one on the nose, the success arm's pure conjunct IS the landed
      success arm at the file's entry. *)
-  Lemma exec_arms_landed (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
+  Lemma exec_arms_landed (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
+      (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U U' : ustate) (r : mword 64) :
-    exec_arms S Γ γfs cw P Pmiss Φo na alen afun sts U U' r ⊢
+    exec_arms Fs Γ γfs cw P Pmiss Fo na alen afun sts U U' r ⊢
       ⌜exists (entry spv szv' : mword 64),
          kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝.
   Proof.
@@ -808,7 +829,7 @@ Definition wp_kexec_frame
 Definition wp_kexec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (S : uvis -> iProp Σ)
+    (Fs : pfam Σ (uvis -> iProp Σ))
     (gs : list gname) (jp : nat) (gl : gname)
     (pd pav pu : mword 64)
     (gf : gname)
@@ -821,12 +842,12 @@ Definition wp_kexec_sconf_body
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (P Pmiss : nat -> Z -> iProp Σ)
-    (Φo : aview -> Z -> anode -> iProp Σ) :=
+    (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :=
   let Γfs := fs_gamma_L fsc_fs in
   wp_kexec_frame gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
     pidv U dqb dqs dqa dqpv dqas m K eb b lks
-    (exec_au_pre S Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts)
-    (exec_arms S Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts U).
+    (exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts)
+    (exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U).
 
 (* ===================================================================== *)
 (*  4.  THE SEAL                                                          *)
@@ -836,7 +857,7 @@ Module Type KEXEC.
   Parameter wp_kexec_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (S : uvis -> iProp Σ)
+      (Fs : pfam Σ (uvis -> iProp Σ))
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gf : gname)
@@ -849,7 +870,7 @@ Module Type KEXEC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ),
-      wp_kexec_sconf_body S gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
-        pidv U sts dqb dqs dqa dqpv dqas m K eb b lks P Pmiss Φo.
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)),
+      wp_kexec_sconf_body Fs gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
+        pidv U sts dqb dqs dqa dqpv dqas m K eb b lks P Pmiss Fo.
 End KEXEC.

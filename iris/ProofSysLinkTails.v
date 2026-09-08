@@ -108,6 +108,7 @@ Require Import AppInv.           (* [appE]: the commit mask               *)
 Require Import SpecSysUnlinkAU.  (* [utgt_commit_at]                      *)
 Require Import FsAbsUnlinkFire.  (* [uf_utgt_fire], [uf_nlink_row], [uf_nd_top] *)
 Require Import SpecSysLink.      (* [luntgt_fired]                        *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.        (* LAST (FsAbs's own rule)               *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -1048,7 +1049,7 @@ Section ProofSysLinkTails.
       (b : bool) (lks : gset string)
       (bnm bw bo : nat -> bv 8) (Upr : ustate)
       (* the undo's receipt family (round E2, lane E2-L) *)
-      (Φuntgt : aview -> Z -> iProp Σ) :
+      (Funtgt : pfam Σ (aview -> Z -> iProp Σ)) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
@@ -1109,7 +1110,7 @@ Section ProofSysLinkTails.
     FsStateLink.link_tok (fs_gamma_L fsc_fs) (bv_unsigned inum) uty -∗
     (* ...AND THE COMMIT THAT INSTANT SPENDS (round E2, lane E2-L): the
        count-down IS unlink's target step, so this is [utgt_commit_at]. *)
-    utgt_commit_at (fs_gamma_L fsc_fs) appE Φuntgt -∗
+    pf_at (utgt_commit_at (fs_gamma_L fsc_fs) appE) Funtgt -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
@@ -1145,7 +1146,7 @@ Section ProofSysLinkTails.
         bslots 3 -∗
         iref_slot -∗
         (* ...and the undo's receipt (round E2, lane E2-L) *)
-        luntgt_fired Φuntgt (bv_unsigned inum) -∗
+        luntgt_fired Funtgt (bv_unsigned inum) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1478,12 +1479,12 @@ Section ProofSysLinkTails.
                        (sl_setnl_size dn (sl_ndec (di_nlink dn)))
                        Hmaj' Hmin' Hnldec).
     iApply fupd_wp.
-    iMod (uf_utgt_fire fsc_fs ⊤ Φuntgt (bv_unsigned inum)
+    iMod (uf_utgt_fire fsc_fs ⊤ Funtgt (bv_unsigned inum)
             (era_node dn bm dat) (era_node dn' bm dat)
             uf_nd_top Hloc' Hnl1 Hrow' Htynz0
             with "[] [] Hcmun Htop") as "[Htop Huntgt]";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
-    iAssert (luntgt_fired Φuntgt (bv_unsigned inum)) with "[Huntgt]"
+    iAssert (luntgt_fired Funtgt (bv_unsigned inum)) with "[Huntgt]"
       as "Huntgt".
     { rewrite /luntgt_fired. iDestruct "Huntgt" as (av) "[%Hav HΦu]".
       iExists av, (abs_row (era_node dn bm dat)).
@@ -1748,7 +1749,7 @@ Section ProofSysLinkTails.
       (b : bool) (lks : gset string)
       (bnm bw bo : nat -> bv 8) (Upr : ustate)
       (* the undo's receipt family (round E2, lane E2-L) *)
-      (Φuntgt : aview -> Z -> iProp Σ) :
+      (Funtgt : pfam Σ (aview -> Z -> iProp Σ)) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
@@ -1822,7 +1823,7 @@ Section ProofSysLinkTails.
     FsStateLink.link_tok (fs_gamma_L fsc_fs) (bv_unsigned inum) uty -∗
     (* ...AND THE COMMIT THAT INSTANT SPENDS (round E2, lane E2-L): the
        count-down IS unlink's target step, so this is [utgt_commit_at]. *)
-    utgt_commit_at (fs_gamma_L fsc_fs) appE Φuntgt -∗
+    pf_at (utgt_commit_at (fs_gamma_L fsc_fs) appE) Funtgt -∗
     (* ---- the PARENT, still locked ---- *)
     sleeplocked_q gisld sd (i_lock (ientry kd)) pidv -∗
     ⌜(loyd <= tlyd)%nat⌝ -∗
@@ -1875,7 +1876,7 @@ Section ProofSysLinkTails.
         bslots 3 -∗
         iref_slots 2 -∗
         (* ...and the undo's receipt, relayed from [sl_tail_bad] *)
-        luntgt_fired Φuntgt (bv_unsigned inum) -∗
+        luntgt_fired Funtgt (bv_unsigned inum) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1978,7 +1979,7 @@ Section ProofSysLinkTails.
               gil gisl
               kk qi s gy loy tly inum ty u1 Sb1 uty pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
-              Upr Φuntgt HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
+              Upr Funtgt HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
@@ -2035,7 +2036,7 @@ Section ProofSysLinkTails.
       (b : bool) (lks : gset string)
       (bnm bw bo : nat -> bv 8) (Upr : ustate)
       (* the undo's receipt family (round E2, lane E2-L) *)
-      (Φuntgt : aview -> Z -> iProp Σ) :
+      (Funtgt : pfam Σ (aview -> Z -> iProp Σ)) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
@@ -2108,7 +2109,7 @@ Section ProofSysLinkTails.
     FsStateLink.link_tok (fs_gamma_L fsc_fs) (bv_unsigned inum) uty -∗
     (* ...AND THE COMMIT THAT INSTANT SPENDS (round E2, lane E2-L): the
        count-down IS unlink's target step, so this is [utgt_commit_at]. *)
-    utgt_commit_at (fs_gamma_L fsc_fs) appE Φuntgt -∗
+    pf_at (utgt_commit_at (fs_gamma_L fsc_fs) appE) Funtgt -∗
     (* ---- the PARENT, still locked ---- *)
     sleeplocked_q gisld sd (i_lock (ientry kd)) pidv -∗
     ⌜(loyd <= tlyd)%nat⌝ -∗
@@ -2161,7 +2162,7 @@ Section ProofSysLinkTails.
         bslots 3 -∗
         iref_slots 2 -∗
         (* ...and the undo's receipt, relayed from [sl_tail_bad] *)
-        luntgt_fired Φuntgt (bv_unsigned inum) -∗
+        luntgt_fired Funtgt (bv_unsigned inum) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2284,7 +2285,7 @@ Section ProofSysLinkTails.
               gil gisl
               kk qi s gy loy tly inum ty u1 Sb1 uty pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
-              Upr Φuntgt HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
+              Upr Funtgt HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv

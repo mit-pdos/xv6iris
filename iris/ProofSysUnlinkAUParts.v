@@ -86,6 +86,7 @@ Require Import ProofSysUnlink.   (* the top-level pure layer; see header   *)
 Require Import FsAbsMknodFire.
 Require Import SpecSysUnlinkAU.
 Require Import FsAbsUnlinkFire.
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.

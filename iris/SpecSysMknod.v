@@ -216,6 +216,7 @@ Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.   (* [dev_arg]: the device numbers' reading *)
 Require Import FsAbsMknodFire.   (* the commits and the walk premise     *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)              *)
 Require Import PathElems.        (* [path_elems]                         *)
 Import Defs.
@@ -249,13 +250,13 @@ Section SysMknod.
   (* everything the AU caller hands in, at the commit mask [appE] *)
   Definition mknod_au_pre Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (mknod_walk_pre_era γfs cw P Pmiss
-     ∗ acre_commit_at Γ appE (ADev ma mi) Φok
-     ∗ dlookup_commit_at Γ appE Φex
+     ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+     ∗ pf_at (dlookup_commit_at Γ appE) Fex
      (* ...and the CHILD's two legs, unfired *)
-     ∗ cre_child_unfired Γ (ADev ma mi) Φarm Φun)%I.
+     ∗ cre_child_unfired Γ (ADev ma mi) Farm Fun)%I.
 
   (* ret 0's real arm: create's ARM C-OK read at [T_DEVICE]
      ([SpecCreate.cre_ok_arms_dev]) at the fetched path, beside the region
@@ -263,29 +264,29 @@ Section SysMknod.
      device type the found arm cannot succeed ([cre_made_of_ne_file]), so
      the fresh arm is the only one a zero return can come from. *)
   Definition mknod_post_ok Γ (ma mi : Z) (P : nat -> Z -> iProp Σ)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (∃ (pl : list (bv 8)) (i : Z),
        ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
        ∃ (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z) (nl : nat),
          ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
          ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
          P (length (mknod_parent_elems pl)) d ∗
-         dlookup_commit_at Γ appE Φex ∗
-         Φok av d nm i ∗
+         pf_at (dlookup_commit_at Γ appE) Fex ∗
+         Fok.(pf_recv) av d nm i ∗
          (* ...AND THE CHILD'S OWN LEG: the row APPEARED at this inum before
             the parent's entry went in, so the ARM's receipt rides beside
             [cre_pre]; the UNARM comes home unfired. *)
-         cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun)%I.
+         cre_arm_fired Farm i ∗ pf_at (aunarm_commit_at Γ appE) Fun)%I.
 
   (* ret -1's two-way fold: nothing fs-visible happened (argstr failed)
      and the whole bundle comes back, or create's own failure fold (the
      walk died, or create failed at the parent). *)
   Definition mknod_post_fail Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    (mknod_au_pre Γ γfs cw ma mi P Pmiss Φarm Φun Φok Φex
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
+    (mknod_au_pre Γ γfs cw ma mi P Pmiss Farm Fun Fok Fex
      ∨ (∃ pl : list (bv 8),
           (* create's own failure fold read at [T_DEVICE]
              ([SpecCreate.cre_fail_arms_dev]): the walk died and everything
@@ -293,21 +294,21 @@ Section SysMknod.
              fired (ARM F-BAD) or not, and the child's legs whole or the
              do-then-undo PAIR (ruling Q-h). *)
           ((mknod_walk_dead_era γfs P Pmiss pl
-              ∗ acre_commit_at Γ appE (ADev ma mi) Φok
-              ∗ dlookup_commit_at Γ appE Φex
-              ∗ cre_child_unfired Γ (ADev ma mi) Φarm Φun)
+              ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+              ∗ pf_at (dlookup_commit_at Γ appE) Fex
+              ∗ cre_child_unfired Γ (ADev ma mi) Farm Fun)
            ∨ (∃ d : Z,
                 P (length (mknod_parent_elems pl)) d
-                ∗ acre_commit_at Γ appE (ADev ma mi) Φok
+                ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
                 ∗ ((∃ (av : aview) (i : Z) (nm : fname)
                       (ents : gmap fname Z) (nl : nat),
                       ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
                       ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                       ⌜ents !! nm = Some i⌝ ∗
-                      Φex av d nm i)
-                   ∨ dlookup_commit_at Γ appE Φex)
-                ∗ (cre_child_unfired Γ (ADev ma mi) Φarm Φun
-                   ∨ ∃ i : Z, cre_child_pair Φarm Φun i)))))%I.
+                      Fex.(pf_recv) av d nm i)
+                   ∨ pf_at (dlookup_commit_at Γ appE) Fex)
+                ∗ (cre_child_unfired Γ (ADev ma mi) Farm Fun
+                   ∨ ∃ i : Z, cre_child_pair Farm Fun i)))))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0.  NO
      ESCAPE on the [ret = 0] arm: the walk takes the relative start, so a
@@ -315,22 +316,22 @@ Section SysMknod.
      the header. *)
   Definition mknod_arms Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (r : mword 64) : iProp Σ :=
     ((⌜r = (zero_reg : mword 64)⌝
-      ∗ mknod_post_ok Γ ma mi P Φarm Φun Φok Φex)
+      ∗ mknod_post_ok Γ ma mi P Farm Fun Fok Fex)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ mknod_post_fail Γ γfs cw ma mi P Pmiss Φarm Φun Φok Φex))%I.
+        ∗ mknod_post_fail Γ γfs cw ma mi P Pmiss Farm Fun Fok Fex))%I.
 
   (* the return blanket, read off the arms: the arms already split on the
      two words a0 can hold, so the blanket is a consequence and not a
      second conjunct of the continuation *)
   Lemma mknod_arms_ret Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) (r : mword 64) :
-    mknod_arms Γ γfs cw ma mi P Pmiss Φarm Φun Φok Φex r ⊢ ⌜sys_mknod_ret r⌝.
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) (r : mword 64) :
+    mknod_arms Γ γfs cw ma mi P Pmiss Farm Fun Fok Fex r ⊢ ⌜sys_mknod_ret r⌝.
   Proof.
     rewrite /mknod_arms /sys_mknod_ret.
     iIntros "[[%Hr _] | [%Hr _]]"; iPureIntro; [left | right]; exact Hr.
@@ -385,25 +386,32 @@ Section SysMknod.
       : aview -> Z -> fname -> Z -> iProp Σ :=
     fun av d nm i => (⌜arun av root ps ds⌝ ∗ Φ av d nm i)%I.
 
+  (* ...and the PAIR the arms are read at: the run rides the RECEIPT, the
+     refund is the client's own (the enrichment costs it nothing). *)
+  Definition mkr_fam (root : Z) (ps : list fname) (ds : list Z)
+      (F : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ) :=
+    MkPfam (mkr_recv root ps ds F.(pf_recv)) F.(pf_refund).
+
   (* ret 0: [mknod_post_ok] with the cursor gone (the stable form owes
      the walk nothing -- see the derivation) and the instant's run stated
      purely beside the client's own receipt.  The lookup commit comes back
-     AT THE CLIENT'S OWN [Φex], not at the enriched one: the enrichment is
+     AT THE CLIENT'S OWN [Fex], not at the enriched one: the enrichment is
      a conjunct, so the refund weakens back. *)
   Definition mknod_stable_ok Γ (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
        (ents : gmap fname Z) (nl : nat),
        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
        ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
        ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜arun av root ps ds⌝ ∗
-       dlookup_commit_at Γ appE Φex ∗
-       Φok av d nm i ∗
+       pf_at (dlookup_commit_at Γ appE) Fex ∗
+       Fok.(pf_recv) av d nm i ∗
        (* the child's row APPEARED at this inum *)
-       cre_arm_fired Φarm i ∗ aunarm_commit_at Γ appE Φun)%I.
+       cre_arm_fired Farm i ∗ pf_at (aunarm_commit_at Γ appE) Fun)%I.
 
   (* ret -1: TWO arms where the AU form has three folds, and the collapse
      is the cursor's disappearance -- "the walk died at hop k" and "nothing
@@ -413,36 +421,37 @@ Section SysMknod.
      exists-observation fired at a name the parent already held. *)
   Definition mknod_stable_fail Γ (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    ((acre_commit_at Γ appE (ADev ma mi) Φok ∗ dlookup_commit_at Γ appE Φex
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
+    ((pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+      ∗ pf_at (dlookup_commit_at Γ appE) Fex
       (* the child's legs: whole, or the do-then-undo PAIR (ruling Q-h) --
          "nothing fired" and "the walk died" collapse into one arm here, and
          the [fail:] tail lands in it too *)
-      ∗ (cre_child_unfired Γ (ADev ma mi) Φarm Φun
-         ∨ ∃ ic : Z, cre_child_pair Φarm Φun ic))
+      ∗ (cre_child_unfired Γ (ADev ma mi) Farm Fun
+         ∨ ∃ ic : Z, cre_child_pair Farm Fun ic))
      ∨ (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
           (ents : gmap fname Z) (nl : nat),
           ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
           ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
           ⌜ents !! nm = Some i⌝ ∗
           ⌜arun av root ps ds⌝ ∗
-          acre_commit_at Γ appE (ADev ma mi) Φok ∗
-          Φex av d nm i
+          pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok ∗
+          Fex.(pf_recv) av d nm i
           (* ...and the child's legs: whole, or the do-then-undo PAIR
              (ruling Q-h) *)
-          ∗ (cre_child_unfired Γ (ADev ma mi) Φarm Φun
-             ∨ ∃ ic : Z, cre_child_pair Φarm Φun ic)))%I.
+          ∗ (cre_child_unfired Γ (ADev ma mi) Farm Fun
+             ∨ ∃ ic : Z, cre_child_pair Farm Fun ic)))%I.
 
   Definition mknod_stable_arms Γ (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (r : mword 64) : iProp Σ :=
     ((⌜r = (zero_reg : mword 64)⌝
-      ∗ mknod_stable_ok Γ ma mi root ps ds Φarm Φun Φok Φex)
+      ∗ mknod_stable_ok Γ ma mi root ps ds Farm Fun Fok Fex)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ mknod_stable_fail Γ ma mi root ps ds Φarm Φun Φok Φex))%I.
+        ∗ mknod_stable_fail Γ ma mi root ps ds Farm Fun Fok Fex))%I.
 
 End SysMknod.
 
@@ -616,15 +625,15 @@ Definition wp_sys_mknod_body
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (P Pmiss : nat -> Z -> iProp Σ)
-    (Φarm Φun : aview -> Z -> iProp Σ)
-    (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
+    (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+    (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :=
   let Γfs := fs_gamma_L fsc_fs in
   let ma := dev_arg v1 in
   let mi := dev_arg v2 in
   wp_sys_mknod_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v0 v1 v2 pid U m K eb b lks
-    (mknod_au_pre Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Φarm Φun Φok Φex)
-    (mknod_arms Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Φarm Φun Φok Φex).
+    (mknod_au_pre Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Farm Fun Fok Fex)
+    (mknod_arms Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Farm Fun Fok Fex).
 
 (* ===================================================================== *)
 (*  THE STABLE COROLLARY'S BODY                                           *)
@@ -659,8 +668,8 @@ Definition wp_sys_mknod_stable_body
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (root : Z) (avc : aview) (ds : list Z) (ps : list fname)
-    (Φarm Φun : aview -> Z -> iProp Σ)
-    (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
+    (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+    (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :=
   let Γfs := fs_gamma_L fsc_fs in
   let ma := dev_arg v1 in
   let mi := dev_arg v2 in
@@ -668,10 +677,10 @@ Definition wp_sys_mknod_stable_body
   wp_sys_mknod_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v0 v1 v2 pid U m K eb b lks
     (mkr_chain Γfs avc ds ps
-     ∗ acre_commit_at Γfs appE (ADev ma mi) Φok
-     ∗ dlookup_commit_at Γfs appE Φex
-     ∗ cre_child_unfired Γfs (ADev ma mi) Φarm Φun)%I
-    (mknod_stable_arms Γfs ma mi root ps ds Φarm Φun Φok Φex).
+     ∗ pf_at (acre_commit_at Γfs appE (ADev ma mi)) Fok
+     ∗ pf_at (dlookup_commit_at Γfs appE) Fex
+     ∗ cre_child_unfired Γfs (ADev ma mi) Farm Fun)%I
+    (mknod_stable_arms Γfs ma mi root ps ds Farm Fun Fok Fex).
 
 (* ONE MODULE TYPE.  There is no parallel statement for the walk, the
    commits or the arms, and no second proof against the code: a client that
@@ -691,10 +700,10 @@ Module Type SYSMKNOD.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ),
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)),
       wp_sys_mknod_body γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-        v0 v1 v2 pid U m K eb b lks P Pmiss Φarm Φun Φok Φex.
+        v0 v1 v2 pid U m K eb b lks P Pmiss Farm Fun Fok Fex.
 End SYSMKNOD.
 
 (* ===================================================================== *)

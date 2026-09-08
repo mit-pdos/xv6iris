@@ -125,6 +125,8 @@ Require Import FsAbsMknodFire.   (* [np_start_of_mknod], the walk premise *)
 Require Import CodeSysMkdir.
 Require Import SpecSysMkdir.
 Require Import FsTree.          (* [fname]: the parent-leg receipt's name *)
+Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.       (* [aview]: the receipts' view argument (round E2, lane E2-C) *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -766,16 +768,16 @@ Section ProofSysMkdirBody.
       (b : bool) (lks : gset string)
       (* ---- THE APPLICATION'S SIDE ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     wp_sys_mkdir_sconf_body gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v
                             pid U m K eb b lks
-                            P Pmiss Φarm Φdots Φun Φok Φex.
+                            P Pmiss Farm Fdots Fun Fok Fex.
   Proof.
     cbv beta delta [wp_sys_mkdir_sconf_body].
     intros pcE pj ret_tgt HK HdevR Hnib0 Hgeom
@@ -1212,7 +1214,7 @@ Section ProofSysMkdirBody.
                 SpecDirlookup.T_DIR (mword_of_int 0) (mword_of_int 0)
                 (upd_usM (us_upt U P') _) MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
                 N4 (K - 18)%nat eb b lks
-                P Pmiss Φarm Φdots Φun Φok Φex
+                P Pmiss Farm Fdots Fun Fok Fex
                 ltac:(lia) HdevR Hnib0 Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
                 (md_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush md_tdir_nz SpecCreate.T_DIR_ty_ok Hpkc

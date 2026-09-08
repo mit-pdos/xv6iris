@@ -140,6 +140,7 @@ Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix *)
 Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
 Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsAbsCreateFire.  (* the UNARM fire [caf_unarm_fire] and its row readings (round E2, lane E2-C) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.        (* [aview], [abs_of], [abs_node] *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
@@ -212,11 +213,11 @@ Section ProofCreateFail.
       (nf nsl : nat -> bv 8) (t : nat)
       (* ---- THE APPLICATION'S SIDE ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     (K_create <= K)%nat ->
     16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -253,7 +254,7 @@ Section ProofCreateFail.
                    plen pfun pv ty major minor U u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                    kd qd gd γil γisl dind dn bm data nf nsl t CIDf
-                   P Pmiss Φarm Φdots Φun Φok Φex).
+                   P Pmiss Farm Fdots Fun Fok Fex).
   Proof.
     intros HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcovb
            Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb.
@@ -504,7 +505,7 @@ Section ProofCreateFail.
                   (cr_setf dnc major minor (mword_of_int 0 : mword 16)) bmc datc
                   ltac:(rewrite cr_setf_nlink; vm_compute; reflexivity)).
     iApply fupd_wp.
-    iMod (caf_unarm_fire fsc_fs ⊤ (bv_unsigned cinum) _ Φun
+    iMod (caf_unarm_fire fsc_fs ⊤ (bv_unsigned cinum) _ Fun
             (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                       bmc datc)
             (era_node (cr_setf dnc major minor (mword_of_int 0 : mword 16))
@@ -885,7 +886,7 @@ Section ProofCreateFail.
        +0xc4 and DISAPPEARED at +0x146.  No dot ever landed on a
        non-directory child, so the dots commit goes home unfired. *)
     iDestruct (cr_fail_of_pair fsc_fs (bv_unsigned ty) (bv_unsigned major)
-                 (bv_unsigned minor) P Pmiss Φarm Φdots Φun Φok Φex
+                 (bv_unsigned minor) P Pmiss Farm Fdots Fun Fok Fex
                  (bview plen pfun) (bv_unsigned dind) (bv_unsigned cinum)
                  with "HPpar Hdlkc Hacre Harmr [Hdots] Hunr") as "Hcf".
     { iRight. iExact "Hdots". }

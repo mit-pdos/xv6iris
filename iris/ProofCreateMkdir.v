@@ -146,6 +146,7 @@ Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import AppInv.           (* [appE]: the commit mask the dots receipt names *)
 Require Import FsAbsDelta.       (* [acre_bump], [dots_ents]: the deltas the legs' rows are stated at (round E2, lane E2-C) *)
 Require Import FsAbsMknodFire.   (* the parent-leg fire [caf_acre_fire], [mkf_era_is_dir]/[mkf_era_live] (round E2, lane E2-C) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.        (* [aview], [abs_of], [abs_of_dir] *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
@@ -221,11 +222,11 @@ Section ProofCreateMkdir.
       (nf nsl : nat -> bv 8) (t : nat)
       (* ---- THE APPLICATION'S SIDE ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     (K_create <= K)%nat ->
     icfg_dev = ROOTDEV ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -272,7 +273,7 @@ Section ProofCreateMkdir.
                     plen pfun pv ty major minor U u Sb ns pidv
                     dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                     kd qd gd γil γisl dind dn bm data nf nsl t CIDm
-                    P Pmiss Φarm Φdots Φun Φok Φex).
+                    P Pmiss Farm Fdots Fun Fok Fex).
   Proof.
     intros HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
            Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Hpkc Hu Hns Hj Hgs
@@ -2194,7 +2195,7 @@ Section ProofCreateMkdir.
           (*  disk holds ([cre_child] at a directory).                     *)
           (* ============================================================ *)
           iApply fupd_wp.
-          iMod (cr_dirty_clear_dots ⊤ t (bv_unsigned cinum) (bv_unsigned dind) true Φdots
+          iMod (cr_dirty_clear_dots ⊤ t (bv_unsigned cinum) (bv_unsigned dind) true Fdots
                   (era_node (cr_setf dnc major minor
                                (mword_of_int 1 : mword 16)) bmc datc)
                   (era_node dc2 bm2 dat2)
@@ -2258,7 +2259,7 @@ Section ProofCreateMkdir.
           iEval (rewrite top_frag_1) in "Hctop".
           iMod (caf_acre_fire fsc_fs ⊤
                   (cre_child (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor))
-                  Φok (bv_unsigned dind) (bv_unsigned cinum) (bname 14 nf) (DfracOwn 1)
+                  Fok (bv_unsigned dind) (bv_unsigned cinum) (bname 14 nf) (DfracOwn 1)
                   (era_node dn bm data)
                   (era_node (cr_setf dp3 (di_major dp3) (di_minor dp3)
                                (add_vec (di_nlink dp3 : mword 16)
@@ -2548,7 +2549,7 @@ Section ProofCreateMkdir.
                parent leg fired; the unarm and the exists observation come
                home and the cursor is at the parent. *)
             iApply (cr_ok_of_made (bv_unsigned ty) (bv_unsigned major)
-                      (bv_unsigned minor) P Φarm Φdots Φun Φok Φex
+                      (bv_unsigned minor) P Farm Fdots Fun Fok Fex
                       (bview plen pfun) (bv_unsigned dind) (bname 14 nf)
                       (bv_unsigned cinum)
                       (cr_last_of_npar _ nf Hnpname)
@@ -2670,7 +2671,7 @@ Section ProofCreateMkdir.
              (durable-disk 2b-inode-3). *)
           (* ...THE DOTS FIRE (round E2, lane E2-C): both dots landed on the
              child before the parent's append failed *)
-          iMod (cr_dirty_dots ⊤ t (bv_unsigned cinum) (bv_unsigned dind) true Φdots
+          iMod (cr_dirty_dots ⊤ t (bv_unsigned cinum) (bv_unsigned dind) true Fdots
                   (era_node (cr_setf dnc major minor
                                (mword_of_int 1 : mword 16)) bmc datc)
                   (era_node dc2 bm2 dat2)
@@ -2678,8 +2679,8 @@ Section ProofCreateMkdir.
             as "(Hdirty & Hctop & Hdotsr)";
             [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           iModIntro.
-          iAssert ((∃ full : bool, cre_dots_fired Φdots (bv_unsigned cinum) (bv_unsigned dind) full)
-                   ∨ adots_commit_at (fs_gamma_L fsc_fs) appE Φdots)%I
+          iAssert ((∃ full : bool, cre_dots_fired Fdots (bv_unsigned cinum) (bv_unsigned dind) full)
+                   ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots)%I
             with "[Hdotsr]" as "Hdotsx".
           { iLeft. iExists true. iExact "Hdotsr". }
           (* THE ["."] UNIT COMES BACK OUT OF THE CHILD'S PAYLOAD (lane
@@ -2713,7 +2714,7 @@ Section ProofCreateMkdir.
  plen pfun pv ty major minor U u
                         Sb ns pidv dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                         kd qd gd γil γisl dind nf nsl t
-                        P Pmiss Φarm Φdots Φun Φok Φex
+                        P Pmiss Farm Fdots Fun Fok Fex
                         HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                         Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
                         with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
@@ -2840,7 +2841,7 @@ Section ProofCreateMkdir.
                      ltac:(rewrite Hc2tyd; vm_compute; reflexivity) Hc2nlz)
             Heqent2 Hc1ents.
           reflexivity. }
-        iMod (cr_dirty_dots ⊤ t (bv_unsigned cinum) (bv_unsigned dind) false Φdots
+        iMod (cr_dirty_dots ⊤ t (bv_unsigned cinum) (bv_unsigned dind) false Fdots
                 (era_node (cr_setf dnc major minor
                              (mword_of_int 1 : mword 16)) bmc datc)
                 (era_node dc2 bm2 dat2)
@@ -2848,8 +2849,8 @@ Section ProofCreateMkdir.
           as "(Hdirty & Hctop & Hdotsr)";
           [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
         iModIntro.
-        iAssert ((∃ full : bool, cre_dots_fired Φdots (bv_unsigned cinum) (bv_unsigned dind) full)
-                 ∨ adots_commit_at (fs_gamma_L fsc_fs) appE Φdots)%I
+        iAssert ((∃ full : bool, cre_dots_fired Fdots (bv_unsigned cinum) (bv_unsigned dind) full)
+                 ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots)%I
           with "[Hdotsr]" as "Hdotsx".
         { iLeft. iExists false. iExact "Hdotsr". }
         (* THE ["."] UNIT COMES BACK OUT OF THE CHILD'S PAYLOAD (lane
@@ -2883,7 +2884,7 @@ Section ProofCreateMkdir.
  plen pfun pv ty major minor U u Sb ns pidv
                       dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                       kd qd gd γil γisl dind nf nsl t
-                      P Pmiss Φarm Φdots Φun Φok Φex
+                      P Pmiss Farm Fdots Fun Fok Fex
                       HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                       Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
                       with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
@@ -3003,8 +3004,8 @@ Section ProofCreateMkdir.
         [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
       iModIntro.
       (* no dot landed: the dots commit comes home unfired (round E2) *)
-      iAssert ((∃ full : bool, cre_dots_fired Φdots (bv_unsigned cinum) (bv_unsigned dind) full)
-               ∨ adots_commit_at (fs_gamma_L fsc_fs) appE Φdots)%I
+      iAssert ((∃ full : bool, cre_dots_fired Fdots (bv_unsigned cinum) (bv_unsigned dind) full)
+               ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots)%I
         with "[Hdots]" as "Hdotsx".
       { iRight. iExact "Hdots". }
       iPoseProof (cr_fail_mkdir_half (CID := CID) γs j γl pd pav pu
@@ -3012,7 +3013,7 @@ Section ProofCreateMkdir.
  plen pfun pv ty major minor U u Sb ns pidv
                     dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                     kd qd gd γil γisl dind nf nsl t
-                    P Pmiss Φarm Φdots Φun Φok Φex
+                    P Pmiss Farm Fdots Fun Fok Fex
                     HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                     Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
                     with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen

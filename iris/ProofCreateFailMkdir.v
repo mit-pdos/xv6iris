@@ -140,6 +140,7 @@ Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
 Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsAbsDelta.       (* [dots_ents]: the entry map the dots left (round E2, lane E2-C) *)
 Require Import FsAbsCreateFire.  (* the UNARM fire's commit and receipt (round E2, lane E2-C) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.        (* [aview], [abs_of], [abs_node] *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
@@ -211,11 +212,11 @@ Section ProofCreateFailMkdir.
       (nf nsl : nat -> bv 8) (t : nat)
       (* ---- THE APPLICATION'S SIDE ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     (K_create <= K)%nat ->
     16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -252,7 +253,7 @@ Section ProofCreateFailMkdir.
                    plen pfun pv ty major minor U u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                    kd qd gd γil γisl dind nf nsl t CIDf
-                   P Pmiss Φarm Φdots Φun Φok Φex).
+                   P Pmiss Farm Fdots Fun Fok Fex).
   Proof.
     intros HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcovb
            Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb.
@@ -518,7 +519,7 @@ Section ProofCreateFailMkdir.
                                (mword_of_int 0 : mword 16)) bmc datc) = None)
       by exact (caf_era_none_nl0 _ bmc datc Hznl).
     iApply fupd_wp.
-    iMod (cr_dirty_clear_unarm ⊤ t (bv_unsigned cinum) _ Φun
+    iMod (cr_dirty_clear_unarm ⊤ t (bv_unsigned cinum) _ Fun
             (era_node dc bmc datc)
             (era_node (cr_setf dc major minor (mword_of_int 0 : mword 16))
                       bmc datc)
@@ -790,7 +791,7 @@ Section ProofCreateFailMkdir.
        dots receipt the entry brought -- both dots, the first alone, or none
        at all -- carried through unchanged. *)
     iDestruct (cr_fail_of_pair fsc_fs (bv_unsigned ty) (bv_unsigned major)
-                 (bv_unsigned minor) P Pmiss Φarm Φdots Φun Φok Φex
+                 (bv_unsigned minor) P Pmiss Farm Fdots Fun Fok Fex
                  (bview plen pfun) (bv_unsigned dind) (bv_unsigned cinum)
                  with "HPpar Hdlkc Hacre Harmr Hdotsx Hunr") as "Hcf".
     iSpecialize ("Hcont" $! CIDfin with "[%]"); [wp_next_chain |].

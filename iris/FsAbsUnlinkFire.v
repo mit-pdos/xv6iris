@@ -100,6 +100,7 @@ Require Import FsAbsDelta.   (* [abs_view_insert]                        *)
 Require Import FsAbsMknodFire.   (* [dlookup_commit_at], [mkf_abs_of_dir]    *)
 Require Import SpecSysUnlinkAU.  (* the statement this file's fires serve    *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                  *)
 
 Local Open Scope Z_scope.
@@ -262,21 +263,23 @@ Section UnlinkFire.
      firing function's own era fragment, so the fragment goes straight
      back. *)
   Lemma uf_dmiss_fire (γfs : fs_names) (E : coPset) (dq : dfrac)
-      (Φ : aview -> Z -> fname -> iProp Σ)
+      (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ))
       (d : Z) (nm : fname) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     fn_is_dir n = true ->
     dir_entries n !! nm = None ->
     ftop_inv γfs -∗
-    dmiss_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (dmiss_commit_at (fs_gamma_L γfs) appE) Fmiss -∗
     top_frag_q (fs_gamma_L γfs) dq d n ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq d n
       ∗ ∃ av : aview,
           ⌜arow_at av d (MkAnode (ADir (dir_entries n)) (fn_nlink n))⌝
           ∗ ⌜dir_entries n !! nm = None⌝
-          ∗ Φ av d nm.
+          ∗ Fmiss.(pf_recv) av d nm.
   Proof.
     intros HE Hdir Hnm. iIntros "#Hi Hcm Hf".
+    (* THE PIECE IS SPENT: the fire eliminates to the AU side. *)
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     (* [γtop (fs_gamma_L γfs)] and [fs_top γfs] are the SAME gname
        ([FsAbs.ftop_gamma_top], by reflexivity) but the unifier cannot solve
        [γtop ?Γ =?= fs_top γfs], so the fragment is put in the body's own
@@ -309,7 +312,7 @@ Section UnlinkFire.
      and its non-dots witness -- arm (iii-c)'s four pure conjuncts at a
      single instant. *)
   Lemma uf_dex_fire (γfs : fs_names) (E : coPset) (dqd dqt : dfrac)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d t : Z) (nm : fname) (nd nt : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     fn_is_dir nd = true ->
@@ -319,7 +322,7 @@ Section UnlinkFire.
     fn_nlink nt <> 0%nat ->
     ~ dots_only (dir_entries nt) ->
     ftop_inv γfs -∗
-    dlookup_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (dlookup_commit_at (fs_gamma_L γfs) appE) Fex -∗
     top_frag_q (fs_gamma_L γfs) dqd d nd -∗
     top_frag_q (fs_gamma_L γfs) dqt t nt ={E}=∗
       top_frag_q (fs_gamma_L γfs) dqd d nd
@@ -329,9 +332,10 @@ Section UnlinkFire.
           ∗ ⌜dir_entries nd !! nm = Some t⌝
           ∗ ⌜av !! t = Some (MkAnode (ADir (dir_entries nt)) (fn_nlink nt))⌝
           ∗ ⌜~ dots_only (dir_entries nt)⌝
-          ∗ Φ av d nm t.
+          ∗ Fex.(pf_recv) av d nm t.
   Proof.
     intros HE Hdird Hnld Hnm Hdirt Hnlt Hne. iIntros "#Hi Hcm Hfd Hft".
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag_q /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -370,7 +374,7 @@ Section UnlinkFire.
      back untouched.  [dec] is [unl_dec] of the target's own node, so the
      FILE arm instantiates it at 0 and the DIR arm at 1. *)
   Lemma uf_uent_fire (γfs : fs_names) (E : coPset) (dqt : dfrac)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d t : Z) (nm : fname) (dec : nat) (np np' nt : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local d np' ->
@@ -386,17 +390,18 @@ Section UnlinkFire.
       = Some (MkAnode (ADir (delete nm (dir_entries np))) (fn_nlink np - dec)%nat) ->
     fn_type nt <> 0 ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    uent_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (uent_commit_at (fs_gamma_L γfs) appE) Fent -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqt t nt ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ top_frag_q (fs_gamma_L γfs) dqt t nt
       ∗ ∃ av : aview,
           ⌜unl_pre av d nm (dir_entries np) (fn_nlink np) t (abs_row nt)⌝
-          ∗ Φ av d nm t.
+          ∗ Fent.(pf_recv) av d nm t.
   Proof.
     intros HE Hloc Hdir Hnm HnD HnDD Hnlp Hnlt Hdots Hdec Habsp' Hnzt.
     iIntros "#Hi #Hai Hcm Hfp Hft".
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag /top_frag_q /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -470,7 +475,7 @@ Section UnlinkFire.
   Proof. solve_ndisj. Qed.
 
   Lemma uf_utgt_fire (γfs : fs_names) (E : coPset)
-      (Φ : aview -> Z -> iProp Σ) (t : Z) (nt nt' : fs_node) :
+      (Ftgt : pfam Σ (aview -> Z -> iProp Σ)) (t : Z) (nt nt' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local t nt' ->
     (1 <= fn_nlink nt)%nat ->
@@ -478,12 +483,13 @@ Section UnlinkFire.
     /\ abs_row nt' = MkAnode (an_node (abs_row nt)) (fn_nlink nt - 1)%nat ->
     fn_type nt <> 0 ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    utgt_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (utgt_commit_at (fs_gamma_L γfs) appE) Ftgt -∗
     top_frag (fs_gamma_L γfs) t nt ={E}=∗
       top_frag (fs_gamma_L γfs) t nt'
-      ∗ ∃ av : aview, ⌜av !! t = Some (abs_row nt)⌝ ∗ Φ av t.
+      ∗ ∃ av : aview, ⌜av !! t = Some (abs_row nt)⌝ ∗ Ftgt.(pf_recv) av t.
   Proof.
     intros HE Hloc Hnl Habs' Hnzt. iIntros "#Hi #Hai Hcm Hf".
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".

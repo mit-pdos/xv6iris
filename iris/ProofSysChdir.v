@@ -157,6 +157,7 @@ Require Import DirentEnc.       (* [bview]: the fetched string as a list *)
 Require Import FsTree.          (* [fname] *)
 Require Import SpecNameiEra.    (* the era walk *)
 Require Import FsAbsOpenFire.   (* [opf_start_of_open], [opf_open_fire_1] *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -946,9 +947,9 @@ Section ProofSysChdirBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ) :
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :
     wp_sys_chdir_body gf gs j gl pd pav pu dqb dqs v pid U m K eb b lks
-      P Pmiss Φo.
+      P Pmiss Fo.
   Proof.
     cbv beta delta [wp_sys_chdir_body wp_sys_chdir_frame].
     intros Γfs pcE pj ret_tgt HK HdevR Hnib0 Hgeom
@@ -1627,7 +1628,7 @@ Section ProofSysChdirBody.
            locked, off the payload's own era fragment -- the row the
            [T_DIR] test below reads the type of ---- *)
         iApply fupd_wp.
-        iMod (opf_open_fire_1 fsc_fs ⊤ Φo (bv_unsigned inum) (era_node dn bm dat)
+        iMod (opf_open_fire_1 fsc_fs ⊤ Fo (bv_unsigned inum) (era_node dn bm dat)
                 ltac:(solve_ndisj) (opf_era_typed_ok _ _ dn bm dat Hiok)
                 with "[] Hoc Htopl") as "[Htopl Hobs]";
           [iApply (ireg_inv_ftop with "Hireg") |].

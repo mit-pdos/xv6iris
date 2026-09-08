@@ -25,7 +25,7 @@
 
    ==== WHAT THE CREATE ARM ADDS TO THE PLAIN ENTRY, AND NOTHING ELSE ==
 
-     - two more caller predicates ([Φok], [Φex]) on the binder list;
+     - two more caller predicates ([Fok], [Fex]) on the binder list;
      - the bundle destructed at [open_au_pre_create] (five pieces, not
        three);
      - the exit continuation at [so_cont0_au_create] -- [so_cont0_au] with
@@ -105,6 +105,7 @@ Require Import SpecSysOpen.   (* the ONE contract: the frame, the arms, [SYSOPEN
 Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAU.       (* [SysOpenPlainProof]: the plain arm *)
 Require Import ProofSysOpenAUEntryC. (* [so_entry_c_au], [so_cont0_au_create] *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -167,14 +168,14 @@ Section ProofSysOpenAUFullBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
-      (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     wp_sys_open_create_body gfl gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v vom
-                           pid U sts m K eb b lks P Pmiss Φarm Φun Φok Φex Φo Φt.
+                           pid U sts m K eb b lks P Pmiss Farm Fun Fok Fex Fo Ft.
   Proof.
     cbv beta zeta delta [wp_sys_open_create_body wp_sys_open_frame].
     intros Hcr HK HdevR Hnib0 Hgeom Hsize
@@ -809,7 +810,7 @@ Section ProofSysOpenAUFullBody.
     iAssert (wp_next (CID0 := CID21) true (proc_addr j)
                (so_cont0_au_create gf
  ns dqb dqs dqbs dqn (proc_addr j) pid vom
-                         (us_upt U P') sts P Pmiss Φarm Φun Φok Φex Φo Φt m K eb b lks))
+                         (us_upt U P') sts P Pmiss Farm Fun Fok Fex Fo Ft m K eb b lks))
       with "[Hcont]" as "Hcont0".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
       iEval (rewrite /so_cont0_au_create). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -857,7 +858,7 @@ Section ProofSysOpenAUFullBody.
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
               pid dqb dqs dqbs dqn (us_upt U P') sts m S2 sp0 K eb b lks
               u4 u5 u6 u24
-              vom P Pmiss Φarm Φun Φok Φex Φo Φt
+              vom P Pmiss Farm Fun Fok Fex Fo Ft
               HKfull HdevR Hnib0 Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hpk Hni1 Hni2
               Hni3 Hush Hprkc Hnsb Hj Hgl Heb Hlkempty eq_refl Hal23
@@ -891,19 +892,19 @@ Section ProofSysOpenAUFullBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
-      (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     wp_sys_open_body gfl gf gs j gl pd pav pu ns dqb dqs dqbs dqn v vom
-                     pid U sts m K eb b lks P Pmiss Φarm Φun Φok Φex Φo Φt.
+                     pid U sts m K eb b lks P Pmiss Farm Fun Fok Fex Fo Ft.
   Proof.
     rewrite /wp_sys_open_body /open_in /open_arms.
     destruct (om_create vom) eqn:Hcr.
     - exact (wp_sys_open_create gfl gf gs j gl pd pav pu ns dqb dqs dqbs dqn
-               v vom pid U sts m K eb b lks P Pmiss Φarm Φun Φok Φex Φo Φt Hcr).
+               v vom pid U sts m K eb b lks P Pmiss Farm Fun Fok Fex Fo Ft Hcr).
     - exact (Plain.wp_sys_open_plain gfl gf gs j gl pd pav pu ns dqb dqs dqbs
-               dqn v vom pid U sts m K eb b lks P Pmiss Φo Φt Hcr).
+               dqn v vom pid U sts m K eb b lks P Pmiss Fo Ft Hcr).
   Qed.
 
 End ProofSysOpenAUFullBody.

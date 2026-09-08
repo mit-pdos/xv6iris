@@ -116,6 +116,7 @@ Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUAlloc.
 Require Import ProofSysOpenAUJoin.
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -206,8 +207,8 @@ Section ProofSysOpenAUWalk.
       (* ---- the AU side ---- *)
       (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
-      (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     (K_sys_open <= K)%nat -> icfg_dev = ROOTDEV -> (0 < icfg_nib)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
@@ -289,12 +290,12 @@ Section ProofSysOpenAUWalk.
        picks the start inum -- ROOTINO on an absolute path, [p->cwd]'s on a
        relative one -- and fires it there. ---- *)
     open_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
-    aopen_commit_at (fs_gamma_L fsc_fs) appE Φo -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) appE Φt -∗
+    pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Fo -∗
+    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
     wp_next true (proc_addr jx)
       (so_cont0_au gf ns
                 dqb dqs dqbs dqn (proc_addr jx) pidv vom U sts
-                P Pmiss Φo Φt m K eb b lks) -∗
+                P Pmiss Fo Ft m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
@@ -516,7 +517,7 @@ Section ProofSysOpenAUWalk.
       { unfold sys_open_slots, create_slots in *. lia. }
       { (* ARM B-FAIL: the walk died at some hop, so NOTHING was observed
            and both commits come home beside the era refund. *)
-        iApply (so_arm_dead gf (proc_addr jx) pidv vom P Pmiss Φo Φt U sts _
+        iApply (so_arm_dead gf (proc_addr jx) pidv vom P Pmiss Fo Ft U sts _
                   (bview plen bp) Ha0f
                   with "Hpriv Hfrag Hfds Hdead Hoc Htc"). } }
     (* ---- namei RESOLVED: the reference, shed and generation-named, and
@@ -641,14 +642,14 @@ Section ProofSysOpenAUWalk.
     iDestruct (so_flat_ok with "Hflat") as "[%Hiokf Hflat]".
     iDestruct (so_flat_top with "Hflat") as "[Htop Hflatb]".
     iApply fupd_wp.
-    iMod (opf_open_fire_1 fsc_fs ⊤ Φo (bv_unsigned inum)
+    iMod (opf_open_fire_1 fsc_fs ⊤ Fo (bv_unsigned inum)
             (era_node dn bm data) ltac:(solve_ndisj)
             (opf_era_typed_ok _ _ dn bm data Hiokf) with "[] Hoc Htop")
       as "[Htop Hobs0]";
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iDestruct ("Hflatb" with "Htop") as "Hflat".
-    iAssert (so_obs Φo (bv_unsigned inum) (era_node dn bm data))
+    iAssert (so_obs Fo (bv_unsigned inum) (era_node dn bm data))
       with "[Hobs0]" as "Hobs".
     { rewrite /so_obs. iExact "Hobs0". }
     assert (Hpcil : ret_pc (P2 !!! Regidx Rra : mword 64)
@@ -764,7 +765,7 @@ Section ProofSysOpenAUWalk.
       iAssert (wp_next true (proc_addr jx)
                  (so_cont_au gf
                           (ns - 1)%nat dqb dqs (proc_addr jx) pidv vom U sts
-                          P Pmiss Φo Φt m K eb b lks))
+                          P Pmiss Fo Ft m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
         iEval (rewrite /so_cont_au). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -779,7 +780,7 @@ Section ProofSysOpenAUWalk.
  kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm om lo
                 (ns - 1)%nat n1 pidv dqb dqs U sts m Q2 sp0 K eb b lks w4 w5 w6 w24
                 bp1
-                data vom (bview plen bp) P Pmiss Φo Φt
+                data vom (bview plen bp) P Pmiss Fo Ft
                 eq_refl HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdirw Hom
                 Hal23 Hsp0 HQ2sp HQ2thr HQ2s0 HQ2s1 HQ2s2 HQ2s3 Hal ltac:(unfold sys_open_slots, create_slots in *; lia)
@@ -854,7 +855,7 @@ Section ProofSysOpenAUWalk.
       iAssert (wp_next true (proc_addr jx)
                  (so_cont_au gf
                           (ns - 1)%nat dqb dqs (proc_addr jx) pidv vom U sts
-                          P Pmiss Φo Φt m K eb b lks))
+                          P Pmiss Fo Ft m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
         iEval (rewrite /so_cont_au). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -871,7 +872,7 @@ Section ProofSysOpenAUWalk.
  kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm om lo
                 (ns - 1)%nat n1 pidv dqb dqs U sts m Q3 sp0 K eb b lks w4 w5 w6 w24
                 bp1
-                data vom (bview plen bp) P Pmiss Φo Φt
+                data vom (bview plen bp) P Pmiss Fo Ft
                 eq_refl HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty
                 ltac:(intros _; exact Hom0) Hom
@@ -940,7 +941,7 @@ Section ProofSysOpenAUWalk.
     { unfold sys_open_slots, create_slots in *. lia. }
     { (* ARM C-FAIL: a directory opened for writing.  The observation HAS
          fired -- this refusal is inside the child's lock window. *)
-      iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U sts _
+      iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Fo Ft U sts _
                 (bview plen bp) (bv_unsigned inum) (era_node dn bm data) Ha0f
                 with "Hpriv Hfrag Hfds HP Hobs Htc"). }
   Qed.

@@ -144,6 +144,7 @@ Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
 Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsAbsDelta.       (* [dots_ents]: the entry map the dots fire lands (round E2, lane E2-C) *)
 Require Import FsAbsCreateFire.  (* the legs' commits, receipts and fires (round E2, lane E2-C) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.        (* [abs_of], [MkAnode]: the rows the fires are stated at *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
@@ -1649,57 +1650,58 @@ Section ProofCreateMain.
      back (the success arm).  UNARM: fire the unarm commit at the row that
      disappears, disarm, hand the token back (mkdir's [fail:] tail). *)
   Lemma cr_dirty_arm (E : coPset) (t : nat) (i : Z) (c : absnode)
-      (Φ : aview -> Z -> iProp Σ) (n n' : fs_node) :
+      (Farm : pfam Σ (aview -> Z -> iProp Σ)) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     abs_of n = None ->
     abs_of n' = Some (MkAnode c 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
-    aarm_commit_at (fs_gamma_L fsc_fs) appE c Φ -∗
+    pf_at (aarm_commit_at (fs_gamma_L fsc_fs) appE c) Farm -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
-      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n' ∗ cre_arm_fired Φ i.
+      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n' ∗ cre_arm_fired Farm i.
   Proof.
     iIntros (HE Hnone Hrow) "#Hi #Hai Htx Hcm Hf".
     iMod (ireg_arm E fsc_fs i t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Htx")
       as (k) "Harm".
-    iMod (caf_arm_fire fsc_fs E k t (1/2)%Qp {[i]} i c Φ n n' HE
+    iMod (caf_arm_fire fsc_fs E k t (1/2)%Qp {[i]} i c Farm n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hnone Hrow
             with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
     iModIntro. iFrame "Hf Hr". rewrite /cr_dirty. iExists k. iExact "Harm".
   Qed.
 
   Lemma cr_dirty_dots (E : coPset) (t : nat) (i d : Z) (full : bool)
-      (Φ : aview -> Z -> Z -> bool -> iProp Σ) (n n' : fs_node) :
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ)) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     abs_of n = Some (MkAnode (ADir ∅) 1%nat) ->
     abs_of n' = Some (MkAnode (ADir (dots_ents full i d)) 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
-    adots_commit_at (fs_gamma_L fsc_fs) appE Φ -∗
+    pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
-      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n' ∗ cre_dots_fired Φ i d full.
+      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'
+      ∗ cre_dots_fired Fdots i d full.
   Proof.
     iIntros (HE Hrow Hrow') "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
-    iMod (caf_dots_fire fsc_fs E k t (1/2)%Qp {[i]} i d full Φ n n' HE
+    iMod (caf_dots_fire fsc_fs E k t (1/2)%Qp {[i]} i d full Fdots n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hrow'
             with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
     iModIntro. iFrame "Hf Hr". iExists k. iExact "Harm".
   Qed.
 
   Lemma cr_dirty_clear_dots (E : coPset) (t : nat) (i d : Z) (full : bool)
-      (Φ : aview -> Z -> Z -> bool -> iProp Σ) (n n' : fs_node) :
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ)) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
     abs_of n = Some (MkAnode (ADir ∅) 1%nat) ->
     abs_of n' = Some (MkAnode (ADir (dots_ents full i d)) 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
-    adots_commit_at (fs_gamma_L fsc_fs) appE Φ -∗
+    pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
-      ∗ cre_dots_fired Φ i d full.
+      ∗ cre_dots_fired Fdots i d full.
   Proof.
     iIntros (HE Hloc Hrow Hrow') "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
-    iMod (caf_dots_fire fsc_fs E k t (1/2)%Qp {[i]} i d full Φ n n' HE
+    iMod (caf_dots_fire fsc_fs E k t (1/2)%Qp {[i]} i d full Fdots n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hrow'
             with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
@@ -1711,20 +1713,20 @@ Section ProofCreateMain.
   Qed.
 
   Lemma cr_dirty_clear_unarm (E : coPset) (t : nat) (i : Z) (c : absnode)
-      (Φ : aview -> Z -> iProp Σ) (n n' : fs_node) :
+      (Fun : pfam Σ (aview -> Z -> iProp Σ)) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
     abs_of n = Some (MkAnode c 1%nat) ->
     abs_of n' = None ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
-    aunarm_commit_at (fs_gamma_L fsc_fs) appE Φ -∗
+    pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
-      ∗ cre_unarm_fired Φ i.
+      ∗ cre_unarm_fired Fun i.
   Proof.
     iIntros (HE Hloc Hrow Hnone) "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
-    iMod (caf_unarm_fire_armed fsc_fs E k t (1/2)%Qp {[i]} i c Φ n n' HE
+    iMod (caf_unarm_fire_armed fsc_fs E k t (1/2)%Qp {[i]} i c Fun n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hnone
             with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
@@ -1790,16 +1792,16 @@ Section ProofCreateMain.
   (* ARMS G / A-FAIL: the walk reached the parent and nothing else moved. *)
   Lemma cr_fail_of_cursor (γfs : fs_names) (tyz ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) :
     P (length (mknod_parent_elems pl)) d -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
-    cre_commits (fs_gamma_L fsc_fs) tyz ma mi Φarm Φdots Φun Φok -∗
+    pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
+    cre_commits (fs_gamma_L fsc_fs) tyz ma mi Farm Fdots Fun Fok -∗
     cre_fail_arms (fs_gamma_L fsc_fs) γfs tyz ma mi P Pmiss
-      Φarm Φdots Φun Φok Φex pl.
+      Farm Fdots Fun Fok Fex pl.
   Proof.
     iIntros "HP Hdl Hcre". rewrite /cre_fail_arms /cre_commits.
     iDestruct "Hcre" as "(Ha & Hd & Hu & Hac)".
@@ -1812,22 +1814,22 @@ Section ProofCreateMain.
      one at the parent's OWN level, which hands the cursor back instead. *)
   Lemma cr_fail_of_dead (γfs : fs_names) (tyz ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) :
     np_dead γfs P Pmiss pl -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
-    cre_commits (fs_gamma_L fsc_fs) tyz ma mi Φarm Φdots Φun Φok -∗
+    pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
+    cre_commits (fs_gamma_L fsc_fs) tyz ma mi Farm Fdots Fun Fok -∗
     cre_fail_arms (fs_gamma_L fsc_fs) γfs tyz ma mi P Pmiss
-      Φarm Φdots Φun Φok Φex pl.
+      Farm Fdots Fun Fok Fex pl.
   Proof.
     iIntros "Hdead Hdl Hcre".
     iDestruct (np_dead_to_mknod γfs P Pmiss pl with "Hdead") as "[Hd | Hp]".
     - rewrite /cre_fail_arms. iLeft. iFrame "Hd Hdl Hcre".
     - iDestruct "Hp" as (dpar) "HPd".
-      iApply (cr_fail_of_cursor γfs tyz ma mi P Pmiss Φarm Φdots Φun Φok Φex
+      iApply (cr_fail_of_cursor γfs tyz ma mi P Pmiss Farm Fdots Fun Fok Fex
                 pl dpar with "HPd Hdl Hcre").
   Qed.
 
@@ -1835,17 +1837,17 @@ Section ProofCreateMain.
      else did. *)
   Lemma cr_fail_of_seen (γfs : fs_names) (tyz ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) (nm : fname) (i : Z) :
     list_basics.last (path_elems pl) = Some nm ->
     P (length (mknod_parent_elems pl)) d -∗
-    cre_ex_fired Φex d nm i -∗
-    cre_commits (fs_gamma_L fsc_fs) tyz ma mi Φarm Φdots Φun Φok -∗
+    cre_ex_fired Fex d nm i -∗
+    cre_commits (fs_gamma_L fsc_fs) tyz ma mi Farm Fdots Fun Fok -∗
     cre_fail_arms (fs_gamma_L fsc_fs) γfs tyz ma mi P Pmiss
-      Φarm Φdots Φun Φok Φex pl.
+      Farm Fdots Fun Fok Fex pl.
   Proof.
     iIntros (Hlast) "HP Hex Hcre". rewrite /cre_fail_arms /cre_commits.
     iDestruct "Hcre" as "(Ha & Hd & Hu & Hac)".
@@ -1859,20 +1861,20 @@ Section ProofCreateMain.
      disappeared, the parent leg never fired (ruling Q-h). *)
   Lemma cr_fail_of_pair (γfs : fs_names) (tyz ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d i : Z) :
     P (length (mknod_parent_elems pl)) d -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
-    acre_commit_at_gen (fs_gamma_L fsc_fs) appE (cre_child tyz ma mi) Φok -∗
-    cre_arm_fired Φarm i -∗
-    ((∃ full : bool, cre_dots_fired Φdots i d full)
-     ∨ adots_commit_at (fs_gamma_L fsc_fs) appE Φdots) -∗
-    cre_unarm_fired Φun i -∗
+    pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
+    pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE (cre_child tyz ma mi)) Fok -∗
+    cre_arm_fired Farm i -∗
+    ((∃ full : bool, cre_dots_fired Fdots i d full)
+     ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots) -∗
+    cre_unarm_fired Fun i -∗
     cre_fail_arms (fs_gamma_L fsc_fs) γfs tyz ma mi P Pmiss
-      Φarm Φdots Φun Φok Φex pl.
+      Farm Fdots Fun Fok Fex pl.
   Proof.
     iIntros "HP Hdl Hac Ha Hd Hu". rewrite /cre_fail_arms.
     iRight. iExists d. iFrame "HP". iSplitL "Hdl"; [by iRight |].
@@ -1883,16 +1885,16 @@ Section ProofCreateMain.
      commit comes home and the payout is the observation. *)
   Lemma cr_ok_of_found (tyz ma mi : Z)
       (P : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) (nm : fname) (i : Z) :
     list_basics.last (path_elems pl) = Some nm ->
     P (length (mknod_parent_elems pl)) d -∗
-    cre_ex_fired Φex d nm i -∗
-    cre_commits (fs_gamma_L fsc_fs) tyz ma mi Φarm Φdots Φun Φok -∗
-    cre_ok_arms (fs_gamma_L fsc_fs) tyz ma mi P Φarm Φdots Φun Φok Φex
+    cre_ex_fired Fex d nm i -∗
+    cre_commits (fs_gamma_L fsc_fs) tyz ma mi Farm Fdots Fun Fok -∗
+    cre_ok_arms (fs_gamma_L fsc_fs) tyz ma mi P Farm Fdots Fun Fok Fex
       pl false i.
   Proof.
     iIntros (Hlast) "HP Hex Hcre". rewrite /cre_ok_arms.
@@ -1903,20 +1905,20 @@ Section ProofCreateMain.
      parent leg fired and the unarm and the observation come home. *)
   Lemma cr_ok_of_made (tyz ma mi : Z)
       (P : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) (nm : fname) (i : Z) :
     list_basics.last (path_elems pl) = Some nm ->
     P (length (mknod_parent_elems pl)) d -∗
-    cre_arm_fired Φarm i -∗
-    (cre_dots_fired Φdots i d true
-     ∨ adots_commit_at (fs_gamma_L fsc_fs) appE Φdots) -∗
-    cre_acre_fired Φok d nm i (cre_child tyz ma mi d i) -∗
-    aunarm_commit_at (fs_gamma_L fsc_fs) appE Φun -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
-    cre_ok_arms (fs_gamma_L fsc_fs) tyz ma mi P Φarm Φdots Φun Φok Φex
+    cre_arm_fired Farm i -∗
+    (cre_dots_fired Fdots i d true
+     ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots) -∗
+    cre_acre_fired Fok d nm i (cre_child tyz ma mi d i) -∗
+    pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
+    pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
+    cre_ok_arms (fs_gamma_L fsc_fs) tyz ma mi P Farm Fdots Fun Fok Fex
       pl true i.
   Proof.
     iIntros (Hlast) "HP Ha Hd Hac Hu Hdl". rewrite /cre_ok_arms.
@@ -1934,11 +1936,11 @@ Section ProofCreateMain.
       (CIDc : CpuId)
       (* ---- THE APPLICATION'S SIDE (round E2, lane E2-C) ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (∀ (mf : regfile) (ok made : bool)
        (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
        (dn : dinode) (bm : blkmap)
@@ -1972,12 +1974,12 @@ Section ProofCreateMain.
               /\ cre_ok_pure ty major minor made dn⌝ ∗
           create_locked pidv k qi s g inum dn bm ∗
           cre_ok_arms (fs_gamma_L fsc_fs) (bv_unsigned ty) (bv_unsigned major)
-            (bv_unsigned minor) P Φarm Φdots Φun Φok Φex (bview plen pfun)
+            (bv_unsigned minor) P Farm Fdots Fun Fok Fex (bview plen pfun)
             made (bv_unsigned inum)
         else ⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗ log_tx icfg_log ∗
           cre_fail_arms (fs_gamma_L fsc_fs) fsc_fs (bv_unsigned ty)
             (bv_unsigned major) (bv_unsigned minor) P Pmiss
-            Φarm Φdots Φun Φok Φex (bview plen pfun)) -∗
+            Farm Fdots Fun Fok Fex (bview plen pfun)) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* THE EPILOGUE FUNNEL at +0x70: [mv a0,s2], the seven [c.ldsp]s, the
@@ -2306,11 +2308,11 @@ Section ProofCreateMain.
       (b : bool) (lks : gset string)
       (CIDa : CpuId)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (∀ (Ma : regfile) (w5 : mword 64)
        (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
        (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
@@ -2416,9 +2418,9 @@ Section ProofCreateMain.
           observation UNFIRED -- the name was not there -- and the four
           commits, NONE fired on this path ---- *)
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
+       pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
        cre_commits (fs_gamma_L fsc_fs) (bv_unsigned ty) (bv_unsigned major)
-         (bv_unsigned minor) Φarm Φdots Φun Φok -∗
+         (bv_unsigned minor) Farm Fdots Fun Fok -∗
        (* and the contract's own continuation, ANCHORED AT THE ENTRY HART
           (ProofDirlink's [dl_after_body]): the block's own proof does the
           retargeting, so this file hands over [Hcont] untouched. *)
@@ -2427,7 +2429,7 @@ Section ProofCreateMain.
             cr_cont_body γf
  plen pfun pv ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                         ret_tgt CIDc P Pmiss Φarm Φdots Φun Φok Φex) -∗
+                         ret_tgt CIDc P Pmiss Farm Fdots Fun Fok Fex) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
@@ -2472,11 +2474,11 @@ Section ProofCreateMain.
       (nf nsl : nat -> bv 8) (t : nat)
       (CIDm : CpuId)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (∀ (Mx : regfile) (kslot : nat) (q : Qp) (g gil gisl : gname) (lo tl : nat)
        (cinum : mword 32) (dnc : dinode) (bmc : blkmap)
        (datc : nat -> list (bv 8)) (n3 : nat) (Sb3 : gset Z),
@@ -2639,18 +2641,19 @@ Section ProofCreateMain.
           observation UNFIRED, the ARM fired at +0xc4 (its receipt), the
           other three commits unspent ---- *)
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
-       cre_arm_fired Φarm (bv_unsigned cinum) -∗
-       adots_commit_at (fs_gamma_L fsc_fs) appE Φdots -∗
-       aunarm_commit_at (fs_gamma_L fsc_fs) appE Φun -∗
-       acre_commit_at_gen (fs_gamma_L fsc_fs) appE
-         (cre_child (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor)) Φok -∗
+       pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
+       cre_arm_fired Farm (bv_unsigned cinum) -∗
+       pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
+       pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
+       pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
+                (cre_child (bv_unsigned ty) (bv_unsigned major)
+                           (bv_unsigned minor))) Fok -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
  plen pfun pv ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                         ret_tgt CIDc P Pmiss Φarm Φdots Φun Φok Φex) -∗
+                         ret_tgt CIDc P Pmiss Farm Fdots Fun Fok Fex) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition cr_fail_body
@@ -2668,11 +2671,11 @@ Section ProofCreateMain.
       (nf nsl : nat -> bv 8) (t : nat)
       (CIDf : CpuId)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (∀ (Mx : regfile) (kslot : nat) (q : Qp) (g gil gisl : gname) (lo tl : nat)
        (cinum : mword 32) (dnc : dinode) (bmc : blkmap)
        (datc : nat -> list (bv 8))
@@ -2866,18 +2869,19 @@ Section ProofCreateMain.
           (its receipt), the other three commits unspent -- the
           [sh zero,74(s3)] below fires the unarm ---- *)
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
-       cre_arm_fired Φarm (bv_unsigned cinum) -∗
-       adots_commit_at (fs_gamma_L fsc_fs) appE Φdots -∗
-       aunarm_commit_at (fs_gamma_L fsc_fs) appE Φun -∗
-       acre_commit_at_gen (fs_gamma_L fsc_fs) appE
-         (cre_child (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor)) Φok -∗
+       pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
+       cre_arm_fired Farm (bv_unsigned cinum) -∗
+       pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
+       pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
+       pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
+                (cre_child (bv_unsigned ty) (bv_unsigned major)
+                           (bv_unsigned minor))) Fok -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
  plen pfun pv ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                         ret_tgt CIDc P Pmiss Φarm Φdots Φun Φok Φex) -∗
+                         ret_tgt CIDc P Pmiss Farm Fdots Fun Fok Fex) -∗
        WP (Loop : expr riscv_lang))%I.
 
 
@@ -2984,11 +2988,11 @@ Section ProofCreateMain.
       (nf nsl : nat -> bv 8) (t : nat)
       (CIDf : CpuId)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (∀ (Mx : regfile) (kslot : nat) (q : Qp) (g gil gisl : gname) (lo tl : nat)
        (cinum : mword 32)
        (dp : dinode) (bmp : blkmap) (datap : nat -> list (bv 8))
@@ -3143,19 +3147,20 @@ Section ProofCreateMain.
           whatever the entry wrote (or not at all), the unarm and the
           parent leg unspent ---- *)
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
-       cre_arm_fired Φarm (bv_unsigned cinum) -∗
-       ((∃ full : bool, cre_dots_fired Φdots (bv_unsigned cinum) (bv_unsigned dind) full)
-        ∨ adots_commit_at (fs_gamma_L fsc_fs) appE Φdots) -∗
-       aunarm_commit_at (fs_gamma_L fsc_fs) appE Φun -∗
-       acre_commit_at_gen (fs_gamma_L fsc_fs) appE
-         (cre_child (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor)) Φok -∗
+       pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
+       cre_arm_fired Farm (bv_unsigned cinum) -∗
+       ((∃ full : bool, cre_dots_fired Fdots (bv_unsigned cinum) (bv_unsigned dind) full)
+        ∨ pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots) -∗
+       pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
+       pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
+                (cre_child (bv_unsigned ty) (bv_unsigned major)
+                           (bv_unsigned minor))) Fok -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
  plen pfun pv ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
-                         ret_tgt CIDc P Pmiss Φarm Φdots Φun Φok Φex) -∗
+                         ret_tgt CIDc P Pmiss Farm Fdots Fun Fok Fex) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* ---- (c) THE HALF -------------------------------------------------- *)

@@ -33,14 +33,15 @@
 
    Read's whole caller-supplied input is ONE one-shot piece: a single-phase
    commit that borrows the kernel's half of the inode map AND the offset
-   shadow's half at the instant, returns the receipt [Φ av off a d] and the
-   shadow advanced by [d].  Per the REFUNDS ruling the caller hands it in
-   as [aread_commit_at … Φ ∧ R], with [R] its own chosen refund; the kernel
-   eliminates to the AU side at the fire, and returns the whole conjunction
-   on the ONE arm that does not fire (the sign guard), where the caller
-   eliminates to [R].  [read_post_ok] / [read_post_fail] / [read_arms] are
-   that disposition, and they are the EXTRA the unified read contract pays
-   on an open, readable inode descriptor.
+   shadow's half at the instant, returns the receipt [F.(pf_recv) av off a d]
+   and the shadow advanced by [d].  Per the REFUNDS ruling the caller hands
+   it in as [pf_at (aread_commit_at Γ appE i γo) F], the receipt beside the
+   refund in the one pair [PieceFam.pfam]; the kernel eliminates
+   to the AU side at the fire, and returns the whole conjunction on the ONE
+   arm that does not fire (the sign guard), where the caller eliminates to
+   its refund.  [read_post_ok] / [read_post_fail] / [read_arms] are that
+   disposition, and they are the EXTRA the unified read contract pays on an
+   open, readable inode descriptor.
 
    ==== WHAT THE FIRE DOES =============================================
 
@@ -112,6 +113,7 @@ Require Import SpecSysReadAU.    (* the read observation's pure vocabulary  *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import
                                     ([FsAbsOpenFire]'s reason)              *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.
 
@@ -316,13 +318,13 @@ Section ReadFire.
   (* =================================================================== *)
 
   (* Read has ONE one-shot piece, the observation commit above, and per the
-     REFUNDS ruling every one-shot piece a caller hands in is [AU /\ R] with
-     [R] the caller-chosen REFUND -- provable from the same resources the
-     caller spent building the AU, so both conjuncts come out of one
-     context.  The kernel eliminates to the AU side when it fires and to [R]
-     when it hands the piece back unfired.  There is exactly one arm where
-     that happens (the sign guard), and it returns the SAME conjunction it
-     was given, so a caller eliminates to [R] there. *)
+     REFUNDS ruling every one-shot piece a caller hands in is [pf_at AU F]:
+     the AU conjoined with [F]'s refund, both proved from the resources the
+     caller spent building the AU.  The kernel eliminates to the AU side
+     when it fires and hands the whole pair back unfired otherwise.  There
+     is exactly one arm where that happens (the sign guard), and it returns
+     the SAME [pf_at] it was given, so a caller eliminates there to its own
+     [pf_refund]. *)
 
   (* ret >= 0: the observation fired and the value IS the tie's -- keyed
      by the equation itself rather than by a constant (the count depends
@@ -335,40 +337,41 @@ Section ReadFire.
      NO REFUND HERE: the piece is SPENT, and whatever the caller invested
      in building it comes back through the receipt [Φ] it chose. *)
   Definition read_post_ok Γ (i : Z) (n : Z)
-      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) : iProp Σ :=
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
+      (r : mword 64) : iProp Σ :=
     (∃ (av : aview) (off : nat) (a : anode) (d : nat),
        ⌜ard_pre av i off a⌝ ∗ ⌜0 <= n⌝ ∗ ⌜ard_ret_tie n a off r⌝ ∗
        ⌜Z.of_nat d = bv_unsigned r⌝ ∗
-       Φ av off a d)%I.
+       F.(pf_recv) av off a d)%I.
 
   (* ret -1: the fork's two live failure arms, keyed by the sign the
      caller already knows.  The guard arm ([n < 0], pre-lock) hands the
-     piece BACK UNFIRED -- the same [AU /\ R] the caller supplied, so it
-     eliminates to [R]; the copyout-fault arm delivers the FIRED receipt
+     piece BACK UNFIRED -- the same [pf_at] the caller supplied, so it
+     eliminates to its refund; the copyout-fault arm delivers the FIRED receipt
      -- the transfer's source value was observed even though the copy died
      -- with no count tie (readi answers -1, the offset does not move, the
      user bytes are unstated), at advance 0. *)
   Definition read_post_fail Γ (i : Z) (γo : gname) (n : Z)
-      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ) : iProp Σ :=
-    ((⌜n < 0⌝ ∗ (aread_commit_at Γ appE i γo Φ ∧ R))
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) : iProp Σ :=
+    ((⌜n < 0⌝ ∗ pf_at (aread_commit_at Γ appE i γo) F)
      ∨ (⌜0 <= n⌝
         ∗ ∃ (av : aview) (off : nat) (a : anode),
-            ⌜ard_pre av i off a⌝ ∗ Φ av off a 0%nat))%I.
+            ⌜ard_pre av i off a⌝ ∗ F.(pf_recv) av off a 0%nat))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0 *)
   Definition read_arms Γ (i : Z) (γo : gname) (n : Z)
-      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
       (r : mword 64) : iProp Σ :=
-    (read_post_ok Γ i n Φ r
+    (read_post_ok Γ i n F r
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ read_post_fail Γ i γo n Φ R))%I.
+        ∗ read_post_fail Γ i γo n F))%I.
 
   (* the arms refine the unified contract's unconditional return clause --
      [SpecFileread.fileread_ret] IS [pipe_rw_ret], and [ard_ret_tie_ret] is
      the ok arm's half.  Stated here so nothing above has to unfold the
      disjunction to see it. *)
-  Lemma read_arms_ret Γ (i : Z) γo (n : Z) Φ R (r : mword 64) :
-    read_arms Γ i γo n Φ R r -∗ ⌜pipe_rw_ret n r⌝.
+  Lemma read_arms_ret Γ (i : Z) γo (n : Z) F (r : mword 64) :
+    read_arms Γ i γo n F r -∗ ⌜pipe_rw_ret n r⌝.
   Proof.
     rewrite /read_arms /read_post_ok. iIntros "[Hok | [%Hm1 _]]".
     - iDestruct "Hok" as (av off a d) "(_ & %Hn & %Htie & _ & _)".
@@ -378,13 +381,13 @@ Section ReadFire.
 
   (* THE SIGN GUARD'S EXIT: the piece goes back exactly as it came in.
      fileread's [n < 0] test fires before the type dispatch, so nothing
-     fs-visible has happened and the caller eliminates the returned
-     conjunction to its own [R]. *)
+     fs-visible has happened and the caller eliminates the returned pair to
+     its own [pf_refund]. *)
   Lemma read_arms_neg Γ (i : Z) γo (n : Z)
-      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ) :
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) :
     (n < 0)%Z ->
-    (aread_commit_at Γ appE i γo Φ ∧ R) -∗
-    read_arms Γ i γo n Φ R (mword_of_int (-1) : mword 64).
+    pf_at (aread_commit_at Γ appE i γo) F -∗
+    read_arms Γ i γo n F (mword_of_int (-1) : mword 64).
   Proof.
     intros Hn. iIntros "Hc". rewrite /read_arms. iRight.
     iSplitR; [done |]. rewrite /read_post_fail. iLeft.
@@ -427,22 +430,24 @@ Section ReadFire.
      the hold where the count is known; the row cannot move between the
      lock's acquire and there. *)
   Lemma arf_read_fire (γfs : fs_names) (E : coPset) (dq : dfrac)
-      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (i : Z) (γo : gname)
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (i : Z) (γo : gname)
       (off d : nat) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     (off <= MAXFILE * BSIZE)%nat ->
     anode_size_ok (abs_row n) ->
     fn_type n <> 0 ->
     ftop_inv γfs -∗
-    aread_commit_at (fs_gamma_L γfs) appE i γo Φ -∗
+    pf_at (aread_commit_at (fs_gamma_L γfs) appE i γo) F -∗
     top_frag_q (fs_gamma_L γfs) dq i n -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq i n
       ∗ off_gv γo (1/2) (Z.of_nat (off + d))
       ∗ ∃ av : aview,
-          ⌜arow_at av i (abs_row n)⌝ ∗ Φ av off (abs_row n) d.
+          ⌜arow_at av i (abs_row n)⌝ ∗ F.(pf_recv) av off (abs_row n) d.
   Proof.
     intros HE Hoff Hsz Hnz. iIntros "#Hi Hcm Hf Hg".
+    (* THE PIECE IS SPENT: the fire eliminates to the AU side. *)
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     (* the same re-spelling [opf_open_fire] does, and for the same reason:
        the unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag_q /fs_gamma_L /=.
@@ -468,23 +473,23 @@ Section ReadFire.
   (* the [DfracOwn 1] reading, which is the spelling fileread holds
      ([top_frag] whole, from its [ilock] to its [iunlock]) *)
   Lemma arf_read_fire_1 (γfs : fs_names) (E : coPset)
-      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (i : Z) (γo : gname)
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (i : Z) (γo : gname)
       (off d : nat) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     (off <= MAXFILE * BSIZE)%nat ->
     anode_size_ok (abs_row n) ->
     fn_type n <> 0 ->
     ftop_inv γfs -∗
-    aread_commit_at (fs_gamma_L γfs) appE i γo Φ -∗
+    pf_at (aread_commit_at (fs_gamma_L γfs) appE i γo) F -∗
     top_frag (fs_gamma_L γfs) i n -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗
       top_frag (fs_gamma_L γfs) i n
       ∗ off_gv γo (1/2) (Z.of_nat (off + d))
       ∗ ∃ av : aview,
-          ⌜arow_at av i (abs_row n)⌝ ∗ Φ av off (abs_row n) d.
+          ⌜arow_at av i (abs_row n)⌝ ∗ F.(pf_recv) av off (abs_row n) d.
   Proof.
     intros HE Hoff Hsz Hnz. rewrite top_frag_1.
-    exact (arf_read_fire γfs E _ Φ i γo off d n HE Hoff Hsz Hnz).
+    exact (arf_read_fire γfs E _ F i γo off d n HE Hoff Hsz Hnz).
   Qed.
 
   (* =================================================================== *)
@@ -523,6 +528,14 @@ Section ReadFire.
     iFrame "Hn HΦ".
   Qed.
 
+  (* ...and the PAIR the arms are then read at: the enriched receipt
+     beside the client's own refund, unchanged (the wrapping is on the
+     receipt side only). *)
+  Definition arf_pin_fam Γ (i : Z) (q : Qp) (b : anode)
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
+      : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ) :=
+    MkPfam (arf_pin_recv Γ i q b F.(pf_recv)) F.(pf_refund).
+
   (* ...AND THE ARMS COLLAPSE: instantiate the commit at [arf_pin_recv]
      and every arm lands at the client's own value.  NOTE WHERE [0 <= n] IS
      SPENT -- on the GUARD arm, whose unfired piece would otherwise strand
@@ -541,12 +554,13 @@ Section ReadFire.
      that no longer match the goal's. *)
   Lemma arf_stable_ok_arm Γ (i : Z) (nz : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) :
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (r : mword 64) :
     read_post_ok Γ i nz
-      (arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr) r
-    ⊢ read_stable_arms Γ i nz q bs0 nl Φr r.
+      (arf_pin_fam Γ i q (MkAnode (AFile bs0) nl) F) r
+    ⊢ read_stable_arms Γ i nz q bs0 nl F.(pf_recv) r.
   Proof.
-    rewrite /read_post_ok /read_stable_arms /arf_pin_recv.
+    rewrite /read_post_ok /read_stable_arms /arf_pin_fam.
+    cbn [pf_recv pf_refund]. rewrite /arf_pin_recv.
     iIntros "Hok".
     iDestruct "Hok" as (av off a d)
       "(%Hpre & %Hnn & %Htie & %Hrd & %Hrow & %Hab & Hnv & HΦ)".
@@ -577,16 +591,17 @@ Section ReadFire.
      which is why read needs no escape arm where write does. *)
   Lemma arf_stable_fail_arm Γ (i : Z) γo (nz : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
       (r : mword 64) :
     0 <= nz ->
     r = (mword_of_int (-1) : mword 64) ->
     read_post_fail Γ i γo nz
-      (arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr) R
-    ⊢ read_stable_arms Γ i nz q bs0 nl Φr r.
+      (arf_pin_fam Γ i q (MkAnode (AFile bs0) nl) F)
+    ⊢ read_stable_arms Γ i nz q bs0 nl F.(pf_recv) r.
   Proof.
     intros Hnz Hr.
-    rewrite /read_post_fail /read_stable_arms /arf_pin_recv.
+    rewrite /read_post_fail /read_stable_arms /arf_pin_fam.
+    cbn [pf_recv pf_refund]. rewrite /arf_pin_recv.
     iIntros "[[%Hlt _] | [%Hge Hrest]]"; [exfalso; lia |].
     iDestruct "Hrest" as (av off a) "(%Hpre & %Hrow & %Hab & Hnv & HΦ)".
     subst a. destruct Hpre as (Hlk & Hoff & Hsz).
@@ -602,17 +617,17 @@ Section ReadFire.
   (* the two arms, joined *)
   Lemma arf_stable_of_arms Γ (i : Z) γo (nz : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (R : iProp Σ)
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
       (r : mword 64) :
     0 <= nz ->
     read_arms Γ i γo nz
-      (arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr) R r
-    ⊢ read_stable_arms Γ i nz q bs0 nl Φr r.
+      (arf_pin_fam Γ i q (MkAnode (AFile bs0) nl) F) r
+    ⊢ read_stable_arms Γ i nz q bs0 nl F.(pf_recv) r.
   Proof.
     intros Hnz. rewrite /read_arms.
     iIntros "[Hok | [%Hr Hfail]]".
     - iApply (arf_stable_ok_arm with "Hok").
-    - iApply (arf_stable_fail_arm Γ i γo nz q bs0 nl Φr R r Hnz Hr with "Hfail").
+    - iApply (arf_stable_fail_arm Γ i γo nz q bs0 nl F r Hnz Hr with "Hfail").
   Qed.
 
 End ReadFire.

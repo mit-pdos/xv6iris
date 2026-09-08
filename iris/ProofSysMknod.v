@@ -137,6 +137,7 @@ Require Import DirentEnc.        (* [bview]                             *)
 Require Import FsTree.
 Require Import SpecSysMknodAU.   (* [dev_arg]                           *)
 Require Import FsAbsMknodFire.   (* the commits and [mkf_dev_arg]       *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.            (* LAST of the abstract stack          *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -1020,12 +1021,12 @@ Section ProofSysMknodBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     wp_sys_mknod_body gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v0 v1 v2
-                            pid U m K eb b lks P Pmiss Φarm Φun Φok Φex.
+                            pid U m K eb b lks P Pmiss Farm Fun Fok Fex.
   Proof.
     (* the BODY's own three [let]s go first (ZETA), so the device numbers
        are the literal [dev_arg v1] / [dev_arg v2]; the FRAME's [let]s
@@ -1706,21 +1707,21 @@ Section ProofSysMknodBody.
               s4,a4] at +0xca is never taken -- so the one create asks for
               is discharged here, at its own unit, off the region's copy of
               the application invariant. *)
-           iAssert (adots_commit_at (fs_gamma_L fsc_fs) appE
-                      (fun _ _ _ _ => True%I)) as "Hdots".
+           iAssert (pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE)
+                      (pfam_triv (fun _ _ _ _ => True%I))) as "Hdots".
            { iApply SpecCreate.cre_dots_unit.
              iApply (InodeRegion.ireg_inv_app with "Hireg"). }
            iDestruct (cre_commits_of_dev (fs_gamma_L fsc_fs)
                         (bv_unsigned (hw_lo (arg_int32 v1)))
                         (bv_unsigned (hw_lo (arg_int32 v2)))
-                        Φarm Φun Φok with "Hacre Hdots Hchild") as "Hcre".
+                        Farm Fun Fok with "Hacre Hdots Hchild") as "Hcre".
            iApply (Create.wp_create_sconf (CID := CID25) gs j gl pd pav pu
       gf
       pk bf
                      FsAbsCreateFire.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
                      (upd_usM (us_upt U P') _) MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
                      N4 (K - 20)%nat eb b lks
-                     P Pmiss Φarm (fun _ _ _ _ => True%I) Φun Φok Φex
+                     P Pmiss Farm (pfam_triv (fun _ _ _ _ => True%I)) Fun Fok Fex
                      ltac:(lia) HdevR Hnib0 Hgeom Hsize
                      Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
                      (mn_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush
@@ -2073,7 +2074,7 @@ End SysMknodProof.
       [mkr_acre_forget]).  The arms hand back the commit the syscall did
       not fire, and it is a closure at the ENRICHED receipt; the
       enrichment is a conjunct, so it is dropped and the client gets its
-      own [Φok]/[Φex] commit back rather than a stronger-looking one it
+      own [Fok]/[Fex] commit back rather than a stronger-looking one it
       did not ask for.
 
    THE MEASURED SHAPE: ONE LEMMA PER ARM ([mkr_ok_arm] / [mkr_fail_arm]),
@@ -2238,6 +2239,65 @@ Section MknodStable.
     rewrite /mkr_recv. iDestruct "HΦ" as "[_ HΦ]". iModIntro. by iFrame.
   Qed.
 
+  (* ...AND THE FOUR AT THE PAIR.  The enrichment is on the RECEIPT side
+     only, so the two pairs share a refund and [PieceFam.pf_at_mono_pair]'s
+     equation is [eq_refl]: a client that never gets its fire takes back
+     exactly what it invested, enriched or not. *)
+  Lemma mkr_acre_compose_at Γ (E : coPset) (c : absnode) (avc : aview)
+      (root : Z) (ps : list fname) (ds : list Z)
+      (F : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    arun avc root ps ds ->
+    mkr_chain Γ avc ds ps -∗ pf_at (acre_commit_at Γ E c) F -∗
+      pf_at (acre_commit_at Γ E c) (mkr_fam root ps ds F).
+  Proof.
+    intros Hr. iIntros "#Hc Hcm".
+    iApply (pf_at_mono_pair (acre_commit_at Γ E c) (acre_commit_at Γ E c)
+              F (mkr_fam root ps ds F) eq_refl with "[] Hcm").
+    iIntros "Hcm".
+    iApply (mkr_acre_compose Γ E c avc root ps ds F.(pf_recv) Hr
+              with "Hc Hcm").
+  Qed.
+
+  Lemma mkr_dlookup_compose_at Γ (E : coPset) (avc : aview) (root : Z)
+      (ps : list fname) (ds : list Z)
+      (F : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    arun avc root ps ds ->
+    mkr_chain Γ avc ds ps -∗ pf_at (dlookup_commit_at Γ E) F -∗
+      pf_at (dlookup_commit_at Γ E) (mkr_fam root ps ds F).
+  Proof.
+    intros Hr. iIntros "#Hc Hcm".
+    iApply (pf_at_mono_pair (dlookup_commit_at Γ E) (dlookup_commit_at Γ E)
+              F (mkr_fam root ps ds F) eq_refl with "[] Hcm").
+    iIntros "Hcm".
+    iApply (mkr_dlookup_compose Γ E avc root ps ds F.(pf_recv) Hr
+              with "Hc Hcm").
+  Qed.
+
+  Lemma mkr_dlookup_forget_at Γ (E : coPset) (root : Z) (ps : list fname)
+      (ds : list Z) (F : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    pf_at (dlookup_commit_at Γ E) (mkr_fam root ps ds F) -∗
+    pf_at (dlookup_commit_at Γ E) F.
+  Proof.
+    iIntros "Hcm".
+    iApply (pf_at_mono_pair (dlookup_commit_at Γ E) (dlookup_commit_at Γ E)
+              (mkr_fam root ps ds F) F eq_refl with "[] Hcm").
+    iIntros "Hcm".
+    iApply (mkr_dlookup_forget Γ E root ps ds F.(pf_recv) with "Hcm").
+  Qed.
+
+  Lemma mkr_acre_forget_at Γ (E : coPset) (c : absnode) (root : Z)
+      (ps : list fname) (ds : list Z)
+      (F : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    pf_at (acre_commit_at Γ E c) (mkr_fam root ps ds F) -∗
+    pf_at (acre_commit_at Γ E c) F.
+  Proof.
+    iIntros "Hcm".
+    iApply (pf_at_mono_pair (acre_commit_at Γ E c) (acre_commit_at Γ E c)
+              (mkr_fam root ps ds F) F eq_refl with "[] Hcm").
+    iIntros "Hcm".
+    iApply (mkr_acre_forget Γ E c root ps ds F.(pf_recv) with "Hcm").
+  Qed.
+
   (* =================================================================== *)
   (*  3.  THE WALK, OWED NOTHING                                          *)
   (* =================================================================== *)
@@ -2263,70 +2323,72 @@ Section MknodStable.
   (* =================================================================== *)
 
   Lemma mkr_ok_arm Γ (ma mi : Z) (root : Z) (ps : list fname) (ds : list Z)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :
-    mknod_post_ok Γ ma mi (fun _ _ => True%I) Φarm Φun
-      (mkr_recv root ps ds Φok) (mkr_recv root ps ds Φex)
-    ⊢ mknod_stable_ok Γ ma mi root ps ds Φarm Φun Φok Φex.
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    mknod_post_ok Γ ma mi (fun _ _ => True%I) Farm Fun
+      (mkr_fam root ps ds Fok) (mkr_fam root ps ds Fex)
+    ⊢ mknod_stable_ok Γ ma mi root ps ds Farm Fun Fok Fex.
   Proof.
     rewrite /mknod_post_ok /mknod_stable_ok.
     iIntros "H". iDestruct "H" as (pl i) "[%Hi H]".
     iDestruct "H" as (av d nm ents nl)
       "(%Hlast & %Hpre & _ & Hcm & HΦ & Harmr & Hun)".
-    iEval (rewrite /mkr_recv) in "HΦ". iDestruct "HΦ" as "[%Hrun HΦ]".
+    iEval (rewrite /mkr_fam /mkr_recv /=) in "HΦ".
+    iDestruct "HΦ" as "[%Hrun HΦ]".
     iExists pl, av, d, i, nm, ents, nl.
     iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |].
-    iSplitL "Hcm"; [iApply (mkr_dlookup_forget with "Hcm") |].
+    iSplitL "Hcm"; [iApply (mkr_dlookup_forget_at with "Hcm") |].
     (* the child's leg travels unchanged: it names an inum, not a run *)
     iSplitL "HΦ"; [iExact "HΦ" |]. iFrame "Harmr Hun".
   Qed.
 
   Lemma mkr_fail_arm Γ (γfs : fs_names) (cw : Z) (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     mknod_post_fail Γ γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
-      Φarm Φun (mkr_recv root ps ds Φok) (mkr_recv root ps ds Φex)
-    ⊢ mknod_stable_fail Γ ma mi root ps ds Φarm Φun Φok Φex.
+      Farm Fun (mkr_fam root ps ds Fok) (mkr_fam root ps ds Fex)
+    ⊢ mknod_stable_fail Γ ma mi root ps ds Farm Fun Fok Fex.
   Proof.
     rewrite /mknod_post_fail /mknod_stable_fail /mknod_au_pre.
     iIntros "[(_ & Hacre & Hdl & Hchild) | H]".
     { iLeft. iSplitL "Hacre".
-      - iApply (mkr_acre_forget with "Hacre").
-      - iSplitL "Hdl"; [iApply (mkr_dlookup_forget with "Hdl") |].
+      - iApply (mkr_acre_forget_at with "Hacre").
+      - iSplitL "Hdl"; [iApply (mkr_dlookup_forget_at with "Hdl") |].
         iLeft. iExact "Hchild". }
     iDestruct "H" as (pl) "[(_ & Hacre & Hdl & Hchild) | H]".
     { iLeft. iSplitL "Hacre".
-      - iApply (mkr_acre_forget with "Hacre").
-      - iSplitL "Hdl"; [iApply (mkr_dlookup_forget with "Hdl") |].
+      - iApply (mkr_acre_forget_at with "Hacre").
+      - iSplitL "Hdl"; [iApply (mkr_dlookup_forget_at with "Hdl") |].
         iLeft. iExact "Hchild". }
     iDestruct "H" as (d) "(_ & Hacre & [H | Hdl] & Hch)".
     - iRight. iDestruct "H" as (av i nm ents nl) "(%Hlast & %Hd & %Hnm & HΦ)".
-      iEval (rewrite /mkr_recv) in "HΦ". iDestruct "HΦ" as "[%Hrun HΦ]".
+      iEval (rewrite /mkr_fam /mkr_recv /=) in "HΦ".
+    iDestruct "HΦ" as "[%Hrun HΦ]".
       iExists pl, av, d, i, nm, ents, nl.
       iSplitR; [by iPureIntro |].
       iSplitR; [by iPureIntro |].
       iSplitR; [by iPureIntro |].
       iSplitR; [by iPureIntro |].
-      iSplitL "Hacre"; [iApply (mkr_acre_forget with "Hacre") |].
+      iSplitL "Hacre"; [iApply (mkr_acre_forget_at with "Hacre") |].
       iSplitL "HΦ"; [iExact "HΦ" | iExact "Hch"].
     - iLeft. iSplitL "Hacre".
-      + iApply (mkr_acre_forget with "Hacre").
-      + iSplitL "Hdl"; [iApply (mkr_dlookup_forget with "Hdl") |].
+      + iApply (mkr_acre_forget_at with "Hacre").
+      + iSplitL "Hdl"; [iApply (mkr_dlookup_forget_at with "Hdl") |].
         (* whichever child reading arrived travels unchanged *)
         iExact "Hch".
   Qed.
 
   Lemma mkr_arms Γ (γfs : fs_names) (cw : Z) (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) (r : mword 64) :
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) (r : mword 64) :
     mknod_arms Γ γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
-      Φarm Φun (mkr_recv root ps ds Φok) (mkr_recv root ps ds Φex) r
-    ⊢ mknod_stable_arms Γ ma mi root ps ds Φarm Φun Φok Φex r.
+      Farm Fun (mkr_fam root ps ds Fok) (mkr_fam root ps ds Fex) r
+    ⊢ mknod_stable_arms Γ ma mi root ps ds Farm Fun Fok Fex r.
   Proof.
     rewrite /mknod_arms /mknod_stable_arms.
     iIntros "[[%Hr Hok] | [%Hr Hfail]]".
@@ -2352,14 +2414,14 @@ Section MknodStableWp.
       (v0 v1 v2 : mword 64) (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (root : Z) (avc : aview) (ds : list Z) (ps : list fname)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     wp_sys_mknod_body γf gs j gl pd pav pu ns dqb dqs dqbs dqn
       v0 v1 v2 pid U m K eb b lks
-      (fun _ _ => True%I) (fun _ _ => True%I) Φarm Φun
-      (mkr_recv root ps ds Φok) (mkr_recv root ps ds Φex) ->
+      (fun _ _ => True%I) (fun _ _ => True%I) Farm Fun
+      (mkr_fam root ps ds Fok) (mkr_fam root ps ds Fex) ->
     wp_sys_mknod_stable_body γf gs j gl pd pav pu ns dqb dqs dqbs
-      dqn v0 v1 v2 pid U m K eb b lks root avc ds ps Φarm Φun Φok Φex.
+      dqn v0 v1 v2 pid U m K eb b lks root avc ds ps Farm Fun Fok Fex.
   Proof.
     intros HW.
     cbv beta delta [wp_sys_mknod_body wp_sys_mknod_frame] in HW.
@@ -2381,10 +2443,10 @@ Section MknodStableWp.
     (* ---- THE BUNDLE: the walk owed nothing, the commits are enriched ---- *)
     { rewrite /mknod_au_pre. iSplitR; [iApply mkr_walk_triv |].
       iSplitL "Hacre".
-      - iApply (mkr_acre_compose _ _ _ avc root ps ds _ Hrun
+      - iApply (mkr_acre_compose_at _ _ _ avc root ps ds _ Hrun
                   with "Hchain Hacre").
       - iSplitL "Hdl".
-        + iApply (mkr_dlookup_compose _ _ avc root ps ds _ Hrun
+        + iApply (mkr_dlookup_compose_at _ _ avc root ps ds _ Hrun
                     with "Hchain Hdl").
         + (* the child's legs go down unenriched: they name an inum, not a
              run *)

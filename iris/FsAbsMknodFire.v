@@ -127,6 +127,7 @@ Require Import Xv6G.
 Require Import SpecSysMknodAU.   (* [dev_arg], [mknod_parent_elems]         *)
 Require Export FsAbsCreateFire.  (* the commits ([acre_commit_at], [dlookup_commit_at], the legs' -- moved there in round E2 so SpecCreate can name them), their units and seeds, [mkf_auth_nview] *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 
 Local Open Scope Z_scope.
@@ -228,22 +229,24 @@ Section MknodFire.
      one [IcacheEscrow.ic_loaded] carries), so no walk lend is involved
      and the fragment goes straight back. *)
   Lemma mkf_dlookup_fire (γfs : fs_names) (E : coPset) (dq : dfrac)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d i : Z) (nm : fname) (n : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     fn_is_dir n = true ->
     fn_nlink n <> 0%nat ->
     dir_entries n !! nm = Some i ->
     ftop_inv γfs -∗
-    dlookup_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (dlookup_commit_at (fs_gamma_L γfs) appE) Fex -∗
     top_frag_q (fs_gamma_L γfs) dq d n ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq d n
       ∗ ∃ av : aview,
           ⌜av !! d = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n))⌝
           ∗ ⌜dir_entries n !! nm = Some i⌝
-          ∗ Φ av d nm i.
+          ∗ Fex.(pf_recv) av d nm i.
   Proof.
     intros HE Hdir Hnl Hnm. iIntros "#Hi Hcm Hf".
+    (* THE PIECE IS SPENT: the fire eliminates to the AU side. *)
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     (* [γtop (fs_gamma_L γfs)] and [fs_top γfs] are the SAME gname
        ([FsAbs.ftop_gamma_top], by reflexivity) but the unifier cannot
        solve [γtop ?Γ =?= fs_top γfs], so the fragment is put in the
@@ -276,7 +279,7 @@ Section MknodFire.
      armed-child observation [cre_pre]'s third conjunct asks for: nlink 1,
      not yet in the parent) and comes back untouched. *)
   Lemma mkf_acre_fire (γfs : fs_names) (E : coPset) (ma mi : Z)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local d np' ->
@@ -286,17 +289,18 @@ Section MknodFire.
     abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np)) ->
     abs_of nc = Some (MkAnode (ADev ma mi) 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    acre_commit_at (fs_gamma_L γfs) appE (ADev ma mi) Φ -∗
+    pf_at (acre_commit_at (fs_gamma_L γfs) appE (ADev ma mi)) Fok -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ top_frag_q (fs_gamma_L γfs) dqc i nc
       ∗ ∃ av : aview,
           ⌜cre_pre av d nm (dir_entries np) (fn_nlink np) i (ADev ma mi)⌝
-          ∗ Φ av d nm i.
+          ∗ Fok.(pf_recv) av d nm i.
   Proof.
     intros HE Hloc Hdir Hnl Hnone Habsp' Habsc.
     iIntros "#Hi #Hai Hcm Hfp Hfc".
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     (* the same re-spelling as above, and the reason is the same *)
     rewrite /top_frag /top_frag_q /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
@@ -746,7 +750,7 @@ Section CreateFire.
      side of it, same payout.  The device instance is [mkf_acre_fire]
      itself and is NOT rerouted through this. *)
   Lemma caf_acre_fire (γfs : fs_names) (E : coPset) (cf : Z -> Z -> absnode)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local d np' ->
@@ -757,17 +761,18 @@ Section CreateFire.
                                (fn_nlink np + acre_bump (cf d i))%nat) ->
     abs_of nc = Some (MkAnode (cf d i) 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    acre_commit_at_gen (fs_gamma_L γfs) appE cf Φ -∗
+    pf_at (acre_commit_at_gen (fs_gamma_L γfs) appE cf) Fok -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ top_frag_q (fs_gamma_L γfs) dqc i nc
       ∗ ∃ av : aview,
           ⌜cre_pre av d nm (dir_entries np) (fn_nlink np) i (cf d i)⌝
-          ∗ Φ av d nm i.
+          ∗ Fok.(pf_recv) av d nm i.
   Proof.
     intros HE Hloc Hdir Hnl Hnone Habsp' Habsc.
     iIntros "#Hi #Hai Hcm Hfp Hfc".
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     (* the same re-spelling [mkf_acre_fire] does, and for the same reason:
        [γtop (fs_gamma_L γfs)] and [fs_top γfs] are the SAME gname
        ([FsAbs.ftop_gamma_top], by reflexivity) but the unifier cannot
@@ -819,7 +824,7 @@ Section CreateFire.
   (* the [AFile []] instance, which is the one the T_FILE create-AU fires:
      a file child is never an [ADir]. *)
   Lemma caf_acre_fire_file (γfs : fs_names) (E : coPset)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local d np' ->
@@ -829,18 +834,18 @@ Section CreateFire.
     abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np)) ->
     abs_of nc = Some (MkAnode (AFile []) 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    acre_commit_at (fs_gamma_L γfs) appE (AFile []) Φ -∗
+    pf_at (acre_commit_at (fs_gamma_L γfs) appE (AFile [])) Fok -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ top_frag_q (fs_gamma_L γfs) dqc i nc
       ∗ ∃ av : aview,
           ⌜cre_pre av d nm (dir_entries np) (fn_nlink np) i (AFile [])⌝
-          ∗ Φ av d nm i.
+          ∗ Fok.(pf_recv) av d nm i.
   Proof.
     intros HE Hloc Hdir Hnl Hnone Habsp' Habsc.
     iIntros "Hi Hai Hcm Hfp Hfc".
-    iApply (caf_acre_fire γfs E (fun _ _ => AFile []) Φ d i nm dqc np np' nc HE
+    iApply (caf_acre_fire γfs E (fun _ _ => AFile []) Fok d i nm dqc np np' nc HE
               Hloc Hdir Hnl Hnone
               ltac:(rewrite Habsp'; cbn [acre_bump]; by rewrite Nat.add_0_r)
               Habsc with "Hi Hai Hcm Hfp Hfc").

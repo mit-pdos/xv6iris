@@ -140,7 +140,7 @@
                    beside the unfired commit;
              (iii) the walk landed and the node was OBSERVED to be
                    something other than a directory -- the cursor [P L i]
-                   and the receipt [Φo av i a] at that node.
+                   and the receipt [Fo.(pf_recv) av i a] at that node.
  *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -194,6 +194,7 @@ Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [open_walk_dead_era],
                                    [aopen_commit_at] *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
@@ -247,9 +248,9 @@ Section SysChdirArms.
      observation commit *)
   Definition chdir_au_pre Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) : iProp Σ :=
     (open_walk_pre_era γfs cw P Pmiss
-     ∗ aopen_commit_at Γ appE Φo)%I.
+     ∗ pf_at (aopen_commit_at Γ appE) Fo)%I.
 
   (* ret -1: the three-way fold -- (i) nothing fs-visible happened (argstr
      failed: the bundle back whole), (ii) the walk died (the era refund
@@ -257,14 +258,14 @@ Section SysChdirArms.
      observed to be something other than a directory *)
   Definition chdir_post_fail Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
-    (chdir_au_pre Γ γfs cw P Pmiss Φo
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) : iProp Σ :=
+    (chdir_au_pre Γ γfs cw P Pmiss Fo
      ∨ (∃ pl : list (bv 8),
           (open_walk_dead_era γfs P Pmiss pl
-             ∗ aopen_commit_at Γ appE Φo)
+             ∗ pf_at (aopen_commit_at Γ appE) Fo)
           ∨ (∃ (i : Z) (av : aview) (a : anode),
                P (length (path_elems pl)) i
-               ∗ ⌜arow_at av i a⌝ ∗ Φo av i a
+               ∗ ⌜arow_at av i a⌝ ∗ Fo.(pf_recv) av i a
                ∗ ⌜forall (e : gmap fname Z) (nl : nat),
                     a <> MkAnode (ADir e) nl⌝)))%I.
 
@@ -273,13 +274,13 @@ Section SysChdirArms.
      walk's own cursor [i] *)
   Definition chdir_post_ok Γ (γf : gname) (pj : mword 64) (pid : mword 32)
       (P : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (U : ustate) : iProp Σ :=
     (∃ (ipv : mword 64) (pl : list (bv 8)) (i : Z)
        (e : gmap fname Z) (nl : nat) (av : aview),
        P (length (path_elems pl)) i
        ∗ ⌜arow_at av i (MkAnode (ADir e) nl)⌝
-       ∗ Φo av i (MkAnode (ADir e) nl)
+       ∗ Fo.(pf_recv) av i (MkAnode (ADir e) nl)
        ∗ proc_priv γf pj pid (us_cwi (us_cwd U ipv) i))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, at the
@@ -287,13 +288,13 @@ Section SysChdirArms.
   Definition chdir_arms Γ (γfs : fs_names) (γf : gname)
       (pj : mword 64) (pid : mword 32) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (U : ustate) (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int (-1) : mword 64)⌝
       ∗ proc_priv γf pj pid U
-      ∗ chdir_post_fail Γ γfs cw P Pmiss Φo)
+      ∗ chdir_post_fail Γ γfs cw P Pmiss Fo)
      ∨ (⌜r = (zero_reg : mword 64)⌝
-        ∗ chdir_post_ok Γ γf pj pid P Φo U))%I.
+        ∗ chdir_post_ok Γ γf pj pid P Fo U))%I.
 
   (* THE RETURN BLANKET, READ OFF THE ARMS.  It is a consequence and not a
      second conjunct: [sys_chdir_post] carries [proc_priv], and each arm
@@ -302,9 +303,9 @@ Section SysChdirArms.
   Lemma chdir_arms_landed Γ (γfs : fs_names) (γf : gname)
       (pj : mword 64) (pid : mword 32) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (U : ustate) (r : mword 64) :
-    chdir_arms Γ γfs γf pj pid cw P Pmiss Φo U r ⊢
+    chdir_arms Γ γfs γf pj pid cw P Pmiss Fo U r ⊢
       sys_chdir_post γf pj pid U r.
   Proof.
     rewrite /chdir_arms /chdir_post_ok /sys_chdir_post.
@@ -436,12 +437,12 @@ Definition wp_sys_chdir_body
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (P Pmiss : nat -> Z -> iProp Σ)
-    (Φo : aview -> Z -> anode -> iProp Σ) :=
+    (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :=
   let Γfs := fs_gamma_L fsc_fs in
   wp_sys_chdir_frame γf gs j gl pd pav pu dqb dqs
     v pid U m K eb b lks
-    (chdir_au_pre Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φo)
-    (chdir_arms Γfs fsc_fs γf (proc_addr j) pid (pv_cwi (us_V U)) P Pmiss Φo).
+    (chdir_au_pre Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo)
+    (chdir_arms Γfs fsc_fs γf (proc_addr j) pid (pv_cwi (us_V U)) P Pmiss Fo).
 
 (* ===================================================================== *)
 (*  ONE MODULE TYPE                                                       *)
@@ -463,7 +464,7 @@ Module Type SYSCHDIR.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ),
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)),
       wp_sys_chdir_body γf gs j gl pd pav pu dqb dqs
-        v pid U m K eb b lks P Pmiss Φo.
+        v pid U m K eb b lks P Pmiss Fo.
 End SYSCHDIR.

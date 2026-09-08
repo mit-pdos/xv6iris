@@ -107,6 +107,7 @@ Require Import SpecSysUnlinkAU.
 Require Import FsAbsUnlinkFire.
 Require Import ProofSysUnlinkAUParts.
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
@@ -175,10 +176,10 @@ Section ProofSysUnlinkAUW5D.
       (lks : gset string) (t : nat)
       (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phient : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phitgt : aview -> Z -> iProp Σ)
-      (Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phimiss : aview -> Z -> fname -> iProp Σ) :
+      (Phient : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phitgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phimiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) :
     (K_sys_unlink <= K)%nat ->
     printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
     (0 < icfg_nib)%nat ->
@@ -341,10 +342,10 @@ Section ProofSysUnlinkAUW5D.
     (* ---- THE AU SIDE, as W3's seam hands it ---- *)
     ⌜exists es e, nameiparent_of pl es e /\ bname 14 nf = e⌝ -∗
     P (length (mknod_parent_elems pl)) (bv_unsigned dinum) -∗
-    uent_commit_at (fs_gamma_L fsc_fs) appE Phient -∗
-    utgt_commit_at (fs_gamma_L fsc_fs) appE Phitgt -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
-    dmiss_commit_at (fs_gamma_L fsc_fs) appE Phimiss -∗
+    pf_at (uent_commit_at (fs_gamma_L fsc_fs) appE) Phient -∗
+    pf_at (utgt_commit_at (fs_gamma_L fsc_fs) appE) Phitgt -∗
+    pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Phiex -∗
+    pf_at (dmiss_commit_at (fs_gamma_L fsc_fs) appE) Phimiss -∗
     (* ---- the frame, slot 5 FILLED ---- *)
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗

@@ -90,6 +90,7 @@ Require Import FsAbsDelta.       (* [delta_link_tgt]/[delta_link_ent]        *)
 Require Import FsAbsUnlinkFire.  (* [uf_abs_node_nlink], [uf_utgt_fire]      *)
 Require Import SpecSysLink.      (* the statement this file's fires serve    *)
 Require Import AppInv.           (* [appN]/[appE]: the commit mask           *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.        (* LAST (FsAbs's own rule)                  *)
 
 Local Open Scope Z_scope.
@@ -242,7 +243,7 @@ Section LinkFire.
      the count's business ([arow_at]) -- and sys_link, unlike unlink, never
      tests the count. *)
   Lemma lf_tgt_fire (γfs : fs_names) (E : coPset)
-      (Φ : aview -> Z -> anode -> iProp Σ) (t : Z) (nt nt' : fs_node) :
+      (Ftgt : pfam Σ (aview -> Z -> anode -> iProp Σ)) (t : Z) (nt nt' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local t nt' ->
     fn_type nt <> 0 ->
@@ -250,15 +251,17 @@ Section LinkFire.
     fn_type nt' <> 0
     /\ abs_row nt' = MkAnode (an_node (abs_row nt)) (fn_nlink nt + 1)%nat ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    ltgt_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (ltgt_commit_at (fs_gamma_L γfs) appE) Ftgt -∗
     top_frag (fs_gamma_L γfs) t nt ={E}=∗
       top_frag (fs_gamma_L γfs) t nt'
       ∗ ∃ av : aview,
           ⌜arow_at av t (abs_row nt)⌝
           ∗ ⌜link_tgt_ok (an_node (abs_row nt))⌝
-          ∗ Φ av t (abs_row nt).
+          ∗ Ftgt.(pf_recv) av t (abs_row nt).
   Proof.
     intros HE Hloc Hnzt Hok Habs'. iIntros "#Hi #Hai Hcm Hf".
+    (* THE PIECE IS SPENT: the fire eliminates to the AU side. *)
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -302,7 +305,7 @@ Section LinkFire.
      at +0x84 (xv6 f60ff58) refused an [nlink = 0] parent -- which is what
      puts its row in the view at all. *)
   Lemma lf_ent_fire (γfs : fs_names) (E : coPset)
-      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d t : Z) (nm : fname) (np np' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local d np' ->
@@ -312,15 +315,16 @@ Section LinkFire.
     abs_of np'
       = Some (MkAnode (ADir (<[nm := t]> (dir_entries np))) (fn_nlink np)) ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    lent_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (lent_commit_at (fs_gamma_L γfs) appE) Fent -∗
     top_frag (fs_gamma_L γfs) d np ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ ∃ av : aview,
           ⌜av !! d = Some (MkAnode (ADir (dir_entries np)) (fn_nlink np))⌝
           ∗ ⌜dir_entries np !! nm = None⌝
-          ∗ Φ av d nm t.
+          ∗ Fent.(pf_recv) av d nm t.
   Proof.
     intros HE Hloc Hdir Hnl Hnm Habsp'. iIntros "#Hi #Hai Hcm Hf".
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".

@@ -239,10 +239,10 @@
    ret 0  -- [unlink_post_ok]: the fetched path (existential, as always:
              no premise can pin user bytes), the cursor [P Lp d] at the
              parent, [unl_pre] restated purely at instant 1 beside the
-             caller's own receipts [Φent]/[Φtgt], the instant-2 target
+             caller's own receipts [Fent]/[Ftgt], the instant-2 target
              pin, the region bound on [t], and the two observation
              commits refunded (the found fact is subsumed by [unl_pre],
-             so firing [Φex] would be a second receipt at an earlier
+             so firing [Fex] would be a second receipt at an earlier
              instant).
    ret -1 -- [unlink_post_fail], residue returned per arm:
              (i)   nothing fs-visible happened (argstr failed): the
@@ -257,12 +257,12 @@
                        both observation commits refunded (the kernel
                        looked at nothing abstract);
                    (b) GONE -- dirlookup ran and MISSED: the miss
-                       observation [Φmiss] FIRED at the instant, with
+                       observation [Fmiss] FIRED at the instant, with
                        the parent's row and the absent name stated
                        purely beside it;
                    (c) DIR NON-EMPTY -- dirlookup FOUND [t] and
                        isdirempty refuted emptiness: the found
-                       observation [Φex] FIRED, at the instant where
+                       observation [Fex] FIRED, at the instant where
                        BOTH locks are held, so the same [av] purely
                        carries the parent's row, the entry, the
                        target's dir row and its non-dots witness;
@@ -334,6 +334,7 @@ Require Import FsAbsEraMknod.   (* the era walk-premise pair, reused
                                    verbatim (nameiparent-generic) *)
 Require Import FsAbsMknodFire.  (* [dlookup_commit_at]; the [_at] mold *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
@@ -417,15 +418,15 @@ Section SysUnlinkArms.
      [FsAbsStart.ep_start] instantiates to at the fetched string). *)
   Definition unlink_au_pre Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φtgt : aview -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φmiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Ftgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) : iProp Σ :=
     (mknod_walk_pre_era γfs cw P Pmiss
-     ∗ uent_commit_at Γ appE Φent
-     ∗ utgt_commit_at Γ appE Φtgt
-     ∗ dlookup_commit_at Γ appE Φex
-     ∗ dmiss_commit_at Γ appE Φmiss)%I.
+     ∗ pf_at (uent_commit_at Γ appE) Fent
+     ∗ pf_at (utgt_commit_at Γ appE) Ftgt
+     ∗ pf_at (dlookup_commit_at Γ appE) Fex
+     ∗ pf_at (dmiss_commit_at Γ appE) Fmiss)%I.
 
   (* ret 0: the fetched path, the cursor at the parent, [unl_pre]
      restated purely at instant 1, BOTH fired receipts, the instant-2
@@ -433,10 +434,10 @@ Section SysUnlinkArms.
      region bound on the target, and the two observation commits
      refunded. *)
   Definition unlink_post_ok Γ (P : nat -> Z -> iProp Σ)
-      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φtgt : aview -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φmiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Ftgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) : iProp Σ :=
     (∃ (pl : list (bv 8)) (av0 av1 : aview) (d t : Z) (nm : fname)
        (ents : gmap fname Z) (nl : nat) (a : anode),
        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
@@ -444,45 +445,45 @@ Section SysUnlinkArms.
        ⌜0 < t < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜av1 !! t = Some a⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
-       dlookup_commit_at Γ appE Φex ∗
-       dmiss_commit_at Γ appE Φmiss ∗
-       Φent av0 d nm t ∗
-       Φtgt av1 t)%I.
+       pf_at (dlookup_commit_at Γ appE) Fex ∗
+       pf_at (dmiss_commit_at Γ appE) Fmiss ∗
+       Fent.(pf_recv) av0 d nm t ∗
+       Ftgt.(pf_recv) av1 t)%I.
 
   (* ret -1: the header's fold -- (i) bundle back, (ii) walk dead,
      (iii) refused at the parent with the observation each refusal IS *)
   Definition unlink_post_fail Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φtgt : aview -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φmiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
-    (unlink_au_pre Γ γfs cw P Pmiss Φent Φtgt Φex Φmiss
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Ftgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) : iProp Σ :=
+    (unlink_au_pre Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss
      ∨ (∃ pl : list (bv 8),
           (mknod_walk_dead_era γfs P Pmiss pl
-             ∗ uent_commit_at Γ appE Φent
-             ∗ utgt_commit_at Γ appE Φtgt
-             ∗ dlookup_commit_at Γ appE Φex
-             ∗ dmiss_commit_at Γ appE Φmiss)
+             ∗ pf_at (uent_commit_at Γ appE) Fent
+             ∗ pf_at (utgt_commit_at Γ appE) Ftgt
+             ∗ pf_at (dlookup_commit_at Γ appE) Fex
+             ∗ pf_at (dmiss_commit_at Γ appE) Fmiss)
           ∨ (∃ d : Z,
                P (length (mknod_parent_elems pl)) d
-               ∗ uent_commit_at Γ appE Φent
-               ∗ utgt_commit_at Γ appE Φtgt
+               ∗ pf_at (uent_commit_at Γ appE) Fent
+               ∗ pf_at (utgt_commit_at Γ appE) Ftgt
                ∗ ((* (iii-a) the name is a dot: refused BY NAME, before
                      any lookup -- pure, both observations refunded *)
                   (∃ nm : fname,
                      ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
                      ⌜nm = DOT \/ nm = DOTDOT⌝ ∗
-                     dlookup_commit_at Γ appE Φex ∗
-                     dmiss_commit_at Γ appE Φmiss)
+                     pf_at (dlookup_commit_at Γ appE) Fex ∗
+                     pf_at (dmiss_commit_at Γ appE) Fmiss)
                   ∨ (* (iii-b) gone: the miss observation FIRED *)
                   (∃ (av : aview) (nm : fname) (ents : gmap fname Z)
                      (nl : nat),
                      ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
                      ⌜arow_at av d (MkAnode (ADir ents) nl)⌝ ∗
                      ⌜ents !! nm = None⌝ ∗
-                     Φmiss av d nm ∗
-                     dlookup_commit_at Γ appE Φex)
+                     Fmiss.(pf_recv) av d nm ∗
+                     pf_at (dlookup_commit_at Γ appE) Fex)
                   ∨ (* (iii-c) dir non-empty: the found observation
                        FIRED, both rows pinned at the one instant *)
                   (∃ (av : aview) (t : Z) (nm : fname)
@@ -492,37 +493,37 @@ Section SysUnlinkArms.
                      ⌜ents !! nm = Some t⌝ ∗
                      ⌜av !! t = Some (MkAnode (ADir est) nlt)⌝ ∗
                      ⌜~ dots_only est⌝ ∗
-                     Φex av d nm t ∗
-                     dmiss_commit_at Γ appE Φmiss)
+                     Fex.(pf_recv) av d nm t ∗
+                     pf_at (dmiss_commit_at Γ appE) Fmiss)
                   ∨ (* (iii-d) no abstract observation to report: the
                        k = Lp deaths (parent-level type/nlink guards,
                        "unlink of /") -- everything back *)
-                  (dlookup_commit_at Γ appE Φex ∗
-                   dmiss_commit_at Γ appE Φmiss)))))%I.
+                  (pf_at (dlookup_commit_at Γ appE) Fex ∗
+                   pf_at (dmiss_commit_at Γ appE) Fmiss)))))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0
      (implies the landed [sys_unlink_ret]) *)
   Definition unlink_arms Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φtgt : aview -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φmiss : aview -> Z -> fname -> iProp Σ)
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Ftgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ))
       (r : mword 64) : iProp Σ :=
     ((⌜r = (zero_reg : mword 64)⌝
-      ∗ unlink_post_ok Γ P Φent Φtgt Φex Φmiss)
+      ∗ unlink_post_ok Γ P Fent Ftgt Fex Fmiss)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ unlink_post_fail Γ γfs cw P Pmiss Φent Φtgt Φex Φmiss))%I.
+        ∗ unlink_post_fail Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss))%I.
 
   (* the landed return blanket, read off the arms: the one conjunct of
      [SpecSysUnlink.sys_unlink_closer] the AU form replaces, implied *)
   Lemma unlink_arms_ret Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φtgt : aview -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φmiss : aview -> Z -> fname -> iProp Σ) (r : mword 64) :
-    unlink_arms Γ γfs cw P Pmiss Φent Φtgt Φex Φmiss r ⊢ ⌜sys_unlink_ret r⌝.
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Ftgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) (r : mword 64) :
+    unlink_arms Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss r ⊢ ⌜sys_unlink_ret r⌝.
   Proof.
     rewrite /unlink_arms /sys_unlink_ret.
     iIntros "[[%Hr _] | [%Hr _]]"; iPureIntro; [right | left]; exact Hr.
@@ -638,15 +639,15 @@ Definition wp_sys_unlink_body
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (P Pmiss : nat -> Z -> iProp Σ)
-    (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-    (Φtgt : aview -> Z -> iProp Σ)
-    (Φex : aview -> Z -> fname -> Z -> iProp Σ)
-    (Φmiss : aview -> Z -> fname -> iProp Σ) :=
+    (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+    (Ftgt : pfam Σ (aview -> Z -> iProp Σ))
+    (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+    (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) :=
   let Γfs := fs_gamma_L fsc_fs in
   wp_sys_unlink_frame γf gs j gl pd pav pu dqb dqs dqbs
     v0 pid U m K eb b lks
-    (unlink_au_pre Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φent Φtgt Φex Φmiss)
-    (unlink_arms Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φent Φtgt Φex Φmiss).
+    (unlink_au_pre Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fent Ftgt Fex Fmiss)
+    (unlink_arms Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fent Ftgt Fex Fmiss).
 
 (* ===================================================================== *)
 (*  ONE MODULE TYPE                                                       *)
@@ -671,10 +672,10 @@ Module Type SYSUNLINK.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φtgt : aview -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φmiss : aview -> Z -> fname -> iProp Σ),
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Ftgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ)),
       wp_sys_unlink_body γf gs j gl pd pav pu dqb dqs dqbs
-        v0 pid U m K eb b lks P Pmiss Φent Φtgt Φex Φmiss.
+        v0 pid U m K eb b lks P Pmiss Fent Ftgt Fex Fmiss.
 End SYSUNLINK.

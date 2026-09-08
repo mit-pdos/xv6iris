@@ -189,6 +189,7 @@ Require Import FsAbsEraMknod.   (* [mknod_walk_pre_era], [mknod_walk_dead_era]
 Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at],
                                    [mkf_auth_nview] *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
@@ -429,31 +430,36 @@ Section SysOpenAU.
   (*  2d.  The AU bundles                                                 *)
   (* ------------------------------------------------------------------ *)
 
-  (* everything the PLAIN caller hands in, at the mask floor [∅] *)
+  (* Everything the PLAIN caller hands in, at the mask floor [∅].  Each
+     one-shot piece arrives as its AU CONJOINED with its own refund (the
+     REFUNDS ruling); the pair is [PieceFam.pfam], the receipt beside the
+     refund, so the list stays the length it had.  The walk's cursor pair
+     [P]/[Pmiss] stays BARE: a sequenced piece carries its refund as its
+     cursor and owes no second one. *)
   Definition open_au_pre_plain `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
-      (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
     (open_walk_pre_era γfs cw P Pmiss
-     ∗ aopen_commit_at Γ appE Φo
-     ∗ atrunc_commit_at Γ appE Φt)%I.
+     ∗ pf_at (aopen_commit_at Γ appE) Fo
+     ∗ pf_at (atrunc_commit_at Γ appE) Ft)%I.
 
   (* ...and the O_CREATE caller: the parent-prefix one-shot REUSED from
      the mknod era file, create's fused delta at the child [AFile []],
      the exists observation, and open's own two commits *)
   Definition open_au_pre_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm Φun : aview -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
-      (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
     (mknod_walk_pre_era γfs cw P Pmiss
-     ∗ acre_commit_at Γ appE (AFile []) Φok
-     ∗ dlookup_commit_at Γ appE Φex
-     ∗ aopen_commit_at Γ appE Φo
-     ∗ atrunc_commit_at Γ appE Φt
+     ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
+     ∗ pf_at (dlookup_commit_at Γ appE) Fex
+     ∗ pf_at (aopen_commit_at Γ appE) Fo
+     ∗ pf_at (atrunc_commit_at Γ appE) Ft
      (* ...and create's CHILD legs (round E2, lane E2-C) *)
-     ∗ cre_child_unfired Γ (AFile []) Φarm Φun)%I.
+     ∗ cre_child_unfired Γ (AFile []) Farm Fun)%I.
 
   (* ------------------------------------------------------------------ *)
   (*  2e.  The descriptor story                                           *)

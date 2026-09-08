@@ -378,6 +378,7 @@ Require Import SpecSysChdir.     (* [SYSCHDIR], [chdir_arms_landed] *)
 Require Import SpecSysWriteAU.     (* [wchunks]                              *)
 Require Import FsAbsWriteFire.     (* [awrite_chain]                         *)
 Require Import OffGv.              (* [off_user_inv]: the fd row's offset     *)
+Require Import PieceFam.   (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
 Require Import FsAbsInvFire.
 Require Import SpecMyproc.
 (* the content-independent bundles the non-closer fs entries state their
@@ -2866,13 +2867,15 @@ Section SyscallArms.
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     sysc_exec_in U sts -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : gmap Z FsAbsDefs.anode -> Z -> FsAbsDefs.anode -> iProp Σ),
-      sys_exec_au_pre uslot_x (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss Φo (us_M U) v1 sts.
+      (Fo : pfam Σ (gmap Z FsAbsDefs.anode -> Z -> FsAbsDefs.anode -> iProp Σ))
+      (Rs : iProp Σ),
+      sys_exec_au_pre (MkPfam uslot_x Rs) (fs_gamma_L fsc_fs) fsc_fs
+        (pv_cwi (us_V U)) P Pmiss Fo (us_M U) v1 sts.
   Proof.
     intros Hn Hv1. rewrite /sysc_exec_in. iIntros "H".
     iDestruct ("H" with "[%]") as "H"; [exact Hn |].
-    iDestruct (xbundle_elim with "H") as (P Pmiss Φo) "H".
-    iExists P, Pmiss, Φo.
+    iDestruct (xbundle_elim with "H") as (P Pmiss Fo Rs) "H".
+    iExists P, Pmiss, Fo, Rs.
     rewrite /uvis_of /tf_w. cbn [uvis_M uvis_tf uvis_fd].
     rewrite (list_lookup_total_correct _ _ _ Hv1). iExact "H".
   Qed.
@@ -4054,11 +4057,11 @@ Section SyscallArms.
        environment, so nothing of [syscall_env]'s fs-abstract side is
        opened here. ---- *)
     iDestruct (sysc_exec_in_open U sts v1 ltac:(rewrite Hnum; reflexivity) Hv1
-                 with "Hxin") as (P Pmiss Φo) "Hau".
-    iApply (SysExec.wp_sys_exec_sconf uslot_x γf γs j γl
+                 with "Hxin") as (P Pmiss Fo Rs) "Hau".
+    iApply (SysExec.wp_sys_exec_sconf (MkPfam uslot_x Rs) γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 v1 pid U sts M (av - 4)%nat true true lks
-              P Pmiss Φo
+              P Pmiss Fo
               ltac:(lia) Hroot Hnib0 Hlg Hsize
               Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hj Hgamma eq_refl Hv0 Hv1
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hfab Hbmp Hisp Hbmr Hbs
@@ -4562,7 +4565,7 @@ Section SyscallArms.
                  with "Hufrag") as "[Hufrag Hsrin]".
     iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γc fn)
               pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
-              (fun _ _ _ _ => True%I) True%I
+              (pfam_triv (fun _ _ _ _ => True%I))
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Hsrin").
@@ -4770,7 +4773,8 @@ Section SyscallArms.
     iApply (SysChdir.wp_sys_chdir γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 pid U M (av - 4)%nat true true ∅
-              (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I)
+              (fun _ _ => True%I) (fun _ _ => True%I)
+              (pfam_triv (fun _ _ _ => True%I))
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hib Hj Hgamma eq_refl Hv0
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hbio Hlog Hseam
@@ -4912,8 +4916,10 @@ Section SyscallArms.
               DfracDiscarded DfracDiscarded DfracDiscarded v0 pid U M
               (av - 4)%nat true true ∅
               (fun _ _ => True%I) (fun _ _ => True%I)
-              (fun _ _ _ _ => True%I) (fun _ _ => True%I)
-              (fun _ _ _ _ => True%I) (fun _ _ _ => True%I)
+              (pfam_triv (fun _ _ _ _ => True%I))
+              (pfam_triv (fun _ _ => True%I))
+              (pfam_triv (fun _ _ _ _ => True%I))
+              (pfam_triv (fun _ _ _ => True%I))
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbg Hib (proj2 (proj2 (proj2 Hnin))) Hprg Hj Hgamma
               eq_refl Hv0
@@ -5019,7 +5025,9 @@ Section SyscallArms.
 
               DfracDiscarded DfracDiscarded DfracDiscarded v0 v1 pid U M
               (av - 4)%nat true true ∅
-              (fun _ _ _ => True%I) (fun _ _ _ _ => True%I) (fun _ _ => True%I)
+              (pfam_triv (fun _ _ _ => True%I))
+              (pfam_triv (fun _ _ _ _ => True%I))
+              (pfam_triv (fun _ _ => True%I))
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbg Hib (proj2 (proj2 (proj2 Hnin))) Hprg Hj Hgamma
               eq_refl Hv0 Hv1
@@ -5586,9 +5594,11 @@ Section SyscallArms.
                  use ([FsAbsInvFire.fsabs_*]).  The receipts come back at
                  [True] and are dropped. *)
               (fun _ _ => True)%I (fun _ _ => True)%I
-              (fun _ _ => True)%I (fun _ _ _ _ => True)%I
-              (fun _ _ => True)%I (fun _ _ _ _ => True)%I
-              (fun _ _ _ _ => True)%I
+              (pfam_triv (fun _ _ => True%I))
+              (pfam_triv (fun _ _ _ _ => True%I))
+              (pfam_triv (fun _ _ => True%I))
+              (pfam_triv (fun _ _ _ _ => True%I))
+              (pfam_triv (fun _ _ _ _ => True%I))
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
               ltac:(compute; lia) Hj Hgamma eq_refl Hv0
@@ -5707,8 +5717,9 @@ Section SyscallArms.
               v0 v1 v2 pid U M (av - 4)%nat true true ∅
               (fun _ _ => True%I) (fun _ _ => True%I)
               (* create's child legs, at the trivial families too *)
-              (fun _ _ => True%I) (fun _ _ => True%I)
-              (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
+              (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I))
+              (pfam_triv (fun _ _ _ _ => True%I))
+              (pfam_triv (fun _ _ _ _ => True%I))
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
               ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1 Hv2
@@ -5866,9 +5877,11 @@ Section SyscallArms.
                 (fun _ _ => True%I) (fun _ _ => True%I)
                 (* create's child legs, at the trivial families too
                    (round E2, lane E2-C) *)
-                (fun _ _ => True%I) (fun _ _ => True%I)
-                (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
-                (fun _ _ _ => True%I) (fun _ _ _ => True%I)
+                (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I))
+                (pfam_triv (fun _ _ _ _ => True%I))
+                (pfam_triv (fun _ _ _ _ => True%I))
+                (pfam_triv (fun _ _ _ => True%I))
+                (pfam_triv (fun _ _ _ => True%I))
                 ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
                 Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
                 ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1

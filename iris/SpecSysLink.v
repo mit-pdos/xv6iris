@@ -194,6 +194,7 @@ Require Import FsTree.          (* [fname]                                  *)
 Require Import FsBytesGamma.    (* [fs_gamma_L], [fs_view_names], [gamma_top] *)
 Require Import AppInv.          (* [app_step], [appN]/[appE], [app_step_acc] *)
 Require Import SpecSysUnlinkAU. (* [utgt_commit_at] + [FsAbsDelta] re-export *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.       (* LAST (FsAbs's own rule)                  *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -360,36 +361,41 @@ Section SysLinkAbs.
   (* ------------------------------------------------------------------ *)
 
   Definition link_commits Γ
-      (Φtgt : aview -> Z -> anode -> iProp Σ)
-      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φuntgt : aview -> Z -> iProp Σ) : iProp Σ :=
-    (ltgt_commit_at Γ appE Φtgt ∗ lent_commit_at Γ appE Φent
-     ∗ utgt_commit_at Γ appE Φuntgt)%I.
+      (Ftgt : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Funt : pfam Σ (aview -> Z -> iProp Σ)) : iProp Σ :=
+    (pf_at (ltgt_commit_at Γ appE) Ftgt ∗ pf_at (lent_commit_at Γ appE) Fent
+     ∗ pf_at (utgt_commit_at Γ appE) Funt)%I.
 
   (* the whole bundle at the trivial families -- what the dispatcher hands
      down ([FsAbsInvFire.fsabs_link_pre] is this beside [app_inv]) *)
   Lemma link_commits_unit (γfs : fs_names) :
     app_inv γfs -∗
-    link_commits (fs_gamma_L γfs) (fun _ _ _ => True%I)
-      (fun _ _ _ _ => True%I) (fun _ _ => True%I).
+    link_commits (fs_gamma_L γfs) (pfam_triv (fun _ _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ => True%I)).
   Proof.
     iIntros "#Hai". rewrite /link_commits.
-    iSplitR; [iApply (ltgt_commit_at_unit γfs appE link_appN_appE with "Hai") |].
-    iSplitR; [iApply (lent_commit_at_unit γfs appE link_appN_appE with "Hai") |].
+    iSplitR.
+    { iApply pf_at_triv.
+      iApply (ltgt_commit_at_unit γfs appE link_appN_appE with "Hai"). }
+    iSplitR.
+    { iApply pf_at_triv.
+      iApply (lent_commit_at_unit γfs appE link_appN_appE with "Hai"). }
+    iApply pf_at_triv.
     iApply (utgt_commit_at_unit γfs appE link_appN_appE with "Hai").
   Qed.
 
   (* each receipt with its instant's pure facts restated beside the
      caller's own [Φ] *)
-  Definition ltgt_fired (Φ : aview -> Z -> anode -> iProp Σ) (t : Z) : iProp Σ :=
+  Definition ltgt_fired (Ftgt : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (t : Z) : iProp Σ :=
     (∃ (av : aview) (a : anode),
-       ⌜arow_at av t a⌝ ∗ ⌜link_tgt_ok (an_node a)⌝ ∗ Φ av t a)%I.
+       ⌜arow_at av t a⌝ ∗ ⌜link_tgt_ok (an_node a)⌝ ∗ Ftgt.(pf_recv) av t a)%I.
 
-  Definition lent_fired (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+  Definition lent_fired (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d : Z) (nm : fname) (t : Z) : iProp Σ :=
     (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
        ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗ ⌜ents !! nm = None⌝
-       ∗ Φ av d nm t)%I.
+       ∗ Fent.(pf_recv) av d nm t)%I.
 
   (* THE UNDO'S ROW IS AN EXISTENTIAL, and that is a machine fact too: the
      [iunlock(ip)] at +0x6c releases the record, so the one the [bad:] arm
@@ -398,8 +404,9 @@ Section SysLinkAbs.
      know is that the row is present at a live count (the walk's own
      [FsStateLink.link_tok] pays for one link: [IregLinkNz.ireg_tok_nz]),
      which is exactly [utgt_commit_at]'s premise. *)
-  Definition luntgt_fired (Φ : aview -> Z -> iProp Σ) (t : Z) : iProp Σ :=
-    (∃ (av : aview) (a : anode), ⌜av !! t = Some a⌝ ∗ Φ av t)%I.
+  Definition luntgt_fired (Funt : pfam Σ (aview -> Z -> iProp Σ))
+      (t : Z) : iProp Σ :=
+    (∃ (av : aview) (a : anode), ⌜av !! t = Some a⌝ ∗ Funt.(pf_recv) av t)%I.
 
   (* ------------------------------------------------------------------ *)
   (*  THE POST ARMS, keyed on the returned a0                            *)
@@ -417,42 +424,42 @@ Section SysLinkAbs.
                      (dirlink refused).  Both target receipts, the parent
                      leg's commit back unspent. *)
   Definition link_arms Γ
-      (Φtgt : aview -> Z -> anode -> iProp Σ)
-      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φuntgt : aview -> Z -> iProp Σ)
+      (Ftgt : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Funt : pfam Σ (aview -> Z -> iProp Σ))
       (r : mword 64) : iProp Σ :=
     ((⌜r = (zero_reg : mword 64)⌝ ∗
         ∃ (t d : Z) (nm : fname),
-          ltgt_fired Φtgt t ∗ lent_fired Φent d nm t
-          ∗ utgt_commit_at Γ appE Φuntgt)
+          ltgt_fired Ftgt t ∗ lent_fired Fent d nm t
+          ∗ pf_at (utgt_commit_at Γ appE) Funt)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
-          (link_commits Γ Φtgt Φent Φuntgt
-           ∨ (∃ t : Z, ltgt_fired Φtgt t ∗ luntgt_fired Φuntgt t
-                       ∗ lent_commit_at Γ appE Φent))))%I.
+          (link_commits Γ Ftgt Fent Funt
+           ∨ (∃ t : Z, ltgt_fired Ftgt t ∗ luntgt_fired Funt t
+                       ∗ pf_at (lent_commit_at Γ appE) Fent))))%I.
 
   (* ...and the three introduction forms the walk's ten exits use *)
-  Lemma link_arms_none Γ Φtgt Φent Φuntgt (r : mword 64) :
+  Lemma link_arms_none Γ Ftgt Fent Funt (r : mword 64) :
     r = (mword_of_int (-1) : mword 64) ->
-    link_commits Γ Φtgt Φent Φuntgt -∗ link_arms Γ Φtgt Φent Φuntgt r.
+    link_commits Γ Ftgt Fent Funt -∗ link_arms Γ Ftgt Fent Funt r.
   Proof.
     intros ->. rewrite /link_arms. iIntros "H". iRight.
     iSplitR; [done |]. by iLeft.
   Qed.
 
-  Lemma link_arms_undone Γ Φtgt Φent Φuntgt (r : mword 64) (t : Z) :
+  Lemma link_arms_undone Γ Ftgt Fent Funt (r : mword 64) (t : Z) :
     r = (mword_of_int (-1) : mword 64) ->
-    ltgt_fired Φtgt t -∗ luntgt_fired Φuntgt t -∗
-    lent_commit_at Γ appE Φent -∗ link_arms Γ Φtgt Φent Φuntgt r.
+    ltgt_fired Ftgt t -∗ luntgt_fired Funt t -∗
+    pf_at (lent_commit_at Γ appE) Fent -∗ link_arms Γ Ftgt Fent Funt r.
   Proof.
     intros ->. rewrite /link_arms. iIntros "H1 H2 H3". iRight.
     iSplitR; [done |]. iRight. iExists t. iFrame "H1 H2 H3".
   Qed.
 
-  Lemma link_arms_ok Γ Φtgt Φent Φuntgt (r : mword 64)
+  Lemma link_arms_ok Γ Ftgt Fent Funt (r : mword 64)
       (t d : Z) (nm : fname) :
     r = (zero_reg : mword 64) ->
-    ltgt_fired Φtgt t -∗ lent_fired Φent d nm t -∗
-    utgt_commit_at Γ appE Φuntgt -∗ link_arms Γ Φtgt Φent Φuntgt r.
+    ltgt_fired Ftgt t -∗ lent_fired Fent d nm t -∗
+    pf_at (utgt_commit_at Γ appE) Funt -∗ link_arms Γ Ftgt Fent Funt r.
   Proof.
     intros ->. rewrite /link_arms. iIntros "H1 H2 H3". iLeft.
     iSplitR; [done |]. iExists t, d, nm. iFrame "H1 H2 H3".
@@ -460,8 +467,8 @@ Section SysLinkAbs.
 
   (* the landed blanket [sys_link_ret] is IMPLIED by the arms, which is
      what lets the dispatcher keep reading the old fact *)
-  Lemma link_arms_ret Γ Φtgt Φent Φuntgt (r : mword 64) :
-    link_arms Γ Φtgt Φent Φuntgt r -∗ ⌜sys_link_ret r⌝.
+  Lemma link_arms_ret Γ Ftgt Fent Funt (r : mword 64) :
+    link_arms Γ Ftgt Fent Funt r -∗ ⌜sys_link_ret r⌝.
   Proof.
     rewrite /link_arms /sys_link_ret.
     iIntros "[[-> _] | [-> _]]"; iPureIntro; [by right | by left].
@@ -487,9 +494,9 @@ Definition wp_sys_link_sconf_body
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (* ---- the application's four families (round E2, lane E2-L) ---- *)
-    (Φtgt : aview -> Z -> anode -> iProp Σ)
-    (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-    (Φuntgt : aview -> Z -> iProp Σ) :=
+    (Ftgt : pfam Σ (aview -> Z -> anode -> iProp Σ))
+    (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+    (Funt : pfam Σ (aview -> Z -> iProp Σ)) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_link in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -573,7 +580,7 @@ Definition wp_sys_link_sconf_body
      their three instants (round E2, lane E2-L).  The dispatcher passes the
      [_unit] dischargers ([FsAbsInvFire.fsabs_link_pre]) exactly as it does
      for unlink. ---- *)
-  link_commits (fs_gamma_L fsc_fs) Φtgt Φent Φuntgt -∗
+  link_commits (fs_gamma_L fsc_fs) Ftgt Fent Funt -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_link parks in every
      one of its eleven distinct callees, so it can return on another hart
      whatever SIE was doing.
@@ -608,7 +615,7 @@ Definition wp_sys_link_sconf_body
       proc_priv γf pj pid (us_upt U P') -∗
       ⌜sys_link_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       (* ...and the legs' receipts, keyed on that answer *)
-      link_arms (fs_gamma_L fsc_fs) Φtgt Φent Φuntgt
+      link_arms (fs_gamma_L fsc_fs) Ftgt Fent Funt
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -624,11 +631,11 @@ Module Type SYSLINK.
       (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (Φtgt : aview -> Z -> anode -> iProp Σ)
-      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φuntgt : aview -> Z -> iProp Σ),
+      (Ftgt : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Funt : pfam Σ (aview -> Z -> iProp Σ)),
       wp_sys_link_sconf_body γf gs j gl pd pav pu
 
  dqb dqs dqbs v0 v1 pid U
-                             m K eb b lks Φtgt Φent Φuntgt.
+                             m K eb b lks Ftgt Fent Funt.
 End SYSLINK.

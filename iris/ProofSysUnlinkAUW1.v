@@ -110,6 +110,7 @@ Require Import FsAbsMknodFire.
 Require Import SpecSysUnlinkAU.
 Require Import ProofSysUnlinkAUParts.
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
@@ -198,10 +199,10 @@ Section ProofSysUnlinkAUW1.
          nothing in W1 fires. ---- *)
       (pl : list (bv 8)) (iL : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phient : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phitgt : aview -> Z -> iProp Σ)
-      (Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phimiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
+      (Phient : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phitgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phimiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) : iProp Σ :=
     (⌜su_al (m !!! Regidx csp_rs1 : mword 64)⌝ -∗
        ⌜su_regs m (m !!! Regidx csp_rs1 : mword 64) dpv
                 (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64) Ms⌝ -∗
@@ -239,10 +240,10 @@ Section ProofSysUnlinkAUW1.
           in order; nothing comes back *)
        P (length (mknod_parent_elems pl)) iL -∗
        (* the four commits, UNSPENT *)
-       uent_commit_at (fs_gamma_L fsc_fs) appE Phient -∗
-       utgt_commit_at (fs_gamma_L fsc_fs) appE Phitgt -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
-       dmiss_commit_at (fs_gamma_L fsc_fs) appE Phimiss -∗
+       pf_at (uent_commit_at (fs_gamma_L fsc_fs) appE) Phient -∗
+       pf_at (utgt_commit_at (fs_gamma_L fsc_fs) appE) Phitgt -∗
+       pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Phiex -∗
+       pf_at (dmiss_commit_at (fs_gamma_L fsc_fs) appE) Phimiss -∗
        log_opS icfg_log n1 Sb1 -∗
        (* the transaction token rides beside the budget: this walk ends the
           operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
@@ -283,10 +284,10 @@ Section ProofSysUnlinkAUW1.
       (v0 : mword 64) (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phient : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phitgt : aview -> Z -> iProp Σ)
-      (Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phimiss : aview -> Z -> fname -> iProp Σ) :
+      (Phient : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phitgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phimiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) :
     (K_sys_unlink <= K)%nat ->
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->

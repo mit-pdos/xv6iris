@@ -116,6 +116,7 @@ Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix *)
 Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
 Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsTree.           (* [fname]: the receipts' name argument *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.        (* [aview]: the receipts' view argument (round E2, lane E2-C) *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
@@ -191,16 +192,16 @@ Section ProofCreateMain.
       (b : bool) (lks : gset string)
       (* ---- THE APPLICATION'S SIDE ---- *)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ) :
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     wp_create_sconf_body γs j γl pd pav pu
  γf
  plen pfun ty major minor
                          U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
-                         P Pmiss Φarm Φdots Φun Φok Φex.
+                         P Pmiss Farm Fdots Fun Fok Fex.
   Proof.
     rewrite /wp_create_sconf_body.
     intros HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc Hbmsl
@@ -221,7 +222,7 @@ Section ProofCreateMain.
  γf
  plen pfun ty major minor U u Sb ns pidv
               dqb dqs dqbs dqn m K eb b lks
-              P Pmiss Φarm Φdots Φun Φok Φex
+              P Pmiss Farm Fdots Fun Fok Fex
               HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc
               Hbmsl Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hni1 Hni2 Hni3
               Htynz Htyk Hpkc Hu Hns Hj Hgs Ha1 Ha2 Ha3 Heb
@@ -235,7 +236,7 @@ Section ProofCreateMain.
               ty major minor U u Sb ns pidv dqb dqs dqbs dqn m
               (m !!! Regidx csp_rs1 : mword 64)
               (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
-              P Pmiss Φarm Φdots Φun Φok Φex
+              P Pmiss Farm Fdots Fun Fok Fex
               HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl
               Hist0 Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Htynz Htyk Hpkc
               Hu Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
@@ -249,7 +250,7 @@ Section ProofCreateMain.
                 (m !!! Regidx csp_rs1 : mword 64)
                 (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
                 kd qd gd γil γisl dind dn bm data nf nsl t
-                P Pmiss Φarm Φdots Φun Φok Φex
+                P Pmiss Farm Fdots Fun Fok Fex
                 HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl
                 Hist0 Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Hpkc
                 Hu Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
@@ -263,7 +264,7 @@ Section ProofCreateMain.
                 (m !!! Regidx csp_rs1 : mword 64)
                 (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
                 kd qd gd γil γisl dind dn bm data nf nsl t
-                P Pmiss Φarm Φdots Φun Φok Φex
+                P Pmiss Farm Fdots Fun Fok Fex
                 HK Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                 Hist0 Hcovb Hiregb Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
                 with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen

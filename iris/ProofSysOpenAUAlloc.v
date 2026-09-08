@@ -96,6 +96,7 @@ Require Import SpecSysOpenAU.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUStores.
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -170,8 +171,8 @@ Section ProofSysOpenAUAlloc.
       (data : nat -> list (bv 8))
       (vom : mword 64) (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
-      (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     qi = s ->   (* r25 shapes: the parked ident fraction IS the travelling share (so_publish) *)
     (K_sys_open <= K)%nat ->
     (kk < NINODE)%nat ->
@@ -279,11 +280,11 @@ Section ProofSysOpenAUAlloc.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     (* ---- THE AU RESIDUE, inert across this block ---- *)
     P (length (path_elems pl)) (bv_unsigned inum) -∗
-    so_obs Φo (bv_unsigned inum) (era_node dn bm data) -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) appE Φt -∗
+    so_obs Fo (bv_unsigned inum) (era_node dn bm data) -∗
+    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HK Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
@@ -462,7 +463,7 @@ Section ProofSysOpenAUAlloc.
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
-      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U sts _ pl
+      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Fo Ft U sts _ pl
                   (bv_unsigned inum) (era_node dn bm data) Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }
     (* ---- filealloc succeeded ---- *)
@@ -644,7 +645,7 @@ Section ProofSysOpenAUAlloc.
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
-      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U sts _ pl
+      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Fo Ft U sts _ pl
                   (bv_unsigned inum) (era_node dn bm data) Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }
     (* ---- fdalloc installed the descriptor ---- *)
@@ -848,7 +849,7 @@ Section ProofSysOpenAUAlloc.
                 (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
                 (di_major dn) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb dqs U sts m M7 sp0 K eb b
                 lks w6 w24 bp
-                data vom pl P Pmiss Φo Φt
+                data vom pl P Pmiss Fo Ft
                 (FdDevice (bv_unsigned (di_major dn))) 1%positive
                 Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl
@@ -976,7 +977,7 @@ Section ProofSysOpenAUAlloc.
               (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
               (fc_major Cf) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb
               dqs U sts m M8 sp0 K eb b lks w6 w24 bp
-              data vom pl P Pmiss Φo Φt (FdInode (bv_unsigned inum) γo) γo
+              data vom pl P Pmiss Fo Ft (FdInode (bv_unsigned inum) γo) γo
               Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize
               Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty
               Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir

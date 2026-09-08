@@ -84,6 +84,7 @@ Require Import SpecSysOpenAU.
 Require Import SpecSysOpen.   (* the arms this block builds *)
 Require Import FsAbsMknodFire.   (* [acre_commit_at], [dlookup_commit_at]   *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule) *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -114,19 +115,23 @@ Section ProofSysOpenAUCreArm.
 
   (* the FRESH flavour: a PURE row receipt, so the arm spends no commit *)
   Definition socr_Phio_pure (i0 : Z) (a0 : anode)
-      : aview -> Z -> anode -> iProp Σ :=
-    fun (_ : aview) (x : Z) (a : anode) => (⌜x = i0 /\ a = a0⌝)%I.
+      : pfam Σ (aview -> Z -> anode -> iProp Σ) :=
+    pfam_triv (fun (_ : aview) (x : Z) (a : anode) => (⌜x = i0 /\ a = a0⌝)%I).
 
   (* ...and the EXISTS flavour: the caller's own receipt with the row
      equation stapled on *)
+  (* THE REFUND IS THE CALLER'S OWN, unchanged: the tag is on the RECEIPT
+     side only, so the arm that hands this piece back hands back exactly
+     what the caller invested. *)
   Definition socr_Phio_tag (i0 : Z) (a0 : anode)
-      (Phio : aview -> Z -> anode -> iProp Σ)
-      : aview -> Z -> anode -> iProp Σ :=
-    fun (av : aview) (x : Z) (a : anode) =>
-      (⌜x = i0 /\ a = a0⌝ ∗ Phio av x a)%I.
+      (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      : pfam Σ (aview -> Z -> anode -> iProp Σ) :=
+    MkPfam (fun (av : aview) (x : Z) (a : anode) =>
+              (⌜x = i0 /\ a = a0⌝ ∗ Phio.(pf_recv) av x a)%I)
+           Phio.(pf_refund).
 
-  Definition socr_Phit_triv : aview -> Z -> list (bv 8) -> iProp Σ :=
-    fun (_ : aview) (_ : Z) (_ : list (bv 8)) => True%I.
+  Definition socr_Phit_triv : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ) :=
+    pfam_triv (fun (_ : aview) (_ : Z) (_ : list (bv 8)) => True%I).
 
   (* ================================================================== *)
   (*  2.  THE TWO RESIDUES (create's payout, held for the tail)          *)
@@ -135,39 +140,39 @@ Section ProofSysOpenAUCreArm.
   (* ARM C-OK's payout, plus the two commits [SpecSysOpenAU]'s FRESH arms
      refund and the inum bound they assert. *)
   Definition socr_fresh (P : nat -> Z -> iProp Σ)
-      (Phiarm Phiun : aview -> Z -> iProp Σ)
-      (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phio : aview -> Z -> anode -> iProp Σ)
-      (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
+      (Phiarm Phiun : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiok Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (pl : list (bv 8)) (i0 : Z) : iProp Σ :=
     (∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
        ⌜cre_pre av d nm ents nl i0 (AFile [])⌝ ∗
        ⌜0 < i0 < 16 * Z.of_nat icfg_nib⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
-       Phiok av d nm i0 ∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex ∗
-       aopen_commit_at (fs_gamma_L fsc_fs) appE Phio ∗
-       atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit ∗
+       Phiok.(pf_recv) av d nm i0 ∗
+       pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Phiex ∗
+       pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Phio ∗
+       pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit ∗
        (* ...and create's CHILD leg (round E2, lane E2-C): the row APPEARED
           at this inum, the unarm comes home *)
        cre_arm_fired Phiarm i0 ∗
-       aunarm_commit_at (fs_gamma_L fsc_fs) appE Phiun)%I.
+       pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Phiun)%I.
 
   (* ARM F-OK's payout: the exists observation fired, the create commit
      refunded.  Both of open's own commits are SPENT by the tail on this
      flavour, so neither rides here. *)
   Definition socr_exists (P : nat -> Z -> iProp Σ)
-      (Phiarm Phiun : aview -> Z -> iProp Σ)
-      (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Phiarm Phiun : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiok Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (i0 : Z) : iProp Σ :=
     (∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
        ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
        ⌜ents !! nm = Some i0⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
-       Phiex av d nm i0 ∗
-       acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Phiok ∗
+       Phiex.(pf_recv) av d nm i0 ∗
+       pf_at (acre_commit_at (fs_gamma_L fsc_fs) appE (AFile [])) Phiok ∗
        (* the name was already there: create's child legs are whole *)
        cre_child_unfired (fs_gamma_L fsc_fs) (AFile []) Phiarm Phiun)%I.
 
@@ -189,12 +194,12 @@ Section ProofSysOpenAUCreArm.
 
   (* ...and the EXISTS tail's is the real fire, tagged. *)
   Lemma socr_obs_tag (i0 : Z) (n0 : fs_node)
-      (Phio : aview -> Z -> anode -> iProp Σ) :
-    (∃ av : aview, ⌜arow_at av i0 (abs_row n0)⌝ ∗ Phio av i0 (abs_row n0))
+      (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ)) :
+    (∃ av : aview, ⌜arow_at av i0 (abs_row n0)⌝ ∗ Phio.(pf_recv) av i0 (abs_row n0))
     -∗ so_obs (socr_Phio_tag i0 (abs_row n0) Phio) i0 n0.
   Proof.
     iIntros "H". iDestruct "H" as (av) "[%Hav HP]".
-    rewrite /so_obs /socr_Phio_tag. iExists av.
+    rewrite /so_obs /socr_Phio_tag. cbn [pf_recv pf_refund]. iExists av.
     iSplitR; [by iPureIntro |]. iFrame "HP".
     iPureIntro. split; reflexivity.
   Qed.
@@ -204,15 +209,15 @@ Section ProofSysOpenAUCreArm.
   (* ================================================================== *)
 
   Lemma socr_res_of_fail (cw : Z) (R : iProp Σ) (i0 : Z)
-      (Phio : aview -> Z -> anode -> iProp Σ)
-      (Phit : aview -> Z -> list (bv 8) -> iProp Σ) :
+      (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     open_post_fail_plain (fs_gamma_L fsc_fs) fsc_fs cw
       (socr_P R i0) (socr_Pm R) Phio Phit
     ={⊤}=∗ R
-           ∗ (aopen_commit_at (fs_gamma_L fsc_fs) appE Phio
+           ∗ (pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Phio
               ∨ (∃ (i : Z) (av : aview) (a : anode),
-                   ⌜arow_at av i a⌝ ∗ Phio av i a))
-           ∗ atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit.
+                   ⌜arow_at av i a⌝ ∗ Phio.(pf_recv) av i a))
+           ∗ pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit.
   Proof.
     rewrite /open_post_fail_plain /socr_P /socr_Pm.
     iIntros "H". iDestruct "H" as "[Hpre | H]".
@@ -256,7 +261,8 @@ Section ProofSysOpenAUCreArm.
             open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
               (FdInode i0 γo) sts r.
   Proof.
-    rewrite /open_post_ok_plain /socr_P /socr_Phio_pure.
+    rewrite /open_post_ok_plain /socr_P /socr_Phio_pure /pfam_triv.
+    cbn [pf_recv pf_refund].
     iIntros "H". iDestruct "H" as (pl av i) "[[%Hi HR] Harm]".
     subst i.
     iDestruct "Harm" as "[Hdev | [Hfil | Hdir]]".
@@ -274,8 +280,8 @@ Section ProofSysOpenAUCreArm.
      sub-arms, verbatim. *)
   Lemma socr_ok_exists_arm `{GEN : GenId}
       (R : iProp Σ) (i0 : Z) (a0 : anode)
-      (Phio : aview -> Z -> anode -> iProp Σ)
-      (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
+      (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
       (U : ustate) (sts : list fdstate) (r : mword 64) :
     (forall (ents : gmap fname Z) (nl : nat), a0 <> MkAnode (ADir ents) nl) ->
@@ -284,25 +290,26 @@ Section ProofSysOpenAUCreArm.
     ⊢ R ∗ ∃ (av : aview) (nl : nat),
         ((∃ bs0 : list (bv 8),
             ⌜arow_at av i0 (MkAnode (AFile bs0) nl)⌝ ∗
-            Phio av i0 (MkAnode (AFile bs0) nl) ∗
+            Phio.(pf_recv) av i0 (MkAnode (AFile bs0) nl) ∗
             (if om_trunc vom
              then ∃ av' : aview,
                     ⌜arow_at av' i0 (MkAnode (AFile bs0) nl)⌝ ∗
-                    Phit av' i0 bs0
-             else atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit) ∗
+                    Phit.(pf_recv) av' i0 bs0
+             else pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit) ∗
             ∃ γo : gname,
               open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
                 (FdInode i0 γo) sts r)
          ∨ (∃ ma mi : Z,
               ⌜arow_at av i0 (MkAnode (ADev ma mi) nl)⌝ ∗
               ⌜0 <= ma <= NDEV_max⌝ ∗
-              Phio av i0 (MkAnode (ADev ma mi) nl) ∗
-              atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit ∗
+              Phio.(pf_recv) av i0 (MkAnode (ADev ma mi) nl) ∗
+              pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit ∗
               open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
                 (FdDevice ma) sts r)).
   Proof.
     intros Hnd.
     rewrite /open_post_ok_plain /socr_P /socr_Phio_tag.
+    cbn [pf_recv pf_refund].
     iIntros "H". iDestruct "H" as (pl av i) "[[%Hi HR] Harm]".
     subst i. iFrame "HR".
     iDestruct "Harm" as "[Hdev | [Hfil | Hdir]]".
@@ -324,10 +331,10 @@ Section ProofSysOpenAUCreArm.
   Lemma socr_arms_fresh `{GEN : GenId}
       (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phiarm Phiun : aview -> Z -> iProp Σ)
-      (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phio : aview -> Z -> anode -> iProp Σ)
-      (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
+      (Phiarm Phiun : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiok Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (U : ustate) (sts : list fdstate) (r : mword 64) (pl : list (bv 8)) (i0 : Z)
       (bs : list (bv 8)) (nl0 : nat) :
     open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
@@ -366,10 +373,10 @@ Section ProofSysOpenAUCreArm.
   Lemma socr_arms_exists `{GEN : GenId}
       (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phiarm Phiun : aview -> Z -> iProp Σ)
-      (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phio : aview -> Z -> anode -> iProp Σ)
-      (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
+      (Phiarm Phiun : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiok Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (U : ustate) (sts : list fdstate) (r : mword 64) (pl : list (bv 8)) (i0 : Z) (a0 : anode) :
     (forall (ents : gmap fname Z) (nl : nat), a0 <> MkAnode (ADir ents) nl) ->
     open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
@@ -395,11 +402,19 @@ Section ProofSysOpenAUCreArm.
       iSplitR; [by iPureIntro |]. iFrame "HPhi Hac".
       iSplitL "Hcl"; [iLeft; iExact "Hcl" |].
       iDestruct "Hob" as "[Hoc | Hfired]".
-      + iLeft. rewrite /aopen_commit_at /socr_Phio_tag.
+      + (* THE TAG COMES OFF THE RECEIPT AND THE REFUND IS UNTOUCHED: both
+           pairs carry [Phio]'s own refund, so the equation is [eq_refl]
+           and only the AU side is re-proved. *)
+        iLeft.
+        iApply (pf_at_mono_pair (aopen_commit_at (fs_gamma_L fsc_fs) appE)
+                  (aopen_commit_at (fs_gamma_L fsc_fs) appE)
+                  (socr_Phio_tag i0 a0 Phio) Phio eq_refl with "[] Hoc").
+        iIntros "Hoc".
+        rewrite /aopen_commit_at /socr_Phio_tag. cbn [pf_recv].
         iIntros (I ix a) "%Hix Ha".
         iMod ("Hoc" $! I ix a with "[//] Ha") as "[Ha [_ HP2]]".
         iModIntro. iFrame "Ha HP2".
-      + iRight. rewrite /socr_Phio_tag.
+      + iRight. rewrite /socr_Phio_tag. cbn [pf_recv pf_refund].
         iDestruct "Hfired" as (ix avx ax) "(%Hax & [%Heq HP2])".
         destruct Heq as [Hix _]. subst ix.
         iExists avx, ax. iSplitR; [by iPureIntro |]. iExact "HP2".

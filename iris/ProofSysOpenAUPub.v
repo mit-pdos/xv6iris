@@ -98,6 +98,7 @@ Require Import SpecSysOpenAU.
 Require Import SpecSysOpen.   (* the arms this block builds *)
 Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -146,8 +147,8 @@ Section ProofSysOpenAUPub.
       (* ---- the AU side ---- *)
       (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
-      (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (t : fdtype)
       (* the offset shadow's name -- minted by the store block, named by
          [t] on the FD_INODE arm, deposited into the box here *)
@@ -278,10 +279,10 @@ Section ProofSysOpenAUPub.
        open_fd_ok gf (proc_addr jx) pidv U
          (om_readable vom) (om_writable vom) t sts r -∗
        open_post_ok_plain (fs_gamma_L fsc_fs) gf (proc_addr jx) pidv vom
-         P Φo Φt sts U r) -∗
+         P Fo Ft sts U r) -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf Hfdlt

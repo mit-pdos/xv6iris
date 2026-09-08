@@ -80,6 +80,7 @@ Require Import SpecMyproc SpecRelease SpecPrepareReturn.
    [SpecKexecAU] for the contract itself -- kexec has ONE, and this arm
    takes it at the trivial bundle (see [fkr_boot]'s kexec call). *)
 Require Import SpecFsinit SpecKexec SpecPanic.
+Require Import PieceFam.     (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
 Require Import SpecKexecAU.  (* [KEXEC], [exec_au_pre_triv], [exec_arms_landed] *)
 Require Import FsBytesGamma.  (* [fs_gamma_L]: the live Gamma the bundle is at *)
 Require Import PrintkArgs.  (* [PkAStr] / [pk_desc_res] -- panic's message shape *)
@@ -1451,7 +1452,7 @@ Proof.
   iPoseProof (exec_au_pre_triv (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
                 1%nat (fun _ => 5%nat) (fun _ => fkr_init_bytes)
                 (@nil fdstate)) as "Hxpre".
-  iApply (KX.wp_kexec_sconf (fun _ => emp%I) γs j γl pd pav pu
+  iApply (KX.wp_kexec_sconf (MkPfam (fun _ => emp%I) True%I) γs j γl pd pav pu
 
  γf
 
@@ -1460,7 +1461,8 @@ Proof.
             pid U (@nil fdstate)
             DfracDiscarded DfracDiscarded (DfracOwn 1) DfracDiscarded DfracDiscarded
             D5 av2 eb eb ∅
-            (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I)
+            (fun _ _ => True%I) (fun _ _ => True%I)
+            (pfam_triv (fun _ _ _ => True%I))
             Hkx Hdev Hnib0 Hlg Hsize Hbm0
             Hbmcov Hbmlog Hist0 Hcovb Hiregb
             fkr_init_path_cstr ltac:(kxarith)

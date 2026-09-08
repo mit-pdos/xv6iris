@@ -45,6 +45,7 @@ Require Import FsAbsInvFire.    (* [fsabs_exec_half] *)
 Require Import FirstTok.        (* [FirstTok.fsabs_env] -- spelled QUALIFIED below:
                                    [FsAbsInv] (imported after it) exports a
                                    Γ-indexed [fsabs_env] of its own *)
+Require Import PieceFam.       (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
 Require Import UexecExecInst.   (* the [xbundle] instance, [xbundle_intro] *)
 Require Import FsBytesGamma.
 From Kernel Require KernelSyms.
@@ -64,12 +65,16 @@ Section UexecExecMint.
 
   (* exec's AU bundle at a generic slot family: the fs half out of the
      invariant, the slot half out of the family *)
+  (* The slot piece's pair is [S] beside the TRIVIAL refund: a generic
+     process answers for no abstract state, so it takes nothing back if
+     its exec never fires. *)
   Lemma fsabs_exec_pre (S : uvis -> iProp Σ) :
     FirstTok.fsabs_env -∗
     (∀ W' : uvis, S W') -∗
     ∀ (cw : Z) (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate),
-      sys_exec_au_pre S (fs_gamma_L fsc_fs) fsc_fs cw
-        (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I) M av sts.
+      sys_exec_au_pre (MkPfam S True%I) (fs_gamma_L fsc_fs) fsc_fs cw
+        (fun _ _ => True%I) (fun _ _ => True%I)
+        (pfam_triv (fun _ _ _ => True%I)) M av sts.
   Proof.
     iIntros "#Henv Hs" (cw M av sts).
     (* read-kind only ([fsabs_exec_half]): the environment is carried, not
@@ -79,6 +84,7 @@ Section UexecExecMint.
     rewrite /sys_exec_au_pre.
     iSplitR; [iExact "Hwalk" |].
     iSplitR; [iExact "Hcommit" |].
+    rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [| done].
     rewrite /sys_exec_slot_pre. iIntros (na alen afun) "_".
     rewrite /exec_slot_pre. iIntros (av' i f nl W') "_ _ _".
     iApply "Hs".
@@ -90,7 +96,7 @@ Section UexecExecMint.
   Proof.
     iIntros "#Henv Hs".
     iApply (xbundle_intro uslot_x W (fun _ _ => True%I) (fun _ _ => True%I)
-              (fun _ _ _ => True%I)).
+              (pfam_triv (fun _ _ _ => True%I)) True%I).
     iApply (fsabs_exec_pre uslot_x with "Henv Hs").
   Qed.
 

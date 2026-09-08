@@ -109,6 +109,7 @@ Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUPub.
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -185,8 +186,8 @@ Section ProofSysOpenAUStores.
       (data : nat -> list (bv 8))
       (vom : mword 64) (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
-      (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (t : fdtype)
       (* THE OFFSET SHADOW'S NAME, minted by the caller right after the
          [f->off = 0] store (the ghost has to exist before [t] can name it,
@@ -321,11 +322,11 @@ Section ProofSysOpenAUStores.
     (* ---- THE AU RESIDUE: the cursor at the end of the walk, the FIRED
        terminal observation, and the trunc commit still in hand ---- *)
     P (length (path_elems pl)) (bv_unsigned inum) -∗
-    so_obs Φo (bv_unsigned inum) (era_node dn bm data) -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) appE Φt -∗
+    so_obs Fo (bv_unsigned inum) (era_node dn bm data) -∗
+    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize Hbm0
@@ -596,7 +597,7 @@ Section ProofSysOpenAUStores.
         apply eq_vec_true_iff in Htr. rewrite Htr.
         apply bv_eq; vm_compute; reflexivity. }
       iDestruct (so_flat_close with "Hflat") as "Hload".
-      iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Φo Φt U sts pl
+      iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Fo Ft U sts pl
                    (bv_unsigned inum) dn bm data t g
                    (or_introl Hntf) Hdirk Hdevb Hinob Htyen
                    with "HP Hobs Htc") as "Harm".
@@ -604,7 +605,7 @@ Section ProofSysOpenAUStores.
                 gil gisl
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U sts m N6 sp0 K eb b lks w6
-                (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t g
+                (word_of_words lo om) w24 bp vom P Pmiss Fo Ft t g
                 Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
@@ -705,7 +706,7 @@ Section ProofSysOpenAUStores.
       { intros Hc. apply Hnf. apply bv_eq. rewrite Hc.
         vm_compute. reflexivity. }
       iDestruct (so_flat_close with "Hflat") as "Hload".
-      iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Φo Φt U sts pl
+      iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Fo Ft U sts pl
                    (bv_unsigned inum) dn bm data t g
                    (or_intror Hnf2) Hdirk Hdevb Hinob Htyen
                    with "HP Hobs Htc") as "Harm".
@@ -713,7 +714,7 @@ Section ProofSysOpenAUStores.
                 gil gisl
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U sts m N8 sp0 K eb b lks w6
-                (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t g
+                (word_of_words lo om) w24 bp vom P Pmiss Fo Ft t g
                 Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
@@ -882,7 +883,7 @@ Section ProofSysOpenAUStores.
     assert (Htyfz : bv_unsigned (di_type dn) = FsImg.T_FILE_z)
       by (rewrite Hfile; vm_compute; reflexivity).
     iApply fupd_wp.
-    iMod (opf_atrunc_fire fsc_fs ⊤ Φt (bv_unsigned inum)
+    iMod (opf_atrunc_fire fsc_fs ⊤ Ft (bv_unsigned inum)
             (fn_file_bytes (era_node dn bm data))
             (fn_nlink (era_node dn bm data))
             (era_node dn bm data)
@@ -933,7 +934,7 @@ Section ProofSysOpenAUStores.
     { destruct (Hti ltac:(rewrite Htyfz; vm_compute; discriminate)) as [_ Hq].
       exact Hq. }
     iEval (rewrite /so_obs (opf_era_file_row dn bm data Htyfz)) in "Hobs".
-    iDestruct (so_arm_file_tr gf (proc_addr jx) pidv vom P Φo Φt U sts pl
+    iDestruct (so_arm_file_tr gf (proc_addr jx) pidv vom P Fo Ft U sts pl
                  (bv_unsigned inum) (fn_file_bytes (era_node dn bm data))
                  (fn_nlink (era_node dn bm data)) g Htrue
                  with "HP Hobs Htr2") as "Harm".
@@ -943,7 +944,7 @@ Section ProofSysOpenAUStores.
  kk qi s gy loy tly inum (di_trunc dn) bm_empty kf fd l C pn
               om voff nsj u3 pidv dqb dqs U sts m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
-              vom P Pmiss Φo Φt t g
+              vom P Pmiss Fo Ft t g
               Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
               Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
               Hom Hfdty

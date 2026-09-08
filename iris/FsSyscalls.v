@@ -139,6 +139,7 @@ Require Import SpecPrintk.
 Require Import SpecCreate.
 Require Import SpecSysMkdir.
 Require Import SpecSysChdir.
+Require Import PieceFam.       (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
 Require Import FsAbsInvFire.   (* [fsabs_chdir_pre]: the trivial bundle the
                                   friendly layer hands the seal *)
 From Kernel Require KernelSyms.
@@ -368,9 +369,11 @@ Module FsSysMkdir (M : SYSMKDIR).
                  hands mkdir's walk and create's legs the TRIVIAL families
                  and pays the bundle off the parked license *)
               (fun _ _ => True)%I (fun _ _ => True)%I
-              (fun _ _ => True)%I (fun _ _ _ _ => True)%I
-              (fun _ _ => True)%I (fun _ _ _ _ => True)%I
-              (fun _ _ _ _ => True)%I
+              (pfam_triv (fun _ _ => True%I))
+              (pfam_triv (fun _ _ _ _ => True%I))
+              (pfam_triv (fun _ _ => True%I))
+              (pfam_triv (fun _ _ _ _ => True%I))
+              (pfam_triv (fun _ _ _ _ => True%I))
               HK Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus Hprg Hns Hj Hgs
               eq_refl Htf
@@ -537,7 +540,8 @@ Module FsSysChdir (M : SYSCHDIR).
        abstract state, so every cursor is [True] and the observation
        returns nothing. *)
     iApply (M.wp_sys_chdir γf γs j γl pd pav pu dqb dqs v pid U m K true b lks
-              (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I)
+              (fun _ _ => True%I) (fun _ _ => True%I)
+              (pfam_triv (fun _ _ _ => True%I))
               HK Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hib Hj Hgs eq_refl Htf
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlogc

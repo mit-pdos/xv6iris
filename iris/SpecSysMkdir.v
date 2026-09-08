@@ -166,6 +166,7 @@ Require Import FsAbsEra.        (* [ep_start_triv] *)
 Require Import FsAbsMknodFire.  (* [mknod_walk_pre_era], the walk premise *)
 Require Import FsTree.          (* [fname]: the parent-leg receipt's name *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.       (* [aview]: the receipts' view argument *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -217,18 +218,18 @@ Definition mkdir_au_pre
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (Γ : fs_view_names Σ) (γfs : fs_names) (cw : Z)
     (P Pmiss : nat -> Z -> iProp Σ)
-    (Φarm : aview -> Z -> iProp Σ)
-    (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-    (Φun : aview -> Z -> iProp Σ)
-    (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-    (Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+    (Farm : pfam Σ (aview -> Z -> iProp Σ))
+    (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+    (Fun : pfam Σ (aview -> Z -> iProp Σ))
+    (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+    (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
   (mknod_walk_pre_era γfs cw P Pmiss
-   ∗ dlookup_commit_at Γ appE Φex
+   ∗ pf_at (dlookup_commit_at Γ appE) Fex
    ∗ cre_commits Γ
        (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
        (bv_unsigned (mword_of_int 0 : mword 16))
        (bv_unsigned (mword_of_int 0 : mword 16))
-       Φarm Φdots Φun Φok)%I.
+       Farm Fdots Fun Fok)%I.
 
 (* SATISFIABILITY, and what the dispatcher and the friendly packaging hand
    down: the generic application asks nothing of mkdir's walk or its legs,
@@ -242,8 +243,8 @@ Lemma mkdir_au_pre_unit
     (γfs : fs_names) (cw : Z) :
   app_inv γfs -∗
   mkdir_au_pre (fs_gamma_L γfs) γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
-    (fun _ _ => True%I) (fun _ _ _ _ => True%I) (fun _ _ => True%I)
-    (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I).
+    (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I))
+    (pfam_triv (fun _ _ _ _ => True%I)).
 Proof.
   iIntros "#Hai". rewrite /mkdir_au_pre.
   iSplitR.
@@ -258,11 +259,11 @@ Definition mkdir_arms
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (Γ : fs_view_names Σ) (γfs : fs_names) (cw : Z)
     (P Pmiss : nat -> Z -> iProp Σ)
-    (Φarm : aview -> Z -> iProp Σ)
-    (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-    (Φun : aview -> Z -> iProp Σ)
-    (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-    (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+    (Farm : pfam Σ (aview -> Z -> iProp Σ))
+    (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+    (Fun : pfam Σ (aview -> Z -> iProp Σ))
+    (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+    (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
     (r : mword 64) : iProp Σ :=
   ((⌜r = (zero_reg : mword 64)⌝ ∗
       ∃ (pl : list (bv 8)) (i : Z),
@@ -270,17 +271,17 @@ Definition mkdir_arms
           (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
           (bv_unsigned (mword_of_int 0 : mword 16))
           (bv_unsigned (mword_of_int 0 : mword 16))
-          P Φarm Φdots Φun Φok Φex pl true i)
+          P Farm Fdots Fun Fok Fex pl true i)
    ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
         (* argstr failed and create never ran, so the WHOLE bundle comes
            back; or create refused and its own failure fold is the payout *)
-        (mkdir_au_pre Γ γfs cw P Pmiss Φarm Φdots Φun Φok Φex
+        (mkdir_au_pre Γ γfs cw P Pmiss Farm Fdots Fun Fok Fex
          ∨ ∃ pl : list (bv 8),
              cre_fail_arms Γ γfs
                (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
                (bv_unsigned (mword_of_int 0 : mword 16))
                (bv_unsigned (mword_of_int 0 : mword 16))
-               P Pmiss Φarm Φdots Φun Φok Φex pl)))%I.
+               P Pmiss Farm Fdots Fun Fok Fex pl)))%I.
 
 Global Typeclasses Opaque mkdir_au_pre mkdir_arms.
 
@@ -299,11 +300,11 @@ Definition wp_sys_mkdir_sconf_body
     (b : bool) (lks : gset string)
     (* ---- THE APPLICATION'S SIDE ---- *)
     (P Pmiss : nat -> Z -> iProp Σ)
-    (Φarm : aview -> Z -> iProp Σ)
-    (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-    (Φun : aview -> Z -> iProp Σ)
-    (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-    (Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
+    (Farm : pfam Σ (aview -> Z -> iProp Σ))
+    (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+    (Fun : pfam Σ (aview -> Z -> iProp Σ))
+    (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+    (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_mkdir in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -388,7 +389,7 @@ Definition wp_sys_mkdir_sconf_body
      observation and the four commits create's legs fire, at mkdir's own
      type index ---- *)
   mkdir_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
-    P Pmiss Φarm Φdots Φun Φok Φex -∗
+    P Pmiss Farm Fdots Fun Fok Fex -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_mkdir sleeps (begin_op,
      argstr's fault path, create and end_op all park), so it can return on
      another hart whatever SIE was doing. *)
@@ -430,7 +431,7 @@ Definition wp_sys_mkdir_sconf_body
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       (* ...and the legs' receipts, keyed on that answer *)
       mkdir_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
-        P Pmiss Φarm Φdots Φun Φok Φex
+        P Pmiss Farm Fdots Fun Fok Fex
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -448,14 +449,14 @@ Module Type SYSMKDIR.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φarm : aview -> Z -> iProp Σ)
-      (Φdots : aview -> Z -> Z -> bool -> iProp Σ)
-      (Φun : aview -> Z -> iProp Σ)
-      (Φok : aview -> Z -> fname -> Z -> iProp Σ)
-      (Φex : aview -> Z -> fname -> Z -> iProp Σ),
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)),
       wp_sys_mkdir_sconf_body γf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v
                               pid U m K eb b lks
-                              P Pmiss Φarm Φdots Φun Φok Φex.
+                              P Pmiss Farm Fdots Fun Fok Fex.
 End SYSMKDIR.

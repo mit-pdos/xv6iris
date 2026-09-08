@@ -51,6 +51,7 @@ Require Import DirView.
 Require Import BlkmapDefs.
 Require Import InodeLock.
 Require Import SpecIalloc.
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsCreateFire. (* [T_FILE], [T_DEVICE], [create_made] *)
 Require Import SpecCreate.
 (* [nx_sext16_inj] -- the halfword-decision cluster B' hoisted out of

@@ -109,6 +109,7 @@ Require Import SpecSysUnlinkAU.
 Require Import FsAbsUnlinkFire.
 Require Import ProofSysUnlinkAUParts.
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
@@ -199,10 +200,10 @@ Section ProofSysUnlinkAUW2.
       (lks : gset string)
       (w4 w5 w6 w27 w30 : mword 64) (bd nfx bnm0 bp be : nat -> bv 8)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phient : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phitgt : aview -> Z -> iProp Σ)
-      (Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phimiss : aview -> Z -> fname -> iProp Σ) :
+      (Phient : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phitgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phimiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) :
     (K_iunlockput <= K - 30)%nat -> (K_end_op <= K - 30)%nat ->
     (30 <= K)%nat -> ((K - 30) + 30 = K)%nat ->
     (kk < NINODE)%nat ->
@@ -394,10 +395,10 @@ Section ProofSysUnlinkAUW2.
          not spent on the success path (the statement's deviation 4). ---- *)
       (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phient : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phitgt : aview -> Z -> iProp Σ)
-      (Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phimiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
+      (Phient : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phitgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phimiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) : iProp Σ :=
     (⌜su_regs m sp0 (ientry kd) (ientry ks)
                 (m !!! Regidx Rs3 : mword 64) M2⌝ -∗
        ⌜(kd < NINODE)%nat⌝ -∗
@@ -433,10 +434,10 @@ Section ProofSysUnlinkAUW2.
        (* the name tie, and the cursor at the parent's own index *)
        ⌜exists es e, nameiparent_of pl es e /\ bname 14 nf = e⌝ -∗
        P (length (mknod_parent_elems pl)) (bv_unsigned dinum) -∗
-       uent_commit_at (fs_gamma_L fsc_fs) appE Phient -∗
-       utgt_commit_at (fs_gamma_L fsc_fs) appE Phitgt -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
-       dmiss_commit_at (fs_gamma_L fsc_fs) appE Phimiss -∗
+       pf_at (uent_commit_at (fs_gamma_L fsc_fs) appE) Phient -∗
+       pf_at (utgt_commit_at (fs_gamma_L fsc_fs) appE) Phitgt -∗
+       pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Phiex -∗
+       pf_at (dmiss_commit_at (fs_gamma_L fsc_fs) appE) Phimiss -∗
        (* ---- [dp], LOCKED and OPEN ---- *)
        is_sleeplock_genl gild gisld (i_lock (ientry kd)) "inode"%string
                         (ic_slp fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
@@ -514,10 +515,10 @@ Section ProofSysUnlinkAUW2.
       (lks : gset string)
       (pl : list (bv 8)) (iL : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phient : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phitgt : aview -> Z -> iProp Σ)
-      (Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phimiss : aview -> Z -> fname -> iProp Σ) :
+      (Phient : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phitgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phimiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) :
     (K_sys_unlink <= K)%nat ->
     (0 < icfg_nib)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -569,10 +570,10 @@ Section ProofSysUnlinkAUW2.
     inode_held_ty_at dpv T_DIR iL -∗
     ⌜exists es e, nameiparent_of pl es e /\ bname 14 nf = e⌝ -∗
     P (length (mknod_parent_elems pl)) iL -∗
-    uent_commit_at (fs_gamma_L fsc_fs) appE Phient -∗
-    utgt_commit_at (fs_gamma_L fsc_fs) appE Phitgt -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
-    dmiss_commit_at (fs_gamma_L fsc_fs) appE Phimiss -∗
+    pf_at (uent_commit_at (fs_gamma_L fsc_fs) appE) Phient -∗
+    pf_at (utgt_commit_at (fs_gamma_L fsc_fs) appE) Phitgt -∗
+    pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Phiex -∗
+    pf_at (dmiss_commit_at (fs_gamma_L fsc_fs) appE) Phimiss -∗
     log_opS icfg_log n1 Sb1 -∗
     (* the transaction token rides beside the budget: this walk ends the
        operation, and end_op takes the whole [log_op] (durable-disk lane A) *)

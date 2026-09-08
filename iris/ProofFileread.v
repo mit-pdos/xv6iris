@@ -114,6 +114,7 @@ Require Import AppInv.            (* [appN]/[appE]: the commit's mask        *)
 Require Import FsBytesGamma.      (* [fs_gamma_L]: the live Γ                *)
 Require Import SpecSysReadAU.     (* [ard_pre], [ard_ret_tie]                *)
 Require Import FsAbsReadFire.     (* [arf_read_fire], [read_arms]            *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.         (* LAST (FsAbs's own rule)                 *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -456,8 +457,8 @@ Section ProofFileread.
       (k : nat) (q : Qp) (st : fdstate) (fn : fread_names)
       (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
-      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (Rf : iProp Σ)
-    : wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks Φr Rf.
+      (Fr : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
+    : wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks Fr.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj addr ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn Heb Hbelow.
@@ -718,7 +719,7 @@ Section ProofFileread.
       { cbn [umem_wr]. rewrite HVid. iExact "Hpriv". }
       { by iApply fileread_env_out_of_env. }
       { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-        iApply (fileread_extra_unreadable inumx γox Cf st n Φr Rf
+        iApply (fileread_extra_unreadable inumx γox Cf st n Fr
                   (mword_of_int (-1) : mword 64) Hok Hrdz0). }
     - (* ===============================================================
          READABLE: spill s1/s3, park the three arguments, dispatch on the
@@ -1036,7 +1037,7 @@ Section ProofFileread.
            piece goes back exactly as it came in and the caller eliminates the
            returned conjunction to its own refund. *)
         { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-          iApply (fileread_extra_neg st n Φr Rf Hneg with "Hau"). } }
+          iApply (fileread_extra_neg st n Fr Hneg with "Hau"). } }
       (* [Z_lt_dec] leaves the negation; every use below wants the [<=]. *)
       assert (Hn0 : (0 <= n)%Z) by lia.
       (* ===========================================================
@@ -1313,7 +1314,7 @@ Section ProofFileread.
           iFrame "Hpipe Hpref Hiru Hoh". }
         { by iApply fileread_env_out_of_env. }
         { iSplitR; [iPureIntro; exact Hretpr |].
-          iApply (fileread_extra_of_pipe inumx γox Cf st n Φr Rf _ Hok Htyp). }
+          iApply (fileread_extra_of_pipe inumx γox Cf st n Fr _ Hok Htyp). }
       + (* ---- +0x22 c.li a4,3 ; +0x24 beq a5,a4 -> FD_DEVICE ---- *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x24))
                   (mword_of_int 70 : mword 13) Ra4 Ra5 B5 (K - 6)%nat b
@@ -1718,7 +1719,7 @@ Section ProofFileread.
                   iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
                   by left. }
                 { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-                  iApply (fileread_extra_of_dev inumx γox Cf st n Φr Rf _ Hok Htyd). }
+                  iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ Hok Htyd). }
              ** (* ---- the console's read: the INDIRECT CALL at +0x94 ---- *)
                 iApply (wp_cbeqz_fall_s_sconf (mword_of_int (FR + 0x96))
                           (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 7)) Ra5
@@ -1903,7 +1904,7 @@ Section ProofFileread.
                 { iSplitR; [iPureIntro;
                             apply (fr_ret_of_cons n r Hn0);
                             rewrite Z.max_r in Hrr; lia |].
-                  iApply (fileread_extra_of_dev inumx γox Cf st n Φr Rf _ Hok Htyd). }
+                  iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ Hok Htyd). }
           ++ (* --------- the major is OUT OF RANGE: return -1 ------------
                 The [bltu] is taken before the table is ever indexed, so the
                 environment is [emp] and the caller owed nothing. *)
@@ -1985,7 +1986,7 @@ Section ProofFileread.
              { cbn [umem_wr]. rewrite HVid. iExact "Hpriv". }
              { by iApply (fr_env_out_dev fn st Cf inumx _ Hok Htyd). }
              { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-               iApply (fileread_extra_of_dev inumx γox Cf st n Φr Rf _ Hok Htyd). }
+               iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ Hok Htyd). }
         * (* ---- +0x28 c.li a4,2 ; +0x2a bne a5,a4 -> panic ---- *)
           iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x2a))
                     (mword_of_int 78 : mword 13) Ra4 Ra5 B6 (K - 6)%nat b
@@ -2069,12 +2070,11 @@ Section ProofFileread.
                 the same key. *)
              assert (Hstm : st = FdOpen true wbx (FdInode (bv_unsigned inm) γo0))
                by (rewrite Hst Hieq Hgo; reflexivity).
-             (* THE CALLER'S ONE PIECE.  The refund half is spent only on the
-                sign guard, which is behind us, so this arm eliminates to the
-                commit and keeps nothing. *)
-             iDestruct (fileread_in_inode_of st wbx (bv_unsigned inm) γo0 Φr Rf
+             (* THE CALLER'S ONE PIECE, still paired with its refund: the
+                fire below takes the pair and spends the AU side, since the
+                refund's one arm (the sign guard) is behind us. *)
+             iDestruct (fileread_in_inode_of st wbx (bv_unsigned inm) γo0 Fr
                           Hstm with "Hau") as "Hau".
-             iDestruct "Hau" as "[Hau _]".
              assert (Hibcov : IBLOCK inm icfg_ist ∈ fsc_cov)
                by (apply Hgeo; exact Hinlt).
              iDestruct (ic_escrows_acc2
@@ -2647,7 +2647,7 @@ Section ProofFileread.
                 iEval (rewrite Htgt54) in "Hpc".
                 iApply fupd_wp.
                 (* THE FIRE, at advance 0: the offset did not move *)
-                iMod (arf_read_fire fsc_fs ⊤ (DfracOwn (1/4)) Φr
+                iMod (arf_read_fire fsc_fs ⊤ (DfracOwn (1/4)) Fr
                         (bv_unsigned inm) γo0 (Z.to_nat (bv_unsigned v)) 0%nat
                         (era_node dnl bml data)
                         ltac:(solve_ndisj) Hoffcap
@@ -2856,7 +2856,7 @@ Section ProofFileread.
                    ok arm at the exact count. *)
                 { iSplitR; [iPureIntro; exact Hretok |].
                   iApply (fileread_extra_inode_of st wbx (bv_unsigned inm) γo0
-                            n Φr Rf _ Hstm).
+                            n Fr _ Hstm).
                   destruct Hskip as [H1 | [H1 Ht0]].
                   { rewrite /read_arms /read_post_fail. iRight.
                     iSplitR; [iPureIntro; exact H1 |]. iRight.
@@ -2992,7 +2992,7 @@ Section ProofFileread.
                 iApply fupd_wp.
                 (* THE FIRE, at advance [tot]: the bytes and the offset move
                    in the one fupd *)
-                iMod (arf_read_fire fsc_fs ⊤ (DfracOwn (1/4)) Φr
+                iMod (arf_read_fire fsc_fs ⊤ (DfracOwn (1/4)) Fr
                         (bv_unsigned inm) γo0 (Z.to_nat (bv_unsigned v)) tot
                         (era_node dnl bml data)
                         ltac:(solve_ndisj) Hoffcap
@@ -3202,7 +3202,7 @@ Section ProofFileread.
                    own equation, carried down by [Hcase]. *)
                 { iSplitR; [iPureIntro; exact Hretok2 |].
                   iApply (fileread_extra_inode_of st wbx (bv_unsigned inm) γo0
-                            n Φr Rf _ Hstm).
+                            n Fr _ Hstm).
                   rewrite /read_arms /read_post_ok. iLeft.
                   iExists avf, (Z.to_nat (bv_unsigned v)),
                     (abs_row (era_node dnl bml data)), tot.

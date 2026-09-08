@@ -885,6 +885,7 @@ FsStateLink.v
 FsStateInode.v
 FsStateBitmap.v
 FsState.v
+PieceFam.v
 FsAbsDefs.v
 # AppCfg = the application's predicate on the abstract state's VIEW, as a
 # class record ([appcfg Σ], app-instances.md sections 1-2); a field of

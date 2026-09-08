@@ -26,7 +26,8 @@
      - the descriptor view [uvis_fd W] as [sts]: the table the NEW process
        starts with is the one the caller had, which is exactly the key's
        ([exec_slot_pre]'s [sts] rides straight into [exec_key U' sts na]).
-   The three ghost/logical parameters [P], [Pmiss] and [Φo] are
+   The ghost/logical parameters [P], [Pmiss], [Fo] and the slot piece's
+   refund are
    EXISTENTIAL here: the U-mode contract cannot name the caller's era
    predicates, so the arm says only "some AU bundle at this key", and the
    dispatch route re-binds them when it consumes the bundle.
@@ -58,6 +59,7 @@ Require Import UserFd.         (* [ufdG]                              *)
 Require Import UexecSlot.      (* [uvis] / [tf_w]                     *)
 Require Import UexecRetExec.   (* [uexecXG] / [xbundle]               *)
 Require Import SpecSysExecAU.  (* [sys_exec_au_pre]                   *)
+Require Import PieceFam.       (* [pfam]: the one-shot piece's pair *)
 Require Import FsAbsDefs.          (* LAST (FsAbs's own rule)             *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]                        *)
 From Kernel Require KernelSyms.
@@ -78,10 +80,14 @@ Section UexecExecInst.
   (* what the program hands over at its exec ecall, at the trapping key
      [W]; the bundle's slot wand concludes at [X], the recursive
      occurrence (header, and UexecRetExec.v's) *)
+  (* [Rs] is the SLOT PIECE's refund and is existential here for the same
+     reason the families are: the U-mode contract cannot name what the
+     process would take back if its exec never fired. *)
   Definition exec_xbundle (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
     (∃ (P Pmiss : nat -> Z -> iProp Σ)
-       (Φo : aview -> Z -> anode -> iProp Σ),
-       sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) P Pmiss Φo
+       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ),
+       sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+         P Pmiss Fo
          (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W))%I.
 
   Lemma exec_xbundle_ne (n : nat) :
@@ -89,8 +95,9 @@ Section UexecExecInst.
   Proof.
     intros X Y HXY W ? <-. rewrite /exec_xbundle.
     apply bi.exist_ne; intros P. apply bi.exist_ne; intros Pmiss.
-    apply bi.exist_ne; intros Φo.
-    exact (sys_exec_au_pre_ne n X Y (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) P Pmiss Φo
+    apply bi.exist_ne; intros Fo. apply bi.exist_ne; intros Rs.
+    exact (sys_exec_au_pre_ne n X Y Rs (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+             P Pmiss Fo
              (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) HXY).
   Qed.
 
@@ -113,13 +120,14 @@ Section UexecExecInst.
      predicates, its own observation -- has the arm's payload *)
   Lemma xbundle_intro (X : uvis -d> iPropO Σ) (W : uvis)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ) :
-    sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) P Pmiss Φo
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
+    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+      P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) -∗
     xbundle X W.
   Proof.
     iIntros "H". rewrite /xbundle /= /exec_xbundle.
-    iExists P, Pmiss, Φo. iExact "H".
+    iExists P, Pmiss, Fo, Rs. iExact "H".
   Qed.
 
   (* ...and the elim, the shape the dispatch route (stage E2) reads the
@@ -127,8 +135,9 @@ Section UexecExecInst.
   Lemma xbundle_elim (X : uvis -d> iPropO Σ) (W : uvis) :
     xbundle X W -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ),
-      sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) P Pmiss Φo
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ),
+      sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+        P Pmiss Fo
         (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W).
   Proof. iIntros "H". rewrite /xbundle /= /exec_xbundle. iExact "H". Qed.
 

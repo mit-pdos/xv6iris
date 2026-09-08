@@ -58,6 +58,7 @@ Require Import ProofSysUnlinkAUW2.
 Require Import ProofSysUnlinkAUW3.
 Require Import ProofSysUnlinkAUW5F.
 Require Import ProofSysUnlinkAUW5D.
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
@@ -112,10 +113,10 @@ Section ProofSysUnlinkAU.
       (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phient : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phitgt : aview -> Z -> iProp Σ)
-      (Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phimiss : aview -> Z -> fname -> iProp Σ) :
+      (Phient : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phitgt : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phimiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) :
     wp_sys_unlink_body gf gs jx gl pd pav
       pu
       dqb dqs dqbs v0 pid U m K eb b lks P Pmiss

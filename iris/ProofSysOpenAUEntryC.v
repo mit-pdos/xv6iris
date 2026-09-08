@@ -126,6 +126,7 @@ Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUJoin.
 Require Import ProofSysOpenAUCreArm.
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -161,10 +162,10 @@ Section ProofSysOpenAUEntryCCont.
       (pj : mword 64) (pidv : mword 32) (vom : mword 64) (U : ustate)
       (sts : list fdstate)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phiarm Phiun : aview -> Z -> iProp Σ)
-      (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phio : aview -> Z -> anode -> iProp Σ)
-      (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
+      (Phiarm Phiun : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiok Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string)
       : CpuId -> iProp Σ :=
     fun (CIDx : CpuId) =>
@@ -231,10 +232,10 @@ Section ProofSysOpenAUEntryC.
       (* ---- the AU side ---- *)
       (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
-      (Phiarm Phiun : aview -> Z -> iProp Σ)
-      (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
-      (Phio : aview -> Z -> anode -> iProp Σ)
-      (Phit : aview -> Z -> list (bv 8) -> iProp Σ) :
+      (Phiarm Phiun : pfam Σ (aview -> Z -> iProp Σ))
+      (Phiok Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     (K_sys_open <= K)%nat -> icfg_dev = ROOTDEV -> (0 < icfg_nib)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
@@ -309,10 +310,10 @@ Section ProofSysOpenAUEntryC.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     (* ---- THE AU BUNDLE (the contract's O_CREATE side, verbatim) ---- *)
     mknod_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
-    acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Phiok -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
-    aopen_commit_at (fs_gamma_L fsc_fs) appE Phio -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit -∗
+    pf_at (acre_commit_at (fs_gamma_L fsc_fs) appE (AFile [])) Phiok -∗
+    pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Phiex -∗
+    pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Phio -∗
+    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit -∗
     (* ...and create's CHILD legs (round E2, lane E2-C) *)
     cre_child_unfired (fs_gamma_L fsc_fs) (AFile []) Phiarm Phiun -∗
     wp_next true (proc_addr jx)
@@ -475,8 +476,8 @@ Section ProofSysOpenAUEntryC.
        +0xca is never taken -- so the one create asks for is discharged
        here, at its own unit, off the region's copy of the application
        invariant. *)
-    iAssert (adots_commit_at (fs_gamma_L fsc_fs) appE (fun _ _ _ _ => True%I))
-      as "Hdots".
+    iAssert (pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE)
+               (pfam_triv (fun _ _ _ _ => True%I))) as "Hdots".
     { iApply SpecCreate.cre_dots_unit.
       iApply (InodeRegion.ireg_inv_app with "Hireg"). }
     iDestruct (cre_commits_of_file (fs_gamma_L fsc_fs) 0 0
@@ -486,7 +487,8 @@ Section ProofSysOpenAUEntryC.
               FsAbsCreateFire.T_FILE (mword_of_int 0) (mword_of_int 0)
               (upd_usM U _) MAXOPBLOCKS Sb ns pidv dqb dqs dqbs dqn
               N5 (K - 24)%nat eb b lks
-              P Pmiss Phiarm (fun _ _ _ _ => True%I) Phiun Phiok Phiex
+              P Pmiss Phiarm (pfam_triv (fun _ _ _ _ => True%I)) Phiun
+              Phiok Phiex
               HKcr HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
               Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
               ltac:(assert (E31 : (2 ^ 31 = 2147483648)%Z)
@@ -726,7 +728,8 @@ Section ProofSysOpenAUEntryC.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { rewrite /socr_P. iSplitR; [by iPureIntro |]. iExact "HR". }
-      { iApply (atrunc_commit_at_unit fsc_fs appE ltac:(rewrite /appE; done)).
+      { rewrite /socr_Phit_triv. iApply pf_at_triv.
+        iApply (atrunc_commit_at_unit fsc_fs appE ltac:(rewrite /appE; done)).
         iApply (ireg_inv_app with "Hireg"). }
     - (* ============ ARM F-OK: the name was there =====================
          The contract wants the terminal observation FIRED at the found

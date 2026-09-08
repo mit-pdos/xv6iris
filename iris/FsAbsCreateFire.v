@@ -83,6 +83,7 @@ Require Import Xv6G.
 Require FsImg.                   (* [FsImg.T_FILE_z], qualified             *)
 Require Import FsAbsDelta.       (* the legs, [cre_pre], [dots_delta]       *)
 Require Import AppInv.           (* [appN]/[appE], [app_step], [app_inv]    *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 
 Local Open Scope Z_scope.
@@ -370,39 +371,51 @@ Section CreateFire.
   (*  1a.  The receipts, as the contracts hand them out                   *)
   (* ------------------------------------------------------------------ *)
 
-  (* each with its instant's pure facts restated beside the caller's Φ *)
-  Definition cre_arm_fired (Φ : aview -> Z -> iProp Σ) (i : Z) : iProp Σ :=
-    (∃ av : aview, ⌜av !! i = None⌝ ∗ Φ av i)%I.
+  (* Each with its instant's pure facts restated beside the caller's
+     receipt.  A FIRED piece pays only its receipt: the pair's refund is
+     dropped here, which is the whole content of "the investment comes
+     back through the receipt the caller chose". *)
+  Definition cre_arm_fired (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (i : Z) : iProp Σ :=
+    (∃ av : aview, ⌜av !! i = None⌝ ∗ Farm.(pf_recv) av i)%I.
 
-  Definition cre_dots_fired (Φ : aview -> Z -> Z -> bool -> iProp Σ)
+  Definition cre_dots_fired (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
       (i d : Z) (full : bool) : iProp Σ :=
-    (∃ av : aview, ⌜av !! i = Some (MkAnode (ADir ∅) 1%nat)⌝ ∗ Φ av i d full)%I.
+    (∃ av : aview, ⌜av !! i = Some (MkAnode (ADir ∅) 1%nat)⌝
+       ∗ Fdots.(pf_recv) av i d full)%I.
 
-  Definition cre_unarm_fired (Φ : aview -> Z -> iProp Σ) (i : Z) : iProp Σ :=
-    (∃ (av : aview) (c : absnode), ⌜av !! i = Some (MkAnode c 1%nat)⌝ ∗ Φ av i)%I.
+  Definition cre_unarm_fired (Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (i : Z) : iProp Σ :=
+    (∃ (av : aview) (c : absnode), ⌜av !! i = Some (MkAnode c 1%nat)⌝
+       ∗ Fun.(pf_recv) av i)%I.
 
-  Definition cre_acre_fired (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+  Definition cre_acre_fired (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d : Z) (nm : fname) (i : Z) (c : absnode) : iProp Σ :=
     (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
-       ⌜cre_pre av d nm ents nl i c⌝ ∗ Φ av d nm i)%I.
+       ⌜cre_pre av d nm ents nl i c⌝ ∗ Fok.(pf_recv) av d nm i)%I.
 
   (* ...and the EXISTS OBSERVATION's receipt: the name WAS in the parent's
      entry map at the instant create's own [dirlookup] read it, and nothing
      moved. *)
-  Definition cre_ex_fired (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+  Definition cre_ex_fired (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d : Z) (nm : fname) (i : Z) : iProp Σ :=
     (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
        ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗ ⌜ents !! nm = Some i⌝ ∗
-       Φ av d nm i)%I.
+       Fex.(pf_recv) av d nm i)%I.
 
-  (* the child's two legs, as the AU twins' arms carry them: both commits
-     back UNFIRED, or the do-then-undo PAIR (ruling Q-h) *)
+  (* The child's two legs, as the AU twins' arms carry them: both commits
+     back UNFIRED, or the do-then-undo PAIR (ruling Q-h).  UNFIRED means
+     the whole pair the caller handed in -- the commit CONJOINED with its
+     refund -- so a caller whose leg never fired eliminates to its own
+     [pf_refund]. *)
   Definition cre_child_unfired Γ (c : absnode)
-      (Φarm Φun : aview -> Z -> iProp Σ) : iProp Σ :=
-    (aarm_commit_at Γ appE c Φarm ∗ aunarm_commit_at Γ appE Φun)%I.
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ)) : iProp Σ :=
+    (pf_at (aarm_commit_at Γ appE c) Farm
+     ∗ pf_at (aunarm_commit_at Γ appE) Fun)%I.
 
-  Definition cre_child_pair (Φarm Φun : aview -> Z -> iProp Σ) (i : Z) : iProp Σ :=
-    (cre_arm_fired Φarm i ∗ cre_unarm_fired Φun i)%I.
+  Definition cre_child_pair (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (i : Z) : iProp Σ :=
+    (cre_arm_fired Farm i ∗ cre_unarm_fired Fun i)%I.
 
   (* ------------------------------------------------------------------ *)
   (*  1b.  Satisfiability: the [_unit] dischargers                        *)
@@ -697,18 +710,22 @@ Section CreateFire.
      [FsAbsDefs.abs_of_bare]) becomes the row [(c, 1)]; under the registry,
      because a directory child is half-built from here to its dots. *)
   Lemma caf_arm_fire (γfs : fs_names) (E : coPset) (k t : nat) (q : Qp)
-      (S : gset Z) (i : Z) (c : absnode) (Φ : aview -> Z -> iProp Σ)
+      (S : gset Z) (i : Z) (c : absnode)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
       (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     i ∈ S ->
     abs_of n = None ->
     abs_of n' = Some (MkAnode c 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
-    aarm_commit_at (fs_gamma_L γfs) appE c Φ -∗
+    pf_at (aarm_commit_at (fs_gamma_L γfs) appE c) Farm -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
-      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n' ∗ cre_arm_fired Φ i.
+      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n' ∗ cre_arm_fired Farm i.
   Proof.
     iIntros (HE Hin Hnone Hrow) "#Hi #Hai Hrec Hcm Hf".
+    (* THE PIECE IS SPENT: the fire eliminates to the AU side and the
+       refund goes with the arm that did not happen. *)
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     iApply (caf_armed_retag γfs E k t q S i n n' _ HE Hin
               with "Hi Hai Hrec [Hcm] Hf").
     iIntros (I Hlk) "Hta".
@@ -730,17 +747,19 @@ Section CreateFire.
      (the success arm's [cr_dirty_clear] disarms right after) *)
   Lemma caf_dots_fire (γfs : fs_names) (E : coPset) (k t : nat) (q : Qp)
       (S : gset Z) (i d : Z) (full : bool)
-      (Φ : aview -> Z -> Z -> bool -> iProp Σ) (n n' : fs_node) :
+      (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ)) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     i ∈ S ->
     abs_of n = Some (MkAnode (ADir ∅) 1%nat) ->
     abs_of n' = Some (MkAnode (ADir (dots_ents full i d)) 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
-    adots_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (adots_commit_at (fs_gamma_L γfs) appE) Fdots -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
-      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n' ∗ cre_dots_fired Φ i d full.
+      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'
+      ∗ cre_dots_fired Fdots i d full.
   Proof.
     iIntros (HE Hin Hrow Hrow') "#Hi #Hai Hrec Hcm Hf".
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     iApply (caf_armed_retag γfs E k t q S i n n' _ HE Hin
               with "Hi Hai Hrec [Hcm] Hf").
     iIntros (I Hlk) "Hta".
@@ -760,18 +779,20 @@ Section CreateFire.
   (* THE UNARM under the registry (site #13b, mkdir's fail tail): the
      dotless or half-dotted directory at count 1 DISAPPEARS *)
   Lemma caf_unarm_fire_armed (γfs : fs_names) (E : coPset) (k t : nat) (q : Qp)
-      (S : gset Z) (i : Z) (c : absnode) (Φ : aview -> Z -> iProp Σ)
+      (S : gset Z) (i : Z) (c : absnode)
+      (Fun : pfam Σ (aview -> Z -> iProp Σ))
       (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     i ∈ S ->
     abs_of n = Some (MkAnode c 1%nat) ->
     abs_of n' = None ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
-    aunarm_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (aunarm_commit_at (fs_gamma_L γfs) appE) Fun -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
-      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n' ∗ cre_unarm_fired Φ i.
+      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n' ∗ cre_unarm_fired Fun i.
   Proof.
     iIntros (HE Hin Hrow Hnone) "#Hi #Hai Hrec Hcm Hf".
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     iApply (caf_armed_retag γfs E k t q S i n n' _ HE Hin
               with "Hi Hai Hrec [Hcm] Hf").
     iIntros (I Hlk) "Hta".
@@ -791,17 +812,18 @@ Section CreateFire.
      child's fail arm: the row was never suspended) -- the zeroed record
      owes [inode_local], which the site's re-pack proves anyway *)
   Lemma caf_unarm_fire (γfs : fs_names) (E : coPset) (i : Z) (c : absnode)
-      (Φ : aview -> Z -> iProp Σ) (n n' : fs_node) :
+      (Fun : pfam Σ (aview -> Z -> iProp Σ)) (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
     abs_of n = Some (MkAnode c 1%nat) ->
     abs_of n' = None ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    aunarm_commit_at (fs_gamma_L γfs) appE Φ -∗
+    pf_at (aunarm_commit_at (fs_gamma_L γfs) appE) Fun -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
-      top_frag (fs_gamma_L γfs) i n' ∗ cre_unarm_fired Φ i.
+      top_frag (fs_gamma_L γfs) i n' ∗ cre_unarm_fired Fun i.
   Proof.
     iIntros (HE Hloc Hrow Hnone) "#Hi #Hai Hcm Hf".
+    iDestruct (pf_at_au with "Hcm") as "Hcm".
     iApply (caf_retag γfs E i n n' _ HE Hloc with "Hi Hai [Hcm] Hf").
     iIntros (I Hlk) "Hta".
     assert (Hav : abs_view I !! i = Some (MkAnode c 1%nat))
