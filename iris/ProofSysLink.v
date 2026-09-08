@@ -138,8 +138,6 @@ Require Import ProofSysLinkTails.
 (* THE APPLICATION'S SIDE (round E2, lane E2-L): the three commits
    [SpecSysLink] now takes, the two fires this walk performs, and the third
    -- unlink's, because [FsAbsDelta.delta_link_untgt] IS [delta_unl_tgt]. *)
-Require Import AppInv.           (* [appE]: the commit mask               *)
-Require Import SpecSysUnlinkAU.  (* [utgt_commit_at]                      *)
 Require Import FsAbsUnlinkFire.  (* [uf_nd_top]                           *)
 Require Import FsAbsLinkFire.    (* [lf_tgt_fire], [lf_ent_fire] + bridges *)
 Require Import FsAbsDefs.        (* LAST (FsAbs's own rule)               *)

@@ -81,7 +81,7 @@ Require Import FsTree.
 Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.
 Require Import SpecSysOpenAU.
-Require Import FsAbsMknodFire.   (* [acre_commit_at], [dlookup_commit_at]   *)
+Require Import FsAbsCreateFire.   (* [acre_commit_at], [dlookup_commit_at]   *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule) *)
 From Kernel Require KernelSyms.

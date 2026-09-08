@@ -139,8 +139,6 @@ Require Import SpecNameiparent.
 Require Import SpecCreate.
 Require Import FsTree.           (* [fname] *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ the commits are at *)
-Require Import AppInv.           (* [appE]: the commit mask *)
-Require Import FsAbsCreateFire.  (* the legs' commits and receipts (round E2, lane E2-C) *)
 Require Import FsAbsDefs.        (* [aview]: the receipts' view argument (round E2, lane E2-C) *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's

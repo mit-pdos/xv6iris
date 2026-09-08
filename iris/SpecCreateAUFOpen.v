@@ -54,7 +54,7 @@ Require Import FileInvDefs.
 Require Import ProcAvail.
 Require Import Xv6G.
 Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]         *)
-Require Import FsAbsMknodFire.   (* the two commits                         *)
+Require Import FsAbsCreateFire.   (* the two commits                         *)
 Require Import SpecCreateAUF.    (* [cauf_ok], [cauf_fail]                  *)
 Require Import SpecSysOpenAU.    (* the consumer, which does NOT move       *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)

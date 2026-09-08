@@ -373,7 +373,6 @@ Require Import SpecSysChdirAU.   (* [SYSCHDIR_AU], [chdir_arms_landed], [fsabs_c
    WRITABLE inode fd; every other descriptor keeps the landed sconf. *)
 Require Import SpecSysWriteAU.     (* [wchunks], [wri_receipts]              *)
 Require Import SpecSysWriteAUEra.  (* [SYSWRITE_AU_ERA], [write_arms_at]     *)
-Require Import FsAbsWriteFire.     (* [awrite_chain]                         *)
 Require Import OffGv.              (* [off_user_inv]: the fd row's offset     *)
 Require Import FsAbsInvFire.
 Require Import SpecMyproc.

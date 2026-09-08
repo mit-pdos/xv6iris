@@ -120,7 +120,6 @@ Require Import SpecCreate.
 Require Import CodeSysMkdir.
 Require Import SpecSysMkdir.
 Require Import FsTree.          (* [fname]: the parent-leg receipt's name *)
-Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
 Require Import FsAbsDefs.       (* [aview]: the receipts' view argument (round E2, lane E2-C) *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

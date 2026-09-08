@@ -68,7 +68,7 @@ Require Import DirView.          (* [T_DIR_z]                               *)
 Require Import FsTree.           (* [fname], [DOT], [DOTDOT]                *)
 Require Import FsBlocks.         (* [fs_names]                              *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]                            *)
-Require Import InodeInv.
+Require Import BlkmapDefs.
 Require Import IrefSlots.
 Require Import Xv6Cameras.
 (* the binder classes, IMPORTED rather than inherited (FsAbsMknodFire's
