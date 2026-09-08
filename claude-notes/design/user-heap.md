@@ -83,6 +83,27 @@ times in `UkEcho.v`).  Packing the ambient inside `urun` makes the
 continuation good at any ambient BY CONSTRUCTION.  `urun_close` is the
 lemma that converts, and is the only place `ukc` still appears.
 
+### The supplier and the admission predicate (the syscall deposit's carrier)
+
+Every `ecall` deposits the syscall's bundle (`UexecSG.sbundle uslot n W`)
+with the kernel, and a program proof cannot name that bundle — the fs
+vocabulary is above it.  So `urun` carries an abstract supplier `Dsup`
+(persistent, existential) and a per-program admission predicate `Sok :
+Z -> uvis -> Prop`, with the minting law as a pure side condition:
+`∀ n W, Sok n W -> n <> USYS_exec -> ⊢ □ Dsup -∗ sbundle uslot n W`.  The
+ecall leaf for a call at (n, W) discharges `Sok n W` from the program's
+key facts, as it discharges the `usys_*` rows.  The generic slot and any
+program that owns nothing about the file system take `Dsup := ssupply`
+(the application predicate holds at every view) and `Sok := λ _ _, True`;
+a verified program under a constraining predicate takes `Dsup := emp` and
+`Sok` := the calls it makes at the keys it holds, and proves the law in
+its kernel-side constructor file, which sits above the fs tower.  Exec's
+leaf takes its deposit as an explicit premise (the exec bundle carries the
+new process's slot wand).  Why not simpler: the supply as a conjunct of
+the kernel's bundle `uvb`, or inside `urun` itself, would make the kernel
+(resp. the program) owe "the predicate is trivially true" to run at all —
+unsatisfiable before echo's taint exists.
+
 ## Leaf shape
 
     uinstr_is γt pc rvc i -∗
