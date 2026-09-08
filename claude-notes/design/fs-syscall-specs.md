@@ -415,6 +415,18 @@ receipt and never mention `R`; the pair lives at the assembly.  The
 trivial family is `pfam_triv Φ` (refund `True`), which is what the
 dispatcher and the friendly layer pass.
 
+**A PIECE MAY NOT ASK THE CLIENT TO MOVE A KERNEL-OWNED GHOST.**  The
+client of a bundle is, after the ARM, an arbitrary user process whose
+only resource is its supplier; a piece is therefore payable only if it
+asks nothing the process cannot hold at every key.  Borrowing the
+kernel's half of the inode map and returning it unchanged is fine;
+returning the offset shadow's half ADVANCED is not (it needs the per-row
+`off_user_inv`, a kernel-side invariant).  So the observation and chunk
+commits lend the shadow and take it back unmoved, and the kernel's fire
+lemma moves it afterwards from the row invariant it holds.  (As of the
+ARM lane: read's `aread_commit_at` and the write chain's nodes are the
+two pieces being re-shaped to this rule.)
+
 **ONE CONTRACT PER SYSCALL.**  `sys_write` is the model: `SpecFilewrite.
 FILEWRITE` and `SpecSysWrite.SYSWRITE` are its only seals.  Each keeps the
 whole-function frame and takes a caller INPUT and returns an armed OUTPUT,

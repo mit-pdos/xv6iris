@@ -297,6 +297,33 @@ ssupply`, `psok := λ _, True`; echo's programs (ARM-c) at `Dsup := emp`,
 `psok` := the numbers they call.  Exec's leaf keeps the explicit-premise
 shape (its bundle carries the slot wand).
 
+**The law is KEY-FREE, and the criterion is "payable at every key from
+the supplier alone" (ruled 2026-09-08, forced by the compiler).**  `urun`
+is re-established after every instruction and the program's own execution
+moves every component of the key (a store moves `M`, sbrk moves `pm`/`sz`,
+open/dup/close/pipe move `fdv`, every returning ecall moves `cw`), so a
+law inside `urun` indexed by the key must be closed under all five — i.e.
+it is the key-free law: `udep := □ Dsup ∗ ⌜∀ n W, psok n -> n <>
+USYS_exec -> ⊢ □ Dsup -∗ sbundle uslot n W⌝`.  Consequences: (a) a
+number is in a program's `psok` iff its bundle is payable at EVERY key
+from `□ Dsup` alone; for a constraining program that excludes any
+syscall whose bundle is keyed on the descriptor view or reads the image
+(write is keyed on `sys_fd_st`; exec and mknod read paths out of the
+image), which take the EXPLICIT route: the leaf's premise is the weaker
+`psok n ∨ sbundle uslot n W`, and the program produces the deposit from
+a section-variable law with a key premise discharged from its own
+ledger, proved in its kernel-side constructor; (b) for the GENERIC slot
+(`Dsup := ssupply`) every contract's bundle must be payable at every key
+from the supplier — which exposes a PIECE-SHAPE DEFECT for ARM-b: read's
+`aread_commit_at` and the write chain's nodes lend the offset shadow's
+kernel half at `off` and demand it back MOVED (`off + d` / `off + |bs|`);
+today's dischargers pay that with the per-row `off_user_inv γo`, which no
+process holds at an arbitrary key.  RULE: a piece may not ask the client
+to return a kernel-owned ghost moved; the client returns the shadow
+unmoved and observes, and the kernel's fire lemma moves it from the row
+invariant it holds.  ARM-b re-shapes those two pieces (and any other with
+the same dependence) before turning the real bundles on.
+
 #### What is actually left to decide for L2-a
 
 - ~~D-A~~ **REFUNDS, RULED 2026-09-07 (owner): every piece of a bundle is
