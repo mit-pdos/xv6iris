@@ -379,7 +379,15 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   the dependency inverted (`SpecSysOpen` requires it); the plain frame
   and the two AU links are gone, `LinkSysOpen.v` is the link, the
   dispatcher's omode destruct is one call with `fsabs_open_in`.
-  UNLINK, CHDIR: in flight.
+  ~~UNLINK~~ LANDED — mknod's fold exactly: `SYSUNLINK`/`wp_sys_unlink`,
+  the blanket derived (`unlink_arms_ret`), `SpecSysUnlinkAU.v` the
+  statement leaf (its `utgt_commit_at` IS sys_link's undo leg, which is
+  why it stays a leaf) with the dependency inverted, the plain frame
+  deleted, ONE closer (`sys_unlink_closer` takes the armed post `ARMS`;
+  the proof layer's byte-identical twin `su_au_closer` retired),
+  `LinkSysUnlink.v`.  `ProofSysUnlinkAU.v` keeps its name because
+  `ProofSysUnlink.v` is the pure layer below it (hygiene backlog).
+  CHDIR: in flight.
 
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
