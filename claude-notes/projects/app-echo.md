@@ -269,27 +269,33 @@ minted from nothing but the generic family (`fsabs_exec_pre`'s
 `fsabs_env` premise is dead), which is why the real supply must be the
 application predicate's.
 
-**The deposit's CARRIER (ruled 2026-09-08, ARM-a's one friction).**  The
-program proofs sit BELOW the fs vocabulary, so a leaf cannot pay
-`sbundle uslot n W` directly; it needs something in hand.  Refuted: (1)
-`□ ssupply` as a conjunct of the kernel's bundle `uvb` — the kernel would
-owe the supply to resume ANY process, unsatisfiable pre-taint for echo:
-the GAP-premise trap in the trap loop; (2) `□ ssupply` inside `urun` —
-the same trap one level down (echo could not build a `urun` pre-taint);
-(3) the deposit as an explicit premise of every ecall leaf — honest but
-~1000 edits across 370 program lemmas.  RULED (4): `urun` carries an
-abstract SUPPLIER `Dsup : iProp Σ` (existential, used as `□ Dsup`) and a
-per-program ADMISSION predicate `Sok : Z -> uvis -> Prop`, with the
-minting law as a pure side condition in `HRut`'s idiom:
-`⌜∀ n W, Sok n W -> n <> USYS_exec -> ⊢ □ Dsup -∗ sbundle uslot n W⌝`.
-A KEY predicate, not a number set, because what a program can pay
-depends on its key (echo pays write's console arm because `uvis_fd W !!
-1` is the console).  ARM-a/b: every program at `Dsup := ssupply`, `Sok :=
-λ _ _, True`; ARM-c: echo's programs at `Dsup := emp` and `Sok` := their
-calls at their keys, the law proved above the fs tower in their kernel-
-side constructor files; the tainted generic slot at `Dsup := ssupply`.
-Exec's leaf keeps the explicit-premise shape (the exec bundle carries the
-slot wand).  `urun` never moves again.
+**The deposit's CARRIER (ruled 2026-09-08, refined once).**  The program
+proofs sit BELOW the fs vocabulary, so a leaf cannot pay `sbundle uslot n
+W` directly.  Refuted: (1) `□ ssupply` as a conjunct of the kernel's
+bundle `uvb` — the kernel would owe the supply to resume ANY process,
+unsatisfiable pre-taint for echo: the GAP-premise trap in the trap loop;
+(2) `□ ssupply` inside `urun` — the same trap one level down; (3) the
+deposit as an explicit premise of every ecall leaf — ~1000 edits across
+370 program lemmas; (3′) a free key predicate `Sok n W` in `urun` — the
+leaf cannot discharge it, because the key is bound one layer in by
+`urun`'s existentials.  RULED: a small ambient class `uprogSG Σ` with
+`Dsup : iProp Σ` (the program's SUPPLIER, used as `□ Dsup`) and `psok :
+Z -> Prop` (the NUMBERS it admits); `urun` gains `□ Dsup` and the pure
+minting law over its OWN bound variables, quantified over the registers
+and pc so `urun_close` re-establishes it:
+`⌜∀ n m' pc', psok n -> n <> USYS_exec -> ⊢ □ Dsup -∗ sbundle uslot n
+(uvis_of_run m' pc' M pm sz fdv cw)⌝`.  The key-dependence a program's
+bundles have (echo's "fd 1 is the console") is a fact about the bound
+`fdv`/`M`, provable where the constructor proves this conjunct; the
+honest consequence of the register quantification is that a program
+holding a FILE descriptor pays the write chain for every fd/count its
+`psok` admits.  The leaf takes `⌜psok n⌝` as a pure premise; each program
+file binds its `psok <literal>` facts as section variables, discharged in
+its kernel-side constructor (no program lemma statement moves).
+Instances: the generic slot and every ARM-a/b program at `Dsup :=
+ssupply`, `psok := λ _, True`; echo's programs (ARM-c) at `Dsup := emp`,
+`psok` := the numbers they call.  Exec's leaf keeps the explicit-premise
+shape (its bundle carries the slot wand).
 
 #### What is actually left to decide for L2-a
 

@@ -83,26 +83,35 @@ times in `UkEcho.v`).  Packing the ambient inside `urun` makes the
 continuation good at any ambient BY CONSTRUCTION.  `urun_close` is the
 lemma that converts, and is the only place `ukc` still appears.
 
-### The supplier and the admission predicate (the syscall deposit's carrier)
+### The supplier and the admitted numbers (the syscall deposit's carrier)
 
 Every `ecall` deposits the syscall's bundle (`UexecSG.sbundle uslot n W`)
 with the kernel, and a program proof cannot name that bundle — the fs
-vocabulary is above it.  So `urun` carries an abstract supplier `Dsup`
-(persistent, existential) and a per-program admission predicate `Sok :
-Z -> uvis -> Prop`, with the minting law as a pure side condition:
-`∀ n W, Sok n W -> n <> USYS_exec -> ⊢ □ Dsup -∗ sbundle uslot n W`.  The
-ecall leaf for a call at (n, W) discharges `Sok n W` from the program's
-key facts, as it discharges the `usys_*` rows.  The generic slot and any
-program that owns nothing about the file system take `Dsup := ssupply`
-(the application predicate holds at every view) and `Sok := λ _ _, True`;
-a verified program under a constraining predicate takes `Dsup := emp` and
-`Sok` := the calls it makes at the keys it holds, and proves the law in
-its kernel-side constructor file, which sits above the fs tower.  Exec's
+vocabulary is above it.  So a small ambient class `uprogSG` gives each
+program a SUPPLIER `Dsup` (persistent) and the NUMBERS it admits `psok :
+Z -> Prop`, and `urun` carries `□ Dsup` plus the minting law as a pure
+side condition over its own bound variables, quantified over the
+registers and pc so `urun_close` re-establishes it:
+`∀ n m' pc', psok n -> n <> USYS_exec -> ⊢ □ Dsup -∗ sbundle uslot n
+(uvis_of_run m' pc' M pm sz fdv cw)`.  The ecall leaf for a call at `n`
+takes `⌜psok n⌝` as a pure premise; a program file binds its `psok
+<literal>` facts as section variables and its kernel-side constructor
+discharges them, above the fs tower, where it proves the law.  The
+generic slot and any program that owns nothing about the file system
+take `Dsup := ssupply` (the application predicate holds at every view)
+and admit every number; a verified program under a constraining
+predicate takes `Dsup := emp` and admits the numbers it calls — the key
+facts its bundles need (which descriptors are the console, what the
+image holds) are facts about `urun`'s bound `fdv` and `M`.  Because the
+law is quantified over the registers, a program holding a FILE descriptor
+pays the write chain for every fd and count its `psok` admits.  Exec's
 leaf takes its deposit as an explicit premise (the exec bundle carries the
 new process's slot wand).  Why not simpler: the supply as a conjunct of
 the kernel's bundle `uvb`, or inside `urun` itself, would make the kernel
 (resp. the program) owe "the predicate is trivially true" to run at all —
-unsatisfiable before echo's taint exists.
+unsatisfiable before echo's taint exists; and a free key predicate in
+`urun` cannot be discharged at the leaf, where the key is bound one layer
+in.
 
 ## Leaf shape
 
