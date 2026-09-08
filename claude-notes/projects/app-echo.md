@@ -22,17 +22,13 @@ binaries at every reboot).
 
 ## Lanes (design §6), with what each unblocks
 
-- [ ] **L2 — the step moves to the process.**  Proposal below (a persistent
-  per-call give on the ecall arm, dischargers off it, `Happ_auto` deleted,
-  echo's taint disjunct); its four questions await the owner.  The returning-ecall arm's
-  persistent give carrying `app_step`, the AU fires taking it from there,
-  the generic slot at `taint -∗ □ uexec_wp`; then `app_auto`/`app_auto_raw`/
-  `Happ_auto`/`app_step_of_auto`/`app_step_acc` — the era-wide blanket
-  promise the GENERIC dischargers still pay every AU fire's step with, and
-  which only the generic application can pay — are deleted.  Unblocks: every
-  non-generic step.  Gate: none (L3 landed).  Shape: `fd-row-pilot.md` §2's
-  deposit disjunct at a persistent payload; `UexecRetExec.uexecXG` for
-  the ambient class.
+- [ ] **L2 — the step moves to the process.**  RULED 2026-09-07 (owner):
+  each syscall's precondition is its landed contract's ONE-SHOT AU bundle,
+  supplied by the process through the ecall arm the way `UexecRetExec`
+  already does for exec; no persistent promise crosses the seam.  Then
+  the `fsabs_*` dischargers, `app_step_acc`, `app_auto`, the mint's
+  license premise and `Happ_auto` are deleted.  Plan and open items
+  below.  Gate: none (L3 landed).
 - [x] ~~**L3 — round E of `app-instances.md`**~~ (kernel side, application-
   independent).  LANDED: every view move on a dispatched path is an AU fire
   or a `_step`; link, mkdir, create's legs, the write and `iput`'s free are
@@ -86,120 +82,269 @@ L2); `Hphi` needs L2 and L7.  A theorem taking those as hypotheses would be
 the GAP-premise trap (`durable-notes.md`).  Echo's own pin (`/echo`'s
 inum and bytes, `FsShPin`'s shape) joins `echo_fs` with L6.
 
-## The L2 proposal (awaiting the owner's rulings; questions at the end)
+## L2 — the plan, corrected 2026-09-07 (the first two drafts were wrong; see the end)
 
-#### (i) The give: a persistent, per-call promise (pure vocabulary `sys_delta`)
+**THE RULING (owner, 2026-09-07).**  No persistent promise crosses the
+ecall seam.  Each syscall's precondition is the ONE-SHOT AU bundle its
+landed contract already defines, supplied by the process; there is no
+"universal AU", no pure delta table, no kernel-side discharger.
 
-    sys_delta (n : Z) (tf : list (mword 64)) (fdv : list fdstate) (cw : Z)
-              (av : aview) (i : Z) (av' : aview) : Prop
-      -- "syscall n, issued with trapframe words tf from fd table fdv and cwd cw, may move row i
-          of the view av to av'": the per-syscall table over FsAbsDelta's vocabulary, e.g.
-          mknod: ∃ d nm c j, av' = delta_arm j c av ∨ av' = delta_unarm j av ∨ av' = delta_create d nm j c av
-                 with (d, nm) the path's parent/last element resolved in av from cw (the AU walk's
-                 `apath_at`/`mknod_parent_elems` vocabulary, SpecSysMknodAU) and c = ADev (a1) (a2);
-          write:  ∃ off bs, av' = delta_write i off bs av, i the inum of fdv !! a0 (FdInode i _);
-          read/fstat/chdir/dup/close/exit/…: av' = av;  exec: av' = av (reads only);
-          unlink/link/open(O_CREATE|O_TRUNC)/mkdir: their deltas at the resolved path.
+#### What is landed (design/fs-syscall-specs.md; the `SpecSys*AU.v` files)
 
-    app_give (P : aview -> iProp) (n : Z) (W : uvis) : iProp :=
-      □ ∀ I i av', ⌜sys_delta n (uvis_tf W) (uvis_fd W) (uvis_cwd W) (abs_view I) i av'⌝ -∗
-                   app_step_P P i I av'
-    app_give_any P := □ ∀ I i av', app_step_P P i I av'          -- = app_auto_raw's body
+Every fs syscall has an AU-form contract whose CLIENT-supplied part is a
+BUNDLE of one-shot fupds, one per linearization instant the code has:
 
-(`app_step_P` is `AppInv.app_step` with the predicate a parameter instead of `app_pred app_run`,
-so a process file below the kernel proofs can state it; `app_step` is its instance.)  PERSISTENT,
-so the kernel may fire it as many times as the syscall retags, and no "return" leg is needed —
-this is why L2 is cheaper than the fd-row pilot's deposit (below): nothing linear crosses.
+- **the walk** — `open_walk_pre_era γfs cw P Pmiss` / `mknod_walk_pre_era`
+  (parent prefix): for the path string fetched, one `={⊤}=∗` yielding the
+  cursor `P 0 start` and ONE `FsAbs.ax_hop` PER PATH COMPONENT, each fired
+  in `dirlookup` under that directory's lock against its then-current
+  entry map: `P k d -∗ lend d ents ={⊤}=∗ lend d ents ∗ (P (S k) c | Pmiss k d)`.
+  `P`/`Pmiss` are the client's own cursor predicates.
+- **read-kind commits** — `aopen_commit_at`, `dlookup_commit_at`: single
+  phase, borrow the kernel's half `ghost_map_auth (γtop) (1/2) I`, learn
+  the row purely (`arow_at`), return the receipt `Φ (abs_view I) i a`.
+- **write-kind commits** — `acre_commit_at`, `atrunc_commit_at`,
+  `awrite_full_at`/`awrite_part_at`: TWO PHASES.  Phase 1 borrows the
+  pre-map at the instant and the client returns `AppInv.app_step i I
+  (delta …)` — its application claim survives THIS delta — plus phase 2,
+  which borrows the post-map (the client WITNESSES the delta applied) and
+  returns the receipt.
+- **the undo legs** — `cre_child_unfired = aarm_commit_at ∗ aunarm_commit_at`:
+  the child's row appears at nlink 1; if the parent's entry write fails
+  the unarm fires instead.
+- **write's chain** — `awrite_chain Γ E i γo Φ k cnt`: `wchunks n` nodes,
+  each `full ∧ part` (the kernel picks), each returning the NEXT node;
+  the partial arm ends the loop.  One fire per `begin_op`…`end_op` chunk.
+- **exec** — `SpecKexecAU.exec_au_pre S … = walk ∗ aopen_commit_at Φo ∗
+  exec_slot_pre S Φo …`, where `exec_slot_pre : ∀ av i f nl W', Φo av i
+  (AFile f) -∗ ⌜loadable f⌝ -∗ ⌜kexec_image_ok f … W'⌝ -∗ S W'` — GIVEN
+  the observation receipt for the file kexec read and the key it built,
+  the caller supplies the slot at that key.  NO PINNING IN THE SPEC: a
+  caller narrows the files it answers for through its own `Φo`.
+- **the posts return what did not fire** — e.g. `open_post_fail_plain =
+  bundle unspent ∨ (walk died: dead receipt ∗ both commits unfired) ∨
+  (observation fired ∗ trunc unfired)`.  "Unspent" is the post's
+  disjunction; nothing inside an AU says "fire me unspent".
 
-#### (ii) The channel: the ecall arm of `uexec_ret` carries the give
+**Who supplies the bundle today.**  The DISPATCHER (`ProofSyscall`), at
+the trivial families (`fun _ _ => True`), paying every write-kind
+commit's `app_step` out of the parked license via the `fsabs_*`
+dischargers.  EXCEPT exec: `UexecRetExec` (a parallel form of the trap
+contract behind the ambient class `uexecXG`, payload `xbundle X W`) makes
+the PROCESS hand over `sys_exec_au_pre uslot_x … P Pmiss Φo …` at its exec
+ecall — families existential in the arm ("some bundle at this key"),
+re-bound by the dispatch; the slot wand concludes at the fixpoint
+variable.  It is a GIVE: on failure the refunded bundle stays in the
+kernel's frame (a program cannot retry exec).  `UexecExecInst.v` is the
+kernel-side instance.
 
-`UexecRet.uexec_ret_F`'s generic ecall arm (UexecRet.v ~539-600) becomes
+#### L2 = do for every fs syscall what exec already does
 
-    app_give P n W ∗ (∀ r M' π' szv' fdv' cw', ⌜usys_mem_ok …⌝ -∗ ⌜usys_fd_ok …⌝ -∗ … -∗ X (bump …))
+- The ecall arm of `UexecRet.uexec_ret_F` splits off each syscall number
+  that HAS an AU contract and demands that contract's bundle from the
+  process, through the same class mechanism (`UexecRetExec` and
+  `UexecRetFs` fold into `uexec_ret_F`, as both headers say they will).
+  Syscalls without an fs contract keep today's arm.  Verified programs
+  prove their bundles — the walk cursor, the commits (each write-kind
+  commit's `app_step` for THEIR predicate), the receipts they want.
+- The dispatcher passes the process's bundle to the sealed contract
+  instead of the trivial one (exec's arm at ProofSyscall ~2902 is the
+  model).  The `fsabs_*` dischargers, `app_step_acc`, `app_auto`, the
+  mint's license premise and `Happ_auto` are then deleted (§(iv) items
+  1, 3–5 stand; item 2, the leftover `□ fw_app_write_step` on the plain
+  write contract, is retired in favour of the chain's per-chunk step).
+- **The generic slot.**  An unverified program's slot must produce every
+  bundle at the trivial families; the write-kind `app_step`s are payable
+  iff the application predicate is trivially true — `app_triv` by
+  definition, echo from the taint (`taint ⊢ ∀ av, echo_pred av`).  So
+  `uexec_wp_uslot`/`cond_entry_slot` gain the premise `□ ∀ av, app_pred
+  app_run av` and `UEXEC_GEN` carries it.  This is not a design choice;
+  it is what "unconstrained abstract state" means as a premise.
+- **exec needs nothing new.**  Pre-taint, sh's `Φo`/cursor at the
+  fire-time view (opening `app_inv` inside the commit for its own pins)
+  proves the observed file is echo's and answers with echo's verified
+  slot; in the taint branch it answers with the generic slot.  Whether
+  the kernel's proof ever takes `exec_post_ok`'s "(b) generic mint" arm
+  for an x-tier process must be checked (`ProofKexecAU`).
 
-with `P` the application's predicate reached through the ambient class the slot already has
-(`UexecRetExec.uexecXG`'s pattern: a class so the return former's cone gains no fs imports —
-the give mentions only `aview`/`fs_node` maps and `FsAbsDelta`, which sit below).  The process
-picks nothing: every process proves the give for every ecall it issues.  The generic inhabitant
-`UexecRet.uexec_wp_uslot : □ uexec_wp -∗ uslot W` gains the premise `app_give_any P` (it cannot
-know which calls the unverified program makes); `UexecCond.cond_entry_slot` likewise.  For
-`app_triv` both are free (`app_auto_raw_triv`).
+#### What is actually left to decide for L2-a
 
-#### (iii) The kernel side: dischargers off the give, `Happ_auto` deleted
+- ~~D-A~~ **REFUNDS, RULED 2026-09-07 (owner): every piece of a bundle is
+  `AU ∧ R`,** with `R` the caller-chosen REFUND — provable from the same
+  resources the caller spent building the AU (both conjuncts from one
+  context).  The kernel eliminates to the AU side at the fire and to `R`
+  when it hands the piece back unfired.  What this costs in the landed
+  shape: each piece's definition gains one `∧ R` parameter; the posts are
+  UNCHANGED, because they already return unfired pieces verbatim
+  (`open_post_fail_plain`'s three arms; `write_post_fail_at` returns
+  `awrite_chain … (length bss + x)`, the unfired tail, `x ≤ 1`).  The
+  halfway abort is NOT a real issue: a bundle is a `∗` of independent
+  one-shot pieces, no piece is ever half-fired (both commit phases sit in
+  one `ftopN` critical section; a hop is one fupd), sequencing rides the
+  cursor `P k d` which the death receipt returns, and the chain is NESTED
+  (node k's phase 2 yields node k+1), so `R_k` on the outermost unfired
+  node covers everything invested in the tail.  Two real obligations on
+  the caller: a resource used by two pieces must be pre-fractioned (one
+  piece per fraction), and a FIRED piece returns its investment only
+  through the receipt the caller chose (`aopen_commit_at_pinned` already
+  hands the `nview` share back inside `Φ`).  CONSEQUENCE: the arm must be
+  the DEPOSIT shape (the post read back under the arm's ∀, the fd-row
+  pilot's route) and not `UexecRetExec`'s give, which drops the post.
+- **THE WRITE CHAIN'S REFUND IS A PREFIX CURSOR (owner, 2026-09-07).**  Node
+  k of the chain becomes `Q k ∧ (full_k ∧ part_k)` and the base case
+  `chain k 0 := Q k`, with `Q k` the caller's predicate "after the prefix
+  of k chunks" — the walk's cursor `P k d`, carried over to chunks.  It
+  fits because the chain is NESTED: node k+1 is built by the caller
+  INSIDE node k's phase 2, where the post-map witness
+  (`abs_view I' = delta_write i off bs (abs_view I)`, and for the partial
+  arm the counted `r` beside the landed run) is in hand, so `Q (k+1)`
+  genuinely knows chunk k landed.  The kernel eliminates to the arms when
+  it fires chunk k and returns the node otherwise; the caller eliminates
+  to `Q` at whatever position the loop stopped — success (`length bss`
+  chunks, the chain "resumes at the receipts' length"), the partial arm
+  (`x = 1`, one past the receipts), or an early -1 (`x = 0`).  So the
+  three returns of `write_post_ok_at`/`write_post_fail_at` collapse to
+  "here is the node at the stop position", and `Q` subsumes both the
+  refund `R` and the per-chunk receipt family `Φ`/`wri_receipts`/
+  `wri_part_receipt`, which can go.  AND `Q` CAN CARRY THE BUFFER (owner's
+  question, 2026-09-07; my "cannot" was wrong).  Each node's phase 1
+  ∀-binds the chunk's bytes `bs` and the landed contract ties them to the
+  caller's buffer only once, in the post, on the concatenation
+  (`ubytes_at M ua (concat bss)`, ruling A) — a presentation choice made
+  because the chunk DECOMPOSITION is existential.  But the source side
+  chains by construction (filewrite reads `addr + i` at its own running
+  total), and the per-chunk fact is ALREADY in the proof:
+  `SpecFilewriteAU.v:299` has `⌜ubytes_at M (add_vec_int ua t) bs⌝` at
+  running total `t`, and the post's concatenation is `ubytes_at_app` over
+  it.  So node k's phase 1 gains the pure premise `⌜ubytes_at M (ua + tot)
+  bs⌝` with `tot` the total the cursor `Q k` carries, and `Q (k+1)` can
+  say "the file holds the first `tot + |bs|` bytes of my buffer, spliced
+  at the offsets I saw".  The per-chunk FILE offsets stay unrelated across
+  instants (another writer through the same `struct file` may move
+  `f->off` between chunks) — known at each fire from the lent
+  `off_gv` half, not chained.
+- **D-B. Which syscalls in the first cut.**  Those with landed AU
+  contracts: mknod, open (plain/create), unlink, link, chdir, write,
+  exec; plus whatever mkdir/read have.  Inventory before the brief.
+- ~~D-C~~ **ONE SPEC PER SYSCALL — RULED 2026-09-07 (owner).**  Raised on
+  `sys_write`, which has THREE proved contracts today (the plain
+  `SpecSysWrite` over every descriptor kind, whose FD_INODE arm takes the
+  persistent premise `SpecFilewrite.fw_app_write_step`, minted from the
+  license at ProofSyscall:4458; `SpecSysWriteAUEra`, the chain, premise-
+  pinned to an open writable inode; `SpecSysWriteConsAU`, the console
+  arm) with the dispatcher choosing by the descriptor's state
+  (`sysc_write_inode`, ~4478) — and then generalised: EVERY syscall gets
+  ONE contract.  Its arms are keyed on what the code keys on (the
+  descriptor's `fdstate`: `FdInode` → the chain, `FdDevice` console → the
+  console receipt, `FdPipe` → pipewrite's, closed/unwritable → -1; for
+  path syscalls, the walk's outcome), the AU form IS the contract, and the
+  plain forms retire.  Stable forms stay as DERIVED corollaries (a lemma,
+  never a second proof against the code).  THIS SUPERSEDES R10
+  ("landed contracts never move; new specs are parallel forms") for the
+  syscall layer: the parallel forms were the transitional device and they
+  are now folded.  Inventory of the parallel families to fold (2026-09-07):
+  write ×3 (+`SpecFilewrite`/`AU`/`Cons`), read ×3 (`Read`/`AU`/`AUAt`),
+  open ×2, mknod ×3 (`Mknod`/`AU`/`AUEra`), unlink ×2, chdir ×2, dup ×2,
+  exec ×2 (+ `SpecKexec`/`AU`/`B2`/`B3`/`Pin`/`Pinned`), create ×4
+  (`Create`/`AU`/`AUF`/`AUFOpen`), sync ×2.  Single-form today: link,
+  mkdir, close, pipe, fstat, fork, exit, wait, kill, getpid, sbrk, pause,
+  uptime.  The plain forms' remaining consumers are their own proof files
+  and the dispatcher (`grep -l "SpecSysWrite\." iris/*.v` etc.), so the
+  fold is per syscall: restate the AU contract with all arms, re-point the
+  dispatcher, delete the plain statement and proof.  This is L2-b's shape
+  now — the unified contract is where the process's bundle lands.
+Not decisions: the generic slot's premise (above); pinning (echo's own
+`Φo`, never the spec's); the write chain (landed).
 
-The trap loop already carries the ecall's `uexec_ret` to the dispatcher (milestone J's shape:
-`ProofUsertrapSys` holds the slot bundle `uslot_x (uvis_of U sts)`; `ProofSyscall.sysc_arm_pre`).
-The dispatcher's fs arms today read `FirstTok.fsabs_env = app_inv` off `syscall_env` and pay with
-the license.  After L2 each arm reads `app_give (app_pred app_run) n W` off the payload and uses
-NEW dischargers `fsabs_*_pre_give : app_give P n W -∗ ⌜n = USYS_x⌝ -∗ <bundle at the True
-families>` — one per dispatched fs syscall (mknod, open create/plain, unlink, link, mkdir, write
-inode, chdir, exec; read is read-kind and owes nothing) — each proved by showing that every
-commit's step the contract can demand is `sys_delta n …`-shaped at the row the commit's premise
-names.  That is the substance of the lane: ~10 lemmas of the shape `fsabs_mknod_pre_era` but
-with the delta obligation discharged from the table instead of the blanket.  Then `app_inv`
-keeps only the half authority and the claim (`app_auto` is no longer parked in it),
-`AppInv.app_auto`/`app_auto_raw`/`app_step_of_auto`/`app_step_acc(_view)` are deleted, and
-`Happ_auto` leaves `xv6_app_adequacy` and `xv6_power_adequacy_gen` (SystemAdequacy — the ONE
-statement change the round makes; the fs adequacy statement is untouched).
+#### Why the first two drafts were wrong (so nobody re-proposes them)
 
-#### (iv) Echo's side: the taint pays the generic give
+Draft 1 (commit `d26c19aea`) made the step a `□` promise: refuted above.
+Draft 2 (this file, earlier today) kept a SINGLE per-call AU over a pure
+delta table `sys_delta` with kernel-side `fsabs_*_pre_au` dischargers.
+That was a parallel form of the landed bundles — the near-duplicate the
+guiding principle forbids — and it could not be right: the AU shape is
+per syscall (a hop per path component, two-phase commits, undo legs, a
+chain for write, a slot wand for exec), and the process supplies THE
+BUNDLE, not a summary of it.  `sys_delta`, `app_au`, `app_au_any`,
+`AppAu.v`, `FsSysDelta.v`, `sys_ask` are all withdrawn.
 
-Echo's programs are enriched (they prove `app_give echo_fs n W` per call — init's mknod/open of
-the console, sh's exec/fork/wait/read/write, echo's write: every one is either `av' = av` or a
-create at a fresh inum under `/`, which preserves the per-inum pins; ONE lemma
-`echo_fs_sys_delta : ∀ n tf fdv cw av i av', sys_delta … -> echo_fs_pure av -> echo_fs_pure av'`
-for the deltas those calls can make, since the pins name inums 1 and 2's rows and `/`'s entries
-only by lookup).  After the taint (input leaves the discipline) a process runs the generic slot,
-which needs `app_give_any`; so echo's predicate becomes
+## The two options for the generic slot's supply — RULED 2026-09-07: option 2
 
-    echo_pred γ av := mono_nat_lb_own γ 1 ∨ ⌜echo_fs_pure av⌝
+§(iv) item 6 leaves two ways to make every ecall payable: (1) PREVENT bad
+input, drop the taint, and prove no syscall ever violates the invariant;
+(2) SWITCH to a tainted mode at the first off-discipline byte, after which
+processes run the generic slot.  Findings:
 
-— once tainted, the witness is persistent and re-establishes the claim at any view (the "echo
-pays by taint" of round E2's notes, made exact).  `Happ_xfer`/`Happ_init` are unaffected (a
-disjunction of a persistent and a pure claim duplicates; era 0 is the right disjunct).  The
-taint-to-generic handoff `taint -∗ app_give_any echo_pred` is the "generic slot at
-`taint -∗ □ uexec_wp`" app-echo.md names.
+- **Option 1 in its pure form is not available.**  Adequacy quantifies
+  over every environment byte and the rx wand must be provable for ANY
+  `b` (uart-trace.md ruling 3, the design's own note on `Hrx`).  "Prevent"
+  means restricting `prim_step`, which ruling 3 refused.  The only way to
+  make the post-bad-byte WP obligations discharge without a semantic change
+  is a WP-level vacuity token minted at the bad byte — which IS the taint.
+  Option 1 also does not save L5: sh's verified path needs to know the
+  bytes it reads are the typed ones to follow the disciplined parse at all.
+- **Option 2 works, but "all slots become generic" is not a kernel
+  mechanism.**  A slot is the process's OWN WP; each verified program
+  switches ITSELF at the receipt where the taint first reaches it, by
+  applying the generic inhabitant with the taint as its supply at the
+  current key.  Most never switch: init's and echo's calls are all
+  view-preserving, and a view-preserving AU is trivial for ANY predicate.
+- **Where the taint is minted and how it travels (= L5's shape).**  The rx
+  wand fires INSIDE `WpUart.wp_uart_loop` (rx arm, ~WpUart.v:930) with the
+  UART invariant open — kernel-visible.  Give the loop's invariant a TAG
+  COLUMN: per pushed byte a persistent, application-chosen iProp the wand
+  returns beside `R h'` (opaque `T : list mobs -> iProp`, so no era
+  identity is needed — the dual of Lane C's `uart_acc`).  uartgetc's RHR
+  read pulls byte + tag; a kernel ledger threads it consoleintr → cons.buf
+  → consoleread → the read syscall's AU RECEIPT.  For echo the tag is
+  "prefix still disciplined ∨ taint"; sh's `gets` reads one byte per
+  `read`, and `star_prefix` is prefix-closed, so a per-byte check suffices.
+- **Every fs-CONTENT-dependent AU gets a taint branch.**  Its fire-time
+  claim is `taint ∨ pins`.  Pre-taint the pins branch plus `kexec_ok`'s
+  success arm makes the exec gate hold (init's exec sh, sh's exec echo);
+  in the taint branch the AU hands the taint to the exec mint as the
+  generic slot's supply through its KERNEL-FACING output.  So the AU's
+  output is `▷ P av' ∗ Ψ` with `Ψ` the kernel's ask (exec: gate ∨ supply).
+  Fork needs no supply: the child's slot is the parent's second conjunct;
+  J's re-mint on the fork arm must go (fork's real row) because re-minting
+  would need a supply.  Children of a tainted process inherit the
+  persistent taint (`Forkable` trivially).
+- **No global atomic switch is needed.**  Between the bad push and sh's
+  read every process is still verified and pins-preserving; after it,
+  each opener of `app_inv` gets the disjunction and handles both arms.
+  The lb is at the fixed part's gname, so it survives reboots; era n+1
+  boots at `taint ∨ pins` and init's exec-sh AU takes the taint branch.
+  `Hphi` is unchanged.
+- **Costs specific to option 2:** the disjunction predicate (Q4), the tag
+  column in `WpUart` (machine layer), the console ledger (kernel), the
+  taint branch in each content-dependent continuation, the supply field in
+  `UEXEC_GEN`.  Common to both options: L5's tie, the exec-site forcing
+  function, fork's real row, the per-program AUs on the disciplined path.
 
-#### Why not the fd-row pilot's deposit disjunct as the whole channel
+RULED 2026-09-07 (owner): option 2.  It is the only one the semantics
+admits and its extra cost is the tag plumbing, which L5 owes in either case.
 
-`fd-row-pilot.md` §2 routes a LINEAR mirror half through the trap (`mcur γm u` in, stepped `u'`
-out) so the process LEARNS the syscall's effect (the console pilot's `r3 = 0`).  L2 needs the
-opposite direction only: the process PROMISES.  A persistent give crosses without a return leg,
-needs no `uenr_dom` disjunction (every process supplies it; the generic one supplies the blanket
-form), no mirror joins in the loop, and no parking generalization (§6's third ask) — the payload
-is persistent, so the park's fixpoint is untouched.  The two are complementary and the pilot's
-route (a) can land later on top: its enriched disjunct would carry the mirror half BESIDE the give.
+## Lanes in flight
 
-#### Cost and staging (each stage a green gate)
+- **W-UNIFY (opened 2026-09-07, Opus lane, two phases).**  sys_write's
+  three contracts (`SpecSysWrite` plain / `SpecSysWriteAUEra` chain /
+  `SpecSysWriteConsAU` console; filewrite's three likewise) fold into ONE
+  `FILEWRITE` and ONE `SYSWRITE`, arms keyed on the descriptor state; the
+  chain's receipt family `Φ` becomes the prefix cursor `Q`, base case
+  `Q k`, the per-chunk buffer tie `ubytes_at M (ua + FW_MAX*k) bs` (partial
+  arm: `take r bs`) in phase 1; `fw_app_write_step` and the receipt
+  definitions deleted; the dispatcher calls the one contract with the
+  trivial cursor (still paying `app_step` from the license — the license
+  leaves in a later lane).  Phase 1 = statement, reported for review before
+  proofs.  Out of scope: a pipe-write AU (the pipe arm keeps the landed
+  blanket).
 
-- L2-a (pure + slot side, kernel untouched): `sys_delta` (FsAbsDelta or a new `FsSysDelta.v`
-  below UexecRet's cone), `app_step_P`/`app_give`/`app_give_any` (a new `AppGive.v` below
-  UexecRet), the class hook, the arm change in `uexec_ret_F`, `uexec_wp_uslot`/`cond_entry_slot`
-  with the `app_give_any` premise, the Uk engine's ecall leaves gaining the give obligation
-  (`UkStep`/`UkSync`/`UkFork`/`UkInit`… — each verified program proves its gives; sync's are all
-  `av' = av`).  Ripple: everything above `UexecRet` that builds a slot (~the Uk files, the three
-  mint sites' generic inhabitants).  Sizing before the brief: `grep -l "uexec_ret\|uslot" iris/*.v`.
-- L2-b (kernel side): the dispatcher's arms take the give from the trap's payload (find where
-  `ProofUsertrapSys` hands the ecall's `uexec_ret` to `ProofSyscall` — the `sysc_arm_pre`
-  bundle's slot component), the `fsabs_*_pre_give` dischargers, `app_inv` without the license,
-  `Happ_auto` deleted from App.v/SystemAdequacy.v (statement change: owner sign-off), the
-  AppInv deletions.
-- L2-c (echo): `echo_pred` with the taint disjunct, `echo_fs_sys_delta`, the three programs'
-  gives (lands with L6's program proofs; L2 only states the shape).
+## Decisions outstanding after the 2026-09-07 rulings
 
-#### Questions for the owner
-
-- Q1. THE GIVE IS PERSISTENT AND PER-CALL , not the AU bundle itself (route (a) with
-  receipts).  Agree?  (The receipts are the fd-row pilot's business; L2 pays steps only.)
-- Q2. `Happ_auto` LEAVES the system theorem  — a statement change to
-  `SystemAdequacy.xv6_power_adequacy_gen`'s hypotheses (the audited fs statement is untouched).
-  The alternative keeps it as the generic slot's premise only (no theorem change; the license
-  survives as a resource the generic inhabitant consumes).  Recommendation: delete — a hypothesis
-  nobody can discharge except the trivial application is the GAP-premise trap in a milder form.
-- Q3. `sys_delta`'s resolution of paths: the table names the parent/last-element the AU walks
-  resolve (`apath_at` at the process's `cwd`).  Under concurrency the view may change between
-  the give and the fire, so the table must be stated at the FIRE-TIME view (the commit's `I`),
-  which is what the give does (`abs_view I` is the commit's).  A give stated at the trap-time view
-  would be unsound.  Confirm the fire-time reading.
-- Q4. Echo's predicate gains the taint disjunct ; `app_pred`'s type stays
-  `app_names -> aview -> iProp` (the taint witness lives in `app_fixed`'s gname).  Agree?
+For L2-a: only D-B (which syscalls in the first cut; the inventory is
+above and is mine).  D-A and D-C are RULED (refund by `AU ∧ R` / the
+prefix cursor; one spec per syscall).
+For later lanes: the rx wand's tag output (L5), read's receipt (L5),
+`kexec_ok`'s success arm and Lane X's chain conjunct (L6), fork's real
+row (L6), init's wait null-window row (L6).  Ordering: L2-a → the park
+→ L5 → L2-b → L6 → L7.  Q4 stays provisional.

@@ -10,7 +10,10 @@ lane Y below), `namei-pinned-lookup.md` (paused; its port is lane P).
 
 Working rules (inherited): all builds on the EC2 mirror; Opus for proof
 lanes, Fable for design (user's split); R10 byte-stability — landed
-contracts never move, new specs are parallel forms; merge to main at
+contracts never move, new specs are parallel forms — SUPERSEDED for the
+syscall layer 2026-09-07 (owner): ONE contract per syscall, the AU form
+with all arms, the plain/era/cons parallel forms folded into it (see
+`app-echo.md`, "ONE SPEC PER SYSCALL"); merge to main at
 each green gate, never push campaign branches (the user pushes).
 
 ## Input to the simplification campaign's rank 4 (consumer side)
