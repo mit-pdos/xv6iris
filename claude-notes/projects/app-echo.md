@@ -768,9 +768,20 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   `spost_at` indexed by the witness `f`, the arm `∃ f, deposit at f ∗
   post at f`, `uexec_ret_F_split` handing out the witness, `f` a plain
   parameter of the trap/uservec/syscall bodies and their module types;
-  `sbundle` survives as a derived reader, `spost` gone.  Next slices: the
-  instance at the nine real bundles; `Happ_sup` as the fourth credential;
-  `ut_sys_out` as a post row; then B2.
+  `sbundle` survives as a derived reader, `spost` gone.  Two more rulings (a third agent finishes from the clean tree): the
+  supply credential lands FIRST — the discharger tower bottoms out in
+  `app_step_acc`/`app_step_acc_view`, stated at `app_inv`, so the instance
+  pays its write-kind steps either by duplicating the tower (~16 twins B2
+  would delete) or by RE-BASING those two lemmas and the `_unit`/`fsabs_*`
+  layers on `□ app_sup` (a premise rename), which needs the credential to
+  exist; and `spost_at` is `emp` at chdir 9 and open 15 THIS ROUND, because
+  their landed arms bundle `proc_priv`, the fd bundle and `fd_slot` —
+  kernel resources a process at its own key cannot name; splitting those
+  two arms into a kernel half and a receipt half is OWED (ARM-c/L6, where
+  open's receipts matter).  Read's and write's returned posts drop the pure
+  blanket (it reads `pv_ofile V`; the round carries `usys_*`).  Order:
+  (ii) `Happ_sup` + the re-based tower → (i) the instance at the nine
+  bundles → (iii) `ut_sys_out` as a post row → B2.
 
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
