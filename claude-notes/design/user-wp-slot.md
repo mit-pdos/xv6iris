@@ -460,8 +460,8 @@ user-mode-on-kernel engine — the full account is
 
 **Stage 4: the DESCRIPTOR VIEW in the key** (owner-directed; this is
 part (A)'s refinement taken at the KEY rather than as an iProp payload —
-see [`fd-row-pilot.md`](fd-row-pilot.md) §2 (c1), which recommended
-against it, and was overruled).
+see [`../completed/fd-row-pilot.md`](../completed/fd-row-pilot.md) §2 (c1),
+which recommended against it, and was overruled; the pilot is retired).
 
 - `uvis` gains `uvis_fd : list fdstate` — one `FdSlots.fdstate` per
   descriptor, the user-visible state of `p->ofile[]` (CLOSED, or OPEN at a

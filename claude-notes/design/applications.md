@@ -8,9 +8,9 @@ builds on [`adequacy.md`](adequacy.md)
 (the trace slot `Pt`, the hook `Hphi`, the crash slot `Pc`),
 [`crash.md`](crash.md) (the fixed layer, the PowerOn arm's lend),
 [`fs-syscall-specs.md`](fs-syscall-specs.md) (the AU forms, the deltas
-and the abstract view `aview`), [`user-wp-slot.md`](user-wp-slot.md) and
-[`fd-row-pilot.md`](fd-row-pilot.md) (the process's trap contract and how
-a process hands the kernel a payload at an ecall).  The worklist for the
+and the abstract view `aview`), [`user-wp-slot.md`](user-wp-slot.md) (the process's trap contract; how a
+process hands the kernel a payload at an ecall is §2 below — the fd-row
+pilot that first tried it is retired to `completed/fd-row-pilot.md`).  The worklist for the
 first application is [`../projects/app-echo.md`](../projects/app-echo.md).
 
 ## 0. The two applications, and what separates them

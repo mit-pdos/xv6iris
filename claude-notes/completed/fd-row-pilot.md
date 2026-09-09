@@ -1,7 +1,21 @@
 # fd-row-pilot — the enriched u-tier syscall row, piloted on init's console
 
-The design of record for the enriched u-tier syscall row. Spec statements:
-`iris/FsFdMirror.v`, `iris/UexecRetFs.v`, `iris/FdRowPilot.v`.
+**RETIRED 2026-09-09.**  The pilot's parallel form (`FsFdMirror.v`,
+`UexecRetFs.v`, `FdRowPilot.v`, `FdRowMint.v`, `UkInitFs.v`, `UkRunSysFs.v`,
+`UkRunFsLeaf.v`, `UkStepGenFs.v`, `UkStepGenSeals.v`, `FsImgConsole.v`) is
+deleted (HYGIENE lane, projects/app-echo.md).  What it prototyped — a
+per-process payload deposited at an ecall and returned stepped — is
+adopted in a different shape: the ARM (design/applications.md §2,
+`UexecSG.sbundle_at`/`spost_at`), where each syscall deposits its own
+contract's one-shot bundle and gets the armed post back; the descriptor
+view rides IN THE KEY (`uvis_fd`, design/user-wp-slot.md stage 4) and is
+stepped by the pure row `usys_fd_ok`.  Kept for the ghost-crossing seam
+ruling (§2) and the era-0 pilot theorem's shape.  Everything below is
+historical.
+
+The design of record for the enriched u-tier syscall row was here. Spec
+statements: `iris/FsFdMirror.v`, `iris/UexecRetFs.v`, `iris/FdRowPilot.v`
+(deleted).
 
 Related: [`user-wp-slot.md`](user-wp-slot.md) (the trap contract this
 enriches; its part (A) PARKS exactly this refinement: "a later refinement

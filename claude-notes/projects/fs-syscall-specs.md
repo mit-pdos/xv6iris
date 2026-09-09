@@ -3666,7 +3666,7 @@ the plan's own "Open" list is not duplicated.
 
 ## FD-ROW PILOT — the enriched u-tier syscall row (design lane landed 2026-08-31)
 
-Design of record: [`../design/fd-row-pilot.md`](../design/fd-row-pilot.md)
+Design of record (RETIRED 2026-09-09, the ARM supersedes it): [`../completed/fd-row-pilot.md`](../completed/fd-row-pilot.md)
 (the seam ruling with the refuted alternatives, the target theorem, the
 era-0 story, upstream-vs-ours, non-goals).  Files (all NEW; nothing
 frozen touched; all EC2-green, zero `Admitted`, zero new `Axiom`):
@@ -4364,7 +4364,7 @@ free descriptor, but `usys_fd_ok`'s open row says only that the slot it
 returned was free — sound, and too weak to say a REDIR redirects.  Their
 commit left the choice open (strengthen the plain row vs widen sh's
 runner to the enriched channel) and cited this campaign's pin
-(design/fd-row-pilot.md: open = the least closed row, fdalloc's own scan
+(completed/fd-row-pilot.md, retired: open = the least closed row, fdalloc's own scan
 order).  THE RULING: strengthen the PLAIN row — the fact is pure and
 channel-independent, the kernel's `fdalloc` loop is its proof, and the
 enriched row then READS it, the same delegation `ufs_step_fd_agrees`

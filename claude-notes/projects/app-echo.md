@@ -1078,6 +1078,71 @@ row reaches INTO `first_done`'s `fs_ready` copies of persistent rows —
 build such packages with `iSplitL`/`iSplitR`.  `UexecCond.uslot_congr`
 has no callers (delete in (a) or (c)).
 
+#### HYGIENE (LANDED 2026-09-09; brief `brief-hygiene.md`)
+
+The sweep owed after the folds, ruled from the phase-1 inventory:
+(H1) the `AU`-suffixed leaves become `Sys{Write,Read,Mknod,Open}Defs.v`;
+exec was INVERTED (its `AU` files held the contracts and `SpecKexec.v` /
+`SpecSysExec.v` were live vocabulary leaves) — swapped in one pass:
+`SpecKexec`→`KexecDefs`, `SpecKexecAU`→`SpecKexec`, `SpecSysExec`→
+`SysExecDefs`, `SpecSysExecAU`→`SpecSysExec`, `ProofKexecA`→
+`ProofKexecACode`, `ProofKexecAUA`→`ProofKexecA`, `KexecAUBridge`→
+`KexecBridge`; unlink: `ProofSysUnlink`→`ProofSysUnlinkPure`, the `AU`
+proof family drops the suffix (`…AUParts`→`ProofSysUnlinkShared`); open's
+thirteen `ProofSysOpenAU*` drop it (`…AUParts`→`ProofSysOpenShared`).
+Lemma-level `_au` bundle names stay (EXEC-UNIFY's record).
+(H2) `npar_walk_pre_era`/`npar_walk_dead_era`, `namei_walk_pre_era`/
+`namei_walk_dead_era`, `npar_elems` — `_era` KEPT: both walks are stated
+over the era lend, so the suffix names a real concept.
+(H3) `uexec_ret_ret_F`→`uexec_ret_cont_F`.
+(H4) `aopen_commit`/`aopen_commit_at_weaken` and `mkf_acre_fire` deleted;
+`KEXECB3` collapses into `ProofKexecB3.v` (the ascription stays — dropping
+it would make the 4200-line functor body transparent); `KexecOkQ`'s `Q`
+hole is LEFT (threaded through eight phase files, plugged once; a header
+line records it).
+(H5) the fd-row pilot's ten parallel-form files are deleted (none in the
+adequacy cone; `FsImgConsole.v` dies with them); its design note is
+retired to `completed/`; `fd_frags_any` is live and stays.
+(H6) CONS-FOLD: the Loc form takes the plain names; `consolewrite_stack`
+survives into the folded file (it is on the path).
+Rebuild: 607 files (the `FdSlots.v` comment is in).  AS LANDED: 14 files
+deleted (the pilot's ten, the superseded consolewrite trio, `SpecKexecB3`),
+34 renamed, no `AU` in any filename; `SysUnlinkDefs.v` joined the leaves;
+`ProofSysUnlinkPure.v` is the pure layer under unlink's walk, `*Shared.v`
+each walk's hoisted layer; `ProofKexecACode.v` phase A at the machine,
+`ProofKexecA.v` phase A at the contract; `KexecBridge.v` the pure closer.
+
+#### RECEIPT-IMAGE (designed 2026-09-09; brief `brief-receipt-image.md`, queued behind HYGIENE)
+
+A GAP IN READ'S RECEIPT.  `read_post_ok` hands the process the node `a`,
+the offset and the count, but the bytes in its OWN BUFFER are the image
+row's existential `bs` (`usys_mem_ok` at read: `M' = umem_wr M addr d bs`)
+and the receipt is read at `(W, r, fdv', cw')` — no `M'`.  fileread's and
+sys_read's contracts say so in as many words ("this contract does not
+relay that … a caller that wants it calls readi").  So a verified reader
+learns nothing about what it read; sh's `gets` cannot follow a parse, and
+L5's console tags would have nothing to attach to.
+
+THE FIX.  `spost_at X n f W r M' fdv' cw'` — the post is read at the
+resume image too (RECEIPT-SPLIT's mold; `π'`/`szv'` stay out).
+`read_post_ok Γ i n F r M' addr` gains the pure tie: on an `AFile bs` row,
+`∀ j < d, M' !! (addr + j) = Some (bs !!! (off + j))`; the directory arm
+stays unstated, the console/pipe arms are not `FdInode`.  The obligation
+sits at fileread's two fire sites: readi's post is an equation
+(`umem_wr … tot (rd_bytes data off)`), the fired row is
+`abs_row (era_node dnl bml data)` whose file bytes are `file_bytes
+(fn_data …) (fn_size …)`, and `rd_bytes data off j = file_byte data
+(off + j)`; `umem_wr_lookup_in` closes it.  Then L5's console receipt is
+`∃ bs, ⌜∀ j < d, M' !! (addr+j) = Some (bs j)⌝ ∗ [∗] tags` at the same
+place.
+
+ORDER AFTER THIS: L5-a (the tag column in `uart_inv_body` beside `u_rx`,
+the rx wand returns the persistent tag, `uartgetc` pops byte + tag),
+L5-b (consoleintr → `cons_res`'s tag column → consoleread's post →
+fileread's device arm → sys_read's console receipt), ARM-c (echo's supply
+from the taint, `echo_pred := taint ∨ pins`), L6 (init/sh/echo programs),
+L7.
+
 ## Decisions outstanding (refreshed 2026-09-08)
 
 Everything ruled on 2026-09-07/08 is implemented up to and including the
