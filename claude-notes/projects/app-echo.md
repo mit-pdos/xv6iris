@@ -1530,8 +1530,22 @@ bounded in the payload and founded pinned at boot (`nextpid = 1` in
 arm in `[1, PIDMAX]`, the fork return row `r = -1 ∨ 1 ≤ sint r ≤ PIDMAX`
 at the dispatcher, then the round instantiates the parent's arm
 unconditionally and the loop's `Hmk` premise goes.  ORDER: FETCHSTR-MEM
-phase 2 (rebased; the four spec files re-applied from
-`fetchstr-wip.patch`) → UK-NAMES + CWD → PID-ROW → C+D → ARM-c (1).
+(LANDED) → UK-NAMES + CWD → PID-ROW → C+D → ARM-c (1).
+
+FETCHSTR-MEM LANDED (2026-09-09): `SpecCopyinstr.copyinstr_got M srcva f
+k := ∀ j ≤ k, M !! uint (add_vec_int srcva j) = Some (f j)` (the `j = k`
+instance is the NUL in the image), folded into `copyinstr_ret`'s success
+arm; `SpecFetchstr.fetchstr_got M addr maxn f r` (guarded by `k < maxn`,
+which keeps the -1 arm vacuous) as a separate conjunct, relayed by
+`SpecArgstr` at the argument word; `exec_path_of` AND `exec_args_of`
+index bytes the machine's way (`uint (add_vec_int p j)`), so
+`exec_path_of_bview` needs no no-wrap premise; the exec bundle is owed at
+`exec_path_of (us_M U) v0 pl` — the ONE path the caller passed — at all
+four sites and `sys_exec_au_pre_at`'s premise.  ProofCopyinstr's byte loop
+carries the copied prefix and the cursor `s1 = srcva + done`; `CHUNK`
+takes the page's bytes as `M`'s (`proc_ptm_page_bytes`).  STILL OWED: the
+argv reading `exec_args_of` — `fetchaddr` is ownership-only, so the argv
+POINTERS stay unread though the strings they point at are.
 
 ## Decisions outstanding (refreshed 2026-09-08)
 
