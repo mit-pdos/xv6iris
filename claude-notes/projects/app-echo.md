@@ -1157,7 +1157,7 @@ fileread's device arm → sys_read's console receipt), ARM-c (echo's supply
 from the taint, `echo_pred := taint ∨ pins`), L6 (init/sh/echo programs),
 L7.
 
-#### L5 — findings for the design (2026-09-09; not yet a brief)
+#### L5 — findings for the design (2026-09-09); L5-a in flight (`brief-l5a-tag.md`), L5-b drafted (`brief-l5b-ledger.md`)
 
 THE READS ARE FREE.  uartgetc's LSR poll and RHR load are
 `wp_uart_read_free_s_sconf` (WpSconfUartAccess): the loaded byte is an
@@ -1200,6 +1200,38 @@ bytes copied, `∃ hs, ⌜length hs = d ∧ ∀ j, last (hs !! j) = ObsUartIn
 console receipt carry it to the process (RECEIPT-IMAGE's `M'` gives the
 `bs j` tie).  Lane cut: L5-a = token + non-free reads + column + the App
 hypothesis (`Htag`); L5-b = the console ledger through to the receipt.
+Two design details fixed in the briefs: the tag family is AMBIENT, a
+field `riscv_rx_tag` beside `riscv_obs_pred` in the machine class, so
+`dev_inv`'s type does not move; the rx token is a ghost_var half
+`uart_rx_tok γ k` (k = bytes popped) with a mono-nat `uart_rx_pushed_lb`
+— the LSR read under the token mints `pushed ≥ k + 1`, the RHR pop under
+both finds the FIFO nonempty (no junk arm).  consoleintr stores
+`cons_xlate b` (`'\r'` → `'\n'`) with the tag; the ring gains the
+coupling `r ≤ w ≤ e ≤ r + 128` the ConsoleInv header foresaw, maintained
+at consoleintr's guard and consoleread's push-back.
+
+L5-a PHASE-1 FINDINGS AND RULINGS (2026-09-09).  (F1) `uart_tx_pop` in
+LOOPBACK mode re-queues the drained byte into `u_rx` with no observation
+— the column carries `⌜uart_loopback u = false⌝` (true at reset, nothing
+writes MCR).  (F2) `uartinit`'s FCR write (`0x07`) FLUSHES `u_rx` without
+a pop, which no monotone counter survives — RULED: the rx token is born
+into the BOOT CHAIN at `dev_inv_alloc`, threads `main → consoleinit →
+uartinit` (the flush is "pop everything" under the token: `nk := np`;
+every FCR write requires it), and `main` DEPOSITS it into `plic_inv`
+before `plicinit`/`plicinithart`.  `plic_inv_body` is two-armed:
+pre-init `uart_preinit γ ∗ ⌜∀ c, ¬ plic_enabled p c uart⌝` (so a UART
+claim there is refuted through `plic_cand`) or post-init `uart_inited γ ∗
+tokslot γ p`; `plicinithart`'s enable write requires the persistent
+`uart_inited`.  (F3) `plic_ok` gains `p_pending i → ¬ p_claimed i` (the
+claim's handout needs the token to have been inside).  (F4) the RHR read
+is a pop only with DLAB clear — the pop takes `uart_dlab_off`.  (F5) the
+free read keeps two users (ISR ack at 2, uartintr's THRE poll at 5) and
+gains `off ≠ 0`.  The column is a SEPARATE callback leg on the UART
+load/store bodies (`uart_colE`), not inside `uart_ghosts`, so the
+application's rx/tx wands keep their shape.  `riscv_obs_pred` lives in
+`riscvFixedGS` (RiscvPtsto.v:523), set by `RiscvAdequacy.boot_fixedGS`
+— `riscv_rx_tag` sits beside it.  `AppEcho.v` builds no `xv6_app`
+record; it gains `echo_tag γcl h := ⌜disc h⌝ ∨ mono_nat_lb_own γcl 1`.
 
 ## Decisions outstanding (refreshed 2026-09-08)
 
