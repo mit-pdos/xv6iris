@@ -1273,6 +1273,89 @@ fourth row of `console_caps` (which already crosses `started` inside
 `main_deposit`); `uart_dlab_off` is already inside `is_txlock` ⊂
 `console_caps`, so the RHR pop's DLAB premise costs no contract change.
 
+#### L5-b LEDGER (in flight 2026-09-09; brief `brief-l5b-ledger.md`)
+
+Phase-1 facts.  The ring's coupling is stated on the 32-BIT DIFFERENCES
+the code itself compares (`c.subw` then `bltu`): `cons_ok r w e :=
+uint (w - r) ≤ uint (e - r) ≤ 128`; `uint r ≤ uint w ≤ uint e` is
+FALSE because the three `uint` indices only ever increment and wrap
+(not a kernel bug — unsigned differences are exactly right).
+`cons_slot r k := (uint r + k) mod 128` is wrap-blind because 128 | 2^32
+and injective on `[0,128)`; `cons_row r e bs ts` ties each live slot's
+tag `Some h` to its byte by `obs_ends_in h b ∧ bs !! slot = cons_xlate b`
+(`'\r' → '\n'`, the one translation before the store).  consoleread's
+post gains `hs` with `cons_tagged bs hs d` and the persistent tags;
+`SpecFileread.console_receipt r M' addr` (no `n`) at `FdDevice CONSOLE`
+by `decide`, with the three `fileread_extra_dev_*` lemmas; the `-1`
+disjunct exists only at fileread's tier.  THREE maintainers in
+consoleintr, not two: the guard (`ct_dflt`, the fact born at +0x044 must
+be passed down to `ct_store`/`ct_cr` with the tag premise), the two
+`cons.e--` (kill loop and backspace need `⌜ee ≠ ww⌝`), and `cons.w := e`
+(`ct_wake_prop` took the ring whole and a2 opaque — it now takes the ring
+destructed with `⌜a2 = sext ee⌝`).  consoleread's `cr_win`/`cr_run` hid
+the run's source under `umem_wrote`; they name it now, with the `hs`
+accumulator through seven loop invariants; the pop needs `⌜rr ≠ ww⌝`.
+`boot_cons_res` founds `r = w = e = 0` (bss cells) with `ts = replicate
+128 None`.  Phase 2 runs in two halves (consoleintr side, then
+consoleread + fileread) to fit the agent's context.
+
+#### ARM-c — DESIGN (2026-09-09): `Happ_sup` leaves the theorem; the kernel never mints
+
+WHERE THE SUPPLY IS SPENT TODAY.  `app_sup` (boot-born from `Happ_sup`,
+threaded as the fourth kernel-wide credential) is spent by the kernel at
+exactly THREE mint sites: (1) userinit's park (`ProofUserinit` ~806:
+`uslot_mint` at the family the park captures); (2) the trap loop's exec
+GAP arm (`UexecApply` ~888: `ut_exec_out`'s third disjunct — kexec
+succeeded, `r ≠ -1`, but the node is not `anode_loadable`, `exec_post_ok`'s
+arm (b); the round mints because the process's slot wand
+`exec_slot_pre` speaks only of loadable files); (3) the pid-wrap row
+(`UexecApply` ~908).  Everything else that names `app_sup` — the
+`fsabs_*`/`caf_*`/`lnk_*` dischargers, `xv6_ssupply`, the supply law —
+is the CONSTRUCTION of a generic slot's bundles from a supply, used by
+whoever mints such a slot; those stay, parametric in the supply.
+
+WHY A CONSTRAINING APPLICATION CANNOT HOLD `Happ_sup`.  It is `∀ c r,
+⊢ app_sup_raw (app_pred A c) r`, i.e. "the claim is trivially true"; for
+echo `echo_pred := taint ∨ pins` is true of every view only under the
+taint, which exists only after the first bad byte.  So `taint ⊢ app_sup`
+(the taint is persistent) but no closed hypothesis does.  The generic
+slot's supply must therefore come from a PROCESS that holds the taint,
+never from the kernel.
+
+THE THREE SITES, RETIRED.
+1. userinit: the park takes the FIRST PROCESS'S SLOT from the theorem
+   instead of a supply.  Shape: forkret's boot arm runs kexec("/init")
+   between park and resume, so the slot is an exec-slot piece at the
+   OBSERVED image — `∀ av i f nl W', Φo av i (AFile f) -∗ ⌜kexec_loadable
+   f⌝ -∗ ⌜kexec_image_ok f … W'⌝ -∗ uslot W'` with `Φo` the observation of
+   /init's node (echo: era-0 pins say it is the image's /init, and
+   `UkInit`'s program proof supplies `uslot` at that key — L6's
+   "exec-site gate at the observed image").  The generic theorem supplies
+   it from `app_sup_raw_triv`'s mint.  `SpecUserinit`/`SpecMain`/
+   `BootShared`/`SyscParkEnv.park_world` lose `app_sup`.
+2. exec's gap: the process's exec deposit COVERS arm (b).  `exec_slot_pre`
+   gains the non-loadable-success case (`Fo.(pf_recv) av i a -∗ ⌜¬
+   anode_loadable a⌝ -∗ ⌜kexec_ok …⌝ -∗ S W'`, at whatever the landed
+   success conjuncts pin); a verified process refutes it from its pin
+   (the observed node IS the image's loadable file), a tainted process
+   pays it with the generic slot minted from the taint.  `ut_exec_out`'s
+   third disjunct and the round's `Hmk` at the exec arm disappear.
+3. the pid wrap: the KERNEL FIX (kernel-defects.md, `allocpid` panics on
+   wrap) — after it `kfork_post`'s pid arm is `0 < pidv`, the parent
+   always resumes on its own arm, and the round's last `Hmk` goes.  Until
+   the fix lands the pid-wrap row keeps `app_sup` as a premise of the
+   loop, which is the one place a constraining application cannot pay.
+Then the loop's `Hmk` premise, `park_world`'s supply row and the
+kernel-wide threading are deleted; `Happ_sup` leaves `xv6_app_adequacy`;
+`app_triv` keeps `app_sup_raw_triv` for its own mints; `AppEcho` gets
+`echo_pred := taint ∨ pins` (`Happ_xfer`: pure ∨ persistent transports;
+`Happ_init`: era-0 pins) and the tainted generic slot's supply is
+`echo_tag`'s taint arm, delivered through L5-b's console receipt.  ORDER:
+after L5-b: (2) exec's arm (b) in the deposit; (1) userinit's slot piece
++ `UkInit`'s slot at the observed image (L6 init); (3) waits on the
+kernel fix; then `Happ_sup` goes.  Brief for (2): `brief-armc-execb.md`
+(queued behind L5-b).
+
 ## Decisions outstanding (refreshed 2026-09-08)
 
 Everything ruled on 2026-09-07/08 is implemented up to and including the
