@@ -3360,8 +3360,8 @@ Section InodeRegion.
      applications.md section 2): [_same] when the reading is unchanged
      ([FsAbsDefs.abs_of n = FsAbsDefs.abs_of n'], nothing from the
      application); [_step] with a step wand from the caller's contract (the
-     AU fires: today the generic dischargers pay it off the parked license,
-     lane L2 the process's payload).  There is no blanket form: every view
+     AU fires: the process's own deposit pays it, and a generic slot's is
+     paid off [AppInv.app_sup]).  There is no blanket form: every view
      move on a dispatched path is an AU fire or a [_step], and the only
      [_same] movers are the two that run between ABSENT rows -- ilock's
      fresh-inode fill and the escrow deposit's free, both of which read the
@@ -3372,7 +3372,7 @@ Section InodeRegion.
     ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗ ▷ app_auto -∗
+    (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
        ▷ app_pred app_run (FsAbsDefs.abs_view I) -∗
        ▷ app_pred app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
@@ -3404,7 +3404,7 @@ Section InodeRegion.
   Proof.
     iIntros (HE Habs Hloc) "#Hi #Hai Hf".
     iApply (ireg_top_retag_gen E γfs i n n' HE Hloc with "Hi Hai [] Hf").
-    iIntros (I Hin) "_ Hp". rewrite (FsAbsDefs.abs_view_insert_same I i n n' Hin Habs). iExact "Hp".
+    iIntros (I Hin) "Hp". rewrite (FsAbsDefs.abs_view_insert_same I i n n' Hin Habs). iExact "Hp".
   Qed.
 
   Lemma ireg_top_retag_step (E : coPset) (γfs : fs_names) (i : Z)
@@ -3419,7 +3419,7 @@ Section InodeRegion.
   Proof.
     iIntros (HE Hloc) "#Hi #Hai Hstep Hf".
     iApply (ireg_top_retag_gen E γfs i n n' HE Hloc with "Hi Hai [Hstep] Hf").
-    iIntros (I Hin) "_ Hp". iNext. iApply ("Hstep" $! I with "[//] Hp").
+    iIntros (I Hin) "Hp". iNext. iApply ("Hstep" $! I with "[//] Hp").
   Qed.
 
   (* ...and the SUSPENDED form: the walk holds a receipt naming this inum,
@@ -3431,7 +3431,7 @@ Section InodeRegion.
     ↑ftopN ∪ ↑appN ⊆ E ->
     i ∈ S ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
-    (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗ ▷ app_auto -∗
+    (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
        ▷ app_pred app_run (FsAbsDefs.abs_view I) -∗
        ▷ app_pred app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
@@ -3468,7 +3468,7 @@ Section InodeRegion.
     iIntros (HE Hin Habs) "#Hi #Hai Hrec Hf".
     iApply (ireg_top_retag_armed_gen E γfs k t q S i n n' HE Hin
               with "Hi Hai Hrec [] Hf").
-    iIntros (I Hlk) "_ Hp". rewrite (FsAbsDefs.abs_view_insert_same I i n n' Hlk Habs). iExact "Hp".
+    iIntros (I Hlk) "Hp". rewrite (FsAbsDefs.abs_view_insert_same I i n n' Hlk Habs). iExact "Hp".
   Qed.
 
   Lemma ireg_top_retag_armed_step (E : coPset) (γfs : fs_names) (k t : nat)
@@ -3485,7 +3485,7 @@ Section InodeRegion.
     iIntros (HE Hin) "#Hi #Hai Hrec Hstep Hf".
     iApply (ireg_top_retag_armed_gen E γfs k t q S i n n' HE Hin
               with "Hi Hai Hrec [Hstep] Hf").
-    iIntros (I Hlk) "_ Hp". iNext. iApply ("Hstep" $! I with "[//] Hp").
+    iIntros (I Hlk) "Hp". iNext. iApply ("Hstep" $! I with "[//] Hp").
   Qed.
 
   (* [logN], [iregN] and [ftopN] are pairwise distinct namespaces, so a

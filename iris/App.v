@@ -22,6 +22,13 @@
    non-trivial application is [AppEcho.v]; what it still owes is
    claude-notes/projects/app-echo.md.
 
+   THE OBLIGATIONS ARE SIX FAMILIES, and that is all of them: [Hbirth],
+   [Happ_xfer], [Happ_init], [Happ_sup], the trace ledger's ([HR0], [HRt],
+   [Hpow], [Htx], [Hrx]) and [Hphi].  There is no parked license: the
+   BLANKET PROMISE that the claim survives every one-row move of the map is
+   gone, because the AU fires' steps come out of the PROCESS's own deposit
+   ([UexecSG.sbundle_at]) and a generic slot's out of [Happ_sup].
+
    HOW THE PIECES MEET THE THEOREM.
    - [app_fixed]/[app_cl] are the BIRTH STEP: [Hbirth] runs FIRST in
      [RiscvAdequacy.riscv_power_adequacy], before the crash slot, and the
@@ -46,12 +53,6 @@
      sys_fork's kfork call) and to the closed trap loop.  A constraining
      application cannot pay it and does not have to -- it does not
      instantiate this theorem (see [SystemAdequacy]'s [Happ_sup]).
-   - [Happ_auto] is the application's PARKED LICENSE ([AppInv.app_auto]):
-     the BLANKET PROMISE that its claim survives every one-row move of the
-     map, which is why a constraining application cannot pay it yet
-     ([AppEcho]); the era mint parks it in [app_inv], the generic
-     dischargers pay the AU fires' steps off it, and lane L2 replaces it by
-     per-syscall proofs from the process.
    - [app_R c] is the trace slot's resource at the fixed part; [HR0]
      RECEIVES the birth step's yield ([obs_ledger_at_alloc_cl]) -- for the
      echo application, its taint counter at 0; the power step and the two
@@ -75,9 +76,8 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import FsState.
 Require Import FsAbsDefs.        (* [aview], [abs_view]: the claim is over the view *)
-Require Import AppInv.           (* [app_auto_raw]: the parked license, and
-                                    [app_sup_raw]: the supply, both at the
-                                    raw gname *)
+Require Import AppInv.           (* [app_sup_raw]: the supply, at the raw
+                                    gname *)
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import WpUart.
@@ -173,14 +173,12 @@ Theorem xv6_app_adequacy Σ
        (app-instances.md sections 1-3, round C): the TRANSPORT (its one
        durability obligation -- a copy of the claim at fresh instance names,
        under the later every crossing hands it over at), the ERA-0 claim
-       at the image's own abstract state, and the parked license ---- *)
+       at the image's own abstract state, and the supply ---- *)
     (Happ_xfer : forall c : app_fixed A, ⊢ app_xfer_raw (app_pred A c))
     (Happ_init : forall c : app_fixed A,
        ⊢ |==> ∃ r : app_names A,
            app_pred A c r (abs_view (fss_inodes (FsDurImg.img_state
               (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib))))
-    (Happ_auto : forall (c : app_fixed A) (r : app_names A),
-       ⊢ app_auto_raw (app_pred A c) r)
     (* ...and the SUPPLY (the ARM; [AppInv.app_sup_raw]): the claim holds of
        EVERY view.  It is the credential an unverified program's syscall
        bundles are paid out of, born at boot and carried to the two slot
@@ -231,7 +229,7 @@ Proof.
     rewrite Heq. reflexivity. }
   exact (xv6_power_adequacy_gen Σ g sb nib cov
            (app_fixed A) (app_cl A) Hbirth
-           (app_names A) (app_pred A) Happ_xfer Happ_init Happ_auto Happ_sup
+           (app_names A) (app_pred A) Happ_xfer Happ_init Happ_sup
            (fun γobs c => obs_ledger_at (app_R A c) γobs)
            (fun γobs c =>
               obs_ledger_at_alloc_cl (app_R A c) γobs (app_cl A c) (HR0 c))
@@ -271,13 +269,6 @@ Section AppTriv.
   Proof.
     iModIntro. cbn [app_triv app_names app_pred].
     iExists (). iPureIntro. exact Logic.I.
-  Qed.
-
-  Lemma app_triv_auto (c : app_fixed (app_triv Σ)) (r : app_names (app_triv Σ)) :
-    ⊢ app_auto_raw (app_pred (app_triv Σ) c) r.
-  Proof.
-    cbn [app_triv app_pred]. apply app_auto_raw_triv.
-    intros r' av. reflexivity.
   Qed.
 
   (* the supply: the generic application's predicate IS [True], which is
@@ -325,7 +316,6 @@ Proof.
                  iIntros "!>" (h b u u') "_ _ Hg _"; iModIntro; by iFrame "Hg")
            app_triv_xfer
            ltac:(intros c; exact (app_triv_init c _))
-           app_triv_auto
            app_triv_sup
            ltac:(intros Hinv γgen γstart γreg γd γsw γobs c T g' h;
                  iIntros "_ _ _ _ _"; iModIntro; iPureIntro; exact Logic.I)

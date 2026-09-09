@@ -636,7 +636,7 @@ Section CreateFire.
     (* THE MOVE, at the whole authority ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
             with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
-    { iIntros (_) "_ Hp". iApply (app_step_at i I _ n' eq_refl with "Hstep Hp"). }
+    { iIntros (_) "Hp". iApply (app_step_at i I _ n' eq_refl with "Hstep Hp"). }
     iMod ("Hph2" with "Hta") as "[Hta HR]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
@@ -675,7 +675,7 @@ Section CreateFire.
     iMod ("Hcm" $! I with "[//] Hta") as "(Hta & Hstep & Hph2)".
     iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
             with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
-    { iIntros (_) "_ Hp". iApply (app_step_at i I _ n' eq_refl with "Hstep Hp"). }
+    { iIntros (_) "Hp". iApply (app_step_at i I _ n' eq_refl with "Hstep Hp"). }
     iMod ("Hph2" with "Hta") as "[Hta HR]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".

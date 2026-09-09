@@ -43,15 +43,20 @@
                                    when the disk is the mkfs image
                                    ([echo_fs_era0]).
 
-   WHAT IS DELIBERATELY NOT HERE: a theorem.  The application's parked
-   license ([AppInv.app_auto]) is UNPAYABLE for [echo_fs] until lane L2 of
-   app-instances.md retires it -- it admits EVERY one-row move, which no pin
-   survives -- exactly
-   as the old delta-free license was payable only from [tainted]; the boot
-   lend at a non-pristine boot needs the durable instance (round C); the
-   conclusion needs both.  A theorem taking those as hypotheses would be
-   durable-notes.md's GAP-premise trap, so the application is a
-   definition and its lanes are the worklist. *)
+   WHAT AN APPLICATION OWES, and what echo can pay.  The obligations of
+   [App.xv6_app_adequacy] are [Hbirth], [Happ_xfer], [Happ_init],
+   [Happ_sup], the trace ledger's five and [Hphi] -- there is no parked
+   license any more, and that retirement is what makes a CONSTRAINING
+   application an instance at all: the blanket promise admitted every
+   one-row move, which no pin survives.  What echo still cannot pay is
+   [Happ_sup] -- its claim is [taint ∨ pins], true of every view only after
+   the taint is minted (lane L5) -- and [Hphi], which needs the programs
+   (L6) and the output side (L7); the boot lend at a non-pristine boot
+   needs the durable instance (round C).
+
+   WHAT IS DELIBERATELY NOT HERE: a theorem.  One taking those as
+   hypotheses would be durable-notes.md's GAP-premise trap, so the
+   application is a definition and its lanes are the worklist. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.

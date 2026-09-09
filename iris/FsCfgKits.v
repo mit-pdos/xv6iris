@@ -315,10 +315,10 @@ Section FsCfgKits.
      exc_own (fs_exc fsc_fs) Xexc ∗
      (* THE APPLICATION'S INVARIANT (app-instances.md section 2): the other
         half of the abstract map's authority beside the application's claim
-        about its view and its parked license, FOUNDED AT THE ERA MINT at
+        about its view and its transport, FOUNDED AT THE ERA MINT at
         the founded map.  Persistent; forkret's boot arm projects it into
-        [FirstTok.first_done], and it is the handle the generic dischargers
-        pay every commit's step through.  LAST, so the pass-through sites'
+        [FirstTok.first_done], and it is the handle every commit's step is
+        applied through.  LAST, so the pass-through sites'
         patterns only grow at the end.  At the application record [APP]
         this kit threads (explicit through the kits, ambient everywhere
         else). *)

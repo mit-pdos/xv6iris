@@ -1821,10 +1821,10 @@ Section CollectAll.
     iDestruct "Hireg" as "(#Hiregi & _ & #Hftop & #Happ)".
     iDestruct "Hbmi" as "(#Hbmb & _)".
     (* ---- 0. the application's invariant: its half, its claim, the domain
-       row (the license and the transport stay put) ---- *)
+       row (the transport stays put) ---- *)
     iMod (inv_acc E appN with "Happ") as "[Hab Hclapp]"; [exact Hap |].
     iEval (rewrite /app_body) in "Hab".
-    iDestruct "Hab" as (Ia) "(>Hha & Hpa & >%Hdom & #Hlic & #Hxa)".
+    iDestruct "Hab" as (Ia) "(>Hha & Hpa & >%Hdom & #Hxa)".
     (* ---- 1. the abstract map's authority ---- *)
     iMod (inv_acc (E ∖ ↑appN) ftopN with "Hftop") as "[Hfb Hclft]";
       [solve_ndisj |].
@@ -1914,7 +1914,7 @@ Section CollectAll.
     { iApply bi.later_intro. rewrite /ftop_body. iExists I, A. iFrame "Hta Hlk Hpk".
       iPureIntro. exact Hclean. }
     iMod ("Hclapp" with "[Hha Hpa]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hha Hpa Hlic Hxa".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hha Hpa Hxa".
       iPureIntro. exact Hdom. }
     (* the pair, placed by name: [P_dur_at]'s head conjunct is a byte
        AUTHORITY, so no bare [iFrame] here (see [fs_snap_law_build]) *)

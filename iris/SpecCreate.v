@@ -748,7 +748,7 @@ Section CreateSpec.
 
   (* The whole of what a caller hands create, for a caller that tracks
      nothing: every hop says yes, every cursor is [True], and each commit
-     is its own unit paid off the parked license.  It sits here rather than
+     is its own unit paid off [AppInv.app_sup].  It sits here rather than
      in [FsAbsInvFire]'s [fsabs_*] family because [ProofSysMkdir], one of
      its consumers, is BELOW that file in the cone. *)
   Lemma cre_start_unit (γfs : fs_names) (cw : Z) (pl : list (bv 8)) :

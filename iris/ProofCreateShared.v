@@ -1740,11 +1740,11 @@ Section ProofCreateMain.
   (* ...AND THE VIEW-PRESERVING TWINS (app-instances.md section 7, round
      E1): a retag whose reading is unchanged ([FsAbsDefs.abs_of n =
      FsAbsDefs.abs_of n']) owes the application nothing, so it rides
-     [InodeRegion.ireg_top_retag_armed_same] and the parked license is not
-     consulted.  The FILE arm's disarm (the node does not move at all) and
-     mkdir's failing-["."] arm (a bare directory at count 1 either side)
-     take these; the byte-moving arms stay on the [_auto] forms above until
-     round E2 gives them their AU steps. *)
+     [InodeRegion.ireg_top_retag_armed_same] and the application is not
+     consulted at all.  The FILE arm's disarm (the node does not move at
+     all) and mkdir's failing-["."] arm (a bare directory at count 1 either
+     side) take these; every byte-moving arm is an AU fire, whose step comes
+     out of the caller's own commit. *)
   Lemma cr_dirty_retag_same (E : coPset) (t : nat) (i : Z)
       (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->

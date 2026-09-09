@@ -184,8 +184,8 @@ Require Import ProcInv.
 Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 (* THE APPLICATION'S SIDE (round E2, lane E2-L).  [FsTree] for the entry
    name, [FsBytesGamma] for the live Gamma the commits are indexed by,
-   [AppInv] for [app_step]/[appE] and the parked license the [_unit]s pay
-   with, [SpecSysUnlinkAU] for [utgt_commit_at] -- link's failure arm's
+   [AppInv] for [app_step]/[appE] -- the step the [_unit]s pay off the
+   supply -- [SpecSysUnlinkAU] for [utgt_commit_at] -- link's failure arm's
    count-down IS unlink's target step ([FsAbsDelta.delta_link_untgt] is
    [delta_unl_tgt] on the nose), so it is REUSED and not cloned -- and
    [FsAbsDelta] (which [SpecSysUnlinkAU] re-exports) for the three deltas.

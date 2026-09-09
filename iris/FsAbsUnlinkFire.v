@@ -439,7 +439,7 @@ Section UnlinkFire.
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I d np np' ltac:(rewrite /appE; done)
             with "Hai [Hstep] Hta Hfp") as "[Hta Hfp]".
-    { iIntros (_) "_ Hp". iApply (app_step_at d I _ np' with "Hstep Hp").
+    { iIntros (_) "Hp". iApply (app_step_at d I _ np' with "Hstep Hp").
       by rewrite Hdelta Hdec. }
     iMod ("Hph2" $! (<[d := np']> I) with "[%] Hta") as "[Hta HΦ]".
     { by rewrite Hdelta Hdec. }
@@ -513,7 +513,7 @@ Section UnlinkFire.
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I t nt nt' ltac:(rewrite /appE; done)
             with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
-    { iIntros (_) "_ Hp". iApply (app_step_at t I _ nt' Hdelta with "Hstep Hp"). }
+    { iIntros (_) "Hp". iApply (app_step_at t I _ nt' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[t := nt']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".

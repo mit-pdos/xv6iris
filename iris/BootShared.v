@@ -70,7 +70,7 @@ Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsImg.          (* the image sweeps' vocabulary *)
 Require Import FsCfgBoot.      (* the two boot kits *)
 Require Import FsCfgSnap.      (* [fs_cfg_alloc_snap] -- the era mint *)
-Require Import AppInv.         (* [app_auto]/[app_xfer]: the application's parked license and its transport, handed to the mint *)
+Require Import AppInv.         (* [app_xfer]/[app_sup]: the application's transport, handed to the mint, and its supply, handed straight back out *)
 Require Import AppDur.         (* [app_guest]: the guest the mint's crash seam is stated at (round C) *)
 Require FsAbsDefs.             (* [abs_view]: the application's claim is over the founded map's view (Require, not Import: it re-exports FsState) *)
 Require Import AppCfg.         (* [appcfg]: the application's record, the third field [fileG_of] takes *)
@@ -1441,17 +1441,15 @@ Section BootAlloc.
        [SystemAdequacy.fs_boot_pure] delivers into this fupd. *)
     fs_boot_snap_wf (v_disk (g.(gdev).(dvirtio))) ndisk S Pb sb nib cov ->
     (* the application's boot obligation -- its claim at the founded map's
-       view, at the era's running instance -- and its parked license, both
-       straight through to [FsCfgSnap.fs_cfg_alloc_snap] (app-instances.md
-       round A) *)
+       view, at the era's running instance -- straight through to
+       [FsCfgSnap.fs_cfg_alloc_snap] (app-instances.md round A) *)
     (* ...LATER-SHAPED since round C: the claim comes off the lent durable
        instance through the transport, and the mint's [inv_alloc] takes
        the later *)
     ▷ @app_pred Σ APP (@app_run Σ APP)
       (FsAbsDefs.abs_view (FsState.fss_inodes S)) -∗
-    app_auto (APP := APP) -∗
     (* ...AND THE SUPPLY (the ARM; [AppInv.app_sup]): the application's claim
-       held of EVERY view.  Unlike the license it is parked in NOTHING -- it
+       held of EVERY view.  It is parked in NOTHING -- it
        comes straight back out below, at the era's own [fileG] instance, as
        one of the shared persistents, and travels from there to the boot
        hart's chain, main, userinit's park and the closed trap loop.  It is
@@ -1588,7 +1586,7 @@ Section BootAlloc.
     pose proof Hbf as Hbf'.
     destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0' & _).
     destruct Hv0' as (v0 & Hv0).
-    iIntros "Hok #Hlic #Hsup #Hxfer #Hseamg Hdursnap H".
+    iIntros "Hok #Hsup #Hxfer #Hseamg Hdursnap H".
     iDestruct (power_boot_res_unpack Rb g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hkptb & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
@@ -1789,7 +1787,7 @@ Section BootAlloc.
             (FsCrash.hdr_wset_home _ cov _ Hhwf)
             (FsCrash.hdr_wset_sb _ cov _ Hhwf)
             Hagr Hnibeq Hnib32 Hcovin Hcovmeta
-            with "Hdimg Hbsauth Hbslots Hok Hlic Hxfer Hseamg Hdursnap")
+            with "Hdimg Hbsauth Hbslots Hok Hxfer Hseamg Hdursnap")
       as (ICFG FSC) "Hfs".
     (* durable-disk 2b-inode-3 / 2b-inode-4: NEITHER ERA GHOST ARRIVES HERE
        ANY MORE.  The top map's authority is [InodeRegion.ftop_inv] (carried

@@ -602,8 +602,8 @@ Section SysOpenArms.
               It used to be REFUNDED here and the kernel ran its own
               throw-away commit over the [itrunc] instead -- a piece it had
               to conjure, and the last thing in the tree whose
-              [AppInv.app_step] could only come from the application's
-              parked license.  The honest reading is that the code really
+              [AppInv.app_step] no client could have supplied.  The honest
+              reading is that the code really
               does truncate (the fresh child is a [T_FILE], so the
               [(omode & O_TRUNC) && ip->type == T_FILE] test decides on the
               mode bit alone), and the delta is the IDENTITY because the

@@ -1272,7 +1272,7 @@ Section IlockLoad.
              parks nothing else -- [InodeRegion.ireg_top_park]'s count
              clause, which the box's [fresh_shape] fires) and the claim box
              the fill writes is at count 0 too ([fresh_shape_nlink]).  So the
-             retag is [_same] and reads nothing off the parked license. *)
+             retag is [_same] and owes the application nothing. *)
           assert (Habsbox : FsAbsDefs.abs_of n0
                   = FsAbsDefs.abs_of
                       (era_node dn bm_empty (fun _ => replicate BSIZE (bv_0 8)))).

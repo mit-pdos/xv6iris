@@ -329,7 +329,7 @@ Section MknodFire.
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I d np np' ltac:(rewrite /appE; done)
             with "Hai [Hstep] Hta Hfp") as "[Hta Hfp]".
-    { iIntros (_) "_ Hp". iApply (app_step_at d I _ np' Hdelta with "Hstep Hp"). }
+    { iIntros (_) "Hp". iApply (app_step_at d I _ np' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[d := np']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
@@ -807,7 +807,7 @@ Section CreateFire.
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I d np np' ltac:(rewrite /appE; done)
             with "Hai [Hstep] Hta Hfp") as "[Hta Hfp]".
-    { iIntros (_) "_ Hp". iApply (app_step_at d I _ np' Hdelta with "Hstep Hp"). }
+    { iIntros (_) "Hp". iApply (app_step_at d I _ np' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[d := np']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".

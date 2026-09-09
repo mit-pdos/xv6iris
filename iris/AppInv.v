@@ -36,9 +36,13 @@
                bundles carry it (paid by the generic dischargers out of
                [app_sup], the credential a process that answers for nothing
                runs on; a verified program pays it from its own payload).
-    There is no blanket form: every view move on a dispatched path is an AU
-    fire or a [_step], and the only [_same] movers are the ones between
-    absent rows.
+    THERE IS NO BLANKET FORM, AND NO PARKED LICENSE.  Every view move on a
+    dispatched path is an AU fire or a [_step], the only [_same] movers are
+    the ones between absent rows, and the process supplies the fires' steps
+    inside its own deposit ([UexecSG.sbundle_at]); a generic slot's are paid
+    from [app_sup].  The blanket promise "the claim survives ANY one-row
+    move", which the dischargers used to read off the body, is gone: it was
+    unpayable by any constraining application, and nothing needs it.
     Both are ONE lemma, [app_top_update], at a later-shaped step: the
     application's claim is an arbitrary iProp -- neither timeless nor
     persistent -- so it stays under the invariant's later and the step is
@@ -70,42 +74,11 @@ Definition appN : namespace := nroot .@ "app".
 Definition appE : coPset := ↑appN.
 
 (* ------------------------------------------------------------------ *)
-(*  1.  The raw license: at a predicate and an instance                 *)
+(*  1.  The raw credentials: at a predicate and an instance             *)
 (* ------------------------------------------------------------------ *)
 
-Section AppAutoRaw.
+Section AppCredsRaw.
   Context {Σ : gFunctors}.
-
-  (* the application's PARKED LICENSE: the BLANKET PROMISE that its claim
-     survives ANY one-row move of the map.  It is what the generic
-     dischargers pay the AU fires' steps with, because nothing from the
-     process reaches the kernel yet; lane L2 replaces it by per-syscall
-     proofs from the process and deletes it.
-     RAW -- the predicate (its fixed part already applied) and the instance
-     are ARGUMENTS -- so the system theorem can state it under
-     [riscvGpreS], before the fixed record exists
-     ([SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_auto]); [app_auto]
-     below is the pinned form.  [app_sup_raw] beside it is the ARM's
-     credential -- a DIFFERENT promise; see its own note. *)
-  Definition app_auto_raw {N : Type}
-      (A : N -> aview -> iProp Σ) (r : N) : iProp Σ :=
-    (□ (∀ (I : gmap Z fs_node) (i : Z) (n n' : fs_node),
-          ⌜I !! i = Some n⌝ -∗
-          A r (abs_view I) -∗ A r (abs_view (<[i := n']> I))))%I.
-
-  Global Instance app_auto_raw_persistent {N} (A : N -> aview -> iProp Σ) r :
-    Persistent (app_auto_raw A r).
-  Proof. rewrite /app_auto_raw. apply _. Qed.
-
-  (* the generic application's: a predicate that holds of every view holds
-     of the moved one *)
-  Lemma app_auto_raw_triv {N} (A : N -> aview -> iProp Σ) (r : N) :
-    (forall r av, A r av ⊣⊢ True) -> ⊢ app_auto_raw A r.
-  Proof.
-    intros Htriv. rewrite /app_auto_raw. iIntros "!>" (I i n n') "_ _".
-    iApply (bi.equiv_entails_1_2 _ _ (Htriv r (abs_view (<[i := n']> I)))).
-    iPureIntro. exact Logic.I.
-  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  1a.  THE SUPPLY: the claim holds of EVERY view                      *)
@@ -119,14 +92,12 @@ Section AppAutoRaw.
      out of.  It is what [UexecSG.ssupply] is instantiated at
      ([UexecExecInst]).
 
-     IT IS NOT PARKED IN [app_body] BELOW, and that is the difference
-     between it and the license.  The license is a promise about MOVES,
-     which every application can make about its own claim; the supply is a
-     statement that the claim says nothing, which a CONSTRAINING
-     application cannot make -- echo's is [taint ∨ pins], provable at every
-     view only after the taint is minted.  An era mint that had to found it
-     would be unfoundable for such an application.  So it travels as a
-     PERSISTENT CREDENTIAL of the generic system theorem
+     IT IS NOT PARKED IN [app_body] BELOW, and that is deliberate: the
+     supply is a statement that the claim says nothing, which a
+     CONSTRAINING application cannot make -- echo's is [taint ∨ pins],
+     provable at every view only after the taint is minted.  An era mint
+     that had to found it would be unfoundable for such an application.  So
+     it travels as a PERSISTENT CREDENTIAL of the generic system theorem
      ([SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]), born at boot
      and handed to the two slot mints and the closed trap loop, and it
      stays out of every era-owned resource so that a constraining
@@ -134,7 +105,8 @@ Section AppAutoRaw.
 
      RAW -- the predicate and the instance are ARGUMENTS -- so the system
      theorem can state it under [riscvGpreS], before the fixed record
-     exists; [app_sup] below is the pinned form. *)
+     exists ([SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]);
+     [app_sup] below is the pinned form. *)
   Definition app_sup_raw {N : Type}
       (A : N -> aview -> iProp Σ) (r : N) : iProp Σ :=
     (□ (∀ av : aview, A r av))%I.
@@ -164,7 +136,7 @@ Section AppAutoRaw.
      reaches every crossing under an invariant's later, and a basic update
      cannot run under it; a timeless claim strips, a claim holding
      invariants duplicates under the later.  RAW -- the predicate is an
-     ARGUMENT -- for [app_auto_raw]'s reason. *)
+     ARGUMENT -- for [app_sup_raw]'s reason. *)
   Definition app_xfer_raw {N : Type} (A : N -> aview -> iProp Σ) : iProp Σ :=
     (□ (∀ (r : N) (av : aview),
           ▷ A r av ==∗ ▷ A r av ∗ ∃ r' : N, ▷ A r' av))%I.
@@ -190,7 +162,7 @@ Section AppAutoRaw.
     rewrite /app_xfer_raw. iIntros "!>" (r av) "#H".
     iModIntro. iSplitR; [iExact "H" |]. iExists r. iExact "H".
   Qed.
-End AppAutoRaw.
+End AppCredsRaw.
 
 (* ------------------------------------------------------------------ *)
 (*  2.  The invariant, at the ambient configuration                     *)
@@ -211,15 +183,6 @@ Section AppInv.
      files above [fileG] see it through [file_icfg]). *)
   Context `{ICFG : icfg}.
 
-  Definition app_auto : iProp Σ := app_auto_raw app_pred app_run.
-
-  Global Instance app_auto_persistent : Persistent app_auto.
-  Proof. rewrite /app_auto. apply _. Qed.
-
-  Lemma app_auto_of_triv :
-    (forall r av, app_pred r av ⊣⊢ True) -> ⊢ app_auto.
-  Proof. intros Htriv. rewrite /app_auto. by apply app_auto_raw_triv. Qed.
-
   (* THE SUPPLY, PINNED: what the deposit class's [UexecSG.ssupply] is at
      the kernel's instance.  A CREDENTIAL, not a parked resource -- see
      [app_sup_raw] above for why it cannot live in [app_body]. *)
@@ -233,7 +196,7 @@ Section AppInv.
   Proof. intros Htriv. rewrite /app_sup. by apply app_sup_raw_triv. Qed.
 
   (* THE TRANSPORT, PINNED (round C): parked in the body so the era owns
-     it, and a premise of the era mint beside [app_auto]. *)
+     it, and the one application-side premise of the era mint. *)
   Definition app_xfer : iProp Σ := app_xfer_raw app_pred.
 
   Global Instance app_xfer_persistent : Persistent app_xfer.
@@ -262,15 +225,14 @@ Section AppInv.
   Qed.
 
   (* THE BODY: the application's half of the authority, the claim about the
-     map it carries (read through the view), the domain row, the parked
-     license and the transport.  NOT timeless: the claim is an arbitrary
-     iProp and stays under the later. *)
+     map it carries (read through the view), the domain row and the
+     transport.  NOT timeless: the claim is an arbitrary iProp and stays
+     under the later. *)
   Definition app_body (γfs : fs_names) : iProp Σ :=
     (∃ I : gmap Z fs_node,
        ghost_map_auth (fs_top γfs) (1/2) I ∗
        app_pred app_run (abs_view I) ∗
        ⌜app_dom I⌝ ∗
-       app_auto ∗
        app_xfer)%I.
 
   Definition app_inv (γfs : fs_names) : iProp Σ := inv appN (app_body γfs).
@@ -281,17 +243,16 @@ Section AppInv.
   (* ALLOCATION, at the era mint: the guest half of the authority the boot
      founded, the claim at the founded map -- LATER-SHAPED, because it
      arrives from the durable instance through the transport (round C) and
-     [inv_alloc] takes the later -- the domain row, the license and the
-     transport. *)
+     [inv_alloc] takes the later -- the domain row and the transport. *)
   Lemma app_inv_alloc (γfs : fs_names) (I : gmap Z fs_node) (E : coPset) :
     app_dom I ->
     ghost_map_auth (fs_top γfs) (1/2) I -∗
     ▷ app_pred app_run (abs_view I) -∗
-    app_auto -∗ app_xfer -∗ |={E}=> app_inv γfs.
+    app_xfer -∗ |={E}=> app_inv γfs.
   Proof.
-    iIntros (Hd) "Hh Hp #Ha #Hx". rewrite /app_inv.
+    iIntros (Hd) "Hh Hp #Hx". rewrite /app_inv.
     iApply (inv_alloc appN E with "[Hh Hp]").
-    iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Ha Hx".
+    iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
     iPureIntro. exact Hd.
   Qed.
 
@@ -305,13 +266,13 @@ Section AppInv.
      ([ghost_map_auth_agree]), combines them to the whole, moves the
      element, splits back, and re-closes the application's body at the
      new map with the claim re-established UNDER THE LATER by the step --
-     which sees the license and the old claim there, [▷]-shaped, and owes
-     the new one [▷]-shaped.  The three forms below are its readings. *)
+     which sees the old claim there, [▷]-shaped, and owes the new one
+     [▷]-shaped.  The three forms below are its readings. *)
   Lemma app_top_update (E : coPset) (γfs : fs_names) (I : gmap Z fs_node)
       (i : Z) (n n' : fs_node) :
     ↑appN ⊆ E ->
     app_inv γfs -∗
-    (⌜I !! i = Some n⌝ -∗ ▷ app_auto -∗
+    (⌜I !! i = Some n⌝ -∗
        ▷ app_pred app_run (abs_view I) -∗
        ▷ app_pred app_run (abs_view (<[i := n']> I))) -∗
     ghost_map_auth (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
@@ -320,16 +281,16 @@ Section AppInv.
     iIntros (HE) "#Hinv Hstep Hk Hf".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hd & #Ha & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hd & #Hx)".
     iDestruct (ghost_map_auth_agree with "Hk Hh") as %<-.
     iDestruct (ghost_map_lookup with "Hk Hf") as %Hi.
     iAssert (ghost_map_auth (fs_top γfs) 1 I) with "[Hk Hh]" as "Hk".
     { iEval (rewrite -Qp.half_half). iSplitL "Hk"; [iExact "Hk" | iExact "Hh"]. }
     iMod (ghost_map_update n' with "Hk Hf") as "[Hk Hf]".
     iDestruct "Hk" as "[Hk Hh]".
-    iDestruct ("Hstep" with "[//] Ha Hp") as "Hp".
+    iDestruct ("Hstep" with "[//] Hp") as "Hp".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists (<[i := n']> I). iFrame "Hh Hp Ha Hx".
+    { iNext. rewrite /app_body. iExists (<[i := n']> I). iFrame "Hh Hp Hx".
       iPureIntro. exact (app_dom_insert I i n n' Hi Hd). }
     iModIntro. iFrame "Hk Hf".
   Qed.
@@ -345,7 +306,7 @@ Section AppInv.
   Proof.
     iIntros (HE Habs) "#Hinv Hk Hf".
     iApply (app_top_update E γfs I i n n' HE with "Hinv [] Hk Hf").
-    iIntros (Hi) "_ Hp". rewrite (abs_view_insert_same I i n n' Hi Habs). iExact "Hp".
+    iIntros (Hi) "Hp". rewrite (abs_view_insert_same I i n n' Hi Habs). iExact "Hp".
   Qed.
 
   (* [_step]: the caller pays, with a plain wand -- it lifts under the later *)
@@ -360,7 +321,7 @@ Section AppInv.
   Proof.
     iIntros (HE) "#Hinv Hstep Hk Hf".
     iApply (app_top_update E γfs I i n n' HE with "Hinv [Hstep] Hk Hf").
-    iIntros (Hi) "_ Hp". iNext. iApply ("Hstep" with "Hp").
+    iIntros (Hi) "Hp". iNext. iApply ("Hstep" with "Hp").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -396,44 +357,16 @@ Section AppInv.
   (* THE IDENTITY STEP (E2-V2): a move that leaves the view where it is
      owes the application nothing.  It is the arm every counted commit takes
      at a row the view does not have -- the write to, the truncation of, an
-     unlinked-but-open file -- and it needs neither the license nor the
-     row: the reading is the same map. *)
+     unlinked-but-open file -- and it needs nothing from the application:
+     the reading is the same map. *)
   Lemma app_step_id (i : Z) (I : gmap Z fs_node) :
     ⊢ app_step i I (abs_view I).
   Proof.
     rewrite /app_step. iIntros (n' Heq) "Hp". rewrite Heq. iExact "Hp".
   Qed.
 
-  (* the license pays any step at a row the map has: it admits EVERY
-     one-row move, which is what makes it a blanket promise (lane L2
-     replaces it by per-syscall proofs from the process) *)
-  Lemma app_step_of_auto (i : Z) (I : gmap Z fs_node) (av' : aview) :
-    is_Some (I !! i) ->
-    ▷ app_auto -∗ app_step i I av'.
-  Proof.
-    intros [n Hn]. iIntros "#Ha". rewrite /app_step.
-    iIntros (n' Heq) "Hp". iNext.
-    iEval (rewrite /app_auto /app_auto_raw) in "Ha".
-    iApply ("Ha" $! I i n n' with "[//] Hp").
-  Qed.
-
-  (* THE LICENSE, READ OFF THE INVARIANT: [▷]-shaped and persistent, so the
-     body closes unchanged.  A generic discharger runs this inside the
-     commit's own fupd (the commits fire at [appE], with [appN] closed). *)
-  Lemma app_auto_acc (E : coPset) (γfs : fs_names) :
-    ↑appN ⊆ E ->
-    app_inv γfs ={E}=∗ ▷ app_auto.
-  Proof.
-    iIntros (HE) "#Hinv".
-    iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(Hh & Hp & Hd & #Ha & #Hx)".
-    iMod ("Hclose" with "[Hh Hp Hd]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hd Ha Hx". }
-    iModIntro. iExact "Ha".
-  Qed.
-
-  (* THE TRANSPORT, READ OFF THE INVARIANT: [▷]-shaped, like the license.
+  (* THE TRANSPORT, READ OFF THE INVARIANT: [▷]-shaped and persistent, so
+     the body closes unchanged.
      Note what this is NOT good for: a fupd under a later cannot run
      without a step, so the commit's law does not read the transport here
      -- it takes [app_xfer] itself, carried from the mint on the fsinit kit
@@ -445,9 +378,9 @@ Section AppInv.
     iIntros (HE) "#Hinv".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(Hh & Hp & Hd & #Ha & #Hx)".
+    iDestruct "Hbody" as (I) "(Hh & Hp & Hd & #Hx)".
     iMod ("Hclose" with "[Hh Hp Hd]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hd Ha Hx". }
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hd Hx". }
     iModIntro. iExact "Hx".
   Qed.
 
@@ -455,11 +388,10 @@ Section AppInv.
      every move of the map, so a discharger holding [app_sup] pays a
      write-kind commit's [app_step] by throwing the pre-view claim away and
      reading the post-view one straight off the credential.  There is no
-     side condition left, and that is why this is ONE lemma: the license
-     form needs the row to EXIST ([app_step_of_auto]'s [is_Some]) because it
-     promises only what a one-row MOVE preserves, so it needed a second
-     reading beside it that took [app_step_id]'s arm where the view had no
-     row.  The supply needs neither. *)
+     side condition left, and that is why this is ONE lemma: the retired
+     license form promised only what a one-row MOVE preserves, so it needed
+     the row to EXIST and a second reading beside it for the moves at a row
+     the view does not have.  The supply needs neither. *)
   Lemma app_step_acc (i : Z) (I : gmap Z fs_node) (av' : aview) :
     app_sup -∗ app_step i I av'.
   Proof.

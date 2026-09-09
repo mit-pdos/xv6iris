@@ -281,7 +281,7 @@ Section LinkFire.
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I t nt nt' ltac:(rewrite /appE; done)
             with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
-    { iIntros (_) "_ Hp". iApply (app_step_at t I _ nt' Hdelta with "Hstep Hp"). }
+    { iIntros (_) "Hp". iApply (app_step_at t I _ nt' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[t := nt']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
@@ -344,7 +344,7 @@ Section LinkFire.
             with "[//] [//] Hta") as "(Hta & Hstep & Hph2)".
     iMod (app_top_update appE γfs I d np np' ltac:(rewrite /appE; done)
             with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
-    { iIntros (_) "_ Hp". iApply (app_step_at d I _ np' Hdelta with "Hstep Hp"). }
+    { iIntros (_) "Hp". iApply (app_step_at d I _ np' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[d := np']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
