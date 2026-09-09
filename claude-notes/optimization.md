@@ -576,6 +576,15 @@ metric for whole-tree proof-term size** — treat a jump as a tripwire.
 
 ## Smaller traps
 
+- **A `big_sepM` submap step inlined at syscall altitude does not terminate.**
+  `iDestruct (big_sepM_subseteq _ _ _ Hsub with "H")` inside a U-mode entry WP
+  (the goal mentions the whole program key) ran 6+ minutes at 847 MB and never
+  returned; the same step as a closed lemma off the WP (`UInitKernel.
+  ubyte_map_sub`) costs 8 ms. The map was a `filter` over a 1296-entry dumped
+  image (`UCodeInit.init_argv_map`) -- a definition nobody computes but the
+  unifier will, so it also gets `Local Opaque` beside its readers. Rule: any
+  lemma about a dumped map is stated and proved closed, then applied.
+
 - **`lia` cannot do a nested-division chain** — stage it with `Z_div_exact_2` +
   `Z.div_div`.
 - **In a `first [ … ]`, put the CHEAP-FAILING branch first.** The cost of a
