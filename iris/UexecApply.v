@@ -480,7 +480,7 @@ Section Apply.
         (* ...and the armed post transports by the SAME six key rows the
            deposit does ([UexecSG.skey_eq]) *)
         * iEval (rewrite (spost_at_cong S (usys_num (uvis_tf W')) f W' W r
-                            (skey_eq_sym W W' Hsk))) in "Hsp".
+                            fdv' cw' (skey_eq_sym W W' Hsk))) in "Hsp".
           iExact "Hsp".
       + iIntros "H" (r M' pi' szv' fdv' cw') "%Hmo %Hfo %Hpo %Hco Hsp".
         rewrite (Hb r M' pi' szv' fdv' cw').
@@ -492,8 +492,8 @@ Section Apply.
         * exact (usys_pipe_ok_arg_cong _ (uvis_tf W) (uvis_tf W') _ _ _ _ _
                    Ha0 Hpo).
         * exact Hco.
-        * iEval (rewrite (spost_at_cong S (usys_num (uvis_tf W')) f W W' r Hsk))
-            in "Hsp". iExact "Hsp".
+        * iEval (rewrite (spost_at_cong S (usys_num (uvis_tf W')) f W W' r
+                            fdv' cw' Hsk)) in "Hsp". iExact "Hsp".
   Qed.
 
   Lemma uexec_arm_key_cong (sc : mword 64) (W W' : uvis) (f : sfam) :
@@ -727,7 +727,7 @@ Section LoopApply.
        the return value and where both callers hold it; [Ha0] below is what
        identifies it with the round's own [r]. *)
     spost_at S (usys_num (uvis_tf (uvis_run W))) f (uvis_run W)
-      (uvis_tf W' !!! tf_arg_idx 0) -∗
+      (uvis_tf W' !!! tf_arg_idx 0) (uvis_fd W') (uvis_cwd W') -∗
     (∀ (r' : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
        (szv' : Z) (fdv' : list fdstate) (cw' : Z),
        ⌜usys_mem_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W))
@@ -737,7 +737,8 @@ Section LoopApply.
        ⌜usys_pipe_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W))
                      r' (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
        ⌜usys_cwd_ok (usys_num (uvis_tf (uvis_run W))) r' (uvis_cwd W) cw'⌝ -∗
-       spost_at S (usys_num (uvis_tf (uvis_run W))) f (uvis_run W) r' -∗
+       spost_at S (usys_num (uvis_tf (uvis_run W))) f (uvis_run W) r'
+         fdv' cw' -∗
        S (bump (uvis_run W) r' M' π' szv' fdv' cw')) -∗
     S W'.
   Proof.
@@ -844,7 +845,7 @@ Section LoopApply.
       /\ usys_num (uvis_tf (uvis_run W)) <> USYS_exit
       /\ usys_num (uvis_tf (uvis_run W)) <> USYS_fork⌝ -∗
        spost_at uslot (usys_num (uvis_tf (uvis_run W))) f (uvis_run W)
-         (uvis_tf W' !!! tf_arg_idx 0)) -∗
+         (uvis_tf W' !!! tf_arg_idx 0) (uvis_fd W') (uvis_cwd W')) -∗
     uexec_arm sc W f -∗ uslot W'.
   Proof.
     intros Hl Hfd Hfdrow Hpiperow Hr.
@@ -983,7 +984,8 @@ Section LoopApply.
       /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_exit
       /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_fork⌝ -∗
        spost_at uslot (usys_num (tf_of g (ret_pc sepc_v))) f
-         (uvis_run W) (pv_tf (us_V U') !!! tf_arg_idx 0)) -∗
+         (uvis_run W) (pv_tf (us_V U') !!! tf_arg_idx 0)
+         fdv' (pv_cwi (us_V U'))) -∗
     uexec_arm sc W f -∗
     uslot (uvis_of U' fdv').
   Proof.

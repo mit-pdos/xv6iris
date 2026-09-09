@@ -882,14 +882,15 @@ Section UtSysBlock.
           | reflexivity
           | exact (eq_sym Hpr5) ]. }
       iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts
-                 (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0))%I
+                 (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0)
+                 stsR (pv_cwi (us_V (MkUstate V2 M2))))%I
         with "[Hso]" as "Hso".
       { iIntros (n) "%Hc". destruct Hc as (_ & Hcn & Hcx & Hcf).
         iDestruct ("Hso" $! n with "[%]") as "H";
           [ cbn [us_V]; split_and!;
             [ rewrite <- Hn0; exact Hcn | exact Hcx | exact Hcf ] |].
         rewrite (spost_at_cong uslot n fdep (uvis_of U0 sts)
-                   (uvis_of (MkUstate V1 (us_M U)) sts) _ Hkeyo).
+                   (uvis_of (MkUstate V1 (us_M U)) sts) _ _ _ Hkeyo).
         iExact "H". }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true

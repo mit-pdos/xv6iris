@@ -357,11 +357,12 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
     (* ...AND THE SYSCALL CHANNEL'S, forwarded at this boundary's own entry
        key -- the same one the deposit went down at
        ([wp_uservec_pt_body]'s pre row below) -- and read at the a0 word of
-       the record the round left ([SpecUsertrap.ut_sys_out]) *)
+       the record the round left, at the resume view it left
+       ([SpecUsertrap.ut_sys_out]) *)
     (∀ n : Z,
        ut_sys_out n f sc_v (tf_of g (ret_pc sepc_v))
          (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts
-         (pv_tf (us_V U') !!! tf_arg_idx 0)) -∗
+         (pv_tf (us_V U') !!! tf_arg_idx 0) sts' (pv_cwi (us_V U'))) -∗
     WP (Loop : expr riscv_lang)).
 Global Typeclasses Opaque uservec_post.
 

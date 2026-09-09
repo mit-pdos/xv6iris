@@ -265,10 +265,11 @@ Section UtRet2.
       (uint (pv_sz (us_V U0))) U sts0 sts -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
-       the record it parks -- [SpecUsertrap.ut_sys_out] *)
+       the record it parks, at the resume view it parks it at --
+       [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
        ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0)) -∗
+         (pv_tf (us_V U) !!! tf_arg_idx 0) sts (pv_cwi (us_V U))) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw fdep) -∗
@@ -766,10 +767,11 @@ Section UtRet.
       (uint (pv_sz (us_V U0))) U sts0 sts -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
-       the record it parks -- [SpecUsertrap.ut_sys_out] *)
+       the record it parks, at the resume view it parks it at --
+       [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
        ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0)) -∗
+         (pv_tf (us_V U) !!! tf_arg_idx 0) sts (pv_cwi (us_V U))) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw fdep) -∗
@@ -882,6 +884,9 @@ Section UtRet.
                      = pv_tf (us_V (MkUstate Vr (us_M U))) !!! tf_arg_idx 0)
       by exact (tf_ueq_arg _ _ 0 ltac:(lia) HVru).
     iEval (rewrite Hsoarg) in "Hso".
+    (* ...and at the cwd inum of that same record, which the row also reads
+       and which prepare_return leaves alone ([HVrcwi]) *)
+    iEval (rewrite -HVrcwi) in "Hso".
     (* THE DESCRIPTOR ROW ACROSS prepare_return.  The row reads the parked
        trapframe at a0 alone, and prepare_return re-arms the four KERNEL
        words -- which is exactly what [tf_ueq] is blind to -- so it crosses
@@ -998,10 +1003,11 @@ Section UtA6.
       (uint (pv_sz (us_V U0))) U sts0 sts -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
-       the record it parks -- [SpecUsertrap.ut_sys_out] *)
+       the record it parks, at the resume view it parks it at --
+       [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
        ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0)) -∗
+         (pv_tf (us_V U) !!! tf_arg_idx 0) sts (pv_cwi (us_V U))) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw fdep) -∗
@@ -1294,10 +1300,11 @@ Section UtFa.
       (uint (pv_sz (us_V U0))) U sts0 sts -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
-       the record it parks -- [SpecUsertrap.ut_sys_out] *)
+       the record it parks, at the resume view it parks it at --
+       [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
        ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0)) -∗
+         (pv_tf (us_V U) !!! tf_arg_idx 0) sts (pv_cwi (us_V U))) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw fdep) -∗

@@ -420,7 +420,13 @@ Section SysOpenAU.
      [k] never fired (non-directory cursor, or namex's nlink guard) and
      the cursor comes back with hops from [k], or it fired and missed and
      the miss receipt comes back with hops from [S k] *)
-  Definition open_walk_dead_era `{XI : CurCtx} (γfs : fs_names)
+  (* NO [`{XI : CurCtx}] -- see [aopen_commit_at] and [open_walk_pre_era]
+     above: the body is the era refund, and nothing in it reads a context.
+     The binder has to be absent rather than merely unused, because the
+     failure fold this appears in is what open's and chdir's RECEIPTS carry
+     ([SpecSysOpen.open_receipt_plain], [SpecSysChdir.chdir_receipt]), and a
+     receipt is read at a U-mode key where there is no context to resolve. *)
+  Definition open_walk_dead_era (γfs : fs_names)
       (P Pmiss : nat -> Z -> iProp Σ) (pl : list (bv 8)) : iProp Σ :=
     (∃ (k : nat) (d : Z),
        ⌜(k < length (path_elems pl))%nat⌝ ∗
@@ -497,6 +503,73 @@ Section SysOpenAU.
        (* the caller's OWN table with exactly ONE row moved -- the landed
           success row's shape, at the arm's typed row *)
        fd_frags (pv_fdg (us_V UW)) (<[fd := FdOpen rb wb t]> sts))%I.
+
+  (* ------------------------------------------------------------------ *)
+  (*  2e'.  The descriptor story, SPLIT: the kernel's half and the        *)
+  (*  process's.                                                          *)
+  (*                                                                      *)
+  (*  [open_fd_ok] above bundles three things: the [struct proc] cell      *)
+  (*  fdalloc wrote ([proc_priv] at [us_ofile]), the descriptor-state      *)
+  (*  fragments at the moved table ([fd_frags]) -- both KERNEL-owned, and  *)
+  (*  neither nameable by a process at its own key -- and one PURE fact,   *)
+  (*  which is the only part of open's success a process can state:        *)
+  (*  WHICH descriptor came back, that it was closed before, and that the  *)
+  (*  table it resumes at is the caller's with that one row retyped.       *)
+  (*                                                                      *)
+  (*  So the pure fact is named on its own ([open_fd_rcpt], read at the    *)
+  (*  RESUME view [fdv'] rather than at an existential insert), and         *)
+  (*  [open_fd_ok_split] below reads the bundle as the kernel's half at     *)
+  (*  that view beside it.  [open_fd_ok] itself keeps the shape its five    *)
+  (*  producers prove, and the split is a consequence of it.                *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE RECEIPT: what open's success is worth to the PROCESS.  It sharpens
+     [UsysMemOk.usys_fd_ok]'s open row -- which says a descriptor became
+     open at SOME type and mode -- by naming the mode bits (the caller's own
+     omode) and the type (the node the walk reached), and it is the reason
+     the arm's [t] is worth carrying: a program that opens the console
+     learns its descriptor is [FdDevice], not merely open. *)
+  Definition open_fd_rcpt (rb wb : bool) (t : fdtype) (sts : list fdstate)
+      (r : mword 64) (fdv' : list fdstate) : Prop :=
+    exists fd : nat,
+      r = (mword_of_int (Z.of_nat fd) : mword 64)
+      /\ sts !! fd = Some FdClosed
+      /\ fdv' = <[fd := FdOpen rb wb t]> sts.
+
+  (* ...AND THE SPLIT ITSELF: [open_fd_ok] read as the KERNEL'S HALF -- the
+     block with the [ofile] cell written and the descriptor fragments -- at
+     the view [fdv'] the process resumes at, BESIDE the pure receipt about
+     that view.  One direction is what every consumer wants
+     ([SpecSysOpen.open_arms_split]); the arms keep both halves, so nothing
+     is given up by reading them this way. *)
+  Lemma open_fd_ok_split `{XI : CurCtx} (γf : gname) (p : mword 64)
+      (pid : mword 32) (UW : ustate) (rb wb : bool) (t : fdtype)
+      (sts : list fdstate) (r : mword 64) :
+    open_fd_ok γf p pid UW rb wb t sts r ⊢
+      ∃ (fd : nat) (l : list nat) (k : nat) (fdv' : list fdstate),
+        (* the kernel's row, AT THE SPLIT'S OWN [fd]: which descriptor
+           fdalloc took, that the caller's table had it closed, and what the
+           resume view is.  It is [open_fd_rcpt]'s content spelled at that
+           [fd] rather than at an existential one, because the dispatcher
+           reads [SpecFdalloc.fd_frees_below] at the same descriptor the
+           free list's head names ([ProofSyscall]'s open arm). *)
+        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64)
+         /\ fd_frees (pv_ofile (us_V UW)) = fd :: l
+         /\ sts !! fd = Some FdClosed
+         /\ fdv' = <[fd := FdOpen rb wb t]> sts⌝
+        ∗ ⌜open_fd_rcpt rb wb t sts r fdv'⌝
+        ∗ proc_priv γf p pid (us_ofile UW fd (fnode k))
+        ∗ fd_frags (pv_fdg (us_V UW)) fdv'.
+  Proof.
+    rewrite /open_fd_ok /open_fd_rcpt.
+    iIntros "H". iDestruct "H" as (fd l k) "((%Hr & %Hfl & %Hcl) & Hp & Hb)".
+    iExists fd, l, k, (<[fd := FdOpen rb wb t]> sts).
+    iSplitR; [ iPureIntro;
+               split_and!; [ exact Hr | exact Hfl | exact Hcl | reflexivity ] | ].
+    iSplitR; [ iPureIntro; exists fd;
+               split_and!; [ exact Hr | exact Hcl | reflexivity ] | ].
+    iFrame "Hp Hb".
+  Qed.
 
 End SysOpenAU.
 

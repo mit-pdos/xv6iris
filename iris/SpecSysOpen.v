@@ -534,7 +534,9 @@ Section SysOpenArms.
   (* ret -1: the header's three-way fold, residue returned per arm.  The
      third disjunct's observation is FIRED, not optional: every post-walk
      failure sits inside the child's lock window. *)
-  Definition open_post_fail_plain `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
+  (* NO [`{XI : CurCtx}]: nothing in the fold reads one, and the receipt
+     ([open_receipt_plain]) is stated at a U-mode key where none resolves. *)
+  Definition open_post_fail_plain Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
@@ -655,7 +657,8 @@ Section SysOpenArms.
   (* ret -1: the fold.  Note arm (a): a FRESH create that succeeded
      before open's table-full failure leaves its delta STANDING, and the
      receipt is delivered -- the fs mutation of a failed open is real. *)
-  Definition open_post_fail_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
+  (* ...and the create side's, context-free for the same reason *)
+  Definition open_post_fail_create Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -881,6 +884,399 @@ Section SysOpenArms.
            Fo Ft sts UW r
     else open_arms_plain Γ γfs cw γf p pid vom P Pmiss Fo Ft sts UW r.
 
+  (* ------------------------------------------------------------------ *)
+  (*  2i.  THE RECEIPTS: the process-nameable half of the two arm         *)
+  (*  families.                                                           *)
+  (*                                                                      *)
+  (*  The arms above are what the DISPATCHER receives, and three of the    *)
+  (*  things they carry are kernel-owned: [ProcInv.proc_priv] at the block *)
+  (*  whose [ofile] cell fdalloc wrote, [FdSlots.fd_frags] at the moved    *)
+  (*  table, and [FdSlots.fd_slot].  A process at its own U-mode key holds  *)
+  (*  none of the three, so the arms are not what comes back to it.        *)
+  (*                                                                      *)
+  (*  What DOES come back is these: the arms with the walk cursor, the      *)
+  (*  observed rows, the fired receipts and the trunc leg kept verbatim,    *)
+  (*  and [SpecSysOpenAU.open_fd_ok] replaced by its PURE half              *)
+  (*  ([SpecSysOpenAU.open_fd_rcpt]) read at the descriptor view the call   *)
+  (*  RESUMES at.  That is where the descriptor lives: open's whole effect  *)
+  (*  on the caller is one row of [fdv'], so a receipt about it cannot be   *)
+  (*  stated at the trap key at all -- which is why [UexecSG.spost_at]      *)
+  (*  takes the resume view.  [open_arms_split] is the tie, and it keeps    *)
+  (*  the kernel half beside the receipt so the arms lose no strength.      *)
+  (* ------------------------------------------------------------------ *)
+
+  Definition open_receipt_plain Γ (γfs : fs_names) (cw : Z) (vom : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (sts : list fdstate) (r : mword 64) (fdv' : list fdstate) : iProp Σ :=
+    ((* FAILURE: the table did not move, and the whole bundle is back *)
+     (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ⌜fdv' = sts⌝
+      ∗ open_post_fail_plain Γ γfs cw P Pmiss Fo Ft)
+     ∨ (∃ (pl : list (bv 8)) (av : aview) (i : Z),
+          P (length (path_elems pl)) i ∗
+          ((* DEVICE *)
+           (∃ (ma mi : Z) (nl : nat),
+              ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝ ∗
+              ⌜0 <= ma <= NDEV_max⌝ ∗
+              Fo.(pf_recv) av i (MkAnode (ADev ma mi) nl) ∗
+              pf_at (atrunc_commit_at Γ appE) Ft ∗
+              ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
+                 (FdDevice ma) sts r fdv'⌝)
+           ∨ (* FILE, with the trunc leg *)
+           (∃ (bs0 : list (bv 8)) (nl : nat),
+              ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝ ∗
+              Fo.(pf_recv) av i (MkAnode (AFile bs0) nl) ∗
+              (if om_trunc vom
+               then ∃ av' : aview,
+                      ⌜arow_at av' i (MkAnode (AFile bs0) nl)⌝ ∗
+                      Ft.(pf_recv) av' i bs0
+               else pf_at (atrunc_commit_at Γ appE) Ft) ∗
+              ∃ γo : gname,
+                ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
+                   (FdInode i γo) sts r fdv'⌝)
+           ∨ (* DIRECTORY, at O_RDONLY exactly *)
+           (∃ (ents : gmap fname Z) (nl : nat),
+              ⌜arow_at av i (MkAnode (ADir ents) nl)⌝ ∗
+              ⌜om_arg vom = 0⌝ ∗
+              Fo.(pf_recv) av i (MkAnode (ADir ents) nl) ∗
+              pf_at (atrunc_commit_at Γ appE) Ft ∗
+              ∃ γo : gname,
+                ⌜open_fd_rcpt true false (FdInode i γo) sts r fdv'⌝))))%I.
+
+  Definition open_receipt_create Γ (γfs : fs_names) (cw : Z) (vom : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (sts : list fdstate) (r : mword 64) (fdv' : list fdstate) : iProp Σ :=
+    ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ⌜fdv' = sts⌝
+      ∗ open_post_fail_create Γ γfs cw P Pmiss Farm Fun Fok Fex Fo Ft)
+     ∨ (∃ (pl : list (bv 8)) (d i : Z) (nm : fname),
+          ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+          P (length (mknod_parent_elems pl)) d ∗
+          ((* FRESH *)
+           (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
+              ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
+              ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
+              Fok.(pf_recv) av d nm i ∗
+              pf_at (dlookup_commit_at Γ appE) Fex ∗
+              pf_at (aopen_commit_at Γ appE) Fo ∗
+              (if om_trunc vom
+               then ∃ (av' : aview) (nl' : nat),
+                      ⌜arow_at av' i (MkAnode (AFile []) nl')⌝ ∗
+                      Ft.(pf_recv) av' i []
+               else pf_at (atrunc_commit_at Γ appE) Ft) ∗
+              cre_arm_fired Farm i
+              ∗ pf_at (aunarm_commit_at Γ appE) Fun ∗
+              ∃ γo : gname,
+                ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
+                   (FdInode i γo) sts r fdv'⌝)
+           ∨ (* EXISTS-OPENS *)
+           (∃ (avx : aview) (entsx : gmap fname Z) (nlx : nat),
+              ⌜avx !! d = Some (MkAnode (ADir entsx) nlx)⌝ ∗
+              ⌜entsx !! nm = Some i⌝ ∗
+              Fex.(pf_recv) avx d nm i ∗
+              pf_at (acre_commit_at Γ appE (AFile [])) Fok ∗
+              cre_child_unfired Γ (AFile []) Farm Fun ∗
+              (∃ (av : aview) (nl : nat),
+                 ((∃ bs0 : list (bv 8),
+                     ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝ ∗
+                     Fo.(pf_recv) av i (MkAnode (AFile bs0) nl) ∗
+                     (if om_trunc vom
+                      then ∃ av' : aview,
+                             ⌜arow_at av' i (MkAnode (AFile bs0) nl)⌝ ∗
+                             Ft.(pf_recv) av' i bs0
+                      else pf_at (atrunc_commit_at Γ appE) Ft) ∗
+                     ∃ γo : gname,
+                       ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
+                          (FdInode i γo) sts r fdv'⌝)
+                  ∨ (∃ ma mi : Z,
+                       ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝ ∗
+                       ⌜0 <= ma <= NDEV_max⌝ ∗
+                       Fo.(pf_recv) av i (MkAnode (ADev ma mi) nl) ∗
+                       pf_at (atrunc_commit_at Γ appE) Ft ∗
+                       ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
+                          (FdDevice ma) sts r fdv'⌝)))))))%I.
+
+  (* ...and the one receipt, keyed on the O_CREATE bit exactly as [open_in]
+     and [open_arms] are *)
+  Definition open_receipt Γ (γfs : fs_names) (cw : Z) (vom : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (sts : list fdstate) (r : mword 64) (fdv' : list fdstate) : iProp Σ :=
+    if om_create vom
+    then open_receipt_create Γ γfs cw vom P Pmiss Farm Fun Fok Fex Fo Ft
+           sts r fdv'
+    else open_receipt_plain Γ γfs cw vom P Pmiss Fo Ft sts r fdv'.
+
+  (* ------------------------------------------------------------------ *)
+  (*  2j.  THE SPLIT: the arms as the kernel's half beside the receipt.    *)
+  (*                                                                      *)
+  (*  The dispatcher keeps [proc_priv] at the block the call leaves, the   *)
+  (*  descriptor fragments at the view it leaves and [fd_slot], plus the   *)
+  (*  pure disjunction that says WHICH descriptor fdalloc took (which is   *)
+  (*  what [ProofSyscall]'s arm needs to prove [SpecSyscall.sysc_fd_ok]);  *)
+  (*  the process gets the receipt at that same view.  Every conjunct of   *)
+  (*  the arms appears on the right, so nothing is weakened.               *)
+  (* ------------------------------------------------------------------ *)
+  Lemma open_arms_plain_split `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
+      (γf : gname) (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (sts : list fdstate) (UW : ustate) (r : mword 64) :
+    open_arms_plain Γ γfs cw γf p pid vom P Pmiss Fo Ft sts UW r ⊢
+      ∃ (UW' : ustate) (sts' : list fdstate),
+        ⌜(r = (mword_of_int (-1) : mword 64) /\ UW' = UW /\ sts' = sts)
+         \/ (exists (fd : nat) (l : list nat) (k : nat) (rb wb : bool)
+                    (t : fdtype),
+               r = (mword_of_int (Z.of_nat fd) : mword 64)
+               /\ fd_frees (pv_ofile (us_V UW)) = fd :: l
+               /\ UW' = us_ofile UW fd (fnode k)
+               (* ...AND THE RECEIPT'S OWN ROW at that same [fd], which the
+                  dispatcher needs and the receipt keeps inside a disjunct
+                  it cannot reach: the descriptor was CLOSED and the resume
+                  view is the caller's table with that one row retyped.
+                  This is what [ProofSyscall]'s arm proves
+                  [SpecSyscall.sysc_fd_ok] from ([SpecFdalloc.fd_frees_below]
+                  turns the free list's head into
+                  [UsysMemOk.fd_least_closed]). *)
+               /\ sts !! fd = Some FdClosed
+               /\ sts' = <[fd := FdOpen rb wb t]> sts)⌝
+        ∗ proc_priv γf p pid UW'
+        ∗ fd_frags (pv_fdg (us_V UW)) sts'
+        ∗ fd_slot
+        ∗ open_receipt_plain Γ γfs cw vom P Pmiss Fo Ft sts r sts'.
+  Proof.
+    rewrite /open_arms_plain /open_post_ok_plain /open_receipt_plain.
+    iIntros "[[(%Hr & Hpriv & Hb & Hfail) | H] Hslot]".
+    - iExists UW, sts.
+      iSplitR; [ iPureIntro; left;
+                 split_and!; [ exact Hr | reflexivity | reflexivity ] | ].
+      iFrame "Hpriv Hb Hslot". iLeft.
+      iSplitR; [ iPureIntro; exact Hr | ].
+      iSplitR; [ iPureIntro; reflexivity | ].
+      iExact "Hfail".
+    - iDestruct "H" as (pl av i) "(HP & [Hd | [Hf | Hdir]])".
+      + (* DEVICE *)
+        iDestruct "Hd" as (ma mi nl) "(%Ha & %Hma & HFo & Ht & Hfd)".
+        iDestruct (open_fd_ok_split with "Hfd") as (fd l k fdv')
+          "((%Hr & %Hfl & %Hcl & %Hins) & %Hrc & Hpriv & Hb)".
+        iExists (us_ofile UW fd (fnode k)), fdv'.
+        iSplitR; [ iPureIntro; right; exists fd, l, k, (om_readable vom), (om_writable vom), (FdDevice ma);
+                   split_and!;
+                     [ exact Hr | exact Hfl | reflexivity
+                     | exact Hcl | exact Hins ] | ].
+        iFrame "Hpriv Hb Hslot". iRight.
+        iExists pl, av, i. iFrame "HP". iLeft.
+        iExists ma, mi, nl.
+        iSplitR; [ iPureIntro; exact Ha | ].
+        iSplitR; [ iPureIntro; exact Hma | ].
+        iSplitL "HFo"; [ iExact "HFo" | ].
+        iSplitL "Ht"; [ iExact "Ht" | ].
+        iPureIntro. exact Hrc.
+      + (* FILE, with the trunc leg *)
+        iDestruct "Hf" as (bs0 nl) "(%Ha & HFo & Htr & Hfd)".
+        iDestruct "Hfd" as (go) "Hfd".
+        iDestruct (open_fd_ok_split with "Hfd") as (fd l k fdv')
+          "((%Hr & %Hfl & %Hcl & %Hins) & %Hrc & Hpriv & Hb)".
+        iExists (us_ofile UW fd (fnode k)), fdv'.
+        iSplitR; [ iPureIntro; right; exists fd, l, k, (om_readable vom), (om_writable vom), (FdInode i go);
+                   split_and!;
+                     [ exact Hr | exact Hfl | reflexivity
+                     | exact Hcl | exact Hins ] | ].
+        iFrame "Hpriv Hb Hslot". iRight.
+        iExists pl, av, i. iFrame "HP". iRight. iLeft.
+        iExists bs0, nl.
+        iSplitR; [ iPureIntro; exact Ha | ].
+        iSplitL "HFo"; [ iExact "HFo" | ].
+        iSplitL "Htr"; [ iExact "Htr" | ].
+        iExists go. iPureIntro. exact Hrc.
+      + (* DIRECTORY *)
+        iDestruct "Hdir" as (ents nl) "(%Ha & %Hom & HFo & Ht & Hfd)".
+        iDestruct "Hfd" as (go) "Hfd".
+        iDestruct (open_fd_ok_split with "Hfd") as (fd l k fdv')
+          "((%Hr & %Hfl & %Hcl & %Hins) & %Hrc & Hpriv & Hb)".
+        iExists (us_ofile UW fd (fnode k)), fdv'.
+        iSplitR; [ iPureIntro; right; exists fd, l, k, true, false, (FdInode i go);
+                   split_and!;
+                     [ exact Hr | exact Hfl | reflexivity
+                     | exact Hcl | exact Hins ] | ].
+        iFrame "Hpriv Hb Hslot". iRight.
+        iExists pl, av, i. iFrame "HP". iRight. iRight.
+        iExists ents, nl.
+        iSplitR; [ iPureIntro; exact Ha | ].
+        iSplitR; [ iPureIntro; exact Hom | ].
+        iSplitL "HFo"; [ iExact "HFo" | ].
+        iSplitL "Ht"; [ iExact "Ht" | ].
+        iExists go. iPureIntro. exact Hrc.
+  Qed.
+
+  Lemma open_arms_create_split `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
+      (γf : gname) (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (sts : list fdstate) (UW : ustate) (r : mword 64) :
+    open_arms_create Γ γfs cw γf p pid vom P Pmiss Farm Fun Fok Fex Fo Ft
+      sts UW r ⊢
+      ∃ (UW' : ustate) (sts' : list fdstate),
+        ⌜(r = (mword_of_int (-1) : mword 64) /\ UW' = UW /\ sts' = sts)
+         \/ (exists (fd : nat) (l : list nat) (k : nat) (rb wb : bool)
+                    (t : fdtype),
+               r = (mword_of_int (Z.of_nat fd) : mword 64)
+               /\ fd_frees (pv_ofile (us_V UW)) = fd :: l
+               /\ UW' = us_ofile UW fd (fnode k)
+               (* ...AND THE RECEIPT'S OWN ROW at that same [fd], which the
+                  dispatcher needs and the receipt keeps inside a disjunct
+                  it cannot reach: the descriptor was CLOSED and the resume
+                  view is the caller's table with that one row retyped.
+                  This is what [ProofSyscall]'s arm proves
+                  [SpecSyscall.sysc_fd_ok] from ([SpecFdalloc.fd_frees_below]
+                  turns the free list's head into
+                  [UsysMemOk.fd_least_closed]). *)
+               /\ sts !! fd = Some FdClosed
+               /\ sts' = <[fd := FdOpen rb wb t]> sts)⌝
+        ∗ proc_priv γf p pid UW'
+        ∗ fd_frags (pv_fdg (us_V UW)) sts'
+        ∗ fd_slot
+        ∗ open_receipt_create Γ γfs cw vom P Pmiss Farm Fun Fok Fex Fo Ft
+            sts r sts'.
+  Proof.
+    rewrite /open_arms_create /open_post_ok_create /open_receipt_create.
+    iIntros "[[(%Hr & Hpriv & Hb & Hfail) | H] Hslot]".
+    - iExists UW, sts.
+      iSplitR; [ iPureIntro; left;
+                 split_and!; [ exact Hr | reflexivity | reflexivity ] | ].
+      iFrame "Hpriv Hb Hslot". iLeft.
+      iSplitR; [ iPureIntro; exact Hr | ].
+      iSplitR; [ iPureIntro; reflexivity | ].
+      iExact "Hfail".
+    - iDestruct "H" as (pl d i nm) "(%Hlast & HP & [Hfresh | Hex])".
+      + (* FRESH *)
+        iDestruct "Hfresh" as (av ents nl)
+          "(%Hcre & %Hib & HFok & Hex & Ho & Htr & Harm & Hun & Hfd)".
+        iDestruct "Hfd" as (go) "Hfd".
+        iDestruct (open_fd_ok_split with "Hfd") as (fd l k fdv')
+          "((%Hr & %Hfl & %Hcl & %Hins) & %Hrc & Hpriv & Hb)".
+        iExists (us_ofile UW fd (fnode k)), fdv'.
+        iSplitR; [ iPureIntro; right; exists fd, l, k, (om_readable vom), (om_writable vom), (FdInode i go);
+                   split_and!;
+                     [ exact Hr | exact Hfl | reflexivity
+                     | exact Hcl | exact Hins ] | ].
+        iFrame "Hpriv Hb Hslot". iRight.
+        iExists pl, d, i, nm.
+        iSplitR; [ iPureIntro; exact Hlast | ].
+        iFrame "HP". iLeft.
+        iExists av, ents, nl.
+        iSplitR; [ iPureIntro; exact Hcre | ].
+        iSplitR; [ iPureIntro; exact Hib | ].
+        iSplitL "HFok"; [ iExact "HFok" | ].
+        iSplitL "Hex"; [ iExact "Hex" | ].
+        iSplitL "Ho"; [ iExact "Ho" | ].
+        iSplitL "Htr"; [ iExact "Htr" | ].
+        iSplitL "Harm"; [ iExact "Harm" | ].
+        iSplitL "Hun"; [ iExact "Hun" | ].
+        iExists go. iPureIntro. exact Hrc.
+      + (* EXISTS-OPENS *)
+        iDestruct "Hex" as (avx entsx nlx)
+          "(%Hdx & %Hent & HFex & HFok & Hchild & Hnode)".
+        iDestruct "Hnode" as (av nl) "[Hfile | Hdev]".
+        * iDestruct "Hfile" as (bs0) "(%Ha & HFo & Htr & Hfd)".
+          iDestruct "Hfd" as (go) "Hfd".
+          iDestruct (open_fd_ok_split with "Hfd") as (fd l k fdv')
+            "((%Hr & %Hfl & %Hcl & %Hins) & %Hrc & Hpriv & Hb)".
+          iExists (us_ofile UW fd (fnode k)), fdv'.
+          iSplitR; [ iPureIntro; right; exists fd, l, k, (om_readable vom), (om_writable vom), (FdInode i go);
+                     split_and!;
+                       [ exact Hr | exact Hfl | reflexivity
+                     | exact Hcl | exact Hins ] | ].
+          iFrame "Hpriv Hb Hslot". iRight.
+          iExists pl, d, i, nm.
+          iSplitR; [ iPureIntro; exact Hlast | ].
+          iFrame "HP". iRight.
+          iExists avx, entsx, nlx.
+          iSplitR; [ iPureIntro; exact Hdx | ].
+          iSplitR; [ iPureIntro; exact Hent | ].
+          iSplitL "HFex"; [ iExact "HFex" | ].
+          iSplitL "HFok"; [ iExact "HFok" | ].
+          iSplitL "Hchild"; [ iExact "Hchild" | ].
+          iExists av, nl. iLeft. iExists bs0.
+          iSplitR; [ iPureIntro; exact Ha | ].
+          iSplitL "HFo"; [ iExact "HFo" | ].
+          iSplitL "Htr"; [ iExact "Htr" | ].
+          iExists go. iPureIntro. exact Hrc.
+        * iDestruct "Hdev" as (ma mi) "(%Ha & %Hma & HFo & Ht & Hfd)".
+          iDestruct (open_fd_ok_split with "Hfd") as (fd l k fdv')
+            "((%Hr & %Hfl & %Hcl & %Hins) & %Hrc & Hpriv & Hb)".
+          iExists (us_ofile UW fd (fnode k)), fdv'.
+          iSplitR; [ iPureIntro; right; exists fd, l, k, (om_readable vom), (om_writable vom), (FdDevice ma);
+                     split_and!;
+                       [ exact Hr | exact Hfl | reflexivity
+                     | exact Hcl | exact Hins ] | ].
+          iFrame "Hpriv Hb Hslot". iRight.
+          iExists pl, d, i, nm.
+          iSplitR; [ iPureIntro; exact Hlast | ].
+          iFrame "HP". iRight.
+          iExists avx, entsx, nlx.
+          iSplitR; [ iPureIntro; exact Hdx | ].
+          iSplitR; [ iPureIntro; exact Hent | ].
+          iSplitL "HFex"; [ iExact "HFex" | ].
+          iSplitL "HFok"; [ iExact "HFok" | ].
+          iSplitL "Hchild"; [ iExact "Hchild" | ].
+          iExists av, nl. iRight. iExists ma, mi.
+          iSplitR; [ iPureIntro; exact Ha | ].
+          iSplitR; [ iPureIntro; exact Hma | ].
+          iSplitL "HFo"; [ iExact "HFo" | ].
+          iSplitL "Ht"; [ iExact "Ht" | ].
+          iPureIntro. exact Hrc.
+  Qed.
+
+  (* ...and the one split, keyed on the O_CREATE bit exactly as [open_arms]
+     and [open_receipt] are *)
+  Lemma open_arms_split `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
+      (γf : gname) (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (sts : list fdstate) (UW : ustate) (r : mword 64) :
+    open_arms Γ γfs cw γf p pid vom P Pmiss Farm Fun Fok Fex Fo Ft sts UW r ⊢
+      ∃ (UW' : ustate) (sts' : list fdstate),
+        ⌜(r = (mword_of_int (-1) : mword 64) /\ UW' = UW /\ sts' = sts)
+         \/ (exists (fd : nat) (l : list nat) (k : nat) (rb wb : bool)
+                    (t : fdtype),
+               r = (mword_of_int (Z.of_nat fd) : mword 64)
+               /\ fd_frees (pv_ofile (us_V UW)) = fd :: l
+               /\ UW' = us_ofile UW fd (fnode k)
+               (* ...AND THE RECEIPT'S OWN ROW at that same [fd], which the
+                  dispatcher needs and the receipt keeps inside a disjunct
+                  it cannot reach: the descriptor was CLOSED and the resume
+                  view is the caller's table with that one row retyped.
+                  This is what [ProofSyscall]'s arm proves
+                  [SpecSyscall.sysc_fd_ok] from ([SpecFdalloc.fd_frees_below]
+                  turns the free list's head into
+                  [UsysMemOk.fd_least_closed]). *)
+               /\ sts !! fd = Some FdClosed
+               /\ sts' = <[fd := FdOpen rb wb t]> sts)⌝
+        ∗ proc_priv γf p pid UW'
+        ∗ fd_frags (pv_fdg (us_V UW)) sts'
+        ∗ fd_slot
+        ∗ open_receipt Γ γfs cw vom P Pmiss Farm Fun Fok Fex Fo Ft sts r sts'.
+  Proof.
+    rewrite /open_arms /open_receipt. destruct (om_create vom).
+    - apply open_arms_create_split.
+    - apply open_arms_plain_split.
+  Qed.
+
   (* THE RETURN BLANKET, READ OFF THE ARMS.  It is a consequence and not a
      second conjunct: [sys_open_post] carries [proc_priv], the
      descriptor-state bundle and [fd_slot], and each arm already carries
@@ -967,7 +1363,8 @@ End SysOpenArms.
    (durable-notes; optimization.md, "a big-op body is the predictor"). *)
 Global Typeclasses Opaque open_post_ok_plain open_post_fail_plain
   open_arms_plain open_post_ok_create open_post_fail_create
-  open_arms_create open_in open_arms.
+  open_arms_create open_in open_arms
+  open_receipt_plain open_receipt_create open_receipt.
 
 (* ===================================================================== *)
 (*  THE WHOLE-FUNCTION FRAME, abstracted over the caller's bundle and the *)

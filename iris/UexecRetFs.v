@@ -153,7 +153,7 @@ Section UexecRetFs.
                 of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
              ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
              ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
-             spost_at uslot n f W r -∗
+             spost_at uslot n f W r fdv' cw' -∗
              X (bump W r M' π' szv' fdv' cw'))
           ∨ (∃ u : umirror,
                mcur γm u ∗
@@ -176,7 +176,7 @@ Section UexecRetFs.
                      enriches the RETURN CHANNEL, not the deposit's contents,
                      so what comes back is what [UexecRet.uexec_ret_ret_F]
                      hands back and [uexec_ret_fs_of] passes it straight on *)
-                  spost_at uslot n f W r -∗
+                  spost_at uslot n f W r fdv' cw' -∗
                   X (bump W r M' π' szv' fdv' cw')))))
        else (∃ f : sfam,
              sbundle_at X n f W ∗
@@ -193,7 +193,7 @@ Section UexecRetFs.
                   of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
                ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
                ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
-               spost_at uslot n f W r -∗
+               spost_at uslot n f W r fdv' cw' -∗
                X (bump W r M' π' szv' fdv' cw')))
      else X W)%I.
 
@@ -250,7 +250,7 @@ Section UexecRetFs.
     Contractive (uslot_fs_F γm).
   Proof.
     rewrite /uslot_fs_F /uvb_fs_F /ukont_fs_F /ukb_fs_F /uexec_ret_fs_F.
-    solve_contractive.
+    solve_contractive_wide.
   Qed.
 
   Definition uslot_fs (γm : gname) : uvis -> iProp Σ :=

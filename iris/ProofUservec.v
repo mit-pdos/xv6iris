@@ -1928,7 +1928,7 @@ Section UservecAllPt.
                     (pv_tf (us_V UUt))
                     (tf_of g (ret_pc sepc_v)) UUt
                     (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M)
-                    sts _
+                    sts _ _ _
                     ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
                           unfold UsysMemOk.usys_num, tf_arg_idx, tf_of;
                           reflexivity)

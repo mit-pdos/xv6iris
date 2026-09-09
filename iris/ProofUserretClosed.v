@@ -479,6 +479,7 @@ Section UserretClosed.
                                 (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
                              (uvis_M W)) (uvis_fd W))
                  (uvis_run W) (pv_tf (us_V U2) !!! tf_arg_idx 0)
+                 sts2 (pv_cwi (us_V U2))
                  ltac:(rewrite /skey_eq; split_and!;
                        [ reflexivity | reflexivity | reflexivity
                        | reflexivity | reflexivity

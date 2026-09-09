@@ -296,6 +296,83 @@ Section SysChdirArms.
      ∨ (⌜r = (zero_reg : mword 64)⌝
         ∗ chdir_post_ok Γ γf pj pid P Fo U))%I.
 
+  (* THE PROCESS-NAMEABLE HALF OF THE ARMS: chdir's RECEIPT.  What the arms
+     above give the DISPATCHER is [proc_priv] at the block whose cwd moved;
+     what they give the PROCESS is this -- the walk cursor, the observed
+     directory row and the observation's receipt, read at the working
+     directory the call resumes at.  It names no kernel ghost: no
+     [proc_priv], no [pv_cwd] pointer, no [ProcInv] record at all, which is
+     what makes it statable at the U-mode key ([UexecSG.spost_at], branch 9)
+     where the only thing the process holds about its cwd is [cw'].
+
+     THE TWO ARMS ARE THE ARMS', keyed on the same a0: a failed chdir
+     resumes at the directory it came in with and hands the whole bundle
+     back ([chdir_post_fail]); a successful one resumes at the inum the walk
+     reached, which is the receipt's whole content -- [cw' = i] is what
+     SHARPENS [UsysMemOk.usys_cwd_ok]'s chdir row (which says only that a
+     FAILED chdir does not move) into "the directory you named is the
+     directory you are in".  [chdir_arms_split] is the tie. *)
+  Definition chdir_receipt Γ (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (r : mword 64) (cw' : Z) : iProp Σ :=
+    ((⌜r = (mword_of_int (-1) : mword 64)⌝
+      ∗ ⌜cw' = cw⌝
+      ∗ chdir_post_fail Γ γfs cw P Pmiss Fo)
+     ∨ (⌜r = (zero_reg : mword 64)⌝
+        ∗ ∃ (pl : list (bv 8)) (i : Z) (e : gmap fname Z) (nl : nat)
+            (av : aview),
+            ⌜cw' = i⌝
+            ∗ P (length (path_elems pl)) i
+            ∗ ⌜arow_at av i (MkAnode (ADir e) nl)⌝
+            ∗ Fo.(pf_recv) av i (MkAnode (ADir e) nl)))%I.
+
+  (* THE SPLIT: the arms as the kernel's half beside the receipt.  The
+     dispatcher keeps [proc_priv] at the block the call leaves -- which is
+     the block itself on the failure arm and the block with the cwd pointer
+     and inum written on the success arm -- and the pure disjunction that
+     says which; the process gets the receipt, read at the inum the block
+     now carries.  The arms are not weakened: everything they hold appears
+     on the right of this wand.
+
+     THE PREMISE IS THE CONTRACT'S OWN INSTANTIATION.  [chdir_arms] takes
+     [cw] and [U] independently and relates them nowhere, so its failure arm
+     cannot say by itself that the call resumes at [cw]; [wp_sys_chdir_body]
+     instantiates the arms at [cw := pv_cwi (us_V U)] and the dispatcher's
+     arm therefore has this equation by [reflexivity]. *)
+  Lemma chdir_arms_split Γ (γfs : fs_names) (γf : gname)
+      (pj : mword 64) (pid : mword 32) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (U : ustate) (r : mword 64) :
+    pv_cwi (us_V U) = cw ->
+    chdir_arms Γ γfs γf pj pid cw P Pmiss Fo U r ⊢
+      ∃ U' : ustate,
+        ⌜(r = (mword_of_int (-1) : mword 64) /\ U' = U)
+         \/ (r = (zero_reg : mword 64)
+             /\ exists (ipv : mword 64) (i : Z), U' = us_cwi (us_cwd U ipv) i)⌝
+        ∗ proc_priv γf pj pid U'
+        ∗ chdir_receipt Γ γfs cw P Pmiss Fo r (pv_cwi (us_V U')).
+  Proof.
+    intros Hcw. rewrite /chdir_arms /chdir_post_ok /chdir_receipt.
+    iIntros "[(%Hr & Hpriv & Hfail) | (%Hr & H)]".
+    - iExists U.
+      iSplitR; [ iPureIntro; left; exact (conj Hr eq_refl) | ].
+      iFrame "Hpriv". iLeft.
+      iSplitR; [ iPureIntro; exact Hr | ].
+      iSplitR; [ iPureIntro; exact Hcw | ].
+      iExact "Hfail".
+    - iDestruct "H" as (ipv pl i e nl av) "(HP & %Harow & HFo & Hpriv)".
+      iExists (us_cwi (us_cwd U ipv) i).
+      iSplitR;
+        [ iPureIntro; right; split; [ exact Hr | exists ipv, i; reflexivity ] | ].
+      iFrame "Hpriv". iRight.
+      iSplitR; [ iPureIntro; exact Hr | ].
+      iExists pl, i, e, nl, av.
+      iSplitR; [ iPureIntro; reflexivity | ].
+      iFrame "HP". iSplitR; [ iPureIntro; exact Harow | ]. iExact "HFo".
+  Qed.
+
   (* THE RETURN BLANKET, READ OFF THE ARMS.  It is a consequence and not a
      second conjunct: [sys_chdir_post] carries [proc_priv], and each arm
      already carries it.  This is the bridge [FsSyscalls]'s friendly
@@ -319,7 +396,7 @@ End SysChdirArms.
 
 (* big-op bodies behind definitions: sealed, per the family convention *)
 Global Typeclasses Opaque chdir_au_pre chdir_post_fail chdir_post_ok
-  chdir_arms.
+  chdir_arms chdir_receipt.
 
 (* ===================================================================== *)
 (*  THE WHOLE-FUNCTION FRAME, abstracted over the caller's bundle and the *)
