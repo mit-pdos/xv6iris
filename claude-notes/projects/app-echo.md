@@ -1485,8 +1485,17 @@ EXISTING size ghost as a pair (`ghost_var γs (1/2) (sz, cw)` inside
 break's own mechanism; no `urun`/`uheap` argument moves (584 + 36 sites
 untouched), ~68 `usz` sites + the sbrk and chdir leaves; `udepw` then
 reads `c` in place of `∀ cw`.  Refuted: a cwd filter on `udepw` alone
-(nothing at the u-tier pins `cw`).  Remaining lanes, in order:
-FETCHSTR-MEM (the reading), CWD-GHOST (option 2), then C+D.
+(nothing at the u-tier pins `cw`).  OWNER RULING (2026-09-09): option
+(2) is a HACK — do not do it.  The cwd is its OWN separation-logic
+resource on the fd resources' mold (`ucwd_auth` in the state tied to the
+key's `uvis_cwd`, the program's fragment `ucwd γc c`, preserved by
+`usys_cwd_ok_quiet`, moved by a chdir leaf when one exists); and the
+engine's ghost names are BUNDLED IN A RECORD (`uk_names`: text, heap
+data, size, fd, cwd) so `urun` and the leaves take one argument and a new
+resource adds a field, not an argument — done in the SAME pass, since it
+touches the same sites.  Remaining lanes, in order: FETCHSTR-MEM (the
+reading; in flight), UK-NAMES + CWD (brief `brief-cwd-ghost.md`; the
+record sweep is its own green checkpoint), then C+D.
 
 USERINIT AND THE BOOT ARM.  forkret's boot arm kexec("/init") today takes
 `exec_au_pre_triv` with the slot predicate `emp` and gets the user WP from
