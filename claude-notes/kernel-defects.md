@@ -221,6 +221,46 @@ SEMANTIC argument rather than the syntactic identity in-core `itrunc` enjoys.
 The `[ref--, free]` gap leaves a state no `iget` can reach, so preemption is
 harmless and a crash there is an ordinary crash-orphan.
 
+## Open: `allocpid` wraps — the pid is a 32-bit counter with no bound
+
+```c
+int nextpid = 1;
+int allocpid() { acquire(&pid_lock); pid = nextpid; nextpid = nextpid + 1; release(&pid_lock); return pid; }
+```
+
+`nextpid` is a signed `int` incremented forever. After 2^31 - 1 allocations
+the increment overflows (undefined behaviour in C; the compiled `addiw`
+wraps to -2^31), and from then on every `fork()` returns a NEGATIVE pid to
+the parent for the next 2^31 forks — which every user program reads as
+"fork failed" (`forktest.c:25`, `grind.c:111,122`, sh, init), so a child
+is created and its parent believes there is none. After exactly 2^32
+allocations `allocpid` returns 0, and the parent of that fork cannot tell
+itself from its child: both resume with `a0 = 0`. `kill(pid)` and `wait`
+are unaffected in the kernel (they compare pids by equality), the damage
+is entirely in the user-visible convention.
+
+**Found by the proof, 2026-09-08 (FORK-ROW, projects/app-echo.md).** The
+process's fork continuation has a parent arm guarded by `r <> 0`, and the
+kernel cannot discharge the guard: `SpecAllocpid.nextpid_res_at` is an
+existential value, and no invariant `0 < nextpid` is inductive across the
+wrap. The round therefore instantiates the parent's arm only at `r <> 0`
+and lets the parent at `r = 0` fall to the generic slot minted from the
+application's supply (`UexecApply.uexec_ret_round_slot`, the pid-wrap
+row). That is honest and sound, but it means a verified application may
+lose its verified state after 2^32 forks for a reason that is a kernel
+defect, not a program property.
+
+**The fix belongs in xv6**: either `panic("allocpid: pid space exhausted")`
+when `nextpid` would wrap (2^31 pids is far beyond any test's reach, and a
+panic is the honest reading of "the counter is not reusable"), or widen
+`nextpid` and the `pid` fields to 64 bits and keep the same panic at 2^63.
+With the panic in the source the kernel's `kfork_post` pid arm becomes
+`0 < pidv`, `nextpid_res_at` carries `0 < v < 2^31 - 1`, and the pid-wrap
+row in the round disappears: the parent always resumes on its own arm.
+Consequences for the contracts are recorded with FORK-ROW when the fix
+lands; the source procedure is durable-notes §"Changing the kernel
+SOURCE" (`XV6_REV` moves, every proof naming an address in `proc.c` moves).
+
 ## Two unfixed inconsistencies in the read path
 
 - `read(pipefd, buf, 0)` BLOCKS until a writer produces a byte and then returns
