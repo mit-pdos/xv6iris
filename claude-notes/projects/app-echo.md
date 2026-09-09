@@ -1112,7 +1112,7 @@ deleted (the pilot's ten, the superseded consolewrite trio, `SpecKexecB3`),
 each walk's hoisted layer; `ProofKexecACode.v` phase A at the machine,
 `ProofKexecA.v` phase A at the contract; `KexecBridge.v` the pure closer.
 
-#### RECEIPT-IMAGE (designed 2026-09-09; brief `brief-receipt-image.md`, queued behind HYGIENE)
+#### RECEIPT-IMAGE (LANDED 2026-09-09; brief `brief-receipt-image.md`)
 
 A GAP IN READ'S RECEIPT.  `read_post_ok` hands the process the node `a`,
 the offset and the count, but the bytes in its OWN BUFFER are the image
@@ -1134,7 +1134,21 @@ sits at fileread's two fire sites: readi's post is an equation
 (fn_data …) (fn_size …)`, and `rd_bytes data off j = file_byte data
 (off + j)`; `umem_wr_lookup_in` closes it.  Then L5's console receipt is
 `∃ bs, ⌜∀ j < d, M' !! (addr+j) = Some (bs j)⌝ ∗ [∗] tags` at the same
-place.
+place.  Phase-1 facts: `spost_at` has EIGHT arguments (`f_equiv_wide`
+grew an eight-arity case); `file_bytes_lookup` existed in `ElfBridge.v`
+and moved beside `file_bytes` in `FsTree.v`; the stable corollaries
+`arf_stable_ok_arm`/`arf_stable_of_arms` take `M' addr` and weaken the
+tie away; SpecSyscall's contract has ONE post row at `us_M U'` and the
+read arm's `umem_wr … dw bsw` is its instantiation inside ProofSyscall.
+AS LANDED: the `AFile` tie is GUARDED by the caller's run linearity
+(`∀ i < d, uint (addr + i) = uint addr + i`) — `umem_wr` is keyed by the
+64-bit va precisely so no kernel contract promises the destination does
+not wrap (SpecCopyout's and SpecReadi's headers), and `umem_wr_lookup_in`
+takes linearity as a hypothesis; a program that owns its buffer has it for
+free (`UkRunSys.uheap_ubytes_run` bounds mapped addresses below MAXVA).
+`ProofFileread.fr_buffer_tie` is the obligation, `FsTree.file_bytes_lookup`
+its last step.  Fourteen quiet sites, not sixteen; `sysc_out_read` reads
+the destination argument.
 
 ORDER AFTER THIS: L5-a (the tag column in `uart_inv_body` beside `u_rx`,
 the rx wand returns the persistent tag, `uartgetc` pops byte + tag),
@@ -1142,6 +1156,50 @@ L5-b (consoleintr → `cons_res`'s tag column → consoleread's post →
 fileread's device arm → sys_read's console receipt), ARM-c (echo's supply
 from the taint, `echo_pred := taint ∨ pins`), L6 (init/sh/echo programs),
 L7.
+
+#### L5 — findings for the design (2026-09-09; not yet a brief)
+
+THE READS ARE FREE.  uartgetc's LSR poll and RHR load are
+`wp_uart_read_free_s_sconf` (WpSconfUartAccess): the loaded byte is an
+arbitrary `bt`/`c` with NO relation to the device's `u_rx`.  So the kernel
+today learns nothing about the byte it hands consoleintr.  The tag column
+needs NON-FREE reads: `SpecUart.wp_lb_uart_s_sconf_body` already carries
+an invariant-open callback (`∀ u bt u', ⌜uart_read u off = Some (bt, u')⌝
+-∗ uart_ghosts γ u' -∗ R ==∗ uart_ghosts γ u' ∗ S bt` — the LSR `_ea` read
+uses it to learn THRE); the RHR pop is `uart_read u 0 = Some (b, u')` with
+`u_rx u = b :: rx'` when nonempty, and JUNK (`byte0` with the FIFO on)
+when empty.
+
+THE JUNK ARM IS REFUTABLE.  uartgetc runs only inside uartintr, between
+devintr's `plic_claim` (which returns `uart_irq_id` and sets `p_claimed`)
+and `plic_complete`; `DevModel.plic_latch` refuses to re-pend a claimed
+source, so no second hart enters uartintr for the UART until completion —
+exactly one hart pops the FIFO at a time, and after a non-free LSR read
+shows DR the FIFO is still nonempty at the pop.  What is missing is the
+RESOURCE: `plic_inv_body` is `∃ p, plic_frag p ∗ ⌜plic_ok p⌝` with nothing
+about the claim.  Add an rx CLAIM TOKEN `uart_rx_tok` held by the PLIC
+invariant while `p_claimed p uart_irq_id = false`, handed out by
+`plic_claim`'s post when it returns the UART id and taken back by
+`plic_complete`; uartintr's contract takes and returns it; the non-free
+reads require it.  Without it the honest receipt is `tag ∨ ⌜junk⌝`, and
+a junk 0x00 in sh's line breaks the output side (L7) with no taint to fall
+back on.
+
+THE TAG COLUMN.  The application supplies a persistent family
+`Tg : list mobs → iProp` (echo: `⌜disc h⌝ ∨ taint`) and its rx wand returns
+`R h' ∗ Tg h'` (`echo_R_rx` can: disciplined → left; otherwise the counter
+is 1 → the lb).  `uart_inv_body` gains a column aligned with `u_rx`: the
+history prefixes `hs` at which each queued byte was pushed, with
+`[∗ list] h ∈ hs, Tg h` and `⌜last h = ObsUartIn b⌝` per byte (persistent,
+so a pop hands the reader a copy).  The rx arm of `wp_uart_loop` pushes;
+every other arm preserves; the RHR pop drops the head.  Then the kernel
+ledger: consoleintr takes the byte's `(h, Tg h)` and stores it in
+`cons_res`'s ring beside the byte; consoleread's post yields, for the `d`
+bytes copied, `∃ hs, ⌜length hs = d ∧ ∀ j, last (hs !! j) = ObsUartIn
+(bs j)⌝ ∗ [∗ list] h ∈ hs, Tg h`; fileread's device arm and sys_read's
+console receipt carry it to the process (RECEIPT-IMAGE's `M'` gives the
+`bs j` tie).  Lane cut: L5-a = token + non-free reads + column + the App
+hypothesis (`Htag`); L5-b = the console ledger through to the receipt.
 
 ## Decisions outstanding (refreshed 2026-09-08)
 
