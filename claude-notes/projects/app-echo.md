@@ -1432,6 +1432,57 @@ exec branch).  A CONSTRAINING program builds its own:
   needs them twice: to take arm (a)'s wand with `⌜kexec_loadable f⌝`, and
   to REFUTE arm (b)'s `⌜¬ anode_loadable a⌝` once the pin gives `a`.
 
+L6-INIT PHASE 1 (2026-09-09): A and B LANDED in the working tree —
+`ElfLoadable.v` (`sh_elf_loadable`, `init_elf_loadable`, the `*_anode_
+loadable` forms; a computable `kexec_loadable_b`; 1.8 s), `UInitKernel.v`
+(`init_uexec_slot`, `init_slot_of_kexec` on UShKernel's mold, still
+taking `uxsup`).  THREE BLOCKERS for C/D, ruled:
+1. THE OBSERVED INUM IS UNTIED: `exec_slot_pre`'s wands get `Φo av i a` at
+   an arbitrary `i`; the pin speaks of `ino`.  RULED: both wands gain the
+   cursor's final position `P L i` as a premise (the proof holds exactly
+   one copy, `ProofKexecA.kxa_receipt`); `exec_post_ok`'s success arms
+   drop it, the fail arms keep it.
+2. THE WALK PREMISE IS OVER EVERY PATH (`namei_walk_pre_era`'s `∀ pl`), so
+   a pinned cursor cannot answer hops of another path.  RULED: the exec
+   bundle states its walk AT THE ARGUMENT'S STRING — `namei_walk_pre_era_at
+   γfs cw pl P Pmiss` guarded by the copyinstr fact about `M` at `av`;
+   open/chdir/unlink keep the `∀ pl` form.
+3. THE PROCESS'S CWD IS HIDDEN (`urun`'s existential, `udepw`'s `∀ cw`),
+   and init execs the RELATIVE "sh".  Design pending: a per-program cwd
+   fact carried like `ufd_auth` (stepped by `usys_cwd_ok`) or a pure cwd
+   parameter for programs that never chdir.
+Also: `app_inv` is kernel-tier (`fsabs_env`), so the pinned bundle is
+built in the kernel-side constructor and handed to the program as the
+opaque `uxsup`/`udepw`; the claim law must be stated DUPLICATING (the
+fire puts the claim back into `app_body`) and the taint must be Timeless
+(the later off `app_body`) — echo's `mono_nat_lb_own` is.  `FsAbsPins.v`
+does not exist: the pinned-walk vocabulary is `FsAbs.v` §4 (`apr_walk`),
+era instance `FsAbsEra.apr_walk_era`.
+
+L6-INIT PHASE 2a LANDED (2026-09-09): blocker 1 — `exec_slot_pre` takes the
+walk's terminal cursor `Pfin : Z → iProp` as both wands' first premise
+(`exec_au_pre` at `P (length (path_elems pl))`), `exec_post_ok`'s success
+arms no longer return it, the fail arms do; blocker 2 — `exec_au_pre`/
+`_post_ok`/`_post_fail`/`_arms` are at ONE path `pl` with the walk as
+`FsAbsEra.ex_start` (already `namei_walk_pre_era`'s body at one path;
+`FsAbsOpenFire.opf_start_of_open` is the ∀-bridge, unusable from
+UexecExecInst because of an explicit CurCtx binder — make it a section
+variable), and `sys_exec_au_pre` carries the PATH pointer `pv` (argument
+0; `av` is argv, argument 1) and owes the walk/slot at paths satisfying
+`exec_path_shape` — what `SpecFetchstr.fetchstr_ret` promises, a NUL-
+terminated int-sized string with NO tie to the user image.  SO THE
+SEMANTIC HALF IS OWED: `exec_path_of M pv pl` (named, beside the shape)
+needs a memory-indexed `wp_fetchstr_sconf_mem`/`copyinstr_got`; only then
+is the bundle owed at the one string in the process's image, which the
+pinned cursor needs.  Blocker 3 RULED: option (2) — the cwd rides the
+EXISTING size ghost as a pair (`ghost_var γs (1/2) (sz, cw)` inside
+`uheap`, the handle `usz_cwd γs sz c`, `usz` an existential wrapper), the
+break's own mechanism; no `urun`/`uheap` argument moves (584 + 36 sites
+untouched), ~68 `usz` sites + the sbrk and chdir leaves; `udepw` then
+reads `c` in place of `∀ cw`.  Refuted: a cwd filter on `udepw` alone
+(nothing at the u-tier pins `cw`).  Remaining lanes, in order:
+FETCHSTR-MEM (the reading), CWD-GHOST (option 2), then C+D.
+
 USERINIT AND THE BOOT ARM.  forkret's boot arm kexec("/init") today takes
 `exec_au_pre_triv` with the slot predicate `emp` and gets the user WP from
 the park closer's FAMILY (minted from the supply).  For a constraining
