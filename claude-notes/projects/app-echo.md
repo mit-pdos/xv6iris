@@ -973,6 +973,23 @@ from uvmcopy's pointwise post (`perm_leaf` reads bits 1..4 only,
 `dom` agrees because `um_below` puts every mapped page under `n`); sz —
 `np->sz = p->sz`; cwd — B4's `pv_cwi Vc' = pv_cwi Up`.  `ProofSysFork`
 hands kfork the single slot, minted from the supply for now.
+  KFORK-CHILD (LANDED 2026-09-08; brief `brief-kfork-child.md`).
+  Phase-1 facts: `kfork_child Up := us_tf Up (<[14%nat := zero_reg]>
+  (pv_tf (us_V Up)))` and the pure lemmas live in a new leaf
+  `iris/KforkChild.v` (a lemma in UserPtTree rebuilds 659 files, in
+  ProcPtOwn 621; the leaf rebuilds none) — `umem_write_copy_id`,
+  `perm_leaf_pte_set_ad`, `perm_leaf_uvm_pte_flags10`, `perm_of_ext`,
+  `perm_of_uvmcopy_child`, `urun_eq_kfork_child`; `4096 * uvm_np sz =
+  pgroundup sz` is `ProcPtOwn.uvm_np_live`; the child's table is literally
+  `∅` before the copy (B6's `HCempty`).  `kfk_b5` is abstract over the run
+  key `Wk` with `urun_eq Wk Uc` and `uvis_fd Wk = stsP`.  B6 DISCARDED the
+  child's image (`∃ Mc, proc_ptm P' … Mc` at the uvmcopy return) and
+  `kfk_pro_exit3` carried neither sz, image nor perm facts to Main — phase 2
+  keeps the concrete image and threads the three facts.  AS LANDED: B6
+  closes the child's image at `us_M Up`, its exit clause and `kfork_arm3`
+  carry sz/image/perm, Main assembles `urun_eq_kfork_child`;
+  `ProofSysFork` mints the one slot from the supply (lane (c) replaces
+  the mint by the deposit); `UexecCond.uslot_congr` deleted (no callers).
 
 (c) FORK-ROW.  The child continuation travels DOWN as fork's deposit and
 the parent's arm is instantiated at the return:
