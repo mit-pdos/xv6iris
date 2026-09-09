@@ -112,7 +112,7 @@ Section UserStepFull.
            reg_agree_on ((u_Drw ∪ u_Dro) ∖ tk_clock3) rs3 rsP⌝ -∗
         hreg_frame rs3 u_Drw -∗
         hreg_frame_ro (u_Df (uc_dqc C)) rs3 u_Dro -∗
-        resv_any cpu_id -∗
+        resv_any cpu_id -∗ fuel_frag cpu_id Any -∗
         ((user_inv C pt Rut -∗ WP (Loop : expr riscv_lang)) ∧
          (user_trap_frame C pt Rut -∗ WP (Loop : expr riscv_lang))) -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -224,7 +224,7 @@ Section UserStepFull.
     (* ---- take the three bundles apart ---- *)
     rewrite /user_regs u_regs_open.
     iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & HPC & HnPC
-                           & Hgpr & Hmr & Hcr & Hresv)".
+                           & Hgpr & Hmr & Hcr & Hresv & Hfuel)".
     iDestruct "Hmr" as (mst mi mc micfg) "(Hminstret & Hmincr & #Hmcnt & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hmcycle & Hmtime & Hmip)".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & #Hmedl & Hmenv & #Hsenv &
@@ -285,7 +285,7 @@ Section UserStepFull.
               ltac:(intros st rs2 H; exact (proj1 H))
               ltac:(intros st rs2 H; exact (proj1 (proj2 H)))
               ltac:(intros r _; reflexivity)
-              with "Hcert Hresv Hrw Hro [Hpmpi Hbytes Hclose Hrut] [Hk]").
+              with "Hcert Hresv Hfuel Hrw Hro [Hpmpi Hbytes Hclose Hrut] [Hk]").
     - (* the classification, with everything the machine owns beside the frame *)
       iIntros "Hfrag Hrw Hro".
       iApply ("Hclass" $! RS (wrap_pre RS) t mm usatp pcfg paddr mcenv scenv hpm
@@ -298,8 +298,8 @@ Section UserStepFull.
           iFrame "Hpmpi Hmedl Hsenv Hmste Hsste Hmcen Hscen Hhpm Hclaims
                   Hbytes Hclose" ].
     - (* the payload's closer does the rest *)
-      iNext. iIntros (rs3 rs2) "%Hag Hrw Hro [Hresv Hcl]".
-      iApply ("Hcl" $! rs3 with "[%] Hrw Hro Hresv Hk"). exact Hag.
+      iNext. iIntros (rs3 rs2) "%Hag Hrw Hro [Hresv Hcl] Hfuel".
+      iApply ("Hcl" $! rs3 with "[%] Hrw Hro Hresv Hfuel Hk"). exact Hag.
   Qed.
 
 End UserStepFull.

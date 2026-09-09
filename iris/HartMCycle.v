@@ -956,18 +956,28 @@ Section mcycle.
   (*                                                                    *)
   (* [Ψ] rides through untouched: it is where a leaf carries whatever    *)
   (* its instruction produced besides registers (the store's updated     *)
-  (* points-to, say). *)
-  Lemma wp_loop_cycle (Drw Dro : gset register) (Df : register -> dfrac)
-      (P : regstate -> Prop) (Ψ : iProp Σ) :
+  (* points-to, say).                                                    *)
+  (*                                                                    *)
+  (* THE FUEL (liveness.md D4) rides past the body: the boundary charges  *)
+  (* it through the client's [cycle_permit] for the pair [(k, k')], and   *)
+  (* the continuation -- where a leaf rebuilds [pc_isk] -- receives it at *)
+  (* [k'].  The body never sees it; nothing inside a cycle can touch a    *)
+  (* hart's fuel.  The [_k] forms are the generic ones; the plain forms  *)
+  (* are [Any]/[Any] with [gen_cert]'s own permit, which is what every   *)
+  (* uncounted leaf calls. *)
+  Lemma wp_loop_cycle_k (Drw Dro : gset register) (Df : register -> dfrac)
+      (P : regstate -> Prop) (Ψ : iProp Σ) (k k' : fuel_kind) :
     Drw ## Dro ->
     (R_bitvector_64 mcycle : register) ∈ Drw ->
     (R_bitvector_64 mtime : register) ∈ Drw ->
     (R_bitvector_64 mip : register) ∈ Drw ->
     gen_cert -∗
+    cycle_permit cpu_id k k' -∗
     (* the hart's reservation mirror (design §3a): whatever the previous
        instruction left comes in, the boundary drops it, and the body starts
        at [None] *)
     resv_any cpu_id -∗
+    fuel_frag cpu_id k -∗
     ▷ (resv_frag cpu_id None -∗
        swp (try_step 0 false)
          (fun _ => ∃ rs1 : regstate, ⌜P rs1⌝ ∗
@@ -976,23 +986,86 @@ Section mcycle.
          ⌜∃ rs1 : regstate, P rs1 /\
             reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs2 rs1⌝ -∗
          hreg_frame rs2 Drw -∗ hreg_frame_ro Df rs2 Dro -∗ Ψ -∗
+         fuel_frag cpu_id k' -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hdisj HWcy HWti HWip.
-    iIntros "#Hcert Hfrag Hbody Hcont".
+    iIntros "#Hcert #Hperm Hfrag Hfuel Hbody Hcont".
     iDestruct "Hfrag" as (rr) "Hfrag".
-    iApply (swp_loop rr with "Hcert Hfrag").
-    iNext. iIntros (tick) "Hfrag".
+    iApply (swp_loop_k rr k k' with "Hcert Hperm Hfrag Hfuel").
+    iNext. iIntros (tick) "Hfrag Hfuel".
     iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
-              with "[Hcont] [-]").
+              with "[Hcont Hfuel] [-]").
     2:{ iApply (swp_tick_wrap Drw Dro Df P Ψ tick Hdisj HWcy HWti HWip
                   with "Hcert [Hbody Hfrag]"). iApply ("Hbody" with "Hfrag"). }
     iIntros (u). iDestruct 1 as (rs2) "(%Hex & Hrw & Hro & HPsi)".
-    iApply ("Hcont" with "[%] Hrw Hro HPsi"). exact Hex.
+    iApply ("Hcont" with "[%] Hrw Hro HPsi Hfuel"). exact Hex.
+  Qed.
+
+  Lemma wp_loop_cycle (Drw Dro : gset register) (Df : register -> dfrac)
+      (P : regstate -> Prop) (Ψ : iProp Σ) :
+    Drw ## Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ->
+    (R_bitvector_64 mtime : register) ∈ Drw ->
+    (R_bitvector_64 mip : register) ∈ Drw ->
+    gen_cert -∗
+    resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
+    ▷ (resv_frag cpu_id None -∗
+       swp (try_step 0 false)
+         (fun _ => ∃ rs1 : regstate, ⌜P rs1⌝ ∗
+                     hreg_frame rs1 Drw ∗ hreg_frame_ro Df rs1 Dro ∗ Ψ)) -∗
+    ▷ (∀ rs2 : regstate,
+         ⌜∃ rs1 : regstate, P rs1 /\
+            reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs2 rs1⌝ -∗
+         hreg_frame rs2 Drw -∗ hreg_frame_ro Df rs2 Dro -∗ Ψ -∗
+         fuel_frag cpu_id Any -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hdisj HWcy HWti HWip.
+    iIntros "#Hcert Hfrag Hfuel Hbody Hcont".
+    iPoseProof "Hcert" as "(_ & _ & _ & #Hany)". iSpecialize ("Hany" $! cpu_id).
+    iApply (wp_loop_cycle_k Drw Dro Df P Ψ Any Any Hdisj HWcy HWti HWip
+              with "Hcert Hany Hfrag Hfuel Hbody Hcont").
   Qed.
 
   (* the indexed-rider twin of [wp_loop_cycle] (see [swp_tick_wrap_ex]) *)
+  Lemma wp_loop_cycle_ex_k (Drw Dro : gset register) (Df : register -> dfrac)
+      (P : regstate -> Prop) (Ψ : regstate -> iProp Σ) (k k' : fuel_kind) :
+    Drw ## Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ->
+    (R_bitvector_64 mtime : register) ∈ Drw ->
+    (R_bitvector_64 mip : register) ∈ Drw ->
+    gen_cert -∗
+    cycle_permit cpu_id k k' -∗
+    resv_any cpu_id -∗
+    fuel_frag cpu_id k -∗
+    ▷ (resv_frag cpu_id None -∗
+       swp (try_step 0 false)
+         (fun _ => ∃ rs1 : regstate, ⌜P rs1⌝ ∗
+                     hreg_frame rs1 Drw ∗ hreg_frame_ro Df rs1 Dro ∗ Ψ rs1)) -∗
+    ▷ (∀ rs2 rs1 : regstate,
+         ⌜P rs1 /\ reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs2 rs1⌝ -∗
+         hreg_frame rs2 Drw -∗ hreg_frame_ro Df rs2 Dro -∗ Ψ rs1 -∗
+         fuel_frag cpu_id k' -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hdisj HWcy HWti HWip.
+    iIntros "#Hcert #Hperm Hfrag Hfuel Hbody Hcont".
+    iDestruct "Hfrag" as (rr) "Hfrag".
+    iApply (swp_loop_k rr k k' with "Hcert Hperm Hfrag Hfuel").
+    iNext. iIntros (tick) "Hfrag Hfuel".
+    iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
+              with "[Hcont Hfuel] [-]").
+    2:{ iApply (swp_tick_wrap_ex Drw Dro Df P Ψ tick Hdisj HWcy HWti HWip
+                  with "Hcert [Hbody Hfrag]"). iApply ("Hbody" with "Hfrag"). }
+    iIntros (u). iDestruct 1 as (rs2 rs1) "(%Hex & Hrw & Hro & HPsi)".
+    iApply ("Hcont" with "[%] Hrw Hro HPsi Hfuel"). exact Hex.
+  Qed.
+
   Lemma wp_loop_cycle_ex (Drw Dro : gset register) (Df : register -> dfrac)
       (P : regstate -> Prop) (Ψ : regstate -> iProp Σ) :
     Drw ## Dro ->
@@ -1001,6 +1074,7 @@ Section mcycle.
     (R_bitvector_64 mip : register) ∈ Drw ->
     gen_cert -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     ▷ (resv_frag cpu_id None -∗
        swp (try_step 0 false)
          (fun _ => ∃ rs1 : regstate, ⌜P rs1⌝ ∗
@@ -1008,20 +1082,15 @@ Section mcycle.
     ▷ (∀ rs2 rs1 : regstate,
          ⌜P rs1 /\ reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs2 rs1⌝ -∗
          hreg_frame rs2 Drw -∗ hreg_frame_ro Df rs2 Dro -∗ Ψ rs1 -∗
+         fuel_frag cpu_id Any -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hdisj HWcy HWti HWip.
-    iIntros "#Hcert Hfrag Hbody Hcont".
-    iDestruct "Hfrag" as (rr) "Hfrag".
-    iApply (swp_loop rr with "Hcert Hfrag").
-    iNext. iIntros (tick) "Hfrag".
-    iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
-              with "[Hcont] [-]").
-    2:{ iApply (swp_tick_wrap_ex Drw Dro Df P Ψ tick Hdisj HWcy HWti HWip
-                  with "Hcert [Hbody Hfrag]"). iApply ("Hbody" with "Hfrag"). }
-    iIntros (u). iDestruct 1 as (rs2 rs1) "(%Hex & Hrw & Hro & HPsi)".
-    iApply ("Hcont" with "[%] Hrw Hro HPsi"). exact Hex.
+    iIntros "#Hcert Hfrag Hfuel Hbody Hcont".
+    iPoseProof "Hcert" as "(_ & _ & _ & #Hany)". iSpecialize ("Hany" $! cpu_id).
+    iApply (wp_loop_cycle_ex_k Drw Dro Df P Ψ Any Any Hdisj HWcy HWti HWip
+              with "Hcert Hany Hfrag Hfuel Hbody Hcont").
   Qed.
 
   (* the two footprint weakenings every frame client needs *)
@@ -1088,6 +1157,79 @@ Section mcycle.
   (* as [wrap_pre rs1] itself, so the caller may name its own canonical    *)
   (* successor file instead of carrying a [register_set] around.           *)
   (* ==================================================================== *)
+  (* THE FUEL (liveness.md D4) rides through: generic in the pair, with the
+     client's permit; the plain form below is [Any]/[Any] with [gen_cert]'s
+     own permit, and is what every uncounted wrapper calls. *)
+  Lemma swp_exec_step_decode_execute_k (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs1 rsA rsB : regstate) (Psi : iProp Σ)
+      {k k' : fuel_kind} :
+    Drw ## Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ->
+    (R_bitvector_64 mtime : register) ∈ Drw ->
+    (R_bitvector_64 mip : register) ∈ Drw ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (hart_state : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_32 mcountinhibit : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 minstretcfg : register) ∈ Drw ∪ Dro ->
+    (R_bool minstret_increment : register) ∈ Drw ->
+    (R_bool minstret_increment : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 minstret : register) ∈ Drw ->
+    (R_bitvector_64 minstret : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 nextPC : register) ∈ Drw ∪ Dro ->
+    register_lookup hart_state rs1 = HART_ACTIVE tt ->
+    register_lookup hart_state rsB = HART_ACTIVE tt ->
+    register_lookup (R_bool minstret_increment) rsB
+      = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+          (register_lookup (R_bitvector_64 minstretcfg) rs1)
+          (register_lookup cur_privilege rs1) ->
+    reg_agree_on (Drw ∪ Dro) (wrap_pre rs1) rsA ->
+    gen_cert -∗
+    cycle_permit cpu_id k k' -∗
+    resv_any cpu_id -∗
+    fuel_frag cpu_id k -∗
+    hreg_frame rs1 Drw -∗
+    hreg_frame_ro Df rs1 Dro -∗
+    (resv_frag cpu_id None -∗
+     hreg_frame rsA Drw -∗ hreg_frame_ro Df rsA Dro -∗
+       swp (run_hart_active 0)
+         (fun st => ∃ w : SailStdpp.Values.mword 32,
+                    ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
+                    hreg_frame rsB Drw ∗ hreg_frame_ro Df rsB Dro ∗ Psi)) -∗
+    ▷ (∀ rs3 : regstate,
+         ⌜∃ mi : SailStdpp.Values.mword 64,
+            reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs3
+              (wrap_post rsB mi)⌝ -∗
+         hreg_frame rs3 Drw -∗ hreg_frame_ro Df rs3 Dro -∗ Psi -∗
+         fuel_frag cpu_id k' -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hdisj HWcy HWti HWip HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
+      HWpc HDpc HDnpc Hhart Hhart2 Hmi2 Hpre.
+    iIntros "#Hcert #Hperm Hfrag Hfuel Hrw Hro Hbody Hcont".
+    iApply (wp_loop_cycle_k Drw Dro Df
+              (fun rsx => exists mi : SailStdpp.Values.mword 64,
+                 rsx = wrap_post rsB mi)
+              Psi k k' Hdisj HWcy HWti HWip
+              with "Hcert Hperm Hfrag Hfuel [Hrw Hro Hbody] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro HPsi Hfuel".
+        destruct Hag as (rsP & (mi & ->) & Hag).
+        iApply ("Hcont" with "[%] Hrw Hro HPsi Hfuel"). by exists mi. }
+    iNext. iIntros "Hfrag".
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_try_step_gen Drw Dro Df rs1 rsB Psi Hdisj HDpriv
+                   HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc HDpc HDnpc
+                   Hhart Hhart2 Hmi2 with "Hcert Hrw Hro [Hbody Hfrag]") ].
+    { iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & HPsi)".
+      iExists _. iSplitR; [iPureIntro; by exists mi|]. iFrame. }
+    iIntros "Hrw Hro".
+    rewrite (hreg_frame_ext _ rsA Drw (reg_agree_l _ _ _ _ Hpre)).
+    rewrite (hreg_frame_ro_ext Df _ rsA Dro (reg_agree_r _ _ _ _ Hpre)).
+    iApply ("Hbody" with "Hfrag Hrw Hro").
+  Qed.
+
   Lemma swp_exec_step_decode_execute (Drw Dro : gset register)
       (Df : register -> dfrac) (rs1 rsA rsB : regstate) (Psi : iProp Σ) :
     Drw ## Dro ->
@@ -1114,6 +1256,7 @@ Section mcycle.
     reg_agree_on (Drw ∪ Dro) (wrap_pre rs1) rsA ->
     gen_cert -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame rs1 Drw -∗
     hreg_frame_ro Df rs1 Dro -∗
     (resv_frag cpu_id None -∗
@@ -1127,30 +1270,18 @@ Section mcycle.
             reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs3
               (wrap_post rsB mi)⌝ -∗
          hreg_frame rs3 Drw -∗ hreg_frame_ro Df rs3 Dro -∗ Psi -∗
+         fuel_frag cpu_id Any -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hdisj HWcy HWti HWip HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
       HWpc HDpc HDnpc Hhart Hhart2 Hmi2 Hpre.
-    iIntros "#Hcert Hfrag Hrw Hro Hbody Hcont".
-    iApply (wp_loop_cycle Drw Dro Df
-              (fun rsx => exists mi : SailStdpp.Values.mword 64,
-                 rsx = wrap_post rsB mi)
-              Psi Hdisj HWcy HWti HWip with "Hcert Hfrag [Hrw Hro Hbody] [Hcont]").
-    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro HPsi".
-        destruct Hag as (rsP & (mi & ->) & Hag).
-        iApply ("Hcont" with "[%] Hrw Hro HPsi"). by exists mi. }
-    iNext. iIntros "Hfrag".
-    iApply (swp_mono with "[] [-]");
-      [| iApply (swp_try_step_gen Drw Dro Df rs1 rsB Psi Hdisj HDpriv
-                   HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc HDpc HDnpc
-                   Hhart Hhart2 Hmi2 with "Hcert Hrw Hro [Hbody Hfrag]") ].
-    { iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & HPsi)".
-      iExists _. iSplitR; [iPureIntro; by exists mi|]. iFrame. }
-    iIntros "Hrw Hro".
-    rewrite (hreg_frame_ext _ rsA Drw (reg_agree_l _ _ _ _ Hpre)).
-    rewrite (hreg_frame_ro_ext Df _ rsA Dro (reg_agree_r _ _ _ _ Hpre)).
-    iApply ("Hbody" with "Hfrag Hrw Hro").
+    iIntros "#Hcert Hfrag Hfuel Hrw Hro Hbody Hcont".
+    iPoseProof "Hcert" as "(_ & _ & _ & #Hany)". iSpecialize ("Hany" $! cpu_id).
+    iApply (swp_exec_step_decode_execute_k Drw Dro Df rs1 rsA rsB Psi
+              Hdisj HWcy HWti HWip HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
+              HWpc HDpc HDnpc Hhart Hhart2 Hmi2 Hpre
+              with "Hcert Hany Hfrag Hfuel Hrw Hro Hbody Hcont").
   Qed.
 
 End mcycle.

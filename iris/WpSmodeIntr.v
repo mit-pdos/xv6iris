@@ -294,7 +294,7 @@ Section WpSmodeIntr.
       by (rewrite HSIE0; vm_compute; reflexivity).
     iAssert (sie_cap_rest kt m n false p) with "[Hstk Harm Hctx]" as "Hrest".
     { rewrite /sie_cap_rest /sie_arm. iFrame "Hstk Harm Hctx Htc Hwit". }
-    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv & Hfuel)".
     iDestruct "Hmr" as (msr bmi mc micfg) "(Hmsr & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -340,10 +340,10 @@ Section WpSmodeIntr.
          chain -- taking it here is what puts the leaf's obligation in hand
          BEFORE the body has to be supplied. ---- *)
       iDestruct "Hresv" as (rr) "Hfrag".
-      iApply (swp_loop rr with "Hcert Hfrag").
-      iNext. iIntros (tick) "Hfrag".
+      iApply (swp_loop rr with "Hcert Hfrag Hfuel").
+      iNext. iIntros (tick) "Hfrag Hfuel".
       iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
-                with "[] [-]").
+                with "[Hfuel] [-]").
       2:{ iApply (swp_tick_wrap_ex s_Drwb s_Dro (s_Df (DfracOwn 1))
                     (fun rsx => exists (rs2 : regstate) (mi : mword 64),
                        off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0 rs2 /\
@@ -553,7 +553,7 @@ Section WpSmodeIntr.
       iApply ("Hcont" $! npc ms1 m' av' with
                 "[Hhs3 Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3 Hsatp3
                   Htlb3 Hpcfg3 Hpaddr3 Hres1 Hrest1 Hfile1 Hclose1]
-                 [HPC HnPC Hmsr3 Hmi3 Hcy3 Hti3 Hip3 Hresv1] HRv").
+                 [HPC HnPC Hmsr3 Hmi3 Hcy3 Hti3 Hip3 Hresv1 Hfuel] HRv").
       - rewrite /sie_cap_gpr_at. iFrame "Hhs3 Hfile1".
         iSplitL "Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3".
         { iApply (sconf_at_of_cells ms1 mdv1 Hmsf1 Hmm1
@@ -562,7 +562,7 @@ Section WpSmodeIntr.
         iApply ("Hclose1" $! m' av' b' tlb1 with "[%] Hsatp3 Htlb3 Hpcfg3
                   Hpaddr3 Hres1 Hrest1").
         intros _. reflexivity.
-      - rewrite /pc_is. iFrame "HPC HnPC Hresv1".
+      - rewrite /pc_is /pc_isk. iFrame "HPC HnPC Hresv1 Hfuel".
         iSplitL "Hmsr3 Hmi3".
         { iExists mi, (minstret_inc_flag mc micfg Supervisor), mc, micfg.
           by iFrame "Hmsr3 Hmi3 Hmc Hmicfg". }
@@ -599,10 +599,10 @@ Section WpSmodeIntr.
          chain -- taking it here is what puts the leaf's obligation in hand
          BEFORE the body has to be supplied. ---- *)
       iDestruct "Hresv" as (rr) "Hfrag".
-      iApply (swp_loop rr with "Hcert Hfrag").
-      iNext. iIntros (tick) "Hfrag".
+      iApply (swp_loop rr with "Hcert Hfrag Hfuel").
+      iNext. iIntros (tick) "Hfrag Hfuel".
       iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
-                with "[] [-]").
+                with "[Hfuel] [-]").
       2:{ iApply (swp_tick_wrap_ex s_Drw s_Dro (s_Df (DfracOwn 1))
                     (fun rsx => exists (rs2 : regstate) (mi : mword 64),
                        off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0 rs2 /\
@@ -803,7 +803,7 @@ Section WpSmodeIntr.
       iApply ("Hcont" $! npc ms1 m' av' with
                 "[Hhs3 Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3 Hsatp3
                   Htlb3 Hpcfg3 Hpaddr3 Hres1 Hrest1 Hfile1 Hclose1]
-                 [HPC HnPC Hmsr3 Hmi3 Hcy3 Hti3 Hip3 Hresv1] HRv").
+                 [HPC HnPC Hmsr3 Hmi3 Hcy3 Hti3 Hip3 Hresv1 Hfuel] HRv").
       - rewrite /sie_cap_gpr_at. iFrame "Hhs3 Hfile1".
         iSplitL "Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3".
         { iApply (sconf_at_of_cells ms1 mdv1 Hmsf1 Hmm1
@@ -812,7 +812,7 @@ Section WpSmodeIntr.
         iApply ("Hclose1" $! m' av' b' tlb1 with "[%] Hsatp3 Htlb3 Hpcfg3
                   Hpaddr3 Hres1 Hrest1").
         intros _. reflexivity.
-      - rewrite /pc_is. iFrame "HPC HnPC Hresv1".
+      - rewrite /pc_is /pc_isk. iFrame "HPC HnPC Hresv1 Hfuel".
         iSplitL "Hmsr3 Hmi3".
         { iExists mi, (minstret_inc_flag mc micfg Supervisor), mc, micfg.
           by iFrame "Hmsr3 Hmi3 Hmc Hmicfg". }

@@ -179,7 +179,7 @@ Lemma prim_step_gout_wire_ok e g κ e' g' efs :
 Proof.
   intros Hstep Hok.
   destruct Hstep as
-    [ (gen & cpu & m & -> & -> & _ & [ (_ & Hn) | (_ & _ & ->) ])
+    [ (gen & cpu & m & -> & _ & [ (_ & _ & Hn) | (_ & _ & _ & ->) ])
     | [ (gen & -> & _ & _ & [ ([Hpw Hgen] & d' & Hu & ->) | (_ & -> & ->) ])
     | [ (gen & -> & _ & -> & _ & [ (_ & d' & W & log' & Hd & _ & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & -> & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])

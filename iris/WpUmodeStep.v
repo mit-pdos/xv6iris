@@ -230,7 +230,7 @@ Section UvEngine.
         ⌜uv_tail rs2 rs3⌝ -∗
         hreg_frame rs3 u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rs3 u_Dro -∗
         TsoCtx.own_context XI -∗
-        resv_any cpu_id -∗ R -∗
+        resv_any cpu_id -∗ fuel_frag cpu_id Any -∗ R -∗
         WP (Loop : expr riscv_lang)))%I.
 
   Definition uv_arm_res (R : iProp Σ) (rs2 : regstate) : iProp Σ :=
@@ -377,6 +377,7 @@ Section UvLandClose.
     tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rs2) ->
     hreg_frame rs3 u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rs3 u_Dro -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     uv_bytes pt M t -∗
     uv_res pt M t usatp pcfg paddr -∗
     (hart_state ↦ᵣ HART_ACTIVE tt ∗ cur_privilege ↦ᵣ p ∗
@@ -483,7 +484,7 @@ Section UvLandClose.
     assert (Hpt : u_pins_pt rs3 usatp pcfg paddr (register_lookup tlb rs3))
       by (rewrite /u_pins_pt; split_and!;
           [ exact Lsatp3 | exact Lpcfg3 | exact Lpaddr3 | reflexivity ]).
-    iIntros "Hrw Hro Hresv Hmm [#Hclaims Hcl]".
+    iIntros "Hrw Hro Hresv Hfuel Hmm [#Hclaims Hcl]".
     iDestruct (u_frames_elim_at p rs3 (uc_dqc C) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
                  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
                  Hregs Htick Hcfg Hhw Hpt with "Hrw Hro")
@@ -500,8 +501,8 @@ Section UvLandClose.
     { rewrite Ltlb3. exact Htlbok. }
     rewrite <- Hgeq.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hutlb Humem".
-    iSplitL "HPC HnPC Hminstret Hmincr Hmcycle Hmtime Hmip Hresv".
-    { rewrite /pc_is /minstret_res /clock_res. iFrame "HPC HnPC Hresv".
+    iSplitL "HPC HnPC Hminstret Hmincr Hmcycle Hmtime Hmip Hresv Hfuel".
+    { rewrite /pc_is /pc_isk /minstret_res /clock_res. iFrame "HPC HnPC Hresv Hfuel".
       iSplitL "Hminstret Hmincr".
       - iExists _, _, _, _. iFrame "Hminstret Hmincr Hmcnt Hmicfg".
       - iExists _, _, _. iFrame "Hmcycle Hmtime Hmip". }
@@ -576,12 +577,12 @@ Section UvArms.
       Lsste Lsenv Lsatp Lpcfg Lpaddr Htok Htlbok.
     iIntros "#Hamb #Hcap Hresv Hmm Hres Hctx Hk".
     rewrite /uv_psi. iFrame "Hctx Hresv".
-    iIntros (rs3) "%Htail Hrw Hro Hctx Hresv HR".
+    iIntros (rs3) "%Htail Hrw Hro Hctx Hresv Hfuel HR".
     iDestruct ("Hk" with "HR") as "Hcont".
     iDestruct (uv_land_close C pt M m' npc t usatp pcfg paddr User rs2 rs3
                  Htail Lhs Lpriv Lnpc Hgag Hx0 Lstvec Lmie Lmdl Lmedl Lmenv
                  Lmste Lsste Lsenv Lsatp Lpcfg Lpaddr Htok Htlbok
-                 with "Hrw Hro Hresv Hmm Hres")
+                 with "Hrw Hro Hresv Hfuel Hmm Hres")
       as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr & Hcfg &
            Hutlb & Humem)".
     iApply ("Hcont" $! CID XI with "[-Hpc] Hpc").
@@ -632,13 +633,13 @@ Section UvArms.
       Lsste Lsenv Lsatp Lpcfg Lpaddr Htok Htlbok.
     iIntros "Hresv Hmm Hres Hctx Hcont".
     rewrite /uv_psi. iFrame "Hctx Hresv".
-    iIntros (rs3) "%Htail Hrw Hro Hctx Hresv Hresume".
+    iIntros (rs3) "%Htail Hrw Hro Hctx Hresv Hfuel Hresume".
     iDestruct (uv_land_close C pt M g (stvec_base (uc_stvec C)) t usatp pcfg
                  (* the trapped landing shape *)
                  paddr Supervisor rs2 rs3
                  Htail Lhs Lpriv Lnpc Hgag Hx0 Lstvec Lmie Lmdl Lmedl Lmenv
                  Lmste Lsste Lsenv Lsatp Lpcfg Lpaddr Htok Htlbok
-                 with "Hrw Hro Hresv Hmm Hres")
+                 with "Hrw Hro Hresv Hfuel Hmm Hres")
       as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr & Hcfg &
            Hutlb & Humem)".
     iDestruct (umem_x_forget with "Humem") as "Humem".
@@ -795,7 +796,7 @@ Section UvStepEngine.
     iPoseProof "Hamb" as "(#Hhw & _ & _)".
     iDestruct "Hregs" as (ms_v sc_v stval_v sepc_v)
       "(%Hmsok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc)".
-    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv & Hfuel)".
     iDestruct "Hmr" as (mst mi mc micfg) "(Hminstret & Hmincr & #Hmcnt & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hmcycle & Hmtime & Hmip)".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & #Hmedl & Hmenv & #Hsenv &
@@ -899,7 +900,7 @@ Section UvStepEngine.
               ltac:(intros st rs2 H; exact (proj1 H))
               ltac:(intros st rs2 H; exact (proj1 (proj2 H)))
               ltac:(intros r _; reflexivity)
-              with "Hcert Hresv Hrw Hro [Hmm Hcl Hobl Hctx] [Hkc]").
+              with "Hcert Hresv Hfuel Hrw Hro [Hmm Hcl Hobl Hctx] [Hkc]").
     - (* ================= THE BODY SLOT ================= *)
       iIntros "Hfrag Hrw Hro".
       iApply (swp_mono with "[] [-]").
@@ -977,8 +978,8 @@ Section UvStepEngine.
         { exact Hpre. }
         iIntros "[_ $]".
     - (* ================= THE CYCLE'S TAIL ================= *)
-      iNext. iIntros (rs3 rs2) "%Hag Hrw Hro (Hctx & Hresv & Hcl)".
-      iApply ("Hcl" $! rs3 with "[%] Hrw Hro Hctx Hresv [$IH $Hkc]").
+      iNext. iIntros (rs3 rs2) "%Hag Hrw Hro (Hctx & Hresv & Hcl) Hfuel".
+      iApply ("Hcl" $! rs3 with "[%] Hrw Hro Hctx Hresv Hfuel [$IH $Hkc]").
       exact (uv_tail_of RS rs2 rs3 Hag).
   Qed.
 

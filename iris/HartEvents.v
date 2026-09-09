@@ -415,6 +415,7 @@ Section events.
     rewrite Hg.
     iLöb as "IH".
     iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
+    { exact I. }
     iIntros (σ oth img log tv itv V) "_ %Htv %Hitv Hσ Hiv Htso".
     destruct (decide (footprint (Interface.WriteReq.pa req) n ## oth))
       as [Hfree|Hblocked].
@@ -508,6 +509,7 @@ Section events.
        every frag value *)
     iLöb as "IH" forall (rr).
     iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
+    { exact I. }
     iIntros (σ oth img log tv itv V) "_ %Htv %Hitv Hσ Hiv Htso".
     destruct (decide (footprint (Interface.ReadReq.pa req) n ## oth))
       as [Hfree|Hblocked].
@@ -613,6 +615,7 @@ Section events.
     iLöb as "IH".
     iApply (wp_hart_step_resv _ (Some (snap_of (Interface.WriteReq.pa req) n w))
               with "Hcert Hfrag").
+    { exact I. }
     iIntros (σ oth img log tv itv V) "%Hok %Htv %Hitv Hσ Hiv Htso".
     pose proof (snap_of_read_bytes _ _ _ _ Hn (Hok _ eq_refl)) as Hrb.
     destruct (decide (footprint (Interface.WriteReq.pa req) n ## oth))
@@ -740,6 +743,7 @@ Section events.
       by (rewrite Hm; exact (HC _ (Interface.MemWrite n req) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
+    { exact I. }
     iIntros (σ oth img log tv itv V) "_ %Htv %Hitv Hσ Hiv Htso".
     iMod ("H" $! σ with "Hσ") as (d') "[%Hdw Hk]".
     iModIntro. iExists (C (K (inl None))), (MState σ.(sregs) σ.(mem) d'),

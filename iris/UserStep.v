@@ -511,7 +511,7 @@ Section UserWaitClose.
     (R_bitvector_32 mcounteren) ↦ᵣ□ mcenv -∗
     (R_bitvector_32 scounteren) ↦ᵣ□ scenv -∗ mhpmcounter ↦ᵣ□ hpm -∗
     hreg_frame rs3 u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rs3 u_Dro -∗
-    resv_any cpu_id -∗ pt_claims 2 t -∗ bytes_own mm -∗
+    resv_any cpu_id -∗ fuel_frag cpu_id Any -∗ pt_claims 2 t -∗ bytes_own mm -∗
     (∀ (t' : ptree) (mm' : PtBytes.pamap) (tlbvec' : type_of_register tlb),
        ⌜u_mem_step pt t t' mm mm'⌝ -∗
        ⌜tlb_ok_pt (mword_of_int 0) t' tlbvec'⌝ -∗
@@ -522,7 +522,7 @@ Section UserWaitClose.
     intros Hhok Hmsok Hlock Lhs Lpriv Lms Lpc Lnpc Lstvec Lmie Lmdl Lmenv
       Lsatp Lpcfg Lpaddr Ltlb Htlbok Hwf.
     iIntros "Hpmp #Hmedl #Hsenv #Hmste #Hsste #Hmcen #Hscen #Hhpm
-             Hrw Hro Hresv Hclaims Hbytes Hclose Hrut".
+             Hrw Hro Hresv Hfuel Hclaims Hbytes Hclose Hrut".
     iDestruct (u_frames_elim rs3 (uc_dqc C) hs3 ms3
                  (register_lookup (R_bitvector_64 scause) rs3)
                  (register_lookup (R_bitvector_64 stval) rs3)
@@ -574,9 +574,9 @@ Section UserWaitClose.
     iSplitR; [ iPureIntro; exact Hmsok |].
     iSplitR; [ iPureIntro; exact Hlock |].
     iSplitL "Hhs Hpriv Hms Hsc Hstval Hsepc HPC HnPC Hgpr Hminstret Hmincr
-             Hmcycle Hmtime Hmip Hresv".
+             Hmcycle Hmtime Hmip Hresv Hfuel".
     { rewrite /user_regs /u_regs /minstret_res /clock_res.
-      iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc HPC HnPC Hgpr Hresv".
+      iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc HPC HnPC Hgpr Hresv Hfuel".
       iSplitL "Hminstret Hmincr".
       - iExists _, _, _, _. iFrame "Hminstret Hmincr Hmcnt Hmicfg".
       - iExists _, _, _. iFrame "Hmcycle Hmtime Hmip". }
@@ -618,7 +618,7 @@ Section UserStepWaitArm.
     (* ---- take the three bundles apart ---- *)
     rewrite /user_regs u_regs_open.
     iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & HPC & HnPC
-                           & Hgpr & Hmr & Hcr & Hresv)".
+                           & Hgpr & Hmr & Hcr & Hresv & Hfuel)".
     iDestruct "Hmr" as (mst mi mc micfg) "(Hminstret & Hmincr & #Hmcnt & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hmcycle & Hmtime & Hmip)".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & #Hmedl & Hmenv & #Hsenv &
@@ -666,8 +666,8 @@ Section UserStepWaitArm.
               u_w_cy u_w_ti u_w_ip u_in_priv u_in_hart u_in_mc u_in_micfg
               u_w_mi u_in_mi u_w_ms u_in_ms u_w_PC u_in_PC u_in_nPC
               (eq_refl : register_lookup hart_state RS = HART_WAITING (wr, ib))
-              with "Hcert Hresv Hrw Hro [//] [-]").
-    iNext. iIntros (rs3) "(%rsP & %Hwp & %Hag) Hrw Hro Hresv _".
+              with "Hcert Hresv Hfuel Hrw Hro [//] [-]").
+    iNext. iIntros (rs3) "(%rsP & %Hwp & %Hag) Hrw Hro Hresv Hfuel _".
     iApply "Hcont".
     destruct Hwp as [Hstay | (rs' & mi2 & Hwk & ->)].
     - (* ---- STAY: the hart is still waiting, PC and nextPC untouched ---- *)
@@ -696,7 +696,7 @@ Section UserStepWaitArm.
                 ltac:(rewrite (T _ u_in_tlb ltac:(u_notin_clock) eq_refl); reflexivity)
                 Htlbok Hwf
                 with "Hpmpi Hmedl Hsenv Hmste Hsste Hmcen Hscen Hhpm
-                      Hrw Hro Hresv Hclaims Hbytes Hclose Hrut").
+                      Hrw Hro Hresv Hfuel Hclaims Hbytes Hclose Hrut").
     - (* ---- WAKE: hart_state := ACTIVE, PC ticks to nextPC ---- *)
       assert (T : forall r : register, r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
                 register_beq r (R_bitvector_64 minstret) = false ->
@@ -727,7 +727,7 @@ Section UserStepWaitArm.
                 ltac:(rewrite (T _ u_in_tlb ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
                 Htlbok Hwf
                 with "Hpmpi Hmedl Hsenv Hmste Hsste Hmcen Hscen Hhpm
-                      Hrw Hro Hresv Hclaims Hbytes Hclose Hrut").
+                      Hrw Hro Hresv Hfuel Hclaims Hbytes Hclose Hrut").
   Qed.
 
 End UserStepWaitArm.

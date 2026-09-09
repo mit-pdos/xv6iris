@@ -698,12 +698,19 @@ Section InstrBytes.
 
      The name is now too narrow; a rename is a pure token substitution and
      is deliberately left as its own change rather than mixed in here. *)
-  Definition pc_is (x : mword 64) : iProp Σ :=
+  Definition pc_isk (k : fuel_kind) (x : mword 64) : iProp Σ :=
     (PC ↦ᵣ x ∗ nextPC ↦ᵣ x ∗ minstret_res ∗ clock_res ∗
      (* the hart's reservation mirror (design/main-cycle-port.md §3a): at
         whatever the last instruction left -- [None] unless it ended with a
         dangling exclusive read -- and the cycle boundary drops it *)
-     resv_any cpu_id)%I.
+     resv_any cpu_id ∗
+     (* the hart's fuel (claude-notes/projects/liveness.md D3): charged by
+        the cycle boundary's permit and by nothing else.  [Any] outside a
+        liveness client's counted windows, which is every leaf in the tree
+        but the counted twins of the boot chain. *)
+     fuel_frag cpu_id k)%I.
+
+  Definition pc_is (x : mword 64) : iProp Σ := pc_isk Any x.
 
   (* mmode_config: the ambient resources a straight-line M-mode kernel
      instruction reads and preserves -- the persistent [hw_config] and
@@ -847,9 +854,9 @@ Section InstrBytes.
   (* [pc_is]'s [minstret_res], not from [mmode_config].                    *)
   (* ------------------------------------------------------------------ *)
   Lemma mm_frames_intro (dq : dfrac) (pc : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) :
-    mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pc_is pc -∗
-    hw_config ∗ resv_any cpu_id ∗
+      (pmpcfg0 : type_of_register pmpcfg_n) (k : fuel_kind) :
+    mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pc_isk k pc -∗
+    hw_config ∗ resv_any cpu_id ∗ fuel_frag cpu_id k ∗
     ∃ (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
       (pmar0 : list PMA_Region) (elp0 : type_of_register elp),
@@ -875,7 +882,7 @@ Section InstrBytes.
     iIntros "Hmm Hpmpc Hpc".
     iDestruct "Hmm" as "(#Hhw & Hhs & Hpriv & Hmst)".
     iDestruct "Hmst" as (mst0) "(Hmstatus & %HmIE & %HMPRV & %HSXL & %HKF)".
-    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv & Hfuel)".
     iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -883,7 +890,7 @@ Section InstrBytes.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmS & %HmC &
         %HmU & %HmM & %Hpmaall & %Hsec1 & %Hsec2 & %Helpnp & %HmA &
         %Hmisaval & %Hsecval & _)".
-    iFrame "Hhw Hresv".
+    iFrame "Hhw Hresv Hfuel".
     iExists ms, bmi, cy, ti, ip, mst0, mc, micfg, misa0, mseccfg0,
             (mword_of_int 0 : mword 64), pmar0, elp0.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
@@ -998,22 +1005,23 @@ Section InstrBytes.
       (pcfg : type_of_register pmpcfg_n)
       (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
-      (pmar0 : list PMA_Region) (elp0 : type_of_register elp) :
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp) (k : fuel_kind) :
     eq_vec (_get_Mstatus_MIE mst0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
     _get_Mstatus_SXL mst0 = 'b"10" ->
     mstatus_kernel_facts mst0 ->
     hw_config -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id k -∗
     hreg_frame (mm_rs npc npc ms bmi cy ti ip mst0 pcfg mc micfg misa0
                   mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
     hreg_frame_ro (mm_Df dq)
       (mm_rs npc npc ms bmi cy ti ip mst0 pcfg mc micfg misa0
          mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
-    mmode_config dq ∗ pmpcfg_n ↦ᵣ{ dq } pcfg ∗ pc_is npc.
+    mmode_config dq ∗ pmpcfg_n ↦ᵣ{ dq } pcfg ∗ pc_isk k npc.
   Proof.
     intros HmIE HMPRV HSXL HKF.
-    iIntros "#Hhw Hresv Hrw Hro".
+    iIntros "#Hhw Hresv Hfuel Hrw Hro".
     rewrite mm_rw_split mm_ro_split.
     rewrite mm_rs_PC mm_rs_nPC mm_rs_ms mm_rs_mi mm_rs_cy mm_rs_ti mm_rs_ip.
     rewrite mm_rs_priv mm_rs_mst mm_rs_hart mm_rs_pcfg mm_rs_mc
@@ -1024,8 +1032,8 @@ Section InstrBytes.
     iSplitL "Hhs Hpriv Hmst".
     { iFrame "Hhw Hhs Hpriv". iExists mst0. by iFrame "Hmst". }
     iFrame "Hpcfg".
-    rewrite /pc_is /minstret_res /clock_res.
-    iFrame "HPC HnPC Hresv".
+    rewrite /pc_isk /minstret_res /clock_res.
+    iFrame "HPC HnPC Hresv Hfuel".
     iSplitL "Hms Hmi".
     - iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg".
     - iExists cy, ti, ip. by iFrame.

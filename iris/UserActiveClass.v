@@ -340,12 +340,12 @@ Section UserActiveClass.
     u_mem_wf pt t mm ->
     u_open C pt t mm usatp pcfg paddr mcenv scenv hpm -∗
     hreg_frame rs3 u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rs3 u_Dro -∗
-    resv_any cpu_id -∗ Rut pt -∗
+    resv_any cpu_id -∗ fuel_frag cpu_id Any -∗ Rut pt -∗
     user_trap_frame C pt Rut.
   Proof.
     intros Hmsok Lhs Lpriv Lpc Lnpc Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr
       Ltlb Htlbok Hwf.
-    iIntros "Hopen Hrw Hro Hresv Hrut".
+    iIntros "Hopen Hrw Hro Hresv Hfuel Hrut".
     rewrite /u_open.
     iDestruct "Hopen" as "(Hpmp & #Hmedl & #Hsenv & #Hmste & #Hsste &
                            #Hmcen & #Hscen & #Hhpm & #Hclaims & Hbytes & Hclose)".
@@ -396,12 +396,12 @@ Section UserActiveClass.
            Hsatp & Htlb & Hpcfg & Hpaddr)".
     iApply (user_trap_frame_intro C pt Rut _ _ _ _ (u_regfile rs3) Hmsok
               with "Hhs Hpriv Hms Hsc Hstval Hsepc
-                    [HPC HnPC Hresv Hminstret Hmincr Hmcycle Hmtime Hmip]
+                    [HPC HnPC Hresv Hfuel Hminstret Hmincr Hmcycle Hmtime Hmip]
                     Hgpr [Hpmp Hbytes Hclose Hsatp Htlb Hpcfg Hpaddr]
                     [Hstvec Hmie Hmdl Hmenv] Hrut").
     - (* pc_is at the handler base *)
-      rewrite /pc_is /minstret_res /clock_res.
-      iFrame "HPC HnPC Hresv".
+      rewrite /pc_is /pc_isk /minstret_res /clock_res.
+      iFrame "HPC HnPC Hresv Hfuel".
       iSplitL "Hminstret Hmincr".
       + iExists _, _, _, _. iFrame "Hminstret Hmincr Hmcnt Hmicfg".
       + iExists _, _, _. iFrame "Hmcycle Hmtime Hmip".
@@ -542,7 +542,7 @@ Section UserActiveClass.
       Htlbok Hwf.
     iIntros "Hresv Hopen Hrut".
     rewrite /u_step_psi. iFrame "Hresv".
-    iIntros (rs3) "%Htp Hrw Hro Hresv Hk".
+    iIntros (rs3) "%Htp Hrw Hro Hresv Hfuel Hk".
     pose proof (u_tail_of rs1 rs2 rs3 Htp) as Htail.
     assert (T : forall r : register, r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
               register_beq r (R_bitvector_64 minstret) = false ->
@@ -577,7 +577,7 @@ Section UserActiveClass.
                 ltac:(rewrite (T _ u_in_tlb ltac:(u_notin_clock) eq_refl eq_refl eq_refl); exact Ltlb)
                 Htlbok Hwf
                 with "Hpmp Hmedl Hsenv Hmste Hsste Hmcen Hscen Hhpm
-                      Hrw Hro Hresv Hclaims Hbytes Hclose Hrut").
+                      Hrw Hro Hresv Hfuel Hclaims Hbytes Hclose Hrut").
     - iApply (u_close_inv C pt Rut t mm usatp tlbvec pcfg paddr
                 mcenv scenv hpm rs3 (HART_WAITING (wr, ib))
                 (register_lookup (R_bitvector_64 mstatus) rs2)
@@ -598,7 +598,7 @@ Section UserActiveClass.
                 ltac:(rewrite (T _ u_in_tlb ltac:(u_notin_clock) eq_refl eq_refl eq_refl); exact Ltlb)
                 Htlbok Hwf
                 with "Hpmp Hmedl Hsenv Hmste Hsste Hmcen Hscen Hhpm
-                      Hrw Hro Hresv Hclaims Hbytes Hclose Hrut").
+                      Hrw Hro Hresv Hfuel Hclaims Hbytes Hclose Hrut").
   Qed.
 
 
@@ -635,7 +635,7 @@ Section UserActiveClass.
       Htlbok Hwf.
     iIntros "Hresv Hopen Hrut".
     rewrite /u_step_psi. iFrame "Hresv".
-    iIntros (rs3) "%Htp Hrw Hro Hresv Hk".
+    iIntros (rs3) "%Htp Hrw Hro Hresv Hfuel Hk".
     pose proof (u_tail_of rs1 rs2 rs3 Htp) as Htail.
     assert (T : forall r : register, r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
               register_beq r (R_bitvector_64 minstret) = false ->
@@ -663,7 +663,7 @@ Section UserActiveClass.
               ltac:(rewrite (T _ u_in_paddr ltac:(u_notin_clock) eq_refl eq_refl eq_refl); exact Lpaddr)
               ltac:(rewrite (T _ u_in_tlb ltac:(u_notin_clock) eq_refl eq_refl eq_refl); exact Ltlb)
               Htlbok Hwf
-              with "Hopen Hrw Hro Hresv Hrut").
+              with "Hopen Hrw Hro Hresv Hfuel Hrut").
   Qed.
 
 

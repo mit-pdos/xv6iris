@@ -438,38 +438,40 @@ Section WfiWait.
     register_lookup hart_state rs = HART_WAITING (WAIT_WFI, ib) ->
     gen_cert -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame rs wfi_Drw -∗
     hreg_frame_ro (s_Df (DfracOwn 1)) rs wfi_Dro -∗
     Psi -∗
     (∀ rs3 : regstate, ⌜wfi_wake rs rs3⌝ -∗
        hreg_frame rs3 wfi_Drw -∗
        hreg_frame_ro (s_Df (DfracOwn 1)) rs3 wfi_Dro -∗
-       resv_any cpu_id -∗ Psi -∗ WP (Loop : expr riscv_lang)) -∗
+       resv_any cpu_id -∗ fuel_frag cpu_id Any -∗ Psi -∗
+       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hhart) "#Hcert Hany Hrw Hro HPsi Hcont".
-    iRevert "Hany Hrw Hro HPsi Hcont". iRevert (rs Hhart).
+    iIntros (Hhart) "#Hcert Hany Hfuel Hrw Hro HPsi Hcont".
+    iRevert "Hany Hfuel Hrw Hro HPsi Hcont". iRevert (rs Hhart).
     iLöb as "IH".
-    iIntros (rs Hhart) "Hany Hrw Hro HPsi Hcont".
+    iIntros (rs Hhart) "Hany Hfuel Hrw Hro HPsi Hcont".
     iApply (swp_exec_step_waiting wfi_Dr wfi_Dw wfi_Drw wfi_Dro
               (s_Df (DfracOwn 1)) rs WAIT_WFI ib Psi
               wfi_disj wfi_Dr_in wfi_Dw_in wfi_Dr_mip wfi_Dr_mie wfi_Dw_hart
               wfi_w_cy wfi_w_ti wfi_w_ip wfi_in_priv wfi_in_hart wfi_in_mc
               wfi_in_micfg wfi_w_mi wfi_in_mi wfi_w_ms wfi_in_ms wfi_w_PC
               wfi_in_PC wfi_in_nPC Hhart
-              with "Hcert Hany Hrw Hro HPsi [Hcont]").
-    iNext. iIntros (rs3) "%Hag Hrw Hro Hany HPsi".
+              with "Hcert Hany Hfuel Hrw Hro HPsi [Hcont]").
+    iNext. iIntros (rs3) "%Hag Hrw Hro Hany Hfuel HPsi".
     destruct Hag as (rsP & Hwp & Hag3).
     destruct (wfi_wait_cases ib rs rsP rs3 Hhart Hwp Hag3) as [Hstay | Hwake].
     - (* ---- STUTTER: back into the loop at the landing file ---- *)
       pose proof Hstay as Hstay'. destruct Hstay' as (Hhart3 & _ & _).
-      iApply ("IH" $! rs3 with "[%] Hany Hrw Hro HPsi [Hcont]").
+      iApply ("IH" $! rs3 with "[%] Hany Hfuel Hrw Hro HPsi [Hcont]").
       { exact Hhart3. }
-      iIntros (rs4) "%Hw4 Hrw Hro Hany HPsi".
-      iApply ("Hcont" $! rs4 with "[%] Hrw Hro Hany HPsi").
+      iIntros (rs4) "%Hw4 Hrw Hro Hany Hfuel HPsi".
+      iApply ("Hcont" $! rs4 with "[%] Hrw Hro Hany Hfuel HPsi").
       exact (wfi_wake_trans ib rs rs3 rs4 Hstay Hw4).
     - (* ---- WAKE: the parked wfi retires at nextPC ---- *)
-      iApply ("Hcont" $! rs3 with "[%] Hrw Hro Hany HPsi"). exact Hwake.
+      iApply ("Hcont" $! rs3 with "[%] Hrw Hro Hany Hfuel HPsi"). exact Hwake.
   Qed.
 
 End WfiWait.
@@ -1073,7 +1075,7 @@ Section WfiLeaf.
     iDestruct (ghost_var_agree with "Hhalf Hcnt") as %Hb0.
     assert (HSIE : eq_vec (_get_Mstatus_SIE mst0) ('b"1") = false)
       by (rewrite Hb0; vm_compute; reflexivity).
-    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv & Hfuel)".
     iDestruct "Hmr" as (msr bmi mc micfg) "(Hmsr & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -1152,7 +1154,7 @@ Section WfiLeaf.
                     exact (s_pre_agree pc msr bmi cy ti ip mst0 pcfg paddr mc
                              micfg misa0 mseccfg0 (mword_of_int 0) pmar0 elp0
                              satp0 MIE_S mdv0 MENVCFG_S tlbv))
-              with "Hcert Hresv Hrw Hro [Hfile Hcnt Hhalf Htie Hrest Hres]
+              with "Hcert Hresv Hfuel Hrw Hro [Hfile Hcnt Hhalf Htie Hrest Hres]
                     [Hcont Hclose]").
     - (* ---------------- THE ENTER STEP'S BODY ---------------- *)
       iIntros "Hfrag Hrw Hro".
@@ -1243,7 +1245,7 @@ Section WfiLeaf.
       iCombine "Hrw Hro" as "Hf". iEval (rewrite -wfi_frames_s) in "Hf".
       iDestruct "Hf" as "[$ $]". iExact "HR".
     - (* ---------------- THE WAIT PHASE AND THE WAKE ---------------- *)
-      iNext. iIntros (rs3 rs2) "%Hpost Hrw Hro HPsi".
+      iNext. iIntros (rs3 rs2) "%Hpost Hrw Hro HPsi Hfuel".
       destruct Hpost as (rsP & Htsf & Hag3).
       destruct Htsf as (st & (Hst & (tv & Hrs2)) & Hlast).
       destruct Hst as (w0 & ->). cbn [tsf_post] in Hlast.
@@ -1259,9 +1261,10 @@ Section WfiLeaf.
                  sret_tie mst0 ∗ sie_cap_rest kt m n b p ∗
                  strans_res_at satp0 (register_lookup tlb rs2))%I
                 rs3 Hhart3
-                with "Hcert Hany Hrw Hro [$Hfile $Hcnt $Hhalf $Htie $Hrest $HRes]
+                with "Hcert Hany Hfuel Hrw Hro
+                      [$Hfile $Hcnt $Hhalf $Htie $Hrest $HRes]
                       [Hcont Hclose]").
-      iIntros (rs4) "%Hwake Hrw Hro Hany
+      iIntros (rs4) "%Hwake Hrw Hro Hany Hfuel
                      (Hfile & Hcnt & Hhalf & Htie & Hrest & HRes)".
       (* ---- the landing tower, cell by cell ---- *)
       pose proof (wfi_land_PC pc msr (minstret_inc_flag mc micfg Supervisor)
@@ -1302,7 +1305,7 @@ Section WfiLeaf.
       (* ---- and the bundles back ---- *)
       iApply ("Hcont" with "[Hhs Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv Hsatp
                              Htlb Hpcfg Hpaddr HRes Hrest Hfile Hclose] Hcnt
-                            [HPC HnPC Hmsr Hmi Hcy Hti Hip Hany]").
+                            [HPC HnPC Hmsr Hmi Hcy Hti Hip Hany Hfuel]").
       + iApply (sie_cap_gpr_join with "Hhs [Hpriv Hms Hhalf Htie Hmie Hmdl
                                             Hmenv] [Hsatp Htlb Hpcfg Hpaddr
                                             HRes Hrest Hclose] Hfile").
@@ -1317,7 +1320,7 @@ Section WfiLeaf.
           iEval (rewrite (irrelevant_register_set (tlb : register)
                             (R_bitvector_64 nextPC : register) _ _ eq_refl)
                  s_rs_tlb) in "HRes". iExact "HRes".
-      + rewrite /pc_is. iFrame "HPC HnPC Hany".
+      + rewrite /pc_is /pc_isk. iFrame "HPC HnPC Hany Hfuel".
         iSplitL "Hmsr Hmi".
         { iExists (register_lookup (R_bitvector_64 minstret) rs4),
                   (register_lookup (R_bool minstret_increment) rs4), mc, micfg.

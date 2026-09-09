@@ -295,16 +295,38 @@ Section swp.
      the whole-cycle rule of the pre-port semantics, restated over the
      per-node language.  The ∀-over-[tick] is the machine's choice, which
      is why it is here and not inside a leaf. *)
-  Lemma swp_loop (rr : option resv) :
+  (* Generic in the fuel pair (liveness.md D4): the boundary charges the
+     hart's fuel through the client's [cycle_permit]; the uncounted form
+     below is this at [Any]/[Any] with [gen_cert]'s own permit. *)
+  Lemma swp_loop_k (rr : option resv) (k k' : fuel_kind) :
     gen_cert -∗
+    cycle_permit cpu_id k k' -∗
     resv_frag cpu_id rr -∗
+    fuel_frag cpu_id k -∗
     ▷ (∀ tick : bool,
-         resv_frag cpu_id None -∗
+         resv_frag cpu_id None -∗ fuel_frag cpu_id k' -∗
          swp (riscv_step tick) (fun _ => WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcert Hfrag H". iApply (wp_hart_restart rr with "Hcert Hfrag").
-    iNext. iIntros (tick) "Hfrag". iApply swp_wp_loop. iApply ("H" with "Hfrag").
+    iIntros "#Hcert #Hperm Hfrag Hfuel H".
+    iApply (wp_hart_restart_k rr k k' with "Hcert Hperm Hfrag Hfuel").
+    iNext. iIntros (tick) "Hfrag Hfuel". iApply swp_wp_loop.
+    iApply ("H" with "Hfrag Hfuel").
+  Qed.
+
+  Lemma swp_loop (rr : option resv) :
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    fuel_frag cpu_id Any -∗
+    ▷ (∀ tick : bool,
+         resv_frag cpu_id None -∗ fuel_frag cpu_id Any -∗
+         swp (riscv_step tick) (fun _ => WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "#Hcert Hfrag Hfuel H".
+    iApply (wp_hart_restart rr with "Hcert Hfrag Hfuel").
+    iNext. iIntros (tick) "Hfrag Hfuel". iApply swp_wp_loop.
+    iApply ("H" with "Hfrag Hfuel").
   Qed.
 
   (* ---- modalities: [swp] is closed under everything WP is ---- *)

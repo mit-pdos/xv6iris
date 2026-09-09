@@ -349,6 +349,7 @@ Section stepany.
        instruction left, handed to the body at [None]; the body returns it
        inside [Psi] if the caller wants it back *)
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame rs1 Drw -∗
     hreg_frame_ro Df rs1 Dro -∗
     (resv_frag cpu_id None -∗
@@ -370,20 +371,22 @@ Section stepany.
             reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs3
               (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 Drw -∗ hreg_frame_ro Df rs3 Dro -∗ Psi -∗
+         fuel_frag cpu_id Any -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hdisj HWcy HWti HWip HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
       HWpc HDpc HDnpc Hhart HQhart HQmi Hpre.
-    iIntros "#Hcert Hfrag Hrw Hro Hbody Hcont".
+    iIntros "#Hcert Hfrag Hfuel Hrw Hro Hbody Hcont".
     iApply (wp_loop_cycle Drw Dro Df
               (fun rsx => exists (rs2 : regstate)
                             (mi : SailStdpp.Values.mword 64),
                  Q rs2 /\ rsx = wrap_post rs2 mi)
-              Psi Hdisj HWcy HWti HWip with "Hcert Hfrag [Hrw Hro Hbody] [Hcont]").
-    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro HPsi".
+              Psi Hdisj HWcy HWti HWip
+              with "Hcert Hfrag Hfuel [Hrw Hro Hbody] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro HPsi Hfuel".
         destruct Hag as (rsP & (rs2 & mi & HQ & ->) & Hag).
-        iApply ("Hcont" with "[%] Hrw Hro HPsi").
+        iApply ("Hcont" with "[%] Hrw Hro HPsi Hfuel").
         exists rs2, mi. split; [exact HQ | exact Hag]. }
     iNext. iIntros "Hfrag".
     iApply (swp_mono with "[] [-]");
@@ -630,6 +633,7 @@ Section stepany.
        instruction left, handed to the body at [None]; the body returns it
        inside [Psi] if the caller wants it back *)
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame rs1 Drw -∗
     hreg_frame_ro Df rs1 Dro -∗
     (* UNDER A LATER.  The body runs at the NEXT language step -- the cycle's
@@ -655,24 +659,26 @@ Section stepany.
          ⌜Q rs2 /\
           reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs3 (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 Drw -∗ hreg_frame_ro Df rs3 Dro -∗ Psi rs2 -∗
+         fuel_frag cpu_id Any -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hdisj HWcy HWti HWip HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
       HWpc HDpc HDnpc Hhart HQhart HQmi Hpre.
-    iIntros "#Hcert Hfrag Hrw Hro Hbody Hcont".
+    iIntros "#Hcert Hfrag Hfuel Hrw Hro Hbody Hcont".
     iApply (wp_loop_cycle_ex Drw Dro Df
               (fun rsx => exists (rs2 : regstate)
                             (mi : SailStdpp.Values.mword 64),
                  Q rs2 /\ rsx = wrap_post rs2 mi)
               (fun rsx => ∃ (rs2 : regstate) (mi : SailStdpp.Values.mword 64),
                  ⌜Q rs2 /\ rsx = wrap_post rs2 mi⌝ ∗ Psi rs2)%I
-              Hdisj HWcy HWti HWip with "Hcert Hfrag [Hrw Hro Hbody] [Hcont]").
-    2:{ iNext. iIntros (rs3 rsP) "%Hag Hrw Hro HPsi".
+              Hdisj HWcy HWti HWip
+              with "Hcert Hfrag Hfuel [Hrw Hro Hbody] [Hcont]").
+    2:{ iNext. iIntros (rs3 rsP) "%Hag Hrw Hro HPsi Hfuel".
         destruct Hag as (_ & Hag).
         iDestruct "HPsi" as (rs2 mi) "[%HQe HPsi]".
         destruct HQe as [HQ ->].
-        iApply ("Hcont" with "[%] Hrw Hro HPsi").
+        iApply ("Hcont" with "[%] Hrw Hro HPsi Hfuel").
         split; [exact HQ | exact Hag]. }
     iNext. iIntros "Hfrag".
     iApply (swp_mono with "[] [-]");

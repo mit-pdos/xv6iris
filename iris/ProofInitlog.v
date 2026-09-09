@@ -2138,7 +2138,7 @@ Section ProofInitlog.
        because custody was installed at birth; the era's picture goes in at
        [lm_install ... i] and comes back at [lm_install ... (S i)]. *)
     { iModIntro. iIntros (i w) "%Hwi %Hlen' Hmi".
-      iDestruct "Hcert" as "(_ & Hstc2 & Hregc2)".
+      iDestruct "Hcert" as "(_ & Hstc2 & Hregc2 & _)".
       assert (Hwsi : (hdr_dec bs_hdr).2 !! i = Some (uint w)).
       { rewrite -(il_W_uint bs_hdr).
         exact (it_map_lookup (il_W bs_hdr ((hdr_dec bs_hdr).1)) i w Hwi). }
@@ -2377,7 +2377,7 @@ Section ProofInitlog.
        and the era's picture is the disk's because it was born so.  There is
        no swap here and nothing re-bases. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
-      iDestruct "Hcert" as "(_ & Hstc & Hregc)".
+      iDestruct "Hcert" as "(_ & Hstc & Hregc & _)".
       iApply (fs_clear_keep_seq_permit cov logstart
                 (lm_install M ((hdr_dec bs_hdr).2)
                    (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1))

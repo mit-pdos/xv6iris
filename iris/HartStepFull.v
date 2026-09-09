@@ -707,6 +707,7 @@ Section stepfull.
     reg_agree_on (Drw ∪ Dro) (wrap_pre rs1) rsA ->
     gen_cert -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame rs1 Drw -∗
     hreg_frame_ro Df rs1 Dro -∗
     (resv_frag cpu_id None -∗
@@ -741,21 +742,22 @@ Section stepfull.
          ⌜∃ rsP : regstate, tsf_post Q rs2 rsP /\
             reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs3 rsP⌝ -∗
          hreg_frame rs3 Drw -∗ hreg_frame_ro Df rs3 Dro -∗ Psi rs2 -∗
+         fuel_frag cpu_id Any -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hdisj HWcy HWti HWip HDpriv HWhart HDhart HDmc HDcfg HWmi HDmi
       HWms HDms HWpc HDpc HDnpc Hhart HQhart HQmi Hpre.
-    iIntros "#Hcert Hfrag Hrw Hro Hbody Hcont".
+    iIntros "#Hcert Hfrag Hfuel Hrw Hro Hbody Hcont".
     iApply (wp_loop_cycle_ex Drw Dro Df
               (fun rsx => exists rs2 : regstate, tsf_post Q rs2 rsx)
               (fun rsx => ∃ rs2 : regstate, ⌜tsf_post Q rs2 rsx⌝ ∗ Psi rs2)%I
               Hdisj HWcy HWti HWip
-              with "Hcert Hfrag [Hrw Hro Hbody] [Hcont]").
-    2:{ iNext. iIntros (rs3 rsP) "%Hag Hrw Hro HPsi".
+              with "Hcert Hfrag Hfuel [Hrw Hro Hbody] [Hcont]").
+    2:{ iNext. iIntros (rs3 rsP) "%Hag Hrw Hro HPsi Hfuel".
         destruct Hag as (_ & Hag).
         iDestruct "HPsi" as (rs2) "[%Hpost HPsi]".
-        iApply ("Hcont" with "[%] Hrw Hro HPsi").
+        iApply ("Hcont" with "[%] Hrw Hro HPsi Hfuel").
         exists rsP. split; [exact Hpost | exact Hag]. }
     iNext. iIntros "Hfrag".
     iApply (swp_mono with "[] [-]");
@@ -1040,6 +1042,7 @@ Section stepfull.
     register_lookup hart_state rs = HART_WAITING (wr, ib) ->
     gen_cert -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     Psi -∗
@@ -1047,21 +1050,21 @@ Section stepfull.
          ⌜∃ rsP : regstate, wait_post (Drw ∪ Dro) rs rsP /\
             reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs3 rsP⌝ -∗
          hreg_frame rs3 Drw -∗ hreg_frame_ro Df rs3 Dro -∗
-         resv_any cpu_id -∗ Psi -∗
+         resv_any cpu_id -∗ fuel_frag cpu_id Any -∗ Psi -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hdisj HDr HDw Hip Hie Hhs HWcy HWti HWip HDpriv HDhart HDmc HDcfg
       HWmi HDmi HWms HDms HWpc HDpc HDnpc Hhart.
-    iIntros "#Hcert Hany Hrw Hro HPsi Hcont".
+    iIntros "#Hcert Hany Hfuel Hrw Hro HPsi Hcont".
     (* the plain [wp_loop_cycle], not the [_ex] twin: this rule has no body
        obligation, so the rider is a resource the CALLER hands in before the
        step and there is no post-file for it to be keyed on *)
     iApply (wp_loop_cycle Drw Dro Df (wait_post (Drw ∪ Dro) rs)
               (resv_any cpu_id ∗ Psi)%I Hdisj HWcy HWti HWip
-              with "Hcert Hany [Hrw Hro HPsi] [Hcont]").
-    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [Hany HPsi]".
-        iApply ("Hcont" with "[%] Hrw Hro Hany HPsi"). exact Hag. }
+              with "Hcert Hany Hfuel [Hrw Hro HPsi] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [Hany HPsi] Hfuel".
+        iApply ("Hcont" with "[%] Hrw Hro Hany Hfuel HPsi"). exact Hag. }
     iNext. iIntros "Hfr".
     iDestruct (resv_any_intro cpu_id None with "Hfr") as "Hany".
     iApply (swp_try_step_waiting Dr Dw Drw Dro Df rs wr ib Psi Hdisj HDr HDw

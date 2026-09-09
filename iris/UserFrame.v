@@ -920,7 +920,7 @@ Section URegs.
      sepc ↦ᵣ sepc_v ∗
      PC ↦ᵣ va ∗
      nextPC ↦ᵣ va' ∗
-     minstret_res ∗ clock_res ∗ resv_any cpu_id ∗
+     minstret_res ∗ clock_res ∗ resv_any cpu_id ∗ fuel_frag cpu_id Any ∗
      gpr_file g)%I.
 
   Lemma u_regs_pc_is (hs : HartState) (ms sc stv sep va : mword 64)
@@ -929,11 +929,11 @@ Section URegs.
       hart_state ↦ᵣ hs ∗ cur_privilege ↦ᵣ User ∗ mstatus ↦ᵣ ms ∗
       scause ↦ᵣ sc ∗ stval ↦ᵣ stv ∗ sepc ↦ᵣ sep ∗ pc_is va ∗ gpr_file g.
   Proof.
-    rewrite /u_regs /pc_is. iSplit.
+    rewrite /u_regs /pc_is /pc_isk. iSplit.
     - iIntros "(Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & HPC & HnPC & Hmr &
-                Hcr & Hresv & Hg)". iFrame.
+                Hcr & Hresv & Hfuel & Hg)". iFrame.
     - iIntros "(Hhs & Hpriv & Hms & Hsc & Hstv & Hsep &
-                (HPC & HnPC & Hmr & Hcr & Hresv) & Hg)". iFrame.
+                (HPC & HnPC & Hmr & Hcr & Hresv & Hfuel) & Hg)". iFrame.
   Qed.
 
   (* unpacked, for the frames bridge *)
@@ -948,13 +948,13 @@ Section URegs.
          (R_bitvector_32 mcountinhibit) ↦ᵣ□ mc ∗
          (R_bitvector_64 minstretcfg) ↦ᵣ□ micfg) ∗
       (∃ cy ti ip : mword 64, mcycle ↦ᵣ cy ∗ mtime ↦ᵣ ti ∗ mip ↦ᵣ ip) ∗
-      resv_any cpu_id.
+      resv_any cpu_id ∗ fuel_frag cpu_id Any.
   Proof.
     rewrite /u_regs /minstret_res /clock_res. iSplit.
     - iIntros "(Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & HPC & HnPC & Hmr &
-                Hcr & Hresv & Hg)". iFrame.
+                Hcr & Hresv & Hfuel & Hg)". iFrame.
     - iIntros "(Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & HPC & HnPC & Hg &
-                Hmr & Hcr & Hresv)". iFrame.
+                Hmr & Hcr & Hresv & Hfuel)". iFrame.
   Qed.
 
 End URegs.

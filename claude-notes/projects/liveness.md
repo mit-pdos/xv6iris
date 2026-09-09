@@ -662,6 +662,107 @@ So the pilot targets are from-the-start properties, and the first one
   This is the proposal's "re-run the script" without duplicating ~30
   lemmas.
 
+### 7.3a Step 1 as built (checkpoint 2026-09-09, tree does NOT build to the top yet)
+
+What is implemented and compiles on the VM (each wave validated with
+`make -k <targets>` up to and including the U-mode tier):
+
+- D1: `RiscvLang.mobs` has `ObsCycle c pc d`; `node_obs cpu rs d m` is the
+  hart arm's event (`Ret` only); `hart_silent`/`node_obs_silent`.  The hart
+  arm's `κ` moved INSIDE the live/corpse disjunction (a dead hart at `Ret`
+  must still be silent), so `prim_step_hart_inv` and every destruct of the
+  hart arm changed shape: `(gen & cpu & m & -> & _ & [ (Hlive & Hκ & Hn) |
+  (_ & -> & _ & ->) ])`.  `prim_step_hart_restart` now emits the event.
+  `ObsTrace`: `is_io ObsCycle = true`, `obs_step` accepts it while on,
+  `node_obs_io/_wire/_boots`, and `obs_wf_live h gen d` (what a live hart's
+  rule tells its callback: shape, boot count `S gen`, wire tie).
+- D2/D3/D4 in `RiscvPtsto`: `fuel_kind := Any | Exact b`, `era_fuel_name`,
+  `riscvF_fuelGS`, `cpu_map` (generic; `resv_map := cpu_map`, the
+  `Insert` instances are per value type so `cpu_map_insert` takes the
+  pointwise fact), `fuel_auth_at/fuel_frag_at/fuel_frag` + agree/update,
+  `mstate_interp_at`, `cycle_permit_at E gen c k k'` (lends the hart's
+  `mstate_interp_at`, `obs_auth h`, `⌜obs_wf_live⌝`; fuel `k → k'`; base
+  layer knows no fuel arithmetic), `cycle_permit_any(_at)`, and `gen_cert`
+  is now FOUR conjuncts (+ `cycle_permit_any`) -- every
+  `#(Hborn & Hstarted & Hrege)` destruct gained `& _`.
+- `RiscvExec`: `wp_hart_step_obs` (general node, frag form, obs threaded
+  like `wp_uart_step`), `wp_hart_step_resv` derived with a `hart_silent m`
+  premise (4 call sites got `{ exact I. }`), `wp_hart_step` derives silence
+  from its `Hpres` premise (a `Ret` node cannot preserve a `Some`
+  reservation), `wp_hart_restart_k rr k k'` (takes `cycle_permit cpu_id k
+  k'`, runs it at ⊤ before the mask drop), `wp_hart_restart` at `Any` with
+  `gen_cert`'s permit.  `iDestruct "Hcert"` CONSUMES the intuitionistic
+  hyp -- use `iPoseProof "Hcert" as "(_ & _ & _ & #Hany)"`.
+- `InstrBytes.pc_isk k x` (fuel frag LAST), `pc_is := pc_isk Any`.
+  `mm_frames_intro/elim` generic in `k` (trailing explicit arg).
+- The fuel FRAGMENT is threaded through every cycle-level engine as a
+  separate resource: engines take `fuel_frag cpu_id Any -∗` right after
+  `resv_any cpu_id -∗` and hand it to the CONTINUATION (never the body)
+  as `… -∗ fuel_frag cpu_id Any -∗ WP Loop`.  Done in: HartSwp
+  (`swp_loop_k`/`swp_loop`), HartMCycle (`wp_loop_cycle{,_ex}{,_k}`,
+  `swp_exec_step_decode_execute{,_k}` -- the `_k` has implicit `{k k'}`),
+  HartStepAny ×2, HartStepFull ×2, WpInstr (`mm_cycle_w`/`wp_instr_exw`
+  generic with implicit `{k k'}` + permit first wand; `mm_cycle`,
+  `wp_instr_ex`, `wp_instr`, `wp_instr_w` at Any; NEW `wp_instr_k`,
+  `wp_instr_w_k`), WpInstrMip, WpInstrConfig (`mc_frames_intro/elim` k,
+  `mc_cycle` generic, NEW `wp_instr_config_k`), SmodeCorePt
+  (`spt_frames_intro{,_b}`, `spt_frames_elim{,_b}`, `spt_cycle{,_b}`,
+  `wp_instr_s_config_regime`), TrampStepPt, WpSmodePtFetch, WpIntrInv,
+  WpSmodeIntr (`swp_loop … Hfuel`, `swp_mono … with "[Hfuel] [-]"`),
+  WpSmodeWfi (`wfi_wait_loop`), UserFrame (`u_regs` carries the frag;
+  `u_regs_pc_is`/`u_regs_open`), UserStep (`u_close_inv`), UserActiveClass
+  (`u_close_trap`), UserStepFull (`u_step_psi`), WpUmodeStep (`uv_psi`,
+  `uv_land_close`, `uv_psi_active/_trap`), UkStep, UkStepGen.  The
+  measured churn: 44 cycle-level statements + 13 `pc_is` open/close
+  sites; leaf-level `resv_any` users (144 statements) are untouched.
+- NEW `iris/CyclePermit.v` (after `RiscvPtsto.v` in `_CoqProject`, NOT
+  yet compiled): `cycle_permit_any_triv` (trivial slot) and
+  `cycle_permit_any_ledger` (a ledger's `□ ∀ h c pc d, R h ={⊤∖↑obsN}=∗
+  R (h ++ [ObsCycle c pc d])`).
+- `RiscvAdequacy` EDITED BUT NOT COMPILED: `riscv_pre_fuelGS`, `riscvΣ`,
+  `boot_fixedGS` (+1 `_`), `power_boot_res … ndisk K0 Mof Rb g'` with the
+  row `[∗ set] c, c ↪[era_fuel_name HE] (K0 c)` after the resv row
+  (unpack indices shift by one; `power_boot_res_lend` regenerated),
+  `wp_power_loop`/`riscv_power_adequacy` take `K0` and TWO hooks
+  `Hoff`/`Hon` in place of `Hobs`; `Hon` runs POST-step (after `Hswap`),
+  receives `era_registered`, `fuel_auth_at HE (fun _ => Any)` and every
+  frag at `Any`, returns the frags at `K0` -- the fuel map is allocated
+  at the constant `Any` (`cpu_map_const` + `big_sepM_gset_to_gmap`), and
+  the client opens windows in the hook.  `obs_pred_at_off/on`,
+  `obs_ledger_at_off/on`; `riscv_trace_adequacy` at `K0 := fun _ => Any`.
+
+STILL TO DO for step 1 (in this order; each is designed, none written):
+
+1. `BootShared`: rename `hart_resv c` to `hart_boundary c := resv_frag c
+   None ∗ fuel_frag c Any` (7 sites); `power_boot_res_unpack` at
+   `(fun _ => Any)` with a new row `[∗ set] c, fuel_frag c Any` after the
+   resv row and the tail spelled as the three rows `gen_born ∗ gen_started
+   ∗ era_registered` (no `/gen_cert` rewrite); `boot_shared_alloc` gains
+   an input wand `cycle_permit_any -∗` and packs `gen_cert` itself
+   (`iSplitR` ×3 then the permit); combine the two families with
+   `iCombine … ; rewrite -big_sepS_sep` before `big_sepS_enum_to_list
+   hart_boundary`; `boot_hart_pre` destructs the pair and passes both to
+   `boot_entry_pre`.
+2. `BootChain.boot_entry_pre`: `fuel_frag cpu_id Any -∗` after the resv
+   frag; `rewrite /pc_is /pc_isk` and frame it (last conjunct).
+3. `SystemAdequacy`: `xv6_boot_era` gets a premise `(⊢ obs_inv -∗
+   cycle_permit_any)` beside `Hperm` and passes the permit into
+   `boot_shared_alloc`; `xv6_power_adequacy_gen` replaces `Hobs` with
+   `Hoff`/`Hon` (raw forms, as in `riscv_power_adequacy` at `K0 := fun _
+   => Any`) and gains `Hcyc : forall (HR : riscvGS Σ) (GEN : GenId), shape
+   -> ⊢ obs_inv -∗ cycle_permit_any` (Hperm's pattern; discharge at the
+   boot entailment next to `apply (Hperm _ gen γ)`); the three callers
+   pass `obs_pred_at_off`/`_on` + `cycle_permit_any_triv` (trivial) or
+   `obs_ledger_at_off/_on` + `cycle_permit_any_ledger` (`xv6_trace_adequacy`
+   gains a `Hcyc` hypothesis on `R`).  `Require Import CyclePermit`.
+4. `App.v`: `xv6_app_adequacy` gains the cycle hook on `app_R`; the
+   trivial corollary supplies it (`iIntros "!>" … "_ _"; by iModIntro`).
+5. Full VM build (`make -f CoqMakefile -j180 -k`), grep `Error`, then
+   `make audit-only`; record the count of edited files as the zero-churn
+   result (it is NOT zero: the fuel fragment costs every cycle engine one
+   wand, see above -- the `pc_is`-carried resource design was right, the
+   claim that only the 13 unfolding sites move was wrong).
+
 ### 7.4 The first target (P1) and its worklist
 
 **P1: from reset, under F-pool for hart 0 and no PowerOff, hart 0 eventually

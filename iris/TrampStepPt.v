@@ -313,6 +313,7 @@ Section SRsPFrames.
       (pcfg1 : type_of_register pmpcfg_n)
       (paddr1 : type_of_register pmpaddr_n) (tv : type_of_register tlb) :
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame (s_rs_p p npc npc ms bmi cy ti ip mstatus1 pcfg1 paddr1 mc micfg
                   misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
       s_Drw -∗
@@ -325,7 +326,7 @@ Section SRsPFrames.
     satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗ pmpaddr_n ↦ᵣ paddr1 ∗
     tlb ↦ᵣ tv ∗ pc_is npc.
   Proof.
-    iIntros "Hresv Hrw Hro".
+    iIntros "Hresv Hfuel Hrw Hro".
     rewrite s_rw_split s_ro_split_mix.
     rewrite s_rs_p_PC s_rs_p_nPC s_rs_p_ms s_rs_p_mi s_rs_p_cy s_rs_p_ti
       s_rs_p_ip s_rs_p_tlb s_rs_p_priv s_rs_p_mst s_rs_p_hart s_rs_p_pcfg
@@ -337,8 +338,8 @@ Section SRsPFrames.
                          #Hmisa & #Hsec & #Hpma & #Hhtif & #Help & #Hsenv &
                          Hsatp & Hmie & Hmdl & Hmenv)".
     iFrame "Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc".
-    rewrite /pc_is /minstret_res /clock_res.
-    iFrame "HPC HnPC Hresv".
+    rewrite /pc_is /pc_isk /minstret_res /clock_res.
+    iFrame "HPC HnPC Hresv Hfuel".
     iSplitL "Hms Hmi".
     - iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg".
     - iExists cy, ti, ip. by iFrame.
@@ -1028,7 +1029,7 @@ Section TrampFetchPt.
     iDestruct (spt_frames_intro dq pc mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg
                  paddr tlbv
                  with "Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
-                       Htlbc Hpc") as "[Hfrag Hfr]".
+                       Htlbc Hpc") as "(Hfrag & Hfuel & Hfr)".
     iDestruct "Hfr" as (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0)
       "(%Hmisaval & %Hpmaall & %Helpnp & Hrw & Hro)".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
@@ -1049,9 +1050,9 @@ Section TrampFetchPt.
                     apply s_rs_p_hart)
               ltac:(intros rs2 (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->);
                     apply s_rs_p_mi)
-              with "Hcert Hfrag Hrw Hro [Hex HRes Htok Hinstr] [Hcont]").
+              with "Hcert Hfrag Hfuel Hrw Hro [Hex HRes Htok Hinstr] [Hcont]").
     2:{ (* ---- the continuation ---- *)
-        iNext. iIntros (rs3 rs2 mi) "[%HQ %Hag] Hrw Hro (HRes & Htok & Hfrag & HRl)".
+        iNext. iIntros (rs3 rs2 mi) "[%HQ %Hag] Hrw Hro (HRes & Htok & Hfrag & HRl) Hfuel".
         destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->).
         iEval (rewrite s_rs_p_tlb) in "HRes".
         iEval (rewrite s_rs_p_nPC s_rs_p_mst s_rs_p_mdl) in "HRl".
@@ -1064,7 +1065,7 @@ Section TrampFetchPt.
         iDestruct (spt_frames_elim_p dq priv1 npc mi
                      (minstret_inc_flag mc micfg Supervisor) _ _ _ mc micfg
                      misa0 mseccfg0 senv0 pmar0 elp0 ms1 satp1 mie1 mdv1
-                     menvcfg1 pcfg1 paddr1 tv with "Hfrag Hrw Hro")
+                     menvcfg1 pcfg1 paddr1 tv with "Hfrag Hfuel Hrw Hro")
           as "(Hhs & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
                Hpaddr & Htlbc & Hpc)".
         iApply ("Hcont" $! npc ms1 mdv1 tv with "Hhs Hpriv Hmst Hmie Hmdl Hmenv

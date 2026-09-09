@@ -4719,6 +4719,7 @@ Section SmodeCorePt.
        = minstret_inc_flag mc micfg Supervisor) ->
     gen_cert -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                   mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
       s_Drw -∗
@@ -4751,11 +4752,12 @@ Section SmodeCorePt.
              (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
          hreg_frame_ro Df rs3 s_Dro -∗ Psi rs2 -∗
+         fuel_frag cpu_id Any -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HQhart HQmi.
-    iIntros "#Hcert Hfrag Hrw Hro Hbody Hcont".
+    iIntros "#Hcert Hfrag Hfuel Hrw Hro Hbody Hcont".
     iApply (swp_exec_step_any_ex s_Drw s_Dro Df
               (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
@@ -4769,7 +4771,7 @@ Section SmodeCorePt.
                     by rewrite s_rs_mc s_rs_micfg s_rs_priv)
               (s_pre_agree pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
-              with "Hcert Hfrag Hrw Hro [Hbody] Hcont").
+              with "Hcert Hfrag Hfuel Hrw Hro [Hbody] Hcont").
     (* [swp_exec_step_any_ex]'s body premise is UNDER A LATER (the body runs
        at the next language step, so a caller may build it from a resource a
        step produces).  Absorbed here rather than threaded: no consumer of
@@ -4834,7 +4836,7 @@ Section SmodeCorePt.
     satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
     tlb ↦ᵣ tlbv -∗
     pc_is pc -∗
-    resv_any cpu_id ∗
+    resv_any cpu_id ∗ fuel_frag cpu_id Any ∗
     ∃ (ms : mword 64) (bmi : bool) (cy ti ip : mword 64) (mc : mword 32)
       (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
       (elp0 : type_of_register elp),
@@ -4849,7 +4851,7 @@ Section SmodeCorePt.
            mseccfg0 senv0 pmar0 elp0 satp0 mie_v mdv0 menvcfg0 tlbv) s_Dro.
   Proof.
     iIntros "#Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc Hpc".
-    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)". iFrame "Hresv".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv & Hfuel)". iFrame "Hresv Hfuel".
     iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -5001,7 +5003,7 @@ Section SmodeCorePt.
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
     pc_is pc -∗
-    resv_any cpu_id ∗
+    resv_any cpu_id ∗ fuel_frag cpu_id Any ∗
     ∃ (ms : mword 64) (bmi : bool) (cy ti ip : mword 64) (mc : mword 32)
       (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
       (elp0 : type_of_register elp),
@@ -5016,7 +5018,7 @@ Section SmodeCorePt.
            mseccfg0 senv0 pmar0 elp0 satp0 mie_v mdv0 menvcfg0 tlbv) s_Dro.
   Proof.
     iIntros "#Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Hpc".
-    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)". iFrame "Hresv".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv & Hfuel)". iFrame "Hresv Hfuel".
     iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -5128,6 +5130,7 @@ Section SmodeCorePt.
       (pcfg1 : type_of_register pmpcfg_n)
       (paddr1 : type_of_register pmpaddr_n) (tv : type_of_register tlb) :
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame (s_rs npc npc ms bmi cy ti ip mstatus1 pcfg1 paddr1 mc micfg
                   misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
       s_Drwb -∗
@@ -5139,7 +5142,7 @@ Section SmodeCorePt.
     mideleg ↦ᵣ{ dq } mdv1 ∗ menvcfg ↦ᵣ{ dq } menvcfg1 ∗
     satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗ pmpaddr_n ↦ᵣ paddr1 ∗ pc_is npc.
   Proof.
-    iIntros "Hresv Hrw Hro".
+    iIntros "Hresv Hfuel Hrw Hro".
     rewrite s_rw_split_b s_ro_split_mix.
     rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip.
     rewrite s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
@@ -5150,8 +5153,8 @@ Section SmodeCorePt.
                          #Hmisa & #Hsec & #Hpma & #Hhtif & #Help & #Hsenv &
                          Hsatp & Hmie & Hmdl & Hmenv)".
     iFrame "Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr".
-    rewrite /pc_is /minstret_res /clock_res.
-    iFrame "HPC HnPC Hresv".
+    rewrite /pc_is /pc_isk /minstret_res /clock_res.
+    iFrame "HPC HnPC Hresv Hfuel".
     iSplitL "Hms Hmi".
     - iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg".
     - iExists cy, ti, ip. by iFrame.
@@ -5171,6 +5174,7 @@ Section SmodeCorePt.
        = minstret_inc_flag mc micfg Supervisor) ->
     gen_cert -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                   mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
       s_Drwb -∗
@@ -5203,11 +5207,12 @@ Section SmodeCorePt.
              (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drwb -∗
          hreg_frame_ro Df rs3 s_Dro -∗ Psi rs2 -∗
+         fuel_frag cpu_id Any -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HQhart HQmi.
-    iIntros "#Hcert Hfrag Hrw Hro Hbody Hcont".
+    iIntros "#Hcert Hfrag Hfuel Hrw Hro Hbody Hcont".
     iApply (swp_exec_step_any_ex s_Drwb s_Dro Df
               (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
@@ -5223,7 +5228,7 @@ Section SmodeCorePt.
                  (s_pre_agree pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0
                     tlbv))
-              with "Hcert Hfrag Hrw Hro [Hbody] Hcont").
+              with "Hcert Hfrag Hfuel Hrw Hro [Hbody] Hcont").
     (* [swp_exec_step_any_ex]'s body premise is UNDER A LATER (the body runs
        at the next language step, so a caller may build it from a resource a
        step produces).  Absorbed here rather than threaded: no consumer of
@@ -5272,6 +5277,7 @@ Section SmodeCorePt.
       (pcfg1 : type_of_register pmpcfg_n)
       (paddr1 : type_of_register pmpaddr_n) (tv : type_of_register tlb) :
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame (s_rs npc npc ms bmi cy ti ip mstatus1 pcfg1 paddr1 mc micfg
                   misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
       s_Drw -∗
@@ -5284,7 +5290,7 @@ Section SmodeCorePt.
     satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗ pmpaddr_n ↦ᵣ paddr1 ∗
     tlb ↦ᵣ tv ∗ pc_is npc.
   Proof.
-    iIntros "Hresv Hrw Hro".
+    iIntros "Hresv Hfuel Hrw Hro".
     rewrite s_rw_split s_ro_split_mix.
     rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
       s_rs_tlb.
@@ -5296,8 +5302,8 @@ Section SmodeCorePt.
                          #Hmisa & #Hsec & #Hpma & #Hhtif & #Help & #Hsenv &
                          Hsatp & Hmie & Hmdl & Hmenv)".
     iFrame "Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc".
-    rewrite /pc_is /minstret_res /clock_res.
-    iFrame "HPC HnPC Hresv".
+    rewrite /pc_is /pc_isk /minstret_res /clock_res.
+    iFrame "HPC HnPC Hresv Hfuel".
     iSplitL "Hms Hmi".
     - iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg".
     - iExists cy, ti, ip. by iFrame.
@@ -5729,7 +5735,7 @@ Section SmodeCorePt.
     iDestruct (spt_frames_intro dq pc mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg
                  paddr tlbv
                  with "Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
-                       Htlbc Hpc") as "[Hfrag Hfr]".
+                       Htlbc Hpc") as "(Hfrag & Hfuel & Hfr)".
     iDestruct "Hfr" as (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0)
       "(%Hmisaval & %Hpmaall & %Helpnp & Hrw & Hro)".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
@@ -5749,9 +5755,9 @@ Section SmodeCorePt.
                     apply s_rs_hart)
               ltac:(intros rs2 (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->);
                     apply s_rs_mi)
-              with "Hcert Hfrag Hrw Hro [Hex HRes Hinstr] [Hcont]").
+              with "Hcert Hfrag Hfuel Hrw Hro [Hex HRes Hinstr] [Hcont]").
     2:{ (* ---- the continuation ---- *)
-        iNext. iIntros (rs3 rs2 mi) "[%HQ %Hag] Hrw Hro (HRes & Hfrag & HRl)".
+        iNext. iIntros (rs3 rs2 mi) "[%HQ %Hag] Hrw Hro (HRes & Hfrag & HRl) Hfuel".
         destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->).
         iEval (rewrite s_rs_tlb) in "HRes".
         iEval (rewrite s_rs_nPC s_rs_mst s_rs_mdl) in "HRl".
@@ -5764,7 +5770,7 @@ Section SmodeCorePt.
         iDestruct (spt_frames_elim dq npc mi
                      (minstret_inc_flag mc micfg Supervisor) _ _ _ mc micfg
                      misa0 mseccfg0 senv0 pmar0 elp0 ms1 satp1 mie1 mdv1
-                     menvcfg1 pcfg1 paddr1 tv with "Hfrag Hrw Hro")
+                     menvcfg1 pcfg1 paddr1 tv with "Hfrag Hfuel Hrw Hro")
           as "(Hhs & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
                Hpaddr & Htlbc & Hpc)".
         iApply ("Hcont" $! npc ms1 mdv1 tv with "Hhs Hpriv Hmst Hmie Hmdl Hmenv

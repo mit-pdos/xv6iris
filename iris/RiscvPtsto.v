@@ -172,6 +172,16 @@ Record log_mirror := MkLogMirror {
   lm_view : Z -> list (bv 8);
 }.
 
+(* THE FUEL KIND of a hart (claude-notes/projects/liveness.md, D3): what
+   the liveness ledger knows about how many instruction cycles the hart
+   may still take before it must reach a declared exit.  [Any] is the
+   uncounted state every hart is in unless a liveness client says
+   otherwise; [Exact b] is a counted window with [b] cycles left.  A
+   ghost-map VALUE, so it is Σ-free and lives beside the era record; the
+   arithmetic on it belongs to the client's permits, never to the base
+   rules ([cycle_permit] below takes the pair of kinds as parameters). *)
+Inductive fuel_kind := Any | Exact (b : nat).
+
 Record riscvEraGS := RiscvEraGS {
   (* one register-map ghost name PER hart.  A [ghost_map] element on
      [cpu_reg_name c] owns a register of hart [c].  The function is total (every
@@ -362,6 +372,14 @@ Record riscvEraGS := RiscvEraGS {
      across interference, so the reservation's SNAPSHOT plus [resv_ok] in
      [era_interp] is what supplies it. *)
   era_resv_name : gname;
+  (* THE PER-HART FUEL LEDGER (liveness.md D3): a ghost map [CPU -> fuel_kind]
+     whose fragment [fuel_frag c k] rides in [InstrBytes.pc_isk] and is
+     charged by the restart rule's permit at every cycle announcement
+     ([ObsCycle]).  Per-era like the reservation mirror and for the same
+     reason: a power cycle resets every window.  The AUTH is the liveness
+     client's, inside its trace predicate -- the base layer never holds it,
+     which is what keeps the ledger a client-side notion. *)
+  era_fuel_name : gname;
   (* THE TSO GHOST NAMES (tso-machine-flip.md par.4), all four PER-ERA --
      the write log and the views die with RAM at a power edge, exactly
      like the reservations; a fresh era re-mints them over the empty
@@ -442,6 +460,9 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      ([riscvEraGS.era_resv_name] above), since reservations do not survive a
      power cycle -- [boot_shape] mints them all at [None]. *)
   riscvF_resvGS :: ghost_mapG Σ CPU (option resv);
+  (* the fuel ledger's class (liveness.md D3); the NAME is per-era
+     ([riscvEraGS.era_fuel_name] above) *)
+  riscvF_fuelGS :: ghost_mapG Σ CPU fuel_kind;
   (* the TSO machine ghosts' functor bundle (TsoGhost.v); the NAMES are
      per-era (the four [era_*_name] fields above) *)
   riscvF_tsomemGS :: tsoMemG Σ;
@@ -658,12 +679,8 @@ Definition disk_dur_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
 Definition era_registered `{!riscvFixedGS Σ} (gen : nat) (E : riscvEraGS) : iProp Σ :=
   gen ↪[riscv_registry_name]□ E.
 
-(* THE CERTIFICATE BUNDLE a generation-[gen_id] thread carries (inside
-   [minstret_inv], so no statement anywhere names it): born + started +
-   its era's registration.  The base rules take it as one persistent
-   premise and case on the current [(ggen, gpow)] against it. *)
-Definition gen_cert `{!riscvGS Σ} `{GEN : GenId} : iProp Σ :=
-  (gen_born gen_id ∗ gen_started gen_id ∗ era_registered gen_id riscv_eraGS)%I.
+(* the certificate bundle a thread carries, [gen_cert], is defined below the
+   cycle permit it now includes (the fuel ledger section). *)
 
 (* ---------------------------------------------------------------------- *)
 (* THE CRASH-SPANNING INVARIANT (claude-notes/design/crash.md).             *)
@@ -2002,41 +2019,65 @@ Definition gregs_interp `{!riscvGS Σ} (gr : CPU -> regstate) : iProp Σ :=
 
 
 (* ---------------------------------------------------------------------- *)
-(* THE RESERVATION MIRROR (design §3a).  [gresv] is a total function and     *)
-(* [ghost_map_auth] wants a map, so this is the one conversion -- via         *)
-(* [map_imap] over [fin_to_set CPU], which makes the lookup lemma three       *)
-(* rewrites with no [NoDup] obligation (the [list_to_map] spelling costs one).*)
+(* A TOTAL PER-HART FUNCTION AS A MAP.  [gresv] (and the fuel ledger) are   *)
+(* total functions and [ghost_map_auth] wants a map, so this is the one     *)
+(* conversion -- via [map_imap] over [fin_to_set CPU], which makes the       *)
+(* lookup lemma three rewrites with no [NoDup] obligation (the [list_to_map] *)
+(* spelling costs one).  Generic in the value type: the reservation mirror  *)
+(* (design §3a) and the fuel ledger (liveness.md D3) are the two instances.  *)
 (* ---------------------------------------------------------------------- *)
-Definition resv_map (f : CPU -> option resv) : gmap CPU (option resv) :=
+Definition cpu_map {A : Type} (f : CPU -> A) : gmap CPU A :=
   map_imap (fun c _ => Some (f c)) (gset_to_gmap () (fin_to_set CPU : gset CPU)).
 
-Lemma resv_map_lookup (f : CPU -> option resv) (c : CPU) :
-  resv_map f !! c = Some (f c).
+Lemma cpu_map_lookup {A : Type} (f : CPU -> A) (c : CPU) :
+  cpu_map f !! c = Some (f c).
 Proof.
-  rewrite /resv_map map_lookup_imap lookup_gset_to_gmap.
+  rewrite /cpu_map map_lookup_imap lookup_gset_to_gmap.
   rewrite option_guard_True; [ reflexivity | apply elem_of_fin_to_set ].
 Qed.
 
+(* the pointwise update.  The language declares one [Insert] instance per
+   value type ([RiscvLang.gresv_insert], [gtv_insert], ...; [gfuel_insert]
+   below), all of the same pointwise shape, which is the premise here. *)
+Lemma cpu_map_insert {A : Type} `{Insert CPU A (CPU -> A)}
+    (f : CPU -> A) (c : CPU) (a : A) :
+  (forall c', (<[c := a]> f) c' = if decide (c' = c) then a else f c') ->
+  cpu_map (<[c := a]> f) = <[c := a]> (cpu_map f).
+Proof.
+  intros Hins. apply map_eq. intros c'. rewrite cpu_map_lookup Hins.
+  destruct (decide (c' = c)) as [->|Hne].
+  - by rewrite lookup_insert.
+  - by rewrite lookup_insert_ne // cpu_map_lookup.
+Qed.
+
+(* a constant function is [gset_to_gmap]: the shape a boot allocation hands
+   out, one fragment per hart at the same value *)
+Lemma cpu_map_const {A : Type} (f : CPU -> A) (a : A) :
+  (forall c, f c = a) ->
+  cpu_map f = gset_to_gmap a (fin_to_set CPU : gset CPU).
+Proof.
+  intros Hf. apply map_eq. intros c.
+  rewrite cpu_map_lookup lookup_gset_to_gmap option_guard_True;
+    [ by rewrite Hf | apply elem_of_fin_to_set ].
+Qed.
+
+(* the reservation mirror's instance, by name (design §3a) *)
+Definition resv_map (f : CPU -> option resv) : gmap CPU (option resv) := cpu_map f.
+
+Lemma resv_map_lookup (f : CPU -> option resv) (c : CPU) :
+  resv_map f !! c = Some (f c).
+Proof. apply cpu_map_lookup. Qed.
+
 Lemma resv_map_insert (f : CPU -> option resv) (c : CPU) (r : option resv) :
   resv_map (<[c := r]> f) = <[c := r]> (resv_map f).
-Proof.
-  apply map_eq. intros c'. rewrite resv_map_lookup.
-  destruct (decide (c' = c)) as [->|Hne].
-  - rewrite lookup_insert /insert /gresv_insert. by rewrite decide_True.
-  - rewrite lookup_insert_ne // resv_map_lookup /insert /gresv_insert.
-    by rewrite decide_False.
-Qed.
+Proof. apply cpu_map_insert. intros c'. reflexivity. Qed.
 
 (* the all-[None] map (every era begins there): what the boot allocation
    hands out, one [None] fragment per hart *)
 Lemma resv_map_none (f : CPU -> option resv) :
   (forall c, f c = None) ->
   resv_map f = gset_to_gmap None (fin_to_set CPU : gset CPU).
-Proof.
-  intros Hf. apply map_eq. intros c.
-  rewrite resv_map_lookup lookup_gset_to_gmap option_guard_True;
-    [ by rewrite Hf | apply elem_of_fin_to_set ].
-Qed.
+Proof. apply cpu_map_const. Qed.
 
 (* THE PRESERVING CASE, which is what lets the rules whose arms never touch
    the reservation (register nodes, announces, plain and MMIO READS) keep
@@ -2158,6 +2199,7 @@ Proof.
   iModIntro. rewrite /resv_auth_at resv_map_insert. iFrame.
 Qed.
 
+
 (* ---------------------------------------------------------------------- *)
 (* 3. irisGS instance (claude-notes/design/crash.md).  [state_interp] is    *)
 (*    defined over the FIXED layer ALONE and holds the CURRENT era          *)
@@ -2180,6 +2222,135 @@ Definition dev_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
   (ghost_var (era_uart_name E) (1/2) d.(duart) ∗
    ghost_var (era_plic_name E) (1/2) d.(dplic) ∗
    ghost_var (era_virtio_name E) (1/2) d.(dvirtio))%I.
+
+(* ---------------------------------------------------------------------- *)
+(* THE FUEL LEDGER (claude-notes/projects/liveness.md, D3-D4).             *)
+(*                                                                          *)
+(* [fuel_frag c k] is hart [c]'s view of its own fuel kind; it rides in     *)
+(* [InstrBytes.pc_isk] so every leaf threads it without naming it.  The     *)
+(* AUTH is the liveness client's (inside its trace predicate, D5), stated   *)
+(* here at an explicit era so that client can name it; the agreement and   *)
+(* update lemmas are the client's tools.  The base layer moves a fragment   *)
+(* in exactly one place: the restart rule, through a CYCLE PERMIT.          *)
+(* ---------------------------------------------------------------------- *)
+Global Instance gfuel_insert : Insert CPU fuel_kind (CPU -> fuel_kind) :=
+  fun cpu k f c => if decide (c = cpu) then k else f c.
+
+Lemma fuel_map_insert (f : CPU -> fuel_kind) (c : CPU) (k : fuel_kind) :
+  cpu_map (<[c := k]> f) = <[c := k]> (cpu_map f).
+Proof. apply cpu_map_insert. intros c'. reflexivity. Qed.
+
+Definition fuel_auth_at `{!riscvFixedGS Σ} (E : riscvEraGS)
+    (f : CPU -> fuel_kind) : iProp Σ :=
+  ghost_map_auth (era_fuel_name E) 1 (cpu_map f).
+
+Definition fuel_frag_at `{!riscvFixedGS Σ} (E : riscvEraGS) (c : CPU)
+    (k : fuel_kind) : iProp Σ :=
+  (c ↪[era_fuel_name E] k)%I.
+
+Definition fuel_frag `{!riscvGS Σ} (c : CPU) (k : fuel_kind) : iProp Σ :=
+  fuel_frag_at riscv_eraGS c k.
+
+Global Instance fuel_frag_at_timeless `{!riscvFixedGS Σ} E c k :
+  Timeless (fuel_frag_at E c k).
+Proof. rewrite /fuel_frag_at. apply _. Qed.
+Global Instance fuel_frag_timeless `{!riscvGS Σ} c k : Timeless (fuel_frag c k).
+Proof. rewrite /fuel_frag. apply _. Qed.
+
+Lemma fuel_frag_agree `{!riscvFixedGS Σ} (E : riscvEraGS) (f : CPU -> fuel_kind)
+    (c : CPU) (k : fuel_kind) :
+  fuel_auth_at E f -∗ fuel_frag_at E c k -∗ ⌜f c = k⌝.
+Proof.
+  iIntros "Ha Hf".
+  iDestruct (ghost_map_lookup with "Ha Hf") as %Hl.
+  rewrite cpu_map_lookup in Hl. by injection Hl.
+Qed.
+
+Lemma fuel_frag_update `{!riscvFixedGS Σ} (E : riscvEraGS) (f : CPU -> fuel_kind)
+    (c : CPU) (k k' : fuel_kind) :
+  fuel_auth_at E f -∗ fuel_frag_at E c k ==∗
+  fuel_auth_at E (<[c := k']> f) ∗ fuel_frag_at E c k'.
+Proof.
+  iIntros "Ha Hf".
+  iMod (ghost_map_update k' with "Ha Hf") as "[Ha Hf]".
+  iModIntro. rewrite /fuel_auth_at fuel_map_insert. iFrame.
+Qed.
+
+(* ONE HART'S VIEW OF THE MACHINE, at an explicit era: [mstate_interp]
+   (below) IS this at the ambient era and hart, by delta -- the form a
+   fixed-layer statement (the cycle permit, a client hook of adequacy)
+   needs, since it cannot name an ambient [riscvGS]. *)
+Definition mstate_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (c : CPU)
+    (σ : mstate) : iProp Σ :=
+  (reg_interp_at (era_reg_name E c) σ.(sregs) ∗
+   gen_heap_interp (hG := era_memGS_of E) σ.(mem) ∗
+   dev_interp_at E σ.(mdev))%I.
+
+(* THE CYCLE PERMIT (liveness.md D4): the client's authorisation of one
+   cycle announcement of hart [c] whose fuel goes from [k] to [k'].  The
+   restart rule ([RiscvExec.wp_hart_step_obs]) runs it at the full mask,
+   BEFORE the step's mask shrink, because the event is determined by the
+   pre-state; the client opens its trace invariant inside, moves its half
+   of the history and the fuel fragment against its own auth.  What it is
+   handed: the hart's view of the machine, LENT (so the event's [pc] and
+   fabric sample can be agreed against the hart's own [PC ↦ᵣ] and the
+   device ghosts -- that is how a window's exit or a wait's justification
+   becomes a trace fact), the machine's half of the history at [h], and
+   what [state_interp] knows about [h] ([ObsTrace.obs_wf_live]).  The
+   fuel ARITHMETIC ([Exact (S b) -> Exact b], a checkpoint's refresh) is
+   entirely the client's: the base layer takes the pair of kinds and asks
+   nothing of them.  Persistent, so a contract can carry a whole family of
+   them ([□ ∀ b, cycle_permit c (Exact (S b)) (Exact b)]). *)
+Definition cycle_permit_at `{!riscvFixedGS Σ} (E : riscvEraGS) (gen : nat)
+    (c : CPU) (k k' : fuel_kind) : iProp Σ :=
+  (□ ∀ (σ : mstate) (h : list mobs),
+     ⌜obs_wf_live h gen σ.(mdev)⌝ -∗
+     mstate_interp_at E c σ -∗ obs_auth h -∗ fuel_frag_at E c k ={⊤}=∗
+     mstate_interp_at E c σ ∗
+     obs_auth (h ++ [ObsCycle c (register_lookup PC σ.(sregs)) σ.(mdev)])%list ∗
+     fuel_frag_at E c k')%I.
+
+Definition cycle_permit `{!riscvGS Σ} `{GEN : GenId} (c : CPU) (k k' : fuel_kind)
+    : iProp Σ :=
+  cycle_permit_at riscv_eraGS gen_id c k k'.
+
+(* THE UNCOUNTED PERMIT, for every hart: what [gen_cert] carries, so that
+   an uncounted cycle -- every cycle of every hart outside a liveness
+   client's windows -- costs no statement anywhere.  Every client can
+   prove it (the ledger records a stutter of a thread outside the tier);
+   a client with no ledger at all just moves the history. *)
+Definition cycle_permit_any_at `{!riscvFixedGS Σ} (E : riscvEraGS) (gen : nat)
+    : iProp Σ :=
+  (∀ c : CPU, cycle_permit_at E gen c Any Any)%I.
+
+Definition cycle_permit_any `{!riscvGS Σ} `{GEN : GenId} : iProp Σ :=
+  cycle_permit_any_at riscv_eraGS gen_id.
+
+Global Instance cycle_permit_at_persistent `{!riscvFixedGS Σ} E gen c k k' :
+  Persistent (cycle_permit_at E gen c k k').
+Proof. rewrite /cycle_permit_at. apply _. Qed.
+Global Instance cycle_permit_persistent `{!riscvGS Σ} `{GEN : GenId} c k k' :
+  Persistent (cycle_permit c k k').
+Proof. rewrite /cycle_permit. apply _. Qed.
+Global Instance cycle_permit_any_at_persistent `{!riscvFixedGS Σ} E gen :
+  Persistent (cycle_permit_any_at E gen).
+Proof. rewrite /cycle_permit_any_at. apply _. Qed.
+Global Instance cycle_permit_any_persistent `{!riscvGS Σ} `{GEN : GenId} :
+  Persistent cycle_permit_any.
+Proof. rewrite /cycle_permit_any. apply _. Qed.
+
+(* THE CERTIFICATE BUNDLE a generation-[gen_id] thread carries (inside
+   [minstret_inv], so no statement anywhere names it): born + started +
+   its era's registration + the uncounted cycle permit.  The base rules
+   take it as one persistent premise and case on the current
+   [(ggen, gpow)] against it; the restart rule spends the permit.  The
+   first three rows are adequacy's ([RiscvAdequacy.power_boot_res]); the
+   permit is the boot client's, built from its trace predicate exactly as
+   the UART thread's permit is ([WpUart.uart_obs_permit]), and packed here
+   by [BootShared]. *)
+Definition gen_cert `{!riscvGS Σ} `{GEN : GenId} : iProp Σ :=
+  (gen_born gen_id ∗ gen_started gen_id ∗ era_registered gen_id riscv_eraGS ∗
+   cycle_permit_any)%I.
 (* the era's four conjuncts.  The DISK IMAGE rides here, in LAST position,
    rather than beside the fixed conjuncts: it is per-era (see
    [era_disk_name]), so when the power is off there is no disk conjunct at

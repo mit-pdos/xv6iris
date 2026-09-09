@@ -296,14 +296,14 @@ Section WpInstrConfig.
   (* the MIE fact alone.                                                 *)
   (* ------------------------------------------------------------------ *)
   Lemma mc_frames_intro (pc ms0 : mword 64)
-      (pcfg0 : type_of_register pmpcfg_n) :
+      (pcfg0 : type_of_register pmpcfg_n) (k : fuel_kind) :
     hw_config -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Machine -∗
     mstatus ↦ᵣ ms0 -∗
     pmpcfg_n ↦ᵣ pcfg0 -∗
-    pc_is pc -∗
-    resv_any cpu_id ∗
+    pc_isk k pc -∗
+    resv_any cpu_id ∗ fuel_frag cpu_id k ∗
     ∃ (ms : mword 64) (bmi : bool) (cy ti ip : mword 64) (mc : mword 32)
       (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
       (elp0 : type_of_register elp),
@@ -321,7 +321,7 @@ Section WpInstrConfig.
            mseccfg0 pmar0 elp0 senv0) mm_Dro.
   Proof.
     iIntros "#Hhw Hhs Hpriv Hmstatus Hpmpc Hpc".
-    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)". iFrame "Hresv".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv & Hfuel)". iFrame "Hresv Hfuel".
     iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -353,17 +353,18 @@ Section WpInstrConfig.
       (pcfg1 : type_of_register pmpcfg_n)
       (ms : mword 64) (bmi : bool) (cy ti ip mst1 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
-      (pmar0 : list PMA_Region) (elp0 : type_of_register elp) :
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp) (k : fuel_kind) :
     resv_any cpu_id -∗
+    fuel_frag cpu_id k -∗
     hreg_frame (mc_rs priv1 npc npc ms bmi cy ti ip mst1 pcfg1 mc micfg
                   misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
     hreg_frame_ro (mm_Df (DfracOwn 1))
       (mc_rs priv1 npc npc ms bmi cy ti ip mst1 pcfg1 mc micfg misa0
          mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
     hart_state ↦ᵣ HART_ACTIVE tt ∗ cur_privilege ↦ᵣ priv1 ∗
-    mstatus ↦ᵣ mst1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗ pc_is npc.
+    mstatus ↦ᵣ mst1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗ pc_isk k npc.
   Proof.
-    iIntros "Hresv Hrw Hro".
+    iIntros "Hresv Hfuel Hrw Hro".
     rewrite mm_rw_split mm_ro_split.
     rewrite mc_rs_PC mc_rs_nPC mc_rs_ms mc_rs_mi mc_rs_cy mc_rs_ti mc_rs_ip.
     rewrite mc_rs_priv mc_rs_mst mc_rs_hart mc_rs_pcfg mc_rs_mc
@@ -372,8 +373,8 @@ Section WpInstrConfig.
     iDestruct "Hrw" as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip)".
     iDestruct "Hro" as "(Hpriv & Hmst & Hhs & Hpcfg & #Hmc & #Hmicfg & _)".
     iFrame "Hhs Hpriv Hmst Hpcfg".
-    rewrite /pc_is /minstret_res /clock_res.
-    iFrame "HPC HnPC Hresv".
+    rewrite /pc_isk /minstret_res /clock_res.
+    iFrame "HPC HnPC Hresv Hfuel".
     iSplitL "Hms Hmi".
     - iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg".
     - iExists cy, ti, ip. by iFrame.
@@ -479,9 +480,12 @@ Section WpInstrConfig.
       (pcfg0 pcfg1 : type_of_register pmpcfg_n) (Psi : iProp Σ)
       (ms : mword 64) (bmi : bool) (cy ti ip mst0 mst1 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
-      (pmar0 : list PMA_Region) (elp0 : type_of_register elp) :
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      {k k' : fuel_kind} :
+    cycle_permit cpu_id k k' -∗
     hw_config -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id k -∗
     hreg_frame (mm_rs pc pc ms bmi cy ti ip mst0 pcfg0 mc micfg misa0
                   mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
     hreg_frame_ro (mm_Df (DfracOwn 1))
@@ -504,13 +508,13 @@ Section WpInstrConfig.
                          cy ti ip mst1 pcfg1 mc micfg misa0 mseccfg0 pmar0
                          elp0 senv0) mm_Dro ∗ Psi)) -∗
     ▷ (hart_state ↦ᵣ HART_ACTIVE tt -∗ cur_privilege ↦ᵣ priv1 -∗
-       mstatus ↦ᵣ mst1 -∗ pmpcfg_n ↦ᵣ pcfg1 -∗ pc_is npc -∗ Psi -∗
+       mstatus ↦ᵣ mst1 -∗ pmpcfg_n ↦ᵣ pcfg1 -∗ pc_isk k' npc -∗ Psi -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hhw Hfrag Hrw Hro Hbody Hcont".
+    iIntros "#Hperm #Hhw Hfrag Hfuel Hrw Hro Hbody Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
-    iApply (swp_exec_step_decode_execute mm_Drw mm_Dro (mm_Df (DfracOwn 1))
+    iApply (swp_exec_step_decode_execute_k mm_Drw mm_Dro (mm_Df (DfracOwn 1))
               (mm_rs pc pc ms bmi cy ti ip mst0 pcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mc_rs priv1 pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst1 pcfg1 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (Psi ∗ resv_any cpu_id)%I
               mm_disj mm_w_cy mm_w_ti mm_w_ip mm_in_priv mm_in_hart mm_in_mc
               mm_in_micfg mm_w_mi mm_in_mi mm_w_ms mm_in_ms mm_w_PC mm_in_PC
@@ -522,8 +526,8 @@ Section WpInstrConfig.
                     | by rewrite mm_rs_mc mm_rs_micfg mm_rs_priv ])
               (mm_pre_agree pc ms bmi cy ti ip mst0 pcfg0 mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0)
-              with "Hcert Hfrag Hrw Hro [Hbody] [Hcont]").
-    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag]".
+              with "Hcert Hperm Hfrag Hfuel Hrw Hro [Hbody] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag] Hfuel".
         destruct Hag as (mi & Hag).
         pose proof (mc_tick_agree priv1 pc npc ms (minstret_inc_flag mc micfg Machine)
                       cy ti ip mst1 pcfg1 mc micfg misa0 mseccfg0 senv0
@@ -532,7 +536,7 @@ Section WpInstrConfig.
         iDestruct (mm_ro_ext (DfracOwn 1) _ _ Hag' with "Hro") as "Hro".
         iDestruct (mc_frames_elim priv1 npc pcfg1 mi
                      (minstret_inc_flag mc micfg Machine) _ _ _ mst1 mc micfg misa0
-                     mseccfg0 senv0 pmar0 elp0 with "Hfrag Hrw Hro")
+                     mseccfg0 senv0 pmar0 elp0 k' with "Hfrag Hfuel Hrw Hro")
           as "(Hhs & Hpriv & Hmst & Hpcfg & Hpc)".
         iApply ("Hcont" with "Hhs Hpriv Hmst Hpcfg Hpc HPsi"). }
     iIntros "Hfrag Hrw Hro".
@@ -558,19 +562,24 @@ Section WpInstrConfig.
   (* [minstret_inv] is kept as a premise so upstream callers do not have   *)
   (* to notice that the invariant is gone.                                *)
   (* ==================================================================== *)
-  Lemma wp_instr_config (pc npc : mword 64) (is_rvc : bool) (i : instruction)
+  (* THE COUNTED FORM first (liveness.md D6), generic in the fuel pair
+     with the client's permit; [wp_instr_config] below is its uncounted
+     instance, the one the config-writing leaves call. *)
+  Lemma wp_instr_config_k (pc npc : mword 64) (is_rvc : bool) (i : instruction)
       (m m' : regfile) (priv1 : Privilege) (ms0 ms1 : mword 64)
-      (pmpcfg0 pmpcfg1 : type_of_register pmpcfg_n) (R : iProp Σ) :
+      (pmpcfg0 pmpcfg1 : type_of_register pmpcfg_n) (R : iProp Σ)
+      {k k' : fuel_kind} :
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
     (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
+    cycle_permit cpu_id k k' -∗
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Machine -∗
     mstatus ↦ᵣ ms0 -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
-    pc_is pc -∗
+    pc_isk k pc -∗
     gpr_file m -∗
     instr pc is_rvc i -∗
     (cur_privilege ↦ᵣ Machine -∗
@@ -586,15 +595,15 @@ Section WpInstrConfig.
                    (R_bitvector_64 PC) ↦ᵣ pc ∗
                    (R_bitvector_64 nextPC) ↦ᵣ npc ∗ R)) -∗
     ▷ (hart_state ↦ᵣ HART_ACTIVE tt -∗ cur_privilege ↦ᵣ priv1 -∗
-       mstatus ↦ᵣ ms1 -∗ pmpcfg_n ↦ᵣ pmpcfg1 -∗ pc_is npc -∗
+       mstatus ↦ᵣ ms1 -∗ pmpcfg_n ↦ᵣ pmpcfg1 -∗ pc_isk k' npc -∗
        gpr_file m' -∗ R -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hpmp HmIE Hstat.
-    iIntros "#Hhw _ Hhs Hpriv Hms Hpmpc Hpc Hgpr Hinstr Hex Hcont".
-    iDestruct (mc_frames_intro pc ms0 pmpcfg0
-                 with "Hhw Hhs Hpriv Hms Hpmpc Hpc") as "[Hfrag Hfr]".
+    iIntros "#Hperm #Hhw _ Hhs Hpriv Hms Hpmpc Hpc Hgpr Hinstr Hex Hcont".
+    iDestruct (mc_frames_intro pc ms0 pmpcfg0 k
+                 with "Hhw Hhs Hpriv Hms Hpmpc Hpc") as "(Hfrag & Hfuel & Hfr)".
     iDestruct "Hfr" as (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0
         pmar0 elp0)
       "(%HmS & %HmC & %HmA & %Hmisaval & %Hsecval & %Hpmaall & %Helpnp &
@@ -603,7 +612,7 @@ Section WpInstrConfig.
     iDestruct (hw_config_kmap with "Hhw") as "#Hkm".
     iApply (mc_cycle pc npc priv1 pmpcfg0 pmpcfg1 (gpr_file m' ∗ R)%I
               ms bmi cy ti ip ms0 ms1 mc micfg misa0 mseccfg0 senv0 pmar0
-              elp0 with "Hhw Hfrag Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
+              elp0 with "Hperm Hhw Hfrag Hfuel Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
     2:{ iNext. iIntros "Hhs Hpriv Hms Hpmpc Hpc [Hgpr HR]".
         iApply ("Hcont" with "Hhs Hpriv Hms Hpmpc Hpc Hgpr HR"). }
     assert (Hdok : decode_ok (mm_Drw ∪ mm_Dro) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip ms0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0)).
@@ -654,6 +663,48 @@ Section WpInstrConfig.
                    micfg misa0 mseccfg0 senv0 pmar0 elp0)).
       iApply ("Hcl" with "Hpriv Hmst Hpcfg"). }
     iFrame "Hgpr HR".
+  Qed.
+
+  Lemma wp_instr_config (pc npc : mword 64) (is_rvc : bool) (i : instruction)
+      (m m' : regfile) (priv1 : Privilege) (ms0 ms1 : mword 64)
+      (pmpcfg0 pmpcfg1 : type_of_register pmpcfg_n) (R : iProp Σ) :
+    pmp_allows_all pmpcfg0 ->
+    eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Machine -∗
+    mstatus ↦ᵣ ms0 -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc is_rvc i -∗
+    (cur_privilege ↦ᵣ Machine -∗
+     mstatus ↦ᵣ ms0 -∗
+     pmpcfg_n ↦ᵣ pmpcfg0 -∗
+     gpr_file m -∗
+     (R_bitvector_64 PC) ↦ᵣ pc -∗
+     (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ priv1 ∗ mstatus ↦ᵣ ms1 ∗
+                   pmpcfg_n ↦ᵣ pmpcfg1 ∗ gpr_file m' ∗
+                   (R_bitvector_64 PC) ↦ᵣ pc ∗
+                   (R_bitvector_64 nextPC) ↦ᵣ npc ∗ R)) -∗
+    ▷ (hart_state ↦ᵣ HART_ACTIVE tt -∗ cur_privilege ↦ᵣ priv1 -∗
+       mstatus ↦ᵣ ms1 -∗ pmpcfg_n ↦ᵣ pmpcfg1 -∗ pc_is npc -∗
+       gpr_file m' -∗ R -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hpmp HmIE Hstat.
+    iIntros "#Hhw Hminv Hhs Hpriv Hms Hpmpc Hpc Hgpr Hinstr Hex Hcont".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iPoseProof "Hcert" as "(_ & _ & _ & #Hany)". iSpecialize ("Hany" $! cpu_id).
+    iApply (wp_instr_config_k pc npc is_rvc i m m' priv1 ms0 ms1 pmpcfg0 pmpcfg1 R
+              Hpmp HmIE Hstat
+              with "Hany Hhw Hminv Hhs Hpriv Hms Hpmpc Hpc Hgpr Hinstr Hex Hcont").
   Qed.
 
 End WpInstrConfig.

@@ -4337,7 +4337,7 @@ Section ProofEndOp.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose proof Hgeom as [Hcovok Hlogsub].
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hcert Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hop Hcont".
-    iDestruct "Hcert" as "(_ & _ & #Hregc)".
+    iDestruct "Hcert" as "(_ & _ & #Hregc & _)".
     (* [b] and [eb] AGREE at depth 0 -- [CpuOwn.cpu_own_eb_agree], the general
        (index-free) fact, not [cpu_own_forces_on] which needed [eb = true].
        Per durable-notes: do NOT [subst b] -- keep the name, rewrite the

@@ -91,6 +91,7 @@ Section WpInstrMip.
     mstatus_kernel_facts mst0 ->
     hw_config -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
     hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
     (hreg_frame (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
@@ -105,7 +106,7 @@ Section WpInstrMip.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HmIE HMPRV HSXL HKF.
-    iIntros "#Hhw Hfrag Hrw Hro Hbody Hcont".
+    iIntros "#Hhw Hfrag Hfuel Hrw Hro Hbody Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iApply (swp_exec_step_any mm_Drw mm_Dro (mm_Df dq)
               (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0)
@@ -120,8 +121,8 @@ Section WpInstrMip.
               ltac:(intros rs2 [ip2 ->]; mmrs)
               (mm_pre_agree pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0)
-              with "Hcert Hfrag Hrw Hro [Hbody] [Hcont]").
-    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag]".
+              with "Hcert Hfrag Hfuel Hrw Hro [Hbody] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag] Hfuel".
         destruct Hag as (rs2 & mi & (ip2 & ->) & Hag).
         pose proof (mm_tick_agree pc npc ms (minstret_inc_flag mc micfg Machine)
                       cy ti ip2 mst0 pmpcfg0 mc micfg misa0 mseccfg0 senv0
@@ -129,8 +130,8 @@ Section WpInstrMip.
         iDestruct (mm_rw_ext _ _ Hag' with "Hrw") as "Hrw".
         iDestruct (mm_ro_ext dq _ _ Hag' with "Hro") as "Hro".
         iDestruct (mm_frames_elim dq npc pmpcfg0 mi (minstret_inc_flag mc micfg Machine)
-                     _ _ _ mst0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
-                     HmIE HMPRV HSXL HKF with "Hhw Hfrag Hrw Hro")
+                     _ _ _ mst0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 Any
+                     HmIE HMPRV HSXL HKF with "Hhw Hfrag Hfuel Hrw Hro")
           as "(Hmm & Hpmpc & Hpc)".
         iApply ("Hcont" with "Hmm Hpmpc Hpc HPsi"). }
     (* the body never reaches a memory event, so the reservation is held
@@ -180,8 +181,8 @@ Section WpInstrMip.
   Proof.
     intros Hpmp Hstat.
     iIntros "Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
-    iDestruct (mm_frames_intro dq pc pmpcfg0 with "Hmm Hpmpc Hpc")
-      as "(#Hhw & Hfrag & Hfr)".
+    iDestruct (mm_frames_intro dq pc pmpcfg0 Any with "Hmm Hpmpc Hpc")
+      as "(#Hhw & Hfrag & Hfuel & Hfr)".
     iDestruct "Hfr" as (ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0 senv0
         pmar0 elp0)
       "(%HmIE & %HMPRV & %HSXL & %HKF & %HmS & %HmC & %HmA & %Hmisaval &
@@ -191,7 +192,7 @@ Section WpInstrMip.
     iApply (mm_cycle_mip pc npc pmpcfg0 (gpr_file m' ∗ R)%I
               ms bmi cy ti ip mst0
               mc micfg misa0 mseccfg0 senv0 pmar0 elp0 HmIE HMPRV HSXL HKF
-              with "Hhw Hfrag Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
+              with "Hhw Hfrag Hfuel Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
     2:{ iNext. iIntros "Hmm Hpmpc Hpc [Hgpr HR]".
         iApply ("Hcont" with "Hmm Hpmpc Hpc Hgpr HR"). }
     (* the two pure facts the dispatch wants, at the [wrap_pre] file *)

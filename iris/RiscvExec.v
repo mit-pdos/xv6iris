@@ -241,7 +241,7 @@ Section WPDead.
     assert (e2 = e /\ g2 = g /\ efs = [] /\ κ = []) as (-> & -> & -> & ->).
     { destruct e; simplify_eq/=.
       - destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
-          as (-> & -> & [(Hlive & _) | (_ & -> & ->)]);
+          as (-> & [(Hlive & _) | (_ & -> & -> & ->)]);
           [exfalso; by apply Hnl|done].
       - destruct (prim_step_uart_inv _ _ _ _ _ _ Hstep)
           as (-> & -> & [(Hlive & _) | (_ & -> & ->)]);
@@ -766,7 +766,7 @@ Section WPExec.
     WP (HartE gen_id cpu_id m : expr riscv_lang).
   Proof.
     intros Hpres.
-    iIntros "#(Hborn & Hstarted & Hrege) H".
+    iIntros "#(Hborn & Hstarted & Hrege & _) H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
@@ -785,7 +785,7 @@ Section WPExec.
         by apply prim_step_hart_dead. }
       iIntros (e2 g2 efs Hstep) "!>".
       destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
-        as (-> & -> & [(Hlive & _) | (_ & -> & ->)]); [by exfalso|].
+        as (-> & [(Hlive & _) | (_ & -> & -> & ->)]); [by exfalso|].
       iIntros "_". iMod "Hback" as "_". iModIntro.
       iEval (cbn [app]) in "Hobs".
       iFrame "Hgauth Hsauth Htie Hobs".
@@ -799,6 +799,20 @@ Section WPExec.
          [ggen + 0 = gen_id]. *)
       exfalso. rewrite /start_count Hpw Heq Nat.add_0_r in Hsge. lia. }
     assert (Hlive : thread_live g gen_id) by (split; congruence).
+    (* THE NODE IS SILENT, and the reservation premise already says so: the
+       restart node drops every reservation, so a rule whose node keeps the
+       reservation cannot be at the restart.  No second premise for the
+       ~15 callers to discharge. *)
+    assert (Hsil : node_obs cpu_id (g.(gregs) cpu_id) g.(gdev) m = []).
+    { destruct m as [u|T oc k]; [|reflexivity]. exfalso.
+      pose proof (Hpres (others_resv g.(gresv) cpu_id) (hart_agent cpu_id)
+                    g.(gimg) (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev))
+                    g.(glog) (g.(gtv) cpu_id) (g.(gitv) cpu_id) (Some ∅)
+                    (riscv_step false) (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev))
+                    g.(glog) (g.(gtv) cpu_id) (g.(gitv) cpu_id) None) as Hr.
+      cbv beta iota delta [mnode_step] in Hr.
+      discriminate (Hr (ex_intro _ false (conj eq_refl (conj eq_refl
+                     (conj eq_refl (conj eq_refl (conj eq_refl eq_refl))))))). }
     (* LIVE.  Tie the ambient era to the existential via the registry. *)
     iDestruct "Hera" as (E) "(%HRE & Hera)".
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
@@ -827,12 +841,14 @@ Section WPExec.
                 g.(gimg) log0 (<[cpu_id := tv0]> g.(gtv))
                 (<[cpu_id := itv0]> g.(gitv))), [].
       left. exists gen_id, cpu_id, m. split_and!; try reflexivity.
-      left. split; [exact Hlive|]. by exists m0, σ0, log0, tv0, itv0, r0. }
+      left. split_and!; [exact Hlive|by rewrite Hsil|].
+      by exists m0, σ0, log0, tv0, itv0, r0. }
     iIntros (e2 g2 efs Hstep) "!>".
     destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
-      as (-> & -> & [(_ & (m2 & σ2 & log2 & tv2 & itv2 & r2 & Hnode & -> & ->))
-                    | (Hnl & _)]);
+      as (-> & [(_ & Hκ & (m2 & σ2 & log2 & tv2 & itv2 & r2 & Hnode & -> & ->))
+               | (Hnl & _)]);
       last by exfalso.
+    rewrite Hsil in Hκ. subst κ.
     (* the hart moved no disk byte: the durable conjunct is FRAMED, at the
        post-state's own image ([RiscvLang.mnode_step_v_disk]) *)
     pose proof (mnode_step_v_disk _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hnode) as Hvd.
@@ -876,21 +892,34 @@ Section WPExec.
     exact (prim_step_itv_ok _ _ _ _ _ _ Hstep Hmm Hiok).
   Qed.
 
-  (* THE FRAG FORM: for the arms that CHANGE the hart's reservation (every
-     RAM/MMIO write, the exclusive read, the [Ret] boundary).  The caller
-     brings the hart's [resv_frag] at [rr]; the callback runs at exactly
-     [r := rr] (agreement with the auth), learns that a [Some] reservation's
-     snapshot still IS memory ([resv_ok], the fact the conditional write
-     lives on), and gets the frag back at whatever the arm set. *)
-  Lemma wp_hart_step_resv (m : M unit) (rr : option resv) :
+  (* THE GENERAL FRAG FORM, WITH THE TRACE: for the arms that CHANGE the
+     hart's reservation (every RAM/MMIO write, the exclusive read, the [Ret]
+     boundary) -- and, through the boundary, the one hart node that is
+     OBSERVED (RiscvLang §3b': the restart node announces the cycle,
+     [node_obs]).  The caller brings the hart's [resv_frag] at [rr]; the
+     callback runs at exactly [r := rr] (agreement with the auth), learns
+     that a [Some] reservation's snapshot still IS memory ([resv_ok], the
+     fact the conditional write lives on), and gets the frag back at
+     whatever the arm set.  THE HISTORY rides beside the machine state
+     exactly as in [wp_uart_step]: the callback receives [state_interp]'s
+     half at the history so far, with what is known about it
+     ([ObsTrace.obs_wf_live]), and owes it back at the node's event -- which
+     is DETERMINED by the pre-state, so a client permit that moves the
+     ghost can run in the ⊤ phase, before the mask shrinks
+     ([wp_hart_restart_k] below).  A silent node owes it back unchanged
+     ([wp_hart_step_resv]). *)
+  Lemma wp_hart_step_obs (m : M unit) (rr : option resv) :
     gen_cert -∗
     resv_frag cpu_id rr -∗
-    (∀ σ oth img log tv itv V, ⌜forall rv, rr = Some rv -> rv ⊆ σ.(mem)⌝ -∗
+    (∀ σ oth img log tv itv V (h : list mobs),
+       ⌜forall rv, rr = Some rv -> rv ⊆ σ.(mem)⌝ -∗
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
        ⌜(itv <= length log)%nat⌝ -∗
+       ⌜obs_wf_live h gen_id σ.(mdev)⌝ -∗
        mstate_interp σ -∗
        hart_iview_auth cpu_id itv -∗
-       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+       obs_auth h ={⊤,∅}=∗
        ∃ m0 σ0 log0 tv0 itv0 r0,
          ⌜mnode_step oth (hart_agent cpu_id) img σ log tv itv rr
             m m0 σ0 log0 tv0 itv0 r0⌝ ∗
@@ -901,11 +930,12 @@ Section WPExec.
                hart_iview_auth cpu_id itv' ∗
                tso_interp_of riscv_eraGS img σ'.(mem) log'
                  (vstep (hart_agent cpu_id) tv' log' V) ∗
+               obs_auth (h ++ node_obs cpu_id σ.(sregs) σ.(mdev) m)%list ∗
                (resv_frag cpu_id r' -∗
                 WP (HartE gen_id cpu_id m' : expr riscv_lang)))) -∗
     WP (HartE gen_id cpu_id m : expr riscv_lang).
   Proof.
-    iIntros "#(Hborn & Hstarted & Hrege) Hfrag H".
+    iIntros "#(Hborn & Hstarted & Hrege & _) Hfrag H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
@@ -924,7 +954,7 @@ Section WPExec.
         by apply prim_step_hart_dead. }
       iIntros (e2 g2 efs Hstep) "!>".
       destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
-        as (-> & -> & [(Hlive & _) | (_ & -> & ->)]); [by exfalso|].
+        as (-> & [(Hlive & _) | (_ & -> & -> & ->)]); [by exfalso|].
       iIntros "_". iMod "Hback" as "_". iModIntro.
       iEval (cbn [app]) in "Hobs".
       iFrame "Hgauth Hsauth Htie Hobs".
@@ -950,29 +980,34 @@ Section WPExec.
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
     iDestruct (iview_interp_acc cpu_id with "Hiv") as "[Hivc Hivclose]".
     iEval (rewrite tso_interp_at_of) in "Htso".
+    (* the history so far, and what the callback may know about it *)
+    iDestruct "Hobs" as (h) "(%Htot & %Hwf & Hoauth)".
     iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev))
             (others_resv g.(gresv) cpu_id)
-            g.(gimg) g.(glog) (g.(gtv) cpu_id) (g.(gitv) cpu_id) (avf g)
-            with "[] [] [] [Hri Hmem Hdev] Hivc Htso")
+            g.(gimg) g.(glog) (g.(gtv) cpu_id) (g.(gitv) cpu_id) (avf g) h
+            with "[] [] [] [] [Hri Hmem Hdev] Hivc Htso Hoauth")
       as (m0 σ0 log0 tv0 itv0 r0) "(%Hwit & Hk)".
     { iPureIntro. intros rv Hrv. apply (Hrok cpu_id). by rewrite Hrr. }
     { iPureIntro. apply avf_hart. }
     { iPureIntro. exact (Hiok cpu_id). }
+    { iPureIntro. exact (obs_wf_live_of _ _ _ Hwf Hlive). }
     { rewrite /mstate_interp /=. iFrame "Hri Hmem Hdev". }
     rewrite -Hrr in Hwit.
     iModIntro. iSplitR.
     { iPureIntro.
-      exists [], (HartE gen_id cpu_id m0),
+      exists (node_obs cpu_id (g.(gregs) cpu_id) g.(gdev) m),
+             (HartE gen_id cpu_id m0),
              (GState (<[cpu_id := σ0.(sregs)]> g.(gregs)) σ0.(mem) σ0.(mdev)
                 g.(ggen) g.(gpow) (<[cpu_id := r0]> g.(gresv))
                 g.(gimg) log0 (<[cpu_id := tv0]> g.(gtv))
                 (<[cpu_id := itv0]> g.(gitv))), [].
       left. exists gen_id, cpu_id, m. split_and!; try reflexivity.
-      left. split; [exact Hlive|]. by exists m0, σ0, log0, tv0, itv0, r0. }
+      left. split_and!; [exact Hlive|reflexivity|].
+      by exists m0, σ0, log0, tv0, itv0, r0. }
     iIntros (e2 g2 efs Hstep) "!>".
     destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
-      as (-> & -> & [(_ & (m2 & σ2 & log2 & tv2 & itv2 & r2 & Hnode & -> & ->))
-                    | (Hnl & _)]);
+      as (-> & [(_ & -> & (m2 & σ2 & log2 & tv2 & itv2 & r2 & Hnode & -> & ->))
+               | (Hnl & _)]);
       last by exfalso.
     (* the hart moved no disk byte: the durable conjunct is FRAMED, at the
        post-state's own image ([RiscvLang.mnode_step_v_disk]) *)
@@ -983,7 +1018,7 @@ Section WPExec.
       by (symmetry; exact Hvd).
     rewrite Hrr in Hnode.
     iMod ("Hk" $! m2 σ2 log2 tv2 itv2 r2 with "[//]")
-      as "[(Hri' & Hmem' & Hdev') (Hivc' & Htso' & HWP)]".
+      as "[(Hri' & Hmem' & Hdev') (Hivc' & Htso' & Hoauth' & HWP)]".
     iDestruct ("Hclose" with "Hri'") as "Hgr'".
     iDestruct ("Hivclose" with "Hivc'") as "Hiv2".
     iDestruct (tso_interp_hart_wb _ g cpu_id σ2.(sregs) σ2.(mem) σ2.(mdev)
@@ -993,10 +1028,11 @@ Section WPExec.
     iDestruct ("HWP" with "Hfrag") as "HWP".
     iIntros "_ !>".
     iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
-    (* the trace conjunct: a hart step is SILENT, so it is re-packed at the
-       same history ([obs_interp_silent]) *)
-    iEval (cbn [app]) in "Hobs".
-    iDestruct (obs_interp_silent _ _ _ _ _ _ Hstep with "Hobs") as "Hobs".
+    (* the trace conjunct, re-packed at the extended history: the callback
+       moved the ghost by the node's own event, the language's step
+       invariant does the rest ([obs_interp_close]) *)
+    iDestruct (obs_interp_close _ _ _ _ _ _ h κs Hstep Hwf Htot with "Hoauth'")
+      as "Hobs".
     rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth Htie HWP Hobs".
@@ -1014,28 +1050,78 @@ Section WPExec.
     exact (prim_step_itv_ok _ _ _ _ _ _ Hstep Hmm Hiok).
   Qed.
 
-
+  (* THE SILENT FRAG FORM, derived: the general rule at a node that is not
+     the restart ([hart_silent]), so the history goes back untouched and
+     the callback never sees it.  What every reservation-changing leaf
+     uses. *)
+  Lemma wp_hart_step_resv (m : M unit) (rr : option resv) :
+    hart_silent m ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    (∀ σ oth img log tv itv V, ⌜forall rv, rr = Some rv -> rv ⊆ σ.(mem)⌝ -∗
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       ⌜(itv <= length log)%nat⌝ -∗
+       mstate_interp σ -∗
+       hart_iview_auth cpu_id itv -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+       ∃ m0 σ0 log0 tv0 itv0 r0,
+         ⌜mnode_step oth (hart_agent cpu_id) img σ log tv itv rr
+            m m0 σ0 log0 tv0 itv0 r0⌝ ∗
+          ▷ (∀ m' σ' log' tv' itv' r',
+               ⌜mnode_step oth (hart_agent cpu_id) img σ log tv itv rr
+                  m m' σ' log' tv' itv' r'⌝ ={∅,⊤}=∗
+               mstate_interp σ' ∗
+               hart_iview_auth cpu_id itv' ∗
+               tso_interp_of riscv_eraGS img σ'.(mem) log'
+                 (vstep (hart_agent cpu_id) tv' log' V) ∗
+               (resv_frag cpu_id r' -∗
+                WP (HartE gen_id cpu_id m' : expr riscv_lang)))) -∗
+    WP (HartE gen_id cpu_id m : expr riscv_lang).
+  Proof.
+    iIntros (Hsil) "#Hcert Hfrag H".
+    iApply (wp_hart_step_obs m rr with "Hcert Hfrag").
+    iIntros (σ oth img log tv itv V h) "%Hrv %Htv %Hitv %Hwf Hsi Hiv Htso Hoauth".
+    iMod ("H" $! σ oth img log tv itv V with "[//] [//] [//] Hsi Hiv Htso")
+      as (m0 σ0 log0 tv0 itv0 r0) "[%Hwit Hk]".
+    iModIntro. iExists m0, σ0, log0, tv0, itv0, r0.
+    iSplitR; [iPureIntro; exact Hwit|].
+    iNext. iIntros (m' σ' log' tv' itv' r') "%Hn".
+    iMod ("Hk" $! m' σ' log' tv' itv' r' with "[//]") as "(Hsi & Hiv & Htso & HWP)".
+    iModIntro. iFrame "Hsi Hiv Htso HWP".
+    rewrite (node_obs_silent _ _ _ _ Hsil) app_nil_r. iExact "Hoauth".
+  Qed.
 
   (* THE BOUNDARY RULE, derived: at [Loop] the only node is the restart, so
      the caller owes nothing about σ at all and simply picks up the WP of a
      fresh cycle -- at BOTH ticks, since the tick is chosen by the machine.
      This is where the old rule's ∀-over-[tick] now lives; the [tick_clock]
      tail is then ordinary register nodes of the same cycle, not a second
-     successor state the caller has to name. *)
-  (* The boundary is where a DANGLING reservation is dropped (§3a), so this
+     successor state the caller has to name.
+
+     The boundary is where a DANGLING reservation is dropped (§3a), so this
      is a frag-form rule: the hart's [resv_frag] comes in at whatever the
-     last instruction left and goes out at [None] for the next cycle. *)
-  Lemma wp_hart_restart (rr : option resv) :
+     last instruction left and goes out at [None] for the next cycle.  And
+     it is where the cycle is ANNOUNCED (liveness.md D1/D4): the hart's
+     fuel fragment comes in at [k] and goes out at [k'], through the
+     client's [cycle_permit] for that pair -- run here at the full mask,
+     with the hart's view of the machine lent to it.  Generic in the pair:
+     the uncounted rule below is this one at [Any]/[Any] with the permit
+     every [gen_cert] carries; a counted contract brings its own. *)
+  Lemma wp_hart_restart_k (rr : option resv) (k k' : fuel_kind) :
     gen_cert -∗
+    cycle_permit cpu_id k k' -∗
     resv_frag cpu_id rr -∗
+    fuel_frag cpu_id k -∗
     ▷ (∀ tick : bool,
-         resv_frag cpu_id None -∗
+         resv_frag cpu_id None -∗ fuel_frag cpu_id k' -∗
          WP (HartE gen_id cpu_id (riscv_step tick) : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcert Hfrag H". rewrite /LoopE.
-    iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
-    iIntros (σ oth img log tv itv V) "_ %Htv %Hitv Hsi Hiv Htso".
+    iIntros "#Hcert #Hperm Hfrag Hfuel H". rewrite /LoopE.
+    iApply (wp_hart_step_obs _ rr with "Hcert Hfrag").
+    iIntros (σ oth img log tv itv V h) "_ %Htv %Hitv %Hwf Hsi Hiv Htso Hoauth".
+    (* the announcement, authorised: at ⊤, before the mask shrinks *)
+    iMod ("Hperm" $! σ h with "[//] Hsi Hoauth Hfuel") as "(Hsi & Hoauth & Hfuel)".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
     iExists (riscv_step false), σ, log, tv, itv, None.
     iSplitR; [iPureIntro; by exists false|].
@@ -1047,7 +1133,24 @@ Section WPExec.
        back untouched. *)
     iSplitL "Htso".
     { rewrite -Htv. iApply (tso_interp_of_idle with "Htso"). }
-    iIntros "Hfrag". iApply ("H" with "Hfrag").
+    iSplitL "Hoauth"; [iExact "Hoauth"|].
+    iIntros "Hfrag". iApply ("H" with "Hfrag Hfuel").
+  Qed.
+
+  (* the UNCOUNTED boundary: what every cycle outside a liveness client's
+     windows takes, with the permit [gen_cert] carries *)
+  Lemma wp_hart_restart (rr : option resv) :
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    fuel_frag cpu_id Any -∗
+    ▷ (∀ tick : bool,
+         resv_frag cpu_id None -∗ fuel_frag cpu_id Any -∗
+         WP (HartE gen_id cpu_id (riscv_step tick) : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "#Hcert Hfrag Hfuel H".
+    iPoseProof "Hcert" as "(_ & _ & _ & #Hany)". iSpecialize ("Hany" $! cpu_id).
+    iApply (wp_hart_restart_k rr Any Any with "Hcert Hany Hfrag Hfuel H").
   Qed.
 
 End WPExec.
@@ -1082,7 +1185,7 @@ Section WPDev.
             WP (UartLoop : expr riscv_lang))) -∗
     WP (UartLoop : expr riscv_lang).
   Proof.
-    iIntros "#(Hborn & Hstarted & Hrege) H".
+    iIntros "#(Hborn & Hstarted & Hrege & _) H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
@@ -1222,7 +1325,7 @@ Section WPDev.
             WP (DiskLoop : expr riscv_lang))) -∗
     WP (DiskLoop : expr riscv_lang).
   Proof.
-    iIntros "#(Hborn & Hstarted & Hrege) H".
+    iIntros "#(Hborn & Hstarted & Hrege & _) H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
@@ -1315,7 +1418,7 @@ Section WPDev.
             WP (PlicLoop : expr riscv_lang))) -∗
     WP (PlicLoop : expr riscv_lang).
   Proof.
-    iIntros "#(Hborn & Hstarted & Hrege) H".
+    iIntros "#(Hborn & Hstarted & Hrege & _) H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].

@@ -48,17 +48,25 @@ Section WpInstr.
   (* the S-mode wrapper writes its own thirty-line twin of THIS and reuses  *)
   (* that rule unchanged.                                                  *)
   (* ==================================================================== *)
+  (* GENERIC IN THE FUEL PAIR (liveness.md D4/D6): the cycle charges the
+     hart's fuel from [k] to [k'] through the client's [cycle_permit], and
+     the continuation rebuilds [pc_isk k'].  [k]/[k'] are implicit: they
+     are read off the permit and the incoming [pc_isk].  The uncounted
+     callers below are this at [Any]/[Any] with [gen_cert]'s own permit. *)
   Lemma mm_cycle_w (pc npc : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
       {dq : dfrac} (Psi : iProp Σ)
       (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
-      (pmar0 : list PMA_Region) (elp0 : type_of_register elp) :
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      {k k' : fuel_kind} :
     eq_vec (_get_Mstatus_MIE mst0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
     _get_Mstatus_SXL mst0 = 'b"10" ->
     mstatus_kernel_facts mst0 ->
+    cycle_permit cpu_id k k' -∗
     hw_config -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id k -∗
     hreg_frame (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
     hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
     (resv_frag cpu_id None -∗
@@ -68,22 +76,22 @@ Section WpInstr.
                     ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
                     hreg_frame (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw ∗
                     hreg_frame_ro (mm_Df dq) (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro ∗ Psi ∗ resv_any cpu_id)) -∗
-    ▷ (mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pc_is npc -∗ Psi -∗
+    ▷ (mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pc_isk k' npc -∗ Psi -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HmIE HMPRV HSXL HKF.
-    iIntros "#Hhw Hfrag Hrw Hro Hbody Hcont".
+    iIntros "#Hperm #Hhw Hfrag Hfuel Hrw Hro Hbody Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
-    iApply (swp_exec_step_decode_execute mm_Drw mm_Dro (mm_Df dq)
+    iApply (swp_exec_step_decode_execute_k mm_Drw mm_Dro (mm_Df dq)
               (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (Psi ∗ resv_any cpu_id)%I
               mm_disj mm_w_cy mm_w_ti mm_w_ip mm_in_priv mm_in_hart mm_in_mc
               mm_in_micfg mm_w_mi mm_in_mi mm_w_ms mm_in_ms mm_w_PC mm_in_PC
               mm_in_nPC ltac:(mmrs) ltac:(mmrs) ltac:(mmrs)
               (mm_pre_agree pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0)
-              with "Hcert Hfrag Hrw Hro [Hbody] [Hcont]").
-    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag]".
+              with "Hcert Hperm Hfrag Hfuel Hrw Hro [Hbody] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag] Hfuel".
         destruct Hag as (mi & Hag).
         pose proof (mm_tick_agree pc npc ms (minstret_inc_flag mc micfg Machine)
                       cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 senv0
@@ -91,8 +99,8 @@ Section WpInstr.
         iDestruct (mm_rw_ext _ _ Hag' with "Hrw") as "Hrw".
         iDestruct (mm_ro_ext dq _ _ Hag' with "Hro") as "Hro".
         iDestruct (mm_frames_elim dq npc pmpcfg0 mi (minstret_inc_flag mc micfg Machine)
-                     _ _ _ mst0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
-                     HmIE HMPRV HSXL HKF with "Hhw Hfrag Hrw Hro")
+                     _ _ _ mst0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 k'
+                     HmIE HMPRV HSXL HKF with "Hhw Hfrag Hfuel Hrw Hro")
           as "(Hmm & Hpmpc & Hpc)".
         iApply ("Hcont" with "Hmm Hpmpc Hpc HPsi"). }
     (* the body owns the reservation across the instruction and gives it
@@ -101,7 +109,8 @@ Section WpInstr.
   Qed.
 
   (* the FRAG-FREE instance, for the 33 leaves whose execute never touches
-     memory: the reservation is held aside and handed straight back. *)
+     memory: the reservation is held aside and handed straight back.
+     Uncounted ([Any]/[Any], the permit is [gen_cert]'s). *)
   Lemma mm_cycle (pc npc : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
       {dq : dfrac} (Psi : iProp Σ)
       (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
@@ -113,6 +122,7 @@ Section WpInstr.
     mstatus_kernel_facts mst0 ->
     hw_config -∗
     resv_any cpu_id -∗
+    fuel_frag cpu_id Any -∗
     hreg_frame (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
     hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
     (hreg_frame (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗ hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
@@ -126,10 +136,12 @@ Section WpInstr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HmIE HMPRV HSXL HKF.
-    iIntros "#Hhw Hfrag Hrw Hro Hbody Hcont".
+    iIntros "#Hhw Hfrag Hfuel Hrw Hro Hbody Hcont".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iPoseProof "Hcert" as "(_ & _ & _ & #Hany)". iSpecialize ("Hany" $! cpu_id).
     iApply (mm_cycle_w pc npc pmpcfg0 Psi ms bmi cy ti ip mst0 mc micfg misa0
               mseccfg0 senv0 pmar0 elp0 HmIE HMPRV HSXL HKF
-              with "Hhw Hfrag Hrw Hro [Hbody] Hcont").
+              with "Hany Hhw Hfrag Hfuel Hrw Hro [Hbody] Hcont").
     iIntros "Hfrag Hrw Hro".
     iApply (swp_mono with "[Hfrag] [-]"); [|iApply ("Hbody" with "Hrw Hro")].
     iIntros (st). iDestruct 1 as (w) "(-> & Hrw & Hro & HPsi)".
@@ -152,12 +164,13 @@ Section WpInstr.
      [wp_instr] is the instance that names the file. *)
   Lemma wp_instr_exw (pc npc : mword 64) (is_rvc : bool) (i : instruction)
       (m : regfile) (pmpcfg0 : type_of_register pmpcfg_n)
-      {dq : dfrac} (R : regfile -> iProp Σ) :
+      {dq : dfrac} (R : regfile -> iProp Σ) {k k' : fuel_kind} :
     pmp_allows_all pmpcfg0 ->
     (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
+    cycle_permit cpu_id k k' -∗
     mmode_config dq -∗
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-    pc_is pc -∗
+    pc_isk k pc -∗
     gpr_file m -∗
     instr pc is_rvc i -∗
     (* PC rides along read-only: AUIPC and JAL compute from it, and the
@@ -173,14 +186,14 @@ Section WpInstr.
                    resv_any cpu_id ∗
                    ∃ mf : regfile, gpr_file mf ∗ R mf)) -∗
     ▷ (∀ mf : regfile, mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-       pc_is npc -∗ gpr_file mf -∗ R mf -∗
+       pc_isk k' npc -∗ gpr_file mf -∗ R mf -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hpmp Hstat.
-    iIntros "Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
-    iDestruct (mm_frames_intro dq pc pmpcfg0 with "Hmm Hpmpc Hpc")
-      as "(#Hhw & Hfrag & Hfr)".
+    iIntros "#Hperm Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
+    iDestruct (mm_frames_intro dq pc pmpcfg0 k with "Hmm Hpmpc Hpc")
+      as "(#Hhw & Hfrag & Hfuel & Hfr)".
     iDestruct "Hfr" as (ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0 senv0
         pmar0 elp0)
       "(%HmIE & %HMPRV & %HSXL & %HKF & %HmS & %HmC & %HmA & %Hmisaval &
@@ -191,7 +204,7 @@ Section WpInstr.
     iApply (mm_cycle_w pc npc pmpcfg0 (∃ mf : regfile, gpr_file mf ∗ R mf)%I
               ms bmi cy ti ip mst0
               mc micfg misa0 mseccfg0 senv0 pmar0 elp0 HmIE HMPRV HSXL HKF
-              with "Hhw Hfrag Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
+              with "Hperm Hhw Hfrag Hfuel Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
     2:{ iNext. iIntros "Hmm Hpmpc Hpc HEx".
         iDestruct "HEx" as (mf) "[Hgpr HR]".
         iApply ("Hcont" with "Hmm Hpmpc Hpc Hgpr HR"). }
@@ -272,8 +285,10 @@ Section WpInstr.
   Proof.
     intros Hpmp Hstat.
     iIntros "Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
+    iDestruct (mmode_config_cert with "Hmm") as "[#Hcert Hmm]".
+    iPoseProof "Hcert" as "(_ & _ & _ & #Hany)". iSpecialize ("Hany" $! cpu_id).
     iApply (wp_instr_exw pc npc is_rvc i m pmpcfg0 R Hpmp Hstat
-              with "Hmm Hpmpc Hpc Hgpr Hinstr [Hex] Hcont").
+              with "Hany Hmm Hpmpc Hpc Hgpr Hinstr [Hex] Hcont").
     iIntros "Hf HPC HnPC Hfrag".
     iApply (swp_mono with "[Hfrag] [-]");
       [| iApply ("Hex" with "Hf HPC HnPC") ].
@@ -293,6 +308,48 @@ Section WpInstr.
   (* sigma and asking for a successor state in one fupd, which per-node    *)
   (* stepping invalidates.                                                *)
   (* ==================================================================== *)
+  (* THE COUNTED FORM (liveness.md D6): the same wrapper generic in the
+     fuel pair, with the client's permit for it.  A counted whole-function
+     proof applies its leaves at this form; [wp_instr] below is the
+     uncounted instance every other leaf call site sees. *)
+  Lemma wp_instr_k (pc npc : mword 64) (is_rvc : bool) (i : instruction)
+      (m m' : regfile) (pmpcfg0 : type_of_register pmpcfg_n)
+      {dq : dfrac} (R : iProp Σ) {k k' : fuel_kind} :
+    pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
+    cycle_permit cpu_id k k' -∗
+    mmode_config dq -∗
+    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+    pc_isk k pc -∗
+    gpr_file m -∗
+    instr pc is_rvc i -∗
+    (gpr_file m -∗
+     (R_bitvector_64 PC) ↦ᵣ pc -∗
+     (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m' ∗
+                   (R_bitvector_64 PC) ↦ᵣ pc ∗
+                   (R_bitvector_64 nextPC) ↦ᵣ npc ∗ R)) -∗
+    ▷ (mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+       pc_isk k' npc -∗ gpr_file m' -∗ R -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hpmp Hstat.
+    iIntros "#Hperm Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
+    iApply (wp_instr_exw pc npc is_rvc i m pmpcfg0
+              (fun mf => ⌜mf = m'⌝ ∗ R)%I Hpmp Hstat
+              with "Hperm Hmm Hpmpc Hpc Hgpr Hinstr [Hex] [Hcont]").
+    - iIntros "Hf HPC HnPC Hfrag".
+      iApply (swp_mono with "[Hfrag] [-]"); [| iApply ("Hex" with "Hf HPC HnPC") ].
+      iIntros (e) "(-> & Hf & HPC & HnPC & HR)".
+      iSplitR; [done|]. iFrame "HPC HnPC".
+      iSplitL "Hfrag"; [iApply (resv_any_intro with "Hfrag")|].
+      iExists m'. iFrame "Hf HR". done.
+    - iNext. iIntros (mf) "Hmm Hpmpc Hpc Hf [-> HR]".
+      iApply ("Hcont" with "Hmm Hpmpc Hpc Hf HR").
+  Qed.
+
   Lemma wp_instr (pc npc : mword 64) (is_rvc : bool) (i : instruction)
       (m m' : regfile) (pmpcfg0 : type_of_register pmpcfg_n)
       {dq : dfrac} (R : iProp Σ) :
@@ -319,16 +376,10 @@ Section WpInstr.
   Proof.
     intros Hpmp Hstat.
     iIntros "Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
-    iApply (wp_instr_ex pc npc is_rvc i m pmpcfg0
-              (fun mf => ⌜mf = m'⌝ ∗ R)%I Hpmp Hstat
-              with "Hmm Hpmpc Hpc Hgpr Hinstr [Hex] [Hcont]").
-    - iIntros "Hf HPC HnPC".
-      iApply (swp_mono with "[] [-]"); [| iApply ("Hex" with "Hf HPC HnPC") ].
-      iIntros (e) "(-> & Hf & HPC & HnPC & HR)".
-      iSplitR; [done|]. iFrame "HPC HnPC".
-      iExists m'. iFrame "Hf HR". done.
-    - iNext. iIntros (mf) "Hmm Hpmpc Hpc Hf [-> HR]".
-      iApply ("Hcont" with "Hmm Hpmpc Hpc Hf HR").
+    iDestruct (mmode_config_cert with "Hmm") as "[#Hcert Hmm]".
+    iPoseProof "Hcert" as "(_ & _ & _ & #Hany)". iSpecialize ("Hany" $! cpu_id).
+    iApply (wp_instr_k pc npc is_rvc i m m' pmpcfg0 R Hpmp Hstat
+              with "Hany Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont").
   Qed.
 
   (* ==================================================================== *)
@@ -341,6 +392,46 @@ Section WpInstr.
   (* whatever the instruction left.  [wp_instr] is the instance for the    *)
   (* leaves that never reach a memory event.                              *)
   (* ==================================================================== *)
+  Lemma wp_instr_w_k (pc npc : mword 64) (is_rvc : bool) (i : instruction)
+      (m m' : regfile) (pmpcfg0 : type_of_register pmpcfg_n)
+      {dq : dfrac} (R : iProp Σ) {k k' : fuel_kind} :
+    pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
+    cycle_permit cpu_id k k' -∗
+    mmode_config dq -∗
+    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+    pc_isk k pc -∗
+    gpr_file m -∗
+    instr pc is_rvc i -∗
+    (gpr_file m -∗
+     (R_bitvector_64 PC) ↦ᵣ pc -∗
+     (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+     resv_frag cpu_id None -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m' ∗
+                   (R_bitvector_64 PC) ↦ᵣ pc ∗
+                   (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+                   resv_any cpu_id ∗ R)) -∗
+    ▷ (mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+       pc_isk k' npc -∗ gpr_file m' -∗ R -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hpmp Hstat.
+    iIntros "#Hperm Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
+    iApply (wp_instr_exw pc npc is_rvc i m pmpcfg0
+              (fun mf => ⌜mf = m'⌝ ∗ R)%I Hpmp Hstat
+              with "Hperm Hmm Hpmpc Hpc Hgpr Hinstr [Hex] [Hcont]").
+    - iIntros "Hf HPC HnPC Hfrag".
+      iApply (swp_mono with "[] [-]");
+        [| iApply ("Hex" with "Hf HPC HnPC Hfrag") ].
+      iIntros (e) "(-> & Hf & HPC & HnPC & Hresv & HR)".
+      iSplitR; [done|]. iFrame "HPC HnPC Hresv".
+      iExists m'. iFrame "Hf HR". done.
+    - iNext. iIntros (mf) "Hmm Hpmpc Hpc Hf [-> HR]".
+      iApply ("Hcont" with "Hmm Hpmpc Hpc Hf HR").
+  Qed.
+
   Lemma wp_instr_w (pc npc : mword 64) (is_rvc : bool) (i : instruction)
       (m m' : regfile) (pmpcfg0 : type_of_register pmpcfg_n)
       {dq : dfrac} (R : iProp Σ) :
@@ -367,17 +458,10 @@ Section WpInstr.
   Proof.
     intros Hpmp Hstat.
     iIntros "Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
-    iApply (wp_instr_exw pc npc is_rvc i m pmpcfg0
-              (fun mf => ⌜mf = m'⌝ ∗ R)%I Hpmp Hstat
-              with "Hmm Hpmpc Hpc Hgpr Hinstr [Hex] [Hcont]").
-    - iIntros "Hf HPC HnPC Hfrag".
-      iApply (swp_mono with "[] [-]");
-        [| iApply ("Hex" with "Hf HPC HnPC Hfrag") ].
-      iIntros (e) "(-> & Hf & HPC & HnPC & Hresv & HR)".
-      iSplitR; [done|]. iFrame "HPC HnPC Hresv".
-      iExists m'. iFrame "Hf HR". done.
-    - iNext. iIntros (mf) "Hmm Hpmpc Hpc Hf [-> HR]".
-      iApply ("Hcont" with "Hmm Hpmpc Hpc Hf HR").
+    iDestruct (mmode_config_cert with "Hmm") as "[#Hcert Hmm]".
+    iPoseProof "Hcert" as "(_ & _ & _ & #Hany)". iSpecialize ("Hany" $! cpu_id).
+    iApply (wp_instr_w_k pc npc is_rvc i m m' pmpcfg0 R Hpmp Hstat
+              with "Hany Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont").
   Qed.
 
 End WpInstr.

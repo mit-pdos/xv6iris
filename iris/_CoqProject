@@ -64,6 +64,7 @@ PtreeType.v
 Ktier.v
 UartNames.v
 RiscvPtsto.v
+CyclePermit.v
 TsoCtx.v
 MemClaim.v
 TsoCtxAbsorbLb.v

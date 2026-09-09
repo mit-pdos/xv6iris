@@ -2686,7 +2686,7 @@ Proof.
   iDestruct (ghost_var_agree with "Hhalf Hq1") as %HSIE1.
   iDestruct (tlb_res_to_cells with "Htlbres") as (satp0 tlbv pcfg paddr)
     "(%Hsatpf & %Hpmpf & Hsatp & Htlb & Hpcfg & Hpaddr & Hsnap & #Hkinv & #Hcreds)".
-  iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
+  iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv & Hfuel)".
   iDestruct "Hmr" as (msr bmi mc micfg) "(Hmsr & Hmi & #Hmc & #Hmicfg)".
   iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
   iPoseProof "Hhw" as "#Hhwc".
@@ -2719,7 +2719,7 @@ Proof.
                ⌜intr_Q (minstret_inc_flag mc micfg Supervisor) rs2 /\
                 rsx = wrap_post rs2 mi⌝ ∗ intr_psi kt m av p pc0 is_rvc i b' R rs2)%I
             i_disj i_w_cy i_w_ti i_w_ip
-            with "Hcert Hresv [-] []").
+            with "Hcert Hresv Hfuel [-] []").
   { (* ==================== THE CYCLE'S BODY ==================== *)
     iNext. iIntros "Hfrag".
     iApply (swp_mono with "[] [-]").
@@ -3058,7 +3058,7 @@ Proof.
     iExists (wrap_post rs2 mi). iSplitR; [iPureIntro; by exists rs2, mi|].
     iFrame "Hrw Hro". iExists rs2, mi. iFrame "HPsi". iPureIntro. by split. }
   { (* ================= THE CYCLE'S CONTINUATION ================= *)
-    iNext. iIntros (rs3 rs1) "%Hag Hirw Hiro Hpsi".
+    iNext. iIntros (rs3 rs1) "%Hag Hirw Hiro Hpsi Hfuel".
     destruct Hag as ((rs2x & mix & _ & _) & Hag).
     iDestruct "Hpsi" as (rs2 mi) "((%HQ & %Heq) & Hpsi)".
     destruct HQ as (Hha2 & Hmi2 & Hpv2). subst rs1.
@@ -3083,9 +3083,9 @@ Proof.
     iAssert (∀ Rres : iProp Σ,
                (pc_is (register_lookup (R_bitvector_64 nextPC) rs2) -∗ Rres) -∗
                resv_any cpu_id -∗ Rres)%I
-      with "[HPC HnPC Hmsr3 Hmi3 Hcy3 Hti3 Hip3]" as "Hmkpc".
-    { iIntros (Rres) "Hk Hresv". iApply "Hk". rewrite /pc_is.
-      iFrame "HPC HnPC Hresv".
+      with "[HPC HnPC Hmsr3 Hmi3 Hcy3 Hti3 Hip3 Hfuel]" as "Hmkpc".
+    { iIntros (Rres) "Hk Hresv". iApply "Hk". rewrite /pc_is /pc_isk.
+      iFrame "HPC HnPC Hresv Hfuel".
       iSplitL "Hmsr3 Hmi3".
       { iExists (register_lookup (R_bitvector_64 minstret) rs3),
                 (register_lookup (R_bool minstret_increment) rs3),

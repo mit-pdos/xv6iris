@@ -1,10 +1,11 @@
 (* ObsTrace.v -- the PURE vocabulary of the observable trace.                *)
 (*                                                                          *)
-(*  The language emits four observation events (RiscvLang.mobs, §3b'):      *)
+(*  The language emits five observation events (RiscvLang.mobs, §3b'):      *)
 (*  ObsUartOut/ObsUartIn on the UART thread's drain/rx arms, ObsPowerOff/   *)
-(*  ObsPowerOn on the power thread.  This file says what a WELL-FORMED      *)
-(*  history of them looks like and proves it a STEP INVARIANT of the        *)
-(*  semantics, with no Iris in it:                                          *)
+(*  ObsPowerOn on the power thread, ObsCycle on a live hart's restart node  *)
+(*  (claude-notes/projects/liveness.md, D1).  This file says what a         *)
+(*  WELL-FORMED history of them looks like and proves it a STEP INVARIANT   *)
+(*  of the semantics, with no Iris in it:                                   *)
 (*                                                                          *)
 (*    obs_wf h g  :=  trace_shape h (gpow g)                 -- alternation  *)
 (*                 /\ obs_boots h = start_count g             -- boot count  *)
@@ -148,9 +149,20 @@ Proof.
   - cbn [obs_wire]. by rewrite app_nil_r.
 Qed.
 
-(* a UART step's events are console I/O and nothing else *)
+(* the IN-CYCLE events: everything but the two power edges.  A UART step's
+   events are console I/O; a hart's only event is its cycle announcement,
+   which carries no wire content and no boot ([node_obs_wire],
+   [node_obs_boots] below). *)
 Definition is_io (e : mobs) : bool :=
-  match e with ObsUartIn _ | ObsUartOut _ => true | _ => false end.
+  match e with ObsUartIn _ | ObsUartOut _ | ObsCycle _ _ _ => true | _ => false end.
+
+Lemma node_obs_io (cpu : CPU) (rs : regstate) (d : dev_state) (m : M unit) :
+  Forall (fun e => is_io e = true) (node_obs cpu rs d m).
+Proof. destruct m; repeat constructor. Qed.
+
+Lemma node_obs_wire (cpu : CPU) (rs : regstate) (d : dev_state) (m : M unit) :
+  obs_wire (node_obs cpu rs d m) = [].
+Proof. by destruct m. Qed.
 
 Lemma uart_step_io (d : dev_state) (κ : list mobs) (d' : dev_state) :
   uart_step d κ d' -> Forall (fun e => is_io e = true) κ.
@@ -212,6 +224,7 @@ Definition obs_step (s : option bool) (e : mobs) : option bool :=
   | Some true, ObsPowerOff => Some false
   | Some true, ObsUartIn _ => Some true
   | Some true, ObsUartOut _ => Some true
+  | Some true, ObsCycle _ _ _ => Some true
   | _, _ => None
   end.
 
@@ -254,6 +267,10 @@ Qed.
 Lemma obs_boots_io (κ : list mobs) :
   Forall (fun e => is_io e = true) κ -> obs_boots κ = 0%nat.
 Proof. induction 1 as [|e κ He _ IH]; [reflexivity|]. by destruct e. Qed.
+
+Lemma node_obs_boots (cpu : CPU) (rs : regstate) (d : dev_state) (m : M unit) :
+  obs_boots (node_obs cpu rs d m) = 0%nat.
+Proof. by destruct m. Qed.
 
 (* the CURRENT power cycle's I/O: the events since the last power event.
    A power event resets it, so with the power off it is empty. *)
@@ -307,22 +324,46 @@ Proof.
   - by rewrite Hpw.
 Qed.
 
+(* what a LIVE hart's rule may tell its callback about the history
+   ([RiscvExec.wp_hart_step_obs]): [obs_wf h g] read through
+   [thread_live g gen], with [g] projected away -- the power is on, the boot
+   count is this generation's, and the wire tie at the hart's own view of
+   the fabric. *)
+Definition obs_wf_live (h : list mobs) (gen : nat) (d : dev_state) : Prop :=
+  trace_shape h true
+  /\ obs_boots h = S gen
+  /\ obs_wire (open_seg h) = u_wire (duart d).
+
+Lemma obs_wf_live_of (h : list mobs) (g : gstate) (gen : nat) :
+  obs_wf h g -> thread_live g gen -> obs_wf_live h gen g.(gdev).
+Proof.
+  intros (Hsh & Hbt & Hw) [Hpw Hgen]. rewrite Hpw in Hsh Hbt Hw.
+  split_and!; [exact Hsh | lia | exact (Hw eq_refl)].
+Qed.
+
 Lemma prim_step_obs_wf e g κ e' g' efs (h : list mobs) :
   prim_step e g κ e' g' efs -> obs_wf h g -> obs_wf (h ++ κ) g'.
 Proof.
   intros Hstep (Hsh & Hbt & Hwire).
   destruct Hstep as
-    [ (gen & cpu & m & -> & -> & _ & [ (_ & Hn) | (_ & _ & ->) ])
+    [ (gen & cpu & m & -> & _ & [ ([Hpw Hgen] & -> & Hn) | (_ & -> & _ & ->) ])
     | [ (gen & -> & _ & _ & [ ([Hpw Hgen] & d' & Hu & ->) | (_ & -> & ->) ])
     | [ (gen & -> & _ & -> & _ & [ (_ & d' & W & log' & Hd & _ & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & -> & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
     | (-> & _ & [ (Hpw & -> & _ & ->) | (Hpw & -> & _ & Hboot) ]) ] ] ] ];
     try (rewrite app_nil_r; by split_and!).
-  - (* a hart node: silent, and it never moves the wire *)
-    rewrite app_nil_r. destruct Hn as (m' & s' & log' & tv' & itv' & r' & Hn & _ & ->). cbn.
-    split_and!; [exact Hsh|exact Hbt|].
-    intros Hpw. rewrite (Hwire Hpw). symmetry.
-    exact (mnode_step_u_wire _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
+  - (* a hart node: at most a cycle announcement, which is in-cycle, boots
+       nothing and puts nothing on the wire; and the node never moves the
+       wire *)
+    destruct Hn as (m' & s' & log' & tv' & itv' & r' & Hn & _ & ->). cbn.
+    pose proof (node_obs_io cpu (g.(gregs) cpu) g.(gdev) m) as Hio.
+    rewrite Hpw in Hsh Hbt Hwire. cbn in Hbt.
+    split_and!.
+    + rewrite Hpw. by apply trace_shape_io.
+    + rewrite Hpw obs_boots_app node_obs_boots. cbn. lia.
+    + intros _. rewrite (open_seg_io _ _ Hio) obs_wire_app node_obs_wire app_nil_r
+        (Hwire eq_refl). symmetry.
+      exact (mnode_step_u_wire _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
   - (* the UART: its events extend the open cycle, and by exactly what
        reached the wire *)
     pose proof (uart_step_io _ _ _ Hu) as Hio. cbn.

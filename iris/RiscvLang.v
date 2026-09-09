@@ -403,7 +403,7 @@ Definition resv_ok (g : gstate) : Prop :=
 (*   Iris threads a per-step observation list [κ] through [prim_step] and   *)
 (*   quantifies whole-trace adequacy over the concatenation, so a pure       *)
 (*   trace property over these events is available to a client's [phi]      *)
-(*   (claude-notes/design/adequacy.md).  Four events, on three arms:         *)
+(*   (claude-notes/design/adequacy.md).  Five events, on four arms:          *)
 (*                                                                          *)
 (*     ObsUartOut b  -- byte [b] left the UART on SOUT ([uart_step]'s drain  *)
 (*                      arm, NORMAL mode only: under LOOP the byte goes back  *)
@@ -420,6 +420,16 @@ Definition resv_ok (g : gstate) : Prop :=
 (*     ObsPowerOn /  -- the power thread's two arms.  A trace property can    *)
 (*     ObsPowerOff      therefore segment the observable trace by power       *)
 (*                      cycle without any ghost state.                        *)
+(*     ObsCycle c pc d -- hart [c] began an instruction cycle at [pc], with  *)
+(*                      the device fabric at [d] (the hart arm's RESTART      *)
+(*                      node, live branch only).  Not something the host      *)
+(*                      sees: it is the ALIGNMENT event of the liveness       *)
+(*                      design (claude-notes/projects/liveness.md, D1) --     *)
+(*                      the point where a per-hart fuel ledger is charged,    *)
+(*                      and the SAMPLE of the machine ([pc], [d]) that lets   *)
+(*                      a wait be justified as a fact about the trace (the    *)
+(*                      tx FIFO was non-empty at this cycle).  Every other    *)
+(*                      node of the hart arm is silent.                       *)
 (*                                                                          *)
 (*   Everything else stays silent (κ = []): CPU MMIO pushes a byte only      *)
 (*   into the tx FIFO -- the wire event is the device's own later drain --   *)
@@ -431,7 +441,29 @@ Inductive mobs :=
   | ObsUartIn  (b : bv 8)
   | ObsUartOut (b : bv 8)
   | ObsPowerOn
-  | ObsPowerOff.
+  | ObsPowerOff
+  | ObsCycle (c : CPU) (pc : SailStdpp.Values.mword 64) (d : dev_state).
+
+(* THE HART ARM'S OBSERVATION, per node: the restart node announces the
+   cycle, every other node is silent.  A function of the node and of the
+   hart's own pre-state (its PC and the fabric), so the event is DETERMINED
+   before the step -- which is what lets the restart rule's permit run at
+   the full mask, before the step's mask shrink (RiscvExec.wp_hart_step_obs). *)
+Definition node_obs (cpu : CPU) (rs : regstate) (d : dev_state) (m : M unit)
+    : list mobs :=
+  match m with
+  | Interface.Ret _ => [ObsCycle cpu (register_lookup PC rs) d]
+  | Interface.Next _ _ => []
+  end.
+
+(* a node that is not the restart: what the silent lifting rules ask of
+   their node ([RiscvExec.wp_hart_step_resv]) *)
+Definition hart_silent (m : M unit) : Prop :=
+  match m with Interface.Ret _ => False | Interface.Next _ _ => True end.
+
+Lemma node_obs_silent (cpu : CPU) (rs : regstate) (d : dev_state) (m : M unit) :
+  hart_silent m -> node_obs cpu rs d m = [].
+Proof. destruct m; [contradiction | reflexivity]. Qed.
 
 (* the OUTPUT bytes of an observation list -- [uart_step_wire]'s currency.
    A direct Fixpoint (not stdpp's [omap] instance method) so [cbn] reduces
@@ -1493,9 +1525,10 @@ Definition prim_step
     (e' : mexpr) (g' : gstate) (efs : list mexpr) : Prop :=
   (* THE HART ARM, one Sail-monad NODE at a time.  [LoopE] is a [HartE], so
      the corpse arm covers the instruction boundary uniformly -- one arm. *)
-  (exists gen cpu m, e = HartE gen cpu m /\ κ = [] /\ efs = [] /\
-    ((thread_live g gen /\ hart_node_step gen g cpu m e' g')
-     \/ (~ thread_live g gen /\ e' = e /\ g' = g)))
+  (exists gen cpu m, e = HartE gen cpu m /\ efs = [] /\
+    ((thread_live g gen /\ κ = node_obs cpu (g.(gregs) cpu) g.(gdev) m /\
+      hart_node_step gen g cpu m e' g')
+     \/ (~ thread_live g gen /\ κ = [] /\ e' = e /\ g' = g)))
   \/
   (* the UART arm carries the machine's console I/O OBSERVATIONS (§3b'):
      [κ] is the step relation's own index, so the drain and rx arms emit
@@ -1565,11 +1598,12 @@ Qed.
 
 Lemma prim_step_hart_inv gen cpu m g κ e' g' efs :
   prim_step (HartE gen cpu m) g κ e' g' efs ->
-  κ = [] /\ efs = [] /\
-  ((thread_live g gen /\ hart_node_step gen g cpu m e' g')
-   \/ (~ thread_live g gen /\ e' = HartE gen cpu m /\ g' = g)).
+  efs = [] /\
+  ((thread_live g gen /\ κ = node_obs cpu (g.(gregs) cpu) g.(gdev) m /\
+    hart_node_step gen g cpu m e' g')
+   \/ (~ thread_live g gen /\ κ = [] /\ e' = HartE gen cpu m /\ g' = g)).
 Proof.
-  intros [(gen0 & cpu0 & m0 & Heq & ? & ? & Harm)
+  intros [(gen0 & cpu0 & m0 & Heq & ? & Harm)
          | [(? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (Heq & _)]]]];
     try discriminate Heq.
   injection Heq as -> -> ->. by split_and!.
@@ -1713,7 +1747,7 @@ Lemma prim_step_hart_regs_frame e g κ e' g' efs (c : CPU) :
 Proof.
   intros Hstep Hnot Hnp.
   destruct Hstep as
-    [ (gen & cpu & m & -> & _ & _ & [ (_ & (m' & s' & log' & tv' & itv' & r' & _ & _ & ->)) | (_ & _ & ->) ])
+    [ (gen & cpu & m & -> & _ & [ (_ & _ & (m' & s' & log' & tv' & itv' & r' & _ & _ & ->)) | (_ & _ & _ & ->) ])
     | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & _ & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & Hp & ->) | (_ & ->) ])
@@ -1733,7 +1767,8 @@ Qed.
 Lemma prim_step_hart_dead gen cpu m g :
   ~ thread_live g gen -> prim_step (HartE gen cpu m) g [] (HartE gen cpu m) g [].
 Proof.
-  intros Hd. left. exists gen, cpu, m. split_and!; try reflexivity. by right.
+  intros Hd. left. exists gen, cpu, m. split_and!; try reflexivity.
+  by right; split_and!.
 Qed.
 
 (* THE BOUNDARY always steps when live: the restart arm needs no resources
@@ -1744,14 +1779,15 @@ Qed.
    witness that does not need it. *)
 Lemma prim_step_hart_restart gen cpu g (tick : bool) :
   thread_live g gen ->
-  prim_step (LoopE gen cpu) g [] (HartE gen cpu (riscv_step tick))
+  prim_step (LoopE gen cpu) g [ObsCycle cpu (register_lookup PC (g.(gregs) cpu)) g.(gdev)]
+    (HartE gen cpu (riscv_step tick))
     (GState (<[cpu := g.(gregs) cpu]> g.(gregs)) g.(gmem) g.(gdev)
        g.(ggen) g.(gpow) (<[cpu := None]> g.(gresv))
        g.(gimg) g.(glog) (<[cpu := g.(gtv) cpu]> g.(gtv))
        (<[cpu := g.(gitv) cpu]> g.(gitv))) [].
 Proof.
   intros Hl. left. exists gen, cpu, (Interface.Ret tt).
-  split_and!; try reflexivity. left. split; [exact Hl|].
+  split_and!; try reflexivity. left. split_and!; [exact Hl|reflexivity|].
   exists (riscv_step tick), (MState (g.(gregs) cpu) g.(gmem) g.(gdev)),
     g.(glog), (g.(gtv) cpu), (g.(gitv) cpu), None.
   split_and!; [by exists tick|reflexivity|reflexivity].
@@ -1928,7 +1964,7 @@ Lemma prim_step_resv_ok e g κ e' g' efs :
 Proof.
   intros Hstep Hok.
   destruct Hstep as
-    [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
+    [ (gen & cpu & m & -> & _ & [ (_ & _ & Hn) | (_ & _ & _ & ->) ])
     | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & _ & Hkeep & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
@@ -2025,7 +2061,7 @@ Lemma prim_step_mm_ok e g κ e' g' efs :
 Proof.
   intros Hstep Hok.
   destruct Hstep as
-    [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
+    [ (gen & cpu & m & -> & _ & [ (_ & _ & Hn) | (_ & _ & _ & ->) ])
     | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & Hlog & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
@@ -2066,7 +2102,7 @@ Lemma prim_step_itv_ok e g κ e' g' efs :
 Proof.
   intros Hstep Hok Hitv.
   destruct Hstep as
-    [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
+    [ (gen & cpu & m & -> & _ & [ (_ & _ & Hn) | (_ & _ & _ & ->) ])
     | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & Hlog & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])

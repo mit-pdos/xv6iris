@@ -622,7 +622,7 @@ Section SPtFolded.
       iDestruct (spt_frames_intro dq pc mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg
                    paddr tlbv
                    with "Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
-                         Htlbc Hpc") as "[Hfrag Hfr]".
+                         Htlbc Hpc") as "(Hfrag & Hfuel & Hfr)".
       iDestruct "Hfr" as (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0
                           elp0) "(%Hmisaval & %Hpmaall & %Helpnp & Hrw & Hro)".
       (* THE ENGINE PRODUCES THE FETCH TRANSLATION.  A leaf cannot: at the
@@ -650,10 +650,10 @@ Section SPtFolded.
                                   pcfg1 & paddr1 & tv & ->); apply s_rs_hart)
                 ltac:(intros rs2 (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & satp1 &
                                   pcfg1 & paddr1 & tv & ->); apply s_rs_mi)
-                with "Hcert Hfrag Hrw Hro [Hex HRes Hinstr Hcl] [Hcont]").
+                with "Hcert Hfrag Hfuel Hrw Hro [Hex HRes Hinstr Hcl] [Hcont]").
       2:{ (* ---- the continuation: RE-SEAL, off the rider ---- *)
           iNext. iIntros (rs3 rs2 mi)
-            "[%HQ %Hag] Hrw Hro (HRes & Hclose & Hfrag & HRl)".
+            "[%HQ %Hag] Hrw Hro (HRes & Hclose & Hfrag & HRl) Hfuel".
           destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & satp1 & pcfg1 &
                           paddr1 & tv & ->).
           iEval (rewrite -sr_swp_res_agree s_rs_satp s_rs_tlb) in "HRes".
@@ -669,7 +669,7 @@ Section SPtFolded.
           iDestruct (spt_frames_elim dq npc mi
                        (minstret_inc_flag mc micfg Supervisor) _ _ _ mc micfg
                        misa0 mseccfg0 senv0 pmar0 elp0 ms1 satp1 mie1 mdv1
-                       menvcfg1 pcfg1 paddr1 tv with "Hfrag Hrw Hro")
+                       menvcfg1 pcfg1 paddr1 tv with "Hfrag Hfuel Hrw Hro")
             as "(Hhs & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
                  Hpaddr & Htlbc & Hpc)".
           iApply ("Hcont" $! npc ms1 mdv1 with
@@ -773,7 +773,7 @@ Section SPtFolded.
       iDestruct (spt_frames_intro_b dq pc mstatus0 mie_v mdv0 menvcfg0 satp0
                    pcfg paddr tlbv
                    with "Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
-                         Hpc") as "[Hfrag Hfr]".
+                         Hpc") as "(Hfrag & Hfuel & Hfr)".
       iDestruct "Hfr" as (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0
                           elp0) "(%Hmisaval & %Hpmaall & %Helpnp & Hrw & Hro)".
       iPoseProof (spt_fetch_tr_of_regime_b R dq pc mstatus0 satp0 mie_v mdv0
@@ -798,10 +798,10 @@ Section SPtFolded.
                                   pcfg1 & paddr1 & tv & ->); apply s_rs_hart)
                 ltac:(intros rs2 (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & satp1 &
                                   pcfg1 & paddr1 & tv & ->); apply s_rs_mi)
-                with "Hcert Hfrag Hrw Hro [Hex HRes Hinstr Hcl] [Hcont]").
+                with "Hcert Hfrag Hfuel Hrw Hro [Hex HRes Hinstr Hcl] [Hcont]").
       2:{ (* ---- the continuation ---- *)
           iNext. iIntros (rs3 rs2 mi)
-            "[%HQ %Hag] Hrw Hro (HRes & Hclose & Hfrag & HRl)".
+            "[%HQ %Hag] Hrw Hro (HRes & Hclose & Hfrag & HRl) Hfuel".
           destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & satp1 & pcfg1 &
                           paddr1 & tv & ->).
           iEval (rewrite -sr_swp_res_agree s_rs_satp s_rs_tlb) in "HRes".
@@ -822,7 +822,7 @@ Section SPtFolded.
                        (minstret_inc_flag mc micfg Supervisor) _ _ _ mc micfg
                        misa0 mseccfg0 senv0 pmar0 elp0 ms1 satp1 mie1 mdv1
                        menvcfg1 pcfg1 paddr1 (register_lookup tlb rs3)
-                       with "Hfrag Hrw Hro")
+                       with "Hfrag Hfuel Hrw Hro")
             as "(Hhs & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
                  Hpaddr & Hpc)".
           iApply ("Hcont" $! npc ms1 mdv1 with
