@@ -1233,6 +1233,46 @@ application's rx/tx wands keep their shape.  `riscv_obs_pred` lives in
 — `riscv_rx_tag` sits beside it.  `AppEcho.v` builds no `xv6_app`
 record; it gains `echo_tag γcl h := ⌜disc h⌝ ∨ mono_nat_lb_own γcl 1`.
 
+RULED 2026-09-09 (owner): THE PLIC IS THE LOCK, AND IT GETS A CSL SPEC.
+uartintr/uartgetc's exclusion is NOT a kernel bug (the PLIC gateway does
+not re-forward a claimed source until completion; the claim brackets the
+whole handler) — it is a correctness argument that the proofs must
+state: `plic_claim` returns the claimed source's payload `R i` (the UART's
+is the EXCLUSIVE RIGHT TO POP, `uart_rx_tok`), `plic_complete` takes it
+back into the PLIC's logical ownership.  The PLIC invariant is not
+initialised until needed: per source `plic_preinit ∨ (plic_inited ∗ if
+claimed then emp else R i)`; boot populates the UART's slot uninitialised;
+initialising the UART/PLIC (main, after consoleinit's flush under the
+token, before plicinit) swaps to the right arm and mints the persistent
+`inited`; the disjunction elimination is FOLDED INTO plic_claim /
+plic_complete (they take the persistent witness, which rides
+`console_caps`), so callers never see it.  The `¬ enabled` clause and
+plicinithart's premise from the phase-1 design are dropped.  Brief:
+`brief-l5a-finish.md` (a fresh agent over the previous agent's tree, which
+was complete and proved except two red files; backup `l5a-wip-*.tgz`).
+L5-a (2/2) LANDED: the PLIC invariant is a row of per-source SLOTS
+(`WpUart.plic_slot γ p i := plic_preinit γ i ∨ (plic_inited γ i ∗ if
+p_claimed p i then emp else plic_payload γ i)`, over `plic_tracked =
+[uart; virtio]` — under `plic_ok` a claim returns only those two); the
+three tables are concrete and name only the UART (payload = the receive
+token `uart_rx_tok`, one-shot = `un_init`); the pre-state says nothing
+about `p`, so plicinit/plicinithart owe only `plic_slots_stable`, and the
+deposit's unreachable in-service branch parks `emp`; `plic_claim` /
+`plic_complete` take `uart_inited` and own the disjunction.  The column,
+the non-free LSR/RHR reads (`wp_uart_lsr_read_rx_s_sconf`,
+`wp_uart_rhr_pop_s_sconf`, `wp_uart_fcr_write_s_sconf`, the free read at
+`off ≠ 0`), `wp_uartgetc_inline`'s byte + tag (`ObsTrace.obs_ends_in`),
+uartintr's token loop, consoleintr's tag premise (taken, unused until
+L5-b), the boot chain (`dev_inv_alloc` → main → consoleinit → uartinit's
+flush → main's deposit before plicinit), `BootChain`/`SystemAdequacy`
+naming the token.  `rx_masked`/`rx_empty` moved to WpSconfUartAccess.
+L5-a (1/2) LANDED `8dbf1eaec`: the ambient family, the permit's tag
+output, `plic_serve_ok` in `plic_ok` with `plic_claim_serves`, the App
+plumbing, `echo_tag`.  Placements ruled for (2/2): `uart_inited γd` is a
+fourth row of `console_caps` (which already crosses `started` inside
+`main_deposit`); `uart_dlab_off` is already inside `is_txlock` ⊂
+`console_caps`, so the RHR pop's DLAB premise costs no contract change.
+
 ## Decisions outstanding (refreshed 2026-09-08)
 
 Everything ruled on 2026-09-07/08 is implemented up to and including the
