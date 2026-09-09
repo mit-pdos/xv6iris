@@ -835,7 +835,14 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   back.  `spost_at` stays `emp` until `ut_sys_out` is a post row: the
   round's premise is PRODUCED by the loop and has no producer before that
   row — turning the posts on first made `ProofUserretClosed` unprovable.
-  Remaining: (iii) the post row + the six real `spost_at` branches, B2.
+  STEP (iii) LANDED (`6b9666092`): `ut_sys_out n f` is a row of
+  `usertrap_post` at the plain entry frame and the outgoing a0 word;
+  `sysc_sys_out` beside `sysc_exec_out` in the dispatcher's post, produced
+  by the six fs arms from their contracts' armed posts (read/write's
+  `*_extra` at `fd_st_of_key` without the pure blanket) and paid quietly by
+  the rest; `xv6_spost`'s six real branches, `emp` at exec (consumed) and
+  at chdir/open (the arm split owed); the loop discharges the round's
+  `spost` premise from uservec's row.  Remaining: B2.
 
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep
