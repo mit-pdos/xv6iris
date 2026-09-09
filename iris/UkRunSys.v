@@ -385,7 +385,7 @@ Section UkRunSys.
   (* was holding is still good.  a0 is the kernel's return value, about    *)
   (* which nothing is claimed.                                             *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_quiet (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_quiet (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (n : Z) (avail : nat) :
     usysno m = n ->
     n <> USYS_exit -> n <> USYS_fork ->
@@ -400,18 +400,18 @@ Section UkRunSys.
        there was none. *)
     n <> USYS_close -> n <> USYS_dup -> n <> USYS_open ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc n -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc n -∗
     (∀ (h' : CpuId) (r : mword 64),
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m) (add_vec_int pc 4) avail -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m) (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -451,7 +451,7 @@ Section UkRunSys.
     cbn [uvis_M uvis_perm uvis_of_run].
     (* the resumed key is at the SAME view, so the bump is at [fdv] twice *)
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r with "Hrun").
@@ -473,7 +473,7 @@ Section UkRunSys.
   (* answer: [UserFd.ualloc] is that case analysis, and it is a case       *)
   (* analysis on the CALLER's ledger rather than on the kernel's choice.   *)
   (* At an all-open ledger it delivers a handle above the standard streams *)
-  (* -- [UserFd.ufd γfd fd (FdOpen …)], a separable resource a program can *)
+  (* -- [UserFd.ufd] at the descriptor's name, a resource a program can    *)
   (* carry into a subroutine and read back with [UserFd.ufd_agree]; at a   *)
   (* ledger with a closed slot it names THAT slot, which is what makes a   *)
   (* redirection ([close(1); open(path)]) provable at all.                 *)
@@ -486,14 +486,14 @@ Section UkRunSys.
   (* the handle.  ([UsysMemOk.usys_fd_ok]'s open row carries the same      *)
   (* guard, for the same reason.)                                          *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_open (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_open (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (l : list fdstate) (avail : nat) :
     usysno m = USYS_open ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_open -∗
-    ustd γfd l -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_open -∗
+    ustd (ukn_fd N) l -∗
     (∀ (h' : CpuId) (r : mword 64),
        ((∃ (fd : nat) (rd wr : bool) (t : fdtype),
            (* the number AND its bound: a caller that wants to feed this
@@ -501,9 +501,9 @@ Section UkRunSys.
               and [fd < NOFILE] is what makes that reading exact *)
            ⌜r = (mword_of_int (Z.of_nat fd) : mword 64)
             /\ (fd < NOFILE)%nat⌝ ∗
-           ualloc γfd l fd (FdOpen rd wr t))
-        ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd l)) -∗
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+           ualloc (ukn_fd N) l fd (FdOpen rd wr t))
+        ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ustd (ukn_fd N) l)) -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -511,7 +511,7 @@ Section UkRunSys.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -555,12 +555,12 @@ Section UkRunSys.
     - (* A DESCRIPTOR CAME BACK, at the LOWEST free slot -- which is the
          promise [sys_open_post] makes and the row carries, and which the
          caller's ledger turns into a NUMBER. *)
-      iMod (ufd_alloc_least γfd fdv l fd (FdOpen rd wr t) Hcl
+      iMod (ufd_alloc_least (ukn_fd N) fdv l fd (FdOpen rd wr t) Hcl
               ltac:(discriminate) with "Hufd Hstd") as "[Hufd Hh]".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
                  (<[fd := FdOpen rd wr t]> fdv) cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hdep").
       iIntros (h') "Hrun".
@@ -572,7 +572,7 @@ Section UkRunSys.
     - (* the call failed: nothing moved, and the ledger comes straight back *)
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hdep").
       iIntros (h') "Hrun".
@@ -594,7 +594,7 @@ Section UkRunSys.
   (* disturb its source, and the slot the copy lands in was CLOSED, so it  *)
   (* is not the source's.                                                  *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_dup (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_dup (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (l : list fdstate) (fd0 : nat) (st : fdstate)
       (avail : nat) :
     usysno m = USYS_dup ->
@@ -603,19 +603,19 @@ Section UkRunSys.
     bv_signed (trunc32 (m !!! Regidx (mword_of_int 10))) = Z.of_nat fd0 ->
     st <> FdClosed ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_dup -∗
-    ustd γfd l -∗
-    ufd_own γfd l fd0 st -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_dup -∗
+    ustd (ukn_fd N) l -∗
+    ufd_own (ukn_fd N) l fd0 st -∗
     (∀ (h' : CpuId) (r : mword 64),
        ((∃ fd1 : nat,
            ⌜r = (mword_of_int (Z.of_nat fd1) : mword 64)
             /\ (fd1 < NOFILE)%nat⌝ ∗
-           ualloc γfd l fd1 st ∗ ufd_own γfd (ustd_after l st) fd0 st)
+           ualloc (ukn_fd N) l fd1 st ∗ ufd_own (ukn_fd N) (ustd_after l st) fd0 st)
         ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
-           ustd γfd l ∗ ufd_own γfd l fd0 st)) -∗
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+           ustd (ukn_fd N) l ∗ ufd_own (ukn_fd N) l fd0 st)) -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -623,7 +623,7 @@ Section UkRunSys.
     intros Hn Harg Hstne Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hh0 Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -633,7 +633,7 @@ Section UkRunSys.
     iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
     (* ...and the slot the copy lands in is never the source's, which is
        what lets the claim come back at the ledger the copy left *)
-    iDestruct (ufd_own_ne_lowest γfd l fd0 st Hstne with "Hstd Hh0") as %Hnel.
+    iDestruct (ufd_own_ne_lowest (ukn_fd N) l fd0 st Hstne with "Hstd Hh0") as %Hnel.
     iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
@@ -675,13 +675,13 @@ Section UkRunSys.
          own [st] ([Hsrc], off the claim), and the destination slot was the
          LOWEST free one, which the ledger reads as a number. *)
       rewrite Hai (list_lookup_total_correct fdv fd0 st Hsrc).
-      iDestruct (ufd_own_after γfd l fd0 st st Hnel with "Hh0") as "Hh0".
-      iMod (ufd_alloc_least γfd fdv l fd1 st Hcl Hstne with "Hufd Hstd")
+      iDestruct (ufd_own_after (ukn_fd N) l fd0 st st Hnel with "Hh0") as "Hh0".
+      iMod (ufd_alloc_least (ukn_fd N) fdv l fd1 st Hcl Hstne with "Hufd Hstd")
         as "[Hufd Hh1]".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
                  (<[fd1 := st]> fdv) cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hdep").
       iIntros (h') "Hrun".
@@ -693,7 +693,7 @@ Section UkRunSys.
          nothing moved, and both resources come straight back *)
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hdep").
       iIntros (h') "Hrun".
@@ -712,17 +712,17 @@ Section UkRunSys.
   (* leaf for a proof that has not started tracking its descriptors;         *)
   (* [wp_uk_ecall_dup] is the one that pays a claim and gets two.            *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_dup_untracked (γt γd γs γfd : gname) (h : CpuId)
+  Lemma wp_uk_ecall_dup_untracked (N : uk_names) (h : CpuId)
       (m : regfile) (pc : mword 64) (l : list fdstate) (avail : nat) :
     usysno m = USYS_dup ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_dup -∗
-    ustd γfd l -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_dup -∗
+    ustd (ukn_fd N) l -∗
     (∀ (h' : CpuId) (r : mword 64) (l' : list fdstate),
-       ustd γfd l' -∗
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+       ustd (ukn_fd N) l' -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -730,7 +730,7 @@ Section UkRunSys.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -767,29 +767,29 @@ Section UkRunSys.
     cbn [uvis_M uvis_perm uvis_fd uvis_of_run] in Hfdok |- *.
     iApply uslot_bupd.
     destruct Hfdok as [(fd1 & Hr & Hcl & ->) | [Hrm ->]].
-    - iAssert (|==> ufd_auth γfd
+    - iAssert (|==> ufd_auth (ukn_fd N)
                  (<[fd1 := fdv !!! Z.to_nat (usys_argfd (tf_of m pc))]> fdv) ∗
-                 ∃ l' : list fdstate, ustd γfd l')%I
+                 ∃ l' : list fdstate, ustd (ukn_fd N) l')%I
         with "[Hufd Hstd]" as ">[Hufd Hstd]".
       { destruct (decide (fdv !!! Z.to_nat (usys_argfd (tf_of m pc)) = FdClosed))
           as [He | Hne].
         - rewrite He.
-          iDestruct (ufd_alloc_least_closed γfd fdv fd1 Hcl with "Hufd") as "$".
+          iDestruct (ufd_alloc_least_closed (ukn_fd N) fdv fd1 Hcl with "Hufd") as "$".
           iModIntro. by iExists l.
-        - iMod (ufd_alloc_least_any γfd fdv l fd1 _ Hcl Hne with "Hufd Hstd")
+        - iMod (ufd_alloc_least_any (ukn_fd N) fdv l fd1 _ Hcl Hne with "Hufd Hstd")
             as "[$ $]". by iModIntro. }
       iDestruct "Hstd" as (l') "Hstd".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
                  (<[fd1 := fdv !!! Z.to_nat (usys_argfd (tf_of m pc))]> fdv) cw cw'
                  r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hdep").
       iIntros (h') "Hrun". iApply ("Hcont" $! h' r l' with "Hstd Hrun").
     - iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hdep").
       iIntros (h') "Hrun". iApply ("Hcont" $! h' r l with "Hstd Hrun").
@@ -847,18 +847,18 @@ Section UkRunSys.
   (* a failure arm it can never discharge -- xv6's sh writes [close(fd);   *)
   (* open(path)] and checks neither result.                                *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_close (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_close (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (fd : nat) (st : fdstate) (avail : nat) :
     usysno m = USYS_close ->
     bv_signed (trunc32 (m !!! Regidx (mword_of_int 10))) = Z.of_nat fd ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_close -∗
-    ufd γfd fd st -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_close -∗
+    ufd (ukn_fd N) fd st -∗
     (∀ (h' : CpuId) (r : mword 64),
        ⌜uint r = 0⌝ -∗
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -866,7 +866,7 @@ Section UkRunSys.
     intros Hn Harg Hal4.
     iIntros "#Hi Hrun Hsb Hh Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -902,11 +902,11 @@ Section UkRunSys.
     destruct (uk_close_row m pc fd st fdv fdv' r Harg Hi Hne Hfdok)
       as [Hr0 ->].
     iApply uslot_bupd.
-    iMod (ufd_close_hi γfd fdv fd st with "Hufd Hh") as "Hufd".
+    iMod (ufd_close_hi (ukn_fd N) fdv fd st with "Hufd Hh") as "Hufd".
     iModIntro.
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
                (<[fd := FdClosed]> fdv) cw cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
               with "Hheap Hstk Hufd Hdep").
     iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "[%] Hrun"). exact Hr0.
@@ -914,21 +914,21 @@ Section UkRunSys.
 
   (* ...and the STANDARD-STREAM close, which spends the ledger's own entry
      and hands it back at [FdClosed]. *)
-  Lemma wp_uk_ecall_close_std (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_close_std (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (l : list fdstate) (fd : nat) (st : fdstate)
       (avail : nat) :
     usysno m = USYS_close ->
     bv_signed (trunc32 (m !!! Regidx (mword_of_int 10))) = Z.of_nat fd ->
     (fd < NSTD)%nat -> l !! fd = Some st -> st <> FdClosed ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_close -∗
-    ustd γfd l -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_close -∗
+    ustd (ukn_fd N) l -∗
     (∀ (h' : CpuId) (r : mword 64),
        ⌜uint r = 0⌝ -∗
-       ustd γfd (<[fd := FdClosed]> l) -∗
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+       ustd (ukn_fd N) (<[fd := FdClosed]> l) -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -936,7 +936,7 @@ Section UkRunSys.
     intros Hn Harg Hs Hkl Hne Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -972,11 +972,11 @@ Section UkRunSys.
     cbn [uvis_M uvis_perm uvis_fd uvis_of_run] in Hfdok |- *.
     destruct (uk_close_row m pc fd st fdv fdv' r Harg Hi Hne Hfdok) as [Hr0 ->].
     iApply uslot_bupd.
-    iMod (ufd_close_std γfd fdv l fd st Hs Hkl with "Hufd Hstd") as "[Hufd Hstd]".
+    iMod (ufd_close_std (ukn_fd N) fdv l fd st Hs Hkl with "Hufd Hstd") as "[Hufd Hstd]".
     iModIntro.
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
                (<[fd := FdClosed]> fdv) cw cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
               with "Hheap Hstk Hufd Hdep").
     iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "[%] Hstd Hrun"). exact Hr0.
@@ -1004,20 +1004,20 @@ Section UkRunSys.
   (* less could not absorb it, and the heap would be left describing bytes *)
   (* the kernel had changed underneath it.                                *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_read (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_read (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (a : Z) (cnt : nat) (f : nat -> bv 8) (avail : nat) :
     usysno m = USYS_read ->
     m !!! Regidx (mword_of_int 11) = (mword_of_int a : mword 64) ->
     bv_signed (subrange_vec_dec (m !!! Regidx (mword_of_int 12)) 31 0
                : mword 32) = Z.of_nat cnt ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    ubytes γd a cnt f -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_read -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    ubytes (ukn_d N) a cnt f -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_read -∗
     (∀ (h' : CpuId) (r : mword 64) (g : nat -> bv 8),
-       ubytes γd a cnt g -∗
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+       ubytes (ukn_d N) a cnt g -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1025,7 +1025,7 @@ Section UkRunSys.
     intros Hn Ha1 Hcnt Hal4.
     iIntros "#Hi Hbs Hrun Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1094,7 +1094,7 @@ Section UkRunSys.
        the only place the update CAN run, the row being what says how far
        the image moved *)
     iApply uslot_bupd.
-    iMod (uheap_store_run γt γd γs M pm sz a cnt f
+    iMod (uheap_store_run (ukn_t N) (ukn_d N) (ukn_s N) M pm sz a cnt f
             (fun k => if decide (k < d)%nat then bs k else f k)
             with "Hheap Hbs") as "[Hheap Hbs]".
     iModIntro.
@@ -1112,7 +1112,7 @@ Section UkRunSys.
                (umem_write M a cnt
                   (fun k => if decide (k < d)%nat then bs k else f k))
                pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r _ with "Hbs Hrun").
@@ -1124,15 +1124,15 @@ Section UkRunSys.
   (* image -- so the only arm that comes back is the failure, and the row  *)
   (* says so outright: -1, and not one byte moved.                         *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_exec (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_exec (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
     usysno m = USYS_exec ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_exec -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_exec -∗
     (∀ h' : CpuId,
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx (mword_of_int 10) := (mword_of_int (-1) : mword 64)]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1141,7 +1141,7 @@ Section UkRunSys.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1181,7 +1181,7 @@ Section UkRunSys.
     subst fdv'.
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw'
                (mword_of_int (-1) : mword 64) Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' with "Hrun").
@@ -1193,16 +1193,16 @@ Section UkRunSys.
   (* untouched and the leaf can hand the SAME run on -- exactly the quiet  *)
   (* row's shape.  This is the arm init and sh both take.                  *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_wait_null (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_wait_null (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
     usysno m = USYS_wait ->
     uint (m !!! Regidx (mword_of_int 10)) = 0 ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_wait -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_wait -∗
     (∀ (h' : CpuId) (r : mword 64),
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1210,7 +1210,7 @@ Section UkRunSys.
     intros Hn Hz Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1251,7 +1251,7 @@ Section UkRunSys.
         vm_compute; discriminate. }
     subst fdv'.
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r with "Hrun").
@@ -1292,7 +1292,7 @@ Section UkRunSys.
   (* instance for a caller that owns NOTHING, and this leaf is the one for  *)
   (* a caller that does.                                                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_window (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_window (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (n : Z) (dst : mword 64) (cap k : nat)
       (f : nat -> bv 8) (avail : nat) :
     usysno m = n ->
@@ -1306,28 +1306,28 @@ Section UkRunSys.
        own; the other three are outside the domain and cost nothing. *)
     n <> USYS_close -> n <> USYS_dup -> n <> USYS_open -> n <> USYS_pipe ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc n -∗
-    ubytes γd (uint dst) k f -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc n -∗
+    ubytes (ukn_d N) (uint dst) k f -∗
     (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8),
        ⌜ (d <= cap)%nat ⌝ -∗
        ⌜ forall j : nat, (d <= j < k)%nat -> g j = f j ⌝ -∗
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
-       ubytes γd (uint dst) k g -∗
+       ubytes (ukn_d N) (uint dst) k g -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hwin Hcapk Hcl Hdp Hop Hpp Hal4.
     iIntros "#Hi Hrun Hsb Hbuf Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* THE NO-WRAP FACT, off the ownership rather than off a premise *)
-    iDestruct (uheap_ubytes_run γt γd γs M pm sz (DfracOwn 1) (uint dst) k f
+    iDestruct (uheap_ubytes_run (ukn_t N) (ukn_d N) (ukn_s N) M pm sz (DfracOwn 1) (uint dst) k f
                  with "Hheap Hbuf") as %Hbnd.
     assert (Hlin : forall i : nat, (i < k)%nat ->
               uint (add_vec_int dst (Z.of_nat i)) = (uint dst + Z.of_nat i)%Z).
@@ -1390,17 +1390,17 @@ Section UkRunSys.
        re-assembly runs under [ukc]'s own binders -- which is why this leaf
        opens the close by hand instead of applying it to the goal. *)
     rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb'".
-    iEval (rewrite (ubytes_split γd (uint dst) d k f Hdk)) in "Hbuf".
+    iEval (rewrite (ubytes_split (ukn_d N) (uint dst) d k f Hdk)) in "Hbuf".
     iDestruct "Hbuf" as "[Hblo Hbhi]".
-    iMod (uheap_store_run γt γd γs M pm sz (uint dst) d f g with "Hheap Hblo")
+    iMod (uheap_store_run (ukn_t N) (ukn_d N) (ukn_s N) M pm sz (uint dst) d f g with "Hheap Hblo")
       as "[Hheap Hblo]".
-    iDestruct (ubytes_ext γd (uint dst + Z.of_nat d) (k - d)
+    iDestruct (ubytes_ext (ukn_d N) (uint dst + Z.of_nat d) (k - d)
                  (fun j => f (d + j)%nat) (fun j => g (d + j)%nat)
                  ltac:(intros j _; symmetry; apply Hgf; lia) with "Hbhi")
       as "Hbhi".
-    iAssert (ubytes γd (uint dst) k g) with "[Hblo Hbhi]" as "Hbuf".
-    { rewrite (ubytes_split γd (uint dst) d k g Hdk). iFrame "Hblo Hbhi". }
-    iDestruct (urun_close_upd γt γd γs γfd (umem_write M (uint dst) d g) pm m
+    iAssert (ubytes (ukn_d N) (uint dst) k g) with "[Hblo Hbhi]" as "Hbuf".
+    { rewrite (ubytes_split (ukn_d N) (uint dst) d k g Hdk). iFrame "Hblo Hbhi". }
+    iDestruct (urun_close_upd N (umem_write M (uint dst) d g) pm m
                  (mword_of_int 10) r sz fdv cw' (add_vec_int pc 4) avail
                  ltac:(unfold unot_sp; vm_compute; discriminate)
                  with "Hheap Hstk Hufd Hdep [Hcont Hbuf]") as "Hkc";
@@ -1436,15 +1436,15 @@ Section UkRunSys.
   (* scribbled -- the caller gets its run back at an arbitrary [g] and no  *)
   (* handles.  That is what the kernel actually promises.                  *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_pipe (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_pipe (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (l : list fdstate) (f : nat -> bv 8) (avail : nat) :
     usysno m = USYS_pipe ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_pipe -∗
-    ustd γfd l -∗
-    ubytes γd (uint (m !!! Regidx (mword_of_int 10))) 8 f -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_pipe -∗
+    ustd (ukn_fd N) l -∗
+    ubytes (ukn_d N) (uint (m !!! Regidx (mword_of_int 10))) 8 f -∗
     (∀ (h' : CpuId) (r : mword 64) (g : nat -> bv 8),
        ((∃ a b : nat,
            (* the two slots, their bound (so the caller can read either
@@ -1465,15 +1465,15 @@ Section UkRunSys.
               ledger -- which is where any program that has not just closed
               a standard stream is -- both arms are handles and the ledger
               does not move at all. *)
-           ualloc_at γfd l a (FdOpen true false FdPipe) ∗
-           ualloc_at γfd (ustd_after l (FdOpen true false FdPipe)) b
+           ualloc_at (ukn_fd N) l a (FdOpen true false FdPipe) ∗
+           ualloc_at (ukn_fd N) (ustd_after l (FdOpen true false FdPipe)) b
              (FdOpen false true FdPipe) ∗
-           ustd γfd (ustd_after (ustd_after l (FdOpen true false FdPipe))
+           ustd (ukn_fd N) (ustd_after (ustd_after l (FdOpen true false FdPipe))
                        (FdOpen false true FdPipe)))
-        ∨ (⌜ uint r <> 0 ⌝ ∗ ustd γfd l)) -∗
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+        ∨ (⌜ uint r <> 0 ⌝ ∗ ustd (ukn_fd N) l)) -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
-       ubytes γd (uint (m !!! Regidx (mword_of_int 10))) 8 g -∗
+       ubytes (ukn_d N) (uint (m !!! Regidx (mword_of_int 10))) 8 g -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1481,12 +1481,12 @@ Section UkRunSys.
     set (dst := m !!! Regidx (mword_of_int 10)).
     iIntros "#Hi Hrun Hsb Hstd Hbuf Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
-    iDestruct (uheap_ubytes_run γt γd γs M pm sz (DfracOwn 1) (uint dst) 8 f
+    iDestruct (uheap_ubytes_run (ukn_t N) (ukn_d N) (ukn_s N) M pm sz (DfracOwn 1) (uint dst) 8 f
                  with "Hheap Hbuf") as %Hbnd.
     assert (Hlin : forall i : nat, (i < 8)%nat ->
               uint (add_vec_int dst (Z.of_nat i)) = (uint dst + Z.of_nat i)%Z).
@@ -1609,9 +1609,9 @@ Section UkRunSys.
     rewrite (uslot_bump_run m pc M (umem_write M (uint dst) dd gg) pm pm sz sz
                fdv fdv' cw cw' r Hx0 Hal4).
     rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb'".
-    iEval (rewrite (ubytes_split γd (uint dst) dd 8 f Hdd8)) in "Hbuf".
+    iEval (rewrite (ubytes_split (ukn_d N) (uint dst) dd 8 f Hdd8)) in "Hbuf".
     iDestruct "Hbuf" as "[Hblo Hbhi]".
-    iMod (uheap_store_run γt γd γs M pm sz (uint dst) dd f gg with "Hheap Hblo")
+    iMod (uheap_store_run (ukn_t N) (ukn_d N) (ukn_s N) M pm sz (uint dst) dd f gg with "Hheap Hblo")
       as "[Hheap Hblo]".
     (* hoisted out of argument position: the tail bound [j < 8 - dd] is what
        [Hgf] needs and an [ltac:] there would be run before it is in scope
@@ -1619,17 +1619,17 @@ Section UkRunSys.
     assert (Htail : forall j : nat, (j < 8 - dd)%nat ->
               f (dd + j)%nat = gg (dd + j)%nat)
       by (intros j Hj; symmetry; apply Hgf; lia).
-    iDestruct (ubytes_ext γd (uint dst + Z.of_nat dd) (8 - dd)
+    iDestruct (ubytes_ext (ukn_d N) (uint dst + Z.of_nat dd) (8 - dd)
                  (fun j => f (dd + j)%nat) (fun j => gg (dd + j)%nat)
                  Htail with "Hbhi")
       as "Hbhi".
-    iAssert (ubytes γd (uint dst) 8 gg) with "[Hblo Hbhi]" as "Hbuf".
-    { rewrite (ubytes_split γd (uint dst) dd 8 gg Hdd8). iFrame "Hblo Hbhi". }
+    iAssert (ubytes (ukn_d N) (uint dst) 8 gg) with "[Hblo Hbhi]" as "Hbuf".
+    { rewrite (ubytes_split (ukn_d N) (uint dst) dd 8 gg Hdd8). iFrame "Hblo Hbhi". }
     (* ---- THE AUTHORITY MOVES TO [fdv'], and on success it pays out the
            two handles.  [b]'s end is installed first so that [a] is still
            free when its own insert runs -- the two are distinct, which is
            what the row promises. ---- *)
-    iAssert (|==> ufd_auth γfd fdv' ∗
+    iAssert (|==> ufd_auth (ukn_fd N) fdv' ∗
               ((∃ a b : nat,
                   ⌜ uint r = 0 /\ a <> b /\ (a < NOFILE)%nat /\ (b < NOFILE)%nat
                     /\ (forall i : nat, (i < 8)%nat ->
@@ -1639,21 +1639,21 @@ Section UkRunSys.
                                  else nth_byte
                                         (trunc32 (mword_of_int (Z.of_nat b) : mword 64))
                                         (i - 4)%nat) ⌝ ∗
-                  ualloc_at γfd l a (FdOpen true false FdPipe) ∗
-                  ualloc_at γfd (ustd_after l (FdOpen true false FdPipe)) b
+                  ualloc_at (ukn_fd N) l a (FdOpen true false FdPipe) ∗
+                  ualloc_at (ukn_fd N) (ustd_after l (FdOpen true false FdPipe)) b
                     (FdOpen false true FdPipe) ∗
-                  ustd γfd (ustd_after
+                  ustd (ukn_fd N) (ustd_after
                               (ustd_after l (FdOpen true false FdPipe))
                               (FdOpen false true FdPipe)))
-               ∨ (⌜ uint r <> 0 ⌝ ∗ ustd γfd l)))%I
+               ∨ (⌜ uint r <> 0 ⌝ ∗ ustd (ukn_fd N) l)))%I
       with "[Hufd Hstd]" as ">[Hufd Hhs]".
     { destruct (decide (uint r = 0)) as [Hr0 | Hr0].
       - destruct (Hsucc Hr0) as (a & b & Hne & Hca & Hcb & Hfdv' & Hbytes).
         (* allocated in the ROW's own order: read end first, write end
            against the table -- and the ledger -- that left *)
-        iMod (ufd_alloc_least γfd fdv l a (FdOpen true false FdPipe) Hca
+        iMod (ufd_alloc_least (ukn_fd N) fdv l a (FdOpen true false FdPipe) Hca
                 ltac:(discriminate) with "Hufd Hstd") as "[Hufd [Hstd Hha]]".
-        iMod (ufd_alloc_least γfd (<[a := FdOpen true false FdPipe]> fdv)
+        iMod (ufd_alloc_least (ukn_fd N) (<[a := FdOpen true false FdPipe]> fdv)
                 (ustd_after l (FdOpen true false FdPipe)) b
                 (FdOpen false true FdPipe) Hcb ltac:(discriminate)
                 with "Hufd Hstd") as "[Hufd [Hstd Hhb]]".
@@ -1667,7 +1667,7 @@ Section UkRunSys.
           | exact Hbytes ].
       - rewrite (Hfail Hr0). iModIntro. iFrame "Hufd".
         iRight. iFrame "Hstd". iPureIntro. exact Hr0. }
-    iDestruct (urun_close_upd γt γd γs γfd (umem_write M (uint dst) dd gg) pm m
+    iDestruct (urun_close_upd N (umem_write M (uint dst) dd gg) pm m
                  (mword_of_int 10) r sz fdv' cw' (add_vec_int pc 4) avail
                  ltac:(unfold unot_sp; vm_compute; discriminate)
                  with "Hheap Hstk Hufd Hdep [Hcont Hbuf Hhs]") as "Hkc";
@@ -1689,23 +1689,23 @@ Section UkRunSys.
   (* should eventually merge (this one generalizes, modulo the address      *)
   (* spelling) -- relay note in the worklist.                               *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_read_win (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_read_win (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (cnt : Z) (k : nat) (f : nat -> bv 8) (avail : nat) :
     usysno m = USYS_read ->
     bv_signed (subrange_vec_dec (m !!! Regidx (mword_of_int 12)) 31 0 : mword 32)
       = cnt ->
     (Z.to_nat cnt <= k)%nat ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_read -∗
-    ubytes γd (uint (m !!! Regidx (mword_of_int 11))) k f -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_read -∗
+    ubytes (ukn_d N) (uint (m !!! Regidx (mword_of_int 11))) k f -∗
     (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8),
        ⌜ (d <= Z.to_nat cnt)%nat ⌝ -∗
        ⌜ forall j : nat, (d <= j < k)%nat -> g j = f j ⌝ -∗
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
-       ubytes γd (uint (m !!! Regidx (mword_of_int 11))) k g -∗
+       ubytes (ukn_d N) (uint (m !!! Regidx (mword_of_int 11))) k g -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1718,7 +1718,7 @@ Section UkRunSys.
       destruct (decide (USYS_read = USYS_read)) as [_ | Hc];
         [ | exfalso; exact (Hc eq_refl) ].
       rewrite Hcnt. reflexivity. }
-    iApply (wp_uk_ecall_window γt γd γs γfd h m pc USYS_read
+    iApply (wp_uk_ecall_window N h m pc USYS_read
               (m !!! Regidx (mword_of_int 11)) (Z.to_nat cnt) k f avail
               Hn Hw Hk
               (* read is none of the four -- by computation on the number *)
@@ -1785,7 +1785,7 @@ Section UkRunSys.
   (* leaves the break page-aligned and [malloc]'s [morecore] asks for      *)
   (* whole pages, so no caller pays for it.                                *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_sbrk (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_sbrk (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (sz n : Z) (avail : nat) :
     usysno m = USYS_sbrk ->
     (* the argument, as [argint] reads it back: the low 32 bits of a0, sign
@@ -1794,15 +1794,15 @@ Section UkRunSys.
     0 <= n -> 0 <= sz -> usz_ok (sz + n) ->
     pgroundup sz = sz ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
-    udepw γt γd γs γfd m pc USYS_sbrk -∗
-    usz γs sz -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_sbrk -∗
+    usz (ukn_s N) sz -∗
     (∀ (h' : CpuId) (r : mword 64),
-       ((⌜ r = (mword_of_int (-1) : mword 64) ⌝ ∗ usz γs sz)
-        ∨ (⌜ r = (mword_of_int sz : mword 64) ⌝ ∗ usz γs (sz + n) ∗
-           ∃ g : nat -> bv 8, ubytes γd sz (Z.to_nat n) g)) -∗
-       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+       ((⌜ r = (mword_of_int (-1) : mword 64) ⌝ ∗ usz (ukn_s N) sz)
+        ∨ (⌜ r = (mword_of_int sz : mword 64) ⌝ ∗ usz (ukn_s N) (sz + n) ∗
+           ∃ g : nat -> bv 8, ubytes (ukn_d N) sz (Z.to_nat n) g)) -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1817,7 +1817,7 @@ Section UkRunSys.
     iIntros "#Hi Hrun Hsb Hsz Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut szk M pm fdv cw)
       "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
-    iMod (udepw_mint γt γd γs γfd m pc _ M pm _ fdv cw
+    iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     (* the key's break IS the program's *)
     iDestruct (uheap_usz with "Hheap Hsz") as %->.
@@ -1910,7 +1910,7 @@ Section UkRunSys.
         intros a Ha. exact (proj2 (ukp_img pt sz M Mp a Hpure) (or_intror Ha)). }
       subst M'. rewrite HMg.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd γt γd γs γfd M pm m (mword_of_int 10) r sz fdv cw'
+      iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv cw'
                 (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hdep [Hcont Hsz]").
@@ -1995,9 +1995,9 @@ Section UkRunSys.
       rewrite (uslot_bump_run m pc M (umem_grow M (sz + n)) pm pm'
                  sz (sz + n) fdv fdv cw cw' r Hx0 Hal4).
       rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb'".
-      iMod (uheap_grow_run γt γd γs M pm pm' sz n Hsz0 Hn0 Hfresh Hext
+      iMod (uheap_grow_run (ukn_t N) (ukn_d N) (ukn_s N) M pm pm' sz n Hsz0 Hn0 Hfresh Hext
               Hcan' Hstop' with "Hheap Hsz") as "(Hheap & Hsz & Hrun')".
-      iDestruct (urun_close_upd γt γd γs γfd (umem_grow M (sz + n)) pm' m
+      iDestruct (urun_close_upd N (umem_grow M (sz + n)) pm' m
                    (mword_of_int 10) r (sz + n) fdv cw' (add_vec_int pc 4) avail
                    ltac:(unfold unot_sp; vm_compute; discriminate)
                    with "Hheap Hstk Hufd Hdep [Hcont Hsz Hrun']") as "Hkc".
@@ -2008,11 +2008,11 @@ Section UkRunSys.
         [ exact Hlo' | exact Hpm' ].
   Qed.
 
-  Lemma wp_uk_ecall_exit (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_exit (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
     usysno m = USYS_exit ->
-    uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs γfd h m pc avail -∗
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn. iIntros "#Hi Hrun".

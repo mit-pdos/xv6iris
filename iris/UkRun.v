@@ -6,7 +6,7 @@
 (* packages that together with the machine bundle into the one thing a    *)
 (* user-program proof ever holds:                                          *)
 (*                                                                        *)
-(*   urun γt γd γs m pc                                                    *)
+(*   urun N h m pc avail                                                   *)
 (*                                                                        *)
 (* -- "the process is running, with general registers [m] at pc [pc]".     *)
 (* Everything else is INSIDE, existentially: the hart, the loop-constant   *)
@@ -94,6 +94,34 @@ Require Import ProcGeom.  (* [NOFILE] -- how many of them there are *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+(* ===================================================================== *)
+(* THE PROCESS'S GHOST NAMES, IN ONE RECORD.                              *)
+(*                                                                        *)
+(* The engine's per-process ghosts travel together: every leaf that       *)
+(* touches [urun] needs all of them at once, so a name carried loose is   *)
+(* an argument on [urun], on every leaf, and on every statement in every  *)
+(* program file.  The ENGINE therefore bundles them: [urun], [udepw] and  *)
+(* every leaf take the record and read the fields.                        *)
+(*                                                                        *)
+(* THE LEAF RESOURCES KEEP THEIR OWN NAMES.  [UserHeap.uheap] / [usz] /   *)
+(* [utext] / [ubyte] / [ustack] and [UserFd.ufd_auth] / [ufd] / [ustd]    *)
+(* are stated at bare gnames and APPLIED at the record's fields.  They    *)
+(* are resources in their own right, and they are used at names that are  *)
+(* nobody's running process -- the mirrored fragments [UkFork.uheap_fork] *)
+(* hands the child before the child's record exists, for one.  The record *)
+(* is the ENGINE's bundle, not a replacement for a ghost name.            *)
+(*                                                                        *)
+(* A program file binds the record and reads the fields under the names   *)
+(* the engine has always used, with four [Local Notation]s at the top of  *)
+(* its section; the engine's own leaves spell the projections out.        *)
+(* ===================================================================== *)
+Record uk_names := MkUkNames {
+  ukn_t : gname;   (* the text map's authority ([UserHeap.utext]'s) *)
+  ukn_d : gname;   (* the data map's ([ubyte], [ustack], the slack) *)
+  ukn_s : gname;   (* the break ([usz], a half of a ghost variable) *)
+  ukn_fd : gname   (* the descriptor table's ([UserFd.ufd_auth]) *)
+}.
+
 Section UkRun.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -204,19 +232,19 @@ Section UkRun.
      key, which is what exec takes always, and what a program with a
      key-reading bundle (init's mknod, a constraining application's write)
      takes at its own numbers. *)
-  Definition udepw (γt γd γs γfd : gname) (m : regfile) (pc : mword 64)
+  Definition udepw (N : uk_names) (m : regfile) (pc : mword 64)
       (n : Z) : iProp Σ :=
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
        (fdv : list fdstate) (cw : Z),
-       uheap γt γd γs M pm sz -∗ ufd_auth γfd fdv -∗
-       uheap γt γd γs M pm sz ∗ ufd_auth γfd fdv ∗
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
         ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv cw)))%I.
 
   (* the GENERIC route's supplier: a number the program admits *)
-  Lemma udepw_of_psok (γt γd γs γfd : gname) (m : regfile) (pc : mword 64)
+  Lemma udepw_of_psok (N : uk_names) (m : regfile) (pc : mword 64)
       (n : Z) :
-    psok n -> n <> USYS_exec -> ⊢ udepw γt γd γs γfd m pc n.
+    psok n -> n <> USYS_exec -> ⊢ udepw N m pc n.
   Proof.
     intros Hok Hne. rewrite /udepw. iIntros (M pm sz fdv cw) "Hh Hf".
     iFrame "Hh Hf". iLeft. iPureIntro. exact (conj Hok Hne).
@@ -227,12 +255,12 @@ Section UkRun.
      deposit can have been taken and no side condition is owed here. *)
   (* ...UNDER A BASIC UPDATE, since the law is (UexecSG.v's header).  Every
      call site is inside its leaf's own WP goal, which absorbs it. *)
-  Lemma udepw_mint (γt γd γs γfd : gname) (m : regfile) (pc : mword 64)
+  Lemma udepw_mint (N : uk_names) (m : regfile) (pc : mword 64)
       (n : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
       (fdv : list fdstate) (cw : Z) :
-    udep -∗ udepw γt γd γs γfd m pc n -∗
-    uheap γt γd γs M pm sz -∗ ufd_auth γfd fdv ==∗
-    uheap γt γd γs M pm sz ∗ ufd_auth γfd fdv ∗
+    udep -∗ udepw N m pc n -∗
+    uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
+    uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
     sbundle uslot n (uvis_of_run m pc M pm sz fdv cw).
   Proof.
     iIntros "#Hdep Hsb Hheap Hufd".
@@ -266,14 +294,14 @@ Section UkRun.
 
   (* what an exec leaf's caller does with it: the explicit disjunct of
      [udepw], at whatever key the walk has reached *)
-  Lemma udepw_of_uxsup (γt γd γs γfd : gname) (m : regfile) (pc : mword 64) :
-    uxsup -∗ udepw γt γd γs γfd m pc USYS_exec.
+  Lemma udepw_of_uxsup (N : uk_names) (m : regfile) (pc : mword 64) :
+    uxsup -∗ udepw N m pc USYS_exec.
   Proof.
     iIntros "#Hx" (M pm sz fdv cw) "Hh Hf". iFrame "Hh Hf". iRight.
     iApply "Hx".
   Qed.
 
-  Definition urun (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+  Definition urun (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) : iProp Σ :=
     (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ) (sz : Z)
@@ -290,8 +318,8 @@ Section UkRun.
        ⌜ forall pt' : uptd,
            ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) (cur_ctx (CurCtx := xi)) ∗
                         (TsoCtx.own_context (CID := h) (cur_ctx (CurCtx := xi)) -∗ Rut pt') ⌝ ∗
-       uheap γt γd γs M pm sz ∗
-       ustack γd (m !!! Regidx csp_rs1) avail ∗
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗
+       ustack (ukn_d N) (m !!! Regidx csp_rs1) avail ∗
        (* THE PROGRAM'S OWN VIEW OF ITS DESCRIPTORS, keyed at the very [fdv]
           the bundle is at.  This is the conjunct that makes a user-level fd
           fact possible: [urun] is where [fdv] is bound and carried between
@@ -302,7 +330,7 @@ Section UkRun.
           Note this is NOT [Rfd] one line down: [Rfd] is the KERNEL's
           fragment bundle, chosen by the loop and handed back whole at every
           trap, and a program never learns its ghost name. *)
-       ufd_auth γfd fdv ∗
+       ufd_auth (ukn_fd N) fdv ∗
        udep ∗
        uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw M m pc)%I.
 
@@ -320,17 +348,17 @@ Section UkRun.
   (* [sz] is a parameter: [urun] hides the break existentially, but a leaf
      that is closing back up has just destructed it, so it can say which one.
      Re-introducing the existential at THAT size is all this does. *)
-  Lemma urun_close (γt γd γs γfd : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+  Lemma urun_close (N : uk_names) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (sz : Z) (fdv : list fdstate) (cw : Z) (m : regfile) (pc : mword 64)
       (avail : nat) :
-    uheap γt γd γs M pm sz -∗
-    ustack γd (m !!! Regidx csp_rs1) avail -∗
+    uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗
+    ustack (ukn_d N) (m !!! Regidx csp_rs1) avail -∗
     (* ...and the descriptor authority, at the same [fdv] the key is at *)
-    ufd_auth γfd fdv -∗
+    ufd_auth (ukn_fd N) fdv -∗
     (* the deposit supplier and its law, back at the same key -- persistent,
        so a leaf that destructed [urun] hands the very copy it read *)
     udep -∗
-    (∀ h : CpuId, urun γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
+    (∀ h : CpuId, urun N h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
     ukc pm M sz fdv cw m pc.
   Proof.
     iIntros "Hheap Hstk Hufd #Hdep Hcont".
@@ -358,15 +386,15 @@ Section UkRun.
 
   (* ...and the same when the instruction WROTE a register: the free stack
      is keyed by sp, and [unot_sp] says this write was not to sp. *)
-  Lemma urun_close_upd (γt γd γs γfd : gname) (M : gmap Z (bv 8))
+  Lemma urun_close_upd (N : uk_names) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
       (sz : Z) (fdv : list fdstate) (cw : Z) (pc' : mword 64) (avail : nat) :
     unot_sp rd ->
-    uheap γt γd γs M pm sz -∗
-    ustack γd (m !!! Regidx csp_rs1) avail -∗
-    ufd_auth γfd fdv -∗
+    uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗
+    ustack (ukn_d N) (m !!! Regidx csp_rs1) avail -∗
+    ufd_auth (ukn_fd N) fdv -∗
     udep -∗
-    (∀ h : CpuId, urun γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
+    (∀ h : CpuId, urun N h (<[Regidx rd := v]> m) pc' avail -∗
                   WP (Loop : expr riscv_lang)) -∗
     ukc pm M sz fdv cw (<[Regidx rd := v]> m) pc'.
   Proof.
@@ -623,9 +651,9 @@ Section UkRun.
 
   (* ...and what a PROGRAM can read off its own run, without opening it: the
      two stack facts every prologue used to take as premises. *)
-  Lemma urun_stack (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma urun_stack (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
-    urun γt γd γs γfd h m pc avail -∗
+    urun N h m pc avail -∗
     ⌜ uint (m !!! Regidx csp_rs1) mod 8 = 0
       /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
   Proof.
@@ -721,23 +749,23 @@ Section UkRun.
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (* ...and the deposit supplier, exactly as [uslot_of_urun] takes it *)
     udep -∗
-    (∀ (γt γd γs γfd : gname) (h : CpuId),
+    (∀ (N : uk_names) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
-       usz γs (uvis_sz W) -∗
-       utext_all γt (uvis_M W) (uvis_perm W) -∗
-       ustd γfd (take NSTD (uvis_fd W)) -∗
+       usz (ukn_s N) (uvis_sz W) -∗
+       utext_all (ukn_t N) (uvis_M W) (uvis_perm W) -∗
+       ustd (ukn_fd N) (take NSTD (uvis_fd W)) -∗
        ([∗ map] k ↦ b ∈ base.filter
              (fun kv : Z * bv 8 =>
                 kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
                        - 8 * Z.of_nat avail)
              (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
-          ubyte γd k b) -∗
+          ubyte (ukn_d N) k b) -∗
        ([∗ map] k ↦ b ∈ base.filter
              (fun kv : Z * bv 8 =>
                 ~ (kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)))
              (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
-          ubyte γd k b) -∗
-       urun γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W))
+          ubyte (ukn_d N) k b) -∗
+       urun N h (tf_resume_gpr0 (uvis_tf W))
          (tf_resume_pc (uvis_tf W)) avail -∗
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
@@ -797,7 +825,7 @@ Section UkRun.
       unfold f. rewrite Hb'. reflexivity. }
     iDestruct (ubytes_of_map γd _ base (8 * avail) f Hf with "Dmid") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Hstd Dlo Dtop");
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd) h with "[%] Hszf Ht Hstd Dlo Dtop");
       [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
@@ -843,10 +871,10 @@ Section UkRun.
        ([Dsup := ssupply], every number admitted); a verified program's
        constructor passes its own. *)
     udep -∗
-    (∀ (γt γd γs γfd : gname) (h : CpuId),
+    (∀ (N : uk_names) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
-       usz γs (uvis_sz W) -∗
-       utext_all γt (uvis_M W) (uvis_perm W) -∗
+       usz (ukn_s N) (uvis_sz W) -∗
+       utext_all (ukn_t N) (uvis_M W) (uvis_perm W) -∗
        (* THE LEDGER OF THE STANDARD STREAMS, at the states the resumed key
           carries.  It comes out here because it has to: the low [NSTD] keys
           are in [UserFd.ufd_map] by construction, so their fragments exist
@@ -855,8 +883,8 @@ Section UkRun.
           that does not care about its standard streams drops it -- and then
           calls no allocating syscall, which is the honest reading of "it is
           not tracking its descriptors". *)
-       ustd γfd (take NSTD (uvis_fd W)) -∗
-       urun γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
+       ustd (ukn_fd N) (take NSTD (uvis_fd W)) -∗
+       urun N h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          avail -∗
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
@@ -891,7 +919,7 @@ Section UkRun.
       unfold f. unfold D, base in *. rewrite Hb. reflexivity. }
     iDestruct (ubytes_of_map γd D base (8 * avail) f Hf with "Hd") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Hstd");
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd) h with "[%] Hszf Ht Hstd");
       [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
@@ -945,10 +973,10 @@ Section UkRun.
        ([Dsup := ssupply], every number admitted); a verified program's
        constructor passes its own. *)
     udep -∗
-    (∀ (γt γd γs γfd : gname) (h : CpuId),
+    (∀ (N : uk_names) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
-       usz γs (uvis_sz W) -∗
-       utext_all γt (uvis_M W) (uvis_perm W) -∗
+       usz (ukn_s N) (uvis_sz W) -∗
+       utext_all (ukn_t N) (uvis_M W) (uvis_perm W) -∗
        (* THE LEDGER OF THE STANDARD STREAMS, at the states the resumed key
           carries.  It comes out here because it has to: the low [NSTD] keys
           are in [UserFd.ufd_map] by construction, so their fragments exist
@@ -957,13 +985,13 @@ Section UkRun.
           that does not care about its standard streams drops it -- and then
           calls no allocating syscall, which is the honest reading of "it is
           not tracking its descriptors". *)
-       ustd γfd (take NSTD (uvis_fd W)) -∗
+       ustd (ukn_fd N) (take NSTD (uvis_fd W)) -∗
        ([∗ map] k ↦ b ∈ base.filter
              (fun kv : Z * bv 8 =>
                 ~ (kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)))
              (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
-          ubyteq γd DfracDiscarded k b) -∗
-       urun γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
+          ubyteq (ukn_d N) DfracDiscarded k b) -∗
+       urun N h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          avail -∗
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
@@ -1010,7 +1038,7 @@ Section UkRun.
                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D)
                  base (8 * avail) f Hf with "Dlo") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Hstd Dhi");
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd) h with "[%] Hszf Ht Hstd Dhi");
       [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),

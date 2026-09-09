@@ -258,21 +258,21 @@ Section UShKernel.
   (* ------------------------------------------------------------------- *)
   (* SS1 UkSh's Hypothesis, discharged (header).                          *)
   (* ------------------------------------------------------------------- *)
-  Lemma ush_read_leaf_of_win (γt γd γs γfd : gname) :
+  Lemma ush_read_leaf_of_win (N : uk_names) :
     forall (h : CpuId) (m : regfile) (pc : mword 64) (a : Z) (k : nat)
            (f : nat -> bv 8) (avail : nat),
       usysno m = USYS_read ->
       uint (m !!! Regidx (mword_of_int 11 : mword 5)) = a ->
       uint (m !!! Regidx (mword_of_int 12 : mword 5)) = Z.of_nat k ->
       is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-      uinstr_is γt pc false (ECALL tt) -∗
-      ubytes γd a k f -∗
-      urun γt γd γs γfd h m pc avail -∗
+      uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+      ubytes (ukn_d N) a k f -∗
+      urun N h m pc avail -∗
       (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8),
          ⌜ (d <= k)%nat ⌝ -∗
          ⌜ forall j : nat, (d <= j < k)%nat -> g j = f j ⌝ -∗
-         ubytes γd a k g -∗
-         urun γt γd γs γfd h' (<[Regidx (mword_of_int 10 : mword 5) := r]> m)
+         ubytes (ukn_d N) a k g -∗
+         urun N h' (<[Regidx (mword_of_int 10 : mword 5) := r]> m)
            (add_vec_int pc 4) avail -∗
          WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang).
@@ -281,7 +281,7 @@ Section UShKernel.
     iIntros "#Hi Hbuf Hrun Hcont".
     subst a.
     pose proof (sh_rdcount_le _ k Hk) as Hcnt.
-    iApply (wp_uk_ecall_read_win γt γd γs γfd h m pc _ k f avail Hn eq_refl
+    iApply (wp_uk_ecall_read_win N h m pc _ k f avail Hn eq_refl
               Hcnt Hal4 with "Hi Hrun [] Hbuf").
     { iApply udepw_of_psok; [ apply Hpsok | ]; (vm_compute; discriminate). }
     iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
@@ -338,22 +338,24 @@ Section UShKernel.
        obligation; the exec bundle rides in through [ush_rest], whose
        discharge takes [UkRun.uxsup].) *)
     udep -∗
-    (∀ γt γd γs γfd : gname, ush_rest γt γd γs γfd (R γt γd γs)) -∗
+    (∀ N : uk_names,
+       ush_rest N (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
     uslot W.
   Proof.
     intros Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hfdnone Hstop.
     iIntros "#Hpay #Hdep #Hrest".
     iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Hal8
               Hroom Hstk Hfdlen Hstop with "Hdep").
-    iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht Hstd Dlo _ Hrun".
+    iIntros (N h) "%Hsz Hszf #Ht Hstd Dlo _ Hrun".
     rewrite Hpc.
     (* [R] and the line buffer, out of the data below the frame *)
-    iDestruct ("Hpay" $! γt γd γs with "Hszf Dlo") as (f) "[HR Hbs]".
-    iPoseProof ("Hrest" $! γt γd γs γfd) as "#Hr".
-    iApply (wp_ksh_start γt γd γs γfd Hpsok (ush_read_leaf_of_win γt γd γs γfd)
-              (R γt γd γs) h _ f n0 (take NSTD (uvis_fd W))
+    iDestruct ("Hpay" $! (ukn_t N) (ukn_d N) (ukn_s N) with "Hszf Dlo")
+      as (f) "[HR Hbs]".
+    iPoseProof ("Hrest" $! N) as "#Hr".
+    iApply (wp_ksh_start N Hpsok (ush_read_leaf_of_win N)
+              (R (ukn_t N) (ukn_d N) (ukn_s N)) h _ f n0 (take NSTD (uvis_fd W))
               with "Hr [] [Hstd] HR Hbs [Hrun]").
-    - iApply (shk_code_of_text γt (uvis_M W) (uvis_perm W)
+    - iApply (shk_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (shk_img_text _ Hsub) Hx with "Ht").
     - rewrite /ush_std. iFrame "Hstd". iPureIntro.
       exact (fd_lowest_closed_take_none _ _ Hfdnone).
@@ -392,7 +394,8 @@ Section UShKernel.
         ∃ f : nat -> bv 8, R γt γd γs ∗ ubytes γd sh_buf sh_nbuf f) -∗
     (* the deposit supplier, passed straight through *)
     udep -∗
-    (∀ γt γd γs γfd : gname, ush_rest γt γd γs γfd (R γt γd γs)) -∗
+    (∀ N : uk_names,
+       ush_rest N (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
     uslot W'.
   Proof.
     intros Hok Hroom Hlen Hnone Hstop.

@@ -55,7 +55,12 @@ Section UkSync.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
-  Context (γt γd γs γfd : gname).
+  Context (N : uk_names).
+  (* the fields, under the names the engine has always used *)
+  Local Notation γt := (ukn_t N).
+  Local Notation γd := (ukn_d N).
+  Local Notation γs := (ukn_s N).
+  Local Notation γfd := (ukn_fd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -80,14 +85,14 @@ Section UkSync.
   (* ------------------------------------------------------------------- *)
   Lemma wp_ksync_exit (h : CpuId) (m : regfile) (avail : nat) :
     sync_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int SyncSyms.exit) avail -∗
+    urun N h m (mword_of_int SyncSyms.exit) avail -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun".
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
     rewrite Hsexit.
     (* 0x2c8  c.li a7,2 *)
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x2c8)
+    iApply (wp_uk_cli N h m (mword_of_int 0x2c8)
               (mword_of_int 2 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -104,7 +109,7 @@ Section UkSync.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 2 : mword 64)]> m).
     (* 0x2ca  ecall -- SYS_exit, the arm with no continuation *)
-    iApply (wp_uk_ecall_exit γt γd γs γfd h1 m1 (mword_of_int 0x2ca) avail
+    iApply (wp_uk_ecall_exit N h1 m1 (mword_of_int 0x2ca) avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 2 : mword 64));
                     vm_compute; reflexivity)
@@ -120,9 +125,9 @@ Section UkSync.
   Lemma wp_ksync_sync (h : CpuId) (m : regfile) (avail : nat) :
     is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true ->
     sync_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int SyncSyms.sync) avail -∗
+    urun N h m (mword_of_int SyncSyms.sync) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m))
          (m !!! Regidx ra_idx) avail -∗
@@ -133,7 +138,7 @@ Section UkSync.
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
     rewrite Hssync.
     (* 0x368  c.li a7,22 *)
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x368)
+    iApply (wp_uk_cli N h m (mword_of_int 0x368)
               (mword_of_int 22 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -150,7 +155,7 @@ Section UkSync.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m).
     (* 0x36a  ecall -- the QUIET row *)
-    iApply (wp_uk_ecall_quiet γt γd γs γfd h1 m1 (mword_of_int 0x36a) 22 avail
+    iApply (wp_uk_ecall_quiet N h1 m1 (mword_of_int 0x36a) 22 avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 22 : mword 64));
                     vm_compute; reflexivity)
@@ -180,7 +185,7 @@ Section UkSync.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 22 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x36e) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x36e) ra_idx
               (m !!! Regidx ra_idx) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; unfold ret_pc; symmetry;
@@ -207,7 +212,7 @@ Section UkSync.
   Lemma wp_ksync_main (h : CpuId) (m : regfile) (sp0 : mword 64) (n : nat) :
     m !!! Regidx csp_rs1 = sp0 ->
     sync_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int SyncSyms.main) (2 + n) -∗
+    urun N h m (mword_of_int SyncSyms.main) (2 + n) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp. iIntros "#Hcode Hrun".
@@ -226,7 +231,7 @@ Section UkSync.
     assert (Ho0 : uoff_sdsp (mword_of_int 0 : mword 6) = 0)
       by (vm_compute; reflexivity).
     (* ---- 0x00  c.addi sp,sp,-16 -- THE PUSH ---- *)
-    iApply (wp_uk_caddi_sp_dn γt γd γs γfd h m (mword_of_int 0x0)
+    iApply (wp_uk_caddi_sp_dn N h m (mword_of_int 0x0)
               (mword_of_int 48 : mword 6) 2 n
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "[] Hrun").
@@ -243,7 +248,7 @@ Section UkSync.
       by exact (upd_eq m (Regidx csp_rs1)
                   (regval_into_reg (add_vec_int sp0 (-16)))).
     (* ---- 0x02  c.sdsp ra,8(sp) ---- *)
-    iApply (wp_uk_csdsp γt γd γs γfd h1 m1 (mword_of_int 0x2)
+    iApply (wp_uk_csdsp N h1 m1 (mword_of_int 0x2)
               (mword_of_int 1 : mword 6) ra_idx (uint sp0 - 8) v8 n
               ltac:(rewrite Hsp1 Hsp16 Ho8; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
@@ -255,7 +260,7 @@ Section UkSync.
     rewrite E02.
     iIntros (h2) "Hrun".
     (* ---- 0x04  c.sdsp s0,0(sp) ---- *)
-    iApply (wp_uk_csdsp γt γd γs γfd h2 m1 (mword_of_int 0x4)
+    iApply (wp_uk_csdsp N h2 m1 (mword_of_int 0x4)
               (mword_of_int 0 : mword 6) s0_idx (uint sp0 - 16) v0 n
               ltac:(rewrite Hsp1 Hsp16 Ho0; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
@@ -267,7 +272,7 @@ Section UkSync.
     rewrite E04.
     iIntros (h3) "Hrun".
     (* ---- 0x06  c.addi4spn s0,sp,16 (s0 is never read again in main) ---- *)
-    iApply (wp_uk_caddi4spn γt γd γs γfd h3 m1 (mword_of_int 0x6)
+    iApply (wp_uk_caddi4spn N h3 m1 (mword_of_int 0x6)
               (mword_of_int 0 : mword 3) (mword_of_int 4 : mword 8) s0_idx
               (add_vec_int (add_vec_int sp0 (-16)) 16) n
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -287,7 +292,7 @@ Section UkSync.
     set (m2 := <[Regidx s0_idx
                  := regval_into_reg (add_vec_int (add_vec_int sp0 (-16)) 16)]> m1).
     (* ---- 0x08  jal ra,0x368 <sync> ---- *)
-    iApply (wp_uk_jal γt γd γs γfd h4 m2 (mword_of_int 0x8)
+    iApply (wp_uk_jal N h4 m2 (mword_of_int 0x8)
               (mword_of_int 864 : mword 21) ra_idx
               (mword_of_int SyncSyms.sync) (mword_of_int 0xc) n
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -312,7 +317,7 @@ Section UkSync.
     set (m4 := <[Regidx a0_idx := ret]>
                  (<[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m3)).
     (* ---- 0x0c  c.li a0,0 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h6 m4 (mword_of_int 0xc)
+    iApply (wp_uk_cli N h6 m4 (mword_of_int 0xc)
               (mword_of_int 0 : mword 6) a0_idx n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -325,7 +330,7 @@ Section UkSync.
                  := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 6)
                                      : mword 64)]> m4).
     (* ---- 0x0e  jal ra,0x2c8 <exit> -- diverges ---- *)
-    iApply (wp_uk_jal γt γd γs γfd h7 m5 (mword_of_int 0xe)
+    iApply (wp_uk_jal N h7 m5 (mword_of_int 0xe)
               (mword_of_int 698 : mword 21) ra_idx
               (mword_of_int SyncSyms.exit) (mword_of_int 0x12) n
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -353,7 +358,7 @@ Section UkSync.
   Lemma wp_ksync_start (h : CpuId) (m : regfile) (sp0 : mword 64) (n : nat) :
     m !!! Regidx csp_rs1 = sp0 ->
     sync_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int SyncSyms.start) (2 + (2 + n)) -∗
+    urun N h m (mword_of_int SyncSyms.start) (2 + (2 + n)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp. iIntros "#Hcode Hrun".
@@ -372,7 +377,7 @@ Section UkSync.
     assert (Ho0 : uoff_sdsp (mword_of_int 0 : mword 6) = 0)
       by (vm_compute; reflexivity).
     (* ---- 0x12  c.addi sp,sp,-16 -- THE PUSH ---- *)
-    iApply (wp_uk_caddi_sp_dn γt γd γs γfd h m (mword_of_int 0x12)
+    iApply (wp_uk_caddi_sp_dn N h m (mword_of_int 0x12)
               (mword_of_int 48 : mword 6) 2 (2 + n)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "[] Hrun").
@@ -389,7 +394,7 @@ Section UkSync.
       by exact (upd_eq m (Regidx csp_rs1)
                   (regval_into_reg (add_vec_int sp0 (-16)))).
     (* ---- 0x14  c.sdsp ra,8(sp) ---- *)
-    iApply (wp_uk_csdsp γt γd γs γfd h1 m1 (mword_of_int 0x14)
+    iApply (wp_uk_csdsp N h1 m1 (mword_of_int 0x14)
               (mword_of_int 1 : mword 6) ra_idx (uint sp0 - 8) v8 (2 + n)
               ltac:(rewrite Hsp1 Hsp16 Ho8; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
@@ -401,7 +406,7 @@ Section UkSync.
     rewrite E14.
     iIntros (h2) "Hrun".
     (* ---- 0x16  c.sdsp s0,0(sp) ---- *)
-    iApply (wp_uk_csdsp γt γd γs γfd h2 m1 (mword_of_int 0x16)
+    iApply (wp_uk_csdsp N h2 m1 (mword_of_int 0x16)
               (mword_of_int 0 : mword 6) s0_idx (uint sp0 - 16) v0 (2 + n)
               ltac:(rewrite Hsp1 Hsp16 Ho0; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
@@ -413,7 +418,7 @@ Section UkSync.
     rewrite E16.
     iIntros (h3) "Hrun".
     (* ---- 0x18  c.addi4spn s0,sp,16 ---- *)
-    iApply (wp_uk_caddi4spn γt γd γs γfd h3 m1 (mword_of_int 0x18)
+    iApply (wp_uk_caddi4spn N h3 m1 (mword_of_int 0x18)
               (mword_of_int 0 : mword 3) (mword_of_int 4 : mword 8) s0_idx
               (add_vec_int (add_vec_int sp0 (-16)) 16) (2 + n)
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -433,7 +438,7 @@ Section UkSync.
     set (m2 := <[Regidx s0_idx
                  := regval_into_reg (add_vec_int (add_vec_int sp0 (-16)) 16)]> m1).
     (* ---- 0x1a  jal ra,0x0 <main> ---- *)
-    iApply (wp_uk_jal γt γd γs γfd h4 m2 (mword_of_int 0x1a)
+    iApply (wp_uk_jal N h4 m2 (mword_of_int 0x1a)
               (mword_of_int 2097126 : mword 21) ra_idx
               (mword_of_int SyncSyms.main) (mword_of_int 0x1e) (2 + n)
               ltac:(unfold unot_sp; vm_compute; discriminate)

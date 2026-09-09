@@ -51,7 +51,12 @@ Section UkShParseLex.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
-  Context (γt γd γs γfd : gname).
+  Context (N : uk_names).
+  (* the fields, under the names the engine has always used *)
+  Local Notation γt := (ukn_t N).
+  Local Notation γd := (ukn_d N).
+  Local Notation γs := (ukn_s N).
+  Local Notation γfd := (ukn_fd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
@@ -80,23 +85,23 @@ Section UkShParseLex.
   (* ---- what the earlier files of the parser define, at this
          file's own ghost names.  Everything else they export is a
          PURE constant and comes in with the [Require Import]. ---- *)
-  Local Notation urun_x0 := (UkShParse.urun_x0 γt γd γs γfd).
-  Local Notation ushp_exec_at := (UkShParse.ushp_exec_at γd).
-  Local Notation ushp_exec_pre := (UkShParse.ushp_exec_pre γd).
-  Local Notation ushp_frame_join := (UkShParse.ushp_frame_join γd).
-  Local Notation ushp_frame_split := (UkShParse.ushp_frame_split γd).
-  Local Notation ushp_malloc_ty := (UkShParse.ushp_malloc_ty γt γd γs γfd).
-  Local Notation ushp_peel0 := (UkShParse.ushp_peel0 γd).
-  Local Notation ushp_slots_nil0 := (UkShParse.ushp_slots_nil0 γd).
-  Local Notation ushp_sstr := (UkShParse.ushp_sstr γt γd).
-  Local Notation ushp_sstr_text := (UkShParse.ushp_sstr_text γt γd).
-  Local Notation ushp_type_at := (UkShParse.ushp_type_at γd).
-  Local Notation ushp_ubytes_ext := (UkShParse.ushp_ubytes_ext γd).
-  Local Notation wp_kshp_fp := (UkShParse.wp_kshp_fp γt γd γs γfd).
-  Local Notation wp_kshp_restore := (UkShParse.wp_kshp_restore γt γd γs γfd).
-  Local Notation wp_kshp_spill := (UkShParse.wp_kshp_spill γt γd γs γfd).
-  Local Notation wp_kshp_strchr := (UkShParse.wp_kshp_strchr γt γd γs γfd).
-  Local Notation wp_kshp_strlen := (UkShParse.wp_kshp_strlen γt γd γs γfd).
+  Local Notation urun_x0 := (UkShParse.urun_x0 N).
+  Local Notation ushp_exec_at := (UkShParse.ushp_exec_at N).
+  Local Notation ushp_exec_pre := (UkShParse.ushp_exec_pre N).
+  Local Notation ushp_frame_join := (UkShParse.ushp_frame_join N).
+  Local Notation ushp_frame_split := (UkShParse.ushp_frame_split N).
+  Local Notation ushp_malloc_ty := (UkShParse.ushp_malloc_ty N).
+  Local Notation ushp_peel0 := (UkShParse.ushp_peel0 N).
+  Local Notation ushp_slots_nil0 := (UkShParse.ushp_slots_nil0 N).
+  Local Notation ushp_sstr := (UkShParse.ushp_sstr N).
+  Local Notation ushp_sstr_text := (UkShParse.ushp_sstr_text N).
+  Local Notation ushp_type_at := (UkShParse.ushp_type_at N).
+  Local Notation ushp_ubytes_ext := (UkShParse.ushp_ubytes_ext N).
+  Local Notation wp_kshp_fp := (UkShParse.wp_kshp_fp N).
+  Local Notation wp_kshp_restore := (UkShParse.wp_kshp_restore N).
+  Local Notation wp_kshp_spill := (UkShParse.wp_kshp_spill N).
+  Local Notation wp_kshp_strchr := (UkShParse.wp_kshp_strchr N).
+  Local Notation wp_kshp_strlen := (UkShParse.wp_kshp_strlen N).
 
 
   (* ===================================================================== *)
@@ -185,7 +190,7 @@ Section UkShParseLex.
     shp_code γt -∗
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
-    urun γt γd γs γfd h mc (mword_of_int 0x46e) (2 + nn) -∗
+    urun N h mc (mword_of_int 0x46e) (2 + nn) -∗
     (ustr γd dq s0 len f -∗
      ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
        ∀ (h' : CpuId) (mc' : regfile),
@@ -195,7 +200,7 @@ Section UkShParseLex.
          ⌜ mc' !!! Regidx s1_idx
              = mword_of_int
                  (s0 + Z.of_nat (j + ushp_skipws (len - j) j f)) ⌝ -∗
-         urun γt γd γs γfd h' mc' (mword_of_int 0x482) (2 + nn) -∗
+         urun N h' mc' (mword_of_int 0x482) (2 + nn) -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -205,7 +210,7 @@ Section UkShParseLex.
     iDestruct (ustr_nonul with "Hstr") as %Hne.
     (* ---- 0x46e  lbu a1,0(s1) ---- *)
     iDestruct (ustr_byte γd dq s0 len f j Hj with "Hstr") as "[Hb Hcl]".
-    iApply (wp_uk_lbu γt γd γs γfd h mc (mword_of_int 0x46e)
+    iApply (wp_uk_lbu N h mc (mword_of_int 0x46e)
               (mword_of_int 0 : mword 12) s1_idx a1_idx dq
               (s0 + Z.of_nat j) (f j) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -229,7 +234,7 @@ Section UkShParseLex.
                                    : mword 64))).
       exact (zext8_moi (f j)). }
     (* ---- 0x472  c.mv a0,s3 ---- *)
-    iApply (wp_uk_cmv γt γd γs γfd h1 m1 (mword_of_int 0x472) a0_idx s3_idx
+    iApply (wp_uk_cmv N h1 m1 (mword_of_int 0x472) a0_idx s3_idx
               (mword_of_int ushp_whitespace) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -245,7 +250,7 @@ Section UkShParseLex.
                     m2 !!! Regidx q = m1 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m1 (Regidx a0_idx) (Regidx q) _ Hq)).
     (* ---- 0x474  jal a82 <strchr> ---- *)
-    iApply (wp_uk_jal γt γd γs γfd h2 m2 (mword_of_int 0x474)
+    iApply (wp_uk_jal N h2 m2 (mword_of_int 0x474)
               (mword_of_int 1550 : mword 21) ra_idx
               (mword_of_int 0xa82) (mword_of_int 0x478) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -301,7 +306,7 @@ Section UkShParseLex.
       assert (Htk : true = eq_vec (m4 !!! Regidx a0_idx) zero_reg).
       { rewrite Ha0_4 (ushp_ws_chr_z (f j) Ews).
         rewrite (moi_eq_zero 0 ltac:(unfold Z64; lia)). reflexivity. }
-      iApply (wp_uk_cbeqz γt γd γs γfd h4 m4 (mword_of_int 0x478)
+      iApply (wp_uk_cbeqz N h4 m4 (mword_of_int 0x478)
                 (mword_of_int 5 : mword 8) (mword_of_int 2 : mword 3)
                 a0_idx true (mword_of_int 0x482) (2 + nn)
                 ltac:(vm_compute; reflexivity) Htk
@@ -321,7 +326,7 @@ Section UkShParseLex.
       rewrite (moi_eq_zero (ushp_whitespace + Z.of_nat k)
                  ltac:(unfold ushp_whitespace, Z64; lia)).
       symmetry. apply Z.eqb_neq. unfold ushp_whitespace. lia. }
-    iApply (wp_uk_cbeqz γt γd γs γfd h4 m4 (mword_of_int 0x478)
+    iApply (wp_uk_cbeqz N h4 m4 (mword_of_int 0x478)
               (mword_of_int 5 : mword 8) (mword_of_int 2 : mword 3)
               a0_idx false (mword_of_int 0x482) (2 + nn)
               ltac:(vm_compute; reflexivity) Htk
@@ -334,7 +339,7 @@ Section UkShParseLex.
     assert (E1 : (sign_extend' 64 (mword_of_int 1 : mword 6) : mword 64)
                  = mword_of_int 1)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_uk_caddi γt γd γs γfd h5 m4 (mword_of_int 0x47a)
+    iApply (wp_uk_caddi N h5 m4 (mword_of_int 0x47a)
               (mword_of_int 1 : mword 6) s1_idx
               (mword_of_int (s0 + Z.of_nat (S j))) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -370,7 +375,7 @@ Section UkShParseLex.
         rewrite (ushp_moi_neq (s0 + Z.of_nat len) (s0 + Z.of_nat len)
                    ltac:(lia) ltac:(lia)).
         rewrite Z.eqb_refl. reflexivity. }
-      iApply (wp_uk_btype γt γd γs γfd h6 m5 (mword_of_int 0x47c)
+      iApply (wp_uk_btype N h6 m5 (mword_of_int 0x47c)
                 (mword_of_int 8178 : mword 13) s1_idx s2_idx BNE false
                 (mword_of_int 0x46e) (2 + nn)
                 Htk2
@@ -380,7 +385,7 @@ Section UkShParseLex.
       { iApply (uis_shp_47c with "Hcode"). }
       rewrite (ushp_pc_step 0x47c 4). iIntros (h7) "Hrun".
       (* ---- 0x480  c.mv s1,s2 -- [s = es], which it already is ---- *)
-      iApply (wp_uk_cmv γt γd γs γfd h7 m5 (mword_of_int 0x480) s1_idx s2_idx
+      iApply (wp_uk_cmv N h7 m5 (mword_of_int 0x480) s1_idx s2_idx
                 (mword_of_int (s0 + Z.of_nat len)) (2 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
@@ -412,7 +417,7 @@ Section UkShParseLex.
       assert (Hne2 : (s0 + Z.of_nat len =? s0 + Z.of_nat (S j)) = false)
         by (apply Z.eqb_neq; lia).
       rewrite Hne2. reflexivity. }
-    iApply (wp_uk_btype γt γd γs γfd h6 m5 (mword_of_int 0x47c)
+    iApply (wp_uk_btype N h6 m5 (mword_of_int 0x47c)
               (mword_of_int 8178 : mword 13) s1_idx s2_idx BNE true
               (mword_of_int 0x46e) (2 + nn)
               Htk2
@@ -448,7 +453,7 @@ Section UkShParseLex.
     shp_code γt -∗
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
-    urun γt γd γs γfd h mc (mword_of_int 0x46a) (2 + nn) -∗
+    urun N h mc (mword_of_int 0x46a) (2 + nn) -∗
     (ustr γd dq s0 len f -∗
      ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
        ∀ (h' : CpuId) (mc' : regfile),
@@ -458,7 +463,7 @@ Section UkShParseLex.
          ⌜ mc' !!! Regidx s1_idx
              = mword_of_int
                  (s0 + Z.of_nat (j + ushp_skipws (len - j) j f)) ⌝ -∗
-         urun γt γd γs γfd h' mc' (mword_of_int 0x482) (2 + nn) -∗
+         urun N h' mc' (mword_of_int 0x482) (2 + nn) -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -472,7 +477,7 @@ Section UkShParseLex.
         rewrite (moi_ge_u (s0 + Z.of_nat len) (s0 + Z.of_nat len)
                    ltac:(unfold Z64 in *; lia) ltac:(unfold Z64 in *; lia)).
         symmetry. apply Z.geb_le. lia. }
-      iApply (wp_uk_btype γt γd γs γfd h mc (mword_of_int 0x46a)
+      iApply (wp_uk_btype N h mc (mword_of_int 0x46a)
                 (mword_of_int 24 : mword 13) a1_idx s1_idx BGEU true
                 (mword_of_int 0x482) (2 + nn)
                 Htk
@@ -494,7 +499,7 @@ Section UkShParseLex.
       rewrite (moi_ge_u (s0 + Z.of_nat j) (s0 + Z.of_nat len)
                  ltac:(unfold Z64 in *; lia) ltac:(unfold Z64 in *; lia)).
       symmetry. rewrite Z.geb_leb. apply Z.leb_gt. lia. }
-    iApply (wp_uk_btype γt γd γs γfd h mc (mword_of_int 0x46a)
+    iApply (wp_uk_btype N h mc (mword_of_int 0x46a)
               (mword_of_int 24 : mword 13) a1_idx s1_idx BGEU false
               (mword_of_int 0x482) (2 + nn)
               Htk
@@ -532,9 +537,9 @@ Section UkShParseLex.
                        (s5_idx, mword_of_int 1 : mword 6)],
        uword γd (uint sp0 - 8 * (Z.of_nat i + 1)) (vals i)) -∗
     ustack γd spl 1 -∗
-    urun γt γd γs γfd h me (mword_of_int 0x48e) (2 + nn) -∗
+    urun N h me (mword_of_int 0x48e) (2 + nn) -∗
     (∀ h' : CpuId,
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx csp_rs1 := regval_into_reg sp0]>
             (ushp_spillback [(ra_idx, mword_of_int 7 : mword 6);
                              (s0_idx, mword_of_int 6 : mword 6);
@@ -645,7 +650,7 @@ Section UkShParseLex.
                  ltac:(rewrite <- uint_unsigned; lia)).
       rewrite <- !uint_unsigned. lia. }
     (* ---- 0x49c  c.addi16sp sp,sp,64 -- THE POP ---- *)
-    iApply (wp_uk_caddi16sp_up γt γd γs γfd h1 mr (mword_of_int 0x49c)
+    iApply (wp_uk_caddi16sp_up N h1 mr (mword_of_int 0x49c)
               (mword_of_int 4 : mword 6) 8 (2 + nn)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "[] [Hsl Hloc] Hrun").
@@ -662,7 +667,7 @@ Section UkShParseLex.
                 vals ltac:(cbn [length]; lia) with "Hsl Hloc"). }
     rewrite Hspr Hup (ushp_pc_step 0x49c 2). iIntros (h2) "Hrun".
     (* ---- 0x49e  c.jr ra ---- *)
-    iApply (wp_uk_cjr γt γd γs γfd h2
+    iApply (wp_uk_cjr N h2
               (<[Regidx csp_rs1 := regval_into_reg sp0]> mr)
               (mword_of_int 0x49e) ra_idx (ret_pc (vals 0%nat)) (8 + (2 + nn))
               ltac:(vm_compute; discriminate)
@@ -706,7 +711,7 @@ Section UkShParseLex.
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ushp_sstr tt dt toks tlen tf -∗
-    urun γt γd γs γfd h m (mword_of_int ShSyms.peek) (8 + (2 + nn)) -∗
+    urun N h m (mword_of_int ShSyms.peek) (8 + (2 + nn)) -∗
     (uword γd ps
        (mword_of_int (s0 + Z.of_nat (off + ushp_skipws (len - off) off f))) -∗
      ustr γd dq s0 len f -∗
@@ -718,7 +723,7 @@ Section UkShParseLex.
              = mword_of_int
                  (ushp_peek_res len f
                     (off + ushp_skipws (len - off) off f) tlen tf) ⌝ -∗
-         urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx)) (8 + (2 + nn)) -∗
+         urun N h' m' (ret_pc (m !!! Regidx ra_idx)) (8 + (2 + nn)) -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -736,7 +741,7 @@ Section UkShParseLex.
     assert (Hkk : (kk <= len)%nat).
     { unfold kk. pose proof (ushp_skipws_le (len - off) off f). lia. }
     (* ---- 0x448  c.addi16sp sp,sp,-64 -- THE PUSH ---- *)
-    iApply (wp_uk_caddi16sp_dn γt γd γs γfd h m (mword_of_int 0x448)
+    iApply (wp_uk_caddi16sp_dn N h m (mword_of_int 0x448)
               (mword_of_int 60 : mword 6) 8 (2 + nn)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "[] Hrun").
@@ -831,7 +836,7 @@ Section UkShParseLex.
                     m2 !!! Regidx q = m1 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m1 (Regidx s0_idx) (Regidx q) _ Hq)).
     (* ---- 0x45a  c.mv s4,a0 ---- *)
-    iApply (wp_uk_cmv γt γd γs γfd h3 m2 (mword_of_int 0x45a) s4_idx a0_idx
+    iApply (wp_uk_cmv N h3 m2 (mword_of_int 0x45a) s4_idx a0_idx
               (mword_of_int ps) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -847,7 +852,7 @@ Section UkShParseLex.
                     m3 !!! Regidx q = m2 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m2 (Regidx s4_idx) (Regidx q) _ Hq)).
     (* ---- 0x45c  c.mv s2,a1 ---- *)
-    iApply (wp_uk_cmv γt γd γs γfd h4 m3 (mword_of_int 0x45c) s2_idx a1_idx
+    iApply (wp_uk_cmv N h4 m3 (mword_of_int 0x45c) s2_idx a1_idx
               (mword_of_int (s0 + Z.of_nat len)) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -865,7 +870,7 @@ Section UkShParseLex.
                     m4 !!! Regidx q = m3 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m3 (Regidx s2_idx) (Regidx q) _ Hq)).
     (* ---- 0x45e  c.mv s5,a2 ---- *)
-    iApply (wp_uk_cmv γt γd γs γfd h5 m4 (mword_of_int 0x45e) s5_idx a2_idx
+    iApply (wp_uk_cmv N h5 m4 (mword_of_int 0x45e) s5_idx a2_idx
               (mword_of_int toks) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -889,7 +894,7 @@ Section UkShParseLex.
       rewrite (Hm2 a0_idx ltac:(vm_compute; discriminate)).
       rewrite (Hm1 a0_idx ltac:(vm_compute; discriminate)). exact Ha0. }
     (* ---- 0x460  c.ld s1,0(a0) -- the cursor ---- *)
-    iApply (wp_uk_cld γt γd γs γfd h6 m5 (mword_of_int 0x460)
+    iApply (wp_uk_cld N h6 m5 (mword_of_int 0x460)
               (mword_of_int 0 : mword 5) (mword_of_int 2 : mword 3)
               (mword_of_int 1 : mword 3) a0_idx s1_idx ps w0 (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -905,7 +910,7 @@ Section UkShParseLex.
                     m6 !!! Regidx q = m5 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m5 (Regidx s1_idx) (Regidx q) _ Hq)).
     (* ---- 0x462  auipc s3,0x2 ---- *)
-    iApply (wp_uk_auipc γt γd γs γfd h7 m6 (mword_of_int 0x462)
+    iApply (wp_uk_auipc N h7 m6 (mword_of_int 0x462)
               (mword_of_int 2 : mword 20) s3_idx (mword_of_int 0x2462) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -919,7 +924,7 @@ Section UkShParseLex.
                     m7 !!! Regidx q = m6 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m6 (Regidx s3_idx) (Regidx q) _ Hq)).
     (* ---- 0x466  addi s3,s3,-1114  -- s3 = &whitespace ---- *)
-    iApply (wp_uk_addi γt γd γs γfd h8 m7 (mword_of_int 0x466)
+    iApply (wp_uk_addi N h8 m7 (mword_of_int 0x466)
               (mword_of_int 2982 : mword 12) s3_idx s3_idx
               (mword_of_int ushp_whitespace) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1018,7 +1023,7 @@ Section UkShParseLex.
       by (rewrite (Hpres csp_rs1 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact Hsp8).
     (* ---- 0x482  sd s1,0(s4)  --  *ps = s ---- *)
-    iApply (wp_uk_sd γt γd γs γfd h10 mc' (mword_of_int 0x482)
+    iApply (wp_uk_sd N h10 mc' (mword_of_int 0x482)
               (mword_of_int 0 : mword 12) s4_idx s1_idx ps w0 (2 + nn)
               ltac:(rewrite Hs4_c (uint_moi ps ltac:(unfold Z64 in *; lia));
                     vm_compute uoff_i12; lia)
@@ -1031,7 +1036,7 @@ Section UkShParseLex.
     destruct (Nat.eq_dec kk len) as [ Hkend | Hkne ].
     { (* the cursor ran to [es]: the byte is the NUL and peek answers 0 *)
       iDestruct (ustr_nul with "Hstr") as "[Hb Hcl]".
-      iApply (wp_uk_lbu γt γd γs γfd h11 mc' (mword_of_int 0x486)
+      iApply (wp_uk_lbu N h11 mc' (mword_of_int 0x486)
                 (mword_of_int 0 : mword 12) s1_idx a1_idx dq
                 (s0 + Z.of_nat len) ubyte0 (2 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1051,7 +1056,7 @@ Section UkShParseLex.
                       n9 !!! Regidx q = mc' !!! Regidx q)
         by (intros q Hq; exact (upd_ne mc' (Regidx a1_idx) (Regidx q) _ Hq)).
       (* ---- 0x48a  c.li a0,0 ---- *)
-      iApply (wp_uk_cli γt γd γs γfd h12 n9 (mword_of_int 0x48a)
+      iApply (wp_uk_cli N h12 n9 (mword_of_int 0x48a)
                 (mword_of_int 0 : mword 6) a0_idx (2 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
@@ -1077,7 +1082,7 @@ Section UkShParseLex.
       { rewrite Ha1_10. unfold neq_vec. rewrite (ushp_zext_nul ubyte0).
         rewrite (bool_decide_eq_true_2 (ubyte0 = ubyte0) eq_refl).
         reflexivity. }
-      iApply (wp_uk_cbnez γt γd γs γfd h13 n10 (mword_of_int 0x48c)
+      iApply (wp_uk_cbnez N h13 n10 (mword_of_int 0x48c)
                 (mword_of_int 10 : mword 8) (mword_of_int 3 : mword 3)
                 a1_idx false (mword_of_int 0x4a0) (2 + nn)
                 ltac:(vm_compute; reflexivity) Htk
@@ -1202,7 +1207,7 @@ Section UkShParseLex.
     assert (Hklt : (kk < len)%nat) by lia.
     iDestruct (ustr_nonul with "Hstr") as %Hnenul.
     iDestruct (ustr_byte γd dq s0 len f kk Hklt with "Hstr") as "[Hb Hcl]".
-    iApply (wp_uk_lbu γt γd γs γfd h11 mc' (mword_of_int 0x486)
+    iApply (wp_uk_lbu N h11 mc' (mword_of_int 0x486)
               (mword_of_int 0 : mword 12) s1_idx a1_idx dq
               (s0 + Z.of_nat kk) (f kk) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1222,7 +1227,7 @@ Section UkShParseLex.
                     n9 !!! Regidx q = mc' !!! Regidx q)
       by (intros q Hq; exact (upd_ne mc' (Regidx a1_idx) (Regidx q) _ Hq)).
     (* ---- 0x48a  c.li a0,0 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h12 n9 (mword_of_int 0x48a)
+    iApply (wp_uk_cli N h12 n9 (mword_of_int 0x48a)
               (mword_of_int 0 : mword 6) a0_idx (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1248,7 +1253,7 @@ Section UkShParseLex.
     { rewrite Ha1_10. unfold neq_vec. rewrite (ushp_zext_nul (f kk)).
       rewrite (bool_decide_eq_false_2 (f kk = ubyte0) (Hnenul kk Hklt)).
       reflexivity. }
-    iApply (wp_uk_cbnez γt γd γs γfd h13 n10 (mword_of_int 0x48c)
+    iApply (wp_uk_cbnez N h13 n10 (mword_of_int 0x48c)
               (mword_of_int 10 : mword 8) (mword_of_int 3 : mword 3)
               a1_idx true (mword_of_int 0x4a0) (2 + nn)
               ltac:(vm_compute; reflexivity) Htk
@@ -1261,7 +1266,7 @@ Section UkShParseLex.
     assert (Hs5_10 : n10 !!! Regidx s5_idx = mword_of_int toks).
     { rewrite (Hn10 s5_idx ltac:(vm_compute; discriminate)).
       rewrite (Hn9 s5_idx ltac:(vm_compute; discriminate)). exact Hs5_c. }
-    iApply (wp_uk_cmv γt γd γs γfd h14 n10 (mword_of_int 0x4a0) a0_idx s5_idx
+    iApply (wp_uk_cmv N h14 n10 (mword_of_int 0x4a0) a0_idx s5_idx
               (mword_of_int toks) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1275,7 +1280,7 @@ Section UkShParseLex.
                      n11 !!! Regidx q = n10 !!! Regidx q)
       by (intros q Hq; exact (upd_ne n10 (Regidx a0_idx) (Regidx q) _ Hq)).
     (* ---- 0x4a2  jal a82 <strchr> ---- *)
-    iApply (wp_uk_jal γt γd γs γfd h15 n11 (mword_of_int 0x4a2)
+    iApply (wp_uk_jal N h15 n11 (mword_of_int 0x4a2)
               (mword_of_int 1504 : mword 21) ra_idx
               (mword_of_int 0xa82) (mword_of_int 0x4a6) (2 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1317,7 +1322,7 @@ Section UkShParseLex.
         [ | unfold Z64; lia ].
       pose proof (ushp_find_ge tlen 0%nat tf (f kk) jj Ej) as Hjr.
       unfold Z64 in *. lia. }
-    iApply (wp_uk_sltu γt γd γs γfd h17 n13 (mword_of_int 0x4a6)
+    iApply (wp_uk_sltu N h17 n13 (mword_of_int 0x4a6)
               x0_idx a0_idx a0_idx
               (mword_of_int (if Z.ltb 0 (ushp_chr toks tlen 0%nat tf (f kk))
                              then 1 else 0)) (2 + nn)
@@ -1338,7 +1343,7 @@ Section UkShParseLex.
                      n14 !!! Regidx q = n13 !!! Regidx q)
       by (intros q Hq; exact (upd_ne n13 (Regidx a0_idx) (Regidx q) _ Hq)).
     (* ---- 0x4aa  c.j 0x48e ---- *)
-    iApply (wp_uk_cj γt γd γs γfd h18 n14 (mword_of_int 0x4aa)
+    iApply (wp_uk_cj N h18 n14 (mword_of_int 0x4aa)
               (mword_of_int 2034 : mword 11) (mword_of_int 0x48e) (2 + nn)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -1671,14 +1676,14 @@ Section UkShParseLex.
   Lemma wp_kshp_execcmd (h : CpuId) (m : regfile) (s0 : Z) (nn : nat) :
     shp_code γt -∗
     UMalloc -∗
-    urun γt γd γs γfd h m (mword_of_int ShSyms.execcmd) (4 + (10 + nn)) -∗
+    urun N h m (mword_of_int ShSyms.execcmd) (4 + (10 + nn)) -∗
     (∀ (h' : CpuId) (m' : regfile) (p : Z),
        ⌜ ucallee_saved m m' ⌝ -∗
        ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
        ⌜ 0 < p /\ p mod 16 = 0 /\ p + 168 < 2 ^ 38 ⌝ -∗
        ushp_exec_pre s0 p [] -∗
        UMalloc' -∗
-       urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx)) (4 + (10 + nn)) -∗
+       urun N h' m' (ret_pc (m !!! Regidx ra_idx)) (4 + (10 + nn)) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1693,7 +1698,7 @@ Section UkShParseLex.
       assert (Em : bv_modulus 64 = Z64) by (vm_compute; reflexivity).
       rewrite Em in Hr. exact Hr. }
     (* ---- 0x1d2  c.addi sp,sp,-32 -- THE PUSH ---- *)
-    iApply (wp_uk_caddi_sp_dn γt γd γs γfd h m (mword_of_int 0x1d2)
+    iApply (wp_uk_caddi_sp_dn N h m (mword_of_int 0x1d2)
               (mword_of_int 32 : mword 6) 4 (10 + nn)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "[] Hrun").
@@ -1780,7 +1785,7 @@ Section UkShParseLex.
       iSplit; [ iApply (uis_shp_1d8 with "Hcode") | done ]. }
     iIntros "Hsl" (h2) "Hrun". cbn [length].
     (* ---- 0x1da  c.addi4spn s0,sp,32 ---- *)
-    iApply (wp_uk_caddi4spn γt γd γs γfd h2 m1 (mword_of_int 0x1da)
+    iApply (wp_uk_caddi4spn N h2 m1 (mword_of_int 0x1da)
               (mword_of_int 0 : mword 3) (mword_of_int 8 : mword 8) s0_idx
               (add_vec (m1 !!! Regidx csp_rs1)
                  (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))
@@ -1805,7 +1810,7 @@ Section UkShParseLex.
     assert (E168 : (sign_extend' 64 (mword_of_int 168 : mword 12) : mword 64)
                    = mword_of_int 168)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_uk_li γt γd γs γfd h3 m2 (mword_of_int 0x1dc)
+    iApply (wp_uk_li N h3 m2 (mword_of_int 0x1dc)
               (mword_of_int 168 : mword 12) a0_idx (mword_of_int 168) (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1819,7 +1824,7 @@ Section UkShParseLex.
                     m3 !!! Regidx q = m2 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m2 (Regidx a0_idx) (Regidx q) _ Hq)).
     (* ---- 0x1e0  jal 118c <malloc> ---- *)
-    iApply (wp_uk_jal γt γd γs γfd h4 m3 (mword_of_int 0x1e0)
+    iApply (wp_uk_jal N h4 m3 (mword_of_int 0x1e0)
               (mword_of_int 4012 : mword 21) ra_idx
               (mword_of_int 0x118c) (mword_of_int 0x1e4) (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1864,7 +1869,7 @@ Section UkShParseLex.
     assert (E168n : Z.to_nat 168 = 168%nat) by (vm_compute; reflexivity).
     rewrite E168n.
     (* ---- 0x1e4  c.mv s1,a0 ---- *)
-    iApply (wp_uk_cmv γt γd γs γfd h6 m5 (mword_of_int 0x1e4) s1_idx a0_idx
+    iApply (wp_uk_cmv N h6 m5 (mword_of_int 0x1e4) s1_idx a0_idx
               (mword_of_int p) (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1881,7 +1886,7 @@ Section UkShParseLex.
       by exact (upd_eq m5 (Regidx s1_idx)
                   (regval_into_reg (mword_of_int p : mword 64))).
     (* ---- 0x1e6  li a2,168 ---- *)
-    iApply (wp_uk_li γt γd γs γfd h7 m6 (mword_of_int 0x1e6)
+    iApply (wp_uk_li N h7 m6 (mword_of_int 0x1e6)
               (mword_of_int 168 : mword 12) a2_idx (mword_of_int 168) (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1895,7 +1900,7 @@ Section UkShParseLex.
                     m7 !!! Regidx q = m6 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m6 (Regidx a2_idx) (Regidx q) _ Hq)).
     (* ---- 0x1ea  c.li a1,0 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h8 m7 (mword_of_int 0x1ea)
+    iApply (wp_uk_cli N h8 m7 (mword_of_int 0x1ea)
               (mword_of_int 0 : mword 6) a1_idx (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1910,7 +1915,7 @@ Section UkShParseLex.
                     m8 !!! Regidx q = m7 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m7 (Regidx a1_idx) (Regidx q) _ Hq)).
     (* ---- 0x1ec  jal a5c <memset> ---- *)
-    iApply (wp_uk_jal γt γd γs γfd h9 m8 (mword_of_int 0x1ec)
+    iApply (wp_uk_jal N h9 m8 (mword_of_int 0x1ec)
               (mword_of_int 2160 : mword 21) ra_idx
               (mword_of_int 0xa5c) (mword_of_int 0x1f0) (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1949,7 +1954,7 @@ Section UkShParseLex.
       apply bv_eq; vm_compute; reflexivity. }
     rewrite <- shpp_memset.
     (* ---- memset(cmd, 0, 168) -- UkSh.v's, across the code bridge ---- *)
-    iApply (wp_ksh_memset γt γd γs γfd h10 m9 p 168%nat g (8 + nn)
+    iApply (wp_ksh_memset N h10 m9 p 168%nat g (8 + nn)
               Ha0_9 Ha2_9 ltac:(lia) ltac:(unfold Z31; lia)
               with "Hkcode Hbs Hrun").
     iIntros "Hbs" (h11 m10) "%Hcs910 Hrun".
@@ -1965,7 +1970,7 @@ Section UkShParseLex.
     iDestruct (ushp_peel0 (p + 8) (p + 88) 80 80 ltac:(lia) with "Hbs")
       as "[Hav Hev]".
     (* ---- 0x1f0  c.li a5,1 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h11 m10 (mword_of_int 0x1f0)
+    iApply (wp_uk_cli N h11 m10 (mword_of_int 0x1f0)
               (mword_of_int 1 : mword 6) a5_idx (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1991,7 +1996,7 @@ Section UkShParseLex.
       rewrite (Hm8 s1_idx ltac:(vm_compute; discriminate)).
       rewrite (Hm7 s1_idx ltac:(vm_compute; discriminate)). exact Hs1_6. }
     (* ---- 0x1f2  c.sw a5,0(s1)  --  cmd->type = EXEC ---- *)
-    iApply (wp_uk_csw γt γd γs γfd h12 m11 (mword_of_int 0x1f2)
+    iApply (wp_uk_csw N h12 m11 (mword_of_int 0x1f2)
               (mword_of_int 0 : mword 5) (mword_of_int 1 : mword 3)
               (mword_of_int 7 : mword 3) s1_idx a5_idx p
               (mword_of_int 0 : mword 64) (10 + nn)
@@ -2007,7 +2012,7 @@ Section UkShParseLex.
     iIntros "Hty". rewrite Ha5_11.
     rewrite (ushp_pc_step 0x1f2 2). iIntros (h13) "Hrun".
     (* ---- 0x1f4  c.mv a0,s1 ---- *)
-    iApply (wp_uk_cmv γt γd γs γfd h13 m11 (mword_of_int 0x1f4) a0_idx s1_idx
+    iApply (wp_uk_cmv N h13 m11 (mword_of_int 0x1f4) a0_idx s1_idx
               (mword_of_int p) (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -2072,7 +2077,7 @@ Section UkShParseLex.
                  ltac:(rewrite <- uint_unsigned; lia)).
       rewrite <- !uint_unsigned. lia. }
     (* ---- 0x1fc  c.addi16sp sp,sp,32 -- THE POP ---- *)
-    iApply (wp_uk_caddi16sp_up γt γd γs γfd h15 me (mword_of_int 0x1fc)
+    iApply (wp_uk_caddi16sp_up N h15 me (mword_of_int 0x1fc)
               (mword_of_int 2 : mword 6) 4 (10 + nn)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "[] [Hsl Hloc] Hrun").
@@ -2099,7 +2104,7 @@ Section UkShParseLex.
       exact (upd_eq m12 (Regidx ra_idx)
                (regval_into_reg (m !!! Regidx ra_idx))). }
     (* ---- 0x1fe  c.jr ra ---- *)
-    iApply (wp_uk_cjr γt γd γs γfd h16 mf (mword_of_int 0x1fe) ra_idx
+    iApply (wp_uk_cjr N h16 mf (mword_of_int 0x1fe) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) (4 + (10 + nn))
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hraf; reflexivity)

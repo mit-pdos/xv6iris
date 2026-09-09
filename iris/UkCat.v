@@ -50,7 +50,12 @@ Section UkCat.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
-  Context (γt γd γs γfd : gname).
+  Context (N : uk_names).
+  (* the fields, under the names the engine has always used *)
+  Local Notation γt := (ukn_t N).
+  Local Notation γd := (ukn_d N).
+  Local Notation γs := (ukn_s N).
+  Local Notation γfd := (ukn_fd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -91,7 +96,7 @@ Section UkCat.
       (avail : nat) :
     fd_lowest_closed l = None ->
     cat_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int CatSyms.open) avail -∗
+    urun N h m (mword_of_int CatSyms.open) avail -∗
     ustd γfd l -∗
     (∀ (h' : CpuId) (ret : mword 64),
        (* THE HANDLE FOR WHAT WAS OPENED, forwarded rather than dropped --
@@ -102,7 +107,7 @@ Section UkCat.
            ufd γfd fd (FdOpen rd wr t))
         ∨ ⌜ret = (mword_of_int (-1) : mword 64)⌝) -∗
        ustd γfd l -∗
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -114,7 +119,7 @@ Section UkCat.
       as (_ & _ & _ & _ & _ & _ & _ & Hwrite & Hopen & Hclose & _).
     rewrite Hopen.
     (* ---- 0x3ec  c.li a7,15 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3ec)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3ec)
               (mword_of_int 15 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -134,7 +139,7 @@ Section UkCat.
     (* ---- 0x3ee  ecall -- the QUIET row ---- *)
     (* open moves the table: the dedicated leaf, whose handle cat does not
        yet carry *)
-    iApply (wp_uk_ecall_open γt γd γs γfd h1 m1 (mword_of_int 0x3ee) l avail
+    iApply (wp_uk_ecall_open N h1 m1 (mword_of_int 0x3ee) l avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 15 : mword 64));
@@ -173,7 +178,7 @@ Section UkCat.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 15 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x3f2) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3f2) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hraopen; reflexivity)
@@ -191,10 +196,10 @@ Section UkCat.
       (avail : nat) :
     bv_signed (trunc32 (m !!! Regidx a0_idx)) = Z.of_nat fd ->
     cat_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int CatSyms.close) avail -∗
+    urun N h m (mword_of_int CatSyms.close) avail -∗
     ufd γfd fd st -∗
     (∀ (h' : CpuId) (ret : mword 64),
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 21 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -206,7 +211,7 @@ Section UkCat.
       as (_ & _ & _ & _ & _ & _ & _ & Hwrite & Hopen & Hclose & _).
     rewrite Hclose.
     (* ---- 0x3d4  c.li a7,21 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3d4)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3d4)
               (mword_of_int 21 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -224,7 +229,7 @@ Section UkCat.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 21 : mword 64)]> m).
     (* ---- 0x3d6  ecall -- close, SPENDING the handle ---- *)
-    iApply (wp_uk_ecall_close γt γd γs γfd h1 m1 (mword_of_int 0x3d6) fd st avail
+    iApply (wp_uk_ecall_close N h1 m1 (mword_of_int 0x3d6) fd st avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 21 : mword 64));
@@ -256,7 +261,7 @@ Section UkCat.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 21 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x3da) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3da) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hraclose; reflexivity)
@@ -268,9 +273,9 @@ Section UkCat.
 
   Lemma wp_kcat_write (h : CpuId) (m : regfile) (avail : nat) :
     cat_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int CatSyms.write) avail -∗
+    urun N h m (mword_of_int CatSyms.write) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -282,7 +287,7 @@ Section UkCat.
       as (_ & _ & _ & _ & _ & _ & _ & Hwrite & Hopen & Hclose & _).
     rewrite Hwrite.
     (* ---- 0x3cc  c.li a7,16 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3cc)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3cc)
               (mword_of_int 16 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -300,7 +305,7 @@ Section UkCat.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m).
     (* ---- 0x3ce  ecall -- the QUIET row ---- *)
-    iApply (wp_uk_ecall_quiet γt γd γs γfd h1 m1 (mword_of_int 0x3ce) 16 avail
+    iApply (wp_uk_ecall_quiet N h1 m1 (mword_of_int 0x3ce) 16 avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 16 : mword 64));
@@ -330,7 +335,7 @@ Section UkCat.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 16 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x3d2) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3d2) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hrawrite; reflexivity)
@@ -345,14 +350,14 @@ Section UkCat.
   (* --------------------------------------------------------------------- *)
   Lemma wp_kcat_exit (h : CpuId) (m : regfile) (avail : nat) :
     cat_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int CatSyms.exit) avail -∗
+    urun N h m (mword_of_int CatSyms.exit) avail -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun".
     destruct cat_syms_pins
       as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hexit).
     rewrite Hexit.
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3ac)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3ac)
               (mword_of_int 2 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -369,7 +374,7 @@ Section UkCat.
     rewrite E0e Eme.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 2 : mword 64)]> m).
-    iApply (wp_uk_ecall_exit γt γd γs γfd h1 m1 (mword_of_int 0x3ae) avail
+    iApply (wp_uk_ecall_exit N h1 m1 (mword_of_int 0x3ae) avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 2 : mword 64));
@@ -391,10 +396,10 @@ Section UkCat.
       = Z.of_nat cnt ->
     cat_code γt -∗
     ubytes γd a cnt f -∗
-    urun γt γd γs γfd h m (mword_of_int CatSyms.read) avail -∗
+    urun N h m (mword_of_int CatSyms.read) avail -∗
     (∀ (h' : CpuId) (ret : mword 64) (g : nat -> bv 8),
        ubytes γd a cnt g -∗
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 5 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -406,7 +411,7 @@ Section UkCat.
       as (_ & _ & _ & _ & _ & _ & Hread & _ & _ & _ & _).
     rewrite Hread.
     (* ---- 0x3c4  c.li a7,5 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3c4)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3c4)
               (mword_of_int 5 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -434,7 +439,7 @@ Section UkCat.
                  ltac:(vm_compute; discriminate)).
       exact Hcnt. }
     (* ---- 0x3c6  ecall -- the row that MOVES THE IMAGE ---- *)
-    iApply (wp_uk_ecall_read γt γd γs γfd h1 m1 (mword_of_int 0x3c6) a cnt f avail
+    iApply (wp_uk_ecall_read N h1 m1 (mword_of_int 0x3c6) a cnt f avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 5 : mword 64));
@@ -459,7 +464,7 @@ Section UkCat.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 5 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x3ca) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3ca) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hrar; reflexivity)

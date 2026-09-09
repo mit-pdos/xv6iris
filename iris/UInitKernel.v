@@ -185,14 +185,14 @@ Section UInitKernel.
     iIntros "#Hdep #Hxs".
     iApply (uslot_of_urun W (2 + (4 + (12 + (12 + (4 + n0)))))
               Hal8 Hroom Hstk Hfdlen Hstop with "Hdep").
-    iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht Hstd Hrun".
+    iIntros (N h) "%Hsz Hszf #Ht Hstd Hrun".
     rewrite Hpc.
-    iApply (wp_kinit_start γt γd γs γfd Hpsok (uvis_sz W) h
+    iApply (wp_kinit_start N Hpsok (uvis_sz W) h
               (tf_resume_gpr0 (uvis_tf W)) n0
               with "[] Hxs [] Hszf [Hstd] Hrun").
-    - iApply (init_code_of_text γt (uvis_M W) (uvis_perm W)
+    - iApply (init_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_text _ Hsub) Hx with "Ht").
-    - iApply (init_rodata_of_text γt (uvis_M W) (uvis_perm W)
+    - iApply (init_rodata_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_data _ Hsub) Hx with "Ht").
     - iExists (take NSTD (uvis_fd W)). iExact "Hstd".
   Qed.

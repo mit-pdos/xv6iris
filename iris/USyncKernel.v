@@ -160,12 +160,12 @@ Section USyncKernel.
     iIntros "#Hdep".
     iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata Hfdlen Hstop with "Hdep").
     (* sync makes no descriptor call, so its ledger is dropped here *)
-    iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht _ Hrun".
+    iIntros (N h) "%Hsz Hszf #Ht _ Hrun".
     rewrite Hpc.
-    iApply (wp_ksync_start γt γd γs γfd Hpsok h (tf_resume_gpr0 (uvis_tf W))
+    iApply (wp_ksync_start N Hpsok h (tf_resume_gpr0 (uvis_tf W))
               (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0
               eq_refl with "[] Hrun").
-    iApply (sync_code_of_text γt (uvis_M W) (uvis_perm W) Hsub Hx with "Ht").
+    iApply (sync_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W) Hsub Hx with "Ht").
   Qed.
 
 End USyncKernel.

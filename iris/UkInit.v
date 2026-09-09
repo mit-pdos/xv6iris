@@ -50,7 +50,12 @@ Section UkInit.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
-  Context (γt γd γs γfd : gname).
+  Context (N : uk_names).
+  (* the fields, under the names the engine has always used *)
+  Local Notation γt := (ukn_t N).
+  Local Notation γd := (ukn_d N).
+  Local Notation γs := (ukn_s N).
+  Local Notation γfd := (ukn_fd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -103,11 +108,11 @@ Section UkInit.
      a NAMED state, which is [UserFd.ualloc]'s business. *)
   Lemma wp_kinit_open (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int InitSyms.open) avail -∗
+    urun N h m (mword_of_int InitSyms.open) avail -∗
     ustd_any γfd -∗
     (∀ (h' : CpuId) (ret : mword 64),
        ustd_any γfd -∗
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -118,7 +123,7 @@ Section UkInit.
     iDestruct "Hstd" as (l) "Hstd".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hopen.
     (* ---- 0x3b2  c.li a7,15 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3b2)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3b2)
               (mword_of_int 15 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -139,7 +144,7 @@ Section UkInit.
        dedicated one mints the handle for whatever descriptor came back.
        init does not yet carry that handle -- it is dropped here -- but the
        leaf is what will hand it over when it does. *)
-    iApply (wp_uk_ecall_open γt γd γs γfd h1 m1 (mword_of_int 0x3b4) l avail
+    iApply (wp_uk_ecall_open N h1 m1 (mword_of_int 0x3b4) l avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 15 : mword 64));
@@ -169,7 +174,7 @@ Section UkInit.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 15 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x3b8) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3b8) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -181,9 +186,9 @@ Section UkInit.
 
   Lemma wp_kinit_mknod (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int InitSyms.mknod) avail -∗
+    urun N h m (mword_of_int InitSyms.mknod) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 17 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -193,7 +198,7 @@ Section UkInit.
     iIntros "#Hcode Hrun Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hmknod.
     (* ---- 0x3ba  c.li a7,17 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3ba)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3ba)
               (mword_of_int 17 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -210,7 +215,7 @@ Section UkInit.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 17 : mword 64)]> m).
     (* ---- 0x3bc  ecall -- the QUIET row ---- *)
-    iApply (wp_uk_ecall_quiet γt γd γs γfd h1 m1 (mword_of_int 0x3bc) 17 avail
+    iApply (wp_uk_ecall_quiet N h1 m1 (mword_of_int 0x3bc) 17 avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 17 : mword 64));
@@ -240,7 +245,7 @@ Section UkInit.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 17 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x3c0) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3c0) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -252,11 +257,11 @@ Section UkInit.
 
   Lemma wp_kinit_dup (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int InitSyms.dup) avail -∗
+    urun N h m (mword_of_int InitSyms.dup) avail -∗
     ustd_any γfd -∗
     (∀ (h' : CpuId) (ret : mword 64),
        ustd_any γfd -∗
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -267,7 +272,7 @@ Section UkInit.
     iDestruct "Hstd" as (l) "Hstd".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hdup.
     (* ---- 0x3ea  c.li a7,10 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3ea)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3ea)
               (mword_of_int 10 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -290,7 +295,7 @@ Section UkInit.
        [wp_uk_ecall_dup] -- which pays a handle and returns two -- is what
        "init's dup is specified" will mean, and needs the handle from
        [wp_kinit_open] threaded down to here. *)
-    iApply (wp_uk_ecall_dup_untracked γt γd γs γfd h1 m1
+    iApply (wp_uk_ecall_dup_untracked N h1 m1
               (mword_of_int 0x3ec) l avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
@@ -316,7 +321,7 @@ Section UkInit.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 10 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x3f0) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3f0) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -328,9 +333,9 @@ Section UkInit.
 
   Lemma wp_kinit_write (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int InitSyms.write) avail -∗
+    urun N h m (mword_of_int InitSyms.write) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -340,7 +345,7 @@ Section UkInit.
     iIntros "#Hcode Hrun Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hwrite.
     (* ---- 0x392  c.li a7,16 ---- *)
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x392)
+    iApply (wp_uk_cli N h m (mword_of_int 0x392)
               (mword_of_int 16 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -357,7 +362,7 @@ Section UkInit.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m).
     (* ---- 0x394  ecall -- the QUIET row ---- *)
-    iApply (wp_uk_ecall_quiet γt γd γs γfd h1 m1 (mword_of_int 0x394) 16 avail
+    iApply (wp_uk_ecall_quiet N h1 m1 (mword_of_int 0x394) 16 avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 16 : mword 64));
@@ -387,7 +392,7 @@ Section UkInit.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 16 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x398) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x398) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -399,12 +404,12 @@ Section UkInit.
 
   Lemma wp_kinit_exit (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int InitSyms.exit) avail -∗
+    urun N h m (mword_of_int InitSyms.exit) avail -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hexit.
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x372)
+    iApply (wp_uk_cli N h m (mword_of_int 0x372)
               (mword_of_int 2 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -420,7 +425,7 @@ Section UkInit.
     rewrite E0 Em.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 2 : mword 64)]> m).
-    iApply (wp_uk_ecall_exit γt γd γs γfd h1 m1 (mword_of_int 0x374) avail
+    iApply (wp_uk_ecall_exit N h1 m1 (mword_of_int 0x374) avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 2 : mword 64));
                     vm_compute; reflexivity)
@@ -430,17 +435,17 @@ Section UkInit.
 
   Lemma wp_kinit_exec (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int InitSyms.exec) avail -∗
+    urun N h m (mword_of_int InitSyms.exec) avail -∗
     (* THE EXEC DEPOSIT, on the EXPLICIT route: exec's bundle reads the key
        (argv, out of the image), so it is not payable from the supplier and
        [UkRun.udepw]'s left disjunct excludes it by construction.  The
        caller hands it in, at the key the ecall traps from. *)
-    udepw γt γd γs γfd
+    udepw N
       (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m)
       (mword_of_int 0x3ac) USYS_exec -∗
     (* exec only comes back when it FAILED, and then it returns -1 *)
     (∀ h' : CpuId,
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := (mword_of_int (-1) : mword 64)]>
             (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -449,7 +454,7 @@ Section UkInit.
   Proof.
     iIntros "#Hcode Hrun Hsbx Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hexec.
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3aa)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3aa)
               (mword_of_int 7 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -465,7 +470,7 @@ Section UkInit.
     rewrite E0 Em.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m).
-    iApply (wp_uk_ecall_exec γt γd γs γfd h1 m1 (mword_of_int 0x3ac) avail
+    iApply (wp_uk_ecall_exec N h1 m1 (mword_of_int 0x3ac) avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 7 : mword 64));
                     vm_compute; reflexivity)
@@ -486,7 +491,7 @@ Section UkInit.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 7 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x3b0) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3b0) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -502,9 +507,9 @@ Section UkInit.
   Lemma wp_kinit_wait (h : CpuId) (m : regfile) (avail : nat) :
     uint (m !!! Regidx a0_idx) = 0 ->
     init_code γt -∗
-    urun γt γd γs γfd h m (mword_of_int InitSyms.wait) avail -∗
+    urun N h m (mword_of_int InitSyms.wait) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
-       urun γt γd γs γfd h'
+       urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 3 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -514,7 +519,7 @@ Section UkInit.
     intros Hz.
     iIntros "#Hcode Hrun Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hwait.
-    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x37a)
+    iApply (wp_uk_cli N h m (mword_of_int 0x37a)
               (mword_of_int 3 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -535,7 +540,7 @@ Section UkInit.
       rewrite (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
                  (mword_of_int 3 : mword 64) ltac:(vm_compute; discriminate)).
       exact Hz. }
-    iApply (wp_uk_ecall_wait_null γt γd γs γfd h1 m1 (mword_of_int 0x37c) avail
+    iApply (wp_uk_ecall_wait_null N h1 m1 (mword_of_int 0x37c) avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 3 : mword 64));
                     vm_compute; reflexivity)
@@ -558,7 +563,7 @@ Section UkInit.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 3 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int 0x380) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x380) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)

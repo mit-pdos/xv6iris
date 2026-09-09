@@ -88,7 +88,12 @@ Section UkShFork.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
-  Context (γt γd γs γfd : gname).
+  Context (N : uk_names).
+  (* the fields, under the names the engine has always used *)
+  Local Notation γt := (ukn_t N).
+  Local Notation γd := (ukn_d N).
+  Local Notation γs := (ukn_s N).
+  Local Notation γfd := (ukn_fd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -110,9 +115,9 @@ Section UkShFork.
   Local Notation s5_idx := (mword_of_int 21 : mword 5).
   Local Notation s6_idx := (mword_of_int 22 : mword 5).
 
-  Local Notation ush_std := (UkSh.ush_std γfd).
+  Local Notation ush_std := (UkSh.ush_std N).
   Local Notation ushl_dat := (UkShLoop.ushl_dat γd).
-  Local Notation ushl_head := (UkShLoop.ushl_head γt γd γs γfd).
+  Local Notation ushl_head := (UkShLoop.ushl_head N).
 
   (* ===================================================================== *)
   (* §1 THE TWO CATALOG BRIDGES THE CHILD NEEDS.                            *)
@@ -172,10 +177,10 @@ Section UkShFork.
   (* §3 THE ARM.                                                            *)
   (* ===================================================================== *)
   Lemma wp_kshf_fork
-      (Hsbrk : forall (gd gs : gname) (sz n : Z) (r : mword 64),
-         UkShMalloc.ushm_sbrk_ans gd gs sz n r -∗
+      (Hsbrk : forall (N' : uk_names) (sz n : Z) (r : mword 64),
+         UkShMalloc.ushm_sbrk_ans N' sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
-         UkShMalloc.ushm_sbrk_ans gd gs sz n r)
+         UkShMalloc.ushm_sbrk_ans N' sz n r)
       (Hclw : UkShDiag.ushd_clw_text_ty)
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
       (toks : list (nat * nat)) (sz : Z) (l : list fdstate) (n : nat) :
@@ -201,7 +206,7 @@ Section UkShFork.
     ush_std l -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun γt γd γs γfd h m (mword_of_int 0x92c) (16 + (80 + n)) -∗
+    urun N h m (mword_of_int 0x92c) (16 + (80 + n)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl Hszlo Hszal Hszok.
@@ -211,7 +216,7 @@ Section UkShFork.
     assert (Hlen31 : Z.of_nat len < 2 ^ 31)
       by (unfold sh_nbuf in Hkl; lia).
     (* ---- 0x92c  jal ra,fork1 ---- *)
-    iApply (wp_uk_jal γt γd γs γfd h m (mword_of_int 0x92c)
+    iApply (wp_uk_jal N h m (mword_of_int 0x92c)
               (mword_of_int 2094908 : mword 21) ra_idx
               (mword_of_int ShSyms.fork1) (mword_of_int 0x930)
               (16 + (80 + n))
@@ -233,7 +238,7 @@ Section UkShFork.
     (* ---- fork1() ---- *)
     replace (16 + (80 + n))%nat with (2 + (UkShDiag.ush_Dg + (66 + n)))%nat
       by (unfold UkShDiag.ush_Dg; lia).
-    iApply (UkShDiag.wp_kshr_fork1_final Hpsok γt γd γs γfd (ushf_pay f)
+    iApply (UkShDiag.wp_kshr_fork1_final Hpsok N (ushf_pay f)
               sz l ∅ h1 m1 (66 + n)
               with "Hcode Hro [Hdat Hbuf] Hsz Hustd [] Hrun").
     { rewrite /ushf_pay.
@@ -252,7 +257,7 @@ Section UkShFork.
       iIntros (hA mA rA) "%HrA %HcsA %Ha0A Hpay Hsz Hustd _ Hrun".
       iDestruct "Hpay" as "(_ & _ & _ & Hdat & Hbuf)".
       (* ---- 0x930  c.beqz a0,0x9c0 -- NOT taken: this is the parent ---- *)
-      iApply (wp_uk_cbeqz γt γd γs γfd hA mA (mword_of_int 0x930)
+      iApply (wp_uk_cbeqz N hA mA (mword_of_int 0x930)
                 (mword_of_int 72 : mword 8) (mword_of_int 2 : mword 3) a0_idx
                 false (mword_of_int 0x9c0)
                 (2 + (UkShDiag.ush_Dg + (66 + n)))
@@ -267,7 +272,7 @@ Section UkShFork.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E930. iIntros (hB) "Hrun".
       (* ---- 0x932  c.li a0,0 ---- *)
-      iApply (wp_uk_cli γt γd γs γfd hB mA (mword_of_int 0x932)
+      iApply (wp_uk_cli N hB mA (mword_of_int 0x932)
                 (mword_of_int 0 : mword 6) a0_idx
                 (2 + (UkShDiag.ush_Dg + (66 + n)))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -286,7 +291,7 @@ Section UkShFork.
       set (mB := <[Regidx a0_idx
                    := regval_into_reg (mword_of_int 0 : mword 64)]> mA).
       (* ---- 0x934  jal ra,wait ---- *)
-      iApply (wp_uk_jal γt γd γs γfd hC mB (mword_of_int 0x934)
+      iApply (wp_uk_jal N hC mB (mword_of_int 0x934)
                 (mword_of_int 858 : mword 21) ra_idx
                 (mword_of_int ShSyms.wait) (mword_of_int 0x938)
                 (2 + (UkShDiag.ush_Dg + (66 + n)))
@@ -308,7 +313,7 @@ Section UkShFork.
       assert (Hra_C : mC !!! Regidx ra_idx = (mword_of_int 0x938 : mword 64))
         by exact (upd_eq mB (Regidx ra_idx) _).
       (* ---- wait((int * )0) ---- *)
-      iApply (UkShRun.wp_kshr_wait Hpsok γt γd γs γfd hD mC
+      iApply (UkShRun.wp_kshr_wait Hpsok N hD mC
                 (2 + (UkShDiag.ush_Dg + (66 + n))) Ha0_C
                 with "Hcode Hrun").
       iIntros (hE ret) "Hrun".
@@ -353,10 +358,10 @@ Section UkShFork.
       + exact HregsD.
       + rewrite /UkSh.ush_std. iFrame "Hustd". iPureIntro. exact Hlow.
     - (* ================= THE CHILD: parse, run, exec =================== *)
-      iIntros (gt gd gs gfd hA mA) "%HcsA %Ha0A #Hcode' Hpay Hsz Hustd _ Hrun".
+      iIntros (N' hA mA) "%HcsA %Ha0A #Hcode' Hpay Hsz Hustd _ Hrun".
       iDestruct "Hpay" as "(_ & #Hro' & #Hjt' & Hdat & Hbuf)".
       (* ---- 0x930  c.beqz a0,0x9c0 -- TAKEN: this is the child ---- *)
-      iApply (wp_uk_cbeqz gt gd gs gfd hA mA (mword_of_int 0x930)
+      iApply (wp_uk_cbeqz N' hA mA (mword_of_int 0x930)
                 (mword_of_int 72 : mword 8) (mword_of_int 2 : mword 3) a0_idx
                 true (mword_of_int 0x9c0)
                 (2 + (UkShDiag.ush_Dg + (66 + n)))
@@ -370,12 +375,12 @@ Section UkShFork.
       { iApply (uis_shk_930 with "Hcode'"). }
       iIntros (hB) "Hrun".
       (* the line, cut out of the child's own copy of the buffer *)
-      iDestruct (UkShCd.ushc_bytes_sub gd sh_buf sh_nbuf f k (S len)
+      iDestruct (UkShCd.ushc_bytes_sub N' sh_buf sh_nbuf f k (S len)
                    ltac:(lia) with "Hbuf") as "[Hsub _]".
-      iDestruct (UkShCd.ushc_ustr_of_bytes gd (sh_buf + Z.of_nat k) len
+      iDestruct (UkShCd.ushc_ustr_of_bytes N' (sh_buf + Z.of_nat k) len
                    (fun j : nat => f (k + j)%nat) Hnn Hlen31 Hnul
                    with "Hsub") as "Hline".
-      iDestruct (UkShLoop.ushl_fresh_of_dat gd gs sz with "Hdat Hsz")
+      iDestruct (UkShLoop.ushl_fresh_of_dat N' sz with "Hdat Hsz")
         as "(Hfresh & Hws & Hsy)".
       assert (Hs1_A : mA !!! Regidx s1_idx
                       = (mword_of_int (sh_buf + Z.of_nat k) : mword 64)).
@@ -384,7 +389,7 @@ Section UkShFork.
       replace (2 + (UkShDiag.ush_Dg + (66 + n)))%nat
         with (60 + (8 + (UkShDiag.ush_Dg + n)))%nat
         by (unfold UkShDiag.ush_Dg; lia).
-      iApply (UkShMain.wp_kshm_child_alloc gt gd gs gfd Hpsok (Hsbrk gd gs) Hclw
+      iApply (UkShMain.wp_kshm_child_alloc N' Hpsok (Hsbrk N') Hclw
                 hB mA DfracDiscarded DfracDiscarded
                 (sh_buf + Z.of_nat k) len (fun j : nat => f (k + j)%nat)
                 toks sz l n
@@ -419,10 +424,10 @@ Section UkShFork.
   (* second is stage 5's [ush_simple] scope and not this file's.            *)
   (* ===================================================================== *)
   Lemma wp_kshm_body
-      (Hsbrk : forall (gd gs : gname) (sz n : Z) (r : mword 64),
-         UkShMalloc.ushm_sbrk_ans gd gs sz n r -∗
+      (Hsbrk : forall (N' : uk_names) (sz n : Z) (r : mword 64),
+         UkShMalloc.ushm_sbrk_ans N' sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
-         UkShMalloc.ushm_sbrk_ans gd gs sz n r)
+         UkShMalloc.ushm_sbrk_ans N' sz n r)
       (Hclw : UkShDiag.ushd_clw_text_ty)
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
       (toks : list (nat * nat)) (sz : Z) (l : list fdstate) (n : nat) :
@@ -450,7 +455,7 @@ Section UkShFork.
     ush_std l -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun γt γd γs γfd h m (mword_of_int 0x97a) (16 + (80 + n)) -∗
+    urun N h m (mword_of_int 0x97a) (16 + (80 + n)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hs1 Ha5 Hnn Hnul Hkl Hns Htoks Htlen Hszlo Hszal Hszok.
@@ -468,7 +473,7 @@ Section UkShFork.
                       bv_unsigned (f (S (S k))) = 32))
       as [(Hck & Hck1 & Hck2) | Hne].
     - (* ================= the line is a [cd] command =================== *)
-      iApply (UkShCd.wp_kshc_cd γt γd γs γfd Hpsok h m f k (k + len)%nat l sz n
+      iApply (UkShCd.wp_kshc_cd N Hpsok h m f k (k + len)%nat l sz n
                 Hregs Hs1 Ha5 ltac:(lia) Hnul Hck Hck1 Hck2
                 with "Hhead Hcode Hro Hpcode Hstd Hdat Hsz Hbuf Hrun").
     - (* ================= it is not: fall through to the fork ========== *)
@@ -487,7 +492,7 @@ Section UkShFork.
           rewrite (moi_neq_vec 99 99 ltac:(unfold Z64; lia)
                      ltac:(unfold Z64; lia)).
           symmetry. apply negb_false_iff. apply Z.eqb_eq. reflexivity. }
-        iApply (wp_uk_btype γt γd γs γfd h m (mword_of_int 0x97a)
+        iApply (wp_uk_btype N h m (mword_of_int 0x97a)
                   (mword_of_int 8114 : mword 13) s5_idx a5_idx BNE false
                   (mword_of_int 0x92c) (16 + (80 + n))
                   Htk7a
@@ -502,10 +507,10 @@ Section UkShFork.
         (* ---- 0x97e  lbu a5,1(s1) ---- *)
         assert (Ead1 : sh_buf + Z.of_nat (S k) = sh_buf + Z.of_nat k + 1)
           by lia.
-        iDestruct (UkShCd.ushc_bytes_one γd sh_buf sh_nbuf f (S k)
+        iDestruct (UkShCd.ushc_bytes_one N sh_buf sh_nbuf f (S k)
                      ltac:(lia) with "Hbuf") as "[Hb1 Hcl1]".
         iEval (rewrite Ead1) in "Hb1".
-        iApply (wp_uk_lbu γt γd γs γfd h1 m (mword_of_int 0x97e)
+        iApply (wp_uk_lbu N h1 m (mword_of_int 0x97e)
                   (mword_of_int 1 : mword 12) s1_idx a5_idx (DfracOwn 1)
                   (sh_buf + Z.of_nat k + 1) (f (S k)) (16 + (80 + n))
                   ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -566,7 +571,7 @@ Section UkShFork.
             rewrite (moi_neq_vec 100 100 ltac:(unfold Z64; lia)
                        ltac:(unfold Z64; lia)).
             symmetry. apply negb_false_iff. apply Z.eqb_eq. reflexivity. }
-          iApply (wp_uk_btype γt γd γs γfd h2 m1 (mword_of_int 0x982)
+          iApply (wp_uk_btype N h2 m1 (mword_of_int 0x982)
                     (mword_of_int 8106 : mword 13) s3_idx a5_idx BNE false
                     (mword_of_int 0x92c) (16 + (80 + n))
                     Htk82
@@ -581,10 +586,10 @@ Section UkShFork.
           (* ---- 0x986  lbu a5,2(s1) ---- *)
           assert (Ead2 : sh_buf + Z.of_nat (S (S k))
                          = sh_buf + Z.of_nat k + 2) by lia.
-          iDestruct (UkShCd.ushc_bytes_one γd sh_buf sh_nbuf f (S (S k))
+          iDestruct (UkShCd.ushc_bytes_one N sh_buf sh_nbuf f (S (S k))
                        ltac:(lia) with "Hbuf") as "[Hb2 Hcl2]".
           iEval (rewrite Ead2) in "Hb2".
-          iApply (wp_uk_lbu γt γd γs γfd h3 m1 (mword_of_int 0x986)
+          iApply (wp_uk_lbu N h3 m1 (mword_of_int 0x986)
                     (mword_of_int 2 : mword 12) s1_idx a5_idx (DfracOwn 1)
                     (sh_buf + Z.of_nat k + 2) (f (S (S k))) (16 + (80 + n))
                     ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -645,7 +650,7 @@ Section UkShFork.
             rewrite (moi_neq_vec (bv_unsigned (f (S (S k)))) 32
                        (Hbr (S (S k))) ltac:(unfold Z64; lia)).
             symmetry. apply negb_true_iff. apply Z.eqb_neq. exact Hnck2. }
-          iApply (wp_uk_btype γt γd γs γfd h4 m2 (mword_of_int 0x98a)
+          iApply (wp_uk_btype N h4 m2 (mword_of_int 0x98a)
                     (mword_of_int 8098 : mword 13) s6_idx a5_idx BNE true
                     (mword_of_int 0x92c) (16 + (80 + n))
                     Htk8a
@@ -665,7 +670,7 @@ Section UkShFork.
             rewrite (moi_neq_vec (bv_unsigned (f (S k))) 100
                        (Hbr (S k)) ltac:(unfold Z64; lia)).
             symmetry. apply negb_true_iff. apply Z.eqb_neq. exact Hnck1. }
-          iApply (wp_uk_btype γt γd γs γfd h2 m1 (mword_of_int 0x982)
+          iApply (wp_uk_btype N h2 m1 (mword_of_int 0x982)
                     (mword_of_int 8106 : mword 13) s3_idx a5_idx BNE true
                     (mword_of_int 0x92c) (16 + (80 + n))
                     Htk82
@@ -685,7 +690,7 @@ Section UkShFork.
           rewrite (moi_neq_vec (bv_unsigned (f k)) 99 (Hbr k)
                      ltac:(unfold Z64; lia)).
           symmetry. apply negb_true_iff. apply Z.eqb_neq. exact Hnck. }
-        iApply (wp_uk_btype γt γd γs γfd h m (mword_of_int 0x97a)
+        iApply (wp_uk_btype N h m (mword_of_int 0x97a)
                   (mword_of_int 8114 : mword 13) s5_idx a5_idx BNE true
                   (mword_of_int 0x92c) (16 + (80 + n))
                   Htk7a
@@ -775,10 +780,10 @@ Section UkShFork.
         (length toks < 10)%nat.
 
   Lemma ushf_rest_of_body
-      (Hsbrk : forall (gd gs : gname) (sz n : Z) (r : mword 64),
-         UkShMalloc.ushm_sbrk_ans gd gs sz n r -∗
+      (Hsbrk : forall (N' : uk_names) (sz n : Z) (r : mword 64),
+         UkShMalloc.ushm_sbrk_ans N' sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
-         UkShMalloc.ushm_sbrk_ans gd gs sz n r)
+         UkShMalloc.ushm_sbrk_ans N' sz n r)
       (Hclw : UkShDiag.ushd_clw_text_ty) (sz : Z) :
     ushf_lexable ->
     (* the break, as [exec] leaves it *)
@@ -790,7 +795,7 @@ Section UkShFork.
        [UkShRun.wp_kshr_runcmd]: this walk reaches runcmd's EXEC arm *)
     uxsup -∗
     shk_rodata γt -∗ ush_jtab γt -∗
-    UkSh.ush_rest γt γd γs γfd (UkShLoop.ushl_R γd γs sz).
+    UkSh.ush_rest N (UkShLoop.ushl_R N sz).
   Proof.
     intros Hlex Hszlo Hszal Hszok.
     iIntros "#Hcode #Hxs #Hro #Hjt".
@@ -803,7 +808,7 @@ Section UkShFork.
               Hregs Hs1 Ha5 Hnn Hnul ltac:(lia) Hns Htoks Htlen
               Hszlo Hszal Hszok
               with "[Hhead] Hcode Hxs Hro [] Hjt Hstd Hdat Hsz Hbuf Hrun").
-    - iApply (UkShLoop.ushl_head_of_R γt γd γs γfd with "Hhead").
+    - iApply (UkShLoop.ushl_head_of_R N with "Hhead").
     - iApply (ushf_code_shp with "Hcode").
   Qed.
 

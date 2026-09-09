@@ -52,22 +52,31 @@ Section UkShLoop.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
-  Context (γt γd γs γfd : gname).
+  Context (N : uk_names).
+  (* the fields, under the names the engine has always used *)
+  Local Notation γt := (ukn_t N).
+  Local Notation γd := (ukn_d N).
+  Local Notation γs := (ukn_s N).
+  Local Notation γfd := (ukn_fd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
   (* the DATA a turn of the loop needs and does not create.  [8208] is
      [freep] (0x2010) and [8328] is [base] (0x2088) -- the two literals
      [UkShMalloc.ushm_fresh] unfolds to. *)
-  Definition ushl_dat : iProp Σ :=
-    (ustr γd DfracDiscarded ushp_whitespace 5 ushp_ws_f ∗
-     ustr γd DfracDiscarded ushp_symbols 7 ushp_sym_f ∗
-     uword γd 8208 (mword_of_int 0) ∗
-     (∃ fb : nat -> bv 8, ubytes γd 8328 16 fb))%I.
+  (* AT A BARE DATA NAME, not at the record's: a forked child assembles
+     this at ITS name out of the mirrored fragments, so [UkShFork.ushf_pay]
+     -- a [gname -> gname -> gname] payload family -- has to be able to
+     write it down. *)
+  Definition ushl_dat (g : gname) : iProp Σ :=
+    (ustr g DfracDiscarded ushp_whitespace 5 ushp_ws_f ∗
+     ustr g DfracDiscarded ushp_symbols 7 ushp_sym_f ∗
+     uword g 8208 (mword_of_int 0) ∗
+     (∃ fb : nat -> bv 8, ubytes g 8328 16 fb))%I.
 
   Lemma ushl_fresh_of_dat (sz : Z) :
-    ushl_dat -∗ usz γs sz -∗
-      UkShMalloc.ushm_fresh γd γs sz ∗
+    ushl_dat γd -∗ usz γs sz -∗
+      UkShMalloc.ushm_fresh N sz ∗
       ustr γd DfracDiscarded ushp_whitespace 5 ushp_ws_f ∗
       ustr γd DfracDiscarded ushp_symbols 7 ushp_sym_f.
   Proof.
@@ -80,10 +89,10 @@ Section UkShLoop.
   Definition ushl_head (l : list fdstate) (sz : Z) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat),
        ⌜ UkSh.ush_regs m ⌝ -∗
-       UkSh.ush_std γfd l -∗
-       ushl_dat -∗ usz γs sz -∗
+       UkSh.ush_std N l -∗
+       ushl_dat γd -∗ usz γs sz -∗
        ubytes γd sh_buf sh_nbuf f -∗
-       urun γt γd γs γfd h m (mword_of_int 0x938) (16 + (80 + n)) -∗
+       urun N h m (mword_of_int 0x938) (16 + (80 + n)) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* [UkSh.ush_rest]'s opaque [R], AT THIS SHELL.  The re-cut left [R] a
@@ -91,13 +100,13 @@ Section UkShLoop.
      tables and the allocator's cells -- does not have to live in
      iris/UkSh.v.  The break rides with them: [usz] is not bytes, so it is
      not part of [ushl_dat], but a turn carries it all the same. *)
-  Definition ushl_R (sz : Z) : iProp Σ := (ushl_dat ∗ usz γs sz)%I.
+  Definition ushl_R (sz : Z) : iProp Σ := (ushl_dat γd ∗ usz γs sz)%I.
 
   (* ...and then [UkSh.ush_loop_head] AT that [R] IS [ushl_head]: the same
      four binders, the same budget ([UkSh.ush_Dbody] is 80), and the two
      halves of [ushl_R] uncurried. *)
   Lemma ushl_head_of_R (l : list fdstate) (sz : Z) :
-    UkSh.ush_loop_head γt γd γs γfd (ushl_R sz) l -∗ ushl_head l sz.
+    UkSh.ush_loop_head N (ushl_R sz) l -∗ ushl_head l sz.
   Proof.
     iIntros "H" (h m f n) "%Hregs Hstd Hdat Hsz Hbuf Hrun".
     iApply ("H" $! h m f n with "[%//] Hstd [$Hdat $Hsz] Hbuf Hrun").

@@ -82,7 +82,12 @@ Section UkShMain.
 
   (* the four ghost names a program proof runs at, as every file in the
      lane binds them *)
-  Context (γt γd γs γfd : gname).
+  Context (N : uk_names).
+  (* the fields, under the names the engine has always used *)
+  Local Notation γt := (ukn_t N).
+  Local Notation γd := (ukn_d N).
+  Local Notation γs := (ukn_s N).
+  Local Notation γfd := (ukn_fd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -310,7 +315,7 @@ Section UkShMain.
      run's own heap, and the run survives because the conclusion is pure *)
   Local Lemma urun_ubytes_bnd (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) (a : Z) (nb : nat) (fb : nat -> bv 8) :
-    urun γt γd γs γfd h m pc avail -∗ ubytes γd a nb fb -∗
+    urun N h m pc avail -∗ ubytes γd a nb fb -∗
     ⌜ forall j : nat, (j < nb)%nat -> 0 <= a + Z.of_nat j < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hbs".
@@ -334,10 +339,10 @@ Section UkShMain.
     Z.of_nat len < 2 ^ 31 ->
     0 < s0 -> s0 + Z.of_nat len < 2 ^ 38 ->
     (* the run is here only to read the node's address bound off the heap *)
-    urun γt γd γs γfd h m pc avail -∗
-    ushp_tree γd s0 p (UshpExec toks) -∗
+    urun N h m pc avail -∗
+    ushp_tree N s0 p (UshpExec toks) -∗
     ubytes γd s0 (S len) (ushp_nulfold toks (ushp_ext len f)) ==∗
-    urun γt γd γs γfd h m pc avail ∗
+    urun N h m pc avail ∗
     ush_cmd γd p (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks)).
   Proof.
     intros Htoks Hns Hnn Hlen31 Hs0 Hs0hi.
@@ -473,14 +478,14 @@ Section UkShMain.
          0 < nbytes -> nbytes <= 65504 ->
          shp_code γt -∗
          UMalloc -∗
-         urun γt γd γs γfd h m (mword_of_int ShSyms.malloc) (10 + avail) -∗
+         urun N h m (mword_of_int ShSyms.malloc) (10 + avail) -∗
          (∀ (h' : CpuId) (m' : regfile) (p : Z) (g : nat -> bv 8),
             ⌜ ucallee_saved m m' ⌝ -∗
             ⌜ m' !!! Regidx (mword_of_int 10) = mword_of_int p ⌝ -∗
             ⌜ 0 < p /\ p mod 16 = 0 /\ p + nbytes < 2 ^ 38 ⌝ -∗
             ubytes γd p (Z.to_nat nbytes) g -∗
             usz γs szv -∗
-            urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx (mword_of_int 1)))
+            urun N h' m' (ret_pc (m !!! Regidx (mword_of_int 1)))
               (10 + avail) -∗
             WP (Loop : expr riscv_lang)) -∗
          WP (Loop : expr riscv_lang))
@@ -502,7 +507,7 @@ Section UkShMain.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UserFd.ustd γfd ld -∗ UMalloc -∗
-    urun γt γd γs γfd h m (mword_of_int 0x9c0)
+    urun N h m (mword_of_int 0x9c0)
       (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -513,7 +518,7 @@ Section UkShMain.
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
     iDestruct (ustr_len with "Hline") as %Hlen31.
     (* ---- 0x9c0  c.mv a0,s1 ---- *)
-    iApply (wp_uk_cmv γt γd γs γfd h m (mword_of_int 0x9c0) a0_idx s1_idx
+    iApply (wp_uk_cmv N h m (mword_of_int 0x9c0) a0_idx s1_idx
               (add_vec zero_reg (m !!! Regidx s1_idx))
               (60 + (8 + (UkShDiag.ush_Dg + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -538,7 +543,7 @@ Section UkShMain.
       by (rewrite /m1 (upd_ne m (Regidx a0_idx) (Regidx s1_idx) _
                          ltac:(vm_compute; discriminate)); exact Hs1).
     (* ---- 0x9c2  jal ra,parsecmd ---- *)
-    iApply (wp_uk_jal γt γd γs γfd h1 m1 (mword_of_int 0x9c2)
+    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x9c2)
               (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
               (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9c6)
               (60 + (8 + (UkShDiag.ush_Dg + n)))
@@ -561,8 +566,8 @@ Section UkShMain.
       by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
           apply bv_eq; vm_compute; reflexivity).
     (* ---- parsecmd ---- *)
-    iApply (UkShParseCmd.wp_kshp_parser γt γd γs γfd UMalloc (usz γs szv)
-              Hmalloc (Hclw γt γd γs γfd)
+    iApply (UkShParseCmd.wp_kshp_parser N UMalloc (usz γs szv)
+              Hmalloc (Hclw N)
               h2 m2 dw dv s0 len f toks
               (8 + (UkShDiag.ush_Dg + n))
               Ha0_2 Hns Htoks Htlen Hs0 Hs64
@@ -571,7 +576,7 @@ Section UkShMain.
     iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz Hrun".
     rewrite Hra_2.
     (* ---- 0x9c6  jal ra,runcmd ---- *)
-    iApply (wp_uk_jal γt γd γs γfd h3 m3 (mword_of_int 0x9c6)
+    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9c6)
               (mword_of_int 2094792 : mword 21) (mword_of_int 1 : mword 5)
               (mword_of_int ShSyms.runcmd) (mword_of_int 0x9ca)
               (60 + (8 + (UkShDiag.ush_Dg + n)))
@@ -603,7 +608,7 @@ Section UkShMain.
     iApply (UkShDiag.wp_kshr_runcmd_final Hpsok Hclw
               (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks))
               ltac:(cbn [ush_simple]; exact I)
-              γt γd γs γfd h4 m4 p szv ld (60 + n) Ha0_4
+              N h4 m4 p szv ld (60 + n) Ha0_4
               with "Hcode Hxs Hjt Htree Hsz Hstd Hrun").
   Qed.
 
@@ -625,9 +630,9 @@ Section UkShMain.
   (* ===================================================================== *)
   Lemma wp_kshm_child_alloc
       (Hsbrk : forall (sz n : Z) (r : mword 64),
-         UkShMalloc.ushm_sbrk_ans γd γs sz n r -∗
+         UkShMalloc.ushm_sbrk_ans N sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
-         UkShMalloc.ushm_sbrk_ans γd γs sz n r)
+         UkShMalloc.ushm_sbrk_ans N sz n r)
       (Hclw : UkShDiag.ushd_clw_text_ty)
       (h : CpuId) (m : regfile) (dw dv : dfrac)
       (s0 : Z) (len : nat) (f : nat -> bv 8) (toks : list (nat * nat))
@@ -651,15 +656,15 @@ Section UkShMain.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UserFd.ustd γfd ld -∗
-    UkShMalloc.ushm_fresh γd γs sz -∗
-    urun γt γd γs γfd h m (mword_of_int 0x9c0)
+    UkShMalloc.ushm_fresh N sz -∗
+    urun N h m (mword_of_int 0x9c0)
       (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38 Hszlo Hszal Hszok.
     iIntros "#Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd HM Hrun".
-    iApply (wp_kshm_child (UkShMalloc.ushm_fresh γd γs sz) (sz + 65536)
-              (UkShMalloc.ushm_malloc_ok_holds γt γd γs γfd Hpsok Hsbrk sz
+    iApply (wp_kshm_child (UkShMalloc.ushm_fresh N sz) (sz + 65536)
+              (UkShMalloc.ushm_malloc_ok_holds N Hpsok Hsbrk sz
                  Hszlo Hszal Hszok)
               Hclw h m dw dv s0 len f toks ld n
               Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38

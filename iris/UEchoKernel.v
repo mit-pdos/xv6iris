@@ -429,9 +429,9 @@ Section UEchoKernel.
               ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop
               with "Hdep").
     (* echo makes no descriptor call, so its ledger is dropped here *)
-    iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht _ #HA Hrun".
+    iIntros (N h) "%Hsz Hszf #Ht _ #HA Hrun".
     rewrite Hpc.
-    iApply (wp_kecho_start γt γd γs γfd Hpsok h (tf_resume_gpr0 (uvis_tf W))
+    iApply (wp_kecho_start N Hpsok h (tf_resume_gpr0 (uvis_tf W))
               (uvis_av W)
               (echo_args (uvis_M W) (uvis_av W) (Z.to_nat (uvis_argc W))) 0
               ltac:(rewrite echo_args_length;
@@ -439,9 +439,9 @@ Section UEchoKernel.
                     unfold uvis_argc; symmetry; apply moi_of_uint)
               ltac:(unfold uvis_av; symmetry; apply moi_of_uint)
               with "[] [] Hrun").
-    { iApply (echo_code_of_text γt (uvis_M W) (uvis_perm W) Hsub Hx
+    { iApply (echo_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W) Hsub Hx
                 with "Ht"). }
-    { iApply (echo_uargv_of_area γd (uvis_M W) (uvis_perm W) (uvis_sz W)
+    { iApply (echo_uargv_of_area (ukn_d N) (uvis_M W) (uvis_perm W) (uvis_sz W)
                 (uvis_av W) (uint (uvis_sp W)) (uvis_argc W)
                 Hsp0 Hargs Havd Havs with "HA"). }
   Qed.

@@ -61,17 +61,17 @@ Section UkRunBr.
 
   (* the base branch against x0 -- [bltz]/[bgez]/[beqz]/[bnez].  The second
      operand is not read off [m]: it is [zero_reg], off the bundle. *)
-  Lemma wp_uk_btype0 (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+  Lemma wp_uk_btype0 (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
       (imm : mword 13) (rs1 : mword 5) (op : bop) (taken : bool) (tgt : mword 64)
       (avail : nat) :
     taken = uv_btaken op (m !!! Regidx rs1) zero_reg ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uinstr_is γt pc false
+    uinstr_is (ukn_t N) pc false
       (BTYPE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, op)) -∗
-    urun γt γd γs γfd h m pc avail -∗
+    urun N h m pc avail -∗
     (∀ h' : CpuId,
-       urun γt γd γs γfd h' m
+       urun N h' m
          (if taken then tgt else add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -89,17 +89,17 @@ Section UkRunBr.
   (* ...and the x0 branch handing its [▷] out.  init's INNER loop closes
      through [bge a0,x0] at 0x4e, which is exactly this shape; without it
      the wait loop has no back edge that provides a later. *)
-  Lemma wp_uk_btype0_later (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_btype0_later (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5) (op : bop)
       (taken : bool) (tgt : mword 64) (avail : nat) :
     taken = uv_btaken op (m !!! Regidx rs1) zero_reg ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uinstr_is γt pc false
+    uinstr_is (ukn_t N) pc false
       (BTYPE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, op)) -∗
-    urun γt γd γs γfd h m pc avail -∗
+    urun N h m pc avail -∗
     ▷ (∀ h' : CpuId,
-         urun γt γd γs γfd h' m
+         urun N h' m
            (if taken then tgt else add_vec_int pc 4) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -116,17 +116,17 @@ Section UkRunBr.
   (* ...and the branch whose x0 is on the LEFT.  [blez a0] is [bge x0,a0],
      so the zero register is rs1 here, not rs2 -- the mirror of
      [wp_uk_btype0], and cat's read loop exits through exactly this. *)
-  Lemma wp_uk_btype0l (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+  Lemma wp_uk_btype0l (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
       (imm : mword 13) (rs2 : mword 5) (op : bop) (taken : bool) (tgt : mword 64)
       (avail : nat) :
     taken = uv_btaken op zero_reg (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uinstr_is γt pc false
+    uinstr_is (ukn_t N) pc false
       (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0 : mword 5), op)) -∗
-    urun γt γd γs γfd h m pc avail -∗
+    urun N h m pc avail -∗
     (∀ h' : CpuId,
-       urun γt γd γs γfd h' m
+       urun N h' m
          (if taken then tgt else add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
