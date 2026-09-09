@@ -46,6 +46,7 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 
 Section UkShLoop.
   Context `{!riscvGS Σ}.
@@ -58,6 +59,7 @@ Section UkShLoop.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
@@ -89,7 +91,7 @@ Section UkShLoop.
   Definition ushl_head (l : list fdstate) (sz : Z) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat),
        ⌜ UkSh.ush_regs m ⌝ -∗
-       UkSh.ush_std N l -∗
+       UkSh.ush_pstate N l -∗
        ushl_dat γd -∗ usz γs sz -∗
        ubytes γd sh_buf sh_nbuf f -∗
        urun N h m (mword_of_int 0x938) (16 + (80 + n)) -∗

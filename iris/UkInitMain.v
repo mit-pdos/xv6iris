@@ -40,6 +40,7 @@ Require Import UkRunBr.
 Local Open Scope Z_scope.
 Import Defs.
 
+Require Import UserCwd.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
@@ -57,6 +58,7 @@ Section UkInitMain.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -588,11 +590,16 @@ Section UkInitMain.
   Lemma wp_kinit_fork (szv : Z) (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗ init_rodata γt -∗ usz γs szv -∗
     ustd_any γfd -∗
+    (* the working directory, index-free: fork keeps it and init never
+       reads it, but the child's half is minted at the parent's value and
+       the leaf needs one to name ([UkFork.wp_uk_ecall_fork]) *)
+    UserCwd.ucwd_any γcwd -∗
     urun N h m (mword_of_int InitSyms.fork) avail -∗
     ((∀ (h' : CpuId) (r : mword 64),
         ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
         (init_code γt ∗ init_rodata γt) -∗ usz γs szv -∗
         ustd_any γfd -∗
+        UserCwd.ucwd_any γcwd -∗
         urun N h'
           (<[Regidx a0_idx := r]>
              (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m))
@@ -600,6 +607,7 @@ Section UkInitMain.
         WP (Loop : expr riscv_lang)) ∗
      (∀ (N' : uk_names) (h' : CpuId),
         (init_code (ukn_t N') ∗ init_rodata (ukn_t N')) -∗ usz (ukn_s N') szv -∗
+        UserCwd.ucwd_any (ukn_cwd N') -∗
         urun N' h'
           (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
              (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m))
@@ -607,8 +615,9 @@ Section UkInitMain.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hro Hsz Hstd Hrun [Hpar Hchi]".
+    iIntros "#Hcode #Hro Hsz Hstd Hcwd Hrun [Hpar Hchi]".
     iDestruct "Hstd" as (l) "Hstd".
+    iDestruct "Hcwd" as (cwv) "Hcwd".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & _ & _ & _ & Hfork & _ & _ & _ & _).
     rewrite Hfork.
@@ -635,13 +644,13 @@ Section UkInitMain.
        opened AFTER the fork, in the child's exec'd image -- so the handle
        set fork carries across is empty and both extra premises are [emp]. *)
     iApply (wp_uk_ecall_fork N h1 mf1 (mword_of_int 0x36c) avail szv
-              l ∅ (fun gt _ _ => (init_code gt ∗ init_rodata gt)%I)
+              l ∅ cwv (fun gt _ _ => (init_code gt ∗ init_rodata gt)%I)
               ltac:(unfold mf1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 1 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] [] Hsz Hstd [] Hrun").
+              with "[] [] Hsz Hstd [] Hcwd Hrun").
     { iApply (uis_init_36c with "Hcode"). }
     { iFrame "Hcode Hro". }
     { rewrite big_sepM_empty. done. }
@@ -657,7 +666,7 @@ Section UkInitMain.
                ltac:(vm_compute; discriminate)). }
     iSplitL "Hpar".
     - (* the PARENT resumes under the names it already had *)
-      iIntros (hp r) "%Hrnz Hpay Hsz Hstd _ Hrun".
+      iIntros (hp r) "%Hrnz Hpay Hsz Hstd _ Hcwd Hrun".
       set (mp := <[Regidx a0_idx := r]> mf1).
       assert (Hrap : mp !!! Regidx ra_idx = m !!! Regidx ra_idx).
       { rewrite /mp (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) r
@@ -671,13 +680,14 @@ Section UkInitMain.
                 with "[] Hrun").
       { iApply (uis_init_370 with "Hcp"). }
       iIntros (hp2) "Hrun".
-      iApply ("Hpar" $! hp2 r with "[] [] Hsz [Hstd] Hrun").
+      iApply ("Hpar" $! hp2 r with "[] [] Hsz [Hstd] [Hcwd] Hrun").
       { iPureIntro. exact Hrnz. }
       { iFrame "Hcp Hrp". }
       { by iExists l. }
+      { by iExists cwv. }
     - (* ...and the CHILD under fresh ones.  Its ledger is dropped: init's
          child execs, and nothing before the exec allocates. *)
-      iIntros (N' hc) "Hpay Hsz _ _ Hrun".
+      iIntros (N' hc) "Hpay Hsz _ _ Hcwd Hrun".
       set (mk := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]> mf1).
       assert (Hrak : mk !!! Regidx ra_idx = m !!! Regidx ra_idx).
       { rewrite /mk (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) _
@@ -691,8 +701,9 @@ Section UkInitMain.
                 with "[] Hrun").
       { iApply (uis_init_370 with "Hck"). }
       iIntros (hc2) "Hrun".
-      iApply ("Hchi" $! N' hc2 with "[] Hsz Hrun").
+      iApply ("Hchi" $! N' hc2 with "[] Hsz [Hcwd] Hrun").
       { iFrame "Hck Hrk". }
+      { iApply (ucwd_any_of with "Hcwd"). }
   Qed.
 
 
@@ -722,12 +733,14 @@ Section UkInitMain.
         ⌜ m !!! Regidx s2_idx = mword_of_int LIT_START ⌝ -∗
         usz γs szv -∗
         ustd_any γfd -∗
+        UserCwd.ucwd_any γcwd -∗
         urun N h m (mword_of_int 0x32) (12 + (12 + (4 + n))) -∗
         WP (Loop : expr riscv_lang))
      ∧ (∀ (h : CpuId) (m : regfile),
           ⌜ m !!! Regidx s2_idx = mword_of_int LIT_START ⌝ -∗
           usz γs szv -∗
           ustd_any γfd -∗
+          UserCwd.ucwd_any γcwd -∗
           urun N h m (mword_of_int 0x44) (12 + (12 + (4 + n))) -∗
           WP (Loop : expr riscv_lang))).
   Proof.
@@ -741,7 +754,7 @@ Section UkInitMain.
     iLöb as "IH".
     iSplit.
     - (* ==================== the RESTART head @0x32 ==================== *)
-      iIntros (h m) "%Hs2 Hsz Hstd Hrun".
+      iIntros (h m) "%Hs2 Hsz Hstd Hcwd Hrun".
       iApply (wp_uk_cmv N h m (mword_of_int 0x32) a0_idx s2_idx
                 (add_vec zero_reg (m !!! Regidx s2_idx)) (12 + (12 + (4 + n)))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -822,11 +835,11 @@ Section UkInitMain.
                       = (mword_of_int 0x3c : mword 64))
         by (rewrite Hral4; apply bv_eq; vm_compute; reflexivity).
       iApply (wp_kinit_fork szv hl4 ml4 (12 + (12 + (4 + n)))
-                with "Hcode Hro Hsz Hstd Hrun").
+                with "Hcode Hro Hsz Hstd Hcwd Hrun").
       rewrite Eretf.
       iSplitR "".
       + (* ------------- the PARENT: r <> 0 ------------- *)
-        iIntros (hp r) "%Hrnz [#Hcp #Hrp] Hsz Hstd Hrun".
+        iIntros (hp r) "%Hrnz [#Hcp #Hrp] Hsz Hstd Hcwd Hrun".
         set (mp0 := <[Regidx a0_idx := r]>
                       (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> ml4)).
         assert (Ha0p0 : mp0 !!! Regidx a0_idx = r)
@@ -917,10 +930,10 @@ Section UkInitMain.
           rewrite E42p.
           iIntros (hp3) "Hrun".
           iDestruct "IH" as "[_ IH2]".
-          iApply ("IH2" $! hp3 mp1 with "[] Hsz Hstd Hrun").
+          iApply ("IH2" $! hp3 mp1 with "[] Hsz Hstd Hcwd Hrun").
           iPureIntro. exact Hs2p1.
       + (* ------------- the CHILD: r = 0 ------------- *)
-        iIntros (N' hc) "[#Hck #Hrk] Hsz Hrun".
+        iIntros (N' hc) "[#Hck #Hrk] Hsz _ Hrun".
         set (mc0 := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
                       (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> ml4)).
         assert (Ha0c0 : mc0 !!! Regidx a0_idx = (mword_of_int 0 : mword 64))
@@ -984,7 +997,7 @@ Section UkInitMain.
         iApply (wp_kinit_main_child N' hc3 mc1 n
                   with "Hck Hxs Hrk Hrun").
     - (* ==================== the WAIT head @0x44 ==================== *)
-      iIntros (h m) "%Hs2 Hsz Hstd Hrun".
+      iIntros (h m) "%Hs2 Hsz Hstd Hcwd Hrun".
       (* ---- 0x44  c.li a0,0 -- the NULL status pointer ---- *)
       iApply (wp_uk_cli N h m (mword_of_int 0x44)
                 (mword_of_int 0 : mword 6) a0_idx (12 + (12 + (4 + n)))
@@ -1063,7 +1076,7 @@ Section UkInitMain.
         { iApply (uis_init_4a with "Hcode"). }
         iNext. iIntros (hw4) "Hrun".
         iDestruct "IH" as "[IH1 _]".
-        iApply ("IH1" $! hw4 mw3 with "[] Hsz Hstd Hrun").
+        iApply ("IH1" $! hw4 mw3 with "[] Hsz Hstd Hcwd Hrun").
         iPureIntro. exact Hs2w3.
       * (* somebody else's child, or an error *)
         iApply (wp_uk_btype_later N hw3 mw3 (mword_of_int 0x4a)
@@ -1094,7 +1107,7 @@ Section UkInitMain.
           { iApply (uis_init_4e with "Hcode"). }
           iNext. iIntros (hw5) "Hrun".
           iDestruct "IH" as "[_ IH2]".
-          iApply ("IH2" $! hw5 mw3 with "[] Hsz Hstd Hrun").
+          iApply ("IH2" $! hw5 mw3 with "[] Hsz Hstd Hcwd Hrun").
           iPureIntro. exact Hs2w3.
         + (* wait itself failed: the diagnostic at 0x52 *)
           iApply (wp_uk_btype0_later N hw4 mw3 (mword_of_int 0x4e)
@@ -1125,10 +1138,11 @@ Section UkInitMain.
     uxsup -∗
     init_rodata γt -∗ usz γs szv -∗
     ustd_any γfd -∗
+    UserCwd.ucwd_any γcwd -∗
     urun N h m (mword_of_int 0x1e) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hrun".
+    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hcwd Hrun".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & _ & _ & Hdup & _ & _ & _ & _ & _).
     (* ---- 0x1e  c.li a0,0 ---- *)
@@ -1253,7 +1267,7 @@ Section UkInitMain.
       by exact (upd_eq mq7 (Regidx s2_idx) (regval_into_reg _)).
     (* ---- 0x32: the restart head, and main never comes back ---- *)
     iDestruct (wp_kinit_main_loop szv n with "Hcode Hxs Hro") as "[Hloop _]".
-    iApply ("Hloop" $! hq8 mq8 with "[] Hsz Hstd Hrun").
+    iApply ("Hloop" $! hq8 mq8 with "[] Hsz Hstd Hcwd Hrun").
     iPureIntro. exact Hs2q8.
   Qed.
 
@@ -1270,10 +1284,11 @@ Section UkInitMain.
     uxsup -∗
     init_rodata γt -∗ usz γs szv -∗
     ustd_any γfd -∗
+    UserCwd.ucwd_any γcwd -∗
     urun N h m (mword_of_int 0x64) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hrun".
+    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hcwd Hrun".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & Hopen & Hmknod & _ & _ & _ & _ & _ & _).
     (* ---- 0x64  c.li a2,0 ---- *)
@@ -1463,7 +1478,7 @@ Section UkInitMain.
     { iApply (uis_init_82 with "Hcode"). }
     iIntros (hr8) "Hrun".
     iApply (wp_kinit_main_from_1e szv hr8 mr7 n
-              with "Hcode Hxs Hro Hsz Hstd Hrun").
+              with "Hcode Hxs Hro Hsz Hstd Hcwd Hrun").
   Qed.
 
 
@@ -1485,11 +1500,12 @@ Section UkInitMain.
     uxsup -∗
     init_rodata γt -∗ usz γs szv -∗
     ustd_any γfd -∗
+    UserCwd.ucwd_any γcwd -∗
     urun N h m (mword_of_int InitSyms.main)
       (4 + (12 + (12 + (4 + n)))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hrun".
+    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hcwd Hrun".
     destruct init_syms_pins
       as (_ & Hmain & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
     rewrite Hmain.
@@ -1707,7 +1723,7 @@ Section UkInitMain.
       { iApply (uis_init_1a with "Hcode"). }
       iIntros (hm11) "Hrun".
       iApply (wp_kinit_main_repair szv hm11 mm7 n
-                with "Hcode Hxs Hro Hsz Hstd Hrun").
+                with "Hcode Hxs Hro Hsz Hstd Hcwd Hrun").
     - (* it did: straight on to the dups *)
       iApply (wp_uk_btype0 N hm10 mm7 (mword_of_int 0x1a)
                 (mword_of_int 74 : mword 13) a0_idx BLT false
@@ -1722,7 +1738,7 @@ Section UkInitMain.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E1a. iIntros (hm11) "Hrun".
       iApply (wp_kinit_main_from_1e szv hm11 mm7 n
-                with "Hcode Hxs Hro Hsz Hstd Hrun").
+                with "Hcode Hxs Hro Hsz Hstd Hcwd Hrun").
   Qed.
 
 
@@ -1738,11 +1754,12 @@ Section UkInitMain.
     uxsup -∗
     init_rodata γt -∗ usz γs szv -∗
     ustd_any γfd -∗
+    UserCwd.ucwd_any γcwd -∗
     urun N h m (mword_of_int InitSyms.start)
       (2 + (4 + (12 + (12 + (4 + n))))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hrun".
+    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hcwd Hrun".
     destruct init_syms_pins
       as (Hstart & Hmain & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
     rewrite Hstart.
@@ -1854,7 +1871,7 @@ Section UkInitMain.
               with "[] Hrun").
     { iApply (uis_init_c4 with "Hcode"). }
     iIntros (hs4) "Hrun".
-    iApply (wp_kinit_main szv hs4 _ n with "Hcode Hxs Hro Hsz Hstd Hrun").
+    iApply (wp_kinit_main szv hs4 _ n with "Hcode Hxs Hro Hsz Hstd Hcwd Hrun").
   Qed.
 
 End UkInitMain.

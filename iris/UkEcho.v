@@ -48,6 +48,7 @@ Section UkEcho.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -968,8 +969,9 @@ Section UkEcho.
               ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate)
-              (* ...and the three descriptor-moving numbers *)
+              (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+              ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun []").
     { iApply (uis_echo_354 with "Hcode"). }

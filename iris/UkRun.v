@@ -94,6 +94,8 @@ Require Import ProcGeom.  (* [NOFILE] -- how many of them there are *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UserCwd.  (* [ucwd_auth] -- the PROGRAM's own view of its
+                            working directory, on the same mold *)
 (* ===================================================================== *)
 (* THE PROCESS'S GHOST NAMES, IN ONE RECORD.                              *)
 (*                                                                        *)
@@ -112,14 +114,15 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
 (* is the ENGINE's bundle, not a replacement for a ghost name.            *)
 (*                                                                        *)
 (* A program file binds the record and reads the fields under the names   *)
-(* the engine has always used, with four [Local Notation]s at the top of  *)
+(* the engine has always used, with five [Local Notation]s at the top of  *)
 (* its section; the engine's own leaves spell the projections out.        *)
 (* ===================================================================== *)
 Record uk_names := MkUkNames {
   ukn_t : gname;   (* the text map's authority ([UserHeap.utext]'s) *)
   ukn_d : gname;   (* the data map's ([ubyte], [ustack], the slack) *)
   ukn_s : gname;   (* the break ([usz], a half of a ghost variable) *)
-  ukn_fd : gname   (* the descriptor table's ([UserFd.ufd_auth]) *)
+  ukn_fd : gname;  (* the descriptor table's ([UserFd.ufd_auth]) *)
+  ukn_cwd : gname  (* the working directory's ([UserCwd.ucwd_auth]) *)
 }.
 
 Section UkRun.
@@ -301,16 +304,29 @@ Section UkRun.
     iApply "Hx".
   Qed.
 
+  (* ...AND WHAT A SUPPLIER THAT ONLY HAS THE BUNDLE AT ONE WORKING
+     DIRECTORY DOES INSTEAD.  [uxsup] asks for exec's bundle at EVERY key;
+     an application whose exec claim is about a PATH cannot pay that,
+     because a path names a file only relative to the directory it is
+     resolved from.  What such an application has is the bundle at every
+     key whose cwd is the ONE inum its process is at -- and that is NOT a
+     [udepw], because the [cw] a [udepw] must answer at is bound by its own
+     ∀ and only agreement against [urun]'s half can pin it.  The agreement
+     therefore happens in the LEAF, which has destructed [urun] and holds
+     that half: see [UkRunSys.wp_uk_ecall_exec_at_cwd], which takes the
+     program's half and the [c]-indexed bundle in place of a [udepw] and
+     hands the half back. *)
+
   Definition urun (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) : iProp Σ :=
     (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ) (sz : Z)
        (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (fdv : list fdstate)
-       (* THE WORKING DIRECTORY IS HIDDEN TOO, and with no ghost beside it:
-          a program that never looks at its cwd should not have to name
-          it, and nothing in the running bundle reads it -- it only rides
-          the bundle so the trap-out key can be built at the inum the
-          process was resumed at ([UexecRet.ukb_F]'s pin). *)
+       (* THE WORKING DIRECTORY IS HIDDEN TOO, exactly as the image, the
+          break and the descriptor view are: a program that never looks at
+          its cwd should not have to name it.  A program that DOES holds
+          [UserCwd.ucwd] outside, and the authority below is what ties that
+          half to the [cw] the key is at. *)
        (cw : Z),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        (* A6.140: the residue-token accessor rides the bundle as a PURE
@@ -331,8 +347,34 @@ Section UkRun.
           fragment bundle, chosen by the loop and handed back whole at every
           trap, and a program never learns its ghost name. *)
        ufd_auth (ukn_fd N) fdv ∗
+       (* THE PROGRAM'S OWN VIEW OF ITS WORKING DIRECTORY, keyed at the very
+          [cw] the bundle is at -- the descriptor authority's twin, one
+          value wide.  [cw] is bound by this existential, so this is the
+          only place a half can be pinned to it, and pinning it is what
+          lets a program say "my working directory is inum [c]" and have
+          that mean something about the key its next ecall traps from. *)
+       ucwd_auth (ukn_cwd N) cw ∗
        udep ∗
        uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw M m pc)%I.
+
+  (* THE ROUND'S EFFECT ON THE CWD, AT EVERY NUMBER BUT CHDIR.  A leaf
+     re-closes [urun] at the [cw'] the round resumed the process at, and
+     [UsysMemOk.usys_cwd_ok_quiet] says that is the [cw] it trapped from.
+     Re-keying the engine's half by that equation is the ONLY thing a leaf
+     has to do about the working directory, and it is why the program's
+     half rides through every call untouched.  [UserFd.ufd_auth_quiet]'s
+     twin, one value wide. *)
+  Lemma ucwd_auth_quiet (N : uk_names) (cw cw' : Z) :
+    cw' = cw -> ucwd_auth (ukn_cwd N) cw -∗ ucwd_auth (ukn_cwd N) cw'.
+  Proof. intros ->. iIntros "$". Qed.
+
+  (* THE MOVER, for the day a chdir leaf exists.  [UsysMemOk.usys_cwd_ok]
+     has exactly one non-quiet row and no leaf takes it yet; when one does,
+     this is the step it runs, with the new inum coming off the row. *)
+  Lemma ucwd_move (N : uk_names) (c c' : Z) :
+    ucwd_auth (ukn_cwd N) c -∗ ucwd (ukn_cwd N) c ==∗
+    ucwd_auth (ukn_cwd N) c' ∗ ucwd (ukn_cwd N) c'.
+  Proof. iApply ucwd_update. Qed.
 
   (* "this instruction does not write sp".  Every leaf that writes a general
      register carries it; a concrete [rd] decides it by [vm_compute]. *)
@@ -355,16 +397,18 @@ Section UkRun.
     ustack (ukn_d N) (m !!! Regidx csp_rs1) avail -∗
     (* ...and the descriptor authority, at the same [fdv] the key is at *)
     ufd_auth (ukn_fd N) fdv -∗
+    (* ...and the cwd authority, at the same [cw] the key is at *)
+    ucwd_auth (ukn_cwd N) cw -∗
     (* the deposit supplier and its law, back at the same key -- persistent,
        so a leaf that destructed [urun] hands the very copy it read *)
     udep -∗
     (∀ h : CpuId, urun N h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
     ukc pm M sz fdv cw m pc.
   Proof.
-    iIntros "Hheap Hstk Hufd #Hdep Hcont".
+    iIntros "Hheap Hstk Hufd Hcwd #Hdep Hcont".
     rewrite /ukc. iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
-    iFrame "Hheap Hstk Hufd Hdep Hb". iPureIntro.
+    iFrame "Hheap Hstk Hufd Hcwd Hdep Hb". iPureIntro.
     split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
@@ -393,13 +437,14 @@ Section UkRun.
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗
     ustack (ukn_d N) (m !!! Regidx csp_rs1) avail -∗
     ufd_auth (ukn_fd N) fdv -∗
+    ucwd_auth (ukn_cwd N) cw -∗
     udep -∗
     (∀ h : CpuId, urun N h (<[Regidx rd := v]> m) pc' avail -∗
                   WP (Loop : expr riscv_lang)) -∗
     ukc pm M sz fdv cw (<[Regidx rd := v]> m) pc'.
   Proof.
-    intros Hns. iIntros "Hheap Hstk Hufd #Hdep Hcont".
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+    intros Hns. iIntros "Hheap Hstk Hufd Hcwd #Hdep Hcont".
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwd Hdep Hcont").
     rewrite (unot_sp_upd rd v m Hns). iExact "Hstk".
   Qed.
 
@@ -658,7 +703,7 @@ Section UkRun.
       /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwd & #Hdep & Hb)".
     iDestruct (ustack_align with "Hstk") as %Hal.
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
     iPureIntro. exact (conj Hal Hroom).
@@ -754,6 +799,12 @@ Section UkRun.
        usz (ukn_s N) (uvis_sz W) -∗
        utext_all (ukn_t N) (uvis_M W) (uvis_perm W) -∗
        ustd (ukn_fd N) (take NSTD (uvis_fd W)) -∗
+       (* ...AND THE PROGRAM'S OWN HALF OF ITS WORKING DIRECTORY, at the
+          inum the resumed key carries.  Same reason the ledger comes out
+          here: this is where the process's [urun] is created, so it is
+          where the tie between the program's half and the key's [cw]
+          begins.  A program that never looks at its cwd drops it. *)
+       ucwd (ukn_cwd N) (uvis_cwd W) -∗
        ([∗ map] k ↦ b ∈ base.filter
              (fun kv : Z * bv 8 =>
                 kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
@@ -785,6 +836,10 @@ Section UkRun.
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
     iMod (ufd_alloc_std (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _))
       as (γfd) "(Hufd & Hstd & _)".
+    (* ...AND THE WORKING DIRECTORY'S PAIR, at the inum the resumed key
+       carries: the authority stays in the [urun] being built, the
+       fragment goes to the program. *)
+    iMod (ucwd_alloc (uvis_cwd W)) as (γc) "[Hcwa Hcwf]".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     (* ---- the two cuts: at the frame's base, then at sp ---- *)
     set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
@@ -825,7 +880,7 @@ Section UkRun.
       unfold f. rewrite Hb'. reflexivity. }
     iDestruct (ubytes_of_map γd _ base (8 * avail) f Hf with "Dmid") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd) h with "[%] Hszf Ht Hstd Dlo Dtop");
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc) h with "[%] Hszf Ht Hstd Hcwf Dlo Dtop");
       [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
@@ -833,7 +888,7 @@ Section UkRun.
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd Hdep".
+    iFrame "Hheap Hstk Hufd Hcwa Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
@@ -884,6 +939,12 @@ Section UkRun.
           calls no allocating syscall, which is the honest reading of "it is
           not tracking its descriptors". *)
        ustd (ukn_fd N) (take NSTD (uvis_fd W)) -∗
+       (* ...AND THE PROGRAM'S OWN HALF OF ITS WORKING DIRECTORY, at the
+          inum the resumed key carries.  Same reason the ledger comes out
+          here: this is where the process's [urun] is created, so it is
+          where the tie between the program's half and the key's [cw]
+          begins.  A program that never looks at its cwd drops it. *)
+       ucwd (ukn_cwd N) (uvis_cwd W) -∗
        urun N h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          avail -∗
        WP (Loop : expr riscv_lang))
@@ -907,6 +968,10 @@ Section UkRun.
        resumed KEY carries, which is the view the kernel is handing it. *)
     iMod (ufd_alloc_std (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _))
       as (γfd) "(Hufd & Hstd & _)".
+    (* ...AND THE WORKING DIRECTORY'S PAIR, at the inum the resumed key
+       carries: the authority stays in the [urun] being built, the
+       fragment goes to the program. *)
+    iMod (ucwd_alloc (uvis_cwd W)) as (γc) "[Hcwa Hcwf]".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     (* ---- the carve ---- *)
     set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
@@ -919,7 +984,7 @@ Section UkRun.
       unfold f. unfold D, base in *. rewrite Hb. reflexivity. }
     iDestruct (ubytes_of_map γd D base (8 * avail) f Hf with "Hd") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd) h with "[%] Hszf Ht Hstd");
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc) h with "[%] Hszf Ht Hstd Hcwf");
       [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
@@ -927,7 +992,7 @@ Section UkRun.
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd Hdep".
+    iFrame "Hheap Hstk Hufd Hcwa Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
@@ -986,6 +1051,12 @@ Section UkRun.
           calls no allocating syscall, which is the honest reading of "it is
           not tracking its descriptors". *)
        ustd (ukn_fd N) (take NSTD (uvis_fd W)) -∗
+       (* ...AND THE PROGRAM'S OWN HALF OF ITS WORKING DIRECTORY, at the
+          inum the resumed key carries.  Same reason the ledger comes out
+          here: this is where the process's [urun] is created, so it is
+          where the tie between the program's half and the key's [cw]
+          begins.  A program that never looks at its cwd drops it. *)
+       ucwd (ukn_cwd N) (uvis_cwd W) -∗
        ([∗ map] k ↦ b ∈ base.filter
              (fun kv : Z * bv 8 =>
                 ~ (kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)))
@@ -1014,6 +1085,10 @@ Section UkRun.
        resumed KEY carries, which is the view the kernel is handing it. *)
     iMod (ufd_alloc_std (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _))
       as (γfd) "(Hufd & Hstd & _)".
+    (* ...AND THE WORKING DIRECTORY'S PAIR, at the inum the resumed key
+       carries: the authority stays in the [urun] being built, the
+       fragment goes to the program. *)
+    iMod (ucwd_alloc (uvis_cwd W)) as (γc) "[Hcwa Hcwf]".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     (* ---- the cut at the entry sp ---- *)
     set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
@@ -1038,7 +1113,7 @@ Section UkRun.
                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D)
                  base (8 * avail) f Hf with "Dlo") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd) h with "[%] Hszf Ht Hstd Dhi");
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc) h with "[%] Hszf Ht Hstd Hcwf Dhi");
       [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
@@ -1046,7 +1121,7 @@ Section UkRun.
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd Hdep".
+    iFrame "Hheap Hstk Hufd Hcwa Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].

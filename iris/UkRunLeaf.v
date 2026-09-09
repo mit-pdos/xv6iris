@@ -88,12 +88,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Hrd. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_cli C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rd
               (sign_extend' 64 imm) Hui Hrd (eq_sym (uimm6_norm imm))
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -111,12 +111,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_caddi C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rd wval
               Hui H1 ltac:(rewrite (sext6_12_64 imm); exact H2)
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -135,12 +135,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_caddi4spn C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw cr nzimm rd wval
               Hui H1 H2 H3
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -160,12 +160,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2 H3 H4. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_jal C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rd tgt wval
               Hui H1 H2 H3 H4
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -182,12 +182,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_cjr C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rs1 tgt
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap Hstk Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap Hstk Hufd Hcwda Hdep Hcont").
   Qed.
 
   Lemma wp_uk_cmv (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -204,12 +204,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_cmv C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rd rs2 wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -227,12 +227,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_caddiw C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rd wval
               Hui H1 ltac:(rewrite (sext6_12_64 imm); exact H2)
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -249,12 +249,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_cj C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm tgt
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap Hstk Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap Hstk Hufd Hcwda Hdep Hcont").
   Qed.
 
   Lemma wp_uk_addi (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -271,12 +271,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_addi C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs1 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -294,12 +294,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_add C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rs1 rs2 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -317,12 +317,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_slli C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw shamt rs1 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -340,12 +340,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_srli C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw shamt rs1 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -363,12 +363,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_subw C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rs1 rs2 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -386,12 +386,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_auipc C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -409,12 +409,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_sub C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rs1 rs2 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -432,12 +432,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_and C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rs1 rs2 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -455,12 +455,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_sltu C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rs1 rs2 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -478,12 +478,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_addw C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rs1 rs2 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -501,12 +501,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_sltiu C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs1 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -524,12 +524,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_andi C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs1 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -547,12 +547,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_xori C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs1 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -570,12 +570,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_addiw C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs1 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -593,12 +593,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_slliw C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw shamt rs1 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -616,12 +616,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_lui C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -639,12 +639,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_divu C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rs1 rs2 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -662,12 +662,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_remu C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rs1 rs2 rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -686,12 +686,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_jalr C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs1 rd wr tgt
               Hui H1 H2 H3
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (uv_upd_not_sp m rd wr (add_vec_int pc 4) Hns H2). iExact "Hstk".
   Qed.
 
@@ -709,12 +709,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_jr C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs1 rd tgt
               Hui H1 H2 H3
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap Hstk Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap Hstk Hufd Hcwda Hdep Hcont").
   Qed.
 
   Lemma wp_uk_cadd (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -731,12 +731,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_cadd C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw rd rs2 wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -756,12 +756,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2 H3 H4. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_cand C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw crd crs2 rd rs2 wval
               Hui H1 H2 H3 H4
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -781,12 +781,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2 H3 H4. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_caddw C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw crd crs2 rd rs2 wval
               Hui H1 H2 H3 H4
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -804,12 +804,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_clui C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -827,12 +827,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_cslli C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw shamt rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -851,12 +851,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_csrli C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw shamt crd rd wval
               Hui H1 H2 H3
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -875,12 +875,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_li C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rd wval
               Hui H1 H2
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep Hcont").
     rewrite (unot_sp_upd rd _ m Hns). iExact "Hstk".
   Qed.
 
@@ -906,12 +906,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkBranch.wp_uk_btype C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs2 rs1 op taken tgt
               Hui H1 H2 H3
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap Hstk Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap Hstk Hufd Hcwda Hdep Hcont").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -939,13 +939,13 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkBranch.wp_uk_btype_later C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs2 rs1
               op taken tgt Hui H1 H2 H3
-              with "Hb [Hheap Hstk Hufd Hcont]").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
     iNext.
-    iApply (urun_close with "Hheap Hstk Hufd Hdep Hcont").
+    iApply (urun_close with "Hheap Hstk Hufd Hcwda Hdep Hcont").
   Qed.
 
   Lemma wp_uk_cbeqz (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -963,12 +963,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3 H4. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkBranch.wp_uk_cbeqz C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm cr rs taken tgt
               Hui H1 H2 H3 H4
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap Hstk Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap Hstk Hufd Hcwda Hdep Hcont").
   Qed.
 
   Lemma wp_uk_cbnez (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -986,12 +986,12 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3 H4. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkBranch.wp_uk_cbnez C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm cr rs taken tgt
               Hui H1 H2 H3 H4
-              with "Hb [Hheap Hstk Hufd Hcont]").
-    iApply (urun_close with "Hheap Hstk Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcont]").
+    iApply (urun_close with "Hheap Hstk Hufd Hcwda Hdep Hcont").
   Qed.
 
 
@@ -1050,7 +1050,7 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Himm. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     (* the room below sp is a CONSEQUENCE of owning the free stack *)
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom'.
@@ -1067,8 +1067,8 @@ Section UkRunLeaf.
               (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat k)))
               Hui ltac:(vm_compute; discriminate)
               ltac:(rewrite (sext6_12_64 imm) Himm; reflexivity)
-              with "Hb [Hheap Hstk Hufd Hframe Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep [Hframe Hcont]").
+              with "Hb [Hheap Hstk Hufd Hcwda Hframe Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep [Hframe Hcont]").
     - rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg _)). iExact "Hstk".
     - iIntros (h') "Hrun". iApply ("Hcont" with "Hframe Hrun").
   Qed.
@@ -1092,7 +1092,7 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Himm. iIntros "#Hi Hframe Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     (* ...and so is the absence of wrap, off the frame being returned *)
     iDestruct (ustack_nowrap with "Hheap Hframe") as %Hnw.
@@ -1106,8 +1106,8 @@ Section UkRunLeaf.
               (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
               Hui ltac:(vm_compute; discriminate)
               ltac:(rewrite (sext6_12_64 imm) Himm; reflexivity)
-              with "Hb [Hheap Hstk Hufd Hframe Hcont]").
-    iApply (urun_close with "Hheap [Hstk Hframe] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hframe Hcont]").
+    iApply (urun_close with "Hheap [Hstk Hframe] Hufd Hcwda Hdep Hcont").
     rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg _)).
     rewrite (ustack_app (ukn_d N) (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
                (m !!! Regidx csp_rs1) k n Hu).
@@ -1135,7 +1135,7 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Himm. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     (* the room below sp is a CONSEQUENCE of owning the free stack *)
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom'.
@@ -1151,8 +1151,8 @@ Section UkRunLeaf.
     iApply (UkLeaf.wp_uk_caddi16sp C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm
               (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat k)))
               Hui ltac:(unfold add_vec_int; f_equal; exact (eq_sym Himm))
-              with "Hb [Hheap Hstk Hufd Hframe Hcont]").
-    iApply (urun_close with "Hheap [Hstk] Hufd Hdep [Hframe Hcont]").
+              with "Hb [Hheap Hstk Hufd Hcwda Hframe Hcont]").
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwda Hdep [Hframe Hcont]").
     - rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg _)). iExact "Hstk".
     - iIntros (h') "Hrun". iApply ("Hcont" with "Hframe Hrun").
   Qed.
@@ -1177,7 +1177,7 @@ Section UkRunLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Himm. iIntros "#Hi Hframe Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (ustack_nowrap with "Hheap Hframe") as %Hnw.
     assert (Hu : uint (m !!! Regidx csp_rs1)
@@ -1189,8 +1189,8 @@ Section UkRunLeaf.
     iApply (UkLeaf.wp_uk_caddi16sp C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm
               (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
               Hui ltac:(unfold add_vec_int; f_equal; exact (eq_sym Himm))
-              with "Hb [Hheap Hstk Hufd Hframe Hcont]").
-    iApply (urun_close with "Hheap [Hstk Hframe] Hufd Hdep Hcont").
+              with "Hb [Hheap Hstk Hufd Hcwda Hframe Hcont]").
+    iApply (urun_close with "Hheap [Hstk Hframe] Hufd Hcwda Hdep Hcont").
     rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg _)).
     rewrite (ustack_app (ukn_d N) (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
                (m !!! Regidx csp_rs1) k n Hu).

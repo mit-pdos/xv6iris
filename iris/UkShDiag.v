@@ -126,6 +126,7 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             which rides inside [urun] *)
 Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 
 Section UkShDiagStr.
   Context `{!riscvGS Σ}.
@@ -408,6 +409,7 @@ Section UkShDiagPutc.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -855,6 +857,7 @@ Section UkShDiagVprintf.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -2959,6 +2962,7 @@ Section UkShDiagVprintfS.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
 
   (* WHICH HALF OF THE HEAP THE '%s' ARGUMENT LIVES IN.  cat's is a heap
      string ([ustr] at γd); sh's [panic] prints a .rodata literal
@@ -5530,6 +5534,7 @@ Section UkShDiagFprintf.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
 
   (* WHICH HALF OF THE HEAP THE '%s' ARGUMENT LIVES IN.  cat's is a heap
      string ([ustr] at γd); sh's [panic] prints a .rodata literal
@@ -6905,6 +6910,7 @@ Section UkShDiagRun.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -7519,6 +7525,7 @@ Section UkShDiagLeaf.
       uxsup -∗
       ush_jtab (ukn_t N) -∗ ush_cmd (ukn_d N) t c -∗ usz (ukn_s N) szv -∗
       UserFd.ustd (ukn_fd N) ld -∗
+      UserCwd.ucwd_any (ukn_cwd N) -∗
       urun N h m (mword_of_int ShSyms.runcmd)
         (6 * ush_ht c + (2 + (ush_Dg + n))) -∗
       WP (Loop : expr riscv_lang).
@@ -7530,6 +7537,7 @@ Section UkShDiagLeaf.
       (h : CpuId) (m : regfile) (n : nat) :
     shk_code (ukn_t N) -∗ shk_rodata (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
+    UserCwd.ucwd_any (ukn_cwd N) -∗
     ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
     urun N h m (mword_of_int ShSyms.fork1) (2 + (ush_Dg + n)) -∗
     ((∀ (h' : CpuId) (m' : regfile) (r : mword 64),
@@ -7538,6 +7546,7 @@ Section UkShDiagLeaf.
         ⌜ m' !!! Regidx a0_idx = r ⌝ -∗
         P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
         UserFd.ustd (ukn_fd N) l -∗
+        UserCwd.ucwd_any (ukn_cwd N) -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
         urun N h' m'
           (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
@@ -7548,6 +7557,7 @@ Section UkShDiagLeaf.
         ⌜ m' !!! Regidx a0_idx = (mword_of_int 0 : mword 64) ⌝ -∗
         shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
         UserFd.ustd (ukn_fd N') l -∗
+        UserCwd.ucwd_any (ukn_cwd N') -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
         urun N' h' m'
           (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))

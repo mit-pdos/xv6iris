@@ -142,6 +142,8 @@ Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UserCwd.  (* [ucwd] -- the parent's half of its working
+                            directory, which the child is minted at *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Section UkFork.
@@ -756,7 +758,7 @@ Section UkFork.
      the two extra premises are [emp]. *)
   Lemma wp_uk_ecall_fork (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (szv : Z) (l : list fdstate)
-      (D : gmap nat fdstate)
+      (D : gmap nat fdstate) (c : Z)
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P} :
     usysno m = USYS_fork ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
@@ -765,6 +767,14 @@ Section UkFork.
     usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
     ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+    (* THE CALLER'S OWN HALF OF ITS WORKING DIRECTORY.  fork keeps the cwd
+       ([UexecRet]'s child arm resumes the child at the parent's
+       [uvis_cwd]), and the child's half has to be minted at a value this
+       statement can NAME -- [urun]'s [cw] is existentially bound and
+       cannot be.  So the parent hands its half in, agreement pins the
+       key's [cw] to it, and both processes come out holding [c]: exactly
+       what fork does to the descriptor ledger one line up. *)
+    UserCwd.ucwd (ukn_cwd N) c -∗
     urun N h m pc avail -∗
     ((∀ (h' : CpuId) (r : mword 64),
         ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
@@ -772,6 +782,8 @@ Section UkFork.
         (* the parent keeps what it had: fork writes nothing into its table *)
         UserFd.ustd (ukn_fd N) l -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+        (* ...and its working directory, which fork did not move *)
+        UserCwd.ucwd (ukn_cwd N) c -∗
         urun N h' (<[Regidx (mword_of_int 10) := r]> m)
           (add_vec_int pc 4) avail -∗
         WP (Loop : expr riscv_lang)) ∗
@@ -780,7 +792,8 @@ Section UkFork.
         authority is no different: parent and child each own a full map, and
         one name could not carry both.  (This is why the descriptor name is a
         FIELD of the record rather than an ambient: an ambient name would
-        make this arm unprovable.)
+        make this arm unprovable.)  Its WORKING DIRECTORY is a fresh name
+        for the same reason and at the same value: fork keeps the cwd.
         ...AND IT GETS THE HANDLES FOR EVERYTHING IT INHERITED, at that
         fresh name.  [fdv] is the PARENT's table -- fork copies it, which is
         what [UexecRet]'s child arm now says -- so the map is exactly what
@@ -799,14 +812,17 @@ Section UkFork.
            sh's PIPE runs in the child). *)
         UserFd.ustd (ukn_fd N') l -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
+        UserCwd.ucwd (ukn_cwd N') c -∗
         urun N' h'
           (<[Regidx (mword_of_int 10) := (mword_of_int 0 : mword 64)]> m)
           (add_vec_int pc 4) avail -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hal4. iIntros "#Hi HP Hsz Hstd HD Hrun [Hpar Hchild]".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    intros Hn Hal4. iIntros "#Hi HP Hsz Hstd HD Hcwd Hrun [Hpar Hchild]".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    (* the caller's half pins the key's working directory *)
+    iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* the caller's handles ARE the parent's table, at the slots they name --
@@ -832,7 +848,7 @@ Section UkFork.
       "(Hheap' & Hsz' & #Htf' & #Hpf' & Hdf')".
     iMod ("Hrebuild" $! γt' γd' γs' with "Htf' Hpf' Hdf'") as "[HP' Hstk']".
     (* ---- the trap ---- *)
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -841,7 +857,7 @@ Section UkFork.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_fork).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c)) = USYS_fork).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_fork = USYS_exit)) as [He | _];
@@ -851,16 +867,16 @@ Section UkFork.
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
     (* the PARENT keeps the descriptor authority it had -- fork does not
        touch the parent's table -- and the CHILD mints its own below. *)
-    iSplitL "Hpar HP Hsz Hstd HD Hheap Hstk Hufd".
+    iSplitL "Hpar HP Hsz Hstd HD Hcwd Hheap Hstk Hufd Hcwda".
     (* ---- the parent: same heap, r <> 0, a quiet-shaped resume ---- *)
     - iIntros (r fdv' cw') "%Hr %Hfv %Hcv". subst fdv' cw'.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw r Hx0 Hal4).
-      iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv cw
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c r Hx0 Hal4).
+      iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv c
                 (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hdep").
+                with "Hheap Hstk Hufd Hcwda Hdep").
       iIntros (h') "Hrun".
-      iApply ("Hpar" $! h' r with "[%] HP Hsz Hstd HD Hrun"). exact Hr.
+      iApply ("Hpar" $! h' r with "[%] HP Hsz Hstd HD Hcwd Hrun"). exact Hr.
     (* ---- the child: fresh heap, r = 0, payload rebuilt at the new names *)
     - iIntros (fdv' cw') "%Hfdv' %Hcv'". subst fdv' cw'.
       (* THE CHILD'S OWN DESCRIPTOR AUTHORITY, minted at the view the kernel
@@ -878,16 +894,20 @@ Section UkFork.
       iMod (ufd_alloc_std fdv D Hfdlen Hsub)
         as (γfd') "(Hufd' & Hstd' & Hfrag')".
       iEval (rewrite Hstl) in "Hstd'".
+      (* ...AND ITS OWN WORKING-DIRECTORY PAIR, at the inum the kernel
+         resumed it at, which is the parent's: fork keeps the cwd. *)
+      iMod (ucwd_alloc c) as (γc') "[Hcwa' Hcwf']".
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c
                  (mword_of_int 0) Hx0 Hal4).
-      iApply (urun_close_upd (MkUkNames γt' γd' γs' γfd') M pm m (mword_of_int 10)
-                (mword_of_int 0) sz fdv cw (add_vec_int pc 4) avail
+      iApply (urun_close_upd (MkUkNames γt' γd' γs' γfd' γc') M pm m
+                (mword_of_int 10)
+                (mword_of_int 0) sz fdv c (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap' Hstk' Hufd' Hdep").
+                with "Hheap' Hstk' Hufd' Hcwa' Hdep").
       iIntros (h') "Hrun".
-      iApply ("Hchild" $! (MkUkNames γt' γd' γs' γfd') h'
-                with "HP' Hsz' Hstd' Hfrag' Hrun").
+      iApply ("Hchild" $! (MkUkNames γt' γd' γs' γfd' γc') h'
+                with "HP' Hsz' Hstd' Hfrag' Hcwf' Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -912,7 +932,8 @@ Section UkFork.
   Lemma wp_uk_ecall_fork_argv (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (szv : Z)
       (M0 : gmap Z (bv 8)) (pm0 : gmap (mword 27) uperm)
-      (av : Z) (args : list uarg) (l : list fdstate) (D : gmap nat fdstate) :
+      (av : Z) (args : list uarg) (l : list fdstate) (D : gmap nat fdstate)
+      (c : Z) :
     usysno m = USYS_fork ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
@@ -921,12 +942,16 @@ Section UkFork.
     usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
     ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+    (* the caller's half of its working directory -- [wp_uk_ecall_fork]'s
+       own note says why it has to come in to reach the child *)
+    UserCwd.ucwd (ukn_cwd N) c -∗
     urun N h m pc avail -∗
     ((∀ (h' : CpuId) (r : mword 64),
         ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
         usz (ukn_s N) szv -∗
         UserFd.ustd (ukn_fd N) l -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+        UserCwd.ucwd (ukn_cwd N) c -∗
         urun N h' (<[Regidx (mword_of_int 10) := r]> m)
           (add_vec_int pc 4) avail -∗
         WP (Loop : expr riscv_lang)) ∗
@@ -944,23 +969,25 @@ Section UkFork.
            [wp_uk_ecall_fork]'s own note *)
         UserFd.ustd (ukn_fd N') l -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
+        UserCwd.ucwd (ukn_cwd N') c -∗
         urun N' h'
           (<[Regidx (mword_of_int 10) := (mword_of_int 0 : mword 64)]> m)
           (add_vec_int pc 4) avail -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hal4. iIntros "#Hi #Htext #Hargv Hsz Hstd HD Hrun [Hpar Hchild]".
-    iApply (wp_uk_ecall_fork N h m pc avail szv l D
+    intros Hn Hal4.
+    iIntros "#Hi #Htext #Hargv Hsz Hstd HD Hcwd Hrun [Hpar Hchild]".
+    iApply (wp_uk_ecall_fork N h m pc avail szv l D c
               (fun γt0 γd0 γs0 => (utext_all γt0 M0 pm0 ∗ uargv γd0 av args)%I)
-              Hn Hal4 with "Hi [] Hsz Hstd HD Hrun [Hpar Hchild]").
+              Hn Hal4 with "Hi [] Hsz Hstd HD Hcwd Hrun [Hpar Hchild]").
     { iSplitR; [ iExact "Htext" | iExact "Hargv" ]. }
     iSplitL "Hpar".
-    - iIntros (h' r) "%Hr _ Hsz Hstd HD Hrun".
-      iApply ("Hpar" $! h' r with "[%] Hsz Hstd HD Hrun"). exact Hr.
-    - iIntros (N' h') "[Ht' Ha'] Hsz' Hstd' Hfrag' Hrun".
+    - iIntros (h' r) "%Hr _ Hsz Hstd HD Hcwd Hrun".
+      iApply ("Hpar" $! h' r with "[%] Hsz Hstd HD Hcwd Hrun"). exact Hr.
+    - iIntros (N' h') "[Ht' Ha'] Hsz' Hstd' Hfrag' Hcwd' Hrun".
       iApply ("Hchild" $! N' h'
-                with "Ht' Ha' Hsz' Hstd' Hfrag' Hrun").
+                with "Ht' Ha' Hsz' Hstd' Hfrag' Hcwd' Hrun").
   Qed.
 
 End UkFork.

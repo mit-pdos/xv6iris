@@ -238,6 +238,7 @@ Proof.
 Qed.
 
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 
 Section UShKernel.
   Context `{!riscvGS Σ}.
@@ -346,7 +347,7 @@ Section UShKernel.
     iIntros "#Hpay #Hdep #Hrest".
     iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Hal8
               Hroom Hstk Hfdlen Hstop with "Hdep").
-    iIntros (N h) "%Hsz Hszf #Ht Hstd Dlo _ Hrun".
+    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf Dlo _ Hrun".
     rewrite Hpc.
     (* [R] and the line buffer, out of the data below the frame *)
     iDestruct ("Hpay" $! (ukn_t N) (ukn_d N) (ukn_s N) with "Hszf Dlo")
@@ -354,11 +355,12 @@ Section UShKernel.
     iPoseProof ("Hrest" $! N) as "#Hr".
     iApply (wp_ksh_start N Hpsok (ush_read_leaf_of_win N)
               (R (ukn_t N) (ukn_d N) (ukn_s N)) h _ f n0 (take NSTD (uvis_fd W))
-              with "Hr [] [Hstd] HR Hbs [Hrun]").
+              with "Hr [] [Hstd Hcwf] HR Hbs [Hrun]").
     - iApply (shk_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (shk_img_text _ Hsub) Hx with "Ht").
-    - rewrite /ush_std. iFrame "Hstd". iPureIntro.
-      exact (fd_lowest_closed_take_none _ _ Hfdnone).
+    - rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hstd".
+      iSplitR; [ iPureIntro; exact (fd_lowest_closed_take_none _ _ Hfdnone) | ].
+      iApply (ucwd_any_of with "Hcwf").
     - iExact "Hrun".
   Qed.
 

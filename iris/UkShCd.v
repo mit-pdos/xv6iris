@@ -39,10 +39,13 @@
 (*                                                                        *)
 (* WHAT chdir COSTS THE WALK: NOTHING ABOUT THE PATH.  The kernel READS   *)
 (* the path out of user memory and the row is about what it WRITES, so    *)
-(* the quiet leaf wants no resource for it at all -- a path that is not   *)
+(* the leaf wants no resource for it at all -- a path that is not         *)
 (* terminated inside the process's memory is a -1 from [copyinstr], not   *)
-(* an unsound step.  The cwd itself rides inside [urun] existentially,    *)
-(* which is why chdir MOVING it needs no new row here.                    *)
+(* an unsound step.  WHAT IT DOES COST is the process's own half of its   *)
+(* working directory ([UserCwd.ucwd]): chdir is the one row that MOVES    *)
+(* the cwd, [UkRun.urun] carries the other half, and an authority cannot  *)
+(* move without the fragment.  The arm takes [UserCwd.ucwd_any] in and    *)
+(* hands it back -- sh never reads which directory it is in.              *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -125,6 +128,7 @@ Qed.
 
 Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 
 Section UkShCd.
   Context `{!riscvGS Σ}.
@@ -137,6 +141,7 @@ Section UkShCd.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -166,6 +171,7 @@ Section UkShCd.
   (* ---- what the other files of the lane define, at this file's own
          ghost names ---- *)
   Local Notation ush_std := (UkSh.ush_std N).
+  Local Notation ush_pstate := (UkSh.ush_pstate N).
   Local Notation ush_loop_head := (UkSh.ush_loop_head N).
   Local Notation urun_x0 := (UkShParse.urun_x0 N).
   Local Notation wp_kshp_strlen := (UkShParse.wp_kshp_strlen N).
@@ -276,10 +282,19 @@ Section UkShCd.
   (* [urun] existentially, so a row that moves it needs no premise of this  *)
   (* walk: what comes back is a run at whatever the cwd now is.             *)
   (* ===================================================================== *)
+  (* THE WORKING DIRECTORY GOES IN AND COMES BACK, index-free.  chdir is
+     the one row that moves it, and moving it takes the process's own half
+     ([UkRunSys.wp_uk_ecall_chdir]) -- so sh cannot call chdir without
+     holding one, exactly as it cannot call an allocating syscall without
+     its descriptor ledger.  WHICH directory it lands in is not something
+     the row says and not something sh reads, so what travels is
+     [UserCwd.ucwd_any]: one resource, no binder. *)
   Lemma wp_kshc_chdir (h : CpuId) (m : regfile) (avail : nat) :
     shk_code γt -∗
+    UserCwd.ucwd_any γcwd -∗
     urun N h m (mword_of_int ShSyms.chdir) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
+       UserCwd.ucwd_any γcwd -∗
        urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 9 : mword 64)]> m))
@@ -287,7 +302,7 @@ Section UkShCd.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hcode Hcwd Hrun Hcont".
     assert (Hpin : ShSyms.chdir = 0xcf6)
       by (destruct shk_syms_pins as (_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&H&_);
           exact H).
@@ -308,26 +323,20 @@ Section UkShCd.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E0 Em. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 9 : mword 64)]> m).
-    (* ---- 0xcf8  ecall -- the QUIET row at SYS_chdir ---- *)
-    iApply (wp_uk_ecall_quiet N h1 m1 (mword_of_int 0xcf8) 9 avail
+    (* ---- 0xcf8  ecall -- THE ROW THAT MOVES THE CWD ---- *)
+    iApply (wp_uk_ecall_chdir_any N h1 m1 (mword_of_int 0xcf8) avail
               ltac:(rewrite /m1 /usysno
                       (upd_eq m (Regidx a7_idx) (mword_of_int 9 : mword 64));
                     vm_compute; reflexivity)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun []").
+              with "[] Hrun [] Hcwd").
     { iApply (uis_shk_cf8 with "Hcode"). }
     { iApply udepw_of_psok; [ apply Hpsok | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0xcf8 : mword 64) 4
                  = mword_of_int 0xcfc)
       by (apply bv_eq; vm_compute; reflexivity).
-    rewrite E1. iIntros (h2 ret) "Hrun".
+    rewrite E1. iIntros (h2 ret) "Hcwd Hrun".
     set (m2 := <[Regidx a0_idx := ret]> m1).
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
     { unfold m2, m1.
@@ -345,7 +354,7 @@ Section UkShCd.
               with "[] Hrun").
     { iApply (uis_shk_cfc with "Hcode"). }
     iIntros (h3) "Hrun".
-    iApply ("Hcont" $! h3 ret with "Hrun").
+    iApply ("Hcont" $! h3 ret with "Hcwd Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -373,7 +382,7 @@ Section UkShCd.
     bv_unsigned (f (S (S k))) = 32 ->
     ushl_head l sz -∗
     shk_code γt -∗ shk_rodata γt -∗ shp_code γt -∗
-    ush_std l -∗
+    ush_pstate l -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x97a)
@@ -806,9 +815,13 @@ Section UkShCd.
                  := regval_into_reg (mword_of_int 0x9aa : mword 64)]> mB).
     assert (Hra_C : mC !!! Regidx ra_idx = (mword_of_int 0x9aa : mword 64))
       by exact (upd_eq mB (Regidx ra_idx) _).
+    (* THE ONE PLACE sh SPENDS ITS WORKING DIRECTORY: out of the process
+       state, into the chdir row, and back in a turn later. *)
+    iDestruct "Hstd" as "[Hstd Hcwd]".
     iApply (wp_kshc_chdir h16 mC (16 + (80 + n))
-              with "Hcode Hrun").
-    iIntros (h17 ret) "Hrun".
+              with "Hcode Hcwd Hrun").
+    iIntros (h17 ret) "Hcwd Hrun".
+    iCombine "Hstd Hcwd" as "Hstd".
     rewrite Hra_C.
     assert (Eret2 : ret_pc (mword_of_int 0x9aa : mword 64)
                     = mword_of_int 0x9aa)

@@ -88,6 +88,7 @@ Section UkShMain.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -506,13 +507,14 @@ Section UkShMain.
     ustr γd (DfracOwn 1) s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
-    UserFd.ustd γfd ld -∗ UMalloc -∗
+    UserFd.ustd γfd ld -∗
+    UserCwd.ucwd_any γcwd -∗ UMalloc -∗
     urun N h m (mword_of_int 0x9c0)
       (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38.
-    iIntros "#Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd HM Hrun".
+    iIntros "#Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd HM Hrun".
     (* the line's own bytes are non-NUL, which is what makes each token a
        string once the cut lands *)
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
@@ -609,7 +611,7 @@ Section UkShMain.
               (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks))
               ltac:(cbn [ush_simple]; exact I)
               N h4 m4 p szv ld (60 + n) Ha0_4
-              with "Hcode Hxs Hjt Htree Hsz Hstd Hrun").
+              with "Hcode Hxs Hjt Htree Hsz Hstd Hcwd Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -656,19 +658,20 @@ Section UkShMain.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UserFd.ustd γfd ld -∗
+    UserCwd.ucwd_any γcwd -∗
     UkShMalloc.ushm_fresh N sz -∗
     urun N h m (mword_of_int 0x9c0)
       (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38 Hszlo Hszal Hszok.
-    iIntros "#Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd HM Hrun".
+    iIntros "#Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd HM Hrun".
     iApply (wp_kshm_child (UkShMalloc.ushm_fresh N sz) (sz + 65536)
               (UkShMalloc.ushm_malloc_ok_holds N Hpsok Hsbrk sz
                  Hszlo Hszal Hszok)
               Hclw h m dw dv s0 len f toks ld n
               Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38
-              with "Hcode Hxs Hpcode Hpro Hjt Hline Hws Hsy Hstd HM Hrun").
+              with "Hcode Hxs Hpcode Hpro Hjt Hline Hws Hsy Hstd Hcwd HM Hrun").
   Qed.
 
 End UkShMain.

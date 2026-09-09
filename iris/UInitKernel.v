@@ -71,6 +71,7 @@ Require Import ElfLoadable.    (* [init_elf_loadable] -- the image xv6 loads *)
 Require Import UShKernel.      (* the entry geometry, and sh's own bridge *)
 Require User.InitSyms User.InitData User.InitInstrs.
 Require Import UexecSG.        (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 
 Local Open Scope Z_scope.
 Import Defs.
@@ -185,16 +186,17 @@ Section UInitKernel.
     iIntros "#Hdep #Hxs".
     iApply (uslot_of_urun W (2 + (4 + (12 + (12 + (4 + n0)))))
               Hal8 Hroom Hstk Hfdlen Hstop with "Hdep").
-    iIntros (N h) "%Hsz Hszf #Ht Hstd Hrun".
+    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf Hrun".
     rewrite Hpc.
     iApply (wp_kinit_start N Hpsok (uvis_sz W) h
               (tf_resume_gpr0 (uvis_tf W)) n0
-              with "[] Hxs [] Hszf [Hstd] Hrun").
+              with "[] Hxs [] Hszf [Hstd] [Hcwf] Hrun").
     - iApply (init_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_text _ Hsub) Hx with "Ht").
     - iApply (init_rodata_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_data _ Hsub) Hx with "Ht").
     - iExists (take NSTD (uvis_fd W)). iExact "Hstd".
+    - iApply (ucwd_any_of with "Hcwf").
   Qed.
 
   (* ------------------------------------------------------------------- *)

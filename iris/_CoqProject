@@ -535,6 +535,11 @@ FdSlots.v
 # rides inside [UkRun.urun], the handles are what a user-level proof carries.
 # Distinct from FdSlots' kernel/process split -- see UserFd.v's header.
 UserFd.v
+# ...and the PROGRAM's own working directory (the cwd), one ghost variable
+# split in half: the engine's half rides inside [UkRun.urun] at the key's
+# [uvis_cwd], the program's half is what a proof carries and hands to the
+# syscall that reads it.  See UserCwd.v's header.
+UserCwd.v
 # THE ITABLE ENTRY, IN THREE LAYERS.  IcacheRefDefs is the entry's
 # geometry, the cache's constants ([icfg]) and the algebra's boot
 # literals -- what sixty-odd files want and nothing more; IcacheRef is

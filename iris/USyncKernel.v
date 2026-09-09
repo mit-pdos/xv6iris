@@ -48,6 +48,7 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             which rides inside [urun] *)
 Require Import UsysMemOk.
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 
 Section USyncKernel.
   Context `{!riscvGS Σ}.
@@ -160,7 +161,9 @@ Section USyncKernel.
     iIntros "#Hdep".
     iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata Hfdlen Hstop with "Hdep").
     (* sync makes no descriptor call, so its ledger is dropped here *)
-    iIntros (N h) "%Hsz Hszf #Ht _ Hrun".
+    (* sync makes no descriptor call and no chdir, so its ledger and its
+       working directory are both dropped here *)
+    iIntros (N h) "%Hsz Hszf #Ht _ _ Hrun".
     rewrite Hpc.
     iApply (wp_ksync_start N Hpsok h (tf_resume_gpr0 (uvis_tf W))
               (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0

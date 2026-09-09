@@ -53,11 +53,14 @@
 (*                                                                        *)
 (* (5) THE TWO STANDARD DESCRIPTORS ARE A PRECONDITION, not something sh  *)
 (* establishes.  sh inherits fd 0 and fd 1 from init and never opens       *)
-(* either; [ush_std] is the pair of handles, threaded from [wp_ksh_start]  *)
-(* through main, the console preamble and the command loop, and out        *)
-(* through [ush_rest] to where runcmd's REDIR and PIPE arms will spend     *)
-(* them.  See [ush_std]'s own header for why an inherited descriptor is    *)
-(* unclosable without one.                                                 *)
+(* either; [ush_std] is the pair of handles, and it travels inside         *)
+(* [ush_pstate] -- sh's process state, the ledger together with its        *)
+(* working directory -- from [wp_ksh_start] through main, the console      *)
+(* preamble and the command loop, and out through [ush_rest] to where      *)
+(* runcmd's REDIR and PIPE arms spend the handles and the [cd] builtin     *)
+(* spends the cwd.  See [ush_std]'s own header for why an inherited        *)
+(* descriptor is unclosable without one, and [ush_pstate]'s for why the    *)
+(* two travel as one resource.                                             *)
 (*                                                                        *)
 (* WHERE THE STAGE STOPS.  0x97a, the first instruction of main's body     *)
 (* past the blank-line test, is [ush_rest]: an abstract continuation that  *)
@@ -112,6 +115,8 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
 Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
+Require Import UserCwd.  (* [ucwd_any] -- sh's own working directory, which
+                            its [cd] builtin spends *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Section UkSh.
@@ -125,6 +130,7 @@ Section UkSh.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -308,11 +314,11 @@ Section UkSh.
     ⌜ m !!! Regidx x0_idx = zero_reg ⌝ ∗ urun N h m pc avail.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
     iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
-    iFrame "Hheap Hstk Hufd Hdep Hb".
+    iFrame "Hheap Hstk Hufd Hcwda Hdep Hb".
     iPureIntro. split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
@@ -361,9 +367,10 @@ Section UkSh.
   (* THE SYSCALL STUB SHAPE.  usys.S emits every stub as                    *)
   (*   c.li a7,<n> ; ecall ; c.jr ra                                        *)
   (* so ONE lemma covers every quiet-row syscall sh issues; the caller      *)
-  (* supplies the three [uinstr_is] resources and the number.  The eight    *)
+  (* supplies the three [uinstr_is] resources and the number.  The          *)
   (* [n <> USYS_*] premises are the program paying, one by one, for not     *)
-  (* being in any of the rows that write user memory.                       *)
+  (* being in any of the rows that write user memory, move a descriptor,    *)
+  (* or move the working directory.                                         *)
   (* ===================================================================== *)
   Local Lemma wp_ksh_qstub (h : CpuId) (m : regfile) (pc0 pc1 pc2 : Z)
       (imm : mword 6) (n : Z) (avail : nat) :
@@ -376,6 +383,9 @@ Section UkSh.
        the run at the view it opened at, so it is for calls that leave
        [p->ofile[]] alone.  open / close / dup have their own leaves. *)
     n <> USYS_close -> n <> USYS_dup -> n <> USYS_open ->
+    (* ...and chdir, the one row that moves the working directory, which
+       [urun] carries the process's own authority over *)
+    n <> USYS_chdir ->
     add_vec_int (mword_of_int pc0 : mword 64) 2 = mword_of_int pc1 ->
     add_vec_int (mword_of_int pc1 : mword 64) 4 = mword_of_int pc2 ->
     is_aligned_vaddr (Virtaddr (mword_of_int pc2 : mword 64)) 2 = true ->
@@ -391,7 +401,7 @@ Section UkSh.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Himm Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop E01 E12 Hal2.
+    intros Himm Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd E01 E12 Hal2.
     iIntros "#Ci0 #Ci1 #Ci2 Hrun Hcont".
     (* ---- pc0  c.li a7,n ---- *)
     iApply (wp_uk_cli N h m (mword_of_int pc0) imm a7_idx avail
@@ -405,7 +415,7 @@ Section UkSh.
     set (m1 := <[Regidx a7_idx := (mword_of_int n : mword 64)]> m).
     (* ---- pc1  ecall -- the QUIET row ---- *)
     iApply (wp_uk_ecall_quiet N h1 m1 (mword_of_int pc1) n avail
-              Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop
+              Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd
               ltac:(rewrite E12; exact Hal2)
               with "Ci1 Hrun []").
     { iApply udepw_of_psok; [ apply Hpsok | ];
@@ -720,8 +730,9 @@ Section UkSh.
               ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate)
-              (* ...and the three descriptor-moving numbers *)
+              (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+              ltac:(discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -4106,6 +4117,26 @@ Section UkSh.
   Definition ush_std (l : list fdstate) : iProp Σ :=
     (ustd γfd l ∗ ⌜fd_lowest_closed l = None⌝)%I.
 
+  (* ===================================================================== *)
+  (* ...AND THE OTHER GHOST A TURN CANNOT ESCAPE CARRYING: THE CWD.        *)
+  (*                                                                       *)
+  (* [UkRun.urun] holds the process's authority over its working directory *)
+  (* ([UserCwd.ucwd_auth], pinned to the inum the trap key is at), and an  *)
+  (* authority does not move without the fragment -- so sh's [cd] builtin, *)
+  (* which issues chdir, must hold one, exactly as its REDIR must hold the *)
+  (* descriptor ledger.  Neither is READ by the walk: sh never asks which  *)
+  (* directory it is in, so the cwd travels index-free                     *)
+  (* ([UserCwd.ucwd_any]).                                                 *)
+  (*                                                                       *)
+  (* THE TWO TRAVEL AS ONE RESOURCE, which is why this definition exists   *)
+  (* rather than a second premise beside [ush_std] at thirteen sites:      *)
+  (* every lemma between the loop head and the syscall that spends one is  *)
+  (* then unchanged by the other's arrival.  [UserFd.ufd_state] is the     *)
+  (* same move one tier down.                                             *)
+  (* ===================================================================== *)
+  Definition ush_pstate (l : list fdstate) : iProp Σ :=
+    (ush_std l ∗ UserCwd.ucwd_any γcwd)%I.
+
   (* the loop head, and the abstract rest of main's body ------------------ *)
   (* Both are indexed by the two states, because both are re-entered: the
      head is sh's command loop and the rest hands back into it.  sh's parent
@@ -4129,7 +4160,7 @@ Section UkSh.
   Definition ush_loop_head (R : iProp Σ) (l : list fdstate) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat),
        ⌜ ush_regs m ⌝ -∗
-       ush_std l -∗
+       ush_pstate l -∗
        R -∗
        ubytes γd sh_buf sh_nbuf f -∗
        urun N h m (mword_of_int 0x938) (16 + (ush_Dbody + n)) -∗
@@ -4143,7 +4174,7 @@ Section UkSh.
           ⌜ m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ⌝ -∗
           ⌜ m !!! Regidx a5_idx = mword_of_int (bv_unsigned (f k)) ⌝ -∗
           ⌜ (k <= i2 < sh_nbuf)%nat /\ f i2 = ubyte0 ⌝ -∗
-          ush_std l -∗
+          ush_pstate l -∗
           R -∗
           ubytes γd sh_buf sh_nbuf f -∗
           urun N h m (mword_of_int 0x97a) (16 + (ush_Dbody + n)) -∗
@@ -4908,7 +4939,7 @@ Section UkSh.
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
     ush_rest R -∗
     shk_code γt -∗
-    ush_std l -∗
+    ush_pstate l -∗
     R -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x914) (16 + (ush_Dbody + n0)) -∗
@@ -5086,7 +5117,7 @@ Section UkSh.
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
     ush_rest R -∗
     shk_code γt -∗
-    ush_std l -∗
+    ush_pstate l -∗
     R -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x900) (16 + (ush_Dbody + n0)) -∗
@@ -5138,14 +5169,14 @@ Section UkSh.
                  := regval_into_reg (mword_of_int 0x908 : mword 64)]> mB).
     assert (HraC : mC !!! Regidx ra_idx = mword_of_int 0x908)
       by exact (upd_eq mB (Regidx ra_idx) (mword_of_int 0x908 : mword 64)).
-    iDestruct "Hstd" as "[Hstd %Hnone]".
+    iDestruct "Hstd" as "[[Hstd %Hnone] Hcwd]".
     iApply (wp_ksh_open h3 mC l n Hnone with "Hcode Hrun Hstd").
     (* THE HANDLE FOR THE CONSOLE sh just opened.  Carried to the close at
        0x910 -- sh's loop opens "console" and closes the descriptor when it
        is already >= 3, which is the one place sh closes what it opened. *)
     iIntros (h4 ret) "Hfdh Hstd Hrun".
-    iAssert (ush_std l) with "[Hstd]" as "Hstd";
-      [ iFrame "Hstd"; iPureIntro; exact Hnone |].
+    iAssert (ush_pstate l) with "[Hstd Hcwd]" as "Hstd";
+      [ iFrame "Hstd Hcwd"; iPureIntro; exact Hnone |].
     rewrite HraC.
     assert (Eret : ret_pc (mword_of_int 0x908 : mword 64) = mword_of_int 0x908)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -5251,7 +5282,7 @@ Section UkSh.
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
     ush_rest R -∗
     shk_code γt -∗
-    ush_std l -∗
+    ush_pstate l -∗
     R -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int ShSyms.main)
@@ -5485,7 +5516,7 @@ Section UkSh.
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
     ush_rest R -∗
     shk_code γt -∗
-    ush_std l -∗
+    ush_pstate l -∗
     R -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int ShSyms.start)
@@ -5645,6 +5676,7 @@ Section UkShLeaf.
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
+  Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION

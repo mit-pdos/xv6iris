@@ -104,23 +104,31 @@ Definition usys_win (n : Z) (tf : list (mword 64)) : option (mword 64 * nat) :=
 
 (* a window row is none of the four numbers a leaf has to dispatch away from
    before it can read the table: not exit and not fork (which [uexec_ret]'s
-   own case analysis takes first), and not exec or sbrk *)
+   own case analysis takes first), and not exec or sbrk.  ...AND NOT CHDIR,
+   which is what lets the window leaf re-key the cwd authority [urun]
+   carries without taking a premise for it: a window call names a buffer,
+   and chdir has none. *)
 Lemma usys_win_num (n : Z) (tf : list (mword 64)) (dst : mword 64) (cap : nat) :
   usys_win n tf = Some (dst, cap) ->
-  n <> USYS_exit /\ n <> USYS_fork /\ n <> USYS_exec /\ n <> USYS_sbrk.
+  n <> USYS_exit /\ n <> USYS_fork /\ n <> USYS_exec /\ n <> USYS_sbrk
+  /\ n <> USYS_chdir.
 Proof.
   unfold usys_win.
   destruct (decide (n = USYS_wait)) as [-> | _];
-    [ intros _; unfold USYS_wait, USYS_exit, USYS_fork, USYS_exec, USYS_sbrk;
+    [ intros _; unfold USYS_wait, USYS_exit, USYS_fork, USYS_exec, USYS_sbrk,
+                       USYS_chdir;
       split_and!; discriminate | ].
   destruct (decide (n = USYS_pipe)) as [-> | _];
-    [ intros _; unfold USYS_pipe, USYS_exit, USYS_fork, USYS_exec, USYS_sbrk;
+    [ intros _; unfold USYS_pipe, USYS_exit, USYS_fork, USYS_exec, USYS_sbrk,
+                       USYS_chdir;
       split_and!; discriminate | ].
   destruct (decide (n = USYS_read)) as [-> | _];
-    [ intros _; unfold USYS_read, USYS_exit, USYS_fork, USYS_exec, USYS_sbrk;
+    [ intros _; unfold USYS_read, USYS_exit, USYS_fork, USYS_exec, USYS_sbrk,
+                       USYS_chdir;
       split_and!; discriminate | ].
   destruct (decide (n = USYS_fstat)) as [-> | _];
-    [ intros _; unfold USYS_fstat, USYS_exit, USYS_fork, USYS_exec, USYS_sbrk;
+    [ intros _; unfold USYS_fstat, USYS_exit, USYS_fork, USYS_exec, USYS_sbrk,
+                       USYS_chdir;
       split_and!; discriminate | ].
   intros Hc; discriminate Hc.
 Qed.
@@ -229,6 +237,8 @@ Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UserCwd.  (* [ucwd] -- the program's own half of its working
+                            directory, which the exec leaf reads *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Section UkRunSys.
@@ -399,6 +409,12 @@ Section UkRunSys.
        their own leaves now, which do the ghost step instead of asserting
        there was none. *)
     n <> USYS_close -> n <> USYS_dup -> n <> USYS_open ->
+    (* ...AND IT DOES NOT MOVE THE WORKING DIRECTORY.  [urun] carries the
+       program's authority over that too, and this leaf re-closes the run at
+       the cwd it opened at, so chdir -- the one row that moves it
+       ([UsysMemOk.usys_cwd_ok]) -- is excluded here.  It is quiet in memory
+       and in the descriptor table, so nothing else was ruling it out. *)
+    n <> USYS_chdir ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     urun N h m pc avail -∗
@@ -408,9 +424,9 @@ Section UkRunSys.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hal4.
+    intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hcd Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -441,6 +457,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (exact (usys_cwd_ok_quiet n r cw cw' Hcd Hcwrow)).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _ Hexec Hsbrk H3 H4 H5 H8 Hok)
       as [-> [-> ->]].
     (* ...AND THE TABLE DID NOT MOVE.  This is the row being READ rather
@@ -452,11 +474,138 @@ Section UkRunSys.
     (* the resumed key is at the SAME view, so the bump is at [fdv] twice *)
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
-              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hdep").
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r with "Hrun").
   Qed.
 
+
+  (* ------------------------------------------------------------------- *)
+  (* ecall, at CHDIR -- THE ONE ROW THAT MOVES THE WORKING DIRECTORY.      *)
+  (*                                                                      *)
+  (* chdir writes no user byte and moves no descriptor, so it reached the  *)
+  (* quiet leaf on those grounds.  It cannot any more: [urun] carries the  *)
+  (* process's own authority over its cwd, and the quiet leaf re-closes    *)
+  (* the run at the cwd it opened at.  What chdir does is exactly what     *)
+  (* [close] does to a descriptor -- it moves a ghost the program owns     *)
+  (* half of -- so it gets its own leaf, and the program has to hand its   *)
+  (* half in.  Nobody escapes that: an authority cannot move without the   *)
+  (* fragment, which is the whole content of the fragment.                 *)
+  (*                                                                      *)
+  (* WHAT COMES BACK IS THE NEW INUM, AND NOTHING ABOUT IT.  The row       *)
+  (* ([UsysMemOk.usys_cwd_ok] at chdir) constrains the FAILURE arm only --  *)
+  (* a nonzero return leaves the cwd where it was -- because on success    *)
+  (* the new inum is whatever [namei] found, which no user-level row can   *)
+  (* name.  A caller that only wants to keep calling syscalls takes        *)
+  (* [wp_uk_ecall_chdir_any] and never binds it.                           *)
+  (* ------------------------------------------------------------------- *)
+  Local Lemma usys_cwd_ok_chdir_fwd (r : mword 64) (c c' : Z) :
+    usys_cwd_ok USYS_chdir r c c' -> uint r <> 0 -> c' = c.
+  Proof.
+    unfold usys_cwd_ok.
+    destruct (decide (USYS_chdir = USYS_chdir)) as [_ | Hne];
+      [ exact (fun H => H) | exfalso; exact (Hne eq_refl) ].
+  Qed.
+
+  Lemma wp_uk_ecall_chdir (N : uk_names) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) (c : Z) :
+    usysno m = USYS_chdir ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_chdir -∗
+    UserCwd.ucwd (ukn_cwd N) c -∗
+    (∀ (h' : CpuId) (r : mword 64) (c' : Z),
+       ⌜ uint r <> 0 -> c' = c ⌝ -∗
+       UserCwd.ucwd (ukn_cwd N) c' -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Hal4.
+    iIntros "#Hi Hrun Hsb Hcwd Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    (* the key's cwd IS the one the caller's half is at *)
+    iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
+    iMod (udepw_mint N m pc _ M pm _ fdv c
+                with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c))
+                   = USYS_chdir).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    rewrite Hnum. cbv zeta.
+    destruct (decide (USYS_chdir = USYS_exit)) as [He | _];
+      [ exfalso; unfold USYS_chdir, USYS_exit in He; discriminate He | ].
+    destruct (decide (USYS_chdir = USYS_fork)) as [He | _];
+      [ exfalso; unfold USYS_chdir, USYS_fork in He; discriminate He | ].
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* the IMAGE and the TABLE crossed the trap untouched, as at a quiet
+       call: chdir writes no user byte and moves no descriptor. *)
+    destruct (usys_mem_ok_quiet USYS_chdir _ r _ _ _ _ _ _
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                Hok)
+      as [-> [-> ->]].
+    assert (Hview : fdv' = fdv).
+    { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
+        vm_compute; discriminate. }
+    subst fdv'.
+    cbn [uvis_M uvis_perm uvis_of_run].
+    (* ...AND THE CWD DID NOT.  Both halves move together, which is the
+       only way either can move. *)
+    iApply uslot_bupd.
+    iMod (ucwd_move N c cw' with "Hcwda Hcwd") as "[Hcwda Hcwd]".
+    iModIntro.
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c cw' r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              with "Hheap Hstk Hufd Hcwda Hdep").
+    iIntros (h') "Hrun".
+    iApply ("Hcont" $! h' r cw' with "[%] Hcwd Hrun").
+    exact (usys_cwd_ok_chdir_fwd r c cw' Hcwrow).
+  Qed.
+
+  (* ...and the shape a caller that does not track WHICH directory it is in
+     takes: one resource, no binder ([UserFd.ustd_any]'s precedent).  sh's
+     [cd] builtin is that caller -- it prints a diagnostic on failure and
+     goes round its loop either way, and the only thing it does with its
+     working directory afterwards is carry it into a fork. *)
+  Lemma wp_uk_ecall_chdir_any (N : uk_names) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) :
+    usysno m = USYS_chdir ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_chdir -∗
+    UserCwd.ucwd_any (ukn_cwd N) -∗
+    (∀ (h' : CpuId) (r : mword 64),
+       UserCwd.ucwd_any (ukn_cwd N) -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Hal4. iIntros "#Hi Hrun Hsb Hcwd Hcont".
+    iDestruct "Hcwd" as (c) "Hcwd".
+    iApply (wp_uk_ecall_chdir N h m pc avail c Hn Hal4 with "Hi Hrun Hsb Hcwd").
+    iIntros (h' r c') "_ Hcwd Hrun".
+    iApply ("Hcont" $! h' r with "[Hcwd] Hrun").
+    iApply (ucwd_any_of with "Hcwd").
+  Qed.
 
   (* ------------------------------------------------------------------- *)
   (* ecall, at OPEN -- THE FIRST LEAF THAT MOVES THE PROGRAM'S OWN GHOST   *)
@@ -510,7 +659,7 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -537,6 +686,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     (* the IMAGE half is the quiet row: open touches no user byte *)
     destruct (usys_mem_ok_quiet USYS_open _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
@@ -562,7 +717,7 @@ Section UkRunSys.
                  (<[fd := FdOpen rd wr t]> fdv) cw cw' r Hx0 Hal4).
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hdep").
+                with "Hheap Hstk Hufd Hcwda Hdep").
       iIntros (h') "Hrun".
       iApply ("Hcont" $! h' r with "[Hh] Hrun").
       iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro.
@@ -574,7 +729,7 @@ Section UkRunSys.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hdep").
+                with "Hheap Hstk Hufd Hcwda Hdep").
       iIntros (h') "Hrun".
       iApply ("Hcont" $! h' r with "[Hstd] Hrun").
       iRight. iFrame "Hstd". iPureIntro. exact Hrm.
@@ -622,7 +777,7 @@ Section UkRunSys.
   Proof.
     intros Hn Harg Hstne Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hh0 Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -656,6 +811,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     destruct (usys_mem_ok_quiet USYS_dup _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -683,7 +844,7 @@ Section UkRunSys.
                  (<[fd1 := st]> fdv) cw cw' r Hx0 Hal4).
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hdep").
+                with "Hheap Hstk Hufd Hcwda Hdep").
       iIntros (h') "Hrun".
       iApply ("Hcont" $! h' r with "[Hh1 Hh0] Hrun").
       iLeft. iExists fd1. iFrame "Hh1 Hh0". iPureIntro.
@@ -695,7 +856,7 @@ Section UkRunSys.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hdep").
+                with "Hheap Hstk Hufd Hcwda Hdep").
       iIntros (h') "Hrun".
       iApply ("Hcont" $! h' r with "[Hstd Hh0] Hrun").
       iRight. iFrame "Hstd Hh0". iPureIntro. exact Hrm.
@@ -729,7 +890,7 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -756,6 +917,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     destruct (usys_mem_ok_quiet USYS_dup _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -785,13 +952,13 @@ Section UkRunSys.
                  r Hx0 Hal4).
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hdep").
+                with "Hheap Hstk Hufd Hcwda Hdep").
       iIntros (h') "Hrun". iApply ("Hcont" $! h' r l' with "Hstd Hrun").
     - iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hdep").
+                with "Hheap Hstk Hufd Hcwda Hdep").
       iIntros (h') "Hrun". iApply ("Hcont" $! h' r l with "Hstd Hrun").
   Qed.
 
@@ -865,7 +1032,7 @@ Section UkRunSys.
   Proof.
     intros Hn Harg Hal4.
     iIntros "#Hi Hrun Hsb Hh Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -894,6 +1061,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     destruct (usys_mem_ok_quiet USYS_close _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -908,7 +1081,7 @@ Section UkRunSys.
                (<[fd := FdClosed]> fdv) cw cw' r Hx0 Hal4).
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              with "Hheap Hstk Hufd Hdep").
+              with "Hheap Hstk Hufd Hcwda Hdep").
     iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "[%] Hrun"). exact Hr0.
   Qed.
 
@@ -935,7 +1108,7 @@ Section UkRunSys.
   Proof.
     intros Hn Harg Hs Hkl Hne Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -965,6 +1138,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     destruct (usys_mem_ok_quiet USYS_close _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -978,7 +1157,7 @@ Section UkRunSys.
                (<[fd := FdClosed]> fdv) cw cw' r Hx0 Hal4).
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              with "Hheap Hstk Hufd Hdep").
+              with "Hheap Hstk Hufd Hcwda Hdep").
     iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "[%] Hstd Hrun"). exact Hr0.
   Qed.
 
@@ -1024,7 +1203,7 @@ Section UkRunSys.
   Proof.
     intros Hn Ha1 Hcnt Hal4.
     iIntros "#Hi Hbs Hrun Hsb Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -1053,6 +1232,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     (* unfold the row down to its read arm *)
     unfold usys_mem_ok in Hok.
     destruct (decide (USYS_read = USYS_exec)) as [He | _];
@@ -1113,7 +1298,7 @@ Section UkRunSys.
                   (fun k => if decide (k < d)%nat then bs k else f k))
                pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
-              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hdep").
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r _ with "Hbs Hrun").
   Qed.
@@ -1140,7 +1325,7 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -1167,6 +1352,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     destruct (usys_mem_ok_exec_row USYS_exec _ r _ _ _ _ _ _ eq_refl Hok)
       as [-> [-> [-> ->]]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -1182,9 +1373,93 @@ Section UkRunSys.
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw'
                (mword_of_int (-1) : mword 64) Hx0 Hal4).
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
-              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hdep").
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' with "Hrun").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* EXEC AT THE PROCESS'S OWN WORKING DIRECTORY.                          *)
+  (*                                                                      *)
+  (* The leaf above takes a [udepw], which answers at whatever [cw] the    *)
+  (* run turns out to be at.  A caller whose exec bundle is a claim about  *)
+  (* a PATH cannot supply one: a path names a file only relative to the    *)
+  (* directory it is resolved from, so what such a caller has is the       *)
+  (* bundle at every key whose cwd is the ONE inum its process is at.      *)
+  (*                                                                      *)
+  (* THAT IS NOT A [udepw] AND CANNOT BE MADE INTO ONE.  [udepw] binds     *)
+  (* [cw] under its own ∀, and the only thing that pins it is agreement    *)
+  (* against the half [urun] carries -- which arrives inside the closure,  *)
+  (* where the program's half would have to be spent to reach it.  So the  *)
+  (* agreement happens HERE instead: this leaf has destructed [urun], it   *)
+  (* holds both halves for the length of one step, and it hands the        *)
+  (* program's back on the failure arm.  A program that execs in a loop    *)
+  (* (sh does) still knows where it is on the next turn.                   *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uk_ecall_exec_at_cwd (N : uk_names) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) (c : Z) :
+    usysno m = USYS_exec ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    (* the program's half of its working directory... *)
+    UserCwd.ucwd (ukn_cwd N) c -∗
+    (* ...and the deposit at every key whose cwd is that one inum *)
+    (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+       (fdv : list fdstate),
+       sbundle uslot USYS_exec (uvis_of_run m pc M pm sz fdv c)) -∗
+    (∀ h' : CpuId,
+       UserCwd.ucwd (ukn_cwd N) c -∗
+       urun N h'
+         (<[Regidx (mword_of_int 10) := (mword_of_int (-1) : mword 64)]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Hal4.
+    iIntros "#Hi Hrun Hcwd Hsb Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    (* the whole point of the leaf: the key's cwd IS the one the caller's
+       bundle is stated at *)
+    iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
+    iDestruct ("Hsb" $! M pm sz fdv) as "Hdepn".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c)) = USYS_exec).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    rewrite Hnum. cbv zeta.
+    destruct (decide (USYS_exec = USYS_exit)) as [He | _];
+      [ exfalso; unfold USYS_exec, USYS_exit in He; discriminate He | ].
+    destruct (decide (USYS_exec = USYS_fork)) as [He | _];
+      [ exfalso; unfold USYS_exec, USYS_fork in He; discriminate He | ].
+    iDestruct "Hdepn" as (fdep) "Hdepn".
+    iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    assert (Hcw : cw' = c)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N c cw' Hcw with "Hcwda") as "Hcwda".
+    destruct (usys_mem_ok_exec_row USYS_exec _ r _ _ _ _ _ _ eq_refl Hok)
+      as [-> [-> [-> ->]]].
+    cbn [uvis_M uvis_perm uvis_of_run].
+    assert (Hview : fdv' = fdv).
+    { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
+        vm_compute; discriminate. }
+    subst fdv'.
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c cw'
+               (mword_of_int (-1) : mword 64) Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hdep").
+    iIntros (h') "Hrun".
+    iApply ("Hcont" $! h' with "Hcwd Hrun").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1209,7 +1484,7 @@ Section UkRunSys.
   Proof.
     intros Hn Hz Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -1238,6 +1513,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     destruct (usys_mem_ok_wait_null USYS_wait _ r _ _ _ _ _ _
                 eq_refl Ha0 Hok) as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -1252,7 +1533,7 @@ Section UkRunSys.
     subst fdv'.
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
-              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hdep").
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r with "Hrun").
   Qed.
@@ -1321,7 +1602,7 @@ Section UkRunSys.
   Proof.
     intros Hn Hwin Hcapk Hcl Hdp Hop Hpp Hal4.
     iIntros "#Hi Hrun Hsb Hbuf Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -1349,7 +1630,7 @@ Section UkRunSys.
     assert (Hw : usys_win n (uvis_tf (uvis_of_run m pc M pm sz fdv cw))
                  = Some (dst, cap)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of. exact Hwin. }
-    destruct (usys_win_num n _ dst cap Hw) as (Hexit & Hfork & _ & _).
+    destruct (usys_win_num n _ dst cap Hw) as (Hexit & Hfork & _ & _ & Hchd).
     rewrite Hnum. cbv zeta.
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
     destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
@@ -1359,6 +1640,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (exact (usys_cwd_ok_quiet n r cw cw' Hchd Hcwrow)).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     destruct (usys_mem_ok_window n _ r _ _ _ _ _ _ dst cap Hw Hok)
       as ((d & bs & Hdcap & HM') & -> & ->).
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run] in HM' |- *.
@@ -1403,7 +1690,7 @@ Section UkRunSys.
     iDestruct (urun_close_upd N (umem_write M (uint dst) d g) pm m
                  (mword_of_int 10) r sz fdv cw' (add_vec_int pc 4) avail
                  ltac:(unfold unot_sp; vm_compute; discriminate)
-                 with "Hheap Hstk Hufd Hdep [Hcont Hbuf]") as "Hkc";
+                 with "Hheap Hstk Hufd Hcwda Hdep [Hcont Hbuf]") as "Hkc";
       [ iIntros (h'') "Hrun";
         iApply ("Hcont" $! h'' r d g with "[%] [%] Hrun Hbuf");
         [ exact Hdcap | intros j Hj; apply Hgf; lia ] | ].
@@ -1480,7 +1767,7 @@ Section UkRunSys.
     intros Hn Hal4.
     set (dst := m !!! Regidx (mword_of_int 10)).
     iIntros "#Hi Hrun Hsb Hstd Hbuf Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -1528,6 +1815,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     destruct (usys_mem_ok_window USYS_pipe _ r _ _ _ _ _ _ dst 8%nat Hw Hok)
       as ((d & bs & Hdcap & HM') & -> & ->).
     cbn [uvis_M uvis_perm uvis_sz uvis_fd uvis_of_run] in HM', Hfdok, Hpiperow |- *.
@@ -1670,7 +1963,7 @@ Section UkRunSys.
     iDestruct (urun_close_upd N (umem_write M (uint dst) dd gg) pm m
                  (mword_of_int 10) r sz fdv' cw' (add_vec_int pc 4) avail
                  ltac:(unfold unot_sp; vm_compute; discriminate)
-                 with "Hheap Hstk Hufd Hdep [Hcont Hbuf Hhs]") as "Hkc";
+                 with "Hheap Hstk Hufd Hcwda Hdep [Hcont Hbuf Hhs]") as "Hkc";
       [ iIntros (h'') "Hrun";
         iApply ("Hcont" $! h'' r gg with "Hhs Hrun Hbuf") | ].
     iApply ("Hkc" $! h' xi' C' pt' Rfd' Rut' with "[%] [%] Hb'");
@@ -1816,7 +2109,7 @@ Section UkRunSys.
       change (2 ^ 38)%Z with 274877906944%Z. lia. }
     iIntros "#Hi Hrun Hsb Hsz Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut szk M pm fdv cw)
-      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     (* the key's break IS the program's *)
@@ -1868,6 +2161,12 @@ Section UkRunSys.
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
     cbn [uvis_M uvis_perm uvis_sz uvis_fd uvis_cwd uvis_of_run] in Hok |- *.
     (* the row, in three pieces *)
     unfold usys_mem_ok in Hok.
@@ -1913,7 +2212,7 @@ Section UkRunSys.
       iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv cw'
                 (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hdep [Hcont Hsz]").
+                with "Hheap Hstk Hufd Hcwda Hdep [Hcont Hsz]").
       iIntros (h'') "Hrun".
       iApply ("Hcont" $! h'' r with "[Hsz] Hrun").
       iLeft. iSplitR; [ iPureIntro; exact Hr | ]. iExact "Hsz".
@@ -2000,7 +2299,7 @@ Section UkRunSys.
       iDestruct (urun_close_upd N (umem_grow M (sz + n)) pm' m
                    (mword_of_int 10) r (sz + n) fdv cw' (add_vec_int pc 4) avail
                    ltac:(unfold unot_sp; vm_compute; discriminate)
-                   with "Hheap Hstk Hufd Hdep [Hcont Hsz Hrun']") as "Hkc".
+                   with "Hheap Hstk Hufd Hcwda Hdep [Hcont Hsz Hrun']") as "Hkc".
       { iIntros (h'') "Hrun".
         iApply ("Hcont" $! h'' r with "[Hsz Hrun'] Hrun").
         iRight. iSplitR; [ iPureIntro; exact Hr | ]. iFrame "Hsz Hrun'". }
@@ -2016,7 +2315,7 @@ Section UkRunSys.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn. iIntros "#Hi Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
               (fun (s : mstate)
