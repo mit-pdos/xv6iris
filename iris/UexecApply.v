@@ -436,7 +436,7 @@ Section Apply.
       - reflexivity.
       - reflexivity.
       - reflexivity. }
-    rewrite /uexec_arm_F /uexec_fork_F /uexec_ret_ret_F. cbv zeta.
+    rewrite /uexec_arm_F /uexec_fork_parent_F /uexec_ret_ret_F. cbv zeta.
     destruct (decide (sc = uecall_scause)) as [_ | _];
       [ | exact (HS W W' Hg Hp HM Hpi Hsz Hfd Hcw) ].
     (* [Hfd] joins the other four: the returning arm's row reads the ENTRY
@@ -447,22 +447,16 @@ Section Apply.
     destruct (decide (usys_num (uvis_tf W') = USYS_exit)) as [_ | _];
       [ reflexivity | ].
     destruct (decide (usys_num (uvis_tf W') = USYS_fork)) as [_ | _].
-    - (* fork: two arms, both at the [(M, pi)] the key already carries *)
+    - (* fork: the PARENT arm alone, at the [(M, pi)] the key already
+         carries.  The child's continuation went down as the deposit and
+         is not part of the arm ([UexecRet.uexec_dep_F]). *)
       iSplit.
-      + iIntros "[H1 H2]". iSplitL "H1".
-        * iIntros (r fdv' cw' Hr).
-          rewrite -(Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw').
-          iApply ("H1" $! r fdv' cw'). iPureIntro. exact Hr.
-        * iIntros (fdv' cw').
-          rewrite -(Hb (mword_of_int 0) (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw').
-          iApply ("H2" $! fdv' cw').
-      + iIntros "[H1 H2]". iSplitL "H1".
-        * iIntros (r fdv' cw' Hr).
-          rewrite (Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw').
-          iApply ("H1" $! r fdv' cw'). iPureIntro. exact Hr.
-        * iIntros (fdv' cw').
-          rewrite (Hb (mword_of_int 0) (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw').
-          iApply ("H2" $! fdv' cw').
+      + iIntros "H1" (r fdv' cw' Hr).
+        rewrite -(Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw').
+        iApply ("H1" $! r fdv' cw'). iPureIntro. exact Hr.
+      + iIntros "H1" (r fdv' cw' Hr).
+        rewrite (Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw').
+        iApply ("H1" $! r fdv' cw'). iPureIntro. exact Hr.
     - (* the returning arms: the row transports by SS3 *)
       iSplit.
       + iIntros "H" (r M' pi' szv' fdv' cw') "%Hmo %Hfo %Hpo %Hco Hsp".
@@ -838,9 +832,11 @@ Section LoopApply.
         ∨ ⌜uvis_tf W' !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝)) -∗
     (* ...AND THE ARMED POST the deposit bought, at the value the round
        bound.  Owed only on the RETURNING arm -- exit hands nothing back and
-       fork runs no contract, so the guard excludes both, exactly as
-       [SpecUsertrap.ut_sys_out]'s does; every other arm of the round is a
-       mint or the transparent key. *)
+       fork pays no receipt (what its deposit buys is the CHILD's
+       execution), so the guard excludes both, exactly as
+       [SpecUsertrap.ut_sys_out]'s does; every other arm of the round is an
+       instantiation of the process's own arm, a mint or the transparent
+       key. *)
     (⌜sc = uecall_scause
       /\ usys_num (uvis_tf (uvis_run W)) <> USYS_exit
       /\ usys_num (uvis_tf (uvis_run W)) <> USYS_fork⌝ -∗
@@ -893,24 +889,81 @@ Section LoopApply.
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_exit))
           as [Hx | _]; [ contradiction (Hnex Hx) | ].
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_fork))
-          as [_ | Hnfk].
-        * (* THE FORK ROW, AND WHAT THE KERNEL STILL OWES.  Both of
-             fork's arms are discharged by MINTING a slot out of the
-             [∀ W'', uslot W''] family rather than by instantiating the
-             program's own arm: nothing here says [r <> 0], so the round
-             cannot tell parent from child, and the mint serves either.
-             That is why strengthening the child arm's guard to
-             [fdv' = uvis_fd W] ([UexecRet.uexec_ret_F]) costs this proof
-             nothing -- it never supplies the premise at all.
-             IT IS ALSO WHY THE FACT IS NOT YET EARNED.  The child's table
-             really is a copy ([ProofKforkParts.kfk_childV_full] proves the
-             POINTER array is), but the fdstate view reaches the child
-             through the park, where [ProofForkretPark]'s closure mints
-             [uslot (uvis_of U' sts)] at an EXISTENTIAL [sts] --
-             [FdSlots.v]'s own retirement note names [fd_frags_any] as
-             where the value is dropped.  Closing that is what turns this
-             mint into an instantiation. *)
-          iApply "Hmk".
+          as [Hfk | Hnfk].
+        * (* THE FORK ROW.  The arm left here is the PARENT's alone
+             ([UexecRet.uexec_fork_parent_F]) -- the child's continuation
+             went DOWN as fork's deposit and is spent at kfork's park -- and
+             it is instantiated, not minted, at the pid the round returned.
+             Fork's three rows are the table's defaults, so the resume key
+             is the trapped one bumped at [r] and nothing else moved. *)
+          (* THE PID WRAP IS THE ONE ARM THE PROGRAM DOES NOT COVER.
+             allocpid's counter is a 32-bit word incremented by an [addiw],
+             which wraps, so the kernel cannot promise the parent a nonzero
+             pid and the program's arm -- guarded on [r <> 0] -- says
+             nothing at zero.  A parent handed 0 back therefore resumes on
+             the generic slot the application's supply mints, which is
+             exactly what the supply is for. *)
+          destruct (decide (r = (mword_of_int 0 : mword 64))) as [_ | Hrne];
+            [ iApply "Hmk" | ].
+          (* fork's three rows, read off the table's defaults *)
+          assert (Hne7 : usys_num (uvis_tf (uvis_run W)) <> USYS_exec)
+            by (rewrite Hfk; vm_compute; discriminate).
+          assert (Hne12 : usys_num (uvis_tf (uvis_run W)) <> USYS_sbrk)
+            by (rewrite Hfk; vm_compute; discriminate).
+          assert (Hne3 : usys_num (uvis_tf (uvis_run W)) <> USYS_wait)
+            by (rewrite Hfk; vm_compute; discriminate).
+          assert (Hne4 : usys_num (uvis_tf (uvis_run W)) <> USYS_pipe)
+            by (rewrite Hfk; vm_compute; discriminate).
+          assert (Hne5 : usys_num (uvis_tf (uvis_run W)) <> USYS_read)
+            by (rewrite Hfk; vm_compute; discriminate).
+          assert (Hne8 : usys_num (uvis_tf (uvis_run W)) <> USYS_fstat)
+            by (rewrite Hfk; vm_compute; discriminate).
+          assert (Hne21 : usys_num (uvis_tf (uvis_run W)) <> USYS_close)
+            by (rewrite Hfk; vm_compute; discriminate).
+          assert (Hne10 : usys_num (uvis_tf (uvis_run W)) <> USYS_dup)
+            by (rewrite Hfk; vm_compute; discriminate).
+          assert (Hne15 : usys_num (uvis_tf (uvis_run W)) <> USYS_open)
+            by (rewrite Hfk; vm_compute; discriminate).
+          assert (Hne9 : usys_num (uvis_tf (uvis_run W)) <> USYS_chdir)
+            by (rewrite Hfk; vm_compute; discriminate).
+          destruct (usys_mem_ok_quiet (usys_num (uvis_tf (uvis_run W)))
+                      (uvis_tf (uvis_run W)) r (uvis_M W) (uvis_M W')
+                      (uvis_perm W) (uvis_perm W') (uvis_sz W) (uvis_sz W')
+                      Hne7 Hne12 Hne3 Hne4 Hne5 Hne8 Hm) as (HM' & Hpi' & Hsz').
+          assert (Hfd' : uvis_fd W' = uvis_fd W)
+            by exact (usys_fd_ok_quiet (usys_num (uvis_tf (uvis_run W)))
+                        (uvis_tf (uvis_run W)) (uvis_tf W' !!! tf_arg_idx 0)
+                        (uvis_fd W) (uvis_fd W')
+                        Hne21 Hne10 Hne15 Hne4 (Hfdrow Hec)).
+          assert (Hcw' : uvis_cwd W' = uvis_cwd W)
+            by exact (usys_cwd_ok_quiet (usys_num (uvis_tf (uvis_run W))) r
+                        (uvis_cwd W) (uvis_cwd W') Hne9 Hc).
+          (* ...and the bump, read back at the resume key -- the same two
+             transports the returning arms use *)
+          destruct Hb as [Hb1 Hb2].
+          assert (Hla : (tf_arg_idx 0 < length (uvis_tf (uvis_run W)))%nat)
+            by (rewrite (uvis_run_length W); unfold tf_arg_idx, TFWORDS; lia).
+          assert (Hle : (tf_epc_idx < length (uvis_tf (uvis_run W)))%nat)
+            by (rewrite (uvis_run_length W); unfold tf_epc_idx, TFWORDS; lia).
+          assert (Hg1 : tf_resume_gpr0 (bump_tf (uvis_tf (uvis_run W)) r)
+                        = tf_resume_gpr0 (uvis_tf W')).
+          { rewrite (tf_resume_gpr0_bump (uvis_tf (uvis_run W)) r Hla).
+            exact (eq_sym Hb1). }
+          assert (Hp1 : tf_resume_pc (bump_tf (uvis_tf (uvis_run W)) r)
+                        = tf_resume_pc (uvis_tf W')).
+          { rewrite (tf_resume_pc_bump (uvis_tf (uvis_run W)) r Hle).
+            exact (eq_sym Hb2). }
+          rewrite /uexec_fork_parent_F.
+          iDestruct ("Hret" $! r (uvis_fd W') (uvis_cwd W')
+                       with "[%] [%] [%]") as "Hs";
+            [ exact Hrne | exact Hfd' | exact Hcw' | ].
+          iEval (rewrite (uslot_key_cong
+                            (bump (uvis_run W) r (uvis_M (uvis_run W))
+                               (uvis_perm (uvis_run W)) (uvis_sz (uvis_run W))
+                               (uvis_fd W') (uvis_cwd W'))
+                            W' Hg1 Hp1 (eq_sym HM') (eq_sym Hpi') (eq_sym Hsz')
+                            eq_refl eq_refl)) in "Hs".
+          iExact "Hs".
         * (* the returning arms: the row is the round's own conjunct *)
           iDestruct ("Hsp" with "[%]") as "Hsp";
             [ split_and!; [ exact Hec | exact Hnex | exact Hnfk ] |].

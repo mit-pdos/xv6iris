@@ -388,8 +388,9 @@ Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
 (* ===================================================================== *)
 (* THE GUARD IS [UexecRet.uexec_dep_F]'s OWN CASE ANALYSIS, spelled out:
    the cause is an ecall, the number is [n], and [n] is a RETURNING one --
-   exit returns nothing and fork runs no contract, so at those two the
-   process deposits nothing and the row must not ask for one. *)
+   exit deposits nothing at all, and fork's deposit is a SLOT on its own
+   row ([ut_fork_in] below), so at those two this row must not ask for a
+   bundle. *)
 Definition ut_sys_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
@@ -437,16 +438,110 @@ Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
       ∨ uslot (uvis_of U' sts')                       (* loadable: the new image's slot *)
       ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝))%I.   (* the gap *)
 
-(* the quiet readings, for the four non-ecall causes *)
-Lemma ut_sys_in_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+(* [uvis_of] of a trapframe-rewritten record, spelled out: the key is the
+   new frame over the record's own image, permission projection, break and
+   working directory.  [KforkChild.uvis_of_kfork_child] is the same fact at
+   the dispatcher's own record. *)
+Lemma uvis_of_us_tf (U : ustate) (ws : list (mword 64)) (sts : list fdstate) :
+  uvis_of (us_tf U ws) sts
+  = MkUvis ws (us_M U)
+           (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+           (uint (pv_sz (us_V U))) sts (pv_cwi (us_V U)).
+Proof. reflexivity. Qed.
+
+(* ===================================================================== *)
+(* FORK'S DEPOSIT: THE CHILD'S CONTINUATION, GOING DOWN.                  *)
+(*                                                                        *)
+(* [UexecRet.uexec_dep_F] at fork is a SLOT, not a bundle -- the WP the    *)
+(* forked child will run, at the one record it resumes at -- and this row  *)
+(* is how it reaches the dispatcher.  It is NOT [UexecSG.sbundle_at]'s     *)
+(* shape and cannot be: the key mentions the epc through                   *)
+(* [UsysMemOk.bump_tf], which [UexecSG.skey_eq] does not fix, so the       *)
+(* deposit class's congruence would be FALSE of it.  Hence its own row,    *)
+(* moulded on [ut_exec_out] -- guarded on the cause and the number, with   *)
+(* the four transparent arms discharging it by refuting the guard.         *)
+(*                                                                        *)
+(* THE TRAPFRAME IS THE PROLOGUE'S, NOT THE ENTRY RECORD'S.  The child     *)
+(* resumes past the ecall, so the record is [tf] BUMPED -- a0 := 0 and     *)
+(* epc + 4 -- and [tf] therefore has to be the frame whose epc word is     *)
+(* the faulting pc, i.e. the one usertrap's +0x28..+0x2e block leaves      *)
+(* ([ut_pro]).  The record [U]'s own epc word is still the PREVIOUS        *)
+(* round's, which is why [tf] rides beside it exactly as it does for       *)
+(* [ut_exec_out].  Everything else -- image, permission map, break,        *)
+(* descriptor table, working directory -- is the parent's, which is what   *)
+(* makes this record [KforkChild.kfork_child]'s at the dispatcher.         *)
+(* ===================================================================== *)
+Definition ut_fork_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
-    (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
+    (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
+    (sts : list fdstate) : iProp Σ :=
+  (⌜sc_v = uecall_scause /\ usys_num tf = USYS_fork⌝ -∗
+     uslot (uvis_of (us_tf U (bump_tf tf (mword_of_int 0))) sts))%I.
+
+(* THE ROW'S CONGRUENCE, and it is [TfUser.tf_ueq]-shaped rather than
+   [UexecSG.skey_eq]-shaped: the payload reads the resume register file and
+   the resume PC of the BUMPED frame, so the two frames have to agree on
+   the epc word and on all thirty-one restorable registers -- which is
+   exactly what [tf_ueq] says, and exactly what uservec's save walk and
+   prepare_return's re-arm leave.  The two LENGTH premises are the bump's
+   own readers' ([UexecRet.tf_resume_gpr_bump] /
+   [UexecRet.tf_resume_pc_bump]); [ut_exec_out_ueq] needs neither because
+   its bump is a pure relation and never computed.  Everything else is
+   read off the record: image, permission projection, break, cwd. *)
+Lemma ut_fork_in_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (sc_v : mword 64) (tf tf' : list (mword 64)) (U U' : ustate)
     (sts : list fdstate) :
-  sc_v <> uecall_scause -> ⊢ ut_sys_in n f sc_v tf U sts.
+  length tf = TFWORDS ->
+  length tf' = TFWORDS ->
+  tf_ueq tf tf' ->
+  us_M U' = us_M U ->
+  perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))
+    = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))) ->
+  pv_sz (us_V U') = pv_sz (us_V U) ->
+  pv_cwi (us_V U') = pv_cwi (us_V U) ->
+  ut_fork_in sc_v tf U sts -∗ ut_fork_in sc_v tf' U' sts.
 Proof.
-  intros Hne. rewrite /ut_sys_in. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
+  intros Hl Hl' Hu HM Hpi Hsz Hcw.
+  assert (Hla : (tf_arg_idx 0 < length tf)%nat)
+    by (rewrite Hl; unfold tf_arg_idx, TFWORDS; lia).
+  assert (Hla' : (tf_arg_idx 0 < length tf')%nat)
+    by (rewrite Hl'; unfold tf_arg_idx, TFWORDS; lia).
+  assert (Hle : (tf_epc_idx < length tf)%nat)
+    by (rewrite Hl; unfold tf_epc_idx, TFWORDS; lia).
+  assert (Hle' : (tf_epc_idx < length tf')%nat)
+    by (rewrite Hl'; unfold tf_epc_idx, TFWORDS; lia).
+  assert (Hg : tf_resume_gpr0 (bump_tf tf (mword_of_int 0))
+               = tf_resume_gpr0 (bump_tf tf' (mword_of_int 0))).
+  { rewrite (tf_resume_gpr0_bump tf (mword_of_int 0) Hla).
+    rewrite (tf_resume_gpr0_bump tf' (mword_of_int 0) Hla').
+    rewrite (tf_ueq_resume_gpr0 tf tf' Hu). reflexivity. }
+  assert (Hp : tf_resume_pc (bump_tf tf (mword_of_int 0))
+               = tf_resume_pc (bump_tf tf' (mword_of_int 0))).
+  { rewrite (tf_resume_pc_bump tf (mword_of_int 0) Hle).
+    rewrite (tf_resume_pc_bump tf' (mword_of_int 0) Hle').
+    unfold tf_w. rewrite (tf_ueq_epc tf tf' Hu). reflexivity. }
+  rewrite /ut_fork_in. iIntros "H %Hc".
+  iDestruct ("H" with "[%]") as "H";
+    [ split; [ exact (proj1 Hc)
+             | rewrite (tf_ueq_num tf tf' Hu); exact (proj2 Hc) ] |].
+  rewrite !uvis_of_us_tf.
+  iEval (rewrite (uslot_key_cong
+                    (MkUvis (bump_tf tf (mword_of_int 0)) (us_M U)
+                       (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+                       (uint (pv_sz (us_V U))) sts (pv_cwi (us_V U)))
+                    (MkUvis (bump_tf tf' (mword_of_int 0)) (us_M U')
+                       (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
+                       (uint (pv_sz (us_V U'))) sts (pv_cwi (us_V U')))
+                    Hg Hp (eq_sym HM) (eq_sym Hpi)
+                    (f_equal uint (eq_sym Hsz)) eq_refl (eq_sym Hcw))) in "H".
+  iExact "H".
 Qed.
 
+(* the quiet readings, for the four non-ecall causes.  Only the OUT rows
+   need one: a deposit going DOWN is simply dropped by an arm that owes
+   nothing ([ProofUsertrap]'s device demultiplexer), so [ut_sys_in] and
+   [ut_fork_in] have no quiet reading at all. *)
 Lemma ut_sys_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
@@ -844,6 +939,10 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
   (* the process's deposit for the number it trapped at, owed only at an
      ecall -- [ut_sys_in] *)
   (∀ n : Z, ut_sys_in n f sc_v (pv_tf (us_V U)) U sts) -∗
+  (* ...and FORK'S, which is not one of them: a slot rather than a bundle,
+     and stated at the frame the PROLOGUE leaves (the entry record's epc
+     word is still the previous round's) -- [ut_fork_in] *)
+  ut_fork_in sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))) U sts -∗
   (* THE CROSSING: usertrap parks (yield, and every sleeping syscall), so it
      may return on a different hart -- and the bundle comes back at THAT
      hart, which is why [R] is a family (see the note above). *)

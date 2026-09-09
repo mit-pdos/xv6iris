@@ -481,6 +481,11 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} 
   (∀ n : Z,
      ut_sys_in n f sc_v (tf_of g (ret_pc sepc_v))
        (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts) -∗
+  (* ...and FORK'S deposit, which is a SLOT and not a bundle: the child's
+     continuation, at the key the saved frame bumps to
+     ([SpecUsertrap.ut_fork_in]) *)
+  ut_fork_in sc_v (tf_of g (ret_pc sepc_v))
+    (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts -∗
   wp_next true (proc_addr j) (fun CID' : CpuId =>
     uservec_post (CID := CID') (URes CID') C pt vksp U M g sts sepc_v sc_v f) -∗
   WP (Loop : expr riscv_lang).

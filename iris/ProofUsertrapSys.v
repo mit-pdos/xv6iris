@@ -65,6 +65,7 @@ Require Import SpecUsertrap UsertrapRes.
 Require Import UsysMemOk UsysMemOkSpec UexecRound UexecSlot UexecRet UserPerm.  (* the round's vocabulary *)
 Require Import UexecSG.        (* [sbundle_at_cong] / [skey_eq] -- the deposit across
                                   the epc rewrites *)
+Require Import KforkChild.     (* [kfork_child] -- the record fork's deposit lands at *)
 Require Import ProofUsertrapParts ProofPrepareReturnParts.
 Require Import ProofUsertrapTail.
 From Kernel Require KernelInstrs.
@@ -149,6 +150,10 @@ Section UtSysBlock.
     (* the process's deposit at the ENTRY record: what the dispatcher's
        exec channel is offered, read at 7 ([SpecUsertrap.ut_sys_in]) *)
     (∀ n : Z, ut_sys_in n fdep scv (pv_tf (us_V U0)) U0 sts) -∗
+    (* ...and FORK'S deposit, a SLOT and not a bundle, at the frame the
+       PROLOGUE leaves -- which [Hpro] says is [pv_tf (us_V U)]
+       ([SpecUsertrap.ut_fork_in]) *)
+    ut_fork_in scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) U0 sts -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
                      mie_v menvcfg0 U0 sts epv scv fdep) -∗
@@ -159,7 +164,7 @@ Section UtSysBlock.
     pose proof (ut_nx_bound_off av nx Hav Hnx) as Hkso.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hhold Hframe Hxin Hcont".
+    iIntros "#Htext Hpc Hcg Hhold Hframe Hxin Hfin Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     (* depth 0 forces the held set empty, so killed/kexit's order premises
        need no hypothesis of this lemma's own. *)
@@ -447,6 +452,38 @@ Section UtSysBlock.
         rewrite list_lookup_total_insert_ne;
           [| unfold tf_epc_idx, tf_arg_idx; lia].
         reflexivity. }
+      (* THE CHILD'S RECORD, at the dispatcher's own state.  The two epc
+         writes compose: the prologue's [epc := r_sepc()] ([Hpr1]) and the
+         [epc += 4] at +0x9a ([Ha5d]) turn the ENTRY frame into
+         [UsysMemOk.bump_tf] of the prologue's frame -- and a0 := 0 on top
+         of that is exactly [KforkChild.kfork_child]'s one word (index 14 is
+         [ProcGeom.tf_arg_idx 0]).  So fork's deposit needs no re-keying at
+         all: the record the process deposited at IS the record kfork's
+         contract states. *)
+      assert (HS2a5d : rget S2 Ra5 = uepc)
+        by (rgne; rewrite /S2 upd_eq; reflexivity).
+      assert (HS3a5d : rget S3 Ra5
+                       = add_vec (rget S2 Ra5)
+                           (sign_extend' 64
+                              (sign_extend' 12 (mword_of_int 4 : mword 6))))
+        by (rgne; rewrite /S3 upd_eq; reflexivity).
+      assert (Ha5d : rget S3 Ra5 = add_vec_int (pv_tf (us_V U) !!! tf_epc_idx) 4).
+      { rewrite (list_lookup_total_correct _ _ _ Hepc) HS3a5d HS2a5d.
+        apply addv_sext4. }
+      assert (HV1cwid : pv_cwi V1 = pv_cwi (us_V U))
+        by (rewrite /V1; destruct (us_V U); reflexivity).
+      assert (Hzr : (zero_reg : mword 64) = mword_of_int 0)
+        by (apply bv_eq; vm_compute; reflexivity).
+      assert (Htfch : <[14%nat := zero_reg]> (pv_tf V1)
+                      = bump_tf (pv_tf (us_V U)) (mword_of_int 0)).
+      { rewrite HV1tf0 Ha5d Hzr. unfold bump_tf, tf_arg_idx. reflexivity. }
+      assert (Hchild : uvis_of (kfork_child (MkUstate V1 (us_M U))) sts
+                       = uvis_of (us_tf U0 (bump_tf
+                            (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+                            (mword_of_int 0))) sts).
+      { rewrite uvis_of_kfork_child uvis_of_us_tf. cbn [us_V us_M].
+        rewrite <- Hpr1. rewrite Htfch.
+        rewrite HV1upt HV1sz HV1cwid Hpr2 Hpr3 Hpr4 Hpr5. reflexivity. }
       (* ---- +0x9e: csrsi sstatus,2 -- intr_on(), and the reserve is paid ---- *)
       iDestruct (ut_flip_pre (un_pj N) with "Hcpu") as "(Hcnt & Hcells)".
       (* THE CARVE, and why it needs a NAME for the remainder.  The enabling
@@ -510,7 +547,7 @@ Section UtSysBlock.
  (un_fn N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) sts lks fdep
                 Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
-                with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [Hufr] [Hxin] [-]").
+                with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [Hufr] [Hxin] [Hfin] [-]").
     (* the syscall channel takes the bundle AT ITS NAMED STATES now, and
        hands back the states the call left together with the table row that
        says how they moved -- no ∃-weakening on either side of the call. *)
@@ -536,6 +573,15 @@ Section UtSysBlock.
          rewrite <- (sbundle_at_cong uslot n fdep (uvis_of U0 sts)
                        (uvis_of (MkUstate V1 (us_M U)) sts) Hkey).
          iExact "Hx". }
+    (* FORK'S DEPOSIT, handed on unchanged: [Hchild] above says the record
+       the process deposited at and the record the dispatcher's arm spends
+       at are THE SAME record, so there is nothing to re-key.  The guard is
+       the number across the prologue's epc insert
+       ([UsysMemOk.usys_num_epc]). *)
+    2: { rewrite /sysc_fork_in. iIntros "%Hk". cbn [us_V] in Hk.
+         iDestruct ("Hfin" with "[%]") as "Hj".
+         { split; [ exact Hscec | rewrite usys_num_epc Hn0; exact Hk ]. }
+         rewrite Hchild. iExact "Hj". }
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
          takes no premise at all -- [cpu_own] carries no caller frame to

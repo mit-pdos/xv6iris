@@ -334,6 +334,149 @@ Section UserretClosed.
            kernel as uservec's pre row; the arm without it stays for the
            round ([UexecRet.uexec_ret_split]). ---- *)
     iDestruct (uexec_ret_split sc W with "Hret") as (fdep) "[Hxin Hret]".
+    (* the residue's index, read at the key: the three equations the round
+       and fork's deposit both cross by.  [Hpi0] is stated at the RE-KEYED
+       index ([us_upt U0 pt]), which is what the loop resumed under. *)
+    assert (Hpi0 : perm_of (ud_um (pv_upt (us_V (us_upt U0 pt))))
+                     (uint (pv_sz (us_V (us_upt U0 pt)))) = uvis_perm W)
+      by (rewrite Hperm; reflexivity).
+    assert (Hsz0 : uint (pv_sz (us_V (us_upt U0 pt))) = uvis_sz W)
+      by exact (eq_sym Hszw).
+    assert (Hcw0 : pv_cwi (us_V (us_upt U0 pt)) = uvis_cwd W)
+      by (rewrite Hcww; exact Hcwi).
+    (* ---- FORK'S DEPOSIT IS A SECOND ROW, and the two are exclusive.  At
+           every returning number the deposit is the syscall's bundle and
+           travels as [SpecUsertrap.ut_sys_in]; at FORK it is the child's
+           own continuation and travels as [SpecUsertrap.ut_fork_in].  Both
+           rows are guarded on the number, so the one this trap is not at
+           is proved without touching the resource. ---- *)
+    assert (Hla1 : (tf_arg_idx 0 < length (uvis_tf W))%nat)
+      by (rewrite Hlen; unfold tf_arg_idx, TFWORDS; lia).
+    assert (Hle1 : (tf_epc_idx < length (uvis_tf W))%nat)
+      by (rewrite Hlen; unfold tf_epc_idx, TFWORDS; lia).
+    assert (Hla2 : (tf_arg_idx 0
+                    < length (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))%nat)
+      by (rewrite tf_of_length; unfold tf_arg_idx, TFWORDS; lia).
+    assert (Hle2 : (tf_epc_idx
+                    < length (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))%nat)
+      by (rewrite tf_of_length; unfold tf_epc_idx, TFWORDS; lia).
+    assert (Hgpr0 : tf_resume_gpr0 (bump_tf (uvis_tf W) (mword_of_int 0))
+                    = tf_resume_gpr0
+                        (bump_tf (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                    (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                           (mword_of_int 0))).
+    { rewrite (tf_resume_gpr0_bump (uvis_tf W) (mword_of_int 0) Hla1).
+      rewrite (tf_resume_gpr0_bump
+                 (tf_of (tf_resume_gpr0 (uvis_tf W))
+                    (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                 (mword_of_int 0) Hla2).
+      rewrite (tf_of_resume_gpr (tf_resume_gpr0 (uvis_tf W))
+                 (ret_pc (tf_w (uvis_tf W) tf_epc_idx))
+                 (tf_resume_gpr0_x0 (uvis_tf W))).
+      reflexivity. }
+    (* the resume pc crosses the run projection by [UexecApply.ret_pc_add4]:
+       clearing bit 0 before the +4 and after it give the same target *)
+    assert (Hpc0 : tf_resume_pc (bump_tf (uvis_tf W) (mword_of_int 0))
+                   = tf_resume_pc
+                       (bump_tf (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                   (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                          (mword_of_int 0))).
+    { rewrite (tf_resume_pc_bump (uvis_tf W) (mword_of_int 0) Hle1).
+      rewrite (tf_resume_pc_bump
+                 (tf_of (tf_resume_gpr0 (uvis_tf W))
+                    (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                 (mword_of_int 0) Hle2).
+      rewrite (tf_of_epc (tf_resume_gpr0 (uvis_tf W))
+                 (ret_pc (tf_w (uvis_tf W) tf_epc_idx))).
+      exact (eq_sym (ret_pc_add4 (tf_w (uvis_tf W) tf_epc_idx))). }
+    iAssert ((∀ n : Z,
+                SpecUsertrap.ut_sys_in n fdep sc
+                  (tf_of (tf_resume_gpr0 (uvis_tf W))
+                     (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                  (ProcDefs.upd_usM
+                     (ProcInv.us_tf (us_upt U0 pt)
+                        (tf_of (tf_resume_gpr0 (uvis_tf W))
+                           (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
+                     (uvis_M W))
+                  (uvis_fd W))
+             ∗ SpecUsertrap.ut_fork_in sc
+                  (tf_of (tf_resume_gpr0 (uvis_tf W))
+                     (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                  (ProcDefs.upd_usM
+                     (ProcInv.us_tf (us_upt U0 pt)
+                        (tf_of (tf_resume_gpr0 (uvis_tf W))
+                           (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
+                     (uvis_M W))
+                  (uvis_fd W))%I
+      with "[Hxin]" as "[Hin Hfin]".
+    { destruct (decide (usys_num (uvis_tf W) = USYS_fork)) as [Hfk | Hnfk].
+      - iSplitR.
+        + (* the bundle row excludes fork by its own guard *)
+          iIntros (n) "%Hg". exfalso.
+          destruct Hg as (_ & Hgn & _ & Hgf). apply Hgf. rewrite <- Hgn.
+          exact (eq_trans (uvis_run_num W) Hfk).
+        + (* THE CHILD'S CONTINUATION.  The deposit's key is the TRAPPED
+             frame bumped and the row's is the RUN projection's bumped, and
+             the two agree at everything a slot reads
+             ([UexecApply.uslot_key_cong]). *)
+          rewrite /SpecUsertrap.ut_fork_in. iIntros "%Hg".
+          rewrite /uexec_dep /uexec_dep_F. cbv zeta.
+          destruct (decide (sc = uecall_scause)) as [_ | Hc];
+            [ | exfalso; exact (Hc (proj1 Hg)) ].
+          destruct (decide (usys_num (uvis_tf W) = USYS_exit)) as [He | _];
+            [ exfalso; rewrite Hfk in He; discriminate He | ].
+          destruct (decide (usys_num (uvis_tf W) = USYS_fork)) as [_ | Hc];
+            [ | exfalso; exact (Hc Hfk) ].
+          rewrite /uexec_fork_child_F SpecUsertrap.uvis_of_us_tf.
+          iEval (rewrite (uslot_key_cong
+                            (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W)
+                               (uvis_sz W) (uvis_fd W) (uvis_cwd W))
+                            (MkUvis
+                               (bump_tf (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                           (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                                  (mword_of_int 0))
+                               (uvis_M W)
+                               (perm_of (ud_um (pv_upt (us_V (us_upt U0 pt))))
+                                  (uint (pv_sz (us_V (us_upt U0 pt)))))
+                               (uint (pv_sz (us_V (us_upt U0 pt))))
+                               (uvis_fd W)
+                               (pv_cwi (us_V (us_upt U0 pt))))
+                            Hgpr0 Hpc0 eq_refl (eq_sym Hpi0) (eq_sym Hsz0)
+                            eq_refl (eq_sym Hcw0))) in "Hxin".
+          iExact "Hxin".
+      - iSplitL "Hxin".
+        + (* the pre row is the deposit at the RUN projection of the trapped
+             key, which reads the same image, argument words and descriptor
+             view ([UexecApply.uvis_run_arg0] / [_arg1] / [_arg2]) *)
+          iIntros (n) "%Hg".
+          destruct Hg as (Hgc & Hgn & Hgx & Hgf).
+          assert (Hn : usys_num (uvis_tf W) = n)
+            by (rewrite <- (uvis_run_num W); exact Hgn).
+          rewrite /uexec_dep /uexec_dep_F. cbv zeta.
+          destruct (decide (sc = uecall_scause)) as [_ | Hc];
+            [ | exfalso; exact (Hc Hgc) ].
+          rewrite Hn.
+          destruct (decide (n = USYS_exit)) as [He | _];
+            [ exfalso; exact (Hgx He) | ].
+          destruct (decide (n = USYS_fork)) as [He | _];
+            [ exfalso; exact (Hgf He) | ].
+          match goal with
+          | |- environments.envs_entails _ (sbundle_at _ _ _ ?W') =>
+              rewrite <- (sbundle_at_cong uslot n fdep W W'
+                            ltac:(rewrite /skey_eq; split_and!;
+                                  [ reflexivity
+                                  | exact (eq_sym (uvis_run_arg0 W))
+                                  | exact (eq_sym (uvis_run_arg1 W))
+                                  | exact (eq_sym (uvis_run_arg2 W))
+                                  | reflexivity
+                                  | exact (eq_trans Hcww (eq_sym Hcwi)) ]))
+          end.
+          iExact "Hxin".
+        + (* not fork, so the fork row is vacuous *)
+          rewrite /SpecUsertrap.ut_fork_in. iIntros "%Hg". exfalso.
+          apply Hnfk. rewrite <- (uvis_run_num W). exact (proj2 Hg). }
     (* ---- one round.  [Hret] -- the linear return user execution handed
            back -- is FRAMED across the crossing (R-a / K8). ---- *)
     iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp
@@ -341,34 +484,7 @@ Section UserretClosed.
               (tf_resume_gpr0 (uvis_tf W))
               ms_v sc stv (tf_w (uvis_tf W) tf_epc_idx)
               Hstv Hdqc Hmie Hj Hnorm Hptwf
-              with "Hkt Hhw Hmin Hclaim Hcreds Hframe Hures [Hxin] [-]").
-    { (* the pre row is the deposit at the RUN projection of the trapped
-         key, which reads the same image, argument words and descriptor view
-         ([UexecApply.uvis_run_arg0] / [_arg1] / [_arg2]) *)
-      iIntros (n). rewrite /SpecUsertrap.ut_sys_in. iIntros "%Hg".
-      destruct Hg as (Hgc & Hgn & Hgx & Hgf).
-      assert (Hn : usys_num (uvis_tf W) = n)
-        by (rewrite <- (uvis_run_num W); exact Hgn).
-      rewrite /uexec_dep /uexec_dep_F. cbv zeta.
-      destruct (decide (sc = uecall_scause)) as [_ | Hc];
-        [ | exfalso; exact (Hc Hgc) ].
-      rewrite Hn.
-      destruct (decide (n = USYS_exit)) as [He | _];
-        [ exfalso; exact (Hgx He) | ].
-      destruct (decide (n = USYS_fork)) as [He | _];
-        [ exfalso; exact (Hgf He) | ].
-      match goal with
-      | |- environments.envs_entails _ (sbundle_at _ _ _ ?W') =>
-          rewrite <- (sbundle_at_cong uslot n fdep W W'
-                        ltac:(rewrite /skey_eq; split_and!;
-                              [ reflexivity
-                              | exact (eq_sym (uvis_run_arg0 W))
-                              | exact (eq_sym (uvis_run_arg1 W))
-                              | exact (eq_sym (uvis_run_arg2 W))
-                              | reflexivity
-                              | exact (eq_trans Hcww (eq_sym Hcwi)) ]))
-      end.
-      iExact "Hxin". }
+              with "Hkt Hhw Hmin Hclaim Hcreds Hframe Hures Hin Hfin [-]").
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
@@ -421,18 +537,11 @@ Section UserretClosed.
            the round left ([UexecApply]).  The round is stated at the RUN
            projection of the trapped key, and its entry permission map is
            the key's own once the index has been re-keyed onto [pt]. ---- *)
-    assert (Hpi0 : perm_of (ud_um (pv_upt (us_V (us_upt U0 pt))))
-                     (uint (pv_sz (us_V (us_upt U0 pt)))) = uvis_perm W)
-      by (rewrite Hperm; reflexivity).
     unfold uv_round in Hround'.
     rewrite Hpi0 in Hround'.
-    (* ...and the same for the break, which the key carries now *)
-    assert (Hsz0 : uint (pv_sz (us_V (us_upt U0 pt))) = uvis_sz W)
-      by exact (eq_sym Hszw).
+    (* ...and the same for the break and the cwd's inum, which the key
+       carries now ([Hsz0] / [Hcw0], hoisted above the round) *)
     rewrite Hsz0 in Hround'.
-    (* ...and for the cwd's inum: the residue's block is at the key's *)
-    assert (Hcw0 : pv_cwi (us_V (us_upt U0 pt)) = uvis_cwd W)
-      by (rewrite Hcww; exact Hcwi).
     rewrite Hcw0 in Hround'.
     (* THE RESUMED KEY IS AT [sts2], THE POST-SYSCALL VIEW.  That is the
        whole point of the conditional pin: on an ecall the kernel may have

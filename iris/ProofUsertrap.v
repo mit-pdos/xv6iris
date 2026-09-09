@@ -775,6 +775,9 @@ Section UtDispatch.
     (* the process's exec bundle, at the ENTRY record -- the ecall arm's
        alone ([SpecUsertrap.ut_sys_in]) *)
     (∀ n : Z, ut_sys_in n fdep sc (pv_tf (us_V U0)) U0 sts) -∗
+    (* ...and fork's deposit, the ecall arm's alone too, at the frame the
+       prologue leaves ([SpecUsertrap.ut_fork_in]) *)
+    ut_fork_in sc (<[tf_epc_idx := ret_pc ep]> (pv_tf (us_V U0))) U0 sts -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') SY.syscall_env) pt ksp m0
                      mie_v menvcfg0 U0 sts ep sc fdep) -∗
@@ -784,7 +787,7 @@ Section UtDispatch.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hcpu Hclm Hraw Henv Hframe Hxin Hcont".
+    iIntros "#Htext Hpc Hcg Hcpu Hclm Hraw Henv Hframe Hxin Hfin Hcont".
     iDestruct "Henv" as "[#Hcaps Hown]".
     (* the device complement, at THIS hart, out of the bundle's [∀ h] form *)
     iAssert (devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
@@ -885,15 +888,15 @@ Section UtDispatch.
                 mie_v menvcfg0 ep sc ∅ sts fdep
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HD2sp HD2s1 HD2a0 HcsD2
                 Hmiev Hmenvv Hpro Hscec
-                with "Htext Hpc Hcg Hhold Hframe Hxin Hcont").
+                with "Htext Hpc Hcg Hhold Hframe Hxin Hfin Hcont").
     - (* not a syscall: the device demultiplexer.  The beq FELL THROUGH, so
          the round's [decide] goes the other way and the four arms below get
          the transparent instance. *)
       assert (Hscne : sc <> (uecall_scause : mword 64)).
       { intro Hc. apply (proj1 (eq_vec_false_iff _ _) Hsys).
         rewrite HD2a4 HD2a5. exact Hc. }
-      (* no ecall, no bundle owed: the four arms below drop it *)
-      iClear "Hxin".
+      (* no ecall, no deposit owed: the four arms below drop both rows *)
+      iClear "Hxin". iClear "Hfin".
       iApply (wp_beq_fall_s_sconf (mword_of_int (UT + 0x36))
                 (mword_of_int 90 : mword 13) Ra5 Ra4 D2 nx false
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -1367,7 +1370,7 @@ Section UtSeal.
     cbv beta delta [wp_usertrap_body].
     intros pcE pj Hms Hj Hsp Htp Hmiev Hmask Hmenvv.
     iIntros "#Htext Hpc #Hhw #Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
-             Hmie Hmdl Hmenv Hgpr HR Hxin Hcont".
+             Hmie Hmdl Hmenv Hgpr HR Hxin Hfin Hcont".
     (* SCOPED: a bare [rewrite] would unfold [ut_res] inside the crossing's
        [usertrap_post] too, and the blocks state it folded. *)
     iEval (rewrite /usertrap_res /ut_res) in "HR".
@@ -1380,7 +1383,7 @@ Section UtSeal.
               mie_v mdv0 menvcfg0 sts
               Hms Hav Hsp Htp Hmiev Hmask Hmenvv
               with "Htext Hpc Hhw Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
-                    Hmie Hmdl Hmenv Hgpr Htc Htrap Henv [Hcont Hxin]").
+                    Hmie Hmdl Hmenv Hgpr Htc Htrap Henv [Hcont Hxin Hfin]").
     iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV %HcwiV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
     iApply (ut_dispatch N (MkUstate V Mu) (MkUstate V' Mu) pt ksp m M av (av - 4)%nat sepc_v sc_v stval_v
               mie_v menvcfg0 sts fdep
@@ -1390,7 +1393,7 @@ Section UtSeal.
               (trap_res_off (av - 4)%nat)
               ltac:(rewrite HuptV Hupt; reflexivity) Hksp Hsp HMsp HMs1 HMa0 HcsM
               Hmiev Hmenvv
-              with "Htext Hpc Hcg Hcpu Hclm Hraw Henv Hfr Hxin Hcont").
+              with "Htext Hpc Hcg Hcpu Hclm Hraw Henv Hfr Hxin Hfin Hcont").
   Qed.
 
 End UtSeal.

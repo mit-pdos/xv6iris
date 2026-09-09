@@ -31,9 +31,13 @@
    WHAT IS LEFT, and none of it is kfork-specific: the interrupt/nesting
    bundle ([sie_cap_gpr], [cpu_own]), the caller's own private block
    ([proc_priv], handed back verbatim -- kfork only READS the parent), the
-   allocator at [kalloc_env _ None], and four persistent handles: the
-   process table, the nextpid and wait_lock spinlocks, the ftable and the
-   itable.  The last two travel with the FS fabric ([fsc_fs], [fsc_cov],
+   allocator at [kalloc_env _ None], four persistent handles (the process
+   table, the nextpid and wait_lock spinlocks, the ftable and the itable),
+   and ONE LINEAR RESOURCE: the child's user-execution slot, which is
+   kfork's own premise passed straight through.  The forking process
+   deposited it at the ecall and the trap route carried it here
+   ([SpecUsertrap.ut_fork_in] / [SpecSyscall.sysc_fork_in]), so sys_fork
+   mints nothing.  The last two travel with the FS fabric ([fsc_fs], [fsc_cov],
    [fsc_logst], [nib]) because [IcacheEscrow.is_itable2]'s resource does;
    kfork does no I/O and touches no log, and inherits them only because its
    [idup] call takes the itable lock.  A syscall dispatcher that already
@@ -76,6 +80,9 @@ Require Import WaitInv.
 Require Import KvmSpec.
 Require Import SpecAllocpid.
 Require Import SpecKfork.
+Require Import UexecSlot.  (* [uvis_of] -- the child's key *)
+Require Import UexecRet.   (* [uslot] -- the deposit sys_fork forwards *)
+Require Import KforkChild. (* [kfork_child] -- the record it is stated at *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -143,6 +150,13 @@ Definition wp_sys_fork_sconf_body
      [FirstTok.first_tok_of_done] mints the child's token from, at the
      [sd a0,336(s4)] that closes the child's construction window. *)
   first_done -∗
+  (* THE CHILD'S CONTINUATION, straight through to kfork.  fork's DEPOSIT:
+     the process handed the kernel the WP its child will run when it made
+     the ecall, and the trap route ([SpecUsertrap.ut_fork_in],
+     [SpecSyscall.sysc_fork_in]) carries it here.  ONE slot, at the record
+     [SpecKfork] states from the parent -- so sys_fork neither mints nor
+     re-keys, it forwards. *)
+  uslot (uvis_of (kfork_child U) sts) -∗
   proc_priv γf p pid U -∗
   (* THE PARENT'S DESCRIPTOR STATES.  fork's whole effect on descriptors is
      that the CHILD gets these -- [SpecKfork]'s copy loop retypes the child's

@@ -15,7 +15,9 @@
    an [IrefSlots.iref_slot], and no caller could produce either; the
    contract was honest and unusable.  This proof is the check that it is
    usable now, and it needs nothing kfork-specific to run: every premise it
-   forwards is either persistent or the syscall's own state.
+   forwards is persistent, the syscall's own state, or the child's slot --
+   and that last one is the FORKING PROCESS's deposit, handed down the trap
+   route, so this file mints nothing at all.
 
    The save/restore of ra/s0 SPANS the kfork call, so the final
    [callee_saved] does not factor through the two halves and is discharged
@@ -42,14 +44,10 @@ Require Import Xv6Cameras.
 Require Import IrefSlots.
 Require Import SpecKfork.
 Require Import SpecSysFork.
-Require Import UexecWp.   (* [UEXEC_GEN] -- the mint's [box] *)
 Require Import UexecSlot. (* [uvis] *)
 Require Import UexecRet.  (* [uslot] -- DIRECT, the seal does not travel *)
-Require Import UexecCond. (* [cond_entry_slot] -- the conditional mint *)
-Require Import UexecExecMint. (* [uslot_mint] -- it, at the kernel's instance *)
 Require Import KforkChild.    (* [kfork_child] -- the record the slot is at *)
-Require Import SyscParkEnv.   (* [park_world_sup] -- the supply, off the world *)
-Require Import AppInv.        (* [app_sup] -- the credential the mint runs on *)
+Require Import SyscParkEnv.   (* [park_world] -- the world the child's park needs *)
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -82,22 +80,20 @@ Proof.
   rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
 Qed.
 
-(* [UG] -- THE GENERIC USER-EXECUTION WP, as a functor argument, and the
-   SECOND (and last) mint site in the tree; userinit's park is the other.
-   kfork's contract takes the CHILD'S WP as a linear premise -- parking a
-   process consumes one, and nothing persistent carries a copy any more --
-   so sys_fork, kfork's one caller, has to pay it.  It pays with the generic
-   inhabitant, which is what a process forked by an unverified parent gets;
-   when the parent is verified the very same premise is where its own
-   fork-continuation deposit will go instead.  A [box] proposition proved
-   from no linear hypothesis, so the argument costs the composition exactly
-   one application: [LinkSysFork.v] passes [UexecGen UserProof].  See
+(* NO GENERIC-WP FUNCTOR ARGUMENT.  kfork's contract takes the CHILD'S WP
+   as a linear premise, and sys_fork -- kfork's one caller -- gets it from
+   ITS OWN caller: the process that called fork() deposited its child
+   continuation at the ecall, and the trap route carries it down.  So the
+   only remaining mint site in the tree is userinit's park; a process
+   forked by an UNVERIFIED parent is served by the generic inhabitant one
+   level up, where the loop pays the deposit out of the supply
+   ([UexecRet.uexec_dep_F_of_supply] at fork).  See
    claude-notes/design/user-wp-slot.md. *)
 Require Import UserFd.   (* [ufdG] -- the program's descriptor-table class,
                             needed to mint a user slot *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
-Module SysForkProof (Kfork : KFORK) (UG : UEXEC_GEN) : SYSFORK.
+Module SysForkProof (Kfork : KFORK) : SYSFORK.
 
 Section ProofSysFork.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
@@ -134,7 +130,8 @@ Section ProofSysFork.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg sp']> m).
     set (M2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv #Hireg Henv #Hpav #Hworld #Htoken #Hfdone Hpriv Hpfrag Hcont".
+             #Hitbl #Hitinv #Hireg Henv #Hpav #Hworld #Htoken #Hfdone Hjslot
+             Hpriv Hpfrag Hcont".
     assert (Hcsp1 : M1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     assert (Hpush : sp' = pa_stk (m !!! Regidx csp_rs1) 2).
     { unfold sp', pa_stk, add_vec_int, imm_entry.
@@ -207,23 +204,15 @@ Section ProofSysFork.
     (* the pair arrives NAMED (rank 1d): [fsc_kpages] is a [FsCfg.fscfg]
        field, so there is no existential left to open. *)
     iPoseProof "Henv" as "#Henvn".
-    (* THE MINT.  kfork consumes ONE slot for the child it parks, at the
-       record its contract states from the parent
-       ([KforkChild.kfork_child]), and this is where that slot is paid for:
-       out of the application's supply, through the generic inhabitant
-       ([UexecExecMint.uslot_mint] gives [∀ W, uslot W], instantiated here
-       at that one record).  A verified parent hands its own
-       fork-continuation in at the SAME record instead, which is what makes
-       the premise a single slot rather than a family -- and is the whole
-       point of stating the child's state as a function of the parent's. *)
-    iAssert (uslot (uvis_of (kfork_child U) sts))%I as "Hjslot".
-    { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      (* the supply the mint runs on rides the world a park needs
-         ([SyscParkEnv.park_world]) -- the premise that already threads
-         usertrap -> syscall -> sys_fork -> kfork *)
-      iDestruct (SyscParkEnv.park_world_sup with "Hworld") as "#Hsup".
-      iDestruct (UexecExecMint.uslot_mint with "Hsup Hgen") as "#Hmk".
-      iApply "Hmk". }
+    (* THE CHILD'S SLOT IS FORWARDED, not minted.  kfork consumes ONE slot
+       for the child it parks, at the record its contract states from the
+       parent ([KforkChild.kfork_child]); sys_fork's own contract takes
+       that very slot, because the process that called fork() deposited its
+       child continuation at the ecall and the trap route
+       ([SpecUsertrap.ut_fork_in], [SpecSyscall.sysc_fork_in]) carried it
+       here.  So this function neither mints nor re-keys: the premise IS
+       kfork's premise, which is the whole point of stating the child's
+       state as a function of the parent's. *)
     iApply (Kfork.wp_kfork_sconf γp γw γl γf γs
 
               Bj lvl (av - 2)%nat eb p b pid U sts lks

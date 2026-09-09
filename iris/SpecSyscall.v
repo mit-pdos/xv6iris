@@ -154,6 +154,7 @@ Require Import UexecSlot.        (* [uvis_of] *)
 Require Import UexecRet.         (* [uslot] -- the slot the exec channel returns *)
 Require Import UexecSG.          (* [uexecSG]: [sbundle_at] / [spost_at] *)
 Require Import UexecExecInst.    (* the class INSTANCE: exec's bundle at 7 *)
+Require Import KforkChild.       (* [kfork_child] -- the record fork's deposit is at *)
 Import Defs.
 
 (* ===================================================================== *)
@@ -336,8 +337,8 @@ Section SyscExec.
      is a post at the very receipts it chose, so the two legs cannot be
      stated at independent witnesses ([UexecSG.v]'s header).
      EXIT AND FORK ARE EXCLUDED, exactly as they are one hop up: exit
-     returns nothing and fork runs no contract, so the process deposits
-     nothing there and the row must not ask for one. *)
+     deposits nothing at all and fork deposits a SLOT ([sysc_fork_in]),
+     so at those two this row must not ask for a bundle. *)
   Definition sysc_sys_in (U : ustate) (sts : list fdstate) (f : sfam)
       : iProp Σ :=
     (∀ n : Z,
@@ -367,12 +368,34 @@ Section SyscExec.
      other number's post ignores both.
 
      EXIT AND FORK ARE EXCLUDED, as they are for the deposit: exit never
-     returns and fork runs no contract. *)
+     returns and fork pays no receipt -- its deposit is a slot, and what it
+     buys is the CHILD's execution, not a post to the parent. *)
   Definition sysc_sys_out (U : ustate) (sts : list fdstate) (f : sfam)
       (r : mword 64) (sts' : list fdstate) (cw' : Z) : iProp Σ :=
     (∀ n : Z,
        ⌜sysc_num (us_V U) = n /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
        spost_at uslot n f (uvis_of U sts) r sts' cw')%I.
+
+  (* FORK'S DEPOSIT, the one that is a SLOT.  Every other number's deposit
+     is a bundle at the entry key ([sysc_sys_in]); fork's is the WP its
+     CHILD will run, at the record kfork's contract states from the
+     parent's ([KforkChild.kfork_child]: the dispatcher's own trapframe --
+     epc already past the ecall -- with a0 := 0, and the parent's image,
+     permission map, break, descriptor table and working directory).  The
+     fork arm hands it straight to [SpecSysFork], which hands it to kfork,
+     which spends it at the child's park.
+     GUARDED ON THE NUMBER ALONE, because the dispatcher is already past
+     the cause: every other arm discharges it by refuting the guard off its
+     own table index ([sysc_fork_in_ne]). *)
+  Definition sysc_fork_in (U : ustate) (sts : list fdstate) : iProp Σ :=
+    (⌜sysc_num (us_V U) = UsysMemOk.USYS_fork⌝ -∗
+       uslot (uvis_of (kfork_child U) sts))%I.
+
+  Lemma sysc_fork_in_ne (U : ustate) (sts : list fdstate) :
+    sysc_num (us_V U) <> UsysMemOk.USYS_fork -> ⊢ sysc_fork_in U sts.
+  Proof.
+    intros Hne. rewrite /sysc_fork_in. iIntros "%Hc". exfalso. exact (Hne Hc).
+  Qed.
 
   (* the numbers that owe nothing, as one premise an arm discharges from its
      own table index by [lia] *)
@@ -499,6 +522,8 @@ Definition wp_syscall_sconf_body
   (* the process's deposit for whatever number it trapped with -- see
      [sysc_sys_in] *)
   sysc_sys_in U sts f -∗
+  (* ...and fork's, which is a SLOT and not a bundle -- see [sysc_fork_in] *)
+  sysc_fork_in U sts -∗
   (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
      TABLE ENTRY NOT RETURN WITHOUT THE CONTRACT SAYING WHICH ONE.
 

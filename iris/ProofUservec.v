@@ -156,7 +156,7 @@ Section UservecAllPt.
        unify through the definition. See claude-notes/optimization.md. *)
     unfold uservec_gpr.
     intros Hstvec Hdqc Hmie Hjlt Hnorm Hptwf.
-    iIntros "#Hkt #Hhw #Hinv #Hclaim #Hcreds Hframe Hures Hxin Hcont".
+    iIntros "#Hkt #Hhw #Hinv #Hclaim #Hcreds Hframe Hures Hxin Hfin Hcont".
     (* ============ open the trapped machine ============ *)
     (* AT NAMED DATA (milestone J1a).  [user_trap_frame] is definitionally the
        ∃ over [user_trap_frame_at], so this is the same premise with its five
@@ -1635,7 +1635,7 @@ Section UservecAllPt.
               ms_v sc_v stval_v sepc_v vksp (uc_mie C) (uc_mideleg C) MENVCFG_S _ sts
               fdep
               Hums Hjlt Hspv' Htpv' Hmie Hmm Hmenvval0
-              with "Hkt Hpc Hhw Hinv Hhs Hpriv Hms Hsc Hstval Hsepc Hstvec Hmie Hmdl Hmenv Hfile Hures' [Hxin]").
+              with "Hkt Hpc Hhw Hinv Hhs Hpriv Hms Hsc Hstval Hsepc Hstvec Hmie Hmdl Hmenv Hfile Hures' [Hxin] [Hfin]").
     { (* THE BUNDLE ACROSS THE SAVE WALK: the saved frame is [g]'s registers
          at the two words the bundle's key and guard read (a1, a7) -- the
          agreement the round crosses by, restricted to two indices, hence
@@ -1657,6 +1657,29 @@ Section UservecAllPt.
                           unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
                     eq_refl
                     with "Hxin")
+      end. }
+    { (* FORK'S DEPOSIT ACROSS THE SAVE WALK.  The row reads the whole
+         RESUME frame (it bumps it), so the two sides have to agree at the
+         epc word and all thirty-one restorable registers -- [TfUser.tf_ueq],
+         which the walk gives on the nose: the words uservec stored ARE
+         [g]'s registers, and both frames name [ret_pc sepc_v] as the epc.
+         The record's other four projections are the same record's. *)
+      match goal with
+      | |- environments.envs_entails _ (SpecUsertrap.ut_fork_in _ ?TF ?UU _) =>
+          assert (Hlf : length TF = TFWORDS)
+            by (cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf]; reflexivity);
+          assert (Hueqf : TfUser.tf_ueq (tf_of g (ret_pc sepc_v)) TF)
+            by (apply TfUser.tf_ueq_sym;
+                cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
+                split; [ reflexivity | ];
+                intros i Hi;
+                do 36 (destruct i as [| i]; [ first [ reflexivity | lia ] | ]);
+                lia);
+          iApply (ut_fork_in_ueq sc_v (tf_of g (ret_pc sepc_v)) TF
+                    (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU sts
+                    (tf_of_length g (ret_pc sepc_v)) Hlf Hueqf
+                    eq_refl eq_refl eq_refl eq_refl
+                    with "Hfin")
       end. }
     iApply wp_next_intro. iIntros (CID2).
     iEval (rewrite /usertrap_post).

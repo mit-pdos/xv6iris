@@ -612,23 +612,49 @@ Section UexecRet.
      on its own ([uexec_dep_F]).  [uexec_ret_F] -- the one the fixpoint is
      taken of -- is the two together on the returning arm. *)
 
-  (* fork's two slots: the parent's at a nonzero return, the child's at 0 *)
-  Definition uexec_fork_F (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
-    ((∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z),
+  (* ------------------------------------------------------------------- *)
+  (* FORK'S TWO SLOTS, and they travel in OPPOSITE DIRECTIONS.            *)
+  (*                                                                      *)
+  (* The PARENT's slot is the arm the round instantiates on the way back   *)
+  (* out ([uexec_arm_F] at fork is [uexec_fork_parent_F] and nothing       *)
+  (* else); the CHILD's is fork's DEPOSIT and goes DOWN to kfork           *)
+  (* ([uexec_dep_F] at fork is [uexec_fork_child_F], the child conjunct    *)
+  (* at the ONE record it can be at).  [uexec_ret_F] -- what the PROGRAM   *)
+  (* proves -- is the two together, the child's under the [∀ fdv' cw']     *)
+  (* guards that make the copy a fact the program LEARNS.                  *)
+  (* ------------------------------------------------------------------- *)
+
+  (* the parent's arm: a NONZERO return, the key it trapped at bumped *)
+  Definition uexec_fork_parent_F (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
+    (∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z),
         ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
         (* THE PARENT'S OWN TABLE DOES NOT MOVE.  fork copies the
            parent's descriptors INTO THE CHILD and leaves the parent's
            array alone, so the process that gets a nonzero return
-           resumes at the view it trapped at.  Free to add: the kernel
-           MINTS at this arm ([UexecApply.uexec_ret_round_slot]'s fork
-           case) rather than instantiating it, so nothing has to prove
-           the guard -- but it is what the code does, and without it a
-           program cannot keep a descriptor handle across its own
-           fork. *)
+           resumes at the view it trapped at.
+           THE GUARD IS PAID FOR: the round instantiates this arm at the
+           pid the kernel returned ([UexecApply.uexec_ret_round_slot]'s
+           fork case), so a program keeps a descriptor handle across its
+           own fork. *)
         ⌜fdv' = uvis_fd W⌝ -∗
         (* ...NOR ITS WORKING DIRECTORY: fork does not chdir. *)
         ⌜cw' = uvis_cwd W⌝ -∗
-        X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv' cw')) ∗
+        X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv' cw'))%I.
+
+  (* the child's arm, AT ITS ONE RECORD: a0 := 0, the pc past the ecall,
+     the parent's image, permission map, break, descriptor table and
+     working directory.  The [∀ fdv' cw'] guards of the program's own
+     statement collapse here by reflexivity -- fork copies the table and
+     keeps the cwd, so there is exactly one record the child resumes at,
+     and that is what makes this deposit a SINGLE slot the trap route can
+     carry down to [SpecKfork]. *)
+  Definition uexec_fork_child_F (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
+    X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
+         (uvis_fd W) (uvis_cwd W)).
+
+  (* the two together: what a program proves at a fork ecall *)
+  Definition uexec_fork_F (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
+    (uexec_fork_parent_F X W ∗
      (∀ (fdv' : list fdstate) (cw' : Z),
         (* THE CHILD'S TABLE IS THE PARENT'S.  fork() copies it --
            [np->ofile[i] = filedup(p->ofile[i])] -- and this is the arm
@@ -637,12 +663,11 @@ Section UexecRet.
            made a forked child hold no handle for anything: not the
            pipe ends its parent had just made, not the standard streams
            it inherited.  THE DIRECTION MATTERS FOR WHO PAYS: the
-           PROGRAM proves this arm and the KERNEL instantiates it, so a
-           stronger guard is easier for the program (it learns the
-           table) and harder for the kernel (it must exhibit the copy).
-           [UkFork.wp_uk_ecall_fork] is what the program does with it;
-           the FORK ROW note in [UexecApply.uexec_ret_round_slot] is
-           what the kernel still owes. *)
+           PROGRAM proves this arm and the KERNEL receives it as fork's
+           deposit, so a stronger guard is easier for the program (it
+           learns the table) and harder for the kernel (it must exhibit
+           the copy).  [UkFork.wp_uk_ecall_fork] is what the program does
+           with it; [SpecKfork]'s slot premise is where it lands. *)
         ⌜fdv' = uvis_fd W⌝ -∗
         (* ...AND SO IS ITS WORKING DIRECTORY: [np->cwd = idup(p->cwd)],
            and the child's block is built at the parent's inum
@@ -650,6 +675,28 @@ Section UexecRet.
         ⌜cw' = uvis_cwd W⌝ -∗
         X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
              fdv' cw')))%I.
+
+  (* the guarded child conjunct and the one record, each way *)
+  Lemma uexec_fork_child_of (X : uvis -d> iPropO Σ) (W : uvis) :
+    (∀ (fdv' : list fdstate) (cw' : Z),
+       ⌜fdv' = uvis_fd W⌝ -∗ ⌜cw' = uvis_cwd W⌝ -∗
+       X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
+            fdv' cw')) -∗
+    uexec_fork_child_F X W.
+  Proof.
+    iIntros "H". rewrite /uexec_fork_child_F.
+    iApply ("H" $! (uvis_fd W) (uvis_cwd W) with "[%] [%]"); reflexivity.
+  Qed.
+
+  Lemma uexec_fork_child_to (X : uvis -d> iPropO Σ) (W : uvis) :
+    uexec_fork_child_F X W -∗
+    (∀ (fdv' : list fdstate) (cw' : Z),
+       ⌜fdv' = uvis_fd W⌝ -∗ ⌜cw' = uvis_cwd W⌝ -∗
+       X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
+            fdv' cw')).
+  Proof.
+    rewrite /uexec_fork_child_F. iIntros "H" (fdv' cw') "-> ->". iExact "H".
+  Qed.
 
   (* the returning arm's CONTINUATION: the four pure rows, the syscall's
      armed post [spost_at] -- what the process gets back for the bundle it
@@ -713,20 +760,23 @@ Section UexecRet.
     (if decide (sc = uecall_scause) then
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
-       else if decide (n = USYS_fork) then uexec_fork_F X W
+       else if decide (n = USYS_fork) then uexec_fork_parent_F X W
        else uexec_ret_ret_F X n f W
      else X W)%I.
 
   (* ...AND THE DEPOSIT ALONE: what the process owes at this trap.  [emp]
-     off the returning arm -- exit returns nothing and fork runs no
-     contract -- and [emp] at every returning number the instance has no
-     contract for. *)
+     off the returning arm -- exit returns nothing -- and [emp] at every
+     returning number the instance has no contract for.
+     FORK DEPOSITS ITS CHILD'S CONTINUATION.  It is the one number whose
+     deposit is not a bundle but a SLOT: the process hands the kernel the
+     WP the child will run, at the one record the child resumes at, and
+     the trap route carries it to [SpecKfork]'s slot premise. *)
   Definition uexec_dep_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
       (f : sfam) : iProp Σ :=
     (if decide (sc = uecall_scause) then
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
-       else if decide (n = USYS_fork) then emp
+       else if decide (n = USYS_fork) then uexec_fork_child_F X W
        else sbundle_at X n f W
      else emp)%I.
 
@@ -865,7 +915,7 @@ Section UexecRet.
   Local Instance uslot_F_contractive : Contractive uslot_F.
   Proof.
     rewrite /uslot_F /uvb_F /ukont_F /ukb_F /uexec_ret_F /uexec_fork_F
-            /uexec_ret_ret_F.
+            /uexec_fork_parent_F /uexec_ret_ret_F.
     solve_contractive_wide.
   Qed.
 
@@ -1038,8 +1088,8 @@ Section UexecRet.
           process's bundle for this number at this key ([UexecSG]), the
           families bound once outside both legs.  It is [emp] at every
           number the instance has no contract for, but a leaf below the
-          file-system tower cannot see that -- it pays with
-          [uexec_dep_of_supply_ne] instead. *)
+          file-system tower cannot see that -- it pays out of the supply
+          instead ([UexecSG.sbundle_of_supply_ne]). *)
        (∃ f : sfam,
         sbundle_at uslot n f W ∗
         (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
@@ -1068,7 +1118,7 @@ Section UexecRet.
     uexec_arm sc W f ⊣⊢
     (let n := usys_num (uvis_tf W) in
      if decide (n = USYS_exit) then emp
-     else if decide (n = USYS_fork) then uexec_fork_F uslot W
+     else if decide (n = USYS_fork) then uexec_fork_parent_F uslot W
      else uexec_ret_ret_F uslot n f W).
   Proof.
     intros ->. rewrite /uexec_arm /uexec_arm_F.
@@ -1110,8 +1160,13 @@ Section UexecRet.
       [| iExists sfam_pt; iSplitR; [done | iExact "H"]].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit));
       [ iExists sfam_pt; iSplitR; [done | iExact "H"] |].
-    destruct (decide (usys_num (uvis_tf W) = USYS_fork));
-      [ iExists sfam_pt; iSplitR; [done | iExact "H"] |].
+    (* FORK SPLITS FOR REAL: the child conjunct is the deposit and the
+       parent conjunct the arm, and the child's [∀ fdv' cw'] guards
+       collapse by reflexivity on the way down
+       ([uexec_fork_child_of]). *)
+    destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
+    { iDestruct "H" as "[Hp Hc]". iExists sfam_pt. iSplitL "Hc";
+        [ iApply (uexec_fork_child_of X W with "Hc") | iExact "Hp" ]. }
     iDestruct "H" as (f) "[Hd Ha]". iExists f. iFrame "Hd Ha".
   Qed.
 
@@ -1123,7 +1178,10 @@ Section UexecRet.
     iIntros "Hd Ha".
     destruct (decide (sc = uecall_scause)); [| iExact "Ha"].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ iExact "Ha" |].
-    destruct (decide (usys_num (uvis_tf W) = USYS_fork)); [ iExact "Ha" |].
+    (* ...and joins back: the deposit's one record re-guards
+       ([uexec_fork_child_to]) *)
+    destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
+    { iSplitL "Ha"; [ iExact "Ha" | iApply (uexec_fork_child_to X W with "Hd") ]. }
     iExists f. iFrame "Hd Ha".
   Qed.
 
@@ -1139,38 +1197,6 @@ Section UexecRet.
   (* PAYING THE DEPOSIT OUT OF THE SUPPLY.                                *)
   (* ------------------------------------------------------------------- *)
 
-  (* what every ecall leaf uses: at any trap that is not an exec ecall, the
-     supply alone pays -- exec is the one syscall whose bundle carries a
-     slot wand (UexecSG.v's header), and [n <> USYS_exec] is a premise the
-     leaves already carry. *)
-  (* BUPD-SHAPED, since the class's laws are ([UexecSG.v]'s header): the
-     update belongs to the LAW, so a consumer runs it where it has a
-     modality -- every one of them does, the deposit being minted inside a
-     WP step. *)
-  (* ...AT SOME FAMILIES, which the caller then carries to the arm: the
-     supply pays a bundle, and the arm's [∃] is filled by the witness this
-     hands back. *)
-  Lemma uexec_dep_F_of_supply_ne (X : uvis -d> iPropO Σ) (sc : mword 64)
-      (W : uvis) :
-    (sc = uecall_scause -> usys_num (uvis_tf W) <> USYS_exec) ->
-    □ ssupply ==∗ ∃ f : sfam, uexec_dep_F X sc W f.
-  Proof.
-    intros Hne. rewrite /uexec_dep_F. cbv zeta. iIntros "#Hsup".
-    destruct (decide (sc = uecall_scause)) as [Hec |];
-      [| iModIntro; by iExists sfam_pt].
-    destruct (decide (usys_num (uvis_tf W) = USYS_exit));
-      [iModIntro; by iExists sfam_pt |].
-    destruct (decide (usys_num (uvis_tf W) = USYS_fork));
-      [iModIntro; by iExists sfam_pt |].
-    iApply (sbundle_of_supply_ne X (usys_num (uvis_tf W)) W (Hne Hec)).
-    iExact "Hsup".
-  Qed.
-
-  Lemma uexec_dep_of_supply_ne (sc : mword 64) (W : uvis) :
-    (sc = uecall_scause -> usys_num (uvis_tf W) <> USYS_exec) ->
-    □ ssupply ==∗ ∃ f : sfam, uexec_dep sc W f.
-  Proof. exact (uexec_dep_F_of_supply_ne uslot sc W). Qed.
-
   (* ...and what the GENERIC inhabitants use: the supply beside a generic
      slot family, which is what answers exec's wand *)
   Lemma uexec_dep_F_of_supply (X : uvis -d> iPropO Σ) (sc : mword 64)
@@ -1181,8 +1207,10 @@ Section UexecRet.
     destruct (decide (sc = uecall_scause)); [| iModIntro; by iExists sfam_pt].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit));
       [iModIntro; by iExists sfam_pt |].
+    (* fork's deposit is a slot at ONE record, which the generic family
+       has at every record *)
     destruct (decide (usys_num (uvis_tf W) = USYS_fork));
-      [iModIntro; by iExists sfam_pt |].
+      [iModIntro; iExists sfam_pt; rewrite /uexec_fork_child_F; iApply "Hall" |].
     iApply (sbundle_of_supply X (usys_num (uvis_tf W)) W with "Hsup Hall").
   Qed.
 
@@ -1195,8 +1223,7 @@ Section UexecRet.
     destruct (decide (sc = uecall_scause)); [ | iApply "H" ].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { rewrite /uexec_fork_F.
-      iSplitR; [ iIntros (r fdv' cw' _ _ _); iApply "H" | iIntros (fdv' cw' _ _); iApply "H" ]. }
+    { rewrite /uexec_fork_parent_F. iIntros (r fdv' cw' _ _ _). iApply "H". }
     rewrite /uexec_ret_ret_F.
     iIntros (r M' π' szv' fdv' cw' _ _ _ _) "_". iApply "H".
   Qed.
