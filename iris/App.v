@@ -116,18 +116,25 @@ Record xv6_app (Σ : gFunctors) := MkApp {
   app_pred  : app_fixed -> app_names -> aview -> iProp Σ;
   (* the trace ledger, at the fixed part (section 4) *)
   app_R     : app_fixed -> list mobs -> iProp Σ;
+  (* THE INPUT TAG (app-echo.md lane L5): what the application claims of a
+     byte the environment pushed, at the history it arrived at.  Persistent
+     (the obligation [Htagp] below), because the UART's receive column keeps
+     one per queued byte and every reader copies it out.  It is the record's
+     entry for the machine's ambient [RiscvPtsto.riscv_rx_tag]. *)
+  app_tag   : app_fixed -> list mobs -> iProp Σ;
   (* the conclusion, over the operational state and the run's trace *)
   app_phi   : gstate -> list mobs -> Prop;
 }.
-Arguments MkApp {Σ} _ _ _ _ _ _.
+Arguments MkApp {Σ} _ _ _ _ _ _ _.
 Arguments app_fixed {Σ} _. Arguments app_cl {Σ} _ _.
 Arguments app_names {Σ} _. Arguments app_pred {Σ} _ _ _ _.
-Arguments app_R {Σ} _ _ _. Arguments app_phi {Σ} _ _ _.
+Arguments app_R {Σ} _ _ _. Arguments app_tag {Σ} _ _ _.
+Arguments app_phi {Σ} _ _ _.
 
 (* THE GENERIC APPLICATION: no fixed part, nothing claimed, nothing read *)
 Definition app_triv (Σ : gFunctors) : xv6_app Σ :=
   MkApp unit (fun _ => True%I) unit (fun _ _ _ => True%I)
-        (fun _ _ => emp%I) (fun _ _ => True).
+        (fun _ _ => emp%I) (fun _ _ => True%I) (fun _ _ => True).
 
 (* ---------------------------------------------------------------------- *)
 (* THE THEOREM.  [xv6_power_adequacy_gen] at the application: the birth    *)
@@ -148,6 +155,9 @@ Theorem xv6_app_adequacy Σ
     (* ---- the trace ledger's obligations ([xv6_trace_adequacy]'s, the
        birth step's yield received at the ledger's birth) ---- *)
     (HRt : forall (c : app_fixed A) (h : list mobs), Timeless (app_R A c h))
+    (* the tag is copied out of the UART's receive column once per reader,
+       so it has to be duplicable by construction *)
+    (Htagp : forall (c : app_fixed A) (h : list mobs), Persistent (app_tag A c h))
     (HR0 : forall c : app_fixed A, app_cl A c ⊢ |==> app_R A c [])
     (Hpow : forall (c : app_fixed A) (h : list mobs) (on : bool) (dk : Z -> bv 8),
        trace_shape h on ->
@@ -168,7 +178,8 @@ Theorem xv6_app_adequacy Σ
               ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
               uart_ghosts γ u' -∗ app_R A c h
                 ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
-              uart_ghosts γ u' ∗ app_R A c (h ++ [ObsUartIn b])%list))
+              uart_ghosts γ u' ∗ app_R A c (h ++ [ObsUartIn b])%list ∗
+              app_tag A c (h ++ [ObsUartIn b])%list))
     (* ---- the application's three obligations on its predicate
        (app-instances.md sections 1-3, round C): the TRANSPORT (its one
        durability obligation -- a copy of the claim at fresh instance names,
@@ -198,7 +209,8 @@ Theorem xv6_app_adequacy Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
-               γobs T (obs_ledger_at (app_R A c) γobs) (app_fixed A) c) g' -∗
+               γobs T (obs_ledger_at (app_R A c) γobs)
+               (app_tag A c) (Htagp c) (app_fixed A) c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
              γd γsw γreg γstart c -∗
@@ -221,16 +233,18 @@ Proof.
            boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
              (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                 γd γsw γreg γstart c)
-             γobs T (obs_ledger_at (app_R A c) γobs) (app_fixed A) c) ->
+             γobs T (obs_ledger_at (app_R A c) γobs)
+             (app_tag A c) (Htagp c) (app_fixed A) c) ->
       ⊢ obs_inv -∗ uart_obs_permit γ).
   { intros HRg GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Gcl & GT & Heq).
-    refine (uart_obs_permit_ledger (app_R A Gcl) γ (HRt Gcl) _
-              (Htx HRg Gcl γ) (Hrx HRg Gcl γ)).
-    rewrite Heq. reflexivity. }
+    refine (uart_obs_permit_ledger (app_R A Gcl) (app_tag A Gcl) γ (HRt Gcl)
+              _ _ (Htx HRg Gcl γ) (Hrx HRg Gcl γ));
+      rewrite Heq; reflexivity. }
   exact (xv6_power_adequacy_gen Σ g sb nib cov
            (app_fixed A) (app_cl A) Hbirth
            (app_names A) (app_pred A) Happ_xfer Happ_init Happ_sup
            (fun γobs c => obs_ledger_at (app_R A c) γobs)
+           (app_tag A) Htagp
            (fun γobs c =>
               obs_ledger_at_alloc_cl (app_R A c) γobs (app_cl A c) (HR0 c))
            (fun γd γobs c =>
@@ -308,12 +322,14 @@ Proof.
   refine (proj1 (xv6_app_adequacy xv6Σ g fsimg_sb fsimg_nib fsimg_cov (app_triv xv6Σ)
            app_triv_birth
            ltac:(intros c h; cbn [app_triv app_R]; apply _)
+           ltac:(intros c h; cbn [app_triv app_tag]; apply _)
            app_triv_R0
            ltac:(intros c h on dk _; cbn [app_triv app_R]; iIntros "_"; by iModIntro)
            ltac:(intros HR c γ; cbn [app_triv app_R];
                  iIntros "!>" (h b u u') "_ _ _ _ Hg _"; iModIntro; by iFrame "Hg")
-           ltac:(intros HR c γ; cbn [app_triv app_R];
-                 iIntros "!>" (h b u u') "_ _ Hg _"; iModIntro; by iFrame "Hg")
+           ltac:(intros HR c γ; cbn [app_triv app_R app_tag];
+                 iIntros "!>" (h b u u') "_ _ Hg _"; iModIntro;
+                 iFrame "Hg"; auto)
            app_triv_xfer
            ltac:(intros c; exact (app_triv_init c _))
            app_triv_sup

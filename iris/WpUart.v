@@ -797,18 +797,48 @@ Section DevLoops.
      survive any input, which is why input assumptions are antecedents
      inside it.  [uart_obs_permit_triv] discharges the permit for the
      trivial predicate. *)
+  (* THE TAG THE ARM PRODUCES (app-echo.md lane L5).  Only the rx arm carries
+     a byte INTO the machine, so only the rx arm mints a tag: the ambient
+     family read at the history the byte arrived at.  Every other arm --
+     including the LOOPBACK drain, whose [κ] is empty and whose byte enters
+     the receive FIFO with no observation at all -- produces nothing. *)
+  Definition uart_tag_of (h κ : list mobs) : iProp Σ :=
+    match κ with
+    | [ObsUartIn _] => riscv_rx_tag (h ++ κ)%list
+    | _ => emp
+    end%I.
+
+  Global Instance uart_tag_of_persistent h κ : Persistent (uart_tag_of h κ).
+  Proof.
+    rewrite /uart_tag_of. destruct κ as [|k κ']; [apply _|].
+    destruct k; destruct κ'; apply _.
+  Qed.
+
+  (* at the trivial family every arm's tag is free *)
+  Lemma uart_tag_of_triv (h κ : list mobs) :
+    riscv_rx_tag = rx_tag_triv -> ⊢ uart_tag_of h κ.
+  Proof.
+    intros Htag. rewrite /uart_tag_of.
+    destruct κ as [|k κ']; [done|].
+    destruct k; destruct κ'; try done.
+    rewrite Htag /rx_tag_triv. done.
+  Qed.
+
   Definition uart_obs_permit (γ : uart_names) : iProp Σ :=
     (□ ∀ (h κ : list mobs) (d : dev_state) (u' : uart_state),
        ⌜uart_step d κ (set_duart d u')⌝ -∗ ⌜trace_shape h true⌝ -∗
        ⌜obs_wire (open_seg h) = u_wire (duart d)⌝ -∗
        uart_ghosts γ u' -∗ obs_auth h ={⊤ ∖ ↑uartN}=∗
-       uart_ghosts γ u' ∗ obs_auth (h ++ κ)%list)%I.
+       uart_ghosts γ u' ∗ obs_auth (h ++ κ)%list ∗ uart_tag_of h κ)%I.
 
   Lemma uart_obs_permit_triv (γ : uart_names) :
     riscv_obs_pred = obs_pred_triv ->
+    (* the trivial application claims nothing of its input, so the tag the rx
+       arm owes is [True] and the permit can mint it out of nothing *)
+    riscv_rx_tag = rx_tag_triv ->
     obs_inv -∗ uart_obs_permit γ.
   Proof.
-    intros Heq. iIntros "#Hoinv !>" (h κ d u') "%Hstep %Hsh %Hwire Hg Hauth".
+    intros Heq Htag. iIntros "#Hoinv !>" (h κ d u') "%Hstep %Hsh %Hwire Hg Hauth".
     iInv "Hoinv" as "HP" "Hclose".
     iEval (rewrite Heq /obs_pred_triv) in "HP".
     iDestruct "HP" as (h') ">Hfrag".
@@ -816,7 +846,7 @@ Section DevLoops.
     iMod (obs_update _ (h ++ κ)%list with "Hauth Hfrag") as "[Hauth Hfrag]".
     iMod ("Hclose" with "[Hfrag]") as "_".
     { iNext. rewrite Heq /obs_pred_triv. iExists (h ++ κ)%list. iExact "Hfrag". }
-    iModIntro. iFrame "Hg Hauth".
+    iModIntro. iFrame "Hg Hauth". iApply uart_tag_of_triv. exact Htag.
   Qed.
 
   (* THE PERMIT FROM A LEDGER (uart-trace.md phase 4).  The client's trace
@@ -827,9 +857,13 @@ Section DevLoops.
      facts in hand, at a mask that lets the wand open the crash invariant
      too.  Coq-level hypotheses, so the system theorem can pass its own
      down; [R] timeless, so the ledger's later strips. *)
-  Lemma uart_obs_permit_ledger (R : list mobs -> iProp Σ) (γ : uart_names)
+  Lemma uart_obs_permit_ledger (R : list mobs -> iProp Σ)
+      (Tg : list mobs -> iProp Σ) (γ : uart_names)
       (HRt : forall h, Timeless (R h))
       (Heq : riscv_obs_pred = obs_ledger R)
+      (* the tag family the record carries IS the client's, which is what
+         lets the rx wand below discharge the permit's tag output *)
+      (Htag : riscv_rx_tag = Tg)
       (Htx : ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
                ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
                ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
@@ -838,7 +872,8 @@ Section DevLoops.
       (Hrx : ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
                ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
                uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
-               uart_ghosts γ u' ∗ R (h ++ [ObsUartIn b])%list)) :
+               uart_ghosts γ u' ∗ R (h ++ [ObsUartIn b])%list ∗
+               Tg (h ++ [ObsUartIn b])%list)) :
     obs_inv -∗ uart_obs_permit γ.
   Proof.
     iIntros "#Hoinv". iPoseProof Htx as "#Htx". iPoseProof Hrx as "#Hrx".
@@ -855,30 +890,31 @@ Section DevLoops.
       + (* under LOOP nothing reached the wire: no event *)
         iMod ("Hclose" with "[Hfrag HR]") as "_".
         { iNext. rewrite Heq /obs_ledger. iExists h. iFrame. }
-        iModIntro. rewrite app_nil_r. iFrame.
+        iModIntro. rewrite app_nil_r. iFrame "Hg Hauth"; try done.
       + iMod ("Htx" $! h b (duart d) _ with "[//] [//] [//] [//] Hg HR")
           as "[Hg HR]".
         iMod (obs_update _ (h ++ [ObsUartOut b])%list with "Hauth Hfrag")
           as "[Hauth Hfrag]".
         iMod ("Hclose" with "[Hfrag HR]") as "_".
         { iNext. rewrite Heq /obs_ledger. iExists _. iFrame. }
-        iModIntro. iFrame.
-    - (* a byte arrived from the outside world *)
+        iModIntro. iFrame "Hg Hauth"; try done.
+    - (* a byte arrived from the outside world: the ONE arm with a tag *)
       unfold set_duart in Hd'. injection Hd' as ->.
-      iMod ("Hrx" $! h b (duart d) _ with "[//] [//] Hg HR") as "[Hg HR]".
+      iMod ("Hrx" $! h b (duart d) _ with "[//] [//] Hg HR")
+        as "(Hg & HR & Htg)".
       iMod (obs_update _ (h ++ [ObsUartIn b])%list with "Hauth Hfrag")
         as "[Hauth Hfrag]".
       iMod ("Hclose" with "[Hfrag HR]") as "_".
       { iNext. rewrite Heq /obs_ledger. iExists _. iFrame. }
-      iModIntro. iFrame.
+      iModIntro. iFrame "Hg Hauth". rewrite /uart_tag_of Htag. iExact "Htg".
     - (* the latch: silent *)
       iMod ("Hclose" with "[Hfrag HR]") as "_".
       { iNext. rewrite Heq /obs_ledger. iExists h. iFrame. }
-      iModIntro. rewrite app_nil_r. iFrame.
+      iModIntro. rewrite app_nil_r. iFrame "Hg Hauth"; try done.
     - (* the stutter: silent *)
       iMod ("Hclose" with "[Hfrag HR]") as "_".
       { iNext. rewrite Heq /obs_ledger. iExists h. iFrame. }
-      iModIntro. rewrite app_nil_r. iFrame.
+      iModIntro. rewrite app_nil_r. iFrame "Hg Hauth"; try done.
   Qed.
 
   Lemma wp_uart_loop γ :
@@ -922,8 +958,10 @@ Section DevLoops.
          (nothing under LOOP -- the arm's own [κ]) *)
       iAssert (uart_ghosts γ u') with "[Hacc Hout Htx Hdl]" as "Hg".
       { rewrite /uart_ghosts. iFrame. }
+      (* the tx arm's tag output is [emp] ([uart_tag_of] mints one only for
+         an rx event), so there is nothing to file here. *)
       iMod ("Hperm" $! h _ d u' with "[//] [//] [//] Hg Hoauth")
-        as "[Hg Hoauth]".
+        as "(Hg & Hoauth & _)".
       iMod ("Hclose" with "[Hu' Hg]") as "_".
       { iNext. iExists u'. iFrame. }
       iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".
@@ -939,8 +977,12 @@ Section DevLoops.
                    (uart_rx_push_out _ b _ Hrx)
                    (uart_rx_push_dlab _ b _ Hrx) with "Hg") as "Hg".
       (* THE TRACE STEP: the client moves the history by the input event *)
+      (* the rx arm's tag is the application's claim about this byte, at the
+         history it arrived at.  It is persistent, and the loop does not file
+         it: the receive column that holds one per queued byte is not part of
+         [uart_inv_body]. *)
       iMod ("Hperm" $! h [ObsUartIn b] d u' with "[//] [//] [//] Hg Hoauth")
-        as "[Hg Hoauth]".
+        as "(Hg & Hoauth & _)".
       iMod ("Hclose" with "[Hu' Hg]") as "_".
       { iNext. iExists u'. iFrame. }
       iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".

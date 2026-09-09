@@ -521,6 +521,22 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscv_obs_name : gname;
   riscv_obs_total : list mobs;
   riscv_obs_pred : iProp Σ;
+  (* THE INPUT TAG FAMILY (claude-notes/projects/app-echo.md, lane L5).  The
+     AMBIENT twin of [riscv_obs_pred], and ambient for the same reason: every
+     byte the environment pushes into the UART carries an
+     application-chosen, PERSISTENT claim about the history it arrived at,
+     minted by the rx wand at the moment of the push and copied out again by
+     every reader of the receive FIFO.  A kernel contract that carries a tag
+     therefore names no new parameter -- it reads the family off the record,
+     exactly as it reads the observation predicate.  The adequacy theorem
+     sets it from the application ([App.app_tag] at the run's fixed part);
+     the trivial application sets it to [fun _ => True].
+
+     PERSISTENCE IS A FIELD, not a side condition at every use: the tag is
+     copied out of the UART invariant's column once per queued byte and
+     handed on to the console, so it has to be duplicable by construction. *)
+  riscv_rx_tag : list mobs -> iProp Σ;
+  riscv_rx_tag_persistent : forall h, Persistent (riscv_rx_tag h);
   (* THE APPLICATION'S FIXED PART (claude-notes/projects/app-instances.md
      §6 ruling 1, round D0).  The machine no longer owns a counter: the
      application declares whatever [Type] its fixed part has, and its BIRTH
@@ -533,6 +549,10 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscv_client_T : Type;
   riscv_client   : riscv_client_T;
 }.
+
+(* the tag family's persistence, as an instance -- the field is a plain
+   record component, so resolution needs this line to find it *)
+Global Existing Instance riscv_rx_tag_persistent.
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_fixedGS :: riscvFixedGS Σ;
@@ -710,6 +730,16 @@ Definition obs_frag `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
 
 Definition obs_inv `{!riscvFixedGS Σ} : iProp Σ :=
   inv obsN riscv_obs_pred.
+
+(* THE TRIVIAL TAG FAMILY: what an application that claims nothing about its
+   input fills the tag slot with.  Named rather than written out at each use
+   so the equations the UART thread's permit is stated over
+   ([WpUart.uart_obs_permit_triv]) have something to match. *)
+Definition rx_tag_triv {Σ : gFunctors} : list mobs -> iProp Σ :=
+  fun _ => True%I.
+Global Instance rx_tag_triv_persistent {Σ : gFunctors} (h : list mobs) :
+  Persistent (rx_tag_triv (Σ := Σ) h).
+Proof. rewrite /rx_tag_triv. apply _. Qed.
 
 (* the TRIVIAL trace predicate -- the client's half and nothing about it.
    What a client that states no trace property fills the slot with. *)

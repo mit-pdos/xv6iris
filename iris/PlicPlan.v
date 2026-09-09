@@ -48,10 +48,22 @@ Definition plic_dev_irq_word (w : nat) : Z :=
 Definition plic_senable_ok (w : nat) (word : bv 32) : Prop :=
   Z.land (bv_unsigned word) (plic_dev_irq_word w) = bv_unsigned word.
 
+(* A SOURCE IN SERVICE IS NOT PENDING.  The gateway sets a pending bit only
+   for a source that is neither pending nor claimed ([plic_latch]) and a claim
+   clears the pending bit as it marks the source claimed ([plic_claim]), so
+   the two bits are never both set.  It is part of the plan rather than a
+   separate conjunct because the plan is what every borrowing leaf carries
+   across its write, and because the preservation lemmas below are already
+   the four places that have to know: this is the fact a claim of the UART
+   reads to learn the source was NOT already in service, which is what makes
+   the receive token reachable in the PLIC invariant at that moment. *)
+Definition plic_serve_ok (p : plic_state) : Prop :=
+  forall i : N, p_pending p i = true -> p_claimed p i = false.
+
 (* the kernel's PLIC plan: every context's enable bitmap names only real
-   sources. *)
+   sources, and no source is pending and in service at once. *)
 Definition plic_ok (p : plic_state) : Prop :=
-  forall c w : nat, plic_senable_ok w (p_enable p c w).
+  (forall c w : nat, plic_senable_ok w (p_enable p c w)) /\ plic_serve_ok p.
 
 (* The reset PLIC satisfies the plan: every S-context enable word is zero, and
    zero enables nothing (so a fortiori nothing outside the real sources).
@@ -59,8 +71,10 @@ Definition plic_ok (p : plic_state) : Prop :=
    PowerOn hands it (claude-notes/design/crash.md). *)
 Lemma plic_ok_plic0 : plic_ok plic0_state.
 Proof.
-  intros c w. unfold plic_senable_ok. cbn [p_enable plic0_state].
-  destruct (Nat.eqb w 0); vm_compute; reflexivity.
+  split.
+  - intros c w. unfold plic_senable_ok. cbn [p_enable plic0_state].
+    destruct (Nat.eqb w 0); vm_compute; reflexivity.
+  - intros i Hpend. cbn [p_pending plic0_state] in Hpend. discriminate.
 Qed.
 
 (* A hart that overwrites ONE WORD of ONE CONTEXT's bitmap with a value
@@ -71,7 +85,8 @@ Lemma plic_ok_wupd_enable (p : plic_state) (c wi : nat) (w : bv 32) :
   plic_ok (PlicState (p_prio p) (p_pending p) (p_claimed p)
                      (wupd (p_enable p) c wi w) (p_thresh p)).
 Proof.
-  intros Hp Hw c' w'. cbn [p_enable]. unfold wupd.
+  intros [Hp Hs] Hw. split; [ | exact Hs ].
+  intros c' w'. cbn [p_enable]. unfold wupd.
   destruct (Nat.eqb c' c) eqn:Hc; cbn [andb].
   - destruct (Nat.eqb w' wi) eqn:Hw'; [ | apply Hp ].
     apply Nat.eqb_eq in Hw' as ->. exact Hw.
@@ -83,14 +98,14 @@ Lemma plic_ok_hupd_thresh (p : plic_state) (h : nat) (w : bv 32) :
   plic_ok p ->
   plic_ok (PlicState (p_prio p) (p_pending p) (p_claimed p)
                      (p_enable p) (hupd (p_thresh p) h w)).
-Proof. intros Hp c wi. exact (Hp c wi). Qed.
+Proof. intros [Hp Hs]. split; [ intros c wi; exact (Hp c wi) | exact Hs ]. Qed.
 
 (* Writing a source priority touches no enable word. *)
 Lemma plic_ok_nupd_prio (p : plic_state) (i : N) (w : bv 32) :
   plic_ok p ->
   plic_ok (PlicState (nupd (p_prio p) i w) (p_pending p) (p_claimed p)
                      (p_enable p) (p_thresh p)).
-Proof. intros Hp c wi. exact (Hp c wi). Qed.
+Proof. intros [Hp Hs]. split; [ intros c wi; exact (Hp c wi) | exact Hs ]. Qed.
 
 (* ...and a source-priority write is therefore ALWAYS admissible: an offset in
    the priority window (positive, below [4 * plic_nsrc], 4-aligned) makes
@@ -118,8 +133,16 @@ Lemma plic_ok_latch (p p' : plic_state) (i : N) :
   plic_latch p i = Some p' -> plic_ok p -> plic_ok p'.
 Proof.
   unfold plic_latch.
-  destruct (negb (p_pending p i) && negb (p_claimed p i)); [ | discriminate ].
-  intros Heq. injection Heq as <-. intros Hp c wi. exact (Hp c wi).
+  destruct (negb (p_pending p i) && negb (p_claimed p i)) eqn:Hg;
+    [ | discriminate ].
+  intros Heq. injection Heq as <-. intros [Hp Hs].
+  apply andb_prop in Hg as [Hnp Hnc].
+  apply negb_true_iff in Hnc.
+  split; [ intros c wi; exact (Hp c wi) | ].
+  intros j Hpend. cbn [p_pending p_claimed] in *. unfold nupd in Hpend.
+  destruct (N.eqb j i) eqn:Hj.
+  - apply N.eqb_eq in Hj as ->. exact Hnc.
+  - exact (Hs j Hpend).
 Qed.
 
 (* the word [plicinithart] writes is permitted in word 0 (it IS the mask) *)
@@ -195,7 +218,8 @@ Proof.
   intros Hplan Hin Hen.
   assert (Hbit : Z.testbit (plic_dev_irq_word (plic_src_word i))
                            (plic_src_bit i) = true).
-  { unfold plic_enabled in Hen. unfold plic_ok, plic_senable_ok in Hplan.
+  { unfold plic_enabled in Hen. destruct Hplan as [Hplan _].
+    unfold plic_senable_ok in Hplan.
     rewrite <- (Hplan c (plic_src_word i)) in Hen. rewrite Z.land_spec in Hen.
     apply andb_prop in Hen as [_ Hen]. exact Hen. }
   vm_compute in Hin.
@@ -222,8 +246,33 @@ Lemma plic_ok_claim (p : plic_state) (c : nat) :
   plic_ok p -> plic_ok (snd (plic_claim p c)).
 Proof.
   intro Hplan. unfold plic_claim.
-  destruct (plic_best p c); cbn [snd]; [ | exact Hplan ].
-  intros c' w. cbn [p_enable]. exact (Hplan c' w).
+  destruct (plic_best p c) as [i|]; cbn [snd]; [ | exact Hplan ].
+  destruct Hplan as [Hp Hs].
+  split; [ intros c' w; cbn [p_enable]; exact (Hp c' w) | ].
+  intros j Hpend. cbn [p_pending p_claimed] in *. unfold nupd in *.
+  destruct (N.eqb j i) eqn:Hj; [ discriminate | exact (Hs j Hpend) ].
+Qed.
+
+(* WHAT A CLAIM LEARNS ABOUT SERVICE.  A claim takes a source that is
+   PENDING ([plic_cand]), and the plan says a pending source is not already
+   in service -- so the source the claim takes was free before and is in
+   service after.  This is the pure half of the receive token's handout: the
+   PLIC invariant parks the token under [p_claimed p uart_irq_id = false],
+   and this is what says the token is there to be taken. *)
+Lemma plic_claim_serves (p : plic_state) (c : nat) (i : N) :
+  plic_ok p -> plic_best p c = Some i ->
+  p_claimed p i = false /\ p_claimed (snd (plic_claim p c)) i = true.
+Proof.
+  intros Hplan Hbest.
+  destruct (plic_best_spec p c i Hbest) as [_ Hcand].
+  assert (Hpend : p_pending p i = true).
+  { unfold plic_cand in Hcand.
+    apply andb_prop in Hcand as [Hc _]. apply andb_prop in Hc as [Hc _].
+    exact Hc. }
+  split.
+  - exact (proj2 Hplan i Hpend).
+  - unfold plic_claim. rewrite Hbest. cbn [snd p_claimed]. unfold nupd.
+    rewrite N.eqb_refl. reflexivity.
 Qed.
 
 (* Completing touches only claimed, so it is a no-op as far as the plan is
@@ -234,5 +283,8 @@ Proof.
   intro Hplan. unfold plic_complete.
   destruct ((1 <=? Z.of_N i) && (Z.of_N i <? Z.of_nat plic_nsrc))%Z;
     [ | exact Hplan ].
-  intros c w. cbn [p_enable]. exact (Hplan c w).
+  destruct Hplan as [Hp Hs].
+  split; [ intros c w; cbn [p_enable]; exact (Hp c w) | ].
+  intros j Hpend. cbn [p_pending p_claimed] in *. unfold nupd.
+  destruct (N.eqb j i) eqn:Hj; [ reflexivity | exact (Hs j Hpend) ].
 Qed.

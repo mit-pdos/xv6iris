@@ -238,6 +238,19 @@ Section EchoLedger.
   Global Instance echo_R_timeless γcl h : Timeless (echo_R γcl h).
   Proof. rewrite /echo_R. apply _. Qed.
 
+  (* THE INPUT TAG (app-echo.md lane L5), this application's entry in the
+     machine's ambient tag slot ([RiscvPtsto.riscv_rx_tag], set by
+     [App.xv6_app_adequacy] from [App.app_tag]): of every byte the
+     environment pushed, either the history up to and including it kept the
+     console discipline, or the ledger's counter has already moved and the
+     taint is a permanent fact.  Persistent in both arms, which is what lets
+     the UART's receive column hand a copy to every reader of the byte. *)
+  Definition echo_tag (γcl : echo_fixed) (h : list mobs) : iProp Σ :=
+    (⌜disc h⌝ ∨ mono_nat_lb_own γcl 1)%I.
+
+  Global Instance echo_tag_persistent γcl h : Persistent (echo_tag γcl h).
+  Proof. rewrite /echo_tag. apply _. Qed.
+
   (* "untainted" is the counter at 0: what the end of the trace reads.  The
      TAINT [mono_nat_lb_own γcl 1] is this application's own fact now (it
      was the machine's [client_lb 1] before round D0). *)
@@ -275,17 +288,25 @@ Section EchoLedger.
   Qed.
 
   (* an input byte: still disciplined (0 stays), the first bad byte (0 -> 1),
-     or already tainted (1 stays) -- monotone in every case *)
+     or already tainted (1 stays) -- monotone in every case.  It also mints
+     THE BYTE'S TAG: the left arm when the history is still disciplined, the
+     counter's lower bound otherwise, which is exactly [echo_tag]. *)
   Lemma echo_R_rx γcl h b :
     trace_shape h true ->
-    echo_R γcl h ==∗ echo_R γcl (h ++ [ObsUartIn b]).
+    echo_R γcl h ==∗
+      echo_R γcl (h ++ [ObsUartIn b]) ∗ echo_tag γcl (h ++ [ObsUartIn b]).
   Proof.
-    intros Hsh. iIntros "H". rewrite /echo_R /echo_phase.
+    intros Hsh. iIntros "H". rewrite /echo_R /echo_tag /echo_phase.
     destruct (decide (disc (h ++ [ObsUartIn b]))) as [Hd'|Hd'].
-    - rewrite decide_True; last exact (disc_in h b Hsh Hd'). by iModIntro.
-    - destruct (decide (disc h)) as [Hd|Hd].
-      + iMod (mono_nat_own_update 1%nat with "H") as "[H _]"; [lia|]. by iModIntro.
-      + by iModIntro.
+    - rewrite decide_True; last exact (disc_in h b Hsh Hd').
+      iModIntro. iFrame "H". iLeft. iPureIntro. exact Hd'.
+    - (* off the discipline: the counter is at 1 either way, and its lower
+         bound is the taint *)
+      (* the destruct above already reduced the RHS's [decide] to 1; the
+         LHS's is 0 or 1 and both are below it *)
+      iMod (mono_nat_own_update 1%nat with "H") as "[H #Hlb]";
+        [destruct (decide (disc h)); lia|].
+      iModIntro. iFrame "H". iRight. iExact "Hlb".
   Qed.
 End EchoLedger.
 
