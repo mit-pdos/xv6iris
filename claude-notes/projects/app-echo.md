@@ -22,13 +22,14 @@ binaries at every reboot).
 
 ## Lanes (design §6), with what each unblocks
 
-- [ ] **L2 — the step moves to the process.**  RULED 2026-09-07 (owner):
-  each syscall's precondition is its landed contract's ONE-SHOT AU bundle,
-  supplied by the process through the ecall arm the way `UexecRetExec`
-  already does for exec; no persistent promise crosses the seam.  Then
-  the `fsabs_*` dischargers, `app_step_acc`, `app_auto`, the mint's
-  license premise and `Happ_auto` are deleted.  Plan and open items
-  below.  Gate: none (L3 landed).
+- [x] ~~**L2 — the step moves to the process.**~~  LANDED 2026-09-08 (lanes
+  ARM-a and ARM-b, commits `7cc15a670` … `cb831ce4c`).  Each ecall deposits
+  its syscall's one-shot bundle at the process's own families and gets the
+  armed post back at those families; the generic slot mints from the
+  supply (`app_sup`, born at boot from `Happ_sup`); `app_auto`/`Happ_auto`
+  are GONE.  The application's obligations are `Hbirth`, `Happ_xfer`,
+  `Happ_init`, `Happ_sup`, the ledger's and `Hphi`.  Owed to L6: the
+  chdir/open arm split (their returned posts are `emp`), fork's real row.
 - [x] ~~**L3 — round E of `app-instances.md`**~~ (kernel side, application-
   independent).  LANDED: every view move on a dispatched path is an AU fire
   or a `_step`; link, mkdir, create's legs, the write and `iput`'s free are
@@ -771,7 +772,7 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   `uexec_ret` or `udep` needs the class in its own binder list, and the
   class must be imported before it.
 
-- **ARM-b** (in flight, 2026-09-08): ~~B0~~ LANDED and pushed
+- ~~**ARM-b**~~ LANDED 2026-09-08 (three Opus agents): ~~B0~~ LANDED and pushed
   (`6060c4442`) — the three offset-shadow pieces return the shadow
   unmoved and the fire lemmas advance it from the row invariant (which
   reaches them through `foff_row st`, already in the descriptor bundle);
@@ -842,7 +843,11 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   `*_extra` at `fd_st_of_key` without the pure blanket) and paid quietly by
   the rest; `xv6_spost`'s six real branches, `emp` at exec (consumed) and
   at chdir/open (the arm split owed); the loop discharges the round's
-  `spost` premise from uservec's row.  Remaining: B2.
+  `spost` premise from uservec's row.  B2 LANDED (`cb831ce4c`): `app_auto`/`Happ_auto` and the license family
+  deleted from AppInv, the movers, the mint, the two adequacy theorems and
+  `App.xv6_app_adequacy`; the eleven external `app_top_update` sites drop
+  the license token; App.v/AppEcho.v state the obligations exactly.  THE
+  ARM IS COMPLETE.
 
 - **HYGIENE BACKLOG from the folds** (one mechanical sweep, after the
   syscall folds; not a lane by itself): (a) the vocabulary leaves keep

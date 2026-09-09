@@ -32,7 +32,7 @@ first application is [`../projects/app-echo.md`](../projects/app-echo.md).
   mkfs image's at every state".
 
 The generic application constrains nothing, so everything it asks of the
-kernel is discharged trivially (`app_auto_raw_triv`, `app_xfer_raw_triv`,
+kernel is discharged trivially (`app_sup_raw_triv`, `app_xfer_raw_triv`,
 the generic slot).  The echo application constrains the state, so every
 retag that changes the user-visible view, every process creation and
 every reboot has to be paid for.  The scaffold makes those payments
@@ -101,7 +101,7 @@ definition and never a vacuous theorem):
 | `Hbirth` | `⊢ \|==> ∃ c, app_cl A c` — the fixed part's birth | `iExists ()` |
 | `Happ_xfer` | `∀ c, ⊢ app_xfer_raw (app_pred A c)` — the TRANSPORT (§3), the one durability obligation | `app_xfer_raw_triv` |
 | `Happ_init` | `∀ c, ⊢ \|==> ∃ r, app_pred A c r (abs_view (fss_inodes (img_state …)))` — era 0's claim at the mkfs image | trivial |
-| `Happ_auto` | `∀ c r, ⊢ app_auto_raw (app_pred A c) r` — the BLANKET PROMISE the kernel-defined mover's step is paid from (§2; deleted by lane L2, not by round E) | `app_auto_raw_triv` |
+| `Happ_sup` | `∀ c r, ⊢ app_sup_raw (app_pred A c) r` — the predicate holds at EVERY view: the SUPPLY the generic slot mints its deposits from (§2). Trivially true for the generic application; a constraining application does not instantiate the generic theorem (its slots are verified; the tainted generic slot's supply arrives through the exec bundle) | `app_sup_raw_triv` |
 | `HR0`, `HRt`, `Hpow`, `Htx`, `Hrx` | `xv6_trace_adequacy`'s ledger obligations, `HR0` RECEIVING `app_cl A c` | as today |
 | `Hphi` | the conclusion, holding the COMPOSITE crash slot `xv6_slot` and the ledger at the end of the run (§5) | as today |
 
@@ -122,13 +122,12 @@ on `m`, an update needs the whole:
 
       app_body γfs := ∃ I, ghost_map_auth (fs_top γfs) (1/2) I
                          ∗ app_pred app_run (abs_view I)
-                         ∗ ⌜app_dom I⌝ ∗ app_auto ∗ app_xfer
+                         ∗ ⌜app_dom I⌝ ∗ app_xfer
 
   `app_dom I` (the map's domain is the inode region) is a pure row the
   commit needs (the snapshot is at the region restriction of `I`), proved
   at the mint from the snapshot's geometry and preserved by the mover;
-  `app_auto` and `app_xfer` are the two persistent laws parked where the
-  movers and the commit read them.
+  `app_xfer` is the one persistent law parked where the commit reads it.
 - **THE MOVER** (`InodeRegion.ireg_top_retag_*`, plus `_armed_` twins):
   the one operation that changes the map needs the whole authority, so it
   opens BOTH invariants (masks `↑ftopN ∪ ↑appN`) and re-establishes the
@@ -153,14 +152,21 @@ on `m`, an update needs the whole:
   the live view (a row exists only at nonzero type AND nonzero count) that
   makes both moves view-preserving.
 
-  `app_auto` / `Happ_auto` — the BLANKET PROMISE that the predicate
-  survives every one-row move — STAYS until lane L2, but is now spent in
-  exactly one place: the GENERIC dischargers pay the AU fires' steps with
-  it (`app_step_of_auto`/`app_step_acc`), because nothing from the process
-  reaches the kernel yet.  L2 replaces it by per-syscall proofs from the
-  process and deletes it.  An application whose predicate is not
-  preserved by arbitrary changes (echo) is therefore an instance only after
-  L2.
+  THE STEP IS THE PROCESS'S.  Every `ecall` deposits, through the trap
+  contract's per-number row (`SpecUsertrap.ut_sys_in n f`), the syscall's
+  one-shot bundle at the process's OWN families `f` (`UexecSG.sbundle_at`;
+  the instance `UexecExecInst.xfam` is one record over every contract's
+  families), and receives the armed post back at the same `f`
+  (`ut_sys_out n f`, `spost_at`).  The dispatcher runs the one contract at
+  those families, so each write-kind commit's `app_step` is the process's
+  proof.  A GENERIC (unverified) process mints its deposit from the SUPPLY
+  `AppInv.app_sup := □ ∀ av, app_pred app_run av` — the predicate holds at
+  every view — born at boot from `Happ_sup` and carried as a kernel-wide
+  persistent credential (§1's table).  There is no license: `app_auto`
+  and `Happ_auto` are gone (lane L2, 2026-09-08).  A verified program under
+  a constraining predicate carries its own supplier and admitted numbers
+  (`UexecSG.uprogSG`; `design/user-heap.md`), and pays key-dependent
+  bundles on the explicit route.
 - **What a process sees at a syscall:** an AU fire lends the pre-map and
   the claim and takes the claim at the post-map back; read-kind fires
   lend and return it untouched.  `FsAbs.astate` is fraction-agnostic
