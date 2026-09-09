@@ -813,7 +813,7 @@ Section ProofSysRead.
       (* argfd answered NONE: the key is [FdClosed] and the arm is the landed
          blanket and nothing more. *)
       { iApply (sys_read_arms_none (us_V U) v sts (sys_rw_count v2) Fr
-                  (mword_of_int (-1) : mword 64) Hnone eq_refl). }
+                  (mword_of_int (-1) : mword 64) _ _ Hnone eq_refl). }
     - (* ================= SUCCESS: the descriptor resolved ============= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & _ & Hfcell)".
       pose proof (arg_fd_lookup v (pv_ofile (us_V U)) fd fv Hsome)
@@ -1032,7 +1032,7 @@ Section ProofSysRead.
          sys_read relays fileread's return value untouched -- one match in
          the tree, not two. *)
       { iApply (sys_read_arms_of (us_V U) v sts fd fv stf (sys_rw_count v2)
-                  Fr rv Hsome Hstq with "Harms"). }
+                  Fr rv _ _ Hsome Hstq with "Harms"). }
   Qed.
 
 End ProofSysRead.

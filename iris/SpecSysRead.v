@@ -287,12 +287,12 @@ Section SpecSysRead.
      [ProofSyscall] is written against. *)
   Definition sys_read_arms (V : pprivate) (v : mword 64) (sts : list fdstate)
       (n : Z) (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-      (r : mword 64) : iProp Σ :=
+      (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) : iProp Σ :=
     (⌜sys_read_ret V v n r⌝ ∗
-     fileread_extra (sys_fd_st v (pv_ofile V) sts) n F r)%I.
+     fileread_extra (sys_fd_st v (pv_ofile V) sts) n F r M' addr)%I.
 
-  Lemma sys_read_arms_ret V v sts n F r :
-    sys_read_arms V v sts n F r -∗ ⌜sys_read_ret V v n r⌝.
+  Lemma sys_read_arms_ret V v sts n F r M' addr :
+    sys_read_arms V v sts n F r M' addr -∗ ⌜sys_read_ret V v n r⌝.
   Proof. iIntros "[%H _]". by iPureIntro. Qed.
 
   (* ...and the other projection, which is what the process gets back: the
@@ -300,9 +300,9 @@ Section SpecSysRead.
      a kernel array, so it cannot ride the trap contract's per-number post
      row ([UexecExecInst.xv6_spost]) -- and it does not need to: the round
      already carries [UsysMemOk.usys_mem_ok] and [usys_fd_ok]. *)
-  Lemma sys_read_arms_extra V v sts n F r :
-    sys_read_arms V v sts n F r -∗
-    fileread_extra (sys_fd_st v (pv_ofile V) sts) n F r.
+  Lemma sys_read_arms_extra V v sts n F r M' addr :
+    sys_read_arms V v sts n F r M' addr -∗
+    fileread_extra (sys_fd_st v (pv_ofile V) sts) n F r M' addr.
   Proof. iIntros "[_ $]". Qed.
 
   (* ---- the key, read at the two shapes the walk reaches it in --------
@@ -310,10 +310,10 @@ Section SpecSysRead.
      descriptor whose row the caller's own bundle names. *)
   Lemma sys_read_arms_none (V : pprivate) (v : mword 64) (sts : list fdstate)
       (n : Z) (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-      (r : mword 64) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) :
     arg_fd v (pv_ofile V) = None ->
     r = (mword_of_int (-1) : mword 64) ->
-    ⊢ sys_read_arms V v sts n F r.
+    ⊢ sys_read_arms V v sts n F r M' addr.
   Proof.
     intros Hnone Hr. rewrite /sys_read_arms /sys_fd_st Hnone.
     iSplitR; [| done]. iPureIntro. left. split; [exact Hr | exact Hnone].
@@ -333,10 +333,10 @@ Section SpecSysRead.
   Lemma sys_read_arms_of (V : pprivate) (v : mword 64) (sts : list fdstate)
       (fd : nat) (fv : mword 64) (st : fdstate) (n : Z)
       (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-      (r : mword 64) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) :
     arg_fd v (pv_ofile V) = Some (fd, fv) ->
     sts !! fd = Some st ->
-    fileread_arms st n F r -∗ sys_read_arms V v sts n F r.
+    fileread_arms st n F r M' addr -∗ sys_read_arms V v sts n F r M' addr.
   Proof.
     intros Hsome Hst. rewrite /sys_read_arms /sys_fd_st Hsome Hst /=.
     iIntros "[%Hret $]". iPureIntro. right. by exists fd, fv.
@@ -431,11 +431,14 @@ Definition wp_sys_read_sconf_body
      [v1 .. v1+d) overwritten and nothing else touched.
 
      WHAT STAYS EXISTENTIAL IS THE BYTES, NOT AN IMAGE -- and, on a
-     non-negative answer, not the length either: it IS the answer.  A
-     caller of sys_read that wants its own untouched bytes back reads them
-     with [UserPtTree.umem_wr_lookup_out], exactly as a caller of fileread
-     does; this contract does not (and cannot, on the console/pipe arms) say
-     more about [bs] than that it is a byte function of the right length. *)
+     non-negative answer, not the length either: it IS the answer.  The
+     receipt names the bytes on the inode arm: [sys_read_arms] is read at
+     the RESUME IMAGE and the destination [v1], and its inode arm says the
+     [d] bytes at [v1] are the observed file's bytes from the offset
+     ([FsAbsReadFire.read_post_ok]); the console and pipe arms leave them
+     existential.  A caller that wants its own untouched bytes back reads
+     them with [UserPtTree.umem_wr_lookup_out], exactly as a caller of
+     fileread does. *)
     ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
@@ -465,7 +468,8 @@ Definition wp_sys_read_sconf_body
       (* ---- THE ARMED OUTPUT ([sys_read_arms]): the blanket
          ⌜sys_read_ret⌝, and beside it what the arm the descriptor selects
          proved. ---- *)
-      sys_read_arms (us_V U) v sts (sys_rw_count v2) F r -∗
+      sys_read_arms (us_V U) v sts (sys_rw_count v2) F r
+        (umem_wr (us_M U) v1 d bs) v1 -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

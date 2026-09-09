@@ -336,14 +336,44 @@ Section ReadFire.
      sign guard.
      ...AND THE ADVANCE IS THE ANSWER: the receipt's [d] is the count the
      read delivered and the offset moved by exactly it.
+     ...AND THE BUFFER IS NAMED.  [M'] is the image the call RESUMES at and
+     [addr] the destination it was handed, and on a FILE row the [d] bytes
+     at [addr] ARE the observed bytes from [off]: what a verified reader
+     learns about its own buffer, which the image row
+     ([UsysMemOk.usys_mem_ok]) leaves as an existential byte function.  A
+     DIRECTORY row says nothing -- the dirent encoding the aview forgets is
+     exactly what a caller would need -- and a device row is unreachable
+     from an [FdInode] descriptor.
+     THE RUN'S LINEARITY IS THE CALLER'S, NOT THE KERNEL'S, and that is the
+     tower's standing convention for a user-memory window rather than a
+     concession here: [UserPtTree.umem_wr] is keyed by the 64-bit va
+     [uint (add_vec_int addr j)] precisely so that no kernel contract has to
+     promise the destination does not wrap ([SpecCopyout]'s and
+     [SpecReadi]'s headers say so in as many words), and nothing the kernel
+     holds can refute a wrap -- a wrapped va is a small one, and a small va
+     is inside the process's own image.  A caller that OWNS the buffer has
+     the run linear for free (every mapped user address is below MAXVA:
+     [UkRunSys.uheap_ubytes_run], which is what [umem_wr_write] is already
+     instantiated from), so the tie is stated under exactly that hypothesis
+     and the program pays nothing for it.
      NO REFUND HERE: the piece is SPENT, and whatever the caller invested
      in building it comes back through the receipt [Φ] it chose. *)
   Definition read_post_ok Γ (i : Z) (n : Z)
       (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-      (r : mword 64) : iProp Σ :=
+      (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) : iProp Σ :=
     (∃ (av : aview) (off : nat) (a : anode) (d : nat),
        ⌜ard_pre av i off a⌝ ∗ ⌜0 <= n⌝ ∗ ⌜ard_ret_tie n a off r⌝ ∗
        ⌜Z.of_nat d = bv_unsigned r⌝ ∗
+       ⌜match an_node a with
+        | AFile bs =>
+            (forall i : nat, (i < d)%nat ->
+               uint (add_vec_int addr (Z.of_nat i))
+               = (uint addr + Z.of_nat i)%Z) ->
+            forall j : nat, (j < d)%nat ->
+              M' !! uint (add_vec_int addr (Z.of_nat j))
+              = Some (bs !!! (off + j)%nat)
+        | _ => True
+        end⌝ ∗
        F.(pf_recv) av off a d)%I.
 
   (* ret -1: the fork's two live failure arms, keyed by the sign the
@@ -351,8 +381,11 @@ Section ReadFire.
      piece BACK UNFIRED -- the same [pf_at] the caller supplied, so it
      eliminates to its refund; the copyout-fault arm delivers the FIRED receipt
      -- the transfer's source value was observed even though the copy died
-     -- with no count tie (readi answers -1, the offset does not move, the
-     user bytes are unstated), at advance 0. *)
+     -- with no count tie (readi answers -1, the offset does not move), at
+     advance 0.  NOTHING LANDED IS SAID OF THE BUFFER ON THIS ARM, which is
+     why it takes no image: readi overwrites its running count with -1 when
+     a copyout faults, so blocks it already delivered are in the buffer and
+     unaccounted for, and the ok arm's tie would be false here. *)
   Definition read_post_fail Γ (i : Z) (γo : gname) (n : Z)
       (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) : iProp Σ :=
     ((⌜n < 0⌝ ∗ pf_at (aread_commit_at Γ appE i γo) F)
@@ -363,8 +396,8 @@ Section ReadFire.
   (* the armed disjunction the continuation receives, keyed on a0 *)
   Definition read_arms Γ (i : Z) (γo : gname) (n : Z)
       (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-      (r : mword 64) : iProp Σ :=
-    (read_post_ok Γ i n F r
+      (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) : iProp Σ :=
+    (read_post_ok Γ i n F r M' addr
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
         ∗ read_post_fail Γ i γo n F))%I.
 
@@ -372,11 +405,12 @@ Section ReadFire.
      [SpecFileread.fileread_ret] IS [pipe_rw_ret], and [ard_ret_tie_ret] is
      the ok arm's half.  Stated here so nothing above has to unfold the
      disjunction to see it. *)
-  Lemma read_arms_ret Γ (i : Z) γo (n : Z) F (r : mword 64) :
-    read_arms Γ i γo n F r -∗ ⌜pipe_rw_ret n r⌝.
+  Lemma read_arms_ret Γ (i : Z) γo (n : Z) F (r : mword 64)
+      (M' : gmap Z (bv 8)) (addr : mword 64) :
+    read_arms Γ i γo n F r M' addr -∗ ⌜pipe_rw_ret n r⌝.
   Proof.
     rewrite /read_arms /read_post_ok. iIntros "[Hok | [%Hm1 _]]".
-    - iDestruct "Hok" as (av off a d) "(_ & %Hn & %Htie & _ & _)".
+    - iDestruct "Hok" as (av off a d) "(_ & %Hn & %Htie & _ & _ & _)".
       iPureIntro. exact (ard_ret_tie_ret n a off r Hn Htie).
     - iPureIntro. rewrite Hm1 /pipe_rw_ret. by left.
   Qed.
@@ -386,10 +420,11 @@ Section ReadFire.
      fs-visible has happened and the caller eliminates the returned pair to
      its own [pf_refund]. *)
   Lemma read_arms_neg Γ (i : Z) γo (n : Z)
-      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) :
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
+      (M' : gmap Z (bv 8)) (addr : mword 64) :
     (n < 0)%Z ->
     pf_at (aread_commit_at Γ appE i γo) F -∗
-    read_arms Γ i γo n F (mword_of_int (-1) : mword 64).
+    read_arms Γ i γo n F (mword_of_int (-1) : mword 64) M' addr.
   Proof.
     intros Hn. iIntros "Hc". rewrite /read_arms. iRight.
     iSplitR; [done |]. rewrite /read_post_fail. iLeft.
@@ -566,16 +601,17 @@ Section ReadFire.
      that no longer match the goal's. *)
   Lemma arf_stable_ok_arm Γ (i : Z) (nz : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
-      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (r : mword 64) :
+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (r : mword 64)
+      (M' : gmap Z (bv 8)) (addr : mword 64) :
     read_post_ok Γ i nz
-      (arf_pin_fam Γ i q (MkAnode (AFile bs0) nl) F) r
+      (arf_pin_fam Γ i q (MkAnode (AFile bs0) nl) F) r M' addr
     ⊢ read_stable_arms Γ i nz q bs0 nl F.(pf_recv) r.
   Proof.
     rewrite /read_post_ok /read_stable_arms /arf_pin_fam.
     cbn [pf_recv pf_refund]. rewrite /arf_pin_recv.
     iIntros "Hok".
     iDestruct "Hok" as (av off a d)
-      "(%Hpre & %Hnn & %Htie & %Hrd & %Hrow & %Hab & Hnv & HΦ)".
+      "(%Hpre & %Hnn & %Htie & %Hrd & _ & %Hrow & %Hab & Hnv & HΦ)".
     subst a. destruct Hpre as (Hlk & Hoff & Hsz).
     assert (Hsz' : (length bs0 <= MAXFILE * BSIZE)%nat) by exact Hsz.
     assert (Htie' : r = (mword_of_int
@@ -630,10 +666,10 @@ Section ReadFire.
   Lemma arf_stable_of_arms Γ (i : Z) γo (nz : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
       (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-      (r : mword 64) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) :
     0 <= nz ->
     read_arms Γ i γo nz
-      (arf_pin_fam Γ i q (MkAnode (AFile bs0) nl) F) r
+      (arf_pin_fam Γ i q (MkAnode (AFile bs0) nl) F) r M' addr
     ⊢ read_stable_arms Γ i nz q bs0 nl F.(pf_recv) r.
   Proof.
     intros Hnz. rewrite /read_arms.

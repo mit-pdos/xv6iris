@@ -45,7 +45,7 @@ Require Import PageGeom.        (* [PGSIZE]                                  *)
 Require Import UmodeAbi.        (* [uimg_sub]                                *)
 Require Import ElfEnc.          (* [le_at], [ph_at], [eh_phnum]              *)
 Require Import ElfFile.         (* the image semantics                       *)
-Require Import ElfBridge.       (* [le_at_shift_of_list], [file_bytes_lookup] *)
+Require Import ElfBridge.       (* [le_at_shift_of_list], [le_at_of_file_bytes] *)
 Require Import RiscvPtsto.      (* [svpn_of]: the page key of a user address *)
 Require Import UserPerm.        (* [uperm], [uperm_rw], [perm_of]: the projection the slot is keyed on *)
 Require Import UserPtTree.      (* [umem_write], [umem_wr], [umem_grow],
@@ -1982,7 +1982,7 @@ Qed.
         [ProcPtOwn.svpn_of_unsigned_small] under the two new premises
         [uint va mod 4096 = 0] and [uint va + filesz <= uvm_maxsz]; the
         bytes are [SpecReadi.rd_delivered_bytes] plus
-        [ElfBridge.file_bytes_lookup], sized by readi's own
+        [FsTree.file_bytes_lookup], sized by readi's own
         [tot = rd_clamp].
 
       * [ProofKexecB3.kxc_ph_step] steps [kxb_at] across the

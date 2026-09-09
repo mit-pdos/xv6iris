@@ -119,7 +119,7 @@ Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
 Require Import SpecKexecB2.
 Require Import KexecPtImage.
-Require Import ElfBridge.   (* [file_bytes_lookup] -- readi's bytes ARE the file's *)
+Require Import ElfBridge.   (* [le_at_of_file_bytes] -- readi's bytes ARE the file's *)
 Require Import UmodeAbi.    (* [uimg_sub] *)
 Require Import ElfFile.     (* [elf_phdr] fields, [phdr_ok], [seg_map] *)
 Require Import UserPerm.    (* [perm_leaf]: the permission projection (S6) *)
@@ -1572,7 +1572,7 @@ Section KexecB3Body.
       { intros j Hj.
         rewrite /pf (rd_delivered_bytes datl phb offn tot j ltac:(lia))
                 /rd_bytes /kxc_fb.
-        symmetry. apply ElfBridge.file_bytes_lookup. lia. }
+        symmetry. apply FsTree.file_bytes_lookup. lia. }
       assert (Hpeq : kxb_phdr_at (kxc_fb datl dnf) offn
                      = kxb_phdr (kxc_fb datl dnf) ef i) by reflexivity.
       destruct (kxb_phdr_fields (kxc_fb datl dnf) pf offn Hpfb)

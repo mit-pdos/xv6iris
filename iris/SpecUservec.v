@@ -362,7 +362,8 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
     (∀ n : Z,
        ut_sys_out n f sc_v (tf_of g (ret_pc sepc_v))
          (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts
-         (pv_tf (us_V U') !!! tf_arg_idx 0) sts' (pv_cwi (us_V U'))) -∗
+         (pv_tf (us_V U') !!! tf_arg_idx 0) (us_M U') sts'
+         (pv_cwi (us_V U'))) -∗
     WP (Loop : expr riscv_lang)).
 Global Typeclasses Opaque uservec_post.
 

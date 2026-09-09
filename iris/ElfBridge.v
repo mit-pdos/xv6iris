@@ -17,7 +17,7 @@
    carries [AFile (fn_file_bytes (era_node dn bm data))], and
    [fn_file_bytes] is [FsTree.file_bytes data (Z.to_nat (fn_size n))].
    So the missing pure link is index-by-index: [file_bytes]'s [!!!] at [k]
-   IS [file_byte] at [k], below the size ([file_bytes_lookup]).  The two
+   IS [file_byte] at [k], below the size ([FsTree.file_bytes_lookup]).  The two
    halves compose into [le_at_of_file_bytes], which is the shape a proof
    with a [readi]-filled buffer wants.  (The [era] half --
    [fn_data (era_node dn bm data) = data] under [blk_holes_zero] -- lives
@@ -491,20 +491,14 @@ Qed.
 (*  6.  THE [readi] WINDOW: the bytes kexec reads ARE the abstract file    *)
 (* ====================================================================== *)
 
-(* [FsTree.file_bytes]' total lookup below the size IS [file_byte].  With
+(* [FsTree.file_bytes]' total lookup below the size IS [file_byte]
+   ([FsTree.file_bytes_lookup], beside the definition).  With
    [SpecReadi.rd_delivered_bytes] ([rd_delivered data olds off tot j =
-   file_byte data (off + j)] for [j < tot]) this is the whole tie between
+   file_byte data (off + j)] for [j < tot]) that is the whole tie between
    what [readi] delivers and the [AFile] list the observation carries:
    [fn_file_bytes (era_node dn bm data)] is [file_bytes data (Z.to_nat
    (bv_unsigned (di_size dn)))] once [FsStateEra.era_node_data] has
    replaced [fn_data (era_node dn bm data)] by [data]. *)
-Lemma file_bytes_lookup (data : nat -> list (bv 8)) (sz k : nat) :
-  (k < sz)%nat -> file_bytes data sz !!! k = file_byte data k.
-Proof.
-  intros Hk. apply list_lookup_total_correct.
-  unfold file_bytes. rewrite list_lookup_fmap, lookup_seq_lt by exact Hk.
-  reflexivity.
-Qed.
 
 (* THE COMPOSITE the exec proof applies: a buffer filled by [readi] from
    file offset [base] reads exactly as the abstract byte list does. *)

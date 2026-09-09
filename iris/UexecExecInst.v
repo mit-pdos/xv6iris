@@ -29,13 +29,16 @@
    its bundle is consumed and its process never resumes on success.  Every
    number without a contract pays [emp] too.
 
-   THE POST IS READ AT THE RESUME KEY, which is what makes the two receipts
-   statable: chdir's whole effect on its caller is the working directory it
-   resumes at ([cw']) and open's is one row of the descriptor table it
-   resumes at ([fdv']), and neither is a projection of the TRAP key.  So
-   [UexecSG.spost_at] takes both beside the returned a0, bound by the same
-   [∀] of the arm that binds the four pure rows, and the two receipts
-   SHARPEN the rows [UsysMemOk.usys_cwd_ok] and [usys_fd_ok] state there:
+   THE POST IS READ AT THE RESUME KEY, which is what makes the three
+   receipts statable: read's whole effect on its caller is the bytes it put
+   in the caller's buffer, which are entries of the image it resumes at
+   ([M']); chdir's is the working directory it resumes at ([cw']) and
+   open's is one row of the descriptor table it resumes at ([fdv']); none
+   is a projection of the TRAP key.  So [UexecSG.spost_at] takes all three
+   beside the returned a0, bound by the same [∀] of the arm that binds the
+   four pure rows, and the receipts SHARPEN the rows
+   [UsysMemOk.usys_mem_ok], [usys_cwd_ok] and [usys_fd_ok] state there:
+   "the file's bytes from your offset" rather than "some byte function",
    "the directory you named" rather than "a failed chdir did not move", and
    "the console, at your omode" rather than "some slot became open".  The
    route back to the process is [SpecUsertrap.ut_sys_out] as a row of
@@ -391,11 +394,13 @@ Section UexecExecInst.
      else emp)%I.
 
   (* ...AND THE ARMED POST BACK, at the same key and the same families.
-     SIX NUMBERS PAY IT.  Each branch is that syscall's own landed armed
+     WHICH NUMBERS PAY A POST -- eight of them.  Each branch is that syscall's own landed armed
      post, read off the SAME key projections its input branch above is read
      off -- so what a process gets back is a statement about the very
      receipts, refunds and cursors it deposited:
-       5   [SpecFileread.fileread_extra] at [SpecArgfd.fd_st_of_key] and 16
+       5   [SpecFileread.fileread_extra] at [SpecArgfd.fd_st_of_key], at the
+           RESUME IMAGE [M'] and the buffer address argument 1 -- the
+           receipt names the bytes read() put in the caller's buffer; and 16
            [SpecFilewrite.filewrite_extra] at the same key -- WITHOUT the
            landed pure blanket ([fileread_ret] / [filewrite_ret]), which
            reads [pv_ofile V], a kernel array no process can name, while the
@@ -418,21 +423,23 @@ Section UexecExecInst.
            success -- there is nothing to give back.
      Every number without a contract pays [emp] too.
 
-     THE RESUME KEY'S TWO MOVING COMPONENTS, [fdv'] and [cw'], are
-     arguments here for exactly the two receipts: a descriptor is a row of
-     the table the call returns to, and a working directory IS the field
-     chdir wrote.  The other six branches ignore them, as does every
-     contract-free number.
+     THE RESUME KEY'S THREE MOVING COMPONENTS, [M'], [fdv'] and [cw'], are
+     arguments here for exactly the three receipts that read them: the
+     bytes read() delivered are entries of the resume image, a descriptor
+     is a row of the table the call returns to, and a working directory IS
+     the field chdir wrote.  The other five branches ignore them, as does
+     every contract-free number.
 
      THE SLOT FAMILY [X] DOES NOT OCCUR: a post is what comes back to the
      process that is RESUMING, so no branch concludes at the fixpoint
      variable the way exec's input bundle does.  That is what makes
      non-expansiveness a [reflexivity]. *)
   Definition xv6_spost (X : uvis -d> iPropO Σ) (n : Z) (f : xfam) (W : uvis)
-      (r : mword 64) (fdv' : list fdstate) (cw' : Z) : iProp Σ :=
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z)
+      : iProp Σ :=
     (if decide (n = 5) then
        fileread_extra (fd_st_of_key (xk_a W 0) (uvis_fd W))
-         (sys_rw_count (xk_a W 2)) (rf_F f) r
+         (sys_rw_count (xk_a W 2)) (rf_F f) r M' (xk_a W 1)
      else if decide (n = 9) then
        chdir_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
          (cf_P f) (cf_Pmiss f) (cf_Fo f) r cw'
@@ -479,10 +486,11 @@ Section UexecExecInst.
   Qed.
 
   Lemma xv6_spost_ne (k : nat) :
-    Proper (dist k ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> dist k)
+    Proper (dist k ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> dist k)
       xv6_spost.
   Proof.
-    intros X Y _ n ? <- f ? <- W ? <- r ? <- fdv' ? <- cw' ? <-. reflexivity.
+    intros X Y _ n ? <- f ? <- W ? <- r ? <- M' ? <- fdv' ? <- cw' ? <-.
+    reflexivity.
   Qed.
 
   (* THE KEY CONGRUENCE, off [UexecSG.skey_eq]: every branch reads the image,
@@ -504,9 +512,10 @@ Section UexecExecInst.
      one of the three argument words, the descriptor view or the working
      directory, and [skey_eq] pins all six. *)
   Lemma xv6_spost_cong (X : uvis -d> iPropO Σ) (n : Z) (f : xfam)
-      (W W' : uvis) (r : mword 64) (fdv' : list fdstate) (cw' : Z) :
+      (W W' : uvis) (r : mword 64) (M' : gmap Z (bv 8))
+      (fdv' : list fdstate) (cw' : Z) :
     skey_eq W W' ->
-    xv6_spost X n f W r fdv' cw' ⊣⊢ xv6_spost X n f W' r fdv' cw'.
+    xv6_spost X n f W r M' fdv' cw' ⊣⊢ xv6_spost X n f W' r M' fdv' cw'.
   Proof.
     intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw).
     rewrite /xv6_spost /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw.
@@ -792,10 +801,11 @@ Section UexecExecInst.
   (* from.  Each is the match at one literal and nothing else.             *)
   (* ================================================================== *)
   Lemma spost_at_read_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
     fileread_extra (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
-      (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (rf_F f) r -∗
-    spost_at X 5 f W r fdv' cw'.
+      (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (rf_F f) r M'
+      (tf_w (uvis_tf W) (tf_arg_idx 1)) -∗
+    spost_at X 5 f W r M' fdv' cw'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_take. iExact "H".
@@ -805,10 +815,10 @@ Section UexecExecInst.
      the dispatcher splits ([SpecSysChdir.chdir_arms_split]) hands the
      kernel half back and this the process's. *)
   Lemma spost_at_chdir_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
     chdir_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       (cf_P f) (cf_Pmiss f) (cf_Fo f) r cw' -∗
-    spost_at X 9 f W r fdv' cw'.
+    spost_at X 9 f W r M' fdv' cw'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_take. iExact "H".
@@ -817,54 +827,54 @@ Section UexecExecInst.
   (* ...and open's, at the descriptor view it resumes at
      ([SpecSysOpen.open_arms_split]) *)
   Lemma spost_at_open_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
     open_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       (tf_w (uvis_tf W) (tf_arg_idx 1))
       (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
       (of_Fo f) (of_Ft f) (uvis_fd W) r fdv' -∗
-    spost_at X 15 f W r fdv' cw'.
+    spost_at X 15 f W r M' fdv' cw'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_take. iExact "H".
   Qed.
 
   Lemma spost_at_write_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
     filewrite_extra (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
       (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (uvis_M W)
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (wf_Q f) (wf_tr0 f) r -∗
-    spost_at X 16 f W r fdv' cw'.
+    spost_at X 16 f W r M' fdv' cw'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_skip. xv6_take. iExact "H".
   Qed.
 
   Lemma spost_at_mknod_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
     mknod_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       (dev_arg (tf_w (uvis_tf W) (tf_arg_idx 1)))
       (dev_arg (tf_w (uvis_tf W) (tf_arg_idx 2)))
       (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f) r -∗
-    spost_at X 17 f W r fdv' cw'.
+    spost_at X 17 f W r M' fdv' cw'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_take. iExact "H".
   Qed.
 
   Lemma spost_at_unlink_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
     unlink_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       (uf_P f) (uf_Pmiss f) (uf_Fent f) (uf_Ftgt f) (uf_Fex f) (uf_Fmiss f) r -∗
-    spost_at X 18 f W r fdv' cw'.
+    spost_at X 18 f W r M' fdv' cw'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_take. iExact "H".
   Qed.
 
   Lemma spost_at_link_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
     link_arms (fs_gamma_L fsc_fs) (lf_Ftgt f) (lf_Fent f) (lf_Funt f) r -∗
-    spost_at X 19 f W r fdv' cw'.
+    spost_at X 19 f W r M' fdv' cw'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip.
@@ -872,11 +882,11 @@ Section UexecExecInst.
   Qed.
 
   Lemma spost_at_mkdir_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
     mkdir_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       (df_P f) (df_Pmiss f) (df_Farm f) (df_Fdots f) (df_Fun f)
       (df_Fok f) (df_Fex f) r -∗
-    spost_at X 20 f W r fdv' cw'.
+    spost_at X 20 f W r M' fdv' cw'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip.
@@ -886,10 +896,10 @@ Section UexecExecInst.
   (* ...and the numbers that pay nothing, in one lemma: exec (whose [emp]
      the header explains) and every number without a contract at all. *)
   Lemma spost_at_emp (X : uvis -d> iPropO Σ) (n : Z) (f : xfam) (W : uvis)
-      (r : mword 64) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
     ~ (n = 5 \/ n = 9 \/ n = 15 \/ n = 16 \/ n = 17 \/ n = 18 \/ n = 19
        \/ n = 20) ->
-    ⊢ spost_at X n f W r fdv' cw'.
+    ⊢ spost_at X n f W r M' fdv' cw'.
   Proof.
     intros Hne. rewrite /spost_at /= /xv6_spost.
     destruct (decide (n = 5)) as [He | _]; [ exfalso; apply Hne; tauto |].

@@ -409,19 +409,21 @@ Definition ut_sys_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : C
    ([UexecApply.uexec_ret_round_slot_of]'s premise) is discharged FROM IT.
    Eight numbers make it non-trivial ([UexecExecInst.xv6_spost]); at the
    rest it is [emp] and every arm pays it for free.
-   ...AND AT THE RESUME VIEW, which is why [sts'] and [cw'] ride beside the
-   entry key: chdir's receipt is about the working directory the round
+   ...AND AT THE RESUME VIEW, which is why [M'], [sts'] and [cw'] ride
+   beside the entry key: read's receipt is about the bytes the round left
+   in the caller's buffer, chdir's about the working directory the round
    leaves and open's about one row of the descriptor view it leaves, and
-   neither is a projection of the entry frame ([UexecSG.spost_at]).  It is
-   the same pair [ut_exec_out] already takes off the exit side. *)
+   none is a projection of the entry frame ([UexecSG.spost_at]).  They are
+   the same components [ut_exec_out] already takes off the exit side. *)
 Definition ut_sys_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
-    (sts : list fdstate) (r : mword 64) (sts' : list fdstate) (cw' : Z)
+    (sts : list fdstate) (r : mword 64) (M' : gmap Z (bv 8))
+    (sts' : list fdstate) (cw' : Z)
     : iProp Σ :=
   (⌜sc_v = uecall_scause /\ usys_num tf = n
     /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
-     spost_at uslot n f (uvis_of U sts) r sts' cw')%I.
+     spost_at uslot n f (uvis_of U sts) r M' sts' cw')%I.
 
 Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
@@ -545,8 +547,9 @@ Qed.
 Lemma ut_sys_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
-    (sts : list fdstate) (r : mword 64) (sts' : list fdstate) (cw' : Z) :
-  sc_v <> uecall_scause -> ⊢ ut_sys_out n f sc_v tf U sts r sts' cw'.
+    (sts : list fdstate) (r : mword 64) (M' : gmap Z (bv 8))
+    (sts' : list fdstate) (cw' : Z) :
+  sc_v <> uecall_scause -> ⊢ ut_sys_out n f sc_v tf U sts r M' sts' cw'.
 Proof.
   intros Hne. rewrite /ut_sys_out. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
 Qed.
@@ -594,22 +597,22 @@ Lemma ut_sys_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf tf' : list (mword 64))
     (U U' : ustate) (sts : list fdstate) (r : mword 64)
-    (sts' : list fdstate) (cw' : Z) :
+    (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z) :
   usys_num tf' = usys_num tf ->
   us_M U = us_M U' ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 0) = tf_w (pv_tf (us_V U')) (tf_arg_idx 0) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 1) = tf_w (pv_tf (us_V U')) (tf_arg_idx 1) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 2) = tf_w (pv_tf (us_V U')) (tf_arg_idx 2) ->
   pv_cwi (us_V U) = pv_cwi (us_V U') ->
-  ut_sys_out n f sc_v tf U sts r sts' cw' -∗
-  ut_sys_out n f sc_v tf' U' sts r sts' cw'.
+  ut_sys_out n f sc_v tf U sts r M' sts' cw' -∗
+  ut_sys_out n f sc_v tf' U' sts r M' sts' cw'.
 Proof.
   intros Hn HM Ha0 Ha1 Ha2 Hcw. rewrite /ut_sys_out. iIntros "H %Hc".
   destruct Hc as (Hce & Hcn & Hcx & Hcf).
   iDestruct ("H" with "[%]") as "H";
     [ split_and!; [ exact Hce | rewrite <- Hn; exact Hcn | exact Hcx | exact Hcf ] |].
   iEval (rewrite (spost_at_cong uslot n f (uvis_of U sts) (uvis_of U' sts) r
-                    sts' cw'
+                    M' sts' cw'
                     ltac:(rewrite /skey_eq; split_and!;
                           [ exact HM | exact Ha0 | exact Ha1 | exact Ha2
                           | reflexivity | exact Hcw ]))) in "H".
@@ -864,7 +867,8 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        process's own returning arm. *)
     (∀ n : Z,
        ut_sys_out n f sc_v (pv_tf (us_V U)) U sts
-         (pv_tf (us_V U') !!! tf_arg_idx 0) sts' (pv_cwi (us_V U'))) -∗
+         (pv_tf (us_V U') !!! tf_arg_idx 0) (us_M U') sts'
+         (pv_cwi (us_V U'))) -∗
     WP (Loop : expr riscv_lang)).
 
 (* [R] IS A HART-INDEXED FAMILY, AND IT HAS TO BE.  usertrap is handed the

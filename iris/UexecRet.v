@@ -742,13 +742,14 @@ Section UexecRet.
           arm's own [∃], outside both legs, so what comes back is a post
           about the receipts and refunds the process CHOSE
           ([UexecSG.v]'s header).
-          ...AND AT THE RESUME KEY'S TWO MOVING COMPONENTS, [fdv'] and
-          [cw'], under the SAME [∀] that binds them for the pure rows.  A
-          RECEIPT for chdir or open is a statement about exactly those:
-          the descriptor open() returned is a row of [fdv'], the directory
-          chdir() installed IS [cw'].  Nothing else of the resume key is
-          read, so the image, the permission map and the break stay out. *)
-       spost_at X n f W r fdv' cw' -∗
+          ...AND AT THE RESUME KEY'S THREE MOVING COMPONENTS, [M'], [fdv']
+          and [cw'], under the SAME [∀] that binds them for the pure rows.
+          A RECEIPT for read, chdir or open is a statement about exactly
+          those: the bytes read() put in the caller's buffer are entries of
+          [M'], the descriptor open() returned is a row of [fdv'], the
+          directory chdir() installed IS [cw'].  The permission map and the
+          break no receipt reads, so they stay out. *)
+       spost_at X n f W r M' fdv' cw' -∗
        X (bump W r M' π' szv' fdv' cw'))%I.
 
   (* THE ARM WITHOUT THE DEPOSIT -- today's return, read at the fixpoint
@@ -1104,7 +1105,7 @@ Section UexecRet.
               of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
            ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
            ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
-           spost_at uslot n f W r fdv' cw' -∗
+           spost_at uslot n f W r M' fdv' cw' -∗
            uslot (bump W r M' π' szv' fdv' cw')))).
   Proof.
     intros ->. rewrite /uexec_ret /uexec_ret_F.

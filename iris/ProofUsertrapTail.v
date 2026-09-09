@@ -269,7 +269,7 @@ Section UtRet2.
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
        ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0) sts (pv_cwi (us_V U))) -∗
+         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U))) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw fdep) -∗
@@ -771,7 +771,7 @@ Section UtRet.
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
        ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0) sts (pv_cwi (us_V U))) -∗
+         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U))) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw fdep) -∗
@@ -1007,7 +1007,7 @@ Section UtA6.
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
        ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0) sts (pv_cwi (us_V U))) -∗
+         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U))) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw fdep) -∗
@@ -1304,7 +1304,7 @@ Section UtFa.
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
        ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0) sts (pv_cwi (us_V U))) -∗
+         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U))) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw fdep) -∗

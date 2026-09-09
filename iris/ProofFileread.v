@@ -341,6 +341,52 @@ Proof.
   - exists (Z.of_nat tot). split; [reflexivity | lia].
 Qed.
 
+(* ...AND THE BUFFER TIE, the other half of the inode arm's receipt.  readi's
+   post is an EQUATION on the image -- [umem_wr M dst tot (rd_bytes data off)]
+   -- and the fired row is [abs_row (era_node dn bm data)], whose file bytes
+   are [FsTree.file_bytes (fn_data ...) (Z.to_nat (fn_size ...))].  So the
+   receipt's conjunct is three composed readings: [umem_wr_lookup_in] under
+   the caller's linearity, [rd_bytes] as [InodeDefs.file_byte] at [off + j],
+   and [FsTree.file_bytes_lookup] at the same index -- which needs
+   [off + j] below the size, and THAT is the count tie ([rd_clamp_ard]: the
+   clamp never reaches past the end).  The era half ([fn_data] IS [data]
+   below the cap) is [FsStateEra.era_node_fb_agree]'s.
+   THE OTHER TWO ROWS ARE FREE: a directory's dirent encoding and a device
+   are the unstated arms. *)
+Lemma fr_buffer_tie (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
+    (M : gmap Z (bv 8)) (addr : mword 64) (nz : Z) (off tot : nat) :
+  blk_holes_zero bm data ->
+  bv_unsigned (di_size dn) <= Z.of_nat (MAXFILE * BSIZE)%nat ->
+  tot = rd_clamp (di_size dn) off (Z.to_nat nz) ->
+  match an_node (abs_row (era_node dn bm data)) with
+  | AFile bs =>
+      (forall i : nat, (i < tot)%nat ->
+         uint (add_vec_int addr (Z.of_nat i)) = (uint addr + Z.of_nat i)%Z) ->
+      forall j : nat, (j < tot)%nat ->
+        umem_wr M addr tot (rd_bytes data off)
+          !! uint (add_vec_int addr (Z.of_nat j))
+        = Some (bs !!! (off + j)%nat)
+  | _ => True
+  end.
+Proof.
+  intros Hh Hsz Htot.
+  destruct (an_node (abs_row (era_node dn bm data))) as [bs | ents | ma mi]
+    eqn:Hrow; [| exact I | exact I].
+  (* the count tie, as a nat bound on the last index the run touches *)
+  assert (Hcap : forall j : nat, (j < tot)%nat ->
+                   (off + j < Z.to_nat (bv_unsigned (di_size dn)))%nat).
+  { intros j Hj. rewrite Htot rd_clamp_ard /ard_count in Hj. lia. }
+  intros Hlin j Hj.
+  rewrite (umem_wr_lookup_in M addr tot (rd_bytes data off) j Hj Hlin).
+  f_equal. rewrite /rd_bytes.
+  rewrite (arf_abs_file_inv (era_node dn bm data) bs Hrow).
+  rewrite /fn_file_bytes /fn_size era_node_rec.
+  rewrite (FsTree.file_bytes_lookup _ _ _ (Hcap j Hj)).
+  symmetry.
+  apply (era_node_fb_agree dn bm data Hh).
+  pose proof (Hcap j Hj) as Hb. lia.
+Qed.
+
 Module FilereadProof (Piperead : PIPEREAD) (Ilock : ILOCK) (Readi : READI)
                      (Iunlock : IUNLOCK) (Consoleread : CONSOLEREAD)
                      (PN : PANIC) : FILEREAD.
@@ -720,7 +766,7 @@ Section ProofFileread.
       { by iApply fileread_env_out_of_env. }
       { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
         iApply (fileread_extra_unreadable inumx γox Cf st n Fr
-                  (mword_of_int (-1) : mword 64) Hok Hrdz0). }
+                  (mword_of_int (-1) : mword 64) _ _ Hok Hrdz0). }
     - (* ===============================================================
          READABLE: spill s1/s3, park the three arguments, dispatch on the
          file's TYPE -- which is read out of the reference's own content
@@ -1037,7 +1083,7 @@ Section ProofFileread.
            piece goes back exactly as it came in and the caller eliminates the
            returned conjunction to its own refund. *)
         { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-          iApply (fileread_extra_neg st n Fr Hneg with "Hau"). } }
+          iApply (fileread_extra_neg st n Fr _ _ Hneg with "Hau"). } }
       (* [Z_lt_dec] leaves the negation; every use below wants the [<=]. *)
       assert (Hn0 : (0 <= n)%Z) by lia.
       (* ===========================================================
@@ -1314,7 +1360,7 @@ Section ProofFileread.
           iFrame "Hpipe Hpref Hiru Hoh". }
         { by iApply fileread_env_out_of_env. }
         { iSplitR; [iPureIntro; exact Hretpr |].
-          iApply (fileread_extra_of_pipe inumx γox Cf st n Fr _ Hok Htyp). }
+          iApply (fileread_extra_of_pipe inumx γox Cf st n Fr _ _ _ Hok Htyp). }
       + (* ---- +0x22 c.li a4,3 ; +0x24 beq a5,a4 -> FD_DEVICE ---- *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x24))
                   (mword_of_int 70 : mword 13) Ra4 Ra5 B5 (K - 6)%nat b
@@ -1719,7 +1765,7 @@ Section ProofFileread.
                   iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
                   by left. }
                 { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-                  iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ Hok Htyd). }
+                  iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ _ _ Hok Htyd). }
              ** (* ---- the console's read: the INDIRECT CALL at +0x94 ---- *)
                 iApply (wp_cbeqz_fall_s_sconf (mword_of_int (FR + 0x96))
                           (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 7)) Ra5
@@ -1904,7 +1950,7 @@ Section ProofFileread.
                 { iSplitR; [iPureIntro;
                             apply (fr_ret_of_cons n r Hn0);
                             rewrite Z.max_r in Hrr; lia |].
-                  iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ Hok Htyd). }
+                  iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ _ _ Hok Htyd). }
           ++ (* --------- the major is OUT OF RANGE: return -1 ------------
                 The [bltu] is taken before the table is ever indexed, so the
                 environment is [emp] and the caller owed nothing. *)
@@ -1986,7 +2032,7 @@ Section ProofFileread.
              { cbn [umem_wr]. rewrite HVid. iExact "Hpriv". }
              { by iApply (fr_env_out_dev fn st Cf inumx _ Hok Htyd). }
              { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-               iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ Hok Htyd). }
+               iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ _ _ Hok Htyd). }
         * (* ---- +0x28 c.li a4,2 ; +0x2a bne a5,a4 -> panic ---- *)
           iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x2a))
                     (mword_of_int 78 : mword 13) Ra4 Ra5 B6 (K - 6)%nat b
@@ -2863,7 +2909,7 @@ Section ProofFileread.
                    ok arm at the exact count. *)
                 { iSplitR; [iPureIntro; exact Hretok |].
                   iApply (fileread_extra_inode_of st wbx (bv_unsigned inm) γo0
-                            n Fr _ Hstm).
+                            n Fr _ _ _ Hstm).
                   destruct Hskip as [H1 | [H1 Ht0]].
                   { rewrite /read_arms /read_post_fail. iRight.
                     iSplitR; [iPureIntro; exact H1 |]. iRight.
@@ -2883,6 +2929,12 @@ Section ProofFileread.
                               exact (fr_ret_tie n dnl bml data
                                        (Z.to_nat (bv_unsigned v)) tot Hn0 Hteq) |].
                     iSplitR; [iPureIntro; rewrite H1 Ht0; vm_compute; reflexivity |].
+                    (* THE BUFFER TIE IS VACUOUS AT ADVANCE 0: no byte
+                       landed, so there is no index to name. *)
+                    iSplitR;
+                      [ iPureIntro;
+                        destruct (an_node (abs_row (era_node dnl bml data)));
+                        [ intros _ jj Hjj; exfalso; lia | exact I | exact I ] |].
                     iExact "HΦf". } }
              ++ (* ---- the update RUNS: f->off += r ---- *)
                 assert (Hadv : (Z.of_nat (Z.to_nat (bv_unsigned v)) + Z.of_nat tot
@@ -3209,7 +3261,7 @@ Section ProofFileread.
                    own equation, carried down by [Hcase]. *)
                 { iSplitR; [iPureIntro; exact Hretok2 |].
                   iApply (fileread_extra_inode_of st wbx (bv_unsigned inm) γo0
-                            n Fr _ Hstm).
+                            n Fr _ _ _ Hstm).
                   rewrite /read_arms /read_post_ok. iLeft.
                   iExists avf, (Z.to_nat (bv_unsigned v)),
                     (abs_row (era_node dnl bml data)), tot.
@@ -3221,6 +3273,15 @@ Section ProofFileread.
                   iSplitR; [iPureIntro; rewrite moi64_unsigned bvw64_small;
                             [reflexivity
                             | change (2 ^ 64)%Z with 18446744073709551616%Z; lia] |].
+                  (* ...AND THE BUFFER: the [tot] bytes readi copied out at
+                     [addr] ARE the observed file's bytes from the offset,
+                     under the caller's own run linearity ([fr_buffer_tie]). *)
+                  iSplitR;
+                    [ iPureIntro;
+                      exact (fr_buffer_tie dnl bml data (us_M U)
+                               (m !!! Regidx Ra1) n
+                               (Z.to_nat (bv_unsigned v)) tot
+                               Hholes Hszn Htoteq) |].
                   iExact "HΦf". }
           -- (* ================ NOT A FILE AT ALL: panic ==========
                 [SpecPanic] discharges the arm; panic never

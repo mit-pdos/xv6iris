@@ -7,7 +7,7 @@
 (*                                                                        *)
 (*    ∃ f, sbundle_at X n f W                                             *)
 (*         ∗ (∀ r … fdv' cw', <the four pure rows>                       *)
-(*                   -∗ spost_at X n f W r fdv' cw'                      *)
+(*                   -∗ spost_at X n f W r M' fdv' cw'                   *)
 (*                   -∗ X (bump W r …))                                   *)
 (*                                                                        *)
 (* -- a DEPOSIT: the process's one-shot AU bundle for syscall [n] goes    *)
@@ -240,34 +240,35 @@ Class uexecSG (Σ : gFunctors) := {
      without a contract, and at exec, whose bundle is CONSUMED and whose
      process never resumes on success.
 
-     READ AT THE RESUME KEY'S TWO MOVING COMPONENTS, not at the trap key
+     READ AT THE RESUME KEY'S THREE MOVING COMPONENTS, not at the trap key
      alone.  A RECEIPT is what the process can NAME of what its call did,
-     and for the two calls whose whole effect is on the resume key --
-     chdir's working directory and open's descriptor table -- there is
+     and for the calls whose whole effect is on the resume key there is
      nothing to name at the trap key: the descriptor open() returned is a
-     row of [fdv'], and the directory chdir() installed is [cw'].  So the
-     post takes the returned a0 [r], the descriptor view [fdv'] and the
-     working directory [cw'] the arm resumes at, all three bound by the
-     SAME [∀] of the arm ([UexecRet.uexec_ret_cont_F]) that binds the four
-     pure rows.  The remaining resume components -- the image, the
-     permission map, the break -- no contract's receipt reads, so they
-     stay out. *)
+     row of [fdv'], the directory chdir() installed is [cw'], and the
+     bytes read() delivered are entries of the resume IMAGE [M'].  So the
+     post takes the returned a0 [r], the resume image [M'], the descriptor
+     view [fdv'] and the working directory [cw'] the arm resumes at, all
+     four bound by the SAME [∀] of the arm
+     ([UexecRet.uexec_ret_cont_F]) that binds the four pure rows.  The
+     remaining resume components -- the permission map and the break --
+     no contract's receipt reads, so they stay out. *)
   spost_at : (uvis -d> iPropO Σ) -> Z -> sfam -> uvis -> mword 64 ->
-             list fdstate -> Z -> iProp Σ;
+             gmap Z (bv 8) -> list fdstate -> Z -> iProp Σ;
 
   sbundle_at_ne : forall k,
     Proper (dist k ==> eq ==> eq ==> eq ==> dist k) sbundle_at;
   spost_at_ne : forall k,
-    Proper (dist k ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> dist k)
+    Proper (dist k ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> dist k)
       spost_at;
 
   sbundle_at_cong : forall (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
       (W W' : uvis),
     skey_eq W W' -> sbundle_at X n f W ⊣⊢ sbundle_at X n f W';
   spost_at_cong : forall (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
-      (W W' : uvis) (r : mword 64) (fdv' : list fdstate) (cw' : Z),
+      (W W' : uvis) (r : mword 64) (M' : gmap Z (bv 8))
+      (fdv' : list fdstate) (cw' : Z),
     skey_eq W W' ->
-    spost_at X n f W r fdv' cw' ⊣⊢ spost_at X n f W' r fdv' cw';
+    spost_at X n f W r M' fdv' cw' ⊣⊢ spost_at X n f W' r M' fdv' cw';
 
   (* the bundles are covariant in the slot family: the only place it occurs
      is exec's wand CONCLUSION *)
@@ -296,12 +297,14 @@ Global Existing Instance sbundle_at_ne.
 Global Existing Instance spost_at_ne.
 
 (* stdpp's [f_equiv] enumerates the application arities it can peel and stops
-   at FIVE; [spost_at] takes SEVEN, so a [solve_contractive] over it fails with
+   at FIVE; [spost_at] takes EIGHT, so a [solve_contractive] over it fails with
    a bare "No applicable tactic".  These are stdpp's own fallback pattern at
-   six and seven, and Iris's tactic with it in the [first]; the U-mode
+   six, seven and eight, and Iris's tactic with it in the [first]; the U-mode
    slot fixpoint [UexecRet.uslot_F] is the user. *)
 Ltac f_equiv_wide :=
   match goal with
+  | |- ?R (?f _ _ _ _ _ _ _ _) _ =>
+      simple apply (_ : Proper (_ ==> _ ==> _ ==> _ ==> _ ==> _ ==> _ ==> _ ==> R) f)
   | |- ?R (?f _ _ _ _ _ _ _) _ =>
       simple apply (_ : Proper (_ ==> _ ==> _ ==> _ ==> _ ==> _ ==> _ ==> R) f)
   | |- ?R (?f _ _ _ _ _ _) _ =>

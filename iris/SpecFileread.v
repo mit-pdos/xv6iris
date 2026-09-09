@@ -786,13 +786,17 @@ Section SpecFileread.
 
   (* WHAT THE ARM PAYS BEYOND THE LANDED BLANKET, at the same key.  Split
      out from [fileread_arms] so [SpecSysRead] can reuse it under its own
-     blanket ([sys_read_ret]) without restating the match. *)
+     blanket ([sys_read_ret]) without restating the match.
+     IT READS THE RESUME IMAGE [M'] AND THE DESTINATION [addr], because the
+     inode arm's receipt names the bytes the call left in the caller's
+     buffer ([FsAbsReadFire.read_post_ok]); the three arms that pay nothing
+     ignore both. *)
   Definition fileread_extra (st : fdstate) (n : Z)
       (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-      (r : mword 64) : iProp Σ :=
+      (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) : iProp Σ :=
     match st with
     | FdOpen true _ (FdInode i γo) =>
-        read_arms (fs_gamma_L fsc_fs) i γo n F r
+        read_arms (fs_gamma_L fsc_fs) i γo n F r M' addr
     | _ => emp
     end%I.
 
@@ -802,11 +806,11 @@ Section SpecFileread.
      form" true BY CONSTRUCTION -- there is nothing to check. *)
   Definition fileread_arms (st : fdstate) (n : Z)
       (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-      (r : mword 64) : iProp Σ :=
-    (⌜fileread_ret n r⌝ ∗ fileread_extra st n F r)%I.
+      (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) : iProp Σ :=
+    (⌜fileread_ret n r⌝ ∗ fileread_extra st n F r M' addr)%I.
 
-  Lemma fileread_arms_ret st n F r :
-    fileread_arms st n F r -∗ ⌜fileread_ret n r⌝.
+  Lemma fileread_arms_ret st n F r M' addr :
+    fileread_arms st n F r M' addr -∗ ⌜fileread_ret n r⌝.
   Proof. iIntros "[%H _]". by iPureIntro. Qed.
 
   (* ---- READING THE KEYED INPUT, BUILDING THE KEYED OUTPUT -------------
@@ -818,9 +822,9 @@ Section SpecFileread.
     pf_at (aread_commit_at (fs_gamma_L fsc_fs) appE i γo) F.
   Proof. by iIntros "$". Qed.
 
-  Lemma fileread_extra_inode wb i γo n F r :
-    read_arms (fs_gamma_L fsc_fs) i γo n F r -∗
-    fileread_extra (FdOpen true wb (FdInode i γo)) n F r.
+  Lemma fileread_extra_inode wb i γo n F r M' addr :
+    read_arms (fs_gamma_L fsc_fs) i γo n F r M' addr -∗
+    fileread_extra (FdOpen true wb (FdInode i γo)) n F r M' addr.
   Proof. by iIntros "$". Qed.
 
   (* ...and the two at a state the walk holds only through an EQUATION: a
@@ -832,30 +836,31 @@ Section SpecFileread.
   Proof. intros ->. by iIntros "$". Qed.
 
   Lemma fileread_extra_inode_of (st : fdstate) (wb : bool) (i : Z) (γo : gname)
-      n F r :
+      n F r M' addr :
     st = FdOpen true wb (FdInode i γo) ->
-    read_arms (fs_gamma_L fsc_fs) i γo n F r -∗ fileread_extra st n F r.
+    read_arms (fs_gamma_L fsc_fs) i γo n F r M' addr -∗
+    fileread_extra st n F r M' addr.
   Proof. intros ->. by iIntros "$". Qed.
 
   (* the three arms that pay nothing beyond the blanket *)
-  Lemma fileread_extra_pipe rb wb n F r :
-    ⊢ fileread_extra (FdOpen rb wb FdPipe) n F r.
+  Lemma fileread_extra_pipe rb wb n F r M' addr :
+    ⊢ fileread_extra (FdOpen rb wb FdPipe) n F r M' addr.
   Proof. rewrite /fileread_extra. by destruct rb. Qed.
 
-  Lemma fileread_extra_dev rb wb (mj : Z) n F r :
-    ⊢ fileread_extra (FdOpen rb wb (FdDevice mj)) n F r.
+  Lemma fileread_extra_dev rb wb (mj : Z) n F r M' addr :
+    ⊢ fileread_extra (FdOpen rb wb (FdDevice mj)) n F r M' addr.
   Proof. rewrite /fileread_extra. by destruct rb. Qed.
 
-  Lemma fileread_extra_closed n F r :
-    ⊢ fileread_extra FdClosed n F r.
+  Lemma fileread_extra_closed n F r M' addr :
+    ⊢ fileread_extra FdClosed n F r M' addr.
   Proof. done. Qed.
 
   (* ...at the key the WALK holds after the [f->type] branch: the descriptor's
      TYPE, not a state shape it would have to re-derive. *)
   Lemma fileread_extra_of_pipe (inum : mword 32) (γo : gname) (C : fcontent)
-      (st : fdstate) n F r :
+      (st : fdstate) n F r M' addr :
     fdstate_ok inum γo C st -> fc_type C = FD_PIPE ->
-    ⊢ fileread_extra st n F r.
+    ⊢ fileread_extra st n F r M' addr.
   Proof.
     intros Hok Ht.
     destruct (fdstate_ok_pipe inum γo C st Hok Ht) as (rb & wb & ->).
@@ -863,9 +868,9 @@ Section SpecFileread.
   Qed.
 
   Lemma fileread_extra_of_dev (inum : mword 32) (γo : gname) (C : fcontent)
-      (st : fdstate) n F r :
+      (st : fdstate) n F r M' addr :
     fdstate_ok inum γo C st -> fc_type C = FD_DEVICE ->
-    ⊢ fileread_extra st n F r.
+    ⊢ fileread_extra st n F r M' addr.
   Proof.
     intros Hok Ht.
     destruct (fdstate_ok_device inum γo C st Hok Ht) as (rb & wb & ->).
@@ -893,13 +898,13 @@ Section SpecFileread.
   (* the [f->readable == 0] early return: no arm of the match is armed
      there, because the only armed one is a READABLE descriptor *)
   Lemma fileread_extra_unreadable (inum : mword 32) (γo : gname)
-      (C : fcontent) (st : fdstate) n F r :
+      (C : fcontent) (st : fdstate) n F r M' addr :
     fdstate_ok inum γo C st ->
     (* the WORD the code tested, not a re-reading of it: the walk arrives
        with [beq a5,x0]'s own boolean *)
     eq_vec (zero_extend' 64 (fc_readable C : mword 8) : mword 64)
            (zero_reg : mword 64) = true ->
-    ⊢ fileread_extra st n F r.
+    ⊢ fileread_extra st n F r M' addr.
   Proof.
     destruct st as [| rb wb ty]; [by iIntros |].
     destruct rb; [| rewrite /fileread_extra; by iIntros].
@@ -912,10 +917,10 @@ Section SpecFileread.
      descriptor whose kind the walk has not read yet -- and it can, for
      free: the inode arm hands the piece back UNSPENT (which is the whole
      point of the refund), and every other arm is [emp]. *)
-  Lemma fileread_extra_neg st n F :
+  Lemma fileread_extra_neg st n F M' addr :
     (n < 0)%Z ->
     fileread_in st F -∗
-    fileread_extra st n F (mword_of_int (-1) : mword 64).
+    fileread_extra st n F (mword_of_int (-1) : mword 64) M' addr.
   Proof.
     intros Hn. destruct st as [| rb wb ty]; [by iIntros |].
     destruct rb; [| by iIntros].
@@ -1017,13 +1022,14 @@ Definition wp_fileread_sconf_body
        shape: the entry image with the run [addr .. addr+d) overwritten and
        nothing else touched.
 
-       WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE.  On
-       the INODE arm [bs] is in fact the file's bytes and [d] the returned
-       count ([SpecReadi]'s post is an equation); this contract does not
-       relay that, because the console and pipe arms cannot, and a caller
-       that wants it calls readi.  A caller of THIS reads its own untouched
-       bytes back with [UserPtTree.umem_wr_lookup_out], which is what the
-       shared shape is for. *)
+       WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE -- and
+       on the INODE arm the receipt names the bytes: [fileread_arms] is read
+       at the RESUME IMAGE and the destination, and its inode arm says the
+       [d] bytes at [addr] are the observed file's bytes from the offset
+       ([FsAbsReadFire.read_post_ok]).  The console and pipe arms leave them
+       existential.  A caller reads its own untouched bytes back with
+       [UserPtTree.umem_wr_lookup_out], which is what the shared shape is
+       for. *)
   ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
@@ -1048,9 +1054,11 @@ Definition wp_fileread_sconf_body
       fileread_env_out fn st -∗
       (* ---- THE ARMED OUTPUT, KEYED ON [st] ([fileread_arms]) ----
          The blanket [⌜fileread_ret n r⌝], and beside it what the arm the
-         descriptor selects proved: the observation's receipt, its unspent
-         return or its fault reading on an inode, nothing anywhere else. *)
-      fileread_arms st n F r -∗
+         descriptor selects proved: the observation's receipt -- read at
+         THIS post's own resume image and destination, so it can name the
+         bytes -- its unspent return or its fault reading on an inode,
+         nothing anywhere else. *)
+      fileread_arms st n F r (umem_wr (us_M U) addr d bs) addr -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -140,7 +140,7 @@ Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
 Require Import SpecKexecB2.
 Require Import KexecPtImage.
-Require Import ElfBridge.   (* [file_bytes_lookup] -- readi's bytes ARE the file's *)
+Require Import ElfBridge.   (* [le_at_of_file_bytes] -- readi's bytes ARE the file's *)
 Require Import KexecBuilt.  (* [load_win] / [load_out] *)
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
@@ -1510,7 +1510,7 @@ Section KexecB2Loops.
         { rewrite -HoffnZ. change (2 ^ 32)%Z with 4294967296%Z. lia. }
         (* ...AND THE WINDOW GREW BY WHAT readi DELIVERED.  [rd_delivered]
            below [tot] IS [file_byte], and the file's bytes below the
-           inode's size ARE [file_bytes]'s ([ElfBridge.file_bytes_lookup]);
+           inode's size ARE [file_bytes]'s ([FsTree.file_bytes_lookup]);
            the offset does not wrap because the loop only continues on a
            FULL count, which bounds [off + n] by the size. *)
         assert (Hwin' : load_win
@@ -1526,7 +1526,7 @@ Section KexecB2Loops.
             by lia.
           rewrite (rd_delivered_bytes datl fpg offn tot kb ltac:(lia)).
           rewrite /rd_bytes.
-          rewrite (ElfBridge.file_bytes_lookup datl
+          rewrite (FsTree.file_bytes_lookup datl
                      (Z.to_nat (bv_unsigned (di_size dnf)))
                      (Z.to_nat (po + ii + Z.of_nat kb))%nat ltac:(lia)).
           rewrite Hkeq. reflexivity. }

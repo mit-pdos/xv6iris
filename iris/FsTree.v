@@ -605,6 +605,19 @@ Qed.
 Definition file_bytes (data : nat -> list (bv 8)) (n : nat) : list (bv 8) :=
   file_byte data <$> seq 0 n.
 
+(* ...AND ITS TOTAL LOOKUP, below the size, IS [file_byte].  The one law
+   every reader of a file's flat view needs, and it belongs beside the
+   definition rather than in either reader: [ElfBridge.le_at_of_file_bytes]
+   ties a kexec buffer to it, and [FsAbsReadFire.read_post_ok]'s buffer tie
+   ties a read()'s destination bytes to it. *)
+Lemma file_bytes_lookup (data : nat -> list (bv 8)) (sz k : nat) :
+  (k < sz)%nat -> file_bytes data sz !!! k = file_byte data k.
+Proof.
+  intros Hk. apply list_lookup_total_correct.
+  unfold file_bytes. rewrite list_lookup_fmap, lookup_seq_lt by exact Hk.
+  reflexivity.
+Qed.
+
 (* THE READING, AND IT IS A FUNCTION.  [node_of] is bytes -> tree spelled
    out; [node_rep] is the relation, which exists so that a resource can
    carry it as a [⌜⌝] conjunct without committing to the [decide]. *)

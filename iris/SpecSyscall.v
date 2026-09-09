@@ -361,20 +361,23 @@ Section SyscExec.
      record's, and it has to be: the post reads the syscall's own ARGUMENT
      words (which fd, which count, which buffer), and the a0 argument slot
      is exactly the word the return value overwrites.  What comes off the
-     EXIT side is the returned value [r] and the two components of the
-     resume key a receipt can be about -- the descriptor view [sts'] and the
-     working directory [cw'].  chdir's receipt is a statement about [cw']
-     and open's about one row of [sts'] ([UexecExecInst.xv6_spost]); every
-     other number's post ignores both.
+     EXIT side is the returned value [r] and the three components of the
+     resume key a receipt can be about -- the image [M'], the descriptor
+     view [sts'] and the working directory [cw'].  read's receipt names the
+     bytes it left in the caller's buffer, entries of [M']; chdir's is a
+     statement about [cw'] and open's about one row of [sts']
+     ([UexecExecInst.xv6_spost]); every other number's post ignores all
+     three.
 
      EXIT AND FORK ARE EXCLUDED, as they are for the deposit: exit never
      returns and fork pays no receipt -- its deposit is a slot, and what it
      buys is the CHILD's execution, not a post to the parent. *)
   Definition sysc_sys_out (U : ustate) (sts : list fdstate) (f : sfam)
-      (r : mword 64) (sts' : list fdstate) (cw' : Z) : iProp Σ :=
+      (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z)
+      : iProp Σ :=
     (∀ n : Z,
        ⌜sysc_num (us_V U) = n /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
-       spost_at uslot n f (uvis_of U sts) r sts' cw')%I.
+       spost_at uslot n f (uvis_of U sts) r M' sts' cw')%I.
 
   (* FORK'S DEPOSIT, the one that is a SLOT.  Every other number's deposit
      is a bundle at the entry key ([sysc_sys_in]); fork's is the WP its
@@ -404,14 +407,15 @@ Section SyscExec.
        \/ k = 20).
 
   Lemma sysc_sys_out_quiet (U : ustate) (sts : list fdstate) (f : sfam)
-      (r : mword 64) (sts' : list fdstate) (cw' : Z) (k : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z)
+      (k : Z) :
     sysc_num (us_V U) = k -> sysc_num_nofs k ->
-    ⊢ sysc_sys_out U sts f r sts' cw'.
+    ⊢ sysc_sys_out U sts f r M' sts' cw'.
   Proof.
     intros Hk Hno. rewrite /sysc_sys_out. iIntros (n) "%Hg".
     assert (Hn : sysc_num_nofs n)
       by (rewrite <- (proj1 Hg); rewrite Hk; exact Hno).
-    iApply (spost_at_emp uslot n f (uvis_of U sts) r sts' cw' Hn).
+    iApply (spost_at_emp uslot n f (uvis_of U sts) r M' sts' cw' Hn).
   Qed.
 
   (* r = -1 and nothing of the process moved but a0: the trapframe up to
@@ -694,11 +698,11 @@ Definition wp_syscall_sconf_body
       (* ...and the SYSCALL CHANNEL's: the armed post of whatever contract
          the number ran, at the process's own families, at the return
          value the a0 slot now holds, and at the RESUME VIEW the round
-         leaves -- the descriptor states [sts'] and the block's own cwd
-         inum, which are what chdir's and open's receipts are about; see
-         [sysc_sys_out] *)
+         leaves -- the block's image, the descriptor states [sts'] and its
+         own cwd inum, which are what read's, chdir's and open's receipts
+         are about; see [sysc_sys_out] *)
       sysc_sys_out U sts f (pv_tf (us_V U') !!! tf_arg_idx 0)
-        sts' (pv_cwi (us_V U')) -∗
+        (us_M U') sts' (pv_cwi (us_V U')) -∗
       WP (Loop : expr riscv_lang))
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).

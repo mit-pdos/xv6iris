@@ -621,8 +621,9 @@ Section Ut56.
                (uint (pv_sz (us_V U0))) U sts sts) as "Hxo".
     { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts
-               (pv_tf (us_V U) !!! tf_arg_idx 0) sts (pv_cwi (us_V U)))%I as "Hso".
-    { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ _ _ Hnec). }
+               (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts
+               (pv_cwi (us_V U)))%I as "Hso".
+    { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ _ _ _ Hnec). }
     iApply (T.ut_a6 Rsys N U0 U pt ksp m0 S1 av nx false
               mie_v menvcfg0 epv scv lks sts sts fdep
               Hwf' ltac:(intros _; reflexivity)
@@ -1049,8 +1050,9 @@ Section UtD0.
       { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts
                  (pv_tf (us_V (MkUstate V' (us_M U))) !!! tf_arg_idx 0)
+                 (us_M (MkUstate V' (us_M U)))
                  sts (pv_cwi (us_V (MkUstate V' (us_M U)))))%I as "Hso".
-      { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ _ _ Hnec). }
+      { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ _ _ _ Hnec). }
       iApply (T.ut_a6 Rsys N U0 (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
                 mie_v menvcfg0 epv scv lks sts sts fdep
                 Hwf' ltac:(intros _; reflexivity)
@@ -1223,8 +1225,9 @@ Section UtE8.
                  (uint (pv_sz (us_V U0))) U sts sts) as "Hxo".
       { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts
-                 (pv_tf (us_V U) !!! tf_arg_idx 0) sts (pv_cwi (us_V U)))%I as "Hso".
-      { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ _ _ Hnec). }
+                 (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts
+                 (pv_cwi (us_V U)))%I as "Hso".
+      { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ _ _ _ Hnec). }
       iApply (T.ut_fa Rsys N U0 U pt ksp m0 mf av nx false
                 mie_v menvcfg0 epv scv lks sts sts fdep
                 Hwf' ltac:(intros _; reflexivity)
