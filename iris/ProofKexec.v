@@ -605,10 +605,12 @@ Section KexecAUExit.
       (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
       (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64) (dqas : dfrac) :
     kxau_ret (CID := CIDx)
-      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U)
+      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+         (bview plen pfun) na alen afun sts U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
-    SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts -∗
+    SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+      (bview plen pfun) na alen afun sts -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       kxau_QF (fun _ : KexecOkQ.kxf_cause => Logic.True)
       gf fsc_kalloc pj pidv U m ret_tgt K b eb lks dqb dqs fsc_bmapstart
@@ -648,7 +650,8 @@ Section KexecAUExit.
     length (pv_tf (us_V U)) = TFWORDS ->
     (na <= MAXARG)%nat ->
     kxau_ret (CID := CIDx)
-      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U)
+      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+         pl na alen afun sts U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
     PA.kxa_receipt Fs P Fo (length (path_elems pl)) zi na alen afun sts dn bm datl -∗
@@ -687,7 +690,7 @@ Section KexecAUExit.
           as [ec Hec].
         rewrite /SpecKexec.exec_arms. iLeft.
         iSplitR; [iPureIntro; split_and!; assumption |].
-        rewrite /SpecKexec.exec_post_fail. iRight. iExists pl. iRight.
+        rewrite /SpecKexec.exec_post_fail. iRight. iRight.
         iExists zi, av0, (MkAnode (AFile (kxc_fb datl dn)) nl), ec.
         iSplitL "HP"; [iExact "HP" |].
         iSplitR; [iPureIntro; exact Hav |].
@@ -702,8 +705,7 @@ Section KexecAUExit.
                     Hload Hag' Htflen ltac:(by right) Hne) as (Himg & Hokx).
         rewrite /SpecKexec.exec_arms. iRight.
         rewrite /SpecKexec.exec_post_ok.
-        iExists pl, zi, av0, (MkAnode (AFile (kxc_fb datl dn)) nl).
-        iSplitL "HP"; [iExact "HP" |].
+        iExists zi, av0, (MkAnode (AFile (kxc_fb datl dn)) nl).
         iSplitR; [iPureIntro; exact Hav |].
         iLeft. iExists (kxc_fb datl dn), nl.
         iSplitR; [iPureIntro; reflexivity |].
@@ -716,7 +718,7 @@ Section KexecAUExit.
            for the arm that did not happen, go with it. *)
         iDestruct (pf_at_au with "Hsl") as "[Hsl _]".
         iApply ("Hsl" $! av0 zi (kxc_fb datl dn) nl
-                  (SpecKexec.exec_key U' sts na) with "HΦ [%] [%]");
+                  (SpecKexec.exec_key U' sts na) with "HP HΦ [%] [%]");
           [exact Hload | exact Himg].
     - (* NOT A LOADABLE FILE.  Arm (b) on success, [EfNotLoadable] on a
          failure past the lock. *)
@@ -725,7 +727,7 @@ Section KexecAUExit.
            named the honest report is [EfNotLoadable]. *)
         rewrite /SpecKexec.exec_arms. iLeft.
         iSplitR; [iPureIntro; split_and!; assumption |].
-        rewrite /SpecKexec.exec_post_fail. iRight. iExists pl. iRight.
+        rewrite /SpecKexec.exec_post_fail. iRight. iRight.
         iExists zi, av0, (abs_row (FsStateEra.era_node dn bm datl)),
                 SpecKexec.EfNotLoadable.
         iSplitL "HP"; [iExact "HP" |].
@@ -745,8 +747,7 @@ Section KexecAUExit.
           by right. }
         rewrite /SpecKexec.exec_arms. iRight.
         rewrite /SpecKexec.exec_post_ok.
-        iExists pl, zi, av0, (abs_row (FsStateEra.era_node dn bm datl)).
-        iSplitL "HP"; [iExact "HP" |].
+        iExists zi, av0, (abs_row (FsStateEra.era_node dn bm datl)).
         iSplitR; [iPureIntro; exact Hav |].
         iRight.
         iSplitR; [iPureIntro; exact Hnl |].
@@ -758,7 +759,7 @@ Section KexecAUExit.
            goes into the wand, and the kernel mints nothing. *)
         iDestruct (pf_at_au with "Hsl") as "[_ Hsl]".
         iApply ("Hsl" $! av0 zi (abs_row (FsStateEra.era_node dn bm datl))
-                  (SpecKexec.exec_key U' sts na) with "HΦ [%] [%]").
+                  (SpecKexec.exec_key U' sts na) with "HP HΦ [%] [%]").
         { exact Hnl. }
         { exact (SpecKexec.kexec_ok_exec_key_ok U U' sts (mf !!! Regidx Ra0)
                    entry spv szv' na alen Htflen Hne Hkok). }
@@ -834,7 +835,8 @@ Section KexecAUMain.
     (* ---- THE EXIT, NAMED.  [kxau_ret] IS the contract's continuation. ---- *)
     iAssert (wp_next true (proc_addr jp) (fun CID : CpuId =>
                kxau_ret (CID := CID)
-                 (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U)
+                 (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+                    (bview plen pfun) na alen afun sts U)
                  gf fsc_kalloc (proc_addr jp) pidv m
                  (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs fsc_bmapstart
                  na plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1) dqa

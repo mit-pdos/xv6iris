@@ -1496,6 +1496,7 @@ Proof.
      What comes back is [exec_arms], and [exec_arms_landed] reads the
      landed [kexec_ok] straight out of it. *)
   iPoseProof (exec_au_pre_triv (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+                (DirentEnc.bview 5%nat fkr_init_bytes)
                 1%nat (fun _ => 5%nat) (fun _ => fkr_init_bytes)
                 (@nil fdstate)) as "Hxpre".
   iApply (KX.wp_kexec_sconf (MkPfam (fun _ => emp%I) True%I) γs j γl pd pav pu

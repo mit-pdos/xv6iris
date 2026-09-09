@@ -111,6 +111,9 @@ Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import ByteBuf.        (* [bb_cstr]                          *)
+Require Import PathElems.      (* [path_elems]                       *)
+Require Import DirentEnc.      (* [bview]                            *)
+Require Import FsAbsEra.       (* [ex_start]: the walk at ONE path    *)
 Require Import FsBlocks.       (* [fs_names]                         *)
 Require Import KexecDefs.      (* [MAXARG], [kexec_ok]               *)
 Require Import SysExecDefs.    (* the vocabulary leaf: [K_sys_exec], [sys_exec_post] *)
@@ -171,6 +174,50 @@ Lemma exec_args_of_shape (M : gmap Z (bv 8)) (av : mword 64)
   exec_args_of M av na alen afun -> exec_args_shape na alen afun.
 Proof. intros [H _]. exact H. Qed.
 
+(* THE PATH, THE SAME PAIR ONE ARGUMENT OVER.  sys_exec [fetchstr]s the
+   path at trapframe argument 0 into a kernel page and hands kexec the
+   buffer; the bundle's walk premise is therefore stated AT ONE [pl]
+   ([FsAbsEra.ex_start]) under a guard on that string, and not at every
+   path.  What the guard can say today is what [SpecFetchstr.fetchstr_ret]
+   promises and no more -- a NUL-terminated string of an int-sized length,
+   with NOTHING tying it to the user image ([exec_path_shape]).  The
+   reading is [exec_path_of], the named upgrade target: it is the twin of
+   [exec_args_of] above and lands by the same route (a memory-indexed
+   [wp_fetchstr_sconf_mem] paying out of a [copyinstr_got]), after which
+   the two occurrences of [exec_path_shape] below become [exec_path_of]
+   and nothing else moves.  ONLY THEN is the bundle owed at a single
+   known path, which is what a pinned caller's cursor needs. *)
+Definition exec_path_shape (pl : list (bv 8)) : Prop :=
+  (Z.of_nat (length pl) < 2 ^ 31)%Z
+  /\ (forall (j : nat) (b : bv 8), pl !! j = Some b ->
+        b <> (mword_of_int 0 : mword 8)).
+
+Definition exec_path_of (M : gmap Z (bv 8)) (pv : mword 64)
+    (pl : list (bv 8)) : Prop :=
+  exec_path_shape pl
+  /\ (forall (j : nat) (b : bv 8), pl !! j = Some b ->
+        M !! (bv_unsigned pv + Z.of_nat j) = Some b)
+  /\ M !! (bv_unsigned pv + Z.of_nat (length pl)) = Some (bv_0 8).
+
+Lemma exec_path_of_shape (M : gmap Z (bv 8)) (pv : mword 64)
+    (pl : list (bv 8)) :
+  exec_path_of M pv pl -> exec_path_shape pl.
+Proof. intros [H _]. exact H. Qed.
+
+(* ...and the one supplier: the buffer sys_exec handed kexec.  [bb_cstr]
+   is exactly [fetchstr]'s promise about it. *)
+Lemma exec_path_shape_bview (plen : nat) (pfun : nat -> bv 8) :
+  (Z.of_nat plen < 2 ^ 31)%Z -> bb_cstr pfun plen ->
+  exec_path_shape (bview plen pfun).
+Proof.
+  intros Hlen [Hnn _]. split; [ by rewrite bview_length | ].
+  intros j b Hb.
+  destruct (decide (j < plen)%nat) as [Hj | Hj].
+  - rewrite (bview_lookup plen pfun j Hj) in Hb. injection Hb as <-.
+    exact (Hnn j Hj).
+  - rewrite lookup_ge_None_2 in Hb; [ discriminate | rewrite bview_length; lia ].
+Qed.
+
 (* ===================================================================== *)
 (*  2.  THE BUNDLE AND THE ARMS AT THE SYSCALL BOUNDARY                   *)
 (* ===================================================================== *)
@@ -186,12 +233,17 @@ Section SysExecAU.
      parameters are kept so the upgrade moves nothing but this wand) *)
   (* A PIECE, so its two families stay BARE: [S] is what the wand
      concludes at and [Φo] is the observation receipt it consumes. *)
+  (* ...and over the PATHS it may have fetched, at the same guard the walk
+     premise carries, because the cursor the slot wand consumes is at the
+     last hop of THAT path ([exec_slot_pre]'s [Pfin]). *)
   Definition sys_exec_slot_pre (S : uvis -> iProp Σ)
+      (P : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
-      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) : iProp Σ :=
-    (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
-       ⌜exec_args_shape na alen afun⌝ -∗
-       exec_slot_pre S Φo na alen afun sts)%I.
+      (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) : iProp Σ :=
+    (∀ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
+       (afun : nat -> nat -> bv 8),
+       ⌜exec_path_shape pl⌝ -∗ ⌜exec_args_shape na alen afun⌝ -∗
+       exec_slot_pre S (P (length (path_elems pl))) Φo na alen afun sts)%I.
 
   (* Both one-shot pieces at their pairs ([SpecKexec.exec_au_pre]'s
      shape, at the argument-shape-quantified slot wand). *)
@@ -199,36 +251,41 @@ Section SysExecAU.
       (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) : iProp Σ :=
-    (namei_walk_pre_era γfs cw P Pmiss
+      (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) : iProp Σ :=
+    ((∀ pl : list (bv 8), ⌜exec_path_shape pl⌝ -∗ ex_start γfs cw P Pmiss pl)
      ∗ pf_at (aopen_commit_at Γ appE) Fo
-     ∗ pf_at (fun S => sys_exec_slot_pre S Fo.(pf_recv) M av sts) Fs)%I.
+     ∗ pf_at (fun S => sys_exec_slot_pre S P Fo.(pf_recv) M pv av sts) Fs)%I.
 
   (* non-expansive in the slot predicate, as [SpecKexec.exec_au_pre_ne]:
      what UexecExecInst.v's instance at the fixpoint variable needs *)
   Lemma sys_exec_slot_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ)
+      (P : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
-      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) :
+      (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) :
     S ≡{n}≡ S' ->
-    sys_exec_slot_pre S Φo M av sts ≡{n}≡ sys_exec_slot_pre S' Φo M av sts.
+    sys_exec_slot_pre S P Φo M pv av sts
+    ≡{n}≡ sys_exec_slot_pre S' P Φo M pv av sts.
   Proof.
     intros HS. rewrite /sys_exec_slot_pre.
+    apply bi.forall_ne; intros pl.
     apply bi.forall_ne; intros na. apply bi.forall_ne; intros alen.
     apply bi.forall_ne; intros afun. apply bi.wand_ne; [reflexivity |].
-    exact (exec_slot_pre_ne n S S' Φo na alen afun sts HS).
+    apply bi.wand_ne; [reflexivity |].
+    exact (exec_slot_pre_ne n S S' (P (length (path_elems pl)))
+             Φo na alen afun sts HS).
   Qed.
 
   Lemma sys_exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
       Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) :
+      (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) :
     S ≡{n}≡ S' ->
-    sys_exec_au_pre (MkPfam S Rs) Γ γfs cw P Pmiss Fo M av sts
-    ≡{n}≡ sys_exec_au_pre (MkPfam S' Rs) Γ γfs cw P Pmiss Fo M av sts.
+    sys_exec_au_pre (MkPfam S Rs) Γ γfs cw P Pmiss Fo M pv av sts
+    ≡{n}≡ sys_exec_au_pre (MkPfam S' Rs) Γ γfs cw P Pmiss Fo M pv av sts.
   Proof.
     intros HS. rewrite /sys_exec_au_pre /pf_at. cbn [pf_recv pf_refund].
-    by rewrite (sys_exec_slot_pre_ne n S S' Fo.(pf_recv) M av sts HS).
+    by rewrite (sys_exec_slot_pre_ne n S S' P Fo.(pf_recv) M pv av sts HS).
   Qed.
 
   (* ret = -1: sys_exec's own early exits (the whole bundle back) folded
@@ -236,11 +293,12 @@ Section SysExecAU.
   Definition sys_exec_post_fail (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) : iProp Σ :=
-    (sys_exec_au_pre Fs Γ γfs cw P Pmiss Fo M av sts
-     ∨ (∃ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
-          ⌜exec_args_shape na alen afun⌝ ∗
-          exec_post_fail Fs Γ γfs cw P Pmiss Fo na alen afun sts))%I.
+      (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) : iProp Σ :=
+    (sys_exec_au_pre Fs Γ γfs cw P Pmiss Fo M pv av sts
+     ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
+          (afun : nat -> nat -> bv 8),
+          ⌜exec_path_shape pl⌝ ∗ ⌜exec_args_shape na alen afun⌝ ∗
+          exec_post_fail Fs Γ γfs cw P Pmiss Fo pl na alen afun sts))%I.
 
   (* the armed disjunction on the block after the copy-ins' growth [V]
      and the returned a0; [M] is the image the arguments were read from *)
@@ -248,24 +306,25 @@ Section SysExecAU.
       (pj : mword 64) (pid : mword 32)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate)
+      (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate)
       (V : pprivate) (r : mword 64) : iProp Σ :=
     (∃ U' : ustate,
        proc_priv γf pj pid U' ∗
        ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = V /\ us_M U' = M⌝
-         ∗ sys_exec_post_fail Fs Γ γfs cw P Pmiss Fo M av sts)
-        ∨ (∃ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
-             ⌜exec_args_shape na alen afun⌝ ∗
-             exec_post_ok Fs Γ P Fo na alen afun sts (MkUstate V M) U' r)))%I.
+         ∗ sys_exec_post_fail Fs Γ γfs cw P Pmiss Fo M pv av sts)
+        ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
+             (afun : nat -> nat -> bv 8),
+             ⌜exec_path_shape pl⌝ ∗ ⌜exec_args_shape na alen afun⌝ ∗
+             exec_post_ok Fs Γ P Fo pl na alen afun sts (MkUstate V M) U' r)))%I.
 
   (* SANITY: the arms imply the landed [SysExecDefs.sys_exec_post] *)
   Lemma sys_exec_arms_landed (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names) (cw : Z) (γf : gname)
       (pj : mword 64) (pid : mword 32)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate)
+      (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate)
       (V : pprivate) (r : mword 64) :
-    sys_exec_arms Fs Γ γfs cw γf pj pid P Pmiss Fo M av sts V r ⊢
+    sys_exec_arms Fs Γ γfs cw γf pj pid P Pmiss Fo M pv av sts V r ⊢
       sys_exec_post γf pj pid V r.
   Proof.
     rewrite /sys_exec_arms /sys_exec_post.
@@ -273,8 +332,8 @@ Section SysExecAU.
     - iExists U', 0%nat, (fun _ => 0%nat),
         (mword_of_int 0), (mword_of_int 0), (mword_of_int 0).
       iFrame "Hp". iPureIntro. left. split; [exact Hr | exact HV].
-    - iDestruct "H" as (na alen afun) "[_ H]".
-      iDestruct (exec_arms_landed Fs Γ γfs cw P Pmiss Fo na alen afun sts
+    - iDestruct "H" as (pl na alen afun) "[_ [_ H]]".
+      iDestruct (exec_arms_landed Fs Γ γfs cw P Pmiss Fo pl na alen afun sts
                    (MkUstate V M) U' r with "[H]") as %(entry & spv & szv' & Hok).
       { rewrite /exec_arms. iRight. iExact "H". }
       iExists U', na, alen, entry, spv, szv'. iFrame "Hp". iPureIntro. exact Hok.
@@ -338,7 +397,7 @@ Definition wp_sys_exec_sconf_body
   (* ---- THE BUNDLE, the one addition to the premise list the vocabulary
      leaf's header describes: the arguments are read off THIS image at
      argument 1 ---- *)
-  sys_exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo (us_M U) v1 sts -∗
+  sys_exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo (us_M U) v0 v1 sts -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
@@ -356,7 +415,7 @@ Definition wp_sys_exec_sconf_body
       (* the armed post: the block after the copy-ins' growth, the
          arguments as read off the entry image, and -- on success at a
          loadable file -- the caller's slot at the resume key *)
-      sys_exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) γf pj pid P Pmiss Fo (us_M U) v1 sts
+      sys_exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) γf pj pid P Pmiss Fo (us_M U) v0 v1 sts
         (upd_upt (us_V U) P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗

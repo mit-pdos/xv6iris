@@ -146,6 +146,9 @@ Require Import UexecRet.       (* [uslot] -- the family the generic
 Require Import SpecSysExec.  (* [sys_exec_au_pre]                   *)
 Require Import SpecKexec.    (* [exec_slot_pre] -- the piece the
                                   monotonicity walks through          *)
+Require FsAbsEra.              (* [ex_start] / [ax_hops_triv]: the walk
+                                  one-shot at ONE path, which is the form
+                                  exec's bundle states                    *)
 Require Import FsAbsInvFire.   (* [fsabs_exec_half] and the eight other
                                   numbers' dischargers, all out of the
                                   supply                              *)
@@ -321,7 +324,8 @@ Section UexecExecInst.
       : iProp Σ :=
     (sys_exec_au_pre (MkPfam X (xf_Rs f)) (fs_gamma_L fsc_fs) fsc_fs
        (uvis_cwd W) (xf_P f) (xf_Pmiss f) (xf_Fo f)
-       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W))%I.
+       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
+       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W))%I.
 
   Lemma exec_sbundle_ne (n : nat) :
     Proper (dist n ==> eq ==> eq ==> dist n) exec_sbundle.
@@ -329,17 +333,20 @@ Section UexecExecInst.
     intros X Y HXY f ? <- W ? <-. rewrite /exec_sbundle.
     exact (sys_exec_au_pre_ne n X Y (xf_Rs f) (fs_gamma_L fsc_fs) fsc_fs
              (uvis_cwd W) (xf_P f) (xf_Pmiss f) (xf_Fo f)
-             (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) HXY).
+             (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
+             (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) HXY).
   Qed.
 
   Lemma exec_sbundle_cong (X : uvis -d> iPropO Σ) (f : xfam) (W W' : uvis) :
     uvis_M W = uvis_M W' ->
+    tf_w (uvis_tf W) (tf_arg_idx 0) = tf_w (uvis_tf W') (tf_arg_idx 0) ->
     tf_w (uvis_tf W) (tf_arg_idx 1) = tf_w (uvis_tf W') (tf_arg_idx 1) ->
     uvis_fd W = uvis_fd W' ->
     uvis_cwd W = uvis_cwd W' ->
     exec_sbundle X f W ⊣⊢ exec_sbundle X f W'.
   Proof.
-    intros HM Hav Hfd Hcw. rewrite /exec_sbundle HM Hav Hfd Hcw. reflexivity.
+    intros HM Hpv Hav Hfd Hcw.
+    rewrite /exec_sbundle HM Hpv Hav Hfd Hcw. reflexivity.
   Qed.
 
   (* ===================================================================== *)
@@ -499,7 +506,7 @@ Section UexecExecInst.
     intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw).
     rewrite /xv6_sbundle.
     destruct (decide (n = USYS_exec)) as [_ | _];
-      [ exact (exec_sbundle_cong X f W W' HM Ha1 Hfd Hcw) | ].
+      [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw) | ].
     rewrite /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw.
     reflexivity.
   Qed.
@@ -539,20 +546,21 @@ Section UexecExecInst.
     iSplit; [ | iDestruct "Hslot" as "[_ $]" ].
     iDestruct "Hslot" as "[Hslot _]".
     rewrite /sys_exec_slot_pre.
-    iIntros (na alen afun) "%Hsh".
-    iDestruct ("Hslot" $! na alen afun with "[%]") as "Hslot"; [ exact Hsh | ].
+    iIntros (pl na alen afun) "%Hpsh %Hsh".
+    iDestruct ("Hslot" $! pl na alen afun with "[%] [%]") as "Hslot";
+      [ exact Hpsh | exact Hsh | ].
     (* BOTH success arms' wands conclude at the family, so the upgrader
        walks in twice. *)
     rewrite /exec_slot_pre.
     iDestruct "Hslot" as "[Hsa Hsb]".
     iSplitL "Hsa".
-    - iIntros (av i ff nl W') "Ho %Hld %Him".
+    - iIntros (av i ff nl W') "HP Ho %Hld %Him".
       iApply "Hup".
-      iApply ("Hsa" $! av i ff nl W' with "Ho [%] [%]");
+      iApply ("Hsa" $! av i ff nl W' with "HP Ho [%] [%]");
         [ exact Hld | exact Him ].
-    - iIntros (av i a W') "Ho %Hnl %Hkk".
+    - iIntros (av i a W') "HP Ho %Hnl %Hkk".
       iApply "Hup".
-      iApply ("Hsb" $! av i a W' with "Ho [%] [%]");
+      iApply ("Hsb" $! av i a W' with "HP Ho [%] [%]");
         [ exact Hnl | exact Hkk ].
   Qed.
 
@@ -613,14 +621,23 @@ Section UexecExecInst.
       iDestruct (fsabs_exec_half (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W))
         as "[#Hwalk #Hcommit]".
       rewrite /sys_exec_au_pre.
-      iSplitR; [iExact "Hwalk" |].
+      (* THE WALK, AT WHATEVER PATH.  A family that tracks nothing owes the
+         one-shot at every string, and every hop of it says yes -- proved
+         here rather than converted from [Hwalk] through
+         [FsAbsOpenFire.opf_start_of_open], whose own [CurCtx] binder this
+         file has no instance for (the header's "NO AMBIENT [CurCtx]"). *)
+      iSplitR;
+        [ iIntros (pl) "_";
+          rewrite /FsAbsEra.ex_start /FsAbsEra.ex_hops_from;
+          iIntros (r) "_"; iModIntro; iSplit;
+          [ done | iApply FsAbsEra.ax_hops_triv ] | ].
       iSplitR; [iExact "Hcommit" |].
       rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [| done].
-      rewrite /sys_exec_slot_pre. iIntros (na alen afun) "_".
+      rewrite /sys_exec_slot_pre. iIntros (pl na alen afun) "_ _".
       (* the generic family answers BOTH success arms' wands *)
       rewrite /exec_slot_pre. iSplitR.
-      + iIntros (av' i ff nl W') "_ _ _". iApply "Hs".
-      + iIntros (av' i a W') "_ _ _". iApply "Hs".
+      + iIntros (av' i ff nl W') "_ _ _ _". iApply "Hs".
+      + iIntros (av' i a W') "_ _ _ _". iApply "Hs".
     - iApply (xv6_sbundle_of_supply_ne X n W Hne). iExact "Hsup".
   Qed.
 
@@ -755,7 +772,8 @@ Section UexecExecInst.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       P Pmiss Fo
-      (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) -∗
+      (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
+      (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) -∗
     sbundle_at X USYS_exec (xfam_exec P Pmiss Fo Rs) W.
   Proof.
     iIntros "H". rewrite /sbundle_at /= /xv6_sbundle.
@@ -769,7 +787,8 @@ Section UexecExecInst.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       P Pmiss Fo
-      (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) -∗
+      (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
+      (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) -∗
     sbundle X USYS_exec W.
   Proof.
     iIntros "H". rewrite /sbundle. iExists (xfam_exec P Pmiss Fo Rs).
@@ -780,7 +799,8 @@ Section UexecExecInst.
     sbundle_at X USYS_exec f W -∗
     sys_exec_au_pre (MkPfam X (xf_Rs f)) (fs_gamma_L fsc_fs) fsc_fs
       (uvis_cwd W) (xf_P f) (xf_Pmiss f) (xf_Fo f)
-      (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W).
+      (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
+      (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W).
   Proof.
     iIntros "H". rewrite /sbundle_at /= /xv6_sbundle.
     destruct (decide (USYS_exec = USYS_exec)) as [_ | Hc];
@@ -794,7 +814,8 @@ Section UexecExecInst.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ),
       sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
         P Pmiss Fo
-        (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W).
+        (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
+        (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W).
   Proof.
     iIntros "H". rewrite /sbundle. iDestruct "H" as (f) "H".
     iDestruct (sbundle_at_exec_elim X f W with "H") as "H".

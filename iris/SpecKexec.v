@@ -36,12 +36,16 @@
    second seal against the code.
 
    IN (the AU bundle, [exec_au_pre]):
-   1. THE WALK PREMISE, [SysOpenDefs.namei_walk_pre_era] REUSED: kexec
-      resolves the whole path with namei, exactly as open's plain arm
-      does, so the one-shot that fires an [ax_hop] at the era lend per
-      path element is the same statement.  A caller that knows the
-      directory chain (init: "/" holds "sh" at a known inum) pins each
-      hop from its own view; a caller that does not passes [True] hops.
+   1. THE WALK PREMISE, [FsAbsEra.ex_start] AT THE PATH IN THE BUFFER:
+      kexec resolves the whole path with namei, exactly as open's plain
+      arm does, so the one-shot that fires an [ax_hop] at the era lend
+      per path element is the same statement -- but at [bview plen pfun]
+      and not at every [pl], because a cursor fixed before the path is
+      known can say nothing about the inums THIS walk visits.  A caller
+      that knows the directory chain (init: "/" holds "sh" at a known
+      inum) pins each hop from its own view; a caller that does not
+      passes [True] hops, converting the universally quantified form with
+      [FsAbsOpenFire.opf_start_of_open].
    2. THE OBSERVATION, [SysOpenDefs.aopen_commit_at] REUSED: ONE
       single-phase read-only commit, fired inside the file's lock
       window, handing the caller the node kexec is about to read AS A
@@ -201,8 +205,8 @@
 
    ==== WHERE THE PROOF PAYS EACH PIECE ================================
 
-   1. THE WALK: [SpecNameiEra.wp_namei_era] at [namei_walk_pre_era]'s
-      one-shot, fired at phase A's namei site ([ProofKexecA]).
+   1. THE WALK: [SpecNameiEra.wp_namei_era] at [ex_start]'s one-shot,
+      fired at phase A's namei site ([ProofKexecA]).
    2. THE OBSERVATION: [FsAbsOpenFire.opf_open_fire] (the whole-[anode]
       fire off the lock window's [top_frag]) at the header-oracle hook of
       phase A, delivering [Fo]'s receipt.
@@ -263,6 +267,7 @@ Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import SpecDirlink.
 Require Import PathElems.       (* [SLASH], [path_elems]                     *)
+Require Import DirentEnc.       (* [bview]: the path buffer as a list        *)
 Require Import FsBlocks.        (* [fs_names]                                *)
 Require Import KexecDefs.       (* the vocabulary leaf this frame is over:
                                    [K_kexec], [kexec_ok], [kxc_sp],
@@ -650,16 +655,28 @@ Section KexecAU.
      [f = sh_bytes], with sh's start WP, and REFUTES the second from the
      same pin (the node it observed IS its image's loadable file).  A
      process that pins nothing answers both from its generic family. *)
-  Definition exec_slot_pre (S : uvis -> iProp Σ)
+  (* THE CURSOR IS A PREMISE OF BOTH WANDS, and it is what ties the
+     observed inum to the WALK: [Pfin] is the caller's cursor at the
+     walk's LAST hop ([exec_au_pre] instantiates it at
+     [P (length (path_elems pl))]), and the kernel applies both wands at
+     the very inum the walk landed on -- [ProofKexecA.kxa_receipt] holds
+     the receipt, the cursor and this piece at one [zi].  Without it the
+     [i] the receipt names is an arbitrary inum and a pinned caller can
+     neither identify the file arm (a) observed nor refute arm (b); the
+     cursor is therefore SPENT here and no longer returned by
+     [exec_post_ok]'s success arms. *)
+  Definition exec_slot_pre (S : uvis -> iProp Σ) (Pfin : Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
     ((∀ (av : aview) (i : Z) (f : elf_bytes) (nl : nat) (W' : uvis),
+        Pfin i -∗
         Φo av i (MkAnode (AFile f) nl) -∗
         ⌜kexec_loadable f⌝ -∗
         ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
         S W')
      ∗ (∀ (av : aview) (i : Z) (a : anode) (W' : uvis),
+          Pfin i -∗
           Φo av i a -∗
           ⌜~ anode_loadable a⌝ -∗
           ⌜exec_key_ok na alen sts W'⌝ -∗
@@ -672,15 +689,24 @@ Section KexecAU.
      the SLOT's -- the caller's own WP is that piece's "receipt", so the
      slot wand's payload and its refund pair exactly as an observation's
      do.  The walk's cursor pair stays bare. *)
+  (* THE WALK IS AT THE PATH kexec WAS CALLED WITH, not at every path:
+     [pl] is [bview plen pfun], the string in the caller's buffer, and
+     [FsAbsEra.ex_start] is [SysOpenDefs.namei_walk_pre_era]'s body at that
+     one [pl] (a caller that tracks nothing converts with
+     [FsAbsOpenFire.opf_start_of_open]).  It is what lets a cursor say
+     something about the inums THIS walk visits, which the universally
+     quantified form cannot. *)
   Definition exec_au_pre (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
       (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
-    (namei_walk_pre_era γfs cw P Pmiss
+    (ex_start γfs cw P Pmiss pl
      ∗ pf_at (aopen_commit_at Γ appE) Fo
-     ∗ pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts) Fs)%I.
+     ∗ pf_at (fun S => exec_slot_pre S (P (length (path_elems pl)))
+                         Fo.(pf_recv) na alen afun sts) Fs)%I.
 
   (* THE BUNDLE A CALLER THAT TRACKS NOTHING HANDS IN, and it is free:
      every hop says yes at a [True] cursor, the observation hands the
@@ -690,15 +716,15 @@ Section KexecAU.
      ([exec_arms_landed]), and its own slot comes from the park closer,
      not from exec.  Nothing of the abstract state is spent, so no
      invariant is needed on either side. *)
-  Lemma exec_au_pre_triv Γ (γfs : fs_names) (cw : Z)
+  Lemma exec_au_pre_triv Γ (γfs : fs_names) (cw : Z) (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
     ⊢ exec_au_pre (MkPfam (fun _ => emp%I) True%I) Γ γfs cw
         (fun _ _ => True%I) (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I))
-        na alen afun sts.
+        pl na alen afun sts.
   Proof.
     rewrite /exec_au_pre. iSplitR.
-    { rewrite /namei_walk_pre_era. iIntros (pl r) "_". iModIntro.
+    { rewrite /ex_start /ex_hops_from. iIntros (r) "_". iModIntro.
       iSplit; [done |]. iApply ax_hops_triv. }
     iSplitR.
     { iApply pf_at_triv. rewrite /aopen_commit_at. iIntros (I i a) "%Hi Ha".
@@ -708,19 +734,21 @@ Section KexecAU.
        [pf_at_triv]. *)
     rewrite /pf_at /=. iSplit; [| done].
     rewrite /exec_slot_pre. iSplitR.
-    - by iIntros (av i f nl W') "_ _ _".
-    - by iIntros (av i a W') "_ _ _".
+    - by iIntros (av i f nl W') "_ _ _ _".
+    - by iIntros (av i a W') "_ _ _ _".
   Qed.
 
   (* non-expansive in the slot predicate: UexecExecInst.v instantiates
      [S] at a fixpoint variable, and the fixpoint's contractivity proof
      needs this of the bundle *)
   Lemma exec_slot_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ)
+      (Pfin : Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
     S ≡{n}≡ S' ->
-    exec_slot_pre S Φo na alen afun sts ≡{n}≡ exec_slot_pre S' Φo na alen afun sts.
+    exec_slot_pre S Pfin Φo na alen afun sts
+    ≡{n}≡ exec_slot_pre S' Pfin Φo na alen afun sts.
   Proof. intros HS. rewrite /exec_slot_pre. solve_proper. Qed.
 
   (* ...and at the PAIR the bundle takes: the refund does not move with the
@@ -729,14 +757,16 @@ Section KexecAU.
       Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
     S ≡{n}≡ S' ->
-    exec_au_pre (MkPfam S Rs) Γ γfs cw P Pmiss Fo na alen afun sts
-    ≡{n}≡ exec_au_pre (MkPfam S' Rs) Γ γfs cw P Pmiss Fo na alen afun sts.
+    exec_au_pre (MkPfam S Rs) Γ γfs cw P Pmiss Fo pl na alen afun sts
+    ≡{n}≡ exec_au_pre (MkPfam S' Rs) Γ γfs cw P Pmiss Fo pl na alen afun sts.
   Proof.
     intros HS. rewrite /exec_au_pre /pf_at. cbn [pf_recv pf_refund].
-    by rewrite (exec_slot_pre_ne n S S' Fo.(pf_recv) na alen afun sts HS).
+    by rewrite (exec_slot_pre_ne n S S' (P (length (path_elems pl)))
+                  Fo.(pf_recv) na alen afun sts HS).
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -747,13 +777,18 @@ Section KexecAU.
      observed there, the landed success conjuncts hold at its entry, and
      the slot is the caller's -- through the deposit's first wand at a
      loadable file (a), through its second at anything else (b). *)
+  (* THE CURSOR IS NOT RETURNED HERE.  Both success arms fed it to the
+     slot piece ([exec_slot_pre]'s new first premise), which is the whole
+     point of that premise: the kernel holds ONE [P L i] and it goes into
+     the wand.  The failure arms below still hand it back -- nothing was
+     spent there. *)
   Definition exec_post_ok (Fs : pfam Σ (uvis -> iProp Σ)) Γ
       (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U U' : ustate) (r : mword 64) : iProp Σ :=
-    (∃ (pl : list (bv 8)) (i : Z) (av : aview) (a : anode),
-       P (length (path_elems pl)) i ∗
+    (∃ (i : Z) (av : aview) (a : anode),
        ⌜arow_at av i a⌝ ∗
        ((* (a) a loadable file: the program xv6 loaded is the ELF
            semantics' image, and the caller's WP is returned at the key
@@ -781,15 +816,16 @@ Section KexecAU.
       (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
     ((* (i) nothing fs-visible happened *)
-     exec_au_pre Fs Γ γfs cw P Pmiss Fo na alen afun sts
-     ∨ (∃ pl : list (bv 8),
-          (* (ii) the walk died at some hop: the era refund shape *)
+     exec_au_pre Fs Γ γfs cw P Pmiss Fo pl na alen afun sts
+     ∨ ((* (ii) the walk died at some hop: the era refund shape *)
           (namei_walk_dead_era γfs P Pmiss pl
              ∗ pf_at (aopen_commit_at Γ appE) Fo
-             ∗ pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts)
+             ∗ pf_at (fun S => exec_slot_pre S (P (length (path_elems pl)))
+                                 Fo.(pf_recv) na alen afun sts)
                  Fs)
           ∨ (* (iii) the walk completed and the node was observed; exec
                failed past the lock, and the arm says WHY (header,
@@ -799,7 +835,8 @@ Section KexecAU.
              P (length (path_elems pl)) i
              ∗ ⌜arow_at av i a⌝ ∗ Fo.(pf_recv) av i a
              ∗ ⌜exec_fail_ok a na alen c⌝
-             ∗ pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts)
+             ∗ pf_at (fun S => exec_slot_pre S (P (length (path_elems pl)))
+                                 Fo.(pf_recv) na alen afun sts)
                  Fs)))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, beside
@@ -808,11 +845,12 @@ Section KexecAU.
       (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U U' : ustate) (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U /\ us_M U' = us_M U⌝
-      ∗ exec_post_fail Fs Γ γfs cw P Pmiss Fo na alen afun sts)
-     ∨ exec_post_ok Fs Γ P Fo na alen afun sts U U' r)%I.
+      ∗ exec_post_fail Fs Γ γfs cw P Pmiss Fo pl na alen afun sts)
+     ∨ exec_post_ok Fs Γ P Fo pl na alen afun sts U U' r)%I.
 
   (* SANITY: the arms imply the landed result relation, so the parallel
      form never contradicts [KexecDefs.kexec_ok] -- the failure arm is the
@@ -822,9 +860,10 @@ Section KexecAU.
       (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U U' : ustate) (r : mword 64) :
-    exec_arms Fs Γ γfs cw P Pmiss Fo na alen afun sts U U' r ⊢
+    exec_arms Fs Γ γfs cw P Pmiss Fo pl na alen afun sts U U' r ⊢
       ⌜exists (entry spv szv' : mword 64),
          kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝.
   Proof.
@@ -832,7 +871,7 @@ Section KexecAU.
     iIntros "[[(%Hr & %HV & _) _] | H]".
     - iPureIntro. exists (mword_of_int 0), (mword_of_int 0), (mword_of_int 0).
       left. split; [exact Hr | exact HV].
-    - iDestruct "H" as (pl i av a) "(_ & _ & [H | H])".
+    - iDestruct "H" as (i av a) "(_ & [H | H])".
       + iDestruct "H" as (f nl) "(_ & _ & %Hok & _)".
         iPureIntro. destruct Hok as (e & spv & szv' & _ & _ & Hok).
         exists (mword_of_int e), spv, szv'. exact Hok.
@@ -964,8 +1003,10 @@ Definition wp_kexec_sconf_body
   let Γfs := fs_gamma_L fsc_fs in
   wp_kexec_frame gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
     pidv U dqb dqs dqa dqpv dqas m K eb b lks
-    (exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts)
-    (exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U).
+    (exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+       (bview plen pfun) na alen afun sts)
+    (exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+       (bview plen pfun) na alen afun sts U).
 
 (* ===================================================================== *)
 (*  4.  THE SEAL                                                          *)

@@ -128,6 +128,7 @@ Require SysOpenDefs.   (* [namei_walk_pre_era] / [namei_walk_dead_era]
                             / [aopen_commit_at]                      *)
 Require FsAbsOpenFire.   (* [opf_start_of_open], [opf_open_fire],
                             [opf_era_file_row]                       *)
+Require FsAbsEra.        (* [ex_start]: the walk one-shot at ONE path *)
 Require SpecKexec.     (* the contract this lane serves            *)
 Require UexecSlot.       (* [uvis] -- the slot predicate's key type  *)
 From Kernel Require KernelSyms.
@@ -259,10 +260,10 @@ Section KexecAUABody.
     bslots 3 -∗
     iref_slots 2 -∗
     (* ==== THE AU BUNDLE, IN PLACE OF THE PIN.  The one-shot is handed
-       DOWN unfired -- the walk picks the start inum and fires it there
-       ([FsAbsOpenFire.opf_start_of_open]) -- and [AU] is whatever else the
+       DOWN unfired, AT THE STRING IN THE BUFFER -- the walk picks the
+       start inum and fires it there -- and [AU] is whatever else the
        caller wants back on the dead arm. ==== *)
-    SysOpenDefs.namei_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
+    FsAbsEra.ex_start fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen pfun) -∗
     AU -∗
     ((SysOpenDefs.namei_walk_dead_era fsc_fs P Pmiss (bview plen pfun) ∗ AU)
        -∗ FAIL) -∗
@@ -473,8 +474,9 @@ Section KexecAUABody.
     (* ---- THE TRACE, THE CALLER'S OWN ONE-SHOT AT THE FETCHED STRING.
        Nothing is fired here: the WALK picks the start inum and fires it
        there ([ProofSysOpenWalk]'s own idiom). ---- *)
-    iDestruct (FsAbsOpenFire.opf_start_of_open fsc_fs (pv_cwi (us_V U)) P Pmiss
-                 (bview plen pfun) with "Hwp") as "Hstart".
+    (* the caller's one-shot IS [ex_start] at this string now, so there is
+       no conversion left to do. *)
+    iRename "Hwp" into "Hstart".
     iApply (NE.wp_namei_era gs jp gl pd pav pu
  gf
               plen pfun MAXOPBLOCKS Sb0 P Pmiss
@@ -782,7 +784,8 @@ Section KexecAUAMain.
                     (fn_nlink (FsStateEra.era_node dn bm data))⌝ ∗
        Fo.(pf_recv) av zi (abs_row (FsStateEra.era_node dn bm data)) ∗
        P L zi ∗
-       pf_at (fun S => SpecKexec.exec_slot_pre S Fo.(pf_recv) na alen afun sts) Fs)%I.
+       pf_at (fun S => SpecKexec.exec_slot_pre S (P L) Fo.(pf_recv)
+                         na alen afun sts) Fs)%I.
 
   (* the +0x090 row, and the [bad:] tails' row, are the same receipt: the
      buffer [ef] plays no part in it (the header claim was the only thing
@@ -806,11 +809,13 @@ Section KexecAUAMain.
       (sts : list fdstate) (pl : list (bv 8)) :
     SysOpenDefs.namei_walk_dead_era γ P Pmiss pl
       ∗ (pf_at (SysOpenDefs.aopen_commit_at (FsBytesGamma.fs_gamma_L γ) appE) Fo
-         ∗ pf_at (fun S => SpecKexec.exec_slot_pre S Fo.(pf_recv) na alen afun sts) Fs) -∗
-    SpecKexec.exec_post_fail Fs (FsBytesGamma.fs_gamma_L γ) γ cw P Pmiss Fo na alen afun sts.
+         ∗ pf_at (fun S => SpecKexec.exec_slot_pre S (P (length (path_elems pl)))
+                             Fo.(pf_recv) na alen afun sts) Fs) -∗
+    SpecKexec.exec_post_fail Fs (FsBytesGamma.fs_gamma_L γ) γ cw P Pmiss Fo
+      pl na alen afun sts.
   Proof.
     iIntros "(Hd & Hoc & Hsl)". rewrite /SpecKexec.exec_post_fail.
-    iRight. iExists pl. iLeft. iFrame "Hd Hoc Hsl".
+    iRight. iLeft. iFrame "Hd Hoc Hsl".
   Qed.
 
   (* ---- THE TWO TAILS' HONESTY (2026-09-04) --------------------------
@@ -929,11 +934,12 @@ Section KexecAUAMain.
     L = length (path_elems pl) ->
     LA.kxc_bad_cause dn ef data ->
     kxa_receipt Fs P Fo L zi na alen afun sts dn bm data -∗
-    SpecKexec.exec_post_fail Fs (FsBytesGamma.fs_gamma_L γ) γ cw P Pmiss Fo na alen afun sts.
+    SpecKexec.exec_post_fail Fs (FsBytesGamma.fs_gamma_L γ) γ cw P Pmiss Fo
+      pl na alen afun sts.
   Proof.
     intros HL Hbad. iIntros "H". rewrite /kxa_receipt.
     iDestruct "H" as (av) "(%Hav & %Hrow & HΦ & HP & Hsl)".
-    rewrite /SpecKexec.exec_post_fail. iRight. iExists pl. iRight.
+    rewrite /SpecKexec.exec_post_fail. iRight. iRight.
     iExists zi, av, (abs_row (FsStateEra.era_node dn bm data)),
             SpecKexec.EfNotLoadable.
     rewrite -HL.
@@ -1035,10 +1041,13 @@ Section KexecAUAMain.
     (* ==== THE AU BUNDLE, IN PLACE OF THE HEADER ORACLE.  The landed
        phase A relays an oracle it cannot answer; the pinned one answers it
        from a pin; this one SPENDS the caller's commit at that instant and
-       hands the caller's receipt out. ==== *)
-    SysOpenDefs.namei_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
+       hands the caller's receipt out.  The walk one-shot is at the string
+       in the buffer, which is where the contract states it. ==== *)
+    FsAbsEra.ex_start fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen pfun) -∗
     pf_at (SysOpenDefs.aopen_commit_at ΓL appE) Fo -∗
-    pf_at (fun S => SpecKexec.exec_slot_pre S Fo.(pf_recv) na alen afun sts) Fs -∗
+    pf_at (fun S => SpecKexec.exec_slot_pre S
+                      (P (length (path_elems (bview plen pfun))))
+                      Fo.(pf_recv) na alen afun sts) Fs -∗
     kalloc_env fsc_kalloc None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -1055,7 +1064,8 @@ Section KexecAUAMain.
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId,
        KEX CX -∗
-       SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts -∗
+       SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+         (bview plen pfun) na alen afun sts -∗
       KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
@@ -1135,8 +1145,11 @@ Section KexecAUAMain.
     iDestruct (ireg_inv_ftop with "Hireg") as "#Hftop".
     iApply (kxc_a1_au (CID0 := CID0) Q QF P Pmiss
               (pf_at (SysOpenDefs.aopen_commit_at ΓL appE) Fo
-                 ∗ pf_at (fun S => SpecKexec.exec_slot_pre S Fo.(pf_recv) na alen afun sts) Fs)%I
-              (SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts)
+                 ∗ pf_at (fun S => SpecKexec.exec_slot_pre S
+                                     (P (length (path_elems (bview plen pfun))))
+                                     Fo.(pf_recv) na alen afun sts) Fs)%I
+              (SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+                 (bview plen pfun) na alen afun sts)
               gs jp gl pd pav pu gf
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m K eb b lks sp0 ra0 s00 s10 s20 pv av KEX

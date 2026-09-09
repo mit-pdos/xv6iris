@@ -3242,22 +3242,24 @@ Section SyscallArms.
   Qed.
 
   Lemma sysc_exec_in_open (U : ustate) (sts : list fdstate) (f : sfam)
-      (v1 : mword 64) :
+      (v0 v1 : mword 64) :
     sysc_num (us_V U) = 7 ->
+    pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     sysc_sys_in U sts f -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (gmap Z FsAbsDefs.anode -> Z -> FsAbsDefs.anode -> iProp Σ))
       (Rs : iProp Σ),
       sys_exec_au_pre (MkPfam uslot Rs) (fs_gamma_L fsc_fs) fsc_fs
-        (pv_cwi (us_V U)) P Pmiss Fo (us_M U) v1 sts.
+        (pv_cwi (us_V U)) P Pmiss Fo (us_M U) v0 v1 sts.
   Proof.
-    intros Hn Hv1. iIntros "H".
+    intros Hn Hv0 Hv1. iIntros "H".
     iDestruct (sysc_sys_in_at U sts f 7 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_exec_elim uslot f _ with "H") as "H".
     iExists (xf_P f), (xf_Pmiss f), (xf_Fo f), (xf_Rs f).
     rewrite /uvis_of /tf_w. cbn [uvis_M uvis_tf uvis_fd].
+    rewrite (list_lookup_total_correct _ _ _ Hv0).
     rewrite (list_lookup_total_correct _ _ _ Hv1). iExact "H".
   Qed.
 
@@ -4458,7 +4460,8 @@ Section SyscallArms.
        PROCESS (the trapping key's own era predicates), not from the
        environment, so nothing of [syscall_env]'s fs-abstract side is
        opened here. ---- *)
-    iDestruct (sysc_exec_in_open U sts fdep v1 ltac:(rewrite Hnum; reflexivity) Hv1
+    iDestruct (sysc_exec_in_open U sts fdep v0 v1
+                 ltac:(rewrite Hnum; reflexivity) Hv0 Hv1
                  with "Hxin") as (P Pmiss Fo Rs) "Hau".
     iApply (SysExec.wp_sys_exec_sconf (MkPfam uslot Rs) γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
@@ -4509,9 +4512,9 @@ Section SyscallArms.
           [ reflexivity | reflexivity
           | exact (perm_of_uptd_ext_sz _ _ _ Hext) | reflexivity | reflexivity ].
       - (* SUCCEEDED *)
-        iDestruct "Hok" as (na alen afun) "[_ Hok]".
+        iDestruct "Hok" as (pl na alen afun) "[_ [_ Hok]]".
         rewrite /exec_post_ok.
-        iDestruct "Hok" as (pl i av0 a) "(_ & _ & [Ha | Hb])".
+        iDestruct "Hok" as (i av0 a) "(_ & [Ha | Hb])".
         + (* (a) a loadable file: the slot, at the resume key *)
           iDestruct "Ha" as (f nl) "(_ & _ & %Hkx & _ & Hslot)".
           destruct Hkx as (e & spv & szv' & _ & Hne & Hkok).

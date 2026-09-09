@@ -310,6 +310,12 @@ UEchoKernel.v
 # Hypothesis discharged) and the bridge from the kernel's image fact
 # ([sh_slot_of_kexec], off SpecKexec.kexec_image_ok at ElfUser.sh_elf).
 UShKernel.v
+# UInitKernel = init's slot ([init_uexec_slot], via UkRun.uslot_of_urun +
+# UkInitMain.wp_kinit_start) and the bridge from the kernel's image fact
+# ([init_slot_of_kexec], off SpecKexec.kexec_image_ok at ElfUser.init_elf).
+# It requires UShKernel for the entry geometry it shares -- and because
+# init's exec target is sh.
+UInitKernel.v
 UkAbi.v
 UexecCond.v
 UCodeEcho.v
@@ -1596,6 +1602,11 @@ SpecKexec.v
 # it sits HERE rather than beside ElfBridge.v only because [kxc_sp] /
 # [kexec_args_at] / [loads_ascending] have no home below KexecDefs*.v.
 KexecImageAlg.v
+# ElfLoadable = the two verified images are files xv6's exec loads
+# ([kexec_loadable] at ElfUser.sh_elf / init_elf), through the computable
+# twin of the acceptance predicate.  A leaf that pays the one vm_compute
+# the *Kernel.v entry constructors deliberately never pay.
+ElfLoadable.v
 KexecBridge.v
 SpecSysExec.v
 # UexecExecInst = the kernel-side instance of UexecSG's [uexecSG] and

@@ -108,6 +108,7 @@ Require Import SpecKexec.     (* [exec_au_pre], [exec_post_ok], [exec_arms] *)
 Require Import FsBytesGamma.    (* [fs_gamma_L] *)
 Require Import SpecSysExec.
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
+Require Import DirentEnc.      (* [bview]: the path buffer as a list         *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Require Import TsoCtx.
 
@@ -127,19 +128,28 @@ Section SysExecAUBridge.
       (γfs : fs_names) (cw : Z)
       (Pw Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (Mim : gmap Z (bv 8)) (avp : mword 64) (sts : list fdstate)
+      (Mim : gmap Z (bv 8)) (pvp avp : mword 64) (sts : list fdstate)
+      (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
+    exec_path_shape pl ->
     exec_args_shape na alen afun ->
-    sys_exec_au_pre Fs Γ γfs cw Pw Pmiss Fo Mim avp sts -∗
-    exec_au_pre Fs Γ γfs cw Pw Pmiss Fo na alen afun sts.
+    sys_exec_au_pre Fs Γ γfs cw Pw Pmiss Fo Mim pvp avp sts -∗
+    exec_au_pre Fs Γ γfs cw Pw Pmiss Fo pl na alen afun sts.
   Proof.
-    intro Hsh. rewrite /sys_exec_au_pre /exec_au_pre.
+    intros Hpsh Hsh. rewrite /sys_exec_au_pre /exec_au_pre.
     iIntros "(Hera & Hcom & Hslot)".
-    iSplitL "Hera"; [iExact "Hera" |]. iSplitL "Hcom"; [iExact "Hcom" |].
-    (* the SLOT piece travels as the pair: its AU narrows at the argument
-       shape, its refund is untouched ([PieceFam.pf_at_mono]). *)
+    (* the WALK piece narrows at the string argstr fetched -- which is the
+       one thing the syscall level knows about the path and the exec-level
+       contract's own premise. *)
+    iSplitL "Hera"; [ iApply ("Hera" $! pl with "[%]"); exact Hpsh |].
+    iSplitL "Hcom"; [iExact "Hcom" |].
+    (* the SLOT piece travels as the pair: its AU narrows at that same
+       string and at the argument shape, its refund is untouched
+       ([PieceFam.pf_at_mono]). *)
     iApply (pf_at_mono with "[] Hslot"). iIntros "Hslot".
-    rewrite /sys_exec_slot_pre. iApply "Hslot". iPureIntro. exact Hsh.
+    rewrite /sys_exec_slot_pre.
+    iApply ("Hslot" $! pl na alen afun with "[%] [%]");
+      [ exact Hpsh | exact Hsh ].
   Qed.
 
   (* (2) the pre-state's IMAGE is immaterial: [exec_post_ok] reads only
@@ -150,11 +160,12 @@ Section SysExecAUBridge.
   Lemma exec_post_ok_V (Fs : pfam Σ (uvis -> iProp Σ)) Γ
       (Pw : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U1 U2 U' : ustate) (r : mword 64) :
     us_V U1 = us_V U2 ->
-    exec_post_ok Fs Γ Pw Fo na alen afun sts U1 U' r -∗
-    exec_post_ok Fs Γ Pw Fo na alen afun sts U2 U' r.
+    exec_post_ok Fs Γ Pw Fo pl na alen afun sts U1 U' r -∗
+    exec_post_ok Fs Γ Pw Fo pl na alen afun sts U2 U' r.
   Proof.
     intro HV. rewrite /exec_post_ok HV. iIntros "H". iExact "H".
   Qed.
@@ -217,7 +228,7 @@ Section SysExecBreakAU.
       (uav : mword 64) (M : regfile) (P : uptd) (i : nat)
       (pg : nat -> mword 64) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (* ---- the AU side ---- *)
-      (sts : list fdstate) (Mim : gmap Z (bv 8)) (avp : mword 64)
+      (sts : list fdstate) (Mim : gmap Z (bv 8)) (pvp avp : mword 64)
       (Pw Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :
     (K_sys_exec <= K)%nat ->
@@ -248,7 +259,7 @@ Section SysExecBreakAU.
     (* the caller's bundle, still quantified over every argument vector of
        the right shape: the instantiation happens below, at the vector the
        fill loop actually built. *)
-    sys_exec_au_pre Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo Mim avp sts -∗
+    sys_exec_au_pre Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo Mim pvp avp sts -∗
     sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun (mword_of_int (SX + 0xb6) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
@@ -261,7 +272,8 @@ Section SysExecBreakAU.
         (* the armed post, at the block the copy-ins left and the returned
            a0; [exec_arms_landed] turns it back into the landed
            [kexec_ok] whenever a caller wants that instead. *)
-        exec_arms Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo i alen afun sts
+        exec_arms Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo
+                  (bview plen pfun) i alen afun sts
                   (us_upt U P) U' (mf !!! Regidx Ra0) -∗
         (* the shape the walk established, which the composition needs to
            name the vector in [sys_exec_arms] *)
@@ -295,7 +307,9 @@ Section SysExecBreakAU.
       - intros j Hj. exact (proj2 (proj2 (proj2 (Hok j Hj)))).
       - intros j Hj. pose proof (proj1 (proj2 (proj2 (Hok j Hj)))). lia. }
     iDestruct (sys_exec_au_pre_at Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo
-                 Mim avp sts i alen afun Hshape with "Hau") as "Hau".
+                 Mim pvp avp sts (bview plen pfun) i alen afun
+                 (exec_path_shape_bview plen pfun ltac:(lia) Hpcstr) Hshape
+                 with "Hau") as "Hau".
     iDestruct (sx_carry_open sp0 m plen pfun rest with "Hcarry")
       as "(Hf1 & Hf2 & Hspill & F10 & Hpb & Hps)".
     (* ===== +0x0b6 addiw a5,s2,0 : argc, in int ===== *)
@@ -659,7 +673,7 @@ Section SysExecWhole.
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
       iApply (sx_break_au (CID0 := CID3) Fs gs j gl pd pav pu γf
                 dqb dqs pid U K true true ∅ sp0 m plen pfun rst v59
-                M3 P3 i3 pg3 al3 af3 sts (us_M U) v1 P Pmiss Fo
+                M3 P3 i3 pg3 al3 af3 sts (us_M U) v0 v1 P Pmiss Fo
                 HK Hlb eq_refl Hplen Hpcstr Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
                 with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hau Hbrk").
@@ -681,14 +695,19 @@ Section SysExecWhole.
           iSplitR; [iPureIntro; split_and!;
                     [exact Hrm1 | rewrite Hrm2; reflexivity | rewrite Hrm3; reflexivity] |].
           rewrite /sys_exec_post_fail. iRight.
-          iExists i3, al3, af3.
+          iExists (bview plen pfun), i3, al3, af3.
+          iSplitR; [iPureIntro;
+                    exact (exec_path_shape_bview plen pfun ltac:(lia) Hpcstr) |].
           iSplitR; [iPureIntro; exact Hshape |]. iExact "Hfail".
         - (* ret = argc: the same arm, re-read at the image the CONTRACT
              names -- [exec_post_ok] projects only [us_V] of its pre-state
              (header, seam 2). *)
-          iRight. iExists i3, al3, af3.
+          iRight. iExists (bview plen pfun), i3, al3, af3.
+          iSplitR; [iPureIntro;
+                    exact (exec_path_shape_bview plen pfun ltac:(lia) Hpcstr) |].
           iSplitR; [iPureIntro; exact Hshape |].
-          iApply (exec_post_ok_V Fs (fs_gamma_L fsc_fs) P Fo i3 al3 af3 sts
+          iApply (exec_post_ok_V Fs (fs_gamma_L fsc_fs) P Fo
+                    (bview plen pfun) i3 al3 af3 sts
                     (us_upt U P3)
                     (MkUstate (upd_upt (us_V U) P3) (us_M U))
                     Ubk (mf !!! Regidx Ra0 : mword 64) eq_refl with "Hok"). }
