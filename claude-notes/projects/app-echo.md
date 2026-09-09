@@ -1369,8 +1369,86 @@ kernel-wide threading are deleted; `Happ_sup` leaves `xv6_app_adequacy`;
 `echo_tag`'s taint arm, delivered through L5-b's console receipt.  ORDER:
 after L5-b: (2) exec's arm (b) in the deposit; (1) userinit's slot piece
 + `UkInit`'s slot at the observed image (L6 init); (3) waits on the
-kernel fix; then `Happ_sup` goes.  Brief for (2): `brief-armc-execb.md`
-(queued behind L5-b).
+kernel fix; then `Happ_sup` goes.  Brief for (2): `brief-armc-execb.md`.
+EXEC-B (LANDED 2026-09-09).  Phase-1 facts: `SpecKexec.exec_slot_pre`
+is the CONJUNCTION of the loadable wand and the other-success wand
+(`Φo av i a -∗ ⌜¬ anode_loadable a⌝ -∗ ⌜exec_key_ok na alen sts W'⌝ -∗
+S W'`), `exec_key_ok` being what `kexec_ok` pins about the resume key
+(a0 = argc, sp = a1 = `kxc_sp_final`, the stack bounds, `kxc_stack_ok`,
+`uvis_fd = sts`, `length tf = TFWORDS`, `na ≤ MAXARG`; nothing about the
+image); `kexec_ok_exec_key_ok` closes it.  `exec_post_ok`'s arm (b)
+returns `Fs.(pf_recv) (exec_key U' sts na)`; the exec channel
+(`sysc_exec_out`/`ut_exec_out`) is two-armed.  ONE (b)-producing site
+(`ProofKexec.kxau_close`), not two; `UexecApply`'s round restates the
+channel inline, so its two statements lose the third disjunct too.  No
+program file names `exec_slot_pre` (all go through `uxsup`).  AS
+LANDED: `exec_key_ok` carries no entry point (outside `kexec_loadable`
+the epc names a value with no ELF semantics), sp = a1 = `kxc_sp_final`
+directly, `na ≤ MAXARG`, `TFWORDS`; `kexec_ok_exec_key_ok`'s one extra
+premise is the entry frame's length, which kexec's closer carries; both
+dispatcher success arms close by the same two lines; the loop's `Hmk`
+has ONE site left, the pid-wrap row (the "third site" was a comment).
+STEP (2) OF ARM-c IS DONE: the kernel mints at exec nowhere.
+
+#### THE PINNED EXEC BUNDLE — design for ARM-c (1) and L6's init/sh (2026-09-09)
+
+HOW A VERIFIED PROGRAM DEPOSITS EXEC.  `UkRun.udepw`'s explicit disjunct
+is `sbundle uslot USYS_exec (uvis_of_run …)` = `UexecExecInst.exec_sbundle`
+= `sys_exec_au_pre (MkPfam uslot R) Γ γfs cw P Pmiss Fo M av sts`: a walk
+cursor, the observation piece, the slot piece.  Today every program pays
+it from `uxsup` (the supply's generic family, `xv6_sbundle_of_supply`'s
+exec branch).  A CONSTRAINING program builds its own:
+- THE OBSERVATION reads the pin.  `aopen_commit_at Γ E Φ` fires at mask
+  `E = appE = ↑appN`, with the kernel's `ghost_map_auth (γtop Γ) (1/2) I`
+  in hand; `γtop (fs_gamma_L γfs) = fs_top γfs` is `app_body`'s authority
+  half, so the caller's fupd opens `app_inv`, agrees `I` and reads
+  `app_pred app_run (abs_view I)` — for echo `⌜echo_fs_pure av⌝ ∨ taint`
+  (pure ∨ persistent) — into its receipt: `Φ av i a := ⌜arow_at av i a⌝ ∗
+  (⌜echo_fs_pure av⌝ ∨ taint)`.  With `arow_at av SH_INO a` the pins give
+  `a = MkAnode (AFile sh_bytes) 1` and `sh_bytes = ElfUser.sh_elf`
+  (`FsShPin.sh_bytes_elf`); likewise `init_bytes = init_elf`.
+- THE CURSOR carries the resolved inum ∨ taint at each hop the same way
+  (`apath_at av ROOTINO sh_path = Some SH_INO`, `arun …` are pins).
+- THE SLOT PIECE answers with the program's kernel-side constructor at
+  the kexec'd key: `UShKernel.sh_slot_of_kexec : kexec_image_ok sh_elf na
+  alen afun sts W' → … → uslot W'` is the mold (its premises: stack room
+  below the argument block, `length sts = NOFILE`, no lowest-closed
+  descriptor, the map stops at the break, the payload `R` and `ush_rest`);
+  init needs its twin `init_slot_of_kexec` in a new `UInitKernel.v` over
+  `UkInitMain.wp_kinit_start` (`init_code`, `init_rodata`, `usz`,
+  `ustd_any`, `urun`, and — recursively — init's OWN pinned exec bundle
+  for "sh" in place of `uxsup`).  In the taint arm of the receipt the slot
+  piece answers with the generic slot minted from the taint
+  (`taint ⊢ app_sup` for `echo_pred := taint ∨ pins`).
+- A GENERIC LEMMA `pinned_exec_bundle` assembles the three from a pin
+  triple (path, inum, bytes) + a `*_slot_of_kexec`; init's and sh's are
+  its two instances.
+- LOADABILITY OF THE TWO IMAGES IS NOT YET PROVED: no `kexec_loadable
+  sh_elf` / `kexec_loadable init_elf` exists.  The pieces do — `ElfUser`'s
+  `*_elf_wf`, `*_elf_entry`, `*_elf_segments`; `UShKernel.sh_loads` (two
+  phdrs at vaddr 0 and 0x2000, ascending); `KexecImageAlg` has
+  `kexec_loadable f <-> kxb_loadable f` (computable) — so each is a
+  `vm_compute`-shaped lemma over the dumped bytes.  The pinned slot piece
+  needs them twice: to take arm (a)'s wand with `⌜kexec_loadable f⌝`, and
+  to REFUTE arm (b)'s `⌜¬ anode_loadable a⌝` once the pin gives `a`.
+
+USERINIT AND THE BOOT ARM.  forkret's boot arm kexec("/init") today takes
+`exec_au_pre_triv` with the slot predicate `emp` and gets the user WP from
+the park closer's FAMILY (minted from the supply).  For a constraining
+application the park package carries init's PINNED EXEC BUNDLE instead of
+a family (a third mode beside `Wk : option uvis`): the boot arm feeds it
+to kexec and the closer's `uslot (uvis_of U' sts)` is exec's arm (a)
+receipt `Fs.(pf_recv) (exec_key U' sts na)` (the a0 store makes
+`exec_key` the resumed record).  `SpecUserinit`/`SpecMain`/`BootShared`
+then take the bundle from the theorem (`Hinit_slot`) in place of
+`app_sup`; the generic theorem supplies it from the trivial supply.
+`UexecCond.cond_entry_slot`'s decidable gate chain (sync, echo, then the
+generic WP) is the mechanism that PICKS a verified program's slot from an
+exec'd key; the pinned bundle makes the generic tail unreachable for a
+pinned exec (the observed node IS the image's file), which is what lets
+the supply leave.  Lanes: L6-INIT (`init_slot_of_kexec`, the pinned
+bundle lemma, init's exec of sh), then ARM-c(1) (userinit's bundle mode),
+then `Happ_sup` leaves (after EXEC-B and the kernel's pid fix).
 
 ## Decisions outstanding (refreshed 2026-09-08)
 
