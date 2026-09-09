@@ -953,7 +953,84 @@ instead of minting from the supply:
    to kfork.
 
 Three lanes at least: (a) kfork states the child record (with the image
-lemma above); (b) the steady park; (c) the row.  Order after RECEIPT-SPLIT.
+lemma above); (b) the steady park; (c) the row.  Order: (b) first — the
+kfork↔park seam is where a single slot must be accepted before kfork can
+be asked for one; then (a); then (c).
+
+LANES (a) AND (c), DESIGNED (2026-09-08; briefs cut after (b) lands).
+
+(a) KFORK-CHILD.  `SpecKfork`'s slot premise becomes ONE slot at the
+record kfork builds, stated from the parent:
+  `kfork_child Up := MkUstate (upd_tf (us_V Up) (<[14%nat := zero_reg]>
+   (pv_tf (us_V Up)))) (us_M Up)`; premise `uslot (uvis_of (kfork_child Up) stsP)`.
+The proof re-keys it onto the child's actual record `Uc` at the park
+(`uslot_of_urun_eq`): trapframe — the copy loop leaves `pv_tf Vc = pv_tf Up`
+(`ProofKforkMain` ~586, `V1`) and B7 stores word 14 (`kfk_b7`'s post);
+image — `umem_write Mnew 0 (4096 n) (Mold !!! ·) = Mold` (the lazy view is
+canonical, above); perm — `perm_of (ud_um P') sz = perm_of (ud_um Pold) sz`
+from uvmcopy's pointwise post (`perm_leaf` reads bits 1..4 only,
+`pte_set_ad` writes 6..7, `uvm_pte (pte_flags10 w)` keeps the low ten;
+`dom` agrees because `um_below` puts every mapped page under `n`); sz —
+`np->sz = p->sz`; cwd — B4's `pv_cwi Vc' = pv_cwi Up`.  `ProofSysFork`
+hands kfork the single slot, minted from the supply for now.
+
+(c) FORK-ROW.  The child continuation travels DOWN as fork's deposit and
+the parent's arm is instantiated at the return:
+  - `UexecRet.uexec_dep_F` at fork := the child conjunct at its one record,
+    `X (bump W 0 (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_fd W) (uvis_cwd W))`
+    (the `∀ fdv' cw'` guards collapse: fork copies the table and keeps the
+    cwd); `uexec_arm_F` at fork := the parent conjunct only.
+  - `SpecUsertrap.ut_fork_in` / `SpecSyscall.sysc_fork_in` carry it (mold:
+    `ut_exec_out`, a number-specific row); the dispatcher's fork arm hands
+    it to `SysFork`, whose contract takes `uslot (uvis_of (kfork_child U) sts)`
+    — `bump_tf (uvis_tf W) 0` and `<[14 := 0]> (pv_tf U)` agree on the
+    resume gpr and pc (the dispatcher's record is the key with epc bumped),
+    the rest of the key is the parent's; `ProofSysFork`'s mint goes.
+  - THE PARENT AT r ≠ 0 resumes on the program's parent conjunct.
+  - THE PARENT AT r = 0 — PID WRAP — RESUMES ON THE SUPPLY.  `allocpid`'s
+    counter is a 32-bit word with no bound (`nextpid_res_at` is an
+    existential value; `addiw` wraps), so the kernel cannot promise
+    `pid ≠ 0` without a fork budget nothing enforces.  The row therefore
+    reads: `r ≠ 0` → the program's arm; `r = 0` → `uslot_mint` from
+    `app_sup`, i.e. after 2^32 forks a verified parent may fall to the
+    generic slot.  Honest, and it is exactly what the supply is for; the
+    program's `⌜r <> 0⌝` guard stays.  No positivity invariant on nextpid.
+
+STEADY-PARK (lane (b), LANDED 2026-09-08).  The slot the park captures
+sees only (resume gpr, resume pc, image, perm, sz, fd, cwd) —
+`UexecApply.uslot_key_cong` — and forkret's steady arm resumes at a record
+that agrees with the parked one on all of them (`tf_ueq` from
+prepare_return, `us_M U` unchanged, `ud_um (ud_norm P) = ud_um P`, sz and
+cwi untouched).  So the park package gains an OPTIONAL parked run key
+`Wk : option uvis`: `Some (uvis_of U [])` when the parker holds
+`first_done` (kfork), `None` otherwise (userinit).  With `Some`, the
+package carries `first_done` and the closer gets the pure premise
+`urun_eq Wk U'`; the parker captures ONE slot `uslot (uvis_of U sts)` and
+the closer re-keys it by the congruence.  forkret's boot arm refutes
+`Some` by `first_tok_boot_excl` (its `first_addr ↦₄ 1` against the
+package's `↦₄□ 0`); its steady arm proves `urun_eq` from the facts it
+already has.  kfork parks steady, instantiating its family at
+`uvis_of Uc stsP`; `SpecKfork`'s premise is unchanged until lane (a).
+Brief: scratchpad `brief-steady-park.md`.  Phase-1 corrections: the
+run-key vocabulary (`urun_eq`, `urun_eq_of`, `urun_eq_resume` in
+projection form, `uslot_of_urun_eq` from `uslot_ukc`) lives in
+`UexecRet.v` (UexecSlot has no `tf_resume_gpr0`; `ProcInv.upd_upt` is
+outside UexecRet's cone); `steady` is a plain parameter of
+`forkret_park_paid_body` / `wp_forkret_gen_body`, and the boot-arm
+refutation's `first_done` is a premise of `wp_forkret_gen_body` (the
+closer stays a ∀-wand), moved by one more `ctx_move` in the cap's proof;
+two park lemmas, `park_token_park` and `park_token_park_steady`, no
+shared body.  AS LANDED: `park_cap` takes `steady : bool`; `park_pkg`'s
+`Wk : option uvis` is `if steady then Some (uvis_of U []) else None`; a
+`Some` package carries `first_done` and its closer takes `urun_eq Wk U'`;
+`wp_forkret_gen_body` gains `steady` and `if steady then first_done else
+emp`; forkret's steady arm proves the run key by `urun_eq_resume`, its
+boot arm is refuted by `first_tok_boot_excl` in the main theorem, so
+`fkr_boot` keeps `Wk := None`; `ProofKforkB5` parks steady, spending its
+family at `uvis_of Uc stsP`.  Gotcha recorded: `iFrame` past a package
+row reaches INTO `first_done`'s `fs_ready` copies of persistent rows —
+build such packages with `iSplitL`/`iSplitR`.  `UexecCond.uslot_congr`
+has no callers (delete in (a) or (c)).
 
 ## Decisions outstanding (refreshed 2026-09-08)
 

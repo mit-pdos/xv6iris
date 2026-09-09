@@ -1106,6 +1106,13 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
   read at a U-mode key** ("Cannot infer the implicit parameter XI" at the
   instance). Definitions that a receipt or bundle reaches must be CurCtx-free;
   drop dead binders rather than threading a context.
+- **`iFrame` with persistent rows can frame INTO a nested bundle.** Building
+  `ParkCap.park_pkg` with `iFrame "Htext Hwire …"` framed `kernel_text` and the
+  device rows into the copies inside `first_done`'s `fs_ready`, leaving a mode
+  row that was no longer `first_done`; the failure was a bare `iExact … does
+  not match goal`. Build packages that contain other bundles row by row with
+  `iSplitL`/`iSplitR`; diagnose with `iStopProof; match goal with |- bi_entails
+  _ ?p => idtac p end`.
 - **`ghost_map_lookup` against an auth over a UNION is `lookup_union_Some_raw`**
   — do not `rewrite lookup_union` and `cbn`.
 - **Reassembling a record after an `upd_*` can hang even though every unchanged
