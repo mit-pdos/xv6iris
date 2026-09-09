@@ -1097,6 +1097,15 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
   it. To reduce the projections of a LITERAL record (e.g. a `pfam` pair's
   `pf_recv`/`pf_refund`), use `cbn [pf_recv pf_refund]`, naming exactly the
   projections; never `/=`.
+- **stdpp's `f_equiv` enumerates arities and stops at FIVE.** A
+  `solve_contractive`/`f_equiv` over a seven-argument application (e.g.
+  `UexecSG.spost_at`) fails with a bare `No applicable tactic` and no goal.
+  `UexecSG.f_equiv_wide` / `solve_contractive_wide` are stdpp's own fallback
+  pattern extended to six and seven; use them for such fixpoints.
+- **A `` `{XI : CurCtx} `` binder that no body reads still blocks any definition
+  read at a U-mode key** ("Cannot infer the implicit parameter XI" at the
+  instance). Definitions that a receipt or bundle reaches must be CurCtx-free;
+  drop dead binders rather than threading a context.
 - **`ghost_map_lookup` against an auth over a UNION is `lookup_union_Some_raw`**
   — do not `rewrite lookup_union` and `cbn`.
 - **Reassembling a record after an `upd_*` can hang even though every unchanged

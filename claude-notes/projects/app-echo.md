@@ -28,8 +28,8 @@ binaries at every reboot).
   armed post back at those families; the generic slot mints from the
   supply (`app_sup`, born at boot from `Happ_sup`); `app_auto`/`Happ_auto`
   are GONE.  The application's obligations are `Hbirth`, `Happ_xfer`,
-  `Happ_init`, `Happ_sup`, the ledger's and `Hphi`.  Owed to L6: the
-  chdir/open arm split (their returned posts are `emp`), fork's real row.
+  `Happ_init`, `Happ_sup`, the ledger's and `Hphi`.  Owed to L6: fork's
+  real row (the chdir/open receipt split landed: RECEIPT-SPLIT).
 - [x] ~~**L3 — round E of `app-instances.md`**~~ (kernel side, application-
   independent).  LANDED: every view move on a dispatched path is an AU fire
   or a `_step`; link, mkdir, create's legs, the write and `iput`'s free are
@@ -866,6 +866,95 @@ admits and its extra cost is the tag plumbing, which L5 owes in either case.
   the one used), `KEXECB3`'s consumer-less seal, `KexecOkQ`'s single-
   instantiation `Q` hole.
 
+#### RECEIPT-SPLIT (LANDED 2026-09-08) — chdir's and open's posts stop being `emp`
+
+The ARM's post at 9 and 15 is `emp` because the landed arms bundle
+`proc_priv`, the fd bundle and `fd_slot`.  The lane splits each arm into a
+KERNEL half (what the dispatcher's tail keeps: the block, the fd bundle,
+`fd_slot`, the `fd_frees` head) and a RECEIPT half the process can name,
+and the instance returns the receipt.
+
+THE POST IS READ AT THE RESUME VIEW.  A receipt is worth something only if
+it ties what the walk reached to the key the process resumes at: chdir's
+says the new working directory IS the inum `i` whose row is `ADir e`, and
+open's says the descriptor's state in the resumed table IS
+`FdOpen rd wr (FdInode i γo)` (or `FdDevice ma`) at the inode the path
+resolved to — facts the pure rows (`usys_cwd_ok`, `usys_fd_ok`) leave
+existential.  So `spost_at X n f W r fdv' cw'`: the trap key, the returned
+a0, and the resume key's descriptor view and cwd, bound by the same ∀ in
+`uexec_ret_ret_F` that already binds them.  `sysc_sys_out`/`ut_sys_out`
+and uservec's row carry the two arguments (uservec's exec row already
+takes `U' sts sts'`).  Receipts: `chdir_receipt Γ γfs cw P Pmiss Fo r cw'`
+(fail: `cw' = cw` and the refund; ok: `cw' = i`, the cursor, `arow_at`,
+`pf_recv`); `open_fd_rcpt rb wb t sts r fdv'` (pure: `r = fd`,
+`sts !! fd = Some FdClosed`, `fdv' = <[fd := FdOpen rb wb t]> sts`) inside
+`open_receipt_plain/_create`, mirroring `open_in`.  The arms keep their
+strength; `chdir_arms_split`/`open_arms_split` are the rearrangements the
+tails consume.
+
+AS LANDED.  `UexecSG.spost_at` reads the returned a0 AND the resume key's
+two moving components — the descriptor view and the working directory —
+under the same ∀ of `UexecRet.uexec_ret_ret_F` that binds the four pure
+rows; the route down is `SpecSyscall.sysc_sys_out`,
+`SpecUsertrap.ut_sys_out` (with its `_cong` and `_quiet`) and
+`SpecUservec`'s post row, all at the record and view the round leaves.
+`SpecSysChdir.chdir_receipt` and `SpecSysOpen.open_receipt` (plain and
+create, keyed on O_CREATE as `open_in` is) are the process-nameable halves
+of the two arm families; `chdir_arms_split` (premise `pv_cwi (us_V U) =
+cw`, which the body instantiates) and `open_arms_split` hand the
+dispatcher the kernel half (`proc_priv`, the fragments, `fd_slot`) plus
+the pure row `sysc_fd_ok` needs, and the process the receipt.
+`SpecSysOpenAU.open_fd_rcpt` / `open_fd_ok_split` split open's descriptor
+bundle without moving `open_fd_ok` (the five ProofSysOpenAU* producers are
+untouched).  `UexecExecInst.xv6_spost` pays eight numbers; exec alone pays
+`emp`; `sysc_num_nofs` excludes 9 and 15; `ProofSyscall.sysc_out_chdir` /
+`sysc_out_open` are the two arms' intros.  Three dead `{XI : CurCtx}`
+binders (`open_walk_dead_era`, `open_post_fail_plain/_create`) are gone.
+`UexecSG.f_equiv_wide` / `solve_contractive_wide` carry the two U-mode
+fixpoints past stdpp's five-argument `f_equiv` (durable-notes gotcha).
+Audit unchanged at thirteen.
+
+#### FORK'S REAL ROW — scoped, NOT a single lane (2026-09-08)
+
+What it takes to hand kfork the process's deposited child continuation
+(`uexec_fork_F`'s second conjunct, at the ONE record
+`bump W 0 (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_fd W) (uvis_cwd W)`)
+instead of minting from the supply:
+
+1. `SpecKfork`'s slot premise is a FAMILY over every W with
+   `uvis_fd W = stsP ∧ uvis_cwd W = pv_cwi (us_V Up)` — free in tf, image,
+   perm, sz.  It must become the single record: kfork's contract has to
+   STATE the child's ustate as a function of the parent's (trapframe copied
+   with a0 := 0 — `bump_tf` at 0 — image, perm and sz equal).  Today's
+   proof knows the pieces separately (B4's `Vc'` facts, B6's
+   `upd_pt (upd_sz Vc (pv_sz Up)) P' (pv_tf Vc)`, `SpecUvmcopy`'s pointwise
+   flags) but never assembles them.
+2. THE IMAGE IS THE OBSTACLE.  `SpecUvmcopy`'s post is
+   `M' = umem_write Mnew 0 (4096 * n) (fun a => Mold !!! a)` — agreement on
+   the copied range, `Mnew` elsewhere — not `M' = Mold` as a gmap.  The
+   child arm demands `uvis_M W` on the nose.  RESOLVED: the key's image IS
+   canonical.  `proc_priv` holds the LAZY view (`umem_lazy P sz M`:
+   `is_Some (M !! va) <-> uva_mapped P va \/ uva_live sz va`, unmapped live
+   bytes read zero) and `um_below sz` puts every mapped page below sz, so
+   `dom M` is exactly `[0, pgroundup sz)`.  The child is indexed at the
+   parent's size (the "copied region live in both" premise) and
+   `n = uvm_np sz` covers that whole range, so `umem_write Mnew 0 (4096 n)
+   (Mold !!! ·) = Mold` by `map_eq` — a pure lemma over `umem_write` and the
+   two domain laws, no change to the child arm.
+3. THE PARK RESUMES AT AN EXISTENTIAL RECORD.  `ParkCap.park_pkg`'s
+   closer instantiates the family at `uvis_of U' sts` with U' related to
+   the parked U only by `pv_upt`, `pv_fdg`, `pv_cwi` — because forkret's
+   boot arm runs kexec("/init") between park and resume.  A forked child
+   never runs the boot arm (kfork holds `first_done`), so a STEADY park
+   variant whose closer resumes at the parked record exactly is sound, but
+   it is new ParkCap/ProofForkretPark/SpecForkretParkPaid machinery.
+4. Then the dispatcher's fork arm (`UexecApply` FORK ROW note) instantiates
+   both arms: parent at `r ≠ 0` from `kfork_post`'s pid arm, child handed
+   to kfork.
+
+Three lanes at least: (a) kfork states the child record (with the image
+lemma above); (b) the steady park; (c) the row.  Order after RECEIPT-SPLIT.
+
 ## Decisions outstanding (refreshed 2026-09-08)
 
 Everything ruled on 2026-09-07/08 is implemented up to and including the
@@ -876,8 +965,9 @@ refund record; the ten syscall folds and R-CONJ are on main.  Still open:
 - **L5** — the rx wand's TAG output and the console ledger (the design
   sketch is under "The two options for the generic slot's supply"); the
   console READ arm's receipt is where the tag reaches sh.
-- **L6** — fork's real row (mandatory: re-minting needs the supply);
-  init's `wait(0)` null-window row; echo's own bundles (its pins as
+- **L6** — fork's real row (mandatory: re-minting needs the supply;
+  scoped above — three lanes; the child image's representation is
+  settled: the lazy view is canonical); init's `wait(0)` null-window row; echo's own bundles (its pins as
   cursor/receipt families; the exec slot wand answered from
   `kexec_image_ok`).
 - **Q4** stays provisional (`echo_pred := taint ∨ pins`).
