@@ -1254,6 +1254,7 @@ ProofIget.v
 ProofIput.v
 LinkIput.v
 LinkIget.v
+KforkChild.v
 SpecKfork.v
 SpecSafestrcpy.v
 SpecStrncpy.v

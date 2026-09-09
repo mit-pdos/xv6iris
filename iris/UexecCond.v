@@ -297,44 +297,7 @@ Section UexecCond.
 End UexecCond.
 
 (* ===================================================================== *)
-(* SS4 THE RE-KEY, at two [ustate]s.                                       *)
-(*                                                                         *)
-(* [uslot (uvis_of U sts)] reads [U] through [pv_tf (us_V U)], [us_M U] and *)
-(* the PROJECTION of the table and size -- never the table itself.  So a    *)
-(* slot minted at the state a PARKER holds is a slot at the state a RESUMER *)
-(* produces as soon as those agree, and a fresh TABLE (fork's child) costs  *)
-(* only its projection agreeing -- which uvmcopy's leaf-for-leaf copy       *)
-(* gives.  THE PARK'S OWN RE-KEY IS [UexecRet.uslot_of_urun_eq], stated at  *)
-(* a captured KEY rather than at a second [ustate], because that is the     *)
-(* shape [ParkCap.park_pkg]'s steady closer carries                         *)
-(* ([UexecRet.urun_eq], the premise beside the [pv_fdg] and [pv_cwi]        *)
-(* ones); this one is the [ustate]-to-[ustate] spelling.                    *)
-(* ===================================================================== *)
-Section UexecCondCongr.
-  Context `{!riscvGS Σ}.
-  Context `{!ufdG Σ}.
-  Context `{GEN : GenId} `{XI : CurCtx}.
-  Context `{SG : uexecSG Σ}.
-  Context `{PS : uprogSG Σ}.
-
-  Lemma uslot_congr (U1 U2 : ustate) (sts : list fdstate) :
-    pv_tf (us_V U1) = pv_tf (us_V U2) ->
-    us_M U1 = us_M U2 ->
-    perm_of (ud_um (pv_upt (us_V U1))) (uint (pv_sz (us_V U1)))
-    = perm_of (ud_um (pv_upt (us_V U2))) (uint (pv_sz (us_V U2))) ->
-    (* the break is key material now *)
-    pv_sz (us_V U1) = pv_sz (us_V U2) ->
-    (* ...and so is the cwd's inum *)
-    pv_cwi (us_V U1) = pv_cwi (us_V U2) ->
-    uslot (uvis_of U1 sts) -∗ uslot (uvis_of U2 sts).
-  Proof.
-    intros Htf Hm Hp Hs Hc. rewrite /uvis_of Htf Hm Hp Hs Hc. iIntros "H". iExact "H".
-  Qed.
-
-End UexecCondCongr.
-
-(* ===================================================================== *)
-(* SS5 THE DISCHARGE AT userinit, and the ONE fact about the literal it    *)
+(* SS4 THE DISCHARGE AT userinit, and the ONE fact about the literal it    *)
 (* needs.  userinit's process has the EMPTY user map -- allocproc's arm    *)
 (* delivers [pv_upt V = ProcPtOwn.upt_desc root tfp] and [upt_desc root    *)
 (* tfp = UPTD root tfp emptyset (um_pas emptyset)] -- so the sync branch  *)

@@ -52,9 +52,11 @@ Require Import HartTp.
 Require Import IntrDefs.
 Require Import ProcGeom.
 Require Import PageGeom.
+Require Import PtAdBits.  (* [pte_set_ad] -- uvmcopy's leaves are A/D variants *)
 Require Import PtBuild.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import UserPerm.   (* [perm_of] -- the child's permission view, in the exit clause *)
 Require Import FdSlots FileInv.
 Require Import WpLock.
 Require Import SwtchCtx.
@@ -77,6 +79,7 @@ Require Import SpecKfork.
 Require Import CpuOwn.
 Require Import CodeKfork.
 Require Import ProofKforkParts.
+Require Import KforkChild.  (* the child's record and its three pure laws *)
 Require Import ProofKfork.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -255,6 +258,21 @@ Section KforkPrologue.
         ⌜ npa = proc_addr j /\ (j < NPROC)%nat /\ γs !! j = Some γl2 /\
           pv_ofile (us_V Uc') = replicate NOFILE (zero_reg : mword 64) /\
           pv_cwd (us_V Uc') = (zero_reg : mword 64) ⌝ -∗
+        (* WHAT THE CHILD ALREADY SHARES WITH THE PARENT, and it is exactly
+           the part of the child's record a SLOT reads: [np->sz = p->sz] is
+           the store at +0x40, the image is the parent's page for page (the
+           [_mem] contract's [umem_write] over the whole live region, which
+           [KforkChild.umem_write_copy_id] collapses because the lazy view's
+           domain IS that region), and the permission view is a projection
+           of the table, which uvmcopy rebuilds leaf for leaf
+           ([KforkChild.perm_of_uvmcopy_child]).  [ProofKforkMain] assembles
+           these three with the copied trapframe and the copied cwd inum
+           into the child's RUN KEY, which is what lets kfork be handed ONE
+           slot ([KforkChild.urun_eq_kfork_child], [SpecKfork]'s premise). *)
+        ⌜ pv_sz (us_V Uc') = pv_sz (us_V Up) /\
+          us_M Uc' = us_M Up /\
+          perm_of (ud_um (pv_upt (us_V Uc'))) (uint (pv_sz (us_V Up)))
+            = perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))) ⌝ -∗
         (* IN-LOCK EXIT: allocproc returned holding np->lock, so the index
            carries the trap reserve of the arm the caller will eventually
            return at ([trap_res b]) -- exactly [SpecAllocproc]'s found-arm
@@ -1013,6 +1031,19 @@ Section KforkPrologue.
       iDestruct (proc_ptm_pt with "HCpt") as "HCpt".
       iEval (rewrite (proc_pt_ptm (pv_upt Vc) (uint (pv_sz (us_V Up))))) in "HCpt".
       iDestruct "HCpt" as (MC0) "HCpt".
+      (* THE TWO DOMAIN LAWS, taken HERE because the child's view is about to
+         be spent on the call: both images are the LAZY sz-region view, so
+         both are defined at exactly [0, PGROUNDUP p->sz) -- the parent's by
+         [um_below], the child's because its map is empty.  That is what
+         makes uvmcopy's [umem_write] over the run the parent's map on the
+         nose ([KforkChild.umem_write_copy_id], applied in the success arm
+         below). *)
+      iDestruct (proc_ptm_dom with "HPpt") as %HdomP0.
+      iDestruct (proc_ptm_dom with "HCpt") as %HdomC0.
+      pose proof (KforkChild.umem_dom_live (pv_upt (us_V Up)) (pv_sz (us_V Up))
+                    (us_M Up) HbelP HdomP0) as HlivP.
+      pose proof (KforkChild.umem_dom_live (pv_upt Vc) (pv_sz (us_V Up)) MC0
+                    ltac:(rewrite HCempty; apply um_below_empty) HdomC0) as HlivC.
       iApply (Uvmcopy.wp_uvmcopy_mem_sconf fsc_kalloc N5p (pv_upt (us_V Up)) (pv_upt Vc)
                 (uint (pv_sz (us_V Up))) (uint (pv_sz (us_V Up))) (us_M Up) MC0
                 (trap_res b + K1)%nat eb pme (S lvl) false
@@ -1342,16 +1373,41 @@ Section KforkPrologue.
         iDestruct ("HPwand" $! (pv_upt (us_V Up)) (pv_sz (us_V Up)) (pv_tf (us_V Up)) (us_M Up)
                      with "[%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg") as "HPpriv".
         { reflexivity. } { reflexivity. } { exact HszbP. } { exact HbelP. }
-        (* the child's image is now PRECISE: uvmcopy filled it with the
-           parent's bytes over the copied run, on the nose (the [_mem]
-           contract's [umem_write Mnew 0 (4096*n) (Mold !!! .)]).  The
-           call was opened at exactly the size [np->sz] is about to
-           become, so [HCwand] closes on it directly -- no re-view.  Only
-           the NAME [MCs] is existential here, not the image itself. *)
-        iAssert (∃ Mc : gmap Z (bv 8), proc_ptm P' (uint (pv_sz (us_V Up))) Mc)%I
-          with "[HCpt]" as (MCs) "HCpt".
-        { iExists _. iFrame "HCpt". }
-        iDestruct ("HCwand" $! P' (pv_sz (us_V Up)) (pv_tf Vc) MCs
+        (* THE CHILD'S IMAGE IS THE PARENT'S, as a gmap.  uvmcopy reports it
+           as the parent's bytes WRITTEN OVER whatever the fresh child had
+           ([umem_write Mnew 0 (4096*n) (Mold !!! .)]); both maps are the
+           lazy sz-region view, the run covers that whole region
+           ([ProcPtOwn.uvm_np_live]), so the write IS the parent's map.
+           Naming it [us_M Up] rather than existentially quantifying it is
+           what carries the fact to the park -- see the exit's third pure
+           clause. *)
+        iEval (rewrite HN5pa2) in "HCpt".
+        pose proof (KforkChild.umem_write_copy_id (us_M Up) MC0
+                      (uint (pv_sz (us_V Up))) (uvm_np (pv_sz (us_V Up)))
+                      HlivP HlivC (uvm_np_live (pv_sz (us_V Up)))) as HMimg.
+        iEval (rewrite HMimg) in "HCpt".
+        (* ...AND SO IS ITS PERMISSION VIEW.  uvmcopy rebuilds each leaf as
+           an A/D variant of [uvm_pte (pte_flags10 w) r] -- a new page and a
+           forced PTE_V, and [perm_leaf] reads neither. *)
+        assert (Hin2 : forall i : nat, (i < uvm_np (pv_sz (us_V Up)))%nat ->
+                  match ud_um (pv_upt (us_V Up)) !! vpn_at (svpn_of (mword_of_int 0 : mword 64)) i with
+                  | None => ud_um P' !! vpn_at (svpn_of (mword_of_int 0 : mword 64)) i
+                            = ud_um (pv_upt Vc) !! vpn_at (svpn_of (mword_of_int 0 : mword 64)) i
+                  | Some w => exists (r w' : mword 64) (a d : mword 1),
+                      ud_um P' !! vpn_at (svpn_of (mword_of_int 0 : mword 64)) i = Some w' /\
+                      w' = pte_set_ad (uvm_pte (pte_flags10 w) r) a d
+                  end).
+        { intros i Hi. specialize (Hin i Hi).
+          destruct (ud_um (pv_upt (us_V Up)) !! vpn_at (svpn_of (mword_of_int 0 : mword 64)) i)
+            as [w0 |] eqn:Heqw0.
+          - destruct Hin as (r & w' & a & d & _ & Hpv & Hpte).
+            exists r, w', a, d. split; [exact Hpv | exact Hpte].
+          - exact Hin. }
+        pose proof (KforkChild.perm_of_uvmcopy_child (pv_sz (us_V Up))
+                      (svpn_of (mword_of_int 0 : mword 64))
+                      (pv_upt (us_V Up)) (pv_upt Vc) P'
+                      KforkChild.svpn_of_zero HCempty HbelP Hout Hin2) as Hpermc.
+        iDestruct ("HCwand" $! P' (pv_sz (us_V Up)) (pv_tf Vc) (us_M Up)
                      with "[%] [%] [%] [%] HCsz HCpg HCpt HCtf HCtfpg") as "HCpriv".
         { exact Hroot2. } { exact Htf2. } { exact HszbP. } { exact HbelC'. }
         iEval (rewrite (kfk_priv_close_id (us_V Up))) in "HPpriv".
@@ -1374,9 +1430,9 @@ Section KforkPrologue.
         iSpecialize ("Hcont4a" $! CID11 with "[%]"); [wp_next_chain|].
         iSpecialize ("Hcont4a" $! CID28 with "[%]"); [wp_next_chain|].
         iApply ("Hcont4a" $! N10 npa j γl2 pid_c ch
-                  (MkUstate (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc)) MCs)
+                  (MkUstate (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc)) (us_M Up))
                   (ud_tfp (pv_upt (us_V Up))) (ud_tfp (pv_upt Vc))
-                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv Hpfrag HCpriv
+                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv Hpfrag HCpriv
                         Hcfrag
                         Hmk Hheld Hhart Hfdsp Hirsp Hbslp Hkstk [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
         * exact HN10sp.
@@ -1390,6 +1446,8 @@ Section KforkPrologue.
         * split_and!; [reflexivity | exact HjN | exact Hgamma
                       | cbn [upd_pt upd_sz pv_ofile pv_fdg]; exact HVcof
                       | cbn [upd_pt upd_sz pv_cwd pv_fdg]; exact HVccwd].
+        * split_and!; [reflexivity | reflexivity |
+                       cbn [upd_pt upd_sz pv_upt pv_fdg]; exact Hpermc].
         * iExists ks, rest. iSplitR; [iPureIntro; exact Hrestlen|].
           iFrame "Hks Hctx".
         * iExact "Henv'".

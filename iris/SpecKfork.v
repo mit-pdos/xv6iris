@@ -174,8 +174,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import SyscParkEnv ParkCap.   (* [park_world] / [park_token] *)
 Require Import UexecSlot. (* [uvis] -- the slot's key *)
-Require Import UexecRet.  (* [uslot] -- the slot family kfork spends at the
-                             park.  Required DIRECTLY (durable-notes). *)
+Require Import UexecRet.  (* [uslot] -- the slot kfork spends at the park.
+                             Required DIRECTLY (durable-notes). *)
+Require Import KforkChild. (* [kfork_child] -- the record it is spent at *)
 Require Import Xv6Cameras.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -279,32 +280,27 @@ Definition wp_kfork_sconf_body
      which would be a module cycle, since that proof runs the trap loop
      kfork sits inside.  See ParkCap.v. *)
   park_token γs -∗
-  (* THE SLOT FAMILY FOR THE CHILD, spent at the park.  A LINEAR premise,
-     and the reason kfork's contract has one: what the child's trap loop
-     will run is a resource of the child, and it is paid by whoever forks --
-     sys_fork, the one caller, mints the generic inhabitant for it.  Nothing
+  (* THE CHILD'S SLOT, spent at the park.  A LINEAR premise, and the reason
+     kfork's contract has one: what the child's trap loop will run is a
+     resource of the child, and it is paid by whoever forks.  Nothing
      persistent in the tree carries one ([SyscParkEnv.park_world] used to),
      so this premise is what makes the parent responsible for its child.
-     KFORK SPENDS IT AT ONE RECORD.  The park it reaches is the STEADY one
-     ([ParkCap.park_token_park_steady]) -- kfork holds [FirstTok.first_done]
-     below, so the child can never be resumed through forkret's boot arm,
-     and the package therefore takes a single slot at the parked record and
-     re-keys it at the resume ([UexecRet.urun_eq]).  So [ProofKforkB5]
-     instantiates this family at [uvis_of Uc stsP], the record kfork just
-     built, and hands that one slot on.  The family shape SURVIVES here only
-     because kfork's contract does not yet STATE the child's record as a
-     function of the parent's; when it does, this premise becomes that one
-     slot and the instantiation disappears.
-     ...AND IT IS RESTRICTED TO THE PARENT'S OWN TABLE, which is what makes
-     "a parent with a continuation for its child can pay" true rather than
-     aspirational: the child is parked with [stsP] and resumed at a key
-     whose descriptor view is [stsP], so a family covering every OTHER view
-     is asking for what is never used -- and a parent with a continuation
-     for its child has one at its own table and at no other. *)
-  (* ...AND TO THE PARENT'S OWN WORKING DIRECTORY, for the same reason:
-     the child's block is built at the parent's inum
-     ([ProofKforkB4]'s post) and resumed at a key carrying it. *)
-  (∀ W : uvis, ⌜uvis_fd W = stsP /\ uvis_cwd W = pv_cwi (us_V Up)⌝ -∗ uslot W) -∗
+     ONE SLOT, AT THE RECORD KFORK STATES.  [KforkChild.kfork_child] is the
+     child's user-visible state as a function of the parent's -- the
+     parent's trapframe with a0 := 0, its address space, its size, its
+     descriptor table, its working directory -- so a caller with a
+     continuation for its child pays for exactly that continuation and for
+     nothing else.  The record the child is actually parked at differs from
+     it only in what the slot does not read ([UexecApply.uslot_key_cong]):
+     allocproc's page-table root and trapframe page, the child's own
+     descriptor pointers, ghost names and name bytes, and the KERNEL words
+     of the trapframe.  So the park re-keys, and it may: kfork holds
+     [FirstTok.first_done] below, so the child can never be resumed through
+     forkret's boot arm and the park it reaches is the STEADY one
+     ([ParkCap.park_token_park_steady]), whose closer resumes at a record
+     with the parked run key ([UexecRet.urun_eq],
+     [KforkChild.urun_eq_kfork_child]). *)
+  uslot (uvis_of (kfork_child Up) stsP) -∗
   (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
      take out of the parent's block: the parent's token may be the EXCLUSIVE
      boot arm, and the child needs a token of its own.  [first_done] is

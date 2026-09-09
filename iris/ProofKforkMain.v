@@ -117,6 +117,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import UserPtTree.
+Require Import UserPerm.   (* [perm_of] -- the child's permission view, in the run key *)
 Require Import FdSlots FileInv.
 Require Import WpLock.
 Require Import SwtchCtx.
@@ -142,10 +143,12 @@ Require Import SpecIdup.
 Require Import SpecSafestrcpy.
 Require Import SyscParkEnv ParkCap.
 Require Import UexecSlot. (* [uvis] *)
-Require Import UexecRet.  (* [uslot] -- the generic family, threaded to [B5]
-                             beside the WP.  Required DIRECTLY. *)
+Require Import UexecRet.  (* [uslot] / [urun_eq] -- the child's single slot
+                             and its run key, threaded to [B5] beside the
+                             WP.  Required DIRECTLY. *)
 Require Import SpecKfork.
 Require Import ProofKforkParts.
+Require Import KforkChild.  (* [kfork_child] / [urun_eq_kfork_child] *)
 Require Import ProofKfork.
 Require Import ProofKforkB1.
 Require Import ProofKforkB2.
@@ -474,6 +477,16 @@ Section KforkArms.
     npa = proc_addr j -> (j < NPROC)%nat -> γs !! j = Some γl2 ->
     pv_ofile (us_V Uc') = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd (us_V Uc') = (zero_reg : mword 64) ->
+    (* WHAT THE CHILD ALREADY SHARES WITH THE PARENT ([ProofKforkB6]'s exit
+       clause of the same name): the size uvmcopy was run at, the image it
+       copied and the permission view it rebuilt.  With the trapframe the
+       loop below copies and the cwd inum B4 duplicates, these ARE the
+       child's run key, which is what lets the slot premise be a single
+       slot ([KforkChild.urun_eq_kfork_child]). *)
+    pv_sz (us_V Uc') = pv_sz (us_V Up) ->
+    us_M Uc' = us_M Up ->
+    perm_of (ud_um (pv_upt (us_V Uc'))) (uint (pv_sz (us_V Up)))
+      = perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))) ->
     (* THE FLOOR OF THIS CONE IS wait_lock (8), which kfork takes AFTER
        releasing np->lock (kernel/proc.c:295) and which ProofKforkB5 states.
        allocproc's "proc" (9) is the call the function is about and the one
@@ -535,12 +548,12 @@ Section KforkArms.
        through to [B5.kfk_b5] *)
     park_world γs -∗
     park_token γs -∗
-    (* ...and the child's SLOT FAMILY, also straight through to
-       [B5.kfk_b5], where the park captures it -- restricted to the parent's
-       own table, which is the one the child is parked and resumed at.
-       LINEAR, unlike the two rows above it: see [SpecKfork]'s premise of the
-       same name. *)
-    (∀ W : uvis, ⌜uvis_fd W = stsP /\ uvis_cwd W = pv_cwi (us_V Up)⌝ -∗ uslot W) -∗
+    (* ...and the child's SLOT, also straight through to [B5.kfk_b5], where
+       the park captures it -- at the record kfork STATES from the parent,
+       which this proof re-keys onto the record the child is actually parked
+       at.  LINEAR, unlike the two rows above it: see [SpecKfork]'s premise
+       of the same name. *)
+    uslot (uvis_of (kfork_child Up) stsP) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
@@ -552,7 +565,7 @@ Section KforkArms.
   Proof.
     intros HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMts5
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
-      Hofnull Hcwdnull Hbelow.
+      Hofnull Hcwdnull Hshsz Hshimg Hshperm Hbelow.
     subst tfsrc tfdst.
     iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag HCpriv Hcfrag #Hmk
              Hheld Hhart Hfd Hbsl Hkst Hctxex Hpay Hkalloc #Hwlock #Hft
@@ -678,27 +691,38 @@ Section KforkArms.
       iEval (rewrite Hnpa) in "Hpvcx4".
       iEval (rewrite Hnpa) in "Hmk".
       iEval (rewrite Hnpa) in "Hkst".
-      (* THE FAMILY, RE-KEYED ONTO THE CHILD'S BLOCK: it arrived restricted
-         to the PARENT's working directory ([SpecKfork]'s premise), and the
-         child's block was built at that inum (B4's post, lane C1), so the
-         two restrictions are the same one. *)
-      assert (Hcwi4 : pv_cwi Vc4 = pv_cwi (us_V Up))
-        by (destruct HVc4 as (_ & _ & _ & _ & _ & _ & _ & Hc); exact Hc).
-      iAssert (∀ W : uvis,
-                 ⌜uvis_fd W = stsP
-                  /\ uvis_cwd W = pv_cwi (us_V (MkUstate Vc4 ((us_M Uc'))))⌝
-                 -∗ uslot W)%I with "[Hjslot]" as "Hjslot".
-      { iIntros (W) "%HW". iApply "Hjslot". iPureIntro.
-        cbn [us_V] in HW. rewrite Hcwi4 in HW. exact HW. }
+      (* THE RUN KEY.  The slot arrived at [uvis_of (kfork_child Up) stsP],
+         the record [SpecKfork] states from the parent; the child is parked
+         at [MkUstate Vc4 (us_M Uc')].  The two agree on every projection a
+         slot reads: the trapframe is the parent's with a0 := 0 (B2's copy
+         loop through [V1], B7's store through [V2], both preserved by the
+         fd scan and by B4), the image, the size and the permission view are
+         B6's exit clause, and the cwd inum is B4's post.  So the park may
+         take the ONE slot ([ParkCap.park_token_park_steady], via
+         [UexecRet.uslot_of_urun_eq] inside [B5.kfk_b5]). *)
+      assert (Hshperm' : perm_of (ud_um (pv_upt (us_V Uc'))) (uint (pv_sz (us_V Uc')))
+                         = perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))))
+        by (rewrite Hshsz; exact Hshperm).
+      assert (Hurun : urun_eq (uvis_of (kfork_child Up) stsP)
+                        (MkUstate Vc4 ((us_M Uc')))).
+      { destruct HVc4 as (Hs & Hu & Ht & _ & _ & _ & _ & Hc).
+        apply urun_eq_kfork_child.
+        - exact Ht.
+        - exact Hshimg.
+        - cbn [us_V]. rewrite Hu Hs. exact Hshperm'.
+        - cbn [us_V]. rewrite Hs. exact Hshsz.
+        - cbn [us_V]. exact Hc. }
       (* ---- ProofKforkB5: the two lock crossings, the RUNNABLE park ---- *)
       (* pass B5's exit arm as THIS proof's [b] (with [eq_sym Hbeq] for B5's
          own [b = match lvl ...] premise) rather than as the [match] itself:
          the in-lock index we are handing it is spelled [trap_res b + (K - 8)],
          and B5's entry index has to be syntactically that. *)
       iApply (B5.kfk_b5 γs γf γw γl γl2 j mf4 K lvl eb b
-                pme ks pid_c (MkUstate Vc4 ((us_M Uc'))) stsP ch rest
+                pme ks pid_c (MkUstate Vc4 ((us_M Uc'))) stsP
+                (uvis_of (kfork_child Up) stsP) ch rest
                 (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
+                Hurun eq_refl
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock Hft Hworld Htoken Hfdone
                       Hheld Hhart Hpvcx4 Hcfrag Hjslot Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
       all: try lkbelow.
@@ -848,10 +872,11 @@ Section KforkMain.
     - (* ---- arm 3: uvmcopy succeeded, the copy loop's head at +0x4a ---- *)
       iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Uc' tfsrc tfdst).
       destruct Uc' as [Vc' Mc].
-      iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures".
+      iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures %Hshare".
       iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcfrag #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
                Hke #Hwl #Hft #Hit #Hiti HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
+      destruct Hshare as (Hshsz & Hshimg & Hshperm).
       destruct Htfs as (Htfsrc & Htfdst).
       iApply (kfork_arm3 (CID0 := CID3) γf γw γl γs
  m K lvl eb b pme
@@ -861,7 +886,7 @@ Section KforkMain.
                 (wpk_K_ge56 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
-                Hnpa HjN Hgamma Hofn Hcwdn ltac:(lkbelow)
+                Hnpa HjN Hgamma Hofn Hcwdn Hshsz Hshimg Hshperm ltac:(lkbelow)
                 with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag HCp Hcfrag Hmk Hheld Hhart
                       Hfd Hbsl Hkst Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone Hworld Htoken Hjslot
                       [HR]").

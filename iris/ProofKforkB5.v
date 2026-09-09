@@ -83,8 +83,10 @@ Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the r
 Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
 Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
 Require Import UexecSlot. (* [uvis] *)
-Require Import UexecRet.  (* [uslot] -- the slot family, in the proofmode
-                             context here, so this Require is DIRECT *)
+Require Import UexecRet.  (* [uslot] / [urun_eq] / [uslot_of_urun_eq] -- the
+                             child's slot and the re-key the park does with
+                             it, both in the proofmode context here, so this
+                             Require is DIRECT *)
 Require Import SpecAcquire SpecRelease.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
@@ -160,7 +162,7 @@ Section ProofKforkB5.
       (γs : list gname) (γf γw γft γl : gname) (j : nat)
       (Mt : regfile) (K lvl : nat) (eb b : bool)
       (pme ks : mword 64) (pid_c : mword 32) (Uc : ustate)
-      (stsP : list fdstate)
+      (stsP : list fdstate) (Wk : uvis)
       (ch : mword 64) (rest : list (mword 64)) (rv : mword 64)
       (lks : gset string) :
     (18 <= K)%nat ->
@@ -172,6 +174,16 @@ Section ProofKforkB5.
     Mt !!! Regidx Rs4 = ProcGeom.proc_addr j ->
     Mt !!! Regidx Rs5 = pme ->
     Mt !!! Regidx Rs1 = rv ->
+    (* THE CHILD'S RUN KEY.  The slot below is captured at [Wk], and [Wk]
+       agrees with the record the child is parked at on everything a slot
+       reads besides the descriptor view ([UexecRet.urun_eq]) -- which is
+       the second premise.  So the park's steady closer, which resumes at a
+       record with the parked run key, can hand that one slot back
+       ([UexecRet.uslot_of_urun_eq]).  The caller names [Wk]: kfork's is
+       [uvis_of (KforkChild.kfork_child Up) stsP], the record [SpecKfork]
+       states from the parent. *)
+    urun_eq Wk Uc ->
+    uvis_fd Wk = stsP ->
     (* THE FRESHNESS PREMISE, AT THE LOWEST RANK THIS BLOCK TOUCHES:
        "wait_lock" (10), acquired directly at +0xd0; "proc" (11), released
        immediately on entry and re-acquired at +0xe6, is higher and follows
@@ -208,13 +220,12 @@ Section ProofKforkB5.
        park is keyed at it, which is how a forked child's descriptors become
        stateable at all. *)
     FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Uc)) stsP -∗
-    (* ...and the SLOT FAMILY for the child, on the very same route:
-       kfork's caller supplies it ([SpecKfork]'s premise of the same name),
-       the park captures it into the resume closer, and that closer
-       instantiates it at the record the child actually resumes with -- whose
-       descriptor view is [stsP], which is why the family is restricted to
-       that table.  LINEAR -- see claude-notes/design/user-wp-slot.md. *)
-    (∀ W : uvis, ⌜uvis_fd W = stsP /\ uvis_cwd W = pv_cwi (us_V Uc)⌝ -∗ uslot W) -∗
+    (* ...and the SLOT for the child, on the very same route: kfork's caller
+       supplies it ([SpecKfork]'s premise of the same name), the park
+       captures it, and the resume hands it back at the record the child
+       actually resumes with -- which has [Wk]'s run key.  LINEAR -- see
+       claude-notes/design/user-wp-slot.md. *)
+    uslot Wk -∗
     (* the slot's ALLOCATION MARKER, minted by allocproc and carried here
        through kfork's body: every non-UNUSED arm of the lock invariant
        holds it, so both releases below need it ([ProcAvail.v]).
@@ -238,7 +249,7 @@ Section ProofKforkB5.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hfresh.
+    intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hurun Hkfd Hfresh.
     iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv Hfrag Hjslot #Hmk
              Hfd Hirsp Hbsl Hkfree #Hks Hctx Hcont".
     (* -------------------------------------------------------------- *)
@@ -289,16 +300,14 @@ Section ProofKforkB5.
        keyed at it. *)
     (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    (* THE FAMILY, SPENT AT THE ONE RECORD THE PARK IS AT.  This parker holds
+    (* THE SLOT, RE-KEYED ONTO THE RECORD THE PARK IS AT.  This parker holds
        [FirstTok.first_done], so the child can never be resumed through
        forkret's boot arm and the park is the STEADY one
-       ([ParkCap.park_token_park_steady]): it takes a slot at the parked
-       record and re-keys it at the resume, instead of a family over every
-       record at this table.  The family's own two side conditions are the
-       projection's, hence [reflexivity]; a caller with a continuation for
-       ONE record is what [SpecKfork]'s premise will become. *)
-    iDestruct ("Hjslot" $! (uvis_of Uc stsP) with "[%]") as "Hjslot";
-      [ split; reflexivity |].
+       ([ParkCap.park_token_park_steady]): it takes ONE slot at the parked
+       record, instead of a family over every record at this table.  The
+       caller's slot is at [Wk], which has that record's run key, and the
+       congruence is what carries it there. *)
+    iEval (rewrite (uslot_of_urun_eq Wk Uc stsP Hurun Hkfd)) in "Hjslot".
     iMod (park_token_park_steady N rest Uc stsP Hwf Hrest
             with "Hrun Htoken Htext Hwire Hsup Htramp Hmk Hstack Henv Hown_park Hfdone Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirsp]")

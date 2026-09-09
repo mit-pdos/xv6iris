@@ -47,6 +47,7 @@ Require Import UexecSlot. (* [uvis] *)
 Require Import UexecRet.  (* [uslot] -- DIRECT, the seal does not travel *)
 Require Import UexecCond. (* [cond_entry_slot] -- the conditional mint *)
 Require Import UexecExecMint. (* [uslot_mint] -- it, at the kernel's instance *)
+Require Import KforkChild.    (* [kfork_child] -- the record the slot is at *)
 Require Import SyscParkEnv.   (* [park_world_sup] -- the supply, off the world *)
 Require Import AppInv.        (* [app_sup] -- the credential the mint runs on *)
 From Kernel Require KernelInstrs.
@@ -206,28 +207,23 @@ Section ProofSysFork.
     (* the pair arrives NAMED (rank 1d): [fsc_kpages] is a [FsCfg.fscfg]
        field, so there is no existential left to open. *)
     iPoseProof "Henv" as "#Henvn".
-    (* THE MINT.  kfork consumes a slot family for the child it parks; the
-       [box] is eliminated once, here, into the LINEAR resource the contract
-       wants.  Via
-       [UexecCond.cond_entry_slot] rather than the bare generic inhabitant
-       [uexec_wp_uslot]: a process whose key qualifies picks up sync's own
-       constructor instead, which is the whole point of the conditional
-       probe.  The family, not a keyed slot -- the park cannot know the key
-       the resume will land on (projects/user-wp-slot.md SS4c, R-b). *)
-    (* AT THE PARENT'S OWN TABLE.  kfork's premise is the family restricted
-       to the descriptor view the child is parked and resumed at, which the
-       generic inhabitant satisfies by ignoring the restriction -- and which
-       is the shape a VERIFIED parent's fork-continuation can be handed in
-       instead. *)
-    iAssert (∀ W : uvis, ⌜uvis_fd W = sts /\ uvis_cwd W = pv_cwi (us_V U)⌝ -∗ uslot W)%I
-      as "Hjslot".
+    (* THE MINT.  kfork consumes ONE slot for the child it parks, at the
+       record its contract states from the parent
+       ([KforkChild.kfork_child]), and this is where that slot is paid for:
+       out of the application's supply, through the generic inhabitant
+       ([UexecExecMint.uslot_mint] gives [∀ W, uslot W], instantiated here
+       at that one record).  A verified parent hands its own
+       fork-continuation in at the SAME record instead, which is what makes
+       the premise a single slot rather than a family -- and is the whole
+       point of stating the child's state as a function of the parent's. *)
+    iAssert (uslot (uvis_of (kfork_child U) sts))%I as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
       (* the supply the mint runs on rides the world a park needs
          ([SyscParkEnv.park_world]) -- the premise that already threads
          usertrap -> syscall -> sys_fork -> kfork *)
       iDestruct (SyscParkEnv.park_world_sup with "Hworld") as "#Hsup".
       iDestruct (UexecExecMint.uslot_mint with "Hsup Hgen") as "#Hmk".
-      iIntros (W) "_". iApply "Hmk". }
+      iApply "Hmk". }
     iApply (Kfork.wp_kfork_sconf γp γw γl γf γs
 
               Bj lvl (av - 2)%nat eb p b pid U sts lks
