@@ -663,7 +663,9 @@ Section LoopApply.
      way is what lets a syscall move the process's fd view.
 
      Read the proof below for why the other three arms do not want it.  The
-     exec and fork arms [iApply "Hmk"] -- a kernel MINT, free at ANY key.
+     exec arm is the process's own deposit, answered at the key the kernel
+     built; fork's pid-wrap row takes the kernel MINT, free at ANY key --
+     the loop's last one.
      The returning ecall arm instantiates [uexec_ret]'s own ∀-bound [fdv']
      at [uvis_fd W'], which is arbitrary: "the process is safe at every
      return value AND every descriptor view the kernel hands back" is
@@ -820,7 +822,10 @@ Section LoopApply.
     (* THE KERNEL'S EXEC ANSWER:
        exec is the one entry whose round says nothing, because the record it
        leaves is a DIFFERENT program's.  The dispatcher answers with the
-       failure facts, the new image's slot, or the loadability gap. *)
+       failure facts or the new image's slot -- both of kexec's success arms
+       pay the slot out of the process's OWN exec deposit
+       ([SpecKexec.exec_slot_pre]'s two wands), so there is no third arm and
+       the round mints nothing at exec. *)
     (⌜sc = uecall_scause /\ usys_num (uvis_tf (uvis_run W)) = USYS_exec⌝ -∗
        (⌜exists r : mword 64,
            uround_bump_ok (uvis_tf (uvis_run W)) (uvis_tf W') r
@@ -828,8 +833,7 @@ Section LoopApply.
                 (uvis_M W) (uvis_perm W) (uvis_sz W)
                 (uvis_M W') (uvis_perm W') (uvis_sz W')
            /\ uvis_fd W' = uvis_fd W⌝
-        ∨ uslot W'
-        ∨ ⌜uvis_tf W' !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝)) -∗
+        ∨ uslot W')) -∗
     (* ...AND THE ARMED POST the deposit bought, at the value the round
        bound.  Owed only on the RETURNING arm -- exit hands nothing back and
        fork pays no receipt (what its deposit buys is the CHILD's
@@ -863,8 +867,8 @@ Section LoopApply.
           as [Hx | _]; [ exfalso; rewrite Hexec in Hx; discriminate Hx | ].
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_fork))
           as [Hx | _]; [ exfalso; rewrite Hexec in Hx; discriminate Hx | ].
-        iDestruct ("Hxo" with "[%]") as "[%Hfail | [Hslot | %Hgap]]";
-          [ split; [exact Hec | exact Hexec] | | | ].
+        iDestruct ("Hxo" with "[%]") as "[%Hfail | Hslot]";
+          [ split; [exact Hec | exact Hexec] | | ].
         * (* failed: the returning arm at [r = -1].  Its cwd row is the
              round's exec disjunct: exec inherits, so the field did not
              move, and exec is not chdir. *)
@@ -882,10 +886,8 @@ Section LoopApply.
                     (Hfdrow Hec) (Hpiperow Hec) Hc with "[Hsp] Hret").
           (* the post is at the a0 word, which the failure arm pins to [r] *)
           iExact "Hsp".
-        * (* loadable: the new image's slot *)
+        * (* succeeded: the new image's slot, out of the deposit *)
           iExact "Hslot".
-        * (* the loadability gap: the mint *)
-          iApply "Hmk".
       + cbv zeta.
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_exit))
           as [Hx | _]; [ contradiction (Hnex Hx) | ].
@@ -1032,8 +1034,7 @@ Section LoopApply.
                 (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
                 (uint (pv_sz (us_V U')))
            /\ fdv' = uvis_fd W⌝
-        ∨ uslot (uvis_of U' fdv')
-        ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝)) -∗
+        ∨ uslot (uvis_of U' fdv'))) -∗
     (⌜sc = uecall_scause
       /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_exit
       /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_fork⌝ -∗

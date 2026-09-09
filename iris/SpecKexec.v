@@ -82,8 +82,10 @@
            path names, so a directory whose dirent bytes begin with the
            ELF magic is exec'd (a finding of the phase-A proof,
            2026-09-04).  The landed success conjuncts hold at SOME entry,
-           the receipt and the WP premise come back, and the kernel mints
-           the generic slot as it does today.
+           and the kernel returns THE CALLER'S WP again -- the SECOND wand
+           of [exec_slot_pre], applied at [exec_key_ok], the part of those
+           conjuncts that speaks about the resume key.  The receipt is
+           consumed by that wand, and the kernel mints nothing.
    - ret = -1 (FAILURE): the landed failure arm ([V' = V]) beside the
      honest three-way fold of the bundle: (i) nothing fs-visible fired
      (begin_op/namei not reached: unspent bundle back); (ii) the walk died
@@ -128,7 +130,8 @@
    page-aligned segment starts, ascending non-overlapping segments).
    Success arm (b) is the honest residue: the code CAN succeed on a file
    outside the set, and this contract then promises nothing about the
-   image and keeps today's generic mint.  Tightening the set toward the
+   image -- only [exec_key_ok], and the caller pays for that case out of
+   its own deposit's second wand.  Tightening the set toward the
    code's test is the prover's finding to report, never a premise to
    strengthen here.
 
@@ -193,8 +196,8 @@
    its arguments learns that the only way exec fails after resolving
    its path is running out of memory -- and that on success it holds
    its own WP at the image it computed.  A caller that proves nothing
-   about the file runs under the generic user-mode safety WP, which
-   does not care what the image holds, and takes arm (b).
+   about the file answers arm (b)'s wand with the generic user-mode
+   safety WP, which does not care what the image holds.
 
    ==== WHERE THE PROOF PAYS EACH PIECE ================================
 
@@ -445,6 +448,31 @@ Definition exec_key (U' : ustate) (sts : list fdstate) (na : nat) : uvis :=
                        (pv_tf (us_V U'))))
           sts.
 
+(* WHAT A SUCCESSFUL kexec PINS ABOUT THE RESUME KEY WHEN THE NODE IS NOT A
+   LOADABLE FILE (header, THE ACCEPTANCE PREDICATE).  [KexecDefs.kexec_ok]'s
+   success conjuncts, read at the key -- and NOTHING ELSE, because outside
+   [kexec_loadable] the contract promises nothing about the image: neither
+   [uvis_M] nor [uvis_perm] occurs below.  THE ENTRY POINT IS NOT HERE
+   either: [kexec_ok] pins the epc word to a value the file the code
+   accepted has no ELF semantics to name, so the row would say nothing and
+   is not stated.  What is left is sp and a1 at the argument vector, argc,
+   the stack geometry, the argument-count bound and the descriptor view --
+   enough for a slot constructor to resume on, and enough for a process
+   whose own pin says the observed node IS its image's loadable file to
+   refute the case outright. *)
+Definition exec_key_ok (na : nat) (alen : nat -> nat) (sts : list fdstate)
+    (W' : uvis) : Prop :=
+  let spv := (mword_of_int (kxc_sp_final (uvis_sz W') alen na) : mword 64) in
+  tf_w (uvis_tf W') (tf_arg_idx 0) = (mword_of_int (Z.of_nat na) : mword 64)
+  /\ tf_w (uvis_tf W') kxc_tf_sp_idx = spv
+  /\ tf_w (uvis_tf W') (tf_arg_idx 1) = spv
+  /\ (uvis_sz W' - 4096 <= uint spv)%Z
+  /\ (uint spv <= uvis_sz W')%Z
+  /\ kxc_stack_ok (uvis_sz W') (uvis_sz W' - 4096) alen na
+  /\ (na <= MAXARG)%nat
+  /\ uvis_fd W' = sts
+  /\ length (uvis_tf W') = TFWORDS.
+
 (* THE KEY'S WORKING DIRECTORY IS THE BLOCK'S, and the block's is the
    caller's: exec inherits the cwd ([KexecDefs.kexec_ok]'s row, read off
    [kexec_ok_exec] by [kexec_ok_exec_cwi]).  So [kexec_image_ok] names no
@@ -461,6 +489,82 @@ Proof.
   intros (e & spv & szv' & _ & Hne & Hok).
   destruct Hok as [[Hr _] | Hs]; [ contradiction (Hne Hr) | ].
   destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hcwi & _). exact Hcwi.
+Qed.
+
+(* THE KEY'S THREE OTHER READINGS, beside [exec_key_cwd]: the trapframe is
+   the post-exec frame with argc inserted, the size and the descriptor view
+   are the block's. *)
+Lemma exec_key_tf (U' : ustate) (sts : list fdstate) (na : nat) :
+  uvis_tf (exec_key U' sts na)
+  = <[tf_arg_idx 0 := (mword_of_int (Z.of_nat na) : mword 64)]> (pv_tf (us_V U')).
+Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
+
+Lemma exec_key_sz (U' : ustate) (sts : list fdstate) (na : nat) :
+  uvis_sz (exec_key U' sts na) = uint (pv_sz (us_V U')).
+Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
+
+Lemma exec_key_fd (U' : ustate) (sts : list fdstate) (na : nat) :
+  uvis_fd (exec_key U' sts na) = sts.
+Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
+
+(* THE SUCCESS CONJUNCTS AT THE RESUME KEY.  [KexecDefs.kexec_ok]'s second
+   arm read through [exec_key]: the three trapframe words the commit block
+   and the dispatcher's a0 store leave, the size and the stack bounds, and
+   the descriptor view.  The entry frame's length is a premise -- [kxc_tf]
+   is three inserts, which preserve it, and nothing in [kexec_ok] says what
+   it was.  This is the fact success arm (b) hands the deposit's second
+   wand. *)
+Lemma kexec_ok_exec_key_ok (U U' : ustate) (sts : list fdstate)
+    (r entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) :
+  length (pv_tf (us_V U)) = TFWORDS ->
+  r <> (mword_of_int (-1) : mword 64) ->
+  kexec_ok (us_V U) (us_V U') r entry spv szv' na alen ->
+  exec_key_ok na alen sts (exec_key U' sts na).
+Proof.
+  intros Hlen Hne Hok.
+  destruct Hok as [(Hr & _) | Hok]; [ contradiction (Hne Hr) | ].
+  destruct Hok as (Hr & Hna & Hstok & Hpsz & Hspv & Htfp & Htf
+                   & Hof & Hfdg & Hcwd & Hcwi & Hnm & Hlo & Hhi).
+  assert (Hlt6 : (kxc_tf_sp_idx < length (pv_tf (us_V U)))%nat)
+    by (rewrite Hlen; unfold TFWORDS, kxc_tf_sp_idx; lia).
+  assert (Hlt15 : (tf_arg_idx 1 < length (pv_tf (us_V U)))%nat)
+    by (rewrite Hlen; unfold TFWORDS, tf_arg_idx; lia).
+  assert (Hlt14 : (tf_arg_idx 0 < length (pv_tf (us_V U)))%nat)
+    by (rewrite Hlen; unfold TFWORDS, tf_arg_idx; lia).
+  (* the indices are pairwise distinct, so each read commutes with the
+     inserts it is not at *)
+  assert (Hn06 : tf_arg_idx 0 <> kxc_tf_sp_idx)
+    by (unfold tf_arg_idx, kxc_tf_sp_idx; lia).
+  assert (Hn36 : tf_epc_idx <> kxc_tf_sp_idx)
+    by (unfold tf_epc_idx, kxc_tf_sp_idx; lia).
+  assert (Hn01 : tf_arg_idx 0 <> tf_arg_idx 1)
+    by (unfold tf_arg_idx; lia).
+  assert (Hn31 : tf_epc_idx <> tf_arg_idx 1)
+    by (unfold tf_epc_idx, tf_arg_idx; lia).
+  assert (Hn61 : kxc_tf_sp_idx <> tf_arg_idx 1)
+    by (unfold kxc_tf_sp_idx, tf_arg_idx; lia).
+  unfold exec_key_ok. cbv zeta.
+  rewrite exec_key_tf exec_key_sz exec_key_fd Hpsz.
+  (* the argument vector's address is the [spv] the commit block wrote *)
+  rewrite <- Hspv.
+  split_and!.
+  { unfold tf_w. apply list_lookup_total_insert.
+    rewrite Htf !length_insert. exact Hlt14. }
+  { unfold tf_w. rewrite Htf.
+    rewrite (list_lookup_total_insert_ne _ _ _ _ Hn06).
+    rewrite (list_lookup_total_insert_ne _ _ _ _ Hn36).
+    apply list_lookup_total_insert. rewrite length_insert. exact Hlt6. }
+  { unfold tf_w. rewrite Htf.
+    rewrite (list_lookup_total_insert_ne _ _ _ _ Hn01).
+    rewrite (list_lookup_total_insert_ne _ _ _ _ Hn31).
+    rewrite (list_lookup_total_insert_ne _ _ _ _ Hn61).
+    apply list_lookup_total_insert. exact Hlt15. }
+  { exact Hlo. }
+  { exact Hhi. }
+  { exact Hstok. }
+  { exact Hna. }
+  { reflexivity. }
+  { rewrite length_insert Htf !length_insert. exact Hlen. }
 Qed.
 
 (* the two conjuncts a slot constructor reads first off the key *)
@@ -536,20 +640,30 @@ Section KexecAU.
   (* ------------------------------------------------------------------ *)
 
   (* THE CALLER'S WP (header, IN 3): handed its own receipt for the node
-     kexec read, and told the file is loadable and which key kexec built,
-     the caller supplies the slot at that key.  [Fo] is the observation
-     receipt's shape ([aopen_commit_at]'s), so a caller pins the file it
-     is willing to answer for through [Fo] -- init answers only for
-     [f = sh_bytes], with sh's start WP. *)
+     kexec read, the caller supplies the slot at the key kexec built.  TWO
+     WANDS, ONE PER SUCCESS ARM, because the caller pays BOTH: the file is
+     loadable and the key is the image's, or the node is not a loadable
+     file and the key is only what the success conjuncts pin
+     ([exec_key_ok]).  [Fo] is the observation receipt's shape
+     ([aopen_commit_at]'s), so a caller pins the file it is willing to
+     answer for through [Fo] -- init answers the first wand only for
+     [f = sh_bytes], with sh's start WP, and REFUTES the second from the
+     same pin (the node it observed IS its image's loadable file).  A
+     process that pins nothing answers both from its generic family. *)
   Definition exec_slot_pre (S : uvis -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
-    (∀ (av : aview) (i : Z) (f : elf_bytes) (nl : nat) (W' : uvis),
-       Φo av i (MkAnode (AFile f) nl) -∗
-       ⌜kexec_loadable f⌝ -∗
-       ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
-       S W')%I.
+    ((∀ (av : aview) (i : Z) (f : elf_bytes) (nl : nat) (W' : uvis),
+        Φo av i (MkAnode (AFile f) nl) -∗
+        ⌜kexec_loadable f⌝ -∗
+        ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
+        S W')
+     ∗ (∀ (av : aview) (i : Z) (a : anode) (W' : uvis),
+          Φo av i a -∗
+          ⌜~ anode_loadable a⌝ -∗
+          ⌜exec_key_ok na alen sts W'⌝ -∗
+          S W'))%I.
 
   (* everything the caller hands in *)
   (* Everything the caller hands in.  Both one-shot pieces arrive as their
@@ -593,7 +707,9 @@ Section KexecAU.
        [True] -- so its two halves are split here rather than by
        [pf_at_triv]. *)
     rewrite /pf_at /=. iSplit; [| done].
-    rewrite /exec_slot_pre. by iIntros (av i f nl W') "_ _ _".
+    rewrite /exec_slot_pre. iSplitR.
+    - by iIntros (av i f nl W') "_ _ _".
+    - by iIntros (av i a W') "_ _ _".
   Qed.
 
   (* non-expansive in the slot predicate: UexecExecInst.v instantiates
@@ -627,9 +743,10 @@ Section KexecAU.
   (*  2b.  The arms                                                       *)
   (* ------------------------------------------------------------------ *)
 
-  (* ret = argc (header, OUT): the walk completed at [i], a FILE was
+  (* ret = argc (header, OUT): the walk completed at [i], a node was
      observed there, the landed success conjuncts hold at its entry, and
-     the slot is the caller's (a) or the generic mint's (b). *)
+     the slot is the caller's -- through the deposit's first wand at a
+     loadable file (a), through its second at anything else (b). *)
   Definition exec_post_ok (Fs : pfam Σ (uvis -> iProp Σ)) Γ
       (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
@@ -648,14 +765,16 @@ Section KexecAU.
            ⌜kexec_image_ok f na alen afun sts (exec_key U' sts na)⌝ ∗
            Fs.(pf_recv) (exec_key U' sts na))
         ∨ (* (b) anything else the code accepted (header): the landed
-             success conjuncts at some entry, the receipt and the WP
-             premise back *)
+             success conjuncts at some entry, and the caller's OWN WP at
+             the resume key -- the deposit's SECOND wand, applied to the
+             receipt and to [exec_key_ok] ([kexec_ok_exec_key_ok]).  The
+             receipt is consumed by that wand exactly as arm (a) consumes
+             it, and the kernel mints nothing. *)
         (⌜~ anode_loadable a⌝ ∗
          ⌜exists (entry spv szv' : mword 64),
             r <> (mword_of_int (-1) : mword 64)
             /\ kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝ ∗
-         Fo.(pf_recv) av i a ∗
-         pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts) Fs)))%I.
+         Fs.(pf_recv) (exec_key U' sts na))))%I.
 
   (* ret = -1 (header, OUT): the three-way fold of the bundle *)
   Definition exec_post_fail (Fs : pfam Σ (uvis -> iProp Σ)) Γ
@@ -726,7 +845,7 @@ End KexecAU.
 
 (* big-op bodies behind definitions: sealed, per the family convention
    (durable-notes; optimization.md, "a big-op body is the predictor").
-   [exec_slot_pre] is a plain wand and stays transparent. *)
+   [exec_slot_pre] is a pair of plain wands and stays transparent. *)
 Global Typeclasses Opaque exec_au_pre exec_post_ok exec_post_fail exec_arms.
 
 (* ===================================================================== *)

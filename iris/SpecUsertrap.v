@@ -373,8 +373,9 @@ Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
 (*                                                                          *)
 (* [ut_exec_out] is EXEC'S OWN out-shape and stays beside them: exec is the *)
 (* one entry whose round says nothing, because the record it leaves is a    *)
-(* DIFFERENT program's.  Its three disjuncts -- the failure facts, the new  *)
-(* image's slot, the loadability gap -- have no per-number reading.         *)
+(* DIFFERENT program's.  Its two disjuncts -- the failure facts and the new *)
+(* image's slot, which the process's own exec deposit pays on BOTH of       *)
+(* [SpecKexec.exec_post_ok]'s success arms -- have no per-number reading.   *)
 (*                                                                          *)
 (* All three are guarded on the CAUSE and the NUMBER, so the four           *)
 (* transparent arms discharge them by refuting the guard.                   *)
@@ -437,8 +438,7 @@ Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
               (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
               (uint (pv_sz (us_V U')))
          /\ sts' = sts⌝                       (* failed: the returning shape at r = -1 *)
-      ∨ uslot (uvis_of U' sts')                       (* loadable: the new image's slot *)
-      ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝))%I.   (* the gap *)
+      ∨ uslot (uvis_of U' sts')))%I.                  (* succeeded: the new image's slot *)
 
 (* [uvis_of] of a trapframe-rewritten record, spelled out: the key is the
    new frame over the record's own image, permission projection, break and
@@ -643,9 +643,9 @@ Lemma ut_exec_out_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
   ut_exec_out sc_v tf' M π szv U'' sts sts'.
 Proof.
   intros Hu Hu' HM Hpi Hsz Hcwi. rewrite /ut_exec_out. iIntros "H %Hc".
-  iDestruct ("H" with "[%]") as "[%Hf | [Hs | %Hg]]";
+  iDestruct ("H" with "[%]") as "[%Hf | Hs]";
     [ split; [exact (proj1 Hc) | rewrite (tf_ueq_num tf tf' Hu); exact (proj2 Hc)]
-    | | | ].
+    | | ].
   - iLeft. iPureIntro. destruct Hf as (r & [Hb1 Hb2] & Hm & Hst).
     exists r. split; [split |].
     + rewrite <- (tf_ueq_resume_gpr0 _ _ Hu'). rewrite <- (tf_ueq_resume_gpr0 _ _ Hu).
@@ -654,15 +654,13 @@ Proof.
       rewrite <- (tf_ueq_epc _ _ Hu). exact Hb2.
     + split; [| exact Hst]. rewrite HM Hpi Hsz.
       exact (usys_mem_ok_ueq _ _ _ _ _ _ _ _ _ _ Hu Hm).
-  - iRight. iLeft.
+  - iRight.
     iEval (rewrite (uslot_key_cong (uvis_of U' sts') (uvis_of U'' sts')
                       (tf_ueq_resume_gpr0 _ _ Hu') (tf_ueq_resume_pc _ _ Hu')
                       (eq_sym HM) (eq_sym Hpi) (f_equal uint (eq_sym Hsz)) eq_refl
                       (eq_sym Hcwi)))
       in "Hs".
     iExact "Hs".
-  - iRight. iRight. iPureIntro.
-    rewrite <- (tf_ueq_arg _ _ 0 ltac:(lia) Hu'). exact Hg.
 Qed.
 
 (* THE PROLOGUE'S OWN MOVE: [U'] is [U] with the epc word rewritten, which

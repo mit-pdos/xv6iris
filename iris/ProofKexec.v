@@ -711,9 +711,10 @@ Section KexecAUExit.
         iSplitR; [iPureIntro; exact Hokx |].
         iSplitR; [iPureIntro; exact Himg |].
         (* THE SLOT PIECE IS SPENT: eliminate the pair to its AU side --
-           the caller's WP at the key kexec built -- and the refund goes
-           with the arm that did not happen. *)
-        iDestruct (pf_at_au with "Hsl") as "Hsl".
+           the caller's WP at the key kexec built -- and take the FIRST of
+           its two wands, the loadable-image one.  The refund, and the wand
+           for the arm that did not happen, go with it. *)
+        iDestruct (pf_at_au with "Hsl") as "[Hsl _]".
         iApply ("Hsl" $! av0 zi (kxc_fb datl dn) nl
                   (SpecKexec.exec_key U' sts na) with "HΦ [%] [%]");
           [exact Hload | exact Himg].
@@ -735,6 +736,13 @@ Section KexecAUExit.
       + assert (Hne : (mf !!! Regidx Ra0) <> (mword_of_int (-1) : mword 64)).
         { destruct Hsucc as (_ & Hr & _). rewrite Hr.
           exact (kxau_argc_ne_m1 na Hnamax). }
+        assert (Hkok : kexec_ok (us_V U) (us_V U') (mf !!! Regidx Ra0)
+                         entry spv szv' na alen).
+        { apply (KexecOkQ.kexec_ok_qf_weaken
+                   (fun e => KexecBridge.exec_built_Q (kxc_fb datl dn) ef
+                               na alen afun e U')
+                   (kxau_QFp (kxc_fb datl dn) na alen)).
+          by right. }
         rewrite /SpecKexec.exec_arms. iRight.
         rewrite /SpecKexec.exec_post_ok.
         iExists pl, zi, av0, (abs_row (FsStateEra.era_node dn bm datl)).
@@ -742,14 +750,18 @@ Section KexecAUExit.
         iSplitR; [iPureIntro; exact Hav |].
         iRight.
         iSplitR; [iPureIntro; exact Hnl |].
-        iSplitR.
-        { iPureIntro. exists entry, spv, szv'. split; [exact Hne |].
-          apply (KexecOkQ.kexec_ok_qf_weaken
-                   (fun e => KexecBridge.exec_built_Q (kxc_fb datl dn) ef
-                               na alen afun e U')
-                   (kxau_QFp (kxc_fb datl dn) na alen)).
-          by right. }
-        iFrame "HΦ Hsl".
+        iSplitR; [iPureIntro; by exists entry, spv, szv' |].
+        (* THE SLOT PIECE IS SPENT HERE TOO, at its SECOND wand: the node is
+           not a loadable file, and what the success conjuncts pin about the
+           key is [SpecKexec.exec_key_ok] ([kexec_ok_exec_key_ok], whose
+           trapframe-length premise is this lemma's [Htflen]).  The receipt
+           goes into the wand, and the kernel mints nothing. *)
+        iDestruct (pf_at_au with "Hsl") as "[_ Hsl]".
+        iApply ("Hsl" $! av0 zi (abs_row (FsStateEra.era_node dn bm datl))
+                  (SpecKexec.exec_key U' sts na) with "HΦ [%] [%]").
+        { exact Hnl. }
+        { exact (SpecKexec.kexec_ok_exec_key_ok U U' sts (mf !!! Regidx Ra0)
+                   entry spv szv' na alen Htflen Hne Hkok). }
   Qed.
 
 End KexecAUExit.

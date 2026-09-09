@@ -4473,19 +4473,16 @@ Section SyscallArms.
     rewrite /sys_exec_arms.
     iDestruct "Harms" as (Uk) "[Hpriv Harm]".
     destruct Uk as [V' Mk].
-    (* the returned trapframe's length, for the gap arm's a0 lookup *)
-    iDestruct (proc_priv_tf with "Hpriv") as "(Htfc' & Htfp' & Hpvback')".
-    iDestruct (tf_page_length with "Htfp'") as "%Htflen'".
-    iDestruct ("Hpvback'" with "Htfc' Htfp'") as "Hpriv".
-    cbn [us_V] in Htflen'.
     pose proof Hext as Hext'. destruct Hext' as ((_ & Htf & _) & _).
     (* ---- THE ARMS, READ ONCE: the two immobility facts the shared tail
        wants, and the channel's answer at the record AFTER the a0 store
        [sysc_ret_tail] performs.  Failure: nothing of the process moved
        but a0 (the block is the entry block after the copy-ins' lazy fill,
-       whose permission projection [perm_of_uptd_ext_sz] pins).  Success
-       at a loadable file: the slot is minted at [exec_key], which IS this
-       record once a0 holds argc.  Success elsewhere: the gap, r <> -1. ---- *)
+       whose permission projection [perm_of_uptd_ext_sz] pins).  SUCCESS,
+       either arm: the slot comes out of the process's own exec deposit at
+       [exec_key], which IS this record once a0 holds argc -- arm (a) from
+       the loadable-image wand, arm (b) from the [exec_key_ok] one.  Same
+       code path, so the two arms close alike. ---- *)
     iAssert (⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt (us_V U))
              /\ pv_fdg V' = pv_fdg (us_V U)
              /\ pv_cwi V' = pv_cwi (us_V U)⌝ ∗
@@ -4526,23 +4523,22 @@ Section SyscallArms.
             - rewrite Htf'. cbn [pv_upt upd_upt pv_fdg]. exact Htf.
             - revert Hfg. cbn [pv_fdg upd_upt]. exact id.
             - revert Hcwi. cbn [pv_cwi upd_upt]. exact id. }
-          rewrite /sysc_exec_out. iIntros "_". iRight. iLeft.
+          rewrite /sysc_exec_out. iIntros "_". iRight.
           rewrite /exec_key. rewrite Hr. cbn [us_V]. iExact "Hslot".
-        + (* (b) the loadability gap: only [r <> -1] is known *)
-          iDestruct "Hb" as "(_ & %Hok & _)".
+        + (* (b) the node was not a loadable file: the same slot, out of
+             the deposit's second wand *)
+          iDestruct "Hb" as "(_ & %Hok & Hslot)".
           destruct Hok as (entry & spv & szv' & Hne & Hkok).
           cbn [us_V] in Hkok.
-          destruct Hkok as [(Hm1 & _) | (_ & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & _)];
+          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & _)];
             [exact (False_ind _ (Hne Hm1)) |].
           iSplitR.
           { iPureIntro. split_and!.
             - rewrite Htf'. cbn [pv_upt upd_upt pv_fdg]. exact Htf.
             - revert Hfg. cbn [pv_fdg upd_upt]. exact id.
             - revert Hcwi. cbn [pv_cwi upd_upt]. exact id. }
-          rewrite /sysc_exec_out. iIntros "_". iRight. iRight. iPureIntro.
-          cbn [us_V us_tf upd_usV upd_tf pv_tf].
-          rewrite list_lookup_total_insert; [exact Hne |].
-          rewrite Htflen'. unfold TFWORDS, tf_arg_idx. lia. }
+          rewrite /sysc_exec_out. iIntros "_". iRight.
+          rewrite /exec_key. rewrite Hr. cbn [us_V]. iExact "Hslot". }
     (* ---- what the shared tail needs of the returned state ---- *)
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }

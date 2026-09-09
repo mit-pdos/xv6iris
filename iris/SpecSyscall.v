@@ -431,12 +431,16 @@ Section SyscExec.
     /\ sts' = sts.
 
   (* [U'] is the record AFTER the dispatcher's own a0 store, so on success
-     [uvis_of U' sts'] IS [SpecKexec.exec_key]'s resume key *)
+     [uvis_of U' sts'] IS [SpecKexec.exec_key]'s resume key.
+     TWO ARMS: exec failed, or the process resumes on ITS OWN slot at the
+     new key.  Both of [SpecKexec.exec_post_ok]'s success arms deliver that
+     slot -- the loadable one out of the deposit's image wand, anything
+     else out of its [SpecKexec.exec_key_ok] wand -- so the channel has no
+     third disjunct and the round mints nothing at exec. *)
   Definition sysc_exec_out (U U' : ustate) (sts sts' : list fdstate) : iProp Σ :=
     (⌜sysc_num (us_V U) = 7⌝ -∗
        (⌜sysc_exec_failed U U' sts sts'⌝
-        ∨ uslot (uvis_of U' sts')                       (* the new image's slot *)
-        ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝))%I.  (* the loadability gap *)
+        ∨ uslot (uvis_of U' sts')))%I.                  (* the new image's slot *)
 
   (* every other entry owes nothing *)
   Lemma sysc_exec_out_ne (U U' : ustate) (sts sts' : list fdstate) :

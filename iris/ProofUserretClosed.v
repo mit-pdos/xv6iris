@@ -281,10 +281,13 @@ Section UserretClosed.
   Proof.
     intros Hj.
     iIntros "#Hkt #Hclaim #Hwire #Hsup".
-    (* THE LOOP MINTS (refutation R-c).  Two of the round's arms are kernel
-       mints by design -- exec's loadability gap, and fork, where nothing
-       yet says [r <> 0] (K2) -- so [UserretClosed] takes a [UEXEC_GEN]
-       again.  Through [UexecCond.cond_entry_slot], not the bare generic
+    (* THE LOOP MINTS (refutation R-c).  ONE arm of the round is a kernel
+       mint by design -- fork's pid wrap, where nothing yet says [r <> 0]
+       (K2) -- so [UserretClosed] takes a [UEXEC_GEN] again.  exec is no
+       longer one of them: both of kexec's success arms are paid by the
+       process's own deposit ([SpecKexec.exec_slot_pre]'s two wands), so the
+       exec channel hands the round a slot and never a mint.
+       Through [UexecCond.cond_entry_slot], not the bare generic
        inhabitant, so a process whose key qualifies picks up sync's own
        constructor.  Its [psok] premise is the instance's own (every number
        is admitted) and its supply is the credential above --

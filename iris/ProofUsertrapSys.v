@@ -879,14 +879,14 @@ Section UtSysBlock.
          a0 insert on the epc-bumped frame IS [UsysMemOk.bump_tf] at -1, and
          image, permission projection, size and descriptors are the entry's
          -- [uround_ok]'s returning shape, as [SpecUsertrap.ut_exec_out]
-         states it.  The slot and the gap go through untouched. *)
+         states it.  The slot goes through untouched. *)
       iAssert (ut_exec_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                  (us_M U0)
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                  (uint (pv_sz (us_V U0))) (MkUstate V2 M2) sts stsR)
         with "[Hxo]" as "Hxo".
       { rewrite /ut_exec_out. iIntros "%Hc". destruct Hc as [_ Hc7].
-        iDestruct ("Hxo" with "[%]") as "[%Hfail | [Hslot | %Hgap]]".
+        iDestruct ("Hxo" with "[%]") as "[%Hfail | Hslot]".
         { cbn [us_V]. rewrite <- Hn0. rewrite usys_num_epc in Hc7. exact Hc7. }
         - iLeft. iPureIntro.
           destruct Hfail as (Htf2 & HM2 & Hpi2 & Hsz2 & Hsts).
@@ -910,8 +910,7 @@ Section UtSysBlock.
               [ reflexivity | rewrite HM2; exact Hpr4
               | rewrite Hpi2 HV1upt HV1sz Hpr2 Hpr3; reflexivity
               | rewrite Hsz2 HV1sz Hpr3; reflexivity ].
-        - iRight. iLeft. iExact "Hslot".
-        - iRight. iRight. iPureIntro. exact Hgap. }
+        - iRight. iExact "Hslot". }
       (* ...AND THE SYSCALL CHANNEL'S, re-keyed the same way.  The row reads
          the ENTRY key, and the dispatcher's record differs from it by the
          two epc rewrites alone -- which move neither the image, nor the

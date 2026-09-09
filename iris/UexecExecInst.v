@@ -93,8 +93,8 @@
 
    MONOTONICITY IN THE SLOT FAMILY is the one field whose proof is not a
    projection: the family occurs only as the CONCLUSION of the slot piece's
-   wand, so the upgrader walks in under [sys_exec_slot_pre]'s ∀s and
-   [PieceFam.pf_at]'s [∧]-refund.
+   two wands (one per success arm), so the upgrader walks in under
+   [sys_exec_slot_pre]'s ∀s and [PieceFam.pf_at]'s [∧]-refund, twice.
 
    THE SUPPLY [ssupply] IS THE APPLICATION'S PREDICATE HELD OF EVERY VIEW
    ([AppInv.app_sup]).  That is the credential an UNVERIFIED program runs
@@ -519,9 +519,10 @@ Section UexecExecInst.
   Qed.
 
   (* MONOTONICITY IN THE SLOT FAMILY.  The family occurs in exactly one
-     branch -- the CONCLUSION of exec's slot piece's wand
+     branch -- the CONCLUSION of both of exec's slot piece's wands
      ([exec_slot_pre]) -- so the upgrader walks in under the piece's ∀s and
-     its [∧]-refund, and every other branch is the identity. *)
+     its [∧]-refund, once per success arm, and every other branch is the
+     identity. *)
   Lemma xv6_sbundle_mono (X Y : uvis -d> iPropO Σ) (n : Z) (f : xfam)
       (W : uvis) :
     ⊢ □ (∀ W' : uvis, X W' -∗ Y W') -∗
@@ -540,11 +541,19 @@ Section UexecExecInst.
     rewrite /sys_exec_slot_pre.
     iIntros (na alen afun) "%Hsh".
     iDestruct ("Hslot" $! na alen afun with "[%]") as "Hslot"; [ exact Hsh | ].
+    (* BOTH success arms' wands conclude at the family, so the upgrader
+       walks in twice. *)
     rewrite /exec_slot_pre.
-    iIntros (av i ff nl W') "Ho %Hld %Him".
-    iApply "Hup".
-    iApply ("Hslot" $! av i ff nl W' with "Ho [%] [%]");
-      [ exact Hld | exact Him ].
+    iDestruct "Hslot" as "[Hsa Hsb]".
+    iSplitL "Hsa".
+    - iIntros (av i ff nl W') "Ho %Hld %Him".
+      iApply "Hup".
+      iApply ("Hsa" $! av i ff nl W' with "Ho [%] [%]");
+        [ exact Hld | exact Him ].
+    - iIntros (av i a W') "Ho %Hnl %Hkk".
+      iApply "Hup".
+      iApply ("Hsb" $! av i a W' with "Ho [%] [%]");
+        [ exact Hnl | exact Hkk ].
   Qed.
 
   (* THE SUPPLY.  Opaque in the class, and at THIS instance it is the
@@ -608,8 +617,10 @@ Section UexecExecInst.
       iSplitR; [iExact "Hcommit" |].
       rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [| done].
       rewrite /sys_exec_slot_pre. iIntros (na alen afun) "_".
-      rewrite /exec_slot_pre. iIntros (av' i ff nl W') "_ _ _".
-      iApply "Hs".
+      (* the generic family answers BOTH success arms' wands *)
+      rewrite /exec_slot_pre. iSplitR.
+      + iIntros (av' i ff nl W') "_ _ _". iApply "Hs".
+      + iIntros (av' i a W') "_ _ _". iApply "Hs".
     - iApply (xv6_sbundle_of_supply_ne X n W Hne). iExact "Hsup".
   Qed.
 
