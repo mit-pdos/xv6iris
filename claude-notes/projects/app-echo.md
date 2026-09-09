@@ -1544,6 +1544,31 @@ rebuild, so a record-typed payload would carry a field no instance can
 honour); `UkShLoop.ushl_dat` moved onto a bare gname for the same reason.
 38 files, +3123/−2926, scripted sweep + hand residue (backup in the
 scratchpad).
+CWD-RESOURCE (2/2, LANDED 2026-09-09; brief `brief-cwd-finish.md`).  Phase-1
+facts: `UserCwd.ucwd_auth γc c`/`ucwd γc c` (two halves of a `ghost_var`
+on the existing `ghost_varG Σ Z`, no new camera), `ukn_cwd` the record's
+fifth field, `urun` carries `ucwd_auth (ukn_cwd N) cw` at the very `cw`
+`uvb` is at; the three entry constructors mint the pair at the key's
+`uvis_cwd` and hand the fragment to the program beside `ustd`.  FORK takes
+the parent's fragment IN and returns it beside the child's, both at `c`
+(`cw` is `urun`'s existential, so the child's cannot be stated at it
+otherwise — the descriptor ledger's own mold).  The round re-keys the auth
+half at each leaf's `⌜usys_cwd_ok n r cw cw'⌝` (twelve `UkRunSys` sites,
+`usys_cwd_ok_quiet` + `subst`); the ∀-in-`n` `wp_uk_ecall_quiet` GAINS
+`n ≠ USYS_chdir` (ruled: honest — "nothing moved" now includes the cwd);
+`wp_uk_ecall_window` is already chdir-free through `usys_win`.  RULED: the
+exec fragment is RETURNED, not spent — a new leaf `wp_uk_ecall_exec_at_cwd`
+takes `ucwd (ukn_cwd N) c` and a `c`-indexed deposit, pins `cw = c` by
+agreement inside its proof, and hands the fragment back on the -1
+continuation (sh execs repeatedly); `udepw` keeps its landed shape.
+AS LANDED: `UserCwd.v` (no new camera); the round re-keys the auth half
+by `UkRun.ucwd_auth_quiet` at twelve sites; CHDIR HAS A LEAF — sh's `cd`
+builtin already issued chdir through `wp_uk_ecall_quiet` at the bare
+literal 9 (both briefs' `grep USYS_chdir` missed it), so `UkRunSys.wp_uk_
+ecall_chdir` (informative, `⌜uint r ≠ 0 → c' = c⌝`) and `_any` exist and
+sh carries its cwd inside `UkSh.ush_pstate l := ush_std l ∗ ucwd_any`;
+`USyncKernel`/`UEchoKernel` drop the fragment, `UShKernel`/`UInitKernel`
+pass it on.  UK-NAMES + CWD IS COMPLETE.
 
 FETCHSTR-MEM LANDED (2026-09-09): `SpecCopyinstr.copyinstr_got M srcva f
 k := ∀ j ≤ k, M !! uint (add_vec_int srcva j) = Some (f j)` (the `j = k`
