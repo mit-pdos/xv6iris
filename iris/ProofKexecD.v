@@ -2017,6 +2017,16 @@ Section KexecDMain.
     assert (Hceq : c = na).
     { destruct (Nat.lt_ge_cases c na) as [Hlt | Hge];
         [exfalso; exact (Havf_nz c Hlt Havfc) | lia]. }
+    rewrite /kxc_d_res.
+    iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
+                          Hpath & Hargv & Hargs & Helf & Hframe)".
+    (* THE MAP-STOP ROW (S7) IS MINTED HERE, and this is the table fact it
+       is minted from: [kxc_at_2a6]'s [um_below sz1 P.(ud_um)] -- exec
+       built a fresh space, so nothing is mapped at or above the size it
+       settled on -- plus the size bound a COVERED space carries
+       ([UmCovered.proc_pt_covered_maxsz]: there are only 2^27 user vpns). *)
+    iDestruct (proc_pt_wf_get with "Hpt") as %HwfP.
+    pose proof (proc_pt_covered_maxsz P sz1 HwfP Hcov) as Hmaxsz1.
     (* the GUARDED premise [kxd_commit] asks for, discharged from this
        state's own image conjuncts: [kxq_pay]'s [U'] is pinned to [Mi] and
        [sz1], which is exactly where [kexec_built] reads.  Phase D writes
@@ -2032,10 +2042,10 @@ Section KexecDMain.
            trapframe words, so the image at the commit IS [Mi]. *)
         | exact Himg | exact Hszr
         (* ...and the permission row (S6), at the table the commit installs *)
-        | rewrite Hup; exact Hpermok]. }
-    rewrite /kxc_d_res.
-    iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
-                          Hpath & Hargv & Hargs & Helf & Hframe)".
+        | rewrite Hup; exact Hpermok
+        (* ...and S7, off the table's own [um_below] *)
+        | rewrite Hup;
+          exact (kxb_perm_below_intro P.(ud_um) sz1 Hbelow Hmaxsz1) ]. }
     rewrite /kxc_frameB.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 & Hf9 &
                             Hf10 & Hf11 & Hf12 & Hf13 & Hust & Hph &

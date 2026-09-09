@@ -32,7 +32,8 @@
 (* RW stack page; the frame's bytes off [kexec_stack_at] (below the        *)
 (* argument block every stack-page byte is zero, hence present); the .bss  *)
 (* buffer off [ElfUser.sh_elf_image_concrete]; the descriptors off         *)
-(* [kexec_image_ok_fd].  NO [vm_compute] ON [sh_elf] IS NEEDED: the entry, *)
+(* [kexec_image_ok_fd]; the map-stop row off [kexec_image_ok_below].  NO   *)
+(* [vm_compute] ON [sh_elf] IS NEEDED: the entry,                          *)
 (* the segment table and the image split are ElfUser.v's already-reduced   *)
 (* facts, and the PT_LOAD headers are read off [sh_elf_segments] for a     *)
 (* VARIABLE file ([elf_segments_loads]) so the kernel never reduces the    *)
@@ -311,7 +312,7 @@ Section UShKernel.
     fd_lowest_closed (uvis_fd W) = None ->
     (* the map stops at the break -- [UkRun.uslot_of_urun]'s own premise,
        which is what lets a later [sbrk] hand sh fresh memory.  The bridge
-       below reads it off [kexec_image_ok]'s page rows. *)
+       below reads it off [kexec_image_ok]'s own row. *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (* THE PAYLOAD.  The data below the frame is handed over whole, and it
@@ -375,15 +376,6 @@ Section UShKernel.
     kexec_sz sh_elf - PGSIZE + 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
       <= kxc_sp_final (kexec_sz sh_elf) alen na ->
     length sts = NOFILE -> fd_lowest_closed sts = None ->
-    (* THE MAP STOPS AT THE BREAK, and it is the ONE premise the image fact
-       does not give: [KexecBuilt.kxb_perm_ok] says which pages the new
-       address space HAS, not that it has no others, so the converse --
-       the kernel's own [ProcPtOwn.um_below] at the image exec just built
-       -- is carried in from the exec channel.  It is what lets sh's later
-       [sbrk] see that the run it is handed is fresh
-       ([UserHeap.uheap]'s map-stop clause). *)
-    (forall (p : mword 27) (q : uperm), uvis_perm W' !! p = Some q ->
-       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W')) ->
     (* the payload, passed straight through: see [sh_uexec_slot] *)
     □ (∀ γt γd γs : gname,
         usz γs (uvis_sz W') -∗
@@ -400,14 +392,19 @@ Section UShKernel.
        ush_rest N (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
     uslot W'.
   Proof.
-    intros Hok Hroom Hlen Hnone Hstop.
+    intros Hok Hroom Hlen Hnone.
+    (* THE MAP STOPS AT THE BREAK, off the image fact's own row: exec built
+       a fresh address space, so [KexecBuilt.kxb_perm_below] says it maps
+       nothing above the break, which is what lets sh's later [sbrk] see
+       the run it is handed as fresh ([UserHeap.uheap]'s map-stop clause). *)
+    pose proof (kexec_image_ok_below _ _ _ _ _ _ Hok) as Hstop.
     destruct sh_loads as (p0 & p1 & Hld & Hv0 & Hm0 & Hf0 & Hv1 & Hm1 & Hf1).
     pose proof sh_kexec_sz as Hsz. pose proof sh_kexec_top as Htop.
     pose proof (kexec_image_ok_pc _ _ _ _ _ _ _ Hok sh_elf_entry) as Hpc.
     pose proof (kexec_image_ok_fd _ _ _ _ _ _ Hok) as Hfd.
     rewrite Hsz in Hroom. unfold PGSIZE in Hroom.
     unfold kexec_image_ok in Hok. cbv zeta in Hok. rewrite Hsz in Hok.
-    destruct Hok as (_ & Hszv & Hsp & _ & _ & Himg & _ & Hstk & Hperm & _ & _).
+    destruct Hok as (_ & Hszv & Hsp & _ & _ & Himg & _ & Hstk & Hperm & _ & _ & _).
     destruct Hperm as (Hpg & _ & Hstpg).
     rewrite Htop in Hstpg. change (0x3000 + PGSIZE) with 0x4000 in Hstpg.
     set (spv := kxc_sp_final 0x5000 alen na) in *.

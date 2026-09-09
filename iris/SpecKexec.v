@@ -173,6 +173,14 @@
        non-coherent instruction cache the only pages a program may run
        are those executable AND not writable, and a slot constructor
        reads exactly that off this row for the text segment;
+     - AND NOTHING ABOVE THE BREAK ([KexecBuilt.kxb_perm_below] at
+       [uvis_sz W'] / [uvis_perm W']): the converse of the row above.
+       exec builds a FRESH table -- uvmcreate, uvmalloc up to the loads'
+       top, the guard and the stack page -- so the kernel's own
+       [ProcPtOwn.um_below] holds of it, and this is that fact read at
+       the key.  It is what a slot constructor needs for the exec'd
+       program's later [sbrk] to see the run it is handed as fresh
+       ([UserHeap.uheap]'s map-stop clause);
      - the descriptor view is the caller's ([sts]) and the trapframe is
        [TFWORDS] long.
    NOT YET STATED, named so the follow-on is a list: (d2) the zero fill
@@ -399,6 +407,13 @@ Definition kexec_image_ok (f : elf_bytes) (na : nat) (alen : nat -> nat)
   /\ kexec_args_at top alen na afun (uvis_M W')
   /\ kexec_stack_at top alen na (uvis_M W')
   /\ kxb_perm_ok f (kexec_top f) (uvis_perm W')
+  (* ...and the map STOPS AT THE BREAK.  [kxb_perm_ok] says which pages the
+     new space has; this says it has no others, and it is the row a slot
+     constructor needs so the exec'd program's later [sbrk] sees fresh
+     memory.  exec builds a FRESH table, so the kernel's own
+     [ProcPtOwn.um_below] of it is where the row comes from
+     ([KexecBuilt.kxb_perm_below_intro], at the mint in [KexecBridge]). *)
+  /\ kxb_perm_below (uvis_sz W') (uvis_perm W')
   /\ uvis_fd W' = sts
   /\ length (uvis_tf W') = TFWORDS.
 
@@ -587,7 +602,16 @@ Qed.
 Lemma kexec_image_ok_fd (f : elf_bytes) (na : nat) (alen : nat -> nat)
     (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) :
   kexec_image_ok f na alen afun sts W' -> uvis_fd W' = sts.
-Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hfd & _). exact Hfd. Qed.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hfd & _). exact Hfd. Qed.
+
+(* THE MAP-STOP READER: the row a slot constructor takes straight over as
+   [UkRun.uslot_of_urun]'s premise. *)
+Lemma kexec_image_ok_below (f : elf_bytes) (na : nat) (alen : nat -> nat)
+    (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) :
+  kexec_image_ok f na alen afun sts W' ->
+  forall (p : mword 27) (q : UserPerm.uperm), uvis_perm W' !! p = Some q ->
+    (bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W'))%Z.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hbe & _). exact Hbe. Qed.
 
 (* THE TEXT READER (header, THE PERMISSIONS): a page of PT_LOAD header
    [i] carries that header's bits.  For sh/init the text segment is

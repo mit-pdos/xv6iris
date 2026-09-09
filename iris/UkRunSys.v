@@ -1395,6 +1395,15 @@ Section UkRunSys.
   (* holds both halves for the length of one step, and it hands the        *)
   (* program's back on the failure arm.  A program that execs in a loop    *)
   (* (sh does) still knows where it is on the next turn.                   *)
+  (*                                                                       *)
+  (* WHAT IT TAKES IS [UkRun.udepw_at], NOT A BARE BUNDLE FAMILY: the      *)
+  (* deposit is LENT the heap and the fd authority and hands them back     *)
+  (* beside the bundle, because a PINNED bundle's own premises --          *)
+  (* [exec_path_of M pv pl] off the program's rodata through               *)
+  (* [UserHeap.uheap_text], and [length sts = NOFILE] /                    *)
+  (* [fd_lowest_closed sts = None] off the descriptor list -- are facts    *)
+  (* about the very key the bundle is stated at.  A supplier that owes     *)
+  (* nothing ignores the loan ([UkRun.udepw_at_of_bundle]).                *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_ecall_exec_at_cwd (N : uk_names) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (c : Z) :
@@ -1405,9 +1414,7 @@ Section UkRunSys.
     (* the program's half of its working directory... *)
     UserCwd.ucwd (ukn_cwd N) c -∗
     (* ...and the deposit at every key whose cwd is that one inum *)
-    (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-       (fdv : list fdstate),
-       sbundle uslot USYS_exec (uvis_of_run m pc M pm sz fdv c)) -∗
+    udepw_at N m pc USYS_exec c -∗
     (∀ h' : CpuId,
        UserCwd.ucwd (ukn_cwd N) c -∗
        urun N h'
@@ -1422,7 +1429,8 @@ Section UkRunSys.
     (* the whole point of the leaf: the key's cwd IS the one the caller's
        bundle is stated at *)
     iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
-    iDestruct ("Hsb" $! M pm sz fdv) as "Hdepn".
+    iMod (udepw_at_mint N m pc _ c M pm _ fdv
+                with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c Hui

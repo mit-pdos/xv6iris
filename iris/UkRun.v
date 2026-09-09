@@ -314,8 +314,84 @@ Section UkRun.
      ∀ and only agreement against [urun]'s half can pin it.  The agreement
      therefore happens in the LEAF, which has destructed [urun] and holds
      that half: see [UkRunSys.wp_uk_ecall_exec_at_cwd], which takes the
-     program's half and the [c]-indexed bundle in place of a [udepw] and
+     program's half and a [c]-indexed deposit in place of a [udepw] and
      hands the half back. *)
+
+  (* THE CWD-FIXED DEPOSIT.  [udepw] with the working directory FIXED at
+     [c] -- the [∀ cw] gone -- and the SAME LOAN of the two authorities.
+
+     THE LOAN IS THE WHOLE POINT.  A supplier that answers at every key is
+     free to ignore what it is lent ([udepw_at_of_bundle] below is that
+     supplier).  A PINNED bundle is not: it owes [exec_path_of M pv pl] --
+     the path string read out of the program's own rodata, which is a fact
+     about [M] and reaches a supplier through [UserHeap.uheap_text] -- and
+     [length sts = NOFILE] / [fd_lowest_closed sts = None], which are
+     readings of [ufd_auth]'s list.  Both are facts about the very key the
+     bundle is stated at, so the only way to state them is to hand the
+     supplier the authorities they are read off and take them back beside
+     the bundle. *)
+  Definition udepw_at (N : uk_names) (m : regfile) (pc : mword 64)
+      (n : Z) (c : Z) : iProp Σ :=
+    (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+       (fdv : list fdstate),
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
+       (⌜psok n /\ n <> USYS_exec⌝
+        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv c)))%I.
+
+  (* [udepw] IS THE ∀-CWD FORM, one direction.  The two differ only in
+     where the [cw] binder sits, so the equivalence holds both ways; this
+     is the direction a caller holding a [udepw] needs, and stating it
+     rather than redefining [udepw] as [∀ cw, udepw_at … cw] is what keeps
+     the ∀-ORDER at [udepw]'s twenty-odd use sites ([iDestruct ("Hsb" $! M
+     pm sz fdv cw)]) unmoved. *)
+  Lemma udepw_at_of_udepw (N : uk_names) (m : regfile) (pc : mword 64)
+      (n : Z) (c : Z) :
+    udepw N m pc n -∗ udepw_at N m pc n c.
+  Proof.
+    iIntros "Hd" (M pm sz fdv) "Hh Hf".
+    iApply ("Hd" $! M pm sz fdv c with "Hh Hf").
+  Qed.
+
+  (* ...AND THE SUPPLIER THAT IGNORES THE LOAN: a caller that already has
+     the bundle at every [(M, pm, sz, fdv)] of this one cwd hands it back
+     unread.  [udepw_at] is WEAKER to supply than the bare family, which is
+     why the leaf can take it in the bare one's place. *)
+  Lemma udepw_at_of_bundle (N : uk_names) (m : regfile) (pc : mword 64)
+      (n : Z) (c : Z) :
+    (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+       (fdv : list fdstate),
+       sbundle uslot n (uvis_of_run m pc M pm sz fdv c)) -∗
+    udepw_at N m pc n c.
+  Proof.
+    iIntros "Hb" (M pm sz fdv) "Hh Hf". iFrame "Hh Hf". iRight.
+    iApply "Hb".
+  Qed.
+
+  (* the trivial supplier at the ∀-key form, through the two above *)
+  Lemma udepw_at_of_uxsup (N : uk_names) (m : regfile) (pc : mword 64)
+      (c : Z) :
+    uxsup -∗ udepw_at N m pc USYS_exec c.
+  Proof.
+    iIntros "#Hx". iApply udepw_at_of_bundle. iIntros (M pm sz fdv).
+    iApply "Hx".
+  Qed.
+
+  (* THE LEAF'S USE OF IT, [udepw_mint]'s shape at the fixed cwd *)
+  Lemma udepw_at_mint (N : uk_names) (m : regfile) (pc : mword 64)
+      (n : Z) (c : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+      (sz : Z) (fdv : list fdstate) :
+    udep -∗ udepw_at N m pc n c -∗
+    uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
+    uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
+    sbundle uslot n (uvis_of_run m pc M pm sz fdv c).
+  Proof.
+    iIntros "#Hdep Hsb Hheap Hufd".
+    iDestruct ("Hsb" $! M pm sz fdv with "Hheap Hufd")
+      as "(Hheap & Hufd & [%Hok | Hb])"; iFrame "Hheap Hufd";
+      [ iApply (udep_dep n _ (proj1 Hok) (proj2 Hok) with "Hdep")
+      | by iModIntro ].
+  Qed.
 
   Definition urun (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) : iProp Σ :=

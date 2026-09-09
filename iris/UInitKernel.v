@@ -27,7 +27,8 @@
 (* [uimg_sub (elf_image init_elf)] through [init_img_sub_of_elf] below;   *)
 (* the pages off [KexecBuilt.kxb_perm_ok] at init's two PT_LOADs (R-X at  *)
 (* 0x0, RW- at 0x1000) and the RW stack page; the frame's bytes off       *)
-(* [kexec_stack_at]; the descriptors off [kexec_image_ok_fd].  init's     *)
+(* [kexec_stack_at]; the descriptors off [kexec_image_ok_fd]; the         *)
+(* map-stop row off [kexec_image_ok_below].  init's                       *)
 (* image is one page of text plus one of data, so [kexec_top init_elf] is *)
 (* 0x2000, [kexec_sz] 0x4000, and the stack page is [0x3000, 0x4000).     *)
 (*                                                                       *)
@@ -211,14 +212,13 @@ Section UInitKernel.
       + 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0)))))
       <= kxc_sp_final (kexec_sz ElfUser.init_elf) alen na ->
     length sts = NOFILE ->
-    (* THE MAP STOPS AT THE BREAK, the one premise the image fact does not
-       give -- [UShKernel.sh_slot_of_kexec]'s note is the reasoning. *)
-    (forall (p : mword 27) (q : uperm), uvis_perm W' !! p = Some q ->
-       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W')) ->
     (forall k : Z, k <> USYS_exec -> psok k) ->
     udep -∗ uxsup -∗ uslot W'.
   Proof.
-    intros Hok Hroom Hlen Hstop Hpsok.
+    intros Hok Hroom Hlen Hpsok.
+    (* THE MAP STOPS AT THE BREAK, off the image fact's own row --
+       [UShKernel.sh_slot_of_kexec]'s note is the reasoning. *)
+    pose proof (kexec_image_ok_below _ _ _ _ _ _ Hok) as Hstop.
     destruct init_loads as (p0 & p1 & Hld & Hv0 & Hm0 & Hf0 & Hv1 & Hm1 & Hf1).
     pose proof init_kexec_sz as Hsz. pose proof init_kexec_top as Htop.
     pose proof (kexec_image_ok_pc _ _ _ _ _ _ _ Hok ElfUser.init_elf_entry)
@@ -226,7 +226,7 @@ Section UInitKernel.
     pose proof (kexec_image_ok_fd _ _ _ _ _ _ Hok) as Hfd.
     rewrite Hsz in Hroom. unfold PGSIZE in Hroom.
     unfold kexec_image_ok in Hok. cbv zeta in Hok. rewrite Hsz in Hok.
-    destruct Hok as (_ & Hszv & Hsp & _ & _ & Himg & _ & Hstk & Hperm & _ & _).
+    destruct Hok as (_ & Hszv & Hsp & _ & _ & Himg & _ & Hstk & Hperm & _ & _ & _).
     destruct Hperm as (Hpg & _ & Hstpg).
     rewrite Htop in Hstpg. change (0x2000 + PGSIZE) with 0x3000 in Hstpg.
     set (spv := kxc_sp_final 0x4000 alen na) in *.

@@ -816,6 +816,44 @@ Definition kxb_perm_ok (f : elf_bytes) (top : Z) (π : gmap (mword 27) uperm) : 
   (* the stack page: writable, not executable *)
   /\ π !! kexec_pg (top + PGSIZE) = Some uperm_rw.
 
+(* ...AND THE CONVERSE, at the break.  [kxb_perm_ok] says which pages the
+   new address space HAS; this says it has NO OTHERS -- every page the
+   projection names lies below [PGROUNDUP] of the size, which is what
+   lets the exec'd program's later [sbrk] see the run it is handed as
+   fresh ([UserHeap.uheap]'s map-stop clause, and [UkRun.uslot_of_urun]'s
+   own premise).  It holds because exec builds a FRESH table: uvmcreate,
+   uvmalloc up to the loads' top, the guard and the stack page -- so the
+   kernel's [ProcPtOwn.um_below] of that table is what it is read off. *)
+Definition kxb_perm_below (sz : Z) (π : gmap (mword 27) uperm) : Prop :=
+  forall (p : mword 27) (q : uperm), π !! p = Some q ->
+    (bv_unsigned p * 4096 < pgroundup sz)%Z.
+
+(* THE INTRODUCTION, from the table.  Both of [perm_of]'s cases give it:
+   a MAPPED page is bounded by [um_below] and [PGROUNDUP] only grows, and
+   a FILLED page is in [live_pages] by construction. *)
+Lemma kxb_perm_below_intro (um : gmap (mword 27) (mword 64)) (szv : mword 64) :
+  ProcPtOwn.um_below szv um ->
+  (bv_unsigned szv <= ProcPtOwn.uvm_maxsz)%Z ->
+  kxb_perm_below (uint szv) (perm_of um (uint szv)).
+Proof.
+  intros Hbel Hmax p q Hp.
+  pose proof (proj1 (bv_unsigned_in_range _ szv)) as Hs0.
+  destruct (ProcPtOwn.pgroundup_maxsz szv Hmax) as [[Hge Hle] _].
+  rewrite ProcPtOwn.uvm_maxsz_val in Hmax, Hle.
+  assert (Hgl : pgroundup (bv_unsigned szv)
+                = bv_unsigned (ProcPtOwn.pgroundup szv))
+    by (apply ProcPtOwn.pgroundup_live;
+        change (2 ^ 64)%Z with 18446744073709551616%Z; lia).
+  rewrite (uint_unsigned szv) in Hp. rewrite (uint_unsigned szv).
+  rewrite perm_of_lookup in Hp.
+  destruct (um !! p) as [w |] eqn:Hw.
+  - pose proof (Hbel p w Hw) as Hlt. lia.
+  - destruct (bool_decide (p ∈ live_pages (bv_unsigned szv))) eqn:Hin;
+      [| discriminate Hp ].
+    apply (live_pages_bound (bv_unsigned szv) p);
+      [ unfold usz_ok; lia | exact (proj1 (bool_decide_eq_true _) Hin) ].
+Qed.
+
 Lemma kexec_sz_after_nil : kexec_sz_after [] = 0.
 Proof. reflexivity. Qed.
 
@@ -2045,4 +2083,10 @@ Definition kexec_built (f : elf_bytes) (ef : nat -> bv 8) (sz1 : mword 64)
      (uvis_perm W')] with [KexecImageAlg.kexec_top_of_sz_after]. *)
   /\ (kxb_walk_ok f ef ->
         kxb_perm_ok f (pgroundup (kexec_sz_after (elf_loads f)))
-          (perm_of (ud_um (pv_upt (us_V U'))) (uint sz1))).
+          (perm_of (ud_um (pv_upt (us_V U'))) (uint sz1)))
+  (* S7: AND NOTHING ABOVE THE BREAK.  Unguarded by the walk: it is a fact
+     about the table exec built, not about the file it read.  [KexecBridge]
+     quotes it at [uvis_sz W'] as [SpecKexec.kexec_image_ok]'s
+     [kxb_perm_below] row. *)
+  /\ kxb_perm_below (uint sz1)
+       (perm_of (ud_um (pv_upt (us_V U'))) (uint sz1)).

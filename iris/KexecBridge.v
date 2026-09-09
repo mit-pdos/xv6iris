@@ -125,8 +125,8 @@ Proof.
   destruct Hok as [(Hr & _) | Hok]; [by contradiction |].
   destruct Hok as (Hr & Hna & Hstok & Hpsz & Hspv & Htfp & Htf
                    & Hof & Hfdg & Hcwd & Hnm & Hlo & Hhi).
-  destruct Hbuilt as (Hsz & Hargs & Hstk & Himg & Hsize & Hperm);
-    cbn in Hsz, Hargs, Hstk, Himg, Hsize, Hperm.
+  destruct Hbuilt as (Hsz & Hargs & Hstk & Himg & Hsize & Hperm & Hbel);
+    cbn in Hsz, Hargs, Hstk, Himg, Hsize, Hperm, Hbel.
   destruct Hload as (Hwf & (e0 & He0 & Hpo) & Hfa & Hasc).
   (* (4): the walk's guard, from loadability *)
   assert (Hwalk : kxb_walk_ok f ef).
@@ -206,6 +206,10 @@ Proof.
     split; [apply kxb_stack_at_kexec; rewrite <- Htop; exact Hstk |].
     split; [rewrite Hkeyperm, Hsz, (kexec_top_of_sz_after f Hwf);
             exact (Hperm Hwalk) |].
+    (* S7 read at the key: the same projection, at the size the row is
+       stated at ([Htop] backwards, since the [let] already put the
+       contract's [kexec_sz f] in the goal) *)
+    split; [rewrite Hkeyperm, Hsz, <- Htop; exact Hbel |].
     split; [reflexivity | exact Hwlen].
   - right. rewrite <- Hentry.
     repeat (split; try assumption).
