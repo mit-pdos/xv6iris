@@ -1611,6 +1611,13 @@ KexecImageAlg.v
 ElfLoadable.v
 KexecBridge.v
 SpecSysExec.v
+# PinnedExec = a verified program's OWN exec deposit, from a PIN on the
+# abstract view: the walk cursor and the terminal observation read the
+# application's claim by opening AppInv.app_inv inside each fire, and the
+# slot piece answers with the exec'd program's kernel-side constructor.
+# Generic in the pin, the taint, the payload and the slot predicate; init's
+# exec of /sh and sh's of /echo are its instances.
+PinnedExec.v
 # UexecExecInst = the kernel-side instance of UexecSG's [uexecSG] and
 # [uprogSG]: [sbundle X 7 W] := some [sys_exec_au_pre] at the trapping key's
 # image, argv pointer (trapframe argument 1) and descriptor view, [emp] at

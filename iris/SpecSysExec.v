@@ -265,6 +265,53 @@ Proof.
     f_equal. apply bv_eq. vm_compute. reflexivity.
 Qed.
 
+(* THE READING PINS THE PATH.  [exec_path_of M pv] is a FUNCTION of the
+   image and the pointer: the bytes below the terminator are [M]'s, the
+   terminator is at [length pl], and the shape says no earlier byte is a
+   NUL -- so two readings at one [(M, pv)] have the same length and, byte
+   for byte, the same content.  This is what a bundle owed at every path
+   the caller MIGHT have passed reduces to at a caller whose image is
+   known: the one path it did pass ([PinnedExec.v] takes
+   [exec_path_of M pv pl] as its premise and answers the ∀ through this
+   lemma). *)
+Lemma exec_path_of_uniq (M : gmap Z (bv 8)) (pv : mword 64)
+    (pl1 pl2 : list (bv 8)) :
+  exec_path_of M pv pl1 -> exec_path_of M pv pl2 -> pl1 = pl2.
+Proof.
+  intros (Hs1 & Hb1 & Hn1) (Hs2 & Hb2 & Hn2).
+  assert (Hz : bv_0 8 = (mword_of_int 0 : mword 8))
+    by (apply bv_eq; vm_compute; reflexivity).
+  (* the terminator of the shorter reading is a non-NUL byte of the
+     longer one, which its shape forbids *)
+  assert (Hcut : forall (q1 q2 : list (bv 8)),
+             (forall (j : nat) (b : bv 8), q2 !! j = Some b ->
+                M !! uint (add_vec_int pv (Z.of_nat j)) = Some b) ->
+             (forall (j : nat) (b : bv 8), q2 !! j = Some b ->
+                b <> (mword_of_int 0 : mword 8)) ->
+             M !! uint (add_vec_int pv (Z.of_nat (length q1))) = Some (bv_0 8) ->
+             (length q2 <= length q1)%nat).
+  { intros q1 q2 Hb Hnn Hnul.
+    destruct (decide (length q2 <= length q1)%nat) as [Hle | Hgt]; [ exact Hle | ].
+    exfalso.
+    destruct (lookup_lt_is_Some_2 q2 (length q1) ltac:(lia)) as [b Hbj].
+    pose proof (Hb _ _ Hbj) as HM. rewrite Hnul in HM.
+    apply Some_inj in HM. rewrite Hz in HM.
+    exact (Hnn _ _ Hbj (eq_sym HM)). }
+  assert (Hlen : length pl1 = length pl2).
+  { pose proof (Hcut pl1 pl2 Hb2 (proj2 Hs2) Hn1) as H12.
+    pose proof (Hcut pl2 pl1 Hb1 (proj2 Hs1) Hn2) as H21. lia. }
+  apply list_eq. intros j.
+  destruct (pl1 !! j) as [b1 |] eqn:H1.
+  - destruct (lookup_lt_is_Some_2 pl2 j
+                ltac:(rewrite -Hlen; exact (lookup_lt_Some _ _ _ H1)))
+      as [b2 H2].
+    rewrite H2. f_equal.
+    pose proof (Hb1 _ _ H1) as E1. pose proof (Hb2 _ _ H2) as E2.
+    rewrite E1 in E2. by apply Some_inj in E2.
+  - apply lookup_ge_None in H1. symmetry.
+    apply lookup_ge_None_2. lia.
+Qed.
+
 (* ===================================================================== *)
 (*  2.  THE BUNDLE AND THE ARMS AT THE SYSCALL BOUNDARY                   *)
 (* ===================================================================== *)
