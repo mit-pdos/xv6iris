@@ -87,7 +87,7 @@ Require Import FsBytesGamma.
 Require Import SysMknodDefs.
 Require Import SysOpenDefs.
 Require Import SpecSysOpen.   (* the arms this block builds *)
-Require Import FsAbsMknodFire.   (* [acre_commit_at], [dlookup_commit_at]   *)
+Require Import FsAbsCreateFire.   (* [acre_commit_at], [dlookup_commit_at]   *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule) *)

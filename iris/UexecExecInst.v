@@ -154,17 +154,14 @@ Require Import SpecArgfd.      (* [fd_st_of_key] -- the descriptor key a
 Require Import SpecFileread.   (* [fileread_in] / [fileread_extra]    *)
 Require Import SpecFilewrite.  (* [filewrite_in] / [filewrite_extra]  *)
 Require Import SpecSysRead.    (* [sys_rw_count]                      *)
-Require Import SpecSysWrite.
 Require Import SpecSysChdir.   (* [chdir_au_pre]                      *)
 Require Import SpecSysOpen.    (* [open_in]                           *)
-Require Import SysOpenDefs.
 Require Import SpecSysMknod.   (* [mknod_au_pre] / [mknod_arms]       *)
 Require Import SysMknodDefs. (* [dev_arg]                           *)
 Require Import SpecSysUnlink.  (* [unlink_au_pre] / [unlink_arms]     *)
 Require Import SpecSysLink.    (* [link_commits] / [link_arms]        *)
 Require Import SpecSysMkdir.   (* [mkdir_au_pre] / [mkdir_arms]       *)
 Require Import FsTree.         (* [fname]                             *)
-Require Import FirstTok.       (* [FirstTok.fsabs_env]                *)
 Require Import AppInv.         (* [app_sup] -- THE SUPPLY.  Required
                                   DIRECTLY: the definition is named in a
                                   class field's body                   *)
@@ -177,7 +174,6 @@ Require Import ProcAvail.
 Require Import Xv6G.
 Require Import FsCfg.
 Import Defs.
-Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 

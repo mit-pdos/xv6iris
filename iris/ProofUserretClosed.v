@@ -99,7 +99,6 @@ Require Import UexecSG.       (* [uexecSG]: [sbundle_at] / [spost_at] / [skey_eq
 Require Import UexecExecMint. (* [uslot_mint] -- the loop's generic slot *)
 Require Import UexecExecInst. (* the class INSTANCE: what the loop hands the
                                  process back at each contracted number *)
-Require Import FirstTok.      (* the syscall environment's own file *)
 Require Import AppInv.        (* [app_sup] -- the credential the mint runs on *)
 Require Import UserretUser.
 Require Import TfPage36.

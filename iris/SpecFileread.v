@@ -183,7 +183,6 @@ Require Import FileInvDefs.
 Require Import SpecReadi.
 Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ                 *)
 Require Import AppInv.           (* [appN]/[appE]: the commit's mask         *)
-Require Import SysReadDefs.    (* the read observation's pure vocabulary   *)
 Require Import FsAbsReadFire.    (* [aread_commit_at], [read_arms]: the one
                                     piece and its arms                       *)
 From Kernel Require KernelSyms.
@@ -192,7 +191,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
-Require Import FsAbs.   (* LAST (FsAbs's own rule) *)
+Require Import FsAbsDefs.   (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 

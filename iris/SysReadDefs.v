@@ -106,26 +106,9 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile.
 Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import IntrDefs.
-Require Import WpNext.
-Require Import SpecPanic.
-Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
-Require Import SchedCtx.
-Require Import IrefSlots.
-Require Import UserPtTree.
-Require Import KvmSpec.
-Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import FileInvDefs.
-Require Import SpecArgfd.      (* [arg_fd]                                  *)
-Require Import ConsoleInv.
 Require Import FsTree.         (* [file_bytes]: the landed flat byte-list
                                   reading the slice vocabulary is cut from  *)
 Require Import PipeInvDefs.    (* [pipe_rw_ret], the landed blanket the
@@ -135,14 +118,8 @@ Require Import SpecReadi.      (* [rd_clamp], [rd_delivered]: what readi
                                   actually answers -- the tie is to THESE  *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import ProcAvail.
-Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
-Require Import FsAbs.          (* the abstract state (lane A, landed)       *)
-Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ                  *)
-Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import FsAbsDefs.          (* the abstract state (lane A, landed)       *)
 Import Defs.
-Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 

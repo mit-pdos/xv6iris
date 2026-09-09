@@ -114,30 +114,12 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import IntrDefs.
-Require Import WpNext.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
 Require Import Xv6Cameras.
-Require Import BioDefs.
-Require Import LogInv.
-Require Import BitmapInv.
-Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRefDefs.
-Require Import IcacheInv.
-Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import UserPtTree.
-Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 (* [KexecDefs] for [kexec_ok] and [fs_fabric].  This contract is a CALLER of
    kexec -- its whole job is to build kexec's precondition -- so requiring
    kexec's Spec is not the cross-function reach the tree's rule warns about;
@@ -151,7 +133,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 Require Import TsoCtx.
 

@@ -126,7 +126,6 @@ Proof. lia. Qed.
 (*  ([unclaimed_USED : unclaimed USED = false]).                       *)
 (* ------------------------------------------------------------------ *)
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
-Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Section PstateUsedHelper.
   Context `{!riscvGS Σ}.

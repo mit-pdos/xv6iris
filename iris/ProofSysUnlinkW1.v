@@ -108,7 +108,6 @@ Require Import ProofSysUnlinkPure.
 Require Import SysMknodDefs.
 Require Import FsAbsMknodFire.
 Require Import SysUnlinkDefs.
-Require Import ProofSysUnlinkShared.
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.

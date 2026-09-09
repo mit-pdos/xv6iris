@@ -39,11 +39,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile.
-Require Import CalleeSaved KernelDataInv.
-Require Import IntrDefs.
-Require Import CpuOwn.
+Require Import KernelDataInv.
 Require Import FdSlots.
 Require Import WpUart.
 Require Import ByteBuf.
@@ -68,17 +64,13 @@ Require Import IcacheRef.
 Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import FileInvDefs.
-Require Import UserPtTree.
-Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import SpecReadi.        (* [rd_delivered]                         *)
 Require Import PathElems.        (* [path_elems], [nameiparent_of]         *)
-Require Import SpecSysUnlink.
 Require Import ProofSysUnlinkPure.   (* the top-level pure layer; see header   *)
 Require Import FsAbsMknodFire.
 Require Import SysUnlinkDefs.
 Require Import FsAbsUnlinkFire.
-Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.

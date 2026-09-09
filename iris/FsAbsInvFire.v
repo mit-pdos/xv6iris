@@ -63,7 +63,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import FsTree.          (* [fname] *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ *)
 Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    Import: [FsImg]'s [fs_sb] field readers
@@ -88,20 +87,15 @@ Require Import SpecSysUnlink.      (* [unlink_au_pre]: the one contract's bundle
 Require Import SpecSysLink.        (* [link_commits] (round E2, lane E2-L) *)
 Require Import FsAbsReadFire.      (* [aread_commit_at] *)
 Require Import FsAbsWriteFire.     (* [awrite_full_at], [awrite_chain] *)
-Require Import OffGv.              (* [off_user_inv]: the row the FIRE moves *)
 Require Import AppInv.             (* [appN]/[appE], [app_sup], [app_step_acc]: the supply and the step it pays *)
 Require Import FsAbsDefs.          (* [abs_view_lookup_is_Some] *)
 Require Import FsCfg.              (* [fscfg]: the fs configuration is AMBIENT *)
-Require Import ConsoleInv.         (* [devsw_write_val_console]: the cell's pin *)
 Require Import UartSentLoc.        (* [uart_sent_nil]: the free trace seed *)
 Require Import SpecFilewrite.      (* [filewrite_in]: the one keyed input *)
-Require Import SpecArgfd.          (* [sys_fd_st]: the descriptor-state key *)
 Require Import SpecFileread.       (* [fileread_in]: read's keyed input *)
 Require Import SpecSysRead.        (* in the require block; the dischargers
                                       are stated at the BARE descriptor state *)
-Require Import SpecSysWrite.
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
-Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 

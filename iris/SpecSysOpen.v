@@ -336,7 +336,7 @@ Require Import SysOpenDefs.   (* THE STATEMENT LEAF: the omode readings,
                                    the two commits, the walk package, the
                                    two bundles, [open_fd_ok] *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
-Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
+Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 

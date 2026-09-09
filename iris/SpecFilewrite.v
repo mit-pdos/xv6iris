@@ -173,18 +173,15 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
-Require Import FsNode.      (* [fs_node]                                *)
 Require Import AppInv.      (* [app_step]/[app_inv]: the application's
                                claim and the step a fire pays for it
                                (round E2, lane E2-W)                     *)
-Require Import FsAbsDelta.  (* [delta_write], [delta_write_absent]       *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ                 *)
 Require Import SpecCopyin.       (* [ubytes_at]: the content seam (RULING A) *)
 Require Import SysWriteDefs.   (* [FW_MAX], [wri_pre], [wchunks]           *)
 Require Import FsAbsWriteFire.   (* [awrite_chain]: the cursor chain         *)
 Require Import UartSentLoc.      (* [uart_sent_from]: the console receipt    *)
 Require Import SpecConsolewrite. (* [cons_sent_cnt]: the callee's post    *)
-Require Import FsAbsDefs.   (* LAST (FsAbs's own rule)                   *)
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.

@@ -49,7 +49,6 @@ Require Import SpecMemset.
 Require Import SpecReadi.
 Require Import SpecWritei.
 Require Import SpecNparWrapEra.   (* [NPAR_WRAP_ERA]: the era walk         *)
-Require Import SysUnlinkDefs.
 Require Import SpecSysUnlink.   (* the ONE contract: the closer, the arms, [SYSUNLINK] *)
 Require Import ProofSysUnlinkW1.
 Require Import ProofSysUnlinkW2.

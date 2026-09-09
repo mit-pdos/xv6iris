@@ -27,8 +27,7 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import BioDefs.        (* [BSIZE]                                   *)
 Require Import InodeInv.       (* [MAXFILE]                                 *)
-Require Import FsBlocks.       (* [blk_splice]: the landed byte splice      *)
-Require Import FsAbs.          (* the abstract state (lane A, landed)       *)
+Require Import FsAbsDefs.          (* the abstract state (lane A, landed)       *)
 
 Local Open Scope Z_scope.
 

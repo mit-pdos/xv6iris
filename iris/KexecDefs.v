@@ -162,21 +162,13 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText.
-Require Import IntrDefs.
-Require Import WpNext.
 Require Import WpLock.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskInv.
@@ -184,17 +176,13 @@ Require Import Xv6Cameras.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import BitmapInv.
-Require Import ByteBuf.
-Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import UserPtTree.
-Require Import KvmSpec.
-Require Import ProcInv.
+Require Import ProcDefs.
 Require Import FileInvDefs.
 (* [SpecNamex] for [ROOTDEV] -- a param.h constant that happens to live in a
    Spec file.  It should be hoisted the way [tf_epc_idx] was (see ProcGeom.v):
@@ -206,7 +194,6 @@ Require Import FileInvDefs.
    SpecDirlink's.  Since the two contracts have to compose, kexec's
    precondition must be the SYNTACTICALLY same proposition namei's is.  The
    three copies should be one; also in the cleanup list. *)
-Require Import SpecDirlink.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.

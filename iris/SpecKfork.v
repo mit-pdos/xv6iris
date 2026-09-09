@@ -322,7 +322,6 @@ Definition wp_kfork_sconf_body
   WP (Loop : expr riscv_lang).
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
-Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Module Type KFORK.
   Parameter wp_kfork_sconf :

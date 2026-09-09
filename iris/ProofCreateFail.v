@@ -135,10 +135,6 @@ Require Import SpecPanic.
 Require Import SpecIput SpecIupdate.
 Require Import SpecIunlockput.
 Require Import SpecCreate.
-Require Import PathElems.        (* [path_elems]: the name tie's list      *)
-Require Import SysMknodDefs.   (* [npar_elems]: the PARENT prefix *)
-Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
-Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsAbsCreateFire.  (* the UNARM fire [caf_unarm_fire] and its row readings (round E2, lane E2-C) *)
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.        (* [aview], [abs_of], [abs_node] *)

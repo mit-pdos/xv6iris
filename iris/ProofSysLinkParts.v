@@ -56,7 +56,6 @@ Require Import CodeSysLink.
 Require Import SpecSysLink.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 

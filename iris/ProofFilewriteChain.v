@@ -48,17 +48,14 @@ Require Import Xv6Cameras.
 Require Import FdSlots.
 Require Import IrefSlots.
 Require Import FileInvDefs.
-Require Import BioDefs.            (* [BSIZE]: the disturbed tail's bound   *)
 Require Import ProcAvail.
-Require Import FsBytesGamma.
+Require Import FsStateDefs.
 Require Import Xv6G.
-Require Import FsCfg.
 Require Import SysWriteDefs.     (* [FW_MAX], [wchunks], [wri_pre]        *)
 Require Import FsAbsWriteFire.     (* [awrite_chain] and its two arms       *)
 Require Import SpecCopyin.         (* [ubytes_at]: the content seam         *)
 Require Import SpecFilewrite.      (* [write_post_ok_at], [write_post_fail_at] *)
 Require Import AppInv.             (* [appE]                                *)
-Require Import FsAbsDefs.          (* LAST (FsAbs's own rule)               *)
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.

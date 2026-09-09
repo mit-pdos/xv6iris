@@ -175,17 +175,8 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import AlignBits.
-Require Import RegFile.
 Require Import ProcGeom.     (* [tf_arg_idx] -- the argument words the key
                                 congruence is stated at *)
-Require Import TfUser.
-Require Import UserPtTree.
-Require Import UserExec.
-Require Import SpecUserret.
-Require Import ProcDefs.
-Require Import UserPerm.
 Require Import FdSlots.
 Require Import UsysMemOk.    (* [USYS_exec] -- the one number whose bundle
                                 carries a slot wand *)

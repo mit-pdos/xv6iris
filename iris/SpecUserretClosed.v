@@ -70,9 +70,7 @@ Require Import UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its produc
 Require Export UexecWp.
 Require Import UserPerm.   (* [perm_of] -- the key's permission projection *)
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
-Require Import UexecSG.       (* [uexecSG]: the deposit class [uslot]/[ukc] are indexed by *)
 Require Import AppInv.        (* [app_sup]: the supply credential the loop's mint runs on *)
-Require Import UexecExecInst. (* the class INSTANCE, so the body resolves it directly -- this file sits above the instance and binds no class of its own; its binder list matches the seal's *)
 Require Import UexecRet.   (* [ukc] -- the U-mode continuation the entry runs.
                               REQUIRED DIRECTLY: [ukc]'s body is the sealed
                               [uvb], and the seal does not travel through a

@@ -118,14 +118,10 @@ Require Import SpecIunlockput.
 Require Import SpecDirlookup.
 Require Import SpecCreate.
 Require Import DirentEnc.        (* [bview]                               *)
-Require Import PathElems.        (* [path_elems]                          *)
-Require Import SysMknodDefs.   (* [npar_elems]                  *)
-Require Import FsAbsEra.         (* [ep_start]                            *)
 Require Import FsAbsMknodFire.   (* [np_start_of_mknod], the walk premise *)
 Require Import CodeSysMkdir.
 Require Import SpecSysMkdir.
 Require Import FsTree.          (* [fname]: the parent-leg receipt's name *)
-Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.       (* [aview]: the receipts' view argument (round E2, lane E2-C) *)
 From Kernel Require KernelSyms.

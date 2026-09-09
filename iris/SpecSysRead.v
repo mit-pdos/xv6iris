@@ -166,16 +166,13 @@ Require Import FileInvDefs.
 Require Import SpecArgfd.
 Require Import ConsoleInv.
 Require Import SpecFileread.
-Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ                 *)
-Require Import AppInv.           (* [appN]/[appE]: the commit's mask         *)
-Require Import FsAbsReadFire.    (* [read_arms]: the inode arm's disposition *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
-Require Import FsAbs.  (* LAST (FsAbs's own rule) *)
+Require Import FsAbsDefs.  (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 

@@ -129,7 +129,6 @@ Require Import SpecEndOp.
 Require Import SpecIunlockput.
 Require Import SpecArgint.
 Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ            *)
-Require Import AppInv.           (* [appE]: the commit mask             *)
 Require Import SpecCreate.
 Require Import CodeSysMknod.
 Require Import SpecSysMknod.     (* the contract this file seals        *)

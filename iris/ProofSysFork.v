@@ -44,10 +44,6 @@ Require Import Xv6Cameras.
 Require Import IrefSlots.
 Require Import SpecKfork.
 Require Import SpecSysFork.
-Require Import UexecSlot. (* [uvis] *)
-Require Import UexecRet.  (* [uslot] -- DIRECT, the seal does not travel *)
-Require Import KforkChild.    (* [kfork_child] -- the record the slot is at *)
-Require Import SyscParkEnv.   (* [park_world] -- the world the child's park needs *)
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -91,7 +87,6 @@ Qed.
    claude-notes/design/user-wp-slot.md. *)
 Require Import UserFd.   (* [ufdG] -- the program's descriptor-table class,
                             needed to mint a user slot *)
-Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Module SysForkProof (Kfork : KFORK) : SYSFORK.
 

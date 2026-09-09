@@ -72,10 +72,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import AppInv.            (* [appE]: the commit's mask                *)
-Require Import FsBytesGamma.      (* [fs_gamma_L]: the live Γ                 *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
-Require Import FsAbs.             (* [aview], [anode]: the receipt's shape    *)
+Require Import FsAbsDefs.             (* [aview], [anode]: the receipt's shape    *)
 Require Import ByteBuf.  (* A6.58: the CONTEXT tower\'s 8<->4 halving ([ctx_word_pointsto_split4]/[_join4]) *)
 Import Defs.
 Local Open Scope Z_scope.

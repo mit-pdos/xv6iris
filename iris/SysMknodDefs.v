@@ -61,18 +61,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
-Require Import FdSlots.
 Require Export SwtchCtx.
-Require Import WpUart.
-Require Import DiskInv.
-Require Import Xv6Cameras.
-Require Import LogInv.
-Require Import BitmapInv.
-Require Import IrefSlots.
-Require Import IcacheEscrow.
-Require Import FileInvDefs.
-Require Import ProcInv.
 Require Import FsAbsCreateFire. (* [T_DEVICE], [create_made]                *)
 Require Import PathElems.       (* [path_elems], [SLASH] *)
 Require Import FsTree.          (* [fname] *)
@@ -81,12 +70,9 @@ Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    ([sb_ninodes] : fs_sb -> Z) would shadow
                                    the superblock CELL ADDRESSES a syscall
                                    frame threads *)
-Require Import FsAbs.           (* the abstract state *)
-Require Import FsStateDefs.    (* [fs_gamma_L]: the live Γ *)
+Require Import FsAbsDefs.           (* the abstract state *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import ProcAvail.
-Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Local Open Scope Z_scope.

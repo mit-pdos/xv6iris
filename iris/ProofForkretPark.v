@@ -119,7 +119,6 @@ Require Import TsoCtx.   (* [own_context_twin] / [ctx_move] -- the child's own c
 (* ===================================================================== *)
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
-Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Module ForkretParkProof (FR : FORKRET) : FORKRET_PARK_PAID.
 

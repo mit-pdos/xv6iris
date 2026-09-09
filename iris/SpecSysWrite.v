@@ -102,7 +102,6 @@ Require Import SpecArgfd.
 Require Import SpecSysRead.
 Require Import ConsoleInv.
 Require Import SpecFilewrite.
-Require Import SpecCopyin.   (* [ubytes_at]: the content seam (RULING A)   *)
 Require Import WpUart.       (* [uart_names]: the console arm's seed       *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

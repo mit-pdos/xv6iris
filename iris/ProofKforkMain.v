@@ -201,7 +201,6 @@ Proof.
   intro Hb. rewrite (Hs Hb). exact (Hch Hb).
 Qed.
 
-Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Module KforkProof (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
              (FP : FREEPROC) (RL : RELEASE) (AQ : ACQUIRE)

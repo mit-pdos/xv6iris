@@ -42,21 +42,15 @@ Require Import UexecSlot.
 Require Import UexecWp.
 Require Import UexecRet.
 Require Import UexecCond.       (* [cond_entry_slot] -- the plain generic slot *)
-Require Import SpecKexec.
-Require Import SpecSysExec.
-Require Import FsAbsInvFire.    (* [fsabs_exec_half] *)
 Require Import FirstTok.        (* in the require block for FsAbsInvFire's
                                    sake; nothing here names its [fsabs_env] *)
-Require Import PieceFam.       (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
 Require Import UexecExecInst.   (* the class INSTANCE: [uexecSG_xv6] / [uprogSG_gen] *)
 Require Import UkRun.           (* [udep] -- the supplier and its key-free law *)
 Require Import AppInv.          (* [app_sup] -- the credential both mints take *)
-Require Import FsBytesGamma.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.
-Require Import FsCfg.
 Import Defs.
 Require Import TsoCtx.
 

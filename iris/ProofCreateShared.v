@@ -120,7 +120,6 @@ Require Import DinodeEnc.
    that, at the ABI's sign-extended [major] / [minor] arguments. *)
 Require Import DirentEnc.
 Require Import BvShift.
-Require Import PathElems.
 Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.

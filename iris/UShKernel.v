@@ -58,7 +58,7 @@ Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import UmodeArith.
 Require Import UserPerm UexecSlot UexecRet UsysMemOk.
-Require Import UserHeap UkRun UkRunSys.
+Require Import UserHeap UkRunSys.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import UserFd.

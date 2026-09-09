@@ -134,11 +134,6 @@ Require Import SpecIput SpecIupdate.
 Require Import SpecIunlockput.
 Require Import SpecCreate.
 Require Import DirentEnc.        (* [bview]: the path buffer's reading     *)
-Require Import PathElems.        (* [path_elems]: the name tie's list      *)
-Require Import SysMknodDefs.   (* [npar_elems]: the PARENT prefix *)
-Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
-Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
-Require Import FsAbsDelta.       (* [dots_ents]: the entry map the dots left (round E2, lane E2-C) *)
 Require Import FsAbsCreateFire.  (* the UNARM fire's commit and receipt (round E2, lane E2-C) *)
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.        (* [aview], [abs_of], [abs_node] *)

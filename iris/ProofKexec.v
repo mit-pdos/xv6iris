@@ -69,7 +69,6 @@ Require Import UserPtTree.
 Require Import FileInvDefs.
 Require Import KexecDefs.
 Require Import ElfFile.      (* [elf_bytes] *)
-Require Import ElfBridge.    (* [le_at_of_file_bytes] *)
 Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.
 Require Import KexecBridge. (* the pure closer: [exec_built_Q] and friends *)

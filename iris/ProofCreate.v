@@ -110,11 +110,6 @@ Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
 Require Import SpecNparWrapEra.  (* the ERA nameiparent walk, the callee  *)
 Require Import SpecCreate.
-Require Import DirentEnc.        (* [bview]: the path buffer's reading     *)
-Require Import PathElems.        (* [path_elems]: the name tie's list      *)
-Require Import SysMknodDefs.   (* [npar_elems]: the PARENT prefix *)
-Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
-Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsTree.           (* [fname]: the receipts' name argument *)
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.        (* [aview]: the receipts' view argument (round E2, lane E2-C) *)

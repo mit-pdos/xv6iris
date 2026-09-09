@@ -138,10 +138,6 @@ Require Import SpecIput SpecIalloc SpecIupdate.
 Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
 Require Import SpecCreate.
-Require Import PathElems.        (* [path_elems]: the name tie's list      *)
-Require Import SysMknodDefs.   (* [npar_elems]: the PARENT prefix *)
-Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
-Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsAbsDelta.       (* [acre_bump], [dots_ents]: the deltas the legs' rows are stated at (round E2, lane E2-C) *)
 Require Import FsAbsMknodFire.   (* the parent-leg fire [caf_acre_fire], [caf_made_row], [mkf_parent_row] (round E2, lane E2-C) *)
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)

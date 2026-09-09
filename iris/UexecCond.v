@@ -50,11 +50,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 From iris.base_logic.lib Require Import ghost_var.
 Require Import RiscvLang RiscvPtsto.
-Require Import ProcDefs ProcPt ProcPtOwn.   (* [tf_sp_idx] / [tf_arg_idx] *)
+Require Import ProcPt ProcPtOwn.   (* [tf_sp_idx] / [tf_arg_idx] *)
 Require Import UserPtTree UserExec.
 Require Import UmodeAbi.
 Require Import UserPerm UexecWp UexecSlot UexecRet.
-Require Import FdSlots.  (* [fdstate] -- the key's descriptor view *)
 Require Import UkAbi.   (* [uk_xpage] / [uk_stack] / [uk_args_c]: the key-level facts *)
 Require Import WpMmodeLeafBase.
 Require Import USyncKernel.

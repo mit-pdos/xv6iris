@@ -89,7 +89,6 @@ Require Import SchedCtx.
 Require Import SpecEitherCopyin.
 Require Import SpecUartwriteLoc.   (* the located callee contract *)
 Require Import CodeConsolewrite.
-Require Import SpecConsolewrite.
 Require Import SpecCopyin.   (* [ubytes_at], [add_vec_moi_comm] *)
 Require Import SpecConsolewrite.
 From Kernel Require KernelSyms.

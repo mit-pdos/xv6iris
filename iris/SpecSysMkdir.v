@@ -161,7 +161,6 @@ Require Import SpecCreate.      (* [create_slots], [create_units], [K_create],
                                    [cre_fail_arms], and their units *)
 Require Import FsBlocks.        (* [fs_names] *)
 Require Import AppInv.          (* [appE], [app_sup] *)
-Require Import PathElems.       (* [path_elems] *)
 Require Import FsAbsEra.        (* [ep_start_triv] *)
 Require Import FsAbsMknodFire.  (* [npar_walk_pre_era], the walk premise *)
 Require Import FsTree.          (* [fname]: the parent-leg receipt's name *)

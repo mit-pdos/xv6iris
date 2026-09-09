@@ -369,17 +369,12 @@ Require Import SpecSysOpen.
    [SYSMKNOD], required above; open's and unlink's are [SpecSysOpen]'s
    [SYSOPEN] and [SpecSysUnlink]'s [SYSUNLINK], over their statement
    leaves. *)
-Require Import SysOpenDefs SysUnlinkDefs.
 Require Import SpecSysUnlink.    (* [SYSUNLINK], [unlink_arms_ret] *)
 Require Import SpecSysChdir.     (* [SYSCHDIR], [chdir_arms_landed] *)
 (* ...and the write's (round E2, lane E2-W, W1): the dispatch case-splits
    on the descriptor's own state and runs the AU write for an open,
    WRITABLE inode fd; every other descriptor keeps the landed sconf. *)
-Require Import SysWriteDefs.     (* [wchunks]                              *)
-Require Import FsAbsWriteFire.     (* [awrite_chain]                         *)
-Require Import OffGv.              (* [off_user_inv]: the fd row's offset     *)
 Require Import PieceFam.   (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
-Require Import FsAbsInvFire.
 Require Import SpecMyproc.
 (* the content-independent bundles the non-closer fs entries state their
    environments over -- [filestat_fs_env]/[fread_names] and friends. *)

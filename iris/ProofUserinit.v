@@ -111,7 +111,6 @@ Require Import SpecForkretPark.
 Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID] -- [park_token_intro] *)
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the running token (L8) *)
 Require Import ParkCap.               (* [park_token_park] *)
-Require Import AppInv.                (* [app_sup] -- the supply the park carries *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
 Require Import UexecWp.               (* [UEXEC_GEN] -- the mint's [box] *)
@@ -213,7 +212,6 @@ Proof. intro H. split_and!; lia. Qed.
    claimed state. *)
 Require Import UserFd.   (* [ufdG] -- the program's descriptor-table class,
                             needed to mint a user slot *)
-Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Section PstateRunnableHelper.
   Context `{!riscvGS Σ}.

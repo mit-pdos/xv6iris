@@ -119,7 +119,6 @@ Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
 Require Import SpecKexecB2.
 Require Import KexecPtImage.
-Require Import ElfBridge.   (* [le_at_of_file_bytes] -- readi's bytes ARE the file's *)
 Require Import UmodeAbi.    (* [uimg_sub] *)
 Require Import ElfFile.     (* [elf_phdr] fields, [phdr_ok], [seg_map] *)
 Require Import UserPerm.    (* [perm_leaf]: the permission projection (S6) *)

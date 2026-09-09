@@ -1014,7 +1014,6 @@ Proof. lia. Qed.
    state need, in the campaign's usual order with [FsAbs] LAST. ---- *)
 Require FsImg.                     (* [T_FILE_z] -- Require, NOT Import    *)
 Require Import FsBytesGamma.       (* [fs_gamma_L]: the live Γ             *)
-Require Import AppInv.             (* [app_step], [appE]                   *)
 Require Import FsAbsOpenFire.      (* [opf_era_file_row]                   *)
 Require Import FsAbsWriteFire.     (* the fire, the splice bridge, item 4  *)
 Require Import SpecCopyin.         (* [ubytes_at], [add_vec_moi_comm]      *)
