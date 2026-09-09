@@ -1732,3 +1732,47 @@ in `sx_body`/`sx_step`/`sx_loop`, the break publishing the NULL word beside
 PinnedExec's three constructor wands take `exec_args_of`;
 `exec_args_shape` stays as its first conjunct (`exec_args_of_shape`).
 NEXT: PINNED-EXEC D (brief `brief-pinned-exec-d.md`), then ARM-c (1).
+
+PINNED-EXEC D — brief-pinned-exec-d.md (2026-09-09): phase 1 landed the
+shape, phase 2 stopped on D-4.  Landed (WIP, uncommitted; backup
+`pexd-wip.patch` + `UInitSh-wip.v` in the scratchpad): `UCodeInit.
+init_argv_map` (InitData's data half at/above 0x1000, the array `{ "sh",
+0 }`) and `init_argv` its persisted view; init's entry carves with
+`uslot_of_urun_all`, persists the sixteen bytes (`uarea_persist`) and drops
+the rest of the page; they cross the fork with text and rodata
+(`UkFork.forkable_ubyteq_map`).  `UkInit.init_exec_sup` replaces `uxsup` in
+init's six lemmas: the deposit at a0 = 0x9a8, a1 = 0x1000, cwd ROOTINO,
+lent the heap and fd authority (`udepw_at`); `wp_kinit_exec` is
+cwd-indexed; every init lemma carries `ucwd` at the root.  `UInitSh.v` pays
+it ABOVE the kernel's UexecSG instance (`init_sh_slot T Pay := app_inv ∗
+claim law at era0_sh_pins ∗ □ (T -∗ ∀ W, uslot W) ∗ Pay`, `sh_pay Rsh n0`,
+`init_args_det`: na = 1, alen 0 = 2 off init's image, so `kxc_sp_final
+0x5000 alen 1 = 0x4FE0` and sh's frames fit for n0 ≤ 402; `init_exec_sup_
+of_sh_slot`).  The u-tier stays over the CLASS: importing the instance
+into UkInitMain/UInitKernel makes every `psok` premise `fun _ => True`.
+`init_slot_of_kexec` takes `uvis_cwd W' = ROOTINO` (ARM-c (1) discharges).
+Trap: `big_sepM_subseteq` inlined at syscall altitude does not terminate
+(847 MB, 6+ min); as a closed lemma with `Local Opaque init_argv_map` it
+is 8 ms (→ optimization.md).  F1: `sh_slot_of_kexec`'s `fd_lowest_closed
+sts = None` was unsatisfiable at every real exec of sh (it says all NOFILE
+slots are open); weakened to the NSTD prefix -- and then D-4 showed even
+that is a GAP.
+
+D-4 RULING: STD-LEDGER (2026-09-09).  init cannot prove its standard
+streams are open: its dups go through the untracked leaf, and xv6's init
+never tests its second `open` (repair arm) nor its two `dup`s -- on real
+paths sh starts with a closed standard stream, and xv6's sh has code for
+exactly that (its console preamble `while((fd = open("console")) >= 0) if
+(fd >= 3) { close(fd); break; }` re-opens the console into closed slots).
+So sh's entry premise `fd_lowest_closed (take NSTD sts) = None`
+(`UkSh.ush_std`'s pure, UShKernel's two premises) was a GAP premise --
+"the console opens succeeded" assumed rather than proved.  RULED: sh is
+verified at ANY standard-stream ledger.  The fact is used at ONE program
+point, the console preamble (`wp_ksh_console`, `wp_ksh_open`/`_ostub`,
+`ualloc_hi`); `UserFd.ualloc_at` already says where an open lands (`Some
+k` → `fd = k`, ledger `ustd_after`; `None` → `fd ≥ NSTD` with a handle),
+so the loop generalises over the ledger and the fall-through `close(fd)`
+spends the handle as today.  REDIR is refuted in the verified command set,
+so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
+takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
+ORDER: STD-LEDGER + D FINISH → ARM-c (1a) (brief `brief-armc-1a.md`, written) → (1b) echo's discharge.
