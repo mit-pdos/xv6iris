@@ -42,9 +42,11 @@ binaries at every reboot).
   into the durable instance and the transport (round C): the claim rides
   the crash slot beside the snapshot and crosses at commit/clone/boot as a
   resource.
-- [ ] **L5 — console input tie.**  Unblocks: sh minting the taint at the
-  point it leaves the discipline; hence L2's last step and L6's sh.
-  Gate: none (console.c is proven; the ledger is new).
+- [x] ~~**L5 — console input tie.**~~  LANDED 2026-09-09 (RECEIPT-IMAGE,
+  L5-a in two halves, L5-b): every received byte carries the
+  application's persistent tag from the rx wand to the read syscall's
+  receipt; the PLIC claim is the UART's lock (`plic_slot`, the pop
+  token); the ring is coupled.
 - [ ] **L6 — the programs.**  init and sh on the Uk engine with paid
   ecalls; the exec-site gate at the observed image; fork's real row.
   Gate: L2, L5; `user-wp-slot.md` items 1–3.
@@ -1273,7 +1275,7 @@ fourth row of `console_caps` (which already crosses `started` inside
 `main_deposit`); `uart_dlab_off` is already inside `is_txlock` ⊂
 `console_caps`, so the RHR pop's DLAB premise costs no contract change.
 
-#### L5-b LEDGER (in flight 2026-09-09; brief `brief-l5b-ledger.md`)
+#### L5-b LEDGER (LANDED 2026-09-09; briefs `brief-l5b-ledger.md`, `brief-l5b-finish.md`)
 
 Phase-1 facts.  The ring's coupling is stated on the 32-BIT DIFFERENCES
 the code itself compares (`c.subw` then `bltu`): `cons_ok r w e :=
@@ -1296,8 +1298,22 @@ destructed with `⌜a2 = sext ee⌝`).  consoleread's `cr_win`/`cr_run` hid
 the run's source under `umem_wrote`; they name it now, with the `hs`
 accumulator through seven loop invariants; the pop needs `⌜rr ≠ ww⌝`.
 `boot_cons_res` founds `r = w = e = 0` (bss cells) with `ts = replicate
-128 None`.  Phase 2 runs in two halves (consoleintr side, then
-consoleread + fileread) to fit the agent's context.
+128 None`.  AS LANDED (second agent, after the first died on the session
+limit mid-consoleintr): consoleintr maintains the coupling at FOUR
+places (the room guard feeding the store and the `'\r'` arm, the two
+`cons.e--` under a hoisted `e ≠ w`, the wake tail's `w := e`);
+consoleread's `cr_win`/`cr_run` name the run's source, the pop reads the
+slot's tag out of `cons_tags` (persistent, `cons_tags_get`), rounds
+append by `cr_wr_glue`/`cr_tagged_glue`, the +0xe6 push-back restores the
+coupling; ProofFileread's console arm SPLITS ON THE MAJOR
+(`fileread_extra_of_dev_console` / `_of_dev_other`) because fileread's
+contract does not know its devsw column is the console's table — the
+tie `frn_rp fn = devsw_read_val` is the DISPATCHER's premise
+(SpecSysRead), so `devsw_read_val_is_console` is a table fact only.
+`fileread_extra_dev`/`_of_dev` are split three ways.  L5 IS COMPLETE: a
+byte's tag travels rx wand → UART column → uartgetc → consoleintr → the
+ring → consoleread → fileread's console receipt → the read syscall's
+`spost_at` → the process.
 
 #### ARM-c — DESIGN (2026-09-09): `Happ_sup` leaves the theorem; the kernel never mints
 
