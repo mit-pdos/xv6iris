@@ -1626,3 +1626,68 @@ premise (~255) and its Require; `SpecUserretClosed.v:169`;
 `SpecUserinit.v:226`; `SpecMain.v` ~651; `BootShared.v` ~1471, ~1503;
 `BootChain.v` ~406.  NEXT: PINNED-EXEC (C+D, brief `brief-pinned-exec.md`),
 then ARM-c (1).
+
+PINNED-EXEC C LANDED (2026-09-09; brief `brief-pinned-exec.md`).
+`iris/PinnedExec.v`: `pin_resolves Pin cw pl hops ino f nl` (the start
+`um_start_of cw pl = hops !!! 0`, the terminal `hops !!! length (path_elems
+pl) = ino`, and under `Pin v` the run plus `v !! ino = Some (MkAnode (AFile
+f) nl)`); the cursor `pex_P T hops k d := ⌜d = hops !!! k⌝ ∨ T`, the miss
+`pex_Pmiss T k d := T`, the receipt `pex_recv Pin T v i a := ⌜arow_at v i
+a⌝ ∗ (⌜Pin v⌝ ∨ T)` at the trivial refund (`pex_Fo := pfam_triv …`);
+`pinned_exec_bundle γfs X Pin T cw pl hops ino f nl Pay M pv av sts` takes
+`pin_resolves`, `kexec_loadable f`, `exec_path_of M pv pl` (the walk is
+owed at EVERY reading `sys_exec_au_pre` admits; `SpecSysExec.exec_path_of_uniq`
+says the reading is a function of `(M, pv)`), the duplicating claim law, the
+invariant, the constructor wand `□ (∀ na alen afun W', ⌜kexec_image_ok f na
+alen afun sts W'⌝ -∗ ⌜exec_args_shape na alen afun⌝ -∗ Pay -∗ X W')`, the
+taint slot `□ (T -∗ ∀ W', X W')` and `Pay`, and yields `sys_exec_au_pre
+(MkPfam X R) …` at `R := Pay`.  The fire (`pex_aopen`): the piece is owed
+at `appE = ↑appN`, so `inv_acc` opens `app_inv` to the empty mask, the
+lent `ghost_map_auth (γtop Γ) (1/2) I` agrees with the body's half
+(`ftop_gamma_top` is reflexivity), the claim law is applied UNDER the
+later and its timeless conclusion stripped in the same fupd.  The hop
+(`pex_hop`) reads the lent entry map against the invariant's authority
+(`elend_aents` at `astate_q_intro`) and steps the pinned run
+(`arun_step_tot`).  Traps: name `fileG`/`irefslotG`/`pavG` only with their
+modules imported (else fresh Type variables); `FileInvDefs`'s field
+instances need the module IMPORTED, not just Required.
+
+D IS BLOCKED ON THREE EXEC-CHANNEL FACTS -- rulings (2026-09-09):
+- D-1 (the c-indexed exec leaf lends nothing): `UkRunSys.wp_uk_ecall_exec_at_cwd`
+  takes the bare bundle at every `M`/`fdv`, but a pinned bundle needs
+  `exec_path_of M pv pl` (init's rodata through `uheap_text`) and `length
+  sts = NOFILE`/`fd_lowest_closed sts = None` (the fd authority).  RULED:
+  `UkRun.udepw_at N m pc n c` = `udepw` with the cwd FIXED at `c` and the
+  same loan of `uheap`/`ufd_auth`; the leaf takes `ucwd (ukn_cwd N) c ∗
+  udepw_at N m pc USYS_exec c`; `udepw_at_of_uxsup` keeps the trivial
+  supplier.  Lane EXEC-CHANNEL.
+- D-3 (the MAP-STOP premise has no supplier on the pinned route):
+  `sh_slot_of_kexec`/`init_slot_of_kexec` take `∀ p q, uvis_perm W' !! p =
+  Some q → p*4096 < pgroundup (uvis_sz W')` "from the exec channel", but
+  the channel offers only `kexec_image_ok`, whose `kxb_perm_ok` says which
+  pages the space HAS, not that it has no others.  RULED: `kexec_image_ok`
+  gains the row (`kxb_perm_below`, the kernel's own `ProcPtOwn.um_below`
+  reading of the fresh table), proved where ProofKexec mints the image
+  fact; the two constructors drop the premise.  Lane EXEC-CHANNEL.
+- D-2 (sh's ROOM premise needs `na`/`alen`, i.e. the argv reading): the
+  wand gets only `exec_args_shape`; `kexec_stack_at` says the arguments
+  FIT with no slack, so sh's frames are not provable at unknown args.
+  RULED: land the owed `exec_args_of M av na alen afun` (lane EXEC-ARGS):
+  `fetchaddr` gets a memory-indexed post (`fetchaddr_got`, the
+  `fetchstr_got` mold), sys_exec's argv loop relays pointer `i` at
+  `uint (add_vec_int av (8 i))` and `copyinstr_got M p_i (afun i) (alen
+  i)`, the NUL pointer at `8 na`; the fact rides beside `exec_args_shape`
+  at `sys_exec_slot_pre`'s wand and `pinned_exec_bundle`'s constructor.
+  THEN init: its argv array `{ "sh", 0 }` is at 0x1000 in the WRITABLE
+  segment (`user-rocq/InitData.v:30`, `initRodataEnd = 0x1000`), which
+  `uslot_of_urun` drops -- init's entry carve moves to `uslot_of_urun_all`
+  and init holds the sixteen `ubyte` fragments round the loop and across
+  the fork (sh's line buffer is the mold); the deposit's `uheap` loan
+  turns them into `M` facts.  The path bytes `0x9a8..0x9aa = "sh\0"` are
+  in `init_ro` already.
+- Also noted: six UkInitMain lemmas take `uxsup` (`wp_kinit_main_child`
+  :444, `_loop` :726, `_from_1e` :1134, `_repair` :1280, `wp_kinit_main`
+  :1496, `wp_kinit_start` :1750); `wp_kinit_main_child` takes no cwd
+  (the child drops `ucwd_any` at :997); `_CoqProject`'s comment above
+  UexecExecInst still says `fsabs_env` where the supply is `app_sup`.
+ORDER: EXEC-CHANNEL (D-1 + D-3) → EXEC-ARGS → PINNED-EXEC D → ARM-c (1).
