@@ -38,8 +38,14 @@ sie_cap_gpr kt m n b p -∗
 pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
 dev_inv γd γv -∗
 R -∗
+(* THE GHOST STEP, run with the UART invariant open.  The RECEIVE COLUMN
+   travels beside the four ghosts as its own leg (WpUart.uart_colE): a read
+   at offset 0 with DLAB clear POPS the FIFO, and what the column carries --
+   one application tag per queued byte, aligned with [u_rx] -- has to move
+   with it.  Every other read leaves both alone. *)
 (∀ u bt u', ⌜ uart_read u off = Some (bt, u') ⌝ -∗
-   uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S bt) -∗
+   uart_ghosts γd u -∗ uart_colE γd u -∗ R ==∗
+   uart_ghosts γd u' ∗ uart_colE γd u' ∗ S bt) -∗
 wp_next b p (fun (CID : CpuId) =>
   ∀ bt : bv 8,
   sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ldval bt)]> m) n b p -∗
@@ -64,8 +70,10 @@ sie_cap_gpr kt m n b p -∗
 pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
 dev_inv γd γv -∗
 R -∗
+(* the column travels here too: an FCR write may clear the receive FIFO *)
 (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
-   uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
+   uart_ghosts γd u -∗ uart_colE γd u -∗ R ==∗
+   uart_ghosts γd u' ∗ uart_colE γd u' ∗ S) -∗
 wp_next b p (fun (CID : CpuId) =>
   sie_cap_gpr kt m n b p -∗
   pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
@@ -96,8 +104,10 @@ sie_cap_gpr kt m n b p -∗
 pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
 uart_inv γd -∗
 R -∗
+(* the column travels here too: an FCR write may clear the receive FIFO *)
 (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
-   uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
+   uart_ghosts γd u -∗ uart_colE γd u -∗ R ==∗
+   uart_ghosts γd u' ∗ uart_colE γd u' ∗ S) -∗
 wp_next b p (fun (CID : CpuId) =>
   sie_cap_gpr kt m n b p -∗
   pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗

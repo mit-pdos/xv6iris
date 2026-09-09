@@ -250,6 +250,8 @@ Section EchoLedger.
 
   Global Instance echo_tag_persistent γcl h : Persistent (echo_tag γcl h).
   Proof. rewrite /echo_tag. apply _. Qed.
+  Global Instance echo_tag_timeless γcl h : Timeless (echo_tag γcl h).
+  Proof. rewrite /echo_tag. apply _. Qed.
 
   (* "untainted" is the counter at 0: what the end of the trace reads.  The
      TAINT [mono_nat_lb_own γcl 1] is this application's own fact now (it

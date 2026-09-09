@@ -494,6 +494,125 @@ Proof.
   discriminate.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(*  THE RECEIVE SIDE, as pure facts.  The UART invariant keeps a TAG COLUMN  *)
+(*  aligned with [u_rx] (WpUart.v), so every transition that touches the     *)
+(*  receive FIFO owes a statement here about [u_rx] -- and about             *)
+(*  [uart_loopback], because the column is maintainable only with LOOP off:  *)
+(*  a loopbacked byte enters this UART's own receiver with no observation,   *)
+(*  hence with no tag to file beside it ([uart_tx_pop]'s loopback arm).      *)
+(* ---------------------------------------------------------------------- *)
+
+(* MCR bit 4 is the only thing loopback reads, so every write except MCR's
+   leaves it alone, as does every read. *)
+Lemma uart_read_rx_stable (u : uart_state) (off : Z) (b : bv 8) (u' : uart_state) :
+  off <> 0 \/ uart_dlab u = true ->
+  uart_read u off = Some (b, u') ->
+  u_rx u' = u_rx u /\ uart_loopback u' = uart_loopback u.
+Proof.
+  intro Hoff. unfold uart_read.
+  destruct (off =? 0) eqn:E0.
+  { destruct Hoff as [Hne | Hd].
+    - apply Z.eqb_eq in E0. lia.
+    - rewrite Hd. intro H. injection H as <- <-. done. }
+  destruct (off =? 1) eqn:E1.
+  { destruct (uart_dlab u); intro H; injection H as <- <-; done. }
+  destruct (off =? 2) eqn:E2.
+  { destruct (uart_isr_thri u); intro H; injection H as <- <-; done. }
+  destruct (off =? 3) eqn:E3. { intro H; injection H as <- <-; done. }
+  destruct (off =? 4) eqn:E4. { intro H; injection H as <- <-; done. }
+  destruct (off =? 5) eqn:E5. { intro H; injection H as <- <-; done. }
+  destruct (off =? 6) eqn:E6. { intro H; injection H as <- <-; done. }
+  destruct (off =? 7) eqn:E7. { intro H; injection H as <- <-; done. }
+  discriminate.
+Qed.
+
+(* RHR with DLAB clear IS the pop, and the byte it returns is the head. *)
+Lemma uart_read_rhr_pop (u : uart_state) (b : bv 8) (rx' : list (bv 8))
+    (bt : bv 8) (u' : uart_state) :
+  uart_dlab u = false ->
+  u_rx u = b :: rx' ->
+  uart_read u 0 = Some (bt, u') ->
+  bt = b /\ u_rx u' = rx' /\ uart_loopback u' = uart_loopback u.
+Proof.
+  intros Hd Hrx. unfold uart_read. cbn [Z.eqb]. rewrite Hd, Hrx.
+  intro H. injection H as <- <-. done.
+Qed.
+
+(* ...and with an EMPTY FIFO it is a pure read: the junk arm. *)
+Lemma uart_read_rhr_empty (u : uart_state) (bt : bv 8) (u' : uart_state) :
+  uart_dlab u = false ->
+  u_rx u = [] ->
+  uart_read u 0 = Some (bt, u') -> u' = u.
+Proof.
+  intros Hd Hrx. unfold uart_read. cbn [Z.eqb]. rewrite Hd, Hrx.
+  intro H. by injection H as <- <-.
+Qed.
+
+(* Every write but FCR's and MCR's leaves the receive FIFO and LOOP alone. *)
+Lemma uart_write_rx_stable (u : uart_state) (off : Z) (b : bv 8) (u' : uart_state) :
+  off <> 2 -> off <> 4 ->
+  uart_write u off b = Some u' ->
+  u_rx u' = u_rx u /\ uart_loopback u' = uart_loopback u.
+Proof.
+  intros H2 H4. unfold uart_write.
+  destruct (off =? 0) eqn:E0.
+  { destruct (uart_dlab u); [intro H; injection H as <-; done|].
+    destruct (length (u_tx u) <? uart_fifo_depth)%nat;
+      intro H; injection H as <-; done. }
+  destruct (off =? 1) eqn:E1.
+  { destruct (uart_dlab u); intro H; injection H as <-; done. }
+  destruct (off =? 2) eqn:E2. { apply Z.eqb_eq in E2. lia. }
+  destruct (off =? 3) eqn:E3. { intro H; injection H as <-; done. }
+  destruct (off =? 4) eqn:E4. { apply Z.eqb_eq in E4. lia. }
+  destruct (off =? 7) eqn:E7. { intro H; injection H as <-; done. }
+  destruct ((off =? 5) || (off =? 6)). { intro H; injection H as <-; done. }
+  discriminate.
+Qed.
+
+(* THE FCR WRITE IS A POP OF EVERYTHING, or of nothing.  Bit 1 clears the
+   receive FIFO outright and TOGGLING bit 0 flushes both FIFOs, so a driver
+   that enables them loses whatever had already arrived -- which is exactly
+   what xv6's [uartinit] does (FCR = 0x07).  Hence the receive token: this is
+   the one transition besides the RHR pop that removes queued bytes. *)
+Definition uart_fcr_clr_rx (u : uart_state) (b : bv 8) : bool :=
+  xorb (Z.testbit (bv_unsigned b) 0) (uart_fifo_en u)
+  || Z.testbit (bv_unsigned b) 1.
+
+Lemma uart_write_fcr_rx (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_write u 2 b = Some u' ->
+  u_rx u' = (if uart_fcr_clr_rx u b then [] else u_rx u)
+  /\ uart_loopback u' = uart_loopback u.
+Proof.
+  unfold uart_write, uart_fcr_clr_rx. cbn [Z.eqb].
+  intro H. injection H as <-. cbn [u_rx u_mcr]. done.
+Qed.
+
+(* An MCR write is the only thing that can turn LOOP ON, which is what the
+   column's [uart_loopback u = false] clause is about; nothing in the kernel
+   writes MCR, and [uart_write_rx_stable] covers every offset that is neither
+   it nor FCR. *)
+
+(* The device's own two receive-side arms. *)
+Lemma uart_tx_pop_rx (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_loopback u = false ->
+  uart_tx_pop u = Some (b, u') ->
+  u_rx u' = u_rx u /\ uart_loopback u' = uart_loopback u.
+Proof.
+  intro Hlb. unfold uart_tx_pop.
+  destruct (u_tx u) as [| c tx']; [discriminate|].
+  rewrite Hlb. intro H. injection H as <- <-. done.
+Qed.
+
+Lemma uart_rx_push_rx (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_rx_push u b = Some u' ->
+  u_rx u' = u_rx u ++ [b] /\ uart_loopback u' = uart_loopback u.
+Proof.
+  unfold uart_rx_push.
+  destruct (length (u_rx u) <? uart_fifo_depth)%nat eqn:Hroom; [| discriminate].
+  intro H. injection H as <-. cbn [u_rx uart_recv u_mcr]. rewrite Hroom. done.
+Qed.
+
 (* A THR write appends the byte to the accepted trace -- but ONLY with DLAB
    clear (else offset 0 is the divisor latch, not THR) and only with room in
    the FIFO (the model drops the byte when full, exactly as the hardware

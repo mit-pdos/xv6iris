@@ -98,7 +98,7 @@ Require Import TsoCtx.
    [wp_next_off] anyway, since the hart cannot move). *)
 Definition wp_uartinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γd : uart_names) (m : regfile) (K : nat)
-    (l : list (bv 8)) (b0 : bool) (p : mword 64) :=
+    (l : list (bv 8)) (b0 : bool) (k : nat) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* THE FRAME PLUS THE CALLEE.  uartinit's own frame is [addi sp,sp,-16] = 2
@@ -116,6 +116,13 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   (* "everything accepted has been transmitted, and the transmitter is mine":
      the pair that makes the FCR FIFO-clear shrink nothing *)
   uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_sent γd l -∗
+  (* THE RECEIVE TOKEN.  uartinit's FCR write is [FCR_FIFO_ENABLE |
+     FCR_FIFO_CLEAR], and the CLEAR empties the RECEIVE FIFO -- a pop of
+     everything, which only the token's holder may perform (WpUart.v's
+     receive column).  The token is born into the boot chain by
+     [dev_inv_alloc] for exactly this write, and main parks it in the PLIC
+     invariant afterwards. *)
+  uart_rx_tok γd k -∗
   (* the UNFROZEN DLAB half, at an arbitrary power-on value *)
   uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
   (* the transmit lock's storage, uninitialized: all three fields of
@@ -127,6 +134,8 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
     ⌜ callee_saved m mr ⌝ -∗
     (* no THR write, so the accepted trace is untouched *)
     uart_tx_own γd l -∗ uart_sent γd l -∗
+    (* ...and the token back, at whatever the flush left the counter *)
+    (∃ k' : nat, uart_rx_tok γd k') -∗
     (* the final LCR write cleared DLAB, so the half is frozen for good *)
     uart_dlab_off γd -∗
     (* THE TRANSMIT LOCK COMES BACK OUT, INITIALIZED -- the "newlock" ghost
@@ -145,6 +154,6 @@ Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γd : uart_names) (m : regfile) (K : nat)
-      (l : list (bv 8)) (b0 : bool) (p : mword 64),
-      wp_uartinit_sconf_body γd m K l b0 p.
+      (l : list (bv 8)) (b0 : bool) (k : nat) (p : mword 64),
+      wp_uartinit_sconf_body γd m K l b0 k p.
 End UARTINIT.

@@ -145,6 +145,72 @@ Proof.
   - exact (Hs j Hpend).
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(*  WHAT EACH PLIC TRANSITION DOES TO ENABLED AND IN SERVICE.           *)
+(*                                                                        *)
+(*  The PLIC invariant parks each source's payload under [p_claimed i]      *)
+(*  (WpUart.plic_slot), so every transition that opens that invariant owes  *)
+(*  a statement about what it does to the service bits.                     *)
+(* ---------------------------------------------------------------------- *)
+
+(* A WRITE OUTSIDE THE CLAIM/COMPLETE REGISTER LEAVES SERVICE ALONE.  Only
+   that register's write is a completion; everything else the PLIC decodes
+   touches priorities, the (read-only) pending bitmap, an enable word or a
+   threshold. *)
+Lemma plic_write_outside_claim (p p' : plic_state) (off : Z) (v : bv 32) :
+  plic_write p off v = Some p' ->
+  plic_claim_ctx off = None ->
+  forall j : N, p_claimed p' j = p_claimed p j.
+Proof.
+  unfold plic_write.
+  destruct (plic_prio_src off) as [i|].
+  { destruct (i =? 0)%N; intros H _; injection H as <-; reflexivity. }
+  destruct (plic_pending_widx off) as [w|].
+  { intros H _. injection H as <-. reflexivity. }
+  destruct (plic_enable_ctx off) as [[c w]|].
+  { intros H _. injection H as <-. reflexivity. }
+  destruct (plic_thresh_ctx off) as [c|].
+  { intros H _. injection H as <-. reflexivity. }
+  destruct (plic_claim_ctx off) as [c|]; [ discriminate 2 | discriminate 1 ].
+Qed.
+
+(* THE GATEWAY LATCHES A PENDING BIT and touches nothing else, so every
+   source's service bit -- and with it every slot of the PLIC invariant --
+   survives a latch untouched. *)
+Lemma plic_latch_claimed (p p' : plic_state) (i : N) :
+  plic_latch p i = Some p' ->
+  forall j : N, p_claimed p' j = p_claimed p j.
+Proof.
+  unfold plic_latch.
+  destruct (negb (p_pending p i) && negb (p_claimed p i)); [ | discriminate ].
+  intro H. injection H as <-. done.
+Qed.
+
+Lemma plic_complete_claimed_ne (p : plic_state) (i j : N) :
+  j <> i -> p_claimed (plic_complete p i) j = p_claimed p j.
+Proof.
+  intro Hne. unfold plic_complete.
+  destruct ((1 <=? Z.of_N i) && (Z.of_N i <? Z.of_nat plic_nsrc))%Z;
+    cbn [p_claimed]; [ | reflexivity ].
+  unfold nupd. destruct (N.eqb j i) eqn:Hji; [ | reflexivity ].
+  apply N.eqb_eq in Hji. exfalso. exact (Hne Hji).
+Qed.
+
+Lemma plic_complete_claimed_in (p : plic_state) (i : N) :
+  (1 <= Z.of_N i)%Z -> (Z.of_N i < Z.of_nat plic_nsrc)%Z ->
+  p_claimed (plic_complete p i) i = false.
+Proof.
+  intros H1 H2. unfold plic_complete.
+  rewrite (proj2 (Z.leb_le _ _) H1), (proj2 (Z.ltb_lt _ _) H2).
+  cbn [p_claimed andb]. unfold nupd. by rewrite N.eqb_refl.
+Qed.
+
+(* the UART's source id is a real one, which is what makes a completion
+   naming it land rather than be dropped *)
+Lemma uart_irq_id_range :
+  (1 <= Z.of_N uart_irq_id)%Z /\ (Z.of_N uart_irq_id < Z.of_nat plic_nsrc)%Z.
+Proof. unfold uart_irq_id, plic_nsrc. cbn. lia. Qed.
+
 (* the word [plicinithart] writes is permitted in word 0 (it IS the mask) *)
 Lemma plic_senable_ok_mask : plic_senable_ok 0 (Z_to_bv 32 plic_dev_irq_mask).
 Proof. unfold plic_senable_ok. vm_compute. reflexivity. Qed.
@@ -253,6 +319,19 @@ Proof.
   destruct (N.eqb j i) eqn:Hj; [ discriminate | exact (Hs j Hpend) ].
 Qed.
 
+(* A claim that returns something other than the UART's id leaves the UART's
+   service bit alone, whatever else it took. *)
+Lemma plic_claim_other_claimed (p : plic_state) (c : nat) (i : N) :
+  plic_best p c <> Some i ->
+  p_claimed (snd (plic_claim p c)) i = p_claimed p i.
+Proof.
+  intro Hne. unfold plic_claim.
+  destruct (plic_best p c) as [k|] eqn:Hbest; cbn [snd]; [ | reflexivity ].
+  cbn [p_claimed]. unfold nupd.
+  destruct (N.eqb i k) eqn:Hik; [ | reflexivity ].
+  apply N.eqb_eq in Hik as ->. exfalso. exact (Hne eq_refl).
+Qed.
+
 (* WHAT A CLAIM LEARNS ABOUT SERVICE.  A claim takes a source that is
    PENDING ([plic_cand]), and the plan says a pending source is not already
    in service -- so the source the claim takes was free before and is in
@@ -273,6 +352,23 @@ Proof.
   - exact (proj2 Hplan i Hpend).
   - unfold plic_claim. rewrite Hbest. cbn [snd p_claimed]. unfold nupd.
     rewrite N.eqb_refl. reflexivity.
+Qed.
+
+(* ...and the id a claim returns identifies the source it took: the plan
+   admits only the machine's two, and their encodings differ. *)
+Lemma plic_claim_uart_of_ret (p : plic_state) (c : nat) (i : N) :
+  plic_ok p -> plic_best p c = Some i ->
+  Z_to_bv 32 (Z.of_N i) = Z_to_bv 32 (Z.of_N uart_irq_id) ->
+  i = uart_irq_id.
+Proof.
+  intros Hok Hbest Heq.
+  destruct (plic_best_spec p c i Hbest) as [Hin Hcand].
+  assert (Hen : plic_enabled p c i = true).
+  { unfold plic_cand in Hcand.
+    apply andb_prop in Hcand as [Hc _]. apply andb_prop in Hc as [_ Hc]. exact Hc. }
+  destruct (plic_enabled_srcs p c i Hok Hin Hen) as [E | E]; [ exact E | ].
+  exfalso. rewrite E in Heq.
+  apply (f_equal bv_unsigned) in Heq. vm_compute in Heq. discriminate.
 Qed.
 
 (* Completing touches only claimed, so it is a no-op as far as the plan is

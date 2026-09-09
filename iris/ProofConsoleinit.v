@@ -93,8 +93,8 @@ Section ConsoleinitBody.
 
   Hypothesis wp_uartinit :
     forall `{CID : CpuId} (γd : uart_names) (m : regfile) (K : nat)
-      (l : list (bv 8)) (b0 : bool) (p : mword 64),
-      wp_uartinit_sconf_body γd m K l b0 p.
+      (l : list (bv 8)) (b0 : bool) (k : nat) (p : mword 64),
+      wp_uartinit_sconf_body γd m K l b0 k p.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -102,15 +102,15 @@ Section ConsoleinitBody.
     end.
 
   Lemma wp_consoleinit_sconf_gen (γd : uart_names)
-      (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool)
+      (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool) (k : nat)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64) :
-    wp_consoleinit_sconf_body γd m K l b0 vclock vcname vccpu dread0 dwrite0 p.
+    wp_consoleinit_sconf_body γd m K l b0 k vclock vcname vccpu dread0 dwrite0 p.
   Proof.
     cbv beta delta [wp_consoleinit_sconf_body].
     intros pcE ret_tgt clk c_cname c_ccpu HK.
     pose proof (cni_cap_bounds K HK) as (Hc2 & HK4).
-    iIntros "Hcg #Htext #Hkdata Hpc #Huinv Htx #Hlb #Hsent Hdlab Hclock Hcname Hccpu Hraw Hdr Hdw Hrest Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc #Huinv Htx #Hlb #Hsent Htok Hdlab Hclock Hcname Hccpu Hraw Hdr Hdw Hrest Hcont".
     (* the "cons" string literal (4 chars + NUL), read out of the data image *)
     pose (name := (mword_of_int cons_name_str : mword 64)).
     assert (Hcons : forall j bt, cstring_bytes "cons"%string !! j = Some bt ->
@@ -282,9 +282,9 @@ Section ConsoleinitBody.
     iEval (rewrite Htgtua) in "Hpc".
     assert (HU0sp : U0 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
       by (rewrite /U0 upd_ne; [exact Hmilsp | reg_neq]).
-    iApply (wp_uartinit γd U0 (K - 2)%nat l b0 p
-              ltac:(lia) with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Hdlab Hraw").
-    iIntros (mu) "Hcg Hpc %Huacs Htx #Hsent' #Hdoff Hfresh".
+    iApply (wp_uartinit γd U0 (K - 2)%nat l b0 k p
+              ltac:(lia) with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Htok Hdlab Hraw").
+    iIntros (mu) "Hcg Hpc %Huacs Htx #Hsent' Htok #Hdoff Hfresh".
     assert (Hretua : ret_pc (U0 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.consoleinit + 0x20)).
     { rewrite /U0 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretua) in "Hpc".
@@ -468,7 +468,7 @@ Section ConsoleinitBody.
        [ConsoleInv.devsw_table].  [Hdr]/[Hdw] hold [consoleread]/[consolewrite]
        at this point -- that is what the two [c.sd]s above put there. *)
     iMod (ConsoleInv.devsw_table_of_rest with "Hrest Hdr Hdw") as "#Htbl".
-    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Htx Hsent Hdoff Hclock Hcnm Hccpu Hfresh Htbl").
+    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Htx Hsent Htok Hdoff Hclock Hcnm Hccpu Hfresh Htbl").
     (* callee_saved m E3: the two sub-calls preserve s1..s11/tp; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
@@ -514,10 +514,10 @@ End ConsoleinitBody.
 Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINIT.
   Definition wp_consoleinit_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γd : uart_names) (m : regfile) (K : nat)
-      (l : list (bv 8)) (b0 : bool)
+      (l : list (bv 8)) (b0 : bool) (k : nat)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64)
-      : wp_consoleinit_sconf_body γd m K l b0 vclock vcname vccpu dread0 dwrite0 p :=
+      : wp_consoleinit_sconf_body γd m K l b0 k vclock vcname vccpu dread0 dwrite0 p :=
     (* Passed bare, [Initlock.wp_initlock_sconf]'s own implicit [CID] gets
        EAGERLY specialized to THIS definition's [CID] (typeclass-style
        implicit resolution fires on a bare reference), which is strictly
@@ -529,7 +529,7 @@ Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINI
     wp_consoleinit_sconf_gen
       (fun `(CID' : CpuId) m' vlock' vname' vcpu' s' K' b' p' =>
          Initlock.wp_initlock_sconf KT0 (CID:=CID') m' vlock' vname' vcpu' s' K' b' p')
-      (fun `(CID' : CpuId) γd' m' K' l' b0' p' =>
-         Uartinit.wp_uartinit_sconf (CID:=CID') γd' m' K' l' b0' p')
-      γd m K l b0 vclock vcname vccpu dread0 dwrite0 p.
+      (fun `(CID' : CpuId) γd' m' K' l' b0' k' p' =>
+         Uartinit.wp_uartinit_sconf (CID:=CID') γd' m' K' l' b0' k' p')
+      γd m K l b0 k vclock vcname vccpu dread0 dwrite0 p.
 End ConsoleinitProof.

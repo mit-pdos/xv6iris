@@ -64,7 +64,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvPtsto RiscvLang.
+Require Import RiscvPtsto RiscvLang ObsTrace.
 Require Import RegFile.
 Require Import RiscvExtras.
 Require Import FdSlots.
@@ -95,9 +95,18 @@ Section ConsoleCaps.
      baseline its echo extends.  The ghost NAMES are existential: nothing
      above consoleintr names either lock, so binding them here keeps the
      bundle parameter-free in [γu] alone. *)
+  (* [uart_inited γu] rides along, and it is the only row that is not a lock:
+     it is the witness that the boot chain has parked the receive token in
+     the PLIC invariant, which plicinithart needs before it may enable the
+     UART's interrupt source and which every reader of a tagged byte needs
+     to know the token exists at all.  It is persistent and context-free, so
+     it costs the bundle one conjunct and the morphism nothing.
+     [uart_dlab_off γu] is already here, inside [is_txlock] (UartTxInv.v) --
+     which is where uartintr's RHR pop reads it from. *)
   Definition console_caps `{XI : CurCtx} (γu : uart_names) : iProp Σ :=
     (∃ γtx γc : gname,
-       is_txlock γtx γu ∗ is_conslock γc ∗ uart_sent_sub γu [])%I.
+       is_txlock γtx γu ∗ is_conslock γc ∗ uart_sent_sub γu [] ∗
+       uart_inited γu)%I.
 
   Global Instance console_caps_persistent `{XI : CurCtx} γu : Persistent (console_caps γu).
   Proof. rewrite /console_caps. apply _. Qed.
@@ -137,6 +146,17 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fds
  procs_inv γs -∗
   dev_inv γu γv -∗
   console_caps γu -∗
+  (* THE BYTE'S TAG (app-echo.md lane L5).  a0 carries a byte the environment
+     pushed into the UART, and this is the history it arrived at together
+     with the application's persistent claim about that history.  consoleintr
+     TAKES IT AND DOES NOT USE IT: the console ledger that files a tag beside
+     each buffered byte is the next lane's; what this premise buys now is
+     that the tag reaches the console at all, so no caller has to be
+     re-plumbed when the ring learns to hold it. *)
+  (∃ (h : list mobs) (c : bv 8),
+     ⌜ m !!! Regidx (mword_of_int 10 : mword 5)
+       = (extend_value (n := 8) true (c : mword 8) : mword 64) ⌝ ∗
+     ⌜ obs_ends_in h c ⌝ ∗ riscv_rx_tag h) -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗

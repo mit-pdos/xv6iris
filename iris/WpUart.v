@@ -29,7 +29,7 @@
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants ghost_map ghost_var gen_heap own.
+From iris.base_logic.lib Require Import invariants ghost_map ghost_var gen_heap own mono_nat.
 From iris.algebra.lib Require Import mono_list dfrac_agree.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -571,6 +571,16 @@ Section DevLoops.
   Global Instance uart_ghosts_timeless γ u : Timeless (uart_ghosts γ u).
   Proof. rewrite /uart_ghosts. apply _. Qed.
 
+  (* DLAB off, read off the bundle without spending it: what the RHR pop
+     needs to know that offset 0 really is the receive register and not the
+     divisor latch. *)
+  Lemma uart_ghosts_dlab_off (γ : uart_names) (u : uart_state) :
+    uart_dlab_off γ -∗ uart_ghosts γ u -∗ ⌜ uart_dlab u = false ⌝.
+  Proof.
+    iIntros "Hoff (_ & _ & _ & Hdl)".
+    by iDestruct (uart_dlab_agree with "Hdl Hoff") as %Hd.
+  Qed.
+
   (* a transition that moves no UART ghost quantity carries them all over *)
   Lemma uart_ghosts_stable γ u u' :
     uart_acc u' = uart_acc u ->
@@ -583,6 +593,247 @@ Section DevLoops.
     iDestruct (uart_out_auth_stable _ u u' Ho with "Hout") as "$".
     iDestruct (uart_tx_auth_stable _ u u' Ha with "Htx") as "$".
     iDestruct (uart_dlab_auth_stable _ u u' Hd with "Hdl") as "$".
+  Qed.
+
+  (* ==================================================================== *)
+  (*  THE RECEIVE SIDE: the token, the push counter, and the TAG COLUMN.   *)
+  (*                                                                      *)
+  (*  Every byte the environment pushes into the UART carries a            *)
+  (*  persistent, application-chosen claim about the history it arrived at *)
+  (*  ([RiscvPtsto.riscv_rx_tag], minted by the rx wand inside              *)
+  (*  [wp_uart_loop]).  The invariant keeps those claims in a COLUMN        *)
+  (*  aligned with [u_rx], so a hart that pops the FIFO gets a copy of the  *)
+  (*  head's; and two counters pin the alignment arithmetically, so the     *)
+  (*  FIFO-is-non-empty fact a poll observes survives to the pop.           *)
+  (*                                                                      *)
+  (*  EXACTLY ONE HART MAY SHORTEN THE FIFO, and that is a theorem, not a   *)
+  (*  hope: the pop counter is a [ghost_var] whose other half is the        *)
+  (*  RECEIVE TOKEN, and both the RHR pop and the FCR receive-flush need    *)
+  (*  it.  The token lives in the PLIC invariant while the UART is          *)
+  (*  unclaimed and leaves it at the claim.                                *)
+  (* ==================================================================== *)
+
+  (* the popper's half: [k] bytes have ever been removed from the FIFO *)
+  Definition uart_rx_tok (γ : uart_names) (k : nat) : iProp Σ :=
+    ghost_var γ.(un_rxpop) (1/2) k.
+  (* the invariant's half *)
+  Definition uart_rx_popped (γ : uart_names) (k : nat) : iProp Σ :=
+    ghost_var γ.(un_rxpop) (1/2) k.
+  (* persistent: at least [n] bytes have ever been pushed *)
+  Definition uart_rx_pushed_lb (γ : uart_names) (n : nat) : iProp Σ :=
+    mono_nat_lb_own γ.(un_rxpush) n.
+
+  Global Instance uart_rx_pushed_lb_persistent γ n :
+    Persistent (uart_rx_pushed_lb γ n).
+  Proof. rewrite /uart_rx_pushed_lb. apply _. Qed.
+  Global Instance uart_rx_tok_timeless γ k : Timeless (uart_rx_tok γ k).
+  Proof. rewrite /uart_rx_tok. apply _. Qed.
+
+  Lemma uart_rx_tok_agree γ k k' :
+    uart_rx_popped γ k -∗ uart_rx_tok γ k' -∗ ⌜k = k'⌝.
+  Proof.
+    iIntros "H1 H2". by iDestruct (ghost_var_agree with "H1 H2") as %->.
+  Qed.
+  Lemma uart_rx_tok_update γ k k' :
+    uart_rx_popped γ k -∗ uart_rx_tok γ k ==∗
+      uart_rx_popped γ k' ∗ uart_rx_tok γ k'.
+  Proof.
+    iIntros "H1 H2". iApply (ghost_var_update_halves with "H1 H2").
+  Qed.
+  (* THE ONE-SHOT that says uartinit's FCR flush has run.  Its exclusive half
+     is what the PLIC invariant holds until the boot chain deposits the
+     token; the persistent lower bound is what plicinithart needs before it
+     may enable the UART's interrupt source. *)
+  Definition uart_preinit (γ : uart_names) : iProp Σ :=
+    mono_nat_auth_own γ.(un_init) 1 0.
+  Definition uart_inited (γ : uart_names) : iProp Σ :=
+    mono_nat_lb_own γ.(un_init) 1.
+
+  Global Instance uart_inited_persistent γ : Persistent (uart_inited γ).
+  Proof. rewrite /uart_inited. apply _. Qed.
+  Global Instance uart_preinit_timeless γ : Timeless (uart_preinit γ).
+  Proof. rewrite /uart_preinit. apply _. Qed.
+
+  Lemma uart_preinit_inited_False γ : uart_preinit γ -∗ uart_inited γ -∗ False.
+  Proof.
+    iIntros "Ha Hlb".
+    iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hle].
+    iPureIntro. lia.
+  Qed.
+  Lemma uart_preinit_fire γ : uart_preinit γ ==∗ uart_inited γ.
+  Proof.
+    iIntros "Ha". rewrite /uart_preinit /uart_inited.
+    iMod (mono_nat_own_update 1%nat with "Ha") as "[_ Hlb]"; [lia|].
+    by iModIntro.
+  Qed.
+
+  (* THE COLUMN.  [hs !! j] is the history at which [u_rx u !! j] arrived, so
+     the byte is that history's last event and the application's claim about
+     it is [riscv_rx_tag] there.  [np] counts pushes and [nk] removals, and
+     their difference IS the queue's length -- the arithmetic that turns a
+     poll's data-ready into a pop's the-head-exists.
+
+     LOOP MUST BE OFF.  Under MCR bit 4 the transmitter's drain re-enters
+     this UART's own receiver ([DevModel.uart_tx_pop]'s loopback arm) with no
+     observation at all, so it would lengthen [u_rx] with no tag to file.
+     The clause holds at power-on ([uart_mcr_reset] is OUT2 alone) and every
+     transition but an MCR write preserves it. *)
+  Definition uart_col_ok (u : uart_state) (hs : list (list mobs))
+      (np nk : nat) : Prop :=
+    np = (nk + length (u_rx u))%nat
+    /\ length hs = length (u_rx u)
+    /\ uart_loopback u = false
+    /\ (forall (j : nat) (b : bv 8) (h : list mobs),
+          u_rx u !! j = Some b -> hs !! j = Some h -> obs_ends_in h b).
+
+  Definition uart_col (γ : uart_names) (u : uart_state)
+      (hs : list (list mobs)) (np nk : nat) : iProp Σ :=
+    (mono_nat_auth_own γ.(un_rxpush) 1 np ∗ uart_rx_popped γ nk ∗
+     ([∗ list] h ∈ hs, riscv_rx_tag h) ∗
+     ⌜uart_col_ok u hs np nk⌝)%I.
+
+  Definition uart_colE (γ : uart_names) (u : uart_state) : iProp Σ :=
+    (∃ hs np nk, uart_col γ u hs np nk)%I.
+
+  Global Instance uart_col_timeless γ u hs np nk :
+    Timeless (uart_col γ u hs np nk).
+  Proof. rewrite /uart_col /uart_rx_popped. apply _. Qed.
+  Global Instance uart_colE_timeless γ u : Timeless (uart_colE γ u).
+  Proof. rewrite /uart_colE. apply _. Qed.
+
+  (* the clause the tx arm reads: the column exists only with LOOP off *)
+  Lemma uart_colE_loopback (γ : uart_names) (u : uart_state) :
+    uart_colE γ u -∗ ⌜uart_loopback u = false⌝.
+  Proof.
+    iIntros "H". iDestruct "H" as (hs np nk) "(_ & _ & _ & %Hok)".
+    iPureIntro. exact (proj1 (proj2 (proj2 Hok))).
+  Qed.
+
+  (* a transition that touches neither the FIFO nor LOOP carries it over *)
+  Lemma uart_colE_stable (γ : uart_names) (u u' : uart_state) :
+    u_rx u' = u_rx u ->
+    uart_loopback u' = uart_loopback u ->
+    uart_colE γ u -∗ uart_colE γ u'.
+  Proof.
+    iIntros (Hrx Hlb) "H".
+    iDestruct "H" as (hs np nk) "(Ha & Hk & Hts & %Hok)".
+    iExists hs, np, nk. iFrame "Ha Hk Hts". iPureIntro.
+    destruct Hok as (H1 & H2 & H3 & H4).
+    rewrite /uart_col_ok Hrx Hlb. split_and!; assumption.
+  Qed.
+
+  (* THE PUSH (the device thread's rx arm): the byte goes on the tail with
+     its history beside it. *)
+  Lemma uart_colE_push (γ : uart_names) (u u' : uart_state)
+      (b : bv 8) (h : list mobs) :
+    u_rx u' = (u_rx u ++ [b])%list ->
+    uart_loopback u' = uart_loopback u ->
+    obs_ends_in h b ->
+    riscv_rx_tag h -∗ uart_colE γ u ==∗ uart_colE γ u'.
+  Proof.
+    iIntros (Hrx Hlb Hlast) "#Ht H".
+    iDestruct "H" as (hs np nk) "(Ha & Hk & Hts & %Hok)".
+    destruct Hok as (H1 & H2 & H3 & H4).
+    iMod (mono_nat_own_update (S np) with "Ha") as "[Ha _]"; [lia|].
+    iModIntro. iExists (hs ++ [h])%list, (S np), nk.
+    iFrame "Ha Hk".
+    iSplitL.
+    { rewrite big_sepL_app. iFrame "Hts". cbn [big_opL].
+      iSplitL; [iExact "Ht" | done]. }
+    { iPureIntro. rewrite /uart_col_ok Hrx Hlb !length_app H2 H3.
+      cbn [length]. split_and!; [lia | lia | reflexivity |].
+      intros j c g Hj Hg.
+      destruct (decide (j < length (u_rx u))%nat) as [Hlt|Hge].
+      - rewrite lookup_app_l in Hj; [|exact Hlt].
+        rewrite lookup_app_l in Hg; [|by rewrite H2].
+        exact (H4 j c g Hj Hg).
+      - assert (Hj' : j = length (u_rx u)).
+        { apply lookup_lt_Some in Hj. rewrite length_app in Hj.
+          cbn [length] in Hj. lia. }
+        subst j. rewrite lookup_app_r in Hj; [|lia].
+        rewrite Nat.sub_diag in Hj. cbn in Hj. injection Hj as <-.
+        rewrite lookup_app_r in Hg; [|lia].
+        rewrite H2 Nat.sub_diag in Hg. cbn in Hg. injection Hg as <-.
+        exact Hlast. }
+  Qed.
+
+  (* THE POLL: a non-empty FIFO means at least one more byte has been pushed
+     than the token's holder has removed. *)
+  Lemma uart_col_poll (γ : uart_names) (u : uart_state) (k : nat) :
+    u_rx u <> [] ->
+    uart_colE γ u -∗ uart_rx_tok γ k -∗
+      uart_colE γ u ∗ uart_rx_tok γ k ∗ uart_rx_pushed_lb γ (S k).
+  Proof.
+    iIntros (Hne) "H Htok".
+    iDestruct "H" as (hs np nk) "(Ha & Hk & Hts & %Hok)".
+    iDestruct (uart_rx_tok_agree with "Hk Htok") as %<-.
+    destruct Hok as (H1 & H2 & H3 & H4).
+    assert (Hle : (S nk <= np)%nat)
+      by (destruct (u_rx u); [done | cbn [length] in H1; lia]).
+    iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
+    (* [uart_rx_tok] and [uart_rx_popped] are the same proposition, so the
+       two halves must be placed by hand: [iFrame] would put the caller's
+       token into the column's own slot. *)
+    iSplitR "Htok".
+    - iExists hs, np, nk. iFrame "Ha Hk Hts". iPureIntro.
+      rewrite /uart_col_ok. split_and!; assumption.
+    - iSplitL "Htok"; [iExact "Htok"|].
+      rewrite /uart_rx_pushed_lb.
+      iApply (mono_nat_lb_own_le (γ := γ.(un_rxpush)) (n := np) (S nk) Hle).
+      iExact "Hlb".
+  Qed.
+
+  (* THE POP: the lower bound the poll minted refutes the empty FIFO, the
+     head's tag comes out (persistent, so a copy stays), and the token's
+     count moves by one. *)
+  Lemma uart_col_pop (γ : uart_names) (u u' : uart_state) (k : nat)
+      (bt : bv 8) :
+    (forall b rx', u_rx u = b :: rx' ->
+       bt = b /\ u_rx u' = rx' /\ uart_loopback u' = uart_loopback u) ->
+    uart_colE γ u -∗ uart_rx_tok γ k -∗ uart_rx_pushed_lb γ (S k) ==∗
+      uart_colE γ u' ∗ uart_rx_tok γ (S k) ∗
+      (∃ h, ⌜obs_ends_in h bt⌝ ∗ riscv_rx_tag h).
+  Proof.
+    iIntros (Hpop) "H Htok #Hlb".
+    iDestruct "H" as (hs np nk) "(Ha & Hk & Hts & %Hok)".
+    iDestruct (uart_rx_tok_agree with "Hk Htok") as %<-.
+    destruct Hok as (H1 & H2 & H3 & H4).
+    iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hge].
+    destruct (u_rx u) as [| b rx'] eqn:Hrx.
+    { cbn [length] in H1. lia. }
+    destruct (Hpop b rx' eq_refl) as (-> & Hrx' & Hlb').
+    destruct hs as [| hh hs']; [cbn [length] in H2; discriminate|].
+    iDestruct "Hts" as "[#Hth Hts]".
+    assert (Hhead : obs_ends_in hh b) by exact (H4 0%nat b hh eq_refl eq_refl).
+    iMod (uart_rx_tok_update γ nk (S nk) with "Hk Htok") as "[Hk Htok]".
+    iModIntro. iSplitR "Htok Hth".
+    - iExists hs', np, (S nk). iFrame "Ha Hk Hts". iPureIntro.
+      rewrite /uart_col_ok Hrx' Hlb'. cbn [length] in H1, H2.
+      split_and!; [lia | lia | exact H3 |].
+      intros j c g Hj Hg. exact (H4 (S j) c g Hj Hg).
+    - iSplitL "Htok"; [iExact "Htok"|].
+      iExists hh. iSplitR; [iPureIntro; exact Hhead | iExact "Hth"].
+  Qed.
+
+  (* THE FLUSH: an FCR write that clears the receive FIFO is a pop of
+     EVERYTHING, and needs the token for exactly that reason. *)
+  Lemma uart_colE_flush (γ : uart_names) (u u' : uart_state) (k : nat) :
+    u_rx u' = [] ->
+    uart_loopback u' = uart_loopback u ->
+    uart_colE γ u -∗ uart_rx_tok γ k ==∗
+      uart_colE γ u' ∗ ∃ k', uart_rx_tok γ k'.
+  Proof.
+    iIntros (Hrx Hlb) "H Htok".
+    iDestruct "H" as (hs np nk) "(Ha & Hk & Hts & %Hok)".
+    iDestruct (uart_rx_tok_agree with "Hk Htok") as %<-.
+    destruct Hok as (H1 & H2 & H3 & H4).
+    iMod (uart_rx_tok_update γ nk np with "Hk Htok") as "[Hk Htok]".
+    iModIntro. iSplitR "Htok"; [| iExists np; iExact "Htok"].
+    iExists [], np, np. iFrame "Ha Hk".
+    iSplitR; [done|].
+    iPureIntro. rewrite /uart_col_ok Hrx Hlb H3.
+    cbn [length]. split_and!; [lia | reflexivity | reflexivity |].
+    intros j c g Hj. done.
   Qed.
 
   (* The PLIC half carries [plic_ok] (DevModel.v): every hart's S-context
@@ -608,10 +859,15 @@ Section DevLoops.
      the PLIC's [plic_ok]: the interrupt-status register holds only the two
      bits the spec defines, which is what makes [virtio_disk_intr]'s 0x3
      acknowledgement provably drop the interrupt line ([virtio_ack_clears]). *)
+  (* [uart_preinit] is the UART slot's PRE-STATE, which the allocation puts
+     into the PLIC invariant's left arm: the receive token itself goes to the
+     boot chain, which carries it to uartinit's FCR flush and deposits it
+     afterwards ([uart_rx_tok_deposit]). *)
   Definition dev_inv_body (γ : uart_names) (γd : disk_names) : iProp Σ :=
     (∃ (u : uart_state) (p : plic_state) (v : virtio_state),
        uart_frag u ∗ plic_frag p ∗ virtio_frag v ∗
-       uart_ghosts γ u ∗ virtio_proto γd v ∗
+       uart_ghosts γ u ∗ uart_colE γ u ∗ uart_preinit γ ∗
+       virtio_proto γd v ∗
        ⌜ plic_ok p ⌝ ∗ ⌜ virtio_isr_ok v ⌝)%I.
 
   Global Instance uart_frag_timeless u : Timeless (uart_frag u).
@@ -638,10 +894,198 @@ Section DevLoops.
   Definition diskN : namespace := devN .@ "disk".
 
   Definition uart_inv_body (γ : uart_names) : iProp Σ :=
-    (∃ u : uart_state, uart_frag u ∗ uart_ghosts γ u)%I.
+    (∃ u : uart_state, uart_frag u ∗ uart_ghosts γ u ∗ uart_colE γ u)%I.
 
-  Definition plic_inv_body : iProp Σ :=
-    (∃ p : plic_state, plic_frag p ∗ ⌜ plic_ok p ⌝)%I.
+  (* ------------------------------------------------------------------ *)
+  (*  THE PLIC INVARIANT'S PER-SOURCE SLOTS.                             *)
+  (*                                                                     *)
+  (*  Every interrupt source the PLIC can hand a hart owns a SLOT in the  *)
+  (*  PLIC invariant, and a slot is a ONE-SHOT.  Before the source's      *)
+  (*  device is initialized the slot holds the exclusive PRE-STATE and    *)
+  (*  nothing else; the initialization takes it out and re-deposits the   *)
+  (*  persistent post-state together with the source's PAYLOAD -- the     *)
+  (*  resource a driver acquires by claiming that source.  The payload    *)
+  (*  sits in the slot exactly while the source is NOT in service, so a   *)
+  (*  claim takes it out and the matching completion puts it back, and    *)
+  (*  the whole handshake is folded into [plic_claim]/[plic_complete]:    *)
+  (*  their callers name only the payload.                                *)
+  (*                                                                     *)
+  (*  The three tables are CONCRETE.  Only the UART has a payload -- the  *)
+  (*  receive token, THE EXCLUSIVE RIGHT TO POP the receive FIFO -- so    *)
+  (*  only the UART has a one-shot to run, and it is the [un_init] field  *)
+  (*  [uart_names] already carries.  Every other source's slot is [emp]   *)
+  (*  at every [p]: it is founded in its post-state at boot and survives  *)
+  (*  every transition with nothing to prove.  Giving a second source a   *)
+  (*  payload is three table rows, one ghost name, and an extra case in   *)
+  (*  the two movers below; no statement outside this block moves.        *)
+  (* ------------------------------------------------------------------ *)
+  Definition plic_payload (γ : uart_names) (i : N) : iProp Σ :=
+    (if (i =? uart_irq_id)%N then ∃ k : nat, uart_rx_tok γ k else emp)%I.
+  Definition plic_preinit (γ : uart_names) (i : N) : iProp Σ :=
+    (if (i =? uart_irq_id)%N then uart_preinit γ else False)%I.
+  Definition plic_inited (γ : uart_names) (i : N) : iProp Σ :=
+    (if (i =? uart_irq_id)%N then uart_inited γ else emp)%I.
+
+  Definition plic_slot (γ : uart_names) (p : plic_state) (i : N) : iProp Σ :=
+    (plic_preinit γ i
+     ∨ (plic_inited γ i ∗
+        if p_claimed p i then emp else plic_payload γ i))%I.
+
+  (* THE SOURCES THE INVARIANT TRACKS.  Not [plic_srcs] (DevModel.v: all
+     ninety-five real ids): under [plic_ok] a claim can only ever return one
+     of the machine's own two ([PlicPlan.plic_enabled_srcs], and
+     [plic_claim_ret] on top of it), so this list already covers every source
+     a claim can hand a payload for -- and the big-op is a two-element cons
+     instead of a ninety-five-element fold. *)
+  Definition plic_tracked : list N := [uart_irq_id; virtio_irq_id].
+
+  Definition plic_slots (γ : uart_names) (p : plic_state) : iProp Σ :=
+    ([∗ list] i ∈ plic_tracked, plic_slot γ p i)%I.
+
+  (* A PAYLOAD-LESS SLOT IS FREE, at any state: both of its arms are [emp].
+     This is what makes the big-op collapse to the UART's slot. *)
+  Lemma plic_slot_other (γ : uart_names) (p : plic_state) (i : N) :
+    (i =? uart_irq_id)%N = false -> ⊢ plic_slot γ p i.
+  Proof.
+    intros Hi.
+    rewrite /plic_slot /plic_preinit /plic_inited /plic_payload Hi.
+    iRight. iSplitR; [done|]. destruct (p_claimed p i); done.
+  Qed.
+
+  (* ...so the big-op IS the UART's slot, in both directions. *)
+  Lemma plic_slots_uart (γ : uart_names) (p : plic_state) :
+    plic_slots γ p -∗ plic_slot γ p uart_irq_id.
+  Proof. rewrite /plic_slots /plic_tracked. iIntros "(Hu & _)". iExact "Hu". Qed.
+
+  Lemma plic_slots_of_uart (γ : uart_names) (p : plic_state) :
+    plic_slot γ p uart_irq_id -∗ plic_slots γ p.
+  Proof.
+    rewrite /plic_slots /plic_tracked. iIntros "Hu".
+    iSplitL "Hu"; [iExact "Hu"|]. iSplitR; [| done].
+    iApply (plic_slot_other γ p virtio_irq_id). vm_compute. reflexivity.
+  Qed.
+
+  (* THE UART SLOT, read and written.  [plic_slot] is a definition, so the
+     proofmode needs these three to see its disjunction; they are also where
+     the PRE-STATE IS REFUTED, which is the whole content of "a caller
+     holding [uart_inited] never meets the left arm". *)
+  Lemma plic_slot_uart_cases (γ : uart_names) (p : plic_state) :
+    plic_slot γ p uart_irq_id -∗
+      uart_preinit γ
+      ∨ (uart_inited γ ∗
+         if p_claimed p uart_irq_id then emp else ∃ k : nat, uart_rx_tok γ k).
+  Proof. rewrite /plic_slot. iIntros "H". iExact "H". Qed.
+
+  Lemma plic_slot_uart_intro (γ : uart_names) (p : plic_state) :
+    uart_inited γ -∗
+    (if p_claimed p uart_irq_id then emp else ∃ k : nat, uart_rx_tok γ k) -∗
+    plic_slot γ p uart_irq_id.
+  Proof.
+    iIntros "#Hin Hpay". rewrite /plic_slot. iRight.
+    iSplitR; [iExact "Hin"|]. iExact "Hpay".
+  Qed.
+
+  Lemma plic_slot_uart_elim (γ : uart_names) (p : plic_state) :
+    uart_inited γ -∗ plic_slot γ p uart_irq_id -∗
+    (if p_claimed p uart_irq_id then emp else ∃ k : nat, uart_rx_tok γ k).
+  Proof.
+    iIntros "#Hin Hu".
+    iDestruct (plic_slot_uart_cases with "Hu") as "[Hpre | [_ Hpay]]".
+    - iDestruct (uart_preinit_inited_False with "Hpre Hin") as %[].
+    - iExact "Hpay".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  WHAT THE THREE PLIC TRANSITIONS DO TO THE SLOTS.                   *)
+  (* ------------------------------------------------------------------ *)
+
+  (* ANYTHING THAT LEAVES SERVICE ALONE leaves the slots alone: a latch, a
+     priority write, an enable write, a threshold write. *)
+  Lemma plic_slots_stable (γ : uart_names) (p p' : plic_state) :
+    p_claimed p' uart_irq_id = p_claimed p uart_irq_id ->
+    plic_slots γ p -∗ plic_slots γ p'.
+  Proof.
+    intros Hcl. iIntros "H". iDestruct (plic_slots_uart with "H") as "Hu".
+    iApply plic_slots_of_uart. rewrite /plic_slot Hcl. iExact "Hu".
+  Qed.
+
+  (* A CLAIM TAKES THE PAYLOAD OUT of the slot it marks in service, and the
+     handout is keyed by the id the claim RETURNS -- which is what lets a
+     caller spend it without any fact about [plic_best]. *)
+  Lemma plic_slots_claim (γ : uart_names) (p : plic_state) (c : nat) :
+    plic_ok p ->
+    uart_inited γ -∗ plic_slots γ p -∗
+      plic_slots γ (snd (plic_claim p c)) ∗
+      (⌜ fst (plic_claim p c) = Z_to_bv 32 (Z.of_N uart_irq_id) ⌝ -∗
+         ∃ k : nat, uart_rx_tok γ k).
+  Proof.
+    intros Hok. iIntros "#Hin H".
+    iDestruct (plic_slots_uart with "H") as "Hu".
+    destruct (plic_best p c) as [i|] eqn:Hbest; last first.
+    { (* nothing to serve: the state is unchanged and the id is 0 *)
+      assert (Hsnd : snd (plic_claim p c) = p)
+        by (unfold plic_claim; rewrite Hbest; reflexivity).
+      assert (Hfst : fst (plic_claim p c) = Z_to_bv 32 0)
+        by (unfold plic_claim; rewrite Hbest; reflexivity).
+      rewrite Hsnd Hfst.
+      iSplitL "Hu"; [by iApply plic_slots_of_uart|].
+      iIntros (Hv). exfalso.
+      apply (f_equal bv_unsigned) in Hv. vm_compute in Hv. discriminate. }
+    destruct (plic_claim_serves p c i Hok Hbest) as [Hb Ha].
+    destruct (decide (i = uart_irq_id)) as [->|Hne].
+    - (* the UART: it was out of service, so the payload was in the slot, and
+         it is in service now, so the slot is empty and the payload leaves *)
+      iDestruct (plic_slot_uart_elim with "Hin Hu") as "Hpay".
+      iEval (rewrite Hb) in "Hpay".
+      iSplitR "Hpay".
+      { iApply plic_slots_of_uart.
+        iApply (plic_slot_uart_intro with "Hin"). rewrite Ha. done. }
+      iIntros (_). iExact "Hpay".
+    - (* some other source: the UART's service bit is untouched, and the id
+         the claim returns is not the UART's *)
+      assert (Hother : plic_best p c <> Some uart_irq_id).
+      { rewrite Hbest. injection 1 as Hi. exact (Hne Hi). }
+      assert (Hcl : p_claimed (snd (plic_claim p c)) uart_irq_id
+                    = p_claimed p uart_irq_id)
+        by exact (plic_claim_other_claimed p c uart_irq_id Hother).
+      assert (Hfst : fst (plic_claim p c) = Z_to_bv 32 (Z.of_N i))
+        by (unfold plic_claim; rewrite Hbest; reflexivity).
+      iSplitL "Hu".
+      { iApply plic_slots_of_uart. rewrite /plic_slot Hcl. iExact "Hu". }
+      iIntros (Hv). exfalso. apply Hne.
+      apply (plic_claim_uart_of_ret p c i Hok Hbest).
+      rewrite -Hfst. exact Hv.
+  Qed.
+
+  (* ...and a completion puts it back. *)
+  Lemma plic_slots_complete (γ : uart_names) (p : plic_state) (i : N) :
+    uart_inited γ -∗ plic_slots γ p -∗
+    (⌜ i = uart_irq_id ⌝ -∗ ∃ k : nat, uart_rx_tok γ k) -∗
+    plic_slots γ (plic_complete p i).
+  Proof.
+    iIntros "#Hin H Htok".
+    destruct (decide (i = uart_irq_id)) as [Heq|Hne].
+    - iDestruct (plic_slots_uart with "H") as "Hu".
+      iApply plic_slots_of_uart.
+      assert (Hf : p_claimed (plic_complete p i) uart_irq_id = false).
+      { rewrite Heq.
+        exact (plic_complete_claimed_in p uart_irq_id
+                 (proj1 uart_irq_id_range) (proj2 uart_irq_id_range)). }
+      iApply (plic_slot_uart_intro with "Hin"). rewrite Hf.
+      iApply "Htok". iPureIntro. exact Heq.
+    - (* a completion of anything else leaves the UART's service bit alone *)
+      iApply (plic_slots_stable γ p (plic_complete p i)
+                (plic_complete_claimed_ne p i uart_irq_id ltac:(congruence))).
+      iExact "H".
+  Qed.
+
+  (* THE PLIC INVARIANT: the fabric, the plan, and one slot per tracked
+     source.  The boot chain founds the UART's slot in its pre-state and
+     moves it to its post-state in ONE fupd ([uart_rx_tok_deposit]), which is
+     also where the receive token is parked; every later PLIC access carries
+     [uart_inited] and therefore never meets the pre-state again. *)
+  Definition plic_inv_body (γ : uart_names) : iProp Σ :=
+    (∃ p : plic_state, plic_frag p ∗ ⌜ plic_ok p ⌝ ∗ plic_slots γ p)%I.
 
   Definition disk_inv_body (γd : disk_names) : iProp Σ :=
     (∃ v : virtio_state,
@@ -649,25 +1093,33 @@ Section DevLoops.
 
   Global Instance uart_inv_body_timeless γ : Timeless (uart_inv_body γ).
   Proof. rewrite /uart_inv_body. apply _. Qed.
-  Global Instance plic_inv_body_timeless : Timeless plic_inv_body.
+  Global Instance plic_slot_timeless γ p i : Timeless (plic_slot γ p i).
+  Proof.
+    rewrite /plic_slot /plic_preinit /plic_inited /plic_payload
+            /uart_preinit /uart_inited.
+    destruct (i =? uart_irq_id)%N; destruct (p_claimed p i); apply _.
+  Qed.
+  Global Instance plic_slots_timeless γ p : Timeless (plic_slots γ p).
+  Proof. rewrite /plic_slots. apply _. Qed.
+  Global Instance plic_inv_body_timeless γ : Timeless (plic_inv_body γ).
   Proof. rewrite /plic_inv_body. apply _. Qed.
   Global Instance disk_inv_body_timeless γd : Timeless (disk_inv_body γd).
   Proof. rewrite /disk_inv_body. apply _. Qed.
 
   Definition uart_inv (γ : uart_names) : iProp Σ := inv uartN (uart_inv_body γ).
-  Definition plic_inv : iProp Σ := inv plicN plic_inv_body.
+  Definition plic_inv (γ : uart_names) : iProp Σ := inv plicN (plic_inv_body γ).
   Definition disk_inv (γd : disk_names) : iProp Σ := inv diskN (disk_inv_body γd).
 
   Global Instance uart_inv_persistent γ : Persistent (uart_inv γ).
   Proof. rewrite /uart_inv. apply _. Qed.
-  Global Instance plic_inv_persistent : Persistent plic_inv.
+  Global Instance plic_inv_persistent γ : Persistent (plic_inv γ).
   Proof. rewrite /plic_inv. apply _. Qed.
   Global Instance disk_inv_persistent γd : Persistent (disk_inv γd).
   Proof. rewrite /disk_inv. apply _. Qed.
 
   Lemma uart_inv_alloc E γ : uart_inv_body γ ={E}=∗ uart_inv γ.
   Proof. iIntros "Hbody". rewrite /uart_inv. by iApply inv_alloc. Qed.
-  Lemma plic_inv_alloc E : plic_inv_body ={E}=∗ plic_inv.
+  Lemma plic_inv_alloc E γ : plic_inv_body γ ={E}=∗ plic_inv γ.
   Proof. iIntros "Hbody". rewrite /plic_inv. by iApply inv_alloc. Qed.
   Lemma disk_inv_alloc E γd : disk_inv_body γd ={E}=∗ disk_inv γd.
   Proof. iIntros "Hbody". rewrite /disk_inv. by iApply inv_alloc. Qed.
@@ -690,7 +1142,7 @@ Section DevLoops.
      client threads [dev_inv] and borrows the fragment by opening the relevant
      half around the access. *)
   Definition dev_inv (γ : uart_names) (γd : disk_names) : iProp Σ :=
-    (uart_inv γ ∗ plic_inv ∗ disk_inv γd ∗ perm_inv gen_id (dn_perm γd))%I.
+    (uart_inv γ ∗ plic_inv γ ∗ disk_inv γd ∗ perm_inv gen_id (dn_perm γd))%I.
 
   Global Instance dev_inv_persistent γ γd : Persistent (dev_inv γ γd).
   Proof. rewrite /dev_inv. apply _. Qed.
@@ -701,7 +1153,7 @@ Section DevLoops.
      leaf holding [dev_inv] in its intuitionistic context keeps it. *)
   Lemma dev_inv_uart γ γd : dev_inv γ γd -∗ uart_inv γ.
   Proof. iIntros "(#H & _ & _ & _)". iExact "H". Qed.
-  Lemma dev_inv_plic γ γd : dev_inv γ γd -∗ plic_inv.
+  Lemma dev_inv_plic γ γd : dev_inv γ γd -∗ plic_inv γ.
   Proof. iIntros "(_ & #H & _ & _)". iExact "H". Qed.
   Lemma dev_inv_disk γ γd : dev_inv γ γd -∗ disk_inv γd.
   Proof. iIntros "(_ & _ & #H & _)". iExact "H". Qed.
@@ -718,19 +1170,66 @@ Section DevLoops.
      [dev_inv_body]: that body carries a [Timeless] instance (it is what the
      three timeless per-device invariants are carved out of), and
      [perm_inv_body] is deliberately NOT timeless. *)
+  (* THE ALLOCATION HANDS THE RECEIVE TOKEN OUT.  The UART's slot is founded
+     in its PRE-STATE ([uart_preinit]) and every other tracked source's in
+     its post-state with an [emp] payload, so the token itself goes to the
+     boot chain, which threads it through consoleinit into uartinit's FCR
+     flush and deposits it afterwards ([uart_rx_tok_deposit]). *)
   Lemma dev_inv_alloc E γ γd :
-    dev_inv_body γ γd -∗ perm_inv_body gen_id (dn_perm γd) ={E}=∗ dev_inv γ γd.
+    dev_inv_body γ γd -∗ perm_inv_body gen_id (dn_perm γd) -∗
+    uart_rx_tok γ 0 ={E}=∗ dev_inv γ γd ∗ uart_rx_tok γ 0.
   Proof.
-    iIntros "Hbody Hperm". rewrite /dev_inv_body.
-    iDestruct "Hbody" as (u p v) "(Hu & Hp & Hv & Hg & Hproto & %Hpok & %Hvok)".
-    iMod (uart_inv_alloc E γ with "[Hu Hg]") as "#Huinv".
-    { iExists u. iFrame "Hu Hg". }
-    iMod (plic_inv_alloc E with "[Hp]") as "#Hpinv".
-    { iExists p. iFrame "Hp". iPureIntro. exact Hpok. }
+    iIntros "Hbody Hperm Htok". rewrite /dev_inv_body.
+    iDestruct "Hbody" as (u p v)
+      "(Hu & Hp & Hv & Hg & Hcol & Hpre & Hproto & %Hpok & %Hvok)".
+    iMod (uart_inv_alloc E γ with "[Hu Hg Hcol]") as "#Huinv".
+    { iExists u. iFrame "Hu Hg Hcol". }
+    iMod (plic_inv_alloc E γ with "[Hp Hpre]") as "#Hpinv".
+    { iExists p. iFrame "Hp". iSplitR; [iPureIntro; exact Hpok|].
+      iApply plic_slots_of_uart. rewrite /plic_slot. iLeft. iExact "Hpre". }
     iMod (disk_inv_alloc E γd with "[Hv Hproto]") as "#Hdinv".
     { iExists v. iFrame "Hv Hproto". iPureIntro. exact Hvok. }
     iMod (perm_inv_alloc E gen_id (dn_perm γd) with "Hperm") as "#Hqinv".
-    iModIntro. rewrite /dev_inv. iFrame "Huinv Hpinv Hdinv Hqinv".
+    iModIntro. rewrite /dev_inv. iFrame "Huinv Hpinv Hdinv Hqinv Htok".
+  Qed.
+
+  (* THE DEPOSIT: the boot chain parks the token, in the ONE fupd that runs
+     the UART slot's one-shot -- out of the pre-state, into the post-state
+     with the payload.  main runs it between consoleinit and plicinit, and
+     the [uart_inited] it mints is what every later PLIC access carries, so
+     no one meets the pre-state again.
+
+     THE SLOT'S [if] IS THE ONE PLACE the pre-state's silence about [p] is
+     felt.  The pre-state says nothing at all about the PLIC state -- no
+     "the UART is enabled nowhere" clause -- so [p_claimed p uart_irq_id =
+     false] is not available here, and the (unreachable: nothing has enabled
+     the UART's source yet, so no claim can have taken it) in-service branch
+     parks [emp] and drops the token.  Nothing downstream is weakened by
+     that: a claim hands out the payload only from an OUT-of-service slot,
+     and this branch leaves the slot exactly as an in-service one must look. *)
+  Lemma uart_rx_tok_deposit E γ (k : nat) :
+    ↑plicN ⊆ E ->
+    plic_inv γ -∗ uart_rx_tok γ k ={E}=∗ uart_inited γ.
+  Proof.
+    iIntros (Hmask) "#Hpinv Htok".
+    iInv "Hpinv" as ">Hbody" "Hclose".
+    iDestruct "Hbody" as (p) "(Hp & %Hpok & Hslots)".
+    iDestruct (plic_slots_uart with "Hslots") as "Hu".
+    iDestruct (plic_slot_uart_cases with "Hu") as "[Hpre | [#Hin Hrest]]".
+    - iMod (uart_preinit_fire with "Hpre") as "#Hin".
+      iMod ("Hclose" with "[Hp Htok]") as "_".
+      { iNext. iExists p. iFrame "Hp". iSplitR; [iPureIntro; exact Hpok|].
+        iApply plic_slots_of_uart.
+        iApply (plic_slot_uart_intro with "Hin").
+        destruct (p_claimed p uart_irq_id); [done | by iExists k]. }
+      by iModIntro.
+    - (* the deposit has already run: the slot's own payload is the token's
+         partner, so this one is spare and is simply dropped *)
+      iMod ("Hclose" with "[Hp Hrest]") as "_".
+      { iNext. iExists p. iFrame "Hp". iSplitR; [iPureIntro; exact Hpok|].
+        iApply plic_slots_of_uart.
+        iApply (plic_slot_uart_intro with "Hin"). iExact "Hrest". }
+      iModIntro. iFrame "Hin".
   Qed.
 
   (* Allocate all four UART ghosts from an initial device state.  Hands back
@@ -749,11 +1248,18 @@ Section DevLoops.
      Power-on DLAB is therefore arbitrary, and no adequacy hypothesis
      constrains it. *)
   Lemma uart_ghosts_alloc (u : uart_state) :
+    u_rx u = [] ->
+    uart_loopback u = false ->
     ⊢ |==> ∃ γ, uart_sent_auth γ u ∗ uart_out_auth γ u ∗
                 uart_tx_auth γ u ∗ uart_dlab_auth γ u ∗
                 uart_tx_own γ (uart_acc u) ∗ uart_sent γ (uart_acc u) ∗
-                uart_dlab_is γ (DfracOwn (1/2)) (uart_dlab u).
+                uart_dlab_is γ (DfracOwn (1/2)) (uart_dlab u) ∗
+                (* the receive side: the column at an empty FIFO, the token
+                   the boot chain carries, and the one-shot the PLIC
+                   invariant's pre-deposit arm holds *)
+                uart_colE γ u ∗ uart_rx_tok γ 0 ∗ uart_preinit γ.
   Proof.
+    intros Hrx Hlb.
     iMod (own_alloc (●ML (uart_acc u : list (leibnizO (bv 8))))) as (γa) "Ha";
       [apply mono_list_auth_valid|].
     iMod (own_alloc (●ML (u_out u : list (leibnizO (bv 8))))) as (γb) "Hb";
@@ -771,10 +1277,24 @@ Section DevLoops.
     (* split the DLAB agree into the invariant's half and the caller's *)
     iEval (rewrite -Qp.half_half -dfrac_op_own dfrac_agree_op own_op) in "Hd".
     iDestruct "Hd" as "[Hd1 Hd2]".
-    iModIntro. iExists (UartNames γa γb γc γd).
+    (* the receive side's three *)
+    iMod (mono_nat_own_alloc 0%nat) as (γpu) "[Hpu _]".
+    iMod (ghost_var_alloc 0%nat) as (γpo) "Hpo".
+    iEval (rewrite -Qp.half_half) in "Hpo".
+    iDestruct (ghost_var_split with "Hpo") as "[Hpo1 Hpo2]".
+    iMod (mono_nat_own_alloc 0%nat) as (γin) "[Hin _]".
+    iModIntro. iExists (UartNames γa γb γc γd γpu γpo γin).
     rewrite /uart_sent_auth /uart_out_auth /uart_tx_auth /uart_tx_own
-            /uart_dlab_auth /uart_dlab_is /uart_sent /=.
+            /uart_dlab_auth /uart_dlab_is /uart_sent /uart_colE /uart_col
+            /uart_rx_tok /uart_rx_popped /uart_preinit /=.
     iFrame "Ha Hb Hc1 Hd1 Hc2 Hsent Hd2".
+    (* the column's own half of the pop counter and the caller's token are
+       the SAME proposition, so the last three are placed by hand *)
+    iSplitR "Hpo2 Hin".
+    { iExists [], 0%nat, 0%nat. iFrame "Hpu Hpo1". iSplitR; [done|].
+      iPureIntro. rewrite /uart_col_ok Hrx Hlb. cbn [length].
+      split_and!; [done | done | done | intros j b h Hj; done]. }
+    iSplitL "Hpo2"; [iExact "Hpo2" | iExact "Hin"].
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -918,7 +1438,7 @@ Section DevLoops.
   Qed.
 
   Lemma wp_uart_loop γ :
-    gen_cert -∗ uart_inv γ -∗ plic_inv -∗ uart_obs_permit γ -∗
+    gen_cert -∗ uart_inv γ -∗ plic_inv γ -∗ uart_obs_permit γ -∗
     WP (UartLoop : expr riscv_lang).
   Proof.
     iIntros "#Hcert #Huinv #Hpinv #Hperm".
@@ -938,7 +1458,7 @@ Section DevLoops.
     - (* a byte leaves the tx FIFO: it moves from the head of [u_tx] to the
          tail of [u_out], so the accepted trace is UNCHANGED. *)
       iInv "Huinv" as ">Hbody" "Hclose".
-      iDestruct "Hbody" as (u) "(Hu & Hg)".
+      iDestruct "Hbody" as (u) "(Hu & Hg & Hcol)".
       iDestruct (dev_interp_agree_uart with "Hdev Hu") as %Hu.
       rewrite Hu in Htx0.
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
@@ -959,15 +1479,22 @@ Section DevLoops.
       iAssert (uart_ghosts γ u') with "[Hacc Hout Htx Hdl]" as "Hg".
       { rewrite /uart_ghosts. iFrame. }
       (* the tx arm's tag output is [emp] ([uart_tag_of] mints one only for
-         an rx event), so there is nothing to file here. *)
+         an rx event), so the column takes nothing here. *)
       iMod ("Hperm" $! h _ d u' with "[//] [//] [//] Hg Hoauth")
         as "(Hg & Hoauth & _)".
-      iMod ("Hclose" with "[Hu' Hg]") as "_".
+      (* THE COLUMN: with LOOP off ([uart_col]'s own clause, read off the
+         state the invariant is at) the drain does not touch [u_rx] at all;
+         under LOOP it would re-enter the receiver with no observation, which
+         is why the clause is there. *)
+      iDestruct (uart_colE_loopback with "Hcol") as %Hlbf.
+      destruct (uart_tx_pop_rx u _ u' Hlbf Htx0) as [Hrxe Hlbe].
+      iDestruct (uart_colE_stable γ u u' Hrxe Hlbe with "Hcol") as "Hcol".
+      iMod ("Hclose" with "[Hu' Hg Hcol]") as "_".
       { iNext. iExists u'. iFrame. }
       iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".
     - (* a byte arrives from the outside world: rx only, trace untouched *)
       iInv "Huinv" as ">Hbody" "Hclose".
-      iDestruct "Hbody" as (u) "(Hu & Hg)".
+      iDestruct "Hbody" as (u) "(Hu & Hg & Hcol)".
       iDestruct (dev_interp_agree_uart with "Hdev Hu") as %Hu.
       rewrite Hu in Hrx.
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
@@ -978,25 +1505,35 @@ Section DevLoops.
                    (uart_rx_push_dlab _ b _ Hrx) with "Hg") as "Hg".
       (* THE TRACE STEP: the client moves the history by the input event *)
       (* the rx arm's tag is the application's claim about this byte, at the
-         history it arrived at.  It is persistent, and the loop does not file
-         it: the receive column that holds one per queued byte is not part of
-         [uart_inv_body]. *)
+         history it arrived at -- and it is what the column files beside the
+         byte, so every later reader of the FIFO's head gets a copy. *)
       iMod ("Hperm" $! h [ObsUartIn b] d u' with "[//] [//] [//] Hg Hoauth")
-        as "(Hg & Hoauth & _)".
-      iMod ("Hclose" with "[Hu' Hg]") as "_".
+        as "(Hg & Hoauth & #Htg)".
+      (* THE COLUMN: the byte goes on the tail of [u_rx] and its history --
+         which ends with exactly this event -- on the tail of the column. *)
+      destruct (uart_rx_push_rx u b u' Hrx) as [Hrxe Hlbe].
+      iMod (uart_colE_push γ u u' b (h ++ [ObsUartIn b])%list Hrxe Hlbe
+              (obs_ends_in_snoc h b) with "[] Hcol") as "Hcol".
+      { iExact "Htg". }
+      iMod ("Hclose" with "[Hu' Hg Hcol]") as "_".
       { iNext. iExists u'. iFrame. }
       iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".
     - (* the gateway latches the UART's interrupt level.  This is the ONE
          UART transition that touches the PLIC, and it touches nothing else,
          so only [plicN] is opened. *)
       iInv "Hpinv" as ">Hbody" "Hclose".
-      iDestruct "Hbody" as (p) "(Hp & %Hpok)".
+      iDestruct "Hbody" as (p) "(Hp & %Hpok & Harm)".
       iDestruct (dev_interp_agree_plic with "Hdev Hp") as %Hp.
       iMod (dev_interp_update_plic _ p p' with "Hdev Hp") as "[Hdev' Hp']".
-      iMod ("Hclose" with "[Hp']") as "_".
-      { iNext. iExists p'. iFrame "Hp'". iPureIntro.
-        apply (plic_ok_latch p p' uart_irq_id);
-          [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
+      assert (Hlat : plic_latch p uart_irq_id = Some p')
+        by (rewrite <- Hp; exact Hlatch).
+      (* the gateway sets a PENDING bit and touches no service bit, so every
+         slot survives it *)
+      pose proof (plic_latch_claimed p p' uart_irq_id Hlat) as Hcl'.
+      iMod ("Hclose" with "[Hp' Harm]") as "_".
+      { iNext. iExists p'. iFrame "Hp'".
+        iSplitR; [iPureIntro; exact (plic_ok_latch p p' uart_irq_id Hlat Hpok)|].
+        iApply (plic_slots_stable _ p p' (Hcl' uart_irq_id)). iExact "Harm". }
       (* silent: the history is unchanged *)
       rewrite app_nil_r.
       iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".
@@ -1010,7 +1547,7 @@ Section DevLoops.
   (*  THE DISK THREAD.  Opens [diskN] for the DMA/wild arms and [plicN]   *)
   (*  for the latch arm.                                                 *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_disk_loop γd :
+  Lemma wp_disk_loop (γu : uart_names) γd :
     (* the disk names are the CANONICAL ones: the image gname is the AMBIENT
        ERA's, which is what identifies the auth [wp_disk_step] hands over with
        the fragments [virtio_proto] holds.  [disk_ghosts_alloc] exports this
@@ -1022,7 +1559,7 @@ Section DevLoops.
        (claude-notes/design/crash.md).  [crashN] is disjoint from [diskN] and
        [plicN], so the two openings compose. *)
     gen_cert -∗ crash_inv -∗ perm_inv gen_id (dn_perm γd) -∗ disk_inv γd -∗
-    plic_inv -∗
+    plic_inv γu -∗
     WP (DiskLoop : expr riscv_lang).
   Proof.
     intros Himg.
@@ -1510,13 +2047,17 @@ Section DevLoops.
       destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
       rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       iInv "Hpinv" as ">Hbody" "Hclose".
-      iDestruct "Hbody" as (p) "(Hp & %Hpok)".
+      iDestruct "Hbody" as (p) "(Hp & %Hpok & Harm)".
       iDestruct (dev_interp_agree_plic with "Hdev Hp") as %Hp.
       iMod (dev_interp_update_plic _ p p' with "Hdev Hp") as "[Hdev' Hp']".
-      iMod ("Hclose" with "[Hp']") as "_".
-      { iNext. iExists p'. iFrame "Hp'". iPureIntro.
-        apply (plic_ok_latch p p' virtio_irq_id);
-          [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
+      assert (Hlat : plic_latch p virtio_irq_id = Some p')
+        by (rewrite <- Hp; exact Hlatch).
+      pose proof (plic_latch_claimed p p' virtio_irq_id Hlat) as Hcl'.
+      iMod ("Hclose" with "[Hp' Harm]") as "_".
+      { iNext. iExists p'. iFrame "Hp'".
+        iSplitR;
+          [iPureIntro; exact (plic_ok_latch p p' virtio_irq_id Hlat Hpok)|].
+        iApply (plic_slots_stable _ p p' (Hcl' uart_irq_id)). iExact "Harm". }
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev'".
       iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
@@ -1552,8 +2093,8 @@ Section DevLoops.
   (*  three loops' interfaces uniform and to record that the wire's value   *)
   (*  is the PLIC's.                                                       *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_plic_loop :
-    gen_cert -∗ plic_inv -∗ wire_inv -∗
+  Lemma wp_plic_loop (γu : uart_names) :
+    gen_cert -∗ plic_inv γu -∗ wire_inv -∗
     WP (PlicLoop : expr riscv_lang).
   Proof.
     iIntros "#Hcert #Hpinv #Hwinv".

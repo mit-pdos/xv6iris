@@ -344,12 +344,19 @@ Class uartGhostG (Σ : gFunctors) := UartGhostG {
   uart_ghost_listG :: inG Σ (mono_listR (leibnizO (bv 8)));
   uart_ghost_txG :: ghost_varG Σ (list (bv 8));
   uart_ghost_dlabG :: inG Σ (dfrac_agreeR (leibnizO bool));
+  (* the RECEIVE TOKEN's half ([WpUart.uart_rx_tok]): the count of bytes ever
+     removed from the receive FIFO.  The push counter beside it and the
+     one-shot that says uartinit has run are [mono_nat]s and use the AMBIENT
+     [riscvF_genGS] (RiscvPtsto.v) -- a second [mono_natG] here would make
+     resolution ambiguous (TsoGhost.v). *)
+  uart_ghost_rxpopG :: ghost_varG Σ nat;
 }.
 
 Definition uartGhostΣ : gFunctors :=
   #[ GFunctor (mono_listR (leibnizO (bv 8)));
      ghost_varΣ (list (bv 8));
-     GFunctor (dfrac_agreeR (leibnizO bool)) ].
+     GFunctor (dfrac_agreeR (leibnizO bool));
+     ghost_varΣ nat ].
 
 Global Instance subG_uartGhostG Σ : subG uartGhostΣ Σ -> uartGhostG Σ.
 Proof. solve_inG. Qed.

@@ -67,6 +67,19 @@ Proof.
     [ left | right; left | right; right ]; apply bv_eq; vm_compute; reflexivity.
 Qed.
 
+(* ...and the reverse reading, which is what carries the RECEIVE TOKEN out of
+   the claim: a0 holding the UART's id means the 32-bit register did.  Both
+   sides are literals, so the two encodings are compared by computation. *)
+Lemma pq_claim_of_a0 (v : bv 32) :
+  plic_claim_ret_ok v ->
+  (extend_value (n := 8*4) false v : mword 64)
+    = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ->
+  v = Z_to_bv 32 (Z.of_N uart_irq_id).
+Proof.
+  intros [-> | [-> | ->]] H; [ | reflexivity | ];
+    exfalso; apply (f_equal bv_unsigned) in H; vm_compute in H; discriminate.
+Qed.
+
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
    one-line bridge from a leaf's [rget] to the register-map facts a
    whole-function proof already has.  Written name-free (durable-notes: an
@@ -125,7 +138,7 @@ Section ProofPlicClaim.
     set (s00 := m0 !!! Regidx s0_idx).
     set (R1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0).
     set (R2 := <[Regidx s0_idx := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> R1).
-    iIntros "Hcg #Htext Hpc #Hdinv Hcont".
+    iIntros "Hcg #Htext Hpc #Hdinv #Hinit Hcont".
     assert (Hn2 : (2 <= n)%nat) by lia.
     assert (Hcsp1 : R1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     assert (Hpush : sp' = pa_stk (m0 !!! Regidx csp_rs1) 2).
@@ -247,6 +260,9 @@ Section ProofPlicClaim.
     (* ---- 0x16: c.lw a0,4(a5) -- THE CLAIM ---- *)
     iApply (wp_lw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plic_claim + 0x16)) true false
               a0_idx a5_idx (mword_of_int 4 : mword 12) N4 (n - 2)%nat plic_claim_ret_ok
+              emp%I
+              (fun cv => ⌜ cv = Z_to_bv 32 (Z.of_N uart_irq_id) ⌝ -∗
+                           ∃ k : nat, uart_rx_tok γd k)%I
               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_canon _ (ph_sclaim_geom _ Hhart)))
@@ -260,11 +276,24 @@ Section ProofPlicClaim.
                       rewrite Hc in Hk; exact Hk
                     | pose proof (plic_claim_ret pq (plic_sctx (Z.to_nat (bv_unsigned cid_word))) Hpq) as Hk;
                       rewrite Hc in Hk; exact Hk ])
-              with "Hcg Hpc [] Hdinv").
+              with "Hcg Hpc [] Hdinv [] []").
     { iApply (pqi_16 with "Htext"). }
+    { done. }
+    { (* THE CLAIM TAKES THE PAYLOAD OUT.  The read IS [plic_claim] at this
+         hart's S context, and the UART's payload is parked under
+         [p_claimed … uart_irq_id]: [plic_slots_claim] does the whole
+         arithmetic -- refuting the slot's pre-state against [uart_inited],
+         and refuting a UART id from a claim of anything else. *)
+      iIntros (pq cv pq') "%Hpr %Hpq Hslots _".
+      rewrite HN4a5 (ph_sclaim_read _ pq Hhart) in Hpr.
+      injection Hpr as Hpr.
+      iDestruct (plic_slots_claim γd pq
+                   (plic_sctx (Z.to_nat (bv_unsigned cid_word))) Hpq
+                   with "Hinit Hslots") as "[Hslots Htok]".
+      rewrite Hpr. cbn [fst snd]. iModIntro. iFrame "Hslots Htok". }
     iIntros (cv) "%Hcv".
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iIntros "Hcg Hpc Htok".
     assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.plic_claim + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.plic_claim + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
     set (cval := (extend_value (n := 8*4) false cv : mword 64)).
@@ -348,7 +377,12 @@ Section ProofPlicClaim.
     assert (Hra_final : ret_pc (rget N8 ra_idx) = ret_tgt)
       by (rgne; rewrite HN8ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" $! N8 with "Hcg Hpc [%]").
+    iApply ("Hcont" $! N8 with "Hcg Hpc [%] [Htok]").
+    2:{ (* the token, re-keyed from the 32-bit register value to the 64-bit
+           word the epilogue leaves in a0 *)
+        iIntros (Ha0). iApply "Htok". iPureIntro.
+        revert Ha0. rewrite HN8a0. unfold cval.
+        exact (pq_claim_of_a0 cv Hcv). }
     split; [ | split ].
     - (* sp and s0 are saved-then-restored ACROSS the call, so the fact does not
          factor through the callee's [callee_saved]; each conjunct on its own. *)

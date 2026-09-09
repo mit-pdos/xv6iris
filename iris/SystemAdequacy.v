@@ -264,11 +264,12 @@ Lemma fs_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
     (app_fs : CT -> N -> FsAbsDefs.aview -> iProp Σ)
     (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs : gname) (c : CT)
     (T : list mobs) (Tg : list mobs -> iProp Σ)
-    (HTg : forall h, Persistent (Tg h)) (g' : gstate) :
+    (HTg : forall h, Persistent (Tg h)) (HTgt : forall h, Timeless (Tg h))
+    (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
           (xv6_slot N app_fs cov ls γd γsw γreg γstart c)
-          γobs T (obs_pred_at γobs) Tg HTg CT c) g' -∗
+          γobs T (obs_pred_at γobs) Tg HTg HTgt CT c) g' -∗
     ▷ xv6_slot N app_fs cov ls γd γsw γreg γstart c -∗
     ◇ ⌜fs_boot_pure cov ls (v_disk (g'.(gdev).(dvirtio)))⌝.
 Proof.
@@ -276,7 +277,8 @@ Proof.
            (xv6_slot N app_fs cov ls)
            (fs_boot_pure cov ls)
            (xv6_slot_project N app_fs cov ls)
-           Hinv γgen γstart γreg γd γsw γobs T (obs_pred_at γobs) Tg HTg c g').
+           Hinv γgen γstart γreg γd γsw γobs T (obs_pred_at γobs)
+           Tg HTg HTgt c g').
 Qed.
 
 (* ...AND A [phi] THAT IS NOT ABOUT THE DISK AT ALL, beside it.
@@ -305,11 +307,12 @@ Lemma xv6_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
     (app_fs : CT -> N -> FsAbsDefs.aview -> iProp Σ)
     (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs : gname) (c : CT)
     (T : list mobs) (Tg : list mobs -> iProp Σ)
-    (HTg : forall h, Persistent (Tg h)) (g' : gstate) :
+    (HTg : forall h, Persistent (Tg h)) (HTgt : forall h, Timeless (Tg h))
+    (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
           (xv6_slot N app_fs cov ls γd γsw γreg γstart c)
-          γobs T (obs_pred_at γobs) Tg HTg CT c) g' -∗
+          γobs T (obs_pred_at γobs) Tg HTg HTgt CT c) g' -∗
     ▷ xv6_slot N app_fs cov ls γd γsw γreg γstart c -∗
     ◇ ⌜xv6_trace_pure cov ls g'⌝.
 Proof.
@@ -318,7 +321,7 @@ Proof.
      not spent and the disk projection still has it *)
   iDestruct (power_interp_resv_ok with "Hsi") as %Hresv.
   iDestruct (fs_trace_hook Σ cov ls CT N app_fs Hinv γgen γstart γreg γd γsw
-               γobs c T Tg HTg g' with "Hsi HP") as ">%Hdisk".
+               γobs c T Tg HTg HTgt g' with "Hsi HP") as ">%Hdisk".
   iModIntro. iPureIntro. split; [exact Hdisk | exact Hresv].
 Qed.
 
@@ -566,7 +569,7 @@ Section SystemBoot.
       as (Hfd Hir Hpav Hbs HF γd γv Rspent γi ξd)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
         #Hcinv & #Hcert & #Hsup & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
-        Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
+        Htok & Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
     (* THE FILE SYSTEM'S BOOT KITS ARE NO LONGER DROPPED (stage (e)).
        [Hfs] is the ten configuration ties plus [fs_kit_icache] plus
@@ -603,12 +606,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
+    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
+      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -675,6 +678,8 @@ Section SystemBoot.
         iSpecialize ("HP" with "Htx").
         iSpecialize ("HP" with "Hsent").
         iSpecialize ("HP" with "Hlb").
+        (* THE RECEIVE TOKEN, on its way to uartinit's FCR flush *)
+        iSpecialize ("HP" with "Htok").
         iSpecialize ("HP" with "Hdlab").
         iSpecialize ("HP" with "Hcfg").
         iSpecialize ("HP" with "Hclaim").
@@ -701,8 +706,8 @@ Section SystemBoot.
     iDestruct (Hperm γd with "Hoinv") as "#Hperm".
     iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv Hperm") |].
     iSplitR;
-      [iApply (wp_disk_loop γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
-    iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
+      [iApply (wp_disk_loop γd γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
+    iApply (wp_plic_loop γd with "Hcert Hpinv Hwinv").
   Qed.
 
 End SystemBoot.
@@ -788,6 +793,7 @@ Theorem xv6_power_adequacy_gen Σ
        from the application. *)
     (Tg : CT -> list mobs -> iProp Σ)
     (HTg : forall (c : CT) (h : list mobs), Persistent (Tg c h))
+    (HTgt : forall (c : CT) (h : list mobs), Timeless (Tg c h))
     (* ...the second argument is the application's FIXED PART
        (app-instances.md section 6 ruling 1): born by [Hbirth] before the
        crash slot, and its yield owned by the trace slot from birth *)
@@ -809,7 +815,7 @@ Theorem xv6_power_adequacy_gen Σ
             boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
               (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
                  γd γsw γreg γstart c)
-              γobs T (Pt γobs c) (Tg c) (HTg c) CT c) ->
+              γobs T (Pt γobs c) (Tg c) (HTg c) (HTgt c) CT c) ->
        ⊢ obs_inv -∗ uart_obs_permit γ)
     (phi : gstate -> list mobs -> Prop)
     (* ...the slot [Hphi] holds at the end of the run is the COMPOSITE
@@ -822,7 +828,7 @@ Theorem xv6_power_adequacy_gen Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
-               γobs T (Pt γobs c) (Tg c) (HTg c) CT c) g' -∗
+               γobs T (Pt γobs c) (Tg c) (HTg c) (HTgt c) CT c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
              γd γsw γreg γstart c -∗
@@ -1012,7 +1018,7 @@ Proof.
            (* THE TRACE SLOT AND THE TRACE HOOK, threaded straight through:
               this layer fixes the crash predicate but says nothing about the
               trace, so both pass down unexamined. *)
-           Pt Tg HTg HPt Hobs phi Hphi
+           Pt Tg HTg HTgt HPt Hobs phi Hphi
            Hgen0 Hpow _ n κs t2 g2 Hn).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
@@ -1068,7 +1074,8 @@ Theorem xv6_power_adequacy Σ
                (xv6_slot unit (fun _ _ _ => True%I) cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
                γobs T (obs_pred_at γobs) rx_tag_triv
-               (@rx_tag_triv_persistent Σ) unit c) g' -∗
+               (@rx_tag_triv_persistent Σ) (@rx_tag_triv_timeless Σ)
+               unit c) g' -∗
          ▷ xv6_slot unit (fun _ _ _ => True%I) cov (FsImg.sb_logstart sb)
              γd γsw γreg γstart c -∗
          ◇ ⌜phi g'⌝)
@@ -1095,6 +1102,7 @@ Proof.
             (fun γobs _ => obs_pred_at γobs)
             (fun _ : unit => rx_tag_triv)
             (fun (_ : unit) (h : list mobs) => @rx_tag_triv_persistent Σ h)
+            (fun (_ : unit) (h : list mobs) => @rx_tag_triv_timeless Σ h)
             (obs_pred_at_alloc_cl (fun _ : unit => True%I))
             (fun γd γobs _ => obs_pred_at_step XV6_DISK_BYTES γd γobs)
             _ (fun g _ => phi g)
@@ -1118,6 +1126,7 @@ Theorem xv6_trace_adequacy Σ
        each byte the environment pushed, at the history it arrived at.  The
        rx wand below produces it; the machine's ambient slot IS it. *)
     (Tg : list mobs -> iProp Σ) (HTg : forall h, Persistent (Tg h))
+    (HTgt : forall h, Timeless (Tg h))
     (HR0 : ⊢ |==> R [])
     (Hpow : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
        trace_shape h on ->
@@ -1160,6 +1169,7 @@ Proof.
                   reflexivity)
             (fun γobs _ => obs_ledger_at R γobs)
             (fun _ : unit => Tg) (fun (_ : unit) (h : list mobs) => HTg h)
+            (fun (_ : unit) (h : list mobs) => HTgt h)
             (fun γobs _ => obs_ledger_at_alloc_cl R γobs True%I
                              ltac:(iIntros "_"; iMod HR0 as "HR"; by iModIntro))
             (fun γd γobs _ => obs_ledger_at_step XV6_DISK_BYTES R HRt Hpow γd γobs)
@@ -1425,7 +1435,8 @@ Corollary xv6_power_adequacy_xv6Σ (g : gstate)
                (xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
                   (FsImg.sb_logstart fsimg_sb) γd γsw γreg γstart c)
                γobs T (obs_pred_at γobs) rx_tag_triv
-               (@rx_tag_triv_persistent xv6Σ) unit c) g' -∗
+               (@rx_tag_triv_persistent xv6Σ) (@rx_tag_triv_timeless xv6Σ)
+               unit c) g' -∗
          ▷ xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
              (FsImg.sb_logstart fsimg_sb) γd γsw γreg γstart c -∗
          ◇ ⌜phi g'⌝)
@@ -1489,7 +1500,8 @@ Proof.
               xv6_trace_hook xv6Σ fsimg_cov (FsImg.sb_logstart fsimg_sb)
                 unit unit (fun _ _ _ => True%I)
                 Hinv γgen γstart γreg γd γsw γobs c T
-                rx_tag_triv (@rx_tag_triv_persistent xv6Σ) g')
+                rx_tag_triv (@rx_tag_triv_persistent xv6Σ)
+                (@rx_tag_triv_timeless xv6Σ) g')
            Hgen0 Hpow Hdisk).
 Qed.
 
@@ -1506,6 +1518,7 @@ Qed.
 Corollary xv6_trace_adequacy_xv6Σ (g : gstate)
     (R : list mobs -> iProp xv6Σ) (HRt : forall h, Timeless (R h))
     (Tg : list mobs -> iProp xv6Σ) (HTg : forall h, Persistent (Tg h))
+    (HTgt : forall h, Timeless (Tg h))
     (HR0 : ⊢ |==> R [])
     (Hpow : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
        trace_shape h on ->
@@ -1530,7 +1543,7 @@ Corollary xv6_trace_adequacy_xv6Σ (g : gstate)
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ P κs.
 Proof.
   apply (xv6_trace_adequacy xv6Σ g fsimg_sb fsimg_nib fsimg_cov R HRt Tg HTg
-           HR0 Hpow Htx Hrx P HR Hgen0 Hpow0).
+           HTgt HR0 Hpow Htx Hrx P HR Hgen0 Hpow0).
   rewrite Hdisk. exact fsimg_image_wf.
 Qed.
 
@@ -1555,6 +1568,7 @@ Proof.
             (fun γobs _ => obs_pred_at γobs)
             (fun _ : unit => rx_tag_triv)
             (fun (_ : unit) (h : list mobs) => @rx_tag_triv_persistent xv6Σ h)
+            (fun (_ : unit) (h : list mobs) => @rx_tag_triv_timeless xv6Σ h)
             (obs_pred_at_alloc_cl (fun _ : unit => True%I))
             (fun γd γobs _ => obs_pred_at_step XV6_DISK_BYTES γd γobs)
             _ (fun g h => obs_wf h g)

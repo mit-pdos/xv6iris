@@ -419,7 +419,8 @@ Section ProofMain.
   (* =================================================================== *)
   Local Lemma mn_grp_printk 
       (γd : uart_names) (γv : disk_names)
-      (m : regfile) (n : nat) (p0 : mword 64) (l0 : list (bv 8)) (b0 : bool) :
+      (m : regfile) (n : nat) (p0 : mword 64) (l0 : list (bv 8)) (b0 : bool)
+      (k0 : nat) :
     (K_userinit <= n)%nat ->
     sie_cap_gpr KT0 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
@@ -440,6 +441,7 @@ Section ProofMain.
     (* the console RING, which this group locks up behind cons.lock *)
     cons_res -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
+    uart_rx_tok γd k0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     (* NO [γpr] BINDER ANY MORE (fs-cfg-boot.md (f-3)): the "pr" lock is
        allocated at the AMBIENT [fsc_printk] since debt (E), so the group's
@@ -464,7 +466,7 @@ Section ProofMain.
   Proof.
     intros Hn.
     iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr".
-    iIntros "Hkprintk Hdevsw Hrest Hring Htx Hsent Hlb Hdlab Hcont".
+    iIntros "Hkprintk Hdevsw Hrest Hring Htx Hsent Hlb Htok Hdlab Hcont".
     iPoseProof (dev_inv_uart with "Hdev") as "#Huinv".
     iPoseProof (kernel_data_string mn_nl_addr mn_nl
                   (mword_of_int mn_nl_addr) eq_refl
@@ -505,11 +507,23 @@ Section ProofMain.
        exactly [WpLock.newlock]'s premises.  The two [newlock]s are taken
        twenty lines below, once [printkinit] has returned; together they are
        [SpecConsoleintr.console_caps]. *)
-    iApply (Consoleinit.wp_consoleinit_sconf γd C0 n l0 b0
+    iApply (Consoleinit.wp_consoleinit_sconf γd C0 n l0 b0 k0
               vcl vcn vcc dr0 dw0 p0 ltac:(lia)
-              with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Hdlab
+              with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Htok Hdlab
                     Hcw Hcn Hcc Hltx Hdr Hdw Hrest").
-    iIntros (mc) "Hcg Hpc %Hcsci Htx Hsent #Hdoff Hclw #Hclnm Hclcpu Hlkfresh #Htbl".
+    iIntros (mc) "Hcg Hpc %Hcsci Htx Hsent Htok #Hdoff Hclw #Hclnm Hclcpu Hlkfresh #Htbl".
+    (* ===== THE DEPOSIT.  uartinit's FCR flush is done, so the receive
+       token has no further boot-chain business: park it in the PLIC
+       invariant, which mints the persistent [uart_inited] every later
+       enable write and every reader of a tagged byte holds.  It runs HERE,
+       between consoleinit and plicinit, which is why the invariant's
+       pre-deposit arm can say the UART is enabled nowhere. ===== *)
+    iDestruct "Htok" as (ktok) "Htok".
+    iApply fupd_wp.
+    iMod (uart_rx_tok_deposit ⊤ γd ktok ltac:(solve_ndisj)
+            with "[] Htok") as "#Hinit".
+    { iApply (dev_inv_plic with "Hdev"). }
+    iModIntro.
     assert (Hretci : ret_pc (C0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x46) : mword 64)).
     { rewrite /C0 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -601,7 +615,7 @@ Section ProofMain.
     { rewrite /console_caps. iExists γtx, γcl.
       iSplitR; [iExact "Htxl" |].
       iSplitR; [iExact "Hconslk" |].
-      iExact "Hsub0". }
+      iSplitR; [iExact "Hsub0" | iExact "Hinit"]. }
     (* THE CONSOLE BUNDLE, and this is the only point at which it can be
        built: [Hconslk] is [is_conslock γcl] with γcl still concrete, and
        [Htbl] is the table consoleinit filled twenty instructions ago.
@@ -1275,7 +1289,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.plicinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpl) in "Hpc".
-    iApply (Plicinit.wp_plicinit_sconf T3 n p0 ltac:(lia)
+    iApply (Plicinit.wp_plicinit_sconf γd T3 n p0 ltac:(lia)
               with "Hcg Htext Hpc Hpinv").
     iApply wp_next_off_intro.
     iIntros (mpl) "Hcg Hpc %Hcspl".
@@ -2181,7 +2195,7 @@ Section ProofMain.
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv Hprim #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
-    iIntros "#Hdev #Hwire #Hsup Htx Hsent Hlb Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
+    iIntros "#Hdev #Hwire #Hsup Htx Hsent Hlb Htok Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     (* THE [tx_busy] CELL IS GONE from the bundle: ae96fd0 deleted the flag, so
@@ -2266,9 +2280,9 @@ Section ProofMain.
     iApply (mn_boot_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc".
     (* --- 0x42 .. 0x6a : console / printk --- *)
-    iApply (mn_grp_printk γd γv m1 (K - 2)%nat p0 l0 b0 Hn50
+    iApply (mn_grp_printk γd γv m1 (K - 2)%nat p0 l0 b0 0%nat Hn50
               with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr
-                    Hkprintk Hdevsw Hdevrest Hring Htx Hsent Hlb Hdlab").
+                    Hkprintk Hdevsw Hdevrest Hring Htx Hsent Hlb Htok Hdlab").
     iIntros (m2) "Hcg Hpc Hfree Hcpu #Hpenv #Hccaps #Hcready".
     (* ---- STAGE (f): the printk half of [FirstTok.first_boot_persist],
        re-spelled at the CONFIGURATION's device gnames.  The group produces

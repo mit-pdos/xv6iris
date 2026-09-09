@@ -45,6 +45,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import SpecPlicClaim.   (* [plic_claim_a0_ok]: the ids a claim can hand back *)
 Import Defs.
 
 
@@ -72,12 +73,24 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
   bv_unsigned (rget m0 tp_idx) < Z.of_nat dev_ncpu ->
+  (* THE ID BEING COMPLETED IS ONE A CLAIM HANDED BACK.  Only that makes the
+     32-bit register write identify the source: a0's low word decides which
+     service bit clears, and the three admissible ids are distinct there.
+     Every real caller has this from [SpecPlicClaim]'s own post. *)
+  plic_claim_a0_ok (rget m0 (mword_of_int 10 : mword 5)) ->
   (* plic_complete's own max depth: its 32-byte frame (4 slots) plus the two
      slots cpuid's frame needs below it. *)
   (6 <= n)%nat ->
   sie_cap_gpr KT1 m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
-  dev_inv γd γv -∗
+  dev_inv γd γv -∗ uart_inited γd -∗
+  (* THE RECEIVE TOKEN GOES BACK, when the id being completed is the UART's.
+     A completion clears the source's service bit, and the PLIC invariant
+     holds the token precisely while the source is out of service -- so the
+     caller owes it here.  [SpecPlicClaim]'s post is where it came from. *)
+  (⌜ rget m0 (mword_of_int 10 : mword 5)
+     = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
+     ∃ k : nat, uart_rx_tok γd k) -∗
   ( ∀ m' : regfile,
     sie_cap_gpr KT1 m' n false p -∗
     pc_is ret_tgt -∗

@@ -643,6 +643,10 @@ Section SpecMain.
        [SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]. *)
     app_sup -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
+    (* THE RECEIVE TOKEN, born with the device invariant and carried by main
+       to uartinit's FCR flush; main parks it in the PLIC invariant between
+       consoleinit and plicinit, which is what mints [uart_inited]. *)
+    uart_rx_tok γd 0%nat -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     (* ...and the two disk ghosts the protocol invariant does NOT hold, minted

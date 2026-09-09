@@ -158,6 +158,9 @@ Theorem xv6_app_adequacy Σ
     (* the tag is copied out of the UART's receive column once per reader,
        so it has to be duplicable by construction *)
     (Htagp : forall (c : app_fixed A) (h : list mobs), Persistent (app_tag A c h))
+    (* ...and timeless, because the receive column that files it lives in the
+       UART invariant, whose body every device leaf strips a later off *)
+    (Htagt : forall (c : app_fixed A) (h : list mobs), Timeless (app_tag A c h))
     (HR0 : forall c : app_fixed A, app_cl A c ⊢ |==> app_R A c [])
     (Hpow : forall (c : app_fixed A) (h : list mobs) (on : bool) (dk : Z -> bv 8),
        trace_shape h on ->
@@ -210,7 +213,7 @@ Theorem xv6_app_adequacy Σ
                (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
                γobs T (obs_ledger_at (app_R A c) γobs)
-               (app_tag A c) (Htagp c) (app_fixed A) c) g' -∗
+               (app_tag A c) (Htagp c) (Htagt c) (app_fixed A) c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
              γd γsw γreg γstart c -∗
@@ -234,7 +237,7 @@ Proof.
              (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                 γd γsw γreg γstart c)
              γobs T (obs_ledger_at (app_R A c) γobs)
-             (app_tag A c) (Htagp c) (app_fixed A) c) ->
+             (app_tag A c) (Htagp c) (Htagt c) (app_fixed A) c) ->
       ⊢ obs_inv -∗ uart_obs_permit γ).
   { intros HRg GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Gcl & GT & Heq).
     refine (uart_obs_permit_ledger (app_R A Gcl) (app_tag A Gcl) γ (HRt Gcl)
@@ -244,7 +247,7 @@ Proof.
            (app_fixed A) (app_cl A) Hbirth
            (app_names A) (app_pred A) Happ_xfer Happ_init Happ_sup
            (fun γobs c => obs_ledger_at (app_R A c) γobs)
-           (app_tag A) Htagp
+           (app_tag A) Htagp Htagt
            (fun γobs c =>
               obs_ledger_at_alloc_cl (app_R A c) γobs (app_cl A c) (HR0 c))
            (fun γd γobs c =>
@@ -322,6 +325,7 @@ Proof.
   refine (proj1 (xv6_app_adequacy xv6Σ g fsimg_sb fsimg_nib fsimg_cov (app_triv xv6Σ)
            app_triv_birth
            ltac:(intros c h; cbn [app_triv app_R]; apply _)
+           ltac:(intros c h; cbn [app_triv app_tag]; apply _)
            ltac:(intros c h; cbn [app_triv app_tag]; apply _)
            app_triv_R0
            ltac:(intros c h on dk _; cbn [app_triv app_R]; iIntros "_"; by iModIntro)

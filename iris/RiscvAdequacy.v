@@ -1129,6 +1129,7 @@ Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
        Coq-level argument for the reason [Ptp] is one -- the client writes it
        in a context that has no [riscvFixedGS] yet. *)
     (Tg : list mobs -> iProp Σ) (HTg : forall h, Persistent (Tg h))
+    (HTgt : forall h, Timeless (Tg h))
     (* the application's FIXED PART (app-instances.md §6 ruling 1): its
        type and the one value [riscv_power_adequacy]'s birth step produced,
        before the crash slot *)
@@ -1141,7 +1142,7 @@ Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
      runs of underscores are one longer each; the trace fields at the end
      are main's.  All resolve from [riscvGpreS]. *)
   RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-    _ _ _ γdisk ndisk Pcp γswap _ γobs T Ptp Tg HTg CT c.
+    _ _ _ γdisk ndisk Pcp γswap _ γobs T Ptp Tg HTg HTgt CT c.
 
 (* ---------------------------------------------------------------------- *)
 (* THE TRACE HOOK'S HELPERS -- ONE PER CONJUNCT OF [state_interp].          *)
@@ -1206,11 +1207,12 @@ Lemma disk_proj_trace {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
             ▷ Pc γdisk γsw γreg γst c ∗ ⌜Ppure dk⌝))
     (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap : gname)
     (γobs : gname) (T : list mobs) (Ptp : iProp Σ)
-    (Tg : list mobs -> iProp Σ) (HTg : forall h, Persistent (Tg h)) (c : CT)
+    (Tg : list mobs -> iProp Σ) (HTg : forall h, Persistent (Tg h))
+    (HTgt : forall h, Timeless (Tg h)) (c : CT)
     (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-          (Pc γdisk γswap γreg γstart c) γobs T Ptp Tg HTg CT c) g' -∗
+          (Pc γdisk γswap γreg γstart c) γobs T Ptp Tg HTg HTgt CT c) g' -∗
     ▷ Pc γdisk γswap γreg γstart c -∗
     ◇ ⌜Ppure (v_disk (dvirtio (gdev g')))⌝.
 Proof.
@@ -1488,6 +1490,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        spent. *)
     (Tg : CT -> list mobs -> iProp Σ)
     (HTg : forall (c : CT) (h : list mobs), Persistent (Tg c h))
+    (HTgt : forall (c : CT) (h : list mobs), Timeless (Tg c h))
     (* ...born holding the empty history AND what the application's birth
        step yielded (app-instances.md §6 ruling 1): the birth ran first,
        and the trace slot is the owner of its yield from the slot's own
@@ -1559,7 +1562,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
                (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c)
-               (Tg c) (HTg c) CT c) g' -∗
+               (Tg c) (HTg c) (HTgt c) CT c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ Pc γdisk γswap γreg γstart c -∗ ▷ Pt γobs c -∗
          ◇ ⌜phi g' h⌝)
@@ -1604,7 +1607,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
               (c : CT) (T : list mobs),
        F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
              (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c)
-             (Tg c) (HTg c) CT c ->
+             (Tg c) (HTg c) (HTgt c) CT c ->
        ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof (Rb c) g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
@@ -1676,7 +1679,7 @@ Proof.
      lets [state_interp] tie the history so far to the future *)
   set (F := boot_fixedGS Hinv γgen γstart γreg γfdisk ndisk γswap
               (Pc γfdisk γswap γreg γstart c) γobs κs (Pt γobs c)
-              (Tg c) (HTg c) CT c).
+              (Tg c) (HTg c) (HTgt c) CT c).
   (* the client's trace hook at the gnames just allocated.  [F] is a local
      DEFINITION, so this statement and the one the final observation below
      faces are convertible. *)
@@ -1807,7 +1810,8 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
               (c : unit) (T : list mobs),
        F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
              (Pc γdisk γswap γreg γstart) γobs T (obs_ledger_at R γobs)
-             rx_tag_triv (@rx_tag_triv_persistent Σ) unit c ->
+             rx_tag_triv (@rx_tag_triv_persistent Σ)
+             (@rx_tag_triv_timeless Σ) unit c ->
        ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
@@ -1827,6 +1831,7 @@ Proof.
            (fun γobs _ => obs_ledger_at R γobs)
            (fun _ : unit => rx_tag_triv)
            (fun (_ : unit) (h : list mobs) => @rx_tag_triv_persistent Σ h)
+           (fun (_ : unit) (h : list mobs) => @rx_tag_triv_timeless Σ h)
            (fun γobs _ => obs_ledger_at_alloc_cl R γobs True%I
                             ltac:(iIntros "_"; iMod HR0 as "HR"; by iModIntro))
            (fun γdisk γobs _ => obs_ledger_at_step ndisk R HRt Hpow γdisk γobs)

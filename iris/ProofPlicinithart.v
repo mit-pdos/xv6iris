@@ -294,7 +294,7 @@ Section ProofPlicinithart.
     { rewrite HN5a4. apply bv_eq; vm_compute; reflexivity. }
     (* ---- 0x1a: sw a4,128(a5) -- PLIC_SENABLE(hart) = 1026 ---- *)
     iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plicinithart + 0x1a)) false a4_idx a5_idx
-              (mword_of_int 128 : mword 12) N5 (n - 2)%nat
+              (mword_of_int 128 : mword 12) N5 (n - 2)%nat emp%I emp%I
               ltac:(rewrite HN5a5; exact (ph_geom_range _ (ph_senable_geom _ Hhart)))
               ltac:(rewrite HN5a5; exact (ph_geom_align _ (ph_senable_geom _ Hhart)))
               ltac:(rewrite HN5a5; exact (ph_geom_canon _ (ph_senable_geom _ Hhart)))
@@ -304,10 +304,20 @@ Section ProofPlicinithart.
                     [ exact (ph_senable_write _ pq _ Hhart)
                     | apply plic_ok_wupd_enable;
                       [ exact Hpq | exact plic_senable_ok_mask ] ])
-              with "Hcg Hpc [] Hdinv").
+              with "Hcg Hpc [] Hdinv [] []").
     { iApply (phi_1a with "Htext"). }
+    { done. }
+    { (* an ENABLE write: it touches the enable bitmap and nothing else, so
+         the slots come straight back *)
+      iIntros (pq pq') "%Hpw _ Hslots _".
+      rewrite HN5sw HN5a5 (ph_senable_write _ pq _ Hhart) in Hpw.
+      injection Hpw as Hrec.
+      assert (Hcl : p_claimed pq' uart_irq_id = p_claimed pq uart_irq_id)
+        by (rewrite <- Hrec; reflexivity).
+      iModIntro. iSplitL "Hslots"; [| done].
+      iApply (plic_slots_stable _ pq pq' Hcl). iExact "Hslots". }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iIntros "Hcg Hpc _".
     assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x1a) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1e) in "Hpc".
     (* ---- 0x1e: slliw a0,a0,13 ---- *)
@@ -362,7 +372,7 @@ Section ProofPlicinithart.
     { rewrite HN8z. apply bv_eq; vm_compute; reflexivity. }
     (* ---- 0x28: sw zero,0(a5) -- PLIC_SPRIORITY(hart) = 0 ---- *)
     iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plicinithart + 0x28)) false z_idx a5_idx
-              (mword_of_int 0 : mword 12) N8 (n - 2)%nat
+              (mword_of_int 0 : mword 12) N8 (n - 2)%nat emp%I emp%I
               ltac:(rewrite HN8a5; exact (ph_geom_range _ (ph_sthresh_geom _ Hhart)))
               ltac:(rewrite HN8a5; exact (ph_geom_align _ (ph_sthresh_geom _ Hhart)))
               ltac:(rewrite HN8a5; exact (ph_geom_canon _ (ph_sthresh_geom _ Hhart)))
@@ -371,10 +381,18 @@ Section ProofPlicinithart.
                     eexists; split;
                     [ exact (ph_sthresh_write _ pq _ Hhart)
                     | apply plic_ok_hupd_thresh; exact Hpq ])
-              with "Hcg Hpc [] Hdinv").
+              with "Hcg Hpc [] Hdinv [] []").
     { iApply (phi_28 with "Htext"). }
+    { done. }
+    { iIntros (pq pq') "%Hpw _ Hslots _".
+      rewrite HN8sw HN8a5 (ph_sthresh_write _ pq _ Hhart) in Hpw.
+      injection Hpw as Hrec.
+      assert (Hcl : p_claimed pq' uart_irq_id = p_claimed pq uart_irq_id)
+        by (rewrite <- Hrec; reflexivity).
+      iModIntro. iSplitL "Hslots"; [| done].
+      iApply (plic_slots_stable _ pq pq' Hcl). iExact "Hslots". }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iIntros "Hcg Hpc _".
     assert (Hpp2c : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x28) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp2c) in "Hpc".
     (* ---- 0x2c: c.ldsp ra,8(sp) ---- *)

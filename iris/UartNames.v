@@ -26,10 +26,27 @@ From iris.base_logic.lib Require Import own.
                later device steps (see [uart_tx_still_empty], DevModel.v).
       un_tx    ghost_var halves over the accepted trace -- EXCLUSIVE
                ownership of the transmitter (see [uart_tx_own] in WpUart.v).
-      un_dlab  dfrac_agree over DLAB -- freezable to a persistent fact.       *)
+      un_dlab  dfrac_agree over DLAB -- freezable to a persistent fact.
+      un_rxpush  mono_nat over the number of bytes the environment has ever
+               pushed into the receive FIFO.  Its lower bound
+               [uart_rx_pushed_lb] is what carries a "the FIFO was
+               non-empty" observation from the LSR poll to the RHR pop.
+      un_rxpop  ghost_var halves over the number of bytes ever REMOVED from
+               the receive FIFO -- popped by an RHR read or flushed by an
+               FCR write.  The client's half is [uart_rx_tok], the receive
+               token: exactly one hart holds it, so exactly one hart can
+               shorten the FIFO.
+      un_init  the one-shot that says uartinit's FCR flush has run.  Its
+               exclusive half [uart_preinit] is what the PLIC invariant
+               holds before the boot chain deposits the token; the
+               persistent [uart_inited] is what plicinithart needs before it
+               may enable the UART's interrupt source.                       *)
 Record uart_names := UartNames {
-  un_acc  : gname;
-  un_out  : gname;
-  un_tx   : gname;
-  un_dlab : gname;
+  un_acc    : gname;
+  un_out    : gname;
+  un_tx     : gname;
+  un_dlab   : gname;
+  un_rxpush : gname;
+  un_rxpop  : gname;
+  un_init   : gname;
 }.

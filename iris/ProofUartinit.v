@@ -137,15 +137,16 @@ Section ProofUartinit.
   Qed.
 
   Lemma wp_uartinit_sconf (γd : uart_names)
-      (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool) (p : mword 64)
-    : wp_uartinit_sconf_body γd m K l b0 p.
+      (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool) (k : nat)
+      (p : mword 64)
+    : wp_uartinit_sconf_body γd m K l b0 k p.
   Proof.
     cbv beta delta [wp_uartinit_sconf_body].
     intros pcE ret_tgt HK.
     set (sp0 := m !!! Regidx csp_rs1).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     pose (name_uart := (mword_of_int uart_name_str : mword 64)).
-    iIntros "Hcg #Htext #Hkdata Hpc #Huinv Htx #Hlb #Hsent Hdlab Hraw Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc #Huinv Htx #Hlb #Hsent Htok Hdlab Hraw Hcont".
     iDestruct "Hraw" as (vtlock vtname vtcpu) "(Hf1 & Hf2 & Hf3)".
     iDestruct (sie_cap_gpr_x0 m K false p (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
                  with "Hcg") as "[%Hx0 Hcg]".
@@ -251,10 +252,15 @@ Section ProofUartinit.
               ltac:(rgne; rewrite HR3a5; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc [] Huinv [$Htx $Hdlab] []").
     { iApply (uii_0c with "Htext"). }
-    { iIntros (uu uu') "%Hw Hg [Ht Hd]".
+    { iIntros (uu uu') "%Hw Hg Hcol [Ht Hd]".
       destruct (uart_write_1_stable uu _ uu' Hw) as (Ha & Ho & Hdb).
+      destruct (uart_write_rx_stable uu 1 _ uu' ltac:(lia) ltac:(lia) Hw)
+        as [Hrxe Hlbe].
       iModIntro. iSplitL "Hg";
-        [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") | iFrame "Ht Hd" ]. }
+        [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
+      iSplitL "Hcol";
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -301,13 +307,18 @@ Section ProofUartinit.
               ltac:(rgne; rewrite HR5a4; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc [] Huinv [$Htx $Hdlab] []").
     { iApply (uii_18 with "Htext"). }
-    { iIntros (uu uu') "%Hw Hg [Ht Hd]".
+    { iIntros (uu uu') "%Hw Hg Hcol [Ht Hd]".
       destruct (uart_write_3_stable uu _ uu' Hw) as (Ha & Ho & Hdb).
+      destruct (uart_write_rx_stable uu 3 _ uu' ltac:(lia) ltac:(lia) Hw)
+        as [Hrxe Hlbe].
       assert (Hdt : uart_dlab uu' = true)
         by (rewrite Hdb Hblcr1; vm_compute; reflexivity).
       iMod (ui_lcr_step γd uu uu' b0 Ha Ho with "Hg Hd") as "[Hg' Hd']".
       iEval (rewrite Hdt) in "Hd'".
-      iModIntro. iSplitL "Hg'"; [ iExact "Hg'" | iFrame "Ht Hd'" ]. }
+      iModIntro. iSplitL "Hg'"; [ iExact "Hg'" |].
+      iSplitL "Hcol";
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        | iFrame "Ht Hd'" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x18) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -364,11 +375,16 @@ Section ProofUartinit.
               ltac:(rgne; rewrite HR7a2; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc [] Huinv [$Htx $Hdlab] []").
     { iApply (uii_22 with "Htext"). }
-    { iIntros (uu uu') "%Hw Hg [Ht Hd]".
+    { iIntros (uu uu') "%Hw Hg Hcol [Ht Hd]".
       iDestruct (ui_dlab_of_ghosts γd uu (DfracOwn (1/2)) true with "Hg Hd") as %Hdu.
       destruct (uart_write_0_dlab_stable uu _ uu' Hdu Hw) as (Ha & Ho & Hdb).
+      destruct (uart_write_rx_stable uu 0 _ uu' ltac:(lia) ltac:(lia) Hw)
+        as [Hrxe Hlbe].
       iModIntro. iSplitL "Hg";
-        [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") | iFrame "Ht Hd" ]. }
+        [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
+      iSplitL "Hcol";
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
     assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
@@ -385,10 +401,15 @@ Section ProofUartinit.
               ltac:(rgne; rewrite HR7a5; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc [] Huinv [$Htx $Hdlab] []").
     { iApply (uii_26 with "Htext"). }
-    { iIntros (uu uu') "%Hw Hg [Ht Hd]".
+    { iIntros (uu uu') "%Hw Hg Hcol [Ht Hd]".
       destruct (uart_write_1_stable uu _ uu' Hw) as (Ha & Ho & Hdb).
+      destruct (uart_write_rx_stable uu 1 _ uu' ltac:(lia) ltac:(lia) Hw)
+        as [Hrxe Hlbe].
       iModIntro. iSplitL "Hg";
-        [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") | iFrame "Ht Hd" ]. }
+        [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
+      iSplitL "Hcol";
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
     assert (Hpp2a : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x26) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -408,13 +429,18 @@ Section ProofUartinit.
               ltac:(rgne; rewrite HR7a4; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc [] Huinv [$Htx $Hdlab] []").
     { iApply (uii_2a with "Htext"). }
-    { iIntros (uu uu') "%Hw Hg [Ht Hd]".
+    { iIntros (uu uu') "%Hw Hg Hcol [Ht Hd]".
       destruct (uart_write_3_stable uu _ uu' Hw) as (Ha & Ho & Hdb).
+      destruct (uart_write_rx_stable uu 3 _ uu' ltac:(lia) ltac:(lia) Hw)
+        as [Hrxe Hlbe].
       assert (Hdt : uart_dlab uu' = false)
         by (rewrite Hdb Hblcr2; vm_compute; reflexivity).
       iMod (ui_lcr_step γd uu uu' true Ha Ho with "Hg Hd") as "[Hg' Hd']".
       iEval (rewrite Hdt) in "Hd'".
-      iModIntro. iSplitL "Hg'"; [ iExact "Hg'" | iFrame "Ht Hd'" ]. }
+      iModIntro. iSplitL "Hg'"; [ iExact "Hg'" |].
+      iSplitL "Hcol";
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        | iFrame "Ht Hd'" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
     assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x2a) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -457,22 +483,40 @@ Section ProofUartinit.
        nothing. *)
     iApply (Uart.wp_sb_uart_uinv_s_sconf KT0 (CID:=CID) γd 2 (mword_of_int (KernelSyms.uartinit + 0x32)) false (mword_of_int 12 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 2 : mword 12)
               R9 (K - 2)%nat
-              (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
-              (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
+              (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false ∗
+                 uart_rx_tok γd k)%I
+              (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false ∗
+                 ∃ k' : nat, uart_rx_tok γd k')%I
               false p
               ltac:(unfold uart_size; lia)
               ltac:(rgne; rewrite HR9a4; vm_compute; reflexivity)
               ltac:(rgne; rewrite HR9a4; apply bv_eq; vm_compute; reflexivity)
               ltac:(rgne; rewrite HR9a4; apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc [] Huinv [$Htx $Hdlab] []").
+              with "Hcg Hpc [] Huinv [$Htx $Hdlab $Htok] []").
     { iApply (uii_32 with "Htext"). }
-    { iIntros (uu uu') "%Hw Hg [Ht Hd]".
+    { (* THE RECEIVE FLUSH.  FCR = 0x07 sets bit 1, so the receive FIFO is
+         emptied outright: this is a pop of everything, and it is why
+         uartinit takes the receive token at all. *)
+      iIntros (uu uu') "%Hw Hg Hcol (Ht & Hd & Htok)".
       iDestruct (ui_tx_empty γd uu l with "Hg Ht Hlb") as %Htxe.
       destruct (uart_write_2_stable uu _ uu' Htxe Hw) as (Ha & Ho & Hdb).
-      iModIntro. iSplitL "Hg";
-        [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") | iFrame "Ht Hd" ]. }
+      destruct (uart_write_fcr_rx uu _ uu' Hw) as [Hrxe Hlbe].
+      (* the written byte is not spelled here -- it is the leaf's own
+         [storebyte] -- so the clear flag is taken apart by shape *)
+      match type of Hrxe with
+      | u_rx uu' = (if ?cl then [] else _) => destruct cl eqn:Hclr
+      end.
+      + iMod (uart_colE_flush γd uu uu' k Hrxe Hlbe with "Hcol Htok")
+          as "[Hcol Htok]".
+        iModIntro. iSplitL "Hg";
+          [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
+        iFrame "Hcol Ht Hd Htok".
+      + iDestruct (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol") as "Hcol".
+        iModIntro. iSplitL "Hg";
+          [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
+        iFrame "Hcol Ht Hd". by iExists k. }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc [Htx Hdlab]".
+    iIntros "Hcg Hpc (Htx & Hdlab & Htok)".
     assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x32) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp36) in "Hpc".
     (* +0x36 sb a3,1(a5) : IER <- 3 -- enable tx/rx interrupts.  Offset 1
@@ -488,10 +532,15 @@ Section ProofUartinit.
               ltac:(rgne; rewrite HR9a5; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc [] Huinv [$Htx $Hdlab] []").
     { iApply (uii_36 with "Htext"). }
-    { iIntros (uu uu') "%Hw Hg [Ht Hd]".
+    { iIntros (uu uu') "%Hw Hg Hcol [Ht Hd]".
       destruct (uart_write_1_stable uu _ uu' Hw) as (Ha & Ho & Hdb).
+      destruct (uart_write_rx_stable uu 1 _ uu' ltac:(lia) ltac:(lia) Hw)
+        as [Hrxe Hlbe].
       iModIntro. iSplitL "Hg";
-        [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") | iFrame "Ht Hd" ]. }
+        [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
+      iSplitL "Hcol";
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
     (* Device programming done, and DLAB is off for good: freeze the caller
@@ -707,7 +756,7 @@ Section ProofUartinit.
       rewrite /R3 upd_ne; [| congruence].
       rewrite /R2 upd_ne; [| congruence].
       rewrite /R1 upd_ne; [reflexivity | congruence]. }
-    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Htx Hsent Hdoff Hfresh").
+    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Htx Hsent Htok Hdoff Hfresh").
     unfold callee_saved.
     split. { rewrite HE3csp. reflexivity. }
     split. { rewrite /E3 upd_ne; [| vm_compute; discriminate].

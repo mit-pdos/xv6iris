@@ -534,9 +534,14 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
 
      PERSISTENCE IS A FIELD, not a side condition at every use: the tag is
      copied out of the UART invariant's column once per queued byte and
-     handed on to the console, so it has to be duplicable by construction. *)
+     handed on to the console, so it has to be duplicable by construction.
+     TIMELESS as well as persistent, and for the reason [obs_ledger]'s [R]
+     is: the tags are filed in the UART's own invariant, whose body is
+     stripped of its later at every device leaf.  A client whose claim needs
+     a non-timeless part keeps it outside and hands it in. *)
   riscv_rx_tag : list mobs -> iProp Σ;
   riscv_rx_tag_persistent : forall h, Persistent (riscv_rx_tag h);
+  riscv_rx_tag_timeless : forall h, Timeless (riscv_rx_tag h);
   (* THE APPLICATION'S FIXED PART (claude-notes/projects/app-instances.md
      §6 ruling 1, round D0).  The machine no longer owns a counter: the
      application declares whatever [Type] its fixed part has, and its BIRTH
@@ -553,6 +558,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
 (* the tag family's persistence, as an instance -- the field is a plain
    record component, so resolution needs this line to find it *)
 Global Existing Instance riscv_rx_tag_persistent.
+Global Existing Instance riscv_rx_tag_timeless.
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_fixedGS :: riscvFixedGS Σ;
@@ -739,6 +745,9 @@ Definition rx_tag_triv {Σ : gFunctors} : list mobs -> iProp Σ :=
   fun _ => True%I.
 Global Instance rx_tag_triv_persistent {Σ : gFunctors} (h : list mobs) :
   Persistent (rx_tag_triv (Σ := Σ) h).
+Proof. rewrite /rx_tag_triv. apply _. Qed.
+Global Instance rx_tag_triv_timeless {Σ : gFunctors} (h : list mobs) :
+  Timeless (rx_tag_triv (Σ := Σ) h).
 Proof. rewrite /rx_tag_triv. apply _. Qed.
 
 (* the TRIVIAL trace predicate -- the client's half and nothing about it.

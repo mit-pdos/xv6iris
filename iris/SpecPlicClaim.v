@@ -87,12 +87,21 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
   (4 <= n)%nat ->
   sie_cap_gpr KT1 m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
-  dev_inv γd γv -∗
+  dev_inv γd γv -∗ uart_inited γd -∗
   ( ∀ m' : regfile,
     sie_cap_gpr KT1 m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 /\
       plic_claim_a0_ok (m' !!! Regidx a0_idx) ⌝ -∗
+    (* AND THE RECEIVE TOKEN, when the source it took is the UART's.  A
+       claim marks its source in service, and the PLIC invariant parks the
+       token exactly while the UART is NOT -- so the token leaves the
+       invariant here, travels through uartintr, and goes back at the
+       matching plic_complete.  That is what makes exactly one hart the
+       popper of the receive FIFO. *)
+    (⌜ m' !!! Regidx a0_idx
+       = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
+       ∃ k : nat, uart_rx_tok γd k) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

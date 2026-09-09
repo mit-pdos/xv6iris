@@ -2590,8 +2590,8 @@ Section ProofConsoleintr.
   Proof.
     cbv beta delta [wp_consoleintr_sconf_body].
     intros rettgt HK Hlen Hlvl Hbelow.
-    iIntros "Hcg Hcnt #Ht Hpc #Hpinv #Hdev #Hcaps Hcont".
-    iDestruct "Hcaps" as (γtx γc) "(#Htxl & #Hlk & #Hsub)".
+    iIntros "Hcg Hcnt #Ht Hpc #Hpinv #Hdev #Hcaps _Htag Hcont".
+    iDestruct "Hcaps" as (γtx γc) "(#Htxl & #Hlk & #Hsub & #Hinitd)".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.

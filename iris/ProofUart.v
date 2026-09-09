@@ -220,13 +220,13 @@ Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
             iInv "Huinv" as ">Hdbody" "Hdclose".
-            iDestruct "Hdbody" as (u) "(Huf & Hg)".
+            iDestruct "Hdbody" as (u) "(Huf & Hg & Hcol)".
             iDestruct (uart_agree with "Hua Huf") as %Hduart.
             destruct (uart_write_total u off storebyte Hoff) as [u' Hwrite_u].
             iMod (dev_interp_update_uart sigma.(mdev) u u'
                     with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
-            iMod ("Hacc" $! u u' with "[//] Hg HR") as "[Hg' HS]".
-            iMod ("Hdclose" with "[Huf' Hg']") as "_".
+            iMod ("Hacc" $! u u' with "[//] Hg Hcol HR") as "(Hg' & Hcol' & HS)".
+            iMod ("Hdclose" with "[Huf' Hg' Hcol']") as "_".
             { iApply bi.later_intro. iExists u'. iFrame. }
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
             iModIntro. iExists (set_duart sigma.(mdev) u').
@@ -471,13 +471,14 @@ Qed.
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
             iInv "Huinv" as ">Hdbody" "Hdclose".
-            iDestruct "Hdbody" as (u) "(Huf & Hg)".
+            iDestruct "Hdbody" as (u) "(Huf & Hg & Hcol)".
             iDestruct (uart_agree with "Hua Huf") as %Hduart.
             destruct (uart_read_total u off Hoff) as (bt & u' & Hread_u).
             iMod (dev_interp_update_uart sigma.(mdev) u u'
                     with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
-            iMod ("Hacc" $! u bt u' with "[//] Hg HR") as "[Hg' HS]".
-            iMod ("Hdclose" with "[Huf' Hg']") as "_".
+            iMod ("Hacc" $! u bt u' with "[//] Hg Hcol HR")
+              as "(Hg' & Hcol' & HS)".
+            iMod ("Hdclose" with "[Huf' Hg' Hcol']") as "_".
             { iApply bi.later_intro. iExists u'. iFrame. }
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
             iModIntro. iExists bt, (set_duart sigma.(mdev) u').

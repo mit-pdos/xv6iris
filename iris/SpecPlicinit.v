@@ -56,7 +56,7 @@ Import Defs.
 (* the two PLIC interrupt-source ids xv6 raises to priority 1,
    [uart_irq_id] (= 10) and [virtio_irq_id] (= 1), both come from DevModel. *)
 
-Definition wp_plicinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m0 : regfile) (n : nat) (p : mword 64) :=
+Definition wp_plicinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γd : uart_names) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.plicinit in
   let ra0 := m0 !!! Regidx ra_idx in
@@ -66,7 +66,11 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   kernel_text -∗ pc_is pcE -∗
   (* the PLIC fabric, borrowed from the invariant around each priority write;
      both writes preserve [plic_ok], so nothing is owed back to the caller *)
-  plic_inv -∗
+  (* the PLIC invariant is keyed by the UART's ghost names: it is where the
+     receive token lives while the UART is not in service.  plicinit's two
+     writes are source-PRIORITY writes and touch no service bit, so every
+     slot survives them untouched. *)
+  plic_inv γd -∗
   wp_next false p (fun (CID : CpuId) =>
     ∀ m' : regfile,
     sie_cap_gpr KT1 m' n false p -∗
@@ -77,6 +81,6 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
 
 Module Type PLICINIT.
   Parameter wp_plicinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m0 : regfile) (n : nat) (p : mword 64),
-      wp_plicinit_sconf_body m0 n p.
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γd : uart_names) (m0 : regfile) (n : nat) (p : mword 64),
+      wp_plicinit_sconf_body γd m0 n p.
 End PLICINIT.

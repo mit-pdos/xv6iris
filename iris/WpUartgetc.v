@@ -32,7 +32,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import DevModel DiskPtsto WpUart.
@@ -58,10 +58,10 @@ Section WpUartgetc.
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
-  (* what the [c.andi a5,a5,1] leaves in a5, and the [beqz] that reads it *)
-  Definition rx_masked (b : bv 8) : mword 64 :=
-    and_vec (lsr_ldval_of b) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))).
-  Definition rx_empty (b : bv 8) : bool := eq_vec (rx_masked b) (zero_reg : mword 64).
+  (* [rx_masked] / [rx_empty] -- what the [c.andi a5,a5,1] leaves in a5 and
+     the [beqz] that reads it -- live in WpSconfUartAccess.v beside
+     [lsr_thre_clear]: the non-free LSR leaf states its lower-bound output in
+     terms of [rx_empty], so the two have to be the same function. *)
 
   (* a5's compressed-register index *)
   Lemma ug_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx Ra5.
@@ -95,6 +95,7 @@ Section WpUartgetc.
      for the other) was the gap. *)
   Lemma wp_uartgetc_inline (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
       (rs_lsr rs_rhr : mword 5) `{!SrcOk rs_lsr} (imm8 : mword 8)
+      (k : nat)
       (pcL pcA pcB pcR pcK pcNo : mword 64) (b : bool) :
     (* the two bases: the LSR and the RHR, each already in a register --
        [rs_lsr]/[rs_rhr] are register-index VARIABLES, so the read has to go
@@ -122,26 +123,32 @@ Section WpUartgetc.
     instr pcB true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg,
                            creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) -∗
     instr pcR false (LOAD (mword_of_int 0 : mword 12, Regidx rs_rhr, Regidx Ra0, true, 1)) -∗
-    dev_inv γd γv -∗
+    dev_inv γd γv -∗ uart_dlab_off γd -∗ uart_rx_tok γd k -∗
     wp_next b p (fun (CID : CpuId) =>
       (* the two returns, as a CONJUNCTION: exactly one is taken, and they must
          share whatever the caller is carrying across the call *)
-      ( (* "return -1": the rx FIFO was empty *)
+      ( (* "return -1": the rx FIFO was empty, and the token is untouched *)
         ( ∀ bt : bv 8,
             ⌜ rx_empty bt = true ⌝ -∗
             sie_cap_gpr kt (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b p -∗
             pc_is pcNo -∗
+            uart_rx_tok γd k -∗
             WP (Loop : expr riscv_lang))
-        ∧ (* "return the byte": it is in a0, zero-extended *)
+        ∧ (* "return the byte": it is in a0, zero-extended -- WITH THE HISTORY
+             IT ARRIVED AT and the application's claim about it, and with the
+             token's count one further on *)
         ( ∀ bt c : bv 8,
             ⌜ rx_empty bt = false ⌝ -∗
             sie_cap_gpr kt (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
                            (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m)) n b p -∗
             pc_is pcK -∗
+            uart_rx_tok γd (S k) -∗
+            (∃ h : list mobs, ⌜ obs_ends_in h c ⌝ ∗ riscv_rx_tag h) -∗
             WP (Loop : expr riscv_lang)) )) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hlsr Hrhr Hne Hrtp HA HB HR HK HNo Hal) "Hcg Hpc HiL HiA HiB HiR #Hdinv Hk".
+    iIntros (Hlsr Hrhr Hne Hrtp HA HB HR HK HNo Hal)
+      "Hcg Hpc HiL HiA HiB HiR #Hdinv #Hdlab Htok Hk".
     (* the class, consumed at [rs_lsr]: the LSR address is the same word at
        every hart, so the premise stated at the entry hart still holds at the
        hart the poll's [wp_next] lands on.  Also the wiring check -- attach the
@@ -159,12 +166,12 @@ Section WpUartgetc.
     assert (Hrhr0 : m !!! Regidx rs_rhr = uart_pa 0).
     { rewrite -(rget_ne m rs_rhr ltac:(congruence)). exact Hrhr. }
     (* --- the rx-ready poll: [lbu a5,0(s1)] --- *)
-    iApply (UAcc.wp_uart_read_free_s_sconf γd γv 5 pcL Ra5 rs_lsr (mword_of_int 0 : mword 12)
-              m n b ltac:(unfold uart_size; lia) ltac:(vm_compute; discriminate)
+    iApply (UAcc.wp_uart_lsr_read_rx_s_sconf γd γv pcL Ra5 rs_lsr (mword_of_int 0 : mword 12)
+              m n k b ltac:(vm_compute; discriminate)
               ltac:(rdok)
               ltac:(rewrite Hlsr; apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc HiL Hdinv [-]").
-    iIntros (CID1 Hs1 bt) "Hcg Hpc". iEval (rewrite HA) in "Hpc".
+              with "Hcg Hpc HiL Hdinv Htok [-]").
+    iIntros (CID1 Hs1 bt) "Hcg Hpc Htok Hlb". iEval (rewrite HA) in "Hpc".
     (* --- [c.andi a5,a5,1] --- *)
     iApply (wp_candi_s_sconf pcA Ra5 (mword_of_int 1 : mword 6)
               (<[Regidx Ra5 := regval_into_reg (lsr_ldval_of bt)]> m) n b
@@ -194,7 +201,7 @@ Section WpUartgetc.
       iApply bi.later_intro. iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite HNo) in "Hpc".
       iSpecialize ("Hk" $! CID3 with "[%]"); [wp_next_chain|].
       iDestruct "Hk" as "[Hno _]".
-      iApply ("Hno" $! bt with "[%] Hcg Hpc"). exact Hempty.
+      iApply ("Hno" $! bt with "[%] Hcg Hpc Htok"). exact Hempty.
     - (* a byte is waiting: [lbu a0,0(s2)] pops it *)
       iApply (wp_cbeqz_fall_s_sconf (CID:=CID2) pcB imm8 (Cregidx (mword_of_int 7)) Ra5
                 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b
@@ -202,19 +209,21 @@ Section WpUartgetc.
                 ltac:(rewrite Hlk; exact Hempty)
                 with "Hcg Hpc HiB [-]").
       iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite HR) in "Hpc".
-      iApply (UAcc.wp_uart_read_free_s_sconf (CID:=CID3) γd γv 0 pcR Ra0 rs_rhr (mword_of_int 0 : mword 12)
-                (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b
-                ltac:(unfold uart_size; lia) ltac:(vm_compute; discriminate)
+      iApply (UAcc.wp_uart_rhr_pop_s_sconf (CID:=CID3) γd γv pcR Ra0 rs_rhr (mword_of_int 0 : mword 12)
+                (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n k b
+                ltac:(vm_compute; discriminate)
                 ltac:(rdok)
                 ltac:(rewrite (rget_ne _ rs_rhr ltac:(congruence))
                         (upd_ne m (Regidx Ra5) (Regidx rs_rhr)
                            (regval_into_reg (rx_masked bt)) ltac:(congruence)) Hrhr0;
                       apply bv_eq; vm_compute; reflexivity)
-                with "Hcg Hpc HiR Hdinv [-]").
-      iIntros (CID4 Hs4 c) "Hcg Hpc". iEval (rewrite HK) in "Hpc".
+                with "Hcg Hpc HiR Hdinv Hdlab [Htok] [Hlb]").
+      { iExact "Htok". }
+      { iApply "Hlb". iPureIntro. reflexivity. }
+      iIntros (CID4 Hs4 c) "Hcg Hpc Htok Hh". iEval (rewrite HK) in "Hpc".
       iSpecialize ("Hk" $! CID4 with "[%]"); [wp_next_chain|].
       iDestruct "Hk" as "[_ Hyes]".
-      iApply ("Hyes" $! bt c with "[%] Hcg Hpc"). exact Hempty.
+      iApply ("Hyes" $! bt c with "[%] Hcg Hpc Htok Hh"). exact Hempty.
   Qed.
 
   (* ------------------------------------------------------------------- *)

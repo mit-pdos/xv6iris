@@ -135,8 +135,15 @@ Existing Instance riscv_memGS.
 (* inside an [iApply] is SHELVED, not reported.                          *)
 (* ==================================================================== *)
 
-Lemma wp_sw_plic_pinv_s_sconf (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
-    (m : regfile) (n : nat) :
+(* THE PLIC INVARIANT'S SLOTS TRAVEL WITH THE WRITE, as the UART leaves'
+   column does (SpecUart.v): each slot holds its source's payload while that
+   source is out of service, and a write to the claim/complete register moves
+   one.  The leaf knows nothing about what is in a slot -- it hands the whole
+   [plic_slots] to the caller's callback, which is where plic_complete parks
+   the receive token and where every other PLIC write simply gives them back
+   ([WpUart.plic_slots_stable]). *)
+Lemma wp_sw_plic_pinv_s_sconf (γ : uart_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+    (m : regfile) (n : nat) (R S : iProp Σ) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) in
@@ -148,10 +155,14 @@ Lemma wp_sw_plic_pinv_s_sconf (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
   sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-  plic_inv -∗
+  plic_inv γ -∗ R -∗
+  (∀ pl pl', ⌜ plic_write pl (uint a8 - plic_base)%Z storeword = Some pl' ⌝ -∗
+     ⌜ plic_ok pl ⌝ -∗
+     plic_slots γ pl -∗ R ==∗ plic_slots γ pl' ∗ S) -∗
   wp_next false p (fun (CID : CpuId) =>
     sie_cap_gpr kt m n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    S -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 Proof.
@@ -185,19 +196,19 @@ Proof.
              (pma_width_ok 4 eq_refl eq_refl)). }
   assert (Hpalign : is_aligned_paddr (Physaddr (pa_of (kpt_leaf_ppn (svpn_of ea)) ea)) 4 = true)
     by (rewrite Hpaid; exact Halign).
-  iIntros "Hcg Hpc Hinstr #Hpinv Hcont".
+  iIntros "Hcg Hpc Hinstr #Hpinv HR Hacc Hcont".
   iApply (wp_instr_s_sconf m n false false pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
             (fun (_CIDx : CpuId) npc _ms' m' n' =>
                (⌜npc = add_vec_int pc (if is_rvc then 2 else 4)⌝ ∗
-                ⌜m' = m⌝ ∗ ⌜n' = n⌝)%I)
-            with "Hcg Hpc Hinstr [Hcont]").
+                ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ S)%I)
+            with "Hcg Hpc Hinstr [HR Hacc Hcont]").
   iApply bi.later_intro.
   (* FREE THE NAME [CID] FOR THE REBOUND HART -- see the templates in
      WpSconfMem.v.  At [b = false] the two harts coincide, but the obligation
      is stated hart-generically, so the body is annotated all the same. *)
   rename CID into CID0.
-  iIntros (CID Hs). rewrite /sconf_step_obl. iSplitR "Hcont".
+  iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HR Hacc".
   - (* ---------------- THE INSTRUCTION ---------------- *)
     iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
     assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -283,7 +294,7 @@ Proof.
                   imm rs2 rs1 (tp_pin (CID := CID) m)
                   (pa_of (kpt_leaf_ppn (svpn_of ea)) ea) storeword
                   pmar0 pcfg paddr
-                  True%I (sr_swp_res (strans_regime (CID := CID))) rr
+                  S (sr_swp_res (strans_regime (CID := CID))) rr
                   (sr_swp_mode (strans_regime (CID := CID)) satp0)
                   Lsv
                   Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
@@ -309,7 +320,7 @@ Proof.
                   Lep
                   HA Hord HW Hcov (pma_all_io Hpma_all) Hdcls
                   Lva Hpalign
-                  with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] []").
+                  with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HR Hacc]").
         - (* the data translation, at the DEVICE page's static claim *)
           iIntros "Hfrag HRes Hrw Hro".
           rewrite Hea.
@@ -327,13 +338,17 @@ Proof.
           iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
           iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
           iInv "Hpinv" as ">Hdbody" "Hdclose".
-          iDestruct "Hdbody" as (pl) "(Hplf & %Hpok)".
+          iDestruct "Hdbody" as (pl) "(Hplf & %Hpok & Hslots)".
           iDestruct (plic_agree with "Hpldev Hplf") as %Hpeq.
           destruct (Hwrite pl Hpok) as (pl' & Hpw & Hpok').
           iMod (dev_interp_update_plic sigma.(mdev) pl pl'
                   with "[$Hua $Hpldev $Hvdev] Hplf") as "[Hdev' Hp']".
-          iMod ("Hdclose" with "[Hp']") as "_".
-          { iApply bi.later_intro. iExists pl'. iFrame "Hp'". iPureIntro. exact Hpok'. }
+          assert (Hpw' : plic_write pl (uint a8 - plic_base)%Z storeword
+                         = Some pl') by (rewrite Ha8ea; exact Hpw).
+          iMod ("Hacc" $! pl pl' with "[//] [//] Hslots HR") as "[Hslots' HS]".
+          iMod ("Hdclose" with "[Hp' Hslots']") as "_".
+          { iApply bi.later_intro. iExists pl'. iFrame "Hp'".
+            iSplitR; [iPureIntro; exact Hpok'|]. iExact "Hslots'". }
           iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
           iModIntro. iExists (set_dplic sigma.(mdev) pl').
           iSplitR.
@@ -341,10 +356,10 @@ Proof.
             apply (dev_write_plic sigma.(mdev) ea storeword pl' Hrange).
             rewrite <- Hpeq. exact Hpw. }
           iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
-          iFrame "Hreg Hmem Hdev'". }
+          iFrame "Hreg Hmem Hdev' HS". }
     (* ---- the post ---- *)
     iIntros (e) "(-> & Hfile & Hland)".
-    iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & _ & Hfrag)".
+    iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & HS & Hfrag)".
     iSplitR; [done|].
     iAssert (∃ tv2 : type_of_register tlb,
                hreg_frame (CID := CID)
@@ -382,18 +397,19 @@ Proof.
       iPureIntro. split; assumption. }
     iSplitL "Htr Hstk Harm Hctx".
     { rewrite /sie_cap. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
-    iFrame "Hfile". iPureIntro. split_and!; reflexivity.
+    iFrame "Hfile".
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "HS".
   - (* ---------------- THE CONTINUATION ---------------- *)
-    iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
+    iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HS)".
     iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
-    iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
+    iApply ("Hcont" $! CID with "[%] Hcg' Hpc' HS"). exact Hs.
 Qed.
 
 (* The bundle-taking RESTATEMENT of the leaf above, for the consumers written
    before the device invariant was split per device ([plicinithart],
    [plic_complete]): statement verbatim, proof one projection. *)
 Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
-    (m : regfile) (n : nat) :
+    (m : regfile) (n : nat) (R S : iProp Σ) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) in
@@ -405,10 +421,14 @@ Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 6
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
   sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-  dev_inv γd γv -∗
+  dev_inv γd γv -∗ R -∗
+  (∀ pl pl', ⌜ plic_write pl (uint a8 - plic_base)%Z storeword = Some pl' ⌝ -∗
+     ⌜ plic_ok pl ⌝ -∗
+     plic_slots γd pl -∗ R ==∗ plic_slots γd pl' ∗ S) -∗
   wp_next false p (fun (CID : CpuId) =>
     sie_cap_gpr kt m n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    S -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 Proof.
@@ -421,11 +441,11 @@ Proof.
     by (intros hh; unfold ea; by rewrite (src_ok_rget_indep m rs1 hh CID)).
   assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
     by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
-  iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
+  iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
   iDestruct (dev_inv_plic with "Hdinv") as "#Hpinv".
-  iApply (wp_sw_plic_pinv_s_sconf pc is_rvc rs2 rs1 imm m n
+  iApply (wp_sw_plic_pinv_s_sconf γd pc is_rvc rs2 rs1 imm m n R S
             Hrange Halign Hcanon Hdevvpn Hwrite
-            with "Hcg Hpc Hinstr Hpinv Hcont").
+            with "Hcg Hpc Hinstr Hpinv HR Hacc Hcont").
 Qed.
 
 (* The width-4 PLIC MMIO LOAD, dual to [wp_sw_plic_dev_s_sconf].  A PLIC read
@@ -436,7 +456,8 @@ Qed.
    read that holds at all of them -- that is how [plic_claim] learns its result
    is one of the machine's own interrupt ids. *)
 Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1}
-    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) :
+    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop)
+    (R : iProp Σ) (S : bv 32 -> iProp Σ) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   (* the vmem level hands back the value itself now, not the split accumulator *)
@@ -451,12 +472,19 @@ Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 6
      exists v p', plic_read p (uint a8 - plic_base)%Z = Some (v, p') /\ plic_ok p' /\ P v) ->
   sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
-  dev_inv γd γv -∗
+  dev_inv γd γv -∗ R -∗
+  (* THE CLAIM MOVES THE SLOTS: a read of the claim register marks its source
+     in service, so the payload the PLIC invariant holds for it leaves with
+     the read and the caller does the ghost step while the invariant is
+     open. *)
+  (∀ pl v pl', ⌜ plic_read pl (uint a8 - plic_base)%Z = Some (v, pl') ⌝ -∗
+     ⌜ plic_ok pl ⌝ -∗ plic_slots γd pl -∗ R ==∗ plic_slots γd pl' ∗ S v) -∗
   ( ∀ v : bv 32,
     ⌜ P v ⌝ -∗
     wp_next false p (fun (CID : CpuId) =>
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ldval v)]> m) n false p -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+      S v -∗
       WP (Loop : expr riscv_lang))) -∗
   WP (Loop : expr riscv_lang).
 Proof.
@@ -490,7 +518,7 @@ Proof.
                 = <[Regidx rd := regval_into_reg (zero_reg : mword 64)]> m
                     !!! Regidx csp_rs1)
     by (symmetry; apply upd_ne; congruence).
-  iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
+  iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
   iDestruct (dev_inv_plic with "Hdinv") as "#Hpinv".
   iApply (wp_instr_s_sconf m n false false pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))
@@ -498,11 +526,11 @@ Proof.
                (∃ v : bv 32,
                   ⌜npc = add_vec_int pc (if is_rvc then 2 else 4)⌝ ∗
                   ⌜m' = <[Regidx rd := regval_into_reg (ldval v)]> m⌝ ∗
-                  ⌜n' = n⌝ ∗ ⌜P v⌝)%I)
-            with "Hcg Hpc Hinstr [Hcont]").
+                  ⌜n' = n⌝ ∗ ⌜P v⌝ ∗ S v)%I)
+            with "Hcg Hpc Hinstr [HR Hacc Hcont]").
   iApply bi.later_intro.
   rename CID into CID0.
-  iIntros (CID Hs). rewrite /sconf_step_obl. iSplitR "Hcont".
+  iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HR Hacc".
   - (* ---------------- THE INSTRUCTION ---------------- *)
     iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
     assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -580,9 +608,9 @@ Proof.
                   imm rs1 rd is_unsigned (tp_pin (CID := CID) m)
                   (pa_of (kpt_leaf_ppn (svpn_of ea)) ea)
                   pmar0 pcfg paddr
-                  (fun v => ⌜P v⌝)%I
+                  (fun v => ⌜P v⌝ ∗ S v)%I
                   (Mobl_dev4_ex (pa_of (kpt_leaf_ppn (svpn_of ea)) ea)
-                     (fun v => ⌜P v⌝)%I)
+                     (fun v => ⌜P v⌝ ∗ S v)%I)
                   (sr_swp_res (strans_regime (CID := CID))) rr
                   (sr_swp_mode (strans_regime (CID := CID)) satp0)
                   Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
@@ -609,9 +637,10 @@ Proof.
                   HA Hord HR Hcov (pma_all_io Hpma_all) Hdcls
                   Lva Hpalign Hrd
                   (swp_dev_read_node4_ex (CID := CID)
-                     (pa_of (kpt_leaf_ppn (svpn_of ea)) ea) (fun v => ⌜P v⌝)%I
+                     (pa_of (kpt_leaf_ppn (svpn_of ea)) ea)
+                     (fun v => ⌜P v⌝ ∗ S v)%I
                      (proj1 Hdcls))
-                  with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [Hpinv]").
+                  with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [Hpinv HR Hacc]").
         - (* the data translation, at the DEVICE page's static claim *)
           iIntros "Hfrag HRes Hrw Hro".
           rewrite Hea.
@@ -631,13 +660,17 @@ Proof.
           iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
           iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
           iInv "Hpinv" as ">Hdbody" "Hdclose".
-          iDestruct "Hdbody" as (pl) "(Hplf & %Hpok)".
+          iDestruct "Hdbody" as (pl) "(Hplf & %Hpok & Hslots)".
           iDestruct (plic_agree with "Hpldev Hplf") as %Hpeq.
           destruct (Hread pl Hpok) as (v & pl' & Hpr & Hpok' & HPv).
           iMod (dev_interp_update_plic sigma.(mdev) pl pl'
                   with "[$Hua $Hpldev $Hvdev] Hplf") as "[Hdev' Hp']".
-          iMod ("Hdclose" with "[Hp']") as "_".
-          { iApply bi.later_intro. iExists pl'. iFrame "Hp'". iPureIntro. exact Hpok'. }
+          assert (Hpr' : plic_read pl (uint a8 - plic_base)%Z = Some (v, pl'))
+            by (rewrite Ha8ea; exact Hpr).
+          iMod ("Hacc" $! pl v pl' with "[//] [//] Hslots HR") as "[Hslots' HS]".
+          iMod ("Hdclose" with "[Hp' Hslots']") as "_".
+          { iApply bi.later_intro. iExists pl'. iFrame "Hp'".
+            iSplitR; [iPureIntro; exact Hpok'|]. iExact "Hslots'". }
           iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
           iModIntro. iExists v, (set_dplic sigma.(mdev) pl').
           iSplitR.
@@ -645,11 +678,12 @@ Proof.
             apply (dev_read_plic sigma.(mdev) ea v pl' Hrange).
             rewrite <- Hpeq. exact Hpr. }
           iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
-          iFrame "Hreg Hmem Hdev'". iPureIntro. exact HPv. }
+          iFrame "Hreg Hmem Hdev'".
+          iSplitR; [iPureIntro; exact HPv | iExact "HS"]. }
     (* ---- the post ---- *)
     iIntros (e) "(-> & Hpost)".
     iDestruct "Hpost" as (v) "(Hfile & Hland)".
-    iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hany & %HPv)".
+    iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hany & %HPv & HS)".
     iSplitR; [done|].
     iAssert (∃ tv2 : type_of_register tlb,
                hreg_frame (CID := CID)
@@ -694,13 +728,15 @@ Proof.
     iSplitL "Hfile".
     { iEval (rewrite (tp_pin_upd m rd (regval_into_reg (ldval v)) Hrdtp))
         in "Hfile". iExact "Hfile". }
-    iExists v. iPureIntro. split_and!; try reflexivity. exact HPv.
+    iExists v.
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [iPureIntro; exact HPv | iExact "HS"].
   - (* ---------------- THE CONTINUATION ---------------- *)
     iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
-    iDestruct "Hpay" as (v) "(-> & -> & -> & %HPv)".
+    iDestruct "Hpay" as (v) "(-> & -> & -> & %HPv & HS)".
     iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
     iDestruct ("Hcont" $! v with "[%]") as "Hcont2"; [ exact HPv | ].
-    iApply ("Hcont2" $! CID with "[%] Hcg' Hpc'"). exact Hs.
+    iApply ("Hcont2" $! CID with "[%] Hcg' Hpc' HS"). exact Hs.
 Qed.
 
 (* ------------------------------------------------------------------- *)

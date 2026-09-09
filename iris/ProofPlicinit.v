@@ -48,6 +48,7 @@ Require Import StackOwn CalleeSaved.
 Require Import WpSmodeIntr.
 Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import DevModel DiskPtsto WpUart.
 Require Import PlicPlan WpPlic SpecPlicinit.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -100,8 +101,8 @@ Section ProofPlicinit.
   (*  THE CAPSTONE: a WP for the entire plicinit(), entry through return.  *)
   (* =================================================================== *)
   Lemma wp_plicinit_sconf
-      (m0 : regfile) (n : nat) (p : mword 64)
-    : wp_plicinit_sconf_body m0 n p.
+      (γd : uart_names) (m0 : regfile) (n : nat) (p : mword 64)
+    : wp_plicinit_sconf_body γd m0 n p.
   Proof.
     cbv beta delta [wp_plicinit_sconf_body].
     intros ra_idx pcE ra0 ret_tgt Hn.
@@ -212,7 +213,8 @@ Section ProofPlicinit.
        against [Hcg], so left implicit it is still a bare evar when [Ha4']
        tries to [rewrite] into it ("does not match any subterm" against
        [rget ?CID m4 a4_idx]) -- pin it to the hart [Hcg] is actually at. *)
-    iApply (wp_sw_plic_pinv_s_sconf (CID := CID6) (mword_of_int (KernelSyms.plicinit + 0x0e)) true a5_idx a4_idx (mword_of_int 40) m4 (n - 2)%nat
+    iApply (wp_sw_plic_pinv_s_sconf (CID := CID6) γd (mword_of_int (KernelSyms.plicinit + 0x0e)) true a5_idx a4_idx (mword_of_int 40) m4 (n - 2)%nat
+              emp%I emp%I
               ltac:(rewrite Ha4'; zrange_vm)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
@@ -220,13 +222,23 @@ Section ProofPlicinit.
               ltac:(rewrite Ha4' Hsw; intros pq Hpq;
                     apply (plic_write_prio_ok pq _ 10%N);
                     [ vm_compute; reflexivity | exact Hpq ])
-              with "Hcg Hpc [] Hpinv").
+              with "Hcg Hpc [] Hpinv [] []").
     { iApply (pi_0e with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    { done. }
+    { (* a source-priority write touches no service bit, so the slots come
+         straight back *)
+      iIntros (pq pq') "%Hpw _ Hslots _".
+      iModIntro. iSplitL "Hslots"; [| done].
+      iApply (plic_slots_stable _ pq pq'
+                (plic_write_outside_claim _ _ _ _ Hpw
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) uart_irq_id)).
+      iExact "Hslots". }
+    iIntros (CID7 Hs7) "Hcg Hpc _".
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
     (* ---- 0x10: c.sw a5,4(a4)  -- source 1 priority ---- *)
-    iApply (wp_sw_plic_pinv_s_sconf (CID := CID7) (mword_of_int (KernelSyms.plicinit + 0x10)) true a5_idx a4_idx (mword_of_int 4) m4 (n - 2)%nat
+    iApply (wp_sw_plic_pinv_s_sconf (CID := CID7) γd (mword_of_int (KernelSyms.plicinit + 0x10)) true a5_idx a4_idx (mword_of_int 4) m4 (n - 2)%nat
+              emp%I emp%I
               ltac:(rewrite Ha4'; zrange_vm)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
@@ -234,9 +246,16 @@ Section ProofPlicinit.
               ltac:(rewrite Ha4' Hsw; intros pq Hpq;
                     apply (plic_write_prio_ok pq _ 1%N);
                     [ vm_compute; reflexivity | exact Hpq ])
-              with "Hcg Hpc [] Hpinv").
+              with "Hcg Hpc [] Hpinv [] []").
     { iApply (pi_10 with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    { done. }
+    { iIntros (pq pq') "%Hpw _ Hslots _".
+      iModIntro. iSplitL "Hslots"; [| done].
+      iApply (plic_slots_stable _ pq pq'
+                (plic_write_outside_claim _ _ _ _ Hpw
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) uart_irq_id)).
+      iExact "Hslots". }
+    iIntros (CID8 Hs8) "Hcg Hpc _".
     assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
     (* ---- 0x12: c.ldsp ra,8(sp) ---- *)

@@ -264,6 +264,9 @@ Section ProofDevintr.
     m0 !!! Regidx s1_idx = s10 ->
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
     M !!! Regidx s1_idx = irq ->
+    (* the id being completed is one a claim handed back -- plic_complete
+       needs it to know which service bit its 32-bit write clears *)
+    plic_claim_a0_ok irq ->
     ( forall r : mword 5, is_cs_idx r = true ->
         r <> csp_rs1 -> r <> (mword_of_int 8 : mword 5) ->
         r <> (mword_of_int 9 : mword 5) -> M !!! Regidx r = m0 !!! Regidx r ) ->
@@ -273,7 +276,12 @@ Section ProofDevintr.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.devintr + 0x62) : mword 64) -∗
     scause ↦ᵣ{dq} sc -∗
-    dev_inv γu γv -∗
+    dev_inv γu γv -∗ uart_inited γu -∗
+    (* THE RECEIVE TOKEN, on its way back into the PLIC invariant: the UART
+       arm claimed it and uartintr returned it, and this is where the
+       completion parks it again. *)
+    (⌜ irq = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
+       ∃ kk : nat, uart_rx_tok γu kk) -∗
     pa_stk sp0 1 ↦₈[KT1] ra0 -∗
     pa_stk sp0 2 ↦₈[KT1] s00 -∗
     pa_stk sp0 3 ↦₈[KT1] s10 -∗
@@ -287,8 +295,8 @@ Section ProofDevintr.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hk Hm0sp Hm0ra Hm0s0 Hm0s1 HMsp HMs1 Hthr Hret.
-    iIntros "Hcg Hcnt #Htext Hpc Hsc #Hdev Hb1 Hb2 Hb3 Hb4 Hcont".
+    intros Hk Hm0sp Hm0ra Hm0s0 Hm0s1 HMsp HMs1 Ha0ok Hthr Hret.
+    iIntros "Hcg Hcnt #Htext Hpc Hsc #Hdev #Hinit Htok Hb1 Hb2 Hb3 Hb4 Hcont".
     (* ---- +0x62: c.mv a0,s1 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.devintr + 0x62)) a0_idx s1_idx M k false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -318,9 +326,15 @@ Section ProofDevintr.
                     = add_vec_int (mword_of_int (KernelSyms.devintr + 0x64) : mword 64) 4)
       by (rewrite /T1 upd_eq; reflexivity).
     (* ===================== plic_complete(irq) ===================== *)
+    (* a0 IS the claimed id: [c.mv a0,s1] copied it, and [T1] only added ra *)
+    assert (HT1a0 : rget T1 a0_idx = irq).
+    { rgne. rewrite /T1 upd_ne; [| vm_compute; discriminate].
+      rewrite /T0 upd_eq. unfold regval_into_reg.
+      rewrite add_vec_zero_l. rgne. exact HMs1. }
     iApply (PlicComplete.wp_plic_complete_sconf γu γv T1 k p
-              (di_tp_bound T1) ltac:(lia)
-              with "Hcg Htext Hpc Hdev").
+              (di_tp_bound T1) ltac:(rewrite HT1a0; exact Ha0ok) ltac:(lia)
+              with "Hcg Htext Hpc Hdev Hinit [Htok]").
+    { iIntros (Hv). iApply "Htok". iPureIntro. rewrite -HT1a0. exact Hv. }
     iIntros (MC) "Hcg Hpc %HcsC".
     destruct HcsC as [HcsC HraC].
     assert (Hpc68 : ret_pc (T1 !!! Regidx ra_idx) = mword_of_int (KernelSyms.devintr + 0x68))
@@ -412,6 +426,10 @@ Section ProofDevintr.
     set (s10 := (m !!! Regidx s1_idx : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hsc #Hcaps".
     iDestruct "Hcaps" as "(#Hdev & #Hccaps & #Hgeom & #Hdlk & #Htcap & #Htk & #Hpinv)".
+    (* the deposit witness, out of the console credential: it is what the
+       PLIC leaves need to know the invariant is past its pre-deposit arm *)
+    iAssert (uart_inited γu) as "#Hinit".
+    { iDestruct "Hccaps" as (γtx γc) "(_ & _ & _ & #Hin)". iExact "Hin". }
     iIntros "Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
@@ -628,8 +646,8 @@ Section ProofDevintr.
       (* ===================== plic_claim() ===================== *)
       iApply (PlicClaim.wp_plic_claim_sconf γu γv B0 (av - 4)%nat p
                 (di_tp_bound B0) ltac:(lia)
-                with "Hcg Htext Hpc Hdev").
-      iIntros (MK) "Hcg Hpc %HcsK".
+                with "Hcg Htext Hpc Hdev Hinit").
+      iIntros (MK) "Hcg Hpc %HcsK Hrxtok".
       destruct HcsK as (HcsK & HraK & Hok).
       assert (Hpc30 : ret_pc (B0 !!! Regidx ra_idx) = mword_of_int (KernelSyms.devintr + 0x30))
         by (rewrite HB0ra; pcw).
@@ -722,6 +740,7 @@ Section ProofDevintr.
       assert (Hret1 : devintr_ret sc = (mword_of_int 1 : mword 64))
         by (unfold devintr_ret; rewrite Hext; reflexivity).
       (* ===================== THE THREE-WAY irq DISPATCH ===================== *)
+      pose proof Hok as Hokc.
       unfold plic_claim_a0_ok in Hok.
       destruct Hok as [H0 | [Huart | Hvirt]].
       + (* ---------------- irq = 0: nothing to serve ---------------- *)
@@ -873,11 +892,12 @@ Section ProofDevintr.
         assert (HU0ra : U0 !!! Regidx ra_idx
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) 4)
           by (rewrite /U0 upd_eq; reflexivity).
+        iDestruct ("Hrxtok" with "[%]") as (kk) "Htok"; [exact Huart|].
         iApply (Uartintr.wp_uartintr_sconf γu γv γs U0 (av - 4)%nat lvl eb p false
-                  _ Hlen ltac:(lia) ltac:(lia)
-                  with "Hcg Hcnt Htext Hpc Hdev Hpinv Hccaps").
+                  kk _ Hlen ltac:(lia) ltac:(lia)
+                  with "Hcg Hcnt Htext Hpc Hdev Hpinv Hccaps Htok").
         all: try lkbelow.
-        iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc".
+        iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc Htok".
         destruct HcsU as [HcsU HdomU].
         assert (Hpc4c : ret_pc (U0 !!! Regidx ra_idx) = mword_of_int (KernelSyms.devintr + 0x4c))
           by (rewrite HU0ra; pcw).
@@ -907,8 +927,9 @@ Section ProofDevintr.
           rewrite (callee_saved_lookup HcsB3MU r Hr). exact (HB3thr r Hr Ncsp N8 N9). }
         iApply (di_plic_tail γu γv m MU sp0 ra0 s00 s10 irq (av - 4)%nat lvl eb p dq sc w4 lks
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl
-                  HMUsp HMUs1 HMUthr Hret1
-                  with "Hcg Hcnt Htext Hpc Hsc Hdev Hb1 Hb2 Hb3 Hb4").
+                  HMUsp HMUs1 Hokc HMUthr Hret1
+                  with "Hcg Hcnt Htext Hpc Hsc Hdev Hinit [Htok] Hb1 Hb2 Hb3 Hb4").
+        { iIntros (_). iExact "Htok". }
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".
         replace (av - 4 + 4)%nat with av by (lia).
         iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hsc Hpc"). exact Hf.
@@ -1019,8 +1040,8 @@ Section ProofDevintr.
           rewrite (callee_saved_lookup HcsV0MV r Hr). exact (HV0thr r Hr Ncsp N8 N9). }
         iApply (di_plic_tail γu γv m MV sp0 ra0 s00 s10 irq (av - 4)%nat lvl eb p dq sc w4 lks
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl
-                  HMVsp HMVs1 HMVthr Hret1
-                  with "Hcg Hcnt Htext Hpc Hsc Hdev Hb1 Hb2 Hb3 Hb4").
+                  HMVsp HMVs1 Hokc HMVthr Hret1
+                  with "Hcg Hcnt Htext Hpc Hsc Hdev Hinit Hrxtok Hb1 Hb2 Hb3 Hb4").
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".
         replace (av - 4 + 4)%nat with av by (lia).
         iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hsc Hpc"). exact Hf.

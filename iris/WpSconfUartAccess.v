@@ -21,7 +21,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import DevModel DiskPtsto WpUart.
@@ -56,6 +56,24 @@ Lemma uart_nothre_beqz (u : uart_state) :
 Proof.
   intro H. unfold lsr_thre_clear, lsr_ldval_of, uart_lsr. rewrite H.
   destruct (uart_rx_ready u); vm_compute; reflexivity.
+Qed.
+
+(* THE RX-READY TEST, as uartgetc compiles it: [c.andi a5,a5,1] then
+   [c.beqz a5].  True = DR clear = branch taken = "return -1".  It lives
+   beside [lsr_thre_clear] because it is the same kind of thing -- a pure
+   function of the byte the LSR read returned -- and because the non-free
+   LSR leaf below states its lower-bound output in terms of it. *)
+Definition rx_masked (b : bv 8) : mword 64 :=
+  and_vec (lsr_ldval_of b) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))).
+Definition rx_empty (b : bv 8) : bool := eq_vec (rx_masked b) (zero_reg : mword 64).
+
+(* DR clear really does take the branch, so the two cases of uartgetc's test
+   are exactly [uart_rx_ready u]. *)
+Lemma uart_nodr_beqz (u : uart_state) :
+  uart_rx_ready u = false -> rx_empty (uart_lsr u) = true.
+Proof.
+  intro H. unfold rx_empty, rx_masked, lsr_ldval_of, uart_lsr. rewrite H.
+  destruct (uart_thre u); vm_compute; reflexivity.
 Qed.
 
 Module UartAccessProof (Uart : UART).
@@ -153,14 +171,20 @@ Section WpSconfUartAccess.
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hinstr Hdinv Hown [] [Hcont]").
-    - iIntros (u bt u') "%Hread Hg Hown".
+    - iIntros (u bt u') "%Hread Hg Hcol Hown".
+      (* the LSR is read-only: the receive FIFO and LOOP are where the
+         invariant left them *)
+      assert (Hne5 : (5 <> 0)%Z) by lia.
+      destruct (uart_read_rx_stable u 5 bt u' (or_introl Hne5) Hread)
+        as [Hrxe Hlbe].
+      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
       rewrite uart_read_lsr in Hread. injection Hread as <- <-.
       iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
       destruct (uart_thre u) eqn:Hthre.
       + iDestruct (uart_tx_poll_thre γd u l Hthre with "Hown Htx Hout")
           as "(Hown & Htx & Hout & #Hlb & %Hfacts)".
-        iModIntro. iFrame "Hs Hout Htx Hdl Hown". iIntros (_). iExact "Hlb".
-      + iModIntro. iFrame "Hs Hout Htx Hdl Hown".
+        iModIntro. iFrame "Hs Hout Htx Hdl Hcol Hown". iIntros (_). iExact "Hlb".
+      + iModIntro. iFrame "Hs Hout Htx Hdl Hcol Hown".
         iIntros (Hc). rewrite (uart_nothre_beqz u Hthre) in Hc. discriminate.
     - iEval (rewrite /wp_next). iIntros (CID1 Hs1 bt) "Hcg Hpc [Hown Hlb]".
       iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
@@ -231,10 +255,17 @@ Section WpSconfUartAccess.
                        | apply bv_eq; vm_compute; reflexivity]]).
   Qed.
 
+  (* [off <> 0] IS THE RECEIVE COLUMN'S SIDE CONDITION.  Offset 0 with DLAB
+     clear is the RHR, and reading it POPS the FIFO -- which moves the column
+     and needs the receive token ([wp_uart_rhr_pop_s_sconf] below).  Every
+     other offset leaves [u_rx] and LOOP where they were, which is what makes
+     this read free.  uartintr's two uses are the ISR acknowledge (offset 2)
+     and its own THRE poll (offset 5). *)
   Lemma wp_uart_read_free_s_sconf (γd : uart_names) (γv : disk_names)
       (off : Z) (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     (0 <= off < uart_size)%Z ->
+    off <> 0 ->
     uint rd <> 0 ->
     rd_ok rd ->
     add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa off ->
@@ -248,7 +279,7 @@ Section WpSconfUartAccess.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hoff Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hcont".
+    iIntros (Hoff Hne0 Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hcont".
     (* the class, consumed at [rs1] -- the one line the funnel change needs,
        and this leaf's wiring check.  See the family note at the head of this
        section. *)
@@ -264,10 +295,14 @@ Section WpSconfUartAccess.
               ltac:(rewrite Haddr; exact Hg3)
               with "Hcg Hpc Hinstr Hdinv [] [] [Hcont]").
     - done.
-    - iIntros (u bt u') "%Hread Hg _".
+    - iIntros (u bt u') "%Hread Hg Hcol _".
       destruct (uart_read_stable u off bt u' Hread) as (Ha & Ho & Hd).
-      iModIntro. iSplitL "Hg"; [| done].
-      iApply (uart_ghosts_stable γd u u' Ha Ho Hd with "Hg").
+      destruct (uart_read_rx_stable u off bt u' (or_introl Hne0) Hread)
+        as [Hrxe Hlbe].
+      iModIntro. iSplitL "Hg".
+      { iApply (uart_ghosts_stable γd u u' Ha Ho Hd with "Hg"). }
+      iSplitL "Hcol"; [| done].
+      iApply (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol").
     - iEval (rewrite /wp_next). iIntros (CID1 Hs1 bt) "Hcg Hpc _".
       iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
       iApply ("Hcont" $! bt with "Hcg Hpc").
@@ -313,7 +348,11 @@ Section WpSconfUartAccess.
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hinstr Hdinv Hown [] [Hcont]").
-    - iIntros (u u') "%Hwrite Hg Hown".
+    - iIntros (u u') "%Hwrite Hg Hcol Hown".
+      (* a THR write is offset 0, which is neither FCR nor MCR *)
+      destruct (uart_write_rx_stable u 0 sb u' ltac:(lia) ltac:(lia) Hwrite)
+        as [Hrxe Hlbe].
+      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
       iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
       iDestruct (uart_tx_ready_persists γd u l with "Hown Hlb Hoff Htx Hout Hdl") as %[Hempty Hdlab].
       iDestruct (uart_tx_own_agree with "Htx Hown") as %Haccu.
@@ -327,9 +366,189 @@ Section WpSconfUartAccess.
       iDestruct (uart_out_auth_stable γd u u' (uart_write_out _ _ _ _ Hwrite) with "Hout") as "Hout".
       iDestruct (uart_dlab_auth_stable γd u u' (uart_write_dlab_0 _ _ _ Hwrite) with "Hdl") as "Hdl".
       iEval (rewrite Hacc') in "Hown". iEval (rewrite Hacc') in "Hsent".
-      iModIntro. rewrite /uart_ghosts. iFrame "Hs Hout Htx Hdl Hown Hsent".
+      iModIntro. rewrite /uart_ghosts. iFrame "Hs Hout Htx Hdl Hcol Hown Hsent".
     - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Hown Hsent]".
       iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hown Hsent").
+      iPureIntro. exact Hs1.
+  Qed.
+
+  (* ==================================================================== *)
+  (*  THE NON-FREE RECEIVE READS, and the FCR flush.                       *)
+  (*                                                                      *)
+  (*  These are the three accesses that touch the receive FIFO, and all    *)
+  (*  three take the RECEIVE TOKEN: it is the ghost half whose partner is  *)
+  (*  the column's own pop counter, so a hart without it cannot shorten    *)
+  (*  [u_rx] at all.  That is what makes uartgetc's junk arm refutable --  *)
+  (*  between the poll that sees DR and the RHR read that pops, no other   *)
+  (*  hart can have emptied the FIFO, and neither can an FCR flush.        *)
+  (* ==================================================================== *)
+
+  (* THE RX-READY POLL (offset 5), under the token.  The LSR is a pure read,
+     so the column is untouched; what the caller gains is the persistent
+     lower bound that survives to the pop when DR was set. *)
+  Lemma wp_uart_lsr_read_rx_s_sconf (γd : uart_names) (γv : disk_names)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (k : nat) (b : bool) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 5 ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
+    dev_inv γd γv -∗ uart_rx_tok γd k -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ bt : bv 8,
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      uart_rx_tok γd k -∗
+      (* DR set means a byte is queued that this token's holder has not
+         removed, and that is a MONOTONE fact: nobody else can un-queue it *)
+      (⌜ rx_empty bt = false ⌝ -∗ uart_rx_pushed_lb γd (S k)) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Htok Hcont".
+    assert (Haddr_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa 5)
+      by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
+    iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 5 pc false true rd rs1 imm
+              m n (uart_rx_tok γd k)
+              (fun bt => uart_rx_tok γd k ∗
+                 (⌜ rx_empty bt = false ⌝ -∗ uart_rx_pushed_lb γd (S k)))%I b p
+              ltac:(unfold uart_size; lia) Hrd Hrdok
+              ltac:(rewrite Haddr; vm_compute; reflexivity)
+              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
+              with "Hcg Hpc Hinstr Hdinv Htok [] [Hcont]").
+    - iIntros (u bt u') "%Hread Hg Hcol Htok".
+      assert (Hne5 : (5 <> 0)%Z) by lia.
+      destruct (uart_read_rx_stable u 5 bt u' (or_introl Hne5) Hread)
+        as [Hrxe Hlbe].
+      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
+      rewrite uart_read_lsr in Hread. injection Hread as <- <-.
+      destruct (uart_rx_ready u) eqn:Hdr.
+      + assert (Hne : u_rx u <> []).
+        { intro Hnil. rewrite /uart_rx_ready Hnil in Hdr. discriminate. }
+        iDestruct (uart_col_poll γd u k Hne with "Hcol Htok")
+          as "(Hcol & Htok & #Hlb)".
+        iModIntro. iSplitL "Hg"; [iExact "Hg"|].
+        iSplitL "Hcol"; [iExact "Hcol"|].
+        iSplitL "Htok"; [iExact "Htok"|]. iIntros (_). iExact "Hlb".
+      + (* DR clear: the test the caller compiles takes its branch, so the
+           wand is vacuous *)
+        iModIntro. iSplitL "Hg"; [iExact "Hg"|].
+        iSplitL "Hcol"; [iExact "Hcol"|].
+        iSplitL "Htok"; [iExact "Htok"|].
+        iIntros (Hbit). rewrite (uart_nodr_beqz u Hdr) in Hbit. discriminate.
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1 bt) "Hcg Hpc [Htok Hlb]".
+      iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+      iApply ("Hcont" $! bt with "Hcg Hpc Htok Hlb").
+  Qed.
+
+  (* THE RHR POP (offset 0, DLAB clear).  The lower bound the poll minted
+     refutes the empty FIFO, so this really is a pop; out come the head's
+     history and the application's claim about it, and the token's count
+     moves by one. *)
+  Lemma wp_uart_rhr_pop_s_sconf (γd : uart_names) (γv : disk_names)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (k : nat) (b : bool) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 0 ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
+    dev_inv γd γv -∗ uart_dlab_off γd -∗
+    uart_rx_tok γd k -∗ uart_rx_pushed_lb γd (S k) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ c : bv 8,
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of c)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      uart_rx_tok γd (S k) -∗
+      (∃ h : list mobs, ⌜ obs_ends_in h c ⌝ ∗ riscv_rx_tag h) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv #Hdlab Htok #Hlb Hcont".
+    assert (Haddr_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa 0)
+      by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
+    iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 0 pc false true rd rs1 imm
+              m n (uart_rx_tok γd k)
+              (fun c => uart_rx_tok γd (S k) ∗
+                 (∃ h : list mobs, ⌜ obs_ends_in h c ⌝ ∗ riscv_rx_tag h))%I b p
+              ltac:(unfold uart_size; lia) Hrd Hrdok
+              ltac:(rewrite Haddr; vm_compute; reflexivity)
+              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
+              with "Hcg Hpc Hinstr Hdinv Htok [] [Hcont]").
+    - iIntros (u bt u') "%Hread Hg Hcol Htok".
+      iDestruct (uart_ghosts_dlab_off with "Hdlab Hg") as %Hd.
+      iMod (uart_col_pop γd u u' k bt
+              ltac:(intros bb rx' Hrx;
+                    exact (uart_read_rhr_pop u bb rx' bt u' Hd Hrx Hread))
+              with "Hcol Htok Hlb") as "(Hcol & Htok & Hh)".
+      (* the four transmitter ghosts are untouched by any read *)
+      destruct (uart_read_stable u 0 bt u' Hread) as (Ha & Ho & Hdl).
+      iDestruct (uart_ghosts_stable γd u u' Ha Ho Hdl with "Hg") as "Hg".
+      iModIntro. iFrame "Hg Hcol Htok Hh".
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1 c) "Hcg Hpc [Htok Hh]".
+      iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+      iApply ("Hcont" $! c with "Hcg Hpc Htok Hh").
+  Qed.
+
+  (* THE FCR WRITE (offset 2).  Bit 1, and a toggle of bit 0, CLEAR the
+     receive FIFO -- a pop of everything -- so this write takes the token
+     too.  It is uartinit's sixth store, and the reason the token is born
+     into the boot chain rather than into the PLIC invariant. *)
+  Lemma wp_uart_fcr_write_s_sconf (γd : uart_names) (γv : disk_names)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
+      (imm : mword 12) (m : regfile) (n : nat) (k : nat) (R S : iProp Σ)
+      (b : bool) :
+    let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 2 ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
+    dev_inv γd γv -∗ uart_rx_tok γd k -∗ R -∗
+    (* the transmitter side of an FCR write is the caller's own business
+       (bit 2 clears the TX FIFO): it runs the usual ghost step beside the
+       column's *)
+    (∀ u u', ⌜ uart_write u 2 sb = Some u' ⌝ -∗
+       uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      (∃ k' : nat, uart_rx_tok γd k') -∗
+      S -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros sb.
+    iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Htok HR Hstep Hcont".
+    assert (Haddr_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa 2)
+      by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
+    assert (Hsb_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
+    destruct (uart_geom_ok 2 ltac:(unfold uart_size; lia)) as (Hg1 & Hg2 & Hg3).
+    iApply (Uart.wp_sb_uart_s_sconf kt (CID:=CID) γd γv 2 pc false rs2 rs1 imm
+              m n (uart_rx_tok γd k ∗ R)%I
+              ((∃ k' : nat, uart_rx_tok γd k') ∗ S)%I b p
+              ltac:(unfold uart_size; lia)
+              ltac:(rewrite Haddr; exact Hg1)
+              ltac:(rewrite Haddr; exact Hg2)
+              ltac:(rewrite Haddr; exact Hg3)
+              with "Hcg Hpc Hinstr Hdinv [Htok HR] [Hstep] [Hcont]").
+    - iFrame "Htok HR".
+    - iIntros (u u') "%Hwrite Hg Hcol [Htok HR]".
+      destruct (uart_write_fcr_rx u sb u' Hwrite) as [Hrxe Hlbe].
+      iMod ("Hstep" $! u u' with "[//] Hg HR") as "[Hg HS]".
+      destruct (uart_fcr_clr_rx u sb) eqn:Hclr.
+      + iMod (uart_colE_flush γd u u' k Hrxe Hlbe with "Hcol Htok")
+          as "[Hcol Htok]".
+        iModIntro. iFrame "Hg Hcol Htok HS".
+      + iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
+        iModIntro. iFrame "Hg Hcol HS". by iExists k.
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Htok HS]".
+      iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok HS").
       iPureIntro. exact Hs1.
   Qed.
 

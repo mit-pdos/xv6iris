@@ -215,6 +215,20 @@ Definition obs_step (s : option bool) (e : mobs) : option bool :=
   | _, _ => None
   end.
 
+(* THE ARRIVAL A HISTORY ENDS WITH.  A byte the environment pushed into the
+   UART is tagged at the history it arrived at, and every contract that
+   relays such a byte -- the receive column, uartgetc's post, consoleintr's
+   premise -- has to say that the history and the byte belong together.  One
+   name for that tie, so the six of them spell it identically.  (Coq's
+   [List.last] takes a default and stdpp's is shadowed by it here, which is
+   the other reason this is a definition rather than an equation.) *)
+Definition obs_ends_in (h : list mobs) (b : bv 8) : Prop :=
+  exists h0, h = (h0 ++ [ObsUartIn b])%list.
+
+Lemma obs_ends_in_snoc (h : list mobs) (b : bv 8) :
+  obs_ends_in (h ++ [ObsUartIn b])%list b.
+Proof. by exists h. Qed.
+
 Definition trace_shape (h : list mobs) (on : bool) : Prop :=
   foldl obs_step (Some false) h = Some on.
 

@@ -146,7 +146,8 @@ Section UiCont.
      pa_stk sp0 4 ↦₈[KT1] (m0 !!! Regidx Rs2))%I.
 
   (* the caller's continuation, named once *)
-  Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}  (m0 : regfile)
+  Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+      (γu : uart_names) (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ mf : regfile,
@@ -154,15 +155,17 @@ Section UiCont.
          sie_cap_gpr KT1 mf av b pme -∗
          cpu_own lvl eb pme b lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
+         (∃ k' : nat, uart_rx_tok γu k') -∗
          WP (Loop : expr riscv_lang)))%I.
 
   (* re-anchor it at a hart reached mid-block.  Through the named definition
      [wp_next_shift]'s direct idiom cannot infer [K], so unfold first. *)
-  Lemma ui_ret_cont_shift `{GEN : GenId} `{XI : CurCtx} (CIDa CIDb : CpuId)  (m0 : regfile)
+  Lemma ui_ret_cont_shift `{GEN : GenId} `{XI : CurCtx} (CIDa CIDb : CpuId)
+      (γu : uart_names) (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) :
     (b = false \/ pme = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
-    ui_ret_cont (CID0 := CIDa)  m0 av lvl eb pme b lks -∗
-    ui_ret_cont (CID0 := CIDb)  m0 av lvl eb pme b lks.
+    ui_ret_cont (CID0 := CIDa) γu m0 av lvl eb pme b lks -∗
+    ui_ret_cont (CID0 := CIDb) γu m0 av lvl eb pme b lks.
   Proof. intros Hs. rewrite /ui_ret_cont. exact (wp_next_shift Hs). Qed.
 
 
@@ -188,7 +191,7 @@ Section ProofUartintr.
   (* ------------------------------------------------------------------ *)
   (*  THE EPILOGUE: +0x4c -> return.                                      *)
   (* ------------------------------------------------------------------ *)
-  Lemma ui_tail `{CID0 : CpuId}
+  Lemma ui_tail `{CID0 : CpuId} (γu : uart_names)
       (m0 M : regfile) (av lvl : nat) (eb : bool) (pme : mword 64)
       (sp0 : mword 64) (b : bool) (lks : gset string) :
     ui_regs m0 M (pa_stk sp0 4) ->
@@ -199,12 +202,13 @@ Section ProofUartintr.
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x4c)) -∗
     ui_frame sp0 m0 -∗
-    ui_ret_cont m0 av lvl eb pme b lks -∗
+    (∃ k' : nat, uart_rx_tok γu k') -∗
+    ui_ret_cont γu m0 av lvl eb pme b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hav.
     destruct Hregs as (Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
-    iIntros "#Ht Hcg Hcnt Hpc Hfr Hcont".
+    iIntros "#Ht Hcg Hcnt Hpc Hfr Htok Hcont".
     rewrite /ui_frame. iDestruct "Hfr" as "(H1 & H2 & H3 & H4)".
     set (spd := pa_stk sp0 4).
     assert (Hb1 : add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1)
@@ -315,7 +319,7 @@ Section ProofUartintr.
     iDestruct (cpu_own_transport CID0 CID6 lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /ui_ret_cont.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E5 with "[%] Hcg Hcnt Hpc").
+    iApply ("Hcont" $! E5 with "[%] Hcg Hcnt Hpc Htok").
     split; [| intro r; apply rf_to_gmap_dom].
     unfold callee_saved.
     split; [rewrite /E5 upd_eq Hpopv; symmetry; exact Hsp0|].
@@ -366,12 +370,18 @@ Section ProofUartintr.
       cpu_own (CID := CIDe) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
       ui_frame sp0 m0 -∗
-      ui_ret_cont (CID0 := CIDe)  m0 av lvl eb pme b lks -∗
+      (∃ k : nat, uart_rx_tok γu k) -∗
+      ui_ret_cont (CID0 := CIDe) γu m0 av lvl eb pme b lks -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp0 Hlen Hlvl Hav Hbelow.
     iIntros (CIDe M) "%Hregs %Hs1 %Hs2 #Ht #Hdinv #Hpinv #Hccaps".
-    iIntros "Hcg Hcnt Hpc Hfr Hcont".
+    iIntros "Hcg Hcnt Hpc Hfr Htok Hcont".
+    (* DLAB is off for good, out of the console credential's transmit lock:
+       the RHR pop needs it to know offset 0 really is the receive register *)
+    iAssert (uart_dlab_off γu) as "#Hdlab".
+    { iDestruct "Hccaps" as (γtx γc) "(#Htxl & _ & _ & _)".
+      iDestruct "Htxl" as "[_ #Hd]". iExact "Hd". }
     assert (Jcall : add_vec (mword_of_int (KernelSyms.uartintr + 0x38) : mword 64)
                       (sign_extend' 64 (mword_of_int 2095332 : mword 21))
                     = mword_of_int KernelSyms.consoleintr) by pcw.
@@ -386,47 +396,51 @@ Section ProofUartintr.
       cpu_own (CID := CIDk) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
       ui_frame sp0 m0 -∗
-      ui_ret_cont (CID0 := CIDk)  m0 av lvl eb pme b lks -∗
+      (∃ k : nat, uart_rx_tok γu k) -∗
+      ui_ret_cont (CID0 := CIDk) γu m0 av lvl eb pme b lks -∗
       WP (Loop : expr riscv_lang))%I with "[]" as "Loop".
     { iLöb as "IH".
-      iIntros (CIDk M1) "%Hregs1 %Hls1 %Hls2 Hcg Hcnt Hpc Hfr Hcont".
+      iIntros (CIDk M1) "%Hregs1 %Hls1 %Hls2 Hcg Hcnt Hpc Hfr Htok Hcont".
+      iDestruct "Htok" as (k) "Htok".
       assert (Hlsr : forall (CID' : CpuId), rget (CID := CID') M1 Rs1 = uart_pa 5)
         by (intros CID'; rgne; exact Hls1).
       assert (Hrhr : forall (CID' : CpuId), rget (CID := CID') M1 Rs2 = uart_pa 0)
         by (intros CID'; rgne; exact Hls2).
       iApply (UG.wp_uartgetc_inline γu γv M1 (av - 4)%nat Rs1 Rs2
-                (mword_of_int 13 : mword 8)
+                (mword_of_int 13 : mword 8) k
                 (mword_of_int (KernelSyms.uartintr + 0x2c)) (mword_of_int (KernelSyms.uartintr + 0x30))
                 (mword_of_int (KernelSyms.uartintr + 0x32)) (mword_of_int (KernelSyms.uartintr + 0x34))
                 (mword_of_int (KernelSyms.uartintr + 0x38)) (mword_of_int (KernelSyms.uartintr + 0x4c)) b
                 (Hlsr _) (Hrhr _) ltac:(reg_neq) ltac:(reg_neq)
                 ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc [] [] [] [] Hdinv [Hcnt Hfr Hcont]").
+                with "Hcg Hpc [] [] [] [] Hdinv Hdlab Htok [Hcnt Hfr Hcont]").
       { iApply (uii2_2c with "Ht"). }
       { iEval (rewrite -UG.ug_cr7). iApply (uii2_30 with "Ht"). }
       { iApply (uii2_32 with "Ht"). }
       { iApply (uii2_34 with "Ht"). }
       iIntros (CIDg Hsg).
       iSplit.
-      - (* the FIFO was empty: leave the loop *)
-        iIntros (bt) "_ Hcg Hpc".
-        assert (Hrx : ui_regs m0 (<[Regidx Ra5 := regval_into_reg (UG.rx_masked bt)]> M1)
+      - (* the FIFO was empty: leave the loop, with the token *)
+        iIntros (bt) "_ Hcg Hpc Htok".
+        assert (Hrx : ui_regs m0 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> M1)
                         (pa_stk sp0 4)).
         { destruct Hregs1 as (A2 & A19 & A20 & A21 & A22 & A23 & A24 & A25 & A26 & A27).
           unfold ui_regs. split_and!; (rewrite upd_ne; [| reg_neq]); assumption. }
         iDestruct (cpu_own_transport CIDk CIDg lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (ui_ret_cont_shift CIDk CIDg m0 av lvl eb pme b lks
+        iDestruct (ui_ret_cont_shift CIDk CIDg γu m0 av lvl eb pme b lks
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply (ui_tail m0 (<[Regidx Ra5 := regval_into_reg (UG.rx_masked bt)]> M1)
+        iApply (ui_tail γu m0 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> M1)
                   av lvl eb pme sp0 b lks Hrx Hsp0 Hav
-                  with "Ht Hcg Hcnt Hpc Hfr Hcont").
-      - (* a byte: hand it to consoleintr and go round again *)
-        iIntros (bt c) "_ Hcg Hpc".
+                  with "Ht Hcg Hcnt Hpc Hfr [Htok] Hcont").
+        by iExists k.
+      - (* a byte: hand it -- with its history and the application's claim
+           about it -- to consoleintr, and go round again *)
+        iIntros (bt c) "_ Hcg Hpc Htok #Hh".
         set (G0 := <[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
-                   (<[Regidx Ra5 := regval_into_reg (UG.rx_masked bt)]> M1)).
+                   (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> M1)).
         change (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
-                (<[Regidx Ra5 := regval_into_reg (UG.rx_masked bt)]> M1)) with G0.
+                (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> M1)) with G0.
         (* +0x38 jal ra,consoleintr *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartintr + 0x38)) Rra (mword_of_int 2095332 : mword 21)
                   G0 (av - 4)%nat b ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
@@ -450,8 +464,14 @@ Section ProofUartintr.
         iApply (Consoleintr.wp_consoleintr_sconf γu γv G1 γs pme lvl (av - 4)%nat eb b lks
                   ltac:(lia)
                   Hlen ltac:(lia) Hbelow
-                  with "Hcg Hcnt Ht Hpc Hpinv Hdinv Hccaps").
+                  with "Hcg Hcnt Ht Hpc Hpinv Hdinv Hccaps [Hh]").
         all: try lkbelow.
+        { (* a0 holds the byte, zero-extended by the [lbu] that popped it *)
+          iDestruct "Hh" as (h) "[%Hlast #Htg]".
+          iExists h, c. iSplitR.
+          { iPureIntro. rewrite /G1 upd_ne; [| vm_compute; discriminate].
+            rewrite /G0 upd_eq. reflexivity. }
+          iSplitR; [iPureIntro; exact Hlast | iExact "Htg"]. }
         iIntros (CIDc Hsc Mf) "[%Hcsf %Hdomf] Hcg Hcnt Ht2 Hpc".
         iEval (rewrite HG1ra) in "Hpc".
         assert (P3c : ret_pc (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x38) : mword 64) 4)
@@ -465,13 +485,14 @@ Section ProofUartintr.
         { iApply (uii2_3c with "Ht"). }
         iIntros (CIDz Hsz). iNext. iIntros "Hcg Hpc". iEval (rewrite Jback) in "Hpc".
         iDestruct (cpu_own_transport CIDc CIDz lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (ui_ret_cont_shift CIDk CIDz m0 av lvl eb pme b lks
+        iDestruct (ui_ret_cont_shift CIDk CIDz γu m0 av lvl eb pme b lks
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply ("IH" $! CIDz Mf with "[%] [%] [%] Hcg Hcnt Hpc Hfr Hcont").
+        iApply ("IH" $! CIDz Mf with "[%] [%] [%] Hcg Hcnt Hpc Hfr [Htok] Hcont").
+        4: by iExists (S k).
         + apply (ui_regs_cs m0 M1 Mf); [exact HcsMf | exact Hregs1].
         + rewrite (callee_saved_lookup HcsMf (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact Hls1.
         + rewrite (callee_saved_lookup HcsMf (mword_of_int 18) ltac:(vm_compute; reflexivity)). exact Hls2. }
-    iApply ("Loop" $! CIDe M with "[%] [%] [%] Hcg Hcnt Hpc Hfr Hcont");
+    iApply ("Loop" $! CIDe M with "[%] [%] [%] Hcg Hcnt Hpc Hfr Htok Hcont");
       [exact Hregs | exact Hs1 | exact Hs2].
   Qed.
 
@@ -497,11 +518,12 @@ Section ProofUartintr.
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x22)) -∗
     ui_frame sp0 m0 -∗
-    ui_ret_cont m0 av lvl eb pme b lks -∗
+    (∃ k : nat, uart_rx_tok γu k) -∗
+    ui_ret_cont γu m0 av lvl eb pme b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hlen Hlvl Hav Hbelow.
-    iIntros "#Ht #Hdinv #Hpinv #Hccaps Hcg Hcnt Hpc Hfr Hcont".
+    iIntros "#Ht #Hdinv #Hpinv #Hccaps Hcg Hcnt Hpc Hfr Htok Hcont".
     assert (P26 : add_vec_int (mword_of_int (KernelSyms.uartintr + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.uartintr + 0x26)) by pcw.
     assert (P28 : add_vec_int (mword_of_int (KernelSyms.uartintr + 0x26) : mword 64) 2 = mword_of_int (KernelSyms.uartintr + 0x28)) by pcw.
     assert (P2c : add_vec_int (mword_of_int (KernelSyms.uartintr + 0x28) : mword 64) 4 = mword_of_int (KernelSyms.uartintr + 0x2c)) by pcw.
@@ -546,10 +568,10 @@ Section ProofUartintr.
         (rewrite /S2 upd_ne; [| reg_neq]); (rewrite /S1 upd_ne; [| reg_neq]);
         (rewrite /S0 upd_ne; [| reg_neq]); assumption. }
     iDestruct (cpu_own_transport CID0 CIDT3 lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (ui_ret_cont_shift CID0 CIDT3 m0 av lvl eb pme b lks
+    iDestruct (ui_ret_cont_shift CID0 CIDT3 γu m0 av lvl eb pme b lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iPoseProof (ui_rx γu γv γs m0 av lvl eb pme sp0 b lks Hsp0 Hlen Hlvl Hav Hbelow) as "Rx".
-    iApply ("Rx" $! CIDT3 S2 with "[%] [%] [%] Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr Hcont");
+    iApply ("Rx" $! CIDT3 S2 with "[%] [%] [%] Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr Htok Hcont");
       [exact HS2regs | exact HS2s1 | exact HS2s2].
   Qed.
 
@@ -558,13 +580,14 @@ Section ProofUartintr.
   (* ------------------------------------------------------------------ *)
   Lemma wp_uartintr_sconf (γu : uart_names) (γv : disk_names)
       (γs : list gname)
-      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string)
-    : wp_uartintr_sconf_body γu γv γs m av lvl eb pme b lks.
+      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool)
+      (k : nat) (lks : gset string)
+    : wp_uartintr_sconf_body γu γv γs m av lvl eb pme b k lks.
   Proof.
     cbv beta delta [wp_uartintr_sconf_body].
     intros pcE ret_tgt Hlen Hlvl Hav Hbelow.
-    iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Hpinv #Hccaps Hcont".
-    iAssert (ui_ret_cont m av lvl eb pme b lks) with "[Hcont]" as "Hcont".
+    iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Hpinv #Hccaps Htok Hcont".
+    iAssert (ui_ret_cont γu m av lvl eb pme b lks) with "[Hcont]" as "Hcont".
     { iExact "Hcont". }
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
@@ -678,7 +701,7 @@ Section ProofUartintr.
     { intros CID'; rgne. rewrite HA2a5. apply bv_eq; vm_compute; reflexivity. }
     iApply (UAcc.wp_uart_read_free_s_sconf γu γv 2 (mword_of_int (KernelSyms.uartintr + 0x10)) Ra5 Ra5
               (mword_of_int 2 : mword 12) A2 (av - 4)%nat b
-              ltac:(unfold uart_size; lia) ltac:(nz) ltac:(rdok) (HA2ad _)
+              ltac:(unfold uart_size; lia) ltac:(nz) ltac:(nz) ltac:(rdok) (HA2ad _)
               with "Hcg Hpc [] Hdinv").
     { iApply (uii2_10 with "Ht"). }
     iIntros (CID8 Hs8 bisr) "Hcg Hpc". iEval (rewrite P14) in "Hpc".
@@ -704,7 +727,7 @@ Section ProofUartintr.
     { intros CID'; rgne. rewrite HA4a5. apply bv_eq; vm_compute; reflexivity. }
     iApply (UAcc.wp_uart_read_free_s_sconf γu γv 5 (mword_of_int (KernelSyms.uartintr + 0x18)) Ra5 Ra5
               (mword_of_int 5 : mword 12) A4 (av - 4)%nat b
-              ltac:(unfold uart_size; lia) ltac:(nz) ltac:(rdok) (HA4ad _)
+              ltac:(unfold uart_size; lia) ltac:(nz) ltac:(nz) ltac:(rdok) (HA4ad _)
               with "Hcg Hpc [] Hdinv").
     { iApply (uii2_18 with "Ht"). }
     iIntros (CID10 Hs10 blsr) "Hcg Hpc". iEval (rewrite P1c) in "Hpc".
@@ -743,11 +766,12 @@ Section ProofUartintr.
       { iApply (uii2_20 with "Ht"). }
       iIntros (CIDF HsF) "Hcg Hpc". iEval (rewrite P22) in "Hpc".
       iDestruct (cpu_own_transport CID CIDF lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (ui_ret_cont_shift CID CIDF m av lvl eb pme b lks
+      iDestruct (ui_ret_cont_shift CID CIDF γu m av lvl eb pme b lks
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ui_rx_setup γu γv γs m B2 av lvl eb pme sp0 b lks
                 HB2regs Hspm Hlen Hlvl Hav Hbelow
-                with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr Hcont").
+                with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr [Htok] Hcont").
+      by iExists k.
     - (* THRE: wake the writers, then join the rx setup *)
       assert (Jtx : add_vec (mword_of_int (KernelSyms.uartintr + 0x20) : mword 64)
                       (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0"))))
@@ -831,11 +855,12 @@ Section ProofUartintr.
       { iApply (uii2_4a with "Ht"). }
       iIntros (CIDW5 HsW5). iNext. iIntros "Hcg Hpc". iEval (rewrite Jrel) in "Hpc".
       iDestruct (cpu_own_transport CIDW4 CIDW5 lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (ui_ret_cont_shift CID CIDW5 m av lvl eb pme b lks
+      iDestruct (ui_ret_cont_shift CID CIDW5 γu m av lvl eb pme b lks
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ui_rx_setup γu γv γs m Mw av lvl eb pme sp0 b lks
                 HregsW Hspm Hlen Hlvl Hav Hbelow
-                with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr Hcont").
+                with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr [Htok] Hcont").
+      by iExists k.
   Qed.
 
 End ProofUartintr.

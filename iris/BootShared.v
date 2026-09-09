@@ -1513,6 +1513,9 @@ Section BootAlloc.
          §3a), so the boot client never names one. *)
       (∃ l0 : list (bv 8),
          uart_tx_own γd l0 ∗ uart_sent γd l0 ∗ uart_out_lb γd l0) ∗
+      (* the RECEIVE TOKEN, born with the device invariant and owed to
+         uartinit's FCR flush (SpecMain.v) *)
+      uart_rx_tok γd 0%nat ∗
       (∃ b0 : bool, uart_dlab_is γd (DfracOwn (1/2)) b0) ∗
       (∃ c0 : virtio_cfg,
          ⌜virtio_live c0 = false⌝ ∗ disk_cfg_is γv (DfracOwn (1/2)) c0) ∗
@@ -1729,8 +1732,10 @@ Section BootAlloc.
                  with "Hcl Hfdslots Hirslots Hirfile Hfdauth Hbsproc Hbss") as
       "(#Hstcl & Hstw & Hlocks & Hglobals & Hharts & Hpages)".
     (* ---- the device fabric ---- *)
-    iMod (uart_ghosts_alloc (g.(gdev).(duart))) as (γd)
-      "(Hacc & Hout & Htxa & Hdla & Htx & Hsent & Hdlab)".
+    iMod (uart_ghosts_alloc (g.(gdev).(duart))
+            ltac:(rewrite Hu0; reflexivity)
+            ltac:(rewrite Hu0; vm_compute; reflexivity)) as (γd)
+      "(Hacc & Hout & Htxa & Hdla & Htx & Hsent & Hdlab & Hcol & Htok & Hpre)".
     iDestruct (uart_out_auth_lb γd (g.(gdev).(duart)) with "Hout")
       as "[Hout #Hlb]".
     assert (Hacceq : uart_acc (g.(gdev).(duart)) = u_out (g.(gdev).(duart)))
@@ -1746,14 +1751,16 @@ Section BootAlloc.
             ltac:(rewrite Hv0; apply virtio_reset_wce))
       as (γv) "(%Himg & Hproto & Hcfg & Hcmauth & #Hdone & Hheads & Hpbody)".
     iMod (dev_inv_alloc ⊤ γd γv
-            with "[Huf Hpf Hvf Hacc Hout Htxa Hdla Hproto] Hpbody")
-      as "#Hdev".
+            with "[Huf Hpf Hvf Hacc Hout Htxa Hdla Hcol Hpre Hproto] Hpbody Htok")
+      as "[#Hdev Htok]".
     { rewrite /dev_inv_body.
       iExists (g.(gdev).(duart)), (g.(gdev).(dplic)), (g.(gdev).(dvirtio)).
       iFrame "Hacc Hout Htxa Hdla".
       iSplitL "Huf"; [iExact "Huf" |].
       iSplitL "Hpf"; [iExact "Hpf" |].
       iSplitL "Hvf"; [iExact "Hvf" |].
+      iSplitL "Hcol"; [iExact "Hcol" |].
+      iSplitL "Hpre"; [iExact "Hpre" |].
       iSplitL "Hproto"; [iExact "Hproto" |].
       iSplit; [iPureIntro; rewrite Hp0; exact plic_ok_plic0
               | iPureIntro; rewrite Hv0; exact (virtio_isr_ok_reset v0)]. }
@@ -1889,6 +1896,7 @@ Section BootAlloc.
     iSplitL "Hprocsavail"; [iExact "Hprocsavail" |].
     iSplitL "Htx Hsent".
     { iExists (uart_acc (g.(gdev).(duart))). iFrame "Htx Hsent Hlb". }
+    iSplitL "Htok"; [iExact "Htok" |].
     iSplitL "Hdlab"; [iExists (uart_dlab (g.(gdev).(duart))); iExact "Hdlab" |].
     iSplitL "Hcfg".
     { iExists (v_cfg (g.(gdev).(dvirtio))).

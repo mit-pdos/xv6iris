@@ -45,7 +45,7 @@ Require Import HartTp WpNext IntrDefs.
 Require Import StackOwn CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import PlicPlan PlicHart DiskPtsto WpUart WpPlic SpecCpuid SpecPlicComplete.
+Require Import PlicPlan PlicHart DiskPtsto WpUart WpPlic SpecCpuid SpecPlicClaim SpecPlicComplete.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -67,6 +67,20 @@ Import Defs.
    one-line bridge from a leaf's [rget] to the register-map facts a
    whole-function proof already has.  Written name-free (durable-notes: an
    Ltac body cannot mention a hypothesis by literal name). *)
+(* THE ID THE STORE NAMES, back to the argument.  The 32-bit register write
+   truncates a0, and truncation is injective on the three ids a claim can
+   hand back -- which is why the contract asks for [plic_claim_a0_ok]. *)
+Lemma pc_a0_of_sw (w : mword 64) :
+  plic_claim_a0_ok w ->
+  Z.to_N (bv_unsigned (autocast (T := mword)
+            (subrange_vec_dec w (Z.sub (Z.mul 4 8) 1) 0) : mword 32))
+    = uart_irq_id ->
+  w = (mword_of_int (Z.of_N uart_irq_id) : mword 64).
+Proof.
+  intros [-> | [-> | ->]] H; [ | reflexivity | ];
+    exfalso; vm_compute in H; discriminate.
+Qed.
+
 Local Ltac rgne :=
   rewrite rget_ne;
   [ | let H1 := fresh in let H2 := fresh in
@@ -106,7 +120,7 @@ Section ProofPlicComplete.
     : wp_plic_complete_sconf_body γd γv m0 n p.
   Proof.
     cbv beta delta [wp_plic_complete_sconf_body].
-    intros ra_idx tp_idx pcE ra0 ret_tgt Hhart Hn.
+    intros ra_idx tp_idx pcE ra0 ret_tgt Hhart Ha0ok Hn.
     assert (Htp : forall mm : regfile, rget mm tp_idx = cid_word)
       by (intros mm; exact (rget_tp mm)).
     rewrite (Htp m0) in Hhart.
@@ -123,7 +137,7 @@ Section ProofPlicComplete.
     set (s10 := m0 !!! Regidx s1_idx).
     set (R1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0).
     set (R2 := <[Regidx s0_idx := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> R1).
-    iIntros "Hcg #Htext Hpc #Hdinv Hcont".
+    iIntros "Hcg #Htext Hpc #Hdinv #Hinit Htok Hcont".
     assert (Hn4 : (4 <= n)%nat) by lia.
     assert (Hcsp1 : R1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     assert (Hpush : add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry))
@@ -277,8 +291,20 @@ Section ProofPlicComplete.
     { rgne. unfold N4. rewrite upd_eq. unfold regval_into_reg.
       rewrite HN3a5 HN3a4. unfold ph_sthb. apply add_vec64_comm. }
     (* ---- 0x1a: c.sw s1,4(a5) -- PLIC_SCLAIM(hart) = irq ---- *)
+    (* s1 still holds the irq argument: [c.mv s1,a0] copied it and cpuid
+       preserves s1 ([callee_saved]), and nothing after touches it. *)
+    assert (HN4s1 : rget N4 s1_idx = rget m0 a0_idx).
+    { rgne. unfold N4, N3, N2.
+      repeat (rewrite upd_ne; [| vm_compute; discriminate]).
+      rewrite (proj1 (proj2 (proj2 Hmo_cs))).
+      unfold R3. rewrite upd_eq. unfold regval_into_reg.
+      rewrite add_vec_zero_l. rgne. unfold R2, R1.
+      repeat (rewrite upd_ne; [| vm_compute; discriminate]). reflexivity. }
     iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plic_complete + 0x1a)) true s1_idx a5_idx
               (mword_of_int 4 : mword 12) N4 (n - 4)%nat
+              (⌜ rget m0 a0_idx
+                 = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
+                 ∃ k : nat, uart_rx_tok γd k)%I emp%I
               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_canon _ (ph_sclaim_geom _ Hhart)))
@@ -286,10 +312,20 @@ Section ProofPlicComplete.
               ltac:(rewrite HN4a5; intros pq Hpq; eexists; split;
                     [ exact (ph_sclaim_write _ pq _ Hhart)
                     | apply plic_ok_complete; exact Hpq ])
-              with "Hcg Hpc [] Hdinv").
+              with "Hcg Hpc [] Hdinv [Htok] []").
     { iApply (pci_1a with "Htext"). }
+    { iExact "Htok". }
+    { (* THE TOKEN GOES BACK.  The write IS [plic_complete] at the id in s1,
+         and the UART's payload is parked under [p_claimed … uart_irq_id]. *)
+      iIntros (pq pq') "%Hpw _ Hslots Htok".
+      rewrite HN4a5 (ph_sclaim_write _ pq _ Hhart) in Hpw.
+      injection Hpw as <-.
+      iModIntro. iSplitL; [| done].
+      iApply (plic_slots_complete with "Hinit Hslots [Htok]").
+      iIntros (Hv). iApply "Htok". iPureIntro.
+      apply (pc_a0_of_sw _ Ha0ok). rewrite <- Hv. rgne. by rewrite HN4s1. }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iIntros "Hcg Hpc _".
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x1a) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
     (* ---- the epilogue ---- *)
