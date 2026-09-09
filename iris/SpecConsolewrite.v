@@ -1,6 +1,6 @@
-(* SpecConsolewrite.v -- the public interface of consolewrite, stated
-   independently of its proof.  Requires only the definitional layer -- never
-   a whole-function proof file -- so every function proof can be checked in
+(* SpecConsolewrite.v -- THE contract of consolewrite, stated independently
+   of its proof.  Requires only the definitional layer -- never a
+   whole-function proof file -- so every function proof can be checked in
    parallel.
 
      int consolewrite(int user_src, uint64 src, int n) {
@@ -35,7 +35,8 @@
    * the running-thread bundle ([procs_inv]) and the hart-generic parking
      premise [eb = true] at [noff = 0], because uartwrite SLEEPS between
      bytes.  Nothing of this function's own state crosses that park: [buf]
-     is in the frame, and the frame is not shared.
+     is in the frame, and the frame is not shared;
+   * the SEED [UartTxInv.uart_sent γu tr0] -- the located half, below.
 
    THE BOUNCE BUFFER IS INVISIBLE HERE, and that is the point of it being a
    local: the 32 bytes are carved out of the four lowest slots of the frame
@@ -44,29 +45,39 @@
 
    ---- WHAT IT PROMISES ABOUT THE OUTPUT -------------------------------
 
-   The RETURN VALUE RANGE, [0 <= r <= n], and nothing else.  Not [-1]: this
-   function has no failing exit -- a copy that faults BREAKS, and the count
-   already pushed is what it answers -- so the [-1] the assumed contract used
-   to admit was slack, and it is gone.  ([Z.max 0 n] rather than [n] so the
-   statement is true at a non-positive request too, where the loop never runs
-   and the answer is 0; [PipeInvDefs.pipe_rw_ret] takes the same care, and
+   THE RETURN VALUE RANGE, [0 <= r <= Z.max 0 n].  Not [-1]: this function
+   has no failing exit -- a copy that faults BREAKS, and the count already
+   pushed is what it answers.  ([Z.max 0 n] rather than [n] so the statement
+   is true at a non-positive request too, where the loop never runs and the
+   answer is 0; [PipeInvDefs.pipe_rw_ret] takes the same care, and
    [SpecFilewrite]'s [filewrite_ret] is where the two meet.)
 
-   WHAT IT DOES NOT PROMISE IS WHICH BYTES REACHED THE WIRE, and this is a
-   deliberate loss.  uartwrite's own contract does say
-   ([UartTxInv.uart_sent_sub γu bs] -- every byte of its buffer was accepted
-   by the UART, in order, possibly interleaved), but the bytes consolewrite
-   hands it came out of USER memory through copyin, about which the kernel
-   may assume nothing: [SpecEitherCopyin.either_copyin_post]'s user arm gives
-   back the destination at an EXISTENTIAL content ([∃ dst_new]), because a
-   copyin that faults part-way has still written a prefix.  So the strongest
-   sound claim would be "for each chunk there EXISTS a byte string, unrelated
-   to anything the caller can name, that the UART accepted" -- a statement
-   with no consumer.  A trace claim about a console write becomes worth
-   stating only once the user page's contents are nameable at this altitude,
-   which is a property of copyin's spec and not of this function. *)
+   AND THE LOCATED RECEIPT [cons_sent_cnt γu tr0 r], which is why the seed is
+   a premise: the contract threads it through the chunk loop
+   ([UartSentLoc.uart_sent_from_chain] is the glue; the count bookkeeping
+   [i += nn] only after a full chunk push gives the length equation).
+
+   THE COUNT IS THE RECEIPT'S LENGTH, and that is what makes this contract
+   worth stating.  consolewrite has NO failing exit, and [i += nn] runs only
+   AFTER [uartwrite(buf, nn)] returned, i.e. only after all [nn] bytes of
+   that chunk were accepted.  So at every exit the returned [r] is exactly
+   the number of bytes this call handed the UART -- which is the equation
+   [SpecFilewrite]'s console arms are stated on ([wcons_ok] at [r = n],
+   [wcons_short] at [r < n]; one predicate serves both because consolewrite
+   cannot tell them apart and does not need to).
+
+   ...AND IT SAYS WHICH BYTES.  [SpecEitherCopyin.either_copyin_post] relays
+   [SpecCopyin.copyin_got] on its success exit, so each chunk's bytes are
+   pinned to the process's own image, and [cons_sent_cnt] carries the join --
+   [SpecCopyin.ubytes_at (us_M U) uaddr bs] beside the length.  That is what
+   makes "init's printf printed THESE characters" stateable: the accepted
+   run IS the caller's buffer, byte for byte, at the image it lent.
+
+   WHAT IS STILL NOT CLAIMED is the WIRE, not the bytes: this is an
+   ACCEPTANCE receipt, and UartSentLoc.v's header is the design of record for
+   what it says. *)
 From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import gmap bitvector.definitions.
+From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language weakestpre lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
@@ -88,6 +99,8 @@ Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
+Require Import UartSentLoc.       (* [uart_sent_from]: the located receipt *)
+Require Import SpecCopyin.        (* [ubytes_at]: the content seam        *)
 Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
@@ -97,6 +110,89 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
+
+Section ConsSentCnt.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  (* THE DEVICE-WRITE RECEIPT AT A COUNT: [r] bytes were accepted by the
+     UART, in order, after the seed -- AND THEY ARE THE CALLER'S OWN BYTES,
+     the process's run at user va [ua] in the image [M] it lent (RULING A,
+     the content seam; [SpecCopyin.ubytes_at]).  This is
+     [SpecFilewrite.wcons_ok]'s body at [n := r], which is how the console
+     arm's OK and SHORT disjuncts are both read off it.
+
+     THE BYTE STRING IS STILL BOUND EXISTENTIALLY and that is not a
+     weakness: [M] is a PARTIAL map, so "the bytes at [ua]" is not a
+     function this layer can apply; the equation pins every one of them
+     against the image the caller handed in, which is the whole of what
+     "printf printed MY characters" needs. *)
+  Definition cons_sent_cnt (γu : uart_names) (tr0 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64) (r : Z) : iProp Σ :=
+    (∃ bs : list (bv 8),
+       ⌜Z.of_nat (length bs) = r⌝ ∗ ⌜ubytes_at M ua bs⌝ ∗
+       uart_sent_from γu tr0 bs)%I.
+
+  Global Instance cons_sent_cnt_persistent γu tr0 M ua r :
+    Persistent (cons_sent_cnt γu tr0 M ua r).
+  Proof. apply _. Qed.
+
+  (* the empty call's receipt, free from the seed: the [n <= 0] exit and the
+     loop's entry both start here *)
+  Lemma cons_sent_cnt_zero (γu : uart_names) (tr0 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64) :
+    uart_sent γu tr0 -∗ cons_sent_cnt γu tr0 M ua 0.
+  Proof.
+    iIntros "H". iExists []. iSplitR; [done|].
+    iSplitR; [iPureIntro; apply ubytes_at_nil|].
+    by iApply uart_sent_from_refl.
+  Qed.
+
+  (* THE SEED FOR THE NEXT CHUNK, read off the receipt one already holds.
+     Every field is persistent or pure, so this DOES NOT CONSUME the
+     receipt -- the walk keeps it for the exit that returns [r] unchanged
+     (consolewrite's copy-failed break) and uses the [tr1] it hands out to
+     seed the next [uartwrite]. *)
+  Lemma cons_sent_cnt_seed (γu : uart_names) (tr0 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64) (r : Z) :
+    cons_sent_cnt γu tr0 M ua r -∗
+    ∃ (tr1 bs1 : list (bv 8)),
+      ⌜Z.of_nat (length bs1) = r⌝ ∗ ⌜ubytes_at M ua bs1⌝ ∗
+      ⌜tr0 `prefix_of` tr1⌝ ∗
+      ⌜bs1 `sublist_of` drop (length tr0) tr1⌝ ∗ uart_sent γu tr1.
+  Proof.
+    iIntros "H". iDestruct "H" as (bs1) "(%Hlen & %Hby & Hfrom)".
+    iDestruct "Hfrom" as (tr1) "(#Htr & %Hp & %Hs)".
+    iExists tr1, bs1. by iFrame "Htr".
+  Qed.
+
+  (* THE CHUNK STEP, and the only genuinely new fact in this file: a receipt
+     for [r] bytes, followed by a located receipt for [k] more bytes seeded
+     at the first one's own trace witness, is a receipt for [r + k].  This is
+     [i += nn] in the logic -- the count bookkeeping and the trace
+     bookkeeping are the same step, which is why the returned count IS the
+     receipt's length at every exit. *)
+  Lemma cons_sent_cnt_chunk (γu : uart_names) (tr0 tr1 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64)
+      (r : Z) (bs1 bs2 : list (bv 8)) :
+    Z.of_nat (length bs1) = r ->
+    tr0 `prefix_of` tr1 ->
+    bs1 `sublist_of` drop (length tr0) tr1 ->
+    (* the two content halves: what is already accepted, and what this chunk
+       copied -- the latter at the BUMPED base, which is exactly the
+       [add a2,si,sbase] the loop performs *)
+    ubytes_at M ua bs1 ->
+    ubytes_at M (add_vec_int ua (Z.of_nat (length bs1))) bs2 ->
+    uart_sent_from γu tr1 bs2 -∗
+    cons_sent_cnt γu tr0 M ua (r + Z.of_nat (length bs2)).
+  Proof.
+    iIntros (Hlen Hp Hb Hb1 Hb2) "H".
+    iExists ((bs1 ++ bs2)%list). iSplitR.
+    { iPureIntro. rewrite length_app. lia. }
+    iSplitR; [iPureIntro; exact (ubytes_at_app M ua bs1 bs2 Hb1 Hb2)|].
+    by iApply (uart_sent_from_chain γu tr0 tr1 bs1 bs2 Hp Hb with "H").
+  Qed.
+
+End ConsSentCnt.
 
 (* consolewrite's own frame is SIXTEEN slots ([c.addi16sp sp,sp,-128]: three
    saved registers, nine more shrink-wrapped, and the 32-byte [buf] in the
@@ -117,60 +213,52 @@ Definition wp_consolewrite_sconf_body
     (γs : list gname) (j : nat) (γlp : gname)
     (γu : uart_names) (γv : disk_names) (γl : gname)
     (m : regfile) (av : nat) (eb : bool)
-    (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string)
+    (tr0 : list (bv 8)) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consolewrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the process running here is proc j (sleep's linkage, inside uartwrite) *)
+  (* THE USER SOURCE, named (RULING A).  a1 was unconstrained and unnamed
+     until the content seam; it is a [let], not a premise, so no caller
+     moves. *)
+  let uaddr : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
   (j < NPROC)%nat ->
   γs !! j = Some γlp ->
   length γs = NPROC ->
-  (* a0 = 1: the source is a USER address.  filewrite's dispatch passes the
-     literal 1 (the [c.li a0,1] at +0x7c), and this contract is only stated
-     for that case -- the kernel-source arm has no caller. *)
   m !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ->
-  (* a2 is the int argument [n] *)
   m !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int n : mword 64) ->
   (- 2 ^ 31 <= n < 2 ^ 31)%Z ->
   (consolewrite_stack <= av)%nat ->
-  (* PARKING PREMISE (hart-generic scheduler protocol).  See SpecSched.v. *)
   eb = true ->
-  (* the order premise, at the LOWEST rank this cone touches; every
-     higher one follows by [locks_below_mono]. *)
   locks_below lks "proc" ->
   sie_cap_gpr KT1 m av b pj -∗
-  (* noff = 0: the sleep inside uartwrite demands that tx_lock -- taken and
-     released inside uartwrite's own loop -- be the only lock held. *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv_core pj pid U -∗
   kalloc_env γa None -∗
-  (* uartwrite's whole credential: the device fabric and the transmit lock
-     (UartTxInv.v).  Both persistent. *)
   dev_inv γu γv -∗
   is_txlock γl γu -∗
   procs_inv γs -∗
-  (* THE CROSSING IS [true], NOT [b] -- consolewrite reaches a park, so the
-     porting guide's rule applies: a parking function's [wp_next] index is
-     [true] unconditionally.  With [eb = true] above and [cpu_own_eb_agree]
-     at level 0 the two spellings coincide at every constructible instance. *)
+  (* ---- THE SEED: the one addition to the landed premises.  Persistent,
+     and free at [[]] ([UartSentLoc.uart_sent_nil]). ---- *)
+  uart_sent γu tr0 -∗
   wp_next true pj (fun (CID : CpuId) =>
-    (* THE IMAGE DOES NOT MOVE.  consolewrite only READS user memory
-       (either_copyin, one 64-byte chunk at a time), and at the lazy view a
-       fault inside the copy backs a page already in the view reading 0.  So
-       the block comes back at the caller's own [us_M U]; only the
-       DESCRIPTOR grows.  (image campaign, tier 3.) *)
   ∀ (mf : regfile) (r : Z) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
-      (* the whole of what a device write promises: it delivered somewhere
-         between nothing and all of it. *)
       ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core pj pid (us_upt U P') -∗
+      (* THE RECEIPT, at the returned count: [r] bytes accepted, in order,
+         after the seed, AND THEY ARE THE BYTES AT [a1] in the image the
+         caller lent (RULING A).  Persistent -- the caller keeps it forever.
+         [us_M U] is the INPUT image and stays the right one to state it
+         against: consolewrite only READS user memory, and the pages a copy
+         faults in were already in the view. *)
+      cons_sent_cnt γu tr0 (us_M U) uaddr r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -180,6 +268,7 @@ Module Type CONSOLEWRITE.
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γu : uart_names) (γv : disk_names) (γl : gname)
       (m : regfile) (av : nat) (eb : bool)
-      (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string),
-      wp_consolewrite_sconf_body γa γf γs j γlp γu γv γl m av eb pid U n b lks.
+      (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string)
+      (tr0 : list (bv 8)),
+      wp_consolewrite_sconf_body γa γf γs j γlp γu γv γl m av eb pid U n b lks tr0.
 End CONSOLEWRITE.

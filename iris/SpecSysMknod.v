@@ -46,8 +46,8 @@
    [mknod_au_pre] is the one-shot bundle of this syscall's linearization
    instants, at the commit mask [appE]:
 
-     - [mknod_walk_pre_era] -- nameiparent's PARENT PREFIX
-       ([mknod_parent_elems pl = removelast (path_elems pl)]: create
+     - [npar_walk_pre_era] -- nameiparent's PARENT PREFIX
+       ([npar_elems pl = removelast (path_elems pl)]: create
        resolves with nameiparent, which fires dirlookup on every element
        but the last, and the LAST element is the created NAME, tied in the
        post by [last (path_elems pl) = Some nm]).  It is a ONE-SHOT
@@ -100,7 +100,7 @@
    locals.  So the walk splits slot 19 into two words
    ([InstrBytes.word_pointsto_split4]) and each word into two halfwords,
    and rejoins on the way to the epilogue.  What reaches the CONTRACT is
-   [SpecSysMknodAU.dev_arg] of the trapframe words -- the low sixteen bits
+   [SysMknodDefs.dev_arg] of the trapframe words -- the low sixteen bits
    read unsigned -- so the caller's receipts speak about the numbers IT
    passed.  What the caller must supply is only that trapframe words
    [tf_arg_idx 0], [1] and [2] exist (argraw's premise, spelled through
@@ -213,7 +213,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import FsTree.
 Require Import FsBytesGamma.
-Require Import SpecSysMknodAU.   (* [dev_arg]: the device numbers' reading *)
+Require Import SysMknodDefs.   (* [dev_arg]: the device numbers' reading *)
 Require Import FsAbsMknodFire.   (* the commits and the walk premise     *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
@@ -252,7 +252,7 @@ Section SysMknod.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
-    (mknod_walk_pre_era γfs cw P Pmiss
+    (npar_walk_pre_era γfs cw P Pmiss
      ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
      ∗ pf_at (dlookup_commit_at Γ appE) Fex
      (* ...and the CHILD's two legs, unfired *)
@@ -271,7 +271,7 @@ Section SysMknod.
        ∃ (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z) (nl : nat),
          ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
          ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
-         P (length (mknod_parent_elems pl)) d ∗
+         P (length (npar_elems pl)) d ∗
          pf_at (dlookup_commit_at Γ appE) Fex ∗
          Fok.(pf_recv) av d nm i ∗
          (* ...AND THE CHILD'S OWN LEG: the row APPEARED at this inum before
@@ -293,12 +293,12 @@ Section SysMknod.
              is whole, or the cursor comes home with the exists observation
              fired (ARM F-BAD) or not, and the child's legs whole or the
              do-then-undo PAIR (ruling Q-h). *)
-          ((mknod_walk_dead_era γfs P Pmiss pl
+          ((npar_walk_dead_era γfs P Pmiss pl
               ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
               ∗ pf_at (dlookup_commit_at Γ appE) Fex
               ∗ cre_child_unfired Γ (ADev ma mi) Farm Fun)
            ∨ (∃ d : Z,
-                P (length (mknod_parent_elems pl)) d
+                P (length (npar_elems pl)) d
                 ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
                 ∗ ((∃ (av : aview) (i : Z) (nm : fname)
                       (ents : gmap fname Z) (nl : nat),
@@ -610,7 +610,7 @@ Definition wp_sys_mknod_frame
 
 (* THE CONTRACT'S BODY.  The abstract state is read at the LIVE Γ,
    [fs_gamma_L fsc_fs]; the device numbers are the syscall arguments' own
-   low halfwords ([SpecSysMknodAU.dev_arg]), so the caller's receipts
+   low halfwords ([SysMknodDefs.dev_arg]), so the caller's receipts
    speak about the numbers IT passed. *)
 Definition wp_sys_mknod_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -721,7 +721,7 @@ End SYSMKNOD.
      interior back to the client, and its members take [(k, d)] -- an index
      and an inum.  The cursor predicate is fixed when the contract is
      instantiated, which is BEFORE the fetched string exists
-     ([mknod_walk_pre_era] is a one-shot universally quantified over [pl]),
+     ([npar_walk_pre_era] is a one-shot universally quantified over [pl]),
      so no cursor can mention [pl].
    - Therefore the located branch of any match key must be an alternative
      whose OTHER branch is entered when a hop's name misses the client's

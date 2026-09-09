@@ -1,7 +1,7 @@
 (* ProofSysUnlinkTails.v -- sys_unlink's EXIT blocks, as block lemmas.
    These apply callees' contracts, so they live inside a module functor
    ([design/spec-modules.md]); the functor is NOT ascribed to a signature,
-   because it is a parts layer -- [ProofSysUnlink.v] instantiates it beside
+   because it is a parts layer -- [ProofSysUnlinkPure.v] instantiates it beside
    its own callee arguments and the seal happens there.
 
      ARM A   (+0x170 .. +0x172)  argstr < 0: no begin_op ever ran

@@ -89,7 +89,7 @@ Require Import ProcInv.
 Require Import SchedCtx CtxMorphTac.
 Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
 Require Import StackOwn.   (* [stack_own] -- the kernel stack moves into the twin (L8) *)
-Require Import SpecKexec.   (* [K_kexec] -- forkret's deepest callee, on the boot arm *)
+Require Import KexecDefs.   (* [K_kexec] -- forkret's deepest callee, on the boot arm *)
 Require Import SpecForkret.
 Require Import FirstTok.
 Require Import UserPtTree ProcPtOwn.

@@ -78,7 +78,7 @@ Definition uround_bump_ok (tf tf' : list (mword 64)) (r : mword 64) : Prop :=
 (* ===================================================================== *)
 (* [cw] / [cw'] are the cwd's inum before and after ([UexecSlot.uvis_cwd]).
    The exec disjunct pins it too -- exec INHERITS the caller's directory
-   ([SpecKexec.kexec_ok]'s row), and the failed-exec arm of
+   ([KexecDefs.kexec_ok]'s row), and the failed-exec arm of
    [UexecApply.uexec_ret_round_slot] resumes at the caller's key, so it
    has to know the field did not move.  The returning disjunct carries
    [UsysMemOk.usys_cwd_ok] beside the memory row: chdir may move it, nothing

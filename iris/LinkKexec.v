@@ -4,7 +4,7 @@
    namei ([SpecNameiEra.NAMEI_ERA]) the contract's walk calls.  BOTH namei
    forms are supplied -- the plain one because the blocks this cone opens
    as [PA.LA] / [PA.T] / [PB..PD] are functors over it, the era one because
-   [ProofKexecAUA.kxc_a1_au] makes the call.
+   [ProofKexecA.kxc_a1_au] makes the call.
 
    So this cone's assumption count is the plain kexec cone's union
    [LinkNameiEra]'s. *)

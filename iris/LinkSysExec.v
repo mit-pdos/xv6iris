@@ -10,7 +10,7 @@
 
    The allocator appears TWICE, as [Kalloc] and [Kfree], because the loop
    allocates a page per argument and both exits give every one of them back;
-   see SpecSysExec.v's header on why the kalloc'd pages therefore do not
+   see SysExecDefs.v's header on why the kalloc'd pages therefore do not
    appear in the contract at all.
 
    panic is not a module argument: the contract takes [kernel_data] and

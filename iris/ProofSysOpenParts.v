@@ -3,7 +3,7 @@
    callee's contract, and therefore everything that can live outside the
    module functor.
 
-   The walk is [ProofSysOpenAU*.v] (the atomic-update form is the only one
+   The walk is [ProofSysOpen*.v] (the atomic-update form is the only one
    left); the op-wide log ledger is [SysOpenBudget.v]; the contract is
    [SpecSysOpen.v], whose header carries the arm graph and the frame map.
 
@@ -978,7 +978,7 @@ Section ProofSysOpenPublish.
     fpay_tok gf kf 1 pn -∗
     (* THE OFF CONJUNCT, ALREADY DEPOSITED (off-ledger ruling): the ledger
        step ran under [ip->lock] -- [so_deposit] below, called by
-       [ProofSysOpenAUPub]'s publication before iunlock spends the valid cell --
+       [ProofSysOpenPub]'s publication before iunlock spends the valid cell --
        so what reaches the publication is the finished [file_core_off]. *)
     (* item 24: the share from [so_deposit] at FD_INODE, the free word at
        FD_DEVICE; [fpay_tok_update] records [fp_obox := γb] (the creator

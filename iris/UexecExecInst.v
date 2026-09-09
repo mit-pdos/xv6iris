@@ -62,11 +62,11 @@
    NOTHING HERE READS A [TsoCtx.CurCtx], and that is a requirement rather
    than an accident (the section note below).  Getting there cost the dead
    context binders on [FsAbsDelta.delta_trunc],
-   [SpecSysOpenAU.atrunc_commit_at] and the [om_*] mode readers,
+   [SysOpenDefs.atrunc_commit_at] and the [om_*] mode readers,
    [SpecSysOpen.open_in] and [SpecSysMkdir.mkdir_au_pre]/[mkdir_arms] --
    TSO-rebase appends that no body ever read.
 
-   WHAT EXEC'S BUNDLE IS.  [SpecSysExecAU.sys_exec_au_pre] at the TRAPPING
+   WHAT EXEC'S BUNDLE IS.  [SpecSysExec.sys_exec_au_pre] at the TRAPPING
    KEY's own data:
      - the image [uvis_M W]: the arguments are read off the image the
        process trapped at ([wp_sys_exec_sconf_body] takes the bundle at
@@ -105,7 +105,7 @@
    bundles will be paid from when they are turned on, and because the
    credential has to exist before the dischargers can be re-based on it.
    That is also why this file sits ABOVE the fire tower rather than beside
-   SpecSysExecAU.v: the supply law is a class field, and its exec case is
+   SpecSysExec.v: the supply law is a class field, and its exec case is
    [fsabs_exec_half].
 
    WHERE THE SUPPLY COMES FROM, AND WHY IT IS NOT PARKED.  It is a Coq
@@ -140,8 +140,8 @@ Require Import UsysMemOk.      (* [USYS_exec] -- the one number with a bundle *)
 Require Import UexecSG.        (* [uexecSG] / [uprogSG] -- the class   *)
 Require Import UexecRet.       (* [uslot] -- the family the generic
                                   inhabitants mint at                 *)
-Require Import SpecSysExecAU.  (* [sys_exec_au_pre]                   *)
-Require Import SpecKexecAU.    (* [exec_slot_pre] -- the piece the
+Require Import SpecSysExec.  (* [sys_exec_au_pre]                   *)
+Require Import SpecKexec.    (* [exec_slot_pre] -- the piece the
                                   monotonicity walks through          *)
 Require Import FsAbsInvFire.   (* [fsabs_exec_half] and the eight other
                                   numbers' dischargers, all out of the
@@ -154,9 +154,9 @@ Require Import SpecSysRead.    (* [sys_rw_count]                      *)
 Require Import SpecSysWrite.
 Require Import SpecSysChdir.   (* [chdir_au_pre]                      *)
 Require Import SpecSysOpen.    (* [open_in]                           *)
-Require Import SpecSysOpenAU.
+Require Import SysOpenDefs.
 Require Import SpecSysMknod.   (* [mknod_au_pre] / [mknod_arms]       *)
-Require Import SpecSysMknodAU. (* [dev_arg]                           *)
+Require Import SysMknodDefs. (* [dev_arg]                           *)
 Require Import SpecSysUnlink.  (* [unlink_au_pre] / [unlink_arms]     *)
 Require Import SpecSysLink.    (* [link_commits] / [link_arms]        *)
 Require Import SpecSysMkdir.   (* [mkdir_au_pre] / [mkdir_arms]       *)
@@ -188,7 +188,7 @@ Section UexecExecInst.
      those two slots DIFFERENT terms that print identically, and the unifier
      does not stop.  A process's deposit does not depend on the context of
      the kernel proof that consumes it, and the chain the exec bundle names
-     ([SpecSysExecAU.sys_exec_au_pre] down to [SpecSysOpenAU]'s pieces) does
+     ([SpecSysExec.sys_exec_au_pre] down to [SysOpenDefs]'s pieces) does
      not read one. *)
   Context `{GEN : GenId}.
 

@@ -10,12 +10,12 @@
 
    The module this builds seals [SpecSysOpen.SYSOPEN]: its one parameter
    [wp_sys_open], keyed on [om_create vom], with the plain arm re-exported
-   from [ProofSysOpenAU.SysOpenPlainProof] (see [ProofSysOpenAUFull]'s
+   from [ProofSysOpen.SysOpenPlainProof] (see [ProofSysOpenFull]'s
    header) and the create arm proved beside it. *)
 Require Import LinkArgint LinkArgstr LinkBeginOp LinkNameiEra
         LinkIlock LinkIunlock LinkIunlockput LinkEndOp LinkFileclose
         LinkItrunc LinkFilealloc LinkFdalloc LinkCreate
-        ProofSysOpenAUFull.
+        ProofSysOpenFull.
 
 Module SysOpen := SysOpenProof Argint Argstr BeginOp NameiEra Ilock
                                Iunlock Iunlockput EndOp Fileclose

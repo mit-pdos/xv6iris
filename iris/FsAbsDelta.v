@@ -5,11 +5,11 @@
    from the spec file that minted it (2026-09-04; a pure hoist -- no
    statement changed, no proof touched, R10):
 
-     [acre_bump], [delta_create] + row algebra      from SpecSysMknodAU.v
+     [acre_bump], [delta_create] + row algebra      from SysMknodDefs.v
      splice algebra, [delta_write] + row algebra    from the write cone
-     [delta_trunc] + row algebra                    from SpecSysOpenAU.v
+     [delta_trunc] + row algebra                    from SysOpenDefs.v
      [unl_dec], [delta_unl_ent], [delta_unl_tgt],
-       [delta_unlink] + row algebra                 from SpecSysUnlinkAU.v
+       [delta_unlink] + row algebra                 from SysUnlinkDefs.v
 
    Each of those files does [Require Export FsAbsDelta] at the point the
    text stood, so every consumer of a spec file still sees the same names
@@ -74,7 +74,7 @@ Require Import FsAbsDefs.      (* LAST: [aview], [anode], [absnode]            *
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
-(*  1.  CREATE (from SpecSysMknodAU.v)                                   *)
+(*  1.  CREATE (from SysMknodDefs.v)                                   *)
 (* ===================================================================== *)
 
 (* mkdir's fused parent bump (doc section 4: "mkdir additionally:
@@ -132,10 +132,10 @@ Proof.
 Qed.
 
 (* THE SIDE CONDITIONS, as one proposition (moved here from
-   SpecSysMknodAU.v in round E2, lane E2-C, so that [SpecCreate]'s bundle
-   can name the parent-leg commit -- SpecSysMknodAU requires SpecCreate):
+   SysMknodDefs.v in round E2, lane E2-C, so that [SpecCreate]'s bundle
+   can name the parent-leg commit -- SysMknodDefs requires SpecCreate):
    the parent is a directory whose map lacks the name, and the child's row
-   already reads as the freshly-minted node (SpecSysMknodAU's header, THE
+   already reads as the freshly-minted node (SysMknodDefs's header, THE
    FRESHNESS SHAPE) *)
 Definition cre_pre (av : aview) (d : Z) (nm : fname)
     (ents : gmap fname Z) (nl : nat) (i : Z) (c : absnode) : Prop :=
@@ -153,7 +153,7 @@ Proof.
   injection Hi as Hc' _. exact (Hc ents (eq_sym Hc')).
 Qed.
 
-(* THE COLLAPSE (SpecSysMknodAU's header's freshness argument,
+(* THE COLLAPSE (SysMknodDefs's header's freshness argument,
    machine-checked): under [cre_pre] with a device child, the fused delta
    IS the one-row parent insert -- the child's insert is the identity on
    its already-minted row.  This is what makes the AU dischargeable at
@@ -514,7 +514,7 @@ Lemma delta_write_absent (av : aview) (i : Z) (off : nat)
 Proof. intros Hi. rewrite /delta_write Hi //. Qed.
 
 (* ===================================================================== *)
-(*  3.  TRUNC (from SpecSysOpenAU.v)                                     *)
+(*  3.  TRUNC (from SysOpenDefs.v)                                     *)
 (* ===================================================================== *)
 
 (* THE DELTA: the file's bytes become empty; nlink untouched.  Total on
@@ -571,7 +571,7 @@ Lemma delta_trunc_absent (av : aview) (i : Z) :
 Proof. intros Hi. rewrite /delta_trunc Hi //. Qed.
 
 (* ===================================================================== *)
-(*  4.  UNLINK (from SpecSysUnlinkAU.v)                                  *)
+(*  4.  UNLINK (from SysUnlinkDefs.v)                                  *)
 (* ===================================================================== *)
 
 (* the dir-arm's parent decrement -- [acre_bump]'s inverse-shaped sibling:

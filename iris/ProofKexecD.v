@@ -2,7 +2,7 @@
 
    Entry is [ProofKexecSeam.kxc_at_2a6], phase C's exit: both copyouts are
    done, every [bad:] entry is behind us, and the state already ASSERTS the
-   two conditions [SpecKexec.kexec_ok]'s success arm quotes.  What is left is
+   two conditions [KexecDefs.kexec_ok]'s success arm quotes.  What is left is
    the commit itself --
 
      p->trapframe->a1  = sp                    +0x2a6 .. +0x2aa
@@ -76,7 +76,7 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import ElfFile.      (* [elf_bytes], [elf_image], [elf_loads] *)
 Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.
@@ -701,7 +701,7 @@ Section KexecDCommit.
 
   (* the two trapframe words the commit writes SECOND and THIRD are at
      distinct indices, so the order the block happens to write them in is
-     not the order [SpecKexec.kxc_tf] quotes. *)
+     not the order [KexecDefs.kxc_tf] quotes. *)
   Lemma kxd_tf_swap (ws : list (mword 64)) (a b : mword 64) :
     <[kxc_tf_sp_idx := b]> (<[tf_epc_idx := a]> ws)
     = <[tf_epc_idx := a]> (<[kxc_tf_sp_idx := b]> ws).

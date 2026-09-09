@@ -130,7 +130,7 @@ Require Import SpecFileclose. (* [fclose_names] -- see the header *)
    invents fresh binders with those names (durable-notes.md's typeclass-sweep
    trap: the tell is [UNDEFINED EVARS]/"unresolved implicit arguments"
    naming exactly these). *)
-Require Import SpecSysExec.   (* [K_sys_exec]: the deepest entry in the table *)
+Require Import SysExecDefs.   (* [K_sys_exec]: the deepest entry in the table *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -194,7 +194,7 @@ Import Defs.
    shape for them.  [sbrk] gets [sysc_sbrk_ok] below -- a FUNCTION of the
    entry and exit sizes, saying which way the address space went and how
    far, descriptor included; [exec] replaces the address space outright and
-   is unconstrained here, its image being [SpecKexec]'s to pin. *)
+   is unconstrained here, its image being [KexecDefs]'s to pin. *)
 Definition sysc_num (V : pprivate) : Z :=
   bv_signed (subrange_vec_dec (pv_tf V !!! tf_arg_idx 7) 31 0 : mword 32).
 
@@ -317,7 +317,7 @@ Qed.
 (* ===================================================================== *)
 (* A caller that offers the process's deposit ([UexecSG.sbundle_at uslot n f]
    at the number it trapped with -- at exec, [UexecExecInst.exec_sbundle],
-   the [SpecSysExecAU] AU precondition at the trapping key, its slot wand
+   the [SpecSysExec] AU precondition at the trapping key, its slot wand
    concluding at the U-mode slot) gets back, on exec, either the failure
    facts or [UexecRet.uslot] of the NEW image.  Every non-exec arm owes
    nothing ([sysc_exec_out_ne]). *)
@@ -427,7 +427,7 @@ Section SyscExec.
     /\ sts' = sts.
 
   (* [U'] is the record AFTER the dispatcher's own a0 store, so on success
-     [uvis_of U' sts'] IS [SpecKexecAU.exec_key]'s resume key *)
+     [uvis_of U' sts'] IS [SpecKexec.exec_key]'s resume key *)
   Definition sysc_exec_out (U U' : ustate) (sts sts' : list fdstate) : iProp Σ :=
     (⌜sysc_num (us_V U) = 7⌝ -∗
        (⌜sysc_exec_failed U U' sts sts'⌝

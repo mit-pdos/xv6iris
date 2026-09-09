@@ -701,7 +701,7 @@ Section UexecRet.
   (* the returning arm's CONTINUATION: the four pure rows, the syscall's
      armed post [spost_at] -- what the process gets back for the bundle it
      deposited -- and the next slot at the bumped key. *)
-  Definition uexec_ret_ret_F (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
+  Definition uexec_ret_cont_F (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
       (W : uvis) : iProp Σ :=
     (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
        (szv' : Z) (fdv' : list fdstate) (cw' : Z),
@@ -761,7 +761,7 @@ Section UexecRet.
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
        else if decide (n = USYS_fork) then uexec_fork_parent_F X W
-       else uexec_ret_ret_F X n f W
+       else uexec_ret_cont_F X n f W
      else X W)%I.
 
   (* ...AND THE DEPOSIT ALONE: what the process owes at this trap.  [emp]
@@ -792,7 +792,7 @@ Section UexecRet.
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
        else if decide (n = USYS_fork) then uexec_fork_F X W
-       else (∃ f : sfam, sbundle_at X n f W ∗ uexec_ret_ret_F X n f W)
+       else (∃ f : sfam, sbundle_at X n f W ∗ uexec_ret_cont_F X n f W)
      else X W)%I.
 
   (* (B) the kernel obligation: its later-free BODY, and the guarded form *)
@@ -915,7 +915,7 @@ Section UexecRet.
   Local Instance uslot_F_contractive : Contractive uslot_F.
   Proof.
     rewrite /uslot_F /uvb_F /ukont_F /ukb_F /uexec_ret_F /uexec_fork_F
-            /uexec_fork_parent_F /uexec_ret_ret_F.
+            /uexec_fork_parent_F /uexec_ret_cont_F.
     solve_contractive_wide.
   Qed.
 
@@ -1119,7 +1119,7 @@ Section UexecRet.
     (let n := usys_num (uvis_tf W) in
      if decide (n = USYS_exit) then emp
      else if decide (n = USYS_fork) then uexec_fork_parent_F uslot W
-     else uexec_ret_ret_F uslot n f W).
+     else uexec_ret_cont_F uslot n f W).
   Proof.
     intros ->. rewrite /uexec_arm /uexec_arm_F.
     destruct (decide (uecall_scause = uecall_scause)); [ reflexivity | contradiction ].
@@ -1224,7 +1224,7 @@ Section UexecRet.
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
     { rewrite /uexec_fork_parent_F. iIntros (r fdv' cw' _ _ _). iApply "H". }
-    rewrite /uexec_ret_ret_F.
+    rewrite /uexec_ret_cont_F.
     iIntros (r M' π' szv' fdv' cw' _ _ _ _) "_". iApply "H".
   Qed.
 

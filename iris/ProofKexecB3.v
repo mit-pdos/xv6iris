@@ -101,7 +101,7 @@ Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecIput.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
@@ -118,7 +118,6 @@ Require Import SpecUvmalloc.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
 Require Import SpecKexecB2.
-Require Import SpecKexecB3.
 Require Import KexecPtImage.
 Require Import ElfBridge.   (* [file_bytes_lookup] -- readi's bytes ARE the file's *)
 Require Import UmodeAbi.    (* [uimg_sub] *)
@@ -140,6 +139,205 @@ Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- t
 Set Printing Depth 40.
 
 Notation KXB := KernelSyms.kexec (only parsing).
+
+(* ===================================================================== *)
+(*  THE SEAL PHASE C TAKES: [KEXECB3], and the two statements behind it.  *)
+(* ===================================================================== *)
+(* [kxc_b2] (the loop path) and [kxc_b2z] (the [elf.phnum = 0] path) are
+   phase B WHOLE -- both of phase B1's outputs, landing at +0x1ae, phase
+   C's entry.  Neither STATEMENT mentions any of [KexecB3Proof]'s eleven
+   functor arguments (Myproc, ... Uvmalloc) or its own [B2]/[A] -- those
+   are only in the PROOFS -- so [KEXECB3] takes no functor parameters. *)
+
+
+Notation Rra := (mword_of_int 1 : mword 5).
+Notation Rs0 := (mword_of_int 8 : mword 5).
+Notation Rs1 := (mword_of_int 9 : mword 5).
+Notation Rs2 := (mword_of_int 18 : mword 5).
+Notation Rs3 := (mword_of_int 19 : mword 5).
+Notation Rs4 := (mword_of_int 20 : mword 5).
+Notation Rs5 := (mword_of_int 21 : mword 5).
+Notation Rs6 := (mword_of_int 22 : mword 5).
+Notation Rs7 := (mword_of_int 23 : mword 5).
+Notation Rs8 := (mword_of_int 24 : mword 5).
+Notation Rs9 := (mword_of_int 25 : mword 5).
+Notation Rs10 := (mword_of_int 26 : mword 5).
+Notation Rs11 := (mword_of_int 27 : mword 5).
+Notation Ra0 := (mword_of_int 10 : mword 5).
+
+(* ===================================================================== *)
+(*  [kxc_b2] -- PHASE B2 WHOLE, THE LOOP PATH.  Statement copied verbatim  *)
+(*  from ProofKexecB3.v; see that file for the design. *)
+(* ===================================================================== *)
+Definition kxc_b2_body
+      (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+    (gs : list gname) (jp : nat) (gl : gname)
+ (pd pav pu : mword 64)
+    (gilf gislf : gname) (gf : gname)
+    (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
+    (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) (n2 : nat)
+    (plen : nat) (pfun : nat -> bv 8)
+    (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+    (afun : nat -> nat -> bv 8)
+    (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
+    (m M : regfile) (K : nat)
+    (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
+    (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (i : nat) (szv : mword 64) :=
+  (* THE FAILURE-SIDE PLUG (S5).  The phdr loop owns five of kexec's eight
+     [bad:] entries: four of them REJECT THE FILE (memsz < filesz, the
+     [vaddr + memsz] wrap, a misaligned [vaddr], and a short read of the
+     header table itself) and the fifth is uvmalloc's exhaustion.  So the
+     block takes one premise per cause -- the first CONDITIONAL on the
+     fact its four tails actually establish. *)
+  (~ KexecBuilt.kxb_walk_loadable (kxc_fb datl dnf) ef ->
+     QF KexecOkQ.KfNotLoadable) ->
+  QF KexecOkQ.KfNoMem ->
+  (K_kexec <= K)%nat ->
+  (kf < NINODE)%nat ->
+  log_geom_ok fsc_cov fsc_logst ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
+  0 <= icfg_ist ->
+  cov_below fsc_cov fsc_size ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
+  (jp < NPROC)%nat ->
+  gs !! jp = Some gl ->
+  m !!! Regidx csp_rs1 = sp0 ->
+  m !!! Regidx Rra = ra0 ->
+  m !!! Regidx Rs0 = s00 ->
+  m !!! Regidx Rs1 = s10 ->
+  m !!! Regidx Rs2 = s20 ->
+  kernel_text -∗
+  fs_fabric gs pd pav pu
+ -∗
+  kxc_at_12c jp gf
+ kf qf sf gyf loyf tlyf inumf dnf bmf datl gilf gislf n2
+             plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas m M K
+             sp0 ra0 s00 s10 s20 pv av
+             (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
+             (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
+             (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
+             w67 ef P Mi i szv -∗
+  wp_next true (proc_addr jp) (fun (CID : CpuId) =>
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+         eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
+         av dqa avf aslen dqas afun) -∗
+  wp_next true (proc_addr jp) (fun (CID : CpuId) =>
+    ∀ (M' : regfile) (P' : uptd) (Mo : gmap Z (bv 8)) (szv' : mword 64),
+      kxc_at_1ae jp gf
+                 plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
+                 M' K sp0 ra0 s00 s10 s20 pv av
+                 (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
+                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
+                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
+                 w67 (kxc_fb datl dnf) ef P' Mo szv' (m !!! Regidx Rs11) -∗
+      wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
+        KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+             eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
+             pfun av dqa avf aslen dqas afun) -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+(* ===================================================================== *)
+(*  [kxc_b2z] -- PHASE B2 WHOLE, THE [elf.phnum = 0] PATH.  Statement      *)
+(*  copied verbatim from ProofKexecB3.v. *)
+(* ===================================================================== *)
+Definition kxc_b2z_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+    (gs : list gname) (jp : nat) (gl : gname)
+ (pd pav pu : mword 64)
+    (gilf gislf : gname) (gf : gname)
+    (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
+    (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) (n2 : nat)
+    (plen : nat) (pfun : nat -> bv 8)
+    (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+    (afun : nat -> nat -> bv 8)
+    (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
+    (m M : regfile) (K : nat)
+    (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
+    (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) :=
+  (K_kexec <= K)%nat ->
+  (kf < NINODE)%nat ->
+  log_geom_ok fsc_cov fsc_logst ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
+  0 <= icfg_ist ->
+  cov_below fsc_cov fsc_size ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
+  (jp < NPROC)%nat ->
+  gs !! jp = Some gl ->
+  kernel_text -∗
+  fs_fabric gs pd pav pu
+ -∗
+  kxc_at_1a2 jp gf
+ kf qf sf gyf loyf tlyf inumf dnf bmf datl gilf gislf n2
+             plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas m M K
+             sp0 ra0 s00 s10 s20 pv av
+             (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
+             (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
+             (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13
+             w67 ef P Mi -∗
+  wp_next true (proc_addr jp) (fun (CID : CpuId) =>
+    ∀ (M' : regfile),
+      kxc_at_1ae jp gf
+                 plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
+                 M' K sp0 ra0 s00 s10 s20 pv av
+                 (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
+                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
+                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13
+                 w67 (kxc_fb datl dnf) ef P Mi
+                 (mword_of_int 0 : mword 64) (m !!! Regidx Rs11) -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+Module Type KEXECB3.
+  Parameter kxc_b2 :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+      (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
+      (gs : list gname) (jp : nat) (gl : gname)
+ (pd pav pu : mword 64)
+      (gilf gislf : gname) (gf : gname)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) (n2 : nat)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
+      (m M : regfile) (K : nat)
+      (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (i : nat) (szv : mword 64),
+    kxc_b2_body Q QF gs jp gl pd pav pu gilf gislf
+ gf
+      kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
+      pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
+      ef P Mi i szv.
+
+  Parameter kxc_b2z :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+      (gs : list gname) (jp : nat) (gl : gname)
+ (pd pav pu : mword 64)
+      (gilf gislf : gname) (gf : gname)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) (n2 : nat)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
+      (m M : regfile) (K : nat)
+      (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)),
+    kxc_b2z_body gs jp gl pd pav pu gilf gislf
+ gf
+      kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
+      pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P Mi.
+End KEXECB3.
 
 (* ===================================================================== *)
 (*  THE [ph] BUFFER'S FIVE FIELD OFFSETS, off its base slot 61.            *)
@@ -990,7 +1188,7 @@ Section KexecB3Body.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (i : nat) (szv : mword 64) :
-    (* the failure-side plug's two causes (S5; SpecKexecB3's note) *)
+    (* the failure-side plug's two causes (S5) *)
     (~ KexecBuilt.kxb_walk_loadable (kxc_fb datl dnf) ef ->
        QF KexecOkQ.KfNotLoadable) ->
     QF KexecOkQ.KfNoMem ->
@@ -1070,7 +1268,7 @@ Section KexecB3Body.
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
-    iDestruct (SpecKexec.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct (KexecDefs.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
@@ -3595,7 +3793,7 @@ Section KexecB3Loop.
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) :
-    (* the failure-side plug's two causes (S5; SpecKexecB3's note) *)
+    (* the failure-side plug's two causes (S5) *)
     (~ KexecBuilt.kxb_walk_loadable (kxc_fb datl dnf) ef ->
        QF KexecOkQ.KfNotLoadable) ->
     QF KexecOkQ.KfNoMem ->
@@ -3902,7 +4100,7 @@ Section KexecB3Close.
                          #Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
-    iDestruct (SpecKexec.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct (KexecDefs.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &

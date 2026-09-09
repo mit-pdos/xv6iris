@@ -119,7 +119,7 @@ Record uvis := MkUvis {
      boundary instantiates it off the block ([uvis_of]), the syscall rows
      say which entry may move it ([UsysMemOk.usys_cwd_ok]: chdir, and only
      when it succeeds), fork's arm copies it parent to child, and exec
-     inherits it ([SpecKexec.kexec_ok]). *)
+     inherits it ([KexecDefs.kexec_ok]). *)
   uvis_cwd  : Z;
 }.
 

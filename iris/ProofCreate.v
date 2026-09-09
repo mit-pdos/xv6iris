@@ -112,7 +112,7 @@ Require Import SpecNparWrapEra.  (* the ERA nameiparent walk, the callee  *)
 Require Import SpecCreate.
 Require Import DirentEnc.        (* [bview]: the path buffer's reading     *)
 Require Import PathElems.        (* [path_elems]: the name tie's list      *)
-Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix *)
+Require Import SysMknodDefs.   (* [npar_elems]: the PARENT prefix *)
 Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
 Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsTree.           (* [fname]: the receipts' name argument *)

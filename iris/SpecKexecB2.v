@@ -98,7 +98,7 @@ Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecIput.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import KexecOkQ.
 Require Import SpecDirlink.
 Require Import ProofKexecParts.

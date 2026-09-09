@@ -17,7 +17,7 @@ From Stdlib Require Import ZArith List.
 Require Import LinkArgstr LinkBeginOp LinkNparWrapEra LinkIlock LinkNamecmp
         LinkDirlookup LinkMemsetArray LinkReadi LinkWritei LinkIupdate
         LinkIunlockput LinkEndOp LinkPanic
-        ProofSysUnlinkAU.
+        ProofSysUnlink.
 
 Module SysUnlink := SysUnlinkProof Argstr BeginOp NparWrap Ilock Namecmp
                                    Dirlookup MemsetArray Readi Writei

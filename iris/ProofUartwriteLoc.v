@@ -48,7 +48,7 @@
 
    There is no genuinely new proof content in this file: the two located
    ghost lemmas live in [UartSentLoc.v], beside the invariant they are
-   about, because [ProofConsolewriteLoc.v] needs them without this file's
+   about, because [ProofConsolewrite.v] needs them without this file's
    1700-line cone.
 
    ProofUartwrite.v's header is the design of record for the walk itself --

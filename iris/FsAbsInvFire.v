@@ -2,8 +2,8 @@
    contract asks its caller for, satisfied by a client that knows nothing
    about the abstract state, at receipts that say nothing.
 
-   WHAT THIS IS FOR.  The AU contracts ([SpecSysOpenAU], [SpecSysMknod],
-   [SpecSysUnlinkAU], [SpecSysRead]/[SpecFileread], [SpecSysWrite]/
+   WHAT THIS IS FOR.  The AU contracts ([SysOpenDefs], [SpecSysMknod],
+   [SysUnlinkDefs], [SpecSysRead]/[SpecFileread], [SpecSysWrite]/
    [SpecFilewrite], [SpecCreate]) take, beside the
    landed frame, a bundle of caller-supplied fupds: the walk premise (one
    [ax_hop] per path element, fired at the era lend) and the commits (one
@@ -35,7 +35,7 @@
    read/write dischargers open NOTHING of their own: the offset shadow is
    lent and returned unmoved (the piece-shape rule), and the kernel's fire
    lemma advances it out of the descriptor row's [OffGv.off_user_inv]. *)
-(* Require block: SpecSysOpenAU.v's, VERBATIM (durable-notes: trimmed imports
+(* Require block: SysOpenDefs.v's, VERBATIM (durable-notes: trimmed imports
    have OOM'd the build, and a class name that is not in scope silently becomes
    a section VARIABLE), plus this file's own lines. *)
 From Stdlib Require Import ZArith Lia List.
@@ -69,21 +69,21 @@ Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    Import: [FsImg]'s [fs_sb] field readers
                                    would shadow the superblock CELL
                                    ADDRESSES the frame below threads *)
-Require Import SpecSysMknodAU.  (* [delta_create], [cre_pre],
-                                   [mknod_parent_elems], [abs_view_insert] *)
-Require Import SpecSysWriteAU.  (* [wchunks]: the chain's node count, and
+Require Import SysMknodDefs.  (* [delta_create], [cre_pre],
+                                   [npar_elems], [abs_view_insert] *)
+Require Import SysWriteDefs.  (* [wchunks]: the chain's node count, and
                                    the splice algebra it re-exports *)
 Require Import FsAbsEra.        (* [elend]: the era lend the hops fire *)
-Require Import FsAbsEraMknod.   (* [mknod_walk_pre_era], [mknod_walk_dead_era]
+Require Import FsAbsEraMknod.   (* [npar_walk_pre_era], [npar_walk_dead_era]
                                    -- the parent-prefix one-shot, REUSED *)
 Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at],
                                    [mkf_auth_nview] *)
 (* ...and this file's own: the other commit definitions and the invariant.
    FsAbs stays LAST (its own rule), so these go above the block's tail. *)
-Require Import SpecSysOpenAU.      (* [aopen/atrunc_commit_at], [open_walk_pre_era], [open_au_pre_*] *)
+Require Import SysOpenDefs.      (* [aopen/atrunc_commit_at], [namei_walk_pre_era], [open_au_pre_*] *)
 Require Import SpecSysChdir.       (* [chdir_au_pre]: the walk premise + open's commit *)
 Require Import SpecSysMknod.       (* [mknod_au_pre]: the one contract's bundle *)
-Require Import SpecSysUnlinkAU.    (* [uent/utgt/dmiss_commit_at] *)
+Require Import SysUnlinkDefs.    (* [uent/utgt/dmiss_commit_at] *)
 Require Import SpecSysUnlink.      (* [unlink_au_pre]: the one contract's bundle *)
 Require Import SpecSysLink.        (* [link_commits] (round E2, lane E2-L) *)
 Require Import FsAbsReadFire.      (* [aread_commit_at] *)
@@ -121,16 +121,16 @@ Section FsAbsInvFire.
      [SpecCreate]'s own bundle unit needs them and sits below this file. *)
 
   Lemma fsabs_open_walk (γfs : fs_names) (cw : Z) :
-    ⊢ open_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
+    ⊢ namei_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
   Proof.
-    rewrite /open_walk_pre_era. iIntros (pl r) "_". iModIntro.
+    rewrite /namei_walk_pre_era. iIntros (pl r) "_". iModIntro.
     iSplit; [done |]. iApply ax_hops_triv.
   Qed.
 
   Lemma fsabs_mknod_walk (γfs : fs_names) (cw : Z) :
-    ⊢ mknod_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
+    ⊢ npar_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
   Proof.
-    rewrite /mknod_walk_pre_era. iIntros (pl r) "_". iModIntro.
+    rewrite /npar_walk_pre_era. iIntros (pl r) "_". iModIntro.
     iSplit; [done |]. iApply ax_hops_triv.
   Qed.
 
@@ -315,12 +315,12 @@ Section FsAbsInvFire.
   Qed.
 
   (* ...and the fs-facing half of exec's AU bundle
-     ([SpecSysExecAU.sys_exec_au_pre] minus its slot wand), which is open's
+     ([SpecSysExec.sys_exec_au_pre] minus its slot wand), which is open's
      walk and open's commit at [True] -- what [UexecExecMint] mints the
      process's exec bundle out of.  Read-kind only, so nothing of the
      application's is needed. *)
   Lemma fsabs_exec_half Γ (γfs : fs_names) (cw : Z) :
-    ⊢ open_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
+    ⊢ namei_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
       ∗ pf_at (aopen_commit_at Γ appE) (pfam_triv (fun _ _ _ => True%I)).
   Proof.
     iSplitR; [iApply fsabs_open_walk | iApply fsabs_aopen].

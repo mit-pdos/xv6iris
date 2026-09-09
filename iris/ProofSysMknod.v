@@ -135,7 +135,7 @@ Require Import CodeSysMknod.
 Require Import SpecSysMknod.     (* the contract this file seals        *)
 Require Import DirentEnc.        (* [bview]                             *)
 Require Import FsTree.
-Require Import SpecSysMknodAU.   (* [dev_arg]                           *)
+Require Import SysMknodDefs.   (* [dev_arg]                           *)
 Require Import FsAbsMknodFire.   (* the commits and [mkf_dev_arg]       *)
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.            (* LAST of the abstract stack          *)
@@ -459,7 +459,7 @@ Definition hw_join (lo hi : mword 16) : mword 32 :=
 (* THE HALFWORD TIE, bit-level half: [argint] writes an [int] and the [lh]
    at +0x32 / +0x36 reads back its LOW HALFWORD, which the record field
    then reads UNSIGNED -- so the abstract child's device number is the
-   trapframe word's low sixteen bits, i.e. [SpecSysMknodAU.dev_arg] on the
+   trapframe word's low sixteen bits, i.e. [SysMknodDefs.dev_arg] on the
    nose.  The arithmetic is
    [FsAbsMknodFire.mkf_dev_arg]; this is it at [hw_lo]'s spelling. *)
 Lemma mn_dev_major `{XI : CurCtx} (v : mword 64) :
@@ -1697,7 +1697,7 @@ Section ProofSysMknodBody.
                      ltac:(wp_next_chain) with "Hown") as "Hown".
            (* THE ONE-SHOT, HANDED DOWN UNFIRED
               ([FsAbsNparMknod.np_start_of_mknod]): [ep_start] at the
-              string this call fetched IS [mknod_walk_pre_era] at that
+              string this call fetched IS [npar_walk_pre_era] at that
               string, so nothing is fired here -- the WALK picks the start
               inum (ROOTINO, or the cwd's) and fires it there. *)
            iDestruct (np_start_of_mknod fsc_fs (pv_cwi (us_V U)) P Pmiss (bview pk bf)
@@ -2050,7 +2050,7 @@ End SysMknodProof.
 
    1. THE WALK PREMISE IS DISCHARGED, NOT PASSED ON ([mkr_walk_triv]).  The
       stable client owes no cursor: instantiate [P] and [Pmiss] at [True]
-      and [mknod_walk_pre_era]'s one-shot is provable outright -- every
+      and [npar_walk_pre_era]'s one-shot is provable outright -- every
       [ax_hop] at a trivial cursor is [⊢]-derivable, whatever the fetched
       string turns out to be.  This is what collapses the -1 arm's
       three-way fold to two: "the walk died at hop k" and "nothing
@@ -2308,9 +2308,9 @@ Section MknodStable.
   Qed.
 
   Lemma mkr_walk_triv (γfs : fs_names) (cw : Z) :
-    ⊢ mknod_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
+    ⊢ npar_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
   Proof.
-    rewrite /mknod_walk_pre_era. iIntros (pl r) "%Hs". iModIntro.
+    rewrite /npar_walk_pre_era. iIntros (pl r) "%Hs". iModIntro.
     iSplitR; [done |]. rewrite /ax_hops_from.
     iApply big_sepL_intro. iIntros "!>" (j s Hj). iApply mkr_hop_triv.
   Qed.

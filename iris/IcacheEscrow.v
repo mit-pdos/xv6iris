@@ -535,7 +535,7 @@ Section IcacheEscrow.
 
      The form is the DEPOSIT-TIME [FsStateInode.ent_toks_x]: the marker set
      is existential and the per-directory count is EXACT, which is where
-     [ProofSysUnlink]'s (D2) reads "a directory holding a live subdirectory
+     [ProofSysUnlinkPure]'s (D2) reads "a directory holding a live subdirectory
      record has at least two links".  A checked-out walk OPENS it --
      [dlinks_open] names the marker set -- moves entries and counts freely,
      and re-seals at [dlinks_intro] with the equation restored.  create's

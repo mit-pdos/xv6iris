@@ -1,110 +1,82 @@
-(* SpecSysExec.v -- sys_exec()'s VOCABULARY LEAF: the frame budget
-   [K_sys_exec] and the RESULT RELATION [sys_exec_post], stated
-   independently of any proof.
+(* SpecSysExec.v -- sys_exec's ONE CONTRACT [SYSEXEC]: [SpecKexec]'s
+   bundle and arms lifted to the syscall boundary, where the arguments
+   are READ OFF THE USER IMAGE rather than handed in.  A STATEMENT FILE.
 
-   THE CONTRACT ITSELF IS [SpecSysExecAU.SYSEXEC] ([wp_sys_exec_sconf]),
-   one file up: sys_exec has ONE contract, and it is the atomic-update one
-   -- kexec's bundle and arms lifted to the syscall boundary
-   (fs-syscall-specs.md, "ONE CONTRACT PER SYSCALL").  Its frame is the
-   premise list this header describes row for row, and its armed post
-   implies the [sys_exec_post] below
-   ([SpecSysExecAU.sys_exec_arms_landed]).
+   Design of record: SpecKexec.v's header (the exec AU: the walk, the
+   one observation, the caller's own u-mode WP for the program observed)
+   and claude-notes/design/user-wp-slot.md (the slot, and the trap
+   contract's exec arm this level feeds).
 
-     uint64 sys_exec(void) {
-       char path[MAXPATH], *argv[MAXARG];
-       int i;
-       uint64 uargv, uarg;
+   ==== WHAT THIS CONTRACT IS ==========================================
 
-       argaddr(1, &uargv);
-       if (argstr(0, path, MAXPATH) < 0) return -1;
-       memset(argv, 0, sizeof(argv));
-       for (i = 0;; i++) {
-         if (i >= NELEM(argv))                                    goto bad;
-         if (fetchaddr(uargv + sizeof(uint64)*i, &uarg) < 0)       goto bad;
-         if (uarg == 0) { argv[i] = 0; break; }
-         if ((argv[i] = kalloc()) == 0)                            goto bad;
-         if (fetchstr(uarg, argv[i], PGSIZE) < 0)                  goto bad;
-       }
-       int ret = kexec(path, argv);
-       for (i = 0; i < NELEM(argv) && argv[i] != 0; i++) kfree(argv[i]);
-       return ret;
-      bad:
-       for (i = 0; i < NELEM(argv) && argv[i] != 0; i++) kfree(argv[i]);
-       return -1;
-     }
+   THE ONLY CONTRACT sys_exec has, and the only seal the dispatcher may
+   take: [SysExecDefs.v] below is the vocabulary leaf
+   ([K_sys_exec], [sys_exec_post]).  The frame is that file's own premise
+   list row for row -- the block-layer geometry relayed to kexec, the two
+   trapframe arguments, [eb = true], the fabric, the process -- with the
+   bundle [EXTRA] after the process block and the armed post in the pure
+   slot ([sys_exec_arms_landed] reads [sys_exec_post] back out of it).
 
-   @ KernelSyms.sys_exec, 101 instructions / 268 bytes, a 480-byte frame.
-   The LAST function of the exec cone and the last of sysfile.c.
+   THE ONE THING THIS LEVEL ADDS: the argument vector is not a
+   parameter.  sys_exec [fetchaddr]s each [argv[i]] out of the user's
+   image at trapframe argument 1 and [fetchstr]s each string into a
+   kernel page, then calls kexec with what it read.  So the caller's WP
+   premise is quantified over the argument vectors kexec may be handed
+   ([sys_exec_slot_pre]), and the success arm names the one it ran at.
 
-   ---- WHAT IT IS FOR --------------------------------------------------
+   WHAT THE QUANTIFICATION IS OVER, HONESTLY.  The intended premise is
+   the READING of the user image at the argv pointer --
+   [exec_args_of (us_M U) v1 na alen afun] below, kept as the named
+   upgrade target -- so that a caller that knows its own argv (init:
+   ["sh"] at a known address of its image) would instantiate it once.
+   That reading is NOT DERIVABLE today (finding, 2026-09-03, the first
+   proof attempt): [SpecFetchaddr.fetchaddr_post] is about OWNERSHIP of
+   the destination word, not its value, [SpecFetchstr]'s post ties the
+   copied bytes to nothing in the image, and [SpecCopyinstr] has no
+   content promise at any tier (only [SpecCopyin.copyin_got] exists).
+   So the premise is quantified over every vector of the right SHAPE
+   ([exec_args_shape]: below MAXARG, NUL-terminated strings within a
+   page -- kexec's own premises) and nothing else.  For the init -> sh
+   chain this loses nothing: xv6's sh ignores its arguments, so sh's
+   start WP holds at every vector.  The upgrade is: memory-indexed
+   [wp_fetchaddr_sconf_mem] / [wp_fetchstr_sconf_mem] twins paying out
+   of [copyin_got] (and a [copyinstr_got] to build the second on),
+   threaded through sys_exec's argv loop, after which
+   [sys_exec_slot_pre] moves from [exec_args_shape] to [exec_args_of]
+   and every arm below is unchanged.
 
-   sys_exec exists to MARSHAL: it turns two user words in the trapframe
-   into exactly the resources [SpecKexecAU.wp_kexec_frame] demands, and it
-   is the only caller kexec has.  Read the two contracts together -- almost
-   every premise of the contract above is one of kexec's, paid here:
+   THE CONTINUATION binds [(mf, P', M')] with the page-table growth
+   report and an EXISTENTIAL image (milestone J item 1's staging).  The
+   U-mode side's row for exec's failure is [r = -1 /\ M' = M]
+   ([UsysMemOk]); tightening this frame's failure arm to same-M is an
+   open item, recorded and not taken.
 
-   * kexec wants the PATH as [S plen] owned bytes with [bb_cstr pfun plen].
-     [argstr] copies the user string into this function's own
-     [char path[MAXPATH]] and reports [fetchstr_ret], which is exactly that
-     (or -1, and then kexec is never called).
-   * kexec wants each ARGUMENT as a NUL-terminated string of [alen i]
-     characters inside [aslen i] owned bytes with [alen i < 4096].
-     [kalloc] gives a whole page and [fetchstr] fills it with [max = PGSIZE],
-     so [aslen i = 4096] and [alen i < 4096] -- kexec's blocker-§7 premise,
-     paid for free.
-   * kexec wants the ARGV VECTOR as [S na] owned words ending in a NULL.
-     That is this function's own [char *argv[MAXARG]] frame array, memset to
-     zero and then filled; the [break] arm writes the terminating NULL.
-   * kexec wants [na < MAXARG].  The loop tests [i != 32] on its BACK EDGE,
-     so it reaches the break with [i < 32] -- see the note on the off-by-one
-     below, which is why the premise is [<] and not [<=].
+   ==== THE ARMS ========================================================
 
-   ---- THE ONE THING THAT HAD TO MOVE FIRST ----------------------------
+   ret = argc: [SpecKexec.exec_post_ok] at the block after the
+   copy-ins' growth ([us_upt U P']), at the reading [na alen afun] the
+   success arm exhibits.  Its arm (a) hands back [S (exec_key U' sts
+   na)] -- THE PROPOSITION THE DISPATCH DEPOSITS for the new process, at
+   the slot predicate [S] the whole contract is parametric in (SpecKexec
+   header) -- and arm (b) the refunds.
+   ret = -1: the landed failure equation on the block ([us_V U' =
+   us_upt-ed V]) beside [SpecKexec.exec_post_fail]'s three-way fold,
+   plus a FOURTH disjunct this level owns: sys_exec failed BEFORE kexec
+   (a bad path or argv pointer, too many arguments, out of kernel
+   pages), with the whole bundle back unspent -- indistinguishable from
+   kexec's (i) by the return value, so folded into the same [∨].
 
-   kexec used to carry a log-budget premise, [(L+1) * iput_units +
-   iput_units <= MAXOPBLOCKS], admitting only single-element paths.  sys_exec
-   cannot pay it and no caller ever could: the path arrives through [argstr],
-   so its contents -- and hence [L] -- are EXISTENTIAL.  The premise is gone,
-   priced instead through [SpecNamei.wp_namei_gen] over [LogInv.log_opS],
-   whose [SpecNamex.walk_need] is 4 whatever the depth; SpecKexec.v's header
-   has the story.  Without that, this contract does not exist.
+   ==== WHERE THE PROOF PAYS EACH PIECE ================================
 
-   ---- WHAT THE POSTCONDITION SAYS -------------------------------------
+   1. The argv shape: [exec_args_shape] is the walk's own loop invariant
+      ([fetchstr]'s [bb_cstr] and length, the MAXARG bound) -- free.
+      The reading [exec_args_of] is the upgrade (header).
+   2. [SpecKexec.KEXEC] at that reading, with the bundle specialized by
+      [sys_exec_slot_pre]'s ∀.
+   3. The kfree/kalloc bookkeeping, shared with the blocks in
+      [ProofSysExecParts].
 
-   [kexec_ok] VERBATIM, against the block the copy-ins left behind.  There
-   is nothing sys_exec can add to it and nothing it should drop:
-
-   * the page table may have GROWN before kexec ran -- [argstr] and each
-     [fetchstr] fault user pages in -- so the block kexec is called with is
-     [upd_upt V P'], and [uptd_ext (pv_upt V) P'] is what the copy-ins
-     report.  (kexec's own copyouts may grow it further; that is inside
-     [kexec_ok]'s success arm.)
-   * on every path that does NOT reach kexec -- argstr failed, fetchaddr
-     failed, kalloc returned 0, fetchstr failed, or the loop ran out of
-     argv slots -- the return is -1 and the block is handed back UNCHANGED
-     at [upd_upt V P'].  That is [kexec_ok]'s failure arm exactly, so those
-     five paths and kexec's own eight [bad:] entries are one disjunct.
-   * [na], [alen], [entry], [spv] and [szv'] are existential: they are
-     functions of user memory, which no caller of this contract names.
-
-   THE KALLOC'D PAGES DO NOT APPEAR, in the contract or in its result.
-   Every page the loop allocates is freed by one of the two [kfree] loops
-   before the function returns -- including on the success path, after
-   kexec has copied the strings out -- so the allocator is left exactly as
-   it was found and [kalloc_env] is the only thing that crosses.  That is
-   also why there is no page-count premise: the loop allocates at most
-   MAXARG pages and gives every one of them back.
-
-   ---- THE OFF-BY-ONE THE C HAS, AND WHERE IT IS RULED OUT --------------
-
-   The C tests [i >= NELEM(argv)] at the TOP of the loop body, but gcc
-   compiles it as the loop's back-edge test ([bne s2,s7] at +0x8e), so the
-   break at [uarg == 0] is reached with [i < 32] and the [argv[i] = 0] store
-   is in range.  What is NOT in range is kexec's own [ustack[argc] = 0] at
-   exactly [argc = 32], which is why kexec takes [na < MAXARG] rather than
-   [na <= MAXARG] -- and this function is where that premise is discharged,
-   from the same back-edge test.  claude-notes/kernel-defects.md has the
-   C-level story. *)
+   BINDERS: SysExecDefs's plus [ufdG] (the slot). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -138,50 +110,277 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
-(* [SpecKexec] for [kexec_ok] and [fs_fabric].  This contract is a CALLER of
-   kexec -- its whole job is to build kexec's precondition -- so requiring
-   kexec's Spec is not the cross-function reach the tree's rule warns about;
-   the two are designed against each other.  It also makes this the second
-   consumer of [fs_fabric], which per the promote-on-second-consumer rule
-   would move it to a shared [FsFabric.v]; not done, because the second
-   consumer is kexec's own caller rather than an independent stater, so
-   nothing here restates the thirteen. *)
-Require Import SpecKexec.
+Require Import ByteBuf.        (* [bb_cstr]                          *)
+Require Import FsBlocks.       (* [fs_names]                         *)
+Require Import KexecDefs.      (* [MAXARG], [kexec_ok]               *)
+Require Import SysExecDefs.    (* the vocabulary leaf: [K_sys_exec], [sys_exec_post] *)
+Require Import UserFd.         (* [ufdG]                             *)
+Require Import UexecSlot.      (* [uvis]                             *)
+Require Import SysOpenDefs.  (* [namei_walk_pre_era], [aopen_commit_at] *)
+Require Import SpecKexec.    (* [exec_slot_pre], [exec_post_ok], [exec_post_fail] *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
+Require Import FsAbsDefs.          (* LAST (FsAbs's own rule)            *)
+Require Import FsBytesGamma.   (* [fs_gamma_L]                       *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
-Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import Xv6G.
+Require Import FsCfg.
 Import Defs.
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
-(* sys_exec's own frame is 480 bytes -- SIXTY slots ([c.addi16sp sp,-480] at
-   +0x00) -- of which sixteen are [path[MAXPATH]] and thirty-two are
-   [argv[MAXARG]].  Its deepest callee is kexec by a wide margin
-   ([SpecKexec.K_kexec] = 174); argstr wants 60, fetchstr 56, fetchaddr and
-   memset and kalloc and kfree less. *)
-Notation K_sys_exec := (244%nat) (only parsing).
-Section SpecSysExec.
+(* ===================================================================== *)
+(*  1.  THE ARGUMENT VECTOR, AS A READING OF THE USER IMAGE               *)
+(* ===================================================================== *)
+
+(* the eight-byte little-endian word at [a] in the (lazy) image [M] *)
+Definition uimg_word_at (M : gmap Z (bv 8)) (a : Z) (w : mword 64) : Prop :=
+  forall k, (k < 8)%nat ->
+    M !! (a + Z.of_nat k) = bv_to_little_endian 8 8 (bv_unsigned w) !! k.
+
+(* THE SHAPE of an argument vector kexec accepts (its own premises):
+   below MAXARG, each argument a NUL-terminated string of [alen i]
+   characters ([bb_cstr]: non-NUL below, NUL at [alen i]) shorter than a
+   page.  This is what the WP premise is quantified over today (header). *)
+Definition exec_args_shape (na : nat) (alen : nat -> nat)
+    (afun : nat -> nat -> bv 8) : Prop :=
+  (na < MAXARG)%nat
+  /\ (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i))
+  /\ (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z).
+
+(* THE READING sys_exec performs -- the upgrade target (header): the
+   shape, and [argv[0 .. na)] non-null pointers read at [av + 8 i],
+   [argv[na]] NULL, each pointer naming its string's bytes in the image. *)
+Definition exec_args_of (M : gmap Z (bv 8)) (av : mword 64)
+    (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) : Prop :=
+  exec_args_shape na alen afun
+  /\ (exists avf : nat -> mword 64,
+        (forall i, (i <= na)%nat ->
+           uimg_word_at M (bv_unsigned av + 8 * Z.of_nat i) (avf i))
+        /\ (forall i, (i < na)%nat -> avf i <> (mword_of_int 0 : mword 64))
+        /\ avf na = (mword_of_int 0 : mword 64)
+        /\ (forall i, (i < na)%nat ->
+              (forall j, (j <= alen i)%nat ->
+                 M !! (bv_unsigned (avf i) + Z.of_nat j) = Some (afun i j)))).
+
+Lemma exec_args_of_shape (M : gmap Z (bv 8)) (av : mword 64)
+    (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
+  exec_args_of M av na alen afun -> exec_args_shape na alen afun.
+Proof. intros [H _]. exact H. Qed.
+
+(* ===================================================================== *)
+(*  2.  THE BUNDLE AND THE ARMS AT THE SYSCALL BOUNDARY                   *)
+(* ===================================================================== *)
+
+Section SysExecAU.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
-  Context `{XI : CurCtx}.
-  (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
-     carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
-     definitions below mention the block, so the section has to bind it. *)
-  Context `{GEN : GenId}.
+            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Implicit Types Γ : fs_view_names Σ.
 
-  (* sys_exec's result, and it is [kexec_ok] verbatim: every path that never
-     reaches kexec returns -1 with the block unchanged, which is that
-     relation's own failure arm.  [V] here is the block AFTER the copy-ins'
-     page-table growth -- the caller reads it as [upd_upt V P']. *)
-  Definition sys_exec_post (γf : gname) (pa : mword 64) (pid : mword 32)
+  (* the caller's WP, for every argument vector of the right shape
+     (header: the image reading is the upgrade target; the [M av]
+     parameters are kept so the upgrade moves nothing but this wand) *)
+  (* A PIECE, so its two families stay BARE: [S] is what the wand
+     concludes at and [Φo] is the observation receipt it consumes. *)
+  Definition sys_exec_slot_pre (S : uvis -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) : iProp Σ :=
+    (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
+       ⌜exec_args_shape na alen afun⌝ -∗
+       exec_slot_pre S Φo na alen afun sts)%I.
+
+  (* Both one-shot pieces at their pairs ([SpecKexec.exec_au_pre]'s
+     shape, at the argument-shape-quantified slot wand). *)
+  Definition sys_exec_au_pre (Fs : pfam Σ (uvis -> iProp Σ)) Γ
+      (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) : iProp Σ :=
+    (namei_walk_pre_era γfs cw P Pmiss
+     ∗ pf_at (aopen_commit_at Γ appE) Fo
+     ∗ pf_at (fun S => sys_exec_slot_pre S Fo.(pf_recv) M av sts) Fs)%I.
+
+  (* non-expansive in the slot predicate, as [SpecKexec.exec_au_pre_ne]:
+     what UexecExecInst.v's instance at the fixpoint variable needs *)
+  Lemma sys_exec_slot_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) :
+    S ≡{n}≡ S' ->
+    sys_exec_slot_pre S Φo M av sts ≡{n}≡ sys_exec_slot_pre S' Φo M av sts.
+  Proof.
+    intros HS. rewrite /sys_exec_slot_pre.
+    apply bi.forall_ne; intros na. apply bi.forall_ne; intros alen.
+    apply bi.forall_ne; intros afun. apply bi.wand_ne; [reflexivity |].
+    exact (exec_slot_pre_ne n S S' Φo na alen afun sts HS).
+  Qed.
+
+  Lemma sys_exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
+      Γ (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) :
+    S ≡{n}≡ S' ->
+    sys_exec_au_pre (MkPfam S Rs) Γ γfs cw P Pmiss Fo M av sts
+    ≡{n}≡ sys_exec_au_pre (MkPfam S' Rs) Γ γfs cw P Pmiss Fo M av sts.
+  Proof.
+    intros HS. rewrite /sys_exec_au_pre /pf_at. cbn [pf_recv pf_refund].
+    by rewrite (sys_exec_slot_pre_ne n S S' Fo.(pf_recv) M av sts HS).
+  Qed.
+
+  (* ret = -1: sys_exec's own early exits (the whole bundle back) folded
+     with kexec's three-way fold at the reading it ran at *)
+  Definition sys_exec_post_fail (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) : iProp Σ :=
+    (sys_exec_au_pre Fs Γ γfs cw P Pmiss Fo M av sts
+     ∨ (∃ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
+          ⌜exec_args_shape na alen afun⌝ ∗
+          exec_post_fail Fs Γ γfs cw P Pmiss Fo na alen afun sts))%I.
+
+  (* the armed disjunction on the block after the copy-ins' growth [V]
+     and the returned a0; [M] is the image the arguments were read from *)
+  Definition sys_exec_arms (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names) (cw : Z) (γf : gname)
+      (pj : mword 64) (pid : mword 32)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate)
       (V : pprivate) (r : mword 64) : iProp Σ :=
-    (∃ (U' : ustate) (na : nat) (alen : nat -> nat)
-       (entry spv szv' : mword 64),
-       ⌜kexec_ok V (us_V U') r entry spv szv' na alen⌝ ∗
-       proc_priv γf pa pid U')%I.
+    (∃ U' : ustate,
+       proc_priv γf pj pid U' ∗
+       ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = V /\ us_M U' = M⌝
+         ∗ sys_exec_post_fail Fs Γ γfs cw P Pmiss Fo M av sts)
+        ∨ (∃ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
+             ⌜exec_args_shape na alen afun⌝ ∗
+             exec_post_ok Fs Γ P Fo na alen afun sts (MkUstate V M) U' r)))%I.
 
-End SpecSysExec.
+  (* SANITY: the arms imply the landed [SysExecDefs.sys_exec_post] *)
+  Lemma sys_exec_arms_landed (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names) (cw : Z) (γf : gname)
+      (pj : mword 64) (pid : mword 32)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate)
+      (V : pprivate) (r : mword 64) :
+    sys_exec_arms Fs Γ γfs cw γf pj pid P Pmiss Fo M av sts V r ⊢
+      sys_exec_post γf pj pid V r.
+  Proof.
+    rewrite /sys_exec_arms /sys_exec_post.
+    iIntros "H". iDestruct "H" as (U') "[Hp [[(%Hr & %HV & _) _] | H]]".
+    - iExists U', 0%nat, (fun _ => 0%nat),
+        (mword_of_int 0), (mword_of_int 0), (mword_of_int 0).
+      iFrame "Hp". iPureIntro. left. split; [exact Hr | exact HV].
+    - iDestruct "H" as (na alen afun) "[_ H]".
+      iDestruct (exec_arms_landed Fs Γ γfs cw P Pmiss Fo na alen afun sts
+                   (MkUstate V M) U' r with "[H]") as %(entry & spv & szv' & Hok).
+      { rewrite /exec_arms. iRight. iExact "H". }
+      iExists U', na, alen, entry, spv, szv'. iFrame "Hp". iPureIntro. exact Hok.
+  Qed.
 
+End SysExecAU.
+
+Global Typeclasses Opaque sys_exec_au_pre sys_exec_post_fail sys_exec_arms.
+
+(* ===================================================================== *)
+(*  3.  THE MACHINE CONTRACT: SysExecDefs's frame + the AU                *)
+(* ===================================================================== *)
+
+Definition wp_sys_exec_sconf_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (Fs : pfam Σ (uvis -> iProp Σ))                  (* the slot predicate the caller's WP concludes at *)
+    (γf : gname)                           (* ftable, kalloc      *)
+    (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
+    (pd pav pu : mword 64)                              (* disk fabric + lock  *)
+    (dqb dqs : dfrac)
+    (v0 v1 : mword 64)                        (* syscall arguments 0 and 1 *)
+    (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (m : regfile) (K : nat) (eb : bool)
+    (b : bool) (lks : gset string)
+    (P Pmiss : nat -> Z -> iProp Σ)
+    (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.sys_exec in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  let Γfs := fs_gamma_L fsc_fs in
+  (K_sys_exec <= K)%nat ->
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
+  log_geom_ok fsc_cov fsc_logst ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
+  0 <= icfg_ist ->
+  cov_below fsc_cov fsc_size ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
+  (j < NPROC)%nat ->
+  gs !! j = Some gl ->
+  eb = true ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
+  sie_cap_gpr KT1 m K b pj -∗
+  cpu_own 0 eb pj b lks -∗
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  fs_fabric gs pd pav pu -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
+  bslots 3 -∗
+  kalloc_env fsc_kalloc None -∗
+  iref_slots 2 -∗
+  proc_priv γf pj pid U -∗
+  (* ---- THE BUNDLE, the one addition to the premise list the vocabulary
+     leaf's header describes: the arguments are read off THIS image at
+     argument 1 ---- *)
+  sys_exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo (us_M U) v1 sts -∗
+  wp_next true pj (fun (CID : CpuId) =>
+  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
+      ⌜callee_saved m mf⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      sie_cap_gpr KT1 mf K b pj -∗
+      cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
+      pc_is ret_tgt -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
+      bslots 3 -∗
+      kalloc_env fsc_kalloc None -∗
+      iref_slots 2 -∗
+      (* the armed post: the block after the copy-ins' growth, the
+         arguments as read off the entry image, and -- on success at a
+         loadable file -- the caller's slot at the resume key *)
+      sys_exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) γf pj pid P Pmiss Fo (us_M U) v1 sts
+        (upd_upt (us_V U) P')
+        (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+(* ===================================================================== *)
+(*  4.  THE SEAL                                                          *)
+(* ===================================================================== *)
+
+Module Type SYSEXEC.
+  Parameter wp_sys_exec_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (Fs : pfam Σ (uvis -> iProp Σ))
+      (γf : gname)
+      (gs : list gname) (j : nat) (gl : gname)
+      (pd pav pu : mword 64)
+      (dqb dqs : dfrac)
+      (v0 v1 : mword 64)
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)),
+      wp_sys_exec_sconf_body Fs γf gs j gl pd pav pu dqb dqs v0 v1 pid U sts
+        m K eb b lks P Pmiss Fo.
+End SYSEXEC.

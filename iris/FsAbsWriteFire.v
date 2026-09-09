@@ -57,7 +57,7 @@
 
    ==== THE FIRE POINT: ONE PER CHUNK, AT THAT CHUNK'S RETAG =============
 
-   [wrf_awrite_fire] is [FsAbsMknodFire.mkf_acre_fire]'s /
+   [wrf_awrite_fire] is [FsAbsMknodFire.caf_acre_fire]'s /
    [FsAbsOpenFire.opf_atrunc_fire]'s two-phase mold at
    [FsAbsDelta.delta_write], FUSED WITH THE ROW RETAG: it replaces the
    [InodeRegion.ireg_top_retag_*] filewrite's inode arm performs after writei
@@ -68,7 +68,7 @@
    section -- which is what makes the pair ONE instant per chunk.
 
    THE PEEL IS NOT NEEDED HERE, and that is a finding.  sys_open's trunc
-   commit had to travel with a PEELED payload ([ProofSysOpenAUParts.so_flat])
+   commit had to travel with a PEELED payload ([ProofSysOpenShared.so_flat])
    because one [bs0] is shared between an observation fired at [ilock] and a
    receipt fired at the retag far below, with an existential [data] resealed
    in between.  filewrite's chunks each RE-LOCK: every chunk opens its own
@@ -151,7 +151,7 @@ Require Import Xv6G.
 Require Import SpecWritei.       (* [wi_dinode]                             *)
 Require Import SpecCopyin.       (* [ubytes_at]: the content seam           *)
 Require Import FsAbsDelta.   (* [abs_view_insert]                       *)
-Require Import SpecSysWriteAU.   (* [FW_MAX], [wri_pre], [wchunks]          *)
+Require Import SysWriteDefs.   (* [FW_MAX], [wri_pre], [wchunks]          *)
 Require Import FsAbsOpenFire.    (* [opf_era_file_row], [opf_era_type]      *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import       *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
@@ -738,8 +738,8 @@ Section WriteFire.
     iIntros "#Hi #Hai #Hoinv Hcm Hf Hg".
     assert (Hfoff : ↑foffN ⊆ E).
     { etrans; [| exact HE]. rewrite /foffN /appN. solve_ndisj. }
-    (* the re-spelling [mkf_acre_fire] does, and for the same reason: the
-       unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
+    (* the re-spelling is needed because the unifier cannot solve
+       [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".

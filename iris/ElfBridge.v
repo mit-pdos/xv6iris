@@ -27,7 +27,7 @@
    THE TWO TRUNCATIONS ARE THE ONLY REAL CONTENT.  [eh_phoff] and [ph_off]
    are FOUR-byte loads of EIGHT-byte fields (the C assigns a [uint64] to an
    [int]), so they equal [ee_phoff] / [ep_offset] only under the bounds
-   [SpecKexecAU.kexec_loadable] carries ([< 2 ^ 31]).  Every such lemma
+   [SpecKexec.kexec_loadable] carries ([< 2 ^ 31]).  Every such lemma
    below therefore states its bound as a hypothesis rather than hiding it;
    [elf_le_at_trunc] is where the arithmetic happens, once.
 

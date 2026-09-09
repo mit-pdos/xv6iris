@@ -1,6 +1,6 @@
 (* FsAbsOpenFire.v -- sys_open's TWO FIRE POINTS, DISCHARGED AGAINST THE
    INVARIANT, plus the row readings and the walk-premise bridge
-   the open family's statement leaf ([SpecSysOpenAU]) leaves to a
+   the open family's statement leaf ([SysOpenDefs]) leaves to a
    prover: the walk premise's start, the terminal observation's fire and
    the trunc fire.
 
@@ -12,8 +12,8 @@
 
    ==== ITEM 1: THE WALK PREMISE, RECONCILED ============================
 
-   [SpecSysOpenAU]'s [open_walk_pre_era] is the ONE-SHOT OVER ALL PATHS
-   ([FsAbsEraMknod.mknod_walk_pre_era]'s shape at the FULL element list)
+   [SysOpenDefs]'s [namei_walk_pre_era] is the ONE-SHOT OVER ALL PATHS
+   ([FsAbsEraMknod.npar_walk_pre_era]'s shape at the FULL element list)
    while the era contracts now take [FsAbsStart.ex_start] -- the same shot
    at a FIXED [pl].  The reconciliation is therefore the namei-side twin of
    [FsAbsNparMknod.np_start_of_mknod] and nothing in the contract moves:
@@ -22,7 +22,7 @@
    ([FsAbsNparMknod.np_rootino_agree], reused rather than restated).
 
    ROUTE TAKEN, AND WHY.  The alternative offered was to restate
-   [open_walk_pre_era] AT [ex_start] in place (statement and seal moving
+   [namei_walk_pre_era] AT [ex_start] in place (statement and seal moving
    together, as the ret-0 escape retirement did).  A discharge lemma is
    cleaner HERE because the two shapes are not the same predicate: the
    contract's one-shot is universally quantified over [pl] -- it is handed
@@ -44,8 +44,8 @@
 
    ==== ITEM 3: THE TRUNC FIRE ==========================================
 
-   [opf_atrunc_fire] is [mkf_acre_fire]'s two-phase mold at
-   [SpecSysOpenAU.delta_trunc], FUSED WITH THE ROW RETAG -- it replaces the
+   [opf_atrunc_fire] is [FsAbsMknodFire.caf_acre_fire]'s two-phase mold at
+   [SysOpenDefs.delta_trunc], FUSED WITH THE ROW RETAG -- it replaces the
    [InodeRegion.ireg_top_retag_*] sys_open performs after [itrunc] returns
    (the O_TRUNC bridge), with one extra premise (the caller's commit) and
    one extra payout (the receipt).  Same premise as the retag it replaces
@@ -59,7 +59,7 @@
    ride untouched -- which is what makes the delta collapse to the one-row
    insert and what makes the receipt's nlink the OBSERVED one.
 
-   THE OBSERVED-ROW TIE ([SpecSysOpenAU]'s header, THE ONE DELTA; owner
+   THE OBSERVED-ROW TIE ([SysOpenDefs]'s header, THE ONE DELTA; owner
    question 2) IS PAID BY THE FRAGMENT, not by a custody argument in prose:
    both fires read the row off the SAME [top_frag], and sys_open holds it
    whole across the window (ilock ... filealloc/fdalloc ... itrunc), so the
@@ -67,7 +67,7 @@
    caller's [Ft] receipt is delivered at that state.
 
    BINDERS: [FsAbsMknodFire]'s section list VERBATIM (which is
-   [SpecSysMknodAU]'s) -- [fileG] is bound and [icacheG]/[icfg] resolve only
+   [SysMknodDefs]'s) -- [fileG] is bound and [icacheG]/[icfg] resolve only
    through its fields. *)
 
 From Stdlib Require Import ZArith Lia List.
@@ -94,11 +94,11 @@ Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]     *)
 Require Import Xv6G.
 Require Import SpecItrunc.       (* [di_trunc]                              *)
 Require Import FsAbsDelta.   (* [abs_view_insert]                       *)
-Require Import SpecSysOpenAU.    (* the contract this file serves           *)
+Require Import SysOpenDefs.    (* the contract this file serves           *)
 Require Import FsAbsEra.       (* [ex_start]                              *)
 Require Import FsAbsMknodFire.   (* [mkf_abs_of_dir], [mkf_era_is_dir]      *)
 Require FsImg.                   (* [T_FILE_z], [ROOTINO] -- Require, NOT
-                                    Import (SpecSysOpenAU's reason)         *)
+                                    Import (SysOpenDefs's reason)         *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                 *)
@@ -286,16 +286,16 @@ Section OpenFire.
   (* =================================================================== *)
 
   (* The contract's one-shot, specialised to the string the walk fetched:
-     [FsAbsStart.ex_start] at that [pl] IS [open_walk_pre_era] there (same
+     [FsAbsStart.ex_start] at that [pl] IS [namei_walk_pre_era] there (same
      quantifier over the start, same start rule, same family over
      [path_elems pl]), so this is a rename.
      The namei-side twin of [FsAbsNparMknod.np_start_of_mknod]. *)
   Lemma opf_start_of_open `{XI : TsoCtx.CurCtx} (γfs : fs_names) (cw : Z) (P Pmiss : nat -> Z -> iProp Σ)
       (pl : list (bv 8)) :
-    open_walk_pre_era γfs cw P Pmiss -∗ ex_start γfs cw P Pmiss pl.
+    namei_walk_pre_era γfs cw P Pmiss -∗ ex_start γfs cw P Pmiss pl.
   Proof.
     iIntros "Hpre". rewrite /ex_start. iIntros (r Hr).
-    rewrite /open_walk_pre_era.
+    rewrite /namei_walk_pre_era.
     iMod ("Hpre" $! pl r with "[%]") as "[$ $]"; [exact Hr | done].
   Qed.
 
@@ -359,7 +359,7 @@ Section OpenFire.
   (*  3.  ITEM 3: THE TRUNC FIRE, FUSED WITH THE ROW RETAG                *)
   (* =================================================================== *)
 
-  (* [mkf_acre_fire]'s mold at [delta_trunc].  Replaces the
+  (* [FsAbsMknodFire.caf_acre_fire]'s mold at [delta_trunc].  Replaces the
      [InodeRegion.ireg_top_retag_*] sys_open calls after [itrunc] returns:
      same [inode_local] premise, same payout, plus the caller's two phases
      inside the one [ftopN] critical section.  The receipt's pre-state row

@@ -126,7 +126,7 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
@@ -829,7 +829,7 @@ Section KexecB2Loops.
     (* depth 0 forces the held set empty, so readi's order premise needs no
        hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct (SpecKexec.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct (KexecDefs.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     rewrite /kxc_res.

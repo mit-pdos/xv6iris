@@ -141,7 +141,7 @@ Require Import SpecNparWrapEra.  (* the ERA nameiparent walk, this file's callee
 Require Import SpecCreate.
 Require Import DirentEnc.        (* [bview]: the path buffer's reading    *)
 Require Import PathElems.        (* [path_elems]: the name tie's list     *)
-Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix *)
+Require Import SysMknodDefs.   (* [npar_elems]: the PARENT prefix *)
 Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start  *)
 Require Import FsAbsMknodFire.   (* the era walk's package and FIRE 1      *)
 Require Import FsTree.           (* [fname] *)
@@ -287,7 +287,7 @@ Section ProofCreateFound.
        (durable-disk lane A) *)
     log_tx icfg_log -∗
     (* ---- THE APPLICATION'S SIDE: the walk's DEFERRED start ([ep_start]
-       at this path buffer IS [FsAbsMknodFire.mknod_walk_pre_era] at it),
+       at this path buffer IS [FsAbsMknodFire.npar_walk_pre_era] at it),
        the exists observation, and the four commits, NONE fired on this
        half ---- *)
     ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen pfun) -∗

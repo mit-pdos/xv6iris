@@ -139,7 +139,7 @@ Require Import SpecNamex.
 Require Import SpecCreate.
 Require Import FsBlocks.         (* [fs_names]: the era's gnames          *)
 Require Import PathElems.        (* [path_elems]: the name tie's list      *)
-Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix *)
+Require Import SysMknodDefs.   (* [npar_elems]: the PARENT prefix *)
 Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
 Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsAbsDelta.       (* [dots_ents]: the entry map the dots fire lands (round E2, lane E2-C) *)
@@ -1797,7 +1797,7 @@ Section ProofCreateMain.
       (Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) :
-    P (length (mknod_parent_elems pl)) d -∗
+    P (length (npar_elems pl)) d -∗
     pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
     cre_commits (fs_gamma_L fsc_fs) tyz ma mi Farm Fdots Fun Fok -∗
     cre_fail_arms (fs_gamma_L fsc_fs) γfs tyz ma mi P Pmiss
@@ -1843,7 +1843,7 @@ Section ProofCreateMain.
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) (nm : fname) (i : Z) :
     list_basics.last (path_elems pl) = Some nm ->
-    P (length (mknod_parent_elems pl)) d -∗
+    P (length (npar_elems pl)) d -∗
     cre_ex_fired Fex d nm i -∗
     cre_commits (fs_gamma_L fsc_fs) tyz ma mi Farm Fdots Fun Fok -∗
     cre_fail_arms (fs_gamma_L fsc_fs) γfs tyz ma mi P Pmiss
@@ -1866,7 +1866,7 @@ Section ProofCreateMain.
       (Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d i : Z) :
-    P (length (mknod_parent_elems pl)) d -∗
+    P (length (npar_elems pl)) d -∗
     pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
     pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE (cre_child tyz ma mi)) Fok -∗
     cre_arm_fired Farm i -∗
@@ -1891,7 +1891,7 @@ Section ProofCreateMain.
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) (nm : fname) (i : Z) :
     list_basics.last (path_elems pl) = Some nm ->
-    P (length (mknod_parent_elems pl)) d -∗
+    P (length (npar_elems pl)) d -∗
     cre_ex_fired Fex d nm i -∗
     cre_commits (fs_gamma_L fsc_fs) tyz ma mi Farm Fdots Fun Fok -∗
     cre_ok_arms (fs_gamma_L fsc_fs) tyz ma mi P Farm Fdots Fun Fok Fex
@@ -1911,7 +1911,7 @@ Section ProofCreateMain.
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) (nm : fname) (i : Z) :
     list_basics.last (path_elems pl) = Some nm ->
-    P (length (mknod_parent_elems pl)) d -∗
+    P (length (npar_elems pl)) d -∗
     cre_arm_fired Farm i -∗
     (cre_dots_fired Fdots i d true
      ∨ cre_dots_leg (fs_gamma_L fsc_fs) tyz Fdots) -∗
@@ -2417,7 +2417,7 @@ Section ProofCreateMain.
           puts the cursor and the payload on the same [d]), the exists
           observation UNFIRED -- the name was not there -- and the four
           commits, NONE fired on this path ---- *)
-       P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
+       P (length (npar_elems (bview plen pfun))) (bv_unsigned dind) -∗
        pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
        cre_commits (fs_gamma_L fsc_fs) (bv_unsigned ty) (bv_unsigned major)
          (bv_unsigned minor) Farm Fdots Fun Fok -∗
@@ -2640,7 +2640,7 @@ Section ProofCreateMain.
        (* ---- THE APPLICATION'S SIDE: the cursor at the parent, the exists
           observation UNFIRED, the ARM fired at +0xc4 (its receipt), the
           other three commits unspent ---- *)
-       P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
+       P (length (npar_elems (bview plen pfun))) (bv_unsigned dind) -∗
        pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
        cre_arm_fired Farm (bv_unsigned cinum) -∗
        pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
@@ -2868,7 +2868,7 @@ Section ProofCreateMain.
           cursor and the exists observation go home; the ARM fired at +0xc4
           (its receipt), the other three commits unspent -- the
           [sh zero,74(s3)] below fires the unarm ---- *)
-       P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
+       P (length (npar_elems (bview plen pfun))) (bv_unsigned dind) -∗
        pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
        cre_arm_fired Farm (bv_unsigned cinum) -∗
        cre_dots_leg (fs_gamma_L fsc_fs) (bv_unsigned ty) Fdots -∗
@@ -3146,7 +3146,7 @@ Section ProofCreateMain.
           exists observation home, the ARM fired, the DOTS fired at
           whatever the entry wrote (or not at all), the unarm and the
           parent leg unspent ---- *)
-       P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
+       P (length (npar_elems (bview plen pfun))) (bv_unsigned dind) -∗
        pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
        cre_arm_fired Farm (bv_unsigned cinum) -∗
        ((∃ full : bool, cre_dots_fired Fdots (bv_unsigned cinum) (bv_unsigned dind) full)

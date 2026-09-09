@@ -64,7 +64,7 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import UmodeAbi.     (* [uimg_sub] *)
 Require Import ElfFile.      (* [elf_bytes], [elf_image], [elf_loads] *)
 Require Import UserPerm.     (* [perm_of], [perm_leaf]: the projection (S6)  *)
@@ -88,12 +88,11 @@ Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
 Require Import KexecPtImage.
-(* No require of ProofKexecB3.v (nor even SpecKexecB3.v): this file does
-   not yet consume [kxc_b2]/[kxc_b2z] (the argv loop that will is still in
-   progress).  When that resumes, SpecKexecB3.v is ready with those two
-   statements -- add a [(B3 : KEXECB3)] functor argument to [KexecCProof]
-   the way ProofKexecB3.v itself takes [(B2 : KEXECB2)], never a
-   [Require Import ProofKexecB3.]. *)
+(* No require of ProofKexecB3.v: this file does not consume [kxc_b2]/
+   [kxc_b2z] (the argv loop that would is still in progress).  When that
+   resumes, take a [(B3 : ProofKexecB3.KEXECB3)] functor argument on
+   [KexecCProof] the way ProofKexecB3.v itself takes [(B2 : KEXECB2)],
+   never a [Require Import ProofKexecB3.]. *)
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -322,7 +321,7 @@ Section KexecCSetup.
        [kxc_at_21a]'s conjuncts, and the argv loop that consumes that state
        needs both facts to call [strlen] on argument [i]. Carrying them from
        here, unconsumed, means the argv loop's own lemmas don't need a
-       SEPARATE way to reach back to [SpecKexec]'s contract for them. *)
+       SEPARATE way to reach back to [KexecDefs]'s contract for them. *)
     (forall i, (i < na)%nat -> (alen i < aslen i)%nat) ->
     (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i)) ->
     (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z) ->
@@ -342,7 +341,7 @@ Section KexecCSetup.
         (* THE TWO FACTS ABOUT [sz1] THE REST OF PHASE C RUNS ON, PUBLISHED
            HERE BECAUSE THIS IS WHERE THEY ARE DISCOVERED.  The stack top is
            [PGROUNDUP(szv) + 8192], so it is at least 8192 -- which is what
-           rules out the push loop's underflow (SpecKexec's blocker §7) and
+           rules out the push loop's underflow (KexecDefs's blocker §7) and
            is a premise of every later phase-C lemma; and [oldsz] is not an
            unknown at all, it is [p->sz] as [proc_priv] already records it,
            so the successor states quote [pv_sz V] rather than binding a
@@ -2374,7 +2373,7 @@ Section KexecCLoop.
     change (bv_modulus 64) with 18446744073709551616%Z. lia.
   Qed.
 
-  (* [andi s2,a5,-16] is the C's [sp -= sp % 16] (SpecKexec.v's own header:
+  (* [andi s2,a5,-16] is the C's [sp -= sp % 16] (KexecDefs.v's own header:
      the two agree only because the operand is non-negative, which is why
      this needs [0<=Y] and not just any [Y]). [sub_land_same_l]
      (Stdlib.ZArith.Zbitwise) gives [Y - Y.&15 = Y.&(Z.lnot 15)] and
@@ -3805,7 +3804,7 @@ Section KexecCLoop.
            (argv[c+1] <> 0) is now the loop's BACK EDGE, and FALLING THROUGH
            (argv[c+1] = 0) is its natural exit into +0x268.  The MAXARG arm,
            its [li s8,32] constant and the +0x26e bail stub all go with the
-           check; [S c < 32] now comes from [c <= na] and SpecKexec's
+           check; [S c < 32] now comes from [c <= na] and KexecDefs's
            [na < MAXARG] premise, which the spec already had to carry. ---- *)
         assert (Hcreg268 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx Ra0)
           by (vm_compute; reflexivity).
@@ -5149,7 +5148,7 @@ Section KexecCClose.
          loop's [kx_str_at] survives it verbatim, and its own bytes are in
          [kxb_arg_addr]'s right disjunct, so the surviving zeros widen from
          the string zone to the whole argument block.  What comes out is
-         [SpecKexecAU.kexec_stack_at]'s second conjunct at [c] -- the first
+         [SpecKexec.kexec_stack_at]'s second conjunct at [c] -- the first
          is [Hstackok] just below. ---- *)
       assert (Hvectop : (kxc_sp_final (uint sz1) alen c
                          + 8 * (Z.of_nat c + 1) <= uint sz1)%Z).

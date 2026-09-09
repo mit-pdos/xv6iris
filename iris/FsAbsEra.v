@@ -20,7 +20,7 @@
    is not a payload change but a SECOND WALK: same 334 bytes of namex, same
    contract shape, one different resource crossing the caller's [={T}=*].
    This file is that resource, stated once, so the walk's proof
-   ([ProofNamexEra]) and its consumers ([SpecSysMknodAU]'s prover) share a
+   ([ProofNamexEra]) and its consumers ([SysMknodDefs]'s prover) share a
    vocabulary instead of each unfolding a ghost.
 
    THE SHAPE, AND WHY IT IS THIS ONE.  [elend Gamma d dq ents] is the era
@@ -608,8 +608,8 @@ End FsAbsEra.
    dirlookups every element but the last, and returns the directory the
    last element would have been looked up IN.  So its trace family is the
    hop list over [removelast (path_elems pl)] -- which is, definitionally,
-   [SpecSysMknodAU.mknod_parent_elems pl], the family lane W's
-   [FsAbsEraMknod.mknod_walk_pre_era] already produces.  Stating the
+   [SysMknodDefs.npar_elems pl], the family lane W's
+   [FsAbsEraMknod.npar_walk_pre_era] already produces.  Stating the
    contract over the parent prefix is therefore not a design choice with
    alternatives: it is the only shape a create-side caller can supply.  (An
    earlier sketch had the walk take the FULL family and hand the last hop
@@ -841,7 +841,7 @@ End FsAbsNpar.
    only tie a caller can be expected to know -- an ABSOLUTE path starts at
    the root.
 
-   That is precisely the shape lane W's [FsAbsEraMknod.mknod_walk_pre_era]
+   That is precisely the shape lane W's [FsAbsEraMknod.npar_walk_pre_era]
    was already written in (that file's ∀ pl r with the [pl !! 0 = Some
    SLASH -> r = ROOTINO] side condition), which is why the consumer side
    needed no invention: [ep_start] at lane W's own [pl] IS that predicate
@@ -902,8 +902,8 @@ Qed.
 (*  0'. NAMEX'S START RULE (lane C3)                                      *)
 (*                                                                        *)
 (*  Pure and top level: absolute paths start at the root, relative ones   *)
-(*  at the process's cwd inum [cw].  [FsFdMirror.um_start] is this same   *)
-(*  rule read off the U-mode mirror ([FsFdMirror.um_start_of_agree]).     *)
+(*  at the process's cwd inum [cw].  A U-mode caller reads the same rule  *)
+(*  off the cwd its resume key carries ([UexecSG.spost_at]'s [cw']).      *)
 (* ===================================================================== *)
 
 Definition um_start_of (cw : Z) (pl : list (bv 8)) : Z :=
@@ -943,7 +943,7 @@ Section FsAbsStart.
        P 0%nat r ∗ ex_hops_from γfs P Pmiss pl 0%nat)%I.
 
   (* THE NAMEIPARENT SIDE: the same one shot over the PARENT PREFIX
-     ([FsAbsNpar.np_elems], which is lane W's [mknod_parent_elems]). *)
+     ([FsAbsNpar.np_elems], which is lane W's [npar_elems]). *)
   Definition ep_start (γfs : fs_names) (cw : Z) (P : nat -> Z -> iProp Σ)
       (Pmiss : nat -> Z -> iProp Σ) (pl : list (bv 8)) : iProp Σ :=
     (∀ r : Z,

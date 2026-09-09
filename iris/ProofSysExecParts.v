@@ -115,9 +115,9 @@ Require Import SpecFetchstr.
 Require Import SpecKalloc.
 Require Import SpecKfree.
 Require Import SpecMemset.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import CodeSysExec.
-Require Import SpecSysExec.
+Require Import SysExecDefs.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

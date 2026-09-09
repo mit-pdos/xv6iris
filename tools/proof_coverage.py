@@ -47,7 +47,7 @@ are discovered automatically:
   (a ``let`` bound from register x1 / ``ra``, whatever it is named) is a
   WHOLE-FUNCTION spec for ``<sym>``.  Either pin may be FACTORED into a
   same-file predicate the body applies rather than written inline -- the
-  atomic-update specs put both in a shared ``_frame`` (``SpecSysOpenAU.v``),
+  atomic-update specs put both in a shared ``_frame`` (``SysOpenDefs.v``),
   and several older specs factor just the continuation -- so both are followed
   through the application (``entry_via_frame`` / ``runs_to_end``);
 * the same with a nonzero entry offset, or with a continuation that is another
@@ -289,7 +289,7 @@ def entry_via_frame(text: str, local_defs: dict | None):
     """The entry pin of a `_body` that FACTORS it into a same-file FRAME.
 
     A `_body` normally opens with its own `let pcE := mword_of_int
-    KernelSyms.<sym>`.  The atomic-update family does not: `SpecSysOpenAU.v`'s
+    KernelSyms.<sym>`.  The atomic-update family does not: `SysOpenDefs.v`'s
     `wp_sys_open_au_plain_body` is one line over `wp_sys_open_au_frame` -- the
     shared premises and conclusion both its arms ride, parameterised by the
     arm's precondition and arms -- and the entry pin lives in the frame.

@@ -182,7 +182,7 @@ Definition upd_name (V : pprivate) (ns : list (bv 8)) : pprivate :=
    file and does not chdir).  This is exactly the composite kexec's two
    accessors below produce, and [upd_exec_compose] is the equation that says
    so -- stating the postcondition with this one name is what keeps
-   SpecKexec's success arm readable. *)
+   KexecDefs's success arm readable. *)
 Definition upd_exec (V : pprivate) (szv : mword 64) (P : uptd)
     (ws : list (mword 64)) (ns : list (bv 8)) : pprivate :=
   MkPPriv szv P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) ns (pv_cwi V).

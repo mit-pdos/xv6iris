@@ -52,7 +52,7 @@
    iris-FREE in the sense of [ElfFile.v] / [ElfBridge.v]: no proofmode, no
    ghost state, vanilla [rewrite ... by ...] throughout.  It does Require
    [UserPtTree.v] (for [umem_write] / [umem_grow] / [pgroundup]) and
-   [SpecKexec*.v] (for [kxc_sp] / [kexec_sz] / [kexec_args_at] and the
+   [KexecDefs*.v] (for [kxc_sp] / [kexec_sz] / [kexec_args_at] and the
    rest of the names the contract is stated in), because there is no
    lighter home for those; that is also why the _CoqProject row sits with
    the kexec specs rather than beside [ElfBridge.v]. *)
@@ -69,11 +69,11 @@ Require Import UserPtTree.      (* [umem_write], [umem_wr], [umem_grow],
 Require Import ElfFile.         (* the image semantics                       *)
 Require Import ElfBridge.       (* [elf_parse_phdr_all], [ph_at_of_ehdr] --
                                    §4's identification of the code's walk  *)
-Require Import SpecKexec.       (* [kxc_sp], [kxc_sp_final], [kxc_stack_ok]  *)
+Require Import KexecDefs.       (* [kxc_sp], [kxc_sp_final], [kxc_stack_ok]  *)
 Require Export KexecBuilt.      (* the argument block's algebra, spelled
-                                   below [SpecKexecAU] so the kexec block
+                                   below [SpecKexec] so the kexec block
                                    proofs can name it; §5 bridges it       *)
-Require Import SpecKexecAU.     (* [loads_ascending], [kexec_top],
+Require Import SpecKexec.     (* [loads_ascending], [kexec_top],
                                    [kexec_sz], [kexec_arg_addr],
                                    [kexec_args_at], [kexec_stack_at],
                                    [kexec_ustack]                            *)
@@ -92,8 +92,8 @@ Local Open Scope Z_scope.
     The reason is the one §4 already records: the phdr loop's and loadseg's
     INVARIANTS are stated in exactly that vocabulary, and
     [ProofKexecSeam.v] / [ProofKexecB2.v] / [ProofKexecB3.v] sit below
-    [SpecKexecAU.v] -- which this file requires and they must not.  What is
-    left here is what genuinely names [SpecKexecAU]: [kexec_top] /
+    [SpecKexec.v] -- which this file requires and they must not.  What is
+    left here is what genuinely names [SpecKexec]: [kexec_top] /
     [kexec_sz], [loads_ascending], and §5's bridges.                       *)
 
 (* ...hence [kexec_top] and [kexec_sz] in terms of the loop's own state. *)
@@ -141,7 +141,7 @@ Qed.
 (* ---- [loads_ascending] IS [KexecBuilt.kxb_ascending] ---- *)
 
 (*  The kernel-side phdr loop cannot name [loads_ascending] (this file is
-    above [SpecKexecAU]); [KexecBuilt.kxb_ascending] is the same fixpoint
+    above [SpecKexec]); [KexecBuilt.kxb_ascending] is the same fixpoint
     spelled below it, and this is the identification, plus the four rows
     the contract's own spelling wants.  Each is one [rewrite]. *)
 
@@ -233,7 +233,7 @@ Qed.
     re-exported by the [Require Export] above.  The reason is the
     dependency order: the argv loop's INVARIANT is stated in exactly that
     vocabulary, and [ProofKexecSeam.v] / [ProofKexecC.v] sit below
-    [SpecKexecAU.v] -- which this file requires and they must not.  So the
+    [SpecKexec.v] -- which this file requires and they must not.  So the
     predicates are spelled in [KexecBuilt] and §5 below is the bridge.
     The two [umem_grow] lookup laws and the three [pgroundup] rows moved
     with them, for the same reason ([kx_page_zero_grow] needs them).      *)
@@ -243,8 +243,8 @@ Qed.
 (* ====================================================================== *)
 
 (*  [kxb_ustack] / [kxb_arg_addr] / [kxb_args_at] / [kxb_stack_at] are
-    [SpecKexecAU]'s four predicates transcribed character for character
-    into a file that does not require [SpecKexecAU], so each of these is
+    [SpecKexec]'s four predicates transcribed character for character
+    into a file that does not require [SpecKexec], so each of these is
     the identity -- and stating them is what lets a client of the exec
     contract consume [KexecBuilt.kexec_built] without ever unfolding it. *)
 

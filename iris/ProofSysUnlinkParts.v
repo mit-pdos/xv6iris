@@ -3,7 +3,7 @@
    contract, and therefore everything that can live outside the module
    functor.
 
-   The walk itself is [ProofSysUnlink.v]; the op-wide log ledger is
+   The walk itself is [ProofSysUnlinkW1/W2/W3/W5F/W5D]; the op-wide log ledger is
    [SysUnlinkBudget.v]; the contract is [SpecSysUnlink.v], whose header
    carries the arm graph and the frame map.
 

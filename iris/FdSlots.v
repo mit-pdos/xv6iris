@@ -569,34 +569,30 @@ Section FdSlots.
     (⌜length sts = NOFILE⌝ ∗ ([∗ list] fd ↦ st ∈ sts, fd_st γ fd st) ∗
      foff_rows sts)%I.
 
-  (* [fd_frags_any] IS BEING RETIRED, and this note records what it cost.
-     The values were existential as a staging decision -- nothing outside
-     the kernel read them, so quantifying kept the bundle a plain in-and-out
-     family on the syscall channel.  What that bought in uniformity it paid
-     for in silence: the weakening DISCARDS a value the producer had in
-     hand, and once discarded it cannot be recovered, since this predicate
-     pins the length and nothing else.  Every remaining use is a place where
-     a caller is being told less than the callee knew.
+  (* [fd_frags_any] (below) IS THE FORGETFUL READING OF THIS BUNDLE, and it
+     is LIVE: it is the shape the syscall channel threads where no caller
+     names the list -- [SpecKexit]/[ProofKexit], [ProofSysExit],
+     [SpecSysPipe] and [SpecSysOpen]'s post, [ProcInv]'s array bridge,
+     [UsysMemOk]'s loop invariant, [UsertrapRes]'s weakening.
 
-     THE WORKED EXAMPLE IS FORK, AND IT IS RETIRED.  allocproc's mint proves
-     [fd_frags γ fdt0]; kfork's copy loop retypes the child's ghost one
-     descriptor at a time, at the state the PARENT's own list records; and
-     the park is keyed at the list that comes out.  While either end
-     forgot -- the mint on the line after it, or the loop's invariant -- a
-     forked child's descriptors were unstateable, which is what parked sh's
-     command-tree runner.  Both ends name the list now
+     WHAT IT COSTS, so a caller chooses deliberately.  The weakening
+     DISCARDS a value the producer had in hand, and once discarded it
+     cannot be recovered, since [fd_frags_any] pins the length and nothing
+     else.  Every use of it is a place where a caller is told less than the
+     callee knew.
+
+     THE WORKED EXAMPLE IS FORK, WHERE BOTH ENDS NAME THE LIST INSTEAD.
+     allocproc's mint proves [fd_frags γ fdt0]; kfork's copy loop retypes
+     the child's ghost one descriptor at a time, at the state the PARENT's
+     own list records; and the park is keyed at the list that comes out.
+     While either end forgot -- the mint on the line after it, or the
+     loop's invariant -- a forked child's descriptors were unstateable,
+     which is what parked sh's command-tree runner
      (claude-notes/design/user-fd.md SS4).
 
-     THE ORIGINAL NOTE, for the record:
-
-     The values are existential for now, and that is a staging decision, not
-     a limitation of the shape.  Nothing outside the kernel reads them yet,
-     and quantifying keeps the bundle a plain in-and-out family on the
-     syscall channel -- the same shape [fd_slots FDSPARE] has, so
-     [SpecSyscall]'s twenty-two entries thread it without a new index.  A
-     client that wants to state a DELTA ("fd 3 is closed now") takes
-     [fd_frags] at an explicit [sts] instead; that is a change of parameter
-     at the holder, not a re-plumb. *)
+     A client that wants to state a DELTA ("fd 3 is closed now") takes
+     [fd_frags] at an explicit [sts]; that is a change of parameter at the
+     holder, not a re-plumb. *)
   (* THE TABLE A FRESH PROCESS IS BORN WITH.  It lives HERE rather than at
      the mirror because [ProcInv]'s slot-open mint is what produces it, and
      that mint is below every consumer -- a name defined above it could not
@@ -614,9 +610,9 @@ Section FdSlots.
   (* was free" licenses open to answer any free slot at all.              *)
   (*                                                                     *)
   (* TWO READINGS OF ONE FACT, and both are wanted.  [fd_lowest_closed]   *)
-  (* is the scan as a FUNCTION -- it computes, which is what the mirror's *)
-  (* rows want ([FsFdMirror], which is where it used to live; it moved    *)
-  (* down because [UsysMemOk]'s rows are below that file).                *)
+  (* is the scan as a FUNCTION -- it computes, which is what a caller     *)
+  (* that must NAME the descriptor open() answered wants; it sits here,   *)
+  (* below [UsysMemOk]'s rows, so every such caller can see it.           *)
   (* [fd_least_closed] is the same fact as a RELATION, and that is the    *)
   (* form a PROOF wants: "this slot is closed and no smaller one is" is   *)
   (* what fdalloc's own postcondition yields, via                          *)

@@ -4,7 +4,7 @@
 
    ---- THIS FILE EXISTS FOR THE BUILD GRAPH, NOT FOR THE PROOF -----------
 
-   Every line below was in ProofKexecA.v, and ProofKexecB.v reached it by
+   Every line below was in ProofKexecACode.v, and ProofKexecB.v reached it by
    requiring that file outright.  Nothing requires either proof file in turn
    -- they are both leaves -- so that edge bought nothing and cost the one
    thing a leaf can still cost: it put A and B IN SERIES on the build's
@@ -38,12 +38,12 @@
    A's body: [kxc_exit_m1] and [kxc_bad64] are each applied at the hart their
    caller's [c.j] resumed on, and a sibling lemma in the SAME section would
    resolve its [CpuId] through the section variable by name.  The reason is
-   recorded in full above [Section KexecABody] in ProofKexecA.v, where the
+   recorded in full above [Section KexecABody] in ProofKexecACode.v, where the
    applications are.  It is a constraint on the section, not on the file, so
    do not collapse these two sections into one on the grounds that the file
    boundary now separates them from their callers.
 
-   Read ProofKexecA.v's header for the frame map, the register conventions and
+   Read ProofKexecACode.v's header for the frame map, the register conventions and
    the reasoning about the buffers; it is still the entry point for this
    proof.  claude-notes/projects/kexec.md is the worklist. *)
 
@@ -103,7 +103,7 @@ Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecIput.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
@@ -957,7 +957,7 @@ End KexecA.
    half opens it at its top and closes it (with
    [ProofKexecParts.kxc_upd_cwd_id]) before its exits.
 
-   [SpecKexec.fs_fabric] is NOT here: it is persistent, so it is carried by
+   [KexecDefs.fs_fabric] is NOT here: it is persistent, so it is carried by
    whoever needs it rather than threaded.
 
    THE PATH BUFFER IS AT [dqpv] AND THE ARGUMENT STRINGS AT [dqas], the two
@@ -1023,7 +1023,7 @@ Section KexecASeam.
             depth, so what crosses this seam is the one fact the closing
             iunlockput needs.  Spelling it as the counted contract's
             [MAXOPBLOCKS - (L+1)*iput_units <= n1] is what used to cap kexec
-            at one path element -- see SpecKexec.v's header. ---- *)
+            at one path element -- see KexecDefs.v's header. ---- *)
      ⌜ (iput_units <= n1)%nat ⌝ ∗
      log_op icfg_log n1 ∗
      (* ---- the inode namei returned, and the slot it came out of ---- *)
@@ -1053,7 +1053,7 @@ End KexecASeam.
 
 (* ===================================================================== *)
 (*  THE OPEN INODE'S PAYLOAD, AT A NAMED [data] (S3b).                    *)
-(*  Spelled HERE because both phase A (ProofKexecA.v, which chooses the    *)
+(*  Spelled HERE because both phase A (ProofKexecACode.v, which chooses the    *)
 (*  name at its header readi) and the seam states (ProofKexecSeam.v,       *)
 (*  which carry it from +0x090 to +0x1a4) must see it, and those two are   *)
 (*  siblings.                                                              *)
@@ -1278,8 +1278,8 @@ Section KexecAExit.
 
   (* [fs_fabric]'s CONSTRUCTOR IS GONE (rank 1d), and so is the 107.7 s it
      was written to avoid.  The bundle is [FsReady.fs_ready] plus three rows
-     now (SpecKexec.v), so a block that unpacked it with
-     [SpecKexec.fs_fabric_all] and has to hand it on again does not rebuild
+     now (KexecDefs.v), so a block that unpacked it with
+     [KexecDefs.fs_fabric_all] and has to hand it on again does not rebuild
      anything: the bundle is PERSISTENT and still in the intuitionistic
      context, so every one of the ten call sites is one [iExact "Hfab"]. *)
 
@@ -1514,7 +1514,7 @@ Section KexecABad.
     (* depth 0 with interrupts on forces the held set empty, so iunlockput's
        order premise needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct (SpecKexec.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct (KexecDefs.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (kxa_esc_acc k Hk with "Hesc") as "#Hesck".

@@ -14,7 +14,7 @@
 (* down, the syscall's armed post comes back.  Both families are fields   *)
 (* of this class, at the RECURSIVE OCCURRENCE [X], for the reason the     *)
 (* exec payload was: the concrete bundles live above the whole file-system*)
-(* tower ([SpecSysOpen.open_in], [SpecSysExecAU.sys_exec_au_pre], …) and  *)
+(* tower ([SpecSysOpen.open_in], [SpecSysExec.sys_exec_au_pre], …) and  *)
 (* threading them as arguments would drag that tower's binders through    *)
 (* every U-mode form below.  The one instance is [UexecExecInst.v].       *)
 (*                                                                        *)
@@ -25,8 +25,8 @@
 (* existentials -- one inside the bundle, one inside the post -- would    *)
 (* hand a program a post about families it never chose.  So the [∃] sits  *)
 (* on the ARM, outside both, and the two class fields are INDEXED by it:  *)
-(* this is [FdRowPilot]'s mirror shape ([∃ u, mcur u ∗ (∀ …, mcur u' -∗ …)*)
-(* ]) at the families instead of the mirror.                              *)
+(* an existential over a current value, with the deposit and the post     *)
+(* both read at it ([∃ f, sbundle_at .. f ∗ spost_at .. f]).              *)
 (*                                                                        *)
 (* [sfam] IS ONE TYPE, NOT A [Z]-INDEXED FAMILY, and the reason is        *)
 (* mechanical rather than aesthetic.  With [sfam : Z -> Type] the         *)
@@ -43,7 +43,7 @@
 (* names, and the fields no number reads are inert.                       *)
 (*                                                                        *)
 (* WHY THE FAMILIES TAKE [X].  exec's bundle contains a SLOT WAND -- the  *)
-(* caller's WP for the program exec loads ([SpecKexecAU.exec_slot_pre]    *)
+(* caller's WP for the program exec loads ([SpecKexec.exec_slot_pre]    *)
 (* concludes at [S W']) -- so the family has to be applied to the         *)
 (* fixpoint variable, and at the fixpoint it concludes at [uslot] itself. *)
 (* Non-expansiveness in [X] is a field because that is what the           *)
@@ -161,11 +161,11 @@
 (* sites -- which see the instance -- discharge both.                       *)
 (* ===================================================================== *)
 
-(* [sbundle_at_mono] is what an ENRICHED parallel fixpoint's injection    *)
-(* needs ([UexecRetFs.uexec_ret_fs_of] carries the deposit from [uslot]   *)
-(* to [uslot_fs γm]): the bundles are covariant in the SLOT family,       *)
-(* because the only place it occurs is exec's wand CONCLUSION.  (Not to   *)
-(* be confused with [sfam], the DEPOSIT's families, which the mover fixes.)*)
+(* [sbundle_at_mono] is what an injection between two U-mode slot         *)
+(* fixpoints needs when it carries a deposit from one to the other: the   *)
+(* bundles are covariant in the SLOT family, because the only place it    *)
+(* occurs is exec's wand CONCLUSION.  (Not to be confused with [sfam],    *)
+(* the DEPOSIT's families, which the mover fixes.)                        *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -248,7 +248,7 @@ Class uexecSG (Σ : gFunctors) := {
      row of [fdv'], and the directory chdir() installed is [cw'].  So the
      post takes the returned a0 [r], the descriptor view [fdv'] and the
      working directory [cw'] the arm resumes at, all three bound by the
-     SAME [∀] of the arm ([UexecRet.uexec_ret_ret_F]) that binds the four
+     SAME [∀] of the arm ([UexecRet.uexec_ret_cont_F]) that binds the four
      pure rows.  The remaining resume components -- the image, the
      permission map, the break -- no contract's receipt reads, so they
      stay out. *)
@@ -298,8 +298,8 @@ Global Existing Instance spost_at_ne.
 (* stdpp's [f_equiv] enumerates the application arities it can peel and stops
    at FIVE; [spost_at] takes SEVEN, so a [solve_contractive] over it fails with
    a bare "No applicable tactic".  These are stdpp's own fallback pattern at
-   six and seven, and Iris's tactic with it in the [first]; the two U-mode
-   fixpoints ([UexecRet.uslot_F], [UexecRetFs.uslot_fs_F]) are the users. *)
+   six and seven, and Iris's tactic with it in the [first]; the U-mode
+   slot fixpoint [UexecRet.uslot_F] is the user. *)
 Ltac f_equiv_wide :=
   match goal with
   | |- ?R (?f _ _ _ _ _ _ _) _ =>

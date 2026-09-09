@@ -308,7 +308,7 @@ UEchoKernel.v
 # UShKernel = sh's slot ([sh_uexec_slot], via UkRun.uslot_of_urun_all +
 # UkSh.wp_ksh_start, with UkSh's read-leaf
 # Hypothesis discharged) and the bridge from the kernel's image fact
-# ([sh_slot_of_kexec], off SpecKexecAU.kexec_image_ok at ElfUser.sh_elf).
+# ([sh_slot_of_kexec], off SpecKexec.kexec_image_ok at ElfUser.sh_elf).
 UShKernel.v
 UkAbi.v
 UexecCond.v
@@ -729,7 +729,6 @@ ElfUser.v
 FsImg.v
 FsImgDisk.v
 FsImgCheck.v
-FsImgConsole.v
 PathElems.v
 CodeWriteHead.v
 CodeInstallTrans.v
@@ -1351,7 +1350,7 @@ CodeSysExec.v
 CodeKexec.v
 KexecOkQ.v
 KexecBuilt.v
-SpecKexec.v
+KexecDefs.v
 SpecFlags2perm.v
 ProofFlags2perm.v
 LinkFlags2perm.v
@@ -1360,9 +1359,6 @@ ProofFilestatParts.v
 ProofFilestat.v
 LinkFilestat.v
 SpecFilewrite.v
-SpecConsolewrite.v
-ProofConsolewrite.v
-LinkConsolewrite.v
 ProofFilewriteParts.v
 ProofFilewriteChain.v
 ProofFilewrite.v
@@ -1378,16 +1374,15 @@ LinkSysFstat.v
 ProofKexecParts.v
 ProofKexecTail.v
 ProofKexecSeam.v
-ProofKexecA.v
+ProofKexecACode.v
 ProofKexecB.v
 SpecKexecB2.v
 KexecPtImage.v
 ProofKexecB2.v
-SpecKexecB3.v
 ProofKexecB3.v
 ProofKexecC.v
 ProofKexecD.v
-SpecSysExec.v
+SysExecDefs.v
 # sys_exec's blocks, split off from the composition (ProofSysExec.v, which
 # is up beside the contract it seals): everything that does not name [Kexec].
 ProofSysExecParts.v
@@ -1457,7 +1452,7 @@ InodeDefs.v
 SpecSysUnlink.v
 ProofSysUnlinkParts.v
 ProofSysUnlinkTails.v
-ProofSysUnlink.v
+ProofSysUnlinkPure.v
 ProofSyscall.v
 LinkUserretClosed.v
 TfPage36.v
@@ -1488,7 +1483,7 @@ LogSnapLaw.v
 FsFlushedCore.v
 FsDurSyscall.v
 FsAbs.v
-SpecSysMknodAU.v
+SysMknodDefs.v
 FsAbsEra.v
 SpecNamexEra.v
 ProofNamexEra.v
@@ -1497,7 +1492,7 @@ SpecNameiEra.v
 ProofNameiEra.v
 LinkNameiEra.v
 FsAbsEraMknod.v
-SpecSysWriteAU.v
+SysWriteDefs.v
 FsAbsNpar.v
 SpecNparEra.v
 ProofNparEra.v
@@ -1505,7 +1500,7 @@ LinkNparEra.v
 SpecNparWrapEra.v
 ProofNparWrapEra.v
 LinkNparWrapEra.v
-SpecSysReadAU.v
+SysReadDefs.v
 FsAbsMknodFire.v
 # sys_mknod's ONE contract, its proof and its link.  The stable corollary
 # is DERIVED inside the proof file (no second walk, no second seal); its
@@ -1519,7 +1514,7 @@ LinkSysMknod.v
 # state (the port the banner of claude-notes/projects/namei-pinned-lookup.md
 # asks for).  A LEAF, like every consumer of FsImgCheck -- nothing requires it.
 FsInitPin.v
-SpecSysOpenAU.v
+SysOpenDefs.v
 FsAbsStart.v
 
 # sys_sync's durability receipt.  FsFlushedCore builds [flushed b D] out of
@@ -1530,62 +1525,57 @@ FsAbsStart.v
 # composition over FsDurSyscall's certificates.  sys_sync's own contract
 # states the receipt at these leaves; its row is listed above.
 FsAbsOpenFire.v
-ProofSysOpenAUBits.v
-ProofSysOpenAUParts.v
-ProofSysOpenAUPub.v
-ProofSysOpenAUStores.v
-ProofSysOpenAUAlloc.v
-ProofSysOpenAUJoin.v
-ProofSysOpenAUWalk.v
-ProofSysOpenAU.v
+ProofSysOpenBits.v
+ProofSysOpenShared.v
+ProofSysOpenPub.v
+ProofSysOpenStores.v
+ProofSysOpenAlloc.v
+ProofSysOpenJoin.v
+ProofSysOpenWalk.v
+ProofSysOpen.v
 
 # fs-syscall-specs lane P, transport half: the era-0 identification that
 # closes lane P GAP (1) -- the map the boot mint founds the era at IS
 # era0_D, at the one era-0 premise (this era's disk is mkfs's image).  Also
 # a LEAF: its import cone is FsInitPin's own and nothing requires it.
 FsInitPinBoot.v
-SpecSysUnlinkAU.v
+SysUnlinkDefs.v
 FsAbsReadFire.v
 # ...and lane W's O_CREATE ARM itself, which the carry unlocks.
-# ProofSysOpenAUCreArm is the SHIM: the blocks from the join down are
+# ProofSysOpenCreArm is the SHIM: the blocks from the join down are
 # parametric in the four caller predicates, so the create arm runs them at
 # shim predicates and converts the armed post afterwards.
-# ProofSysOpenAUEntryC is +0x38..+0x48 and ARM A-FAIL; ProofSysOpenAUFull
+# ProofSysOpenEntryC is +0x38..+0x48 and ARM A-FAIL; ProofSysOpenFull
 # is the entry with the +0x36 branch mirrored, and it SEALS
 # SpecSysOpen.SYSOPEN -- ONE parameter, keyed on om_create, with the plain
-# arm applied from ProofSysOpenAU's own functor, so there is one proof of
-# that arm in the tree and not two, and ProofSysOpenAU's functor is
+# arm applied from ProofSysOpen's own functor, so there is one proof of
+# that arm in the tree and not two, and ProofSysOpen's functor is
 # unascribed.
-ProofSysOpenAUCreArm.v
-ProofSysOpenAUEntryC.v
-ProofSysOpenAUFull.v
+ProofSysOpenCreArm.v
+ProofSysOpenEntryC.v
+ProofSysOpenFull.v
 LinkSysOpen.v
 FsAbsWriteFire.v
 # fs-syscall-specs, THE CONSOLE-WRITE LANE: init.c's printf path, and the
 # campaign's last device-side gap on init.  The observable is ACCEPTANCE --
 # the bytes reached the UART transmitter, in order, after a seed the caller
-# holds (SpecSysWriteConsAU.v's header says why not the wire) -- and it is
+# holds (UartSentLoc.v's header says why not the wire) -- and it is
 # carried by a LOCATED receipt, which is what makes per-write() receipts
 # concatenate into one for a whole printf.
 #   UartSentLoc is that receipt at the transmitter invariant, where its
-# PRODUCERS live; the four *Loc files are the landed uartwrite and
-# consolewrite walks with the receipt threaded through (copy-adapts, R10:
-# SpecUartwrite / SpecConsolewrite / SpecFilewrite / SpecSysWrite and their
-# proofs are untouched); SpecFilewriteCons is the device arm's dispatch
-# contract and ProofSysWriteConsAU seals SpecSysWriteConsAU over it.
-#   ProofFilewriteCons SEALS that dispatch contract -- ProofFilewrite's walk
-# with the pipe, inode and panic arms and the two device -1 paths refuted
-# from the premises rather than proved -- and the last two Links close the
-# chain: FilewriteCons is a closed instance, and LinkSysWriteConsAU turns
-# SYSWRITE_CONS_AU from a seal into a theorem.  init.c's printf path is then
-# proved end to end, over the standing three assumptions and nothing else.
+# PRODUCERS live; the *Loc trio is uartwrite's walk with the receipt
+# threaded through, and SpecConsolewrite / ProofConsolewrite /
+# LinkConsolewrite are consolewrite's ONE contract, which takes the seed and
+# returns cons_sent_cnt.  ProofFilewrite's device arm calls it at every
+# major and LinkFilewrite closes the chain, so init.c's printf path is
+# proved end to end over the standing assumptions and nothing else.
 UartSentLoc.v
 SpecUartwriteLoc.v
 ProofUartwriteLoc.v
 LinkUartwriteLoc.v
-SpecConsolewriteLoc.v
-ProofConsolewriteLoc.v
-LinkConsolewriteLoc.v
+SpecConsolewrite.v
+ProofConsolewrite.v
+LinkConsolewrite.v
 
 # The era-0 SHELL pins: FsInitPin's /init pair (path pin, content pin,
 # arun walk) and FsInitPinBoot's boot transport, replayed at inum 13 with
@@ -1596,18 +1586,18 @@ LinkConsolewriteLoc.v
 FsShPin.v
 AppEcho.v
 # kexec's ONE contract: the walk, one observation of the file, and the
-# caller's own u-mode WP for the program observed (SpecKexecAU.v's header).
-# SpecKexec.v, far below, is the vocabulary leaf it is stated over.
-SpecKexecAU.v
+# caller's own u-mode WP for the program observed (SpecKexec.v's header).
+# KexecDefs.v, far below, is the vocabulary leaf it is stated over.
+SpecKexec.v
 # THE PURE LOADER ALGEBRA the exec proofs' loop invariants consume: the
 # image inclusion laws ([uimg_sub] over [elf_image]), the loadseg window,
 # the [sz] chain ([kexec_sz_after] = [elf_mem_end], hence [kexec_sz]) and
 # the stack page's zero fill / [kexec_args_at].  iris-free (no proofmode);
 # it sits HERE rather than beside ElfBridge.v only because [kxc_sp] /
-# [kexec_args_at] / [loads_ascending] have no home below SpecKexec*.v.
+# [kexec_args_at] / [loads_ascending] have no home below KexecDefs*.v.
 KexecImageAlg.v
-KexecAUBridge.v
-SpecSysExecAU.v
+KexecBridge.v
+SpecSysExec.v
 # UexecExecInst = the kernel-side instance of UexecSG's [uexecSG] and
 # [uprogSG]: [sbundle X 7 W] := some [sys_exec_au_pre] at the trapping key's
 # image, argv pointer (trapframe argument 1) and descriptor view, [emp] at
@@ -1647,14 +1637,14 @@ LinkSysExec.v
 # three theorems that take it are conditional; everything below them is
 # not.  Read the header before extending.
 # THE EXEC COMPOSITION.
-#   ProofKexecAUA is phase A with the namei call at SpecNameiEra's era walk
+#   ProofKexecA is phase A with the namei call at SpecNameiEra's era walk
 # and the header oracle ANSWERED rather than relayed; ProofKexec composes it
 # with the shared blocks B..D at
-# [Q := KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef ...], where the one
+# [Q := KexecBridge.exec_built_Q (kxc_fb datl dnf) ef ...], where the one
 # paying site is discharged by exec_built_Q_intro and the exit is converted
 # twice (kxau_close_fail below +0x090, kxau_close at the receipt above it).
 # LinkKexec closes the functor over LinkNameiEra beside LinkNamei.
-ProofKexecAUA.v
+ProofKexecA.v
 ProofKexec.v
 LinkKexec.v
 
@@ -1694,19 +1684,18 @@ App.v
 # contract, plus the abs_of wrap of the landed dir_entries_unlink_eq, the
 # count-lowered bridge at both iupdates, and the isdirempty bridge in both
 # directions.
-#   ProofSysUnlinkAUParts is the shared layer (the hoisted projections, the
+#   ProofSysUnlinkShared is the shared layer (the hoisted projections, the
 # name tie, the fire sites' pure side conditions) and the five blocks are
 # the walk.  ProofSysUnlinkParts, ProofSysUnlinkTails (every exit block) and
-# ProofSysUnlink's top-level pure layer sit below them.  ProofSysUnlinkAU
+# ProofSysUnlinkPure's top-level pure layer sit below them.  ProofSysUnlink
 # seals SpecSysUnlink.SYSUNLINK -- its one parameter wp_sys_unlink -- and
 # LinkSysUnlink makes it unconditional: assumption set = resv_matches,
 # resv_is_valid, funext, i.e. LinkNamexEra's, with nothing new entering the
-# cone.  (The file keeps its AU suffix because ProofSysUnlink.v is the pure
-# layer this cone requires.)
+# cone.
 FsAbsUnlinkFire.v
 # app round E2, lane E2-L: LINK IN PLACE.  SpecSysLink gains the three
 # commits (the target's count up, the parent's entry, and the undo -- which
-# IS SpecSysUnlinkAU's utgt_commit_at, reused from the statement leaf) and
+# IS SysUnlinkDefs's utgt_commit_at, reused from the statement leaf) and
 # FsAbsLinkFire is the fire
 # leaf for the first two, beside the abs_of wraps of the landed
 # dir_entries_dirlink_ins and of the count-raised record.  It sits here,
@@ -1714,13 +1703,13 @@ FsAbsUnlinkFire.v
 # ProofSysLink/ProofSysLinkTails (listed far above) consume it.
 FsAbsLinkFire.v
 FsAbsInvFire.v
-ProofSysUnlinkAUParts.v
-ProofSysUnlinkAUW1.v
-ProofSysUnlinkAUW2.v
-ProofSysUnlinkAUW3.v
-ProofSysUnlinkAUW5F.v
-ProofSysUnlinkAUW5D.v
-ProofSysUnlinkAU.v
+ProofSysUnlinkShared.v
+ProofSysUnlinkW1.v
+ProofSysUnlinkW2.v
+ProofSysUnlinkW3.v
+ProofSysUnlinkW5F.v
+ProofSysUnlinkW5D.v
+ProofSysUnlink.v
 LinkSysUnlink.v
 # fs-syscall-specs lane SH-TO-URUN, STAGES 1-2: the shell's program proof
 # on the urun engine.  UCodeShK.v is a SECOND code catalog over the SAME
@@ -1950,44 +1939,3 @@ UkShMain.v
 # cannot supply about a line the user typed -- that second one is stage 5's
 # [ush_simple] scope and not this file's.
 UkShFork.v
-
-# FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
-# u-tier syscall row.  FsFdMirror = the pure mirror + step table;
-# UexecRetFs = the parallel enriched trap contract + the conservativity
-# bridge + the engine seal; UkRunSysFs = the enriched ecall leaf (the
-# deposit arm taken, the row read at the caller's own string, the re-close
-# on urun_fs) over ONE remaining seal, FDROW_UKFS_STEP -- UkStep.wp_uk_ecall
-# with uvb/uexec_ret swapped for their enriched twins, which the plain
-# engine cannot supply (its file header measures why, and files the
-# X-generic-engine ask); FdRowPilot = the era-0 pilot theorems;
-# FdRowMint = the era-0 mirror mint at the userinit park (both halves'
-# homes + the park arm in parallel form).  FdRowPilot and FdRowMint are
-# image-check consumers, so the leaf rule applies to the PILOT CONE:
-# FdRowMint and UkInitFs are its leaves and nothing may require either;
-# FdRowPilot is required by those two alone.
-#   UkRunFsLeaf = the enriched LEAF TOWER (stage P5): the plain leaves
-# init's console preamble uses, re-threaded on urun_fs/ukc_fs, plus the
-# text-string and no-path enriched ecall leaves, over ONE more seal --
-# FDROW_UKFS_RETIRE.wp_uk_retire_fs_later = UkStep.wp_uk_retire_later with
-# uvb/ukc swapped for their enriched twins.  That single funnel seal covers
-# EVERY non-ecall leaf kind in the slice (registers, auipc, the three
-# jumps, the x0 branch); both it and UkRunSysFs's collapse to nothing under
-# upstream ask (4), the X-generic engine.
-#   UkInitFs = init's console preamble WALKED on the enriched tier (0xc
-# through the two dups to the restart head 0x32), refining
-# FdRowPilot.pilot_console_dups.
-#   UkStepGenFs = the X-generic engine (UkStepGen, below UkStep) at the
-# ENRICHED family: it DISCHARGES both of the seals above -- one
-# instantiation each, no copy -- so FDROW_UKFS_STEP and FDROW_UKFS_RETIRE
-# are theorems.  UkStepGenSeals is the LEAF that applies the two walk
-# functors at them (it is the one file allowed to require UkInitFs, and
-# nothing may require IT).
-FsFdMirror.v
-UexecRetFs.v
-UkRunSysFs.v
-UkRunFsLeaf.v
-UkStepGenFs.v
-FdRowPilot.v
-FdRowMint.v
-UkInitFs.v
-UkStepGenSeals.v

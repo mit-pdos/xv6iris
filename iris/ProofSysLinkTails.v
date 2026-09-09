@@ -105,7 +105,7 @@ Require Import ProofSysLinkParts.
    REUSED VERBATIM.  [SpecSysLink] supplies the receipt [luntgt_fired] the
    three [bad:]-bound tails hand their caller. *)
 Require Import AppInv.           (* [appE]: the commit mask               *)
-Require Import SpecSysUnlinkAU.  (* [utgt_commit_at]                      *)
+Require Import SysUnlinkDefs.  (* [utgt_commit_at]                      *)
 Require Import FsAbsUnlinkFire.  (* [uf_utgt_fire], [uf_nlink_row], [uf_nd_top] *)
 Require Import SpecSysLink.      (* [luntgt_fired]                        *)
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)

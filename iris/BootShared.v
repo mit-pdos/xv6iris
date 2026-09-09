@@ -1546,7 +1546,7 @@ Section BootAlloc.
       iref_slots_auth ∗
       (* ...and TWO iref-slot UNITS, row (C) of [FirstTok.first_fsinit]:
          fsinit's ireclaim borrows ONE for its iget/iput pair and hands it
-         back, and [SpecKexec] -- which forkret's [if (first)] arm reaches
+         back, and [KexecDefs] -- which forkret's [if (first)] arm reaches
          next, on the same token -- takes [iref_slots 2].  Both are split
          off the file table's [NFILE] share, which nothing holds yet. *)
       iref_slots 2 ∗
@@ -1711,7 +1711,7 @@ Section BootAlloc.
        [main_globals_raw], the table's one unit per free slot; the boot
        chain's own [IREFBOOT] are row (C) of [FirstTok.first_fsinit]
        ([SpecFsinit] takes one for ireclaim's iget/iput pair and hands it
-       back -- fs-cfg-boot.md (f-2) -- and [SpecKexec], which forkret's boot
+       back -- fs-cfg-boot.md (f-2) -- and [KexecDefs], which forkret's boot
        arm calls next off the same token, takes two).
 
        Those last two are their OWN row and not a slice of the table's:

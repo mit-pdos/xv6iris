@@ -93,7 +93,7 @@
    only [sys_unlink]: gcc folded the whole helper into
    sys_unlink+0x0f8..+0x12c.  So there is no [CodeIsdirempty.v], no
    contract, no coverage row and there never will be -- the loop is a BLOCK
-   LEMMA inside [ProofSysUnlink], and its invariant is a fact about that
+   LEMMA inside [ProofSysUnlinkPure], and its invariant is a fact about that
    block.  Two consequences reach this interface:
 
    * THE LOOP SPENDS NO LOG BUDGET WHATEVER.  Its body is [readi], whose
@@ -229,8 +229,8 @@
 
    [unlink_au_pre] is the one-shot bundle of this syscall's linearization
    instants, at the commit mask [appE]: the nameiparent PARENT-PREFIX walk
-   premise ([FsAbsEraMknod.mknod_walk_pre_era], reused verbatim -- it is
-   nameiparent-generic) and [SpecSysUnlinkAU]'s four commits.  That file's
+   premise ([FsAbsEraMknod.npar_walk_pre_era], reused verbatim -- it is
+   nameiparent-generic) and [SysUnlinkDefs]'s four commits.  That file's
    header carries the delta's two-instant shape, [unl_pre]'s side
    conditions and why the pair reads as one delta anyway.
 
@@ -247,7 +247,7 @@
    ret -1 -- [unlink_post_fail], residue returned per arm:
              (i)   nothing fs-visible happened (argstr failed): the
                    whole bundle back unspent;
-             (ii)  the walk died at hop [k]: [mknod_walk_dead_era]'s
+             (ii)  the walk died at hop [k]: [npar_walk_dead_era]'s
                    refund shape, all four commits back;
              (iii) the walk delivered the parent ([P Lp d] back, both
                    delta commits back) and the transaction refused:
@@ -324,12 +324,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
-Require Import SpecSysUnlinkAU.  (* THE STATEMENT LEAF: the delta's side
+Require Import SysUnlinkDefs.  (* THE STATEMENT LEAF: the delta's side
                                     conditions and the four commits *)
 Require Import PathElems.       (* [path_elems], [SLASH] *)
 Require Import FsTree.          (* [fname], [DOT], [DOTDOT] *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
-Require Import SpecSysMknodAU.  (* [mknod_parent_elems]                  *)
+Require Import SysMknodDefs.  (* [npar_elems]                  *)
 Require Import FsAbsEraMknod.   (* the era walk-premise pair, reused
                                    verbatim (nameiparent-generic) *)
 Require Import FsAbsMknodFire.  (* [dlookup_commit_at]; the [_at] mold *)
@@ -411,10 +411,10 @@ Section SysUnlinkArms.
   Implicit Types Γ : fs_view_names Σ.
 
   (* Everything the caller hands in, at the commit mask [appE].  The walk
-     premise is [FsAbsEraMknod.mknod_walk_pre_era]
+     premise is [FsAbsEraMknod.npar_walk_pre_era]
      REUSED VERBATIM (it is nameiparent-generic -- the one-shot
      ∀ pl r with only the SLASH -> ROOTINO tie, the hop family at the
-     era lend over the parent prefix [mknod_parent_elems pl]; it is what
+     era lend over the parent prefix [npar_elems pl]; it is what
      [FsAbsStart.ep_start] instantiates to at the fetched string). *)
   Definition unlink_au_pre Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
@@ -422,7 +422,7 @@ Section SysUnlinkArms.
       (Ftgt : pfam Σ (aview -> Z -> iProp Σ))
       (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) : iProp Σ :=
-    (mknod_walk_pre_era γfs cw P Pmiss
+    (npar_walk_pre_era γfs cw P Pmiss
      ∗ pf_at (uent_commit_at Γ appE) Fent
      ∗ pf_at (utgt_commit_at Γ appE) Ftgt
      ∗ pf_at (dlookup_commit_at Γ appE) Fex
@@ -444,7 +444,7 @@ Section SysUnlinkArms.
        ⌜unl_pre av0 d nm ents nl t a⌝ ∗
        ⌜0 < t < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜av1 !! t = Some a⌝ ∗
-       P (length (mknod_parent_elems pl)) d ∗
+       P (length (npar_elems pl)) d ∗
        pf_at (dlookup_commit_at Γ appE) Fex ∗
        pf_at (dmiss_commit_at Γ appE) Fmiss ∗
        Fent.(pf_recv) av0 d nm t ∗
@@ -460,13 +460,13 @@ Section SysUnlinkArms.
       (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) : iProp Σ :=
     (unlink_au_pre Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss
      ∨ (∃ pl : list (bv 8),
-          (mknod_walk_dead_era γfs P Pmiss pl
+          (npar_walk_dead_era γfs P Pmiss pl
              ∗ pf_at (uent_commit_at Γ appE) Fent
              ∗ pf_at (utgt_commit_at Γ appE) Ftgt
              ∗ pf_at (dlookup_commit_at Γ appE) Fex
              ∗ pf_at (dmiss_commit_at Γ appE) Fmiss)
           ∨ (∃ d : Z,
-               P (length (mknod_parent_elems pl)) d
+               P (length (npar_elems pl)) d
                ∗ pf_at (uent_commit_at Γ appE) Fent
                ∗ pf_at (utgt_commit_at Γ appE) Ftgt
                ∗ ((* (iii-a) the name is a dot: refused BY NAME, before
@@ -515,8 +515,8 @@ Section SysUnlinkArms.
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
         ∗ unlink_post_fail Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss))%I.
 
-  (* the landed return blanket, read off the arms: the one conjunct of
-     [SpecSysUnlink.sys_unlink_closer] the AU form replaces, implied *)
+  (* the return blanket, read off the arms: the pure conjunct
+     [SpecSysUnlink.sys_unlink_closer] carries, implied *)
   Lemma unlink_arms_ret Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fent : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))

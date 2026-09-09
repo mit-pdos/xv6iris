@@ -25,7 +25,7 @@
        element but the last, so it fires [L-1] hops, and the family it
        consumes is [FsAbsNpar.ep_hops_from] -- [ax_hop] at [elend] over
        [removelast (path_elems pl)].  That list IS
-       [SpecSysMknodAU.mknod_parent_elems pl] (FsAbsNparMknod, fact (1)),
+       [SysMknodDefs.npar_elems pl] (FsAbsNparMknod, fact (1)),
        which is not a coincidence: it is the only family a create-side
        caller can supply.  Handing the walk the FULL family and giving the
        last hop back unfired was the other candidate and it is
@@ -59,7 +59,7 @@
    SLASH] premise is GONE: the entry test at +0x22 decides the arm, and
    the trace premise is [FsAbsStart.ep_start] -- a one shot universally
    quantified over the START INUM, tied to ROOTINO only when the path
-   begins with SLASH.  That is lane W's [mknod_walk_pre_era] on the nose,
+   begins with SLASH.  That is lane W's [npar_walk_pre_era] on the nose,
    which is why the consumer side needed no invention.
 
    The recorded blocker (the cwd's inum is unexposed -- [inode_held] hides
@@ -338,7 +338,7 @@ Definition wp_npar_era_body
   log_opSt icfg_log n Sb -∗
   (* ---- THE TRACE (ONE premise, DEFERRED IN THE START), OVER THE
      PARENT PREFIX.  [FsAbsStart.ep_start] at this walk's own [pl] IS
-     [FsAbsEraMknod.mknod_walk_pre_era] -- same quantifier, same tie, same
+     [FsAbsEraMknod.npar_walk_pre_era] -- same quantifier, same tie, same
      family ([FsAbsNparMknod.np_start_of_mknod], one [iMod]). ---- *)
   ep_start fsc_fs (pv_cwi (us_V Upr)) P Pmiss pl -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] -- namex parks. *)

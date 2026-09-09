@@ -1109,7 +1109,7 @@ Section FileInv.
      THE NUMBER IS [FsImg.T_DEVICE_z], QUALIFIED AND NOT RESTATED.  FsImg is
      already in this file's cone (through [FsCfg]), so the constant is
      nameable without importing the disk-image layer for one integer --
-     [ProofSysOpenAUStores] spells it the same way.  Its sibling [T_DIR_z]
+     [ProofSysOpenStores] spells it the same way.  Its sibling [T_DIR_z]
      is unqualified only because [DirView] is imported here for the fourth
      conjunct's sake.
 

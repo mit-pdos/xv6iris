@@ -2574,7 +2574,7 @@ Section EraRes.
      count.  [ent_dset_ok] admits only entries that are neither dot name,
      and a dots-only directory has no others -- so a bundle opened at such
      a record hands back [D = ∅], and [node_exact] then reads the count off
-     the liveness bit alone.  This is what [ProofSysUnlink]'s rmdir arm
+     the liveness bit alone.  This is what [ProofSysUnlinkPure]'s rmdir arm
      reads at the emptied child before the decrement (durable-disk G5's
      FINDING 3); until G6 the same fact came off the old ledger's count
      clause. *)

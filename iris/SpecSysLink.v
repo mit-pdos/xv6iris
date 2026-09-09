@@ -185,15 +185,15 @@ Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 (* THE APPLICATION'S SIDE (round E2, lane E2-L).  [FsTree] for the entry
    name, [FsBytesGamma] for the live Gamma the commits are indexed by,
    [AppInv] for [app_step]/[appE] -- the step the [_unit]s pay off the
-   supply -- [SpecSysUnlinkAU] for [utgt_commit_at] -- link's failure arm's
+   supply -- [SysUnlinkDefs] for [utgt_commit_at] -- link's failure arm's
    count-down IS unlink's target step ([FsAbsDelta.delta_link_untgt] is
    [delta_unl_tgt] on the nose), so it is REUSED and not cloned -- and
-   [FsAbsDelta] (which [SpecSysUnlinkAU] re-exports) for the three deltas.
+   [FsAbsDelta] (which [SysUnlinkDefs] re-exports) for the three deltas.
    [FsAbsDefs] LAST, by FsAbs's own rule. *)
 Require Import FsTree.          (* [fname]                                  *)
 Require Import FsBytesGamma.    (* [fs_gamma_L], [fs_view_names], [gamma_top] *)
 Require Import AppInv.          (* [app_step], [appN]/[appE], [app_step_acc] *)
-Require Import SpecSysUnlinkAU. (* [utgt_commit_at] + [FsAbsDelta] re-export *)
+Require Import SysUnlinkDefs. (* [utgt_commit_at] + [FsAbsDelta] re-export *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.       (* LAST (FsAbs's own rule)                  *)
 From Kernel Require KernelSyms.
@@ -232,7 +232,7 @@ Definition sys_link_ret (r : mword 64) : Prop :=
    the R10 waiver that goes with it).
 
    THE DELTA IS THREE INSTANTS, and that is a machine fact -- the same
-   stance [SpecSysUnlinkAU]'s header takes for unlink's two:
+   stance [SysUnlinkDefs]'s header takes for unlink's two:
 
      instant 1 -- THE TARGET'S COUNT ([ip->nlink++; iupdate(ip)] at
         +0x5e..+0x66, BEFORE the entry exists).  [FsAbsDelta.delta_link_tgt]
@@ -244,7 +244,7 @@ Definition sys_link_ret (r : mword 64) : Prop :=
         files and devices only, so no count moves.
      instant 3 -- THE UNDO, on every route to [bad:] ([ip->nlink--;
         iupdate(ip)] at +0xfa..+0x106).  [delta_link_untgt] IS
-        [delta_unl_tgt], so ITS COMMIT IS [SpecSysUnlinkAU.utgt_commit_at],
+        [delta_unl_tgt], so ITS COMMIT IS [SysUnlinkDefs.utgt_commit_at],
         REUSED VERBATIM rather than cloned.
 
    [FsAbsDelta.delta_link_split] is the machine-checked composition and

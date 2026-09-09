@@ -163,7 +163,7 @@ Require Import FsBlocks.        (* [fs_names] *)
 Require Import AppInv.          (* [appE], [app_sup] *)
 Require Import PathElems.       (* [path_elems] *)
 Require Import FsAbsEra.        (* [ep_start_triv] *)
-Require Import FsAbsMknodFire.  (* [mknod_walk_pre_era], the walk premise *)
+Require Import FsAbsMknodFire.  (* [npar_walk_pre_era], the walk premise *)
 Require Import FsTree.          (* [fname]: the parent-leg receipt's name *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
@@ -222,7 +222,7 @@ Definition mkdir_au_pre
     (Fun : pfam Σ (aview -> Z -> iProp Σ))
     (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
     (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
-  (mknod_walk_pre_era γfs cw P Pmiss
+  (npar_walk_pre_era γfs cw P Pmiss
    ∗ pf_at (dlookup_commit_at Γ appE) Fex
    ∗ cre_commits Γ
        (bv_unsigned (SpecDirlookup.T_DIR : mword 16))
@@ -246,7 +246,7 @@ Lemma mkdir_au_pre_unit
 Proof.
   iIntros "#Hsup". rewrite /mkdir_au_pre.
   iSplitR.
-  { rewrite /mknod_walk_pre_era. iIntros (pl r) "_". iModIntro.
+  { rewrite /npar_walk_pre_era. iIntros (pl r) "_". iModIntro.
     iSplit; [done |]. iApply ax_hops_triv. }
   iSplitR; [iApply cre_dlookup_unit |].
   iApply (cre_commits_unit γfs with "Hsup").

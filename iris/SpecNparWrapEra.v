@@ -15,7 +15,7 @@
 
      - ONE trace premise, [FsAbsStart.ep_start] -- the cursor and the
        PARENT-PREFIX family at whatever inum the walk begins at, which is
-       [FsAbsEraMknod.mknod_walk_pre_era] on the nose
+       [FsAbsEraMknod.npar_walk_pre_era] on the nose
        ([FsAbsNparMknod.np_start_of_mknod]).  There is NO absolute-path
        premise: the relative start landed with lane A-iii and both arms
        of namex's entry test are proven;

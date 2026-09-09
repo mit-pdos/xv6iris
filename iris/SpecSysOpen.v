@@ -1,7 +1,7 @@
 (* SpecSysOpen.v -- THE contract of sys_open(), stated independently of its
    proof.  Requires only the definitional layer, its callees' SPECS, the
    abstract-state vocabulary and the family's statement leaf
-   ([SpecSysOpenAU]) -- never a whole-function proof file -- so every
+   ([SysOpenDefs]) -- never a whole-function proof file -- so every
    function proof can be checked in parallel.
 
      uint64 sys_open(void) {
@@ -80,7 +80,7 @@
    [Module Type SYSOPEN] is sys_open's only seal.  Its body is the
    whole-function FRAME below plus ONE caller INPUT ([open_in]) and ONE
    armed OUTPUT ([open_arms]), BOTH KEYED THE WAY THE CODE KEYS: on
-   [SpecSysOpenAU.om_create vom], the O_CREATE bit of the caller's own
+   [SysOpenDefs.om_create vom], the O_CREATE bit of the caller's own
    omode argument, which the machine tests with the [andi a5,a5,512] /
    [c.beqz] pair at +0x36.  On the [false] side the input is
    [open_au_pre_plain] and the output [open_arms_plain]; on the [true] side
@@ -98,14 +98,14 @@
    [wp_sys_open_create_body], are the one body at a DECIDED key: each takes
    [om_create vom = false] / [= true] as a premise and is otherwise
    [wp_sys_open_body] with the [if] reduced.  They are not sealed, not
-   client-facing, and each has exactly ONE proof (ProofSysOpenAU.v's plain
-   walk, ProofSysOpenAUFull.v's create walk); the seal's own lemma is the
+   client-facing, and each has exactly ONE proof (ProofSysOpen.v's plain
+   walk, ProofSysOpenFull.v's create walk); the seal's own lemma is the
    three-line [destruct] over them.  So there is one proof per arm and one
    contract for the syscall.
 
    ==== WHAT THE CALLER HANDS IN =======================================
 
-   [SpecSysOpenAU]'s two bundles -- see that file's header for the walk
+   [SysOpenDefs]'s two bundles -- see that file's header for the walk
    premise's era shape, the two commits, and the ONE delta the no-O_CREATE
    surface has (O_TRUNC's).  The caller's predicates are the walk cursor
    [P]/[Pmiss], create's child legs [Farm]/[Fun], create's two receipts
@@ -259,7 +259,7 @@
    No durable clause of any kind appears below (design/fs-syscall-specs.md
    section 5).  NO STABLE COROLLARY is sealed either: the era/[_at] stable
    story is a dedicated follow-on, and the agreement seeds
-   ([SpecSysOpenAU]'s [_pinned] lemmas) are its raw material.
+   ([SysOpenDefs]'s [_pinned] lemmas) are its raw material.
 
    BINDERS: one instance path per scope -- [fileG] is bound and
    [icacheG]/[icfg] resolve only through its fields (the SpecCreate
@@ -326,13 +326,13 @@ Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    Import: [FsImg]'s [fs_sb] field readers
                                    would shadow the superblock CELL
                                    ADDRESSES the frame below threads *)
-Require Import SpecSysMknodAU.  (* [delta_create], [cre_pre],
-                                   [mknod_parent_elems], [abs_view_insert] *)
-Require Import FsAbsEraMknod.   (* [mknod_walk_pre_era], [mknod_walk_dead_era]
+Require Import SysMknodDefs.  (* [delta_create], [cre_pre],
+                                   [npar_elems], [abs_view_insert] *)
+Require Import FsAbsEraMknod.   (* [npar_walk_pre_era], [npar_walk_dead_era]
                                    -- the parent-prefix one-shot, REUSED *)
 Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at] *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
-Require Import SpecSysOpenAU.   (* THE STATEMENT LEAF: the omode readings,
+Require Import SysOpenDefs.   (* THE STATEMENT LEAF: the omode readings,
                                    the two commits, the walk package, the
                                    two bundles, [open_fd_ok] *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
@@ -403,7 +403,7 @@ Section SpecSysOpen.
      THE TYPE STAYS EXISTENTIAL, and honestly so: it is [FdDevice] exactly
      when the path resolved to a T_DEVICE inode, which is a fact about the
      PATH WALK and not about the descriptor table.
-     [SpecSysOpenAU.open_fd_ok] names it, because the AU frame observes the
+     [SysOpenDefs.open_fd_ok] names it, because the AU frame observes the
      inode. *)
   Definition sys_open_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (UW : ustate) (sts : list fdstate)
@@ -542,7 +542,7 @@ Section SysOpenArms.
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
     (open_au_pre_plain Γ γfs cw P Pmiss Fo Ft
      ∨ (∃ pl : list (bv 8),
-          (open_walk_dead_era γfs P Pmiss pl
+          (namei_walk_dead_era γfs P Pmiss pl
              ∗ pf_at (aopen_commit_at Γ appE) Fo
              ∗ pf_at (atrunc_commit_at Γ appE) Ft)
           ∨ (∃ i : Z,
@@ -592,7 +592,7 @@ Section SysOpenArms.
       (sts : list fdstate) (UW : ustate) (r : mword 64) : iProp Σ :=
     (∃ (pl : list (bv 8)) (d i : Z) (nm : fname),
        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
-       P (length (mknod_parent_elems pl)) d ∗
+       P (length (npar_elems pl)) d ∗
        ((* FRESH *)
         (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
            ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
@@ -666,14 +666,14 @@ Section SysOpenArms.
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
     (open_au_pre_create Γ γfs cw P Pmiss Farm Fun Fok Fex Fo Ft
      ∨ (∃ pl : list (bv 8),
-          (mknod_walk_dead_era γfs P Pmiss pl
+          (npar_walk_dead_era γfs P Pmiss pl
              ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
              ∗ pf_at (dlookup_commit_at Γ appE) Fex
              ∗ pf_at (aopen_commit_at Γ appE) Fo
              ∗ pf_at (atrunc_commit_at Γ appE) Ft
              ∗ cre_child_unfired Γ (AFile []) Farm Fun)
           ∨ (∃ d : Z,
-               P (length (mknod_parent_elems pl)) d
+               P (length (npar_elems pl)) d
                ∗ pf_at (atrunc_commit_at Γ appE) Ft
                ∗ ((* (a) create succeeded FRESH; open failed past it *)
                   (∃ (av : aview) (i : Z) (nm : fname)
@@ -896,8 +896,8 @@ Section SysOpenArms.
   (*                                                                      *)
   (*  What DOES come back is these: the arms with the walk cursor, the      *)
   (*  observed rows, the fired receipts and the trunc leg kept verbatim,    *)
-  (*  and [SpecSysOpenAU.open_fd_ok] replaced by its PURE half              *)
-  (*  ([SpecSysOpenAU.open_fd_rcpt]) read at the descriptor view the call   *)
+  (*  and [SysOpenDefs.open_fd_ok] replaced by its PURE half              *)
+  (*  ([SysOpenDefs.open_fd_rcpt]) read at the descriptor view the call   *)
   (*  RESUMES at.  That is where the descriptor lives: open's whole effect  *)
   (*  on the caller is one row of [fdv'], so a receipt about it cannot be   *)
   (*  stated at the trap key at all -- which is why [UexecSG.spost_at]      *)
@@ -955,7 +955,7 @@ Section SysOpenArms.
       ∗ open_post_fail_create Γ γfs cw P Pmiss Farm Fun Fok Fex Fo Ft)
      ∨ (∃ (pl : list (bv 8)) (d i : Z) (nm : fname),
           ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
-          P (length (mknod_parent_elems pl)) d ∗
+          P (length (npar_elems pl)) d ∗
           ((* FRESH *)
            (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
               ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
@@ -1575,7 +1575,7 @@ Definition wp_sys_open_create_body
    deliberately: the mknod prover showed the frozen-shape stable forms are
    underivable as stated, the era/[_at] stable story is a dedicated
    follow-on, and this family does not author vacuous statements.  The
-   agreement seeds ([SpecSysOpenAU]'s [_pinned] lemmas) are its raw
+   agreement seeds ([SysOpenDefs]'s [_pinned] lemmas) are its raw
    material. *)
 Module Type SYSOPEN.
   Parameter wp_sys_open :

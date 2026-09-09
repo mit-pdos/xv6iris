@@ -338,7 +338,7 @@ Require Import FsCrash.
    superblock cells, at [□]) straight off [FsReady.fs_ready], and no contract
    in the cone names a used-set.  Everything else the fs fabric names is
    qualified at its home
-   ([SpecKexec], [SpecPanic], [BioInv], [SpecDirlink], [InodeInv]) rather than
+   ([KexecDefs], [SpecPanic], [BioInv], [SpecDirlink], [InodeInv]) rather than
    imported, so nothing this file already says changes meaning. *)
 Require Import BitmapInv.
 Require Import ConsoleInv.
@@ -357,7 +357,7 @@ Require Import SpecProcinit.
 Require Import PrintkArgs SpecPrintk.
 Require Import CodeSyscall.
 Require Import SpecSysFork SpecSysExit SpecSysWait SpecSysPipe SpecSysRead SpecSysKill
-               SpecSysExec SpecSysFstat SpecSysChdir SpecSysDup SpecSysGetpid SpecSysSbrk
+               SysExecDefs SpecSysFstat SpecSysChdir SpecSysDup SpecSysGetpid SpecSysSbrk
                SpecSysPause SpecSysUptime SpecSysWrite SpecSysMknod SpecSysLink SpecSysMkdir
                SpecSysClose SpecSysSync.
 Require Import SpecSysOpen.
@@ -369,13 +369,13 @@ Require Import SpecSysOpen.
    [SYSMKNOD], required above; open's and unlink's are [SpecSysOpen]'s
    [SYSOPEN] and [SpecSysUnlink]'s [SYSUNLINK], over their statement
    leaves. *)
-Require Import SpecSysOpenAU SpecSysUnlinkAU.
+Require Import SysOpenDefs SysUnlinkDefs.
 Require Import SpecSysUnlink.    (* [SYSUNLINK], [unlink_arms_ret] *)
 Require Import SpecSysChdir.     (* [SYSCHDIR], [chdir_arms_landed] *)
 (* ...and the write's (round E2, lane E2-W, W1): the dispatch case-splits
    on the descriptor's own state and runs the AU write for an open,
    WRITABLE inode fd; every other descriptor keeps the landed sconf. *)
-Require Import SpecSysWriteAU.     (* [wchunks]                              *)
+Require Import SysWriteDefs.     (* [wchunks]                              *)
 Require Import FsAbsWriteFire.     (* [awrite_chain]                         *)
 Require Import OffGv.              (* [off_user_inv]: the fd row's offset     *)
 Require Import PieceFam.   (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
@@ -385,7 +385,7 @@ Require Import SpecMyproc.
    environments over -- [filestat_fs_env]/[fread_names] and friends. *)
 Require Import UartTxInv.
 Require Import SpecFileread SpecFilewrite.
-Require Import SpecSysMknodAU.   (* [dev_arg] -- mknod's device numbers, as
+Require Import SysMknodDefs.   (* [dev_arg] -- mknod's device numbers, as
                                     the deposit's key spells them *)
 Require Import SpecFilestat.
 Require Import BioInv.
@@ -400,8 +400,8 @@ Require Import SpecSyscall.
    caller offers the process's bundle, and the vocabulary its answer is
    stated in.  [sys_exec_au_pre]/[sys_exec_arms]/[exec_post_ok] are
    [Typeclasses Opaque], so they are imported here directly. *)
-Require Import SpecKexecAU.      (* [exec_post_ok], [exec_key], [kexec_ok_exec] *)
-Require Import SpecSysExecAU.    (* [SYSEXEC], [sys_exec_arms]              *)
+Require Import SpecKexec.      (* [exec_post_ok], [exec_key], [kexec_ok_exec] *)
+Require Import SpecSysExec.    (* [SYSEXEC], [sys_exec_arms]              *)
 Require Import UexecSG.          (* [uexecSG]: [sbundle_at]                     *)
 Require Import UexecRet.         (* [uslot] -- the slot the exec channel returns *)
 Require Import UexecExecInst.    (* [sbundle_at_exec_elim] -- the reader        *)
@@ -595,7 +595,7 @@ Section SyscallVocab.
      free-standing parameters, so a fresh existential inside this bundle was
      exactly as good as one tied to the ambient [fn].  The GAP entries are
      precisely the ones where that stops being true: [sys_exec] consumes
-     [SpecKexec.fs_fabric] AND the two superblock cells AND
+     [KexecDefs.fs_fabric] AND the two superblock cells AND
      [BitmapInv.bitmap_inv], all in the same breath and all at
      [fn]'s own [fcn_fs]/[fcn_bmapstart]/[fcn_cov]/[fcn_logstart]/[fcn_size],
      so a fabric over fresh existentials could never be shown to describe the
@@ -1147,7 +1147,7 @@ Section SyscallVocab.
     iExact "Hfs".
   Qed.
 
-  (* [SpecKexec.fs_fabric], re-assembled: the thirteen persistent resources
+  (* [KexecDefs.fs_fabric], re-assembled: the thirteen persistent resources
      kexec's cone (and therefore sys_exec's) states as one bundle.  Two of
      them come from OUTSIDE [syscall_env] -- [kernel_data], which every arm
      already holds, and [procs_inv γs] at the dispatch's own [γs] -- see
@@ -1155,7 +1155,7 @@ Section SyscallVocab.
   Lemma sysc_fs_fabric (γf : gname) (pj : mword 64) (γs : list gname)
  (fn : fclose_names) :
     kernel_data -∗ procs_inv γs -∗ syscall_env γf pj fn -∗
-    SpecKexec.fs_fabric γs
+    KexecDefs.fs_fabric γs
       (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
 
 .
@@ -1169,7 +1169,7 @@ Section SyscallVocab.
        fifteen-step chain this replaces existed because a named [iFrame]
        over that many definition-valued rows is a goal-side search per
        hypothesis. *)
-    rewrite /SpecKexec.fs_fabric.
+    rewrite /KexecDefs.fs_fabric.
     iSplitR; [iExact "Hrdy"    |].
     iSplitR; [iExact "Hprocs"  |].
     iSplitR; [iExact "Hgeom"   |].
@@ -2695,7 +2695,7 @@ Section SyscallRet.
     (* THE EXEC CHANNEL'S ANSWER, AT THE RECORD AFTER THE STORE BELOW: the
        [sd a0,112(s2)] at +0x3a is the dispatcher's own a0 write, so the
        record the caller resumes in is the entry's one with a0 replaced --
-       which is exactly [SpecKexecAU.exec_key]'s shape.  Every non-exec arm
+       which is exactly [SpecKexec.exec_key]'s shape.  Every non-exec arm
        pays this with [sysc_exec_out_ne] off its own number. *)
     sysc_exec_out U
       (us_tf U' (<[tf_arg_idx 0 := E !!! Regidx Ra0]> (pv_tf (us_V U'))))
@@ -3281,7 +3281,7 @@ Section SyscallArms.
   Qed.
 
   (* [sys_exec]'s ARM: at [k = 7], [sysc_mem_ok]'s [exec] branch is [True]
-     unconditionally -- the image is [SpecKexec]'s to pin, not this
+     unconditionally -- the image is [KexecDefs]'s to pin, not this
      predicate's, so no fact about [M]/[M'] is needed at all. *)
   Lemma sysc_mem_ok_exec (V V' : pprivate) (M M' : gmap Z (bv 8)) :
     sysc_num V = Z.of_nat 7 -> sysc_mem_ok V V' M M'.
@@ -4369,7 +4369,7 @@ Section SyscallArms.
   (* ------------------------------------------------------------------- *)
   (* THE TENTH ARM: k = 7, [sys_exec] -- the first of the eight entries the
      file header calls the GENUINE SPEC GAP, and the one that shows what
-     closing that gap actually costs.  Its contract (SpecSysExec.v) is
+     closing that gap actually costs.  Its contract (SysExecDefs.v) is
      kexec's precondition marshalled: the whole FS fabric, the two
      superblock cells, [bitmap_inv], the kalloc environment and two units of
      the inode-reference allowance.
@@ -4449,7 +4449,7 @@ Section SyscallArms.
     assert (Hret : ret_pc (M !!! Regidx Rra)
                    = (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64))
       by (rewrite HMra; apply bv_eq; vm_compute; reflexivity).
-    (* ---- THE BUNDLE OFFERED: the AU contract ([SpecSysExecAU]), whose
+    (* ---- THE BUNDLE OFFERED: the AU contract ([SpecSysExec]), whose
        arms are what the channel hands back.  The bundle comes from the
        PROCESS (the trapping key's own era predicates), not from the
        environment, so nothing of [syscall_env]'s fs-abstract side is

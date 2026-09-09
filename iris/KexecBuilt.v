@@ -3,19 +3,19 @@
 
    TWO THINGS LIVE HERE, and they are together for one reason: both have to
    be nameable INSIDE the kernel-side kexec proofs (ProofKexecSeam.v,
-   ProofKexecC.v, ProofKexecD.v), which sit far below [SpecKexecAU.v] in
-   the dependency order -- [SpecKexecAU] pulls the whole [SpecSysOpenAU] /
+   ProofKexecC.v, ProofKexecD.v), which sit far below [SpecKexec.v] in
+   the dependency order -- [SpecKexec] pulls the whole [SysOpenDefs] /
    [FsAbs] atomic-update cone, and no kexec block proof may depend on that.
    So the vocabulary the loop invariants are stated in has to be HERE, and
-   [KexecImageAlg.v] -- which is above [SpecKexecAU] and may name
+   [KexecImageAlg.v] -- which is above [SpecKexec] and may name
    [kexec_args_at] / [kexec_stack_at] -- carries the bridge rows that turn
    these into the contract's own predicates.  The [kxb_] prefix marks
    exactly the predicates that have a twin over there:
 
-       kxb_ustack    = SpecKexecAU.kexec_ustack
-       kxb_arg_addr  = SpecKexecAU.kexec_arg_addr
-       kxb_args_at   = SpecKexecAU.kexec_args_at
-       kxb_stack_at  = SpecKexecAU.kexec_stack_at
+       kxb_ustack    = SpecKexec.kexec_ustack
+       kxb_arg_addr  = SpecKexec.kexec_arg_addr
+       kxb_args_at   = SpecKexec.kexec_args_at
+       kxb_stack_at  = SpecKexec.kexec_stack_at
 
    and the twins are DEFINITIONALLY the same predicate, so each bridge is
    the identity ([KexecImageAlg] §5).
@@ -51,7 +51,7 @@ Require Import UserPerm.        (* [uperm], [uperm_rw], [perm_of]: the projectio
 Require Import UserPtTree.      (* [umem_write], [umem_wr], [umem_grow],
                                    [uva_live]                               *)
 Require Import ProcDefs.        (* [ustate], [us_M], [us_V], [pv_sz]         *)
-Require Import SpecKexec.       (* [kxc_sp], [kxc_sp_final], [kxc_round16],
+Require Import KexecDefs.       (* [kxc_sp], [kxc_sp_final], [kxc_round16],
                                    [kxc_stack_ok]                           *)
 Import Defs.
 
@@ -162,7 +162,7 @@ Qed.
 (*  2.  THE ADDRESSES THE ARGUMENT BLOCK OCCUPIES                         *)
 (* ====================================================================== *)
 
-(* [SpecKexecAU.kexec_ustack] / [kexec_arg_addr], verbatim -- see this
+(* [SpecKexec.kexec_ustack] / [kexec_arg_addr], verbatim -- see this
    file's header for why they are spelled twice. *)
 Definition kxb_ustack (top : Z) (alen : nat -> nat) (na i : nat) : Z :=
   if decide (i < na)%nat then kxc_sp top alen (S i) else 0.
@@ -303,7 +303,7 @@ Proof.
       exact (Hnul i ltac:(lia)).
 Qed.
 
-(* [SpecKexecAU.kexec_args_at] / [kexec_stack_at], verbatim (header). *)
+(* [SpecKexec.kexec_args_at] / [kexec_stack_at], verbatim (header). *)
 Definition kxb_args_at (top : Z) (alen : nat -> nat) (na : nat)
     (afun : nat -> nat -> bv 8) (M : gmap Z (bv 8)) : Prop :=
   (forall i j, (i < na)%nat -> (j < alen i)%nat ->
@@ -429,7 +429,7 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 (*  A WORD'S BYTES ARE ITS LITTLE-ENDIAN ENCODING.  [kxb_args_at]'s third   *)
 (*  conjunct is spelled with stdpp's [bv_to_little_endian] (the contract's  *)
-(*  own spelling, shared with [SpecSysExecAU]'s window rows); the frame     *)
+(*  own spelling, shared with [SpecSysExec]'s window rows); the frame     *)
 (*  slots the argv loop wrote hand their bytes over as [nth_byte].  Below   *)
 (*  eight bytes the two agree on the nose -- the 64-bit wrap [mword_of_int] *)
 (*  applies is invisible to byte [k] for [k < 8].                           *)
@@ -920,7 +920,7 @@ Fixpoint kxb_ascending (ps : list elf_phdr) : Prop :=
   end.
 
 (* ---- ASCENDING SEGMENTS: prefixes, and the [take i]-indexed invariant ----
-       [SpecKexecAU.kxb_ascending], spelled below it (this file's header:
+       [SpecKexec.kxb_ascending], spelled below it (this file's header:
        the kernel-side loops must not depend on the AU cone).
        [KexecImageAlg] §3 is the (one-[rewrite]) bridge. *)
 
@@ -988,7 +988,7 @@ Qed.
     the file's bytes and the ELF header's own [ph_at], which is what these
     four are.  [kxb_phdr_at] is [ElfFile.elf_parse_phdr]'s record without
     the option ([KexecImageAlg] §4 is the identification, under the bounds
-    [SpecKexecAU.kexec_loadable] carries); [kxb_phoff] is the offset readi
+    [SpecKexec.kexec_loadable] carries); [kxb_phoff] is the offset readi
     is actually handed, i.e. the 32-bit truncation the ABI performs.       *)
 
 Definition kxb_phdr_at (f : elf_bytes) (o : nat) : elf_phdr :=
@@ -1062,7 +1062,7 @@ Definition kxb_at (f : elf_bytes) (ef : nat -> bv 8) (n : nat)
    PT_LOADs to be well-formed, and them to ASCEND (which is what makes the
    later segments' writes miss the earlier ones and the [uvmalloc] fold a
    plain running maximum).  It is a PREMISE of the block lemmas, not a
-   conjunct of the states -- [SpecKexecAU.kexec_loadable] is where it comes
+   conjunct of the states -- [SpecKexec.kexec_loadable] is where it comes
    from, and [KexecImageAlg] §4 is the (only) glue. *)
 Definition kxb_walk_ok (f : elf_bytes) (ef : nat -> bv 8) : Prop :=
   kxb_loads f ef (Z.to_nat (eh_phnum ef)) = elf_loads f
@@ -1129,7 +1129,7 @@ Qed.
 (*  3c.  THE LOADER'S ACCEPTANCE PREDICATE, BELOW THE AU CONTRACT (S5)     *)
 (* ====================================================================== *)
 
-(*  [SpecKexecAU.kexec_loadable] transcribed character for character into a
+(*  [SpecKexec.kexec_loadable] transcribed character for character into a
     file the kernel-side proofs may name ([loads_ascending] restated as
     [kxb_ascending], the two bridged in [KexecImageAlg] §3 already).  It
     exists for ONE reason: the eight [bad:] tails have to say WHY they
@@ -1158,7 +1158,7 @@ Definition kxb_walk_loadable (f : elf_bytes) (ef : nat -> bv 8) : Prop :=
 
 (* ---- the two rows [kxb_walk_ok_of_loadable]'s proof was built out of,
         moved down here so [kxb_walk_loadable_of_loadable] can use them
-        without naming [SpecKexecAU] ([KexecImageAlg] §4 re-exports). ---- *)
+        without naming [SpecKexec] ([KexecImageAlg] §4 re-exports). ---- *)
 
 Lemma kxb_phdr_at_parse (l : elf_bytes) (o : Z) (p : elf_phdr) :
   elf_parse_phdr l o = Some p -> kxb_phdr_at l (Z.to_nat o) = p.
@@ -1946,7 +1946,7 @@ Qed.
 
     WHAT IT CARRIES.  [sz1] is the size the run reached ([p->sz] at the
     exit), and over the stack page at [uint sz1] the argument block is
-    exactly where [SpecKexecAU.kexec_args_at] says it is and every other
+    exactly where [SpecKexec.kexec_args_at] says it is and every other
     byte of that page is zero ([kexec_stack_at]'s own second conjunct).
     The strings come from the argv loop's own invariant and the zeros from
     that invariant plus the closing pointer-vector copyout; [KexecImageAlg]
@@ -2029,7 +2029,7 @@ Qed.
     are named at the three premise sites ([ProofKexecD.kxd_phaseD],
     [ProofKexec.kxc_d_tail] / [kxc_cd]).  The
     right-hand side is spelled to match [KexecImageAlg.kexec_sz_of_sz_after],
-    which is S4's (identity) bridge to [SpecKexecAU.kexec_sz f].            *)
+    which is S4's (identity) bridge to [SpecKexec.kexec_sz f].            *)
 Definition kexec_built (f : elf_bytes) (ef : nat -> bv 8) (sz1 : mword 64)
     (na : nat) (alen : nat -> nat)
     (afun : nat -> nat -> bv 8) (U' : ustate) : Prop :=
@@ -2040,8 +2040,8 @@ Definition kexec_built (f : elf_bytes) (ef : nat -> bv 8) (sz1 : mword 64)
   /\ (kxb_walk_ok f ef ->
         uint sz1 = pgroundup (kexec_sz_after (elf_loads f)) + 2 * PGSIZE)
   (* S6: THE PERMISSION PROJECTION the run built, at the stack top the
-     size row names.  [KexecAUBridge] turns it into
-     [SpecKexecAU.kexec_image_ok]'s [kxb_perm_ok f (kexec_top f)
+     size row names.  [KexecBridge] turns it into
+     [SpecKexec.kexec_image_ok]'s [kxb_perm_ok f (kexec_top f)
      (uvis_perm W')] with [KexecImageAlg.kexec_top_of_sz_after]. *)
   /\ (kxb_walk_ok f ef ->
         kxb_perm_ok f (pgroundup (kexec_sz_after (elf_loads f)))

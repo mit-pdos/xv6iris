@@ -3,7 +3,7 @@
 (*  (claude-notes/completed/namei-pinned-lookup.md §13.3)                 *)
 (* ===================================================================== *)
 
-(*  WHY THIS EXISTS.  [SpecKexec.kexec_ok] is spelled in thirty-one places
+(*  WHY THIS EXISTS.  [KexecDefs.kexec_ok] is spelled in thirty-one places
     across the kexec cone, and every one of them is a phase lemma RELAYING
     kexec's own exit continuation:
 
@@ -34,19 +34,26 @@
     [mword 64 -> Prop], and every [bad:] tail's proof term is unchanged --
     but [kexec_closer], which BINDS the exit's [U'], plugs the hole with
     [fun e => Q e U'] for a client-supplied [Q : mword 64 -> ustate -> Prop].
-    A client of [SpecKexecAU.v] needs to say things about the image the run
+    A client of [SpecKexec.v] needs to say things about the image the run
     built ([us_M U'], its size), and only the closer can see it.
 
-    [SpecKexec.v] IS UNTOUCHED: [kexec_ok] stays what it is, and
+    [KexecDefs.v] IS UNTOUCHED: [kexec_ok] stays what it is, and
     [kexec_ok_q_True] below is the row that says so -- at
     [Q := fun _ _ => True] the two relations are equivalent, which is what
     makes the hole a refinement of the landed relation rather than a
-    different one.                                                        *)
+    different one.
+
+    THE HOLE HAS ONE PLUG: [KexecBridge.exec_built_Q], the fact bundle
+    the exec contract's postcondition is stated over.  It stays a hole
+    rather than being specialised to that plug because [Q] and [QF] are
+    parameters of [kexec_closer], which every one of kexec's eight phase
+    files relays; specialising changes no statement's strength and rewrites
+    all eight.                                                            *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 (* the bi notations [⌜ ⌝] / [-∗] / [[∗ list]] that [kexec_closer] below is
-   written in; this file used to be pure Prop and needed none of them *)
+   written in *)
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap frac.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
@@ -59,10 +66,10 @@ Require Import ProcGeom.
 Require Import UserPtTree.      (* [ud_tfp] / [ud_root] *)
 Require Import ProcInv.
 Require Import ElfEnc.          (* [le_at] -- the entry field's reader *)
-Require Import SpecKexec.       (* [kexec_ok] and its vocabulary       *)
+Require Import KexecDefs.       (* [kexec_ok] and its vocabulary       *)
 
 (* ...and the vocabulary [kexec_closer] below needs.  Every one of these is
-   already in this file's transitive cone through [SpecKexec]; naming them
+   already in this file's transitive cone through [KexecDefs]; naming them
    here only brings them into SCOPE. *)
 Require Import Riscv.rv64d_types.  (* [Regidx]                          *)
 Require Import RegFile.         (* [regfile]                            *)
@@ -90,7 +97,7 @@ Local Open Scope Z_scope.
 (*  1.  THE RELATION WITH THE HOLE                                        *)
 (* ===================================================================== *)
 
-(*  [SpecKexec.kexec_ok] verbatim, with one conjunct [Q entry] added at the
+(*  [KexecDefs.kexec_ok] verbatim, with one conjunct [Q entry] added at the
     FRONT of the success arm.  The failure arm is character-for-character
     the landed one.                                                       *)
 Definition kexec_ok_q (Q : mword 64 -> Prop) (V V' : pprivate) (r : mword 64)
@@ -109,7 +116,7 @@ Definition kexec_ok_q (Q : mword 64 -> Prop) (V V' : pprivate) (r : mword 64)
    ud_tfp (pv_upt V') = ud_tfp (pv_upt V) /\
    kxc_tf (pv_tf V) (pv_tf V') entry spv /\
    pv_ofile V' = pv_ofile V /\
-   (* ...and its fd-state ghost name -- see [SpecKexec.kexec_ok]'s note *)
+   (* ...and its fd-state ghost name -- see [KexecDefs.kexec_ok]'s note *)
    pv_fdg V' = pv_fdg V /\
    pv_cwd V' = pv_cwd V /\
    pv_cwi V' = pv_cwi V /\
@@ -158,7 +165,7 @@ Proof. intro H. by apply kexec_ok_q_True. Qed.
     is paid at the [bad:] tail that jumped -- each of which knows, as a
     pure fact about the file and the frame, WHY it jumped.
 
-    [kxf_cause] is [SpecKexecAU.exec_fail_cause] transcribed into a file
+    [kxf_cause] is [SpecKexec.exec_fail_cause] transcribed into a file
     that sits BELOW the AU contract (the kernel-side cone must not name
     it); the composition bridges the two by a three-row match.           *)
 Inductive kxf_cause :=
@@ -266,12 +273,12 @@ Proof. intro H. apply kexec_ok_qf_of_q, kexec_ok_q_of_True, H. Qed.
     names the RELATION, leaving the CONTINUATION spelled out at all of
     them.  It is thirteen rows, ~800 printed characters, and a count over
     the cone found dozens of copies across the phase files (ProofKexecC
-    x13, B3 x6, B x5, Tail x4, A x3, SpecKexecB2 x3, SpecKexecB3 x3,
-    Kexec x2, D x2), differing only in bound-variable names and in which
+    x13, B3 x9, B x5, Tail x4, A x3, SpecKexecB2 x3, Kexec x2, D x2),
+    differing only in bound-variable names and in which
     of [b]/[eb] and [lks]/[emptyset] the caller passes.
 
     claude-notes/optimization.md, "Seal a whole-function proof's
-    continuation" and the ProofSysUnlink case study beside it: an inline
+    continuation" and the ProofSysUnlinkPure case study beside it: an inline
     continuation is re-embedded in the term of EVERY proofmode step that
     carries it, so it is priced by |Delta| x steps, and in the kexec block
     lemmas it measures 35-44 % of the statement.  Naming it changes no
@@ -314,7 +321,7 @@ Definition kexec_closer `{XI : TsoCtx.CurCtx}
     (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64)
     (aslen : nat -> nat) (dqas : dfrac) (afun : nat -> nat -> bv 8)
     : iProp Σ :=
-  (* the moved image, exactly as [SpecKexec]'s own post binds it *)
+  (* the moved image, exactly as [KexecDefs]'s own post binds it *)
   (∀ (mf : regfile) (U' : ustate)
       (entry spv szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗

@@ -110,11 +110,11 @@
    ==== WHAT THE CALLER HANDS IN, AND WHAT IT BUYS =====================
 
    [chdir_au_pre] is the walk-only bundle at the commit mask [appE]:
-   [SpecSysOpenAU.open_walk_pre_era] handed down unfired, plus
-   [SpecSysOpenAU.aopen_commit_at], open's plain read-only observation,
+   [SysOpenDefs.namei_walk_pre_era] handed down unfired, plus
+   [SysOpenDefs.aopen_commit_at], open's plain read-only observation,
    fired under the node's lock exactly where the walk tests [T_DIR].
    sys_chdir MINTS NO VOCABULARY OF ITS OWN: every piece it names is the
-   open family's, which is why the pieces live in [SpecSysOpenAU] and only
+   open family's, which is why the pieces live in [SysOpenDefs] and only
    the bundle, the arms and the frame live here.
 
    What it buys is the inum.  A blanket-only success arm is
@@ -123,7 +123,7 @@
    inode that was.  Here [z] IS the walk's cursor, so a caller that
    supplied a cursor it understands learns where its cwd went.
 
-   THE START: the walk premise is [open_walk_pre_era] at
+   THE START: the walk premise is [namei_walk_pre_era] at
    [pv_cwi (us_V U)], the calling process's cwd inum at entry, so a
    relative chdir's walk starts where the block says it does.
 
@@ -136,7 +136,7 @@
              unchanged on every arm:
              (i)   nothing fs-visible happened (argstr failed): the whole
                    bundle comes back;
-             (ii)  the walk died: [open_walk_dead_era]'s refund shape
+             (ii)  the walk died: [namei_walk_dead_era]'s refund shape
                    beside the unfired commit;
              (iii) the walk landed and the node was OBSERVED to be
                    something other than a directory -- the cursor [P L i]
@@ -192,7 +192,7 @@ Require Import PathElems.       (* [path_elems] *)
 Require Import FsTree.          (* [fname] *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
-Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [open_walk_dead_era],
+Require Import SysOpenDefs.   (* [namei_walk_pre_era], [namei_walk_dead_era],
                                    [aopen_commit_at] *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
@@ -249,7 +249,7 @@ Section SysChdirArms.
   Definition chdir_au_pre Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) : iProp Σ :=
-    (open_walk_pre_era γfs cw P Pmiss
+    (namei_walk_pre_era γfs cw P Pmiss
      ∗ pf_at (aopen_commit_at Γ appE) Fo)%I.
 
   (* ret -1: the three-way fold -- (i) nothing fs-visible happened (argstr
@@ -261,7 +261,7 @@ Section SysChdirArms.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) : iProp Σ :=
     (chdir_au_pre Γ γfs cw P Pmiss Fo
      ∨ (∃ pl : list (bv 8),
-          (open_walk_dead_era γfs P Pmiss pl
+          (namei_walk_dead_era γfs P Pmiss pl
              ∗ pf_at (aopen_commit_at Γ appE) Fo)
           ∨ (∃ (i : Z) (av : aview) (a : anode),
                P (length (path_elems pl)) i

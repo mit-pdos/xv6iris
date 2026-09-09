@@ -1,4 +1,4 @@
-(* ProofSysExec.v -- sys_exec at its contract, [SpecSysExecAU.SYSEXEC].
+(* ProofSysExec.v -- sys_exec at its contract, [SpecSysExec.SYSEXEC].
 
    ONE CALL SITE, AND THE REST IS SHARED.  Every block of sys_exec lives in
    ProofSysExecParts.v and is used here VERBATIM: the prologue, the lazy
@@ -10,17 +10,17 @@
    continuation costs the composition nothing).
 
    WHAT THIS FILE ADDS: [sx_break_au], the six instructions at
-   +0x0b6 .. +0x0cc that call kexec at [SpecKexecAU.KEXEC], and the
+   +0x0b6 .. +0x0cc that call kexec at [SpecKexec.KEXEC], and the
    composition.
 
    ---- THE TWO SEAMS ---------------------------------------------------
 
-   (1) THE BUNDLE.  [SpecSysExecAU.sys_exec_slot_pre] is quantified over
+   (1) THE BUNDLE.  [SpecSysExec.sys_exec_slot_pre] is quantified over
    every argument vector of the right SHAPE ([exec_args_shape]: below
    MAXARG, NUL-terminated strings within a page).  That triple is exactly
    the fill loop's own invariant [ProofSysExecParts.sx_ok] read at the
    break, so [sx_break_au] instantiates the quantifier at the [na alen
-   afun] it is about to hand kexec and gets [SpecKexecAU.exec_au_pre] --
+   afun] it is about to hand kexec and gets [SpecKexec.exec_au_pre] --
    [sys_exec_au_pre_at] below is that one step.
 
    (2) THE IMAGE.  [exec_post_ok] and [exec_arms] project only [us_V] of
@@ -85,9 +85,9 @@ Require Import SpecFetchstr.
 Require Import SpecKalloc.
 Require Import SpecKfree.
 Require Import SpecMemset.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import CodeSysExec.
-Require Import SpecSysExec.
+Require Import SysExecDefs.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -104,9 +104,9 @@ Require Import ProofSysExecParts.
 Require Import FsBlocks.
 Require Import UserFd.          (* [ufdG] *)
 Require Import UexecSlot.       (* [uvis] *)
-Require Import SpecKexecAU.     (* [exec_au_pre], [exec_post_ok], [exec_arms] *)
+Require Import SpecKexec.     (* [exec_au_pre], [exec_post_ok], [exec_arms] *)
 Require Import FsBytesGamma.    (* [fs_gamma_L] *)
-Require Import SpecSysExecAU.
+Require Import SpecSysExec.
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Require Import TsoCtx.
@@ -169,8 +169,8 @@ End SysExecAUBridge.
 Module SysExecProof (Argaddr : ARGADDR) (Argstr : ARGSTR) (Memset : MEMSET)
                       (Fetchaddr : FETCHADDR) (Kalloc : KALLOC)
                       (Fetchstr : FETCHSTR) (Kfree : KFREE)
-                      (KX : SpecKexecAU.KEXEC)
-                      : SpecSysExecAU.SYSEXEC.
+                      (KX : SpecKexec.KEXEC)
+                      : SpecSysExec.SYSEXEC.
 
 Module Import Parts :=
   SysExecParts Argaddr Argstr Memset Fetchaddr Kalloc Fetchstr Kfree.
@@ -288,7 +288,7 @@ Section SysExecBreakAU.
     iIntros "Hout".
     (* THE BUNDLE'S INSTANTIATION.  [exec_args_shape] IS [sx_ok] read at the
        break, plus the loop's own [i < 32] -- kexec's three argument
-       premises and nothing else (SpecSysExecAU.v's header). *)
+       premises and nothing else (SpecSysExec.v's header). *)
     assert (Hshape : exec_args_shape i alen afun).
     { split_and!.
       - unfold MAXARG. lia.
@@ -598,7 +598,7 @@ Section SysExecWhole.
       { exact Hcs. }
       { exact Hext. }
       { (* argstr failed BEFORE kexec ran, so the bundle is unspent: that is
-           [sys_exec_post_fail]'s own first disjunct (SpecSysExecAU.v's
+           [sys_exec_post_fail]'s own first disjunct (SpecSysExec.v's
            "a FOURTH disjunct this level owns"). *)
         rewrite /sys_exec_arms.
         iExists (us_upt U P').

@@ -135,7 +135,7 @@ Require Import SpecIunlockput.
 Require Import SpecCreate.
 Require Import DirentEnc.        (* [bview]: the path buffer's reading     *)
 Require Import PathElems.        (* [path_elems]: the name tie's list      *)
-Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix *)
+Require Import SysMknodDefs.   (* [npar_elems]: the PARENT prefix *)
 Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start   *)
 Require Import FsAbsMknodFire.   (* the era walk's package and its fires    *)
 Require Import FsAbsDelta.       (* [dots_ents]: the entry map the dots left (round E2, lane E2-C) *)

@@ -363,9 +363,9 @@ Require Import PathElems.        (* [path_elems]: the walk's hop names       *)
 Require Import DirView.          (* [T_DIR_z] -- the dots leg's guard *)
 Require Import FsAbsCreateFire.  (* the legs' commits and receipts, the type
                                     literals and [create_made]              *)
-Require Import SpecSysMknodAU.   (* [mknod_parent_elems]: the PARENT prefix  *)
+Require Import SysMknodDefs.   (* [npar_elems]: the PARENT prefix  *)
 Require Import FsAbsEra.         (* [ep_start]: the walk's deferred start    *)
-Require Import FsAbsMknodFire.   (* [mknod_walk_dead_era]: the walk's death  *)
+Require Import FsAbsMknodFire.   (* [npar_walk_dead_era]: the walk's death  *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.        (* LAST (FsAbs's own rule)                 *)
 Import Defs.
@@ -428,7 +428,7 @@ Proof. right. left. reflexivity. Qed.
    durable-notes' *"iSpecialize: cannot instantiate (P -∗ Q) with P"*.
    Worse, the [Module Type] below would be UNPROVABLE while stating it,
    because a sealer must supply the statement at INDEPENDENT instances.
-   [SpecKexec] already binds it this way for the same reason; keep it. *)
+   [KexecDefs] already binds it this way for the same reason; keep it. *)
 Section CreateSpec.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
@@ -639,7 +639,7 @@ Section CreateSpec.
       (pl : list (bv 8)) (made : bool) (i : Z) : iProp Σ :=
     (∃ (d : Z) (nm : fname),
        ⌜list_basics.last (path_elems pl) = Some nm⌝
-       ∗ P (length (mknod_parent_elems pl)) d
+       ∗ P (length (npar_elems pl)) d
        ∗ (if made
           then cre_arm_fired Farm i
                ∗ (cre_dots_fired Fdots i d true ∨ cre_dots_leg Γ tyz Fdots)
@@ -665,11 +665,11 @@ Section CreateSpec.
       (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) : iProp Σ :=
-    ((mknod_walk_dead_era γfs P Pmiss pl
+    ((npar_walk_dead_era γfs P Pmiss pl
         ∗ pf_at (dlookup_commit_at Γ appE) Fex
         ∗ cre_commits Γ tyz ma mi Farm Fdots Fun Fok)
      ∨ (∃ d : Z,
-          P (length (mknod_parent_elems pl)) d
+          P (length (npar_elems pl)) d
           ∗ ((∃ (nm : fname) (i : Z),
                 ⌜list_basics.last (path_elems pl) = Some nm⌝
                 ∗ cre_ex_fired Fex d nm i)
@@ -837,7 +837,7 @@ Section CreateSpec.
       ∃ (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z) (nl : nat),
         ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
         ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
-        P (length (mknod_parent_elems pl)) d ∗
+        P (length (npar_elems pl)) d ∗
         pf_at (dlookup_commit_at Γ appE) Fex ∗
         Fok.(pf_recv) av d nm i ∗
         cre_arm_fired Farm i ∗ pf_at (aunarm_commit_at Γ appE) Fun.
@@ -862,12 +862,12 @@ Section CreateSpec.
       (pl : list (bv 8)) :
     cre_fail_arms Γ γfs (bv_unsigned T_DEVICE) ma mi P Pmiss
       Farm Fdots Fun Fok Fex pl ⊢
-      ((mknod_walk_dead_era γfs P Pmiss pl
+      ((npar_walk_dead_era γfs P Pmiss pl
           ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
           ∗ pf_at (dlookup_commit_at Γ appE) Fex
           ∗ cre_child_unfired Γ (ADev ma mi) Farm Fun)
        ∨ (∃ d : Z,
-            P (length (mknod_parent_elems pl)) d
+            P (length (npar_elems pl)) d
             ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
             ∗ ((∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
                   (nl : nat),
@@ -912,7 +912,7 @@ Section CreateSpec.
       made i ⊢
       ∃ (d : Z) (nm : fname),
         ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
-        P (length (mknod_parent_elems pl)) d ∗
+        P (length (npar_elems pl)) d ∗
         ((∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
             Fok.(pf_recv) av d nm i ∗
@@ -958,7 +958,7 @@ Section CreateSpec.
       ∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
         ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
         ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
-        P (length (mknod_parent_elems pl)) d ∗
+        P (length (npar_elems pl)) d ∗
         Fok.(pf_recv) av d nm i ∗
         pf_at (dlookup_commit_at Γ appE) Fex ∗
         cre_arm_fired Farm i ∗ pf_at (aunarm_commit_at Γ appE) Fun.
@@ -985,7 +985,7 @@ Section CreateSpec.
         ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
         ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
         ⌜ents !! nm = Some i⌝ ∗
-        P (length (mknod_parent_elems pl)) d ∗
+        P (length (npar_elems pl)) d ∗
         Fex.(pf_recv) av d nm i ∗
         pf_at (acre_commit_at Γ appE (AFile [])) Fok ∗
         cre_child_unfired Γ (AFile []) Farm Fun.
@@ -1019,12 +1019,12 @@ Section CreateSpec.
       (pl : list (bv 8)) :
     cre_fail_arms Γ γfs (bv_unsigned T_FILE) ma mi P Pmiss
       Farm Fdots Fun Fok Fex pl ⊢
-      ((mknod_walk_dead_era γfs P Pmiss pl
+      ((npar_walk_dead_era γfs P Pmiss pl
           ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
           ∗ pf_at (dlookup_commit_at Γ appE) Fex
           ∗ cre_child_unfired Γ (AFile []) Farm Fun)
        ∨ (∃ d : Z,
-            P (length (mknod_parent_elems pl)) d
+            P (length (npar_elems pl)) d
             ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
             ∗ ((∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
                   (nl : nat),
@@ -1206,11 +1206,11 @@ Definition wp_create_sconf_body
   log_tx icfg_log -∗
   (* ---- THE APPLICATION'S SIDE ----
      THE WALK: the PARENT-PREFIX one-shot at create's own path buffer
-     ([FsAbsEra.ep_start]).  The syscall hands its [mknod_walk_pre_era]
+     ([FsAbsEra.ep_start]).  The syscall hands its [npar_walk_pre_era]
      straight down ([FsAbsMknodFire.np_start_of_mknod]) and the START INUM
      is decided inside the walk: ROOTINO on an absolute fetch, the calling
      process's [pv_cwi] on a relative one.  The hop family is over the
-     PARENT PREFIX, which is [SpecSysMknodAU.mknod_parent_elems]
+     PARENT PREFIX, which is [SysMknodDefs.npar_elems]
      definitionally.
      THE EXISTS OBSERVATION: fired at create's own [dirlookup] when the name
      is already in the parent's entry map, and refunded on every arm that

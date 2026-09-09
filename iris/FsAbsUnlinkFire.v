@@ -1,5 +1,5 @@
 (* FsAbsUnlinkFire.v -- THE UNLINK AU's FOUR FIRE POINTS, discharged
-   against the invariant, plus the reading bridges [SpecSysUnlinkAU]'s
+   against the invariant, plus the reading bridges [SysUnlinkDefs]'s
    header owes its prover (items 1 and 2).
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the unlink
@@ -10,7 +10,7 @@
 
    ==== THE FOUR FIRES ==================================================
 
-   The mold is [FsAbsMknodFire.mkf_acre_fire] / [mkf_dlookup_fire]: one
+   The mold is [FsAbsMknodFire.caf_acre_fire] / [mkf_dlookup_fire]: one
    step each, [ftopN] opened and closed inside, the row read off the
    FIRING FUNCTION'S OWN era fragment (sys_unlink holds [dp]'s from W2's
    ilock and [ip]'s from W3's, both inside [IcacheEscrow.ic_loaded], so
@@ -48,14 +48,14 @@
    [FsStateEra.dir_entries_unlink_eq] (the delete-side half): a zeroed
    record keeps its type, so the row stays an [ADir], and its count moves
    only by the dir arm's own [dp->nlink--].  [uf_nlink_row] is the
-   count-lowered bridge at both iupdates -- ProofSysUnlink's [su_setnl_*]
+   count-lowered bridge at both iupdates -- ProofSysUnlinkPure's [su_setnl_*]
    congruences restated ABSTRACTLY, over "a record that differs in
    [di_nlink] alone", because [su_setnl] itself lives in a proof file and
    a leaf may not depend on one.
 
    [uf_dots_only] and [uf_not_dots_only] are THE ISDIREMPTY BRIDGE, both
    directions.  Forward: the loop's harvest [DirView.dir_dots_only] (every
-   live record's name is a dot name) becomes [SpecSysUnlinkAU.dots_only] of
+   live record's name is a dot name) becomes [SysUnlinkDefs.dots_only] of
    the entry map, through [FsTree.dir_view_lookup_rec] -- every key of the
    view comes from a live record inside the count.  Backward: ONE live
    record at index >= 2 refutes it, through [DirView.dir_dots_ix] (records
@@ -64,7 +64,7 @@
    really is IN the view).  The backward direction is arm (iii-c)'s
    witness and the forward one is [unl_pre]'s last conjunct.
 
-   BINDERS: [SpecSysUnlinkAU]'s section list VERBATIM -- [fileG] is bound
+   BINDERS: [SysUnlinkDefs]'s section list VERBATIM -- [fileG] is bound
    and [icacheG]/[icfg] resolve only through its fields (SpecCreate's
    header: a standalone [icfg] beside [fileG] gives two instance paths and
    the propositions print identically while failing to unify). *)
@@ -85,7 +85,7 @@ Require Import BioDefs.          (* [BSIZE]                                  *)
 Require Import InodeInv.         (* [blk_holes_zero], [MAXFILE]              *)
 Require Import IrefSlots.
 Require Import Xv6Cameras.
-(* the three binder classes [SpecSysUnlinkAU]'s section list names, IMPORTED
+(* the three binder classes [SysUnlinkDefs]'s section list names, IMPORTED
    rather than inherited ([FsAbsMknodFire]'s banner: [Require Import] does
    not re-import a required file's own imports, and an unbound [fileG] in a
    [`{! ...}] binder is silently generalised into a variable). *)
@@ -98,7 +98,7 @@ Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]      *)
 Require Import Xv6G.
 Require Import FsAbsDelta.   (* [abs_view_insert]                        *)
 Require Import FsAbsMknodFire.   (* [dlookup_commit_at], [mkf_abs_of_dir]    *)
-Require Import SpecSysUnlinkAU.  (* the statement this file's fires serve    *)
+Require Import SysUnlinkDefs.  (* the statement this file's fires serve    *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                  *)
@@ -249,7 +249,7 @@ Qed.
 (* ===================================================================== *)
 
 Section UnlinkFire.
-  (* [SpecSysUnlinkAU]'s binder list, verbatim. *)
+  (* [SysUnlinkDefs]'s binder list, verbatim. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Implicit Types Γ : fs_view_names Σ.

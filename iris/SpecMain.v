@@ -595,7 +595,7 @@ Section SpecMain.
     log_mirror_born (FsCrash.mirror_of (FsCrash.fs_blocks dk)) -∗
     (* ---- ROW (C), first half: TWO iref-slot units.  One is for
        ireclaim's iget/iput pair inside fsinit, which hands it back; the
-       pair is what [SpecKexec] takes, and forkret's [if (first)] arm calls
+       pair is what [KexecDefs] takes, and forkret's [if (first)] arm calls
        kexec off this same token straight after fsinit.  Split off the file
        table's share in [boot_shared_alloc]; the second half
        ([BioDefs.bslots]) is produced at WP time by [bio_init_at] and never

@@ -16,8 +16,8 @@
      [OffGv.off_user_inv] -- all inside the one [ftopN] critical section,
      which is what makes the pair ONE instant per chunk.  There is no receipt family; the
      caller's PREFIX CURSOR [Q] is what each node's phase 2 advances;
-   * the FD_DEVICE arm calls the LOCATED consolewrite
-     ([SpecConsolewriteLoc.CONSOLEWRITE_LOC]) at EVERY major, and that is
+   * the FD_DEVICE arm calls consolewrite
+     ([SpecConsolewrite.CONSOLEWRITE]) at EVERY major, and that is
      why one walk serves both: [filewrite_dev_env] says the cell is "null or
      consolewrite" everywhere, so the arm must be able to call consolewrite
      where the descriptor's major is not the console's -- and the located
@@ -25,7 +25,7 @@
      ([UartSentLoc.uart_sent_nil]) where the caller supplied none.  At the
      console the seed is the caller's own [tr0], out of the keyed input, and
      the pin that comes with it is what refutes the null-slot -1; off the
-     console the receipt is dropped.  The functor takes [CONSOLEWRITE_LOC]
+     console the receipt is dropped.  The functor takes [CONSOLEWRITE]
      and there is no consumer of [CONSOLEWRITE] left.
 
    ==== WHAT THE APPLICATION'S STEP COSTS ===============================
@@ -261,7 +261,7 @@
 
    S3n SURPRISE, and the one thing that will bite the walk mechanically:
    THERE ARE TWO CONSTANTS NAMED [FW_MAX] AND THIS FILE MUST IMPORT BOTH.
-   [SpecSysWriteAU.FW_MAX : Z] (the chunk size as the [lui]/[addi] pairs
+   [SysWriteDefs.FW_MAX : Z] (the chunk size as the [lui]/[addi] pairs
    materialise it) and [WriteiBudget.FW_MAX : nat] (the same 3072 as the
    budget lemmas' hypothesis) are DIFFERENT CONSTANTS AT DIFFERENT TYPES,
    and whichever file is [Require Import]ed second shadows the other.  Every
@@ -416,9 +416,9 @@ Require Import SpecIlock SpecIunlock.
 Require Import SpecWritei.
 Require Import WriteiBudget.
 Require Import SpecPipewrite.
-Require Import SpecConsolewrite.
+Require Import SpecConsolewrite. (* [consolewrite_stack], [cons_sent_cnt] *)
 Require Import ConsoleInv.  (* [NDEV_max], [a_devsw_write] *)
-Require Import SpecSysWriteAU.  (* [FW_MAX], [wchunks], [wri_pre] *)
+Require Import SysWriteDefs.  (* [FW_MAX], [wchunks], [wri_pre] *)
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.
 Require Import TsoCtx.
@@ -481,7 +481,7 @@ Proof. lia. Qed.
 (* ---------------------------------------------------------------------- *)
 
 (* The two [FW_MAX]s, related once.  See the header's SURPRISE. *)
-Lemma fw_max_bridge `{XI : CurCtx} : Z.of_nat WriteiBudget.FW_MAX = SpecSysWriteAU.FW_MAX.
+Lemma fw_max_bridge `{XI : CurCtx} : Z.of_nat WriteiBudget.FW_MAX = SysWriteDefs.FW_MAX.
 Proof. vm_compute. reflexivity. Qed.
 
 (* ...and the chunk bound in the shape the WALK has it: the code compares
@@ -489,7 +489,7 @@ Proof. vm_compute. reflexivity. Qed.
    call is a [Z] fact about the register, while the budget lemma wants a
    [nat] one about writei's argument. *)
 Lemma fw_budget_ok `{XI : CurCtx} (off n1 : nat) :
-  (Z.of_nat n1 <= SpecSysWriteAU.FW_MAX) ->
+  (Z.of_nat n1 <= SysWriteDefs.FW_MAX) ->
   (wi_cost_bmonly off n1 <= MAXOPBLOCKS)%nat.
 Proof.
   intro Hn. apply WriteiBudget.wi_cost_bmonly_fits.
@@ -502,7 +502,7 @@ Qed.
 Lemma fw_budget_ok_empty `{XI : CurCtx} (off : nat) :
   (wi_cost_bmonly off 0 <= MAXOPBLOCKS)%nat.
 Proof.
-  apply fw_budget_ok. unfold SpecSysWriteAU.FW_MAX. cbn. lia.
+  apply fw_budget_ok. unfold SysWriteDefs.FW_MAX. cbn. lia.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -517,21 +517,21 @@ Qed.
 
 (* the [bge] falls: the chunk is the whole remainder *)
 Lemma fw_chunk_rem `{XI : CurCtx} (n i : Z) :
-  (0 <= i < n) -> (n - i <= SpecSysWriteAU.FW_MAX) ->
-  (0 < n - i <= SpecSysWriteAU.FW_MAX).
+  (0 <= i < n) -> (n - i <= SysWriteDefs.FW_MAX) ->
+  (0 < n - i <= SysWriteDefs.FW_MAX).
 Proof. lia. Qed.
 
 (* the [bge] is taken: the chunk is the cap itself *)
 Lemma fw_chunk_cap `{XI : CurCtx} (n i : Z) :
-  (0 <= i < n) -> (SpecSysWriteAU.FW_MAX < n - i) ->
-  (0 < SpecSysWriteAU.FW_MAX <= SpecSysWriteAU.FW_MAX).
-Proof. unfold SpecSysWriteAU.FW_MAX. lia. Qed.
+  (0 <= i < n) -> (SysWriteDefs.FW_MAX < n - i) ->
+  (0 < SysWriteDefs.FW_MAX <= SysWriteDefs.FW_MAX).
+Proof. unfold SysWriteDefs.FW_MAX. lia. Qed.
 
 (* ...and either way the chunk is in int range, which is what the
    [sext.w s3,s3] at +0x82 needs ([fw_sextw_moi]'s hypothesis). *)
 Lemma fw_chunk_lt31 `{XI : CurCtx} (c : Z) :
-  (0 < c <= SpecSysWriteAU.FW_MAX) -> (0 <= c < 2 ^ 31).
-Proof. unfold SpecSysWriteAU.FW_MAX. lia. Qed.
+  (0 < c <= SysWriteDefs.FW_MAX) -> (0 <= c < 2 ^ 31).
+Proof. unfold SysWriteDefs.FW_MAX. lia. Qed.
 
 (* THE DECREASE.  [addw s4,s4,s1] at +0xc4 advances [i] by the count writei
    returned, and the loop is left when [i >= n].  The fuel is [n - i] and
@@ -1019,19 +1019,17 @@ Require Import FsAbsOpenFire.      (* [opf_era_file_row]                   *)
 Require Import FsAbsWriteFire.     (* the fire, the splice bridge, item 4  *)
 Require Import SpecCopyin.         (* [ubytes_at], [add_vec_moi_comm]      *)
 Require Import UartSentLoc.        (* [uart_sent_nil]: the free seed       *)
-Require Import SpecConsolewriteLoc. (* the LOCATED callee's contract       *)
 Require Import ProofFilewriteChain. (* [fw_au_raw] and its five moves      *)
 Require Import FsAbsDelta.         (* [blk_splice_nil], [delta_write]      *)
 Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)              *)
 
-(* THE FUNCTOR TAKES EIGHT CALLEES, and the seventh is the LOCATED
-   consolewrite: the device arm relays an accepted-trace receipt on the
-   console major, and the located contract is the general form at every
-   other major too (its seed is free there), so one walk serves both and
-   the landed [CONSOLEWRITE] is not a parameter of this functor. *)
+(* THE FUNCTOR TAKES EIGHT CALLEES, and the seventh is consolewrite: the
+   device arm relays an accepted-trace receipt on the console major, and
+   consolewrite's contract is the general form at every other major too (its
+   seed is free there), so one walk serves them all. *)
 Module FilewriteProof (Pipewrite : PIPEWRITE) (Ilock : ILOCK) (Writei : WRITEI)
                       (Iunlock : IUNLOCK) (BeginOp : BEGIN_OP) (EndOp : END_OP)
-                      (ConsolewriteLoc : CONSOLEWRITE_LOC) (PN : PANIC)
+                      (Consolewrite : CONSOLEWRITE) (PN : PANIC)
                       : FILEWRITE.
 
 Section ProofFilewrite.
@@ -1066,7 +1064,7 @@ Section ProofFilewrite.
      TOO, AND 180 HYPOTHESES IS A LARGE CONTEXT").  [zlia H1 H2 ..] keeps
      exactly the named facts and closes; [fwclear] is its bare half for the
      sites that run another tactic first.  [XI] is always kept because
-     [SpecSysWriteAU.FW_MAX] is stated over it, so a [Hcrange]-style bound
+     [SysWriteDefs.FW_MAX] is stated over it, so a [Hcrange]-style bound
      does not typecheck without it. *)
   Tactic Notation "fwclear" hyp_list(Hs) := clear - XI Hs.
   Tactic Notation "zlia" hyp_list(Hs) := clear - XI Hs; lia.
@@ -1501,21 +1499,21 @@ Section ProofFilewrite.
     (0 <= iz < nz)%Z -> (nz < 2 ^ 31)%Z ->
     M !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
     M !!! Regidx Rs5 = (mword_of_int nz : mword 64) ->
-    M !!! Regidx Rs7 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64) ->
-    M !!! Regidx Rs9 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64) ->
+    M !!! Regidx Rs7 = (mword_of_int SysWriteDefs.FW_MAX : mword 64) ->
+    M !!! Regidx Rs9 = (mword_of_int SysWriteDefs.FW_MAX : mword 64) ->
     sie_cap_gpr KT1 M Kn b p -∗
     kernel_text -∗
     InstrBytes.pc_is (mword_of_int (FW + 0xd4) : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (c : Z) (P : regfile),
-        ⌜(0 < c <= SpecSysWriteAU.FW_MAX)%Z /\ (c <= nz - iz)%Z
+        ⌜(0 < c <= SysWriteDefs.FW_MAX)%Z /\ (c <= nz - iz)%Z
           (* AU EDIT (difference 5): the chunk is one of the two the code
              can pick, and NOT merely bounded by both.  Free at both exits
              -- they instantiate [c] with exactly these -- and it is what
              the back edge needs: a chunk that leaves [i < n] cannot be
              [nz - iz], so it is the cap, so the fired total stays
              [FW_MAX * p]. *)
-          /\ (c = nz - iz \/ c = SpecSysWriteAU.FW_MAX)%Z
+          /\ (c = nz - iz \/ c = SysWriteDefs.FW_MAX)%Z
           /\ P !!! Regidx Rs3 = (mword_of_int c : mword 64)
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
                 P !!! Regidx r = M !!! Regidx r)⌝ -∗
@@ -1557,11 +1555,11 @@ Section ProofFilewrite.
     assert (HT2a5 : T2 !!! Regidx Ra5 = (mword_of_int (nz - iz) : mword 64))
       by (rewrite /T2 upd_ne; [exact HT1a5 | vm_compute; discriminate]).
     assert (HT2s7 : T2 !!! Regidx Rs7
-                    = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
+                    = (mword_of_int SysWriteDefs.FW_MAX : mword 64)).
     { rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1 upd_ne; [exact HMs7 | vm_compute; discriminate]. }
     assert (HT2s9 : T2 !!! Regidx Rs9
-                    = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
+                    = (mword_of_int SysWriteDefs.FW_MAX : mword 64)).
     { rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1 upd_ne; [exact HMs9 | vm_compute; discriminate]. }
     assert (HT2thr : forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
@@ -1574,19 +1572,19 @@ Section ProofFilewrite.
     iEval (rewrite Hppda) in "Hpc".
     (* ---- +0xd2 bge s7,a5 : is 3072 >= n - i ? ---- *)
     assert (Hcmp : zopz0zKzJ_s (rget T2 Rs7) (rget T2 Ra5)
-                   = Z.geb SpecSysWriteAU.FW_MAX (nz - iz)).
+                   = Z.geb SysWriteDefs.FW_MAX (nz - iz)).
     { rewrite (rget_ne T2 Rs7 ltac:(vm_compute; discriminate)).
       rewrite (rget_ne T2 Ra5 ltac:(vm_compute; discriminate)).
       rewrite HT2s7 HT2a5.
-      apply fw_bge_moi; unfold SpecSysWriteAU.FW_MAX;
+      apply fw_bge_moi; unfold SysWriteDefs.FW_MAX;
         change (2 ^ 31)%Z with 2147483648%Z; lia. }
     assert (Htgt82 : add_vec (mword_of_int (FW + 0xda) : mword 64)
               (sign_extend' 64 (mword_of_int 8112 : mword 13))
               = mword_of_int (FW + 0x8a))
       by (apply bv_eq; vm_compute; reflexivity).
-    destruct (Z.geb SpecSysWriteAU.FW_MAX (nz - iz)) eqn:Hge.
+    destruct (Z.geb SysWriteDefs.FW_MAX (nz - iz)) eqn:Hge.
     - (* ---- TAKEN: the chunk is the whole remainder ([fw_chunk_rem]) ---- *)
-      assert (Hrem : (0 < nz - iz <= SpecSysWriteAU.FW_MAX)%Z).
+      assert (Hrem : (0 < nz - iz <= SysWriteDefs.FW_MAX)%Z).
       { apply fw_chunk_rem; [lia | apply Z.geb_le; exact Hge]. }
       iApply (wp_bge_taken_s_sconf (mword_of_int (FW + 0xda))
                 (mword_of_int 8112 : mword 13) Ra5 Rs7 T2 Kn b
@@ -1603,12 +1601,12 @@ Section ProofFilewrite.
     - (* ---- FALL: the chunk is the CAP ([fw_chunk_cap]).  [Z.geb_le] is
              the only direction that exists; the strict one is derived by
              cases, NOT by a [Z.geb_gt] (there is no such lemma). ---- *)
-      assert (Hgt : (SpecSysWriteAU.FW_MAX < nz - iz)%Z).
-      { destruct (Z.le_gt_cases (nz - iz) SpecSysWriteAU.FW_MAX) as [Hle | Hgt']; [| lia].
+      assert (Hgt : (SysWriteDefs.FW_MAX < nz - iz)%Z).
+      { destruct (Z.le_gt_cases (nz - iz) SysWriteDefs.FW_MAX) as [Hle | Hgt']; [| lia].
         exfalso.
-        rewrite (proj2 (Z.geb_le SpecSysWriteAU.FW_MAX (nz - iz)) Hle) in Hge.
+        rewrite (proj2 (Z.geb_le SysWriteDefs.FW_MAX (nz - iz)) Hle) in Hge.
         discriminate. }
-      assert (Hcap : (0 < SpecSysWriteAU.FW_MAX <= SpecSysWriteAU.FW_MAX)%Z)
+      assert (Hcap : (0 < SysWriteDefs.FW_MAX <= SysWriteDefs.FW_MAX)%Z)
         by (apply (fw_chunk_cap nz iz); [lia | exact Hgt]).
       iApply (wp_bge_fall_s_sconf (mword_of_int (FW + 0xda))
                 (mword_of_int 8112 : mword 13) Ra5 Rs7 T2 Kn b
@@ -1630,7 +1628,7 @@ Section ProofFilewrite.
       set (T3 := <[Regidx Rs3 := regval_into_reg
                     (add_vec zero_reg (T2 !!! Regidx Rs9))]> T2).
       assert (HT3s3 : T3 !!! Regidx Rs3
-                      = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
+                      = (mword_of_int SysWriteDefs.FW_MAX : mword 64)).
       { rewrite /T3 upd_eq. unfold regval_into_reg.
         rewrite add_vec_zero_l. exact HT2s9. }
       assert (HT3thr : forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
@@ -1657,7 +1655,7 @@ Section ProofFilewrite.
       iIntros (CID5 Hq5). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt82b) in "Hpc".
       iSpecialize ("Hcont" $! CID5 with "[]"); [iPureIntro; wp_next_chain|].
-      iApply ("Hcont" $! SpecSysWriteAU.FW_MAX T3 with "[%] Hcg Hpc").
+      iApply ("Hcont" $! SysWriteDefs.FW_MAX T3 with "[%] Hcg Hpc").
       split_and!; [lia | lia | lia | lia | exact HT3s3 | exact HT3thr].
   Qed.
 
@@ -1919,16 +1917,16 @@ Section ProofFilewrite.
        [t = FW_MAX * p] because a chunk that did not exhaust the count IS
        the cap ([Hcpick]). *)
     t = iz ->
-    t = (SpecSysWriteAU.FW_MAX * Z.of_nat p)%Z ->
+    t = (SysWriteDefs.FW_MAX * Z.of_nat p)%Z ->
     uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) PI ->
     M !!! Regidx csp_rs1 = pa_stk sp0 12 ->
     M !!! Regidx Rs2 = fnode kx ->
     M !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
     M !!! Regidx Rs5 = (mword_of_int n : mword 64) ->
     M !!! Regidx Rs6 = m !!! Regidx Ra1 ->
-    M !!! Regidx Rs7 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64) ->
+    M !!! Regidx Rs7 = (mword_of_int SysWriteDefs.FW_MAX : mword 64) ->
     M !!! Regidx Rs8 = (mword_of_int 1 : mword 64) ->
-    M !!! Regidx Rs9 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64) ->
+    M !!! Regidx Rs9 = (mword_of_int SysWriteDefs.FW_MAX : mword 64) ->
     (* s1 and s3 are the loop's own scratch and are EXCLUDED here as well
        as the eight the entry set: [fw_rest5] puts the caller's values
        back out of slots 3 and 5 before [fw_tail] ever looks. *)
@@ -2088,14 +2086,14 @@ Section ProofFilewrite.
       by (rewrite (HPthr Rs6 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HMs6).
     assert (HPs7 : P !!! Regidx Rs7
-                   = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64))
+                   = (mword_of_int SysWriteDefs.FW_MAX : mword 64))
       by (rewrite (HPthr Rs7 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HMs7).
     assert (HPs8 : P !!! Regidx Rs8 = (mword_of_int 1 : mword 64))
       by (rewrite (HPthr Rs8 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HMs8).
     assert (HPs9 : P !!! Regidx Rs9
-                   = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64))
+                   = (mword_of_int SysWriteDefs.FW_MAX : mword 64))
       by (rewrite (HPthr Rs9 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HMs9).
     assert (HPthr' : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -2162,14 +2160,14 @@ Section ProofFilewrite.
       by (rewrite (HB0thr Rs6 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HPs6).
     assert (HB0s7 : B0 !!! Regidx Rs7
-                    = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64))
+                    = (mword_of_int SysWriteDefs.FW_MAX : mword 64))
       by (rewrite (HB0thr Rs7 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HPs7).
     assert (HB0s8 : B0 !!! Regidx Rs8 = (mword_of_int 1 : mword 64))
       by (rewrite (HB0thr Rs8 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HPs8).
     assert (HB0s9 : B0 !!! Regidx Rs9
-                    = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64))
+                    = (mword_of_int SysWriteDefs.FW_MAX : mword 64))
       by (rewrite (HB0thr Rs9 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HPs9).
     assert (HB0thr2 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -2181,7 +2179,7 @@ Section ProofFilewrite.
       exact (HPthr' r Hr Nsp N0 N1 N2 N3 N4 N5 N6 N7 N8 N9). }
     (* the chunk's two [Z] shapes, and the [nat] the callee takes it at *)
     assert (Hcz : Z.of_nat (Z.to_nat c) = c) by (apply Z2Nat.id; lia).
-    assert (Hcb : (Z.of_nat (Z.to_nat c) <= SpecSysWriteAU.FW_MAX)%Z)
+    assert (Hcb : (Z.of_nat (Z.to_nat c) <= SysWriteDefs.FW_MAX)%Z)
       by (rewrite Hcz; lia).
     assert (Hclt31 : (0 <= c < 2 ^ 31)%Z) by (apply fw_chunk_lt31; lia).
     assert (Hizlt31 : (0 <= iz < 2 ^ 31)%Z) by (apply (fw_i_lt31 n iz); lia).
@@ -2712,7 +2710,7 @@ Section ProofFilewrite.
                [FileInvDefs.off_wf_lt31] instead, which is already in [Z]. *)
             rewrite Hoffz.
             pose proof (off_wf_lt31 v Hwf) as Hw31.
-            unfold SpecSysWriteAU.FW_MAX in Hcrange.
+            unfold SysWriteDefs.FW_MAX in Hcrange.
             change (2 ^ 31)%Z with 2147483648%Z in Hw31.
             change (2 ^ 32)%Z with 4294967296%Z. lia.
           - apply Hcap2. exact Hszb. }
@@ -3539,7 +3537,7 @@ Section ProofFilewrite.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         (* AU EDIT: the chunk that did NOT exhaust the count IS the cap
            ([Hcpick]), which is what re-proves the tie at the new [pf]. *)
-        assert (Hcfm : c = SpecSysWriteAU.FW_MAX)
+        assert (Hcfm : c = SysWriteDefs.FW_MAX)
           by (fwclear Hcpick Hlt; destruct Hcpick as [Hp1 | Hp2]; lia).
         (* THE BACK EDGE'S FOUR ARITHMETIC PREMISES, NAMED.  Spliced as
            [ltac:(lia)] into [IH]'s argument list they were the single most
@@ -3552,7 +3550,7 @@ Section ProofFilewrite.
         assert (Htiz2 : tf = (iz + c)%Z).
         { destruct Hfire as [(_ & _ & _ & E4) | [(_ & _ & _ & E4) | (E1 & _)]];
             [exfalso; zlia E4 Hcrz Hcrange | exfalso; zlia E4 Hcrz | rewrite E1; zlia Htiz]. }
-        assert (Hmul2 : tf = (SpecSysWriteAU.FW_MAX * Z.of_nat pf)%Z).
+        assert (Hmul2 : tf = (SysWriteDefs.FW_MAX * Z.of_nat pf)%Z).
         { destruct Hfire as [(_ & _ & _ & E4) | [(_ & _ & _ & E4) | (E1 & E2 & _)]];
             [exfalso; zlia E4 Hcrz Hcrange | exfalso; zlia E4 Hcrz
              | rewrite E1 E2; zlia Hmul Hcfm]. }
@@ -4672,7 +4670,7 @@ Section ProofFilewrite.
                   exact (HDrthrm c Hcs N2 N8 N18 N21 N22). }
                 iDestruct (cpu_own_transport CID CID20 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iApply (ConsolewriteLoc.wp_consolewrite_loc_sconf fsc_kalloc γf γs j γlp
+                iApply (Consolewrite.wp_consolewrite_sconf fsc_kalloc γf γs j γlp
                           (fsc_uart) (fsc_disk) (fwn_txlock fn)
                           E2 (K - 12)%nat eb pidv U n b lks trs
                           Hj Hgs Hlens HE2a0 HE2a2 (fw_n_range n Hn01)
@@ -5226,7 +5224,7 @@ Section ProofFilewrite.
                                (add_vec (L2 !!! Regidx Rs7)
                                   (sign_extend' 64 (mword_of_int 3072 : mword 12)))]> L2).
                  assert (HL3s7 : L3 !!! Regidx Rs7
-                                 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
+                                 = (mword_of_int SysWriteDefs.FW_MAX : mword 64)).
                  { rewrite /L3 upd_eq. unfold regval_into_reg.
                    rewrite /L2 upd_eq. exact fw_addi_m1024. }
                  assert (Hpp50 : add_vec_int (mword_of_int (FW + 0x4c) : mword 64) 4
@@ -5259,7 +5257,7 @@ Section ProofFilewrite.
                                      (sign_extend' 64 (mword_of_int 3072 : mword 12)))
                                   31 0))]> L4).
                  assert (HL5a5 : L5 !!! Regidx Ra5
-                                 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
+                                 = (mword_of_int SysWriteDefs.FW_MAX : mword 64)).
                  { rewrite /L5 upd_eq. unfold regval_into_reg.
                    rewrite /L4 upd_eq. exact fw_addiw_m1024. }
                  assert (Hpp56 : add_vec_int (mword_of_int (FW + 0x52) : mword 64) 4
@@ -5276,7 +5274,7 @@ Section ProofFilewrite.
                  set (L6 := <[Regidx Rs9 := regval_into_reg
                                (add_vec zero_reg (L5 !!! Regidx Ra5))]> L5).
                  assert (HL6s9 : L6 !!! Regidx Rs9
-                                 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
+                                 = (mword_of_int SysWriteDefs.FW_MAX : mword 64)).
                  { rewrite /L6 upd_eq. unfold regval_into_reg.
                    rewrite add_vec_zero_l. exact HL5a5. }
                  assert (Hpp58 : add_vec_int (mword_of_int (FW + 0x56) : mword 64) 2
@@ -5295,10 +5293,10 @@ Section ProofFilewrite.
                  assert (HL7s8 : L7 !!! Regidx Rs8 = (mword_of_int 1 : mword 64))
                    by (rewrite /L7; apply upd_eq).
                  assert (HL7s9 : L7 !!! Regidx Rs9
-                                 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64))
+                                 = (mword_of_int SysWriteDefs.FW_MAX : mword 64))
                    by (rewrite /L7 upd_ne; [exact HL6s9 | vm_compute; discriminate]).
                  assert (HL7s7 : L7 !!! Regidx Rs7
-                                 = (mword_of_int SpecSysWriteAU.FW_MAX : mword 64)).
+                                 = (mword_of_int SysWriteDefs.FW_MAX : mword 64)).
                  { rewrite /L7 upd_ne; [| vm_compute; discriminate].
                    rewrite /L6 upd_ne; [| vm_compute; discriminate].
                    rewrite /L5 upd_ne; [| vm_compute; discriminate].

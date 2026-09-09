@@ -77,12 +77,12 @@ Require Import SpecMyproc SpecRelease SpecPrepareReturn.
 (* the boot arm's three callees.  [FSINIT] and [KEXEC] became callable from
    here only once their contracts stopped demanding [eb = true]: this arm
    runs with interrupts OFF (see [SpecForkret.v]'s header).
-   [SpecKexec] for the vocabulary ([K_kexec], [kexec_ok], [fs_fabric]);
-   [SpecKexecAU] for the contract itself -- kexec has ONE, and this arm
+   [KexecDefs] for the vocabulary ([K_kexec], [kexec_ok], [fs_fabric]);
+   [SpecKexec] for the contract itself -- kexec has ONE, and this arm
    takes it at the trivial bundle (see [fkr_boot]'s kexec call). *)
-Require Import SpecFsinit SpecKexec SpecPanic.
+Require Import SpecFsinit KexecDefs SpecPanic.
 Require Import PieceFam.     (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
-Require Import SpecKexecAU.  (* [KEXEC], [exec_au_pre_triv], [exec_arms_landed] *)
+Require Import SpecKexec.  (* [KEXEC], [exec_au_pre_triv], [exec_arms_landed] *)
 Require Import FsBytesGamma.  (* [fs_gamma_L]: the live Gamma the bundle is at *)
 Require Import PrintkArgs.  (* [PkAStr] / [pk_desc_res] -- panic's message shape *)
 Require Import FsReady.
@@ -107,7 +107,7 @@ Set Printing Depth 40.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module ForkretProof (MP : MYPROC) (RL : RELEASE) (PR : PREPARE_RETURN)
-                    (FS : FSINIT) (KX : SpecKexecAU.KEXEC) (PN : PANIC)
+                    (FS : FSINIT) (KX : SpecKexec.KEXEC) (PN : PANIC)
                     (UC : USERRET_CLOSED) : FORKRET.
 
 (* register indices and the two scripts, at MODULE level: an [Ltac] defined
@@ -1529,12 +1529,12 @@ Proof.
      stack pointer -- the three the plain frame used to bind universally *)
   iDestruct (exec_arms_landed with "Harms") as %(entry & spv & szv' & Hkok).
   (* kexec keeps the descriptor block, hence the fd-state ghost name it is
-     keyed on -- [SpecKexec.kexec_ok] states it. *)
+     keyed on -- [KexecDefs.kexec_ok] states it. *)
   assert (Hfgk : pv_fdg V' = pv_fdg (us_V U)).
   { destruct Hkok as [ (_ & HV') | Hs ].
     - exact (f_equal pv_fdg HV').
     - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & Hfg & _). exact Hfg. }
-  (* ...and the cwd's inum, which exec inherits ([SpecKexec.kexec_ok]) *)
+  (* ...and the cwd's inum, which exec inherits ([KexecDefs.kexec_ok]) *)
   assert (Hcwik : pv_cwi V' = pv_cwi (us_V U)).
   { destruct Hkok as [ (_ & HV') | Hs ].
     - exact (f_equal pv_cwi HV').

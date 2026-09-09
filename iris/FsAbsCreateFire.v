@@ -53,7 +53,7 @@
    says which ([FsAbsDelta.dots_delta], [dots_ents]).
 
    BINDERS: [SpecCreate]'s section list VERBATIM (which is
-   [SpecSysMknodAU]'s) -- [fileG] is bound and [icacheG]/[icfg] resolve
+   [SysMknodDefs]'s) -- [fileG] is bound and [icacheG]/[icfg] resolve
    only through its fields. *)
 
 From Stdlib Require Import ZArith Lia List.
@@ -93,7 +93,7 @@ Local Open Scope Z_scope.
 (*                                                                        *)
 (*  create's own vocabulary, stated here rather than in [SpecCreate]      *)
 (*  because the era walk's fires ([FsAbsMknodFire]) and the mknod          *)
-(*  vocabulary leaf ([SpecSysMknodAU]) both read it and both sit BELOW     *)
+(*  vocabulary leaf ([SysMknodDefs]) both read it and both sit BELOW     *)
 (*  the create contract, which names their walk package in turn.          *)
 (* ===================================================================== *)
 
@@ -601,7 +601,7 @@ Section CreateFire.
   (* =================================================================== *)
 
   (* UNDER THE ARMED REGISTRY ([InodeRegion.ireg_top_retag_armed_gen]'s
-     critical section with [FsAbsMknodFire.mkf_acre_fire]'s two phases
+     critical section with [FsAbsMknodFire.caf_acre_fire]'s two phases
      inside): the receipt names this inum, so the row says nothing about
      it and the new node may be anything -- a directory with a count and
      no dots included.  The caller's step is delivered at the RAW insert

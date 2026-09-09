@@ -1,159 +1,229 @@
-(* SpecKexec.v -- kexec()'s VOCABULARY LEAF (kernel/exec.c): the frame
-   constants, the stack geometry and the RESULT RELATION [kexec_ok], stated
-   independently of any proof.  Requires only the definitional layer -- never
-   a whole-function proof file -- so every function proof can be checked in
-   parallel.
+(* SpecKexec.v -- kexec()'s ONE CONTRACT [KEXEC]: the walk, ONE
+   observation of the file, and -- if what was observed is a program xv6
+   will load -- the caller's OWN WP for running it.  A STATEMENT FILE:
+   definitions, structural lemmas, and a [Module Type] seal; no walk, no
+   proof against the machine.
 
-   THE CONTRACT ITSELF IS [SpecKexecAU.KEXEC] ([wp_kexec_sconf]), one file
-   up: kexec has ONE contract, and it is the atomic-update one -- the walk,
-   the single observation of the file, and the caller's own WP for the
-   program observed (fs-syscall-specs.md, "ONE CONTRACT PER SYSCALL").  The
-   frame there is this file's own premise list row for row, and its armed
-   post implies the [kexec_ok] below at some entry
-   ([SpecKexecAU.exec_arms_landed]), so everything this header says about
-   what kexec promises is still read off [kexec_ok] here.  What lives here
-   is what a caller or a block lemma needs WITHOUT the abstract-state layer:
-   [K_kexec], [MAXARG], the [kxc_*] stack algebra, [kexec_ok] and
-   [fs_fabric].
+   Design of record: claude-notes/design/fs-syscall-specs.md (the AU
+   family: sections 0-4), claude-notes/design/user-wp-slot.md (the slot
+   [UexecRet.uslot] this contract's conclusion is keyed at -- through the
+   SLOT PREDICATE [S] below -- and the ruled trap contract whose exec arm
+   this fills), claude-notes/design/elf.md
+   (the file-side ELF semantics [ElfFile.elf_image]), and the owner's
+   2026-09-03 brief: "the caller must supply fupds for the pathname
+   resolution and the reads of the resulting file; after those translate
+   into some ELF binary, if that binary is valid the caller must provide
+   the WP for starting execution of the u-mode process -- the WP the
+   u-mode slot wants -- and that is how u-mode WPs chain: init proving
+   the fupds for exec("sh") concludes in the WP for running sh."
 
-     int kexec(char *path, char **argv)
+   The mold is SysOpenDefs.v (the era walk premise, the single-phase
+   whole-[anode] observation, the exclusion-by-premise pattern).
 
-   @ KernelSyms.kexec = 0x800046bc, 287 instructions / 860 bytes -- THE
-   LARGEST FUNCTION IN THE TREE, three times the next one (kfork, 270 B), and
-   the only one that is simultaneously an FS client, a page-table builder and
-   a [struct proc] mutator.  A 544-byte frame (68 slots) holding four
-   objects the contract never mentions because they are frame-resident
-   ([StackBytes.slot_bytes_own], the way namei's [name[DIRSIZ]] is):
+   ==== WHAT THIS CONTRACT IS ==========================================
 
-     s0-432  struct elfhdr elf     64 B   readi's first destination
-     s0-488  struct proghdr ph     56 B   readi's per-segment destination
-     s0-368  uint64 ustack[33]    264 B   the argv pointer vector
-     s0-536/-528/-520/-512/-504    the spilled 0xfff mask, path, sz1, argv, off
+   THE ONLY CONTRACT kexec has, and the only seal any caller may take:
+   [KexecDefs.v] below is the vocabulary leaf ([K_kexec],
+   [kexec_ok], the [kxc_*] stack algebra, [fs_fabric]), and the frame
+   below is that file's own premise list row for row -- with THREE things
+   added on the caller's side and ONE on the kernel's.  A caller that
+   wants nothing of the abstract state instantiates [S] at [emp] and the
+   bundle at [exec_au_pre_triv] (forkret's boot arm does exactly that) and
+   reads [kexec_ok] back off the arms with [exec_arms_landed]; a caller
+   that pins the file it is willing to run answers [exec_slot_pre] with
+   that program's slot.  Stable and pinned readings are the CALLER's
+   business -- derived at the call site from its own [P]/[Phio], never a
+   second seal against the code.
 
-   ---- THE FOUR THINGS IT DOES ------------------------------------------
+   IN (the AU bundle, [exec_au_pre]):
+   1. THE WALK PREMISE, [SysOpenDefs.namei_walk_pre_era] REUSED: kexec
+      resolves the whole path with namei, exactly as open's plain arm
+      does, so the one-shot that fires an [ax_hop] at the era lend per
+      path element is the same statement.  A caller that knows the
+      directory chain (init: "/" holds "sh" at a known inum) pins each
+      hop from its own view; a caller that does not passes [True] hops.
+   2. THE OBSERVATION, [SysOpenDefs.aopen_commit_at] REUSED: ONE
+      single-phase read-only commit, fired inside the file's lock
+      window, handing the caller the node kexec is about to read AS A
+      WHOLE ([anode]: a file's bytes, or a directory / device that will
+      fail the magic test).  See THE ONE OBSERVATION below for why this
+      is one fupd and not one per readi.
+   3. THE PROGRAM'S WP, [exec_slot_pre]: for every observed file [f]
+      that xv6 loads ([kexec_loadable f]) and every resume key [W']
+      kexec may build from it ([kexec_image_ok f na alen afun sts W']),
+      the caller supplies [S W'] -- [S] a SLOT PREDICATE every form
+      below is parametric in, instantiated by the dispatcher at the
+      trapframe-keyed user-execution WP ([UexecRet.uslot]: the very
+      proposition the trap loop deposits and runs; design note, "the two
+      WP forms").  [S] is a parameter and not [uslot] because the exec
+      bundle the process hands over ([UexecExecInst.exec_sbundle]) is an
+      [exec_au_pre] whose slot wand concludes at the FIXPOINT VARIABLE of
+      the enriched trap contract, which is what lets the kernel return
+      the U-mode slot.  The caller receives its own
+      observation receipt [Fo av i (AFile f)] first, so the WP it owes is
+      only for the file it observed: init, whose receipt says
+      [f = sh_bytes], owes only sh's start WP at sh's key.
 
-   (1) OPENS THE EXECUTABLE, inside one log transaction:
-         begin_op(); ip = namei(path); ilock(ip); readi(elf hdr)
-       and closes it with iunlockput(ip); end_op() on every path.
-   (2) BUILDS A SECOND ADDRESS SPACE -- proc_pagetable(p) for a table that is
-       NOT p->pagetable, then per PT_LOAD program header uvmalloc + an
-       INLINED loadseg (walkaddr + readi straight into the physical page).
-   (3) PUSHES THE ARGUMENTS onto a fresh one-page user stack under a guard
-       page (uvmalloc + uvmclear + copyout per argument + copyout of the
-       pointer vector).
-   (4) COMMITS: stores the new root, size, name, and three trapframe words,
-       then frees the OLD table.  Everything before the commit is undone by
-       [bad:] -- which is why the failure arm hands the process back at the
-       IDENTICAL [V].
+   OUT (the arms, [exec_arms]):
+   - ret = argc (SUCCESS).  The walk completed at [i] and the node
+     observed there was [a]; then
+       (a) [a] is a loadable file [f]: the landed success conjuncts hold
+           at [entry = the ELF's entry of f] ([kexec_ok_exec]) and the
+           kernel returns THE CALLER'S WP, applied: [S (exec_key U'
+           sts na)] -- the slot at the state the process resumes in (the
+           new trapframe with [a0 := argc], the new image, the new size,
+           the caller's descriptor view) -- beside the pure
+           [kexec_image_ok] it was instantiated at.  The receipt was
+           consumed by the WP premise.
+       (b) [a] is anything else and kexec succeeded anyway: a file the
+           code accepts that [kexec_loadable] does not describe (see THE
+           ACCEPTANCE PREDICATE), or NOT A FILE AT ALL -- kexec never
+           tests the inode's type, it reads raw bytes off whatever the
+           path names, so a directory whose dirent bytes begin with the
+           ELF magic is exec'd (a finding of the phase-A proof,
+           2026-09-04).  The landed success conjuncts hold at SOME entry,
+           the receipt and the WP premise come back, and the kernel mints
+           the generic slot as it does today.
+   - ret = -1 (FAILURE): the landed failure arm ([V' = V]) beside the
+     honest three-way fold of the bundle: (i) nothing fs-visible fired
+     (begin_op/namei not reached: unspent bundle back); (ii) the walk died
+     at hop [k] (the era refund shape, commit and WP back); (iii) the walk
+     completed, the node was OBSERVED (the receipt is delivered), and
+     exec failed past the lock -- a bad ELF, a directory or device, an
+     allocation failure, an oversized argument set -- with the WP premise
+     back.  A failed exec's abstract effect is NIL: kexec mutates no
+     inode, so there is no delta anywhere in this contract.
 
-   ---- THE ALTITUDE, AND WHY IT IS TWO AT ONCE --------------------------
+   ==== THE ONE OBSERVATION (why not a fupd per readi) ==================
 
-   kexec holds [ProcInv.proc_priv] (it writes p->sz, p->pagetable,
-   p->trapframe's words and p->name) AND drives the [ProcPtOwn.proc_pt] tier
-   directly, on a SECOND descriptor that no [proc_priv] describes yet.  That
-   second descriptor is the whole difficulty: every existing bridge out of
-   [proc_priv] ([proc_priv_addrspace], [proc_priv_copy]) pins [ud_root],
-   because until now every caller grew or shrank the table it already had.
-   [ProcInv.proc_priv_newspace] is the bridge that does not, and its ONE
-   remaining pin is [ud_tfp] -- the trapframe page genuinely does not move
-   across an exec (proc_pagetable maps whatever p->trapframe already holds,
-   and [tf_page], the page's bytes, is outside [proc_pt] entirely, so it
-   survives proc_freepagetable of the old table and is re-attached to the
-   new descriptor).
+   kexec reads the file 1 + phnum + Σ ceil(filesz/PGSIZE) times (the
+   header, each program header, each page of each segment -- the three
+   static readi sites in ProofKexecACode/B3/B2), and EVERY one of those reads
+   happens under the ONE [ilock] kexec takes before the header read and
+   releases at [iunlockput].  Under the lock the node cannot move (the
+   payload's custody pins the authority's row, exactly as
+   [SysOpenDefs]'s trunc receipt argues), so every readi returns bytes
+   of the SAME [f]: the reads are deterministic functions of one observed
+   value, and a per-read commit family would deliver [n] receipts of the
+   same [f] at the same instant.  The linearization point of exec's READ
+   side is the lock, and the contract says so with one commit.  A caller
+   that wants per-read receipts derives them from [f] ([rd_bytes] is
+   [file_byte] of the payload, and [FsStateInode.fn_file_bytes] reads the
+   same payload) -- the prover's obligation is the single fire at the
+   header oracle hook ProofKexecACode already carries, generalized from
+   "a header claim" to "the whole node".
 
-   ---- WHAT THE SUCCESS ARM SAYS, AND WHAT IT DELIBERATELY DOES NOT -----
+   ==== THE ACCEPTANCE PREDICATE, HONESTLY ==============================
 
-   SAYS: the process's private block is re-established at a NEW descriptor
-   and a NEW size, the return value is [argc], and the three trapframe words
-   the C writes hold the ELF entry point and the final stack pointer
-   ([kxc_tf]).  Those are the facts a caller returning to user mode needs.
+   [kexec_loadable f] is NOT the code's test.  The code checks the magic
+   and, per PT_LOAD header, four arithmetic facts, and otherwise trusts
+   an attacker-controlled table; a file with overlapping or descending
+   segments can pass it, and its image is then NOT [ElfFile.elf_image]
+   (later segments overwrite earlier ones; a descending one hits
+   [loadseg]'s "address should exist" panic, which is why the ascending
+   condition is in).  [kexec_loadable] is the set of files for which
+   the LOADED IMAGE IS THE ELF SEMANTICS' IMAGE: [ElfFile.elf_wf] (the
+   file-side well-formedness the dumps satisfy) plus the xv6-loadable
+   bounds elf.md names (the two 4-byte [int] truncations kexec performs,
+   page-aligned segment starts, ascending non-overlapping segments).
+   Success arm (b) is the honest residue: the code CAN succeed on a file
+   outside the set, and this contract then promises nothing about the
+   image and keeps today's generic mint.  Tightening the set toward the
+   code's test is the prover's finding to report, never a premise to
+   strengthen here.
 
-   DOES NOT SAY WHAT THE USER PAGES HOLD.  [proc_pt] owns its pages at
-   EXISTENTIAL contents (the user-safety altitude -- see SpecVmfault.v and
-   SpecCopyout.v, which record the same limitation for the same reason), so
-   there is no resource in this contract that could record "the image is
-   loaded".  Stating that the process will actually RUN the file's text needs
-   a contents-indexed refinement of [proc_pt]; noted, not built, and it is
-   the single largest thing this contract gives up.  What survives is
-   structural: the entry PC, the stack pointer, the size, and the coherence
-   between them.
+   ==== THE IMAGE, AND WHAT IS DEFERRED ================================
 
-   DOES NOT PIN THE NEW SIZE to the ELF's segment table either.  [szv'] is
-   existential, related to [sp'] only by the stack geometry ([kxc_stack_ok]):
-   the stack is the top page of the image and the guard page is below it.
-   Pinning [szv'] would mean modelling the phdr loop's fold over
-   [ph.vaddr + ph.memsz], which is stateable ([ElfEnc.v] has the field
-   readers) but has no consumer while the contents are existential anyway.
+   [kexec_image_ok f na alen afun sts W'] states what kexec built, at the
+   key the slot is stated on ([UexecSlot.uvis]):
+     - the resume pc is the ELF entry (word [tf_epc_idx] of the
+       trapframe; [tf_resume_pc] clears bit 0 and every entry is even);
+     - the size is [kexec_sz f]: the segments' end rounded up plus the
+       guard and stack pages;
+     - sp and a1 are [kxc_sp_final], a0 is argc (the landed [kxc_tf]
+       rows, plus the a0 the dispatcher writes on return);
+     - the ELF's file image and its .bss zeros are IN the image
+       ([UmodeAbi.uimg_sub (elf_image f)]);
+     - THE STACK kexec allocates ON TOP of the image ([kexec_stack_at]):
+       two pages above the rounded-up segment end, the lower one the
+       guard [uvmclear] makes inaccessible, the upper one the initial
+       stack; the arguments are pushed from its top -- argument [i]'s
+       characters and NUL at [kxc_sp top alen (S i)], then the
+       [na + 1]-word [ustack] vector at [kxc_sp_final], [ustack[i]] the
+       address of string [i] and [ustack[na] = 0], every word
+       little-endian ([kexec_args_at]); every other byte of the stack
+       page reads ZERO (uvmalloc's zero fill, in the lazy view); [sp]
+       and [a1] are the vector's address and [a0] is [argc] -- so
+       main's [argv] is exactly that vector, which is what a slot
+       constructor reads off the key through [kexec_image_ok_argv];
+     - THE PERMISSIONS ([KexecBuilt.kxb_perm_ok] at [uvis_perm W']):
+       every page [uvmalloc] mapped for a PT_LOAD header carries that
+       header's X/W bits ([flags2perm]: X iff [flags & 1], W iff
+       [flags & 2] -- the pages from the previous segment's rounded end
+       up to [vaddr + memsz]), the stack page is W and not X, and the
+       guard page, mapped with U cleared, is ABSENT from the projection.
+       This is the code/data split the U-tier keys on: under the
+       non-coherent instruction cache the only pages a program may run
+       are those executable AND not writable, and a slot constructor
+       reads exactly that off this row for the text segment;
+     - the descriptor view is the caller's ([sts]) and the trapframe is
+       [TFWORDS] long.
+   NOT YET STATED, named so the follow-on is a list: (d2) the zero fill
+   of the .bss-to-page-end tail and of the guard page's reading; (d3)
+   [p->name].  Each is a pure conjunct on [W'], added without moving any
+   shape.
 
-   DOES NOT PIN p->name.  It is existential at the right length.  xv6 reads
-   [p->name] only from procdump, which design/proc-struct.md already records
-   as unprovable as written (it reads other processes' names with no lock).
+   ==== LOADABLE MEANS SUCCESS, MODULO MEMORY ===========================
 
-   ---- THE FAILURE ARM IS EXACT ----------------------------------------
+   The failure arm past the lock (arm (iii)) names its CAUSE
+   ([exec_fail_cause]): the node was not a loadable file, or the
+   arguments did not fit the stack page ([kxc_stack_ok] false), or an
+   allocation failed (a kalloc / uvmalloc / proc_pagetable exhaustion).
+   The pool is uncounted, so memory exhaustion has no pure witness; what
+   keeps [EfNoMem] from being a blanket excuse is ORDER: every allocation
+   kexec performs comes after the ELF magic test, so a memory failure
+   implies the node's bytes -- if it was a file -- passed THE KERNEL'S
+   test ([kexec_magic_ok]: a header's worth of bytes whose first four
+   are the magic; the code compares only those four, not the class and
+   data bytes [ElfFile.elf_magic_ok] also checks) -- [exec_fail_ok]'s
+   [EfNoMem] row.  A real file that failed that test, or was too short
+   to hold a header, must be blamed on [EfNotLoadable], and the tails
+   have the header buffer to prove it.
+   So a caller that proves [kexec_loadable f] and the fit condition for
+   its arguments learns that the only way exec fails after resolving
+   its path is running out of memory -- and that on success it holds
+   its own WP at the image it computed.  A caller that proves nothing
+   about the file runs under the generic user-mode safety WP, which
+   does not care what the image holds, and takes arm (b).
 
-   [r = -1] hands back [proc_priv γf p pid V] at the SAME [V].  Every one of
-   the eight [bad:] entries is reached before the commit block at +0x2dc, and
-   the new table -- if one was built -- has gone through proc_freepagetable.
-   This is what makes exec's failure invisible to the caller, and it is the
-   property sys_exec needs to keep its own [proc_priv] story straight.
+   ==== WHERE THE PROOF PAYS EACH PIECE ================================
 
-   ---- THERE IS NO LOG-BUDGET PREMISE, AND THERE USED TO BE ------------
+   1. THE WALK: [SpecNameiEra.wp_namei_era] at [namei_walk_pre_era]'s
+      one-shot, fired at phase A's namei site ([ProofKexecA]).
+   2. THE OBSERVATION: [FsAbsOpenFire.opf_open_fire] (the whole-[anode]
+      fire off the lock window's [top_frag]) at the header-oracle hook of
+      phase A, delivering [Fo]'s receipt.
+   3. THE BYTES: each readi's [rd_bytes data off] IS a window of the
+      observed [f] ([era_node]'s [fn_file_bytes] = [file_byte data] over
+      the size), so the header the commit block reads, the program
+      headers the loop reads and the segments loadseg copies are
+      [f]'s -- one bridge lemma per readi site.
+   4. THE IMAGE: [kexec_image_ok] out of [KexecBuilt]'s cone facts:
+      [kxc_tf] for the trapframe words, the uvmalloc/loadseg loop for
+      [uimg_sub (elf_image f)], copyout's post for [kexec_args_at]; the
+      composition is [KexecBridge.exec_built_Q].
+   5. THE HAND-OFF: [exec_slot_pre] instantiated at the observed [f] and
+      the built key, returning the [S]-slot on arm (a) and refunding the
+      premise on every other arm.  The proofs never open [S].
+   6. THE DISPATCH SIDE: the exec channel carries the returned slot to
+      the deposit instead of minting, and the U-mode side's [uexec_ret]
+      exec arm SUPPLIES [exec_au_pre] ([UexecSG]'s deposit class,
+      instantiated in [UexecExecInst]) -- the seam through which a
+      verified program hands over its successor's WP.
 
-   The log ledger has to cover namei AND the closing iunlockput out of ONE
-   begin_op, and begin_op mints only [MAXOPBLOCKS = 10].  Priced through
-   SpecNamei's COUNTED contract that is [(L+1) * iput_units + iput_units <=
-   MAXOPBLOCKS], i.e. [3L + 6 <= 10] -- one path element, enough for "/init"
-   and "sh" and not for "/bin/sh".  That premise stood here until sys_exec
-   needed it: sys_exec's path arrives through [argstr], so its contents are
-   EXISTENTIAL and no caller can ever discharge a claim about [L].  A
-   contract with a premise its only caller cannot pay is not a bound on what
-   the theorem covers -- it is an unusable contract.
-
-   The fix is not to tighten the charge but to take the SET form.
-   [SpecNamei.wp_namei_gen] over [LogInv.log_opS] prices the walk at
-   [SpecNamex.walk_need L], which is 4 WHATEVER THE DEPTH, and spends at most
-   two -- leaving eight for an iunlockput that needs three.  [log_op] is by
-   definition [∃ Sb, log_opS], so phase A enters the set form with one
-   [iDestruct] at the namei call and leaves it with [LogInv.log_opS_op]; the
-   only other change is that the +0x032 seam carries [iput_units <= n1]
-   rather than an interval in [L].  sys_chdir was the first syscall to need
-   this (SpecSysChdir.v's ledger section); kexec is the second.
-
-   * [na <= MAXARG]: the argument-count bound the C enforces with its
-     [bne s1,s8] against 32.  Above it the function takes [bad:], which is
-     the -1 arm, so this is a premise only of the SUCCESS disjunct.
-
-   * [kxc_stack_ok]: the arguments fit in the one-page user stack.  Also only
-     a success-arm condition; the C's two [bltu ...,s7] tests against
-     [stackbase] take [bad:] otherwise.
-
-   ---- THE TWO CALLEE CONTRACTS THIS FUNCTION FORCED OPEN ----------------
-
-   Both were stated for the callers they had, and neither was usable here.
-   Both have been generalised; the story is in claude-notes/projects/kexec.md.
-
-   * SpecCopyout used to demand [p_pagetable p ↦₈ page_base P.(ud_root)] --
-     i.e. that the table copied into IS the running process's -- because
-     copyout may call vmfault, and vmfault read p->sz and mapped into
-     p->pagetable rather than the table it was passed.  kexec copies into a
-     table it has built and not yet installed, so this was a real blocker.
-
-     *** RETIRED UPSTREAM. ***  xv6 `4f2fc8b` made vmfault take the size as
-     an ARGUMENT and map into the table it was handed, and gave copyout a
-     matching [psz] parameter in a1.  copyout is now stated over an
-     arbitrary [proc_pt P] with no process cells at all, so kexec just
-     passes the new image's size and the blocker is gone.  The [co_license]
-     / [co_mapped] / [arm] apparatus that had been built to work around it
-     is deleted (SpecCopyout.v) -- which is cheaper for kexec than the
-     workaround was: it no longer has to establish [pte_vu] over its
-     destination range at all.
-
-   * SpecSafestrcpy used to demand the FULL [n = 16] source bytes, an
-     over-ask its own header admitted.  kexec's source is [last], a pointer
-     INTO the path string, and sixteen bytes past it run off the end of the
-     caller's buffer.  It now takes an owned length [ns] with
-     [SpecSafestrcpy.ssc_src_ok], and kexec pays the "there is a NUL inside
-     what you own" disjunct out of the path's own [bb_cstr]. *)
+   BINDERS: KexecDefs's list plus [ufdG] (the slot's section binds it,
+   and the dispatcher instantiates [S] there).  [GenId] because the arms
+   carry [proc_priv]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -170,282 +240,636 @@ Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
-Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskInv.
 Require Import Xv6Cameras.
-Require Import BioInv.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import LogInv.
+Require Import LogDefs.
 Require Import BitmapInv.
 Require Import ByteBuf.
 Require Import InodeInv.
-Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRefDefs.
 Require Import IcacheInv.
-Require Import IcacheEscrow.
-Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcInv.
 Require Import FileInvDefs.
-(* [SpecNamex] for [ROOTDEV] -- a param.h constant that happens to live in a
-   Spec file.  It should be hoisted the way [tf_epc_idx] was (see ProcGeom.v):
-   a Spec should not have to require another function's Spec to name a
-   constant.  Recorded in projects/kexec.md's cleanup list. *)
-(* [SpecDirlink] for [ic_sleeplocks], and it must be THIS one: the definition
-   exists three times, identically, in IcacheBoot.v / SpecFileclose.v /
-   SpecDirlink.v, and in SpecNamei's import scope the name resolves to
-   SpecDirlink's.  Since the two contracts have to compose, kexec's
-   precondition must be the SYNTACTICALLY same proposition namei's is.  The
-   three copies should be one; also in the cleanup list. *)
 Require Import SpecDirlink.
+Require Import PathElems.       (* [SLASH], [path_elems]                     *)
+Require Import FsBlocks.        (* [fs_names]                                *)
+Require Import KexecDefs.       (* the vocabulary leaf this frame is over:
+                                   [K_kexec], [kexec_ok], [kxc_sp],
+                                   [kxc_sp_final], [kxc_tf_sp_idx], [MAXARG] *)
+Require Import PageGeom.        (* [PGSIZE]                                  *)
+Require Import UserPtTree.      (* [pgroundup]                               *)
+Require Import ElfEnc.          (* [ELF_MAGIC]: the four bytes the code tests *)
+Require Import ElfFile.         (* [elf_bytes], [elf_wf], [elf_image],
+                                   [elf_entry], [elf_loads], [elf_mem_end]  *)
+Require Import UmodeAbi.        (* [uimg_sub]                                *)
+Require Import KexecBuilt.      (* [kxb_perm_ok], [kexec_seg_perm], [kexec_pg]: the
+                                   permission projection kexec builds (its home) *)
+Require Import UserFd.          (* [ufdG] -- UexecRet's section binds it     *)
+Require Import UexecSlot.       (* [uvis], [uvis_of], [tf_w]                 *)
+Require Import FsAbsEra.        (* [ax_hops_triv]: the trivial hop family  *)
+Require Import SysOpenDefs.   (* [namei_walk_pre_era], [namei_walk_dead_era],
+                                   [aopen_commit_at] -- REUSED, see header  *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
+Require Import FsAbsDefs.           (* LAST (FsAbs's own rule)                   *)
+Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ                  *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
-Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
-Require Import FsReady. (* [fs_ready]: the fabric IS this predicate now *)
+Require Import Xv6G.
+Require Import FsCfg.
 Import Defs.
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
-
 (* ===================================================================== *)
-(*  Constants the contract quotes by name.                                *)
+(*  1.  THE PURE LAYER: loadability, the size, the stack, the key        *)
 (* ===================================================================== *)
 
-(* param.h.  Both appear in the instruction stream as literals -- MAXARG as
-   the [li s8,32] the argument loop compares against, USERSTACK inside the
-   [lui a2,0x2] that makes [(USERSTACK + 1) * PGSIZE = 8192]. *)
-Definition MAXARG : nat := 32%nat.
-Definition USERSTACK : nat := 1%nat.
-
-(* kexec's own 68-slot frame over namei's 106, which is the tallest callee
-   (readi 78, iunlockput 64, end_op 58, copyout 52, uvmalloc 42, ilock 44,
-   proc_pagetable / proc_freepagetable 40, begin_op 26, walkaddr 10,
-   flags2perm / safestrcpy / strlen 2).
-
-   THE TOP OF THE BMAP CHAIN now, not the psz/copyout one: printk's real
-   stack need (48, printk_stack) dominates bmap (64), which dominates
-   balloc's out-of-blocks arm (58), which propagated readi 72 -> 78 ->
-   dirlookup 84 -> 90 -> namex 96 -> 102 -> namei 100 -> 106, and so this
-   one 168 -> 174.  None of it is a soundness question, it is all just "the
-   callee needs six more slots than it did" (SpecReadi.v's header has the
-   arithmetic). *)
-Notation K_kexec := (184%nat) (only parsing).
-(* ===================================================================== *)
-(*  The argument-stack model.                                             *)
-(* ===================================================================== *)
-(* The pointer arithmetic of the two push loops, transcribed from the
-   instructions rather than from the C, because the C's [sp -= sp % 16] is a
-   MASK on the machine ([andi s2,a5,-16]) and the two agree only because the
-   stack top is itself 16-aligned.
-
-     sp -= strlen(argv[i]) + 1        [addiw a5,a0,1] [sub a5,s2,a5]
-     sp &= ~15                        [andi s2,a5,-16]
-
-   [kxc_round16] is that mask at the Z tier; every value the success arm
-   quantifies over is at or above [stackbase] and hence non-negative, so the
-   mask and [x - x mod 16] agree and no wrap can occur -- which is exactly
-   what [kxc_stack_ok]'s in-range conjuncts buy. *)
-Definition kxc_round16 (x : Z) : Z := x - x `mod` 16.
-
-(* The stack pointer after pushing arguments [0 .. i).  [len i] is
-   [strlen(argv[i])] -- the string's length, NOT counting its NUL, which is
-   why the recurrence subtracts [len i + 1]. *)
-Fixpoint kxc_sp (top : Z) (len : nat -> nat) (i : nat) : Z :=
-  match i with
-  | O => top
-  | S i' => kxc_round16 (kxc_sp top len i' - (Z.of_nat (len i') + 1))
+(* the segments in program-header order do not overlap and ascend: each
+   ends at or before the next begins.  [uvmalloc] grows [sz] monotonically
+   and [loadseg] writes through [walkaddr] into pages that must already
+   exist, so this is what makes the loop's image the union of disjoint
+   windows -- [ElfFile.elf_image]. *)
+Fixpoint loads_ascending (ps : list elf_phdr) : Prop :=
+  match ps with
+  | [] => True
+  | p :: ps' =>
+      (match ps' with
+       | [] => True
+       | q :: _ => ep_vaddr p + ep_memsz p <= ep_vaddr q
+       end) /\ loads_ascending ps'
   end.
 
-(* ...and after the pointer vector [ustack[0 .. argc]] is pushed on top of
-   them: [sp -= (argc + 1) * 8; sp &= ~15]. *)
-Definition kxc_sp_final (top : Z) (len : nat -> nat) (argc : nat) : Z :=
-  kxc_round16 (kxc_sp top len argc - 8 * (Z.of_nat argc + 1)).
+(* THE ACCEPTANCE PREDICATE (header): the files whose loaded image is the
+   ELF semantics' image.  [elf_wf] carries the magic, the 56-byte header
+   entries, the in-file bounds, [filesz <= memsz], no wrap, and pairwise
+   disjointness; the four extra conjuncts are xv6's: the two [int]
+   truncations kexec performs on eight-byte fields ([eh_phoff] and each
+   [ph.off] are read as 4-byte words -- ElfEnc.v), page-aligned segment
+   starts (the [vaddr % PGSIZE != 0] test), and the ascending order the
+   loop's [sz] threading needs. *)
+Definition kexec_loadable (f : elf_bytes) : Prop :=
+  elf_wf f = true
+  /\ (exists e, elf_parse_ehdr f = Some e /\ ee_phoff e < 2 ^ 31)
+  /\ Forall (fun p => ep_offset p < 2 ^ 31 /\ ep_vaddr p `mod` PGSIZE = 0)
+       (elf_loads f)
+  /\ loads_ascending (elf_loads f).
 
-(* THE FIT CONDITION, one conjunct per [bltu ...,s7] the C executes: the
-   pointer is tested against [stackbase] after every argument and once more
-   after the vector.  [base] is [top - USERSTACK * PGSIZE]. *)
-Definition kxc_stack_ok (top base : Z) (len : nat -> nat) (argc : nat) : Prop :=
-  (forall i, (1 <= i)%nat -> (i <= argc)%nat -> base <= kxc_sp top len i)
-  /\ base <= kxc_sp_final top len argc.
+(* the top of the loaded segments, page-rounded ([sz1] in the C: the
+   [PGROUNDUP(sz)] after the load loop; 0 for a file with no PT_LOAD) *)
+Definition kexec_top (f : elf_bytes) : Z :=
+  match elf_mem_end f with
+  | Some e => pgroundup e
+  | None => 0
+  end.
 
-(* ===================================================================== *)
-(*  What the commit block writes into the trapframe.                      *)
-(* ===================================================================== *)
-(*   p->trapframe->a1  = sp     [sd s2,120(a5)]   word 15 = tf_arg_idx 1
-     p->trapframe->epc = entry  [sd a4,24(a5)]    word  3 = tf_epc_idx
-     p->trapframe->sp  = sp     [sd s2,48(a5)]    word  6
-   (ProcGeom's trapframe layout; word 6 has no name of its own yet.)  The
-   three indices are distinct, so the order the C writes them in does not
-   matter and the result is one simultaneous update. *)
-Definition kxc_tf_sp_idx : nat := 6%nat.
+(* the new [p->sz]: two more pages, the lower one the guard uvmclear turns
+   unusable, the upper one the stack ([USERSTACK = 1]) *)
+Definition kexec_sz (f : elf_bytes) : Z := kexec_top f + 2 * PGSIZE.
 
-Definition kxc_tf (ws ws' : list (mword 64)) (entry spv : mword 64) : Prop :=
-  ws' = <[tf_epc_idx := entry]>
-          (<[kxc_tf_sp_idx := spv]>
-             (<[tf_arg_idx 1 := spv]> ws)).
+(* THE ARGUMENT BLOCK, at the addresses the landed stack model computes:
+   argument [i]'s [alen i] characters and its NUL at [kxc_sp top alen (S i)]
+   (the pointer AFTER the push of argument [i], which is where copyout
+   wrote it), and the [na + 1]-word pointer vector at [kxc_sp_final]:
+   [ustack[i] = kxc_sp top alen (S i)] for [i < na], [ustack[na] = 0], each
+   word little-endian over eight bytes. *)
+Definition kexec_ustack (top : Z) (alen : nat -> nat) (na i : nat) : Z :=
+  if decide (i < na)%nat then kxc_sp top alen (S i) else 0.
 
-(* ===================================================================== *)
-(*  The result relation.                                                  *)
-(* ===================================================================== *)
-(* [V] is the private block on entry, [V'] the one on exit and [r] the
-   returned a0.  Two arms, and the failure arm is an EQUALITY on the whole
-   block -- see the header. *)
-Definition kexec_ok (V V' : pprivate) (r : mword 64)
-    (entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) : Prop :=
-  (* FAILED: nothing moved.  Eight [bad:] entries, all before the commit. *)
-  (r = (mword_of_int (-1) : mword 64) /\ V' = V)
-  \/
-  (* SUCCEEDED: a new address space, a new size, the three trapframe words,
-     an existential name at the right length, and [argc] in a0.  The
-     descriptor array and the working directory are untouched -- xv6's exec
-     closes no descriptor and does not chdir.
-       The two conditions the C tests and this arm therefore ASSERTS (rather
-     than taking as premises: above them the machine goes to [bad:], which is
-     the other arm) are the argument-count bound and the stack fit. *)
-  (r = (mword_of_int (Z.of_nat na) : mword 64) /\
-   (na <= MAXARG)%nat /\
-   kxc_stack_ok (uint szv') (uint szv' - 4096) alen na /\
-   pv_sz V' = szv' /\
-   spv = (mword_of_int (kxc_sp_final (uint szv') alen na) : mword 64) /\
-   ud_tfp (pv_upt V') = ud_tfp (pv_upt V) /\
-   kxc_tf (pv_tf V) (pv_tf V') entry spv /\
-   pv_ofile V' = pv_ofile V /\
-   (* ...AND ITS fd-STATE GHOST NAME, which follows: exec never opens the
-      descriptor block, so the [proc_ofiles] it hands back is the one it was
-      given, authorities and all, and that is keyed on [pv_fdg].  Stated
-      because the syscall dispatcher's return needs it -- the fd-state
-      fragment bundle rides beside the block and has to be re-keyed. *)
-   pv_fdg V' = pv_fdg V /\
-   pv_cwd V' = pv_cwd V /\
-   (* ...and the cwd's inum beside the pointer (lane C1): exec does not
-      chdir, so [ProcDefs.pv_cwi] is untouched like the cell it labels *)
-   pv_cwi V' = pv_cwi V /\
-   length (pv_name V') = PNAMELEN /\
-   (* the stack geometry: [sp] sits in the top page of the image, above the
-      guard page uvmclear turned unusable *)
-   (uint szv' - 4096 <= uint spv)%Z /\
-   (uint spv <= uint szv')%Z).
+Definition kexec_args_at (top : Z) (alen : nat -> nat) (na : nat)
+    (afun : nat -> nat -> bv 8) (M : gmap Z (bv 8)) : Prop :=
+  (forall i j, (i < na)%nat -> (j < alen i)%nat ->
+     M !! (kxc_sp top alen (S i) + Z.of_nat j) = Some (afun i j))
+  /\ (forall i, (i < na)%nat ->
+        M !! (kxc_sp top alen (S i) + Z.of_nat (alen i)) = Some (bv_0 8))
+  /\ (forall i k, (i <= na)%nat -> (k < 8)%nat ->
+        M !! (kxc_sp_final top alen na + 8 * Z.of_nat i + Z.of_nat k)
+        = bv_to_little_endian 8 8 (kexec_ustack top alen na i) !! k).
 
-(* ===================================================================== *)
-(*  THE FILE SYSTEM FABRIC, as one bundle.                                *)
-(* ===================================================================== *)
-(* Thirteen resources that every FS client's contract lists one by one --
-   SpecNamei, SpecIlock, SpecReadi and SpecIunlockput each spell out their
-   own subset, and kexec needs the union of all four.  EVERY ONE OF THEM IS
-   PERSISTENT (machine-checked: the two invariants, the two ctx's, the four
-   icache pieces, the crash seam, the era certificate, the disk lock and its
-   geometry, and procs_inv, which is a big-op of [is_lock]).  So the bundle
-   costs nothing to carry, nothing to split, and nothing to give back --
-   which is what makes it worth having: kexec's four phases would otherwise
-   each restate the thirteen, and a block statement that is thirteen lines of
-   fabric before its first real resource is unreadable.
+(* the byte addresses the argument block occupies: the strings (with
+   their NULs) and the pointer vector *)
+Definition kexec_arg_addr (top : Z) (alen : nat -> nat) (na : nat) (a : Z) : Prop :=
+  (exists i, (i < na)%nat
+     /\ kxc_sp top alen (S i) <= a <= kxc_sp top alen (S i) + Z.of_nat (alen i))
+  \/ (kxc_sp_final top alen na <= a < kxc_sp_final top alen na + 8 * (Z.of_nat na + 1)).
 
-   A caller unbundles with one [iDestruct] at each callee call site.
+(* THE STACK (header, THE IMAGE): the stack page is the top page of the
+   image, the guard page sits below it, the arguments fit ([kxc_stack_ok]
+   at the guard's top as the base, the landed fit condition), and every
+   stack-page byte outside the argument block reads zero.  The guard
+   page's own reading and both pages' permissions are (d1)/(d2). *)
+Definition kexec_stack_at (top : Z) (alen : nat -> nat) (na : nat)
+    (M : gmap Z (bv 8)) : Prop :=
+  kxc_stack_ok top (top - PGSIZE) alen na
+  /\ (forall a, top - PGSIZE <= a < top -> ~ kexec_arg_addr top alen na a ->
+        M !! a = Some (bv_0 8)).
 
-   ITS HOME IS HERE ONLY UNTIL A SECOND CONTRACT WANTS IT.  Nothing about
-   this is kexec-specific, and the right home is a shared [FsFabric.v] that
-   SpecNamei / SpecIlock / SpecReadi / SpecIunlockput are all restated over.
-   That is a sweep across eight Spec files and their proofs, it is not needed
-   to prove kexec, and the tree's rule is to promote on the second consumer
-   (as [ProcInv.proc_priv_name] and [InodeInv.ireg_blocks_ok] both were).
-   Promote it then. *)
-Definition fs_fabric
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (gs : list gname)
-    (pd pav pu : mword 64)
-    : iProp Σ :=
-  (* FOUR ROWS WHERE THERE WERE SEVENTEEN (rank 1d).  This bundle used to
-     SPELL the file system out -- the .rodata image, panic's credentials,
-     the block and log ctx's, the crash seam, the era certificate, the
-     icache's four, the inode region and its sealed regime, the device
-     invariant -- at names each caller threaded.  Every one of those names
-     is a [FsCfg.fscfg] / [IcacheRefDefs.icfg] field now, and a bundle spelled
-     entirely at ambient names IS [FsReady.fs_ready]: a copy of a
-     parameter-free predicate is still a copy.  [fs_fabric_all] below hands
-     back the sixteen rows in the ORDER the cone's destructs read them, so
-     nothing downstream had to move.
+(* THE KEY kexec BUILT (header, THE IMAGE): what the new process resumes
+   at, stated on the user-visible record the slot is keyed by.  [sts] is
+   the caller's descriptor view: exec closes no descriptor. *)
+Definition kexec_image_ok (f : elf_bytes) (na : nat) (alen : nat -> nat)
+    (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) : Prop :=
+  let top := kexec_sz f in
+  let spv := kxc_sp_final top alen na in
+  (exists e, elf_entry f = Some e
+             /\ tf_w (uvis_tf W') tf_epc_idx = (mword_of_int e : mword 64))
+  /\ uvis_sz W' = top
+  /\ tf_w (uvis_tf W') kxc_tf_sp_idx = (mword_of_int spv : mword 64)
+  /\ tf_w (uvis_tf W') (tf_arg_idx 1) = (mword_of_int spv : mword 64)
+  /\ tf_w (uvis_tf W') (tf_arg_idx 0) = (mword_of_int (Z.of_nat na) : mword 64)
+  /\ uimg_sub (elf_image f) (uvis_M W')
+  /\ kexec_args_at top alen na afun (uvis_M W')
+  /\ kexec_stack_at top alen na (uvis_M W')
+  /\ kxb_perm_ok f (kexec_top f) (uvis_perm W')
+  /\ uvis_fd W' = sts
+  /\ length (uvis_tf W') = TFWORDS.
 
-     WHAT IS NOT [fs_ready], and why each is here.  [procs_inv gs] is a
-     PROCESS resource at the CALLER's own proc array -- the file system has
-     no process content at all (FsCfg.v's header).  The disk fabric is at
-     the caller's own three ring pages, which [fs_ready] QUANTIFIES (that
-     record's ruling R1: [virtio_disk_init] [kalloc]s them at WP time), and
-     the kexec cone threads them down to [bread]; [FsReady.disk_geom_agree]
-     is the bridge in the other direction. *)
-  (FsReady.fs_ready ∗
-   procs_inv gs ∗
-   disk_geom fsc_disk pd pav pu ∗
-   is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu))%I.
+(* WHY exec FAILED past the lock (header, LOADABLE MEANS SUCCESS) *)
+Inductive exec_fail_cause :=
+| EfNotLoadable   (* the node is not a loadable file: a directory or
+                     device, a bad magic, headers outside
+                     [kexec_loadable] *)
+| EfArgsFit       (* the arguments do not fit the stack page *)
+| EfNoMem.        (* kalloc / uvmalloc / proc_pagetable exhaustion *)
 
-Global Instance fs_fabric_persistent
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    gs pd pav pu :
-  Persistent (fs_fabric gs pd pav pu).
-Proof. rewrite /fs_fabric. apply _. Qed.
+(* THE KERNEL'S MAGIC TEST, on the file: 64 bytes were read (a short
+   read fails before the test) and the first four are the magic.  The
+   code compares exactly these four ([ElfEnc.ELF_MAGIC]); ElfFile's
+   [elf_magic_ok] is stronger (class and data bytes too), so it is NOT
+   what a memory-failure tail can establish. *)
+Definition kexec_magic_ok (f : elf_bytes) : Prop :=
+  (64 <= length f)%nat /\ elf_le_at f 0 4 = ELF_MAGIC.
 
-(* THE UNPACK, in the bundle's own historical order -- which is what keeps
-   the cone's six positional [iDestruct]s verbatim across the collapse.
-   Twelve of the sixteen rows are one [FsReady] projection each; the other
-   four ride in the bundle. *)
-Lemma fs_fabric_all
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (gs : list gname) (pd pav pu : mword 64) :
-  fs_fabric gs pd pav pu -∗
-  kernel_data ∗
-  panic_env ∗
-  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) ∗
-  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev ∗
-  fs_crash_seam fsc_cov fsc_logst ∗
-  gen_cert ∗
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev ∗
-  itable_inv ∗
-  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗
-  ic_sleeplocks fsc_ic ∗
-  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
-  ireg_open ∗
-  procs_inv gs ∗
-  dev_inv fsc_uart fsc_disk ∗
-  disk_geom fsc_disk pd pav pu ∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu).
+Definition anode_loadable (a : anode) : Prop :=
+  exists (f : elf_bytes) (nl : nat), a = MkAnode (AFile f) nl /\ kexec_loadable f.
+
+Definition exec_fail_ok (a : anode) (na : nat) (alen : nat -> nat)
+    (c : exec_fail_cause) : Prop :=
+  match c with
+  | EfNotLoadable => ~ anode_loadable a
+  | EfArgsFit =>
+      exists (f : elf_bytes) (nl : nat),
+        a = MkAnode (AFile f) nl
+        /\ ~ kxc_stack_ok (kexec_sz f) (kexec_sz f - PGSIZE) alen na
+  | EfNoMem =>
+      (* the allocations all come after the magic test (header) *)
+      forall (f : elf_bytes) (nl : nat),
+        a = MkAnode (AFile f) nl -> kexec_magic_ok f
+  end.
+
+(* the landed success conjuncts, at the ELF's entry, the failure arm
+   refuted: [kexec_ok] with [entry] the file's ([KexecDefs.kexec_ok]'s
+   second disjunct is the only one a non-[-1] return admits) *)
+Definition kexec_ok_exec (f : elf_bytes) (V V' : pprivate) (r : mword 64)
+    (na : nat) (alen : nat -> nat) : Prop :=
+  exists (e : Z) (spv szv' : mword 64),
+    elf_entry f = Some e
+    /\ r <> (mword_of_int (-1) : mword 64)
+    /\ kexec_ok V V' r (mword_of_int e : mword 64) spv szv' na alen.
+
+(* THE RESUME KEY: the post-exec block with argc written into a0 (the
+   dispatcher's return-value store, which lands AFTER kexec), read through
+   [uvis_of] at the caller's descriptor view *)
+Definition exec_key (U' : ustate) (sts : list fdstate) (na : nat) : uvis :=
+  uvis_of (us_tf U' (<[tf_arg_idx 0 := (mword_of_int (Z.of_nat na) : mword 64)]>
+                       (pv_tf (us_V U'))))
+          sts.
+
+(* THE KEY'S WORKING DIRECTORY IS THE BLOCK'S, and the block's is the
+   caller's: exec inherits the cwd ([KexecDefs.kexec_ok]'s row, read off
+   [kexec_ok_exec] by [kexec_ok_exec_cwi]).  So [kexec_image_ok] names no
+   cwd -- the key is [uvis_of] of the post-exec block, whose inum the entry
+   block already pins. *)
+Lemma exec_key_cwd (U' : ustate) (sts : list fdstate) (na : nat) :
+  uvis_cwd (exec_key U' sts na) = pv_cwi (us_V U').
+Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
+
+Lemma kexec_ok_exec_cwi (f : elf_bytes) (V V' : pprivate) (r : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  kexec_ok_exec f V V' r na alen -> pv_cwi V' = pv_cwi V.
 Proof.
-  (* row by row, not one [iFrame]: every conjunct is definition-valued, so a
-     named frame pays a goal-side conversion per hypothesis -- the same
-     measurement (107.7 s and 90.6 s at two call sites) that made the old
-     constructor lemma worth having. *)
-  iIntros "(#Hrdy & #Hprocs & #Hgeom & #Hdlock)".
-  iDestruct (FsReady.fs_ready_icache with "Hrdy") as "(#Hitab & #Hitinv & #Hesc & #Hslks)".
-  iDestruct (FsReady.fs_ready_region with "Hrdy") as "[#Hireg #Hropen]".
-  iDestruct (FsReady.fs_ready_disk with "Hrdy") as "[#Hdevi _]".
-  iSplitR; [iApply (FsReady.fs_ready_data with "Hrdy") |].
-  iSplitR; [iApply (FsReady.fs_ready_panic with "Hrdy") |].
-  iSplitR; [iApply (FsReady.fs_ready_bio with "Hrdy") |].
-  iSplitR; [iApply (FsReady.fs_ready_log with "Hrdy") |].
-  iSplitR; [iApply (FsReady.fs_ready_seam with "Hrdy") |].
-  iSplitR; [iApply (FsReady.fs_ready_gen with "Hrdy") |].
-  iSplitR; [iExact "Hitab"  |].
-  iSplitR; [iExact "Hitinv" |].
-  iSplitR; [iExact "Hesc"   |].
-  iSplitR; [iExact "Hslks"  |].
-  iSplitR; [iExact "Hireg"  |].
-  iSplitR; [iExact "Hropen" |].
-  iSplitR; [iExact "Hprocs" |].
-  iSplitR; [iExact "Hdevi"  |].
-  iSplitR; [iExact "Hgeom"  |].
-  iExact "Hdlock".
+  intros (e & spv & szv' & _ & Hne & Hok).
+  destruct Hok as [[Hr _] | Hs]; [ contradiction (Hne Hr) | ].
+  destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hcwi & _). exact Hcwi.
 Qed.
 
+(* the two conjuncts a slot constructor reads first off the key *)
+Lemma kexec_image_ok_pc (f : elf_bytes) (na : nat) (alen : nat -> nat)
+    (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) (e : Z) :
+  kexec_image_ok f na alen afun sts W' ->
+  elf_entry f = Some e ->
+  tf_resume_pc (uvis_tf W') = ret_pc (mword_of_int e : mword 64).
+Proof.
+  intros (He & _) Hent. destruct He as (e' & He' & Hw).
+  rewrite Hent in He'. injection He' as ->.
+  rewrite /tf_resume_pc Hw. reflexivity.
+Qed.
+
+Lemma kexec_image_ok_fd (f : elf_bytes) (na : nat) (alen : nat -> nat)
+    (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) :
+  kexec_image_ok f na alen afun sts W' -> uvis_fd W' = sts.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hfd & _). exact Hfd. Qed.
+
+(* THE TEXT READER (header, THE PERMISSIONS): a page of PT_LOAD header
+   [i] carries that header's bits.  For sh/init the text segment is
+   R-X, so its pages read [MkUperm true false] -- executable and not
+   writable, the U-tier's definition of text. *)
+Lemma kexec_image_ok_perm (f : elf_bytes) (na : nat) (alen : nat -> nat)
+    (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis)
+    (i : nat) (p : elf_phdr) (b : Z) :
+  kexec_image_ok f na alen afun sts W' ->
+  elf_loads f !! i = Some p ->
+  kexec_seg_pages (elf_loads f) i p b ->
+  uvis_perm W' !! kexec_pg b = Some (kexec_seg_perm p).
+Proof.
+  intros (_ & _ & _ & _ & _ & _ & _ & _ & (Hperm & _ & _) & _) Hi Hb.
+  exact (Hperm i p Hi b Hb).
+Qed.
+
+(* THE ARGV READER (header, THE STACK): what main sees.  [a1] is the
+   vector's address; the [i]-th word of the vector, for [i < na], is the
+   address of the [i]-th string, whose characters and NUL are in the
+   image; the word after the last is NULL.  This is the whole of what a
+   program's slot constructor needs to know about its arguments. *)
+Lemma kexec_image_ok_argv (f : elf_bytes) (na : nat) (alen : nat -> nat)
+    (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) :
+  kexec_image_ok f na alen afun sts W' ->
+  let vec := kxc_sp_final (kexec_sz f) alen na in
+  tf_w (uvis_tf W') (tf_arg_idx 1) = (mword_of_int vec : mword 64)
+  /\ tf_w (uvis_tf W') (tf_arg_idx 0) = (mword_of_int (Z.of_nat na) : mword 64)
+  /\ (forall i k, (i <= na)%nat -> (k < 8)%nat ->
+        uvis_M W' !! (vec + 8 * Z.of_nat i + Z.of_nat k)
+        = bv_to_little_endian 8 8 (kexec_ustack (kexec_sz f) alen na i) !! k)
+  /\ (forall i j, (i < na)%nat -> (j < alen i)%nat ->
+        uvis_M W' !! (kxc_sp (kexec_sz f) alen (S i) + Z.of_nat j) = Some (afun i j))
+  /\ (forall i, (i < na)%nat ->
+        uvis_M W' !! (kxc_sp (kexec_sz f) alen (S i) + Z.of_nat (alen i))
+        = Some (bv_0 8)).
+Proof.
+  intros (_ & _ & _ & Ha1 & Ha0 & _ & (Hstr & Hnul & Hvec) & _).
+  split; [exact Ha1 |]. split; [exact Ha0 |]. split; [exact Hvec |].
+  split; [exact Hstr | exact Hnul].
+Qed.
+
+(* ===================================================================== *)
+(*  2.  THE AU BUNDLE AND THE ARMS                                        *)
+(* ===================================================================== *)
+
+Section KexecAU.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  (* ------------------------------------------------------------------ *)
+  (*  2a.  The program's WP, conditional on what was observed             *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE CALLER'S WP (header, IN 3): handed its own receipt for the node
+     kexec read, and told the file is loadable and which key kexec built,
+     the caller supplies the slot at that key.  [Fo] is the observation
+     receipt's shape ([aopen_commit_at]'s), so a caller pins the file it
+     is willing to answer for through [Fo] -- init answers only for
+     [f = sh_bytes], with sh's start WP. *)
+  Definition exec_slot_pre (S : uvis -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) : iProp Σ :=
+    (∀ (av : aview) (i : Z) (f : elf_bytes) (nl : nat) (W' : uvis),
+       Φo av i (MkAnode (AFile f) nl) -∗
+       ⌜kexec_loadable f⌝ -∗
+       ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
+       S W')%I.
+
+  (* everything the caller hands in *)
+  (* Everything the caller hands in.  Both one-shot pieces arrive as their
+     AU conjoined with their own refund, the pair being [PieceFam.pfam]:
+     [Fo] is the terminal observation's receipt beside its refund, [Fs] is
+     the SLOT's -- the caller's own WP is that piece's "receipt", so the
+     slot wand's payload and its refund pair exactly as an observation's
+     do.  The walk's cursor pair stays bare. *)
+  Definition exec_au_pre (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
+      (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) : iProp Σ :=
+    (namei_walk_pre_era γfs cw P Pmiss
+     ∗ pf_at (aopen_commit_at Γ appE) Fo
+     ∗ pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts) Fs)%I.
+
+  (* THE BUNDLE A CALLER THAT TRACKS NOTHING HANDS IN, and it is free:
+     every hop says yes at a [True] cursor, the observation hands the
+     lent half straight back with a [True] receipt, and the slot wand
+     concludes at [emp].  This is what forkret's boot arm supplies at its
+     [kexec("/init")] -- it wants only [kexec_ok] back
+     ([exec_arms_landed]), and its own slot comes from the park closer,
+     not from exec.  Nothing of the abstract state is spent, so no
+     invariant is needed on either side. *)
+  Lemma exec_au_pre_triv Γ (γfs : fs_names) (cw : Z)
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) :
+    ⊢ exec_au_pre (MkPfam (fun _ => emp%I) True%I) Γ γfs cw
+        (fun _ _ => True%I) (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I))
+        na alen afun sts.
+  Proof.
+    rewrite /exec_au_pre. iSplitR.
+    { rewrite /namei_walk_pre_era. iIntros (pl r) "_". iModIntro.
+      iSplit; [done |]. iApply ax_hops_triv. }
+    iSplitR.
+    { iApply pf_at_triv. rewrite /aopen_commit_at. iIntros (I i a) "%Hi Ha".
+      iModIntro. by iFrame "Ha". }
+    (* the slot's pair is not the trivial one -- its receipt is [emp], not
+       [True] -- so its two halves are split here rather than by
+       [pf_at_triv]. *)
+    rewrite /pf_at /=. iSplit; [| done].
+    rewrite /exec_slot_pre. by iIntros (av i f nl W') "_ _ _".
+  Qed.
+
+  (* non-expansive in the slot predicate: UexecExecInst.v instantiates
+     [S] at a fixpoint variable, and the fixpoint's contractivity proof
+     needs this of the bundle *)
+  Lemma exec_slot_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) :
+    S ≡{n}≡ S' ->
+    exec_slot_pre S Φo na alen afun sts ≡{n}≡ exec_slot_pre S' Φo na alen afun sts.
+  Proof. intros HS. rewrite /exec_slot_pre. solve_proper. Qed.
+
+  (* ...and at the PAIR the bundle takes: the refund does not move with the
+     fixpoint, so it is an ordinary binder here. *)
+  Lemma exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
+      Γ (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) :
+    S ≡{n}≡ S' ->
+    exec_au_pre (MkPfam S Rs) Γ γfs cw P Pmiss Fo na alen afun sts
+    ≡{n}≡ exec_au_pre (MkPfam S' Rs) Γ γfs cw P Pmiss Fo na alen afun sts.
+  Proof.
+    intros HS. rewrite /exec_au_pre /pf_at. cbn [pf_recv pf_refund].
+    by rewrite (exec_slot_pre_ne n S S' Fo.(pf_recv) na alen afun sts HS).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  2b.  The arms                                                       *)
+  (* ------------------------------------------------------------------ *)
+
+  (* ret = argc (header, OUT): the walk completed at [i], a FILE was
+     observed there, the landed success conjuncts hold at its entry, and
+     the slot is the caller's (a) or the generic mint's (b). *)
+  Definition exec_post_ok (Fs : pfam Σ (uvis -> iProp Σ)) Γ
+      (P : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) (U U' : ustate) (r : mword 64) : iProp Σ :=
+    (∃ (pl : list (bv 8)) (i : Z) (av : aview) (a : anode),
+       P (length (path_elems pl)) i ∗
+       ⌜arow_at av i a⌝ ∗
+       ((* (a) a loadable file: the program xv6 loaded is the ELF
+           semantics' image, and the caller's WP is returned at the key
+           the process resumes in *)
+        (∃ (f : elf_bytes) (nl : nat),
+           ⌜a = MkAnode (AFile f) nl⌝ ∗
+           ⌜kexec_loadable f⌝ ∗
+           ⌜kexec_ok_exec f (us_V U) (us_V U') r na alen⌝ ∗
+           ⌜kexec_image_ok f na alen afun sts (exec_key U' sts na)⌝ ∗
+           Fs.(pf_recv) (exec_key U' sts na))
+        ∨ (* (b) anything else the code accepted (header): the landed
+             success conjuncts at some entry, the receipt and the WP
+             premise back *)
+        (⌜~ anode_loadable a⌝ ∗
+         ⌜exists (entry spv szv' : mword 64),
+            r <> (mword_of_int (-1) : mword 64)
+            /\ kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝ ∗
+         Fo.(pf_recv) av i a ∗
+         pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts) Fs)))%I.
+
+  (* ret = -1 (header, OUT): the three-way fold of the bundle *)
+  Definition exec_post_fail (Fs : pfam Σ (uvis -> iProp Σ)) Γ
+      (γfs : fs_names) (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) : iProp Σ :=
+    ((* (i) nothing fs-visible happened *)
+     exec_au_pre Fs Γ γfs cw P Pmiss Fo na alen afun sts
+     ∨ (∃ pl : list (bv 8),
+          (* (ii) the walk died at some hop: the era refund shape *)
+          (namei_walk_dead_era γfs P Pmiss pl
+             ∗ pf_at (aopen_commit_at Γ appE) Fo
+             ∗ pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts)
+                 Fs)
+          ∨ (* (iii) the walk completed and the node was observed; exec
+               failed past the lock, and the arm says WHY (header,
+               LOADABLE MEANS SUCCESS): not a loadable file, the
+               arguments did not fit, or out of memory *)
+          (∃ (i : Z) (av : aview) (a : anode) (c : exec_fail_cause),
+             P (length (path_elems pl)) i
+             ∗ ⌜arow_at av i a⌝ ∗ Fo.(pf_recv) av i a
+             ∗ ⌜exec_fail_ok a na alen c⌝
+             ∗ pf_at (fun S => exec_slot_pre S Fo.(pf_recv) na alen afun sts)
+                 Fs)))%I.
+
+  (* the armed disjunction the continuation receives, keyed on a0, beside
+     the landed result relation's own failure equation *)
+  Definition exec_arms (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
+      (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) (U U' : ustate) (r : mword 64) : iProp Σ :=
+    ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U /\ us_M U' = us_M U⌝
+      ∗ exec_post_fail Fs Γ γfs cw P Pmiss Fo na alen afun sts)
+     ∨ exec_post_ok Fs Γ P Fo na alen afun sts U U' r)%I.
+
+  (* SANITY: the arms imply the landed result relation, so the parallel
+     form never contradicts [KexecDefs.kexec_ok] -- the failure arm is the
+     landed one on the nose, the success arm's pure conjunct IS the landed
+     success arm at the file's entry. *)
+  Lemma exec_arms_landed (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
+      (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) (U U' : ustate) (r : mword 64) :
+    exec_arms Fs Γ γfs cw P Pmiss Fo na alen afun sts U U' r ⊢
+      ⌜exists (entry spv szv' : mword 64),
+         kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝.
+  Proof.
+    rewrite /exec_arms /exec_post_ok.
+    iIntros "[[(%Hr & %HV & _) _] | H]".
+    - iPureIntro. exists (mword_of_int 0), (mword_of_int 0), (mword_of_int 0).
+      left. split; [exact Hr | exact HV].
+    - iDestruct "H" as (pl i av a) "(_ & _ & [H | H])".
+      + iDestruct "H" as (f nl) "(_ & _ & %Hok & _)".
+        iPureIntro. destruct Hok as (e & spv & szv' & _ & _ & Hok).
+        exists (mword_of_int e), spv, szv'. exact Hok.
+      + iDestruct "H" as "(_ & %Hok & _)".
+        iPureIntro. destruct Hok as (entry & spv & szv' & _ & Hok).
+        exists entry, spv, szv'. exact Hok.
+  Qed.
+
+End KexecAU.
+
+(* big-op bodies behind definitions: sealed, per the family convention
+   (durable-notes; optimization.md, "a big-op body is the predictor").
+   [exec_slot_pre] is a plain wand and stays transparent. *)
+Global Typeclasses Opaque exec_au_pre exec_post_ok exec_post_fail exec_arms.
+
+(* ===================================================================== *)
+(*  3.  THE MACHINE CONTRACT: KexecDefs's frame + the AU                  *)
+(* ===================================================================== *)
+
+(* THE MACHINE FRAME: kexec's premises and threaded resources, with the
+   bundle [EXTRA] after the process block and the armed post in the pure
+   slot ([exec_arms_landed] reads [KexecDefs.kexec_ok] back out of it).
+   The continuation's binders carry no [entry spv szv'] -- they are the
+   success arm's existentials -- and keep every resource row. *)
+Definition wp_kexec_frame
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
+    (pd pav pu : mword 64)                              (* disk fabric + lock  *)
+    (gf : gname)                                        (* file table          *)
+    (plen : nat) (pfun : nat -> bv 8)                   (* the path buffer     *)
+    (na : nat) (avf : nat -> mword 64)                  (* argv[0 .. na]       *)
+    (alen : nat -> nat) (aslen : nat -> nat)            (* strlen / owned len  *)
+    (afun : nat -> nat -> bv 8)                         (* the argument bytes  *)
+    (pidv : mword 32) (U : ustate)
+    (dqb dqs dqa dqpv dqas : dfrac)
+    (m : regfile) (K : nat) (eb : bool)
+    (b : bool) (lks : gset string)
+    (EXTRA : iProp Σ) (ARMS : ustate -> mword 64 -> iProp Σ) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.kexec in
+  let pj := proc_addr jp in
+  let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
+  let av := m !!! Regidx (mword_of_int 11 : mword 5) in   (* a1 = argv *)
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_kexec <= K)%nat ->
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
+  log_geom_ok fsc_cov fsc_logst ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
+  0 <= icfg_ist ->
+  cov_below fsc_cov fsc_size ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
+  bb_cstr pfun plen ->
+  (Z.of_nat plen < 2 ^ 31)%Z ->
+  (forall i, (i < na)%nat -> avf i <> (mword_of_int 0 : mword 64)) ->
+  avf na = (mword_of_int 0 : mword 64) ->
+  (na < MAXARG)%nat ->
+  (forall i, (i < na)%nat -> (alen i < aslen i)%nat) ->
+  (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i)) ->
+  (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z) ->
+  (jp < NPROC)%nat ->
+  gs !! jp = Some gl ->
+  sie_cap_gpr KT1 m K b pj -∗
+  cpu_own 0 eb pj b lks -∗
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
+  kernel_text -∗ pc_is pcE -∗
+  fs_fabric gs pd pav pu -∗
+  kalloc_env fsc_kalloc None -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
+  proc_priv gf pj pidv U -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+  ([∗ list] i ∈ seq 0 na,
+     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+  bslots 3 -∗
+  iref_slots 2 -∗
+  (* ---- THE BUNDLE (the one addition to the premise list) ---- *)
+  EXTRA -∗
+  wp_next true pj (fun (CID : CpuId) =>
+  ∀ (mf : regfile) (U' : ustate),
+      ⌜callee_saved m mf⌝ -∗
+      (* the armed post on the moved block and the returned a0 (implies
+         the landed [kexec_ok] at some entry, [exec_arms_landed]) *)
+      ARMS U' (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      sie_cap_gpr KT1 mf K b pj -∗
+      cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
+      pc_is ret_tgt -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
+      kalloc_env fsc_kalloc None -∗
+      proc_priv gf pj pidv U' -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+      ([∗ list] i ∈ seq 0 na,
+         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+      bslots 3 -∗
+      iref_slots 2 -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+(* THE CONTRACT.  The abstract state is read at the LIVE Γ; the
+   descriptor view [sts] is the caller's (kexec never opens the
+   descriptor block, so the key's fd leg is whatever the caller holds). *)
+Definition wp_kexec_sconf_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (Fs : pfam Σ (uvis -> iProp Σ))
+    (gs : list gname) (jp : nat) (gl : gname)
+    (pd pav pu : mword 64)
+    (gf : gname)
+    (plen : nat) (pfun : nat -> bv 8)
+    (na : nat) (avf : nat -> mword 64)
+    (alen : nat -> nat) (aslen : nat -> nat)
+    (afun : nat -> nat -> bv 8)
+    (pidv : mword 32) (U : ustate) (sts : list fdstate)
+    (dqb dqs dqa dqpv dqas : dfrac)
+    (m : regfile) (K : nat) (eb : bool)
+    (b : bool) (lks : gset string)
+    (P Pmiss : nat -> Z -> iProp Σ)
+    (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :=
+  let Γfs := fs_gamma_L fsc_fs in
+  wp_kexec_frame gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
+    pidv U dqb dqs dqa dqpv dqas m K eb b lks
+    (exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts)
+    (exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U).
+
+(* ===================================================================== *)
+(*  4.  THE SEAL                                                          *)
+(* ===================================================================== *)
+
+Module Type KEXEC.
+  Parameter wp_kexec_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (Fs : pfam Σ (uvis -> iProp Σ))
+      (gs : list gname) (jp : nat) (gl : gname)
+      (pd pav pu : mword 64)
+      (gf : gname)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64)
+      (alen : nat -> nat) (aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (U : ustate) (sts : list fdstate)
+      (dqb dqs dqa dqpv dqas : dfrac)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)),
+      wp_kexec_sconf_body Fs gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
+        pidv U sts dqb dqs dqa dqpv dqas m K eb b lks P Pmiss Fo.
+End KEXEC.

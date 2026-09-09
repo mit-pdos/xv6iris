@@ -4,7 +4,7 @@
    The walk runs at [SpecNameiEra.wp_namei_era], with the walk premise
    handed DOWN unfired (the walk picks the start inum -- ROOTINO on an
    absolute path, the block's [pv_cwi] on a relative one -- and fires it
-   there, as [ProofSysOpenAUWalk] does), the observation commit fired
+   there, as [ProofSysOpenWalk] does), the observation commit fired
    under the node's lock exactly where the [T_DIR] test reads the type
    ([FsAbsOpenFire.opf_open_fire_1]), and the three arms of [chdir_arms]
    paid: the era refund on the dead arm, the cursor and the receipt at a

@@ -15,7 +15,7 @@
    entry, and -- on every route to [bad:] -- the target's count back DOWN.
    The third is [FsAbsDelta.delta_link_untgt], which IS
    [FsAbsDelta.delta_unl_tgt] on the nose, so its commit is
-   [SpecSysUnlinkAU.utgt_commit_at] and its fire is
+   [SysUnlinkDefs.utgt_commit_at] and its fire is
    [FsAbsUnlinkFire.uf_utgt_fire], REUSED VERBATIM at
    [ProofSysLinkTails.sl_tail_bad]'s retag.  Nothing about the undo is
    restated here; cloning it would be the cross-product the guiding
@@ -54,7 +54,7 @@
    now carries [0 < bv_unsigned inum] and [lf_inum_nz] is the one-line
    bridge to [bv_0 16].
 
-   BINDERS: [SpecSysUnlinkAU]'s section list VERBATIM, which is also
+   BINDERS: [SysUnlinkDefs]'s section list VERBATIM, which is also
    [SpecSysLink]'s -- [fileG] is bound and [icacheG]/[icfg]/[fscfg] resolve
    only through its fields. *)
 

@@ -28,7 +28,7 @@
      +0x0cc  j    +0x12c             into the phdr loop BODY
 
      [+0x31c tail:]  ld s6,480(sp) ; j +0x64   -- and +0x064 is phase A's
-     already-proven [ProofKexecA.KexecAProof.kxc_bad64].  It restores ONLY
+     already-proven [ProofKexecACode.KexecACodeProof.kxc_bad64].  It restores ONLY
      s6 because at that point s6 is the only one of s3..s11 this stretch has
      spilled: the [beqz] at +0x9a is BEFORE the other seven spills.  That is
      the lazy-spill hazard of claude-notes/projects/kexec.md, and it is why
@@ -81,7 +81,7 @@
       what relates them is the threading conjunct over the callee-saved
       registers this stretch has not written.
    2. [proc_priv] travels whole.
-   4. [b = eb] is pinned FIRST, with [ProofKexecA.kxc_sie_b_agree] -- at
+   4. [b = eb] is pinned FIRST, with [ProofKexecACode.kxc_sie_b_agree] -- at
       depth 0 the two indices coincide, so [b] is substituted away and the
       whole stretch runs at the free [eb].  kexec's OWN crossing is the
       literal [true] (it parks), which is not the same thing.
@@ -135,7 +135,7 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FileInvDefs.
 Require Import SpecIput.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
@@ -172,7 +172,7 @@ Notation KXB := KernelSyms.kexec (only parsing).
 (* ===================================================================== *)
 (* [Iunlockput] and [EndOp] are used only through the +0x064 tail
    [kxc_bad64], so all seven of that functor's arguments have to be supplied
-   here.  The tail lives in ProofKexecTail.v rather than in ProofKexecA.v so
+   here.  The tail lives in ProofKexecTail.v rather than in ProofKexecACode.v so
    that phase B does not have to wait for phase A to compile; see that file's
    header. *)
 Module KexecBProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)

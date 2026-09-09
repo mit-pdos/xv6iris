@@ -324,7 +324,7 @@ Definition wp_dirlookup_sconf_body
      (5) before the self/non-self split -- so the count it is missing is
      only the region record's, and this equation transports the one it has.
      FOUR of the five callers hand the SAME record in twice ([dn dn]:
-     FsLookup, ProofCreate, ProofNamex, ProofSysUnlink) and pay [eq_refl];
+     FsLookup, ProofCreate, ProofNamex, ProofSysUnlinkPure) and pay [eq_refl];
      the fifth (ProofDirlink, the one caller with a genuinely stale region
      index) pays it out of [di_nlink_stable]'s first conjunct, which its
      contract already carries for [SpecIupdate]'s sake.  It is the same

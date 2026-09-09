@@ -2029,7 +2029,7 @@ Section InodeOwned.
   (* (D2), READ OFF THE PAYLOAD: a directory holding a live SUBDIRECTORY
      record has at least TWO links -- one for its own entry in its parent
      ([node_exact]'s [+1] at a live node) and one for the subdirectory's
-     [".."].  This is what [ProofSysUnlink.su_w5_dir] takes. *)
+     [".."].  This is what [ProofSysUnlinkPure.su_w5_dir] takes. *)
   Lemma node_exact_min2 n D s :
     node_exact n D -> fn_is_dir n = true -> fn_orphan n = false ->
     s ∈ D -> (2 <= fn_nlink n)%nat.

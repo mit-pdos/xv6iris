@@ -261,7 +261,7 @@ Proof. vm_compute. reflexivity. Qed.
 (*  0x80007188..8c = 101 120 101 99 0.)                                   *)
 (* ===================================================================== *)
 
-(* The path bytes as a naming FUNCTION, which is what [SpecKexec] indexes
+(* The path bytes as a naming FUNCTION, which is what [KexecDefs] indexes
    its [seq]-shaped premise by.  Defined by lookup into [cstring_bytes]
    rather than as six literals, so it cannot drift from the string: change
    the literal and both [fkr_init_path_cstr] and [fkr_init_path_bytes]
@@ -324,7 +324,7 @@ Section ForkretRodata.
          KT0 window [kernel_data] hands out -- .rodata is identity-mapped
          -- and that is this lemma; every tier above it is a weakening of
          this one, so the read off [KernelData.kernel_data] happens once.
-         [SpecKexec] needs both tiers of it: the path premise is written
+         [KexecDefs] needs both tiers of it: the path premise is written
          [↦ₘ[KT1]] but the argument-strings premise carries no bracket at
          all, so it resolves to [Ktier.curktier_default = KT0]. ---- *)
   Lemma fkr_init_path_run0 :
@@ -392,7 +392,7 @@ End ForkretRodata.
 (*  spend them and still hand [fkr_tail] the run whole.                    *)
 (* ===================================================================== *)
 
-(* the vector's two entries, as the function [SpecKexec] indexes by *)
+(* the vector's two entries, as the function [KexecDefs] indexes by *)
 Definition fkr_argv (i : nat) : mword 64 :=
   match i with
   | O => (mword_of_int fkr_init_path : mword 64)

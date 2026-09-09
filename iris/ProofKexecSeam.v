@@ -72,7 +72,7 @@ Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import UmodeAbi.     (* [uimg_sub]                                 *)
 Require Import ElfFile.      (* [elf_image], [elf_loads]                   *)
 Require Import UserPerm.     (* [perm_of]: the permission projection (S6)     *)
@@ -403,7 +403,7 @@ Section KexecBFrame.
 
   (* the elf slots as 64 NAMED bytes, with the per-slot 8-alignment facts kept
      as a PURE side product: a byte run does not carry alignment and
-     [bytes_own_slotsn] demands it back.  [ProofKexecA.kxc_elf_acc] is the
+     [bytes_own_slotsn] demands it back.  [ProofKexecACode.kxc_elf_acc] is the
      same carve with the giveback packaged as a wand; this chunk needs the
      alignment as DATA, because the naming survives into the loop invariant
      while the giveback happens much later. *)
@@ -496,7 +496,7 @@ Section KexecBFrameB.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
-  (* [ProofKexecA.kxc_frameA6] with (a) the ELF slots (47..54) taken OUT --
+  (* [ProofKexecACode.kxc_frameA6] with (a) the ELF slots (47..54) taken OUT --
      they travel named, see the file header -- and (b) slots 5..13 and 67
      PINNED, because from here on every one of them holds a value some later
      block reloads: 5..13 are the nine lazily-spilled callee-saved registers
@@ -533,7 +533,7 @@ End KexecBFrameB.
 (* ===================================================================== *)
 Section KexecBSeam.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.  (* NB: icacheG + icfg come
-              from [fileG] -- ProofKexecA.v's header records why a standalone
+              from [fileG] -- ProofKexecACode.v's header records why a standalone
               [!icacheG Σ] beside [!fileG Σ] is a SECOND instance. *)
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
@@ -1048,7 +1048,7 @@ Section KexecBSeam.
   (*  [argv[argc]] is known non-null, so on the C's own reasoning a vector  *)
   (*  whose first null sits exactly at index 32 leaves the loop with        *)
   (*  [argc = 32] and the following [ustack[argc] = 0] writes one past      *)
-  (*  [uint64 ustack[MAXARG]].  What rules that out is [SpecKexec]'s        *)
+  (*  [uint64 ustack[MAXARG]].  What rules that out is [KexecDefs]'s        *)
   (*  [na < MAXARG] premise, which sys_exec -- the only caller -- supplies. *)
   (*  So this conjunct is DERIVED FROM THE CONTRACT rather than from any    *)
   (*  test the function performs, and the argv loop threads [na < MAXARG]   *)
@@ -1086,9 +1086,9 @@ Section KexecBSeam.
           first.  [kxc_at_21a], INSIDE the loop, keeps its copy: there s7 is
           live and read at +0x252.
         [c < 32] survives and is NOT a loss: it comes from [c <= na] and
-        SpecKexec's [na < MAXARG] premise, which the spec already had to take
+        KexecDefs's [na < MAXARG] premise, which the spec already had to take
         because the deleted test was the "incomplete" one -- it could not see
-        a vector whose first null sits exactly at MAXARG (SpecKexec.v's own
+        a vector whose first null sits exactly at MAXARG (KexecDefs.v's own
         header says so).  So the check upstream removed was buying the proof
         nothing it did not already have. *)
      ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c = (mword_of_int 0 : mword 64) /\
@@ -1194,7 +1194,7 @@ Section KexecBSeam.
         character-for-character spelling of it) and the exception set has
         widened from the strings alone to all of [kxb_arg_addr].  Beside
         the [kxc_stack_ok] two conjuncts up, that second half IS
-        [SpecKexecAU.kexec_stack_at]; phase D hands both to the
+        [SpecKexec.kexec_stack_at]; phase D hands both to the
         entry-point hole as [KexecBuilt.kexec_built]. ---- *)
      ⌜ kxb_args_at (uint sz1) alen c afun Mi /\
        kx_zero_except (uint sz1) (kxb_arg_addr (uint sz1) alen c) Mi /\

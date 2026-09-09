@@ -222,7 +222,7 @@ Require Import FdSlots FileInvDefs.
 Require Import ProcInv ProcPtOwn.
 Require Import SchedCtx.   (* [procs_inv] / [proc_lock_res] -- p->lock is the table's slot [j] *)
 Require Import IrefSlots ProcAvail.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import UsertrapRes UtResFits.
 Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, see the header *)
 Require Import UexecSlot.  (* [uvis] / [uvis_of] *)

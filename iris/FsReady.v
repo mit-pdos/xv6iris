@@ -51,7 +51,7 @@
     every later syscall.  A twenty-parameter version can be carried only by
     existentially quantifying the twenty, and a bare existential is useless
     downstream -- a consumer handed [∃ γ…, fs_ready γ…] cannot feed it to
-    [SpecKexec.fs_fabric] or [UsertrapRes.ut_res_bare], whose own resources
+    [KexecDefs.fs_fabric] or [UsertrapRes.ut_res_bare], whose own resources
     are keyed to the CALLER's concrete names, because nothing relates the
     two.  Ambient names remove the existential instead of hiding it.
 
@@ -65,7 +65,7 @@
 
     [procs_inv] IS NOT A CONJUNCT.  It is a PROCESS resource, it is
     persistent, every consumer holds it beside this predicate anyway
-    ([SpecKexec.fs_fabric] lists it separately), and it was the only
+    ([KexecDefs.fs_fabric] lists it separately), and it was the only
     conjunct that reached back into the process layer -- which is what made
     the file system LOOK as though it depended on process abstractions.  A
     spec that wants it takes [procs_inv γs] as its own premise.
@@ -286,7 +286,7 @@ Section FsReady.
      file system's world once -- at the seal, below.
 
      [procs_inv] IS NO LONGER A CONJUNCT.  It is persistent and every
-     consumer holds it beside this predicate anyway ([SpecKexec.fs_fabric]
+     consumer holds it beside this predicate anyway ([KexecDefs.fs_fabric]
      lists it separately; forkret's tier carries it in the park package's
      persistent world), and it was the one conjunct that reached back into
      the process layer -- which is what made [fs_ready] look as though the
@@ -510,7 +510,7 @@ Section FsReady.
      ADDRESSES held in [disk_geom]'s own persistent cells, so any two
      [disk_geom]s at one [disk_names] agree on all three.  A consumer that
      threads its own [pd]/[pav]/[pu] and carries [disk_geom] at them (which
-     is how [ProofSyscall.sysc_fs_env] and [SpecKexec.fs_fabric] spell the
+     is how [ProofSyscall.sysc_fs_env] and [KexecDefs.fs_fabric] spell the
      disk fabric) can therefore always identify them with [fs_ready]'s
      witness.  Nothing analogous exists for a gname, which is why R1 stops
      at these three fields. *)

@@ -180,10 +180,10 @@ Require Import AppInv.      (* [app_step]/[app_inv]: the application's
 Require Import FsAbsDelta.  (* [delta_write], [delta_write_absent]       *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ                 *)
 Require Import SpecCopyin.       (* [ubytes_at]: the content seam (RULING A) *)
-Require Import SpecSysWriteAU.   (* [FW_MAX], [wri_pre], [wchunks]           *)
+Require Import SysWriteDefs.   (* [FW_MAX], [wri_pre], [wchunks]           *)
 Require Import FsAbsWriteFire.   (* [awrite_chain]: the cursor chain         *)
 Require Import UartSentLoc.      (* [uart_sent_from]: the console receipt    *)
-Require Import SpecConsolewriteLoc. (* [cons_sent_cnt]: the callee's post    *)
+Require Import SpecConsolewrite. (* [cons_sent_cnt]: the callee's post    *)
 Require Import FsAbsDefs.   (* LAST (FsAbs's own rule)                   *)
 Require Import TsoCtx.
 
@@ -207,7 +207,7 @@ Notation filewrite_stack := ((12 + K_writei)%nat) (only parsing).
    what the [slli a5,a5,4] / [ld a5,8(a5)] pair at +0x6c / +0x78 computes.
    The read side is [SpecFileread.a_devsw_read]; the two must not be
    confused, and S3a's decode note 2 exists because they were. *)
-(* THE CHUNK SIZE lives in [SpecSysWriteAU.v] -- the write delta's pure
+(* THE CHUNK SIZE lives in [SysWriteDefs.v] -- the write delta's pure
    vocabulary leaf -- because the INVARIANT layer needs it too
    ([FsAbsWriteFire]'s [wri_count_*] and [wchunks]) and a spec file may not
    own a definition the invariant layer needs
@@ -338,8 +338,8 @@ Section SpecFilewrite.
   (* ONE cell, and only when the major is in range.  The disjunction is the
      honest statement of what the kernel installs: [consoleinit] fills
      [devsw[CONSOLE]] and nothing fills any other entry, so a write slot is
-     either null (and the code returns -1) or [consolewrite] (whose LOCATED
-     contract, [SpecConsolewriteLoc.CONSOLEWRITE_LOC], is what the walk
+     either null (and the code returns -1) or [consolewrite] (whose
+     contract, [SpecConsolewrite.CONSOLEWRITE], is what the walk
      calls -- at every major, since this disjunction pins none).  The
      address is [a_devsw_write], NOT
      [SpecFileread.a_devsw_read]: decode note 2. *)
@@ -661,7 +661,7 @@ Section SpecFilewrite.
      existentially, because [M] is a PARTIAL map and "the bytes at [ua]" is
      not a function this layer can apply; [SpecCopyin.ubytes_at] pins every
      one of them against the image the caller lent.  This IS
-     [SpecConsolewriteLoc.cons_sent_cnt] -- the callee relays its return
+     [SpecConsolewrite.cons_sent_cnt] -- the callee relays its return
      value untouched, so the two are one definition, not two. *)
   Definition wcons_ok (γu : uart_names) (tr0 : list (bv 8))
       (M : gmap Z (bv 8)) (ua : mword 64) (n : Z) : iProp Σ :=

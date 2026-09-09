@@ -16,7 +16,7 @@
     it, and every later syscall reads it back.  A twenty-parameter version
     can be carried only by existentially quantifying the twenty, and a bare
     existential is useless downstream: a consumer that has been handed
-    [∃ γ…, fs_ready γ…] cannot feed it to [SpecKexec.fs_fabric] or to
+    [∃ γ…, fs_ready γ…] cannot feed it to [KexecDefs.fs_fabric] or to
     [UsertrapRes.ut_res_bare], whose own resources are keyed to the
     CALLER's concrete names, because nothing relates the two.  Ambient
     names remove the existential instead of hiding it.
@@ -50,7 +50,7 @@
     [procs_inv]'s [γs] is not here either, and that is deliberate: it is a
     PROCESS name, and it was in [fs_ready] only because [procs_inv] was a
     conjunct.  That conjunct is gone -- it is persistent, every consumer
-    already holds it beside the fs environment ([SpecKexec.fs_fabric] lists
+    already holds it beside the fs environment ([KexecDefs.fs_fabric] lists
     it separately, and forkret's tier carries it in the park package's
     persistent world), and dropping it is what leaves this class with no
     process content at all.

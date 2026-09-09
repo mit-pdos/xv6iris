@@ -8,8 +8,8 @@
    ([SpecFilewrite.filewrite_devsw]).
 
    THIS CONE ASSUMES NOTHING of its own.  Its FD_DEVICE arm dispatches
-   through [devsw[major].write] into the LOCATED consolewrite
-   ([LinkConsolewriteLoc]), which is a proof down to the UART's THR store;
+   through [devsw[major].write] into consolewrite
+   ([LinkConsolewrite]), which is a proof down to the UART's THR store;
    and note what does not appear even though it runs underneath: balloc's
    Axiom.  filewrite's writei is the ALLOCATING one, but [LinkBalloc.v] is a
    proof. *)

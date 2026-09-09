@@ -119,7 +119,7 @@ Require Import SpecDirlookup.
 Require Import SpecCreate.
 Require Import DirentEnc.        (* [bview]                               *)
 Require Import PathElems.        (* [path_elems]                          *)
-Require Import SpecSysMknodAU.   (* [mknod_parent_elems]                  *)
+Require Import SysMknodDefs.   (* [npar_elems]                  *)
 Require Import FsAbsEra.         (* [ep_start]                            *)
 Require Import FsAbsMknodFire.   (* [np_start_of_mknod], the walk premise *)
 Require Import CodeSysMkdir.
@@ -1203,7 +1203,7 @@ Section ProofSysMkdirBody.
       iDestruct (cpu_own_transport CID11 CID17 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       (* THE ONE-SHOT, HANDED DOWN UNFIRED: [ep_start] at the string this
-         call fetched IS [mknod_walk_pre_era] at that string, so nothing is
+         call fetched IS [npar_walk_pre_era] at that string, so nothing is
          fired here -- the WALK picks the start inum (ROOTINO, or the cwd's)
          and fires it there. *)
       iDestruct (np_start_of_mknod fsc_fs (pv_cwi (us_V U)) P Pmiss (bview pk bf)

@@ -436,7 +436,7 @@ Section Apply.
       - reflexivity.
       - reflexivity.
       - reflexivity. }
-    rewrite /uexec_arm_F /uexec_fork_parent_F /uexec_ret_ret_F. cbv zeta.
+    rewrite /uexec_arm_F /uexec_fork_parent_F /uexec_ret_cont_F. cbv zeta.
     destruct (decide (sc = uecall_scause)) as [_ | _];
       [ | exact (HS W W' Hg Hp HM Hpi Hsz Hfd Hcw) ].
     (* [Hfd] joins the other four: the returning arm's row reads the ENTRY

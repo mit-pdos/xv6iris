@@ -596,7 +596,7 @@ Qed.
 (* so the plain tier pins only the FAILURE case (sys_chdir returns -1 and  *)
 (* the directory is untouched) and leaves the landed inum to the enriched  *)
 (* tier's naming.  Every other entry preserves it: exec inherits the       *)
-(* caller's ([SpecKexec.kexec_ok]'s row), fork copies it parent to child   *)
+(* caller's ([KexecDefs.kexec_ok]'s row), fork copies it parent to child   *)
 (* (the fork arm of [UexecRet.uexec_ret_F] says so directly), and nothing  *)
 (* else touches [p->cwd].                                                  *)
 (* ===================================================================== *)

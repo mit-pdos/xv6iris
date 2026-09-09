@@ -54,7 +54,7 @@ Definition IREFSPARE : nat := 4%nat.
 
 (* THE BOOT CHAIN'S OWN TWO UNITS, and they are NOT part of the table's
    provisioning.  [SpecFsinit] takes one for ireclaim's iget/iput pair and
-   [SpecKexec] -- which forkret's boot arm calls next off the same token --
+   [KexecDefs] -- which forkret's boot arm calls next off the same token --
    takes two; both run before any file is opened and neither hands anything
    back to the ftable.  If they were carved out of the [NFILE] units the
    table could not start with all [NFILE] slots FREE, and a free slot owns

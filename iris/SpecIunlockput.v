@@ -129,7 +129,7 @@ Local Open Scope Z_scope.
    76 -> 78, forced by [K_iput]'s 72 -> 74 (SpecIput.v's note): the walk calls
    iput at [K - 4], so [K_iput <= K - 4] needs K >= 78.  All eleven
    iunlockput call sites were re-checked and every one has slack (the
-   tightest is ProofCreate/ProofSysUnlink at K - 10 / K - 30, i.e. 114). *)
+   tightest is ProofCreate/ProofSysUnlinkPure at K - 10 / K - 30, i.e. 114). *)
 Notation K_iunlockput := (78%nat) (only parsing).
 (* =====================================================================  *)
 (*  THE CREDITED SET-FORM CONTRACT (fs-sysfile GR-2b, retrofit 4b)        *)

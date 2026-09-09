@@ -5,7 +5,7 @@
    arm demands the process's bundle for the number it is at
    ([UexecSG.sbundle]).  At the kernel's instance ([UexecExecInst]) the only
    number with a bundle is exec, and exec's is
-   [SpecSysExecAU.sys_exec_au_pre] at the trapping key: open's walk premise
+   [SpecSysExec.sys_exec_au_pre] at the trapping key: open's walk premise
    and open's commit -- both handed back at [True] receipts by
    [FsAbsInvFire.fsabs_exec_half], which is a closed fact -- beside the slot
    wand the kernel fires for the NEW image.  A generic slot family pays that
@@ -42,8 +42,8 @@ Require Import UexecSlot.
 Require Import UexecWp.
 Require Import UexecRet.
 Require Import UexecCond.       (* [cond_entry_slot] -- the plain generic slot *)
-Require Import SpecKexecAU.
-Require Import SpecSysExecAU.
+Require Import SpecKexec.
+Require Import SpecSysExec.
 Require Import FsAbsInvFire.    (* [fsabs_exec_half] *)
 Require Import FirstTok.        (* in the require block for FsAbsInvFire's
                                    sake; nothing here names its [fsabs_env] *)

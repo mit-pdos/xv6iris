@@ -1,6 +1,6 @@
 (* ===================================================================== *)
 (*  ProofKexec.v -- kexec's contract, ASSEMBLED.                          *)
-(*  (SpecKexecAU.v sections 3-4; design/fs-syscall-specs.md)              *)
+(*  (SpecKexec.v sections 3-4; design/fs-syscall-specs.md)              *)
 (* ===================================================================== *)
 
 (*  THE COMPOSITION.  The cone has been generic in [Q] since the
@@ -8,14 +8,14 @@
     tails apply UNCHANGED; this file is the two sections that assemble
     them, with three things of its own.
 
-      (1) PHASE A IS THE AU ONE ([ProofKexecAUA.kxc_phaseA_au]), which
+      (1) PHASE A IS THE AU ONE ([ProofKexecA.kxc_phaseA_au]), which
           spends the caller's walk premise and its ONE observation.  That
           is the only block written for this contract.
 
       (2) THE ONE PAYING SITE.  [kxc_cd] takes [Q (kxq_entry ef)], and
           this run discharges it from WHAT THE RUN BUILT --
-          [KexecAUBridge.exec_built_Q_intro], at
-          [Q := KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef ...].
+          [KexecBridge.exec_built_Q_intro], at
+          [Q := KexecBridge.exec_built_Q (kxc_fb datl dnf) ef ...].
 
       (3) THE EXIT IS CONVERTED, TWICE, and that is the whole of the AU
           work in this file:
@@ -29,14 +29,14 @@
               takes the RECEIPT phase A bought and answers the ONE
               question the arms are keyed on -- is the observed node a
               file [kexec_loadable] describes?  That question is decided
-              CONSTRUCTIVELY ([KexecAUBridge.kexec_loadable_dec]); the
+              CONSTRUCTIVELY ([KexecBridge.kexec_loadable_dec]); the
               audit stays at its thirteen axioms.
 
           On the [-1] side of the second conversion the cause is
           [EfNoMem] when the node IS a loadable file (its magic passed by
-          [KexecAUBridge.kexec_magic_of_loadable] -- [elf_wf] tests the
+          [KexecBridge.kexec_magic_of_loadable] -- [elf_wf] tests the
           magic first) and [EfNotLoadable] otherwise, which is exactly
-          [SpecKexecAU.exec_fail_ok]'s honest fold.                      *)
+          [SpecKexec.exec_fail_ok]'s honest fold.                      *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -67,12 +67,12 @@ Require Import BitmapInv.
 Require Import IrefSlots.
 Require Import UserPtTree.
 Require Import FileInvDefs.
-Require Import SpecKexec.
+Require Import KexecDefs.
 Require Import ElfFile.      (* [elf_bytes] *)
 Require Import ElfBridge.    (* [file_bytes_lookup] *)
 Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.
-Require Import KexecAUBridge. (* the pure closer: [exec_built_Q] and friends *)
+Require Import KexecBridge. (* the pure closer: [exec_built_Q] and friends *)
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
@@ -113,14 +113,14 @@ Require DirView.               (* [DirView.T_DIR_z]                  *)
 Require Import SpecNameiEra.   (* [NAMEI_ERA]: the functor argument  *)
 Require Import UserFd.         (* [ufdG] -- the slot's descriptor leg *)
 Require Import UexecSlot.
-Require Import ProofKexecAUA.  (* the AU phase A                     *)
+Require Import ProofKexecA.  (* the AU phase A                     *)
 Require FsBytesGamma.          (* [FsBytesGamma.fs_gamma_L]          *)
 (* THE ABSTRACT SIDE.  [FsAbs] LAST of the two, per its own rule; the
    AU leaves stay QUALIFIED (their statements are all this file wants). *)
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)
 Require Import FsAbsDefs.
 Require FsAbsOpenFire.
-Require SpecKexecAU.           (* THE CONTRACT                       *)
+Require SpecKexec.           (* THE CONTRACT                       *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -137,7 +137,7 @@ Notation KX := KernelSyms.kexec (only parsing).
 
 (* ===================================================================== *)
 (*  THE PROOF.  The sixteen callee contracts plus the era walk, with       *)
-(*  [ProofKexecAUA]'s phase A over the shared blocks B..D.                 *)
+(*  [ProofKexecA]'s phase A over the shared blocks B..D.                 *)
 (* ===================================================================== *)
 Module KexecProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                     (NE : NAMEI_ERA)
@@ -146,9 +146,9 @@ Module KexecProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                     (PFP : PROC_FREEPAGETABLE) (Walkaddr : WALKADDR)
                     (Flags2perm : FLAGS2PERM) (Uvmalloc : UVMALLOC)
                     (Uvmclear : UVMCLEAR) (Strlen : STRLEN) (Copyout : COPYOUT)
-                    (SS : SAFESTRCPY) (PN : PANIC) : SpecKexecAU.KEXEC.
+                    (SS : SAFESTRCPY) (PN : PANIC) : SpecKexec.KEXEC.
 
-Module PA := ProofKexecAUA.KexecAUAProof Myproc BeginOp Namei NE Ilock Readi
+Module PA := ProofKexecA.KexecAProof Myproc BeginOp Namei NE Ilock Readi
                                          Iunlockput EndOp.
 Module PB := ProofKexecB.KexecBProof Myproc BeginOp Namei Ilock Readi
                                      Iunlockput EndOp PPT.
@@ -389,7 +389,7 @@ Section KexecAUExit.
   Notation ΓL := (FsBytesGamma.fs_gamma_L fsc_fs).
 
   (* [KexecOkQ.kexec_closer]'s resource rows with the ARMED POST in place
-     of the pure [kexec_ok_q] -- i.e. [SpecKexecAU.wp_kexec_frame]'s
+     of the pure [kexec_ok_q] -- i.e. [SpecKexec.wp_kexec_frame]'s
      own continuation, named so the two conversions below can quote it. *)
   Definition kxau_ret `{CID : CpuId}
       (ARMS : ustate -> mword 64 -> iProp Σ)
@@ -420,7 +420,7 @@ Section KexecAUExit.
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang))%I.
 
-  (* the linear twin of [ProofKexecA.kxc_exit_open_r]: the receipt the
+  (* the linear twin of [ProofKexecACode.kxc_exit_open_r]: the receipt the
      conversion spends is not persistent, so the wand is not either. *)
   Lemma kxau_exit_conv `{CIDx : CpuId} (pj : mword 64)
       (KEX E : CpuId -> iProp Σ) (R : iProp Σ) :
@@ -441,7 +441,7 @@ Section KexecAUExit.
   (*  [EfNotLoadable], are the SAME split: is the node the walk observed   *)
   (*  a file that [kexec_loadable] describes?  [Hrow] is the receipt's own *)
   (*  conditional file row (the oracle's instant is where [inode_ok] was   *)
-  (*  in scope); everything else is [KexecAUBridge]'s decision procedure   *)
+  (*  in scope); everything else is [KexecBridge]'s decision procedure   *)
   (*  and [FsAbsOpenFire]'s two other row shapes.                          *)
   (* ------------------------------------------------------------------ *)
   Lemma kxau_classify (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
@@ -451,8 +451,8 @@ Section KexecAUExit.
                  (fn_nlink (FsStateEra.era_node dn bm data))) ->
     { nl : nat | abs_row (FsStateEra.era_node dn bm data)
                  = MkAnode (AFile (kxc_fb data dn)) nl
-                 /\ SpecKexecAU.kexec_loadable (kxc_fb data dn) }
-    + { ~ SpecKexecAU.anode_loadable (abs_row (FsStateEra.era_node dn bm data)) }.
+                 /\ SpecKexec.kexec_loadable (kxc_fb data dn) }
+    + { ~ SpecKexec.anode_loadable (abs_row (FsStateEra.era_node dn bm data)) }.
   Proof.
     intros Hrow.
     destruct (decide (bv_unsigned (di_type dn) = FsImg.T_FILE_z)) as [Ht | Ht].
@@ -490,11 +490,11 @@ Section KexecAUExit.
   Definition kxau_QFp (f : elf_bytes) (na : nat) (alen : nat -> nat)
       (c : KexecOkQ.kxf_cause) : Prop :=
     match c with
-    | KexecOkQ.KfNotLoadable => ~ SpecKexecAU.kexec_loadable f
+    | KexecOkQ.KfNotLoadable => ~ SpecKexec.kexec_loadable f
     | KexecOkQ.KfArgsFit =>
-        SpecKexecAU.kexec_loadable f ->
-        ~ kxc_stack_ok (SpecKexecAU.kexec_sz f)
-                       (SpecKexecAU.kexec_sz f - PageGeom.PGSIZE) alen na
+        SpecKexec.kexec_loadable f ->
+        ~ kxc_stack_ok (SpecKexec.kexec_sz f)
+                       (SpecKexec.kexec_sz f - PageGeom.PGSIZE) alen na
     | KexecOkQ.KfNoMem => Logic.True
     end.
 
@@ -502,8 +502,8 @@ Section KexecAUExit.
      magic first, so the kernel's own four-byte test passed. *)
   Lemma kxau_nomem_ok (a : anode) (f : elf_bytes) (nl : nat)
       (na : nat) (alen : nat -> nat) :
-    a = MkAnode (AFile f) nl -> SpecKexecAU.kexec_loadable f ->
-    SpecKexecAU.exec_fail_ok a na alen SpecKexecAU.EfNoMem.
+    a = MkAnode (AFile f) nl -> SpecKexec.kexec_loadable f ->
+    SpecKexec.exec_fail_ok a na alen SpecKexec.EfNoMem.
   Proof.
     intros Ha Hl. cbn. intros f' nl' Heq.
     rewrite Ha in Heq. injection Heq as Hn _. rewrite <- Hn.
@@ -516,15 +516,15 @@ Section KexecAUExit.
      "a loadable file never fails for being unloadable". *)
   Lemma kxau_fail_cause (f : elf_bytes) (nl na : nat) (alen : nat -> nat)
       (c : KexecOkQ.kxf_cause) :
-    SpecKexecAU.kexec_loadable f -> kxau_QFp f na alen c ->
-    exists e : SpecKexecAU.exec_fail_cause,
-      SpecKexecAU.exec_fail_ok (MkAnode (AFile f) nl) na alen e.
+    SpecKexec.kexec_loadable f -> kxau_QFp f na alen c ->
+    exists e : SpecKexec.exec_fail_cause,
+      SpecKexec.exec_fail_ok (MkAnode (AFile f) nl) na alen e.
   Proof.
     intros Hload Hc. destruct c; cbn in Hc.
     - exfalso. exact (Hc Hload).
-    - exists SpecKexecAU.EfArgsFit. cbn. exists f, nl.
+    - exists SpecKexec.EfArgsFit. cbn. exists f, nl.
       split; [reflexivity | exact (Hc Hload)].
-    - exists SpecKexecAU.EfNoMem.
+    - exists SpecKexec.EfNoMem.
       exact (kxau_nomem_ok _ f nl na alen eq_refl Hload).
   Qed.
 
@@ -532,7 +532,7 @@ Section KexecAUExit.
      from the loadability the run cannot decide but the plug can name. *)
   Lemma kxau_notloadable_prem (f : elf_bytes) (ef : nat -> bv 8)
       (na : nat) (alen : nat -> nat) :
-    (SpecKexecAU.kexec_loadable f ->
+    (SpecKexec.kexec_loadable f ->
        forall j : nat, (j < 64)%nat -> ef j = f !!! j) ->
     ~ KexecBuilt.kxb_walk_loadable f ef ->
     kxau_QFp f na alen KexecOkQ.KfNotLoadable.
@@ -545,7 +545,7 @@ Section KexecAUExit.
 
   Lemma kxau_argsfit_prem (f : elf_bytes) (ef : nat -> bv 8)
       (na : nat) (alen : nat -> nat) :
-    (SpecKexecAU.kexec_loadable f ->
+    (SpecKexec.kexec_loadable f ->
        forall j : nat, (j < 64)%nat -> ef j = f !!! j) ->
     forall z : Z,
       (KexecBuilt.kxb_walk_ok f ef ->
@@ -606,10 +606,10 @@ Section KexecAUExit.
       (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
       (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64) (dqas : dfrac) :
     kxau_ret (CID := CIDx)
-      (SpecKexecAU.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U)
+      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
-    SpecKexecAU.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts -∗
+    SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       kxau_QF (fun _ : KexecOkQ.kxf_cause => Logic.True)
       gf fsc_kalloc pj pidv U m ret_tgt K b eb lks dqb dqs fsc_bmapstart
@@ -625,7 +625,7 @@ Section KexecAUExit.
     iApply ("Hret" $! mf U' with "[%] [Hfail] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
                                   Hka Hpriv Hpath Hargv Hargs Hbs Hirs").
     { exact Hcs. }
-    rewrite /SpecKexecAU.exec_arms. iLeft.
+    rewrite /SpecKexec.exec_arms. iLeft.
     iSplitR; [iPureIntro; split_and!; assumption |]. iExact "Hfail".
   Qed.
 
@@ -649,12 +649,12 @@ Section KexecAUExit.
     length (pv_tf (us_V U)) = TFWORDS ->
     (na <= MAXARG)%nat ->
     kxau_ret (CID := CIDx)
-      (SpecKexecAU.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U)
+      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
     PA.kxa_receipt Fs P Fo (length (path_elems pl)) zi na alen afun sts dn bm datl -∗
     KexecOkQ.kexec_closer (CID := CIDx)
-      (KexecAUBridge.exec_built_Q (kxc_fb datl dn) ef na alen afun)
+      (KexecBridge.exec_built_Q (kxc_fb datl dn) ef na alen afun)
       (kxau_QFp (kxc_fb datl dn) na alen)
       gf fsc_kalloc pj pidv U m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na alen plen pv dqpv pfun av dqa avf aslen dqas afun.
@@ -671,7 +671,7 @@ Section KexecAUExit.
     iDestruct "Hrcpt" as (av0) "(%Hav & %Hrow & HΦ & HP & Hsl)".
     destruct (kxau_classify dn bm datl Hrow) as [(nl & Ha & Hload) | Hnl].
     - (* A LOADABLE FILE.  Arm (a) on success; [EfNoMem] on a failure past
-         the lock -- the magic did pass, [KexecAUBridge]. *)
+         the lock -- the magic did pass, [KexecBridge]. *)
       rewrite Ha in Hav. rewrite Ha.
       (* the buffer readi filled IS the file's first 64 bytes *)
       assert (Hag' : forall j : nat, (j < 64)%nat -> ef j = kxc_fb datl dn !!! j).
@@ -686,9 +686,9 @@ Section KexecAUExit.
            magic row [kexec_magic_of_loadable] proves. *)
         destruct (kxau_fail_cause (kxc_fb datl dn) nl na alen cc Hload Hcc)
           as [ec Hec].
-        rewrite /SpecKexecAU.exec_arms. iLeft.
+        rewrite /SpecKexec.exec_arms. iLeft.
         iSplitR; [iPureIntro; split_and!; assumption |].
-        rewrite /SpecKexecAU.exec_post_fail. iRight. iExists pl. iRight.
+        rewrite /SpecKexec.exec_post_fail. iRight. iExists pl. iRight.
         iExists zi, av0, (MkAnode (AFile (kxc_fb datl dn)) nl), ec.
         iSplitL "HP"; [iExact "HP" |].
         iSplitR; [iPureIntro; exact Hav |].
@@ -701,8 +701,8 @@ Section KexecAUExit.
         destruct (exec_image_ok_of_ok_q (kxc_fb datl dn) ef (us_V U) U' sts
                     na alen afun (mf !!! Regidx Ra0) entry spv szv'
                     Hload Hag' Htflen ltac:(by right) Hne) as (Himg & Hokx).
-        rewrite /SpecKexecAU.exec_arms. iRight.
-        rewrite /SpecKexecAU.exec_post_ok.
+        rewrite /SpecKexec.exec_arms. iRight.
+        rewrite /SpecKexec.exec_post_ok.
         iExists pl, zi, av0, (MkAnode (AFile (kxc_fb datl dn)) nl).
         iSplitL "HP"; [iExact "HP" |].
         iSplitR; [iPureIntro; exact Hav |].
@@ -716,18 +716,18 @@ Section KexecAUExit.
            with the arm that did not happen. *)
         iDestruct (pf_at_au with "Hsl") as "Hsl".
         iApply ("Hsl" $! av0 zi (kxc_fb datl dn) nl
-                  (SpecKexecAU.exec_key U' sts na) with "HΦ [%] [%]");
+                  (SpecKexec.exec_key U' sts na) with "HΦ [%] [%]");
           [exact Hload | exact Himg].
     - (* NOT A LOADABLE FILE.  Arm (b) on success, [EfNotLoadable] on a
          failure past the lock. *)
       destruct Hq as [(Hr & HV & (_ & _ & HM)) | Hsucc].
       + (* the node is not a loadable file, so whatever cause the tail
            named the honest report is [EfNotLoadable]. *)
-        rewrite /SpecKexecAU.exec_arms. iLeft.
+        rewrite /SpecKexec.exec_arms. iLeft.
         iSplitR; [iPureIntro; split_and!; assumption |].
-        rewrite /SpecKexecAU.exec_post_fail. iRight. iExists pl. iRight.
+        rewrite /SpecKexec.exec_post_fail. iRight. iExists pl. iRight.
         iExists zi, av0, (abs_row (FsStateEra.era_node dn bm datl)),
-                SpecKexecAU.EfNotLoadable.
+                SpecKexec.EfNotLoadable.
         iSplitL "HP"; [iExact "HP" |].
         iSplitR; [iPureIntro; exact Hav |].
         iSplitL "HΦ"; [iExact "HΦ" |].
@@ -736,8 +736,8 @@ Section KexecAUExit.
       + assert (Hne : (mf !!! Regidx Ra0) <> (mword_of_int (-1) : mword 64)).
         { destruct Hsucc as (_ & Hr & _). rewrite Hr.
           exact (kxau_argc_ne_m1 na Hnamax). }
-        rewrite /SpecKexecAU.exec_arms. iRight.
-        rewrite /SpecKexecAU.exec_post_ok.
+        rewrite /SpecKexec.exec_arms. iRight.
+        rewrite /SpecKexec.exec_post_ok.
         iExists pl, zi, av0, (abs_row (FsStateEra.era_node dn bm datl)).
         iSplitL "HP"; [iExact "HP" |].
         iSplitR; [iPureIntro; exact Hav |].
@@ -746,7 +746,7 @@ Section KexecAUExit.
         iSplitR.
         { iPureIntro. exists entry, spv, szv'. split; [exact Hne |].
           apply (KexecOkQ.kexec_ok_qf_weaken
-                   (fun e => KexecAUBridge.exec_built_Q (kxc_fb datl dn) ef
+                   (fun e => KexecBridge.exec_built_Q (kxc_fb datl dn) ef
                                na alen afun e U')
                    (kxau_QFp (kxc_fb datl dn) na alen)).
           by right. }
@@ -795,21 +795,21 @@ Section KexecAUMain.
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :
-    SpecKexecAU.wp_kexec_sconf_body Fs gs jp gl pd pav pu gf plen pfun na avf alen
+    SpecKexec.wp_kexec_sconf_body Fs gs jp gl pd pav pu gf plen pfun na avf alen
       aslen afun pidv U sts dqb dqs dqa dqpv dqas m K eb b lks P Pmiss Fo.
   Proof.
-    rewrite /SpecKexecAU.wp_kexec_sconf_body /SpecKexecAU.wp_kexec_frame.
+    rewrite /SpecKexec.wp_kexec_sconf_body /SpecKexec.wp_kexec_frame.
     intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0
            Hcovb Hiregb Hcstr Hplen Havf_nz Havf_na Hnamax
            Halen_b Halen_c Halen_4 Hjp Hgs.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hka Hbm Hins Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hau Hcont".
-    (* ---- THE BUNDLE, OPENED (SpecKexecAU sect. 2): the walk premise,
+    (* ---- THE BUNDLE, OPENED (SpecKexec sect. 2): the walk premise,
        the one observation, and the program's WP. ---- *)
-    rewrite /SpecKexecAU.exec_au_pre.
+    rewrite /SpecKexec.exec_au_pre.
     iDestruct "Hau" as "(Hwalk & Hoc & Hsl)".
     (* the trapframe's length, read off the block ONCE: the image closer
-       ([KexecAUBridge.exec_image_ok_of_ok_q]) wants it about the INCOMING
+       ([KexecBridge.exec_image_ok_of_ok_q]) wants it about the INCOMING
        state, and at the exit only [U'] is in hand. *)
     iDestruct (proc_priv_tf with "Hpriv") as "(Hq14 & Htfp & Hpvbk)".
     iDestruct (tf_page_length with "Htfp") as %Htflen.
@@ -823,7 +823,7 @@ Section KexecAUMain.
     (* ---- THE EXIT, NAMED.  [kxau_ret] IS the contract's continuation. ---- *)
     iAssert (wp_next true (proc_addr jp) (fun CID : CpuId =>
                kxau_ret (CID := CID)
-                 (SpecKexecAU.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U)
+                 (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo na alen afun sts U)
                  gf fsc_kalloc (proc_addr jp) pidv m
                  (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs fsc_bmapstart
                  na plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1) dqa
@@ -867,7 +867,7 @@ Section KexecAUMain.
     iDestruct (kxau_exit_conv (CIDx := CIDa) (proc_addr jp) _
                  (fun CID : CpuId =>
                     KexecOkQ.kexec_closer
-                      (KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
+                      (KexecBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
                       (kxau_QFp (kxc_fb datl dnf) na alen)
                       gf fsc_kalloc (proc_addr jp) pidv U m
                       (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs
@@ -887,11 +887,11 @@ Section KexecAUMain.
        [kexec_sz].  So both are proved under [kexec_loadable] and are
        vacuous otherwise -- which is why the composition can pay them
        without deciding loadability here. ---- *)
-    assert (Hagf : SpecKexecAU.kexec_loadable (kxc_fb datl dnf) ->
+    assert (Hagf : SpecKexec.kexec_loadable (kxc_fb datl dnf) ->
               forall j : nat, (j < 64)%nat -> ef j = kxc_fb datl dnf !!! j).
     { intros Hload j Hj. rewrite (Hef j Hj). symmetry.
       unfold kxc_fb. apply file_bytes_lookup.
-      pose proof (KexecAUBridge.kexec_loadable_len _ Hload) as H64.
+      pose proof (KexecBridge.kexec_loadable_len _ Hload) as H64.
       rewrite kxau_fb_length in H64. lia. }
     (* the nine resources phase B threads whole and never looks inside *)
     iAssert (kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf
@@ -916,7 +916,7 @@ Section KexecAUMain.
       iSplitL "Hiref"; [iExact "Hiref" | iExact "Hru"]. }
     (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
     iApply (PB.kxc_b1 (CID0 := CIDa)
-              (KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
+              (KexecBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
               (kxau_QFp (kxc_fb datl dnf) na alen)
               gs jp gl pd pav pu gf
               kf qf sf gyf loyf tlyf inumf dnf bmf datl gilf gislf n2
@@ -946,7 +946,7 @@ Section KexecAUMain.
       iDestruct (wp_next_retarget CIDz CIDy true (proc_addr jp) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (kxc_cd (CID0 := CIDy)
-                (KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
+                (KexecBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
                 (kxau_QFp (kxc_fb datl dnf) na alen)
                 jp gf
  plen pfun na avf alen aslen afun
@@ -959,7 +959,7 @@ Section KexecAUMain.
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13z
                 w67z (kxc_fb datl dnf) ef Pz Miz (mword_of_int 0 : mword 64)
                 (fun szg U' Hb =>
-                   KexecAUBridge.exec_built_Q_intro (kxc_fb datl dnf) ef na alen
+                   KexecBridge.exec_built_Q_intro (kxc_fb datl dnf) ef na alen
                      afun szg U' Hb)
                 I (kxau_argsfit_prem (kxc_fb datl dnf) ef na alen Hagf)
                 HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
@@ -969,7 +969,7 @@ Section KexecAUMain.
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
       iIntros (CIDl) "%Hsl". iIntros (Ml Pl Mil) "Hst12c Hcont".
       iApply (PB3.kxc_b2 (CID0 := CIDl)
-                (KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
+                (KexecBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
                 (kxau_QFp (kxc_fb datl dnf) na alen)
                 gs jp gl pd pav pu
                 gilf gislf gf
@@ -986,7 +986,7 @@ Section KexecAUMain.
                 with "Htext Hfab Hst12c Hcont []").
       iIntros (CIDy) "%Hsy". iIntros (My Py Miy szvy) "Hst1ae Hcont".
       iApply (kxc_cd (CID0 := CIDy)
-                (KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
+                (KexecBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
                 (kxau_QFp (kxc_fb datl dnf) na alen)
                 jp gf
  plen pfun na avf alen aslen afun
@@ -999,7 +999,7 @@ Section KexecAUMain.
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                 (mword_of_int 4095 : mword 64) (kxc_fb datl dnf) ef Py Miy szvy
                 (fun szg U' Hb =>
-                   KexecAUBridge.exec_built_Q_intro (kxc_fb datl dnf) ef na alen
+                   KexecBridge.exec_built_Q_intro (kxc_fb datl dnf) ef na alen
                      afun szg U' Hb)
                 I (kxau_argsfit_prem (kxc_fb datl dnf) ef na alen Hagf)
                 HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4

@@ -3,7 +3,7 @@
    count bridge the walk needs.
 
    The pure vocabulary the arms are stated in -- [ard_count], [ard_pre],
-   [ard_ret_tie] and the slice/readi bridges -- is [SpecSysReadAU.v], the
+   [ard_ret_tie] and the slice/readi bridges -- is [SysReadDefs.v], the
    leaf below this one; the CONTRACT the arms key into is
    [SpecFileread.FILEREAD] / [SpecSysRead.SYSREAD], the one contract per
    syscall, above it.  Design of record:
@@ -26,7 +26,7 @@
    [ftop_clean] is a statement about the RECORDS.  Read-onlyness does not
    help: the loss happens on the way OUT, in the existential of [astate],
    before the client does anything at all.  So [aread_commit_at] borrows
-   the [ghost_map_auth] itself, exactly as [SpecSysOpenAU]'s
+   the [ghost_map_auth] itself, exactly as [SysOpenDefs]'s
    [aopen_commit_at] and [FsAbsMknodFire]'s [dlookup_commit_at] do.
 
    ==== THE ONE PIECE, AND ITS REFUND ==================================
@@ -81,7 +81,7 @@
    needs no re-cut when the custody seam moves.
 
    BINDERS: [FsAbsOpenFire]'s section list, verbatim (which is
-   [FsAbsMknodFire]'s, which is [SpecSysMknodAU]'s) -- [fileG] is bound and
+   [FsAbsMknodFire]'s, which is [SysMknodDefs]'s) -- [fileG] is bound and
    [icacheG]/[icfg] resolve only through its fields. *)
 
 From Stdlib Require Import ZArith Lia List.
@@ -110,7 +110,7 @@ Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]     *)
 Require Import Xv6G.
 Require Import SpecReadi.        (* [rd_clamp]                              *)
 Require Import PipeInvDefs.      (* [pipe_rw_ret]: the return blanket       *)
-Require Import SpecSysReadAU.    (* the read observation's pure vocabulary  *)
+Require Import SysReadDefs.    (* the read observation's pure vocabulary  *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import
                                     ([FsAbsOpenFire]'s reason)              *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)

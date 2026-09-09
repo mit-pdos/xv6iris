@@ -183,7 +183,7 @@ Require Import FileInvDefs.
 Require Import SpecReadi.
 Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ                 *)
 Require Import AppInv.           (* [appN]/[appE]: the commit's mask         *)
-Require Import SpecSysReadAU.    (* the read observation's pure vocabulary   *)
+Require Import SysReadDefs.    (* the read observation's pure vocabulary   *)
 Require Import FsAbsReadFire.    (* [aread_commit_at], [read_arms]: the one
                                     piece and its arms                       *)
 From Kernel Require KernelSyms.
