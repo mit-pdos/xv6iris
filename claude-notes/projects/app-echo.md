@@ -1530,7 +1530,7 @@ bounded in the payload and founded pinned at boot (`nextpid = 1` in
 arm in `[1, PIDMAX]`, the fork return row `r = -1 ∨ 1 ≤ sint r ≤ PIDMAX`
 at the dispatcher, then the round instantiates the parent's arm
 unconditionally and the loop's `Hmk` premise goes.  ORDER: FETCHSTR-MEM
-(LANDED) → UK-NAMES + CWD → PID-ROW → C+D → ARM-c (1).
+(LANDED) → UK-NAMES + CWD (LANDED) → PID-ROW (LANDED) → C+D → ARM-c (1).
 
 UK-NAMES (1/2) LANDED (2026-09-09): `UkRun.uk_names := {ukn_t; ukn_d;
 ukn_s; ukn_fd}` (top of UkRun.v; the cwd field is added with the resource
@@ -1601,3 +1601,28 @@ refund record; the ten syscall folds and R-CONJ are on main.  Still open:
   `kexec_image_ok`).
 - **Q4** stays provisional (`echo_pred := taint ∨ pins`).
 - Hygiene backlog (above) after ARM.
+
+PID-ROW LANDED (2026-09-09; brief `brief-pid-row.md`).  `ProcGeom.PIDMAX =
+1000` (kernel/param.h, beside NPROC).  `PidLock.nextpid_res_at` carries
+`1 <= v <= PIDMAX`; the .data word is carved PINNED at 1
+(`BootShared.nextpid_bytes`, `first`'s carve the mold) and main's `newlock`
+FOUNDS the bound.  `wp_ap_pidsec` carries the interval on the WHOLE 64-bit
+a3, not on `trunc32` of it -- `beq a3,a6` compares whole registers, so a
+low-half bound cannot bound the fall-through arm: one conjunct on the iLöb
+invariant, one on the merge point's a1, the scan unchanged, five value laws
+(`ap_c1_val` .. `ap_trunc_val`) for the lw / two c.mv / addiw / two stores.
+The interval reaches `allocproc_post`, `kfork_post` and `SpecSysFork`; the
+dispatcher gains a FORK ROW beside sbrk's ANSWER (`SpecSyscall`, mirrored in
+`sysc_hcont_ty`/`_epilogue_tail`/`_ret_tail`; `sysc_num_ne1` at the twenty
+other arms, `sysc_sext_pid` at fork's), bridged by `sysc_mem_ok_usys` into
+`usys_mem_ok`'s fork row `r = -1 ∨ 1 <= sint r <= PIDMAX`.  The round
+instantiates the parent's arm UNCONDITIONALLY (`usys_mem_ok_fork_nz`); the
+`Hmk` premise and the loop's mint are gone (`UexecExecMint.uslot_mint`
+keeps one reader, userinit's park at ProofUserinit).  `app_sup` STAYS, now
+unspent by the loop -- ARM-c (1) removes: `ProofUserretClosed.v` loop
+premise (~255) and its Require; `SpecUserretClosed.v:169`;
+`SyscParkEnv.park_world`'s row (~126) + `park_world_sup` (~145);
+`ParkCap.park_pkg`'s row (~122, ~332, ~468); `ProofForkret.v` ~239, ~884;
+`SpecUserinit.v:226`; `SpecMain.v` ~651; `BootShared.v` ~1471, ~1503;
+`BootChain.v` ~406.  NEXT: PINNED-EXEC (C+D, brief `brief-pinned-exec.md`),
+then ARM-c (1).

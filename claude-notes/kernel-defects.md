@@ -232,20 +232,22 @@ What the tree did about it is in `xv6-bump-playbook.md` ("A function that
 becomes `static` and gets inlined") and PidLock.v's header; the pid cell's
 ownership is now three-way (`design/proc-struct.md` §2).
 
-**STILL OPEN AS PROOF WORK — the pid-wrap row.** The kernel now keeps
-every live pid in `[1, PIDMAX]` and distinct, but the contracts do not yet
-say so: `PidLock.nextpid_res_at` still carries the counter at an
-existential value, and `allocproc_post` / `kfork_post` still quantify the
-pid existentially, so the user round's `r = 0` arm (the pid-wrap row of
-FORK-ROW, `projects/app-echo.md`) is still live.  Retiring it means: pin
-`nextpid`'s .data initial value at boot (it is `1`; BootShared's `.data`
-carve currently hands the word out at an existential, the way `first` is
-NOT), carry `1 <= nextpid <= PIDMAX` in the lock payload, carry the same
-bound through the scan's loop invariant into `allocproc_post` (the block
-lemma `ProofAllocproc.wp_ap_pidsec` is where the pid is chosen), and
-thread `0 < pid` to `kfork_post` and `SpecSysFork`.  Then the round's
-parent always resumes on its own arm.  Uniqueness (no two live slots share
-a pid) is a further step nothing consumes yet.
+**CLOSED AS PROOF WORK (PID-ROW, 2026-09-09).** The contracts now say
+what the kernel keeps: `ProcGeom.PIDMAX = 1000` (from `kernel/param.h`,
+beside `NPROC`); `PidLock.nextpid_res_at` carries `1 <= nextpid <= PIDMAX`,
+founded at boot by the `.data` carve handing `nextpid` out PINNED at `1`
+(`BootShared.nextpid_bytes`, `first`'s carve the mold) into main's
+`newlock`; `ProofAllocproc.wp_ap_pidsec` keeps the interval on the whole
+64-bit candidate register through the retry loop (the `beq a3, a6` against
+PIDMAX compares whole registers, so a low-half bound cannot bound the
+fall-through arm); the interval reaches `allocproc_post`, `kfork_post` and
+`SpecSysFork`; the dispatcher's returning post gains a fork row
+(`r = -1 ∨ 1 <= sint r <= PIDMAX`, `SpecSyscall` beside sbrk's ANSWER
+clause) bridged into `UsysMemOk.usys_mem_ok`'s fork branch.  The user
+round instantiates the parent's arm unconditionally
+(`UexecApply.usys_mem_ok_fork_nz`); the pid-wrap row and the loop's `Hmk`
+premise are gone.  Uniqueness (no two live slots share a pid) is a further
+step nothing consumes yet.
 
 The original finding, kept for the record:
 
