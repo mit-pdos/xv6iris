@@ -216,7 +216,14 @@ Lemma fkr_tail
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γs : list gname) (γw γft γf γtl : gname)
     (pid : mword 32) (U : ustate)
-    (ks : mword 64) (mt : regfile) (av av2 : nat) (eb : bool) :
+    (ks : mword 64) (mt : regfile) (av av2 : nat) (eb : bool)
+    (* WHICH OF THE PARK'S TWO MODES built this record -- the tail is where
+       the mode is PAID.  [true] means the closer wants the parked record's
+       RUN KEY, and the record the tail resumes with is [U] up to what
+       prepare_return moves, which is exactly what [UexecRet.urun_eq_resume]
+       transports.  [false] means it wants nothing.
+       [SpecForkret.wp_forkret_gen_body] carries the same bit. *)
+    (steady : bool) :
   let p   : mword 64 := proc_addr j in
   let ksp : mword 64 := add_vec ks (mword_of_int 4096) in
   (j < NPROC)%nat ->
@@ -262,7 +269,8 @@ Lemma fkr_tail
      that applies the closer has to be holding them. *)
   UsertrapRes.park_globals cur_ctx γs γw γft γf γtl -∗
   forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
-                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U)) pid av -∗
+                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U))
+                 (if steady then Some (uvis_of U []) else None) pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1.
@@ -335,6 +343,11 @@ Proof.
              ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
              (* ...nor the cwd's inum *)
              ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
+             (* ...nor the break.  [upd_tf] rewrites the word list and
+                nothing else, and the resumed record's RUN KEY reads the
+                size ([UexecRet.urun_eq]), so the steady mode's closer
+                premise needs it named here beside the other two. *)
+             ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
              (* ...and that the four kernel stores are INVISIBLE to the
                 resume state ([SpecPrepareReturn.prepare_return_tf_ueq]).
                 Milestone J's entry needs it: the slot the park deposited is
@@ -342,9 +355,10 @@ Proof.
                 sret's to is the [sepc] cell prepare_return wrote from it. *)
              ⌜tf_ueq (pv_tf (us_V U)) (pv_tf V')⌝ ∗
              UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid (MkUstate V' ((us_M U))))%I
-    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcwi & %Htueq & #Htfk & Hpv)".
+    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcwi & %Hpsz & %Htueq & #Htfk & Hpv)".
   { iExists (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat ksp (cid_word (CID := CIDf)))).
     iFrame "Hpv". iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro;
@@ -723,17 +737,31 @@ Proof.
   iDestruct (ut_tfk_upd_upt (CID := CIDf) ksp V' pt with "Htfk") as "#Htfk'".
   (* THE CLOSER YIELDS TWO THINGS: the residue, and a slot keyed at the
      record forkret actually resumes with ([SpecForkret.forkret_closer]).
-     BOTH ARE SPENT NOW (milestone J, S5): [wp_userret_closed] runs the
-     process's own continuation, so the second is what the trap loop's
-     first round consumes. *)
+     BOTH ARE SPENT HERE: [wp_userret_closed] runs the process's own
+     continuation, so the second is what the trap loop's first round
+     consumes. *)
   iDestruct ("Hyield" $! CIDf XI pt (MkUstate (upd_upt V' pt) (us_M U))
-               with "[%] [%] [%] [%] [%] Hpg Htfk' Hdone HW Htc Hyld")
-    as (sts) "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | | ].
+               with "[%] [%] [%] [%] [%] [%] Hpg Htfk' Hdone HW Htc Hyld")
+    as (sts) "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
      moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
   { exact Hfg. }
   (* ...nor [pv_cwi] *)
   { exact Hcwi. }
+  (* THE STEADY MODE'S RUN KEY, which is the whole of what this arm owes the
+     park: the record the tail resumes with is the entry record up to what
+     prepare_return moved -- the four kernel trapframe words ([Htueq]), the
+     descriptor renormalised ([ud_um (ud_norm P) = ud_um P], [reflexivity]),
+     the size and the cwd untouched, the image the same map.  The [None]
+     mode asks nothing. *)
+  { destruct steady; [| exact I].
+    refine (urun_eq_resume (uvis_of U []) U (MkUstate (upd_upt V' pt) (us_M U))
+              (urun_eq_of U []) _ _ _ _ _).
+    - exact Htueq.
+    - reflexivity.
+    - exact Hpsz.
+    - exact Hcwi.
+    - reflexivity. }
   (* ---- the config record for this round ---- *)
   assert (HSEa0 : tp_pin SE !!! Regidx (mword_of_int 10)
                   = kvi_satp_word (ud_root pt)).
@@ -888,8 +916,17 @@ Lemma fkr_boot
      ([UsertrapRes.park_globals], SpecForkret's premise list), so the block
      that applies the closer has to be holding them. *)
   UsertrapRes.park_globals cur_ctx γs γw γft γf γtl -∗
+  (* AT THE [None] MODE, and that is a fact about this arm rather than a
+     choice: a steady park's package promises the resume lands on the parked
+     record's run key, and kexec("/init") below replaces the address space.
+     The two are incompatible, and the refutation is the caller's -- the
+     theorem opens [FirstTok.first_tok] before it enters this arm, and the
+     package's own [first_done] contradicts the boot disjunct it finds
+     ([FirstTok.first_tok_boot_excl]).  So the arm is only ever reached at
+     [None] and owes the closer no key. *)
   forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
-                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U)) pid av -∗
+                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U))
+                 None pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1.
@@ -1709,7 +1746,7 @@ Proof.
     assert (Hav2k : (K_prepare_return <= av2)%nat) by kxarith.
     iApply (fkr_tail W j γs γw γft γf γtl pid
               (MkUstate (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V'))) M')
-              ks E4 av av2 eb Hjlt Hav2k Havsum HE4sp HE4s1
+              ks E4 av av2 eb false Hjlt Hav2k Havsum HE4sp HE4s1
               with "Htext Hwire Hsup Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
                     Hpriv Hdone HW Hpg [Hyield]").
     (* [upd_tf] does not touch [pv_fdg], so the closer the caller handed in
@@ -1721,10 +1758,10 @@ Theorem wp_forkret
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
     (pid : mword 32) (U : ustate)
-    (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :
+    (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) (steady : bool) :
     wp_forkret_gen_body
       (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
-      j γs γl γw γft γf γtl pid U ks m av av2 eb.
+      j γs γl γw γft γf γtl pid U ks m av av2 eb steady.
 Proof.
   cbv beta delta [wp_forkret_gen_body].
   intros pcE p ksp Hjlt Hgl Hav2 Hkx Hut Hsp.
@@ -1738,7 +1775,7 @@ Proof.
   (* the frame's six slots come off the top and go back on at the exit *)
   assert (Havsum : av = (6 + (trap_res eb + av2))%nat) by lia.
   iIntros "#Htext #Hwire #Hsup #Hclaimmap Hpc #Hpinv #Hpg Hcg Hcpu Htc Hclm
-           Hlocked HR #Hks Hpv HW Hyield".
+           Hlocked HR #Hks Hpv HW Hmode Hyield".
   (* p->lock IS the process table's slot [j] -- which is why this contract
      takes [procs_inv] and no longer takes an [is_lock] of its own. *)
   iDestruct (procs_inv_lookup γs j γl Hgl with "Hpinv") as "#Hislock".
@@ -1949,6 +1986,18 @@ Proof.
   iDestruct (first_tok_open with "Hftok") as "[Hboot | #Hdone]".
   { (* ---------------- THE BOOT ARM: fsinit / first = 0 / kexec -------- *)
     iDestruct "Hboot" as "(Hf1 & #Hbp & #Hka & Hfsi)".
+    (* THE STEADY MODE IS DEAD ON THIS ARM, and this is where the park's
+       promise is cashed rather than merely believed.  A steady package
+       promises the resume lands on the parked record's RUN KEY, which
+       kexec("/init") below would falsify -- so it hands forkret
+       [FirstTok.first_done], and that resource's [first_addr ↦₄□ 0] cannot
+       coexist with the boot disjunct's [first_addr ↦₄ 1] just opened
+       ([FirstTok.first_tok_boot_excl]).  Below this line the mode is
+       [false] and the closer wants no key. *)
+    destruct steady.
+    { iAssert (FirstTok.first_done) with "[Hmode]" as "Hd"; [iExact "Hmode"|].
+      iDestruct "Hd" as "[Hd0 _]".
+      iDestruct (first_tok_boot_excl with "Hf1 Hd0") as %[]. }
     (* the two [_ext] halves are still at the entry hart; the release moved
        the binder, so they come across before the arm is entered *)
     iDestruct (trap_csrs_ext_transport CID CIDr eb p
@@ -2072,7 +2121,7 @@ Proof.
                ltac:(wp_next_chain) with "Hcx") as "Hcx".
   (* the steady arm's [first_done] IS [first_tok]'s persistent steady
      disjunct, read at +0x24; it goes straight to the tail. *)
-  iApply (fkr_tail (CID := CID6) W j γs γw γft γf γtl pid U ks T4 av av2 eb
+  iApply (fkr_tail (CID := CID6) W j γs γw γft γf γtl pid U ks T4 av av2 eb steady
             Hjlt Hpr Havsum HT4sp HT4s1
           with "Htext Hwire Hsup Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv
                 Hdone2 HW Hpg Hyield").

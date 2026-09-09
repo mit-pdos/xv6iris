@@ -297,17 +297,18 @@ Section UexecCond.
 End UexecCond.
 
 (* ===================================================================== *)
-(* SS4 THE RE-KEY LEMMA the park channel needs.                            *)
+(* SS4 THE RE-KEY, at two [ustate]s.                                       *)
 (*                                                                         *)
-(* [uslot (uvis_of U)] reads [U] through [pv_tf (us_V U)], [us_M U] and the *)
-(* PROJECTION of the table and size -- never the table itself.  So a slot   *)
-(* minted at the state a PARKER holds can be spent at the state a RESUMER   *)
-(* produces, given those equations -- the gap in [ParkCap.park_token_park]: *)
-(* the captured [fd_frags_any (pv_fdg V)] row is re-keyed onto the closer's *)
-(* own [∀ V'] by [rewrite -Hfg] off the closer's [⌜pv_fdg V' = pv_fdg V⌝],   *)
-(* and there is NO analogous premise for the trapframe.  A fresh TABLE      *)
-(* (fork's child) costs only its projection agreeing -- which uvmcopy's     *)
-(* leaf-for-leaf copy gives.                                                *)
+(* [uslot (uvis_of U sts)] reads [U] through [pv_tf (us_V U)], [us_M U] and *)
+(* the PROJECTION of the table and size -- never the table itself.  So a    *)
+(* slot minted at the state a PARKER holds is a slot at the state a RESUMER *)
+(* produces as soon as those agree, and a fresh TABLE (fork's child) costs  *)
+(* only its projection agreeing -- which uvmcopy's leaf-for-leaf copy       *)
+(* gives.  THE PARK'S OWN RE-KEY IS [UexecRet.uslot_of_urun_eq], stated at  *)
+(* a captured KEY rather than at a second [ustate], because that is the     *)
+(* shape [ParkCap.park_pkg]'s steady closer carries                         *)
+(* ([UexecRet.urun_eq], the premise beside the [pv_fdg] and [pv_cwi]        *)
+(* ones); this one is the [ustate]-to-[ustate] spelling.                    *)
 (* ===================================================================== *)
 Section UexecCondCongr.
   Context `{!riscvGS Σ}.

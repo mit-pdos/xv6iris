@@ -109,6 +109,8 @@ Require Import UmodeRegs.    (* [uv_regs] / [uv_amb] *)
 Require Import UmodeText.    (* [user_ptm_inv_x]: the image STAMPED while the process runs *)
 Require Import UserPerm.     (* [uperm] / [perm_of] *)
 Require Import FdSlots.      (* [fdstate] -- the descriptor view in the key *)
+Require Import ProcDefs.     (* [ustate] / [us_V] / [us_M] -- the kernel record
+                                the RUN KEY below is matched against *)
 Require Import UexecSG.      (* [uexecSG]: [sbundle_at] / [spost_at] / [ssupply] --
                                 the per-syscall DEPOSIT the returning arm
                                 carries; see that file's header *)
@@ -329,6 +331,65 @@ Qed.
 Lemma tf_ueq_resume_gpr0 (tf tf' : list (mword 64)) :
   tf_ueq tf tf' -> tf_resume_gpr0 tf = tf_resume_gpr0 tf'.
 Proof. intros H. unfold tf_resume_gpr0. exact (tf_ueq_resume_gpr zero_rf tf tf' H). Qed.
+
+(* ===================================================================== *)
+(* THE RUN KEY: the six projections a slot reads of its key, matched      *)
+(* against a kernel process record.                                      *)
+(*                                                                       *)
+(* [UexecApply.uslot_key_cong] is the statement that a slot sees the      *)
+(* resume register file, the resume pc, the image, the permission view,   *)
+(* the size, the descriptor view and the working directory -- and         *)
+(* nothing else.  [urun_eq Wk U'] says a captured key [Wk] agrees with    *)
+(* the record [U'] on all of them EXCEPT the descriptor view, which the   *)
+(* trap boundary supplies separately ([uvis_of] takes it as a parameter,  *)
+(* and the party that holds the [FdSlots.fd_frags] bundle is the party    *)
+(* that names it).  So a slot captured at [Wk] is a slot at the record    *)
+(* [U'] resumes with, at whatever descriptor view [Wk] already carries    *)
+(* -- [uslot_of_urun_eq] below.                                          *)
+(*                                                                       *)
+(* WHAT IT IS FOR: a park whose parker knows the boot arm is dead         *)
+(* (FirstTok.first_done -- a forked child's) captures ONE slot at the     *)
+(* parked record instead of a family over every record at its table, and  *)
+(* the resume re-keys that slot onto the record it actually resumes with. *)
+(* [ParkCap.park_pkg]'s closer takes this as its pure premise.            *)
+(* ===================================================================== *)
+Definition urun_eq (Wk : uvis) (U' : ustate) : Prop :=
+  tf_resume_gpr0 (uvis_tf Wk) = tf_resume_gpr0 (pv_tf (us_V U'))
+  /\ tf_resume_pc (uvis_tf Wk) = tf_resume_pc (pv_tf (us_V U'))
+  /\ uvis_M Wk = us_M U'
+  /\ uvis_perm Wk = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))
+  /\ uvis_sz Wk = uint (pv_sz (us_V U'))
+  /\ uvis_cwd Wk = pv_cwi (us_V U').
+
+(* the projection IS the run key -- and at ANY descriptor view, since
+   [urun_eq] does not read one *)
+Lemma urun_eq_of (U : ustate) (sts : list fdstate) : urun_eq (uvis_of U sts) U.
+Proof.
+  unfold urun_eq, uvis_of.
+  cbn [uvis_tf uvis_M uvis_perm uvis_sz uvis_cwd].
+  repeat split.
+Qed.
+
+(* THE FACT FORKRET'S STEADY ARM HAS.  prepare_return moves the trapframe's
+   four KERNEL words only ([TfUser.tf_ueq]), the descriptor is renormalised
+   but its map is untouched ([ProcPtOwn.ud_norm]), and the size, the working
+   directory and the image do not move -- so the record the resume lands on
+   has the parked record's run key. *)
+Lemma urun_eq_resume (Wk : uvis) (U U2 : ustate) :
+  urun_eq Wk U ->
+  tf_ueq (pv_tf (us_V U)) (pv_tf (us_V U2)) ->
+  ud_um (pv_upt (us_V U2)) = ud_um (pv_upt (us_V U)) ->
+  pv_sz (us_V U2) = pv_sz (us_V U) ->
+  pv_cwi (us_V U2) = pv_cwi (us_V U) ->
+  us_M U2 = us_M U ->
+  urun_eq Wk U2.
+Proof.
+  intros (Hg & Hp & HM & Hpi & Hsz & Hcw) Hueq Hum Hpsz Hpcw HMM.
+  unfold urun_eq.
+  rewrite -(tf_ueq_resume_gpr0 _ _ Hueq) -(tf_ueq_resume_pc _ _ Hueq)
+          Hum Hpsz Hpcw HMM.
+  exact (conj Hg (conj Hp (conj HM (conj Hpi (conj Hsz Hcw))))).
+Qed.
 
 (* ------------------------------------------------------------------- *)
 (* The bump, read back: a0 := r on the restored file, epc + 4 as the pc. *)
@@ -885,6 +946,24 @@ Section UexecRet.
     ukc (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W) (uvis_cwd W)
       (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)).
   Proof. exact (uslot_unfold W). Qed.
+
+  (* ...AND THE RE-KEY THE RUN KEY BUYS.  A slot captured at [Wk] is a slot
+     at the record [U'] resumes with, keyed at [Wk]'s own descriptor view:
+     [urun_eq] pins the six projections [uslot_ukc] reads besides that view,
+     and the view is the one the capturing party already named.  This is
+     what lets a park under [FirstTok.first_done] capture ONE slot instead
+     of a family -- see [urun_eq] above and [ParkCap.park_pkg]. *)
+  Lemma uslot_of_urun_eq (Wk : uvis) (U' : ustate) (sts : list fdstate) :
+    urun_eq Wk U' ->
+    uvis_fd Wk = sts ->
+    (* the ascription pins [Σ] exactly as [UexecApply.uslot_key_cong]'s does *)
+    (uslot Wk : iProp Σ) ⊣⊢ uslot (uvis_of U' sts).
+  Proof.
+    intros (Hg & Hp & HM & Hpi & Hsz & Hcw) Hfd.
+    rewrite (uslot_ukc Wk) (uslot_ukc (uvis_of U' sts)).
+    unfold uvis_of. cbn [uvis_tf uvis_M uvis_perm uvis_sz uvis_fd uvis_cwd].
+    rewrite Hg Hp HM Hpi Hsz Hcw Hfd. reflexivity.
+  Qed.
 
   (* the slot at the TRAP-OUT key is the continuation at the running state:
      the round trip, under x0 = 0 (every [gpr_file] has it) and a 2-aligned

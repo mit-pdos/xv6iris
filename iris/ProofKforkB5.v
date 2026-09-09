@@ -83,7 +83,7 @@ Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the r
 Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
 Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
 Require Import UexecSlot. (* [uvis] *)
-Require Import UexecRet.  (* [uslot] -- the generic family, in the proofmode
+Require Import UexecRet.  (* [uslot] -- the slot family, in the proofmode
                              context here, so this Require is DIRECT *)
 Require Import SpecAcquire SpecRelease.
 Require Import CodeKfork.
@@ -289,8 +289,18 @@ Section ProofKforkB5.
        keyed at it. *)
     (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (park_token_park N rest Uc stsP Hwf Hrest
-            with "Hrun Htoken Htext Hwire Hsup Htramp Hmk Hstack Henv Hown_park Hfrag Hjslot
+    (* THE FAMILY, SPENT AT THE ONE RECORD THE PARK IS AT.  This parker holds
+       [FirstTok.first_done], so the child can never be resumed through
+       forkret's boot arm and the park is the STEADY one
+       ([ParkCap.park_token_park_steady]): it takes a slot at the parked
+       record and re-keys it at the resume, instead of a family over every
+       record at this table.  The family's own two side conditions are the
+       projection's, hence [reflexivity]; a caller with a continuation for
+       ONE record is what [SpecKfork]'s premise will become. *)
+    iDestruct ("Hjslot" $! (uvis_of Uc stsP) with "[%]") as "Hjslot";
+      [ split; reflexivity |].
+    iMod (park_token_park_steady N rest Uc stsP Hwf Hrest
+            with "Hrun Htoken Htext Hwire Hsup Htramp Hmk Hstack Henv Hown_park Hfdone Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "[Hrun Hpctx]".
     (* built in [park_child]'s own conjunct order rather than framed: its

@@ -175,7 +175,31 @@
    [first_done] does NOT supply ([is_ftable], the [wait_lock], the ticks
    lock, [devintr_caps_any], [procs_avail], [console_ready], the nextpid
    lock), all of which main creates before userinit runs and all of which
-   kfork's parent already holds. *)
+   kfork's parent already holds.
+
+   ==== THE PARK HAS TWO MODES, AND forkret DECIDES WHICH IS LIVE ========
+
+   The closer hands back a slot for the record forkret resumes with, and
+   the party that has to OWN that slot is the parker.  What it can own
+   depends on whether the boot arm can still run:
+
+     - [steady = false]: it can.  kexec("/init") replaces the address space
+       between the park and the resume, so no key captured at the park is
+       still the resume's; the parker owns the slot FAMILY over every record
+       at its table and cwd, and the closer instantiates it (userinit).
+
+     - [steady = true]: it cannot, and the parker proves it by handing over
+       [FirstTok.first_done].  Then the resume is the steady arm, which
+       lands on a record carrying the parked one's RUN KEY -- the resume
+       register file, the resume pc, the image, the permission view, the
+       size and the cwd ([UexecRet.urun_eq]) -- so ONE slot at the parked
+       record suffices and the closer's pure premise re-keys it (kfork).
+
+   forkret is where the promise is cashed: its steady arm PROVES the run
+   key of the record it ends on, and its boot arm is REFUTED, because
+   [first_done]'s [first_addr ↦₄□ 0] cannot coexist with the boot
+   disjunct's [first_addr ↦₄ 1] ([FirstTok.first_tok_boot_excl]).  That is
+   why the bit and the resource are premises HERE and not in the closer. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -254,6 +278,15 @@ Definition forkret_closer
     (g : gname)
     (* ...and its cwd's inum -- see [ParkCap.park_pkg] *)
     (cw : Z)
+    (* ...AND THE PARKED RUN KEY, WHEN THERE IS ONE.  [None]: the parker
+       captured a slot FAMILY, because the resume may still run the boot
+       arm's kexec("/init") and no key captured at the park survives that.
+       [Some Wk]: the parker holds [FirstTok.first_done], the boot arm is
+       dead, and what it captured is ONE slot at [Wk] -- so the closer's
+       pure premise below asks the resumer to say that the record it
+       resumes with carries that run key.  [ParkCap.park_pkg] is the
+       package this closer is a row of. *)
+    (Wk : option uvis)
     (pid : mword 32) (av : nat) : iProp Σ :=
   (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate),
      ⌜pv_upt (us_V U') = pt'⌝ -∗
@@ -266,8 +299,19 @@ Definition forkret_closer
         descriptor ghost.  See [SpecForkretParkPaid.forkret_park_pkg]. *)
      ⌜pv_fdg (us_V U') = g⌝ -∗
      (* ...and the resumed record is at the parked process's working
-        directory: the family the parker captured is restricted to it *)
+        directory: the slot row the parker captured is restricted to it *)
      ⌜pv_cwi (us_V U') = cw⌝ -∗
+     (* ...AND, ON THE STEADY MODE, THAT THE RESUMED RECORD CARRIES THE
+        PARKED RUN KEY: the resume register file, the resume pc, the image,
+        the permission view, the size and the working directory
+        ([UexecRet.urun_eq]) -- everything the slot reads of its key but the
+        descriptor view, which the closer's own existential names.  forkret
+        proves it of the record it ends on: prepare_return moves only the
+        four kernel trapframe words ([TfUser.tf_ueq]), [us_M] does not move,
+        [ud_um (ud_norm P) = ud_um P], and neither the size nor the cwd is
+        touched.  [None] asks nothing -- that mode's closer instantiates a
+        family. *)
+     ⌜match Wk with Some W0 => urun_eq W0 U' | None => True end⌝ -∗
      (* THE RESUMER'S OWN GLOBALS, at ITS context -- forkret holds them and
         hands them in, exactly as it does [first_done] and [timer_cap]
         (UsertrapRes.v, the park half; L8, A12.19). *)
@@ -291,11 +335,13 @@ Definition forkret_closer
         is about to hand back. *)
      TimerCap.timer_cap (CID := h) -∗
      forkret_yield (CID := h) (XI := Xc) γf p ksp pid av (us_V U') -∗
-     (* THE RESIDUE, AND THE SLOT FOR THE RECORD THIS RESUME LANDS ON.  The
-        parker captured the GENERIC family and the closer instantiates it
-        here -- see [ParkCap.park_pkg], of which this is the forkret-side
-        spelling, and projects/user-wp-slot.md SS4c (R-b) for why the key
-        cannot be the parked one (the boot arm's kexec moves it). *)
+     (* THE RESIDUE, AND THE SLOT FOR THE RECORD THIS RESUME LANDS ON.  At
+        [Wk = None] the parker captured a slot FAMILY and the closer
+        instantiates it here, because the key cannot be the parked one --
+        the boot arm's kexec moves it (projects/user-wp-slot.md SS4c, R-b);
+        at [Wk = Some _] it captured ONE slot and the run-key premise above
+        re-keys it onto this record.  See [ParkCap.park_pkg], of which this
+        is the forkret-side spelling. *)
      (* one [sts] for both: the residue's fragments and the slot's key --
         see [ParkCap.park_pkg], of which this is the forkret-side spelling *)
      (∃ sts : list fdstate,
@@ -319,7 +365,21 @@ Definition wp_forkret_gen_body
     (W : iProp Σ)
     (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
     (pid : mword 32) (U : ustate)
-    (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
+    (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool)
+    (* WHICH OF THE PARK'S TWO MODES built this record.  [true]: the parker
+       held [FirstTok.first_done] and captured ONE slot, at the parked
+       record's run key -- so it owes forkret that resource (the row below)
+       and forkret owes the closer the run key of the record it resumes
+       with.  The key is [uvis_of U []]: the projection of the very record
+       forkret is entered at, at a placeholder descriptor view, since
+       [UexecRet.urun_eq] does not read one.  [false]: the parker captured a
+       slot family and owes nothing extra; the closer asks nothing.
+       FORKRET DECIDES THE MODE'S FATE, which is why the bit is here: the
+       steady arm proves the run key it is asked for, and the BOOT arm --
+       whose kexec("/init") would make the key false -- is REFUTED, because
+       [first_done]'s [first_addr ↦₄□ 0] is incompatible with the boot arm's
+       own [first_addr ↦₄ 1] ([FirstTok.first_tok_boot_excl]). *)
+    (steady : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.forkret in
   let p   : mword 64 := proc_addr j in
   let ksp : mword 64 := add_vec ks (mword_of_int 4096) in
@@ -368,9 +428,20 @@ Definition wp_forkret_gen_body
   is_kstack p ks -∗
   proc_priv γf p pid U -∗
   W -∗
+  (* ---- THE STEADY PARK'S EVIDENCE THAT THE BOOT ARM IS DEAD, and nothing
+     on the other mode.  A parker that promises the resume lands on the
+     parked run key is promising that nothing runs kexec("/init") in
+     between, and this is the resource that makes that true: forkret reads
+     [first] on the arm it takes, and the boot arm's [first_addr ↦₄ 1] --
+     out of its own [FirstTok.first_tok] -- is incompatible with the
+     [first_addr ↦₄□ 0] here.  So the boot arm is refuted rather than owing
+     a key it cannot have.  Persistent, so the parker pays nothing.
+     [SpecForkretParkPaid.forkret_park_pkg] carries the same row. ---- *)
+  (if steady then FirstTok.first_done else emp) -∗
   (* ---- the residue closer -- see the header, and [forkret_closer] above
      for why it is a name rather than the wand spelled out ---- *)
-  forkret_closer URes W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U)) pid av -∗
+  forkret_closer URes W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U))
+    (if steady then Some (uvis_of U []) else None) pid av -∗
   WP (Loop : expr riscv_lang).
 
 (* The residue is the module-type parameter it is everywhere else: forkret's
@@ -389,8 +460,8 @@ Module Type FORKRET.
       (W : iProp Σ)
       (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
       (pid : mword 32) (U : ustate)
-      (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
+      (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) (steady : bool),
       wp_forkret_gen_body
         (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
-        j γs γl γw γft γf γtl pid U ks m av av2 eb.
+        j γs γl γw γft γf γtl pid U ks m av av2 eb steady.
 End FORKRET.

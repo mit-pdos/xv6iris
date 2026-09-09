@@ -204,10 +204,10 @@ Theorem forkret_park_paid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
     (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
-    (pid : mword 32) (U : ustate) (av : nat) :
+    (pid : mword 32) (U : ustate) (av : nat) (steady : bool) :
     forkret_park_paid_body
       (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) W
-      γs γw γft γf γtl pa ks rest pid U av.
+      γs γw γft γf γtl pa ks rest pid U av steady.
 Proof.
   cbv beta delta [forkret_park_paid_body].
   intros Hrest [j [Hpa Hj]] Hut.
@@ -218,7 +218,13 @@ Proof.
      under the parker. *)
   iMod (own_context_twin cur_ctx with "Hrun") as "[Hrun (%XIc & Hthr)]".
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hsup & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hsup & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk
+                       & Hmode & Hclose)".
+  (* THE MODE ROW, at the shape the [ctx_move] combinator takes: the package
+     spells it as a [match] on the run key it carries, and the key is
+     [steady]'s own [if], so the two agree by iota on each arm. *)
+  iAssert (if steady then FirstTok.first_done else emp)%I with "[Hmode]" as "Hmode".
+  { destruct steady; [iExact "Hmode" | iEmpIntro]. }
   iMod (ctx_move (R := λ ξ, ctx_cells (XI := ξ) (p_context (proc_addr j))
                               (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest))
           cur_ctx XIc with "Hrun Hthr Hctx") as "(Hrun & Hthr & Hctx)".
@@ -232,6 +238,11 @@ Proof.
           cur_ctx XIc with "Hrun Hthr Hglobp") as "(Hrun & Hthr & #Hglobc)".
   iMod (ctx_move (R := λ ξ, proc_priv (XI := ξ) γf (proc_addr j) pid U)
           cur_ctx XIc with "Hrun Hthr Hpriv") as "(Hrun & Hthr & Hpriv)".
+  (* ...and the mode row, which forkret reads at ITS context: the boot arm's
+     [first_addr ↦₄ 1] comes out of the block that was just moved, so the
+     [↦₄□ 0] that refutes it has to be at the same identity. *)
+  iMod (ctx_move (R := λ ξ, (if steady then FirstTok.first_done (XI := ξ) else emp)%I)
+          cur_ctx XIc with "Hrun Hthr Hmode") as "(Hrun & Hthr & Hmode)".
   iMod (ctx_park XIc cur_ctx with "Hrun Hthr") as "[Hrun Hpk]".
   iModIntro. iFrame "Hrun".
   rewrite /proc_ctx /proc_ctx_at. iExists XIc. iFrame "Hpk".
@@ -258,6 +269,10 @@ Proof.
                 one did -- see [SpecForkretParkPaid.forkret_park_pkg] *)
              ⌜pv_fdg (us_V U') = pv_fdg (us_V U)⌝ -∗
              ⌜pv_cwi (us_V U') = pv_cwi (us_V U)⌝ -∗
+             (* ...and, on the steady mode, the parked run key -- passed
+                straight through to the package's own closer *)
+             ⌜match (if steady then Some (uvis_of U []) else None) with
+               | Some W0 => urun_eq W0 U' | None => True end⌝ -∗
              (* ...and the resumer's globals, at ITS context (L8, A12.19) *)
              UsertrapRes.park_globals Xc γs γw γft γf γtl -∗
              UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
@@ -271,10 +286,10 @@ Proof.
                   (add_vec ks (mword_of_int 4096)) U' sts
                 ∗ uslot (uvis_of U' sts)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcwi #Hglob #Htfk Hdone HW #Htc Hy".
+  { iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcwi %Hrk #Hglob #Htfk Hdone HW #Htc Hy".
     iApply ("Hclose" $! h Xc pt' U'
-              with "[%] [%] [%] [%] [%] Hglob Htfk Hdone HW Htc Hy Hfd Hirsp");
-      [exact HV | exact Hnorm | exact Hptwf | exact Hfg | exact Hcwi]. }
+              with "[%] [%] [%] [%] [%] [%] Hglob Htfk Hdone HW Htc Hy Hfd Hirsp");
+      [exact HV | exact Hnorm | exact Hptwf | exact Hfg | exact Hcwi | exact Hrk]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
   iDestruct "Hpay" as (A' cret backr) "[Hrec Hpay]".
   (* the payload can only be the DISPATCH one -- the parking disjunct would
@@ -333,10 +348,10 @@ Proof.
   (* forkret, at the resuming hart.                                      *)
   (* ================================================================== *)
   iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γw γft γf γtl pid U ks m av
-            (av - 6 - trap_res eb')%nat eb'
+            (av - 6 - trap_res eb')%nat eb' steady
             Hj Hgl Hbud Hkx Hut Hsp
           with "Htext Hwire Hsup Hkmap Hpc [] [] Hcg Hcpu Htc Hclm
-                Hlocked HR Hksc [Hpriv] HW Hclose").
+                Hlocked HR Hksc [Hpriv] HW Hmode Hclose").
   (* THE THREE MOVED ROWS -- [procs_inv], [park_globals]'s handles and the
      child's private block through [BioInv.buf_escrow] -- are at the
      record's identity [XIc], so each closes by [iExact].  Bracketed rather
@@ -363,23 +378,29 @@ Proof.
             (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) γs).
   { intros N av. exact (FR.usertrap_res_bare_park N av). }
   rewrite /park_cap. iModIntro.
-  iIntros (hp ξp γw γft γf γtl pa ks rest pid U av) "%Hrest %Hj %Hav Hrun Hpkg HW Hchild".
+  iIntros (hp ξp γw γft γf γtl pa ks rest pid U av steady)
+    "%Hrest %Hj %Hav Hrun Hpkg HW Hchild".
   destruct U as [V M].
   iDestruct "Hchild" as "(#Hks & Hctx & Hpriv & Hfd & Hirsp)".
   iApply (forkret_park_paid (CID := hp) (XI := ξp) (park_token γs) γs γw γft γf γtl pa ks rest pid
-            (MkUstate V M) av Hrest Hj Hav with "Hrun [Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
+            (MkUstate V M) av steady Hrest Hj Hav
+          with "Hrun [Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
   iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hsup & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hsup & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk
+                       & Hmode & Hclose)".
   iFrame "Htext Hwire Hsup Hkmap Hmk Hstk".
   (* [procs_inv] and the globals by [iExact]: the persistent [Hpinv] would
      otherwise be framed INTO the transparent globals bundle's first row *)
   iSplitR; [iExact "Hpinv"|].
   iSplitR; [iExact "Hglobp"|].
+  (* the mode row: the two packages are the same proposition, so this is the
+     one hypothesis, on either arm *)
+  iSplitL "Hmode"; [iExact "Hmode"|].
   iNext.
-  iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcwi #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
+  iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcwi %Hrk #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
   iApply ("Hclose" $! h Xc pt' U'
-            with "[%] [%] [%] [%] [%] Hglob Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
-    [exact HV | exact Hnorm | exact Hptwf | exact Hfg | exact Hcwi].
+            with "[%] [%] [%] [%] [%] [%] Hglob Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
+    [exact HV | exact Hnorm | exact Hptwf | exact Hfg | exact Hcwi | exact Hrk].
 Qed.
 
 End ForkretParkProof.

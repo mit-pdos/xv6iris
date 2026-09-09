@@ -2090,7 +2090,8 @@ Qed.
 
 (* ...AND THE PARKER'S GLOBALS, at ITS OWN CONTEXT, out of what it holds
    anyway: the park package carries them so the twin can be given a copy
-   ([ParkCap.park_token_park]). *)
+   (both parkers -- [ParkCap.park_token_park] and
+   [ParkCap.park_token_park_steady]). *)
 Lemma park_globals_of_park_env `{XI : CurCtx} `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
     !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} (N : ut_names) :
   ut_park_caps N -∗ sysc_park_extra (un_tk N) -∗

@@ -174,7 +174,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import SyscParkEnv ParkCap.   (* [park_world] / [park_token] *)
 Require Import UexecSlot. (* [uvis] -- the slot's key *)
-Require Import UexecRet.  (* [uslot] -- the generic family kfork hands the
+Require Import UexecRet.  (* [uslot] -- the slot family kfork spends at the
                              park.  Required DIRECTLY (durable-notes). *)
 Require Import Xv6Cameras.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
@@ -279,26 +279,28 @@ Definition wp_kfork_sconf_body
      which would be a module cycle, since that proof runs the trap loop
      kfork sits inside.  See ParkCap.v. *)
   park_token γs -∗
-  (* THE GENERIC SLOT FAMILY FOR THE CHILD, consumed by the park.  A LINEAR
-     premise, and the reason kfork's contract has one: what the child's trap
-     loop will run is a resource of the child, captured at the park
-     ([ParkCap.park_token_park]) and paid by whoever forks -- sys_fork, the
-     one caller, mints the generic inhabitant for it.  Nothing persistent in
-     the tree carries one ([SyscParkEnv.park_world] used to), so this premise
-     is what makes the parent responsible for its child.  The package's
-     resume closer instantiates it at the record the child is resumed with.  KFORK INSTANTIATES NOTHING -- it hands the family
-     straight to the park, which is what keeps the child's key out of this
-     contract: a key chosen here would be stale by the time forkret's boot
-     arm has run kexec("/init") (projects/user-wp-slot.md SS4c, R-b).  When
-     the parent is verified, this premise takes the parent's own
-     fork-continuation deposit instead of the generic inhabitant.
+  (* THE SLOT FAMILY FOR THE CHILD, spent at the park.  A LINEAR premise,
+     and the reason kfork's contract has one: what the child's trap loop
+     will run is a resource of the child, and it is paid by whoever forks --
+     sys_fork, the one caller, mints the generic inhabitant for it.  Nothing
+     persistent in the tree carries one ([SyscParkEnv.park_world] used to),
+     so this premise is what makes the parent responsible for its child.
+     KFORK SPENDS IT AT ONE RECORD.  The park it reaches is the STEADY one
+     ([ParkCap.park_token_park_steady]) -- kfork holds [FirstTok.first_done]
+     below, so the child can never be resumed through forkret's boot arm,
+     and the package therefore takes a single slot at the parked record and
+     re-keys it at the resume ([UexecRet.urun_eq]).  So [ProofKforkB5]
+     instantiates this family at [uvis_of Uc stsP], the record kfork just
+     built, and hands that one slot on.  The family shape SURVIVES here only
+     because kfork's contract does not yet STATE the child's record as a
+     function of the parent's; when it does, this premise becomes that one
+     slot and the instantiation disappears.
      ...AND IT IS RESTRICTED TO THE PARENT'S OWN TABLE, which is what makes
-     that sentence payable rather than aspirational: the child is parked
-     with [stsP] and resumed at a key whose descriptor view is [stsP], so a
-     family covering every OTHER view is asking for what is never used --
-     and a parent with a continuation for its child has one at its own
-     table and at no other.  [ParkCap.park_token_park] carries the same
-     restriction and discharges it by [reflexivity]. *)
+     "a parent with a continuation for its child can pay" true rather than
+     aspirational: the child is parked with [stsP] and resumed at a key
+     whose descriptor view is [stsP], so a family covering every OTHER view
+     is asking for what is never used -- and a parent with a continuation
+     for its child has one at its own table and at no other. *)
   (* ...AND TO THE PARENT'S OWN WORKING DIRECTORY, for the same reason:
      the child's block is built at the parent's inum
      ([ProofKforkB4]'s post) and resumed at a key carrying it. *)

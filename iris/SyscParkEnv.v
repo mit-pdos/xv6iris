@@ -130,9 +130,11 @@ Section ParkWorld.
           round -- which is exactly what a per-process WP must not be.  The
           child's WP is a LINEAR resource the PARKER supplies instead, on
           the park channel ([UsertrapRes.ut_park_intro_body] /
-          [ParkCap.park_chan], captured at [ParkCap.park_token_park] the
-          way the child's [fd_frags_any] is); it enters the world at the
-          two mint sites named in claude-notes/design/user-wp-slot.md. *)
+          [ParkCap.park_chan], captured at the park the way the child's
+          [fd_frags_any] is -- as a slot FAMILY at
+          [ParkCap.park_token_park], as ONE slot at the parked record at
+          [ParkCap.park_token_park_steady]); it enters the world at the two
+          mint sites named in claude-notes/design/user-wp-slot.md. *)
        (∃ ip : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈□ ip))%I.
 
   Global Instance park_world_persistent γs : Persistent (park_world γs).
