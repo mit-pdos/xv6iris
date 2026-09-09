@@ -101,7 +101,7 @@ Require Import FdSlots.
 Require Import SchedCtx.
 Require Import KvmSpec.
 Require Import ProcAvail.
-Require Import SpecAllocpid.
+Require Import PidLock.
 (* the two callee contracts whose budgets this one is the sum of.  Neither
    pulls the file-system cone: [SpecNameiRootBoot] is a leaf by design (its
    header says why) and [SpecAllocproc] is the proc/kalloc layer. *)

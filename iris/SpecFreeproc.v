@@ -7,7 +7,9 @@
        if (p->pagetable) proc_freepagetable(p->pagetable, p->sz);
        p->pagetable = 0;
        p->sz = 0;
+       acquire(&pid_lock);      // upstream ded23f2
        p->pid = 0;
+       release(&pid_lock);
        p->name[0] = 0;
        p->chan = 0;
        p->killed = 0;
@@ -15,10 +17,13 @@
        p->state = UNUSED;
      }
 
-   @ KernelSyms.freeproc = 0x80001ae6, twenty-six instructions: a 32-byte
-   ra/s0/s1 frame (slot 0 unused), the two guarded frees, and nine zeroing
-   stores.  It takes NO lock -- both callers already hold p->lock -- and
-   returns nothing.
+   @ KernelSyms.freeproc, thirty-three instructions: a 32-byte ra/s0/s1
+   frame (slot 0 unused), the two guarded frees, nine zeroing stores, and
+   -- since upstream ded23f2 -- an acquire/release of <pid_lock> around the
+   one that clears p->pid.  Both callers already hold p->lock; the pid lock
+   is the only lock it takes itself (see PidLock.v for why the cell needs
+   it), so the contract's order floor is "nextpid" and it carries the
+   lock's handle.  Returns nothing.
 
    THIS IS THE INVERSE OF allocproc: it turns a slot that owns an address
    space back into a [ProcInv.proc_dormant] at UNUSED, which is exactly the
@@ -76,6 +81,8 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
+Require Import WpLock.
+Require Import PidLock.   (* the pid lock freeproc takes around [p->pid = 0] *)
 Require Import KvmSpec.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -238,7 +245,7 @@ Section SpecFreeproc.
      holds p->lock, and holding a spinlock in xv6 means interrupts are off on
      this hart.  So [false] is what the callers actually have. *)
   Definition wp_freeproc_sconf_body
-      (γa : gname) (mm : regfile)
+      (γp γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
@@ -248,6 +255,9 @@ Section SpecFreeproc.
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
     (* 4-slot frame + proc_freepagetable's 40 (kfree needs only 14) *)
     (44 <= K)%nat ->
+    (* a real slot: the pid store takes <pid_lock>'s quarter of proc[j].pid
+       out of the lock's payload, which is indexed over [seq 0 NPROC] *)
+    (j < NPROC)%nat ->
     (* the kfree / proc_freepagetable chain keeps the transient noff
        increment in int range *)
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
@@ -255,11 +265,16 @@ Section SpecFreeproc.
     (* freeproc's own kfree(trapframe) is direct, at "kmem"(13); the
        proc_freepagetable arm's own callees carry no order premise of their
        own yet, so this is the whole cone this contract needs to state. *)
-    locks_below lks "kmem" ->
+    (* freeproc now ACQUIRES <pid_lock> ("nextpid", 10) around its
+       [p->pid = 0] (upstream ded23f2), so that is the floor of what the
+       caller may already hold; kfree's "kmem" (11) follows by
+       [locks_below_mono]. *)
+    locks_below lks "nextpid" ->
     sie_cap_gpr KT1 mm K false pme -∗
     cpu_own ilvl eb pme false lks -∗
     kernel_text -∗
     pc_is pcE -∗
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     proc_held cpu_id j γl st ch -∗
     fp_rest pa V pid -∗
     fp_pt pa (pv_sz V) opt -∗
@@ -284,10 +299,10 @@ Module Type FREEPROC.
        only the fd-SLOT ghost, so Rocq prunes [fileG] from the body and the
        Parameter must not re-introduce it. *)
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γa : gname) (mm : regfile)
+      (γp γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
       (ilvl : nat) (lks : gset string),
-      wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme ilvl lks.
+      wp_freeproc_sconf_body γp γa mm j γl V pid st ch opt otf K eb pme ilvl lks.
 End FREEPROC.

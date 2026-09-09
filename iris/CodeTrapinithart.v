@@ -26,14 +26,13 @@ Require Import KernelDecode14.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode31.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeTrapinithart.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- trapinithart @ KernelSyms.trapinithart, 28 bytes ---- *)
 
@@ -57,9 +56,9 @@ Section CodeTrapinithart.
   Proof. mk_base (KernelSyms.trapinithart + 0x8) (mword_of_int 0x00003797 : mword 32)
     (mword_of_int (KernelSyms.trapinithart + 0x8) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00003797. Qed.
 
-  Lemma tii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) false (ITYPE (mword_of_int 318 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.trapinithart + 0xc) (mword_of_int 0x13e78793 : mword 32)
-    (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) (ITYPE (mword_of_int 318 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_13e78793. Qed.
+  Lemma tii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) false (ITYPE (mword_of_int 314 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.trapinithart + 0xc) (mword_of_int 0x13a78793 : mword 32)
+    (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) (ITYPE (mword_of_int 314 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_13a78793. Qed.
 
   Lemma tii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x10) : mword 64) false (CSRReg (mword_of_int 261 : mword 12, Regidx (mword_of_int 15), zreg, CSRRW)).
   Proof. mk_base (KernelSyms.trapinithart + 0x10) (mword_of_int 0x10579073 : mword 32)

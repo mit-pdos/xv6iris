@@ -1015,6 +1015,11 @@ the parent's arm is instantiated at the return:
     `app_sup`, i.e. after 2^32 forks a verified parent may fall to the
     generic slot.  Honest, and it is exactly what the supply is for; the
     program's `⌜r <> 0⌝` guard stays.  No positivity invariant on nextpid.
+    [2026-09-09, XV6_REV ded23f2: upstream fixed the wrap — pids are now
+    reused from `[1, PIDMAX]` by a scan under pid_lock, so the kernel CAN
+    promise `pid ≠ 0`; the contracts do not say so yet.  What retiring this
+    row costs is itemised in `kernel-defects.md` ("STILL OPEN AS PROOF
+    WORK").]
   FORK-ROW (LANDED 2026-09-09; brief `brief-fork-row.md`).  Phase-1
   facts: `uexec_fork_F = uexec_fork_parent_F ∗ <guarded child>`; the arm
   at fork is the parent piece, the deposit `uexec_fork_child_F X W := X

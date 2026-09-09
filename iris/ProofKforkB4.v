@@ -509,10 +509,10 @@ Section KforkB4Proof.
     (* +0xba: jal ra,safestrcpy.                                      *)
     (* ------------------------------------------------------------- *)
     assert (Hjss : add_vec (mword_of_int (KF + 0xba) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2093258 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2093206 : mword 21))
                    = mword_of_int KernelSyms.safestrcpy)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_s_sconf (mword_of_int (KF + 0xba)) Rra (mword_of_int 2093258 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KF + 0xba)) Rra (mword_of_int 2093206 : mword 21)
               M5 (rsv + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").

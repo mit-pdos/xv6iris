@@ -2431,24 +2431,42 @@ Section ProcInv.
   Qed.
 
   (* The two halves of [p->pid], joined and split ([RiscvPtsto]'s
-     [ctx_word4_pointsto_half] is the 1/2 + 1/2 split itself).  allocproc is the one
-     function that holds BOTH -- the invariant's permanent half out of
-     [SchedCtx.proc_pub] and the dormant block's -- and so the one function
-     that may WRITE the cell.  Joining first tells it the two halves agree,
-     which is what [ctx_word4_pointsto_agree] is for; splitting after the store
-     is what hands one half back to the invariant and one to [proc_priv]. *)
-  Lemma p_pid_join (pa : mword 64) (p1 p2 : mword 32) :
-    p_pid pa ↦₄{DfracOwn (1/2)} p1 -∗ p_pid pa ↦₄{DfracOwn (1/2)} p2 -∗
-    ⌜p1 = p2⌝ ∗ p_pid pa ↦₄ p1.
+     [ctx_word4_pointsto_half] is the 1/2 + 1/2 split itself).  allocproc and
+     freeproc are the two functions that hold ALL the pieces -- the
+     invariant's permanent quarter out of [SchedCtx.proc_pub], the dormant
+     block's half, and <pid_lock>'s quarter -- and so the two that may WRITE
+     the cell.  Joining first tells them the pieces agree, which is what
+     [ctx_word4_pointsto_agree] is for; splitting after the store is what
+     hands each piece back to its owner. *)
+  (* THREE-WAY since upstream ded23f2 (the pid scan): the slot lock's
+     quarter ([SchedCtx.proc_pub]), the travelling half, and <pid_lock>'s
+     quarter ([SchedCtx.pid_lock_share]) -- in that argument order.  Both
+     writers (allocproc's [p->pid = pid], freeproc's [p->pid = 0]) hold all
+     three, which is what makes the store provable at all. *)
+  Lemma p_pid_frac3 : (1 : Qp) = (1/4 + (1/2 + 1/4))%Qp.
+  Proof. compute_done. Qed.
+
+  Lemma p_pid_join3 (pa : mword 64) (p1 p2 p3 : mword 32) :
+    p_pid pa ↦₄{DfracOwn (1/4)} p1 -∗ p_pid pa ↦₄{DfracOwn (1/2)} p2 -∗
+    p_pid pa ↦₄{DfracOwn (1/4)} p3 -∗
+    ⌜p1 = p2 /\ p2 = p3⌝ ∗ p_pid pa ↦₄ p1.
   Proof.
-    iIntros "H1 H2".
+    iIntros "H1 H2 H3".
     iDestruct (ctx_word4_pointsto_agree with "H1 H2") as %<-.
-    iSplit; [done|]. rewrite ctx_word4_pointsto_half. iFrame.
+    iDestruct (ctx_word4_pointsto_agree with "H1 H3") as %<-.
+    iSplit; [done|].
+    assert (Hd : DfracOwn 1 = DfracOwn (1/4 + (1/2 + 1/4))%Qp) by (rewrite -p_pid_frac3; reflexivity).
+    rewrite Hd !ctx_word4_pointsto_frac_split. iFrame.
   Qed.
 
-  Lemma p_pid_split (pa : mword 64) (v : mword 32) :
-    p_pid pa ↦₄ v -∗ p_pid pa ↦₄{DfracOwn (1/2)} v ∗ p_pid pa ↦₄{DfracOwn (1/2)} v.
-  Proof. rewrite ctx_word4_pointsto_half. iIntros "$". Qed.
+  Lemma p_pid_split3 (pa : mword 64) (v : mword 32) :
+    p_pid pa ↦₄ v -∗
+    p_pid pa ↦₄{DfracOwn (1/4)} v ∗ p_pid pa ↦₄{DfracOwn (1/2)} v ∗
+    p_pid pa ↦₄{DfracOwn (1/4)} v.
+  Proof.
+    assert (Hd : DfracOwn 1 = DfracOwn (1/4 + (1/2 + 1/4))%Qp) by (rewrite -p_pid_frac3; reflexivity).
+    rewrite Hd !ctx_word4_pointsto_frac_split. iIntros "$".
+  Qed.
 
   (* =================================================================== *)
   (* The DORMANT shape: what the lock invariant holds at UNUSED/ZOMBIE.   *)

@@ -26,14 +26,13 @@ Require Import KernelDecode16.
 Require Import KernelDecode21.
 Require Import KernelDecode24.
 Require Import KernelDecode31.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeKvminit.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- kvminit @ KernelSyms.kvminit, 28 bytes ---- *)
 
@@ -61,9 +60,9 @@ Section CodeKvminit.
   Proof. mk_base (KernelSyms.kvminit + 0xc) (mword_of_int 0x00009797 : mword 32)
     (mword_of_int (KernelSyms.kvminit + 0xc) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00009797. Qed.
 
-  Lemma kii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) false (STORE (mword_of_int 300 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
-  Proof. mk_base (KernelSyms.kvminit + 0x10) (mword_of_int 0x12a7b623 : mword 32)
-    (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) (STORE (mword_of_int 300 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_12a7b623. Qed.
+  Lemma kii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) false (STORE (mword_of_int 252 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
+  Proof. mk_base (KernelSyms.kvminit + 0x10) (mword_of_int 0x0ea7be23 : mword 32)
+    (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) (STORE (mword_of_int 252 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_0ea7be23. Qed.
 
   Lemma kii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x14) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.kvminit + 0x14) (mword_of_int 0x60a2 : mword 16)

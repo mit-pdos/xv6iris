@@ -221,7 +221,33 @@ SEMANTIC argument rather than the syntactic identity in-core `itrunc` enjoys.
 The `[ref--, free]` gap leaves a state no `iget` can reach, so preemption is
 harmless and a crash there is an ordinary crash-orphan.
 
-## Open: `allocpid` wraps — the pid is a 32-bit counter with no bound
+## FIXED UPSTREAM (ded23f2, pinned 2026-09-09): `allocpid` wraps — the pid was a 32-bit counter with no bound
+
+**Upstream's fix** (`ded23f2 fix pid wraparound/reuse`): `allocpid` is now
+`static void allocpid(struct proc *p)` — under `pid_lock` it takes
+`nextpid`, advances it as `(pid == PIDMAX) ? 1 : pid + 1` (`PIDMAX =
+1000`), and retries until no `proc[]` slot holds the candidate; `freeproc`
+clears `p->pid` under `pid_lock` too.  gcc inlines it into `allocproc`.
+What the tree did about it is in `xv6-bump-playbook.md` ("A function that
+becomes `static` and gets inlined") and PidLock.v's header; the pid cell's
+ownership is now three-way (`design/proc-struct.md` §2).
+
+**STILL OPEN AS PROOF WORK — the pid-wrap row.** The kernel now keeps
+every live pid in `[1, PIDMAX]` and distinct, but the contracts do not yet
+say so: `PidLock.nextpid_res_at` still carries the counter at an
+existential value, and `allocproc_post` / `kfork_post` still quantify the
+pid existentially, so the user round's `r = 0` arm (the pid-wrap row of
+FORK-ROW, `projects/app-echo.md`) is still live.  Retiring it means: pin
+`nextpid`'s .data initial value at boot (it is `1`; BootShared's `.data`
+carve currently hands the word out at an existential, the way `first` is
+NOT), carry `1 <= nextpid <= PIDMAX` in the lock payload, carry the same
+bound through the scan's loop invariant into `allocproc_post` (the block
+lemma `ProofAllocproc.wp_ap_pidsec` is where the pid is chosen), and
+thread `0 < pid` to `kfork_post` and `SpecSysFork`.  Then the round's
+parent always resumes on its own arm.  Uniqueness (no two live slots share
+a pid) is a further step nothing consumes yet.
+
+The original finding, kept for the record:
 
 ```c
 int nextpid = 1;
@@ -241,7 +267,7 @@ is entirely in the user-visible convention.
 
 **Found by the proof, 2026-09-08 (FORK-ROW, projects/app-echo.md).** The
 process's fork continuation has a parent arm guarded by `r <> 0`, and the
-kernel cannot discharge the guard: `SpecAllocpid.nextpid_res_at` is an
+kernel cannot discharge the guard: `PidLock.nextpid_res_at` is an
 existential value, and no invariant `0 < nextpid` is inductive across the
 wrap. The round therefore instantiates the parent's arm only at `r <> 0`
 and lets the parent at `r = 0` fall to the generic slot minted from the
@@ -250,16 +276,13 @@ row). That is honest and sound, but it means a verified application may
 lose its verified state after 2^32 forks for a reason that is a kernel
 defect, not a program property.
 
-**The fix belongs in xv6**: either `panic("allocpid: pid space exhausted")`
-when `nextpid` would wrap (2^31 pids is far beyond any test's reach, and a
-panic is the honest reading of "the counter is not reusable"), or widen
-`nextpid` and the `pid` fields to 64 bits and keep the same panic at 2^63.
-With the panic in the source the kernel's `kfork_post` pid arm becomes
-`0 < pidv`, `nextpid_res_at` carries `0 < v < 2^31 - 1`, and the pid-wrap
-row in the round disappears: the parent always resumes on its own arm.
-Consequences for the contracts are recorded with FORK-ROW when the fix
-lands; the source procedure is durable-notes §"Changing the kernel
-SOURCE" (`XV6_REV` moves, every proof naming an address in `proc.c` moves).
+The fix that was proposed here (panic on wrap, or 64-bit pids) is not the
+one upstream took: upstream REUSES pids (bounded counter + a liveness scan),
+which is the POSIX shape.  For the proofs that is a stronger obligation
+than a monotone counter — a pid says nothing about WHICH incarnation of a
+slot it names unless the contract also carries the scan's result — and it
+is why the retirement of the pid-wrap row above is more than a bound on
+`nextpid`.
 
 ## Two unfixed inconsistencies in the read path
 

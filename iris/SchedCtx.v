@@ -137,16 +137,31 @@ Section SchedCtx.
      and chan cells.  The lock's own cpu word is inside [lock_inv] and the
      token PINS it at this hart (WpLock.v), which is exactly what holding /
      release need -- so no cell rides here. *)
+  (* THE pid_lock's SHARE OF ONE SLOT'S pid CELL.  allocproc's pid scan
+     (upstream ded23f2: allocpid retries until it finds a pid no slot holds)
+     reads [q->pid] for every q under <pid_lock> ALONE, so that lock owns a
+     read share of all 64 cells ([PidLock.nextpid_res_at]).  A quarter: the
+     slot's own lock keeps a quarter ([proc_pub] below) and the travelling
+     half stays where it was ([ProcDefs.proc_priv_bare], [ProcInv.proc_dormant]),
+     so nothing above the two writers -- allocproc and freeproc, which hold all
+     three -- had to move.  Over an EXPLICIT context, because the lock payload
+     it lives in is λ-converted (PidLock.v). *)
+  Definition pid_lock_share_at (ξ : TsoCtx.CtxId) (pa : mword 64) : iProp Σ :=
+    (∃ v : mword 32, TsoCtx.ctx_word4_pointsto ξ (p_pid pa) (DfracOwn (1/4)) v)%I.
+  Definition pid_lock_share (pa : mword 64) : iProp Σ :=
+    pid_lock_share_at TsoCtx.cur_ctx pa.
+
   (* The lock-protected cells whose VALUES no protocol step needs to name:
      killed and xstate (mutable under p->lock, read by kill / wait), and the
-     invariant's permanent HALF of the pid cell -- the other half rides with
-     the running process in [ProcInv.proc_priv], and the two agree for free by
+     invariant's permanent QUARTER of the pid cell -- the travelling half
+     rides with the running process in [ProcInv.proc_priv], the other quarter
+     is <pid_lock>'s ([pid_lock_share] above), and all three agree for free by
      [ctx_word4_pointsto_agree].  Bundled EXISTENTIALLY so that growing the
      invariant by these three cells costs every existing caller one opaque
      conjunct instead of three new spec parameters. *)
   Definition proc_pub (pa : mword 64) : iProp Σ :=
     (∃ (kl xs pid : mword 32),
-       p_killed pa ↦₄ kl ∗ p_xstate pa ↦₄ xs ∗ p_pid pa ↦₄{DfracOwn (1/2)} pid)%I.
+       p_killed pa ↦₄ kl ∗ p_xstate pa ↦₄ xs ∗ p_pid pa ↦₄{DfracOwn (1/4)} pid)%I.
 
   (* [i] is the hart the lock is held ON -- the hart whose scheduler chain
      this payload half belongs to.  Every current user instantiates it at

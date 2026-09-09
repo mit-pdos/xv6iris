@@ -10,7 +10,7 @@
        }
        return 0;
      found:
-       p->pid = allocpid();
+       allocpid(p);           // static, inlined: the pid scan under pid_lock
        p->state = USED;
        if ((p->trapframe = kalloc()) == 0) { ... return 0; }
        p->pagetable = proc_pagetable(p);
@@ -58,8 +58,9 @@
    null and [cwd] is 0, straight out of the dormant block, so the caller owes
    no file reference.  [p->sz] and [p->name] are whatever the block already
    held -- allocproc writes neither, and freeproc's zeroing of them has no
-   consumer (design/proc-struct.md).  The pid is existential: allocpid's
-   contract says nothing about the counter's value.
+   consumer (design/proc-struct.md).  The pid is existential: the inlined
+   allocpid scan (ProofAllocproc.v's [wp_ap_pidsec]) promises nothing about
+   the value it picks, only that the lock is taken and released.
 
    THE SAVED CONTEXT comes back as raw cells, not as a
    [SchedCtx.proc_ctx]: turning "ra = forkret, sp = kstack + PGSIZE" into a
@@ -93,7 +94,7 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
-Require Import SpecAllocpid.
+Require Import PidLock.
 Require Import LockRank.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -277,8 +278,8 @@ Definition wp_allocproc_sconf_body
   (exists nb, on = Some nb /\ (K_allocproc < nb)%nat) ->
   (* allocproc's own acquire needs every lock this hart already holds to
      rank below "proc" (11) -- the ONLY lock allocproc itself acquires.
-     The nested calls it makes while p->lock is held (allocpid's "nextpid"
-     (12), kalloc's "kmem" (13)) both rank ABOVE "proc", so
+     The nested calls it makes while p->lock is held (the inlined allocpid's
+     "nextpid" (10), kalloc's "kmem" (11)) both rank ABOVE "proc", so
      [locks_below_mono] plus [locks_below_union_singleton] derive their
      order premises from this single bound; see ProofAllocproc.v. *)
   locks_below lks "proc" ->

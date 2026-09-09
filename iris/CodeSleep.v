@@ -19,6 +19,7 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
+Require Import KernelDecode06.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
@@ -28,15 +29,15 @@ Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode23.
+Require Import KernelDecode27.
 Require Import KernelDecode29.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeSleep.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- sleep @ KernelSyms.sleep, 48 bytes ---- *)
 
@@ -60,17 +61,17 @@ Section CodeSleep.
   Proof. mk_rvc (KernelSyms.sleep + 0x8) (mword_of_int 0x1000 : mword 16)
     (mword_of_int (KernelSyms.sleep + 0x8) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_1000 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma sli_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep + 0xa) : mword 64) false (JAL (mword_of_int 2095520 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sleep + 0xa) (mword_of_int 0x9a1ff0ef : mword 32)
-    (mword_of_int (KernelSyms.sleep + 0xa) : mword 64) (JAL (mword_of_int 2095520 : mword 21, Regidx (mword_of_int 1))) kd_9a1ff0ef. Qed.
+  Lemma sli_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep + 0xa) : mword 64) false (JAL (mword_of_int 2095468 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sleep + 0xa) (mword_of_int 0x96dff0ef : mword 32)
+    (mword_of_int (KernelSyms.sleep + 0xa) : mword 64) (JAL (mword_of_int 2095468 : mword 21, Regidx (mword_of_int 1))) kd_96dff0ef. Qed.
 
   Lemma sli_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep + 0xe) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.sleep + 0xe) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.sleep + 0xe) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma sli_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep + 0x10) : mword 64) false (JAL (mword_of_int 2092154 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sleep + 0x10) (mword_of_int 0xc7bfe0ef : mword 32)
-    (mword_of_int (KernelSyms.sleep + 0x10) : mword 64) (JAL (mword_of_int 2092154 : mword 21, Regidx (mword_of_int 1))) kd_c7bfe0ef. Qed.
+  Lemma sli_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep + 0x10) : mword 64) false (JAL (mword_of_int 2092102 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sleep + 0x10) (mword_of_int 0xc47fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sleep + 0x10) : mword 64) (JAL (mword_of_int 2092102 : mword 21, Regidx (mword_of_int 1))) kd_c47fe0ef. Qed.
 
   Lemma sli_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep + 0x14) : mword 64) true (LOAD (mword_of_int 32 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_rvc (KernelSyms.sleep + 0x14) (mword_of_int 0x709c : mword 16)
@@ -96,9 +97,9 @@ Section CodeSleep.
   Proof. mk_rvc (KernelSyms.sleep + 0x20) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sleep + 0x20) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma sli_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep + 0x22) : mword 64) false (JAL (mword_of_int 2092272 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sleep + 0x22) (mword_of_int 0xcf1fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sleep + 0x22) : mword 64) (JAL (mword_of_int 2092272 : mword 21, Regidx (mword_of_int 1))) kd_cf1fe0ef. Qed.
+  Lemma sli_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep + 0x22) : mword 64) false (JAL (mword_of_int 2092220 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sleep + 0x22) (mword_of_int 0xcbdfe0ef : mword 32)
+    (mword_of_int (KernelSyms.sleep + 0x22) : mword 64) (JAL (mword_of_int 2092220 : mword 21, Regidx (mword_of_int 1))) kd_cbdfe0ef. Qed.
 
   Lemma sli_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep + 0x26) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.sleep + 0x26) (mword_of_int 0x60e2 : mword 16)

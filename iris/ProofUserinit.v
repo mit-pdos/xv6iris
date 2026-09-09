@@ -401,7 +401,7 @@ Section ProofUserinit.
     (* +0x0a jal ra,allocproc                                                *)
     (* ===================================================================== *)
     iApply (wp_jal_s_sconf (mword_of_int (UI + 0x0a)) Rra
-              (mword_of_int 2096976 : mword 21) R2 (K - 4)%nat b
+              (mword_of_int 2096886 : mword 21) R2 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uin_0a with "Htext"). }
@@ -409,7 +409,7 @@ Section ProofUserinit.
     set (R3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (UI + 0x0a) : mword 64) 4)]> R2).
     assert (Htgtap : add_vec (mword_of_int (UI + 0x0a) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096976 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096886 : mword 21))
                      = mword_of_int KernelSyms.allocproc) by pcw.
     iEval (rewrite Htgtap) in "Hpc".
     assert (HR3ra : (R3 !!! Regidx Rra : mword 64)
@@ -483,12 +483,12 @@ Section ProofUserinit.
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 sd a0,1796(a5) : initproc = p ===== *)
     assert (Hinitaddr : add_vec (rget R5 Ra5)
-                          (sign_extend' 64 (mword_of_int 1780 : mword 12))
+                          (sign_extend' 64 (mword_of_int 1680 : mword 12))
                         = (mword_of_int KernelSyms.initproc : mword 64)).
     { assert (Hr : rget R5 Ra5 = R5 !!! Regidx Ra5) by (rgne; reflexivity).
       rewrite Hr /R5 upd_eq. pcw. }
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0)
-              (mword_of_int (UI + 0x14)) Ra0 Ra5 (mword_of_int 1780 : mword 12)
+              (mword_of_int (UI + 0x14)) Ra0 Ra5 (mword_of_int 1680 : mword 12)
               R5 (trap_res b + (K - 4))%nat v0 false
               with "Hcg Hpc [] [Hinitproc]").
     { iApply (uin_14 with "Htext"). }
@@ -522,13 +522,13 @@ Section ProofUserinit.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== +0x1c addi a0,a0,1484 : a0 = "/" ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (UI + 0x1c)) Ra0 Ra0
-              (mword_of_int 1484 : mword 12) R6 (trap_res b + (K - 4))%nat false
+              (mword_of_int 1432 : mword 12) R6 (trap_res b + (K - 4))%nat false
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (uin_1c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (R7 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (rget R6 Ra0)
-                     (sign_extend' 64 (mword_of_int 1484 : mword 12)))]> R6).
+                     (sign_extend' 64 (mword_of_int 1432 : mword 12)))]> R6).
     assert (HR7a0 : (R7 !!! Regidx Ra0 : mword 64)
                     = (mword_of_int uin_slash_addr : mword 64)).
     { rewrite /R7 upd_eq.
@@ -840,7 +840,7 @@ Section ProofUserinit.
     (* +0x2e jal ra,release                                                  *)
     (* ===================================================================== *)
     iApply (wp_jal_s_sconf (mword_of_int (UI + 0x2e)) Rra
-              (mword_of_int 2093160 : mword 21) R10 (trap_res b + (K - 4))%nat false
+              (mword_of_int 2093108 : mword 21) R10 (trap_res b + (K - 4))%nat false
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uin_2e with "Htext"). }
@@ -848,7 +848,7 @@ Section ProofUserinit.
     set (R11 := <[Regidx Rra := regval_into_reg
                    (add_vec_int (mword_of_int (UI + 0x2e) : mword 64) 4)]> R10).
     assert (Htgtrl : add_vec (mword_of_int (UI + 0x2e) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2093160 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2093108 : mword 21))
                      = mword_of_int KernelSyms.release) by pcw.
     iEval (rewrite Htgtrl) in "Hpc".
     assert (HR11ra : (R11 !!! Regidx Rra : mword 64)

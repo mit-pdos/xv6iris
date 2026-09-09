@@ -31,14 +31,13 @@ Require Import KernelDecode21.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeArgstr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- argstr @ KernelSyms.argstr, 40 bytes ---- *)
 

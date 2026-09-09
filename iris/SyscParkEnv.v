@@ -46,7 +46,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import WpLock.        (* [is_lock] *)
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
-Require Import SpecAllocpid.  (* [alp_pid_lock] / [nextpid_res] *)
+Require Import PidLock.  (* [alp_pid_lock] / [nextpid_res] *)
 Require Import ProcAvail.     (* [procs_avail] *)
 Require Import TicksInv.      (* [is_tickslock] *)
 Require Import ConsoleInv.    (* [console_ready] *)

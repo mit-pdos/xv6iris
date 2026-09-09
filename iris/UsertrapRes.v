@@ -1940,7 +1940,7 @@ Definition park_globals `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fil
    console_ready (XI := ξ) ∗
    is_tickslock (XI := ξ) γtl ∗
    (∃ γp : gname,
-      is_lock (XI := ξ) γp SpecAllocpid.alp_pid_lock "nextpid"%string SpecAllocpid.nextpid_res_at) ∗
+      is_lock (XI := ξ) γp PidLock.alp_pid_lock "nextpid"%string PidLock.nextpid_res_at) ∗
    (∃ ip : mword 64,
       ctx_word_pointsto ξ (mword_of_int KernelSyms.initproc : mword 64)
         DfracDiscarded ip))%I.

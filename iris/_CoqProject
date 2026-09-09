@@ -1072,10 +1072,7 @@ CodeKerneltrap.v
 ProofKerneltrapParts.v
 ProofKerneltrap.v
 LinkKerneltrap.v
-SpecAllocpid.v
-CodeAllocpid.v
-ProofAllocpid.v
-LinkAllocpid.v
+PidLock.v
 SpecFreeproc.v
 CodeFreeproc.v
 ProofFreeproc.v

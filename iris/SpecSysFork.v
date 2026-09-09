@@ -78,7 +78,7 @@ Require Import IcacheEscrow.
 Require Import SpecProcinit.
 Require Import WaitInv.
 Require Import KvmSpec.
-Require Import SpecAllocpid.
+Require Import PidLock.
 Require Import SpecKfork.
 Require Import UexecSlot.  (* [uvis_of] -- the child's key *)
 Require Import UexecRet.   (* [uslot] -- the deposit sys_fork forwards *)

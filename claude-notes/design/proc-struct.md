@@ -86,17 +86,28 @@ one, because `killed()` may be called on any proc by any hart.
 
 ### 2. Lock-protected but immutable-while-allocated — `pid`
 
-`allocproc` writes it once under the lock; after that nobody writes it. But it
-is read two ways: by *other* cores under `p->lock` (`kkill()`'s scan, `wait()`'s
-`pp->pid`) and by the owning process with **no lock at all** (`sys_getpid`,
-`acquiresleep`/`holdingsleep` — `jal myproc; lw a5,48(a0)`).
+`allocproc` writes it once under the lock (and `freeproc` clears it); after
+that nobody writes it. But it is read THREE ways: by *other* cores under
+`p->lock` (`kkill()`'s scan, `wait()`'s `pp->pid`), by the owning process
+with **no lock at all** (`sys_getpid`, `acquiresleep`/`holdingsleep` — `jal
+myproc; lw a5,48(a0)`), and — since upstream `ded23f2` (pid reuse) — by
+`allocproc`'s pid scan, which reads EVERY slot's `pid` under `pid_lock`
+alone, no `q->lock`.
 
 This is precisely `design/file-table.md`'s discipline 2: a
 reference-counted read-share that becomes writable again when the last holder
 goes away. And exactly as there, no ghost algebra is needed — a **points-to
-fraction** gives agreement for free (`word4_pointsto_agree`). Half stays in the
-lock resource so `kkill()` can always read it; half travels with the running
-process. `allocproc` reunites both halves in the `UNUSED` arm and so may write.
+fraction** gives agreement for free (`word4_pointsto_agree`). THREE PIECES:
+a quarter stays in the slot's lock resource (`SchedCtx.proc_pub`) so
+`kkill()` can always read it; a quarter of every slot's cell lives in
+`pid_lock`'s payload (`SchedCtx.pid_lock_share`, gathered in
+`PidLock.nextpid_res_at`) so the scan can read all 64; half travels with
+the running process. The two writers — `allocproc`'s store, `freeproc`'s
+clear — hold all three (`p->lock` from their caller, `pid_lock` by their
+own `acquire`, which is exactly what `ded23f2` added to `freeproc`);
+`ProcInv.p_pid_join3` / `p_pid_split3` reunite and redistribute. The
+table below says "the second `pid` half" for the travelling piece; the two
+quarters never move.
 
 ### 3. A different lock — `parent` (`WaitInv.v`)
 

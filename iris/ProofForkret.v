@@ -278,7 +278,7 @@ Proof.
   (*  +0x64: jal ra, prepare_return.                                     *)
   (* ================================================================== *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x64)) Rra
-            (mword_of_int 2806 : mword 21) mt av2 eb
+            (mword_of_int 2858 : mword 21) mt av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc []").
   { iApply (fkr_64 with "Htext"). }
@@ -290,7 +290,7 @@ Proof.
   assert (HT5sp : T5 !!! Regidx csp_rs1 = pa_stk ksp 6)
     by (rewrite /T5 upd_ne; [exact Hmtsp | reg_neq]).
   assert (Hprep : add_vec (mword_of_int (FR + 0x64) : mword 64)
-                    (sign_extend' 64 (mword_of_int 2806 : mword 21))
+                    (sign_extend' 64 (mword_of_int 2858 : mword 21))
                   = mword_of_int KernelSyms.prepare_return) by pcw.
   iEval (rewrite Hprep) in "Hpc".
   (* the three hart-indexed carriers, moved to the current binder in one
@@ -955,13 +955,13 @@ Proof.
   iEval (rewrite Hbp18) in "Hpc".
   (* ---- +0x18: addi a5,a5,-1712 -- a5 = &first ---- *)
   iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x18)) Ra5 Ra5
-            (mword_of_int 2384 : mword 12) B1 av2 eb
+            (mword_of_int 2336 : mword 12) B1 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
   { iApply (fkr_18 with "Htext"). }
   iIntros (CIDb2 Hkb2) "Hcg Hpc".
   set (B2 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget B1 Ra5)
-                    (sign_extend' 64 (mword_of_int 2384 : mword 12)))]> B1).
+                    (sign_extend' 64 (mword_of_int 2336 : mword 12)))]> B1).
   assert (HB2a5 : rget B2 Ra5 = first_addr).
   { rgne. rewrite /B2 upd_eq. rgne. rewrite /B1 upd_eq. exact fkr_first_addr. }
   assert (Hbp1c : add_vec_int (mword_of_int (FR + 0x18) : mword 64) 4
@@ -1093,7 +1093,7 @@ Proof.
   iEval (rewrite Hbp28) in "Hpc".
   (* ---- +0x28: jal ra, fsinit ---- *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x28)) Rra
-            (mword_of_int 7182 : mword 21) B5 av2 eb
+            (mword_of_int 7234 : mword 21) B5 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc []").
   { iApply (fkr_28 with "Htext"). }
@@ -1194,13 +1194,13 @@ Proof.
   iEval (rewrite Hcp30) in "Hpc".
   (* ---- +0x30: addi a5,a5,-1736 -- a5 = &first ---- *)
   iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x30)) Ra5 Ra5
-            (mword_of_int 2360 : mword 12) C1 av2 eb
+            (mword_of_int 2312 : mword 12) C1 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
   { iApply (fkr_30 with "Htext"). }
   iIntros (CIDb10 Hkb10) "Hcg Hpc".
   set (C2 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget C1 Ra5)
-                    (sign_extend' 64 (mword_of_int 2360 : mword 12)))]> C1).
+                    (sign_extend' 64 (mword_of_int 2312 : mword 12)))]> C1).
   assert (HC2a5 : rget C2 Ra5 = first_addr).
   { rgne. rewrite /C2 upd_eq. rgne. rewrite /C1 upd_eq. exact fkr_first_addr2. }
   assert (Hcp34 : add_vec_int (mword_of_int (FR + 0x30) : mword 64) 4
@@ -1407,7 +1407,7 @@ Proof.
   iEval (rewrite Hdp52) in "Hpc".
   (* ---- +0x52: jal ra, kexec ---- *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x52)) Rra
-            (mword_of_int 11878 : mword 21) D4 av2 eb
+            (mword_of_int 11930 : mword 21) D4 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc []").
   { iApply (fkr_52 with "Htext"). }
@@ -2036,13 +2036,13 @@ Proof.
   iEval (rewrite Hp18) in "Hpc".
   (* ---- +0x18: addi a5,a5,-1712 -- a5 = &first ---- *)
   iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x18)) Ra5 Ra5
-            (mword_of_int 2384 : mword 12) T1 av2 eb
+            (mword_of_int 2336 : mword 12) T1 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
   { iApply (fkr_18 with "Htext"). }
   iIntros (CID2 Hk2) "Hcg Hpc".
   set (T2 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget T1 Ra5)
-                    (sign_extend' 64 (mword_of_int 2384 : mword 12)))]> T1).
+                    (sign_extend' 64 (mword_of_int 2336 : mword 12)))]> T1).
   assert (HT2a5 : rget T2 Ra5 = first_addr).
   { rgne. rewrite /T2 upd_eq. rgne. rewrite /T1 upd_eq. exact fkr_first_addr. }
   assert (Hp1c : add_vec_int (mword_of_int (FR + 0x18) : mword 64) 4

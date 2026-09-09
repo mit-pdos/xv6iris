@@ -81,6 +81,7 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WaitInv.
+Require Import PidLock.   (* kwait -> freeproc takes <pid_lock> *)
 Require Import SpecProcinit.   (* [wait_lock_addr] *)
 Require Import SpecKwait.      (* [K_kwait] -- the budget this one is built on *)
 From Kernel Require KernelSyms.
@@ -95,7 +96,7 @@ Import Defs.
    callees: kwait's 60 (argaddr's is 18). *)
 Notation sys_wait_stack := ((4 + K_kwait)%nat) (only parsing).
 Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
+    (γa γp γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
     (pid : mword 32) (U : ustate) (v0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_wait in
@@ -114,6 +115,8 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   procs_inv γs -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
   kalloc_env γa None -∗
+  (* <pid_lock>, for kwait's freeproc (upstream ded23f2) *)
+  is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
   proc_priv γf pj pid U -∗
   wp_next b pj (fun (CID : CpuId) =>
   (* kwait's window, verbatim: the only write is copyout's four-byte
@@ -138,8 +141,8 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
 Module Type SYSWAIT.
   Parameter wp_sys_wait_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
+      (γa γp γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (U : ustate) (v0 : mword 64),
-      wp_sys_wait_sconf_body γa γf γw γs j γl m av eb b lks pid U v0.
+      wp_sys_wait_sconf_body γa γp γf γw γs j γl m av eb b lks pid U v0.
 End SYSWAIT.

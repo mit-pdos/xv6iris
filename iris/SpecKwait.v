@@ -131,6 +131,7 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WaitInv.
+Require Import PidLock.   (* freeproc takes <pid_lock> around [p->pid = 0] *)
 Require Import SpecProcinit.   (* [wait_lock_addr] -- procinit is what makes it *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -152,7 +153,7 @@ Import Defs.
    callee-saved home in s11 and the frame grew to 14 slots (SpecCopyout.v). *)
 Notation K_kwait := (62%nat) (only parsing).
 Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
+    (γa γp γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
     (pid : mword 32) (U : ustate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kwait in
@@ -179,6 +180,9 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
   is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
   (* copyout's lazy faulting and freeproc's kfree chain both live here *)
   kalloc_env γa None -∗
+  (* <pid_lock>: freeproc acquires it around [p->pid = 0] (upstream ded23f2),
+     and kwait reaches freeproc when it reaps a ZOMBIE child *)
+  is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
   (* the caller's own private block: copyout reads p->pagetable and p->sz *)
   proc_priv γf pj pid U -∗
   wp_next b pj (fun (CID : CpuId) =>
@@ -212,8 +216,8 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
 Module Type KWAIT.
   Parameter wp_kwait_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
+      (γa γp γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (lks : gset string),
-      wp_kwait_sconf_body γa γf γw γs j γl m av eb b pid U lks.
+      wp_kwait_sconf_body γa γp γf γw γs j γl m av eb b pid U lks.
 End KWAIT.

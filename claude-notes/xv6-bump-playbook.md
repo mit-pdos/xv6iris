@@ -112,6 +112,21 @@ interval function the disassembly says it is, rebuild the maps from the two
 Fifteen lines, and it reports a SHAPE mismatch at once if the intervals are
 wrong.
 
+**A function that becomes `static` and gets INLINED vanishes from the symbol
+table**, and the first thing that notices is `make gen-code` dying with a
+`KeyError: '<f>'` from the manifest row (ded23f2: `allocpid`).  The row goes,
+and with it `Code<F>.v`, `Proof<F>.v`, `Link<F>.v` and the `_CoqProject`
+lines — but NOT necessarily `Spec<F>.v`: if it is the home of a lock's payload
+or any other resource its consumers name (allocpid's `nextpid_res_at` was
+named by fifteen files), rename it to what it now is (`PidLock.v`) and sed
+the imports.  The caller that absorbed the body gains a reshaped region the
+size of the inlined function; the cheapest proof shape is a **block lemma
+stated like the contract the callee used to have** (`ProofAllocproc.v`'s
+`wp_ap_pidsec`: same entry/exit obligations, the callee's `Link` functor
+parameter becomes the caller's), so the rest of the caller's proof sees a
+renumbered call site and nothing else.  The lock-rank comment and every
+`(rank)` mention of the callee are stale too.
+
 **A shape change in a function with no `Code<F>.v` costs nothing**, and the
 sweep says so by not naming it — an empty sweep is a real answer, not a broken
 command. A function that HAS a Code file but no proof is the same answer one
@@ -228,7 +243,18 @@ Anything not anchored on a `KernelSyms.<sym> + off`:
   the pc) and cannot see the argument list. The file then fails at the `iApply`
   with the tool's own correct rewrite reported as the error.
 - **A raw address literal** (`assert (H : uint hp_flag = 2147525284)`) — the
-  shape every `addr_is_ram` obligation uses. Harmless while the bump and the
+  shape every `addr_is_ram` obligation uses.  **Sweep DECIMAL and
+  PRE-DIVIDED forms too**, not just `0x8…`: ded23f2 moved every `.data`/`.bss`
+  symbol by `-0x30` (the `.eh_frame` for the inlined function went away, so
+  the data segment moved DOWN while `.text` grew), and the hits that mattered
+  were `2147582488` (`bcache + 0x18`, four files), `536895644`
+  (`(bcache + 0x70) / 4`, the same four), `2147628168` / `268453521` (`disk`
+  and `disk / 8`), `0x800127e8` / `0x800181e8` / `2147582440` (`proc`,
+  `tickslock`, in `ProofProcMapstacks`) and `ElfKernel.kernel_bss_lo`.  The
+  recipe: strip comments, take every 9–10-digit literal `v`, and for each
+  divisor `d ∈ {1,2,4,8,16}` ask whether `v·d` lands inside a MOVED symbol's
+  OLD extent.  A `.data` move with `.rodata` unchanged is exactly the case
+  where the `.rodata` string sweep (§4b) reports nothing and this one does. Harmless while the bump and the
   proof are in the same tree, because the build catches it; **not harmless
   across a MERGE**, where a side branch's files were never in the sweep and
   every audit reports zero. Find them with one pass over the OLD symbol table:
@@ -452,6 +478,23 @@ live = [i for i in range(13*16)
         if struct.unpack('<h', img[inodestart*B+i*64:][:2])[0] != 0]
 print(len(live), live)          # N, and the inums, which must be 1..N
 ```
+
+### 4h. A proof that HANGS after a bump (not fails)
+
+`ProofArgraw.v` went from 94 s to a 45-minute spin at ded23f2 with no error,
+and everything in the tree queued behind it.  The cause was not the changed
+immediate itself but a fold that had always been silently owed as a
+CONVERSION: a leaf leaves the register map in the `rget` spelling, the proof
+`set`s the `!!!` spelling and `change`s to it, the `change` finds nothing to
+replace (a syntactic mismatch, no error), and the unifier later proves the
+two maps convertible by reducing the register VALUE -- fast for `addi 32`,
+astronomically slow for `addi 4076` (a negative displacement).  The fix is
+`iEval (rgne; rgne) in "Hcg"` before the `set` (one `rgne` per `rget` in the
+value); the tell is `coqc -time` showing the wedged sentence as an `iApply`
+or `iSpecialize` whose premise is `sie_cap_gpr … <regmap> …`.  **Run bump
+builds under a per-process CPU cap** (`ulimit -t 1200` in the remote shell
+before `make -k`) so a spin becomes an `Error 152`-style failure the round
+reports instead of a build that never ends; `run-on-gcp --proofs` has no cap.
 
 ## 5. Iterating to green
 

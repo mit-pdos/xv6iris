@@ -21,7 +21,6 @@ Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
-Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
@@ -37,17 +36,15 @@ Require Import KernelDecode21.
 Require Import KernelDecode22.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
-Require Import KernelDecode28.
 Require Import KernelDecode29.
 Require Import KernelDecode31.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeProcPagetable.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- proc_pagetable @ KernelSyms.proc_pagetable, 132 bytes ---- *)
 
@@ -79,9 +76,9 @@ Section CodeProcPagetable.
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0xc) (mword_of_int 0x892a : mword 16)
     (mword_of_int (KernelSyms.proc_pagetable + 0xc) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)) kd_892a exec_execute_C_MV. Qed.
 
-  Lemma ppti_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0xe) : mword 64) false (JAL (mword_of_int 2094990 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.proc_pagetable + 0xe) (mword_of_int 0xf8eff0ef : mword 32)
-    (mword_of_int (KernelSyms.proc_pagetable + 0xe) : mword 64) (JAL (mword_of_int 2094990 : mword 21, Regidx (mword_of_int 1))) kd_f8eff0ef. Qed.
+  Lemma ppti_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0xe) : mword 64) false (JAL (mword_of_int 2095052 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.proc_pagetable + 0xe) (mword_of_int 0xfccff0ef : mword 32)
+    (mword_of_int (KernelSyms.proc_pagetable + 0xe) : mword 64) (JAL (mword_of_int 2095052 : mword 21, Regidx (mword_of_int 1))) kd_fccff0ef. Qed.
 
   Lemma ppti_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x12) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x12) (mword_of_int 0x84aa : mword 16)
@@ -99,9 +96,9 @@ Section CodeProcPagetable.
   Proof. mk_base (KernelSyms.proc_pagetable + 0x18) (mword_of_int 0x00004697 : mword 32)
     (mword_of_int (KernelSyms.proc_pagetable + 0x18) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 13), AUIPC)) kd_00004697. Qed.
 
-  Lemma ppti_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x1c) : mword 64) false (ITYPE (mword_of_int 1528 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)).
-  Proof. mk_base (KernelSyms.proc_pagetable + 0x1c) (mword_of_int 0x5f868693 : mword 32)
-    (mword_of_int (KernelSyms.proc_pagetable + 0x1c) : mword 64) (ITYPE (mword_of_int 1528 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)) kd_5f868693. Qed.
+  Lemma ppti_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x1c) : mword 64) false (ITYPE (mword_of_int 1590 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)).
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x1c) (mword_of_int 0x63668693 : mword 32)
+    (mword_of_int (KernelSyms.proc_pagetable + 0x1c) : mword 64) (ITYPE (mword_of_int 1590 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)) kd_63668693. Qed.
 
   Lemma ppti_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x20) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 12), LUI)).
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x20) (mword_of_int 0x6605 : mword 16)
@@ -119,9 +116,9 @@ Section CodeProcPagetable.
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x28) (mword_of_int 0x05b2 : mword 16)
     (mword_of_int (KernelSyms.proc_pagetable + 0x28) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 11), SLLI)) kd_05b2 exec_execute_C_SLLI. Qed.
 
-  Lemma ppti_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x2a) : mword 64) false (JAL (mword_of_int 2094538 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.proc_pagetable + 0x2a) (mword_of_int 0xdcaff0ef : mword 32)
-    (mword_of_int (KernelSyms.proc_pagetable + 0x2a) : mword 64) (JAL (mword_of_int 2094538 : mword 21, Regidx (mword_of_int 1))) kd_dcaff0ef. Qed.
+  Lemma ppti_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x2a) : mword 64) false (JAL (mword_of_int 2094600 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x2a) (mword_of_int 0xe08ff0ef : mword 32)
+    (mword_of_int (KernelSyms.proc_pagetable + 0x2a) : mword 64) (JAL (mword_of_int 2094600 : mword 21, Regidx (mword_of_int 1))) kd_e08ff0ef. Qed.
 
   Lemma ppti_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x2e) : mword 64) false (BTYPE (mword_of_int 44 : mword 13, zreg, Regidx (mword_of_int 10), BLT)).
   Proof. mk_base (KernelSyms.proc_pagetable + 0x2e) (mword_of_int 0x02054663 : mword 32)
@@ -155,9 +152,9 @@ Section CodeProcPagetable.
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x42) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.proc_pagetable + 0x42) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma ppti_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x44) : mword 64) false (JAL (mword_of_int 2094512 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.proc_pagetable + 0x44) (mword_of_int 0xdb0ff0ef : mword 32)
-    (mword_of_int (KernelSyms.proc_pagetable + 0x44) : mword 64) (JAL (mword_of_int 2094512 : mword 21, Regidx (mword_of_int 1))) kd_db0ff0ef. Qed.
+  Lemma ppti_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x44) : mword 64) false (JAL (mword_of_int 2094574 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x44) (mword_of_int 0xdeeff0ef : mword 32)
+    (mword_of_int (KernelSyms.proc_pagetable + 0x44) : mword 64) (JAL (mword_of_int 2094574 : mword 21, Regidx (mword_of_int 1))) kd_deeff0ef. Qed.
 
   Lemma ppti_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x48) : mword 64) false (BTYPE (mword_of_int 30 : mword 13, zreg, Regidx (mword_of_int 10), BLT)).
   Proof. mk_base (KernelSyms.proc_pagetable + 0x48) (mword_of_int 0x00054f63 : mword 32)
@@ -199,9 +196,9 @@ Section CodeProcPagetable.
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x5c) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.proc_pagetable + 0x5c) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma ppti_5e : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x5e) : mword 64) false (JAL (mword_of_int 2095416 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.proc_pagetable + 0x5e) (mword_of_int 0x939ff0ef : mword 32)
-    (mword_of_int (KernelSyms.proc_pagetable + 0x5e) : mword 64) (JAL (mword_of_int 2095416 : mword 21, Regidx (mword_of_int 1))) kd_939ff0ef. Qed.
+  Lemma ppti_5e : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x5e) : mword 64) false (JAL (mword_of_int 2095478 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x5e) (mword_of_int 0x977ff0ef : mword 32)
+    (mword_of_int (KernelSyms.proc_pagetable + 0x5e) : mword 64) (JAL (mword_of_int 2095478 : mword 21, Regidx (mword_of_int 1))) kd_977ff0ef. Qed.
 
   Lemma ppti_62 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x62) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)).
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x62) (mword_of_int 0x4481 : mword 16)
@@ -235,9 +232,9 @@ Section CodeProcPagetable.
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x72) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.proc_pagetable + 0x72) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma ppti_74 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x74) : mword 64) false (JAL (mword_of_int 2094926 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.proc_pagetable + 0x74) (mword_of_int 0xf4eff0ef : mword 32)
-    (mword_of_int (KernelSyms.proc_pagetable + 0x74) : mword 64) (JAL (mword_of_int 2094926 : mword 21, Regidx (mword_of_int 1))) kd_f4eff0ef. Qed.
+  Lemma ppti_74 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x74) : mword 64) false (JAL (mword_of_int 2094988 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x74) (mword_of_int 0xf8cff0ef : mword 32)
+    (mword_of_int (KernelSyms.proc_pagetable + 0x74) : mword 64) (JAL (mword_of_int 2094988 : mword 21, Regidx (mword_of_int 1))) kd_f8cff0ef. Qed.
 
   Lemma ppti_78 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x78) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)).
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x78) (mword_of_int 0x4581 : mword 16)
@@ -247,9 +244,9 @@ Section CodeProcPagetable.
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x7a) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.proc_pagetable + 0x7a) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma ppti_7c : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x7c) : mword 64) false (JAL (mword_of_int 2095386 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.proc_pagetable + 0x7c) (mword_of_int 0x91bff0ef : mword 32)
-    (mword_of_int (KernelSyms.proc_pagetable + 0x7c) : mword 64) (JAL (mword_of_int 2095386 : mword 21, Regidx (mword_of_int 1))) kd_91bff0ef. Qed.
+  Lemma ppti_7c : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x7c) : mword 64) false (JAL (mword_of_int 2095448 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x7c) (mword_of_int 0x959ff0ef : mword 32)
+    (mword_of_int (KernelSyms.proc_pagetable + 0x7c) : mword 64) (JAL (mword_of_int 2095448 : mword 21, Regidx (mword_of_int 1))) kd_959ff0ef. Qed.
 
   Lemma ppti_80 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x80) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)).
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x80) (mword_of_int 0x4481 : mword 16)

@@ -434,10 +434,10 @@ Section KexecBBody.
     iEval (rewrite Hpp094) in "Hpc".
     (* ---- +0x094: jal ra,proc_pagetable ---- *)
     assert (Htpp : add_vec (mword_of_int (KXB + 0x094) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085272 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085158 : mword 21))
                    = mword_of_int KernelSyms.proc_pagetable) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXB + 0x094)) Rra
-              (mword_of_int 2085272 : mword 21) G1 (K - 68)%nat eb
+              (mword_of_int 2085158 : mword 21) G1 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htpp; vm_compute; reflexivity)
               with "Hcg Hpc []").

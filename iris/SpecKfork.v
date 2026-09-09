@@ -166,7 +166,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SpecAllocpid.
+Require Import PidLock.
 Require Import WaitInv.
 Require Import SpecProcinit.
 From Kernel Require KernelSyms.

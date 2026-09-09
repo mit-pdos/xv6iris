@@ -16,6 +16,7 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode00.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode07.
@@ -25,21 +26,20 @@ Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode17.
+Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode23.
-Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
 Require Import KernelDecode30.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeUartPutcSync.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- uartputc_sync @ KernelSyms.uartputc_sync, 74 bytes ---- *)
 
@@ -71,9 +71,9 @@ Section CodeUartPutcSync.
   Proof. mk_base (KernelSyms.uartputc_sync + 0xc) (mword_of_int 0x00012517 : mword 32)
     (mword_of_int (KernelSyms.uartputc_sync + 0xc) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00012517. Qed.
 
-  Lemma upi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x10) : mword 64) false (ITYPE (mword_of_int 2590 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uartputc_sync + 0x10) (mword_of_int 0xa1e50513 : mword 32)
-    (mword_of_int (KernelSyms.uartputc_sync + 0x10) : mword 64) (ITYPE (mword_of_int 2590 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_a1e50513. Qed.
+  Lemma upi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x10) : mword 64) false (ITYPE (mword_of_int 2542 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uartputc_sync + 0x10) (mword_of_int 0x9ee50513 : mword 32)
+    (mword_of_int (KernelSyms.uartputc_sync + 0x10) : mword 64) (ITYPE (mword_of_int 2542 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_9ee50513. Qed.
 
   Lemma upi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x14) : mword 64) false (JAL (mword_of_int 592 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.uartputc_sync + 0x14) (mword_of_int 0x250000ef : mword 32)
@@ -115,9 +115,9 @@ Section CodeUartPutcSync.
   Proof. mk_base (KernelSyms.uartputc_sync + 0x34) (mword_of_int 0x00012517 : mword 32)
     (mword_of_int (KernelSyms.uartputc_sync + 0x34) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00012517. Qed.
 
-  Lemma upi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x38) : mword 64) false (ITYPE (mword_of_int 2550 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uartputc_sync + 0x38) (mword_of_int 0x9f650513 : mword 32)
-    (mword_of_int (KernelSyms.uartputc_sync + 0x38) : mword 64) (ITYPE (mword_of_int 2550 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_9f650513. Qed.
+  Lemma upi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x38) : mword 64) false (ITYPE (mword_of_int 2502 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uartputc_sync + 0x38) (mword_of_int 0x9c650513 : mword 32)
+    (mword_of_int (KernelSyms.uartputc_sync + 0x38) : mword 64) (ITYPE (mword_of_int 2502 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_9c650513. Qed.
 
   Lemma upi_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x3c) : mword 64) false (JAL (mword_of_int 688 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.uartputc_sync + 0x3c) (mword_of_int 0x2b0000ef : mword 32)

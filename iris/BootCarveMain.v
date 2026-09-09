@@ -1946,7 +1946,10 @@ Section BootCarveMain.
      (* the parent cell, which belongs to wait_lock rather than to p->lock --
         see the split at +56 below *)
      (∃ pv : SailStdpp.Values.mword 64,
-        TsoCtx.ctx_word_pointsto XI (p_parent a) (DfracOwn 1) pv))%I.
+        TsoCtx.ctx_word_pointsto XI (p_parent a) (DfracOwn 1) pv) ∗
+     (* ...and <pid_lock>'s quarter of the pid cell (the third owner of +48,
+        since upstream ded23f2's pid scan reads it under that lock alone) *)
+     pid_lock_share a)%I.
 
   Lemma boot_proc_slot `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
@@ -2088,14 +2091,20 @@ Section BootCarveMain.
        its sixteen bytes ZERO and hence [ProcGeom.pname_wf] provable. *)
     iDestruct (boot_proc_name g A Hmem Hlo Hbss ltac:(lia) with "Hcl Hnm")
       as (bs) "[%Hbs Hnm]".
-    (* the pid cell is owned by BOTH halves at a half each *)
+    (* the pid cell has THREE owners: the dormant block's half, the slot
+       lock's quarter ([proc_pub]) and <pid_lock>'s quarter *)
     iAssert (TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 48))
                (DfracOwn (1/2)) vpid ∗
-             TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 48))
-               (DfracOwn (1/2)) vpid)%I with "[Hpid]"
-      as "[Hpid1 Hpid2]".
-    { rewrite -TsoCtx.ctx_word4_pointsto_frac_split Qp.div_2. iExact "Hpid". }
+             (TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 48))
+                (DfracOwn (1/4)) vpid ∗
+              TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 48))
+                (DfracOwn (1/4)) vpid))%I with "[Hpid]"
+      as "[Hpid1 [Hpid2 Hpid3]]".
+    { rewrite -!TsoCtx.ctx_word4_pointsto_frac_split.
+      assert (Hq : (1/2 + (1/4 + 1/4))%Qp = 1%Qp) by compute_done.
+      rewrite Hq. iExact "Hpid". }
     rewrite /proc_slot_raw /proc_raw /proc_pub /proc_dormant_nofd /proc_fields
+            /pid_lock_share /pid_lock_share_at
             /p_state /p_chan /p_parent /p_killed /p_xstate /p_pid /p_kstack /p_sz
             /p_pagetable /p_trapframe /p_context /p_cwd
             E48 E72 E80 E88 !off_of_z.
@@ -2119,11 +2128,13 @@ Section BootCarveMain.
         iSplitR; [iPureIntro; exact Hbs |]. iExact "Hnm". }
       iSplitL "Hof"; [iExact "Hof" |]. iSplitL "Hctx"; [iExact "Hctx" |].
       iSplitL "Hpg"; [iExact "Hpg" |]. iExact "Htf". }
-    iSplitR "Hpar"; [| iExists vpar; iExact "Hpar"].
-    iSplitL "Hch"; [iExists vch; iExact "Hch" |].
-    iExists vkl, vxs, vpid.
-    iSplitL "Hkl"; [iExact "Hkl" |]. iSplitL "Hxs"; [iExact "Hxs" |].
-    iExact "Hpid2".
+    iSplitR "Hpar Hpid3".
+    { iSplitL "Hch"; [iExists vch; iExact "Hch" |].
+      iExists vkl, vxs, vpid.
+      iSplitL "Hkl"; [iExact "Hkl" |]. iSplitL "Hxs"; [iExact "Hxs" |].
+      iExact "Hpid2". }
+    iSplitL "Hpar"; [iExists vpar; iExact "Hpar" |].
+    iExists vpid. iExact "Hpid3".
   Qed.
 
   (* ...and the 64 slots, out of the one [proc[]] range: ONE family, whose
@@ -2142,7 +2153,9 @@ Section BootCarveMain.
        (* ...and the parent cells, which are wait_lock's, not p->lock's *)
        ([∗ list] i ∈ seq 0 NPROC,
           ∃ pv : SailStdpp.Values.mword 64,
-            TsoCtx.ctx_word_pointsto XI (p_parent (proc_addr i)) (DfracOwn 1) pv).
+            TsoCtx.ctx_word_pointsto XI (p_parent (proc_addr i)) (DfracOwn 1) pv) ∗
+       (* ...and <pid_lock>'s quarter of every pid cell, which is that lock's *)
+       ([∗ list] i ∈ seq 0 NPROC, pid_lock_share (proc_addr i)).
   Proof.
     intro Hmem. iIntros "#Hcl H".
     iDestruct (boot_cran_stride_family_seq g proc_slot_raw
@@ -2165,16 +2178,22 @@ Section BootCarveMain.
                                     T1 T2 with "H") as "[H _]";
                        iApply (boot_proc_slot g A Hmem Q1 Q2 Q3 with "Hcl H"))
                  with "Hcl H") as "H".
-    rewrite /proc_slot_raw big_sepL_sep. iDestruct "H" as "[H1 H23]".
-    rewrite big_sepL_sep. iDestruct "H23" as "[H2 H3]".
+    rewrite /proc_slot_raw big_sepL_sep. iDestruct "H" as "[H1 H234]".
+    (* the cuts are made IN the hypothesis: a goal-wide [rewrite big_sepL_sep]
+       would now also split the [chan ∗ proc_pub] pair, whose body is a [∗] too *)
+    iEval (rewrite big_sepL_sep) in "H234". iDestruct "H234" as "[H2 H34]".
+    iEval (rewrite big_sepL_sep) in "H34". iDestruct "H34" as "[H3 H4]".
     iSplitL "H1".
     - iApply (big_sepL_mono with "H1"). iIntros (n i _) "Hi".
       rewrite (proc_addr_of_z i). iExact "Hi".
     - iSplitL "H2".
       + iApply (big_sepL_mono with "H2"). iIntros (n i _) "Hi".
         rewrite (proc_addr_of_z i). iExact "Hi".
-      + iApply (big_sepL_mono with "H3"). iIntros (n i _) "Hi".
-        rewrite (proc_addr_of_z i). iExact "Hi".
+      + iSplitL "H3".
+        * iApply (big_sepL_mono with "H3"). iIntros (n i _) "Hi".
+          rewrite (proc_addr_of_z i). iExact "Hi".
+        * iApply (big_sepL_mono with "H4"). iIntros (n i _) "Hi".
+          rewrite (proc_addr_of_z i). iExact "Hi".
   Qed.
 
   (* one page, out of its own 4096-byte range: [BootCarve.boot_cran_mem_run]

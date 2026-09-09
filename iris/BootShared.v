@@ -640,7 +640,7 @@ Section BootBssChain.
                  (KernelSyms.proc + proc_size * Z.of_nat NPROC) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hprocs H]".
     iDestruct (boot_procs_raw g Hmem with "Hcl Hprocs")
-      as "[Hpr1 [Hpr2 Hpar]]".
+      as "[Hpr1 [Hpr2 [Hpar Hpr3]]]".
     (* the parent cells, gathered into wait_lock's resource.  The carve hands
        one existential per slot; [WaitInv.wait_res] is one list. *)
     iDestruct (WaitInv.wait_res_of_cells with "Hpar") as "Hwres".
@@ -927,7 +927,7 @@ Section BootBssChain.
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
-    iSplitL "Hdr Hdw Hdevrest Hkm Hkpt Hpr1 Hpr2 Hwres Hfd Hir Hfent Hirf Hfda
+    iSplitL "Hdr Hdw Hdevrest Hkm Hkpt Hpr1 Hpr2 Hpr3 Hwres Hfd Hir Hfent Hirf Hfda
              Hbss Hip Htk Hbsl Hbln Hhd
              Hbpay Hsbb Hino Hient Hlog Hdd Hda Hdu Hdf Hdi Hslots Hring".
     { rewrite /main_globals_raw.
@@ -939,6 +939,7 @@ Section BootBssChain.
       iSplitL "Hkpt"; [iExists vkpt; iExact "Hkpt" |].
       iSplitL "Hpr1"; [iExact "Hpr1" |].
       iSplitL "Hpr2"; [iExact "Hpr2" |].
+      iSplitL "Hpr3"; [iExact "Hpr3" |].
       iSplitL "Hwres"; [iExact "Hwres" |].
       iSplitL "Hfd"; [iExact "Hfd" |].
       iSplitL "Hir"; [iExact "Hir" |].
@@ -1053,13 +1054,13 @@ Qed.
    loader leaves 1 in each, but no client has read one yet).  Nothing
    consumes this bundle today; it is here so that narrowing [kernel_data]
    does not drop the bytes on the floor, and it is what [SpecForkret]'s
-   `first` premise and [SpecAllocpid.nextpid_res] get threaded from when
+   `first` premise and [PidLock.nextpid_res] get threaded from when
    those land ([main_globals_raw] is where they will end up). *)
 (* THE IMAGE'S TWO WRITABLE INITIALIZED GLOBALS.
 
    [first] IS AT A PINNED VALUE and [nextpid] is not, and the asymmetry is
    the point.  Nobody reasons about [nextpid]'s initial contents -- it is
-   spent immediately on [SpecAllocpid.nextpid_res], whose own shape is
+   spent immediately on [PidLock.nextpid_res], whose own shape is
    [∃ v, alp_nextpid ↦₄ v].  [first] is different: forkret's [if (first)]
    branch is decided by that cell, so a holder of [∃ w, first ↦₄ w] cannot
    tell which arm it is in and the boot arm becomes unprovable.  The image

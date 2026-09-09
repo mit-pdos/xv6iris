@@ -29,14 +29,13 @@ Require Import KernelDecode21.
 Require Import KernelDecode25.
 Require Import KernelDecode27.
 Require Import KernelDecode30.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeHolding.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- holding @ KernelSyms.holding, 44 bytes ---- *)
 

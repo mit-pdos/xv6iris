@@ -65,7 +65,7 @@ Definition lock_ranks : list (string * nat) :=
   ; ("virtio_disk",  7)
   ; ("wait_lock",    8)
   ; ("proc",         9)   (* every sleep_prepare / wakeup *)
-  ; ("nextpid",     10)   (* allocproc -> allocpid *)
+  ; ("nextpid",     10)   (* allocproc's pid scan, freeproc's p->pid = 0 *)
   ; ("kmem",        11)   (* allocproc -> kalloc, freeproc -> kfree *)
   (* [pr] and [uart] are at the TOP, and that is forced by panic().  panic is
      printk + printk + self-jump, so it takes pr.lock and, under it, tx_lock;

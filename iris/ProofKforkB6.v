@@ -69,7 +69,7 @@ Require Import IcacheRefDefs.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SpecAllocpid.
+Require Import PidLock.
 Require Import WaitInv.
 Require Import SpecProcinit.
 Require Import SpecMyproc.
@@ -625,7 +625,7 @@ Section KforkPrologue.
     (* =================================================================
        +0x00c: jal ra, myproc
        ================================================================= *)
-    iApply (wp_jal_s_sconf (mword_of_int (KF + 0xc)) Rra (mword_of_int 2096260 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KF + 0xc)) Rra (mword_of_int 2096208 : mword 21)
               M1 K1 b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_00c with "Htext"). }
@@ -633,7 +633,7 @@ Section KforkPrologue.
     set (M2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KF + 0xc) : mword 64) 4)]> M1).
     assert (Hjmyp : add_vec (mword_of_int (KF + 0xc) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2096260 : mword 21)) = mword_of_int KernelSyms.myproc)
+                     (sign_extend' 64 (mword_of_int 2096208 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmyp) in "Hpc".
     assert (HM2sp : M2 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -695,7 +695,7 @@ Section KforkPrologue.
     (* =================================================================
        +0x012: jal ra, allocproc
        ================================================================= *)
-    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x12)) Rra (mword_of_int 2096810 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x12)) Rra (mword_of_int 2096720 : mword 21)
               M4 K1 b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_012 with "Htext"). }
@@ -703,7 +703,7 @@ Section KforkPrologue.
     set (M5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KF + 0x12) : mword 64) 4)]> M4).
     assert (Hjalp : add_vec (mword_of_int (KF + 0x12) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2096810 : mword 21)) = mword_of_int KernelSyms.allocproc)
+                     (sign_extend' 64 (mword_of_int 2096720 : mword 21)) = mword_of_int KernelSyms.allocproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjalp) in "Hpc".
     assert (HM5sp : M5 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -933,7 +933,7 @@ Section KforkPrologue.
       (* =================================================================
          +0x028: jal ra, uvmcopy
          ================================================================= *)
-      iApply (wp_jal_s_sconf (mword_of_int (KF + 0x28)) Rra (mword_of_int 2094918 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KF + 0x28)) Rra (mword_of_int 2094866 : mword 21)
                 N4 (trap_res b + K1)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kfk_028 with "Htext"). }
@@ -941,7 +941,7 @@ Section KforkPrologue.
       set (N5 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KF + 0x28) : mword 64) 4)]> N4).
       assert (Hjuvc : add_vec (mword_of_int (KF + 0x28) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094918 : mword 21)) = mword_of_int KernelSyms.uvmcopy)
+                       (sign_extend' 64 (mword_of_int 2094866 : mword 21)) = mword_of_int KernelSyms.uvmcopy)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjuvc) in "Hpc".
       assert (HN5sp : N5 !!! Regidx csp_rs1 = pa_stk sp0 8)

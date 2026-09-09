@@ -95,7 +95,12 @@ SAIL_RISCV_REV ?= 070832a1e4b086f0c6f7635de54cc2b4cfd66993
 # functions; 4398009 -> 4aab0eb: deterministic builds (-ffile-prefix-map, so
 # every binary and fs.img is byte-identical across build trees -- what the
 # literal rocq-raw dumps depend on) plus a new usertests binary
-# (linkoverflow); no kernel/user layout change, all 20 dumps byte-identical).
+# (linkoverflow); no kernel/user layout change, all 20 dumps byte-identical;
+# 45071c7 -> ded23f2: fix pid wraparound/reuse -- allocpid becomes a static
+# retry scan over proc[] under pid_lock and gcc INLINES it into allocproc
+# (the <allocpid> symbol is gone), freeproc takes pid_lock around p->pid = 0,
+# everything after proc.c's allocproc moves +0x34, .eh_frame shrinks so
+# every .data/.bss symbol moves -0x30; fs.img and the user dumps unchanged).
 # Nothing here is a local commit:
 # `git -C xv6-riscv checkout --detach $(XV6_REV)` reproduces the image, and
 # that is the whole recipe.
@@ -105,7 +110,7 @@ SAIL_RISCV_REV ?= 070832a1e4b086f0c6f7635de54cc2b4cfd66993
 # stays reachable only from your local clone -- expect the diff between two
 # consecutive pins to be an upstream commit that landed UNDER the series, not
 # on top of it.
-XV6_REV ?= 45071c74c56b216a76bc08213d6c7a90b8f0688b
+XV6_REV ?= ded23f2aa3e8a355d82ee1735a60c9d41f26877c
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v \
               $(KDUMP)/KernelElfRaw.v $(KDUMP)/FsImgRaw.v

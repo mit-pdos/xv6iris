@@ -194,14 +194,14 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma su_dotaddr `{XI : CurCtx} :
   add_vec (add_vec (mword_of_int (SU + 0x34) : mword 64)
                    (auipc_off (mword_of_int 2 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1554 : mword 12))
+          (sign_extend' 64 (mword_of_int 1502 : mword 12))
   = (mword_of_int su_dot_addr : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma su_dotdotaddr `{XI : CurCtx} :
   add_vec (add_vec (mword_of_int (SU + 0x48) : mword 64)
                    (auipc_off (mword_of_int 2 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1542 : mword 12))
+          (sign_extend' 64 (mword_of_int 1490 : mword 12))
   = (mword_of_int su_dotdot_addr : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 

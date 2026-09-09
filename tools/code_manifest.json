@@ -6,12 +6,6 @@
   2
  ],
  [
-  "CodeAllocpid.v",
-  "allocpid",
-  "apdi_",
-  2
- ],
- [
   "CodeAllocproc.v",
   "allocproc",
   "api_",

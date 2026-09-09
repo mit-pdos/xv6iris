@@ -32,14 +32,13 @@ Require Import KernelDecode21.
 Require Import KernelDecode22.
 Require Import KernelDecode25.
 Require Import KernelDecode28.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodePushOff.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- push_off @ KernelSyms.push_off, 58 bytes ---- *)
 

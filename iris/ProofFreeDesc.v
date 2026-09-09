@@ -279,15 +279,15 @@ Section ProofFreeDesc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp26) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.free_desc + 0x26)) a5_idx a5_idx
-              (mword_of_int 0xde4 : mword 12) V2 n b
+              (mword_of_int 0xd84 : mword 12) V2 n b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fdi_26 with "Htext"). }
     iIntros (CIDc3 Hc3) "Hcg Hpc".
     set (V3 := <[Regidx a5_idx := regval_into_reg
-        (add_vec (rget V2 a5_idx) (sign_extend' 64 (mword_of_int 3556 : mword 12)))]> V2).
+        (add_vec (rget V2 a5_idx) (sign_extend' 64 (mword_of_int 3460 : mword 12)))]> V2).
     change (<[Regidx a5_idx := regval_into_reg
-        (add_vec (rget V2 a5_idx) (sign_extend' 64 (mword_of_int 3556 : mword 12)))]> V2) with V3.
+        (add_vec (rget V2 a5_idx) (sign_extend' 64 (mword_of_int 3460 : mword 12)))]> V2) with V3.
     assert (Hp2a : add_vec_int (mword_of_int (KernelSyms.free_desc + 0x26) : mword 64) 4 = mword_of_int (KernelSyms.free_desc + 0x2a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp2a) in "Hpc".
@@ -648,15 +648,15 @@ Section ProofFreeDesc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc12) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.free_desc + 0x12)) a5_idx a5_idx
-              (mword_of_int 0xdf8 : mword 12) A3 (K - 2)%nat b
+              (mword_of_int 0xd98 : mword 12) A3 (K - 2)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fdi_12 with "Htext"). }
     iIntros (CIDd8 Hd8) "Hcg Hpc".
     set (A4 := <[Regidx a5_idx := regval_into_reg
-        (add_vec (rget A3 a5_idx) (sign_extend' 64 (mword_of_int 3576 : mword 12)))]> A3).
+        (add_vec (rget A3 a5_idx) (sign_extend' 64 (mword_of_int 3480 : mword 12)))]> A3).
     change (<[Regidx a5_idx := regval_into_reg
-        (add_vec (rget A3 a5_idx) (sign_extend' 64 (mword_of_int 3576 : mword 12)))]> A3) with A4.
+        (add_vec (rget A3 a5_idx) (sign_extend' 64 (mword_of_int 3480 : mword 12)))]> A3) with A4.
     assert (Hpc16 : add_vec_int (mword_of_int (KernelSyms.free_desc + 0x12) : mword 64) 4 = mword_of_int (KernelSyms.free_desc + 0x16))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
@@ -764,20 +764,20 @@ Section ProofFreeDesc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc4e) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.free_desc + 0x4e)) a0_idx a0_idx
-              (mword_of_int 0xdd4 : mword 12) E0 (K - 2)%nat b
+              (mword_of_int 0xd74 : mword 12) E0 (K - 2)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fdi_4e with "Htext"). }
     iIntros (CIDd14 Hd14) "Hcg Hpc".
     set (E1 := <[Regidx a0_idx := regval_into_reg
-        (add_vec (rget E0 a0_idx) (sign_extend' 64 (mword_of_int 3540 : mword 12)))]> E0).
+        (add_vec (rget E0 a0_idx) (sign_extend' 64 (mword_of_int 3444 : mword 12)))]> E0).
     change (<[Regidx a0_idx := regval_into_reg
-        (add_vec (rget E0 a0_idx) (sign_extend' 64 (mword_of_int 3540 : mword 12)))]> E0) with E1.
+        (add_vec (rget E0 a0_idx) (sign_extend' 64 (mword_of_int 3444 : mword 12)))]> E0) with E1.
     assert (Hpc52 : add_vec_int (mword_of_int (KernelSyms.free_desc + 0x4e) : mword 64) 4 = mword_of_int (KernelSyms.free_desc + 0x52))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc52) in "Hpc".
     (* ---- +0x52: jal ra,wakeup ---- *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.free_desc + 0x52)) ra_idx (mword_of_int 2082956 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.free_desc + 0x52)) ra_idx (mword_of_int 2082960 : mword 21)
               E1 (K - 2)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
@@ -789,7 +789,7 @@ Section ProofFreeDesc.
     change (<[Regidx ra_idx := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.free_desc + 0x52) : mword 64) 4)]> E1) with E2.
     assert (Hjwk : add_vec (mword_of_int (KernelSyms.free_desc + 0x52) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2082956 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2082960 : mword 21))
                    = mword_of_int KernelSyms.wakeup)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjwk) in "Hpc".

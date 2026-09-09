@@ -310,6 +310,11 @@ Section SpecMain.
      ([∗ list] i ∈ seq 0 NPROC,
         (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
         proc_pub (proc_addr i)) ∗
+     (* ...AND <pid_lock>'s QUARTER OF EVERY pid CELL -- the part of a
+        [struct proc] that belongs to THAT lock (upstream ded23f2's pid scan
+        reads all 64 under it), carved beside [proc_pub]'s quarter and routed
+        to main's [newlock] for [PidLock.nextpid_res]. *)
+     ([∗ list] i ∈ seq 0 NPROC, pid_lock_share (proc_addr i)) ∗
      (* ...AND WHAT wait_lock IS OVER.  [WaitInv.wait_res] is [∃ ps,
         parents_own ps], the NPROC [p_parent] cells -- the one part of a
         [struct proc] that belongs to a lock OTHER than p->lock, which is
@@ -547,7 +552,7 @@ Section SpecMain.
        two are convertible and [BootChain] frames one against the other.
 
        main spends the [nextpid] half immediately: it is the whole of
-       [SpecAllocpid.nextpid_res], so the [newlock] on procinit's
+       [PidLock.nextpid_res], so the [newlock] on procinit's
        [lk_fresh pid_lock_addr "nextpid"] turns the pair into the
        [is_lock γp alp_pid_lock "nextpid" nextpid_res_at] that allocproc -- and
        hence kfork, sys_fork and userinit -- takes.  `first` is forkret's;

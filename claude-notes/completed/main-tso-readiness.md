@@ -452,7 +452,7 @@ the payload family is wider than the four trap-path ones:
 | `bcache_res` | `BioInv.v:941` | 37 | 9 | — |
 | `ftable_res` | `FileInv.v:40` | 35 | 12 | — |
 | `ticks_res` | `TicksInv.v:41` | 31 | 9 | 16 |
-| `nextpid_res` | `SpecAllocpid.v:59` | 29 | 12 | — |
+| `nextpid_res` | `PidLock.v:59` | 29 | 12 | — |
 | `sl_res` | `SleepLock.v:422` | 20 | 5 | — |
 | `pr_res` | `SpecPrintk.v:209` | 16 | 7 | — |
 
@@ -852,7 +852,7 @@ been pushed.
    (T-leg: 27 λ uses, 0 const).  The M-leg's `CtxMorph` instance sections
    that exist only to serve λ payloads were dropped where the T-leg has
    none (`ConsoleInv.console_inv_morph`, `ProcInv`'s section, `FileInv`'s
-   `ftable_res_morph`, `SchedCtx`'s, `SpecAllocpid`'s, `FsReady`'s).
+   `ftable_res_morph`, `SchedCtx`'s, `PidLock`'s, `FsReady`'s).
 3. **`lock_name` is the closed term both legs have** (raw discarded word
    + `ctx_string_all`); `lock_name_intro` takes `ctx_string_all`, and the
    boot string minter is `KernelDataInv.kernel_data_string_all`.

@@ -92,6 +92,7 @@ Require Import SchedCtx.
 Require Import WaitInv.
 Require Import SpecAcquire SpecRelease SpecMyproc SpecKilled SpecSleepPrepare SpecSleep.
 Require Import SpecCopyout SpecFreeproc.
+Require Import PidLock.   (* freeproc's <pid_lock> premise *)
 Require Import SpecProcinit.
 Require Import SpecKwait.
 From Kernel Require KernelInstrs KernelSyms.
@@ -910,16 +911,16 @@ Section ProofKwait.
     iEval (rewrite Hpf0) in "Hpc".
     (* +0xf0 addi a0,a0,258 : a0 := &wait_lock *)
     assert (HrgT0 : rget (CID := CIDt) T0 Ra0 = T0 !!! Regidx Ra0) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0xfe)) Ra0 Ra0 (mword_of_int 352 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0xfe)) Ra0 Ra0 (mword_of_int 252 : mword 12)
               T0 (trap_res eb + (K - 10))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kwi_fe with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite HrgT0) in "Hcg".
     set (T1 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (T0 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 352 : mword 12)))]> T0).
+                  (add_vec (T0 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 252 : mword 12)))]> T0).
     change (<[Regidx Ra0 := regval_into_reg
-                  (add_vec (T0 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 352 : mword 12)))]> T0) with T1.
+                  (add_vec (T0 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 252 : mword 12)))]> T0) with T1.
     assert (HT1a0 : T1 !!! Regidx Ra0 = wait_lock_addr).
     { rewrite /T1 upd_eq /T0 upd_eq /wait_lock_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -933,7 +934,7 @@ Section ProofKwait.
     iEval (rewrite Hpf4) in "Hpc".
     (* +0xf4 jal ra,release *)
     iApply (wp_jal_s_sconf (mword_of_int (KW + 0x102)) Rra
-              (mword_of_int 2091466 : mword 21) T1 (trap_res eb + (K - 10))%nat false
+              (mword_of_int 2091414 : mword 21) T1 (trap_res eb + (K - 10))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_102 with "Htext"). }
@@ -943,7 +944,7 @@ Section ProofKwait.
     change (<[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KW + 0x102) : mword 64) 4)]> T1) with T2.
     assert (Hjrel : add_vec (mword_of_int (KW + 0x102) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2091466 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2091414 : mword 21))
                     = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjrel) in "Hpc".
@@ -1078,7 +1079,7 @@ Section ProofKwait.
     iEval (rewrite Hp96) in "Hpc".
     (* +0x96 jal ra,release *)
     iApply (wp_jal_s_sconf (mword_of_int (KW + 0x96)) Rra
-              (mword_of_int 2091574 : mword 21) U0 (trap_res eb + (K - 10))%nat false
+              (mword_of_int 2091522 : mword 21) U0 (trap_res eb + (K - 10))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_96 with "Htext"). }
@@ -1088,7 +1089,7 @@ Section ProofKwait.
     change (<[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KW + 0x96) : mword 64) 4)]> U0) with U1.
     assert (Hjr1 : add_vec (mword_of_int (KW + 0x96) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2091574 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2091522 : mword 21))
                    = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjr1) in "Hpc".
@@ -1137,16 +1138,16 @@ Section ProofKwait.
     iEval (rewrite Hp9e) in "Hpc".
     (* +0x9e addi a0,a0,340 : a0 := &wait_lock *)
     assert (HrgU2 : rget (CID := CIDt) U2 Ra0 = U2 !!! Regidx Ra0) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0x9e)) Ra0 Ra0 (mword_of_int 448 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0x9e)) Ra0 Ra0 (mword_of_int 348 : mword 12)
               U2 (trap_res eb + (K - 10))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kwi_9e with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite HrgU2) in "Hcg".
     set (U3 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (U2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 448 : mword 12)))]> U2).
+                  (add_vec (U2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 348 : mword 12)))]> U2).
     change (<[Regidx Ra0 := regval_into_reg
-                  (add_vec (U2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 448 : mword 12)))]> U2) with U3.
+                  (add_vec (U2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 348 : mword 12)))]> U2) with U3.
     assert (HU3a0 : U3 !!! Regidx Ra0 = wait_lock_addr).
     { rewrite /U3 upd_eq /U2 upd_eq /wait_lock_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1160,7 +1161,7 @@ Section ProofKwait.
     iEval (rewrite Hpa2) in "Hpc".
     (* +0xa2 jal ra,release *)
     iApply (wp_jal_s_sconf (mword_of_int (KW + 0xa2)) Rra
-              (mword_of_int 2091562 : mword 21) U3 (trap_res eb + (K - 10))%nat false
+              (mword_of_int 2091510 : mword 21) U3 (trap_res eb + (K - 10))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_a2 with "Htext"). }
@@ -1170,7 +1171,7 @@ Section ProofKwait.
     change (<[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KW + 0xa2) : mword 64) 4)]> U3) with U4.
     assert (Hjr2 : add_vec (mword_of_int (KW + 0xa2) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2091562 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2091510 : mword 21))
                    = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjr2) in "Hpc".
@@ -1241,7 +1242,7 @@ Section ProofKwait.
   (* wait_lock's table), frees it, and unwinds both locks.               *)
   (* ================================================================== *)
   Local Lemma kw_reap `{GEN : GenId} `{CIDp : CpuId} `{XI : CurCtx}
-       (γs : list gname) (γa γw γk : gname)
+       (γs : list gname) (γa γp γw γk : gname)
       (mm Mr : regfile) (pme : mword 64) (k K : nat) (eb : bool)
       (pidc : mword 32) (ch : mword 64) (ps : list (mword 64)) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1264,6 +1265,7 @@ Section ProofKwait.
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x60)) -∗
     kalloc_env γa None -∗
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     (* the child's lock, contents out, at ZOMBIE *)
     is_lock γk (proc_addr k) "proc"%string (proc_lock_pay γs γk (proc_addr k)) -∗
     locked γk CIDp -∗
@@ -1299,11 +1301,13 @@ Section ProofKwait.
       by (vm_compute; lia).
     assert (Hfresh_proc : locks_below ({["wait_lock"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Hwl_lt_proc | lkbelow]. }
-    assert (Hfresh_kmem : locks_below ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
-                            "kmem").
+    (* freeproc's own floor is "nextpid" (10) since upstream ded23f2 made it
+       take <pid_lock>; its kfree's "kmem" (11) follows inside freeproc. *)
+    assert (Hfresh_nextpid : locks_below ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
+                               "nextpid").
     { apply locks_below_union_singleton; [vm_compute; lia |].
       lkbelow. }
-    iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hlkk Htokk Hstate Hpsg Hchan Hpub
+    iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hplk #Hlkk Htokk Hstate Hpsg Hchan Hpub
              Hdorm Hpark #Hmk #Hlk Htok Hps Hframe Hcont".
     (* ---- +0x60 sd x0,56(s1) : pp->parent = 0, out of wait_lock's table ---- *)
     iDestruct (parents_own_length ps with "Hps") as %Hlen.
@@ -1352,7 +1356,7 @@ Section ProofKwait.
     iEval (rewrite Hp66) in "Hpc".
     (* ---- +0x66 jal ra,freeproc ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KW + 0x66)) Rra
-              (mword_of_int 2095326 : mword 21) R0 (trap_res eb + (K - 10))%nat false
+              (mword_of_int 2095212 : mword 21) R0 (trap_res eb + (K - 10))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_66 with "Htext"). }
@@ -1362,7 +1366,7 @@ Section ProofKwait.
     change (<[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KW + 0x66) : mword 64) 4)]> R0) with R1.
     assert (Hjfp : add_vec (mword_of_int (KW + 0x66) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2095326 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2095212 : mword 21))
                    = mword_of_int KernelSyms.freeproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjfp) in "Hpc".
@@ -1379,12 +1383,12 @@ Section ProofKwait.
     (* the ZOMBIE block, in freeproc's own vocabulary *)
     iDestruct (fp_of_dormant_zombie (proc_addr k) with "Hdorm")
       as (Vc pidz) "(Hrest & Hpt & Htf)".
-    iApply (Freeproc.wp_freeproc_sconf γa R1 k γk Vc pidz ZOMBIE ch
+    iApply (Freeproc.wp_freeproc_sconf γp γa R1 k γk Vc pidz ZOMBIE ch
               (Some (pv_upt Vc)) (Some (ud_tfp (pv_upt Vc), pv_tf Vc))
               (trap_res eb + (K - 10))%nat eb pme 2%nat
               ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
-              ltac:(pose proof (kw_K44 K HK); lia) kw_ilvl2 HR1a0 Hfresh_kmem
-              with "Hcg Hown Htext Hpc [Htokk Hstate Hpsg Hchan Hpub] Hrest Hpt Htf Henv").
+              ltac:(pose proof (kw_K44 K HK); lia) Hk kw_ilvl2 HR1a0 Hfresh_nextpid
+              with "Hcg Hown Htext Hpc Hplk [Htokk Hstate Hpsg Hchan Hpub] Hrest Hpt Htf Henv").
     all: try lkbelow.
     { rewrite /proc_held. iFrame "Htokk Hstate Hpsg Hchan Hpub". }
     iApply wp_next_off_intro.
@@ -1421,7 +1425,7 @@ Section ProofKwait.
     iEval (rewrite Hp6c) in "Hpc".
     (* ---- +0x6c jal ra,release : the child's lock ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KW + 0x6c)) Rra
-              (mword_of_int 2091616 : mword 21) R2 (trap_res eb + (K - 10))%nat false
+              (mword_of_int 2091564 : mword 21) R2 (trap_res eb + (K - 10))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_6c with "Htext"). }
@@ -1431,7 +1435,7 @@ Section ProofKwait.
     change (<[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KW + 0x6c) : mword 64) 4)]> R2) with R3.
     assert (Hjr1 : add_vec (mword_of_int (KW + 0x6c) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2091616 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2091564 : mword 21))
                    = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjr1) in "Hpc".
@@ -1491,16 +1495,16 @@ Section ProofKwait.
     iEval (rewrite Hp74) in "Hpc".
     (* ---- +0x74 addi a0,a0,382 : a0 := &wait_lock ---- *)
     assert (HrgR4 : rget (CID := CIDp) R4 Ra0 = R4 !!! Regidx Ra0) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0x74)) Ra0 Ra0 (mword_of_int 490 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0x74)) Ra0 Ra0 (mword_of_int 390 : mword 12)
               R4 (trap_res eb + (K - 10))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kwi_74 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite HrgR4) in "Hcg".
     set (R5 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 490 : mword 12)))]> R4).
+                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 390 : mword 12)))]> R4).
     change (<[Regidx Ra0 := regval_into_reg
-                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 490 : mword 12)))]> R4) with R5.
+                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 390 : mword 12)))]> R4) with R5.
     assert (HR5a0 : R5 !!! Regidx Ra0 = wait_lock_addr).
     { rewrite /R5 upd_eq /R4 upd_eq /wait_lock_addr. apply bv_eq; vm_compute; reflexivity. }
     assert (HR5sp : R5 !!! Regidx csp_rs1 = spr).
@@ -1515,7 +1519,7 @@ Section ProofKwait.
     iEval (rewrite Hp78) in "Hpc".
     (* ---- +0x78 jal ra,release : wait_lock, level 1 -> 0 ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KW + 0x78)) Rra
-              (mword_of_int 2091604 : mword 21) R5 (trap_res eb + (K - 10))%nat false
+              (mword_of_int 2091552 : mword 21) R5 (trap_res eb + (K - 10))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_78 with "Htext"). }
@@ -1525,7 +1529,7 @@ Section ProofKwait.
     change (<[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KW + 0x78) : mword 64) 4)]> R5) with R6.
     assert (Hjr2 : add_vec (mword_of_int (KW + 0x78) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2091604 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2091552 : mword 21))
                    = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjr2) in "Hpc".
@@ -1571,7 +1575,7 @@ Section ProofKwait.
   (* the arms differ only in whether the user page table grew.           *)
   (* ================================================================== *)
   Local Lemma kw_found `{GEN : GenId} `{CIDf : CpuId} `{XI : CurCtx}
-       (γs : list gname) (γa γf γw γk : gname)
+       (γs : list gname) (γa γp γf γw γk : gname)
       (mm Mf : regfile) (pme addr : mword 64) (k K : nat) (eb : bool)
       (pid : mword 32) (U : ustate) (ch : mword 64) (ps : list (mword 64)) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1594,6 +1598,7 @@ Section ProofKwait.
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x40)) -∗
     kalloc_env γa None -∗
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     is_lock γk (proc_addr k) "proc"%string (proc_lock_pay γs γk (proc_addr k)) -∗
     locked γk CIDf -∗
     p_state (proc_addr k) ↦₄ ZOMBIE -∗
@@ -1630,7 +1635,7 @@ Section ProofKwait.
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hk Hsp Hs1 Hs2 Hs7 Hcs Hbelow.
-    iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hlkk Htokk Hstate Hpsg Hchan Hpub
+    iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hplk #Hlkk Htokk Hstate Hpsg Hchan Hpub
              Hdorm Hpark #Hmk #Hlk Htok Hps Hpriv Hframe Hcont".
     iDestruct "Hpub" as (kl xs pidc) "(Hkilled & Hxstate & Hpidhalf)".
     (* ---- +0x40 lw s3,48(s1) : pid = pp->pid ---- *)
@@ -1640,7 +1645,7 @@ Section ProofKwait.
       apply kw_pid_off. }
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KW + 0x40)) Rs3 Rs1
               (mword_of_int 48 : mword 12) Mf (trap_res eb + (K - 10))%nat pidc false
-              (dqm := DfracOwn (1/2))
+              (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Hpidhalf]").
     { iApply (kwi_40 with "Htext"). }
@@ -1677,9 +1682,9 @@ Section ProofKwait.
       iEval (rewrite Htgt60) in "Hpc".
       iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
       { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
-      iApply (kw_reap γs γa γw γk mm F0 pme k K eb pidc ch ps lks
+      iApply (kw_reap γs γa γp γw γk mm F0 pme k K eb pidc ch ps lks
                 HK Hk HF0sp HF0s1 HF0s3 HF0cs Hbelow
-                with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
+                with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hplk Hlkk Htokk Hstate Hpsg Hchan
                       Hpub Hdorm Hpark Hmk Hlk Htok Hps Hframe [Hcont Hpriv]").
       iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
@@ -1861,7 +1866,7 @@ Section ProofKwait.
       iEval (rewrite Hp58) in "Hpc".
       (* +0x58 jal ra,copyout *)
       iApply (wp_jal_s_sconf (mword_of_int (KW + 0x58)) Rra
-                (mword_of_int 2093894 : mword 21) F5 (trap_res eb + (K - 10))%nat false
+                (mword_of_int 2093842 : mword 21) F5 (trap_res eb + (K - 10))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kwi_58 with "Htext"). }
@@ -1871,7 +1876,7 @@ Section ProofKwait.
       change (<[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KW + 0x58) : mword 64) 4)]> F5) with F6.
       assert (Hjco : add_vec (mword_of_int (KW + 0x58) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2093894 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2093842 : mword 21))
                      = mword_of_int KernelSyms.copyout)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjco) in "Hpc".
@@ -1988,9 +1993,9 @@ Section ProofKwait.
                        = mword_of_int (KW + 0x60))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp60) in "Hpc".
-        iApply (kw_reap γs γa γw γk mm mco pme k K eb pidc ch ps lks
+        iApply (kw_reap γs γa γp γw γk mm mco pme k K eb pidc ch ps lks
                   HK Hk Hcosp Hcos1 Hcos3 Hcocs Hbelow
-                  with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
+                  with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hplk Hlkk Htokk Hstate Hpsg Hchan
                         Hpub Hdorm Hpark Hmk Hlk Htok Hps Hframe [Hcont Hpriv]").
         iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
@@ -2020,7 +2025,7 @@ Section ProofKwait.
   (* (fdalloc's rule).                                                    *)
   (* ================================================================== *)
   Local Lemma kw_scan `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
-      (γs : list gname) (γa γf γw : gname)
+      (γs : list gname) (γa γp γf γw : gname)
       (mm : regfile) (pme addr : mword 64) (K : nat) (eb : bool)
       (pid : mword 32) (U : ustate) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -2034,6 +2039,7 @@ Section ProofKwait.
     procs_inv γs -∗
     kernel_text -∗
     kalloc_env γa None -∗
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
     ∀ (kk : nat) (M : regfile) (hv : mword 64) (ps : list (mword 64)),
       ⌜(kk < NPROC)%nat⌝ -∗ ⌜kw_scan_regs M mm pme addr kk⌝ -∗
@@ -2067,7 +2073,7 @@ Section ProofKwait.
       by (vm_compute; lia).
     assert (Hfresh_proc : locks_below ({["wait_lock"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Hwl_lt_proc | lkbelow]. }
-    iIntros "#Hpinv #Htext #Henv #Hlk".
+    iIntros "#Hpinv #Htext #Henv #Hplk #Hlk".
     iAssert (∀ (fuel kk : nat) (M : regfile) (hv : mword 64) (ps : list (mword 64)),
                ⌜(NPROC - kk <= fuel)%nat⌝ -∗ ⌜(kk < NPROC)%nat⌝ -∗
                ⌜kw_scan_regs M mm pme addr kk⌝ -∗ ⌜M !!! Regidx Ra4 = hv⌝ -∗
@@ -2267,7 +2273,7 @@ Section ProofKwait.
         iEval (rewrite Hpba) in "Hpc".
         (* +0xba jal ra,acquire *)
         iApply (wp_jal_s_sconf (mword_of_int (KW + 0xba)) Rra
-                  (mword_of_int 2091402 : mword 21) S1 (trap_res eb + (K - 10))%nat false
+                  (mword_of_int 2091350 : mword 21) S1 (trap_res eb + (K - 10))%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kwi_ba with "Htext"). }
@@ -2277,7 +2283,7 @@ Section ProofKwait.
         change (<[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KW + 0xba) : mword 64) 4)]> S1) with S2.
         assert (Hjacq : add_vec (mword_of_int (KW + 0xba) : mword 64)
-                          (sign_extend' 64 (mword_of_int 2091402 : mword 21))
+                          (sign_extend' 64 (mword_of_int 2091350 : mword 21))
                         = mword_of_int KernelSyms.acquire)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjacq) in "Hpc".
@@ -2362,10 +2368,10 @@ Section ProofKwait.
             [rewrite unclaimed_ZOMBIE; iFrame "Hpsg"|].
           (* [kw_exit_fn] IS [kw_found]'s plain continuation now that it
              carries no frame, so there is nothing to cash in here. *)
-          iApply (kw_found γs γa γf γw γk mm S3 pme addr kk K eb pid U ch ps
+          iApply (kw_found γs γa γp γf γw γk mm S3 pme addr kk K eb pid U ch ps
                     ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
                     HK Hk HS3sp HS3s1 HS3s2 HS3s7 HS3cs Hbelow
-                    with "Hcg Hown Hpay1 Hpay Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
+                    with "Hcg Hown Hpay1 Hpay Htext Hpc Henv Hplk Hlkk Htokk Hstate Hpsg Hchan
                           Hpub Hdorm Hpark Hmk Hlk Htok Hps Hpriv Hframe Hqfn").
         * (* ===== not a ZOMBIE: release, set havekids, continue ===== *)
           iApply (wp_beq_fall_s_sconf (mword_of_int (KW + 0xc0))
@@ -2399,7 +2405,7 @@ Section ProofKwait.
           iEval (rewrite Hpc6) in "Hpc".
           (* +0xc6 jal ra,release *)
           iApply (wp_jal_s_sconf (mword_of_int (KW + 0xc6)) Rra
-                    (mword_of_int 2091526 : mword 21) S4 (trap_res eb + (K - 10))%nat false
+                    (mword_of_int 2091474 : mword 21) S4 (trap_res eb + (K - 10))%nat false
                     ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kwi_c6 with "Htext"). }
@@ -2409,7 +2415,7 @@ Section ProofKwait.
           change (<[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (KW + 0xc6) : mword 64) 4)]> S4) with S5.
           assert (Hjrel : add_vec (mword_of_int (KW + 0xc6) : mword 64)
-                            (sign_extend' 64 (mword_of_int 2091526 : mword 21))
+                            (sign_extend' 64 (mword_of_int 2091474 : mword 21))
                           = mword_of_int KernelSyms.release)
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hjrel) in "Hpc".
@@ -2780,7 +2786,7 @@ Section ProofKwait.
         iEval (rewrite Hpe0) in "Hpc".
         (* +0xe0 jal ra,release *)
         iApply (wp_jal_s_sconf (mword_of_int (KW + 0xe0)) Rra
-                  (mword_of_int 2091500 : mword 21) T4 (trap_res eb + (K - 10))%nat false
+                  (mword_of_int 2091448 : mword 21) T4 (trap_res eb + (K - 10))%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kwi_e0 with "Htext"). }
@@ -2790,7 +2796,7 @@ Section ProofKwait.
         change (<[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KW + 0xe0) : mword 64) 4)]> T4) with T5.
         assert (Hjrl : add_vec (mword_of_int (KW + 0xe0) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2091500 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2091448 : mword 21))
                        = mword_of_int KernelSyms.release) by pcstep.
         iEval (rewrite Hjrl) in "Hpc".
         assert (HT5ra : T5 !!! Regidx Rra
@@ -2879,7 +2885,7 @@ Section ProofKwait.
         iEval (rewrite Hpea) in "Hpc".
         (* +0xea jal ra,acquire *)
         iApply (wp_jal_s_sconf (mword_of_int (KW + 0xea)) Rra
-                  (mword_of_int 2091354 : mword 21) T7 (K - 10)%nat eb
+                  (mword_of_int 2091302 : mword 21) T7 (K - 10)%nat eb
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kwi_ea with "Htext"). }
@@ -2889,7 +2895,7 @@ Section ProofKwait.
         change (<[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KW + 0xea) : mword 64) 4)]> T7) with T8.
         assert (Hjaq : add_vec (mword_of_int (KW + 0xea) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2091354 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2091302 : mword 21))
                        = mword_of_int KernelSyms.acquire) by pcstep.
         iEval (rewrite Hjaq) in "Hpc".
         assert (HT8ra : T8 !!! Regidx Rra
@@ -2935,7 +2941,7 @@ Section ProofKwait.
   (* pays for the IH's later.                                            *)
   (* ================================================================== *)
   Local Lemma kw_round_body `{GEN : GenId} `{CIDy : CpuId} `{XI : CurCtx} (CID0 : CPU)
-      (γs : list gname) (γa γf γw γl : gname) (jj : nat)
+      (γs : list gname) (γa γp γf γw γl : gname) (jj : nat)
       (mm M : regfile) (pme addr : mword 64) (K : nat) (eb : bool)
       (pid : mword 32) (U : ustate) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -2952,6 +2958,7 @@ Section ProofKwait.
     locks_below lks "wait_lock" ->
     kernel_text -∗ procs_inv γs -∗
     kalloc_env γa None -∗
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
     ▷ kw_round CID0 γf γw jj mm pme addr K eb pid U lks -∗
     kw_exit_fn CIDy γf mm pme addr K eb pid U lks -∗
@@ -2964,7 +2971,7 @@ Section ProofKwait.
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 HK Heb Hjj Hgl Hlen Hpme Hanch Hregs Hbelow.
-    iIntros "#Htext #Hpinv #Henv #Hlk IH Hqfn Hcg Hown Hpay Hpc
+    iIntros "#Htext #Hpinv #Henv #Hplk #Hlk IH Hqfn Hcg Hown Hpay Hpc
              Htok Hres Hpriv Hframe".
     iDestruct "Hres" as (ps) "Hps".
     (* +0xe0 c.li a4,0 : havekids = 0 *)
@@ -3007,7 +3014,7 @@ Section ProofKwait.
     (* +0xe6 addi s1,s1,1316 : pp = &proc[0] *)
     assert (Hrge2 : rget (CID := CIDy) D1 Rs1 = D1 !!! Regidx Rs1) by (rgne; reflexivity).
     iApply (wp_addi4_s_sconf (mword_of_int (KW + 0xf4)) Rs1 Rs1
-              (mword_of_int 1410 : mword 12) D1 (trap_res eb + (K - 10))%nat false
+              (mword_of_int 1310 : mword 12) D1 (trap_res eb + (K - 10))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kwi_f4 with "Htext"). }
@@ -3015,10 +3022,10 @@ Section ProofKwait.
     iEval (rewrite Hrge2) in "Hcg".
     set (D2 := <[Regidx Rs1 := regval_into_reg
                   (add_vec (D1 !!! Regidx Rs1)
-                     (sign_extend' 64 (mword_of_int 1410 : mword 12)))]> D1).
+                     (sign_extend' 64 (mword_of_int 1310 : mword 12)))]> D1).
     change (<[Regidx Rs1 := regval_into_reg
                   (add_vec (D1 !!! Regidx Rs1)
-                     (sign_extend' 64 (mword_of_int 1410 : mword 12)))]> D1) with D2.
+                     (sign_extend' 64 (mword_of_int 1310 : mword 12)))]> D1) with D2.
     assert (HD2s1 : D2 !!! Regidx Rs1 = proc_addr 0).
     { rewrite /D2 upd_eq /D1 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HD2a4 : D2 !!! Regidx Ra4 = (mword_of_int 0 : mword 64))
@@ -3061,8 +3068,8 @@ Section ProofKwait.
                 pid U hx px lks HK Heb Hjj Hgl Hpme Hanch Hrx Hax Hbelow
                 with "Htext Hpinv Hlk IH Hqfnx Hcgx Hownx Hpayx Hpcx
                       Htokx Hpsx Hprivx Hframex"). }
-    iDestruct (kw_scan (CID0 := CIDy)  γs γa γf γw mm pme addr K eb pid U lks
-                 HK Hlen Hbelow with "Hpinv Htext Henv Hlk") as "Hscan".
+    iDestruct (kw_scan (CID0 := CIDy)  γs γa γp γf γw mm pme addr K eb pid U lks
+                 HK Hlen Hbelow with "Hpinv Htext Henv Hplk Hlk") as "Hscan".
     iApply ("Hscan" $! 0%nat D2 (mword_of_int 0 : mword 64) ps
               with "[%] [%] [%] Hqfn Hqce Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe").
     { unfold NPROC; lia. }
@@ -3097,10 +3104,10 @@ Section ProofKwaitMain.
   Notation Rs7 := (mword_of_int 23 : mword 5).
 
   Lemma wp_kwait_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
+      (γa γp γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (lks : gset string) :
-    wp_kwait_sconf_body γa γf γw γs j γl m av eb b pid U lks.
+    wp_kwait_sconf_body γa γp γf γw γs j γl m av eb b pid U lks.
   Proof.
     cbv beta delta [wp_kwait_sconf_body].
     (* [Hbelow] is SpecKwait.v's own new LAST Coq premise -- see
@@ -3110,7 +3117,7 @@ Section ProofKwaitMain.
        "wait_lock" (10) bound by [locks_below_mono]/
        [locks_below_union_singleton] at each nested call. *)
     intros pcE pj ret_tgt addr Hj Hgl Hav Heb Hbelow.
-    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hlk #Henv Hpriv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hlk #Henv #Hplk Hpriv Hcont".
     (* LEVEL 0 WITH AN ENABLED BASE FORCES THE ENABLED INDEX (sys_pause's
        rule): the [b <> eb] instances of this contract are vacuous. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbm.
@@ -3320,7 +3327,7 @@ Section ProofKwaitMain.
     iEval (rewrite Hp18) in "Hpc".
     (* +0x18 jal ra,myproc *)
     iApply (wp_jal_s_sconf (mword_of_int (KW + 0x18)) Rra
-              (mword_of_int 2094924 : mword 21) P2 (av - 10)%nat eb
+              (mword_of_int 2094872 : mword 21) P2 (av - 10)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_18 with "Htext"). }
@@ -3330,7 +3337,7 @@ Section ProofKwaitMain.
     change (<[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KW + 0x18) : mword 64) 4)]> P2) with P3.
     assert (Hjmy : add_vec (mword_of_int (KW + 0x18) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2094924 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2094872 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcstep.
     iEval (rewrite Hjmy) in "Hpc".
     assert (HP3ra : P3 !!! Regidx Rra = add_vec_int (mword_of_int (KW + 0x18) : mword 64) 4)
@@ -3395,16 +3402,16 @@ Section ProofKwaitMain.
     assert (Hp22 : add_vec_int (mword_of_int (KW + 0x1e) : mword 64) 4 = mword_of_int (KW + 0x22)) by pcstep.
     iEval (rewrite Hp22) in "Hpc".
     assert (Hrg22 : rget (CID := CID16) P5 Ra0 = P5 !!! Regidx Ra0) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0x22)) Ra0 Ra0 (mword_of_int 572 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0x22)) Ra0 Ra0 (mword_of_int 472 : mword 12)
               P5 (av - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kwi_22 with "Htext"). }
     iIntros (CID17 Hs17) "Hcg Hpc".
     iEval (rewrite Hrg22) in "Hcg".
     set (P6 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (P5 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 572 : mword 12)))]> P5).
+                  (add_vec (P5 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 472 : mword 12)))]> P5).
     change (<[Regidx Ra0 := regval_into_reg
-                  (add_vec (P5 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 572 : mword 12)))]> P5) with P6.
+                  (add_vec (P5 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 472 : mword 12)))]> P5) with P6.
     assert (HP6a0 : P6 !!! Regidx Ra0 = wait_lock_addr).
     { rewrite /P6 upd_eq /P5 upd_eq /wait_lock_addr. apply bv_eq; vm_compute; reflexivity. }
     assert (HP6s2 : P6 !!! Regidx Rs2 = pj).
@@ -3422,7 +3429,7 @@ Section ProofKwaitMain.
     iEval (rewrite Hp26) in "Hpc".
     (* +0x26 jal ra,acquire : take wait_lock *)
     iApply (wp_jal_s_sconf (mword_of_int (KW + 0x26)) Rra
-              (mword_of_int 2091550 : mword 21) P6 (av - 10)%nat eb
+              (mword_of_int 2091498 : mword 21) P6 (av - 10)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_26 with "Htext"). }
@@ -3432,7 +3439,7 @@ Section ProofKwaitMain.
     change (<[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KW + 0x26) : mword 64) 4)]> P6) with P7.
     assert (Hjacq : add_vec (mword_of_int (KW + 0x26) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2091550 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2091498 : mword 21))
                     = mword_of_int KernelSyms.acquire) by pcstep.
     iEval (rewrite Hjacq) in "Hpc".
     assert (HP7ra : P7 !!! Regidx Rra = add_vec_int (mword_of_int (KW + 0x26) : mword 64) 4)
@@ -3505,16 +3512,16 @@ Section ProofKwaitMain.
     assert (Hp32 : add_vec_int (mword_of_int (KW + 0x2e) : mword 64) 4 = mword_of_int (KW + 0x32)) by pcstep.
     iEval (rewrite Hp32) in "Hpc".
     assert (Hrg32 : rget (CID := CID19) Q2 Rs3 = Q2 !!! Regidx Rs3) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0x32)) Rs3 Rs3 (mword_of_int 68 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0x32)) Rs3 Rs3 (mword_of_int 4064 : mword 12)
               Q2 (trap_res eb + (av - 10))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kwi_32 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hrg32) in "Hcg".
     set (Q3 := <[Regidx Rs3 := regval_into_reg
-                  (add_vec (Q2 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 68 : mword 12)))]> Q2).
+                  (add_vec (Q2 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 4064 : mword 12)))]> Q2).
     change (<[Regidx Rs3 := regval_into_reg
-                  (add_vec (Q2 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 68 : mword 12)))]> Q2) with Q3.
+                  (add_vec (Q2 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 4064 : mword 12)))]> Q2) with Q3.
     assert (HQ3s3 : Q3 !!! Regidx Rs3 = proc_addr NPROC).
     { rewrite /Q3 upd_eq /Q2 upd_eq. rewrite proc_addr_acur /pacur.
       apply bv_eq; vm_compute; reflexivity. }
@@ -3535,16 +3542,16 @@ Section ProofKwaitMain.
     assert (Hp3a : add_vec_int (mword_of_int (KW + 0x36) : mword 64) 4 = mword_of_int (KW + 0x3a)) by pcstep.
     iEval (rewrite Hp3a) in "Hpc".
     assert (Hrg3a : rget (CID := CID19) Q4 Rs6 = Q4 !!! Regidx Rs6) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0x3a)) Rs6 Rs6 (mword_of_int 548 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KW + 0x3a)) Rs6 Rs6 (mword_of_int 448 : mword 12)
               Q4 (trap_res eb + (av - 10))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kwi_3a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hrg3a) in "Hcg".
     set (Q5 := <[Regidx Rs6 := regval_into_reg
-                  (add_vec (Q4 !!! Regidx Rs6) (sign_extend' 64 (mword_of_int 548 : mword 12)))]> Q4).
+                  (add_vec (Q4 !!! Regidx Rs6) (sign_extend' 64 (mword_of_int 448 : mword 12)))]> Q4).
     change (<[Regidx Rs6 := regval_into_reg
-                  (add_vec (Q4 !!! Regidx Rs6) (sign_extend' 64 (mword_of_int 548 : mword 12)))]> Q4) with Q5.
+                  (add_vec (Q4 !!! Regidx Rs6) (sign_extend' 64 (mword_of_int 448 : mword 12)))]> Q4) with Q5.
     assert (HQ5s6 : Q5 !!! Regidx Rs6 = wait_lock_addr).
     { rewrite /Q5 upd_eq /Q4 upd_eq /wait_lock_addr. apply bv_eq; vm_compute; reflexivity. }
     (* the round's register invariant, at the loop head *)
@@ -3603,9 +3610,9 @@ Section ProofKwaitMain.
     iAssert (kw_round CID γf γw j m pj adr av eb pid U lks) with "[]" as "Hround".
     { iLöb as "IH". rewrite /kw_round.
       iIntros (CIDz Hsz N) "%Hrz Hcgz Hownz Hpayz Hpcz Htokz Hresz Hprivz Hframez Hqfnz".
-      iApply (kw_round_body (CIDy := CIDz) CID γs γa γf γw γl j m N pj adr av eb pid U lks
+      iApply (kw_round_body (CIDy := CIDz) CID γs γa γp γf γw γl j m N pj adr av eb pid U lks
                 Hav Heb Hj Hgl Hlen Hpjv Hsz Hrz Hbelow
-                with "Htext Hpinv Henv Hlk IH Hqfnz Hcgz Hownz Hpayz Hpcz
+                with "Htext Hpinv Henv Hplk Hlk IH Hqfnz Hcgz Hownz Hpayz Hpcz
                       Htokz Hresz Hprivz Hframez"). }
     rewrite /kw_round.
     (* the loop's own index is the literal [true] (sleep's crossing), while

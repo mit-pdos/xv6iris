@@ -754,13 +754,13 @@ Section ProofSysUnlinkW2.
     iEval (rewrite Hpp38) in "Hpc".
     (* ===== +0x38 addi a1,a1,1656 -- the "." literal ===== *)
     iApply (wp_addi4_s_sconf (CID := CID3) (mword_of_int (SU + 0x38)) Ra1 Ra1
-              (mword_of_int 1554 : mword 12) R1 (K - 30)%nat b
+              (mword_of_int 1502 : mword 12) R1 (K - 30)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (suli_038 with "Htext"). }
     iIntros (CID4 Hq4) "Hcg Hpc".
     set (R2 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (R1 !!! Regidx Ra1)
-                     (sign_extend' 64 (mword_of_int 1554 : mword 12)))]> R1).
+                     (sign_extend' 64 (mword_of_int 1502 : mword 12)))]> R1).
     assert (HR2a1 : (R2 !!! Regidx Ra1 : mword 64)
                     = (mword_of_int su_dot_addr : mword 64)).
     { etransitivity; [ rewrite /R2; apply upd_eq |].
@@ -922,13 +922,13 @@ Section ProofSysUnlinkW2.
       iEval (rewrite Hpp4c) in "Hpc".
       (* ===== +0x4c addi a1,a1,1644 -- the ".." literal ===== *)
       iApply (wp_addi4_s_sconf (CID := CID9) (mword_of_int (SU + 0x4c)) Ra1 Ra1
-                (mword_of_int 1542 : mword 12) R5 (K - 30)%nat b
+                (mword_of_int 1490 : mword 12) R5 (K - 30)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
       { iApply (suli_04c with "Htext"). }
       iIntros (CID10 Hq10) "Hcg Hpc".
       set (R6 := <[Regidx Ra1 := regval_into_reg
                     (add_vec (R5 !!! Regidx Ra1)
-                       (sign_extend' 64 (mword_of_int 1542 : mword 12)))]> R5).
+                       (sign_extend' 64 (mword_of_int 1490 : mword 12)))]> R5).
       assert (HR6a1 : (R6 !!! Regidx Ra1 : mword 64)
                       = (mword_of_int su_dotdot_addr : mword 64)).
       { etransitivity; [ rewrite /R6; apply upd_eq |].

@@ -16,7 +16,9 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode02.
 Require Import KernelDecode04.
+Require Import KernelDecode06.
 Require Import KernelDecode08.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
@@ -24,21 +26,17 @@ Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
-Require Import KernelDecode16.
-Require Import KernelDecode17.
 Require Import KernelDecode19.
-Require Import KernelDecode20.
 Require Import KernelDecode21.
+Require Import KernelDecode25.
 Require Import KernelDecode26.
-Require Import KernelDecode31.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeSysUptime.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- sys_uptime @ KernelSyms.sys_uptime, 60 bytes ---- *)
 
@@ -66,21 +64,21 @@ Section CodeSysUptime.
   Proof. mk_base (KernelSyms.sys_uptime + 0xa) (mword_of_int 0x00015517 : mword 32)
     (mword_of_int (KernelSyms.sys_uptime + 0xa) : mword 64) (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00015517. Qed.
 
-  Lemma sui_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0xe) : mword 64) false (ITYPE (mword_of_int 1842 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.sys_uptime + 0xe) (mword_of_int 0x73250513 : mword 32)
-    (mword_of_int (KernelSyms.sys_uptime + 0xe) : mword 64) (ITYPE (mword_of_int 1842 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_73250513. Qed.
+  Lemma sui_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0xe) : mword 64) false (ITYPE (mword_of_int 1742 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.sys_uptime + 0xe) (mword_of_int 0x6ce50513 : mword 32)
+    (mword_of_int (KernelSyms.sys_uptime + 0xe) : mword 64) (ITYPE (mword_of_int 1742 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_6ce50513. Qed.
 
-  Lemma sui_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x12) : mword 64) false (JAL (mword_of_int 2089212 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_uptime + 0x12) (mword_of_int 0x8fcfe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_uptime + 0x12) : mword 64) (JAL (mword_of_int 2089212 : mword 21, Regidx (mword_of_int 1))) kd_8fcfe0ef. Qed.
+  Lemma sui_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x12) : mword 64) false (JAL (mword_of_int 2089160 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_uptime + 0x12) (mword_of_int 0x8c8fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_uptime + 0x12) : mword 64) (JAL (mword_of_int 2089160 : mword 21, Regidx (mword_of_int 1))) kd_8c8fe0ef. Qed.
 
   Lemma sui_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x16) : mword 64) false (UTYPE (mword_of_int 7 : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (KernelSyms.sys_uptime + 0x16) (mword_of_int 0x00007797 : mword 32)
     (mword_of_int (KernelSyms.sys_uptime + 0x16) : mword 64) (UTYPE (mword_of_int 7 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00007797. Qed.
 
-  Lemma sui_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x1a) : mword 64) false (LOAD (mword_of_int 2038 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (KernelSyms.sys_uptime + 0x1a) (mword_of_int 0x7f67a783 : mword 32)
-    (mword_of_int (KernelSyms.sys_uptime + 0x1a) : mword 64) (LOAD (mword_of_int 2038 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_7f67a783. Qed.
+  Lemma sui_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x1a) : mword 64) false (LOAD (mword_of_int 1938 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (KernelSyms.sys_uptime + 0x1a) (mword_of_int 0x7927a783 : mword 32)
+    (mword_of_int (KernelSyms.sys_uptime + 0x1a) : mword 64) (LOAD (mword_of_int 1938 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_7927a783. Qed.
 
   Lemma sui_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.sys_uptime + 0x1e) (mword_of_int 0x84be : mword 16)
@@ -90,13 +88,13 @@ Section CodeSysUptime.
   Proof. mk_base (KernelSyms.sys_uptime + 0x20) (mword_of_int 0x00015517 : mword 32)
     (mword_of_int (KernelSyms.sys_uptime + 0x20) : mword 64) (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00015517. Qed.
 
-  Lemma sui_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x24) : mword 64) false (ITYPE (mword_of_int 1820 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.sys_uptime + 0x24) (mword_of_int 0x71c50513 : mword 32)
-    (mword_of_int (KernelSyms.sys_uptime + 0x24) : mword 64) (ITYPE (mword_of_int 1820 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_71c50513. Qed.
+  Lemma sui_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x24) : mword 64) false (ITYPE (mword_of_int 1720 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.sys_uptime + 0x24) (mword_of_int 0x6b850513 : mword 32)
+    (mword_of_int (KernelSyms.sys_uptime + 0x24) : mword 64) (ITYPE (mword_of_int 1720 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_6b850513. Qed.
 
-  Lemma sui_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x28) : mword 64) false (JAL (mword_of_int 2089326 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_uptime + 0x28) (mword_of_int 0x96efe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_uptime + 0x28) : mword 64) (JAL (mword_of_int 2089326 : mword 21, Regidx (mword_of_int 1))) kd_96efe0ef. Qed.
+  Lemma sui_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x28) : mword 64) false (JAL (mword_of_int 2089274 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_uptime + 0x28) (mword_of_int 0x93afe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_uptime + 0x28) : mword 64) (JAL (mword_of_int 2089274 : mword 21, Regidx (mword_of_int 1))) kd_93afe0ef. Qed.
 
   Lemma sui_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_uptime + 0x2c) : mword 64) false (SHIFTIOP (mword_of_int 32 : mword 6, Regidx (mword_of_int 9), Regidx (mword_of_int 10), SLLI)).
   Proof. mk_base (KernelSyms.sys_uptime + 0x2c) (mword_of_int 0x02049513 : mword 32)

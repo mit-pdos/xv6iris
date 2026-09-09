@@ -61,6 +61,7 @@ Require Import ProcInv.
 Require Import KvmSpec.
 Require Import SchedCtx.
 Require Import SpecFreeproc.
+Require Import PidLock.   (* freeproc now takes <pid_lock> *)
 Require Import SpecRelease.
 Require Import CodeKfork.
 Require Import ProofKforkParts.
@@ -115,7 +116,7 @@ Section KforkB1Proof.
      GENERIC allocator gname, so the pair stays universally quantified here
      and this file depends on no file-system configuration. *)
   Lemma kfk_exit_uvmcopy
-      (γs : list gname) (γa : gname) (γk : gname * gname) (γl : gname)
+      (γs : list gname) (γa γp : gname) (γk : gname * gname) (γl : gname)
       (j : nat) (ch : mword 64)
       (V : pprivate) (pid : mword 32) (P : uptd) (ws : list (mword 64))
       (m Mt : regfile) (K : nat)
@@ -123,6 +124,8 @@ Section KforkB1Proof.
       (pme : mword 64) (eb b : bool) (lvl : nat) (lks : gset string) :
     (52 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+    (* a real slot -- freeproc's pid store wants it (SpecFreeproc) *)
+    (j < NPROC)%nat ->
     (* The EXIT arm, named.  This block is entered with np->lock HELD, so its
        entry index has to carry the trap reserve OF THE ARM IT WILL RETURN AT
        -- and that arm is the release's [match lvl with O => eb | S _ => false
@@ -172,6 +175,8 @@ Section KforkB1Proof.
     proc_held cpu_id j γl USED ch -∗
     hart_at_any (proc_addr j) -∗
     is_lock γl (proc_addr j) "proc"%string (proc_lock_pay γs γl (proc_addr j)) -∗
+    (* <pid_lock>, for freeproc's [p->pid = 0] (upstream ded23f2) *)
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     kalloc_env_at γa γk None -∗
     fp_rest (proc_addr j) V pid -∗
     fp_pt (proc_addr j) (pv_sz V) (Some P) -∗
@@ -186,9 +191,9 @@ Section KforkB1Proof.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlvl Hb Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hmts4 Hthr Hfresh.
+    intros HK Hlvl Hj Hb Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hmts4 Hthr Hfresh.
     iIntros "Hcg Hcpu Hpay #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-              Hheld Hhaa #Hislock #Henv Hfprest Hfppt Hfptf Hcont".
+              Hheld Hhaa #Hislock #Hpidlk #Henv Hfprest Hfppt Hfptf Hcont".
     (* freeproc is stated at the ANONYMOUS bundle ([kalloc_env], count
        existentially quantified), so hand it the projection; both forms are
        persistent at [None], so "Henv" survives for our own postcondition. *)
@@ -208,10 +213,10 @@ Section KforkB1Proof.
     iEval (rewrite Hpp7e) in "Hpc".
     (* ---- +0x7e: jal ra,freeproc ---- *)
     assert (Htgt7e : add_vec (mword_of_int (KF + 0x7e) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096626 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096512 : mword 21))
                      = mword_of_int KernelSyms.freeproc)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x7e)) Rra (mword_of_int 2096626 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x7e)) Rra (mword_of_int 2096512 : mword 21)
               T0 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Htgt7e; vm_compute; reflexivity)
@@ -226,10 +231,10 @@ Section KforkB1Proof.
     assert (HT1a0 : T1 !!! Regidx Ra0 = proc_addr j)
       by (rewrite /T1 upd_ne; [exact HT0a0 | vm_compute; discriminate]).
     (* ---- freeproc ---- *)
-    iApply (FP.wp_freeproc_sconf γa T1 j γl V pid USED ch (Some P) (Some (ud_tfp P, ws))
+    iApply (FP.wp_freeproc_sconf γp γa T1 j γl V pid USED ch (Some P) (Some (ud_tfp P, ws))
               (trap_res b + (K - 8))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
-              ltac:(pose proof (kfkb1_K44 K HK); lia) (kfkb1_lvlS lvl Hlvl) HT1a0
-              with "Hcg Hcpu Htext Hpc Hheld Hfprest Hfppt Hfptf Henvb").
+              ltac:(pose proof (kfkb1_K44 K HK); lia) Hj (kfkb1_lvlS lvl Hlvl) HT1a0
+              with "Hcg Hcpu Htext Hpc Hpidlk Hheld Hfprest Hfppt Hfptf Henvb").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mfp) "Hcg Hcpu Hpc %Hcsfp Hheld Hdorm".
@@ -268,10 +273,10 @@ Section KforkB1Proof.
     iEval (rewrite Hpp84) in "Hpc".
     (* ---- +0x84: jal ra,release ---- *)
     assert (Htgt84 : add_vec (mword_of_int (KF + 0x84) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2092916 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2092864 : mword 21))
                      = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x84)) Rra (mword_of_int 2092916 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x84)) Rra (mword_of_int 2092864 : mword 21)
               T2 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Htgt84; vm_compute; reflexivity)

@@ -21,17 +21,15 @@ Require Import KernelDecode07.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
-Require Import KernelDecode16.
 Require Import KernelDecode27.
 Require Import ExecCommon.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeEntry.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- _entry @ KernelSyms._entry, 26 bytes ---- *)
 
@@ -39,9 +37,9 @@ Section CodeEntry.
   Proof. mk_base KernelSyms._entry (mword_of_int 0x0000a117 : mword 32)
     (mword_of_int KernelSyms._entry : mword 64) (UTYPE (mword_of_int 10 : mword 20, Regidx (mword_of_int 2), AUIPC)) kd_0000a117. Qed.
 
-  Lemma eni_04 : kernel_text -∗ instr (mword_of_int (KernelSyms._entry + 0x4) : mword 64) false (LOAD (mword_of_int 648 : mword 12, Regidx (mword_of_int 2), Regidx (mword_of_int 2), false, 8)).
-  Proof. mk_base (KernelSyms._entry + 0x4) (mword_of_int 0x28813103 : mword 32)
-    (mword_of_int (KernelSyms._entry + 0x4) : mword 64) (LOAD (mword_of_int 648 : mword 12, Regidx (mword_of_int 2), Regidx (mword_of_int 2), false, 8)) kd_28813103. Qed.
+  Lemma eni_04 : kernel_text -∗ instr (mword_of_int (KernelSyms._entry + 0x4) : mword 64) false (LOAD (mword_of_int 600 : mword 12, Regidx (mword_of_int 2), Regidx (mword_of_int 2), false, 8)).
+  Proof. mk_base (KernelSyms._entry + 0x4) (mword_of_int 0x25813103 : mword 32)
+    (mword_of_int (KernelSyms._entry + 0x4) : mword 64) (LOAD (mword_of_int 600 : mword 12, Regidx (mword_of_int 2), Regidx (mword_of_int 2), false, 8)) kd_25813103. Qed.
 
   Lemma eni_08 : kernel_text -∗ instr (mword_of_int (KernelSyms._entry + 0x8) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 10), LUI)).
   Proof. mk_rvc (KernelSyms._entry + 0x8) (mword_of_int 0x6505 : mword 16)

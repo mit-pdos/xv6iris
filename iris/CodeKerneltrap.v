@@ -23,32 +23,31 @@ Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
-Require Import KernelDecode08.
+Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
+Require Import KernelDecode12.
+Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode16.
 Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
+Require Import KernelDecode20.
 Require Import KernelDecode23.
-Require Import KernelDecode24.
 Require Import KernelDecode25.
-Require Import KernelDecode26.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
 Require Import KernelDecode29.
-Require Import KernelDecode30.
 Require Import KernelDecode31.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeKerneltrap.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- kerneltrap @ KernelSyms.kerneltrap, 146 bytes ---- *)
 
@@ -172,25 +171,25 @@ Section CodeKerneltrap.
   Proof. mk_base (KernelSyms.kerneltrap + 0x4c) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.kerneltrap + 0x4c) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma kti_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x50) : mword 64) false (ITYPE (mword_of_int 3086 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kerneltrap + 0x50) (mword_of_int 0xc0e50513 : mword 32)
-    (mword_of_int (KernelSyms.kerneltrap + 0x50) : mword 64) (ITYPE (mword_of_int 3086 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c0e50513. Qed.
+  Lemma kti_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x50) : mword 64) false (ITYPE (mword_of_int 3034 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kerneltrap + 0x50) (mword_of_int 0xbda50513 : mword 32)
+    (mword_of_int (KernelSyms.kerneltrap + 0x50) : mword 64) (ITYPE (mword_of_int 3034 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_bda50513. Qed.
 
-  Lemma kti_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x54) : mword 64) false (JAL (mword_of_int 2089274 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kerneltrap + 0x54) (mword_of_int 0x93afe0ef : mword 32)
-    (mword_of_int (KernelSyms.kerneltrap + 0x54) : mword 64) (JAL (mword_of_int 2089274 : mword 21, Regidx (mword_of_int 1))) kd_93afe0ef. Qed.
+  Lemma kti_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x54) : mword 64) false (JAL (mword_of_int 2089222 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kerneltrap + 0x54) (mword_of_int 0x906fe0ef : mword 32)
+    (mword_of_int (KernelSyms.kerneltrap + 0x54) : mword 64) (JAL (mword_of_int 2089222 : mword 21, Regidx (mword_of_int 1))) kd_906fe0ef. Qed.
 
   Lemma kti_58 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x58) : mword 64) false (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.kerneltrap + 0x58) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.kerneltrap + 0x58) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma kti_5c : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x5c) : mword 64) false (ITYPE (mword_of_int 3114 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kerneltrap + 0x5c) (mword_of_int 0xc2a50513 : mword 32)
-    (mword_of_int (KernelSyms.kerneltrap + 0x5c) : mword 64) (ITYPE (mword_of_int 3114 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c2a50513. Qed.
+  Lemma kti_5c : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x5c) : mword 64) false (ITYPE (mword_of_int 3062 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kerneltrap + 0x5c) (mword_of_int 0xbf650513 : mword 32)
+    (mword_of_int (KernelSyms.kerneltrap + 0x5c) : mword 64) (ITYPE (mword_of_int 3062 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_bf650513. Qed.
 
-  Lemma kti_60 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x60) : mword 64) false (JAL (mword_of_int 2089262 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kerneltrap + 0x60) (mword_of_int 0x92efe0ef : mword 32)
-    (mword_of_int (KernelSyms.kerneltrap + 0x60) : mword 64) (JAL (mword_of_int 2089262 : mword 21, Regidx (mword_of_int 1))) kd_92efe0ef. Qed.
+  Lemma kti_60 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x60) : mword 64) false (JAL (mword_of_int 2089210 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kerneltrap + 0x60) (mword_of_int 0x8fafe0ef : mword 32)
+    (mword_of_int (KernelSyms.kerneltrap + 0x60) : mword 64) (JAL (mword_of_int 2089210 : mword 21, Regidx (mword_of_int 1))) kd_8fafe0ef. Qed.
 
   Lemma kti_64 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x64) : mword 64) false (CSRReg (mword_of_int 321 : mword 12, zreg, Regidx (mword_of_int 12), CSRRS)).
   Proof. mk_base (KernelSyms.kerneltrap + 0x64) (mword_of_int 0x14102673 : mword 32)
@@ -208,29 +207,29 @@ Section CodeKerneltrap.
   Proof. mk_base (KernelSyms.kerneltrap + 0x6e) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.kerneltrap + 0x6e) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma kti_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x72) : mword 64) false (ITYPE (mword_of_int 3124 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kerneltrap + 0x72) (mword_of_int 0xc3450513 : mword 32)
-    (mword_of_int (KernelSyms.kerneltrap + 0x72) : mword 64) (ITYPE (mword_of_int 3124 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c3450513. Qed.
+  Lemma kti_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x72) : mword 64) false (ITYPE (mword_of_int 3072 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kerneltrap + 0x72) (mword_of_int 0xc0050513 : mword 32)
+    (mword_of_int (KernelSyms.kerneltrap + 0x72) : mword 64) (ITYPE (mword_of_int 3072 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c0050513. Qed.
 
-  Lemma kti_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x76) : mword 64) false (JAL (mword_of_int 2088414 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kerneltrap + 0x76) (mword_of_int 0xddffd0ef : mword 32)
-    (mword_of_int (KernelSyms.kerneltrap + 0x76) : mword 64) (JAL (mword_of_int 2088414 : mword 21, Regidx (mword_of_int 1))) kd_ddffd0ef. Qed.
+  Lemma kti_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x76) : mword 64) false (JAL (mword_of_int 2088362 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kerneltrap + 0x76) (mword_of_int 0xdabfd0ef : mword 32)
+    (mword_of_int (KernelSyms.kerneltrap + 0x76) : mword 64) (JAL (mword_of_int 2088362 : mword 21, Regidx (mword_of_int 1))) kd_dabfd0ef. Qed.
 
   Lemma kti_7a : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x7a) : mword 64) false (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.kerneltrap + 0x7a) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.kerneltrap + 0x7a) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma kti_7e : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x7e) : mword 64) false (ITYPE (mword_of_int 3152 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kerneltrap + 0x7e) (mword_of_int 0xc5050513 : mword 32)
-    (mword_of_int (KernelSyms.kerneltrap + 0x7e) : mword 64) (ITYPE (mword_of_int 3152 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c5050513. Qed.
+  Lemma kti_7e : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x7e) : mword 64) false (ITYPE (mword_of_int 3100 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kerneltrap + 0x7e) (mword_of_int 0xc1c50513 : mword 32)
+    (mword_of_int (KernelSyms.kerneltrap + 0x7e) : mword 64) (ITYPE (mword_of_int 3100 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c1c50513. Qed.
 
-  Lemma kti_82 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x82) : mword 64) false (JAL (mword_of_int 2089228 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kerneltrap + 0x82) (mword_of_int 0x90cfe0ef : mword 32)
-    (mword_of_int (KernelSyms.kerneltrap + 0x82) : mword 64) (JAL (mword_of_int 2089228 : mword 21, Regidx (mword_of_int 1))) kd_90cfe0ef. Qed.
+  Lemma kti_82 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x82) : mword 64) false (JAL (mword_of_int 2089176 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kerneltrap + 0x82) (mword_of_int 0x8d8fe0ef : mword 32)
+    (mword_of_int (KernelSyms.kerneltrap + 0x82) : mword 64) (JAL (mword_of_int 2089176 : mword 21, Regidx (mword_of_int 1))) kd_8d8fe0ef. Qed.
 
-  Lemma kti_86 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64) false (JAL (mword_of_int 2093478 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kerneltrap + 0x86) (mword_of_int 0x9a6ff0ef : mword 32)
-    (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64) (JAL (mword_of_int 2093478 : mword 21, Regidx (mword_of_int 1))) kd_9a6ff0ef. Qed.
+  Lemma kti_86 : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64) false (JAL (mword_of_int 2093426 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kerneltrap + 0x86) (mword_of_int 0x972ff0ef : mword 32)
+    (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64) (JAL (mword_of_int 2093426 : mword 21, Regidx (mword_of_int 1))) kd_972ff0ef. Qed.
 
   Lemma kti_8a : kernel_text -∗ instr (mword_of_int (KernelSyms.kerneltrap + 0x8a) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 214 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (KernelSyms.kerneltrap + 0x8a) (mword_of_int 0xd555 : mword 16)

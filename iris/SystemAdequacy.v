@@ -584,7 +584,7 @@ Section SystemBoot.
        initialized globals (`first`, `nextpid`), which [kernel_data] stopped
        claiming when it was narrowed to [rodata_end].  It is threaded to main
        now: [ProofMain.mn_grp_kvm] spends `nextpid` on the [newlock] that
-       builds [SpecAllocpid]'s lock, which is allocproc's premise and hence
+       builds [PidLock]'s lock, which is allocproc's premise and hence
        userinit's.  `first` rides along and is dropped there -- its consumer
        is forkret's [if (first)] arm. *)
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".

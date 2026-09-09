@@ -1109,10 +1109,10 @@ Section KexecDCommit.
     iEval (rewrite Hpp2d8) in "Hpc".
     (* ---- +0x2dc: jal ra,safestrcpy ---- *)
     assert (Htss : add_vec (mword_of_int (KXD + 0x2d8) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2081586 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2081534 : mword 21))
                    = mword_of_int KernelSyms.safestrcpy) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXD + 0x2d8)) Rra
-              (mword_of_int 2081586 : mword 21) E3 (K - 68)%nat eb
+              (mword_of_int 2081534 : mword 21) E3 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htss; vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -1565,10 +1565,10 @@ Section KexecDCommit.
     iEval (rewrite Hpp2fc) in "Hpc".
     (* ---- +0x300: jal ra,proc_freepagetable(old table, oldsz) ---- *)
     assert (Htpfp : add_vec (mword_of_int (KXD + 0x2fc) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2084788 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2084674 : mword 21))
                     = mword_of_int KernelSyms.proc_freepagetable) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXD + 0x2fc)) Rra
-              (mword_of_int 2084788 : mword 21) F5 (K - 68)%nat eb
+              (mword_of_int 2084674 : mword 21) F5 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htpfp; vm_compute; reflexivity)
               with "Hcg Hpc []").

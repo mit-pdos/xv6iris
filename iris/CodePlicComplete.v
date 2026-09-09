@@ -17,7 +17,7 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode04.
-Require Import KernelDecode06.
+Require Import KernelDecode05.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
@@ -28,14 +28,13 @@ Require Import KernelDecode20.
 Require Import KernelDecode21.
 Require Import KernelDecode28.
 Require Import KernelDecode31.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodePlicComplete.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- plic_complete @ KernelSyms.plic_complete, 38 bytes ---- *)
 
@@ -63,9 +62,9 @@ Section CodePlicComplete.
   Proof. mk_rvc (KernelSyms.plic_complete + 0xa) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.plic_complete + 0xa) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma pci_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) false (JAL (mword_of_int 2081342 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.plic_complete + 0xc) (mword_of_int 0xa3efc0ef : mword 32)
-    (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) (JAL (mword_of_int 2081342 : mword 21, Regidx (mword_of_int 1))) kd_a3efc0ef. Qed.
+  Lemma pci_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) false (JAL (mword_of_int 2081294 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.plic_complete + 0xc) (mword_of_int 0xa0efc0ef : mword 32)
+    (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) (JAL (mword_of_int 2081294 : mword 21, Regidx (mword_of_int 1))) kd_a0efc0ef. Qed.
 
   Lemma pci_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_complete + 0x10) : mword 64) false (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 15), SLLIW)).
   Proof. mk_base (KernelSyms.plic_complete + 0x10) (mword_of_int 0x00d5179b : mword 32)

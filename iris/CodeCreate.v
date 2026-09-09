@@ -45,14 +45,13 @@ Require Import KernelDecode28.
 Require Import KernelDecode29.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeCreate.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- create @ KernelSyms.create, 356 bytes ---- *)
 
@@ -444,9 +443,9 @@ Section CodeCreate.
   Proof. mk_base (KernelSyms.create + 0xfc) (mword_of_int 0x00003597 : mword 32)
     (mword_of_int (KernelSyms.create + 0xfc) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_00003597. Qed.
 
-  Lemma cri_100 : kernel_text -∗ instr (mword_of_int (KernelSyms.create + 0x100) : mword 64) false (ITYPE (mword_of_int 2348 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.create + 0x100) (mword_of_int 0x92c58593 : mword 32)
-    (mword_of_int (KernelSyms.create + 0x100) : mword 64) (ITYPE (mword_of_int 2348 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_92c58593. Qed.
+  Lemma cri_100 : kernel_text -∗ instr (mword_of_int (KernelSyms.create + 0x100) : mword 64) false (ITYPE (mword_of_int 2296 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.create + 0x100) (mword_of_int 0x8f858593 : mword 32)
+    (mword_of_int (KernelSyms.create + 0x100) : mword 64) (ITYPE (mword_of_int 2296 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_8f858593. Qed.
 
   Lemma cri_104 : kernel_text -∗ instr (mword_of_int (KernelSyms.create + 0x104) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.create + 0x104) (mword_of_int 0x854e : mword 16)
@@ -468,9 +467,9 @@ Section CodeCreate.
   Proof. mk_base (KernelSyms.create + 0x110) (mword_of_int 0x00003597 : mword 32)
     (mword_of_int (KernelSyms.create + 0x110) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_00003597. Qed.
 
-  Lemma cri_114 : kernel_text -∗ instr (mword_of_int (KernelSyms.create + 0x114) : mword 64) false (ITYPE (mword_of_int 2336 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.create + 0x114) (mword_of_int 0x92058593 : mword 32)
-    (mword_of_int (KernelSyms.create + 0x114) : mword 64) (ITYPE (mword_of_int 2336 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_92058593. Qed.
+  Lemma cri_114 : kernel_text -∗ instr (mword_of_int (KernelSyms.create + 0x114) : mword 64) false (ITYPE (mword_of_int 2284 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.create + 0x114) (mword_of_int 0x8ec58593 : mword 32)
+    (mword_of_int (KernelSyms.create + 0x114) : mword 64) (ITYPE (mword_of_int 2284 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_8ec58593. Qed.
 
   Lemma cri_118 : kernel_text -∗ instr (mword_of_int (KernelSyms.create + 0x118) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.create + 0x118) (mword_of_int 0x854e : mword 16)

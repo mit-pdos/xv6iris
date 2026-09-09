@@ -749,7 +749,7 @@ the evidence for every offset. This file is only the worklist.
         base words are fetchaddr's own.
 
 - [x] **S6 — `allocproc` PROVEN and LINKED, counted-only**
-      (`SpecAllocpid.v` / `LinkAllocpid.v` / `SpecAllocproc.v` /
+      (`PidLock.v` / `LinkAllocpid.v` / `SpecAllocproc.v` /
       `CodeAllocproc.v` / `ProofAllocproc.v` / `LinkAllocproc.v`, over
       ACQUIRE / RELEASE / ALLOCPID / KALLOC / PROC_PAGETABLE / MEMSET;
       **38 s**, `proof_coverage` reads it `proven`).  Fifty-five instructions: a 32-byte

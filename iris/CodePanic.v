@@ -26,14 +26,13 @@ Require Import KernelDecode21.
 Require Import KernelDecode22.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodePanic.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- panic @ KernelSyms.panic, 40 bytes ---- *)
 

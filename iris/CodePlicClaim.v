@@ -23,20 +23,19 @@ Require Import KernelDecode08.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
+Require Import KernelDecode17.
 Require Import KernelDecode19.
-Require Import KernelDecode20.
 Require Import KernelDecode24.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
 Require Import KernelDecode31.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodePlicClaim.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- plic_claim @ KernelSyms.plic_claim, 32 bytes ---- *)
 
@@ -56,9 +55,9 @@ Section CodePlicClaim.
   Proof. mk_rvc (KernelSyms.plic_claim + 0x6) (mword_of_int 0x0800 : mword 16)
     (mword_of_int (KernelSyms.plic_claim + 0x6) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0800 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma pqi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_claim + 0x8) : mword 64) false (JAL (mword_of_int 2081378 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.plic_claim + 0x8) (mword_of_int 0xa62fc0ef : mword 32)
-    (mword_of_int (KernelSyms.plic_claim + 0x8) : mword 64) (JAL (mword_of_int 2081378 : mword 21, Regidx (mword_of_int 1))) kd_a62fc0ef. Qed.
+  Lemma pqi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_claim + 0x8) : mword 64) false (JAL (mword_of_int 2081330 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.plic_claim + 0x8) (mword_of_int 0xa32fc0ef : mword 32)
+    (mword_of_int (KernelSyms.plic_claim + 0x8) : mword 64) (JAL (mword_of_int 2081330 : mword 21, Regidx (mword_of_int 1))) kd_a32fc0ef. Qed.
 
   Lemma pqi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_claim + 0xc) : mword 64) false (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLLIW)).
   Proof. mk_base (KernelSyms.plic_claim + 0xc) (mword_of_int 0x00d5151b : mword 32)
