@@ -28,8 +28,9 @@ binaries at every reboot).
   armed post back at those families; the generic slot mints from the
   supply (`app_sup`, born at boot from `Happ_sup`); `app_auto`/`Happ_auto`
   are GONE.  The application's obligations are `Hbirth`, `Happ_xfer`,
-  `Happ_init`, `Happ_sup`, the ledger's and `Hphi`.  Owed to L6: fork's
-  real row (the chdir/open receipt split landed: RECEIPT-SPLIT).
+  `Happ_init`, `Happ_sup`, the ledger's and `Hphi`.  The chdir/open
+  receipt split (RECEIPT-SPLIT) and fork's real row (KFORK-CHILD,
+  STEADY-PARK, FORK-ROW) are landed.
 - [x] ~~**L3 — round E of `app-instances.md`**~~ (kernel side, application-
   independent).  LANDED: every view move on a dispatched path is an AU fire
   or a `_step`; link, mkdir, create's legs, the write and `iput`'s free are
@@ -1012,6 +1013,34 @@ the parent's arm is instantiated at the return:
     `app_sup`, i.e. after 2^32 forks a verified parent may fall to the
     generic slot.  Honest, and it is exactly what the supply is for; the
     program's `⌜r <> 0⌝` guard stays.  No positivity invariant on nextpid.
+  FORK-ROW (LANDED 2026-09-09; brief `brief-fork-row.md`).  Phase-1
+  facts: `uexec_fork_F = uexec_fork_parent_F ∗ <guarded child>`; the arm
+  at fork is the parent piece, the deposit `uexec_fork_child_F X W := X
+  (bump W 0 (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_fd W) (uvis_cwd W))`;
+  `_split`/`_join` really split fork (the child's guards re-enter by
+  substitution).  `SpecUsertrap.ut_fork_in sc_v tf U sts := ⌜ecall ∧ num tf
+  = fork⌝ -∗ uslot (uvis_of (us_tf U (bump_tf tf 0)) sts)` is stated over
+  the TRAPFRAME argument (the record on `wp_usertrap_body` carries the
+  previous round's epc; the prologue rewrites it), instantiated at
+  `<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))` exactly as
+  `ut_exec_out` is; its congruence is `tf_ueq`-shaped with two length
+  premises.  The bridge to `SpecSyscall.sysc_fork_in U sts := … uslot
+  (uvis_of (kfork_child U) sts)` is a RECORD EQUALITY: usertrap's `+4`
+  store (`Ha5`) and `HV1tf0` make `<[14 := 0]> (pv_tf V1)` literally
+  `bump_tf (pv_tf U) 0`.  The non-ecall arms DROP the input rows (no
+  `_quiet` relay; the caller-less `ut_sys_in_quiet` goes too).  Uk* files
+  compile unchanged.  AS LANDED: `ProofSysFork` forwards the slot — the
+  mint, its `UEXEC_GEN` argument and `LinkSysFork`'s `UG` are gone, so
+  userinit's park is the ONE mint site left; at the return the round
+  instantiates the parent's arm at the pid, and `r = 0` (the pid wrap)
+  alone falls to the supply; `park_world` stays in sys_fork's contract
+  (kfork takes it independently).  Deleted as caller-less:
+  `uexec_dep_F_of_supply_ne`, `uexec_dep_of_supply_ne`.
+
+FORK'S REAL ROW IS COMPLETE: (a) KFORK-CHILD, (b) STEADY-PARK, (c)
+FORK-ROW all on main.  The generic slot is minted in exactly two places —
+userinit's park and the pid-wrap return — and the loop's round otherwise
+runs on the process's own deposit.
 
 STEADY-PARK (lane (b), LANDED 2026-09-08).  The slot the park captures
 sees only (resume gpr, resume pc, image, perm, sz, fd, cwd) —
@@ -1059,9 +1088,8 @@ refund record; the ten syscall folds and R-CONJ are on main.  Still open:
 - **L5** — the rx wand's TAG output and the console ledger (the design
   sketch is under "The two options for the generic slot's supply"); the
   console READ arm's receipt is where the tag reaches sh.
-- **L6** — fork's real row (mandatory: re-minting needs the supply;
-  scoped above — three lanes; the child image's representation is
-  settled: the lazy view is canonical); init's `wait(0)` null-window row; echo's own bundles (its pins as
+- **L6** — fork's real row LANDED (three lanes, above); init's `wait(0)`
+  null-window row; echo's own bundles (its pins as
   cursor/receipt families; the exec slot wand answered from
   `kexec_image_ok`).
 - **Q4** stays provisional (`echo_pred := taint ∨ pins`).
