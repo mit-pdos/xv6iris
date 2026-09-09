@@ -193,6 +193,14 @@ Section SpecSysWrite.
     sys_write_arms V v sts n M ua Q tr0 r -∗ ⌜sys_write_ret V v n r⌝.
   Proof. iIntros "[%H _]". by iPureIntro. Qed.
 
+  (* ...and the other projection -- the arm's payout without the blanket,
+     which is what travels back to the process ([SpecSysRead]'s twin says
+     why the blanket cannot). *)
+  Lemma sys_write_arms_extra V v sts n M ua Q tr0 r :
+    sys_write_arms V v sts n M ua Q tr0 r -∗
+    filewrite_extra (sys_fd_st v (pv_ofile V) sts) n M ua Q tr0 r.
+  Proof. iIntros "[_ $]". Qed.
+
   (* ---- the key, read at the two shapes the walk reaches it in --------
      argfd answered NONE (the -1 above the branch), or it answered a
      descriptor whose row the caller's own bundle names. *)

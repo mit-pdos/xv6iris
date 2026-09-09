@@ -1664,7 +1664,7 @@ Section UservecAllPt.
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
       "%Huptpt2 %Hrd2 %Hfdk2 %Hfde2 %Hpipe2 %Hpcret
        %Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
-       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2 Hxo2".
+       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2 Hxo2 Hso2".
     (* x0 IS ZERO in the file usertrap handed back -- the one fact the
        register-file tie below needs of the base ([UexecRet.userret_gpr_x0]). *)
     iDestruct (gpr_file_x0 mf (mword_of_int 0) ltac:(vm_compute; reflexivity)
@@ -1821,7 +1821,7 @@ Section UservecAllPt.
                 deferred to a goal, [?U'] is already resolved by the time the
                 (purely iota) conversion is checked. *)
              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
-                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2 Hcreds2 [Hxo2]").
+                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2 Hcreds2 [Hxo2] [Hso2]").
     - (* the descriptor the residue is keyed at IS the one handed over *)
       reflexivity.
     - (* THE ROUND, read at the machine that trapped.  usertrap's [tf0] is
@@ -1913,6 +1913,34 @@ Section UservecAllPt.
                     ltac:(cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf];
                           reflexivity)
                     with "Hxo2")
+      end.
+    - (* THE SYSCALL CHANNEL'S ANSWER, across the same two moves.  The row's
+         KEY is the entry one on both sides -- usertrap ran at the record
+         this boundary named, so the six rows of
+         [SpecUsertrap.ut_sys_out_cong] are the save walk's own definitional
+         lookups and only the guard's epc insert has to peel
+         ([UsysMemOk.usys_num_epc]).  On the exit side only the RETURN VALUE
+         moves, by userret's page words, and it is the same word. *)
+      iIntros (n). iSpecialize ("Hso2" $! n).
+      match type of Hrd2 with
+      | SpecUsertrap.ut_round _ _ ?UUt _ =>
+          iApply (SpecUsertrap.ut_sys_out_cong n fdep sc_v
+                    (pv_tf (us_V UUt))
+                    (tf_of g (ret_pc sepc_v)) UUt
+                    (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M)
+                    sts _
+                    ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
+                          unfold UsysMemOk.usys_num, tf_arg_idx, tf_of;
+                          reflexivity)
+                    eq_refl
+                    ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
+                          unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
+                    ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
+                          unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
+                    ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
+                          unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
+                    eq_refl
+                    with "Hso2")
       end.
   Qed.
 

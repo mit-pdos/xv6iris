@@ -777,7 +777,7 @@ Section UtDispatch.
     (∀ n : Z, ut_sys_in n fdep sc (pv_tf (us_V U0)) U0 sts) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') SY.syscall_env) pt ksp m0
-                     mie_v menvcfg0 U0 sts ep sc) -∗
+                     mie_v menvcfg0 U0 sts ep sc fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hpk Hpro Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv.
@@ -989,7 +989,7 @@ Section UtDispatch.
                     "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
           rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
         iApply (A.ut_e8 SY.syscall_env N U0 U pt ksp m0 D4 av nx
-                  mie_v menvcfg0 ep sc ∅ sts
+                  mie_v menvcfg0 ep sc ∅ sts fdep
                   Hwf' Hav Hnx Htfpe Hksp Hm0sp HD4sp HD4s1 HcsD4
                   Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                   (* the transparent arms' defining cause, off the dispatch's own
@@ -1068,7 +1068,7 @@ Section UtDispatch.
                       "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
             rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
           iApply (A.ut_d0 SY.syscall_env N U0 U pt ksp m0 D6 av nx
-                    mie_v menvcfg0 ep sc ∅ sts
+                    mie_v menvcfg0 ep sc ∅ sts fdep
                     Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD6sp HD6s1 HcsD6
                     Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                     (* the transparent arms' defining cause, off the dispatch's own
@@ -1149,7 +1149,7 @@ Section UtDispatch.
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
              iApply (A.ut_d0 SY.syscall_env N U0 U pt ksp m0 D8 av nx
-                       mie_v menvcfg0 ep sc ∅ sts
+                       mie_v menvcfg0 ep sc ∅ sts fdep
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                        (* the transparent arms' defining cause, off the dispatch's own
@@ -1173,7 +1173,7 @@ Section UtDispatch.
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
              iApply (A.ut_56 SY.syscall_env N U0 U pt ksp m0 D8 av nx
-                       mie_v menvcfg0 ep sc ∅ sts
+                       mie_v menvcfg0 ep sc ∅ sts fdep
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                        (* the transparent arms' defining cause, off the dispatch's own

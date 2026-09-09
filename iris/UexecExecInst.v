@@ -17,8 +17,16 @@
    AU contract.  Each branch is that contract's own landed INPUT, read off
    the key: the process's families, the image, the three argument words, the
    descriptor view and the working directory, and nothing else.  Every other
-   number's [sbundle_at] is [emp], and so is every number's [spost_at]
-   (the post's route back is the next step's row -- see [xv6_spost]).
+   number's [sbundle_at] is [emp].
+
+   WHICH NUMBERS PAY A POST.  Six: read 5, write 16, mknod 17, unlink 18,
+   link 19, mkdir 20, each at that contract's own armed post, read off the
+   same key projections its input is.  exec 7 pays [emp] (its bundle is
+   consumed and its process never resumes on success); chdir 9 and open 15
+   pay [emp] as a DEBT their landed arms' kernel resources force -- see
+   [xv6_spost]'s own note.  The route back to the process is
+   [SpecUsertrap.ut_sys_out] as a row of [usertrap_post], produced by the
+   dispatcher's [SpecSyscall.sysc_sys_out].
 
    THE DEPOSIT'S FAMILIES ([UexecSG.sfam]) are a RECORD with one field per
    contracted syscall, so that the arm can bind them once in front of both
@@ -369,35 +377,61 @@ Section UexecExecInst.
      else emp)%I.
 
   (* ...AND THE ARMED POST BACK, at the same key and the same families.
-     STILL [emp] AT EVERY NUMBER, and that is a STAGING fact, not a design
-     one: the post's only route to the process is
-     [SpecUsertrap.ut_sys_out] as a row of [usertrap_post], and until that
-     row exists nothing in the kernel PRODUCES a [spost_at] --
-     [UexecApply.uexec_ret_round_slot]'s premise is discharged from this
-     [emp] by the loop.  The families the post will be stated at are
-     already in [xfam] above, because they are the very ones the DEPOSIT is
-     made at; what the next step adds is the row, the dispatcher's
-     production and these branches:
-       5   [SpecFileread.fileread_extra] at [fd_st_of_key], and 16
+     SIX NUMBERS PAY IT.  Each branch is that syscall's own landed armed
+     post, read off the SAME key projections its input branch above is read
+     off -- so what a process gets back is a statement about the very
+     receipts, refunds and cursors it deposited:
+       5   [SpecFileread.fileread_extra] at [SpecArgfd.fd_st_of_key] and 16
            [SpecFilewrite.filewrite_extra] at the same key -- WITHOUT the
-           landed pure blanket, which reads [pv_ofile V] (a kernel array)
-           while the round already carries [UsysMemOk.usys_mem_ok] /
-           [usys_fd_ok];
-       17/18/19/20  the contract's arms verbatim
-           ([mknod_arms] / [unlink_arms] / [link_arms] / [mkdir_arms]);
-       7   [emp] -- exec's process never resumes on success;
-       9/15  [emp], and THAT one is a debt: chdir's and open's landed arms
-           bundle [ProcInv.proc_priv], the fd bundle and [FdSlots.fd_slot]
-           -- kernel resources a process at its own key cannot name -- so
+           landed pure blanket ([fileread_ret] / [filewrite_ret]), which
+           reads [pv_ofile V], a kernel array no process can name, while the
+           round already carries [UsysMemOk.usys_mem_ok] / [usys_fd_ok];
+       17/18/19/20  the contract's arms verbatim ([mknod_arms] /
+           [unlink_arms] / [link_arms] / [mkdir_arms]).
+     THREE PAY [emp], and the reasons differ:
+       7   exec's bundle is CONSUMED and its process never resumes on
+           success -- there is nothing to give back;
+       9/15  a DEBT.  chdir's and open's landed arms bundle
+           [ProcInv.proc_priv], the fd bundle and [FdSlots.fd_slot] --
+           kernel resources a process at its own key cannot name -- so
            returning them verbatim is not statable here.  Splitting each of
            those two arms into a KERNEL half (what the dispatcher keeps) and
            a RECEIPT half (what the process gets back) is OWED, and it is
-           what open's receipts will be worth to a verified program. *)
-  Definition xv6_spost (X : uvis -d> iPropO Σ) (n : Z) (f : xfam) (W : uvis)
-      (r : mword 64) : iProp Σ := emp%I.
+           what open's receipts will be worth to a verified program.
+     Every number without a contract pays [emp] too.
 
-  (* THE FAMILY OCCURS IN ONE BRANCH ONLY -- exec's slot wand -- so both
-     non-expansiveness proofs are that branch and eight [reflexivity]s. *)
+     THE SLOT FAMILY [X] DOES NOT OCCUR: a post is what comes back to the
+     process that is RESUMING, so no branch concludes at the fixpoint
+     variable the way exec's input bundle does.  That is what makes
+     non-expansiveness a [reflexivity]. *)
+  Definition xv6_spost (X : uvis -d> iPropO Σ) (n : Z) (f : xfam) (W : uvis)
+      (r : mword 64) : iProp Σ :=
+    (if decide (n = 5) then
+       fileread_extra (fd_st_of_key (xk_a W 0) (uvis_fd W))
+         (sys_rw_count (xk_a W 2)) (rf_F f) r
+     else if decide (n = 16) then
+       filewrite_extra (fd_st_of_key (xk_a W 0) (uvis_fd W))
+         (sys_rw_count (xk_a W 2)) (uvis_M W) (xk_a W 1)
+         (wf_Q f) (wf_tr0 f) r
+     else if decide (n = 17) then
+       mknod_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+         (dev_arg (xk_a W 1)) (dev_arg (xk_a W 2))
+         (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f) r
+     else if decide (n = 18) then
+       unlink_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+         (uf_P f) (uf_Pmiss f) (uf_Fent f) (uf_Ftgt f) (uf_Fex f) (uf_Fmiss f) r
+     else if decide (n = 19) then
+       link_arms (fs_gamma_L fsc_fs) (lf_Ftgt f) (lf_Fent f) (lf_Funt f) r
+     else if decide (n = 20) then
+       mkdir_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+         (df_P f) (df_Pmiss f) (df_Farm f) (df_Fdots f) (df_Fun f)
+         (df_Fok f) (df_Fex f) r
+     else emp)%I.
+
+  (* THE SLOT FAMILY OCCURS IN ONE BRANCH OF THE DEPOSIT -- exec's slot wand
+     -- so that non-expansiveness proof is that branch and eight
+     [reflexivity]s, and the POST's is one [reflexivity]: no post concludes
+     at the fixpoint variable. *)
   Ltac xv6_num_cases :=
     repeat (match goal with
             | |- context [decide (?n = ?k)] =>
@@ -432,10 +466,17 @@ Section UexecExecInst.
     reflexivity.
   Qed.
 
+  (* ...and the post's, at the same six rows: every branch reads the image,
+     one of the three argument words, the descriptor view or the working
+     directory, and [skey_eq] pins all six. *)
   Lemma xv6_spost_cong (X : uvis -d> iPropO Σ) (n : Z) (f : xfam)
       (W W' : uvis) (r : mword 64) :
     skey_eq W W' -> xv6_spost X n f W r ⊣⊢ xv6_spost X n f W' r.
-  Proof. intros _. reflexivity. Qed.
+  Proof.
+    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw).
+    rewrite /xv6_spost /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw.
+    reflexivity.
+  Qed.
 
   (* MONOTONICITY IN THE SLOT FAMILY.  The family occurs in exactly one
      branch -- the CONCLUSION of exec's slot piece's wand
@@ -707,6 +748,93 @@ Section UexecExecInst.
     iIntros "H". rewrite /sbundle. iDestruct "H" as (f) "H".
     iDestruct (sbundle_at_exec_elim X f W with "H") as "H".
     iExists (xf_P f), (xf_Pmiss f), (xf_Fo f), (xf_Rs f). iExact "H".
+  Qed.
+
+  (* ================================================================== *)
+  (* THE POST-SIDE INTRODUCTIONS, the mirror of the eight readers above:   *)
+  (* the dispatcher's arm holds its contract's armed post and needs it at  *)
+  (* the class field, at its own number and the key the process deposited  *)
+  (* from.  Each is the match at one literal and nothing else.             *)
+  (* ================================================================== *)
+  Lemma spost_at_read_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
+      (r : mword 64) :
+    fileread_extra (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
+      (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (rf_F f) r -∗
+    spost_at X 5 f W r.
+  Proof.
+    iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
+    xv6_take. iExact "H".
+  Qed.
+
+  Lemma spost_at_write_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
+      (r : mword 64) :
+    filewrite_extra (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
+      (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (uvis_M W)
+      (tf_w (uvis_tf W) (tf_arg_idx 1)) (wf_Q f) (wf_tr0 f) r -∗
+    spost_at X 16 f W r.
+  Proof.
+    iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
+    xv6_skip. xv6_take. iExact "H".
+  Qed.
+
+  Lemma spost_at_mknod_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
+      (r : mword 64) :
+    mknod_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+      (dev_arg (tf_w (uvis_tf W) (tf_arg_idx 1)))
+      (dev_arg (tf_w (uvis_tf W) (tf_arg_idx 2)))
+      (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f) r -∗
+    spost_at X 17 f W r.
+  Proof.
+    iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
+    xv6_skip. xv6_skip. xv6_take. iExact "H".
+  Qed.
+
+  Lemma spost_at_unlink_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
+      (r : mword 64) :
+    unlink_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+      (uf_P f) (uf_Pmiss f) (uf_Fent f) (uf_Ftgt f) (uf_Fex f) (uf_Fmiss f) r -∗
+    spost_at X 18 f W r.
+  Proof.
+    iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
+    xv6_skip. xv6_skip. xv6_skip. xv6_take. iExact "H".
+  Qed.
+
+  Lemma spost_at_link_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
+      (r : mword 64) :
+    link_arms (fs_gamma_L fsc_fs) (lf_Ftgt f) (lf_Fent f) (lf_Funt f) r -∗
+    spost_at X 19 f W r.
+  Proof.
+    iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
+    xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_take. iExact "H".
+  Qed.
+
+  Lemma spost_at_mkdir_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
+      (r : mword 64) :
+    mkdir_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+      (df_P f) (df_Pmiss f) (df_Farm f) (df_Fdots f) (df_Fun f)
+      (df_Fok f) (df_Fex f) r -∗
+    spost_at X 20 f W r.
+  Proof.
+    iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
+    xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_take. iExact "H".
+  Qed.
+
+  (* ...and the sixteen-plus numbers that pay nothing, in one lemma: exec,
+     chdir and open (whose [emp] the header explains) and every number
+     without a contract at all. *)
+  Lemma spost_at_emp (X : uvis -d> iPropO Σ) (n : Z) (f : xfam) (W : uvis)
+      (r : mword 64) :
+    ~ (n = 5 \/ n = 16 \/ n = 17 \/ n = 18 \/ n = 19 \/ n = 20) ->
+    ⊢ spost_at X n f W r.
+  Proof.
+    intros Hne. rewrite /spost_at /= /xv6_spost.
+    destruct (decide (n = 5)) as [He | _]; [ exfalso; apply Hne; tauto |].
+    destruct (decide (n = 16)) as [He | _]; [ exfalso; apply Hne; tauto |].
+    destruct (decide (n = 17)) as [He | _]; [ exfalso; apply Hne; tauto |].
+    destruct (decide (n = 18)) as [He | _]; [ exfalso; apply Hne; tauto |].
+    destruct (decide (n = 19)) as [He | _]; [ exfalso; apply Hne; tauto |].
+    destruct (decide (n = 20)) as [He | _]; [ exfalso; apply Hne; tauto |].
+    done.
   Qed.
 
 End UexecExecInst.

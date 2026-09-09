@@ -295,6 +295,16 @@ Section SpecSysRead.
     sys_read_arms V v sts n F r -∗ ⌜sys_read_ret V v n r⌝.
   Proof. iIntros "[%H _]". by iPureIntro. Qed.
 
+  (* ...and the other projection, which is what the process gets back: the
+     arm's own payout WITHOUT the blanket.  The blanket reads [pv_ofile V],
+     a kernel array, so it cannot ride the trap contract's per-number post
+     row ([UexecExecInst.xv6_spost]) -- and it does not need to: the round
+     already carries [UsysMemOk.usys_mem_ok] and [usys_fd_ok]. *)
+  Lemma sys_read_arms_extra V v sts n F r :
+    sys_read_arms V v sts n F r -∗
+    fileread_extra (sys_fd_st v (pv_ofile V) sts) n F r.
+  Proof. iIntros "[_ $]". Qed.
+
   (* ---- the key, read at the two shapes the walk reaches it in --------
      argfd answered NONE (the -1 above the branch), or it answered a
      descriptor whose row the caller's own bundle names. *)

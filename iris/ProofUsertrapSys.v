@@ -151,7 +151,7 @@ Section UtSysBlock.
     (∀ n : Z, ut_sys_in n fdep scv (pv_tf (us_V U0)) U0 sts) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
-                     mie_v menvcfg0 U0 sts epv scv) -∗
+                     mie_v menvcfg0 U0 sts epv scv fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv Hpro Hscec.
@@ -584,7 +584,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2 stsR)
-        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hcwig %Hsbrg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo".
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hcwig %Hsbrg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo Hso".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -866,14 +866,39 @@ Section UtSysBlock.
               | rewrite Hsz2 HV1sz Hpr3; reflexivity ].
         - iRight. iLeft. iExact "Hslot".
         - iRight. iRight. iPureIntro. exact Hgap. }
+      (* ...AND THE SYSCALL CHANNEL'S, re-keyed the same way.  The row reads
+         the ENTRY key, and the dispatcher's record differs from it by the
+         two epc rewrites alone -- which move neither the image, nor the
+         three argument words, nor the descriptor view, nor the cwd, i.e.
+         none of [UexecSG.skey_eq]'s six rows.  Same congruence the deposit
+         went DOWN by ([SpecUsertrap.ut_sys_in]'s own note). *)
+      assert (Hkeyo : skey_eq (uvis_of U0 sts)
+                        (uvis_of (MkUstate V1 (us_M U)) sts)).
+      { rewrite /skey_eq. split_and!;
+          [ exact (eq_sym Hpr4)
+          | exact (Hargw 0%nat ltac:(lia))
+          | exact (Hargw 1%nat ltac:(lia))
+          | exact (Hargw 2%nat ltac:(lia))
+          | reflexivity
+          | exact (eq_sym Hpr5) ]. }
+      iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts
+                 (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0))%I
+        with "[Hso]" as "Hso".
+      { iIntros (n) "%Hc". destruct Hc as (_ & Hcn & Hcx & Hcf).
+        iDestruct ("Hso" $! n with "[%]") as "H";
+          [ cbn [us_V]; split_and!;
+            [ rewrite <- Hn0; exact Hcn | exact Hcx | exact Hcf ] |].
+        rewrite (spost_at_cong uslot n fdep (uvis_of U0 sts)
+                   (uvis_of (MkUstate V1 (us_M U)) sts) _ Hkeyo).
+        iExact "H". }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
-                mie_v menvcfg0 epv scv lks sts stsR
+                mie_v menvcfg0 epv scv lks sts stsR fdep
                 Hwf' ltac:(intros Hne; exfalso; exact (Hne Hscec)) Hfde Hpipe Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
                 Hmiev Hmenvv Hrda
-                with "Htext Hpc Hcg [-Hframe Hxo Hcont] Hframe Hxo Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitR; [rewrite /trap_csrs_ext; done|].

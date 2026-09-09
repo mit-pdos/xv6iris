@@ -100,6 +100,8 @@ Require Import SpecVmfault.
 Require Import SpecPrintk.
 Require Import UsysMemOk.   (* [uecall_scause] -- the transparent arms' defining cause *)
 Require Import SpecUsertrap UsertrapRes.
+Require Import UexecSG.    (* [sfam] -- the deposit's families, relayed with
+                              the syscall channel's out row *)
 Require Import UserPerm.   (* [perm_of_uptd_ext_sz] -- the fill is transparent *)
 Require Import ProofUsertrapParts.
 Require Import UsertrapAux.
@@ -225,7 +227,9 @@ Section Ut56.
      process record does not move and [ut_a6] is applied at the SAME [V]. *)
   Lemma ut_56 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
-      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) (sts : list fdstate) :
+      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) (sts : list fdstate)
+      (* the deposit's families, relayed to the tails *)
+      (fdep : sfam) :
     printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -256,7 +260,7 @@ Section Ut56.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts epv scv) -∗
+                     mie_v menvcfg0 U0 sts epv scv fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
@@ -616,14 +620,17 @@ Section Ut56.
                (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                (uint (pv_sz (us_V U0))) U sts sts) as "Hxo".
     { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ Hnec). }
+    iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts
+               (pv_tf (us_V U) !!! tf_arg_idx 0))%I as "Hso".
+    { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ Hnec). }
     iApply (T.ut_a6 Rsys N U0 U pt ksp m0 S1 av nx false
-              mie_v menvcfg0 epv scv lks sts sts
+              mie_v menvcfg0 epv scv lks sts sts fdep
               Hwf' ltac:(intros _; reflexivity)
               ltac:(intros Hc; exfalso; exact (Hnec Hc))
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               Hmiev Hmenvv Hrd
-              with "Htext Hpc Hcg [-Hframe Hxo Hcont] Hframe Hxo Hcont").
+              with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
     all: try lkbelow.
     iApply (ua_hold_on Rsys N U _ sts with "Hcpu [-Hclm Hown] Hclm [-]").
     - rewrite /trap_csrs.
@@ -668,7 +675,9 @@ Section UtD0.
      taken and the code joins +0xa6 -- with the process record MOVED. *)
   Lemma ut_d0 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
-      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) (sts : list fdstate) :
+      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) (sts : list fdstate)
+      (* the deposit's families, relayed to the tails *)
+      (fdep : sfam) :
     printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -699,7 +708,7 @@ Section UtD0.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts epv scv) -∗
+                     mie_v menvcfg0 U0 sts epv scv fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
@@ -971,7 +980,7 @@ Section UtD0.
       rewrite us_upt_id upd_usM_id.
       iDestruct ("Hownback" $! U sts with "Hpv Hufr Hsy") as "Hown".
       iApply (ut_56 Rsys N U0 U pt ksp m0 mr av nx
-                mie_v menvcfg0 epv scv lks sts
+                mie_v menvcfg0 epv scv lks sts fdep
                 Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd Hnec
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
@@ -1038,14 +1047,17 @@ Section UtD0.
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                  (uint (pv_sz (us_V U0))) (MkUstate V' (us_M U)) sts sts) as "Hxo".
       { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ Hnec). }
+    iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts
+                 (pv_tf (us_V (MkUstate V' (us_M U))) !!! tf_arg_idx 0))%I as "Hso".
+      { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ Hnec). }
       iApply (T.ut_a6 Rsys N U0 (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
-                mie_v menvcfg0 epv scv lks sts sts
+                mie_v menvcfg0 epv scv lks sts sts fdep
                 Hwf' ltac:(intros _; reflexivity)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc))
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd'
-                with "Htext Hpc Hcg [-Hframe Hxo Hcont] Hframe Hxo Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
       all: try lkbelow.
       iApply (ua_hold_on Rsys N (MkUstate V' (us_M U)) with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
@@ -1076,7 +1088,9 @@ Section UtE8.
      on it. *)
   Lemma ut_e8 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
-      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) (sts : list fdstate) :
+      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) (sts : list fdstate)
+      (* the deposit's families, relayed to the tails *)
+      (fdep : sfam) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -1106,7 +1120,7 @@ Section UtE8.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts epv scv) -∗
+                     mie_v menvcfg0 U0 sts epv scv fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
@@ -1207,14 +1221,17 @@ Section UtE8.
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                  (uint (pv_sz (us_V U0))) U sts sts) as "Hxo".
       { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ Hnec). }
+    iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts
+                 (pv_tf (us_V U) !!! tf_arg_idx 0))%I as "Hso".
+      { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ Hnec). }
       iApply (T.ut_fa Rsys N U0 U pt ksp m0 mf av nx false
-                mie_v menvcfg0 epv scv lks sts sts
+                mie_v menvcfg0 epv scv lks sts sts fdep
                 Hwf' ltac:(intros _; reflexivity)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc))
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hxo Hcont] Hframe Hxo Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
       iApply (ua_hold_on Rsys N U _ sts with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
     - (* KILLED: fall through to +0xf2's [c.j +0xf6], then kexit(-1). *)

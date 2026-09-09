@@ -344,6 +344,47 @@ Section SyscExec.
        ⌜sysc_num (us_V U) = n /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
        sbundle_at uslot n f (uvis_of U sts))%I.
 
+  (* ...AND WHAT COMES BACK, at the same key and the SAME families: the
+     syscall's armed post, read at the value the dispatcher returned.  This
+     is the row the deposit was made for -- the unfired pieces of the
+     process's own bundle, its receipts and its cursors -- and it is worth
+     something to the depositor only because [f] is bound once, in front of
+     both legs, by the arm that made the deposit ([UexecSG.v]'s header).
+
+     [emp] at every number whose [UexecSG.spost_at] is: exec (its bundle is
+     consumed and its process never resumes on success), chdir and open (a
+     debt -- their landed arms bundle kernel resources a process cannot
+     name; see [UexecExecInst.xv6_spost]), and every number without a
+     contract.  [sysc_sys_out_quiet] is what those arms pay it with.
+
+     THE KEY IS THE ENTRY RECORD'S, not the resumed one, and it has to be:
+     the post reads the syscall's own ARGUMENT words (which fd, which count,
+     which buffer), and the a0 argument slot is exactly the word the return
+     value overwrites.  Only the value [r] comes off the exit side.
+
+     EXIT AND FORK ARE EXCLUDED, as they are for the deposit: exit never
+     returns and fork runs no contract. *)
+  Definition sysc_sys_out (U : ustate) (sts : list fdstate) (f : sfam)
+      (r : mword 64) : iProp Σ :=
+    (∀ n : Z,
+       ⌜sysc_num (us_V U) = n /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
+       spost_at uslot n f (uvis_of U sts) r)%I.
+
+  (* the numbers that owe nothing, as one premise an arm discharges from its
+     own table index by [lia] *)
+  Definition sysc_num_nofs (k : Z) : Prop :=
+    ~ (k = 5 \/ k = 16 \/ k = 17 \/ k = 18 \/ k = 19 \/ k = 20).
+
+  Lemma sysc_sys_out_quiet (U : ustate) (sts : list fdstate) (f : sfam)
+      (r : mword 64) (k : Z) :
+    sysc_num (us_V U) = k -> sysc_num_nofs k -> ⊢ sysc_sys_out U sts f r.
+  Proof.
+    intros Hk Hno. rewrite /sysc_sys_out. iIntros (n) "%Hg".
+    assert (Hn : sysc_num_nofs n)
+      by (rewrite <- (proj1 Hg); rewrite Hk; exact Hno).
+    iApply (spost_at_emp uslot n f (uvis_of U sts) r Hn).
+  Qed.
+
   (* r = -1 and nothing of the process moved but a0: the trapframe up to
      the a0 slot, the image, the permission projection (a copy-in's lazy
      fill grows the descriptor but not the projection), the size, the
@@ -619,6 +660,10 @@ Definition wp_syscall_sconf_body
       (* ...and the exec channel's answer: on exec, the failure facts or
          the new image's slot at the resume record [U'] *)
       sysc_exec_out U U' sts sts' -∗
+      (* ...and the SYSCALL CHANNEL's: the armed post of whatever contract
+         the number ran, at the process's own families and at the return
+         value the a0 slot now holds -- see [sysc_sys_out] *)
+      sysc_sys_out U sts f (pv_tf (us_V U') !!! tf_arg_idx 0) -∗
       WP (Loop : expr riscv_lang))
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).

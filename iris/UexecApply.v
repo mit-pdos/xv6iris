@@ -836,9 +836,13 @@ Section LoopApply.
         ∨ uslot W'
         ∨ ⌜uvis_tf W' !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝)) -∗
     (* ...AND THE ARMED POST the deposit bought, at the value the round
-       bound.  Owed only on the returning arm; every other arm of the round
-       is a mint or the transparent key. *)
-    (⌜sc = uecall_scause⌝ -∗
+       bound.  Owed only on the RETURNING arm -- exit hands nothing back and
+       fork runs no contract, so the guard excludes both, exactly as
+       [SpecUsertrap.ut_sys_out]'s does; every other arm of the round is a
+       mint or the transparent key. *)
+    (⌜sc = uecall_scause
+      /\ usys_num (uvis_tf (uvis_run W)) <> USYS_exit
+      /\ usys_num (uvis_tf (uvis_run W)) <> USYS_fork⌝ -∗
        spost_at uslot (usys_num (uvis_tf (uvis_run W))) f (uvis_run W)
          (uvis_tf W' !!! tf_arg_idx 0)) -∗
     uexec_arm sc W f -∗ uslot W'.
@@ -850,7 +854,6 @@ Section LoopApply.
     destruct (decide (sc = uecall_scause)) as [Hec | Hne].
     - (* ---- ECALL ---- *)
       rewrite (uexec_arm_ecall sc (uvis_run W) f Hec).
-      iDestruct ("Hsp" with "[%]") as "Hsp"; [ exact Hec |].
       rewrite Hec in Hr.
       destruct (uround_ok_ecall (uvis_tf (uvis_run W)) (uvis_M W) (uvis_M W')
                   (uvis_perm W) (uvis_perm W') (uvis_sz W) (uvis_sz W')
@@ -868,6 +871,10 @@ Section LoopApply.
              round's exec disjunct: exec inherits, so the field did not
              move, and exec is not chdir. *)
           destruct Hfail as (r & Hb & Hm & Hfd').
+          iDestruct ("Hsp" with "[%]") as "Hsp";
+            [ split_and!;
+              [ exact Hec | rewrite Hexec; discriminate
+              | rewrite Hexec; discriminate ] |].
           rewrite <- Hexec in Hm.
           assert (Hnec : USYS_exec <> USYS_chdir) by discriminate.
           assert (Hc : usys_cwd_ok (usys_num (uvis_tf (uvis_run W))) r
@@ -885,7 +892,7 @@ Section LoopApply.
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_exit))
           as [Hx | _]; [ contradiction (Hnex Hx) | ].
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_fork))
-          as [_ | _].
+          as [_ | Hnfk].
         * (* THE FORK ROW, AND WHAT THE KERNEL STILL OWES.  Both of
              fork's arms are discharged by MINTING a slot out of the
              [∀ W'', uslot W''] family rather than by instantiating the
@@ -904,6 +911,8 @@ Section LoopApply.
              mint into an instantiation. *)
           iApply "Hmk".
         * (* the returning arms: the row is the round's own conjunct *)
+          iDestruct ("Hsp" with "[%]") as "Hsp";
+            [ split_and!; [ exact Hec | exact Hnex | exact Hnfk ] |].
           iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r Hl Hb Hm
                     (Hfdrow Hec) (Hpiperow Hec) Hc with "[Hsp] Hret").
           iExact "Hsp".
@@ -970,7 +979,9 @@ Section LoopApply.
            /\ fdv' = uvis_fd W⌝
         ∨ uslot (uvis_of U' fdv')
         ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝)) -∗
-    (⌜sc = uecall_scause⌝ -∗
+    (⌜sc = uecall_scause
+      /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_exit
+      /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_fork⌝ -∗
        spost_at uslot (usys_num (tf_of g (ret_pc sepc_v))) f
          (uvis_run W) (pv_tf (us_V U') !!! tf_arg_idx 0)) -∗
     uexec_arm sc W f -∗

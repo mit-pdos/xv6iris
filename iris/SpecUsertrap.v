@@ -363,7 +363,7 @@ Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
 (* [ut_sys_in n f] / [ut_sys_out n f] are the PER-NUMBER pair, AT THE       *)
 (* DEPOSIT'S OWN FAMILIES: the process deposits its bundle for the number   *)
 (* it trapped at ([UexecSG.sbundle_at], which at [UexecExecInst]'s instance *)
-(* is exec's AU bundle at 7 and [emp] elsewhere) and gets the syscall's     *)
+(* is that syscall's landed AU input) and gets the syscall's                *)
 (* armed post back under the arm's own return value ([UexecSG.spost_at]) at *)
 (* THE SAME [f] -- the contract takes it once and both rows read it, which  *)
 (* is what makes the post worth anything to the depositor.  This is the     *)
@@ -402,12 +402,12 @@ Definition ut_sys_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : C
    round's return value.  [f] is the deposit's own: the trap contract takes
    it once and both rows read it, which is what makes the post worth
    anything to the process that deposited ([UexecSG.v]'s header).
-   NOT YET A ROW OF [usertrap_post]: at [UexecExecInst]'s instance [spost_at]
-   is [emp] at every number, so the loop's consumer
-   ([UexecApply.uexec_ret_round_slot_of]'s premise) discharges it from the
-   instance and no kernel-side producer owes anything.  Turning a syscall's
-   contract on is what makes this a row -- the dispatcher hands it back and
-   the round relays it, beside [ut_exec_out]. *)
+   A ROW OF [usertrap_post], beside [ut_exec_out]: the dispatcher hands the
+   armed post back ([SpecSyscall.sysc_sys_out]), the four tails relay it
+   untouched, and the loop's consumer
+   ([UexecApply.uexec_ret_round_slot_of]'s premise) is discharged FROM IT.
+   Six numbers make it non-trivial ([UexecExecInst.xv6_spost]); at the rest
+   it is [emp] and every arm pays it for free. *)
 Definition ut_sys_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
@@ -638,7 +638,11 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        entry trapframe as usertrap's own prologue leaves it (the
        +0x28..+0x2e block writes [epc := r_sepc()]), which is the user-visible
        trapframe the round starts from. *)
-    (U : ustate) (sts : list fdstate) (sepc_v sc_v : mword 64) : iProp Σ :=
+    (U : ustate) (sts : list fdstate) (sepc_v sc_v : mword 64)
+    (* THE DEPOSIT'S FAMILIES, read by the syscall channel's out row below:
+       what comes back is a post at the very receipts the process deposited
+       at ([UexecSG.v]'s header). *)
+    (f : sfam) : iProp Σ :=
   let ret_tgt : mword 64 := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   ( ∀ (pt' : uptd) (mf : regfile)
       (ms' usatp uepc sc' stval' mdv0 : mword 64) (U' : ustate)
@@ -750,6 +754,13 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
     ut_exec_out sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
       (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
       (uint (pv_sz (us_V U))) U' sts sts' -∗
+    (* ...AND THE SYSCALL CHANNEL'S, at the same entry frame and read at the
+       a0 word the round left -- [ut_sys_out].  The dispatcher produces it,
+       the four tails relay it, and the U-mode loop hands it to the
+       process's own returning arm. *)
+    (∀ n : Z,
+       ut_sys_out n f sc_v (pv_tf (us_V U)) U sts
+         (pv_tf (us_V U') !!! tf_arg_idx 0)) -∗
     WP (Loop : expr riscv_lang)).
 
 (* [R] IS A HART-INDEXED FAMILY, AND IT HAS TO BE.  usertrap is handed the
@@ -828,7 +839,8 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
      may return on a different hart -- and the bundle comes back at THAT
      hart, which is why [R] is a family (see the note above). *)
   wp_next true pj (fun (CID' : CpuId) =>
-    usertrap_post (CID := CID') (R CID') pt ksp m mie_v menvcfg0 U sts sepc_v sc_v) -∗
+    usertrap_post (CID := CID') (R CID') pt ksp m mie_v menvcfg0 U sts sepc_v
+      sc_v f) -∗
   WP (Loop : expr riscv_lang).
 
 (* THE MODULE TYPE'S INSTANCE LIST IS THE UNION OF THE FIVE CONES', NOT THE

@@ -97,7 +97,8 @@ Require Import UexecApply.   (* the round's tail, as named lemmas *)
 Require Import UexecSG.       (* [uexecSG]: [sbundle_at] / [spost_at] / [skey_eq] -- the loop runs on the
                                  enriched slot (lane E3b) *)
 Require Import UexecExecMint. (* [uslot_mint] -- the loop's generic slot *)
-Require Import UexecExecInst. (* the class INSTANCE: [spost_at] is [emp] here *)
+Require Import UexecExecInst. (* the class INSTANCE: what the loop hands the
+                                 process back at each contracted number *)
 Require Import FirstTok.      (* the syscall environment's own file *)
 Require Import AppInv.        (* [app_sup] -- the credential the mint runs on *)
 Require Import UserretUser.
@@ -328,9 +329,10 @@ Section UserretClosed.
       as "Hframe".
     { done. }
     (* ---- THE SPLIT: the process's deposit -- owed at every returning
-           ecall, and at [UexecExecInst]'s instance non-[emp] only at exec
-           -- goes DOWN to the kernel as uservec's pre row; the arm without
-           it stays for the round ([UexecRet.uexec_ret_split]). ---- *)
+           ecall, and at [UexecExecInst]'s instance that syscall's own AU
+           input at each of the nine contracted numbers -- goes DOWN to the
+           kernel as uservec's pre row; the arm without it stays for the
+           round ([UexecRet.uexec_ret_split]). ---- *)
     iDestruct (uexec_ret_split sc W with "Hret") as (fdep) "[Hxin Hret]".
     (* ---- one round.  [Hret] -- the linear return user execution handed
            back -- is FRAMED across the crossing (R-a / K8). ---- *)
@@ -373,7 +375,7 @@ Section UserretClosed.
       "%Huptpt' %Hround' %Hfdkept %Hfdecall %Hpipecall %Hpcret' %Hgprtie'
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
-       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds' Hxo".
+       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds' Hxo Hso".
     (* the three frozen CSRs, duplicated out of the residue for [user_cfg] *)
     iDestruct (UV.usertrap_res_csrs_open (CID := CID') pt' ksp U2 with "Hures'")
       as "[Hcsrs Hcback]".
@@ -457,12 +459,31 @@ Section UserretClosed.
                  Hpipecall Hround'
                  (* ...AND THE SYSCALL'S ARMED POST, back under the arm's own
                     [∀ r], AT THE FAMILIES THE DEPOSIT WAS MADE AT ([fdep],
-                    the witness the split handed out).  At [UexecExecInst]'s
-                    instance [spost_at] is [emp] at every number, so the
-                    kernel owes nothing yet; the row that carries it once a
-                    contract is turned on is [SpecUsertrap.ut_sys_out]. *)
-                 with "Hmk Hxo [] Hret") as "Hslot";
-      [ iIntros "_"; rewrite /spost_at /= /xv6_spost; done | ].
+                    the witness the split handed out).  It comes off
+                    [SpecUsertrap.ut_sys_out], uservec's own post row, at the
+                    key the deposit went down at -- which differs from the
+                    round's run projection in none of [UexecSG.skey_eq]'s six
+                    rows, exactly as it did on the way in. *)
+                 with "Hmk Hxo [Hso] Hret") as "Hslot";
+      [ iIntros "%Hg"; destruct Hg as (Hgec & Hgex & Hgfk);
+        iDestruct ("Hso" $! (usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                               (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
+                     with "[%]") as "Hso";
+        [ split_and!;
+          [ exact Hgec | reflexivity | exact Hgex | exact Hgfk ] |];
+        iEval (rewrite (spost_at_cong uslot
+                 (usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                    (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))) fdep
+                 (uvis_of (upd_usM (us_tf (us_upt U0 pt)
+                             (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
+                             (uvis_M W)) (uvis_fd W))
+                 (uvis_run W) (pv_tf (us_V U2) !!! tf_arg_idx 0)
+                 ltac:(rewrite /skey_eq; split_and!;
+                       [ reflexivity | reflexivity | reflexivity
+                       | reflexivity | reflexivity
+                       | exact (eq_trans Hcwi (eq_sym Hcww)) ]))) in "Hso";
+        iExact "Hso" | ].
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)
     assert (Hpi2 : uvis_perm (uvis_of U2 sts2)
