@@ -1690,7 +1690,7 @@ D IS BLOCKED ON THREE EXEC-CHANNEL FACTS -- rulings (2026-09-09):
   :1496, `wp_kinit_start` :1750); `wp_kinit_main_child` takes no cwd
   (the child drops `ucwd_any` at :997); `_CoqProject`'s comment above
   UexecExecInst still says `fsabs_env` where the supply is `app_sup`.
-ORDER: EXEC-CHANNEL (LANDED) → EXEC-ARGS → PINNED-EXEC D → ARM-c (1).
+ORDER: EXEC-CHANNEL (LANDED) → EXEC-ARGS (LANDED) → PINNED-EXEC D → ARM-c (1).
 
 EXEC-CHANNEL LANDED (2026-09-09; brief `brief-exec-channel.md`).  D-1:
 `UkRun.udepw_at N m pc n c` (after `udepw_of_uxsup`) is `udepw` with the
@@ -1711,3 +1711,24 @@ after `kxb_perm_ok`, reader `kexec_image_ok_below`; KexecBridge re-keys
 it purely.  `sh_slot_of_kexec`/`init_slot_of_kexec` read it from the image
 fact (premise dropped; neither has a caller yet).  Hygiene noticed:
 `KexecBuilt.pgroundup_ge` duplicates `UserPerm.pgroundup_ge`.
+
+EXEC-ARGS LANDED (2026-09-09; brief `brief-exec-args.md`).  sys_exec's
+contract reads the ARGV VECTOR off the process image the way it reads the
+path.  `SpecCopyin.uimg_word_at` (beside `copyin_got`: one image vocabulary
+at bytes and at words; the eight addresses are consecutive in Z, the wrap
+ruled out by `fetch_ok` + `p->sz <= MAXVA`) is the word row.
+`SpecFetchaddr.fetchaddr_got M addr r w := r = 0 -> uimg_word_at M (uint
+addr) w` rides `fetchaddr_post`'s success arm INSIDE the existential, paid
+in ProofFetchaddr out of `copyin_got` via `fa_no_wrap` (`lia`'s zify hook
+forced the arithmetic into plain-Z lemmas `fa_z_small`/`fa_z_byte`).
+`ByteBuf.bb_word_acc`'s wand names the rebuilt word's bytes;
+`RiscvModelBytes.bv_le_nth_byte(_w)` is the `bv_to_little_endian`/`nth_byte`
+bridge (moved down from KexecBuilt).  `exec_args_of` indexes pointers the
+machine's way, `uint (add_vec_int av (8 i))`, and spells its string row
+`copyinstr_got`.  The fill loop relays it: `sx_avok` beside `sx_ok`, `uvf`
+in `sx_body`/`sx_step`/`sx_loop`, the break publishing the NULL word beside
+`sx_body` at +0xb6 (the back edge's mold), `sx_head`'s slot 59 stated at
+`v1` (was a fresh ∀).  `sys_exec_slot_pre`'s wand, both arms and
+PinnedExec's three constructor wands take `exec_args_of`;
+`exec_args_shape` stays as its first conjunct (`exec_args_of_shape`).
+NEXT: PINNED-EXEC D (brief `brief-pinned-exec-d.md`), then ARM-c (1).
