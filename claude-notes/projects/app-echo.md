@@ -1690,4 +1690,24 @@ D IS BLOCKED ON THREE EXEC-CHANNEL FACTS -- rulings (2026-09-09):
   :1496, `wp_kinit_start` :1750); `wp_kinit_main_child` takes no cwd
   (the child drops `ucwd_any` at :997); `_CoqProject`'s comment above
   UexecExecInst still says `fsabs_env` where the supply is `app_sup`.
-ORDER: EXEC-CHANNEL (D-1 + D-3) → EXEC-ARGS → PINNED-EXEC D → ARM-c (1).
+ORDER: EXEC-CHANNEL (LANDED) → EXEC-ARGS → PINNED-EXEC D → ARM-c (1).
+
+EXEC-CHANNEL LANDED (2026-09-09; brief `brief-exec-channel.md`).  D-1:
+`UkRun.udepw_at N m pc n c` (after `udepw_of_uxsup`) is `udepw` with the
+cwd FIXED at `c` and the same loan of `uheap`/`ufd_auth`; adapters
+`udepw_at_of_udepw` (one direction -- redefining `udepw` would move the
+∀-order at its twenty-odd `$! M pm sz fdv cw` sites), `udepw_at_of_bundle`
+(the bare family, loan ignored), `udepw_at_of_uxsup`, `udepw_at_mint`.
+`UkRunSys.wp_uk_ecall_exec_at_cwd` takes `ucwd (ukn_cwd N) c -∗ udepw_at N
+m pc USYS_exec c`; the -1 continuation returns the fragment.  The leaf
+had NO callers (sh's exec fragment UkShRun.v:~1007 and init's
+UkInit.v:~476 call the plain `wp_uk_ecall_exec`); D is its first.  D-3:
+`KexecBuilt.kxb_perm_below sz π := ∀ p q, π !! p = Some q → p*4096 <
+pgroundup sz`, row S7 of `kexec_built` (unguarded by `kxb_walk_ok`),
+discharged at the ONE construction site ProofKexecD.v:~2048 from the
+phase's entry fact `um_below sz1 (ud_um P)` (`ProofKexecSeam.kxc_at_2a6`)
+via `kxb_perm_below_intro`; `kexec_image_ok` carries it at position 10
+after `kxb_perm_ok`, reader `kexec_image_ok_below`; KexecBridge re-keys
+it purely.  `sh_slot_of_kexec`/`init_slot_of_kexec` read it from the image
+fact (premise dropped; neither has a caller yet).  Hygiene noticed:
+`KexecBuilt.pgroundup_ge` duplicates `UserPerm.pgroundup_ge`.
