@@ -149,10 +149,12 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fds
   (* THE BYTE'S TAG (app-echo.md lane L5).  a0 carries a byte the environment
      pushed into the UART, and this is the history it arrived at together
      with the application's persistent claim about that history.  consoleintr
-     TAKES IT AND DOES NOT USE IT: the console ledger that files a tag beside
-     each buffered byte is the next lane's; what this premise buys now is
-     that the tag reaches the console at all, so no caller has to be
-     re-plumbed when the ring learns to hold it. *)
+     FILES IT: the arm that appends the byte to the ring writes [Some h] into
+     the tag column at the slot the byte lands in ([ConsoleInv.cons_row] is
+     the coupling, [cons_tags] the column), which is how consoleread can hand
+     each delivered byte's tag to its caller.  The three arms that do not
+     append -- a NUL byte, a full ring, backspace/kill-line -- drop it, and
+     a tag is persistent, so dropping costs nothing. *)
   (∃ (h : list mobs) (c : bv 8),
      ⌜ m !!! Regidx (mword_of_int 10 : mword 5)
        = (extend_value (n := 8) true (c : mword 8) : mword 64) ⌝ ∗

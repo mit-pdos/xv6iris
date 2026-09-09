@@ -591,7 +591,7 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.cons + 24) (KernelSyms.cons + 24)
                  (KernelSyms.cons + 164) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hring H]".
-    iDestruct (boot_cons_res g Hmem ltac:(zlit) ltac:(zlit) ltac:(zeq)
+    iDestruct (boot_cons_res g Hmem ltac:(zlit) ltac:(zlit) ltac:(zlit) ltac:(zeq)
                  with "Hcl Hring") as "Hring".
     iDestruct (bss_cut g (KernelSyms.cons + 164) KernelSyms.pr
                  (KernelSyms.pr + 24) ram_hi

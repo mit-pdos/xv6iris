@@ -54,18 +54,35 @@
 
    ---- WHAT IT PROMISES ABOUT THE OUTPUT -------------------------------
 
-   The RETURN VALUE RANGE, [-1 <= r <= n], and nothing else.  The [-1] is
-   real here (unlike consolewrite's): a process killed while it waits gets
-   it.  ([Z.max 0 n] rather than [n] so the statement is true at a
-   non-positive request too, where the loop never runs and the answer is 0.)
+   THE RETURN VALUE RANGE, [-1 <= r <= n].  The [-1] is real here (unlike
+   consolewrite's): a process killed while it waits gets it.  ([Z.max 0 n]
+   rather than [n] so the statement is true at a non-positive request too,
+   where the loop never runs and the answer is 0.)  It is what
+   [SpecFileread.fileread_ret] consumes.
 
-   WHAT IT DOES NOT PROMISE IS WHICH BYTES ARRIVED, and that is a property of
-   [ConsoleInv.cons_res] rather than of this contract: the ring's contents
-   are unconstrained there because the only thing that FILLS them is
-   consoleintr, which is assumed (LinkConsoleintr.v).  See ConsoleInv.v's
-   header for why a coupling stated today would be an assumption in
-   disguise.  What fileread's caller gets out of the call is the range above,
-   which is what [SpecFileread.fileread_ret] consumes. *)
+   ...AND THE LEDGER: the [d] bytes the call copied out are [d] bytes the
+   UART really delivered, in copy order, each with the application's
+   persistent claim about the history it arrived at.
+   [ConsoleInv.cons_tagged bs hs d] is the tie -- [hs !! j] ends in an
+   [ObsUartIn b] whose [ConsoleInv.cons_xlate b] IS the [j]th byte of the
+   run -- and [[∗ list] h ∈ hs, riscv_rx_tag h] is the claim.  It comes
+   out of the ring's coupling (ConsoleInv.v's header): the loop pops at
+   [cons.r] while [cons.r != cons.w], so every byte it copies is inside
+   the live range the row speaks for.  The tags are PERSISTENT, so this
+   costs the ring nothing.
+
+   THE -1 ARM IS NOT AN EXCEPTION.  A process killed mid-loop has already
+   copied earlier rounds' bytes, and those bytes were tagged; the ledger
+   is stated at the same [d] on every arm, so a caller need not case on
+   the answer to read it.
+
+   WHAT IS STILL NOT PROMISED is a LINE DISCIPLINE -- that what was typed
+   is what is read, in the order it was typed.  The ledger says each byte
+   delivered arrived at a history that ends in it; it does not order the
+   histories, and it does not say the ring was not edited (C('U') and
+   backspace drop bytes that were tagged).  What the read syscall's
+   console receipt carries to the process is exactly this
+   ([SpecFileread.console_receipt]). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -74,6 +91,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
+Require Import ObsTrace.   (* [mobs]: the tag's history *)
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import RiscvExtras.
@@ -159,10 +177,14 @@ Definition wp_consoleread_sconf_body
        WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE.  [d]
        is how far the loop got -- NOT pinned to [r], because a copyout that
        faults part-way may still have moved its byte before the loop broke.
-       [bs] is what came out of the console ring, which no contract at this
-       tier can name: the ring is the existential half of [ConsoleInv]'s
-       invariant and the loop sleeps inside the read. *)
-  ∀ (mf : regfile) (r : Z) (P' : uptd) (d : nat) (bs : nat -> bv 8),
+       [bs] is what came out of the console ring, which this contract does
+       not spell out byte for byte: the ring is the existential half of
+       [ConsoleInv]'s invariant and the loop sleeps inside the read.  What
+       it DOES say about those bytes is the ledger below -- each one is a
+       byte the UART delivered, translated by [ConsoleInv.cons_xlate], with
+       its tag. *)
+  ∀ (mf : regfile) (r : Z) (P' : uptd) (d : nat) (bs : nat -> bv 8)
+      (hs : list (list mobs)),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       (* the whole of what a device read promises: it delivered somewhere
@@ -180,6 +202,13 @@ Definition wp_consoleread_sconf_body
          kernel caller, which does see the arm. *)
       ⌜(0 <= r)%Z -> r = Z.of_nat d⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
+      (* THE LEDGER: one tag per byte copied, in copy order, tied to the
+         run's own source function.  Stated as a PURE clause beside a
+         persistent big-op rather than as one existential proposition, so
+         a caller that wants only the bytes can drop the tags by framing
+         and a caller that wants only the tie never opens an ∃. *)
+      ⌜cons_tagged bs hs d⌝ -∗
+      ([∗ list] h ∈ hs, riscv_rx_tag h) -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗

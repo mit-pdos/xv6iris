@@ -536,13 +536,20 @@ Section BootCarveMain.
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= KernelSyms.cons ->
+    (* THE RING IS .bss, AND THE COUPLING NEEDS THAT.  The three index words
+       are not merely SOME words: [ConsoleInv.cons_ok] is a relation between
+       them, and the only reason it holds at boot is that all three are
+       ZERO.  So the cells come out of [boot_cran_cell4_bss], which reads
+       the image and hands back a NAMED value, and that costs this lemma
+       the [img_end] premise every .bss claim carries. *)
+    img_end <= KernelSyms.cons ->
     KernelSyms.cons + 164 <= ram_hi ->
     KernelSyms.cons mod 4 = 0 ->
     kmap_static_claims -∗
     boot_cran g (KernelSyms.cons + 24) (KernelSyms.cons + 164) -∗
     cons_res.
   Proof.
-    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    intros Hmem Hlo Hbss Hhi Hal. iIntros "#Hcl H".
     assert (Hal4 : forall k : Z, k mod 4 = 0 -> (KernelSyms.cons + k) mod 4 = 0)
       by (intros k Hk; rewrite Z.add_mod; [| lia]; rewrite Hal Hk; reflexivity).
     (* the four windows, in address order *)
@@ -552,16 +559,25 @@ Section BootCarveMain.
                  (KernelSyms.cons + 164) ltac:(lia) ltac:(lia) with "H") as "[Hr H]".
     iDestruct (boot_cran_split g (KernelSyms.cons + 156) (KernelSyms.cons + 160)
                  (KernelSyms.cons + 164) ltac:(lia) ltac:(lia) with "H") as "[Hw He]".
-    (* the three index words *)
-    iDestruct (boot_cran_cell4 g (KernelSyms.cons + 152) Hmem ltac:(lia) ltac:(lia)
-                 ltac:(apply Hal4; reflexivity) with "Hcl Hr") as (rr) "Hr".
-    iDestruct (boot_cran_cell4 g (KernelSyms.cons + 156) Hmem ltac:(lia) ltac:(lia)
-                 ltac:(apply Hal4; reflexivity) with "Hcl Hw") as (ww) "Hw".
+    (* the three index words, AT ZERO *)
+    iDestruct (boot_cran_cell4_bss g (KernelSyms.cons + 152)
+                 (mword_of_int 0 : mword 32) Hmem ltac:(lia) ltac:(lia) ltac:(lia)
+                 ltac:(apply Hal4; reflexivity)
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl Hr") as "Hr".
+    iDestruct (boot_cran_cell4_bss g (KernelSyms.cons + 156)
+                 (mword_of_int 0 : mword 32) Hmem ltac:(lia) ltac:(lia) ltac:(lia)
+                 ltac:(apply Hal4; reflexivity)
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl Hw") as "Hw".
     iDestruct (boot_cran_eq g (KernelSyms.cons + 160) (KernelSyms.cons + 164)
                  (KernelSyms.cons + 160) (KernelSyms.cons + 160 + 4)
                  eq_refl ltac:(lia) with "He") as "He".
-    iDestruct (boot_cran_cell4 g (KernelSyms.cons + 160) Hmem ltac:(lia) ltac:(lia)
-                 ltac:(apply Hal4; reflexivity) with "Hcl He") as (ee) "He".
+    iDestruct (boot_cran_cell4_bss g (KernelSyms.cons + 160)
+                 (mword_of_int 0 : mword 32) Hmem ltac:(lia) ltac:(lia) ltac:(lia)
+                 ltac:(apply Hal4; reflexivity)
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl He") as "He".
     (* the 128 ring bytes *)
     assert (Hb128 : KernelSyms.cons + 152
                     = KernelSyms.cons + 24 + Z.of_nat INPUT_BUF_SIZE)
@@ -586,7 +602,21 @@ Section BootCarveMain.
     iEval (rewrite (Hcell 156 ltac:(apply bv_eq; vm_compute; reflexivity))) in "Hw".
     iEval (rewrite (Hcell 160 ltac:(apply bv_eq; vm_compute; reflexivity))) in "He".
     rewrite /cons_res /a_cons_r /a_cons_w /a_cons_e.
-    iExists rr, ww, ee, bs. iFrame "Hr Hw He Hb". iPureIntro. exact Hlen.
+    iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
+            (mword_of_int 0 : mword 32), bs, (replicate INPUT_BUF_SIZE None).
+    iFrame "Hr Hw He Hb".
+    iSplitR; [iPureIntro; exact Hlen |].
+    iSplitR; [iPureIntro; apply length_replicate |].
+    (* the coupling at an EMPTY ring: every distance is zero, so the row's
+       range is empty and it says nothing. *)
+    assert (H0 : bv_unsigned (sub_vec (mword_of_int 0 : mword 32)
+                                      (mword_of_int 0 : mword 32)) = 0%Z)
+      by (apply cons_sub_self).
+    iSplitR.
+    { iPureIntro. rewrite /cons_ok H0 cons_bufz. lia. }
+    iSplitR.
+    { iPureIntro. intros k Hk. rewrite H0 in Hk. exfalso. lia. }
+    iApply cons_tags_none.
   Qed.
 
   (* ------------------------------------------------------------------ *)

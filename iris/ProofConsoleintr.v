@@ -72,6 +72,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
+Require Import ObsTrace.   (* [obs_ends_in]: the tag premise's byte *)
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RiscvExtras.
@@ -364,6 +365,102 @@ Section CtBodies.
     - rewrite Z2Nat.id; [| lia]. symmetry. apply w32_moi_unsigned.
   Qed.
 
+  (* ---- THE TAG PREMISE'S BYTE ---------------------------------------
+     a0 arrives ZERO-extended ([Riscv.rv64d.extend_value] at
+     [is_unsigned = true], which is what SpecConsoleintr's premise spells),
+     so the [sb] that appends it stores the byte itself and the two
+     comparisons against '\r' are comparisons of the byte. *)
+  Lemma ct_arg_zext (c : bv 8) :
+    (extend_value (n := 8) true (c : mword 8) : mword 64)
+    = (zero_extend' 64 (c : mword 8) : mword 64).
+  Proof. reflexivity. Qed.
+
+  Lemma ct_arg_trunc8 (c : bv 8) :
+    trunc8 (extend_value (n := 8) true (c : mword 8) : mword 64) = c.
+  Proof. rewrite ct_arg_zext. apply trunc8_zext8. Qed.
+
+  Lemma ct_arg_ne13 (c : bv 8) :
+    eq_vec (extend_value (n := 8) true (c : mword 8) : mword 64)
+           (mword_of_int 13 : mword 64) = false ->
+    c <> (mword_of_int 13 : mword 8).
+  Proof. intros Hne Heq. rewrite Heq in Hne. vm_compute in Hne. discriminate. Qed.
+
+  Lemma ct_arg_eq13 (c : bv 8) :
+    eq_vec (extend_value (n := 8) true (c : mword 8) : mword 64)
+           (mword_of_int 13 : mword 64) = true ->
+    c = (mword_of_int 13 : mword 8).
+  Proof.
+    intro H. apply eq_vec_true_iff in H.
+    apply (f_equal (fun w : mword 64 => trunc8 w)) in H.
+    rewrite ct_arg_trunc8 in H. rewrite H.
+    apply bv_eq; vm_compute; reflexivity.
+  Qed.
+
+  (* the byte the '\r' arm stores, at the translation's own spelling *)
+  Lemma ct_trunc8_10 :
+    trunc8 (mword_of_int 10 : mword 64) = (mword_of_int 10 : mword 8).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+  (* ---- THE RING INDEX, AS THE COUPLING'S SLOT ------------------------
+     [ct_ring_idx] hands out SOME [i] below 128; the row is indexed by
+     [ConsoleInv.cons_slot], and the two are the same number. *)
+  Lemma ct_idx_slot (x : mword 32) (i : nat) :
+    (i < INPUT_BUF_SIZE)%nat ->
+    and_vec (sign_extend' 64 x : mword 64)
+            (sign_extend' 64 (mword_of_int 127 : mword 12))
+      = (mword_of_int (Z.of_nat i) : mword 64) ->
+    i = cons_slot x 0.
+  Proof.
+    intros Hlt Hw. rewrite <- (cons_slot_of_and x).
+    rewrite Hw moi64_unsigned.
+    assert (Hb : (0 <= Z.of_nat i < 2 ^ 64)%Z).
+    { rewrite /INPUT_BUF_SIZE in Hlt.
+      assert (H64 : (2 ^ 64)%Z = 18446744073709551616%Z)
+        by (vm_compute; reflexivity).
+      rewrite H64. lia. }
+    rewrite (bvw64_small (Z.of_nat i) Hb) Nat2Z.id. reflexivity.
+  Qed.
+
+  (* ---- THE TWO 32-BIT COMPARISONS, AT THE WORDS THEMSELVES ------------
+     both guards compare SIGN-EXTENDED cells, and the extension is
+     injective ([RiscvExtras.sext64_32_inj]). *)
+  Lemma ct_ne32 (x y : mword 32) :
+    neq_vec (sign_extend' 64 x : mword 64) (sign_extend' 64 y : mword 64) = true ->
+    x <> y.
+  Proof.
+    intros Hn Heq. subst y. unfold neq_vec in Hn.
+    rewrite eq_vec_refl in Hn. discriminate.
+  Qed.
+
+  Lemma ct_eqf32 (x y : mword 32) :
+    eq_vec (sign_extend' 64 x : mword 64) (sign_extend' 64 y : mword 64) = false ->
+    x <> y.
+  Proof. intros Hn Heq. subst y. rewrite eq_vec_refl in Hn. discriminate. Qed.
+
+  (* the ring-room guard at +0x044: [bltu a4,a5] NOT taken is
+     [cons.e - cons.r <= 127], read off the 32-bit difference the [c.subw]
+     computed.  The comparison is UNSIGNED on the sign-extended difference,
+     so a difference that does not fit in 7 bits is refuted twice over. *)
+  Lemma ct_room (x : mword 32) :
+    zopz0zI_u (mword_of_int 127 : mword 64) (sign_extend' 64 x : mword 64) = false ->
+    (bv_unsigned x < Z.of_nat INPUT_BUF_SIZE)%Z.
+  Proof.
+    intro H. rewrite cons_bufz.
+    unfold zopz0zI_u in H. apply Z.ltb_ge in H. rewrite !uint_unsigned in H.
+    assert (H127 : bv_unsigned (mword_of_int 127 : mword 64) = 127%Z)
+      by (vm_compute; reflexivity).
+    rewrite H127 in H.
+    pose proof (bv_unsigned_in_range _ (sign_extend' 64 x : mword 64)) as Hr0.
+    assert (H32 : (2 ^ 32)%Z = 4294967296%Z) by (vm_compute; reflexivity).
+    assert (Hsm : (0 <= bv_unsigned (sign_extend' 64 x : mword 64) < 2 ^ 32)%Z)
+      by (rewrite H32; lia).
+    assert (Hw : bv_wrap 32 (bv_unsigned (sign_extend' 64 x : mword 64))
+                 = bv_unsigned x).
+    { rewrite <- (trunc32_unsigned (sign_extend' 64 x)). by rewrite trunc32_sext. }
+    rewrite cons_bvw (Z.mod_small _ _ Hsm) in Hw.
+    rewrite <- Hw. lia.
+  Qed.
+
   (* the function's own exit, as a [wp_next] at the entry hart *)
   Definition ct_ret `{CID0 : CpuId} `{XI : CurCtx} (pme : mword 64) (m0 : regfile)
       (K lvl : nat) (eb : bool) (b : bool) (lks : gset string) : iProp Σ :=
@@ -651,16 +748,28 @@ Section ProofConsoleintr.
       (γc : gname) (pme : mword 64) (m0 : regfile)
       (K lvl : nat) (eb : bool) (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CIDw : CpuId) =>
-       ∀ (M : regfile) (wv : mword 64),
+       ∀ (M : regfile) (rr ww ee : mword 32) (bs : list (bv 8))
+         (ts : list (option (list mobs))),
          ⌜ M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ⌝ -∗
-         ⌜ M !!! Regidx Ra2 = wv ⌝ -∗
+         (* a2 IS THE RING'S OWN [cons.e], and that is why the ring arrives
+            DESTRUCTED here rather than as [cons_res]: this block stores a2
+            into [cons.w] and [ConsoleInv.cons_ok] is a relation between the
+            two, so under [cons_res]'s existential the equation could not
+            even be stated.  All four entries have it -- each has just put
+            the new [cons.e] in a2. *)
+         ⌜ M !!! Regidx Ra2 = sign_extend' 64 ee ⌝ -∗
          ⌜ ct_cs_hi M m0 ⌝ -∗
+         ⌜ length bs = INPUT_BUF_SIZE ⌝ -∗
+         ⌜ length ts = INPUT_BUF_SIZE ⌝ -∗
+         ⌜ cons_ok rr ww ee ⌝ -∗
+         ⌜ cons_row rr ee bs ts ⌝ -∗
          sie_cap_gpr KT1 M (trap_res b + (K - 6))%nat false pme -∗
          pc_is (mword_of_int (CT + 0x156)) -∗
          cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
          arm_pay KT1 lvl eb pme -∗
          locked γc cpu_id -∗
-         cons_res -∗
+         a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗
+         cons_data bs -∗ cons_tags ts -∗
          ct_rest sp0 -∗
          ct_exit_prop (CID0 := CID0) γc pme m0 K lvl eb b sp0 lks -∗
          WP (Loop : expr riscv_lang)))%I.
@@ -686,7 +795,9 @@ Section ProofConsoleintr.
       lkbelow. }
     iIntros "#Ht #Hpinv".
     rewrite /ct_wake_prop.
-    iIntros (CIDw Hsw M wv) "%Hsp %Ha2 %Hcs Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT".
+    iIntros (CIDw Hsw M rr ww ee bs ts)
+      "%Hsp %Ha2 %Hcs %Hlenb %Hlent %Hok %Hrow Hcg Hpc Hcnt Hpay Hlocked
+       Hrc Hwc Hec Hdat Hts Hrest EXIT".
     (* +0x156 auipc a5,0x12 *)
     iApply (wp_auipc_s_sconf (mword_of_int (CT + 0x156)) Ra5 (mword_of_int 18 : mword 20)
               M (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat false
@@ -700,11 +811,10 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x15a)) by pcw.
     iEval (rewrite Hp15a) in "Hpc".
     (* +0x15a sw a2,-198(a5) : cons.w := cons.e *)
-    iDestruct "Hres" as (rr ww ee bs) "(Hrc & Hwc & Hec & %Hlenb & Hdat)".
     assert (HW1wa : add_vec (W1 !!! Regidx Ra5)
                       (sign_extend' 64 (mword_of_int 3914 : mword 12)) = a_cons_w).
     { rewrite /W1 upd_eq /a_cons_w /coff_of /a_cons. apply bv_eq; vm_compute; reflexivity. }
-    assert (HW1a2 : W1 !!! Regidx Ra2 = wv)
+    assert (HW1a2 : W1 !!! Regidx Ra2 = sign_extend' 64 ee)
       by (rewrite /W1 upd_ne; [exact Ha2 | reg_neq]).
     iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CT + 0x15a)) Ra2 Ra5 (mword_of_int 3914 : mword 12)
               W1 (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat ww false
@@ -712,13 +822,17 @@ Section ProofConsoleintr.
     { iApply (cnti_15a with "Ht"). }
     { rgall. iEval (rewrite HW1wa). iExact "Hwc". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hwc". rgall.
-    iEval (rewrite HW1wa HW1a2) in "Hwc".
+    iEval (rewrite HW1wa HW1a2 trunc32_sext) in "Hwc".
     assert (Hp15e : add_vec_int (mword_of_int (CT + 0x15a) : mword 64) 4
                     = mword_of_int (CT + 0x15e)) by pcw.
     iEval (rewrite Hp15e) in "Hpc".
-    iAssert (cons_res) with "[Hrc Hwc Hec Hdat]" as "Hres".
-    { iExists rr, (trunc32 wv), ee, bs. iFrame "Hrc Hwc Hec Hdat".
-      iPureIntro. exact Hlenb. }
+    (* the store moved [cons.w] up to [cons.e]: the row is untouched (it
+       speaks of [r .. e)) and [cons_ok] holds because [w = e]. *)
+    iAssert (cons_res) with "[Hrc Hwc Hec Hdat Hts]" as "Hres".
+    { iExists rr, ee, ee, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+      iPureIntro. split_and!;
+        [ exact Hlenb | exact Hlent | exact (cons_ok_set_w rr ww ee Hok)
+        | exact Hrow ]. }
     (* +0x15e auipc a0,0x12 ; +0x162 addi a0,a0,-210 : a0 := &cons.r *)
     iApply (wp_auipc_s_sconf (mword_of_int (CT + 0x15e)) Ra0 (mword_of_int 18 : mword 20)
               W1 (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat false
@@ -897,7 +1011,8 @@ Section ProofConsoleintr.
       (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CIDk : CpuId) =>
-       ∀ (M : regfile) (rr ww ee : mword 32) (bs : list (bv 8)),
+       ∀ (M : regfile) (rr ww ee : mword 32) (bs : list (bv 8))
+         (ts : list (option (list mobs))),
          ⌜ M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ⌝ -∗
          ⌜ M !!! Regidx Rs1 = a_cons ⌝ -∗
          ⌜ M !!! Regidx Rs2 = (mword_of_int 10 : mword 64) ⌝ -∗
@@ -905,13 +1020,23 @@ Section ProofConsoleintr.
          ⌜ M !!! Regidx Ra5 = sign_extend' 64 ee ⌝ -∗
          ⌜ ct_cs_top M m0 ⌝ -∗
          ⌜ length bs = INPUT_BUF_SIZE ⌝ -∗
+         ⌜ length ts = INPUT_BUF_SIZE ⌝ -∗
+         ⌜ cons_ok rr ww ee ⌝ -∗
+         ⌜ cons_row rr ee bs ts ⌝ -∗
+         (* THE LOOP'S OWN GUARD, HOISTED INTO THE INVARIANT.  The body
+            decrements [cons.e] BEFORE the [bne] at +0x0da re-tests it, so
+            what makes the decrement legal is the test the ENTRY ran: both
+            ways in ([ct_kill_pre]'s [beq] at +0x0b4 and the back edge)
+            establish it. *)
+         ⌜ ee <> ww ⌝ -∗
          ct_exit_prop (CID0 := CID0) γc pme m0 K lvl eb b sp0 lks -∗
          sie_cap_gpr KT1 M (trap_res b + (K - 6))%nat false pme -∗
          pc_is (mword_of_int (CT + 0xb8)) -∗
          cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
          arm_pay KT1 lvl eb pme -∗
          locked γc cpu_id -∗
-         a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗ cons_data bs -∗
+         a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗
+         cons_data bs -∗ cons_tags ts -∗
          pa_stk sp0 4 ↦₈[KT1] (m0 !!! Regidx Rs2) -∗
          pa_stk sp0 5 ↦₈[KT1] (m0 !!! Regidx Rs3) -∗
          (∃ w : mword 64, pa_stk sp0 6 ↦₈[KT1] w) -∗
@@ -935,8 +1060,9 @@ Section ProofConsoleintr.
     iIntros "#Ht #Hdev #Htxl #Hsub".
     rewrite /ct_kill_prop.
     iLöb as "IH".
-    iIntros (CIDk Hsk M rr ww ee bs)
-      "%Hsp %Hs1 %Hs2 %Hs3 %Ha5 %Hthr %Hlenb EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat H4 H5 H6".
+    iIntros (CIDk Hsk M rr ww ee bs ts)
+      "%Hsp %Hs1 %Hs2 %Hs3 %Ha5 %Hthr %Hlenb %Hlent %Hok %Hrow %Hne
+       EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts H4 H5 H6".
     (* ---- +0x0b8 c.addiw a5,a5,-1 ---- *)
     iApply (wp_caddiw_s_sconf (mword_of_int (CT + 0xb8)) Ra5 (mword_of_int 63 : mword 6)
               M (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat false
@@ -1051,11 +1177,14 @@ Section ProofConsoleintr.
                 ltac:(exact (ct_cs_top_thr L4 M m0 HthrL Hthr))
                 ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(vm_compute; reflexivity)
                 ltac:(wp_next_chain) Hbelow
-                with "[] [] [] Hcg Hpc Hcnt Hpay Hlocked [Hrc Hwc Hec Hdat] H4 H5 H6 EXIT").
+                with "[] [] [] Hcg Hpc Hcnt Hpay Hlocked
+                      [Hrc Hwc Hec Hdat Hts] H4 H5 H6 EXIT").
       { iApply (cnti_0ea with "Ht"). }
       { iApply (cnti_0ec with "Ht"). }
       { iApply (cnti_0ee with "Ht"). }
-      iExists rr, ww, ee, bs. iFrame "Hrc Hwc Hec Hdat". iPureIntro. exact Hlenb. }
+      iExists rr, ww, ee, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+      iPureIntro. split_and!;
+        [ exact Hlenb | exact Hlent | exact Hok | exact Hrow ]. }
     (* ---- an ordinary byte: erase it ---- *)
     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0xc4)) (mword_of_int 38 : mword 13)
               Rs2 Ra4 L4 (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat
@@ -1079,6 +1208,24 @@ Section ProofConsoleintr.
     { rgall. iEval (rewrite Hea). iExact "Hec". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hec". rgall.
     iEval (rewrite Hea HL4a5 trunc32_sext) in "Hec".
+    (* THE DECREMENT, AT THE COUPLING.  [ee <> ww] is the loop invariant's
+       own clause, so [cons.e--] cannot take [e] below [w]; the live range
+       shrinks by one and the row is inherited (the dropped slot's tag
+       simply stays in [ts]). *)
+    assert (Hok' : cons_ok rr ww ee')
+      by (rewrite /ee'; exact (cons_ok_dec_e rr ww ee Hok Hne)).
+    assert (Hge1 : (1 <= bv_unsigned (sub_vec ee rr))%Z).
+    { destruct Hok as [Hle1 Hle2].
+      pose proof (cons_sub_range ww rr) as Hrw.
+      destruct (Z.eq_dec (bv_unsigned (sub_vec ww rr))
+                         (bv_unsigned (sub_vec ee rr))) as [E | NE].
+      - exfalso. apply Hne. symmetry. exact (cons_sub_inj rr ww ee E).
+      - lia. }
+    assert (Hdec : bv_unsigned (sub_vec ee' rr)
+                   = (bv_unsigned (sub_vec ee rr) - 1)%Z)
+      by (rewrite /ee'; exact (cons_sub_dec ee rr Hge1)).
+    assert (Hrow' : cons_row rr ee' bs ts)
+      by (exact (cons_row_mono rr ee ee' bs ts ltac:(lia) Hrow)).
     assert (Hp0cc : add_vec_int (mword_of_int (CT + 0xc8) : mword 64) 4
                     = mword_of_int (CT + 0xcc)) by pcw.
     iEval (rewrite Hp0cc) in "Hpc".
@@ -1180,15 +1327,20 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0xb8)) by pcw.
       iEval (rewrite Hbk) in "Hpc".
       iSpecialize ("IH" $! CIDk with "[%]"); [wp_next_chain|].
-      iApply ("IH" $! L8 rr ww ee' bs with "[%] [%] [%] [%] [%] [%] [%]
-                EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat H4 H5 H6").
+      iApply ("IH" $! L8 rr ww ee' bs ts with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+                EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts H4 H5 H6").
       - rewrite (HthrL8 csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
       - rewrite (HthrL8 Rs1 ltac:(vm_compute; reflexivity)). exact Hs1.
       - rewrite (HthrL8 Rs2 ltac:(vm_compute; reflexivity)). exact Hs2.
       - rewrite (HthrL8 Rs3 ltac:(vm_compute; reflexivity)). exact Hs3.
       - exact HL8a5.
       - exact (ct_cs_top_thr L8 M m0 HthrL8 Hthr).
-      - exact Hlenb. }
+      - exact Hlenb.
+      - exact Hlent.
+      - exact Hok'.
+      - exact Hrow'.
+      (* the back edge re-tests [cons.e != cons.w], which is the IH's clause *)
+      - intro Hc; exact (ct_ne32 ww ee' Hmore (eq_sym Hc)). }
     (* the line is empty: fall out at +0x0de *)
     iApply (wp_bne_fall_s_sconf (mword_of_int (CT + 0xda)) (mword_of_int 8158 : mword 13)
               Ra5 Ra4 L8 (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat
@@ -1206,11 +1358,13 @@ Section ProofConsoleintr.
               ltac:(exact (ct_cs_top_thr L8 M m0 HthrL8 Hthr))
               ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(vm_compute; reflexivity)
               ltac:(wp_next_chain) Hbelow
-              with "[] [] [] Hcg Hpc Hcnt Hpay Hlocked [Hrc Hwc Hec Hdat] H4 H5 H6 EXIT").
+              with "[] [] [] Hcg Hpc Hcnt Hpay Hlocked
+                    [Hrc Hwc Hec Hdat Hts] H4 H5 H6 EXIT").
     { iApply (cnti_0de with "Ht"). }
     { iApply (cnti_0e0 with "Ht"). }
     { iApply (cnti_0e2 with "Ht"). }
-    iExists rr, ww, ee', bs. iFrame "Hrc Hwc Hec Hdat". iPureIntro. exact Hlenb.
+    iExists rr, ww, ee', bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+    iPureIntro. split_and!; [ exact Hlenb | exact Hlent | exact Hok' | exact Hrow' ].
   Qed.
 
   (* =================================================================== *)
@@ -1221,7 +1375,9 @@ Section ProofConsoleintr.
   Lemma ct_cr `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
-      (b : bool) (sp0 : mword 64) (lks : gset string) :
+      (b : bool) (sp0 : mword 64) (lks : gset string)
+      (rr ww ee : mword 32) (bs : list (bv 8))
+      (ts : list (option (list mobs))) (h : list mobs) (c : bv 8) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     ct_cs_hi M m0 ->
     (consoleintr_stack <= K)%nat ->
@@ -1230,21 +1386,36 @@ Section ProofConsoleintr.
     (* same "cons" bound as the sibling arms: this one reaches consputc,
        whose cone runs up to "uart" (15). *)
     locks_below lks "cons" ->
+    (* THE RING, DESTRUCTED, with [ct_dflt]'s room guard beside it: this arm
+       falls straight into WAKE, which needs a2 to be THIS [cons.e]. *)
+    length bs = INPUT_BUF_SIZE ->
+    length ts = INPUT_BUF_SIZE ->
+    cons_ok rr ww ee ->
+    cons_row rr ee bs ts ->
+    (bv_unsigned (sub_vec ee rr) < Z.of_nat INPUT_BUF_SIZE)%Z ->
+    (* the byte and its tag.  This is the arm the '\r' test TOOK, so the
+       byte is the carriage return and [ConsoleInv.cons_xlate] of it is the
+       newline the code stores. *)
+    obs_ends_in h c ->
+    c = (mword_of_int 13 : mword 8) ->
     kernel_text -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
+    riscv_rx_tag h -∗
     sie_cap_gpr KT1 M (trap_res b + (K - 6))%nat false pme -∗
     pc_is (mword_of_int (CT + 0x12e)) -∗
     cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
     arm_pay KT1 lvl eb pme -∗
     locked γc cpu_id -∗
-    cons_res -∗
+    a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗
+    cons_data bs -∗ cons_tags ts -∗
     ct_rest sp0 -∗
     ct_wake_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
     ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hsp Hcs HK Hlvl Hchain Hbelow.
-    iIntros "#Ht #Hdev #Htxl #Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest WAKE EXIT".
+    intros Hsp Hcs HK Hlvl Hchain Hbelow Hlenb Hlent Hok Hrow Hroom Hends Hc13.
+    iIntros "#Ht #Hdev #Htxl #Hsub #Htg Hcg Hpc Hcnt Hpay Hlocked
+             Hrc Hwc Hec Hdat Hts Hrest WAKE EXIT".
     (* ---- +0x12e c.li a0,10 ; +0x130 jal consputc ---- *)
     iApply (wp_cli_s_sconf (mword_of_int (CT + 0x12e)) Ra0 (mword_of_int 10 : mword 6)
               (mword_of_int 10 : mword 64) M (trap_res b + (K - 6))%nat false
@@ -1310,7 +1481,6 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x13c)) by pcw.
     iEval (rewrite Hp13c) in "Hpc".
     (* ---- +0x13c lw a4,160(a5) : a4 := cons.e ---- *)
-    iDestruct "Hres" as (rr ww ee bs) "(Hrc & Hwc & Hec & %Hlenb & Hdat)".
     assert (Hea : add_vec (D4 !!! Regidx Ra5)
                     (sign_extend' 64 (mword_of_int 160 : mword 12)) = a_cons_e)
       by (rewrite HD4a5; reflexivity).
@@ -1447,16 +1617,28 @@ Section ProofConsoleintr.
     assert (HthrA : forall r : mword 5, is_cs_idx r = true ->
               D10 !!! Regidx r = M !!! Regidx r)
       by (intros r Hr; rewrite (HthrD r Hr); apply HthrC; exact Hr).
-    iAssert (cons_res) with "[Hrc Hwc Hec Hdat]" as "Hres".
-    { iExists rr, ww, ee1, (<[idx := trunc8 (mword_of_int 10 : mword 64)]> bs).
-      iFrame "Hrc Hwc Hec Hdat". iPureIntro. rewrite length_insert. exact Hlenb. }
+    (* THE APPEND, AT THE COUPLING.  The slot is [cons.e]'s own
+       ([ct_idx_slot]), the byte is [cons_xlate '\r'] = '\n', and the tag
+       filed beside it is the one the contract handed in. *)
+    assert (Hidx : idx = cons_slot ee 0) by (exact (ct_idx_slot ee idx Hidxlt Hidxw)).
+    assert (Hbyte10 : trunc8 (mword_of_int 10 : mword 64) = cons_xlate c).
+    { rewrite Hc13 cons_xlate_cr. exact ct_trunc8_10. }
+    iDestruct (cons_tags_upd ts idx h with "Htg Hts") as "Hts".
     iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
-    iApply ("WAKE" $! D10 (sign_extend' 64 ee1) with "[%] [%] [%]
-              Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT").
+    iApply ("WAKE" $! D10 rr ww ee1
+              (<[idx := trunc8 (mword_of_int 10 : mword 64)]> bs)
+              (<[idx := Some h]> ts)
+              with "[%] [%] [%] [%] [%] [%] [%]
+              Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hrest EXIT").
     - rewrite (HthrA csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
     - rewrite /D10 upd_ne; [| reg_neq]. rewrite /D9 upd_ne; [| reg_neq].
       rewrite /D8 upd_ne; [| reg_neq]. rewrite /D7; apply upd_eq.
     - exact (ct_cs_hi_thr D10 M m0 HthrA Hcs).
+    - rewrite length_insert. exact Hlenb.
+    - rewrite length_insert. exact Hlent.
+    - rewrite /ee1. exact (cons_ok_inc_e rr ww ee Hok Hroom).
+    - rewrite Hbyte10 /ee1.
+      exact (cons_row_push rr ee idx bs ts h c Hlenb Hlent Hroom Hidx Hends Hrow).
   Qed.
 
   (* =================================================================== *)
@@ -1513,7 +1695,8 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0xf8)) by pcw.
     iEval (rewrite Hp0f8) in "Hpc".
     (* ---- +0x0f8 lw a5,160(a4) ; +0x0fc lw a4,156(a4) ---- *)
-    iDestruct "Hres" as (rr ww ee bs) "(Hrc & Hwc & Hec & %Hlenb & Hdat)".
+    iDestruct "Hres" as (rr ww ee bs ts)
+      "(Hrc & Hwc & Hec & %Hlenb & %Hlent & %Hok & %Hrow & Hdat & Hts)".
     assert (Hea : add_vec (B2 !!! Regidx Ra4)
                     (sign_extend' 64 (mword_of_int 160 : mword 12)) = a_cons_e)
       by (rewrite HB2a4; reflexivity).
@@ -1566,10 +1749,12 @@ Section ProofConsoleintr.
       iEval (rewrite Hp104) in "Hpc".
       iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
       iApply ("EXIT" $! B4 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked
-                [Hrc Hwc Hec Hdat] Hrest").
+                [Hrc Hwc Hec Hdat Hts] Hrest").
       - rewrite (HthrB csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
       - exact (ct_cs_hi_thr B4 M m0 HthrB Hcs).
-      - iExists rr, ww, ee, bs. iFrame "Hrc Hwc Hec Hdat". iPureIntro. exact Hlenb. }
+      - iExists rr, ww, ee, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+        iPureIntro. split_and!;
+          [ exact Hlenb | exact Hlent | exact Hok | exact Hrow ]. }
     (* ---- +0x11a .. +0x12c : erase it ---- *)
     iApply (wp_bne_taken_s_sconf (mword_of_int (CT + 0x100)) (mword_of_int 26 : mword 13)
               Ra5 Ra4 B4 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
@@ -1614,6 +1799,26 @@ Section ProofConsoleintr.
     { rgall. iEval (rewrite HB6ea). iExact "Hec". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hec". rgall.
     iEval (rewrite HB6ea HB6a5 trunc32_sext) in "Hec".
+    (* THE DECREMENT, AT THE COUPLING.  The [bne] at +0x100 that brought
+       control here is the test [cons.e != cons.w], so [cons.e--] cannot
+       take [e] below [w]; the live range shrinks by one and the row is
+       inherited (the dropped slot's tag simply stays in [ts]). *)
+    assert (Hew : ee <> ww)
+      by (intro Hc; exact (ct_ne32 ww ee Hne (eq_sym Hc))).
+    assert (Hok' : cons_ok rr ww ee1)
+      by (rewrite /ee1; exact (cons_ok_dec_e rr ww ee Hok Hew)).
+    assert (Hge1 : (1 <= bv_unsigned (sub_vec ee rr))%Z).
+    { destruct Hok as [Hle1 Hle2].
+      pose proof (cons_sub_range ww rr) as Hrw.
+      destruct (Z.eq_dec (bv_unsigned (sub_vec ww rr))
+                         (bv_unsigned (sub_vec ee rr))) as [E | NE].
+      - exfalso. apply Hew. symmetry. exact (cons_sub_inj rr ww ee E).
+      - lia. }
+    assert (Hdec : bv_unsigned (sub_vec ee1 rr)
+                   = (bv_unsigned (sub_vec ee rr) - 1)%Z)
+      by (rewrite /ee1; exact (cons_sub_dec ee rr Hge1)).
+    assert (Hrow' : cons_row rr ee1 bs ts)
+      by (exact (cons_row_mono rr ee ee1 bs ts ltac:(lia) Hrow)).
     assert (Hp124 : add_vec_int (mword_of_int (CT + 0x120) : mword 64) 4
                     = mword_of_int (CT + 0x124)) by pcw.
     iEval (rewrite Hp124) in "Hpc".
@@ -1676,10 +1881,12 @@ Section ProofConsoleintr.
     iEval (rewrite Hj104) in "Hpc".
     iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
     iApply ("EXIT" $! mcp with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked
-              [Hrc Hwc Hec Hdat] Hrest").
+              [Hrc Hwc Hec Hdat Hts] Hrest").
     - rewrite (HthrM csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
     - exact (ct_cs_hi_thr mcp M m0 HthrM Hcs).
-    - iExists rr, ww, ee1, bs. iFrame "Hrc Hwc Hec Hdat". iPureIntro. exact Hlenb.
+    - iExists rr, ww, ee1, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+      iPureIntro. split_and!;
+        [ exact Hlenb | exact Hlent | exact Hok' | exact Hrow' ].
   Qed.
 
   (* =================================================================== *)
@@ -1763,7 +1970,8 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x9e)) by pcw.
     iEval (rewrite Hp09e) in "Hpc".
     (* ---- +0x09e lw a5,160(a4) ; +0x0a2 lw a4,156(a4) ---- *)
-    iDestruct "Hres" as (rr ww ee bs) "(Hrc & Hwc & Hec & %Hlenb & Hdat)".
+    iDestruct "Hres" as (rr ww ee bs ts)
+      "(Hrc & Hwc & Hec & %Hlenb & %Hlent & %Hok & %Hrow & Hdat & Hts)".
     assert (Hea : add_vec (E2 !!! Regidx Ra4)
                     (sign_extend' 64 (mword_of_int 160 : mword 12)) = a_cons_e)
       by (rewrite HE2a4; reflexivity).
@@ -1881,11 +2089,13 @@ Section ProofConsoleintr.
                 ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(vm_compute; reflexivity)
                 Hchain Hbelow
                 with "[] [] [] Hcg Hpc Hcnt Hpay Hlocked
-                      [Hrc Hwc Hec Hdat] H4 H5 H6 EXIT").
+                      [Hrc Hwc Hec Hdat Hts] H4 H5 H6 EXIT").
       { iApply (cnti_0e4 with "Ht"). }
       { iApply (cnti_0e6 with "Ht"). }
       { iApply (cnti_0e8 with "Ht"). }
-      iExists rr, ww, ee, bs. iFrame "Hrc Hwc Hec Hdat". iPureIntro. exact Hlenb. }
+      iExists rr, ww, ee, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+      iPureIntro. split_and!;
+        [ exact Hlenb | exact Hlent | exact Hok | exact Hrow ]. }
     (* ---- the line is not empty: enter the loop at +0x0b8 ---- *)
     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0xb4)) (mword_of_int 48 : mword 13)
               Ra5 Ra4 E8 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
@@ -1896,10 +2106,15 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0xb8)) by pcw.
     iEval (rewrite Hp0b8) in "Hpc".
     iSpecialize ("KILL" $! CIDq with "[%]"); [exact Hchain|].
-    iApply ("KILL" $! E8 rr ww ee bs with "[%] [%] [%] [%] [%] [%] [%]
-              EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat H4 H5 H6");
+    (* the [beq] the loop is entered THROUGH is what supplies its invariant's
+       [cons.e != cons.w] clause -- the body decrements before the back edge
+       re-tests. *)
+    iApply ("KILL" $! E8 rr ww ee bs ts
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+              EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts H4 H5 H6");
       [ exact HE8sp | exact HE8s1 | exact HE8s2 | exact HE8s3 | exact HE8a5
-      | exact HE8top | exact Hlenb ].
+      | exact HE8top | exact Hlenb | exact Hlent | exact Hok | exact Hrow
+      | intro Hc; exact (ct_eqf32 ww ee Hemp (eq_sym Hc)) ].
   Qed.
 
   (* =================================================================== *)
@@ -1910,7 +2125,9 @@ Section ProofConsoleintr.
   Lemma ct_store `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
-      (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string) :
+      (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string)
+      (rr ww ee : mword 32) (bs : list (bv 8))
+      (ts : list (option (list mobs))) (h : list mobs) (c : bv 8) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     M !!! Regidx Rs1 = cv ->
     ct_cs_hi M m0 ->
@@ -1920,21 +2137,38 @@ Section ProofConsoleintr.
     (* same "cons" bound as the sibling arms: the store path reaches
        consputc, whose cone runs up to "uart" (15). *)
     locks_below lks "cons" ->
+    (* THE RING, DESTRUCTED, with [ct_dflt]'s room guard beside it: the
+       three ways out of this block that reach WAKE all need a2 to be THIS
+       [cons.e], which [cons_res]'s existential cannot say. *)
+    length bs = INPUT_BUF_SIZE ->
+    length ts = INPUT_BUF_SIZE ->
+    cons_ok rr ww ee ->
+    cons_row rr ee bs ts ->
+    (bv_unsigned (sub_vec ee rr) < Z.of_nat INPUT_BUF_SIZE)%Z ->
+    (* the byte and its tag.  This is the arm the '\r' test did NOT take,
+       so [ConsoleInv.cons_xlate] is the identity on the byte. *)
+    obs_ends_in h c ->
+    cv = (extend_value (n := 8) true (c : mword 8) : mword 64) ->
+    c <> (mword_of_int 13 : mword 8) ->
     kernel_text -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
+    riscv_rx_tag h -∗
     sie_cap_gpr KT1 M (trap_res b + (K - 6))%nat false pme -∗
     pc_is (mword_of_int (CT + 0x4e)) -∗
     cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
     arm_pay KT1 lvl eb pme -∗
     locked γc cpu_id -∗
-    cons_res -∗
+    a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗
+    cons_data bs -∗ cons_tags ts -∗
     ct_rest sp0 -∗
     ct_wake_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
     ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hsp Hs1 Hcs HK Hlvl Hchain Hbelow.
-    iIntros "#Ht #Hdev #Htxl #Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest WAKE EXIT".
+    intros Hsp Hs1 Hcs HK Hlvl Hchain Hbelow Hlenb Hlent Hok Hrow Hroom
+           Hends Hcv Hc13.
+    iIntros "#Ht #Hdev #Htxl #Hsub #Htg Hcg Hpc Hcnt Hpay Hlocked
+             Hrc Hwc Hec Hdat Hts Hrest WAKE EXIT".
     (* ---- +0x04e c.mv a0,s1 ; +0x050 jal consputc : the echo ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (CT + 0x4e)) Ra0 Rs1 M
               (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
@@ -2001,7 +2235,6 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x5c)) by pcw.
     iEval (rewrite Hp05c) in "Hpc".
     (* ---- +0x05c lw a3,160(a4) : a3 := cons.e ---- *)
-    iDestruct "Hres" as (rr ww ee bs) "(Hrc & Hwc & Hec & %Hlenb & Hdat)".
     assert (Hea : add_vec (F4 !!! Regidx Ra4)
                     (sign_extend' 64 (mword_of_int 160 : mword 12)) = a_cons_e)
       by (rewrite HF4a4; reflexivity).
@@ -2090,7 +2323,8 @@ Section ProofConsoleintr.
     iEval (rewrite Hp070) in "Hpc".
     (* ---- +0x070 sb s1,24(a4) : the byte lands in the ring ---- *)
     destruct (cons_data_lookup_lt bs idx Hlenb Hidxlt) as [db Hlk].
-    iDestruct (cons_data_upd bs idx db (trunc8 cv) Hlk with "Hdat") as "[Hbyte Hdback]".
+    iDestruct (cons_data_upd bs idx db (cons_xlate c) Hlk with "Hdat")
+      as "[Hbyte Hdback]".
     assert (HF9a4 : F9 !!! Regidx Ra4
                     = add_vec a_cons (mword_of_int (Z.of_nat idx) : mword 64))
       by (rewrite /F9; apply upd_eq).
@@ -2109,10 +2343,26 @@ Section ProofConsoleintr.
     { rgall. iEval (rewrite Hbaddr). iExact "Hbyte". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hbyte". rgall.
     iEval (rewrite Hbaddr HF9s1) in "Hbyte".
+    (* THE APPEND, AT THE COUPLING.  a0 arrives zero-extended, so the [sb]
+       stores the byte itself; the '\r' test fell through, so [cons_xlate]
+       is the identity on it, and the tag the contract handed in is filed
+       in the slot [cons.e] names. *)
+    assert (Hxl : trunc8 cv = cons_xlate c).
+    { rewrite Hcv ct_arg_trunc8. symmetry. exact (cons_xlate_other c Hc13). }
+    iEval (rewrite Hxl) in "Hbyte".
     iDestruct ("Hdback" with "Hbyte") as "Hdat".
-    iAssert (cons_res) with "[Hrc Hwc Hec Hdat]" as "Hres".
-    { iExists rr, ww, ee1, (<[idx := trunc8 cv]> bs).
-      iFrame "Hrc Hwc Hec Hdat". iPureIntro. rewrite length_insert. exact Hlenb. }
+    assert (Hidx : idx = cons_slot ee 0) by (exact (ct_idx_slot ee idx Hidxlt Hidxw)).
+    iDestruct (cons_tags_upd ts idx h with "Htg Hts") as "Hts".
+    assert (Hlenb1 : length (<[idx := cons_xlate c]> bs) = INPUT_BUF_SIZE)
+      by (rewrite length_insert; exact Hlenb).
+    assert (Hlent1 : length (<[idx := Some h]> ts) = INPUT_BUF_SIZE)
+      by (rewrite length_insert; exact Hlent).
+    assert (Hok1 : cons_ok rr ww ee1)
+      by (rewrite /ee1; exact (cons_ok_inc_e rr ww ee Hok Hroom)).
+    assert (Hrow1 : cons_row rr ee1 (<[idx := cons_xlate c]> bs)
+                      (<[idx := Some h]> ts))
+      by (rewrite /ee1;
+          exact (cons_row_push rr ee idx bs ts h c Hlenb Hlent Hroom Hidx Hends Hrow)).
     assert (Hp074 : add_vec_int (mword_of_int (CT + 0x70) : mword 64) 4
                     = mword_of_int (CT + 0x74)) by pcw.
     iEval (rewrite Hp074) in "Hpc".
@@ -2170,9 +2420,11 @@ Section ProofConsoleintr.
                       = mword_of_int (CT + 0x156)) by pcw.
       iEval (rewrite Hj156) in "Hpc".
       iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
-      iApply ("WAKE" $! F10 (sign_extend' 64 ee1) with "[%] [%] [%]
-                Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT");
-        [ exact Hsp10 | exact HF10a2 | exact Hcshi10 ]. }
+      iApply ("WAKE" $! F10 rr ww ee1 (<[idx := cons_xlate c]> bs)
+                (<[idx := Some h]> ts) with "[%] [%] [%] [%] [%] [%] [%]
+                Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hrest EXIT");
+        [ exact Hsp10 | exact HF10a2 | exact Hcshi10
+        | exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 ]. }
     (* ---- +0x07a c.addi s1,s1,-4 ; +0x07c c.beqz s1 : is it C('D')? ---- *)
     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (CT + 0x78)) (mword_of_int 111 : mword 8)
               (Cregidx (mword_of_int 6)) Ra4 F10 (trap_res b + (K - 6))%nat false
@@ -2223,9 +2475,11 @@ Section ProofConsoleintr.
                       = mword_of_int (CT + 0x156)) by pcw.
       iEval (rewrite Hj156) in "Hpc".
       iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
-      iApply ("WAKE" $! F11 (sign_extend' 64 ee1) with "[%] [%] [%]
-                Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT");
-        [ exact Hsp11 | exact HF11a2 | exact Hcshi11 ]. }
+      iApply ("WAKE" $! F11 rr ww ee1 (<[idx := cons_xlate c]> bs)
+                (<[idx := Some h]> ts) with "[%] [%] [%] [%] [%] [%] [%]
+                Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hrest EXIT");
+        [ exact Hsp11 | exact HF11a2 | exact Hcshi11
+        | exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 ]. }
     (* ---- +0x07e .. +0x08c : is the ring now full? ---- *)
     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (CT + 0x7c)) (mword_of_int 109 : mword 8)
               (Cregidx (mword_of_int 1)) Rs1 F11 (trap_res b + (K - 6))%nat false
@@ -2246,25 +2500,24 @@ Section ProofConsoleintr.
     assert (Hp082 : add_vec_int (mword_of_int (CT + 0x7e) : mword 64) 4
                     = mword_of_int (CT + 0x82)) by pcw.
     iEval (rewrite Hp082) in "Hpc".
-    (* +0x082 lw a4,14(a4) : a4 := cons.r, off the auipc base *)
-    iDestruct "Hres" as (rr' ww' ee' bs') "(Hrc & Hwc & Hec & %Hlenb' & Hdat)".
+    (* +0x082 lw a4,14(a4) : a4 := cons.r, off the auipc base.  The ring
+       stays DESTRUCTED across this read: the fullness test below compares
+       the [cons.e] this block just wrote against this very [cons.r]. *)
     assert (Hra : add_vec (F12 !!! Regidx Ra4)
                     (sign_extend' 64 (mword_of_int 30 : mword 12)) = a_cons_r).
     { rewrite /F12 upd_eq /a_cons_r /coff_of /a_cons. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CT + 0x82)) Ra4 Ra4 (mword_of_int 30 : mword 12)
-              F12 (trap_res b + (K - 6))%nat rr' false ltac:(nz) ltac:(rdok)
+              F12 (trap_res b + (K - 6))%nat rr false ltac:(nz) ltac:(rdok)
               with "Hcg Hpc [] [Hrc]").
     { iApply (cnti_082 with "Ht"). }
     { rgall. iEval (rewrite Hra). iExact "Hrc". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hrc". rgall. iEval (rewrite Hra) in "Hrc".
-    set (F13 := <[Regidx Ra4 := regval_into_reg (sign_extend' 64 rr')]> F12).
-    iAssert (cons_res) with "[Hrc Hwc Hec Hdat]" as "Hres".
-    { iExists rr', ww', ee', bs'. iFrame "Hrc Hwc Hec Hdat". iPureIntro. exact Hlenb'. }
+    set (F13 := <[Regidx Ra4 := regval_into_reg (sign_extend' 64 rr)]> F12).
     assert (Hp086 : add_vec_int (mword_of_int (CT + 0x82) : mword 64) 4
                     = mword_of_int (CT + 0x86)) by pcw.
     iEval (rewrite Hp086) in "Hpc".
     (* +0x086 c.subw a5,a5,a4 *)
-    assert (HF13a4 : F13 !!! Regidx Ra4 = sign_extend' 64 rr')
+    assert (HF13a4 : F13 !!! Regidx Ra4 = sign_extend' 64 rr)
       by (rewrite /F13; apply upd_eq).
     assert (HF13a5 : F13 !!! Regidx Ra5 = sign_extend' 64 ee1).
     { rewrite /F13 upd_ne; [| reg_neq]. rewrite /F12 upd_ne; [| reg_neq].
@@ -2276,7 +2529,7 @@ Section ProofConsoleintr.
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite HF13a4 HF13a5 ct_subw_sext) in "Hcg".
     set (F14 := <[Regidx Ra5 := regval_into_reg
-        (sign_extend' 64 (sub_vec ee1 rr'))]> F13).
+        (sign_extend' 64 (sub_vec ee1 rr))]> F13).
     assert (Hp088 : add_vec_int (mword_of_int (CT + 0x86) : mword 64) 2
                     = mword_of_int (CT + 0x88)) by pcw.
     iEval (rewrite Hp088) in "Hpc".
@@ -2288,7 +2541,7 @@ Section ProofConsoleintr.
     set (F15 := <[Regidx Ra4 := regval_into_reg (mword_of_int 128 : mword 64)]> F14).
     assert (HF15a4 : F15 !!! Regidx Ra4 = (mword_of_int 128 : mword 64))
       by (rewrite /F15; apply upd_eq).
-    assert (HF15a5 : F15 !!! Regidx Ra5 = sign_extend' 64 (sub_vec ee1 rr'))
+    assert (HF15a5 : F15 !!! Regidx Ra5 = sign_extend' 64 (sub_vec ee1 rr))
       by (rewrite /F15 upd_ne; [rewrite /F14; apply upd_eq | reg_neq]).
     assert (HF15a2 : F15 !!! Regidx Ra2 = sign_extend' 64 ee1).
     { rewrite /F15 upd_ne; [| reg_neq]. rewrite /F14 upd_ne; [| reg_neq].
@@ -2310,7 +2563,7 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x8c)) by pcw.
     iEval (rewrite Hp08c) in "Hpc".
     (* +0x08c bne a5,a4 *)
-    destruct (neq_vec (sign_extend' 64 (sub_vec ee1 rr') : mword 64)
+    destruct (neq_vec (sign_extend' 64 (sub_vec ee1 rr) : mword 64)
                 (mword_of_int 128 : mword 64)) eqn:Hfull.
     { (* the ring is NOT full: nothing to hand over, leave *)
       iApply (wp_bne_taken_s_sconf (mword_of_int (CT + 0x8c)) (mword_of_int 120 : mword 13)
@@ -2324,8 +2577,13 @@ Section ProofConsoleintr.
                       = mword_of_int (CT + 0x104)) by pcw.
       iEval (rewrite Hj104) in "Hpc".
       iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
-      iApply ("EXIT" $! F15 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked Hres Hrest");
-        [ exact Hsp15 | exact Hcshi15 ]. }
+      iApply ("EXIT" $! F15 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked
+                [Hrc Hwc Hec Hdat Hts] Hrest").
+      - exact Hsp15.
+      - exact Hcshi15.
+      - iExists rr, ww, ee1, (<[idx := cons_xlate c]> bs), (<[idx := Some h]> ts).
+        iFrame "Hrc Hwc Hec Hdat Hts". iPureIntro. split_and!;
+          [ exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 ]. }
     (* the ring is exactly full: hand the line over at +0x090 *)
     iApply (wp_bne_fall_s_sconf (mword_of_int (CT + 0x8c)) (mword_of_int 120 : mword 13)
               Ra4 Ra5 F15 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
@@ -2347,9 +2605,11 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x156)) by pcw.
     iEval (rewrite Hj156) in "Hpc".
     iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
-    iApply ("WAKE" $! F15 (sign_extend' 64 ee1) with "[%] [%] [%]
-              Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT");
-      [ exact Hsp15 | exact HF15a2 | exact Hcshi15 ].
+    iApply ("WAKE" $! F15 rr ww ee1 (<[idx := cons_xlate c]> bs)
+              (<[idx := Some h]> ts) with "[%] [%] [%] [%] [%] [%] [%]
+              Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hrest EXIT");
+      [ exact Hsp15 | exact HF15a2 | exact Hcshi15
+      | exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 ].
   Qed.
 
   (* =================================================================== *)
@@ -2360,7 +2620,8 @@ Section ProofConsoleintr.
   Lemma ct_dflt `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
-      (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string) :
+      (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string)
+      (h : list mobs) (c : bv 8) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     M !!! Regidx Rs1 = cv ->
     ct_cs_hi M m0 ->
@@ -2370,8 +2631,16 @@ Section ProofConsoleintr.
     (* same "cons" bound as the sibling arms: the default path reaches
        consputc, whose cone runs up to "uart" (15). *)
     locks_below lks "cons" ->
+    (* THE BYTE AND ITS TAG, exactly as the contract states them: a0 holds
+       the ZERO-EXTENDED byte, [h] is the history it arrived at.  This
+       block is where the tag stops being carried and starts being used --
+       the guard at +0x044 below is what makes the append legal, so the
+       two travel down to [ct_store]/[ct_cr] together. *)
+    obs_ends_in h c ->
+    cv = (extend_value (n := 8) true (c : mword 8) : mword 64) ->
     kernel_text -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
+    riscv_rx_tag h -∗
     sie_cap_gpr KT1 M (trap_res b + (K - 6))%nat false pme -∗
     pc_is (mword_of_int (CT + 0x2c)) -∗
     cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
@@ -2383,8 +2652,9 @@ Section ProofConsoleintr.
     ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hsp Hs1 Hcs HK Hlvl Hchain Hbelow.
-    iIntros "#Ht #Hdev #Htxl #Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest WAKE EXIT".
+    intros Hsp Hs1 Hcs HK Hlvl Hchain Hbelow Hends Hcv.
+    iIntros "#Ht #Hdev #Htxl #Hsub #Htg Hcg Hpc Hcnt Hpay Hlocked
+             Hres Hrest WAKE EXIT".
     (* ---- +0x02c c.beqz s1 : [c != 0] ---- *)
     destruct (eq_vec (cv : mword 64) (zero_reg : mword 64)) eqn:Hnul.
     { iApply (wp_cbeqz_taken_s_sconf (mword_of_int (CT + 0x2c)) (mword_of_int 108 : mword 8)
@@ -2434,7 +2704,11 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x36)) by pcw.
     iEval (rewrite Hp036) in "Hpc".
     (* ---- +0x036 lw a5,160(a4) ; +0x03a lw a4,152(a4) ---- *)
-    iDestruct "Hres" as (rr ww ee bs) "(Hrc & Hwc & Hec & %Hlenb & Hdat)".
+    (* the ring stays DESTRUCTED from here to the two arms that append:
+       the guard at +0x044 is a statement about THESE [cons.e] and
+       [cons.r], and [ConsoleInv.cons_res]'s existential would hide it. *)
+    iDestruct "Hres" as (rr ww ee bs ts)
+      "(Hrc & Hwc & Hec & %Hlenb & %Hlent & %Hok & %Hrow & Hdat & Hts)".
     assert (Hea : add_vec (G2 !!! Regidx Ra4)
                     (sign_extend' 64 (mword_of_int 160 : mword 12)) = a_cons_e)
       by (rewrite HG2a4; reflexivity).
@@ -2460,8 +2734,6 @@ Section ProofConsoleintr.
     { rgall. iEval (rewrite Hra). iExact "Hrc". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hrc". rgall. iEval (rewrite Hra) in "Hrc".
     set (G4 := <[Regidx Ra4 := regval_into_reg (sign_extend' 64 rr)]> G3).
-    iAssert (cons_res) with "[Hrc Hwc Hec Hdat]" as "Hres".
-    { iExists rr, ww, ee, bs. iFrame "Hrc Hwc Hec Hdat". iPureIntro. exact Hlenb. }
     assert (Hp03e : add_vec_int (mword_of_int (CT + 0x3a) : mword 64) 4
                     = mword_of_int (CT + 0x3e)) by pcw.
     iEval (rewrite Hp03e) in "Hpc".
@@ -2514,14 +2786,24 @@ Section ProofConsoleintr.
                       = mword_of_int (CT + 0x104)) by pcw.
       iEval (rewrite Hj104) in "Hpc".
       iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
-      iApply ("EXIT" $! G6 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked Hres Hrest").
+      iApply ("EXIT" $! G6 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked
+                [Hrc Hwc Hec Hdat Hts] Hrest").
       - rewrite (HthrG6 csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
-      - exact (ct_cs_hi_thr G6 M m0 HthrG6 Hcs). }
+      - exact (ct_cs_hi_thr G6 M m0 HthrG6 Hcs).
+      - iExists rr, ww, ee, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+        iPureIntro. split_and!;
+          [ exact Hlenb | exact Hlent | exact Hok | exact Hrow ]. }
     iApply (wp_bltu_fall_s_sconf (mword_of_int (CT + 0x44)) (mword_of_int 192 : mword 13)
               Ra5 Ra4 G6 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
               ltac:(rgall; rewrite HG6a4 HG6a5; exact Hgd) with "Hcg Hpc []").
     { iApply (cnti_044 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+    (* THE ROOM GUARD, as the coupling states it.  [bltu 127, e-r] NOT
+       taken is [cons.e - cons.r <= 127], read off the 32-bit difference
+       the [c.subw] at +0x03e computed -- and that is exactly what
+       [ConsoleInv.cons_ok_inc_e] and [cons_row_push] ask of the append. *)
+    assert (Hroom : (bv_unsigned (sub_vec ee rr) < Z.of_nat INPUT_BUF_SIZE)%Z)
+      by (exact (ct_room (sub_vec ee rr) Hgd)).
     assert (Hp048 : add_vec_int (mword_of_int (CT + 0x44) : mword 64) 4
                     = mword_of_int (CT + 0x48)) by pcw.
     iEval (rewrite Hp048) in "Hpc".
@@ -2558,9 +2840,12 @@ Section ProofConsoleintr.
                       = mword_of_int (CT + 0x12e)) by pcw.
       iEval (rewrite Hj12e) in "Hpc".
       iApply (ct_cr (CIDq := CIDq) γtx γc γu γv pme m0 G7 K lvl eb b sp0 lks
+                rr ww ee bs ts h c
                 HG7sp (ct_cs_hi_thr G7 M m0 HthrG7 Hcs) HK Hlvl Hchain Hbelow
-                with "Ht Hdev Htxl Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
-                      WAKE EXIT"). }
+                Hlenb Hlent Hok Hrow Hroom Hends
+                ltac:(exact (ct_arg_eq13 c ltac:(rewrite <- Hcv; exact Hcr)))
+                with "Ht Hdev Htxl Hsub Htg Hcg Hpc Hcnt Hpay Hlocked
+                      Hrc Hwc Hec Hdat Hts Hrest WAKE EXIT"). }
     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0x4a)) (mword_of_int 228 : mword 13)
               Ra5 Rs1 G7 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
               ltac:(rgall; rewrite HG7s1 HG7a5; exact Hcr) with "Hcg Hpc []").
@@ -2570,9 +2855,12 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x4e)) by pcw.
     iEval (rewrite Hp04e) in "Hpc".
     iApply (ct_store (CIDq := CIDq) γtx γc γu γv pme m0 G7 K lvl eb b sp0 cv lks
+              rr ww ee bs ts h c
               HG7sp HG7s1 (ct_cs_hi_thr G7 M m0 HthrG7 Hcs) HK Hlvl Hchain Hbelow
-              with "Ht Hdev Htxl Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
-                    WAKE EXIT").
+              Hlenb Hlent Hok Hrow Hroom Hends Hcv
+              ltac:(exact (ct_arg_ne13 c ltac:(rewrite <- Hcv; exact Hcr)))
+              with "Ht Hdev Htxl Hsub Htg Hcg Hpc Hcnt Hpay Hlocked
+                    Hrc Hwc Hec Hdat Hts Hrest WAKE EXIT").
   Qed.
 
   (* =================================================================== *)
@@ -2590,12 +2878,17 @@ Section ProofConsoleintr.
   Proof.
     cbv beta delta [wp_consoleintr_sconf_body].
     intros rettgt HK Hlen Hlvl Hbelow.
-    iIntros "Hcg Hcnt #Ht Hpc #Hpinv #Hdev #Hcaps _Htag Hcont".
+    iIntros "Hcg Hcnt #Ht Hpc #Hpinv #Hdev #Hcaps Htag Hcont".
     iDestruct "Hcaps" as (γtx γc) "(#Htxl & #Hlk & #Hsub & #Hinitd)".
+    (* THE BYTE'S TAG, opened once here and carried to the one arm that
+       files it in the ring: the default arm's store. *)
+    iDestruct "Htag" as (h c) "(%Hcva & %Hends & #Htg)".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     set (cv := (m !!! Regidx Ra0 : mword 64)).
+    assert (Hcv : cv = (extend_value (n := 8) true (c : mword 8) : mword 64))
+      by (rewrite /cv; exact Hcva).
     (* ================= PROLOGUE: the six-slot frame ==================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))
@@ -2921,8 +3214,9 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x2c)) by pcw.
     iEval (rewrite Hp02c) in "Hpc".
     iApply (ct_dflt (CIDq := CIDaq) γtx γc γu γv pme m S3 K lvl eb b sp0 cv lks
-              HS3sp HS3s1 HS3cs HK Hlvl Hchain Hbelow
-              with "Ht Hdev Htxl Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
+              h c
+              HS3sp HS3s1 HS3cs HK Hlvl Hchain Hbelow Hends Hcv
+              with "Ht Hdev Htxl Hsub Htg Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
                     WAKE EXIT").
   Qed.
 

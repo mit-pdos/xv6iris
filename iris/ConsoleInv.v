@@ -20,46 +20,66 @@
    the credential is the whole of what a caller passes -- ONE persistent
    proposition, taken by value.
 
-   ---- WHY THE RESOURCE IS UNCONSTRAINED ------------------------------
+   ---- WHAT THE RESOURCE COUPLES --------------------------------------
 
-   [cons_res] owns the ring's 128 bytes and the three index words and says
-   NOTHING that relates them.  That is not laziness, and it is worth being
-   explicit about, because the obvious analogy -- [PipeInvDefs.pipe_count_ok],
-   the "there are never more than PIPESIZE live bytes" coupling that
-   piperead's and pipewrite's proofs maintain -- does not transfer:
+   [cons_res] owns the ring's 128 bytes, the three index words, and a TAG
+   COLUMN [ts] of 128 slots beside the bytes, and it relates them: every
+   slot the indices say is LIVE holds a byte the UART really delivered,
+   together with the application's persistent claim about the history it
+   arrived at ([RiscvPtsto.riscv_rx_tag], the column [WpUart.uart_col]
+   keeps beside [u_rx]).  Two clauses say it.
 
-   * NOTHING NEEDS IT.  The only address the code computes from an index is
-     [cons.buf[cons.r % INPUT_BUF_SIZE]], and [% 128] is compiled as
-     [andi a3,a5,127], so the index is in range for EVERY value of [cons.r].
-     A pipe's [nread % PIPESIZE] is the same, but a pipe's writer has to know
-     the slot it is about to fill is free; the console's writer tests
-     [cons.e - cons.r < INPUT_BUF_SIZE] at run time instead.
-   * NOTHING CONSUMES IT.  A coupling would be a statement about the console's
-     LINE DISCIPLINE ("what was typed is what is read"), and no contract in
-     the tree is in a position to observe one: consoleread's bytes leave
-     through either_copyout into user memory, which this layer does not model.
+   * [cons_ok r w e] -- the three counters, in the order the line
+     discipline keeps them: [r <= w <= e <= r + INPUT_BUF_SIZE].  IT IS
+     STATED ON THE 32-BIT DIFFERENCES, not on the counters' values.  The
+     counters are C [uint]s that are only ever incremented, so they wrap,
+     and after a wrap [uint r <= uint e] is simply false; what the code
+     computes and compares is [cons.e - cons.r] as a 32-bit subtraction
+     ([c.subw] at consoleintr +0x03e, then [bltu] against 127), and that
+     difference is exactly what survives the wrap.  So the clause is
+     [uint (e - r) <= INPUT_BUF_SIZE] with [uint (w - r) <= uint (e - r)],
+     and the guard the code runs IS the clause's premise.
+   * [cons_row r e bs ts] -- for every offset [k] into the live range
+     [0 <= k < uint (e - r)], the slot [cons_slot r k] (the ring index of
+     the byte at logical position [r + k], which is [(r + k) mod 128]
+     because 128 divides 2^32) holds a tagged byte: [ts] has a [Some h]
+     there, [h] ends in an [ObsUartIn b], and [bs] has [cons_xlate b].
+     [cons_xlate] is the ONE translation consoleintr applies before the
+     store ([c = (c == '\r') ? '\n' : c]).  Slots outside the live range
+     carry [None] or a stale [Some]; the row says nothing about them, and
+     nothing has to clear them.
 
-   IT IS NOW ESTABLISHABLE, THOUGH, AND THAT IS A CHANGE.  Until xv6 `a28e94b`
-   consoleintr called procdump, which is why it was assumed and why any
-   coupling stated here would have been a property of an axiom.  That call is
-   gone; consoleintr's callees are now exactly acquire / consputc / release /
-   wakeup, all four proven and linked, so the writer of this ring is provable
-   and the "nobody could" half of the argument has expired.  What is left is
-   the "nobody needs" half above, which is the honest reason to keep the
-   resource flat.
+   WHO MAINTAINS IT.  Four places, and every one of them already runs the
+   test its clause needs:
 
-   So what the console publishes is exactly what it can back: the memory is
-   there, one writer at a time reaches it, and a byte read out of it is some
-   byte.  That is enough for consoleread's contract, which promises a RETURN
-   VALUE RANGE and nothing about the bytes -- see SpecConsoleread.v, and
-   [SpecFileread.fileread_ret], which is where the range is consumed.
+   * consoleintr's [cons.e - cons.r < INPUT_BUF_SIZE] guard at +0x044,
+     before the append: it is exactly [uint (e - r) <= 127], so the
+     [cons.e++] that follows lands at [uint (e - r) <= 128] and the new
+     slot [cons_slot r (uint (e - r))] is one no live offset already
+     names.  The byte stored there is [cons_xlate] of the byte in a0 and
+     the tag filed beside it is that byte's, which is what
+     [SpecConsoleintr]'s tag premise hands in;
+   * consoleintr's [cons.e--] at +0x0c8 (the C('U') kill loop) and +0x120
+     (the backspace arm).  Both are guarded by [cons.e != cons.w], which
+     with [uint (w - r) <= uint (e - r)] gives [uint (e - r) >= 1]: the
+     decrement cannot take [e] below [w].  The live range shrinks, so the
+     row is inherited and the dropped slot's tag is simply left in [ts];
+   * consoleintr's [cons.w = cons.e] in the wake tail, which moves [w] up
+     to [e] and touches neither the row nor the ring;
+   * consoleread's [cons.r++] in the copy loop -- guarded by
+     [cons.r != cons.w], so [uint (w - r) >= 1] and the pop cannot pass
+     [w] -- and its [cons.r--] end-of-file push-back at +0x0e6.  The
+     push-back is a DECREMENT, so "r never passes w" is not locally
+     obvious there; it is nonetheless safe because it only ever undoes the
+     [cons.r++] two instructions earlier, and the slot's tag is still in
+     [ts], so the row comes back with it.
 
-   WHEN A CONSUMER ARRIVES, this is the file that grows the coupling, and
-   there are exactly two places that must then maintain it: consoleintr's
-   [cons.e - cons.r < INPUT_BUF_SIZE] guard before it appends, and
-   consoleread's [cons.r--] end-of-file push-back at +0xe6 -- a DECREMENT, so
-   "r never passes w" is not locally obvious there.  It is nonetheless safe:
-   the push-back only ever undoes the [cons.r++] two instructions earlier.
+   WHAT THE COUPLING BUYS is consoleread's post: the [d] bytes it copied
+   out are [d] bytes the UART delivered, in order, with their tags
+   ([SpecConsoleread.v]), and the read syscall's console receipt carries
+   those tags to the process ([SpecFileread.console_receipt]).  The tags
+   are PERSISTENT, so handing one to a reader costs the ring nothing and
+   the pop does not have to clear the column.
 
    ---- WHERE IT COMES FROM AT BOOT ------------------------------------
 
@@ -79,6 +99,8 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto RiscvExtras.
+Require Import RiscvLang ObsTrace.   (* [mobs], [obs_ends_in]: the tag column's vocabulary *)
+Require Import VcGen W32Arith.   (* [trunc32_unsigned]/[trunc32_sext]: the ring index's wrap *)
 Require Import WpLock.
 Require Import TsoCtx CtxMorphTac.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
@@ -119,6 +141,371 @@ Proof. vm_compute. reflexivity. Qed.
 
 Lemma a_cons_nz : eq_vec a_cons (zero_reg : mword 64) = false.
 Proof. vm_compute. reflexivity. Qed.
+
+(* ===================================================================== *)
+(*  THE COUPLING, AS PURE ARITHMETIC                                      *)
+(*                                                                        *)
+(*  Three definitions, all outside the Iris section because every one of   *)
+(*  them is a fact about words and lists: the header's two clauses and     *)
+(*  the slot function they are indexed by.                                 *)
+(* ===================================================================== *)
+
+(* THE ONE TRANSLATION consoleintr applies before it stores:
+   [c = (c == '\r') ? '\n' : c].  Everything the ring says about a
+   buffered byte is said about the byte AFTER this. *)
+Definition cons_xlate (b : bv 8) : bv 8 :=
+  if decide (b = (mword_of_int 13 : mword 8))
+  then (mword_of_int 10 : mword 8) else b.
+
+(* the two readings, as lemmas rather than a [destruct (decide ...)] at
+   each use: the instance term inside this definition is not the one a
+   consumer's [decide] elaborates to, though the two print identically
+   (durable-notes, "Terms that print identically"). *)
+Lemma cons_xlate_cr :
+  cons_xlate (mword_of_int 13 : mword 8) = (mword_of_int 10 : mword 8).
+Proof. rewrite /cons_xlate. by case_decide. Qed.
+
+Lemma cons_xlate_other (b : bv 8) :
+  b <> (mword_of_int 13 : mword 8) -> cons_xlate b = b.
+Proof. intro H. rewrite /cons_xlate. by case_decide. Qed.
+
+(* THE THREE COUNTERS.  Stated on the 32-BIT DIFFERENCES, which is what
+   survives the wrap and what the code computes -- see the header. *)
+Definition cons_ok (r w e : mword 32) : Prop :=
+  (bv_unsigned (sub_vec w r) <= bv_unsigned (sub_vec e r)
+   <= Z.of_nat INPUT_BUF_SIZE)%Z.
+
+(* THE SLOT the byte at logical position [r + k] lives in.  The code
+   computes it as [andi ...,127] on the counter itself; 128 divides 2^32,
+   so the 32-bit wrap is invisible to it and this is the same number. *)
+Definition cons_slot (r : mword 32) (k : Z) : nat :=
+  Z.to_nat ((bv_unsigned r + k) mod Z.of_nat INPUT_BUF_SIZE).
+
+(* THE LIVE RANGE'S ROW.  Nothing is said of a slot outside it. *)
+Definition cons_row (r e : mword 32) (bs : list (bv 8))
+    (ts : list (option (list mobs))) : Prop :=
+  forall k : Z, (0 <= k < bv_unsigned (sub_vec e r))%Z ->
+    exists (h : list mobs) (b : bv 8),
+      ts !! cons_slot r k = Some (Some h)
+      /\ obs_ends_in h b
+      /\ bs !! cons_slot r k = Some (cons_xlate b).
+
+(* WHAT A CONSUMER OF THE RING CARRIES AWAY.  A copy-out run is keyed by a
+   SOURCE FUNCTION ([UserPtTree.umem_wr]'s [src]), so the ledger a reader
+   hands its caller is stated over that function and not over an image:
+   the [j]th byte delivered is the [j]th tag's byte, translated.  The
+   image form is the receipt's ([SpecFileread.console_receipt]), which
+   this becomes at the one place the run's linearity is known. *)
+Definition cons_tagged (bs : nat -> bv 8) (hs : list (list mobs)) (d : nat)
+  : Prop :=
+  length hs = d
+  /\ forall j : nat, (j < d)%nat ->
+       exists (h : list mobs) (b : bv 8),
+         hs !! j = Some h /\ obs_ends_in h b /\ bs j = cons_xlate b.
+
+Lemma cons_tagged_0 (bs : nat -> bv 8) : cons_tagged bs [] 0.
+Proof. split; [reflexivity | intros j Hj; exfalso; lia]. Qed.
+
+(* =====================================================================
+   THE COUPLING'S ARITHMETIC
+
+   Every clause above is a statement about [bv_unsigned (sub_vec _ _)] at
+   width 32, and every move either maintainer makes shifts ONE endpoint by
+   one.  The kit is here, once, so that neither proof does modular
+   arithmetic inline.  [lia] cannot evaluate [2 ^ 32], so each proof that
+   needs the literal asserts it (durable-notes, "Arithmetic").
+   ===================================================================== *)
+
+Lemma cons_bufz : Z.of_nat INPUT_BUF_SIZE = 128.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma cons_bvw (z : Z) : bv_wrap 32 z = z mod 2 ^ 32.
+Proof. reflexivity. Qed.
+
+Lemma cons_urange (x : mword 32) : (0 <= bv_unsigned x < 2 ^ 32)%Z.
+Proof. exact (bv_unsigned_in_range _ x). Qed.
+
+Lemma cons_subz (x y : mword 32) :
+  bv_unsigned (sub_vec x y) = ((bv_unsigned x - bv_unsigned y) mod 2 ^ 32)%Z.
+Proof. rewrite sub_vec32_unsigned. apply cons_bvw. Qed.
+
+Lemma cons_addz (x y : mword 32) :
+  bv_unsigned (add_vec x y) = ((bv_unsigned x + bv_unsigned y) mod 2 ^ 32)%Z.
+Proof. rewrite (add_vec_unsigned x y). apply cons_bvw. Qed.
+
+Lemma cons_u1 : bv_unsigned (mword_of_int 1 : mword 32) = 1%Z.
+Proof. rewrite moi32_unsigned. vm_compute. reflexivity. Qed.
+
+Lemma cons_um1 : bv_unsigned (mword_of_int (-1) : mword 32) = (2 ^ 32 - 1)%Z.
+Proof. rewrite moi32_unsigned. vm_compute. reflexivity. Qed.
+
+Lemma cons_sub_range (x y : mword 32) :
+  (0 <= bv_unsigned (sub_vec x y) < 2 ^ 32)%Z.
+Proof. exact (cons_urange (sub_vec x y)). Qed.
+
+Lemma cons_sub_self (x : mword 32) : bv_unsigned (sub_vec x x) = 0%Z.
+Proof. rewrite cons_subz Z.sub_diag. reflexivity. Qed.
+
+(* the counters are 32 bits wide, so equal DISTANCES from a common base are
+   equal words -- which is how [cons.e != cons.w] becomes [w - r < e - r] *)
+Lemma cons_sub_inj (y x1 x2 : mword 32) :
+  bv_unsigned (sub_vec x1 y) = bv_unsigned (sub_vec x2 y) -> x1 = x2.
+Proof.
+  rewrite !cons_subz. intro H.
+  pose proof (cons_urange x1) as H1. pose proof (cons_urange x2) as H2.
+  assert (Hlit : (2 ^ 32)%Z = 4294967296%Z) by (vm_compute; reflexivity).
+  rewrite Hlit in H, H1, H2.
+  assert (Hz : (((bv_unsigned x1 - bv_unsigned y)
+                 - (bv_unsigned x2 - bv_unsigned y)) mod 4294967296 = 0)%Z).
+  { rewrite Zminus_mod H Z.sub_diag. reflexivity. }
+  replace ((bv_unsigned x1 - bv_unsigned y)
+           - (bv_unsigned x2 - bv_unsigned y))%Z
+     with (bv_unsigned x1 - bv_unsigned x2)%Z in Hz by lia.
+  apply Z.mod_divide in Hz; [| lia]. destruct Hz as [q Hq].
+  apply bv_eq. nia.
+Qed.
+
+Lemma cons_sub_eq0 (x y : mword 32) :
+  bv_unsigned (sub_vec x y) = 0%Z -> x = y.
+Proof.
+  intro H. apply (cons_sub_inj y x y). rewrite H cons_sub_self. reflexivity.
+Qed.
+
+Lemma cons_sub_ne (x y : mword 32) :
+  x <> y -> (1 <= bv_unsigned (sub_vec x y))%Z.
+Proof.
+  intro Hne. pose proof (cons_sub_range x y) as Hr.
+  destruct (Z.eq_dec (bv_unsigned (sub_vec x y)) 0%Z) as [E | NE];
+    [exfalso; exact (Hne (cons_sub_eq0 x y E)) | lia].
+Qed.
+
+(* the three one-step moves: [cons.e++], [cons.e--], [cons.r++] *)
+Lemma cons_sub_inc (x y : mword 32) :
+  (bv_unsigned (sub_vec x y) + 1 < 2 ^ 32)%Z ->
+  bv_unsigned (sub_vec (add_vec x (mword_of_int 1 : mword 32)) y)
+  = (bv_unsigned (sub_vec x y) + 1)%Z.
+Proof.
+  intro Hlt. rewrite cons_subz in Hlt.
+  rewrite !cons_subz cons_addz cons_u1 Zminus_mod_idemp_l.
+  replace (bv_unsigned x + 1 - bv_unsigned y)%Z
+     with ((bv_unsigned x - bv_unsigned y) + 1)%Z by lia.
+  rewrite <- Zplus_mod_idemp_l. apply Z.mod_small.
+  pose proof (Z.mod_pos_bound (bv_unsigned x - bv_unsigned y) (2 ^ 32)
+                ltac:(vm_compute; reflexivity)) as Hb.
+  lia.
+Qed.
+
+Lemma cons_sub_dec (x y : mword 32) :
+  (1 <= bv_unsigned (sub_vec x y))%Z ->
+  bv_unsigned (sub_vec (add_vec x (mword_of_int (-1) : mword 32)) y)
+  = (bv_unsigned (sub_vec x y) - 1)%Z.
+Proof.
+  intro Hge. rewrite cons_subz in Hge.
+  rewrite !cons_subz cons_addz cons_um1 Zminus_mod_idemp_l.
+  replace (bv_unsigned x + (2 ^ 32 - 1) - bv_unsigned y)%Z
+     with ((bv_unsigned x - bv_unsigned y) - 1 + 1 * 2 ^ 32)%Z by lia.
+  rewrite Z_mod_plus_full.
+  rewrite <- Zminus_mod_idemp_l. apply Z.mod_small.
+  pose proof (Z.mod_pos_bound (bv_unsigned x - bv_unsigned y) (2 ^ 32)
+                ltac:(vm_compute; reflexivity)) as Hb.
+  lia.
+Qed.
+
+Lemma cons_sub_shiftr (x y : mword 32) :
+  (1 <= bv_unsigned (sub_vec x y))%Z ->
+  bv_unsigned (sub_vec x (add_vec y (mword_of_int 1 : mword 32)))
+  = (bv_unsigned (sub_vec x y) - 1)%Z.
+Proof.
+  intro Hge. rewrite cons_subz in Hge.
+  rewrite !cons_subz cons_addz cons_u1 Zminus_mod_idemp_r.
+  replace (bv_unsigned x - (bv_unsigned y + 1))%Z
+     with ((bv_unsigned x - bv_unsigned y) - 1)%Z by lia.
+  rewrite <- Zminus_mod_idemp_l. apply Z.mod_small.
+  pose proof (Z.mod_pos_bound (bv_unsigned x - bv_unsigned y) (2 ^ 32)
+                ltac:(vm_compute; reflexivity)) as Hb.
+  lia.
+Qed.
+
+(* ---- the slot function -------------------------------------------- *)
+
+Local Lemma cons_128_div : (128 | 2 ^ 32)%Z.
+Proof. exists 33554432%Z. vm_compute. reflexivity. Qed.
+
+Lemma cons_slot_lt (r : mword 32) (k : Z) : (cons_slot r k < INPUT_BUF_SIZE)%nat.
+Proof.
+  rewrite /cons_slot /INPUT_BUF_SIZE.
+  change (Z.of_nat 128) with 128%Z.
+  pose proof (Z.mod_pos_bound (bv_unsigned r + k) 128
+                ltac:(vm_compute; reflexivity)) as Hb.
+  lia.
+Qed.
+
+Lemma cons_slot_inj (r : mword 32) (k1 k2 : Z) :
+  (0 <= k1 < 128)%Z -> (0 <= k2 < 128)%Z ->
+  cons_slot r k1 = cons_slot r k2 -> k1 = k2.
+Proof.
+  intros H1 H2 He. rewrite /cons_slot /INPUT_BUF_SIZE in He.
+  change (Z.of_nat 128) with 128%Z in He.
+  pose proof (Z.mod_pos_bound (bv_unsigned r + k1) 128
+                ltac:(vm_compute; reflexivity)) as Hb1.
+  pose proof (Z.mod_pos_bound (bv_unsigned r + k2) 128
+                ltac:(vm_compute; reflexivity)) as Hb2.
+  apply Z2Nat.inj in He; [| lia | lia].
+  assert (Hz : (((bv_unsigned r + k1) - (bv_unsigned r + k2)) mod 128 = 0)%Z).
+  { rewrite Zminus_mod He Z.sub_diag. reflexivity. }
+  replace ((bv_unsigned r + k1) - (bv_unsigned r + k2))%Z
+     with (k1 - k2)%Z in Hz by lia.
+  apply Z.mod_divide in Hz; [| lia]. destruct Hz as [q Hq]. nia.
+Qed.
+
+Lemma cons_slot_shift (r : mword 32) (k : Z) :
+  cons_slot (add_vec r (mword_of_int 1 : mword 32)) k = cons_slot r (k + 1).
+Proof.
+  rewrite /cons_slot /INPUT_BUF_SIZE cons_addz cons_u1.
+  change (Z.of_nat 128) with 128%Z.
+  f_equal.
+  rewrite (Zplus_mod ((bv_unsigned r + 1) mod 2 ^ 32) k).
+  rewrite (Z.mod_mod_divide (bv_unsigned r + 1) (2 ^ 32) 128 cons_128_div).
+  rewrite <- Zplus_mod. f_equal; lia.
+Qed.
+
+(* THE CODE'S OWN INDEX: [andi rd,rs,127] on the sign-extended counter.
+   128 divides 2^32, so the wrap the sign extension exposes is invisible. *)
+Lemma cons_slot_of_and (x : mword 32) :
+  Z.to_nat (bv_unsigned (and_vec (sign_extend' 64 x : mword 64)
+              (sign_extend' 64 (mword_of_int 127 : mword 12) : mword 64)))
+  = cons_slot x 0.
+Proof.
+  rewrite /cons_slot /INPUT_BUF_SIZE.
+  change (Z.of_nat 128) with 128%Z.
+  rewrite Z.add_0_r. f_equal.
+  rewrite and_vec64_unsigned.
+  assert (Hm : bv_unsigned (sign_extend' 64 (mword_of_int 127 : mword 12) : mword 64)
+               = Z.ones 7) by (vm_compute; reflexivity).
+  rewrite Hm Z.land_ones; [| lia].
+  change (2 ^ 7)%Z with 128%Z.
+  assert (Hw : bv_wrap 32 (bv_unsigned (sign_extend' 64 x : mword 64))
+               = bv_unsigned x).
+  { rewrite <- (trunc32_unsigned (sign_extend' 64 x)). by rewrite trunc32_sext. }
+  rewrite cons_bvw in Hw. rewrite <- Hw. symmetry.
+  exact (Z.mod_mod_divide _ (2 ^ 32) 128 cons_128_div).
+Qed.
+
+(* ...and the same index read off the far end of the live range: the slot
+   the APPEND lands in is [cons.e]'s own. *)
+Lemma cons_slot_end (r e : mword 32) :
+  cons_slot r (bv_unsigned (sub_vec e r)) = cons_slot e 0.
+Proof.
+  rewrite /cons_slot /INPUT_BUF_SIZE.
+  change (Z.of_nat 128) with 128%Z.
+  rewrite Z.add_0_r. f_equal. rewrite cons_subz.
+  rewrite (Zplus_mod (bv_unsigned r) ((bv_unsigned e - bv_unsigned r) mod 2 ^ 32)).
+  rewrite (Z.mod_mod_divide (bv_unsigned e - bv_unsigned r) (2 ^ 32) 128
+             cons_128_div).
+  rewrite <- Zplus_mod. f_equal; lia.
+Qed.
+
+(* ---- the four moves, at the coupling ------------------------------- *)
+
+(* consoleintr's append, under its own [cons.e - cons.r < INPUT_BUF_SIZE] *)
+Lemma cons_ok_inc_e (r w e : mword 32) :
+  cons_ok r w e ->
+  (bv_unsigned (sub_vec e r) < Z.of_nat INPUT_BUF_SIZE)%Z ->
+  cons_ok r w (add_vec e (mword_of_int 1 : mword 32)).
+Proof.
+  rewrite /cons_ok cons_bufz. intros [H1 H2] Hlt.
+  assert (Hbig : (2 ^ 32)%Z = 4294967296%Z) by (vm_compute; reflexivity).
+  rewrite (cons_sub_inc e r ltac:(rewrite Hbig; lia)). lia.
+Qed.
+
+(* the kill loop's and the backspace arm's [cons.e--], under [cons.e != cons.w] *)
+Lemma cons_ok_dec_e (r w e : mword 32) :
+  cons_ok r w e -> e <> w ->
+  cons_ok r w (add_vec e (mword_of_int (-1) : mword 32)).
+Proof.
+  rewrite /cons_ok. intros [H1 H2] Hne.
+  pose proof (cons_sub_range w r) as Hrw.
+  pose proof (cons_sub_range e r) as Hre.
+  assert (Hlt : (bv_unsigned (sub_vec w r) < bv_unsigned (sub_vec e r))%Z).
+  { destruct (Z.eq_dec (bv_unsigned (sub_vec w r))
+                       (bv_unsigned (sub_vec e r))) as [E | NE]; [| lia].
+    exfalso. apply Hne. symmetry. exact (cons_sub_inj r w e E). }
+  rewrite (cons_sub_dec e r ltac:(lia)). lia.
+Qed.
+
+(* the wake tail's [cons.w = cons.e] *)
+Lemma cons_ok_set_w (r w e : mword 32) : cons_ok r w e -> cons_ok r e e.
+Proof. rewrite /cons_ok. intros [H1 H2]. lia. Qed.
+
+(* consoleread's pop, under [cons.r != cons.w] *)
+Lemma cons_ok_inc_r (r w e : mword 32) :
+  cons_ok r w e -> r <> w ->
+  cons_ok (add_vec r (mword_of_int 1 : mword 32)) w e.
+Proof.
+  rewrite /cons_ok. intros [H1 H2] Hne.
+  assert (Hwr : w <> r) by (intro Hc; apply Hne; symmetry; exact Hc).
+  pose proof (cons_sub_ne w r Hwr) as Hw1.
+  rewrite (cons_sub_shiftr w r Hw1) (cons_sub_shiftr e r ltac:(lia)). lia.
+Qed.
+
+(* ---- the row, at the same four moves -------------------------------- *)
+
+(* a SHORTER live range inherits the row: the two [cons.e--]s owe nothing
+   for the slot they drop, and its tag simply stays in [ts]. *)
+Lemma cons_row_mono (r e e' : mword 32) (bs : list (bv 8))
+    (ts : list (option (list mobs))) :
+  (bv_unsigned (sub_vec e' r) <= bv_unsigned (sub_vec e r))%Z ->
+  cons_row r e bs ts -> cons_row r e' bs ts.
+Proof. intros Hle Hrow k Hk. apply Hrow. lia. Qed.
+
+(* the pop: the range loses its first offset and every slot shifts down *)
+Lemma cons_row_shift (r e : mword 32) (bs : list (bv 8))
+    (ts : list (option (list mobs))) :
+  (1 <= bv_unsigned (sub_vec e r))%Z ->
+  cons_row r e bs ts ->
+  cons_row (add_vec r (mword_of_int 1 : mword 32)) e bs ts.
+Proof.
+  intros Hge Hrow k Hk.
+  rewrite (cons_sub_shiftr e r Hge) in Hk.
+  rewrite cons_slot_shift. apply Hrow. lia.
+Qed.
+
+(* the append: one fresh slot at the far end, and no live slot is clobbered
+   because [cons_slot r] is injective below 128 *)
+Lemma cons_row_push (r e : mword 32) (i : nat) (bs : list (bv 8))
+    (ts : list (option (list mobs))) (h : list mobs) (b : bv 8) :
+  length bs = INPUT_BUF_SIZE -> length ts = INPUT_BUF_SIZE ->
+  (bv_unsigned (sub_vec e r) < Z.of_nat INPUT_BUF_SIZE)%Z ->
+  (* the slot is taken as a PARAMETER with its equation, so a caller that
+     got its index out of [ct_ring_idx] never has to [subst] it through an
+     Iris context *)
+  i = cons_slot e 0 ->
+  obs_ends_in h b ->
+  cons_row r e bs ts ->
+  cons_row r (add_vec e (mword_of_int 1 : mword 32))
+    (<[i := cons_xlate b]> bs) (<[i := Some h]> ts).
+Proof.
+  intros Hlb Hlt Hde Hi Hends Hrow. subst i. revert Hrow. intros Hrow k Hk.
+  assert (Hbig : (2 ^ 32)%Z = 4294967296%Z) by (vm_compute; reflexivity).
+  rewrite cons_bufz in Hde.
+  pose proof (cons_sub_range e r) as Hrg.
+  rewrite (cons_sub_inc e r ltac:(rewrite Hbig; lia)) in Hk.
+  pose proof (cons_slot_end r e) as Hend.
+  destruct (Z.eq_dec k (bv_unsigned (sub_vec e r))) as [Heq | Hne].
+  - subst k. exists h, b. rewrite <- Hend.
+    rewrite list_lookup_insert; [| rewrite Hlt; apply cons_slot_lt].
+    rewrite list_lookup_insert; [| rewrite Hlb; apply cons_slot_lt].
+    split_and!; [reflexivity | exact Hends | reflexivity].
+  - destruct (Hrow k ltac:(lia)) as (h0 & b0 & Ht0 & He0 & Hb0).
+    assert (Hslt : cons_slot r k <> cons_slot e 0).
+    { rewrite <- Hend. intro Hc. apply Hne.
+      exact (cons_slot_inj r k (bv_unsigned (sub_vec e r))
+               ltac:(lia) ltac:(lia) Hc). }
+    exists h0, b0.
+    rewrite list_lookup_insert_ne; [| congruence].
+    rewrite list_lookup_insert_ne; [| congruence].
+    split_and!; [exact Ht0 | exact He0 | exact Hb0].
+Qed.
 
 (* ===================================================================== *)
 (*  devsw[] -- THE DEVICE FUNCTION TABLE                                  *)
@@ -189,6 +576,21 @@ Lemma devsw_write_val_other (mj : Z) :
   mj <> CONSOLE -> devsw_write_val mj = (zero_reg : mword 64).
 Proof. intro H. rewrite /devsw_write_val. by case_decide. Qed.
 
+(* ...and the CONVERSE: a slot that holds consoleread is the console's,
+   because nothing else fills the table and the symbol is not null.  It is
+   a fact about the TABLE, and only a caller that knows the [devsw] column
+   it read IS this table can use it -- fileread's contract does not
+   (SpecSysRead.v is where [frn_rp fn = devsw_read_val] is a premise), so
+   ProofFileread's console arm splits on the major instead. *)
+Lemma devsw_read_val_is_console (mj : Z) :
+  devsw_read_val mj = (mword_of_int KernelSyms.consoleread : mword 64) ->
+  mj = CONSOLE.
+Proof.
+  intro H. destruct (decide (mj = CONSOLE)) as [E | NE]; [exact E | exfalso].
+  rewrite (devsw_read_val_other mj NE) in H.
+  apply (f_equal (@bv_unsigned 64)) in H. vm_compute in H. discriminate.
+Qed.
+
 Section ConsoleInv.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{XI : CurCtx}.
@@ -202,13 +604,74 @@ Section ConsoleInv.
   Global Instance cons_data_timeless bs : Timeless (cons_data bs).
   Proof. apply _. Qed.
 
+  (* THE TAG COLUMN, one slot per ring byte.  [None] is a slot no live
+     offset names -- the boot ring is all [None] -- and a [Some h] is the
+     application's persistent claim about the history the byte in that
+     slot arrived at.  ξ-FREE, because [riscv_rx_tag] is a field of
+     [riscvFixedGS] and no context indexes it; that is what keeps the
+     column out of [cons_res_at]'s transport. *)
+  Definition cons_tags (ts : list (option (list mobs))) : iProp Σ :=
+    ([∗ list] ot ∈ ts,
+       match ot with Some h => riscv_rx_tag h | None => emp end)%I.
+
+  Global Instance cons_tags_persistent ts : Persistent (cons_tags ts).
+  Proof.
+    rewrite /cons_tags. apply big_sepL_persistent. intros ? [h|]; apply _.
+  Qed.
+  Global Instance cons_tags_timeless ts : Timeless (cons_tags ts).
+  Proof.
+    rewrite /cons_tags. apply big_sepL_timeless. intros ? [h|]; apply _.
+  Qed.
+
+  (* the column at the boot ring: [n] empty slots, and nothing owed *)
+  Lemma cons_tags_none (n : nat) : ⊢ cons_tags (replicate n None).
+  Proof.
+    rewrite /cons_tags. iInduction n as [| k IH] "IH"; [done |].
+    rewrite replicate_S big_sepL_cons. iSplitR; [done |]. iApply "IH".
+  Qed.
+
+  (* ...and the one write: consoleintr files a tag beside the byte it just
+     stored.  The slot's old entry is DROPPED (a tag is persistent, an empty
+     slot affine), so this is a wand and not an accessor. *)
+  Lemma cons_tags_upd (ts : list (option (list mobs))) (i : nat)
+      (h : list mobs) :
+    riscv_rx_tag h -∗ cons_tags ts -∗ cons_tags (<[i := Some h]> ts).
+  Proof.
+    iIntros "#Ht Hts". rewrite /cons_tags.
+    destruct (decide (i < length ts)%nat) as [Hlt | Hge]; last first.
+    { rewrite list_insert_ge; [iExact "Hts" | lia]. }
+    destruct (lookup_lt_is_Some_2 ts i Hlt) as [ot Hot].
+    iDestruct (big_sepL_insert_acc
+                 (fun (_ : nat) (o : option (list mobs)) =>
+                    match o with Some g => riscv_rx_tag g | None => emp end)%I
+                 ts i ot Hot with "Hts") as "[_ Hcl]".
+    iApply ("Hcl" $! (Some h)). iExact "Ht".
+  Qed.
+
+  (* ...and the one READ: consoleread takes a copy of the tag of the byte
+     it pops.  A tag is persistent, so the column is handed back whole. *)
+  Lemma cons_tags_get (ts : list (option (list mobs))) (i : nat)
+      (h : list mobs) :
+    ts !! i = Some (Some h) -> cons_tags ts -∗ riscv_rx_tag h.
+  Proof.
+    intro Hi. rewrite /cons_tags. iIntros "Hts".
+    iDestruct (big_sepL_lookup
+                 (fun (_ : nat) (o : option (list mobs)) =>
+                    match o with Some g => riscv_rx_tag g | None => emp end)%I
+                 ts i (Some h) Hi with "Hts") as "H".
+    iExact "H".
+  Qed.
+
   Definition cons_res : iProp Σ :=
-    (∃ (r w e : mword 32) (bs : list (bv 8)),
+    (∃ (r w e : mword 32) (bs : list (bv 8)) (ts : list (option (list mobs))),
        a_cons_r ↦₄ r ∗
        a_cons_w ↦₄ w ∗
        a_cons_e ↦₄ e ∗
        ⌜length bs = INPUT_BUF_SIZE⌝ ∗
-       cons_data bs)%I.
+       ⌜length ts = INPUT_BUF_SIZE⌝ ∗
+       ⌜cons_ok r w e⌝ ∗
+       ⌜cons_row r e bs ts⌝ ∗
+       cons_data bs ∗ cons_tags ts)%I.
 
   Global Instance cons_res_timeless : Timeless cons_res.
   Proof. apply _. Qed.
@@ -239,12 +702,15 @@ Section ConsoleCtx.
     ([∗ list] j ↦ b ∈ bs,
        ctx_pointsto ξ (pa_add a_cons (cons_buf_off + j)) (DfracOwn 1) b)%I.
   Definition cons_res_at (ξ : CtxId) : iProp Σ :=
-    (∃ (r w e : mword 32) (bs : list (bv 8)),
+    (∃ (r w e : mword 32) (bs : list (bv 8)) (ts : list (option (list mobs))),
        ctx_word4_pointsto ξ a_cons_r (DfracOwn 1) r ∗
        ctx_word4_pointsto ξ a_cons_w (DfracOwn 1) w ∗
        ctx_word4_pointsto ξ a_cons_e (DfracOwn 1) e ∗
        ⌜length bs = INPUT_BUF_SIZE⌝ ∗
-       cons_data_at ξ bs)%I.
+       ⌜length ts = INPUT_BUF_SIZE⌝ ∗
+       ⌜cons_ok r w e⌝ ∗
+       ⌜cons_row r e bs ts⌝ ∗
+       cons_data_at ξ bs ∗ cons_tags ts)%I.
   Lemma cons_res_at_cur : cons_res_at cur_ctx = cons_res.
   Proof. reflexivity. Qed.
   Global Instance cons_res_at_morph : CtxMorph cons_res_at.

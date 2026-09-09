@@ -1763,7 +1763,7 @@ Section ProofFileread.
                   iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
                   by left. }
                 { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-                  iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ _ _ Hok Htyd). }
+                  iApply (fileread_extra_of_dev_m1 inumx γox Cf st n Fr _ _ Hok Htyd). }
              ** (* ---- the console's read: the INDIRECT CALL at +0x94 ---- *)
                 iApply (wp_cbeqz_fall_s_sconf (mword_of_int (FR + 0x96))
                           (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 7)) Ra5
@@ -1837,8 +1837,9 @@ Section ProofFileread.
                           with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv
                                 Hprocs").
                 all: try lkbelow.
-                iIntros (CIDcr Hscr mf r P' dcr bscr) "%Hcscr %Hupt %Hrr %Hdcr %Htiecr %Hra0 Hcg Hcnt Hpc
-                                              Hpriv".
+                iIntros (CIDcr Hscr mf r P' dcr bscr hscr)
+                  "%Hcscr %Hupt %Hrr %Hdcr %Htiecr %Hra0 %Htagcr #Htagsc Hcg Hcnt Hpc
+                   Hpriv".
                 (* consoleread copies to its own a1, which is fileread's
                    [addr] carried in s2 *)
                 assert (HE2a1 : E2 !!! Regidx Ra1 = m !!! Regidx Ra1).
@@ -1948,7 +1949,36 @@ Section ProofFileread.
                 { iSplitR; [iPureIntro;
                             apply (fr_ret_of_cons n r Hn0);
                             rewrite Z.max_r in Hrr; lia |].
-                  iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ _ _ Hok Htyd). }
+                  (* THE CONSOLE RECEIPT.  fileread branches on the CELL it
+                     loaded, not on the major, and nothing at this tier ties
+                     a [devsw] slot back to its index -- the equation
+                     [frn_rp fn = ConsoleInv.devsw_read_val] is a premise of
+                     the DISPATCHER's contract (SpecSysRead.v), not of this
+                     one.  So the arm splits on the major itself: at CONSOLE
+                     it pays consoleread's ledger through
+                     [console_receipt_of_run], and at any other major
+                     [fileread_extra] is [emp]. *)
+                  destruct (decide (bv_unsigned (fc_major Cf) = CONSOLE))
+                    as [Emj | Nmj]; last first.
+                  { iApply (fileread_extra_of_dev_other inumx γox Cf st n Fr
+                              _ _ _ Hok Htyd Nmj). }
+                  iApply (fileread_extra_of_dev_console inumx γox Cf st n Fr
+                            _ _ _ Hok Htyd Emj).
+                  destruct (Z.le_gt_cases 0 r) as [H0 | H0]; last first.
+                  { assert (Hm1 : r = (-1)%Z) by lia. rewrite Hm1.
+                    iApply console_receipt_m1. }
+                  assert (Hdb : Z.of_nat dcr = bv_unsigned (mword_of_int r : mword 64)).
+                  { assert (H31 : (2 ^ 31)%Z = 2147483648%Z)
+                      by (vm_compute; reflexivity).
+                    assert (H64 : (2 ^ 64)%Z = 18446744073709551616%Z)
+                      by (vm_compute; reflexivity).
+                    rewrite moi64_unsigned. rewrite <- (Htiecr H0). symmetry.
+                    apply bvw64_small. rewrite H64. rewrite H31 in Hn.
+                    destruct (Z.max_spec 0 n) as [[_ Hm] | [_ Hm]];
+                      rewrite Hm in Hrr; lia. }
+                  iApply (console_receipt_of_run (us_M U) (m !!! Regidx Ra1)
+                            (mword_of_int r) dcr bscr hscr Hdb Htagcr
+                            with "Htagsc"). }
           ++ (* --------- the major is OUT OF RANGE: return -1 ------------
                 The [bltu] is taken before the table is ever indexed, so the
                 environment is [emp] and the caller owed nothing. *)
@@ -2030,7 +2060,7 @@ Section ProofFileread.
              { cbn [umem_wr]. rewrite HVid. iExact "Hpriv". }
              { by iApply (fr_env_out_dev fn st Cf inumx _ Hok Htyd). }
              { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-               iApply (fileread_extra_of_dev inumx γox Cf st n Fr _ _ _ Hok Htyd). }
+               iApply (fileread_extra_of_dev_m1 inumx γox Cf st n Fr _ _ Hok Htyd). }
         * (* ---- +0x28 c.li a4,2 ; +0x2a bne a5,a4 -> panic ---- *)
           iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x2a))
                     (mword_of_int 78 : mword 13) Ra4 Ra5 B6 (K - 6)%nat b
