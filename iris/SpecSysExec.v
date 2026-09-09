@@ -22,8 +22,10 @@
    at trapframe argument 0, [fetchaddr]s each [argv[i]] at trapframe
    argument 1 and [fetchstr]s each string into a kernel page, then calls
    kexec with what it read.  So the caller's WP premise is quantified
-   over what kexec may be handed ([sys_exec_slot_pre]), and the success
-   arm names what it ran at.
+   over what kexec may be handed ([sys_exec_slot_pre]) -- but GUARDED by
+   what the image says it read, so a caller whose image it knows is owed
+   the bundle at ONE path and ONE vector; the success arm names what it
+   ran at.
 
    THE PATH IS READ.  The premise on it is [exec_path_of (us_M U) v0 pl]
    below -- the bytes of [pl] ARE the process's bytes at argument 0, with
@@ -34,21 +36,18 @@
    [SpecFetchstr.fetchstr_got] to [SpecCopyinstr.copyinstr_got], and
    [exec_path_of_bview] below is the one step.
 
-   THE ARGV VECTOR IS STILL OWED.  The intended premise is the twin
-   reading [exec_args_of (us_M U) v1 na alen afun] below, kept as the
-   named upgrade target.  It is not derivable today:
-   [SpecFetchaddr.fetchaddr_post] is about OWNERSHIP of the destination
-   word, not its value, so the argv POINTERS are unread even though the
-   strings they point at now are.  So that premise is quantified over
-   every vector of the right SHAPE ([exec_args_shape]: below MAXARG,
-   NUL-terminated strings within a page -- kexec's own premises) and
-   nothing else.  For the init -> sh chain this loses nothing: xv6's sh
-   ignores its arguments, so sh's start WP holds at every vector.  The
-   upgrade is a memory-indexed [wp_fetchaddr_sconf_mem] paying out of
-   [SpecCopyin.copyin_got], threaded through sys_exec's argv loop
-   alongside the [copyinstr_got] the string half already carries, after
-   which [sys_exec_slot_pre] moves from [exec_args_shape] to
-   [exec_args_of] and every arm below is unchanged.
+   THE ARGV VECTOR IS READ THE SAME WAY.  The premise on it is
+   [exec_args_of (us_M U) v1 na alen afun] below: the SHAPE kexec wants
+   ([exec_args_shape]: below MAXARG, NUL-terminated strings within a
+   page), and, beside it, the pointers -- [argv[i]] is the process's own
+   word at [v1 + 8 i], non-NULL below [na] and NULL at [na], each naming
+   its string's bytes in the image.  It is [SpecFetchaddr.fetchaddr_got]
+   at each pointer and [SpecFetchstr.fetchstr_got] at each string, both
+   relayed by sys_exec's fill loop; the NULL at [na] IS the loop's exit
+   test.  So a caller that knows its own image is owed the bundle at the
+   one vector it passed, which is what a pinned caller's ROOM premise
+   needs ([PinnedExec]).  [exec_args_of_shape] projects the shape back
+   out where a consumer wants only that.
 
    THE CONTINUATION binds [(mf, P', M')] with the page-table growth
    report and an EXISTENTIAL image (milestone J item 1's staging).  The
@@ -75,10 +74,11 @@
 
    1. The path reading: [exec_path_of] is [argstr]'s
       [SpecFetchstr.fetchstr_got] at trapframe argument 0, turned into a
-      list by [exec_path_of_bview].  The argv shape:
-      [exec_args_shape] is the walk's own loop invariant ([fetchstr]'s
-      [bb_cstr] and length, the MAXARG bound) -- free.  The argv reading
-      [exec_args_of] is the upgrade that is still owed (header).
+      list by [exec_path_of_bview].  The argv reading: both halves of
+      [exec_args_of] are the fill loop's own invariants read at the
+      break -- the shape is [ProofSysExecParts.sx_ok] plus the loop's
+      [i < 32], the pointers and strings are [sx_avok], and the
+      terminating NULL is the [c.beqz] that left the loop.
    2. [SpecKexec.KEXEC] at that reading, with the bundle specialized by
       [sys_exec_slot_pre]'s ∀.
    3. The kfree/kalloc bookkeeping, shared with the blocks in
@@ -119,6 +119,7 @@ Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import ByteBuf.        (* [bb_cstr]                          *)
+Require Import SpecCopyin.     (* [uimg_word_at]: the image's word at an address *)
 Require Import SpecCopyinstr.  (* [copyinstr_got]: the path's content *)
 Require Import PathElems.      (* [path_elems]                       *)
 Require Import DirentEnc.      (* [bview]                            *)
@@ -148,10 +149,9 @@ Local Open Scope Z_scope.
 (*  1.  THE ARGUMENT VECTOR, AS A READING OF THE USER IMAGE               *)
 (* ===================================================================== *)
 
-(* the eight-byte little-endian word at [a] in the (lazy) image [M] *)
-Definition uimg_word_at (M : gmap Z (bv 8)) (a : Z) (w : mword 64) : Prop :=
-  forall k, (k < 8)%nat ->
-    M !! (a + Z.of_nat k) = bv_to_little_endian 8 8 (bv_unsigned w) !! k.
+(* the eight-byte little-endian word at [a] in the (lazy) image [M] is
+   [SpecCopyin.uimg_word_at], beside [copyin_got]: one image-reading
+   vocabulary, at bytes and at words. *)
 
 (* THE SHAPE of an argument vector kexec accepts (its own premises):
    below MAXARG, each argument a NUL-terminated string of [alen i]
@@ -163,27 +163,30 @@ Definition exec_args_shape (na : nat) (alen : nat -> nat)
   /\ (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i))
   /\ (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z).
 
-(* THE READING sys_exec performs -- the upgrade target (header): the
-   shape, and [argv[0 .. na)] non-null pointers read at [av + 8 i],
-   [argv[na]] NULL, each pointer naming its string's bytes in the image.
+(* THE READING sys_exec performs: the shape, and [argv[0 .. na)] non-null
+   pointers read at [av + 8 i], [argv[na]] NULL, each pointer naming its
+   string's bytes in the image.
 
-   The string bytes are indexed the way the copy loop walks them,
-   [uint (add_vec_int p j)] -- the machine's own arithmetic, modulo 2^64 --
-   which is the spelling [SpecCopyinstr.copyinstr_got] hands over and the
-   spelling [exec_path_of] below uses, so path and argument are one reading
-   at two arguments. *)
+   EVERY INDEX IS THE MACHINE'S OWN, [uint (add_vec_int p j)] -- modulo
+   2^64 -- because that is what the copy loop's cursor does and what
+   [SpecCopyinstr.copyinstr_got] hands over, so path and argument are one
+   reading at two arguments and neither owes a no-wrap side condition.
+   That applies to the POINTER index too: a user may pass an [av] near the
+   top of the address space, and [argv[i]] is then read at the wrapped
+   address.  Inside one word the eight bytes ARE consecutive in [Z]
+   ([SpecCopyin.uimg_word_at]) -- [fetchaddr]'s own range test is what
+   rules that wrap out, and it holds on the only arm that promises a
+   value. *)
 Definition exec_args_of (M : gmap Z (bv 8)) (av : mword 64)
     (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) : Prop :=
   exec_args_shape na alen afun
   /\ (exists avf : nat -> mword 64,
         (forall i, (i <= na)%nat ->
-           uimg_word_at M (bv_unsigned av + 8 * Z.of_nat i) (avf i))
+           uimg_word_at M (uint (add_vec_int av (8 * Z.of_nat i))) (avf i))
         /\ (forall i, (i < na)%nat -> avf i <> (mword_of_int 0 : mword 64))
         /\ avf na = (mword_of_int 0 : mword 64)
         /\ (forall i, (i < na)%nat ->
-              (forall j, (j <= alen i)%nat ->
-                 M !! uint (add_vec_int (avf i) (Z.of_nat j))
-                   = Some (afun i j)))).
+              copyinstr_got M (avf i) (afun i) (alen i))).
 
 Lemma exec_args_of_shape (M : gmap Z (bv 8)) (av : mword 64)
     (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
@@ -322,9 +325,9 @@ Section SysExecAU.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
-  (* the caller's WP, for every argument vector of the right shape
-     (header: the image reading is the upgrade target; the [M av]
-     parameters are kept so the upgrade moves nothing but this wand) *)
+  (* the caller's WP, for every argument vector the process's own image at
+     [av] holds ([exec_args_of]) and every path it holds at [pv]
+     ([exec_path_of]) *)
   (* A PIECE, so its two families stay BARE: [S] is what the wand
      concludes at and [Φo] is the observation receipt it consumes. *)
   (* ...and over the PATHS it may have fetched, at the same guard the walk
@@ -336,7 +339,7 @@ Section SysExecAU.
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) : iProp Σ :=
     (∀ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
        (afun : nat -> nat -> bv 8),
-       ⌜exec_path_of M pv pl⌝ -∗ ⌜exec_args_shape na alen afun⌝ -∗
+       ⌜exec_path_of M pv pl⌝ -∗ ⌜exec_args_of M av na alen afun⌝ -∗
        exec_slot_pre S (P (length (path_elems pl))) Φo na alen afun sts)%I.
 
   (* Both one-shot pieces at their pairs ([SpecKexec.exec_au_pre]'s
@@ -391,7 +394,7 @@ Section SysExecAU.
     (sys_exec_au_pre Fs Γ γfs cw P Pmiss Fo M pv av sts
      ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
           (afun : nat -> nat -> bv 8),
-          ⌜exec_path_of M pv pl⌝ ∗ ⌜exec_args_shape na alen afun⌝ ∗
+          ⌜exec_path_of M pv pl⌝ ∗ ⌜exec_args_of M av na alen afun⌝ ∗
           exec_post_fail Fs Γ γfs cw P Pmiss Fo pl na alen afun sts))%I.
 
   (* the armed disjunction on the block after the copy-ins' growth [V]
@@ -408,7 +411,7 @@ Section SysExecAU.
          ∗ sys_exec_post_fail Fs Γ γfs cw P Pmiss Fo M pv av sts)
         ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
              (afun : nat -> nat -> bv 8),
-             ⌜exec_path_of M pv pl⌝ ∗ ⌜exec_args_shape na alen afun⌝ ∗
+             ⌜exec_path_of M pv pl⌝ ∗ ⌜exec_args_of M av na alen afun⌝ ∗
              exec_post_ok Fs Γ P Fo pl na alen afun sts (MkUstate V M) U' r)))%I.
 
   (* SANITY: the arms imply the landed [SysExecDefs.sys_exec_post] *)

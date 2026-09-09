@@ -16,11 +16,15 @@
    ---- THE TWO SEAMS ---------------------------------------------------
 
    (1) THE BUNDLE.  [SpecSysExec.sys_exec_slot_pre] is quantified over
-   every argument vector of the right SHAPE ([exec_args_shape]: below
-   MAXARG, NUL-terminated strings within a page).  That triple is exactly
-   the fill loop's own invariant [ProofSysExecParts.sx_ok] read at the
-   break, so [sx_break_au] instantiates the quantifier at the [na alen
-   afun] it is about to hand kexec and gets [SpecKexec.exec_au_pre] --
+   every argument vector, under the guard [exec_args_of]: the SHAPE kexec
+   wants (below MAXARG, NUL-terminated strings within a page) AND the
+   reading off the process's image (each [argv[i]] the word at
+   [v1 + 8 i], the strings the bytes those point at, a NULL at [na]).
+   The shape is [ProofSysExecParts.sx_ok] read at the break plus the
+   loop's own [i < 32]; the reading is [sx_avok] read at the same point,
+   with the terminating NULL the break's [c.beqz] supplied.  So
+   [sx_break_au] instantiates the quantifier at the [na alen afun] it is
+   about to hand kexec and gets [SpecKexec.exec_au_pre] --
    [sys_exec_au_pre_at] below is that one step.
 
    (2) THE IMAGE.  [exec_post_ok] and [exec_arms] project only [us_V] of
@@ -80,6 +84,7 @@ Require Import SpecArgstr.
 (* [proc_priv_tfp_valid] -- [page_valid] of the trapframe page, which
    argaddr's own load now takes as a premise (SpecArgraw's mem-tier fix).
    It is a PROJECTION of [proc_priv], not an obligation on this caller. *)
+Require Import SpecCopyin.     (* [uimg_word_at]: the argv pointers' reading *)
 Require Import SpecFetchaddr.
 Require Import SpecFetchstr.
 Require Import SpecKalloc.
@@ -132,7 +137,7 @@ Section SysExecAUBridge.
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
     exec_path_of Mim pvp pl ->
-    exec_args_shape na alen afun ->
+    exec_args_of Mim avp na alen afun ->
     sys_exec_au_pre Fs Γ γfs cw Pw Pmiss Fo Mim pvp avp sts -∗
     exec_au_pre Fs Γ γfs cw Pw Pmiss Fo pl na alen afun sts.
   Proof.
@@ -227,6 +232,7 @@ Section SysExecBreakAU.
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
       (uav : mword 64) (M : regfile) (P : uptd) (i : nat)
       (pg : nat -> mword 64) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (uvf : nat -> mword 64)
       (* ---- the AU side ---- *)
       (sts : list fdstate) (Mim : gmap Z (bv 8)) (pvp avp : mword 64)
       (Pw Pmiss : nat -> Z -> iProp Σ)
@@ -239,6 +245,16 @@ Section SysExecBreakAU.
        string of the right shape, it is the one the caller passed, read out
        of the block's image at trapframe argument 0. *)
     exec_path_of Mim pvp (bview plen pfun) ->
+    (* ...and the ARGUMENT VECTOR the same way.  [uav] is the word argaddr
+       parked in slot 59, which IS trapframe argument 1 ([sx_head]), so it
+       is the [av] the bundle is owed at; [Mim] is the block's own image,
+       which no copy-in moved.  The third premise is the break's own test:
+       the word at [uargv + 8i] is NULL, and that is [exec_args_of]'s
+       [avf na = 0] row. *)
+    uav = avp ->
+    us_M U = Mim ->
+    uimg_word_at (us_M U) (uint (add_vec_int uav (8 * Z.of_nat i)))
+      (mword_of_int 0 : mword 64) ->
     sx_alp sp0 ->
     icfg_dev = ROOTDEV -> (0 < icfg_nib)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -265,7 +281,7 @@ Section SysExecBreakAU.
        fill loop actually built. *)
     sys_exec_au_pre Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo Mim pvp avp sts -∗
     sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
-            M P i pg alen afun (mword_of_int (SX + 0xb6) : mword 64) -∗
+            M P i pg alen afun uvf (mword_of_int (SX + 0xb6) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       (* the image moves: kexec REPLACES the address space
          ([ProcInv.proc_priv_newspace]), so the block comes back at the new
@@ -279,9 +295,9 @@ Section SysExecBreakAU.
         exec_arms Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo
                   (bview plen pfun) i alen afun sts
                   (us_upt U P) U' (mf !!! Regidx Ra0) -∗
-        (* the shape the walk established, which the composition needs to
+        (* the READING the walk established, which the composition needs to
            name the vector in [sys_exec_arms] *)
-        ⌜exec_args_shape i alen afun⌝ -∗
+        ⌜exec_args_of Mim avp i alen afun⌝ -∗
         ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
@@ -294,25 +310,41 @@ Section SysExecBreakAU.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlb Hsp0 Hplen Hpcstr Hpof Halp Hroot Hnib0
+    intros HK Hlb Hsp0 Hplen Hpcstr Hpof Hav Him Hnul Halp Hroot Hnib0
            Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl Hbt Hebt.
     destruct (sx_kb K HK) as (Kkx & Kar & Kaa & Kfa & Kfs & K14 & K2 & K60 & Kpop).
     iIntros "#Htext #Hfab #Hka Hbmp Hisp #Hbmr Hbs Hir Hau Hst".
     rewrite /sx_body.
-    iDestruct "Hst" as "((%Hi32 & %Hext & %Hok & %HR) & Hpc & Hcg & Hcnt &
+    iDestruct "Hst" as "((%Hi32 & %Hext & %Hok & %Havok & %HR) & Hpc & Hcg & Hcnt &
                          Hpriv & Hcarry & F59 & F60 & Harr & Hpgs)".
     iIntros "Hout".
-    (* THE BUNDLE'S INSTANTIATION.  [exec_args_shape] IS [sx_ok] read at the
-       break, plus the loop's own [i < 32] -- kexec's three argument
-       premises and nothing else (SpecSysExec.v's header). *)
+    (* THE BUNDLE'S INSTANTIATION.  The SHAPE is [sx_ok] read at the break,
+       plus the loop's own [i < 32] -- kexec's three argument premises and
+       nothing else.  The READING is [sx_avok] read at the same point, with
+       the terminating NULL the break's own test supplied; [sx_avf] is the
+       "pointers below [i], NULL at [i]" combinator, here at the USER
+       pointers rather than at the kernel pages. *)
     assert (Hshape : exec_args_shape i alen afun).
     { split_and!.
       - unfold MAXARG. lia.
       - intros j Hj. exact (proj2 (proj2 (proj2 (Hok j Hj)))).
       - intros j Hj. pose proof (proj1 (proj2 (proj2 (Hok j Hj)))). lia. }
+    rewrite Hav in Havok. rewrite Hav in Hnul.
+    rewrite Him in Havok. rewrite Him in Hnul.
+    assert (Hargs : exec_args_of Mim avp i alen afun).
+    { split; [exact Hshape |].
+      exists (sx_avf uvf i). split_and!.
+      - intros j Hj. destruct (decide (j < i)%nat) as [Hlt | Hge].
+        + rewrite (sx_avf_lt uvf i j Hlt). exact (proj1 (Havok j Hlt)).
+        + rewrite (_ : j = i); [| lia]. rewrite (sx_avf_eq uvf i). exact Hnul.
+      - intros j Hj. rewrite (sx_avf_lt uvf i j Hj).
+        exact (proj1 (proj2 (Havok j Hj))).
+      - exact (sx_avf_eq uvf i).
+      - intros j Hj. rewrite (sx_avf_lt uvf i j Hj).
+        exact (proj2 (proj2 (Havok j Hj))). }
     iDestruct (sys_exec_au_pre_at Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo
                  Mim pvp avp sts (bview plen pfun) i alen afun
-                 Hpof Hshape with "Hau") as "Hau".
+                 Hpof Hargs with "Hau") as "Hau".
     iDestruct (sx_carry_open sp0 m plen pfun rest with "Hcarry")
       as "(Hf1 & Hf2 & Hspill & F10 & Hpb & Hps)".
     (* ===== +0x0b6 addiw a5,s2,0 : argc, in int ===== *)
@@ -518,7 +550,7 @@ Section SysExecBreakAU.
              with "[%] [Harms] [%] [%] Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv").
     { exact Hcsg. }
     { rewrite Hga0. iExact "Harms". }
-    { exact Hshape. }
+    { exact Hargs. }
     { exact Hext. }
   Qed.
 
@@ -605,7 +637,7 @@ Section SysExecWhole.
     (* ===== +0x000 .. +0x026 : the prologue ===== *)
     iApply (sx_head γf j pid U v0 v1 m K true true ∅
               HK Harg0 Harg1 Hlb with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka").
-    iIntros (CID1 Hq1 M P' plen pfun rst v59 v60) "[Hm1 | Hft]".
+    iIntros (CID1 Hq1 M P' plen pfun rst v60) "[Hm1 | Hft]".
     { (* ---- argstr failed: -1, and the block never moved ---- *)
       iDestruct "Hm1" as "((%Hcs & %Hext & %Ha0) & Hcg & Hcnt & Hpc & Hpriv)".
       iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain |].
@@ -656,17 +688,20 @@ Section SysExecWhole.
     { split_and!;
         [ exact H2sp | exact H2thr | exact H2s0 | exact H2s1 | exact H2s2
         | exact H2s3 | exact H2s4 | exact H2s5 | exact H2s6 | exact H2s7 ]. }
-    iAssert (sx_body γf j pid U K true true ∅ sp0 m plen pfun rst v59
+    iAssert (sx_body γf j pid U K true true ∅ sp0 m plen pfun rst v1
                M2 P' 0%nat (fun _ => (mword_of_int 0 : mword 64))
                (fun _ => 0%nat) (fun _ _ => (mword_of_int 0 : mword 8))
+               (fun _ => (mword_of_int 0 : mword 64))
                (mword_of_int (SX + 0x56) : mword 64))
       with "[Hpc Hcg Hcnt Hpriv Hcarry F59 F60 Hargv]" as "Hbody".
     { iApply (sx_body_intro (CID0 := CID2) γf j pid U K true true ∅ sp0 m
-                plen pfun rst v59 M2 P' 0%nat
+                plen pfun rst v1 M2 P' 0%nat
                 (fun _ => (mword_of_int 0 : mword 64)) (fun _ => 0%nat)
                 (fun _ _ => (mword_of_int 0 : mword 8))
+                (fun _ => (mword_of_int 0 : mword 64))
                 (mword_of_int (SX + 0x56) : mword 64)
-                ltac:(lia) Hext ltac:(intros q Hq; lia) HR0
+                ltac:(lia) Hext ltac:(intros q Hq; lia)
+                ltac:(intros q Hq; lia) HR0
                 with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] [Hargv] []").
       { iExists v60. iExact "F60". }
       { rewrite /sx_argv0 sx_seq00 big_sepL_nil.
@@ -674,20 +709,22 @@ Section SysExecWhole.
       { rewrite /sx_pages sx_seq00 big_sepL_nil. done. } }
     (* ===== +0x056 .. +0x090 : the fill loop ===== *)
     iApply (sx_loop (CID0 := CID2) γf j pid U K true true ∅ sp0 m plen
-              pfun rst v59 HK Hlb 32%nat M2 P' 0%nat
+              pfun rst v1 HK Hlb 32%nat M2 P' 0%nat
               (fun _ => (mword_of_int 0 : mword 64)) (fun _ => 0%nat)
-              (fun _ _ => (mword_of_int 0 : mword 8)) ltac:(lia)
+              (fun _ _ => (mword_of_int 0 : mword 8))
+              (fun _ => (mword_of_int 0 : mword 64)) ltac:(lia)
               with "Htext Hka Hbody").
-    iIntros (CID3 Hq3 M3 P3 i3 pg3 al3 af3) "[Hbrk | Hbad]".
+    iIntros (CID3 Hq3 M3 P3 i3 pg3 al3 af3 uv3) "[[%Hnul3 Hbrk] | Hbad]".
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
       iApply (sx_break_au (CID0 := CID3) Fs gs j gl pd pav pu γf
-                dqb dqs pid U K true true ∅ sp0 m plen pfun rst v59
-                M3 P3 i3 pg3 al3 af3 sts (us_M U) v0 v1 P Pmiss Fo
-                HK Hlb eq_refl Hplen Hpcstr Hpof Halp Hroot Hnib0
+                dqb dqs pid U K true true ∅ sp0 m plen pfun rst v1
+                M3 P3 i3 pg3 al3 af3 uv3 sts (us_M U) v0 v1 P Pmiss Fo
+                HK Hlb eq_refl Hplen Hpcstr Hpof
+                eq_refl eq_refl Hnul3 Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
                 with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hau Hbrk").
       iIntros (CID4 Hq4 mf Ubk)
-        "%Hcs Harms %Hshape %Hext3 Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv".
+        "%Hcs Harms %Hargs %Hext3 Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf P3 (us_M Ubk)
                with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
@@ -706,13 +743,13 @@ Section SysExecWhole.
           rewrite /sys_exec_post_fail. iRight.
           iExists (bview plen pfun), i3, al3, af3.
           iSplitR; [iPureIntro; exact Hpof |].
-          iSplitR; [iPureIntro; exact Hshape |]. iExact "Hfail".
+          iSplitR; [iPureIntro; exact Hargs |]. iExact "Hfail".
         - (* ret = argc: the same arm, re-read at the image the CONTRACT
              names -- [exec_post_ok] projects only [us_V] of its pre-state
              (header, seam 2). *)
           iRight. iExists (bview plen pfun), i3, al3, af3.
           iSplitR; [iPureIntro; exact Hpof |].
-          iSplitR; [iPureIntro; exact Hshape |].
+          iSplitR; [iPureIntro; exact Hargs |].
           iApply (exec_post_ok_V Fs (fs_gamma_L fsc_fs) P Fo
                     (bview plen pfun) i3 al3 af3 sts
                     (us_upt U P3)
@@ -720,7 +757,7 @@ Section SysExecWhole.
                     Ubk (mf !!! Regidx Ra0 : mword 64) eq_refl with "Hok"). }
     - (* ---- [bad:]: free what was allocated and return -1 ---- *)
       iApply (sx_bad_tail (CID0 := CID3) γf j pid U K true true ∅ sp0 m
-                plen pfun rst v59 M3 P3 i3 pg3 af3
+                plen pfun rst v1 M3 P3 i3 pg3 af3
                 HK Hlb eq_refl Hplen Halp with "Htext Hka Hbad").
       iIntros (CID4 Hq4 mf) "%Hcs %Ha0 %Hext3 Hcg Hcnt Hpc Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].

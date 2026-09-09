@@ -175,6 +175,87 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
+(*  A WORD'S BYTES ARE ITS LITTLE-ENDIAN ENCODING.  Two spellings of the    *)
+(*  same eight bytes meet here: stdpp's [bv_to_little_endian], which is     *)
+(*  what an image-level contract writes ([SpecCopyin.uimg_word_at],         *)
+(*  [KexecBuilt.kxb_args_at]'s third conjunct), and [nth_byte], which is    *)
+(*  what a byte-window rebuild hands over ([ByteBuf.bb_word_acc]).  Below   *)
+(*  eight bytes the two agree on the nose -- the 64-bit wrap                *)
+(*  [mword_of_int] applies is invisible to byte [k] for [k < 8].            *)
+(* ---------------------------------------------------------------------- *)
+(* [mword]/[mword_of_int] live in [SailStdpp.Values], which this file must
+   NOT [Import] (it leaks instances -- durable-notes.md); qualify instead. *)
+Lemma bv_le_nth_byte (z : Z) (k : nat) :
+  (k < 8)%nat ->
+  bv_to_little_endian 8 8 z !! k
+  = Some (nth_byte (SailStdpp.Values.mword_of_int z
+                    : SailStdpp.Values.mword 64) k).
+Proof.
+  intros Hk.
+  (* [RiscvExtras.moi64_unsigned], inlined: that file is ABOVE this one. *)
+  assert (Hmoi : bv_unsigned (SailStdpp.Values.mword_of_int z
+                              : SailStdpp.Values.mword 64) = bv_wrap 64 z).
+  { unfold SailStdpp.Values.mword_of_int,
+           MachineWord.MachineWord.Z_to_word.
+    rewrite Z_to_bv_unsigned. reflexivity. }
+  assert (Hlk : bv_to_little_endian 8 8 z !! k
+                = Some (Z_to_bv 8 (Z.land (z ≫ (Z.of_nat k * 8)) (Z.ones 8)))).
+  { unfold bv_to_little_endian. rewrite list_lookup_fmap.
+    change (Z.of_N 8) with 8.
+    assert (Hz : Z_to_little_endian 8 8 z !! k
+                 = Some (Z.land (z ≫ (Z.of_nat k * 8)) (Z.ones 8))).
+    { apply (Z_to_little_endian_lookup_Some 8 8 z k _ ltac:(lia) ltac:(lia)).
+      split; [lia | reflexivity]. }
+    rewrite Hz. reflexivity. }
+  rewrite Hlk. f_equal. apply bv_eq.
+  rewrite Z_to_bv_unsigned.
+  unfold nth_byte. rewrite bv_extract_unsigned, Hmoi.
+  rewrite Z.land_ones by lia.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N 8) with 256.
+  change (2 ^ Z.of_N 64) with 18446744073709551616.
+  change (Z.ones 8) with 255.
+  replace (Z.of_N (8 * N.of_nat k)) with (Z.of_nat k * 8) by lia.
+  set (n := Z.of_nat k).
+  assert (Hn : 0 <= n <= 7) by (unfold n; lia).
+  rewrite !Z.shiftr_div_pow2 by lia.
+  rewrite Z.mod_mod by lia.
+  set (q := z / 18446744073709551616).
+  assert (Hpow : 2 ^ (64 - n * 8) * 2 ^ (n * 8) = 18446744073709551616).
+  { rewrite <- Z.pow_add_r by lia.
+    replace (64 - n * 8 + n * 8) with 64 by lia. reflexivity. }
+  assert (Hzq : z `mod` 18446744073709551616
+                = z + (- (2 ^ (64 - n * 8) * q)) * 2 ^ (n * 8)).
+  { pose proof (Z.div_mod z 18446744073709551616 ltac:(lia)) as Hdm.
+    fold q in Hdm.
+    replace ((- (2 ^ (64 - n * 8) * q)) * 2 ^ (n * 8))
+      with (- (q * (2 ^ (64 - n * 8) * 2 ^ (n * 8)))) by ring.
+    rewrite Hpow. lia. }
+  rewrite Hzq.
+  rewrite Z.div_add by (apply Z.pow_nonzero; lia).
+  replace (- (2 ^ (64 - n * 8) * q)) with ((- (2 ^ (56 - n * 8) * q)) * 256).
+  2:{ replace ((- (2 ^ (56 - n * 8) * q)) * 256)
+        with (- (q * (2 ^ (56 - n * 8) * 256))) by ring.
+      replace 256 with (2 ^ 8) by reflexivity.
+      rewrite <- Z.pow_add_r by lia.
+      replace (56 - n * 8 + 8) with (64 - n * 8) by lia. ring. }
+  rewrite Z.mod_add by lia.
+  reflexivity.
+Qed.
+
+(* ...at a WORD, which is how a rebuilt byte window arrives. *)
+Lemma bv_le_nth_byte_w (w : SailStdpp.Values.mword 64) (k : nat) :
+  (k < 8)%nat ->
+  bv_to_little_endian 8 8 (bv_unsigned w) !! k = Some (nth_byte w k).
+Proof.
+  intro Hk. rewrite (bv_le_nth_byte (bv_unsigned w) k Hk). do 2 f_equal.
+  apply bv_eq. unfold SailStdpp.Values.mword_of_int,
+                       MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+  exact (bv_unsigned_in_range _ w).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* read_bytes: gather n little-endian bytes from memory (None if missing). *)
 (* ---------------------------------------------------------------------- *)
 

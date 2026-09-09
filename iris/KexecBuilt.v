@@ -427,62 +427,12 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(*  A WORD'S BYTES ARE ITS LITTLE-ENDIAN ENCODING.  [kxb_args_at]'s third   *)
+(*  A WORD'S BYTES ARE ITS LITTLE-ENDIAN ENCODING: [kxb_args_at]'s third   *)
 (*  conjunct is spelled with stdpp's [bv_to_little_endian] (the contract's  *)
-(*  own spelling, shared with [SpecSysExec]'s window rows); the frame     *)
-(*  slots the argv loop wrote hand their bytes over as [nth_byte].  Below   *)
-(*  eight bytes the two agree on the nose -- the 64-bit wrap [mword_of_int] *)
-(*  applies is invisible to byte [k] for [k < 8].                           *)
+(*  own spelling, shared with [SpecCopyin.uimg_word_at]) and the frame      *)
+(*  slots the argv loop wrote hand their bytes over as [nth_byte].          *)
+(*  [RiscvModelBytes.bv_le_nth_byte] is that agreement, beside [nth_byte].  *)
 (* ---------------------------------------------------------------------- *)
-Lemma bv_le_nth_byte (z : Z) (k : nat) :
-  (k < 8)%nat ->
-  bv_to_little_endian 8 8 z !! k = Some (nth_byte (mword_of_int z : mword 64) k).
-Proof.
-  intros Hk.
-  assert (Hlk : bv_to_little_endian 8 8 z !! k
-                = Some (Z_to_bv 8 (Z.land (z ≫ (Z.of_nat k * 8)) (Z.ones 8)))).
-  { unfold bv_to_little_endian. rewrite list_lookup_fmap.
-    change (Z.of_N 8) with 8.
-    assert (Hz : Z_to_little_endian 8 8 z !! k
-                 = Some (Z.land (z ≫ (Z.of_nat k * 8)) (Z.ones 8))).
-    { apply (Z_to_little_endian_lookup_Some 8 8 z k _ ltac:(lia) ltac:(lia)).
-      split; [lia | reflexivity]. }
-    rewrite Hz. reflexivity. }
-  rewrite Hlk. f_equal. apply bv_eq.
-  rewrite Z_to_bv_unsigned.
-  unfold nth_byte. rewrite bv_extract_unsigned, moi64_unsigned.
-  rewrite Z.land_ones by lia.
-  unfold bv_wrap, bv_modulus.
-  change (2 ^ Z.of_N 8) with 256.
-  change (2 ^ Z.of_N 64) with 18446744073709551616.
-  change (Z.ones 8) with 255.
-  replace (Z.of_N (8 * N.of_nat k)) with (Z.of_nat k * 8) by lia.
-  set (n := Z.of_nat k).
-  assert (Hn : 0 <= n <= 7) by (unfold n; lia).
-  rewrite !Z.shiftr_div_pow2 by lia.
-  rewrite Z.mod_mod by lia.
-  set (q := z / 18446744073709551616).
-  assert (Hpow : 2 ^ (64 - n * 8) * 2 ^ (n * 8) = 18446744073709551616).
-  { rewrite <- Z.pow_add_r by lia.
-    replace (64 - n * 8 + n * 8) with 64 by lia. reflexivity. }
-  assert (Hzq : z `mod` 18446744073709551616
-                = z + (- (2 ^ (64 - n * 8) * q)) * 2 ^ (n * 8)).
-  { pose proof (Z.div_mod z 18446744073709551616 ltac:(lia)) as Hdm.
-    fold q in Hdm.
-    replace ((- (2 ^ (64 - n * 8) * q)) * 2 ^ (n * 8))
-      with (- (q * (2 ^ (64 - n * 8) * 2 ^ (n * 8)))) by ring.
-    rewrite Hpow. lia. }
-  rewrite Hzq.
-  rewrite Z.div_add by (apply Z.pow_nonzero; lia).
-  replace (- (2 ^ (64 - n * 8) * q)) with ((- (2 ^ (56 - n * 8) * q)) * 256).
-  2:{ replace ((- (2 ^ (56 - n * 8) * q)) * 256)
-        with (- (q * (2 ^ (56 - n * 8) * 256))) by ring.
-      replace 256 with (2 ^ 8) by reflexivity.
-      rewrite <- Z.pow_add_r by lia.
-      replace (56 - n * 8 + 8) with (64 - n * 8) by lia. ring. }
-  rewrite Z.mod_add by lia.
-  reflexivity.
-Qed.
 
 (* THE CLOSING COPYOUT: the [8 * (na + 1)]-byte pointer vector.  Its run is
    strictly below every string ([kxc_sp_vec_disj]), so the strings survive
@@ -1995,8 +1945,8 @@ Qed.
     [StackBytes.slotsn_bytes_own] + [bytes_own_name], which FORGETS the
     ustack slots' values (the run comes back under an existential naming
     function).  [StackBytes.slotsn_bytes_named] is the same split at NAMED
-    values, and [bv_le_nth_byte] above is the row that a word's [nth_byte]s
-    ARE [bv_to_little_endian 8 8] of it.
+    values, and [RiscvModelBytes.bv_le_nth_byte] is the row that a word's
+    [nth_byte]s ARE [bv_to_little_endian 8 8] of it.
 
     WHAT IT DOES NOT CARRY YET, and what is now in place for it.
     [kexec_image_ok] also asks for [uimg_sub (elf_image f)] and for

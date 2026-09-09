@@ -134,6 +134,20 @@ Definition copyin_got (M : gmap Z (bv 8)) (srcva : mword 64) (len : nat)
   forall j : nat, (j < len)%nat ->
     M !! uint (add_vec_int srcva (Z.of_nat j)) = Some (dst_new j).
 
+(* ...AND THE SAME FACT ABOUT A WORD.  A copy of eight bytes into a
+   caller's [uint64] out-parameter is read back as one 64-bit value, so the
+   image-indexed vocabulary needs a WORD row beside the byte one:
+   [uimg_word_at M a w] says the eight little-endian bytes of [w] are the
+   image's at [a .. a+7].  [a] is a plain [Z] and the eight addresses are
+   consecutive in [Z], not modulo 2^64 -- which costs nothing, because
+   every producer is guarded by a range test that already rules the wrap
+   out ([SpecFetchaddr.fetch_ok]: [uint addr + 8 <= uint p->sz <= MAXVA]).
+   Its consumers are [SpecFetchaddr.fetchaddr_got] (the producer) and
+   [SpecSysExec.exec_args_of] (the argv vector's pointer row). *)
+Definition uimg_word_at (M : gmap Z (bv 8)) (a : Z) (w : mword 64) : Prop :=
+  forall k, (k < 8)%nat ->
+    M !! (a + Z.of_nat k) = bv_to_little_endian 8 8 (bv_unsigned w) !! k.
+
 (* ===================================================================== *)
 (*  THE SAME FACT ABOUT A BYTE LIST -- the receipt layers' spelling.       *)
 (*                                                                        *)

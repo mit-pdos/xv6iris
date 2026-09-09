@@ -57,6 +57,15 @@
 (* that knows its image owes the walk at exactly one path.  The premise   *)
 (* [exec_path_of M pv pl] is therefore the third pure input here, and a   *)
 (* program-side supplier discharges it against its own read-only image.   *)
+(*                                                                       *)
+(* AND SO IS THE ARGUMENT VECTOR.  The slot wand's second pure input is   *)
+(* [SpecSysExec.exec_args_of M av na alen afun], the twin reading at      *)
+(* argument 1: not merely a vector of the right shape, but the pointers   *)
+(* the caller's own image holds at [av + 8 i] and the strings they name.  *)
+(* That is a STRONGER gift to the exec'd program's constructor -- sh's    *)
+(* ROOM premise needs [na] and [alen] to price its frames, which a bare   *)
+(* shape cannot supply -- and [SpecSysExec.exec_args_of_shape] recovers   *)
+(* the shape wherever a consumer wants only that.                         *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -348,7 +357,7 @@ Section PinnedExec.
     □ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
          (W' : uvis),
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
-         ⌜exec_args_shape na alen afun⌝ -∗ Pay -∗ X W') -∗
+         ⌜exec_args_of M av na alen afun⌝ -∗ Pay -∗ X W') -∗
     □ (T -∗ ∀ W' : uvis, X W') -∗
     Pay -∗
     pf_at (fun S => sys_exec_slot_pre S (pex_P T hops) (pex_recv Pin T)
@@ -412,7 +421,7 @@ Section PinnedExec.
     □ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
          (W' : uvis),
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
-         ⌜exec_args_shape na alen afun⌝ -∗ Pay -∗ X W') -∗
+         ⌜exec_args_of M av na alen afun⌝ -∗ Pay -∗ X W') -∗
     (* the taint's generic slot *)
     □ (T -∗ ∀ W' : uvis, X W') -∗
     Pay -∗
@@ -449,7 +458,7 @@ Section PinnedExec.
     □ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
          (W' : uvis),
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
-         ⌜exec_args_shape na alen afun⌝ -∗ Pay -∗ X W') -∗
+         ⌜exec_args_of M av na alen afun⌝ -∗ Pay -∗ X W') -∗
     □ (T -∗ ∀ W' : uvis, X W') -∗
     Pay -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)

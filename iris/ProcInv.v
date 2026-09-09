@@ -2794,7 +2794,7 @@ Section ProcInv.
       iIntros (g) "Hg".
       rewrite (bb_split a 8 (8 * length ws) g).
       iDestruct "Hg" as "[Hg0 Hg1]".
-      iDestruct ("Hhback" $! g with "Hg0") as (w') "Hw'".
+      iDestruct ("Hhback" $! g with "Hg0") as (w') "[_ Hw']".
       iDestruct ("Htback" $! (fun j => g (8 + j)%nat) with "Hg1") as (ws') "[%Hlen Hws']".
       iExists (w' :: ws'). iSplit; [iPureIntro; cbn; lia|].
       rewrite big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0.

@@ -35,9 +35,20 @@
    * [ByteBuf.bb_word_acc] is the [↦₈ ⇄ 8 named bytes] accessor a copy
      through a caller's WORD-sized out-parameter needs.  copyin's buffer is
      [[∗ list] j ∈ seq 0 8, pa_add ip j ↦ₘ f j] at an arbitrary [f], so the
-     word cannot come back holding a named value -- only [∃ w].  That is
-     honest (see SpecCopyin.v) and it is why [fetchaddr_post]'s second arm
-     is existential.
+     word comes back EXISTENTIAL -- but with its bytes named: the rebuild
+     also reports [nth_byte w' j = f j], which is what carries copyin's
+     memory-indexed promise across the accessor.
+
+   * THE CONTENT CLAUSE, [SpecFetchaddr.fetchaddr_got], is that promise at
+     the word.  [SpecCopyin.copyin_got] names byte [j] at
+     [uint (addr + j)], the copy loop's cursor modulo 2^64;
+     [SpecCopyin.uimg_word_at] names the eight at [uint addr + j],
+     consecutive in [Z].  [fa_no_wrap] below is the step, and it is paid
+     out of [fetch_ok] -- the range test THIS arm passed -- against
+     [proc_priv]'s [p->sz <= MAXVA].  The clause is keyed on the returned
+     a0, so [Hpair] has to carry [copyin_got] beside the mapped value:
+     [snez]/[negw] otherwise sever the tie between "fetchaddr answered 0"
+     and "copyin answered 0", and the clause becomes unprovable.
 
    * [snez a0,a0; negw a0,a0] is gcc's map from copyin's 0/-1 to
      fetchaddr's 0/-1, and BOTH read x0 as a source operand.  The generic
@@ -120,6 +131,61 @@ Proof. lia. Qed.
 
 Lemma fa_maxva_lit : (2 ^ 38)%Z = 274877906944%Z.
 Proof. vm_compute. reflexivity. Qed.
+
+(* ---- WHAT THE WORD IS, out of what copyin promised about the bytes ----
+
+   [SpecCopyin.copyin_got] names byte [j] at [uint (addr + j)], the copy
+   loop's own cursor, modulo 2^64; [SpecCopyin.uimg_word_at] names the eight
+   at [uint addr + j], consecutive in [Z].  The two agree because this arm
+   ran copyin AT ALL, which means [fetch_ok addr p->sz] held and
+   [proc_priv]'s [p->sz <= MAXVA] caps the sum far below the wrap. *)
+(* the two bounds, over plain [Z]: [lia] cannot see past an [mword] in
+   context (durable-notes.md), so the arithmetic is factored out. *)
+Lemma fa_z_small (kz : Z) : 0 <= kz < 8 -> 0 <= kz < 18446744073709551616.
+Proof. lia. Qed.
+
+Lemma fa_z_byte (a s kz : Z) :
+  0 <= a -> a + 8 <= s -> s <= 274877906944 -> 0 <= kz < 8 ->
+  0 <= a + kz < 18446744073709551616.
+Proof. lia. Qed.
+
+Lemma fa_no_wrap (addr : mword 64) (szv : mword 64) (k : nat) :
+  fetch_ok addr szv -> (uint szv <= 2 ^ 38)%Z -> (k < 8)%nat ->
+  uint (add_vec_int addr (Z.of_nat k)) = (uint addr + Z.of_nat k)%Z.
+Proof.
+  intros Hok Hsz Hk. rewrite /fetch_ok in Hok.
+  rewrite fa_maxva_lit in Hsz.
+  pose proof (bv_unsigned_in_range _ addr) as [Hlo _].
+  assert (Hkz : (0 <= Z.of_nat k < 8)%Z).
+  { split; [apply Nat2Z.is_nonneg |].
+    change 8%Z with (Z.of_nat 8%nat). apply Nat2Z.inj_lt. exact Hk. }
+  rewrite !uint_unsigned. rewrite !uint_unsigned in Hok.
+  rewrite !uint_unsigned in Hsz.
+  unfold add_vec_int. rewrite add_vec64_unsigned moi64_unsigned.
+  rewrite (bvw64_small (Z.of_nat k));
+    [| change (2 ^ 64)%Z with 18446744073709551616%Z;
+       exact (fa_z_small (Z.of_nat k) Hkz)].
+  apply bvw64_small.
+  change (2 ^ 64)%Z with 18446744073709551616%Z.
+  exact (fa_z_byte (bv_unsigned addr) (bv_unsigned szv) (Z.of_nat k)
+           Hlo Hok Hsz Hkz).
+Qed.
+
+(* ...and the word itself: [f] names the destination bytes, [w] is the value
+   the caller reads back out of the [uint64] cell, and
+   [ByteBuf.bb_word_acc]'s rebuild ties the two per byte. *)
+Lemma fa_got_of_copyin (M : gmap Z (bv 8)) (addr szv : mword 64)
+    (w : mword 64) (f : nat -> bv 8) :
+  fetch_ok addr szv -> (uint szv <= 2 ^ 38)%Z ->
+  copyin_got M addr 8 f ->
+  (forall j : nat, (j < 8)%nat -> nth_byte w j = f j) ->
+  uimg_word_at M (uint addr) w.
+Proof.
+  intros Hok Hsz Hgot Hnb k Hk.
+  rewrite (bv_le_nth_byte_w w k Hk) (Hnb k Hk).
+  rewrite <- (fa_no_wrap addr szv k Hok Hsz Hk).
+  exact (Hgot k Hk).
+Qed.
 
 Module FetchaddrProof (Myproc : MYPROC) (Copyin : COPYIN) : FETCHADDR.
 
@@ -889,6 +955,13 @@ Section ProofFetchaddr.
         { rewrite /A7 upd_ne; [| reg_neq]. rewrite /A6 upd_ne; [| reg_neq]. exact HA5a1. }
         assert (HA7a2 : A7 !!! Regidx Ra2 = ip).
         { rewrite /A7 upd_ne; [| reg_neq]. rewrite /A6 upd_ne; [| reg_neq]. exact HA5a2. }
+        (* copyin's SOURCE address IS the caller's [addr] -- it came off s1,
+           which the prologue parked a0 in.  That is what makes the content
+           relay below a rename and nothing more (ProofFetchstr's move). *)
+        assert (HA7a3 : A7 !!! Regidx Ra3 = addr).
+        { rewrite /A7 upd_ne; [| reg_neq]. rewrite /A6 upd_ne; [| reg_neq].
+          rewrite /A5 upd_ne; [| reg_neq]. rewrite /A4 upd_eq.
+          rewrite /A3 upd_ne; [| reg_neq]. rewrite HA2s1. apply add_vec_zero_l. }
         assert (HA7a4 : A7 !!! Regidx Ra4 = (mword_of_int 8 : mword 64)).
         { rewrite /A7 upd_ne; [| reg_neq]. rewrite /A6 upd_ne; [| reg_neq].
           rewrite /A5 upd_ne; [| reg_neq]. rewrite /A4 upd_ne; [| reg_neq].
@@ -931,11 +1004,12 @@ Section ProofFetchaddr.
                   with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
         all: try lkbelow.
         iIntros (CID20 Hk20 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hbuf %Hcsr %Hext %Hret".
+        rewrite HA7a3 in Hret.
         assert (Hpc2e : ret_pc (A7 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchaddr + 0x2e))
           by (rewrite HA7ra; apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpc2e) in "Hpc".
         iEval (rewrite HA7a2) in "Hbuf".
-        iDestruct ("Hipback" $! dst_new with "Hbuf") as (wnew) "Hip".
+        iDestruct ("Hipback" $! dst_new with "Hbuf") as (wnew) "[%Hnbw Hip]".
         iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
         iDestruct ("Hpback" $! P' (us_M U) with "Hxe Hszc Hptc Hpt") as "Hpriv".
         (* the frame and the callee-saved set survived copyin *)
@@ -952,19 +1026,30 @@ Section ProofFetchaddr.
         (* copyin answers 0 or -1, so BOTH written values are closed
            literals: discharge the whole two-instruction sequence up front,
            by cases, and the WP steps below never have to case-split. *)
+        (* THE CONTENT CLAUSE RIDES THROUGH THE MAP.  [snez]/[negw] turn
+           copyin's 0/-1 into fetchaddr's 0/-1, and the 0 arm is the one
+           copyin promised the bytes on -- so the disjunction carries
+           [copyin_got] beside the value, or the tie to [Hret] is severed
+           here and the answer can no longer be read back. *)
         assert (Hpair : exists sv rv : mword 64,
                   zero_extend' 64 (bool_to_bit (zopz0zI_u zero_reg (mr !!! Regidx Ra0))) = sv /\
                   sign_extend' 64 (sub_vec (subrange_vec_dec (zero_reg : mword 64) 31 0 : mword 32)
                                            (subrange_vec_dec sv 31 0 : mword 32)) = rv /\
-                  (rv = (mword_of_int 0 : mword 64) \/ rv = (mword_of_int (-1) : mword 64))).
-        { destruct Hret as [[H0 _] | H1].
+                  ((rv = (mword_of_int 0 : mword 64)
+                    /\ copyin_got (us_M U) addr 8 dst_new)
+                   \/ rv = (mword_of_int (-1) : mword 64))).
+        { destruct Hret as [[H0 Hgot] | H1].
           - exists (mword_of_int 0 : mword 64), (mword_of_int 0 : mword 64). rewrite H0.
             split; [apply bv_eq; vm_compute; reflexivity|].
-            split; [apply bv_eq; vm_compute; reflexivity| left; reflexivity].
+            split; [apply bv_eq; vm_compute; reflexivity|].
+            left. split; [reflexivity | exact Hgot].
           - exists (mword_of_int 1 : mword 64), (mword_of_int (-1) : mword 64). rewrite H1.
             split; [apply bv_eq; vm_compute; reflexivity|].
             split; [apply bv_eq; vm_compute; reflexivity| right; reflexivity]. }
-        destruct Hpair as (sv & rv & Hsv & Hrv & Hrvcase).
+        destruct Hpair as (sv & rv & Hsv & Hrv & Hrvfull).
+        assert (Hrvcase : rv = (mword_of_int 0 : mword 64)
+                          \/ rv = (mword_of_int (-1) : mword 64))
+          by (destruct Hrvfull as [[H0 _] | H1]; [left; exact H0 | right; exact H1]).
         assert (Hsnez : zero_extend' 64 (bool_to_bit
                           (zopz0zI_u (mr !!! Regidx Rx0) (mr !!! Regidx Ra0))) = sv)
           by (rewrite Hz0; exact Hsv).
@@ -1021,7 +1106,15 @@ Section ProofFetchaddr.
         { exact Hext. }
         iRight. iSplitR.
         { iPureIntro. split; [| exact Hok]. rewrite Hfa0. exact Hrvcase. }
-        iExists wnew. iExact "Hip".
+        iExists wnew. iFrame "Hip". iPureIntro.
+        (* the answer decides the arm: [-1] is not [0], so the clause is
+           vacuous exactly where copyin promised nothing *)
+        intro Hzero. rewrite Hfa0 in Hzero.
+        destruct Hrvfull as [[_ Hgot] | Hm1]; last first.
+        { exfalso. rewrite Hm1 in Hzero.
+          apply (f_equal bv_unsigned) in Hzero. vm_compute in Hzero. discriminate. }
+        exact (fa_got_of_copyin (us_M U) addr (pv_sz (us_V U)) wnew dst_new
+                 Hok Hszb38 Hgot Hnbw).
   Qed.
 
 End ProofFetchaddr.

@@ -60,6 +60,13 @@
    * kexec wants the ARGV VECTOR as [S na] owned words ending in a NULL.
      That is this function's own [char *argv[MAXARG]] frame array, memset to
      zero and then filled; the [break] arm writes the terminating NULL.
+     [fetchaddr] reports one thing more about each user pointer it read,
+     [SpecFetchaddr.fetchaddr_got]: that word IS the process's own at
+     [uargv + 8i].  Together with each [fetchstr]'s content clause and the
+     NULL the break tested, that is what lets this level owe the exec
+     bundle at the single vector the caller passed
+     ([SpecSysExec.exec_args_of]) instead of at every vector of the right
+     shape.
    * kexec wants [na < MAXARG].  The loop tests [i != 32] on its BACK EDGE,
      so it reaches the break with [i < 32] -- see the note on the off-by-one
      below, which is why the premise is [<] and not [<=].

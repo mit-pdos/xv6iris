@@ -560,12 +560,20 @@ Section ByteBuf.
      before the split (the [word_pointsto_split4] discipline).  The
      returned value is existential because the copy names its bytes by an
      arbitrary function; [nth_byte_assemble_len] is what turns eight
-     arbitrary bytes back into a word. *)
+     arbitrary bytes back into a word.
+
+     THE VALUE IS EXISTENTIAL, BUT ITS BYTES ARE NOT: the word handed back
+     is the one whose [nth_byte]s ARE the window's bytes, and the rebuild
+     proves that per byte anyway.  A caller that copied INTO the cell out of
+     a memory-indexed contract ([ProofFetchaddr]: [SpecCopyin.copyin_got])
+     needs exactly this row to say WHICH value came back. *)
   Lemma bb_word_acc (a : mword 64) (w : mword 64) :
     a ↦₈ w -∗
     ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ nth_byte w j) ∗
     (∀ f : nat -> bv 8,
-       ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ f j) -∗ ∃ w' : mword 64, a ↦₈ w').
+       ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ f j) -∗
+       ∃ w' : mword 64,
+         ⌜forall j : nat, (j < 8)%nat -> nth_byte w' j = f j⌝ ∗ a ↦₈ w').
   Proof.
     iIntros "Hw".
     iDestruct (ctx_word_pointsto_aligned_p with "Hw") as %Hal.
@@ -573,15 +581,20 @@ Section ByteBuf.
     iIntros (f) "Hf".
     set (bs := [f 0%nat; f 1%nat; f 2%nat; f 3%nat;
                 f 4%nat; f 5%nat; f 6%nat; f 7%nat]).
+    assert (Hbs : forall i : nat, (i < 8)%nat -> bs !!! i = f i).
+    { intros i Hlt. unfold bs.
+      destruct i as [|[|[|[|[|[|[|[|i']]]]]]]]; try reflexivity. cbn in Hlt. lia. }
+    assert (Hnb : forall i : nat, (i < 8)%nat ->
+              nth_byte (Z_to_bv 64 (assemble_bytes bs) : mword 64) i = f i).
+    { intros i Hlt.
+      rewrite (nth_byte_assemble_len 64 bs i ltac:(cbn; lia) ltac:(cbn; lia)).
+      exact (Hbs i Hlt). }
     iExists (Z_to_bv 64 (assemble_bytes bs) : mword 64).
+    iSplitR; [iPureIntro; exact Hnb |].
     iApply (ctx_word_pointsto_intro _ _ _ _ Hal).
     iApply (big_sepL_mono with "Hf"). intros i j Hj.
     apply lookup_seq in Hj as [-> Hlt].
-    rewrite (nth_byte_assemble_len 64 bs i ltac:(cbn; lia) ltac:(cbn; lia)).
-    assert (Hbs : bs !!! i = f i).
-    { unfold bs.
-      destruct i as [|[|[|[|[|[|[|[|i']]]]]]]]; try reflexivity. cbn in Hlt. lia. }
-    rewrite Hbs. reflexivity.
+    rewrite (Hnb i ltac:(cbn in Hlt; lia)). reflexivity.
   Qed.
 
   (* ------------------------------------------------------------------ *)

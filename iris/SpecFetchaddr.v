@@ -7,7 +7,7 @@
        struct proc *p = myproc();
        if (addr >= p->sz || addr + sizeof(uint64) > p->sz)
          return -1;                 // both tests needed, in case of overflow
-       if (copyin(p->pagetable, (char * )ip, addr, sizeof( *ip)) != 0)
+       if (copyin(p->pagetable, p->sz, (char * )ip, addr, sizeof( *ip)) != 0)
          return -1;
        return 0;
      }
@@ -32,17 +32,24 @@
      discharge one.  The bound lives in [proc_priv] instead and this proof
      pays copyin's premise out of it.
 
-   WHAT *ip GETS.  Nothing, and that is the honest reading rather than a
-   weakness: the bytes come from USER memory, about which the kernel may
-   assume nothing, and [proc_pt] owns the user pages with existential
-   contents (see SpecCopyin.v).  So the two arms of [fetchaddr_post] are
-   about OWNERSHIP, not values:
+   WHAT *ip GETS.  On the answer 0, THE PROCESS'S OWN WORD at [addr]:
+   copyin is memory-indexed ([SpecCopyin.copyin_got] names byte [j] at
+   [addr + j] of the block's image) and [ByteBuf.bb_word_acc]'s rebuild
+   ties the eight bytes to the value the caller reads back, so
+   [fetchaddr_got] below says the word IS
+   [SpecCopyin.uimg_word_at (us_M U) (uint addr)].  The two arms of
+   [fetchaddr_post] are:
 
    - the range test failed: [*ip] is untouched (fetchaddr returned before
      calling copyin), and the answer is -1;
-   - the range test passed: the caller still owns [*ip], now holding SOME
-     value -- a copyin that gives up part-way has already written a prefix,
-     so this is the right statement on BOTH copyin exits.
+   - the range test passed: the caller owns [*ip] holding some [w], and
+     [fetchaddr_got] pins [w] on the 0 arm.  On -1 it pins nothing -- a
+     copyin that gives up part-way has already written a prefix, so the
+     value is only ownership there, which is the copy family's failure arm
+     exactly ([SpecFetchstr.fetchstr_got], keyed on the answer).
+
+   ONE SPEC, NOT TWO.  There is no ∃-weakened twin: a caller that does not
+   care about the value simply drops the clause.
 
    THE RETURN VALUE IS NOT AN UNCONSTRAINED DISJUNCTION.  [r = 0] implies the
    second arm, i.e. [fetch_ok addr (pv_sz V)] -- a caller that gets 0 learns
@@ -68,6 +75,7 @@ Require Import CpuOwn.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
+Require Import SpecCopyin.    (* [uimg_word_at]: the image's word at an address *)
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 From Kernel Require KernelSyms.
@@ -95,14 +103,29 @@ Notation fetchaddr_stack := (54%nat) (only parsing).
 Definition fetch_ok (addr szv : mword 64) : Prop :=
   (uint addr + 8 <= uint szv)%Z.
 
+(* WHICH WORD IT WROTE, at the image it read from.  [r = 0] is the only
+   arm that promises anything: copyin ran to completion, so the eight bytes
+   it moved ARE the process's own at [addr] and the word the caller reads
+   back is their little-endian value ([SpecCopyin.uimg_word_at]).  On the
+   [-1] arm the clause is vacuous, which is the copy family's failure arm
+   exactly -- [SpecFetchstr.fetchstr_got]'s mold, keyed on the answer.
+
+   [uimg_word_at]'s eight addresses are consecutive in [Z], and [fetch_ok]
+   -- which the same arm carries -- is what rules the wrap out. *)
+Definition fetchaddr_got (M : gmap Z (bv 8)) (addr : mword 64)
+    (r w : mword 64) : Prop :=
+  r = (mword_of_int 0 : mword 64) -> uimg_word_at M (uint addr) w.
+
 Section SpecFetchaddr.
   Context `{!riscvGS Σ}.
 
   (* fetchaddr's result, keyed by the returned a0 (the [argfd_post] shape). *)
-  Definition fetchaddr_post `{XI : CurCtx} (ip oldv addr szv r : mword 64) : iProp Σ :=
+  Definition fetchaddr_post `{XI : CurCtx} (M : gmap Z (bv 8))
+      (ip oldv addr szv r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ ¬ fetch_ok addr szv⌝ ∗ ip ↦₈[KT1] oldv
      ∨ ⌜(r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64))
-        /\ fetch_ok addr szv⌝ ∗ ∃ w : mword 64, ip ↦₈[KT1] w)%I.
+        /\ fetch_ok addr szv⌝
+        ∗ ∃ w : mword 64, ip ↦₈[KT1] w ∗ ⌜fetchaddr_got M addr r w⌝)%I.
 
 End SpecFetchaddr.
 
@@ -137,7 +160,7 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (us_upt U P') -∗
-      fetchaddr_post ip oldv addr (pv_sz (us_V U))
+      fetchaddr_post (us_M U) ip oldv addr (pv_sz (us_V U))
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
