@@ -1532,6 +1532,19 @@ at the dispatcher, then the round instantiates the parent's arm
 unconditionally and the loop's `Hmk` premise goes.  ORDER: FETCHSTR-MEM
 (LANDED) → UK-NAMES + CWD → PID-ROW → C+D → ARM-c (1).
 
+UK-NAMES (1/2) LANDED (2026-09-09): `UkRun.uk_names := {ukn_t; ukn_d;
+ukn_s; ukn_fd}` (top of UkRun.v; the cwd field is added with the resource
+in 2/2 so nothing invents a gname); program files bind `Context (N :
+uk_names)` with `Local Notation γt := (ukn_t N)` etc. so every body is
+unchanged text; engine lemmas bind `(N : uk_names)` and spell projections;
+post-fork continuations bind their own `N'`.  Leaf resources keep their
+gname arguments.  `Forkable` STAYS a heap-triple family `gname -> gname ->
+gname -> iProp` (the child's fd name is minted AFTER the heap fork and the
+rebuild, so a record-typed payload would carry a field no instance can
+honour); `UkShLoop.ushl_dat` moved onto a bare gname for the same reason.
+38 files, +3123/−2926, scripted sweep + hand residue (backup in the
+scratchpad).
+
 FETCHSTR-MEM LANDED (2026-09-09): `SpecCopyinstr.copyinstr_got M srcva f
 k := ∀ j ≤ k, M !! uint (add_vec_int srcva j) = Some (f j)` (the `j = k`
 instance is the NUL in the image), folded into `copyinstr_ret`'s success
