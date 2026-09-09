@@ -965,11 +965,12 @@ Section BootCarve.
      owned rather than persisted.
 
      WHY THE VALUE HAS TO BE PINNED.  [boot_ran_cell4] gives [∃ w, _ ↦₄ w],
-     which is enough for a cell whose contents nobody reasons about
-     ([nextpid] is one).  It is NOT enough for [first]: forkret's branch is
-     decided by that cell, so a caller holding an existential cannot tell
-     which arm it is in.  The image says 1, and this lemma is how that fact
-     reaches a points-to. *)
+     which is enough for a cell whose contents nobody reasons about.  It is
+     not enough for either of the image's two writable globals: forkret's
+     branch is decided by [first], and the pid lock's payload carries
+     [1 <= nextpid <= PIDMAX], a bound the boot has to FOUND.  The image
+     says 1 for both, and this lemma is how that fact reaches a
+     points-to. *)
   Lemma boot_ran_cell4_at (g : gstate) (A : Z) (w : mword 32) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->

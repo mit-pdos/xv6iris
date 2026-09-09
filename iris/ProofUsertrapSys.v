@@ -630,7 +630,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2 stsR)
-        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hcwig %Hsbrg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo Hso".
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hcwig %Hsbrg %Hfkg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo Hso".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -704,7 +704,7 @@ Section UtSysBlock.
       assert (Ha5 : rget S3 Ra5 = add_vec_int (pv_tf (us_V U) !!! tf_epc_idx) 4).
       { rewrite (list_lookup_total_correct _ _ _ Hepc) HS3a5 HS2a5.
         apply addv_sext4. }
-      cbn [us_V us_M] in Hmemg, Hmemne2, Hmema0, Hmemupt, Hmemsz, Hcwig, Hsbrg.
+      cbn [us_V us_M] in Hmemg, Hmemne2, Hmema0, Hmemupt, Hmemsz, Hcwig, Hsbrg, Hfkg.
       (* the dispatcher's record is the entry one but for the epc word, so
          its cwd inum is the entry's *)
       assert (HV1cwi : pv_cwi V1 = pv_cwi (us_V U))
@@ -777,6 +777,18 @@ Section UtSysBlock.
             - left. rewrite Ha0w in Hm1. split; [ exact Hm1 | ].
               rewrite Hsz. reflexivity.
             - right. rewrite Ha0w in Hr. split; [ exact Hr | exact Himp ]. }
+          (* FORK'S ANSWER, off the dispatcher's clause and in the shape the
+             U tier's fork row reads (this lane).  It is what makes the trap
+             loop's parent arm unconditional: -1 or a pid in [1, PIDMAX] is
+             never 0. *)
+          assert (Hfkret : sysc_num V1 = USYS_fork ->
+                    w = (mword_of_int (-1) : mword 64)
+                    \/ (1 <= sint w <= PIDMAX)%Z).
+          { intro Hfk.
+            destruct Hfkg as [Hne1 | [Hm1 | Hpb]].
+            - exfalso. exact (Hne1 Hfk).
+            - left. rewrite Ha0w in Hm1. exact Hm1.
+            - right. rewrite Ha0w in Hpb. exact Hpb. }
           (* THE CWD ROW, off the dispatcher's clause: a chdir that returned
              nonzero moved nothing, and every other entry moved nothing.
              The clause reads the stored a0 word, which is [w]. *)
@@ -827,7 +839,7 @@ Section UtSysBlock.
                 rewrite Hszq. exact (perm_of_uptd_ext_sz _ _ _ Hup). }
               rewrite Hpi.
               exact (sysc_mem_ok_usys V1 V2 (us_M U) M2 w _ _ _ _
-                       Hnex Hnsb eq_refl (f_equal uint Hszq) Hmemg). }
+                       Hnex Hnsb eq_refl (f_equal uint Hszq) Hfkret Hmemg). }
       (* THE DESCRIPTOR ROW, CARRIED OUT OF THE DISPATCH.  [Hfdrow] reads the
          syscall table at the record syscall() was CALLED with; what usertrap
          owes is the same table at the record it was ENTERED with, and the

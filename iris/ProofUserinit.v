@@ -446,7 +446,7 @@ Section ProofUserinit.
       "(%Hfacts & Hheld & Hhart & Hpriv & Hfrag & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
         & Hctx & Hcg & Hcpu & Hpay & Hkenv & Hpav)".
     destruct U as [V M].
-    destruct Hfacts as (Hrv & Hj & Hgl & _ & _ & Hcwd0 & Hrest & Hnc).
+    destruct Hfacts as (Hrv & Hj & Hgl & _ & _ & _ & Hcwd0 & Hrest & Hnc).
     (* [Hkfree] is KEPT: the paid park is anchored on the child's free
        kernel stack ([ProcDefs.kstack_free_at] spells it at [ks] below). *)
     iDestruct "Hks" as "#Hks".

@@ -50,6 +50,11 @@ Qed.
 (* struct proc geometry.                                                  *)
 (* ===================================================================== *)
 Definition NPROC : nat := 64%nat.
+(* the highest pid <allocpid> will hand out (kernel/param.h: PIDMAX 1000).
+   A source constant and not an image address, so it is written here rather
+   than generated into KernelConsts.v -- see durable-notes.md, "Image
+   constants are generated". *)
+Definition PIDMAX : Z := 1000.
 Definition proc_size : Z := 360.
 Definition proc_base : mword 64 := mword_of_int KernelSyms.proc.
 Definition proc_addr (i : nat) : mword 64 :=

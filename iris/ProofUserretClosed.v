@@ -96,10 +96,12 @@ Require Import UexecRet.     (* [uslot] / [uexec_ret] / [ukb] / [ukc] /
 Require Import UexecApply.   (* the round's tail, as named lemmas *)
 Require Import UexecSG.       (* [uexecSG]: [sbundle_at] / [spost_at] / [skey_eq] -- the loop runs on the
                                  enriched slot (lane E3b) *)
-Require Import UexecExecMint. (* [uslot_mint] -- the loop's generic slot *)
+Require Import UexecExecMint. (* [udep_gen]/[uslot_mint]: the generic slot's
+                                 construction, which [UexecCond]'s gate chain
+                                 below is stated against *)
 Require Import UexecExecInst. (* the class INSTANCE: what the loop hands the
                                  process back at each contracted number *)
-Require Import AppInv.        (* [app_sup] -- the credential the mint runs on *)
+Require Import AppInv.        (* [app_sup] -- the kernel-wide supply credential *)
 Require Import UserretUser.
 Require Import TfPage36.
 From Kernel Require KernelSyms.
@@ -243,11 +245,13 @@ Section UserretClosed.
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     wire_inv -∗
     (* THE APPLICATION'S SUPPLY, the fourth kernel-wide persistent
-       credential (the ARM; [AppInv.app_sup]).  The loop MINTS the generic
-       slot below, and a generic slot's syscall bundles are paid out of it.
-       A premise rather than anything the loop owns: see [UexecSG.v]'s
-       "[ssupply] IS NOT IN [uvb]" -- putting it in the round's bundle would
-       make the kernel owe it to resume ANY process. *)
+       credential (the ARM; [AppInv.app_sup]).  The loop spends it nowhere:
+       the round is the process's own arm on every entry.  It is carried
+       here, and threaded from [SpecUserretClosed], because the kernel-wide
+       credential is still routed through this interface; the routing is
+       ARM-c (1)'s to retire.  A premise rather than anything the loop owns:
+       see [UexecSG.v]'s "[ssupply] IS NOT IN [uvb]" -- putting it in the
+       round's bundle would make the kernel owe it to resume ANY process. *)
     app_sup -∗
     (* THE ROUND'S ENTRY, NAMED (milestone J).  It used to be the ∃-hidden
        [user_trap_frame] paired with a [uexec_wp]; it is now the trapped
@@ -281,20 +285,12 @@ Section UserretClosed.
   Proof.
     intros Hj.
     iIntros "#Hkt #Hclaim #Hwire #Hsup".
-    (* THE LOOP MINTS (refutation R-c).  ONE arm of the round is a kernel
-       mint by design -- fork's pid wrap, where nothing yet says [r <> 0]
-       (K2) -- so [UserretClosed] takes a [UEXEC_GEN] again.  exec is no
-       longer one of them: both of kexec's success arms are paid by the
-       process's own deposit ([SpecKexec.exec_slot_pre]'s two wands), so the
-       exec channel hands the round a slot and never a mint.
-       Through [UexecCond.cond_entry_slot], not the bare generic
-       inhabitant, so a process whose key qualifies picks up sync's own
-       constructor.  Its [psok] premise is the instance's own (every number
-       is admitted) and its supply is the credential above --
-       [UexecExecMint.uslot_mint]. *)
-    iAssert (□ (∀ W : uvis, uslot W))%I as "#Hmk".
-    { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      iApply (uslot_mint with "Hsup Hgen"). }
+    (* THE LOOP MINTS NOTHING.  Every arm of the round is the process's
+       own: exec's two success arms are paid out of the process's exec
+       deposit ([SpecKexec.exec_slot_pre]'s two wands), and fork's parent
+       arm is instantiated at the pid, which [UsysMemOk.usys_mem_ok]'s fork
+       row says is never 0.  So the round takes no slot family and this
+       loop passes none. *)
     iLöb as "IH".
     iIntros "!>" (h C pt sz γfd cw W sc stv)
       "%Hok %Hperm %Hszw %Hcww #Hhw #Hmin #Hcreds (Hframe & Hfrag & Hret)".
@@ -575,7 +571,7 @@ Section UserretClosed.
                     key the deposit went down at -- which differs from the
                     round's run projection in none of [UexecSG.skey_eq]'s six
                     rows, exactly as it did on the way in. *)
-                 with "Hmk Hxo [Hso] Hret") as "Hslot";
+                 with "Hxo [Hso] Hret") as "Hslot";
       [ iIntros "%Hg"; destruct Hg as (Hgec & Hgex & Hgfk);
         iDestruct ("Hso" $! (usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
                                (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))

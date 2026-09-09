@@ -627,15 +627,22 @@ Section UexecRet.
   (* the parent's arm: a NONZERO return, the key it trapped at bumped *)
   Definition uexec_fork_parent_F (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
     (∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z),
+        (* THE GUARD IS FREE.  <allocpid> allocates every pid in
+           [1, PIDMAX] under <pid_lock> and a failed fork returns -1, so
+           the value the round binds is never 0
+           ([UsysMemOk.usys_mem_ok]'s fork row); the round therefore
+           instantiates this arm UNCONDITIONALLY
+           ([UexecApply.uexec_ret_round_slot]'s fork case) and a program
+           that only says what it does at a nonzero return has said what
+           it does at every return.  The guard stays because it is what a
+           program's own reasoning wants: it is the fact that DISTINGUISHES
+           the parent, and the child never reaches this arm at all -- its
+           continuation went down as fork's deposit. *)
         ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
         (* THE PARENT'S OWN TABLE DOES NOT MOVE.  fork copies the
            parent's descriptors INTO THE CHILD and leaves the parent's
            array alone, so the process that gets a nonzero return
-           resumes at the view it trapped at.
-           THE GUARD IS PAID FOR: the round instantiates this arm at the
-           pid the kernel returned ([UexecApply.uexec_ret_round_slot]'s
-           fork case), so a program keeps a descriptor handle across its
-           own fork. *)
+           resumes at the view it trapped at. *)
         ⌜fdv' = uvis_fd W⌝ -∗
         (* ...NOR ITS WORKING DIRECTORY: fork does not chdir. *)
         ⌜cw' = uvis_cwd W⌝ -∗

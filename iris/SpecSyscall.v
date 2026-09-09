@@ -686,6 +686,21 @@ Definition wp_syscall_sconf_body
                  (uint (pv_sz (us_V U'))
                   = uint (pv_sz (us_V U))
                     + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z)) ⌝ -∗
+      (* ...and FORK'S ANSWER, beside sbrk's and for the same reason: it is
+         the one thing about a return value the U tier's image table cannot
+         derive.  fork (1) either fails, returning -1, or returns the
+         CHILD'S PID, which <allocpid> allocates in [1, PIDMAX]
+         (kernel/param.h) under <pid_lock> and [SpecKfork.kfork_post]
+         relays.  Both are NONZERO, and that is what the clause is for: the
+         trap loop's fork arm is the parent's alone
+         ([UexecRet.uexec_fork_parent_F], guarded on a nonzero return), the
+         child resuming on fork's DEPOSIT instead, so without this the round
+         could not tell which of the two it was resuming.
+         [UsysMemOk.usys_mem_ok]'s fork row is the U tier's reading of it.
+         Every other entry escapes by its number, as sbrk's clause does. *)
+      ⌜ sysc_num (us_V U) <> UsysMemOk.USYS_fork
+        \/ pv_tf (us_V U') !!! tf_arg_idx 0 = (mword_of_int (-1) : mword 64)
+        \/ (1 <= sint (pv_tf (us_V U') !!! tf_arg_idx 0) <= PIDMAX)%Z ⌝ -∗
       sie_cap_gpr KT1 mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
       bslots 3 -∗

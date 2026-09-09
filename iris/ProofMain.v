@@ -865,10 +865,11 @@ Section ProofMain.
        routed here through [main_globals_raw]. *)
     WaitInv.wait_res -∗
     (* [PidLock.nextpid_res] itself: the .data word procinit's
-       [initlock(&pid_lock,"nextpid")] brings under its lock.  It is NOT
-       .bss and it is not [kernel_data]'s -- see [SpecMain]'s own row and
-       [KernelDataInv]'s header. *)
-    (∃ v : mword 32, alp_nextpid ↦₄ v) -∗
+       [initlock(&pid_lock,"nextpid")] brings under its lock, AT THE PINNED
+       VALUE the loader left -- the payload's [1 <= v <= PIDMAX] is founded
+       here.  It is NOT .bss and it is not [kernel_data]'s -- see
+       [SpecMain]'s own row and [KernelDataInv]'s header. *)
+    (alp_nextpid ↦₄ (mword_of_int 1 : mword 32)) -∗
     ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) -∗
     ([∗ list] i ∈ seq 0 NPROC,
        (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗ proc_pub (proc_addr i)) -∗
@@ -1147,7 +1148,15 @@ Section ProofMain.
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ alp_pid_lock "nextpid"%string nextpid_res_at
             with "Hpnm Hrun Hpw Hpc0 [Hnpid Hpshare]") as "[Hrun Hpid0]".
-    { rewrite /nextpid_res_at /pid_lock_share. iFrame "Hnpid Hpshare". }
+    (* the payload's [1 <= nextpid <= PIDMAX] is FOUNDED here: the .data
+       word arrives at the pinned value the loader left ([BootShared]'s
+       carve), so the invariant the scan keeps has an inhabitant. *)
+    { rewrite /nextpid_res_at /pid_lock_share. iSplitL "Hnpid".
+      { iExists (mword_of_int 1 : mword 32). iFrame "Hnpid". iPureIntro.
+        assert (Hv : bv_unsigned (mword_of_int 1 : mword 32) = 1)
+          by (vm_compute; reflexivity).
+        rewrite Hv. unfold PIDMAX. lia. }
+      iFrame "Hpshare". }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hpid0" as (γp) "#Hpidlock".
     (* ---- ASSEMBLY 2c: the wait_lock, and it is the SAME move.  procinit

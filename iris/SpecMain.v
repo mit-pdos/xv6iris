@@ -551,17 +551,19 @@ Section SpecMain.
        [BootShared] sits ABOVE this file and naming it would be a cycle; the
        two are convertible and [BootChain] frames one against the other.
 
-       main spends the [nextpid] half immediately: it is the whole of
+       main spends the [nextpid] half immediately: it is the counter half of
        [PidLock.nextpid_res], so the [newlock] on procinit's
        [lk_fresh pid_lock_addr "nextpid"] turns the pair into the
        [is_lock γp alp_pid_lock "nextpid" nextpid_res_at] that allocproc -- and
        hence kfork, sys_fork and userinit -- takes.  `first` is forkret's;
        main carries it and drops it. *)
-    (* PINNED, not existential: forkret's branch is decided by this cell,
-       so a holder of the existential cannot tell which arm it is in.
-       [BootShared.main_data_raw] carries the same shape. *)
+    (* BOTH PINNED, not existential: forkret's branch is decided by `first`,
+       and the pid lock's payload carries [1 <= nextpid <= PIDMAX] -- the
+       bound that makes every allocated pid nonzero -- so the [newlock]
+       below is where it is FOUNDED.  [BootShared.main_data_raw] carries the
+       same shape. *)
     ((mword_of_int KernelSyms.first_1 : mword 64) ↦₄ (mword_of_int 1 : mword 32)) -∗
-    (∃ w : mword 32, (mword_of_int KernelSyms.nextpid : mword 64) ↦₄ w) -∗
+    ((mword_of_int KernelSyms.nextpid : mword 64) ↦₄ (mword_of_int 1 : mword 32)) -∗
     (* every proc slot's HART TAG, minted at adequacy
        ([RiscvAdequacy.riscv_system_adequacy]) at hart 0: main spends them in
        [SpecProcinit.procs_inv_alloc], one per proc lock.  The tag names the

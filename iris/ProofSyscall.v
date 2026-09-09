@@ -1726,6 +1726,11 @@ Section SyscallVocab.
                    (uint (pv_sz (us_V U'))
                     = uint (pv_sz (us_V U))
                       + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z)) ⌝ -∗
+        (* ...and FORK'S ANSWER -- [SpecSyscall]'s own clause beside sbrk's,
+           and what makes the trap loop's parent arm unconditional *)
+        ⌜ sysc_num (us_V U) <> UsysMemOk.USYS_fork
+          \/ pv_tf (us_V U') !!! tf_arg_idx 0 = (mword_of_int (-1) : mword 64)
+          \/ (1 <= sint (pv_tf (us_V U') !!! tf_arg_idx 0) <= PIDMAX)%Z ⌝ -∗
         sie_cap_gpr KT1 mf av true pj -∗
         cpu_own 0%nat true pj true lks -∗
         bslots 3 -∗
@@ -1935,6 +1940,13 @@ Section SyscallVocab.
               (uint (pv_sz (us_V U'))
                = uint (pv_sz (us_V U))
                  + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z))) ->
+    (* ...and FORK'S ANSWER, read at the stored a0 word beside sbrk's: -1,
+       or a pid in [1, PIDMAX] ([SpecKfork.kfork_post]).  Either way
+       nonzero, which is what makes the trap loop's parent arm
+       unconditional. *)
+    (sysc_num (us_V U) <> UsysMemOk.USYS_fork
+     \/ pv_tf (us_V U') !!! tf_arg_idx 0 = (mword_of_int (-1) : mword 64)
+     \/ (1 <= sint (pv_tf (us_V U') !!! tf_arg_idx 0) <= PIDMAX)%Z) ->
     (* THIS ARM RETURNS, hence is not [exit] (milestone J, K1) -- the last
        pure premise, so that every call site adds exactly one argument
        immediately before its [with "..."].  Free at every one of them:
@@ -1965,7 +1977,7 @@ Section SyscallVocab.
       (us_M U') sts' (pv_cwi (us_V U')) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hne2.
+    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hne2.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont Hxo Hso".
     assert (Hb1 : pa_stk sp0 1 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
@@ -2112,7 +2124,7 @@ Section SyscallVocab.
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).
       reflexivity. }
     iApply ("Hcont" $! T5 U' sts'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hxo Hso").
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hxo Hso").
     { unfold callee_saved.
       split_and!.
       - exact HT5sp.
@@ -2140,7 +2152,8 @@ Section SyscallVocab.
     { exact Hud. }
     { exact Hfg. }
     { exact Hcwi. }
-    exact Hsbr.
+    { exact Hsbr. }
+    exact Hfk.
   Qed.
 
   (* the jalr's target, at a symbolic table index -- [ret_pc] is the
@@ -2666,6 +2679,15 @@ Section SyscallRet.
               (uint (pv_sz (us_V U'))
                = uint (pv_sz (us_V U))
                  + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z))) ->
+    (* ...and FORK'S ANSWER, at the return REGISTER for the same reason as
+       sbrk's: the [sd a0,112(s2)] below is what turns it into the stored
+       word form.  -1, or a pid in [1, PIDMAX] ([SpecKfork.kfork_post]);
+       either way nonzero, which is what makes the trap loop's parent arm
+       unconditional.  Free at every other arm: it knows its own table
+       index. *)
+    (sysc_num (us_V U) <> UsysMemOk.USYS_fork
+     \/ E !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64)
+     \/ (1 <= sint (E !!! Regidx (mword_of_int 10 : mword 5)) <= PIDMAX)%Z) ->
     (* THIS ARM RETURNS, hence is not [exit] (milestone J, K1) -- the last
        pure premise, so that every call site adds exactly one argument
        immediately before its [with "..."].  Free at every one of them:
@@ -2706,7 +2728,7 @@ Section SyscallRet.
       (pv_cwi (us_V U')) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hne2.
+    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hne2.
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont Hxo Hso".
     (* the stored word, as the store lemma spells it *)
     assert (Hrg : rget E Ra0 = E !!! Regidx Ra0) by (rgne; reflexivity).
@@ -2772,6 +2794,14 @@ Section SyscallRet.
                   + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z))).
     { rewrite list_lookup_total_insert; [| exact Hi14].
       rgne. exact Hsbr. }
+    (* ...and fork's answer makes the same move, off the same word *)
+    assert (Hfkstored : sysc_num (us_V U) <> UsysMemOk.USYS_fork
+      \/ <[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0
+           = (mword_of_int (-1) : mword 64)
+      \/ (1 <= sint (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U'))
+                        !!! tf_arg_idx 0) <= PIDMAX)%Z).
+    { rewrite list_lookup_total_insert; [| exact Hi14].
+      rgne. exact Hfk. }
     (* ...and the syscall channel's row makes the same move from the
        register to the slot, by the very word the [sd] just wrote *)
     assert (Hsoword : <[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U'))
@@ -2825,6 +2855,7 @@ Section SyscallRet.
               ltac:(cbn [pv_fdg upd_tf]; exact Hfg)
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_cwi pv_tf]; exact Hcwstored)
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_sz pv_tf]; exact Hsbstored)
+              ltac:(cbn [us_V us_tf upd_usV upd_tf pv_tf]; exact Hfkstored)
               Hne2
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont Hxo [Hso]").
     iEval (rewrite Hsoword). iExact "Hso".
@@ -2889,6 +2920,41 @@ Section SyscallArms.
   Proof.
     intros Hr Hc. apply Hr. rewrite Hc.
     split; discriminate.
+  Qed.
+
+  (* ...AND AT [fork] (1).  The fork ROW is owed by the fork arm alone --
+     it is the only entry whose return value the U tier's table pins -- so
+     every other returning arm escapes by its own table index and the
+     out-of-range fallback by [Hrange]. *)
+  Lemma sysc_num_ne1 (V : pprivate) (k : nat) :
+    sysc_num V = Z.of_nat k -> Nat.eqb k 1 = false ->
+    sysc_num V <> UsysMemOk.USYS_fork.
+  Proof.
+    intros Hk Hne Hc. rewrite Hk in Hc. unfold UsysMemOk.USYS_fork in Hc.
+    change 1%Z with (Z.of_nat 1) in Hc.
+    apply Nat2Z.inj in Hc. rewrite Hc in Hne. discriminate Hne.
+  Qed.
+
+  (* the pid as the RETURN REGISTER holds it.  [SpecKfork.kfork_post] states
+     it as a sign-extended 32-bit value in [1, PIDMAX]; the dispatcher's fork
+     row reads the register as a signed 64-bit int, and inside the interval
+     the two readings agree. *)
+  Lemma sysc_sext_pid (w : mword 32) :
+    (1 <= bv_unsigned w <= PIDMAX)%Z ->
+    (1 <= sint (sign_extend' 64 w : mword 64) <= PIDMAX)%Z.
+  Proof.
+    intros Hw. unfold PIDMAX in Hw |- *.
+    assert (H31 : (2 ^ 31)%Z = 2147483648) by (vm_compute; reflexivity).
+    assert (Hz : (0 <= bv_unsigned w < 2 ^ 31)%Z) by (rewrite H31; lia).
+    assert (Hid : (mword_of_int (bv_unsigned w) : mword 32) = w).
+    { apply bv_eq. rewrite moi32_unsigned. apply bv_wrap_small.
+      exact (bv_unsigned_in_range _ w). }
+    assert (Hs : sint (sign_extend' 64 w : mword 64) = bv_unsigned w).
+    { transitivity (sint (sign_extend' 64
+                            (mword_of_int (bv_unsigned w) : mword 32) : mword 64)).
+      - rewrite Hid. reflexivity.
+      - exact (sint64_moi32 (bv_unsigned w) Hz). }
+    rewrite Hs. lia.
   Qed.
 
   (* ...and at [exec] (lane E2): the exec channel's answer is owed by the
@@ -3440,6 +3506,8 @@ Section SyscallArms.
               eq_refl eq_refl
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3731,6 +3799,8 @@ Section SyscallArms.
               (or_intror (sysc_sbrk_ret_of_ok (us_V U) v0 v1 P' szv'
                             (mf !!! Regidx Ra0) (us_M U) M'
                             (list_lookup_total_correct _ _ _ Hv0) Hok))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3823,6 +3893,8 @@ Section SyscallArms.
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3908,6 +3980,8 @@ Section SyscallArms.
               eq_refl eq_refl
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3987,6 +4061,8 @@ Section SyscallArms.
               eq_refl eq_refl
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4066,6 +4142,8 @@ Section SyscallArms.
               eq_refl eq_refl
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4242,6 +4320,8 @@ Section SyscallArms.
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4349,6 +4429,12 @@ Section SyscallArms.
               eq_refl eq_refl
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...AND FORK'S ANSWER, which this arm alone owes: kfork's post
+                 says the return is -1 or a pid in [1, PIDMAX], and the pid
+                 reaches the register sign-extended. *)
+              ltac:(right; destruct Hrv as [Hm1 | (pidv & Hpv & Hpb)];
+                    [ left; exact Hm1
+                    | right; rewrite Hpv; exact (sysc_sext_pid pidv Hpb) ])
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4570,6 +4656,8 @@ Section SyscallArms.
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont Hxo []").
     (* exec's process never resumes on success, so its [spost_at] is [emp]
@@ -4754,6 +4842,8 @@ Section SyscallArms.
               eq_refl eq_refl
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4911,6 +5001,8 @@ Section SyscallArms.
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] [Hex]").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5043,6 +5135,8 @@ Section SyscallArms.
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] [Hex]").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5138,6 +5232,8 @@ Section SyscallArms.
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5284,6 +5380,8 @@ Section SyscallArms.
                     [ left; split; [ rewrite Hnum; reflexivity | exact Hz ]
                     | right; exact Heq ])
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] [Hrcpt]").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5402,6 +5500,8 @@ Section SyscallArms.
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] [Harms]").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5509,6 +5609,8 @@ Section SyscallArms.
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] [Harms]").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5666,6 +5768,8 @@ Section SyscallArms.
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_iref_join3 with "Hir Hiru").
@@ -5945,6 +6049,8 @@ Section SyscallArms.
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_iref_join3 with "Hir Hiru").
@@ -6090,6 +6196,8 @@ Section SyscallArms.
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] [Harms]").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -6209,6 +6317,8 @@ Section SyscallArms.
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] [Harms]").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -6463,6 +6573,8 @@ Section SyscallArms.
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
+              (* ...and fork's answer: not this entry's number *)
+              (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] [Hrcpt]").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -6873,6 +6985,8 @@ Section SyscallArms.
               ltac:(right; reflexivity)
               (* out of range, so certainly not sbrk's number either *)
               ltac:(left; unfold UsysMemOk.USYS_sbrk in *; lia)
+              (* ...nor fork's *)
+              ltac:(left; unfold UsysMemOk.USYS_fork in *; lia)
               (sysc_num_ne2_range _ Hrange)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont [] []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7_range _ Hrange)).

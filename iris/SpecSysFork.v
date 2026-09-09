@@ -70,6 +70,7 @@ Require Import WpLock.
 Require Import CpuOwn.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
+Require Import ProcGeom.  (* [PIDMAX] -- kernel/param.h *)
 Require Import SchedCtx.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -173,11 +174,14 @@ Definition wp_sys_fork_sconf_body
       proc_priv γf p pid U -∗
       fd_frags (pv_fdg (us_V U)) sts -∗
       kalloc_env_at fsc_kalloc fsc_kpages None -∗
-      (* ... and the return value is kfork's own, unchanged *)
+      (* ... and the return value is kfork's own, unchanged -- including the
+         pid's interval, which is what the dispatcher relays into its own
+         fork row and the trap loop reads as [r <> 0] *)
       ⌜ mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64)
         \/ (exists pidv : mword 32,
               mf !!! Regidx (mword_of_int 10 : mword 5)
-              = (sign_extend' 64 pidv : mword 64)) ⌝ -∗
+              = (sign_extend' 64 pidv : mword 64)
+              /\ (1 <= bv_unsigned pidv <= PIDMAX)%Z) ⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

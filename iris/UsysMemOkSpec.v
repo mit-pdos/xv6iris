@@ -28,6 +28,7 @@ Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.O
 Require Import Riscv.rv64d_types.
 Require Import RiscvLang RiscvPtsto.
 Require Import ProcDefs.
+Require Import ProcGeom.  (* [PIDMAX] -- kernel/param.h *)
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecSyscall.
 Require Import UserPerm UsysMemOk.
@@ -49,10 +50,18 @@ Lemma sysc_mem_ok_usys (V V' : pprivate) (M M' : gmap Z (bv 8)) (r : mword 64)
   sysc_num V <> 7 -> sysc_num V <> 12 ->
   π' = π ->
   szv' = szv ->
+  (* ...and what fork ANSWERED, a PREMISE for the reason sbrk's answer is
+     one below: [sysc_mem_ok] never mentions the return value, and the tie
+     between a fork's return and the pid <allocpid> allocated is
+     [SpecKfork.kfork_post]'s, carried out through the dispatcher's own
+     fork row.  Without it the U tier cannot tell a parent from a child,
+     which is the whole of the trap loop's fork arm. *)
+  (sysc_num V = USYS_fork ->
+     r = (mword_of_int (-1) : mword 64) \/ (1 <= sint r <= PIDMAX)%Z) ->
   sysc_mem_ok V V' M M' ->
   usys_mem_ok (sysc_num V) (pv_tf V) r M π szv M' π' szv'.
 Proof.
-  intros Hne Hns Hp Hs H. unfold sysc_mem_ok in H.
+  intros Hne Hns Hp Hs Hfk H. unfold sysc_mem_ok in H.
   unfold usys_mem_ok, USYS_exec, USYS_sbrk, USYS_wait, USYS_pipe,
          USYS_read, USYS_fstat, usys_rdcount.
   destruct (decide (sysc_num V = 7)); [ contradiction | ].
@@ -68,6 +77,8 @@ Proof.
   destruct (decide (sysc_num V = 4)); [ exact (conj H (conj Hp Hs)) | ].
   destruct (decide (sysc_num V = 5)); [ exact (conj H (conj Hp Hs)) | ].
   destruct (decide (sysc_num V = 8)); [ exact (conj H (conj Hp Hs)) | ].
+  destruct (decide (sysc_num V = USYS_fork)) as [Hf | _];
+    [ exact (conj (Hfk Hf) (conj H (conj Hp Hs))) | ].
   exact (conj H (conj Hp Hs)).
 Qed.
 

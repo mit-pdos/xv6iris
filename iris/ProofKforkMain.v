@@ -478,6 +478,11 @@ Section KforkArms.
     npa = proc_addr j -> (j < NPROC)%nat -> γs !! j = Some γl2 ->
     pv_ofile (us_V Uc') = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd (us_V Uc') = (zero_reg : mword 64) ->
+    (* THE CHILD'S PID IS IN [1, PIDMAX] ([SpecAllocproc.allocproc_post],
+       relayed by [ProofKforkB6]'s exit clause).  It is what this arm owes
+       [SpecKfork.kfork_post]'s pid disjunct, and hence what makes fork's
+       return to the PARENT nonzero. *)
+    (1 <= bv_unsigned pid_c <= PIDMAX)%Z ->
     (* WHAT THE CHILD ALREADY SHARES WITH THE PARENT ([ProofKforkB6]'s exit
        clause of the same name): the size uvmcopy was run at, the image it
        copied and the permission view it rebuilt.  With the trapframe the
@@ -566,7 +571,7 @@ Section KforkArms.
   Proof.
     intros HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMts5
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
-      Hofnull Hcwdnull Hshsz Hshimg Hshperm Hbelow.
+      Hofnull Hcwdnull Hpidc Hshsz Hshimg Hshperm Hbelow.
     subst tfsrc tfdst.
     iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag HCpriv Hcfrag #Hmk
              Hheld Hhart Hfd Hbsl Hkst Hctxex Hpay Hkalloc #Hwlock #Hft
@@ -764,8 +769,9 @@ Section KforkArms.
         iSplitL "Hown5"; [iExact "Hown5" |].
         iSplitL "Hpvx4"; [iExact "Hpvx4" |].
         iSplitL "Hpfrag"; [iExact "Hpfrag" |].
-        iFrame "Hkalloc". iRight. iExists pid_c. iPureIntro.
-        rewrite Hrv. reflexivity.
+        iFrame "Hkalloc". iRight. iExists pid_c. iSplit; iPureIntro.
+        * rewrite Hrv. reflexivity.
+        * exact Hpidc.
     - rewrite kfk_childU_0. iExact "HCpriv".
     - iApply "Hb3app".
   Qed.
@@ -876,7 +882,7 @@ Section KforkMain.
       iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures %Hshare".
       iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcfrag #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
                Hke #Hwl #Hft #Hit #Hiti HR".
-      destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
+      destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn & Hpidc).
       destruct Hshare as (Hshsz & Hshimg & Hshperm).
       destruct Htfs as (Htfsrc & Htfdst).
       iApply (kfork_arm3 (CID0 := CID3) γf γw γl γs
@@ -887,7 +893,7 @@ Section KforkMain.
                 (wpk_K_ge56 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
-                Hnpa HjN Hgamma Hofn Hcwdn Hshsz Hshimg Hshperm ltac:(lkbelow)
+                Hnpa HjN Hgamma Hofn Hcwdn Hpidc Hshsz Hshimg Hshperm ltac:(lkbelow)
                 with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag HCp Hcfrag Hmk Hheld Hhart
                       Hfd Hbsl Hkst Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone Hworld Htoken Hjslot
                       [HR]").

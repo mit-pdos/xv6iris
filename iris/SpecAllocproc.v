@@ -168,6 +168,15 @@ Definition allocproc_post
        (rest : list (mword 64)) (nc : nat),
        ⌜ rv = proc_addr j /\
          (j < NPROC)%nat /\ γs !! j = Some γl /\
+         (* THE PID IS IN [1, PIDMAX] (kernel/param.h).  <allocpid> takes it
+            from the bounded counter <pid_lock> protects
+            ([PidLock.nextpid_res_at]) and its retry loop keeps the bound;
+            the interval, and not just [0 < pid], because it is free at the
+            source and it is what a caller of fork tells the user.  This is
+            the fact the trap loop's fork row runs on: a pid in [1, PIDMAX]
+            is never 0, so the parent of a fork always resumes on its own
+            arm ([UexecRet.uexec_fork_parent_F]'s guard). *)
+         (1 <= bv_unsigned pid <= PIDMAX)%Z /\
          pv_upt (us_V U) = upt_desc root tfp /\
          pv_ofile (us_V U) = replicate NOFILE (zero_reg : mword 64) /\
          pv_cwd (us_V U) = (zero_reg : mword 64) /\

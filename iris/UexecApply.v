@@ -617,11 +617,10 @@ Qed.
 (*        [uexec_ret] is re-keyed onto the RUN projection of the trapped    *)
 (*        key ([uexec_ret_run]) -- which is the key the round's relation is *)
 (*        stated at -- and then the round's own arm picks which of          *)
-(*        [uexec_ret]'s arms pays: transparent, ecall/exec (MINT),          *)
-(*        ecall/fork (MINT), ecall/other (the bumped slot).  The mint       *)
-(*        arrives as the premise [∀ W, uslot W]: the loop holds a           *)
-(*        [UEXEC_GEN] and [UexecCond.cond_entry_slot] turns its [box] into  *)
-(*        exactly that family, so this file needs no functor argument.      *)
+(*        [uexec_ret]'s arms pays: transparent, ecall/exec (the kernel's    *)
+(*        own answer, off the process's exec deposit), ecall/fork (the      *)
+(*        parent's arm, at the pid) or ecall/other (the bumped slot).       *)
+(*        NOTHING IS MINTED: every arm is the process's own.                *)
 (*   [ukc_apply]                     step D: [uvb] built ROW BY ROW (never  *)
 (*        [iFrame]: the bundle carries [gpr_file]) and the continuation     *)
 (*        applied at the table/size the round landed on -- which is step C, *)
@@ -664,8 +663,8 @@ Section LoopApply.
 
      Read the proof below for why the other three arms do not want it.  The
      exec arm is the process's own deposit, answered at the key the kernel
-     built; fork's pid-wrap row takes the kernel MINT, free at ANY key --
-     the loop's last one.
+     built; fork's arm is the PARENT's, instantiated at the pid, and the
+     parent's table is the one fork does not touch.
      The returning ecall arm instantiates [uexec_ret]'s own ∀-bound [fdv']
      at [uvis_fd W'], which is arbitrary: "the process is safe at every
      return value AND every descriptor view the kernel hands back" is
@@ -818,7 +817,6 @@ Section LoopApply.
     uround_ok sc (uvis_tf (uvis_run W)) (uvis_M W) (uvis_perm W) (uvis_sz W)
       (uvis_cwd W)
       (uvis_tf W') (uvis_M W') (uvis_perm W') (uvis_sz W') (uvis_cwd W') ->
-    (∀ W'' : uvis, uslot W'') -∗
     (* THE KERNEL'S EXEC ANSWER:
        exec is the one entry whose round says nothing, because the record it
        leaves is a DIFFERENT program's.  The dispatcher answers with the
@@ -850,7 +848,7 @@ Section LoopApply.
     uexec_arm sc W f -∗ uslot W'.
   Proof.
     intros Hl Hfd Hfdrow Hpiperow Hr.
-    iIntros "Hmk Hxo Hsp Hret".
+    iIntros "Hxo Hsp Hret".
     (* STEP A: the trapped key and its run projection are the same key *)
     iEval (rewrite (uexec_arm_run sc W f Hl)) in "Hret".
     destruct (decide (sc = uecall_scause)) as [Hec | Hne].
@@ -899,15 +897,14 @@ Section LoopApply.
              it is instantiated, not minted, at the pid the round returned.
              Fork's three rows are the table's defaults, so the resume key
              is the trapped one bumped at [r] and nothing else moved. *)
-          (* THE PID WRAP IS THE ONE ARM THE PROGRAM DOES NOT COVER.
-             allocpid's counter is a 32-bit word incremented by an [addiw],
-             which wraps, so the kernel cannot promise the parent a nonzero
-             pid and the program's arm -- guarded on [r <> 0] -- says
-             nothing at zero.  A parent handed 0 back therefore resumes on
-             the generic slot the application's supply mints, which is
-             exactly what the supply is for. *)
-          destruct (decide (r = (mword_of_int 0 : mword 64))) as [_ | Hrne];
-            [ iApply "Hmk" | ].
+          (* THE ARM'S GUARD IS PAID BY THE KERNEL.  <allocpid> allocates
+             the child's pid in [1, PIDMAX] under <pid_lock>, and a fork
+             that fails returns -1, so the round's [r] is never 0 --
+             [UsysMemOk.usys_mem_ok]'s fork row says so and this is where
+             it is spent.  The parent therefore always resumes on the
+             program's own arm; nothing is minted here. *)
+          assert (Hrne : r <> (mword_of_int 0 : mword 64))
+            by exact (usys_mem_ok_fork_nz _ _ _ _ _ _ _ _ _ Hfk Hm).
           (* fork's three rows, read off the table's defaults *)
           assert (Hne7 : usys_num (uvis_tf (uvis_run W)) <> USYS_exec)
             by (rewrite Hfk; vm_compute; discriminate).
@@ -1024,7 +1021,6 @@ Section LoopApply.
       (pv_tf (us_V U')) (us_M U')
       (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
       (uint (pv_sz (us_V U'))) (pv_cwi (us_V U')) ->
-    (∀ W'' : uvis, uslot W'') -∗
     (⌜sc = uecall_scause /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_exec⌝ -∗
        (⌜exists r : mword 64,
            uround_bump_ok (tf_of g (ret_pc sepc_v)) (pv_tf (us_V U')) r

@@ -40,7 +40,10 @@
 (*   pipe (4)   -- eight bytes at argument 0, the two fds.                 *)
 (*   read (5)   -- at most the caller's own count, at argument 1.          *)
 (*   fstat (8)  -- one 24-byte [struct stat], at argument 1.               *)
-(*   the other sixteen -- [M' = M].                                        *)
+(*   fork (1)   -- no byte moves, but the RETURN VALUE is pinned: -1, or a *)
+(*                 pid in [1, PIDMAX].  Both nonzero, which is what makes  *)
+(*                 the trap loop's parent arm unconditional.               *)
+(*   the other fifteen -- [M' = M].                                        *)
 (*                                                                         *)
 (* PURE, and deliberately NOT importing SpecSyscall (whose cone is the     *)
 (* whole kernel).  The word-index map is ProcGeom.v's ([tf_arg_idx],       *)
@@ -241,6 +244,21 @@ Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
     (exists (d : nat) (bs : nat -> bv 8),
        (d <= 24)%nat /\ M' = umem_wr M (tf !!! tf_arg_idx 1) d bs)
     /\ π' = π /\ szv' = szv
+  else if decide (n = USYS_fork) then
+    (* fork (1) MOVES NO BYTE -- the child gets a copy of the image, the
+       caller's own is untouched -- but its RETURN VALUE is the one thing
+       about a return value this table has to say, for the same reason
+       sbrk's row says where the break went: the process's continuation is
+       keyed on it.  The parent gets a pid, which <allocpid> allocates in
+       [1, PIDMAX] (kernel/param.h) under <pid_lock>, and a failed fork
+       gets -1.  BOTH ARE NONZERO, which is what tells the trap loop's
+       round that a returning fork is a PARENT
+       ([UexecRet.uexec_fork_parent_F]'s guard) -- the child never returns
+       through this round at all, it resumes on fork's deposit.  The
+       dispatcher's own clause is [SpecSyscall]'s fork row, bridged by
+       [UsysMemOkSpec.sysc_mem_ok_usys]. *)
+    (r = (mword_of_int (-1) : mword 64) \/ (1 <= sint r <= PIDMAX)%Z)
+    /\ M' = M /\ π' = π /\ szv' = szv
   else M' = M /\ π' = π /\ szv' = szv.
 
 (* ===================================================================== *)
@@ -650,6 +668,9 @@ Proof.
   destruct (decide (n = USYS_pipe)); [contradiction |].
   destruct (decide (n = USYS_read)); [contradiction |].
   destruct (decide (n = USYS_fstat)); [contradiction |].
+  (* fork's row is the quiet one with the return-value clause in front, so
+     the conclusion is unchanged and no caller of this reader moves *)
+  destruct (decide (n = USYS_fork)); [exact (proj2 H) |].
   exact H.
 Qed.
 
@@ -686,6 +707,48 @@ Proof.
   rewrite (Hnull Hz) in Hm. exact (conj Hm (conj Hp Hs)).
 Qed.
 
+(* FORK'S ROW, READ.  Two readers: the disjunction itself, and the fact the
+   trap loop actually spends -- a fork's return is NEVER 0, so the arm the
+   process left behind ([UexecRet.uexec_fork_parent_F], guarded on a nonzero
+   return) is the arm the round instantiates, unconditionally.  The child
+   resumes on fork's DEPOSIT and never comes back through this round. *)
+Lemma usys_mem_ok_fork_ret (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+  n = USYS_fork ->
+  usys_mem_ok n tf r M π szv M' π' szv' ->
+  r = (mword_of_int (-1) : mword 64) \/ (1 <= sint r <= PIDMAX)%Z.
+Proof.
+  intros -> H. unfold usys_mem_ok in H.
+  destruct (decide (USYS_fork = USYS_exec)) as [Hc | _]; [ discriminate Hc | ].
+  destruct (decide (USYS_fork = USYS_sbrk)) as [Hc | _]; [ discriminate Hc | ].
+  destruct (decide (USYS_fork = USYS_wait)) as [Hc | _]; [ discriminate Hc | ].
+  destruct (decide (USYS_fork = USYS_pipe)) as [Hc | _]; [ discriminate Hc | ].
+  destruct (decide (USYS_fork = USYS_read)) as [Hc | _]; [ discriminate Hc | ].
+  destruct (decide (USYS_fork = USYS_fstat)) as [Hc | _]; [ discriminate Hc | ].
+  destruct (decide (USYS_fork = USYS_fork)) as [_ | Hc];
+    [ exact (proj1 H) | exfalso; exact (Hc eq_refl) ].
+Qed.
+
+Lemma usys_mem_ok_fork_nz (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+  n = USYS_fork ->
+  usys_mem_ok n tf r M π szv M' π' szv' ->
+  r <> (mword_of_int 0 : mword 64).
+Proof.
+  intros Hn H.
+  destruct (usys_mem_ok_fork_ret n tf r M M' π π' szv szv' Hn H) as [Hf | Hb];
+    intros Hc.
+  - rewrite Hc in Hf.
+    assert (Hne : bv_unsigned (mword_of_int 0 : mword 64)
+                  <> bv_unsigned (mword_of_int (-1) : mword 64))
+      by (intros Hq; vm_compute in Hq; discriminate Hq).
+    exact (Hne (f_equal bv_unsigned Hf)).
+  - rewrite Hc in Hb.
+    assert (Hz : sint (mword_of_int 0 : mword 64) = 0)
+      by (vm_compute; reflexivity).
+    rewrite Hz in Hb. clear - Hb. lia.
+Qed.
+
 (* the permission map is untouched by every entry but sbrk *)
 Lemma usys_mem_ok_perm (n : Z) (tf : list (mword 64)) (r : mword 64)
     (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
@@ -699,6 +762,7 @@ Proof.
   destruct (decide (n = USYS_pipe)); [exact (proj1 (proj2 H)) |].
   destruct (decide (n = USYS_read)); [exact (proj1 (proj2 H)) |].
   destruct (decide (n = USYS_fstat)); [exact (proj1 (proj2 H)) |].
+  destruct (decide (n = USYS_fork)); [exact (proj1 (proj2 (proj2 H))) |].
   exact (proj1 (proj2 H)).
 Qed.
 

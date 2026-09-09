@@ -25,14 +25,18 @@
 
    WHAT THE LOCK PROTECTS.  Two things, and the second is new with ded23f2:
 
-   - the counter cell <nextpid>, value unconstrained.  Nothing in the tree
-     consumes a bound on it: allocproc's post quantifies the pid
-     existentially, and the pid-wrap row of the user round
-     (projects/app-echo.md FORK-ROW) is what a consumer would have to
-     retire to want one.  With the retry scan the kernel now DOES keep every
-     live pid in [1, PIDMAX] and distinct; carrying that here would need the
-     .data word's initial value pinned at boot the way [first] is, and is
-     recorded as a follow-up in kernel-defects.md rather than done.
+   - the counter cell <nextpid>, IN [1, PIDMAX].  The bound is the whole
+     reason the counter is under a lock at all: it is what makes every pid
+     <allocpid> hands out nonzero, so the parent of a fork can always tell
+     itself from its child.  It is INDUCTIVE across the store the scan makes
+     -- [nextpid = (pid == PIDMAX) ? 1 : pid + 1] lands in [1, PIDMAX] from
+     either branch -- and it is FOUNDED at boot, where the .data word is
+     carved at the pinned value 1 ([BootShared.main_data_raw]) and sealed
+     into the payload by main's [newlock].  [ProofAllocproc.wp_ap_pidsec]
+     carries it through the retry loop into [SpecAllocproc.allocproc_post],
+     from there into [SpecKfork.kfork_post] and the dispatcher's fork row,
+     and the trap loop's round reads it as [r <> 0].  Uniqueness (no two
+     live slots share a pid) is a further step nothing consumes.
 
    - A QUARTER OF EVERY proc[i].pid CELL ([SchedCtx.pid_lock_share]).  The
      scan reads [q->pid] for all 64 slots under pid_lock ALONE -- no q->lock
@@ -87,12 +91,13 @@ Section PidLock.
      across a ∀-quantified resume context. *)
   Context `{XI : CurCtx}.
 
-  (* everything <pid_lock> protects: the counter (value unconstrained) and
-     the lock's quarter of every slot's pid cell -- see the header. *)
+  (* everything <pid_lock> protects: the counter, in [1, PIDMAX], and the
+     lock's quarter of every slot's pid cell -- see the header. *)
   (* A6.129 (the M3 λ-conversion): over an EXPLICIT context; [nextpid_res]
      is the ambient spelling *)
   Definition nextpid_res_at (ξ : TsoCtx.CtxId) : iProp Σ :=
-    ((∃ v : mword 32, TsoCtx.ctx_word4_pointsto ξ alp_nextpid (DfracOwn 1) v) ∗
+    ((∃ v : mword 32, TsoCtx.ctx_word4_pointsto ξ alp_nextpid (DfracOwn 1) v ∗
+                      ⌜1 <= bv_unsigned v <= PIDMAX⌝) ∗
      ([∗ list] j ∈ seq 0 NPROC, pid_lock_share_at ξ (proc_addr j)))%I.
   Definition nextpid_res : iProp Σ := nextpid_res_at TsoCtx.cur_ctx.
 
@@ -102,7 +107,7 @@ Section PidLock.
   (* the ambient spelling, opened: what allocproc's critical section holds *)
   Lemma nextpid_res_open :
     nextpid_res ⊣⊢
-      (∃ v : mword 32, alp_nextpid ↦₄ v) ∗
+      (∃ v : mword 32, alp_nextpid ↦₄ v ∗ ⌜1 <= bv_unsigned v <= PIDMAX⌝) ∗
       ([∗ list] j ∈ seq 0 NPROC, pid_lock_share (proc_addr j)).
   Proof. rewrite /nextpid_res /nextpid_res_at /pid_lock_share. reflexivity. Qed.
 

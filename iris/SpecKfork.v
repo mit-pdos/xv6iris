@@ -160,6 +160,7 @@ Require Import WpLock.
 Require Import CpuOwn.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
+Require Import ProcGeom.  (* [PIDMAX] -- kernel/param.h *)
 Require Import SchedCtx.
 Require Import KvmSpec.
 Require Import InodeRegion.
@@ -221,8 +222,14 @@ Definition kfork_post
        [procs_inv], on the success arm the RUNNABLE park swallowed it. *)
     ( (* allocproc found no slot, or uvmcopy failed *)
       ⌜ rv = (mword_of_int (-1) : mword 64) ⌝
-    ∨ (* the child's pid, sign-extended exactly as `lw`/`mv a0,s1` leaves it *)
-      (∃ pidv : mword 32, ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝) ) )%I.
+    ∨ (* the child's pid, sign-extended exactly as `lw`/`mv a0,s1` leaves it,
+         AND IN [1, PIDMAX] (kernel/param.h) -- allocproc chose it out of the
+         bounded counter <pid_lock> protects and its post says so
+         ([SpecAllocproc.allocproc_post]).  The interval is what makes the
+         value NONZERO, which is the whole point of relaying it: the parent
+         of a fork can always tell itself from its child. *)
+      (∃ pidv : mword 32, ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝ ∗
+                          ⌜ (1 <= bv_unsigned pidv <= PIDMAX)%Z ⌝) ) )%I.
 
 Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

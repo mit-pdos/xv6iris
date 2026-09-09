@@ -1046,28 +1046,29 @@ Qed.
 (* THE WRITABLE INITIALIZED GLOBALS -- the part of the image in
    [rodata_end, img_end) that anything will want to name.  These two cells
    are the reason [KernelDataInv.kernel_data] stops at [rodata_end]: xv6
-   STORES to both (`first = 0` in forkret, `nextpid = nextpid + 1` in
+   STORES to both (`first = 0` in forkret, the counter advance in
    allocpid), so neither can ever be part of a persistent image bundle --
    see that file's header and durable-notes.md.
 
-   Contents-EXISTENTIAL, like every other cell the boot carve hands out (the
-   loader leaves 1 in each, but no client has read one yet).  Nothing
-   consumes this bundle today; it is here so that narrowing [kernel_data]
-   does not drop the bytes on the floor, and it is what [SpecForkret]'s
-   `first` premise and [PidLock.nextpid_res] get threaded from when
-   those land ([main_globals_raw] is where they will end up). *)
-(* THE IMAGE'S TWO WRITABLE INITIALIZED GLOBALS.
+   This bundle is what [SpecForkret]'s `first` premise and
+   [PidLock.nextpid_res] are threaded from ([main_globals_raw] is where
+   they end up). *)
+(* THE IMAGE'S TWO WRITABLE INITIALIZED GLOBALS, BOTH AT PINNED VALUES.
+   The loader leaves 1 in each, and each cell's arm needs to know it.
 
-   [first] IS AT A PINNED VALUE and [nextpid] is not, and the asymmetry is
-   the point.  Nobody reasons about [nextpid]'s initial contents -- it is
-   spent immediately on [PidLock.nextpid_res], whose own shape is
-   [∃ v, alp_nextpid ↦₄ v].  [first] is different: forkret's [if (first)]
-   branch is decided by that cell, so a holder of [∃ w, first ↦₄ w] cannot
-   tell which arm it is in and the boot arm becomes unprovable.  The image
-   says 1 ([KernelData], via [boot_cran_cell4_at]), and pinning it here is
-   what lets the FIRST process carry the right to run that arm. *)
-(* [first]'s FOUR IMAGE BYTES, as a named lemma.  It is named for the reason
-   [BootHart.entry_got_bytes] is: the discharge is a [vm_compute] over an
+   [first]: forkret's [if (first)] branch is decided by that cell, so a
+   holder of [∃ w, first ↦₄ w] cannot tell which arm it is in and the boot
+   arm becomes unprovable; pinning it here is what lets the FIRST process
+   carry the right to run that arm.
+
+   [nextpid]: the counter's payload ([PidLock.nextpid_res]) carries
+   [1 <= v <= PIDMAX], the bound that makes every pid <allocpid> hands out
+   nonzero, and the bound is INDUCTIVE, not inhabited -- main's [newlock]
+   has to found it, so the carve hands the word out at 1 rather than
+   existentially.  The image says 1 for both ([KernelData], via
+   [boot_cran_cell4_at]). *)
+(* [first]'s AND [nextpid]'s FOUR IMAGE BYTES, as named lemmas.  Named for
+   the reason [BootHart.entry_got_bytes] is: the discharge is a [vm_compute] over an
    image map, and inlining one into a proof context normalises
    [boot_byte] -- the filtered union of BOTH image maps -- rather than a
    single lookup.  Named, it is paid once.
@@ -1085,13 +1086,23 @@ Proof.
     vm_compute; apply (f_equal Some), bv_eq; reflexivity.
 Qed.
 
+Lemma nextpid_bytes (j : nat) :
+  (j < 4)%nat ->
+  KernelData.kernel_data !! (KernelSyms.nextpid + Z.of_nat j)
+  = Some (nth_byte (mword_of_int 1 : mword 32) j).
+Proof.
+  intro Hj.
+  destruct j as [|[|[|[|j']]]]; [.. | cbn in Hj; lia];
+    vm_compute; apply (f_equal Some), bv_eq; reflexivity.
+Qed.
+
 (* PRIMARY-ONLY (item 38, checklist line four): these two cells go to main,
    i.e. to ONE hart, so they may be context-INDEXED -- the shared alloc is
    instantiated at the primary's ξ0.  The binder is explicit because this
    definition sits outside every section. *)
 Definition main_data_raw `{!riscvGS Σ} `{XI : CurCtx} : iProp Σ :=
   ((pa_of_z KernelSyms.first_1) ↦₄ (mword_of_int 1 : mword 32) ∗
-   (∃ w : bv 32, (pa_of_z KernelSyms.nextpid)  ↦₄ w))%I.
+   (pa_of_z KernelSyms.nextpid)  ↦₄ (mword_of_int 1 : mword 32))%I.
 
 (* [fs_boot_image_wf] MOVED DOWN to [FsCfgBoot.v] (fs-cfg-boot.md (f-2)),
    for the reason [fs_boot_supply] did: [SpecMain] takes it as a pure
@@ -1661,8 +1672,11 @@ Section BootAlloc.
                  (boot_byte_data_run KernelSyms.first_1
                     (mword_of_int 1 : mword 32) 4%nat ltac:(zlit) first_bytes)
                  with "Hcl Hfirst") as "Hfirst".
-    iDestruct (boot_cran_cell4 g KernelSyms.nextpid Hmem ltac:(zlit)
-                 ltac:(zlit) ltac:(zeq) with "Hcl Hnext") as "Hnext".
+    iDestruct (boot_cran_cell4_at g KernelSyms.nextpid (mword_of_int 1)
+                 Hmem ltac:(zlit) ltac:(zlit) ltac:(zeq)
+                 (boot_byte_data_run KernelSyms.nextpid
+                    (mword_of_int 1 : mword 32) 4%nat ltac:(zlit) nextpid_bytes)
+                 with "Hcl Hnext") as "Hnext".
     (* ---- [_entry]'s GOT slot: the &stack0 word, at [DfracDiscarded] so all
            eight harts share it.  It is in `.got`, i.e. ABOVE [rodata_end],
            so it is persisted here as ONE cell rather than claimed wholesale
@@ -1889,9 +1903,8 @@ Section BootAlloc.
     iSplitL "Hres"; [iExact "Hres" |].
     iSplitL "Hlocks"; [iExact "Hlocks" |].
     iSplitL "Hglobals"; [iExact "Hglobals" |].
-    iDestruct "Hnext" as (wnp) "Hnext".
     iSplitL "Hfirst Hnext";
-      [ rewrite /main_data_raw; iFrame "Hfirst"; iExists wnp; iExact "Hnext" |].
+      [ rewrite /main_data_raw; iFrame "Hfirst"; iExact "Hnext" |].
     iSplitL "Hpark"; [iExact "Hpark" |].
     iSplitL "Hpst"; [iExact "Hpst" |].
     iSplitL "Hprocsavail"; [iExact "Hprocsavail" |].

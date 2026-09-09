@@ -255,9 +255,14 @@ Section KforkPrologue.
            [upd_pt]/[upd_sz] preserve both of these.  The uvmcopy-failure
            continuation states the same two facts about [Vc]; the success
            one has to state them about [Vc'] or the fd scan cannot start. *)
+        (* ...and the child's PID IS IN [1, PIDMAX], straight off
+           [SpecAllocproc.allocproc_post]: this exit is the only place both
+           it and the record are in hand, and [SpecKfork.kfork_post]'s pid
+           arm is what it is carried for. *)
         ⌜ npa = proc_addr j /\ (j < NPROC)%nat /\ γs !! j = Some γl2 /\
           pv_ofile (us_V Uc') = replicate NOFILE (zero_reg : mword 64) /\
-          pv_cwd (us_V Uc') = (zero_reg : mword 64) ⌝ -∗
+          pv_cwd (us_V Uc') = (zero_reg : mword 64) /\
+          (1 <= bv_unsigned pid_c <= PIDMAX)%Z ⌝ -∗
         (* WHAT THE CHILD ALREADY SHARES WITH THE PARENT, and it is exactly
            the part of the child's record a SLOT reads: [np->sz = p->sz] is
            the store at +0x40, the image is the parent's page for page (the
@@ -781,7 +786,7 @@ Section KforkPrologue.
       iDestruct "Hp2" as (j γl2 ch pid_c Uc root tfp ks rest nc)
         "(%Hpures & Hheld & Hhart & Hcpriv & Hcfrag & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Uc as [Vc Mc].
-      destruct Hpures as (Hrv & HjN & Hgamma & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
+      destruct Hpures as (Hrv & HjN & Hgamma & Hpidc & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
       set (npa := proc_addr j).
       assert (Hnpanz : npa <> (zero_reg : mword 64)) by (apply proc_addr_nonzero; exact HjN).
@@ -1445,7 +1450,9 @@ Section KforkPrologue.
         * intros r Hr Ncsp N8' N9' N20 N21. apply HN10thr; assumption.
         * split_and!; [reflexivity | exact HjN | exact Hgamma
                       | cbn [upd_pt upd_sz pv_ofile pv_fdg]; exact HVcof
-                      | cbn [upd_pt upd_sz pv_cwd pv_fdg]; exact HVccwd].
+                      | cbn [upd_pt upd_sz pv_cwd pv_fdg]; exact HVccwd
+                      (* [split_and!] splits the interval too *)
+                      | exact (proj1 Hpidc) | exact (proj2 Hpidc)].
         * split_and!; [reflexivity | reflexivity |
                        cbn [upd_pt upd_sz pv_upt pv_fdg]; exact Hpermc].
         * iExists ks, rest. iSplitR; [iPureIntro; exact Hrestlen|].

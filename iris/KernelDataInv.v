@@ -45,7 +45,7 @@ Import Defs.
 (* below: [text_end, rodata_end), which is .rodata + .eh_frame.            *)
 (*                                                                        *)
 (* The upper bound is not optional.  xv6 STORES to `first` (forkret's      *)
-(* `first = 0`) and to `nextpid` (allocpid's `nextpid = nextpid + 1`),     *)
+(* `first = 0`) and to `nextpid` (allocpid's `nextpid = (pid == PIDMAX) ? 1 : pid + 1`),     *)
 (* and both are initialized `.data`, hence in the dumped image.  Resident  *)
 (* at [DfracDiscarded] they would make [kernel_data] contradict any        *)
 (* ownership of those cells -- and a contradictory premise does not fail   *)
@@ -221,7 +221,7 @@ Section KernelDataInv.
   Lemma kdata_ro_first : kdata_ro !! KernelSyms.first_1 = None.
   Proof. apply kdata_ro_writable_none. vm_compute. discriminate. Qed.
 
-  (* `nextpid` -- allocpid's `nextpid = nextpid + 1` stores to it *)
+  (* `nextpid` -- allocpid's `nextpid = (pid == PIDMAX) ? 1 : pid + 1` stores to it *)
   Lemma kdata_ro_nextpid : kdata_ro !! KernelSyms.nextpid = None.
   Proof. apply kdata_ro_writable_none. vm_compute. discriminate. Qed.
 

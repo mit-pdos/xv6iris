@@ -459,8 +459,9 @@ Module AllocprocCore (Acquire : ACQUIRE) (Release : RELEASE)
 (*                                                                        *)
 (* THE OUTER LOOP IS AN iLöb, NOT A FUEL INDUCTION.  It terminates (64    *)
 (* slots cannot hold all of 65 consecutive candidates), but proving that  *)
-(* is a pigeonhole argument nothing needs: the contract says nothing      *)
-(* about the pid's value, so partial correctness is the whole story.  The *)
+(* is a pigeonhole argument nothing needs: partial correctness is the     *)
+(* whole story, and what the contract says about the pid -- that it lies  *)
+(* in [1, PIDMAX] -- is a loop INVARIANT, not a termination fact.  The    *)
 (* inner scan is bounded by the table and is the usual fuel induction.    *)
 (* ===================================================================== *)
 Notation ap_a3 := (mword_of_int 13 : mword 5).
@@ -472,6 +473,78 @@ Definition ap_c1 : mword 64 :=
   add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))).
 Definition ap_c1000 : mword 64 :=
   add_vec zero_reg (sign_extend' 64 (mword_of_int 1000 : mword 12)).
+
+(* ---------------------------------------------------------------------- *)
+(* THE PID'S INTERVAL, in the arithmetic the block moves it through.        *)
+(*                                                                          *)
+(* The bound is carried on the WHOLE 64-bit register and not on [trunc32]   *)
+(* of it, because the [beq a3,a6] at +0x64 compares the whole register      *)
+(* against PIDMAX: a bound on the low half alone leaves the fall-through    *)
+(* arm unable to say the candidate is below PIDMAX.  Four moves need a      *)
+(* value law -- the [lw] that loads the counter, the [c.mv]s (covered by    *)
+(* [add_vec_zero_l]), the [addiw] that advances it, and the two stores'     *)
+(* [trunc32] -- and they are these.                                         *)
+(* ---------------------------------------------------------------------- *)
+Lemma ap_c1_val : bv_unsigned ap_c1 = 1.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma ap_c1000_val : bv_unsigned ap_c1000 = PIDMAX.
+Proof. unfold PIDMAX. vm_compute. reflexivity. Qed.
+
+(* the counter's value, as the [lw] at +0x48 sign-extends it *)
+Lemma ap_sext_val (w : mword 32) :
+  (bv_unsigned w < 2 ^ 31)%Z ->
+  bv_unsigned (sign_extend' 64 w : mword 64) = bv_unsigned w.
+Proof.
+  intro Hw.
+  pose proof (bv_unsigned_in_range _ w) as [Hr0 _].
+  assert (H31 : (2 ^ 31)%Z = 2147483648) by (vm_compute; reflexivity).
+  assert (H64 : (2 ^ 64)%Z = 18446744073709551616) by (vm_compute; reflexivity).
+  rewrite H31 in Hw.
+  rewrite sext32_64_moi moi64_unsigned. unfold bv_signed.
+  assert (Hsw : bv_swrap 32 (bv_unsigned w) = bv_unsigned w).
+  { apply bv_swrap_small.
+    assert (Hhm : bv_half_modulus 32 = 2147483648) by (vm_compute; reflexivity).
+    rewrite Hhm. lia. }
+  rewrite Hsw. apply bvw64_small. rewrite H64. lia.
+Qed.
+
+(* +0x68 [addiw a1,a3,1]: below PIDMAX the 32-bit add does not wrap, so the
+   next candidate is the current one's successor. *)
+Lemma ap_addiw_val (v : mword 64) :
+  (1 <= bv_unsigned v < PIDMAX)%Z ->
+  bv_unsigned (sign_extend' 64
+     (subrange_vec_dec
+        (add_vec v (sign_extend' 64 (mword_of_int 1 : mword 12))) 31 0 : mword 32)
+     : mword 64)
+  = (bv_unsigned v + 1)%Z.
+Proof.
+  intros Hv. unfold PIDMAX in Hv.
+  assert (H31 : (2 ^ 31)%Z = 2147483648) by (vm_compute; reflexivity).
+  assert (H64 : (2 ^ 64)%Z = 18446744073709551616) by (vm_compute; reflexivity).
+  assert (Hd : bv_unsigned (sign_extend' 64 (mword_of_int 1 : mword 12) : mword 64) = 1)
+    by (vm_compute; reflexivity).
+  assert (Hsum : bv_unsigned (add_vec v (sign_extend' 64 (mword_of_int 1 : mword 12)))
+                 = (bv_unsigned v + 1)%Z).
+  { rewrite add_vec64_unsigned Hd. apply bvw64_small. rewrite H64. lia. }
+  assert (Hlow : bv_unsigned (subrange_vec_dec
+                   (add_vec v (sign_extend' 64 (mword_of_int 1 : mword 12))) 31 0 : mword 32)
+                 = (bv_unsigned v + 1)%Z).
+  { rewrite subrange_31_0_unsigned Hsum. apply Z.mod_small. lia. }
+  rewrite ap_sext_val; [ exact Hlow | rewrite Hlow H31; lia ].
+Qed.
+
+(* the two stores' [sw]/[c.sw]: a value inside the interval survives the
+   truncation to the cell's 32 bits *)
+Lemma ap_trunc_val (v : mword 64) :
+  (bv_unsigned v <= PIDMAX)%Z -> bv_unsigned (trunc32 v) = bv_unsigned v.
+Proof.
+  intro Hv. unfold PIDMAX in Hv.
+  pose proof (bv_unsigned_in_range _ v) as [Hr0 _].
+  rewrite trunc32_unsigned. apply bv_wrap_small.
+  assert (Hm : bv_modulus 32 = 4294967296) by (vm_compute; reflexivity).
+  rewrite Hm. lia.
+Qed.
 
 (* what every point of the retry loop knows about the register map: the
    slot pointer in s1, the two constants, the end-of-table cursor in a2,
@@ -546,6 +619,13 @@ Definition ap_pid_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{C
     (m : regfile) (k : nat) (av n : nat) (eb : bool) (p : mword 64) (lks : gset string) : iProp Σ :=
   (∀ (mf : regfile) (pidn : mword 32),
      ⌜ callee_saved m mf ⌝ -∗
+     (* THE PID THE BLOCK CHOSE IS IN [1, PIDMAX].  It comes off the
+        counter <pid_lock> protects, whose payload carries the same bound
+        ([PidLock.nextpid_res_at]), and the retry loop re-establishes it at
+        every candidate: the [beq a3,a6] against PIDMAX at +0x64 sends the
+        wrap arm to 1 and the fall-through to [pid + 1] with [pid < PIDMAX].
+        [SpecAllocproc.allocproc_post] relays it. *)
+     ⌜ (1 <= bv_unsigned pidn <= PIDMAX)%Z ⌝ -∗
      sie_cap_gpr KT1 mf av false p -∗
      cpu_own n eb p false lks -∗
      pc_is (mword_of_int (KernelSyms.allocproc + 0x98) : mword 64) -∗
@@ -640,7 +720,9 @@ Section ProofAllocprocPid.
     { rewrite (callee_saved_lookup Hcsacq ap_s1 ltac:(vm_compute; reflexivity)). exact HA3s1. }
     assert (Hacq_cs : callee_saved m macq) by exact (callee_saved_trans _ _ _ HA3cs Hcsacq).
     iDestruct "HR" as "[Hnp Hshares]".
-    iDestruct "Hnp" as (nv0) "Hnp".
+    iDestruct "Hnp" as (nv0) "[Hnp %Hnv0]".
+    (* THE FIRST CANDIDATE IS THE COUNTER, and the payload's bound is what
+       founds the retry loop's invariant: [1 <= nextpid <= PIDMAX]. *)
     (* +0x44 auipc a3,0x8 ; +0x48 lw a3,1824(a3) : pid := nextpid *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.allocproc + 0x44)) ap_a3 (mword_of_int 8 : mword 20) macq (trap_res false + av)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
@@ -731,6 +813,10 @@ Section ProofAllocprocPid.
     iAssert (wp_next (CID0 := CIDacq) false p (fun (CIDl : CpuId) =>
         ∀ (R : regfile) (nv : mword 32),
         ⌜ ap_pid_regs m k R ⌝ -∗
+        (* THE CANDIDATE IS IN [1, PIDMAX].  The loop's one new invariant:
+           the first candidate is the counter, which the payload bounds, and
+           every retry copies a1, which the PIDMAX test bounds. *)
+        ⌜ (1 <= bv_unsigned (R !!! Regidx ap_a3 : mword 64) <= PIDMAX)%Z ⌝ -∗
         sie_cap_gpr KT1 R (trap_res false + av)%nat false p -∗
         pc_is (mword_of_int (KernelSyms.allocproc + 0x62) : mword 64) -∗
         alp_nextpid ↦₄ nv -∗
@@ -743,7 +829,7 @@ Section ProofAllocprocPid.
         wp_next (CID0 := CID) false p (fun (CIDc : CpuId) => ap_pid_post (CID := CIDc) m k av n eb p lks) -∗
         WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iLöb as "IH".
-      iIntros (CIDl Hsl R nv) "%HR Hcg Hpc Hnp Hshares Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
+      iIntros (CIDl Hsl R nv) "%HR %HRa3 Hcg Hpc Hnp Hshares Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
       (* +0x62 c.mv a1,a0 : the next counter value defaults to 1 (the wrap) *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.allocproc + 0x62)) ap_a1 ap_a0 R (trap_res false + av)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
@@ -754,13 +840,18 @@ Section ProofAllocprocPid.
       assert (Hp64 : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x62) : mword 64) 2 = mword_of_int (KernelSyms.allocproc + 0x64)) by pcstep.
       iEval (rewrite Hp64) in "Hpc".
       assert (HR1 : ap_pid_regs m k R1) by (unfold R1; regs_ins HR).
+      assert (HR1a3 : R1 !!! Regidx ap_a3 = R !!! Regidx ap_a3)
+        by (rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]).
       (* THE MERGE POINT +0x6c.  The two arms of the PIDMAX test differ only
-         in a1 (1, or pid + 1), and nothing downstream reads its value except
-         the store into <nextpid>, whose value is existential -- so the rest
-         of the iteration is one block over an a1-generic map. *)
+         in a1 (1, or pid + 1), and the only thing downstream reads about it
+         is its INTERVAL -- the exit stores it into <nextpid>, whose payload
+         carries [1, PIDMAX], and a retry copies it into a3, where the loop
+         invariant carries the same.  So the rest of the iteration is one
+         block over an a1-generic map that knows only the bound. *)
       iAssert (wp_next (CID0 := CIDl) false p (fun (CIDm : CpuId) =>
           ∀ (Rm : regfile),
-          ⌜ ap_pid_regs m k Rm /\ Rm !!! Regidx ap_a3 = R1 !!! Regidx ap_a3 ⌝ -∗
+          ⌜ ap_pid_regs m k Rm /\ Rm !!! Regidx ap_a3 = R1 !!! Regidx ap_a3 /\
+            (1 <= bv_unsigned (Rm !!! Regidx ap_a1 : mword 64) <= PIDMAX)%Z ⌝ -∗
           sie_cap_gpr KT1 Rm (trap_res false + av)%nat false p -∗
           pc_is (mword_of_int (KernelSyms.allocproc + 0x6c) : mword 64) -∗
           alp_nextpid ↦₄ nv -∗
@@ -772,7 +863,7 @@ Section ProofAllocprocPid.
           p_pid (proc_addr k) ↦₄{DfracOwn (1/2)} pidh -∗
           wp_next (CID0 := CID) false p (fun (CIDc : CpuId) => ap_pid_post (CID := CIDc) m k av n eb p lks) -∗
           WP (Loop : expr riscv_lang)))%I with "[]" as "Hbody".
-      { iIntros (CIDm Hsm Rm) "[%HRm %HRma3] Hcg Hpc Hnp Hshares Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
+      { iIntros (CIDm Hsm Rm) "(%HRm & %HRma3 & %HRma1) Hcg Hpc Hnp Hshares Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
         (* +0x6c auipc a5,0x11 ; +0x70 addi a5,a5,-916 : q := proc *)
         iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.allocproc + 0x6c)) ap_a5 (mword_of_int 17 : mword 20) Rm (trap_res false + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
@@ -876,9 +967,13 @@ Section ProofAllocprocPid.
             assert (Hp62 : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x60) : mword 64) 2 = mword_of_int (KernelSyms.allocproc + 0x62)) by pcstep.
             iEval (rewrite Hp62) in "Hpc".
             assert (HRe : ap_pid_regs m k Re) by (unfold Re; regs_ins HRd).
+            (* the retry re-establishes the loop's invariant from a1's *)
+            assert (HRea3 : (1 <= bv_unsigned (Re !!! Regidx ap_a3 : mword 64) <= PIDMAX)%Z).
+            { rewrite /Re upd_eq add_vec_zero_l HRda1. exact HRma1. }
             iSpecialize ("IH" $! CIDs with "[%]"); [wp_next_chain |].
-            iApply ("IH" $! Re nv with "[%] Hcg Hpc Hnp Hshares Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
-            exact HRe.
+            iApply ("IH" $! Re nv with "[%] [%] Hcg Hpc Hnp Hshares Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
+            + exact HRe.
+            + exact HRea3.
           - (* not this slot: q++ *)
             iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.allocproc + 0x76)) (mword_of_int 8166 : mword 13) ap_a3 ap_a4 Rd (trap_res false + av)%nat false
                       ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hcmp with "Hcg Hpc []").
@@ -954,10 +1049,28 @@ Section ProofAllocprocPid.
               iApply wp_next_off_intro. iIntros "Hcg Hpc Hpidf".
               iEval (rgne; rewrite Hpaddr) in "Hpidf".
               set (pidn := trunc32 (Rg !!! Regidx ap_a3)).
+              (* ...and the pid the block chose, at the same interval: a3 has
+                 not moved since the loop head, where the invariant bounds it *)
+              assert (HRga3 : Rg !!! Regidx ap_a3 = R !!! Regidx ap_a3).
+              { rewrite /Rg upd_ne; [| vm_compute; discriminate].
+                rewrite HRfa3. exact HR1a3. }
+              assert (Hpidnb : (1 <= bv_unsigned pidn <= PIDMAX)%Z).
+              { rewrite /pidn HRga3 (ap_trunc_val (R !!! Regidx ap_a3) (proj2 HRa3)).
+                exact HRa3. }
               iDestruct (p_pid_split3 with "Hpidf") as "(Hpidi & Hpidh & Hpidk)".
               iDestruct ("Hshback" with "[Hpidk]") as "Hshares". { iExists pidn. iExact "Hpidk". }
+              (* the payload's bound, re-established at the value the [sw]
+                 stored: a1 is inside the interval and the truncation to the
+                 cell's 32 bits does not move it *)
+              assert (HRga1 : Rg !!! Regidx ap_a1 = Rm !!! Regidx ap_a1)
+                by (rewrite /Rg upd_ne; [exact HRfa1 | vm_compute; discriminate]).
+              assert (Hnvb : (1 <= bv_unsigned (trunc32 (Rg !!! Regidx ap_a1)) <= PIDMAX)%Z).
+              { rewrite HRga1 (ap_trunc_val (Rm !!! Regidx ap_a1) (proj2 HRma1)).
+                exact HRma1. }
               iAssert nextpid_res with "[Hnp Hshares]" as "HR".
-              { rewrite /nextpid_res /nextpid_res_at. iSplitL "Hnp". { iExists _. iExact "Hnp". } iExact "Hshares". }
+              { rewrite /nextpid_res /nextpid_res_at. iSplitL "Hnp".
+                { iExists _. iSplitL "Hnp"; [iExact "Hnp" | iPureIntro; exact Hnvb]. }
+                iExact "Hshares". }
               assert (Hp8c : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x8a) : mword 64) 2 = mword_of_int (KernelSyms.allocproc + 0x8c)) by pcstep.
               iEval (rewrite Hp8c) in "Hpc".
               (* +0x8c auipc a0,0x11 ; +0x90 addi a0,a0,-2020 : a0 := &pid_lock *)
@@ -1020,8 +1133,9 @@ Section ProofAllocprocPid.
               (* ---- hand back: the block's whole hart chain is entry -> acquire -> release ---- *)
               iSpecialize ("Hcont" $! CIDrel with "[%]"); [wp_next_chain |].
               iEval (rewrite /ap_pid_post) in "Hcont".
-              iApply ("Hcont" $! mrel pidn with "[%] Hcg Hcpu Hpc Hpidi Hpidh").
-              exact (callee_saved_trans _ _ _ HRrcs Hcsrel).
+              iApply ("Hcont" $! mrel pidn with "[%] [%] Hcg Hcpu Hpc Hpidi Hpidh").
+              * exact (callee_saved_trans _ _ _ HRrcs Hcsrel).
+              * exact Hpidnb.
             + (* more slots to look at: back to +0x74 *)
               assert (HjS : (S j < NPROC)%nat) by exact (ap_kS_lt j Hj Hend).
               assert (Htk : neq_vec (rget (CID := CIDs) Rf ap_a5) (rget (CID := CIDs) Rf ap_a2) = true).
@@ -1056,8 +1170,15 @@ Section ProofAllocprocPid.
         assert (Htgt6c : add_vec (mword_of_int (KernelSyms.allocproc + 0x64) : mword 64) (sign_extend' 64 (mword_of_int 8 : mword 13))
                          = mword_of_int (KernelSyms.allocproc + 0x6c)) by pcstep.
         iEval (rewrite Htgt6c) in "Hpc".
+        (* THE WRAP ARM: a1 is still a0, i.e. 1, so the next candidate is
+           inside the interval with nothing read off a3 at all. *)
+        assert (HR1a1 : R1 !!! Regidx ap_a1 = add_vec zero_reg ap_c1).
+        { rewrite /R1 upd_eq. destruct HR as (_ & Ha0 & _). by rewrite Ha0. }
         iApply ("Hbody" $! R1 with "[%] Hcg Hpc Hnp Hshares Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
-        split; [exact HR1 | reflexivity].
+        (* [split_and!] would split the interval too, so the last conjunct is
+           handed over whole (durable-notes' off-by-one). *)
+        split; [exact HR1 | split; [reflexivity | ]].
+        rewrite HR1a1 add_vec_zero_l ap_c1_val. unfold PIDMAX. lia.
       - (* +0x68 addiw a1,a3,1 : next := pid + 1 *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.allocproc + 0x64)) (mword_of_int 8 : mword 13) ap_a6 ap_a3 R1 (trap_res false + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hmax with "Hcg Hpc []").
@@ -1076,11 +1197,42 @@ Section ProofAllocprocPid.
         assert (Hp6c : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x68) : mword 64) 4 = mword_of_int (KernelSyms.allocproc + 0x6c)) by pcstep.
         iEval (rewrite Hp6c) in "Hpc".
         assert (HR2 : ap_pid_regs m k R2) by (unfold R2; regs_ins HR1).
+        (* THE FALL-THROUGH ARM: the candidate is not PIDMAX, so with the
+           loop's invariant it is at most PIDMAX - 1 and the [addiw] lands
+           inside the interval. *)
+        assert (HR1a3b : (1 <= bv_unsigned (R1 !!! Regidx ap_a3 : mword 64) <= PIDMAX)%Z)
+          by (rewrite HR1a3; exact HRa3).
+        assert (HR1lt : (bv_unsigned (R1 !!! Regidx ap_a3 : mword 64) < PIDMAX)%Z).
+        { destruct HR1 as (_ & _ & Ha6 & _).
+          assert (Hne : (R1 !!! Regidx ap_a3 : mword 64) <> ap_c1000).
+          { intro He. rewrite <- Ha6 in He.
+            assert (Hc : eq_vec (rget (CID := CIDl) R1 ap_a3) (rget (CID := CIDl) R1 ap_a6) = true).
+            { rgne; rgne. rewrite He. apply eq_vec_refl. }
+            rewrite Hc in Hmax. discriminate Hmax. }
+          assert (Hnev : bv_unsigned (R1 !!! Regidx ap_a3 : mword 64) <> PIDMAX).
+          { intro Hv. apply Hne. apply bv_eq. rewrite Hv. by rewrite ap_c1000_val. }
+          lia. }
+        assert (Hpre : (1 <= bv_unsigned (R1 !!! Regidx ap_a3 : mword 64) < PIDMAX)%Z)
+          by (split; [exact (proj1 HR1a3b) | exact HR1lt]).
         iApply ("Hbody" $! R2 with "[%] Hcg Hpc Hnp Hshares Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
-        split; [exact HR2 | rewrite /R2 upd_ne; [reflexivity | vm_compute; discriminate]]. }
+        split;
+          [ exact HR2
+          | split; [ rewrite /R2 upd_ne; [reflexivity | vm_compute; discriminate] | ]].
+        rewrite /R2 upd_eq (ap_addiw_val (R1 !!! Regidx ap_a3) Hpre).
+        unfold PIDMAX in Hpre |- *. lia. }
     iSpecialize ("Hloop" $! CIDacq with "[%]"); [wp_next_chain |].
-    iApply ("Hloop" $! B6 nv0 with "[%] Hcg Hpc Hnp Hshares Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
-    exact HB6regs.
+    (* the first candidate IS the counter, at the payload's bound *)
+    assert (Hnv31 : (bv_unsigned nv0 < 2 ^ 31)%Z).
+    { unfold PIDMAX in Hnv0.
+      assert (H31 : (2 ^ 31)%Z = 2147483648) by (vm_compute; reflexivity).
+      rewrite H31. lia. }
+    assert (HB6a3e : B6 !!! Regidx ap_a3 = sign_extend' 64 (nv0 : mword 32)).
+    { unfold B6, B5, B4, B3, B2. peel_ne. rewrite upd_eq. reflexivity. }
+    assert (HB6a3 : (1 <= bv_unsigned (B6 !!! Regidx ap_a3 : mword 64) <= PIDMAX)%Z).
+    { rewrite HB6a3e (ap_sext_val nv0 Hnv31). exact Hnv0. }
+    iApply ("Hloop" $! B6 nv0 with "[%] [%] Hcg Hpc Hnp Hshares Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
+    - exact HB6regs.
+    - exact HB6a3.
   Qed.
 
 End ProofAllocprocPid.
@@ -1613,7 +1765,7 @@ Section ProofAllocproc.
                   (ap_lvlS lvl Hlvl) ltac:(pose proof (ap_K14 K HK); lia) Hk HL3s1 (ap_below_nextpid lks Hbelow)
                   with "Hcg Hcpu Htext Hpc Hpidlk Hpidinv Hpidhalf").
         iApply wp_next_off_intro. rewrite /ap_pid_post.
-        iIntros (mfa pidn) "%Hcsfa Hcg Hcpu Hpc Hpidinv Hpidown".
+        iIntros (mfa pidn) "%Hcsfa %Hpidnb Hcg Hcpu Hpc Hpidinv Hpidown".
         assert (Hfa_s1 : mfa !!! Regidx ap_s1 = proc_addr k).
         { rewrite (callee_saved_lookup Hcsfa ap_s1 ltac:(vm_compute; reflexivity)). exact HL3s1. }
         assert (Hfa_csp : mfa !!! Regidx csp_rs1 = spd).
@@ -2687,7 +2839,7 @@ Section ProofAllocproc.
                 (pt_base t), tfp, ks, rest, (S (pt_nodes t)).
         iSplitR.
         { iPureIntro. split; [reflexivity|]. split; [exact Hk|]. split; [exact Hγl|].
-          split; [reflexivity|].
+          split; [exact Hpidnb|]. split; [reflexivity|].
           cbn [us_pt upd_usV us_V us_M upd_pt pv_ofile pv_cwd pv_fdg].
           split; [exact Hof|]. split; [exact Hcwd|].
           split; [exact Hrestlen|]. exact (ap_nodes_le (pt_nodes t) Hnodes). }
