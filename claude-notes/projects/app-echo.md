@@ -1515,6 +1515,24 @@ the supply leave.  Lanes: L6-INIT (`init_slot_of_kexec`, the pinned
 bundle lemma, init's exec of sh), then ARM-c(1) (userinit's bundle mode),
 then `Happ_sup` leaves (after EXEC-B and the kernel's pid fix).
 
+#### XV6 BUMP ded23f2 (2026-09-09, another agent) — the pid wrap is fixed upstream
+
+`allocpid` now scans `[1, PIDMAX = 1000]` under `pid_lock` for an unused
+pid and retries; the tree is relaid (395 files), `SpecAllocpid.v` became
+`PidLock.v` (the lock payload owns a quarter of every pid cell).  The
+contracts do NOT yet say `pid ∈ [1, PIDMAX]`: `nextpid_res_at` is still
+at an existential value, `allocproc_post`/`kfork_post` bind the pid
+existentially, so the round's pid-wrap row (`iApply "Hmk"` at `r = 0`) is
+still live.  PID-ROW (brief `brief-pid-row.md`) retires it: the counter
+bounded in the payload and founded pinned at boot (`nextpid = 1` in
+.data; `first`'s pinned carve is the mold), the bound through
+`wp_ap_pidsec` into `allocproc_post`, `kfork_post`/`SpecSysFork`'s pid
+arm in `[1, PIDMAX]`, the fork return row `r = -1 ∨ 1 ≤ sint r ≤ PIDMAX`
+at the dispatcher, then the round instantiates the parent's arm
+unconditionally and the loop's `Hmk` premise goes.  ORDER: FETCHSTR-MEM
+phase 2 (rebased; the four spec files re-applied from
+`fetchstr-wip.patch`) → UK-NAMES + CWD → PID-ROW → C+D → ARM-c (1).
+
 ## Decisions outstanding (refreshed 2026-09-08)
 
 Everything ruled on 2026-09-07/08 is implemented up to and including the
