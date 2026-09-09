@@ -131,16 +131,16 @@ Section SysExecAUBridge.
       (Mim : gmap Z (bv 8)) (pvp avp : mword 64) (sts : list fdstate)
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
-    exec_path_shape pl ->
+    exec_path_of Mim pvp pl ->
     exec_args_shape na alen afun ->
     sys_exec_au_pre Fs Γ γfs cw Pw Pmiss Fo Mim pvp avp sts -∗
     exec_au_pre Fs Γ γfs cw Pw Pmiss Fo pl na alen afun sts.
   Proof.
     intros Hpsh Hsh. rewrite /sys_exec_au_pre /exec_au_pre.
     iIntros "(Hera & Hcom & Hslot)".
-    (* the WALK piece narrows at the string argstr fetched -- which is the
-       one thing the syscall level knows about the path and the exec-level
-       contract's own premise. *)
+    (* the WALK piece narrows at the string argstr fetched -- the ONE path
+       the caller passed, read out of the block's own image, which is what
+       the exec-level contract's premise names. *)
     iSplitL "Hera"; [ iApply ("Hera" $! pl with "[%]"); exact Hpsh |].
     iSplitL "Hcom"; [iExact "Hcom" |].
     (* the SLOT piece travels as the pair: its AU narrows at that same
@@ -235,6 +235,10 @@ Section SysExecBreakAU.
     locks_below lks "kmem" ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     (plen < 128)%nat -> bb_cstr pfun plen ->
+    (* the path AS THE BUNDLE IS OWED IT: [bview plen pfun] is not merely a
+       string of the right shape, it is the one the caller passed, read out
+       of the block's image at trapframe argument 0. *)
+    exec_path_of Mim pvp (bview plen pfun) ->
     sx_alp sp0 ->
     icfg_dev = ROOTDEV -> (0 < icfg_nib)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -290,7 +294,7 @@ Section SysExecBreakAU.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlb Hsp0 Hplen Hpcstr Halp Hroot Hnib0
+    intros HK Hlb Hsp0 Hplen Hpcstr Hpof Halp Hroot Hnib0
            Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl Hbt Hebt.
     destruct (sx_kb K HK) as (Kkx & Kar & Kaa & Kfa & Kfs & K14 & K2 & K60 & Kpop).
     iIntros "#Htext #Hfab #Hka Hbmp Hisp #Hbmr Hbs Hir Hau Hst".
@@ -308,8 +312,7 @@ Section SysExecBreakAU.
       - intros j Hj. pose proof (proj1 (proj2 (proj2 (Hok j Hj)))). lia. }
     iDestruct (sys_exec_au_pre_at Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo
                  Mim pvp avp sts (bview plen pfun) i alen afun
-                 (exec_path_shape_bview plen pfun ltac:(lia) Hpcstr) Hshape
-                 with "Hau") as "Hau".
+                 Hpof Hshape with "Hau") as "Hau".
     iDestruct (sx_carry_open sp0 m plen pfun rest with "Hcarry")
       as "(Hf1 & Hf2 & Hspill & F10 & Hpb & Hps)".
     (* ===== +0x0b6 addiw a5,s2,0 : argc, in int ===== *)
@@ -621,9 +624,15 @@ Section SysExecWhole.
         rewrite /sys_exec_post_fail. iLeft. iExact "Hau". } }
     (* ---- the path is in: run the rest of the function ---- *)
     iDestruct "Hft" as "((%Hsp & %Hs0 & %Hthr2 & %Hext & %Hplen & %Hpcstr &
-                          %Halp & %Hala) & Hpc & Hcg & Hcnt & Hpriv & F1 & F2 &
-                         F3 & F4 & F5 & F6 & F7 & F8 & F9 & F10 & Hpre & Hsuf &
-                         Hab & F59 & F60)".
+                          %Hpgot & %Halp & %Hala) & Hpc & Hcg & Hcnt & Hpriv &
+                         F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8 & F9 & F10 &
+                         Hpre & Hsuf & Hab & F59 & F60)".
+    (* THE PATH, AS THE BUNDLE IS OWED IT.  [bview plen pfun] is the buffer
+       argstr filled, and [Hpgot] says those bytes are the process's own at
+       trapframe argument 0 -- so every occurrence below is at the ONE path
+       the caller actually passed. *)
+    pose proof (exec_path_of_bview (us_M U) v0 plen pfun ltac:(lia) Hpcstr Hpgot)
+      as Hpof.
     (* ===== +0x028 .. +0x054 : the lazy spills and memset ===== *)
     iApply (sx_setup (CID0 := CID1) m M sp0 K true (proc_addr j)
               HK eq_refl Hsp Hs0 Hthr2 Hala
@@ -674,7 +683,7 @@ Section SysExecWhole.
       iApply (sx_break_au (CID0 := CID3) Fs gs j gl pd pav pu γf
                 dqb dqs pid U K true true ∅ sp0 m plen pfun rst v59
                 M3 P3 i3 pg3 al3 af3 sts (us_M U) v0 v1 P Pmiss Fo
-                HK Hlb eq_refl Hplen Hpcstr Halp Hroot Hnib0
+                HK Hlb eq_refl Hplen Hpcstr Hpof Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
                 with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hau Hbrk").
       iIntros (CID4 Hq4 mf Ubk)
@@ -696,15 +705,13 @@ Section SysExecWhole.
                     [exact Hrm1 | rewrite Hrm2; reflexivity | rewrite Hrm3; reflexivity] |].
           rewrite /sys_exec_post_fail. iRight.
           iExists (bview plen pfun), i3, al3, af3.
-          iSplitR; [iPureIntro;
-                    exact (exec_path_shape_bview plen pfun ltac:(lia) Hpcstr) |].
+          iSplitR; [iPureIntro; exact Hpof |].
           iSplitR; [iPureIntro; exact Hshape |]. iExact "Hfail".
         - (* ret = argc: the same arm, re-read at the image the CONTRACT
              names -- [exec_post_ok] projects only [us_V] of its pre-state
              (header, seam 2). *)
           iRight. iExists (bview plen pfun), i3, al3, af3.
-          iSplitR; [iPureIntro;
-                    exact (exec_path_shape_bview plen pfun ltac:(lia) Hpcstr) |].
+          iSplitR; [iPureIntro; exact Hpof |].
           iSplitR; [iPureIntro; exact Hshape |].
           iApply (exec_post_ok_V Fs (fs_gamma_L fsc_fs) P Fo
                     (bview plen pfun) i3 al3 af3 sts

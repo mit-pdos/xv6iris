@@ -367,6 +367,11 @@ Section ProofArgstr.
       by (rewrite /A3 upd_ne; [exact HA2a1 | reg_neq]).
     assert (HA3a2 : A3 !!! Regidx Ra2 = (mword_of_int (Z.of_nat maxn) : mword 64))
       by (rewrite /A3 upd_ne; [exact HA2a2 | reg_neq]).
+    (* argraw's answer is still in a0, and that IS the address fetchstr reads
+       from -- so the content clause comes back stated at [v] with no work *)
+    assert (HA3a0 : A3 !!! Regidx Ra0 = v).
+    { rewrite /A3 upd_ne; [| reg_neq]. rewrite /A2 upd_ne; [| reg_neq].
+      rewrite /A1 upd_ne; [exact HAa0 | reg_neq]. }
     assert (HA3sp : A3 !!! Regidx csp_rs1 = pa_stk sp0 4)
       by (rewrite /A3 upd_ne; [exact HA2sp | reg_neq]).
     assert (HthrA3 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -389,7 +394,8 @@ Section ProofArgstr.
               _ Hn HKfs HA3a2 Hmax31
               with "Hcg Hcpu Htext Hpc Hpriv Henv Hbuf").
     all: try lkbelow.
-    iIntros (CID14 Hk14 mr P' buf_new) "%Hcsr %Hext Hcg Hcpu Hpc Hpriv Hbuf %Hret".
+    iIntros (CID14 Hk14 mr P' buf_new) "%Hcsr %Hext Hcg Hcpu Hpc Hpriv Hbuf %Hret %Hgot".
+    rewrite HA3a0 in Hgot.
     iEval (rewrite HA3a1) in "Hbuf".
     assert (Hpc1c : ret_pc (A3 !!! Regidx Rra) = mword_of_int (KernelSyms.argstr + 0x1c))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).
@@ -557,7 +563,7 @@ Section ProofArgstr.
        plain instructions have moved the hart to [CID20]. *)
     iDestruct (cpu_own_transport CID14 CID20 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID20 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! T5 P' buf_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
+    iApply ("Hcont" $! T5 P' buf_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
     { unfold callee_saved.
       split; [exact HT5sp|].
       split; [exact HT5s0|].
@@ -573,7 +579,8 @@ Section ProofArgstr.
       split; [apply Hthr5; vm_compute; first [reflexivity | discriminate]|].
       apply Hthr5; vm_compute; first [reflexivity | discriminate]. }
     { exact Hext. }
-    rewrite HT5a0. exact Hret.
+    { rewrite HT5a0. exact Hret. }
+    { rewrite HT5a0. exact Hgot. }
   Qed.
 
 End ProofArgstr.

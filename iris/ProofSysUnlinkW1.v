@@ -556,7 +556,7 @@ Section ProofSysUnlinkW1.
               su_maxpath_lt (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbP]").
     { iEval (rewrite HM6a1). iExact "HbP". }
-    iIntros (CID9 Hq9 mas P1 bp1) "%Hcsas %Hupt1 Hcg Hown Hpc Hpriv HbP %Hfsr1".
+    iIntros (CID9 Hq9 mas P1 bp1) "%Hcsas %Hupt1 Hcg Hown Hpc Hpriv HbP %Hfsr1 _".
     iEval (rewrite HM6a1) in "HbP".
     assert (Hpc16 : ret_pc (M6 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x16)) by (rewrite HM6ra; pcw).

@@ -976,7 +976,7 @@ Section ProofSysLinkBody.
               sl_maxpath_lt (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbO]").
     { iEval (rewrite HM6a1). iExact "HbO". }
-    iIntros (CID9 Hq9 mas P1 bo1) "%Hcsas %Hupt1 Hcg Hown Hpc Hpriv HbO %Hfsr1".
+    iIntros (CID9 Hq9 mas P1 bo1) "%Hcsas %Hupt1 Hcg Hown Hpc Hpriv HbO %Hfsr1 _".
     iEval (rewrite HM6a1) in "HbO".
     assert (Hpc16 : ret_pc (M6 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0x16)) by (rewrite HM6ra; pcw).
@@ -1115,7 +1115,7 @@ Section ProofSysLinkBody.
                 with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbW]").
       { iEval (rewrite HN3a1). iExact "HbW". }
       iIntros (CID16 Hq16 mas2 P2 bw1)
-        "%Hcsas2 %Hupt2 Hcg Hown Hpc Hpriv HbW %Hfsr2".
+        "%Hcsas2 %Hupt2 Hcg Hown Hpc Hpriv HbW %Hfsr2 _".
       iEval (rewrite HN3a1) in "HbW".
       iEval (rewrite sl_us_upt_idem) in "Hpriv".
       assert (Hpc2a : ret_pc (N3 !!! Regidx Rra : mword 64)

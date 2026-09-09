@@ -106,6 +106,7 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecArgaddr.
 Require Import SpecArgstr.
+Require Import SpecCopyinstr.  (* [copyinstr_got]: the path's content *)
 (* [proc_priv_tfp_valid] -- [page_valid] of the trapframe page, which
    argaddr's own load now takes as a premise (SpecArgraw's mem-tier fix).
    It is a PROJECTION of [proc_priv], not an obligation on this caller. *)
@@ -970,6 +971,12 @@ Section SysExecHead.
             (M !!! Regidx Rs0 : mword 64) = (m !!! Regidx csp_rs1 : mword 64) /\
             sx_thr2 m M /\
             uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' /\ (plen < 128)%nat /\ bb_cstr pfun plen /\
+            (* ...and WHICH string it is: the buffer's bytes, terminator
+               included, are the process's own at trapframe argument 0.
+               argstr relays it ([SpecArgstr]'s [fetchstr_got]); the exec
+               bundle is owed at exactly this path
+               ([SpecSysExec.exec_path_of]). *)
+            copyinstr_got (us_M U) v0 pfun plen /\
             sx_alp (m !!! Regidx csp_rs1 : mword 64) /\
             sx_ala (m !!! Regidx csp_rs1 : mword 64) ⌝ ∗
           pc_is (mword_of_int (SX + 0x28) : mword 64) ∗
@@ -1305,7 +1312,7 @@ Section SysExecHead.
               sx_arg0_lt ltac:(rewrite HM10a0; reflexivity) Harg0 sx_noff0 Kar
               ltac:(rewrite HM10a2; reflexivity) sx_maxpath_lt Hlb
               with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka Hbuf").
-    iIntros (CID13 Hq13 M11 P' bnew) "%Hcs11 %Hextz Hcg Hcnt Hpc Hpriv Hbuf %Hret".
+    iIntros (CID13 Hq13 M11 P' bnew) "%Hcs11 %Hextz Hcg Hcnt Hpc Hpriv Hbuf %Hret %Hgot0".
     pose proof Hextz as Hext.
     iEval (rewrite HM10a1) in "Hbuf".
     assert (Hpc020 : ret_pc (M10 !!! Regidx Rra : mword 64)
@@ -1390,9 +1397,13 @@ Section SysExecHead.
       iSpecialize ("Hout" $! CID16 with "[%]"); [wp_next_chain |].
       iApply ("Hout" $! M13 P' k bnew (fun j => bnew (S k + j)%nat) v1 u60).
       iRight.
+      (* the relay lands: argstr's content clause, keyed on the answer, at
+         the [k] the answer names *)
+      assert (Hpgot : copyinstr_got (us_M U) v0 bnew k)
+        by (exact (Hgot0 k Hklt Hka0)).
       iSplitR; [iPureIntro; split_and!;
         [ exact HM13sp | exact HM13s0 | exact HM13thr | exact Hext
-        | exact Hklt | exact Hkstr | exact Halp | exact Hala ] |].
+        | exact Hklt | exact Hkstr | exact Hpgot | exact Halp | exact Hala ] |].
       iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
       iSplitL "Hcnt"; [iExact "Hcnt" |]. iSplitL "Hpriv"; [iExact "Hpriv" |].
       iSplitL "F1"; [iExact "F1" |]. iSplitL "F2"; [iExact "F2" |].
@@ -3509,7 +3520,7 @@ Section SysExecStep.
               (proc_addr jp) pid (us_upt U Pa) 4096%nat fpg b lks
               sx_noff0 Kfs HQ6a2 sx_pgsize_lt Hlb
               with "Hcg Hcnt Htext Hpc Hpriv Hka Hpg").
-    iIntros (CID18 Hq18 mg Ps bnew) "%Hcsg %Hextsz Hcg Hcnt Hpc Hpriv Hpg %Hfr".
+    iIntros (CID18 Hq18 mg Ps bnew) "%Hcsg %Hextsz Hcg Hcnt Hpc Hpriv Hpg %Hfr _".
     pose proof Hextsz as Hexts.
     assert (Hups : us_upt (us_upt U Pa) Ps = us_upt U Ps)
       by (destruct U as [Vx Mx]; destruct Vx; reflexivity).

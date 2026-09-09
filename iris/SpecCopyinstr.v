@@ -45,23 +45,32 @@
       what makes a CONTENTS postcondition possible at all.  This is now the
       ONLY thing that distinguishes copyinstr from copyin.
 
-   WHAT THE BUFFER GETS -- and here copyinstr differs from copyin in the one
-   way that matters.  copyin's destination bytes are unconstrained (see
-   SpecCopyin.v): they come from user memory, about which the kernel may
-   assume nothing.  That is still true of copyinstr's bytes ONE AT A TIME --
-   the contract names no individual byte -- but copyinstr's whole job is to
-   establish a STRUCTURAL property of them, namely that the buffer now holds a
-   NUL-terminated string.  That is [ByteBuf.bb_cstr f k]: the NUL sits at [k]
-   and nowhere before it, so [k] is the length strlen will report, and
-   [k < max] says the terminator landed inside the caller's buffer.  Without
-   that clause the function would be useless -- fetchstr runs strlen over the
-   result -- and with it the failure arm can stay information-free, exactly as
-   in the rest of the family: [-1] means an unbackable page or [max] bytes
-   with no NUL among them, and no caller distinguishes them.
+   WHAT THE BUFFER GETS.  Two promises, both on the success arm, and
+   together they are the whole of what distinguishes copyinstr from copyin.
+
+   The STRUCTURE is [ByteBuf.bb_cstr f k]: the buffer holds a NUL-terminated
+   string, the NUL sitting at [k] and nowhere before it, so [k] is the length
+   strlen will report and [k < max] says the terminator landed inside the
+   caller's buffer.  Without that clause the function would be useless --
+   fetchstr runs strlen over the result.
+
+   The CONTENT is [copyinstr_got M srcva f k]: byte [j] of the buffer, for
+   every [j] up to and INCLUDING the terminator, is the byte the process has
+   at [srcva + j].  copyin's [SpecCopyin.copyin_got] one member of the family
+   over, and it lands for the same reason -- the process's memory is NAMED at
+   this altitude, so the loop that reads a byte off a borrowed page is
+   reading a byte [M] already records.  What it buys a caller is the identity
+   of the string rather than merely its shape: exec asks WHICH path its user
+   passed, and only a memory-indexed answer can say.
+
+   The failure arm stays information-free, exactly as in the rest of the
+   family: [-1] means an unbackable page or [max] bytes with no NUL among
+   them, and no caller distinguishes them.
 
    NOTE WHAT THE FAULT PATH DOES NOT DISTURB: [bb_cstr] is a property of the
    DESTINATION buffer, which lives in kernel memory and which vmfault never
-   touches.  So the success arm is stated exactly as before, and only the
+   touches, and [copyinstr_got] is stated at the [M] that comes back
+   unchanged.  So the success arm survives the fault path whole, and only the
    page-table and kalloc resources move. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -90,10 +99,32 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
+(* THE COPIED BYTES ARE THE PROCESS'S.  Byte [j] of the destination, for
+   every [j] up to and INCLUDING the terminator at [k], is the byte the image
+   [M] has at [srcva + j].  ONE clause at [j <= k] rather than a run plus a
+   separate NUL: [bb_cstr f k] already says [f k] is the NUL, so the [j = k]
+   instance IS "the image has a NUL at [srcva + k]", and the pair always
+   travels together (they are conjuncts of the same success arm below).  That
+   is also the spelling [SpecSysExec.exec_args_of] reads an argument string
+   at, so the two meet with no translation.
+
+   The index arithmetic is the machine's -- [add_vec_int], modulo 2^64 --
+   because that is what the copy loop's cursor does; [SpecCopyin.copyin_got]
+   counts the same way. *)
+Definition copyinstr_got (M : gmap Z (bv 8)) (srcva : mword 64)
+    (f : nat -> bv 8) (k : nat) : Prop :=
+  forall j : nat, (j <= k)%nat ->
+    M !! uint (add_vec_int srcva (Z.of_nat j)) = Some (f j).
+
 (* copyinstr's answer, keyed by the returned a0.  The 0 arm is what makes the
-   function usable; the -1 arm deliberately says nothing (see the header). *)
-Definition copyinstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
-  (r = (mword_of_int 0 : mword 64) /\ exists k, (k < maxn)%nat /\ bb_cstr f k)
+   function usable -- it carries BOTH promises at the one [k], which is what
+   keeps a relay (fetchstr's) a [destruct] and not a reconciliation of two
+   independently bound lengths; the -1 arm deliberately says nothing (see the
+   header). *)
+Definition copyinstr_ret (M : gmap Z (bv 8)) (srcva : mword 64)
+    (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
+  (r = (mword_of_int 0 : mword 64)
+   /\ exists k, (k < maxn)%nat /\ bb_cstr f k /\ copyinstr_got M srcva f k)
   \/ r = (mword_of_int (-1) : mword 64).
 
 (* ===================================================================== *)
@@ -111,12 +142,12 @@ Definition copyinstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
 (* [ProcInv.proc_priv] needs in order to get its block back at the image *)
 (* it handed over, instead of at a fresh existential one.                *)
 (*                                                                       *)
-(* The BUFFER promise is unchanged: [copyinstr_ret] already says all a   *)
-(* caller uses (fetchstr runs strlen over the result), and it is a       *)
-(* property of KERNEL memory, which [M] does not describe.  Saying which *)
-(* process bytes the buffer received -- copyin's [copyin_got] -- would   *)
-(* need the copied-prefix invariant threaded through the byte loop; no   *)
-(* caller wants it, so it is deliberately not stated.                    *)
+(* THE BUFFER PROMISE IS INDEXED BY THAT SAME [M].  [copyinstr_ret]      *)
+(* carries the shape ([bb_cstr]) and the content ([copyinstr_got]) at    *)
+(* one [k], the content clause reading the process's bytes at [srcva]    *)
+(* out of the image the caller handed in.  So the contract answers both  *)
+(* "is this a string" and "which string" -- and because [M] does not     *)
+(* move, the answer is about the memory the caller still holds.          *)
 (*                                                                       *)
 (* copyin and copyout each keep a [proc_pt]-altitude COROLLARY beside    *)
 (* their memory-indexed contract, for the callers that say nothing about *)
@@ -133,6 +164,7 @@ Definition wp_copyinstr_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
     (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyinstr in
   let dst := mm !!! Regidx (mword_of_int 12 : mword 5) in
+  let srcva := mm !!! Regidx (mword_of_int 13 : mword 5) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
   (50 <= K)%nat ->
   mm !!! Regidx (mword_of_int 10 : mword 5) = page_base P.(ud_root) ->
@@ -158,7 +190,7 @@ Definition wp_copyinstr_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
     ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] dst_new j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜uptd_ext_sz szv P P'⌝ -∗
-    ⌜copyinstr_ret maxn dst_new (mr !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+    ⌜copyinstr_ret M srcva maxn dst_new (mr !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

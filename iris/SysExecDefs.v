@@ -46,7 +46,12 @@
    * kexec wants the PATH as [S plen] owned bytes with [bb_cstr pfun plen].
      [argstr] copies the user string into this function's own
      [char path[MAXPATH]] and reports [fetchstr_ret], which is exactly that
-     (or -1, and then kexec is never called).
+     (or -1, and then kexec is never called).  It reports one thing more,
+     [SpecFetchstr.fetchstr_got]: those bytes ARE the process's own at
+     trapframe argument 0, which is what lets this level owe the exec
+     bundle at the single path the caller passed
+     ([SpecSysExec.exec_path_of]) instead of at every string of the right
+     shape.
    * kexec wants each ARGUMENT as a NUL-terminated string of [alen i]
      characters inside [aslen i] owned bytes with [alen i < 4096].
      [kalloc] gives a whole page and [fetchstr] fills it with [max = PGSIZE],

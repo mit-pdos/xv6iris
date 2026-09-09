@@ -1490,7 +1490,7 @@ Section ProofSysMknodBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM13a1). iExact "Hbuf". }
-    iIntros (CID19 Hq19 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr".
+    iIntros (CID19 Hq19 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr _".
     iEval (rewrite HM13a1) in "Hbuf".
     assert (Hpc2e : ret_pc (M13 !!! Regidx Rra : mword 64)
                     = mword_of_int (MN + 0x2e)) by (rewrite HM13ra; pcw).

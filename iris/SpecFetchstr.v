@@ -24,11 +24,18 @@
    back is that string's length.  That is strictly more than copyinstr alone
    says, and it is why xv6 has fetchstr at all.
 
-   THREE THINGS THE CONTRACT DELIBERATELY DOES NOT SAY.
+   AND IT SAYS WHICH STRING.  Beside [fetchstr_ret] the contract hands back
+   [fetchstr_got], the relay of [SpecCopyinstr.copyinstr_got] at the block's
+   own image [us_M U] and at the address the caller passed in a0: the [k]
+   bytes and their terminator ARE the process's bytes at that address.  It is
+   a SEPARATE conjunct keyed on the returned length rather than a fold into
+   [fetchstr_ret], because [fetchstr_ret] is destructed at a dozen syscall
+   proofs that want only the shape, and the keying costs nothing -- [max] is
+   below 2^31, so the [-1] answer is no [k] below [max] and the clause is
+   vacuous on the failure arm.
 
-   - Nothing about the individual bytes.  They came from user memory
-     (SpecCopyin.v's reasoning applies verbatim); [bb_cstr] is a STRUCTURAL
-     property of the naming function and that is all a kernel caller can use.
+   TWO THINGS THE CONTRACT DELIBERATELY DOES NOT SAY.
+
    - Nothing distinguishing the two failure modes.  [-1] means either an
      unmapped page or [max] bytes with no NUL among them.  No caller
      separates them, and copyinstr's contract does not either.
@@ -87,6 +94,7 @@ Require Import ByteBuf.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import SpecCopyinstr.   (* [copyinstr_got]: the content half relayed *)
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 From Kernel Require KernelSyms.
@@ -107,11 +115,22 @@ Definition fetchstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
                    /\ r = (mword_of_int (Z.of_nat k) : mword 64))
   \/ r = (mword_of_int (-1) : mword 64).
 
+(* ...and the CONTENT half, at the image the string was read out of and the
+   user address it was read from.  Keyed on the returned length: the answer
+   [r] fixes [k], because [mword_of_int] is injective below 2^31 and [maxn]
+   is bounded there, so on the [-1] arm no [k < maxn] matches and the clause
+   says nothing -- which is the rest of the family's failure arm exactly. *)
+Definition fetchstr_got (M : gmap Z (bv 8)) (addr : mword 64) (maxn : nat)
+    (f : nat -> bv 8) (r : mword 64) : Prop :=
+  forall k : nat, (k < maxn)%nat ->
+    r = (mword_of_int (Z.of_nat k) : mword 64) -> copyinstr_got M addr f k.
+
 Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (ktb : ktier) (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (U : ustate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fetchstr in
+  let addr := m !!! Regidx (mword_of_int 10 : mword 5) in
   let buf := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* push_off's transient noff increment stays in int range (myproc) *)
@@ -143,6 +162,8 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
       proc_priv γf p pid (us_upt U P') -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[ktb] buf_new j) -∗
       ⌜fetchstr_ret maxn buf_new (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+      ⌜fetchstr_got (us_M U) addr maxn buf_new
+         (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

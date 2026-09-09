@@ -552,7 +552,7 @@ Section ProofSysOpenFullBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM9a1). iExact "Hbuf". }
-    iIntros (CID13 Hq13 mas P' bf) "%Hcsas %Huptz Hcg Hown Hpc Hpriv Hbuf %Hfsr".
+    iIntros (CID13 Hq13 mas P' bf) "%Hcsas %Huptz Hcg Hown Hpc Hpriv Hbuf %Hfsr _".
     (* argstr now reports [uptd_ext_sz]; this contract is stated at the
        bare [uptd_ext] (it is not on the dispatcher's permission path), so
        the extra content is dropped here. *)

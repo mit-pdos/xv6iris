@@ -1320,7 +1320,7 @@ Section ProofSysChdirBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM9a1). iExact "Hbuf". }
-    iIntros (CID15 Hq15 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr".
+    iIntros (CID15 Hq15 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr _".
     iEval (rewrite HM9a1) in "Hbuf".
     assert (Hpc22 : ret_pc (M9 !!! Regidx Rra : mword 64)
                     = mword_of_int (SC + 0x22)) by (rewrite HM9ra; pcw).

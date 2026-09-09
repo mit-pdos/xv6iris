@@ -105,6 +105,38 @@ Qed.
 Lemma fs_z_lt_of_nat_lt (k maxn : Z) : (k < maxn)%Z -> (maxn < 2 ^ 31)%Z -> (k < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
+(* THE ANSWER IDENTIFIES THE LENGTH.  [SpecFetchstr.fetchstr_got] is keyed on
+   the returned a0, so the content clause is discharged by reading [k] back
+   out of it: [mword_of_int] is injective on the int range the answer lives
+   in, and [-1] is not any such [k] at all. *)
+Lemma fs_moi_nat_inj (a c : nat) :
+  (Z.of_nat a < 2 ^ 31)%Z -> (Z.of_nat c < 2 ^ 31)%Z ->
+  (mword_of_int (Z.of_nat a) : mword 64) = (mword_of_int (Z.of_nat c) : mword 64) ->
+  a = c.
+Proof.
+  intros Ha Hc Heq.
+  change (2 ^ 31)%Z with 2147483648%Z in Ha, Hc.
+  apply (f_equal bv_unsigned) in Heq.
+  rewrite !moi64_unsigned in Heq.
+  rewrite (bvw64_small (Z.of_nat a)) in Heq; [| change (2 ^ 64)%Z with 18446744073709551616%Z; lia].
+  rewrite (bvw64_small (Z.of_nat c)) in Heq; [| change (2 ^ 64)%Z with 18446744073709551616%Z; lia].
+  lia.
+Qed.
+
+Lemma fs_moi_m1_ne (c : nat) :
+  (Z.of_nat c < 2 ^ 31)%Z ->
+  (mword_of_int (-1) : mword 64) <> (mword_of_int (Z.of_nat c) : mword 64).
+Proof.
+  intros Hc Heq.
+  change (2 ^ 31)%Z with 2147483648%Z in Hc.
+  apply (f_equal bv_unsigned) in Heq.
+  rewrite !moi64_unsigned in Heq.
+  assert (Em1 : bv_wrap 64 (-1) = 18446744073709551615%Z) by (vm_compute; reflexivity).
+  rewrite Em1 in Heq.
+  rewrite (bvw64_small (Z.of_nat c)) in Heq; [| change (2 ^ 64)%Z with 18446744073709551616%Z; lia].
+  lia.
+Qed.
+
 Module FetchstrProof (Myproc : MYPROC) (Copyinstr : COPYINSTR) (Strlen : STRLEN) : FETCHSTR.
 
 Section ProofFetchstr.
@@ -383,7 +415,7 @@ Section ProofFetchstr.
     : wp_fetchstr_sconf_body ktb γa γf m av n eb p pid U maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_fetchstr_sconf_body].
-    intros pcE buf ret_tgt Hn Hav Hmax Hmax31 Hlkbelow.
+    intros pcE addr buf ret_tgt Hn Hav Hmax Hmax31 Hlkbelow.
     
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
@@ -756,6 +788,14 @@ Section ProofFetchstr.
     { rewrite /A5 upd_ne; [| reg_neq]. rewrite /A4 upd_ne; [| reg_neq].
       rewrite /Az upd_ne; [| reg_neq].
       rewrite /A3 upd_ne; [| reg_neq]. exact HA2s1. }
+    (* the source address copyinstr is handed IS the caller's [addr] -- it
+       came off [s3], which fetchstr parked a0 in at +0x0e ([HAs3]).  That is
+       what makes the content relay a rename and nothing more. *)
+    assert (HA5a3 : A5 !!! Regidx Ra3 = addr).
+    { rewrite /A5 upd_ne; [| reg_neq]. rewrite /A4 upd_ne; [| reg_neq].
+      rewrite /Az upd_ne; [| reg_neq]. rewrite /A3 upd_ne; [| reg_neq].
+      rewrite /A2 upd_eq. rewrite /A1 upd_ne; [| reg_neq].
+      rewrite HAs3. apply add_vec_zero_l. }
     assert (HthrA5 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
               r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> A5 !!! Regidx r = m !!! Regidx r).
     { intros r Hr Ncsp N8 N9 N18 N19.
@@ -796,6 +836,7 @@ Section ProofFetchstr.
               with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
     all: try lkbelow.
     iIntros (CID18 Hk18 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hbuf %Hcsr %Hext %Hret".
+    rewrite HA5a3 in Hret.
     iEval (rewrite HA5a2) in "Hbuf".
     assert (Hpc26 : ret_pc (A5 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchstr + 0x26))
       by (rewrite HA5ra; apply bv_eq; vm_compute; reflexivity).
@@ -817,7 +858,7 @@ Section ProofFetchstr.
       [iPureIntro; exact Hext|].
     iDestruct ("Hpback" $! P' (us_M U) with "Hxr Hszc Hptc Hpt") as "Hpriv".
     (* ---- +0x24: bltz a0 -- copyinstr's answer decides the branch ---- *)
-    destruct Hret as [[H0 (k & Hkmax & Hcstr)] | Hm1].
+    destruct Hret as [[H0 (k & Hkmax & Hcstr & Hgot)] | Hm1].
     - (* ======= copyinstr returned 0: fall through to strlen ======= *)
       assert (Hfall : zopz0zI_s (mr !!! Regidx Ra0) zero_reg = false)
         by (rewrite H0; vm_compute; reflexivity).
@@ -910,10 +951,15 @@ Section ProofFetchstr.
          [Hcont]. *)
       iDestruct (cpu_own_transport CID18 CID23 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
+      iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
       { exact Hcsf. }
       { exact Hext. }
-      left. exists k. split; [exact Hkmax|]. split; [exact Hcstr | exact Hfa0].
+      { left. exists k. split; [exact Hkmax|]. split; [exact Hcstr | exact Hfa0]. }
+      { intros k0 Hk0 Hans. rewrite Hfa0 in Hans.
+        assert (Hk031 : (Z.of_nat k0 < 2 ^ 31)%Z).
+        { apply (fs_z_lt_of_nat_lt _ (Z.of_nat maxn)); [| exact Hmax31].
+          apply Nat2Z.inj_lt. exact Hk0. }
+        rewrite <- (fs_moi_nat_inj k k0 Hk31 Hk031 Hans). exact Hgot. }
     - (* ======= copyinstr returned -1: take the branch ======= *)
       assert (Htk : zopz0zI_s (mr !!! Regidx Ra0) zero_reg = true)
         by (rewrite Hm1; vm_compute; reflexivity).
@@ -971,10 +1017,15 @@ Section ProofFetchstr.
       iIntros (CID22 Hk22 mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID18 CID22 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
+      iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
       { exact Hcsf. }
       { exact Hext. }
-      right. exact Hfa0.
+      { right. exact Hfa0. }
+      { intros k0 Hk0 Hans. exfalso. rewrite Hfa0 in Hans.
+        assert (Hk031 : (Z.of_nat k0 < 2 ^ 31)%Z).
+        { apply (fs_z_lt_of_nat_lt _ (Z.of_nat maxn)); [| exact Hmax31].
+          apply Nat2Z.inj_lt. exact Hk0. }
+        exact (fs_moi_m1_ne k0 Hk031 Hans). }
   Qed.
 
 End ProofFetchstr.

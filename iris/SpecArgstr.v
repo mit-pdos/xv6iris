@@ -33,10 +33,16 @@
      answer is [fetchstr_ret];
    - [max < 2^31], inherited from strlen's [int] return through fetchstr.
 
-   The postcondition is fetchstr's verbatim -- [FS.fetchstr_ret max new r]:
-   either the buffer holds a NUL-terminated string of length [k < max] and
-   [r = k], or [r = -1].  [proc_priv] comes back at the image it went in at;
-   only its DESCRIPTOR grows, by whatever copyinstr faulted in. *)
+   The postcondition is fetchstr's verbatim, both halves.  The SHAPE is
+   [fetchstr_ret max new r]: either the buffer holds a NUL-terminated string
+   of length [k < max] and [r = k], or [r = -1].  The CONTENT is
+   [fetchstr_got (us_M U) v max new r] -- those bytes are the process's own,
+   read out of the block's image at [v], the trapframe word this contract
+   already names.  That is why the relay is free here: argraw hands [v]
+   straight to fetchstr, so the address the content clause is stated at is
+   the one the caller already supplied.  [proc_priv] comes back at the image
+   it went in at; only its DESCRIPTOR grows, by whatever copyinstr faulted
+   in. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -112,6 +118,8 @@ Definition wp_argstr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG 
       proc_priv γf p pid (us_upt U P') -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[KT1] buf_new j) -∗
       ⌜fetchstr_ret maxn buf_new (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+      ⌜fetchstr_got (us_M U) v maxn buf_new
+         (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

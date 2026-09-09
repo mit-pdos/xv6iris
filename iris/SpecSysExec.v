@@ -17,33 +17,38 @@
    bundle [EXTRA] after the process block and the armed post in the pure
    slot ([sys_exec_arms_landed] reads [sys_exec_post] back out of it).
 
-   THE ONE THING THIS LEVEL ADDS: the argument vector is not a
-   parameter.  sys_exec [fetchaddr]s each [argv[i]] out of the user's
-   image at trapframe argument 1 and [fetchstr]s each string into a
-   kernel page, then calls kexec with what it read.  So the caller's WP
-   premise is quantified over the argument vectors kexec may be handed
-   ([sys_exec_slot_pre]), and the success arm names the one it ran at.
+   THE ONE THING THIS LEVEL ADDS: the path and the argument vector are
+   not parameters.  sys_exec [argstr]s the path out of the user's image
+   at trapframe argument 0, [fetchaddr]s each [argv[i]] at trapframe
+   argument 1 and [fetchstr]s each string into a kernel page, then calls
+   kexec with what it read.  So the caller's WP premise is quantified
+   over what kexec may be handed ([sys_exec_slot_pre]), and the success
+   arm names what it ran at.
 
-   WHAT THE QUANTIFICATION IS OVER, HONESTLY.  The intended premise is
-   the READING of the user image at the argv pointer --
-   [exec_args_of (us_M U) v1 na alen afun] below, kept as the named
-   upgrade target -- so that a caller that knows its own argv (init:
-   ["sh"] at a known address of its image) would instantiate it once.
-   That reading is NOT DERIVABLE today (finding, 2026-09-03, the first
-   proof attempt): [SpecFetchaddr.fetchaddr_post] is about OWNERSHIP of
-   the destination word, not its value, [SpecFetchstr]'s post ties the
-   copied bytes to nothing in the image, and [SpecCopyinstr] has no
-   content promise at any tier (only [SpecCopyin.copyin_got] exists).
-   So the premise is quantified over every vector of the right SHAPE
-   ([exec_args_shape]: below MAXARG, NUL-terminated strings within a
-   page -- kexec's own premises) and nothing else.  For the init -> sh
-   chain this loses nothing: xv6's sh ignores its arguments, so sh's
-   start WP holds at every vector.  The upgrade is: memory-indexed
-   [wp_fetchaddr_sconf_mem] / [wp_fetchstr_sconf_mem] twins paying out
-   of [copyin_got] (and a [copyinstr_got] to build the second on),
-   threaded through sys_exec's argv loop, after which
-   [sys_exec_slot_pre] moves from [exec_args_shape] to [exec_args_of]
-   and every arm below is unchanged.
+   THE PATH IS READ.  The premise on it is [exec_path_of (us_M U) v0 pl]
+   below -- the bytes of [pl] ARE the process's bytes at argument 0, with
+   the NUL after them -- so a caller that knows its own image and its own
+   argument 0 (init: "/init" at a known address) instantiates the bundle
+   at ONE path, which is what a pinned caller's cursor needs.  It is
+   [SpecArgstr]'s postcondition read through
+   [SpecFetchstr.fetchstr_got] to [SpecCopyinstr.copyinstr_got], and
+   [exec_path_of_bview] below is the one step.
+
+   THE ARGV VECTOR IS STILL OWED.  The intended premise is the twin
+   reading [exec_args_of (us_M U) v1 na alen afun] below, kept as the
+   named upgrade target.  It is not derivable today:
+   [SpecFetchaddr.fetchaddr_post] is about OWNERSHIP of the destination
+   word, not its value, so the argv POINTERS are unread even though the
+   strings they point at now are.  So that premise is quantified over
+   every vector of the right SHAPE ([exec_args_shape]: below MAXARG,
+   NUL-terminated strings within a page -- kexec's own premises) and
+   nothing else.  For the init -> sh chain this loses nothing: xv6's sh
+   ignores its arguments, so sh's start WP holds at every vector.  The
+   upgrade is a memory-indexed [wp_fetchaddr_sconf_mem] paying out of
+   [SpecCopyin.copyin_got], threaded through sys_exec's argv loop
+   alongside the [copyinstr_got] the string half already carries, after
+   which [sys_exec_slot_pre] moves from [exec_args_shape] to
+   [exec_args_of] and every arm below is unchanged.
 
    THE CONTINUATION binds [(mf, P', M')] with the page-table growth
    report and an EXISTENTIAL image (milestone J item 1's staging).  The
@@ -68,9 +73,12 @@
 
    ==== WHERE THE PROOF PAYS EACH PIECE ================================
 
-   1. The argv shape: [exec_args_shape] is the walk's own loop invariant
-      ([fetchstr]'s [bb_cstr] and length, the MAXARG bound) -- free.
-      The reading [exec_args_of] is the upgrade (header).
+   1. The path reading: [exec_path_of] is [argstr]'s
+      [SpecFetchstr.fetchstr_got] at trapframe argument 0, turned into a
+      list by [exec_path_of_bview].  The argv shape:
+      [exec_args_shape] is the walk's own loop invariant ([fetchstr]'s
+      [bb_cstr] and length, the MAXARG bound) -- free.  The argv reading
+      [exec_args_of] is the upgrade that is still owed (header).
    2. [SpecKexec.KEXEC] at that reading, with the bundle specialized by
       [sys_exec_slot_pre]'s ∀.
    3. The kfree/kalloc bookkeeping, shared with the blocks in
@@ -111,6 +119,7 @@ Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import ByteBuf.        (* [bb_cstr]                          *)
+Require Import SpecCopyinstr.  (* [copyinstr_got]: the path's content *)
 Require Import PathElems.      (* [path_elems]                       *)
 Require Import DirentEnc.      (* [bview]                            *)
 Require Import FsAbsEra.       (* [ex_start]: the walk at ONE path    *)
@@ -156,7 +165,13 @@ Definition exec_args_shape (na : nat) (alen : nat -> nat)
 
 (* THE READING sys_exec performs -- the upgrade target (header): the
    shape, and [argv[0 .. na)] non-null pointers read at [av + 8 i],
-   [argv[na]] NULL, each pointer naming its string's bytes in the image. *)
+   [argv[na]] NULL, each pointer naming its string's bytes in the image.
+
+   The string bytes are indexed the way the copy loop walks them,
+   [uint (add_vec_int p j)] -- the machine's own arithmetic, modulo 2^64 --
+   which is the spelling [SpecCopyinstr.copyinstr_got] hands over and the
+   spelling [exec_path_of] below uses, so path and argument are one reading
+   at two arguments. *)
 Definition exec_args_of (M : gmap Z (bv 8)) (av : mword 64)
     (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) : Prop :=
   exec_args_shape na alen afun
@@ -167,26 +182,28 @@ Definition exec_args_of (M : gmap Z (bv 8)) (av : mword 64)
         /\ avf na = (mword_of_int 0 : mword 64)
         /\ (forall i, (i < na)%nat ->
               (forall j, (j <= alen i)%nat ->
-                 M !! (bv_unsigned (avf i) + Z.of_nat j) = Some (afun i j)))).
+                 M !! uint (add_vec_int (avf i) (Z.of_nat j))
+                   = Some (afun i j)))).
 
 Lemma exec_args_of_shape (M : gmap Z (bv 8)) (av : mword 64)
     (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
   exec_args_of M av na alen afun -> exec_args_shape na alen afun.
 Proof. intros [H _]. exact H. Qed.
 
-(* THE PATH, THE SAME PAIR ONE ARGUMENT OVER.  sys_exec [fetchstr]s the
+(* THE PATH, THE SAME PAIR ONE ARGUMENT OVER.  sys_exec [argstr]s the
    path at trapframe argument 0 into a kernel page and hands kexec the
    buffer; the bundle's walk premise is therefore stated AT ONE [pl]
    ([FsAbsEra.ex_start]) under a guard on that string, and not at every
-   path.  What the guard can say today is what [SpecFetchstr.fetchstr_ret]
-   promises and no more -- a NUL-terminated string of an int-sized length,
-   with NOTHING tying it to the user image ([exec_path_shape]).  The
-   reading is [exec_path_of], the named upgrade target: it is the twin of
-   [exec_args_of] above and lands by the same route (a memory-indexed
-   [wp_fetchstr_sconf_mem] paying out of a [copyinstr_got]), after which
-   the two occurrences of [exec_path_shape] below become [exec_path_of]
-   and nothing else moves.  ONLY THEN is the bundle owed at a single
-   known path, which is what a pinned caller's cursor needs. *)
+   path.  THE GUARD IS THE READING, [exec_path_of]: the shape
+   ([exec_path_shape]: NUL-free, int-sized) AND the tie to the image --
+   byte [j] of [pl] is the process's byte at [pv + j], counted the copy
+   loop's way ([exec_args_of] above), with a NUL just past the end.  So
+   the bundle is owed at the ONE path the caller actually passed, which
+   is what a pinned caller's cursor needs.
+
+   [exec_path_shape] is named separately because the reading is the pair
+   and a proof usually wants one half at a time ([exec_path_of_shape]
+   projects it); nothing takes the shape alone as a premise. *)
 Definition exec_path_shape (pl : list (bv 8)) : Prop :=
   (Z.of_nat (length pl) < 2 ^ 31)%Z
   /\ (forall (j : nat) (b : bv 8), pl !! j = Some b ->
@@ -196,16 +213,16 @@ Definition exec_path_of (M : gmap Z (bv 8)) (pv : mword 64)
     (pl : list (bv 8)) : Prop :=
   exec_path_shape pl
   /\ (forall (j : nat) (b : bv 8), pl !! j = Some b ->
-        M !! (bv_unsigned pv + Z.of_nat j) = Some b)
-  /\ M !! (bv_unsigned pv + Z.of_nat (length pl)) = Some (bv_0 8).
+        M !! uint (add_vec_int pv (Z.of_nat j)) = Some b)
+  /\ M !! uint (add_vec_int pv (Z.of_nat (length pl))) = Some (bv_0 8).
 
 Lemma exec_path_of_shape (M : gmap Z (bv 8)) (pv : mword 64)
     (pl : list (bv 8)) :
   exec_path_of M pv pl -> exec_path_shape pl.
 Proof. intros [H _]. exact H. Qed.
 
-(* ...and the one supplier: the buffer sys_exec handed kexec.  [bb_cstr]
-   is exactly [fetchstr]'s promise about it. *)
+(* ...and the SHAPE supplier: the buffer sys_exec handed kexec.  [bb_cstr]
+   is exactly [fetchstr]'s shape promise about it. *)
 Lemma exec_path_shape_bview (plen : nat) (pfun : nat -> bv 8) :
   (Z.of_nat plen < 2 ^ 31)%Z -> bb_cstr pfun plen ->
   exec_path_shape (bview plen pfun).
@@ -216,6 +233,36 @@ Proof.
   - rewrite (bview_lookup plen pfun j Hj) in Hb. injection Hb as <-.
     exact (Hnn j Hj).
   - rewrite lookup_ge_None_2 in Hb; [ discriminate | rewrite bview_length; lia ].
+Qed.
+
+(* ...and the READING supplier, the one step from the syscall's own
+   vocabulary.  [SpecCopyinstr.copyinstr_got] is what [argstr] relays about
+   the path buffer ([SpecFetchstr.fetchstr_got]); [bview] is the same buffer
+   as a list.
+
+   The step is an index shuffle and nothing else: both sides count bytes as
+   [uint (add_vec_int pv j)], the machine's own arithmetic, so there is no
+   no-wrap side condition to discharge -- a user may pass any 64-bit pointer
+   and the reading is about the addresses the copy loop actually touched.
+   [copyinstr_got]'s [j <= plen] range covers the terminator, which is the
+   third conjunct here. *)
+Lemma exec_path_of_bview (M : gmap Z (bv 8)) (pv : mword 64)
+    (plen : nat) (pfun : nat -> bv 8) :
+  (Z.of_nat plen < 2 ^ 31)%Z ->
+  bb_cstr pfun plen ->
+  copyinstr_got M pv pfun plen ->
+  exec_path_of M pv (bview plen pfun).
+Proof.
+  intros Hlen Hcstr Hgot.
+  split_and!.
+  - exact (exec_path_shape_bview plen pfun Hlen Hcstr).
+  - intros j b Hb.
+    destruct (decide (j < plen)%nat) as [Hj | Hj].
+    + rewrite (bview_lookup plen pfun j Hj) in Hb. injection Hb as <-.
+      exact (Hgot j ltac:(lia)).
+    + rewrite lookup_ge_None_2 in Hb; [ discriminate | rewrite bview_length; lia ].
+  - rewrite bview_length (Hgot plen ltac:(lia)) (proj2 Hcstr).
+    f_equal. apply bv_eq. vm_compute. reflexivity.
 Qed.
 
 (* ===================================================================== *)
@@ -242,7 +289,7 @@ Section SysExecAU.
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) : iProp Σ :=
     (∀ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
        (afun : nat -> nat -> bv 8),
-       ⌜exec_path_shape pl⌝ -∗ ⌜exec_args_shape na alen afun⌝ -∗
+       ⌜exec_path_of M pv pl⌝ -∗ ⌜exec_args_shape na alen afun⌝ -∗
        exec_slot_pre S (P (length (path_elems pl))) Φo na alen afun sts)%I.
 
   (* Both one-shot pieces at their pairs ([SpecKexec.exec_au_pre]'s
@@ -252,7 +299,7 @@ Section SysExecAU.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) : iProp Σ :=
-    ((∀ pl : list (bv 8), ⌜exec_path_shape pl⌝ -∗ ex_start γfs cw P Pmiss pl)
+    ((∀ pl : list (bv 8), ⌜exec_path_of M pv pl⌝ -∗ ex_start γfs cw P Pmiss pl)
      ∗ pf_at (aopen_commit_at Γ appE) Fo
      ∗ pf_at (fun S => sys_exec_slot_pre S P Fo.(pf_recv) M pv av sts) Fs)%I.
 
@@ -297,7 +344,7 @@ Section SysExecAU.
     (sys_exec_au_pre Fs Γ γfs cw P Pmiss Fo M pv av sts
      ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
           (afun : nat -> nat -> bv 8),
-          ⌜exec_path_shape pl⌝ ∗ ⌜exec_args_shape na alen afun⌝ ∗
+          ⌜exec_path_of M pv pl⌝ ∗ ⌜exec_args_shape na alen afun⌝ ∗
           exec_post_fail Fs Γ γfs cw P Pmiss Fo pl na alen afun sts))%I.
 
   (* the armed disjunction on the block after the copy-ins' growth [V]
@@ -314,7 +361,7 @@ Section SysExecAU.
          ∗ sys_exec_post_fail Fs Γ γfs cw P Pmiss Fo M pv av sts)
         ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
              (afun : nat -> nat -> bv 8),
-             ⌜exec_path_shape pl⌝ ∗ ⌜exec_args_shape na alen afun⌝ ∗
+             ⌜exec_path_of M pv pl⌝ ∗ ⌜exec_args_shape na alen afun⌝ ∗
              exec_post_ok Fs Γ P Fo pl na alen afun sts (MkUstate V M) U' r)))%I.
 
   (* SANITY: the arms imply the landed [SysExecDefs.sys_exec_post] *)
