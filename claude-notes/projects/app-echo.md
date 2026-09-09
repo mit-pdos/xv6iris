@@ -1776,3 +1776,65 @@ spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
 ORDER: STD-LEDGER + D FINISH → ARM-c (1a) (brief `brief-armc-1a.md`, written) → (1b) echo's discharge.
+
+#### WAIT-EXIT — DESIGN (owner's ruling 2026-09-09): a child's exit returns its resources to the parent through wait()
+
+THE PROBLEM.  init's loop is `fork; child: exec("sh"); parent: wait` forever.
+If wait() could return while the first sh is still running, init would spawn a
+second sh, which could intercept console input meant for the first, and no
+meaningful theorem about input survives.  In proof terms: starting sh means
+handing it OWNERSHIP of the console-input resource (the user-tier reading of
+L5's `uart_rx_tok`/console ledger -- L7 territory), and init cannot hand it out
+twice unless wait() hands it back on sh's exit.  So process exit must be tracked
+precisely: when a process exits it can RETURN resources to its parent, and
+wait() returns the resources of the reaped pid to the parent.  The same
+machinery proves the safety half of what init needs: if a child has not exited,
+wait cannot return its pid (the resource has not been deposited), and if the
+parent has no other children wait cannot return -1 (the parent holds a child
+token the -1 arm's "no children" fact contradicts) -- so init's wait returns
+only when sh has exited, carrying sh's resources.  Blocking itself (wait
+sleeping until the child exits) is liveness and is not what the WP states; the
+safety reading is what the theorem consumes.
+
+WHAT EXISTS TODAY.  `UsysMemOk`'s wait row (~222) says only "copyout of the
+zombie's xstate at argument 0, or nothing at NULL"; the return value `r` is
+free.  `UkRunSys.wp_uk_ecall_wait_null` (~1479) returns at ANY `r` with the
+run unchanged; `UkInit.wp_kinit_wait` (~585) relays it, and init's loop
+re-forks on whatever came back.  Kernel side: `SpecKwait`/`SpecSysWait` (wait
+walks the table under `wait_lock`, reaps a ZOMBIE child, copies xstate,
+`freeproc`), `SpecKexit`/`SpecSysExit` (close fds, iput cwd, `reparent`, wakeup
+parent, ZOMBIE, sched), `WaitInv` (the `parent` cells under `wait_lock`;
+`parents_own`/`wait_res`), `SpecReparent`.  Fork's row: `kfork_post`'s pid arm
+is `1 <= pidv <= PIDMAX` (PID-ROW); uniqueness of live pids is "a further step
+nothing consumes yet" -- THIS consumes it.
+
+THE SHAPE (to be designed in full when scheduled).  A per-child EXIT DEPOSIT:
+- fork mints, for the parent, a CHILD TOKEN keyed by the child's pid, carrying
+  the parent's chosen exit payload `P : iProp` (the resources it expects back);
+  the child's slot is built with the matching obligation (its exit must deposit
+  `P`).  At the U tier this is the fork leaf's parent arm (`UkFork.
+  wp_uk_ecall_fork`: `r = pid` gains `child_tok pid P`) and the child arm's
+  slot premise (the child's `urun`/slot carries "exit deposits P").
+- exit: `UkRunSys.wp_uk_ecall_exit` takes `P` from the program (sh's proof hands
+  back the console-input resource and whatever else the parent lent); the
+  kernel's `kexit` contract moves the deposit into the slot's ZOMBIE state
+  (a row of `proc_pub`/`SchedCtx` beside `p->state = ZOMBIE`, or a per-pid ghost
+  slot the parent's token names), across `reparent` (a reparented child's
+  deposit goes to init: init's token set grows -- design the token as
+  parent-indexed so reparent re-keys it, or make init's wait accept "any
+  deposit" -- decide when scheduled).
+- wait: `kwait`'s success arm returns `r = pid` AND the deposit `P` for that
+  pid (consuming the parent's token); the -1 arm carries `⌜the parent has no
+  live child⌝` (the kernel's `havekids` scan), refutable by a held token; the
+  U-tier row `usys_wait_ok` relays both; `wp_uk_ecall_wait_null` returns
+  `(r = pid ∧ P) ∨ (r = -1 ∧ no children)`.
+- pid uniqueness: tokens keyed by pid need live pids distinct (PID-ROW's
+  further step: `allocpid`'s scan guarantees it; carry "no two live slots share
+  a pid" in `PidLock`'s payload).
+- init: its exec bundle's payload `Pay`/refund carries the console-input
+  resource into sh (`init_sh_slot`'s `Pay` is where it enters); sh's exit
+  returns it; init's wait gets it back and re-forks with it.  The theorem's
+  console-input statement (L7) then has exactly one reader at a time.
+NOT SCHEDULED YET ("at some point"); depends on L7's user-tier input resource
+to have something to hand over.  Prerequisite reading for whoever designs it:
+proc-struct.md §2 (pid cell ownership), SpecKexit/SpecKwait headers, WaitInv.
