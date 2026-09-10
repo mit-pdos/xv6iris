@@ -108,9 +108,10 @@ Section ProofSysFork.
       (γp γw γc γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (Q : Z -> iProp Σ)
       (lks : gset string)
     : wp_sys_fork_sconf_body γp γw γc γl γf γs
- m lvl av eb p b pid U sts lks.
+ m lvl av eb p b pid U sts Q lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
     intros pcE ret_tgt Hav Hlvl Hbelow.
@@ -210,12 +211,12 @@ Section ProofSysFork.
        state as a function of the parent's. *)
     iApply (Kfork.wp_kfork_sconf γp γw γc γl γf γs
 
-              Bj lvl (av - 2)%nat eb p b pid U sts lks
+              Bj lvl (av - 2)%nat eb p b pid U sts Q lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Hjslot Hfdone Hpriv Hpfrag").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
-    iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Hpfrag & #Henv & %Hrv)".
+    iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Hpfrag & #Henv & Hrv)".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))
       by (rewrite HBjra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
@@ -322,7 +323,7 @@ Section ProofSysFork.
     (* [Hcpu] has sat at [CID6] (kfork's own resumed hart) since the
        crossing; the four leaf steps since then never touched it. *)
     iDestruct (cpu_own_transport CID6 CID11 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply ("Hcont" $! E10 with "[%] Hcg Hcpu Hpc Hpriv Hpfrag Henv [%]").
+    iApply ("Hcont" $! E10 with "[%] Hcg Hcpu Hpc Hpriv Hpfrag Henv [Hrv]").
     - unfold callee_saved.
       split_and!.
       + exact HE10csp.
@@ -338,7 +339,10 @@ Section ProofSysFork.
       + apply Hthr; vm_compute; first [reflexivity | discriminate].
       + apply Hthr; vm_compute; first [reflexivity | discriminate].
       + apply Hthr; vm_compute; first [reflexivity | discriminate].
-    - rewrite HE10a0. exact Hrv.
+    - (* the return value's two arms, relayed VERBATIM -- the pid arm
+         carries the child token now, so this is a resource and no longer a
+         pure fact ([SpecKfork.kfork_post]). *)
+      rewrite HE10a0. iExact "Hrv".
   Qed.
 
 End ProofSysFork.

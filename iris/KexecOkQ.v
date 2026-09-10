@@ -120,6 +120,15 @@ Definition kexec_ok_q (Q : mword 64 -> Prop) (V V' : pprivate) (r : mword 64)
    pv_fdg V' = pv_fdg V /\
    pv_cwd V' = pv_cwd V /\
    pv_cwi V' = pv_cwi V /\
+   (* ...AND THE TWO GHOST NAMES.  The identity of a process survives
+      exec -- it is the same incarnation of the same slot, with the same
+      parent expecting the same exit payload -- so [ProcDefs.pv_gen] is
+      untouched; and exec neither forks nor reaps, so the children row's
+      name is too.  [UexecSlot.uvis_gen] of the post-exec key is
+      therefore the pre-exec one, which is what the exec'ing process's
+      own child token stands on. *)
+   pv_gen V' = pv_gen V /\
+   pv_chg V' = pv_chg V /\
    length (pv_name V') = PNAMELEN /\
    (uint szv' - 4096 <= uint spv)%Z /\
    (uint spv <= uint szv')%Z).
@@ -188,6 +197,15 @@ Inductive kxf_cause :=
    pv_fdg V' = pv_fdg V /\
    pv_cwd V' = pv_cwd V /\
    pv_cwi V' = pv_cwi V /\
+   (* ...AND THE TWO GHOST NAMES.  The identity of a process survives
+      exec -- it is the same incarnation of the same slot, with the same
+      parent expecting the same exit payload -- so [ProcDefs.pv_gen] is
+      untouched; and exec neither forks nor reaps, so the children row's
+      name is too.  [UexecSlot.uvis_gen] of the post-exec key is
+      therefore the pre-exec one, which is what the exec'ing process's
+      own child token stands on. *)
+   pv_gen V' = pv_gen V /\
+   pv_chg V' = pv_chg V /\
    length (pv_name V') = PNAMELEN /\
    (uint szv' - 4096 <= uint spv)%Z /\
    (uint spv <= uint szv')%Z)EEDED is unchanged; the [bad:] tails are the ones
@@ -209,6 +227,15 @@ Definition kexec_ok_qf (Q : mword 64 -> Prop) (QF : kxf_cause -> Prop)
    pv_fdg V' = pv_fdg V /\
    pv_cwd V' = pv_cwd V /\
    pv_cwi V' = pv_cwi V /\
+   (* ...AND THE TWO GHOST NAMES.  The identity of a process survives
+      exec -- it is the same incarnation of the same slot, with the same
+      parent expecting the same exit payload -- so [ProcDefs.pv_gen] is
+      untouched; and exec neither forks nor reaps, so the children row's
+      name is too.  [UexecSlot.uvis_gen] of the post-exec key is
+      therefore the pre-exec one, which is what the exec'ing process's
+      own child token stands on. *)
+   pv_gen V' = pv_gen V /\
+   pv_chg V' = pv_chg V /\
    length (pv_name V') = PNAMELEN /\
    (uint szv' - 4096 <= uint spv)%Z /\
    (uint spv <= uint szv')%Z).

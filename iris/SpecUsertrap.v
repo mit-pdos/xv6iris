@@ -125,6 +125,7 @@ Require Import TfUser.     (* [tf_ueq] *)
 Require Import UserPerm.   (* [perm_of] -- the per-page permission view *)
 Require Import UsysMemOk.  (* [uecall_scause] *)
 Require Import UexecRet.   (* [tf_ueq_resume_gpr0] / [tf_ueq_resume_pc] -- the exec rows' congruences *)
+Require Import ChildTok.   (* [child_tok] -- fork's answer to the parent *)
 Require Import UexecSG.        (* [uexecSG]: [sbundle] / [spost] / [skey_eq] *)
 Require Import UexecApply.     (* [uslot_key_cong] -- the slot across the re-key *)
 Require Import UexecExecInst.  (* the class INSTANCE: the process's exec bundle *)
@@ -448,6 +449,69 @@ Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
          /\ sts' = sts⌝                       (* failed: the returning shape at r = -1 *)
       ∨ uslot (uvis_of U' sts' gn cs)))%I.            (* succeeded: the new image's slot *)
 
+(* ===================================================================== *)
+(* FORK'S ANSWER, COMING BACK: the parent's quarter of the child's        *)
+(* generation.                                                            *)
+(*                                                                        *)
+(* fork is the second entry (after exec) whose round says more than a     *)
+(* relation on the key.  The kernel CREATED a process, and what it hands  *)
+(* the parent is [ChildTok.child_tok] -- the quarter of that child's      *)
+(* generation, at the payload the process's own families chose            *)
+(* ([UexecSG.sfork_pay f]) -- together with the generation the parent's   *)
+(* children reading grew by.  The pid the token carries is tied to the a0 *)
+(* word the round left, which is what the process reads.                  *)
+(*                                                                        *)
+(* Guarded on the cause and the number, like [ut_exec_out], so the four   *)
+(* transparent arms and every other entry discharge it by refuting the    *)
+(* guard ([ut_fork_out_quiet]).                                           *)
+(* ===================================================================== *)
+(* THE SET IS NOT IN THIS ROW -- see [SpecSyscall.sysc_fork_out]: what the
+   parent's key resumes at is the trap LOOP's choice, and the children map
+   does not back the reading until WX-RES.  What the kernel hands over is
+   the token, and the generation the loop grows the set by is the one this
+   row names. *)
+Definition ut_fork_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64)
+    : iProp Σ :=
+  (⌜sc_v = uecall_scause /\ usys_num tf = USYS_fork⌝ -∗
+     (⌜r = (mword_of_int (-1) : mword 64)⌝
+      ∨ ∃ (γ : gname) (pidv : mword 32),
+          ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
+          child_tok γ pidv (sfork_pay f)))%I.
+
+(* THE ROW READS THE FRAME ONLY THROUGH ITS a7 WORD, so it transports
+   across any two frames the save walk leaves agreeing on the number --
+   which is what carries it from usertrap's post to uservec's. *)
+Lemma ut_fork_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (f : sfam) (sc_v : mword 64) (tf1 tf2 : list (mword 64)) (r1 r2 : mword 64) :
+  usys_num tf1 = usys_num tf2 -> r1 = r2 ->
+  ut_fork_out f sc_v tf1 r1 -∗ ut_fork_out f sc_v tf2 r2.
+Proof.
+  intros Hn Hr. rewrite /ut_fork_out. subst r2. iIntros "H %Hc".
+  iApply "H". iPureIntro. split; [exact (proj1 Hc) |].
+  rewrite Hn. exact (proj2 Hc).
+Qed.
+
+Lemma ut_fork_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64) :
+  sc_v <> uecall_scause -> ⊢ ut_fork_out f sc_v tf r.
+Proof.
+  intros Hne. rewrite /ut_fork_out. iIntros "%Hc". exfalso.
+  exact (Hne (proj1 Hc)).
+Qed.
+
+Lemma ut_fork_out_quiet_n `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{SG : uexecSG Σ}
+    (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64) :
+  usys_num tf <> USYS_fork -> ⊢ ut_fork_out f sc_v tf r.
+Proof.
+  intros Hne. rewrite /ut_fork_out. iIntros "%Hc". exfalso.
+  exact (Hne (proj2 Hc)).
+Qed.
+
 (* [uvis_of] of a trapframe-rewritten record, spelled out: the key is the
    new frame over the record's own image, permission projection, break and
    working directory.  [KforkChild.uvis_of_kfork_child] is the same fact at
@@ -484,6 +548,7 @@ Proof. reflexivity. Qed.
 (* ===================================================================== *)
 Definition ut_fork_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
+    (f : sfam)
     (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) : iProp Σ :=
   (⌜sc_v = uecall_scause /\ usys_num tf = USYS_fork⌝ -∗
@@ -493,7 +558,16 @@ Definition ut_fork_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
         safe at whichever one the kernel mints; the round learns the actual
         name from kfork's post.  A newly created process has no children.
         ([UexecRet.uexec_fork_child_F]'s own shape.) *)
+     (* ...AND THE CHILD IS OWED ITS OWN PAYLOAD.  The slot is deposited
+        UNDER [ChildTok.my_pay] of what the depositing process's families
+        chose ([UexecSG.sfork_pay]): the parent undertakes that its child
+        is safe knowing what the child's exit will owe, and the kernel
+        pays that knowledge out of the generation it minted.  It is why
+        this row now carries [f]: the payload the child is told about and
+        the payload the parent's token is at are the same one, and [f] is
+        what carries it past the excursion. *)
      ∀ g' : gname,
+       my_pay g' (sfork_pay f) -∗
        uslot (uvis_of (us_tf U (bump_tf tf (mword_of_int 0))) sts g' ∅))%I.
 
 (* THE ROW'S CONGRUENCE, and it is [TfUser.tf_ueq]-shaped rather than
@@ -508,6 +582,7 @@ Definition ut_fork_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
    read off the record: image, permission projection, break, cwd. *)
 Lemma ut_fork_in_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
+    (f : sfam)
     (sc_v : mword 64) (tf tf' : list (mword 64)) (U U' : ustate)
     (sts : list fdstate) :
   length tf = TFWORDS ->
@@ -518,7 +593,7 @@ Lemma ut_fork_in_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : C
     = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))) ->
   pv_sz (us_V U') = pv_sz (us_V U) ->
   pv_cwi (us_V U') = pv_cwi (us_V U) ->
-  ut_fork_in sc_v tf U sts -∗ ut_fork_in sc_v tf' U' sts.
+  ut_fork_in f sc_v tf U sts -∗ ut_fork_in f sc_v tf' U' sts.
 Proof.
   intros Hl Hl' Hu HM Hpi Hsz Hcw.
   assert (Hla : (tf_arg_idx 0 < length tf)%nat)
@@ -539,11 +614,11 @@ Proof.
   { rewrite (tf_resume_pc_bump tf (mword_of_int 0) Hle).
     rewrite (tf_resume_pc_bump tf' (mword_of_int 0) Hle').
     unfold tf_w. rewrite (tf_ueq_epc tf tf' Hu). reflexivity. }
-  rewrite /ut_fork_in. iIntros "H %Hc". iIntros (g').
+  rewrite /ut_fork_in. iIntros "H %Hc". iIntros (g') "Hp".
   iDestruct ("H" with "[%]") as "H";
     [ split; [ exact (proj1 Hc)
              | rewrite (tf_ueq_num tf tf' Hu); exact (proj2 Hc) ] |].
-  iSpecialize ("H" $! g').
+  iSpecialize ("H" $! g'). iSpecialize ("H" with "Hp").
   rewrite !uvis_of_us_tf.
   iEval (rewrite (uslot_key_cong
                     (MkUvis (bump_tf tf (mword_of_int 0)) (us_M U)
@@ -887,6 +962,9 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
     ut_exec_out sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
       (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
       (uint (pv_sz (us_V U))) U' sts sts' gn cs -∗
+    (* ...AND FORK'S: the parent's child token -- see [ut_fork_out] *)
+    ut_fork_out f sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
+      (pv_tf (us_V U') !!! tf_arg_idx 0) -∗
     (* ...AND THE SYSCALL CHANNEL'S, at the same entry frame and read at the
        a0 word the round left -- [ut_sys_out].  The dispatcher produces it,
        the four tails relay it, and the U-mode loop hands it to the
@@ -973,7 +1051,7 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
   (* ...and FORK'S, which is not one of them: a slot rather than a bundle,
      and stated at the frame the PROLOGUE leaves (the entry record's epc
      word is still the previous round's) -- [ut_fork_in] *)
-  ut_fork_in sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))) U sts -∗
+  ut_fork_in f sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))) U sts -∗
   (* THE CROSSING: usertrap parks (yield, and every sleeping syscall), so it
      may return on a different hart -- and the bundle comes back at THAT
      hart, which is why [R] is a family (see the note above). *)

@@ -556,7 +556,7 @@ Proof.
   intros Hlen Hne Hok.
   destruct Hok as [(Hr & _) | Hok]; [ contradiction (Hne Hr) | ].
   destruct Hok as (Hr & Hna & Hstok & Hpsz & Hspv & Htfp & Htf
-                   & Hof & Hfdg & Hcwd & Hcwi & Hnm & Hlo & Hhi).
+                   & Hof & Hfdg & Hcwd & Hcwi & Hgenp & Hchgp & Hnm & Hlo & Hhi).
   assert (Hlt6 : (kxc_tf_sp_idx < length (pv_tf (us_V U)))%nat)
     by (rewrite Hlen; unfold TFWORDS, kxc_tf_sp_idx; lia).
   assert (Hlt15 : (tf_arg_idx 1 < length (pv_tf (us_V U)))%nat)

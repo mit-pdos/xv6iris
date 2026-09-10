@@ -96,6 +96,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Import Defs.
+Require Import ChildTok.  (* [gen_alloc] -- the incarnation allocproc mints *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -1751,18 +1752,7 @@ Section ProofAllocproc.
           as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hbsp & Hkst & Hrest)".
         iModIntro.
         iDestruct "Hrest" as (V pid0) "([%Hof [%Hcwd %Hszb]] & Hpidhalf & Hfields & Hofiles & Hfrag)".
-        iDestruct "Hpub" as (kl xs pid1) "(Hkilled & Hxstate & Hpidinv & Hgen)".
-        (* THE SLOT IS RE-INCARNATED HERE.  allocproc is the only place a
-           process comes into existence, so it is where the slot's
-           generation is replaced: the old name dies with whatever process
-           last held the slot and the new one is fresh.  Nothing is given
-           up -- the old token is dropped -- because no party outside
-           p->lock names the old generation, and the key's reading of the
-           new one ([UexecSlot.uvis_gen]) is taken off THIS cell by the
-           dispatcher that resumes the process. *)
-        iApply fupd_wp.
-        iMod (proc_gen_fresh (proc_addr k) with "Hgen") as "Hgen".
-        iModIntro.
+        iDestruct "Hpub" as (kl xs pid1) "(Hkilled & Hxstate & Hpidinv)".
         (* +0x38 .. +0xee: THE INLINED allocpid -- acquire(&pid_lock), the
            retry scan for a pid no slot holds, [p->pid = pid], release.  One
            block lemma ([wp_ap_pidsec] above), stated in the shape the
@@ -2005,10 +1995,10 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γp γa T2 k γl V pidn USED ch None None
                     (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) Hk (ap_lvlS lvl Hlvl) HT2a0
-                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hgen] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] [Hpgcell] [Htfcell] Henvb").
+                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] [Hpgcell] [Htfcell] Henvb").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
-            iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv Hgen". }
+            iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
             iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx". }
@@ -2377,10 +2367,10 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γp γa U2 k γl V pidn USED ch None (Some (tfp, tfws))
                     (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) Hk (ap_lvlS lvl Hlvl) HU2a0
-                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hgen] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] [Hpgcell] [Htfcell Htfpage] Henvb").
+                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] [Hpgcell] [Htfcell Htfpage] Henvb").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
-            iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv Hgen". }
+            iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
             iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx". }
@@ -2807,7 +2797,19 @@ Section ProofAllocproc.
         iDestruct (proc_ptm_at_of_pt_at (proc_addr k) (upt_desc (pt_base t) tfp)
                      (uint (pv_sz V)) ∅ with "Hptat") as "[_ Hptat]".
         iDestruct "Hptat" as (M0) "[_ Hptat]".
-        iDestruct (proc_priv_nocwd_intro γf (proc_addr k) pidn (MkUstate V M0) (upt_desc (pt_base t) tfp) tfws
+        (* THE SLOT'S NEW INCARNATION, MINTED HERE.  allocproc is the one
+           place a process comes into existence, so it is where the
+           generation is minted -- at THIS slot's address and at the pid
+           <allocpid> just chose, at the TRIVIAL payload: a process nobody
+           forked owes its parent nothing, and a fork REPLACES the payload
+           before splitting ([ChildTok.gen_set]).  The block RECORDS the
+           name and nothing in the block reads it, which is why every
+           resource below is at [V]'s projections unchanged. *)
+        iApply fupd_wp.
+        iMod (gen_alloc (proc_addr k) pidn) as (γg) "Hgen".
+        iModIntro.
+        iDestruct (proc_priv_nocwd_intro γf (proc_addr k) pidn
+                     (MkUstate (upd_gen V γg) M0) (upt_desc (pt_base t) tfp) tfws
                      Hszb (um_below_empty (pv_sz V))
                      with "Hpidown Hfields Hptat [Htfpage] Hofiles") as "Hpriv".
         { cbn [ud_tfp]. iExact "Htfpage". }
@@ -2846,19 +2848,20 @@ Section ProofAllocproc.
         iEval (rewrite Ha0f).
         (* the post is now THREE-way; the found arm is the middle one *)
         rewrite /allocproc_post. iRight. iLeft.
-        iExists k, γl, ch, pidn, (us_pt (MkUstate V M0) (upt_desc (pt_base t) tfp) tfws),
+        iExists k, γl, ch, pidn,
+                (us_pt (MkUstate (upd_gen V γg) M0) (upt_desc (pt_base t) tfp) tfws),
                 (pt_base t), tfp, ks, rest, (S (pt_nodes t)).
         iSplitR.
         { iPureIntro. split; [reflexivity|]. split; [exact Hk|]. split; [exact Hγl|].
           split; [exact Hpidnb|]. split; [reflexivity|].
-          cbn [us_pt upd_usV us_V us_M upd_pt pv_ofile pv_cwd pv_fdg].
+          cbn [us_pt upd_usV us_V us_M upd_pt upd_gen pv_ofile pv_cwd pv_fdg pv_gen].
           split; [exact Hof|]. split; [exact Hcwd|].
           split; [exact Hrestlen|]. exact (ap_nodes_le (pt_nodes t) Hnodes). }
-        iSplitL "Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hgen".
+        iSplitL "Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv".
         { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
-          iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv Hgen". }
+          iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
         iFrame "Hkst".
-        iFrame "Hpark Hpriv Hfrag Hmk Hspare Hirsp Hbsp Hks".
+        iFrame "Hpark Hpriv Hgen Hfrag Hmk Hspare Hirsp Hbsp Hks".
         iSplitL "Hc0 Hc1 Hcrest".
         { rewrite ctx_cells_run !big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0.
           iFrame "Hc0 Hc1 Hcrest". }

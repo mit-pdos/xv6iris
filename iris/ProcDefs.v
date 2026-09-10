@@ -55,16 +55,56 @@ Record pprivate := MkPPriv {
      chdir writes it ([upd_cwi]), fork copies it, exec and everything else
      preserve it -- every other [upd_*] keeps it. *)
   pv_cwi   : Z;
+  (* THIS INCARNATION'S GENERATION: the ghost name allocproc
+     mints for the process, carrying its slot, its pid and the exit
+     PAYLOAD its parent chose ([ChildTok.gen_own]).  A ghost name in the
+     block for [pv_fdg]'s reason and no other -- every spec that touches a
+     process already threads [V], and none of them wants a second ghost
+     index -- and the key's [UexecSlot.uvis_gen] is the reading of THIS
+     field.  It changes at exactly two points, allocproc's mint and the
+     process's death: exec keeps it (the identity survives exec) and every
+     [upd_*] below preserves it. *)
+  pv_gen   : gname;
+  (* ...AND THE NAME OF ITS CHILDREN ROW.  The generations of this
+     process's live children are one row of the <wait_lock> ghost map
+     ([WaitInv.children_own_at] is the authority, [WaitInv.ch_frag
+     (un_ch N) (pv_chg V)] the row, which rides the trap residue beside
+     [FdSlots.fd_frags]); this is the KEY that row is filed under, and
+     [UexecSlot.uvis_ch] is its value.  A name of its own rather than the
+     slot index, so that the party holding the row -- which names only the
+     block -- can find its own entry in the map by [ghost_map_lookup].
+     Installed under <wait_lock> by whoever creates the process
+     ([SpecKfork] for a forked child, main for the first process), which
+     is why it is not allocproc's to mint. *)
+  pv_chg   : gname;
 }.
 
 Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) v (pv_name V)
-          (pv_cwi V).
+          (pv_cwi V) (pv_gen V) (pv_chg V).
 
 (* the inum alone -- chdir's second write, beside the pointer's *)
 Definition upd_cwi (V : pprivate) (z : Z) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) z.
+          (pv_name V) z (pv_gen V) (pv_chg V).
+
+(* THE GENERATION, INSTALLED: allocproc's mint of a fresh incarnation
+   ([ChildTok.gen_alloc]) writes the name it chose into the block. *)
+Definition upd_gen (V : pprivate) (g : gname) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
+          (pv_name V) (pv_cwi V) g (pv_chg V).
+
+(* ...AND THE CHILDREN ROW'S NAME, installed by whoever creates the process
+   at the moment it holds <wait_lock> and can put the row in the map
+   ([SpecKfork]'s [acquire(&wait_lock); np->parent = p]). *)
+Definition upd_chg (V : pprivate) (g : gname) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
+          (pv_name V) (pv_cwi V) (pv_gen V) g.
+
+Lemma upd_gen_id (V : pprivate) : upd_gen V (pv_gen V) = V.
+Proof. destruct V; reflexivity. Qed.
+Lemma upd_chg_id (V : pprivate) : upd_chg V (pv_chg V) = V.
+Proof. destruct V; reflexivity. Qed.
 
 Lemma upd_cwi_id (V : pprivate) : upd_cwi V (pv_cwi V) = V.
 Proof. destruct V; reflexivity. Qed.
@@ -517,7 +557,7 @@ Section ProcDefs.
     iFrame "Hcwd". iIntros (v') "Hcwd".
     rewrite /proc_priv_bare /proc_fields.
     cbn [us_cwd upd_usV us_V us_M upd_cwd
-         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
+         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }

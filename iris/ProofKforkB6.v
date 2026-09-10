@@ -85,6 +85,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import ChildTok.  (* [gen_own] -- the child's incarnation, out of allocproc *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 
@@ -295,6 +296,15 @@ Section KforkPrologue.
            ([SpecKfork.kfork_post]). *)
         FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Up)) stsP -∗
         proc_priv_nocwd γf npa pid_c Uc' -∗
+        (* THE CHILD'S GENERATION, WHOLE, straight out of allocproc's found
+           arm ([SpecAllocproc.allocproc_post]): the incarnation is minted
+           there, and the FORKING process is the party that chooses what
+           its child's exit will owe -- so the name arrives here unspent
+           and [ProofKforkMain] does the [ChildTok.gen_set] and the split.
+           At [Uc']'s field because every step between is an [upd_*] that
+           preserves it. *)
+        ChildTok.gen_own (pv_gen (us_V Uc')) (DfracOwn 1) npa pid_c
+          (fun _ => True)%I -∗
         (* the child's descriptor-state fragments, out of allocproc with its
            block AT [fdt0] -- the copy loop retypes them at the parent's own
            entries and the whole table parks with the child. *)
@@ -784,7 +794,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Uc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & Hcfrag & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
+        "(%Hpures & Hheld & Hhart & Hcpriv & Hcgen & Hcfrag & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Uc as [Vc Mc].
       destruct Hpures as (Hrv & HjN & Hgamma & Hpidc & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
@@ -1438,7 +1448,7 @@ Section KforkPrologue.
                   (MkUstate (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc)) (us_M Up))
                   (ud_tfp (pv_upt (us_V Up))) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv Hpfrag HCpriv
-                        Hcfrag
+                        Hcgen Hcfrag
                         Hmk Hheld Hhart Hfdsp Hirsp Hbslp Hkstk [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
         * exact HN10sp.
         * exact HN10s4.

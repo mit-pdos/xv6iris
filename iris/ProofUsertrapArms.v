@@ -114,6 +114,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 Require Import TsoCtx.
+Require Import ChildTok.  (* [child_tok] -- fork's answer, quiet here *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -621,6 +622,11 @@ Section Ut56.
                (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                (uint (pv_sz (us_V U0))) U sts sts gn cs) as "Hxo".
     { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ Hnec). }
+    (* ...and fork's, refuted through the same cause *)
+    iAssert (ut_fork_out fdep scv
+               (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+               (pv_tf (us_V U) !!! tf_arg_idx 0)) as "Hfo".
+    { iApply (ut_fork_out_quiet _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs
                (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts
                (pv_cwi (us_V U)) cs)%I as "Hso".
@@ -632,7 +638,7 @@ Section Ut56.
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               Hmiev Hmenvv Hrd
-              with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
+              with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hcont] Hframe Hxo Hfo Hso Hcont").
     all: try lkbelow.
     iApply (ua_hold_on Rsys N U _ sts with "Hcpu [-Hclm Hown] Hclm [-]").
     - rewrite /trap_csrs.
@@ -1051,6 +1057,11 @@ Section UtD0.
                  (uint (pv_sz (us_V U0))) (MkUstate V' (us_M U)) sts sts gn cs)
         as "Hxo".
       { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ Hnec). }
+    (* ...and fork's, refuted through the same cause *)
+    iAssert (ut_fork_out fdep scv
+               (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+               (pv_tf (us_V U) !!! tf_arg_idx 0)) as "Hfo".
+    { iApply (ut_fork_out_quiet _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs
                  (pv_tf (us_V (MkUstate V' (us_M U))) !!! tf_arg_idx 0)
                  (us_M (MkUstate V' (us_M U)))
@@ -1063,7 +1074,7 @@ Section UtD0.
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd'
-                with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hcont] Hframe Hxo Hfo Hso Hcont").
       all: try lkbelow.
       iApply (ua_hold_on Rsys N (MkUstate V' (us_M U)) with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
@@ -1228,6 +1239,11 @@ Section UtE8.
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                  (uint (pv_sz (us_V U0))) U sts sts gn cs) as "Hxo".
       { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ Hnec). }
+    (* ...and fork's, refuted through the same cause *)
+    iAssert (ut_fork_out fdep scv
+               (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+               (pv_tf (us_V U) !!! tf_arg_idx 0)) as "Hfo".
+    { iApply (ut_fork_out_quiet _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs
                  (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts
                  (pv_cwi (us_V U)) cs)%I as "Hso".
@@ -1239,7 +1255,7 @@ Section UtE8.
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hcont] Hframe Hxo Hfo Hso Hcont").
       iApply (ua_hold_on Rsys N U _ sts with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
     - (* KILLED: fall through to +0xf2's [c.j +0xf6], then kexit(-1). *)

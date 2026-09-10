@@ -178,6 +178,7 @@ Require Import UexecSlot. (* [uvis] -- the slot's key *)
 Require Import UexecRet.  (* [uslot] -- the slot kfork spends at the park.
                              Required DIRECTLY (durable-notes). *)
 Require Import KforkChild. (* [kfork_child] -- the record it is spent at *)
+Require Import ChildTok.   (* [child_tok] / [my_pay] -- the generation's pieces *)
 Require Import Xv6Cameras.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -195,6 +196,12 @@ Definition kfork_post
  (γf : gname) (lvl : nat) (eb : bool)
     (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
+    (* THE CHILD'S EXIT PAYLOAD, chosen by the forking process and set on
+       the child's generation inside this call ([ChildTok.gen_set]): what
+       the child's exit will owe its parent, as a function of the status.
+       kfork is payload-GENERIC -- it never reads [Q] -- and the generic
+       fork bundle picks [fun _ => True]. *)
+    (Q : Z -> iProp Σ)
     (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
   ( sie_cap_gpr KT1 mr K b pme ∗
     cpu_own lvl eb pme b lks ∗
@@ -228,14 +235,36 @@ Definition kfork_post
          ([SpecAllocproc.allocproc_post]).  The interval is what makes the
          value NONZERO, which is the whole point of relaying it: the parent
          of a fork can always tell itself from its child. *)
-      (∃ pidv : mword 32, ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝ ∗
-                          ⌜ (1 <= bv_unsigned pidv <= PIDMAX)%Z ⌝) ) )%I.
+      (* ...AND THE CHILD TOKEN.  allocproc minted the child's generation
+         at its slot and pid ([ChildTok.gen_alloc]); kfork set the payload
+         on it and split it three ways ([gen_set], [gen_split]) -- the
+         PARENT's quarter is this, the KERNEL's stays in the child's
+         private block, and the discarded half is what the child's
+         [my_pay] and the two persistent readings come off.  This is the
+         one thing about a forked child that comes back to its parent, and
+         what a later wait() redeems ([ChildTok.gen_pay]).
+
+         THE CHILDREN SET IS NOT MOVED HERE, AND THAT IS THIS LANE'S
+         BOUNDARY.  The key's [UexecSlot.uvis_ch] grows by [γ] at the fork
+         arm, and that is a fact about the KEY THE PARKER PAYS -- the
+         resumer instantiates [ParkCap.park_cap]'s [∀ cs] at [cs ∪ {γ}] --
+         not yet a move of the <wait_lock> ghost map: kfork carries the
+         token and does not touch the map.  Lane WX-RES puts
+         [WaitInv.ch_frag] in the trap residue beside [FdSlots.fd_frags],
+         and then kfork and kwait move the map under the lock with the
+         caller's own row. *)
+      (∃ (pidv : mword 32) (γ : gname),
+         ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝ ∗
+         ⌜ (1 <= bv_unsigned pidv <= PIDMAX)%Z ⌝ ∗
+         child_tok γ pidv Q) ) )%I.
 
 Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γp γw γc γl γf : gname)  (γs : list gname)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
+    (* the child's exit payload -- see [kfork_post] *)
+    (Q : Z -> iProp Σ)
     (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -311,7 +340,11 @@ Definition wp_kfork_sconf_body
      this call, so the CALLER cannot name it and undertakes to supply a
      slot at whichever one comes out; the child's children set is [∅] on
      the nose ([UexecRet.uexec_fork_child_F]). *)
-  (∀ g' : gname, uslot (uvis_of (kfork_child Up) stsP g' ∅)) -∗
+  (* ...AND IT IS PAID UNDER THE CHILD'S OWN [my_pay]: the caller's slot
+     may READ the payload its child's exit owes, because a verified child
+     has to prove that exit.  kfork hands it over out of the split it
+     makes ([ChildTok.gen_split]); a generic child ignores it. *)
+  (∀ g' : gname, my_pay g' Q -∗ uslot (uvis_of (kfork_child Up) stsP g' ∅)) -∗
   (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
      take out of the parent's block: the parent's token may be the EXCLUSIVE
      boot arm, and the child needs a token of its own.  [first_done] is
@@ -327,7 +360,7 @@ Definition wp_kfork_sconf_body
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γf lvl eb pme b pid_p Up stsP K mr
+      kfork_post γf lvl eb pme b pid_p Up stsP Q K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -340,7 +373,8 @@ Module Type KFORK.
  (γp γw γc γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
+      (Q : Z -> iProp Σ)
       (lks : gset string),
       wp_kfork_sconf_body γp γw γc γl γf γs
- m lvl K eb pme b pid_p Up stsP lks.
+ m lvl K eb pme b pid_p Up stsP Q lks.
 End KFORK.

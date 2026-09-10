@@ -75,6 +75,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Import Defs.
+Require Import ChildTok.  (* [child_tok] -- fork's answer, relayed *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -154,7 +155,7 @@ Section UtSysBlock.
     (* ...and FORK'S deposit, a SLOT and not a bundle, at the frame the
        PROLOGUE leaves -- which [Hpro] says is [pv_tf (us_V U)]
        ([SpecUsertrap.ut_fork_in]) *)
-    ut_fork_in scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) U0 sts -∗
+    ut_fork_in fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) U0 sts -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
                      mie_v menvcfg0 U0 sts gn cs epv scv fdep) -∗
@@ -634,7 +635,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2 stsR)
-        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hcwig %Hsbrg %Hfkg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo Hso".
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hcwig %Hsbrg %Hfkg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo Hso Hfo".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -742,7 +743,7 @@ Section UtSysBlock.
         - (* exec, whose cwd inum the dispatcher's clause pins: exec is not
              chdir, so the clause's right arm is the one that holds *)
           left. split; [ rewrite <- Hnumeq; exact Hex | ].
-          cbn [us_V pv_cwi].
+          cbn [us_V pv_cwi pv_gen pv_chg].
           destruct Hcwig as [[H9 _] | Hc9];
             [ exfalso; rewrite Hex in H9; discriminate H9 | ].
           rewrite Hc9. exact HV1cwi.
@@ -943,6 +944,16 @@ Section UtSysBlock.
           | reflexivity
           | exact (eq_sym Hpr5)
           | reflexivity | reflexivity ]. }
+      (* FORK'S ANSWER, from the dispatcher's row to the trap contract's:
+         the two are the same disjunction, read at the same a0 word, and
+         the guard differs only in the cause conjunct the dispatcher does
+         not carry ([SpecUsertrap.ut_fork_out]). *)
+      iAssert (ut_fork_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+                 (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0))%I
+        with "[Hfo]" as "Hfo".
+      { rewrite /ut_fork_out /sysc_fork_out. iIntros "%Hc".
+        iApply "Hfo". iPureIntro. destruct Hc as [_ Hc7].
+        cbn [us_V]. rewrite <- Hn0. rewrite usys_num_epc in Hc7. exact Hc7. }
       iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs
                  (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0)
                  (us_M (MkUstate V2 M2))
@@ -962,7 +973,7 @@ Section UtSysBlock.
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
                 Hmiev Hmenvv Hrda
-                with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hcont] Hframe Hxo Hfo Hso Hcont").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitR; [rewrite /trap_csrs_ext; done|].

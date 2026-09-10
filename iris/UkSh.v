@@ -55,12 +55,12 @@
 (* ledger and assumes nothing about which of its three streams are open.   *)
 (* [ush_std] is the ledger of the low NSTD slots at an arbitrary state      *)
 (* vector, and it travels inside [ush_pstate] -- sh's process state, the    *)
-(* ledger together with its working directory -- from [wp_ksh_start]        *)
-(* through main, the console preamble and the command loop, and out         *)
-(* through [ush_rest] to where runcmd's REDIR and PIPE arms close and       *)
-(* reopen standard streams and the [cd] builtin spends the cwd.  See        *)
-(* [ush_std]'s own header for what the ledger buys, and [ush_pstate]'s      *)
-(* for why the two travel as one resource.                                  *)
+(* ledger together with its working directory and its children set -- from  *)
+(* [wp_ksh_start] through main, the console preamble and the command loop,  *)
+(* and out through [ush_rest] to where runcmd's REDIR and PIPE arms close   *)
+(* and reopen standard streams, the [cd] builtin spends the cwd and fork1   *)
+(* moves the children set.  See [ush_std]'s own header for what the ledger  *)
+(* buys, and [ush_pstate]'s for why the three travel as one resource.       *)
 (*                                                                        *)
 (* WHERE THE STAGE STOPS.  0x97a, the first instruction of main's body     *)
 (* past the blank-line test, is [ush_rest]: an abstract continuation that  *)
@@ -89,6 +89,7 @@ Require Import UserHeap UkRun UkRunLeaf UkRunMem UkRunSys UkRunBr.
 Require Import UCodeShK.
 Require Import TsoCtx.
 Require User.ShSyms User.ShInstrs.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -117,6 +118,8 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
 Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
 Require Import UserCwd.  (* [ucwd_any] -- sh's own working directory, which
                             its [cd] builtin spends *)
+Require Import UserChildren.  (* [uch_any] -- sh's own half of its children
+                                 set, which its fork1 spends *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Section UkSh.
@@ -134,7 +137,11 @@ Section UkSh.
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
+  Local Notation γch := (ukn_ch N).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -4123,14 +4130,22 @@ Section UkSh.
   (* walk -- sh never asks which directory it is in -- so it travels       *)
   (* index-free ([UserCwd.ucwd_any]).                                      *)
   (*                                                                       *)
-  (* THE TWO TRAVEL AS ONE RESOURCE, which is why this definition exists   *)
-  (* rather than a second premise beside [ush_std] at thirteen sites:      *)
+  (* ...AND THE THIRD: THE CHILDREN SET.  [UkRun.urun] holds the other     *)
+  (* half of it too, and fork MOVES the set -- an update takes both halves *)
+  (* -- so sh's [fork1] cannot call fork without one, exactly as its [cd]  *)
+  (* cannot call chdir without the cwd.  sh never asks WHICH children it   *)
+  (* has (its wait() reads a pid off a0 and nothing else), so this travels *)
+  (* index-free too ([UserChildren.uch_any]) and its fork site drops the   *)
+  (* token the kernel mints ([UkFork.wp_uk_ecall_fork_any]).               *)
+  (*                                                                       *)
+  (* THE THREE TRAVEL AS ONE RESOURCE, which is why this definition exists *)
+  (* rather than three premises beside [ush_std] at thirteen sites:        *)
   (* every lemma between the loop head and the syscall that spends one is  *)
-  (* then unchanged by the other's arrival.  [UserFd.ufd_state] is the     *)
+  (* then unchanged by the others' arrival.  [UserFd.ufd_state] is the     *)
   (* same move one tier down.                                             *)
   (* ===================================================================== *)
   Definition ush_pstate (l : list fdstate) : iProp Σ :=
-    (ush_std l ∗ UserCwd.ucwd_any γcwd)%I.
+    (ush_std l ∗ UserCwd.ucwd_any γcwd ∗ UserChildren.uch_any γch)%I.
 
   (* the loop head, and the abstract rest of main's body ------------------ *)
   (* Both are indexed by the two states, because both are re-entered: the
@@ -5192,7 +5207,7 @@ Section UkSh.
                  := regval_into_reg (mword_of_int 0x908 : mword 64)]> mB).
     assert (HraC : mC !!! Regidx ra_idx = mword_of_int 0x908)
       by exact (upd_eq mB (Regidx ra_idx) (mword_of_int 0x908 : mword 64)).
-    iDestruct "Hstd" as "[Hstd Hcwd]".
+    iDestruct "Hstd" as "(Hstd & Hcwd & Hch)".
     iApply (wp_ksh_open h3 mC l n with "Hcode Hrun Hstd").
     (* WHAT CAME BACK, PUT IN THE FORM THE TWO BRANCHES CONSUME: the ledger
        the open left, and then either the handle (the descriptor landed
@@ -5231,8 +5246,8 @@ Section UkSh.
           iExists l. iFrame "Hstd".
           iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro. exact Hr.
       - iExists l. iFrame "Hstd". iRight. iPureIntro. left. exact Hrm. }
-    iAssert (ush_pstate l') with "[Hstd Hcwd]" as "Hstd";
-      [ rewrite /ush_pstate /ush_std; iFrame "Hstd Hcwd" |].
+    iAssert (ush_pstate l') with "[Hstd Hcwd Hch]" as "Hstd";
+      [ rewrite /ush_pstate /ush_std; iFrame "Hstd Hcwd Hch" |].
     rewrite HraC.
     assert (Eret : ret_pc (mword_of_int 0x908 : mword 64) = mword_of_int 0x908)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -5768,7 +5783,11 @@ Section UkShLeaf.
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
+  Local Notation γch := (ukn_ch N).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570

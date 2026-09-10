@@ -39,6 +39,7 @@ Require Import UserHeap UkRun UkSync.
 Require Import UCodeSync.
 Require Import TsoCtx.
 Require User.SyncSyms User.SyncInstrs.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -59,6 +60,9 @@ Section USyncKernel.
   Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
 
   (* NO [Context {CID : CpuId}]: the slot binds the hart itself. *)
 

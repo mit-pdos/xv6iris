@@ -389,7 +389,7 @@ Section UserretClosed.
                            (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
                      (uvis_M W))
                   (uvis_fd W) (uvis_gen W) (uvis_ch W))
-             ∗ SpecUsertrap.ut_fork_in sc
+             ∗ SpecUsertrap.ut_fork_in fdep sc
                   (tf_of (tf_resume_gpr0 (uvis_tf W))
                      (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
                   (ProcDefs.upd_usM
@@ -417,9 +417,9 @@ Section UserretClosed.
             [ exfalso; rewrite Hfk in He; discriminate He | ].
           destruct (decide (usys_num (uvis_tf W) = USYS_fork)) as [_ | Hc];
             [ | exfalso; exact (Hc Hfk) ].
-          iIntros (g').
+          iIntros (g') "Hmp".
           rewrite /uexec_fork_child_F SpecUsertrap.uvis_of_us_tf.
-          iSpecialize ("Hxin" $! g').
+          iSpecialize ("Hxin" $! g'). iSpecialize ("Hxin" with "Hmp").
           iEval (rewrite (uslot_key_cong
                             (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W)
                                (uvis_sz W) (uvis_fd W) (uvis_cwd W) g' ∅)
@@ -484,7 +484,7 @@ Section UserretClosed.
       "%Huptpt' %Hround' %Hfdkept %Hfdecall %Hpipecall %Hpcret' %Hgprtie'
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
-       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds' Hxo Hso".
+       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds' Hxo Hfo Hso".
     (* the three frozen CSRs, duplicated out of the residue for [user_cfg] *)
     iDestruct (UV.usertrap_res_csrs_open (CID := CID') pt' ksp U2 with "Hures'")
       as "[Hcsrs Hcback]".
@@ -546,9 +546,73 @@ Section UserretClosed.
        unfolded IS the round lemma's row once the entry permission map and
        break are the key's own *)
     iEval (rewrite /SpecUsertrap.ut_exec_out Hpi0 Hsz0) in "Hxo".
+    (* ---- THE SET THE ROUND RESUMES AT.  Every entry but fork keeps the
+       trapped reading; fork's answer names the generation it grew by, and
+       the loop is the party that CHOOSES the resume key -- the children
+       map under <wait_lock> does not back the reading until WX-RES, so
+       nothing else constrains it.  The choice has to be made before the
+       key is fixed, which is why the answer is taken apart here. ---- *)
+    iAssert (∃ cs' : gset gname,
+               ⌜~ (sc = uecall_scause
+                   /\ usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                  (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                      = USYS_fork) -> cs' = uvis_ch W⌝ ∗
+               (⌜sc = uecall_scause
+                 /\ usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                    = USYS_fork⌝ -∗
+                ufork_ans (sfork_pay fdep)
+                  (pv_tf (us_V U2) !!! tf_arg_idx 0) (uvis_ch W) cs'))%I
+      with "[Hfo]" as (cs') "[%Hchq Hfans]".
+    { destruct (decide (sc = uecall_scause
+                        /\ usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                       (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                           = USYS_fork)) as [Hfk | Hnfk].
+      - iDestruct ("Hfo" with "[%]") as "[%Hm1 | Hpid]"; [ exact Hfk | | ].
+        + (* fork FAILED: -1, no child, the reading does not move *)
+          iExists (uvis_ch W). iSplitR; [iPureIntro; intros _; reflexivity |].
+          iIntros "_". iLeft. iPureIntro. split; [ exact Hm1 | reflexivity ].
+        + (* fork SUCCEEDED: the child's generation joins the reading, and
+             the token comes with it *)
+          iDestruct "Hpid" as (γ pidv) "[%Hpv Htok]".
+          iExists (uvis_ch W ∪ {[γ]}).
+          iSplitR; [iPureIntro; intros Hne; exfalso; exact (Hne Hfk) |].
+          iIntros "_". iRight. iExists γ, pidv.
+          iSplitR; [iPureIntro; exact Hpv |].
+          iSplitR; [iPureIntro; reflexivity | iExact "Htok" ].
+      - iExists (uvis_ch W). iSplitR; [iPureIntro; intros _; reflexivity |].
+        iIntros "%Hg". exfalso. exact (Hnfk Hg). }
+    (* ...AND THE EXEC ANSWER AT THE SET THE ROUND RESUMES AT: exec is not
+       fork, so on that arm the set did not move and the row's slot is at
+       the same key. *)
+    iAssert (⌜sc = uecall_scause
+             /\ usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                            (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                = USYS_exec⌝ -∗
+             (⌜exists r : mword 64,
+                 UexecRound.uround_bump_ok
+                   (tf_of (tf_resume_gpr0 (uvis_tf W))
+                      (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                   (pv_tf (us_V U2)) r
+                 /\ usys_mem_ok USYS_exec
+                      (tf_of (tf_resume_gpr0 (uvis_tf W))
+                         (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                      r (uvis_M W) (uvis_perm W) (uvis_sz W) (us_M U2)
+                      (perm_of (ud_um (pv_upt (us_V U2))) (uint (pv_sz (us_V U2))))
+                      (uint (pv_sz (us_V U2)))
+                 /\ sts2 = uvis_fd W⌝
+              ∨ uslot (uvis_of U2 sts2 (uvis_gen W) cs')))%I
+      with "[Hxo]" as "Hxo".
+    { iIntros "%Hg".
+      assert (Hnf : ~ (sc = uecall_scause
+                       /\ usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                      (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                          = USYS_fork)).
+      { intros [_ Hx]. rewrite (proj2 Hg) in Hx. discriminate Hx. }
+      rewrite (Hchq Hnf). iApply "Hxo". iPureIntro. exact Hg. }
     iDestruct (uexec_ret_round_slot_of sc W fdep (tf_resume_gpr0 (uvis_tf W))
-                 (tf_w (uvis_tf W) tf_epc_idx) U2 sts2
-                 Hlen eq_refl eq_refl Hfdkept
+                 (tf_w (uvis_tf W) tf_epc_idx) U2 sts2 cs'
+                 Hlen eq_refl eq_refl Hfdkept Hchq
                  (* ...and the ECALL arm's row, which is what stops the
                     process resuming at an ARBITRARY descriptor view.  It
                     arrives from uservec's post ([Hfdecall]), which got it
@@ -566,8 +630,11 @@ Section UserretClosed.
                     key the deposit went down at -- which differs from the
                     round's run projection in none of [UexecSG.skey_eq]'s six
                     rows, exactly as it did on the way in. *)
-                 with "Hxo [Hso] Hret") as "Hslot";
+                 with "Hxo Hfans [Hso] Hret") as "Hslot";
       [ iIntros "%Hg"; destruct Hg as (Hgec & Hgex & Hgfk);
+        (* this arm is not fork, so the set the round resumes at is the
+           trapped one and the row transports at the trapped key *)
+        rewrite (Hchq (fun Hbad => Hgfk (proj2 Hbad)));
         iDestruct ("Hso" $! (usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
                                (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
                      with "[%]") as "Hso";
@@ -590,7 +657,7 @@ Section UserretClosed.
         iExact "Hso" | ].
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)
-    assert (Hpi2 : uvis_perm (uvis_of U2 sts2 (uvis_gen W) (uvis_ch W))
+    assert (Hpi2 : uvis_perm (uvis_of U2 sts2 (uvis_gen W) cs')
                    = perm_of (ud_um pt') (uint (pv_sz (us_V U2))))
       by (cbn [uvis_of uvis_perm]; rewrite Huptpt'; reflexivity).
     (* [Rfd] IS THE PROCESS'S OWN FRAGMENTS, at its own ghost name.  The
@@ -605,8 +672,8 @@ Section UserretClosed.
               (Rut_at_acc CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2))
                  (pv_cwi (us_V U2)))
               (uint (pv_sz (us_V U2)))
-              sts2 (pv_cwi (us_V U2)) (uvis_gen W) (uvis_ch W)
-              (uvis_of U2 sts2 (uvis_gen W) (uvis_ch W)) (us_M U2) mf
+              sts2 (pv_cwi (us_V U2)) (uvis_gen W) cs'
+              (uvis_of U2 sts2 (uvis_gen W) cs') (us_M U2) mf
               (sret_ms5 ms') sc' stval' uepc (ret_pc uepc)
               (loop_ok_loop_ucfg mdv0 Hmm pt' Hnorm' Hptwf')
               Hszok

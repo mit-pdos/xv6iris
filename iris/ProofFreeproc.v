@@ -253,7 +253,7 @@ Section ProofFreeproc.
     iApply fupd_wp.
     iMod (pstate_whole_update (proc_addr j) st UNUSED with "Hpsg") as "Hpsg".
     iModIntro.
-    iDestruct "Hpub" as (kl xs pid2) "(Hkilled & Hxstate & Hpid2 & Hgen)".
+    iDestruct "Hpub" as (kl xs pid2) "(Hkilled & Hxstate & Hpid2)".
     iDestruct "Hfields" as "(Hsz & Hcwd & %Hnmlen & Hnm)".
     (* [proc_held] is stated at [proc_addr j] and the block at the [let]-bound
        [pa].  Convertible, but [iFrame]/[iSpecialize] want them SYNTACTICALLY
@@ -407,7 +407,7 @@ Section ProofFreeproc.
            for proc_freepagetable before this block stores 0 into it. *)
         p_sz pa ↦₈ pv_sz V -∗
         WP (Loop : expr riscv_lang)))%I
-      with "[Hcont Hr24 Hr16 Hr8 Hr0 Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid Hpid2 Hgen
+      with "[Hcont Hr24 Hr16 Hr8 Hr0 Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid Hpid2
              Hcwd Hnm Hof Hunits Hspare Hkst Hctx]" as "ZERO".
     { iIntros (CIDz Hsz0 me pgv).
       iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcpu Hpc Hpg Htf Hsz".
@@ -783,7 +783,7 @@ Section ProofFreeproc.
       iDestruct (cpu_own_transport CIDrel CIDzd ilvl eb pme false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDzd with "[]"); [ iPureIntro; wp_next_chain | ].
-      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid2 Hgen]
+      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid2]
                                   [Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hpg Htf]").
       { (* callee_saved mm E3 *)
         assert (HE3thr : fr_thr mm E3).
@@ -811,15 +811,15 @@ Section ProofFreeproc.
         iFrame "Hchan".
         iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
                 (mword_of_int 0 : mword 32).
-        iFrame "Hkilled Hxstate Hpid2 Hgen". }
+        iFrame "Hkilled Hxstate Hpid2". }
       { (* proc_dormant pa UNUSED, at the emptied V *)
         iApply (fp_to_dormant_unused pa
                   (MkPPriv (zero_reg : mword 64) (pv_upt V) (pv_tf V)
                            (pv_ofile V) (pv_fdg V) (pv_cwd V) (<[0%nat := (mword_of_int 0 : mword 8)]> (pv_name V))
-                           (pv_cwi V))
+                           (pv_cwi V) (pv_gen V) (pv_chg V))
                   (mword_of_int 0 : mword 32) (pv_sz V)
                   with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hpg] [Htf]").
-        - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
+        - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
           iSplitR.
           { iPureIntro. split_and!; [exact Hofv | exact Hcwdv |].
             rewrite uint_unsigned. unfold uvm_maxsz. vm_compute. discriminate. }

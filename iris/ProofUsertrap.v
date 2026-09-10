@@ -778,7 +778,7 @@ Section UtDispatch.
     (∀ n : Z, ut_sys_in n fdep sc (pv_tf (us_V U0)) U0 sts gn cs) -∗
     (* ...and fork's deposit, the ecall arm's alone too, at the frame the
        prologue leaves ([SpecUsertrap.ut_fork_in]) *)
-    ut_fork_in sc (<[tf_epc_idx := ret_pc ep]> (pv_tf (us_V U0))) U0 sts -∗
+    ut_fork_in fdep sc (<[tf_epc_idx := ret_pc ep]> (pv_tf (us_V U0))) U0 sts -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') SY.syscall_env) pt ksp m0
                      mie_v menvcfg0 U0 sts gn cs ep sc fdep) -∗

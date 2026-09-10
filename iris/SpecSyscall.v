@@ -144,6 +144,7 @@ Require Import SyscParkEnv. (* [sysc_park_extra] -- and the four rows it does no
 Require Import ParkCap.     (* [park_token] -- the park, as the resource fork hands down *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import ChildTok.         (* [child_tok] / [my_pay] -- fork's two pieces *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 Require Import UserPtTree.       (* [umem_wr] *)
@@ -401,14 +402,57 @@ Section SyscExec.
      depositing process cannot name it and the deposit is a family over
      every one the kernel might mint; a newly created process has no
      children ([UexecRet.uexec_fork_child_F]). *)
-  Definition sysc_fork_in (U : ustate) (sts : list fdstate) : iProp Σ :=
+  (* ...AND UNDER THE CHILD'S OWN PAYLOAD ([ChildTok.my_pay] of what the
+     depositing process's families chose): the parent undertakes that its
+     child is safe knowing what the child's exit owes, and the kernel pays
+     that knowledge out of the generation allocproc minted and kfork set
+     ([ChildTok.gen_split]).  [f] is here for that: it is what carries the
+     payload past the excursion, so the payload the child is told about
+     and the payload the parent's token comes back at are the same one. *)
+  Definition sysc_fork_in (f : sfam) (U : ustate) (sts : list fdstate)
+      : iProp Σ :=
     (⌜sysc_num (us_V U) = UsysMemOk.USYS_fork⌝ -∗
-       ∀ g' : gname, uslot (uvis_of (kfork_child U) sts g' ∅))%I.
+       ∀ g' : gname,
+         my_pay g' (sfork_pay f) -∗
+         uslot (uvis_of (kfork_child U) sts g' ∅))%I.
 
-  Lemma sysc_fork_in_ne (U : ustate) (sts : list fdstate) :
-    sysc_num (us_V U) <> UsysMemOk.USYS_fork -> ⊢ sysc_fork_in U sts.
+  Lemma sysc_fork_in_ne (f : sfam) (U : ustate) (sts : list fdstate) :
+    sysc_num (us_V U) <> UsysMemOk.USYS_fork -> ⊢ sysc_fork_in f U sts.
   Proof.
     intros Hne. rewrite /sysc_fork_in. iIntros "%Hc". exfalso. exact (Hne Hc).
+  Qed.
+
+  (* ===================================================================== *)
+  (* FORK'S ANSWER: the parent's quarter of the child's generation.        *)
+  (*                                                                       *)
+  (* The dispatcher's fork row, the kernel side of                          *)
+  (* [UexecRet.uexec_fork_parent_F].  kfork mints the child's generation   *)
+  (* at the payload this deposit chose and splits it three ways; the       *)
+  (* PARENT's quarter comes back here, at the pid the a0 slot now holds,   *)
+  (* together with the generation its children reading grew by.           *)
+  (* ===================================================================== *)
+  (* THE SET IS NOT IN THIS ROW.  What the parent's key resumes at --
+     [uvis_ch] grown by [γ] -- is a fact about the KEY THE TRAP LOOP
+     BUILDS, and the loop is what chooses it ([UexecApply.
+     uexec_ret_round_slot]'s fork answer): the children map under
+     <wait_lock> does not back the reading until WX-RES, so the kernel has
+     nothing to say about it here.  What it DOES have is the token, and
+     the generation the loop grows the set by is the one this row
+     names. *)
+  Definition sysc_fork_out (f : sfam) (U : ustate) (r : mword 64) : iProp Σ :=
+    (⌜sysc_num (us_V U) = UsysMemOk.USYS_fork⌝ -∗
+       (* THE TWO ARMS FORK HAS: it failed and returned -1, and there is no
+          child and no token; or it returned the child's pid and the
+          parent's quarter comes with it. *)
+       (⌜r = (mword_of_int (-1) : mword 64)⌝
+        ∨ ∃ (γ : gname) (pidv : mword 32),
+            ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
+            child_tok γ pidv (sfork_pay f)))%I.
+
+  Lemma sysc_fork_out_ne (f : sfam) (U : ustate) (r : mword 64) :
+    sysc_num (us_V U) <> UsysMemOk.USYS_fork -> ⊢ sysc_fork_out f U r.
+  Proof.
+    intros Hne. rewrite /sysc_fork_out. iIntros "%Hc". exfalso. exact (Hne Hc).
   Qed.
 
   (* the numbers that owe nothing, as one premise an arm discharges from its
@@ -547,7 +591,7 @@ Definition wp_syscall_sconf_body
      [sysc_sys_in] *)
   sysc_sys_in U sts gn cs f -∗
   (* ...and fork's, which is a SLOT and not a bundle -- see [sysc_fork_in] *)
-  sysc_fork_in U sts -∗
+  sysc_fork_in f U sts -∗
   (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
      TABLE ENTRY NOT RETURN WITHOUT THE CONTRACT SAYING WHICH ONE.
 
@@ -738,6 +782,8 @@ Definition wp_syscall_sconf_body
          are about; see [sysc_sys_out] *)
       sysc_sys_out U sts gn cs f (pv_tf (us_V U') !!! tf_arg_idx 0)
         (us_M U') sts' (pv_cwi (us_V U')) cs -∗
+      (* ...and FORK'S: the parent's child token -- see [sysc_fork_out] *)
+      sysc_fork_out f U (pv_tf (us_V U') !!! tf_arg_idx 0) -∗
       WP (Loop : expr riscv_lang))
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).

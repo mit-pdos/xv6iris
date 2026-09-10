@@ -272,7 +272,9 @@ Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
     (γs : list gname) (γw γc γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
-    (pid : mword 32) (U : ustate) (sts : list fdstate) (gn : gname)
+    (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (* THE GENERATION IS THE BLOCK'S FIELD, not a parameter: see
+       [ParkCap.park_cap]. *)
     (cs : gset gname) (av : nat)
     (* WHICH OF THE PACKAGE'S TWO MODES THE CALLER PAID.  A [true] package
        carries the parked record's RUN KEY -- the projection of the very [U]
@@ -309,8 +311,8 @@ Definition forkret_park_paid_body
      token only under a later. *)
   ⊢ own_context cur_ctx -∗
     forkret_park_pkg URes W γs γw γc γft γf γtl pa ks (pv_fdg (us_V U))
-      (pv_cwi (us_V U)) sts gn cs
-      (if steady then Some (uvis_of U [] gn cs) else None)
+      (pv_cwi (us_V U)) sts (pv_gen (us_V U)) cs
+      (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs) else None)
       pid av -∗
     ▷ W -∗
     is_kstack pa ks -∗
@@ -347,11 +349,11 @@ Module Type FORKRET_PARK_PAID.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
       (γs : list gname) (γw γc γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
-      (pid : mword 32) (U : ustate) (sts : list fdstate) (gn : gname)
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
       (cs : gset gname) (av : nat) (steady : bool),
       forkret_park_paid_body
         (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
-        γs γw γc γft γf γtl pa ks rest pid U sts gn cs av steady.
+        γs γw γc γft γf γtl pa ks rest pid U sts cs av steady.
   (* ...AND THE TOKEN, which is the park as every parker sees it
      ([ParkCap.park_token]): the cap above at [W := the token] plus the
      residue's channel, tied into the fixpoint.  This is the one entry the

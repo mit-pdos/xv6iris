@@ -40,6 +40,7 @@ Require Import WpMmodeLeafBase.
 Require Import UkLeaf.
 Require Import UserHeap.
 Require Import TsoCtx.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 Require Import WpUmodeBranch.
@@ -70,6 +71,9 @@ Section UkRunLeaf.
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
 
   (* ------------------------------------------------------------------- *)

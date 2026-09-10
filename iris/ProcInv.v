@@ -130,7 +130,7 @@ Qed.
 (* functional update of one fd slot -- fdalloc / sys_close / kexit. *)
 Definition upd_ofile (V : pprivate) (fd : nat) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (<[fd := v]> (pv_ofile V)) (pv_fdg V)
-          (pv_cwd V) (pv_name V) (pv_cwi V).
+          (pv_cwd V) (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V).
 
 (* THE ONE UPDATE THAT MOVES THE GHOST NAME: allocproc's mint.  A slot comes
    out of [proc_dormant] with whatever junk name its existential carried (a
@@ -140,11 +140,11 @@ Definition upd_ofile (V : pprivate) (fd : nat) (v : mword 64) : pprivate :=
    for why the name must not outlive the incarnation. *)
 Definition upd_fdg (V : pprivate) (g : gname) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) g (pv_cwd V) (pv_name V)
-          (pv_cwi V).
+          (pv_cwi V) (pv_gen V) (pv_chg V).
 
 Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv v (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
-          (pv_cwi V).
+          (pv_cwi V) (pv_gen V) (pv_chg V).
 
 (* functional update of the trapframe words -- what prepare_return does to
    the four KERNEL slots (kernel_satp / kernel_sp / kernel_trap /
@@ -153,13 +153,13 @@ Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
    only [pv_tf]'s contents move. *)
 Definition upd_tf (V : pprivate) (ws : list (mword 64)) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
-          (pv_cwi V).
+          (pv_cwi V) (pv_gen V) (pv_chg V).
 
 (* the descriptor moves, everything else stays -- what copyin / copyout /
    vmfault do to a process when they fault a page in ([uptd_ext], below). *)
 Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
   MkPPriv (pv_sz V) P (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
-          (pv_cwi V).
+          (pv_cwi V) (pv_gen V) (pv_chg V).
 
 (* [upd_cwd] and [upd_cwd_id] live in [ProcDefs], next to [pprivate]
    itself and to [proc_priv_bare_cwd], the borrow that needs them. *)
@@ -168,13 +168,14 @@ Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
    move, the scalar fields stay.  allocproc's move, once kalloc has produced
    the trapframe page and proc_pagetable the table. *)
 Definition upd_pt (V : pprivate) (P : uptd) (ws : list (mword 64)) : pprivate :=
-  MkPPriv (pv_sz V) P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V) (pv_cwi V).
+  MkPPriv (pv_sz V) P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V) (pv_cwi V)
+          (pv_gen V) (pv_chg V).
 
 (* the 16 debug-name bytes -- kfork's [safestrcpy(np->name, p->name, 16)] and
    kexec's [safestrcpy(p->name, last, 16)]. *)
 Definition upd_name (V : pprivate) (ns : list (bv 8)) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) ns
-          (pv_cwi V).
+          (pv_cwi V) (pv_gen V) (pv_chg V).
 
 (* EXEC'S MOVE: a process REPLACES its address space.  The size, the
    descriptor, the trapframe words and the name all change at once; the
@@ -185,7 +186,8 @@ Definition upd_name (V : pprivate) (ns : list (bv 8)) : pprivate :=
    KexecDefs's success arm readable. *)
 Definition upd_exec (V : pprivate) (szv : mword 64) (P : uptd)
     (ws : list (mword 64)) (ns : list (bv 8)) : pprivate :=
-  MkPPriv szv P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) ns (pv_cwi V).
+  MkPPriv szv P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) ns (pv_cwi V)
+          (pv_gen V) (pv_chg V).
 
 Lemma upd_exec_compose (V : pprivate) (szv : mword 64) (P : uptd)
     (ws : list (mword 64)) (ns : list (bv 8)) :
@@ -1532,7 +1534,7 @@ Section ProcInv.
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iFrame "Hcwd". iIntros (v') "Hcwd".
     rewrite /proc_priv_nocwd /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
@@ -1563,7 +1565,7 @@ Section ProcInv.
     iDestruct "Hpid" as "[Hq1 Hq2]".
     iFrame "Hcwd Hq1". iIntros (v') "Hcwd Hq1".
     rewrite /proc_priv_nocwd /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
     iSplitR; [done|]. iSplitR; [done|].
     rewrite Hq ctx_word4_pointsto_frac_split. iFrame "Hq1 Hq2".
     iSplitL "Hsz Hcwd Hnm".
@@ -1699,7 +1701,7 @@ Section ProcInv.
     iDestruct (proc_priv_nocwd_intro γf pa pid U P ws Hsz Hbel
                  with "Hpid Hf Hpt Htf Ho") as "H".
     iApply proc_priv_split_cwd. iFrame "H Hft".
-    by cbn [upd_pt pv_cwd pv_fdg pv_cwi].
+    by cbn [upd_pt pv_cwd pv_fdg pv_cwi pv_gen pv_chg].
   Qed.
 
   (* ---- projections: what callers actually use ---- *)
@@ -1787,7 +1789,7 @@ Section ProcInv.
     iIntros (v' z') "Hcwd Hc".
     rewrite /proc_priv /proc_priv_core /proc_fields.
     cbn [us_cwi us_cwd upd_usV us_V us_M upd_cwi upd_cwd
-         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
+         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|].
     iFrame "Hpid".
@@ -1851,7 +1853,7 @@ Section ProcInv.
     iIntros (v' z') "Hcwd Hc Hq1".
     rewrite /proc_priv /proc_priv_core /proc_fields.
     cbn [us_cwi us_cwd upd_usV us_V us_M upd_cwi upd_cwd
-         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
+         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|].
     rewrite Hq ctx_word4_pointsto_frac_split. iFrame "Hq1 Hq2".
@@ -2630,7 +2632,7 @@ Section ProcInv.
     iDestruct (fd_frags_of_closed γd with "Hfrag") as "Hfrag".
     iModIntro. iFrame "Hctx Hpg Htf Hsp Hir Hbs Hkst".
     iExists (upd_fdg V γd), pid.
-    cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi].
+    cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi pv_gen pv_chg].
     iSplit; [done|]. iFrame "Hpid Hf".
     iSplitR "Hfrag"; [| rewrite /fdt0; iExact "Hfrag"].
     iDestruct (fd_st_closed_to_any γd (replicate NOFILE (zero_reg : mword 64))

@@ -1667,7 +1667,7 @@ Section UservecAllPt.
          [g]'s registers, and both frames name [ret_pc sepc_v] as the epc.
          The record's other four projections are the same record's. *)
       match goal with
-      | |- environments.envs_entails _ (SpecUsertrap.ut_fork_in _ ?TF ?UU _) =>
+      | |- environments.envs_entails _ (SpecUsertrap.ut_fork_in _ _ ?TF ?UU _) =>
           assert (Hlf : length TF = TFWORDS)
             by (cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf]; reflexivity);
           assert (Hueqf : TfUser.tf_ueq (tf_of g (ret_pc sepc_v)) TF)
@@ -1677,7 +1677,7 @@ Section UservecAllPt.
                 intros i Hi;
                 do 36 (destruct i as [| i]; [ first [ reflexivity | lia ] | ]);
                 lia);
-          iApply (ut_fork_in_ueq sc_v (tf_of g (ret_pc sepc_v)) TF
+          iApply (ut_fork_in_ueq _ sc_v (tf_of g (ret_pc sepc_v)) TF
                     (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU sts
                     (tf_of_length g (ret_pc sepc_v)) Hlf Hueqf
                     eq_refl eq_refl eq_refl eq_refl
@@ -1689,7 +1689,7 @@ Section UservecAllPt.
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
       "%Huptpt2 %Hrd2 %Hfdk2 %Hfde2 %Hpipe2 %Hpcret
        %Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
-       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2 Hxo2 Hso2".
+       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2 Hxo2 Hfo2 Hso2".
     (* x0 IS ZERO in the file usertrap handed back -- the one fact the
        register-file tie below needs of the base ([UexecRet.userret_gpr_x0]). *)
     iDestruct (gpr_file_x0 mf (mword_of_int 0) ltac:(vm_compute; reflexivity)
@@ -1846,7 +1846,7 @@ Section UservecAllPt.
                 deferred to a goal, [?U'] is already resolved by the time the
                 (purely iota) conversion is checked. *)
              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
-                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2 Hcreds2 [Hxo2] [Hso2]").
+                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2 Hcreds2 [Hxo2] [Hfo2] [Hso2]").
     - (* the descriptor the residue is keyed at IS the one handed over *)
       reflexivity.
     - (* THE ROUND, read at the machine that trapped.  usertrap's [tf0] is
@@ -1872,13 +1872,13 @@ Section UservecAllPt.
         cbn [us_V pv_sz us_upt upd_upt upd_usV upd_usM us_tf upd_tf].
         reflexivity.
       + (* ...nor the cwd's inum *)
-        cbn [us_V pv_cwi us_upt upd_upt upd_usV upd_usM us_tf upd_tf].
+        cbn [us_V pv_cwi us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen pv_chg].
         reflexivity.
       + cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hws1.
       + cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf].
         rewrite Huptpt2. reflexivity.
       + cbn [us_V pv_sz us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
-      + cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
+      + cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg]. reflexivity.
     - (* THE ROUND'S DESCRIPTOR HALF, forwarded verbatim: this boundary
          moves no descriptor state of its own -- it saves and restores a
          trapframe -- so whatever usertrap certified about the states is
@@ -1936,10 +1936,17 @@ Section UservecAllPt.
                     ltac:(cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf];
                           rewrite Huptpt2; reflexivity)
                     eq_refl
-                    ltac:(cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf];
+                    ltac:(cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg];
                           reflexivity)
                     with "Hxo2")
       end.
+    - (* FORK'S ANSWER, across the same two moves.  The row reads the entry
+         frame only through its a7 word, and the save walk left the two
+         frames agreeing on it ([SpecUsertrap.ut_fork_out_num_cong]). *)
+      iApply (SpecUsertrap.ut_fork_out_cong with "Hfo2").
+      + cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf].
+        unfold UsysMemOk.usys_num, tf_arg_idx, tf_of. reflexivity.
+      + cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
     - (* THE SYSCALL CHANNEL'S ANSWER, across the same two moves.  The row's
          KEY is the entry one on both sides -- usertrap ran at the record
          this boundary named, so the six rows of

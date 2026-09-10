@@ -111,6 +111,8 @@ Require Import UserPerm.     (* [uperm] / [perm_of] *)
 Require Import FdSlots.      (* [fdstate] -- the descriptor view in the key *)
 Require Import ProcDefs.     (* [ustate] / [us_V] / [us_M] -- the kernel record
                                 the RUN KEY below is matched against *)
+Require Import ChildTok.     (* [child_tok] / [my_pay] -- fork's two pieces of
+                                the child's generation *)
 Require Import UexecSG.      (* [uexecSG]: [sbundle_at] / [spost_at] / [ssupply] --
                                 the per-syscall DEPOSIT the returning arm
                                 carries; see that file's header *)
@@ -637,6 +639,11 @@ End TrappedMachine.
 Section UexecRet.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
+  (* [ChildTok.ctokG]: fork's two rows below hold pieces of the child's
+     generation.  A kernel-side file binding [Xv6G.xv6G] gets it through
+     the bundle and must NOT bind it again; a U-tier file that binds no
+     bundle names it here. *)
+  Context `{!ctokG Σ}.
   Context `{GEN : GenId}.
   (* THE DEPOSIT CLASS.  The returning-syscall arm carries the process's
      bundle for the number it is at and hands the syscall's armed post back
@@ -664,8 +671,27 @@ Section UexecRet.
   (* guards that make the copy a fact the program LEARNS.                  *)
   (* ------------------------------------------------------------------- *)
 
-  (* the parent's arm: a NONZERO return, the key it trapped at bumped *)
-  Definition uexec_fork_parent_F (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
+  (* WHAT FORK ANSWERS ITS PARENT, in the two arms fork actually has.  A
+     fork FAILS -- no slot, or no memory for the child's address space --
+     and then it returns -1, no process was created and the caller's
+     children reading does not move.  It SUCCEEDS, and then the child's
+     generation joins that reading and the parent is handed
+     [ChildTok.child_tok] at the payload its families chose
+     ([UexecSG.sfork_pay]) -- the quarter a later wait() redeems
+     ([ChildTok.gen_pay]).  Both arms are NONZERO, which is what lets the
+     arm below stay guarded on [r <> 0] alone. *)
+  Definition ufork_ans (Q : Z -> iProp Σ) (r : mword 64)
+      (cs cs' : gset gname) : iProp Σ :=
+    (⌜r = (mword_of_int (-1) : mword 64) /\ cs' = cs⌝
+     ∨ ∃ (γ : gname) (pidv : mword 32),
+         ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
+         ⌜cs' = cs ∪ {[γ]}⌝ ∗
+         child_tok γ pidv Q)%I.
+
+  (* the parent's arm: a NONZERO return, the key it trapped at bumped, and
+     fork's answer at that return value. *)
+  Definition uexec_fork_parent_F (X : uvis -d> iPropO Σ) (W : uvis)
+      (Q : Z -> iProp Σ) : iProp Σ :=
     (∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname),
         (* THE GUARD IS FREE.  <allocpid> allocates every pid in
            [1, PIDMAX] under <pid_lock> and a failed fork returns -1, so
@@ -686,13 +712,14 @@ Section UexecRet.
         ⌜fdv' = uvis_fd W⌝ -∗
         (* ...NOR ITS WORKING DIRECTORY: fork does not chdir. *)
         ⌜cw' = uvis_cwd W⌝ -∗
-        (* ...AND ITS CHILDREN SET IS UNMOVED, THIS LANE.  fork adds the
-           child's generation to it, and the arm that says so is WX-FORK's:
-           the parent's half of the child token and the set that grows with
-           it arrive together, because neither is worth anything alone.
-           Until then the quiet row, spelled the way the other two are so
-           that the arm's shape does not move when the semantics do. *)
-        ⌜cs' = uvis_ch W⌝ -∗
+        (* ...AND FORK'S ANSWER, which is where the children reading moves:
+           on the success arm the set grows by the child's generation and
+           the token comes with it, because neither is worth anything
+           alone.  The RESOURCE behind the reading -- the row of the
+           <wait_lock> children map, [WaitInv.ch_frag] -- rides the
+           kernel's residue only from lane WX-RES on; until then the
+           grown set is the key the trap loop builds. *)
+        ufork_ans Q r (uvis_ch W) cs' -∗
         X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv' cw'
              (uvis_gen W) cs'))%I.
 
@@ -709,15 +736,30 @@ Section UexecRet.
      safe at whichever one the kernel mints, and the round learns the
      actual name from kfork's post.  The child has no children of its own
      at the moment it is created, so its set is [∅] on the nose. *)
-  Definition uexec_fork_child_F (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
+  (* ...AND IT LEARNS ITS OWN PAYLOAD.  [my_pay g' Q] is the child's
+     persistent knowledge of what its exit owes its parent; the kernel
+     hands it over out of the split it made at the fork
+     ([ChildTok.gen_split]), and a verified child needs it to prove its own
+     exit.  A generic child ignores it. *)
+  Definition uexec_fork_child_F (X : uvis -d> iPropO Σ) (W : uvis)
+      (Q : Z -> iProp Σ) : iProp Σ :=
     (∀ g' : gname,
+       my_pay g' Q -∗
        X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
             (uvis_fd W) (uvis_cwd W) g' ∅))%I.
 
-  (* the two together: what a program proves at a fork ecall *)
-  Definition uexec_fork_F (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
-    (uexec_fork_parent_F X W ∗
+  (* the two together: what a program proves at a fork ecall, AT THE
+     FAMILIES IT CHOSE.  The child's leg is under [my_pay] of the very
+     payload the parent's leg gets its token at ([UexecSG.sfork_pay f]):
+     the process undertakes that its child is safe KNOWING what its own
+     exit will owe, and the kernel supplies that knowledge out of the
+     generation it minted ([ChildTok.gen_split]).  Persistent, so it costs
+     the child nothing to carry into every later trap. *)
+  Definition uexec_fork_F (X : uvis -d> iPropO Σ) (W : uvis) (f : sfam)
+      : iProp Σ :=
+    (uexec_fork_parent_F X W (sfork_pay f) ∗
      (∀ (fdv' : list fdstate) (cw' : Z) (g' : gname),
+        my_pay g' (sfork_pay f) -∗
         (* THE CHILD'S TABLE IS THE PARENT'S.  fork() copies it --
            [np->ofile[i] = filedup(p->ofile[i])] -- and this is the arm
            that says so.  It used to say only [length fdv' = NOFILE], a
@@ -742,26 +784,30 @@ Section UexecRet.
              fdv' cw' g' ∅)))%I.
 
   (* the guarded child conjunct and the one record, each way *)
-  Lemma uexec_fork_child_of (X : uvis -d> iPropO Σ) (W : uvis) :
+  Lemma uexec_fork_child_of (X : uvis -d> iPropO Σ) (W : uvis)
+      (Q : Z -> iProp Σ) :
     (∀ (fdv' : list fdstate) (cw' : Z) (g' : gname),
+       my_pay g' Q -∗
        ⌜fdv' = uvis_fd W⌝ -∗ ⌜cw' = uvis_cwd W⌝ -∗
        X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
             fdv' cw' g' ∅)) -∗
-    uexec_fork_child_F X W.
+    uexec_fork_child_F X W Q.
   Proof.
-    iIntros "H". rewrite /uexec_fork_child_F. iIntros (g').
-    iApply ("H" $! (uvis_fd W) (uvis_cwd W) g' with "[%] [%]"); reflexivity.
+    iIntros "H". rewrite /uexec_fork_child_F. iIntros (g') "Hp".
+    iApply ("H" $! (uvis_fd W) (uvis_cwd W) g' with "Hp [%] [%]"); reflexivity.
   Qed.
 
-  Lemma uexec_fork_child_to (X : uvis -d> iPropO Σ) (W : uvis) :
-    uexec_fork_child_F X W -∗
+  Lemma uexec_fork_child_to (X : uvis -d> iPropO Σ) (W : uvis)
+      (Q : Z -> iProp Σ) :
+    uexec_fork_child_F X W Q -∗
     (∀ (fdv' : list fdstate) (cw' : Z) (g' : gname),
+       my_pay g' Q -∗
        ⌜fdv' = uvis_fd W⌝ -∗ ⌜cw' = uvis_cwd W⌝ -∗
        X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
             fdv' cw' g' ∅)).
   Proof.
-    rewrite /uexec_fork_child_F. iIntros "H" (fdv' cw' g') "-> ->".
-    iApply "H".
+    rewrite /uexec_fork_child_F. iIntros "H" (fdv' cw' g') "Hp -> ->".
+    iApply ("H" with "Hp").
   Qed.
 
   (* the returning arm's CONTINUATION: the four pure rows, the syscall's
@@ -836,7 +882,7 @@ Section UexecRet.
     (if decide (sc = uecall_scause) then
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
-       else if decide (n = USYS_fork) then uexec_fork_parent_F X W
+       else if decide (n = USYS_fork) then uexec_fork_parent_F X W (sfork_pay f)
        else uexec_ret_cont_F X n f W
      else X W)%I.
 
@@ -852,7 +898,7 @@ Section UexecRet.
     (if decide (sc = uecall_scause) then
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
-       else if decide (n = USYS_fork) then uexec_fork_child_F X W
+       else if decide (n = USYS_fork) then uexec_fork_child_F X W (sfork_pay f)
        else sbundle_at X n f W
      else emp)%I.
 
@@ -867,7 +913,7 @@ Section UexecRet.
     (if decide (sc = uecall_scause) then
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
-       else if decide (n = USYS_fork) then uexec_fork_F X W
+       else if decide (n = USYS_fork) then (∃ f : sfam, uexec_fork_F X W f)
        else (∃ f : sfam, sbundle_at X n f W ∗ uexec_ret_cont_F X n f W)
      else X W)%I.
 
@@ -1001,7 +1047,7 @@ Section UexecRet.
   Local Instance uslot_F_contractive : Contractive uslot_F.
   Proof.
     rewrite /uslot_F /uvb_F /ukont_F /ukb_F /uexec_ret_F /uexec_fork_F
-            /uexec_fork_parent_F /uexec_ret_cont_F.
+            /uexec_fork_parent_F /ufork_ans /uexec_ret_cont_F.
     solve_contractive_wide.
   Qed.
 
@@ -1176,14 +1222,20 @@ Section UexecRet.
     (let n := usys_num (uvis_tf W) in
      if decide (n = USYS_exit) then emp
      else if decide (n = USYS_fork) then
-       ((∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname),
+       (* FORK'S TWO LEGS, AT THE FAMILIES THE PROCESS CHOSE -- which is
+          where its child's EXIT PAYLOAD lives ([UexecSG.sfork_pay]).  The
+          parent's leg gets the child token at that payload; the child's
+          leg is deposited under [ChildTok.my_pay] of the very same one. *)
+       (∃ f : sfam,
+        (∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname),
            ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
            ⌜fdv' = uvis_fd W⌝ -∗
            ⌜cw' = uvis_cwd W⌝ -∗
-           ⌜cs' = uvis_ch W⌝ -∗
+           ufork_ans (sfork_pay f) r (uvis_ch W) cs' -∗
            uslot (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv' cw'
                     (uvis_gen W) cs')) ∗
         (∀ (fdv' : list fdstate) (cw' : Z) (g' : gname),
+           my_pay g' (sfork_pay f) -∗
            ⌜fdv' = uvis_fd W⌝ -∗
            ⌜cw' = uvis_cwd W⌝ -∗
            uslot (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
@@ -1226,7 +1278,7 @@ Section UexecRet.
     uexec_arm sc W f ⊣⊢
     (let n := usys_num (uvis_tf W) in
      if decide (n = USYS_exit) then emp
-     else if decide (n = USYS_fork) then uexec_fork_parent_F uslot W
+     else if decide (n = USYS_fork) then uexec_fork_parent_F uslot W (sfork_pay f)
      else uexec_ret_cont_F uslot n f W).
   Proof.
     intros ->. rewrite /uexec_arm /uexec_arm_F.
@@ -1273,8 +1325,8 @@ Section UexecRet.
        collapse by reflexivity on the way down
        ([uexec_fork_child_of]). *)
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { iDestruct "H" as "[Hp Hc]". iExists sfam_pt. iSplitL "Hc";
-        [ iApply (uexec_fork_child_of X W with "Hc") | iExact "Hp" ]. }
+    { iDestruct "H" as (f) "[Hp Hc]". iExists f. iSplitL "Hc";
+        [ iApply (uexec_fork_child_of X W (sfork_pay f) with "Hc") | iExact "Hp" ]. }
     iDestruct "H" as (f) "[Hd Ha]". iExists f. iFrame "Hd Ha".
   Qed.
 
@@ -1289,7 +1341,8 @@ Section UexecRet.
     (* ...and joins back: the deposit's one record re-guards
        ([uexec_fork_child_to]) *)
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { iSplitL "Ha"; [ iExact "Ha" | iApply (uexec_fork_child_to X W with "Hd") ]. }
+    { iExists f. iSplitL "Ha";
+        [ iExact "Ha" | iApply (uexec_fork_child_to X W (sfork_pay f) with "Hd") ]. }
     iExists f. iFrame "Hd Ha".
   Qed.
 
@@ -1319,7 +1372,7 @@ Section UexecRet.
        has at every record *)
     destruct (decide (usys_num (uvis_tf W) = USYS_fork));
       [iModIntro; iExists sfam_pt; rewrite /uexec_fork_child_F;
-       iIntros (g'); iApply "Hall" |].
+       iIntros (g') "_"; iApply "Hall" |].
     iApply (sbundle_of_supply X (usys_num (uvis_tf W)) W with "Hsup Hall").
   Qed.
 
@@ -1332,7 +1385,8 @@ Section UexecRet.
     destruct (decide (sc = uecall_scause)); [ | iApply "H" ].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { rewrite /uexec_fork_parent_F. iIntros (r fdv' cw' cs' _ _ _ _). iApply "H". }
+    { rewrite /uexec_fork_parent_F.
+      iIntros (r fdv' cw' cs' _ _ _) "_". iApply "H". }
     rewrite /uexec_ret_cont_F.
     iIntros (r M' π' szv' fdv' cw' g' cs' _ _ _ _ _ _) "_". iApply "H".
   Qed.
@@ -1372,6 +1426,7 @@ Global Typeclasses Opaque uslot uvb.
 Section UexecRetGen.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
+  Context `{!ctokG Σ}.
   Context `{GEN : GenId}.
   Context `{SG : uexecSG Σ}.
 

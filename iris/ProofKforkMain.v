@@ -161,6 +161,7 @@ Require Import ProofKforkB7.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
+Require Import ChildTok.  (* [gen_set] / [gen_split] -- fork's mint *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
@@ -249,6 +250,9 @@ Section KforkArms.
       (pid_p : mword 32) (Up : ustate)
       (sp0 ra0 s00 s10 s50 : mword 64) (npa : mword 64) (j : nat)
       (pid_c : mword 32) (ch : mword 64) (Uc : ustate) (stsP : list fdstate)
+      (* the payload, threaded to [kfork_post] and read by nothing on this
+         arm: fork FAILED here, so no generation was split *)
+      (Q : Z -> iProp Σ)
       (Mt : regfile) (lks : gset string) :
     (52 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
@@ -303,7 +307,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γf lvl eb pme b pid_p Up stsP K mr
+        kfork_post γf lvl eb pme b pid_p Up stsP Q K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -366,6 +370,8 @@ Section KforkArms.
  (γf : gname) 
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
+      (* the payload -- see [kfork_arm2]: nothing on this arm reads it *)
+      (Q : Z -> iProp Σ)
       (sp0 ra0 s00 s10 s50 : mword 64) (Mt : regfile) (lks : gset string) :
     (8 <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 -> m !!! Regidx Rs0 = s00 ->
@@ -391,7 +397,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γf lvl eb pme b pid_p Up stsP K mr
+        kfork_post γf lvl eb pme b pid_p Up stsP Q K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -460,6 +466,10 @@ Section KforkArms.
       (sp0 ra0 s00 s10 s50 : mword 64)
       (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
       (pid_c : mword 32) (ch : mword 64) (Uc' : ustate) (stsP : list fdstate)
+      (* THE CHILD'S EXIT PAYLOAD, the depositing process's choice
+         ([UexecSG.sfork_pay]): this arm writes it onto the generation
+         allocproc minted and splits ([ChildTok.gen_split]). *)
+      (Q : Z -> iProp Σ)
       (tfsrc tfdst : mword 44) (lks : gset string) :
     (56 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
@@ -518,6 +528,11 @@ Section KforkArms.
        it, and hands it back with the block. *)
     FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Up)) stsP -∗
     proc_priv_nocwd γf npa pid_c Uc' -∗
+    (* THE CHILD'S GENERATION, WHOLE -- allocproc minted it, and this arm
+       is where the forking process's choice of payload is written onto it
+       and the three pieces cut ([ChildTok.gen_set] / [gen_split]). *)
+    ChildTok.gen_own (pv_gen (us_V Uc')) (DfracOwn 1) npa pid_c
+      (fun _ => True)%I -∗
     (* the child's descriptor-state fragments, minted with its block by
        allocproc AT [fdt0]: the scan retypes them one at a time, at the
        parent's own entries, and the whole table goes into the child's
@@ -559,12 +574,12 @@ Section KforkArms.
        which this proof re-keys onto the record the child is actually parked
        at.  LINEAR, unlike the two rows above it: see [SpecKfork]'s premise
        of the same name. *)
-    (∀ g' : gname, uslot (uvis_of (kfork_child Up) stsP g' ∅)) -∗
+    (∀ γ : gname, my_pay γ Q -∗ uslot (uvis_of (kfork_child Up) stsP γ ∅)) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γf lvl eb pme b pid_p Up stsP K mr
+        kfork_post γf lvl eb pme b pid_p Up stsP Q K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -573,7 +588,7 @@ Section KforkArms.
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
       Hofnull Hcwdnull Hpidc Hshsz Hshimg Hshperm Hbelow.
     subst tfsrc tfdst.
-    iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag HCpriv Hcfrag #Hmk
+    iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag HCpriv Hcgen Hcfrag #Hmk
              Hheld Hhart Hfd Hbsl Hkst Hctxex Hpay Hkalloc #Hwlock #Hft
              Hitb Hitinv #Hireg Hirs #Hfdone #Hworld #Htoken Hjslot Hcont".
     iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
@@ -650,7 +665,7 @@ Section KforkArms.
     iSpecialize ("Hb3app" with "Htext Hft").
     iSpecialize ("Hb3app" $! 0%nat Mx
       with "[%] [%] [Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                     Hheld Hhart Hfd Hbsl Hkst Hpay Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Hjslot Hcont]
+                     Hheld Hhart Hfd Hbsl Hkst Hpay Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Hjslot Hcgen Hcont]
             Hcg Hcpu Hpc Hpv [HCpriv] Hpfrag Hcfrag").
     - unfold NOFILE. lia.
     - split_and!.
@@ -709,15 +724,18 @@ Section KforkArms.
       assert (Hshperm' : perm_of (ud_um (pv_upt (us_V Uc'))) (uint (pv_sz (us_V Uc')))
                          = perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))))
         by (rewrite Hshsz; exact Hshperm).
-      (* THE CHILD'S GENERATION IS A PLACEHOLDER until the slot's
-         generation cell exists (WAIT-EXIT K4(a)): the caller's deposit is
-         a FAMILY over every name allocproc might mint, so this proof may
-         instantiate it at any one, and nothing reads it.  Then it is the
-         name allocproc minted, read off [SchedCtx.proc_pub]. *)
+      (* THE CHILD'S GENERATION IS THE ONE ALLOCPROC MINTED, and the key is
+         built at the BLOCK's field: every step between allocproc and here
+         is an [upd_*] that preserves it, so the park -- which keys the
+         child's slot at [ProcDefs.pv_gen] ([ParkCap.park_cap]) -- and the
+         caller's deposit meet at this one name. *)
+      assert (Hcgn4 : pv_gen Vc4 = pv_gen (us_V Uc')).
+      { destruct HVc4 as (_ & _ & _ & _ & _ & _ & _ & _ & Hg & _).
+        rewrite Hg. rewrite /kfk_childV /V2 /V1. reflexivity. }
       assert (Hurun : urun_eq
-                        (uvis_of (kfork_child Up) stsP (inhabitant : gname) ∅)
+                        (uvis_of (kfork_child Up) stsP (pv_gen Vc4) ∅)
                         (MkUstate Vc4 ((us_M Uc')))).
-      { destruct HVc4 as (Hs & Hu & Ht & _ & _ & _ & _ & Hc).
+      { destruct HVc4 as (Hs & Hu & Ht & _ & _ & _ & _ & Hc & _ & _).
         apply urun_eq_kfork_child.
         - exact Ht.
         - exact Hshimg.
@@ -729,11 +747,24 @@ Section KforkArms.
          own [b = match lvl ...] premise) rather than as the [match] itself:
          the in-lock index we are handing it is spelled [trap_res b + (K - 8)],
          and B5's entry index has to be syntactically that. *)
-      iSpecialize ("Hjslot" $! (inhabitant : gname)).
+      (* FORK'S CHOICE, AND THE SPLIT.  The payload is the depositing
+         process's ([UexecSG.sfork_pay], relayed here as [Q]); the
+         generation allocproc minted is set to it and cut in three -- the
+         PARENT's quarter goes back in [kfork_post]'s pid arm, the CHILD's
+         persistent [ChildTok.my_pay] pays the slot premise, and the
+         KERNEL's quarter is dropped here: WX-EXIT is what gives it a home
+         in the ZOMBIE escrow. *)
+      iApply fupd_wp.
+      iMod (gen_set (pv_gen (us_V Uc')) npa pid_c (fun _ => True)%I Q
+              with "Hcgen") as "Hcgen".
+      iMod (gen_split with "Hcgen") as "(Htok & _ & #Hmp)".
+      iModIntro.
+      iEval (rewrite -Hcgn4) in "Hmp".
+      iSpecialize ("Hjslot" $! (pv_gen Vc4) with "Hmp").
       iApply (B5.kfk_b5 γs γf γw γc γl γl2 j mf4 K lvl eb b
                 pme ks pid_c (MkUstate Vc4 ((us_M Uc'))) stsP
-                (inhabitant : gname) ∅
-                (uvis_of (kfork_child Up) stsP (inhabitant : gname) ∅) ch rest
+                ∅
+                (uvis_of (kfork_child Up) stsP (pv_gen Vc4) ∅) ch rest
                 (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 Hurun eq_refl eq_refl eq_refl
@@ -770,16 +801,17 @@ Section KforkArms.
       iDestruct (cpu_own_transport CID5 CID6 lvl eb pme b Hcross6 with "Hown5") as "Hown5".
       iSpecialize ("Hcont" $! CID6 with "[%]").
       { intros Hdisj. transitivity CID5; [exact (Hcross6 Hdisj) | exact (Hcross5 Hdisj)]. }
-      iApply ("Hcont" $! mr with "[%] Hpc6 [Hsc6 Hown5 Hpvx4 Hpfrag Hkalloc]").
+      iApply ("Hcont" $! mr with "[%] Hpc6 [Hsc6 Hown5 Hpvx4 Hpfrag Hkalloc Htok]").
       + exact Hcsm.
       + rewrite /kfork_post.
         iSplitL "Hsc6"; [iExact "Hsc6" |].
         iSplitL "Hown5"; [iExact "Hown5" |].
         iSplitL "Hpvx4"; [iExact "Hpvx4" |].
         iSplitL "Hpfrag"; [iExact "Hpfrag" |].
-        iFrame "Hkalloc". iRight. iExists pid_c. iSplit; iPureIntro.
-        * rewrite Hrv. reflexivity.
-        * exact Hpidc.
+        iFrame "Hkalloc". iRight. iExists pid_c, (pv_gen (us_V Uc')).
+        iSplitR; [iPureIntro; rewrite Hrv; reflexivity |].
+        iSplitR; [iPureIntro; exact Hpidc |].
+        iExact "Htok".
     - rewrite kfk_childU_0. iExact "HCpriv".
     - iApply "Hb3app".
   Qed.
@@ -817,10 +849,11 @@ Section KforkMain.
  (γp γw γc γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
+      (Q : Z -> iProp Σ)
       (lks : gset string)
  :
     wp_kfork_sconf_body γp γw γc γl γf γs
- m lvl K eb pme b pid_p Up stsP lks.
+ m lvl K eb pme b pid_p Up stsP Q lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl Hbelow.
@@ -838,7 +871,7 @@ Section KforkMain.
                  (∀ mr : regfile,
                     ⌜ callee_saved m mr ⌝ -∗
                     pc_is (ret_pc (m !!! Regidx Rra)) -∗
-                    kfork_post γf lvl eb pme b pid_p Up stsP
+                    kfork_post γf lvl eb pme b pid_p Up stsP Q
                       K mr (mr !!! Regidx Ra0) lks -∗
                     WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
@@ -854,7 +887,7 @@ Section KforkMain.
          [kfork_post] state [kalloc_env_at] once instead of per-arm. *)
       iAssert (kalloc_env_at fsc_kalloc fsc_kpages None) with "[Hke]" as "Hke".
       { iDestruct "Hke" as "[$ | (% & _ & $)]". }
-      iApply (kfork_arm1 (CID0 := CID1) γf m K lvl eb b pme pid_p Up stsP
+      iApply (kfork_arm1 (CID0 := CID1) γf m K lvl eb b pme pid_p Up stsP Q
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5) Mt lks
                 (wpk_K_ge8 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
@@ -871,7 +904,7 @@ Section KforkMain.
       iApply (kfork_arm2 (CID0 := CID2) γp γf γl2 γs m K lvl eb b pme
                 pid_p Up (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
-                npa j pid_c ch (MkUstate Vc Mc) stsP Mt lks
+                npa j pid_c ch (MkUstate Vc Mc) stsP Q Mt lks
                 (wpk_K_ge52 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp ltac:(rewrite HMts4 Hnpa; reflexivity) Hnpa HjN Hgamma
@@ -888,7 +921,7 @@ Section KforkMain.
       iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Uc' tfsrc tfdst).
       destruct Uc' as [Vc' Mc].
       iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures %Hshare".
-      iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcfrag #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
+      iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcgen Hcfrag #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
                Hke #Hwl #Hft #Hit #Hiti HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn & Hpidc).
       destruct Hshare as (Hshsz & Hshimg & Hshperm).
@@ -897,12 +930,12 @@ Section KforkMain.
  m K lvl eb b pme
                 pid_p Up (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
-                Mt npa j γl2 pid_c ch (MkUstate Vc' Mc) stsP tfsrc tfdst lks
+                Mt npa j γl2 pid_c ch (MkUstate Vc' Mc) stsP Q tfsrc tfdst lks
                 (wpk_K_ge56 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn Hpidc Hshsz Hshimg Hshperm ltac:(lkbelow)
-                with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag HCp Hcfrag Hmk Hheld Hhart
+                with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag HCp Hcgen Hcfrag Hmk Hheld Hhart
                       Hfd Hbsl Hkst Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone Hworld Htoken Hjslot
                       [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument

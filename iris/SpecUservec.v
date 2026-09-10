@@ -122,6 +122,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Require Import UmodeText.   (* [user_ptm_inv_x] -- the image STAMPED (icache) *)
+Require Import ChildTok.  (* [child_tok] -- fork's answer, forwarded *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -357,6 +358,9 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
     ut_exec_out sc_v (tf_of g (ret_pc sepc_v)) M
       (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
       (uint (pv_sz (us_V U))) U' sts sts' gn cs -∗
+    (* ...AND FORK'S, forwarded the same way -- [SpecUsertrap.ut_fork_out] *)
+    ut_fork_out f sc_v (tf_of g (ret_pc sepc_v))
+      (pv_tf (us_V U') !!! tf_arg_idx 0) -∗
     (* ...AND THE SYSCALL CHANNEL'S, forwarded at this boundary's own entry
        key -- the same one the deposit went down at
        ([wp_uservec_pt_body]'s pre row below) -- and read at the a0 word of
@@ -491,7 +495,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} 
   (* ...and FORK'S deposit, which is a SLOT and not a bundle: the child's
      continuation, at the key the saved frame bumps to
      ([SpecUsertrap.ut_fork_in]) *)
-  ut_fork_in sc_v (tf_of g (ret_pc sepc_v))
+  ut_fork_in f sc_v (tf_of g (ret_pc sepc_v))
     (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts -∗
   wp_next true (proc_addr j) (fun CID' : CpuId =>
     uservec_post (CID := CID') (URes CID') C pt vksp U M g sts gn cs

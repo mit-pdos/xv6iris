@@ -435,7 +435,7 @@ Section ProofUserinit.
         rewrite avail_sub_Some in Hz0. unfold avail_zero in Hz0.
         exfalso. lia. }
     iDestruct "Hgot" as (j γl ch pid U root tfp ks rest nc)
-      "(%Hfacts & Hheld & Hhart & Hpriv & Hfrag & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
+      "(%Hfacts & Hheld & Hhart & Hpriv & Hgen & Hfrag & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
         & Hctx & Hcg & Hcpu & Hpay & Hkenv & Hpav)".
     destruct U as [V M].
     destruct Hfacts as (Hrv & Hj & Hgl & _ & _ & _ & Hcwd0 & Hrest & Hnc).
@@ -718,7 +718,7 @@ Section ProofUserinit.
       with "[Hpnc Hcref Hfb]" as "Hpriv".
     { iSplitL "Hpnc"; [iExact "Hpnc"|].
       iSplitL "Hcref";
-        [cbn [upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg us_V]; iExact "Hcref" |].
+        [cbn [upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg us_V pv_gen pv_chg]; iExact "Hcref" |].
       iExact "Hfb". }
     (* ...AND THE SLOT LEDGER'S SEAL, beside the allocator's.  allocproc's
        draw at +0x0a was the last counted proc allocation in the boot, and
@@ -802,16 +802,13 @@ Section ProofUserinit.
        (claude-notes/design/user-wp-slot.md; projects/app-echo.md ARM-c). *)
     (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    (* THE FIRST PROCESS'S GENERATION AND CHILDREN, at the park.  The boot
-       mode carries no run key, so nothing reads either: the park names
-       them and the resumed key is built at what it named.  init has no
-       children when userinit parks it.  The generation is a PLACEHOLDER
-       until the slot's generation cell exists (WAIT-EXIT K4(a)): nothing
-       reads it, because nothing backs it.  Then it is the name allocproc
-       minted, read off [SchedCtx.proc_pub]. *)
+    (* THE FIRST PROCESS'S CHILDREN SET, at the park: init has none when
+       userinit parks it.  ITS GENERATION IS NOT NAMED HERE any more --
+       the park keys the record at the BLOCK's own [ProcDefs.pv_gen], the
+       one allocproc minted for this slot ([ParkCap.park_cap]). *)
     iMod (park_token_park N rest
             (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M) fdt0
-            (inhabitant : gname) ∅ Hwf Hrest
+            ∅ Hwf Hrest
             with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hbundle
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "[Hrun Hpctx]".

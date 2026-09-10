@@ -46,6 +46,7 @@ Require Import UserHeap UkRun UkEcho.
 Require Import UCodeEcho.
 Require Import TsoCtx.
 Require User.EchoSyms User.EchoInstrs.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -101,6 +102,9 @@ Section UEchoKernel.
   Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* §2 THE VECTOR, OUT OF THE PERSISTED AREA.                            *)

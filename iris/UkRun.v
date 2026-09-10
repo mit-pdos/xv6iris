@@ -56,6 +56,7 @@ Require Import UkStep.
 Require Import RiscvExtras.
 Require Import UserHeap.
 Require Import TsoCtx.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -134,6 +135,9 @@ Section UkRun.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   (* NO ambient [CpuId]: the hart is an explicit argument of [urun], and the
      [WP] under that binder resolves to the one bound there -- the trick
      [UexecRet.ukc] uses. *)

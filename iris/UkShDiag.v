@@ -88,6 +88,7 @@ Require Import TsoCtx.
 Require User.ShSyms User.ShInstrs.
 Require Import UkProgAbi.
 Require Import UkShRun.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -127,6 +128,7 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
 Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
+Require Import UserChildren.  (* [uch_any] -- the process's own half of its children set *)
 
 Section UkShDiagStr.
   Context `{!riscvGS Σ}.
@@ -137,6 +139,9 @@ Section UkShDiagStr.
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
 
   (* ONE BYTE OF A STRING, IN WHICHEVER HALF IT LIVES -- AND AT WHATEVER
@@ -369,6 +374,9 @@ Section UkShDiagLit.
 
   Context `{!ufdG Σ}.
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* the literal, as the resource vprintf reads *)
   Lemma shd_lit_str (γt : gname) (base : Z) (len : nat) :
@@ -417,6 +425,9 @@ Section UkShDiagPutc.
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -868,6 +879,9 @@ Section UkShDiagVprintf.
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -2985,6 +2999,9 @@ Section UkShDiagVprintfS.
   (* the share the DATA half is borrowed at; the text half ignores it *)
   Context (dqs : dfrac).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -5560,6 +5577,9 @@ Section UkShDiagFprintf.
   (* the share the DATA half is borrowed at; the text half ignores it *)
   Context (dqs : dfrac).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -6870,6 +6890,9 @@ Section UkShDiagFmt.
 
   Context `{!ufdG Σ}.
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -6930,6 +6953,9 @@ Section UkShDiagRun.
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -7297,6 +7323,9 @@ Section UkShDiagLeaf.
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -7547,6 +7576,7 @@ Section UkShDiagLeaf.
       ush_jtab (ukn_t N) -∗ ush_cmd (ukn_d N) t c -∗ usz (ukn_s N) szv -∗
       UserFd.ustd (ukn_fd N) ld -∗
       UserCwd.ucwd_any (ukn_cwd N) -∗
+      UserChildren.uch_any (ukn_ch N) -∗
       urun N h m (mword_of_int ShSyms.runcmd)
         (6 * ush_ht c + (2 + (ush_Dg + n))) -∗
       WP (Loop : expr riscv_lang).
@@ -7559,6 +7589,7 @@ Section UkShDiagLeaf.
     shk_code (ukn_t N) -∗ shk_rodata (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
     UserCwd.ucwd_any (ukn_cwd N) -∗
+    UserChildren.uch_any (ukn_ch N) -∗
     ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
     urun N h m (mword_of_int ShSyms.fork1) (2 + (ush_Dg + n)) -∗
     ((∀ (h' : CpuId) (m' : regfile) (r : mword 64),
@@ -7568,6 +7599,7 @@ Section UkShDiagLeaf.
         P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
         UserFd.ustd (ukn_fd N) l -∗
         UserCwd.ucwd_any (ukn_cwd N) -∗
+        UserChildren.uch_any (ukn_ch N) -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
         urun N h' m'
           (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
@@ -7579,6 +7611,7 @@ Section UkShDiagLeaf.
         shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
         UserFd.ustd (ukn_fd N') l -∗
         UserCwd.ucwd_any (ukn_cwd N') -∗
+        UserChildren.uch_any (ukn_ch N') -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
         urun N' h' m'
           (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))

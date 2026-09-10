@@ -84,6 +84,7 @@ Require Import SpecKfork.
 Require Import UexecSlot.  (* [uvis_of] -- the child's key *)
 Require Import UexecRet.   (* [uslot] -- the deposit sys_fork forwards *)
 Require Import KforkChild. (* [kfork_child] -- the record it is stated at *)
+Require Import ChildTok.   (* [child_tok] / [my_pay] -- fork's two pieces *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -103,6 +104,9 @@ Definition wp_sys_fork_sconf_body
     (γp γw γc γl γf : gname) (γs : list gname)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
     (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (* the child's exit payload, forwarded to kfork -- see
+       [SpecKfork.kfork_post].  sys_fork never reads it. *)
+    (Q : Z -> iProp Σ)
     (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_fork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -159,8 +163,11 @@ Definition wp_sys_fork_sconf_body
      re-keys, it forwards. *)
   (* THE CHILD'S GENERATION IS ∀-BOUND: allocproc mints a fresh one inside
      the kfork this call makes, so no caller can name it, and a newly
-     created process has no children ([UexecRet.uexec_fork_child_F]). *)
-  (∀ g' : gname, uslot (uvis_of (kfork_child U) sts g' ∅)) -∗
+     created process has no children ([UexecRet.uexec_fork_child_F]).
+     ...AND THE SLOT MAY READ THE CHILD'S OWN PAYLOAD ([ChildTok.my_pay]
+     of the [Q] this call is at): kfork hands it over out of the split it
+     makes, and a verified child needs it to prove its own exit. *)
+  (∀ g' : gname, my_pay g' Q -∗ uslot (uvis_of (kfork_child U) sts g' ∅)) -∗
   proc_priv γf p pid U -∗
   (* THE PARENT'S DESCRIPTOR STATES.  fork's whole effect on descriptors is
      that the CHILD gets these -- [SpecKfork]'s copy loop retypes the child's
@@ -180,11 +187,17 @@ Definition wp_sys_fork_sconf_body
       (* ... and the return value is kfork's own, unchanged -- including the
          pid's interval, which is what the dispatcher relays into its own
          fork row and the trap loop reads as [r <> 0] *)
-      ⌜ mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64)
-        \/ (exists pidv : mword 32,
-              mf !!! Regidx (mword_of_int 10 : mword 5)
-              = (sign_extend' 64 pidv : mword 64)
-              /\ (1 <= bv_unsigned pidv <= PIDMAX)%Z) ⌝ -∗
+      (* ...AND, ON THE PID ARM, THE CHILD TOKEN: the parent's quarter of
+         the child's generation at the payload this call chose, straight
+         out of [SpecKfork.kfork_post].  An iProp disjunction and no
+         longer a pure one, because the pid arm now carries a RESOURCE --
+         which is the whole of what fork gives its parent. *)
+      ( ⌜ mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64) ⌝
+        ∨ (∃ (pidv : mword 32) (γ : gname),
+              ⌜ mf !!! Regidx (mword_of_int 10 : mword 5)
+                = (sign_extend' 64 pidv : mword 64) ⌝ ∗
+              ⌜ (1 <= bv_unsigned pidv <= PIDMAX)%Z ⌝ ∗
+              child_tok γ pidv Q) ) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -197,7 +210,8 @@ Module Type SYSFORK.
       (γp γw γc γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (Q : Z -> iProp Σ)
       (lks : gset string),
       wp_sys_fork_sconf_body γp γw γc γl γf γs
- m lvl av eb p b pid U sts lks.
+ m lvl av eb p b pid U sts Q lks.
 End SYSFORK.

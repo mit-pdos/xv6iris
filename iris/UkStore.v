@@ -68,6 +68,7 @@ Require Import ProcPtOwn UserPerm UexecWp UexecRet UkStep.
 Require Import UmodeText.
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -252,6 +253,9 @@ Section UkStoreExecErr.
   Context (k : Z).
   Context (Hkw : vmem_width k).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
 
   (* the [execute (STORE ...)] fact when the access FAULTS: WpUmodeStore's
      [exec_execute_STORE_k_u_walk] with [Ok true] read as [Err er] *)
@@ -330,6 +334,9 @@ Section UkStoreTrapWrap.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
 
   (* [WpUmodeStore.uv_swp_exec_mem] for an execute that TRAPS: the result is
      an arbitrary non-[ExecuteAs] [er] and the byte map does not move (a
@@ -394,6 +401,9 @@ Section UkStorePostFetch.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* The geometry-agnostic middle: from the FETCHED file, write nextPC,    *)
@@ -1022,6 +1032,9 @@ Section UkStoreObl.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* §6 THE OBLIGATION, once per FETCH SHAPE -- the store twins of         *)
@@ -1333,6 +1346,9 @@ Section UkStore.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,

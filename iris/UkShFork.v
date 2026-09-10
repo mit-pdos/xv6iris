@@ -77,11 +77,14 @@ Require Import UkShCd.
 Require Import UkShMain.
 Require Import TsoCtx.
 Require User.ShSyms User.ShInstrs.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
 Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
+Require Import UserChildren.  (* [uch_any] -- the process's own half of its children set *)
 
 Section UkShFork.
   Context `{!riscvGS Σ}.
@@ -98,7 +101,11 @@ Section UkShFork.
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
+  Local Notation γch := (ukn_ch N).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -217,7 +224,7 @@ Section UkShFork.
     intros Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl Hszlo Hszal Hszok.
     iIntros "Hhead #Hcode #Hxs #Hro #Hjt Hstd Hdat Hsz Hbuf Hrun".
     destruct Hregs as (Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
-    iDestruct "Hstd" as "[Hustd Hcwd]".
+    iDestruct "Hstd" as "(Hustd & Hcwd & Hch)".
     assert (Hlen31 : Z.of_nat len < 2 ^ 31)
       by (unfold sh_nbuf in Hkl; lia).
     (* ---- 0x92c  jal ra,fork1 ---- *)
@@ -245,7 +252,7 @@ Section UkShFork.
       by (unfold UkShDiag.ush_Dg; lia).
     iApply (UkShDiag.wp_kshr_fork1_final Hpsok N (ushf_pay f)
               sz l ∅ h1 m1 (66 + n)
-              with "Hcode Hro [Hdat Hbuf] Hsz Hustd Hcwd [] Hrun").
+              with "Hcode Hro [Hdat Hbuf] Hsz Hustd Hcwd Hch [] Hrun").
     { rewrite /ushf_pay.
       iSplitR; [ iExact "Hcode" | ].
       iSplitR; [ iExact "Hro" | ].
@@ -259,7 +266,7 @@ Section UkShFork.
     rewrite Eret.
     iSplitL "Hhead".
     - (* ================= THE PARENT: reap, and round again ============= *)
-      iIntros (hA mA rA) "%HrA %HcsA %Ha0A Hpay Hsz Hustd Hcwd _ Hrun".
+      iIntros (hA mA rA) "%HrA %HcsA %Ha0A Hpay Hsz Hustd Hcwd Hch _ Hrun".
       iDestruct "Hpay" as "(_ & _ & _ & Hdat & Hbuf)".
       (* ---- 0x930  c.beqz a0,0x9c0 -- NOT taken: this is the parent ---- *)
       iApply (wp_uk_cbeqz N hA mA (mword_of_int 0x930)
@@ -359,11 +366,12 @@ Section UkShFork.
         - rewrite (HkeepD s6_idx ltac:(vm_compute; reflexivity)). exact Hs6. }
       replace (2 + (UkShDiag.ush_Dg + (66 + n)))%nat
         with (16 + (80 + n))%nat by (unfold UkShDiag.ush_Dg; lia).
-      iApply ("Hhead" $! hE mD f n with "[%] [Hustd Hcwd] Hdat Hsz Hbuf Hrun").
+      iApply ("Hhead" $! hE mD f n
+                with "[%] [Hustd Hcwd Hch] Hdat Hsz Hbuf Hrun").
       + exact HregsD.
-      + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hustd Hcwd".
+      + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hustd Hcwd Hch".
     - (* ================= THE CHILD: parse, run, exec =================== *)
-      iIntros (N' hA mA) "%HcsA %Ha0A #Hcode' Hpay Hsz Hustd Hcwd _ Hrun".
+      iIntros (N' hA mA) "%HcsA %Ha0A #Hcode' Hpay Hsz Hustd Hcwd Hch _ Hrun".
       iDestruct "Hpay" as "(_ & #Hro' & #Hjt' & Hdat & Hbuf)".
       (* ---- 0x930  c.beqz a0,0x9c0 -- TAKEN: this is the child ---- *)
       iApply (wp_uk_cbeqz N' hA mA (mword_of_int 0x930)
@@ -403,7 +411,7 @@ Section UkShFork.
                 ltac:(unfold sh_buf, sh_nbuf, Z64 in *; lia)
                 ltac:(unfold sh_buf, sh_nbuf in *; lia)
                 Hszlo Hszal Hszok
-                with "Hcode' Hxs [] [] Hjt' Hline Hws Hsy Hustd Hcwd Hfresh Hrun").
+                with "Hcode' Hxs [] [] Hjt' Hline Hws Hsy Hustd Hcwd Hch Hfresh Hrun").
       + iApply (ushf_code_shp with "Hcode'").
       + iApply (ushf_rodata_shp with "Hro'").
   Qed.

@@ -56,6 +56,7 @@ Require Import UserBits.    (* [uint_add_vec_int_small] -- the window's no-wrap 
 Require Import RiscvExtras. (* [uint_unsigned] *)
 Require Import RiscvModelBytes. (* [nth_byte] -- pipe's two reported words *)
 Require Import TsoCtx.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 From Stdlib Require Import ZArith Bool Lia List FunctionalExtensionality.
@@ -250,6 +251,9 @@ Section UkRunSys.
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
 
   (* ===================================================================== *)

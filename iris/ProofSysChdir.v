@@ -2016,7 +2016,7 @@ Section ProofSysChdirBody.
                                          (bv_unsigned inum))))
             with "[Hpbare Hofiles]" as "Hpnc".
           { rewrite proc_priv_nocwd_bare.
-            cbn [upd_cwi upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
+            cbn [upd_cwi upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
             iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"]. }
           iDestruct (cwd_ref_at_of_held_at with "Hheldnew") as "Hrefcwd".
           iAssert (proc_priv gf pj pid
@@ -2027,7 +2027,7 @@ Section ProofSysChdirBody.
                        (upd_usV U (upd_cwi (upd_cwd (upd_upt (us_V U) P') (ientry kk))
                                            (bv_unsigned inum)))).
             iSplitL "Hpnc"; [iExact "Hpnc" |].
-            iEval (cbn [upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg]). iFrame "Hrefcwd Hftok". }
+            iEval (cbn [upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg pv_gen pv_chg]). iFrame "Hrefcwd Hftok". }
           iDestruct (iref_slots_combine 1 1 with "Hislot Hir") as "Hir".
           (* ============ +0x58 c.li a0,0 ============ *)
           iApply (wp_cli_s_sconf (CID := CID36) (mword_of_int (SC + 0x58)) Ra0

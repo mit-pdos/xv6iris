@@ -106,6 +106,7 @@ Require Import UCodeShK.
 Require Import UkSh.
 Require Import TsoCtx.
 Require User.ShSyms User.ShInstrs.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -211,6 +212,7 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             which rides inside [urun] *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
+Require Import UserChildren.  (* [uch_any] -- the process's own half of its children set *)
 
 Section UkShRun.
   Context `{!riscvGS Σ}.
@@ -226,6 +228,9 @@ Section UkShRun.
   (* fixes this constant, and every budget in the file carries it.           *)
   Context (Dg : nat).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -1048,6 +1053,11 @@ Section UkShRun.
     shk_code (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
     UserCwd.ucwd_any (ukn_cwd N) -∗
+    (* ...AND sh's OWN HALF OF ITS CHILDREN SET, index-free for the cwd's
+       reason: fork MOVES the set and an update needs both halves, but sh
+       never asks which children it has, so the token the pid arm mints is
+       dropped at the leaf ([UkFork.wp_uk_ecall_fork_any]). *)
+    UserChildren.uch_any (ukn_ch N) -∗
     ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
     urun N h m (mword_of_int ShSyms.fork) avail -∗
     ((∀ (h' : CpuId) (r : mword 64),
@@ -1055,6 +1065,7 @@ Section UkShRun.
         P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
         UserFd.ustd (ukn_fd N) l -∗
         UserCwd.ucwd_any (ukn_cwd N) -∗
+        UserChildren.uch_any (ukn_ch N) -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
         urun N h'
           (<[Regidx a0_idx := r]>
@@ -1065,6 +1076,7 @@ Section UkShRun.
         shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
         UserFd.ustd (ukn_fd N') l -∗
         UserCwd.ucwd_any (ukn_cwd N') -∗
+        UserChildren.uch_any (ukn_ch N') -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
         urun N' h'
           (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
@@ -1073,7 +1085,7 @@ Section UkShRun.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode HP Hsz Hstd Hcwd HD Hrun [Hpar Hchi]".
+    iIntros "#Hcode HP Hsz Hstd Hcwd Hch HD Hrun [Hpar Hchi]".
     (* the leaf mints the child's half at a NAMED inum, so the index-free
        resource sh carries is opened here and closed on both arms *)
     iDestruct "Hcwd" as (cwv) "Hcwd".
@@ -1093,7 +1105,7 @@ Section UkShRun.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E0 Em. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m).
-    iApply (wp_uk_ecall_fork N h1 m1 (mword_of_int 0xc80) avail szv l D cwv
+    iApply (wp_uk_ecall_fork_any N h1 m1 (mword_of_int 0xc80) avail szv l D cwv
               (fun gt gd gs => (shk_code gt ∗ P gt gd gs)%I)
               (FP := forkable_sep (fun gt _ _ => shk_code gt) P
                        forkable_shk_code FP)
@@ -1101,7 +1113,7 @@ Section UkShRun.
                       (upd_eq m (Regidx a7_idx) (mword_of_int 1 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] [HP] Hsz Hstd HD Hcwd Hrun").
+              with "[] [HP] Hsz Hstd HD Hcwd Hch Hrun").
     { iApply (uis_shk_c80 with "Hcode"). }
     { iSplitR; [ iExact "Hcode" | iExact "HP" ]. }
     assert (E1 : add_vec_int (mword_of_int 0xc80 : mword 64) 4
@@ -1119,7 +1131,7 @@ Section UkShRun.
                   (mword_of_int 1 : mword 64)
                   ltac:(vm_compute; discriminate))). }
     iSplitL "Hpar".
-    - iIntros (hp r) "%Hr [#Hcp HP] Hsz Hstd HD Hcwd Hrun".
+    - iIntros (hp r) "%Hr [#Hcp HP] Hsz Hstd HD Hcwd Hch Hrun".
       iApply (wp_uk_cjr N hp (<[Regidx a0_idx := r]> m1)
                 (mword_of_int 0xc84) ra_idx
                 (ret_pc (m !!! Regidx ra_idx)) avail
@@ -1128,9 +1140,9 @@ Section UkShRun.
                 with "[] Hrun").
       { iApply (uis_shk_c84 with "Hcp"). }
       iIntros (hp2) "Hrun".
-      iApply ("Hpar" $! hp2 r with "[%] HP Hsz Hstd [Hcwd] HD Hrun");
+      iApply ("Hpar" $! hp2 r with "[%] HP Hsz Hstd [Hcwd] Hch HD Hrun");
         [ exact Hr | iApply (ucwd_any_of with "Hcwd") ].
-    - iIntros (N' hc) "[#Hck HP] Hsz Hstd HD Hcwd _ Hrun".
+    - iIntros (N' hc) "[#Hck HP] Hsz Hstd HD Hcwd Hch Hrun".
       iApply (wp_uk_cjr N' hc
                 (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]> m1)
                 (mword_of_int 0xc84) ra_idx
@@ -1140,7 +1152,7 @@ Section UkShRun.
                 with "[] Hrun").
       { iApply (uis_shk_c84 with "Hck"). }
       iIntros (hc2) "Hrun".
-      iApply ("Hchi" $! N' hc2 with "Hck HP Hsz Hstd [Hcwd] HD Hrun").
+      iApply ("Hchi" $! N' hc2 with "Hck HP Hsz Hstd [Hcwd] Hch HD Hrun").
       iApply (ucwd_any_of with "Hcwd").
   Qed.
 
@@ -1470,6 +1482,9 @@ Section UkShRun.
     shk_code (ukn_t N) -∗ shk_rodata (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
     UserCwd.ucwd_any (ukn_cwd N) -∗
+    (* the caller's half of its children set, index-free -- see
+       [wp_kshr_fork] *)
+    UserChildren.uch_any (ukn_ch N) -∗
     (* the caller's descriptors, which BOTH processes come back holding --
        see [UkFork.wp_uk_ecall_fork].  This is what PIPE's six closes and
        REDIR's close-and-reopen are paid for with. *)
@@ -1482,6 +1497,7 @@ Section UkShRun.
         P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
         UserFd.ustd (ukn_fd N) l -∗
         UserCwd.ucwd_any (ukn_cwd N) -∗
+        UserChildren.uch_any (ukn_ch N) -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
         urun N h' m' (ret_pc (m !!! Regidx ra_idx)) (2 + (Dg + n)) -∗
         WP (Loop : expr riscv_lang)) ∗
@@ -1491,12 +1507,13 @@ Section UkShRun.
         shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
         UserFd.ustd (ukn_fd N') l -∗
         UserCwd.ucwd_any (ukn_cwd N') -∗
+        UserChildren.uch_any (ukn_ch N') -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
         urun N' h' m' (ret_pc (m !!! Regidx ra_idx)) (2 + (Dg + n)) -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hro HP Hsz Hstd Hcwd HD Hrun [Hpar Hchi]".
+    iIntros "#Hcode #Hro HP Hsz Hstd Hcwd Hch HD Hrun [Hpar Hchi]".
     rewrite shr_fork1.
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -1634,7 +1651,7 @@ Section UkShRun.
                              (forkable_uword (uint sp0 - 8) vra)
                              (forkable_uword (uint sp0 - 16) vs0))))
               szv l D h5 m3 (Dg + n)
-              with "Hcode [HP Hw8 Hw0] Hsz Hstd Hcwd HD Hrun").
+              with "Hcode [HP Hw8 Hw0] Hsz Hstd Hcwd Hch HD Hrun").
     { iFrame "Hro HP Hw8 Hw0". }
     rewrite Hret3.
     (* the register file both arms resume under, and its sp *)
@@ -1691,14 +1708,15 @@ Section UkShRun.
            exact (Hm1 q (ushr_ridx_ne q csp_rs1 ltac:(lia))). }
     iSplitL "Hpar".
     - (* ---- THE PARENT ---- *)
-      iIntros (hp r) "%Hr (_ & HP & Hw8 & Hw0) Hsz Hstd Hcwd HD Hrun".
+      iIntros (hp r) "%Hr (_ & HP & Hw8 & Hw0) Hsz Hstd Hcwd Hch HD Hrun".
       iApply (wp_kshr_fork1_tail N hp
                 (<[Regidx a0_idx := r]>
                    (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m3))
                 sp0 vra vs0 n Hal8 Hlo (Hspf r)
                 with "Hcode Hro Hw8 Hw0 Hrun").
       iIntros (hp2 m') "%Hq %Hra %Hs0 %Hsps Hrun".
-      iApply ("Hpar" $! hp2 m' r with "[%] [%] [%] HP Hsz Hstd Hcwd HD [Hrun]").
+      iApply ("Hpar" $! hp2 m' r
+                with "[%] [%] [%] HP Hsz Hstd Hcwd Hch HD [Hrun]").
       + exact Hr.
       + exact (fun q => Hback r m' q Hq Hra Hs0 Hsps).
       + rewrite (Hq a0_idx ltac:(vm_compute; lia) ltac:(vm_compute; lia)
@@ -1706,14 +1724,15 @@ Section UkShRun.
         exact (upd_eq _ (Regidx a0_idx) r).
       + iExact "Hrun".
     - (* ---- THE CHILD, under fresh names ---- *)
-      iIntros (N' hc) "#Hck (#Hcro & HP & Hw8 & Hw0) Hsz Hstd Hcwd HD Hrun".
+      iIntros (N' hc) "#Hck (#Hcro & HP & Hw8 & Hw0) Hsz Hstd Hcwd Hch HD Hrun".
       iApply (wp_kshr_fork1_tail N' hc
                 (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
                    (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m3))
                 sp0 vra vs0 n Hal8 Hlo (Hspf (mword_of_int 0 : mword 64))
                 with "Hck Hcro Hw8 Hw0 Hrun").
       iIntros (hc2 m') "%Hq %Hra %Hs0 %Hsps Hrun".
-      iApply ("Hchi" $! N' hc2 m' with "[%] [%] Hck HP Hsz Hstd Hcwd HD [Hrun]").
+      iApply ("Hchi" $! N' hc2 m'
+                with "[%] [%] Hck HP Hsz Hstd Hcwd Hch HD [Hrun]").
       + exact (fun q => Hback (mword_of_int 0 : mword 64) m' q Hq Hra Hs0 Hsps).
       + rewrite (Hq a0_idx ltac:(vm_compute; lia) ltac:(vm_compute; lia)
                    ltac:(vm_compute; lia) ltac:(vm_compute; lia)).
@@ -2703,6 +2722,9 @@ Section UkShRun.
       ush_jtab (ukn_t N) -∗ ush_cmd (ukn_d N) t c -∗ usz (ukn_s N) szv -∗
       UserFd.ustd (ukn_fd N) ld -∗
       UserCwd.ucwd_any (ukn_cwd N) -∗
+      (* the caller's half of its children set, index-free -- LIST and BACK
+         both fork, and the set moves at each ([wp_kshr_fork1]) *)
+      UserChildren.uch_any (ukn_ch N) -∗
       urun N h m (mword_of_int ShSyms.runcmd)
         (6 * ush_ht c + (2 + (Dg + n))) -∗
       WP (Loop : expr riscv_lang).
@@ -2710,7 +2732,7 @@ Section UkShRun.
     induction c as [ args | c1 IH file mode fd | l IHl r IHr
                    | l IHl r IHr | c1 IH ];
       intros Hs N h m t szv ld n Ha0;
-      iIntros "#Hcode #Hexs #Hjt #Htree Hsz Hstd Hcwd Hrun";
+      iIntros "#Hcode #Hexs #Hjt #Htree Hsz Hstd Hcwd Hch Hrun";
       iDestruct (ush_jtab_ro with "Hjt") as "#Hro";
       iDestruct (ush_cmd_addr with "Htree") as %[Htr Ht8];
       assert (Ht4 : t mod 4 = 0)
@@ -2918,13 +2940,13 @@ Section UkShRun.
                 (fun gt gd _ => (ush_jtab gt ∗ ush_cmd gd t (UList l r))%I)
                 (FP := forkable_ush_pay t (UList l r))
                 szv ld ∅ h2 g1 (6 * Nat.max (ush_ht l) (ush_ht r) + n)
-                with "Hcode Hro [] Hsz Hstd Hcwd [] Hrun").
+                with "Hcode Hro [] Hsz Hstd Hcwd Hch [] Hrun").
       { iFrame "Hjt Htree". }
       { rewrite big_sepM_empty. done. }
       rewrite Hra_g1.
       iSplitL "".
       + (* ---- the PARENT: wait(0), then runcmd(lcmd->right) ---- *)
-        iIntros (hA mA rA) "%HrA %HcsA %Ha0A (#Hjt2 & #Ht2) Hsz Hstd Hcwd _ Hrun".
+        iIntros (hA mA rA) "%HrA %HcsA %Ha0A (#Hjt2 & #Ht2) Hsz Hstd Hcwd Hch _ Hrun".
         pose proof (ush_st_cs g1 mA sp0 t Hst_g1 HcsA) as HstA.
         iApply (wp_uk_cbnez N hA mA (mword_of_int 0x128)
                   (mword_of_int 4 : mword 8) (mword_of_int 2 : mword 3)
@@ -2993,9 +3015,9 @@ Section UkShRun.
                                    - ush_ht r) + n))))%nat by lia.
         iApply (IHr (proj2 Hs) N hE g3 qr szv ld
                   ((6 * (Nat.max (ush_ht l) (ush_ht r) - ush_ht r) + n)%nat)
-                  Ha0_g3 with "Hcode Hexs Hjt2 Hqrc Hsz Hstd Hcwd Hrun").
+                  Ha0_g3 with "Hcode Hexs Hjt2 Hqrc Hsz Hstd Hcwd Hch Hrun").
       + (* ---- the CHILD: runcmd(lcmd->left) ---- *)
-        iIntros (N' hA mA) "%HcsA %Ha0A #Hck (#Hjt2 & #Ht2) Hsz Hstd Hcwd _ Hrun".
+        iIntros (N' hA mA) "%HcsA %Ha0A #Hck (#Hjt2 & #Ht2) Hsz Hstd Hcwd Hch _ Hrun".
         iDestruct (ush_cmd_list with "Ht2") as "[#Hsl2 _]".
         iDestruct "Hsl2" as (ql2) "[#Hqlp2 #Hqlc2]".
         pose proof (ush_st_cs g1 mA sp0 t Hst_g1 HcsA) as HstA.
@@ -3055,7 +3077,7 @@ Section UkShRun.
                                    - ush_ht l) + n))))%nat by lia.
         iApply (IHl (proj1 Hs) N' hD g3 ql2 szv ld
                   ((6 * (Nat.max (ush_ht l) (ush_ht r) - ush_ht l) + n)%nat)
-                  Ha0_g3 with "Hck Hexs Hjt2 Hqlc2 Hsz Hstd Hcwd Hrun").
+                  Ha0_g3 with "Hck Hexs Hjt2 Hqlc2 Hsz Hstd Hcwd Hch Hrun").
 
     - (* =================== BACK =================== *)
       iDestruct (ush_cmd_back with "Htree") as (q) "[#Hqp #Hqc]".
@@ -3090,13 +3112,13 @@ Section UkShRun.
                 (fun gt gd _ => (ush_jtab gt ∗ ush_cmd gd t (UBack c1))%I)
                 (FP := forkable_ush_pay t (UBack c1))
                 szv ld ∅ h2 b1 (6 * ush_ht c1 + n)
-                with "Hcode Hro [] Hsz Hstd Hcwd [] Hrun").
+                with "Hcode Hro [] Hsz Hstd Hcwd Hch [] Hrun").
       { iFrame "Hjt Htree". }
       { rewrite big_sepM_empty. done. }
       rewrite Hra_b1.
       iSplitL "".
       + (* ---- the PARENT: exit(0) immediately ---- *)
-        iIntros (hA mA rA) "%HrA %HcsA %Ha0A (#Hjt2 & #Ht2) Hsz Hstd Hcwd _ Hrun".
+        iIntros (hA mA rA) "%HrA %HcsA %Ha0A (#Hjt2 & #Ht2) Hsz Hstd Hcwd Hch _ Hrun".
         iApply (wp_uk_btype0 N hA mA (mword_of_int 0x1c8)
                   (mword_of_int 7970 : mword 13) a0_idx BNE
                   true (mword_of_int 0xea)
@@ -3119,7 +3141,7 @@ Section UkShRun.
         { iApply (uis_shk_ea with "Hcode"). }
         { iApply (uis_shk_ec with "Hcode"). }
       + (* ---- the CHILD: runcmd(bcmd->cmd), in the background ---- *)
-        iIntros (N' hA mA) "%HcsA %Ha0A #Hck (#Hjt2 & #Ht2) Hsz Hstd Hcwd _ Hrun".
+        iIntros (N' hA mA) "%HcsA %Ha0A #Hck (#Hjt2 & #Ht2) Hsz Hstd Hcwd Hch _ Hrun".
         iDestruct (ush_cmd_back with "Ht2") as (q2) "[#Hqp2 #Hqc2]".
         pose proof (ush_st_cs b1 mA sp0 t Hst_b1 HcsA) as HstA.
         destruct HstA as [Hs0A Hs1A].
@@ -3175,7 +3197,7 @@ Section UkShRun.
         replace (2 + (Dg + (6 * ush_ht c1 + n)))%nat
           with (6 * ush_ht c1 + (2 + (Dg + n)))%nat by lia.
         iApply (IH Hs N' hD b3 q2 szv ld n Ha0_b3
-                  with "Hck Hexs Hjt2 Hqc2 Hsz Hstd Hcwd Hrun").
+                  with "Hck Hexs Hjt2 Hqc2 Hsz Hstd Hcwd Hch Hrun").
   Qed.
 
 End UkShRun.

@@ -81,8 +81,12 @@ Require Import ElfUser.        (* [init_elf] and its reduced facts (leaf, see he
 Require Import UShKernel.      (* the entry geometry, and sh's own bridge *)
 Require User.InitSyms User.InitData User.InitInstrs.
 Require Import UexecSG.        (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
+Require Import UserChildren.  (* [uch_any_of] -- the entry's children fragment,
+                                 weakened to the index-free form init carries *)
 Require FsImg.           (* [FsImg.ROOTINO] -- the inum init is born at *)
 
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -166,6 +170,9 @@ Section UInitKernel.
   Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
 
   (* NO [Context {CID : CpuId}] and no ambient [CurCtx]: the slot binds the
      hart itself, and the run binds its own context ([UShKernel]'s note). *)
@@ -234,9 +241,10 @@ Section UInitKernel.
     iIntros "#Hdep #Hxs".
     iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0)))))
               Hal8 Hroom Hstk Hfdlen Hstop with "Hdep").
-    (* init's own half of its children set is dropped here for sh's
-       reason: nothing on init's walk reads it yet. *)
-    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf _ Dlo _ Hrun".
+    (* init's own half of its children set travels with its cwd: nothing
+       on init's walk READS it, but fork MOVES it, so the fragment goes
+       down the chain index-free ([UserChildren.uch_any]). *)
+    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf Hchf Dlo _ Hrun".
     (* ---- the argument vector, out of the data below the frame ---- *)
     assert (Hsub16 :
               init_argv_map
@@ -260,7 +268,7 @@ Section UInitKernel.
     rewrite Hpc.
     iApply (wp_kinit_start N Hpsok (uvis_sz W) h
               (tf_resume_gpr0 (uvis_tf W)) n0
-              with "[] Hxs [] [] Hszf [Hstd] [Hcwf] Hrun").
+              with "[] Hxs [] [] Hszf [Hstd] [Hcwf] [Hchf] Hrun").
     - iApply (init_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_text _ Hsub) Hx with "Ht").
     - iApply (init_rodata_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
@@ -268,6 +276,7 @@ Section UInitKernel.
     - rewrite /init_argv. iExact "Hargv".
     - iExists (take NSTD (uvis_fd W)). iExact "Hstd".
     - rewrite <- Hcw. iExact "Hcwf".
+    - iApply (uch_any_of with "Hchf").
   Qed.
 
   (* ------------------------------------------------------------------- *)

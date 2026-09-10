@@ -1459,6 +1459,9 @@ LogDefs.v
 TxPin.v
 ProcDefs.v
 BioDefs.v
+# the generation as a saved predicate (the child token / exit escrow);
+# [Xv6Cameras.ctokG] is its capacity, so it sits just below the bundle.
+ChildTok.v
 Xv6Cameras.v
 Xv6G.v
 InodeDefs.v

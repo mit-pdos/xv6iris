@@ -62,6 +62,7 @@ Require User.SyncInstrs.
 Require User.EchoSyms User.EchoInstrs.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -231,6 +232,9 @@ Section UexecCond.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   (* the break's ghost class, for [UkRun.usz].  It already exists in the
      tree -- [Xv6Cameras.uioG]'s [uio_brkG] is the same [ghost_varG Σ Z] --
      so nothing new enters Σ. *)

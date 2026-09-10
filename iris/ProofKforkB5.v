@@ -161,7 +161,7 @@ Section ProofKforkB5.
       (γs : list gname) (γf γw γc γft γl : gname) (j : nat)
       (Mt : regfile) (K lvl : nat) (eb b : bool)
       (pme ks : mword 64) (pid_c : mword 32) (Uc : ustate)
-      (stsP : list fdstate) (gnP : gname) (csP : gset gname) (Wk : uvis)
+      (stsP : list fdstate) (csP : gset gname) (Wk : uvis)
       (ch : mword 64) (rest : list (mword 64)) (rv : mword 64)
       (lks : gset string) :
     (18 <= K)%nat ->
@@ -184,8 +184,12 @@ Section ProofKforkB5.
     urun_eq Wk Uc ->
     uvis_fd Wk = stsP ->
     (* ...and the two WAIT-EXIT readings, which [urun_eq] does not read
-       either: the party that names the descriptor view names them too. *)
-    uvis_gen Wk = gnP ->
+       either.  THE GENERATION IS NOT THE PARKER'S TO CHOOSE: the park keys
+       the child's slot at the BLOCK's own field ([ProcDefs.pv_gen], which
+       [ParkCap.park_cap] passes), so what the caller owes is that its key
+       is at that name.  The children set still is the caller's, and this
+       lane's fork arm is what makes the choice non-trivial. *)
+    uvis_gen Wk = pv_gen (us_V Uc) ->
     uvis_ch Wk = csP ->
     (* THE FRESHNESS PREMISE, AT THE LOWEST RANK THIS BLOCK TOUCHES:
        "wait_lock" (10), acquired directly at +0xd0; "proc" (11), released
@@ -310,9 +314,10 @@ Section ProofKforkB5.
        record, instead of a family over every record at this table.  The
        caller's slot is at [Wk], which has that record's run key, and the
        congruence is what carries it there. *)
-    iEval (rewrite (uslot_of_urun_eq Wk Uc stsP gnP csP Hurun Hkfd Hkgn Hkch))
+    iEval (rewrite (uslot_of_urun_eq Wk Uc stsP (pv_gen (us_V Uc)) csP
+                      Hurun Hkfd Hkgn Hkch))
       in "Hjslot".
-    iMod (park_token_park_steady N rest Uc stsP gnP csP Hwf Hrest
+    iMod (park_token_park_steady N rest Uc stsP csP Hwf Hrest
             with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfdone Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "[Hrun Hpctx]".

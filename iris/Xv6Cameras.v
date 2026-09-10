@@ -88,6 +88,8 @@ Require Import VSlot.         (* [vslot] -- the TYPE only; see that file       *
 Require Import DinodeEnc.
 Require Import BlkmapDefs.    (* [blkmap] -- the icache box shape (§15)       *)     (* [dinode]                                     *)
 Require Import FsNode.        (* [fs_node] -- the era top map's value type    *)
+Require Export ChildTok.      (* [genF] / [ctokG] -- the generation's saved
+                                 element and its capacity class (14c) *)
 
 Local Open Scope Z_scope.
 
@@ -959,36 +961,29 @@ Global Instance subG_uchΣ {Σ} : subG uchΣ Σ -> uchG Σ.
 Proof. solve_inG. Qed.
 
 (* ===================================================================== *)
-(*  14c. THE PROCESS SLOT'S GENERATION  (theory: SchedCtx.v)             *)
+(*  14c. THE PROCESS SLOT'S GENERATION  (theory: ChildTok.v)             *)
 (* ===================================================================== *)
 
 (* A GENERATION IS AN INCARNATION OF A SLOT.  allocproc mints a fresh ghost
    name for every process it hands out and freeproc drops it, so the name
    identifies THIS incarnation -- which is what a wait()-side resource
    transfer is indexed by, a pid being reused and a generation not
-   ([UexecSlot.uvis_gen] is the key's reading of it).  The camera is a pair
-   because the name carries two facts at once:
+   ([UexecSlot.uvis_gen] is the key's reading of it).
 
-     [SchedCtx.gen_tok γ]     the EXCLUSIVE token -- the left component,
-                              [Some (Excl ())].  One per incarnation; it is
-                              what makes two live generations distinct.
-     [SchedCtx.gen_slot γ pa] the slot the generation belongs to -- the
-                              right component, [Some (to_agree pa)].  It is
-                              CORE-ID, hence persistent: a generation
-                              belongs to one slot forever, so the fact may
-                              be duplicated and outlive the incarnation,
-                              and two copies agree.
-
-   Both components are [option] so that each half is [own] at the SAME name
-   with the other component at [ε]: the pair splits by [own_op] and the
-   token can be spent without disturbing the slot fact. *)
-Definition genR : cmra :=
-  prodR (optionUR (exclR unitO))
-        (optionUR (agreeR (leibnizO (Values.mword 64)))).
-Class genG (Σ : gFunctors) := GenG { gen_inG :: inG Σ genR }.
-Definition genΣ : gFunctors := #[GFunctor genR].
-Global Instance subG_genΣ {Σ} : subG genΣ Σ -> genG Σ.
-Proof. solve_inG. Qed.
+   The name is a SAVED ELEMENT and not a plain camera, because what it
+   carries is a PREDICATE: the slot address, the pid, and the process's
+   exit PAYLOAD [Q : Z -> iProp].  [ChildTok.genF] is that element's
+   functor and [ChildTok.v] is the whole theory -- the parent's quarter
+   ([child_tok]), the kernel's ([gen_kq]), the discarded half the child's
+   [my_pay] and the two persistent readings come off, and the payment rule
+   the escrow is redeemed by. *)
+(* THE CLASS ITSELF IS [ChildTok.ctokG], one file below, and that is the one
+   exception to "members are defined here": the U-tier leaves that name the
+   generation's pieces bind no bundle and would otherwise have to import
+   [saved_prop] to spell the raw class -- whose re-exports re-shadow
+   [Forall_forall] and the numeral scopes wherever the [Require] lands.  The
+   [Require Export] at the head of this file is what keeps it visible here
+   and in [Xv6G]. *)
 
 (* ===================================================================== *)
 (*  14d. THE WAIT LOCK'S CHILDREN CELLS  (theory: WaitInv.v)             *)
@@ -998,11 +993,20 @@ Proof. solve_inG. Qed.
    the generations of that slot's live children.  A ghost list and not
    memory, because [struct proc] has no such field -- the C code reads the
    same information by scanning [p->parent], and the ghost is the scan's
-   contents-out form ([WaitInv.children_own_at]).  Whole (fraction 1)
-   inside the lock's payload, exactly as [parents_own_at] owns its cells
-   whole. *)
-Class wchG (Σ : gFunctors) := WchG { wch_inG :: ghost_varG Σ (list (gset gname)) }.
-Definition wchΣ : gFunctors := #[ ghost_varΣ (list (gset gname)) ].
+   contents-out form ([WaitInv.children_own_at]).
+
+   A GHOST MAP AND NOT A LIST OF VARIABLES, keyed by the process's own
+   children-ghost name ([ProcDefs.pv_chg]): the AUTHORITY is the lock's
+   payload and the ROW is the process's -- it rides the trap residue beside
+   [FdSlots.fd_frags] ([WaitInv.ch_frag]).  That is what makes the two
+   halves findable: a lock holder that also holds a row learns the map's
+   entry by [ghost_map_lookup], where two halves of a per-process
+   [ghost_var] would leave it unable to say WHICH entry of the payload is
+   its own.  A row is installed under the lock ([ghost_map_insert] at a
+   name allocated cofinitely against the domain) and deleted there when the
+   incarnation is reaped. *)
+Class wchG (Σ : gFunctors) := WchG { wch_inG :: ghost_mapG Σ gname (gset gname) }.
+Definition wchΣ : gFunctors := #[ ghost_mapΣ gname (gset gname) ].
 Global Instance subG_wchΣ {Σ} : subG wchΣ Σ -> wchG Σ.
 Proof. solve_inG. Qed.
 

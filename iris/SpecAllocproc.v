@@ -93,6 +93,7 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
+Require Import ChildTok.  (* [gen_own] -- the incarnation this function mints *)
 Require Import KvmSpec.
 Require Import PidLock.
 Require Import LockRank.
@@ -194,6 +195,20 @@ Definition allocproc_post
           when it installs a working directory ([proc_priv_split_cwd]);
           kfork does it at its [sd a0,336(s4)]. *)
        proc_priv_nocwd γf (proc_addr j) pid U ∗
+       (* THE SLOT'S NEW INCARNATION, MINTED HERE.  allocproc is the one
+          place a process comes into existence, so it is where the
+          generation is minted: a name nothing has ever held, carrying
+          THIS slot's address and the pid <allocpid> just chose, at the
+          TRIVIAL payload -- a process nobody forked owes its parent
+          nothing, and a fork REPLACES the payload before splitting
+          ([ChildTok.gen_set]).  WHOLE, because the caller is the party
+          that chooses: kfork sets the payload and splits the three
+          pieces, and a failure tail simply drops it -- the name dies with
+          the incarnation that never started, exactly as [pv_fdg] does.
+          The block records the name ([ProcDefs.pv_gen]), which is what
+          makes [UexecSlot.uvis_gen] a reading of the block. *)
+       gen_own (pv_gen (us_V U)) (DfracOwn 1) (proc_addr j) pid
+               (fun _ => True)%I ∗
        (* THE DESCRIPTOR-STATE FRAGMENTS, minted here with the block: this
           is the one function that chooses a process's [pv_fdg]
           ([ProcInv.proc_dormant_unused]), so it is the one place the

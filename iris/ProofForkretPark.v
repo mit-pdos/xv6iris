@@ -222,11 +222,11 @@ Theorem forkret_park_paid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
     (γs : list gname) (γw γc γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
-    (pid : mword 32) (U : ustate) (sts : list fdstate) (gn : gname)
+    (pid : mword 32) (U : ustate) (sts : list fdstate)
     (cs : gset gname) (av : nat) (steady : bool) :
     forkret_park_paid_body
       (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) W
-      γs γw γc γft γf γtl pa ks rest pid U sts gn cs av steady.
+      γs γw γc γft γf γtl pa ks rest pid U sts cs av steady.
 Proof.
   cbv beta delta [forkret_park_paid_body].
   intros Hrest [j [Hpa Hj]] Hut.
@@ -299,7 +299,7 @@ Proof.
              ⌜pv_cwi (us_V U') = pv_cwi (us_V U)⌝ -∗
              (* ...and, on the steady mode, the parked run key -- passed
                 straight through to the package's own closer *)
-             ⌜match (if steady then Some (uvis_of U [] gn cs) else None) with
+             ⌜match (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs) else None) with
                | Some W0 => urun_eq W0 U' | None => True end⌝ -∗
              (* ...and the resumer's globals, at ITS context (L8, A12.19) *)
              UsertrapRes.park_globals Xc γs γw γc γft γf γtl -∗
@@ -311,8 +311,8 @@ Proof.
                (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
              (FR.usertrap_res_bare (CID := h) (XI := Xc) pt'
                 (add_vec ks (mword_of_int 4096)) U' sts
-              ∗ match (if steady then Some (uvis_of U [] gn cs) else None) with
-                | Some _ => uslot (uvis_of U' sts gn cs)
+              ∗ match (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs) else None) with
+                | Some _ => uslot (uvis_of U' sts (pv_gen (us_V U)) cs)
                 | None => emp
                 end))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
@@ -378,7 +378,7 @@ Proof.
   (* forkret, at the resuming hart.                                      *)
   (* ================================================================== *)
   iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γw γc γft γf γtl pid U sts
-            gn cs ks m av
+            (pv_gen (us_V U)) cs ks m av
             (av - 6 - trap_res eb')%nat eb' steady
             Hj Hgl Hbud Hkx Hut Hsp
           with "Htext Hwire Hkmap Hpc [] [] Hcg Hcpu Htc Hclm
@@ -409,12 +409,12 @@ Proof.
             (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) γs).
   { intros N av. exact (FR.usertrap_res_bare_park N av). }
   rewrite /park_cap. iModIntro.
-  iIntros (hp ξp γw γc γft γf γtl pa ks rest pid U sts gn cs av steady)
+  iIntros (hp ξp γw γc γft γf γtl pa ks rest pid U sts cs av steady)
     "%Hrest %Hj %Hav Hrun Hpkg HW Hchild".
   destruct U as [V M].
   iDestruct "Hchild" as "(#Hks & Hctx & Hpriv & Hfd & Hirsp)".
   iApply (forkret_park_paid (CID := hp) (XI := ξp) (park_token γs) γs γw γc γft γf γtl pa ks rest pid
-            (MkUstate V M) sts gn cs av steady Hrest Hj Hav
+            (MkUstate V M) sts cs av steady Hrest Hj Hav
           with "Hrun [Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
   iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk

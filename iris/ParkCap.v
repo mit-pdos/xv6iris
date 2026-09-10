@@ -105,7 +105,14 @@ Section ParkCap.
       (* ...AND THE PARKED PROCESS'S GENERATION AND CHILDREN SET, beside
          [sts] and for its reason: the resume key carries both and the
          closer builds it, so the party that read them off the kernel's
-         cells names them here. *)
+         cells names them here.  THE GENERATION IS NOT THE PARKER'S TO
+         CHOOSE -- [park_cap] below passes the parked block's own field
+         [ProcDefs.pv_gen] -- but it stays a PARAMETER here rather
+         than a projection of the closer's [U'], because pinning the
+         RESUMED record's field is a statement about the residue, and the
+         residue does not carry the generation until WX-RES.  The children
+         set is the parker's choice for the same reason, and this lane's
+         fork arm is what makes that choice non-trivial. *)
       (gn : gname) (cs : gset gname)
       (* THE PARKED RUN KEY, WHEN THERE IS ONE.  A park has two modes and
          this is the parameter that selects them ([park_cap]'s [steady] bit
@@ -266,7 +273,12 @@ Section ParkCap.
          (rest : list (mword 64)) (pid : mword 32) (U : ustate)
          (* THE PARKED DESCRIPTOR STATES -- [park_pkg]'s parameter, which
             the parker names off the fragment bundle it holds *)
-         (sts : list fdstate) (gn : gname) (cs : gset gname) (av : nat)
+         (* THE PARKED CHILDREN SET, which the parker names off the
+            resource it holds, exactly as it names [sts].  THE GENERATION
+            IS NOT HERE: the block determines it ([ProcDefs.pv_gen]), so
+            the cap passes the block's field and the package's closer
+            demands the resumed record carry the same one. *)
+         (sts : list fdstate) (cs : gset gname) (av : nat)
          (* WHICH OF THE PACKAGE'S TWO MODES the parker is paying: [true]
             hands the package the parked record's RUN KEY and owes
             [FirstTok.first_done] with it, [false] hands no key and owes
@@ -285,8 +297,8 @@ Section ParkCap.
           -- see [ProofForkretPark]. *)
        own_context (CID := hp) ξp -∗
        park_pkg (XI := ξp) URB W γs γw γc γft γf γtl pa ks (pv_fdg (us_V U))
-         (pv_cwi (us_V U)) sts gn cs
-         (if steady then Some (uvis_of U [] gn cs) else None)
+         (pv_cwi (us_V U)) sts (pv_gen (us_V U)) cs
+         (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs) else None)
          pid av -∗
        (* ...and [W] itself, for forkret to hand the closer: under the same
           later, for the same reason *)
@@ -370,7 +382,7 @@ Section ParkCap.
   (* and the closer re-keys it (kfork's child).                             *)
   (* ------------------------------------------------------------------- *)
   Lemma park_token_park `{CID : CpuId} (N : ut_names) (rest : list (mword 64)) (U : ustate)
-      (sts : list fdstate) (gn : gname) (cs : gset gname) :
+      (sts : list fdstate) (cs : gset gname) :
     ut_wf N ->
     length rest = 12%nat ->
     (* the parker's running token, in and out -- the cap's premise *)
@@ -431,7 +443,7 @@ Section ParkCap.
     iDestruct ("Hchan" $! cur_ctx N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
     iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
-              (un_ks N) rest (un_pid N) U sts gn cs KSTACK_AV false
+              (un_ks N) rest (un_pid N) U sts cs KSTACK_AV false
               with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hbundle] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
@@ -491,7 +503,7 @@ Section ParkCap.
 
      Everything else is [park_token_park]'s, row for row. *)
   Lemma park_token_park_steady `{CID : CpuId} (N : ut_names) (rest : list (mword 64))
-      (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname) :
+      (U : ustate) (sts : list fdstate) (cs : gset gname) :
     ut_wf N ->
     length rest = 12%nat ->
     (* the parker's running token, in and out -- the cap's premise *)
@@ -510,7 +522,10 @@ Section ParkCap.
        [park_token_park] takes them *)
     fd_frags (pv_fdg (us_V U)) sts -∗
     (* ONE SLOT, AT THE PARKED RECORD, at the very table the fragments name *)
-    uslot (uvis_of U sts gn cs) -∗
+    (* AT THE BLOCK'S OWN GENERATION: the key's [UexecSlot.uvis_gen] is
+       the field [ProcDefs.pv_gen], so the parked slot is keyed at it and
+       nothing here chooses. *)
+    uslot (uvis_of U sts (pv_gen (us_V U)) cs) -∗
     (* the child's rows with the block WHOLE -- the steady mode's shape *)
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U true -∗
     |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
@@ -529,7 +544,7 @@ Section ParkCap.
     iDestruct ("Hchan" $! cur_ctx N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
     iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
-              (un_ks N) rest (un_pid N) U sts gn cs KSTACK_AV true
+              (un_ks N) rest (un_pid N) U sts cs KSTACK_AV true
               with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hslot Hdone0] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
@@ -567,9 +582,11 @@ Section ParkCap.
            neither, so the closer's premise is the fact this needs.  Then
            [uslot_of_urun_eq] moves the slot onto the record the resume
            produces, at the descriptor states the residue is about to carry. *)
-        assert (Hrk' : urun_eq (uvis_of U sts gn cs) U') by exact Hrk.
+        assert (Hrk' : urun_eq (uvis_of U sts (pv_gen (us_V U)) cs) U')
+          by exact Hrk.
         iApply (bi.equiv_entails_1_1 _ _
-                  (uslot_of_urun_eq (uvis_of U sts gn cs) U' sts gn cs Hrk'
+                  (uslot_of_urun_eq (uvis_of U sts (pv_gen (us_V U)) cs) U'
+                     sts (pv_gen (us_V U)) cs Hrk'
                      eq_refl eq_refl eq_refl)).
         iExact "Hslot".
     - iNext. iExact "Htok".

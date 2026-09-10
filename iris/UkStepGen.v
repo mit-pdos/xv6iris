@@ -68,6 +68,7 @@ Require Import UsysMemOk.
 Require Import UexecWp UexecSlot UexecRet.
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1777,6 +1778,9 @@ Section UkGenPlain.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
 
   (* fact (i) at [uslot]: the fixpoint unfolding.  [Q] is [True] here, so
      the only difference from [uslot_unfold] is one vacuous premise. *)

@@ -101,7 +101,7 @@ Notation KF := KernelSyms.kfork (only parsing).
    in this file reduces to. *)
 Lemma pprivate_eta (V : pprivate) :
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
-          (pv_cwi V) = V.
+          (pv_cwi V) (pv_gen V) (pv_chg V) = V.
 Proof. destruct V; reflexivity. Qed.
 
 Lemma upd_cwd_id (V : pprivate) : upd_cwd V (pv_cwd V) = V.
@@ -157,7 +157,7 @@ Section KforkB4Res.
     pname_cells pa (DfracOwn 1) (pv_name (us_V U)) ∗
     ⌜length (pv_name (us_V U)) = PNAMELEN⌝ ∗
     (∀ ns : list (bv 8), ⌜length ns = PNAMELEN⌝ -∗ pname_cells pa (DfracOwn 1) ns -∗
-       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns (pv_cwi (us_V U))))).
+       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns (pv_cwi (us_V U)) (pv_gen (us_V U)) (pv_chg (us_V U))))).
   Proof.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
@@ -281,7 +281,13 @@ Section KforkB4Proof.
             (* ...and the cwd's inum, COPIED from the parent (lane C1):
                idup's copy carries the identity the parent's reference
                does, and the child's block is built at it. *)
-            pv_cwi Vc' = pv_cwi (us_V Up)⌝ ∗
+            pv_cwi Vc' = pv_cwi (us_V Up) /\
+            (* ...AND THE TWO GHOST NAMES, which this block does not touch:
+               safestrcpy writes the name bytes and idup the cwd, and the
+               generation is what the park keys the child's slot at
+               ([ParkCap.park_cap] passes [ProcDefs.pv_gen]). *)
+            pv_gen Vc' = pv_gen (us_V Uc) /\
+            pv_chg Vc' = pv_chg (us_V Uc)⌝ ∗
            proc_priv γf npa pid_c (MkUstate Vc' ((us_M Uc)))) -∗
         iref_slots IREFSPARE -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -430,7 +436,7 @@ Section KforkB4Proof.
       with "[Hchild2 Hccref2]" as "Hchild2".
     { iApply proc_priv_split_cwd. iFrame "Hchild2".
       iSplitL "Hccref2";
-        [by cbn [us_cwi us_cwd upd_usV us_V upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg] |].
+        [by cbn [us_cwi us_cwd upd_usV us_V upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg pv_gen pv_chg] |].
       (* THE MINT.  The child's token is the steady arm of the disjunction,
          built from the persistent [first_done] the caller threaded in. *)
       iApply (first_tok_of_done with "Hfdone"). }
@@ -599,7 +605,8 @@ Section KforkB4Proof.
                  with "HnmCfold") as "HnmCfold".
     iDestruct ("HnmCback" $! (h <$> seq 0 16%nat) Hlen_hn with "HnmCfold") as "Hchild3".
     set (Vc3 := MkPPriv (pv_sz Vc2) (pv_upt Vc2) (pv_tf Vc2) (pv_ofile Vc2)
-                  (pv_fdg Vc2) (pv_cwd Vc2) (h <$> seq 0 16%nat) (pv_cwi Vc2)).
+                  (pv_fdg Vc2) (pv_cwd Vc2) (h <$> seq 0 16%nat) (pv_cwi Vc2)
+                  (pv_gen Vc2) (pv_chg Vc2)).
     (* ------------------------------------------------------------- *)
     (* +0xbe: lw s1,48(s4) -- s1 := np->pid, THE RETURN VALUE.        *)
     (* ------------------------------------------------------------- *)
@@ -644,13 +651,15 @@ Section KforkB4Proof.
                 pv_tf Vc' = pv_tf (us_V Uc) /\ pv_ofile Vc' = pv_ofile (us_V Uc) /\
                 pv_cwd Vc' = pv_cwd (us_V Up) /\ pv_fdg Vc' = pv_fdg (us_V Uc) /\
                 length (pv_name Vc') = PNAMELEN /\
-                pv_cwi Vc' = pv_cwi (us_V Up)⌝ ∗
+                pv_cwi Vc' = pv_cwi (us_V Up) /\
+                pv_gen Vc' = pv_gen (us_V Uc) /\
+                pv_chg Vc' = pv_chg (us_V Uc)⌝ ∗
                proc_priv γf npa pid_c (MkUstate Vc' ((us_M Uc))))%I
       with "[Hchild4]" as "HchildFinal".
     { iExists Vc3.
       iSplitR.
       - iPureIntro. rewrite /Vc3 /Vc2 /upd_cwi /upd_cwd.
-        cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_fdg pv_cwi].
+        cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_fdg pv_cwi pv_gen pv_chg].
         rewrite Hcwd. repeat split; reflexivity.
       - iExact "Hchild4". }
     iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].

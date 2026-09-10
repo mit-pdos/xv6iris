@@ -69,6 +69,7 @@ Require Import UkShDiag.
 Require Import UkShLoop.
 Require Import TsoCtx.
 Require User.ShSyms User.ShInstrs.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -129,6 +130,7 @@ Qed.
 Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
+Require Import UserChildren.  (* [uch_any] -- the process's own half of its children set *)
 
 Section UkShCd.
   Context `{!riscvGS Σ}.
@@ -145,7 +147,11 @@ Section UkShCd.
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
+  Local Notation γch := (ukn_ch N).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -820,11 +826,11 @@ Section UkShCd.
       by exact (upd_eq mB (Regidx ra_idx) _).
     (* THE ONE PLACE sh SPENDS ITS WORKING DIRECTORY: out of the process
        state, into the chdir row, and back in a turn later. *)
-    iDestruct "Hstd" as "[Hstd Hcwd]".
+    iDestruct "Hstd" as "(Hstd & Hcwd & Hch)".
     iApply (wp_kshc_chdir h16 mC (16 + (80 + n))
               with "Hcode Hcwd Hrun").
     iIntros (h17 ret) "Hcwd Hrun".
-    iCombine "Hstd Hcwd" as "Hstd".
+    iCombine "Hstd Hcwd Hch" as "Hstd".
     rewrite Hra_C.
     assert (Eret2 : ret_pc (mword_of_int 0x9aa : mword 64)
                     = mword_of_int 0x9aa)

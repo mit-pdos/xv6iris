@@ -60,6 +60,7 @@ Require Import SpecUserret.  (* [userret_gpr] -- the 31-insert register file *)
 Require Import UexecSlot.    (* [uvis] / [tf_w] / [tf_resume_gpr] / [ret_pc_idem] *)
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import UexecSG.      (* [uexecSG]: [sbundle_at] / [spost_at] / [skey_eq] *)
+Require Import ChildTok.     (* [child_tok] -- fork's answer to the parent *)
 Require Import UexecRet.     (* [tf_resume_gpr0] / [tf_of] / [uslot] / [uexec_ret] *)
 Require Import UexecRound.   (* the round this vocabulary is applied under *)
 Require Import TsoCtx.
@@ -356,6 +357,10 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
 Section Apply.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
+  (* [ChildTok.ctokG]: this file names the generation's pieces and binds no
+     whole-system bundle.  A file that binds [Xv6G.xv6G] gets the class
+     through the bundle and must not bind it again. *)
+  Context `{!ctokG Σ}.
   Context `{GEN : GenId}.
   Context `{SG : uexecSG Σ}.
 
@@ -454,7 +459,7 @@ Section Apply.
       - reflexivity.
       - reflexivity.
       - reflexivity. }
-    rewrite /uexec_arm_F /uexec_fork_parent_F /uexec_ret_cont_F. cbv zeta.
+    rewrite /uexec_arm_F /uexec_fork_parent_F /ufork_ans /uexec_ret_cont_F. cbv zeta.
     destruct (decide (sc = uecall_scause)) as [_ | _];
       [ | exact (HS W W' Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch) ].
     (* [Hfd] joins the other four: the returning arm's row reads the ENTRY
@@ -675,6 +680,10 @@ Qed.
 Section LoopApply.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
+  (* [ChildTok.ctokG]: this file names the generation's pieces and binds no
+     whole-system bundle.  A file that binds [Xv6G.xv6G] gets the class
+     through the bundle and must not bind it again. *)
+  Context `{!ctokG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
   Context `{SG : uexecSG Σ}.
 
@@ -845,7 +854,12 @@ Section LoopApply.
        fork and wait arms that DO move the set restate them; nothing here
        has to anticipate that. *)
     uvis_gen W' = uvis_gen W ->
-    uvis_ch W' = uvis_ch W ->
+    (* ...AND THE CHILDREN SET IS QUIET AT EVERY ENTRY BUT FORK, which is
+       the one this lane turns on: fork's own answer below says what the
+       set became, so the blanket premise is guarded off it. *)
+    (~ (sc = uecall_scause
+        /\ usys_num (uvis_tf (uvis_run W)) = USYS_fork) ->
+     uvis_ch W' = uvis_ch W) ->
     (sc <> uecall_scause -> uvis_fd W' = uvis_fd W) ->
     (* ...AND ON THE ECALL ARM, THE SYSCALL'S OWN ROW.  This is the premise
        that used to be missing, and its absence is why the process resumed
@@ -890,6 +904,19 @@ Section LoopApply.
                 (uvis_M W') (uvis_perm W') (uvis_sz W')
            /\ uvis_fd W' = uvis_fd W⌝
         ∨ uslot W')) -∗
+    (* THE KERNEL'S FORK ANSWER, and it is the mint this lane adds.  fork
+       is the second entry whose round says more than a relation on the
+       key: the kernel created a process, and what it hands the PARENT is
+       the parent's quarter of that child's generation
+       ([ChildTok.child_tok], at the payload the process's own families
+       chose) together with the set its children reading grew to.  The
+       return value is read under the round's own bump, which is what ties
+       the pid the token carries to the a0 word the process resumes at.
+       Owed only at a fork ecall; every other arm refutes the guard. *)
+    (⌜sc = uecall_scause
+      /\ usys_num (uvis_tf (uvis_run W)) = USYS_fork⌝ -∗
+     ufork_ans (sfork_pay f) (uvis_tf W' !!! tf_arg_idx 0)
+       (uvis_ch W) (uvis_ch W')) -∗
     (* ...AND THE ARMED POST the deposit bought, at the value the round
        bound.  Owed only on the RETURNING arm -- exit hands nothing back and
        fork pays no receipt (what its deposit buys is the CHILD's
@@ -906,7 +933,7 @@ Section LoopApply.
     uexec_arm sc W f -∗ uslot W'.
   Proof.
     intros Hl Hgn Hch Hfd Hfdrow Hpiperow Hr.
-    iIntros "Hxo Hsp Hret".
+    iIntros "Hxo Hfo Hsp Hret".
     (* STEP A: the trapped key and its run projection are the same key *)
     iEval (rewrite (uexec_arm_run sc W f Hl)) in "Hret".
     destruct (decide (sc = uecall_scause)) as [Hec | Hne].
@@ -935,11 +962,13 @@ Section LoopApply.
               | rewrite Hexec; discriminate ] |].
           rewrite <- Hexec in Hm.
           assert (Hnec : USYS_exec <> USYS_chdir) by discriminate.
+          assert (Hchq : uvis_ch W' = uvis_ch W)
+            by (apply Hch; intros [_ Hx]; rewrite Hexec in Hx; discriminate Hx).
           assert (Hc : usys_cwd_ok (usys_num (uvis_tf (uvis_run W))) r
                          (uvis_cwd W) (uvis_cwd W')).
           { rewrite Hcwx. exact (usys_cwd_ok_refl_at _ USYS_exec r _ Hexec Hnec). }
           iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r Hl
-                    Hgn Hch Hb Hm
+                    Hgn Hchq Hb Hm
                     (Hfdrow Hec) (Hpiperow Hec) Hc with "[Hsp] Hret").
           (* the post is at the a0 word, which the failure arm pins to [r] *)
           iExact "Hsp".
@@ -1012,10 +1041,21 @@ Section LoopApply.
                         = tf_resume_pc (uvis_tf W')).
           { rewrite (tf_resume_pc_bump (uvis_tf (uvis_run W)) r Hle).
             exact (eq_sym Hb2). }
+          (* THE KERNEL'S ANSWER: which generation was created, at which
+             pid, and the parent's quarter of it. *)
+          (* THE STORED a0 WORD IS THE ROUND'S RETURN VALUE: userret
+             restores a0 from word 14 ([UexecSlot.tf_resume_gpr_a0]) and
+             the round's bump pins that register to [r]. *)
+          assert (Ha0r : uvis_tf W' !!! tf_arg_idx 0 = r).
+          { rewrite -(tf_resume_gpr_a0 zero_rf (uvis_tf W')).
+            unfold tf_resume_gpr0 in Hb1. rewrite Hb1. apply upd_eq. }
+          iDestruct ("Hfo" with "[%]") as "Hans";
+            [ split; [ exact Hec | exact Hfk ] | ].
+          iEval (rewrite Ha0r) in "Hans".
           rewrite /uexec_fork_parent_F.
           iDestruct ("Hret" $! r (uvis_fd W') (uvis_cwd W') (uvis_ch W')
-                       with "[%] [%] [%] [%]") as "Hs";
-            [ exact Hrne | exact Hfd' | exact Hcw' | exact Hch | ].
+                       with "[%] [%] [%] Hans") as "Hs";
+            [ exact Hrne | exact Hfd' | exact Hcw' | ].
           iEval (rewrite (uslot_key_cong
                             (bump (uvis_run W) r (uvis_M (uvis_run W))
                                (uvis_perm (uvis_run W)) (uvis_sz (uvis_run W))
@@ -1027,8 +1067,10 @@ Section LoopApply.
         * (* the returning arms: the row is the round's own conjunct *)
           iDestruct ("Hsp" with "[%]") as "Hsp";
             [ split_and!; [ exact Hec | exact Hnex | exact Hnfk ] |].
+          assert (Hchq : uvis_ch W' = uvis_ch W)
+            by (apply Hch; intros [_ Hx]; exact (Hnfk Hx)).
           iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r Hl
-                    Hgn Hch Hb Hm
+                    Hgn Hchq Hb Hm
                     (Hfdrow Hec) (Hpiperow Hec) Hc with "[Hsp] Hret").
           iExact "Hsp".
     - (* ---- TRANSPARENT: interrupt, page fault, anything else ---- *)
@@ -1037,11 +1079,13 @@ Section LoopApply.
                   (uvis_M W) (uvis_M W') (uvis_perm W) (uvis_perm W')
                   (uvis_sz W) (uvis_sz W') (uvis_cwd W) (uvis_cwd W')
                   (uvis_tf W') Hne Hr) as [[Hi1 Hi2] [HM [Hpi [Hsz Hcw]]]].
+      assert (Hchq : uvis_ch W' = uvis_ch W)
+        by (apply Hch; intros [Hx _]; exact (Hne Hx)).
       iEval (rewrite (uslot_key_cong (uvis_run W) W'
                         (eq_sym Hi1) (eq_sym Hi2)
                         (eq_sym HM) (eq_sym Hpi) (eq_sym Hsz)
                         (eq_sym (Hfd Hne)) (eq_sym Hcw)
-                        (eq_sym Hgn) (eq_sym Hch))) in "Hret".
+                        (eq_sym Hgn) (eq_sym Hchq))) in "Hret".
       iExact "Hret".
   Qed.
 
@@ -1058,11 +1102,19 @@ Section LoopApply.
      trap those ARE the trapped ones, and [ut_fd_kept] is what says so. *)
   Lemma uexec_ret_round_slot_of (sc : mword 64) (W : uvis) (f : sfam)
       (g : regfile)
-      (sepc_v : mword 64) (U' : ustate) (fdv' : list fdstate) :
+      (sepc_v : mword 64) (U' : ustate) (fdv' : list fdstate)
+      (* ...AND THE SET TO RESUME AT, beside the descriptor view and for
+         its reason: fork moves it, so the loop passes what the round left
+         rather than the trapped reading.  Every other entry is quiet, and
+         the premise below says so. *)
+      (cs' : gset gname) :
     length (uvis_tf W) = TFWORDS ->
     g = tf_resume_gpr0 (uvis_tf W) ->
     sepc_v = tf_w (uvis_tf W) tf_epc_idx ->
     (sc <> uecall_scause -> fdv' = uvis_fd W) ->
+    (~ (sc = uecall_scause
+        /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_fork) ->
+     cs' = uvis_ch W) ->
     (* ...and the ecall arm's row, forwarded verbatim -- see
        [uexec_ret_round_slot]'s own note.  Stated at [tf_of g] because that
        is the trapframe the round is stated at here, which is exactly the
@@ -1092,21 +1144,26 @@ Section LoopApply.
                 (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
                 (uint (pv_sz (us_V U')))
            /\ fdv' = uvis_fd W⌝
-        ∨ uslot (uvis_of U' fdv' (uvis_gen W) (uvis_ch W)))) -∗
+        ∨ uslot (uvis_of U' fdv' (uvis_gen W) cs'))) -∗
+    (* ...AND FORK'S, forwarded verbatim -- see [uexec_ret_round_slot] *)
+    (⌜sc = uecall_scause
+      /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_fork⌝ -∗
+     ufork_ans (sfork_pay f) (pv_tf (us_V U') !!! tf_arg_idx 0)
+       (uvis_ch W) cs') -∗
     (⌜sc = uecall_scause
       /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_exit
       /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_fork⌝ -∗
        spost_at uslot (usys_num (tf_of g (ret_pc sepc_v))) f
          (uvis_run W) (pv_tf (us_V U') !!! tf_arg_idx 0)
-         (us_M U') fdv' (pv_cwi (us_V U')) (uvis_ch W)) -∗
+         (us_M U') fdv' (pv_cwi (us_V U')) cs') -∗
     uexec_arm sc W f -∗
-    uslot (uvis_of U' fdv' (uvis_gen W) (uvis_ch W)).
+    uslot (uvis_of U' fdv' (uvis_gen W) cs').
   Proof.
-    intros Hl -> -> Hfd Hfdrow Hpiperow Hr.
-    (* THE RESUME KEY IS BUILT AT THE TRAPPED KEY'S OWN TWO READINGS, so
-       both premises are [eq_refl]: this lane's rows are quiet. *)
-    exact (uexec_ret_round_slot sc W (uvis_of U' fdv' (uvis_gen W) (uvis_ch W))
-             f Hl eq_refl eq_refl Hfd Hfdrow Hpiperow Hr).
+    intros Hl -> -> Hfd Hchrow Hfdrow Hpiperow Hr.
+    (* THE RESUME KEY IS BUILT AT THE TRAPPED KEY'S OWN GENERATION -- no
+       entry re-incarnates its caller -- and at the set the loop passes. *)
+    exact (uexec_ret_round_slot sc W (uvis_of U' fdv' (uvis_gen W) cs')
+             f Hl eq_refl Hchrow Hfd Hfdrow Hpiperow Hr).
   Qed.
 
   (* ------------------------------------------------------------------ *)

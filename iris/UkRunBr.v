@@ -43,6 +43,7 @@ Require Import UkStep.   (* [uvb_x0]: the zero register, for the x0 branches *)
 Require Import UkBranch.
 Require Import UkRun.
 Require Import TsoCtx.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -60,6 +61,9 @@ Section UkRunBr.
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
 
   (* the base branch against x0 -- [bltz]/[bgez]/[beqz]/[bnez].  The second

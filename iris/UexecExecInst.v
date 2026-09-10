@@ -260,6 +260,14 @@ Section UexecExecInst.
     df_Fun   : pfam Σ (aview -> Z -> iProp Σ);
     df_Fok   : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ);
     df_Fex   : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ);
+    (* ---- fork (1): THE CHILD'S EXIT PAYLOAD ([UexecSG.sfork_pay]) ----
+       What the process's child owes it back at exit, as a function of the
+       status.  A field of the FAMILIES and not a parameter of fork's rows
+       because the trap route splits a return into its deposit and its arm
+       and carries them past each other, and [f] is the one value that
+       travels with both -- see [UexecSG.v]'s [sfork_pay].  LAST, so every
+       positional builder only gained a trailing argument. *)
+    kf_pay   : Z -> iProp Σ;
   }.
 
   (* THE RECORD AT EXEC'S FOUR AND THE TRIVIAL FAMILIES ELSEWHERE.  The
@@ -267,8 +275,9 @@ Section UexecExecInst.
      [FsAbsInvFire] dischargers produce, because that is what the two supply
      laws below hand back: a process that answers for no abstract state gets
      its bundles AT THIS RECORD. *)
-  Definition xfam_exec (P Pmiss : nat -> Z -> iProp Σ)
-      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) : xfam :=
+  Definition xfam_exec_at (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ)
+      (pay : Z -> iProp Σ) : xfam :=
     {| xf_P := P; xf_Pmiss := Pmiss; xf_Fo := Fo; xf_Rs := Rs;
        rf_F     := pfam_triv (fun _ _ _ _ => True%I);
        cf_P     := fun _ _ => True%I;
@@ -305,12 +314,27 @@ Section UexecExecInst.
        df_Fdots := pfam_triv (fun _ _ _ _ => True%I);
        df_Fun   := pfam_triv (fun _ _ => True%I);
        df_Fok   := pfam_triv (fun _ _ _ _ => True%I);
-       df_Fex   := pfam_triv (fun _ _ _ _ => True%I) |}.
+       df_Fex   := pfam_triv (fun _ _ _ _ => True%I);
+       kf_pay   := pay |}.
+
+  (* ...AT THE TRIVIAL PAYLOAD, which is what every generic process forks
+     with: a generic child's exit owes its parent nothing.  The four-argument
+     name is unchanged, so no discharger moved. *)
+  Definition xfam_exec (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) : xfam :=
+    xfam_exec_at P Pmiss Fo Rs (fun _ => True%I).
 
   (* the point, for the arms that carry no deposit *)
   Definition xfam_pt : xfam :=
     xfam_exec (fun _ _ => True%I) (fun _ _ => True%I)
               (pfam_triv (fun _ _ _ => True%I)) True%I.
+
+  (* ...AND THE POINT AT A CHOSEN PAYLOAD, which is all a fork leaf needs:
+     fork's rows read no other field of the families
+     ([UexecSG.sfam_pay]). *)
+  Definition xfam_pay (Q : Z -> iProp Σ) : xfam :=
+    xfam_exec_at (fun _ _ => True%I) (fun _ _ => True%I)
+                 (pfam_triv (fun _ _ _ => True%I)) True%I Q.
 
   (* ================================================================== *)
   (* THE KEY'S THREE ARGUMENT WORDS, named once.  A bundle reads nothing  *)
@@ -652,6 +676,9 @@ Section UexecExecInst.
   Global Instance uexecSG_xv6 : uexecSG Σ :=
     {| sfam := xfam;
        sfam_pt := xfam_pt;
+       sfork_pay := kf_pay;
+       sfam_pay := xfam_pay;
+       sfork_pay_pay := fun Q => eq_refl;
        sbundle_at := xv6_sbundle;
        spost_at := xv6_spost;
        sbundle_at_ne := xv6_sbundle_ne;

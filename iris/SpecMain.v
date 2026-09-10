@@ -260,7 +260,7 @@ Section SpecMain.
   (* side ASSEMBLY does, and which therefore have nowhere else to come    *)
   (* from:                                                               *)
   (*  - per process, the two PUBLIC cells procinit never touches:          *)
-  (*    [p_chan] and [SchedCtx.proc_pub_bare] (killed / xstate / the      *)
+  (*    [p_chan] and [SchedCtx.proc_pub] (killed / xstate / the      *)
   (*    invariant's permanent HALF of the pid cell -- [proc_raw] carries   *)
   (*    the other half).  [SpecProcinit.procs_inv_alloc] consumes exactly  *)
   (*    [proc_ready i] plus these two, so they are main's to supply.       *)
@@ -312,10 +312,10 @@ Section SpecMain.
      ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) ∗
      ([∗ list] i ∈ seq 0 NPROC,
         (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-        proc_pub_bare (proc_addr i)) ∗
+        proc_pub (proc_addr i)) ∗
      (* ...AND <pid_lock>'s QUARTER OF EVERY pid CELL -- the part of a
         [struct proc] that belongs to THAT lock (upstream ded23f2's pid scan
-        reads all 64 under it), carved beside [proc_pub_bare]'s quarter and routed
+        reads all 64 under it), carved beside [proc_pub]'s quarter and routed
         to main's [newlock] for [PidLock.nextpid_res]. *)
      ([∗ list] i ∈ seq 0 NPROC, pid_lock_share (proc_addr i)) ∗
      (* ...AND WHAT wait_lock IS OVER.  [WaitInv.parents_res] is [∃ ps,

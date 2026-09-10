@@ -1818,7 +1818,7 @@ Proof.
                     Hpriv Hdone HW Hbslot Hpg [Hyield]").
     (* [upd_tf] does not touch [pv_fdg], so the closer the caller handed in
        at the ENTRY record's name is the one this tail wants. *)
-    iEval (cbn [pv_fdg pv_cwi upd_tf]; rewrite Hfgk Hcwik). iExact "Hyield".
+    iEval (cbn [pv_fdg pv_cwi upd_tf pv_gen pv_chg]; rewrite Hfgk Hcwik). iExact "Hyield".
 Qed.
 
 Theorem wp_forkret

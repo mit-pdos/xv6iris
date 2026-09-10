@@ -319,6 +319,15 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
    (* ...and the cwd's inum beside the pointer (lane C1): exec does not
       chdir, so [ProcDefs.pv_cwi] is untouched like the cell it labels *)
    pv_cwi V' = pv_cwi V /\
+   (* ...AND THE TWO GHOST NAMES.  The identity of a process survives
+      exec -- it is the same incarnation of the same slot, with the same
+      parent expecting the same exit payload -- so [ProcDefs.pv_gen] is
+      untouched; and exec neither forks nor reaps, so the children row's
+      name is too.  [UexecSlot.uvis_gen] of the post-exec key is
+      therefore the pre-exec one, which is what the exec'ing process's
+      own child token stands on. *)
+   pv_gen V' = pv_gen V /\
+   pv_chg V' = pv_chg V /\
    length (pv_name V') = PNAMELEN /\
    (* the stack geometry: [sp] sits in the top page of the image, above the
       guard page uvmclear turned unusable *)

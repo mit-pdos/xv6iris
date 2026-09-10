@@ -1637,7 +1637,7 @@ Section ProofKwait.
     intros sp0 spr HK Hk Hsp Hs1 Hs2 Hs7 Hcs Hbelow.
     iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hplk #Hlkk Htokk Hstate Hpsg Hchan Hpub
              Hdorm Hpark #Hmk #Hlk Htok Hps Hch Hpriv Hframe Hcont".
-    iDestruct "Hpub" as (kl xs pidc) "(Hkilled & Hxstate & Hpidhalf & Hgen)".
+    iDestruct "Hpub" as (kl xs pidc) "(Hkilled & Hxstate & Hpidhalf)".
     (* ---- +0x40 lw s3,48(s1) : pid = pp->pid ---- *)
     assert (Hea40 : add_vec (rget (CID := CIDf) Mf Rs1)
                       (sign_extend' 64 (mword_of_int 48 : mword 12)) = p_pid (proc_addr k)).
@@ -1680,8 +1680,8 @@ Section ProofKwait.
                        = mword_of_int (KW + 0x60))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt60) in "Hpc".
-      iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf Hgen]" as "Hpub".
-      { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf Hgen". }
+      iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
+      { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
       iApply (kw_reap γs γa γp γw γc γk mm F0 pme k K eb pidc ch ps lks
                 HK Hk HF0sp HF0s1 HF0s3 HF0cs Hbelow
                 with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hplk Hlkk Htokk Hstate Hpsg Hchan
@@ -1936,8 +1936,8 @@ Section ProofKwait.
       subst Mco.
       iDestruct ("Hback" $! P' (umem_wr (us_M U) addr d (fun i => nth_byte xs i))
                    with "[%] Hsz Hpg Hpt") as "Hpriv"; [exact Hext |].
-      iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf Hgen]" as "Hpub".
-      { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf Hgen". }
+      iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
+      { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
       assert (Hcosp : mco !!! Regidx csp_rs1 = spr)
         by (rewrite (callee_saved_lookup Hcsco csp_rs1 ltac:(vm_compute; reflexivity)); exact HF6sp).
       assert (Hcos1 : mco !!! Regidx Rs1 = proc_addr k)

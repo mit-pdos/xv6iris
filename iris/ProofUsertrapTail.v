@@ -78,6 +78,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
+Require Import ChildTok.  (* [child_tok] -- fork's answer, relayed *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -263,6 +264,9 @@ Section UtRet2.
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
       (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
+    (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
+    ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+      (pv_tf (us_V U) !!! tf_arg_idx 0) -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
        the record it parks, at the resume view it parks it at --
@@ -282,7 +286,7 @@ Section UtRet2.
     
     destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec Hq4
-             Hkptr #Htfk [#Hcaps Hown] Hframe Hxo Hso Hcont".
+             Hkptr #Htfk [#Hcaps Hown] Hframe Hxo Hfo Hso Hcont".
     (* the boundary hands the trap resource back at the literal [∅] that
        [ut_res] pins -- depth 0 forces the held set empty, so this is a
        re-spelling, not an obligation. *)
@@ -643,7 +647,7 @@ Section UtRet2.
               (kvi_satp_word (ud_root (pv_upt (us_V U)))) (mepc_val uepc) scv stv mdv0 U
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
-                    Hmie Hmdl Hmenv Hhw Hmin [-Hxo Hso] Hxo Hso").
+                    Hmie Hmdl Hmenv Hhw Hmin [-Hxo Hfo Hso] Hxo Hfo Hso").
     - reflexivity.
     - exact Hrd.
     - (* [ut_fd_kept], straight off the premise: this tail re-closes the
@@ -765,6 +769,9 @@ Section UtRet.
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
       (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
+    (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
+    ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+      (pv_tf (us_V U) !!! tf_arg_idx 0) -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
        the record it parks, at the resume view it parks it at --
@@ -781,7 +788,7 @@ Section UtRet.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hhold Hframe Hxo Hso Hcont".
+    iIntros "#Htext Hpc Hcg Hhold Hframe Hxo Hfo Hso Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hufr & Hsy & Hownback)".
     iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
@@ -885,6 +892,8 @@ Section UtRet.
                      = pv_tf (us_V (MkUstate Vr (us_M U))) !!! tf_arg_idx 0)
       by exact (tf_ueq_arg _ _ 0 ltac:(lia) HVru).
     iEval (rewrite Hsoarg) in "Hso".
+    (* ...and fork's, read at that same word *)
+    iEval (rewrite Hsoarg) in "Hfo".
     (* ...and at the cwd inum of that same record, which the row also reads
        and which prepare_return leaves alone ([HVrcwi]) *)
     iEval (rewrite -HVrcwi) in "Hso".
@@ -925,7 +934,7 @@ Section UtRet.
                              (ut_cs_of_callee_saved _ _ Hcspr)))
               Hmiev Hmenvv Hrdr Hepcw
               with "Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec
-                    Hq4 Hkptr Htfk [Hown] Hframe Hxo Hso Hcont").
+                    Hq4 Hkptr Htfk [Hown] Hframe Hxo Hfo Hso Hcont").
     rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 
@@ -1002,6 +1011,9 @@ Section UtA6.
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
       (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
+    (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
+    ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+      (pv_tf (us_V U) !!! tf_arg_idx 0) -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
        the record it parks, at the resume view it parks it at --
@@ -1018,7 +1030,7 @@ Section UtA6.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hhold Hframe Hxo Hso Hcont".
+    iIntros "#Htext Hpc Hcg Hhold Hframe Hxo Hfo Hso Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
@@ -1223,7 +1235,7 @@ Section UtA6.
                 mie_v menvcfg0 epw scw lks sts0 sts gn cs fdep
                 Hwf' Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hcont] Hframe Hxo Hfo Hso Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
@@ -1299,6 +1311,9 @@ Section UtFa.
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
       (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
+    (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
+    ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+      (pv_tf (us_V U) !!! tf_arg_idx 0) -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
        the record it parks, at the resume view it parks it at --
@@ -1315,7 +1330,7 @@ Section UtFa.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hhold Hframe Hxo Hso Hcont".
+    iIntros "#Htext Hpc Hcg Hhold Hframe Hxo Hfo Hso Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     (* depth 0 forces the held set empty, which is what lets the yield arm
        hand [cpu_own ... ∅] to a contract that pins [∅] (SpecYield.v). *)
@@ -1372,7 +1387,7 @@ Section UtFa.
                 mie_v menvcfg0 epw scw lks sts0 sts gn cs fdep
                 Hwf' Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hcont] Hframe Hxo Hfo Hso Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
@@ -1460,7 +1475,7 @@ Section UtFa.
                 mie_v menvcfg0 epw scw lks sts0 sts gn cs fdep
                 Hwf' Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hcont] Hframe Hxo Hfo Hso Hcont").
       (* the yield arm came back at the literal [∅]; [lks = ∅] at depth 0
          makes that the set [ut_hold] names. *)
       rewrite /ut_hold Hlkempty. iSplitL "Hcpu"; [iExact "Hcpu"|].

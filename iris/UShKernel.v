@@ -81,6 +81,7 @@ Require Import SpecKexec.    (* [kexec_image_ok] *)
 Require Import UmodeAbi.       (* [uimg_sub] -- the image inclusion *)
 Require Import ElfUser.        (* [sh_elf] and its reduced facts (leaf, see header) *)
 Require User.ShSyms User.ShData User.ShInstrs.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -238,6 +239,7 @@ Qed.
 
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
+Require Import UserChildren.  (* [uch_any] -- the process's own half of its children set *)
 
 Section UShKernel.
   Context `{!riscvGS Σ}.
@@ -249,6 +251,9 @@ Section UShKernel.
   Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   (* THE NUMBERS SH ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis here as it is in the program files, and the exec dispatcher
      -- which sees the instance -- discharges it, exactly as it discharges
@@ -352,10 +357,10 @@ Section UShKernel.
     iIntros "#Hpay #Hdep #Hrest".
     iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Hal8
               Hroom Hstk Hfdlen Hstop with "Hdep").
-    (* sh's own half of its children set is dropped here: no leaf reads it
-       yet, and the fork and wait leaves that will are what put it into
-       [UkSh.ush_pstate]. *)
-    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf _ Dlo _ Hrun".
+    (* sh's own half of its children set travels in [UkSh.ush_pstate]
+       beside the ledger and the cwd: fork1 MOVES the set, so the fragment
+       goes down the chain index-free ([UserChildren.uch_any]). *)
+    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf Hchf Dlo _ Hrun".
     rewrite Hpc.
     (* [R] and the line buffer, out of the data below the frame *)
     iDestruct ("Hpay" $! (ukn_t N) (ukn_d N) (ukn_s N) with "Hszf Dlo")
@@ -363,11 +368,12 @@ Section UShKernel.
     iPoseProof ("Hrest" $! N) as "#Hr".
     iApply (wp_ksh_start N Hpsok (ush_read_leaf_of_win N)
               (R (ukn_t N) (ukn_d N) (ukn_s N)) h _ f n0 (take NSTD (uvis_fd W))
-              with "Hr [] [Hstd Hcwf] HR Hbs [Hrun]").
+              with "Hr [] [Hstd Hcwf Hchf] HR Hbs [Hrun]").
     - iApply (shk_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (shk_img_text _ Hsub) Hx with "Ht").
     - rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hstd".
-      iApply (ucwd_any_of with "Hcwf").
+      iSplitL "Hcwf"; [ iApply (ucwd_any_of with "Hcwf")
+                      | iApply (uch_any_of with "Hchf") ].
     - iExact "Hrun".
   Qed.
 

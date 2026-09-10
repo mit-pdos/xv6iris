@@ -872,7 +872,7 @@ Section ProofMain.
     (alp_nextpid ↦₄ (mword_of_int 1 : mword 32)) -∗
     ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) -∗
     ([∗ list] i ∈ seq 0 NPROC,
-       (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗ proc_pub_bare (proc_addr i)) -∗
+       (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗ proc_pub (proc_addr i)) -∗
     (* <pid_lock>'s quarter of every pid cell: the second half of
        [PidLock.nextpid_res], sealed with the .data word two assemblies down *)
     ([∗ list] i ∈ seq 0 NPROC, pid_lock_share (proc_addr i)) -∗
@@ -1110,16 +1110,6 @@ Section ProofMain.
     iEval (rewrite Hretpr) in "Hpc".
     (* ---- ASSEMBLY 2: the 64 proc locks -> procs_inv ---- *)
     iApply fupd_wp.
-    (* EVERY SLOT BUYS ITS FIRST INCARNATION HERE.  The image's carve is a
-       pure entailment and cannot mint a ghost name, so it hands out
-       [SchedCtx.proc_pub_bare]; this update -- the first one main has
-       after the carve, and the one that puts the cells into the locks --
-       turns each into a [proc_pub] carrying a fresh generation.  From here
-       on every slot has one, dormant slots included, and allocproc
-       replaces it with a fresh one each time it hands the slot out. *)
-    iMod (proc_pub_mint_list (seq 0 NPROC)
-            (fun i => (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch)%I)
-            with "Hppub") as "Hppub".
     iDestruct (big_sepL_sep_2
                  (fun _ i => proc_ready i)
                  (fun _ i => ((∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
@@ -1184,7 +1174,7 @@ Section ProofMain.
        ghost beside them has no cells to come out of, so it is bought here,
        at every slot empty, and its name travels with the lock's own from
        this point on. *)
-    iMod (WaitInv.wait_res_alloc with "Hwres") as (γc) "Hwres".
+    iMod (WaitInv.wait_res_alloc with "Hwres") as (γc γ0) "[Hwres Hrow0]".
     iMod (newlock ⊤ wait_lock_addr "wait_lock"%string (wait_res_at γc)
             with "Hwnm Hrun Hww Hwc0 Hwres") as "[Hrun Hwl0]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".

@@ -222,9 +222,33 @@ Class uexecSG (Σ : gFunctors) := {
      both legs read it. *)
   sfam : Type;
   (* ...and a point of it, for the arms that carry no deposit: the four
-     non-ecall causes, exit and fork.  A consumer that must NAME a family
+     non-ecall causes and exit.  A consumer that must NAME a family
      where the process deposited none takes this one; nothing reads it. *)
   sfam_pt : sfam;
+
+  (* THE FORK PAYLOAD, and it is a field of the FAMILIES rather than a
+     parameter of the fork rows for one mechanical reason: the trap route
+     splits a process's return into its DEPOSIT and its ARM
+     ([UexecRet.uexec_ret_F_split]) and carries them past each other
+     through the whole kernel excursion, so a payload chosen by the fork
+     deposit and read back by the fork arm must travel with something the
+     route already carries -- and [f] is exactly that thing.  The
+     alternative, an [∃ Q] inside [uexec_ret_F]'s fork branch, does not
+     split: the two halves would bind two unrelated payloads and the
+     parent's token would be about neither.  So the payload joins the
+     receipt families in the one value the process chooses at its trap.
+
+     WHAT IT MEANS: [sfork_pay f xs] is what the process's CHILD's exit at
+     status [xs] owes back ([ChildTok]'s [Q]).  The child's slot is
+     deposited under [my_pay] of it and the parent's arm gets
+     [child_tok] at it. *)
+  sfork_pay : sfam -> Z -> iProp Σ;
+  (* ...and the guarantee that the process may CHOOSE it: a family whose
+     payload is [Q] and whose bundles nothing reads.  A fork trap reads no
+     other field of [f], so this point is all a fork leaf needs -- it is
+     [sfam_pt] with the one field that fork does read. *)
+  sfam_pay : (Z -> iProp Σ) -> sfam;
+  sfork_pay_pay : forall Q : Z -> iProp Σ, sfork_pay (sfam_pay Q) = Q;
 
   (* what the process deposits at an ecall of number [n] from key [W], at
      ITS OWN families [f] -- [emp] at every number without a contract *)

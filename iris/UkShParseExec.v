@@ -31,6 +31,7 @@ Require Import UserHeap UkRun UkRunLeaf UkRunMem.
 Require Import UCodeShP.
 Require Import TsoCtx.
 Require User.ShSyms User.ShInstrs.
+Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 Require Import UserFd.
@@ -57,6 +58,9 @@ Section UkShParseExec.
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
   Context `{SG : uexecSG Σ}.
+  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
+     and this file binds no whole-system bundle. *)
+  Context `{!ctokG Σ}.
   Context `{PS : uprogSG Σ}.
 
   Local Notation x0_idx := (mword_of_int 0 : mword 5).

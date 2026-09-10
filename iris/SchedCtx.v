@@ -159,144 +159,19 @@ Section SchedCtx.
      [ctx_word4_pointsto_agree].  Bundled EXISTENTIALLY so that growing the
      invariant by these three cells costs every existing caller one opaque
      conjunct instead of three new spec parameters. *)
-  (* ------------------------------------------------------------------ *)
-  (* THE SLOT'S GENERATION.                                               *)
-  (*                                                                      *)
-  (* allocproc mints a fresh ghost name for the process it hands out and   *)
-  (* freeproc drops it, so the name is an INCARNATION of the slot: a pid   *)
-  (* is reused and a generation is not, which is what a wait()-side        *)
-  (* resource transfer has to be indexed by.  [UexecSlot.uvis_gen] is the  *)
-  (* key's reading of it, and the party that reads it off this cell is the *)
-  (* one that holds p->lock -- the dispatcher, which is also the party     *)
-  (* that instantiates [ParkCap.park_cap]'s [gn].                          *)
-  (*                                                                       *)
-  (* TWO HALVES AT ONE NAME ([Xv6Cameras.genR]): the EXCLUSIVE token, one  *)
-  (* per incarnation, and the PERSISTENT slot fact.  The token is what     *)
-  (* makes two live generations distinct; the slot fact is what a holder   *)
-  (* of a generation reads to learn which slot it names, and it is         *)
-  (* duplicable because a generation belongs to one slot forever.          *)
-  (* ------------------------------------------------------------------ *)
-  Definition gen_tok (γ : gname) : iProp Σ :=
-    own γ ((Some (Excl ()), None) : genR).
-  Definition gen_slot (γ : gname) (pa : mword 64) : iProp Σ :=
-    own γ ((None, Some (to_agree (pa : leibnizO (mword 64)))) : genR).
-
-  Global Instance gen_tok_timeless γ : Timeless (gen_tok γ).
-  Proof. apply _. Qed.
-  Global Instance gen_slot_timeless γ pa : Timeless (gen_slot γ pa).
-  Proof. apply _. Qed.
-  (* PERSISTENT: the right component is [agree], whose core is itself, and
-     the left is [ε] -- so the whole element is core-id.  The left half is
-     spelled out because [ε] at [optionUR] is [None] only after unfolding,
-     which instance search does not do. *)
-  Local Instance gen_none_core_id : CoreId (None : optionUR (exclR unitO)).
-  Proof. apply (ucmra_unit_core_id (A := optionUR (exclR unitO))). Qed.
-  Global Instance gen_slot_persistent γ pa : Persistent (gen_slot γ pa).
-  Proof. rewrite /gen_slot. apply _. Qed.
-
-  (* A GENERATION NAMES ONE SLOT.  Two readings of the same name agree,
-     which is what lets a party holding a generation conclude WHICH slot's
-     incarnation it is.  [proc_addr] is injective below NPROC, so this is
-     the index equality the design states. *)
-  Lemma gen_slot_agree (γ : gname) (pa pa' : mword 64) :
-    gen_slot γ pa -∗ gen_slot γ pa' -∗ ⌜pa = pa'⌝.
-  Proof.
-    rewrite /gen_slot. iIntros "H1 H2".
-    iDestruct (own_valid_2 with "H1 H2") as %Hv.
-    iPureIntro.
-    (* the pair's validity IS the conjunction, and its right half IS the
-       agree op: both steps are conversions, so the reading is [proj2]. *)
-    assert (Hv2 : ✓ (to_agree (pa : leibnizO (mword 64))
-                       ⋅ to_agree (pa' : leibnizO (mword 64))))
-      by exact (proj2 Hv).
-    by apply to_agree_op_valid_L in Hv2.
-  Qed.
-
-  (* TWO LIVE GENERATIONS ARE DISTINCT: the token is exclusive. *)
-  Lemma gen_tok_excl (γ : gname) : gen_tok γ -∗ gen_tok γ -∗ False.
-  Proof.
-    rewrite /gen_tok. iIntros "H1 H2".
-    iDestruct (own_valid_2 with "H1 H2") as %Hv.
-    (* [Excl () ⋅ Excl ()] is [ExclBot], whose validity is [False] -- so the
-       left half of the pair's validity is the goal on the nose. *)
-    iPureIntro. exact (proj1 Hv).
-  Qed.
-
-  (* THE MINT.  One step, at a fresh name, handing out both halves; the
-     slot fact is persistent from birth. *)
-  Lemma gen_alloc (pa : mword 64) :
-    ⊢ |==> ∃ γ : gname, gen_tok γ ∗ gen_slot γ pa.
-  Proof.
-    iMod (own_alloc (((Some (Excl ()), None) : genR)
-                     ⋅ ((None, Some (to_agree (pa : leibnizO (mword 64)))) : genR)))
-      as (γ) "H".
-    { done. }
-    iModIntro. iExists γ.
-    rewrite /gen_tok /gen_slot -own_op. iExact "H".
-  Qed.
-
-  (* ...AND THE SLOT'S GENERATION, bundled the same way, for the same
-     reason: the incarnation's name is not a value any protocol step has to
-     spell, so it costs every existing holder one opaque conjunct instead
-     of a spec parameter.  A party that DOES need the name -- the
-     dispatcher, building the resume key -- opens p->lock, eliminates this
-     existential, and threads the name it finds into
-     [ParkCap.park_cap]'s [gn].  The token is exclusive and the slot fact
-     is persistent, so the pair says "this slot has exactly one live
-     incarnation, and it is at THIS address". *)
-  (* THE SLOT'S LIVE INCARNATION, name and all, as ONE conjunct: the name
-     is bound HERE rather than beside [kl]/[xs]/[pid] so that a holder who
-     does not care about it carries a single opaque hypothesis, and a
-     holder who does opens this one existential and nothing else. *)
-  Definition proc_gen (pa : mword 64) : iProp Σ :=
-    (∃ γg : gname, gen_tok γg ∗ gen_slot γg pa)%I.
-
   Definition proc_pub (pa : mword 64) : iProp Σ :=
-    (∃ (kl xs pid : mword 32),
-       p_killed pa ↦₄ kl ∗ p_xstate pa ↦₄ xs ∗ p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
-       proc_gen pa)%I.
-
-  (* THE RE-INCARNATION, which is allocproc's step: the slot's old
-     generation dies with the process that had it and the new one gets a
-     name nothing else has ever held.  Nothing has to be given up for it --
-     the old token is simply dropped -- because no party outside the lock
-     names the old generation this side of a fork. *)
-  Lemma proc_gen_fresh (pa : mword 64) : proc_gen pa ==∗ proc_gen pa.
-  Proof.
-    iIntros "_". iMod (gen_alloc pa) as (γg) "[Htok Hslot]".
-    iModIntro. iExists γg. iFrame "Htok Hslot".
-  Qed.
-
-  (* THE CELLS ALONE, WITHOUT AN INCARNATION.  What the IMAGE owns: the boot
-     carve is a pure entailment out of the loaded bytes
-     ([BootCarveMain.boot_proc_slot]) and a ghost name cannot be minted
-     there.  So the carve hands out this, and [proc_pub_mint] below buys the
-     generation once per slot, in main's own update, on the way into the
-     lock ([ProofMain]'s second assembly). *)
-  Definition proc_pub_bare (pa : mword 64) : iProp Σ :=
     (∃ (kl xs pid : mword 32),
        p_killed pa ↦₄ kl ∗ p_xstate pa ↦₄ xs ∗ p_pid pa ↦₄{DfracOwn (1/4)} pid)%I.
 
-  Lemma proc_pub_mint (pa : mword 64) : proc_pub_bare pa ==∗ proc_pub pa.
-  Proof.
-    iIntros "H". iDestruct "H" as (kl xs pid) "(Hkl & Hxs & Hpid)".
-    iMod (gen_alloc pa) as (γg) "[Htok Hslot]".
-    iModIntro. iExists kl, xs, pid. iFrame "Hkl Hxs Hpid".
-    iExists γg. iFrame "Htok Hslot".
-  Qed.
+  (* THE SLOT'S GENERATION IS NOT HERE.  A generation is a SAVED PREDICATE
+     carrying the slot, the pid and the process's exit payload
+     ([ChildTok.v]), and it is named by the PRIVATE BLOCK
+     ([ProcDefs.pv_gen]) rather than by this payload -- because the parties
+     that read it (the child's slot, the parent's token, the exit escrow)
+     hold the block or a piece of the generation, and never p->lock.  So
+     this payload is the three cells whose values no protocol step
+     names. *)
 
-  (* ...and the whole table at once, which is the shape main holds it in. *)
-  Lemma proc_pub_mint_list (l : list nat)
-      (F : nat -> iProp Σ) :
-    ([∗ list] i ∈ l, F i ∗ proc_pub_bare (proc_addr i))
-    ==∗ ([∗ list] i ∈ l, F i ∗ proc_pub (proc_addr i)).
-  Proof.
-    iIntros "H".
-    iApply big_sepL_bupd.
-    iApply (big_sepL_mono with "H"). iIntros (n i _) "[HF Hb]".
-    iMod (proc_pub_mint (proc_addr i) with "Hb") as "Hp".
-    iModIntro. iFrame "HF Hp".
-  Qed.
 
   (* [i] is the hart the lock is held ON -- the hart whose scheduler chain
      this payload half belongs to.  Every current user instantiates it at
@@ -779,8 +654,6 @@ Section SchedCtxPay.
      SwtchCtx's -- all imported, none restated here. *)
   Global Instance proc_pub_morph pa : CtxMorph (λ ξ, proc_pub (XI := ξ) pa).
   Proof. rewrite /proc_pub. ctx_morph_solve. Qed.
-  Global Instance proc_pub_bare_morph pa : CtxMorph (λ ξ, proc_pub_bare (XI := ξ) pa).
-  Proof. rewrite /proc_pub_bare. ctx_morph_solve. Qed.
 
   Global Instance proc_ctx_at_morph pa : CtxMorph (λ ξ, proc_ctx_at ξ pa).
   Proof.
