@@ -1813,6 +1813,101 @@ discharges `Hinit_boot` with `T := taint`, the claim law from `echo_pred :=
 taint ∨ pins`, `init_sh_slot` from `app_inv` + those, and `init_slot_of_kexec ∘
 init_exec_sup_of_sh_slot` at the kernel instance.
 
+#### WAIT-EXIT — DESIGN OF RECORD (2026-09-09, owner asked for design + implementation)
+
+WHAT THE TREE SAYS TODAY (verified).  `SpecKwait.wp_kwait_sconf_body`: the
+only thing kwait writes is the four-byte xstate at `addr` (`d <= 4`, `d = 0`
+at NULL); the return `rv` is FREE ("nothing in the tree ties a pid to the
+private exit-status word a zombie carried").  `UsysMemOk`'s wait row (~222)
+relays only the copyout; `UkRunSys.wp_uk_ecall_wait_null` returns at any `r`.
+`SpecKexit`: exit closes fds, iputs cwd, `reparent`, wakeup parent, parks
+ZOMBIE (`SchedCtx.park_pay ZOMBIE = proc_dormant_noctx` -- the private block
+crosses into the slot lock: pagetable, trapframe page, kstack, bslots); the
+trap loop's exit row is `emp` (`UexecRet.uexec_dep_F`: "exit returns
+nothing").  `SpecKfork`: allocproc → pid in `[1, PIDMAX]`; the child's slot
+is the PARENT'S deposit (`sysc_fork_in`/`ut_fork_in`: `uslot (uvis_of
+(kfork_child U) sts)`), parked steady (`park_token_park_steady`); kfork
+holds `wait_lock` when it writes `np->parent` (`is_lock γw wait_lock_addr
+… wait_res_at`, `WaitInv.parents_own ps` = the NPROC parent cells).
+`proc_pub` (p->lock payload) holds `p_killed`, `p_xstate`, a quarter of
+`p_pid`.  `uvis` (the key) = trapframe, image, perm, sz, `uvis_fd : list
+fdstate` (a pure reading of p->ofile), `uvis_cwd : Z`; the program mirrors
+each with its own ghost in `urun` (`ufd_auth`, `ucwd_auth`) stepped by the
+round's pure rows (`usys_fd_ok`, `usys_cwd_ok`).  Pid uniqueness among live
+slots is "a further step nothing consumes" (PidLock header) -- this design
+consumes it.
+
+THE DESIGN.  Every process has a GENERATION ghost (fresh at allocproc, kernel
+cell in its slot, freed at freeproc; with fresh names per allocation nothing
+is ever reset).  A parent forking may TRACK the child: it chooses `Q : Z ->
+iProp` (the payload as a function of the exit status) and receives
+`child_tok γ pid Q := ghost_var γ (1/2) () ∗ saved_pred_own γ (1/2) Q` for
+the child's generation `γ`; the child's key resources receive the matching
+`exit_oblig γ Q` (the other halves).  An untracked child (every fork from a
+generic slot) mints nothing.  The KEY gains two pure readings of kernel
+state: `uvis_trk : option gname` (`Some γ` = this process is tracked with
+obligation ghost `γ`; `None` = untracked) and `uvis_ch : gset gname` (the
+generations of THIS process's live tracked children), and the program
+mirrors `uvis_ch` with `uch_auth (ukn_ch N) S` in `urun` (a sixth record
+field; the cwd mold) -- so the program's child LEDGER `[∗ map] γ ↦ (pid, Q)
+∈ L, child_tok γ pid Q` with `dom L = uvis_ch W` is COMPLETE by
+construction, and the kernel's wait can always find the token of the child
+it reaps.  Kernel side (WaitInv, under `wait_lock`, beside the parent
+cells): `children_own cs : list (gset gname)` (slot j's tracked children --
+the auth `uvis_ch` reads) and `orphans_own os` (tracked children reparented
+to slot j, with their tokens, kernel-held); `tracked_own ts : list (option
+gname)` (what `uvis_trk` reads; or in `proc_pub`).  Invariant (WaitInv):
+`γ ∈ cs !! j ⇒ ∃ k, slot k live-or-zombie, gen k = γ, parent k = j`; live
+pids distinct (PidLock).
+- FORK.  The fork bundle (`uexec_fork_F`/`sysc_fork_in`/`ut_fork_in`) gains
+  the parent's choice: `∃ Q, tracked` or untracked.  Parent arm
+  (`uexec_fork_parent_F`, `kfork_post`'s pid arm, the dispatcher's fork
+  row): `r = pid ∗ child_tok γ pid Q` with `uvis_ch' = uvis_ch ∪ {γ}` (γ
+  existential, `γ ∉ uvis_ch`); child arm: the child's key has `uvis_trk =
+  Some γ`, `uvis_ch = ∅`, and its key resources include `exit_oblig γ Q`
+  (via the child's steady park → forkret → loop → `urun`).  kfork writes
+  `children(parent) ∪= {γ}` under the `wait_lock` it already holds.
+  Untracked: `uvis_trk = None`, no token, `uvis_ch` unchanged.
+- EXIT.  The exit deposit (`uexec_dep_F` at `USYS_exit`, today `emp`):
+  `match uvis_trk W with Some γ => ∃ Q, exit_oblig γ Q ∗ Q (xstate) | None
+  => emp end ∗ [∗ map] … child ledger at uvis_ch W` (the ledger goes to the
+  kernel: reparent moves it into `orphans(init)`).  kexit stores the deposit
+  in the ZOMBIE slot (`park_pay ZOMBIE` gains `exit_dep γ xs`), `reparent`
+  moves `children(p)` + tokens into `orphans(init)`.
+- WAIT.  kwait reaps zombie k with parent me: (a) `gen k ∈ uvis_ch W`
+  (tracked, mine): consumes the token from the bundle's ledger, returns
+  `r = pid_k ∗ Q xs` (agreement of the two `saved_pred` halves), row
+  `uvis_ch' = uvis_ch ∖ {gen k}`; (b) orphan or untracked: `r = pid_k`,
+  ledger back, row unchanged (init's `wpid != pid` path); (c) `r = -1 ∗
+  ⌜uvis_ch W = ∅⌝` (havekids false; the invariant gives it).  freeproc frees
+  the generation.  The U tier: `usys_ch_ok`, `wp_uk_ecall_wait` returns the
+  three arms; `UkInit.wp_kinit_wait` consumes (init's child is sh's pid, so
+  (a) or (b) with `wpid != pid`).  Blocking is liveness and not stated.
+- GENERIC SLOT.  `xv6_sbundle_of_supply` pays exit only at `uvis_trk = None`
+  keys; the generic slot is stated at untracked keys.  A tracked process that
+  becomes generic (the taint) needs its parent's `Q` payable from the taint:
+  the parent supplies `□ (∀ xs, T -∗ Q xs)` beside `Q` (application choice:
+  init/sh choose `Q xs := input-token ∨ T`).  Exec keeps `uvis_trk` (the
+  process identity survives exec); the exec'ing program hands its `exit_oblig`
+  to the exec'd program through the exec bundle's payload (refunded on
+  failure) -- the cwd/`udepw_at` mold.
+LANES (in order; each a brief; all after ARM-c (1a)):
+  WX-KEY: `uvis` gains `uvis_trk`/`uvis_ch`; `uvis_of U sts tk cs`; the trap
+    route carries `tk cs` beside `sts` (SpecUsertrap/SpecSyscall/
+    ProofSyscall/UexecRet/UexecApply/…); `kfork_child`, `exec_key`, `bump`,
+    `skey_eq`, `urun_eq`; WaitInv's cells + invariant; PidLock uniqueness;
+    the generation cell at allocproc/freeproc; `uk_names.ukn_ch` + `urun`'s
+    `uch_auth`; quiet rows everywhere (`usys_ch_ok_quiet`).  Green with no
+    semantic change (all `None`/`∅`, tokens not yet minted).
+  WX-FORK: the tracked option in the fork bundle, `child_tok`/`exit_oblig`,
+    kfork/sys_fork/dispatcher/round/u-tier fork leaf; generic slot at `None`.
+  WX-EXIT: the exit deposit through the route into `park_pay ZOMBIE`;
+    reparent → orphans; u-tier exit leaf takes oblig + payload + ledger.
+  WX-WAIT: kwait/sys_wait return the deposit; the three-arm row; u-tier wait
+    leaf; init's `wp_kinit_wait`; L7 then hands the console-input resource
+    as `Q`.
+Brief for WX-KEY: `brief-wx-key.md`.
+
 #### WAIT-EXIT — DESIGN (owner's ruling 2026-09-09): a child's exit returns its resources to the parent through wait()
 
 THE PROBLEM.  init's loop is `fork; child: exec("sh"); parent: wait` forever.
