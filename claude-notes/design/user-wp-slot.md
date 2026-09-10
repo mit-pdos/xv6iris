@@ -29,8 +29,9 @@ work (real per-process linkage) is `projects/user-wp-slot.md`.
   "Happy with any resume state": this is what the generic safety theorem
   proves (`ProofUexecWp.UexecGen (US : USER) : UEXEC_GEN`, providing
   `uexec_wp_gen : ⊢ □ uexec_wp` — no linear hypothesis, hence `□`, hence
-  mintable wherever a `UEXEC_GEN` is in scope, which the tree keeps to the
-  two mint sites below), and it is the residue's conjunct today.  Its proof
+  mintable wherever a `UEXEC_GEN` is in scope -- which, since ARM-c (1a),
+  is nowhere in the kernel: see THE KERNEL MINTS NOWHERE below), and it is
+  the residue's conjunct today.  Its proof
   is now a **Löb** that
   RETURNS ITSELF: `iLöb` gives `▷ □ uexec_wp`, the paired premise gives
   `▷ (frame ∗ uexec_wp -∗ WP Loop)`, and one `iNext` strips both so the
@@ -129,16 +130,25 @@ mwords).  `UexecWp.v` sits above `IntrDefs` — nothing lower may import it.
   in `X`, and `solve_contractive` absorbs it.
   `ProofForkretPark.park_token_intro` needed no change at all — it builds
   `park_chan` from `ut_park_intro_body` by `iExact`.
-- **THE TWO MINT SITES**, both `UEXEC_GEN.uexec_wp_gen` applications, both
-  eliminating the `□` once into a linear WP that a park consumes:
-  - `ProofUserinit`, at its `park_token_park` call (functor argument
-    `(UG : UEXEC_GEN)`, tied by `LinkUserinit` to `UexecGen UserProof`) —
-    the first process;
-  - `ProofSysFork`, at its `kfork` call (`SysForkProof (Kfork : KFORK)
-    (UG : UEXEC_GEN)`, tied by `LinkSysFork` to `UexecGen UserProof`) —
-    every forked process.
-  `grep -rn "uexec_wp_gen" iris/*.v` shows exactly four lines: the theorem
-  (`ProofUexecWp`), the `Parameter` (`UexecWp`), and those two.
+- **THE KERNEL MINTS NOWHERE** (ARM-c (1a), 2026-09-09).  `UEXEC_GEN.
+  uexec_wp_gen` is applied in the kernel by no proof: userinit parks the
+  first process with the EXEC BUNDLE forkret's boot arm spends on
+  `kexec("/init")` (`InitBoot.init_boot_bundle cw sts`, a row of
+  `ParkCap.park_pkg`'s boot mode; the slot comes out of kexec's own receipt,
+  `SpecKexec.exec_post_ok_recv`), and kfork parks the child with the
+  PARENT's fork deposit (`SpecSyscall.sysc_fork_in`: the child's slot at
+  `kfork_child`).  The bundle is a hypothesis of the theorems, `Hinit_boot`
+  (`SystemAdequacy.xv6_power_adequacy_gen`, `App.xv6_app_adequacy`), which
+  the GENERIC instance discharges from `app_sup_raw_triv` through
+  `UexecExecMint.uslot_mint` and `InitBoot.init_boot_bundle_triv`
+  (`SystemAdequacy.init_boot_of_sup`/`_triv`) and a constraining
+  application discharges from its own pinned bundle.  `grep -rn
+  "uexec_wp_gen" iris/*.v` shows the theorem (`ProofUexecWp`), the
+  `Parameter` (`UexecWp`), and the generic discharge only.  The park's
+  boot mode is "this record is the first process": `ParkCap.park_child`
+  carries, on that mode, the block split and `FirstTok.first_boot` as its
+  own row, which is what lets `wp_forkret`'s steady arm refute a boot-mode
+  resume against the package's `first_done`.
 - **Why kfork's contract takes the premise.**  `SpecKfork`'s
   `wp_kfork_sconf_body` gains `uexec_wp -∗` ("the child's user-execution
   WP, consumed by the park"), threaded `ProofKforkMain.wp_kfork_sconf` →

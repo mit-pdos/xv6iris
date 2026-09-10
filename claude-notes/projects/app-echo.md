@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (brief `brief-armc-1a.md`, written) → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY/FORK/EXIT/WAIT → (1b) echo's discharge.
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -1812,6 +1812,41 @@ length sts = NOFILE -> uvis_cwd W' = ROOTINO -> psok -> udep -∗ init_exec_sup
 discharges `Hinit_boot` with `T := taint`, the claim law from `echo_pred :=
 taint ∨ pins`, `init_sh_slot` from `app_inv` + those, and `init_slot_of_kexec ∘
 init_exec_sup_of_sh_slot` at the kernel instance.
+
+ARM-c (1a) LANDED (2026-09-09; briefs `brief-armc-1a.md`, `brief-armc-1a-finish.md`)
+-- THE KERNEL NEVER MINTS.  `InitBoot.v` names the first process's exec
+bundle: `init_boot_bundle cw sts` is kexec's caller-side bundle at
+`init_boot_path` ("/init", named once; ProofForkretParts uses it), na = 1,
+slot piece `uslot`; `init_boot_bundle_triv` builds one from the generic
+family `□ (∀ W, uslot W)` over `SpecKexec.exec_au_pre_triv_at`.
+`ParkCap.park_pkg`'s mode row is `first_done` at `Some` and `init_boot_bundle
+cw sts` at `None` (an EAGER row: the boot arm spends it at +0x56, the closer
+runs at +0x64); `sts` is a parameter of the package, the closer, forkret's
+body and both parkers (the closer's `∃ sts` is gone), and the closer yields a
+slot only on the steady mode.  `park_child` is mode-indexed: the block whole
+on the steady mode; on the boot mode the deficit block, the cwd reference and
+`FirstTok.first_boot` (the boot arm's four rows, `first_tok := first_boot ∨
+…`) as three rows -- the mode IS "this record is the first process";
+`wp_forkret` cases on the bit: at false it walks the boot arm on those rows,
+at true its steady arm refutes the block token's boot disjunct against the
+package's `first_done` (`first_boot_done_excl`).  forkret's boot arm spends
+the bundle on `kexec("/init")` (`KX.wp_kexec_sconf` at `MkPfam uslot R`, the
+parked `sts`; `Harms` kept as a resource by `exec_arms_landed_keep`) and reads
+the slot out of `exec_post_ok_recv` (both success arms return `Fs.(pf_recv)
+(exec_key U' sts na)`); userinit parks with the bundle and mints nothing
+(`ProofUserinit` lost its `UEXEC_GEN` functor argument).  `app_sup` leaves
+every kernel contract (userinit, main, the boot chain, the trap loop,
+`park_world`, `park_world_open`); the theorems' `Happ_sup` becomes
+`Hinit_boot : ∀ <era classes>, file_app = MkAppcfg N A r -> ⊢ app_inv fsc_fs
+-∗ |==> init_boot_bundle ROOTINO fdt0` (`boot_shared_alloc` returns the
+`file_app` equation; `FsCfgBoot.fs_boot_supply_app_inv` peels `app_inv` off
+kit 2); the generic instances discharge it from `init_boot_of_sup`/`_triv`.
+New CtxMorph instances: `inode_held_at_morph`, `proc_priv_nocwd_morph`,
+`cwd_ref_at_morph`, `first_boot_morph`, `fkp_park_block_morph`.  Audit
+unchanged at thirteen; lemma_diff: four justified GONEs (`app_triv_sup`,
+`fkr_init_bytes`, `syscall_env_sup`, `park_world_sup`).  NEXT: WX-KEY
+(`brief-wx-key.md`); (1b) echo's discharge of `Hinit_boot` waits on the taint
+(`echo_pred := taint ∨ pins`) and L7.
 
 #### WAIT-EXIT — DESIGN OF RECORD (2026-09-09, owner asked for design + implementation)
 
