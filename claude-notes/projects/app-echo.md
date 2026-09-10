@@ -1775,7 +1775,43 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH → ARM-c (1a) (brief `brief-armc-1a.md`, written) → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (brief `brief-armc-1a.md`, written) → (1b) echo's discharge.
+
+STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
+sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
+`UserFd.ustd γfd l` and nothing more, and `UShKernel.sh_uexec_slot`/
+`sh_slot_of_kexec` take only `length sts = NOFILE`.  The ledger is read at
+one program point, main's console preamble (`wp_ksh_console`, 0x900..0x910),
+which is xv6's own repair of a closed stream; `wp_ksh_open`/`wp_ksh_ostub`
+hold at any `l` and relay `UserFd.ualloc` verbatim.  The Löb generalises
+over the ledger; the open's result is normalised ONCE into "the ledger that
+left, plus either the handle or a pure fact about a0".  The two branches stay
+abstract: their common fall-through wants a handle, and the two pure arms
+refute it -- `ret = -1` takes the `bltz` at 0x908, and a descriptor below
+NSTD takes the `bge` against s1 (O_RDWR = 2, a premise of `wp_ksh_console`
+discharged off `c.li s1,2` at 0x8f6).  `k < NSTD` comes from `ustd`'s own
+`length l = NSTD`.  `fd_lowest_closed_take_none` deleted.
+
+PINNED-EXEC D LANDED (2026-09-09; brief part B).  init execs sh on its OWN
+pinned bundle.  `UCodeInit.init_argv` persists init's sixteen argv bytes
+(`init_argv_map`) and crosses the fork with the text
+(`UkFork.forkable_ubyteq_map`, `UkInitMain.forkable_init_img`).
+`UkInit.init_exec_sup` is the u-tier supply: at a0 = 0x9a8, a1 = 0x1000, the
+rodata, the argv bytes and the process's bare ledger (`UserFd.ustd_any`) it
+delivers `udepw_at N' m pc USYS_exec ROOTINO`; `init_exec_sup_of_uxsup` is
+the trivial payer.  The ledger travels because a table does not move without
+the low slots' fragments, is SPENT at the ecall, and carries no claim about
+which streams are open.  Every init lemma is cwd-indexed at ROOTINO
+(`wp_kinit_exec` through `UkRunSys.wp_uk_ecall_exec_at_cwd`).  UInitSh.v
+pays the supply out of the pinned bundle above the kernel's UexecSG
+instance: `init_sh_slot T Pay`, `sh_pay`, `init_args_det` (na = 1, alen 0 =
+2 read off init's image), `init_sh_room` (n0 ≤ 402), `init_exec_sup_of_sh_slot`.
+`UInitKernel.init_slot_of_kexec : kexec_image_ok init_elf … -> room ->
+length sts = NOFILE -> uvis_cwd W' = ROOTINO -> psok -> udep -∗ init_exec_sup
+-∗ uslot W'`.  NEXT: ARM-c (1a) (`brief-armc-1a.md`), then (1b): echo
+discharges `Hinit_boot` with `T := taint`, the claim law from `echo_pred :=
+taint ∨ pins`, `init_sh_slot` from `app_inv` + those, and `init_slot_of_kexec ∘
+init_exec_sup_of_sh_slot` at the kernel instance.
 
 #### WAIT-EXIT — DESIGN (owner's ruling 2026-09-09): a child's exit returns its resources to the parent through wait()
 
