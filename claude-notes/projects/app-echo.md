@@ -2080,9 +2080,9 @@ move rides the answer like fork's), the leaf `wp_uk_ecall_wait` returns the
 escrow with the two facts, `UkInit.wp_kinit_wait` redeems: `child_tok γsh
 pidsh Q`, `γsh ∈ cs`, `r = pidsh` → `γ' = γsh` → `gen_pay`.  The orphan arm
 is real (init reaps reparented children) and is where init drops the escrow.
-The xstate cell is NOT tied to the escrow's `xs` this lane (kexit keyed the
-escrow at its own trapframe word); tie it with the half-cell if a program
-ever reads the status.
+The escrow IS keyed at the stored status through the half-cell (WX-EXIT's
+ruling below), so the copied-out word and the escrow's `xs` agree at the
+reaper through `proc_pub`'s half of `p_xstate` against the ZOMBIE block's.
 
 ORDER: WX-GEN (`brief-wx-gen.md`: the two ghosts, `nextpid_res_at`'s list
 and authority, allocproc/freeproc, the block's halves, kfork's and
@@ -2090,6 +2090,29 @@ userinit's split; green with `children_inv` still stated-not-carried) →
 WX-INV (`brief-wx-inv.md`: carry it; kwait's row) → WX-WAIT
 (`brief-wx-wait.md`: the post, the route, the leaf, init) → ARM-c (1b) → L7.
 WX-PID is absorbed: pid uniqueness IS `pid_reg`.
+
+#### WX-EXIT RULINGS (2026-09-10, coordinator, given mid-lane; the as-landed note supersedes anchors)
+- THE KILL PATH PAYS NOTHING.  `usertrap`'s `if(killed(p)) exit(-1)` runs with
+  no program to pay the exit payload, and everything the killed process owned
+  dies with its dropped continuation.  So `exit_tok γ pid xs := ∃ pa Q, gen_kq
+  γ pa pid Q ∗ ((∃ Q', my_pay γ Q' ∗ Q' xs) ∨ ⌜xs = -1⌝)` and `gen_pay` yields `▷
+  (Q xs ∨ ⌜xs = -1⌝)`: a parent cannot tell a kill from a voluntary `exit(-1)`,
+  which is the kernel's own observable.  kexit's contract is stated at its
+  STATUS ARGUMENT and takes the two-armed deposit; the exit-syscall route pays
+  the left arm at `exit_xs` of the frame, the three `ut_kexit` sites pay
+  `⌜-1 = -1⌝`.
+- THE ESCROW IS KEYED AT THE STORED STATUS, TIED BY THE HALF-CELL (this
+  replaces the earlier "keyed at `exit_xs (pv_tf V)`"): `SchedCtx.proc_pub`
+  holds `p_xstate` at 1/2; the other half rides the process
+  (`proc_priv_core`, and the dormant block's `∃ xs, p_xstate ↦₄{1/2} xs ∗ (if
+  ZOMBIE then exit_tok (pv_gen V) pid xs else emp)`); kexit and freeproc,
+  holding `p->lock`, reunite the halves to write; the reaper, holding
+  `pp->lock`, agrees the two halves, which ties the copied-out word to the
+  escrow.  No `xs` parameter on `proc_dormant`/`park_pay`.
+- THE GENERATION RIDES THE ROUTE PINNED like `pv_fdg`: `forkret_closer`'s
+  `⌜pv_gen (us_V U') = gn⌝`, `usertrap_post`'s `ut_gen_kept`, `Rut_at`'s
+  `⌜pv_gen (us_V U) = gn⌝` discharged `eq_refl` at ParkCap -- so the slot's
+  deposit at `uvis_gen W` reaches kexit's premise at the block's `pv_gen`.
 
 #### WAIT-EXIT — DESIGN OF RECORD (2026-09-09, owner asked for design + implementation)
 
