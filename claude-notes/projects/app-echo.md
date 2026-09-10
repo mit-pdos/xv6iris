@@ -1837,75 +1837,62 @@ round's pure rows (`usys_fd_ok`, `usys_cwd_ok`).  Pid uniqueness among live
 slots is "a further step nothing consumes" (PidLock header) -- this design
 consumes it.
 
-THE DESIGN.  Every process has a GENERATION ghost (fresh at allocproc, kernel
-cell in its slot, freed at freeproc; with fresh names per allocation nothing
-is ever reset).  A parent forking may TRACK the child: it chooses `Q : Z ->
-iProp` (the payload as a function of the exit status) and receives
-`child_tok γ pid Q := ghost_var γ (1/2) () ∗ saved_pred_own γ (1/2) Q` for
-the child's generation `γ`; the child's key resources receive the matching
-`exit_oblig γ Q` (the other halves).  An untracked child (every fork from a
-generic slot) mints nothing.  The KEY gains two pure readings of kernel
-state: `uvis_trk : option gname` (`Some γ` = this process is tracked with
-obligation ghost `γ`; `None` = untracked) and `uvis_ch : gset gname` (the
-generations of THIS process's live tracked children), and the program
-mirrors `uvis_ch` with `uch_auth (ukn_ch N) S` in `urun` (a sixth record
-field; the cwd mold) -- so the program's child LEDGER `[∗ map] γ ↦ (pid, Q)
-∈ L, child_tok γ pid Q` with `dom L = uvis_ch W` is COMPLETE by
-construction, and the kernel's wait can always find the token of the child
-it reaps.  Kernel side (WaitInv, under `wait_lock`, beside the parent
-cells): `children_own cs : list (gset gname)` (slot j's tracked children --
-the auth `uvis_ch` reads) and `orphans_own os` (tracked children reparented
-to slot j, with their tokens, kernel-held); `tracked_own ts : list (option
-gname)` (what `uvis_trk` reads; or in `proc_pub`).  Invariant (WaitInv):
-`γ ∈ cs !! j ⇒ ∃ k, slot k live-or-zombie, gen k = γ, parent k = j`; live
-pids distinct (PidLock).
-- FORK.  The fork bundle (`uexec_fork_F`/`sysc_fork_in`/`ut_fork_in`) gains
-  the parent's choice: `∃ Q, tracked` or untracked.  Parent arm
-  (`uexec_fork_parent_F`, `kfork_post`'s pid arm, the dispatcher's fork
-  row): `r = pid ∗ child_tok γ pid Q` with `uvis_ch' = uvis_ch ∪ {γ}` (γ
-  existential, `γ ∉ uvis_ch`); child arm: the child's key has `uvis_trk =
-  Some γ`, `uvis_ch = ∅`, and its key resources include `exit_oblig γ Q`
-  (via the child's steady park → forkret → loop → `urun`).  kfork writes
-  `children(parent) ∪= {γ}` under the `wait_lock` it already holds.
-  Untracked: `uvis_trk = None`, no token, `uvis_ch` unchanged.
-- EXIT.  The exit deposit (`uexec_dep_F` at `USYS_exit`, today `emp`):
-  `match uvis_trk W with Some γ => ∃ Q, exit_oblig γ Q ∗ Q (xstate) | None
-  => emp end ∗ [∗ map] … child ledger at uvis_ch W` (the ledger goes to the
-  kernel: reparent moves it into `orphans(init)`).  kexit stores the deposit
-  in the ZOMBIE slot (`park_pay ZOMBIE` gains `exit_dep γ xs`), `reparent`
-  moves `children(p)` + tokens into `orphans(init)`.
-- WAIT.  kwait reaps zombie k with parent me: (a) `gen k ∈ uvis_ch W`
-  (tracked, mine): consumes the token from the bundle's ledger, returns
-  `r = pid_k ∗ Q xs` (agreement of the two `saved_pred` halves), row
-  `uvis_ch' = uvis_ch ∖ {gen k}`; (b) orphan or untracked: `r = pid_k`,
-  ledger back, row unchanged (init's `wpid != pid` path); (c) `r = -1 ∗
-  ⌜uvis_ch W = ∅⌝` (havekids false; the invariant gives it).  freeproc frees
-  the generation.  The U tier: `usys_ch_ok`, `wp_uk_ecall_wait` returns the
-  three arms; `UkInit.wp_kinit_wait` consumes (init's child is sh's pid, so
-  (a) or (b) with `wpid != pid`).  Blocking is liveness and not stated.
-- GENERIC SLOT.  `xv6_sbundle_of_supply` pays exit only at `uvis_trk = None`
-  keys; the generic slot is stated at untracked keys.  A tracked process that
-  becomes generic (the taint) needs its parent's `Q` payable from the taint:
-  the parent supplies `□ (∀ xs, T -∗ Q xs)` beside `Q` (application choice:
-  init/sh choose `Q xs := input-token ∨ T`).  Exec keeps `uvis_trk` (the
-  process identity survives exec); the exec'ing program hands its `exit_oblig`
-  to the exec'd program through the exec bundle's payload (refunded on
-  failure) -- the cwd/`udepw_at` mold.
+THE DESIGN (revised with the owner, 2026-09-09: ESCROW tokens; every process
+tracked; the caller hands nothing in).
+- GENERATIONS.  allocproc mints a fresh ghost `γ` for EVERY process (kernel
+  cell in the slot; fresh names, nothing reset, freed at freeproc).  The key
+  gains `uvis_gen : gname` (own generation) and `uvis_ch : gset gname` (the
+  generations of this process's live children, including children reparented
+  to it), both pure readings of kernel state like `uvis_fd`; the program
+  mirrors `uvis_ch` with `uch_auth (ukn_ch N) S` in `urun` (sixth record
+  field, the cwd mold), stepped by the round's row.  `gen_pid γ pid` is a
+  persistent fact (a generation has one pid forever).
+- FORK.  The parent's fork bundle chooses `Q : Z -> iProp` (generic parents:
+  `fun _ => True`).  Parent arm: `r = pid ∗ child_tok γ pid Q` (the parent's
+  half of `saved_pred γ Q` + `gen_pid γ pid`), `uvis_ch' = uvis_ch ∪ {γ}`.
+  The kernel keeps the other half in the child's slot; the child's slot is
+  built by the parent (`uexec_fork_child_F`) at a key with `uvis_gen = γ`,
+  `uvis_ch = ∅`, and receives the persistent `my_pay γ Q`.  kfork adds γ to
+  `children(parent)` under the `wait_lock` it holds.
+- EXIT.  The deposit (`uexec_dep_F` at `USYS_exit`, today `emp`): `∃ Q,
+  my_pay (uvis_gen W) Q ∗ Q xs` (generic slots pay it at `Q = True`).  kexit
+  stores `exit_tok γ pid xs := saved_pred γ (1/2) Q ∗ Q xs` (the kernel's
+  half + the payload: the ESCROW) in the ZOMBIE slot (`park_pay ZOMBIE`);
+  `reparent` moves `children(p)` into `children(init)`.
+- WAIT, ONE SPEC, TWO ARMS.  (a) `r = pid ∗ exit_tok γ' pid xs ∗ ⌜γ' ∈
+  uvis_ch W⌝ ∗ ⌜∀ γ ∈ uvis_ch W, gen_pid γ = pid → γ = γ'⌝` (pid uniqueness
+  among live processes -- PidLock's further step, consumed here), row
+  `uvis_ch' = uvis_ch ∖ {γ'}`; (b) `r = -1 ∗ ⌜uvis_ch W = ∅⌝`.  Nothing is
+  handed in.  THE RULE: `child_tok γ pid Q ∗ exit_tok γ pid xs ⊢ Q xs`
+  (agreement of the halves) -- indexed by the GENERATION, not the pid: a
+  stale token (child reaped, escrow dropped, pid reused) can never combine.
+  sh needs nothing back (its payload for echo is trivial): it drops the
+  escrow without comparing pids.  init needs the input resource back: from
+  `child_tok γsh pidsh Q`, `γsh ∈ uvis_ch W` (nothing removed it) and the
+  uniqueness fact, `r = pidsh` forces `γ' = γsh`; on `r ≠ pidsh` (an
+  orphan) it drops the token, as its code does.  Blocking is liveness and is
+  not stated.
+- GENERIC SLOT / TAINT.  A generic slot pays exit at `Q = True`; a verified
+  process that becomes generic (the taint) needs its parent's `Q` payable
+  from `T` -- the parent supplies `□ (∀ xs, T -∗ Q xs)` beside `Q`
+  (application choice; init/sh choose `Q xs := input-token ∨ T`).  Exec keeps
+  `uvis_gen` (the identity survives exec); `my_pay` is persistent so it
+  travels for free.
 LANES (in order; each a brief; all after ARM-c (1a)):
-  WX-KEY: `uvis` gains `uvis_trk`/`uvis_ch`; `uvis_of U sts tk cs`; the trap
-    route carries `tk cs` beside `sts` (SpecUsertrap/SpecSyscall/
-    ProofSyscall/UexecRet/UexecApply/…); `kfork_child`, `exec_key`, `bump`,
-    `skey_eq`, `urun_eq`; WaitInv's cells + invariant; PidLock uniqueness;
-    the generation cell at allocproc/freeproc; `uk_names.ukn_ch` + `urun`'s
-    `uch_auth`; quiet rows everywhere (`usys_ch_ok_quiet`).  Green with no
-    semantic change (all `None`/`∅`, tokens not yet minted).
-  WX-FORK: the tracked option in the fork bundle, `child_tok`/`exit_oblig`,
-    kfork/sys_fork/dispatcher/round/u-tier fork leaf; generic slot at `None`.
-  WX-EXIT: the exit deposit through the route into `park_pay ZOMBIE`;
-    reparent → orphans; u-tier exit leaf takes oblig + payload + ledger.
-  WX-WAIT: kwait/sys_wait return the deposit; the three-arm row; u-tier wait
-    leaf; init's `wp_kinit_wait`; L7 then hands the console-input resource
-    as `Q`.
+  WX-KEY: `uvis` gains `uvis_gen`/`uvis_ch`; `uvis_of U sts g cs`; the trap
+    route carries them beside `sts`; `kfork_child`, `exec_key`, `bump`,
+    `skey_eq`, `urun_eq`; the generation cell at allocproc/freeproc;
+    WaitInv's `children_own` + invariant (`γ ∈ children j ⇒ a live-or-zombie
+    slot with gen γ and parent j`); PidLock uniqueness; `uk_names.ukn_ch` +
+    `urun`'s `uch_auth`; quiet rows everywhere.  Green with no semantic
+    change (all sets empty, no token minted).
+  WX-FORK: `Q` in the fork bundle, `child_tok`/`my_pay`, kfork/sys_fork/
+    dispatcher/round/u-tier fork leaf; generic parents at `Q = True`.
+  WX-EXIT: the exit deposit through the route into `park_pay ZOMBIE` as the
+    escrow; reparent moves children to init; u-tier exit leaf takes `Q xs`.
+  WX-WAIT: kwait/sys_wait return the escrow with the two facts; the row;
+    u-tier wait leaf; the combination rule; init's `wp_kinit_wait`; L7 then
+    hands the console-input resource as `Q`.
 Brief for WX-KEY: `brief-wx-key.md`.
 
 #### WAIT-EXIT — DESIGN (owner's ruling 2026-09-09): a child's exit returns its resources to the parent through wait()
