@@ -2004,6 +2004,93 @@ WX-RES + WX-ROW LANDED (2026-09-10; briefs `brief-wx-res.md`,
   `proc_ctx`); the adequacy top needs `!wchGpreS Σ` and `Hinit_boot` a `!wchG Σ`
   binder (the era's instance comes out of `boot_shared_alloc`).
 
+#### WX-GEN / WX-INV / WX-WAIT — DESIGN (2026-09-10, coordinator; supersedes the lane list's WX-INV/WX-WAIT/WX-PID entries)
+
+THE PROBLEM THE THREE LANES SHARE.  At the reap kwait holds `wait_lock` and
+the zombie's `p->lock` -- never `pid_lock` -- and its post must say (W2) the
+zombie's generation `γ'` is in the reaper's row (`⌜γ' ∈ uvis_ch W⌝`, or an
+orphan when the reaper is init), (W3) no other generation in that row has the
+zombie's pid (the uniqueness the theorem spends: `r = pidsh` forces `γ' =
+γsh`), (W5) on the -1 arm the row is empty.  `gen_slot γ pa` is PERSISTENT, so
+it says γ was SOME incarnation of slot pa, never the CURRENT one -- a parent
+that never waits keeps `child_tok` of a long-dead generation while the slot
+is re-used -- and pid uniqueness lives in `pid_lock`'s payload, which kwait
+cannot open.  Neither fact can be a pure invariant over `(ps, m)`; both have
+to be RESOURCES whose halves meet.  Two exclusive ghosts do it, each with one
+half in the child's PRIVATE BLOCK and one half in the wait-lock invariant:
+
+- `slot_gen k dq γ` -- "slot k's current generation is γ".  One canonical
+  `own` at `gmapUR nat (dfrac_agreeR (leibnizO gname))`: halves agree, the
+  whole updates with no authority.  The UNUSED dormant block holds it WHOLE
+  (at the last incarnation's name -- the `pv_fdg`/`pv_chg` junk precedent);
+  allocproc updates it to `pv_gen` and hands it out whole; kfork/userinit put
+  ONE HALF into the block (`proc_priv_core`, keyed at `pv_gen (us_V U)`);
+  kfork deposits the other half in the invariant at +0xd4; kwait reunites
+  them at the reap and freeproc puts the whole back.  It is what ties "the
+  ZOMBIE block in my hands" to "entry k of the invariant".
+- `pid_reg pid dq γ := pid ↪[wpr_name]{dq} γ` -- "pid is registered to
+  generation γ".  A `ghost_map` whose AUTHORITY sits in `pid_lock`'s payload
+  (`PidLock.nextpid_res_at` binds the 64 quarter cells' values as a list
+  `pids` and carries `⌜dom = the nonzero pids⌝`): allocproc INSERTS at the
+  `p->pid = pid` store inside its pid section (the scan proved the key fresh;
+  the generation is MINTED THERE TOO -- `gen_alloc` moves into
+  `wp_ap_pidsec`, since the mint needs the pid and the registration needs the
+  name), freeproc DELETES at its `p->pid = 0` (it takes both halves: kwait
+  reunites, allocproc's failure tails hold the whole).  One half in the
+  block beside `slot_gen`'s, the other deposited by kfork at +0xd4.  Two
+  halves at one key AGREE on the generation, which is exactly (W3).
+  Init: userinit puts the halves in init's block and DROPS the spares (init
+  has no parent and is never reaped; state it).
+
+THE INVARIANT (WX-INV), carried in `wait_res_at` and binding everything
+together: `wait_res_at ξ := ∃ ps m O, parents_own_at ξ ps ∗ children_own_at
+m ∗ orphans_own O ∗ children_inv ps m O ip` (ip = initproc's address, a
+parameter or the pinned symbol) with
+  `children_inv ps m O ip := [∗ list] k ↦ v ∈ ps, if v = 0 then emp else
+     ∃ γ pid, slot_gen k (1/2) γ ∗ pid_reg pid (1/2) γ ∗ gen_slot γ (proc_addr k)
+       ∗ gen_pid γ pid ∗ ⌜γ ∈ rowset m v ∨ (v = ip ∧ γ ∈ O)⌝`
+  plus the pure converse `∀ γ0 v S, m !! γ0 = Some (v, S) → ∀ γ ∈ S, ∃ k,
+  ps !! k = Some v ∧ entry k is γ` and the same for `O` at `ip`, and owner
+  uniqueness `m !! γ1 = Some (v, _) → m !! γ2 = Some (v, _) → γ1 = γ2` (rows
+  are per slot at distinct addresses from boot).  Every other pure fact is a
+  RESOURCE consequence: one entry per slot by the list; γ → slot unique by
+  `gen_slot` agreement; γ → pid by `gen_pid` agreement; "slot j has no
+  entry" at kfork's +0xd4 from kfork holding `slot_gen j` WHOLE against a
+  would-be half.  RE-ESTABLISHMENT: kfork at +0xd4 (`ps' = <[j := pme]> ps`,
+  row `cs ∪ {γ}`, new entry j from the halves it kept); kexit's ZOMBIE store
+  (`rp_map` sends every cell at `pa_e` to `ip`; its row `S` moves into `O`;
+  entries of its children re-satisfy the clause at `ip`; its OWN entry is
+  untouched, halves stay in its ZOMBIE block); kwait's reap (entry k comes
+  out -- both halves to freeproc -- `ps' = <[k := 0]> ps`, the reaper's row
+  `cs ∖ {γ'}`, or `O ∖ {γ'}` when it is an orphan of init).  So WX-INV also
+  gives kwait its own row (the contract takes `ch_frag (pv_chg (us_V U)) pj
+  cs` and returns it at `cs'`, relayed by `SpecSysWait` and the dispatcher's
+  wait arm exactly as fork's is) -- the invariant forces the row move.
+
+THE POST (WX-WAIT).  `kwait`'s success arm: `r = pid' ∗ exit_tok γ' pid' xs
+∗ (⌜γ' ∈ cs⌝ ∨ ⌜pj = ip ∧ γ' ∈ O⌝) ∗ □ (∀ γ, ⌜γ ∈ cs⌝ → gen_pid γ pid' -∗
+⌜γ = γ'⌝) ∗ row at cs ∖ {γ'}`; the -1 arm: `⌜cs = ∅⌝ ∗ row at cs`.  The
+proof of (W2): entry k of the invariant against the ZOMBIE block's
+`slot_gen k (1/2) (pv_gen Vc)`; of (W3): a `γ ∈ cs` has an entry at some
+slot with `pid_reg pid_γ (1/2) γ` and `gen_pid γ pid_γ`; `gen_pid γ pid'`
+gives `pid_γ = pid'`, and the block's `pid_reg pid' (1/2) γ'` agrees: `γ =
+γ'`; of (W5): the scan found no cell at `pj`, so the converse empties `cs`.
+The u-tier row relays `cs' = cs ∖ {γ'}` (`usys_ch_ok` stays pure-quiet; the
+move rides the answer like fork's), the leaf `wp_uk_ecall_wait` returns the
+escrow with the two facts, `UkInit.wp_kinit_wait` redeems: `child_tok γsh
+pidsh Q`, `γsh ∈ cs`, `r = pidsh` → `γ' = γsh` → `gen_pay`.  The orphan arm
+is real (init reaps reparented children) and is where init drops the escrow.
+The xstate cell is NOT tied to the escrow's `xs` this lane (kexit keyed the
+escrow at its own trapframe word); tie it with the half-cell if a program
+ever reads the status.
+
+ORDER: WX-GEN (`brief-wx-gen.md`: the two ghosts, `nextpid_res_at`'s list
+and authority, allocproc/freeproc, the block's halves, kfork's and
+userinit's split; green with `children_inv` still stated-not-carried) →
+WX-INV (`brief-wx-inv.md`: carry it; kwait's row) → WX-WAIT
+(`brief-wx-wait.md`: the post, the route, the leaf, init) → ARM-c (1b) → L7.
+WX-PID is absorbed: pid uniqueness IS `pid_reg`.
+
 #### WAIT-EXIT — DESIGN OF RECORD (2026-09-09, owner asked for design + implementation)
 
 WHAT THE TREE SAYS TODAY (verified).  `SpecKwait.wp_kwait_sconf_body`: the
