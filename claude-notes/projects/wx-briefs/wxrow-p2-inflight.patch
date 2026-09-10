@@ -909,7 +909,7 @@ index acd458488..c519aa89f 100644
      iSplitR; [iPureIntro; exact Hf|]. iFrame.
    Qed.
 diff --git a/iris/ProcInv.v b/iris/ProcInv.v
-index c09449941..f0072cbe9 100644
+index c09449941..4ceec96b0 100644
 --- a/iris/ProcInv.v
 +++ b/iris/ProcInv.v
 @@ -291,7 +291,7 @@ Section ProcInv.
@@ -921,7 +921,7 @@ index c09449941..f0072cbe9 100644
    (* [FirstTok.first_tok] rides inside the private block (see
       [proc_priv_core]), and its boot arm names [RiscvPtsto.gen_cert]; that
       is the ONLY new index the block acquires.  The file-system's own two
-@@ -2532,14 +2532,26 @@ Section ProcInv.
+@@ -2532,15 +2532,29 @@ Section ProcInv.
       passed on by every later producer of a dormant slot.  See
       [ProcDefs.proc_dormant]'s note for why the slot rather than the process
       owns them while it is dormant. *)
@@ -947,11 +947,14 @@ index c09449941..f0072cbe9 100644
 -    iExists V, pid. iFrame "Hpid Hf Ho Hsp Hir Hbs Hkst Hctx". iSplit; [done|].
 +    iExists (upd_chg V γ0), pid.
 +    cbn [upd_chg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi pv_gen pv_chg].
-+    iFrame "Hpid Hf Ho Hsp Hir Hbs Hkst Hch Hctx". iSplit; [done|].
++    (* BOTH [st]-keyed disjuncts take their [else] branch, and the row's has
++       to be reduced before it can be framed. *)
      rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
++    iFrame "Hpid Hf Ho Hsp Hir Hbs Hkst Hch Hctx". iSplit; [done|].
      iSplitL "Hs".
      { iApply fd_slots_to_any. by rewrite Hof length_replicate. }
-@@ -2554,6 +2566,11 @@ Section ProcInv.
+     iFrame "Hpg Htf".
+@@ -2554,6 +2568,11 @@ Section ProcInv.
       the store would be unsatisfiable, not merely premature.  The seal
       happens at the one point where the cell has been written and persisted
       ([SpecProcinit.procs_inv_alloc]'s pass 3). *)
@@ -963,7 +966,7 @@ index c09449941..f0072cbe9 100644
    Definition proc_dormant_prestk (pa : mword 64) : iProp Σ :=
      (proc_dormant_nofd pa ∗ fd_slots (NOFILE + FDSPARE) ∗
       iref_slots (1 + IREFSPARE) ∗ bslots 3)%I.
-@@ -2563,11 +2580,12 @@ Section ProcInv.
+@@ -2563,11 +2582,12 @@ Section ProcInv.
      iref_slots (1 + IREFSPARE) -∗ bslots 3 -∗ proc_dormant_prestk pa.
    Proof. iIntros "H Hs Hir Hbs". iFrame "H Hs Hir Hbs". Qed.
  
@@ -980,7 +983,7 @@ index c09449941..f0072cbe9 100644
    Qed.
  
    (* allocproc's move: it finds an UNUSED slot, so the two address-space
-@@ -2615,6 +2633,12 @@ Section ProcInv.
+@@ -2615,6 +2635,12 @@ Section ProcInv.
         uint (pv_sz V) <= uvm_maxsz⌝ ∗
        p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
        proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf (pv_fdg V) pa (pv_ofile V) ∗
@@ -993,7 +996,7 @@ index c09449941..f0072cbe9 100644
        (* THE FRAGMENT BUNDLE, out with the block and BESIDE it -- inside the
           existential because it is keyed on the [pv_fdg] this step just
           chose.  It travels with [fd_slots FDSPARE] from here to
-@@ -2624,7 +2648,7 @@ Section ProcInv.
+@@ -2624,7 +2650,7 @@ Section ProcInv.
           descriptors were unstateable as a direct consequence. *)
        fd_frags (pv_fdg V) fdt0.
    Proof.
@@ -1002,7 +1005,7 @@ index c09449941..f0072cbe9 100644
      rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
      iDestruct "Haddr" as "[Hpg Htf]".
      iMod (fd_st_alloc NOFILE) as (γd) "Hst".
-@@ -2633,7 +2657,7 @@ Section ProcInv.
+@@ -2633,7 +2659,7 @@ Section ProcInv.
      iModIntro. iFrame "Hctx Hpg Htf Hsp Hir Hbs Hkst".
      iExists (upd_fdg V γd), pid.
      cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi pv_gen pv_chg].
@@ -1011,7 +1014,7 @@ index c09449941..f0072cbe9 100644
      iSplitR "Hfrag"; [| rewrite /fdt0; iExact "Hfrag"].
      iDestruct (fd_st_closed_to_any γd (replicate NOFILE (zero_reg : mword 64))
                   with "[Hauth]") as "Hst"; [by rewrite length_replicate|].
-@@ -2872,7 +2896,7 @@ End ProcPtMorph.
+@@ -2872,7 +2898,7 @@ End ProcPtMorph.
  (* ==================================================================== *)
  Section ProcPrivMorph.
    Context `{!riscvGS Σ}.
@@ -15014,7 +15017,7 @@ index c40a7e1bd..e6cabd99a 100644
              with "[] Hwl Hft Hprocs Hdg Hdone2 Hpw Htok").
      rewrite /sysc_park_extra. iFrame "Hnp Hpav Htl Hcr".
 diff --git a/iris/WaitInv.v b/iris/WaitInv.v
-index b2bf45504..53cc373fa 100644
+index b2bf45504..d7351aa86 100644
 --- a/iris/WaitInv.v
 +++ b/iris/WaitInv.v
 @@ -16,29 +16,45 @@
@@ -15358,7 +15361,7 @@ index b2bf45504..53cc373fa 100644
  
    Lemma parents_own_length ps : parents_own ps -∗ ⌜length ps = NPROC⌝.
    Proof. iIntros "[% _]". done. Qed.
-@@ -379,6 +437,56 @@ Section WaitInv.
+@@ -379,6 +437,57 @@ Section WaitInv.
  
  End WaitInv.
  
@@ -15391,13 +15394,15 @@ index b2bf45504..53cc373fa 100644
 +  Proof.
 +    revert k m. induction n as [|n IH]; intros k m.
 +    - iIntros "Ha". iModIntro. iExists m. iFrame "Ha". done.
-+    - iIntros "Ha". cbn [seq]. rewrite big_sepL_cons.
++    - iIntros "Ha".
 +      set (γ0 := fresh (dom m)).
 +      assert (Hfr : m !! γ0 = None) by (apply not_elem_of_dom, is_fresh).
 +      iMod (ghost_map_insert γ0 (proc_addr k, (∅ : gset gname)) Hfr with "Ha")
 +        as "[Ha Hf]".
 +      iMod (IH (S k) _ with "Ha") as (m') "[Ha Hrows]".
 +      iModIntro. iExists m'. iFrame "Ha".
++      replace (seq k (S n)) with (k :: seq (S k) n) by reflexivity.
++      rewrite big_sepL_cons.
 +      iSplitL "Hf"; [iExists γ0; iExact "Hf" | iExact "Hrows"].
 +  Qed.
 +
@@ -15406,8 +15411,7 @@ index b2bf45504..53cc373fa 100644
 +  Proof.
 +    iMod (ghost_map_alloc (∅ : gmap gname (mword 64 * gset gname))) as (γ) "[Ha _]".
 +    iMod (ch_rows_alloc γ NPROC 0 ∅ with "Ha") as (m') "[Ha Hrows]".
-+    iModIntro. iExists (WchG Σ _ γ).
-+    rewrite /children_boot /children_res /children_own_at /ch_frag; cbn [wch_name].
++    iModIntro. iExists (WchG Σ _ γ). rewrite /children_boot /children_res.
 +    iSplitL "Ha"; [iExists m'; iExact "Ha" | iExact "Hrows"].
 +  Qed.
 +End WaitInvBoot.

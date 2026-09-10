@@ -64,6 +64,23 @@ patch: `projects/wx-briefs/`.
 - Owner's clarification this session: the "discarded half" of the generation ghost is
   Iris `DfracDiscarded` (a permanent read-only share), accepted as designed.
 
+## LATEST+1 (2026-09-10, successor session, Fable coordinator)
+- Found the tree DIRTY (284 iris files, the in-flight phase-2 sweep, slightly ahead
+  of the old snapshot); backed it up and refreshed `wx-briefs/wxrow-p2-inflight.patch`
+  to it.  Built once (`wxrow7`): COMPILED=720, EXIT=2, ONE error --
+  `ProcInv.v:2748` `proc_priv_to_dormant_zombie` (the ZOMBIE block now carries the
+  row, the lemma takes none in); everything above ProcInv SKIPPED, so the red list
+  above it is unknown.  Grep showed the row still absent from kfork B5's park and
+  parent move, userinit's park, kwait's reap reset, and kexit's ZOMBIE park.
+- Wrote the continuation brief `wx-briefs/brief-wx-row-res-finish-2.md` (rulings
+  restated; R1 kexit's row premise through SpecKexit/SpecSysExit/the dispatcher's
+  exit arm; R2 userinit; R3 kfork child row + parent `children_own_upd` at +0xd4 with
+  the moved row returned through `kfk_b5`'s continuation; R4 kwait's reset; R5 the
+  rest of the red list) and launched a fresh Opus agent on it.
+- If you find this session gone and the tree dirty: same rule as above -- back up,
+  build once, read the red list, then gate/commit or relaunch on
+  `brief-wx-row-res-finish-2.md` with the red list appended.
+
 ## HOW TO RESUME
 1. `git status --porcelain` in /shared/xv6iris-2.
    - CLEAN tree at/after `51f7ae907`: WX-RES either landed (check `git log`) or
