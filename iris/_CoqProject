@@ -1625,6 +1625,15 @@ PinnedExec.v
 # application-side fs invariant [FirstTok.fsabs_env] -- which is why it sits
 # above FsAbsInvFire (the supply law's exec case IS that mint).
 UexecExecInst.v
+# UInitSh = init's OWN exec deposit, PAID: [init_sh_slot] (the file-system
+# invariant, the duplicating claim law at FsShPin.era0_sh_pins, the taint's
+# generic slot and sh's entry payload), [init_args_det] (init's argument
+# vector is a constant of its image, so na = 1 and alen 0 = 2 -- which is
+# what prices sh's frames), and the assembly into UkInit.init_exec_sup.
+# ABOVE UexecExecInst because the last step is [sbundle_exec_intro], which
+# is the kernel's INSTANCE of UexecSG -- the u-tier files below state
+# everything over the class.
+UInitSh.v
 # UexecExecMint = the generic mint: the loop's slot at every key, from the
 # invariant and UexecCond.cond_entry_slot with both premises discharged from
 # the instance.

@@ -41,6 +41,11 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Require Import UserCwd.
+Require FsImg.  (* [FsImg.ROOTINO]: init is born in the root and never
+                   chdirs, so its working directory is that inum forever --
+                   which is what makes its exec of the RELATIVE "sh" name a
+                   file.  QUALIFIED: this file has no other business with
+                   the file-system tower. *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
@@ -443,14 +448,37 @@ Section UkInitMain.
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_main_child (N' : uk_names) (h : CpuId) (m : regfile) (n : nat) :
     init_code (ukn_t N') -∗
-    (* the exec deposit's supplier -- [UkRun.uxsup]: init's child arm
-       ecalls exec, whose bundle the key-free minting law cannot pay *)
-    uxsup -∗
+    (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
+       arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
+       and the argument vector, out of the image) and is therefore not
+       payable through [UkRun.udep]'s key-free law.  It is init's OWN
+       supply, at its own two argument registers and at the one working
+       directory it ever has, and it is LENT the heap and the fd authority
+       so a pinned bundle can read them. *)
+    init_exec_sup -∗
     init_rodata (ukn_t N') -∗
+    (* ...AND THE ARGUMENT VECTOR, at the child's own data name: the
+       supplier reads init's sixteen persisted .data bytes back into facts
+       about the process image, which is what pins [na = 1] and the one
+       argument's length -- and hence prices the exec'd program's frames.
+       It crosses the fork with the text and the rodata
+       ([UkFork.forkable_ubyteq_map]). *)
+    init_argv (ukn_d N') -∗
+    (* ...AND THE CHILD'S OWN HALF OF ITS WORKING DIRECTORY.  The exec leaf
+       is cwd-indexed ([UkInit.wp_kinit_exec]) because a pinned bundle is
+       about a PATH and "sh" is relative; the child was forked at the
+       root, and nothing between the fork and the ecall moves it. *)
+    UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
+    (* ...AND THE DESCRIPTOR LEDGER.  exec copies the table, so the exec'd
+       program's entry constructor speaks about THIS process's slots, and
+       only a ledger is a claim on them; sh asks nothing about their
+       states, so the bare ledger is what travels.  It is SPENT here --
+       the one path past a returning exec is the diagnostic and exit(1). *)
+    ustd_any (ukn_fd N') -∗
     urun N' h m (mword_of_int 0x96) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hxs #Hro Hrun".
+    iIntros "#Hcode #Hxs #Hro #Hargv Hcwd Hstd Hrun".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hexec & _ & _).
     (* ---- 0x96  auipc a1,0x1 ---- *)
@@ -547,10 +575,30 @@ Section UkInitMain.
     assert (Hrac5 : mc5 !!! Regidx ra_idx = (mword_of_int 0xaa : mword 64))
       by exact (upd_eq mc4 (Regidx ra_idx) (regval_into_reg _)).
     (* ---- exec("sh", argv) -- and it FAILED, or we would not be here ---- *)
-    iApply (wp_kinit_exec N' hc5 mc5 (12 + (12 + (4 + n)))
-              with "Hcode Hrun []").
-    { iApply (udepw_of_uxsup with "Hxs"). }
-    iIntros (hc6) "Hrun".
+    (* THE DEPOSIT, out of init's own supply: the two argument registers
+       are pinned by the four instructions above, and the working
+       directory is the one the fragment names. *)
+    iApply (wp_kinit_exec N' hc5 mc5 (12 + (12 + (4 + n))) FsImg.ROOTINO
+              with "Hcode Hrun Hcwd [Hstd]").
+    { iApply ("Hxs" $! N' (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> mc5)
+                (mword_of_int 0x3ac) with "[%] [%] Hro Hargv Hstd").
+      - rewrite (upd_ne mc5 (Regidx a7_idx) (Regidx a0_idx)
+                   (mword_of_int 7 : mword 64)
+                   ltac:(vm_compute; discriminate)).
+        rewrite /mc5 (upd_ne mc4 (Regidx ra_idx) (Regidx a0_idx) _
+                        ltac:(vm_compute; discriminate)).
+        exact (upd_eq mc3 (Regidx a0_idx) _).
+      - rewrite (upd_ne mc5 (Regidx a7_idx) (Regidx a1_idx)
+                   (mword_of_int 7 : mword 64)
+                   ltac:(vm_compute; discriminate)).
+        rewrite /mc5 (upd_ne mc4 (Regidx ra_idx) (Regidx a1_idx) _
+                        ltac:(vm_compute; discriminate)).
+        rewrite /mc4 (upd_ne mc3 (Regidx a0_idx) (Regidx a1_idx) _
+                        ltac:(vm_compute; discriminate)).
+        rewrite /mc3 (upd_ne mc2 (Regidx a0_idx) (Regidx a1_idx) _
+                        ltac:(vm_compute; discriminate)).
+        exact (upd_eq mc1 (Regidx a1_idx) _). }
+    iIntros (hc6) "Hcwd Hrun".
     assert (Eretc : ret_pc (mc5 !!! Regidx ra_idx)
                     = (mword_of_int 0xaa : mword 64))
       by (rewrite Hrac5; apply bv_eq; vm_compute; reflexivity).
@@ -568,16 +616,26 @@ Section UkInitMain.
   (* carried by the leaf itself.                                             *)
   (* --------------------------------------------------------------------- *)
   Local Instance forkable_init_img :
-    Forkable (fun gt _ _ => (init_code gt ∗ init_rodata gt)%I).
+    Forkable (fun gt gd _ =>
+                (init_code gt ∗ init_rodata gt ∗ init_argv gd)%I).
   Proof.
     eapply Forkable_ext;
       [ | apply (forkable_sep
                    (fun gt _ _ => ([∗ map] a ↦ b ∈ InitInstrs.init_bytes,
                                      utext gt a b)%I)
-                   (fun gt _ _ => ([∗ map] a ↦ b ∈ init_ro, utext gt a b)%I)
+                   (fun gt gd _ =>
+                      (([∗ map] a ↦ b ∈ init_ro, utext gt a b)
+                       ∗ ([∗ map] a ↦ b ∈ init_argv_map,
+                            ubyteq gd DfracDiscarded a b))%I)
                    (forkable_utext_map InitInstrs.init_bytes)
-                   (forkable_utext_map init_ro)) ].
-    intros gt gd gs. rewrite /init_code /init_rodata /utext_img. reflexivity.
+                   (forkable_sep
+                      (fun gt _ _ => ([∗ map] a ↦ b ∈ init_ro, utext gt a b)%I)
+                      (fun _ gd _ => ([∗ map] a ↦ b ∈ init_argv_map,
+                                        ubyteq gd DfracDiscarded a b)%I)
+                      (forkable_utext_map init_ro)
+                      (forkable_ubyteq_map init_argv_map))) ].
+    intros gt gd gs.
+    rewrite /init_code /init_rodata /init_argv /utext_img. reflexivity.
   Qed.
 
   (* --------------------------------------------------------------------- *)
@@ -588,26 +646,33 @@ Section UkInitMain.
 (* even walk its return.                                                   *)
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_fork (szv : Z) (h : CpuId) (m : regfile) (avail : nat) :
-    init_code γt -∗ init_rodata γt -∗ usz γs szv -∗
+    init_code γt -∗ init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
+    (* THE LEDGER.  fork copies the descriptor table, so the child wakes
+       on the parent's, and the child is the arm that execs sh -- which
+       needs a ledger of its own to hand on.  [UkFork.wp_uk_ecall_fork]
+       mints the child's half at the parent's own [l], so both halves
+       leave at the same states. *)
     ustd_any γfd -∗
     (* the working directory, index-free: fork keeps it and init never
        reads it, but the child's half is minted at the parent's value and
        the leaf needs one to name ([UkFork.wp_uk_ecall_fork]) *)
-    UserCwd.ucwd_any γcwd -∗
+    UserCwd.ucwd γcwd FsImg.ROOTINO -∗
     urun N h m (mword_of_int InitSyms.fork) avail -∗
     ((∀ (h' : CpuId) (r : mword 64),
         ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
-        (init_code γt ∗ init_rodata γt) -∗ usz γs szv -∗
+        (init_code γt ∗ init_rodata γt ∗ init_argv γd) -∗ usz γs szv -∗
         ustd_any γfd -∗
-        UserCwd.ucwd_any γcwd -∗
+        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
         urun N h'
           (<[Regidx a0_idx := r]>
              (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m))
           (ret_pc (m !!! Regidx ra_idx)) avail -∗
         WP (Loop : expr riscv_lang)) ∗
      (∀ (N' : uk_names) (h' : CpuId),
-        (init_code (ukn_t N') ∗ init_rodata (ukn_t N')) -∗ usz (ukn_s N') szv -∗
-        UserCwd.ucwd_any (ukn_cwd N') -∗
+        (init_code (ukn_t N') ∗ init_rodata (ukn_t N') ∗ init_argv (ukn_d N'))
+          -∗ usz (ukn_s N') szv -∗
+        ustd_any (ukn_fd N') -∗
+        UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
         urun N' h'
           (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
              (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m))
@@ -615,9 +680,8 @@ Section UkInitMain.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hro Hsz Hstd Hcwd Hrun [Hpar Hchi]".
+    iIntros "#Hcode #Hro #Hargv Hsz Hstd Hcwd Hrun [Hpar Hchi]".
     iDestruct "Hstd" as (l) "Hstd".
-    iDestruct "Hcwd" as (cwv) "Hcwd".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & _ & _ & _ & Hfork & _ & _ & _ & _).
     rewrite Hfork.
@@ -644,7 +708,9 @@ Section UkInitMain.
        opened AFTER the fork, in the child's exec'd image -- so the handle
        set fork carries across is empty and both extra premises are [emp]. *)
     iApply (wp_uk_ecall_fork N h1 mf1 (mword_of_int 0x36c) avail szv
-              l ∅ cwv (fun gt _ _ => (init_code gt ∗ init_rodata gt)%I)
+              l ∅ FsImg.ROOTINO
+              (fun gt gd _ =>
+                 (init_code gt ∗ init_rodata gt ∗ init_argv gd)%I)
               ltac:(unfold mf1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 1 : mword 64));
@@ -652,7 +718,7 @@ Section UkInitMain.
               ltac:(vm_compute; reflexivity)
               with "[] [] Hsz Hstd [] Hcwd Hrun").
     { iApply (uis_init_36c with "Hcode"). }
-    { iFrame "Hcode Hro". }
+    { iFrame "Hcode Hro Hargv". }
     { rewrite big_sepM_empty. done. }
     assert (E36c : add_vec_int (mword_of_int 0x36c : mword 64) 4
                    = mword_of_int 0x370)
@@ -672,7 +738,7 @@ Section UkInitMain.
       { rewrite /mp (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) r
                        ltac:(vm_compute; discriminate)).
         exact (Hraf mf1 r eq_refl). }
-      iDestruct "Hpay" as "[#Hcp #Hrp]".
+      iDestruct "Hpay" as "(#Hcp & #Hrp & #Hap)".
       iApply (wp_uk_cjr N hp mp (mword_of_int 0x370) ra_idx
                 (ret_pc (m !!! Regidx ra_idx)) avail
                 ltac:(vm_compute; discriminate)
@@ -680,20 +746,19 @@ Section UkInitMain.
                 with "[] Hrun").
       { iApply (uis_init_370 with "Hcp"). }
       iIntros (hp2) "Hrun".
-      iApply ("Hpar" $! hp2 r with "[] [] Hsz [Hstd] [Hcwd] Hrun").
+      iApply ("Hpar" $! hp2 r with "[] [] Hsz [Hstd] Hcwd Hrun").
       { iPureIntro. exact Hrnz. }
-      { iFrame "Hcp Hrp". }
-      { by iExists l. }
-      { by iExists cwv. }
+      { iFrame "Hcp Hrp Hap". }
+      { iExists l. iFrame "Hstd". }
     - (* ...and the CHILD under fresh ones.  Its ledger is dropped: init's
          child execs, and nothing before the exec allocates. *)
-      iIntros (N' hc) "Hpay Hsz _ _ Hcwd Hrun".
+      iIntros (N' hc) "Hpay Hsz Hstd _ Hcwd Hrun".
       set (mk := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]> mf1).
       assert (Hrak : mk !!! Regidx ra_idx = m !!! Regidx ra_idx).
       { rewrite /mk (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) _
                        ltac:(vm_compute; discriminate)).
         exact (Hraf mf1 (mword_of_int 0) eq_refl). }
-      iDestruct "Hpay" as "[#Hck #Hrk]".
+      iDestruct "Hpay" as "(#Hck & #Hrk & #Hak)".
       iApply (wp_uk_cjr N' hc mk (mword_of_int 0x370) ra_idx
                 (ret_pc (m !!! Regidx ra_idx)) avail
                 ltac:(vm_compute; discriminate)
@@ -701,9 +766,9 @@ Section UkInitMain.
                 with "[] Hrun").
       { iApply (uis_init_370 with "Hck"). }
       iIntros (hc2) "Hrun".
-      iApply ("Hchi" $! N' hc2 with "[] Hsz [Hcwd] Hrun").
-      { iFrame "Hck Hrk". }
-      { iApply (ucwd_any_of with "Hcwd"). }
+      iApply ("Hchi" $! N' hc2 with "[] Hsz [Hstd] Hcwd Hrun").
+      { iFrame "Hck Hrk Hak". }
+      { iExists l. iFrame "Hstd". }
   Qed.
 
 
@@ -725,26 +790,32 @@ Section UkInitMain.
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_main_loop (szv : Z) (n : nat) :
     init_code γt -∗
-    (* the exec deposit's supplier -- [UkRun.uxsup]: init's child arm
-       ecalls exec, whose bundle the key-free minting law cannot pay *)
-    uxsup -∗
+    (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
+       arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
+       and the argument vector, out of the image) and is therefore not
+       payable through [UkRun.udep]'s key-free law.  It is init's OWN
+       supply, at its own two argument registers and at the one working
+       directory it ever has, and it is LENT the heap and the fd authority
+       so a pinned bundle can read them. *)
+    init_exec_sup -∗
     init_rodata γt -∗
+    init_argv γd -∗
     ((∀ (h : CpuId) (m : regfile),
         ⌜ m !!! Regidx s2_idx = mword_of_int LIT_START ⌝ -∗
         usz γs szv -∗
         ustd_any γfd -∗
-        UserCwd.ucwd_any γcwd -∗
+        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
         urun N h m (mword_of_int 0x32) (12 + (12 + (4 + n))) -∗
         WP (Loop : expr riscv_lang))
      ∧ (∀ (h : CpuId) (m : regfile),
           ⌜ m !!! Regidx s2_idx = mword_of_int LIT_START ⌝ -∗
           usz γs szv -∗
           ustd_any γfd -∗
-          UserCwd.ucwd_any γcwd -∗
+          UserCwd.ucwd γcwd FsImg.ROOTINO -∗
           urun N h m (mword_of_int 0x44) (12 + (12 + (4 + n))) -∗
           WP (Loop : expr riscv_lang))).
   Proof.
-    iIntros "#Hcode #Hxs #Hro".
+    iIntros "#Hcode #Hxs #Hro #Hargv".
     destruct init_syms_pins
       as (_ & _ & Hprintf & _ & _ & _ & _ & _ & Hfork & Hwait & _ & _ & _).
     assert (HokS : init_lit_ok LIT_START 18%nat = true)
@@ -835,11 +906,11 @@ Section UkInitMain.
                       = (mword_of_int 0x3c : mword 64))
         by (rewrite Hral4; apply bv_eq; vm_compute; reflexivity).
       iApply (wp_kinit_fork szv hl4 ml4 (12 + (12 + (4 + n)))
-                with "Hcode Hro Hsz Hstd Hcwd Hrun").
+                with "Hcode Hro Hargv Hsz Hstd Hcwd Hrun").
       rewrite Eretf.
       iSplitR "".
       + (* ------------- the PARENT: r <> 0 ------------- *)
-        iIntros (hp r) "%Hrnz [#Hcp #Hrp] Hsz Hstd Hcwd Hrun".
+        iIntros (hp r) "%Hrnz (#Hcp & #Hrp & #Hap) Hsz Hstd Hcwd Hrun".
         set (mp0 := <[Regidx a0_idx := r]>
                       (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> ml4)).
         assert (Ha0p0 : mp0 !!! Regidx a0_idx = r)
@@ -933,7 +1004,7 @@ Section UkInitMain.
           iApply ("IH2" $! hp3 mp1 with "[] Hsz Hstd Hcwd Hrun").
           iPureIntro. exact Hs2p1.
       + (* ------------- the CHILD: r = 0 ------------- *)
-        iIntros (N' hc) "[#Hck #Hrk] Hsz _ Hrun".
+        iIntros (N' hc) "(#Hck & #Hrk & #Hak) Hsz Hstd Hcwd Hrun".
         set (mc0 := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
                       (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> ml4)).
         assert (Ha0c0 : mc0 !!! Regidx a0_idx = (mword_of_int 0 : mword 64))
@@ -995,7 +1066,7 @@ Section UkInitMain.
         { iApply (uis_init_42 with "Hck"). }
         iIntros (hc3) "Hrun".
         iApply (wp_kinit_main_child N' hc3 mc1 n
-                  with "Hck Hxs Hrk Hrun").
+                  with "Hck Hxs Hrk Hak Hcwd Hstd Hrun").
     - (* ==================== the WAIT head @0x44 ==================== *)
       iIntros (h m) "%Hs2 Hsz Hstd Hcwd Hrun".
       (* ---- 0x44  c.li a0,0 -- the NULL status pointer ---- *)
@@ -1133,16 +1204,21 @@ Section UkInitMain.
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_main_from_1e (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     init_code γt -∗
-    (* the exec deposit's supplier -- [UkRun.uxsup]: init's child arm
-       ecalls exec, whose bundle the key-free minting law cannot pay *)
-    uxsup -∗
-    init_rodata γt -∗ usz γs szv -∗
+    (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
+       arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
+       and the argument vector, out of the image) and is therefore not
+       payable through [UkRun.udep]'s key-free law.  It is init's OWN
+       supply, at its own two argument registers and at the one working
+       directory it ever has, and it is LENT the heap and the fd authority
+       so a pinned bundle can read them. *)
+    init_exec_sup -∗
+    init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
     ustd_any γfd -∗
-    UserCwd.ucwd_any γcwd -∗
+    UserCwd.ucwd γcwd FsImg.ROOTINO -∗
     urun N h m (mword_of_int 0x1e) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hcwd Hrun".
+    iIntros "#Hcode #Hxs #Hro #Hargv Hsz Hstd Hcwd Hrun".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & _ & _ & Hdup & _ & _ & _ & _ & _).
     (* ---- 0x1e  c.li a0,0 ---- *)
@@ -1266,7 +1342,8 @@ Section UkInitMain.
     assert (Hs2q8 : mq8 !!! Regidx s2_idx = mword_of_int LIT_START)
       by exact (upd_eq mq7 (Regidx s2_idx) (regval_into_reg _)).
     (* ---- 0x32: the restart head, and main never comes back ---- *)
-    iDestruct (wp_kinit_main_loop szv n with "Hcode Hxs Hro") as "[Hloop _]".
+    iDestruct (wp_kinit_main_loop szv n with "Hcode Hxs Hro Hargv")
+      as "[Hloop _]".
     iApply ("Hloop" $! hq8 mq8 with "[] Hsz Hstd Hcwd Hrun").
     iPureIntro. exact Hs2q8.
   Qed.
@@ -1279,16 +1356,21 @@ Section UkInitMain.
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_main_repair (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     init_code γt -∗
-    (* the exec deposit's supplier -- [UkRun.uxsup]: init's child arm
-       ecalls exec, whose bundle the key-free minting law cannot pay *)
-    uxsup -∗
-    init_rodata γt -∗ usz γs szv -∗
+    (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
+       arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
+       and the argument vector, out of the image) and is therefore not
+       payable through [UkRun.udep]'s key-free law.  It is init's OWN
+       supply, at its own two argument registers and at the one working
+       directory it ever has, and it is LENT the heap and the fd authority
+       so a pinned bundle can read them. *)
+    init_exec_sup -∗
+    init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
     ustd_any γfd -∗
-    UserCwd.ucwd_any γcwd -∗
+    UserCwd.ucwd γcwd FsImg.ROOTINO -∗
     urun N h m (mword_of_int 0x64) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hcwd Hrun".
+    iIntros "#Hcode #Hxs #Hro #Hargv Hsz Hstd Hcwd Hrun".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & Hopen & Hmknod & _ & _ & _ & _ & _ & _).
     (* ---- 0x64  c.li a2,0 ---- *)
@@ -1478,7 +1560,7 @@ Section UkInitMain.
     { iApply (uis_init_82 with "Hcode"). }
     iIntros (hr8) "Hrun".
     iApply (wp_kinit_main_from_1e szv hr8 mr7 n
-              with "Hcode Hxs Hro Hsz Hstd Hcwd Hrun").
+              with "Hcode Hxs Hro Hargv Hsz Hstd Hcwd Hrun").
   Qed.
 
 
@@ -1495,17 +1577,22 @@ Section UkInitMain.
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_main (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     init_code γt -∗
-    (* the exec deposit's supplier -- [UkRun.uxsup]: init's child arm
-       ecalls exec, whose bundle the key-free minting law cannot pay *)
-    uxsup -∗
-    init_rodata γt -∗ usz γs szv -∗
+    (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
+       arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
+       and the argument vector, out of the image) and is therefore not
+       payable through [UkRun.udep]'s key-free law.  It is init's OWN
+       supply, at its own two argument registers and at the one working
+       directory it ever has, and it is LENT the heap and the fd authority
+       so a pinned bundle can read them. *)
+    init_exec_sup -∗
+    init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
     ustd_any γfd -∗
-    UserCwd.ucwd_any γcwd -∗
+    UserCwd.ucwd γcwd FsImg.ROOTINO -∗
     urun N h m (mword_of_int InitSyms.main)
       (4 + (12 + (12 + (4 + n)))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hcwd Hrun".
+    iIntros "#Hcode #Hxs #Hro #Hargv Hsz Hstd Hcwd Hrun".
     destruct init_syms_pins
       as (_ & Hmain & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
     rewrite Hmain.
@@ -1723,7 +1810,7 @@ Section UkInitMain.
       { iApply (uis_init_1a with "Hcode"). }
       iIntros (hm11) "Hrun".
       iApply (wp_kinit_main_repair szv hm11 mm7 n
-                with "Hcode Hxs Hro Hsz Hstd Hcwd Hrun").
+                with "Hcode Hxs Hro Hargv Hsz Hstd Hcwd Hrun").
     - (* it did: straight on to the dups *)
       iApply (wp_uk_btype0 N hm10 mm7 (mword_of_int 0x1a)
                 (mword_of_int 74 : mword 13) a0_idx BLT false
@@ -1738,7 +1825,7 @@ Section UkInitMain.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E1a. iIntros (hm11) "Hrun".
       iApply (wp_kinit_main_from_1e szv hm11 mm7 n
-                with "Hcode Hxs Hro Hsz Hstd Hcwd Hrun").
+                with "Hcode Hxs Hro Hargv Hsz Hstd Hcwd Hrun").
   Qed.
 
 
@@ -1749,17 +1836,22 @@ Section UkInitMain.
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_start (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     init_code γt -∗
-    (* the exec deposit's supplier -- [UkRun.uxsup]: init's child arm
-       ecalls exec, whose bundle the key-free minting law cannot pay *)
-    uxsup -∗
-    init_rodata γt -∗ usz γs szv -∗
+    (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
+       arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
+       and the argument vector, out of the image) and is therefore not
+       payable through [UkRun.udep]'s key-free law.  It is init's OWN
+       supply, at its own two argument registers and at the one working
+       directory it ever has, and it is LENT the heap and the fd authority
+       so a pinned bundle can read them. *)
+    init_exec_sup -∗
+    init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
     ustd_any γfd -∗
-    UserCwd.ucwd_any γcwd -∗
+    UserCwd.ucwd γcwd FsImg.ROOTINO -∗
     urun N h m (mword_of_int InitSyms.start)
       (2 + (4 + (12 + (12 + (4 + n))))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hxs #Hro Hsz Hstd Hcwd Hrun".
+    iIntros "#Hcode #Hxs #Hro #Hargv Hsz Hstd Hcwd Hrun".
     destruct init_syms_pins
       as (Hstart & Hmain & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
     rewrite Hstart.
@@ -1871,7 +1963,7 @@ Section UkInitMain.
               with "[] Hrun").
     { iApply (uis_init_c4 with "Hcode"). }
     iIntros (hs4) "Hrun".
-    iApply (wp_kinit_main szv hs4 _ n with "Hcode Hxs Hro Hsz Hstd Hcwd Hrun").
+    iApply (wp_kinit_main szv hs4 _ n with "Hcode Hxs Hro Hargv Hsz Hstd Hcwd Hrun").
   Qed.
 
 End UkInitMain.

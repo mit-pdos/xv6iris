@@ -5546,6 +5546,52 @@ Section UCodeInit.
 
   Global Typeclasses Opaque init_rodata.
 
+  (* ...AND THE ARGUMENT VECTOR, [init_ro]'s complement in the image's data
+     half: the sixteen bytes of .data at 0x1000..0x100f, which are the
+     array [{ "sh", 0 }] init's child arm passes to exec -- the pointer
+     0x9a8 in the first word and the terminating NULL in the second.  The
+     map is COMPUTED from the dump, not retyped: everything of
+     [InitData.init_data] at or above [initRodataEnd].
+
+     THEY ARE READ-ONLY IN FACT.  init never stores into its writable
+     segment, so the sixteen bytes are handed over PERSISTED
+     ([UserHeap.uarea_persist] at init's entry carve) rather than
+     exclusively: init keeps them round its two loops, they cross the fork
+     with the text and the rodata, and the exec deposit reads them back
+     into facts about the process image through [UserHeap.uheap_ubyte].
+     A persisted byte is also what makes the fork payload a [Forkable]
+     one ([UkFork.forkable_ubyteq_map]). *)
+  Definition init_argv_map : gmap Z (bv 8) :=
+    filter (fun kv => (4096 <= kv.1)%Z) InitData.init_data.
+
+  Definition init_argv (g : gname) : iProp Σ :=
+    ([∗ map] a ↦ b ∈ init_argv_map, ubyteq g DfracDiscarded a b)%I.
+
+  Global Instance init_argv_persistent g : Persistent (init_argv g).
+  Proof. apply _. Qed.
+
+  Global Typeclasses Opaque init_argv.
+
+  (* the two readings of the map: its keys are the sixteen .data addresses,
+     and its bytes are the image's *)
+  Lemma init_argv_map_range (a : Z) (b : bv 8) :
+    init_argv_map !! a = Some b -> (4096 <= a < 4112)%Z.
+  Proof.
+    intro Hb. apply map_lookup_filter_Some in Hb as [Hb Hge].
+    pose proof (InitData.init_data_range a b Hb) as Hr.
+    cbn [fst] in Hge.
+    cbv [InitData.init_data_lo InitData.init_data_hi] in Hr. lia.
+  Qed.
+
+  Lemma init_argv_map_data (a : Z) (b : bv 8) :
+    init_argv_map !! a = Some b -> InitData.init_data !! a = Some b.
+  Proof. intro Hb. by apply map_lookup_filter_Some in Hb as [Hb _]. Qed.
+
+  (* ...so an image that contains init's data half contains them *)
+  Lemma init_argv_map_sub (M' : gmap Z (bv 8)) :
+    init_data_sub M' -> uimg_sub init_argv_map M'.
+  Proof. intros Hd a b Hb. exact (Hd a b (init_argv_map_data a b Hb)). Qed.
+
   Lemma init_rodata_of_text : utext_all gt M pm -∗ init_rodata gt.
   Proof.
     assert (Hin : forall (a : Z) (b : bv 8),

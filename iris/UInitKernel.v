@@ -6,20 +6,31 @@
 (* [UShKernel.v] is the mold, and its header is where the reasoning       *)
 (* lives; the two differences are:                                       *)
 (*                                                                       *)
-(*  THE ENTRY IS LOSSY.  [UkInitMain.wp_kinit_start] takes only the text  *)
-(*  ([UCodeInit.init_code]), the read-only image ([init_rodata]), the     *)
-(*  break ([usz]) and an untracked descriptor ledger ([ustd_any]) -- init *)
-(*  reads no static datum out of its writable segment -- so the plain     *)
-(*  [UkRun.uslot_of_urun] carve is enough, and no payload premise and no  *)
-(*  [fd_lowest_closed] row appear.  sh's line buffer is what forces its   *)
-(*  entry to the [_all] carve.                                            *)
+(*  THE ARGUMENT VECTOR IS CARVED AND PERSISTED.  init's child arm passes *)
+(*  exec the array [{ "sh", 0 }] at 0x1000, sixteen bytes of its writable *)
+(*  segment, and the exec deposit reads them back off the process image.  *)
+(*  So the entry takes the [UkRun.uslot_of_urun_all] carve, lifts those   *)
+(*  sixteen bytes out of the exclusive data below the frame and persists  *)
+(*  them ([UserHeap.uarea_persist]), yielding [UCodeInit.init_argv]: init *)
+(*  never stores into .data, so a read-only view is all it wants, and a   *)
+(*  persisted view is what crosses the fork.  The rest of that page       *)
+(*  (.bss and slack) is dropped.                                          *)
 (*                                                                       *)
 (*  THE EXEC SUPPLIER CROSSES HERE.  init's child arm ecalls              *)
-(*  exec("sh", argv), whose bundle reads the key, so it is not payable    *)
+(*  exec("sh", argv), whose bundle READS THE KEY, so it is not payable    *)
 (*  through [UkRun.udep]'s key-free law: [wp_kinit_start] takes           *)
-(*  [UkRun.uxsup] and so does this constructor.  Replacing that premise   *)
-(*  by init's OWN pinned exec bundle for /sh is the next step (L6-INIT    *)
-(*  deliverable D); nothing else in this file moves when it happens.      *)
+(*  [UkInit.init_exec_sup] -- the deposit at init's own two argument      *)
+(*  registers and at the root, lent the heap and the fd authority -- and  *)
+(*  so does this constructor.  [UInitSh.init_exec_sup_of_sh_slot] pays it *)
+(*  out of init's PINNED exec bundle for /sh, above the kernel's instance *)
+(*  of [UexecSG.uexecSG]; this file stays stated over the class.          *)
+(*                                                                       *)
+(*  THE WORKING DIRECTORY IS A PREMISE.  init never chdirs, so its cwd    *)
+(*  stays the inum userinit's [namei("/")] left, and the pinned bundle is *)
+(*  stated at that inum -- which is what makes the RELATIVE name "sh"     *)
+(*  name a file.  The image fact does not carry it (exec does not chdir), *)
+(*  so the bridge takes [uvis_cwd W' = FsImg.ROOTINO] and its caller      *)
+(*  supplies it.                                                          *)
 (*                                                                       *)
 (* THE BRIDGE ([init_slot_of_kexec]) discharges every key premise from    *)
 (* [kexec_image_ok ElfUser.init_elf ...] exactly as sh's does: the pc off *)
@@ -59,7 +70,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import UserFd.
 Require Import UCodeInit UkInit UkInitMain.
-Require Import UkRun.          (* [udep] / [uxsup] / [uslot_of_urun] / [urun] *)
+Require Import UkRun.          (* [udep] / [uslot_of_urun_all] / [urun] *)
 Require Import PageGeom.       (* [PGSIZE] *)
 Require Import UserPtTree.     (* [pgroundup] *)
 Require Import ElfFile.
@@ -73,6 +84,7 @@ Require Import UShKernel.      (* the entry geometry, and sh's own bridge *)
 Require User.InitSyms User.InitData User.InitInstrs.
 Require Import UexecSG.        (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
+Require FsImg.           (* [FsImg.ROOTINO] -- the inum init is born at *)
 
 Local Open Scope Z_scope.
 Import Defs.
@@ -136,6 +148,13 @@ Lemma init_start_pc :
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
 (* [UShKernel]'s two closed-arithmetic tactics, which are [Local] there *)
+(* [init_argv_map] IS A FILTER OVER A 1296-ENTRY DUMPED MAP: nothing here
+   computes it (every reading goes through [UCodeInit.init_argv_map_range] /
+   [_data]), but the unifier will if it is let to, and the big-op steps
+   below are exactly where it would (durable-notes, "a definition nobody
+   computes but the unifier will"). *)
+Local Opaque UCodeInit.init_argv_map.
+
 Local Ltac zclosed :=
   split; [ vm_compute; discriminate | vm_compute; reflexivity ].
 Local Ltac zle := vm_compute; discriminate.
@@ -151,6 +170,18 @@ Section UInitKernel.
   (* NO [Context {CID : CpuId}] and no ambient [CurCtx]: the slot binds the
      hart itself, and the run binds its own context ([UShKernel]'s note). *)
 
+  (* A SUBMAP OF AN OWNED BYTE MAP IS OWNED.  Stated OFF THE WP, and that
+     is what makes it usable: [big_sepM_subseteq]'s three implicit
+     arguments unified inside a syscall-altitude goal do not terminate,
+     while an [iDestruct] of this closed lemma costs milliseconds. *)
+  Lemma ubyte_map_sub (γd : gname) (A B : gmap Z (bv 8)) :
+    A ⊆ B ->
+    ([∗ map] k ↦ b ∈ B, ubyte γd k b) -∗ ([∗ map] k ↦ b ∈ A, ubyte γd k b).
+  Proof.
+    intros Hsub. iIntros "H".
+    iApply (big_sepM_subseteq _ _ _ Hsub with "H").
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* SS1 THE DEPOSIT: init's entry conditions on a key.                    *)
   (* ------------------------------------------------------------------- *)
@@ -160,6 +191,17 @@ Section UInitKernel.
     (* init's whole image is one executable page *)
     (forall a : Z, 0 <= a < 4096 ->
        ux_addr (uvis_perm W) a /\ ~ uw_addr (uvis_perm W) a) ->
+    (* ...AND ITS SECOND PAGE IS THE WRITABLE ONE, which is where the
+       argument vector lives.  The sixteen bytes at 0x1000..0x100f come out
+       of the entry carve ([UkRun.uslot_of_urun_all]'s exclusive half below
+       the frame) and are PERSISTED here: init never stores into its data
+       segment, so what it keeps round its two loops and hands the fork is
+       a read-only view.  Present, writable and below the frame's base is
+       exactly what puts them in that half. *)
+    (forall a : Z, 4096 <= a < 4112 -> uw_addr (uvis_perm W) a) ->
+    4112 <= uvis_sz W ->
+    4112 <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+            - 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0))))) ->
     uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
     (* the frame budget [wp_kinit_start] walks with *)
     8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0)))))
@@ -170,34 +212,60 @@ Section UInitKernel.
                      - 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0)))))
                      + Z.of_nat j)%Z)) ->
     length (uvis_fd W) = NOFILE ->
-    (* the map stops at the break -- [UkRun.uslot_of_urun]'s own premise *)
+    (* the map stops at the break -- [UkRun.uslot_of_urun_all]'s own premise *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* THE WORKING DIRECTORY IS THE ROOT.  userinit's [namei("/")] is what
+       puts it there and init never chdirs, so the fragment the carve mints
+       is at that inum -- which is what makes the exec of the RELATIVE
+       "sh" name a file, and what init's exec supply is stated at. *)
+    uvis_cwd W = FsImg.ROOTINO ->
     (* the numbers init admits ([UexecSG.uprogSG]'s [psok]) *)
     (forall k : Z, k <> USYS_exec -> psok k) ->
     (* the ordinary deposit supplier... *)
     udep -∗
     (* ...and the EXEC supplier, which init's child arm spends on
-       exec("sh", argv).  Deliverable D replaces it by init's own pinned
-       exec bundle for /sh. *)
-    uxsup -∗
+       exec("sh", argv): its OWN, at its own two argument registers and at
+       the root, not the generic bundle at every key. *)
+    UkInit.init_exec_sup -∗
     uslot W.
   Proof.
-    intros Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop Hpsok.
+    intros Hpc Hsub Hx Hwd Hszd Hbase Hal8 Hroom Hstk Hfdlen Hstop Hcw Hpsok.
     iIntros "#Hdep #Hxs".
-    iApply (uslot_of_urun W (2 + (4 + (12 + (12 + (4 + n0)))))
+    iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0)))))
               Hal8 Hroom Hstk Hfdlen Hstop with "Hdep").
-    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf Hrun".
+    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf Dlo _ Hrun".
+    (* ---- the argument vector, out of the data below the frame ---- *)
+    assert (Hsub16 :
+              init_argv_map
+              ⊆ base.filter
+                  (fun kv : Z * bv 8 =>
+                     kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+                            - 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0))))))
+                  (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W))).
+    { apply map_subseteq_spec. intros a b Hb.
+      pose proof (init_argv_map_range a b Hb) as Hr.
+      apply map_lookup_filter_Some. split; [| cbn [fst]; clear -Hr Hbase; lia ].
+      unfold udata_lo, udata_part.
+      apply map_lookup_filter_Some. split;
+        [| cbn [fst]; clear -Hr Hszd; lia ].
+      apply map_lookup_filter_Some. split.
+      - exact (init_img_data _ Hsub a b (init_argv_map_data a b Hb)).
+      - cbn [fst]. exact (Hwd a Hr). }
+    iDestruct (ubyte_map_sub (ukn_d N) init_argv_map _ Hsub16 with "Dlo")
+      as "Dargv".
+    iMod (uarea_persist (ukn_d N) init_argv_map with "Dargv") as "#Hargv".
     rewrite Hpc.
     iApply (wp_kinit_start N Hpsok (uvis_sz W) h
               (tf_resume_gpr0 (uvis_tf W)) n0
-              with "[] Hxs [] Hszf [Hstd] [Hcwf] Hrun").
+              with "[] Hxs [] [] Hszf [Hstd] [Hcwf] Hrun").
     - iApply (init_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_text _ Hsub) Hx with "Ht").
     - iApply (init_rodata_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_data _ Hsub) Hx with "Ht").
+    - rewrite /init_argv. iExact "Hargv".
     - iExists (take NSTD (uvis_fd W)). iExact "Hstd".
-    - iApply (ucwd_any_of with "Hcwf").
+    - rewrite <- Hcw. iExact "Hcwf".
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -212,10 +280,15 @@ Section UInitKernel.
       + 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0)))))
       <= kxc_sp_final (kexec_sz ElfUser.init_elf) alen na ->
     length sts = NOFILE ->
+    (* THE PROCESS IS AT THE ROOT.  userinit's [namei("/")] is what put it
+       there, and this is the one entry premise the image fact does not
+       carry -- exec does not chdir, so the key's [uvis_cwd] is whatever
+       the caller's block held.  ARM-c (1) discharges it. *)
+    uvis_cwd W' = FsImg.ROOTINO ->
     (forall k : Z, k <> USYS_exec -> psok k) ->
-    udep -∗ uxsup -∗ uslot W'.
+    udep -∗ UkInit.init_exec_sup -∗ uslot W'.
   Proof.
-    intros Hok Hroom Hlen Hpsok.
+    intros Hok Hroom Hlen Hcw Hpsok.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row --
        [UShKernel.sh_slot_of_kexec]'s note is the reasoning. *)
     pose proof (kexec_image_ok_below _ _ _ _ _ _ Hok) as Hstop.
@@ -265,6 +338,20 @@ Section UInitKernel.
     { intros a Ha. apply (uw_addr_of_perm π a uperm_rw); [| reflexivity ].
       apply (sh_page_perm π 0x3000 a);
         [ exact Hstpg | reflexivity | clear -Ha; lia | zle.. ]. }
+    (* ---- the .data/.bss page: RW-, and it holds the argument vector ---- *)
+    assert (Hpg1 : π !! kexec_pg 0x1000 = Some (kexec_seg_perm p1)).
+    { apply (Hpg 1%nat p1); [ rewrite Hld; reflexivity | ].
+      unfold kexec_seg_pages. rewrite Hld. cbn [take].
+      unfold kexec_sz_after. cbn [foldl]. unfold kx_grow, kx_uvmalloc.
+      rewrite Hv0 Hm0 Hv1 Hm1. unfold PGSIZE.
+      split; [ reflexivity | zclosed ]. }
+    assert (Hperm1 : kexec_seg_perm p1 = MkUperm false true)
+      by (unfold kexec_seg_perm; rewrite Hf1; reflexivity).
+    assert (Hwd : forall a : Z, 4096 <= a < 4112 -> uw_addr π a).
+    { intros a Ha.
+      apply (uw_addr_of_perm π a (MkUperm false true)); [| reflexivity ].
+      rewrite <- Hperm1. apply (sh_page_perm π 0x1000 a);
+        [ exact Hpg1 | reflexivity | clear -Ha; lia | zle.. ]. }
     (* ---- the frame's bytes: zero on the stack page below the block ---- *)
     destruct Hstk as (_ & Hzero). unfold PGSIZE in Hzero.
     assert (Hbelow : forall a : Z, 0x3000 <= a < spv -> M !! a = Some (bv_0 8)).
@@ -281,6 +368,9 @@ Section UInitKernel.
     - rewrite Hpc. exact init_start_pc.
     - exact (init_img_sub_of_elf M Himg).
     - exact Hx.
+    - exact Hwd.
+    - rewrite Hszv. clear; lia.
+    - rewrite Hsp'. clear -Hroom; lia.
     - rewrite Hsp'. exact (kxc_sp_final_mod8 _ _ _).
     - rewrite Hsp'. clear -Hroom; lia.
     - intros j Hj. rewrite Hsp'. destruct (Hfrm j Hj) as [Hj0 Hj1].
@@ -290,6 +380,7 @@ Section UInitKernel.
       + rewrite Hszv. clear -Hj1 Hspv; lia.
     - rewrite Hfd. exact Hlen.
     - exact Hstop.
+    - exact Hcw.
     - exact Hpsok.
   Qed.
 

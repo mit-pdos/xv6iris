@@ -215,7 +215,7 @@ Section UkShFork.
     intros Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl Hszlo Hszal Hszok.
     iIntros "Hhead #Hcode #Hxs #Hro #Hjt Hstd Hdat Hsz Hbuf Hrun".
     destruct Hregs as (Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
-    iDestruct "Hstd" as "[[Hustd %Hlow] Hcwd]".
+    iDestruct "Hstd" as "[Hustd Hcwd]".
     assert (Hlen31 : Z.of_nat len < 2 ^ 31)
       by (unfold sh_nbuf in Hkl; lia).
     (* ---- 0x92c  jal ra,fork1 ---- *)
@@ -360,7 +360,6 @@ Section UkShFork.
       iApply ("Hhead" $! hE mD f n with "[%] [Hustd Hcwd] Hdat Hsz Hbuf Hrun").
       + exact HregsD.
       + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hustd Hcwd".
-        iPureIntro. exact Hlow.
     - (* ================= THE CHILD: parse, run, exec =================== *)
       iIntros (N' hA mA) "%HcsA %Ha0A #Hcode' Hpay Hsz Hustd Hcwd _ Hrun".
       iDestruct "Hpay" as "(_ & #Hro' & #Hjt' & Hdat & Hbuf)".

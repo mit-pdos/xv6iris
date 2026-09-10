@@ -40,6 +40,13 @@
 (* 29 KB constant.  ElfUser.v is a declared leaf, so importing it here is  *)
 (* in order.                                                               *)
 (*                                                                        *)
+(* SH'S ENTRY SAYS NOTHING ABOUT ITS STANDARD STREAMS.  The only          *)
+(* descriptor premise is [length sts = NOFILE]: the ledger of the low      *)
+(* [NSTD] slots ([UkSh.ush_std]) goes in at whatever state the exec'ing     *)
+(* process left it, and sh's console preamble is xv6's own repair of a      *)
+(* closed one.  A caller could not supply more anyway -- init's dups go     *)
+(* through the untracked leaf and init never tests its repair open.         *)
+(*                                                                         *)
 (* THE ONE PREMISE THE IMAGE FACT DOES NOT GIVE: room for sh's frames.     *)
 (* [kxc_stack_ok] only says the argument block fits the stack page, so     *)
 (* "sp - 8 * avail is still on the stack page" is stated as a premise on   *)
@@ -198,15 +205,6 @@ Lemma uw_addr_of_perm (π : gmap (mword 27) uperm) (a : Z) (q : uperm) :
   uw_addr π a.
 Proof. intros Hq Hw. exists q. exact (conj Hq Hw). Qed.
 
-(* a whole table with no closed slot has none in its low prefix *)
-Lemma fd_lowest_closed_take_none (l : list fdstate) (n : nat) :
-  fd_lowest_closed l = None -> fd_lowest_closed (take n l) = None.
-Proof.
-  intro H. rewrite <- (take_drop n l) in H.
-  rewrite fd_lowest_closed_app in H.
-  destruct (fd_lowest_closed (take n l)); [ discriminate H | reflexivity ].
-Qed.
-
 (* the kernel's read count is the signed low half of a2; at a caller whose
    a2 IS a count it is at most that count *)
 Lemma sh_rdcount_le (x : mword 64) (k : nat) :
@@ -309,7 +307,10 @@ Section UShKernel.
                      - 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
                      + Z.of_nat j)%Z)) ->
     length (uvis_fd W) = NOFILE ->
-    fd_lowest_closed (uvis_fd W) = None ->
+    (* AND NOTHING ELSE ABOUT THE TABLE.  [ush_pstate]'s ledger is the low
+       [NSTD] slots at whatever states the exec'ing process left them; sh's
+       [fdalloc] reasoning reads the scan off THEM, and its console
+       preamble reopens a stream that is closed. *)
     (* the map stops at the break -- [UkRun.uslot_of_urun]'s own premise,
        which is what lets a later [sbrk] hand sh fresh memory.  The bridge
        below reads it off [kexec_image_ok]'s own row. *)
@@ -344,7 +345,7 @@ Section UShKernel.
        ush_rest N (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
     uslot W.
   Proof.
-    intros Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hfdnone Hstop.
+    intros Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop.
     iIntros "#Hpay #Hdep #Hrest".
     iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Hal8
               Hroom Hstk Hfdlen Hstop with "Hdep").
@@ -360,7 +361,6 @@ Section UShKernel.
     - iApply (shk_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (shk_img_text _ Hsub) Hx with "Ht").
     - rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hstd".
-      iSplitR; [ iPureIntro; exact (fd_lowest_closed_take_none _ _ Hfdnone) | ].
       iApply (ucwd_any_of with "Hcwf").
     - iExact "Hrun".
   Qed.
@@ -375,7 +375,7 @@ Section UShKernel.
     (* room for sh's frames on the stack page, below the argument block *)
     kexec_sz sh_elf - PGSIZE + 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
       <= kxc_sp_final (kexec_sz sh_elf) alen na ->
-    length sts = NOFILE -> fd_lowest_closed sts = None ->
+    length sts = NOFILE ->
     (* the payload, passed straight through: see [sh_uexec_slot] *)
     □ (∀ γt γd γs : gname,
         usz γs (uvis_sz W') -∗
@@ -392,7 +392,7 @@ Section UShKernel.
        ush_rest N (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
     uslot W'.
   Proof.
-    intros Hok Hroom Hlen Hnone.
+    intros Hok Hroom Hlen.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row: exec built
        a fresh address space, so [KexecBuilt.kxb_perm_below] says it maps
        nothing above the break, which is what lets sh's later [sbrk] see
@@ -489,7 +489,6 @@ Section UShKernel.
       + apply Hwstk. split; [ exact Hj0 | clear -Hj1 Hspv; lia ].
       + rewrite Hszv. clear -Hj1 Hspv; lia.
     - rewrite Hfd. exact Hlen.
-    - rewrite Hfd. exact Hnone.
     - exact Hstop.
   Qed.
 

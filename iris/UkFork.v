@@ -576,6 +576,21 @@ Section UkFork.
     iModIntro. iIntros (γt' γd' γs') "#Hm' _ _". iModIntro. iExact "Hm'".
   Qed.
 
+  (* ...and a whole PERSISTED DATA map at once, [forkable_utext_map]'s twin
+     on the other half of the heap.  init's argument vector is what needs
+     it: sixteen read-only .data bytes the parent keeps and the child
+     inherits. *)
+  Global Instance forkable_ubyteq_map (D : gmap Z (bv 8)) :
+    Forkable (fun _ γd _ => ([∗ map] a ↦ b ∈ D, ubyteq γd DfracDiscarded a b)%I).
+  Proof.
+    intros γt γd γs. iIntros "#Hm".
+    iExists ∅, D, ∅.
+    rewrite !big_sepM_empty.
+    iSplitR; [ done | ]. iSplitR; [ iExact "Hm" | ]. iSplitR; [ done | ].
+    iSplitR; [ iIntros "_"; iExact "Hm" | ].
+    iModIntro. iIntros (γt' γd' γs') "_ #Hm' _". iModIntro. iExact "Hm'".
+  Qed.
+
   Global Instance forkable_utext_all (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) :
     Forkable (fun γt _ _ => utext_all γt M pm).

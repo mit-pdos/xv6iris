@@ -44,6 +44,13 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             which rides inside [urun] *)
 Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import FdSlots.  (* [fdstate] -- what the ledger's slots hold *)
+Require Import UserCwd.  (* [ucwd]: the process's own half of its cwd -- the
+                            exec leaf is indexed by it *)
+Require FsImg.           (* [FsImg.ROOTINO]: init never chdirs, so its
+                            working directory is the root inum forever.
+                            QUALIFIED, not imported: this file has no other
+                            business with the file-system tower. *)
 
 Section UkInit.
   Context `{!riscvGS Σ}.
@@ -436,18 +443,86 @@ Section UkInit.
     { iApply (uis_init_374 with "Hcode"). }
   Qed.
 
-  Lemma wp_kinit_exec (h : CpuId) (m : regfile) (avail : nat) :
+  (* ===================================================================== *)
+  (* INIT'S OWN EXEC SUPPLY, in place of [UkRun.uxsup].                     *)
+  (*                                                                       *)
+  (* [uxsup] is the exec bundle at EVERY key -- what a program that answers *)
+  (* for nothing runs on.  init answers for exactly one exec: the child     *)
+  (* arm's [exec("sh", argv)], at a0 = 0x9a8 ("sh" in its rodata), a1 =     *)
+  (* 0x1000 (its .data argument vector) and the working directory it was    *)
+  (* born with and never moves ([FsImg.ROOTINO]).  So what init carries is  *)
+  (* the [c]-indexed deposit at THOSE keys and no other, and the deposit    *)
+  (* is LENT the heap and the fd authority ([UkRun.udepw_at]) because a     *)
+  (* pinned bundle's own premises -- the path string in the image, the      *)
+  (* descriptor list -- are facts about the very key it is stated at.       *)
+  (*                                                                       *)
+  (* THE TWO CATALOGS ARE PREMISES for the same reason: the supplier reads  *)
+  (* "sh" out of [init_rodata] and the argument vector out of              *)
+  (* [init_argv] through the lent [UserHeap.uheap], and the program is what *)
+  (* holds them.  Both are persistent, so paying them costs nothing and     *)
+  (* they survive the [iLob] the restart loop re-enters.                    *)
+  (*                                                                       *)
+  (* [N'] is quantified because the arm that execs runs in the FORK CHILD,  *)
+  (* under fresh heap names; [m] and [pc] because the key the ecall traps   *)
+  (* from is built by the walk that reaches it.                            *)
+  (*                                                                       *)
+  (* WHERE IT COMES FROM: [UInitSh.init_exec_sup_of_sh_slot] builds it out  *)
+  (* of init's PINNED exec bundle for /sh, and [UkRun.udepw_at_of_uxsup]    *)
+  (* out of the trivial supplier.                                          *)
+  (* ===================================================================== *)
+  (* ...AND THE LEDGER IS SPENT ON IT.  exec COPIES the descriptor table,
+     so the exec'd program's entry constructor speaks about the CALLER's
+     slots -- and nothing in [UkRun.urun]'s [ufd_auth] is the program's
+     claim on them: only its own ledger is.  sh says nothing about which
+     of its standard streams are open, so what has to travel is the bare
+     ledger ([UserFd.ustd_any]) rather than any fact about it; it has to
+     travel at all because a table does not move without the fragments of
+     the low slots.  init hands it to the supply and does not get it back,
+     which costs nothing: the only path past a returning exec is the
+     diagnostic and exit(1). *)
+  Definition init_exec_sup : iProp Σ :=
+    (□ (∀ (N' : uk_names) (m : regfile) (pc : mword 64),
+          ⌜ m !!! Regidx a0_idx = (mword_of_int 0x9a8 : mword 64) ⌝ -∗
+          ⌜ m !!! Regidx a1_idx = (mword_of_int 0x1000 : mword 64) ⌝ -∗
+          init_rodata (ukn_t N') -∗
+          init_argv (ukn_d N') -∗
+          ustd_any (ukn_fd N') -∗
+          udepw_at N' m pc USYS_exec FsImg.ROOTINO))%I.
+
+  Global Instance init_exec_sup_persistent : Persistent init_exec_sup.
+  Proof. rewrite /init_exec_sup. apply _. Qed.
+
+  (* the trivial supplier still pays it: a bundle at every key is a bundle
+     at init's *)
+  Lemma init_exec_sup_of_uxsup : uxsup -∗ init_exec_sup.
+  Proof.
+    iIntros "#Hx". iModIntro. iIntros (N' m pc) "_ _ _ _ _".
+    iApply (udepw_at_of_uxsup with "Hx").
+  Qed.
+
+  (* ...AND THE LEAF IS CWD-INDEXED.  [UkRunSys.wp_uk_ecall_exec_at_cwd]
+     takes the program's own half of its working directory beside the
+     deposit and hands it back on the failure arm: a pinned bundle is about
+     a PATH, and a relative path names a file only against the directory it
+     is resolved from.  init's [c] is [FsImg.ROOTINO] at every call site,
+     but the leaf is stated at a variable one -- nothing here depends on
+     which inum it is. *)
+  Lemma wp_kinit_exec (h : CpuId) (m : regfile) (avail : nat) (c : Z) :
     init_code γt -∗
     urun N h m (mword_of_int InitSyms.exec) avail -∗
+    (* the program's half of its working directory *)
+    UserCwd.ucwd γcwd c -∗
     (* THE EXEC DEPOSIT, on the EXPLICIT route: exec's bundle reads the key
        (argv, out of the image), so it is not payable from the supplier and
        [UkRun.udepw]'s left disjunct excludes it by construction.  The
-       caller hands it in, at the key the ecall traps from. *)
-    udepw N
+       caller hands it in, at the key the ecall traps from and at the one
+       working directory it answers for. *)
+    udepw_at N
       (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m)
-      (mword_of_int 0x3ac) USYS_exec -∗
+      (mword_of_int 0x3ac) USYS_exec c -∗
     (* exec only comes back when it FAILED, and then it returns -1 *)
     (∀ h' : CpuId,
+       UserCwd.ucwd γcwd c -∗
        urun N h'
          (<[Regidx a0_idx := (mword_of_int (-1) : mword 64)]>
             (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m))
@@ -455,7 +530,7 @@ Section UkInit.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hsbx Hcont".
+    iIntros "#Hcode Hrun Hcwd Hsbx Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hexec.
     iApply (wp_uk_cli N h m (mword_of_int 0x3aa)
               (mword_of_int 7 : mword 6) a7_idx avail
@@ -473,18 +548,18 @@ Section UkInit.
     rewrite E0 Em.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m).
-    iApply (wp_uk_ecall_exec N h1 m1 (mword_of_int 0x3ac) avail
+    iApply (wp_uk_ecall_exec_at_cwd N h1 m1 (mword_of_int 0x3ac) avail c
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 7 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun Hsbx").
+              with "[] Hrun Hcwd Hsbx").
     { iApply (uis_init_3ac with "Hcode"). }
     assert (E1 : add_vec_int (mword_of_int 0x3ac : mword 64) 4
                  = mword_of_int 0x3b0)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1.
-    iIntros (h2) "Hrun".
+    iIntros (h2) "Hcwd Hrun".
     set (m2 := <[Regidx a0_idx := (mword_of_int (-1) : mword 64)]> m1).
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
     { unfold m2, m1.
@@ -501,7 +576,7 @@ Section UkInit.
               with "[] Hrun").
     { iApply (uis_init_3b0 with "Hcode"). }
     iIntros (h3) "Hrun".
-    iApply ("Hcont" $! h3 with "Hrun").
+    iApply ("Hcont" $! h3 with "Hcwd Hrun").
   Qed.
 
   (* init calls [wait] with a NULL status pointer, which is the only arm
