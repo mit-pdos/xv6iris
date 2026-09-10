@@ -13,18 +13,21 @@ patch: `projects/wx-briefs/`.
 - Landed today: WX-KEY (`987f79afd`), WX-FORK (`901f9aba5`, rebased over a
   nightly dead-import sweep `086c81b9f`).
 
-## What was RUNNING when this was written
-- WX-RES phase 2 (agent on the coordinator's session; brief
-  `wx-briefs/brief-wx-res.md` + the phase-2 go-ahead rulings recorded in
-  app-echo.md's order line and below).  Its phase-1 tree is `wx-briefs/wxres-p1.patch`
-  (11 modified iris files, green statements, 8 red proof roots).  Phase-2 rulings:
-  `park_cap` keeps `∀ sts cs`; `usertrap_res_bare_fd_open` keeps `cs` fixed and
-  `ProofUserretClosed.Rut_at` gains the `cs` index; option (C) for the invariant
-  (`ch_frag γc γ0 pa S`, the slot address in the map's value; `children_inv`
-  STATED, NOT carried -- WX-INV carries it); the two row installs (kfork's child
-  row under `wait_lock` + `upd_chg`; main hands init's row `ch_frag γc γ0 pa_init ∅`
-  to userinit as a `SpecUserinit` premise); `ut_fork_out := ufork_ans (sfork_pay f)
-  r cs cs'` + `ut_ch_kept`; kfork moves the parent's row (`children_own_upd`).
+## State of the WORKING TREE at this checkpoint (2026-09-10, later)
+- The tree is DIRTY with WX-RES phase-2 WIP: 23 modified iris/*.v (backup
+  `wx-briefs/wxres-p2.patch`, apply with `git apply` onto `51f7ae907`/`e90eacb4c`
+  if the tree was cleaned).  Build `wxres6`: COMPILED=1010, EXIT=2, FOUR red roots
+  (`ProofKforkB5.v:~320`, `ProofUserinit.v:~809`, `ProofSyscall.v:~1743`,
+  `ProofUsertrapSys.v:~291`).  Everything else in the lane is landed and green (see
+  `wx-briefs/brief-wx-row-res-finish.md` "STATE").
+- WX-RES stopped on a STRUCTURAL blocker: kfork seals the child's residue at its
+  first `release(&np->lock)` before it takes `wait_lock`, so it cannot install the
+  child's children row; main cannot name init's slot either.  RULED (P): rows are
+  per-slot, born at boot by `wait_res_alloc` (NPROC rows), riding the DORMANT block
+  exactly as the descriptor ghost does; allocproc hands the row out and writes its
+  name into `pv_chg`; freeproc returns it; `children_own_install/_del` die.  That is
+  lane WX-ROW, folded with the WX-RES finish into ONE brief:
+  `wx-briefs/brief-wx-row-res-finish.md`.  An agent may have been launched on it.
 
 ## HOW TO RESUME
 1. `git status --porcelain` in /shared/xv6iris-2.
@@ -32,13 +35,12 @@ patch: `projects/wx-briefs/`.
      was never applied.  If not landed: launch a fresh Opus agent on
      `wx-briefs/brief-wx-res.md` (both phases; apply the rulings above), then
      gate/commit/push (procedure below), then WX-EXIT (`brief-wx-exit.md`).
-   - DIRTY tree with WX-RES WIP (iris/UsertrapRes.v, SpecUsertrap.v, WaitInv.v,
-     ParkCap.v, SpecKfork.v, SpecSyscall.v, SpecUservec.v, SpecUserretClosed.v,
-     SpecForkret.v, SpecForkretParkPaid.v, Proof* …): the agent was killed mid
-     phase 2.  Back the tree up (`git diff -- iris/ > <backup>.patch`), build it
-     once (`./gcp-rocq/vmbuild.sh xv6iris-2 <log>`), read the red list, and hand a
-     fresh agent a continuation brief (state + red files + the rulings above +
-     "do not revert"), the way `brief-wx-fork-finish.md` did.
+   - DIRTY tree with WX-RES/WX-ROW WIP: back it up (`git diff -- iris/ >
+     <backup>.patch`), build it once (`./gcp-rocq/vmbuild.sh xv6iris-2 <log>`),
+     read the red list, and hand a fresh Opus agent
+     `wx-briefs/brief-wx-row-res-finish.md` (or a continuation of it: state + red
+     files + "do not revert"), the way `brief-wx-fork-finish.md` did.  If the WIP
+     is exactly `wxres-p2.patch`, that brief applies as written.
 2. Gate before any commit: zero `Error`/`EXIT=0`; VM `make audit-only` = EXACTLY
    the thirteen; `tools/lemma_diff.py` clean; `git diff --cached` empty; nothing
    outside iris/ modified.  Commit iris with `git add -A -- iris/`, notes by path;
