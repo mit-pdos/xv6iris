@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES (the children fragment rides the residue; fork moves the map; `children_wf` carried; brief `brief-wx-res.md`) → WX-EXIT → WX-WAIT → WX-PID → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES (running: the children fragment rides the residue at a named set and the holder's slot address; fork moves the map; the two row installs; `children_inv` STATED) → WX-EXIT → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -1941,11 +1941,13 @@ WX-FORK LANDED (2026-09-10; briefs `brief-wx-fork.md`, `brief-wx-fork-finish.md`
   S` (a per-slot `ghost_var` half could not say WHICH entry is the holder's
   own; the ghost_map fragment proves its membership), `children_own_lookup/
   upd/install/del`; rows installed under `wait_lock` at a name fresh for
-  the domain (`fresh (dom m)`; gnames are positives): kfork installs the
-  child's at `np->parent = p` and writes it to `pv_chg`; main installs init's
-  at `wait_res_alloc` (`∃ γc γ0, wait_res γc ∗ ch_frag γc γ0 ∅`) -- userinit
-  takes no `wait_lock`.  allocproc does NOT mint `pv_chg`.  `children_wf ps m
-  chs gs` restated, still NOT carried.
+  the domain (`fresh (dom m)`; gnames are positives).  THE INSTALLS ARE NOT
+  WIRED BY THIS LANE (WX-RES found `children_own_install` has no caller and
+  `wait_res_alloc`'s `ch_frag γc γ0 ∅` is dropped at ProofMain ~1177): kfork
+  installs the child's row under the `wait_lock` it holds and writes the
+  name to `pv_chg`, main hands init's row to userinit -- both WX-RES phase 2.
+  allocproc does NOT mint `pv_chg`.  `children_wf ps m chs gs` restated,
+  still NOT carried.
 - The U tier: `UkFork.wp_uk_ecall_fork` takes `(Sc : gset gname) (Q : Z ->
   iProp Σ)`, the premise `uch (ukn_ch N) Sc`, and gives the parent arm the
   two-armed answer; `wp_uk_ecall_fork_any` is the index-free leaf at `Q :=
