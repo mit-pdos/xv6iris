@@ -1738,7 +1738,7 @@ Section BootCarveMain.
   Qed.
 
   (* ================================================================== *)
-  (* [proc_raw] / [proc_pub]: ONE process slot, and then the family.      *)
+  (* [proc_raw] / [proc_pub_bare]: ONE process slot, and then the family.      *)
   (*                                                                    *)
   (* Four RUNS inside a [struct proc] have no cell wrapper of their own,  *)
   (* so they get one each here: the 14-word saved context, the sixteen    *)
@@ -1925,8 +1925,9 @@ Section BootCarveMain.
   (* ---- ONE process slot: everything the image owes about [proc[i]] ----
      [proc_raw]'s three own cells plus [proc_dormant_nofd], AND the two
      PUBLIC conjuncts [main_globals_raw] lists separately ([p_chan] and
-     [proc_pub]) -- one lemma, because [p_pid ↦₄{1/2}] appears in BOTH halves
-     (inside [proc_dormant_nofd] and inside [proc_pub]) and the image can only
+     [proc_pub_bare]) -- one lemma, because [p_pid ↦₄{1/2}] appears in BOTH
+     halves (inside [proc_dormant_nofd] and inside [proc_pub_bare]) and the
+     image can only
      hand out the cell ONCE: it is carved in full at +48 and SPLIT.
      The four PINNED zeros ([sz] at +72, [pagetable] at +80, [trapframe] at
      +88, [cwd] at +336) come from [boot_cran_cell8_bss]; the [pv_sz] bound
@@ -1937,12 +1938,12 @@ Section BootCarveMain.
   (* THE MIDDLE PAIR IS PARENTHESISED, and that is not cosmetic: [∗] is
      right-associative, so without it the two [big_sepL_sep] rewrites below
      would cut this in the wrong place and [boot_procs_raw] would hand its
-     caller [chan] and [proc_pub ∗ parent] instead of the pair and the
+     caller [chan] and [proc_pub_bare ∗ parent] instead of the pair and the
      parent. *)
   Local Definition proc_slot_raw `{XI : TsoCtx.CurCtx} (a : Arch.pa) : iProp Σ :=
     (proc_raw a ∗
      ((∃ ch : SailStdpp.Values.mword 64,
-         TsoCtx.ctx_word_pointsto XI (p_chan a) (DfracOwn 1) ch) ∗ proc_pub a) ∗
+         TsoCtx.ctx_word_pointsto XI (p_chan a) (DfracOwn 1) ch) ∗ proc_pub_bare a) ∗
      (* the parent cell, which belongs to wait_lock rather than to p->lock --
         see the split at +56 below *)
      (∃ pv : SailStdpp.Values.mword 64,
@@ -2012,7 +2013,7 @@ Section BootCarveMain.
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
     (* +56 IS [p_parent], and it used to be dropped with the padding.  It is
        the only cell of the slot that belongs to a lock OTHER than p->lock:
-       [WaitInv.wait_res] is [∃ ps, parents_own ps], the NPROC parent cells,
+       [WaitInv.parents_res] is [∃ ps, parents_own ps], the NPROC parent cells,
        and wait_lock is what kexit and kwait take to touch them.  Carving it
        here is what finally gives that lock a resource to be over. *)
     iDestruct (boot_cran_split g (A + 56) (A + 56 + 8) (A + 360)
@@ -2092,7 +2093,7 @@ Section BootCarveMain.
     iDestruct (boot_proc_name g A Hmem Hlo Hbss ltac:(lia) with "Hcl Hnm")
       as (bs) "[%Hbs Hnm]".
     (* the pid cell has THREE owners: the dormant block's half, the slot
-       lock's quarter ([proc_pub]) and <pid_lock>'s quarter *)
+       lock's quarter ([proc_pub_bare]) and <pid_lock>'s quarter *)
     iAssert (TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 48))
                (DfracOwn (1/2)) vpid ∗
              (TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 48))
@@ -2103,7 +2104,7 @@ Section BootCarveMain.
     { rewrite -!TsoCtx.ctx_word4_pointsto_frac_split.
       assert (Hq : (1/2 + (1/4 + 1/4))%Qp = 1%Qp) by compute_done.
       rewrite Hq. iExact "Hpid". }
-    rewrite /proc_slot_raw /proc_raw /proc_pub /proc_dormant_nofd /proc_fields
+    rewrite /proc_slot_raw /proc_raw /proc_pub_bare /proc_dormant_nofd /proc_fields
             /pid_lock_share /pid_lock_share_at
             /p_state /p_chan /p_parent /p_killed /p_xstate /p_pid /p_kstack /p_sz
             /p_pagetable /p_trapframe /p_context /p_cwd
@@ -2149,7 +2150,7 @@ Section BootCarveMain.
        ([∗ list] i ∈ seq 0 NPROC,
           (∃ ch : SailStdpp.Values.mword 64,
              TsoCtx.ctx_word_pointsto XI (p_chan (proc_addr i)) (DfracOwn 1) ch) ∗
-          proc_pub (proc_addr i)) ∗
+          proc_pub_bare (proc_addr i)) ∗
        (* ...and the parent cells, which are wait_lock's, not p->lock's *)
        ([∗ list] i ∈ seq 0 NPROC,
           ∃ pv : SailStdpp.Values.mword 64,
@@ -2180,7 +2181,7 @@ Section BootCarveMain.
                  with "Hcl H") as "H".
     rewrite /proc_slot_raw big_sepL_sep. iDestruct "H" as "[H1 H234]".
     (* the cuts are made IN the hypothesis: a goal-wide [rewrite big_sepL_sep]
-       would now also split the [chan ∗ proc_pub] pair, whose body is a [∗] too *)
+       would now also split the [chan ∗ proc_pub_bare] pair, whose body is a [∗] too *)
     iEval (rewrite big_sepL_sep) in "H234". iDestruct "H234" as "[H2 H34]".
     iEval (rewrite big_sepL_sep) in "H34". iDestruct "H34" as "[H3 H4]".
     iSplitL "H1".

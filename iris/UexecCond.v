@@ -235,6 +235,9 @@ Section UexecCond.
      tree -- [Xv6Cameras.uioG]'s [uio_brkG] is the same [ghost_varG Σ Z] --
      so nothing new enters Σ. *)
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 

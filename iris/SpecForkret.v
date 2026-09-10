@@ -287,7 +287,7 @@ End SpecForkret.
 Definition forkret_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
-    (W : iProp Σ) (γs : list gname) (γw γft γf γtl : gname) (p ksp : mword 64)
+    (W : iProp Σ) (γs : list gname) (γw γc γft γf γtl : gname) (p ksp : mword 64)
     (* the parked process's fd-state ghost name *)
     (g : gname)
     (* ...and its cwd's inum -- see [ParkCap.park_pkg] *)
@@ -296,6 +296,9 @@ Definition forkret_closer
        yields and for the key it yields it at -- see [ParkCap.park_pkg],
        whose parameter this is *)
     (sts : list fdstate)
+    (* ...and the parked process's generation and children set, beside
+       [sts] and for its reason -- see [ParkCap.park_pkg] *)
+    (gn : gname) (cs : gset gname)
     (* ...AND THE PARKED RUN KEY, WHEN THERE IS ONE.  [None] is the BOOT
        mode: the resume runs the boot arm's kexec("/init"), no key captured
        at the park survives that, and the record's slot comes out of exec
@@ -333,7 +336,7 @@ Definition forkret_closer
      (* THE RESUMER'S OWN GLOBALS, at ITS context -- forkret holds them and
         hands them in, exactly as it does [first_done] and [timer_cap]
         (UsertrapRes.v, the park half; L8, A12.19). *)
-     UsertrapRes.park_globals Xc γs γw γft γf γtl -∗
+     UsertrapRes.park_globals Xc γs γw γc γft γf γtl -∗
      (* THE TRAPFRAME'S KERNEL WORDS, at the resuming hart: prepare_return
         wrote them there and [V'] is the descriptor it handed back, so this
         is forkret's to pay -- see [UsertrapRes.ut_tfk]. *)
@@ -364,7 +367,7 @@ Definition forkret_closer
         and the slot's key, and it is the package's argument. *)
      (URes h Xc pt' ksp U' sts
       ∗ match Wk with
-        | Some _ => uslot (uvis_of U' sts)
+        | Some _ => uslot (uvis_of U' sts gn cs)
         | None => emp
         end))%I.
 
@@ -384,12 +387,12 @@ Definition wp_forkret_gen_body
        closer at its tail.  The parker holds it only under a later, so the
        package cannot carry it outright; see ParkCap.v. *)
     (W : iProp Σ)
-    (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
+    (j : nat) (γs : list gname) (γl γw γc γft γf γtl : gname)
     (pid : mword 32) (U : ustate)
     (* THE PARKED DESCRIPTOR STATES: the closer's, and -- on the boot arm --
        the list kexec builds its resume key at.  [ParkCap.park_pkg]'s
        argument. *)
-    (sts : list fdstate)
+    (sts : list fdstate) (gn : gname) (cs : gset gname)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool)
     (* WHICH OF THE PARK'S TWO MODES built this record.  [true]: the parker
        held [FirstTok.first_done] and captured ONE slot, at the parked
@@ -435,7 +438,7 @@ Definition wp_forkret_gen_body
   procs_inv γs -∗
   (* ...AND THE REST OF THE RESUMER'S GLOBALS, which forkret hands to the
      residue closer at its tail (UsertrapRes.park_globals). *)
-  UsertrapRes.park_globals cur_ctx γs γw γft γf γtl -∗
+  UsertrapRes.park_globals cur_ctx γs γw γc γft γf γtl -∗
   (* ---- the running kernel thread, as swtch left it ---- *)
   sie_cap_gpr KT1 m av false p -∗
   cpu_own 1%nat eb p false {["proc"%string]} -∗
@@ -483,8 +486,8 @@ Definition wp_forkret_gen_body
    else init_boot_bundle (pv_cwi (us_V U)) sts) -∗
   (* ---- the residue closer -- see the header, and [forkret_closer] above
      for why it is a name rather than the wand spelled out ---- *)
-  forkret_closer URes W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U))
-    sts (if steady then Some (uvis_of U []) else None) pid av -∗
+  forkret_closer URes W γs γw γc γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U))
+    sts gn cs (if steady then Some (uvis_of U [] gn cs) else None) pid av -∗
   WP (Loop : expr riscv_lang).
 
 (* The residue is the module-type parameter it is everywhere else: forkret's
@@ -501,10 +504,11 @@ Module Type FORKRET.
   Parameter wp_forkret :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
-      (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
+      (j : nat) (γs : list gname) (γl γw γc γft γf γtl : gname)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (gn : gname) (cs : gset gname)
       (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) (steady : bool),
       wp_forkret_gen_body
         (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
-        j γs γl γw γft γf γtl pid U sts ks m av av2 eb steady.
+        j γs γl γw γc γft γf γtl pid U sts gn cs ks m av av2 eb steady.
 End FORKRET.

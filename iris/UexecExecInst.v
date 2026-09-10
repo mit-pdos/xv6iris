@@ -439,8 +439,14 @@ Section UexecExecInst.
      process that is RESUMING, so no branch concludes at the fixpoint
      variable the way exec's input bundle does.  That is what makes
      non-expansiveness a [reflexivity]. *)
+  (* [cs'] is the RESUME KEY'S CHILDREN SET, beside [fdv'] and [cw'] and for
+     their reason: a receipt may be about what the call left in the resume
+     key, and wait(2)'s is about exactly that.  No entry's post reads it
+     yet -- the eight below are file-system entries -- so every branch
+     ignores it. *)
   Definition xv6_spost (X : uvis -d> iPropO Σ) (n : Z) (f : xfam) (W : uvis)
       (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z)
+      (cs' : gset gname)
       : iProp Σ :=
     (if decide (n = 5) then
        fileread_extra (fd_st_of_key (xk_a W 0) (uvis_fd W))
@@ -491,10 +497,10 @@ Section UexecExecInst.
   Qed.
 
   Lemma xv6_spost_ne (k : nat) :
-    Proper (dist k ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> dist k)
+    Proper (dist k ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> dist k)
       xv6_spost.
   Proof.
-    intros X Y _ n ? <- f ? <- W ? <- r ? <- M' ? <- fdv' ? <- cw' ? <-.
+    intros X Y _ n ? <- f ? <- W ? <- r ? <- M' ? <- fdv' ? <- cw' ? <- cs' ? <-.
     reflexivity.
   Qed.
 
@@ -505,7 +511,7 @@ Section UexecExecInst.
       (W W' : uvis) :
     skey_eq W W' -> xv6_sbundle X n f W ⊣⊢ xv6_sbundle X n f W'.
   Proof.
-    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw).
+    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & _ & _).
     rewrite /xv6_sbundle.
     destruct (decide (n = USYS_exec)) as [_ | _];
       [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw) | ].
@@ -518,11 +524,11 @@ Section UexecExecInst.
      directory, and [skey_eq] pins all six. *)
   Lemma xv6_spost_cong (X : uvis -d> iPropO Σ) (n : Z) (f : xfam)
       (W W' : uvis) (r : mword 64) (M' : gmap Z (bv 8))
-      (fdv' : list fdstate) (cw' : Z) :
+      (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     skey_eq W W' ->
-    xv6_spost X n f W r M' fdv' cw' ⊣⊢ xv6_spost X n f W' r M' fdv' cw'.
+    xv6_spost X n f W r M' fdv' cw' cs' ⊣⊢ xv6_spost X n f W' r M' fdv' cw' cs'.
   Proof.
-    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw).
+    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & _ & _).
     rewrite /xv6_spost /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw.
     reflexivity.
   Qed.
@@ -831,11 +837,11 @@ Section UexecExecInst.
   (* from.  Each is the match at one literal and nothing else.             *)
   (* ================================================================== *)
   Lemma spost_at_read_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     fileread_extra (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
       (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (rf_F f) r M'
       (tf_w (uvis_tf W) (tf_arg_idx 1)) -∗
-    spost_at X 5 f W r M' fdv' cw'.
+    spost_at X 5 f W r M' fdv' cw' cs'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_take. iExact "H".
@@ -845,10 +851,10 @@ Section UexecExecInst.
      the dispatcher splits ([SpecSysChdir.chdir_arms_split]) hands the
      kernel half back and this the process's. *)
   Lemma spost_at_chdir_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     chdir_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       (cf_P f) (cf_Pmiss f) (cf_Fo f) r cw' -∗
-    spost_at X 9 f W r M' fdv' cw'.
+    spost_at X 9 f W r M' fdv' cw' cs'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_take. iExact "H".
@@ -857,54 +863,54 @@ Section UexecExecInst.
   (* ...and open's, at the descriptor view it resumes at
      ([SpecSysOpen.open_arms_split]) *)
   Lemma spost_at_open_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     open_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       (tf_w (uvis_tf W) (tf_arg_idx 1))
       (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
       (of_Fo f) (of_Ft f) (uvis_fd W) r fdv' -∗
-    spost_at X 15 f W r M' fdv' cw'.
+    spost_at X 15 f W r M' fdv' cw' cs'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_take. iExact "H".
   Qed.
 
   Lemma spost_at_write_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     filewrite_extra (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
       (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (uvis_M W)
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (wf_Q f) (wf_tr0 f) r -∗
-    spost_at X 16 f W r M' fdv' cw'.
+    spost_at X 16 f W r M' fdv' cw' cs'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_skip. xv6_take. iExact "H".
   Qed.
 
   Lemma spost_at_mknod_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     mknod_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       (dev_arg (tf_w (uvis_tf W) (tf_arg_idx 1)))
       (dev_arg (tf_w (uvis_tf W) (tf_arg_idx 2)))
       (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f) r -∗
-    spost_at X 17 f W r M' fdv' cw'.
+    spost_at X 17 f W r M' fdv' cw' cs'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_take. iExact "H".
   Qed.
 
   Lemma spost_at_unlink_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     unlink_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       (uf_P f) (uf_Pmiss f) (uf_Fent f) (uf_Ftgt f) (uf_Fex f) (uf_Fmiss f) r -∗
-    spost_at X 18 f W r M' fdv' cw'.
+    spost_at X 18 f W r M' fdv' cw' cs'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_take. iExact "H".
   Qed.
 
   Lemma spost_at_link_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     link_arms (fs_gamma_L fsc_fs) (lf_Ftgt f) (lf_Fent f) (lf_Funt f) r -∗
-    spost_at X 19 f W r M' fdv' cw'.
+    spost_at X 19 f W r M' fdv' cw' cs'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip.
@@ -912,11 +918,11 @@ Section UexecExecInst.
   Qed.
 
   Lemma spost_at_mkdir_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
-      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     mkdir_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
       (df_P f) (df_Pmiss f) (df_Farm f) (df_Fdots f) (df_Fun f)
       (df_Fok f) (df_Fex f) r -∗
-    spost_at X 20 f W r M' fdv' cw'.
+    spost_at X 20 f W r M' fdv' cw' cs'.
   Proof.
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip. xv6_skip.
@@ -926,10 +932,10 @@ Section UexecExecInst.
   (* ...and the numbers that pay nothing, in one lemma: exec (whose [emp]
      the header explains) and every number without a contract at all. *)
   Lemma spost_at_emp (X : uvis -d> iPropO Σ) (n : Z) (f : xfam) (W : uvis)
-      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) :
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     ~ (n = 5 \/ n = 9 \/ n = 15 \/ n = 16 \/ n = 17 \/ n = 18 \/ n = 19
        \/ n = 20) ->
-    ⊢ spost_at X n f W r M' fdv' cw'.
+    ⊢ spost_at X n f W r M' fdv' cw' cs'.
   Proof.
     intros Hne. rewrite /spost_at /= /xv6_spost.
     destruct (decide (n = 5)) as [He | _]; [ exfalso; apply Hne; tauto |].

@@ -929,7 +929,7 @@ Section KexitPark.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   Lemma kx_park `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
-       (γf γw : gname) (γs : list gname)
+       (γf γw γc : gname) (γs : list gname)
       (j : nat) (γl : gname) (ip sv spF : mword 64) (dqi : dfrac)
       (M : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (U : ustate) :
@@ -966,7 +966,7 @@ Section KexitPark.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x60)) -∗
     procs_inv γs -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
+    is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
     (* the cwd's unit REJOINED with the allowance: [iput] handed the [1]
@@ -1059,7 +1059,7 @@ Section KexitPark.
       rewrite /P0 upd_ne; [exact Hs4 | vm_compute; discriminate]. }
     iDestruct (cpu_own_transport CID0 CIDw 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDw) γw "wait_lock"%string wait_res_at
+    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDw) γw "wait_lock"%string (wait_res_at γc)
               P2 0 eb pj av b lks ltac:(lia) ltac:(lia)
               Hfresh
               with "Hcg Hown Htext Hpc []").
@@ -1078,7 +1078,8 @@ Section KexitPark.
                     = mword_of_int (KX + 0x6c))
       by (rewrite HP2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc6c) in "Hpc".
-    iDestruct "Hres" as (ps) "Hpar".
+    iDestruct "Hres" as "[Hpar Hch]".
+    iDestruct "Hpar" as (ps) "Hpar".
     iDestruct (parents_own_length with "Hpar") as "%Hpslen".
     assert (Hacq_s3 : macq !!! Regidx (mword_of_int 19 : mword 5) = pj).
     { rewrite (callee_saved_lookup Hcsa (mword_of_int 19 : mword 5) ltac:(vm_compute; reflexivity)).
@@ -1336,7 +1337,7 @@ Section KexitPark.
     iDestruct (pstate_whole_split pj RUNNING) as "[_ Hwe]".
     iDestruct ("Hwe" with "[Hpg Hclm]") as "Hpg".
     { rewrite unclaimed_RUNNING. iFrame "Hpg Hclm". }
-    iDestruct "Hpub" as (kl xs pidv) "(Hkilled & Hxstate & Hpidh)".
+    iDestruct "Hpub" as (kl xs pidv) "(Hkilled & Hxstate & Hpidh & Hgen)".
     (* +0x80 sw s4,44(s3) : p->xstate = status *)
     assert (Hrgl19 : rget (CID := CIDa) mlk (mword_of_int 19 : mword 5)
                      = mlk !!! Regidx (mword_of_int 19 : mword 5)) by (rgne; reflexivity).
@@ -1451,11 +1452,11 @@ Section KexitPark.
                  [av].  Level 2 -> 1 is itself carve-neutral ([trap_res false]
                  on entry), so both sides of this call sit at
                  [trap_res b + av]. *)
-              wait_res_at PC 1%nat eb pj (trap_res b + av)%nat
+              (wait_res_at γc) PC 1%nat eb pj (trap_res b + av)%nat
               ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
               ltac:(rewrite HPCa0; apply addv_sext0) ltac:(lia)
-              with "Hcg Htext Hpc Hwl Hlkw [Hpar] Hown Hpay2").
-    { iExists _. iExact "Hpar". }
+              with "Hcg Htext Hpc Hwl Hlkw [Hpar Hch] Hown Hpay2").
+    { iFrame "Hch". iExists _. iExact "Hpar". }
     iApply wp_next_off_intro.
     iIntros (mrel) "Hcg Hpc %Hcsrel Hown".
     assert (Hpc96 : ret_pc (PC !!! Regidx (mword_of_int 1 : mword 5))
@@ -1500,11 +1501,11 @@ Section KexitPark.
        index-generic, so it just rides through at that index. *)
     iApply (Sched.wp_sched_sconf (CID := CIDa)  γs j γl ZOMBIE ch0 PD (trap_res b + av)%nat eb
               Hj Hgl park_ok_ZOMBIE ltac:(lia)
-              with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh]
+              with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh Hgen]
                     [Hpriv Hsp Hir Hbs Hcloser] Hpay Hcpuemp Hoc Htag Hvc").
     { rewrite /proc_held. iFrame "Hlkp Hstate Hpg Hchan".
       iExists kl, (trunc32 (rget (CID := CIDa) mlk (mword_of_int 20 : mword 5))), pidv.
-      iFrame "Hkilled Hxstate Hpidh". }
+      iFrame "Hkilled Hxstate Hpidh Hgen". }
     { (* THE DONATION.  sched's [park_pay] is a CLOSER: at a park that never
          returns it hands back the whole stack region it was called with,
          because its own frame and tail are dead the instant the swtch
@@ -1539,7 +1540,7 @@ Section KexitRest.
             !irefslotG Σ, !pavG Σ}.
 
   Lemma kx_rest `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
-       (γf γw : gname) (γs : list gname)
+       (γf γw γc : gname) (γs : list gname)
       (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (* the inode cache and the two regions iput's truncate arm frees into *)
@@ -1580,7 +1581,7 @@ Section KexitRest.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
     procs_inv γs -∗ panic_env -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
+    is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
     bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
     log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
@@ -1872,7 +1873,7 @@ Section KexitRest.
     (* "wait_lock" (10) outranks "itable" (2): weaken [Hfresh]'s bound. *)
     assert (Hfresh_wl : locks_below lks "wait_lock")
       by lkbelow.
-    iApply (kx_park (CID0 := CID8)  γf γw γs j γl ip sv spF dqi meo av eb b lks pid
+    iApply (kx_park (CID0 := CID8)  γf γw γc γs j γl ip sv spF dqi meo av eb b lks pid
               (us_cwd U (zero_reg : mword 64))
               Hj Hgl ltac:(lia)
               ltac:(split; [exact Heo_s3 | split; [exact Heo_s4 |
@@ -1892,14 +1893,14 @@ Section ProofKexit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_kexit_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
-      (γft γf γw : gname)
+      (γft γf γw γc : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (dqi : dfrac)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (U : ustate)
-    : wp_kexit_sconf_body γft γf γw γs j γl pd pav pu
+    : wp_kexit_sconf_body γft γf γw γc γs j γl pd pav pu
  ip dqi
 
                           on fn m av eb b lks pid U.
@@ -2274,7 +2275,7 @@ Section ProofKexit.
         (* "itable" (2) outranks "ftable" (1): weaken [Hfresh]'s bound. *)
         assert (Hfresh_it : locks_below lks "itable")
           by lkbelow.
-        iApply (kx_rest (CID0 := CIDx)  γf γw γs j γl
+        iApply (kx_rest (CID0 := CIDx)  γf γw γc γs j γl
                   pd pav pu
 
 

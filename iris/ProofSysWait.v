@@ -97,10 +97,10 @@ Section ProofSysWait.
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
   Lemma wp_sys_wait_sconf
-      (γa γp γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
+      (γa γp γf γw γc : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (U : ustate) (v0 : mword 64)
-    : wp_sys_wait_sconf_body γa γp γf γw γs j γl m av eb b lks pid U v0.
+    : wp_sys_wait_sconf_body γa γp γf γw γc γs j γl m av eb b lks pid U v0.
   Proof.
     cbv beta delta [wp_sys_wait_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hv0 Hav Heb.
@@ -297,7 +297,7 @@ Section ProofSysWait.
     { rewrite /B2 upd_ne; [| vm_compute; discriminate]. rewrite /B1 upd_eq. reflexivity. }
     (* ===================== kwait(p) ===================== *)
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kwait.wp_kwait_sconf γa γp γf γw γs j γl B2 (av - 4)%nat eb b pid U lks
+    iApply (Kwait.wp_kwait_sconf γa γp γf γw γc γs j γl B2 (av - 4)%nat eb b pid U lks
               Hj Hgl (sw_Kkw av Hav) Heb
               with "Hcg Hcpu Htext Hpc Hprocs Hlk Henv Hplk Hpriv").
     all: try lkbelow.

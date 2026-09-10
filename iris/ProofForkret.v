@@ -216,8 +216,9 @@ End Res.
    [FirstTok.first_tok_of_done] after persisting the store. *)
 Lemma fkr_tail
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (W : iProp Σ) (j : nat) (γs : list gname) (γw γft γf γtl : gname)
+    (W : iProp Σ) (j : nat) (γs : list gname) (γw γc γft γf γtl : gname)
     (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (gn : gname) (cs : gset gname)
     (ks : mword 64) (mt : regfile) (av av2 : nat) (eb : bool)
     (* WHICH OF THE PARK'S TWO MODES built this record -- the tail is where
        the mode is PAID.  [true] means the closer wants the parked record's
@@ -265,7 +266,7 @@ Lemma fkr_tail
      [uslot (exec_key U' sts 1)], which is this record's key at the
      descriptor states the park named.  The tail re-keys it onto the record
      userret resumes with exactly as it re-keys the closer's. *)
-  (if steady then emp else uslot (uvis_of U sts)) -∗
+  (if steady then emp else uslot (uvis_of U sts gn cs)) -∗
   (* THE RESIDUE CLOSER, by name: [SpecForkret.forkret_closer] is the wand
      this used to spell out.  It is ~13 % of the Iris context of every step
      of this walk, and a proofmode step's term carries the whole context
@@ -273,10 +274,11 @@ Lemma fkr_tail
   (* THE RESUMER'S OWN GLOBALS (L8, A12.19): the closer takes them now
      ([UsertrapRes.park_globals], SpecForkret's premise list), so the block
      that applies the closer has to be holding them. *)
-  UsertrapRes.park_globals cur_ctx γs γw γft γf γtl -∗
+  UsertrapRes.park_globals cur_ctx γs γw γc γft γf γtl -∗
   forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
-                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U))
-                 sts (if steady then Some (uvis_of U []) else None) pid av -∗
+                 W γs γw γc γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U))
+                 sts gn cs (if steady then Some (uvis_of U [] gn cs) else None)
+                 pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1.
@@ -763,8 +765,9 @@ Proof.
      the size and the cwd untouched, the image the same map.  The [None]
      mode asks nothing. *)
   { destruct steady; [| exact I].
-    refine (urun_eq_resume (uvis_of U []) U (MkUstate (upd_upt V' pt) (us_M U))
-              (urun_eq_of U []) _ _ _ _ _).
+    refine (urun_eq_resume (uvis_of U [] gn cs) U
+              (MkUstate (upd_upt V' pt) (us_M U))
+              (urun_eq_of U [] gn cs) _ _ _ _ _).
     - exact Htueq.
     - reflexivity.
     - exact Hpsz.
@@ -791,21 +794,22 @@ Proof.
      record the boot arm reached kexec's return with -- so it is re-keyed
      here by exactly the fact the steady mode's closer premise is
      discharged by ([UexecRet.urun_eq_resume]). *)
-  iAssert (uslot (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts))
+  iAssert (uslot (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs))
     with "[Hslot Hbslot]" as "Hslot".
   { destruct steady; [iExact "Hslot" |].
     iApply (bi.equiv_entails_1_1 _ _
-              (uslot_of_urun_eq (uvis_of U sts)
-                 (MkUstate (upd_upt V' pt) (us_M U)) sts
-                 (urun_eq_resume (uvis_of U sts) U
+              (uslot_of_urun_eq (uvis_of U sts gn cs)
+                 (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs
+                 (urun_eq_resume (uvis_of U sts gn cs) U
                     (MkUstate (upd_upt V' pt) (us_M U))
-                    (urun_eq_of U sts) Htueq eq_refl Hpsz Hcwi eq_refl)
-                 eq_refl)).
+                    (urun_eq_of U sts gn cs) Htueq eq_refl Hpsz Hcwi eq_refl)
+                 eq_refl eq_refl eq_refl)).
     iExact "Hbslot". }
   assert (Hpcslot : tf_resume_pc
-                      (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts))
+                      (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts
+                                  gn cs))
                     = ret_pc (mepc_val epc)).
-  { change (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts))
+  { change (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs))
       with (pv_tf V').
     rewrite <- (tf_ueq_resume_pc (pv_tf (us_V U)) (pv_tf V') Htueq).
     unfold tf_resume_pc, tf_w.
@@ -816,7 +820,7 @@ Proof.
   iApply (UC.wp_userret_closed (CID := CIDf)
             (loop_ucfg mdv0 Hmask) pt kroot j ksp (tp_pin SE)
             (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv
-            (MkUstate (upd_upt V' pt) (us_M U)) sts
+            (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs
             (loop_ok_loop_ucfg mdv0 Hmask pt Hnorm Hptwf)
             Hjlt
             Hretms Hmapwf HSEa0
@@ -886,8 +890,9 @@ Qed.
 
 Lemma fkr_boot
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (W : iProp Σ) (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
+    (W : iProp Σ) (j : nat) (γs : list gname) (γl γw γc γft γf γtl : gname)
     (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (gn : gname) (cs : gset gname)
     (ks : mword 64) (mr : regfile) (av av2 : nat) (eb : bool) :
   let p   : mword 64 := proc_addr j in
   let ksp : mword 64 := add_vec ks (mword_of_int 4096) in
@@ -941,7 +946,7 @@ Lemma fkr_boot
   (* THE RESUMER'S OWN GLOBALS (L8, A12.19): the closer takes them now
      ([UsertrapRes.park_globals], SpecForkret's premise list), so the block
      that applies the closer has to be holding them. *)
-  UsertrapRes.park_globals cur_ctx γs γw γft γf γtl -∗
+  UsertrapRes.park_globals cur_ctx γs γw γc γft γf γtl -∗
   (* AT THE [None] MODE, and that is a fact about this arm rather than a
      choice: a steady park's package promises the resume lands on the parked
      record's run key, and kexec("/init") below replaces the address space.
@@ -951,8 +956,8 @@ Lemma fkr_boot
      ([ParkCap.park_child]).  So the arm is only ever reached at [None] and
      owes the closer no key. *)
   forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
-                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U))
-                 sts None pid av -∗
+                 W γs γw γc γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U))
+                 sts gn cs None pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1.
@@ -1529,7 +1534,7 @@ Proof.
 
             5%nat init_boot_bytes 1%nat fkr_argv
             (fun _ => 5%nat) (fun _ => 6%nat) (fun _ => init_boot_bytes)
-            pid U sts
+            pid U sts gn cs
             DfracDiscarded DfracDiscarded (DfracOwn 1) DfracDiscarded DfracDiscarded
             D5 av2 eb eb ∅
             Pcur Pmiss Fo
@@ -1751,7 +1756,7 @@ Proof.
        loadable file, arm (b) because the bundle's second wand pays for a
        node that is not).  That key is the resumed record with argc stored
        in a0, which is the record this arm reaches [fkr_tail] at. *)
-    iAssert (uslot (exec_key (MkUstate V' M') sts 1%nat)) with "[Harms]" as "Hbslot".
+    iAssert (uslot (exec_key (MkUstate V' M') sts gn cs 1%nat)) with "[Harms]" as "Hbslot".
     { rewrite /exec_arms.
       iDestruct "Harms" as "[[%Hf _] | Hok']".
       { destruct Hf as (Hrm1 & _). exfalso.
@@ -1801,14 +1806,15 @@ Proof.
     assert (Ha0v : rget E1 Ra0 = (mword_of_int (Z.of_nat 1) : mword 64)).
     { rgne. rewrite /E1 upd_ne; [exact Hr | reg_neq]. }
     assert (Hkeyeq :
-              exec_key (MkUstate V' M') sts 1%nat
+              exec_key (MkUstate V' M') sts gn cs 1%nat
               = uvis_of (MkUstate (upd_tf V'
-                            (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V'))) M') sts).
+                            (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V'))) M')
+                        sts gn cs).
     { rewrite /exec_key Ha0v. reflexivity. }
     iEval (rewrite Hkeyeq) in "Hbslot".
-    iApply (fkr_tail W j γs γw γft γf γtl pid
+    iApply (fkr_tail W j γs γw γc γft γf γtl pid
               (MkUstate (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V'))) M')
-              sts ks E4 av av2 eb false Hjlt Hav2k Havsum HE4sp HE4s1
+              sts gn cs ks E4 av av2 eb false Hjlt Hav2k Havsum HE4sp HE4s1
               with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
                     Hpriv Hdone HW Hbslot Hpg [Hyield]").
     (* [upd_tf] does not touch [pv_fdg], so the closer the caller handed in
@@ -1818,12 +1824,13 @@ Qed.
 
 Theorem wp_forkret
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (W : iProp Σ) (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
+    (W : iProp Σ) (j : nat) (γs : list gname) (γl γw γc γft γf γtl : gname)
     (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (gn : gname) (cs : gset gname)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) (steady : bool) :
     wp_forkret_gen_body
       (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
-      j γs γl γw γft γf γtl pid U sts ks m av av2 eb steady.
+      j γs γl γw γc γft γf γtl pid U sts gn cs ks m av av2 eb steady.
 Proof.
   cbv beta delta [wp_forkret_gen_body].
   intros pcE p ksp Hjlt Hgl Hav2 Hkx Hut Hsp.
@@ -2060,7 +2067,8 @@ Proof.
                  ltac:(wp_next_chain) with "Hext") as "Hext".
     iDestruct (cpu_claim_ext_transport CID CIDr eb p
                  ltac:(wp_next_chain) with "Hcx") as "Hcx".
-    iApply (fkr_boot (CID := CIDr) W j γs γl γw γft γf γtl pid U sts ks mr av av2 eb
+    iApply (fkr_boot (CID := CIDr) W j γs γl γw γc γft γf γtl pid U sts gn cs
+              ks mr av av2 eb
               Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1
             with "Htext Hwire Hclaimmap Hpc Hpinv Hcg Hcpu Hext Hcx Hks
                   Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hmode Hpg Hyield"). }
@@ -2201,7 +2209,8 @@ Proof.
      kexec("/init") instead.  [fkr_tail]'s boot-mode slot premise is
      therefore [emp] here. *)
   iAssert (emp)%I with "[]" as "Hnoslot"; [iEmpIntro|].
-  iApply (fkr_tail (CID := CID6) W j γs γw γft γf γtl pid U sts ks T4 av av2 eb true
+  iApply (fkr_tail (CID := CID6) W j γs γw γc γft γf γtl pid U sts gn cs
+            ks T4 av av2 eb true
             Hjlt Hpr Havsum HT4sp HT4s1
           with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv
                 Hdone2 HW Hnoslot Hpg Hyield").

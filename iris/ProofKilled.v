@@ -238,7 +238,7 @@ Section ProofKilled.
     iEval (rewrite Hp12) in "Hpc".
     (* ---- open the lock: p->killed is in the ALWAYS-RESIDENT row ---- *)
     iDestruct (proc_lock_res_elim γs γl (proc_addr j) with "HR") as (st ch) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
-    iDestruct "Hpub" as (kl xs pid) "(Hkilled & Hxstate & Hpidhalf)".
+    iDestruct "Hpub" as (kl xs pid) "(Hkilled & Hxstate & Hpidhalf & Hgen)".
     (* +0x12: c.lw a5,40(s1) *)
     assert (Hmacq_s1 : macq !!! Regidx kl_s1 = proc_addr j).
     { rewrite (callee_saved_lookup Hcs_acq kl_s1 ltac:(vm_compute; reflexivity)).
@@ -313,9 +313,9 @@ Section ProofKilled.
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     (* reassemble the lock resource: nothing moved, so the slots go back as-is *)
-    iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hkilled Hxstate Hpidhalf Hslot]" as "HR2".
+    iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hkilled Hxstate Hpidhalf Hgen Hslot]" as "HR2".
     { iApply (proc_lock_res_intro γs γl (proc_addr j) st ch with "Hstate Hpg Hchan [-Hslot] Hslot").
-      iExists kl, xs, pid. iFrame "Hkilled Hxstate Hpidhalf". }
+      iExists kl, xs, pid. iFrame "Hkilled Hxstate Hpidhalf Hgen". }
     (* ===================== release(&p->lock) ===================== *)
     (* the acquire handed the window index out as [trap_res b + N]; release
        wants it as [trap_res outb + N] with [outb = match n with O => eb

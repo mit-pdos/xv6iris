@@ -809,6 +809,9 @@ Section UkShParse.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context (N : uk_names).
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
@@ -954,12 +957,12 @@ Section UkShParse.
     ⌜ m !!! Regidx x0_idx = zero_reg ⌝ ∗ urun N h m pc avail.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw)
-      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs)
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
-    iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
-    iFrame "Hheap Hstk Hufd Hcwda Hdep Hb".
+    iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw, gn, cs.
+    iFrame "Hheap Hstk Hufd Hcwda Hcha Hdep Hb".
     iPureIntro. split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 

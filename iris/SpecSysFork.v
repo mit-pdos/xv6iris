@@ -100,7 +100,7 @@ Notation K_sys_fork := ((K_kfork + 2)%nat) (only parsing).
 Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γp γw γl γf : gname) (γs : list gname)
+    (γp γw γc γl γf : gname) (γs : list gname)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
     (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
     (lks : gset string) :=
@@ -116,7 +116,7 @@ Definition wp_sys_fork_sconf_body
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
   is_ftable γl γf -∗
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
@@ -157,7 +157,10 @@ Definition wp_sys_fork_sconf_body
      [SpecSyscall.sysc_fork_in]) carries it here.  ONE slot, at the record
      [SpecKfork] states from the parent -- so sys_fork neither mints nor
      re-keys, it forwards. *)
-  uslot (uvis_of (kfork_child U) sts) -∗
+  (* THE CHILD'S GENERATION IS ∀-BOUND: allocproc mints a fresh one inside
+     the kfork this call makes, so no caller can name it, and a newly
+     created process has no children ([UexecRet.uexec_fork_child_F]). *)
+  (∀ g' : gname, uslot (uvis_of (kfork_child U) sts g' ∅)) -∗
   proc_priv γf p pid U -∗
   (* THE PARENT'S DESCRIPTOR STATES.  fork's whole effect on descriptors is
      that the CHILD gets these -- [SpecKfork]'s copy loop retypes the child's
@@ -191,10 +194,10 @@ Module Type SYSFORK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
              !irefslotG Σ, !pavG Σ} `{!ufdG Σ}
       `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γp γw γl γf : gname) (γs : list gname)
+      (γp γw γc γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
       (lks : gset string),
-      wp_sys_fork_sconf_body γp γw γl γf γs
+      wp_sys_fork_sconf_body γp γw γc γl γf γs
  m lvl av eb p b pid U sts lks.
 End SYSFORK.

@@ -167,10 +167,11 @@ Section SysExecAUBridge.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
-      (sts : list fdstate) (U1 U2 U' : ustate) (r : mword 64) :
+      (sts : list fdstate) (gn : gname) (cs : gset gname)
+      (U1 U2 U' : ustate) (r : mword 64) :
     us_V U1 = us_V U2 ->
-    exec_post_ok Fs Γ Pw Fo pl na alen afun sts U1 U' r -∗
-    exec_post_ok Fs Γ Pw Fo pl na alen afun sts U2 U' r.
+    exec_post_ok Fs Γ Pw Fo pl na alen afun sts gn cs U1 U' r -∗
+    exec_post_ok Fs Γ Pw Fo pl na alen afun sts gn cs U2 U' r.
   Proof.
     intro HV. rewrite /exec_post_ok HV. iIntros "H". iExact "H".
   Qed.
@@ -234,7 +235,8 @@ Section SysExecBreakAU.
       (pg : nat -> mword 64) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (uvf : nat -> mword 64)
       (* ---- the AU side ---- *)
-      (sts : list fdstate) (Mim : gmap Z (bv 8)) (pvp avp : mword 64)
+      (sts : list fdstate) (gn : gname) (cs : gset gname)
+      (Mim : gmap Z (bv 8)) (pvp avp : mword 64)
       (Pw Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :
     (K_sys_exec <= K)%nat ->
@@ -293,7 +295,7 @@ Section SysExecBreakAU.
            a0; [exec_arms_landed] turns it back into the landed
            [kexec_ok] whenever a caller wants that instead. *)
         exec_arms Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo
-                  (bview plen pfun) i alen afun sts
+                  (bview plen pfun) i alen afun sts gn cs
                   (us_upt U P) U' (mf !!! Regidx Ra0) -∗
         (* the READING the walk established, which the composition needs to
            name the vector in [sys_exec_arms] *)
@@ -491,7 +493,8 @@ Section SysExecBreakAU.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (KX.wp_kexec_sconf Fs gs jp gl pd pav pu γf
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
-              pid (us_upt U P) sts dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
+              pid (us_upt U P) sts gn cs
+              dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
               N6 (K - 60)%nat eb b lks Pw Pmiss Fo
               Kkx Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
               Hcb Hireg Hpcstr ltac:(lia)
@@ -612,11 +615,13 @@ Section SysExecWhole.
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (gn : gname) (cs : gset gname)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :
       wp_sys_exec_sconf_body Fs γf gs j gl pd pav pu dqb dqs v0 v1 pid U sts
+        gn cs
         m K eb b lks P Pmiss Fo.
   Proof.
     cbv beta zeta delta [wp_sys_exec_sconf_body].
@@ -718,7 +723,7 @@ Section SysExecWhole.
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
       iApply (sx_break_au (CID0 := CID3) Fs gs j gl pd pav pu γf
                 dqb dqs pid U K true true ∅ sp0 m plen pfun rst v1
-                M3 P3 i3 pg3 al3 af3 uv3 sts (us_M U) v0 v1 P Pmiss Fo
+                M3 P3 i3 pg3 al3 af3 uv3 sts gn cs (us_M U) v0 v1 P Pmiss Fo
                 HK Hlb eq_refl Hplen Hpcstr Hpof
                 eq_refl eq_refl Hnul3 Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
@@ -751,7 +756,7 @@ Section SysExecWhole.
           iSplitR; [iPureIntro; exact Hpof |].
           iSplitR; [iPureIntro; exact Hargs |].
           iApply (exec_post_ok_V Fs (fs_gamma_L fsc_fs) P Fo
-                    (bview plen pfun) i3 al3 af3 sts
+                    (bview plen pfun) i3 al3 af3 sts gn cs
                     (us_upt U P3)
                     (MkUstate (upd_upt (us_V U) P3) (us_M U))
                     Ubk (mf !!! Regidx Ra0 : mword 64) eq_refl with "Hok"). }

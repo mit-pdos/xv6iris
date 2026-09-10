@@ -99,6 +99,16 @@ Class xv6G (Σ : gFunctors) := Xv6G {
   xv6_pipe       :: pipeG Σ;
   xv6_cinv       :: cinvG Σ;
   xv6_uio        :: uioG Σ;
+  (* the U-tier's children ghost ([UserChildren.uch_auth] / [uch]); its
+     [gname] is [UkRun.ukn_ch].  See [Xv6Cameras.uchG]. *)
+  xv6_uch        :: uchG Σ;
+  (* the process slot's generation ghost ([SchedCtx.gen_tok] / [gen_slot]);
+     its [gname] is minted per incarnation and rides inside
+     [SchedCtx.proc_pub].  See [Xv6Cameras.genG]. *)
+  xv6_gen        :: genG Σ;
+  (* the [wait_lock] children cells ([WaitInv.children_own_at]); its [gname]
+     is boot-carved beside the lock's own.  See [Xv6Cameras.wchG]. *)
+  xv6_wch        :: wchG Σ;
   (* the off-borrow liveness counter's camera (off-ledger ruling); its
      gname is [FsCfg.fsc_fol].  See [Xv6Cameras.flivG]. *)
   xv6_fliv       :: flivG Σ;
@@ -131,7 +141,7 @@ Class xv6G (Σ : gFunctors) := Xv6G {
    [xv6G xv6Σ]" even when every constituent is present. *)
 Definition xv6GΣ : gFunctors :=
   #[ sieΣ; lockΣ; kallocΣ; bioΣ; diskGhostΣ; uartGhostΣ; fsLogΣ; logΣ;
-     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ;
+     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ; uchΣ; genΣ; wchΣ;
      flivΣ; bioboxΣ; icboxΣ;
      offboxΣ ].
 

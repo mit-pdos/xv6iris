@@ -84,7 +84,7 @@
    the whole point of the eb-generic sweep.  Nothing is handed back, because
    kexit does not return.
 
-   [is_lock γw wait_lock_addr ... wait_res] -- kexit is the second consumer
+   [is_lock γw wait_lock_addr ... wait_res_at γc] -- kexit is the second consumer
    of the parent table after kwait, and takes it exactly as kwait does.
 
    The [initproc] cell at any fraction: kexit reads it for the panic test and
@@ -150,6 +150,9 @@ Definition wp_kexit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
+    (* ...and the children ghost wait_lock owns beside the parent cells
+       ([WaitInv.children_own_at]), which the payload is keyed on *)
+    (γc : gname)
      (γs : list gname) (j : nat) (γl : gname)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -224,7 +227,7 @@ Definition wp_kexit_sconf_body
   panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)
   is_ftable γft γf -∗
   (* ...and closing one can free a pipe's page, so kexit owns kalloc's side
@@ -316,14 +319,14 @@ End KexitSeals.
 Module Type KEXIT.
   Parameter wp_kexit_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γft γf γw : gname)
+      (γft γf γw γc : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (dqi : dfrac)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (U : ustate),
-      wp_kexit_sconf_body γft γf γw γs j γl pd pav pu
+      wp_kexit_sconf_body γft γf γw γc γs j γl pd pav pu
  ip dqi
 
                           on fn m av eb b lks pid U.

@@ -388,7 +388,7 @@ Section UserretClosed.
                         (tf_of (tf_resume_gpr0 (uvis_tf W))
                            (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
                      (uvis_M W))
-                  (uvis_fd W))
+                  (uvis_fd W) (uvis_gen W) (uvis_ch W))
              ∗ SpecUsertrap.ut_fork_in sc
                   (tf_of (tf_resume_gpr0 (uvis_tf W))
                      (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
@@ -417,10 +417,12 @@ Section UserretClosed.
             [ exfalso; rewrite Hfk in He; discriminate He | ].
           destruct (decide (usys_num (uvis_tf W) = USYS_fork)) as [_ | Hc];
             [ | exfalso; exact (Hc Hfk) ].
+          iIntros (g').
           rewrite /uexec_fork_child_F SpecUsertrap.uvis_of_us_tf.
+          iSpecialize ("Hxin" $! g').
           iEval (rewrite (uslot_key_cong
                             (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W)
-                               (uvis_sz W) (uvis_fd W) (uvis_cwd W))
+                               (uvis_sz W) (uvis_fd W) (uvis_cwd W) g' ∅)
                             (MkUvis
                                (bump_tf (tf_of (tf_resume_gpr0 (uvis_tf W))
                                            (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
@@ -430,9 +432,10 @@ Section UserretClosed.
                                   (uint (pv_sz (us_V (us_upt U0 pt)))))
                                (uint (pv_sz (us_V (us_upt U0 pt))))
                                (uvis_fd W)
-                               (pv_cwi (us_V (us_upt U0 pt))))
+                               (pv_cwi (us_V (us_upt U0 pt)))
+                               g' ∅)
                             Hgpr0 Hpc0 eq_refl (eq_sym Hpi0) (eq_sym Hsz0)
-                            eq_refl (eq_sym Hcw0))) in "Hxin".
+                            eq_refl (eq_sym Hcw0) eq_refl eq_refl)) in "Hxin".
           iExact "Hxin".
       - iSplitL "Hxin".
         + (* the pre row is the deposit at the RUN projection of the trapped
@@ -459,7 +462,8 @@ Section UserretClosed.
                                   | exact (eq_sym (uvis_run_arg1 W))
                                   | exact (eq_sym (uvis_run_arg2 W))
                                   | reflexivity
-                                  | exact (eq_trans Hcww (eq_sym Hcwi)) ]))
+                                  | exact (eq_trans Hcww (eq_sym Hcwi))
+                                  | reflexivity | reflexivity ]))
           end.
           iExact "Hxin".
         + (* not fork, so the fork row is vacuous *)
@@ -468,7 +472,8 @@ Section UserretClosed.
     (* ---- one round.  [Hret] -- the linear return user execution handed
            back -- is FRAMED across the crossing (R-a / K8). ---- *)
     iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp
-              (us_upt U0 pt) (uvis_fd W) fdep (uvis_M W)
+              (us_upt U0 pt) (uvis_fd W) (uvis_gen W) (uvis_ch W) fdep
+              (uvis_M W)
               (tf_resume_gpr0 (uvis_tf W))
               ms_v sc stv (tf_w (uvis_tf W) tf_epc_idx)
               Hstv Hdqc Hmie Hj Hnorm Hptwf
@@ -574,17 +579,18 @@ Section UserretClosed.
                  (uvis_of (upd_usM (us_tf (us_upt U0 pt)
                              (tf_of (tf_resume_gpr0 (uvis_tf W))
                                 (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
-                             (uvis_M W)) (uvis_fd W))
+                             (uvis_M W)) (uvis_fd W) (uvis_gen W) (uvis_ch W))
                  (uvis_run W) (pv_tf (us_V U2) !!! tf_arg_idx 0)
-                 (us_M U2) sts2 (pv_cwi (us_V U2))
+                 (us_M U2) sts2 (pv_cwi (us_V U2)) (uvis_ch W)
                  ltac:(rewrite /skey_eq; split_and!;
                        [ reflexivity | reflexivity | reflexivity
                        | reflexivity | reflexivity
-                       | exact (eq_trans Hcwi (eq_sym Hcww)) ]))) in "Hso";
+                       | exact (eq_trans Hcwi (eq_sym Hcww))
+                       | reflexivity | reflexivity ]))) in "Hso";
         iExact "Hso" | ].
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)
-    assert (Hpi2 : uvis_perm (uvis_of U2 sts2)
+    assert (Hpi2 : uvis_perm (uvis_of U2 sts2 (uvis_gen W) (uvis_ch W))
                    = perm_of (ud_um pt') (uint (pv_sz (us_V U2))))
       by (cbn [uvis_of uvis_perm]; rewrite Huptpt'; reflexivity).
     (* [Rfd] IS THE PROCESS'S OWN FRAGMENTS, at its own ghost name.  The
@@ -599,14 +605,15 @@ Section UserretClosed.
               (Rut_at_acc CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2))
                  (pv_cwi (us_V U2)))
               (uint (pv_sz (us_V U2)))
-              sts2 (pv_cwi (us_V U2))
-              (uvis_of U2 sts2) (us_M U2) mf
+              sts2 (pv_cwi (us_V U2)) (uvis_gen W) (uvis_ch W)
+              (uvis_of U2 sts2 (uvis_gen W) (uvis_ch W)) (us_M U2) mf
               (sret_ms5 ms') sc' stval' uepc (ret_pc uepc)
               (loop_ok_loop_ucfg mdv0 Hmm pt' Hnorm' Hptwf')
               Hszok
               (user_mstatus_ok_sret_ms5 ms' HSXL HMXR HFS HVS HTVM HTSR
                  HXS HSD HMPP HSPIE)
-              Hpi2 eq_refl eq_refl eq_refl eq_refl (eq_sym Hgprtie') (eq_sym Hpcret')
+              Hpi2 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
+              (eq_sym Hgprtie') (eq_sym Hpcret')
               with "Hslot Hhw' Hmin' Hwire Hregs' Hupt' Hfrag2 Hcfg' Hrut' [-]").
     (* the next round's contract, under the later the bundle takes it at --
        which is exactly the shape of the Löb hypothesis.  A GENUINE Löb back
@@ -618,7 +625,7 @@ Section UserretClosed.
     (* the middle conjunct IS the descriptor view coming back -- [Rfd] here
        is [fd_frags (pv_fdg (us_V U2))], so this is the process's own
        fragments at the trap-out key's own [uvis_fd]. *)
-    iIntros (W2 sc2 stv2) "%Hp2 %Hs2 %Hf2 %Hc2 (Hframe2 & Hfrag2' & Hret2)".
+    iIntros (W2 sc2 stv2) "%Hp2 %Hs2 %Hf2 %Hc2 %Hgn2 %Hch2 (Hframe2 & Hfrag2' & Hret2)".
     iApply ("IH" $! CID' (loop_ucfg mdv0 Hmm) pt' (uint (pv_sz (us_V U2)))
               (pv_fdg (us_V U2)) (pv_cwi (us_V U2)) W2 sc2 stv2
               with "[%] [%] [%] [%] Hhw' Hmin' Hcreds' [$Hframe2 $Hfrag2' $Hret2]").
@@ -685,9 +692,9 @@ End Res.
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)
-      (fdv : list fdstate) :
+      (fdv : list fdstate) (gn : gname) (cs : gset gname) :
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U fdv fdv.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U fdv fdv gn cs.
   Proof.
     cbv beta delta [wp_userret_closed_body].
     intros Hok Hj Hretms Hwf Ha0 Hsatpr Hinj Hacc.
@@ -752,7 +759,7 @@ End Res.
     iDestruct (tf_page_open36 (ud_tfp pt) ws Hlenws with "Htfp") as
       (u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280) "(-> & Hu0 & Hu8 & Hu16 & Hu24 & Hu32 & Htf40 & Htf48 & Htf56 & Htf64 & Htf72 & Htf80 & Htf88 & Htf96 & Htf104 & Htf112 & Htf120 & Htf128 & Htf136 & Htf144 & Htf152 & Htf160 & Htf168 & Htf176 & Htf184 & Htf192 & Htf200 & Htf208 & Htf216 & Htf224 & Htf232 & Htf240 & Htf248 & Htf256 & Htf264 & Htf272 & Htf280 & Htail)".
     iApply (RU.wp_userret_user C pt (uint (pv_sz (us_V U))) fdv (pv_cwi (us_V U))
-              (us_M U)
+              gn cs (us_M U)
               (FdSlots.fd_frags (pv_fdg (us_V U)))
               (LP.Rut_at CID (uint (pv_sz (us_V U))) (pv_fdg (us_V U)) (pv_cwi (us_V U)))
               (LP.Rut_at_acc CID (uint (pv_sz (us_V U))) (pv_fdg (us_V U))
@@ -797,7 +804,7 @@ End Res.
       (* the fd pin is dropped: the loop's Löb hypothesis is ∀-general in
          the key, so it is proved at whatever descriptor view the trap-out
          key names. *)
-      iIntros (W sc stv) "%Hp %Hs %Hf %Hc (Hframe & Hfrag' & Hret)".
+      iIntros (W sc stv) "%Hp %Hs %Hf %Hc %Hgn %Hch (Hframe & Hfrag' & Hret)".
       iApply ("Hloop" $! CID C pt (uint (pv_sz (us_V U))) (pv_fdg (us_V U))
                 (pv_cwi (us_V U)) W sc stv
                 with "[%] [%] [%] [%] Hhw Hmin Hcreds [$Hframe $Hfrag' Hret]").

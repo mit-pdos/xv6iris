@@ -42,6 +42,9 @@ Section UkShParseRedir.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context (N : uk_names).
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).

@@ -55,6 +55,9 @@ Section USyncKernel.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
@@ -163,7 +166,7 @@ Section USyncKernel.
     (* sync makes no descriptor call, so its ledger is dropped here *)
     (* sync makes no descriptor call and no chdir, so its ledger and its
        working directory are both dropped here *)
-    iIntros (N h) "%Hsz Hszf #Ht _ _ Hrun".
+    iIntros (N h) "%Hsz Hszf #Ht _ _ _ Hrun".
     rewrite Hpc.
     iApply (wp_ksync_start N Hpsok h (tf_resume_gpr0 (uvis_tf W))
               (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0

@@ -244,6 +244,9 @@ Section UShKernel.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS SH ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -349,7 +352,10 @@ Section UShKernel.
     iIntros "#Hpay #Hdep #Hrest".
     iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Hal8
               Hroom Hstk Hfdlen Hstop with "Hdep").
-    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf Dlo _ Hrun".
+    (* sh's own half of its children set is dropped here: no leaf reads it
+       yet, and the fork and wait leaves that will are what put it into
+       [UkSh.ush_pstate]. *)
+    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf _ Dlo _ Hrun".
     rewrite Hpc.
     (* [R] and the line buffer, out of the data below the frame *)
     iDestruct ("Hpay" $! (ukn_t N) (ukn_d N) (ukn_s N) with "Hszf Dlo")

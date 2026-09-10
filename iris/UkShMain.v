@@ -79,6 +79,9 @@ Section UkShMain.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
 
   (* the four ghost names a program proof runs at, as every file in the
      lane binds them *)
@@ -320,7 +323,7 @@ Section UkShMain.
     ⌜ forall j : nat, (j < nb)%nat -> 0 <= a + Z.of_nat j < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hbs".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw)
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs)
       "(_ & _ & _ & Hheap & _)".
     iDestruct (uheap_ubytes_img γt γd γs M pm sz a nb fb with "Hheap Hbs")
       as %Hall.

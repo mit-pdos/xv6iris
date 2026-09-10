@@ -42,6 +42,8 @@
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
+(* [gname] -- the key's generation and children readings are ghost NAMES *)
+From iris.base_logic.lib Require Import own.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -136,7 +138,10 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
     (* THE DESCRIPTOR VIEW the deposited slot is keyed at.  ∀-bound at the
        entry: whoever holds the slot holds it at some [uvis_of U sts], and
        the entry runs it at the same one. *)
-    (fdv : list fdstate) (sts : list fdstate) :=
+    (fdv : list fdstate) (sts : list fdstate)
+    (* ...and the two WAIT-EXIT readings the slot is keyed at, beside
+       [fdv] and for its reason *)
+    (gn : gname) (cs : gset gname) :=
   (* ---- the loop's own shape, re-established every round ---- *)
   loop_ok C pt ->
   (j < NPROC)%nat ->
@@ -195,7 +200,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
          that one lemma plus the equation between its own [sepc] value and
          the trapframe's epc word. ---- *)
   ukc (perm_of (ud_um pt) (uint (pv_sz (us_V U)))) (us_M U)
-      (uint (pv_sz (us_V U))) fdv (pv_cwi (us_V U))
+      (uint (pv_sz (us_V U))) fdv (pv_cwi (us_V U)) gn cs
       (tf_resume_gpr0 (pv_tf (us_V U))) (ret_pc sepc0) -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)
   URes CID pt ksp U sts -∗
@@ -220,7 +225,7 @@ Module Type USERRET_CLOSED.
          the entry they are the same descriptor states -- see
          [ParkCap.park_pkg]'s shared existential, which is where the entry's
          two halves come from. *)
-      (sts : list fdstate),
+      (sts : list fdstate) (gn : gname) (cs : gset gname),
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U sts sts.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U sts sts gn cs.
 End USERRET_CLOSED.

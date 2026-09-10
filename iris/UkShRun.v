@@ -217,6 +217,9 @@ Section UkShRun.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
 
   (* THE DIAGNOSTIC CODE'S OWN STACK NEED.  [ush_diag_leaf] below is the      *)
   (* whole printf-and-exit subtree as one premise; whoever discharges it      *)
@@ -487,7 +490,7 @@ Section UkShRun.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access (ukn_t N) (ukn_d N) (ukn_s N) M pm sz dq a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal
@@ -499,13 +502,13 @@ Section UkShRun.
                           (concat_vec uimm ('b"000"))))).
     { rewrite Ha /uoff_c8. rewrite <- moi_add. rewrite !moi_of_uint.
       reflexivity. }
-    iApply (UkLoad.wp_uk_cld C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw uimm crs1 crd rs1 rd
+    iApply (UkLoad.wp_uk_cld C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs uimm crs1 crd rs1 rd
               (mword_of_int a) w Hui He1 He2 Hrd Htgt
               Hok
               Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap)
-              with "Hb [Hheap Hstk Hufd Hcwda Hw Hcont]").
-    iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hdep").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
+    iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iApply ("Hcont" with "Hw").
   Qed.
 
@@ -530,7 +533,7 @@ Section UkShRun.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access (ukn_t N) (ukn_d N) (ukn_s N) M pm sz dq a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal
@@ -542,13 +545,13 @@ Section UkShRun.
                           (concat_vec uimm ('b"00"))))).
     { rewrite Ha /uoff_c4. rewrite <- moi_add. rewrite !moi_of_uint.
       reflexivity. }
-    iApply (UkLoad.wp_uk_clw C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw uimm crs1 crd rs1 rd
+    iApply (UkLoad.wp_uk_clw C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs uimm crs1 crd rs1 rd
               (mword_of_int a) (sign_extend' 64 wv) wv Hui He1 He2 Hrd Htgt
               Hok
               Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
-              with "Hb [Hheap Hstk Hufd Hcwda Hw Hcont]").
-    iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hdep").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
+    iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iApply ("Hcont" with "Hw").
   Qed.
 
@@ -571,7 +574,7 @@ Section UkShRun.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access (ukn_t N) (ukn_d N) (ukn_s N) M pm sz dq a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal
@@ -580,13 +583,13 @@ Section UkShRun.
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
     { exact (umoi_add_i12 _ imm a Ha). }
-    iApply (UkLoad.wp_uk_lwu C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw imm rs1 rd
+    iApply (UkLoad.wp_uk_lwu C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs imm rs1 rd
               (mword_of_int a) (zero_extend' 64 wv) wv Hui Hrd Htgt
               Hok
               Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
-              with "Hb [Hheap Hstk Hufd Hcwda Hw Hcont]").
-    iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hdep").
+              with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
+    iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iApply ("Hcont" with "Hw").
   Qed.
 
@@ -1127,7 +1130,7 @@ Section UkShRun.
       iIntros (hp2) "Hrun".
       iApply ("Hpar" $! hp2 r with "[%] HP Hsz Hstd [Hcwd] HD Hrun");
         [ exact Hr | iApply (ucwd_any_of with "Hcwd") ].
-    - iIntros (N' hc) "[#Hck HP] Hsz Hstd HD Hcwd Hrun".
+    - iIntros (N' hc) "[#Hck HP] Hsz Hstd HD Hcwd _ Hrun".
       iApply (wp_uk_cjr N' hc
                 (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]> m1)
                 (mword_of_int 0xc84) ra_idx

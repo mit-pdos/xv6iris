@@ -57,6 +57,9 @@ Section UkInitMain.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context (N : uk_names).
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
@@ -752,7 +755,9 @@ Section UkInitMain.
       { iExists l. iFrame "Hstd". }
     - (* ...and the CHILD under fresh ones.  Its ledger is dropped: init's
          child execs, and nothing before the exec allocates. *)
-      iIntros (N' hc) "Hpay Hsz Hstd _ Hcwd Hrun".
+      (* the child's own children fragment is [∅] and init's child execs
+         before it forks, so nothing here reads it *)
+      iIntros (N' hc) "Hpay Hsz Hstd _ Hcwd _ Hrun".
       set (mk := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]> mf1).
       assert (Hrak : mk !!! Regidx ra_idx = m !!! Regidx ra_idx).
       { rewrite /mk (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) _

@@ -184,7 +184,7 @@ Require Import BioInitAt.
 Require Import IrefSlots.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
-Require Import WaitInv.   (* [wait_res] -- what wait_lock is over *)
+Require Import WaitInv.   (* [parents_res] -- the cell half of what wait_lock is over *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
@@ -261,7 +261,7 @@ Section SpecMain.
   (* side ASSEMBLY does, and which therefore have nowhere else to come    *)
   (* from:                                                               *)
   (*  - per process, the two PUBLIC cells procinit never touches:          *)
-  (*    [p_chan] and [SchedCtx.proc_pub] (killed / xstate / the           *)
+  (*    [p_chan] and [SchedCtx.proc_pub_bare] (killed / xstate / the      *)
   (*    invariant's permanent HALF of the pid cell -- [proc_raw] carries   *)
   (*    the other half).  [SpecProcinit.procs_inv_alloc] consumes exactly  *)
   (*    [proc_ready i] plus these two, so they are main's to supply.       *)
@@ -313,13 +313,13 @@ Section SpecMain.
      ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) ∗
      ([∗ list] i ∈ seq 0 NPROC,
         (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-        proc_pub (proc_addr i)) ∗
+        proc_pub_bare (proc_addr i)) ∗
      (* ...AND <pid_lock>'s QUARTER OF EVERY pid CELL -- the part of a
         [struct proc] that belongs to THAT lock (upstream ded23f2's pid scan
-        reads all 64 under it), carved beside [proc_pub]'s quarter and routed
+        reads all 64 under it), carved beside [proc_pub_bare]'s quarter and routed
         to main's [newlock] for [PidLock.nextpid_res]. *)
      ([∗ list] i ∈ seq 0 NPROC, pid_lock_share (proc_addr i)) ∗
-     (* ...AND WHAT wait_lock IS OVER.  [WaitInv.wait_res] is [∃ ps,
+     (* ...AND WHAT wait_lock IS OVER.  [WaitInv.parents_res] is [∃ ps,
         parents_own ps], the NPROC [p_parent] cells -- the one part of a
         [struct proc] that belongs to a lock OTHER than p->lock, which is
         why it is not in either big-op above.  The image owns the cells and
@@ -328,7 +328,7 @@ Section SpecMain.
         wait_lock_addr] it already holds to make the [is_lock] every
         consumer of wait_lock (kexit, kwait, reparent, the syscall
         environment) has always taken and nobody has ever built. *)
-     WaitInv.wait_res ∗
+     WaitInv.parents_res ∗
      fd_slots (NPROC * (NOFILE + FDSPARE)) ∗
      (* ... and the iref supply's proc-layer share: 1 + IREFSPARE per
         process, the [1] being its cwd unit.  The remaining [NFILE] units of

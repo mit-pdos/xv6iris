@@ -95,14 +95,16 @@ Proof. reflexivity. Qed.
 
 (* ...and the key it projects to, spelled out: this is the record
    [SpecKfork]'s premise hands kfork a slot at. *)
-Lemma uvis_of_kfork_child (Up : ustate) (sts : list fdstate) :
-  uvis_of (kfork_child Up) sts
+Lemma uvis_of_kfork_child (Up : ustate) (sts : list fdstate)
+    gn cs :
+  uvis_of (kfork_child Up) sts gn cs
   = MkUvis (<[14%nat := zero_reg]> (pv_tf (us_V Up)))
            (us_M Up)
            (perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))))
            (uint (pv_sz (us_V Up)))
            sts
-           (pv_cwi (us_V Up)).
+           (pv_cwi (us_V Up))
+           gn cs.
 Proof. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -357,14 +359,15 @@ Qed.
 (* §4 THE ASSEMBLY: the child's actual record has the run key of the      *)
 (* record [SpecKfork] states.                                             *)
 (* ===================================================================== *)
-Lemma urun_eq_kfork_child (Up Uc : ustate) (sts : list fdstate) :
+Lemma urun_eq_kfork_child (Up Uc : ustate) (sts : list fdstate)
+    gn cs :
   pv_tf (us_V Uc) = <[14%nat := zero_reg]> (pv_tf (us_V Up)) ->
   us_M Uc = us_M Up ->
   perm_of (ud_um (pv_upt (us_V Uc))) (uint (pv_sz (us_V Uc)))
     = perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))) ->
   pv_sz (us_V Uc) = pv_sz (us_V Up) ->
   pv_cwi (us_V Uc) = pv_cwi (us_V Up) ->
-  urun_eq (uvis_of (kfork_child Up) sts) Uc.
+  urun_eq (uvis_of (kfork_child Up) sts gn cs) Uc.
 Proof.
   intros Htf HM Hperm Hsz Hcw.
   unfold urun_eq. rewrite uvis_of_kfork_child.

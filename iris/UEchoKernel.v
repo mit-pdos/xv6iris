@@ -97,6 +97,9 @@ Section UEchoKernel.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
@@ -430,7 +433,9 @@ Section UEchoKernel.
               ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop
               with "Hdep").
     (* echo makes no descriptor call, so its ledger is dropped here *)
-    iIntros (N h) "%Hsz Hszf #Ht _ _ #HA Hrun".
+    (* echo makes no descriptor call, no chdir and no fork, so its ledger,
+       its working directory and its children set are all dropped here *)
+    iIntros (N h) "%Hsz Hszf #Ht _ _ _ #HA Hrun".
     rewrite Hpc.
     iApply (wp_kecho_start N Hpsok h (tf_resume_gpr0 (uvis_tf W))
               (uvis_av W)

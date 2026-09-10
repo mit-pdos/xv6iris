@@ -233,7 +233,7 @@ Definition kfork_post
 
 Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
- (γp γw γl γf : gname)  (γs : list gname)
+ (γp γw γc γl γf : gname)  (γs : list gname)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
     (lks : gset string) :=
@@ -259,7 +259,7 @@ Definition wp_kfork_sconf_body
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
   is_ftable γl γf -∗
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
@@ -307,7 +307,11 @@ Definition wp_kfork_sconf_body
      ([ParkCap.park_token_park_steady]), whose closer resumes at a record
      with the parked run key ([UexecRet.urun_eq],
      [KforkChild.urun_eq_kfork_child]). *)
-  uslot (uvis_of (kfork_child Up) stsP) -∗
+  (* THE CHILD'S GENERATION IS ∀-BOUND: allocproc mints a fresh one inside
+     this call, so the CALLER cannot name it and undertakes to supply a
+     slot at whichever one comes out; the child's children set is [∅] on
+     the nose ([UexecRet.uexec_fork_child_F]). *)
+  (∀ g' : gname, uslot (uvis_of (kfork_child Up) stsP g' ∅)) -∗
   (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
      take out of the parent's block: the parent's token may be the EXCLUSIVE
      boot arm, and the child needs a token of its own.  [first_done] is
@@ -333,10 +337,10 @@ Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module Type KFORK.
   Parameter wp_kfork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
- (γp γw γl γf : gname) (γs : list gname)
+ (γp γw γc γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
       (lks : gset string),
-      wp_kfork_sconf_body γp γw γl γf γs
+      wp_kfork_sconf_body γp γw γc γl γf γs
  m lvl K eb pme b pid_p Up stsP lks.
 End KFORK.

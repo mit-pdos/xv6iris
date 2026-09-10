@@ -142,6 +142,8 @@ Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UserChildren. (* [uch] -- the child's own half of its (empty)
+                                children set, minted here *)
 Require Import UserCwd.  (* [ucwd] -- the parent's half of its working
                             directory, which the child is minted at *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
@@ -151,6 +153,9 @@ Section UkFork.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
@@ -828,6 +833,12 @@ Section UkFork.
         UserFd.ustd (ukn_fd N') l -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
         UserCwd.ucwd (ukn_cwd N') c -∗
+        (* ...AND ITS OWN HALF OF ITS CHILDREN SET, at [∅] on the nose: a
+           process that has just been created has created nothing
+           ([UexecRet.uexec_fork_child_F]'s row).  No binder, because there
+           is only one value it can be -- which is why this arm can name
+           it where it cannot name the parent's. *)
+        UserChildren.uch (ukn_ch N') ∅ -∗
         urun N' h'
           (<[Regidx (mword_of_int 10) := (mword_of_int 0 : mword 64)]> m)
           (add_vec_int pc 4) avail -∗
@@ -835,7 +846,7 @@ Section UkFork.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hal4. iIntros "#Hi HP Hsz Hstd HD Hcwd Hrun [Hpar Hchild]".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
     (* the caller's half pins the key's working directory *)
     iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -863,7 +874,7 @@ Section UkFork.
       "(Hheap' & Hsz' & #Htf' & #Hpf' & Hdf')".
     iMod ("Hrebuild" $! γt' γd' γs' with "Htf' Hpf' Hdf'") as "[HP' Hstk']".
     (* ---- the trap ---- *)
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -872,28 +883,30 @@ Section UkFork.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c)) = USYS_fork).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs))
+                   = USYS_fork).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_fork = USYS_exit)) as [He | _];
       [ exfalso; unfold USYS_fork, USYS_exit in He; lia | ].
     destruct (decide (USYS_fork = USYS_fork)) as [_ | Hne];
       [ | exfalso; exact (Hne eq_refl) ].
-    cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
+    cbn [uvis_M uvis_perm uvis_sz uvis_gen uvis_ch uvis_of_run].
     (* the PARENT keeps the descriptor authority it had -- fork does not
        touch the parent's table -- and the CHILD mints its own below. *)
-    iSplitL "Hpar HP Hsz Hstd HD Hcwd Hheap Hstk Hufd Hcwda".
+    iSplitL "Hpar HP Hsz Hstd HD Hcwd Hheap Hstk Hufd Hcwda Hcha".
     (* ---- the parent: same heap, r <> 0, a quiet-shaped resume ---- *)
-    - iIntros (r fdv' cw') "%Hr %Hfv %Hcv". subst fdv' cw'.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c r Hx0 Hal4).
-      iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv c
+    - iIntros (r fdv' cw' cs') "%Hr %Hfv %Hcv %Hcs". subst fdv' cw' cs'.
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs
+                 r Hx0 Hal4).
+      iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv c gn cs
                 (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hcwda Hdep").
+                with "Hheap Hstk Hufd Hcwda Hcha Hdep").
       iIntros (h') "Hrun".
       iApply ("Hpar" $! h' r with "[%] HP Hsz Hstd HD Hcwd Hrun"). exact Hr.
     (* ---- the child: fresh heap, r = 0, payload rebuilt at the new names *)
-    - iIntros (fdv' cw') "%Hfdv' %Hcv'". subst fdv' cw'.
+    - iIntros (fdv' cw' g') "%Hfdv' %Hcv'". subst fdv' cw'.
       (* THE CHILD'S OWN DESCRIPTOR AUTHORITY, minted at the view the kernel
          handed it -- BEFORE the key is rewritten to [ukc], since the update
          is absorbed by the [uslot] and not by what it unfolds to.  The
@@ -912,17 +925,21 @@ Section UkFork.
       (* ...AND ITS OWN WORKING-DIRECTORY PAIR, at the inum the kernel
          resumed it at, which is the parent's: fork keeps the cwd. *)
       iMod (ucwd_alloc c) as (γc') "[Hcwa' Hcwf']".
+      (* ...AND ITS OWN CHILDREN PAIR, at [∅]: the child has no children.
+         A fresh name for the parent's reason -- both halves of a variable
+         are full, and one name cannot carry two processes' sets. *)
+      iMod (uch_alloc (∅ : gset gname)) as (γch') "[Hcha' Hchf']".
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn g' cs ∅
                  (mword_of_int 0) Hx0 Hal4).
-      iApply (urun_close_upd (MkUkNames γt' γd' γs' γfd' γc') M pm m
+      iApply (urun_close_upd (MkUkNames γt' γd' γs' γfd' γc' γch') M pm m
                 (mword_of_int 10)
-                (mword_of_int 0) sz fdv c (add_vec_int pc 4) avail
+                (mword_of_int 0) sz fdv c g' ∅ (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap' Hstk' Hufd' Hcwa' Hdep").
+                with "Hheap' Hstk' Hufd' Hcwa' Hcha' Hdep").
       iIntros (h') "Hrun".
-      iApply ("Hchild" $! (MkUkNames γt' γd' γs' γfd' γc') h'
-                with "HP' Hsz' Hstd' Hfrag' Hcwf' Hrun").
+      iApply ("Hchild" $! (MkUkNames γt' γd' γs' γfd' γc' γch') h'
+                with "HP' Hsz' Hstd' Hfrag' Hcwf' Hchf' Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -985,6 +1002,12 @@ Section UkFork.
         UserFd.ustd (ukn_fd N') l -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
         UserCwd.ucwd (ukn_cwd N') c -∗
+        (* ...AND ITS OWN HALF OF ITS CHILDREN SET, at [∅] on the nose: a
+           process that has just been created has created nothing
+           ([UexecRet.uexec_fork_child_F]'s row).  No binder, because there
+           is only one value it can be -- which is why this arm can name
+           it where it cannot name the parent's. *)
+        UserChildren.uch (ukn_ch N') ∅ -∗
         urun N' h'
           (<[Regidx (mword_of_int 10) := (mword_of_int 0 : mword 64)]> m)
           (add_vec_int pc 4) avail -∗
@@ -1000,9 +1023,9 @@ Section UkFork.
     iSplitL "Hpar".
     - iIntros (h' r) "%Hr _ Hsz Hstd HD Hcwd Hrun".
       iApply ("Hpar" $! h' r with "[%] Hsz Hstd HD Hcwd Hrun"). exact Hr.
-    - iIntros (N' h') "[Ht' Ha'] Hsz' Hstd' Hfrag' Hcwd' Hrun".
+    - iIntros (N' h') "[Ht' Ha'] Hsz' Hstd' Hfrag' Hcwd' Hch' Hrun".
       iApply ("Hchild" $! N' h'
-                with "Ht' Ha' Hsz' Hstd' Hfrag' Hcwd' Hrun").
+                with "Ht' Ha' Hsz' Hstd' Hfrag' Hcwd' Hch' Hrun").
   Qed.
 
 End UkFork.

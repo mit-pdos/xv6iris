@@ -80,6 +80,8 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
+(* [gname] -- the key's generation and children readings are ghost NAMES *)
+From iris.base_logic.lib Require Import own.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -221,7 +223,8 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
     (M : gmap Z (bv 8)) (g : regfile)
     (* THE ROUND'S ENTRY DESCRIPTOR STATES, named for the same reason the
        image is: the row below is stated against them. *)
-    (sts : list fdstate) (sepc_v sc_v : mword 64)
+    (sts : list fdstate) (gn : gname) (cs : gset gname)
+    (sepc_v sc_v : mword 64)
     (* the deposit's FAMILIES, read by the syscall channel's out row below
        -- see [SpecUsertrap.ut_sys_out] *)
     (f : sfam) : iProp Σ :=
@@ -353,7 +356,7 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
        boundary's own entry trapframe -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out sc_v (tf_of g (ret_pc sepc_v)) M
       (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-      (uint (pv_sz (us_V U))) U' sts sts' -∗
+      (uint (pv_sz (us_V U))) U' sts sts' gn cs -∗
     (* ...AND THE SYSCALL CHANNEL'S, forwarded at this boundary's own entry
        key -- the same one the deposit went down at
        ([wp_uservec_pt_body]'s pre row below) -- and read at the a0 word of
@@ -362,8 +365,9 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
     (∀ n : Z,
        ut_sys_out n f sc_v (tf_of g (ret_pc sepc_v))
          (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts
+         gn cs
          (pv_tf (us_V U') !!! tf_arg_idx 0) (us_M U') sts'
-         (pv_cwi (us_V U'))) -∗
+         (pv_cwi (us_V U')) cs) -∗
     WP (Loop : expr riscv_lang)).
 Global Typeclasses Opaque uservec_post.
 
@@ -377,6 +381,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} 
     (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
     (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
+    (gn : gname) (cs : gset gname)
     (* the deposit's FAMILIES, relayed to usertrap's own row -- see
        [SpecUsertrap.wp_usertrap_body] *)
     (f : sfam)
@@ -481,14 +486,16 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} 
      ([SpecUsertrap.ut_sys_in]) *)
   (∀ n : Z,
      ut_sys_in n f sc_v (tf_of g (ret_pc sepc_v))
-       (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts) -∗
+       (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts
+       gn cs) -∗
   (* ...and FORK'S deposit, which is a SLOT and not a bundle: the child's
      continuation, at the key the saved frame bumps to
      ([SpecUsertrap.ut_fork_in]) *)
   ut_fork_in sc_v (tf_of g (ret_pc sepc_v))
     (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts -∗
   wp_next true (proc_addr j) (fun CID' : CpuId =>
-    uservec_post (CID := CID') (URes CID') C pt vksp U M g sts sepc_v sc_v f) -∗
+    uservec_post (CID := CID') (URes CID') C pt vksp U M g sts gn cs
+      sepc_v sc_v f) -∗
   WP (Loop : expr riscv_lang).
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
@@ -504,6 +511,7 @@ Module Type USERVEC.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
+      (gn : gname) (cs : gset gname)
       (f : sfam) (M : gmap Z (bv 8))
       (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64),
       (* THE BARE RESIDUE, not [usertrap_res] and not even the parked form.
@@ -520,5 +528,5 @@ Module Type USERVEC.
          the same two moves in reverse.  See
          claude-notes/projects/uservec.md. *)
       wp_uservec_pt_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt Rut j vksp U sts f M g ms_v sc_v stval_v sepc_v.
+        C pt Rut j vksp U sts gn cs f M g ms_v sc_v stval_v sepc_v.
 End USERVEC.

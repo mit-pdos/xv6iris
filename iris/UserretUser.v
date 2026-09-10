@@ -47,6 +47,8 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
+(* [gname] -- the key's generation and children readings are ghost NAMES *)
+From iris.base_logic.lib Require Import own.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -99,7 +101,8 @@ Section UserretUser.
          MAPPED view, so the proof forgets it again ([umem_lazy_any]) before
          the bridge.  Taking the named form here is what keeps the weakening
          in ONE place instead of at every entry into the loop. *)
-      (sz : Z) (fdv : list fdstate) (cw : Z) (M : gmap Z (bv 8))
+      (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
+      (M : gmap Z (bv 8))
       (* [Rfd] rides beside [Rut] and for its reason: [UexecRet.uvb] holds
          the process's descriptor view as an ABSTRACT predicate, so this
          layer never needs [fdslotG] to pass it through. *)
@@ -279,7 +282,7 @@ Section UserretUser.
            and size.  [UexecRet.ukc] IS the slot at a natural state
            ([uslot_ukc]), so the caller does the re-key and this lemma's
            whole job is "build [uvb] and apply". ---- *)
-    ukc (perm_of (ud_um pt) sz) M sz fdv cw
+    ukc (perm_of (ud_um pt) sz) M sz fdv cw gn cs
         (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
            va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
            vs11 vt3 vt4 vt5 vt6 va0f)
@@ -292,7 +295,7 @@ Section UserretUser.
            actually produce.  The old shape hid all five under
            [user_trap_frame]'s existentials and typed the successor at
            [uexec_wp] (defect F1/F2, design/user-wp-slot.md). ---- *)
-    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv cw -∗
+    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv cw gn cs -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
@@ -358,7 +361,7 @@ Section UserretUser.
     (* AND THE CONTINUATION RUNS.  The bundle is built row by row inside
        [UexecApply.ukc_apply] -- where the context is that lemma's own
        premises -- rather than inline here (optimization.md, RULE ONE). *)
-    iApply (ukc_apply C pt Rfd Rut HRut sz fdv cw M
+    iApply (ukc_apply C pt Rfd Rut HRut sz fdv cw gn cs M
               (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
                  va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
                  vs11 vt3 vt4 vt5 vt6 va0f)

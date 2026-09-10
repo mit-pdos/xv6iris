@@ -248,7 +248,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
                         & _ & #Hdg & _ & _ & #Hpw)".
     iDestruct "Hglob" as "(_ & _ & _ & _ & #Hcr & #Htl & #Hnp & _)".
     iDestruct "Hextra" as "(_ & #Hpav & _ & _)".
-    iApply (SY.syscall_env_park (XI := Xc) (un_f N) (un_w N) (un_ft N) (un_tk N)
+    iApply (SY.syscall_env_park (XI := Xc) (un_f N) (un_w N) (un_ch N) (un_ft N) (un_tk N)
               (un_fn N) Hj Hplock eq_refl
             with "[] Hwl Hft Hprocs Hdg Hdone2 Hpw Htok").
     rewrite /sysc_park_extra. iFrame "Hnp Hpav Htl Hcr".

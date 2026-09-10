@@ -540,6 +540,11 @@ UserFd.v
 # [uvis_cwd], the program's half is what a proof carries and hands to the
 # syscall that reads it.  See UserCwd.v's header.
 UserCwd.v
+# ...and the PROGRAM's own set of live children, as their GENERATIONS --
+# the same split at a [gset gname]: the engine's half rides inside
+# [UkRun.urun] at the key's [uvis_ch], the program's half is what a proof
+# carries so it can say which children it has.  See UserChildren.v's header.
+UserChildren.v
 # THE ITABLE ENTRY, IN THREE LAYERS.  IcacheRefDefs is the entry's
 # geometry, the cache's constants ([icfg]) and the algebra's boot
 # literals -- what sixty-odd files want and nothing more; IcacheRef is

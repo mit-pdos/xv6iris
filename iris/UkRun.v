@@ -94,6 +94,8 @@ Require Import ProcGeom.  (* [NOFILE] -- how many of them there are *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+Require Import UserChildren. (* [uch_auth] -- the PROGRAM's own view of its
+                                live children's generations *)
 Require Import UserCwd.  (* [ucwd_auth] -- the PROGRAM's own view of its
                             working directory, on the same mold *)
 (* ===================================================================== *)
@@ -122,7 +124,8 @@ Record uk_names := MkUkNames {
   ukn_d : gname;   (* the data map's ([ubyte], [ustack], the slack) *)
   ukn_s : gname;   (* the break ([usz], a half of a ghost variable) *)
   ukn_fd : gname;  (* the descriptor table's ([UserFd.ufd_auth]) *)
-  ukn_cwd : gname  (* the working directory's ([UserCwd.ucwd_auth]) *)
+  ukn_cwd : gname; (* the working directory's ([UserCwd.ucwd_auth]) *)
+  ukn_ch : gname   (* the live children's ([UserChildren.uch_auth]) *)
 }.
 
 Section UkRun.
@@ -135,6 +138,9 @@ Section UkRun.
      [WP] under that binder resolves to the one bound there -- the trick
      [UexecRet.ukc] uses. *)
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
 
   (* ===================================================================== *)
   (* §1 THE RUNNING PREDICATE.                                             *)
@@ -238,18 +244,18 @@ Section UkRun.
   Definition udepw (N : uk_names) (m : regfile) (pc : mword 64)
       (n : Z) : iProp Σ :=
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-       (fdv : list fdstate) (cw : Z),
+       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname),
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
-        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv cw)))%I.
+        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs)))%I.
 
   (* the GENERIC route's supplier: a number the program admits *)
   Lemma udepw_of_psok (N : uk_names) (m : regfile) (pc : mword 64)
       (n : Z) :
     psok n -> n <> USYS_exec -> ⊢ udepw N m pc n.
   Proof.
-    intros Hok Hne. rewrite /udepw. iIntros (M pm sz fdv cw) "Hh Hf".
+    intros Hok Hne. rewrite /udepw. iIntros (M pm sz fdv cw gn cs) "Hh Hf".
     iFrame "Hh Hf". iLeft. iPureIntro. exact (conj Hok Hne).
   Qed.
 
@@ -260,14 +266,14 @@ Section UkRun.
      call site is inside its leaf's own WP goal, which absorbs it. *)
   Lemma udepw_mint (N : uk_names) (m : regfile) (pc : mword 64)
       (n : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-      (fdv : list fdstate) (cw : Z) :
+      (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
     udep -∗ udepw N m pc n -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle uslot n (uvis_of_run m pc M pm sz fdv cw).
+    sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs).
   Proof.
     iIntros "#Hdep Hsb Hheap Hufd".
-    iDestruct ("Hsb" $! M pm sz fdv cw with "Hheap Hufd")
+    iDestruct ("Hsb" $! M pm sz fdv cw gn cs with "Hheap Hufd")
       as "(Hheap & Hufd & [%Hok | Hb])"; iFrame "Hheap Hufd";
       [ iApply (udep_dep n _ (proj1 Hok) (proj2 Hok) with "Hdep")
       | by iModIntro ].
@@ -300,7 +306,7 @@ Section UkRun.
   Lemma udepw_of_uxsup (N : uk_names) (m : regfile) (pc : mword 64) :
     uxsup -∗ udepw N m pc USYS_exec.
   Proof.
-    iIntros "#Hx" (M pm sz fdv cw) "Hh Hf". iFrame "Hh Hf". iRight.
+    iIntros "#Hx" (M pm sz fdv cw gn cs) "Hh Hf". iFrame "Hh Hf". iRight.
     iApply "Hx".
   Qed.
 
@@ -333,11 +339,11 @@ Section UkRun.
   Definition udepw_at (N : uk_names) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) : iProp Σ :=
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-       (fdv : list fdstate),
+       (fdv : list fdstate) (gn : gname) (cs : gset gname),
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
-        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv c)))%I.
+        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs)))%I.
 
   (* [udepw] IS THE ∀-CWD FORM, one direction.  The two differ only in
      where the [cw] binder sits, so the equivalence holds both ways; this
@@ -349,8 +355,8 @@ Section UkRun.
       (n : Z) (c : Z) :
     udepw N m pc n -∗ udepw_at N m pc n c.
   Proof.
-    iIntros "Hd" (M pm sz fdv) "Hh Hf".
-    iApply ("Hd" $! M pm sz fdv c with "Hh Hf").
+    iIntros "Hd" (M pm sz fdv gn cs) "Hh Hf".
+    iApply ("Hd" $! M pm sz fdv c gn cs with "Hh Hf").
   Qed.
 
   (* ...AND THE SUPPLIER THAT IGNORES THE LOAN: a caller that already has
@@ -360,11 +366,11 @@ Section UkRun.
   Lemma udepw_at_of_bundle (N : uk_names) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) :
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-       (fdv : list fdstate),
-       sbundle uslot n (uvis_of_run m pc M pm sz fdv c)) -∗
+       (fdv : list fdstate) (gn : gname) (cs : gset gname),
+       sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs)) -∗
     udepw_at N m pc n c.
   Proof.
-    iIntros "Hb" (M pm sz fdv) "Hh Hf". iFrame "Hh Hf". iRight.
+    iIntros "Hb" (M pm sz fdv gn cs) "Hh Hf". iFrame "Hh Hf". iRight.
     iApply "Hb".
   Qed.
 
@@ -373,21 +379,21 @@ Section UkRun.
       (c : Z) :
     uxsup -∗ udepw_at N m pc USYS_exec c.
   Proof.
-    iIntros "#Hx". iApply udepw_at_of_bundle. iIntros (M pm sz fdv).
+    iIntros "#Hx". iApply udepw_at_of_bundle. iIntros (M pm sz fdv gn cs).
     iApply "Hx".
   Qed.
 
   (* THE LEAF'S USE OF IT, [udepw_mint]'s shape at the fixed cwd *)
   Lemma udepw_at_mint (N : uk_names) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (sz : Z) (fdv : list fdstate) :
+      (sz : Z) (fdv : list fdstate) (gn : gname) (cs : gset gname) :
     udep -∗ udepw_at N m pc n c -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle uslot n (uvis_of_run m pc M pm sz fdv c).
+    sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs).
   Proof.
     iIntros "#Hdep Hsb Hheap Hufd".
-    iDestruct ("Hsb" $! M pm sz fdv with "Hheap Hufd")
+    iDestruct ("Hsb" $! M pm sz fdv gn cs with "Hheap Hufd")
       as "(Hheap & Hufd & [%Hok | Hb])"; iFrame "Hheap Hufd";
       [ iApply (udep_dep n _ (proj1 Hok) (proj2 Hok) with "Hdep")
       | by iModIntro ].
@@ -403,7 +409,13 @@ Section UkRun.
           its cwd should not have to name it.  A program that DOES holds
           [UserCwd.ucwd] outside, and the authority below is what ties that
           half to the [cw] the key is at. *)
-       (cw : Z),
+       (cw : Z)
+       (* ...AND SO ARE THE TWO WAIT-EXIT READINGS.  The process's own
+          generation [gn] has no resource beside it -- nothing the program
+          holds names it -- and its live children [cs] do: the authority
+          below is what ties a program's [UserChildren.uch] to the set the
+          key is at. *)
+       (gn : gname) (cs : gset gname),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        (* A6.140: the residue-token accessor rides the bundle as a PURE
           fact, so a leaf that re-enters [ukc] can hand it back over *)
@@ -430,8 +442,14 @@ Section UkRun.
           lets a program say "my working directory is inum [c]" and have
           that mean something about the key its next ecall traps from. *)
        ucwd_auth (ukn_cwd N) cw ∗
+       (* THE PROGRAM'S OWN VIEW OF ITS CHILDREN, keyed at the very [cs]
+          the bundle is at -- the cwd authority's twin, one set wide.  A
+          program learns which children it has only by agreement against
+          this half, which is what makes wait(2)'s two arms mean
+          something. *)
+       uch_auth (ukn_ch N) cs ∗
        udep ∗
-       uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw M m pc)%I.
+       uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw gn cs M m pc)%I.
 
   (* THE ROUND'S EFFECT ON THE CWD, AT EVERY NUMBER BUT CHDIR.  A leaf
      re-closes [urun] at the [cw'] the round resumed the process at, and
@@ -452,6 +470,21 @@ Section UkRun.
     ucwd_auth (ukn_cwd N) c' ∗ ucwd (ukn_cwd N) c'.
   Proof. iApply ucwd_update. Qed.
 
+  (* THE ROUND'S EFFECT ON THE CHILDREN SET, AT EVERY NUMBER.  This lane's
+     row ([UsysMemOk.usys_ch_ok]) is the identity everywhere, so a leaf
+     re-closes [urun] at the very set it trapped from and this re-key is
+     all it has to do.  [ucwd_auth_quiet]'s twin; fork's, wait's and
+     exit's leaves will spend [uch_move] instead. *)
+  Lemma uch_auth_quiet (N : uk_names) (cs cs' : gset gname) :
+    cs' = cs -> uch_auth (ukn_ch N) cs -∗ uch_auth (ukn_ch N) cs'.
+  Proof. intros ->. iIntros "$". Qed.
+
+  (* THE MOVER, for the day a fork/wait/exit leaf moves the set. *)
+  Lemma uch_move (N : uk_names) (S S' : gset gname) :
+    uch_auth (ukn_ch N) S -∗ uch (ukn_ch N) S ==∗
+    uch_auth (ukn_ch N) S' ∗ uch (ukn_ch N) S'.
+  Proof. iApply uch_update. Qed.
+
   (* "this instruction does not write sp".  Every leaf that writes a general
      register carries it; a concrete [rd] decides it by [vm_compute]. *)
   Definition unot_sp (rd : mword 5) : Prop := Regidx csp_rs1 <> Regidx rd.
@@ -467,7 +500,8 @@ Section UkRun.
      that is closing back up has just destructed it, so it can say which one.
      Re-introducing the existential at THAT size is all this does. *)
   Lemma urun_close (N : uk_names) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (sz : Z) (fdv : list fdstate) (cw : Z) (m : regfile) (pc : mword 64)
+      (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
+      (m : regfile) (pc : mword 64)
       (avail : nat) :
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗
     ustack (ukn_d N) (m !!! Regidx csp_rs1) avail -∗
@@ -475,16 +509,19 @@ Section UkRun.
     ufd_auth (ukn_fd N) fdv -∗
     (* ...and the cwd authority, at the same [cw] the key is at *)
     ucwd_auth (ukn_cwd N) cw -∗
+    (* ...and the children authority, at the same [cs] the key is at *)
+    uch_auth (ukn_ch N) cs -∗
     (* the deposit supplier and its law, back at the same key -- persistent,
        so a leaf that destructed [urun] hands the very copy it read *)
     udep -∗
     (∀ h : CpuId, urun N h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
-    ukc pm M sz fdv cw m pc.
+    ukc pm M sz fdv cw gn cs m pc.
   Proof.
-    iIntros "Hheap Hstk Hufd Hcwd #Hdep Hcont".
+    iIntros "Hheap Hstk Hufd Hcwd Hch #Hdep Hcont".
     rewrite /ukc. iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
-    iApply ("Hcont" $! h). iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
-    iFrame "Hheap Hstk Hufd Hcwd Hdep Hb". iPureIntro.
+    iApply ("Hcont" $! h).
+    iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw, gn, cs.
+    iFrame "Hheap Hstk Hufd Hcwd Hch Hdep Hb". iPureIntro.
     split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
@@ -508,19 +545,21 @@ Section UkRun.
      is keyed by sp, and [unot_sp] says this write was not to sp. *)
   Lemma urun_close_upd (N : uk_names) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
-      (sz : Z) (fdv : list fdstate) (cw : Z) (pc' : mword 64) (avail : nat) :
+      (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
+      (pc' : mword 64) (avail : nat) :
     unot_sp rd ->
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗
     ustack (ukn_d N) (m !!! Regidx csp_rs1) avail -∗
     ufd_auth (ukn_fd N) fdv -∗
     ucwd_auth (ukn_cwd N) cw -∗
+    uch_auth (ukn_ch N) cs -∗
     udep -∗
     (∀ h : CpuId, urun N h (<[Regidx rd := v]> m) pc' avail -∗
                   WP (Loop : expr riscv_lang)) -∗
-    ukc pm M sz fdv cw (<[Regidx rd := v]> m) pc'.
+    ukc pm M sz fdv cw gn cs (<[Regidx rd := v]> m) pc'.
   Proof.
-    intros Hns. iIntros "Hheap Hstk Hufd Hcwd #Hdep Hcont".
-    iApply (urun_close with "Hheap [Hstk] Hufd Hcwd Hdep Hcont").
+    intros Hns. iIntros "Hheap Hstk Hufd Hcwd Hch #Hdep Hcont".
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwd Hch Hdep Hcont").
     rewrite (unot_sp_upd rd v m Hns). iExact "Hstk".
   Qed.
 
@@ -779,7 +818,7 @@ Section UkRun.
       /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwd & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwd & Hch & #Hdep & Hb)".
     iDestruct (ustack_align with "Hstk") as %Hal.
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
     iPureIntro. exact (conj Hal Hroom).
@@ -881,6 +920,11 @@ Section UkRun.
           where the tie between the program's half and the key's [cw]
           begins.  A program that never looks at its cwd drops it. *)
        ucwd (ukn_cwd N) (uvis_cwd W) -∗
+       (* ...AND ITS OWN HALF OF ITS CHILDREN SET, at the very set the
+          resumed key carries -- [∅] at every entry that exists today,
+          because an entry constructor builds the FIRST run of a program
+          and a program that has not forked has no children. *)
+       uch (ukn_ch N) (uvis_ch W) -∗
        ([∗ map] k ↦ b ∈ base.filter
              (fun kv : Z * bv 8 =>
                 kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
@@ -916,6 +960,10 @@ Section UkRun.
        carries: the authority stays in the [urun] being built, the
        fragment goes to the program. *)
     iMod (ucwd_alloc (uvis_cwd W)) as (γc) "[Hcwa Hcwf]".
+    (* ...AND THE CHILDREN SET'S PAIR, at the set the resumed key carries:
+       the authority stays in the [urun] being built, the fragment goes to
+       the program. *)
+    iMod (uch_alloc (uvis_ch W)) as (γch) "[Hcha Hchf]".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     (* ---- the two cuts: at the frame's base, then at sp ---- *)
     set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
@@ -956,15 +1004,16 @@ Section UkRun.
       unfold f. rewrite Hb'. reflexivity. }
     iDestruct (ubytes_of_map γd _ base (8 * avail) f Hf with "Dmid") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc) h with "[%] Hszf Ht Hstd Hcwf Dlo Dtop");
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch) h
+                   with "[%] Hszf Ht Hstd Hcwf Hchf Dlo Dtop");
       [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
-      (uvis_cwd W).
+      (uvis_cwd W), (uvis_gen W), (uvis_ch W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd Hcwa Hdep".
+    iFrame "Hheap Hstk Hufd Hcwa Hcha Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
@@ -1021,6 +1070,11 @@ Section UkRun.
           where the tie between the program's half and the key's [cw]
           begins.  A program that never looks at its cwd drops it. *)
        ucwd (ukn_cwd N) (uvis_cwd W) -∗
+       (* ...AND ITS OWN HALF OF ITS CHILDREN SET, at the very set the
+          resumed key carries -- [∅] at every entry that exists today,
+          because an entry constructor builds the FIRST run of a program
+          and a program that has not forked has no children. *)
+       uch (ukn_ch N) (uvis_ch W) -∗
        urun N h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          avail -∗
        WP (Loop : expr riscv_lang))
@@ -1048,6 +1102,10 @@ Section UkRun.
        carries: the authority stays in the [urun] being built, the
        fragment goes to the program. *)
     iMod (ucwd_alloc (uvis_cwd W)) as (γc) "[Hcwa Hcwf]".
+    (* ...AND THE CHILDREN SET'S PAIR, at the set the resumed key carries:
+       the authority stays in the [urun] being built, the fragment goes to
+       the program. *)
+    iMod (uch_alloc (uvis_ch W)) as (γch) "[Hcha Hchf]".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     (* ---- the carve ---- *)
     set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
@@ -1060,15 +1118,16 @@ Section UkRun.
       unfold f. unfold D, base in *. rewrite Hb. reflexivity. }
     iDestruct (ubytes_of_map γd D base (8 * avail) f Hf with "Hd") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc) h with "[%] Hszf Ht Hstd Hcwf");
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch) h
+                   with "[%] Hszf Ht Hstd Hcwf Hchf");
       [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
-      (uvis_cwd W).
+      (uvis_cwd W), (uvis_gen W), (uvis_ch W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd Hcwa Hdep".
+    iFrame "Hheap Hstk Hufd Hcwa Hcha Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
@@ -1133,6 +1192,11 @@ Section UkRun.
           where the tie between the program's half and the key's [cw]
           begins.  A program that never looks at its cwd drops it. *)
        ucwd (ukn_cwd N) (uvis_cwd W) -∗
+       (* ...AND ITS OWN HALF OF ITS CHILDREN SET, at the very set the
+          resumed key carries -- [∅] at every entry that exists today,
+          because an entry constructor builds the FIRST run of a program
+          and a program that has not forked has no children. *)
+       uch (ukn_ch N) (uvis_ch W) -∗
        ([∗ map] k ↦ b ∈ base.filter
              (fun kv : Z * bv 8 =>
                 ~ (kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)))
@@ -1165,6 +1229,10 @@ Section UkRun.
        carries: the authority stays in the [urun] being built, the
        fragment goes to the program. *)
     iMod (ucwd_alloc (uvis_cwd W)) as (γc) "[Hcwa Hcwf]".
+    (* ...AND THE CHILDREN SET'S PAIR, at the set the resumed key carries:
+       the authority stays in the [urun] being built, the fragment goes to
+       the program. *)
+    iMod (uch_alloc (uvis_ch W)) as (γch) "[Hcha Hchf]".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     (* ---- the cut at the entry sp ---- *)
     set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
@@ -1189,15 +1257,16 @@ Section UkRun.
                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D)
                  base (8 * avail) f Hf with "Dlo") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc) h with "[%] Hszf Ht Hstd Hcwf Dhi");
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch) h
+                   with "[%] Hszf Ht Hstd Hcwf Hchf Dhi");
       [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
-      (uvis_cwd W).
+      (uvis_cwd W), (uvis_gen W), (uvis_ch W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd Hcwa Hdep".
+    iFrame "Hheap Hstk Hufd Hcwa Hcha Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].

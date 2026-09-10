@@ -15,7 +15,7 @@
         name the contract's.
 
     What [SpecKexec]'s postcondition asks for is
-    [kexec_image_ok f na alen afun sts (exec_key U' sts na)] together with
+    [kexec_image_ok f na alen afun sts (exec_key U' sts gn cs na)] together with
     [kexec_ok_exec f V V' r na alen].  Turning the first pair into the
     second is entirely pure -- no resource, no atomic update -- so it is
     one lemma here rather than ten lines of [iPureIntro] at the closer.
@@ -109,6 +109,7 @@ Proof. intros Hr Hv. by left. Qed.
 Lemma exec_image_ok_of_built (f : elf_bytes) (ef : nat -> bv 8)
     (V V' : pprivate) (M' : gmap Z (bv 8)) (sts : list fdstate)
     (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+    gn cs
     (r entry spv szv' sz1 : mword 64) :
   kexec_loadable f ->
   (forall j : nat, (j < 64)%nat -> ef j = f !!! j) ->
@@ -117,7 +118,7 @@ Lemma exec_image_ok_of_built (f : elf_bytes) (ef : nat -> bv 8)
   kexec_built f ef sz1 na alen afun (MkUstate V' M') ->
   kexec_ok V V' r entry spv szv' na alen ->
   r <> (mword_of_int (-1) : mword 64) ->
-  kexec_image_ok f na alen afun sts (exec_key (MkUstate V' M') sts na)
+  kexec_image_ok f na alen afun sts (exec_key (MkUstate V' M') sts gn cs na)
   /\ kexec_ok_exec f V V' r na alen.
 Proof.
   intros Hload Hag Hlen Hent Hbuilt Hok Hne.
@@ -151,17 +152,17 @@ Proof.
     by (rewrite Hlen; unfold TFWORDS, tf_arg_idx; lia).
   (* the key's trapframe, spelled out *)
   set (ws := <[tf_arg_idx 0 := (mword_of_int (Z.of_nat na) : mword 64)]> (pv_tf V')).
-  assert (Hkeytf : uvis_tf (exec_key (MkUstate V' M') sts na) = ws)
+  assert (Hkeytf : uvis_tf (exec_key (MkUstate V' M') sts gn cs na) = ws)
     by (destruct V'; reflexivity).
-  assert (HkeyM : uvis_M (exec_key (MkUstate V' M') sts na) = M')
+  assert (HkeyM : uvis_M (exec_key (MkUstate V' M') sts gn cs na) = M')
     by (destruct V'; reflexivity).
-  assert (Hkeysz : uvis_sz (exec_key (MkUstate V' M') sts na) = uint (pv_sz V'))
+  assert (Hkeysz : uvis_sz (exec_key (MkUstate V' M') sts gn cs na) = uint (pv_sz V'))
     by (destruct V'; reflexivity).
-  assert (Hkeyfd : uvis_fd (exec_key (MkUstate V' M') sts na) = sts)
+  assert (Hkeyfd : uvis_fd (exec_key (MkUstate V' M') sts gn cs na) = sts)
     by (destruct V'; reflexivity).
   (* the key's PERMISSION view is the table the commit installed, projected
      at the size it settled on (S6) *)
-  assert (Hkeyperm : uvis_perm (exec_key (MkUstate V' M') sts na)
+  assert (Hkeyperm : uvis_perm (exec_key (MkUstate V' M') sts gn cs na)
                      = perm_of (ud_um (pv_upt V')) (uint (pv_sz V')))
     by (destruct V'; reflexivity).
   (* the four reads *)
@@ -219,6 +220,7 @@ Qed.
    relation at the plug of §1.  [U'] general, since the AU binds it. *)
 Lemma exec_image_ok_of_ok_q (f : elf_bytes) (ef : nat -> bv 8)
     (V : pprivate) (U' : ustate) (sts : list fdstate)
+    gn cs
     (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
     (r entry spv szv' : mword 64) :
   kexec_loadable f ->
@@ -227,7 +229,7 @@ Lemma exec_image_ok_of_ok_q (f : elf_bytes) (ef : nat -> bv 8)
   kexec_ok_q (fun e => exec_built_Q f ef na alen afun e U')
              V (us_V U') r entry spv szv' na alen ->
   r <> (mword_of_int (-1) : mword 64) ->
-  kexec_image_ok f na alen afun sts (exec_key U' sts na)
+  kexec_image_ok f na alen afun sts (exec_key U' sts gn cs na)
   /\ kexec_ok_exec f V (us_V U') r na alen.
 Proof.
   intros Hload Hag Hlen Hq Hne.

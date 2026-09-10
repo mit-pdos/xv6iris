@@ -85,7 +85,7 @@ Section ParkCap.
      resume beside [first_done] and the timer capability. *)
   Definition park_pkg `{XI : CurCtx}
       (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
-      (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64)
+      (γs : list gname) (γw γc γft γf γtl : gname) (pa ks : mword 64)
       (* the parked process's fd-state ghost name -- see
          [SpecForkretParkPaid.forkret_park_pkg], which is this verbatim *)
       (g : gname)
@@ -102,6 +102,11 @@ Section ParkCap.
          boot arm has to spell it BEFORE the closer runs: it is the [sts]
          kexec builds its resume key at. *)
       (sts : list fdstate)
+      (* ...AND THE PARKED PROCESS'S GENERATION AND CHILDREN SET, beside
+         [sts] and for its reason: the resume key carries both and the
+         closer builds it, so the party that read them off the kernel's
+         cells names them here. *)
+      (gn : gname) (cs : gset gname)
       (* THE PARKED RUN KEY, WHEN THERE IS ONE.  A park has two modes and
          this is the parameter that selects them ([park_cap]'s [steady] bit
          is what a parker passes):
@@ -133,7 +138,7 @@ Section ParkCap.
      (* THE PARKER'S GLOBALS, at ITS context (L8, A12.19): the cap moves
         them into the running twin ([ProofForkretPark], by [ctx_move]),
         which is what the twin's forkret needs to apply the closer below. *)
-     park_globals cur_ctx γs γw γft γf γtl ∗
+     park_globals cur_ctx γs γw γc γft γf γtl ∗
      pslot_used_at pa ∗
      stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
      (* THE MODE'S PAYLOAD.
@@ -182,7 +187,7 @@ Section ParkCap.
            and neither the size nor the cwd moves.  [None] asks nothing --
            that mode's closer instantiates a family instead. *)
         ⌜match Wk with Some W0 => urun_eq W0 U' | None => True end⌝ -∗
-        park_globals Xc γs γw γft γf γtl -∗
+        park_globals Xc γs γw γc γft γf γtl -∗
         ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
         first_done (XI := Xc) -∗
         W -∗
@@ -223,7 +228,7 @@ Section ParkCap.
            the closer to produce and nothing for the kernel to mint. *)
         (URB h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts
          ∗ match Wk with
-           | Some _ => uslot (uvis_of U' sts)
+           | Some _ => uslot (uvis_of U' sts gn cs)
            | None => emp
            end)))%I.
 
@@ -257,11 +262,11 @@ Section ParkCap.
   Definition park_cap
       (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
-    (□ ∀ (hp : CpuId) (ξp : CtxId) (γw γft γf γtl : gname) (pa ks : mword 64)
+    (□ ∀ (hp : CpuId) (ξp : CtxId) (γw γc γft γf γtl : gname) (pa ks : mword 64)
          (rest : list (mword 64)) (pid : mword 32) (U : ustate)
          (* THE PARKED DESCRIPTOR STATES -- [park_pkg]'s parameter, which
             the parker names off the fragment bundle it holds *)
-         (sts : list fdstate) (av : nat)
+         (sts : list fdstate) (gn : gname) (cs : gset gname) (av : nat)
          (* WHICH OF THE PACKAGE'S TWO MODES the parker is paying: [true]
             hands the package the parked record's RUN KEY and owes
             [FirstTok.first_done] with it, [false] hands no key and owes
@@ -279,8 +284,9 @@ Section ParkCap.
           twins it for the child's context and moves the record's rows there
           -- see [ProofForkretPark]. *)
        own_context (CID := hp) ξp -∗
-       park_pkg (XI := ξp) URB W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
-         (pv_cwi (us_V U)) sts (if steady then Some (uvis_of U []) else None)
+       park_pkg (XI := ξp) URB W γs γw γc γft γf γtl pa ks (pv_fdg (us_V U))
+         (pv_cwi (us_V U)) sts gn cs
+         (if steady then Some (uvis_of U [] gn cs) else None)
          pid av -∗
        (* ...and [W] itself, for forkret to hand the closer: under the same
           later, for the same reason *)
@@ -305,7 +311,7 @@ Section ParkCap.
        ▷ (park_env (XI := ξp) N -∗ park_own (XI := ξp) N -∗
           (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate) (sts : list fdstate),
              ⌜pv_upt (us_V U') = pt'⌝ -∗
-             park_globals Xc (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N) -∗
+             park_globals Xc (un_s N) (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) -∗
              ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
              first_done (XI := Xc) -∗
              W -∗
@@ -364,7 +370,7 @@ Section ParkCap.
   (* and the closer re-keys it (kfork's child).                             *)
   (* ------------------------------------------------------------------- *)
   Lemma park_token_park `{CID : CpuId} (N : ut_names) (rest : list (mword 64)) (U : ustate)
-      (sts : list fdstate) :
+      (sts : list fdstate) (gn : gname) (cs : gset gname) :
     ut_wf N ->
     length rest = 12%nat ->
     (* the parker's running token, in and out -- the cap's premise *)
@@ -419,13 +425,13 @@ Section ParkCap.
     iAssert (procs_inv (un_s N)) as "#Hprocs".
     { iDestruct "Henv" as "[Hcaps _]". iDestruct "Hcaps" as "(_ & $ & _)". }
     (* the parker's globals, out of the environment it holds anyway *)
-    iAssert (park_globals cur_ctx (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N)) as "#Hglobp".
+    iAssert (park_globals cur_ctx (un_s N) (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N)) as "#Hglobp".
     { iDestruct "Henv" as "[Hcaps Hextra]".
       iApply (park_globals_of_park_env with "Hcaps Hextra"). }
     iDestruct ("Hchan" $! cur_ctx N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
-    iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
-              (un_ks N) rest (un_pid N) U sts KSTACK_AV false
+    iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
+              (un_ks N) rest (un_pid N) U sts gn cs KSTACK_AV false
               with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hbundle] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
@@ -485,7 +491,7 @@ Section ParkCap.
 
      Everything else is [park_token_park]'s, row for row. *)
   Lemma park_token_park_steady `{CID : CpuId} (N : ut_names) (rest : list (mword 64))
-      (U : ustate) (sts : list fdstate) :
+      (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname) :
     ut_wf N ->
     length rest = 12%nat ->
     (* the parker's running token, in and out -- the cap's premise *)
@@ -504,7 +510,7 @@ Section ParkCap.
        [park_token_park] takes them *)
     fd_frags (pv_fdg (us_V U)) sts -∗
     (* ONE SLOT, AT THE PARKED RECORD, at the very table the fragments name *)
-    uslot (uvis_of U sts) -∗
+    uslot (uvis_of U sts gn cs) -∗
     (* the child's rows with the block WHOLE -- the steady mode's shape *)
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U true -∗
     |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
@@ -517,13 +523,13 @@ Section ParkCap.
     iDestruct "Htok'" as (URB) "[#Hcap #Hchan]".
     iAssert (procs_inv (un_s N)) as "#Hprocs".
     { iDestruct "Henv" as "[Hcaps _]". iDestruct "Hcaps" as "(_ & $ & _)". }
-    iAssert (park_globals cur_ctx (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N)) as "#Hglobp".
+    iAssert (park_globals cur_ctx (un_s N) (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N)) as "#Hglobp".
     { iDestruct "Henv" as "[Hcaps Hextra]".
       iApply (park_globals_of_park_env with "Hcaps Hextra"). }
     iDestruct ("Hchan" $! cur_ctx N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
-    iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
-              (un_ks N) rest (un_pid N) U sts KSTACK_AV true
+    iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
+              (un_ks N) rest (un_pid N) U sts gn cs KSTACK_AV true
               with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hslot Hdone0] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
@@ -561,9 +567,10 @@ Section ParkCap.
            neither, so the closer's premise is the fact this needs.  Then
            [uslot_of_urun_eq] moves the slot onto the record the resume
            produces, at the descriptor states the residue is about to carry. *)
-        assert (Hrk' : urun_eq (uvis_of U sts) U') by exact Hrk.
+        assert (Hrk' : urun_eq (uvis_of U sts gn cs) U') by exact Hrk.
         iApply (bi.equiv_entails_1_1 _ _
-                  (uslot_of_urun_eq (uvis_of U sts) U' sts Hrk' eq_refl)).
+                  (uslot_of_urun_eq (uvis_of U sts gn cs) U' sts gn cs Hrk'
+                     eq_refl eq_refl eq_refl)).
         iExact "Hslot".
     - iNext. iExact "Htok".
   Qed.

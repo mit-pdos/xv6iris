@@ -145,7 +145,7 @@ Definition forkret_park_pkg
     (* what the closer is handed at the resume beside [first_done] -- the
        park token, abstract here; see [SpecForkret] and ParkCap.v *)
     (W : iProp Σ)
-    (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64)
+    (γs : list gname) (γw γc γft γf γtl : gname) (pa ks : mword 64)
     (* THE PARKED PROCESS'S fd-STATE GHOST NAME.  The package's closer holds
        that process's fragment bundle, which is keyed on this name; the
        resume hands back a record [V'] for the same process, and the
@@ -159,6 +159,9 @@ Definition forkret_park_pkg
     (* ...and its descriptor states, which the parker names off the
        fragment bundle it holds -- see [ParkCap.park_pkg] *)
     (sts : list fdstate)
+    (* ...and the parked process's generation and children set, beside
+       [sts] and for its reason -- see [ParkCap.park_pkg] *)
+    (gn : gname) (cs : gset gname)
     (* ...AND THE PARKED RUN KEY, WHEN THERE IS ONE -- the two modes of a
        park, selected by the parker.  [None] is the BOOT mode: the resume
        still runs forkret's boot arm, so no key captured at the park
@@ -178,7 +181,7 @@ Definition forkret_park_pkg
    wire_inv ∗
    kmap_at tramp_vpn tramp_ppn KP_rx ∗
    procs_inv γs ∗
-   UsertrapRes.park_globals cur_ctx γs γw γft γf γtl ∗
+   UsertrapRes.park_globals cur_ctx γs γw γc γft γf γtl ∗
    pslot_used_at pa ∗
    (* ---- the child's kernel stack, free below its top ---- *)
    stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
@@ -238,7 +241,7 @@ Definition forkret_park_pkg
          exactly those facts; [None] asks nothing.  [ParkCap.park_pkg] is
          this verbatim. *)
       ⌜match Wk with Some W0 => urun_eq W0 U' | None => True end⌝ -∗
-      UsertrapRes.park_globals Xc γs γw γft γf γtl -∗
+      UsertrapRes.park_globals Xc γs γw γc γft γf γtl -∗
       UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
       FirstTok.first_done (XI := Xc) -∗
       W -∗
@@ -261,15 +264,16 @@ Definition forkret_park_pkg
          package's argument. *)
       (URes h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts
        ∗ match Wk with
-         | Some _ => uslot (uvis_of U' sts)
+         | Some _ => uslot (uvis_of U' sts gn cs)
          | None => emp
          end)))%I.
 
 Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
-    (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
-    (pid : mword 32) (U : ustate) (sts : list fdstate) (av : nat)
+    (γs : list gname) (γw γc γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
+    (pid : mword 32) (U : ustate) (sts : list fdstate) (gn : gname)
+    (cs : gset gname) (av : nat)
     (* WHICH OF THE PACKAGE'S TWO MODES THE CALLER PAID.  A [true] package
        carries the parked record's RUN KEY -- the projection of the very [U]
        this park is at, at a placeholder descriptor view, since
@@ -304,8 +308,9 @@ Definition forkret_park_paid_body
      fixpoint: the package's closer names the token, and a parker holds the
      token only under a later. *)
   ⊢ own_context cur_ctx -∗
-    forkret_park_pkg URes W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
-      (pv_cwi (us_V U)) sts (if steady then Some (uvis_of U []) else None)
+    forkret_park_pkg URes W γs γw γc γft γf γtl pa ks (pv_fdg (us_V U))
+      (pv_cwi (us_V U)) sts gn cs
+      (if steady then Some (uvis_of U [] gn cs) else None)
       pid av -∗
     ▷ W -∗
     is_kstack pa ks -∗
@@ -341,11 +346,12 @@ Module Type FORKRET_PARK_PAID.
   Parameter forkret_park_paid :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
-      (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
-      (pid : mword 32) (U : ustate) (sts : list fdstate) (av : nat) (steady : bool),
+      (γs : list gname) (γw γc γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
+      (pid : mword 32) (U : ustate) (sts : list fdstate) (gn : gname)
+      (cs : gset gname) (av : nat) (steady : bool),
       forkret_park_paid_body
         (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
-        γs γw γft γf γtl pa ks rest pid U sts av steady.
+        γs γw γc γft γf γtl pa ks rest pid U sts gn cs av steady.
   (* ...AND THE TOKEN, which is the park as every parker sees it
      ([ParkCap.park_token]): the cap above at [W := the token] plus the
      residue's channel, tied into the fixpoint.  This is the one entry the

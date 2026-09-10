@@ -81,7 +81,7 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WireInv.   (* [wire_inv] *)
 Require Import UsertrapRes.   (* [devintr_caps_any] -- the park's device complement *)
-Require Import WaitInv.       (* [wait_res] *)
+Require Import WaitInv.       (* [wait_res_at] *)
 Require Import SpecProcinit.  (* [wait_lock_addr] *)
 Require Import FileInv.       (* [is_ftable] *)
 Require Import ConsoleInv.    (* [console_ready] *)
@@ -143,7 +143,7 @@ Definition wp_userinit_sconf_body
        reads none of them; they index the six persistent rows below, which
        the first process's trap-loop environment is assembled from at the
        park (SpecForkretParkPaid.v, UsertrapRes.park_env). *)
-    (γft γf γw γtl : gname) (pd pav pu : mword 64)
+    (γft γf γw γc γtl : gname) (pd pav pu : mword 64)
     (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (on : option nat) (np : nat) (v0 : mword 64)
     (b : bool) (lks : gset string) :=
@@ -214,7 +214,7 @@ Definition wp_userinit_sconf_body
      device complement is stated at the ambient uart / disk / disk-lock
      names, which is what [fclose_ties] pins the record to. ---- *)
   devintr_caps_any fsc_uart fsc_disk fsc_dlock γtl γs pd pav pu -∗
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
   is_ftable γft γf -∗
   ConsoleInv.console_ready -∗
   wire_inv -∗
@@ -288,9 +288,9 @@ Module Type USERINIT.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γp : gname) (γs : list gname)
-      (γft γf γw γtl : gname) (pd pav pu : mword 64)
+      (γft γf γw γc γtl : gname) (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
       (on : option nat) (np : nat) (v0 : mword 64)
       (b : bool) (lks : gset string),
-      wp_userinit_sconf_body γp γs γft γf γw γtl pd pav pu m K eb pj on np v0 b lks.
+      wp_userinit_sconf_body γp γs γft γf γw γc γtl pd pav pu m K eb pj on np v0 b lks.
 End USERINIT.

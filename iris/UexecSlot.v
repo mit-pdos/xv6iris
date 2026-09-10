@@ -122,6 +122,25 @@ Record uvis := MkUvis {
      when it succeeds), fork's arm copies it parent to child, and exec
      inherits it ([KexecDefs.kexec_ok]). *)
   uvis_cwd  : Z;
+  (* THE PROCESS'S OWN GENERATION.  Every process gets a fresh ghost name
+     at allocproc ([SpecAllocproc]'s found arm mints it into the slot); the
+     name identifies THIS INCARNATION of the slot, which is what a
+     wait()-side resource transfer has to be indexed by -- a pid is reused
+     and a generation is not.  It is a VALUE for [uvis_fd]'s reason: the
+     kernel holds the cell, the key carries the name it reads off it, and
+     [uvis_of] takes it as a parameter.  Exec keeps it (the identity
+     survives exec) and no syscall moves it
+     ([UsysMemOk.usys_gen_ok]). *)
+  uvis_gen  : gname;
+  (* THE GENERATIONS OF THIS PROCESS'S LIVE CHILDREN -- the reading of the
+     kernel's per-slot children cell (the [wait_lock] sibling of the parent
+     cells, [WaitInv]).  It is user-visible because wait(2) is: the -1 arm
+     is "this process has no children" and the success arm names one of
+     them, so a contract that cannot NAME the set cannot say what wait
+     observes.  fork adds the child's generation, exit reparents a set into
+     init's, wait removes the one it reaped; every other entry keeps it
+     ([UsysMemOk.usys_ch_ok]). *)
+  uvis_ch   : gset gname;
 }.
 
 (* the projection from the kernel's process state to the slot's key: drop
@@ -131,12 +150,19 @@ Record uvis := MkUvis {
    NAME ([pv_fdg]) and not the states under it, so the value comes from the
    [fd_frags] bundle the boundary is holding.  Every call site is a place
    that already has that bundle open. *)
-Definition uvis_of (U : ustate) (sts : list fdstate) : uvis :=
+(* [g] and [cs] are PARAMETERS for [sts]'s reason, and read off the same
+   kind of thing: [ustate] carries neither the slot's generation name nor
+   its children set, so both come from the kernel state the boundary is
+   holding -- the slot's generation cell and the [wait_lock] children cell.
+   Every call site is a place that already has them in reach. *)
+Definition uvis_of (U : ustate) (sts : list fdstate) (g : gname)
+    (cs : gset gname) : uvis :=
   MkUvis (pv_tf (us_V U)) (us_M U)
          (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
          (uint (pv_sz (us_V U)))
          sts
-         (pv_cwi (us_V U)).
+         (pv_cwi (us_V U))
+         g cs.
 
 (* ===================================================================== *)
 (* SS1 The trapframe as a word reader.                                     *)

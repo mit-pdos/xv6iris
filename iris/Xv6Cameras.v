@@ -943,6 +943,70 @@ Global Instance subG_uioΣ {Σ} : subG uioΣ Σ -> uioG Σ.
 Proof. solve_inG. Qed.
 
 (* ===================================================================== *)
+(*  14b. THE PROCESS'S CHILDREN SET  (theory: UserChildren.v)            *)
+(* ===================================================================== *)
+
+(* The generations of a process's live children, as one ghost variable
+   split in half: the ENGINE's half rides inside [UkRun.urun] at the very
+   set the trap key carries ([UexecSlot.uvis_ch]), the PROGRAM's half is
+   what a proof carries so that it can say which children it has.  The
+   working directory's shape ([Xv6Cameras]'s [uioG] break ghost, used by
+   [UserCwd]) one value wider.  A class of its own because [gset gname]
+   has no other member on this bundle. *)
+Class uchG (Σ : gFunctors) := UchG { uch_inG :: ghost_varG Σ (gset gname) }.
+Definition uchΣ : gFunctors := #[ ghost_varΣ (gset gname) ].
+Global Instance subG_uchΣ {Σ} : subG uchΣ Σ -> uchG Σ.
+Proof. solve_inG. Qed.
+
+(* ===================================================================== *)
+(*  14c. THE PROCESS SLOT'S GENERATION  (theory: SchedCtx.v)             *)
+(* ===================================================================== *)
+
+(* A GENERATION IS AN INCARNATION OF A SLOT.  allocproc mints a fresh ghost
+   name for every process it hands out and freeproc drops it, so the name
+   identifies THIS incarnation -- which is what a wait()-side resource
+   transfer is indexed by, a pid being reused and a generation not
+   ([UexecSlot.uvis_gen] is the key's reading of it).  The camera is a pair
+   because the name carries two facts at once:
+
+     [SchedCtx.gen_tok γ]     the EXCLUSIVE token -- the left component,
+                              [Some (Excl ())].  One per incarnation; it is
+                              what makes two live generations distinct.
+     [SchedCtx.gen_slot γ pa] the slot the generation belongs to -- the
+                              right component, [Some (to_agree pa)].  It is
+                              CORE-ID, hence persistent: a generation
+                              belongs to one slot forever, so the fact may
+                              be duplicated and outlive the incarnation,
+                              and two copies agree.
+
+   Both components are [option] so that each half is [own] at the SAME name
+   with the other component at [ε]: the pair splits by [own_op] and the
+   token can be spent without disturbing the slot fact. *)
+Definition genR : cmra :=
+  prodR (optionUR (exclR unitO))
+        (optionUR (agreeR (leibnizO (Values.mword 64)))).
+Class genG (Σ : gFunctors) := GenG { gen_inG :: inG Σ genR }.
+Definition genΣ : gFunctors := #[GFunctor genR].
+Global Instance subG_genΣ {Σ} : subG genΣ Σ -> genG Σ.
+Proof. solve_inG. Qed.
+
+(* ===================================================================== *)
+(*  14d. THE WAIT LOCK'S CHILDREN CELLS  (theory: WaitInv.v)             *)
+(* ===================================================================== *)
+
+(* The [wait_lock] sibling of the parent cells: one [gset gname] per slot,
+   the generations of that slot's live children.  A ghost list and not
+   memory, because [struct proc] has no such field -- the C code reads the
+   same information by scanning [p->parent], and the ghost is the scan's
+   contents-out form ([WaitInv.children_own_at]).  Whole (fraction 1)
+   inside the lock's payload, exactly as [parents_own_at] owns its cells
+   whole. *)
+Class wchG (Σ : gFunctors) := WchG { wch_inG :: ghost_varG Σ (list (gset gname)) }.
+Definition wchΣ : gFunctors := #[ ghost_varΣ (list (gset gname)) ].
+Global Instance subG_wchΣ {Σ} : subG wchΣ Σ -> wchG Σ.
+Proof. solve_inG. Qed.
+
+(* ===================================================================== *)
 (*  15.  THE BUFFER-CACHE TRANSIT BOX  (theory: BioInv.v, CtxAnchor.v)   *)
 (* ===================================================================== *)
 

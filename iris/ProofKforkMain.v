@@ -454,7 +454,7 @@ Section KforkArms.
   (*  (p_context npa)]).  Everything else in this lemma is hypothesis-free.  *)
   (* =================================================================== *)
   Lemma kfork_arm3
- (γf γw γl : gname) (γs : list gname)
+ (γf γw γc γl : gname) (γs : list gname)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Up : ustate)
       (sp0 ra0 s00 s10 s50 : mword 64)
@@ -540,7 +540,7 @@ Section KforkArms.
          (SpecAllocproc.forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
     IntrDefs.arm_pay KT1 lvl eb pme -∗
     kalloc_env_at fsc_kalloc fsc_kpages None -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
+    is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
     is_ftable γl γf -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -559,7 +559,7 @@ Section KforkArms.
        which this proof re-keys onto the record the child is actually parked
        at.  LINEAR, unlike the two rows above it: see [SpecKfork]'s premise
        of the same name. *)
-    uslot (uvis_of (kfork_child Up) stsP) -∗
+    (∀ g' : gname, uslot (uvis_of (kfork_child Up) stsP g' ∅)) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
@@ -709,7 +709,13 @@ Section KforkArms.
       assert (Hshperm' : perm_of (ud_um (pv_upt (us_V Uc'))) (uint (pv_sz (us_V Uc')))
                          = perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))))
         by (rewrite Hshsz; exact Hshperm).
-      assert (Hurun : urun_eq (uvis_of (kfork_child Up) stsP)
+      (* THE CHILD'S GENERATION IS A PLACEHOLDER until the slot's
+         generation cell exists (WAIT-EXIT K4(a)): the caller's deposit is
+         a FAMILY over every name allocproc might mint, so this proof may
+         instantiate it at any one, and nothing reads it.  Then it is the
+         name allocproc minted, read off [SchedCtx.proc_pub]. *)
+      assert (Hurun : urun_eq
+                        (uvis_of (kfork_child Up) stsP (inhabitant : gname) ∅)
                         (MkUstate Vc4 ((us_M Uc')))).
       { destruct HVc4 as (Hs & Hu & Ht & _ & _ & _ & _ & Hc).
         apply urun_eq_kfork_child.
@@ -723,12 +729,14 @@ Section KforkArms.
          own [b = match lvl ...] premise) rather than as the [match] itself:
          the in-lock index we are handing it is spelled [trap_res b + (K - 8)],
          and B5's entry index has to be syntactically that. *)
-      iApply (B5.kfk_b5 γs γf γw γl γl2 j mf4 K lvl eb b
+      iSpecialize ("Hjslot" $! (inhabitant : gname)).
+      iApply (B5.kfk_b5 γs γf γw γc γl γl2 j mf4 K lvl eb b
                 pme ks pid_c (MkUstate Vc4 ((us_M Uc'))) stsP
-                (uvis_of (kfork_child Up) stsP) ch rest
+                (inhabitant : gname) ∅
+                (uvis_of (kfork_child Up) stsP (inhabitant : gname) ∅) ch rest
                 (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
-                Hurun eq_refl
+                Hurun eq_refl eq_refl eq_refl
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock Hft Hworld Htoken Hfdone
                       Hheld Hhart Hpvcx4 Hcfrag Hjslot Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
       all: try lkbelow.
@@ -806,12 +814,12 @@ Section KforkMain.
      runs UNCOUNTED and its only caller ([sys_fork]) holds a generic
      allocator gname, so nothing here may pin the pair at [fsc_kpages]. *)
   Lemma wp_kfork_sconf
- (γp γw γl γf : gname) (γs : list gname)
+ (γp γw γc γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
       (lks : gset string)
  :
-    wp_kfork_sconf_body γp γw γl γf γs
+    wp_kfork_sconf_body γp γw γc γl γf γs
  m lvl K eb pme b pid_p Up stsP lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
@@ -823,7 +831,7 @@ Section KforkMain.
     (* [B6.kfk_prologue] is still generic in the allocator's count; kfork
        pins it at [None] here, which is what collapses its Hcont10a
        disjunction and, with it, two of [kfork_post]'s three arms. *)
-    iApply (B6.kfk_prologue γp γw γl γf γs
+    iApply (B6.kfk_prologue γp γw γc γl γf γs
               m lvl K eb pme None b
               pid_p Up stsP
               (wp_next b pme (fun (CID : CpuId) =>
@@ -885,7 +893,7 @@ Section KforkMain.
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn & Hpidc).
       destruct Hshare as (Hshsz & Hshimg & Hshperm).
       destruct Htfs as (Htfsrc & Htfdst).
-      iApply (kfork_arm3 (CID0 := CID3) γf γw γl γs
+      iApply (kfork_arm3 (CID0 := CID3) γf γw γc γl γs
  m K lvl eb b pme
                 pid_p Up (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)

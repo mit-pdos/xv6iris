@@ -164,6 +164,9 @@ Section UInitKernel.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
@@ -234,7 +237,9 @@ Section UInitKernel.
     iIntros "#Hdep #Hxs".
     iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0)))))
               Hal8 Hroom Hstk Hfdlen Hstop with "Hdep").
-    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf Dlo _ Hrun".
+    (* init's own half of its children set is dropped here for sh's
+       reason: nothing on init's walk reads it yet. *)
+    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf _ Dlo _ Hrun".
     (* ---- the argument vector, out of the data below the frame ---- *)
     assert (Hsub16 :
               init_argv_map

@@ -265,11 +265,11 @@ Section ProofUserinit.
      environment's file-table row must be the one main built. *)
   Lemma wp_userinit_sconf
       (γp : gname) (γs : list gname)
-      (γft γf γw γtl : gname) (pd pav pu : mword 64)
+      (γft γf γw γc γtl : gname) (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
       (on : option nat) (np : nat) (v0 : mword 64)
       (b : bool) (lks : gset string)
-    : wp_userinit_sconf_body γp γs γft γf γw γtl pd pav pu m K eb pj on np v0 b lks.
+    : wp_userinit_sconf_body γp γs γft γf γw γc γtl pd pav pu m K eb pj on np v0 b lks.
   Proof.
     cbv beta delta [wp_userinit_sconf_body].
     intros pcE ret_tgt HK Hnb Hdev Hnib Hbelow.
@@ -755,7 +755,7 @@ Section ProofUserinit.
       iDestruct "Hp" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
                          _ & _ & _ & _ & %Hg)".
       iPureIntro. exact Hg. }
-    pose (N := MkUtNames γft γf γw γs j γl pd pav pu
+    pose (N := MkUtNames γft γf γw γc γs j γl pd pav pu
                  γtl
                  iv1 DfracDiscarded
  ks pid).
@@ -803,8 +803,16 @@ Section ProofUserinit.
        (claude-notes/design/user-wp-slot.md; projects/app-echo.md ARM-c). *)
     (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    (* THE FIRST PROCESS'S GENERATION AND CHILDREN, at the park.  The boot
+       mode carries no run key, so nothing reads either: the park names
+       them and the resumed key is built at what it named.  init has no
+       children when userinit parks it.  The generation is a PLACEHOLDER
+       until the slot's generation cell exists (WAIT-EXIT K4(a)): nothing
+       reads it, because nothing backs it.  Then it is the name allocproc
+       minted, read off [SchedCtx.proc_pub]. *)
     iMod (park_token_park N rest
-            (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M) fdt0 Hwf Hrest
+            (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M) fdt0
+            (inhabitant : gname) ∅ Hwf Hrest
             with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hbundle
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "[Hrun Hpctx]".

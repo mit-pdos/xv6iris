@@ -64,6 +64,9 @@ Section UkCatMain.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context (N : uk_names).
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
@@ -229,7 +232,7 @@ Section UkCatMain.
     urun N h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _ & _)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(_ & _ & _ & Hh & _ & _ & _ & _)".
     iDestruct (uheap_ubyte with "Hh Hb") as %(_ & _ & Hbnd).
     iPureIntro. exact Hbnd.
   Qed.

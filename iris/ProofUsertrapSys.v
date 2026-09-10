@@ -119,6 +119,7 @@ Section UtSysBlock.
   Lemma ut_90 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) (sts : list fdstate)
+      (gn : gname) (cs : gset gname)
       (fdep : sfam) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -149,14 +150,14 @@ Section UtSysBlock.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* the process's deposit at the ENTRY record: what the dispatcher's
        exec channel is offered, read at 7 ([SpecUsertrap.ut_sys_in]) *)
-    (∀ n : Z, ut_sys_in n fdep scv (pv_tf (us_V U0)) U0 sts) -∗
+    (∀ n : Z, ut_sys_in n fdep scv (pv_tf (us_V U0)) U0 sts gn cs) -∗
     (* ...and FORK'S deposit, a SLOT and not a bundle, at the frame the
        PROLOGUE leaves -- which [Hpro] says is [pv_tf (us_V U)]
        ([SpecUsertrap.ut_fork_in]) *)
     ut_fork_in scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) U0 sts -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
-                     mie_v menvcfg0 U0 sts epv scv fdep) -∗
+                     mie_v menvcfg0 U0 sts gn cs epv scv fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv Hpro Hscec.
@@ -477,11 +478,12 @@ Section UtSysBlock.
       assert (Htfch : <[14%nat := zero_reg]> (pv_tf V1)
                       = bump_tf (pv_tf (us_V U)) (mword_of_int 0)).
       { rewrite HV1tf0 Ha5d Hzr. unfold bump_tf, tf_arg_idx. reflexivity. }
-      assert (Hchild : uvis_of (kfork_child (MkUstate V1 (us_M U))) sts
-                       = uvis_of (us_tf U0 (bump_tf
-                            (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
-                            (mword_of_int 0))) sts).
-      { rewrite uvis_of_kfork_child uvis_of_us_tf. cbn [us_V us_M].
+      assert (Hchild : forall (g' : gname),
+                 uvis_of (kfork_child (MkUstate V1 (us_M U))) sts g' ∅
+                 = uvis_of (us_tf U0 (bump_tf
+                      (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+                      (mword_of_int 0))) sts g' ∅).
+      { intros g'. rewrite uvis_of_kfork_child uvis_of_us_tf. cbn [us_V us_M].
         rewrite <- Hpr1. rewrite Htfch.
         rewrite HV1upt HV1sz HV1cwid Hpr2 Hpr3 Hpr4 Hpr5. reflexivity. }
       (* ---- +0x9e: csrsi sstatus,2 -- intr_on(), and the reserve is paid ---- *)
@@ -545,7 +547,7 @@ Section UtSysBlock.
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
  (un_fn N) (un_ip N) (un_dqi N)
-                S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) sts lks fdep
+                S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) sts gn cs lks fdep
                 Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
                 with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [Hufr] [Hxin] [Hfin] [-]").
     (* the syscall channel takes the bundle AT ITS NAMED STATES now, and
@@ -561,17 +563,18 @@ Section UtSysBlock.
          { split_and!;
              [ exact Hscec | rewrite Hn0; exact Hkn
              | exact Hkex | exact Hkfk ]. }
-         assert (Hkey : skey_eq (uvis_of U0 sts)
-                          (uvis_of (MkUstate V1 (us_M U)) sts)).
+         assert (Hkey : skey_eq (uvis_of U0 sts gn cs)
+                          (uvis_of (MkUstate V1 (us_M U)) sts gn cs)).
          { rewrite /skey_eq. split_and!;
              [ exact (eq_sym Hpr4)
              | exact (Hargw 0%nat ltac:(lia))
              | exact (Hargw 1%nat ltac:(lia))
              | exact (Hargw 2%nat ltac:(lia))
              | reflexivity
-             | exact (eq_sym Hpr5) ]. }
-         rewrite <- (sbundle_at_cong uslot n fdep (uvis_of U0 sts)
-                       (uvis_of (MkUstate V1 (us_M U)) sts) Hkey).
+             | exact (eq_sym Hpr5)
+             | reflexivity | reflexivity ]. }
+         rewrite <- (sbundle_at_cong uslot n fdep (uvis_of U0 sts gn cs)
+                       (uvis_of (MkUstate V1 (us_M U)) sts gn cs) Hkey).
          iExact "Hx". }
     (* FORK'S DEPOSIT, handed on unchanged: [Hchild] above says the record
        the process deposited at and the record the dispatcher's arm spends
@@ -581,7 +584,8 @@ Section UtSysBlock.
     2: { rewrite /sysc_fork_in. iIntros "%Hk". cbn [us_V] in Hk.
          iDestruct ("Hfin" with "[%]") as "Hj".
          { split; [ exact Hscec | rewrite usys_num_epc Hn0; exact Hk ]. }
-         rewrite Hchild. iExact "Hj". }
+         iIntros (g'). iSpecialize ("Hj" $! g').
+         rewrite (Hchild g'). iExact "Hj". }
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
          takes no premise at all -- [cpu_own] carries no caller frame to
@@ -895,7 +899,7 @@ Section UtSysBlock.
       iAssert (ut_exec_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                  (us_M U0)
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-                 (uint (pv_sz (us_V U0))) (MkUstate V2 M2) sts stsR)
+                 (uint (pv_sz (us_V U0))) (MkUstate V2 M2) sts stsR gn cs)
         with "[Hxo]" as "Hxo".
       { rewrite /ut_exec_out. iIntros "%Hc". destruct Hc as [_ Hc7].
         iDestruct ("Hxo" with "[%]") as "[%Hfail | Hslot]".
@@ -929,30 +933,31 @@ Section UtSysBlock.
          three argument words, nor the descriptor view, nor the cwd, i.e.
          none of [UexecSG.skey_eq]'s six rows.  Same congruence the deposit
          went DOWN by ([SpecUsertrap.ut_sys_in]'s own note). *)
-      assert (Hkeyo : skey_eq (uvis_of U0 sts)
-                        (uvis_of (MkUstate V1 (us_M U)) sts)).
+      assert (Hkeyo : skey_eq (uvis_of U0 sts gn cs)
+                        (uvis_of (MkUstate V1 (us_M U)) sts gn cs)).
       { rewrite /skey_eq. split_and!;
           [ exact (eq_sym Hpr4)
           | exact (Hargw 0%nat ltac:(lia))
           | exact (Hargw 1%nat ltac:(lia))
           | exact (Hargw 2%nat ltac:(lia))
           | reflexivity
-          | exact (eq_sym Hpr5) ]. }
-      iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts
+          | exact (eq_sym Hpr5)
+          | reflexivity | reflexivity ]. }
+      iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs
                  (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0)
                  (us_M (MkUstate V2 M2))
-                 stsR (pv_cwi (us_V (MkUstate V2 M2))))%I
+                 stsR (pv_cwi (us_V (MkUstate V2 M2))) cs)%I
         with "[Hso]" as "Hso".
       { iIntros (n) "%Hc". destruct Hc as (_ & Hcn & Hcx & Hcf).
         iDestruct ("Hso" $! n with "[%]") as "H";
           [ cbn [us_V]; split_and!;
             [ rewrite <- Hn0; exact Hcn | exact Hcx | exact Hcf ] |].
-        rewrite (spost_at_cong uslot n fdep (uvis_of U0 sts)
-                   (uvis_of (MkUstate V1 (us_M U)) sts) _ _ _ _ Hkeyo).
+        rewrite (spost_at_cong uslot n fdep (uvis_of U0 sts gn cs)
+                   (uvis_of (MkUstate V1 (us_M U)) sts gn cs) _ _ _ _ _ Hkeyo).
         iExact "H". }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
-                mie_v menvcfg0 epv scv lks sts stsR fdep
+                mie_v menvcfg0 epv scv lks sts stsR gn cs fdep
                 Hwf' ltac:(intros Hne; exfalso; exact (Hne Hscec)) Hfde Hpipe Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg

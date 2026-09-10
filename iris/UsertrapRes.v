@@ -478,6 +478,11 @@ Section UsertrapRes.
     un_ft : gname;                    (* ftable.lock                        *)
     un_f  : gname;                    (* the open-file table                *)
     un_w  : gname;                    (* wait_lock                          *)
+    (* ...and the ghost that lock's payload owns beside the parent cells:
+       the per-slot children sets ([WaitInv.children_own_at]).  It rides
+       here rather than as a parameter for [un_w]'s reason -- every party
+       that names the lock names its payload. *)
+    un_ch : gname;                    (* wait_lock's children cells         *)
     un_s  : list gname;               (* the proc array's per-slot locks     *)
     un_j  : nat;                      (* the running process's slot          *)
     un_l  : gname;
@@ -629,7 +634,7 @@ Section UsertrapRes.
      devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
      printk_env (fsc_printk) (fsc_uart) (fsc_disk) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res_at ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string (wait_res_at (un_ch N)) ∗
      is_ftable (un_ft N) (un_f N) ∗
      is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
        (λ ξ : CtxId, kmem_res (XIk := ξ) (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
@@ -706,7 +711,7 @@ Section UsertrapRes.
      is_kstack (un_pj N) (un_ks N) ∗
      devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res_at ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string (wait_res_at (un_ch N)) ∗
      is_ftable (un_ft N) (un_f N) ∗
      disk_geom (fsc_disk) (un_pd N) (un_pav N) (un_pu N) ∗
      park_world (un_s N))%I.
@@ -1931,9 +1936,9 @@ End UsertrapRes.
    resumer can supply the bundle before it has seen one. *)
 Definition park_globals `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
     !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-    (ξ : CtxId) (γs : list gname) (γw γft γf γtl : gname) : iProp Σ :=
+    (ξ : CtxId) (γs : list gname) (γw γc γft γf γtl : gname) : iProp Σ :=
   (procs_inv (XI := ξ) γs ∗
-   is_lock (XI := ξ) γw wait_lock_addr "wait_lock"%string wait_res_at ∗
+   is_lock (XI := ξ) γw wait_lock_addr "wait_lock"%string (wait_res_at γc) ∗
    is_ftable (XI := ξ) γft γf ∗
    console_caps (XI := ξ) fsc_uart ∗
    console_ready (XI := ξ) ∗
@@ -1945,8 +1950,8 @@ Definition park_globals `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fil
         DfracDiscarded ip))%I.
 
 Global Instance park_globals_persistent `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-    !irefslotG Σ, !pavG Σ} `{GEN : GenId} ξ γs γw γft γf γtl :
-  Persistent (park_globals ξ γs γw γft γf γtl).
+    !irefslotG Σ, !pavG Σ} `{GEN : GenId} ξ γs γw γc γft γf γtl :
+  Persistent (park_globals ξ γs γw γc γft γf γtl).
 Proof. rewrite /park_globals. apply _. Qed.
 
 (* THE RESUMER'S GLOBALS, AT FLIP'S ARITY (L8 / A12.19; r25 shapes, day
@@ -1959,8 +1964,8 @@ Proof. rewrite /park_globals. apply _. Qed.
    handles without a global one, the console caps' two locks) lands with
    the L8 patch. *)
 Global Instance park_globals_morph `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-    !irefslotG Σ, !pavG Σ} `{GEN : GenId} (γs : list gname) (γw γft γf γtl : gname) :
-  CtxMorph (λ ξ0 : CtxId, park_globals ξ0 γs γw γft γf γtl).
+    !irefslotG Σ, !pavG Σ} `{GEN : GenId} (γs : list gname) (γw γc γft γf γtl : gname) :
+  CtxMorph (λ ξ0 : CtxId, park_globals ξ0 γs γw γc γft γf γtl).
 Proof. rewrite /park_globals. ctx_morph_solve. Qed.
 
 Lemma disk_geom_agree_x `{!riscvGS Σ, !xv6G Σ} `{!ufdG Σ} (ξ1 ξ2 : CtxId) (γ : disk_names)
@@ -2023,7 +2028,7 @@ Lemma ut_caps_of_park `{XI : CurCtx} `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fds
     (Xc : CtxId) (N : ut_names) :
   ut_wf N ->
   ut_park_caps N -∗
-  park_globals Xc (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N) -∗
+  park_globals Xc (un_s N) (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) -∗
   FsReady.fs_ready (XI := Xc) -∗
   ut_caps (XI := Xc) N.
 Proof.
@@ -2093,7 +2098,7 @@ Qed.
 Lemma park_globals_of_park_env `{XI : CurCtx} `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
     !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} (N : ut_names) :
   ut_park_caps N -∗ sysc_park_extra (un_tk N) -∗
-  park_globals cur_ctx (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N).
+  park_globals cur_ctx (un_s N) (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N).
 Proof.
   iIntros "(_ & #Hprocs & _ & #Hdev & #Hwl & #Hft & _ & #Hpw) (#Hnp & _ & #Htl & #Hcr)".
   iDestruct "Hdev" as "(_ & #Hcc & _)".
@@ -2138,7 +2143,7 @@ Definition ut_park_intro_body
     park_own (XI := ξp) N -∗
     (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate) (sts' : list fdstate),
        ⌜pv_upt (us_V U') = pt'⌝ -∗
-       park_globals Xc (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N) -∗
+       park_globals Xc (un_s N) (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) -∗
        ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
        FirstTok.first_done (XI := Xc) -∗
        W -∗
@@ -2173,7 +2178,7 @@ Lemma ut_res_bare_park
   park_own (XI := ξp) N -∗
   (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate) (sts' : list fdstate),
      ⌜pv_upt (us_V U') = pt'⌝ -∗
-     park_globals Xc (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N) -∗
+     park_globals Xc (un_s N) (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) -∗
      (FirstTok.first_done (XI := Xc) -∗ W -∗ Rsys Xc (un_f N) (un_pj N) (un_fn N)) -∗
      ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
      FirstTok.first_done (XI := Xc) -∗

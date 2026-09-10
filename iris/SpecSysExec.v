@@ -404,6 +404,9 @@ Section SysExecAU.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate)
+      (* the two WAIT-EXIT readings the resume key is built at -- exec keeps
+         the caller's identity and its children ([SpecKexec.exec_key]) *)
+      (gn : gname) (cs : gset gname)
       (V : pprivate) (r : mword 64) : iProp Σ :=
     (∃ U' : ustate,
        proc_priv γf pj pid U' ∗
@@ -412,7 +415,8 @@ Section SysExecAU.
         ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
              (afun : nat -> nat -> bv 8),
              ⌜exec_path_of M pv pl⌝ ∗ ⌜exec_args_of M av na alen afun⌝ ∗
-             exec_post_ok Fs Γ P Fo pl na alen afun sts (MkUstate V M) U' r)))%I.
+             exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs
+               (MkUstate V M) U' r)))%I.
 
   (* SANITY: the arms imply the landed [SysExecDefs.sys_exec_post] *)
   Lemma sys_exec_arms_landed (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names) (cw : Z) (γf : gname)
@@ -420,8 +424,9 @@ Section SysExecAU.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate)
+      (gn : gname) (cs : gset gname)
       (V : pprivate) (r : mword 64) :
-    sys_exec_arms Fs Γ γfs cw γf pj pid P Pmiss Fo M pv av sts V r ⊢
+    sys_exec_arms Fs Γ γfs cw γf pj pid P Pmiss Fo M pv av sts gn cs V r ⊢
       sys_exec_post γf pj pid V r.
   Proof.
     rewrite /sys_exec_arms /sys_exec_post.
@@ -430,7 +435,7 @@ Section SysExecAU.
         (mword_of_int 0), (mword_of_int 0), (mword_of_int 0).
       iFrame "Hp". iPureIntro. left. split; [exact Hr | exact HV].
     - iDestruct "H" as (pl na alen afun) "[_ [_ H]]".
-      iDestruct (exec_arms_landed Fs Γ γfs cw P Pmiss Fo pl na alen afun sts
+      iDestruct (exec_arms_landed Fs Γ γfs cw P Pmiss Fo pl na alen afun sts gn cs
                    (MkUstate V M) U' r with "[H]") as %(entry & spv & szv' & Hok).
       { rewrite /exec_arms. iRight. iExact "H". }
       iExists U', na, alen, entry, spv, szv'. iFrame "Hp". iPureIntro. exact Hok.
@@ -454,6 +459,7 @@ Definition wp_sys_exec_sconf_body
     (dqb dqs : dfrac)
     (v0 v1 : mword 64)                        (* syscall arguments 0 and 1 *)
     (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (gn : gname) (cs : gset gname)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (P Pmiss : nat -> Z -> iProp Σ)
@@ -513,7 +519,7 @@ Definition wp_sys_exec_sconf_body
          arguments as read off the entry image, and -- on success at a
          loadable file -- the caller's slot at the resume key *)
       sys_exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) γf pj pid P Pmiss Fo (us_M U) v0 v1 sts
-        (upd_upt (us_V U) P')
+        gn cs (upd_upt (us_V U) P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -533,10 +539,11 @@ Module Type SYSEXEC.
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (gn : gname) (cs : gset gname)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)),
       wp_sys_exec_sconf_body Fs γf gs j gl pd pav pu dqb dqs v0 v1 pid U sts
-        m K eb b lks P Pmiss Fo.
+        gn cs m K eb b lks P Pmiss Fo.
 End SYSEXEC.

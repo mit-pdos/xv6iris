@@ -1,7 +1,7 @@
 (* THE ECALL LEAVES' DEPOSIT PREMISE IS A WAND, NOT A BARE HYPOTHESIS.
    Since the ARM every returning leaf owes the trap contract the process's
    bundle for the number it is at ([UexecRet.uexec_dep_F]), and the key that
-   bundle is at is [uvis_of_run m pc M pm sz fdv cw] -- whose [M], [pm],
+   bundle is at is [uvis_of_run m pc M pm sz fdv cw gn cs] -- whose [M], [pm],
    [sz], [fdv] and [cw] are bound by [UkRun.urun]'s own existential, so a
    leaf has them only AFTER it destructs and can never name them in its own
    statement.  Hence [UkRun.udepw]: a wand off the two authorities the leaf
@@ -246,6 +246,9 @@ Section UkRunSys.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
+     carries beside the cwd's *)
+  Context `{!ghost_varG Σ (gset gname)}.
   Context `{SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
@@ -426,12 +429,12 @@ Section UkRunSys.
   Proof.
     intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hcd Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -440,7 +443,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = n).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = n).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
@@ -456,13 +459,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (exact (usys_cwd_ok_quiet n r cw cw' Hcd Hcwrow)).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _ Hexec Hsbrk H3 H4 H5 H8 Hok)
       as [-> [-> ->]].
     (* ...AND THE TABLE DID NOT MOVE.  This is the row being READ rather
@@ -472,9 +484,9 @@ Section UkRunSys.
     pose proof (usys_fd_ok_quiet n _ r _ _ Hcl Hdp Hop H4 Hfdok) as ->.
     cbn [uvis_M uvis_perm uvis_of_run].
     (* the resumed key is at the SAME view, so the bump is at [fdv] twice *)
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
-              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hdep").
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r with "Hrun").
   Qed.
@@ -525,14 +537,14 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hcwd Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
     (* the key's cwd IS the one the caller's half is at *)
     iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
-    iMod (udepw_mint N m pc _ M pm _ fdv c
+    iMod (udepw_mint N m pc _ M pm _ fdv c gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -541,7 +553,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c))
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs))
                    = USYS_chdir).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
@@ -551,7 +563,7 @@ Section UkRunSys.
       [ exfalso; unfold USYS_chdir, USYS_fork in He; discriminate He | ].
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* the IMAGE and the TABLE crossed the trap untouched, as at a quiet
        call: chdir writes no user byte and moves no descriptor. *)
     destruct (usys_mem_ok_quiet USYS_chdir _ r _ _ _ _ _ _
@@ -564,16 +576,21 @@ Section UkRunSys.
     { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
         vm_compute; discriminate. }
     subst fdv'.
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: chdir moves
+       neither ([UsysMemOk] SS2e/SS2f). *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     cbn [uvis_M uvis_perm uvis_of_run].
     (* ...AND THE CWD DID NOT.  Both halves move together, which is the
        only way either can move. *)
     iApply uslot_bupd.
     iMod (ucwd_move N c cw' with "Hcwda Hcwd") as "[Hcwda Hcwd]".
     iModIntro.
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c cw' gn gn cs cs r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              with "Hheap Hstk Hufd Hcwda Hdep").
+              with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r cw' with "[%] Hcwd Hrun").
     exact (usys_cwd_ok_chdir_fwd r c cw' Hcwrow).
@@ -659,12 +676,12 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -673,7 +690,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_open).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = USYS_open).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_open = USYS_exit)) as [He | _];
@@ -685,13 +702,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     (* the IMAGE half is the quiet row: open touches no user byte *)
     destruct (usys_mem_ok_quiet USYS_open _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
@@ -714,10 +740,10 @@ Section UkRunSys.
               ltac:(discriminate) with "Hufd Hstd") as "[Hufd Hh]".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-                 (<[fd := FdOpen rd wr t]> fdv) cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+                 (<[fd := FdOpen rd wr t]> fdv) cw cw' gn gn cs cs r Hx0 Hal4).
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hcwda Hdep").
+                with "Hheap Hstk Hufd Hcwda Hcha Hdep").
       iIntros (h') "Hrun".
       iApply ("Hcont" $! h' r with "[Hh] Hrun").
       iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro.
@@ -726,10 +752,10 @@ Section UkRunSys.
       rewrite <- Hfdlen. exact (fd_least_closed_lt _ _ Hcl).
     - (* the call failed: nothing moved, and the ledger comes straight back *)
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs r Hx0 Hal4).
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hcwda Hdep").
+                with "Hheap Hstk Hufd Hcwda Hcha Hdep").
       iIntros (h') "Hrun".
       iApply ("Hcont" $! h' r with "[Hstd] Hrun").
       iRight. iFrame "Hstd". iPureIntro. exact Hrm.
@@ -777,8 +803,8 @@ Section UkRunSys.
   Proof.
     intros Hn Harg Hstne Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hh0 Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -789,7 +815,7 @@ Section UkRunSys.
     (* ...and the slot the copy lands in is never the source's, which is
        what lets the claim come back at the ledger the copy left *)
     iDestruct (ufd_own_ne_lowest (ukn_fd N) l fd0 st Hstne with "Hstd Hh0") as %Hnel.
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -798,7 +824,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_dup).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = USYS_dup).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_dup = USYS_exit)) as [He | _];
@@ -810,13 +836,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     destruct (usys_mem_ok_quiet USYS_dup _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -841,10 +876,10 @@ Section UkRunSys.
         as "[Hufd Hh1]".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-                 (<[fd1 := st]> fdv) cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+                 (<[fd1 := st]> fdv) cw cw' gn gn cs cs r Hx0 Hal4).
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hcwda Hdep").
+                with "Hheap Hstk Hufd Hcwda Hcha Hdep").
       iIntros (h') "Hrun".
       iApply ("Hcont" $! h' r with "[Hh1 Hh0] Hrun").
       iLeft. iExists fd1. iFrame "Hh1 Hh0". iPureIntro.
@@ -853,10 +888,10 @@ Section UkRunSys.
     - (* the table was full, or the argument was not an open descriptor:
          nothing moved, and both resources come straight back *)
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs r Hx0 Hal4).
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hcwda Hdep").
+                with "Hheap Hstk Hufd Hcwda Hcha Hdep").
       iIntros (h') "Hrun".
       iApply ("Hcont" $! h' r with "[Hstd Hh0] Hrun").
       iRight. iFrame "Hstd Hh0". iPureIntro. exact Hrm.
@@ -890,12 +925,12 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -904,7 +939,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_dup).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = USYS_dup).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_dup = USYS_exit)) as [He | _];
@@ -916,13 +951,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     destruct (usys_mem_ok_quiet USYS_dup _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -948,17 +992,17 @@ Section UkRunSys.
       iDestruct "Hstd" as (l') "Hstd".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-                 (<[fd1 := fdv !!! Z.to_nat (usys_argfd (tf_of m pc))]> fdv) cw cw'
+                 (<[fd1 := fdv !!! Z.to_nat (usys_argfd (tf_of m pc))]> fdv) cw cw' gn gn cs cs
                  r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hcwda Hdep").
+                with "Hheap Hstk Hufd Hcwda Hcha Hdep").
       iIntros (h') "Hrun". iApply ("Hcont" $! h' r l' with "Hstd Hrun").
     - iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs r Hx0 Hal4).
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hcwda Hdep").
+                with "Hheap Hstk Hufd Hcwda Hcha Hdep").
       iIntros (h') "Hrun". iApply ("Hcont" $! h' r l with "Hstd Hrun").
   Qed.
 
@@ -1032,14 +1076,14 @@ Section UkRunSys.
   Proof.
     intros Hn Harg Hal4.
     iIntros "#Hi Hrun Hsb Hh Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iDestruct (ufd_agree with "Hufd Hh") as %Hi.
     iDestruct (ufd_ne with "Hh") as %Hne.
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1048,7 +1092,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_close).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = USYS_close).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_close = USYS_exit)) as [He | _];
@@ -1060,13 +1104,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     destruct (usys_mem_ok_quiet USYS_close _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -1078,10 +1131,10 @@ Section UkRunSys.
     iMod (ufd_close_hi (ukn_fd N) fdv fd st with "Hufd Hh") as "Hufd".
     iModIntro.
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-               (<[fd := FdClosed]> fdv) cw cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+               (<[fd := FdClosed]> fdv) cw cw' gn gn cs cs r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              with "Hheap Hstk Hufd Hcwda Hdep").
+              with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "[%] Hrun"). exact Hr0.
   Qed.
 
@@ -1108,15 +1161,15 @@ Section UkRunSys.
   Proof.
     intros Hn Harg Hs Hkl Hne Hal4.
     iIntros "#Hi Hrun Hsb Hstd Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iDestruct (ustd_agree with "Hufd Hstd") as %Hst.
     assert (Hi : fdv !! fd = Some st).
     { rewrite <- (lookup_take fdv NSTD fd Hs). by rewrite Hst. }
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1125,7 +1178,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_close).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = USYS_close).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_close = USYS_exit)) as [He | _];
@@ -1137,13 +1190,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     destruct (usys_mem_ok_quiet USYS_close _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -1154,10 +1216,10 @@ Section UkRunSys.
     iMod (ufd_close_std (ukn_fd N) fdv l fd st Hs Hkl with "Hufd Hstd") as "[Hufd Hstd]".
     iModIntro.
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-               (<[fd := FdClosed]> fdv) cw cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
+               (<[fd := FdClosed]> fdv) cw cw' gn gn cs cs r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              with "Hheap Hstk Hufd Hcwda Hdep").
+              with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "[%] Hstd Hrun"). exact Hr0.
   Qed.
 
@@ -1203,14 +1265,14 @@ Section UkRunSys.
   Proof.
     intros Hn Ha1 Hcnt Hal4.
     iIntros "#Hi Hbs Hrun Hsb Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* the run is in the image, and does not wrap *)
     iDestruct (uheap_ubytes_img with "Hheap Hbs") as %Himg.
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1219,7 +1281,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_read).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = USYS_read).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_read = USYS_exit)) as [He | _];
@@ -1231,13 +1293,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     (* unfold the row down to its read arm *)
     unfold usys_mem_ok in Hok.
     destruct (decide (USYS_read = USYS_exec)) as [He | _];
@@ -1296,9 +1367,9 @@ Section UkRunSys.
     rewrite (uslot_bump_run m pc M
                (umem_write M a cnt
                   (fun k => if decide (k < d)%nat then bs k else f k))
-               pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
-              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hdep").
+               pm pm sz sz fdv fdv cw cw' gn gn cs cs r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r _ with "Hbs Hrun").
   Qed.
@@ -1325,12 +1396,12 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1339,7 +1410,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_exec).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = USYS_exec).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_exec = USYS_exit)) as [He | _];
@@ -1351,13 +1422,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     destruct (usys_mem_ok_exec_row USYS_exec _ r _ _ _ _ _ _ eq_refl Hok)
       as [-> [-> [-> ->]]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -1370,10 +1450,10 @@ Section UkRunSys.
     { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
         vm_compute; discriminate. }
     subst fdv'.
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw'
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs
                (mword_of_int (-1) : mword 64) Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
-              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hdep").
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' with "Hrun").
   Qed.
@@ -1425,15 +1505,15 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hcwd Hsb Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
     (* the whole point of the leaf: the key's cwd IS the one the caller's
        bundle is stated at *)
     iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
-    iMod (udepw_at_mint N m pc _ c M pm _ fdv
+    iMod (udepw_at_mint N m pc _ c M pm _ fdv gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1442,7 +1522,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c)) = USYS_exec).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs)) = USYS_exec).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_exec = USYS_exit)) as [He | _];
@@ -1451,10 +1531,19 @@ Section UkRunSys.
       [ exfalso; unfold USYS_exec, USYS_fork in He; discriminate He | ].
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N c cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     destruct (usys_mem_ok_exec_row USYS_exec _ r _ _ _ _ _ _ eq_refl Hok)
       as [-> [-> [-> ->]]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -1462,10 +1551,10 @@ Section UkRunSys.
     { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
         vm_compute; discriminate. }
     subst fdv'.
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c cw'
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c cw' gn gn cs cs
                (mword_of_int (-1) : mword 64) Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
-              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hdep").
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' with "Hcwd Hrun").
   Qed.
@@ -1492,12 +1581,12 @@ Section UkRunSys.
   Proof.
     intros Hn Hz Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1506,9 +1595,9 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_wait).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = USYS_wait).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
-    assert (Ha0 : uint (uvis_tf (uvis_of_run m pc M pm sz fdv cw) !!! tf_arg_idx 0) = 0).
+    assert (Ha0 : uint (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs) !!! tf_arg_idx 0) = 0).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_arg0. exact Hz. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_wait = USYS_exit)) as [He | _];
@@ -1520,13 +1609,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     destruct (usys_mem_ok_wait_null USYS_wait _ r _ _ _ _ _ _
                 eq_refl Ha0 Hok) as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -1539,9 +1637,9 @@ Section UkRunSys.
     { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
         vm_compute; discriminate. }
     subst fdv'.
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _
-              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hdep").
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hcha Hdep").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r with "Hrun").
   Qed.
@@ -1610,8 +1708,8 @@ Section UkRunSys.
   Proof.
     intros Hn Hwin Hcapk Hcl Hdp Hop Hpp Hal4.
     iIntros "#Hi Hrun Hsb Hbuf Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1624,7 +1722,7 @@ Section UkRunSys.
       change (2 ^ 38) with 274877906944 in Hc.
       rewrite !uint_unsigned in Hc |- *.
       apply uint_add_vec_int_small; lia. }
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1633,9 +1731,9 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = n).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = n).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
-    assert (Hw : usys_win n (uvis_tf (uvis_of_run m pc M pm sz fdv cw))
+    assert (Hw : usys_win n (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs))
                  = Some (dst, cap)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of. exact Hwin. }
     destruct (usys_win_num n _ dst cap Hw) as (Hexit & Hfork & _ & _ & Hchd).
@@ -1647,13 +1745,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (exact (usys_cwd_ok_quiet n r cw cw' Hchd Hcwrow)).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     destruct (usys_mem_ok_window n _ r _ _ _ _ _ _ dst cap Hw Hok)
       as ((d & bs & Hdcap & HM') & -> & ->).
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run] in HM' |- *.
@@ -1680,7 +1787,7 @@ Section UkRunSys.
       by exact (usys_fd_ok_quiet _ _ _ _ _ Hcl Hdp Hop Hpp Hfdok).
     subst fdv'.
     rewrite (uslot_bump_run m pc M (umem_write M (uint dst) d g) pm pm sz sz
-               fdv fdv cw cw' r Hx0 Hal4).
+               fdv fdv cw cw' gn gn cs cs r Hx0 Hal4).
     (* [uheap_store_run] is a basic update and [ukc] is not a [WP], so the
        re-assembly runs under [ukc]'s own binders -- which is why this leaf
        opens the close by hand instead of applying it to the goal. *)
@@ -1696,9 +1803,9 @@ Section UkRunSys.
     iAssert (ubytes (ukn_d N) (uint dst) k g) with "[Hblo Hbhi]" as "Hbuf".
     { rewrite (ubytes_split (ukn_d N) (uint dst) d k g Hdk). iFrame "Hblo Hbhi". }
     iDestruct (urun_close_upd N (umem_write M (uint dst) d g) pm m
-                 (mword_of_int 10) r sz fdv cw' (add_vec_int pc 4) avail
+                 (mword_of_int 10) r sz fdv cw' gn cs (add_vec_int pc 4) avail
                  ltac:(unfold unot_sp; vm_compute; discriminate)
-                 with "Hheap Hstk Hufd Hcwda Hdep [Hcont Hbuf]") as "Hkc";
+                 with "Hheap Hstk Hufd Hcwda Hcha Hdep [Hcont Hbuf]") as "Hkc";
       [ iIntros (h'') "Hrun";
         iApply ("Hcont" $! h'' r d g with "[%] [%] Hrun Hbuf");
         [ exact Hdcap | intros j Hj; apply Hgf; lia ] | ].
@@ -1775,8 +1882,8 @@ Section UkRunSys.
     intros Hn Hal4.
     set (dst := m !!! Regidx (mword_of_int 10)).
     iIntros "#Hi Hrun Hsb Hstd Hbuf Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1789,7 +1896,7 @@ Section UkRunSys.
       change (2 ^ 38) with 274877906944 in Hc.
       rewrite !uint_unsigned in Hc |- *.
       apply uint_add_vec_int_small; lia. }
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1798,9 +1905,9 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_pipe).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = USYS_pipe).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
-    assert (Hw : usys_win USYS_pipe (uvis_tf (uvis_of_run m pc M pm sz fdv cw))
+    assert (Hw : usys_win USYS_pipe (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs))
                  = Some (dst, 8%nat)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of.
       unfold usyswin.
@@ -1810,7 +1917,7 @@ Section UkRunSys.
         [ reflexivity | exfalso; exact (Hc eq_refl) ]. }
     (* the row reads a0 at the trapframe; the buffer is owned at the
        REGISTER's spelling.  They are the same word. *)
-    assert (Ha0 : uvis_tf (uvis_of_run m pc M pm sz fdv cw) !!! tf_arg_idx 0 = dst)
+    assert (Ha0 : uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs) !!! tf_arg_idx 0 = dst)
       by (cbn [uvis_tf uvis_of_run]; reflexivity).
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_pipe = USYS_exit)) as [He | _];
@@ -1822,13 +1929,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     destruct (usys_mem_ok_window USYS_pipe _ r _ _ _ _ _ _ dst 8%nat Hw Hok)
       as ((d & bs & Hdcap & HM') & -> & ->).
     cbn [uvis_M uvis_perm uvis_sz uvis_fd uvis_of_run] in HM', Hfdok, Hpiperow |- *.
@@ -1908,7 +2024,7 @@ Section UkRunSys.
        what lets [subst] pick the joined one. *)
     clear HM'. subst M'.
     rewrite (uslot_bump_run m pc M (umem_write M (uint dst) dd gg) pm pm sz sz
-               fdv fdv' cw cw' r Hx0 Hal4).
+               fdv fdv' cw cw' gn gn cs cs r Hx0 Hal4).
     rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb'".
     iEval (rewrite (ubytes_split (ukn_d N) (uint dst) dd 8 f Hdd8)) in "Hbuf".
     iDestruct "Hbuf" as "[Hblo Hbhi]".
@@ -1969,9 +2085,9 @@ Section UkRunSys.
       - rewrite (Hfail Hr0). iModIntro. iFrame "Hufd".
         iRight. iFrame "Hstd". iPureIntro. exact Hr0. }
     iDestruct (urun_close_upd N (umem_write M (uint dst) dd gg) pm m
-                 (mword_of_int 10) r sz fdv' cw' (add_vec_int pc 4) avail
+                 (mword_of_int 10) r sz fdv' cw' gn cs (add_vec_int pc 4) avail
                  ltac:(unfold unot_sp; vm_compute; discriminate)
-                 with "Hheap Hstk Hufd Hcwda Hdep [Hcont Hbuf Hhs]") as "Hkc";
+                 with "Hheap Hstk Hufd Hcwda Hcha Hdep [Hcont Hbuf Hhs]") as "Hkc";
       [ iIntros (h'') "Hrun";
         iApply ("Hcont" $! h'' r gg with "Hhs Hrun Hbuf") | ].
     iApply ("Hkc" $! h' xi' C' pt' Rfd' Rut' with "[%] [%] Hb'");
@@ -2116,9 +2232,9 @@ Section UkRunSys.
       unfold usz_ok in Hszok'.
       change (2 ^ 38)%Z with 274877906944%Z. lia. }
     iIntros "#Hi Hrun Hsb Hsz Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut szk M pm fdv cw)
-      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
-    iMod (udepw_mint N m pc _ M pm _ fdv cw
+    iDestruct "Hrun" as (xi C pt Rfd Rut szk M pm fdv cw gn cs)
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     (* the key's break IS the program's *)
     iDestruct (uheap_usz with "Hheap Hsz") as %->.
@@ -2146,7 +2262,7 @@ Section UkRunSys.
     iDestruct (UkStep.uvb_pure with "Hb") as "[%Hpure Hb]".
     destruct Hpure as [Mp Hpure].
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -2155,7 +2271,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw))
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs))
                    = USYS_sbrk).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
@@ -2168,13 +2284,22 @@ Section UkRunSys.
        hands that witness straight over. *)
     iDestruct "Hdepn" as (fdep) "Hdepn".
     iExists fdep. iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
     cbn [uvis_M uvis_perm uvis_sz uvis_fd uvis_cwd uvis_of_run] in Hok |- *.
     (* the row, in three pieces *)
     unfold usys_mem_ok in Hok.
@@ -2186,11 +2311,11 @@ Section UkRunSys.
     (* the descriptor view does not move: sbrk is none of the four *)
     assert (Hview : fdv' = fdv).
     { apply (usys_fd_ok_quiet USYS_sbrk
-               (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) r fdv fdv');
+               (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) r fdv fdv');
         [ | | | | exact Hfdok ]; vm_compute; discriminate. }
     rewrite Hview.
     (* the argument the row reads is the one the caller named *)
-    assert (Harg' : usys_sbrk_arg (uvis_tf (uvis_of_run m pc M pm sz fdv cw))
+    assert (Harg' : usys_sbrk_arg (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs))
                     = sign_extend' 64 (trunc32 (m !!! Regidx (mword_of_int 10)))).
     { cbn [uvis_tf uvis_of_run]. unfold usys_sbrk_arg.
       rewrite tf_of_arg0. reflexivity. }
@@ -2216,11 +2341,11 @@ Section UkRunSys.
       { rewrite Hui38. apply umem_grow_id.
         intros a Ha. exact (proj2 (ukp_img pt sz M Mp a Hpure) (or_intror Ha)). }
       subst M'. rewrite HMg.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
-      iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv cw'
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs r Hx0 Hal4).
+      iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv cw' gn cs
                 (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hcwda Hdep [Hcont Hsz]").
+                with "Hheap Hstk Hufd Hcwda Hcha Hdep [Hcont Hsz]").
       iIntros (h'') "Hrun".
       iApply ("Hcont" $! h'' r with "[Hsz] Hrun").
       iLeft. iSplitR; [ iPureIntro; exact Hr | ]. iExact "Hsz".
@@ -2300,14 +2425,14 @@ Section UkRunSys.
       (* ---- the heap grows, and the caller gets the run ---- *)
       rewrite Himg.
       rewrite (uslot_bump_run m pc M (umem_grow M (sz + n)) pm pm'
-                 sz (sz + n) fdv fdv cw cw' r Hx0 Hal4).
+                 sz (sz + n) fdv fdv cw cw' gn gn cs cs r Hx0 Hal4).
       rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb'".
       iMod (uheap_grow_run (ukn_t N) (ukn_d N) (ukn_s N) M pm pm' sz n Hsz0 Hn0 Hfresh Hext
               Hcan' Hstop' with "Hheap Hsz") as "(Hheap & Hsz & Hrun')".
       iDestruct (urun_close_upd N (umem_grow M (sz + n)) pm' m
-                   (mword_of_int 10) r (sz + n) fdv cw' (add_vec_int pc 4) avail
+                   (mword_of_int 10) r (sz + n) fdv cw' gn cs (add_vec_int pc 4) avail
                    ltac:(unfold unot_sp; vm_compute; discriminate)
-                   with "Hheap Hstk Hufd Hcwda Hdep [Hcont Hsz Hrun']") as "Hkc".
+                   with "Hheap Hstk Hufd Hcwda Hcha Hdep [Hcont Hsz Hrun']") as "Hkc".
       { iIntros (h'') "Hrun".
         iApply ("Hcont" $! h'' r with "[Hsz Hrun'] Hrun").
         iRight. iSplitR; [ iPureIntro; exact Hr | ]. iFrame "Hsz Hrun'". }
@@ -2323,9 +2448,9 @@ Section UkRunSys.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn. iIntros "#Hi Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -2334,7 +2459,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_exit).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs)) = USYS_exit).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_exit = USYS_exit)) as [_ | Hne];

@@ -58,7 +58,8 @@
    before it.
 
    * IT TAKES A SECOND LOCK, AND THE SECOND LOCK'S RESOURCE IS THE POINT.
-     [WaitInv.wait_res] -- all NPROC [p->parent] cells -- is what wait_lock
+     [WaitInv.wait_res] -- all NPROC [p->parent] cells and the children
+     sets beside them -- is what wait_lock
      protects, and holding it is what licenses BOTH the [ld a5,56(s1)] the
      scan runs on every slot and the [sd x0,56(s1)] that disowns the child.
      [parent] cannot live in [SchedCtx.proc_lock_res]: it is read across
@@ -153,7 +154,7 @@ Import Defs.
    callee-saved home in s11 and the frame grew to 14 slots (SpecCopyout.v). *)
 Notation K_kwait := (62%nat) (only parsing).
 Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γa γp γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
+    (γa γp γf γw γc : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
     (pid : mword 32) (U : ustate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kwait in
@@ -177,7 +178,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
   procs_inv γs -∗
   (* the running-thread bundle sleep needs *)
   (* wait_lock, and what it protects *)
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
   (* copyout's lazy faulting and freeproc's kfree chain both live here *)
   kalloc_env γa None -∗
   (* <pid_lock>: freeproc acquires it around [p->pid = 0] (upstream ded23f2),
@@ -216,8 +217,8 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
 Module Type KWAIT.
   Parameter wp_kwait_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γa γp γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
+      (γa γp γf γw γc : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (lks : gset string),
-      wp_kwait_sconf_body γa γp γf γw γs j γl m av eb b pid U lks.
+      wp_kwait_sconf_body γa γp γf γw γc γs j γl m av eb b pid U lks.
 End KWAIT.

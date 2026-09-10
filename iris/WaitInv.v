@@ -11,11 +11,20 @@
 
    Hence this file: ONE flat resource holding all NPROC parent cells, keyed by
    nothing but the slot index.  [parents_own ps] is the CONTENTS-OUT form -- what
-   a function that already holds wait_lock is handed -- and [wait_res] is the
-   existential closure of it, which is what the lock invariant will be once
-   kexit/kwait need one.  Nothing here mentions the lock itself, deliberately:
-   reparent()'s contract is about the cells, and its caller's obligation to hold
-   the lock is discharged one level up.
+   a function that already holds wait_lock is handed -- and [parents_res] is the
+   existential closure of it.  Nothing here mentions the lock itself,
+   deliberately: reparent()'s contract is about the cells, and its caller's
+   obligation to hold the lock is discharged one level up.
+
+   THE SECOND HALF: THE CHILDREN SETS.  [children_own_at γc cs] is one
+   [gset gname] per slot -- the GENERATIONS ([SchedCtx.gen_slot]) of that
+   slot's live children -- and [wait_res_at γc] is the lock's payload,
+   closing both.  It is ghost and not memory because [struct proc] has no
+   such field: the C code answers "does p have children?" by scanning
+   [q->parent] under this very lock, and the ghost is that scan's
+   contents-out form.  [children_wf] states the tie between the two lists;
+   the payload does not carry it, because reading a slot's generation needs
+   the p->lock cells that hold it.
 
    THE PURE MODEL.  reparent(p) rewrites every cell equal to [p] to [initproc]
    and leaves the rest alone; that is [rp_map p ip].  [rp_upto p ip k] is the
@@ -26,7 +35,7 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
+From iris.base_logic.lib Require Import gen_heap ghost_var.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
@@ -117,6 +126,10 @@ Qed.
 (* ===================================================================== *)
 Section WaitInv.
   Context `{!riscvGS Σ}.
+  (* [Xv6Cameras.wchG]'s capacity: the children cells' ghost.  This file
+     does not take the whole-system bundle -- it is one field of one
+     struct -- so it names the class it needs, as [UserChildren.v] does. *)
+  Context `{!ghost_varG Σ (list (gset gname))}.
   Context `{XI : CurCtx}.
 
   (* every proc's [parent] cell, at its slot's value.  The length conjunct is
@@ -135,13 +148,71 @@ Section WaitInv.
   Global Instance parents_own_at_morph ps : CtxMorph (λ ξ, parents_own_at ξ ps).
   Proof. rewrite /parents_own_at. ctx_morph_solve. Qed.
 
-  (* what [wait_lock] protects, once kexit/kwait need the lock itself.  Nothing
-     in this file consumes it; it is here so the altitude is named in one
-     place. *)
-  Definition wait_res_at (ξ : CtxId) : iProp Σ := (∃ ps, parents_own_at ξ ps)%I.
-  Definition wait_res : iProp Σ := wait_res_at cur_ctx.
+  (* the parent cells' own existential closure -- what the BOOT CARVE
+     produces, before there is a children ghost to pair it with. *)
+  Definition parents_res_at (ξ : CtxId) : iProp Σ := (∃ ps, parents_own_at ξ ps)%I.
+  Definition parents_res : iProp Σ := parents_res_at cur_ctx.
 
-  Global Instance wait_res_at_morph : CtxMorph wait_res_at.
+  (* ------------------------------------------------------------------ *)
+  (* THE CHILDREN CELLS, wait_lock's other half.                          *)
+  (*                                                                      *)
+  (* One [gset gname] per slot: the GENERATIONS of that slot's live        *)
+  (* children ([SchedCtx.gen_slot] names an incarnation, and this is the   *)
+  (* set of the incarnations a process has fathered and not yet reaped).   *)
+  (* GHOST AND NOT MEMORY, because [struct proc] has no such field: the C  *)
+  (* code answers "does p have children?" by scanning [q->parent] under    *)
+  (* the same lock, and this is that scan's contents-out form.  It belongs *)
+  (* to wait_lock for the reason [parent] does -- fork, exit and wait all  *)
+  (* move it ACROSS processes, and [p->lock] cannot express that.          *)
+  (*                                                                       *)
+  (* WHOLE (fraction 1), like the cells beside it: a holder of the lock     *)
+  (* may write it, and nobody outside holds a fragment.                     *)
+  (* ------------------------------------------------------------------ *)
+  Definition children_own_at (γc : gname) (cs : list (gset gname)) : iProp Σ :=
+    (⌜length cs = NPROC⌝ ∗ ghost_var γc 1 cs)%I.
+
+  Lemma children_own_at_length γc cs :
+    children_own_at γc cs -∗ ⌜length cs = NPROC⌝.
+  Proof. iIntros "[% _]". done. Qed.
+
+  (* borrow the whole list and put back a possibly different one: the shape
+     every writer of the table wants, since fork touches the PARENT's entry
+     and exit touches init's as well as its own. *)
+  Lemma children_own_at_upd γc cs cs' :
+    length cs' = NPROC ->
+    children_own_at γc cs -∗ |==> children_own_at γc cs'.
+  Proof.
+    intros Hl. iIntros "[_ Hg]".
+    iMod (ghost_var_update cs' with "Hg") as "Hg".
+    iModIntro. iSplit; [done|]. iExact "Hg".
+  Qed.
+
+  (* THE INVARIANT'S SHAPE, as a pure predicate on the two lists: a
+     generation in slot [j]'s children set is the generation of a slot whose
+     parent cell points at [j].  It is STATED and not carried: reading "the
+     slot with generation γ" needs the per-slot generation cells, which live
+     under p->lock, and a payload cannot mention resources of a lock it does
+     not hold.  WX-FORK carries it, at the p->lock-protected mirror of these
+     cells that fork's writers keep in step. *)
+  Definition children_wf (ps : list (mword 64)) (cs : list (gset gname))
+      (gs : list gname) : Prop :=
+    forall (j : nat) (γ : gname) (S : gset gname),
+      cs !! j = Some S -> γ ∈ S ->
+      exists k : nat, gs !! k = Some γ /\ ps !! k = Some (proc_addr j).
+
+  (* the children cells' own existential closure, the shape every party
+     that does not read them carries: one opaque conjunct. *)
+  Definition children_res (γc : gname) : iProp Σ :=
+    (∃ cs : list (gset gname), children_own_at γc cs)%I.
+
+  (* what [wait_lock] protects: the parent cells and the children sets. *)
+  Definition wait_res_at (γc : gname) (ξ : CtxId) : iProp Σ :=
+    (parents_res_at ξ ∗ children_res γc)%I.
+  Definition wait_res (γc : gname) : iProp Σ := wait_res_at γc cur_ctx.
+
+  Global Instance parents_res_at_morph : CtxMorph parents_res_at.
+  Proof. rewrite /parents_res_at. ctx_morph_solve. Qed.
+  Global Instance wait_res_at_morph γc : CtxMorph (wait_res_at γc).
   Proof. rewrite /wait_res_at. ctx_morph_solve. Qed.
 
   (* THE BOOT CARVE'S SHAPE, GATHERED.  [BootCarveMain.boot_procs_raw] hands
@@ -149,7 +220,7 @@ Section WaitInv.
      list.  The conversion is an induction with an OFFSET, because
      [seq k (S n)] is [k :: seq (S k) n] -- the tail's table indices shift by
      one while the [j] in [parents_own]'s big-op is an index into the LIST.
-     Stated here rather than at the carve so that [wait_res]'s shape stays
+     Stated here rather than at the carve so that [parents_res]'s shape stays
      this file's business. *)
   Lemma parents_cells_gather (n k : nat) :
     ([∗ list] i ∈ seq k n, ∃ pv : mword 64, p_parent (proc_addr i) ↦₈ pv)
@@ -171,17 +242,31 @@ Section WaitInv.
       iExact "Hv".
   Qed.
 
-  (* ...and what the boot chain actually hands main: wait_lock's resource,
-     out of the NPROC parent cells the image owns and nothing else claims. *)
-  Lemma wait_res_of_cells :
+  (* ...and what the boot chain actually hands main: the parent half, out of
+     the NPROC parent cells the image owns and nothing else claims.  The
+     children half has no cells to come out of, so it is MINTED instead --
+     [wait_res_alloc] below, in main's own update. *)
+  Lemma parents_res_of_cells :
     ([∗ list] i ∈ seq 0 NPROC, ∃ pv : mword 64, p_parent (proc_addr i) ↦₈ pv)
-    -∗ wait_res.
+    -∗ parents_res.
   Proof.
     iIntros "H".
     iDestruct (parents_cells_gather NPROC 0 with "H") as (ps) "[%Hlen H]".
     iExists ps. rewrite /parents_own /parents_own_at.
     iSplit; [iPureIntro; exact Hlen |].
     iApply (big_sepL_mono with "H"). iIntros (j v _) "Hv". iExact "Hv".
+  Qed.
+
+  (* THE BOOT MINT: every slot starts with no children.  One name for the
+     whole table, carved once and threaded exactly as the lock's own gname
+     is ([ProofMain]'s wait_lock assembly builds both in the same step). *)
+  Lemma wait_res_alloc : parents_res ==∗ ∃ γc : gname, wait_res γc.
+  Proof.
+    iIntros "Hp".
+    iMod (ghost_var_alloc (replicate NPROC (∅ : gset gname))) as (γc) "Hg".
+    iModIntro. iExists γc. iFrame "Hp".
+    iExists (replicate NPROC (∅ : gset gname)).
+    iSplit; [iPureIntro; apply length_replicate |]. iExact "Hg".
   Qed.
 
   Lemma parents_own_length ps : parents_own ps -∗ ⌜length ps = NPROC⌝.

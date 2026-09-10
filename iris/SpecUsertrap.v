@@ -92,6 +92,8 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
+(* [gname] -- the key's generation and children readings are ghost NAMES *)
+From iris.base_logic.lib Require Import own.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -395,10 +397,14 @@ Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
 Definition ut_sys_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
-    (sts : list fdstate) : iProp Σ :=
+    (* [gn] and [cs] ride beside [sts] for its reason: the key carries the
+       process's generation and its live children's, [ustate] carries
+       neither, and the party that holds the kernel cells they are read off
+       is the party that builds the key. *)
+    (sts : list fdstate) (gn : gname) (cs : gset gname) : iProp Σ :=
   (⌜sc_v = uecall_scause /\ usys_num tf = n
     /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
-     sbundle_at uslot n f (uvis_of U sts))%I.
+     sbundle_at uslot n f (uvis_of U sts gn cs))%I.
 
 (* ...AND THE ARMED POST BACK, at the same key, THE SAME FAMILIES and the
    round's return value.  [f] is the deposit's own: the trap contract takes
@@ -419,18 +425,20 @@ Definition ut_sys_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : C
 Definition ut_sys_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
-    (sts : list fdstate) (r : mword 64) (M' : gmap Z (bv 8))
-    (sts' : list fdstate) (cw' : Z)
+    (sts : list fdstate) (gn : gname) (cs : gset gname) (r : mword 64)
+    (M' : gmap Z (bv 8))
+    (sts' : list fdstate) (cw' : Z) (cs' : gset gname)
     : iProp Σ :=
   (⌜sc_v = uecall_scause /\ usys_num tf = n
     /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
-     spost_at uslot n f (uvis_of U sts) r M' sts' cw')%I.
+     spost_at uslot n f (uvis_of U sts gn cs) r M' sts' cw' cs')%I.
 
 Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
     (sc_v : mword 64) (tf : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
-    (U' : ustate) (sts sts' : list fdstate) : iProp Σ :=
+    (U' : ustate) (sts sts' : list fdstate) (gn : gname) (cs : gset gname)
+    : iProp Σ :=
   (⌜sc_v = uecall_scause /\ usys_num tf = USYS_exec⌝ -∗
      (⌜exists r : mword 64,
          uround_bump_ok tf (pv_tf (us_V U')) r
@@ -438,17 +446,18 @@ Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
               (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
               (uint (pv_sz (us_V U')))
          /\ sts' = sts⌝                       (* failed: the returning shape at r = -1 *)
-      ∨ uslot (uvis_of U' sts')))%I.                  (* succeeded: the new image's slot *)
+      ∨ uslot (uvis_of U' sts' gn cs)))%I.            (* succeeded: the new image's slot *)
 
 (* [uvis_of] of a trapframe-rewritten record, spelled out: the key is the
    new frame over the record's own image, permission projection, break and
    working directory.  [KforkChild.uvis_of_kfork_child] is the same fact at
    the dispatcher's own record. *)
-Lemma uvis_of_us_tf (U : ustate) (ws : list (mword 64)) (sts : list fdstate) :
-  uvis_of (us_tf U ws) sts
+Lemma uvis_of_us_tf (U : ustate) (ws : list (mword 64)) (sts : list fdstate)
+    (gn : gname) (cs : gset gname) :
+  uvis_of (us_tf U ws) sts gn cs
   = MkUvis ws (us_M U)
            (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-           (uint (pv_sz (us_V U))) sts (pv_cwi (us_V U)).
+           (uint (pv_sz (us_V U))) sts (pv_cwi (us_V U)) gn cs.
 Proof. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -478,7 +487,14 @@ Definition ut_fork_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
     (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) : iProp Σ :=
   (⌜sc_v = uecall_scause /\ usys_num tf = USYS_fork⌝ -∗
-     uslot (uvis_of (us_tf U (bump_tf tf (mword_of_int 0))) sts))%I.
+     (* THE CHILD'S GENERATION IS ∀-BOUND HERE, and its children set is [∅]
+        on the nose.  allocproc mints a FRESH generation for the child's
+        slot, so the depositing process cannot name it and undertakes to be
+        safe at whichever one the kernel mints; the round learns the actual
+        name from kfork's post.  A newly created process has no children.
+        ([UexecRet.uexec_fork_child_F]'s own shape.) *)
+     ∀ g' : gname,
+       uslot (uvis_of (us_tf U (bump_tf tf (mword_of_int 0))) sts g' ∅))%I.
 
 (* THE ROW'S CONGRUENCE, and it is [TfUser.tf_ueq]-shaped rather than
    [UexecSG.skey_eq]-shaped: the payload reads the resume register file and
@@ -523,20 +539,22 @@ Proof.
   { rewrite (tf_resume_pc_bump tf (mword_of_int 0) Hle).
     rewrite (tf_resume_pc_bump tf' (mword_of_int 0) Hle').
     unfold tf_w. rewrite (tf_ueq_epc tf tf' Hu). reflexivity. }
-  rewrite /ut_fork_in. iIntros "H %Hc".
+  rewrite /ut_fork_in. iIntros "H %Hc". iIntros (g').
   iDestruct ("H" with "[%]") as "H";
     [ split; [ exact (proj1 Hc)
              | rewrite (tf_ueq_num tf tf' Hu); exact (proj2 Hc) ] |].
+  iSpecialize ("H" $! g').
   rewrite !uvis_of_us_tf.
   iEval (rewrite (uslot_key_cong
                     (MkUvis (bump_tf tf (mword_of_int 0)) (us_M U)
                        (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-                       (uint (pv_sz (us_V U))) sts (pv_cwi (us_V U)))
+                       (uint (pv_sz (us_V U))) sts (pv_cwi (us_V U)) g' ∅)
                     (MkUvis (bump_tf tf' (mword_of_int 0)) (us_M U')
                        (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
-                       (uint (pv_sz (us_V U'))) sts (pv_cwi (us_V U')))
+                       (uint (pv_sz (us_V U'))) sts (pv_cwi (us_V U')) g' ∅)
                     Hg Hp (eq_sym HM) (eq_sym Hpi)
-                    (f_equal uint (eq_sym Hsz)) eq_refl (eq_sym Hcw))) in "H".
+                    (f_equal uint (eq_sym Hsz)) eq_refl (eq_sym Hcw)
+                    eq_refl eq_refl)) in "H".
   iExact "H".
 Qed.
 
@@ -548,8 +566,8 @@ Lemma ut_sys_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) (r : mword 64) (M' : gmap Z (bv 8))
-    (sts' : list fdstate) (cw' : Z) :
-  sc_v <> uecall_scause -> ⊢ ut_sys_out n f sc_v tf U sts r M' sts' cw'.
+    (sts' : list fdstate) (cw' : Z) (gn : gname) (cs cs' : gset gname) :
+  sc_v <> uecall_scause -> ⊢ ut_sys_out n f sc_v tf U sts gn cs r M' sts' cw' cs'.
 Proof.
   intros Hne. rewrite /ut_sys_out. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
 Qed.
@@ -558,8 +576,8 @@ Lemma ut_exec_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI 
     `{SG : uexecSG Σ}
     (sc_v : mword 64) (tf : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
-    (U' : ustate) (sts sts' : list fdstate) :
-  sc_v <> uecall_scause -> ⊢ ut_exec_out sc_v tf M π szv U' sts sts'.
+    (U' : ustate) (sts sts' : list fdstate) (gn : gname) (cs : gset gname) :
+  sc_v <> uecall_scause -> ⊢ ut_exec_out sc_v tf M π szv U' sts sts' gn cs.
 Proof.
   intros Hne. rewrite /ut_exec_out. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
 Qed.
@@ -571,23 +589,25 @@ Qed.
 Lemma ut_sys_in_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf tf' : list (mword 64))
-    (U U' : ustate) (sts : list fdstate) :
+    (U U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname) :
   usys_num tf = usys_num tf' ->
   us_M U = us_M U' ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 0) = tf_w (pv_tf (us_V U')) (tf_arg_idx 0) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 1) = tf_w (pv_tf (us_V U')) (tf_arg_idx 1) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 2) = tf_w (pv_tf (us_V U')) (tf_arg_idx 2) ->
   pv_cwi (us_V U) = pv_cwi (us_V U') ->
-  ut_sys_in n f sc_v tf U sts -∗ ut_sys_in n f sc_v tf' U' sts.
+  ut_sys_in n f sc_v tf U sts gn cs -∗ ut_sys_in n f sc_v tf' U' sts gn cs.
 Proof.
   intros Hn HM Ha0 Ha1 Ha2 Hcw. rewrite /ut_sys_in. iIntros "H %Hc".
   destruct Hc as (Hce & Hcn & Hcx & Hcf).
   iDestruct ("H" with "[%]") as "H";
     [ split_and!; [ exact Hce | rewrite Hn; exact Hcn | exact Hcx | exact Hcf ] |].
-  iEval (rewrite (sbundle_at_cong uslot n f (uvis_of U sts) (uvis_of U' sts)
+  iEval (rewrite (sbundle_at_cong uslot n f (uvis_of U sts gn cs)
+                    (uvis_of U' sts gn cs)
                     ltac:(rewrite /skey_eq; split_and!;
                           [ exact HM | exact Ha0 | exact Ha1 | exact Ha2
-                          | reflexivity | exact Hcw ]))) in "H".
+                          | reflexivity | exact Hcw
+                          | reflexivity | reflexivity ]))) in "H".
   iExact "H".
 Qed.
 
@@ -596,26 +616,29 @@ Qed.
 Lemma ut_sys_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     `{SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf tf' : list (mword 64))
-    (U U' : ustate) (sts : list fdstate) (r : mword 64)
-    (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z) :
+    (U U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
+    (r : mword 64)
+    (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
   usys_num tf' = usys_num tf ->
   us_M U = us_M U' ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 0) = tf_w (pv_tf (us_V U')) (tf_arg_idx 0) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 1) = tf_w (pv_tf (us_V U')) (tf_arg_idx 1) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 2) = tf_w (pv_tf (us_V U')) (tf_arg_idx 2) ->
   pv_cwi (us_V U) = pv_cwi (us_V U') ->
-  ut_sys_out n f sc_v tf U sts r M' sts' cw' -∗
-  ut_sys_out n f sc_v tf' U' sts r M' sts' cw'.
+  ut_sys_out n f sc_v tf U sts gn cs r M' sts' cw' cs' -∗
+  ut_sys_out n f sc_v tf' U' sts gn cs r M' sts' cw' cs'.
 Proof.
   intros Hn HM Ha0 Ha1 Ha2 Hcw. rewrite /ut_sys_out. iIntros "H %Hc".
   destruct Hc as (Hce & Hcn & Hcx & Hcf).
   iDestruct ("H" with "[%]") as "H";
     [ split_and!; [ exact Hce | rewrite <- Hn; exact Hcn | exact Hcx | exact Hcf ] |].
-  iEval (rewrite (spost_at_cong uslot n f (uvis_of U sts) (uvis_of U' sts) r
-                    M' sts' cw'
+  iEval (rewrite (spost_at_cong uslot n f (uvis_of U sts gn cs)
+                    (uvis_of U' sts gn cs) r
+                    M' sts' cw' cs'
                     ltac:(rewrite /skey_eq; split_and!;
                           [ exact HM | exact Ha0 | exact Ha1 | exact Ha2
-                          | reflexivity | exact Hcw ]))) in "H".
+                          | reflexivity | exact Hcw
+                          | reflexivity | reflexivity ]))) in "H".
   iExact "H".
 Qed.
 
@@ -630,7 +653,8 @@ Lemma ut_exec_out_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
     `{SG : uexecSG Σ}
     (sc_v : mword 64) (tf tf' : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
-    (U' U'' : ustate) (sts sts' : list fdstate) :
+    (U' U'' : ustate) (sts sts' : list fdstate) (gn : gname)
+    (cs : gset gname) :
   tf_ueq tf tf' ->
   tf_ueq (pv_tf (us_V U')) (pv_tf (us_V U'')) ->
   us_M U'' = us_M U' ->
@@ -639,8 +663,8 @@ Lemma ut_exec_out_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
   pv_sz (us_V U'') = pv_sz (us_V U') ->
   (* ...and the cwd's inum, which the loadable arm's key carries *)
   pv_cwi (us_V U'') = pv_cwi (us_V U') ->
-  ut_exec_out sc_v tf M π szv U' sts sts' -∗
-  ut_exec_out sc_v tf' M π szv U'' sts sts'.
+  ut_exec_out sc_v tf M π szv U' sts sts' gn cs -∗
+  ut_exec_out sc_v tf' M π szv U'' sts sts' gn cs.
 Proof.
   intros Hu Hu' HM Hpi Hsz Hcwi. rewrite /ut_exec_out. iIntros "H %Hc".
   iDestruct ("H" with "[%]") as "[%Hf | Hs]";
@@ -655,10 +679,11 @@ Proof.
     + split; [| exact Hst]. rewrite HM Hpi Hsz.
       exact (usys_mem_ok_ueq _ _ _ _ _ _ _ _ _ _ Hu Hm).
   - iRight.
-    iEval (rewrite (uslot_key_cong (uvis_of U' sts') (uvis_of U'' sts')
+    iEval (rewrite (uslot_key_cong (uvis_of U' sts' gn cs)
+                      (uvis_of U'' sts' gn cs)
                       (tf_ueq_resume_gpr0 _ _ Hu') (tf_ueq_resume_pc _ _ Hu')
                       (eq_sym HM) (eq_sym Hpi) (f_equal uint (eq_sym Hsz)) eq_refl
-                      (eq_sym Hcwi)))
+                      (eq_sym Hcwi) eq_refl eq_refl))
       in "Hs".
     iExact "Hs".
 Qed.
@@ -743,7 +768,10 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        entry trapframe as usertrap's own prologue leaves it (the
        +0x28..+0x2e block writes [epc := r_sepc()]), which is the user-visible
        trapframe the round starts from. *)
-    (U : ustate) (sts : list fdstate) (sepc_v sc_v : mword 64)
+    (U : ustate) (sts : list fdstate)
+    (* the two WAIT-EXIT readings the key is built at, beside [sts]: this
+       lane's rows keep both, so the post hands them back unchanged. *)
+    (gn : gname) (cs : gset gname) (sepc_v sc_v : mword 64)
     (* THE DEPOSIT'S FAMILIES, read by the syscall channel's out row below:
        what comes back is a post at the very receipts the process deposited
        at ([UexecSG.v]'s header). *)
@@ -858,15 +886,15 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        record the round left -- see [ut_exec_out] *)
     ut_exec_out sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
       (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-      (uint (pv_sz (us_V U))) U' sts sts' -∗
+      (uint (pv_sz (us_V U))) U' sts sts' gn cs -∗
     (* ...AND THE SYSCALL CHANNEL'S, at the same entry frame and read at the
        a0 word the round left -- [ut_sys_out].  The dispatcher produces it,
        the four tails relay it, and the U-mode loop hands it to the
        process's own returning arm. *)
     (∀ n : Z,
-       ut_sys_out n f sc_v (pv_tf (us_V U)) U sts
+       ut_sys_out n f sc_v (pv_tf (us_V U)) U sts gn cs
          (pv_tf (us_V U') !!! tf_arg_idx 0) (us_M U') sts'
-         (pv_cwi (us_V U'))) -∗
+         (pv_cwi (us_V U')) cs) -∗
     WP (Loop : expr riscv_lang)).
 
 (* [R] IS A HART-INDEXED FAMILY, AND IT HAS TO BE.  usertrap is handed the
@@ -887,6 +915,7 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
     (pt : uptd) (j : nat)
     (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
     (mie_v mdv0 menvcfg0 : mword 64) (U : ustate) (sts : list fdstate)
+    (gn : gname) (cs : gset gname)
     (* THE DEPOSIT'S FAMILIES, taken ONCE and read by both syscall rows:
        the process chose them when it built its bundle, and the post it
        gets back is at the same ones ([UexecSG.v]'s header). *)
@@ -940,7 +969,7 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
   R CID pt ksp U sts -∗
   (* the process's deposit for the number it trapped at, owed only at an
      ecall -- [ut_sys_in] *)
-  (∀ n : Z, ut_sys_in n f sc_v (pv_tf (us_V U)) U sts) -∗
+  (∀ n : Z, ut_sys_in n f sc_v (pv_tf (us_V U)) U sts gn cs) -∗
   (* ...and FORK'S, which is not one of them: a slot rather than a bundle,
      and stated at the frame the PROLOGUE leaves (the entry record's epc
      word is still the previous round's) -- [ut_fork_in] *)
@@ -949,8 +978,8 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
      may return on a different hart -- and the bundle comes back at THAT
      hart, which is why [R] is a family (see the note above). *)
   wp_next true pj (fun (CID' : CpuId) =>
-    usertrap_post (CID := CID') (R CID') pt ksp m mie_v menvcfg0 U sts sepc_v
-      sc_v f) -∗
+    usertrap_post (CID := CID') (R CID') pt ksp m mie_v menvcfg0 U sts gn cs
+      sepc_v sc_v f) -∗
   WP (Loop : expr riscv_lang).
 
 (* THE MODULE TYPE'S INSTANCE LIST IS THE UNION OF THE FIVE CONES', NOT THE
@@ -1222,7 +1251,8 @@ Module Type USERTRAP.
       (pt : uptd) (j : nat)
       (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
       (mie_v mdv0 menvcfg0 : mword 64) (U : ustate) (sts : list fdstate)
+      (gn : gname) (cs : gset gname)
       (f : sfam),
       wp_usertrap_body (fun h : CpuId => usertrap_res (CID := h))
-        pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0 U sts f.
+        pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0 U sts gn cs f.
 End USERTRAP.

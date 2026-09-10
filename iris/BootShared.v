@@ -641,9 +641,11 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hprocs H]".
     iDestruct (boot_procs_raw g Hmem with "Hcl Hprocs")
       as "[Hpr1 [Hpr2 [Hpar Hpr3]]]".
-    (* the parent cells, gathered into wait_lock's resource.  The carve hands
-       one existential per slot; [WaitInv.wait_res] is one list. *)
-    iDestruct (WaitInv.wait_res_of_cells with "Hpar") as "Hwres".
+    (* the parent cells, gathered into wait_lock's parent half.  The carve
+       hands one existential per slot; [WaitInv.parents_res] is one list.
+       The lock's children half is ghost and is minted in main's own
+       update ([WaitInv.wait_res_alloc]). *)
+    iDestruct (WaitInv.parents_res_of_cells with "Hpar") as "Hwres".
     (* ---- tickslock, bcache.lock, the 30 buffers, the list sentinel ---- *)
     iDestruct (bss_cut g (KernelSyms.proc + proc_size * Z.of_nat NPROC)
                  KernelSyms.tickslock (KernelSyms.tickslock + 24) ram_hi

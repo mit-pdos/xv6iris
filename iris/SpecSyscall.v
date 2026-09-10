@@ -136,7 +136,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import WpLock.       (* [is_lock] *)
 Require Import SpecProcinit. (* [wait_lock_addr] *)
-Require Import WaitInv.      (* [wait_res] *)
+Require Import WaitInv.      (* [wait_res_at] *)
 Require Import FileInv.      (* [is_ftable] *)
 Require Import DiskInv.      (* [disk_geom] *)
 Require Import FirstTok.     (* [first_done] -- what the environment's producer takes *)
@@ -339,11 +339,15 @@ Section SyscExec.
      EXIT AND FORK ARE EXCLUDED, exactly as they are one hop up: exit
      deposits nothing at all and fork deposits a SLOT ([sysc_fork_in]),
      so at those two this row must not ask for a bundle. *)
-  Definition sysc_sys_in (U : ustate) (sts : list fdstate) (f : sfam)
+  (* [gn] and [cs] ride beside [sts] for its reason -- the key carries the
+     process's generation and its live children's, [ustate] carries
+     neither, and the dispatcher is handed both by the boundary. *)
+  Definition sysc_sys_in (U : ustate) (sts : list fdstate) (gn : gname)
+      (cs : gset gname) (f : sfam)
       : iProp Σ :=
     (∀ n : Z,
        ⌜sysc_num (us_V U) = n /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
-       sbundle_at uslot n f (uvis_of U sts))%I.
+       sbundle_at uslot n f (uvis_of U sts gn cs))%I.
 
   (* ...AND WHAT COMES BACK, at the same key and the SAME families: the
      syscall's armed post, read at the value the dispatcher returned.  This
@@ -372,12 +376,14 @@ Section SyscExec.
      EXIT AND FORK ARE EXCLUDED, as they are for the deposit: exit never
      returns and fork pays no receipt -- its deposit is a slot, and what it
      buys is the CHILD's execution, not a post to the parent. *)
-  Definition sysc_sys_out (U : ustate) (sts : list fdstate) (f : sfam)
+  Definition sysc_sys_out (U : ustate) (sts : list fdstate) (gn : gname)
+      (cs : gset gname) (f : sfam)
       (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z)
+      (cs' : gset gname)
       : iProp Σ :=
     (∀ n : Z,
        ⌜sysc_num (us_V U) = n /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
-       spost_at uslot n f (uvis_of U sts) r M' sts' cw')%I.
+       spost_at uslot n f (uvis_of U sts gn cs) r M' sts' cw' cs')%I.
 
   (* FORK'S DEPOSIT, the one that is a SLOT.  Every other number's deposit
      is a bundle at the entry key ([sysc_sys_in]); fork's is the WP its
@@ -390,9 +396,14 @@ Section SyscExec.
      GUARDED ON THE NUMBER ALONE, because the dispatcher is already past
      the cause: every other arm discharges it by refuting the guard off its
      own table index ([sysc_fork_in_ne]). *)
+  (* THE CHILD'S GENERATION IS ∀-BOUND, its children set [∅] on the nose:
+     allocproc mints a fresh generation for the child's slot, so the
+     depositing process cannot name it and the deposit is a family over
+     every one the kernel might mint; a newly created process has no
+     children ([UexecRet.uexec_fork_child_F]). *)
   Definition sysc_fork_in (U : ustate) (sts : list fdstate) : iProp Σ :=
     (⌜sysc_num (us_V U) = UsysMemOk.USYS_fork⌝ -∗
-       uslot (uvis_of (kfork_child U) sts))%I.
+       ∀ g' : gname, uslot (uvis_of (kfork_child U) sts g' ∅))%I.
 
   Lemma sysc_fork_in_ne (U : ustate) (sts : list fdstate) :
     sysc_num (us_V U) <> UsysMemOk.USYS_fork -> ⊢ sysc_fork_in U sts.
@@ -406,16 +417,17 @@ Section SyscExec.
     ~ (k = 5 \/ k = 9 \/ k = 15 \/ k = 16 \/ k = 17 \/ k = 18 \/ k = 19
        \/ k = 20).
 
-  Lemma sysc_sys_out_quiet (U : ustate) (sts : list fdstate) (f : sfam)
+  Lemma sysc_sys_out_quiet (U : ustate) (sts : list fdstate) (gn : gname)
+      (cs : gset gname) (f : sfam)
       (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z)
-      (k : Z) :
+      (cs' : gset gname) (k : Z) :
     sysc_num (us_V U) = k -> sysc_num_nofs k ->
-    ⊢ sysc_sys_out U sts f r M' sts' cw'.
+    ⊢ sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
   Proof.
     intros Hk Hno. rewrite /sysc_sys_out. iIntros (n) "%Hg".
     assert (Hn : sysc_num_nofs n)
       by (rewrite <- (proj1 Hg); rewrite Hk; exact Hno).
-    iApply (spost_at_emp uslot n f (uvis_of U sts) r M' sts' cw' Hn).
+    iApply (spost_at_emp uslot n f (uvis_of U sts gn cs) r M' sts' cw' cs' Hn).
   Qed.
 
   (* r = -1 and nothing of the process moved but a0: the trapframe up to
@@ -437,14 +449,16 @@ Section SyscExec.
      slot -- the loadable one out of the deposit's image wand, anything
      else out of its [SpecKexec.exec_key_ok] wand -- so the channel has no
      third disjunct and the round mints nothing at exec. *)
-  Definition sysc_exec_out (U U' : ustate) (sts sts' : list fdstate) : iProp Σ :=
+  Definition sysc_exec_out (U U' : ustate) (sts sts' : list fdstate)
+      (gn : gname) (cs : gset gname) : iProp Σ :=
     (⌜sysc_num (us_V U) = 7⌝ -∗
        (⌜sysc_exec_failed U U' sts sts'⌝
-        ∨ uslot (uvis_of U' sts')))%I.                  (* the new image's slot *)
+        ∨ uslot (uvis_of U' sts' gn cs)))%I.            (* the new image's slot *)
 
   (* every other entry owes nothing *)
-  Lemma sysc_exec_out_ne (U U' : ustate) (sts sts' : list fdstate) :
-    sysc_num (us_V U) <> 7 -> ⊢ sysc_exec_out U U' sts sts'.
+  Lemma sysc_exec_out_ne (U U' : ustate) (sts sts' : list fdstate)
+      (gn : gname) (cs : gset gname) :
+    sysc_num (us_V U) <> 7 -> ⊢ sysc_exec_out U U' sts sts' gn cs.
   Proof.
     intro Hne. rewrite /sysc_exec_out.
     iIntros "%Hk". exfalso. exact (Hne Hk).
@@ -469,7 +483,9 @@ Definition wp_syscall_sconf_body
     (pid : mword 32) (U : ustate)
     (* THE DESCRIPTOR STATES syscall() IS ENTERED AT.  The post below states
        [sysc_fd_ok] against them, beside [sysc_mem_ok] against the image. *)
-    (sts : list fdstate) (lks : gset string)
+    (sts : list fdstate)
+    (* the two WAIT-EXIT readings the key is built at, beside [sts] *)
+    (gn : gname) (cs : gset gname) (lks : gset string)
     (* the deposit's FAMILIES, relayed from the trap route -- see
        [sysc_sys_in] *)
     (f : sfam) :=
@@ -529,7 +545,7 @@ Definition wp_syscall_sconf_body
   fd_frags (pv_fdg (us_V U)) sts -∗
   (* the process's deposit for whatever number it trapped with -- see
      [sysc_sys_in] *)
-  sysc_sys_in U sts f -∗
+  sysc_sys_in U sts gn cs f -∗
   (* ...and fork's, which is a SLOT and not a bundle -- see [sysc_fork_in] *)
   sysc_fork_in U sts -∗
   (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
@@ -713,15 +729,15 @@ Definition wp_syscall_sconf_body
       pc_is ret_tgt -∗
       (* ...and the exec channel's answer: on exec, the failure facts or
          the new image's slot at the resume record [U'] *)
-      sysc_exec_out U U' sts sts' -∗
+      sysc_exec_out U U' sts sts' gn cs -∗
       (* ...and the SYSCALL CHANNEL's: the armed post of whatever contract
          the number ran, at the process's own families, at the return
          value the a0 slot now holds, and at the RESUME VIEW the round
          leaves -- the block's image, the descriptor states [sts'] and its
          own cwd inum, which are what read's, chdir's and open's receipts
          are about; see [sysc_sys_out] *)
-      sysc_sys_out U sts f (pv_tf (us_V U') !!! tf_arg_idx 0)
-        (us_M U') sts' (pv_cwi (us_V U')) -∗
+      sysc_sys_out U sts gn cs f (pv_tf (us_V U') !!! tf_arg_idx 0)
+        (us_M U') sts' (pv_cwi (us_V U')) cs -∗
       WP (Loop : expr riscv_lang))
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).
@@ -787,12 +803,12 @@ Module Type SYSCALL.
   Parameter syscall_env_park :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
-      (γf γw γft γtk : gname) (fn : fclose_names),
+      (γf γw γc γft γtk : gname) (fn : fclose_names),
       (fcn_j fn < NPROC)%nat ->
       fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
       fcn_dq fn = DfracOwn (1/4) ->
       sysc_park_extra γtk -∗
-      is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
+      is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
       is_ftable γft γf -∗
       procs_inv (fcn_procs fn) -∗
       disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
@@ -835,7 +851,8 @@ Module Type SYSCALL.
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (gn : gname) (cs : gset gname)
       (lks : gset string) (f : sfam),
       wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid U sts
-        lks f.
+        gn cs lks f.
 End SYSCALL.

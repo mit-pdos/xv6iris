@@ -120,7 +120,7 @@ Section ProofSysExit.
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
   Lemma wp_sys_exit_sconf
-      (γft γf γw : gname)
+      (γft γf γw γc : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (dqi : dfrac)
@@ -128,7 +128,7 @@ Section ProofSysExit.
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
       (v0 : mword 64) (lks : gset string)
-    : wp_sys_exit_sconf_body γft γf γw γs j γl pd pav pu
+    : wp_sys_exit_sconf_body γft γf γw γc γs j γl pd pav pu
  ip dqi
 
                              on fn m av eb b pid U sts v0 lks.
@@ -343,7 +343,7 @@ Section ProofSysExit.
        nothing on the other side to say it to. *)
     iAssert (fd_frags_any (pv_fdg (us_V U))) with "[Hufrag]" as "Hufrag";
       [ by iExists sts | ].
-    iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl pd pav pu
+    iApply (Kexit.wp_kexit_sconf γft γf γw γc γs j γl pd pav pu
  ip dqi
 
               on fn B2 (av - 4)%nat eb b lks pid (upd_usM U _) Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow

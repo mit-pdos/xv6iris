@@ -52,6 +52,9 @@
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
+(* [gname] alone -- the generation row is a statement about a ghost NAME and
+   about no resource, so this file stays a pure one *)
+From iris.base_logic.lib Require Import own.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Require Import Riscv.rv64d.   (* [sign_extend'] -- sbrk's argument, sign-extended *)
@@ -651,6 +654,58 @@ Proof.
   destruct (decide (USYS_chdir = USYS_chdir)) as [_ | Hne];
     [ exact H | contradiction (Hne eq_refl) ].
 Qed.
+
+(* ===================================================================== *)
+(* SS2e THE GENERATION ROW: no number moves it.                            *)
+(*                                                                         *)
+(* [g] / [g'] are the process's own generation name before and after       *)
+(* ([UexecSlot.uvis_gen], the name the kernel's per-slot generation cell   *)
+(* holds).  A generation is the identity of ONE INCARNATION of a slot, and *)
+(* no syscall re-incarnates the CALLER: allocproc mints a generation for a *)
+(* new slot, freeproc drops it, and exec keeps the caller's (the identity  *)
+(* survives exec, which is why exec's row is quiet here even though it     *)
+(* replaces the whole image).  fork's CHILD gets a fresh one, but the      *)
+(* child's key is built on its own row ([UexecRet.uexec_fork_child_F]),    *)
+(* not here.  Stated as a row rather than as structural preservation in    *)
+(* [UexecRet.bump] so that the arm reads the same way as the other four,   *)
+(* and so that a later entry which did move it would have somewhere to say *)
+(* so.  NO TRAPFRAME AND NO RETURN VALUE: nothing the row could read.      *)
+(* ===================================================================== *)
+Definition usys_gen_ok (n : Z) (g g' : gname) : Prop := g' = g.
+
+Lemma usys_gen_ok_quiet (n : Z) (g g' : gname) : usys_gen_ok n g g' -> g' = g.
+Proof. exact id. Qed.
+
+(* the row in the direction a prover supplies it *)
+Lemma usys_gen_ok_refl (n : Z) (g : gname) : usys_gen_ok n g g.
+Proof. reflexivity. Qed.
+
+(* ===================================================================== *)
+(* SS2f THE CHILDREN ROW: which entries move the set of live children.     *)
+(*                                                                         *)
+(* [cs] / [cs'] are the generations of this process's live children before *)
+(* and after ([UexecSlot.uvis_ch], the reading of the [wait_lock] children *)
+(* cell).  Three entries move it -- fork ADDS the child's generation, wait *)
+(* REMOVES the one it reaped, exit hands the whole set to init -- and      *)
+(* every other entry keeps it.  fork's arm is not stated here for the      *)
+(* reason its descriptor copy is not: the fork arm of                      *)
+(* [UexecRet.uexec_ret_F] says it directly, at the generation the deposit  *)
+(* names.  Exit never returns.  So the row that remains for the generic    *)
+(* returning arm is the QUIET one at every number, and wait's arm arrives  *)
+(* with WX-WAIT.  [r] rides along because wait's row will read it (which   *)
+(* child was reaped is the return value's pid), exactly as [usys_cwd_ok]   *)
+(* reads it for chdir's failure case.                                      *)
+(* ===================================================================== *)
+Definition usys_ch_ok (n : Z) (r : mword 64) (cs cs' : gset gname) : Prop :=
+  cs' = cs.
+
+Lemma usys_ch_ok_quiet (n : Z) (r : mword 64) (cs cs' : gset gname) :
+  usys_ch_ok n r cs cs' -> cs' = cs.
+Proof. exact id. Qed.
+
+Lemma usys_ch_ok_refl (n : Z) (r : mword 64) (cs : gset gname) :
+  usys_ch_ok n r cs cs.
+Proof. reflexivity. Qed.
 
 (* the sixteen quiet entries, by name: what a program calling one of them
    learns.  Stated for the row shape rather than per number so a program

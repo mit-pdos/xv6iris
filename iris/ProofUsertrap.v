@@ -744,7 +744,8 @@ Section UtDispatch.
   Lemma ut_dispatch (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (ep sc st : mword 64)
-      (mie_v menvcfg0 : mword 64) (sts : list fdstate) (fdep : sfam) :
+      (mie_v menvcfg0 : mword 64) (sts : list fdstate) (gn : gname)
+      (cs : gset gname) (fdep : sfam) :
     printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     (* THE PROLOGUE'S MOVE (milestone J1a): [U0] is the state usertrap was
        entered at and [U] the one the +0x28..+0x2e block handed on, so the
@@ -774,13 +775,13 @@ Section UtDispatch.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* the process's exec bundle, at the ENTRY record -- the ecall arm's
        alone ([SpecUsertrap.ut_sys_in]) *)
-    (∀ n : Z, ut_sys_in n fdep sc (pv_tf (us_V U0)) U0 sts) -∗
+    (∀ n : Z, ut_sys_in n fdep sc (pv_tf (us_V U0)) U0 sts gn cs) -∗
     (* ...and fork's deposit, the ecall arm's alone too, at the frame the
        prologue leaves ([SpecUsertrap.ut_fork_in]) *)
     ut_fork_in sc (<[tf_epc_idx := ret_pc ep]> (pv_tf (us_V U0))) U0 sts -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') SY.syscall_env) pt ksp m0
-                     mie_v menvcfg0 U0 sts ep sc fdep) -∗
+                     mie_v menvcfg0 U0 sts gn cs ep sc fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hpk Hpro Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv.
@@ -885,7 +886,7 @@ Section UtDispatch.
       assert (Hscec : sc = (uecall_scause : mword 64)).
       { apply eq_vec_true_iff in Hsys. rewrite HD2a4 HD2a5 in Hsys. exact Hsys. }
       iApply (S.ut_90 N U0 U pt ksp m0 D2 av nx
-                mie_v menvcfg0 ep sc ∅ sts fdep
+                mie_v menvcfg0 ep sc ∅ sts gn cs fdep
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HD2sp HD2s1 HD2a0 HcsD2
                 Hmiev Hmenvv Hpro Hscec
                 with "Htext Hpc Hcg Hhold Hframe Hxin Hfin Hcont").
@@ -992,7 +993,7 @@ Section UtDispatch.
                     "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
           rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
         iApply (A.ut_e8 SY.syscall_env N U0 U pt ksp m0 D4 av nx
-                  mie_v menvcfg0 ep sc ∅ sts fdep
+                  mie_v menvcfg0 ep sc ∅ sts gn cs fdep
                   Hwf' Hav Hnx Htfpe Hksp Hm0sp HD4sp HD4s1 HcsD4
                   Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                   (* the transparent arms' defining cause, off the dispatch's own
@@ -1071,7 +1072,7 @@ Section UtDispatch.
                       "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
             rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
           iApply (A.ut_d0 SY.syscall_env N U0 U pt ksp m0 D6 av nx
-                    mie_v menvcfg0 ep sc ∅ sts fdep
+                    mie_v menvcfg0 ep sc ∅ sts gn cs fdep
                     Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD6sp HD6s1 HcsD6
                     Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                     (* the transparent arms' defining cause, off the dispatch's own
@@ -1152,7 +1153,7 @@ Section UtDispatch.
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
              iApply (A.ut_d0 SY.syscall_env N U0 U pt ksp m0 D8 av nx
-                       mie_v menvcfg0 ep sc ∅ sts fdep
+                       mie_v menvcfg0 ep sc ∅ sts gn cs fdep
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                        (* the transparent arms' defining cause, off the dispatch's own
@@ -1176,7 +1177,7 @@ Section UtDispatch.
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
              iApply (A.ut_56 SY.syscall_env N U0 U pt ksp m0 D8 av nx
-                       mie_v menvcfg0 ep sc ∅ sts fdep
+                       mie_v menvcfg0 ep sc ∅ sts gn cs fdep
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                        (* the transparent arms' defining cause, off the dispatch's own
@@ -1363,9 +1364,10 @@ Section UtSeal.
   Lemma wp_usertrap (pt : uptd) (j : nat) (m : regfile)
       (ms_v sc_v stval_v sepc_v ksp : mword 64)
       (mie_v mdv0 menvcfg0 : mword 64) (U : ustate) (sts : list fdstate)
+      (gn : gname) (cs : gset gname)
       (fdep : sfam) :
     wp_usertrap_body (fun h : CpuId => usertrap_res (CID := h))
-      pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0 U sts fdep.
+      pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0 U sts gn cs fdep.
   Proof.
     cbv beta delta [wp_usertrap_body].
     intros pcE pj Hms Hj Hsp Htp Hmiev Hmask Hmenvv.
@@ -1386,7 +1388,7 @@ Section UtSeal.
                     Hmie Hmdl Hmenv Hgpr Htc Htrap Henv [Hcont Hxin Hfin]").
     iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV %HcwiV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
     iApply (ut_dispatch N (MkUstate V Mu) (MkUstate V' Mu) pt ksp m M av (av - 4)%nat sepc_v sc_v stval_v
-              mie_v menvcfg0 sts fdep
+              mie_v menvcfg0 sts gn cs fdep
               (ut_printk (fsc_printk) (fsc_uart) (fsc_disk))
               (conj HtfV (conj HuptV (conj HszV (conj eq_refl HcwiV))))
               Hwf Hav

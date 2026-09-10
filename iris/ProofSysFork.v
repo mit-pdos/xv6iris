@@ -105,11 +105,11 @@ Section ProofSysFork.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_fork_sconf
-      (γp γw γl γf : gname) (γs : list gname)
+      (γp γw γc γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
       (lks : gset string)
-    : wp_sys_fork_sconf_body γp γw γl γf γs
+    : wp_sys_fork_sconf_body γp γw γc γl γf γs
  m lvl av eb p b pid U sts lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
@@ -208,7 +208,7 @@ Section ProofSysFork.
        here.  So this function neither mints nor re-keys: the premise IS
        kfork's premise, which is the whole point of stating the child's
        state as a function of the parent's. *)
-    iApply (Kfork.wp_kfork_sconf γp γw γl γf γs
+    iApply (Kfork.wp_kfork_sconf γp γw γc γl γf γs
 
               Bj lvl (av - 2)%nat eb p b pid U sts lks
               ltac:(lia) Hlvl ltac:(lkbelow)

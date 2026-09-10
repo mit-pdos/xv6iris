@@ -149,7 +149,7 @@ Section ProofUsertrapTail.
                            & #Hgeom & #Hav & #Hfsr & #Hpw)".
     iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & Hufr & _)".
     iPoseProof (SpecPrintk.printk_env_panic with "Hpk") as "#Hpe".
-    iApply (KE.wp_kexit_sconf (un_ft N) (un_f N) (un_w N) (un_s N) (un_j N) (un_l N)
+    iApply (KE.wp_kexit_sconf (un_ft N) (un_f N) (un_w N) (un_ch N) (un_s N) (un_j N) (un_l N)
  (un_pd N) (un_pav N) (un_pu N)
 
               (un_ip N) (un_dqi N)
@@ -195,7 +195,7 @@ Section UtRet2.
          what usertrap was ENTERED at -- the index the caller's post is
          stated against -- and [sts] is what this tail is parking.  They
          differ on exactly one arm. *)
-      (sts0 sts : list fdstate)
+      (sts0 sts : list fdstate) (gn : gname) (cs : gset gname)
       (* the deposit's families, relayed with the syscall channel's row *)
       (fdep : sfam) :
     ut_wf N ->
@@ -262,17 +262,17 @@ Section UtRet2.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts -∗
+      (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
        the record it parks, at the resume view it parks it at --
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
-       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U))) -∗
+       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs
+         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U)) cs) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts0 epw scw fdep) -∗
+                     mie_v menvcfg0 U0 sts0 gn cs epw scw fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv Hrd Hepcw.
@@ -719,7 +719,7 @@ Section UtRet.
          what usertrap was ENTERED at -- the index the caller's post is
          stated against -- and [sts] is what this tail is parking.  They
          differ on exactly one arm. *)
-      (sts0 sts : list fdstate)
+      (sts0 sts : list fdstate) (gn : gname) (cs : gset gname)
       (* the deposit's families, relayed with the syscall channel's row *)
       (fdep : sfam) :
     ut_wf N ->
@@ -764,17 +764,17 @@ Section UtRet.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts -∗
+      (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
        the record it parks, at the resume view it parks it at --
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
-       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U))) -∗
+       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs
+         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U)) cs) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts0 epw scw fdep) -∗
+                     mie_v menvcfg0 U0 sts0 gn cs epw scw fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
@@ -876,6 +876,7 @@ Section UtRet.
                     = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))).
     { cbn [us_V]. rewrite HVrupt HVrsz. reflexivity. }
     iDestruct (ut_exec_out_ueq scw _ _ _ _ _ U (MkUstate Vr (us_M U)) sts0 sts
+                 gn cs
                  (tf_ueq_refl _) HVru eq_refl HVrpi HVrsz HVrcwi with "Hxo") as "Hxo".
     (* ...and the syscall channel's row across the same re-arming.  It reads
        the parked frame at a0 alone, which is what [tf_ueq] is blind to --
@@ -914,7 +915,7 @@ Section UtRet.
                     (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))).
       apply list_lookup_total_correct. exact Hepc. }
     iApply (ut_ret2 (CID := CIDp) Rsys N U0 (MkUstate Vr _) pt ksp m0 mf av nx b uepc vb
-              mie_v menvcfg0 epw scw lks sts0 sts fdep
+              mie_v menvcfg0 epw scw lks sts0 sts gn cs fdep
               Hwf' Hfdk Hfder Hpiper Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
               ltac:(rewrite (callee_saved_lookup Hcspr csp_rs1
                               ltac:(vm_compute; reflexivity)); exact HM1sp)
@@ -950,7 +951,7 @@ Section UtA6.
          what usertrap was ENTERED at -- the index the caller's post is
          stated against -- and [sts] is what this tail is parking.  They
          differ on exactly one arm. *)
-      (sts0 sts : list fdstate)
+      (sts0 sts : list fdstate) (gn : gname) (cs : gset gname)
       (* the deposit's families, relayed with the syscall channel's row *)
       (fdep : sfam) :
     ut_wf N ->
@@ -1000,17 +1001,17 @@ Section UtA6.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts -∗
+      (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
        the record it parks, at the resume view it parks it at --
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
-       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U))) -∗
+       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs
+         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U)) cs) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts0 epw scw fdep) -∗
+                     mie_v menvcfg0 U0 sts0 gn cs epw scw fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hbelow.
@@ -1219,7 +1220,7 @@ Section UtA6.
       iDestruct (wp_next_retarget CID3 CID4 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID4) Rsys N U0 U pt ksp m0 mf av nx b
-                mie_v menvcfg0 epw scw lks sts0 sts fdep
+                mie_v menvcfg0 epw scw lks sts0 sts gn cs fdep
                 Hwf' Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
@@ -1252,7 +1253,7 @@ Section UtFa.
          what usertrap was ENTERED at -- the index the caller's post is
          stated against -- and [sts] is what this tail is parking.  They
          differ on exactly one arm. *)
-      (sts0 sts : list fdstate)
+      (sts0 sts : list fdstate) (gn : gname) (cs : gset gname)
       (* the deposit's families, relayed with the syscall channel's row *)
       (fdep : sfam) :
     ut_wf N ->
@@ -1297,17 +1298,17 @@ Section UtFa.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts -∗
+      (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
     (* ...and the syscall channel's, relayed the same way: this tail moves
        nothing the row reads, and the a0 word it is read at is the one of
        the record it parks, at the resume view it parks it at --
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
-       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0
-         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U))) -∗
+       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs
+         (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U)) cs) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts0 epw scw fdep) -∗
+                     mie_v menvcfg0 U0 sts0 gn cs epw scw fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
@@ -1368,7 +1369,7 @@ Section UtFa.
       iDestruct (wp_next_retarget CID CID2 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID2) Rsys N U0 U pt ksp m0 M1 av nx b
-                mie_v menvcfg0 epw scw lks sts0 sts fdep
+                mie_v menvcfg0 epw scw lks sts0 sts gn cs fdep
                 Hwf' Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").
@@ -1456,7 +1457,7 @@ Section UtFa.
       iDestruct (wp_next_retarget CID4 CID5 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID5) Rsys N U0 U pt ksp m0 mf av nx b
-                mie_v menvcfg0 epw scw lks sts0 sts fdep
+                mie_v menvcfg0 epw scw lks sts0 sts gn cs fdep
                 Hwf' Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hxo Hso Hcont] Hframe Hxo Hso Hcont").

@@ -6,8 +6,8 @@
 (* concretely".  [UexecRet.uexec_ret_F]'s returning-syscall arm is        *)
 (*                                                                        *)
 (*    ∃ f, sbundle_at X n f W                                             *)
-(*         ∗ (∀ r … fdv' cw', <the four pure rows>                       *)
-(*                   -∗ spost_at X n f W r M' fdv' cw'                   *)
+(*         ∗ (∀ r … fdv' cw' cs', <the six pure rows>                    *)
+(*                   -∗ spost_at X n f W r M' fdv' cw' cs'               *)
 (*                   -∗ X (bump W r …))                                   *)
 (*                                                                        *)
 (* -- a DEPOSIT: the process's one-shot AU bundle for syscall [n] goes    *)
@@ -195,16 +195,24 @@ Definition skey_eq (W W' : uvis) : Prop :=
   /\ uvis_tf W !!! tf_arg_idx 1 = uvis_tf W' !!! tf_arg_idx 1
   /\ uvis_tf W !!! tf_arg_idx 2 = uvis_tf W' !!! tf_arg_idx 2
   /\ uvis_fd W = uvis_fd W'
-  /\ uvis_cwd W = uvis_cwd W'.
+  /\ uvis_cwd W = uvis_cwd W'
+  (* ...and the two WAIT-EXIT readings.  A bundle for wait(2) is about the
+     set of live children, and a bundle indexed by an escrow is about the
+     depositing generation, so both belong to the data a bundle may read
+     off the key.  Neither moves under the epc bump, so every prover of
+     this congruence still discharges it componentwise. *)
+  /\ uvis_gen W = uvis_gen W'
+  /\ uvis_ch W = uvis_ch W'.
 
 Lemma skey_eq_refl (W : uvis) : skey_eq W W.
 Proof. rewrite /skey_eq. split_and!; reflexivity. Qed.
 
 Lemma skey_eq_sym (W W' : uvis) : skey_eq W W' -> skey_eq W' W.
 Proof.
-  rewrite /skey_eq. intros (HM & H0 & H1 & H2 & Hfd & Hcw).
+  rewrite /skey_eq. intros (HM & H0 & H1 & H2 & Hfd & Hcw & Hg & Hch).
   split_and!; symmetry;
-    [ exact HM | exact H0 | exact H1 | exact H2 | exact Hfd | exact Hcw ].
+    [ exact HM | exact H0 | exact H1 | exact H2 | exact Hfd | exact Hcw
+    | exact Hg | exact Hch ].
 Qed.
 
 Class uexecSG (Σ : gFunctors) := {
@@ -240,12 +248,12 @@ Class uexecSG (Σ : gFunctors) := {
      remaining resume components -- the permission map and the break --
      no contract's receipt reads, so they stay out. *)
   spost_at : (uvis -d> iPropO Σ) -> Z -> sfam -> uvis -> mword 64 ->
-             gmap Z (bv 8) -> list fdstate -> Z -> iProp Σ;
+             gmap Z (bv 8) -> list fdstate -> Z -> gset gname -> iProp Σ;
 
   sbundle_at_ne : forall k,
     Proper (dist k ==> eq ==> eq ==> eq ==> dist k) sbundle_at;
   spost_at_ne : forall k,
-    Proper (dist k ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> dist k)
+    Proper (dist k ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> dist k)
       spost_at;
 
   sbundle_at_cong : forall (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
@@ -253,9 +261,9 @@ Class uexecSG (Σ : gFunctors) := {
     skey_eq W W' -> sbundle_at X n f W ⊣⊢ sbundle_at X n f W';
   spost_at_cong : forall (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
       (W W' : uvis) (r : mword 64) (M' : gmap Z (bv 8))
-      (fdv' : list fdstate) (cw' : Z),
+      (fdv' : list fdstate) (cw' : Z) (cs' : gset gname),
     skey_eq W W' ->
-    spost_at X n f W r M' fdv' cw' ⊣⊢ spost_at X n f W' r M' fdv' cw';
+    spost_at X n f W r M' fdv' cw' cs' ⊣⊢ spost_at X n f W' r M' fdv' cw' cs';
 
   (* the bundles are covariant in the slot family: the only place it occurs
      is exec's wand CONCLUSION *)
@@ -284,12 +292,14 @@ Global Existing Instance sbundle_at_ne.
 Global Existing Instance spost_at_ne.
 
 (* stdpp's [f_equiv] enumerates the application arities it can peel and stops
-   at FIVE; [spost_at] takes EIGHT, so a [solve_contractive] over it fails with
+   at FIVE; [spost_at] takes NINE, so a [solve_contractive] over it fails with
    a bare "No applicable tactic".  These are stdpp's own fallback pattern at
-   six, seven and eight, and Iris's tactic with it in the [first]; the U-mode
+   six through nine, and Iris's tactic with it in the [first]; the U-mode
    slot fixpoint [UexecRet.uslot_F] is the user. *)
 Ltac f_equiv_wide :=
   match goal with
+  | |- ?R (?f _ _ _ _ _ _ _ _ _) _ =>
+      simple apply (_ : Proper (_ ==> _ ==> _ ==> _ ==> _ ==> _ ==> _ ==> _ ==> _ ==> R) f)
   | |- ?R (?f _ _ _ _ _ _ _ _) _ =>
       simple apply (_ : Proper (_ ==> _ ==> _ ==> _ ==> _ ==> _ ==> _ ==> _ ==> R) f)
   | |- ?R (?f _ _ _ _ _ _ _) _ =>
