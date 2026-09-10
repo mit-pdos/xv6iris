@@ -45,6 +45,25 @@ patch: `projects/wx-briefs/`.
   assembly; `children_own_install` stays (the boot primitive), `children_own_del`
   dies.  Phase 2 = that sweep + the two parks + kfork's parent `children_own_upd`.
 
+## LATEST (2026-09-10, final checkpoint of this session)
+- WX-ROW + WX-RES FINISH phase 2 was RUNNING when this session ended (fresh Opus
+  agent, go-ahead with the rulings above).  The working tree is DIRTY with its
+  in-flight edits; a snapshot taken at this checkpoint is
+  `wx-briefs/wxrow-p2-inflight.patch` (the agent kept editing after it -- the tree
+  itself is authoritative; the patch is a fallback).  The agent's own backups are in
+  the old session's scratchpad and may be gone.
+- If you find the tree dirty: do NOT assume it is green.  Back it up, build once
+  (`./gcp-rocq/vmbuild.sh xv6iris-2 <log>`), read the red list, then either gate/
+  commit (if green: `make audit-only` = the thirteen, `lemma_diff` justified GONEs
+  `children_wf`, `children_own_del`, retyped sealed Parameters) or hand a fresh
+  agent a continuation of `wx-briefs/brief-wx-row-res-finish.md` carrying the phase-2
+  rulings verbatim from the section above ("WX-ROW phase 1 … rulings").
+- If you find the tree clean at a commit AFTER `d129bba6e` whose message names
+  WX-ROW/WX-RES: it landed; continue with WX-EXIT (`wx-briefs/brief-wx-exit.md`,
+  re-anchor file:line first: `ch_frag` now has no `γc` and carries the slot address).
+- Owner's clarification this session: the "discarded half" of the generation ghost is
+  Iris `DfracDiscarded` (a permanent read-only share), accepted as designed.
+
 ## HOW TO RESUME
 1. `git status --porcelain` in /shared/xv6iris-2.
    - CLEAN tree at/after `51f7ae907`: WX-RES either landed (check `git log`) or
