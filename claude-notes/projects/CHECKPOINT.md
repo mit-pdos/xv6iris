@@ -24,7 +24,14 @@ patch: `projects/wx-briefs/`.
   deletes kwait's reset); kexit parks its own row into the ZOMBIE block; `park_cap`'s
   `∀ cs` stays; `children_inv` stated not carried.  The "discarded half" of the
   generation ghost is Iris `DfracDiscarded`, accepted as designed.
-- WX-EXIT LAUNCHED (2026-09-10; fresh Opus agent, phase 1 then stop-and-report).  Its
+- WX-EXIT IN FLIGHT (2026-09-10).  Phase 1 reported; phase 2 ran on the first agent
+  until its context ran out at build `wxexit37` (six red files, lemma_diff clean);
+  a SECOND agent runs `wx-briefs/brief-wx-exit-finish.md` (state, the six reds,
+  the run-side `Q (-1)` plan P1-P4).  Tree DIRTY on purpose; snapshot
+  `wx-briefs/wxexit-inflight.patch`.  If found dirty and no agent alive: back up,
+  build once, read the red list, relaunch on the finish brief with the red list
+  appended.  Rulings given mid-lane are in app-echo.md "WX-EXIT RULINGS".
+- (history) WX-EXIT LAUNCHED (2026-09-10; fresh Opus agent, phase 1 then stop-and-report).  Its
   brief's last section "RE-ANCHORED AFTER THE WX-RES + WX-ROW LANDING" carries the
   corrections (ZOMBIE tightens to `∅`, kwait's reset dies, orphans canonical-named
   beside the map, the children move is kexit's).  Owner's standing instruction: keep
