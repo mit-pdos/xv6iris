@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (running) → WX-RES (the children fragment rides the residue; fork moves the map; `children_wf` carried; brief `brief-wx-res.md`) → WX-EXIT → WX-WAIT → WX-PID → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES (the children fragment rides the residue; fork moves the map; `children_wf` carried; brief `brief-wx-res.md`) → WX-EXIT → WX-WAIT → WX-PID → (1b) echo's discharge.
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -1892,6 +1892,68 @@ Parameter changed in place (`wait_res_at γc`).  Traps: iris `own` import for
 `gname` in spec files but NOT in pure files (`KforkChild`, `KexecBridge`:
 ssreflect `rewrite` grammar); `CoreId (None : optionUR (exclR unitO))` must be
 spelled out.  WX-PID (pid uniqueness in `PidLock.nextpid_res_at`) split off.
+
+WX-FORK LANDED (2026-09-10; briefs `brief-wx-fork.md`, `brief-wx-fork-finish.md`).
+- A generation is a SAVED PREDICATE (`iris/ChildTok.v`): `gen_own γ dq pa pid
+  Q := saved_anything_own (F := genF) γ dq ((pa, pid), Next ∘ Q)` with `genF
+  := prodOF (constOF (leibnizO (mword 64 * mword 32))) (Z -d> ▶ ∙)` -- the
+  slot ADDRESS (proc_pub's key), the pid and the exit payload.  `child_tok γ
+  pid Q` (the parent's quarter), `gen_kq γ pa pid Q` (the kernel's quarter),
+  `my_pay γ Q` (the discarded half, persistent: the child's knowledge of its
+  own payload), `exit_tok γ pid xs := ∃ pa Q, gen_kq … ∗ Q xs` (the escrow),
+  `gen_pay : child_tok γ pid Q -∗ exit_tok γ pid xs -∗ ▷ Q xs` and
+  `gen_pay_timeless` (`◇`, at a Timeless payload; a plain bupd does not absorb
+  except-0 -- one `iMod` at the reaper), `gen_alloc pa pid` (full ownership at
+  `fun _ => True`), `gen_set` (`saved_anything_update`), `gen_split` (1/4 +
+  1/4 + discard 1/2).  Class `ctokG` lives in ChildTok and `Xv6Cameras`
+  re-exports it (naming the raw `savedAnythingG Σ genF` in ~45 U-tier binders
+  drags `saved_prop`'s re-exports in and re-shadows `Forall_forall` and the
+  numeral scope).
+- The PRIVATE BLOCK names both ghosts: `ProcDefs.pprivate`'s trailing `pv_gen`
+  (this incarnation) and `pv_chg` (its children row's name); every `upd_*`
+  and exec (`KexecOkQ`: `pv_gen V' = pv_gen V ∧ pv_chg V' = pv_chg V`)
+  preserve them; `uvis_of` keeps its arity (the child's key is a function of
+  the PARENT's block) but `park_cap` DROPPED its `∀ gn` and keys the parked
+  slot at `pv_gen (us_V U)` (the closer's `⌜pv_gen (us_V U') = gn⌝`, the
+  `pv_fdg` mold); `∀ cs` stays until WX-RES.  WX-KEY's placeholder cell
+  (`SchedCtx.gen_tok/gen_slot/proc_gen/proc_pub_bare/proc_pub_mint*`,
+  `Xv6Cameras.genG`) is GONE (21 justified GONEs).
+- The PAYLOAD is a field of the FAMILIES, not an `∃ Q` (the trap route splits
+  a return into deposit and arm and carries them past each other --
+  `uexec_ret_F_split` hands out only `∃ f`): `UexecSG.sfork_pay : sfam -> Z
+  -> iProp`, `sfam_pay`; `UexecExecInst.xfam`'s trailing `kf_pay`
+  (`xfam_exec` unchanged at the trivial payload = the generic slot).
+- allocproc mints `gen_own γ 1 pa pid (fun _ => True)` into the new block
+  (`SpecAllocproc.v:~210`); kfork `gen_set`s the payload and `gen_split`s:
+  `kfork_post`'s pid arm carries `child_tok γ pidv Q`; the child's slot
+  premise is `∀ γ, my_pay γ Q -∗ uslot (uvis_of (kfork_child U) sts γ ∅)`;
+  the kernel's quarter is DROPPED at the split (WX-EXIT's escrow takes it).
+  `UexecRet.ufork_ans Q r cs cs' := ⌜r = -1 ∧ cs' = cs⌝ ∨ ∃ γ pidv, ⌜r =
+  sign_extend' 64 pidv⌝ ∗ ⌜cs' = cs ∪ {[γ]}⌝ ∗ child_tok γ pidv Q` (fork can
+  fail: the answer is two-armed); `sysc_fork_out`/`ut_fork_out` the same at
+  the a0 word; NO pure fork row in `usys_ch_ok` (the set's move carries a
+  resource, so it lives in the answer); the trap route carries no `cs'`: the
+  loop CHOOSES the resume key's `uvis_ch` (`ProofUserretClosed.v:~555`)
+  because nothing backs the reading yet -- the ruled boundary, stated at
+  `kfork_post`'s token arm and `WaitInv.ch_frag`.
+- The `wait_lock` children mirror is `WaitInv.children_own_at γc (m : gmap
+  gname (gset gname)) := ghost_map_auth γc 1 m`, `ch_frag γc γ S := γ ↪[γc]
+  S` (a per-slot `ghost_var` half could not say WHICH entry is the holder's
+  own; the ghost_map fragment proves its membership), `children_own_lookup/
+  upd/install/del`; rows installed under `wait_lock` at a name fresh for
+  the domain (`fresh (dom m)`; gnames are positives): kfork installs the
+  child's at `np->parent = p` and writes it to `pv_chg`; main installs init's
+  at `wait_res_alloc` (`∃ γc γ0, wait_res γc ∗ ch_frag γc γ0 ∅`) -- userinit
+  takes no `wait_lock`.  allocproc does NOT mint `pv_chg`.  `children_wf ps m
+  chs gs` restated, still NOT carried.
+- The U tier: `UkFork.wp_uk_ecall_fork` takes `(Sc : gset gname) (Q : Z ->
+  iProp Σ)`, the premise `uch (ukn_ch N) Sc`, and gives the parent arm the
+  two-armed answer; `wp_uk_ecall_fork_any` is the index-free leaf at `Q :=
+  fun _ => True` (`uch_any`, token dropped, `⌜r ≠ 0⌝` kept); init threads
+  `uch_any γch` beside its `ucwd` from `UInitKernel.init_uexec_slot` to the
+  fork stub; sh carries it inside `UkSh.ush_pstate` (third conjunct; the
+  thirteen sites unchanged).
+- `UexecSlot.tf_resume_gpr_a0` bridges the a0 word and the return value.
 
 #### WAIT-EXIT — DESIGN OF RECORD (2026-09-09, owner asked for design + implementation)
 
