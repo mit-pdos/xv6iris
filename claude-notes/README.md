@@ -224,3 +224,5 @@ Not listed here: `ls claude-notes/projects/` and read the banners.
 Nobody reads these for guidance; they are where a finished effort's narrative
 goes once its lessons are lifted into the design or durable notes. Not listed
 here either: `ls claude-notes/completed/`.
+
+**Resuming a coordinator session?** Read `projects/CHECKPOINT.md` first.
