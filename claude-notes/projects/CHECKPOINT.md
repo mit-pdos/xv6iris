@@ -29,7 +29,10 @@ patch: `projects/wx-briefs/`.
   corrections (ZOMBIE tightens to `∅`, kwait's reset dies, orphans canonical-named
   beside the map, the children move is kexit's).  Owner's standing instruction: keep
   going through checkpoints -- land, note, launch the next lane, no pausing to ask.
-- NEXT after it: WX-INV → WX-WAIT → WX-PID → ARM-c (1b) → L7.  Original WX-EXIT re-anchoring note: it
+- NEXT after it (REVISED, design in app-echo.md "WX-GEN / WX-INV / WX-WAIT — DESIGN"):
+  WX-GEN (`wx-briefs/brief-wx-gen.md`, written; launch when WX-EXIT lands -- same
+  files) → WX-INV → WX-WAIT → ARM-c (1b) → L7.  WX-PID is absorbed into WX-GEN
+  (pid uniqueness IS the `pid_reg` ghost map's agreement).  Original WX-EXIT re-anchoring note: it
   was drafted against a pre-landing tree -- `ch_frag` has no `γc` and carries the
   slot address; `children_own_del` is GONE (X3 must empty the dying process's row
   with `children_own_upd` to `∅` and move `S` to the orphans, then park the row at
@@ -50,11 +53,8 @@ patch: `projects/wx-briefs/`.
    outside iris/ modified.  Commit iris with `git add -A -- iris/`, notes by path;
    `git fetch`; if origin moved, `git rebase -X theirs origin/main`, rebuild, re-audit;
    push.  Never stash/reset/add -A (except `-- iris/`)/commit -a/amend.
-3. Then, in order: WX-EXIT (`brief-wx-exit.md`, re-anchor file:line first) → WX-INV (carry `children_inv` + orphans in
-   `wait_res_at`, binding `ps` and `m`) → WX-WAIT (kwait returns the escrow with
-   `⌜γ' ∈ uvis_ch⌝` and pid uniqueness; init's `wp_kinit_wait`) → WX-PID (pid
-   uniqueness in `PidLock.nextpid_res_at`) → ARM-c (1b) (echo discharges
-   `Hinit_boot`; needs the taint) → L7.
+3. Then, in order: WX-EXIT → WX-GEN → WX-INV → WX-WAIT (see the design section
+   named above) → ARM-c (1b) (echo discharges `Hinit_boot`; needs the taint) → L7.
 4. Standing rulings (owner): one spec per syscall; no persistent promises across the
    ecall seam; resources are real (cwd, children) never piggybacked; no GAP premises
    (a child program's entry premise must have a discharger in the parent);
