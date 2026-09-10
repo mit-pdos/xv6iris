@@ -13,93 +13,39 @@ patch: `projects/wx-briefs/`.
 - Landed today: WX-KEY (`987f79afd`), WX-FORK (`901f9aba5`, rebased over a
   nightly dead-import sweep `086c81b9f`).
 
-## State of the WORKING TREE at this checkpoint (2026-09-10, later)
-- The tree is DIRTY with WX-RES phase-2 WIP: 23 modified iris/*.v (backup
-  `wx-briefs/wxres-p2.patch`, apply with `git apply` onto `51f7ae907`/`e90eacb4c`
-  if the tree was cleaned).  Build `wxres6`: COMPILED=1010, EXIT=2, FOUR red roots
-  (`ProofKforkB5.v:~320`, `ProofUserinit.v:~809`, `ProofSyscall.v:~1743`,
-  `ProofUsertrapSys.v:~291`).  Everything else in the lane is landed and green (see
-  `wx-briefs/brief-wx-row-res-finish.md` "STATE").
-- WX-RES stopped on a STRUCTURAL blocker: kfork seals the child's residue at its
-  first `release(&np->lock)` before it takes `wait_lock`, so it cannot install the
-  child's children row; main cannot name init's slot either.  RULED (P): rows are
-  per-slot, born at boot by `wait_res_alloc` (NPROC rows), riding the DORMANT block
-  exactly as the descriptor ghost does; allocproc hands the row out and writes its
-  name into `pv_chg`; freeproc returns it; `children_own_install/_del` die.  That is
-  lane WX-ROW, folded with the WX-RES finish into ONE brief:
-  `wx-briefs/brief-wx-row-res-finish.md`.  An agent may have been launched on it.
-
-## WX-ROW phase 1 (later still): rulings given for phase 2
-- Tree: the WX-RES WIP plus the dispatcher relay landed green (`ProofSyscall`,
-  `ProofUsertrapSys`, `ProofUsertrap`); TWO red roots (`ProofKforkB5.v:~320`,
-  `ProofUserinit.v:~809`).  Backup `wx-briefs/wxrow-p1.patch`.
-- RULED: the children map's name becomes CANONICAL (class-carried `wch_name` on
-  `Xv6Cameras.wchG`, minted in the boot fupd beside `fd_slots_alloc`/`bslots_alloc`;
-  the `fdslot_name`/`pav_name`/`bioslot_name` precedent) so `ProcDefs` can name the
-  row and `γc` disappears from `wait_res_at`/`ch_frag`/`un_ch`/`park_globals` (a
-  deleting sweep).  The row RIDES the dormant block on the `kstack_free`/`bslots 3`
-  mold (enters at `proc_dormant_seal`, leaves at `proc_dormant_unused`): `∅` at
-  UNUSED, `∃ S` at ZOMBIE this lane (kwait resets the zombie's row to `∅` under
-  `wait_lock` before `freeproc`; WX-EXIT tightens to `∅`).  `wait_res_alloc` moves
-  BEFORE `procs_inv_alloc` in ProofMain and yields the NPROC rows for the per-slot
-  assembly; `children_own_install` stays (the boot primitive), `children_own_del`
-  dies.  Phase 2 = that sweep + the two parks + kfork's parent `children_own_upd`.
-
-## LATEST (2026-09-10, final checkpoint of this session)
-- WX-ROW + WX-RES FINISH phase 2 was RUNNING when this session ended (fresh Opus
-  agent, go-ahead with the rulings above).  The working tree is DIRTY with its
-  in-flight edits; a snapshot taken at this checkpoint is
-  `wx-briefs/wxrow-p2-inflight.patch` (the agent kept editing after it -- the tree
-  itself is authoritative; the patch is a fallback).  The agent's own backups are in
-  the old session's scratchpad and may be gone.
-- If you find the tree dirty: do NOT assume it is green.  Back it up, build once
-  (`./gcp-rocq/vmbuild.sh xv6iris-2 <log>`), read the red list, then either gate/
-  commit (if green: `make audit-only` = the thirteen, `lemma_diff` justified GONEs
-  `children_wf`, `children_own_del`, retyped sealed Parameters) or hand a fresh
-  agent a continuation of `wx-briefs/brief-wx-row-res-finish.md` carrying the phase-2
-  rulings verbatim from the section above ("WX-ROW phase 1 … rulings").
-- If you find the tree clean at a commit AFTER `d129bba6e` whose message names
-  WX-ROW/WX-RES: it landed; continue with WX-EXIT (`wx-briefs/brief-wx-exit.md`,
-  re-anchor file:line first: `ch_frag` now has no `γc` and carries the slot address).
-- Owner's clarification this session: the "discarded half" of the generation ghost is
-  Iris `DfracDiscarded` (a permanent read-only share), accepted as designed.
-
-## LATEST+1 (2026-09-10, successor session, Fable coordinator)
-- Found the tree DIRTY (284 iris files, the in-flight phase-2 sweep, slightly ahead
-  of the old snapshot); backed it up and refreshed `wx-briefs/wxrow-p2-inflight.patch`
-  to it.  Built once (`wxrow7`): COMPILED=720, EXIT=2, ONE error --
-  `ProcInv.v:2748` `proc_priv_to_dormant_zombie` (the ZOMBIE block now carries the
-  row, the lemma takes none in); everything above ProcInv SKIPPED, so the red list
-  above it is unknown.  Grep showed the row still absent from kfork B5's park and
-  parent move, userinit's park, kwait's reap reset, and kexit's ZOMBIE park.
-- Wrote the continuation brief `wx-briefs/brief-wx-row-res-finish-2.md` (rulings
-  restated; R1 kexit's row premise through SpecKexit/SpecSysExit/the dispatcher's
-  exit arm; R2 userinit; R3 kfork child row + parent `children_own_upd` at +0xd4 with
-  the moved row returned through `kfk_b5`'s continuation; R4 kwait's reset; R5 the
-  rest of the red list) and launched a fresh Opus agent on it.
-- If you find this session gone and the tree dirty: same rule as above -- back up,
-  build once, read the red list, then gate/commit or relaunch on
-  `brief-wx-row-res-finish-2.md` with the red list appended.
+## State of main (2026-09-10, latest)
+- WX-RES + WX-ROW LANDED: `96de38269` (iris, 288 files), gated on the VM (build
+  `wxrow13` EXIT=0, `make audit-only` = the thirteen, `lemma_diff` = the three
+  justified GONEs `children_wf`/`children_own_del`/`children_own_install`).  The
+  as-landed note is in `app-echo.md` ("WX-RES + WX-ROW LANDED").  Tree CLEAN.
+- Rulings that shaped it (kept here because WX-EXIT/WX-INV build on them): the map's
+  name is canonical (`Xv6Cameras.wch_name`); rows are per-slot, born at boot, riding
+  the dormant block (`∅` at UNUSED, `∃ S` at ZOMBIE -- WX-EXIT tightens to `∅` and
+  deletes kwait's reset); kexit parks its own row into the ZOMBIE block; `park_cap`'s
+  `∀ cs` stays; `children_inv` stated not carried.  The "discarded half" of the
+  generation ghost is Iris `DfracDiscarded`, accepted as designed.
+- NEXT: WX-EXIT (`wx-briefs/brief-wx-exit.md`).  Re-anchor its file:line first: it
+  was drafted against a pre-landing tree -- `ch_frag` has no `γc` and carries the
+  slot address; `children_own_del` is GONE (X3 must empty the dying process's row
+  with `children_own_upd` to `∅` and move `S` to the orphans, then park the row at
+  `∅`, which is what lets ZOMBIE tighten); `SpecKexit.wp_kexit_sconf_body` already
+  takes the dying process's row at `cs` (R1 of the finish-2 brief), so X3's "the
+  residue in hand" is kexit's contract, not reparent's.
 
 ## HOW TO RESUME
 1. `git status --porcelain` in /shared/xv6iris-2.
-   - CLEAN tree at/after `51f7ae907`: WX-RES either landed (check `git log`) or
-     was never applied.  If not landed: launch a fresh Opus agent on
-     `wx-briefs/brief-wx-res.md` (both phases; apply the rulings above), then
-     gate/commit/push (procedure below), then WX-EXIT (`brief-wx-exit.md`).
-   - DIRTY tree with WX-RES/WX-ROW WIP: back it up (`git diff -- iris/ >
-     <backup>.patch`), build it once (`./gcp-rocq/vmbuild.sh xv6iris-2 <log>`),
-     read the red list, and hand a fresh Opus agent
-     `wx-briefs/brief-wx-row-res-finish.md` (or a continuation of it: state + red
-     files + "do not revert"), the way `brief-wx-fork-finish.md` did.  If the WIP
-     is exactly `wxres-p2.patch`, that brief applies as written.
+   - CLEAN tree at/after `96de38269`: continue with the NEXT lane above (launch a
+     fresh Opus agent on its brief, two phases, stop-and-report after phase 1).
+   - DIRTY tree with a lane's WIP: back it up (`git diff -- iris/ > <backup>.patch`),
+     build it once (`./gcp-rocq/vmbuild.sh xv6iris-2 <log>`), read the red list,
+     and hand a fresh Opus agent a continuation brief (state + red files + rulings
+     + "do not revert"), the way `brief-wx-row-res-finish-2.md` did.
 2. Gate before any commit: zero `Error`/`EXIT=0`; VM `make audit-only` = EXACTLY
    the thirteen; `tools/lemma_diff.py` clean; `git diff --cached` empty; nothing
    outside iris/ modified.  Commit iris with `git add -A -- iris/`, notes by path;
    `git fetch`; if origin moved, `git rebase -X theirs origin/main`, rebuild, re-audit;
    push.  Never stash/reset/add -A (except `-- iris/`)/commit -a/amend.
-3. Then, in order: WX-EXIT (`brief-wx-exit.md`, drafted against the WX-RES landing
-   -- re-anchor file:line first) → WX-INV (carry `children_inv` + orphans in
+3. Then, in order: WX-EXIT (`brief-wx-exit.md`, re-anchor file:line first) → WX-INV (carry `children_inv` + orphans in
    `wait_res_at`, binding `ps` and `m`) → WX-WAIT (kwait returns the escrow with
    `⌜γ' ∈ uvis_ch⌝` and pid uniqueness; init's `wp_kinit_wait`) → WX-PID (pid
    uniqueness in `PidLock.nextpid_res_at`) → ARM-c (1b) (echo discharges

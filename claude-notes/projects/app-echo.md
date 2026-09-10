@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES (phase 2 WIP, dirty tree; blocked on the row installs → RULED (P): rows per slot born at boot riding the dormant block, the `pv_fdg` mold) + WX-ROW (one brief: `wx-briefs/brief-wx-row-res-finish.md`) → WX-EXIT → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -1956,6 +1956,53 @@ WX-FORK LANDED (2026-09-10; briefs `brief-wx-fork.md`, `brief-wx-fork-finish.md`
   fork stub; sh carries it inside `UkSh.ush_pstate` (third conjunct; the
   thirteen sites unchanged).
 - `UexecSlot.tf_resume_gpr_a0` bridges the a0 word and the return value.
+
+WX-RES + WX-ROW LANDED (2026-09-10; briefs `brief-wx-res.md`,
+`brief-wx-row-res-finish.md`, `brief-wx-row-res-finish-2.md`; commit `96de38269`).
+- THE MAP'S NAME IS CANONICAL: `Xv6Cameras.wch_name` (class-carried on `wchG`,
+  minted with the map in the boot fupd by `WaitInv.children_res_alloc`, the
+  `fdslot_name`/`pav_name` precedent).  No lemma threads a `γc`; `ut_names.un_ch`
+  and `park_globals` lost it.  `ch_frag γ0 pa S := γ0 ↪[wch_name] (pa, S)` is ONE
+  SLOT'S row and carries its owner's slot address in the value (the map cannot
+  otherwise say which key is whose).
+- ROWS ARE PER-SLOT, BORN AT BOOT (rows cannot be installed later: kfork seals the
+  child's residue at its first `release(&np->lock)` BEFORE it takes `wait_lock`,
+  and allocproc never holds it).  `WaitInv.children_boot` = the authority + NPROC
+  rows at `∅`, carried unopened through `BootShared`/`BootChain`/`SpecMain` to
+  `ProofMain`, which pairs the authority with the parent cells for `wait_lock`
+  (`wait_res_alloc` is now the pure pairing) and hands the rows to
+  `SpecProcinit.procs_inv_alloc`'s third pass; `ProcInv.proc_dormant_seal`/
+  `_prestk_seal` write the row's name into the block (`upd_chg`) -- the `pv_chg`
+  the .bss carve left is junk until then, exactly as `pv_fdg` is.
+- THE DORMANT BLOCK HOLDS THE ROW on the `kstack_free`/`bslots 3` footing
+  (`ProcDefs.proc_dormant`/`_noctx`): `∅` when UNUSED, `∃ S` when ZOMBIE.  WX-EXIT
+  tightens ZOMBIE to `∅` (kexit reparents first) and deletes kwait's reset.
+- THE ROUTE: allocproc hands the row out beside `fd_frags` (`proc_dormant_unused`,
+  `allocproc_post`'s found arm at `ch_frag (pv_chg (us_V U)) (proc_addr j) ∅`);
+  the parkers capture it at a named set (`ParkCap.park_token_park`/`_steady`;
+  `park_cap`'s `∀ cs` STAYS -- no projection of `U` determines it; the parker names
+  it off the row); it rides the trap residue (`UsertrapRes.ut_own … ∗ ch_frag
+  (pv_chg (us_V U)) (un_pj N) cs`, the `cs` index on `ut_env/ut_res/ut_hold` and
+  the accessors), which is what `UexecSlot.uvis_ch` reads.  kfork moves the
+  caller's row to `csP ∪ {[γ]}` under `wait_lock` at +0xd4 (`ProofKforkB5.kfk_b5`,
+  `children_own_upd`, γ = the child's `pv_gen`) and returns it in `kfork_post`'s
+  pid arm; both failure arms return it unmoved; the child is parked with the row
+  allocproc gave it.  `ufork_ans`/`sysc_fork_out`/`ut_fork_out` carry `cs cs'`;
+  the dispatcher relays the row and `cs'` (`sysc_hcont_ty`/`sysc_ret_tail`/
+  `sysc_epilogue_tail`/`sysc_fallback`, `sysc_ch_ok`; `ProofUsertrapSys.ut_90`);
+  `ProofUserretClosed` READS the resume key's set off the residue.
+- kwait empties a reaped zombie's row under `wait_lock` before `freeproc`
+  (`kw_reap`); `wp_freeproc_sconf` takes the row at `∅` back into the UNUSED block.
+  kexit parks its OWN row into the ZOMBIE block (`proc_priv_to_dormant_zombie` →
+  `SpecKexit.kexit_park_pay`), relayed off the residue by `SpecSysExit` and the
+  dispatcher's exit arm: a row's only route into a ZOMBIE block (WX-EXIT's X3).
+- `children_inv ps m` (a generation in a row's set is the generation of a slot
+  whose parent cell holds the row owner's address) is STATED as a resource over
+  `gen_slot`, NOT CARRIED (WX-INV binds `ps` and `m` together).  GONE:
+  `children_wf`, `children_own_del`, `children_own_install`.
+- Traps: `SpecForkretPark`'s binders need `!wchG Σ` (the dormant block reaches
+  `proc_ctx`); the adequacy top needs `!wchGpreS Σ` and `Hinit_boot` a `!wchG Σ`
+  binder (the era's instance comes out of `boot_shared_alloc`).
 
 #### WAIT-EXIT — DESIGN OF RECORD (2026-09-09, owner asked for design + implementation)
 
