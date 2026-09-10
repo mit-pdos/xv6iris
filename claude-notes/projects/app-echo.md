@@ -2108,6 +2108,19 @@ WX-PID is absorbed: pid uniqueness IS `pid_reg`.
   (`gen_pay` yields `▷ Q xs`); kexit is stated at its status argument with
   premises `my_pay (pv_gen (us_V U)) Q ∗ Q xs`.  The exit leaf takes
   `(ukn_pay N (-1) -∗ ukn_pay N xs ∧ ukn_pay N (-1))`.
+- THE EXIT PAYLOAD IS A FIELD OF THE FAMILY, like the fork payload
+  (`UexecSG.sexit_pay : sfam -> Z -> iProp`, `sfam_at Q f`, `sexit_pay sfam_pt
+  = fun _ => True`; `xfam` gains the field beside `kf_pay`): deposit and arm are
+  split at the trap and travel past each other, so an `∃ Q` under the saved
+  predicate's later cannot be matched back at the arm -- `UexecSG.v`'s own
+  note for `sfork_pay`.  `uexec_pay_dep sc W f`/`uexec_pay_arm f`,
+  `ut_pay_in f`/`ut_pay_out f`, `sysc_pay_in f`/`sysc_pay_out f` ride the
+  rows that already carry `f`; kexit at `Q := sexit_pay f`.
+- THE STEP ENGINE MOVES `Q (-1)` AT EVERY TRAP ARM, including the interrupt
+  and the load/store page-fault arms: `uk_payload` carries `Q (-1) ∗ my_pay gn
+  Q` with its continuation `Q (-1) -∗ (Kc ∧ ukc …)`; `wp_uk_step`/`wp_uk_ecall`
+  take `my_pay gn Q -∗ Q (-1) -∗ ▷ (Q (-1) -∗ Kc)`.  Resting the payload in the
+  block or the parked record would take it away from the running program.
 - THE ESCROW IS KEYED AT THE STORED STATUS, TIED BY THE HALF-CELL (this
   replaces the earlier "keyed at `exit_xs (pv_tf V)`"): `SchedCtx.proc_pub`
   holds `p_xstate` at 1/2; the other half rides the process
