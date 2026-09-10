@@ -29,6 +29,22 @@ patch: `projects/wx-briefs/`.
   lane WX-ROW, folded with the WX-RES finish into ONE brief:
   `wx-briefs/brief-wx-row-res-finish.md`.  An agent may have been launched on it.
 
+## WX-ROW phase 1 (later still): rulings given for phase 2
+- Tree: the WX-RES WIP plus the dispatcher relay landed green (`ProofSyscall`,
+  `ProofUsertrapSys`, `ProofUsertrap`); TWO red roots (`ProofKforkB5.v:~320`,
+  `ProofUserinit.v:~809`).  Backup `wx-briefs/wxrow-p1.patch`.
+- RULED: the children map's name becomes CANONICAL (class-carried `wch_name` on
+  `Xv6Cameras.wchG`, minted in the boot fupd beside `fd_slots_alloc`/`bslots_alloc`;
+  the `fdslot_name`/`pav_name`/`bioslot_name` precedent) so `ProcDefs` can name the
+  row and `γc` disappears from `wait_res_at`/`ch_frag`/`un_ch`/`park_globals` (a
+  deleting sweep).  The row RIDES the dormant block on the `kstack_free`/`bslots 3`
+  mold (enters at `proc_dormant_seal`, leaves at `proc_dormant_unused`): `∅` at
+  UNUSED, `∃ S` at ZOMBIE this lane (kwait resets the zombie's row to `∅` under
+  `wait_lock` before `freeproc`; WX-EXIT tightens to `∅`).  `wait_res_alloc` moves
+  BEFORE `procs_inv_alloc` in ProofMain and yields the NPROC rows for the per-slot
+  assembly; `children_own_install` stays (the boot primitive), `children_own_del`
+  dies.  Phase 2 = that sweep + the two parks + kfork's parent `children_own_upd`.
+
 ## HOW TO RESUME
 1. `git status --porcelain` in /shared/xv6iris-2.
    - CLEAN tree at/after `51f7ae907`: WX-RES either landed (check `git log`) or
