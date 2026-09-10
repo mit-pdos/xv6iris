@@ -98,7 +98,7 @@ Local Ltac npidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 
 Section ProofNparWrapEraMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE WRAPPER, AT THE TRACE CONTRACT.  [ProofNameiparent]'s eleven

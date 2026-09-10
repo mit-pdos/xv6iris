@@ -308,7 +308,7 @@ Section UInitSh.
      [Context {PS}] here -- a local instance beside the global one is two
      [sbundle]s that print identically. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
 

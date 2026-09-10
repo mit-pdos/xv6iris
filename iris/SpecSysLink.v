@@ -276,7 +276,7 @@ Qed.
 
 Section SysLinkAbs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
@@ -477,7 +477,7 @@ Global Typeclasses Opaque link_arms.
 
 Definition wp_sys_link_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)      (* ftable, kalloc, printk   *)
     (gs : list gname) (j : nat) (gl : gname)     (* the running process      *)
    (* disk fabric + lock *)
@@ -616,7 +616,7 @@ Definition wp_sys_link_sconf_body
 
 Module Type SYSLINK.
   Parameter wp_sys_link_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

@@ -124,7 +124,7 @@ Local Open Scope Z_scope.
 (* ===================================================================== *)
 Section SysExecAUBridge.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
@@ -201,7 +201,7 @@ Module Import Parts :=
 (* ===================================================================== *)
 Section SysExecBreakAU.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -576,7 +576,7 @@ End SysExecBreakAU.
 (* ===================================================================== *)
 Section SysExecWhole.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

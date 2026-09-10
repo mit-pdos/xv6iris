@@ -153,7 +153,7 @@ Module FilestatProof (Myproc : MYPROC) (Ilock : ILOCK) (Stati : STATI)
 
 Section ProofFilestat.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

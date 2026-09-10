@@ -284,7 +284,7 @@ Module T := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
    SECTION, not on the file, so it is recorded here where the application is:
    moving either lemma back beside its caller would reintroduce it. *)
 Section KexecABody.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -2138,7 +2138,7 @@ End KexecABody.
 (*  which prints as the same term twice (durable-notes).                  *)
 (* ===================================================================== *)
 Section KexecAMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

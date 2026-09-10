@@ -715,10 +715,11 @@ Section UexecRet.
         (* ...AND FORK'S ANSWER, which is where the children reading moves:
            on the success arm the set grows by the child's generation and
            the token comes with it, because neither is worth anything
-           alone.  The RESOURCE behind the reading -- the row of the
-           <wait_lock> children map, [WaitInv.ch_frag] -- rides the
-           kernel's residue only from lane WX-RES on; until then the
-           grown set is the key the trap loop builds. *)
+           alone.  The set is READ and not chosen: the resource behind the
+           reading -- the row of the <wait_lock> children map,
+           [WaitInv.ch_frag] -- rides the kernel's residue
+           ([UsertrapRes.ut_own]) and kfork moves it under that lock, so
+           the answer the kernel hands up says what the set became. *)
         ufork_ans Q r (uvis_ch W) cs' -∗
         X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv' cw'
              (uvis_gen W) cs'))%I.

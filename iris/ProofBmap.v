@@ -161,7 +161,7 @@ Set Printing Depth 40.
 (*  about the code.                                                       *)
 (* ===================================================================== *)
 Section BmapKit.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.   (* [log_ctx] carries the swap receipt's gen id *)
   Context `{XI : CurCtx}.
 
@@ -427,7 +427,7 @@ End BmapKit.
    report keys off that suffix and this is an internal statement, not one of
    bmap's two public interfaces (tools/proof_coverage.py). *)
 Definition bm_gen_stmt
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     
     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -544,7 +544,7 @@ Local Ltac bmidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  continuation.                                                         *)
 (* ===================================================================== *)
 Section BmapDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* bmap's 48-byte frame: ra@40 s0@32 s1@24 s2@16 s3@8, and slot 0 --
@@ -642,7 +642,7 @@ Definition bm_sp (m M : regfile) : Prop :=
 (*  +0x8a .. +0x98 : THE JOIN.                                            *)
 (* ===================================================================== *)
 Section BmapEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   Local Lemma bm_epilogue `{GEN : GenId} `{CID0 : CpuId} 
@@ -977,7 +977,7 @@ End BmapEpilogue.
 (*  Reached by THREE of the five arms.                                    *)
 (* ===================================================================== *)
 Section BmapRelease.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   Local Lemma bm_release `{GEN : GenId} `{CID0 : CpuId} 
@@ -1170,7 +1170,7 @@ End BmapRelease.
 (*  entry bn-NDIRECT, and (if it is empty) allocate one and log it.       *)
 (* ===================================================================== *)
 Section BmapTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   Local Lemma bm_indirect_tail `{GEN : GenId} `{CID0 : CpuId} 
@@ -2185,7 +2185,7 @@ End BmapTail.
 (*  +0x00 .. +0x60 : the prologue, the DIRECT arm, and the indirect head. *)
 (* ===================================================================== *)
 Section ProofBmapMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bmap_gen 
@@ -3585,7 +3585,7 @@ Module BmapProof (BA : BALLOC) (BR : BREAD) (BL : BRELSE) (LW : LOG_WRITE) : BMA
 Module Core := BmapCore BR BL.
 
 Section BmapSeal.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bmap_sconf 
@@ -3766,7 +3766,7 @@ Module BmapNoallocProof (BR : BREAD) (BL : BRELSE) : BMAP_NOALLOC.
 Module Core := BmapCore BR BL.
 
 Section BmapNoallocSeal.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bmap_noalloc_sconf 

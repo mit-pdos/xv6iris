@@ -192,7 +192,7 @@ Definition fsi_thr4 (m M : regfile) : Prop :=
 
 Section FsinitDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* ra@24 s0@16 s1@8 s2@0 off the pushed sp, i.e. slots 1..4 off the entry *)
   Definition fsi_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
@@ -282,7 +282,7 @@ End FsinitDefs.
 (* ===================================================================== *)
 Section FsinitEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
@@ -527,7 +527,7 @@ End FsinitEpilogue.
 (* ===================================================================== *)
 Section FsinitMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)

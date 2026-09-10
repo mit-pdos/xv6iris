@@ -103,7 +103,7 @@ Local Open Scope Z_scope.
 
 Section FsAbsInvFire.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)

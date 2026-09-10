@@ -1442,7 +1442,7 @@ Qed.
 (* through [kv_cfg_split], and comes back out for the sret.                  *)
 (* ===================================================================== *)
 Section KernelvecHandler.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma kernelvec_handler_spec (γu : uart_names) (γv : disk_names)

@@ -72,7 +72,7 @@ Import Defs.
    fraction is invisible -- which is exactly what every existing caller
    (bget, ilock) takes, unchanged.  The tracked instance ([H := slh_tok γsl])
    is what makes [wp_acquiresleep_nb_body] at the foot of this file possible. *)
-Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
     (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
@@ -141,7 +141,7 @@ Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ,
    pair, minted at the ENTRY acquire's AMO.  Valid on every path: the pair
    is persistent-monotone, so sleeping does not stale it.  The plain tier
    below is this at [Tl := 0]. *)
-Definition wp_acquiresleep_gen_llb_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_acquiresleep_gen_llb_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
     (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Tl : nat) :=
@@ -213,7 +213,7 @@ Definition wp_acquiresleep_gen_llb_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG
    payload); the winner receives [R cur_ctx] through the inner lock's
    standard payload morph.  Every const tier below is this at
    [R := λ _, R0]. *)
-Definition wp_acquiresleep_genl_llb_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_acquiresleep_genl_llb_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
     (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Tl : nat) :=
@@ -282,7 +282,7 @@ Definition wp_acquiresleep_genl_llb_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslot
   WP (Loop : expr riscv_lang).
 
 
-Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
@@ -390,7 +390,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fd
    THIS IS THE ONLY WAY TO TAKE A SLEEPLOCK WITH A SPINLOCK HELD.  The
    blocking contracts are all at [cpu_own 0], which is what makes sched's
    [noff != 1] panic unreachable from here. *)
-Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (* THE DEPOSIT'S OWN GNAME, separate from the lock's.  A client keys the
@@ -433,7 +433,7 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
    goes in, a floor covering it comes out with the payload at the running
    context (R1 on the NB proof; the inner AMO is the only drain between
    iput's guard re-deposit and its checkout). *)
-Definition wp_acquiresleep_nb_genl_llb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_acquiresleep_nb_genl_llb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (j : nat)
     (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ)
     (* THE DEPOSIT'S OWN GNAME, separate from the lock's.  A client keys the
@@ -475,37 +475,37 @@ Definition wp_acquiresleep_nb_genl_llb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
 
 Module Type ACQUIRESLEEP.
   Parameter wp_acquiresleep_gen_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool) (b : bool) (lks : gset string),
       wp_acquiresleep_gen_sconf_body γs j γl γsl s R H q m pidv Upr av eb b lks.
   Parameter wp_acquiresleep_gen_llb_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Tl : nat),
       wp_acquiresleep_gen_llb_sconf_body γs j γl γsl s R H q m pidv Upr av eb b lks Tl.
   Parameter wp_acquiresleep_genl_llb_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Tl : nat),
       wp_acquiresleep_genl_llb_sconf_body γs j γl γsl s R H q m pidv Upr av eb b lks Tl.
   Parameter wp_acquiresleep_nb_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ) (γt : gname) (q : Qp)
       (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool)
       (n : nat) (lks : gset string),
       wp_acquiresleep_nb_body j γl γsl s R γt q m pidv Upr av eb n lks.
   Parameter wp_acquiresleep_nb_genl_llb_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (j : nat)
       (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (γt : gname) (q : Qp)
       (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool)
       (n : nat) (lks : gset string) (Tl : nat),
       wp_acquiresleep_nb_genl_llb_body j γl γsl s R γt q m pidv Upr av eb n lks Tl.
   Parameter wp_acquiresleep_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
 
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)

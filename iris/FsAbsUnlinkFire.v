@@ -251,7 +251,7 @@ Qed.
 Section UnlinkFire.
   (* [SysUnlinkDefs]'s binder list, verbatim. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* ------------------------------------------------------------------ *)

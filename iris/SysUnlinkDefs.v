@@ -254,7 +254,7 @@ Qed.
 
 Section UnlinkDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 

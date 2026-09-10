@@ -94,10 +94,8 @@ Import Defs.
 Notation K_sys_exit := ((4 + K_kexit)%nat) (only parsing).
 Definition wp_sys_exit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
-    (* wait_lock's children ghost, beside its parent cells *)
-    (γc : gname)
      (γs : list gname) (j : nat) (γl : gname)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -106,7 +104,7 @@ Definition wp_sys_exit_sconf_body
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
     (pid : mword 32) (U : ustate) (sts : list fdstate)
-    (v0 : mword 64) (lks : gset string) :=
+    (v0 : mword 64) (lks : gset string) (cs : gset gname) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exit in
   let pj := proc_addr j in
   fn = MkFCloseNames γs j γl pd pav pu
@@ -148,7 +146,7 @@ Definition wp_sys_exit_sconf_body
   panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
-  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)
   is_ftable γft γf -∗
   (* ...and closing one can free a pipe's page *)
@@ -181,22 +179,27 @@ Definition wp_sys_exit_sconf_body
      and then parks the process as a ZOMBIE.  The bundle dies with the
      incarnation whose name it is keyed on (FdSlots.v). *)
   fd_frags (pv_fdg (us_V U)) sts -∗
+  (* ...AND THE SLOT'S CHILDREN ROW, relayed to kexit, which parks it in the
+     ZOMBIE block ([SpecKexit]).  It rides the trap residue beside the
+     fragment bundle ([UsertrapRes.ut_own]) and, like it, does not come back
+     to the caller: there is no caller to come back to. *)
+  ch_frag (pv_chg (us_V U)) pj cs -∗
   (* NO continuation: sys_exit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
 
 Module Type SYSEXIT.
   Parameter wp_sys_exit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γft γf γw γc : gname)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (dqi : dfrac)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
-    (v0 : mword 64) (lks : gset string),
-      wp_sys_exit_sconf_body γft γf γw γc γs j γl pd pav pu
+    (v0 : mword 64) (lks : gset string) (cs : gset gname),
+      wp_sys_exit_sconf_body γft γf γw γs j γl pd pav pu
  ip dqi
 
-                             on fn m av eb b pid U sts v0 lks.
+                             on fn m av eb b pid U sts v0 lks cs.
 End SYSEXIT.

@@ -132,7 +132,7 @@ Notation sys_pipe_stack := (98%nat) (only parsing).
 Require Import RiscvModelBytes.  (* [nth_byte] -- pipe reports its
                                     descriptors by writing them *)
 Section SpecSysPipe.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
      carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
      definitions below mention the block, so the section has to bind it. *)
@@ -260,7 +260,7 @@ End SpecSysPipe.
 
 Definition wp_sys_pipe_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname)  (γfl γf : gname)
     (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
@@ -391,7 +391,7 @@ Definition wp_sys_pipe_sconf_body
 Module Type SYSPIPE.
   Parameter wp_sys_pipe_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64)

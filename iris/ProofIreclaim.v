@@ -201,7 +201,7 @@ Definition irc_thr8 (m M : regfile) : Prop :=
 (* ===================================================================== *)
 Section IreclaimDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* ireclaim's 64-byte frame: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0 *)
   Definition irc_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
@@ -293,7 +293,7 @@ End IreclaimDefs.
 (* ===================================================================== *)
 Section IreclaimEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma irc_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
@@ -671,7 +671,7 @@ End IreclaimEpilogue.
 (* ===================================================================== *)
 Section IreclaimStep.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma irc_step `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
@@ -932,7 +932,7 @@ End IreclaimStep.
 (* ===================================================================== *)
 Section IreclaimOrphan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma irc_orphan `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
@@ -2091,7 +2091,7 @@ End IreclaimOrphan.
 (* ===================================================================== *)
 Section IreclaimRelease.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma irc_release `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat)
@@ -2282,7 +2282,7 @@ End IreclaimRelease.
 (* ===================================================================== *)
 Section IreclaimScan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma irc_scan `{XI : CurCtx} `{GEN : GenId}
       (γs : list gname) (j : nat) (γl : gname)
@@ -3079,7 +3079,7 @@ End IreclaimScan.
 (* ===================================================================== *)
 Section IreclaimMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Lemma wp_ireclaim_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)

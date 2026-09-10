@@ -379,7 +379,7 @@ Local Ltac regne := reg_ne_side.
 Local Ltac ilidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section InitlogDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* BORROW the block's first word out of its byte list, and give it back.
@@ -599,7 +599,7 @@ End InitlogDefs.
 (*  own hart, exactly like ProofInstallTrans's blocks.                     *)
 (* ===================================================================== *)
 Section InitlogBlocks.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* clones of ProofInstallTrans's small arithmetic helpers (a proof file
@@ -1138,7 +1138,7 @@ Section InitlogBlocks.
 End InitlogBlocks.
 
 Section ProofInitlog.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_initlog_sconf 

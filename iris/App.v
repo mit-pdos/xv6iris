@@ -157,7 +157,7 @@ Definition app_triv (Σ : gFunctors) : xv6_app Σ :=
 (* ---------------------------------------------------------------------- *)
 Theorem xv6_app_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !bioslotGpreS Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ, !wchGpreS Σ}
     `{!ufdG Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
     (A : xv6_app Σ)
@@ -214,7 +214,7 @@ Theorem xv6_app_adequacy Σ
     (Hinit_boot :
        forall (HR : riscvGS Σ) (GEN : GenId)
               `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
-                HPav : !pavG Σ, HF : !fileG Σ}
+                HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
               (c : app_fixed A) (r : app_names A),
          @file_app Σ HF = MkAppcfg (app_names A) (app_pred A c) r ->
          ⊢ AppInv.app_inv FsCfg.fsc_fs -∗
@@ -319,7 +319,7 @@ Section AppTriv.
       `{HX : !xv6G Σ, HU : !ufdG Σ}
       (HR : riscvGS Σ) (GEN : GenId)
       `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
-        HPav : !pavG Σ, HF : !fileG Σ}
+        HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
       (c : app_fixed (app_triv Σ)) (r : app_names (app_triv Σ)) :
     @file_app Σ HF
       = MkAppcfg (app_names (app_triv Σ)) (app_pred (app_triv Σ) c) r ->

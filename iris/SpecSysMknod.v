@@ -244,7 +244,7 @@ End SysMknodRet.
 
 Section SysMknod.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* everything the AU caller hands in, at the commit mask [appE] *)
@@ -470,7 +470,7 @@ Global Typeclasses Opaque mknod_au_pre mknod_post_ok
 
 Definition wp_sys_mknod_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)             (* ftable, kalloc, printk *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (* disk fabric + lock  *)
@@ -614,7 +614,7 @@ Definition wp_sys_mknod_frame
    speak about the numbers IT passed. *)
 Definition wp_sys_mknod_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
@@ -657,7 +657,7 @@ Definition wp_sys_mknod_body
    erased.  It is a DEEP path that pays for the pins. *)
 Definition wp_sys_mknod_stable_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
@@ -689,7 +689,7 @@ Definition wp_sys_mknod_stable_body
 Module Type SYSMKNOD.
   Parameter wp_sys_mknod :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

@@ -135,7 +135,7 @@ Section PinnedExec.
      (SysOpenDefs' note at [aopen_commit_at]) -- a binder here would
      re-index it. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId}.
 
   (* ------------------------------------------------------------------ *)

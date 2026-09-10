@@ -1141,6 +1141,9 @@ Section BootAlloc.
      such cycle: its only instance is [subG] on the functor list. *)
   Context `{FGP : fileGpreS Σ}.
   Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
+  (* the [wait_lock] children map's capacity; its NAME is minted below and
+     handed out with the instance ([WaitInv.children_res_alloc]). *)
+  Context `{!wchGpreS Σ}.
   (* durable-disk 2b-A / B3: [FsCfgBoot.fs_cfg_alloc] allocates the era's
      link family and top map.  Both capacity classes are [Xv6G.xv6G]
      MEMBERS since 2b-inode-3 / 2b-inode-4, so this file -- above the
@@ -1479,7 +1482,7 @@ Section BootAlloc.
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk
       (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) Rb g
     ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
-             (HBs : bioslotG Σ)
+             (HBs : bioslotG Σ) (HWch : wchG Σ)
              (HF : fileG Σ) (γd : uart_names) (γv : disk_names)
              (Rspent : gset Z)
              (γi : gname) (ξd : CtxId),
@@ -1513,6 +1516,9 @@ Section BootAlloc.
          [main] through [BootChain.boot_hart_primary]; main carries it to
          the userinit call site. *)
       procs_avail (Some NPROC) ∗
+      (* THE CHILDREN MAP AND ITS NPROC ROWS, at the canonical name minted
+         above -- see [WaitInv.children_res_alloc]. *)
+      WaitInv.children_boot ∗
       (* NO RESERVATION MIRRORS COME OUT: every hart's is threaded into that
          hart's [InstrBytes.pc_is] here, inside [boot_hart_pre] (design
          §3a), so the boot client never names one. *)
@@ -1716,6 +1722,15 @@ Section BootAlloc.
            authority does.  [FsCfgBoot.fs_cfg_alloc] takes both halves and
            parks them in [BioInitAt.bio_free_tok]. ---- *)
     iMod bslots_alloc as (Hbs) "(Hbsauth & Hbsproc & Hbslots)".
+    (* ---- the <wait_lock> children map, and one row per proc slot.  A
+           NAME-CARRYING class again, and for [ProcAvail]'s reason plus one
+           of its own: a row rides every slot's DORMANT BLOCK
+           ([ProcDefs.proc_dormant]), which sits below every party that
+           threads a lock's gname, so the map's name cannot be a parameter.
+           Nothing can install a row later -- kfork seals the child's
+           residue before it takes the lock -- so all NPROC are born here
+           ([WaitInv.children_res_alloc]). ---- *)
+    iMod WaitInv.children_res_alloc as (Hwch) "Hchb".
     (* THE SUPPLY, IN ITS THREE SHARES, AND NOTHING IS DROPPED ANY MORE.
        [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE + IREFBOOT]: the proc
        layer's share and the FILE TABLE'S both go through
@@ -1879,7 +1894,7 @@ Section BootAlloc.
     (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
-    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC APP), γd, γv,
+    iModIntro. iExists Hfd, Hir, Hpav, Hbs, Hwch, (fileG_of FGP ICFG FSC APP), γd, γv,
                        (snap_spent S nib), γi, ξd.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iPureIntro; exact Hpa |].
@@ -1899,6 +1914,7 @@ Section BootAlloc.
     iSplitL "Hpark"; [iExact "Hpark" |].
     iSplitL "Hpst"; [iExact "Hpst" |].
     iSplitL "Hprocsavail"; [iExact "Hprocsavail" |].
+    iSplitL "Hchb"; [iExact "Hchb" |].
     iSplitL "Htx Hsent".
     { iExists (uart_acc (g.(gdev).(duart))). iFrame "Htx Hsent Hlb". }
     iSplitL "Htok"; [iExact "Htok" |].

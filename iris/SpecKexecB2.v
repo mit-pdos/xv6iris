@@ -335,7 +335,7 @@ End KexecB2Frame.
 (*  [KexecB2Res] section. *)
 (* ===================================================================== *)
 Section KexecB2Res.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
 
   Definition kxc_res `{XI : CurCtx}
@@ -620,7 +620,7 @@ End KexecB2Res.
 Definition kxc_bad324_body `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
       (QF : KexecOkQ.kxf_cause -> Prop)
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
     (gilf gislf : gname) (gf : gname)
@@ -713,7 +713,7 @@ Definition kxc_bad324_body `{XI : CurCtx}
 Definition kxc_ls_body `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
       (QF : KexecOkQ.kxf_cause -> Prop)
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
     (gilf gislf : gname) (gf : gname)
@@ -861,7 +861,7 @@ Definition kxc_ls_body `{XI : CurCtx}
 
 Module Type KEXECB2.
   Parameter kxc_bad324 :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
       (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
@@ -883,7 +883,7 @@ Module Type KEXECB2.
       ef P Mi szf eb lks.
 
   Parameter kxc_ls :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
       (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)

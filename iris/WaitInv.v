@@ -16,29 +16,45 @@
    deliberately: reparent()'s contract is about the cells, and its caller's
    obligation to hold the lock is discharged one level up.
 
-   THE SECOND HALF: THE CHILDREN SETS.  One [gset gname] per LIVE process
-   -- the GENERATIONS ([ChildTok.gen_slot]) of its live children -- as a
-   GHOST MAP: [children_own_at γc m] is the AUTHORITY, the lock's payload,
-   and [ch_frag γc γ S] is one process's ROW, which rides that process's
-   trap residue beside [FdSlots.fd_frags] and is what [UexecSlot.uvis_ch]
-   reads.  It is ghost and not memory because [struct proc] has no such
-   field: the C code answers "does p have children?" by scanning
-   [q->parent] under this very lock, and the ghost is that scan's
+   THE SECOND HALF: THE CHILDREN SETS.  One [gset gname] per PROC SLOT --
+   the GENERATIONS ([ChildTok.gen_slot]) of its live children -- as a
+   GHOST MAP: [children_own_at m] is the AUTHORITY, the lock's payload,
+   and [ch_frag γ pa S] is one slot's ROW, which rides that slot's dormant
+   block while nobody is running on it and that process's trap residue
+   while somebody is, beside [FdSlots.fd_frags], and is what
+   [UexecSlot.uvis_ch] reads.  It is ghost and not memory because [struct
+   proc] has no such field: the C code answers "does p have children?" by
+   scanning [q->parent] under this very lock, and the ghost is that scan's
    contents-out form.
 
-   KEYED BY THE PROCESS'S OWN CHILDREN-GHOST NAME ([ProcDefs.pv_chg]) and
-   not by the slot index, because the party that has to find its entry --
-   the process itself, at fork and at wait -- names the block and nothing
-   else: with a map, holding the row PROVES which entry of the payload is
-   yours ([children_own_lookup]), where two halves of a per-slot
-   [ghost_var] would leave a lock holder unable to say so.  A row is
-   INSTALLED under this lock ([children_own_install], at a name fresh for
-   the map's domain: kfork for a forked child, main for the first process,
-   which is why allocproc does not mint it) and DELETED here when the
-   incarnation is reaped ([children_own_del]).  [children_wf] states the
-   tie between the rows and the parent cells; the payload does not carry
-   it, because reading a slot's generation needs the p->lock cells that
-   hold it.
+   THE MAP'S NAME IS CANONICAL ([Xv6Cameras.wch_name]) and not a parameter,
+   because a row has to be spellable in [ProcDefs.proc_dormant], which sits
+   below every party that threads a lock's gname.
+
+   THE ROWS ARE BORN AT BOOT, ONE PER SLOT, AND NEVER DIE.  [children_res_
+   alloc] mints the map and installs all NPROC rows at [∅] inside the boot
+   fupd; the boot carve puts row [i] into slot [i]'s dormant block, and from
+   there allocproc hands it to the process it creates and freeproc gives it
+   back.  So the map is TOTAL over the NPROC row names by construction and
+   the address in a row's value is right by construction -- which is why
+   there is no delete: an incarnation's row outlives it, emptied.
+
+   KEYED BY THE SLOT'S OWN CHILDREN-GHOST NAME ([ProcDefs.pv_chg]) and not
+   by the slot index, because the party that has to find its entry -- the
+   process itself, at fork and at wait -- names the block and nothing else:
+   with a map, holding the row PROVES which entry of the payload is yours
+   ([children_own_lookup]), where two halves of a per-slot [ghost_var]
+   would leave a lock holder unable to say so.  A row's VALUE carries its
+   owner's slot address beside its set, so that the tie below can name the
+   owner at all.
+
+   [children_inv] states that tie -- a generation in a row's set is the
+   generation of a slot whose parent cell holds the row owner's address --
+   and THE PAYLOAD DOES NOT CARRY IT YET.  Carrying it means binding the
+   parent list and the map under ONE existential in [wait_res_at], which
+   reaches every consumer that takes [parents_own ps] alone (reparent,
+   kexit, kwait, kfork's B5) and the boot carve; that is lane WX-INV's,
+   and WX-WAIT is what consumes it.
 
    THE PURE MODEL.  reparent(p) rewrites every cell equal to [p] to [initproc]
    and leaves the rest alone; that is [rp_map p ip].  [rp_upto p ip k] is the
@@ -63,6 +79,15 @@ Require Import TsoCtx CtxMorphTac.
    [ctx_word_pointsto_forget]) become identities.  No cycle: TsoCtx does not
    reach ProcGeom. *)
 Require Import ProcGeom.
+(* [gen_slot] -- the generation-to-slot reading [children_inv] is stated
+   over.  No cycle: ChildTok is a leaf (saved predicates and nothing
+   else). *)
+Require Import ChildTok.
+(* [Xv6Cameras.wchG] -- the children map's camera AND its canonical name
+   ([wch_name]).  Named directly rather than through [Xv6G]'s bundle for
+   the reason the bundle's own header gives: a class that carries a gname
+   is not a member of it. *)
+Require Import Xv6Cameras.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -140,10 +165,14 @@ Qed.
 (* ===================================================================== *)
 Section WaitInv.
   Context `{!riscvGS Σ}.
-  (* [Xv6Cameras.wchG]'s capacity: the children map's ghost.  This file
-     does not take the whole-system bundle -- it is one field of one
-     struct -- so it names the class it needs, as [UserChildren.v] does. *)
-  Context `{!ghost_mapG Σ gname (gset gname)}.
+  (* [Xv6Cameras.wchG]: the children map's ghost AND its canonical name.
+     This file does not take the whole-system bundle -- it is one field of
+     one struct -- so it names the class it needs, as [UserChildren.v]
+     does; the class carries the name because a row has to be spellable in
+     [ProcDefs.proc_dormant] (see the header). *)
+  Context `{!wchG Σ}.
+  (* [ChildTok.gen_slot] -- [children_inv]'s conjunct *)
+  Context `{!ctokG Σ}.
   Context `{XI : CurCtx}.
 
   (* every proc's [parent] cell, at its slot's value.  The length conjunct is
@@ -186,33 +215,50 @@ Section WaitInv.
   (* row.  Nobody else may touch a set, and no set can move behind the    *)
   (* back of the process whose key names it.                              *)
   (* ------------------------------------------------------------------ *)
-  Definition children_own_at (γc : gname) (m : gmap gname (gset gname)) : iProp Σ :=
-    ghost_map_auth γc 1 m.
+  (* THE VALUE CARRIES THE OWNER'S SLOT ADDRESS beside its set, and that
+     is what makes the tie below statable at all.  The row is keyed by a
+     ghost name ([ProcDefs.pv_chg]), and nothing in the payload can say
+     WHICH slot a given key belongs to -- the field lives under p->lock,
+     and [ChildTok.gen_slot] reads a GENERATION to a slot, not a row name.
+     Putting the address in the value fixes it inside the authority, where
+     no row holder can move it alone; the residue then pins it to the
+     running process's own slot ([UsertrapRes.ut_own] carries the row at
+     [un_pj N]), which is what lets a holder read [children_inv] as a
+     statement about ITSELF. *)
+  Definition children_own_at
+      (m : gmap gname (mword 64 * gset gname)) : iProp Σ :=
+    ghost_map_auth wch_name 1 m.
 
   (* ONE PROCESS'S ROW, at the name its private block records
      ([ProcDefs.pv_chg]).  This is the resource behind
      [UexecSlot.uvis_ch].
 
-     NOTHING CARRIES IT YET.  The trap residue is not indexed by the
-     children set ([UsertrapRes.ut_own] carries [FdSlots.fd_frags] and no
-     row), so at fork the key's [uvis_ch] moving to [cs ∪ {γ}] is a fact
-     about the KEY THE PARKER PAYS -- the resumer instantiates
-     [ParkCap.park_cap]'s [∀ cs] at the grown set -- and not a move of the
-     map below: [SpecKfork] carries the child token and touches no row.
-     Lane WX-RES puts this row in the residue beside the descriptor
-     fragments, and then fork and wait move the map under the lock with
-     the caller's own row, which is what the lemmas below are for. *)
-  Definition ch_frag (γc : gname) (γ : gname) (S : gset gname) : iProp Σ :=
-    (γ ↪[γc] S)%I.
+     IT RIDES THE TRAP RESIDUE, beside the descriptor fragments:
+     [UsertrapRes.ut_own] holds it at the process's own name
+     ([ProcDefs.pv_chg]) and at an EXPLICIT set, which is the set the
+     residue -- and hence the resume key's [UexecSlot.uvis_ch] -- is
+     indexed by.  So the reading is a resource and not a choice: at fork
+     the key's set moves to [cs ∪ {γ}] because kfork moved the map,
+     holding the authority (it has <wait_lock> to write [np->parent]) and
+     the caller's own row off its residue -- which is exactly what
+     [children_own_upd] below takes.
 
-  Global Instance ch_frag_timeless γc γ S : Timeless (ch_frag γc γ S).
+     [pa] IS THE OWNER'S SLOT ADDRESS -- see [children_own_at] above.  The
+     residue carries the row at the running process's own [un_pj N], so a
+     holder of the row is a holder of "the children of the process at
+     [pa]". *)
+  Definition ch_frag (γ : gname) (pa : mword 64)
+      (S : gset gname) : iProp Σ :=
+    (γ ↪[wch_name] (pa, S))%I.
+
+  Global Instance ch_frag_timeless γ pa S : Timeless (ch_frag γ pa S).
   Proof. apply _. Qed.
 
   (* A ROW READS THE AUTHORITY -- the lemma the map shape exists for: a
      lock holder that also holds a row learns WHICH entry is its own, and
      that is what a per-slot pair of [ghost_var] halves could not say. *)
-  Lemma children_own_lookup γc m γ S :
-    children_own_at γc m -∗ ch_frag γc γ S -∗ ⌜m !! γ = Some S⌝.
+  Lemma children_own_lookup m γ pa S :
+    children_own_at m -∗ ch_frag γ pa S -∗ ⌜m !! γ = Some (pa, S)⌝.
   Proof.
     iIntros "Ha Hf". rewrite /children_own_at /ch_frag.
     by iDestruct (ghost_map_lookup with "Ha Hf") as %Hm.
@@ -220,70 +266,74 @@ Section WaitInv.
 
   (* ...AND BOTH TOGETHER MOVE IT: fork's [cs -> cs ∪ {γ}] and wait's
      [cs -> cs ∖ {γ}], each under this lock. *)
-  Lemma children_own_upd γc m γ S S' :
-    children_own_at γc m -∗ ch_frag γc γ S ==∗
-    children_own_at γc (<[γ := S']> m) ∗ ch_frag γc γ S'.
+  (* THE ADDRESS DOES NOT MOVE WITH THE SET: a slot's incarnation stays in
+     its slot, so the update is at [(pa, S')] and the tie the invariant
+     reads is preserved by construction. *)
+  Lemma children_own_upd m γ pa S S' :
+    children_own_at m -∗ ch_frag γ pa S ==∗
+    children_own_at (<[γ := (pa, S')]> m) ∗ ch_frag γ pa S'.
   Proof.
     iIntros "Ha Hf". rewrite /children_own_at /ch_frag.
-    by iMod (ghost_map_update S' with "Ha Hf") as "[$ $]".
+    by iMod (ghost_map_update (pa, S') with "Ha Hf") as "[$ $]".
   Qed.
 
-  (* THE INSTALL.  A new process needs a row, and the row can only be
-     created by the authority -- i.e. under this lock, which allocproc does
-     not hold.  So whoever CREATES the process installs it: kfork at its
-     [acquire(&wait_lock); np->parent = p], and main for the first process,
-     before the lock goes up.  The name is fresh for the map's domain and
-     nothing more is needed -- a [gname] is a [positive] and the domain is
-     finite, so no allocation is involved. *)
-  Lemma children_own_install γc m (S : gset gname) :
-    children_own_at γc m ==∗
-    ∃ γ : gname, ⌜m !! γ = None⌝ ∗
-      children_own_at γc (<[γ := S]> m) ∗ ch_frag γc γ S.
-  Proof.
-    iIntros "Ha". rewrite /children_own_at /ch_frag.
-    set (γ := fresh (dom m)).
-    assert (Hfr : m !! γ = None).
-    { apply not_elem_of_dom. apply is_fresh. }
-    iMod (ghost_map_insert γ S Hfr with "Ha") as "[Ha Hf]".
-    iModIntro. iExists γ. iSplitR; [done|]. iFrame "Ha Hf".
-  Qed.
+  (* THERE IS NO INSTALL, and that is the shape: a row can only be created
+     by the authority, i.e. under this lock -- which allocproc does not
+     hold and kfork holds only AFTER it has sealed the child's residue
+     ([ProofKforkB5], the child's first [release(&np->lock)] at +0xc4).
+     So no row is ever created for a running process: all NPROC of them
+     are minted before the lock goes up ([ch_rows_alloc] at the foot of
+     this file, out of [ghost_map_insert] directly), one per SLOT, and a
+     slot's row is what allocproc hands the process it creates. *)
 
-  (* ...and the reap: the row dies with the incarnation, under this lock,
-     spending the row itself. *)
-  Lemma children_own_del γc m γ S :
-    children_own_at γc m -∗ ch_frag γc γ S ==∗ children_own_at γc (delete γ m).
-  Proof.
-    iIntros "Ha Hf". rewrite /children_own_at /ch_frag.
-    by iMod (ghost_map_delete with "Ha Hf") as "$".
-  Qed.
+  (* THERE IS NO DELETE, and that is the shape and not an omission: a row
+     belongs to the SLOT and outlives every incarnation that runs in it.
+     The reap empties the set ([children_own_upd] to [∅], under this lock)
+     and hands the row back to the dormant block for the next process. *)
 
-  (* THE INVARIANT'S SHAPE, as a pure predicate: a generation in the
-     children set of the process at slot [j] is the generation of a slot
-     whose parent cell points at [j].  [chs] is the per-slot list of the
-     processes' row names ([ProcDefs.pv_chg]) and [gs] of their generations
-     ([ProcDefs.pv_gen]); both live under p->lock, which is why this is
-     STATED and not carried -- a payload cannot mention resources of a lock
-     it does not hold.  It is carried at the p->lock-protected mirror that
-     fork's and wait's writers keep in step. *)
-  Definition children_wf (ps : list (mword 64)) (m : gmap gname (gset gname))
-      (chs : list gname) (gs : list gname) : Prop :=
-    forall (j : nat) (γ0 γ : gname) (S : gset gname),
-      chs !! j = Some γ0 -> m !! γ0 = Some S -> γ ∈ S ->
-      exists k : nat, gs !! k = Some γ /\ ps !! k = Some (proc_addr j).
+  (* THE INVARIANT: a generation in a row's set is the generation of a
+     slot whose parent cell holds that row's owner's address.  A RESOURCE
+     and not a pure fact, because the generation-to-slot reading is
+     [ChildTok.gen_slot], which is persistent -- so re-establishing it
+     costs a lock holder nothing -- while the pure form would have to
+     quantify over the per-slot lists of [ProcDefs.pv_gen], which live
+     under p->lock and which a payload cannot mention.
+
+     STATED, NOT CARRIED.  [wait_res_at] below still binds the parent
+     cells and the map under two independent existentials, and carrying
+     this conjunct means binding [ps] and [m] TOGETHER -- which reaches
+     every consumer that takes [parents_own ps] alone (reparent, kexit,
+     kwait, kfork's B5) and the boot carve.  That is lane WX-INV's, and
+     WX-WAIT is what consumes it: fork needs no freshness ([cs ∪ {[γ]}]
+     is a set union), and the reap is where "a live generation is in
+     exactly one parent's set" is spent. *)
+  Definition children_inv (ps : list (mword 64))
+      (m : gmap gname (mword 64 * gset gname)) : iProp Σ :=
+    ([∗ map] γ0 ↦ pS ∈ m, [∗ set] γ ∈ pS.2,
+       ∃ k : nat, gen_slot γ (proc_addr k) ∗ ⌜ps !! k = Some pS.1⌝)%I.
 
   (* the children map's own existential closure, the shape every party
      that does not read it carries: one opaque conjunct. *)
-  Definition children_res (γc : gname) : iProp Σ :=
-    (∃ m : gmap gname (gset gname), children_own_at γc m)%I.
+  Definition children_res : iProp Σ :=
+    (∃ m : gmap gname (mword 64 * gset gname), children_own_at m)%I.
+
+  (* WHAT THE BOOT FUPD HANDS MAIN, in one row: the authority the wait lock
+     goes up over, and the NPROC rows the proc-table assembly deposits into
+     the slots' dormant blocks ([SpecProcinit.procs_inv_alloc]).  ONE
+     predicate rather than two, because every party between the mint and
+     main -- [BootShared], [BootChain], [SpecMain] -- carries it unopened. *)
+  Definition children_boot : iProp Σ :=
+    (children_res ∗
+     [∗ list] i ∈ seq 0 NPROC, ∃ γ0 : gname, ch_frag γ0 (proc_addr i) ∅)%I.
 
   (* what [wait_lock] protects: the parent cells and the children sets. *)
-  Definition wait_res_at (γc : gname) (ξ : CtxId) : iProp Σ :=
-    (parents_res_at ξ ∗ children_res γc)%I.
-  Definition wait_res (γc : gname) : iProp Σ := wait_res_at γc cur_ctx.
+  Definition wait_res_at (ξ : CtxId) : iProp Σ :=
+    (parents_res_at ξ ∗ children_res)%I.
+  Definition wait_res : iProp Σ := wait_res_at cur_ctx.
 
   Global Instance parents_res_at_morph : CtxMorph parents_res_at.
   Proof. rewrite /parents_res_at. ctx_morph_solve. Qed.
-  Global Instance wait_res_at_morph γc : CtxMorph (wait_res_at γc).
+  Global Instance wait_res_at_morph : CtxMorph wait_res_at.
   Proof. rewrite /wait_res_at. ctx_morph_solve. Qed.
 
   (* THE BOOT CARVE'S SHAPE, GATHERED.  [BootCarveMain.boot_procs_raw] hands
@@ -315,8 +365,10 @@ Section WaitInv.
 
   (* ...and what the boot chain actually hands main: the parent half, out of
      the NPROC parent cells the image owns and nothing else claims.  The
-     children half has no cells to come out of, so it is MINTED instead --
-     [wait_res_alloc] below, in main's own update. *)
+     children half has no cells to come out of, so it is MINTED in the boot
+     fupd instead ([children_res_alloc] at the foot of this file) and
+     travels to main with everything else the carve hands over;
+     [wait_res_alloc] below is only the pairing. *)
   Lemma parents_res_of_cells :
     ([∗ list] i ∈ seq 0 NPROC, ∃ pv : mword 64, p_parent (proc_addr i) ↦₈ pv)
     -∗ parents_res.
@@ -328,20 +380,12 @@ Section WaitInv.
     iApply (big_sepL_mono with "H"). iIntros (j v _) "Hv". iExact "Hv".
   Qed.
 
-  (* THE BOOT MINT, and it hands out ONE ROW WITH THE MAP.  The map's name
-     is carved once and threaded exactly as the lock's own gname is
-     ([ProofMain]'s wait_lock assembly builds both in the same step) -- and
-     the same step installs the row of the FIRST process, because userinit
-     takes no wait_lock and so cannot install its own.  The row travels to
-     userinit as a premise and lands in its block at [pv_chg]. *)
+  (* THE PAIRING, in main's own update: the parent cells the carve hands it
+     and the children authority the boot fupd already minted, together, are
+     what [wait_lock]'s [is_lock] goes up over. *)
   Lemma wait_res_alloc :
-    parents_res ==∗ ∃ (γc γ0 : gname), wait_res γc ∗ ch_frag γc γ0 ∅.
-  Proof.
-    iIntros "Hp".
-    iMod (ghost_map_alloc (∅ : gmap gname (gset gname))) as (γc) "[Ha _]".
-    iMod (children_own_install γc ∅ ∅ with "Ha") as (γ0) "(_ & Ha & Hf)".
-    iModIntro. iExists γc, γ0. iFrame "Hf Hp". iExists _. iExact "Ha".
-  Qed.
+    parents_res -∗ children_res -∗ wait_res.
+  Proof. iIntros "Hp Hc". iFrame "Hp Hc". Qed.
 
   Lemma parents_own_length ps : parents_own ps -∗ ⌜length ps = NPROC⌝.
   Proof. iIntros "[% _]". done. Qed.
@@ -378,6 +422,57 @@ Section WaitInv.
   Qed.
 
 End WaitInv.
+
+(* ===================================================================== *)
+(* BOOT: mint the children map's canonical name and its NPROC rows.      *)
+(* OUTSIDE the section, over the FUNCTOR half only, because it is what   *)
+(* creates the name-carrying instance ([ProcAvail.procs_avail_alloc]'s   *)
+(* shape, [FdSlots.fd_slots_alloc]'s reason).                            *)
+(*                                                                       *)
+(* ONE ROW PER SLOT, AT THE EMPTY SET.  A row belongs to the SLOT and    *)
+(* not to an incarnation: the boot carve puts row [i] into slot [i]'s    *)
+(* dormant block ([ProcDefs.proc_dormant]), allocproc hands it to the    *)
+(* process it creates and freeproc gives it back.  Nothing can install   *)
+(* one later -- kfork seals the child's residue at its first             *)
+(* [release(&np->lock)], BEFORE it takes [wait_lock] -- which is why     *)
+(* they are all born here.                                              *)
+(* ===================================================================== *)
+Section WaitInvBoot.
+  Context `{!riscvGS Σ, !wchGpreS Σ}.
+
+  (* [n] rows, one per slot from [k] up, installed into a raw authority.
+     An OFFSET induction for [parents_cells_gather]'s reason: [seq k (S n)]
+     is [k :: seq (S k) n]. *)
+  Lemma ch_rows_alloc (γ : gname) (n k : nat)
+      (m : gmap gname (mword 64 * gset gname)) :
+    ghost_map_auth γ 1 m ==∗
+    ∃ m' : gmap gname (mword 64 * gset gname),
+      ghost_map_auth γ 1 m' ∗
+      [∗ list] i ∈ seq k n, ∃ γ0 : gname, γ0 ↪[γ] (proc_addr i, (∅ : gset gname)).
+  Proof.
+    revert k m. induction n as [|n IH]; intros k m.
+    - iIntros "Ha". iModIntro. iExists m. iFrame "Ha". done.
+    - iIntros "Ha".
+      set (γ0 := fresh (dom m)).
+      assert (Hfr : m !! γ0 = None) by (apply not_elem_of_dom, is_fresh).
+      iMod (ghost_map_insert γ0 (proc_addr k, (∅ : gset gname)) Hfr with "Ha")
+        as "[Ha Hf]".
+      iMod (IH (S k) _ with "Ha") as (m') "[Ha Hrows]".
+      iModIntro. iExists m'. iFrame "Ha".
+      replace (seq k (S n)) with (k :: seq (S k) n) by reflexivity.
+      rewrite big_sepL_cons.
+      iSplitL "Hf"; [iExists γ0; iExact "Hf" | iExact "Hrows"].
+  Qed.
+
+  Lemma children_res_alloc :
+    ⊢ |==> ∃ _ : wchG Σ, children_boot.
+  Proof.
+    iMod (ghost_map_alloc (∅ : gmap gname (mword 64 * gset gname))) as (γ) "[Ha _]".
+    iMod (ch_rows_alloc γ NPROC 0 ∅ with "Ha") as (m') "[Ha Hrows]".
+    iModIntro. iExists (WchG Σ _ γ). rewrite /children_boot /children_res.
+    iSplitL "Ha"; [iExists m'; iExact "Ha" | iExact "Hrows"].
+  Qed.
+End WaitInvBoot.
 
 (* the [ld/sd rd,56(rs)] displacement form, which is what the instruction
    leaves produce, folded back onto [p_parent]'s [mword_of_int] spelling.

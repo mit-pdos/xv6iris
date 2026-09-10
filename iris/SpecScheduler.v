@@ -48,7 +48,7 @@ Require Import TsoCtx.
 Import Defs.
 
 
-Definition wp_scheduler_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_scheduler_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     
     (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.scheduler in
@@ -92,7 +92,7 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
 
 Module Type SCHEDULER.
   Parameter wp_scheduler_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64),
       wp_scheduler_sconf_body γs m av p0.

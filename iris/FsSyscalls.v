@@ -175,7 +175,7 @@ Require Import TsoCtx.
 (* ====================================================================== *)
 
 Section FsBundles.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
   (* the ambient fs names [FsReady.fs_ready] is stated at.  It rides in on
      [fileG] exactly as [icfg] does (see the note on [FileInvDefs.fileG]),
@@ -256,7 +256,7 @@ End FsBundles.
     file header. *)
 Definition wp_sys_mkdir_friendly_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)                                         (* the file table *)
     (γs : list gname) (j : nat) (γl : gname)             (* the running process *)
     (ns : nat)
@@ -318,7 +318,7 @@ Module FsSysMkdir (M : SYSMKDIR).
 
   Lemma wp_sys_mkdir_friendly
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+        !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (ns : nat)
@@ -459,7 +459,7 @@ End FsSysMkdir.
     against the code behind it. *)
 Definition wp_sys_chdir_friendly_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (γs : list gname) (j : nat) (γl : gname)
     (dqb dqs dqbs dqn : dfrac)
@@ -504,7 +504,7 @@ Module FsSysChdir (M : SYSCHDIR).
 
   Lemma wp_sys_chdir_friendly
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+        !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (dqb dqs dqbs dqn : dfrac)

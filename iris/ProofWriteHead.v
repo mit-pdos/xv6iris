@@ -380,7 +380,7 @@ Local Ltac regne := reg_ne_side.
 Local Ltac whidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section WriteHeadDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* ---------------------------------------------------------------- *)
   (*  the payload-less handle, with its bytes in window form            *)
@@ -513,7 +513,7 @@ End WriteHeadDefs.
 (*  actually starts on.                                                   *)
 (* ===================================================================== *)
 Section WriteHeadBlocks.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* ================================================================== *)
   (*  +0x46 .. +0x5c : bwrite, the logged-view move, brelse, epilogue.   *)
@@ -1321,7 +1321,7 @@ End WriteHeadBlocks.
 (* ===================================================================== *)
 
 Section ProofWriteHead.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_write_head_sconf 

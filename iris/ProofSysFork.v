@@ -92,7 +92,7 @@ Module SysForkProof (Kfork : KFORK) : SYSFORK.
 
 Section ProofSysFork.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   (* NO [Context `{SG : uexecSG Σ}]: this file sits ABOVE
      [UexecExecInst], so the deposit class it speaks is that file's
      INSTANCE, and so is the one the specs it inhabits were stated at.  A
@@ -105,13 +105,14 @@ Section ProofSysFork.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_fork_sconf
-      (γp γw γc γl γf : gname) (γs : list gname)
+      (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (csP : gset gname)
       (Q : Z -> iProp Σ)
       (lks : gset string)
-    : wp_sys_fork_sconf_body γp γw γc γl γf γs
- m lvl av eb p b pid U sts Q lks.
+    : wp_sys_fork_sconf_body γp γw γl γf γs
+ m lvl av eb p b pid U sts csP Q lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
     intros pcE ret_tgt Hav Hlvl Hbelow.
@@ -127,7 +128,7 @@ Section ProofSysFork.
     set (M2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
              #Hitbl #Hitinv #Hireg Henv #Hpav #Hworld #Htoken #Hfdone Hjslot
-             Hpriv Hpfrag Hcont".
+             Hpriv Hpfrag Hpchrow Hcont".
     assert (Hcsp1 : M1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     assert (Hpush : sp' = pa_stk (m !!! Regidx csp_rs1) 2).
     { unfold sp', pa_stk, add_vec_int, imm_entry.
@@ -209,12 +210,13 @@ Section ProofSysFork.
        here.  So this function neither mints nor re-keys: the premise IS
        kfork's premise, which is the whole point of stating the child's
        state as a function of the parent's. *)
-    iApply (Kfork.wp_kfork_sconf γp γw γc γl γf γs
+    iApply (Kfork.wp_kfork_sconf γp γw γl γf γs
 
-              Bj lvl (av - 2)%nat eb p b pid U sts Q lks
+              Bj lvl (av - 2)%nat eb p b pid U sts csP Q lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Hjslot Hfdone Hpriv Hpfrag").
+                    Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Hjslot Hfdone Hpriv Hpfrag
+                    Hpchrow").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
     iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Hpfrag & #Henv & Hrv)".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))

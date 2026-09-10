@@ -129,9 +129,9 @@ Proof.
     split; [reflexivity | split; [exact H1 | exact H2]]]]].
 Qed.
 
-Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* the kernel-side residue, abstract exactly as [SpecUservec] takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ)
     (C : ucfg) (pt : uptd)
     (kroot : mword 44) (j : nat) (ksp : mword 64)
     (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)
@@ -203,7 +203,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
       (uint (pv_sz (us_V U))) fdv (pv_cwi (us_V U)) gn cs
       (tf_resume_gpr0 (pv_tf (us_V U))) (ret_pc sepc0) -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)
-  URes CID pt ksp U sts -∗
+  URes CID pt ksp U sts cs -∗
   WP (Loop : expr riscv_lang).
 
 
@@ -217,7 +217,7 @@ Module Type USERRET_CLOSED.
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
   Include UtResFits.USERTRAP_RES_PARK.
   Parameter wp_userret_closed :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)

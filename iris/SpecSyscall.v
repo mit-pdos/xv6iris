@@ -324,7 +324,7 @@ Qed.
    nothing ([sysc_exec_out_ne]). *)
 Section SyscExec.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
   (* THE PROCESS'S DEPOSIT, AT WHATEVER NUMBER IT TRAPPED WITH.  It used to
@@ -431,29 +431,34 @@ Section SyscExec.
   (* PARENT's quarter comes back here, at the pid the a0 slot now holds,   *)
   (* together with the generation its children reading grew by.           *)
   (* ===================================================================== *)
-  (* THE SET IS NOT IN THIS ROW.  What the parent's key resumes at --
-     [uvis_ch] grown by [γ] -- is a fact about the KEY THE TRAP LOOP
-     BUILDS, and the loop is what chooses it ([UexecApply.
-     uexec_ret_round_slot]'s fork answer): the children map under
-     <wait_lock> does not back the reading until WX-RES, so the kernel has
-     nothing to say about it here.  What it DOES have is the token, and
-     the generation the loop grows the set by is the one this row
-     names. *)
-  Definition sysc_fork_out (f : sfam) (U : ustate) (r : mword 64) : iProp Σ :=
+  (* THE SET IS IN THIS ROW.  The caller's children row rides its trap
+     residue ([UsertrapRes.ut_own]'s [WaitInv.ch_frag]) and comes down this
+     channel with the block; kfork moves it under the <wait_lock> it takes
+     to write [np->parent], so what the parent's key resumes at is a
+     READING of the map and not a choice of the trap loop's.  That is
+     [UexecRet.ufork_ans] on the nose, which is what the loop's fork answer
+     wants ([UexecApply.uexec_ret_round_slot]). *)
+  Definition sysc_fork_out (f : sfam) (U : ustate) (r : mword 64)
+      (cs cs' : gset gname) : iProp Σ :=
     (⌜sysc_num (us_V U) = UsysMemOk.USYS_fork⌝ -∗
-       (* THE TWO ARMS FORK HAS: it failed and returned -1, and there is no
-          child and no token; or it returned the child's pid and the
-          parent's quarter comes with it. *)
-       (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∨ ∃ (γ : gname) (pidv : mword 32),
-            ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
-            child_tok γ pidv (sfork_pay f)))%I.
+       ufork_ans (sfork_pay f) r cs cs')%I.
 
-  Lemma sysc_fork_out_ne (f : sfam) (U : ustate) (r : mword 64) :
-    sysc_num (us_V U) <> UsysMemOk.USYS_fork -> ⊢ sysc_fork_out f U r.
+  Lemma sysc_fork_out_ne (f : sfam) (U : ustate) (r : mword 64)
+      (cs cs' : gset gname) :
+    sysc_num (us_V U) <> UsysMemOk.USYS_fork -> ⊢ sysc_fork_out f U r cs cs'.
   Proof.
     intros Hne. rewrite /sysc_fork_out. iIntros "%Hc". exfalso. exact (Hne Hc).
   Qed.
+
+  (* ...AND THE PURE HALF, for the twenty-one entries that keep the set.
+     fork is the one exception and its arm is the resource above; wait's
+     and exit's arrive with their own lanes. *)
+  Definition sysc_ch_ok (V : pprivate) (cs cs' : gset gname) : Prop :=
+    sysc_num V <> UsysMemOk.USYS_fork -> cs' = cs.
+
+  Lemma sysc_ch_ok_refl (V : pprivate) (cs : gset gname) :
+    sysc_ch_ok V cs cs.
+  Proof. intros _. reflexivity. Qed.
 
   (* the numbers that owe nothing, as one premise an arm discharges from its
      own table index by [lia] *)
@@ -518,9 +523,15 @@ End SyscExec.
 Notation K_syscall := ((4 + K_sys_exec)%nat) (only parsing).
 Definition wp_syscall_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (R : gname -> mword 64 -> fclose_names -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
+    (* the <wait_lock> and the children map it owns.  NAMED here rather
+       than taken out of [R]'s own existential: the row below is the
+       caller's, at the name its residue records
+       ([UsertrapRes.ut_names.un_ch]), and the fork arm has to hand kfork
+       the lock at THAT name. *)
+    (γw : gname)
     (fn : fclose_names)
     (ip : mword 64) (dqi : dfrac)
     (m : regfile) (av : nat)
@@ -551,6 +562,7 @@ Definition wp_syscall_sconf_body
      [pid] index instead would have reached [wp_syscall_sconf_body]'s [R] and
      [UsertrapRes.ut_own]'s [Rsys] slot for the same effect. *)
   fcn_pid fn = pid ->
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
   (* INTERRUPTS ON, at push_off level 0 -- see the header: the [csrsi] that
      precedes the only call site, and what the parking entries need. *)
   sie_cap_gpr KT1 m av true pj -∗
@@ -587,6 +599,12 @@ Definition wp_syscall_sconf_body
 
      AT A NAMED TABLE, so the post can say which descriptors moved. *)
   fd_frags (pv_fdg (us_V U)) sts -∗
+  (* ...AND THE CALLER'S CHILDREN ROW, in and out on the same channel and
+     for the same reason: [UsertrapRes.ut_own] holds it, and fork is the
+     entry that spends it -- kfork moves the map under <wait_lock> with
+     this very row ([WaitInv.children_own_upd]).  The other twenty-one
+     hand it straight back. *)
+  ch_frag (pv_chg (us_V U)) pj cs -∗
   (* the process's deposit for whatever number it trapped with -- see
      [sysc_sys_in] *)
   sysc_sys_in U sts gn cs f -∗
@@ -632,7 +650,9 @@ Definition wp_syscall_sconf_body
        sixteen remaining entries read [us_M U' = us_M U] on the nose. *)
     ∀ (mf : regfile) (U' : ustate)
       (* THE DESCRIPTOR STATES THE CALL LEFT, beside the record it left *)
-      (sts' : list fdstate),
+      (sts' : list fdstate)
+      (* ...and the children set it left -- see [sysc_ch_ok] *)
+      (cs' : gset gname),
       ⌜ callee_saved m mf ⌝ -∗
       (* ...AND WHICH USER BYTES CAN HAVE MOVED, by table index -- see
          [sysc_mem_ok] above.  Sixteen of the twenty-two entries touch no
@@ -658,6 +678,9 @@ Definition wp_syscall_sconf_body
       (* ...and PIPE's two rows joined, so a caller can close what it got *)
       ⌜ sysc_pipe_ok (us_V U) (us_M U) (us_M U')
                      (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ⌝ -∗
+      (* ...and which entries moved the children set: fork alone, and its
+         move is the resource below and not this row *)
+      ⌜ sysc_ch_ok (us_V U) cs cs' ⌝ -∗
       (* ...AND THIS ARM RETURNED, WHICH RULES [exit] OUT (milestone J,
          K1).  [sysc_mem_ok] does NOT: exit falls into the quiet
          "nothing moved" row, so the table alone cannot tell a returning
@@ -719,6 +742,12 @@ Definition wp_syscall_sconf_body
          chooses the CHILD's.  So the bundle below is stated at the ENTRY
          record and this equation is what lets the caller re-key it. *)
       ⌜ pv_fdg (us_V U') = pv_fdg (us_V U) ⌝ -∗
+      (* ...AND THE CHILDREN ROW'S NAME, on exactly those terms -- and it
+         moves even less often: a [ProcDefs.pv_chg] is chosen ONCE, by the
+         boot carve's seal ([ProcInv.proc_dormant_seal]), and belongs to
+         the SLOT thereafter.  So the row below is stated at the ENTRY
+         record and this equation is what lets the caller re-key it. *)
+      ⌜ pv_chg (us_V U') = pv_chg (us_V U) ⌝ -∗
       (* ...and the cwd's inum (lane C1): chdir (9) is the one entry that
          moves it, AND ONLY WHEN IT SUCCEEDS (lane C2: a chdir that returns
          -1 hands the block back at the inum it came in with, which is what
@@ -770,6 +799,8 @@ Definition wp_syscall_sconf_body
       R γf pj fn -∗
       proc_priv γf pj pid U' -∗
       fd_frags (pv_fdg (us_V U)) sts' -∗
+      (* ...and the caller's children row, at the set the call left *)
+      ch_frag (pv_chg (us_V U)) pj cs' -∗
       pc_is ret_tgt -∗
       (* ...and the exec channel's answer: on exec, the failure facts or
          the new image's slot at the resume record [U'] *)
@@ -781,9 +812,10 @@ Definition wp_syscall_sconf_body
          own cwd inum, which are what read's, chdir's and open's receipts
          are about; see [sysc_sys_out] *)
       sysc_sys_out U sts gn cs f (pv_tf (us_V U') !!! tf_arg_idx 0)
-        (us_M U') sts' (pv_cwi (us_V U')) cs -∗
-      (* ...and FORK'S: the parent's child token -- see [sysc_fork_out] *)
-      sysc_fork_out f U (pv_tf (us_V U') !!! tf_arg_idx 0) -∗
+        (us_M U') sts' (pv_cwi (us_V U')) cs' -∗
+      (* ...and FORK'S: the parent's child token and the set its children
+         reading grew to -- see [sysc_fork_out] *)
+      sysc_fork_out f U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
       WP (Loop : expr riscv_lang))
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).
@@ -810,7 +842,7 @@ Module Type SYSCALL.
   Parameter syscall_env :
     forall {Σ : gFunctors} `{XI : CurCtx}
            `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId},
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId},
       gname -> mword 64 -> fclose_names -> iProp Σ.
   (* ===================================================================== *)
   (* THE ENVIRONMENT'S PRODUCER -- the one thing about [syscall_env] that   *)
@@ -848,13 +880,13 @@ Module Type SYSCALL.
      PROCESS half and nothing else. *)
   Parameter syscall_env_park :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
-      (γf γw γc γft γtk : gname) (fn : fclose_names),
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{XI : CurCtx}
+      (γf γw γft γtk : gname) (fn : fclose_names),
       (fcn_j fn < NPROC)%nat ->
       fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
       fcn_dq fn = DfracOwn (1/4) ->
       sysc_park_extra γtk -∗
-      is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
+      is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
       is_ftable γft γf -∗
       procs_inv (fcn_procs fn) -∗
       disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
@@ -871,7 +903,7 @@ Module Type SYSCALL.
   (* ...and read back out, for fork's sake *)
   Parameter syscall_env_world :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (fn : fclose_names),
       syscall_env γf pj fn -∗ park_world (fcn_procs fn).
   (* ...and the application-side abstract-state invariant, off the
@@ -880,25 +912,26 @@ Module Type SYSCALL.
      the loop reads it off a residue it goes on holding. *)
   Parameter syscall_env_fsabs_keep :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (fn : fclose_names),
       syscall_env γf pj fn -∗ FirstTok.fsabs_env ∗ syscall_env γf pj fn.
   Parameter syscall_env_token :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (fn : fclose_names),
       syscall_env γf pj fn -∗ park_token (fcn_procs fn).
 
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
+      (γw : gname)
       (fn : fclose_names)
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
       (gn : gname) (cs : gset gname)
       (lks : gset string) (f : sfam),
-      wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid U sts
+      wp_syscall_sconf_body (syscall_env) γf γs j γl γw fn ip dqi m av pid U sts
         gn cs lks f.
 End SYSCALL.

@@ -13,6 +13,10 @@ Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import StackOwn.
 Require Import FdSlots IrefSlots.
+(* [WaitInv.ch_frag] -- the slot's children row, which rides the dormant
+   block below on [kstack_free]'s footing.  The map's name is canonical
+   ([Xv6Cameras.wch_name]), which is what makes the row spellable here. *)
+Require Export WaitInv.
 (* [bytes_string]/[bytes_string_split]: the pure half of the array->string
    borrow below -- a fixed-size buffer with a NUL in it DETERMINES the C
    string it holds. *)
@@ -68,7 +72,7 @@ Record pprivate := MkPPriv {
   (* ...AND THE NAME OF ITS CHILDREN ROW.  The generations of this
      process's live children are one row of the <wait_lock> ghost map
      ([WaitInv.children_own_at] is the authority, [WaitInv.ch_frag
-     (un_ch N) (pv_chg V)] the row, which rides the trap residue beside
+     (pv_chg V)] the row, which rides the trap residue beside
      [FdSlots.fd_frags]); this is the KEY that row is filed under, and
      [UexecSlot.uvis_ch] is its value.  A name of its own rather than the
      slot index, so that the party holding the row -- which names only the
@@ -334,7 +338,7 @@ Section ProcDefs.
      Sealing once here is the [inode_blocks] fix again. *)
   Global Typeclasses Opaque tf_words tf_tail tf_page.
 
-  Context `{!fdslotG Σ, !irefslotG Σ, !bioslotG Σ}.
+  Context `{!fdslotG Σ, !irefslotG Σ, !bioslotG Σ, !wchG Σ}.
 
   Definition is_kstack (pa : mword 64) (ks : mword 64) : iProp Σ :=
     p_kstack pa ↦₈□ ks.
@@ -605,6 +609,29 @@ Section ProcDefs.
           what makes freeproc's ZOMBIE -> UNUSED step a pass-through and
           what puts the bill on the exit path, where the page actually is. *)
        kstack_free pa ∗
+       (* THE SLOT'S CHILDREN ROW ([WaitInv.ch_frag]), on exactly the
+          footing of [kstack_free] and the three allowances above it: born
+          once at boot, handed out with the block by allocproc, returned by
+          freeproc.  It cannot be MINTED at allocproc the way [pv_fdg]'s
+          fragments are ([ProcInv.proc_dormant_unused] is where those come
+          from) -- the authority is <wait_lock>'s
+          ([WaitInv.children_own_at]) and allocproc does not hold that
+          lock, and kfork seals a child's residue before it takes the lock
+          -- so the row itself is what the slot owns while it is dormant.
+          KEYED AT THE BLOCK'S OWN [pv_chg], which is what makes
+          allocproc's hand-over a hand-over of THIS slot's row.
+            AT [∅] WHEN UNUSED and at an EXISTENTIAL SET WHEN ZOMBIE, on
+          the [st]-keyed disjunct below's own guard.  [∅] at UNUSED is
+          forced: allocproc hands the row to a process that has no children
+          and cannot reset a set (that needs the lock).  The zombie's set is
+          in fact empty too -- kexit reparents its children to init before
+          it parks -- but nothing in the tree states that yet, so the reap
+          empties the row under the <wait_lock> it holds before it calls
+          freeproc, and lane WX-EXIT is what tightens this arm to [∅] and
+          deletes the reset. *)
+       (if bool_decide (st = ZOMBIE)
+        then ∃ S : gset gname, ch_frag (pv_chg V) pa S
+        else ch_frag (pv_chg V) pa ∅) ∗
        own_ctx (p_context pa) ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
@@ -630,6 +657,29 @@ Section ProcDefs.
        (* the bio allowance, as in [proc_dormant] -- see its note *)
        bslots 3 ∗
        kstack_free pa ∗
+       (* THE SLOT'S CHILDREN ROW ([WaitInv.ch_frag]), on exactly the
+          footing of [kstack_free] and the three allowances above it: born
+          once at boot, handed out with the block by allocproc, returned by
+          freeproc.  It cannot be MINTED at allocproc the way [pv_fdg]'s
+          fragments are ([ProcInv.proc_dormant_unused] is where those come
+          from) -- the authority is <wait_lock>'s
+          ([WaitInv.children_own_at]) and allocproc does not hold that
+          lock, and kfork seals a child's residue before it takes the lock
+          -- so the row itself is what the slot owns while it is dormant.
+          KEYED AT THE BLOCK'S OWN [pv_chg], which is what makes
+          allocproc's hand-over a hand-over of THIS slot's row.
+            AT [∅] WHEN UNUSED and at an EXISTENTIAL SET WHEN ZOMBIE, on
+          the [st]-keyed disjunct below's own guard.  [∅] at UNUSED is
+          forced: allocproc hands the row to a process that has no children
+          and cannot reset a set (that needs the lock).  The zombie's set is
+          in fact empty too -- kexit reparents its children to init before
+          it parks -- but nothing in the tree states that yet, so the reap
+          empties the row under the <wait_lock> it holds before it calls
+          freeproc, and lane WX-EXIT is what tightens this arm to [∅] and
+          deletes the reset. *)
+       (if bool_decide (st = ZOMBIE)
+        then ∃ S : gset gname, ch_frag (pv_chg V) pa S
+        else ch_frag (pv_chg V) pa ∅) ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
              (* the image is ∃-weakened here: the descriptor itself is
@@ -644,11 +694,11 @@ Section ProcDefs.
     proc_dormant pa st ⊣⊢ proc_dormant_noctx pa st ∗ own_ctx (p_context pa).
   Proof.
     iSplit.
-    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hctx & Haddr)".
-      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Haddr".
+    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hctx & Haddr)".
+      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hch Haddr".
       iPureIntro; exact Hfacts.
-    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Haddr) Hctx]".
-      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hctx Haddr".
+    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Haddr) Hctx]".
+      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hch Hctx Haddr".
       iPureIntro; exact Hfacts.
   Qed.
 
@@ -721,7 +771,7 @@ Qed.
     iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]". by iFrame.
   Qed.
 
-  Context `{!fdslotG Σ, !irefslotG Σ, !bioslotG Σ}.
+  Context `{!fdslotG Σ, !irefslotG Σ, !bioslotG Σ, !wchG Σ}.
 
   Global Instance kstack_free_morph (pa : mword 64) :
     CtxMorph (fun xi : CtxId => kstack_free (XI := xi) pa).
@@ -738,7 +788,7 @@ Qed.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /proc_dormant_noctx.
     iDestruct "H" as (V pid)
-      "(%Hf & Hpid & Hfl & Ho & Hs & Hsp & Hir & Hbs & Hkst & Haddr)".
+      "(%Hf & Hpid & Hfl & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Haddr)".
     (* [p_pid] is [↦₄]: context-indexed since M1 stage 2 *)
     iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hpid") as "[Hd Hpid]".
     iMod (proc_fields_morph pa (DfracOwn 1) V ξ ξ' with "Hd Hfl") as "[Hd Hfl]".
@@ -763,6 +813,8 @@ Qed.
         iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
         iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
         by iFrame. }
+    (* THE CHILDREN ROW CROSSES UNTOUCHED: a ghost-map element names no
+       context, so it is framed rather than transported. *)
     iModIntro. iFrame "Hd". iExists V, pid.
     iSplitR; [iPureIntro; exact Hf|]. iFrame.
   Qed.

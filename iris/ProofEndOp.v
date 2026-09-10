@@ -722,7 +722,7 @@ Local Ltac eoidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  invariants and the batch in its OPENED form.                          *)
 (* ===================================================================== *)
 Section EndOpDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* end_op's own [wp_next] obligation, NAMED and anchored at an explicit
@@ -1164,7 +1164,7 @@ End EndOpDefs.
 (*  the hart it actually starts on.                                       *)
 (* ===================================================================== *)
 Section EndOpBlocks.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* ================================================================== *)
@@ -4336,7 +4336,7 @@ End EndOpBlocks.
 (* ===================================================================== *)
 
 Section ProofEndOp.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_end_op_sconf 

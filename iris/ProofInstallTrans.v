@@ -603,7 +603,7 @@ Local Ltac rgne :=
 (*  invariant and the two big-op splits the loop carries.                 *)
 (* ===================================================================== *)
 Section InstallTransDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* install_trans's own [wp_next] obligation, NAMED and anchored at an
@@ -984,7 +984,7 @@ End InstallTransDefs.
 (*  The blocks.                                                          *)
 (* ===================================================================== *)
 Section InstallTransBlocks.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* ================================================================== *)
@@ -2703,7 +2703,7 @@ End InstallTransBlocks.
 (* ===================================================================== *)
 
 Section ProofInstallTrans.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_install_trans_sconf 

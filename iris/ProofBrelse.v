@@ -114,7 +114,7 @@ Module BrelseProof (Hsl : HOLDINGSLEEP) (Rsl : RELEASESLEEP)
                    (Aq : ACQUIRE) (Rl : RELEASE) : BRELSE.
 
 Section ProofBrelse.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 

@@ -65,7 +65,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Section SyscParkEnv.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* the nextpid lock's gname is EXISTENTIAL, exactly as [sysc_proc_env]
@@ -84,7 +84,7 @@ Section SyscParkEnv.
 End SyscParkEnv.
 
 Section ParkWorld.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
 

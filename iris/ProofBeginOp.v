@@ -364,7 +364,7 @@ Qed.
 (* ===================================================================== *)
 
 Section BoProps.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* the log lock's batch, opened just for its [lh.n] cell *)
@@ -463,7 +463,7 @@ Local Ltac reg_neq :=
     tryif unify a b then fail else (vm_compute; discriminate) end.
 
 Section BoBodies.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* ---- the exit path: +0x58 (a0 := &log) .. +0x6e (c.ret) ---- *)
@@ -1824,7 +1824,7 @@ End BoBodies.
 (* ===================================================================== *)
 
 Section ProofBeginOp.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_begin_op_sconf 

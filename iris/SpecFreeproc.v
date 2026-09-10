@@ -93,7 +93,7 @@ Local Open Scope Z_scope.
 Notation FRP := KernelSyms.freeproc.
 
 Section SpecFreeproc.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* p->pagetable, and what comes with it.  The [Some] arm's two pure facts
@@ -157,25 +157,31 @@ Section SpecFreeproc.
   Lemma fp_unused_not_zombie : bool_decide (UNUSED = ZOMBIE) = false.
   Proof. apply bool_decide_eq_false_2. vm_compute. discriminate. Qed.
 
+  (* THE CHILDREN ROW COMES OUT BESIDE THE BLOCK and goes back with it.  It
+     is not inside [fp_rest], because [fp_rest] is the STATE-INDEPENDENT
+     part and the row is not: an UNUSED slot's is at [∅] and a ZOMBIE's is
+     at whatever set its exit left ([ProcDefs.proc_dormant]'s own guard). *)
   Lemma fp_of_dormant_unused (pa : mword 64) :
     proc_dormant pa UNUSED ⊢
       ∃ (V : pprivate) (pid : mword 32),
-        fp_rest pa V pid ∗ fp_pt pa (pv_sz V) None ∗ fp_tf pa None.
+        fp_rest pa V pid ∗ ch_frag (pv_chg V) pa ∅ ∗
+        fp_pt pa (pv_sz V) None ∗ fp_tf pa None.
   Proof.
     rewrite /proc_dormant fp_unused_not_zombie.
-    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hctx & Hpg & Htf)".
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hch & Hctx & Hpg & Htf)".
     iExists V, pid. rewrite /fp_rest /fp_pt /fp_tf.
-    iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx Hpg Htf". iPureIntro. exact Hpure.
+    iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hctx Hpg Htf". iPureIntro. exact Hpure.
   Qed.
 
   Lemma fp_to_dormant_unused (pa : mword 64) (V : pprivate) (pid : mword 32)
       (szv : mword 64) :
-    fp_rest pa V pid -∗ fp_pt pa szv None -∗ fp_tf pa None -∗
+    fp_rest pa V pid -∗ ch_frag (pv_chg V) pa ∅ -∗
+    fp_pt pa szv None -∗ fp_tf pa None -∗
     proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hctx) Hpg Htf".
+    iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hctx) Hch Hpg Htf".
     rewrite /fp_pt /fp_tf /proc_dormant fp_unused_not_zombie.
-    iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx Hpg Htf".
+    iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hctx Hpg Htf".
     iPureIntro. exact Hpure.
   Qed.
 
@@ -197,15 +203,21 @@ Section SpecFreeproc.
   Lemma fp_zombie_is_zombie : bool_decide (ZOMBIE = ZOMBIE) = true.
   Proof. by apply bool_decide_eq_true_2. Qed.
 
+  (* THE ROW COMES OUT AT AN EXISTENTIAL SET, and that is the whole
+     difference from the UNUSED bridge.  A zombie's children were
+     reparented to init before it parked, so the set is in fact empty --
+     but nothing in the tree states that yet, so the reaper empties the row
+     under the <wait_lock> it holds before it calls freeproc.  WX-EXIT is
+     what turns this into [∅] and deletes the reset. *)
   Lemma fp_of_dormant_zombie (pa : mword 64) :
     proc_dormant pa ZOMBIE ⊢
       ∃ (V : pprivate) (pid : mword 32),
-        fp_rest pa V pid ∗
+        fp_rest pa V pid ∗ (∃ S : gset gname, ch_frag (pv_chg V) pa S) ∗
         fp_pt pa (pv_sz V) (Some (pv_upt V)) ∗
         fp_tf pa (Some (ud_tfp (pv_upt V), pv_tf V)).
   Proof.
     rewrite /proc_dormant fp_zombie_is_zombie.
-    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hctx & %Hbel & Hpt & Htfp)".
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hch & Hctx & %Hbel & Hpt & Htfp)".
     iExists V, pid.
     (* both [page_valid]s come out of the table: the trapframe's from
        [proc_pt_wf], the root's from the tree's node claim. *)
@@ -216,6 +228,7 @@ Section SpecFreeproc.
     rewrite /fp_rest /fp_pt /fp_tf.
     iSplitL "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx".
     { iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx". iPureIntro. exact Hpure. }
+    iSplitL "Hch"; [iExact "Hch" |].
     iSplitL "Hpg Hpt".
     { iFrame "Hpg". iSplitL "Hpt".
       { iExists Mz. iExact "Hpt". }
@@ -277,6 +290,13 @@ Section SpecFreeproc.
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     proc_held cpu_id j γl st ch -∗
     fp_rest pa V pid -∗
+    (* THE SLOT'S CHILDREN ROW, AT THE EMPTY SET.  freeproc neither reads
+       nor moves it -- it goes straight back into the UNUSED block below --
+       but the block it rebuilds is the one the next allocproc hands out,
+       so the row has to be there and it has to be empty.  Both callers can
+       pay: allocproc's failure tails have the row allocproc just took, and
+       the reaper empties the zombie's under the <wait_lock> it holds. *)
+    ch_frag (pv_chg V) pa ∅ -∗
     fp_pt pa (pv_sz V) opt -∗
     fp_tf pa otf -∗
     kalloc_env γa None -∗
@@ -298,7 +318,7 @@ Module Type FREEPROC.
     (* NO [!fileG Σ]: the contract reaches [ProcInv.proc_dormant], which uses
        only the fd-SLOT ghost, so Rocq prunes [fileG] from the body and the
        Parameter must not re-introduce it. *)
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γp γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))

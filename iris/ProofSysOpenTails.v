@@ -126,7 +126,7 @@ Module SysOpenTails (Iunlock : IUNLOCK) (Iunlockput : IUNLOCKPUT)
                     (EndOp : END_OP) (Fileclose : FILECLOSE).
 
 Section ProofSysOpenTails.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

@@ -91,7 +91,7 @@ Require Import TsoCtx.
 Import Defs.
 
 
-Definition wp_sleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_sleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
@@ -146,7 +146,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
 
 Module Type SLEEP.
   Parameter wp_sleep_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (lks : gset string),
       wp_sleep_sconf_body γs j γl m av eb lks.

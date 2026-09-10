@@ -359,7 +359,7 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
    Promote it then. *)
 Definition fs_fabric
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname)
     (pd pav pu : mword 64)
     : iProp Σ :=
@@ -388,7 +388,7 @@ Definition fs_fabric
 
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     gs pd pav pu :
   Persistent (fs_fabric gs pd pav pu).
 Proof. rewrite /fs_fabric. apply _. Qed.
@@ -399,7 +399,7 @@ Proof. rewrite /fs_fabric. apply _. Qed.
    four ride in the bundle. *)
 Lemma fs_fabric_all
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (pd pav pu : mword 64) :
   fs_fabric gs pd pav pu -∗
   kernel_data ∗

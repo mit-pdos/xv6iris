@@ -241,7 +241,7 @@ Module A := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
                                           Iunlockput EndOp.
 
 Section KexecB2Body.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -702,7 +702,7 @@ End KexecB2Body.
    above sits in the section just closed, so it can be aimed; the loops here
    bind their own hart and are aimed by their callers in turn. *)
 Section KexecB2Loops.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

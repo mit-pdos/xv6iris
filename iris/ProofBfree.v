@@ -462,7 +462,7 @@ Local Ltac bfidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  Vocabulary: the frame, the byte accessor, the continuation.           *)
 (* ===================================================================== *)
 Section BfreeDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* bfree's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition bf_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
@@ -546,7 +546,7 @@ Definition bf_sp (m M : regfile) : Prop :=
 (*  +0x4a .. +0x5e : log_write, brelse and the epilogue.                  *)
 (* ===================================================================== *)
 Section BfreeTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma bf_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat)
@@ -985,7 +985,7 @@ End BfreeTail.
 (*  +0x00 .. +0x46 : the prologue, bread, the bit test and the clear.     *)
 (* ===================================================================== *)
 Section ProofBfreeMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bfree_gen 

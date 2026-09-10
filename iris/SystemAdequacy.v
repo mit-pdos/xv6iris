@@ -336,6 +336,10 @@ Section SystemBoot.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{!ufdG Σ}.
   Context `{!fileGpreS Σ, !fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
+  (* the [wait_lock] children map's capacity: [Xv6Cameras.wchG] carries the
+     NAME, so it left [Xv6G]'s bundle and only the functor half is assumed
+     here -- [BootShared.boot_shared_alloc] mints the instance. *)
+  Context `{!wchGpreS Σ}.
   (* B3's two classes are [xv6G] MEMBERS now (2b-inode-3 / 2b-inode-4), so
      nothing extra is bound here -- see [FsCfgBoot]'s era section. *)
   Context `{GEN : GenId}.
@@ -407,7 +411,7 @@ Section SystemBoot.
          inside the generic discharge. *)
       (Hinit_boot :
          forall `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
-                  HPav : !pavG Σ, HF : !fileG Σ} (r : N),
+                  HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ} (r : N),
            @file_app Σ HF = MkAppcfg N A r ->
            ⊢ AppInv.app_inv FsCfg.fsc_fs -∗
              |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0) :
@@ -581,9 +585,9 @@ Section SystemBoot.
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (MkAppcfg N A r) (fun _ => emp)%I gsn gln gtn Hbf Hbundle
             with "Hok Hxfer Hseamg Hdursnap Hres")
-      as (Hfd Hir Hpav Hbs HF γd γv Rspent γi ξd)
+      as (Hfd Hir Hpav Hbs Hwch HF γd γv Rspent γi ξd)
       "(%Hdimg & %Happ & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
-        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
+        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Hchb & Huart &
         Htok & Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
     (* THE FIRST PROCESS'S EXEC BUNDLE, off [Hinit_boot] at the era's own
@@ -597,7 +601,7 @@ Section SystemBoot.
        evar and the proof term would not close. *)
     iDestruct (FsCfgBoot.fs_boot_supply_app_inv (GEN := GEN) with "Hfs")
       as "[#Happinv Hfs]".
-    iMod (Hinit_boot Hbs Hfd Hir Hpav HF r Happ with "Happinv") as "Hboot".
+    iMod (Hinit_boot Hbs Hfd Hir Hpav Hwch HF r Happ with "Happinv") as "Hboot".
     (* THE FILE SYSTEM'S BOOT KITS ARE NO LONGER DROPPED (stage (e)).
        [Hfs] is the ten configuration ties plus [fs_kit_icache] plus
        [fs_kit_fsinit_ghost], and [Hirauth] is the iref-slot authority
@@ -633,12 +637,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
+    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
+      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -692,6 +696,7 @@ Section SystemBoot.
         iSpecialize ("HP" with "Hpark").
         iSpecialize ("HP" with "Hpst").
         iSpecialize ("HP" with "Hpavail").
+        iSpecialize ("HP" with "Hchb").
         iSpecialize ("HP" with "Hfs").
         iSpecialize ("HP" with "Hmir").
         iSpecialize ("HP" with "Hirslot").
@@ -757,7 +762,7 @@ End SystemBoot.
 
 Lemma init_boot_of_sup {Σ}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId}
+      !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ} `{GEN : GenId}
     (cw : Z) (sts : list fdstate) :
   app_sup -∗ init_boot_bundle cw sts.
 Proof.
@@ -771,7 +776,7 @@ Qed.
    corollaries below and [App.xv6_app_adequacy_triv_xv6Σ] hand in *)
 Lemma init_boot_of_triv {Σ}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId}
+      !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ} `{GEN : GenId}
     (cw : Z) (sts : list fdstate) :
   (forall r av, app_pred r av ⊣⊢ True) ->
   ⊢ init_boot_bundle cw sts.
@@ -785,7 +790,7 @@ Qed.
 
 Theorem xv6_power_adequacy_gen Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !bioslotGpreS Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ, !wchGpreS Σ}
     (* the PROGRAM's descriptor-table class: [xv6Σ] supplies it, and the
        user slot minted during boot is allocated at it.  NAMED, because the
        boot application below is explicit ([@]) and passes it positionally. *)
@@ -842,7 +847,7 @@ Theorem xv6_power_adequacy_gen Σ
     (Hinit_boot :
        forall (HR : riscvGS Σ) (GEN : GenId)
               `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
-                HPav : !pavG Σ, HF : !fileG Σ}
+                HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
               (c : CT) (r : app_names),
          @file_app Σ HF = MkAppcfg app_names (app_fs c) r ->
          ⊢ AppInv.app_inv FsCfg.fsc_fs -∗
@@ -1112,13 +1117,16 @@ Proof.
      member now, so the section generalises one class less. *)
   (* one [_] MORE since the program's descriptor class ([UserFd.ufdG]) joined
      the section: this application counts them positionally. *)
+  (* ...and one more again since the children map's camera
+     ([Xv6Cameras.wchGpreS]) joined it: the boot fupd is what mints the map
+     and its NPROC rows ([WaitInv.children_res_alloc]). *)
   (* the application's data and obligations, APPLIED at the era's fixed part
      [Gcl] (round D0): below the boot nothing names the record's
      [riscv_client], so they are terms here, not holes *)
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ Hufd _ _ _ _ _ gen g' sb nib cov
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ Hufd _ _ _ _ _ _ gen g' sb nib cov
             app_names (app_fs Gcl) (Happ_xfer Gcl)
-            (fun HBs HFd HIr HPav HF r =>
-               Hinit_boot (RiscvGS Σ _ HE) gen HBs HFd HIr HPav HF Gcl r)
+            (fun HBs HFd HIr HPav HWc HF r =>
+               Hinit_boot (RiscvGS Σ _ HE) gen HBs HFd HIr HPav HWc HF Gcl r)
             Hbf Hpure Hcovin Hlogsub Hls2 _ _).
   (* the descriptor class comes back as a GOAL here rather than being
      shelved, because the application is explicit ([@]); it is the section's
@@ -1141,7 +1149,7 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 Theorem xv6_power_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !bioslotGpreS Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ, !wchGpreS Σ}
     (* the program's descriptor-table class -- supplied by [xv6Σ] *)
     `{!ufdG Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
@@ -1177,7 +1185,7 @@ Proof.
             ltac:(intros c; apply app_xfer_raw_triv; intros r av; reflexivity)
             ltac:(intros c; cbv beta; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
-            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HFi ci ri Heq;
+            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri Heq;
                   iIntros "_"; iModIntro; iApply init_boot_of_triv;
                   rewrite Heq; intros r' av; reflexivity)
             (fun γobs _ => obs_pred_at γobs)
@@ -1199,7 +1207,7 @@ Qed.
 
 Theorem xv6_trace_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !bioslotGpreS Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ, !wchGpreS Σ}
     `{!ufdG Σ}   (* the program's descriptor-table class (from [xv6Σ]) *)
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
     (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
@@ -1246,7 +1254,7 @@ Proof.
             ltac:(intros c; apply app_xfer_raw_triv; intros r av; reflexivity)
             ltac:(intros c; cbv beta; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
-            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HFi ci ri Heq;
+            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri Heq;
                   iIntros "_"; iModIntro; iApply init_boot_of_triv;
                   rewrite Heq; intros r' av; reflexivity)
             (fun γobs _ => obs_ledger_at R γobs)
@@ -1297,7 +1305,7 @@ Definition xv6Σ : gFunctors :=
      authority rides inside [UkRun.urun] and the handles are what a
      user-level proof carries.  Distinct from [fdslotΣ], which is the
      kernel/process split over the same descriptors. *)
-  #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ; ufdΣ ].
+  #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ; wchΣ; ufdΣ ].
 
 (* THE POWER THEOREM AT THE CONCRETE FUNCTOR LIST: every class is
    discharged, so "nothing about the ghost state is assumed" is checked
@@ -1645,7 +1653,7 @@ Proof.
             ltac:(intros c; apply app_xfer_raw_triv; intros r av; reflexivity)
             ltac:(intros c; cbv beta; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
-            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HFi ci ri Heq;
+            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri Heq;
                   iIntros "_"; iModIntro; iApply init_boot_of_triv;
                   rewrite Heq; intros r' av; reflexivity)
             (fun γobs _ => obs_pred_at γobs)

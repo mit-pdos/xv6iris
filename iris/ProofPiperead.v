@@ -391,7 +391,7 @@ Module PipereadProof (Myproc : MYPROC) (AcquireGen : ACQUIRE_GEN)
                      (Copyout : COPYOUT) (ReleaseGen : RELEASE_GEN) : PIPEREAD.
 
 Section ProofPiperead.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* register disequality guard (perf rule): [unify] settles convertibility

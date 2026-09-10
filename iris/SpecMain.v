@@ -209,7 +209,7 @@ Require Import TsoCtx.
 Notation K_main := (122%nat) (only parsing).
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section SpecMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
@@ -581,6 +581,12 @@ Section SpecMain.
        and it is what refutes allocproc's empty-table arm, which userinit
        does not test (claude-notes/kernel-defects.md). *)
     procs_avail (Some NPROC) -∗
+    (* THE CHILDREN MAP AND ITS NPROC ROWS, minted in the boot fupd at the
+       canonical name ([WaitInv.children_res_alloc]) because a row has to
+       be spellable in [ProcDefs.proc_dormant].  Main pairs the authority
+       with the parent cells for <wait_lock>'s payload and deposits row [i]
+       into slot [i]'s dormant block at [SpecProcinit.procs_inv_alloc]. *)
+    WaitInv.children_boot -∗
     (* ---- THE FILE SYSTEM'S BOOT-ERA MINT (fs-cfg-boot.md stage (e)) ----
        [FsCfgBoot.fs_cfg_alloc] runs inside [BootShared.boot_shared_alloc]
        and gives [IcacheRefDefs.icfg] / [FsCfg.fscfg] their VALUES; this row is
@@ -706,7 +712,7 @@ End SpecMain.
 
 Module Type MAIN.
   Parameter wp_main_boot_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (m : regfile) (K : nat)
       (p0 : mword 64)

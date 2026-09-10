@@ -51,6 +51,7 @@ Require Import SchedCtx SwtchCtx.
 Require Import FdSlots IrefSlots FileInvDefs.
 Require Import FirstTok TimerCap.
 Require Import UserPtTree ProcPtOwn.   (* [uptd] / [ud_data] / [ud_pas] / [proc_pt_wf] *)
+Require Import WaitInv.  (* [ch_frag] -- the children row the park captures *)
 Require Import UsertrapRes.
 Require Import UexecSlot. (* [uvis] / [uvis_of] -- the slot's key, and the
                              projection of a resumed record onto it *)
@@ -70,7 +71,7 @@ Require Import InitBoot.  (* [init_boot_bundle] -- the first process's exec
                                bundle, the BOOT mode's payload *)
 
 Section ParkCap.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
@@ -84,11 +85,18 @@ Section ParkCap.
      is this, verbatim).  [W] is what the residue closer is handed at the
      resume beside [first_done] and the timer capability. *)
   Definition park_pkg `{XI : CurCtx}
-      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
-      (γs : list gname) (γw γc γft γf γtl : gname) (pa ks : mword 64)
+      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ) (W : iProp Σ)
+      (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64)
       (* the parked process's fd-state ghost name -- see
          [SpecForkretParkPaid.forkret_park_pkg], which is this verbatim *)
       (g : gname)
+      (* ...AND ITS CHILDREN-ROW GHOST NAME, beside the descriptor
+         one and for its reason: the parked row is at
+         [ProcDefs.pv_chg] of the parked block, and the closer's pure
+         premise below demands the resumed record name the same one --
+         nothing between the park and the resume re-incarnates the
+         slot. *)
+      (γch : gname)
       (* ...and its cwd's inum, for the same reason the name is here: the
          row the parker captured is restricted to it ([park_token_park] and
          [park_token_park_steady] below), so the closer needs the resumed
@@ -103,16 +111,18 @@ Section ParkCap.
          kexec builds its resume key at. *)
       (sts : list fdstate)
       (* ...AND THE PARKED PROCESS'S GENERATION AND CHILDREN SET, beside
-         [sts] and for its reason: the resume key carries both and the
-         closer builds it, so the party that read them off the kernel's
-         cells names them here.  THE GENERATION IS NOT THE PARKER'S TO
-         CHOOSE -- [park_cap] below passes the parked block's own field
-         [ProcDefs.pv_gen] -- but it stays a PARAMETER here rather
-         than a projection of the closer's [U'], because pinning the
-         RESUMED record's field is a statement about the residue, and the
-         residue does not carry the generation until WX-RES.  The children
-         set is the parker's choice for the same reason, and this lane's
-         fork arm is what makes that choice non-trivial. *)
+         [sts] and for its reason: the resume key carries both, the
+         residue is indexed by the set, and the closer builds both -- so
+         the party that read them off the kernel's cells names them here.
+         NEITHER IS THE PARKER'S TO CHOOSE.  [park_cap] below passes the
+         parked block's own [ProcDefs.pv_gen] for the generation, and the
+         set is the one the parker's [WaitInv.ch_frag] is at
+         ([park_token_park] / [_steady] take the row as a premise, exactly
+         as they take the fragment bundle).  Both stay PARAMETERS rather
+         than projections of the closer's [U'], because what pins the
+         RESUMED record is a premise of the closer and not a definition:
+         the two pure pins above ([pv_fdg]/[pv_chg]) are how the parked
+         names reach it. *)
       (gn : gname) (cs : gset gname)
       (* THE PARKED RUN KEY, WHEN THERE IS ONE.  A park has two modes and
          this is the parameter that selects them ([park_cap]'s [steady] bit
@@ -145,7 +155,7 @@ Section ParkCap.
      (* THE PARKER'S GLOBALS, at ITS context (L8, A12.19): the cap moves
         them into the running twin ([ProofForkretPark], by [ctx_move]),
         which is what the twin's forkret needs to apply the closer below. *)
-     park_globals cur_ctx γs γw γc γft γf γtl ∗
+     park_globals cur_ctx γs γw γft γf γtl ∗
      pslot_used_at pa ∗
      stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
      (* THE MODE'S PAYLOAD.
@@ -181,6 +191,8 @@ Section ParkCap.
         ⌜proc_pt_wf pt'⌝ -∗
         (* the resumed record names the parked process's fd-state ghost *)
         ⌜pv_fdg (us_V U') = g⌝ -∗
+        (* ...and its children row -- see [γch] above *)
+        ⌜pv_chg (us_V U') = γch⌝ -∗
         (* ...and is at the parked process's working directory: nothing
            between park and resume calls chdir (forkret's boot arm runs
            kexec, which inherits it) *)
@@ -194,7 +206,7 @@ Section ParkCap.
            and neither the size nor the cwd moves.  [None] asks nothing --
            that mode's closer instantiates a family instead. *)
         ⌜match Wk with Some W0 => urun_eq W0 U' | None => True end⌝ -∗
-        park_globals Xc γs γw γc γft γf γtl -∗
+        park_globals Xc γs γw γft γf γtl -∗
         ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
         first_done (XI := Xc) -∗
         W -∗
@@ -233,7 +245,7 @@ Section ParkCap.
            record's slot comes out of kexec, through the exec bundle the
            package's row above handed the boot arm, so there is nothing for
            the closer to produce and nothing for the kernel to mint. *)
-        (URB h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts
+        (URB h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts cs
          ∗ match Wk with
            | Some _ => uslot (uvis_of U' sts gn cs)
            | None => emp
@@ -267,17 +279,21 @@ Section ParkCap.
   (* THE CAP, at a given [W]: the statement of
      [SpecForkretParkPaid.forkret_park_paid_body], as a [□] wand *)
   Definition park_cap
-      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
-    (□ ∀ (hp : CpuId) (ξp : CtxId) (γw γc γft γf γtl : gname) (pa ks : mword 64)
+    (□ ∀ (hp : CpuId) (ξp : CtxId) (γw γft γf γtl : gname) (pa ks : mword 64)
          (rest : list (mword 64)) (pid : mword 32) (U : ustate)
          (* THE PARKED DESCRIPTOR STATES -- [park_pkg]'s parameter, which
             the parker names off the fragment bundle it holds *)
          (* THE PARKED CHILDREN SET, which the parker names off the
-            resource it holds, exactly as it names [sts].  THE GENERATION
-            IS NOT HERE: the block determines it ([ProcDefs.pv_gen]), so
-            the cap passes the block's field and the package's closer
-            demands the resumed record carry the same one. *)
+            [WaitInv.ch_frag] it holds, exactly as it names [sts] off the
+            fragment bundle -- the binder stays because no projection of
+            [U] determines it: the row is a resource beside the block, and
+            the residue is indexed by the set that row is at.  THE
+            GENERATION IS NOT HERE: the block determines it
+            ([ProcDefs.pv_gen]), so the cap passes the block's field and
+            the package's closer demands the resumed record carry the same
+            one. *)
          (sts : list fdstate) (cs : gset gname) (av : nat)
          (* WHICH OF THE PACKAGE'S TWO MODES the parker is paying: [true]
             hands the package the parked record's RUN KEY and owes
@@ -296,8 +312,8 @@ Section ParkCap.
           twins it for the child's context and moves the record's rows there
           -- see [ProofForkretPark]. *)
        own_context (CID := hp) ξp -∗
-       park_pkg (XI := ξp) URB W γs γw γc γft γf γtl pa ks (pv_fdg (us_V U))
-         (pv_cwi (us_V U)) sts (pv_gen (us_V U)) cs
+       park_pkg (XI := ξp) URB W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
+         (pv_chg (us_V U)) (pv_cwi (us_V U)) sts (pv_gen (us_V U)) cs
          (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs) else None)
          pid av -∗
        (* ...and [W] itself, for forkret to hand the closer: under the same
@@ -316,14 +332,15 @@ Section ParkCap.
      the records of THIS table ([un_s N = γs]), which is all the token for
      [γs] ever parks *)
   Definition park_chan
-      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (ξp : CtxId) (N : ut_names) (av : nat),
        ⌜un_s N = γs⌝ -∗ ⌜ut_wf N⌝ -∗ ⌜(K_usertrap <= av)%nat⌝ -∗
        ▷ (park_env (XI := ξp) N -∗ park_own (XI := ξp) N -∗
-          (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate) (sts : list fdstate),
+          (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate)
+             (sts : list fdstate) (cs : gset gname),
              ⌜pv_upt (us_V U') = pt'⌝ -∗
-             park_globals Xc (un_s N) (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) -∗
+             park_globals Xc (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N) -∗
              ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
              first_done (XI := Xc) -∗
              W -∗
@@ -339,12 +356,16 @@ Section ParkCap.
                 [uslot (uvis_of U' sts)] in [park_pkg]'s closer above is what
                 crosses the park. *)
              fd_frags (pv_fdg (us_V U')) sts -∗
-             URB h Xc pt' (add_vec (un_ks N) (mword_of_int 4096)) U' sts)))%I.
+             (* ...AND THE CHILDREN ROW AT A NAMED SET, beside the
+                fragments: this mirrors [UsertrapRes.ut_park_intro_body]
+                row for row. *)
+             ch_frag (pv_chg (us_V U')) (un_pj N) cs -∗
+             URB h Xc pt' (add_vec (un_ks N) (mword_of_int 4096)) U' sts cs)))%I.
 
   (* THE TOKEN: some residue, its cap and its channel, both at [W := the
      token itself] *)
   Definition park_token_F (γs : list gname) (X : iProp Σ) : iProp Σ :=
-    (∃ URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ,
+    (∃ URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ,
        park_cap URB X γs ∗ park_chan URB X γs)%I.
 
   Local Instance park_token_F_contractive γs : Contractive (park_token_F γs).
@@ -408,6 +429,13 @@ Section ParkCap.
        resumes at are THESE, which is what lets the caller say what the
        child's table is. *)
     fd_frags (pv_fdg (us_V U)) sts -∗
+    (* ...AND ITS CHILDREN ROW, AT A NAMED SET, on the fragments' route
+       exactly: the row is one entry of the map [wait_lock] owns
+       ([WaitInv.ch_frag]), born at boot with the slot and handed to the
+       parker by allocproc ([SpecAllocproc.allocproc_post]), and the resume
+       hands it into the residue re-keyed by the closer's own
+       [pv_chg V' = pv_chg V] premise. *)
+    ch_frag (pv_chg (us_V U)) (un_pj N) cs -∗
     (* THE FIRST PROCESS'S EXEC BUNDLE, on the fd fragments' route exactly:
        not part of [park_child] (that bundle goes straight to the cap) but a
        row of the package built here, spent by forkret's boot arm on
@@ -429,7 +457,7 @@ Section ParkCap.
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U false -∗
     |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
   Proof.
-    iIntros (Hwf Hrest) "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Hbundle Hchild".
+    iIntros (Hwf Hrest) "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Hch Hbundle Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
@@ -437,14 +465,14 @@ Section ParkCap.
     iAssert (procs_inv (un_s N)) as "#Hprocs".
     { iDestruct "Henv" as "[Hcaps _]". iDestruct "Hcaps" as "(_ & $ & _)". }
     (* the parker's globals, out of the environment it holds anyway *)
-    iAssert (park_globals cur_ctx (un_s N) (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N)) as "#Hglobp".
+    iAssert (park_globals cur_ctx (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N)) as "#Hglobp".
     { iDestruct "Henv" as "[Hcaps Hextra]".
       iApply (park_globals_of_park_env with "Hcaps Hextra"). }
     iDestruct ("Hchan" $! cur_ctx N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
-    iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
+    iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
               (un_ks N) rest (un_pid N) U sts cs KSTACK_AV false
-              with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hbundle] [] Hchild").
+              with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hch Hbundle] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
     - exact Hkav.
@@ -461,9 +489,10 @@ Section ParkCap.
       iSplitL "Hbundle"; [iExact "Hbundle"|].
       iNext.
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
-      iIntros (h Xc pt' U') "%Hupt %Hnorm %Hptwf %Hfg %Hcwi _ #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+      iIntros (h Xc pt' U') "%Hupt %Hnorm %Hptwf %Hfg %Hcg %Hcwi _ #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       (* the parked bundle, re-keyed onto the resumed record *)
       iEval (rewrite -Hfg) in "Hfrag".
+      iEval (rewrite -Hcg) in "Hch".
       (* ...AND ITS STATES, NAMED.  This is the only place in the park
          channel where the descriptor states are in hand as a value, and it
          is the place the key is minted -- so the key is minted AT them.
@@ -474,8 +503,8 @@ Section ParkCap.
          all the closer produces is the residue, at the package's own
          [sts] -- the list the fragments below are at. *)
       iSplitL; [| iEmpIntro].
-      iApply ("Hclose'" $! h Xc pt' U' sts
-                with "[%] Hglob Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
+      iApply ("Hclose'" $! h Xc pt' U' sts cs
+                with "[%] Hglob Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag Hch").
       exact Hupt.
     - iNext. iExact "Htok".
   Qed.
@@ -521,6 +550,13 @@ Section ParkCap.
     (* the child's descriptor-state fragments, at a named table, exactly as
        [park_token_park] takes them *)
     fd_frags (pv_fdg (us_V U)) sts -∗
+    (* ...AND ITS CHILDREN ROW, AT A NAMED SET, on the fragments' route
+       exactly: the row is one entry of the map [wait_lock] owns
+       ([WaitInv.ch_frag]), born at boot with the slot and handed to the
+       parker by allocproc ([SpecAllocproc.allocproc_post]), and the resume
+       hands it into the residue re-keyed by the closer's own
+       [pv_chg V' = pv_chg V] premise. *)
+    ch_frag (pv_chg (us_V U)) (un_pj N) cs -∗
     (* ONE SLOT, AT THE PARKED RECORD, at the very table the fragments name *)
     (* AT THE BLOCK'S OWN GENERATION: the key's [UexecSlot.uvis_gen] is
        the field [ProcDefs.pv_gen], so the parked slot is keyed at it and
@@ -531,21 +567,21 @@ Section ParkCap.
     |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
   Proof.
     iIntros (Hwf Hrest)
-      "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hdone0 Hfrag Hslot Hchild".
+      "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hdone0 Hfrag Hch Hslot Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
     iDestruct "Htok'" as (URB) "[#Hcap #Hchan]".
     iAssert (procs_inv (un_s N)) as "#Hprocs".
     { iDestruct "Henv" as "[Hcaps _]". iDestruct "Hcaps" as "(_ & $ & _)". }
-    iAssert (park_globals cur_ctx (un_s N) (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N)) as "#Hglobp".
+    iAssert (park_globals cur_ctx (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N)) as "#Hglobp".
     { iDestruct "Henv" as "[Hcaps Hextra]".
       iApply (park_globals_of_park_env with "Hcaps Hextra"). }
     iDestruct ("Hchan" $! cur_ctx N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
-    iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ch N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
+    iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
               (un_ks N) rest (un_pid N) U sts cs KSTACK_AV true
-              with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hslot Hdone0] [] Hchild").
+              with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hch Hslot Hdone0] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
     - exact Hkav.
@@ -570,11 +606,12 @@ Section ParkCap.
       iNext.
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
       iIntros (h Xc pt' U')
-        "%Hupt %Hnorm %Hptwf %Hfg %Hcwi %Hrk #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+        "%Hupt %Hnorm %Hptwf %Hfg %Hcg %Hcwi %Hrk #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       iEval (rewrite -Hfg) in "Hfrag".
+      iEval (rewrite -Hcg) in "Hch".
       iSplitR "Hslot".
-      + iApply ("Hclose'" $! h Xc pt' U' sts
-                  with "[%] Hglob Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
+      + iApply ("Hclose'" $! h Xc pt' U' sts cs
+                  with "[%] Hglob Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag Hch").
         exact Hupt.
       + (* THE RE-KEY -- the whole of the steady park.  The package's run key
            is the parked record's projection at the placeholder view, and the
@@ -599,7 +636,7 @@ Section ParkCap.
   (* [usertrap_res_bare_park], both at [URB := usertrap_res_bare].          *)
   (* ------------------------------------------------------------------- *)
   Lemma park_token_intro_of
-      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (γs : list gname) :
+      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ) (γs : list gname) :
     (forall N av, ut_park_intro_body URB (park_token (un_s N)) N av) ->
     park_cap URB (park_token γs) γs -∗
     park_token γs.

@@ -86,7 +86,7 @@ Module PipeallocProof (Filealloc : FILEALLOC) (Kalloc : KALLOC)
 
 Section ProofPipealloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 

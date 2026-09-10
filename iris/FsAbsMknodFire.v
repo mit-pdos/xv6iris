@@ -135,7 +135,7 @@ Local Open Scope Z_scope.
 Section MknodFire.
   (* [SysMknodDefs]'s binder list, verbatim. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* =================================================================== *)
@@ -371,7 +371,7 @@ Require Import FsAbsEra.        (* [elend], [ex_hops_from], [elend_astate],
 Section EraMknod.
   (* [SysMknodDefs]'s binder list, verbatim. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* =================================================================== *)
@@ -451,7 +451,7 @@ Global Typeclasses Opaque npar_walk_pre_era npar_walk_dead_era.
 
 Section NparMknod.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* ------------------------------------------------------------------ *)
   (*  (1) the families                                                   *)
@@ -660,7 +660,7 @@ Qed.
 Section CreateFire.
   (* [FsAbsMknodFire]'s binder list, verbatim. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 

@@ -166,7 +166,7 @@ Module PD := ProofKexecD.KexecDProof PFP SS.
 (*  nothing of the abstract state.                                         *)
 (* ===================================================================== *)
 Section KexecAUTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -381,7 +381,7 @@ End KexecAUTail.
 (* ===================================================================== *)
 Section KexecAUExit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -773,7 +773,7 @@ End KexecAUExit.
 (* ===================================================================== *)
 Section KexecAUMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

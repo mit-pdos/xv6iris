@@ -364,7 +364,7 @@ Definition sys_unlink_ret (r : mword 64) : Prop :=
    [Section], is in the header's ONE CONTRACT block. *)
 Definition sys_unlink_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gf : gname) (pj : mword 64) (pid : mword 32) (U : ustate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (eb b : bool)
     (lks : gset string) (dqb dqs dqbs : dfrac)
@@ -406,7 +406,7 @@ Definition sys_unlink_closer
 
 Section SysUnlinkArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
@@ -544,7 +544,7 @@ Global Typeclasses Opaque unlink_au_pre unlink_post_ok unlink_post_fail
 
 Definition wp_sys_unlink_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)      (* ftable, kalloc, printk   *)
     (gs : list gname) (j : nat) (gl : gname)     (* the running process *)
     (pd pav pu : mword 64)                       (* disk fabric + lock  *)
@@ -629,7 +629,7 @@ Definition wp_sys_unlink_frame
    definitional ([FsAbs.ftop_gamma_top]). *)
 Definition wp_sys_unlink_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
@@ -662,7 +662,7 @@ Definition wp_sys_unlink_body
 Module Type SYSUNLINK.
   Parameter wp_sys_unlink :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

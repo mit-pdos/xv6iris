@@ -95,7 +95,7 @@ Local Ltac namidx := first [ vm_compute; reflexivity | vm_compute; discriminate 
 
 Section ProofNameiTrMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- THE FRAME CARVE: the two low slots ARE [name[14]] ---- *)

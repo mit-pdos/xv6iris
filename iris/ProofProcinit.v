@@ -173,7 +173,7 @@ Section ProofProcinit.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
   Context `{!fileG Σ}.
-  Context `{!fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop
      lemmas below apply EACH OTHER at a hart that a [wp_next] crossing may
      have migrated to, so each needs its OWN implicit per-lemma [CID]

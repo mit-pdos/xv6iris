@@ -151,7 +151,7 @@ Qed.
 
 Section ProcAvail.
   Context `{!riscvGS Σ}.
-  Context `{!pavG Σ}.
+  Context `{!pavG Σ, !wchG Σ}.
 
   (* ---- THE MARKER.  Persistent, so a scan keeps a copy of every slot it
      passes while handing the slot's own copy back with the lock. ---- *)

@@ -100,10 +100,13 @@ Require Import TsoCtx.
 Notation K_sys_fork := ((K_kfork + 2)%nat) (only parsing).
 Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γp γw γc γl γf : gname) (γs : list gname)
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γp γw γl γf : gname) (γs : list gname)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
     (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (* the caller's children set, forwarded to kfork with its row -- see
+       [SpecKfork.kfork_post].  sys_fork never reads it either. *)
+    (csP : gset gname)
     (* the child's exit payload, forwarded to kfork -- see
        [SpecKfork.kfork_post].  sys_fork never reads it. *)
     (Q : Z -> iProp Σ)
@@ -120,7 +123,7 @@ Definition wp_sys_fork_sconf_body
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
-  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
   is_ftable γl γf -∗
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
@@ -174,6 +177,10 @@ Definition wp_sys_fork_sconf_body
      ghost at exactly this list, one slot per [filedup] -- so the caller has
      to name them, and gets them back untouched. *)
   fd_frags (pv_fdg (us_V U)) sts -∗
+  (* ...AND THE CALLER'S CHILDREN ROW, on the same channel: kfork moves it
+     under the <wait_lock> it takes to write [np->parent], and the moved
+     row comes back below. *)
+  ch_frag (pv_chg (us_V U)) p csP -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
@@ -192,12 +199,17 @@ Definition wp_sys_fork_sconf_body
          out of [SpecKfork.kfork_post].  An iProp disjunction and no
          longer a pure one, because the pid arm now carries a RESOURCE --
          which is the whole of what fork gives its parent. *)
-      ( ⌜ mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64) ⌝
+      (* ...AND THE CALLER'S CHILDREN ROW, MOVED on the pid arm: kfork put
+         the child's generation in the caller's set under <wait_lock>, so
+         what comes back is the reading the resume key is built at. *)
+      ( (⌜ mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64) ⌝ ∗
+         ch_frag (pv_chg (us_V U)) p csP)
         ∨ (∃ (pidv : mword 32) (γ : gname),
               ⌜ mf !!! Regidx (mword_of_int 10 : mword 5)
                 = (sign_extend' 64 pidv : mword 64) ⌝ ∗
               ⌜ (1 <= bv_unsigned pidv <= PIDMAX)%Z ⌝ ∗
-              child_tok γ pidv Q) ) -∗
+              child_tok γ pidv Q ∗
+              ch_frag (pv_chg (us_V U)) p (csP ∪ {[γ]})) ) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -205,13 +217,14 @@ Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module Type SYSFORK.
   Parameter wp_sys_fork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
-             !irefslotG Σ, !pavG Σ} `{!ufdG Σ}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ}
       `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γp γw γc γl γf : gname) (γs : list gname)
+      (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (csP : gset gname)
       (Q : Z -> iProp Σ)
       (lks : gset string),
-      wp_sys_fork_sconf_body γp γw γc γl γf γs
- m lvl av eb p b pid U sts Q lks.
+      wp_sys_fork_sconf_body γp γw γl γf γs
+ m lvl av eb p b pid U sts csP Q lks.
 End SYSFORK.

@@ -208,7 +208,7 @@ End SuMsgStr.
 Module SysUnlinkTails (Iunlockput : IUNLOCKPUT) (EndOp : END_OP) (PN : PANIC).
 
 Section ProofSysUnlinkTails.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

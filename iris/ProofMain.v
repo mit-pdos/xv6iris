@@ -196,7 +196,7 @@ Module MainProof
   : MAIN.
 
 Section ProofMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
@@ -862,8 +862,15 @@ Section ProofMain.
        hands back [lk_fresh wait_lock_addr "wait_lock"]; [WaitInv.parents_res]
        is the NPROC [p_parent] cells, carved by [BootCarveMain]'s slot
        family and routed here through [main_globals_raw].  The lock's OTHER
-       half, the children sets, has no cells and is minted below. *)
+       half, the children sets, has no cells to come out of: it is minted in
+       the boot fupd at the canonical name and arrives on the row below. *)
     WaitInv.parents_res -∗
+    (* THE CHILDREN MAP AND ITS NPROC ROWS ([WaitInv.children_boot]).  The
+       authority pairs with the cells above for <wait_lock>'s payload; row
+       [i] goes into slot [i]'s dormant block at the proc-table assembly
+       ([SpecProcinit.procs_inv_alloc]), which is where a slot's row lives
+       until allocproc hands it to the process it creates. *)
+    WaitInv.children_boot -∗
     (* [PidLock.nextpid_res] itself: the .data word procinit's
        [initlock(&pid_lock,"nextpid")] brings under its lock, AT THE PINNED
        VALUE the loader left -- the payload's [1 <= v <= PIDMAX] is founded
@@ -890,7 +897,7 @@ Section ProofMain.
        kalloc regime there so that its post-allocproc SEAL can be the boot
        token's own allocator row.  A quantified [γa] could never be shown
        equal to the ambient one. *)
-    ( ∀ (γp γw γc : gname) (γs : list gname) (m' : regfile)
+    ( ∀ (γp γw : gname) (γs : list gname) (m' : regfile)
         (root : mword 44) (pas : nat -> mword 44),
         sie_cap_gpr KT1 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
@@ -917,7 +924,7 @@ Section ProofMain.
            consumer in the tree takes it -- kexit, kwait, reparent, the
            syscall environment -- and nothing has ever built one; see
            projects/forkret-park.md E3. *)
-        is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
+        is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
         kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
@@ -937,7 +944,8 @@ Section ProofMain.
     intros Hn Hphystop Hs1 Hprun Hlen H0cid.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hpshare Hfds Hirs Hbss Hparks Hpst Hcont".
+    iIntros "Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hchb Hnpid Hprocs Hppub Hpshare Hfds Hirs Hbss Hparks Hpst Hcont".
+    iDestruct "Hchb" as "[Hchres Hchrows]".
     iDestruct "Hlkmem" as (vkl vkn vkc) "(Hkw & Hkn & Hkc)".
     iDestruct "Hkpt" as (kpt0) "Hkpt".
     (* ---- +0x6e jal kinit ---- *)
@@ -1131,7 +1139,12 @@ Section ProofMain.
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (procs_inv_alloc ⊤ with "Hin Hbank Hrun") as "[Hrun Hpi0]".
+    (* THE SLOT ROWS GO IN HERE: [WaitInv.children_boot]'s big-op, one row
+       per slot, deposited into slot [i]'s dormant block by pass 3.  From
+       there allocproc hands a slot's row to the process it creates and
+       freeproc gives it back -- nothing else can make one, because the
+       authority is <wait_lock>'s. *)
+    iMod (procs_inv_alloc ⊤ with "Hin Hchrows Hbank Hrun") as "[Hrun Hpi0]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hpi0" as (γs) "#Hpinv".
     (* ---- ASSEMBLY 2b: the nextpid LOCK.  procinit's [lk_fresh] plus the
@@ -1169,18 +1182,18 @@ Section ProofMain.
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    (* THE CHILDREN CELLS ARE MINTED IN THE SAME STEP AS THE LOCK.  The
-       carve hands main the parent cells alone ([WaitInv.parents_res]); the
-       ghost beside them has no cells to come out of, so it is bought here,
-       at every slot empty, and its name travels with the lock's own from
-       this point on. *)
-    iMod (WaitInv.wait_res_alloc with "Hwres") as (γc γ0) "[Hwres Hrow0]".
-    iMod (newlock ⊤ wait_lock_addr "wait_lock"%string (wait_res_at γc)
+    (* THE PAYLOAD IS THE PAIR: the parent cells the carve handed main and
+       the children authority the boot fupd minted.  The map's name is
+       CANONICAL ([Xv6Cameras.wch_name]) -- a row of it has to be spellable
+       in [ProcDefs.proc_dormant] -- so nothing travels with the lock's own
+       gname any more. *)
+    iDestruct (WaitInv.wait_res_alloc with "Hwres Hchres") as "Hwres".
+    iMod (newlock ⊤ wait_lock_addr "wait_lock"%string (wait_res_at)
             with "Hwnm Hrun Hww Hwc0 Hwres") as "[Hrun Hwl0]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hwl0" as (γw) "#Hwaitlock".
     iModIntro.
-    iApply ("Hcont" $! γp γw γc γs mpr (pt_base t) pas
+    iApply ("Hcont" $! γp γw γs mpr (pt_base t) pas
               with "Hcg Hpc Hfree Hcpu Hkenv Hkmem Hpinv Hpidlock Hwaitlock
                     Hkptr Hstvec Hkinv Hcreds Hkptp Htramp Hkstx").
   Qed.
@@ -1353,7 +1366,7 @@ Section ProofMain.
   (* =================================================================== *)
   Local Lemma mn_grp_fs 
       (γp : gname) (γs : list gname) (γv : disk_names) (γd : uart_names)
-      (γw γc γtl : gname)
+      (γw γtl : gname)
       (m : regfile) (n : nat) (p0 : mword 64)
       (ps : list (mword 64)) (c0 : virtio_cfg) (free0 : nat -> bv 8)
       (* kit 2's era data.  It used to be carried as two OPAQUE parameters
@@ -1410,7 +1423,7 @@ Section ProofMain.
     console_caps γd -∗
     ConsoleInv.console_ready -∗
     is_tickslock γtl -∗
-    is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
+    is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
     (* ---- ...AND ITS FOUR FORWARDED PERSISTENT ROWS.  [printk_env] is
        [mn_grp_printk]'s product and the kmem [is_lock] is [mn_grp_kvm]'s;
        [gen_cert] and [FsCrash.fs_crash_seam] come down the boot chain from
@@ -1446,6 +1459,10 @@ Section ProofMain.
        it is dropped at the call below; swapping the two contracts is then a
        local edit.  See claude-notes/projects/main-boot.md §G3. *)
     procs_avail (Some NPROC) -∗
+    (* NO CHILDREN ROWS HERE.  They were deposited into the slots' dormant
+       blocks two groups back, at [SpecProcinit.procs_inv_alloc]'s third
+       pass, and userinit takes none: the row the first process is parked
+       with is the one allocproc hands it out of its slot. *)
     (* ...and the [nextpid] lock, for the same reason and to the same place:
        userinit's real contract takes it (allocproc's own premise), the weak
        one does not.  Persistent, so carrying it costs a frame. *)
@@ -1949,7 +1966,7 @@ Section ProofMain.
        They are not spent there either; the staging site is the
        [forkret_park] call, and [ProofUserinit]'s loud D1 block is the
        handoff.  What main no longer does is DROP them. *)
-    iApply (Userinit.wp_userinit_sconf γp γs γft γf γw γc γtl pd pav pu F5 n false p0
+    iApply (Userinit.wp_userinit_sconf γp γs γft γf γw γtl pd pav pu F5 n false p0
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3)
               0%nat iv0 false ∅
               ltac:(lia) Hnb8 Hdevq Hnibq
@@ -2212,7 +2229,7 @@ Section ProofMain.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv Hprim #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
-    iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
+    iIntros "Hparks Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
     iIntros "#Hdev #Hwire Hbundle Htx Hsent Hlb Htok Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
@@ -2324,9 +2341,9 @@ Section ProofMain.
               Hn50 Hphystop Hs1 Hprun Hlen
               (StartedInv.cid_zero_agent cpu_id Hcid)
               with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt
-                    Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hpshare Hfds Hirs
+                    Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hchb Hnpid Hprocs Hppub Hpshare Hfds Hirs
                     Hbss Hparks Hpst").
-    iIntros (γp γw γc γs m3 root pas)
+    iIntros (γp γw γs m3 root pas)
       "Hcg Hpc Hfree Hcpu Hkenv #Hkmem #Hpinv #Hpidlock #Hwaitlock Hkpt Hstvec
        #Hkinv #Hcreds #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
@@ -2335,7 +2352,7 @@ Section ProofMain.
     iIntros (m4 γtl) "Hcg Hpc #Htl Hstvec Hq".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
-    iApply (mn_grp_fs γp γs γv γd γw γc γtl m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
+    iApply (mn_grp_fs γp γs γv γd γw γtl m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
               Pb Rspent
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok Hpkc

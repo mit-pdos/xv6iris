@@ -245,7 +245,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac namidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section ProofUserinit.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
@@ -264,11 +264,11 @@ Section ProofUserinit.
      environment's file-table row must be the one main built. *)
   Lemma wp_userinit_sconf
       (γp : gname) (γs : list gname)
-      (γft γf γw γc γtl : gname) (pd pav pu : mword 64)
+      (γft γf γw γtl : gname) (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
       (on : option nat) (np : nat) (v0 : mword 64)
       (b : bool) (lks : gset string)
-    : wp_userinit_sconf_body γp γs γft γf γw γc γtl pd pav pu m K eb pj on np v0 b lks.
+    : wp_userinit_sconf_body γp γs γft γf γw γtl pd pav pu m K eb pj on np v0 b lks.
   Proof.
     cbv beta delta [wp_userinit_sconf_body].
     intros pcE ret_tgt HK Hnb Hdev Hnib Hbelow.
@@ -435,7 +435,7 @@ Section ProofUserinit.
         rewrite avail_sub_Some in Hz0. unfold avail_zero in Hz0.
         exfalso. lia. }
     iDestruct "Hgot" as (j γl ch pid U root tfp ks rest nc)
-      "(%Hfacts & Hheld & Hhart & Hpriv & Hgen & Hfrag & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
+      "(%Hfacts & Hheld & Hhart & Hpriv & Hgen & Hfrag & Hrow & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
         & Hctx & Hcg & Hcpu & Hpay & Hkenv & Hpav)".
     destruct U as [V M].
     destruct Hfacts as (Hrv & Hj & Hgl & _ & _ & _ & Hcwd0 & Hrest & Hnc).
@@ -754,7 +754,7 @@ Section ProofUserinit.
       iDestruct "Hp" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
                          _ & _ & _ & _ & %Hg)".
       iPureIntro. exact Hg. }
-    pose (N := MkUtNames γft γf γw γc γs j γl pd pav pu
+    pose (N := MkUtNames γft γf γw γs j γl pd pav pu
                  γtl
                  iv1 DfracDiscarded
  ks pid).
@@ -809,7 +809,7 @@ Section ProofUserinit.
     iMod (park_token_park N rest
             (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M) fdt0
             ∅ Hwf Hrest
-            with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hbundle
+            with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hrow Hbundle
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "[Hrun Hpctx]".
     (* built row by row, not framed: the mode row is an [if] the frame

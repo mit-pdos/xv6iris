@@ -91,7 +91,7 @@ Require Import TsoCtx.
 Import Defs.
 
 
-Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
      (γs : list gname) (j : nat) (γl : gname)
     (γt : gname) (m : regfile) (av : nat) (eb : bool)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
@@ -145,7 +145,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
 
 Module Type SYSPAUSE.
   Parameter wp_sys_pause_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
        (γs : list gname) (j : nat) (γl : gname)
       (γt : gname) (m : regfile) (av : nat) (eb : bool)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)

@@ -86,7 +86,7 @@ Definition iulp_sp (m M : regfile) : Prop :=
 
 Section ProofIunlockputMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE WALK IS THE GEN FORM (GR-2a finding 1).  iunlockput is a wrapper,

@@ -184,7 +184,7 @@ Local Open Scope Z_scope.
 
 Section UexecExecInst.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   (* NO AMBIENT [CurCtx], AND THAT IS A REQUIREMENT, not a convenience.  The
      instance is what [UexecRet.uslot] is indexed by, and [uslot] rides
      through the park ([ParkCap.park_token] reads it) and every other place

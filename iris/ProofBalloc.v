@@ -198,7 +198,7 @@ Local Ltac baidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  continuation.                                                         *)
 (* ===================================================================== *)
 Section BallocDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* balloc's 80-byte frame: ra@72 s0@64 s1@56 s2@48 s3@40 s4@32 s5@24
      s6@16 s7@8 s8@0.  [pa_stk sp j] counts DOWN from the entry sp, so slot
@@ -345,7 +345,7 @@ Definition ba_sp (m M : regfile) : Prop :=
 (*  +0x7e .. +0x88 : THE JOIN.  a0 := s1, restore ra/s0/s1, pop, return.  *)
 (* ===================================================================== *)
 Section BallocEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma ba_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
@@ -611,7 +611,7 @@ End BallocEpilogue.
 (*  bitmap and the whole reservation go back untouched.                   *)
 (* ===================================================================== *)
 Section BallocOut.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma ba_out `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
@@ -987,7 +987,7 @@ End BallocOut.
 (*  outer iteration) is the function's OTHER dead arm.                    *)
 (* ===================================================================== *)
 Section BallocExhaust.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma ba_exhaust `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat)
@@ -1215,7 +1215,7 @@ End BallocExhaust.
 (*  shared epilogue carrying the allocated block.                         *)
 (* ===================================================================== *)
 Section BallocRestore.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma ba_restore `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
@@ -1476,7 +1476,7 @@ End BallocRestore.
 (*  pop s2..s8 and fall into the epilogue with s1 = b + bi.               *)
 (* ===================================================================== *)
 Section BallocBzero.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma ba_bzero `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -2050,7 +2050,7 @@ End BallocBzero.
 (*  epilogue with s1 = b + bi.                                           *)
 (* ===================================================================== *)
 Section BallocAlloc.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma ba_alloc `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -2518,7 +2518,7 @@ End BallocAlloc.
 (*  (bi reached BPB -- exit through +0xe6 to +0x8a).                       *)
 (* ===================================================================== *)
 Section BallocScan.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Lemma ba_scan `{GEN : GenId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
@@ -3372,7 +3372,7 @@ End BallocScan.
 (*  once, at [bi = 0], with the full [Z.to_nat BPB] of fuel.               *)
 (* ===================================================================== *)
 Section BallocMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [ba_main] IS THE ONE CORE both top-level lemmas below build on: the

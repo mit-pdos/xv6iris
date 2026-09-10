@@ -98,7 +98,7 @@ Notation KF := KernelSyms.kfork (only parsing).
 Module KforkPrologue (Myproc : MYPROC) (Allocproc : ALLOCPROC_GEN) (Uvmcopy : UVMCOPY).
 
 Section KforkPrologue.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -239,7 +239,7 @@ Section KforkPrologue.
      4614 B in Delta at every step of that walk
      (optimization.md, fold block continuations). *)
   Definition kfk_pro_exit3
- (γw : gname) (γc : gname) (γl : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+ (γw : gname) (γl : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
         (pid_c : mword 32) (ch : mword 64) (Uc' : ustate)
         (tfsrc tfdst : mword 44),
@@ -309,6 +309,10 @@ Section KforkPrologue.
            block AT [fdt0] -- the copy loop retypes them at the parent's own
            entries and the whole table parks with the child. *)
         FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Uc')) fdt0 -∗
+        (* ...and the child's own children row, at [∅], out of the same
+           dormant block ([SpecAllocproc.allocproc_post]): the success path
+           parks it with the child. *)
+        WaitInv.ch_frag (ProcDefs.pv_chg (us_V Uc')) npa ∅ -∗
         (* the new slot's ALLOCATION MARKER, minted by allocproc and needed
            by whoever finally parks the slot at USED / RUNNABLE
            ([SchedCtx.proc_slots_park]).  Persistent. *)
@@ -345,7 +349,7 @@ Section KforkPrologue.
         IntrDefs.arm_pay KT1 lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
         kalloc_env_at fsc_kalloc fsc_kpages None -∗
-        is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
+        is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
         is_ftable γl γf -∗
         is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
         itable_inv -∗
@@ -392,6 +396,13 @@ Section KforkPrologue.
            ([SpecKfork.kfork_post]). *)
         FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Up)) stsP -∗
         proc_priv_nocwd γf npa pid_c Uc -∗
+        (* ...AND THE CHILD'S CHILDREN ROW, at [∅], out of the slot's
+           dormant block with the block ([SpecAllocproc.allocproc_post]):
+           this exit frees the slot, so the row goes back into freeproc's
+           UNUSED block ([SpecFreeproc]).  It is the one piece of the
+           child's ghost state that CANNOT be dropped here -- the name is
+           the slot's, not the incarnation's. *)
+        WaitInv.ch_frag (ProcDefs.pv_chg (us_V Uc)) npa ∅ -∗
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
         ProcGeom.hart_at_any npa -∗
         FdSlots.fd_slots FDSPARE -∗
@@ -451,7 +462,7 @@ Section KforkPrologue.
      holds a generic allocator gname -- so the count/seal pair is universally
      quantified, never [fsc_kpages]. *)
   Lemma kfk_prologue
- (γp γw γc γl γf : gname) (γs : list gname)
+ (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (on : option nat) (b : bool) (pid_p : mword 32) (Up : ustate)
       (stsP : list fdstate) (R : iProp Σ) (lks : gset string) :
@@ -473,7 +484,7 @@ Section KforkPrologue.
     pc_is (mword_of_int KF : mword 64) -∗
     procs_inv γs -∗
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
-    is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
+    is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
     is_ftable γl γf -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -525,7 +536,7 @@ Section KforkPrologue.
        the leaves run so far -- it was simply never surfaced. *)
     (∀ CIDh : CpuId,
        ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
-       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit3 γw γc γl γf γs m lvl K eb pme b pid_p Up stsP R lks sp0 ra0 s00 s10 s50 CID)) -∗
+       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit3 γw γl γf γs m lvl K eb pme b pid_p Up stsP R lks sp0 ra0 s00 s10 s50 CID)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 ra0 s00 s10 s50 HK Hlvl Hbelow.
@@ -794,7 +805,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Uc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & Hcgen & Hcfrag & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
+        "(%Hpures & Hheld & Hhart & Hcpriv & Hcgen & Hcfrag & Hcrow & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Uc as [Vc Mc].
       destruct Hpures as (Hrv & HjN & Hgamma & Hpidc & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
@@ -1157,6 +1168,7 @@ Section KforkPrologue.
         iSpecialize ("Hcont7c" with "HPpriv").
         iSpecialize ("Hcont7c" with "Hpfrag").
         iSpecialize ("Hcont7c" with "HCpriv").
+        iSpecialize ("Hcont7c" with "Hcrow").
         iSpecialize ("Hcont7c" with "Hheld").
         iSpecialize ("Hcont7c" with "Hhart").
         iSpecialize ("Hcont7c" with "Hfdsp").
@@ -1448,7 +1460,7 @@ Section KforkPrologue.
                   (MkUstate (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc)) (us_M Up))
                   (ud_tfp (pv_upt (us_V Up))) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv Hpfrag HCpriv
-                        Hcgen Hcfrag
+                        Hcgen Hcfrag Hcrow
                         Hmk Hheld Hhart Hfdsp Hirsp Hbslp Hkstk [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
         * exact HN10sp.
         * exact HN10s4.

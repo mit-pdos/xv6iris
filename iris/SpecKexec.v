@@ -672,7 +672,7 @@ Qed.
 
 Section KexecAU.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
@@ -1003,7 +1003,7 @@ Global Typeclasses Opaque exec_au_pre exec_post_ok exec_post_fail exec_arms.
    success arm's existentials -- and keep every resource row. *)
 Definition wp_kexec_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
     (pd pav pu : mword 64)                              (* disk fabric + lock  *)
     (gf : gname)                                        (* file table          *)
@@ -1090,7 +1090,7 @@ Definition wp_kexec_frame
    descriptor block, so the key's fd leg is whatever the caller holds). *)
 Definition wp_kexec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (Fs : pfam Σ (uvis -> iProp Σ))
     (gs : list gname) (jp : nat) (gl : gname)
     (pd pav pu : mword 64)
@@ -1123,7 +1123,7 @@ Definition wp_kexec_sconf_body
 Module Type KEXEC.
   Parameter wp_kexec_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (Fs : pfam Σ (uvis -> iProp Σ))
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)

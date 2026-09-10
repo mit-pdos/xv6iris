@@ -140,7 +140,7 @@ Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
    actually true, and it is what fork will need, since fork must [release] the
    proc it gets back and [release] demands [sie_cap_gpr … false …]. *)
 Definition allocproc_post
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (γf : gname) (γs : list gname) (lvl : nat) (eb : bool)
     (pme : mword 64) (on : option nat) (op : option nat)
     (b : bool) (lks : gset string)
@@ -218,6 +218,17 @@ Definition allocproc_post
           A FAILURE TAIL simply drops it -- the name dies with the
           incarnation that never started. *)
        fd_frags (pv_fdg (us_V U)) fdt0 ∗
+       (* THE SLOT'S CHILDREN ROW, out of the dormant block with the three
+          allowances and NOT minted here -- the one piece of the block
+          allocproc cannot make.  The authority is <wait_lock>'s
+          ([WaitInv.children_own_at]) and allocproc does not hold that
+          lock, so this is the row BOOT put in the slot
+          ([WaitInv.children_res_alloc]), at the name the block records
+          ([ProcDefs.pv_chg]).  EMPTY, because a process that has not run
+          has no children.  It travels beside [fd_frags] to the caller's
+          park and from there into [UsertrapRes.ut_own], where fork spends
+          it; a FAILURE TAIL hands it straight back to freeproc. *)
+       ch_frag (pv_chg (us_V U)) (proc_addr j) ∅ ∗
        (* THE SLOT IS NOW ALLOCATED.  Persistent, minted here out of
           [procs_avail]'s authority, and what the caller hands to
           [SchedCtx.proc_slots_park] when it releases the slot at USED or
@@ -286,7 +297,7 @@ Definition allocproc_post
      procs_avail op))%I.
 
 Definition wp_allocproc_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (on : option nat) (op : option nat)
@@ -330,7 +341,7 @@ Definition wp_allocproc_sconf_body
    calls allocproc with no page budget, and there the two freeproc tails are
    LIVE code. *)
 Definition wp_allocproc_core_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (on : option nat) (op : option nat)
@@ -361,7 +372,7 @@ Definition wp_allocproc_core_body
 
 Module Type ALLOCPROC_GEN.
   Parameter wp_allocproc_core :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat)
       (b : bool) (lks : gset string),
@@ -370,7 +381,7 @@ End ALLOCPROC_GEN.
 
 Module Type ALLOCPROC.
   Parameter wp_allocproc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat)
       (b : bool) (lks : gset string),

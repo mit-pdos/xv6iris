@@ -67,7 +67,7 @@ Require Import TsoCtx.
 
 (* six frame slots of reparent's own, plus wakeup's 18. *)
 Notation K_reparent := (24%nat) (only parsing).
-Definition wp_reparent_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_reparent_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
      (m : regfile) (γs : list gname) (pme ip : mword 64)
     (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.reparent in
@@ -106,7 +106,7 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
 
 Module Type REPARENT.
   Parameter wp_reparent_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
        (m : regfile) (γs : list gname) (pme ip : mword 64)
       (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
       wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb b lks.

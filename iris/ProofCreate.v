@@ -171,7 +171,7 @@ Module CreateProof (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT)
 
 Section ProofCreateMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 

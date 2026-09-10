@@ -706,7 +706,7 @@ Module SysLinkProof (Argstr : ARGSTR) (BeginOp : BEGIN_OP) (Namei : NAMEI)
 Module Tails := SysLinkTails Ilock Iupdate Iunlockput EndOp.
 
 Section ProofSysLinkBody.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* the escrow-family projection out of the boot families, at the copy
      THIS contract names ([ic_escrows] is IcacheEscrow's).  The sleeplock

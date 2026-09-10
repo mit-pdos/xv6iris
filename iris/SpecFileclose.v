@@ -185,7 +185,7 @@ Section SpecFileclose.
   (* NOTE [icacheG] is NOT here: [fileG] carries it (FileInv.v's header --
      two instance paths print identically and do not unify), and iput's
      contract is applied at the one that comes with the file table. *)
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- the FD_PIPE arm's environment: pipeclose's ---- *)
@@ -494,7 +494,7 @@ End SpecFileclose.
 
 Definition wp_fileclose_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γfl γf : gname)            (* ftable.lock, ftable  *)
     (k : nat) (q : Qp) (st : fdstate)                 (* the reference        *)
     (fn : fclose_names) (on : option nat)              (* the arms' ghosts   *)
@@ -582,7 +582,7 @@ Definition wp_fileclose_sconf_body
 
 Module Type FILECLOSE.
   Parameter wp_fileclose_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γfl γf : gname)
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fclose_names) (on : option nat)

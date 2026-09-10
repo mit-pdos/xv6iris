@@ -161,7 +161,7 @@ Definition sys_fstat_ret (V : pprivate) (v : mword 64) (r : mword 64) : Prop :=
 
 Section SpecSysFstat.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE DESCRIPTOR ENVIRONMENT -- AND IT IS NO LONGER A WAND.
@@ -194,7 +194,7 @@ End SpecSysFstat.
 
 Definition wp_sys_fstat_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (fn : fstat_names)                           (* the file system's ghosts *)
@@ -268,7 +268,7 @@ Definition wp_sys_fstat_sconf_body
 Module Type SYSFSTAT.
   Parameter wp_sys_fstat_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fstat_names)

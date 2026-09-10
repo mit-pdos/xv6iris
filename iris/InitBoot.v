@@ -73,7 +73,7 @@ Definition init_boot_path : list (bv 8) := DirentEnc.bview 5%nat init_boot_bytes
 
 Section InitBoot.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   (* NO [`{CID : CpuId}] AND NO [`{XI : CurCtx}], deliberately: nothing in
      the bundle reads the hart or its context ([SysOpenDefs]'s note on
      [aopen_commit_at] is the reason -- a context-indexed exec piece makes

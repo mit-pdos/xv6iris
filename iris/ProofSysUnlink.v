@@ -88,7 +88,7 @@ Module W5F := SysUnlinkW5F Ilock Memset Writei Iupdate Iunlockput EndOp PN.
 Module W5D := SysUnlinkW5D Memset Writei Iupdate Iunlockput EndOp PN.
 
 Section ProofSysUnlink.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

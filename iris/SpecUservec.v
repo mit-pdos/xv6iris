@@ -208,7 +208,7 @@ Qed.
    [wp_uservec_pt], via [Include USERTRAP_RES]) to supply, not for this
    definition to re-demand. *)
 Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (URes : uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
+    (URes : uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ)
     (C : ucfg) (pt : uptd) (vksp : mword 64)
     (* THE ROUND'S ENTRY STATE (milestone J1a) -- see [SpecUsertrap.usertrap_post].
        Here the entry trapframe is named at the MACHINE that trapped: [g] is
@@ -233,7 +233,10 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
       (U' : ustate)
       (* the round may have moved the descriptor states; the post names
          where they landed, beside where the record landed *)
-      (sts' : list fdstate),
+      (sts' : list fdstate)
+      (* ...and the children set, on the same terms -- see
+         [SpecUsertrap.ut_ch_kept] *)
+      (cs' : gset gname),
     (* ---- THE ROUND, IMAGE HALF INCLUDED (milestone J, S3).  It used to be
        [uround_vis_ok] (deleted at S6) -- the relation with the image weakened
        away -- because the boundary's residue is the BARE one, whose body
@@ -255,6 +258,7 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
        anyway because the alternative is what the kfork loop does -- prove
        the fact and leave it unstatable. *)
     ⌜SpecUsertrap.ut_fd_kept sc_v sts sts'⌝ -∗
+    ⌜SpecUsertrap.ut_ch_kept sc_v (tf_of g (ret_pc sepc_v)) cs cs'⌝ -∗
     ⌜SpecUsertrap.ut_fd_ecall sc_v (tf_of g (ret_pc sepc_v))
        (pv_tf (us_V U')) sts sts'⌝ -∗
     (* ...and pipe's join, off the same two frames.  The ENTRY image is [M],
@@ -336,7 +340,7 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
        same as at entry -- see the header and
        claude-notes/completed/usertrap.md.  Folding this bundle into the
        user-mode loop is USER-module work, not this spec's. *)
-    URes pt' vksp U' sts' -∗
+    URes pt' vksp U' sts' cs' -∗
     (* THE TWO AMBIENT-HART PERSISTENT BUNDLES, AT THE RESUMING HART.  Both
        are per-hart -- [hw_config]'s cells and the body of [minstret_inv]'s
        invariant are this hart's -- so a caller's pre-crossing copy is a
@@ -360,7 +364,7 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
       (uint (pv_sz (us_V U))) U' sts sts' gn cs -∗
     (* ...AND FORK'S, forwarded the same way -- [SpecUsertrap.ut_fork_out] *)
     ut_fork_out f sc_v (tf_of g (ret_pc sepc_v))
-      (pv_tf (us_V U') !!! tf_arg_idx 0) -∗
+      (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
     (* ...AND THE SYSCALL CHANNEL'S, forwarded at this boundary's own entry
        key -- the same one the deposit went down at
        ([wp_uservec_pt_body]'s pre row below) -- and read at the a0 word of
@@ -371,7 +375,7 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
          (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts
          gn cs
          (pv_tf (us_V U') !!! tf_arg_idx 0) (us_M U') sts'
-         (pv_cwi (us_V U')) cs) -∗
+         (pv_cwi (us_V U')) cs') -∗
     WP (Loop : expr riscv_lang)).
 Global Typeclasses Opaque uservec_post.
 
@@ -382,7 +386,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} 
        (SpecUsertrap.v's own [wp_next true pj] crossing), so everything
        after that call -- the residue included -- is a resource AT WHATEVER
        HART RESUMED.  Same shape, same reason, as [wp_usertrap_body]'s [R]. *)
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ)
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
     (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
     (gn : gname) (cs : gset gname)
@@ -472,7 +476,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} 
      unrelated to [Rut] (which stays fully abstract: uservec's own proof
      never opens it, exactly like [mie]/[mideleg]/[menvcfg] ride through
      [user_cfg] untouched). *)
-  URes CID pt vksp U sts -∗
+  URes CID pt vksp U sts cs -∗
   (* THE CONTINUATION, ACROSS THE CROSSING.  userret's own exit shape plus
      the leftover bare residue -- but at whatever hart usertrap resumed on,
      not the one uservec entered at.  Everything in [uservec_post] is
@@ -512,7 +516,7 @@ Module Type USERVEC.
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
   Include UtResFits.USERTRAP_RES_PARK.
   Parameter wp_uservec_pt :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
       (gn : gname) (cs : gset gname)

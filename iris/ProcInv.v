@@ -291,7 +291,7 @@ Section ProcInv.
      [FdSlots] and [IrefSlots] already do this and [IrefSlots.v]'s header
      spells out the argument.  What propagates is the CLASS -- capacity, no
      resource, no change to any statement's shape. *)
-  Context `{ !fileG Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{ !fileG Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ}.
   (* [FirstTok.first_tok] rides inside the private block (see
      [proc_priv_core]), and its boot arm names [RiscvPtsto.gen_cert]; that
      is the ONLY new index the block acquires.  The file-system's own two
@@ -2532,15 +2532,29 @@ Section ProcInv.
      passed on by every later producer of a dormant slot.  See
      [ProcDefs.proc_dormant]'s note for why the slot rather than the process
      owns them while it is dormant. *)
-  Lemma proc_dormant_seal (pa : mword 64) :
+  (* ...AND THE SLOT'S CHILDREN ROW ENTERS HERE TOO, on exactly [kstack_
+     free]'s footing and by the same route: boot is the only party that can
+     mint one ([WaitInv.children_res_alloc], NPROC of them at [∅], because
+     the authority is <wait_lock>'s and nothing running can reach it before
+     it has sealed its residue), and every later producer of a dormant slot
+     passes on the one it was given.  The row arrives at a name of its own
+     and the SEAL is what writes that name into the block ([upd_chg]): the
+     [pv_chg] the .bss carve left is junk, exactly as [pv_fdg] is until
+     [proc_dormant_unused] chooses one. *)
+  Lemma proc_dormant_seal (pa : mword 64) (γ0 : gname) :
     proc_dormant_nofd pa -∗ fd_slots (NOFILE + FDSPARE) -∗
     iref_slots (1 + IREFSPARE) -∗ bslots 3 -∗ kstack_free pa -∗
+    ch_frag γ0 pa ∅ -∗
     proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs Hir Hbs Hkst".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs Hir Hbs Hkst Hch".
     iDestruct (fd_slots_split with "Hs") as "[Hs Hsp]".
-    iExists V, pid. iFrame "Hpid Hf Ho Hsp Hir Hbs Hkst Hctx". iSplit; [done|].
+    iExists (upd_chg V γ0), pid.
+    cbn [upd_chg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi pv_gen pv_chg].
+    (* BOTH [st]-keyed disjuncts take their [else] branch, and the row's has
+       to be reduced before it can be framed. *)
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
+    iFrame "Hpid Hf Ho Hsp Hir Hbs Hkst Hch Hctx". iSplit; [done|].
     iSplitL "Hs".
     { iApply fd_slots_to_any. by rewrite Hof length_replicate. }
     iFrame "Hpg Htf".
@@ -2554,6 +2568,11 @@ Section ProcInv.
      the store would be unsatisfiable, not merely premature.  The seal
      happens at the one point where the cell has been written and persisted
      ([SpecProcinit.procs_inv_alloc]'s pass 3). *)
+  (* THE CHILDREN ROW IS NOT HERE, and that is deliberate: procinit is what
+     produces this shape ([SpecProcinit.proc_ready]) and procinit cannot
+     make a row -- the authority is <wait_lock>'s.  The row joins at the
+     same step the stack does ([proc_dormant_prestk_seal]), which is the
+     caller's, and the caller is main. *)
   Definition proc_dormant_prestk (pa : mword 64) : iProp Σ :=
     (proc_dormant_nofd pa ∗ fd_slots (NOFILE + FDSPARE) ∗
      iref_slots (1 + IREFSPARE) ∗ bslots 3)%I.
@@ -2563,11 +2582,12 @@ Section ProcInv.
     iref_slots (1 + IREFSPARE) -∗ bslots 3 -∗ proc_dormant_prestk pa.
   Proof. iIntros "H Hs Hir Hbs". iFrame "H Hs Hir Hbs". Qed.
 
-  Lemma proc_dormant_prestk_seal (pa : mword 64) :
-    proc_dormant_prestk pa -∗ kstack_free pa -∗ proc_dormant pa UNUSED.
+  Lemma proc_dormant_prestk_seal (pa : mword 64) (γ0 : gname) :
+    proc_dormant_prestk pa -∗ kstack_free pa -∗ ch_frag γ0 pa ∅ -∗
+    proc_dormant pa UNUSED.
   Proof.
-    iIntros "(Hd & Hs & Hir & Hbs) Hkst".
-    iApply (proc_dormant_seal with "Hd Hs Hir Hbs Hkst").
+    iIntros "(Hd & Hs & Hir & Hbs) Hkst Hch".
+    iApply (proc_dormant_seal with "Hd Hs Hir Hbs Hkst Hch").
   Qed.
 
   (* allocproc's move: it finds an UNUSED slot, so the two address-space
@@ -2615,6 +2635,12 @@ Section ProcInv.
        uint (pv_sz V) <= uvm_maxsz⌝ ∗
       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
       proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf (pv_fdg V) pa (pv_ofile V) ∗
+      (* THE SLOT'S CHILDREN ROW, out with the block and EMPTY -- the one
+         piece of the block that is NOT minted here.  The authority is
+         <wait_lock>'s, so nothing outside that lock can make a row: this
+         is the row boot put in the slot, at the name the block records
+         ([ProcDefs.pv_chg]), and freeproc puts it back. *)
+      ch_frag (pv_chg V) pa ∅ ∗
       (* THE FRAGMENT BUNDLE, out with the block and BESIDE it -- inside the
          existential because it is keyed on the [pv_fdg] this step just
          chose.  It travels with [fd_slots FDSPARE] from here to
@@ -2624,7 +2650,7 @@ Section ProcInv.
          descriptors were unstateable as a direct consequence. *)
       fd_frags (pv_fdg V) fdt0.
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hctx & Haddr)".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iDestruct "Haddr" as "[Hpg Htf]".
     iMod (fd_st_alloc NOFILE) as (γd) "Hst".
@@ -2633,7 +2659,7 @@ Section ProcInv.
     iModIntro. iFrame "Hctx Hpg Htf Hsp Hir Hbs Hkst".
     iExists (upd_fdg V γd), pid.
     cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi pv_gen pv_chg].
-    iSplit; [done|]. iFrame "Hpid Hf".
+    iSplit; [done|]. iFrame "Hpid Hf Hch".
     iSplitR "Hfrag"; [| rewrite /fdt0; iExact "Hfrag"].
     iDestruct (fd_st_closed_to_any γd (replicate NOFILE (zero_reg : mword 64))
                  with "[Hauth]") as "Hst"; [by rewrite length_replicate|].
@@ -2695,7 +2721,7 @@ Section ProcInv.
      already spent its reference on [iput] -- so the premise is the one it
      can actually pay. *)
   Lemma proc_priv_to_dormant_zombie (γf : gname) (pa : mword 64)
-      (pid : mword 32) (U : ustate) :
+      (pid : mword 32) (U : ustate) (cs : gset gname) :
     pv_ofile (us_V U) = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd (us_V U) = (zero_reg : mword 64) ->
     proc_priv_nocwd γf pa pid U -∗ fd_slots FDSPARE -∗
@@ -2713,12 +2739,20 @@ Section ProcInv.
        unused slot does -- that is what makes freeproc's ZOMBIE -> UNUSED
        step a pass-through, and it is the whole reason the exit path has to
        reassemble the page (SpecKexit.v's park). *)
-    kstack_free pa -∗ proc_dormant_noctx pa ZOMBIE.
+    kstack_free pa -∗
+    (* THE SLOT'S CHILDREN ROW, LAST among the spatial premises.  A ZOMBIE
+       block carries the row of the slot it is parking ([ProcDefs.proc_
+       dormant_noctx]'s [∃ S] arm), and this is the only route a row ever
+       takes into one: the process holds it off its trap residue
+       ([UsertrapRes.ut_own]) all the way down kexit, at whatever set its
+       children left it. *)
+    ch_frag (pv_chg (us_V U)) pa cs -∗ proc_dormant_noctx pa ZOMBIE.
   Proof.
-    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hsp Hir Hbs Hkst".
+    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hsp Hir Hbs Hkst Hrow".
     iDestruct (proc_ofiles_null_split γf (pv_fdg (us_V U)) pa (pv_ofile (us_V U)) Hof with "Ho") as "[Ho Hs]".
     iExists (us_V U), pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst".
     rewrite bool_decide_eq_true_2; [| reflexivity].
+    iSplitL "Hrow"; [iExists cs; iExact "Hrow"|].
     iSplitR; [iPureIntro; exact Hbel|].
     iSplitL "Hpt"; [iApply (proc_ptm_at_forget with "Hpt")|]. iFrame "Htfp".
   Qed.
@@ -2872,7 +2906,7 @@ End ProcPtMorph.
 (* ==================================================================== *)
 Section ProcPrivMorph.
   Context `{!riscvGS Σ}.
-  Context `{ !fileG Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{ !fileG Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
 
   Global Instance ofile_slot_morph γf γd pa fd v :

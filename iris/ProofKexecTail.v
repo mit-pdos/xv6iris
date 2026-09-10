@@ -967,7 +967,7 @@ End KexecA.
    so the fraction goes straight through.  What this bundle still holds WHOLE
    is what kexec WRITES: the frame slots, the new table, and [proc_priv]. *)
 Section KexecASeam.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -1059,7 +1059,7 @@ End KexecASeam.
 (*  siblings.                                                              *)
 (* ===================================================================== *)
 Section KexecLdat.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
   (* [ic_loaded]'s PAYLOAD, AT A NAMED [data] (S3b).  [IcacheEscrow.ic_loaded]
@@ -1149,7 +1149,7 @@ End KexecLdat.
 (* ===================================================================== *)
 Section KexecExitQ.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
 
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -1226,7 +1226,7 @@ Module KexecTailProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                       (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
                       (EndOp : END_OP).
 Section KexecAExit.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -1374,7 +1374,7 @@ End KexecAExit.
    same-Section sibling would resolve its [CpuId] through the section
    variable by name. *)
 Section KexecABad.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -1751,7 +1751,7 @@ Module KexecTailProofC (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
 Module T := KexecTailProof Myproc BeginOp Namei Ilock Readi Iunlockput EndOp.
 
 Section KexecCBad.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

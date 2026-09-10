@@ -321,7 +321,7 @@ Qed.
 
 Section SysExecAU.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
@@ -451,7 +451,7 @@ Global Typeclasses Opaque sys_exec_au_pre sys_exec_post_fail sys_exec_arms.
 
 Definition wp_sys_exec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (Fs : pfam Σ (uvis -> iProp Σ))                  (* the slot predicate the caller's WP concludes at *)
     (γf : gname)                           (* ftable, kalloc      *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
@@ -531,7 +531,7 @@ Definition wp_sys_exec_sconf_body
 Module Type SYSEXEC.
   Parameter wp_sys_exec_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (Fs : pfam Σ (uvis -> iProp Σ))
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)

@@ -941,8 +941,9 @@ Section UkFork.
       (* FORK'S TWO ARMS, and the mirror moves on the second: both halves
          of the program's children variable are in hand -- the engine's
          inside the [urun] just destructed, the program's as a premise --
-         which is why the set has to come IN.  The kernel-side ghost map
-         is WX-RES's. *)
+         which is why the set has to come IN.  What the mirror tracks is
+         the kernel's own map ([WaitInv.children_own_at]), whose per-slot
+         row the kernel moves at the same fork. *)
       iApply uslot_bupd.
       iAssert (|==> ∃ cs2 : gset gname,
                  ⌜cs' = cs2⌝ ∗ uch_auth (ukn_ch N) cs2 ∗

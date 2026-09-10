@@ -86,7 +86,7 @@ Module FilecloseProof (Acquire : ACQUIRE) (Release : RELEASE)
                       (Iput : IPUT) (EndOp : END_OP) : FILECLOSE.
 
 Section ProofFileclose.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

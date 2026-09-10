@@ -208,7 +208,7 @@ Local Open Scope Z_scope.
 Notation K_sys_chdir := (136%nat) (only parsing).
 Section SpecSysChdir.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
      carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
@@ -239,7 +239,7 @@ End SpecSysChdir.
 
 Section SysChdirArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
@@ -409,7 +409,7 @@ Global Typeclasses Opaque chdir_au_pre chdir_post_fail chdir_post_ok
    list is [(mf, P')]: the image does not move (the header). *)
 Definition wp_sys_chdir_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)                          (* ftable, kalloc      *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (pd pav pu : mword 64)                              (* disk fabric + lock  *)
@@ -504,7 +504,7 @@ Definition wp_sys_chdir_frame
    [fs_gamma_L fsc_fs]; the walk starts at the block's own cwd inum. *)
 Definition wp_sys_chdir_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
@@ -531,7 +531,7 @@ Definition wp_sys_chdir_body
 Module Type SYSCHDIR.
   Parameter wp_sys_chdir :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

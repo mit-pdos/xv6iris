@@ -105,7 +105,7 @@ Local Open Scope Z_scope.
    releasesleep (22), holdingsleep wanting 16. *)
 Notation K_iunlock := (26%nat) (only parsing).
 Definition wp_iunlock_dep_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
 
     (gs : list gname)
     (gil gisl : gname)
@@ -209,7 +209,7 @@ Definition wp_iunlock_dep_sconf_body
    descriptor is retired in the park's own ghost step, so no line of
    iunlock's own proof is re-run. *)
 Definition wp_iunlock_tx_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
 
     (gs : list gname)
     (gil gisl : gname)
@@ -305,7 +305,7 @@ Definition wp_iunlock_tx_sconf_body
 (* THE PUBLISHED READING OF THE PARK (durable-disk B''-tx3/-tx4), a
    derivation of the one generic body above. *)
 Lemma wp_iunlock_tx_of_dep
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname)
     (gil gisl : gname)
     (k : nat) (s : Qp) (g : gname) (lo tl : nat) (dev inum : mword 32)
@@ -343,7 +343,7 @@ Module Type IUNLOCK.
      its [DepTx] instance; a READ-locker parks at [DepRd] through it
      directly, which is what retires [ic_unshed_rd] at those two sites. *)
   Parameter wp_iunlock_dep_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname)
       (gil gisl : gname)
       (k : nat) (s : Qp) (g : gname) (lo tl : nat) (d : ic_dep) (dev inum : mword 32)
@@ -356,7 +356,7 @@ Module Type IUNLOCK.
   (* the transactional form -- [ProofIunlock] defines it by
      [wp_iunlock_tx_of_dep]. *)
   Parameter wp_iunlock_tx_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
 
       (gs : list gname)
       (gil gisl : gname)

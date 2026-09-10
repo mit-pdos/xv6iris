@@ -821,7 +821,7 @@ Section FwWriteiSrc.
      context.  Qualifying rather than importing, because a new import here
      would also re-resolve every other unqualified name in the file -- see
      the header's [FW_MAX] warning. *)
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   (* ...and [GenId], which [ProcInv.proc_priv_core] acquired with
      [FirstTok.first_tok].  [RiscvLang] IS imported (line ~339), so unlike
      [pavG] above this one binds the real class. *)
@@ -1032,7 +1032,7 @@ Module FilewriteProof (Pipewrite : PIPEWRITE) (Ilock : ILOCK) (Writei : WRITEI)
                       : FILEWRITE.
 
 Section ProofFilewrite.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

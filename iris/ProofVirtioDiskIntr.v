@@ -2193,7 +2193,7 @@ Qed.
 (* ===================================================================== *)
 
 Section VtBody.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -3061,7 +3061,7 @@ Definition vt_regs_ok (m MB : regfile) (sp0 : mword 64) : Prop :=
         MB !!! Regidx r = m !!! Regidx r).
 
 Section VtLoopDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition vt_exit (γd : disk_names)
@@ -3127,7 +3127,7 @@ Qed.
 (* ===================================================================== *)
 Module VtLoopProof (Wakeup : WAKEUP).
 Section VtLoopProof.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -3378,7 +3378,7 @@ Module Epi := VtEpilogue Release.
 Module Lp  := VtLoopProof Wakeup.
 
 Section ProofVirtioDiskIntr.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).

@@ -135,7 +135,7 @@ Local Open Scope Z_scope.
 Notation K_userinit := ((4 + K_namei_root_boot)%nat) (only parsing).
 
 Definition wp_userinit_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}
     `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γp : gname) (γs : list gname)
     (* THE PARK'S NAMES: the open-file table's two gnames, the wait lock's,
@@ -143,7 +143,7 @@ Definition wp_userinit_sconf_body
        reads none of them; they index the six persistent rows below, which
        the first process's trap-loop environment is assembled from at the
        park (SpecForkretParkPaid.v, UsertrapRes.park_env). *)
-    (γft γf γw γc γtl : gname) (pd pav pu : mword 64)
+    (γft γf γw γtl : gname) (pd pav pu : mword 64)
     (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (on : option nat) (np : nat) (v0 : mword 64)
     (b : bool) (lks : gset string) :=
@@ -214,7 +214,7 @@ Definition wp_userinit_sconf_body
      device complement is stated at the ambient uart / disk / disk-lock
      names, which is what [fclose_ties] pins the record to. ---- *)
   devintr_caps_any fsc_uart fsc_disk fsc_dlock γtl γs pd pav pu -∗
-  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
   is_ftable γft γf -∗
   ConsoleInv.console_ready -∗
   wire_inv -∗
@@ -285,12 +285,12 @@ Definition wp_userinit_sconf_body
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module Type USERINIT.
   Parameter wp_userinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}
       `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γp : gname) (γs : list gname)
-      (γft γf γw γc γtl : gname) (pd pav pu : mword 64)
+      (γft γf γw γtl : gname) (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
       (on : option nat) (np : nat) (v0 : mword 64)
       (b : bool) (lks : gset string),
-      wp_userinit_sconf_body γp γs γft γf γw γc γtl pd pav pu m K eb pj on np v0 b lks.
+      wp_userinit_sconf_body γp γs γft γf γw γtl pd pav pu m K eb pj on np v0 b lks.
 End USERINIT.

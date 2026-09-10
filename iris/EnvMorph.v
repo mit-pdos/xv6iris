@@ -60,7 +60,7 @@ Require Import UsertrapRes SyscParkEnv.
 (* ===================================================================== *)
 Section EnvHandles.
   Context `{!riscvGS Σ, !lockG Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 
@@ -93,7 +93,7 @@ End EnvCaches.
 (* ===================================================================== *)
 Section EnvPark.
   Context `{!riscvGS Σ, !lockG Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
 

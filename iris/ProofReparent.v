@@ -124,7 +124,7 @@ Module ReparentProof (Wakeup : WAKEUP) : REPARENT.
 (* so [CID] can be a section variable.                                    *)
 (* ===================================================================== *)
 Section ProofReparentEnds.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* +0x00 .. +0x2a: carve the 6-slot frame, save ra/s0/s1..s4, set s0, park
@@ -599,7 +599,7 @@ End ProofReparentEnds.
 (* not express.                                                           *)
 (* ===================================================================== *)
 Section ProofReparentLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Lemma rp_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       
@@ -1047,7 +1047,7 @@ End ProofReparentLoop.
 (* The whole function.                                                    *)
 (* ===================================================================== *)
 Section ProofReparent.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (m : regfile) (γs : list gname) (pme ip : mword 64)

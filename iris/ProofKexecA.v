@@ -167,7 +167,7 @@ Section KexecAUABody.
   (* [!ufdG Σ] beside the plain phase A's list: [SpecKexec.exec_slot_pre]
      names [UexecRet.uslot], whose key's descriptor leg lives there. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ,
-            !pavG Σ, !ufdG Σ}.
+            !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -739,7 +739,7 @@ End KexecAUABody.
 (* ===================================================================== *)
 Section KexecAUAMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ,
-            !pavG Σ, !ufdG Σ}.
+            !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

@@ -118,7 +118,7 @@ Lemma proc_end_is_tickslock : pacur NPROC = mword_of_int KernelSyms.tickslock.
 Proof. unfold pacur, acur, proc_size, NPROC. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Section SpecProcinit.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* ---- what a lock looks like before and after initlock ---- *)
   Definition lk_raw `{XI : CurCtx} (lk : mword 64) : iProp Σ :=
@@ -178,7 +178,7 @@ End SpecProcinit.
    this composition check takes them; nothing in procinit's own contract
    does. *)
 Section ProcinitSeals.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (γ : gname)  (γs : list gname).
 
@@ -189,7 +189,7 @@ Section ProcinitSeals.
      -- there is no gap between what procinit hands back and what the proc
      lock has to protect.  Stated and checked here because an unproven
      contract is otherwise only as good as my reading of SchedCtx. *)
-  Lemma proc_ready_lock_res (γl : gname) (i : nat) (ch : mword 64) :
+  Lemma proc_ready_lock_res (γl : gname) (i : nat) (ch : mword 64) (γ0 : gname) :
     proc_ready i -∗
     p_chan (proc_addr i) ↦₈ ch -∗
     proc_pub (proc_addr i) -∗
@@ -201,17 +201,22 @@ Section ProcinitSeals.
        not exist until [p->kstack] is persisted, which the caller does in the
        same ghost step (see [procs_inv_alloc]). *)
     kstack_free (proc_addr i) -∗
+    (* ...AND THE SLOT'S CHILDREN ROW, supplied here for [kstack_free]'s
+       reason: procinit cannot make one (the authority is <wait_lock>'s),
+       so the row boot minted joins the block at the same step the stack
+       does ([ProcInv.proc_dormant_prestk_seal]). *)
+    ch_frag γ0 (proc_addr i) ∅ -∗
     lk_fresh (proc_addr i) "proc"%string ∗
     p_kstack (proc_addr i) ↦₈ kstack_va i ∗
     proc_lock_res γs γl (proc_addr i).
   Proof.
-    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hkst".
+    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hkst Hrow".
     iFrame "Hlk Hks".
     rewrite /proc_lock_res /proc_lock_res_at.
     iExists UNUSED, ch. iFrame "Hst Hg Hch Hpub".
     change (proc_slots_at γs cur_ctx (proc_addr i) UNUSED) with (proc_slots γs (proc_addr i) UNUSED).
-    iApply (proc_slots_unused_intro with "[Hdorm Hkst] Hpark").
-    iApply (proc_dormant_prestk_seal with "Hdorm Hkst").
+    iApply (proc_slots_unused_intro with "[Hdorm Hkst Hrow] Hpark").
+    iApply (proc_dormant_prestk_seal with "Hdorm Hkst Hrow").
   Qed.
 
 End ProcinitSeals.
@@ -236,7 +241,7 @@ End ProcinitSeals.
 (*  [WpLock.newlock_delayed] and the two passes below.                  *)
 (* ------------------------------------------------------------------ *)
 Section ProcinitProcsInv.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (γ : gname) .
 
@@ -258,6 +263,11 @@ Section ProcinitProcsInv.
      (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
      proc_pub (proc_addr i) ∗
      proc_dormant_prestk (proc_addr i) ∗
+     (* THE SLOT'S CHILDREN ROW, riding to the seal with the stack and for
+        its reason: procinit cannot make one (the authority is
+        <wait_lock>'s), so boot's row travels here and pass 3 seals it into
+        the dormant block ([ProcInv.proc_dormant_prestk_seal]). *)
+     (∃ γ0 : gname, ch_frag γ0 (proc_addr i) ∅) ∗
      hart_at_any (proc_addr i) ∗
      pstate_lock (proc_addr i) UNUSED ∗
      (* the slot's kernel stack, still spelled at [kstack_va i] because
@@ -265,15 +275,17 @@ Section ProcinitProcsInv.
         two become [kstack_free]. *)
      stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV)%I.
 
-  Lemma proc_ready_split (i : nat) (ch : mword 64) :
+  Lemma proc_ready_split (i : nat) (ch : mword 64) (γ0 : gname) :
     proc_ready i -∗ p_chan (proc_addr i) ↦₈ ch -∗ proc_pub (proc_addr i) -∗
     hart_at_any (proc_addr i) -∗ pstate_lock (proc_addr i) UNUSED -∗
     stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV -∗
+    ch_frag γ0 (proc_addr i) ∅ -∗
     lk_fresh (proc_addr i) "proc"%string ∗ proc_res i.
   Proof.
     rewrite /proc_ready /proc_res.
-    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hstk".
-    iFrame "Hks Hst Hpub Hdorm Hpark Hg Hstk". iExists ch. iExact "Hch".
+    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hstk Hrow".
+    iFrame "Hks Hst Hpub Hdorm Hpark Hg Hstk".
+    iSplitR "Hrow"; [iExists ch; iExact "Hch" | iExists γ0; iExact "Hrow"].
   Qed.
 
   (* PASS ONE, generic: pick [n] lock ghost names, each with the wand that
@@ -321,32 +333,41 @@ Section ProcinitProcsInv.
      in hand.  This step is the FIRST that can take them: [kstack_free]
      names its anchor through the persistent [is_kstack], and that is minted
      in pass 3 below, out of the very cell procinit wrote. *)
+  (* THE SLOT'S CHILDREN ROW ENTERS HERE, on the kernel stack's own route:
+     [WaitInv.children_res_alloc] minted NPROC of them in the boot fupd
+     (nothing later can -- the authority is <wait_lock>'s and kfork seals a
+     child's residue before it takes the lock), the boot chain carried them
+     to main unopened ([WaitInv.children_boot]), and this step deposits row
+     [i] into slot [i]'s dormant block. *)
   Lemma procs_inv_alloc (E : coPset) :
     ([∗ list] i ∈ seq 0 NPROC,
        ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
          proc_pub (proc_addr i)) ∗ hart_full i (0%fin : CPU)) ∗
        pstate_full i UNUSED) -∗
+    ([∗ list] i ∈ seq 0 NPROC, ∃ γ0 : gname, ch_frag γ0 (proc_addr i) ∅) -∗
     kstack_bank -∗
     own_context cur_ctx
     ={E}=∗ own_context cur_ctx ∗ ∃ γs : list gname, procs_inv γs.
   Proof.
-    iIntros "Hin Hbank Hrun".
+    iIntros "Hin Hrows Hbank Hrun".
     iDestruct (kstack_bank_carve with "Hbank") as "Hstk".
-    (* pair each slot's stack with its resources, so one [big_sepL_impl] can
-       carry both through the two passes below *)
+    (* pair each slot's stack AND its row with its resources, so one
+       [big_sepL_impl] can carry all three through the two passes below *)
     iDestruct (big_sepL_sep_2 with "Hin Hstk") as "Hin".
+    iDestruct (big_sepL_sep_2 with "Hin Hrows") as "Hin".
     (* 1. peel [lk_fresh] out of each [proc_ready] *)
     iDestruct (big_sepL_impl
-                 (fun _ i => ((((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+                 (fun _ i => (((((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
                                  proc_pub (proc_addr i)) ∗ hart_full i (0%fin : CPU)) ∗
                                pstate_full i UNUSED) ∗
-                              stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV)%I)
+                              stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV) ∗
+                              (∃ γ0 : gname, ch_frag γ0 (proc_addr i) ∅))%I)
                  (fun _ i => (lk_fresh (proc_addr i) "proc"%string ∗ proc_res i)%I)
                  (seq 0 NPROC) with "Hin []") as "Hin".
-    { iIntros "!>" (k i Hk) "[(((Hrdy & Hch & Hpub) & Hpark) & Hg) Hstk]".
+    { iIntros "!>" (k i Hk) "[[(((Hrdy & Hch & Hpub) & Hpark) & Hg) Hstk] (%γ0 & Hrow)]".
       apply lookup_seq in Hk. destruct Hk as [-> Hlt].
       iDestruct "Hch" as (ch) "Hch".
-      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg] Hstk").
+      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg] Hstk Hrow").
       { iApply (hart_at_any_intro k (0%fin : CPU) Hlt with "Hpark"). }
       (* UNUSED is [unclaimed], so the whole variable is the lock's share *)
       rewrite /pstate_lock unclaimed_UNUSED.
@@ -371,7 +392,7 @@ Section ProcinitProcsInv.
                   (proc_lock_pay γs g (proc_addr i)) ∗
                 ∃ ks : mword 64, is_kstack (proc_addr i) ks))%I as "Hstep".
     { iApply big_sepL_intro.
-      iIntros "!>" (i g _) "Hrun [Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg & Hstk)]".
+      iIntros "!>" (i g _) "Hrun [Hmk (Hks & Hst & Hch & Hpub & Hdorm & (%γ0 & Hrow) & Hpark & Hg & Hstk)]".
       iMod (ctx_word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
       (* THE DEPOSIT: the persisted cell is [is_kstack], and with the words
@@ -380,12 +401,12 @@ Section ProcinitProcsInv.
       { iApply (kstack_free_intro (proc_addr i) (kstack_va i)
                   with "[] Hstk"). iExact "Hksp". }
       iMod ("Hmk" $! ((proc_lock_pay γs g (proc_addr i)))
-              with "[%] Hrun [Hst Hg Hch Hpub Hdorm Hpark Hkst]") as "[Hrun #Hlk]".
+              with "[%] Hrun [Hst Hg Hch Hpub Hdorm Hrow Hpark Hkst]") as "[Hrun #Hlk]".
       { apply _. }
       { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch
-                  with "Hst Hg Hch Hpub [Hdorm Hpark Hkst]").
-        iApply (proc_slots_unused_intro with "[Hdorm Hkst] Hpark").
-        iApply (proc_dormant_prestk_seal with "Hdorm Hkst"). }
+                  with "Hst Hg Hch Hpub [Hdorm Hrow Hpark Hkst]").
+        iApply (proc_slots_unused_intro with "[Hdorm Hrow Hkst] Hpark").
+        iApply (proc_dormant_prestk_seal with "Hdorm Hkst Hrow"). }
       iModIntro. iFrame "Hrun Hlk". iExists (kstack_va i). iExact "Hksp". }
     iMod (big_sepL_fupd_thread E (own_context cur_ctx)
             with "Hrun Hstep Hmk") as "[Hrun Hmk]".
@@ -399,7 +420,7 @@ Section ProcinitProcsInv.
 
 End ProcinitProcsInv.
 
-Definition wp_procinit_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
+Definition wp_procinit_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.procinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* procinit's own frame is 8 slots (addi sp,sp,-64: ra, s0..s6); initlock
@@ -443,6 +464,6 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG 
 
 Module Type PROCINIT.
   Parameter wp_procinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat) (b : bool) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat) (b : bool) (p : mword 64),
       wp_procinit_sconf_body m K b p.
 End PROCINIT.

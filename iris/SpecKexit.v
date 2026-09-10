@@ -84,7 +84,7 @@
    the whole point of the eb-generic sweep.  Nothing is handed back, because
    kexit does not return.
 
-   [is_lock γw wait_lock_addr ... wait_res_at γc] -- kexit is the second consumer
+   [is_lock γw wait_lock_addr ... wait_res_at] -- kexit is the second consumer
    of the parent table after kwait, and takes it exactly as kwait does.
 
    The [initproc] cell at any fraction: kexit reads it for the panic test and
@@ -148,11 +148,8 @@ Import Defs.
 Notation K_kexit := (90%nat) (only parsing).
 Definition wp_kexit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
-    (* ...and the children ghost wait_lock owns beside the parent cells
-       ([WaitInv.children_own_at]), which the payload is keyed on *)
-    (γc : gname)
      (γs : list gname) (j : nat) (γl : gname)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -160,7 +157,7 @@ Definition wp_kexit_sconf_body
                (* kmem.lock, kalloc   *)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    (pid : mword 32) (U : ustate) :=
+    (pid : mword 32) (U : ustate) (cs : gset gname) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kexit in
   let pj := proc_addr j in
   (* [fn] is not an extra degree of freedom: it is exactly kexit's own ghosts,
@@ -227,7 +224,7 @@ Definition wp_kexit_sconf_body
   panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
-  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)
   is_ftable γft γf -∗
   (* ...and closing one can free a pipe's page, so kexit owns kalloc's side
@@ -267,6 +264,13 @@ Definition wp_kexit_sconf_body
      It is NOT given back: the process is ending, and the bundle dies with
      the incarnation whose name it is keyed on (FdSlots.v). *)
   fd_frags_any (pv_fdg (us_V U)) -∗
+  (* ...AND THE SLOT'S CHILDREN ROW, which does come back -- to the SLOT.
+     It rides the trap residue beside the fragment bundle
+     ([UsertrapRes.ut_own]), and kexit hands it to the ZOMBIE block it parks
+     ([kexit_park_pay]), which is where allocproc finds it again.  The set is
+     the caller's: kexit reads nothing off it and moves nothing into it --
+     reparent moves the PARENT cells, not this row. *)
+  ch_frag (pv_chg (us_V U)) pj cs -∗
   (* NO continuation: kexit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
 
@@ -284,10 +288,11 @@ Definition wp_kexit_sconf_body
 (* (SpecProcinit.proc_ready_lock_res is the same kind of check.)             *)
 (* ---------------------------------------------------------------------- *)
 Section KexitSeals.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  Lemma kexit_park_pay (γf : gname) (j : nat) (pid : mword 32) (U : ustate) :
+  Lemma kexit_park_pay (γf : gname) (j : nat) (pid : mword 32) (U : ustate)
+      (cs : gset gname) :
     pv_ofile (us_V U) = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd (us_V U) = (zero_reg : mword 64) ->
     proc_priv_nocwd γf (proc_addr j) pid U -∗ fd_slots FDSPARE -∗
@@ -306,28 +311,33 @@ Section KexitSeals.
        gives it back.  It can, because its swtch never returns: no record is
        parked, so nothing of the page is captured in a continuation. *)
     kstack_free (proc_addr j) -∗
+    (* AND THE SLOT'S CHILDREN ROW, LAST.  It rode the dying process's trap
+       residue ([UsertrapRes.ut_own]) down to here, and the ZOMBIE block is
+       where it goes back to the slot it belongs to
+       ([ProcInv.proc_priv_to_dormant_zombie]). *)
+    ch_frag (pv_chg (us_V U)) (proc_addr j) cs -∗
     park_pay (proc_addr j) ZOMBIE.
   Proof.
     intros Hof Hcwd. rewrite /park_pay inv_dormant_ZOMBIE.
-    iIntros "Hpriv Hsp Hir Hbs Hkst".
-    iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid U Hof Hcwd
-              with "Hpriv Hsp Hir Hbs Hkst").
+    iIntros "Hpriv Hsp Hir Hbs Hkst Hrow".
+    iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid U cs Hof Hcwd
+              with "Hpriv Hsp Hir Hbs Hkst Hrow").
   Qed.
 
 End KexitSeals.
 
 Module Type KEXIT.
   Parameter wp_kexit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γft γf γw γc : gname)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (dqi : dfrac)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-      (pid : mword 32) (U : ustate),
-      wp_kexit_sconf_body γft γf γw γc γs j γl pd pav pu
+      (pid : mword 32) (U : ustate) (cs : gset gname),
+      wp_kexit_sconf_body γft γf γw γs j γl pd pav pu
  ip dqi
 
-                          on fn m av eb b lks pid U.
+                          on fn m av eb b lks pid U cs.
 End KEXIT.

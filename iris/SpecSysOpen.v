@@ -477,7 +477,7 @@ End SpecSysOpen.
 
 Section SysOpenArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   (* [GenId], because the arms carry [proc_priv] *)
   Context `{GEN : GenId}.
   Implicit Types Γ : fs_view_names Σ.
@@ -1379,7 +1379,7 @@ Global Typeclasses Opaque open_post_ok_plain open_post_fail_plain
 
 Definition wp_sys_open_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γfl γf : gname)   (* ftable lock + ghost, kalloc, printk *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (pd pav pu : mword 64)                              (* disk fabric + lock  *)
@@ -1484,7 +1484,7 @@ Definition wp_sys_open_frame
    and the arms are keyed on [om_create vom]. *)
 Definition wp_sys_open_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γfl γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
@@ -1519,7 +1519,7 @@ Definition wp_sys_open_body
    the machine. *)
 Definition wp_sys_open_plain_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γfl γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
@@ -1543,7 +1543,7 @@ Definition wp_sys_open_plain_body
 (* THE O_CREATE ARM: create's surface at the child [AFile []]. *)
 Definition wp_sys_open_create_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γfl γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
@@ -1580,7 +1580,7 @@ Definition wp_sys_open_create_body
 Module Type SYSOPEN.
   Parameter wp_sys_open :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γfl γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

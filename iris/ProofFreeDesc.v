@@ -196,7 +196,7 @@ Proof. vm_compute; reflexivity. Qed.
 Module FreeDescProof (Wakeup : WAKEUP) : FREEDESC.
 
 Section ProofFreeDesc.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).

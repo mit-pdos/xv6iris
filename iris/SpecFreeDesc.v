@@ -42,7 +42,7 @@ Import Defs.
 (* free_desc's own frame is 16 bytes (2 slots); its only callee is wakeup (18) *)
 Notation K_free_desc := (20%nat) (only parsing).
 Definition wp_free_desc_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
      (γs : list gname)
     (pd : mword 64) (i : nat)
     (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)
@@ -88,7 +88,7 @@ Definition wp_free_desc_sconf_body
 
 Module Type FREEDESC.
   Parameter wp_free_desc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
        (γs : list gname)
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)

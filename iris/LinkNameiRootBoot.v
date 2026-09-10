@@ -42,7 +42,7 @@ Require Import TsoCtx.
 
 Module NameiRootBoot : NAMEI_ROOT_BOOT.
   Lemma wp_namei_root_boot :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}
       `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)

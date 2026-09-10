@@ -168,7 +168,7 @@ Definition rd_img (U : ustate) (data : nat -> list (bv 8)) (dst : mword 64)
 (*  Vocabulary: the frame in three strengths, and the continuation.       *)
 (* ===================================================================== *)
 Section ReadiDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -333,7 +333,7 @@ Definition rd_sp (m M : regfile) : Prop :=
 (*  +0xdc .. +0xec : THE RETURN.                                          *)
 (* ===================================================================== *)
 Section ReadiRet.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -657,7 +657,7 @@ End ReadiRet.
 (*  +0xd8 .. +0xda : a0 := s3, restore s3.  THREE PATHS JOIN HERE.        *)
 (* ===================================================================== *)
 Section ReadiJoin.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -805,7 +805,7 @@ End ReadiJoin.
 (*  plus arithmetic (claude-notes/durable-notes.md).                      *)
 (* ===================================================================== *)
 Section ReadiExit.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -1052,7 +1052,7 @@ End ReadiExit.
 (*  [rd_blocks_step] is exactly the decrease that pays for it.            *)
 (* ===================================================================== *)
 Section ReadiLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -2472,7 +2472,7 @@ End ReadiLoop.
 (*  test, the clamp and the n = 0 arm.                                    *)
 (* ===================================================================== *)
 Section ReadiMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not

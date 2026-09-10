@@ -215,7 +215,7 @@ Proof.
 Qed.
 
 Section FirstTok.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
   Context `{!xv6G Σ, !bioslotG Σ} `{ICFG : icfg}.
   Context `{XI : CurCtx}.

@@ -109,7 +109,7 @@ Module SysExitProof (Argint : ARGINT) (Kexit : KEXIT) : SYSEXIT.
 
 Section ProofSysExit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
@@ -120,25 +120,25 @@ Section ProofSysExit.
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
   Lemma wp_sys_exit_sconf
-      (γft γf γw γc : gname)
+      (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (dqi : dfrac)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
-      (v0 : mword 64) (lks : gset string)
-    : wp_sys_exit_sconf_body γft γf γw γc γs j γl pd pav pu
+      (v0 : mword 64) (lks : gset string) (cs : gset gname)
+    : wp_sys_exit_sconf_body γft γf γw γs j γl pd pav pu
  ip dqi
 
-                             on fn m av eb b pid U sts v0 lks.
+                             on fn m av eb b pid U sts v0 lks cs.
   Proof.
     cbv beta delta [wp_sys_exit_sconf_body].
     intros pcE pj Hfn Hj Hgl Hv0 Hav Hgeo Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcl Hcpu #Htext #Hdata Hpc #Hprocs #Hpenv
              #Hlk #Hft #Hkl Hkav #Hbio #Hlog #Hcrash #Hcert #Hdev #Hgeom
-             #Hdlk Hbs Hrdy Hip Hfds Hirs Hpriv Hufrag".
+             #Hdlk Hbs Hrdy Hip Hfds Hirs Hpriv Hufrag Hrow".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
@@ -343,13 +343,13 @@ Section ProofSysExit.
        nothing on the other side to say it to. *)
     iAssert (fd_frags_any (pv_fdg (us_V U))) with "[Hufrag]" as "Hufrag";
       [ by iExists sts | ].
-    iApply (Kexit.wp_kexit_sconf γft γf γw γc γs j γl pd pav pu
+    iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl pd pav pu
  ip dqi
 
-              on fn B2 (av - 4)%nat eb b lks pid (upd_usM U _) Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow
+              on fn B2 (av - 4)%nat eb b lks pid (upd_usM U _) cs Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow
               with "Hcg Hcl4 Hcpu [] [] Htext Hdata Hpc Hprocs Hpenv Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
-                    Hrdy Hip Hfds Hirs Hpriv Hufrag").
+                    Hrdy Hip Hfds Hirs Hpriv Hufrag Hrow").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }

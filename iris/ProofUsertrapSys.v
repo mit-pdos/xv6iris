@@ -100,7 +100,7 @@ Ltac reg_neq :=
 Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section UtSysBlock.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
@@ -146,7 +146,7 @@ Section UtSysBlock.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
-    ut_hold (SY.syscall_env) N U false lks sts -∗
+    ut_hold (SY.syscall_env) N U false lks sts cs -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* the process's deposit at the ENTRY record: what the dispatcher's
@@ -175,6 +175,12 @@ Section UtSysBlock.
     { iDestruct "Hcaps" as "($ & _)". }
     iAssert (kernel_data) with "[]" as "#Hkd".
     { iDestruct "Hcaps" as "(_ & $ & _)". }
+    (* the <wait_lock> handle, off the same persistent bundle: the
+       dispatcher's fork arm hands it to kfork, which moves the children
+       map under it with the caller's own row ([WaitInv.children_own_upd]). *)
+    iAssert (is_lock (un_w N) SpecProcinit.wait_lock_addr "wait_lock"%string
+               (WaitInv.wait_res_at)) with "[]" as "#Hwl".
+    { iDestruct "Hcaps" as "(_ & _ & _ & _ & _ & $ & _)". }
     (* ---- +0x90: jal killed ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (UT + 0x90)) Rra
               (mword_of_int 2095894 : mword 21) m nx false
@@ -288,7 +294,7 @@ Section UtSysBlock.
       iApply (T.ut_kexit SY.syscall_env N U
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
-                nx false lks sts Hwf' ltac:(lia)
+                nx false lks sts cs Hwf' ltac:(lia)
                 with "Htext Hpc Hcg Hkcl4 [-]").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -310,7 +316,7 @@ Section UtSysBlock.
          more of [ut_own]'s conjuncts than that accessor hands out --
          [SpecSyscall.v]'s header on why the five families ride through
          [syscall()] on this same channel rather than inside [Hsy]. *)
-      iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & Hufr & Hsy)".
+      iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & Hufr & Hch & Hsy)".
       (* the epc word EXISTS -- read off the page's own length invariant while
          the block is still whole, because [ut_epc_exists] is a pure read and
          [proc_priv_tf_upd] below consumes the block. *)
@@ -547,14 +553,18 @@ Section UtSysBlock.
         apply ut_cs_insert; [vm_compute; reflexivity |].
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
+                (un_w N)
  (un_fn N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) sts gn cs lks fdep
                 Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
-                with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [Hufr] [Hxin] [Hfin] [-]").
+                with "Hwl Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [Hufr] [Hch] [Hxin] [Hfin] [-]").
     (* the syscall channel takes the bundle AT ITS NAMED STATES now, and
        hands back the states the call left together with the table row that
        says how they moved -- no ∃-weakening on either side of the call. *)
     2: { iExact "Hufr". }
+    (* ...AND THE CHILDREN ROW, on the same channel and at the same named
+       set: the prologue's epc rewrite moves no [pv_chg]. *)
+    2: { iExact "Hch". }
     (* THE BUNDLE OFFERED, re-keyed from the entry record to the
        dispatcher's: the prologue's and the epilogue's epc rewrites move
        neither the image nor the a1 word nor the number *)
@@ -634,8 +644,8 @@ Section UtSysBlock.
          descriptor up to a lazy-fault extension, the size).  Framed, not
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
-      iIntros (CID2 Hk2 mg U2 stsR)
-        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hcwig %Hsbrg %Hfkg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo Hso Hfo".
+      iIntros (CID2 Hk2 mg U2 stsR csR)
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hchrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hchgg %Hcwig %Hsbrg %Hfkg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hch Hpc Hxo Hso Hfo".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -654,6 +664,9 @@ Section UtSysBlock.
       (* the bundle comes back keyed on the ENTRY record; [Hfgg] is the
          dispatcher's own statement that no syscall moves [pv_fdg]. *)
       iEval (rewrite -Hfgg) in "Hufr".
+      (* ...and the children row the same way, off the dispatcher's own
+         statement that no syscall reassigns [pv_chg] *)
+      iEval (rewrite -Hchgg) in "Hch".
       (* THE SYSCALL HANDS THE BUNDLE BACK AT NAMED STATES.  [stsR] is the
          call's own [sts'] and [Hfdrow] is its row against the entry [sts]:
          eighteen entries read [stsR = sts] and the four fd-touching ones
@@ -661,8 +674,8 @@ Section UtSysBlock.
          The residue is rebuilt at [stsR], so the row travels UP with it
          rather than being discarded here -- which is what the ∃-weakening
          this line used to do cost. *)
-      iPoseProof (ut_own_rebuild SY.syscall_env N (MkUstate V2 M2) stsR
-                    with "Hbs Hip Hfd Hir Hpv Hufr Hsy") as "Hown".
+      iPoseProof (ut_own_rebuild SY.syscall_env N (MkUstate V2 M2) stsR csR
+                    with "Hbs Hip Hfd Hir Hpv Hufr Hch Hsy") as "Hown".
       assert (Hmgsp : mg !!! Regidx csp_rs1 = pa_stk ksp 4)
         by (rewrite (callee_saved_lookup Hcsg csp_rs1
                        ltac:(vm_compute; reflexivity)); exact HS4sp).
@@ -949,7 +962,7 @@ Section UtSysBlock.
          the guard differs only in the cause conjunct the dispatcher does
          not carry ([SpecUsertrap.ut_fork_out]). *)
       iAssert (ut_fork_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
-                 (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0))%I
+                 (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0) cs csR)%I
         with "[Hfo]" as "Hfo".
       { rewrite /ut_fork_out /sysc_fork_out. iIntros "%Hc".
         iApply "Hfo". iPureIntro. destruct Hc as [_ Hc7].
@@ -957,7 +970,7 @@ Section UtSysBlock.
       iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs
                  (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0)
                  (us_M (MkUstate V2 M2))
-                 stsR (pv_cwi (us_V (MkUstate V2 M2))) cs)%I
+                 stsR (pv_cwi (us_V (MkUstate V2 M2))) csR)%I
         with "[Hso]" as "Hso".
       { iIntros (n) "%Hc". destruct Hc as (_ & Hcn & Hcx & Hcf).
         iDestruct ("Hso" $! n with "[%]") as "H";
@@ -968,8 +981,15 @@ Section UtSysBlock.
         iExact "H". }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
-                mie_v menvcfg0 epv scv lks sts stsR gn cs fdep
-                Hwf' ltac:(intros Hne; exfalso; exact (Hne Hscec)) Hfde Hpipe Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
+                mie_v menvcfg0 epv scv lks sts stsR gn cs csR fdep
+                Hwf' ltac:(intros Hne; exfalso; exact (Hne Hscec))
+                (* the children set's row: the dispatcher's [sysc_ch_ok] read
+                   through the prologue's epc insert.  The guard is the trap
+                   tail's -- not an ecall, or not fork -- and the ecall half
+                   is [Hscec], so what is left is the number. *)
+                ltac:(intros Hg; apply Hchrow; intro Hf; apply Hg;
+                      split; [exact Hscec | rewrite Hn0; exact Hf])
+                Hfde Hpipe Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
                 Hmiev Hmenvv Hrda

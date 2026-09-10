@@ -108,10 +108,13 @@ Class xv6G (Σ : gFunctors) := Xv6G {
      named by the private block ([ProcDefs.pv_gen]).  See
      [ChildTok.ctokG], re-exported by [Xv6Cameras]. *)
   xv6_ctok       :: ctokG Σ;
-  (* the [wait_lock] children map ([WaitInv.children_own_at] is its
-     authority, [WaitInv.ch_frag] a process's row); its [gname] is
-     boot-carved beside the lock's own.  See [Xv6Cameras.wchG]. *)
-  xv6_wch        :: wchG Σ;
+  (* THE [wait_lock] CHILDREN MAP IS NOT A MEMBER, and cannot be: its
+     class CARRIES THE NAME ([Xv6Cameras.wchG]'s [wch_name]), which is the
+     one thing this bundle may not hold.  A row of that map rides every
+     slot's dormant block ([ProcDefs.proc_dormant]), so the name has to be
+     canonical rather than threaded, and it is minted inside the boot fupd
+     and handed out existentially exactly as [ProcAvail.pavG]'s and
+     [FdSlots.fdslotG]'s are.  Files bind [!wchG Σ] beside [!pavG Σ, !wchG Σ]. *)
   (* the off-borrow liveness counter's camera (off-ledger ruling); its
      gname is [FsCfg.fsc_fol].  See [Xv6Cameras.flivG]. *)
   xv6_fliv       :: flivG Σ;
@@ -144,7 +147,7 @@ Class xv6G (Σ : gFunctors) := Xv6G {
    [xv6G xv6Σ]" even when every constituent is present. *)
 Definition xv6GΣ : gFunctors :=
   #[ sieΣ; lockΣ; kallocΣ; bioΣ; diskGhostΣ; uartGhostΣ; fsLogΣ; logΣ;
-     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ; uchΣ; ctokΣ; wchΣ;
+     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ; uchΣ; ctokΣ;
      flivΣ; bioboxΣ; icboxΣ;
      offboxΣ ].
 

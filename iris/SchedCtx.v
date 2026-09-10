@@ -119,7 +119,7 @@ Proof.
 Qed.
 
 Section SchedCtx.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).
@@ -260,7 +260,7 @@ End SchedCtx.
 (* A6.128: the payload is stated over the pieces above at an EXPLICIT context,
    so those pieces' section is closed first (their [XI] becomes a parameter). *)
 Section SchedCtxPay.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (γs : list gname).
 
@@ -1024,7 +1024,7 @@ End SchedCtxPay.
 (* A6.129: the lock table moves into a forked child's record whole -- stated
    after the section so the table's context is explicit. *)
 Section SchedCtxTable.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (γs : list gname).
   Global Instance procs_inv_morph : CtxMorph (λ ξ, procs_inv (XI := ξ) γs).

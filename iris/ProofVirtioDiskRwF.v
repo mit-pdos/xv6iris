@@ -507,7 +507,7 @@ Section VdrwfP6.
      descend through [cpu_own]'s [if b then ⌜…⌝ else …] and strip a later
      that is not ours.  Keep the bundle opaque. *)
   Local Typeclasses Opaque cpu_own.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Local Ltac reg_neq :=
     lazymatch goal with
@@ -1819,7 +1819,7 @@ Section VdrwfP6.
 End VdrwfP6.
 
 Section ProofVirtioDiskRwF.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Typeclasses Opaque cpu_own.

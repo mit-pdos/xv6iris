@@ -156,7 +156,7 @@ Local Open Scope Z_scope.
 
 Section FsReady.
   (* FsSyscalls' own [Section FsBundles] context, verbatim... *)
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
   (* ...AND THE CACHE'S INDEX, EXPLICIT AND DECLARED LAST (the header's
@@ -659,7 +659,7 @@ End FsReady.
    [ioff_escrows] (retired by L6 -- the off box replaces the ledger), the
    rest context-free or already instanced. *)
 Section FsReadyMorph.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{ICFG : icfg}.
 
 

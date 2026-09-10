@@ -245,7 +245,7 @@ Require Export FsAbsDelta.   (* [delta_trunc] + its row algebra (hoisted 2026-09
 
 Section OpenDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
   (* [GenId], because the arms carry [proc_priv] (SpecSysOpen's note) *)
   Context `{GEN : GenId}.
   Implicit Types Γ : fs_view_names Σ.

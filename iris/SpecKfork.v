@@ -192,10 +192,16 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Notation K_kfork := (56%nat) (only parsing).
 Require Import TsoCtx.
 Definition kfork_post
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γf : gname) (lvl : nat) (eb : bool)
     (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
+    (* THE CALLER'S CHILDREN SET, going in.  The row is the caller's own
+       ([WaitInv.ch_frag] at [ProcDefs.pv_chg] of its block, in the map
+       <wait_lock> owns at the canonical [Xv6Cameras.wch_name]), and it
+       rides its trap residue ([UsertrapRes.ut_own]); kfork holds the lock
+       while it writes [np->parent], and that is where it moves the row. *)
+    (csP : gset gname)
     (* THE CHILD'S EXIT PAYLOAD, chosen by the forking process and set on
        the child's generation inside this call ([ChildTok.gen_set]): what
        the child's exit will owe its parent, as a function of the status.
@@ -227,8 +233,10 @@ Definition kfork_post
     (* ... and what IS left is only the return value.  Nothing about the
        CHILD appears: on the failure arm freeproc returned it to
        [procs_inv], on the success arm the RUNNABLE park swallowed it. *)
-    ( (* allocproc found no slot, or uvmcopy failed *)
-      ⌜ rv = (mword_of_int (-1) : mword 64) ⌝
+    ( (* allocproc found no slot, or uvmcopy failed: the row comes back
+         at the set it went in at, because no child was made *)
+      (⌜ rv = (mword_of_int (-1) : mword 64) ⌝ ∗
+       ch_frag (pv_chg (us_V Up)) pme csP)
     ∨ (* the child's pid, sign-extended exactly as `lw`/`mv a0,s1` leaves it,
          AND IN [1, PIDMAX] (kernel/param.h) -- allocproc chose it out of the
          bounded counter <pid_lock> protects and its post says so
@@ -244,25 +252,30 @@ Definition kfork_post
          one thing about a forked child that comes back to its parent, and
          what a later wait() redeems ([ChildTok.gen_pay]).
 
-         THE CHILDREN SET IS NOT MOVED HERE, AND THAT IS THIS LANE'S
-         BOUNDARY.  The key's [UexecSlot.uvis_ch] grows by [γ] at the fork
-         arm, and that is a fact about the KEY THE PARKER PAYS -- the
-         resumer instantiates [ParkCap.park_cap]'s [∀ cs] at [cs ∪ {γ}] --
-         not yet a move of the <wait_lock> ghost map: kfork carries the
-         token and does not touch the map.  Lane WX-RES puts
-         [WaitInv.ch_frag] in the trap residue beside [FdSlots.fd_frags],
-         and then kfork and kwait move the map under the lock with the
-         caller's own row. *)
+         ...AND THE CALLER'S CHILDREN ROW, MOVED.  kfork holds
+         <wait_lock> while it writes [np->parent], and it holds the
+         caller's row off the caller's residue -- authority and row
+         together, which is what [WaitInv.children_own_upd] takes -- so
+         the set the parent gets back has the child's generation in it.
+         THE CHILD'S OWN ROW IS NOT INSTALLED HERE: it came out of the
+         slot's dormant block with allocproc's found arm
+         ([SpecAllocproc.allocproc_post]) and kfork parks it with the
+         child.  That is what makes the
+         resume key's [UexecSlot.uvis_ch] a READING of the map rather than
+         a choice of the trap loop's. *)
       (∃ (pidv : mword 32) (γ : gname),
          ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝ ∗
          ⌜ (1 <= bv_unsigned pidv <= PIDMAX)%Z ⌝ ∗
-         child_tok γ pidv Q) ) )%I.
+         child_tok γ pidv Q ∗
+         ch_frag (pv_chg (us_V Up)) pme (csP ∪ {[γ]})) ) )%I.
 
 Definition wp_kfork_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
- (γp γw γc γl γf : gname)  (γs : list gname)
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+ (γp γw γl γf : gname)  (γs : list gname)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
+    (* the caller's children set, going in -- see [kfork_post] *)
+    (csP : gset gname)
     (* the child's exit payload -- see [kfork_post] *)
     (Q : Z -> iProp Σ)
     (lks : gset string) :=
@@ -288,7 +301,7 @@ Definition wp_kfork_sconf_body
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
-  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at γc) -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
   is_ftable γl γf -∗
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
@@ -356,11 +369,15 @@ Definition wp_kfork_sconf_body
   (* THE PARENT'S DESCRIPTOR STATES.  kfork needs them to say what it copies
      into the child; it changes none of them and hands them back. *)
   fd_frags (pv_fdg (us_V Up)) stsP -∗
+  (* ...AND THE CALLER'S CHILDREN ROW.  kfork takes <wait_lock> anyway --
+     it writes [np->parent] under it -- so the caller's row travels in with
+     the block and comes back moved ([kfork_post]'s success arm). *)
+  ch_frag (pv_chg (us_V Up)) pme csP -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γf lvl eb pme b pid_p Up stsP Q K mr
+      kfork_post γf lvl eb pme b pid_p Up stsP csP Q K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -369,12 +386,13 @@ Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 
 Module Type KFORK.
   Parameter wp_kfork_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
- (γp γw γc γl γf : gname) (γs : list gname)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+ (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
+      (csP : gset gname)
       (Q : Z -> iProp Σ)
       (lks : gset string),
-      wp_kfork_sconf_body γp γw γc γl γf γs
- m lvl K eb pme b pid_p Up stsP Q lks.
+      wp_kfork_sconf_body γp γw γl γf γs
+ m lvl K eb pme b pid_p Up stsP csP Q lks.
 End KFORK.

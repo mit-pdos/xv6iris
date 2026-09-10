@@ -136,7 +136,7 @@ Proof.
 Qed.
 
 Section UiCont.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* the frame the prologue spilled *)
   Definition ui_frame `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
@@ -178,7 +178,7 @@ Module UAcc := UartAccessProof Uart.
 Module UG := UartgetcProof Uart.
 
 Section ProofUartintr.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=

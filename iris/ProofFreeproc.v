@@ -155,7 +155,7 @@ Module FreeprocProof (Acquire : ACQUIRE) (Release : RELEASE)
                      (KF : KFREE) (PFP : PROC_FREEPAGETABLE) : FREEPROC.
 
 Section ProofFreeproc.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation FR := KernelSyms.freeproc.
@@ -242,7 +242,7 @@ Section ProofFreeproc.
     pose proof (fr_cap K HK) as (Hc4 & Hckf & Hcpf).
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hcpu #Htext Hpc #Hplk Hheld Hrest Hpg Htf #Henv Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hplk Hheld Hrest Hrow Hpg Htf #Henv Hcont".
     iDestruct "Hrest" as "(%Hpure & Hpid & Hfields & Hof & Hunits & Hspare & Hkst & Hctx)".
     destruct Hpure as (Hofv & Hcwdv & Hszb).
     iDestruct "Hheld" as "(Hlk & Hstate & Hpsg & Hchan & Hpub)".
@@ -408,7 +408,7 @@ Section ProofFreeproc.
         p_sz pa ↦₈ pv_sz V -∗
         WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hr24 Hr16 Hr8 Hr0 Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid Hpid2
-             Hcwd Hnm Hof Hunits Hspare Hkst Hctx]" as "ZERO".
+             Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hrow]" as "ZERO".
     { iIntros (CIDz Hsz0 me pgv).
       iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcpu Hpc Hpg Htf Hsz".
       (* release below spells the window index at its own exit arm; the two
@@ -784,7 +784,7 @@ Section ProofFreeproc.
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDzd with "[]"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid2]
-                                  [Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hpg Htf]").
+                                  [Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hrow Hpg Htf]").
       { (* callee_saved mm E3 *)
         assert (HE3thr : fr_thr mm E3).
         { thr_done. }
@@ -818,7 +818,7 @@ Section ProofFreeproc.
                            (pv_ofile V) (pv_fdg V) (pv_cwd V) (<[0%nat := (mword_of_int 0 : mword 8)]> (pv_name V))
                            (pv_cwi V) (pv_gen V) (pv_chg V))
                   (mword_of_int 0 : mword 32) (pv_sz V)
-                  with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hpg] [Htf]").
+                  with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hrow] [Hpg] [Htf]").
         - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
           iSplitR.
           { iPureIntro. split_and!; [exact Hofv | exact Hcwdv |].
@@ -828,6 +828,8 @@ Section ProofFreeproc.
           iFrame "Hsz Hcwd".
           iSplitR. { iPureIntro. apply fr_name_len. exact Hnmlen. }
           rewrite /pname_cells. iExact "Hnm".
+        (* the row's key is [pv_chg], which the emptied block keeps *)
+        - cbn [pv_chg]. iExact "Hrow".
         - rewrite /fp_pt. iExact "Hpg".
         - rewrite /fp_tf. iExact "Htf". } }
 

@@ -142,7 +142,7 @@ End PstateUsedHelper.
 Module KforkB5 (AQ : ACQUIRE) (RL : RELEASE).
 
 Section ProofKforkB5.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ}.
 
   Context `{!ufdG Σ}.
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -158,10 +158,16 @@ Section ProofKforkB5.
   (*  THE BLOCK.                                                          *)
   (* =================================================================== *)
   Lemma kfk_b5 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
-      (γs : list gname) (γf γw γc γft γl : gname) (j : nat)
+      (γs : list gname) (γf γw γft γl : gname) (j : nat)
       (Mt : regfile) (K lvl : nat) (eb b : bool)
       (pme ks : mword 64) (pid_c : mword 32) (Uc : ustate)
       (stsP : list fdstate) (csP : gset gname) (Wk : uvis)
+      (* THE PARENT'S CHILDREN ROW: its name (the parent block's
+         [ProcDefs.pv_chg] -- this block never sees the parent's [ustate],
+         so the name is a parameter) and the set it goes in at.  DISTINCT
+         from [csP], which is the CHILD's set, the one the child's key and
+         its row are at. *)
+      (gpar : gname) (csPar : gset gname)
       (ch : mword 64) (rest : list (mword 64)) (rv : mword 64)
       (lks : gset string) :
     (18 <= K)%nat ->
@@ -207,7 +213,7 @@ Section ProofKforkB5.
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
     SchedCtx.procs_inv γs -∗
-    WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string (WaitInv.wait_res_at γc) -∗
+    WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string (WaitInv.wait_res_at) -∗
     (* THE PAID PARK'S ROWS: the open-file table, the world
        ([SyscParkEnv.park_world] -- device complement, console, the two
        global locks, the slot ledger, wire invariant, trampoline claim, an
@@ -227,6 +233,19 @@ Section ProofKforkB5.
        park is keyed at it, which is how a forked child's descriptors become
        stateable at all. *)
     FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Uc)) stsP -∗
+    (* ...AND THE CHILD'S CHILDREN ROW, on the fragments' route exactly:
+       allocproc handed it out of the slot's dormant block
+       ([SpecAllocproc.allocproc_post]) and the park captures it beside
+       them ([ParkCap.park_token_park_steady]).  At [csP], the set the
+       child's key is at -- a fresh child has none, and its caller passes
+       [∅]. *)
+    WaitInv.ch_frag (ProcDefs.pv_chg (us_V Uc)) (ProcGeom.proc_addr j) csP -∗
+    (* ...AND THE PARENT'S OWN ROW, which is NOT parked: it rides the
+       forking process's trap residue in and out ([UsertrapRes.ut_own]).
+       This block is where fork MOVES it -- it holds <wait_lock> at +0xd4 to
+       write [np->parent], so it holds the authority the row belongs to,
+       and the child's generation joins the parent's set there. *)
+    WaitInv.ch_frag gpar pme csPar -∗
     (* ...and the SLOT for the child, on the very same route: kfork's caller
        supplies it ([SpecKfork]'s premise of the same name), the park
        captures it, and the resume hands it back at the record the child
@@ -253,11 +272,15 @@ Section ProofKforkB5.
         sie_cap_gpr KT1 mf (K - 8)%nat b pme -∗
         cpu_own lvl eb pme b lks -∗
         pc_is (mword_of_int (KF + 0xf6) : mword 64) -∗
+        (* THE PARENT'S ROW, BACK AND MOVED: the child's generation is in
+           the set now, which is what makes the resume key's
+           [UexecSlot.uvis_ch] a reading of the map rather than a choice. *)
+        WaitInv.ch_frag gpar pme (csPar ∪ {[ProcDefs.pv_gen (us_V Uc)]}) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hurun Hkfd Hkgn Hkch Hfresh.
-    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv Hfrag Hjslot #Hmk
+    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv Hfrag Hcrow Hprow Hjslot #Hmk
              Hfd Hirsp Hbsl Hkfree #Hks Hctx Hcont".
     (* -------------------------------------------------------------- *)
     (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via the *)
@@ -274,7 +297,7 @@ Section ProofKforkB5.
     iDestruct (SchedCtx.procs_inv_len with "Hpinv") as %Hnproc.
     iAssert (⌜FsReady.fs_geom_ok⌝)%I as %Hgeomok.
     { iDestruct "Hfdone" as "(_ & #Hrdy & _)". iApply (FsReady.fs_ready_geom with "Hrdy"). }
-    pose (N := MkUtNames γft γf γw γc γs j γl pd pav pu
+    pose (N := MkUtNames γft γf γw γs j γl pd pav pu
                  γtl
                  iv1 DfracDiscarded
  ks pid_c).
@@ -318,7 +341,7 @@ Section ProofKforkB5.
                       Hurun Hkfd Hkgn Hkch))
       in "Hjslot".
     iMod (park_token_park_steady N rest Uc stsP csP Hwf Hrest
-            with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfdone Hfrag Hjslot
+            with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfdone Hfrag Hcrow Hjslot
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "[Hrun Hpctx]".
     (* built in [park_child]'s own conjunct order rather than framed: its
@@ -456,7 +479,7 @@ Section ProofKforkB5.
       rewrite /M3. apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
     (* carry [cpu_own] hart-generically across the three plain leaves *)
     iDestruct (cpu_own_transport CID1 CID4 lvl eb pme b ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (AQ.wp_acquire_sconf KT1 (CID := CID4) γw "wait_lock"%string (WaitInv.wait_res_at γc)
+    iApply (AQ.wp_acquire_sconf KT1 (CID := CID4) γw "wait_lock"%string (WaitInv.wait_res_at)
               M5 lvl eb pme (K - 8)%nat b lks Hlvl (kfkb5_stack_ok K HK)
               Hfresh
               with "Hcg Hown Htext Hpc [Hwl]").
@@ -491,7 +514,20 @@ Section ProofKforkB5.
     assert (Hst_rs5 : rget mr5 Rs5 = pme) by (rewrite (rget_ne mr5 Rs5 ltac:(vm_compute; discriminate)); exact Hr5s5).
     iEval (rewrite Hst_rs5) in "Hpcell".
     iDestruct ("Hpoback" $! pme with "Hpcell") as "Hpo".
-    iAssert (WaitInv.wait_res γc) with "[Hpo Hch]" as "Hwaitres".
+    (* THE PARENT'S ROW MOVES HERE, and this is the only place it can: the
+       authority is the payload of the lock this block is holding, the
+       parent's row came in off its residue, and the child's generation --
+       [ProcDefs.pv_gen] of the block being parked -- is what joins the set.
+       NO FRESHNESS IS OWED: the move is a set union. *)
+    iApply fupd_wp.
+    iDestruct "Hch" as (mch) "Hch".
+    iMod (WaitInv.children_own_upd mch gpar pme csPar
+            (csPar ∪ {[ProcDefs.pv_gen (us_V Uc)]}) with "Hch Hprow")
+      as "[Hch Hprow]".
+    iModIntro.
+    iAssert (WaitInv.children_res) with "[Hch]" as "Hch";
+      [ iExists _; iExact "Hch" | ].
+    iAssert (WaitInv.wait_res) with "[Hpo Hch]" as "Hwaitres".
     { iFrame "Hch". iExists (<[j := pme]> ps). iExact "Hpo". }
     assert (Hpp_d8 : add_vec_int (mword_of_int (KF + 0xd4) : mword 64) 4 = mword_of_int (KF + 0xd8))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -553,7 +589,7 @@ Section ProofKforkB5.
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
     iApply (RL.wp_release_sconf KT1 (CID := CID5) γw SpecProcinit.wait_lock_addr "wait_lock"%string
-              (WaitInv.wait_res_at γc) M8 lvl eb pme (K - 8)%nat
+              (WaitInv.wait_res_at) M8 lvl eb pme (K - 8)%nat
               ({["wait_lock"]} ∪ lks)
               Hlka2 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc Hwl Htokw Hwaitres Hown Hpay").
@@ -740,7 +776,7 @@ Section ProofKforkB5.
     iEval (rewrite -Hb) in "Hown".
     rewrite <- Hb in Hs1. rewrite <- Hb in Hs6. rewrite <- Hb in Hs10.
     iSpecialize ("Hcont" $! CID10 with "[]"); [iPureIntro; wp_next_chain|].
-    iApply ("Hcont" $! mr10 with "[%] Hcg Hown Hpc"). exact Hcs_0_r10.
+    iApply ("Hcont" $! mr10 with "[%] Hcg Hown Hpc Hprow"). exact Hcs_0_r10.
   Qed.
 
 End ProofKforkB5.

@@ -263,7 +263,7 @@ End BootRun.
 (* ====================================================================== *)
 
 Section BootSecondary.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
@@ -317,7 +317,7 @@ End BootSecondary.
 (* ====================================================================== *)
 
 Section BootPrimary.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
@@ -376,6 +376,12 @@ Section BootPrimary.
     (* the proc table's counted regime, straight through from
        [BootShared.boot_shared_alloc] to main -- see [SpecMain]'s own row *)
     procs_avail (Some NPROC) -∗
+    (* THE CHILDREN MAP AND ITS NPROC ROWS, minted in the boot fupd at the
+       canonical name ([WaitInv.children_res_alloc]) because a row has to
+       be spellable in [ProcDefs.proc_dormant].  Main pairs the authority
+       with the parent cells for <wait_lock>'s payload and deposits row [i]
+       into slot [i]'s dormant block at [SpecProcinit.procs_inv_alloc]. *)
+    WaitInv.children_boot -∗
     (* the file system's boot-era mint and the iref-slot authority, both out
        of [BootShared.boot_shared_alloc] and both spent in
        [ProofMain.mn_grp_fs] -- see [SpecMain]'s own rows *)
@@ -426,7 +432,7 @@ Section BootPrimary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hz Hprun Hlen Hlive Himg.
-    iIntros "#Htext #Hdata Hres Hthr #Hstarted Hprim Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
+    iIntros "#Htext #Hdata Hres Hthr #Hstarted Hprim Hlk Hgl Hfirst Hnext Hpark Hpst Hpav Hchb
              Hfs Hmir Hirslot Hirauth #Hcert #Hseam
              #Hdev #Hwire Hinitb Htx Hsent Hlb Htok Hdlab Hcfg Hclaim Hcmauth #Hdone Hkpt Hkptb Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres Hthr").
@@ -440,7 +446,7 @@ Section BootPrimary.
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
               Hlive Himg eq_refl
               with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted Hprim [] Hlk Hgl
-                    Hfirst Hnext Hpark Hpst Hpav Hfs Hmir Hirslot Hirauth
+                    Hfirst Hnext Hpark Hpst Hpav Hchb Hfs Hmir Hirslot Hirauth
                     Hcert Hseam
                     Hdev Hwire Hinitb Htx Hsent Hlb Htok Hdlab
                     Hcfg Hclaim Hcmauth Hdone Htimc Hraw Hkpt Hkptb Hkmap Hpages").

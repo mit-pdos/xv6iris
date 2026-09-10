@@ -1004,10 +1004,35 @@ Proof. solve_inG. Qed.
    [ghost_var] would leave it unable to say WHICH entry of the payload is
    its own.  A row is installed under the lock ([ghost_map_insert] at a
    name allocated cofinitely against the domain) and deleted there when the
-   incarnation is reaped. *)
-Class wchG (Σ : gFunctors) := WchG { wch_inG :: ghost_mapG Σ gname (gset gname) }.
-Definition wchΣ : gFunctors := #[ ghost_mapΣ gname (gset gname) ].
-Global Instance subG_wchΣ {Σ} : subG wchΣ Σ -> wchG Σ.
+   incarnation is reaped.
+
+   THE VALUE CARRIES THE OWNER'S SLOT ADDRESS beside its set.  A row's key
+   is a ghost name, and nothing in the lock's payload can say which slot
+   that name belongs to -- [ProcDefs.pv_chg] lives under p->lock and
+   [ChildTok.gen_slot] reads a GENERATION to a slot, not a row name.  The
+   address is therefore fixed inside the AUTHORITY, where no row holder
+   can move it, and the trap residue pins it to the running process's own
+   slot ([UsertrapRes.ut_own] carries the row at [un_pj N]).  That is what
+   makes [WaitInv.children_inv] statable. *)
+(* THE NAME IS CANONICAL, and that is what makes the row spellable where
+   it has to live.  A row rides the DORMANT BLOCK of the slot it belongs to
+   ([ProcDefs.proc_dormant]) -- born once at boot, handed out by allocproc,
+   returned by freeproc -- and [ProcDefs] sits below every party that
+   threads a lock's gname, so a per-boot [γc] parameter would have to reach
+   [SchedCtx.procs_inv] and its 389 spellings.  It is carried by the class
+   instead, on [FdSlots.fdslot_name] / [ProcAvail.pav_name] /
+   [bioslot_name]'s precedent: the capacity below may be assumed by
+   adequacy, the NAME may not, so it is minted inside the boot fupd
+   ([WaitInv.children_res_alloc], called from [BootShared]) and the
+   instance handed out existentially. *)
+Class wchGpreS (Σ : gFunctors) :=
+  { wch_pre_inG :: ghost_mapG Σ gname (SailStdpp.Values.mword 64 * gset gname) }.
+Class wchG (Σ : gFunctors) :=
+  WchG { wch_inG :: ghost_mapG Σ gname (SailStdpp.Values.mword 64 * gset gname);
+         wch_name : gname }.
+Global Instance wchG_preS `{!wchG Σ} : wchGpreS Σ := {| wch_pre_inG := wch_inG |}.
+Definition wchΣ : gFunctors := #[ ghost_mapΣ gname (SailStdpp.Values.mword 64 * gset gname) ].
+Global Instance subG_wchΣ {Σ} : subG wchΣ Σ -> wchGpreS Σ.
 Proof. solve_inG. Qed.
 
 (* ===================================================================== *)

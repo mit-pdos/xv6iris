@@ -96,7 +96,7 @@ Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
    costs two slots more.) *)
 Notation K_main_secondary := (114%nat) (only parsing).
 Section SpecMainSecondary.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
@@ -137,7 +137,7 @@ End SpecMainSecondary.
    what the barrier record carries at [ξd] and each secondary absorbs into
    its own context.  One [CtxMorph] instance per named row, as elsewhere. *)
 Section MainDepositMorph.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
 
   Global Instance is_txlock_morph γl γu : CtxMorph (λ ξ, is_txlock (XI := ξ) γl γu).
@@ -166,7 +166,7 @@ Section MainDepositMorph.
 End MainDepositMorph.
 
 Section SpecMainSecondaryBody.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition wp_main_secondary_sconf_body
@@ -222,7 +222,7 @@ End SpecMainSecondaryBody.
 
 Module Type MAIN_SECONDARY.
   Parameter wp_main_secondary_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (m : regfile) (K : nat)
       (p0 : mword 64) (γi : gname) (ξd : CtxId)

@@ -59,7 +59,7 @@ Proof. rewrite /p_killed. f_equal; apply bv_eq; vm_compute; reflexivity. Qed.
 Module SetkilledProof (Acquire : ACQUIRE) (Release : RELEASE) : SETKILLED.
 
 Section ProofSetkilled.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation sk_s0 := (mword_of_int 8 : mword 5).

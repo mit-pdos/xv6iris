@@ -94,7 +94,7 @@ Proof. lia. Qed.
 
 Module KforkB1 (FP : FREEPROC) (RL : RELEASE).
 Section KforkB1Proof.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -179,6 +179,10 @@ Section KforkB1Proof.
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     kalloc_env_at γa γk None -∗
     fp_rest (proc_addr j) V pid -∗
+    (* THE CHILD'S CHILDREN ROW, AT [∅], which is what freeproc puts back
+       into the slot's UNUSED block ([SpecFreeproc]): allocproc handed it
+       out at [∅] and this arm never forked, so nothing moved into it. *)
+    WaitInv.ch_frag (pv_chg V) (proc_addr j) ∅ -∗
     fp_pt (proc_addr j) (pv_sz V) (Some P) -∗
     fp_tf (proc_addr j) (Some (ud_tfp P, ws)) -∗
     wp_next (match lvl with O => eb | S _ => false end) pme (fun (CID : CpuId) =>
@@ -193,7 +197,7 @@ Section KforkB1Proof.
   Proof.
     intros HK Hlvl Hj Hb Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hmts4 Hthr Hfresh.
     iIntros "Hcg Hcpu Hpay #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-              Hheld Hhaa #Hislock #Hpidlk #Henv Hfprest Hfppt Hfptf Hcont".
+              Hheld Hhaa #Hislock #Hpidlk #Henv Hfprest Hfprow Hfppt Hfptf Hcont".
     (* freeproc is stated at the ANONYMOUS bundle ([kalloc_env], count
        existentially quantified), so hand it the projection; both forms are
        persistent at [None], so "Henv" survives for our own postcondition. *)
@@ -234,7 +238,7 @@ Section KforkB1Proof.
     iApply (FP.wp_freeproc_sconf γp γa T1 j γl V pid USED ch (Some P) (Some (ud_tfp P, ws))
               (trap_res b + (K - 8))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
               ltac:(pose proof (kfkb1_K44 K HK); lia) Hj (kfkb1_lvlS lvl Hlvl) HT1a0
-              with "Hcg Hcpu Htext Hpc Hpidlk Hheld Hfprest Hfppt Hfptf Henvb").
+              with "Hcg Hcpu Htext Hpc Hpidlk Hheld Hfprest Hfprow Hfppt Hfptf Henvb").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mfp) "Hcg Hcpu Hpc %Hcsfp Hheld Hdorm".

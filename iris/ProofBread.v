@@ -304,7 +304,7 @@ Local Ltac regne := reg_ne_side.
 (*  move the hart forwards it as the IDENTITY.                            *)
 (* ===================================================================== *)
 Section BreadDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Definition bd_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (V : bio_view Σ)
@@ -377,7 +377,7 @@ End BreadDefs.
 (*  applied at the hart it actually starts on.                            *)
 (* ===================================================================== *)
 Section BreadBlocks.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   (* ================================================================== *)
   (*  THE EPILOGUE (0xb8 .. 0xc6), reached from both arms of the tail.   *)
@@ -2554,7 +2554,7 @@ End BreadBlocks.
 (* ===================================================================== *)
 
 Section ProofBread.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bread_sconf

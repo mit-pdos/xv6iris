@@ -146,7 +146,7 @@ Module Alloc := SysOpenAlloc Iunlock Iunlockput EndOp Fileclose Itrunc
 Module Tails := SysOpenTails Iunlock Iunlockput EndOp Fileclose.
 
 Section ProofSysOpenWalk.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

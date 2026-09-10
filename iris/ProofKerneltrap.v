@@ -70,7 +70,7 @@ Module KerneltrapProof (Devintr : DEVINTR) (Myproc : MYPROC) (Yield : YIELD)
   : KERNELTRAP.
 
 Section ProofKerneltrap.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).

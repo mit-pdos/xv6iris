@@ -129,7 +129,7 @@ Local Open Scope Z_scope.
 Notation K_namei_root_boot := (74%nat) (only parsing).
 
 Definition wp_namei_root_boot_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}
     `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
@@ -196,7 +196,7 @@ Definition wp_namei_root_boot_body
 
 Module Type NAMEI_ROOT_BOOT.
   Parameter wp_namei_root_boot :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}
       `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
