@@ -111,12 +111,14 @@
    SpecSysExec.v: the supply law is a class field, and its exec case is
    [fsabs_exec_half].
 
-   WHERE THE SUPPLY COMES FROM, AND WHY IT IS NOT PARKED.  It is a Coq
-   hypothesis of the generic system theorem
-   ([SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]), born at boot and
-   carried as a persistent credential to the two slot mints and the closed
-   trap loop.  It cannot ride an era-owned resource -- see [AppInv]'s
-   [app_sup_raw] -- because a constraining application cannot found it.
+   WHERE THE SUPPLY COMES FROM, AND WHY IT IS NOT PARKED.  It is founded
+   by the GENERIC application alone, out of the triviality of its own
+   predicate ([AppInv.app_sup_of_triv]), at the one place that needs it:
+   its discharge of the system theorem's [Hinit_boot]
+   ([SystemAdequacy.init_boot_of_sup]), which mints the generic slot on it.
+   It cannot ride an era-owned resource -- see [AppInv]'s [app_sup_raw] --
+   because a constraining application cannot found it, and it appears in no
+   kernel contract for the same reason.
 
    [Γ] and [γfs] are NOT existential: the whole tree runs at the single
    ambient file system ([FsCfg.fsc_fs] with the derived view names

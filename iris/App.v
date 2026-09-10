@@ -23,11 +23,13 @@
    claude-notes/projects/app-echo.md.
 
    THE OBLIGATIONS ARE SIX FAMILIES, and that is all of them: [Hbirth],
-   [Happ_xfer], [Happ_init], [Happ_sup], the trace ledger's ([HR0], [HRt],
-   [Hpow], [Htx], [Hrx]) and [Hphi].  There is no parked license: the
-   BLANKET PROMISE that the claim survives every one-row move of the map is
-   gone, because the AU fires' steps come out of the PROCESS's own deposit
-   ([UexecSG.sbundle_at]) and a generic slot's out of [Happ_sup].
+   [Happ_xfer], [Happ_init], [Hinit_boot], the trace ledger's ([HR0],
+   [HRt], [Hpow], [Htx], [Hrx]) and [Hphi].  There is no parked license:
+   the BLANKET PROMISE that the claim survives every one-row move of the
+   map is gone, because the AU fires' steps come out of the PROCESS's own
+   deposit ([UexecSG.sbundle_at]); and there is no supply either -- the
+   kernel mints no user-execution slot, so what the application owes about
+   user execution is the FIRST PROCESS'S EXEC BUNDLE and nothing else.
 
    HOW THE PIECES MEET THE THEOREM.
    - [app_fixed]/[app_cl] are the BIRTH STEP: [Hbirth] runs FIRST in
@@ -46,13 +48,17 @@
      name ([AppDur.app_dur_raw]) -- the PowerOn arm clones it onto the
      lend by the TRANSPORT [Happ_xfer], and the boot founds the era from
      the lent claim.  Era 0's claim is [Happ_init], at the image's state.
-   - [Happ_sup] is the application's SUPPLY ([AppInv.app_sup]): its claim
-     holds of EVERY view.  That is what makes a view-moving commit's step
-     free, and hence what an UNVERIFIED program's syscall bundles are paid
-     out of; boot hands it to the two slot mints (userinit's park and
-     sys_fork's kfork call) and to the closed trap loop.  A constraining
-     application cannot pay it and does not have to -- it does not
-     instantiate this theorem (see [SystemAdequacy]'s [Happ_sup]).
+   - [Hinit_boot] is the FIRST PROCESS'S EXEC BUNDLE
+     ([InitBoot.init_boot_bundle]): kexec's caller-side bundle at "/init",
+     whose SLOT PIECE answers at the key kexec builds.  forkret's boot arm
+     runs that kexec between the first park and the first resume, so no
+     slot the kernel could have minted survives it -- which is why this,
+     and not a supply, is what the application owes about user execution.
+     The generic application discharges it from the trivial mint
+     ([SystemAdequacy.init_boot_of_triv]); a constraining application
+     discharges it from its own pinned bundle at "/init".  Either way it
+     is a discharged premise, not a gap (see [SystemAdequacy]'s
+     [Hinit_boot]).
    - [app_R c] is the trace slot's resource at the fixed part; [HR0]
      RECEIVES the birth step's yield ([obs_ledger_at_alloc_cl]) -- for the
      echo application, its taint counter at 0; the power step and the two
@@ -76,6 +82,12 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import FsState.
 Require Import FsAbsDefs.        (* [aview], [abs_view]: the claim is over the view *)
+Require Import InitBoot.         (* [init_boot_bundle]: the first process's
+                                    exec bundle, the application's one
+                                    obligation about user execution *)
+Require Import InodeInv.         (* [ROOTINO] *)
+Require Import AppCfg.           (* [MkAppcfg]: the era's application record,
+                                    which [Hinit_boot]'s equation names *)
 Require Import AppInv.           (* [app_sup_raw]: the supply, at the raw
                                     gname *)
 Require Import FdSlots.
@@ -193,14 +205,20 @@ Theorem xv6_app_adequacy Σ
        ⊢ |==> ∃ r : app_names A,
            app_pred A c r (abs_view (fss_inodes (FsDurImg.img_state
               (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib))))
-    (* ...and the SUPPLY (the ARM; [AppInv.app_sup_raw]): the claim holds of
-       EVERY view.  It is the credential an unverified program's syscall
-       bundles are paid out of, born at boot and carried to the two slot
-       mints and the closed trap loop.
-       [SystemAdequacy.xv6_power_adequacy_gen]'s own [Happ_sup] carries the
-       paragraph on why it is not the GAP-premise trap. *)
-    (Happ_sup : forall (c : app_fixed A) (r : app_names A),
-       ⊢ app_sup_raw (app_pred A c) r)
+    (* ...and THE FIRST PROCESS'S EXEC BUNDLE (ARM-c): the one thing the
+       application owes the kernel about user execution.  Quantified over
+       the era's ghost classes for the reason
+       [SystemAdequacy.xv6_power_adequacy_gen]'s own [Hinit_boot] gives --
+       they are born by the boot mint -- and its paragraph carries the
+       argument for why it is not the GAP-premise trap. *)
+    (Hinit_boot :
+       forall (HR : riscvGS Σ) (GEN : GenId)
+              `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
+                HPav : !pavG Σ, HF : !fileG Σ}
+              (c : app_fixed A) (r : app_names A),
+         @file_app Σ HF = MkAppcfg (app_names A) (app_pred A c) r ->
+         ⊢ AppInv.app_inv FsCfg.fsc_fs -∗
+           |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0)
     (* ---- the conclusion's proof, at the end of the run: it holds the
        COMPOSITE crash slot ([SystemAdequacy.xv6_slot]: the file system's
        record beside the application's durable claim at the same snapshot
@@ -245,7 +263,7 @@ Proof.
       rewrite Heq; reflexivity. }
   exact (xv6_power_adequacy_gen Σ g sb nib cov
            (app_fixed A) (app_cl A) Hbirth
-           (app_names A) (app_pred A) Happ_xfer Happ_init Happ_sup
+           (app_names A) (app_pred A) Happ_xfer Happ_init Hinit_boot
            (fun γobs c => obs_ledger_at (app_R A c) γobs)
            (app_tag A) Htagp Htagt
            (fun γobs c =>
@@ -288,13 +306,31 @@ Section AppTriv.
     iExists (). iPureIntro. exact Logic.I.
   Qed.
 
-  (* the supply: the generic application's predicate IS [True], which is
-     exactly what "unconstrained abstract state" means as a premise *)
-  Lemma app_triv_sup (c : app_fixed (app_triv Σ)) (r : app_names (app_triv Σ)) :
-    ⊢ app_sup_raw (app_pred (app_triv Σ) c) r.
+  (* THE FIRST PROCESS'S EXEC BUNDLE: the generic application's predicate
+     IS [True], so its supply is free ([AppInv.app_sup_raw_triv]) and the
+     bundle is the trivial one over the generic mint
+     ([SystemAdequacy.init_boot_of_triv]) -- every hop says yes, the
+     observation hands the authority back, and both slot wands answer with
+     the user-execution WP every key admits. *)
+  (* the two classes the section does not carry: the bundle is an [iProp]
+     over the kernel's ghost state, and its slot piece is [UexecRet.uslot],
+     which reads the descriptor class *)
+  Lemma app_triv_init_boot
+      `{HX : !xv6G Σ, HU : !ufdG Σ}
+      (HR : riscvGS Σ) (GEN : GenId)
+      `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
+        HPav : !pavG Σ, HF : !fileG Σ}
+      (c : app_fixed (app_triv Σ)) (r : app_names (app_triv Σ)) :
+    @file_app Σ HF
+      = MkAppcfg (app_names (app_triv Σ)) (app_pred (app_triv Σ) c) r ->
+    ⊢ AppInv.app_inv FsCfg.fsc_fs -∗
+      |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0.
   Proof.
-    cbn [app_triv app_pred]. apply app_sup_raw_triv.
-    intros r' av. reflexivity.
+    intros Heq. iIntros "_". iModIntro.
+    (* the rewrite goes BEFORE the [intros]: [r'] is typed at
+       [app_names file_app], so rewriting under it is a dependent rewrite *)
+    iApply init_boot_of_triv. rewrite Heq. intros r' av.
+    cbn [app_triv app_pred app_names]. reflexivity.
   Qed.
 
   Lemma app_triv_R0 (c : app_fixed (app_triv Σ)) :
@@ -336,7 +372,7 @@ Proof.
                  iFrame "Hg"; auto)
            app_triv_xfer
            ltac:(intros c; exact (app_triv_init c _))
-           app_triv_sup
+           app_triv_init_boot
            ltac:(intros Hinv γgen γstart γreg γd γsw γobs c T g' h;
                  iIntros "_ _ _ _ _"; iModIntro; iPureIntro; exact Logic.I)
            Hgen0 Hpow0 _ n κs t2 g2 Hn)).

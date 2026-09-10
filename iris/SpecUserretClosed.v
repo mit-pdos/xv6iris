@@ -70,7 +70,6 @@ Require Import UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its produc
 Require Export UexecWp.
 Require Import UserPerm.   (* [perm_of] -- the key's permission projection *)
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
-Require Import AppInv.        (* [app_sup]: the kernel-wide supply credential *)
 Require Import UexecRet.   (* [ukc] -- the U-mode continuation the entry runs.
                               REQUIRED DIRECTLY: [ukc]'s body is the sealed
                               [uvb], and the seal does not travel through a
@@ -156,17 +155,6 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   hw_config -∗
   minstret_inv -∗
   wire_inv -∗
-  (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]): the fourth
-     kernel-wide persistent credential, beside the kernel's text and its
-     wiring, handed over exactly as [kernel_text] is.  The loop SPENDS IT
-     NOWHERE -- every arm of the round is the process's own -- and the
-     kernel-wide threading of the credential is what carries it here.  It is
-     a PREMISE and not a conjunct of the round's own bundle for the reason
-     [UexecSG.v]'s header gives: a bundle conjunct would make the kernel owe
-     the supply to resume ANY process, which a constraining application
-     cannot pay.  Born at boot from
-     [SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]. *)
-  app_sup -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   kpt_inv kroot -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗

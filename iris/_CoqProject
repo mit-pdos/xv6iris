@@ -1597,6 +1597,12 @@ AppEcho.v
 # caller's own u-mode WP for the program observed (SpecKexec.v's header).
 # KexecDefs.v, far below, is the vocabulary leaf it is stated over.
 SpecKexec.v
+# InitBoot = the FIRST PROCESS'S EXEC BUNDLE: kexec's caller-side bundle at
+# "/init" with the slot piece at UexecRet.uslot, plus the path constant
+# forkret's boot arm calls kexec at.  The kernel never mints a slot -- this
+# bundle is what the system theorem asks its application for (Hinit_boot),
+# what userinit's park captures, and what forkret's boot arm spends.
+InitBoot.v
 # THE PURE LOADER ALGEBRA the exec proofs' loop invariants consume: the
 # image inclusion laws ([uimg_sub] over [elf_image]), the loadseg window,
 # the [sz] chain ([kexec_sz_after] = [elf_mem_end], hence [kexec_sz]) and

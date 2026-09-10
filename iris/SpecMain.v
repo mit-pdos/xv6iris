@@ -124,7 +124,11 @@ Require Import KptPt.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WireInv.   (* [wire_inv] *)
-Require Import AppInv.    (* [app_sup] -- the supply, handed to userinit *)
+Require Import UexecExecInst. (* [uexecSG_xv6]: the instance the bundle is read at *)
+Require Import InitBoot.  (* [init_boot_bundle] -- the first process's exec
+                             bundle, handed to userinit *)
+Require Import FdSlots.   (* [fdt0]: the fresh table userinit's park is at *)
+Require Import InodeInv.  (* [ROOTINO]: the first process's cwd *)
 Require Import HartTp.
 (* the shared kernel page table: [kpt_unset] is a boot token, [kpt_inv] and
    the 65 claims are what the deposit wand carries to the secondaries *)
@@ -642,13 +646,13 @@ Section SpecMain.
        the rows the first process's park captures
        ([SpecForkretParkPaid.forkret_park_pkg]), handed to userinit. *)
     wire_inv -∗
-    (* ...and beside it the APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]),
-       for exactly the same reason: main does not read it, but userinit's
-       park captures it into the world every child inherits
-       ([SyscParkEnv.park_world]) and the first process's trap loop mints
-       its generic slot out of it.  Born at boot, from
-       [SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]. *)
-    app_sup -∗
+    (* ...and beside it THE FIRST PROCESS'S EXEC BUNDLE: main does not read
+       it, it carries it to userinit, whose park hands it to forkret's boot
+       arm, which spends it on kexec("/init") -- and the slot the first
+       process runs on is that bundle's own slot piece.  LINEAR, at the
+       root inode and the all-closed table allocproc mints.  Born at boot,
+       from [SystemAdequacy.xv6_power_adequacy_gen]'s [Hinit_boot]. *)
+    init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0 -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     (* THE RECEIVE TOKEN, born with the device invariant and carried by main
        to uartinit's FCR flush; main parks it in the PLIC invariant between

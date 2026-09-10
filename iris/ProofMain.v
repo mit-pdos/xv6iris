@@ -64,7 +64,8 @@ Require Import StackOwn.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WireInv.   (* [wire_inv] *)
-Require Import AppInv.    (* [app_sup] -- the supply, forwarded to userinit *)
+Require Import InitBoot.  (* [init_boot_bundle] -- forwarded to userinit *)
+Require Import InodeInv.  (* [ROOTINO] *)
 Require Import UsertrapRes.   (* [devintr_caps_any] *)
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import WpLock.
@@ -1396,10 +1397,10 @@ Section ProofMain.
        table it builds below they are the first process's trap-loop
        environment minus the file system. ---- *)
     wire_inv -∗
-    (* ...and the APPLICATION'S SUPPLY beside them ([AppInv.app_sup]): this
-       group does not read it either, and userinit's park captures it into
-       the world every child inherits *)
-    app_sup -∗
+    (* ...and THE FIRST PROCESS'S EXEC BUNDLE beside them
+       ([InitBoot.init_boot_bundle]): this group does not read it either,
+       and userinit's park hands it to forkret's boot arm *)
+    init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0 -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     console_caps γd -∗
     ConsoleInv.console_ready -∗
@@ -1527,7 +1528,7 @@ Section ProofMain.
   Proof.
     intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures
            Huartq Hdiskq Hgeomok Hpkc.
-    iIntros "Hcg #Htext #Hkdata #Hdev #Hwire #Hsup #Htramp #Hccaps #Hcready #Htl #Hwaitlk
+    iIntros "Hcg #Htext #Hkdata #Hdev #Hwire Hbundle #Htramp #Hccaps #Hcready #Htl #Hwaitlk
              #Hpenv #Hkmem #Hcert #Hseam Hfolauth Hoffa Hfirst
              #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
@@ -1949,7 +1950,7 @@ Section ProofMain.
               ltac:(lia) Hnb8 Hdevq Hnibq
               with "Hcg Hcpu Htext Hkdata Hpc Hpanic Hitl Hitinv Hesc Hireg
                     Hfirst Hpersist Hfsinit
-                    Hpinv Hlpidlk Hdcaps Hwaitlk Hftable' Hcready Hwire Hsup Htramp Hkenv
+                    Hpinv Hlpidlk Hdcaps Hwaitlk Hftable' Hcready Hwire Hbundle Htramp Hkenv
                     Hpavail Hinitproc").
     all: try lkbelow.
     iApply wp_next_off_intro.
@@ -2207,7 +2208,7 @@ Section ProofMain.
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv Hprim #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
-    iIntros "#Hdev #Hwire #Hsup Htx Hsent Hlb Htok Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
+    iIntros "#Hdev #Hwire Hbundle Htx Hsent Hlb Htok Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     (* THE [tx_busy] CELL IS GONE from the bundle: ae96fd0 deleted the flag, so
@@ -2333,7 +2334,7 @@ Section ProofMain.
               Pb Rspent
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok Hpkc
-              with "Hcg Htext Hkdata Hdev Hwire Hsup Htramp Hccaps Hcready Htl Hwaitlock
+              with "Hcg Htext Hkdata Hdev Hwire Hbundle Htramp Hccaps Hcready Htl Hwaitlock
                     Hpenvc Hkmem Hcert Hseamc Hfolat Hoffa Hfirst
                     [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl

@@ -35,6 +35,7 @@ Require Import RiscvModelBytes. (* [pa_add] *)
 Require Import RiscvPtsto.      (* [cstring_bytes], [↦ₛ□], [mem_ktier_mono] *)
 Require Import KernelDataInv.   (* [kernel_data] and its two extraction rules *)
 Require Import ByteBuf.         (* [bb_cstr] -- kexec's shape for the path *)
+Require Import InitBoot.        (* [init_boot_bytes] -- "/init", named once *)
 Require Import PrintkArgs.      (* [pk_desc_res] / [PkAStr] -- panic's shape *)
 From Kernel Require KernelData.
 Require Import TrampPt.
@@ -261,16 +262,16 @@ Proof. vm_compute. reflexivity. Qed.
 (*  0x80007188..8c = 101 120 101 99 0.)                                   *)
 (* ===================================================================== *)
 
-(* The path bytes as a naming FUNCTION, which is what [KexecDefs] indexes
-   its [seq]-shaped premise by.  Defined by lookup into [cstring_bytes]
-   rather than as six literals, so it cannot drift from the string: change
-   the literal and both [fkr_init_path_cstr] and [fkr_init_path_bytes]
-   fail, instead of one of them silently agreeing with the old spelling. *)
-Definition fkr_init_bytes (j : nat) : bv 8 := cstring_bytes "/init"%string !!! j.
+(* The path bytes are [InitBoot.init_boot_bytes] -- the naming FUNCTION
+   [KexecDefs] indexes its [seq]-shaped premise by, and the same one the
+   boot bundle's walk is stated at ([InitBoot.init_boot_path]).  The string
+   is spelled ONCE, there: change the literal and both
+   [fkr_init_path_cstr] and [fkr_init_path_bytes] fail, instead of one of
+   them silently agreeing with the old spelling. *)
 
 (* ---- kexec's [bb_cstr pfun plen] at plen = 5: the NUL is at index 5 and
        nowhere before it ---- *)
-Lemma fkr_init_path_cstr : bb_cstr fkr_init_bytes 5.
+Lemma fkr_init_path_cstr : bb_cstr init_boot_bytes 5.
 Proof.
   split.
   - intros j Hj.
@@ -283,7 +284,7 @@ Qed.
 (* ---- the image really holds those six bytes at [fkr_init_path] ---- *)
 Lemma fkr_init_path_bytes :
   forall j, (j < 6)%nat ->
-    KernelData.kernel_data !! (fkr_init_path + Z.of_nat j)%Z = Some (fkr_init_bytes j).
+    KernelData.kernel_data !! (fkr_init_path + Z.of_nat j)%Z = Some (init_boot_bytes j).
 Proof.
   intros j Hj.
   do 6 (destruct j as [|j]; [vm_compute; reflexivity |]).
@@ -330,10 +331,10 @@ Section ForkretRodata.
   Lemma fkr_init_path_run0 :
     (kernel_data : iProp Σ) -∗
     ([∗ list] i ∈ seq 0 6,
-       pa_add (mword_of_int fkr_init_path : mword 64) i ↦ₘ[KT0]□ fkr_init_bytes i).
+       pa_add (mword_of_int fkr_init_path : mword 64) i ↦ₘ[KT0]□ init_boot_bytes i).
   Proof.
     iIntros "Hkd".
-    iApply (kernel_data_bytes fkr_init_path 6 fkr_init_bytes _ eq_refl
+    iApply (kernel_data_bytes fkr_init_path 6 init_boot_bytes _ eq_refl
               ltac:(unfold text_end, fkr_init_path; lia)
               ltac:(vm_compute; discriminate) fkr_init_path_bytes
              with "Hkd").
@@ -346,7 +347,7 @@ Section ForkretRodata.
   Lemma fkr_init_path_run :
     (kernel_data : iProp Σ) -∗
     ([∗ list] i ∈ seq 0 6,
-       pa_add (mword_of_int fkr_init_path : mword 64) i ↦ₘ[KT1]□ fkr_init_bytes i).
+       pa_add (mword_of_int fkr_init_path : mword 64) i ↦ₘ[KT1]□ init_boot_bytes i).
   Proof.
     iIntros "Hkd".
     iDestruct (fkr_init_path_run0 with "Hkd") as "H".

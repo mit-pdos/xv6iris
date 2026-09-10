@@ -733,3 +733,29 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
       verbatim. *)
    FileInvDefs.flive_auth_at fsc_fol ∗
    ([∗ list] k ∈ seq 0 IcacheRefDefs.NINODE, OffBox.off_set_auth OffBox.off_cfg k ∅))%I.
+
+(* THE APPLICATION'S INVARIANT, PEELED OFF THE SUPPLY.  [AppInv.app_inv] is
+   kit 2's application row ([FsCfgKits.fs_kit_fsinit_ghost]) and it is
+   PERSISTENT, so a copy costs the supply nothing.  The party that needs one
+   before the kit reaches main is [SystemAdequacy.xv6_boot_era]: the era's
+   application discharges the theorem's [Hinit_boot] -- the first process's
+   exec bundle -- out of its own claim, and its claim is what this invariant
+   holds.  Stated at [∧] because that is what a persistent consequence of a
+   linear bundle is; the proofmode splits it into the copy and the bundle. *)
+Lemma fs_boot_supply_app_inv `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}
+    `{GEN : GenId} `{XI : TsoCtx.CurCtx}
+    (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ) (dk : Z -> bv 8)
+    (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
+    (γd : uart_names) (γv : disk_names)
+    (Rspent : gset Z) (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
+  fs_boot_supply ICFG FSC APP dk sb nib cov γd γv Rspent Pb Xexc ⊢
+    AppInv.app_inv (APP := APP) fsc_fs
+    ∧ fs_boot_supply ICFG FSC APP dk sb nib cov γd γv Rspent Pb Xexc.
+Proof.
+  iIntros "H". iSplit; [| iExact "H"].
+  rewrite /fs_boot_supply.
+  iDestruct "H" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hkit & _)".
+  iDestruct (fs_kit_fsinit_ghost_open with "Hkit")
+    as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Happ & _)".
+  iExact "Happ".
+Qed.

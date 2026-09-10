@@ -23,11 +23,13 @@
    WHAT MOVED, ITEM BY ITEM, relative to that earlier statement:
 
      - THE [first] PREMISE IS GONE and nothing replaces it here.  The branch
-       is decided by [FirstTok.first_tok], a conjunct of [ProcInv.proc_priv]
-       -- which this contract already takes and passes through untouched.
-       The caller owes a [proc_priv] whose token is (after boot) the steady
-       arm, and [FirstTok.first_done] is persistent and is already the last
-       conjunct of [ProofSyscall.syscall_env], which the closer needs anyway.
+       is decided by [FirstTok]'s arms, which the block premise below
+       carries and this contract passes through untouched.  A STEADY caller
+       owes a [proc_priv] whose token is the steady arm, and
+       [FirstTok.first_done] is persistent and is already the last conjunct
+       of [ProofSyscall.syscall_env], which the closer needs anyway; a BOOT
+       caller owes the block minus its token, the cwd reference and
+       [FirstTok.first_boot], which is the mode itself as a resource.
 
      - THE DESCRIPTOR IS NOT PINNED.  forkret's residue closer is now
        [∀ pt'], because the boot arm's kexec REPLACES the address space:
@@ -125,7 +127,7 @@ Require Import FirstTok.
 Require Import SpecForkret.
 Require Import SpecForkretPark.
 Require Import ParkCap.   (* [park_token] *)
-Require Import AppInv.    (* [app_sup] -- the supply the package captures *)
+Require Import InitBoot.  (* [init_boot_bundle] -- the BOOT mode's payload *)
 Require Import UexecSlot. (* [uvis] / [uvis_of] *)
 Require Import UexecRet.  (* [uslot] -- required DIRECTLY, the seal does not
                              travel through a re-export (durable-notes) *)
@@ -154,14 +156,19 @@ Definition forkret_park_pkg
     (g : gname)
     (* ...and its cwd's inum -- see [ParkCap.park_pkg] *)
     (cw : Z)
+    (* ...and its descriptor states, which the parker names off the
+       fragment bundle it holds -- see [ParkCap.park_pkg] *)
+    (sts : list fdstate)
     (* ...AND THE PARKED RUN KEY, WHEN THERE IS ONE -- the two modes of a
-       park, selected by the parker.  [None]: the resume may still run
-       forkret's boot arm, so no key captured at the park survives it and
-       the closer instantiates a slot FAMILY.  [Some Wk]: the parker holds
-       [FirstTok.first_done] (the row below), the boot arm is dead, and the
-       closer's pure premise re-keys the parker's ONE slot onto the record
-       the steady arm resumes with.  [ParkCap.park_pkg] is this verbatim;
-       the note there is the design. *)
+       park, selected by the parker.  [None] is the BOOT mode: the resume
+       still runs forkret's boot arm, so no key captured at the park
+       survives it and what the package carries instead is the EXEC BUNDLE
+       that arm spends (the row below), whose slot piece answers at the key
+       kexec builds.  [Some Wk]: the parker holds [FirstTok.first_done]
+       (the row below), the boot arm is dead, and the closer's pure premise
+       re-keys the parker's ONE slot onto the record the steady arm resumes
+       with.  [ParkCap.park_pkg] is this verbatim; the note there is the
+       design. *)
     (Wk : option uvis)
     (pid : mword 32) (av : nat) : iProp Σ :=
   (* [ksp] is spelled out rather than [let]-bound: this bundle is DESTRUCTED
@@ -169,24 +176,26 @@ Definition forkret_park_pkg
   ((* ---- the persistent world the parked closure captures ---- *)
    kernel_text ∗
    wire_inv ∗
-   (* ...INCLUDING THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]):
-      forkret's tail enters the closed trap loop, whose generic-slot mint
-      runs on this credential.  [ParkCap.park_pkg] is this verbatim. *)
-   app_sup ∗
    kmap_at tramp_vpn tramp_ppn KP_rx ∗
    procs_inv γs ∗
    UsertrapRes.park_globals cur_ctx γs γw γft γf γtl ∗
    pslot_used_at pa ∗
    (* ---- the child's kernel stack, free below its top ---- *)
    stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
-   (* ---- THE PARKER'S EVIDENCE THAT THE BOOT ARM IS DEAD, on the steady
-          mode and nothing on the other.  [FirstTok.first_done]'s
+   (* ---- THE MODE'S PAYLOAD.  On the steady mode, THE PARKER'S EVIDENCE
+          THAT THE BOOT ARM IS DEAD: [FirstTok.first_done]'s
           [first_addr ↦₄□ 0] half is incompatible with the boot arm's
           [first_addr ↦₄ 1] ([FirstTok.first_tok_boot_excl]), which is how
           forkret REFUTES that arm rather than owing a run key it cannot
           have.  Persistent, so a parker that has it pays nothing.
+          On the BOOT mode, THE FIRST PROCESS'S EXEC BUNDLE -- what that
+          arm's kexec("/init") is called with, at this record's working
+          directory and descriptor states.  LINEAR.
           [ParkCap.park_pkg] is this verbatim. ---- *)
-   (match Wk with Some _ => FirstTok.first_done | None => emp end) ∗
+   (match Wk with
+    | Some _ => FirstTok.first_done
+    | None => init_boot_bundle cw sts
+    end) ∗
    (* ---- the residue closer, at every hart the record may resume on.
           It takes the two ALLOWANCES the park's own arguments carry
           ([fd_slots FDSPARE] / [iref_slots IREFSPARE]): those are the
@@ -244,26 +253,29 @@ Definition forkret_park_pkg
       forkret_yield (CID := h) (XI := Xc) γf pa (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗
-      (* ...AND IT YIELDS A SLOT KEYED AT THE RECORD IT RESUMES WITH, beside
-         the residue.  [ParkCap.park_pkg] is this verbatim; the note there
-         says why the key is [uvis_of U'] and not the parked one. *)
-      (* ONE [sts] for the residue and the key -- [ParkCap.park_pkg], of
-         which this is the forkret-side spelling, has the argument *)
-      (∃ sts : list fdstate,
-         URes h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts
-         ∗ uslot (uvis_of U' sts))))%I.
+      (* ...AND, ON THE STEADY MODE, IT YIELDS A SLOT KEYED AT THE RECORD
+         IT RESUMES WITH, beside the residue; on the BOOT mode the record's
+         slot is exec's own receipt and the closer produces only the
+         residue.  [ParkCap.park_pkg] is this verbatim; the note there is
+         the design.  ONE [sts] for the residue and the key -- the
+         package's argument. *)
+      (URes h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts
+       ∗ match Wk with
+         | Some _ => uslot (uvis_of U' sts)
+         | None => emp
+         end)))%I.
 
 Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
     (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
-    (pid : mword 32) (U : ustate) (av : nat)
+    (pid : mword 32) (U : ustate) (sts : list fdstate) (av : nat)
     (* WHICH OF THE PACKAGE'S TWO MODES THE CALLER PAID.  A [true] package
        carries the parked record's RUN KEY -- the projection of the very [U]
        this park is at, at a placeholder descriptor view, since
        [UexecRet.urun_eq] does not read one -- and [FirstTok.first_done]
-       beside it; a [false] package carries neither and its closer
-       instantiates a slot family instead.  The bit is a PARAMETER rather
+       beside it; a [false] package carries the first process's exec bundle
+       instead, and its closer yields no slot.  The bit is a PARAMETER rather
        than an existential inside the package because forkret is the party
        that cases on it: its steady arm proves the run key of the record it
        resumes with, and its boot arm is refuted by [first_done]. *)
@@ -293,11 +305,24 @@ Definition forkret_park_paid_body
      token only under a later. *)
   ⊢ own_context cur_ctx -∗
     forkret_park_pkg URes W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
-      (pv_cwi (us_V U)) (if steady then Some (uvis_of U []) else None) pid av -∗
+      (pv_cwi (us_V U)) sts (if steady then Some (uvis_of U []) else None)
+      pid av -∗
     ▷ W -∗
     is_kstack pa ks -∗
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
-    proc_priv γf pa pid U -∗
+    (* THE BLOCK, AT THE MODE'S SHAPE.  [ParkCap.park_child] is this
+       verbatim: whole on the steady mode, and on the boot mode split into
+       the deficit block, the working-directory reference and
+       [FirstTok.first_boot]'s four rows -- so that "this record is the
+       first process" is a row the caller pays rather than a promise
+       forkret has to believe.  forkret's steady arm refutes the boot rows
+       against the [first_done] it reads there
+       ([FirstTok.first_boot_done_excl]), and its boot arm takes them
+       already split. *)
+    (if steady then proc_priv γf pa pid U
+     else proc_priv_nocwd γf pa pid U
+          ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U))
+          ∗ first_boot) -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
     |==> own_context cur_ctx ∗ proc_ctx γs pa.
@@ -317,10 +342,10 @@ Module Type FORKRET_PARK_PAID.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
       (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
-      (pid : mword 32) (U : ustate) (av : nat) (steady : bool),
+      (pid : mword 32) (U : ustate) (sts : list fdstate) (av : nat) (steady : bool),
       forkret_park_paid_body
         (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
-        γs γw γft γf γtl pa ks rest pid U av steady.
+        γs γw γft γf γtl pa ks rest pid U sts av steady.
   (* ...AND THE TOKEN, which is the park as every parker sees it
      ([ParkCap.park_token]): the cap above at [W := the token] plus the
      residue's channel, tied into the fixpoint.  This is the one entry the

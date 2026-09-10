@@ -535,9 +535,20 @@ Section FirstTok.
      unreachable from a bundle at all ([WpLock.is_lock] is an [inv], and
      Iris invariants do not agree), which is the whole reason the pinning
      happened. *)
+  (* THE BOOT ARM, AS A NAME OF ITS OWN.  The four rows are a resource a
+     party can hold OUTSIDE the block: [ParkCap.park_child] carries them as
+     separate rows on the BOOT mode, because that is the mode's whole
+     content -- "the record this parks is the first process" is exactly
+     "the record's token is on this arm", and a package that says one and
+     not the other leaves forkret with a steady resume of a boot record it
+     cannot refute.  Split out here so the two sides of that seam are one
+     proposition. *)
+  Definition first_boot : iProp Σ :=
+    (first_addr ↦₄ (mword_of_int 1 : mword 32)
+       ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗ first_fsinit)%I.
+
   Definition first_tok : iProp Σ :=
-    ((first_addr ↦₄ (mword_of_int 1 : mword 32)
-        ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗ first_fsinit)
+    (first_boot
      ∨ (first_addr ↦₄□ (mword_of_int 0 : mword 32) ∗ fs_ready ∗ fsabs_env))%I.
 
   (* the steady-state arm is persistent, so a process that has booted can
@@ -585,7 +596,7 @@ Section FirstTok.
          ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗ first_fsinit)
       ∨ first_done.
   Proof.
-    iIntros "H". rewrite /first_tok. iDestruct "H" as "[H | H]".
+    iIntros "H". rewrite /first_tok /first_boot. iDestruct "H" as "[H | H]".
     - iLeft. iExact "H".
     - iRight. iExact "H".
   Qed.
@@ -599,12 +610,36 @@ Section FirstTok.
      (name x conjunct) against them (claude-notes/optimization.md, "framing:
      name the context side, construct the goal side"). *)
   Proof.
-    iIntros "H #P #K F". iLeft.
+    iIntros "H #P #K F". rewrite /first_tok /first_boot. iLeft.
     iSplitL "H"; [iExact "H"|].
     iSplitR; [iExact "P"|].
     iSplitR; [iExact "K"|].
     iExact "F".
   Qed.
+
+  (* the same four rows, stopping at the arm rather than at the token --
+     what a boot-mode park carries and what forkret's boot arm opens *)
+  Lemma first_boot_intro :
+    first_addr ↦₄ (mword_of_int 1 : mword 32) -∗
+    first_boot_persist -∗ kalloc_avail fsc_kpages None -∗ first_fsinit -∗
+    first_boot.
+  Proof.
+    iIntros "H #P #K F". rewrite /first_boot.
+    iSplitL "H"; [iExact "H"|].
+    iSplitR; [iExact "P"|].
+    iSplitR; [iExact "K"|].
+    iExact "F".
+  Qed.
+
+  Lemma first_boot_open :
+    first_boot -∗
+    first_addr ↦₄ (mword_of_int 1 : mword 32)
+      ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗ first_fsinit.
+  Proof. rewrite /first_boot. iIntros "$". Qed.
+
+  Lemma first_tok_of_boot : first_boot -∗ first_tok.
+  Proof. iIntros "H". rewrite /first_tok. iLeft. iExact "H". Qed.
+
 
   (* THE SEAL SITE'S WHOLE fs ASSEMBLY, one wand: the sixteen persistent
      rows main built, the count userinit sealed, and the two things fsinit
@@ -683,6 +718,16 @@ Section FirstTok.
     iIntros "H1 H2".
     iDestruct (ctx_word4_pointsto_agree with "H1 H2") as %Hv.
     exfalso. revert Hv. vm_compute. discriminate.
+  Qed.
+  (* THE MODE SEAM'S REFUTATION.  A boot-mode package hands forkret these
+     rows; a resume that reaches the steady arm has read [first] as 0 out
+     of [first_done], and the two cells are the same address at
+     incompatible values. *)
+  Lemma first_boot_done_excl : first_boot -∗ first_done -∗ False.
+  Proof.
+    rewrite /first_boot /first_done.
+    iIntros "(H1 & _ & _ & _) (H0 & _ & _)".
+    iApply (first_tok_boot_excl with "H1 H0").
   Qed.
 
   (* ================================================================== *)
@@ -1008,11 +1053,16 @@ Global Instance first_done_morph
     `{GEN : GenId} `{ICFG : icfg} :
   CtxMorph (λ ξ : CtxId, first_done (XI := ξ)).
 Proof. rewrite /first_done. ctx_morph_solve; apply _. Qed.
+Global Instance first_boot_morph
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ}
+    `{GEN : GenId} `{ICFG : icfg} :
+  CtxMorph (λ ξ : CtxId, first_boot (XI := ξ)).
+Proof. rewrite /first_boot. ctx_morph_solve; apply _. Qed.
 Global Instance first_tok_morph
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ}
     `{GEN : GenId} `{ICFG : icfg} :
   CtxMorph (λ ξ : CtxId, first_tok (XI := ξ)).
-Proof. rewrite /first_tok. ctx_morph_solve; apply _. Qed.
+Proof. rewrite /first_tok /first_boot. ctx_morph_solve; apply _. Qed.
 
 (* ...AND THE SAME SEAL AT TOP LEVEL, for [FsReady.v]'s reason: a
    [Typeclasses Opaque] inside a Section does not survive it.
@@ -1027,4 +1077,8 @@ Proof. rewrite /first_tok. ctx_morph_solve; apply _. Qed.
    [iFrame "Htext …"] ate the first row of [first_boot_persist]).  Sealed,
    the framing stops at the head symbol and the token travels by name. *)
 Typeclasses Opaque first_boot_persist.
+(* [first_boot] carries [first_boot_persist], so it is sealed for the same
+   reason its parent is: a broad [iFrame] at a park site meets the block's
+   boot rows and would eat [kernel_text] out of them. *)
+Typeclasses Opaque first_boot.
 Typeclasses Opaque first_tok.

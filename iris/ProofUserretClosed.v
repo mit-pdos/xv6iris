@@ -101,7 +101,6 @@ Require Import UexecExecMint. (* [udep_gen]/[uslot_mint]: the generic slot's
                                  below is stated against *)
 Require Import UexecExecInst. (* the class INSTANCE: what the loop hands the
                                  process back at each contracted number *)
-Require Import AppInv.        (* [app_sup] -- the kernel-wide supply credential *)
 Require Import UserretUser.
 Require Import TfPage36.
 From Kernel Require KernelSyms.
@@ -244,15 +243,6 @@ Section UserretClosed.
     kernel_text -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     wire_inv -∗
-    (* THE APPLICATION'S SUPPLY, the fourth kernel-wide persistent
-       credential (the ARM; [AppInv.app_sup]).  The loop spends it nowhere:
-       the round is the process's own arm on every entry.  It is carried
-       here, and threaded from [SpecUserretClosed], because the kernel-wide
-       credential is still routed through this interface; the routing is
-       ARM-c (1)'s to retire.  A premise rather than anything the loop owns:
-       see [UexecSG.v]'s "[ssupply] IS NOT IN [uvb]" -- putting it in the
-       round's bundle would make the kernel owe it to resume ANY process. *)
-    app_sup -∗
     (* THE ROUND'S ENTRY, NAMED (milestone J).  It used to be the ∃-hidden
        [user_trap_frame] paired with a [uexec_wp]; it is now the trapped
        machine at the user-visible record [W] that trapped, with the cause
@@ -284,7 +274,7 @@ Section UserretClosed.
          WP (Loop : expr riscv_lang)).
   Proof.
     intros Hj.
-    iIntros "#Hkt #Hclaim #Hwire #Hsup".
+    iIntros "#Hkt #Hclaim #Hwire".
     (* THE LOOP MINTS NOTHING.  Every arm of the round is the process's
        own: exec's two success arms are paid out of the process's exec
        deposit ([SpecKexec.exec_slot_pre]'s two wands), and fork's parent
@@ -707,11 +697,11 @@ End Res.
                                 bullet and the premise list want the pieces *)
     destruct Hok as (Hstv & Hdqc & Hmie & Hmedl & Hnorm & Hptwf).
     destruct Hsatpr as (HuMode & Huasid & Huppn).
-    iIntros "#Hkt #Hhw #Hmin #Hwire #Hsup #Hclaim #Hkpt Hhs Hpriv Hms Hmiec Hmdlc
+    iIntros "#Hkt #Hhw #Hmin #Hwire #Hclaim #Hkpt Hhs Hpriv Hms Hmiec Hmdlc
              Hmenvc #Hsenvc Hsepc Hsc Hstval Hstvec #Hmedlc #Hmsec #Hssec
              Hktlb Hufr Hdata Hpc Hfile Hkc Hures".
     (* the loop, once: it is [□], so one instance serves every round *)
-    iDestruct (LP.stvec_handler_loop j Hj with "Hkt Hclaim Hwire Hsup") as "#Hloop".
+    iDestruct (LP.stvec_handler_loop j Hj with "Hkt Hclaim Hwire") as "#Hloop".
     (* THE SAVE SLOTS COME OUT OF THE RESIDUE, not from the caller: the
        residue owns the trapframe page, so a boundary that asked for both
        would be unsatisfiable (SpecUserretClosed.v's header).  userret READS

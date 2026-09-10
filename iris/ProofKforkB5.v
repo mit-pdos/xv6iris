@@ -261,7 +261,7 @@ Section ProofKforkB5.
     (* of by main.                                                         *)
     (* -------------------------------------------------------------- *)
     iDestruct (park_world_open with "Hworld") as (γtl pd pav pu)
-      "(#Hdcaps & #Hextra & #Hwire & #Htramp & #Hsup & #Hipx)".
+      "(#Hdcaps & #Hextra & #Hwire & #Htramp & #Hipx)".
     iDestruct "Hipx" as (iv1) "#Hip1".
     iDestruct (SchedCtx.procs_inv_len with "Hpinv") as %Hnproc.
     iAssert (⌜FsReady.fs_geom_ok⌝)%I as %Hgeomok.
@@ -308,7 +308,7 @@ Section ProofKforkB5.
        congruence is what carries it there. *)
     iEval (rewrite (uslot_of_urun_eq Wk Uc stsP Hurun Hkfd)) in "Hjslot".
     iMod (park_token_park_steady N rest Uc stsP Hwf Hrest
-            with "Hrun Htoken Htext Hwire Hsup Htramp Hmk Hstack Henv Hown_park Hfdone Hfrag Hjslot
+            with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfdone Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "[Hrun Hpctx]".
     (* built in [park_child]'s own conjunct order rather than framed: its

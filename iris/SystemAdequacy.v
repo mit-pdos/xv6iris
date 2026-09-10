@@ -46,6 +46,13 @@ Require FsAbsDefs.          (* [anode], [abs_view]: the application's claim is o
                                (Require, not Import: it re-exports FsState) *)
 Require Import AppDur.      (* [app_dur_raw]: the application's DURABLE claim beside the snapshot,
                                tied by the guest half of its map (app-instances.md round C) *)
+Require Import InitBoot.    (* [init_boot_bundle]: the first process's exec bundle,
+                               which the theorem's [Hinit_boot] delivers *)
+Require Import InodeInv.    (* [ROOTINO]: the first process's working directory *)
+Require Import UexecExecInst.  (* [uexecSG_xv6]: the instance [uslot] -- and hence
+                                  the bundle -- is read at *)
+Require Import UexecExecMint.  (* [uslot_mint]: the GENERIC application's discharge *)
+Require Import LinkUserinit.   (* [UG.uexec_wp_gen]: ...and the [box] it eliminates *)
 Require Import AppInv.      (* [app_sup_raw]: the application's supply, at the raw gname,
                                beside its boot obligation (applications.md) *)
 Require Import ProcGeom.
@@ -372,26 +379,38 @@ Section SystemBoot.
          The boot itself needs no transport: the lent durable claim IS the
          era's running one. *)
       (Happ_xfer : ⊢ app_xfer_raw A)
-      (* THE SUPPLY (the ARM; [AppInv.app_sup_raw]): the application's claim
-         holds of EVERY view.  It is the credential an UNVERIFIED program's
-         syscall bundles are paid out of, and this boot hands it to the boot
-         hart's chain -- main forwards it to userinit, whose park captures it
-         into [SyscParkEnv.park_world], the world every child inherits, and
-         the closed trap loop mints each round's generic slot out of it.
+      (* THE FIRST PROCESS'S EXEC BUNDLE (ARM-c), and it is the ONE thing
+         the application owes the kernel about user execution.  THE KERNEL
+         NEVER MINTS A SLOT: forkret's boot arm runs kexec("/init") between
+         the first park and the first resume, so the only key that process
+         can be given is the one kexec builds -- and what answers at that
+         key is the SLOT PIECE of the exec bundle the arm is called with.
+         This boot hands the bundle to the boot hart's chain; main forwards
+         it to userinit, whose park carries it to that arm
+         ([InitBoot.init_boot_bundle], [ParkCap.park_pkg]'s BOOT mode).
 
-         WHY THIS IS NOT THE GAP-PREMISE TRAP.  It EXCHANGED one that was:
-         the retired parked license promised that the claim SURVIVES every
-         one-row move of the map, which no constraining application can
-         promise about an arbitrary mover even with every program verified.
-         [Happ_sup] says something else: the claim is trivially true.  That
-         is the honest premise of the GENERIC theorem, whose whole subject is
-         a machine running UNVERIFIED user programs, and it is discharged by
-         [app_sup_raw_triv] at [App.app_triv].  A constraining application
-         does not instantiate the generic theorem at all: its mint sites park
-         VERIFIED slots, fork copies the parent's slot, and the supply a
-         tainted generic slot needs arrives through the exec bundle the
-         tainted process deposits -- never from a boot hypothesis. *)
-      (Happ_sup : forall r : N, ⊢ app_sup_raw A r) :
+         QUANTIFIED OVER THE ERA'S GHOST CLASSES, because they do not exist
+         until [BootShared.boot_shared_alloc] has run -- the equation ties
+         the [appcfg] it built to this era's application, exactly as
+         [Hperm]'s premise ties the fixed record.  It receives the
+         application's own invariant, which is what a CONSTRAINING
+         application reads its pins out of; the bupd is there so a
+         discharge may mint ghosts of its own.
+
+         WHY THIS IS NOT THE GAP-PREMISE TRAP.  It is discharged BY PROOF
+         at every instance: the generic application's from the trivial
+         supply and the generic mint ([init_boot_of_sup] below), echo's
+         from its pinned bundle at "/init".  The SUPPLY [AppInv.app_sup_raw]
+         -- "the claim is trivially true" -- is honest for the generic
+         theorem and unpayable by any constraining application, which is
+         why the obligation is stated at the BUNDLE and the supply stays
+         inside the generic discharge. *)
+      (Hinit_boot :
+         forall `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
+                  HPav : !pavG Σ, HF : !fileG Σ} (r : N),
+           @file_app Σ HF = MkAppcfg N A r ->
+           ⊢ AppInv.app_inv FsCfg.fsc_fs -∗
+             |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0) :
     boot_facts g ->
     (* THE PROJECTION THE POWER THEOREM PROVES AT THIS ERA, AND IT IS THE
        WHOLE OF WHAT THIS BOOT KNOWS ABOUT ITS DISK (durable-disk lane
@@ -558,19 +577,27 @@ Section SystemBoot.
        instance [r] the transport minted; the transport comes with it, and
        the seam at the application's guest goes down to fsinit on the kit.
        All of it goes into the mint through [boot_shared_alloc]. *)
-    (* ...and the SUPPLY, which no invariant owns: it goes straight down the
-       boot hart's chain as a persistent credential (the hypothesis above
-       says why it is not a gap premise). *)
-    iPoseProof (Happ_sup r) as "#Hsup0".
     iPoseProof Happ_xfer as "#Hxfer".
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (MkAppcfg N A r) (fun _ => emp)%I gsn gln gtn Hbf Hbundle
-            with "Hok Hsup0 Hxfer Hseamg Hdursnap Hres")
+            with "Hok Hxfer Hseamg Hdursnap Hres")
       as (Hfd Hir Hpav Hbs HF γd γv Rspent γi ξd)
-      "(%Hdimg & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
-        #Hcinv & #Hcert & #Hsup & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
+      "(%Hdimg & %Happ & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
+        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
         Htok & Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
+    (* THE FIRST PROCESS'S EXEC BUNDLE, off [Hinit_boot] at the era's own
+       ghost classes -- which is why the hypothesis quantifies over them:
+       the mint above is where they are born.  The application's invariant
+       it is handed is [FsCfgKits.fs_kit_fsinit_ghost]'s application row,
+       which rides [Hfs] to main; persistent, so the copy is free.  LINEAR
+       -- it goes down the BOOT hart's chain and nowhere else. *)
+    (* AT THE ERA'S OWN [GenId], BY NAME: the lemma's [GEN] occurs in
+       neither side of its entailment, so resolution would leave it an
+       evar and the proof term would not close. *)
+    iDestruct (FsCfgBoot.fs_boot_supply_app_inv (GEN := GEN) with "Hfs")
+      as "[#Happinv Hfs]".
+    iMod (Hinit_boot Hbs Hfd Hir Hpav HF r Happ with "Happinv") as "Hboot".
     (* THE FILE SYSTEM'S BOOT KITS ARE NO LONGER DROPPED (stage (e)).
        [Hfs] is the ten configuration ties plus [fs_kit_icache] plus
        [fs_kit_fsinit_ghost], and [Hirauth] is the iref-slot authority
@@ -606,12 +633,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
+    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
+      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -673,8 +700,11 @@ Section SystemBoot.
         iSpecialize ("HP" with "Hseam").
         iSpecialize ("HP" with "Hdev").
         iSpecialize ("HP" with "Hwinv").
-        (* THE APPLICATION'S SUPPLY (the ARM), off [Happ_sup] above *)
-        iSpecialize ("HP" with "Hsup").
+        (* THE FIRST PROCESS'S EXEC BUNDLE, off [Hinit_boot] above -- at
+           the era's own ghost classes, and LINEAR, which is why only the
+           BOOT hart's chain carries it (the secondaries never call
+           userinit). *)
+        iSpecialize ("HP" with "Hboot").
         iSpecialize ("HP" with "Htx").
         iSpecialize ("HP" with "Hsent").
         iSpecialize ("HP" with "Hlb").
@@ -713,6 +743,43 @@ Section SystemBoot.
 End SystemBoot.
 
 (* ---------------------------------------------------------------------- *)
+(* 2b. THE GENERIC APPLICATION'S DISCHARGE OF [Hinit_boot].                *)
+(*                                                                        *)
+(* A machine running UNVERIFIED user programs owes the kernel a first      *)
+(* process's exec bundle like any other application, and its is the        *)
+(* TRIVIAL one: the walk says yes at a [True] cursor, the observation      *)
+(* hands the lent authority straight back, and BOTH slot wands answer with *)
+(* the generic inhabitant -- the user-execution WP every key admits        *)
+(* ([ProofUexecWp.uexec_wp_gen]'s [box], eliminated here), minted on the    *)
+(* application's supply -- which lives exactly here, inside this generic    *)
+(* discharge, and in no kernel contract.                                    *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma init_boot_of_sup {Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId}
+    (cw : Z) (sts : list fdstate) :
+  app_sup -∗ init_boot_bundle cw sts.
+Proof.
+  iIntros "#Hsup".
+  iPoseProof LinkUserinit.UG.uexec_wp_gen as "#Hgen".
+  iDestruct (UexecExecMint.uslot_mint with "Hsup Hgen") as "#Hmk".
+  iApply (init_boot_bundle_triv with "Hmk").
+Qed.
+
+(* ...and at the generic application's predicate, which is what the three
+   corollaries below and [App.xv6_app_adequacy_triv_xv6Σ] hand in *)
+Lemma init_boot_of_triv {Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId}
+    (cw : Z) (sts : list fdstate) :
+  (forall r av, app_pred r av ⊣⊢ True) ->
+  ⊢ init_boot_bundle cw sts.
+Proof.
+  intros Htriv. iApply init_boot_of_sup. iApply app_sup_of_triv. exact Htriv.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* 3. THE SYSTEM THEOREM.                                                  *)
 (* ---------------------------------------------------------------------- *)
 
@@ -730,8 +797,9 @@ Theorem xv6_power_adequacy_gen Σ
        claim onto each fresh durable instance -- the PowerOn clone in
        [Hswap] below, the commit's snapshot in the file system's law), its
        ERA-0 claim ([Happ_init], packed into the initial composite slot
-       beside the image's snapshot) and the SUPPLY ([Happ_sup], the ARM's
-       credential -- see its own paragraph).
+       beside the image's snapshot) and the FIRST PROCESS'S EXEC BUNDLE
+       ([Hinit_boot], the one thing the application owes the kernel about
+       user execution -- see its own paragraph).
        The durable claim rides the crash slot ([xv6_slot]) and the lend
        ([Rb] below); the boot founds the era's running one from the lend.
        All at the RAW forms over an arbitrary value of the application's
@@ -741,8 +809,8 @@ Theorem xv6_power_adequacy_gen Σ
        fixed record does not exist yet; once its shape is destructed below,
        the raw forms at the record's [c] ARE [xv6_boot_era]'s pinned ones
        by iota.  The generic application is [unit] / [fun _ => True] /
-       [fun _ _ _ => True] / [emp] / [app_sup_raw_triv] (the instances after
-       this theorem). *)
+       [fun _ _ _ => True] / [emp] / [init_boot_of_sup] (the instances
+       after this theorem). *)
     (CT : Type) (Cl : CT -> iProp Σ)
     (Hbirth : ⊢ |==> ∃ c : CT, Cl c)
     (app_names : Type) (app_fs : CT -> app_names -> gmap Z FsAbsDefs.anode -> iProp Σ)
@@ -761,14 +829,24 @@ Theorem xv6_power_adequacy_gen Σ
            app_fs c r (FsAbsDefs.abs_view
              (fss_inodes (FsDurImg.img_state
                 (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib))))
-    (* THE SUPPLY (the ARM; [AppInv.app_sup_raw]): the application's claim
-       holds of EVERY view.  It is what an unverified program's syscall
-       bundles are paid out of, and it is born here and carried to the boot
-       hart's chain as a persistent credential.  [xv6_boot_era]'s own
-       [Happ_sup] carries the paragraph on why this is not the GAP-premise
-       trap; the generic application discharges it by [app_sup_raw_triv]. *)
-    (Happ_sup : forall (c : CT) (r : app_names),
-       ⊢ app_sup_raw (app_fs c) r)
+    (* THE FIRST PROCESS'S EXEC BUNDLE (ARM-c): the ONE thing the
+       application owes the kernel about user execution.  The kernel mints
+       no user-execution slot; the first process's comes out of the
+       kexec("/init") forkret's boot arm runs, answered by this bundle's
+       own slot piece.  [xv6_boot_era]'s [Hinit_boot] carries the
+       paragraph on why this is not the GAP-premise trap; the generic
+       application discharges it by [init_boot_of_sup], a constraining one
+       by its pinned bundle at "/init".
+       QUANTIFIED OVER THE GHOST RECORD AND THE ERA'S CLASSES the way
+       [Hperm] is -- none of them exists where this theorem is stated. *)
+    (Hinit_boot :
+       forall (HR : riscvGS Σ) (GEN : GenId)
+              `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
+                HPav : !pavG Σ, HF : !fileG Σ}
+              (c : CT) (r : app_names),
+         @file_app Σ HF = MkAppcfg app_names (app_fs c) r ->
+         ⊢ AppInv.app_inv FsCfg.fsc_fs -∗
+           |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0)
     (* THE TRACE INVARIANT, PASSED THROUGH TO
        [RiscvAdequacy.riscv_power_adequacy] (whose header is the full
        story).  [phi] is any pure statement about the OPERATIONAL state, and
@@ -1038,7 +1116,9 @@ Proof.
      [Gcl] (round D0): below the boot nothing names the record's
      [riscv_client], so they are terms here, not holes *)
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ Hufd _ _ _ _ _ gen g' sb nib cov
-            app_names (app_fs Gcl) (Happ_xfer Gcl) (Happ_sup Gcl)
+            app_names (app_fs Gcl) (Happ_xfer Gcl)
+            (fun HBs HFd HIr HPav HF r =>
+               Hinit_boot (RiscvGS Σ _ HE) gen HBs HFd HIr HPav HF Gcl r)
             Hbf Hpure Hcovin Hlogsub Hls2 _ _).
   (* the descriptor class comes back as a GOAL here rather than being
      shelved, because the application is explicit ([@]); it is the section's
@@ -1097,8 +1177,9 @@ Proof.
             ltac:(intros c; apply app_xfer_raw_triv; intros r av; reflexivity)
             ltac:(intros c; cbv beta; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
-            ltac:(intros c r; apply app_sup_raw_triv; intros r' av;
-                  reflexivity)
+            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HFi ci ri Heq;
+                  iIntros "_"; iModIntro; iApply init_boot_of_triv;
+                  rewrite Heq; intros r' av; reflexivity)
             (fun γobs _ => obs_pred_at γobs)
             (fun _ : unit => rx_tag_triv)
             (fun (_ : unit) (h : list mobs) => @rx_tag_triv_persistent Σ h)
@@ -1165,8 +1246,9 @@ Proof.
             ltac:(intros c; apply app_xfer_raw_triv; intros r av; reflexivity)
             ltac:(intros c; cbv beta; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
-            ltac:(intros c r; apply app_sup_raw_triv; intros r' av;
-                  reflexivity)
+            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HFi ci ri Heq;
+                  iIntros "_"; iModIntro; iApply init_boot_of_triv;
+                  rewrite Heq; intros r' av; reflexivity)
             (fun γobs _ => obs_ledger_at R γobs)
             (fun _ : unit => Tg) (fun (_ : unit) (h : list mobs) => HTg h)
             (fun (_ : unit) (h : list mobs) => HTgt h)
@@ -1563,8 +1645,9 @@ Proof.
             ltac:(intros c; apply app_xfer_raw_triv; intros r av; reflexivity)
             ltac:(intros c; cbv beta; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
-            ltac:(intros c r; apply app_sup_raw_triv; intros r' av;
-                  reflexivity)
+            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HFi ci ri Heq;
+                  iIntros "_"; iModIntro; iApply init_boot_of_triv;
+                  rewrite Heq; intros r' av; reflexivity)
             (fun γobs _ => obs_pred_at γobs)
             (fun _ : unit => rx_tag_triv)
             (fun (_ : unit) (h : list mobs) => @rx_tag_triv_persistent xv6Σ h)

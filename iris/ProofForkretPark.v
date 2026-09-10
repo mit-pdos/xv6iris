@@ -94,6 +94,7 @@ Require Import SpecForkret.
 Require Import FirstTok.
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecForkretPark SpecForkretParkPaid ParkCap.
+Require Import InitBoot.  (* [init_boot_bundle] -- the BOOT mode's payload *)
 Require Import UexecSlot. (* [uvis_of] *)
 Require Import UexecRet.  (* [uslot] -- in the proofmode context below, so
                              required DIRECTLY (durable-notes) *)
@@ -199,14 +200,32 @@ Global Instance fkp_is_kstack_morph `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
   CtxMorph (λ ξ, is_kstack (XI := ξ) pa ks).
 Proof. rewrite /is_kstack. ctx_morph_solve. Qed.
 
+(* THE BLOCK'S DEPOSIT ROW, AT BOTH MODES.  The boot mode's is three rows
+   under one [if] ([ParkCap.park_child]); the composite goes through the
+   structural instances by name, because plain search does not always
+   decompose a [sep] (CtxMorphTac.v's header). *)
+Global Instance fkp_park_block_morph
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    `{GEN : GenId}
+    (steady : bool) (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+  CtxMorph (λ ξ, (if steady then proc_priv (XI := ξ) γf pa pid U
+                  else proc_priv_nocwd (XI := ξ) γf pa pid U
+                       ∗ cwd_ref_at (XI := ξ) (pv_cwd (us_V U)) (pv_cwi (us_V U))
+                       ∗ FirstTok.first_boot (XI := ξ))%I).
+(* the last conjunct of a [sep] comes back ETA-REDUCED, so the solver's
+   head-symbol dispatch does not see it as a λ; [first_boot_morph] by name
+   closes it (CtxMorphTac.v's two spellings of [ctx_parked_morph] are the
+   same effect). *)
+Proof. ctx_morph_solve; first [apply _ | apply FirstTok.first_boot_morph]. Qed.
+
 Theorem forkret_park_paid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
     (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
-    (pid : mword 32) (U : ustate) (av : nat) (steady : bool) :
+    (pid : mword 32) (U : ustate) (sts : list fdstate) (av : nat) (steady : bool) :
     forkret_park_paid_body
       (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) W
-      γs γw γft γf γtl pa ks rest pid U av steady.
+      γs γw γft γf γtl pa ks rest pid U sts av steady.
 Proof.
   cbv beta delta [forkret_park_paid_body].
   intros Hrest [j [Hpa Hj]] Hut.
@@ -217,13 +236,14 @@ Proof.
      under the parker. *)
   iMod (own_context_twin cur_ctx with "Hrun") as "[Hrun (%XIc & Hthr)]".
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hsup & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk
                        & Hmode & Hclose)".
   (* THE MODE ROW, at the shape the [ctx_move] combinator takes: the package
      spells it as a [match] on the run key it carries, and the key is
      [steady]'s own [if], so the two agree by iota on each arm. *)
-  iAssert (if steady then FirstTok.first_done else emp)%I with "[Hmode]" as "Hmode".
-  { destruct steady; [iExact "Hmode" | iEmpIntro]. }
+  iAssert (if steady then FirstTok.first_done
+           else init_boot_bundle (pv_cwi (us_V U)) sts)%I with "[Hmode]" as "Hmode".
+  { destruct steady; [iExact "Hmode" | iExact "Hmode"]. }
   iMod (ctx_move (R := λ ξ, ctx_cells (XI := ξ) (p_context (proc_addr j))
                               (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest))
           cur_ctx XIc with "Hrun Hthr Hctx") as "(Hrun & Hthr & Hctx)".
@@ -235,12 +255,20 @@ Proof.
           cur_ctx XIc with "Hrun Hthr Hpinv") as "(Hrun & Hthr & #Hpinvc)".
   iMod (ctx_move (R := λ ξ, UsertrapRes.park_globals ξ γs γw γft γf γtl)
           cur_ctx XIc with "Hrun Hthr Hglobp") as "(Hrun & Hthr & #Hglobc)".
-  iMod (ctx_move (R := λ ξ, proc_priv (XI := ξ) γf (proc_addr j) pid U)
+  (* THE BLOCK, AT THE MODE'S SHAPE ([ParkCap.park_child]): whole on the
+     steady mode, and on the boot mode the deficit block, the cwd reference
+     and [FirstTok.first_boot]'s rows -- three transports under one [if],
+     which [ctx_morph_if] takes apart. *)
+  iMod (ctx_move (R := λ ξ, (if steady then proc_priv (XI := ξ) γf (proc_addr j) pid U
+                             else proc_priv_nocwd (XI := ξ) γf (proc_addr j) pid U
+                                  ∗ cwd_ref_at (XI := ξ) (pv_cwd (us_V U)) (pv_cwi (us_V U))
+                                  ∗ FirstTok.first_boot (XI := ξ))%I)
           cur_ctx XIc with "Hrun Hthr Hpriv") as "(Hrun & Hthr & Hpriv)".
   (* ...and the mode row, which forkret reads at ITS context: the boot arm's
      [first_addr ↦₄ 1] comes out of the block that was just moved, so the
      [↦₄□ 0] that refutes it has to be at the same identity. *)
-  iMod (ctx_move (R := λ ξ, (if steady then FirstTok.first_done (XI := ξ) else emp)%I)
+  iMod (ctx_move (R := λ ξ, (if steady then FirstTok.first_done (XI := ξ)
+                             else init_boot_bundle (pv_cwi (us_V U)) sts)%I)
           cur_ctx XIc with "Hrun Hthr Hmode") as "(Hrun & Hthr & Hmode)".
   iMod (ctx_park XIc cur_ctx with "Hrun Hthr") as "[Hrun Hpk]".
   iModIntro. iFrame "Hrun".
@@ -280,10 +308,12 @@ Proof.
              TimerCap.timer_cap (CID := h) -∗
              forkret_yield (CID := h) (XI := Xc) γf (proc_addr j)
                (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
-             (∃ sts : list fdstate,
-                FR.usertrap_res_bare (CID := h) (XI := Xc) pt'
-                  (add_vec ks (mword_of_int 4096)) U' sts
-                ∗ uslot (uvis_of U' sts)))%I
+             (FR.usertrap_res_bare (CID := h) (XI := Xc) pt'
+                (add_vec ks (mword_of_int 4096)) U' sts
+              ∗ match (if steady then Some (uvis_of U []) else None) with
+                | Some _ => uslot (uvis_of U' sts)
+                | None => emp
+                end))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
   { iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcwi %Hrk #Hglob #Htfk Hdone HW #Htc Hy".
     iApply ("Hclose" $! h Xc pt' U'
@@ -346,10 +376,10 @@ Proof.
   (* ================================================================== *)
   (* forkret, at the resuming hart.                                      *)
   (* ================================================================== *)
-  iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γw γft γf γtl pid U ks m av
+  iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γw γft γf γtl pid U sts ks m av
             (av - 6 - trap_res eb')%nat eb' steady
             Hj Hgl Hbud Hkx Hut Hsp
-          with "Htext Hwire Hsup Hkmap Hpc [] [] Hcg Hcpu Htc Hclm
+          with "Htext Hwire Hkmap Hpc [] [] Hcg Hcpu Htc Hclm
                 Hlocked HR Hksc [Hpriv] HW Hmode Hclose").
   (* THE THREE MOVED ROWS -- [procs_inv], [park_globals]'s handles and the
      child's private block through [BioInv.buf_escrow] -- are at the
@@ -377,17 +407,17 @@ Proof.
             (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) γs).
   { intros N av. exact (FR.usertrap_res_bare_park N av). }
   rewrite /park_cap. iModIntro.
-  iIntros (hp ξp γw γft γf γtl pa ks rest pid U av steady)
+  iIntros (hp ξp γw γft γf γtl pa ks rest pid U sts av steady)
     "%Hrest %Hj %Hav Hrun Hpkg HW Hchild".
   destruct U as [V M].
   iDestruct "Hchild" as "(#Hks & Hctx & Hpriv & Hfd & Hirsp)".
   iApply (forkret_park_paid (CID := hp) (XI := ξp) (park_token γs) γs γw γft γf γtl pa ks rest pid
-            (MkUstate V M) av steady Hrest Hj Hav
+            (MkUstate V M) sts av steady Hrest Hj Hav
           with "Hrun [Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
   iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hsup & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk
                        & Hmode & Hclose)".
-  iFrame "Htext Hwire Hsup Hkmap Hmk Hstk".
+  iFrame "Htext Hwire Hkmap Hmk Hstk".
   (* [procs_inv] and the globals by [iExact]: the persistent [Hpinv] would
      otherwise be framed INTO the transparent globals bundle's first row *)
   iSplitR; [iExact "Hpinv"|].

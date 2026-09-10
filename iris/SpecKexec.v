@@ -28,8 +28,10 @@
    below is that file's own premise list row for row -- with THREE things
    added on the caller's side and ONE on the kernel's.  A caller that
    wants nothing of the abstract state instantiates [S] at [emp] and the
-   bundle at [exec_au_pre_triv] (forkret's boot arm does exactly that) and
-   reads [kexec_ok] back off the arms with [exec_arms_landed]; a caller
+   bundle at [exec_au_pre_triv], and reads [kexec_ok] back off the arms
+   with [exec_arms_landed] -- and a caller that wants the SLOT back and
+   nothing else takes [exec_au_pre_triv_at] at [S := uslot], which is what
+   the first process's bundle is built from ([InitBoot]); a caller
    that pins the file it is willing to run answers [exec_slot_pre] with
    that program's slot.  Stable and pinned readings are the CALLER's
    business -- derived at the call site from its own [P]/[Phio], never a
@@ -732,14 +734,42 @@ Section KexecAU.
      ∗ pf_at (fun S => exec_slot_pre S (P (length (path_elems pl)))
                          Fo.(pf_recv) na alen afun sts) Fs)%I.
 
-  (* THE BUNDLE A CALLER THAT TRACKS NOTHING HANDS IN, and it is free:
-     every hop says yes at a [True] cursor, the observation hands the
-     lent half straight back with a [True] receipt, and the slot wand
-     concludes at [emp].  This is what forkret's boot arm supplies at its
-     [kexec("/init")] -- it wants only [kexec_ok] back
-     ([exec_arms_landed]), and its own slot comes from the park closer,
-     not from exec.  Nothing of the abstract state is spent, so no
-     invariant is needed on either side. *)
+  (* THE BUNDLE A CALLER THAT TRACKS NOTHING HANDS IN, and it is free
+     wherever it has a slot at every key: every hop says yes at a [True]
+     cursor, the observation hands the lent half straight back with a
+     [True] receipt, and BOTH slot wands answer from the family.  The
+     family is [□] because the pair of wands is a [∗] and each arm has to
+     be able to answer -- one fires, but the bundle carries both.
+     Nothing of the abstract state is spent, so no invariant is needed on
+     either side.  [InitBoot.init_boot_bundle_triv] is the caller: the
+     first process's exec bundle, over the generic mint. *)
+  Lemma exec_au_pre_triv_at (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
+      (pl : list (bv 8))
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) :
+    □ (∀ W : uvis, S W) -∗
+    exec_au_pre (MkPfam S True%I) Γ γfs cw
+      (fun _ _ => True%I) (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I))
+      pl na alen afun sts.
+  Proof.
+    iIntros "#HS". rewrite /exec_au_pre. iSplitR.
+    { rewrite /ex_start /ex_hops_from. iIntros (r) "_". iModIntro.
+      iSplit; [done |]. iApply ax_hops_triv. }
+    iSplitR.
+    { iApply pf_at_triv. rewrite /aopen_commit_at. iIntros (I i a) "%Hi Ha".
+      iModIntro. by iFrame "Ha". }
+    (* the slot's pair is not the trivial one -- its receipt is the family,
+       not [True] -- so its two halves are split here rather than by
+       [pf_at_triv]. *)
+    rewrite /pf_at /=. iSplit; [| done].
+    rewrite /exec_slot_pre. iSplitR.
+    - iIntros (av i f nl W') "_ _ _ _". iApply "HS".
+    - iIntros (av i a W') "_ _ _ _". iApply "HS".
+  Qed.
+
+  (* ...and the one a caller that wants nothing back hands in: the slot
+     predicate at [emp].  It is [exec_au_pre_triv_at]'s instance at the
+     family every [emp] satisfies. *)
   Lemma exec_au_pre_triv Γ (γfs : fs_names) (cw : Z) (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
@@ -747,19 +777,8 @@ Section KexecAU.
         (fun _ _ => True%I) (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I))
         pl na alen afun sts.
   Proof.
-    rewrite /exec_au_pre. iSplitR.
-    { rewrite /ex_start /ex_hops_from. iIntros (r) "_". iModIntro.
-      iSplit; [done |]. iApply ax_hops_triv. }
-    iSplitR.
-    { iApply pf_at_triv. rewrite /aopen_commit_at. iIntros (I i a) "%Hi Ha".
-      iModIntro. by iFrame "Ha". }
-    (* the slot's pair is not the trivial one -- its receipt is [emp], not
-       [True] -- so its two halves are split here rather than by
-       [pf_at_triv]. *)
-    rewrite /pf_at /=. iSplit; [| done].
-    rewrite /exec_slot_pre. iSplitR.
-    - by iIntros (av i f nl W') "_ _ _ _".
-    - by iIntros (av i a W') "_ _ _ _".
+    iApply (exec_au_pre_triv_at (fun _ => emp%I)).
+    iIntros "!>" (W). iEmpIntro.
   Qed.
 
   (* non-expansive in the slot predicate: UexecExecInst.v instantiates
@@ -902,6 +921,53 @@ Section KexecAU.
       + iDestruct "H" as "(_ & %Hok & _)".
         iPureIntro. destruct Hok as (entry & spv & szv' & _ & Hok).
         exists entry, spv, szv'. exact Hok.
+  Qed.
+
+  (* ...AND THE SAME READING WITHOUT SPENDING THE ARMS.  The conclusion is
+     pure, so it costs nothing to keep the resource beside it -- and the
+     caller that needs BOTH is forkret's boot arm, which reads [kexec_ok]
+     to walk the [a0 == -1] branch and then takes its slot out of the
+     success arm's receipt.  Stated at [∧] because that is what a pure
+     consequence of a linear resource is; the proofmode splits it into
+     [%] and the resource. *)
+  Lemma exec_arms_landed_keep (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
+      (cw : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (pl : list (bv 8))
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) (U U' : ustate) (r : mword 64) :
+    exec_arms Fs Γ γfs cw P Pmiss Fo pl na alen afun sts U U' r ⊢
+      ⌜exists (entry spv szv' : mword 64),
+         kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝
+      ∧ exec_arms Fs Γ γfs cw P Pmiss Fo pl na alen afun sts U U' r.
+  Proof.
+    iIntros "H". iSplit; [| iExact "H"].
+    iApply (exec_arms_landed with "H").
+  Qed.
+
+  (* THE SLOT OUT OF A SUCCESS, whichever arm fired.  Both of
+     [exec_post_ok]'s arms end in [Fs.(pf_recv) (exec_key U' sts na)] --
+     arm (a) because the file was loadable, arm (b) because the caller's
+     second wand paid for the node it was not -- so a caller that only
+     wants its WP back never has to case on them.  It also hands back the
+     landed success facts, which is what makes the [a0 == -1] branch
+     decidable at the same time. *)
+  Lemma exec_post_ok_recv (Fs : pfam Σ (uvis -> iProp Σ)) Γ
+      (P : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (pl : list (bv 8))
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) (U U' : ustate) (r : mword 64) :
+    exec_post_ok Fs Γ P Fo pl na alen afun sts U U' r ⊢
+      ⌜r <> (mword_of_int (-1) : mword 64)⌝ ∗ Fs.(pf_recv) (exec_key U' sts na).
+  Proof.
+    rewrite /exec_post_ok. iIntros "H".
+    iDestruct "H" as (i av a) "(_ & [Ha | Hb])".
+    - iDestruct "Ha" as (f nl) "(_ & _ & %Hok & _ & $)".
+      iPureIntro. destruct Hok as (e & spv & szv' & _ & Hne & _). exact Hne.
+    - iDestruct "Hb" as "(_ & %Hok & $)".
+      iPureIntro. destruct Hok as (entry & spv & szv' & Hne & _). exact Hne.
   Qed.
 
 End KexecAU.

@@ -70,7 +70,7 @@ Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsImg.          (* the image sweeps' vocabulary *)
 Require Import FsCfgBoot.      (* the two boot kits *)
 Require Import FsCfgSnap.      (* [fs_cfg_alloc_snap] -- the era mint *)
-Require Import AppInv.         (* [app_xfer]/[app_sup]: the application's transport, handed to the mint, and its supply, handed straight back out *)
+Require Import AppInv.         (* [app_xfer]: the application's transport, handed to the mint *)
 Require Import AppDur.         (* [app_guest]: the guest the mint's crash seam is stated at (round C) *)
 Require FsAbsDefs.             (* [abs_view]: the application's claim is over the founded map's view (Require, not Import: it re-exports FsState) *)
 Require Import AppCfg.         (* [appcfg]: the application's record, the third field [fileG_of] takes *)
@@ -1460,15 +1460,6 @@ Section BootAlloc.
        the later *)
     ▷ @app_pred Σ APP (@app_run Σ APP)
       (FsAbsDefs.abs_view (FsState.fss_inodes S)) -∗
-    (* ...AND THE SUPPLY (the ARM; [AppInv.app_sup]): the application's claim
-       held of EVERY view.  It is parked in NOTHING -- it
-       comes straight back out below, at the era's own [fileG] instance, as
-       one of the shared persistents, and travels from there to the boot
-       hart's chain, main, userinit's park and the closed trap loop.  It is
-       taken here only because THIS is where the [appcfg] record is a
-       literal: above the mint the instance is existential, so a caller
-       could not state the row at it. *)
-    app_sup (APP := APP) -∗
     (* the transport and the crash seam at the application's guest, both
        straight through to the mint, which parks the one and puts both on
        fsinit's kit (round C) *)
@@ -1491,16 +1482,16 @@ Section BootAlloc.
              (Rspent : gset Z)
              (γi : gname) (ξd : CtxId),
       ⌜dn_img γv = disk_img_name⌝ ∗
+      (* THE ERA'S [fileG] CARRIES THE APPLICATION RECORD THIS MINT WAS
+         GIVEN.  It is [fileG_of]'s third projection, so the equation holds
+         by iota -- and it is stated because the caller needs it: the
+         system theorem's [Hinit_boot] is quantified over the era's classes
+         and ties its bundle to THIS application ([SystemAdequacy]). *)
+      ⌜@file_app Σ HF = APP⌝ ∗
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗
       started_inv γi ξd (main_dep γd γv) ∗ started_prim γi ∗
       dev_inv γd γv ∗ wire_inv ∗ crash_inv ∗ gen_cert ∗
-      (* ...and the application's supply, RE-STATED AT THE ERA'S INSTANCE:
-         the premise above is at the literal record, this row is at [HF]'s
-         [file_app], which is that record.  Everything above the mint speaks
-         of the instance and not of the literal, so the row has to cross
-         here. *)
-      @app_sup Σ (@file_app Σ HF) ∗
       (* --- one bundle per hart --- *)
       ([∗ list] c ∈ enum CPU,
          ∃ iv : mword 32,
@@ -1601,7 +1592,7 @@ Section BootAlloc.
     pose proof Hbf as Hbf'.
     destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0' & _).
     destruct Hv0' as (v0 & Hv0).
-    iIntros "Hok #Hsup #Hxfer #Hseamg Hdursnap H".
+    iIntros "Hok #Hxfer #Hseamg Hdursnap H".
     iDestruct (power_boot_res_unpack Rb g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hkptb & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
@@ -1889,6 +1880,7 @@ Section BootAlloc.
     iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC APP), γd, γv,
                        (snap_spent S nib), γi, ξd.
     iSplitR; [iPureIntro; exact Himg |].
+    iSplitR; [iPureIntro; exact Hpa |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].
     iSplitR; [iExact "Hstarted" |].
@@ -1897,9 +1889,6 @@ Section BootAlloc.
     iSplitR; [iExact "Hwinv" |].
     iSplitR; [iExact "Hcinv" |].
     iSplitR; [iExact "Hcert" |].
-    (* the supply, at the era's instance: [file_app (fileG_of _ _ _ APP)] IS
-       [APP] by iota ([Hpa] above), so this is the premise verbatim *)
-    iSplitR; [iExact "Hsup" |].
     iSplitL "Hres"; [iExact "Hres" |].
     iSplitL "Hlocks"; [iExact "Hlocks" |].
     iSplitL "Hglobals"; [iExact "Hglobals" |].

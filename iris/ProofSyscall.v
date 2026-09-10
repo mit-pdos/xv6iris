@@ -387,8 +387,7 @@ Require Import BioInv.
 Require Import FsReady FsCfg.
 Require Import FirstTok.  (* [first_done] -- syscall_env's last conjunct *)
 Require Import SyscParkEnv.  (* [sysc_park_extra] -- what the producer below takes;
-                                [park_world_sup] -- the supply, off the world *)
-Require Import AppInv.       (* [app_sup] -- the credential the fs arms pay with *)
+                                its rows are what a park needs *)
 Require Import ParkCap.      (* [park_token] -- the park, handed down through [syscall_env] *)
 Require Import SpecSyscall.
 (* THE EXEC CHANNEL (lane E2): the AU contract the exec arm runs on when the
@@ -1057,17 +1056,6 @@ Section SyscallVocab.
  (fn : fclose_names) :
     syscall_env γf pj fn -∗ park_token (fcn_procs fn).
   Proof. by iIntros "(_ & _ & _ & _ & _ & $)". Qed.
-
-  (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]), off the world a
-     child's park needs -- which is where it rides ([SyscParkEnv.park_world],
-     whose note says why).  It is what the fs arms below pay the write-kind
-     commits' [AppInv.app_step] with while the process deposits nothing. *)
-  Lemma syscall_env_sup (γf : gname) (pj : mword 64) (fn : fclose_names) :
-    syscall_env γf pj fn -∗ app_sup.
-  Proof.
-    iIntros "H". iApply SyscParkEnv.park_world_sup.
-    iApply (syscall_env_world with "H").
-  Qed.
 
   (* ...and the OLD shape, as a projection.  Same reason [sysc_fs_env_all]
      keeps its order: an arm's [iDestruct] pattern is an interface, and

@@ -57,7 +57,6 @@ Require Import DiskInv.  (* [disk_geom] / [disk_res] / [d_lock] *)
 Require Import Xv6Cameras.
 Require Import WireInv.       (* [wire_inv] *)
 Require Import KptExecMap. (* [kmap_at tramp_vpn tramp_ppn KP_rx] *)
-Require Import AppInv.        (* [app_sup] -- the application's supply *)
 Require Import FsCfg.         (* the ambient device names *)
 Require Import FileInvDefs.   (* [fileG] -- which carries [fscfg] *)
 From Kernel Require KernelSyms.
@@ -115,15 +114,6 @@ Section ParkWorld.
        procs_avail None ∗
        wire_inv ∗
        kmap_at tramp_vpn tramp_ppn KP_rx ∗
-       (* ...AND THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]): the
-          credential a GENERIC slot's syscall bundles are paid out of, which
-          is why it rides the world a park needs rather than a premise of
-          its own -- the two mint sites are userinit's park and sys_fork's
-          kfork call, and this bundle is exactly the one that threads
-          usertrap -> syscall -> sys_fork -> kfork.  Persistent, born at boot
-          from [SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]; NOT an
-          era-owned resource (see [AppInv]'s [app_sup_raw]). *)
-       app_sup ∗
        (* THE USER-EXECUTION WP IS NOT HERE, and deliberately so.  This
           bundle is PERSISTENT and rides in [UsertrapRes.ut_park_caps], so
           a conjunct of it is ambiently duplicable from inside every trap
@@ -131,22 +121,14 @@ Section ParkWorld.
           child's WP is a LINEAR resource the PARKER supplies instead, on
           the park channel ([UsertrapRes.ut_park_intro_body] /
           [ParkCap.park_chan], captured at the park the way the child's
-          [fd_frags_any] is -- as a slot FAMILY at
+          [fd_frags_any] is -- as the first process's EXEC BUNDLE at
           [ParkCap.park_token_park], as ONE slot at the parked record at
-          [ParkCap.park_token_park_steady]); it enters the world at the two
-          mint sites named in claude-notes/design/user-wp-slot.md. *)
+          [ParkCap.park_token_park_steady]).  NOR IS THE APPLICATION'S
+          SUPPLY, and that is the point of ARM-c: the kernel mints no slot,
+          so it needs no credential to mint one with. *)
        (∃ ip : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈□ ip))%I.
 
   Global Instance park_world_persistent γs : Persistent (park_world γs).
   Proof. rewrite /park_world. apply _. Qed.
-
-  (* the one row a MINT reads off the bundle: sys_fork's kfork call mints
-     the child's generic slot family, whose bundles the supply pays *)
-  Lemma park_world_sup (γs : list gname) : park_world γs -∗ app_sup.
-  Proof.
-    iIntros "H". iDestruct "H" as (γtl pd pav pu)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hs & _)".
-    iExact "Hs".
-  Qed.
 
 End ParkWorld.

@@ -2885,6 +2885,15 @@ Section ProcPrivMorph.
   Global Instance proc_priv_morph γf pa pid U :
     CtxMorph (λ ξ : CtxId, proc_priv (XI := ξ) γf pa pid U).
   Proof. rewrite /proc_priv. ctx_morph_solve; first [apply _ | apply first_tok_morph]. Qed.
+  (* the deficit block and the working-directory reference, for the party
+     that carries the block SPLIT: [ParkCap.park_child]'s boot mode, whose
+     third row is these two beside [FirstTok.first_boot]. *)
+  Global Instance proc_priv_nocwd_morph γf pa pid U :
+    CtxMorph (λ ξ : CtxId, proc_priv_nocwd (XI := ξ) γf pa pid U).
+  Proof. rewrite /proc_priv_nocwd. ctx_morph_solve; first [apply _ | apply first_tok_morph]. Qed.
+  Global Instance cwd_ref_at_morph v z :
+    CtxMorph (λ ξ : CtxId, cwd_ref_at (XI := ξ) v z).
+  Proof. rewrite /cwd_ref_at. apply _. Qed.
   Global Instance proc_priv_nopt_morph γf pa pid V :
     CtxMorph (λ ξ : CtxId, proc_priv_nopt (XI := ξ) γf pa pid V).
   Proof. rewrite /proc_priv_nopt. ctx_morph_solve; first [apply _ | apply first_tok_morph]. Qed.

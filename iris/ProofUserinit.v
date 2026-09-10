@@ -93,7 +93,7 @@ Require Import LockRank.
 Require Import KallocInv.
 Require Import KvmSpec.   (* [kalloc_env], [kalloc_env_seal] *)
 Require Import FsCfg.     (* [fsc_kalloc] *)
-Require Import FirstTok.  (* [first_tok_boot] -- the deposit *)
+Require Import FirstTok.  (* [first_boot_intro] -- the deposit *)
 Require Import FdSlots.
 Require Import IrefSlots.
 Require Import WpUart.
@@ -113,14 +113,11 @@ Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the r
 Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
-Require Import UexecWp.               (* [UEXEC_GEN] -- the mint's [box] *)
 Require Import UexecSlot.             (* [uvis] *)
 Require Import UexecRet.              (* [uslot] -- DIRECT, the seal does not
                                          travel through a re-export *)
-Require Import UexecExecMint.         (* [uslot_mint] -- the mint at the kernel's instance *)
-Require Import UexecCond.             (* [cond_entry_slot] -- the conditional
-                                         mint: sync's constructor when the
-                                         key qualifies, the generic one else *)
+Require Import InitBoot.              (* [init_boot_bundle] -- what the park
+                                         carries in place of a slot *)
 Require Import FsReady.               (* [fs_geom_ok] *)
 Require Import DiskInv TicksInv.      (* [disk_geom], [is_tickslock] *)
 Require Import SpecUserinit.
@@ -230,23 +227,19 @@ End PstateRunnableHelper.
 
 (* ===================================================================== *)
 
-(* [UG] -- THE GENERIC USER-EXECUTION WP, as a functor argument.  userinit
-   PARKS the first process, and parking a process now COSTS a WP for it: the
-   child's [∀ W, UexecRet.uslot W] is a LINEAR row of the park channel,
-   captured at [ParkCap.park_token_park] (see
-   claude-notes/design/user-wp-slot.md).
-   Nothing persistent carries one -- [SyscParkEnv.park_world] used to, which
-   made it duplicable from inside every trap round -- so this is one of the
-   tree's TWO mint sites, the other being sys_fork's kfork call.  Nothing
-   else in userinit's cone reaches a [SpecUser.USER], so the inhabitant
-   arrives here rather than being derived inline the way consumers that
-   already hold a [USER] do ([ProofUexecWp]'s header).  It is a [box]
-   proposition proved from no linear hypothesis, so the argument costs the
-   composition exactly one application: [LinkUserinit.v] passes
-   [UexecGen UserProof]. *)
+(* NO GENERIC-WP ARGUMENT, AND NO MINT.  Parking the first process costs a
+   user-execution WP for it, and userinit does not make one: forkret's boot
+   arm runs kexec("/init") between this park and the first resume, so the
+   only key that process can be given is the one kexec builds, and what
+   answers at that key is the SLOT PIECE of the exec bundle this contract
+   is handed ([InitBoot.init_boot_bundle], from
+   [SystemAdequacy.xv6_power_adequacy_gen]'s [Hinit_boot]).  The park just
+   carries it ([ParkCap.park_token_park]).  Nothing persistent carries a WP
+   either -- [SyscParkEnv.park_world] used to, which made it duplicable
+   from inside every trap round.  See
+   claude-notes/design/user-wp-slot.md. *)
 Module UserinitProof (AP : ALLOCPROC) (NR : NAMEI_ROOT_BOOT)
-                     (RL : RELEASE) (FP : FORKRET_PARK_PAID)
-                     (UG : UEXEC_GEN) : USERINIT.
+                     (RL : RELEASE) (FP : FORKRET_PARK_PAID) : USERINIT.
 
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
@@ -287,7 +280,7 @@ Section ProofUserinit.
     iIntros "Hcg Hcpu #Htext #Hkd Hpc #Hpenv #Hitl #Hitinv #Hesc #Hireg
              Hfirst #Hpersist Hfsinit
              #Hpinv #Hlpid
-             #Hdcaps #Hwaitlk #Hftable #Hcready #Hwire #Hsup #Htramp
+             #Hdcaps #Hwaitlk #Hftable #Hcready #Hwire Hbundle #Htramp
              Hkenv Hpav Hinitproc Hcont".
     (* the boot arm: at nesting level 0 the exit arm IS the entry base *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Heb. cbn in Heb. subst eb.
@@ -612,11 +605,12 @@ Section ProofUserinit.
                        (bv_unsigned InodeInv.ROOTINO))) in "Hpnc".
     (* the reference namei's [iget] returned, in the shape the block wants *)
     iDestruct (cwd_ref_at_of_held_at ipv _ with "Hip") as "Hcref".
-    (* THE BLOCK IS *NOT* CLOSED HERE any more.  Since [FirstTok.first_tok]
-       became a conjunct of [proc_priv], closing it needs the token too, and
-       the token's allocator row is minted by a ghost step -- so the three
-       pieces meet at the park below, which is the first point in this proof
-       where an [iMod] is available. *)
+    (* THE BLOCK IS *NOT* CLOSED HERE.  [FirstTok.first_tok] is a conjunct
+       of [proc_priv], and this park hands the block SPLIT anyway -- the
+       deficit block, this reference and [FirstTok.first_boot] as three
+       rows.  The boot arm's allocator row is minted by a ghost step, so
+       the pieces meet at the park below, which is the first point in this
+       proof where an [iMod] is available. *)
     assert (Hpp28 : add_vec_int (mword_of_int (UI + 0x24) : mword 64) 4
                     = mword_of_int (UI + 0x28)) by pcw.
     iEval (rewrite Hpp28) in "Hpc".
@@ -666,13 +660,15 @@ Section ProofUserinit.
     (* ================================================================= *)
     (* THE DEPOSIT SITE -- and it is a DEPOSIT now, not a drop.            *)
     (*                                                                    *)
-    (* [FirstTok.first_tok] is a conjunct of [ProcInv.proc_priv], so the   *)
-    (* token goes into the FIRST PROCESS'S BLOCK, which this park hands to *)
-    (* the scheduler.  That is the whole route: forkret runs on the        *)
-    (* context this park saves, forkret's [if (first)] arm is the token's  *)
-    (* only consumer, and the block is what a parked process still owns.   *)
-    (* No premise of [SpecForkretPark.forkret_park_body] had to grow --    *)
-    (* the row rides inside the [proc_priv] that contract already takes.   *)
+    (* [FirstTok.first_boot]'s four rows go to the FIRST PROCESS, which   *)
+    (* this park hands to the scheduler.  That is the whole route:        *)
+    (* forkret runs on the context this park saves, forkret's             *)
+    (* [if (first)] arm is the rows' only consumer, and a parked process   *)
+    (* still owns them.  They travel BESIDE the block rather than folded   *)
+    (* into its [FirstTok.first_tok] -- [ParkCap.park_child]'s boot mode   *)
+    (* -- because their presence IS the mode: forkret's steady arm reads   *)
+    (* [first] as 0 and the [first_addr ↦₄ 1] here refutes that reading,   *)
+    (* so this record can only be resumed on the boot arm.                 *)
     (*                                                                    *)
     (* Three of the four rows were carried here across allocproc and namei *)
     (* untouched ([Hfirst], [Hpersist], [Hfsinit]); the fourth is minted   *)
@@ -702,14 +698,29 @@ Section ProofUserinit.
        allocproc handed back.  The bundle's [∃ γk] could never have been
        tied to [fsc_kpages] here; that is why the counted chain names it. *)
     iDestruct (kalloc_env_at_avail with "Hkenv") as "#Hkav".
-    iDestruct (first_tok_boot with "Hfirst Hpersist Hkav Hfsinit")
-      as "Hftok".
-    iAssert (proc_priv γf (proc_addr j) pid
-               (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M))
-      with "[Hpnc Hcref Hftok]" as "Hpriv".
-    { rewrite proc_priv_split_cwd. iFrame "Hpnc".
-      iSplitL "Hcref"; [cbn [upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg]; iExact "Hcref" |].
-      iExact "Hftok". }
+    (* THE ROWS STAY OUT OF THE BLOCK.  This park is the BOOT one, and its
+       package's mode is exactly "the record's token is on the boot arm" --
+       so [ParkCap.park_child] carries the four rows BESIDE the deficit
+       block and the working-directory reference rather than folded into
+       [FirstTok.first_tok].  forkret reads the mode off them: its steady
+       arm's [first_done] is refuted by the [first_addr ↦₄ 1] here, so the
+       first process can only be resumed on the arm that runs
+       kexec("/init").  The boot arm puts them back into the block at the
+       release store. *)
+    iDestruct (first_boot_intro with "Hfirst Hpersist Hkav Hfsinit") as "Hfb".
+    iAssert (proc_priv_nocwd γf (proc_addr j) pid
+               (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M)
+             ∗ cwd_ref_at
+                 (pv_cwd (us_V (MkUstate (upd_cwi (upd_cwd V ipv)
+                                            (bv_unsigned InodeInv.ROOTINO)) M)))
+                 (pv_cwi (us_V (MkUstate (upd_cwi (upd_cwd V ipv)
+                                            (bv_unsigned InodeInv.ROOTINO)) M)))
+             ∗ FirstTok.first_boot)%I
+      with "[Hpnc Hcref Hfb]" as "Hpriv".
+    { iSplitL "Hpnc"; [iExact "Hpnc"|].
+      iSplitL "Hcref";
+        [cbn [upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg us_V]; iExact "Hcref" |].
+      iExact "Hfb". }
     (* ...AND THE SLOT LEDGER'S SEAL, beside the allocator's.  allocproc's
        draw at +0x0a was the last counted proc allocation in the boot, and
        the environment the parked process will run on wants the sealed form
@@ -768,7 +779,7 @@ Section ProofUserinit.
         (* the world a child's park will need, handed down from here *)
         rewrite /park_world. iExists γtl, pd, pav, pu.
         iDestruct "Hdcaps" as "(#Hd1 & #Hd2 & #Hd3 & #Hd4 & #Hd5 & #Hd6)".
-        iFrame "Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hcready Hwire Htramp Hsup Hpav".
+        iFrame "Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hcready Hwire Htramp Hpav".
         iSplitR; [iExists γp; iExact "Hlpid"|].
         iExists iv1; iExact "Hip1". }
       iSplitR; [iExists γp; iExact "Hlpid"|].
@@ -781,39 +792,31 @@ Section ProofUserinit.
     (* THE TOKEN: the park, proved once at the top ([FP.park_token_intro])
        and from here on a resource every process hands its children. *)
     iPoseProof (FP.park_token_intro γs) as "#Htoken".
-    (* MINT SITE #1 (the other is sys_fork's, at its kfork call): the first
-       process's GENERIC SLOT FAMILY, out of this functor's [UG] argument.
-       The [box] is eliminated once, here, into a LINEAR resource the park
-       below consumes -- nothing persistent carries one any more
-       (claude-notes/design/user-wp-slot.md).  Via
-       [UexecCond.cond_entry_slot] rather than the bare generic inhabitant
-       [uexec_wp_uslot]: a process whose key qualifies picks up sync's own
-       constructor instead, which is the whole point of the conditional
-       probe.  The family, not a keyed slot -- the park cannot know the key
-       the resume will land on (projects/user-wp-slot.md SS4c, R-b) -- but
-       RESTRICTED to the table the park is at, which for userinit's fresh
-       process is [fdt0]: the resume mints its key at that list and at no
-       other, so a family covering every other view is asking for what is
-       never used.  The generic inhabitant satisfies the restriction by
-       ignoring it. *)
-    iAssert (∀ W : uvis,
-               ⌜uvis_fd W = fdt0
-                /\ uvis_cwd W
-                   = pv_cwi (us_V (MkUstate (upd_cwi (upd_cwd V ipv)
-                                               (bv_unsigned InodeInv.ROOTINO)) M))⌝
-               -∗ uslot W)%I
-      as "Hjslot".
-    { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      iDestruct (UexecExecMint.uslot_mint with "Hsup Hgen") as "#Hmkgen".
-      iIntros (W) "_". iApply "Hmkgen". }
+    (* NO MINT.  The first process's user-execution slot is not made here
+       and is not made anywhere in the kernel: forkret's boot arm runs
+       kexec("/init") between this park and the first resume, so the only
+       key that process can be given is the one kexec builds -- and what
+       answers at that key is the SLOT PIECE of the exec bundle this
+       contract was handed ([InitBoot.init_boot_bundle], from
+       [SystemAdequacy.xv6_power_adequacy_gen]'s [Hinit_boot]).  So the
+       park just carries the bundle through
+       (claude-notes/design/user-wp-slot.md; projects/app-echo.md ARM-c). *)
     (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (park_token_park N rest
             (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M) fdt0 Hwf Hrest
-            with "Hrun Htoken Htext Hwire Hsup Htramp Hmk Hstack Henv Hown Hfrag Hjslot
+            with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hbundle
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "[Hrun Hpctx]".
-    { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirs". iExact "Hctx". }
+    (* built row by row, not framed: the mode row is an [if] the frame
+       cannot see through, and its boot arm carries [first_boot_persist],
+       which a broad frame would eat into *)
+    { rewrite /park_child.
+      iSplitR; [iExact "Hks"|].
+      iSplitL "Hctx"; [iExact "Hctx"|].
+      iSplitL "Hpriv"; [iExact "Hpriv"|].
+      iSplitL "Hfd"; [iExact "Hfd"|].
+      iExact "Hirs". }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")
       as "Hpwhole".

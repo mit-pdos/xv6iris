@@ -66,7 +66,8 @@ Import Defs.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
-Require Import AppInv.    (* [app_sup] -- the supply the package captures *)
+Require Import InitBoot.  (* [init_boot_bundle] -- the first process's exec
+                               bundle, the BOOT mode's payload *)
 
 Section ParkCap.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -93,17 +94,29 @@ Section ParkCap.
          [park_token_park_steady] below), so the closer needs the resumed
          record to agree *)
       (cw : Z)
+      (* ...AND THE PARKED PROCESS'S DESCRIPTOR STATES.  The parker holds
+         the [FdSlots.fd_frags] bundle and therefore names the list; the
+         closer hands the residue back at it and the BOOT mode's bundle is
+         owed at it, so the two halves are one list named ONCE, here.  It
+         is a parameter and not the closer's existential because forkret's
+         boot arm has to spell it BEFORE the closer runs: it is the [sts]
+         kexec builds its resume key at. *)
+      (sts : list fdstate)
       (* THE PARKED RUN KEY, WHEN THERE IS ONE.  A park has two modes and
          this is the parameter that selects them ([park_cap]'s [steady] bit
          is what a parker passes):
 
-           [None]    -- the parker captured the slot FAMILY over every
-                        record at [cw] and this table, because whoever
-                        resumes the record may have replaced its address
-                        space first: forkret's boot arm runs kexec("/init")
-                        between the park and the resume, so no key captured
-                        at the park survives it (userinit's park;
-                        projects/user-wp-slot.md SS4c, refutation R-b).
+           [None]    -- THE BOOT MODE.  Whoever resumes this record may
+                        replace its address space first: forkret's boot arm
+                        runs kexec("/init") between the park and the
+                        resume, so no key captured at the park survives it
+                        (userinit's park; projects/user-wp-slot.md SS4c,
+                        refutation R-b).  What the parker hands over
+                        instead is the EXEC BUNDLE that boot arm spends
+                        ([InitBoot.init_boot_bundle], the row below), whose
+                        slot piece answers at the key kexec builds -- so
+                        the closer owes no slot on this mode and the kernel
+                        mints none.
 
            [Some Wk] -- the parker holds [FirstTok.first_done], so the boot
                         arm is DEAD for this record and the resume is
@@ -115,11 +128,6 @@ Section ParkCap.
       (pid : mword 32) (av : nat) : iProp Σ :=
     (kernel_text ∗
      wire_inv ∗
-     (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]): forkret's tail
-        enters the closed trap loop, whose generic-slot mint runs on this
-        credential, so the parker captures it with the rest of the
-        persistent world.  Persistent, so capturing it costs nothing. *)
-     app_sup ∗
      kmap_at tramp_vpn tramp_ppn KP_rx ∗
      procs_inv γs ∗
      (* THE PARKER'S GLOBALS, at ITS context (L8, A12.19): the cap moves
@@ -128,16 +136,29 @@ Section ParkCap.
      park_globals cur_ctx γs γw γft γf γtl ∗
      pslot_used_at pa ∗
      stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
-     (* THE PARKER'S EVIDENCE THAT THE BOOT ARM IS DEAD, on the steady mode
-        and nothing on the other.  A [Some] package promises the resume
-        lands on a record with the parked run key, which is true only if
-        nothing runs kexec("/init") in between -- and the resource that says
-        so is [FirstTok.first_done], whose [first_addr ↦₄□ 0] half is
-        incompatible with the boot arm's [first_addr ↦₄ 1]
-        ([FirstTok.first_tok_boot_excl]).  So forkret REFUTES the boot arm
-        out of this row rather than owing the closer a key it cannot have.
-        Persistent, so a parker that has it pays nothing. *)
-     (match Wk with Some _ => first_done | None => emp end) ∗
+     (* THE MODE'S PAYLOAD.
+
+        [Some]: THE PARKER'S EVIDENCE THAT THE BOOT ARM IS DEAD.  A [Some]
+        package promises the resume lands on a record with the parked run
+        key, which is true only if nothing runs kexec("/init") in between
+        -- and the resource that says so is [FirstTok.first_done], whose
+        [first_addr ↦₄□ 0] half is incompatible with the boot arm's
+        [first_addr ↦₄ 1] ([FirstTok.first_tok_boot_excl]).  So forkret
+        REFUTES the boot arm out of this row rather than owing the closer a
+        key it cannot have.  Persistent, so a parker that has it pays
+        nothing.
+
+        [None]: THE FIRST PROCESS'S EXEC BUNDLE, which is what the boot arm
+        the mode admits actually spends -- kexec("/init") at this record's
+        working directory and descriptor states, whose slot piece hands
+        back the slot at the key kexec built.  LINEAR, and NOT under the
+        later: forkret's boot arm runs it before the closer, so it is a row
+        of the package like [stack_own] and not a capture of the closer's
+        ([InitBoot]'s header). *)
+     (match Wk with
+      | Some _ => first_done
+      | None => init_boot_bundle cw sts
+      end) ∗
      (* THE CLOSER IS UNDER A LATER, the rows above are not: the cap needs
         the rows now, to deposit them into the twin, and only the closer is
         spent a step later, by forkret.  Quantified over the RESUMER's context
@@ -184,32 +205,50 @@ Section ParkCap.
            sound because that mode's [first_done] makes the boot arm dead
            ([park_token_park_steady] below). *)
         (* ...AT THE RECORD'S OWN DESCRIPTOR VIEW, AND THE RESIDUE'S IS THE
-           SAME ONE.  The existential scopes over BOTH conjuncts, which is
-           the tie stated rather than merely arranged: the residue the
-           resume hands back carries [FdSlots.fd_frags] at [sts]
+           SAME ONE: the package's [sts] parameter names both, which is the
+           tie stated rather than merely arranged -- the residue the resume
+           hands back carries [FdSlots.fd_frags] at [sts]
            ([UsertrapRes.ut_own]'s conjunct) and the slot is keyed at
-           [uvis_of U' sts] -- one list, named once.
+           [uvis_of U' sts].  The PRODUCER picks it, and the producer is
+           the party holding the fragments ([park_token_park] below passes
+           the very list its bundle is at); the reading stays true across
+           the park because moving a descriptor's state needs BOTH halves
+           ([FdSlots.fd_st_both_update]) and this closure holds one -- not
+           even forkret's boot arm, whose kexec("/init") does not touch the
+           descriptor array.
 
-           EXISTENTIAL, i.e. the PRODUCER picks, and the producer is the
-           party holding the fragments ([park_token_park] below reads [sts]
-           off the very bundle it hands to the residue).  ∀ would be the
-           wrong shape: it would let the CONSUMER name any view at all,
-           including one the process does not have, which is exactly the
-           sense in which the field would carry no information.  And the
-           reading stays true across the park because moving a descriptor's
-           state needs BOTH halves ([FdSlots.fd_st_both_update]) and this
-           closure holds one -- not even forkret's boot arm, whose
-           kexec("/init") does not touch the descriptor array. *)
-        (∃ sts : list fdstate,
-           URB h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts
-           ∗ uslot (uvis_of U' sts))))%I.
+           THE SLOT IS THE STEADY MODE'S ALONE.  On the boot mode the
+           record's slot comes out of kexec, through the exec bundle the
+           package's row above handed the boot arm, so there is nothing for
+           the closer to produce and nothing for the kernel to mint. *)
+        (URB h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts
+         ∗ match Wk with
+           | Some _ => uslot (uvis_of U' sts)
+           | None => emp
+           end)))%I.
 
-  (* the child's own rows, the ones the park spends *)
+  (* the child's own rows, the ones the park spends.
+
+     THE BLOCK IS MODE-DEPENDENT, and that is the seam that makes the boot
+     mode a fact about the record rather than a promise about it.  On the
+     STEADY mode the block goes over whole: its [FirstTok.first_tok] may be
+     on either arm and the package's own [first_done] refutes the boot one.
+     On the BOOT mode the parker hands the block SPLIT -- the deficit block
+     and the working-directory reference, with [FirstTok.first_boot]'s four
+     rows BESIDE them -- so "this record is the first process" is a row of
+     the park and not an assumption: forkret's steady arm reads [first] as
+     0 out of [first_done] and the boot rows' [first_addr ↦₄ 1] refutes
+     that reading ([FirstTok.first_boot_done_excl]).  The rows rejoin the
+     block at the release store, exactly where the boot arm puts them back
+     ([ProofForkret]'s [fkr_boot], which takes them split already). *)
   Definition park_child `{XI : CurCtx} (γs : list gname) (γf : gname) (pa ks : mword 64)
-      (rest : list (mword 64)) (pid : mword 32) (U : ustate) : iProp Σ :=
+      (rest : list (mword 64)) (pid : mword 32) (U : ustate) (steady : bool) : iProp Σ :=
     (is_kstack pa ks ∗
      ctx_cells (p_context pa) (park_forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
-     proc_priv γf pa pid U ∗
+     (if steady then proc_priv γf pa pid U
+      else proc_priv_nocwd γf pa pid U
+           ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U))
+           ∗ first_boot) ∗
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE)%I.
 
@@ -219,7 +258,10 @@ Section ParkCap.
       (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (hp : CpuId) (ξp : CtxId) (γw γft γf γtl : gname) (pa ks : mword 64)
-         (rest : list (mword 64)) (pid : mword 32) (U : ustate) (av : nat)
+         (rest : list (mword 64)) (pid : mword 32) (U : ustate)
+         (* THE PARKED DESCRIPTOR STATES -- [park_pkg]'s parameter, which
+            the parker names off the fragment bundle it holds *)
+         (sts : list fdstate) (av : nat)
          (* WHICH OF THE PACKAGE'S TWO MODES the parker is paying: [true]
             hands the package the parked record's RUN KEY and owes
             [FirstTok.first_done] with it, [false] hands no key and owes
@@ -238,12 +280,12 @@ Section ParkCap.
           -- see [ProofForkretPark]. *)
        own_context (CID := hp) ξp -∗
        park_pkg (XI := ξp) URB W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
-         (pv_cwi (us_V U)) (if steady then Some (uvis_of U []) else None)
+         (pv_cwi (us_V U)) sts (if steady then Some (uvis_of U []) else None)
          pid av -∗
        (* ...and [W] itself, for forkret to hand the closer: under the same
           later, for the same reason *)
        ▷ W -∗
-       park_child (XI := ξp) γs γf pa ks rest pid U -∗
+       park_child (XI := ξp) γs γf pa ks rest pid U steady -∗
        (* THE CONCLUSION IS THE RECORD PARKED UNDER THE PARKER'S CONTEXT:
           the child's rows live at the record's own existential identity
           ([SwtchCtx.valid_context_pre]'s [XIp]) and its token is
@@ -310,10 +352,11 @@ Section ParkCap.
   (* USING IT: what userinit and kfork do at their park.                    *)
   (*                                                                        *)
   (* TWO PARKERS, TWO MODES.  [park_token_park] below is the park of a       *)
-  (* record whose resume may still run forkret's BOOT arm -- kexec("/init")  *)
+  (* record whose resume still runs forkret's BOOT arm -- kexec("/init")     *)
   (* replaces the address space between the park and the resume, so no key   *)
-  (* captured here survives it and what the parker must own is the slot      *)
-  (* FAMILY over every record at its table and cwd (userinit's park).        *)
+  (* captured here survives it and what the parker must own is the EXEC      *)
+  (* BUNDLE that arm spends, whose slot piece answers at the key kexec       *)
+  (* builds (userinit's park).                                               *)
   (* [park_token_park_steady] is the park of a record whose parker holds     *)
   (* [FirstTok.first_done]: the boot arm is dead, the resume is forkret's    *)
   (* steady arm, and that arm lands on a record with the parked one's RUN    *)
@@ -329,7 +372,6 @@ Section ParkCap.
     park_token (un_s N) -∗
     kernel_text -∗
     wire_inv -∗
-    app_sup -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     pslot_used_at (un_pj N) -∗
     stack_own (KTR := KT1) (add_vec (un_ks N) (mword_of_int 4096)) KSTACK_AV -∗
@@ -348,33 +390,28 @@ Section ParkCap.
        resumes at are THESE, which is what lets the caller say what the
        child's table is. *)
     fd_frags (pv_fdg (us_V U)) sts -∗
-    (* THE SLOT FAMILY, captured on the fd fragments' route exactly: not part
-       of [park_child] (that bundle goes straight to the cap) but captured by
-       the package's RESUME closer, built here, and instantiated at
-       [uvis_of U'] when the record resumes.  A FAMILY rather than a slot at
-       the parked key: the party that resumes this record may have replaced
-       its address space first (forkret's boot arm runs kexec("/init")
-       between the park and the resume), so the only key that is honest here
-       is the one the resume itself produces -- see [park_pkg]'s closer above
-       and projects/user-wp-slot.md SS4c (R-b).
-       ...BUT THE FAMILY IS RESTRICTED TO THE TABLE THE PARK IS AT.  The
-       resume mints its key at [sts] and at no other list, so demanding a
-       slot at every OTHER descriptor view would be asking for what is never
-       used -- and it is exactly what a caller with something better than
-       the generic inhabitant cannot supply.  A parent forking a VERIFIED
-       program has a continuation for its child at the parent's own table
-       and at nothing else; this premise is the shape that accepts it.
-       LINEAR: the parker has to own one, which is what makes a slot enter
-       the world only at the two mint sites (userinit's park and sys_fork's
-       kfork call), each eliminating [UEXEC_GEN.uexec_wp_gen]'s [box] once.
-       ...AND TO THE PARKED BLOCK'S WORKING DIRECTORY, the other key field
-       the resume cannot choose: the closer's own premise says the resumed
-       record is at it. *)
-    (∀ W : uvis, ⌜uvis_fd W = sts /\ uvis_cwd W = pv_cwi (us_V U)⌝ -∗ uslot W) -∗
-    park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U -∗
+    (* THE FIRST PROCESS'S EXEC BUNDLE, on the fd fragments' route exactly:
+       not part of [park_child] (that bundle goes straight to the cap) but a
+       row of the package built here, spent by forkret's boot arm on
+       kexec("/init").  NOT A SLOT, and not a slot family: the party that
+       resumes this record replaces its address space first, so no key
+       named here survives (projects/user-wp-slot.md SS4c, R-b) -- what
+       DOES survive is the bundle whose slot piece answers at the key kexec
+       builds, which is why the boot mode carries this instead.  THE KERNEL
+       THEREFORE MINTS NOTHING: the bundle comes from the application,
+       through the system theorem's [Hinit_boot].
+       AT THE PARKED BLOCK'S WORKING DIRECTORY AND TABLE, the two key
+       fields the resume does not choose: kexec inherits the cwd and does
+       not touch the descriptor array. *)
+    init_boot_bundle (pv_cwi (us_V U)) sts -∗
+    (* THE CHILD'S ROWS, WITH THE BLOCK SPLIT: this parker is parking the
+       FIRST PROCESS, and the boot rows travel as their own rows so that
+       the record's mode is a resource forkret can read.  See
+       [park_child]. *)
+    park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U false -∗
     |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
   Proof.
-    iIntros (Hwf Hrest) "Hrun #Htok #Htext #Hwire #Hsup #Hkmap #Hmk Hstack #Henv Hown Hfrag Hslot Hchild".
+    iIntros (Hwf Hrest) "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Hbundle Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
@@ -388,21 +425,22 @@ Section ParkCap.
     iDestruct ("Hchan" $! cur_ctx N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
     iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
-              (un_ks N) rest (un_pid N) U KSTACK_AV false
-              with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hslot] [] Hchild").
+              (un_ks N) rest (un_pid N) U sts KSTACK_AV false
+              with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hbundle] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
     - exact Hkav.
     - rewrite /park_pkg.
-      iFrame "Htext Hwire Hsup Hkmap Hmk Hstack".
+      iFrame "Htext Hwire Hkmap Hmk Hstack".
       (* [procs_inv] and the globals by [iExact], not [iFrame]: the persistent
          [Hprocs] would otherwise be framed INTO the (transparent) globals
          bundle's own first row and leave the bundle half-built *)
       iSplitR; [iExact "Hprocs"|].
       iSplitR; [iExact "Hglobp"|].
-      (* the mode row: this park is the one whose resume may still run the
-         boot arm, so the package carries no run key and owes nothing *)
-      iSplitR; [iEmpIntro|].
+      (* the mode row: this park is the one whose resume still runs the
+         boot arm, so the package carries no run key and carries instead
+         the bundle that arm spends *)
+      iSplitL "Hbundle"; [iExact "Hbundle"|].
       iNext.
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
       iIntros (h Xc pt' U') "%Hupt %Hnorm %Hptwf %Hfg %Hcwi _ #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
@@ -414,23 +452,13 @@ Section ParkCap.
          The bundle is handed on to the residue unchanged, so the view the
          slot is keyed at and the view the residue carries are the same list
          by construction. *)
-      (* ONE [sts] FOR BOTH: the same list names the residue's fragments and
-         the slot's key, which is what the shared existential says. *)
-      iExists sts.
-      (* row by row, never a frame past a bundle carrying a slot
-         (claude-notes/optimization.md): the residue on the left, the
-         instantiated slot on the right. *)
-      iSplitR "Hslot".
-      + iApply ("Hclose'" $! h Xc pt' U' sts
-                  with "[%] Hglob Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
-        exact Hupt.
-      + (* THE INSTANTIATION -- the whole of the [None] mode's park channel:
-           a family in, the resumed record's key out, keyed at the
-           descriptor states the residue is about to carry.  The family's own
-           side condition is that very keying, so it is [reflexivity] -- and
-           the closer's cwd premise for the other half. *)
-        iApply ("Hslot" $! (uvis_of U' sts)). iPureIntro.
-        split; [ reflexivity | exact Hcwi ].
+      (* THE BOOT MODE OWES NO SLOT: the record's is exec's receipt, so
+         all the closer produces is the residue, at the package's own
+         [sts] -- the list the fragments below are at. *)
+      iSplitL; [| iEmpIntro].
+      iApply ("Hclose'" $! h Xc pt' U' sts
+                with "[%] Hglob Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
+      exact Hupt.
     - iNext. iExact "Htok".
   Qed.
 
@@ -446,10 +474,10 @@ Section ParkCap.
      Persistent, so a parker that has it (kfork's parent hands its child a
      copy) pays nothing for it.
 
-     THE PREMISE IT SHORTENS is the slot.  [park_token_park] above demands a
-     FAMILY over every record at [sts] and [pv_cwi (us_V U)], because that
-     park's resume picks a key the parker cannot predict; this one demands
-     ONE slot, at the parked record's own key, and the closer moves it onto
+     THE PREMISE IT REPLACES is the exec bundle.  [park_token_park] above
+     demands [InitBoot.init_boot_bundle], because that park's resume runs
+     kexec("/init") and the key comes out of it; this one demands ONE
+     slot, at the parked record's own key, and the closer moves it onto
      the record the resume produces ([UexecRet.uslot_of_urun_eq]).  That is
      the shape a parent forking a VERIFIED program can pay: it has a
      continuation for its child at ONE record -- the trapframe it just
@@ -465,7 +493,6 @@ Section ParkCap.
     park_token (un_s N) -∗
     kernel_text -∗
     wire_inv -∗
-    app_sup -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     pslot_used_at (un_pj N) -∗
     stack_own (KTR := KT1) (add_vec (un_ks N) (mword_of_int 4096)) KSTACK_AV -∗
@@ -478,11 +505,12 @@ Section ParkCap.
     fd_frags (pv_fdg (us_V U)) sts -∗
     (* ONE SLOT, AT THE PARKED RECORD, at the very table the fragments name *)
     uslot (uvis_of U sts) -∗
-    park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U -∗
+    (* the child's rows with the block WHOLE -- the steady mode's shape *)
+    park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U true -∗
     |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
   Proof.
     iIntros (Hwf Hrest)
-      "Hrun #Htok #Htext #Hwire #Hsup #Hkmap #Hmk Hstack #Henv Hown Hdone0 Hfrag Hslot Hchild".
+      "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hdone0 Hfrag Hslot Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
@@ -495,7 +523,7 @@ Section ParkCap.
     iDestruct ("Hchan" $! cur_ctx N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
     iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
-              (un_ks N) rest (un_pid N) U KSTACK_AV true
+              (un_ks N) rest (un_pid N) U sts KSTACK_AV true
               with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hslot Hdone0] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
@@ -510,7 +538,6 @@ Section ParkCap.
          goal side.) *)
       iSplitR; [iExact "Htext"|].
       iSplitR; [iExact "Hwire"|].
-      iSplitR; [iExact "Hsup"|].
       iSplitR; [iExact "Hkmap"|].
       iSplitR; [iExact "Hprocs"|].
       iSplitR; [iExact "Hglobp"|].
@@ -524,9 +551,6 @@ Section ParkCap.
       iIntros (h Xc pt' U')
         "%Hupt %Hnorm %Hptwf %Hfg %Hcwi %Hrk #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       iEval (rewrite -Hfg) in "Hfrag".
-      (* ONE [sts] FOR BOTH: the same list names the residue's fragments and
-         the slot's key, which is what the shared existential says. *)
-      iExists sts.
       iSplitR "Hslot".
       + iApply ("Hclose'" $! h Xc pt' U' sts
                   with "[%] Hglob Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").

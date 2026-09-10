@@ -591,4 +591,17 @@ Section IcacheHeldAny.
     iExact "Hs".
   Qed.
 
+  (* the pinned package crosses exactly as its ∃-form does: one more pure
+     conjunct, and the reference itself is what moves *)
+  Global Instance inode_held_at_morph (v : mword 64) (z : Z) :
+    CtxMorph (λ ξ, inode_held_at (XI := ξ) v z).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /inode_held_at.
+    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hb & %Hp & %Hz & Hs)".
+    iMod (inode_refp_morph k q icfg_dev inum ξ ξ' with "Hd Hs") as "[Hd Hs]".
+    iModIntro. iFrame "Hd". iExists k, q, inum.
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iExact "Hs".
+  Qed.
+
 End IcacheHeldAny.

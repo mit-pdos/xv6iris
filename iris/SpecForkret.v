@@ -20,21 +20,26 @@
    ==== THE [first] BRANCH IS DECIDED BY A RESOURCE ======================
 
    This contract takes NO premise about [first] at all.  The branch at
-   +0x24 is decided by [FirstTok.first_tok], which rides inside
-   [ProcInv.proc_priv] -- so the process that runs forkret carries, in its
-   own block, which arm of the [if] it is entitled to:
+   +0x24 is decided by [FirstTok]'s two arms, which the process that runs
+   forkret carries -- so it holds, as a resource, which arm of the [if] it
+   is entitled to:
 
-     - the BOOT arm ([first_addr ↦₄ 1] beside main's persistent rows, the
-       sealed page count and fsinit's whole premise pile) reads 1, falls
-       through, and runs fsinit / the release store / kexec("/init");
+     - the BOOT arm ([FirstTok.first_boot]: [first_addr ↦₄ 1] beside
+       main's persistent rows, the sealed page count and fsinit's whole
+       premise pile) reads 1, falls through, and runs fsinit / the release
+       store / kexec("/init");
 
      - the STEADY arm ([first_addr ↦₄□ 0] beside [FsReady.fs_ready]) reads
        0, takes the [c.beqz], and the boot arm is dead.
 
    The two arms are incompatible at one address, so "at most one process
    ever boots the file system" is a theorem about ownership rather than a
-   claim about scheduling.  [FirstTok.v]'s header is the design; nothing
-   about it is visible here beyond the fact that [proc_priv] is enough.
+   claim about scheduling.  [FirstTok.v]'s header is the design.  WHICH ARM
+   IS THE PACKAGE'S MODE: a boot-mode record carries [first_boot] as rows
+   of its own beside the block minus its token, and a steady-mode one
+   carries the block whole plus [FirstTok.first_done] -- the block premise
+   below is that [if], and it is what makes the two modes' arms decidable
+   here.
 
    WHAT THE BOOT ARM COSTS THIS CONTRACT is [procs_inv γs] and
    [γs !! j = Some γl] -- fsinit's and kexec's cones reach sleep/wakeup,
@@ -183,23 +188,31 @@
    the party that has to OWN that slot is the parker.  What it can own
    depends on whether the boot arm can still run:
 
-     - [steady = false]: it can.  kexec("/init") replaces the address space
-       between the park and the resume, so no key captured at the park is
-       still the resume's; the parker owns the slot FAMILY over every record
-       at its table and cwd, and the closer instantiates it (userinit).
+     - [steady = false] -- THE BOOT MODE.  It can, and it does: this record
+       IS the first process, which the package says by carrying
+       [FirstTok.first_boot]'s rows beside a block without them.
+       kexec("/init") replaces the address space between the park and the
+       resume, so no key captured at the park is still the resume's; what
+       the parker owns instead is the EXEC BUNDLE that arm spends
+       ([InitBoot.init_boot_bundle]), whose slot piece answers at the key
+       kexec builds.  The closer owes no slot, and the kernel mints none
+       (userinit).
 
-     - [steady = true]: it cannot, and the parker proves it by handing over
-       [FirstTok.first_done].  Then the resume is the steady arm, which
-       lands on a record carrying the parked one's RUN KEY -- the resume
-       register file, the resume pc, the image, the permission view, the
-       size and the cwd ([UexecRet.urun_eq]) -- so ONE slot at the parked
-       record suffices and the closer's pure premise re-keys it (kfork).
+     - [steady = true] -- THE STEADY MODE.  The boot arm cannot run, and the
+       parker proves it by handing over [FirstTok.first_done].  Then the
+       resume is the steady arm, which lands on a record carrying the parked
+       one's RUN KEY -- the resume register file, the resume pc, the image,
+       the permission view, the size and the cwd ([UexecRet.urun_eq]) -- so
+       ONE slot at the parked record suffices and the closer's pure premise
+       re-keys it (kfork).
 
-   forkret is where the promise is cashed: its steady arm PROVES the run
-   key of the record it ends on, and its boot arm is REFUTED, because
-   [first_done]'s [first_addr ↦₄□ 0] cannot coexist with the boot
-   disjunct's [first_addr ↦₄ 1] ([FirstTok.first_tok_boot_excl]).  That is
-   why the bit and the resource are premises HERE and not in the closer. *)
+   forkret is where the promise is cashed, and it cases on the MODE: at
+   [true] its steady arm PROVES the run key of the record it ends on and
+   its boot arm is REFUTED, because [first_done]'s [first_addr ↦₄□ 0]
+   cannot coexist with the block token's boot disjunct
+   ([FirstTok.first_tok_boot_excl]); at [false] it walks the boot arm on
+   the rows the package handed it.  That is why the bit, the block's shape
+   and the mode's resource are premises HERE and not in the closer. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -226,7 +239,8 @@ Require Import KexecDefs.
 Require Import UsertrapRes UtResFits.
 Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, see the header *)
 Require Import UexecSlot.  (* [uvis] / [uvis_of] *)
-Require Import AppInv.     (* [app_sup] -- the supply the tail's loop mints on *)
+Require Import InitBoot.   (* [init_boot_bundle] -- the first process's exec
+                              bundle, which the boot arm spends *)
 Require Import UexecRet.   (* [uslot] -- the closer's new second output.
                               Required DIRECTLY: the seal does not travel. *)
 From Kernel Require KernelSyms.
@@ -278,14 +292,18 @@ Definition forkret_closer
     (g : gname)
     (* ...and its cwd's inum -- see [ParkCap.park_pkg] *)
     (cw : Z)
-    (* ...AND THE PARKED RUN KEY, WHEN THERE IS ONE.  [None]: the parker
-       captured a slot FAMILY, because the resume may still run the boot
-       arm's kexec("/init") and no key captured at the park survives that.
-       [Some Wk]: the parker holds [FirstTok.first_done], the boot arm is
-       dead, and what it captured is ONE slot at [Wk] -- so the closer's
-       pure premise below asks the resumer to say that the record it
-       resumes with carries that run key.  [ParkCap.park_pkg] is the
-       package this closer is a row of. *)
+    (* ...and its descriptor states: ONE list for the residue the closer
+       yields and for the key it yields it at -- see [ParkCap.park_pkg],
+       whose parameter this is *)
+    (sts : list fdstate)
+    (* ...AND THE PARKED RUN KEY, WHEN THERE IS ONE.  [None] is the BOOT
+       mode: the resume runs the boot arm's kexec("/init"), no key captured
+       at the park survives that, and the record's slot comes out of exec
+       instead -- so this closer yields none.  [Some Wk]: the parker holds
+       [FirstTok.first_done], the boot arm is dead, and what it captured is
+       ONE slot at [Wk] -- so the closer's pure premise below asks the
+       resumer to say that the record it resumes with carries that run key.
+       [ParkCap.park_pkg] is the package this closer is a row of. *)
     (Wk : option uvis)
     (pid : mword 32) (av : nat) : iProp Σ :=
   (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate),
@@ -335,17 +353,20 @@ Definition forkret_closer
         is about to hand back. *)
      TimerCap.timer_cap (CID := h) -∗
      forkret_yield (CID := h) (XI := Xc) γf p ksp pid av (us_V U') -∗
-     (* THE RESIDUE, AND THE SLOT FOR THE RECORD THIS RESUME LANDS ON.  At
-        [Wk = None] the parker captured a slot FAMILY and the closer
-        instantiates it here, because the key cannot be the parked one --
-        the boot arm's kexec moves it (projects/user-wp-slot.md SS4c, R-b);
-        at [Wk = Some _] it captured ONE slot and the run-key premise above
-        re-keys it onto this record.  See [ParkCap.park_pkg], of which this
-        is the forkret-side spelling. *)
-     (* one [sts] for both: the residue's fragments and the slot's key --
-        see [ParkCap.park_pkg], of which this is the forkret-side spelling *)
-     (∃ sts : list fdstate,
-        URes h Xc pt' ksp U' sts ∗ uslot (uvis_of U' sts)))%I.
+     (* THE RESIDUE, AND -- ON THE STEADY MODE -- THE SLOT FOR THE RECORD
+        THIS RESUME LANDS ON.  At [Wk = Some _] the parker captured ONE
+        slot and the run-key premise above re-keys it onto this record.  At
+        [Wk = None] the closer yields no slot at all: the boot arm's kexec
+        moves the key (projects/user-wp-slot.md SS4c, R-b) and the slot
+        that record runs on is exec's own receipt, paid by the exec bundle
+        the package handed that arm.  See [ParkCap.park_pkg], of which this
+        is the forkret-side spelling; one [sts] for the residue's fragments
+        and the slot's key, and it is the package's argument. *)
+     (URes h Xc pt' ksp U' sts
+      ∗ match Wk with
+        | Some _ => uslot (uvis_of U' sts)
+        | None => emp
+        end))%I.
 
 
 (* THE CONTRACT.  One statement, no [first] premise and no [first] reading:
@@ -365,6 +386,10 @@ Definition wp_forkret_gen_body
     (W : iProp Σ)
     (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
     (pid : mword 32) (U : ustate)
+    (* THE PARKED DESCRIPTOR STATES: the closer's, and -- on the boot arm --
+       the list kexec builds its resume key at.  [ParkCap.park_pkg]'s
+       argument. *)
+    (sts : list fdstate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool)
     (* WHICH OF THE PARK'S TWO MODES built this record.  [true]: the parker
        held [FirstTok.first_done] and captured ONE slot, at the parked
@@ -403,11 +428,6 @@ Definition wp_forkret_gen_body
   m !!! Regidx (mword_of_int 2 : mword 5) = ksp ->
   kernel_text -∗
   wire_inv -∗
-  (* THE APPLICATION'S SUPPLY (the ARM; [AppInv.app_sup]): forkret's tail is
-     the closed trap loop's entrant, and the loop mints the round's generic
-     slot out of this credential ([SpecUserretClosed]'s premise list).  It
-     reaches the parker through [ParkCap.park_pkg]. *)
-  app_sup -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   pc_is pcE -∗
   (* the process table: [is_lock] for the lock released at +0x10, and what
@@ -426,7 +446,21 @@ Definition wp_forkret_gen_body
   proc_lock_res γs γl p -∗
   (* ---- the process ---- *)
   is_kstack p ks -∗
-  proc_priv γf p pid U -∗
+  (* ---- THE PROCESS BLOCK, AT THE PACKAGE'S MODE.  On the steady mode it
+     comes over whole and its [FirstTok.first_tok] may be on either arm --
+     the boot one is refuted below, by the [first_done] the same package
+     carries.  On the BOOT mode the park hands it SPLIT: the deficit block,
+     the working-directory reference, and [FirstTok.first_boot]'s four rows
+     as rows of their own.  That is what makes the mode a FACT about the
+     record: forkret's steady arm reads [first] as 0 and the boot rows'
+     [first_addr ↦₄ 1] refutes that reading
+     ([FirstTok.first_boot_done_excl]), so a boot-mode record can only be
+     resumed on the boot arm -- the arm that spends the exec bundle below.
+     [ParkCap.park_child] carries the same shape. ---- *)
+  (if steady then proc_priv γf p pid U
+   else proc_priv_nocwd γf p pid U
+        ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U))
+        ∗ FirstTok.first_boot) -∗
   W -∗
   (* ---- THE STEADY PARK'S EVIDENCE THAT THE BOOT ARM IS DEAD, and nothing
      on the other mode.  A parker that promises the resume lands on the
@@ -436,12 +470,21 @@ Definition wp_forkret_gen_body
      out of its own [FirstTok.first_tok] -- is incompatible with the
      [first_addr ↦₄□ 0] here.  So the boot arm is refuted rather than owing
      a key it cannot have.  Persistent, so the parker pays nothing.
-     [SpecForkretParkPaid.forkret_park_pkg] carries the same row. ---- *)
-  (if steady then FirstTok.first_done else emp) -∗
+     [SpecForkretParkPaid.forkret_park_pkg] carries the same row.
+     ---- ...AND, ON THE BOOT MODE, THE FIRST PROCESS'S EXEC BUNDLE, which
+     is what the boot arm's kexec("/init") is called with and where that
+     record's user-execution slot comes from: the slot piece answers at the
+     key kexec built ([SpecKexec.exec_post_ok]'s success arms hand back
+     [Fs.(pf_recv) (exec_key U' sts na)]), and the tail re-keys it exactly
+     as the steady arm's closer output is re-keyed.  LINEAR -- the kernel
+     mints nothing.  [InitBoot.init_boot_bundle], [ParkCap.park_pkg]'s row.
+     ---- *)
+  (if steady then FirstTok.first_done
+   else init_boot_bundle (pv_cwi (us_V U)) sts) -∗
   (* ---- the residue closer -- see the header, and [forkret_closer] above
      for why it is a name rather than the wand spelled out ---- *)
   forkret_closer URes W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U))
-    (if steady then Some (uvis_of U []) else None) pid av -∗
+    sts (if steady then Some (uvis_of U []) else None) pid av -∗
   WP (Loop : expr riscv_lang).
 
 (* The residue is the module-type parameter it is everywhere else: forkret's
@@ -459,9 +502,9 @@ Module Type FORKRET.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
       (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
-      (pid : mword 32) (U : ustate)
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
       (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) (steady : bool),
       wp_forkret_gen_body
         (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
-        j γs γl γw γft γf γtl pid U ks m av av2 eb steady.
+        j γs γl γw γft γf γtl pid U sts ks m av av2 eb steady.
 End FORKRET.

@@ -97,15 +97,16 @@ Section AppCredsRaw.
      CONSTRAINING application cannot make -- echo's is [taint ∨ pins],
      provable at every view only after the taint is minted.  An era mint
      that had to found it would be unfoundable for such an application.  So
-     it travels as a PERSISTENT CREDENTIAL of the generic system theorem
-     ([SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]), born at boot
-     and handed to the two slot mints and the closed trap loop, and it
-     stays out of every era-owned resource so that a constraining
-     application's own theorem simply does not carry it.
+     it travels as a PERSISTENT CREDENTIAL built where it is honest -- the
+     GENERIC application's own discharge of the system theorem's
+     [Hinit_boot] ([SystemAdequacy.init_boot_of_sup], which mints the
+     generic slot on it) and the closed trap loop's generic instances --
+     and it stays out of every era-owned resource and out of every kernel
+     contract, so that a constraining application's own theorem simply does
+     not carry it.
 
-     RAW -- the predicate and the instance are ARGUMENTS -- so the system
-     theorem can state it under [riscvGpreS], before the fixed record
-     exists ([SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_sup]);
+     RAW -- the predicate and the instance are ARGUMENTS -- so a holder can
+     state it under [riscvGpreS], before the fixed record exists;
      [app_sup] below is the pinned form. *)
   Definition app_sup_raw {N : Type}
       (A : N -> aview -> iProp Σ) (r : N) : iProp Σ :=
