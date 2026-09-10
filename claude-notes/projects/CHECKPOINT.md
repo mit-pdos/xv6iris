@@ -24,7 +24,12 @@ patch: `projects/wx-briefs/`.
   deletes kwait's reset); kexit parks its own row into the ZOMBIE block; `park_cap`'s
   `∀ cs` stays; `children_inv` stated not carried.  The "discarded half" of the
   generation ghost is Iris `DfracDiscarded`, accepted as designed.
-- NEXT: WX-EXIT (`wx-briefs/brief-wx-exit.md`).  Re-anchor its file:line first: it
+- WX-EXIT LAUNCHED (2026-09-10; fresh Opus agent, phase 1 then stop-and-report).  Its
+  brief's last section "RE-ANCHORED AFTER THE WX-RES + WX-ROW LANDING" carries the
+  corrections (ZOMBIE tightens to `∅`, kwait's reset dies, orphans canonical-named
+  beside the map, the children move is kexit's).  Owner's standing instruction: keep
+  going through checkpoints -- land, note, launch the next lane, no pausing to ask.
+- NEXT after it: WX-INV → WX-WAIT → WX-PID → ARM-c (1b) → L7.  Original WX-EXIT re-anchoring note: it
   was drafted against a pre-landing tree -- `ch_frag` has no `γc` and carries the
   slot address; `children_own_del` is GONE (X3 must empty the dying process's row
   with `children_own_upd` to `∅` and move `S` to the orphans, then park the row at
