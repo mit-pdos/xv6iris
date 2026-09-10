@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY/FORK/EXIT/WAIT → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK → WX-EXIT → WX-WAIT → WX-PID → (1b) echo's discharge.
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -1847,6 +1847,51 @@ unchanged at thirteen; lemma_diff: four justified GONEs (`app_triv_sup`,
 `fkr_init_bytes`, `syscall_env_sup`, `park_world_sup`).  NEXT: WX-KEY
 (`brief-wx-key.md`); (1b) echo's discharge of `Hinit_boot` waits on the taint
 (`echo_pred := taint ∨ pins`) and L7.
+
+WX-KEY LANDED (2026-09-10; brief `brief-wx-key.md`).  The user-execution key
+carries two more readings and the kernel carries the cells they read.
+`UexecSlot.uvis` (UexecSlot.v:~91) gains `uvis_gen : gname` (this process's
+incarnation) and `uvis_ch : gset gname` (its live children's), and `uvis_of U
+sts g cs` (:~158) takes both where it takes `sts`; `UexecRet.uvis_of_run`/
+`bump` (+ `bump_gen`/`bump_ch`), `SpecKexec.exec_key U' sts gn cs na` (both
+carried from the exec'ing key), `skey_eq` (both), `uslot_of_urun_eq` (two
+premises), `spost_at` arity 8 → 9 (`f_equiv_wide` ninth clause); `sbundle_at`
+unchanged (the key rides whole).  They ride the trap route beside `sts`:
+`ParkCap.park_pkg (sts gn cs)` / `park_cap`'s `∀ sts gn cs` (paid by the
+parker), `SpecUservec.uservec_post`, `SpecUsertrap.usertrap_post`, the rows
+`ut_sys_in/out`, `ut_exec_out`, `ut_round`, `ut_fork_in`, `sysc_sys_in/out`,
+`sysc_fork_in` (`∀ g', uslot (uvis_of (kfork_child U) sts g' ∅)`),
+`sysc_exec_out`; `usertrap_res` is NOT indexed by them (no resource behind
+them yet).  The round keeps both at every number (`UsysMemOk.usys_gen_ok`,
+`usys_ch_ok`, `_quiet`/`_refl`); `UexecApply.uexec_ret_round_slot` takes
+`uvis_gen W' = uvis_gen W` / `uvis_ch W' = uvis_ch W` as premises discharged
+`eq_refl` (WX-FORK reshapes the fork case); fork arms: parent `∀ cs'` quiet,
+child `∀ g', X (bump W 0 … g' ∅)`.  The program mirrors the children set with
+`UserChildren.uch` (UserCwd's mold at `gset gname`; `uch_any` unused yet);
+`UkRun.uk_names` gains `ukn_ch`; `urun` holds `uch_auth (ukn_ch N) cs`
+(`uch_auth_quiet`/`uch_move`); the round hands `⌜uvis_gen W' = gn⌝ ∗ ⌜uvis_ch
+W' = cs⌝` (`UkStepGen.ukb_F'`); NO per-leaf statement grew (only
+`UkStep.wp_uk_step`/`wp_uk_ecall`, `UkStepGen`'s twins, UkFork's child arm
+`uch (ukn_ch N') ∅`); ~46 Uk files gained `ghost_varG Σ (gset gname)`.
+Kernel: `Xv6Cameras` §14c `genG` (`genR := prodR (optionUR (exclR unitO))
+(optionUR (agreeR (leibnizO (mword 64))))`), `SchedCtx.gen_tok γ`, `gen_slot γ
+pa` (persistent; keyed on the slot ADDRESS), `gen_slot_agree`, `gen_alloc`;
+`proc_gen pa := ∃ γg, gen_tok γg ∗ gen_slot γg pa` rides in `proc_pub`
+(SchedCtx.v:~246); the boot carve is a PURE entailment and cannot mint, so it
+hands out `proc_pub_bare` and main's assembly mints every slot's first
+incarnation (`ProofMain.v:~1115 proc_pub_mint_list`); allocproc re-mints in
+its found arm (`ProofAllocproc.v:~1755 proc_gen_fresh`), freeproc keeps it.
+`WaitInv.children_own_at γc cs := ⌜length cs = NPROC⌝ ∗ ghost_var γc 1 cs`,
+`children_res γc`, `wait_res_at γc ξ := parents_res_at ξ ∗ children_res γc`
+(`parents_res_of_cells` + `wait_res_alloc`, every slot `∅`, ProofMain
+~1188); `children_wf ps cs gs` STATED, NOT CARRIED (needs the p->lock
+generation readings; WX-FORK carries it at the mirror); `γc` threaded as `γw`
+is (`ut_names.un_ch`, `park_globals`, ~25 kernel lemmas; `γwc` in
+ProofSyscall).  `Xv6Cameras` §14d `wchG`.  `SpecSyscall.syscall_env_park`'s
+Parameter changed in place (`wait_res_at γc`).  Traps: iris `own` import for
+`gname` in spec files but NOT in pure files (`KforkChild`, `KexecBridge`:
+ssreflect `rewrite` grammar); `CoreId (None : optionUR (exclR unitO))` must be
+spelled out.  WX-PID (pid uniqueness in `PidLock.nextpid_res_at`) split off.
 
 #### WAIT-EXIT — DESIGN OF RECORD (2026-09-09, owner asked for design + implementation)
 
