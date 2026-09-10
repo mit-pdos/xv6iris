@@ -2092,15 +2092,22 @@ WX-INV (`brief-wx-inv.md`: carry it; kwait's row) → WX-WAIT
 WX-PID is absorbed: pid uniqueness IS `pid_reg`.
 
 #### WX-EXIT RULINGS (2026-09-10, coordinator, given mid-lane; the as-landed note supersedes anchors)
-- THE KILL PATH PAYS NOTHING.  `usertrap`'s `if(killed(p)) exit(-1)` runs with
-  no program to pay the exit payload, and everything the killed process owned
-  dies with its dropped continuation.  So `exit_tok γ pid xs := ∃ pa Q, gen_kq
-  γ pa pid Q ∗ ((∃ Q', my_pay γ Q' ∗ Q' xs) ∨ ⌜xs = -1⌝)` and `gen_pay` yields `▷
-  (Q xs ∨ ⌜xs = -1⌝)`: a parent cannot tell a kill from a voluntary `exit(-1)`,
-  which is the kernel's own observable.  kexit's contract is stated at its
-  STATUS ARGUMENT and takes the two-armed deposit; the exit-syscall route pays
-  the left arm at `exit_xs` of the frame, the three `ut_kexit` sites pay
-  `⌜-1 = -1⌝`.
+- A KILLED PROCESS STILL PAYS `Q (-1)` (owner's ruling; this replaced a
+  "killed arm" of the escrow).  If sh is killed, init must get the UART-input
+  ownership back to respawn sh, so `Q (-1)` is non-trivial and the PROGRAM
+  keeps its resources in its run: `urun` carries the linear `ukn_pay N (-1)`
+  (sh keeps using it between traps -- that is why it lives in the run and not
+  in the kernel's block); the DEPOSIT at every kernel entry (every ecall
+  number and the non-ecall traps) carries `my_pay (uvis_gen W) Q ∗ Q (-1)`,
+  at `USYS_exit` `my_pay ∗ (Q (exit_xs tf) ∧ Q (-1))` (additive ∧: the kill
+  check at +0xca runs BEFORE `syscall()`, so a process trapped with the exit
+  number may still exit -1; the kernel takes whichever conjunct it needs);
+  every RESUME arm returns `Q (-1)`.  The trap loop holds it across the trap:
+  the three `ut_kexit` sites pay kexit at status -1 from it, sys_exit pays
+  `Q (exit_xs …)`, userret hands it back.  The escrow stays SINGLE-ARMED
+  (`gen_pay` yields `▷ Q xs`); kexit is stated at its status argument with
+  premises `my_pay (pv_gen (us_V U)) Q ∗ Q xs`.  The exit leaf takes
+  `(ukn_pay N (-1) -∗ ukn_pay N xs ∧ ukn_pay N (-1))`.
 - THE ESCROW IS KEYED AT THE STORED STATUS, TIED BY THE HALF-CELL (this
   replaces the earlier "keyed at `exit_xs (pv_tf V)`"): `SchedCtx.proc_pub`
   holds `p_xstate` at 1/2; the other half rides the process
