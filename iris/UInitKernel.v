@@ -61,11 +61,10 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import UmodeArith.
 Require Import UserPerm UexecSlot UexecRet UsysMemOk.
-Require Import UserHeap UkRunSys.
+Require Import UserHeap.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import UserFd.
@@ -79,11 +78,9 @@ Require Import KexecBuilt.     (* [kxb_perm_ok] / [kexec_pg] / [kexec_seg_perm] 
 Require Import SpecKexec.      (* [kexec_image_ok] *)
 Require Import UmodeAbi.       (* [uimg_sub] -- the image inclusion *)
 Require Import ElfUser.        (* [init_elf] and its reduced facts (leaf, see header) *)
-Require Import ElfLoadable.    (* [init_elf_loadable] -- the image xv6 loads *)
 Require Import UShKernel.      (* the entry geometry, and sh's own bridge *)
 Require User.InitSyms User.InitData User.InitInstrs.
 Require Import UexecSG.        (* [uexecSG] / [uprogSG]: the ARM deposit class *)
-Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 Require FsImg.           (* [FsImg.ROOTINO] -- the inum init is born at *)
 
 Local Open Scope Z_scope.

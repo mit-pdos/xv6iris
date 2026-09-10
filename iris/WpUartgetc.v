@@ -35,7 +35,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
-Require Import DevModel DiskPtsto WpUart.
+Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import SpecUart.

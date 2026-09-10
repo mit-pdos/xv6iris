@@ -46,7 +46,6 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
-Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 
 Section UkShLoop.
   Context `{!riscvGS Σ}.

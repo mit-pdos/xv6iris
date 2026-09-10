@@ -41,7 +41,6 @@ Require Import FdSlots.                 (* [fdslotG], [fdstate], [fdt0] *)
 Require Import IrefSlots.               (* [irefslotG] *)
 Require Import ProcAvail.               (* [pavG] *)
 Require Import FileInvDefs.             (* [fileG] and its field instances *)
-Require Import FsBlocks.                (* [fs_names] *)
 Require Import FsAbsDefs.               (* [aview], [anode] *)
 Require Import FsBytesGamma.            (* [fs_gamma_L]: the live Γ *)
 Require Import FsCfg.                   (* [fsc_fs] *)
@@ -54,7 +53,6 @@ Require Import UexecRet.                (* [uslot] -- required DIRECTLY: the
                                            travel through a re-export *)
 Require Import SpecKexec.               (* [exec_au_pre], [exec_au_pre_triv_at] *)
 Require Import Xv6G.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)

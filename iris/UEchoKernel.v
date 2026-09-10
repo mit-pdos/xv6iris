@@ -90,7 +90,6 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             which rides inside [urun] *)
 Require Import UsysMemOk.
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
-Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 
 Section UEchoKernel.
   Context `{!riscvGS Σ}.

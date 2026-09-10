@@ -65,7 +65,6 @@ Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WireInv.   (* [wire_inv] *)
 Require Import InitBoot.  (* [init_boot_bundle] -- forwarded to userinit *)
-Require Import InodeInv.  (* [ROOTINO] *)
 Require Import UsertrapRes.   (* [devintr_caps_any] *)
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import WpLock.

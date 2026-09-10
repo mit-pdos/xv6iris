@@ -60,19 +60,12 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile WpNext.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText.
-Require Import IntrDefs.
-Require Import WpLock CtxMorphTac.
-Require Import CpuOwn.
+Require Import RiscvPtsto.
+Require Import CtxMorphTac.
 Require Import ProcGeom.
 Require Import SchedCtx.   (* [pid_lock_share_at]: the lock's quarter of each pid cell *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 

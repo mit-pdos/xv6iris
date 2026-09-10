@@ -46,7 +46,6 @@ Require Import KptPt.
 Require Import IntrDefs.
 Require Import WireInv.   (* [wire_inv] *)
 Require Import InitBoot.  (* [init_boot_bundle] -- forwarded to main *)
-Require Import FdSlots.   (* [fdt0] *)
 Require Import InodeInv.  (* [ROOTINO] *)
 Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.

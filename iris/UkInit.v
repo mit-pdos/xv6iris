@@ -44,7 +44,6 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             which rides inside [urun] *)
 Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
-Require Import FdSlots.  (* [fdstate] -- what the ledger's slots hold *)
 Require Import UserCwd.  (* [ucwd]: the process's own half of its cwd -- the
                             exec leaf is indexed by it *)
 Require FsImg.           (* [FsImg.ROOTINO]: init never chdirs, so its

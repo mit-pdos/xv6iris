@@ -100,7 +100,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto RiscvExtras.
 Require Import RiscvLang ObsTrace.   (* [mobs], [obs_ends_in]: the tag column's vocabulary *)
-Require Import VcGen W32Arith.   (* [trunc32_unsigned]/[trunc32_sext]: the ring index's wrap *)
+Require Import VcGen.   (* [trunc32_unsigned]/[trunc32_sext]: the ring index's wrap *)
 Require Import WpLock.
 Require Import TsoCtx CtxMorphTac.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.

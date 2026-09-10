@@ -113,7 +113,6 @@ Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the r
 Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
-Require Import UexecSlot.             (* [uvis] *)
 Require Import UexecRet.              (* [uslot] -- DIRECT, the seal does not
                                          travel through a re-export *)
 Require Import InitBoot.              (* [init_boot_bundle] -- what the park

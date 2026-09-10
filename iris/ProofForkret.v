@@ -85,7 +85,6 @@ Require Import SpecMyproc SpecRelease SpecPrepareReturn.
 Require Import SpecFsinit KexecDefs SpecPanic.
 Require Import PieceFam.     (* [pfam]/[pfam_triv]: the one-shot piece's pair *)
 Require Import SpecKexec.  (* [KEXEC], [exec_arms_landed], [exec_post_ok_recv] *)
-Require Import FsBytesGamma.  (* [fs_gamma_L]: the live Gamma the bundle is at *)
 Require Import PrintkArgs.  (* [PkAStr] / [pk_desc_res] -- panic's message shape *)
 Require Import FsReady.
 Require Import SpecUserretClosed.

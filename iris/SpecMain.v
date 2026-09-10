@@ -127,7 +127,6 @@ Require Import WireInv.   (* [wire_inv] *)
 Require Import UexecExecInst. (* [uexecSG_xv6]: the instance the bundle is read at *)
 Require Import InitBoot.  (* [init_boot_bundle] -- the first process's exec
                              bundle, handed to userinit *)
-Require Import FdSlots.   (* [fdt0]: the fresh table userinit's park is at *)
 Require Import InodeInv.  (* [ROOTINO]: the first process's cwd *)
 Require Import HartTp.
 (* the shared kernel page table: [kpt_unset] is a boot token, [kpt_inv] and

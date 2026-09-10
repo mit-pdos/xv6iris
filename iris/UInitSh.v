@@ -44,8 +44,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import WpMmodeLeafBase.  (* [csp_rs1] *)
 Require Import UmodeArith UmodeAbi.
 Require Import ProcGeom.
@@ -59,28 +58,23 @@ Require Import Xv6G.            (* [xv6G] *)
 Require Import FdSlots.         (* [fdslotG], [fdstate] *)
 Require Import IrefSlots.       (* [irefslotG] *)
 Require Import ProcAvail.       (* [pavG] *)
-Require Import IcacheRefDefs.   (* [icfg] *)
 Require Import FileInvDefs.     (* [fileG], and its [appcfg] / [icfg] fields *)
 Require Import UserFd.
-Require Import UserCwd.
 Require Import UserHeap.
-Require Import UserPerm UexecSlot UexecRet UsysMemOk UexecSG.
+Require Import UexecSlot UexecRet UsysMemOk UexecSG.
 Require Import UkRun.
 Require Import UCodeInit UkInit.
 Require Import UkSh UShKernel.
-Require Import ByteBuf.            (* [bb_cstr] / [bb_nonul] *)
 Require Import PathElems.          (* [path_elems] *)
-Require Import ElfFile ElfUser.
+Require Import ElfUser.
 Require Import ElfLoadable.        (* [sh_elf_loadable] *)
 Require Import PageGeom.           (* [PGSIZE] *)
-Require Import KexecDefs KexecBuilt.
+Require Import KexecDefs.
 Require Import SpecKexec.
 Require Import SpecCopyin.         (* [uimg_word_at] *)
-Require Import SpecCopyinstr.      (* [copyinstr_got] *)
 Require Import SpecSysExec.        (* [exec_args_of] / [exec_path_of] *)
 Require Import AppCfg AppInv.
 Require Import FsCfg.
-Require Import FsBlocks FsBytesGamma.
 Require Import FsImgCheck.         (* [fname_sh] *)
 Require Import FsShPin.            (* [era0_sh_pins] / [sh_path] / [SH_INO] *)
 Require Import FsAbsDefs.          (* [aview] / [arun] / [AFile] *)

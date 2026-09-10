@@ -84,9 +84,7 @@ Require Import Xv6G.            (* [xv6G]: the bundle *)
 Require Import FdSlots.         (* [fdslotG] *)
 Require Import IrefSlots.       (* [irefslotG] *)
 Require Import ProcAvail.       (* [pavG] *)
-Require Import IcacheRefDefs.   (* [icfg] *)
 Require Import FileInvDefs.     (* [fileG], and its [appcfg] / [icfg] fields *)
-Require Import ProcGeom.
 Require Import UserFd.          (* [ufdG] *)
 Require Import UexecSlot.       (* [uvis] *)
 Require Import ElfFile.         (* [elf_bytes] *)
@@ -104,7 +102,6 @@ Require Import FsAbsEra.        (* [ex_start], [ex_hop], [elend], [um_start_of] 
 Require Import FsAbsDefs.       (* [arun], [arow_at], [aents], [astep], [abs_view] *)
 Require Import FsAbs.           (* [astate_q_intro] (FsAbs's own rule: LAST) *)
 Import Defs.
-Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 

@@ -48,7 +48,7 @@ Require Import StackOwn CalleeSaved.
 Require Import WpSmodeIntr.
 Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import DevModel DiskPtsto WpUart.
+Require Import DevModel WpUart.
 Require Import PlicPlan WpPlic SpecPlicinit.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

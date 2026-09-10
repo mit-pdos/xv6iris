@@ -82,7 +82,6 @@ Import Defs.
 
 Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
-Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 
 Section UkShFork.
   Context `{!riscvGS Σ}.
