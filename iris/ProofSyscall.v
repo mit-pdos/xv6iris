@@ -1777,7 +1777,7 @@ Section SyscallVocab.
         ch_frag (pv_chg (us_V U)) pj cs' -∗
         pc_is ret_tgt -∗
         (* ...and the exec channel's answer -- [SpecSyscall.sysc_exec_out] *)
-        sysc_exec_out U U' sts sts' gn cs pid -∗
+        sysc_exec_out f U U' sts sts' gn cs pid -∗
         (* ...and the SYSCALL CHANNEL's, at the entry key and the stored
            return value, and at the RESUME VIEW the entry leaves --
            [SpecSyscall.sysc_sys_out] *)
@@ -2053,7 +2053,7 @@ Section SyscallVocab.
     (* ...AND WAIT'S, on fork's footing exactly *)
     sysc_wait_out U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
     (* the exec channel's answer, carried like the rows above it *)
-    sysc_exec_out U U' sts sts' gn cs pid -∗
+    sysc_exec_out f U U' sts sts' gn cs pid -∗
     (* ...and the syscall channel's, carried the same way: the epilogue
        restores registers and touches no trapframe, so the record the row is
        read at is the one its caller already stored into *)
@@ -2833,7 +2833,7 @@ Section SyscallRet.
     sysc_fork_out f U (E !!! Regidx Ra0) cs cs' -∗
     (* ...AND WAIT'S, at the same word *)
     sysc_wait_out U (E !!! Regidx Ra0) cs cs' -∗
-    sysc_exec_out U
+    sysc_exec_out f U
       (us_tf U' (<[tf_arg_idx 0 := E !!! Regidx Ra0]> (pv_tf (us_V U'))))
       sts sts' gn cs pid -∗
     (* ...AND THE SYSCALL CHANNEL'S, AT THE RETURN REGISTER.  An arm's
@@ -3482,15 +3482,18 @@ Section SyscallArms.
     pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     sysc_sys_in U sts gn cs pid f -∗
-    (* THE PAY FACT COMES OUT WITH THE BUNDLE, at the family's own payload:
-       the exec'ing process handed it over so that kexec can hand it to the
-       new image's slot ([SpecKexec.exec_slot_pre]'s wands). *)
-    my_pay gn (kf_pay f) ∗
+    (* THE PAY FACT COMES OUT WITH THE BUNDLE, at the family's own EXIT
+       payload: the exec'ing process handed it over so that kexec can hand
+       it to the new image's slot ([SpecKexec.exec_slot_pre]'s wands), and
+       exec keeps the process -- so what the new image runs at is this
+       process's own payload ([UexecSG.sexit_pay]), the one the trap
+       route's payment row is at ([sysc_pay_in]). *)
+    my_pay gn (kf_xpay f) ∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (gmap Z FsAbsDefs.anode -> Z -> FsAbsDefs.anode -> iProp Σ))
       (Rs : iProp Σ),
       sys_exec_au_pre (MkPfam uslot Rs) (fs_gamma_L fsc_fs) fsc_fs
-        (pv_cwi (us_V U)) (kf_pay f) P Pmiss Fo (us_M U) v0 v1 sts.
+        (pv_cwi (us_V U)) (kf_xpay f) P Pmiss Fo (us_M U) v0 v1 sts.
   Proof.
     intros Hn Hv0 Hv1. iIntros "H".
     iDestruct (sysc_sys_in_at U sts gn cs pid f 7 Hn ltac:(vm_compute; discriminate)
@@ -3710,7 +3713,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -4022,7 +4025,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -4142,7 +4145,7 @@ Section SyscallArms.
        uniqueness that names the generation; there is nothing here to
        fabricate. *)
     { iApply (sysc_wait_out_of U _ rv (xstate_val xw) cs cs' Ha0w with "Hans"). }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -4248,7 +4251,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -4348,7 +4351,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -4448,7 +4451,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -4653,7 +4656,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -4830,7 +4833,7 @@ Section SyscallArms.
     { iExact "Hans". }
     (* wait answers nothing at this entry *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -4947,7 +4950,7 @@ Section SyscallArms.
     iApply (SysExec.wp_sys_exec_sconf (MkPfam uslot Rs) γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 v1 pid U sts gn cs M (av - 4)%nat true true lks
-              (kf_pay fdep) P Pmiss Fo
+              (kf_xpay fdep) P Pmiss Fo
               ltac:(lia) Hroot Hnib0 Hlg Hsize
               Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hj Hgamma eq_refl Hv0 Hv1
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hfab Hbmp Hisp Hbmr Hbs
@@ -4975,7 +4978,7 @@ Section SyscallArms.
                 payment is keyed on it *)
              /\ pv_gen V' = pv_gen (us_V U)
              /\ pv_cwi V' = pv_cwi (us_V U)⌝ ∗
-             sysc_exec_out U
+             sysc_exec_out fdep U
                (us_tf (MkUstate V' Mk)
                   (<[tf_arg_idx 0 := mf !!! Regidx Ra0]>
                      (pv_tf (us_V (MkUstate V' Mk)))))
@@ -5309,7 +5312,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -5487,7 +5490,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     rewrite Hmfa0.
     iApply (sysc_out_write U sts gn cs pid fdep v0 v1 v2 r _ _ _ _
               ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hex").
@@ -5657,7 +5660,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     rewrite Hmfa0.
     iApply (sysc_out_read U sts gn cs pid fdep v0 v1 v2 r _ _ _ _
               ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hex").
@@ -5773,7 +5776,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -5946,7 +5949,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_chdir U sts gn cs pid fdep _ _ sts (pv_cwi V') _
               ltac:(rewrite Hnum; reflexivity) with "Hrcpt").
   Qed.
@@ -6085,7 +6088,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_unlink U sts gn cs pid fdep (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) with "Harms").
   Qed.
@@ -6213,7 +6216,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_link U sts gn cs pid fdep (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) with "Harms").
   Qed.
@@ -6397,7 +6400,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -6702,7 +6705,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
@@ -6867,7 +6870,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_mkdir U sts gn cs pid fdep (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) with "Harms").
   Qed.
@@ -7007,7 +7010,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_mknod U sts gn cs pid fdep v1 v2 (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) Hv1 Hv2 with "Harms").
   Qed.
@@ -7287,7 +7290,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_open U sts gn cs pid fdep v1 _ _ sts' (pv_cwi V') _
               ltac:(rewrite Hnum; reflexivity) Hv1 with "Hrcpt").
   Qed.
@@ -7721,7 +7724,7 @@ Section SyscallArms.
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7_range _ Hrange)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7_range _ Hrange)).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ (sysc_num (us_V U)) eq_refl
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.

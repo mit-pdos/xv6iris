@@ -354,6 +354,19 @@ Section PinnedExec.
          the NEW image's constructor needs -- and both arms below relay it,
          the pinned one to the caller's constructor and the tainted one to
          the generic family. *)
+      (* ...AND THE PAYLOAD ITSELF rides with the pay fact, at the kill
+         status, because exec KEEPS THE PROCESS: the image that starts here
+         runs at the exec'ing process's own generation and its own payload,
+         so its run carries [Q (-1)] between traps like any other
+         ([UkRun.urun]'s conjunct, which [UkRun.uslot_of_urun_all] takes).
+         The one copy in the system is the payment the dispatcher holds
+         across the exec trap ([SpecSyscall.sysc_pay_in]); it reaches these
+         wands through [SpecKexec.exec_slot_pre] and both arms hand it on --
+         the pinned arm to the caller's constructor beside the linear [Pay],
+         the tainted arm to the generic family, which runs at the trivial
+         payload and drops it.  This is the seam a NON-TRIVIAL payload
+         crosses: [Q] is a parameter here, so an application whose exec'd
+         image must own something (sh and the console reader) states it. *)
       (Q : Z -> iProp Σ)
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) :
     pin_resolves Pin cw pl hops ino f nl ->
@@ -363,13 +376,13 @@ Section PinnedExec.
          (W' : uvis),
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
          ⌜exec_args_of M av na alen afun⌝ -∗
-         my_pay (uvis_gen W') Q -∗ Pay -∗ X W') -∗
+         my_pay (uvis_gen W') Q -∗ Q (-1) -∗ Pay -∗ X W') -∗
     (* THE TAINT ARM TAKES THE KEY FIRST AND THE PAY FACT BESIDE [T]: a
        tainted process runs on the GENERIC family, which is itself indexed
        by the pay fact ([UexecExecMint.uslot_mint]), so the arm cannot be
        "[T] gives a slot at every key" any more -- it is "[T] and this
        key's payload give a slot at this key". *)
-    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W') -∗
+    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ X W') -∗
     Pay -∗
     pf_at (fun S => sys_exec_slot_pre S Q (pex_P T hops) (pex_recv Pin T)
                       M pv av sts) (MkPfam X Pay).
@@ -381,11 +394,11 @@ Section PinnedExec.
     rewrite (exec_path_of_uniq M pv pl' pl Hpath' Hpath).
     rewrite /exec_slot_pre /pex_P /pex_recv. iSplitL "HPay".
     - (* ---- ARM (a): the observed node IS the pinned file ---- *)
-      iIntros (av' i f' nl' W') "HP [%Hrow Hc] %Hload' %Hok #Hp".
+      iIntros (av' i f' nl' W') "HP [%Hrow Hc] %Hload' %Hok #Hp HQ".
       iDestruct "HP" as "[%Hi | #HT]"; last first.
-      { iApply ("Hgen" with "HT Hp"). }
+      { iApply ("Hgen" with "HT Hp HQ"). }
       iDestruct "Hc" as "[%HP | #HT]"; last first.
-      { iApply ("Hgen" with "HT Hp"). }
+      { iApply ("Hgen" with "HT Hp HQ"). }
       destruct (Hpin av' HP) as [_ Hrowpin].
       rewrite Hfin in Hi. subst i.
       destruct (decide (nl' = 0%nat)) as [Hz | Hnz].
@@ -393,14 +406,14 @@ Section PinnedExec.
         discriminate Hrowpin. }
       rewrite (arow_at_live av' ino _ Hrow Hnz) in Hrowpin.
       simplify_eq.
-      iApply ("Hcon" $! na alen afun W' with "[%] [%] Hp HPay");
+      iApply ("Hcon" $! na alen afun W' with "[%] [%] Hp HQ HPay");
         [ exact Hok | exact Hargs ].
     - (* ---- ARM (b): a pinned file IS loadable, so this arm is dead ---- *)
-      iIntros (av' i a W') "HP [%Hrow Hc] %Hnload %Hkey #Hp".
+      iIntros (av' i a W') "HP [%Hrow Hc] %Hnload %Hkey #Hp HQ".
       iDestruct "HP" as "[%Hi | #HT]"; last first.
-      { iApply ("Hgen" with "HT Hp"). }
+      { iApply ("Hgen" with "HT Hp HQ"). }
       iDestruct "Hc" as "[%HP | #HT]"; last first.
-      { iApply ("Hgen" with "HT Hp"). }
+      { iApply ("Hgen" with "HT Hp HQ"). }
       destruct (Hpin av' HP) as [_ Hrowpin].
       rewrite Hfin in Hi. subst i.
       destruct (decide (an_nlink a = 0%nat)) as [Hz | Hnz].
@@ -428,14 +441,17 @@ Section PinnedExec.
     □ (∀ v : aview, app_pred app_run v -∗
                       app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
     app_inv γfs -∗
-    (* the exec'd program's slot at every key the image fact admits *)
+    (* the exec'd program's slot at every key the image fact admits, given
+       the process's pay fact AND its payload at the kill status -- both
+       relayed from [SpecKexec.exec_slot_pre], see [pex_slot] *)
     □ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
          (W' : uvis),
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
          ⌜exec_args_of M av na alen afun⌝ -∗
-         my_pay (uvis_gen W') Q -∗ Pay -∗ X W') -∗
-    (* the taint's generic slot, indexed by the pay fact -- see [pex_slot] *)
-    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W') -∗
+         my_pay (uvis_gen W') Q -∗ Q (-1) -∗ Pay -∗ X W') -∗
+    (* the taint's generic slot, indexed by the pay fact and handed the
+       payload beside it -- see [pex_slot] *)
+    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ X W') -∗
     Pay -∗
     sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw Q
       (pex_P T hops) (pex_Pmiss T) (pex_Fo Pin T) M pv av sts.
@@ -471,8 +487,8 @@ Section PinnedExec.
          (W' : uvis),
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
          ⌜exec_args_of M av na alen afun⌝ -∗
-         my_pay (uvis_gen W') Q -∗ Pay -∗ X W') -∗
-    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W') -∗
+         my_pay (uvis_gen W') Q -∗ Q (-1) -∗ Pay -∗ X W') -∗
+    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ X W') -∗
     Pay -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (R : iProp Σ),

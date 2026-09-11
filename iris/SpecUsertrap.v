@@ -455,9 +455,13 @@ Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
 (*                                                                          *)
 (* [ut_exec_out] is EXEC'S OWN out-shape and stays beside them: exec is the *)
 (* one entry whose round says nothing, because the record it leaves is a    *)
-(* DIFFERENT program's.  Its two disjuncts -- the failure facts and the new *)
-(* image's slot, which the process's own exec deposit pays on BOTH of       *)
-(* [SpecKexec.exec_post_ok]'s success arms -- have no per-number reading.   *)
+(* DIFFERENT program's.  Its two disjuncts -- the failure facts, and the    *)
+(* new image's slot as a WAND FROM THE EXIT PAYLOAD, which the process's    *)
+(* own exec deposit pays on BOTH of [SpecKexec.exec_post_ok]'s success      *)
+(* arms -- have no per-number reading.  The payload is [ut_pay_out]'s own   *)
+(* resource: the arms are exclusive, so the row that resumes the OLD key    *)
+(* and the wand that completes the NEW one are two readings of one          *)
+(* payment.                                                                *)
 (*                                                                          *)
 (* All three are guarded on the CAUSE and the NUMBER, so the four           *)
 (* transparent arms discharge them by refuting the guard.                   *)
@@ -518,8 +522,18 @@ Definition ut_sys_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
     /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
      spost_at uslot n f (uvis_of U sts gn cs pid) r M' sts' cw' cs')%I.
 
+(* THE SUCCESS ARM IS A WAND FROM THE PAYLOAD (EXEC-PAY), and [f] rides
+   beside the cause for that: exec keeps the process, so the image the
+   kernel loaded runs at THIS process's payload and its run needs
+   [UkRun.ukn_pay] at the kill status like any other
+   ([UkRun.uslot_of_urun_all]).  The only copy is the one the trap route is
+   holding ([ut_pay_in]), so the slot comes back WAITING on it and
+   [ut_pay_out] is what pays it -- on the failure arm the process resumes
+   at its old key and keeps that row instead.  The two arms are exclusive,
+   so nothing is duplicated. *)
 Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
+    (f : sfam)
     (sc_v : mword 64) (tf : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
     (U' : ustate) (sts sts' : list fdstate) (gn : gname) (cs : gset gname)
@@ -532,7 +546,8 @@ Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
               (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
               (uint (pv_sz (us_V U')))
          /\ sts' = sts⌝                       (* failed: the returning shape at r = -1 *)
-      ∨ uslot (uvis_of U' sts' gn cs pid)))%I.        (* succeeded: the new image's slot *)
+      ∨ (sexit_pay f (-1) -∗                              (* succeeded: the new image's *)
+           uslot (uvis_of U' sts' gn cs pid))))%I.       (* slot, on the payload *)
 
 (* ===================================================================== *)
 (* FORK'S ANSWER, COMING BACK: the parent's quarter of the child's        *)
@@ -829,7 +844,9 @@ Qed.
    status, returned to whatever resumes the process.  A ROW OF
    [usertrap_post] and UNGATED, for the IN row's reason -- every arm that
    returns to user mode returns it, and the three that do not are the
-   three that spend it on [kexit(-1)]. *)
+   three that spend it on [kexit(-1)].  ONE resource, two readers: on a
+   successful exec there is no old key to resume and this row is what
+   [ut_exec_out]'s success wand consumes instead. *)
 Definition ut_pay_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
     (f : sfam) : iProp Σ :=
@@ -853,11 +870,12 @@ Qed.
 
 Lemma ut_exec_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
+    (f : sfam)
     (sc_v : mword 64) (tf : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
     (U' : ustate) (sts sts' : list fdstate) (gn : gname) (cs : gset gname)
     (pid : mword 32) :
-  sc_v <> uecall_scause -> ⊢ ut_exec_out sc_v tf M π szv U' sts sts' gn cs pid.
+  sc_v <> uecall_scause -> ⊢ ut_exec_out f sc_v tf M π szv U' sts sts' gn cs pid.
 Proof.
   intros Hne. rewrite /ut_exec_out. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
 Qed.
@@ -935,6 +953,7 @@ Qed.
    reach. *)
 Lemma ut_exec_out_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
+    (f : sfam)
     (sc_v : mword 64) (tf tf' : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
     (U' U'' : ustate) (sts sts' : list fdstate) (gn : gname)
@@ -947,8 +966,8 @@ Lemma ut_exec_out_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
   pv_sz (us_V U'') = pv_sz (us_V U') ->
   (* ...and the cwd's inum, which the loadable arm's key carries *)
   pv_cwi (us_V U'') = pv_cwi (us_V U') ->
-  ut_exec_out sc_v tf M π szv U' sts sts' gn cs pid -∗
-  ut_exec_out sc_v tf' M π szv U'' sts sts' gn cs pid.
+  ut_exec_out f sc_v tf M π szv U' sts sts' gn cs pid -∗
+  ut_exec_out f sc_v tf' M π szv U'' sts sts' gn cs pid.
 Proof.
   intros Hu Hu' HM Hpi Hsz Hcwi. rewrite /ut_exec_out. iIntros "H %Hc".
   iDestruct ("H" with "[%]") as "[%Hf | Hs]";
@@ -962,7 +981,7 @@ Proof.
       rewrite <- (tf_ueq_epc _ _ Hu). exact Hb2.
     + split; [| exact Hst]. rewrite HM Hpi Hsz.
       exact (usys_mem_ok_ueq _ _ _ _ _ _ _ _ _ _ Hu Hm).
-  - iRight.
+  - iRight. iIntros "HQ". iDestruct ("Hs" with "HQ") as "Hs".
     iEval (rewrite (uslot_key_cong (uvis_of U' sts' gn cs pid)
                       (uvis_of U'' sts' gn cs pid)
                       (tf_ueq_resume_gpr0 _ _ Hu') (tf_ueq_resume_pc _ _ Hu')
@@ -1190,7 +1209,7 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
     R pt' ksp U' sts' cs' pid -∗
     (* THE EXEC CHANNEL'S ANSWER, at the round's entry trapframe and the
        record the round left -- see [ut_exec_out] *)
-    ut_exec_out sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
+    ut_exec_out f sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
       (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
       (uint (pv_sz (us_V U))) U' sts sts' gn cs pid -∗
     (* ...AND FORK'S: the parent's child token -- see [ut_fork_out] *)

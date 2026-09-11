@@ -977,7 +977,7 @@ Section UtSysBlock.
          image, permission projection, size and descriptors are the entry's
          -- [uround_ok]'s returning shape, as [SpecUsertrap.ut_exec_out]
          states it.  The slot goes through untouched. *)
-      iAssert (ut_exec_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+      iAssert (ut_exec_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                  (us_M U0)
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                  (uint (pv_sz (us_V U0))) (MkUstate V2 M2) sts stsR gn cs pid)

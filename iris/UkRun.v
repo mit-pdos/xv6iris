@@ -420,22 +420,33 @@ Section UkRun.
      bundle at every key, which is the GAP-premise trap [udep]'s note
      refutes one number over: a constraining application (echo, at
      [Dsup := emp]) could not build a [urun] at all. *)
-  Definition uxsup : iProp Σ := (□ ∀ W : uvis, sbundle uslot USYS_exec W)%I.
+  (* ...AND IT NAMES THE PAYLOAD, WHICH FOR THIS SUPPLIER IS THE TRIVIAL
+     ONE (EXEC-PAY).  exec's bundle READS the depositing process's own exit
+     payload -- it is what the kernel hands the new image's slot
+     ([SpecKexec.exec_slot_pre]'s two wands, and the [Q (-1)] beside the
+     pay fact) -- so a supplier can no longer hand a bundle at SOME family
+     and let the leaf re-key it ([UexecSG.sbundle_at_at] no longer licenses
+     that at exec): it names the payload, exactly as read's mint does.
+     [uxsup] is the supplier a program that answers for NOTHING carries,
+     and such a program's payload is [fun _ => True] -- so this is the
+     bundle at that payload, and its two consumers below take
+     [ukn_triv].  A process whose exit owes something real (sh, once it
+     holds the console reader) execs on a PINNED supply instead
+     ([UkInit.init_exec_sup]'s shape), which names its own payload. *)
+  Definition uxsup : iProp Σ :=
+    (□ ∀ W : uvis, sbundle_pay uslot USYS_exec (fun _ => True)%I W)%I.
 
   Global Instance uxsup_persistent : Persistent uxsup.
   Proof. rewrite /uxsup. apply _. Qed.
 
   (* what an exec leaf's caller does with it: the explicit disjunct of
      [udepw], at whatever key the walk has reached *)
-  Lemma udepw_of_uxsup (N : uk_names Σ) (m : regfile) (pc : mword 64) :
+  Lemma udepw_of_uxsup (N : uk_names Σ) `{!ukn_triv N}
+      (m : regfile) (pc : mword 64) :
     uxsup -∗ udepw N m pc USYS_exec.
   Proof.
     iIntros "#Hx" (M pm sz fdv cw gn cs pidv) "_ Hh Hf". iFrame "Hh Hf". iRight.
-    (* exec's bundle reads no payload, so the re-keying to this program's
-       own one is free ([UexecSG.sbundle_pay_of_sbundle], R1) *)
-    iApply (sbundle_pay_of_sbundle uslot USYS_exec (ukn_pay N) _
-              ltac:(vm_compute; discriminate)).
-    iApply "Hx".
+    rewrite (ukn_triv_eq (N := N)). iApply "Hx".
   Qed.
 
   (* ...AND WHAT A SUPPLIER THAT ONLY HAS THE BUNDLE AT ONE WORKING
@@ -498,26 +509,24 @@ Section UkRun.
      free re-keying at every branch that does not read one. *)
   Lemma udepw_at_of_bundle (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) :
-    n <> USYS_read ->
+    n <> USYS_read -> n <> USYS_exec ->
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
        (fdv : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32),
        sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv)) -∗
     udepw_at N m pc n c.
   Proof.
-    intros Hne. iIntros "Hb" (M pm sz fdv gn cs pidv) "_ Hh Hf".
+    intros Hne Hnx. iIntros "Hb" (M pm sz fdv gn cs pidv) "_ Hh Hf".
     iFrame "Hh Hf". iRight.
-    iApply (sbundle_pay_of_sbundle uslot n (ukn_pay N) _ Hne). iApply "Hb".
+    iApply (sbundle_pay_of_sbundle uslot n (ukn_pay N) _ Hne Hnx). iApply "Hb".
   Qed.
 
   (* the trivial supplier at the ∀-key form, through the two above *)
-  Lemma udepw_at_of_uxsup (N : uk_names Σ) (m : regfile) (pc : mword 64)
-      (c : Z) :
+  Lemma udepw_at_of_uxsup (N : uk_names Σ) `{!ukn_triv N}
+      (m : regfile) (pc : mword 64) (c : Z) :
     uxsup -∗ udepw_at N m pc USYS_exec c.
   Proof.
-    iIntros "#Hx".
-    iApply (udepw_at_of_bundle N m pc USYS_exec c
-              ltac:(vm_compute; discriminate)).
-    iIntros (M pm sz fdv gn cs pidv). iApply "Hx".
+    iIntros "#Hx" (M pm sz fdv gn cs pidv) "_ Hh Hf".
+    iFrame "Hh Hf". iRight. rewrite (ukn_triv_eq (N := N)). iApply "Hx".
   Qed.
 
   (* THE LEAF'S USE OF IT, [udepw_mint]'s shape at the fixed cwd *)

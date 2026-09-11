@@ -528,9 +528,14 @@ Section UkInit.
 
   (* the trivial supplier still pays it: a bundle at every key is a bundle
      at init's *)
+  (* AT THE TRIVIAL PAYLOAD, which is the row [init_exec_sup] already
+     carries: a process that execs at this lane owes its parent nothing, so
+     the bundle the trivial supplier hands over is at exactly the payload
+     the record names. *)
   Lemma init_exec_sup_of_uxsup : uxsup -∗ init_exec_sup.
   Proof.
-    iIntros "#Hx". iModIntro. iIntros (N' m pc) "_ _ _ _ _ _".
+    iIntros "#Hx". iModIntro. iIntros (N' m pc) "%Hpeq _ _ _ _ _".
+    pose proof (Hpeq : UkRun.ukn_triv N') as Hti.
     iApply (udepw_at_of_uxsup with "Hx").
   Qed.
 

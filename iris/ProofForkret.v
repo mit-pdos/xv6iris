@@ -1834,7 +1834,14 @@ Proof.
       iDestruct "Harms" as "[[%Hf _] | Hok']".
       { destruct Hf as (Hrm1 & _). exfalso.
         rewrite Hr in Hrm1. apply bv_eq in Hrm1. vm_compute in Hrm1. discriminate. }
-      iDestruct (exec_post_ok_recv with "Hok'") as "[_ $]". }
+      (* THE PAYLOAD IS [True] HERE (EXEC-PAY).  The slot the success arm
+         hands back waits on the exec'ing process's own payload at the kill
+         status ([SpecKexec.exec_slot_pre]); <init>'s bundle is at the
+         TRIVIAL payload -- it has no parent to owe anything to
+         ([InitBoot.init_boot_bundle]) -- so the wand's premise is [True]
+         and the boot arm pays it for free. *)
+      iDestruct (exec_post_ok_recv with "Hok'") as "[_ Hrec]".
+      iApply "Hrec". done. }
     iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x60))
               (mword_of_int 58 : mword 13) Ra5 Ra4 E4 av2 eb
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)

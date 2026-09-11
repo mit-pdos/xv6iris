@@ -632,10 +632,10 @@ Section Ut56.
     iEval (rewrite Hpa6) in "Hpc".
     (* ---- the bundle back together, and on to +0xa6 ---- *)
     iDestruct ("Hownback" $! U sts cs with "Hpv Hufr Hch Hsy") as "Hown".
-    iAssert (ut_exec_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
+    iAssert (ut_exec_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
                (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                (uint (pv_sz (us_V U0))) U sts sts gn cs pid) as "Hxo".
-    { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ Hnec). }
+    { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
     (* ...and fork's, refuted through the same cause *)
     iAssert (ut_fork_out fdep scv
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
@@ -1089,11 +1089,11 @@ Section UtD0.
           exact (perm_of_uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pd Hextd).
         - cbn [us_V]. exact HV'sz.
         - cbn [us_V]. rewrite /V'; destruct (us_V U); reflexivity. }
-      iAssert (ut_exec_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
+      iAssert (ut_exec_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                  (uint (pv_sz (us_V U0))) (MkUstate V' (us_M U)) sts sts gn cs pid)
         as "Hxo".
-      { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ Hnec). }
+      { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
     (* ...and fork's, refuted through the same cause *)
     iAssert (ut_fork_out fdep scv
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
@@ -1295,10 +1295,10 @@ Section UtE8.
                           (concat_vec (mword_of_int 6 : mword 8) ('b"0"))))
                      = mword_of_int (UT + 0xfc)) by pcw.
       iEval (rewrite Hpfc) in "Hpc".
-      iAssert (ut_exec_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
+      iAssert (ut_exec_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                  (uint (pv_sz (us_V U0))) U sts sts gn cs pid) as "Hxo".
-      { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ Hnec). }
+      { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
     (* ...and fork's, refuted through the same cause *)
     iAssert (ut_fork_out fdep scv
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))

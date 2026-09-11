@@ -629,7 +629,8 @@ Section UserretClosed.
                       (perm_of (ud_um (pv_upt (us_V U2))) (uint (pv_sz (us_V U2))))
                       (uint (pv_sz (us_V U2)))
                  /\ sts2 = uvis_fd W⌝
-              ∨ uslot (uvis_of U2 sts2 (uvis_gen W) cs2 (uvis_pid W))))%I
+              ∨ (uexec_pay_arm fdep -∗
+                   uslot (uvis_of U2 sts2 (uvis_gen W) cs2 (uvis_pid W)))))%I
       with "[Hxo]" as "Hxo".
     { iIntros "%Hg".
       assert (Hnf : ~ (sc = uecall_scause

@@ -417,7 +417,7 @@ Section SysExecAU.
         ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
              (afun : nat -> nat -> bv 8),
              ⌜exec_path_of M pv pl⌝ ∗ ⌜exec_args_of M av na alen afun⌝ ∗
-             exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs pid
+             exec_post_ok Fs Γ Q P Fo pl na alen afun sts gn cs pid
                (MkUstate V M) U' r)))%I.
 
   (* SANITY: the arms imply the landed [SysExecDefs.sys_exec_post] *)

@@ -1960,8 +1960,8 @@ Section UservecAllPt.
          the image, permission map and break are the entry frame's own. *)
       match goal with
       | |- environments.envs_entails _
-             (SpecUsertrap.ut_exec_out _ _ _ _ _ ?UU' _ _ _ _ _) =>
-          iApply (SpecUsertrap.ut_exec_out_ueq sc_v _ (tf_of g (ret_pc sepc_v)) M
+             (SpecUsertrap.ut_exec_out _ _ _ _ _ _ ?UU' _ _ _ _ _) =>
+          iApply (SpecUsertrap.ut_exec_out_ueq _ sc_v _ (tf_of g (ret_pc sepc_v)) M
                     (UserPerm.perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
                     (uint (pv_sz (us_V U))) U2 UU' sts sts2 gn cs pid Hu36
                     ltac:(cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];

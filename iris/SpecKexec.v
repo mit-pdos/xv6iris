@@ -57,9 +57,12 @@
    3. THE PROGRAM'S WP, [exec_slot_pre]: for every observed file [f]
       that xv6 loads ([kexec_loadable f]) and every resume key [W']
       kexec may build from it ([kexec_image_ok f na alen afun sts W']),
-      the caller supplies [S W'] -- [S] a SLOT PREDICATE every form
-      below is parametric in, instantiated by the dispatcher at the
-      trapframe-keyed user-execution WP ([UexecRet.uslot]: the very
+      the caller supplies [S W'] -- GIVEN the exec'ing process's pay fact
+      AND its exit payload at the kill status, which are what the new
+      image's own run is built from (EXEC-PAY; the payload is the
+      dispatcher's, [SpecSyscall.sysc_pay_in]) -- [S] a SLOT PREDICATE
+      every form below is parametric in, instantiated by the dispatcher
+      at the trapframe-keyed user-execution WP ([UexecRet.uslot]: the very
       proposition the trap loop deposits and runs; design note, "the two
       WP forms").  [S] is a parameter and not [uslot] because the exec
       bundle the process hands over ([UexecExecInst.exec_sbundle]) is an
@@ -75,10 +78,11 @@
      observed there was [a]; then
        (a) [a] is a loadable file [f]: the landed success conjuncts hold
            at [entry = the ELF's entry of f] ([kexec_ok_exec]) and the
-           kernel returns THE CALLER'S WP, applied: [S (exec_key U'
-           sts na)] -- the slot at the state the process resumes in (the
-           new trapframe with [a0 := argc], the new image, the new size,
-           the caller's descriptor view) -- beside the pure
+           kernel returns THE CALLER'S WP, applied as far as it can:
+           [Q (-1) -∗ S (exec_key U' sts na)] -- the slot at the state the
+           process resumes in (the new trapframe with [a0 := argc], the
+           new image, the new size, the caller's descriptor view), still
+           owed the payload kexec never held -- beside the pure
            [kexec_image_ok] it was instantiated at.  The receipt was
            consumed by the WP premise.
        (b) [a] is anything else and kexec succeeded anyway: a file the
@@ -230,8 +234,10 @@
       [uimg_sub (elf_image f)], copyout's post for [kexec_args_at]; the
       composition is [KexecBridge.exec_built_Q].
    5. THE HAND-OFF: [exec_slot_pre] instantiated at the observed [f] and
-      the built key, returning the [S]-slot on arm (a) and refunding the
-      premise on every other arm.  The proofs never open [S].
+      the built key, returning the [S]-slot -- as a WAND FROM THE EXIT
+      PAYLOAD [Q (-1)], which kexec never holds and the DISPATCHER does
+      ([SpecSyscall.sysc_pay_in]) -- on arm (a), and refunding the premise
+      on every other arm.  The proofs never open [S].
    6. THE DISPATCH SIDE: the exec channel carries the returned slot to
       the deposit instead of minting, and the U-mode side's [uexec_ret]
       exec arm SUPPLIES [exec_au_pre] ([UexecSG]'s deposit class,
@@ -718,6 +724,18 @@ Section KexecAU.
      exit deposit's is ([UexecRet.uexec_pay_dep]): a process may only ever
      name the payload it can prove is its own, and the generic family names
      the trivial one. *)
+  (* ...AND THE PAYLOAD ITSELF, [Q (-1)], BESIDE THE FACT.  The pay fact is
+     persistent knowledge; the RESOURCE is separate and linear, and the new
+     image's run has to carry it between traps like any other
+     ([UkRun.urun]'s [ukn_pay N (-1)] conjunct, which
+     [UkRun.uslot_of_urun_all] takes).  There is exactly one copy in the
+     system and it is the one the exec'ing process deposited at its ecall,
+     which the DISPATCHER is holding across the call
+     ([SpecSyscall.sysc_pay_in]) -- kexec never sees it, so these wands
+     take it and [exec_post_ok]'s success arms hand the slot back still
+     waiting on it.  The kernel mints nothing: the resource that reaches
+     the new image is the one the old image gave up.  At the trivial
+     payload the premise is [True] and every generic supplier drops it. *)
   Definition exec_slot_pre (S : uvis -> iProp Σ) (Q : Z -> iProp Σ)
       (Pfin : Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
@@ -729,6 +747,7 @@ Section KexecAU.
         ⌜kexec_loadable f⌝ -∗
         ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
         my_pay (uvis_gen W') Q -∗
+        Q (-1) -∗
         S W')
      ∗ (∀ (av : aview) (i : Z) (a : anode) (W' : uvis),
           Pfin i -∗
@@ -736,6 +755,7 @@ Section KexecAU.
           ⌜~ anode_loadable a⌝ -∗
           ⌜exec_key_ok na alen sts W'⌝ -∗
           my_pay (uvis_gen W') Q -∗
+          Q (-1) -∗
           S W'))%I.
 
   (* everything the caller hands in *)
@@ -797,8 +817,8 @@ Section KexecAU.
        [pf_at_triv]. *)
     rewrite /pf_at /=. iSplit; [| done].
     rewrite /exec_slot_pre. iSplitR.
-    - iIntros (av i f nl W') "_ _ _ _ Hp". iApply ("HS" with "Hp").
-    - iIntros (av i a W') "_ _ _ _ Hp". iApply ("HS" with "Hp").
+    - iIntros (av i f nl W') "_ _ _ _ Hp _". iApply ("HS" with "Hp").
+    - iIntros (av i a W') "_ _ _ _ Hp _". iApply ("HS" with "Hp").
   Qed.
 
   (* ...and the one a caller that wants nothing back hands in: the slot
@@ -859,7 +879,16 @@ Section KexecAU.
      point of that premise: the kernel holds ONE [P L i] and it goes into
      the wand.  The failure arms below still hand it back -- nothing was
      spent there. *)
+  (* THE PAYLOAD IS NOT SPENT HERE -- IT IS OWED BY THE CALLER.  Both slot
+     wands take the exec'ing process's own payload at the kill status
+     ([exec_slot_pre]), and the kernel never holds it: kexec is handed the
+     bundle, not the payment (the trap route's payment row is the
+     DISPATCHER's -- [SpecSyscall.sysc_pay_in]).  So the success arms are
+     the wands applied AS FAR AS THE KERNEL CAN, and what comes out is the
+     slot piece still waiting on [Q (-1)].  The failure arms hand the whole
+     piece back unapplied and owe nothing. *)
   Definition exec_post_ok (Fs : pfam Σ (uvis -> iProp Σ)) Γ
+      (Q : Z -> iProp Σ)
       (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
@@ -876,7 +905,7 @@ Section KexecAU.
            ⌜kexec_loadable f⌝ ∗
            ⌜kexec_ok_exec f (us_V U) (us_V U') r na alen⌝ ∗
            ⌜kexec_image_ok f na alen afun sts (exec_key U' sts gn cs pidv na)⌝ ∗
-           Fs.(pf_recv) (exec_key U' sts gn cs pidv na))
+           (Q (-1) -∗ Fs.(pf_recv) (exec_key U' sts gn cs pidv na)))
         ∨ (* (b) anything else the code accepted (header): the landed
              success conjuncts at some entry, and the caller's OWN WP at
              the resume key -- the deposit's SECOND wand, applied to the
@@ -887,7 +916,7 @@ Section KexecAU.
          ⌜exists (entry spv szv' : mword 64),
             r <> (mword_of_int (-1) : mword 64)
             /\ kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝ ∗
-         Fs.(pf_recv) (exec_key U' sts gn cs pidv na))))%I.
+         (Q (-1) -∗ Fs.(pf_recv) (exec_key U' sts gn cs pidv na)))))%I.
 
   (* ret = -1 (header, OUT): the three-way fold of the bundle *)
   Definition exec_post_fail (Fs : pfam Σ (uvis -> iProp Σ)) Γ
@@ -929,7 +958,7 @@ Section KexecAU.
       (U U' : ustate) (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U /\ us_M U' = us_M U⌝
       ∗ exec_post_fail Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts)
-     ∨ exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs pidv U U' r)%I.
+     ∨ exec_post_ok Fs Γ Q P Fo pl na alen afun sts gn cs pidv U U' r)%I.
 
   (* SANITY: the arms imply the landed result relation, so the parallel
      form never contradicts [KexecDefs.kexec_ok] -- the failure arm is the
@@ -987,21 +1016,28 @@ Section KexecAU.
   Qed.
 
   (* THE SLOT OUT OF A SUCCESS, whichever arm fired.  Both of
-     [exec_post_ok]'s arms end in [Fs.(pf_recv) (exec_key U' sts gn cs na)] --
-     arm (a) because the file was loadable, arm (b) because the caller's
-     second wand paid for the node it was not -- so a caller that only
-     wants its WP back never has to case on them.  It also hands back the
+     [exec_post_ok]'s arms end in
+     [Q (-1) -∗ Fs.(pf_recv) (exec_key U' sts gn cs na)] -- arm (a) because
+     the file was loadable, arm (b) because the caller's second wand paid
+     for the node it was not -- so a caller that only wants its WP back
+     never has to case on them.  It also hands back the
      landed success facts, which is what makes the [a0 == -1] branch
      decidable at the same time. *)
+  (* ...STILL WAITING ON THE PAYLOAD, which is the whole of this lane: the
+     slot the kernel hands back is the one the exec'ing process's own
+     [Q (-1)] completes, and the party that holds that resource is the
+     DISPATCHER ([SpecSyscall.sysc_pay_in]), not kexec. *)
   Lemma exec_post_ok_recv (Fs : pfam Σ (uvis -> iProp Σ)) Γ
+      (Q : Z -> iProp Σ)
       (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
       (U U' : ustate) (r : mword 64) :
-    exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs pidv U U' r ⊢
-      ⌜r <> (mword_of_int (-1) : mword 64)⌝ ∗ Fs.(pf_recv) (exec_key U' sts gn cs pidv na).
+    exec_post_ok Fs Γ Q P Fo pl na alen afun sts gn cs pidv U U' r ⊢
+      ⌜r <> (mword_of_int (-1) : mword 64)⌝
+      ∗ (Q (-1) -∗ Fs.(pf_recv) (exec_key U' sts gn cs pidv na)).
   Proof.
     rewrite /exec_post_ok. iIntros "H".
     iDestruct "H" as (i av a) "(_ & [Ha | Hb])".

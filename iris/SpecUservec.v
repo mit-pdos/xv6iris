@@ -371,7 +371,7 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
     KptShare.kpt_creds -∗
     (* THE EXEC CHANNEL'S ANSWER, forwarded from usertrap's post at this
        boundary's own entry trapframe -- [SpecUsertrap.ut_exec_out] *)
-    ut_exec_out sc_v (tf_of g (ret_pc sepc_v)) M
+    ut_exec_out f sc_v (tf_of g (ret_pc sepc_v)) M
       (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
       (uint (pv_sz (us_V U))) U' sts sts' gn cs pid -∗
     (* ...AND FORK'S, forwarded the same way -- [SpecUsertrap.ut_fork_out] *)

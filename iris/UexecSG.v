@@ -356,17 +356,20 @@ Class uexecSG (Σ : gFunctors) {sg_ctok : ctokG Σ} := {
      family re-keyed at a payload deposits and pays back exactly what it
      did before, which is what lets a leaf take its supplier's [f] and put
      its own payload in it ([sfam_at]).
-     AT EVERY NUMBER BUT read (app-echo.md, "SH-LINE RULING", R1).  read's
-     deposit is a WAND FROM THE FAMILY'S OWN EXIT PAYLOAD
-     ([UexecExecInst.xv6_sbundle] at 5) -- the one branch that reads the
-     payload at all -- so re-keying is an identity on every OTHER number
-     and the side condition says exactly that.  A read leaf does not
-     re-key: it takes its deposit already minted at its own payload
-     ([sbundle_of_supply_ne] names it, and so does [UkRun.udep]'s law).
+     AT EVERY NUMBER BUT read AND exec (app-echo.md, "SH-LINE RULING",
+     R1, and the EXEC-PAY landing).  read's deposit is a WAND FROM THE
+     FAMILY'S OWN EXIT PAYLOAD ([UexecExecInst.xv6_sbundle] at 5), and
+     exec's carries that payload twice over -- the pay fact the kernel
+     relays to the new image's slot and the [Q (-1)] its two wands take
+     ([SpecKexec.exec_slot_pre]) -- so re-keying is an identity on every
+     OTHER number and the side conditions say exactly that.  Neither leaf
+     re-keys: each takes its deposit already minted at its own payload
+     ([sbundle_of_supply_ne] names it, so does [UkRun.udep]'s law, and
+     [UexecExecInst.sbundle_pay_exec_intro] is exec's introduction).
      [spost_at_at] needs no such condition: no post reads the payload. *)
   sbundle_at_at : forall (X : uvis -d> iPropO Σ) (n : Z) (Q : Z -> iProp Σ)
       (f : sfam) (W : uvis),
-    n <> USYS_read ->
+    n <> USYS_read -> n <> USYS_exec ->
     sbundle_at X n (sfam_at Q f) W = sbundle_at X n f W;
   (* [spost_at_at] stops at the four arguments the re-keying touches and
      leaves the answer's five off: the post stands under the arm's own
@@ -473,16 +476,16 @@ Section SBundle.
     sbundle_pay X n Q W -∗ sbundle X n W.
   Proof. iIntros "H". iDestruct "H" as (f) "[_ Hb]". iExists f. iExact "Hb". Qed.
 
-  (* ...and the other direction AT EVERY NUMBER BUT read, which is the one
-     branch whose bundle reads the payload: a bundle at some family is
+  (* ...and the other direction AT EVERY NUMBER BUT read AND exec, the two
+     branches whose bundles read the payload: a bundle at some family is
      re-keyed to the caller's payload for free everywhere else. *)
   Lemma sbundle_pay_of_sbundle (X : uvis -d> iPropO Σ) (n : Z)
       (Q : Z -> iProp Σ) (W : uvis) :
-    n <> USYS_read ->
+    n <> USYS_read -> n <> USYS_exec ->
     sbundle X n W -∗ sbundle_pay X n Q W.
   Proof.
-    intros Hne. iIntros "H". iDestruct "H" as (f) "Hb".
-    iExists (sfam_at Q f). rewrite (sbundle_at_at X n Q f W Hne).
+    intros Hne Hnx. iIntros "H". iDestruct "H" as (f) "Hb".
+    iExists (sfam_at Q f). rewrite (sbundle_at_at X n Q f W Hne Hnx).
     iSplitR; [ iPureIntro; apply sexit_pay_at | iExact "Hb" ].
   Qed.
 

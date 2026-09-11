@@ -455,20 +455,30 @@ Section UInitSh.
     iDestruct (ufd_auth_len with "Hufd") as %Hlen.
     iFrame "Hheap Hufd". iRight.
     (* ---- sh's constructor, at every key the image fact admits ---- *)
+    (* THE PAYLOAD RIDES WITH THE PAY FACT ([SpecKexec.exec_slot_pre]), and
+       at this lane it is the trivial one -- init's child owes nothing --
+       so what the constructor takes beside [my_pay] is [True] and sh's
+       entry is answered without it. *)
     iAssert (□ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
                   (W' : uvis),
                   ⌜kexec_image_ok ElfUser.sh_elf na alen afun fdv W'⌝ -∗
                   ⌜exec_args_of M (mword_of_int 0x1000 : mword 64)
                      na alen afun⌝ -∗
                   my_pay (uvis_gen W') (fun _ => True)%I -∗
+                  (fun _ : Z => True)%I (-1) -∗
                   sh_pay Rsh n0 -∗ uslot W'))%I as "#Hcon".
-    { iModIntro. iIntros (na alen afun W') "%Hok %Hargs #Hmp [#Hp1 #Hp2]".
+    { iModIntro. iIntros (na alen afun W') "%Hok %Hargs #Hmp _ [#Hp1 #Hp2]".
       destruct (init_args_det M na alen afun Hsav Hsro Hargs) as [-> Halen].
       iApply (sh_slot_of_kexec Hpsok Rsh 1%nat alen afun fdv W' n0 Hok
                 (init_sh_room alen n0 Halen Hn0) Hlen with "[] Hdep Hp2 Hmp").
       iModIntro. iIntros (γt γd γs) "Hsz Hlo".
       iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo"). }
     (* ---- the bundle ---- *)
+    (* ...and the taint arm on the same terms: the generic family is at the
+       trivial payload, so the [Q (-1)] it is handed is [True]. *)
+    iAssert (□ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') (fun _ => True)%I -∗
+                  (fun _ : Z => True)%I (-1) -∗ uslot W'))%I as "#Hgen'".
+    { iModIntro. iIntros (W') "#HT #Hmp _". iApply ("Hgen" with "HT Hmp"). }
     iDestruct (pinned_exec_bundle fsc_fs uslot FsShPin.era0_sh_pins T
                  FsImg.ROOTINO init_sh_pl [FsImg.ROOTINO; FsShPin.SH_INO]
                  FsShPin.SH_INO ElfUser.sh_elf 1%nat (sh_pay Rsh n0)
@@ -476,7 +486,7 @@ Section UInitSh.
                  M (mword_of_int 0x9a8) (mword_of_int 0x1000) fdv
                  init_sh_pin_resolves sh_elf_loadable
                  (init_sh_path_of M Hsro)
-                 with "Hcl Hinv Hcon Hgen Hpay") as (P Pmiss Fo R) "Hb".
+                 with "Hcl Hinv Hcon Hgen' Hpay") as (P Pmiss Fo R) "Hb".
     assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv))
                     (tf_arg_idx 0) = (mword_of_int 0x9a8 : mword 64))
       by (etransitivity; [ exact (tf_of_arg0 m pc) | exact Ha0 ]).
@@ -484,16 +494,15 @@ Section UInitSh.
                     (tf_arg_idx 1) = (mword_of_int 0x1000 : mword 64))
       by (etransitivity; [ exact (tf_of_arg1 m pc) | exact Ha1 ]).
     (* THE DEPOSIT IS WANTED AT THIS PROGRAM'S OWN PAYLOAD (app-echo.md,
-       "SH-LINE RULING", R1): exec's bundle reads no payload, so the
-       re-keying is free ([UexecSG.sbundle_pay_of_sbundle]). *)
-    iApply (sbundle_pay_of_sbundle uslot USYS_exec _ _
-              ltac:(vm_compute; discriminate)).
-    iApply (sbundle_exec_intro uslot
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv) P Pmiss Fo R).
-    { (* init's own payload is the trivial one -- userinit's choice, which
-         the entry constructor wrote into the record *)
-      cbn [uvis_gen uvis_of_run]. rewrite -Hpeq. iExact "Hmpay". }
-    rewrite Ea0 Ea1. iExact "Hb".
+       "SH-LINE RULING", R1, at exec): exec's bundle READS the payload --
+       it is what the kernel hands the new image's slot -- so the bundle is
+       introduced AT that payload rather than re-keyed afterwards.  init's
+       own is the trivial one ([Hpeq], userinit's choice). *)
+    iApply (sbundle_pay_exec_intro uslot
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv)
+              (ukn_pay N) P Pmiss Fo R).
+    { cbn [uvis_gen uvis_of_run]. iExact "Hmpay". }
+    rewrite Hpeq Ea0 Ea1. iExact "Hb".
   Qed.
 
 End UInitSh.

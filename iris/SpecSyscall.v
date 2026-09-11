@@ -320,8 +320,10 @@ Qed.
    at the number it trapped with -- at exec, [UexecExecInst.exec_sbundle],
    the [SpecSysExec] AU precondition at the trapping key, its slot wand
    concluding at the U-mode slot) gets back, on exec, either the failure
-   facts or [UexecRet.uslot] of the NEW image.  Every non-exec arm owes
-   nothing ([sysc_exec_out_ne]). *)
+   facts or [UexecRet.uslot] of the NEW image AT THE PRICE OF ITS EXIT
+   PAYLOAD -- the payment the dispatcher is holding across the call
+   ([sysc_pay_in]), which the new image's run needs because exec keeps the
+   process.  Every non-exec arm owes nothing ([sysc_exec_out_ne]). *)
 Section SyscExec.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
@@ -444,8 +446,13 @@ Section SyscExec.
   Definition sysc_pay_in (f : sfam) (U : ustate) : iProp Σ :=
     upay_at (pv_gen (us_V U)) uecall_scause (pv_tf (us_V U)) f.
 
-  (* ...AND WHAT COMES BACK: the payload at the kill status, for the arm
-     that resumes the process. *)
+  (* ...AND WHAT COMES BACK: the payload at the kill status.  UNGATED, for
+     the IN row's reason, and it is ONE resource with TWO readers: every
+     arm that resumes the caller takes it back through its own continuation
+     ([UexecRet.uexec_pay_arm]), and the exec-success arm spends it on the
+     NEW image's slot instead ([sysc_exec_out]'s right disjunct is a wand
+     from exactly this).  The two are exclusive -- a successful exec has no
+     old key to resume -- so nothing is duplicated. *)
   Definition sysc_pay_out (f : sfam) : iProp Σ :=
     uexec_pay_arm f.
 
@@ -600,16 +607,27 @@ Section SyscExec.
      slot -- the loadable one out of the deposit's image wand, anything
      else out of its [SpecKexec.exec_key_ok] wand -- so the channel has no
      third disjunct and the round mints nothing at exec. *)
-  Definition sysc_exec_out (U U' : ustate) (sts sts' : list fdstate)
+  (* THE SUCCESS ARM IS A WAND FROM THE PAYLOAD, and that is this lane
+     (EXEC-PAY).  The image exec loads runs as THIS process -- same
+     generation, same payload ([KexecDefs.KexecOkQ]) -- so its run has to
+     carry [ukn_pay N (-1)] like any other ([UkRun.uslot_of_urun_all]), and
+     the only copy in the system is the one the dispatcher is holding from
+     the trap ([sysc_pay_in]).  So the slot is handed over WAITING on it,
+     and the returning post's [sysc_pay_out] row is what pays it: on the
+     FAILURE arm the process resumes at its old key and keeps the row, on
+     the SUCCESS arm the row goes into this wand and the old key is gone.
+     Nothing is duplicated -- the two arms are exclusive. *)
+  Definition sysc_exec_out (f : sfam) (U U' : ustate) (sts sts' : list fdstate)
       (gn : gname) (cs : gset gname) (pid : mword 32) : iProp Σ :=
     (⌜sysc_num (us_V U) = 7⌝ -∗
        (⌜sysc_exec_failed U U' sts sts'⌝
-        ∨ uslot (uvis_of U' sts' gn cs pid)))%I.        (* the new image's slot *)
+        ∨ (sexit_pay f (-1) -∗
+             uslot (uvis_of U' sts' gn cs pid))))%I.     (* the new image's slot *)
 
   (* every other entry owes nothing *)
-  Lemma sysc_exec_out_ne (U U' : ustate) (sts sts' : list fdstate)
+  Lemma sysc_exec_out_ne (f : sfam) (U U' : ustate) (sts sts' : list fdstate)
       (gn : gname) (cs : gset gname) (pid : mword 32) :
-    sysc_num (us_V U) <> 7 -> ⊢ sysc_exec_out U U' sts sts' gn cs pid.
+    sysc_num (us_V U) <> 7 -> ⊢ sysc_exec_out f U U' sts sts' gn cs pid.
   Proof.
     intro Hne. rewrite /sysc_exec_out.
     iIntros "%Hk". exfalso. exact (Hne Hk).
@@ -925,7 +943,7 @@ Definition wp_syscall_sconf_body
       pc_is ret_tgt -∗
       (* ...and the exec channel's answer: on exec, the failure facts or
          the new image's slot at the resume record [U'] *)
-      sysc_exec_out U U' sts sts' gn cs pid -∗
+      sysc_exec_out f U U' sts sts' gn cs pid -∗
       (* ...and the SYSCALL CHANNEL's: the armed post of whatever contract
          the number ran, at the process's own families, at the return
          value the a0 slot now holds, and at the RESUME VIEW the round

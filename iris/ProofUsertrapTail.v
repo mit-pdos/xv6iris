@@ -307,7 +307,7 @@ Section UtRet2.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
-    ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
+    ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
       (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
@@ -851,7 +851,7 @@ Section UtRet.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
-    ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
+    ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
       (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
@@ -980,7 +980,7 @@ Section UtRet.
                       (uint (pv_sz (us_V (MkUstate Vr (us_M U)))))
                     = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))).
     { cbn [us_V]. rewrite HVrupt HVrsz. reflexivity. }
-    iDestruct (ut_exec_out_ueq scw _ _ _ _ _ U (MkUstate Vr (us_M U)) sts0 sts
+    iDestruct (ut_exec_out_ueq fdep scw _ _ _ _ _ U (MkUstate Vr (us_M U)) sts0 sts
                  gn cs pid
                  (tf_ueq_refl _) HVru eq_refl HVrpi HVrsz HVrcwi with "Hxo") as "Hxo".
     (* ...and the syscall channel's row across the same re-arming.  It reads
@@ -1132,7 +1132,7 @@ Section UtA6.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
-    ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
+    ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
       (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
@@ -1472,7 +1472,7 @@ Section UtFa.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
-    ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
+    ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
       (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)

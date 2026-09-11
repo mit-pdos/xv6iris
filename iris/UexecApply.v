@@ -723,7 +723,10 @@ Qed.
 (*        [uexec_ret]'s arms pays: transparent, ecall/exec (the kernel's    *)
 (*        own answer, off the process's exec deposit), ecall/fork (the      *)
 (*        parent's arm, at the pid) or ecall/other (the bumped slot).       *)
-(*        NOTHING IS MINTED: every arm is the process's own.                *)
+(*        NOTHING IS MINTED: every arm is the process's own.  The PAYMENT   *)
+(*        goes to whichever continuation the round takes -- the process's   *)
+(*        arm on every exit but one, the exec-success wand on that one --   *)
+(*        and the two are exclusive, so one resource serves both.           *)
 (*   [ukc_apply]                     step D: [uvb] built ROW BY ROW (never  *)
 (*        [iFrame]: the bundle carries [gpr_file]) and the continuation     *)
 (*        applied at the table/size the round landed on -- which is step C, *)
@@ -1006,7 +1009,15 @@ Section LoopApply.
                 (uvis_M W) (uvis_perm W) (uvis_sz W)
                 (uvis_M W') (uvis_perm W') (uvis_sz W')
            /\ uvis_fd W' = uvis_fd W⌝
-        ∨ uslot W')) -∗
+        (* ...AND THE SUCCESS ARM TAKES THE PAYMENT (EXEC-PAY).  exec keeps
+           the process: the record the kernel resumes is a different
+           PROGRAM's but the same process, at the same generation and the
+           same payload, so the new image's run needs the [Q (-1)] this
+           round is holding ([UkRun.uslot_of_urun_all]).  The loop hands it
+           to WHICHEVER continuation it takes -- the process's own arm on
+           every other exit from the round, this wand here -- and the two
+           are exclusive, so nothing is duplicated. *)
+        ∨ (uexec_pay_arm f -∗ uslot W'))) -∗
     (* THE KERNEL'S FORK ANSWER, and it is the mint this lane adds.  fork
        is the second entry whose round says more than a relation on the
        key: the kernel created a process, and what it hands the PARENT is
@@ -1098,12 +1109,14 @@ Section LoopApply.
           (* the post is at the a0 word, which the failure arm pins to [r] *)
           { iExact "Hsp". }
           iApply ("Hret" with "Hpay").
-        * (* succeeded: the new image's slot, out of the deposit.  The
-             payment is DROPPED here: this arm's process is gone -- the
-             record the kernel resumes is a different program's -- and the
-             run that image starts is built by its own entry constructor
-             ([UkRun.uslot_of_urun]), which is where its payload enters. *)
-          iExact "Hslot".
+        * (* succeeded: the new image's slot, out of the deposit.  THE
+             PAYMENT GOES INTO IT (EXEC-PAY): the record the kernel resumes
+             is a different program's but the SAME process, at the same
+             generation and the same payload, and the run that image starts
+             carries [UkRun.ukn_pay] at the kill status like any other --
+             so the arm the process would have resumed on is dropped and
+             this wand takes the payment instead. *)
+          iApply ("Hslot" with "Hpay").
       + cbv zeta.
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_exit))
           as [Hx | _]; [ contradiction (Hnex Hx) | ].
@@ -1308,7 +1321,8 @@ Section LoopApply.
                 (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
                 (uint (pv_sz (us_V U')))
            /\ fdv' = uvis_fd W⌝
-        ∨ uslot (uvis_of U' fdv' (uvis_gen W) cs' (uvis_pid W)))) -∗
+        ∨ (uexec_pay_arm f -∗
+             uslot (uvis_of U' fdv' (uvis_gen W) cs' (uvis_pid W))))) -∗
     (* ...AND FORK'S, forwarded verbatim -- see [uexec_ret_round_slot] *)
     (⌜sc = uecall_scause
       /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_fork⌝ -∗

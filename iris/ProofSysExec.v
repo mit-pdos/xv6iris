@@ -163,6 +163,7 @@ Section SysExecAUBridge.
      than on [MkUstate] so both call sites -- the walk's [us_upt _ _] and
      the contract's [MkUstate _ _] -- fit it. *)
   Lemma exec_post_ok_V (Fs : pfam Σ (uvis -> iProp Σ)) Γ
+      (Qp : Z -> iProp Σ)
       (Pw : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
@@ -170,8 +171,8 @@ Section SysExecAUBridge.
       (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
       (U1 U2 U' : ustate) (r : mword 64) :
     us_V U1 = us_V U2 ->
-    exec_post_ok Fs Γ Pw Fo pl na alen afun sts gn cs pidv U1 U' r -∗
-    exec_post_ok Fs Γ Pw Fo pl na alen afun sts gn cs pidv U2 U' r.
+    exec_post_ok Fs Γ Qp Pw Fo pl na alen afun sts gn cs pidv U1 U' r -∗
+    exec_post_ok Fs Γ Qp Pw Fo pl na alen afun sts gn cs pidv U2 U' r.
   Proof.
     intro HV. rewrite /exec_post_ok HV. iIntros "H". iExact "H".
   Qed.
@@ -762,7 +763,7 @@ Section SysExecWhole.
           iRight. iExists (bview plen pfun), i3, al3, af3.
           iSplitR; [iPureIntro; exact Hpof |].
           iSplitR; [iPureIntro; exact Hargs |].
-          iApply (exec_post_ok_V Fs (fs_gamma_L fsc_fs) P Fo
+          iApply (exec_post_ok_V Fs (fs_gamma_L fsc_fs) Qpay P Fo
                     (bview plen pfun) i3 al3 af3 sts gn cs pid
                     (us_upt U P3)
                     (MkUstate (upd_upt (us_V U) P3) (us_M U))
