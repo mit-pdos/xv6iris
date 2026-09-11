@@ -36,11 +36,14 @@ patch: `projects/wx-briefs/`.
 - CONS-ROUTE LANDED (2026-09-11; 24 files; VM build `consroute10` EXIT=0, audit =
   the thirteen, lemma_diff clean).  Notes: `app-echo.md` "SH-LINE RULING",
   "CONS-ROUTE LANDED".  Tree CLEAN.
-- NEXT: SH-LINE (`wx-briefs/brief-sh-line.md`, re-scoped to the ruling: the
-  position pair, `Qsh`, init's fork/wait, the linear `Pay` across exec, fd 0 =
-  console, the payload-wand read, `ushf_lexable` discharged; LAUNCHED 2026-09-11,
-  phase 1 then stop-and-report) → E4 SH-ECHO → E2 INIT-BOOT → E5 L7 (design with
-  the owner).
+- SH-LINE phase 1 LANDED (additive: `UserConsole.v`, `UConsLine.v`, `ukn_const`; VM
+  build `shline4` EXIT=0, audit = the thirteen, lemma_diff clean) and found two
+  more kernel seams, RULED in `app-echo.md` "SH-LINE PHASE 1 LANDED + TWO MORE
+  KERNEL SEAMS RULED": EXEC-PAY (the payload into the exec'd slot;
+  `wx-briefs/brief-exec-pay.md`, LAUNCHED 2026-09-11) → OPEN-PIN (a pinned open of
+  /console so fd 0 is the console device; brief to write) → SH-LINE phase 2 (a
+  fresh agent on a continuation of `brief-sh-line.md`) → E4 → E2 (also threads
+  `riscv_rx_tag = app_tag` into `Hinit_boot`) → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run

@@ -2218,6 +2218,53 @@ premise (their section binds `ctokG` without `xv6G` -- the "prints alike"
 trap); the token is consumed at the bundle's builder.  (5) `cons_acc`'s inner
 wand is a bupd; `cons_acc_ret` and the `_m1`/`_neg` helpers are `==∗`-shaped.
 
+SH-LINE PHASE 1 LANDED + TWO MORE KERNEL SEAMS RULED (2026-09-11).  Landed
+(additive, no consumer yet): `UserConsole.v` (`upos`/`upos_a`, `ucons_reader`,
+`ucons_stored_lb`, `ucons_pay cn γ T`), `UConsLine.v` (sh's read-leaf statement,
+the `gets` line invariant, `ush_std_cons`, the disciplined-line lemmas incl.
+`ush_echo_tokens` at three tokens, `init_exec_sup_lin`), `UkRun.ukn_const`.
+The alias is NOT optional: `ConsoleInv.cons_reader` is discharged over `xv6G`,
+which program files must not bind beside `ctokG`.  Findings, ruled:
+(1) EXEC-PAY.  The exec'd image's run needs `Q (-1)` linearly
+(`uslot_of_urun_all`), the kernel holds it across the exec (`sysc_pay_in`) and
+returns it (`sysc_pay_out`, unconditional), but only into the OLD key's
+continuation (`uexec_arm_F`); a successful exec answers with a finished slot
+(`sysc_exec_out`'s `uslot (uvis_of U' …)`) that never receives it.  RULED:
+CONS-ROUTE's move one syscall over -- `SpecKexec.exec_slot_pre`'s two wands
+conclude `Q (-1) -∗ S W'`, `sysc_exec_out`'s success arm becomes `sexit_pay f
+(-1) -∗ uslot …` (and `ut_exec_out`), and the round feeds `sysc_pay_out`'s own
+resource to whichever continuation it takes; nothing is duplicated.  Every
+`exec_slot_pre` supplier adapts (`exec_au_pre_triv_at`, `PinnedExec`,
+`UexecExecMint`, `UexecCond`, `InitBoot`, `UInitSh`, `UShKernel`, `UInitKernel`,
+`USyncKernel`, `UEchoKernel`): the generic ones take `Q (-1)` and hand it to
+`uslot_of_urun_all`; at the trivial payload it is `True`.
+(2) OPEN-PIN.  "fd 0 is the console" cannot come from tracked dups: the generic
+open leaf's descriptor TYPE is existential (`SpecSysOpen`: it is `FdDevice`
+exactly when the path resolved to a T_DEVICE inode -- a fact about the walk)
+and the leaf discards its `spost_at`.  RULED: a PINNED OPEN on `PinnedExec`'s
+mold -- an era-0 pin for the console device node (`FsConsPin.v` on
+`FsShPin`'s mold: path "console" at the root resolves to the image's device
+inode, major CONSOLE), a `PinnedOpen.pinned_open_bundle` at `open_in …` (row 15
+of `xv6_sbundle`) with the claim law `⌜Pin v⌝ ∨ T`, and an open leaf that KEEPS
+`open_receipt` (row 15 of `xv6_spost`, naming one row of `fdv'`); init's open
+uses it and its ledger is at a named state with fd 0 = `FdOpen true true
+(FdDevice CONSOLE)`; the two dups switch to the tracked leaf.
+(3) THE TAG'S READING.  `riscv_rx_tag h` is a field of the fixed GS tied to
+`app_tag A c` only in the top theorem's `boot_fixedGS` equation; nothing below
+reads it.  RULED: `Hinit_boot` gains the equation `riscv_rx_tag = app_tag A c`
+as a premise (the `file_app = MkAppcfg …` precedent -- E2's), and sh's entry
+takes the persistent claim law `□ (∀ h, riscv_rx_tag h -∗ ⌜disc h⌝ ∨ T)` from
+init's pinned builder, as `UInitSh.init_sh_slot` takes its claim law.
+(4) init's exec supply cannot become linear everywhere (`wp_kinit_main_loop`
+carries it across an `iLöb` and forks a fresh child per round): init keeps
+the PERSISTENT builder (`init_sh_slot`'s three `□` conjuncts) and mints a
+linear `init_exec_sup_lin` per round with `Pay := sh_pay ∗ upos γ n ∗ ucons_pay
+… (-1)`; `pex_slot`'s `∧` lets one `Pay` answer the slot arm and the refund.
+(5) The read-leaf discharge lives at `UInitSh`'s altitude (concrete bundle, no
+abstract `SG`), not in `UShKernel`.
+ORDER: EXEC-PAY → OPEN-PIN → SH-LINE phase 2 → E4 → E2 (which also threads
+(3)'s equation) → E5.
+
 #### E3 — THE INPUT LINE: DESIGN PROPOSAL (2026-09-11, coordinator; AWAITING THE OWNER'S RULING)
 
 FACTS (console-ring survey, verified): `ConsoleInv.cons_res` holds NO ghost state
