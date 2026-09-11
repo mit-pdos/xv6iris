@@ -2144,18 +2144,29 @@ C('D') and ring-full); the editable window `w..e` is an ordinary list `pd`
 consoleread exits pop a byte and never deliver it (the C('D') arm with nothing
 delivered yet; the copyout-failure break past `cons.r++`) -- the swallowed byte
 sits at `nrd + d`; under the owner's discipline `dc = d` (no ^D), an application
-argument.  (5) THE TOKENLESS READ IS ALLOWED AND PRICED, NOT FORBIDDEN (the
-design friction): the kernel cannot make console reading exclusive -- a
-generic process must answer `read(0,…)`, and `fsabs_fileread_in` must produce
-read's deposit at every state for the `uexecSG` supply law -- so the ring keeps
-TWO cursors, the actual `cur` (moved by every read) and the reader's `nrd`
-(a ghost_var pair, moved only by a token-holding read), with the invariant
-`⌜cur = nrd⌝ ∨ cons_dirty`; a read WITHOUT the token pays `app_sup` (the
-credential the generic slot holds; the kernel consumes it as a PRICE, never
-mints it), which the ring stores persistently as `cons_dirty`; the token
-holder's receipt says `⌜cur = nrd⌝ ∨ cons_dirty` -- for echo `app_sup` at every
-view yields the taint (some view fails the pins), so SH-LINE's disciplined
-branch is exactly "no tokenless read happened".
+argument.  (5) THE TOKEN ESCROW -- RULED WITH THE OWNER (2026-09-11; this REPLACES the
+"priced tokenless read" briefly considered).  The kernel's console arm requires
+`cons_reader n` UNCONDITIONALLY: one arm, no price, no second cursor, no dirty
+mark.  A generic (tainted) process can still read fd 0 at the console because
+THE APPLICATION SWITCHES REGIME AT THE TAINT: every kernel token a proven
+process spends (the reader token first; others as they appear) lives, in the
+tainted regime, in a system-wide ESCROW invariant the generic supply opens.
+Before the taint the proven holder (sh, via init's fork payload) owns the token
+outright; at the receipt where sh's tag comes back tainted, sh DEPOSITS the
+token into the escrow and continues as a generic process whose supply is the
+taint; the generic slot's read borrows the token from the escrow and returns it
+at whatever position (in the tainted regime nobody cares where the cursor is,
+so the escrow holds it existentially).  `xv6_ssupply` (a definition, not the
+class field) becomes "the claim holds of every view AND the escrow is open"
+(`app_sup ∗ escrow_open`); `fsabs_fileread_in` pays read's console arm at every
+state by borrowing.  The escrow is an Iris invariant (a linear resource moves
+under a persistent trigger; the deposit happens outside any lock, at sh's
+receipt).  CONS-CURSOR lands the kernel arm and STATES the generic read
+discharge's need (the read leaf at `Some` only; `fsabs_fileread_in`'s console
+case left as the one explicit premise of the supply law's instance until
+SH-LINE builds the escrow); SH-LINE builds the escrow, the switch at sh's
+receipt, and the tracked open/dup in init so sh's fd 0 is `FdDevice CONSOLE`
+in the descriptor ghost (today init drops its handles and sh assumes nothing).
 
 #### THE REMAINING ARC TO `xv6_app_adequacy` FOR ECHO — DESIGN (2026-09-11, coordinator, from a read-only survey of the tree)
 
