@@ -2128,6 +2128,35 @@ PLIC payload, boot; R3 touches `SpecFileread`, `SpecSysRead`, the read leaf,
 `UkSh`'s `gets`; R5 is the payload sweep over init/sh.  Order: R1 → R2 → R3
 (kernel, one lane "CONS-CURSOR") → R5 + sh's line (lane "SH-LINE") → E4.
 
+CONS-CURSOR RULINGS (2026-09-11, phase 1): (1) "histories only grow" is a
+`mono_list` on the MACHINE layer beside the history ghost (`RiscvPtsto.obs_hist_lb`/
+`obs_hist_auth`; `obs_auth h := obs_half h ∗ obs_hist_auth h`, stepped by
+`obs_update`; the power loop steps it itself) -- a fraction parked in the era's
+UART invariant would die at PowerOff.  The UART column's chain has an explicit
+top `ht` beside the anchor `hl`; the push is an ACCESSOR taken with `obs_auth h`
+in hand; the permit is unchanged.  (2) The console hop cannot use the lb (two
+lbs are comparable but nothing decides which came first): `uart_rx_hi`/`cons_hi`
+is a ghost_var pair, one half beside the rx token in the PLIC payload
+(`uart_rx_writer`), one in `cons_res`.  (3) `stored` is the COMMITTED prefix
+`r..w` (a mono_list, extended only by `cons.w = cons.e`, reached from '\n',
+C('D') and ring-full); the editable window `w..e` is an ordinary list `pd`
+(backspace/C('U') pop its tail).  (4) THE CURSOR MOVES BY `dc ∈ {d, d+1}`: two
+consoleread exits pop a byte and never deliver it (the C('D') arm with nothing
+delivered yet; the copyout-failure break past `cons.r++`) -- the swallowed byte
+sits at `nrd + d`; under the owner's discipline `dc = d` (no ^D), an application
+argument.  (5) THE TOKENLESS READ IS ALLOWED AND PRICED, NOT FORBIDDEN (the
+design friction): the kernel cannot make console reading exclusive -- a
+generic process must answer `read(0,…)`, and `fsabs_fileread_in` must produce
+read's deposit at every state for the `uexecSG` supply law -- so the ring keeps
+TWO cursors, the actual `cur` (moved by every read) and the reader's `nrd`
+(a ghost_var pair, moved only by a token-holding read), with the invariant
+`⌜cur = nrd⌝ ∨ cons_dirty`; a read WITHOUT the token pays `app_sup` (the
+credential the generic slot holds; the kernel consumes it as a PRICE, never
+mints it), which the ring stores persistently as `cons_dirty`; the token
+holder's receipt says `⌜cur = nrd⌝ ∨ cons_dirty` -- for echo `app_sup` at every
+view yields the taint (some view fails the pins), so SH-LINE's disciplined
+branch is exactly "no tokenless read happened".
+
 #### THE REMAINING ARC TO `xv6_app_adequacy` FOR ECHO — DESIGN (2026-09-11, coordinator, from a read-only survey of the tree)
 
 WHERE THE TREE IS.  Below the application everything is in: the trap route
