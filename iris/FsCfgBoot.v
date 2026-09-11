@@ -716,7 +716,7 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
     `{XI : TsoCtx.CurCtx}
     (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ) (dk : Z -> bv 8)
     (sb : fs_sb) (nib : nat) (cov : gset Z)
-    (γd : uart_names) (γv : disk_names)
+    (γd : uart_names) (γv : disk_names) (cnm : cons_names)
     (Rspent : gset Z) (Pb : Z -> list (bv 8)) (Xexc : gset Z) : iProp Σ :=
   (⌜icfg_dev = InodeInv.ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
    ⌜icfg_ist = FsImg.sb_inodestart sb⌝ ∗
@@ -724,6 +724,10 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
    ⌜fsc_logst = FsImg.sb_logstart sb⌝ ∗
    ⌜fsc_bmapstart = FsImg.sb_bmapstart sb⌝ ∗
    ⌜fsc_size = FsImg.sb_size sb⌝ ∗ ⌜fsc_ninodes = FsImg.sb_ninodes sb⌝ ∗
+   (* ...and the CONSOLE RING'S names, reused by the era mint exactly as
+      [γd] is (app-echo.md, lane CONS-CURSOR, C2): the ring is minted in the
+      boot chain, at names the era's config then carries as [fsc_cons]. *)
+   ⌜fsc_cons = cnm⌝ ∗
    fs_kit_icache ICFG FSC ∗
    fs_kit_fsinit_ghost ICFG FSC APP (FsCrash.fs_blocks dk) Rspent Pb Xexc ∗
    (* the off-borrow liveness authority and, r25 (item 24/33), the NINODE
@@ -746,15 +750,15 @@ Lemma fs_boot_supply_app_inv `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG �
     `{GEN : GenId} `{XI : TsoCtx.CurCtx}
     (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ) (dk : Z -> bv 8)
     (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
-    (γd : uart_names) (γv : disk_names)
+    (γd : uart_names) (γv : disk_names) (cnm : cons_names)
     (Rspent : gset Z) (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
-  fs_boot_supply ICFG FSC APP dk sb nib cov γd γv Rspent Pb Xexc ⊢
+  fs_boot_supply ICFG FSC APP dk sb nib cov γd γv cnm Rspent Pb Xexc ⊢
     AppInv.app_inv (APP := APP) fsc_fs
-    ∧ fs_boot_supply ICFG FSC APP dk sb nib cov γd γv Rspent Pb Xexc.
+    ∧ fs_boot_supply ICFG FSC APP dk sb nib cov γd γv cnm Rspent Pb Xexc.
 Proof.
   iIntros "H". iSplit; [| iExact "H"].
   rewrite /fs_boot_supply.
-  iDestruct "H" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hkit & _)".
+  iDestruct "H" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hkit & _)".
   iDestruct (fs_kit_fsinit_ghost_open with "Hkit")
     as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Happ & _)".
   iExact "Happ".

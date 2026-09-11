@@ -5,6 +5,7 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat
      invariants.
 From iris.algebra Require Import csum excl agree auth gset.
+From iris.algebra.lib Require Import mono_list.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -521,6 +522,27 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscv_obs_name : gname;
   riscv_obs_total : list mobs;
   riscv_obs_pred : iProp Σ;
+  (* HISTORIES ONLY GROW, AS A RESOURCE (app-echo.md lane CONS-CURSOR, C1).
+     The history ghost above is a [ghost_var], which says what the history
+     IS and nothing about what it WAS: a proof that holds a past history
+     [h0] -- the UART's receive column holds one per queued byte -- cannot
+     compare it with the current [h] at all.  So the machine's half
+     ([obs_auth]) carries, beside the [ghost_var], a MONO_LIST AUTHORITY at
+     the same history, and its persistent lower bound [obs_hist_lb h0] is
+     "[h0] is a prefix of the history the run has reached".  It is stepped
+     in lockstep with the [ghost_var] -- [obs_update] takes the prefix
+     premise every append already satisfies -- so no event can move one
+     without the other, and a lower bound taken at any past event stays
+     true for ever.
+
+     WHY IT IS A MACHINE FIELD AND NOT A CLIENT ONE.  The trivial
+     application's permit ([WpUart.uart_obs_permit_triv]) has to mint the
+     column's evidence just as the ledger's does; a client-chosen family
+     could not, and the receive column is maintained by the UART thread
+     under every application.  The name rides here beside
+     [riscv_obs_name] for the same reason that one does. *)
+  riscvF_obshGS :: inG Σ (mono_listR (leibnizO mobs));
+  riscv_obs_hist : gname;
   (* THE INPUT TAG FAMILY (claude-notes/projects/app-echo.md, lane L5).  The
      AMBIENT twin of [riscv_obs_pred], and ambient for the same reason: every
      byte the environment pushes into the UART carries an
@@ -728,11 +750,73 @@ Definition crash_inv `{!riscvFixedGS Σ} : iProp Σ :=
    disjoint, so the openings compose. *)
 Definition obsN : namespace := nroot .@ "obs".
 
-(* the two halves of the history ghost: [state_interp]'s and the client's *)
-Definition obs_auth `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
+(* the two halves of the history ghost: [state_interp]'s and the client's.
+   THE MACHINE'S HALF CARRIES THE GROWTH AUTHORITY TOO (the record's
+   [riscv_obs_hist] field): every mover of the history holds [obs_auth], so
+   putting the monotone authority there is what makes "the history only
+   grows" a fact no arm can sidestep.  The client's half is unchanged, which
+   is why [obs_ledger]/[obs_pred_triv] and every hook stated over
+   [obs_frag] read exactly as before. *)
+Definition obs_hist_lb `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
+  own riscv_obs_hist (◯ML (h : list (leibnizO mobs))).
+Definition obs_hist_auth `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
+  own riscv_obs_hist (●ML (h : list (leibnizO mobs))).
+(* the machine's half WITHOUT the growth authority.  A CLIENT HOOK MOVES
+   THIS ONE: the power hook is written by a client that has no
+   [riscvFixedGS] and spells [ghost_var γobs (1/2) h], so the monotone
+   authority is stepped beside it by the power loop rather than by the
+   hook. *)
+Definition obs_half `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
   ghost_var riscv_obs_name (1/2) h.
+Definition obs_auth `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
+  (obs_half h ∗ obs_hist_auth h)%I.
 Definition obs_frag `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
   ghost_var riscv_obs_name (1/2) h.
+
+(* THE GROWTH AUTHORITY'S OWN STEP, for the one mover that does not hold
+   the client's half: the power loop, whose hook moves [obs_half] alone. *)
+Lemma obs_hist_auth_step `{!riscvFixedGS Σ} (h h' : list mobs) :
+  h `prefix_of` h' -> obs_hist_auth h ==∗ obs_hist_auth h'.
+Proof.
+  intro Hpre. rewrite /obs_hist_auth. iIntros "Ha".
+  iMod (own_update _ _ (●ML (h' : list (leibnizO mobs))) with "Ha") as "$";
+    [by apply mono_list_update | done].
+Qed.
+
+Global Instance obs_hist_lb_persistent `{!riscvFixedGS Σ} h :
+  Persistent (obs_hist_lb h).
+Proof. rewrite /obs_hist_lb. apply _. Qed.
+Global Instance obs_hist_lb_timeless `{!riscvFixedGS Σ} h :
+  Timeless (obs_hist_lb h).
+Proof. rewrite /obs_hist_lb. apply _. Qed.
+Global Instance obs_auth_timeless `{!riscvFixedGS Σ} h : Timeless (obs_auth h).
+Proof. rewrite /obs_auth. apply _. Qed.
+
+(* THE THREE MOVES ON THE LOWER BOUND.  A snapshot is free; a snapshot and
+   the authority together order the two histories; and a bound weakens to
+   any prefix of itself. *)
+Lemma obs_auth_lb `{!riscvFixedGS Σ} (h : list mobs) :
+  obs_auth h -∗ obs_auth h ∗ obs_hist_lb h.
+Proof.
+  iIntros "[Hv Ha]". rewrite /obs_auth /obs_hist_auth /obs_hist_lb.
+  iEval (rewrite {1}mono_list_auth_lb_op) in "Ha".
+  iDestruct "Ha" as "[Ha Hlb]".
+  iFrame "Hv Ha Hlb".
+Qed.
+
+Lemma obs_hist_lb_prefix `{!riscvFixedGS Σ} (h h0 : list mobs) :
+  obs_auth h -∗ obs_hist_lb h0 -∗ ⌜h0 `prefix_of` h⌝.
+Proof.
+  iIntros "[_ Ha] Hlb". rewrite /obs_hist_auth /obs_hist_lb.
+  by iDestruct (own_valid_2 with "Ha Hlb") as %?%mono_list_both_valid_L.
+Qed.
+
+Lemma obs_hist_lb_mono `{!riscvFixedGS Σ} (h0 h1 : list mobs) :
+  h0 `prefix_of` h1 -> obs_hist_lb h1 -∗ obs_hist_lb h0.
+Proof.
+  intro Hp. rewrite /obs_hist_lb. iIntros "H".
+  iApply (own_mono with "H"). by apply mono_list_lb_mono.
+Qed.
 
 Definition obs_inv `{!riscvFixedGS Σ} : iProp Σ :=
   inv obsN riscv_obs_pred.
@@ -768,13 +852,21 @@ Definition obs_ledger `{!riscvFixedGS Σ} (R : list mobs -> iProp Σ) : iProp Σ
 
 Lemma obs_agree `{!riscvFixedGS Σ} (h1 h2 : list mobs) :
   obs_auth h1 -∗ obs_frag h2 -∗ ⌜h1 = h2⌝.
-Proof. iIntros "H1 H2". by iDestruct (ghost_var_agree with "H1 H2") as %->. Qed.
+Proof.
+  iIntros "[H1 _] H2". by iDestruct (ghost_var_agree with "H1 H2") as %->.
+Qed.
 
+(* THE APPEND.  The prefix premise is the growth law itself, and it costs
+   nothing: every mover of the history appends ([h ++ κ] at a device event,
+   [h ++ [ObsPowerOn]] at a power one), so each supplies it by
+   [prefix_app_r]. *)
 Lemma obs_update `{!riscvFixedGS Σ} (h h' : list mobs) :
+  h `prefix_of` h' ->
   obs_auth h -∗ obs_frag h ==∗ obs_auth h' ∗ obs_frag h'.
 Proof.
-  iIntros "H1 H2". iMod (ghost_var_update_halves h' with "H1 H2") as "[$ $]".
-  done.
+  intro Hpre. iIntros "[H1 Ha] H2". rewrite /obs_auth /obs_half.
+  iMod (ghost_var_update_halves h' with "H1 H2") as "[$ $]".
+  iMod (obs_hist_auth_step h h' Hpre with "Ha") as "$". done.
 Qed.
 
 (* the durable disk's auth, at an image: what [state_interp] holds and what

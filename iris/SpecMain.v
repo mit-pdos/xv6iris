@@ -295,7 +295,7 @@ Section SpecMain.
        l_ncommit ↦₄ v_nc ∗ lh_n_pa ↦₄ v_n ∗
        ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w))%I.
 
-  Definition main_globals_raw : iProp Σ :=
+  Definition main_globals_raw (cn : cons_names) : iProp Σ :=
     ((∃ r w : mword 64,
         devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) ∗
      (* ...and the eighteen devsw entries consoleinit never writes, still as
@@ -423,7 +423,20 @@ Section SpecMain.
         static global the init sequence brings under a lock -- and main needs
         it to run the [WpLock.newlock] that turns consoleinit's postcondition
         into [ConsoleInv.is_conslock], one half of [console_caps]. *)
-     cons_res)%I.
+     cons_res cn ∗
+     (* ...AND THE READER TOKEN (app-echo.md, lane CONS-CURSOR, C2).  The
+        ring's cursor is born at 0 with the ring empty, and its other half
+        -- the exclusive right to consume the console's input -- travels
+        with the boot supply.  THIS LANE hands it back to the top of the
+        boot chain and drops it there; E2 routes it into
+        [PinnedExec.init_boot_bundle] instead. *)
+     cons_reader cn 0%nat ∗
+     (* ...AND THE CLEAN TOKEN, the exclusive authority of the ring's DIRTY
+        MARKER ([ConsoleInv.cons_clean_tok]).  It is what main's [newlock]
+        spends to allocate the credential escrow
+        ([ConsoleInv.cons_cred_inv]) that rides in [is_conslock]: the ring
+        is born with nobody having read behind the token holder's back. *)
+     cons_clean_tok cn)%I.
 
   (* ------------------------------------------------------------------- *)
   (* This hart's own translation and trap resources.  [strans_bit bare]   *)
@@ -453,6 +466,12 @@ Section SpecMain.
       (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (γd : uart_names) (γv : disk_names)
+      (* THE CONSOLE RING'S GHOST NAMES, minted with the ring at boot: the
+         committed sequence's, the cursor's, and the receive side's (whose
+         [un_rxhi] half the ring holds).  A parameter rather than
+         [fsc_cons], because main runs BEFORE the file-system config the
+         ambient one lives in exists. *)
+      (cn : cons_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (* THE FILE SYSTEM'S BOOT-ERA MINT, as the era chose it: the disk's
          bytes, the parsed superblock, the inode region's block count and
@@ -490,6 +509,9 @@ Section SpecMain.
     (* the disk's protocol is in its not-live arm at boot: virtio_disk_init
        makes it live, and its config half [c0] is how main knows so *)
     virtio_live c0 = false ->
+    (* the console ring's names carry the RECEIVE side's, which is where the
+       high-water mark's two halves live (app-echo.md, CONS-CURSOR C2) *)
+    cn_uart cn = γd ->
     (* the inode region is nonempty.  It is [BootShared.fs_boot_image_wf]'s
        fifth conjunct, and it reaches here as a PURE premise rather than as
        one of [fs_boot_supply]'s ties because the era holds it about [nib]
@@ -548,7 +570,7 @@ Section SpecMain.
          P pos cur_ctx) -∗
     (* the boot supply *)
     main_locks_raw -∗
-    main_globals_raw -∗
+    main_globals_raw cn -∗
     (* THE IMAGE'S WRITABLE INITIALIZED GLOBALS, which [kernel_data] stopped
        claiming when it was narrowed to [rodata_end].  This is
        [BootShared.main_data_raw], spelled out rather than named because
@@ -601,7 +623,7 @@ Section SpecMain.
        projections -- so that every row is at the instance the boot chain is
        applied at, which is the same discipline
        [BootShared.boot_shared_alloc]'s return uses. *)
-    fs_boot_supply _ _ _ dk sb nib cov γd γv Rspent Pb
+    fs_boot_supply _ _ _ dk sb nib cov γd γv cn Rspent Pb
       (FsCrash.hdr_wset (FsCrash.fs_blocks dk) (FsImg.sb_logstart sb)) -∗
     (* ---- ROW (B) OF THE fsinit BUNDLE: the ERA's log-region mirror
        variable, straight out of [BootShared.boot_shared_alloc] (the era
@@ -663,7 +685,13 @@ Section SpecMain.
     (* THE RECEIVE TOKEN, born with the device invariant and carried by main
        to uartinit's FCR flush; main parks it in the PLIC invariant between
        consoleinit and plicinit, which is what mints [uart_inited]. *)
-    uart_rx_tok γd 0%nat -∗
+    uart_rx_tok γd 0%nat None -∗
+    (* ...AND THE CONSUMER'S HIGH-WATER HALF, which main parks in the PLIC
+       payload beside the token.  Its partner is inside the ring's resource
+       ([main_globals_raw] above), and the pair is what lets consoleintr
+       order the byte it is filing against the bytes already in the ring
+       (app-echo.md, lane CONS-CURSOR, C2). *)
+    uart_rx_hi γd (1/2) None -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     (* ...and the two disk ghosts the protocol invariant does NOT hold, minted
@@ -718,7 +746,7 @@ Module Type MAIN.
       (m : regfile) (K : nat)
       (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
-      (γd : uart_names) (γv : disk_names)
+      (γd : uart_names) (γv : disk_names) (cn : cons_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
@@ -727,5 +755,5 @@ Module Type MAIN.
       (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
       `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)},
       wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
+        γd γv cn l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
 End MAIN.

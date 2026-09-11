@@ -102,6 +102,11 @@ Require Import RiscvPtsto RiscvExtras.
 Require Import RiscvLang ObsTrace.   (* [mobs], [obs_ends_in]: the tag column's vocabulary *)
 Require Import VcGen.   (* [trunc32_unsigned]/[trunc32_sext]: the ring index's wrap *)
 Require Import WpLock.
+Require Export UartNames.   (* [uart_names]: the receive side's ghost names;
+                               the ring's high-water mark is one of them *)
+From iris.base_logic.lib Require Import ghost_var own.
+From iris.algebra.lib Require Import mono_list.
+From iris.base_logic.lib Require Import mono_nat.   (* the ring's dirty marker: [cons_dirty_lb] *)
 Require Import TsoCtx CtxMorphTac.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -114,6 +119,9 @@ Local Open Scope Z_scope.
 (* ------------------------------------------------------------------ *)
 
 Definition INPUT_BUF_SIZE : nat := 128.
+
+(* [cons_names] -- the ring's three ghost names -- is in [UartNames.v],
+   with the receive side's, so that [FsCfg] can carry it. *)
 
 (* sizeof(struct spinlock): the ring starts right after the lock, which is
    the first member -- so [&cons.lock = &cons], the a0 consoleinit passes to
@@ -205,6 +213,171 @@ Definition cons_tagged (bs : nat -> bv 8) (hs : list (list mobs)) (d : nat)
 
 Lemma cons_tagged_0 (bs : nat -> bv 8) : cons_tagged bs [] 0.
 Proof. split; [reflexivity | intros j Hj; exfalso; lia]. Qed.
+
+(* =====================================================================
+   THE STORED SEQUENCE AND THE CONSUMPTION CURSOR  (app-echo.md, lane
+   CONS-CURSOR, C2)
+
+   The row above says WHICH BYTES are in the ring; it says nothing about
+   the ORDER they arrived in, and a reader that copies [d] of them learns
+   only that each one arrived at some history.  What a program reading the
+   console needs is stronger and is stated here: the ring's bytes are a
+   SEQUENCE, the reader has a CURSOR into it, and consecutive reads return
+   consecutive elements.
+
+   THE SEQUENCE IS THE COMMITTED BYTES, NOT THE RING'S LIVE RANGE.  The
+   ring has two regions and they behave differently.  [r .. w) is
+   COMMITTED: consoleread reads up to [w] and nothing ever takes a byte
+   back out of it, because both of consoleintr's [cons.e--]s are guarded by
+   [cons.e != cons.w].  [w .. e) is the LINE BEING EDITED: backspace and
+   C('U') shorten it.  An append-only ghost list can model the first and
+   cannot model the second, so [stored] covers [r .. w) only, and the
+   editable window rides beside it as an ORDINARY existential list [pd]
+   that shrinks with [cons.e].  THE ONE TRANSITION THAT EXTENDS [stored] IS
+   [cons.w = cons.e] -- the wake tail, reached from the '\n', the C('D')
+   and the ring-full arms -- which moves the whole of [pd] onto the end of
+   [stored] at once.  Nothing else touches it: the store at [cons.e++]
+   extends [pd], the two [cons.e--]s pop [pd]'s tail, and consoleread's
+   [cons.r++] moves the CURSOR, not the list.
+
+   FOUR CLAUSES.
+   * [cons_stored r w n st bs ts] -- the committed region: [st] has
+     [n + (w - r)] entries, the cursor [n] counts the bytes already
+     consumed, and the [k]th unconsumed byte (slot [cons_slot r k]) is
+     [st !! (n + k)] -- its history in [ts], its byte in [bs] translated.
+   * [cons_pend r w e pd bs ts] -- the same for the editable window, keyed
+     from [w].
+   * [cons_chain (st ++ pd)] -- THE ORDER: along the whole stored sequence
+     the histories strictly extend one another.  This is what makes the
+     bytes a sequence of input events rather than a bag, and it is
+     inherited from the UART column's own chain, one byte at a time.
+   * [cons_below (st ++ pd) hh] -- everything stored is at or before the
+     HIGH-WATER MARK [hh], whose other half rides in the PLIC payload
+     beside the receive token.  That half is the only thing that can tell
+     consoleintr that the byte it is about to file is NEWER than every byte
+     the ring already holds: two persistent bounds on the run's history are
+     comparable but do not say WHICH came first, and the ring's own picture
+     can be arbitrarily stale.  The exclusive pair says it. *)
+
+Definition cons_stored (r w : mword 32) (n : nat)
+    (st : list (list mobs * bv 8)) (bs : list (bv 8))
+    (ts : list (option (list mobs))) : Prop :=
+  length st = (n + Z.to_nat (bv_unsigned (sub_vec w r)))%nat
+  /\ forall k : Z, (0 <= k < bv_unsigned (sub_vec w r))%Z ->
+       exists (h : list mobs) (b : bv 8),
+         st !! (n + Z.to_nat k)%nat = Some (h, b)
+         /\ ts !! cons_slot r k = Some (Some h)
+         /\ obs_ends_in h b
+         /\ bs !! cons_slot r k = Some (cons_xlate b).
+
+Definition cons_pend (r w e : mword 32)
+    (pd : list (list mobs * bv 8)) (bs : list (bv 8))
+    (ts : list (option (list mobs))) : Prop :=
+  length pd = Z.to_nat (bv_unsigned (sub_vec e w))
+  /\ forall j : nat, (j < length pd)%nat ->
+       exists (h : list mobs) (b : bv 8),
+         pd !! j = Some (h, b)
+         /\ ts !! cons_slot r (bv_unsigned (sub_vec w r) + Z.of_nat j)
+            = Some (Some h)
+         /\ obs_ends_in h b
+         /\ bs !! cons_slot r (bv_unsigned (sub_vec w r) + Z.of_nat j)
+            = Some (cons_xlate b).
+
+Definition cons_chain (l : list (list mobs * bv 8)) : Prop :=
+  forall (i j : nat) (hi hj : list mobs) (bi bj : bv 8),
+    l !! i = Some (hi, bi) -> l !! j = Some (hj, bj) -> (i < j)%nat ->
+    hist_ext hi hj.
+
+Definition cons_below (l : list (list mobs * bv 8))
+    (hh : option (list mobs)) : Prop :=
+  forall (j : nat) (h : list mobs) (b : bv 8),
+    l !! j = Some (h, b) -> ohist_le (Some h) hh.
+
+(* THE WINDOW A READ HANDS BACK.  [l] is a lower bound on the stored
+   sequence -- a list every later bound agrees with on every index it has,
+   which is what makes two successive reads' windows CONSECUTIVE -- and the
+   read of [d] bytes at cursor [n] delivered exactly [l !! n .. l !! n+d).
+   [length l = n + d] pins the window to the END of the bound, so a caller
+   that holds two of them can line them up by length alone. *)
+Definition cons_window (l : list (list mobs * bv 8)) (n d : nat)
+    (bs : nat -> bv 8) (hs : list (list mobs)) : Prop :=
+  length l = (n + d)%nat
+  /\ length hs = d
+  /\ forall j : nat, (j < d)%nat ->
+       exists (h : list mobs) (b : bv 8),
+         l !! (n + j)%nat = Some (h, b)
+         /\ hs !! j = Some h
+         /\ obs_ends_in h b
+         /\ bs j = cons_xlate b.
+
+Lemma cons_window_0 (l : list (list mobs * bv 8)) (n : nat)
+    (bs : nat -> bv 8) :
+  length l = n -> cons_window l n 0 bs [].
+Proof.
+  intro Hl. split_and!; [lia | reflexivity | intros j Hj; exfalso; lia].
+Qed.
+
+(* the chain survives taking a prefix, which is what lets a reader that
+   holds a lower bound of the stored sequence read the order off it *)
+Lemma cons_chain_prefix (l1 l2 : list (list mobs * bv 8)) :
+  l1 `prefix_of` l2 -> cons_chain l2 -> cons_chain l1.
+Proof.
+  intros [k ->] Hch i j hi hj bi bj Hi Hj Hij.
+  apply (Hch i j hi hj bi bj); [| | exact Hij];
+    by apply lookup_app_l_Some.
+Qed.
+
+(* the same, for the "everything here is at or before [hh]" clause *)
+Lemma cons_below_prefix (l1 l2 : list (list mobs * bv 8))
+    (hh : option (list mobs)) :
+  l1 `prefix_of` l2 -> cons_below l2 hh -> cons_below l1 hh.
+Proof.
+  intros [k ->] Hb j h b Hj.
+  apply (Hb j h b). by apply lookup_app_l_Some.
+Qed.
+
+(* THE STORE'S TWO PURE OBLIGATIONS, once.  consoleintr files a byte whose
+   history is strictly newer than the ring's high-water mark, and the mark
+   is at or after everything the ring holds -- so the byte is strictly
+   after every byte in the ring, which is exactly what extends the chain
+   and moves the mark to the byte just filed. *)
+Lemma cons_chain_snoc (l : list (list mobs * bv 8))
+    (hh : option (list mobs)) (h : list mobs) (b : bv 8) :
+  cons_chain l -> cons_below l hh -> ohist_ext hh h ->
+  cons_chain (l ++ [(h, b)]).
+Proof.
+  intros Hch Hbl Hx i j hi hj bi bj Hi Hj Hij.
+  pose proof (lookup_lt_Some _ _ _ Hj) as Hjl0.
+  rewrite length_app in Hjl0. cbn [length] in Hjl0.
+  assert (Hil : (i < length l)%nat) by lia.
+  rewrite lookup_app_l in Hi; [| exact Hil].
+  destruct (decide (j < length l)%nat) as [Hjl | Hjl].
+  - rewrite lookup_app_l in Hj; [| exact Hjl].
+    exact (Hch i j hi hj bi bj Hi Hj Hij).
+  - assert (Hje : j = length l) by lia. subst j.
+    rewrite lookup_app_r in Hj; [| lia].
+    rewrite Nat.sub_diag in Hj. cbn in Hj.
+    injection Hj as <- <-.
+    exact (ohist_ext_le_ext (Some hi) hh h (Hbl i hi bi Hi) Hx).
+Qed.
+
+Lemma cons_below_snoc (l : list (list mobs * bv 8))
+    (hh : option (list mobs)) (h : list mobs) (b : bv 8) :
+  cons_below l hh -> ohist_ext hh h ->
+  cons_below (l ++ [(h, b)]) (Some h).
+Proof.
+  intros Hbl Hx j g c Hj.
+  pose proof (lookup_lt_Some _ _ _ Hj) as Hjl0.
+  rewrite length_app in Hjl0. cbn [length] in Hjl0.
+  destruct (decide (j < length l)%nat) as [Hjl | Hjl].
+  - rewrite lookup_app_l in Hj; [| exact Hjl].
+    destruct (ohist_ext_le_ext (Some g) hh h (Hbl j g c Hj) Hx) as [Hp _].
+    exact Hp.
+  - assert (Hje : j = length l) by lia. subst j.
+    rewrite lookup_app_r in Hj; [| lia].
+    rewrite Nat.sub_diag in Hj. cbn in Hj.
+    injection Hj as <- <-. exact (ohist_le_Some h).
+Qed.
 
 (* =====================================================================
    THE COUPLING'S ARITHMETIC
@@ -507,6 +680,306 @@ Proof.
     split_and!; [exact Ht0 | exact He0 | exact Hb0].
 Qed.
 
+(* ---- THE RING'S THREE TRANSITIONS, as pure facts -------------------- *)
+
+(* (1) THE COMMIT, [cons.w = cons.e]: the editable window becomes part of
+   the committed prefix, and the window empties.  It is the ONLY transition
+   that extends [stored], and the code reaches it from '\n', from C('D')
+   and from the store that fills the ring (console.c's inner [if]). *)
+Lemma cons_stored_commit (r w e : mword 32) (cur : nat)
+    (st pd : list (list mobs * bv 8)) (bs : list (bv 8))
+    (ts : list (option (list mobs))) :
+  cons_ok r w e ->
+  cons_stored r w cur st bs ts -> cons_pend r w e pd bs ts ->
+  cons_stored r e cur (st ++ pd) bs ts.
+Proof.
+  intros Hok [Hlst Hst] [Hlpd Hpd].
+  pose proof (cons_sub_range w r) as Hwr.
+  pose proof (cons_sub_range e r) as Her.
+  pose proof (cons_sub_range e w) as Hew.
+  (* THE RING'S WINDOW SPLIT.  [w - r] and [e - w] add up to [e - r] at
+     width 32 because [cons_ok] pins both ends inside one 128-byte span:
+     [e - w] is congruent to [(e-r) - (w-r)], which is in [0,128], so the
+     wrap cannot bite. *)
+  assert (Hsplit : (bv_unsigned (sub_vec w r) + bv_unsigned (sub_vec e w)
+                    = bv_unsigned (sub_vec e r))%Z).
+  { assert (Hbig : (2 ^ 32)%Z = 4294967296%Z) by (vm_compute; reflexivity).
+    pose proof (cons_urange r) as Hr0. pose proof (cons_urange w) as Hw0.
+    pose proof (cons_urange e) as He0.
+    pose proof (cons_sub_range e r) as Her0.
+    pose proof (cons_sub_range w r) as Hwr0.
+    assert (Hok2 := Hok). rewrite /cons_ok cons_bufz in Hok2.
+    rewrite (cons_subz e w).
+    assert (Hcong : ((bv_unsigned e - bv_unsigned w)
+                     = (bv_unsigned (sub_vec e r) - bv_unsigned (sub_vec w r))
+                       + ((bv_unsigned e - bv_unsigned r) / 2 ^ 32
+                          - (bv_unsigned w - bv_unsigned r) / 2 ^ 32) * 2 ^ 32)%Z).
+    { rewrite !cons_subz.
+      pose proof (Z.div_mod (bv_unsigned e - bv_unsigned r) (2 ^ 32)
+                    ltac:(lia)) as He1.
+      pose proof (Z.div_mod (bv_unsigned w - bv_unsigned r) (2 ^ 32)
+                    ltac:(lia)) as Hw1.
+      lia. }
+    rewrite Hcong Z_mod_plus_full Z.mod_small; lia. }
+  split.
+  { rewrite length_app Hlst Hlpd. lia. }
+  intros k Hk.
+  destruct (Z_lt_ge_dec k (bv_unsigned (sub_vec w r))) as [Hlt | Hge].
+  - destruct (Hst k ltac:(lia)) as (h & b & Hs & Ht & He & Hb).
+    exists h, b. split_and!; [| exact Ht | exact He | exact Hb].
+    rewrite lookup_app_l; [exact Hs | rewrite Hlst; lia].
+  - set (j := Z.to_nat (k - bv_unsigned (sub_vec w r))).
+    assert (Hjlt : (j < length pd)%nat) by (rewrite Hlpd /j; lia).
+    destruct (Hpd j Hjlt) as (h & b & Hs & Ht & He & Hb).
+    assert (Hkj : (bv_unsigned (sub_vec w r) + Z.of_nat j = k)%Z)
+      by (rewrite /j; lia).
+    rewrite Hkj in Ht. rewrite Hkj in Hb.
+    exists h, b. split_and!; [| exact Ht | exact He | exact Hb].
+    rewrite lookup_app_r; [| rewrite Hlst; lia].
+    rewrite Hlst. replace (cur + Z.to_nat k - (cur + Z.to_nat (bv_unsigned (sub_vec w r))))%nat
+      with j by (rewrite /j; lia).
+    exact Hs.
+Qed.
+
+Lemma cons_pend_commit (r e : mword 32) (bs : list (bv 8))
+    (ts : list (option (list mobs))) :
+  cons_pend r e e [] bs ts.
+Proof.
+  split; [| intros j Hj; cbn [length] in Hj; lia].
+  cbn [length]. rewrite cons_sub_self. reflexivity.
+Qed.
+
+(* (2) THE STORE at [cons.e]: the editable window gains the byte, the
+   committed prefix is untouched because the slot written is outside it. *)
+Lemma cons_stored_ins (r w : mword 32) (cur : nat)
+    (st : list (list mobs * bv 8)) (bs : list (bv 8))
+    (ts : list (option (list mobs))) (i : nat) (h : list mobs) (b : bv 8)
+    (e : mword 32) :
+  cons_ok r w e ->
+  (bv_unsigned (sub_vec e r) < Z.of_nat INPUT_BUF_SIZE)%Z ->
+  i = cons_slot e 0 ->
+  cons_stored r w cur st bs ts ->
+  cons_stored r w cur st (<[i := cons_xlate b]> bs) (<[i := Some h]> ts).
+Proof.
+  intros Hok Hlt Hi [Hlst Hst]. subst i.
+  pose proof (cons_slot_end r e) as Hend.
+  pose proof (cons_sub_range w r) as Hwr0.
+  pose proof (cons_sub_range e r) as Her0.
+  rewrite cons_bufz in Hlt.
+  destruct Hok as [Hok1 Hok2].
+  split; [exact Hlst |].
+  intros k Hk.
+  destruct (Hst k Hk) as (g & c & Hs & Ht & He & Hb).
+  assert (Hr1 : (0 <= k < 128)%Z) by lia.
+  assert (Hr2 : (0 <= bv_unsigned (sub_vec e r) < 128)%Z) by lia.
+  assert (Hne : cons_slot r k <> cons_slot e 0).
+  { rewrite <- Hend. intro Hc.
+    pose proof (cons_slot_inj r k _ Hr1 Hr2 Hc) as Hk2. lia. }
+  exists g, c. split_and!; [exact Hs | | exact He |].
+  - rewrite list_lookup_insert_ne; [exact Ht | congruence].
+  - rewrite list_lookup_insert_ne; [exact Hb | congruence].
+Qed.
+
+Lemma cons_pend_push (r w e : mword 32) (pd : list (list mobs * bv 8))
+    (bs : list (bv 8)) (ts : list (option (list mobs))) (i : nat)
+    (h : list mobs) (b : bv 8) :
+  length bs = INPUT_BUF_SIZE -> length ts = INPUT_BUF_SIZE ->
+  cons_ok r w e ->
+  (bv_unsigned (sub_vec e r) < Z.of_nat INPUT_BUF_SIZE)%Z ->
+  i = cons_slot e 0 ->
+  obs_ends_in h b ->
+  cons_pend r w e pd bs ts ->
+  cons_pend r w (add_vec e (mword_of_int 1 : mword 32)) (pd ++ [(h, b)])
+    (<[i := cons_xlate b]> bs) (<[i := Some h]> ts).
+Proof.
+  intros Hlb Hlt Hok Hltr Hi Hends [Hlpd Hpd]. subst i.
+  assert (Hbig : (2 ^ 32)%Z = 4294967296%Z) by (vm_compute; reflexivity).
+  rewrite cons_bufz in Hltr.
+  pose proof (cons_sub_range e r) as Her.
+  pose proof (cons_sub_range e w) as Hew.
+  pose proof (cons_sub_range w r) as Hwr.
+  pose proof (cons_slot_end r e) as Hend.
+  (* the same window split as [cons_stored_commit]'s *)
+  assert (Hsplit : (bv_unsigned (sub_vec w r) + bv_unsigned (sub_vec e w)
+                    = bv_unsigned (sub_vec e r))%Z).
+  { pose proof (cons_urange r) as Hr0. pose proof (cons_urange w) as Hw0.
+    pose proof (cons_urange e) as He0.
+    pose proof (cons_sub_range e r) as Her0.
+    pose proof (cons_sub_range w r) as Hwr0.
+    assert (Hok2 := Hok). rewrite /cons_ok cons_bufz in Hok2.
+    rewrite (cons_subz e w).
+    assert (Hcong : ((bv_unsigned e - bv_unsigned w)
+                     = (bv_unsigned (sub_vec e r) - bv_unsigned (sub_vec w r))
+                       + ((bv_unsigned e - bv_unsigned r) / 2 ^ 32
+                          - (bv_unsigned w - bv_unsigned r) / 2 ^ 32) * 2 ^ 32)%Z).
+    { rewrite !cons_subz.
+      pose proof (Z.div_mod (bv_unsigned e - bv_unsigned r) (2 ^ 32)
+                    ltac:(lia)) as He1.
+      pose proof (Z.div_mod (bv_unsigned w - bv_unsigned r) (2 ^ 32)
+                    ltac:(lia)) as Hw1.
+      lia. }
+    rewrite Hcong Z_mod_plus_full Z.mod_small; lia. }
+  assert (Hinc : (bv_unsigned (sub_vec (add_vec e (mword_of_int 1 : mword 32)) w)
+                  = bv_unsigned (sub_vec e w) + 1)%Z).
+  { apply (cons_sub_inc e w). rewrite Hbig. lia. }
+  split.
+  { rewrite length_app Hlpd Hinc. cbn [length]. lia. }
+  intros j Hj. rewrite length_app Hlpd in Hj. cbn [length] in Hj.
+  destruct (decide (j < length pd)%nat) as [Hjl | Hjl].
+  - destruct (Hpd j Hjl) as (g & c & Hs & Ht & He & Hb).
+    assert (Hjl2 : (Z.of_nat j < bv_unsigned (sub_vec e w))%Z)
+      by (rewrite Hlpd in Hjl; lia).
+    assert (Hr1 : (0 <= bv_unsigned (sub_vec w r) + Z.of_nat j < 128)%Z)
+      by lia.
+    assert (Hr2 : (0 <= bv_unsigned (sub_vec e r) < 128)%Z) by lia.
+    assert (Hne : cons_slot r (bv_unsigned (sub_vec w r) + Z.of_nat j)
+                  <> cons_slot e 0).
+    { rewrite <- Hend. intro Hc.
+      pose proof (cons_slot_inj r _ _ Hr1 Hr2 Hc) as Hk2. lia. }
+    exists g, c. split_and!; [| | exact He |].
+    + rewrite lookup_app_l; [exact Hs | exact Hjl].
+    + rewrite list_lookup_insert_ne; [exact Ht | congruence].
+    + rewrite list_lookup_insert_ne; [exact Hb | congruence].
+  - assert (Hje : j = length pd) by lia. subst j.
+    assert (Hkey : (bv_unsigned (sub_vec w r) + Z.of_nat (length pd)
+                    = bv_unsigned (sub_vec e r))%Z) by (rewrite Hlpd; lia).
+    rewrite Hkey. rewrite <- Hend.
+    exists h, b. split_and!; [| | exact Hends |].
+    + rewrite lookup_app_r; [| lia]. rewrite Nat.sub_diag. reflexivity.
+    + rewrite list_lookup_insert; [reflexivity | rewrite Hlt; apply cons_slot_lt].
+    + rewrite list_lookup_insert; [reflexivity | rewrite Hlb; apply cons_slot_lt].
+Qed.
+
+(* (3) THE EDIT, backspace and C('U'): [cons.e] moves back one and the
+   window loses its LAST entry.  The committed prefix cannot be reached --
+   the code tests [cons.e != cons.w] first -- so [stored] never shrinks. *)
+Lemma cons_pend_pop (r w e : mword 32) (pd : list (list mobs * bv 8))
+    (x : list mobs * bv 8) (bs : list (bv 8))
+    (ts : list (option (list mobs))) :
+  (1 <= bv_unsigned (sub_vec e w))%Z ->
+  cons_pend r w e (pd ++ [x]) bs ts ->
+  cons_pend r w (add_vec e (mword_of_int (-1) : mword 32)) pd bs ts.
+Proof.
+  intros Hge [Hlpd Hpd].
+  assert (Hbig : (2 ^ 32)%Z = 4294967296%Z) by (vm_compute; reflexivity).
+  pose proof (cons_sub_range e w) as Hew.
+  assert (Hdec : (bv_unsigned (sub_vec (add_vec e (mword_of_int (-1) : mword 32)) w)
+                  = bv_unsigned (sub_vec e w) - 1)%Z)
+    by exact (cons_sub_dec e w Hge).
+  rewrite length_app in Hlpd. cbn [length] in Hlpd.
+  split; [rewrite Hdec; lia |].
+  intros j Hj.
+  destruct (Hpd j ltac:(rewrite length_app; cbn [length]; lia))
+    as (g & c & Hs & Ht & He & Hb).
+  exists g, c. split_and!; [| exact Ht | exact He | exact Hb].
+  rewrite lookup_app_l in Hs; [exact Hs | exact Hj].
+Qed.
+
+(* (4) THE CONSUMPTION, [cons.r++] -- CONSOLEREAD'S ONLY MOVE.  The
+   committed sequence is UNTOUCHED (a byte stays in [stored] forever); what
+   moves is the CURSOR, and that is the whole content of the pop: the [k]th
+   unconsumed byte after it is the [(k+1)]st before it, and both name
+   [st !! (S cur + k)].  This is the only transition that advances [cur],
+   which is why [cur] is what a receipt's window is keyed at. *)
+Lemma cons_stored_pop (r w : mword 32) (cur : nat)
+    (st : list (list mobs * bv 8)) (bs : list (bv 8))
+    (ts : list (option (list mobs))) :
+  (1 <= bv_unsigned (sub_vec w r))%Z ->
+  cons_stored r w cur st bs ts ->
+  cons_stored (add_vec r (mword_of_int 1 : mword 32)) w (S cur) st bs ts.
+Proof.
+  intros Hge [Hlen Hst].
+  pose proof (cons_sub_shiftr w r Hge) as Hdec.
+  split.
+  { rewrite Hlen Hdec. lia. }
+  intros k Hk. rewrite Hdec in Hk.
+  destruct (Hst (k + 1)%Z ltac:(lia)) as (h & b & Hs & Ht & He & Hb).
+  exists h, b. rewrite cons_slot_shift.
+  split_and!; [| exact Ht | exact He | exact Hb].
+  replace (S cur + Z.to_nat k)%nat with (cur + Z.to_nat (k + 1))%nat by lia.
+  exact Hs.
+Qed.
+
+(* ...and the editable window rides the pop unchanged: it is keyed from
+   [cons.w], and the slot the [j]th pending byte lives in is the same
+   address read off the new [cons.r] ([cons_slot_shift] absorbs the
+   shift). *)
+Lemma cons_pend_shift (r w e : mword 32) (pd : list (list mobs * bv 8))
+    (bs : list (bv 8)) (ts : list (option (list mobs))) :
+  (1 <= bv_unsigned (sub_vec w r))%Z ->
+  cons_pend r w e pd bs ts ->
+  cons_pend (add_vec r (mword_of_int 1 : mword 32)) w e pd bs ts.
+Proof.
+  intros Hge [Hlen Hpd]. split; [exact Hlen |].
+  intros j Hj. destruct (Hpd j Hj) as (h & b & Hs & Ht & He & Hb).
+  pose proof (cons_sub_shiftr w r Hge) as Hdec.
+  exists h, b. rewrite cons_slot_shift Hdec.
+  replace (bv_unsigned (sub_vec w r) - 1 + Z.of_nat j + 1)%Z
+     with (bv_unsigned (sub_vec w r) + Z.of_nat j)%Z by lia.
+  split_and!; [exact Hs | exact Ht | exact He | exact Hb].
+Qed.
+
+(* ---- WHAT A READER'S WINDOW IS BUILT OUT OF ------------------------ *)
+
+(* a prefix of any length the sequence has *)
+Lemma cons_prefix_len (st : list (list mobs * bv 8)) (k : nat) :
+  (k <= length st)%nat ->
+  exists l : list (list mobs * bv 8), l `prefix_of` st /\ length l = k.
+Proof.
+  intro Hk. exists (take k st). split.
+  - exists (drop k st). symmetry. apply take_drop.
+  - rewrite length_take. lia.
+Qed.
+
+(* ...and the prefix ONE LONGER, which is what a pop earns: the byte the
+   read just took is the sequence's own next element, so the bound the
+   window is stated at grows by exactly it. *)
+Lemma cons_prefix_snoc (l st : list (list mobs * bv 8))
+    (x : list mobs * bv 8) :
+  l `prefix_of` st -> st !! length l = Some x ->
+  (l ++ [x])%list `prefix_of` st.
+Proof.
+  intros [k ->] Hx.
+  rewrite lookup_app_r in Hx; [| lia]. rewrite Nat.sub_diag in Hx.
+  destruct k as [| y k']; [discriminate |].
+  cbn in Hx. injection Hx as <-.
+  exists k'. by rewrite <- app_assoc.
+Qed.
+
+(* THE WINDOW GROWS BY THE BYTE THE POP TOOK.  The run's source function is
+   the old one below [d] and the popped byte at [d] -- which is exactly what
+   the copy loop's glue builds -- and the tag list gains the byte's own
+   history. *)
+Lemma cons_window_snoc (l : list (list mobs * bv 8)) (n d : nat)
+    (bs bs' : nat -> bv 8) (hs : list (list mobs))
+    (h : list mobs) (b : bv 8) :
+  cons_window l n d bs hs ->
+  obs_ends_in h b ->
+  (forall i : nat, (i < d)%nat -> bs' i = bs i) ->
+  bs' d = cons_xlate b ->
+  cons_window (l ++ [(h, b)])%list n (S d) bs' (hs ++ [h])%list.
+Proof.
+  intros (Hl & Hhl & Hwin) Hends Hlo Hhi.
+  split_and!.
+  - rewrite length_app Hl. cbn [length]. lia.
+  - rewrite length_app Hhl. cbn [length]. lia.
+  - intros j Hj. destruct (decide (j < d)%nat) as [Hjd | Hjd].
+    + destruct (Hwin j Hjd) as (g & c & Hlj & Hhj & He & Hb).
+      exists g, c. split_and!.
+      * rewrite lookup_app_l; [exact Hlj | rewrite Hl; lia].
+      * rewrite lookup_app_l; [exact Hhj | rewrite Hhl; lia].
+      * exact He.
+      * rewrite (Hlo j Hjd). exact Hb.
+    + assert (Hje : j = d) by lia. subst j.
+      exists h, b. split_and!.
+      * rewrite lookup_app_r; [| rewrite Hl; lia].
+        rewrite Hl. replace (n + d - (n + d))%nat with 0%nat by lia. reflexivity.
+      * rewrite lookup_app_r; [| rewrite Hhl; lia].
+        rewrite Hhl Nat.sub_diag. reflexivity.
+      * exact Hends.
+      * exact Hhi.
+Qed.
+
 (* ===================================================================== *)
 (*  devsw[] -- THE DEVICE FUNCTION TABLE                                  *)
 (*                                                                        *)
@@ -591,6 +1064,17 @@ Proof.
   apply (f_equal (@bv_unsigned 64)) in H. vm_compute in H. discriminate.
 Qed.
 
+(* THE CONSOLE'S OWN NAMESPACE, and the ONE invariant at it: the credential
+   escrow [cons_cred_inv] below.  It is disjoint from [AppInv.appN] and from
+   [WpLock.lockN] by construction, so the dispatcher's read arm -- which
+   runs its fancy updates at [⊤] ([ProofFileread]'s [iMod (proto_read_* ⊤
+   ..)]) -- may open it beside anything else the kernel holds.  The mask the
+   two accessors are stated at is therefore [⊤]; they are stated at an
+   arbitrary [E] with [↑consN ⊆ E] so a smaller-masked caller is not shut
+   out. *)
+Definition consN : namespace := nroot .@ "cons".
+Definition consE : coPset := ↑consN.
+
 Section ConsoleInv.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{XI : CurCtx}.
@@ -662,8 +1146,259 @@ Section ConsoleInv.
     iExact "H".
   Qed.
 
-  Definition cons_res : iProp Σ :=
-    (∃ (r w e : mword 32) (bs : list (bv 8)) (ts : list (option (list mobs))),
+  (* ---- THE RING'S GHOSTS ---------------------------------------------
+
+     Three names travel together, so a caller of consoleread passes ONE
+     record and the ring's resource takes no gname parameters of its own.
+     [cn_uart] is there because the HIGH-WATER MARK is a receive-side ghost
+     ([UartNames.un_rxhi]): its other half rides in the PLIC payload beside
+     the receive token, where the popper is, and that pairing is the whole
+     reason the ring can order a byte it is being handed against the bytes
+     it already holds. *)
+  Definition cons_stored_auth (cn : cons_names)
+      (st : list (list mobs * bv 8)) : iProp Σ :=
+    own cn.(cn_log) (●ML (st : list (leibnizO (list mobs * bv 8)))).
+  (* WHAT A RECEIPT HANDS OUT.  Persistent, and any two of them agree on
+     every index both have -- which is what makes two successive reads'
+     windows parts of ONE sequence. *)
+  Definition cons_stored_lb (cn : cons_names)
+      (st : list (list mobs * bv 8)) : iProp Σ :=
+    own cn.(cn_log) (◯ML (st : list (leibnizO (list mobs * bv 8)))).
+  (* THE CURSOR, in two halves.  The ring's half is inside [cons_res]; the
+     other half IS THE READER TOKEN -- the exclusive right to consume the
+     console's input, which is what makes "one reader" a resource instead of
+     a hope about the process tree. *)
+  Definition cons_cursor (cn : cons_names) (n : nat) : iProp Σ :=
+    ghost_var cn.(cn_rd) (1/2) n.
+  Definition cons_reader (cn : cons_names) (n : nat) : iProp Σ :=
+    ghost_var cn.(cn_rd) (1/2) n.
+  (* the ring's half of the high-water mark.  THE SAME PROPOSITION as
+     [WpUart.uart_rx_hi (cn_uart cn) (1/2)], spelled here because this file
+     sits below [WpUart] and must not depend on it; the two unfold to one
+     [ghost_var] at one name. *)
+  Definition cons_hi (cn : cons_names) (hh : option (list mobs)) : iProp Σ :=
+    ghost_var (un_rxhi cn.(cn_uart)) (1/2) hh.
+
+  Global Instance cons_stored_lb_persistent cn st :
+    Persistent (cons_stored_lb cn st).
+  Proof. rewrite /cons_stored_lb. apply _. Qed.
+  Global Instance cons_stored_lb_timeless cn st :
+    Timeless (cons_stored_lb cn st).
+  Proof. rewrite /cons_stored_lb. apply _. Qed.
+  Global Instance cons_reader_timeless cn n : Timeless (cons_reader cn n).
+  Proof. rewrite /cons_reader. apply _. Qed.
+
+  Lemma cons_cursor_agree cn n n' :
+    cons_cursor cn n -∗ cons_reader cn n' -∗ ⌜n = n'⌝.
+  Proof.
+    iIntros "H1 H2". by iDestruct (ghost_var_agree with "H1 H2") as %->.
+  Qed.
+  Lemma cons_cursor_update cn n n' :
+    cons_cursor cn n -∗ cons_reader cn n ==∗
+      cons_cursor cn n' ∗ cons_reader cn n'.
+  Proof. iIntros "H1 H2". iApply (ghost_var_update_halves with "H1 H2"). Qed.
+
+  Lemma cons_stored_lb_get cn st :
+    cons_stored_auth cn st -∗ cons_stored_auth cn st ∗ cons_stored_lb cn st.
+  Proof.
+    iIntros "Ha". rewrite /cons_stored_auth /cons_stored_lb.
+    iEval (rewrite {1}mono_list_auth_lb_op) in "Ha".
+    iDestruct "Ha" as "[Ha Hlb]".
+    iFrame "Ha Hlb".
+  Qed.
+
+  Lemma cons_stored_lb_prefix cn st l :
+    cons_stored_auth cn st -∗ cons_stored_lb cn l -∗ ⌜l `prefix_of` st⌝.
+  Proof.
+    iIntros "Ha Hl". rewrite /cons_stored_auth /cons_stored_lb.
+    by iDestruct (own_valid_2 with "Ha Hl") as %?%mono_list_both_valid_L.
+  Qed.
+
+  (* TWO WINDOWS OF ONE SEQUENCE.  A reader that holds the bound from an
+     earlier read and the bound from a later one can line them up: the two
+     are comparable, so the shorter is a prefix of the longer and every
+     index they share carries the same byte. *)
+  Lemma cons_stored_lb_agree cn l1 l2 :
+    cons_stored_lb cn l1 -∗ cons_stored_lb cn l2 -∗
+      ⌜l1 `prefix_of` l2 \/ l2 `prefix_of` l1⌝.
+  Proof.
+    iIntros "H1 H2". rewrite /cons_stored_lb.
+    by iDestruct (own_valid_2 with "H1 H2")
+      as %?%mono_list_lb_op_valid_L.
+  Qed.
+
+  (* a bound SHORTENS to any prefix of itself, which is how a window whose
+     run is still growing is kept exactly as long as the run *)
+  Lemma cons_stored_lb_weaken cn l l' :
+    l' `prefix_of` l -> cons_stored_lb cn l -∗ cons_stored_lb cn l'.
+  Proof.
+    intro Hp. rewrite /cons_stored_lb. iIntros "H".
+    iApply (own_mono with "H"). by apply mono_list_lb_mono.
+  Qed.
+
+  Lemma cons_stored_append cn st st' :
+    cons_stored_auth cn st ==∗ cons_stored_auth cn (st ++ st').
+  Proof.
+    rewrite /cons_stored_auth. iIntros "Ha".
+    iMod (own_update _ _
+            (●ML ((st ++ st') : list (leibnizO (list mobs * bv 8))))
+            with "Ha") as "$"; [| done].
+    apply mono_list_update. by exists st'.
+  Qed.
+
+  (* ---- A CONSOLE READ WITHOUT THE READER TOKEN IS LEGAL, AND PRICED ----
+
+     The kernel CANNOT make console reading exclusive.  A generic process --
+     one this application says nothing about -- may call read(0, ..), and
+     the generic slot's supply law ([UexecExecInst.xv6_sbundle_of_supply_ne],
+     a FIELD of [UexecSG]'s class) has to answer for it at every syscall
+     number OUT OF A PERSISTENT SUPPLY ([□ ssupply] in both laws).  A
+     deposit that demanded an exclusive token is therefore not merely
+     unprovable: taken as a premise under a [□] it is INCONSISTENT (open it
+     three times and hold [ghost_var γ (1/2) _] thrice), so the arm has to
+     be payable from something persistent.  What the kernel does instead is
+     RECORD that such a read happened, at the price of the credential the
+     generic slot already holds, and let the token holder learn it.
+
+     So the ring carries TWO cursors.  [cur] is the ACTUAL consumed count --
+     pure, the ring's own, moved by EVERY consoleread -- and it is what
+     [cons_stored] keys the committed sequence at.  [nrd] is the READER'S
+     position, the ghost half whose partner is [cons_reader], and only a
+     token-holding read moves it (it needs both halves).  Between them sits
+     the one clause that makes the whole thing honest:
+
+         ⌜cur = nrd⌝ ∨ cons_dirty_lb cn
+
+     -- either nobody has read behind the token holder's back, or somebody
+     did.
+
+     THE MARKER RIDES IN THE RING, THE CREDENTIAL DOES NOT, and the split is
+     forced by TIMELESSNESS: [cons_res] is a LOCK PAYLOAD, which acquire
+     strips a [▷] off, and the credential [Wd] is an arbitrary application
+     [iProp] ([AppInv.app_sup] over an abstract [app_pred]) that is not
+     timeless.  So the ring holds only [cons_dirty_lb] -- a [mono_nat] lower
+     bound at 1, persistent AND timeless -- and the credential sits in the
+     ESCROW INVARIANT [cons_cred_inv] carried beside the lock handle in
+     [is_conslock].  The payer deposits [□ Wd] there while setting the
+     marker; the token holder reads it back out of the marker.  Both opens
+     are atomic; nothing is held open across a step. *)
+
+  (* WHAT THE TOKENLESS CALLER PAYS.  Boxed, so the token holder's receipt
+     can carry a copy away.  [Wd] is an opaque parameter here rather than
+     [AppInv.app_sup] itself because this file sits far below the
+     application's invariant; [SpecFileread]'s console arm is where it is
+     named ([app_sup]), and [SpecConsoleread] relays it. *)
+  Definition cons_dirty_cred (Wd : iProp Σ) : iProp Σ := (□ Wd)%I.
+
+  Global Instance cons_dirty_cred_persistent Wd :
+    Persistent (cons_dirty_cred Wd).
+  Proof. rewrite /cons_dirty_cred. apply _. Qed.
+
+  (* THE RING'S MARKER and the CLEAN TOKEN it is made from.  One [mono_nat]
+     at [cn_dirty]: the authority at 0 is the exclusive clean token, minted
+     in the boot fupd beside the ring; the lower bound at 1 is the marker.
+     The two are incompatible ([mono_nat_lb_own_valid] gives [1 <= 0]),
+     which is what lets a holder of the marker rule out the escrow's clean
+     arm.  Both are timeless. *)
+  Definition cons_clean_tok (cn : cons_names) : iProp Σ :=
+    mono_nat_auth_own cn.(cn_dirty) 1 0%nat.
+  Definition cons_dirty_lb (cn : cons_names) : iProp Σ :=
+    mono_nat_lb_own cn.(cn_dirty) 1%nat.
+
+  Global Instance cons_dirty_lb_persistent cn : Persistent (cons_dirty_lb cn).
+  Proof. rewrite /cons_dirty_lb. apply _. Qed.
+  Global Instance cons_dirty_lb_timeless cn : Timeless (cons_dirty_lb cn).
+  Proof. rewrite /cons_dirty_lb. apply _. Qed.
+  Global Instance cons_clean_tok_timeless cn : Timeless (cons_clean_tok cn).
+  Proof. rewrite /cons_clean_tok. apply _. Qed.
+
+  Lemma cons_dirty_lb_clean cn :
+    cons_clean_tok cn -∗ cons_dirty_lb cn -∗ False.
+  Proof.
+    rewrite /cons_clean_tok /cons_dirty_lb. iIntros "Ha Hlb".
+    iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hle]. lia.
+  Qed.
+
+  (* THE ESCROW.  Its body is the one place [□ Wd] lives, and it is a
+     disjunction the marker decides: clean (nobody has paid) or dirty (the
+     marker is out and the credential is here).  Persistent by [inv], so it
+     rides in [is_conslock] and costs a caller nothing.  Spelled at the
+     [mono_nat] forms rather than at the three names above so that the two
+     accessors can strip the invariant's later off the timeless half
+     without unfolding anything. *)
+  Definition cons_cred_body (cn : cons_names) (Wd : iProp Σ) : iProp Σ :=
+    (mono_nat_auth_own cn.(cn_dirty) 1 0%nat
+     ∨ (mono_nat_lb_own cn.(cn_dirty) 1%nat ∗ □ Wd))%I.
+
+  Definition cons_cred_inv (cn : cons_names) (Wd : iProp Σ) : iProp Σ :=
+    inv consN (cons_cred_body cn Wd).
+
+  Global Instance cons_cred_inv_persistent cn Wd :
+    Persistent (cons_cred_inv cn Wd).
+  Proof. apply _. Qed.
+
+  (* the boot allocation: the clean token buys the escrow *)
+  Lemma cons_cred_inv_alloc (cn : cons_names) (Wd : iProp Σ) (E : coPset) :
+    cons_clean_tok cn ={E}=∗ cons_cred_inv cn Wd.
+  Proof.
+    iIntros "Hcl". rewrite /cons_cred_inv.
+    iApply (inv_alloc consN E (cons_cred_body cn Wd)).
+    iNext. rewrite /cons_cred_body. iLeft. iExact "Hcl".
+  Qed.
+
+  (* THE PAYER, at a mask that admits [consN].  It hands the credential in
+     and gets the marker out; a second payer finds the dirty arm and simply
+     takes a copy of the marker.  ATOMIC: the invariant is closed again
+     before anything else happens, so nothing is held open across a step --
+     which is the whole reason the credential is here and not in the
+     caller's hands across the sleeping call. *)
+  Lemma cons_cred_pay (cn : cons_names) (Wd : iProp Σ) (E : coPset) :
+    ↑consN ⊆ E ->
+    cons_cred_inv cn Wd -∗ cons_dirty_cred Wd ={E}=∗ cons_dirty_lb cn.
+  Proof.
+    intro HE. rewrite /cons_dirty_cred /cons_dirty_lb /cons_cred_inv.
+    iIntros "#Hinv #Hcred".
+    iInv "Hinv" as "Hbody" "Hclose".
+    iEval (rewrite /cons_cred_body) in "Hbody".
+    iDestruct "Hbody" as "[>Htok | [>#Hlb _]]".
+    - iMod (mono_nat_own_update 1%nat with "Htok") as "[_ #Hlb]"; [ lia | ].
+      iMod ("Hclose" with "[]") as "_".
+      { iNext. rewrite /cons_cred_body. iRight.
+        iSplitR; [ iExact "Hlb" | iExact "Hcred" ]. }
+      iModIntro. iExact "Hlb".
+    - iMod ("Hclose" with "[]") as "_".
+      { iNext. rewrite /cons_cred_body. iRight.
+        iSplitR; [ iExact "Hlb" | iExact "Hcred" ]. }
+      iModIntro. iExact "Hlb".
+  Qed.
+
+  (* THE READER.  The marker rules out the clean arm, so the credential is
+     there; it is PERSISTENT, so a copy comes out and the invariant closes
+     unchanged.  The [▷] is the invariant's own -- [Wd] is an arbitrary
+     application [iProp] and nothing strips a later off one -- and the site
+     that uses this ([ProofConsoleread]'s tokenless read, and the token
+     holder's receipt) takes the open around a machine step, where the step
+     strips it. *)
+  Lemma cons_cred_read (cn : cons_names) (Wd : iProp Σ) (E : coPset) :
+    ↑consN ⊆ E ->
+    cons_cred_inv cn Wd -∗ cons_dirty_lb cn ={E}=∗ ▷ cons_dirty_cred Wd.
+  Proof.
+    intro HE. rewrite /cons_dirty_cred /cons_dirty_lb /cons_cred_inv.
+    iIntros "#Hinv #Hlb".
+    iInv "Hinv" as "Hbody" "Hclose".
+    iEval (rewrite /cons_cred_body) in "Hbody".
+    iDestruct "Hbody" as "[>Htok | [_ #Hcred]]".
+    - iDestruct (mono_nat_lb_own_valid with "Htok Hlb") as %[_ Hle]. lia.
+    - iMod ("Hclose" with "[]") as "_".
+      { iNext. rewrite /cons_cred_body. iRight.
+        iSplitR; [ iExact "Hlb" | iExact "Hcred" ]. }
+      iModIntro. iExact "Hcred".
+  Qed.
+
+  Definition cons_res (cn : cons_names) : iProp Σ :=
+    (∃ (r w e : mword 32) (bs : list (bv 8)) (ts : list (option (list mobs)))
+       (cur nrd : nat) (st pd : list (list mobs * bv 8))
+       (hh : option (list mobs)),
        a_cons_r ↦₄ r ∗
        a_cons_w ↦₄ w ∗
        a_cons_e ↦₄ e ∗
@@ -671,10 +1406,170 @@ Section ConsoleInv.
        ⌜length ts = INPUT_BUF_SIZE⌝ ∗
        ⌜cons_ok r w e⌝ ∗
        ⌜cons_row r e bs ts⌝ ∗
-       cons_data bs ∗ cons_tags ts)%I.
+       ⌜cons_stored r w cur st bs ts⌝ ∗
+       ⌜cons_pend r w e pd bs ts⌝ ∗
+       ⌜cons_chain (st ++ pd)⌝ ∗
+       ⌜cons_below (st ++ pd) hh⌝ ∗
+       cons_data bs ∗ cons_tags ts ∗
+       cons_stored_auth cn st ∗ cons_cursor cn nrd ∗ cons_hi cn hh ∗
+       (⌜cur = nrd⌝ ∨ cons_dirty_lb cn))%I.
 
-  Global Instance cons_res_timeless : Timeless cons_res.
-  Proof. apply _. Qed.
+  (* WHAT A CONSOLE READ COSTS ITS CALLER, AND WHAT IT HANDS BACK.  One
+     [option] and two arms -- BELOW the fileread tier only: consoleread's
+     own contract keeps the two arms because the two callers reach it with
+     different resources, and [cons_acc] below is where the one arm the
+     SYSCALL's deposit relays is assembled out of them.  [Some nrd] is a
+     caller holding the reader token at its own position; [None] is a caller
+     that holds none and pays the credential instead. *)
+  Definition cons_pay (cn : cons_names) (Wd : iProp Σ)
+      (ord : option nat) : iProp Σ :=
+    match ord with
+    | Some nrd => cons_reader cn nrd
+    | None => cons_dirty_cred Wd
+    end%I.
+
+  (* [cur] is where the ring's committed sequence actually stood when the
+     call read it, and [dc] how far the cursor moved.  A token holder gets
+     its half back at [cur + dc] together with the one fact it cares about:
+     either the window it was just handed begins at ITS OWN position, or
+     somebody read behind its back -- and then the CREDENTIAL, read out of
+     the escrow against the ring's marker, which is what sends the holder's
+     continuation generic. *)
+  Definition cons_out (cn : cons_names) (Wd : iProp Σ) (ord : option nat)
+      (cur dc : nat) : iProp Σ :=
+    match ord with
+    | Some nrd =>
+        cons_reader cn (cur + dc)%nat ∗ (⌜cur = nrd⌝ ∨ cons_dirty_cred Wd)
+    | None => emp
+    end%I.
+
+  (* ---- THE ONE ARM THE SYSCALL'S DEPOSIT RELAYS -----------------------
+
+     [cons_acc cn Wd Rd] is what a caller of read(0, ..) supplies, and [Rd
+     cur dc] is what that caller chooses to get back -- at the position
+     [cur] the ring's committed sequence stood at and the advance [dc] the
+     cursor made.  ONE ARM, TWO DISJUNCTS, and the caller picks:
+
+       a LEASE HOLDER hands in the reader token at its own [n] and a wand
+       that turns consoleread's [cons_out] into whatever it wants to know
+       (for sh: that the window began at ITS position, and its token back);
+
+       a TAINTED OR GENERIC caller hands in the credential it already holds
+       -- the application's claim of every view, which for a constraining
+       application is exactly what the taint provides -- and owes [Rd] at
+       every position, which for a caller that tracks nothing is [True].
+
+     THIS IS WHY THERE IS NO [option] ABOVE THE FILEREAD TIER: the two
+     callers differ in WHICH DISJUNCT they supply, not in the shape of the
+     deposit, so one leaf and one post serve both.  The holder's half goes
+     INERT under the taint -- nothing reclaims it, and its continuation
+     reads the console on the credential like anyone else. *)
+  Definition cons_acc (cn : cons_names) (Wd : iProp Σ)
+      (Rd : nat -> nat -> iProp Σ) : iProp Σ :=
+    ((∃ n : nat, cons_reader cn n ∗
+        (∀ cur dc : nat, cons_out cn Wd (Some n) cur dc -∗ Rd cur dc))
+     ∨ (cons_dirty_cred Wd ∗ ∀ cur dc : nat, Rd cur dc))%I.
+
+  (* the tainted/generic caller's constructor, which is the whole of
+     [FsAbsInvFire.fsabs_fileread_in]'s console case *)
+  Lemma cons_acc_cred (cn : cons_names) (Wd : iProp Σ)
+      (Rd : nat -> nat -> iProp Σ) :
+    cons_dirty_cred Wd -∗ (∀ cur dc : nat, Rd cur dc) -∗ cons_acc cn Wd Rd.
+  Proof. iIntros "#Hc HR". rewrite /cons_acc. iRight. by iFrame "Hc HR". Qed.
+
+  (* ...and the lease holder's *)
+  Lemma cons_acc_reader (cn : cons_names) (Wd : iProp Σ) (n : nat)
+      (Rd : nat -> nat -> iProp Σ) :
+    cons_reader cn n -∗
+    (∀ cur dc : nat, cons_out cn Wd (Some n) cur dc -∗ Rd cur dc) -∗
+    cons_acc cn Wd Rd.
+  Proof.
+    iIntros "Hrd Hw". rewrite /cons_acc. iLeft. iExists n. iFrame "Hrd Hw".
+  Qed.
+
+  (* ...AND THE ONE OPENING, which is what makes the fileread tier's console
+     call UNIFORM.  Both disjuncts hand the kernel a PAYMENT
+     ([cons_pay] at [Some n] or at [None]) and a wand that turns
+     consoleread's [cons_out] back into what the caller asked for, so the
+     proof below the accessor never case-splits: it opens once, calls
+     consoleread at the [ord] it got, and closes.  The [option] therefore
+     lives entirely between here and [SpecConsoleread]. *)
+  Lemma cons_acc_open (cn : cons_names) (Wd : iProp Σ)
+      (Rd : nat -> nat -> iProp Σ) :
+    cons_acc cn Wd Rd -∗
+    ∃ ord : option nat,
+      cons_pay cn Wd ord ∗
+      (∀ cur dc : nat, cons_out cn Wd ord cur dc -∗ Rd cur dc).
+  Proof.
+    rewrite /cons_acc. iIntros "[Hl | [#Hc Hr]]".
+    - iDestruct "Hl" as (n) "[Hrd Hw]".
+      iExists (Some n). rewrite /cons_pay. iFrame "Hrd Hw".
+    - iExists None. rewrite /cons_pay. iFrame "Hc".
+      iIntros (cur dc) "_". iApply "Hr".
+  Qed.
+
+  (* THE ARM THAT DELIVERED NOTHING.  Every -1 exit of the device arm -- a
+     null [devsw] slot, a major out of range, the [n < 0] sign guard, and
+     consoleread's own killed return -- has to hand the caller back what it
+     asked for without having read the ring at all.  It can: a lease holder
+     gets its own token back at its own position and zero advance, and a
+     tainted caller owes nothing to begin with. *)
+  Lemma cons_acc_ret (cn : cons_names) (Wd : iProp Σ)
+      (Rd : nat -> nat -> iProp Σ) :
+    cons_acc cn Wd Rd -∗ ∃ cur dc : nat, Rd cur dc.
+  Proof.
+    rewrite /cons_acc. iIntros "[Hl | [_ Hr]]";
+      [ | iExists 0%nat, 0%nat; iApply "Hr" ].
+    iDestruct "Hl" as (n) "[Hrd Hw]".
+    iExists n, 0%nat. iApply ("Hw" $! n 0%nat).
+    rewrite /cons_out Nat.add_0_r. iFrame "Hrd". iLeft. by iPureIntro.
+  Qed.
+
+  Global Instance cons_res_timeless cn : Timeless (cons_res cn).
+  Proof.
+    rewrite /cons_res /cons_stored_auth /cons_cursor /cons_hi /cons_dirty_lb.
+    apply _.
+  Qed.
+
+  (* ---- THE RING'S GHOSTS AT BOOT --------------------------------------
+
+     Everything the ring's resource and its two boot-time tokens are made
+     of, in one bundle, so that the .bss carve takes ONE premise: the
+     committed sequence's authority at the empty list, the ring's half of
+     the cursor at 0, the ring's half of the HIGH-WATER MARK at [None], the
+     READER TOKEN at 0 (the cursor's other half, which travels up the boot
+     chain) and the CLEAN TOKEN (the dirty marker's authority at 0, which
+     main spends on [cons_cred_inv_alloc]).
+
+     [cn_uart] is NOT allocated here.  Its [un_rxhi] pair is minted with the
+     UART's ghosts ([WpUart.uart_ghosts_alloc]), one half for the PLIC
+     payload beside the receive token and one for the ring, and this
+     allocation takes the ring's half as its input -- which is exactly why
+     the ring's names record carries the uart's rather than a copy. *)
+  Definition cons_ghosts_boot (cn : cons_names) : iProp Σ :=
+    (cons_stored_auth cn [] ∗ cons_cursor cn 0%nat ∗ cons_hi cn None ∗
+     cons_reader cn 0%nat ∗ cons_clean_tok cn)%I.
+
+  (* The [un_rxhi] half is spelled as its [ghost_var] rather than as
+     [WpUart.uart_rx_hi], because this file sits below [WpUart]; the two
+     are one proposition ([cons_hi]'s note). *)
+  Lemma cons_ghosts_alloc (γu : uart_names) :
+    ghost_var (un_rxhi γu) (1/2) (None : option (list mobs)) ==∗
+      ∃ cn : cons_names, ⌜cn_uart cn = γu⌝ ∗ cons_ghosts_boot cn.
+  Proof.
+    iIntros "Hhi".
+    iMod (own_alloc (●ML ([] : list (leibnizO (list mobs * bv 8)))))
+      as (γl) "Hl"; [apply mono_list_auth_valid |].
+    iMod (ghost_var_alloc 0%nat) as (γr) "Hr".
+    iEval (rewrite -Qp.half_half) in "Hr".
+    iDestruct (ghost_var_split with "Hr") as "[Hr1 Hr2]".
+    iMod (mono_nat_own_alloc 0%nat) as (γk) "[Hk _]".
+    iModIntro. iExists (ConsNames γu γl γr γk).
+    iSplitR; [by iPureIntro |].
+    rewrite /cons_ghosts_boot /cons_stored_auth /cons_cursor /cons_reader
+            /cons_hi /cons_clean_tok /=.
+    iFrame "Hl Hr1 Hhi Hr2 Hk".
+  Qed.
 
 End ConsoleInv.
 
@@ -701,8 +1596,11 @@ Section ConsoleCtx.
   Definition cons_data_at (ξ : CtxId) (bs : list (bv 8)) : iProp Σ :=
     ([∗ list] j ↦ b ∈ bs,
        ctx_pointsto ξ (pa_add a_cons (cons_buf_off + j)) (DfracOwn 1) b)%I.
-  Definition cons_res_at (ξ : CtxId) : iProp Σ :=
-    (∃ (r w e : mword 32) (bs : list (bv 8)) (ts : list (option (list mobs))),
+  Definition cons_res_at (cn : cons_names)
+      (ξ : CtxId) : iProp Σ :=
+    (∃ (r w e : mword 32) (bs : list (bv 8)) (ts : list (option (list mobs)))
+       (cur nrd : nat) (st pd : list (list mobs * bv 8))
+       (hh : option (list mobs)),
        ctx_word4_pointsto ξ a_cons_r (DfracOwn 1) r ∗
        ctx_word4_pointsto ξ a_cons_w (DfracOwn 1) w ∗
        ctx_word4_pointsto ξ a_cons_e (DfracOwn 1) e ∗
@@ -710,20 +1608,52 @@ Section ConsoleCtx.
        ⌜length ts = INPUT_BUF_SIZE⌝ ∗
        ⌜cons_ok r w e⌝ ∗
        ⌜cons_row r e bs ts⌝ ∗
-       cons_data_at ξ bs ∗ cons_tags ts)%I.
-  Lemma cons_res_at_cur : cons_res_at cur_ctx = cons_res.
+       ⌜cons_stored r w cur st bs ts⌝ ∗
+       ⌜cons_pend r w e pd bs ts⌝ ∗
+       ⌜cons_chain (st ++ pd)⌝ ∗
+       ⌜cons_below (st ++ pd) hh⌝ ∗
+       cons_data_at ξ bs ∗ cons_tags ts ∗
+       cons_stored_auth cn st ∗ cons_cursor cn nrd ∗ cons_hi cn hh ∗
+       (⌜cur = nrd⌝ ∨ cons_dirty_lb cn))%I.
+  Lemma cons_res_at_cur (cn : cons_names) :
+    cons_res_at cn cur_ctx = cons_res cn.
   Proof. reflexivity. Qed.
-  Global Instance cons_res_at_morph : CtxMorph cons_res_at.
-  Proof. rewrite /cons_res_at /cons_data_at. ctx_morph_solve. Qed.
+  Global Instance cons_res_at_morph (cn : cons_names) :
+    CtxMorph (cons_res_at cn).
+  Proof.
+    rewrite /cons_res_at /cons_data_at /cons_dirty_lb. ctx_morph_solve.
+  Qed.
 
   (* THE WHOLE CREDENTIAL.  Persistent, singleton, and taken by value: a
      caller of consoleread passes this and nothing else about the console.
      The payload is spelled as a λ that NAMES its context (recipe rule 1):
      the ring re-indexes to whichever context holds the lock. *)
-  Definition is_conslock (γ : gname) : iProp Σ :=
-    is_lock γ a_cons "cons"%string cons_res_at.
+  (* ...AND THE ESCROW RIDES WITH IT (the timelessness split above).  The
+     lock's payload is the ring alone -- timeless, as acquire needs -- and
+     the credential [Wd] the ring's marker stands for is reached through the
+     persistent [cons_cred_inv] conjoined here, so every caller that already
+     takes [is_conslock] (consoleread, consoleintr, fileread) reaches it
+     without a new premise.  Both conjuncts are persistent and neither
+     mentions [XI], so [is_conslock] is still a CLOSED term. *)
+  Definition is_conslock (cn : cons_names) (Wd : iProp Σ)
+      (γ : gname) : iProp Σ :=
+    (is_lock γ a_cons "cons"%string (cons_res_at cn) ∗ cons_cred_inv cn Wd)%I.
 
-  Global Instance is_conslock_persistent γ : Persistent (is_conslock γ).
+  Lemma is_conslock_lock (cn : cons_names) (Wd : iProp Σ) (γ : gname) :
+    is_conslock cn Wd γ -∗ is_lock γ a_cons "cons"%string (cons_res_at cn).
+  Proof. rewrite /is_conslock. by iIntros "[$ _]". Qed.
+
+  Lemma is_conslock_cred (cn : cons_names) (Wd : iProp Σ) (γ : gname) :
+    is_conslock cn Wd γ -∗ cons_cred_inv cn Wd.
+  Proof. rewrite /is_conslock. by iIntros "[_ $]". Qed.
+
+  Lemma is_conslock_intro (cn : cons_names) (Wd : iProp Σ) (γ : gname) :
+    is_lock γ a_cons "cons"%string (cons_res_at cn) -∗
+    cons_cred_inv cn Wd -∗ is_conslock cn Wd γ.
+  Proof. rewrite /is_conslock. iIntros "#H1 #H2". by iFrame "H1 H2". Qed.
+
+  Global Instance is_conslock_persistent cn Wd γ :
+    Persistent (is_conslock cn Wd γ).
   Proof. apply _. Qed.
 
   (* =================================================================== *)
@@ -751,36 +1681,29 @@ Section ConsoleCtx.
   Global Instance devsw_table_persistent : Persistent devsw_table.
   Proof. apply _. Qed.
 
-  Definition console_inv (γ : gname) : iProp Σ :=
-    (is_conslock γ ∗ devsw_table)%I.
+  Definition console_inv (cn : cons_names) (Wd : iProp Σ)
+      (γ : gname) : iProp Σ :=
+    (is_conslock cn Wd γ ∗ devsw_table)%I.
 
-  Global Instance console_inv_persistent γ : Persistent (console_inv γ).
+  Global Instance console_inv_persistent cn Wd γ :
+    Persistent (console_inv cn Wd γ).
   Proof. apply _. Qed.
 
-  (* THE GNAME-FREE FORM, which is what a bundle carries.  The cons lock has
-     exactly one gname for the lifetime of a boot, and no consumer needs to
-     tie it to anything it already holds -- a caller of consoleread passes
-     [is_conslock] by value and nothing else about the console.  So the name
-     is existential here, and an arm that needs it destructs this ONCE and
-     builds its callee's names record around what it got.  That is what keeps
-     the console out of [fclose_names] (a positional record threaded through
-     six files) and out of [FsReady.fs_ready]. *)
-  Definition console_ready : iProp Σ := (∃ γ : gname, console_inv γ)%I.
-
-  Global Instance console_ready_persistent : Persistent console_ready.
-  Proof. apply _. Qed.
-
-  Lemma console_ready_intro (γ : gname) : console_inv γ -∗ console_ready.
-  Proof. iIntros "H". by iExists γ. Qed.
-
-  (* the devsw half alone, which is all most consumers want *)
-  Lemma console_ready_devsw : console_ready -∗ devsw_table.
-  Proof. iIntros "H". iDestruct "H" as (γ) "[_ $]". Qed.
-
-  Lemma console_inv_conslock (γ : gname) : console_inv γ -∗ is_conslock γ.
+  (* THE GNAME-FREE FORM IS GONE (app-echo.md, lane CONS-CURSOR, C3).  It
+     hid the ring's NAMES and the credential as well as the lock's gname,
+     and a read cannot use that: the window a read hands back is stated at
+     the ambient [FsCfg.fsc_cons] and the tokenless arm's price is the
+     application's own [AppInv.app_sup], so the form every carrier of the
+     console now takes is [SpecFileread.console_ready_app] -- this bundle
+     with ONLY the gname left existential.  Nothing in the tree wanted the
+     anonymous one: the park, the trap-loop environment, userinit and the
+     syscall environment all reach the read arm. *)
+  Lemma console_inv_conslock (cn : cons_names) (Wd : iProp Σ) (γ : gname) :
+    console_inv cn Wd γ -∗ is_conslock cn Wd γ.
   Proof. by iIntros "[$ _]". Qed.
 
-  Lemma console_inv_devsw (γ : gname) : console_inv γ -∗ devsw_table.
+  Lemma console_inv_devsw (cn : cons_names) (Wd : iProp Σ) (γ : gname) :
+    console_inv cn Wd γ -∗ devsw_table.
   Proof. by iIntros "[_ $]". Qed.
 
   (* ---- ONE ENTRY, at a major the caller has already bounded ---------- *)
@@ -1022,7 +1945,7 @@ End ConsoleCtx.
 (* ==================================================================
    THE CONSOLE BUNDLE'S TRANSPORT (tso-port.md §0.16′)
 
-   [devsw_table] / [console_inv] / [console_ready] are ξ-INDEXED -- the
+   [devsw_table] and [console_inv] are ξ-INDEXED -- the
    devsw table is [NDEV_max + 1] pairs of [↦₈□] cells -- and the park has
    to hand them to a freshly minted child context, so each needs a
    [CtxMorph].  They are NOT convertible across two contexts (the cells are
@@ -1063,28 +1986,21 @@ Section ConsoleMorph.
     CtxMorph (λ ξ0 : TsoCtx.CtxId, is_lock (XI := ξ0) γ lk s R).
   Proof. rewrite /is_lock. ctx_morph_solve. Qed.
 
-  (* [console_inv] / [console_ready] at another context (tso-port M2: a
-     forkret park carries [console_ready] in [UsertrapRes.park_globals]).
-     The cons lock's payload is the closed [cons_res_at], so the handle
-     moves by [WpLock.is_lock_morph] alone (its floor's transport). *)
-  Global Instance console_inv_morph (γ : gname) :
-    CtxMorph (λ ξ0 : CtxId, console_inv (XI := ξ0) γ).
+  (* [console_inv] at another context (tso-port M2: a forkret park carries
+     [SpecFileread.console_ready_app] in [UsertrapRes.park_globals], whose
+     own morph is this one under an ∃).  The cons lock's payload is the
+     closed [cons_res_at], so the handle moves by [WpLock.is_lock_morph]
+     alone (its floor's transport). *)
+  Global Instance console_inv_morph (cn : cons_names) (Wd : iProp Σ)
+      (γ : gname) :
+    CtxMorph (λ ξ0 : CtxId, console_inv (XI := ξ0) cn Wd γ).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /console_inv /is_conslock.
-    iDestruct "H" as "[#Hlk Ht]".
+    iDestruct "H" as "[[#Hlk #Hcr] Ht]".
     iMod (devsw_table_morph ξ ξ' with "Hd Ht") as "[Hd Ht]".
-    iMod (is_lock_morph_local γ a_cons "cons"%string cons_res_at ξ ξ' with "Hd Hlk")
-      as "[Hd #Hlk']".
-    iModIntro. iFrame "Hd Ht Hlk'".
-  Qed.
-
-  Global Instance console_ready_morph :
-    CtxMorph (λ ξ0 : CtxId, console_ready (XI := ξ0)).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /console_ready.
-    iDestruct "H" as (γ) "H".
-    iMod (console_inv_morph γ ξ ξ' with "Hd H") as "[Hd H]".
-    iModIntro. iFrame "Hd". iExists γ. iExact "H".
+    iMod (is_lock_morph_local γ a_cons "cons"%string (cons_res_at cn) ξ ξ'
+            with "Hd Hlk") as "[Hd #Hlk']".
+    iModIntro. iFrame "Hd Ht Hlk' Hcr".
   Qed.
 
 

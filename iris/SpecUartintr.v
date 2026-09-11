@@ -71,7 +71,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
     (γu : uart_names) (γv : disk_names)
      (γs : list gname)
     (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool)
-    (k : nat) (lks : gset string) :=
+    (k : nat) (hl : option (list mobs)) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   length γs = NPROC ->
@@ -108,14 +108,14 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
      FIFO -- uartgetc's RHR read pops one byte per iteration -- and the token
      is what says no other hart is doing the same.  devintr hands it over
      out of plic_claim's post and takes it back for plic_complete. *)
-  uart_rx_tok γu k -∗
+  uart_rx_writer γu k hl -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
       sie_cap_gpr KT1 mf av b pme -∗
       cpu_own lvl eb pme b lks -∗
       pc_is ret_tgt -∗
-      (∃ k' : nat, uart_rx_tok γu k') -∗
+      (∃ (k' : nat) (hl' : option (list mobs)), uart_rx_writer γu k' hl') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -125,6 +125,6 @@ Module Type UARTINTR.
       (γu : uart_names) (γv : disk_names)
       (γs : list gname)
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool)
-      (k : nat) (lks : gset string),
-      wp_uartintr_sconf_body γu γv γs m av lvl eb pme b k lks.
+      (k : nat) (hl : option (list mobs)) (lks : gset string),
+      wp_uartintr_sconf_body γu γv γs m av lvl eb pme b k hl lks.
 End UARTINTR.

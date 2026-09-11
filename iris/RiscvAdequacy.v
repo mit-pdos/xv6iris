@@ -41,6 +41,7 @@
 From stdpp Require Import gmap finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import csum excl auth gset.
+From iris.algebra.lib Require Import mono_list.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat invariants.
 From iris.program_logic Require Import weakestpre lifting adequacy.
 Require Import SailStdpp.Operators_mwords.
@@ -79,8 +80,11 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_uartGS :: ghost_varG Σ uart_state;
   riscv_pre_plicGS :: ghost_varG Σ plic_state;
   riscv_pre_virtioGS :: ghost_varG Σ virtio_state;
-  (* the observable trace's history ghost (uart-trace.md) *)
+  (* the observable trace's history ghost (uart-trace.md) and the GROWTH
+     authority that rides in its machine half (app-echo.md, CONS-CURSOR C1:
+     [RiscvPtsto.obs_hist_lb]) *)
   riscv_pre_obsGS :: ghost_varG Σ (list mobs);
+  riscv_pre_obshGS :: inG Σ (mono_listR (leibnizO mobs));
   (* [uartGhostG] and [diskGhostG] were fields here, "carried by
      [dev_inv_body]".  They are pure capacity and now live in [Xv6G.xv6G],
      the tree's ONE bundle: a class that carries them as well would give
@@ -145,6 +149,7 @@ Definition riscvΣ : gFunctors :=
      ghost_varΣ plic_state;
      ghost_varΣ virtio_state;
      ghost_varΣ (list mobs);
+     GFunctor (mono_listR (leibnizO mobs));
      uartGhostΣ;
      diskGhostΣ;
      @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
@@ -719,11 +724,16 @@ Section power.
          [Hproj] lends it: a client whose trace property chains ERA-LOCAL
          facts through the durable disk reads the disk at every power event
          here.  A basic update under a [◇] for [Hswap]'s reasons. *)
+      (* ...AT [obs_half], NOT [obs_auth]: the client writes this hook in a
+         context with no [riscvFixedGS] and spells the raw [ghost_var
+         γobs (1/2) h], so the GROWTH authority that rides in [obs_auth]
+         beside it ([RiscvPtsto.obs_hist_auth]) is stepped by the two arms
+         below rather than by the hook. *)
       (Hobs : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
          trace_shape h on ->
-         ⊢ disk_fixed_auth dk -∗ ▷ riscv_obs_pred -∗ obs_auth h ==∗
+         ⊢ disk_fixed_auth dk -∗ ▷ riscv_obs_pred -∗ obs_half h ==∗
            ◇ (disk_fixed_auth dk ∗ ▷ riscv_obs_pred ∗
-              obs_auth (h ++ [if on then ObsPowerOff else ObsPowerOn])%list))
+              obs_half (h ++ [if on then ObsPowerOff else ObsPowerOn])%list))
       (* the boot client is handed the WHOLE fact set a reset machine has
          ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
          per-hart reset registers, the reset devices, power on) -- everything
@@ -759,8 +769,14 @@ Section power.
       pose proof Hwf as (Hsh & _ & _). rewrite Hpw in Hsh.
       iEval (rewrite /disk_fixed_interp) in "Htie".
       iInv "Hoinv" as "HPt" "Hoclose".
+      iDestruct "Hoauth" as "[Hovar Hohist]".
       iMod (Hobs h true (v_disk (g.(gdev).(dvirtio))) Hsh
-              with "Htie HPt Hoauth") as ">(Htie & HPt & Hoauth)".
+              with "Htie HPt Hovar") as ">(Htie & HPt & Hovar)".
+      iMod (obs_hist_auth_step h (h ++ [ObsPowerOff])%list
+              (ex_intro _ [ObsPowerOff] eq_refl)
+              with "Hohist") as "Hohist".
+      iAssert (obs_auth (h ++ [ObsPowerOff])%list) with "[Hovar Hohist]" as "Hoauth";
+        [ rewrite /obs_auth; iFrame "Hovar Hohist" | ].
       iMod ("Hoclose" with "HPt") as "_".
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
       iSplitR.
@@ -828,8 +844,14 @@ Section power.
          trace predicate authorises it, the disk lent as for [Hproj] *)
       pose proof Hwf as (Hsh & _ & _). rewrite Hpw in Hsh.
       iInv "Hoinv" as "HPt" "Hoclose".
+      iDestruct "Hoauth" as "[Hovar Hohist]".
       iMod (Hobs h false (v_disk (g.(gdev).(dvirtio))) Hsh
-              with "Htie HPt Hoauth") as ">(Htie & HPt & Hoauth)".
+              with "Htie HPt Hovar") as ">(Htie & HPt & Hovar)".
+      iMod (obs_hist_auth_step h (h ++ [ObsPowerOn])%list
+              (ex_intro _ [ObsPowerOn] eq_refl)
+              with "Hohist") as "Hohist".
+      iAssert (obs_auth (h ++ [ObsPowerOn])%list) with "[Hovar Hohist]" as "Hoauth";
+        [ rewrite /obs_auth; iFrame "Hovar Hohist" | ].
       iMod ("Hoclose" with "HPt") as "_".
       iInv "Hcinv" as "HP" "Hclose".
       iDestruct (Hproj (v_disk (g.(gdev).(dvirtio))) with "Htie HP")
@@ -1123,6 +1145,10 @@ Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
     (* the trace layer (uart-trace.md): the history ghost's name, the run's
        whole trace, and the client's trace predicate *)
     (γobs : gname) (T : list mobs) (Ptp : iProp Σ)
+    (* the GROWTH authority's name, beside the history ghost's
+       ([RiscvPtsto.obs_hist_lb]): both are allocated in the same step of
+       [riscv_power_adequacy] below, at the empty history. *)
+    (γhist : gname)
     (* the INPUT TAG FAMILY (app-echo.md, lane L5), the ambient twin of the
        trace predicate: what the application claims of every byte the
        environment pushes into the UART, at the history it arrived at.  A
@@ -1142,7 +1168,7 @@ Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
      runs of underscores are one longer each; the trace fields at the end
      are main's.  All resolve from [riscvGpreS]. *)
   RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-    _ _ _ γdisk ndisk Pcp γswap _ γobs T Ptp Tg HTg HTgt CT c.
+    _ _ _ γdisk ndisk Pcp γswap _ γobs T Ptp _ γhist Tg HTg HTgt CT c.
 
 (* ---------------------------------------------------------------------- *)
 (* THE TRACE HOOK'S HELPERS -- ONE PER CONJUNCT OF [state_interp].          *)
@@ -1206,13 +1232,13 @@ Lemma disk_proj_trace {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
          ◇ (disk_img_auth_sized γdisk ndisk dk ∗
             ▷ Pc γdisk γsw γreg γst c ∗ ⌜Ppure dk⌝))
     (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap : gname)
-    (γobs : gname) (T : list mobs) (Ptp : iProp Σ)
+    (γobs : gname) (T : list mobs) (Ptp : iProp Σ) (γhist : gname)
     (Tg : list mobs -> iProp Σ) (HTg : forall h, Persistent (Tg h))
     (HTgt : forall h, Timeless (Tg h)) (c : CT)
     (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-          (Pc γdisk γswap γreg γstart c) γobs T Ptp Tg HTg HTgt CT c) g' -∗
+          (Pc γdisk γswap γreg γstart c) γobs T Ptp γhist Tg HTg HTgt CT c) g' -∗
     ▷ Pc γdisk γswap γreg γstart c -∗
     ◇ ⌜Ppure (v_disk (dvirtio (gdev g')))⌝.
 Proof.
@@ -1557,11 +1583,11 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        trace, which is what the conclusion says. *)
     (phi : gstate -> list mobs -> Prop)
     (Hphi : forall (Hinv : invGS Σ)
-                   (γgen γstart γreg γdisk γswap γobs : gname) (c : CT)
+                   (γgen γstart γreg γdisk γswap γobs γhist : gname) (c : CT)
                    (T : list mobs) (g' : gstate) (h : list mobs),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-               (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c)
+               (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
                (Tg c) (HTg c) (HTgt c) CT c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ Pc γdisk γswap γreg γstart c -∗ ▷ Pt γobs c -∗
@@ -1603,10 +1629,10 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
           it ALREADY APPLIED ([Rb c]) -- at an arbitrary [F] the record's
           client type is not [CT], so the applied form is the only one
           that can be stated there. *)
-       forall (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs : gname)
+       forall (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs γhist : gname)
               (c : CT) (T : list mobs),
        F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-             (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c)
+             (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
              (Tg c) (HTg c) (HTgt c) CT c ->
        ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof (Rb c) g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
@@ -1668,6 +1694,12 @@ Proof.
   iMod (ghost_var_alloc ([] : list mobs)) as (γobs) "Hob".
   iEval (rewrite -Qp.half_half) in "Hob".
   iDestruct (ghost_var_split with "Hob") as "[HobA HobF]".
+  (* ...AND THE GROWTH AUTHORITY beside it, at the same empty history: it
+     rides in the machine's half ([RiscvPtsto.obs_auth]), so every append
+     moves the two together and a lower bound taken at any past event stays
+     true (app-echo.md, CONS-CURSOR C1). *)
+  iMod (own_alloc (●ML ([] : list (leibnizO mobs)))) as (γhist) "HobH";
+    [apply mono_list_auth_valid|].
   (* the birth step's yield, into the client's trace predicate beside its
      half of the history *)
   iMod (HPt γobs c with "[$Hcl $HobF]") as "HPt0".
@@ -1678,12 +1710,12 @@ Proof.
   (* the run's whole trace [κs] is a FIELD of the fixed record: that is what
      lets [state_interp] tie the history so far to the future *)
   set (F := boot_fixedGS Hinv γgen γstart γreg γfdisk ndisk γswap
-              (Pc γfdisk γswap γreg γstart c) γobs κs (Pt γobs c)
+              (Pc γfdisk γswap γreg γstart c) γobs κs (Pt γobs c) γhist
               (Tg c) (HTg c) (HTgt c) CT c).
   (* the client's trace hook at the gnames just allocated.  [F] is a local
      DEFINITION, so this statement and the one the final observation below
      faces are convertible. *)
-  pose proof (Hphi Hinv γgen γstart γreg γfdisk γswap γobs c κs) as Hph.
+  pose proof (Hphi Hinv γgen γstart γreg γfdisk γswap γobs γhist c κs) as Hph.
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (κs' : list mobs) (_ : nat) =>
@@ -1692,7 +1724,7 @@ Proof.
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ F)).
   cbv zeta beta.
-  iSplitL "Hgauth Hsauth HRauth HtieS HobA".
+  iSplitL "Hgauth Hsauth HRauth HtieS HobA HobH".
   { iSplitL "Hgauth Hsauth HRauth HtieS".
     { (* the initial state interpretation: OFF, nothing ever started, no era
          and hence no image map -- but the FS tie IS there: it is fixed-layer,
@@ -1708,7 +1740,7 @@ Proof.
        history of a powered-off never-booted machine is well-formed *)
     rewrite /obs_interp. iExists []. iSplitR; [done|].
     iSplitR; [iPureIntro; exact (obs_wf_init _ Hpow Hgen0)|].
-    iExact "HobA". }
+    rewrite /obs_auth. iFrame "HobA HobH". }
   iSplitL.
   { cbn. iSplitL; [|done].
     (* the shape [Hboot] is handed is [F]'s own definition: [F] is a local
@@ -1719,7 +1751,7 @@ Proof.
               (Hobs γfdisk γobs c)
               (fun HE gen g' Hbf Hp =>
                  Hboot F HE gen g' Hbf Hp Hinv γgen γstart γreg γfdisk γswap
-                   γobs c κs eq_refl)
+                   γobs γhist c κs eq_refl)
               with "Hcinv Hoinv"). }
   (* THE FINAL OBSERVATION, AND IT IS NOW TWO FACTS.
 
@@ -1745,7 +1777,11 @@ Proof.
   subst h.
   iInv "Hcinv" as "HP" "Hclose".
   iInv "Hoinv" as "HPt" "Hoclose".
-  iDestruct (Hph g2 κs with "Hsi Hoauth [//] HP HPt") as ">%Hphig2".
+  (* the client's hook moves only the [ghost_var] half of [obs_auth]; the
+     growth authority beside it is the machine's and is simply dropped here,
+     at the end of the run, where nothing is owed *)
+  iDestruct "Hoauth" as "[Hovar _]".
+  iDestruct (Hph g2 κs with "Hsi Hovar [//] HP HPt") as ">%Hphig2".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".
   iPureIntro. split; [intros e He; exact (Hns e eq_refl He) | exact Hphig2].
 Qed.
@@ -1806,10 +1842,10 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
                     (g' : gstate),
        boot_facts g' ->
        Ppure (v_disk (g'.(gdev).(dvirtio))) ->
-       forall (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs : gname)
+       forall (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs γhist : gname)
               (c : unit) (T : list mobs),
        F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-             (Pc γdisk γswap γreg γstart) γobs T (obs_ledger_at R γobs)
+             (Pc γdisk γswap γreg γstart) γobs T (obs_ledger_at R γobs) γhist
              rx_tag_triv (@rx_tag_triv_persistent Σ)
              (@rx_tag_triv_timeless Σ) unit c ->
        ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
@@ -1836,7 +1872,7 @@ Proof.
                             ltac:(iIntros "_"; iMod HR0 as "HR"; by iModIntro))
            (fun γdisk γobs _ => obs_ledger_at_step ndisk R HRt Hpow γdisk γobs)
            (fun _ h => P h)
-           ltac:(intros Hinv γgen γstart γreg γdisk γswap γobs c T g' h;
+           ltac:(intros Hinv γgen γstart γreg γdisk γswap γobs γhist c T g' h;
                  iIntros "_ Hauth _ _ HPt";
                  iApply (obs_ledger_at_phi R HRt P HR γobs h with "Hauth HPt"))
            Hgen0 Hpow0 Hboot).

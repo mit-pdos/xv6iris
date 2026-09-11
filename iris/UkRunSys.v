@@ -2440,6 +2440,66 @@ Section UkRunSys.
       [ exact Hd | exact Hgf ].
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* ecall, at READ -- THE LEAF THAT HANDS THE PROCESS ITS POST            *)
+  (* (app-echo.md, lane CONS-CURSOR, C3).                                  *)
+  (*                                                                       *)
+  (* Every read leaf above binds its [spost_at] as [_].  That is why no    *)
+  (* program has ever learned anything about the bytes it read: the        *)
+  (* kernel's receipt reaches the round and is dropped there.  This leaf   *)
+  (* is the same walk with the post KEPT, and it costs exactly two things  *)
+  (* the other leaves do not pay:                                          *)
+  (*                                                                       *)
+  (*  - THE DEPOSIT MUST NAME ITS FAMILY.  [udepw]'s explicit disjunct     *)
+  (*    hides it under an existential, which is fine while the post is     *)
+  (*    thrown away and useless once it is not, so the premise here is     *)
+  (*    [UkRun.udepwf] at the program's own [fdep].  That is also what     *)
+  (*    carries the reader TOKEN in: at the console the deposit's input    *)
+  (*    arm IS [SpecFileread.fileread_in]'s console arm, an exclusive      *)
+  (*    resource, which no [□]-shaped supplier could hold.                 *)
+  (*  - THE RESUME KEY MUST BE EXPOSED.  The post is stated at the key the *)
+  (*    process resumes at, whose image [M'] is bound inside [urun]'s own  *)
+  (*    existential, so the continuation binds it -- together with the     *)
+  (*    permission map, the size, the descriptor view, the cwd, the        *)
+  (*    generation and the children set.  A program reads its receipt out  *)
+  (*    of that post by unfolding [spost_at] at its own number, which is   *)
+  (*    [UexecExecInst.xv6_spost]'s read row.                              *)
+  (*                                                                       *)
+  (* THE BUFFER IS A PRECONDITION, as in [wp_uk_ecall_read_win]: the       *)
+  (* caller owns the whole count at a1 going in and gets it back with the  *)
+  (* written prefix moved and the tail pinned.                             *)
+  (*                                                                       *)
+  (* STATED AS A BODY, not yet as a [Lemma]: the walk is                   *)
+  (* [wp_uk_ecall_window]'s and the proof is this lane's phase 2.          *)
+  (* ------------------------------------------------------------------- *)
+  Definition wp_uk_ecall_read_recv_body (N : uk_names Σ) (h : CpuId)
+      (m : regfile) (pc : mword 64) (cnt : Z) (k : nat) (f : nat -> bv 8)
+      (avail : nat) (fdep : sfam) : iProp Σ :=
+    (⌜usysno m = USYS_read⌝ -∗
+     ⌜bv_signed (subrange_vec_dec (m !!! Regidx (mword_of_int 12)) 31 0
+                 : mword 32) = cnt⌝ -∗
+     ⌜(Z.to_nat cnt <= k)%nat⌝ -∗
+     ⌜is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true⌝ -∗
+     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+     urun N h m pc avail -∗
+     udepwf N m pc USYS_read fdep -∗
+     ubytes (ukn_d N) (uint (m !!! Regidx (mword_of_int 11))) k f -∗
+     (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8)
+        (M' : gmap Z (bv 8)) (pm' : gmap (mword 27) uperm) (sz' : Z)
+        (fdv' : list fdstate) (cw' : Z) (gn' : gname) (cs' : gset gname),
+        ⌜ (d <= Z.to_nat cnt)%nat ⌝ -∗
+        ⌜ forall j : nat, (d <= j < k)%nat -> g j = f j ⌝ -∗
+        (* THE POST, AT THE KEY THE PROCESS RESUMES AT *)
+        spost_at uslot USYS_read fdep
+          (uvis_of_run (<[Regidx (mword_of_int 10) := r]> m)
+             (add_vec_int pc 4) M' pm' sz' fdv' cw' gn' cs')
+          r M' fdv' cw' cs' -∗
+        urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+          (add_vec_int pc 4) avail -∗
+        ubytes (ukn_d N) (uint (m !!! Regidx (mword_of_int 11))) k g -∗
+        WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
   (* THE PAGE FLOOR OF AN ADDRESS AT OR ABOVE A PAGE BOUNDARY is itself at
      or above it -- the one arithmetic fact the sbrk leaf's two page-set
      arguments turn on. *)

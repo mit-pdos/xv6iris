@@ -1,7 +1,7 @@
 (* SyscParkEnv.v -- THE FOUR ROWS THE FILE SYSTEM DOES NOT CARRY.
 
    [ProofSyscall.syscall_env] is four conjuncts: [sysc_proc_env],
-   [ConsoleInv.console_ready], [sysc_fs_env], and [FirstTok.first_done].
+   [SpecFileread.console_ready_app], [sysc_fs_env], and [FirstTok.first_done].
    Almost all of it is derivable from [FirstTok.first_done] alone --
    [first_done] is [first_addr ↦₄□ 0 ∗ FsReady.fs_ready], and [fs_ready] is
    the whole file system -- which is what makes the environment payable by a
@@ -19,7 +19,7 @@
      the "nextpid" lock       allocpid's counter, main's to create
      [procs_avail None]       the slot ledger, procinit's
      [is_tickslock]           the ticks lock, main's
-     [console_ready]          consoleinit's
+     [console_ready_app]      consoleinit's
 
    ALL FOUR ARE PERSISTENT AND ALL FOUR EXIST BEFORE EITHER PARKER RUNS --
    main creates every one of them before it calls userinit, and kfork's
@@ -49,7 +49,7 @@ Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import PidLock.  (* [alp_pid_lock] / [nextpid_res] *)
 Require Import ProcAvail.     (* [procs_avail] *)
 Require Import TicksInv.      (* [is_tickslock] *)
-Require Import ConsoleInv.    (* [console_ready] *)
+Require Import ConsoleInv.    (* the console ring's invariant *)
 Require Import SchedCtx.      (* [procs_inv] *)
 Require Import WpUart.        (* [dev_inv] *)
 Require Import SpecConsoleintr.  (* [console_caps] *)
@@ -61,11 +61,17 @@ Require Import FsCfg.         (* the ambient device names *)
 Require Import FileInvDefs.   (* [fileG] -- which carries [fscfg] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import SpecFileread.  (* [console_ready_app] -- the PINNED console row *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Section SyscParkEnv.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !pavG Σ, !wchG Σ}.
+  (* [fileG] IS BOUND HERE since the console row became the PINNED
+     [SpecFileread.console_ready_app]: the pin names [AppInv.app_sup], which
+     is stated at the application record [fileG] carries. *)
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ, !wchG Σ}.
+  Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
 
   (* the nextpid lock's gname is EXISTENTIAL, exactly as [sysc_proc_env]
@@ -75,7 +81,14 @@ Section SyscParkEnv.
     ((∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at) ∗
      procs_avail None ∗
      is_tickslock γtk ∗
-     console_ready)%I.
+     (* THE CONSOLE, PINNED (app-echo.md, lane CONS-CURSOR, the accessor
+        ruling).  The console's gname-free form hid the ring's names and
+        the credential; the read syscall's receipt is stated at the AMBIENT
+        [fsc_cons] and at [AppInv.app_sup], so what the park carries is
+        [SpecFileread.console_ready_app] -- the same bundle with only the
+        cons lock's gname left existential.  Every carrier of the console
+        reaches the read arm, so there is no anonymous form any more. *)
+     console_ready_app)%I.
 
   Global Instance sysc_park_extra_persistent γtk :
     Persistent (sysc_park_extra γtk).
@@ -107,7 +120,7 @@ Section ParkWorld.
        is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) ∗
        is_tickslock γtl ∗
        procs_inv γs ∗
-       console_ready ∗
+       console_ready_app ∗
        (* [sysc_park_extra]'s other two rows, so that this bundle covers all
           of it: the nextpid lock and the sealed slot ledger *)
        (∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at) ∗

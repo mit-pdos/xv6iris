@@ -94,7 +94,7 @@ Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24
    SpecPlicClaim.v. *)
 Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γd : uart_names) (m : regfile) (K : nat)
-    (l : list (bv 8)) (b0 : bool) (k : nat)
+    (l : list (bv 8)) (b0 : bool) (k : nat) (hl : option (list mobs))
     (vclock : bv 32) (vcname vccpu : bv 64)
     (dread0 dwrite0 : mword 64) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleinit in
@@ -120,7 +120,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
   uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_sent γd l -∗
   (* the receive token, straight through to uartinit's FCR flush
      (SpecUartinit.v) and back *)
-  uart_rx_tok γd k -∗
+  uart_rx_tok γd k hl -∗
   uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
   clk ↦₄ vclock -∗
   c_cname ↦₈ vcname -∗
@@ -146,7 +146,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
     (* uartinit writes no THR, so the accepted trace is unchanged; its final
        LCR write cleared DLAB, so the half is frozen for good. *)
     uart_tx_own γd l -∗ uart_sent γd l -∗
-    (∃ k' : nat, uart_rx_tok γd k') -∗ uart_dlab_off γd -∗
+    (∃ (k' : nat) (hl' : option (list mobs)), uart_rx_tok γd k' hl') -∗ uart_dlab_off γd -∗
     (* cons.lock comes back initialized; it is a static global that is never
        freed, so its name field is DISCARDED for the persistent [lock_name],
        ready to be sealed into an [is_lock]. *)
@@ -169,8 +169,8 @@ Module Type CONSOLEINIT.
   Parameter wp_consoleinit_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γd : uart_names) (m : regfile) (K : nat)
-      (l : list (bv 8)) (b0 : bool) (k : nat)
+      (l : list (bv 8)) (b0 : bool) (k : nat) (hl : option (list mobs))
       (vclock : bv 32) (vcname vccpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64),
-      wp_consoleinit_sconf_body γd m K l b0 k vclock vcname vccpu dread0 dwrite0 p.
+      wp_consoleinit_sconf_body γd m K l b0 k hl vclock vcname vccpu dread0 dwrite0 p.
 End CONSOLEINIT.

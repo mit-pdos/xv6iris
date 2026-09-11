@@ -812,6 +812,11 @@ Section SnapMint.
   Context `{XI : TsoCtx.CurCtx}.
 
   Lemma fs_cfg_alloc_snap (γd : uart_names) (γv : disk_names)
+      (* the console ring's ghost names, minted with the ring in the boot
+         chain and carried here so the era's config can name them
+         (app-echo.md, lane CONS-CURSOR, C3: the read syscall's receipt is
+         stated at [fsc_cons]) *)
+      (cnm : cons_names)
       (dk : Z -> bv 8) (ndisk : nat) (S : fs_state_rec) (cov : gset Z)
       (nib : nat) (E : coPset)
       (* ---- THE VALUE THE ERA'S BYTE VIEW IS MINTED AT (durable-disk lane
@@ -889,6 +894,12 @@ Section SnapMint.
       ⌜fsc_bmapstart = sb_bmapstart (fss_sb S)⌝ ∗
       ⌜fsc_size = sb_size (fss_sb S)⌝ ∗
       ⌜fsc_ninodes = sb_ninodes (fss_sb S)⌝ ∗
+      (* ...AND THE CONSOLE RING'S NAMES, which this mint does not choose:
+         they are minted with the ring in the boot chain and REUSED here,
+         exactly as [γd]/[γv] are.  The tie is what lets the boot chain hand
+         main a ring at the AMBIENT [fsc_cons] -- which is where every read
+         syscall's receipt names it. *)
+      ⌜fsc_cons = cnm⌝ ∗
       fs_kit_icache ICFG FSC ∗
       fs_kit_fsinit_ghost ICFG FSC APP (fs_blocks dk) (snap_spent S nib) Pb Xexc ∗
       (* STATEMENT CHANGE (r25 pass 1): the old off LEDGER row
@@ -1269,11 +1280,11 @@ Section SnapMint.
     iExists ICFG,
       (MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
                cov (sb_logstart (fss_sb S)) (sb_bmapstart (fss_sb S))
-               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol).
+               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol cnm).
     rewrite /fs_kit_icache /fs_kit_fsinit_ghost.
     cbn [fsc_printk fsc_kalloc fsc_kpages fsc_uart fsc_disk fsc_dlock
          fsc_bio fsc_fs fsc_ireg fsc_ic fsc_itlock fsc_cov fsc_logst
-         fsc_bmapstart fsc_size fsc_ninodes fsc_fol].
+         fsc_bmapstart fsc_size fsc_ninodes fsc_fol fsc_cons].
     rewrite Hdev Histq Hlogq.
     assert (Hset : (((((cov ∖ ({[ (1:Z) ]} : gset Z))
                          ∖ log_region_set (sb_logstart (fss_sb S)))
@@ -1284,6 +1295,7 @@ Section SnapMint.
     { apply set_eq. intros b. rewrite /snap_spent.
       rewrite 6!elem_of_difference 4!elem_of_union. tauto. }
     rewrite Hset.
+    iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].

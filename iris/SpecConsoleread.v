@@ -124,9 +124,18 @@ Notation consoleread_stack := (70%nat) (only parsing).
 Definition wp_consoleread_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γf : gname)
-    (γs : list gname) (j : nat) (γlp : gname) (γc : gname)
+    (γs : list gname) (j : nat) (γlp : gname) (γc : gname) (cn : cons_names)
+    (Wd : iProp Σ)
     (m : regfile) (av : nat) (eb : bool)
-    (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string)
+    (* HOW THE CALLER PAYS (app-echo.md, lane CONS-CURSOR, C3, and the
+       owner's ruling on the tokenless read).  [Some nrd] is a caller that
+       holds the reader token at its own cursor; [None] is one that does not
+       and pays [Wd] -- the application's supply credential -- instead.  It
+       is a PARAMETER and the payment is a RESOURCE because the receipt
+       names a window of the ring's stored sequence, and a post cannot name
+       a number a premise hid under an existential. *)
+    (ord : option nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleread in
   let pj := proc_addr j in
   (* a1 = dst, the user destination the bytes are copied to *)
@@ -161,7 +170,15 @@ Definition wp_consoleread_sconf_body
   (* THE WHOLE CREDENTIAL: cons.lock, whose resource is the ring and the
      three indices (ConsoleInv.v).  Persistent, so nothing about the console
      is threaded and nothing comes back. *)
-  is_conslock γc -∗
+  is_conslock cn Wd γc -∗
+  (* THE CALLER'S PAYMENT.  The reader token at [Some nrd] -- the other half
+     of the ring's reader cursor, which this call moves and hands back -- or,
+     at [None], the price of reading without it.  A TOKENLESS READ IS LEGAL:
+     the kernel cannot make console reading exclusive, because a generic
+     process must be able to answer read(0,..) and the generic slot's supply
+     law has to pay for it.  What it does instead is RECORD the read, and
+     the record is what the token holder reads off its own receipt. *)
+  cons_pay cn Wd ord -∗
   proc_priv_core pj pid U -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
@@ -182,8 +199,8 @@ Definition wp_consoleread_sconf_body
        it DOES say about those bytes is the ledger below -- each one is a
        byte the UART delivered, translated by [ConsoleInv.cons_xlate], with
        its tag. *)
-  ∀ (mf : regfile) (r : Z) (P' : uptd) (d : nat) (bs : nat -> bv 8)
-      (hs : list (list mobs)),
+  ∀ (mf : regfile) (r : Z) (P' : uptd) (d dc cur : nat) (bs : nat -> bv 8)
+      (hs : list (list mobs)) (sl : list (list mobs * bv 8)),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       (* the whole of what a device read promises: it delivered somewhere
@@ -208,6 +225,45 @@ Definition wp_consoleread_sconf_body
          and a caller that wants only the tie never opens an ∃. *)
       ⌜cons_tagged bs hs d⌝ -∗
       ([∗ list] h ∈ hs, riscv_rx_tag h) -∗
+      (* ...AND THE WINDOW (app-echo.md, lane CONS-CURSOR, C3), UNDER THE
+         SAME DISJUNCTION AS THE POSITION.  On the left arm the [d] bytes
+         are the ring's stored sequence at positions [cur .. cur + d), with
+         their histories; [sl] is a LOWER BOUND on that sequence, so two
+         reads by the same holder of the token hand back two bounds that
+         agree on every index both have and the second window begins exactly
+         where the first ended; [cons_chain sl] is the order along it; and
+         the cursor moved by [dc], which is [d] or ONE MORE -- two of the
+         loop's exits pop a byte and do not deliver it (the [C('D')] arm
+         whose [cons.r--] push-back is skipped because nothing has been
+         delivered yet, and the [either_copyout == -1] break, which has
+         already advanced [cons.r] past the byte it failed to copy).
+
+         WHY IT IS NOT UNCONDITIONAL.  The copy loop SLEEPS -- it drops
+         cons.lock at [cons.r == cons.w] and takes it back afterwards -- and
+         the kernel cannot exclude a second reader across that gap: reading
+         the console without the token is paid for with
+         [ConsoleInv.cons_dirty_cred], which is PERSISTENT
+         ([ConsoleInv.cons_acc]'s second disjunct, and the generic slot's
+         supply law is the reason it has to be), so arbitrarily many
+         processes can be inside consoleread at once.  A reader that pops
+         while this call sleeps moves the ring's committed count without
+         moving the cursor, so this call's bytes are no longer consecutive
+         and its own advance is no longer [d] or [d+1].  What that reader
+         DOES leave behind is the ring's marker, and the marker is the
+         credential: so contiguity is promised exactly where the position
+         is, and the right arm hands back the credential that sends the
+         caller's continuation generic instead.
+
+         [cons_stored_lb] and [cons_tagged] STAY UNCONDITIONAL: a bound on
+         the committed sequence and the per-byte tags hold on every arm --
+         every byte delivered really did arrive at its history -- and it is
+         only their CONSECUTIVENESS that a concurrent reader can take
+         away. *)
+      cons_stored_lb cn sl -∗
+      (⌜cons_window sl cur d bs hs⌝ ∗ ⌜cons_chain sl⌝
+         ∗ ⌜(d <= dc <= d + 1)%nat⌝
+       ∨ cons_dirty_cred Wd) -∗
+      cons_out cn Wd ord cur dc -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
@@ -220,8 +276,10 @@ Module Type CONSOLEREAD.
   Parameter wp_consoleread_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (γc : gname)
+      (γc : gname) (cn : cons_names) (Wd : iProp Σ)
       (m : regfile) (av : nat) (eb : bool)
-      (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string),
-      wp_consoleread_sconf_body γa γf γs j γlp γc m av eb pid U n b lks.
+      (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string)
+      (ord : option nat),
+      wp_consoleread_sconf_body γa γf γs j γlp γc cn Wd m av eb pid U n b lks
+        ord.
 End CONSOLEREAD.

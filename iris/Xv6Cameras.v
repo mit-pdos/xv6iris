@@ -350,14 +350,38 @@ Class uartGhostG (Σ : gFunctors) := UartGhostG {
      removed from the receive FIFO.  The push counter beside it and the
      one-shot that says uartinit has run are [mono_nat]s and use the AMBIENT
      [riscvF_genGS] (RiscvPtsto.v) -- a second [mono_natG] here would make
-     resolution ambiguous (TsoGhost.v). *)
-  uart_ghost_rxpopG :: ghost_varG Σ nat;
+     resolution ambiguous (TsoGhost.v).
+     THE ANCHOR RIDES WITH THE COUNT (app-echo.md, lane CONS-CURSOR, C1):
+     the value is [(k, hl)] -- [k] bytes popped, [hl] the history the LAST
+     popped byte arrived at ([None] before the first pop) -- because the
+     queued histories' chain has to survive an EMPTY queue, and the only
+     thing that outlives an empty queue is the popper's own token. *)
+  uart_ghost_rxpopG :: ghost_varG Σ (nat * option (list mobs));
+  (* THE CONSUMER'S HIGH-WATER MARK ([WpUart.uart_rx_hi]): the history of
+     the last byte the console ring stored.  Its two halves are the whole
+     link between the ring and the popper -- one rides in the PLIC payload
+     beside the receive token, the other inside [ConsoleInv.cons_res] -- and
+     that link is what makes "the ring's newest byte is older than the one I
+     just popped" a fact rather than a hope. *)
+  uart_ghost_rxhiG :: ghost_varG Σ (option (list mobs));
+  (* THE CONSOLE RING'S COMMITTED SEQUENCE ([ConsoleInv.cons_stored_auth]):
+     the append-only log of (history, byte) pairs consoleread consumes, and
+     the READER'S CURSOR into it ([ConsoleInv.cons_reader], a [ghost_var]
+     over the number of bytes consumed).  They are console state and not
+     UART state, but they are cameras of the same receive path and a class
+     of their own would have to be bound in every file that names
+     [WpUart.dev_inv]. *)
+  cons_ghost_logG :: inG Σ (mono_listR (leibnizO (list mobs * bv 8)));
+  cons_ghost_rdG :: ghost_varG Σ nat;
 }.
 
 Definition uartGhostΣ : gFunctors :=
   #[ GFunctor (mono_listR (leibnizO (bv 8)));
      ghost_varΣ (list (bv 8));
      GFunctor (dfrac_agreeR (leibnizO bool));
+     ghost_varΣ (nat * option (list mobs));
+     ghost_varΣ (option (list mobs));
+     GFunctor (mono_listR (leibnizO (list mobs * bv 8)));
      ghost_varΣ nat ].
 
 Global Instance subG_uartGhostG Σ : subG uartGhostΣ Σ -> uartGhostG Σ.

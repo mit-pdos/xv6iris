@@ -103,10 +103,19 @@ Section ConsoleCaps.
      it costs the bundle one conjunct and the morphism nothing.
      [uart_dlab_off γu] is already here, inside [is_txlock] (UartTxInv.v) --
      which is where uartintr's RHR pop reads it from. *)
+  (* THE CONS LOCK'S HANDLE AND NOT [ConsoleInv.is_conslock]: since the
+     credential escrow moved into [is_conslock] (ConsoleInv.v, the
+     timelessness split), that constant carries the application's [Wd], and
+     consoleintr has nothing to do with it -- it STORES bytes, it does not
+     read them, so the only thing it needs about the console is the ring's
+     lock.  Naming the handle directly keeps the interrupt path free of the
+     application parameter. *)
   Definition console_caps `{XI : CurCtx} (γu : uart_names) : iProp Σ :=
-    (∃ γtx γc : gname,
-       is_txlock γtx γu ∗ is_conslock γc ∗ uart_sent_sub γu [] ∗
-       uart_inited γu)%I.
+    (∃ (γtx γc : gname) (cn : cons_names),
+       is_txlock γtx γu ∗
+       WpLock.is_lock γc a_cons "cons"%string (cons_res_at cn) ∗
+       ⌜cn_uart cn = γu⌝ ∗
+       uart_sent_sub γu [] ∗ uart_inited γu)%I.
 
   Global Instance console_caps_persistent `{XI : CurCtx} γu : Persistent (console_caps γu).
   Proof. rewrite /console_caps. apply _. Qed.
@@ -115,7 +124,7 @@ Section ConsoleCaps.
   Global Instance console_caps_morph γu :
     CtxMorph (λ ξ, console_caps (XI := ξ) γu).
   Proof.
-    rewrite /console_caps /UartTxInv.is_txlock /ConsoleInv.is_conslock.
+    rewrite /console_caps /UartTxInv.is_txlock.
     ctx_morph_solve.
   Qed.
 
@@ -123,9 +132,21 @@ End ConsoleCaps.
 
 Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
      (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
-    (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
+    (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)
+    (* THE BYTE, ITS HISTORY AND THE RING'S HIGH-WATER MARK, as PARAMETERS
+       and no longer under an existential: the post has to name the byte's
+       own history ([hb]) to say where the mark ended up, and an existential
+       premise cannot be named by a postcondition. *)
+    (hb : list mobs) (cb : bv 8) (hh : option (list mobs)) :=
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (consoleintr_stack <= K)%nat ->
+  (* a0 carries the byte the environment pushed into the UART *)
+  m !!! Regidx (mword_of_int 10 : mword 5)
+    = (extend_value (n := 8) true (cb : mword 8) : mword 64) ->
+  (* ...at the history [hb], which ends with exactly that arrival *)
+  obs_ends_in hb cb ->
+  (* ...and which is strictly newer than everything the ring holds *)
+  ohist_ext hh hb ->
   length γs = NPROC ->
   (* cons.lock's and wakeup's transient noff increments stay in int range *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
@@ -155,16 +176,33 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fds
      each delivered byte's tag to its caller.  The three arms that do not
      append -- a NUL byte, a full ring, backspace/kill-line -- drop it, and
      a tag is persistent, so dropping costs nothing. *)
-  (∃ (h : list mobs) (c : bv 8),
-     ⌜ m !!! Regidx (mword_of_int 10 : mword 5)
-       = (extend_value (n := 8) true (c : mword 8) : mword 64) ⌝ ∗
-     ⌜ obs_ends_in h c ⌝ ∗ riscv_rx_tag h) -∗
+  riscv_rx_tag hb -∗
+  (* ...AND THE LOWER BOUND ON THE RUN'S HISTORY AT IT.  Persistent, and what
+     travels on into the ring's own column: a reader further down the line
+     compares two of these to line two windows up. *)
+  obs_hist_lb hb -∗
+  (* THE RING'S HIGH-WATER HALF, IN AND OUT (app-echo.md, lane CONS-CURSOR,
+     C2).  [hh] is the newest history the ring already holds, and the premise
+     [ohist_ext hh hb] -- supplied by the caller out of the pop's own two
+     facts, the token's anchor being at or after the mark and strictly before
+     this byte -- is what licenses the store to extend the ring's chain.  The
+     mark comes back at [hb] if the byte was filed and unmoved if it was
+     dropped, which is exactly [ohist_le hh' (Some hb)]; that is what
+     re-establishes the PLIC payload's own clause at the new anchor.
+
+     IT IS A RESOURCE AND NOT A PURE PREMISE because nothing else can say
+     which of two histories came first: both are prefixes of one run, so two
+     persistent bounds on them are comparable and no more, and the ring's own
+     picture can be arbitrarily stale.  The exclusive pair decides it. *)
+  uart_rx_hi γu (1/2) hh -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
       sie_cap_gpr KT1 Mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is rettgt -∗
+      (∃ hh' : option (list mobs),
+         uart_rx_hi γu (1/2) hh' ∗ ⌜ohist_le hh' (Some hb)⌝) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -172,6 +210,7 @@ Module Type CONSOLEINTR.
   Parameter wp_consoleintr_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
        (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
-      (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_consoleintr_sconf_body γu γv m γs pme lvl K eb b lks.
+      (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)
+      (hb : list mobs) (cb : bv 8) (hh : option (list mobs)),
+      wp_consoleintr_sconf_body γu γv m γs pme lvl K eb b lks hb cb hh.
 End CONSOLEINTR.

@@ -95,7 +95,7 @@ Section WpUartgetc.
      for the other) was the gap. *)
   Lemma wp_uartgetc_inline (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
       (rs_lsr rs_rhr : mword 5) `{!SrcOk rs_lsr} (imm8 : mword 8)
-      (k : nat)
+      (k : nat) (hl : option (list mobs))
       (pcL pcA pcB pcR pcK pcNo : mword 64) (b : bool) :
     (* the two bases: the LSR and the RHR, each already in a register --
        [rs_lsr]/[rs_rhr] are register-index VARIABLES, so the read has to go
@@ -123,7 +123,7 @@ Section WpUartgetc.
     instr pcB true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg,
                            creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) -∗
     instr pcR false (LOAD (mword_of_int 0 : mword 12, Regidx rs_rhr, Regidx Ra0, true, 1)) -∗
-    dev_inv γd γv -∗ uart_dlab_off γd -∗ uart_rx_tok γd k -∗
+    dev_inv γd γv -∗ uart_dlab_off γd -∗ uart_rx_tok γd k hl -∗
     wp_next b p (fun (CID : CpuId) =>
       (* the two returns, as a CONJUNCTION: exactly one is taken, and they must
          share whatever the caller is carrying across the call *)
@@ -132,7 +132,7 @@ Section WpUartgetc.
             ⌜ rx_empty bt = true ⌝ -∗
             sie_cap_gpr kt (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b p -∗
             pc_is pcNo -∗
-            uart_rx_tok γd k -∗
+            uart_rx_tok γd k hl -∗
             WP (Loop : expr riscv_lang))
         ∧ (* "return the byte": it is in a0, zero-extended -- WITH THE HISTORY
              IT ARRIVED AT and the application's claim about it, and with the
@@ -142,8 +142,14 @@ Section WpUartgetc.
             sie_cap_gpr kt (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
                            (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m)) n b p -∗
             pc_is pcK -∗
-            uart_rx_tok γd (S k) -∗
-            (∃ h : list mobs, ⌜ obs_ends_in h c ⌝ ∗ riscv_rx_tag h) -∗
+            (* the popped byte's history, the ORDER against the anchor the
+               token carried in, the application's claim and the history's
+               lower bound -- with the token itself at its NEW anchor
+               (app-echo.md, lane CONS-CURSOR, C1) *)
+            (∃ h : list mobs,
+               ⌜ obs_ends_in h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
+               riscv_rx_tag h ∗ obs_hist_lb h ∗
+               uart_rx_tok γd (S k) (Some h)) -∗
             WP (Loop : expr riscv_lang)) )) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -167,7 +173,7 @@ Section WpUartgetc.
     { rewrite -(rget_ne m rs_rhr ltac:(congruence)). exact Hrhr. }
     (* --- the rx-ready poll: [lbu a5,0(s1)] --- *)
     iApply (UAcc.wp_uart_lsr_read_rx_s_sconf γd γv pcL Ra5 rs_lsr (mword_of_int 0 : mword 12)
-              m n k b ltac:(vm_compute; discriminate)
+              m n k hl b ltac:(vm_compute; discriminate)
               ltac:(rdok)
               ltac:(rewrite Hlsr; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc HiL Hdinv Htok [-]").
@@ -210,7 +216,7 @@ Section WpUartgetc.
                 with "Hcg Hpc HiB [-]").
       iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite HR) in "Hpc".
       iApply (UAcc.wp_uart_rhr_pop_s_sconf (CID:=CID3) γd γv pcR Ra0 rs_rhr (mword_of_int 0 : mword 12)
-                (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n k b
+                (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n k hl b
                 ltac:(vm_compute; discriminate)
                 ltac:(rdok)
                 ltac:(rewrite (rget_ne _ rs_rhr ltac:(congruence))
@@ -220,10 +226,10 @@ Section WpUartgetc.
                 with "Hcg Hpc HiR Hdinv Hdlab [Htok] [Hlb]").
       { iExact "Htok". }
       { iApply "Hlb". iPureIntro. reflexivity. }
-      iIntros (CID4 Hs4 c) "Hcg Hpc Htok Hh". iEval (rewrite HK) in "Hpc".
+      iIntros (CID4 Hs4 c) "Hcg Hpc Hh". iEval (rewrite HK) in "Hpc".
       iSpecialize ("Hk" $! CID4 with "[%]"); [wp_next_chain|].
       iDestruct "Hk" as "[_ Hyes]".
-      iApply ("Hyes" $! bt c with "[%] Hcg Hpc Htok Hh"). exact Hempty.
+      iApply ("Hyes" $! bt c with "[%] Hcg Hpc Hh"). exact Hempty.
   Qed.
 
   (* ------------------------------------------------------------------- *)

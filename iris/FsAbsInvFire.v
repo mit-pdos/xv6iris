@@ -247,14 +247,38 @@ Section FsAbsInvFire.
      row and no offset invariant is needed, and no application step is paid
      -- a read moves no row.  This is what makes read's bundle payable by
      an arbitrary user process under the ARM. *)
+  (* ...AND THE CONSOLE ARM IS PAID FROM THE SUPPLY ITSELF (app-echo.md,
+     lane CONS-CURSOR, C3, and the LEASE ruling).  A read of the console
+     takes [ConsoleInv.cons_acc fsc_cons app_sup Rd] -- ONE ARM, two
+     disjuncts -- and this is the TAINTED one: the caller hands in the
+     credential it already holds, which is [app_sup] itself, and owes [Rd]
+     at every position, which at the generic family's [fun _ _ => True] is
+     free.
+
+     THAT IS WHY THE ARM IS NOT AN EXCLUSIVE TOKEN.  The law below is a
+     FIELD of [UexecSG]'s class ([xv6_sbundle_of_supply_ne]), stated at
+     [□ ssupply], and has to hold at EVERY number for an arbitrary program:
+     a console arm demanding the reader token would not merely be
+     unprovable there -- taken as a [□] premise it is INCONSISTENT (open it
+     three times and hold [ghost_var γ (1/2) _] thrice), which would make
+     every generic corollary vacuous while the audit still printed the
+     thirteen.  So the arm is payable from a PERSISTENT credential, and the
+     one the generic slot already runs on is the one it takes. *)
   Lemma fsabs_fileread_in (st : fdstate) :
-    ⊢ fileread_in st (pfam_triv (fun _ _ _ _ => True%I)).
+    app_sup -∗ fileread_in st (pfam_triv (fun _ _ _ _ => True%I))
+                            (fun _ _ => True%I).
   Proof.
     rewrite /fileread_in.
-    destruct st as [| rb wb ty]; [done |].
-    destruct rb; [| done].
-    destruct ty as [i γo | | ma]; [| done | done].
-    iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo).
+    destruct st as [| rb wb ty]; [by iIntros "_" |].
+    destruct rb; [| by iIntros "_"].
+    destruct ty as [i γo | | ma].
+    - iIntros "_". iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo).
+    - by iIntros "_".
+    - case_decide; [| by iIntros "_"].
+      iIntros "#Hsup".
+      iApply (ConsoleInv.cons_acc_cred fsc_cons app_sup (fun _ _ => True%I)).
+      + rewrite /ConsoleInv.cons_dirty_cred. iModIntro. iExact "Hsup".
+      + iIntros (cur dc). done.
   Qed.
 
 

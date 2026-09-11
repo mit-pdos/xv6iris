@@ -84,7 +84,8 @@ Require Import UsertrapRes.   (* [devintr_caps_any] -- the park's device complem
 Require Import WaitInv.       (* [wait_res_at] *)
 Require Import SpecProcinit.  (* [wait_lock_addr] *)
 Require Import FileInv.       (* [is_ftable] *)
-Require Import ConsoleInv.    (* [console_ready] *)
+Require Import ConsoleInv.    (* the console ring's invariant *)
+Require Import SpecFileread.  (* [console_ready_app] -- the PINNED console row *)
 Require Import KptExecMap.   (* [kmap_at tramp_vpn tramp_ppn KP_rx] *)
 Require Import InitBoot.     (* [init_boot_bundle] -- the first process's exec
                                 bundle, which its park captures *)
@@ -216,7 +217,10 @@ Definition wp_userinit_sconf_body
   devintr_caps_any fsc_uart fsc_disk fsc_dlock γtl γs pd pav pu -∗
   is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
   is_ftable γft γf -∗
-  ConsoleInv.console_ready -∗
+  (* the console, PINNED at [fsc_cons]/[AppInv.app_sup]: the first
+     process's park carries what the read syscall's arm needs
+     ([SpecFileread.console_ready_app]) *)
+  SpecFileread.console_ready_app -∗
   wire_inv -∗
   (* THE FIRST PROCESS'S EXEC BUNDLE, and it is the ONE thing this
      contract asks about user execution.  userinit MINTS NOTHING: it parks

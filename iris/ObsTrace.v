@@ -229,6 +229,117 @@ Lemma obs_ends_in_snoc (h : list mobs) (b : bv 8) :
   obs_ends_in (h ++ [ObsUartIn b])%list b.
 Proof. by exists h. Qed.
 
+(* ...and a history names AT MOST ONE byte, which is what lets a reader
+   JOIN two clauses stated over the same [h]: the console receipt's
+   unconditional per-byte ledger (the byte is in the caller's buffer) and
+   its conditional window (the byte is the stored sequence's [cur + j]th)
+   each quantify the byte for themselves, and this is why they agree. *)
+Lemma obs_ends_in_inj (h : list mobs) (b b' : bv 8) :
+  obs_ends_in h b -> obs_ends_in h b' -> b = b'.
+Proof.
+  intros [h0 ->] [h1 He].
+  apply (f_equal (@last mobs)) in He.
+  rewrite !last_snoc in He. by injection He as ->.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  THE ORDER OF TWO HISTORIES  (app-echo.md, lane CONS-CURSOR, C1)        *)
+(*                                                                        *)
+(*  Two histories a proof holds at once are always two SNAPSHOTS OF ONE    *)
+(*  RUN, so the only order that can hold between them is the prefix one,   *)
+(*  and "strictly earlier" is that plus a length.  [hist_ext h h'] is      *)
+(*  "[h'] is [h] with at least one more event on the end"; it is what the  *)
+(*  UART's receive column says of two adjacent queued bytes and what the   *)
+(*  console ring says of two adjacent stored ones.  STATED AS PREFIX PLUS  *)
+(*  LENGTH, not as [h <> h'], because every consumer wants the length      *)
+(*  anyway (it is how two bounds against one authority are ordered) and    *)
+(*  the two forms are equivalent on lists.                                *)
+(*                                                                        *)
+(*  THE [option] FORMS ARE THE EMPTY CASE, not a convenience: the receive  *)
+(*  token's anchor is [None] until the first byte is popped, and the       *)
+(*  console's high-water mark is [None] until the first byte is stored, so *)
+(*  every clause that compares against one has to read [None] as "no       *)
+(*  constraint".                                                          *)
+(* ---------------------------------------------------------------------- *)
+
+Definition hist_ext (h h' : list mobs) : Prop :=
+  h `prefix_of` h' /\ (length h < length h')%nat.
+
+(* "[a] is at or before [b]", with [None] the bottom *)
+Definition ohist_le (a b : option (list mobs)) : Prop :=
+  match a with
+  | None => True
+  | Some g => match b with None => False | Some g' => g `prefix_of` g' end
+  end.
+
+(* "[a] is strictly before the history [h]" *)
+Definition ohist_ext (a : option (list mobs)) (h : list mobs) : Prop :=
+  match a with None => True | Some g => hist_ext g h end.
+
+Lemma hist_ext_trans (h1 h2 h3 : list mobs) :
+  hist_ext h1 h2 -> hist_ext h2 h3 -> hist_ext h1 h3.
+Proof.
+  intros [Hp1 Hl1] [Hp2 Hl2]. split; [by etrans | lia].
+Qed.
+
+(* a prefix that is not longer, followed by a real extension *)
+Lemma hist_ext_of_prefix (h1 h2 h3 : list mobs) :
+  h1 `prefix_of` h2 -> hist_ext h2 h3 -> hist_ext h1 h3.
+Proof.
+  intros Hp [Hp2 Hl2]. split; [by etrans |].
+  apply prefix_length in Hp. lia.
+Qed.
+
+Lemma hist_ext_snoc (h : list mobs) (e : mobs) : hist_ext h (h ++ [e]).
+Proof.
+  split; [by exists [e] |]. rewrite length_app /=. lia.
+Qed.
+
+Lemma ohist_ext_of_le (a : option (list mobs)) (h h' : list mobs) :
+  ohist_le a (Some h) -> hist_ext h h' -> ohist_ext a h'.
+Proof.
+  destruct a as [g|]; [| done]. cbn. intros Hp Hx.
+  exact (hist_ext_of_prefix g h h' Hp Hx).
+Qed.
+
+(* "at or before" composed with "strictly before": the ring's high-water
+   mark sits at or before the popper's ANCHOR, and the byte just popped is
+   strictly after that anchor, so the mark is strictly before the byte.
+   That composition is what licenses consoleintr's store to extend the
+   ring's chain (app-echo.md, lane CONS-CURSOR, C2). *)
+Lemma ohist_ext_le_ext (a b : option (list mobs)) (h : list mobs) :
+  ohist_le a b -> ohist_ext b h -> ohist_ext a h.
+Proof.
+  destruct a as [x|]; [| done].
+  destruct b as [y|]; [| done]. cbn.
+  intros Hp Hx. exact (hist_ext_of_prefix x y h Hp Hx).
+Qed.
+
+(* "strictly before" implies "at or before" *)
+Lemma ohist_le_of_ext (a : option (list mobs)) (h : list mobs) :
+  ohist_ext a h -> ohist_le a (Some h).
+Proof. destruct a as [g|]; [| done]. cbn. by intros [Hp _]. Qed.
+
+Lemma ohist_le_Some (h : list mobs) : ohist_le (Some h) (Some h).
+Proof. cbn. reflexivity. Qed.
+
+Lemma ohist_le_none (b : option (list mobs)) : ohist_le None b.
+Proof. exact I. Qed.
+
+Lemma ohist_le_trans (a b c : option (list mobs)) :
+  ohist_le a b -> ohist_le b c -> ohist_le a c.
+Proof.
+  destruct a as [x|]; [| done]. destruct b as [y|]; [| done].
+  destruct c as [z|]; [| done]. cbn. apply transitivity.
+Qed.
+
+Lemma ohist_le_ext (a : option (list mobs)) (h h' : list mobs) :
+  ohist_ext a h -> hist_ext h h' -> ohist_le a (Some h').
+Proof.
+  destruct a as [g|]; [| done]. cbn. intros Hx Hy.
+  destruct (hist_ext_trans g h h' Hx Hy) as [Hp _]. exact Hp.
+Qed.
+
 Definition trace_shape (h : list mobs) (on : bool) : Prop :=
   foldl obs_step (Some false) h = Some on.
 

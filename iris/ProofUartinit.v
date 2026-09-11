@@ -138,8 +138,8 @@ Section ProofUartinit.
 
   Lemma wp_uartinit_sconf (γd : uart_names)
       (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool) (k : nat)
-      (p : mword 64)
-    : wp_uartinit_sconf_body γd m K l b0 k p.
+      (hl : option (list mobs)) (p : mword 64)
+    : wp_uartinit_sconf_body γd m K l b0 k hl p.
   Proof.
     cbv beta delta [wp_uartinit_sconf_body].
     intros pcE ret_tgt HK.
@@ -484,9 +484,10 @@ Section ProofUartinit.
     iApply (Uart.wp_sb_uart_uinv_s_sconf KT0 (CID:=CID) γd 2 (mword_of_int (KernelSyms.uartinit + 0x32)) false (mword_of_int 12 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 2 : mword 12)
               R9 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false ∗
-                 uart_rx_tok γd k)%I
+                 uart_rx_tok γd k hl)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false ∗
-                 ∃ k' : nat, uart_rx_tok γd k')%I
+                 ∃ (k' : nat) (hl' : option (list mobs)),
+                   uart_rx_tok γd k' hl')%I
               false p
               ltac:(unfold uart_size; lia)
               ltac:(rgne; rewrite HR9a4; vm_compute; reflexivity)
@@ -506,7 +507,7 @@ Section ProofUartinit.
       match type of Hrxe with
       | u_rx uu' = (if ?cl then [] else _) => destruct cl eqn:Hclr
       end.
-      + iMod (uart_colE_flush γd uu uu' k Hrxe Hlbe with "Hcol Htok")
+      + iMod (uart_colE_flush γd uu uu' k hl Hrxe Hlbe with "Hcol Htok")
           as "[Hcol Htok]".
         iModIntro. iSplitL "Hg";
           [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
@@ -514,7 +515,7 @@ Section ProofUartinit.
       + iDestruct (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol") as "Hcol".
         iModIntro. iSplitL "Hg";
           [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
-        iFrame "Hcol Ht Hd". by iExists k. }
+        iFrame "Hcol Ht Hd". iExists k, hl. iExact "Htok". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc (Htx & Hdlab & Htok)".
     assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x32) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x36)) by (apply bv_eq; vm_compute; reflexivity).

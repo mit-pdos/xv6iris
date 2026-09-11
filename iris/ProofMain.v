@@ -115,6 +115,7 @@ Require Import IcacheBoot IcacheEscrow InodeInv.
 Require Import IcacheRefDefs.
 Require Import IrefSlots FsCfg FsBlocks.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
+Require Import ObsTrace.   (* [mobs] / [ohist_le_none]: the receive side's anchor *)
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
 Require Import SpecDevintr SpecClockintr TicksInv.
 Require Import KMap.
@@ -418,10 +419,18 @@ Section ProofMain.
   (* The panic-flag invariant is gone with the flags themselves.           *)
   (* =================================================================== *)
   Local Lemma mn_grp_printk 
-      (γd : uart_names) (γv : disk_names)
+      (γd : uart_names) (γv : disk_names) (cn : cons_names)
       (m : regfile) (n : nat) (p0 : mword 64) (l0 : list (bv 8)) (b0 : bool)
-      (k0 : nat) :
+      (k0 : nat) (hl0 : option (list mobs)) :
     (K_userinit <= n)%nat ->
+    (* the ring's names carry the RECEIVE side's, which is where the
+       high-water mark's two halves live *)
+    cn_uart cn = γd ->
+    (* ...AND THE RING IS THE ERA'S OWN.  [SpecFileread.console_ready_app]
+       -- what the read syscall's arm opens -- is stated at the AMBIENT
+       [fsc_cons], and this tie is [FsCfgBoot.fs_boot_supply]'s: the boot
+       chain mints the ring's names and the era's config reuses them. *)
+    fsc_cons = cn ->
     sie_cap_gpr KT0 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x42) : mword 64) -∗
@@ -439,9 +448,18 @@ Section ProofMain.
     (∃ r w : mword 64, devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) -∗
     ConsoleInv.devsw_rest -∗
     (* the console RING, which this group locks up behind cons.lock *)
-    cons_res -∗
+    cons_res cn -∗
+    (* ...AND THE CLEAN TOKEN, which the [newlock] below spends on the ring's
+       CREDENTIAL ESCROW ([ConsoleInv.cons_cred_inv]): the ring is born with
+       nobody having read behind the reader token's back, and the escrow is
+       what a tokenless read pays into.  It rides in [is_conslock] beside
+       the lock handle, which is why it is minted HERE. *)
+    cons_clean_tok cn -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
-    uart_rx_tok γd k0 -∗
+    uart_rx_tok γd k0 hl0 -∗
+    (* the ring's partner half of the receive side's HIGH-WATER MARK, parked
+       in the PLIC payload beside the token by the deposit below *)
+    uart_rx_hi γd (1/2) None -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     (* NO [γpr] BINDER ANY MORE (fs-cfg-boot.md (f-3)): the "pr" lock is
        allocated at the AMBIENT [fsc_printk] since debt (E), so the group's
@@ -460,13 +478,13 @@ Section ProofMain.
            [newlock] below mints the [is_conslock].  [console_caps] closes
            over its own gname existentially, so the pairing has to happen
            HERE, while the name is still concrete. *)
-        ConsoleInv.console_ready -∗
+        SpecFileread.console_ready_app -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn.
+    intros Hn Hcnu Hconsq.
     iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr".
-    iIntros "Hkprintk Hdevsw Hrest Hring Htx Hsent Hlb Htok Hdlab Hcont".
+    iIntros "Hkprintk Hdevsw Hrest Hring Hclean Htx Hsent Hlb Htok Hhi Hdlab Hcont".
     iPoseProof (dev_inv_uart with "Hdev") as "#Huinv".
     iPoseProof (kernel_data_string mn_nl_addr mn_nl
                   (mword_of_int mn_nl_addr) eq_refl
@@ -507,7 +525,7 @@ Section ProofMain.
        exactly [WpLock.newlock]'s premises.  The two [newlock]s are taken
        twenty lines below, once [printkinit] has returned; together they are
        [SpecConsoleintr.console_caps]. *)
-    iApply (Consoleinit.wp_consoleinit_sconf γd C0 n l0 b0 k0
+    iApply (Consoleinit.wp_consoleinit_sconf γd C0 n l0 b0 k0 hl0
               vcl vcn vcc dr0 dw0 p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Htok Hdlab
                     Hcw Hcn Hcc Hltx Hdr Hdw Hrest").
@@ -518,10 +536,11 @@ Section ProofMain.
        enable write and every reader of a tagged byte holds.  It runs HERE,
        between consoleinit and plicinit, which is why the invariant's
        pre-deposit arm can say the UART is enabled nowhere. ===== *)
-    iDestruct "Htok" as (ktok) "Htok".
+    iDestruct "Htok" as (ktok hltok) "Htok".
     iApply fupd_wp.
-    iMod (uart_rx_tok_deposit ⊤ γd ktok ltac:(solve_ndisj)
-            with "[] Htok") as "#Hinit".
+    iMod (uart_rx_tok_deposit ⊤ γd ktok hltok None ltac:(solve_ndisj)
+            (ohist_le_none hltok)
+            with "[] Htok Hhi") as "#Hinit".
     { iApply (dev_inv_plic with "Hdev"). }
     iModIntro.
     assert (Hretci : ret_pc (C0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
@@ -607,22 +626,35 @@ Section ProofMain.
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock ⊤ a_cons "cons"%string cons_res_at
+    iMod (newlock ⊤ a_cons "cons"%string (cons_res_at cn)
             with "Hclnm Hrun Hclw Hclcpu Hring") as "[Hrun Hcl0]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
-    iDestruct "Hcl0" as (γcl) "#Hconslk".
+    iDestruct "Hcl0" as (γcl) "#Hconslk0".
+    (* THE CREDENTIAL ESCROW, bought with the clean token
+       ([ConsoleInv.cons_cred_inv_alloc]) and folded into [is_conslock]
+       beside the handle.  [Wd] is [AppInv.app_sup]: the credential a
+       process that answers for nothing runs on, which is what the kernel
+       charges a console read taken without the reader token.  The
+       interrupt path's [console_caps] takes the RAW handle instead -- it
+       stores bytes, it does not read them. *)
+    iMod (ConsoleInv.cons_cred_inv_alloc cn AppInv.app_sup ⊤ with "Hclean")
+      as "#Hcred".
+    iPoseProof (ConsoleInv.is_conslock_intro cn AppInv.app_sup γcl
+                  with "Hconslk0 Hcred") as "#Hconslk".
     iAssert (console_caps γd) as "#Hccaps".
-    { rewrite /console_caps. iExists γtx, γcl.
+    { rewrite /console_caps. iExists γtx, γcl, cn.
       iSplitR; [iExact "Htxl" |].
-      iSplitR; [iExact "Hconslk" |].
+      iSplitR; [iExact "Hconslk0" |].
+      iSplitR; [iPureIntro; exact Hcnu |].
       iSplitR; [iExact "Hsub0" | iExact "Hinit"]. }
     (* THE CONSOLE BUNDLE, and this is the only point at which it can be
        built: [Hconslk] is [is_conslock γcl] with γcl still concrete, and
        [Htbl] is the table consoleinit filled twenty instructions ago.
        [console_caps] closes over γcl on the next line, so pairing them
        afterwards would have nothing to pair. *)
-    iAssert (ConsoleInv.console_ready) as "#Hcready".
-    { iExists γcl. rewrite /ConsoleInv.console_inv.
+    iAssert (SpecFileread.console_ready_app) as "#Hcready".
+    { rewrite /SpecFileread.console_ready_app Hconsq.
+      iExists γcl. rewrite /ConsoleInv.console_inv.
       iSplitR; [iExact "Hconslk" | iExact "Htbl"]. }
     iModIntro.
     (* ---- +0x4a auipc a0,0x6 / +0x4e addi a0,a0,476 : a0 := &"\n" ---- *)
@@ -1434,7 +1466,7 @@ Section ProofMain.
     init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0 -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     console_caps γd -∗
-    ConsoleInv.console_ready -∗
+    SpecFileread.console_ready_app -∗
     is_tickslock γtl -∗
     is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
     (* ---- ...AND ITS FOUR FORWARDED PERSISTENT ROWS.  [printk_env] is
@@ -2209,7 +2241,7 @@ Section ProofMain.
   Lemma wp_main_boot_sconf 
       (m : regfile) (K : nat) (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
-      (γd : uart_names) (γv : disk_names)
+      (γd : uart_names) (γv : disk_names) (cn : cons_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
@@ -2218,10 +2250,10 @@ Section ProofMain.
       (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
       `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
+        γd γv cn l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
-    intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hsnap Hp0.
+    intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hcnu Hsnap Hp0.
     (* THE SNAPSHOT HYPOTHESIS, READ HERE (fs-cfg-boot.md stage (f);
        durable-disk lane E-himg).  Two of its rows are main's own ([0 < nib]
        for userinit's namei corner, [0 ∉ cov] for [bio_init_at]); the rest
@@ -2243,7 +2275,7 @@ Section ProofMain.
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv Hprim #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
-    iIntros "#Hdev #Hwire Hbundle Htx Hsent Hlb Htok Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
+    iIntros "#Hdev #Hwire Hbundle Htx Hsent Hlb Htok Hhi Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     (* THE [tx_busy] CELL IS GONE from the bundle: ae96fd0 deleted the flag, so
@@ -2271,14 +2303,14 @@ Section ProofMain.
        [Hdevrest] -- the eighteen devsw entries consoleinit never writes --
        is the console_inv campaign's new second row of [main_globals_raw];
        it rides into [mn_grp_printk] beside the CONSOLE pair and comes back
-       inside [ConsoleInv.console_ready]. *)
+       inside [SpecFileread.console_ready_app]. *)
     iDestruct "Hglobals" as "(Hdevsw & Hdevrest & Hkmem24 & Hkpt & Hprocs & Hppub &
                              Hpshare & Hwres &
                              Hfds & Hirs & Hfents & Hirfile & Hfdauth &
                              Hbss & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead &
                              Hbpay & Hsbb & Hinl &
                              Hient & Hlogr & Hdiskptr & Hdiskfree & Hdusedidx &
-                             Hdslots & Hring)".
+                             Hdslots & Hring & Hrdtok & Hclean)".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iDestruct "Hdiskfree" as (free0) "Hdiskfree".
     (* ---- THE FILE SYSTEM'S BOOT-ERA MINT, opened into its ten ties and
@@ -2289,7 +2321,7 @@ Section ProofMain.
            are stage (f)'s, at the [fs_ready] seal. ---- *)
     iDestruct "Hfs" as "(%Hdevq & %Hnibq & %Histq & %Huartq & %Hdiskq &
                          %Hcovq & %Hlogstq & %Hbmapq & %Hsizeq & %Hninq &
-                         Hkit1 & Hkit2 & Hfolat & Hoffa)".
+                         %Hconsq & Hkit1 & Hkit2 & Hfolat & Hoffa)".
     (* the boot face IS the liveness authority (the off LEDGER is retired,
        r25 item 24: the off cell lives in the fd's own box) *)
     iEval (rewrite flive_auth_at_eq) in "Hfolat".
@@ -2328,9 +2360,11 @@ Section ProofMain.
     iApply (mn_boot_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc".
     (* --- 0x42 .. 0x6a : console / printk --- *)
-    iApply (mn_grp_printk γd γv m1 (K - 2)%nat p0 l0 b0 0%nat Hn50
+    iApply (mn_grp_printk γd γv cn m1 (K - 2)%nat p0 l0 b0 0%nat None Hn50
+              Hcnu Hconsq
               with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr
-                    Hkprintk Hdevsw Hdevrest Hring Htx Hsent Hlb Htok Hdlab").
+                    Hkprintk Hdevsw Hdevrest Hring Hclean Htx Hsent Hlb Htok
+                    Hhi Hdlab").
     iIntros (m2) "Hcg Hpc Hfree Hcpu #Hpenv #Hccaps #Hcready".
     (* ---- STAGE (f): the printk half of [FirstTok.first_boot_persist],
        re-spelled at the CONFIGURATION's device gnames.  The group produces

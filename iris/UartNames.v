@@ -33,9 +33,20 @@ From iris.base_logic.lib Require Import own.
                non-empty" observation from the LSR poll to the RHR pop.
       un_rxpop  ghost_var halves over the number of bytes ever REMOVED from
                the receive FIFO -- popped by an RHR read or flushed by an
-               FCR write.  The client's half is [uart_rx_tok], the receive
-               token: exactly one hart holds it, so exactly one hart can
-               shorten the FIFO.
+               FCR write -- TOGETHER WITH THE LAST REMOVED BYTE'S HISTORY
+               (the ANCHOR, [None] before the first pop).  The client's half
+               is [uart_rx_tok], the receive token: exactly one hart holds
+               it, so exactly one hart can shorten the FIFO.  The anchor is
+               here rather than in the column because the queued histories'
+               strict-prefix chain has to survive an EMPTY queue, and the
+               token is the one thing that does.
+      un_rxhi  ghost_var halves over the history of the last byte the
+               CONSOLE RING stored ([WpUart.uart_rx_hi]).  One half rides in
+               the PLIC payload beside the token, the other in
+               [ConsoleInv.cons_res]; the pure clause between them is
+               "everything the ring holds is at or before the last pop",
+               which is what lets consoleintr's store know the byte it is
+               filing is newer than every byte already in the ring.
       un_init  the one-shot that says uartinit's FCR flush has run.  Its
                exclusive half [uart_preinit] is what the PLIC invariant
                holds before the boot chain deposits the token; the
@@ -48,5 +59,40 @@ Record uart_names := UartNames {
   un_dlab   : gname;
   un_rxpush : gname;
   un_rxpop  : gname;
+  un_rxhi   : gname;
   un_init   : gname;
+}.
+
+(* THE CONSOLE RING'S GHOST NAMES, here and not in [ConsoleInv.v] for the
+   reason [uart_names] is here: [FsCfg]'s config record has to carry them,
+   and it must not pull the console's own theory (hence the device model) in
+   front of every file-system file.
+
+     cn_uart  the receive side's names.  The ring's HIGH-WATER MARK is one
+              of them ([un_rxhi] above): its partner half sits in the PLIC
+              payload beside the receive token, which is where the popper
+              is, and that pairing is what lets the ring order a byte it is
+              handed against the bytes it already holds.
+     cn_log   the APPEND-ONLY sequence of (history, byte) pairs the ring has
+              committed -- what consoleread consumes, and what a read's
+              receipt hands out a lower bound of.
+     cn_rd    the CONSUMPTION CURSOR, a [ghost_var] over the number of bytes
+              consumed.  One half is in the ring's resource; the other IS
+              the console-reader token.
+     cn_dirty the ONE-SHOT MARKER that says "a read without the token has
+              moved the ring's consumed count past the token holder's
+              cursor".  A [mono_nat]: the authority at 0 is the CLEAN token
+              (exclusive, minted at boot beside the ring), the lower bound
+              at 1 is the persistent, TIMELESS marker the ring's resource
+              carries ([ConsoleInv.cons_dirty_lb]).  The marker and not the
+              credential itself is what rides in [ConsoleInv.cons_res],
+              because the credential is an arbitrary application [iProp] and
+              a lock payload must be timeless; the credential lives in the
+              escrow invariant beside the lock handle
+              ([ConsoleInv.cons_cred_inv]). *)
+Record cons_names := ConsNames {
+  cn_uart  : uart_names;
+  cn_log   : gname;
+  cn_rd    : gname;
+  cn_dirty : gname;
 }.

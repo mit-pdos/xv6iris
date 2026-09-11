@@ -178,7 +178,7 @@
 
    So the wand's builder owes only what it can have: the persistent rows
    [first_done] does NOT supply ([is_ftable], the [wait_lock], the ticks
-   lock, [devintr_caps_any], [procs_avail], [console_ready], the nextpid
+   lock, [devintr_caps_any], [procs_avail], [console_ready_app], the nextpid
    lock), all of which main creates before userinit runs and all of which
    kfork's parent already holds.
 

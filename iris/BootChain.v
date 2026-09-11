@@ -323,6 +323,9 @@ Section BootPrimary.
 
   Lemma boot_hart_primary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names)
+      (* the console ring's ghost names, minted with the ring in
+         [BootShared.boot_shared_alloc] and reused by the era's config *)
+      (cn : cons_names)
       (γi : gname) (ξd : CtxId)
       (ps : list (mword 64)) (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (* the file system's boot-era mint, at the era's own disk: threaded
@@ -346,6 +349,9 @@ Section BootPrimary.
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     (* the disk's protocol is in its not-live arm at boot *)
     virtio_live c0 = false ->
+    (* the console ring's names carry the RECEIVE side's, which is where the
+       high-water mark's two halves live (app-echo.md, CONS-CURSOR C2) *)
+    cn_uart cn = γd ->
     (* THE SNAPSHOT HYPOTHESIS, forwarded whole (fs-cfg-boot.md stage (f);
        durable-disk lane E-himg).  This chain still neither reads nor opens
        it; [ProofMain] is what turns it into [FsReady.fs_geom_ok] and
@@ -360,7 +366,7 @@ Section BootPrimary.
     started_inv γi ξd (main_dep γd γv) -∗ started_prim γi -∗
     (* --- the boot supply --- *)
     main_locks_raw -∗
-    main_globals_raw -∗
+    main_globals_raw cn -∗
     (* the image's writable initialized globals -- main spends [nextpid] on
        the pid lock, see [SpecMain]'s own row.  Spelled out rather than named
        as [BootShared.main_data_raw]: that file sits ABOVE this one, so the
@@ -385,7 +391,7 @@ Section BootPrimary.
     (* the file system's boot-era mint and the iref-slot authority, both out
        of [BootShared.boot_shared_alloc] and both spent in
        [ProofMain.mn_grp_fs] -- see [SpecMain]'s own rows *)
-    fs_boot_supply _ _ _ dk sb nib cov γd γv Rspent Pb
+    fs_boot_supply _ _ _ dk sb nib cov γd γv cn Rspent Pb
       (FsCrash.hdr_wset (FsCrash.fs_blocks dk) (FsImg.sb_logstart sb)) -∗
     (* rows (B) and (C) of the fsinit bundle -- see [SpecMain]'s own rows.
        Row (B) is VALUE-BEARING since durable-disk 1a: the era's mirror half
@@ -415,7 +421,10 @@ Section BootPrimary.
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     (* THE RECEIVE TOKEN, born with the device invariant: main carries it to
        uartinit's FCR flush and parks it in the PLIC invariant afterwards. *)
-    uart_rx_tok γd 0%nat -∗
+    uart_rx_tok γd 0%nat None -∗
+    (* ...and the ring's partner half of the receive side's HIGH-WATER MARK,
+       which main parks in the PLIC payload beside the token *)
+    uart_rx_hi γd (1/2) None -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
@@ -431,24 +440,24 @@ Section BootPrimary.
     ([∗ list] p ∈ ps, page_own p) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hreset Hz Hprun Hlen Hlive Himg.
+    intros Hreset Hz Hprun Hlen Hlive Hcnu Himg.
     iIntros "#Htext #Hdata Hres Hthr #Hstarted Hprim Hlk Hgl Hfirst Hnext Hpark Hpst Hpav Hchb
              Hfs Hmir Hirslot Hirauth #Hcert #Hseam
-             #Hdev #Hwire Hinitb Htx Hsent Hlb Htok Hdlab Hcfg Hclaim Hcmauth #Hdone Hkpt Hkptb Hkmap Hpages".
+             #Hdev #Hwire Hinitb Htx Hsent Hlb Htok Hhi Hdlab Hcfg Hclaim Hcmauth #Hdone Hkpt Hkptb Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres Hthr").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps
               (add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
-              (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0
+              (mword_of_int 0x88000000 : mword 64) γd γv cn l0 b0 c0
               dk sb nib cov ndisk S Pb Rspent
               (register_lookup tlb rs) γi ξd (main_dep γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
-              Hlive Himg eq_refl
+              Hlive Hcnu Himg eq_refl
               with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted Hprim [] Hlk Hgl
                     Hfirst Hnext Hpark Hpst Hpav Hchb Hfs Hmir Hirslot Hirauth
                     Hcert Hseam
-                    Hdev Hwire Hinitb Htx Hsent Hlb Htok Hdlab
+                    Hdev Hwire Hinitb Htx Hsent Hlb Htok Hhi Hdlab
                     Hcfg Hclaim Hcmauth Hdone Htimc Hraw Hkpt Hkptb Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
        nine conjuncts at exactly its eight existential witnesses, plus

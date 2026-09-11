@@ -37,6 +37,7 @@ Require Import LockSet.
 Require Import FileInvDefs.
 Require Import VirtioProto VirtioModel VirtioQueue DiskPtsto.
 Require Import PlicPlan WpUart WireInv.
+Require Import ConsoleInv.   (* [cons_ghosts_boot] / [cons_ghosts_alloc] *)
 Require Import SpecConsoleinit SpecIinit.
 Require Import SpecFreerange KvmSpec BcacheInv.
 Require Import StartedInv.
@@ -489,7 +490,7 @@ Section BootBssChain.
      ([main_globals_raw], [main_data_raw]) are primary-only and may be
      context-indexed, while the per-hart rows below are [∀ ξ] and so
      context-free (item 38, checklist line four). *)
-  Lemma boot_bss_carve `{XI : CurCtx} (g : gstate) :
+  Lemma boot_bss_carve `{XI : CurCtx} (g : gstate) (cn : cons_names) :
     boot_facts g ->
     kmap_static_claims -∗
     fd_slots FDSLOTS -∗
@@ -518,10 +519,17 @@ Section BootBssChain.
        procinit routes it so a DORMANT slot owns three -- see
        [ProcDefs.proc_dormant]'s note for the ledger it opens. *)
     bslots (NPROC * 3) -∗
+    (* THE CONSOLE RING'S GHOSTS (app-echo.md, lane CONS-CURSOR, C2).  The
+       carve allocates none of them -- the ring's half of the receive side's
+       high-water mark is the UART mint's, so all five are minted together
+       by [ConsoleInv.cons_ghosts_alloc] beside it.  Three of them go INTO
+       [ConsoleInv.cons_res]; the reader token and the clean token travel on
+       through [main_globals_raw] to main. *)
+    cons_ghosts_boot cn -∗
     boot_cran g img_end ram_hi -∗
       started_claim ∗ started_win_plain ∗
       main_locks_raw ∗
-      main_globals_raw ∗
+      main_globals_raw cn ∗
       ([∗ list] h ∈ enum CPU, boot_hart_bss h) ∗
       (∃ ps : list (mword 64),
          ⌜prun phystop_val s1entry_val ps⌝ ∗
@@ -529,7 +537,7 @@ Section BootBssChain.
          ([∗ list] p ∈ ps, page_own p)).
   Proof.
     intro Hbf. pose proof (boot_mem_of_facts g Hbf) as Hmem.
-    iIntros "#Hcl Hfd Hir Hirf Hfda Hbss H".
+    iIntros "#Hcl Hfd Hir Hirf Hfda Hbss (Hsa & Hcu & Hchi & Hrdtok & Hclean) H".
     (* THE FLAG CELLS ARE GONE.  This chain used to open with two 4-byte cuts
        for [panicked] and [panicking]; upstream d80e61c5 deleted both globals
        from printk.c, so there is no such symbol and nothing to carve.  .bss
@@ -593,8 +601,8 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.cons + 24) (KernelSyms.cons + 24)
                  (KernelSyms.cons + 164) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hring H]".
-    iDestruct (boot_cons_res g Hmem ltac:(zlit) ltac:(zlit) ltac:(zlit) ltac:(zeq)
-                 with "Hcl Hring") as "Hring".
+    iDestruct (boot_cons_res g cn Hmem ltac:(zlit) ltac:(zlit) ltac:(zlit) ltac:(zeq)
+                 with "Hcl Hring Hsa Hcu Hchi") as "Hring".
     iDestruct (bss_cut g (KernelSyms.cons + 164) KernelSyms.pr
                  (KernelSyms.pr + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk2 H]".
@@ -933,7 +941,7 @@ Section BootBssChain.
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
     iSplitL "Hdr Hdw Hdevrest Hkm Hkpt Hpr1 Hpr2 Hpr3 Hwres Hfd Hir Hfent Hirf Hfda
              Hbss Hip Htk Hbsl Hbln Hhd
-             Hbpay Hsbb Hino Hient Hlog Hdd Hda Hdu Hdf Hdi Hslots Hring".
+             Hbpay Hsbb Hino Hient Hlog Hdd Hda Hdu Hdf Hdi Hslots Hring Hrdtok Hclean".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
       { iExists vdr, vdw. rewrite /devsw_console_read /devsw_console_write.
@@ -973,7 +981,9 @@ Section BootBssChain.
         rewrite disk_free_of_z. iExact "Hdf". }
       iSplitL "Hdi"; [rewrite d_used_idx_of_z; iExact "Hdi" |].
       iSplitL "Hslots"; [iExact "Hslots" |].
-      iExact "Hring". }
+      iSplitL "Hring"; [iExact "Hring" |].
+      iSplitL "Hrdtok"; [iExact "Hrdtok" |].
+      iExact "Hclean". }
     iDestruct (big_sepL_sep with "[Hstk Hcpus]") as "Hharts";
       [iSplitL "Hstk"; [iExact "Hstk" | iExact "Hcpus"] |].
     iAssert ([∗ list] i ∈ seq 0 NCPU,
@@ -1486,9 +1496,18 @@ Section BootAlloc.
     ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
              (HBs : bioslotG Σ) (HWch : wchG Σ)
              (HF : fileG Σ) (γd : uart_names) (γv : disk_names)
+             (* THE CONSOLE RING'S GHOST NAMES (app-echo.md, lane
+                CONS-CURSOR, C2), minted here beside the UART's and REUSED
+                by the era mint -- so the ring main locks up IS the one
+                every read syscall's receipt is stated at.  That reuse is
+                [FsCfgBoot.fs_boot_supply]'s own [fsc_cons] tie, below; the
+                tie here is the receive side's, which the file system does
+                not speak of. *)
+             (cnm : cons_names)
              (Rspent : gset Z)
              (γi : gname) (ξd : CtxId),
       ⌜dn_img γv = disk_img_name⌝ ∗
+      ⌜cn_uart cnm = γd⌝ ∗
       (* THE ERA'S [fileG] CARRIES THE APPLICATION RECORD THIS MINT WAS
          GIVEN.  It is [fileG_of]'s third projection, so the equation holds
          by iota -- and it is stated because the caller needs it: the
@@ -1504,7 +1523,7 @@ Section BootAlloc.
          ∃ iv : mword 32,
            boot_hart_res (CID := c) (g.(gregs) c) iv DfracDiscarded) ∗
       (* --- the BOOT hart's supply --- *)
-      main_locks_raw ∗ main_globals_raw ∗
+      main_locks_raw ∗ main_globals_raw cnm ∗
       (* the image's WRITABLE initialized globals, which [kernel_data] no
          longer claims -- see [main_data_raw] *)
       main_data_raw ∗
@@ -1528,7 +1547,11 @@ Section BootAlloc.
          uart_tx_own γd l0 ∗ uart_sent γd l0 ∗ uart_out_lb γd l0) ∗
       (* the RECEIVE TOKEN, born with the device invariant and owed to
          uartinit's FCR flush (SpecMain.v) *)
-      uart_rx_tok γd 0%nat ∗
+      uart_rx_tok γd 0%nat None ∗
+      (* ...AND THE CONSUMER'S HIGH-WATER HALF beside it, which main parks
+         in the PLIC payload with the token.  Its partner is inside the
+         ring's resource ([main_globals_raw] above). *)
+      uart_rx_hi γd (1/2) None ∗
       (∃ b0 : bool, uart_dlab_is γd (DfracOwn (1/2)) b0) ∗
       (∃ c0 : virtio_cfg,
          ⌜virtio_live c0 = false⌝ ∗ disk_cfg_is γv (DfracOwn (1/2)) c0) ∗
@@ -1571,7 +1594,7 @@ Section BootAlloc.
          kit 1 in [ProofMain.mn_grp_fs], kit 2 through [SpecUserinit] to
          forkret's first arm. *)
       fs_boot_supply (@file_icfg Σ HF) (@file_fscfg Σ HF) (@file_app Σ HF)
-        (v_disk (g.(gdev).(dvirtio))) sb nib cov γd γv Rspent Pb
+        (v_disk (g.(gdev).(dvirtio))) sb nib cov γd γv cnm Rspent Pb
         (FsCrash.hdr_wset
            (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))
            (FsImg.sb_logstart sb)).
@@ -1752,15 +1775,26 @@ Section BootAlloc.
     iDestruct (iref_slots_split (NPROC * (1 + IREFSPARE)) NFILE with "Hirslots")
       as "[Hirslots Hirfile]".
     iEval (rewrite /IREFBOOT) in "Hirslot".
-    (* ---- the .bss, in address order ---- *)
-    iDestruct (boot_bss_carve g Hbf
-                 with "Hcl Hfdslots Hirslots Hirfile Hfdauth Hbsproc Hbss") as
-      "(#Hstcl & Hstw & Hlocks & Hglobals & Hharts & Hpages)".
     (* ---- the device fabric ---- *)
     iMod (uart_ghosts_alloc (g.(gdev).(duart))
             ltac:(rewrite Hu0; reflexivity)
             ltac:(rewrite Hu0; vm_compute; reflexivity)) as (γd)
-      "(Hacc & Hout & Htxa & Hdla & Htx & Hsent & Hdlab & Hcol & Htok & Hpre)".
+      "(Hacc & Hout & Htxa & Hdla & Htx & Hsent & Hdlab & Hcol & Htok & Hhi1 &
+        Hhi2 & Hpre)".
+    (* ---- THE CONSOLE RING'S GHOSTS, beside the UART's and not before
+       them: the ring's half of the receive side's HIGH-WATER MARK is one
+       of the pair [uart_ghosts_alloc] just made, and the ring's names
+       record carries the UART's own so the pair can be spoken of at one
+       place (app-echo.md, lane CONS-CURSOR, C2).  The other half stays
+       here and leaves for main's PLIC park. ---- *)
+    iEval (rewrite /uart_rx_hi) in "Hhi1".
+    iMod (cons_ghosts_alloc γd with "Hhi1") as (cnm) "[%Hcnu Hcgb]".
+    (* ---- the .bss, in address order.  It runs AFTER the two mints above
+       because the console ring's resource now owns three of their ghost
+       rows. ---- *)
+    iDestruct (boot_bss_carve g cnm Hbf
+                 with "Hcl Hfdslots Hirslots Hirfile Hfdauth Hbsproc Hcgb Hbss") as
+      "(#Hstcl & Hstw & Hlocks & Hglobals & Hharts & Hpages)".
     iDestruct (uart_out_auth_lb γd (g.(gdev).(duart)) with "Hout")
       as "[Hout #Hlb]".
     assert (Hacceq : uart_acc (g.(gdev).(duart)) = u_out (g.(gdev).(duart)))
@@ -1810,7 +1844,7 @@ Section BootAlloc.
        boot chain now, so there is no pin to drop and no mask premise to
        thread (the mask was the dview lend mint's).  See
        claude-notes/completed/namei-pinned-lookup.md's banner. *)
-    iMod (fs_cfg_alloc_snap γd γv (v_disk (g.(gdev).(dvirtio))) ndisk S cov
+    iMod (fs_cfg_alloc_snap γd γv cnm (v_disk (g.(gdev).(dvirtio))) ndisk S cov
             nib ⊤ gsn gln gtn Pb
             (FsCrash.hdr_wset
                (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))
@@ -1897,8 +1931,9 @@ Section BootAlloc.
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
     iModIntro. iExists Hfd, Hir, Hpav, Hbs, Hwch, (fileG_of FGP ICFG FSC APP), γd, γv,
-                       (snap_spent S nib), γi, ξd.
+                       cnm, (snap_spent S nib), γi, ξd.
     iSplitR; [iPureIntro; exact Himg |].
+    iSplitR; [iPureIntro; exact Hcnu |].
     iSplitR; [iPureIntro; exact Hpa |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].
@@ -1920,6 +1955,7 @@ Section BootAlloc.
     iSplitL "Htx Hsent".
     { iExists (uart_acc (g.(gdev).(duart))). iFrame "Htx Hsent Hlb". }
     iSplitL "Htok"; [iExact "Htok" |].
+    iSplitL "Hhi2"; [iExact "Hhi2" |].
     iSplitL "Hdlab"; [iExists (uart_dlab (g.(gdev).(duart))); iExact "Hdlab" |].
     iSplitL "Hcfg".
     { iExists (v_cfg (g.(gdev).(dvirtio))).

@@ -613,33 +613,80 @@ Section DevLoops.
   (*  unclaimed and leaves it at the claim.                                *)
   (* ==================================================================== *)
 
-  (* the popper's half: [k] bytes have ever been removed from the FIFO *)
-  Definition uart_rx_tok (γ : uart_names) (k : nat) : iProp Σ :=
-    ghost_var γ.(un_rxpop) (1/2) k.
+  (* the popper's half: [k] bytes have ever been removed from the FIFO, and
+     [hl] is the history the LAST removed byte arrived at ([None] before the
+     first pop).  THE ANCHOR RIDES WITH THE COUNT because the queued
+     histories' order has to survive an EMPTY QUEUE: the column orders the
+     bytes it still holds against each other and against [hl], so a pop that
+     drains the FIFO leaves the order behind in the token instead of losing
+     it (app-echo.md, lane CONS-CURSOR, C1). *)
+  Definition uart_rx_tok (γ : uart_names) (k : nat)
+      (hl : option (list mobs)) : iProp Σ :=
+    ghost_var γ.(un_rxpop) (1/2) (k, hl).
   (* the invariant's half *)
-  Definition uart_rx_popped (γ : uart_names) (k : nat) : iProp Σ :=
-    ghost_var γ.(un_rxpop) (1/2) k.
+  Definition uart_rx_popped (γ : uart_names) (k : nat)
+      (hl : option (list mobs)) : iProp Σ :=
+    ghost_var γ.(un_rxpop) (1/2) (k, hl).
   (* persistent: at least [n] bytes have ever been pushed *)
   Definition uart_rx_pushed_lb (γ : uart_names) (n : nat) : iProp Σ :=
     mono_nat_lb_own γ.(un_rxpush) n.
 
+  (* THE CONSUMER'S HIGH-WATER MARK.  [uart_rx_hi γ q hh] is "the newest
+     history the receive path's CONSUMER has taken delivery of is [hh]".
+     The consumer is consoleintr, which files popped bytes in the console
+     ring; one half of this lives in the PLIC payload beside the token (with
+     the pure clause that it is at or before the anchor) and the other
+     inside [ConsoleInv.cons_res].  The two halves ARE the link that makes
+     "every byte already in the ring is older than the one I just popped" a
+     theorem: without it the ring's own picture could be arbitrarily stale,
+     and no amount of persistent evidence about either history decides which
+     of the two came first. *)
+  Definition uart_rx_hi (γ : uart_names) (q : Qp)
+      (hh : option (list mobs)) : iProp Σ :=
+    ghost_var γ.(un_rxhi) q hh.
+
   Global Instance uart_rx_pushed_lb_persistent γ n :
     Persistent (uart_rx_pushed_lb γ n).
   Proof. rewrite /uart_rx_pushed_lb. apply _. Qed.
-  Global Instance uart_rx_tok_timeless γ k : Timeless (uart_rx_tok γ k).
+  Global Instance uart_rx_tok_timeless γ k hl : Timeless (uart_rx_tok γ k hl).
   Proof. rewrite /uart_rx_tok. apply _. Qed.
+  Global Instance uart_rx_hi_timeless γ q hh : Timeless (uart_rx_hi γ q hh).
+  Proof. rewrite /uart_rx_hi. apply _. Qed.
 
-  Lemma uart_rx_tok_agree γ k k' :
-    uart_rx_popped γ k -∗ uart_rx_tok γ k' -∗ ⌜k = k'⌝.
+  Lemma uart_rx_tok_agree γ k k' hl hl' :
+    uart_rx_popped γ k hl -∗ uart_rx_tok γ k' hl' -∗ ⌜k = k' /\ hl = hl'⌝.
   Proof.
-    iIntros "H1 H2". by iDestruct (ghost_var_agree with "H1 H2") as %->.
+    iIntros "H1 H2".
+    iDestruct (ghost_var_agree with "H1 H2") as %Heq.
+    iPureIntro. by injection Heq.
   Qed.
-  Lemma uart_rx_tok_update γ k k' :
-    uart_rx_popped γ k -∗ uart_rx_tok γ k ==∗
-      uart_rx_popped γ k' ∗ uart_rx_tok γ k'.
+  Lemma uart_rx_tok_update γ k k' hl hl' :
+    uart_rx_popped γ k hl -∗ uart_rx_tok γ k hl ==∗
+      uart_rx_popped γ k' hl' ∗ uart_rx_tok γ k' hl'.
   Proof.
     iIntros "H1 H2". iApply (ghost_var_update_halves with "H1 H2").
   Qed.
+
+  Lemma uart_rx_hi_agree γ hh hh' :
+    uart_rx_hi γ (1/2) hh -∗ uart_rx_hi γ (1/2) hh' -∗ ⌜hh = hh'⌝.
+  Proof.
+    iIntros "H1 H2". by iDestruct (ghost_var_agree with "H1 H2") as %->.
+  Qed.
+  Lemma uart_rx_hi_update γ hh hh' :
+    uart_rx_hi γ (1/2) hh -∗ uart_rx_hi γ (1/2) hh ==∗
+      uart_rx_hi γ (1/2) hh' ∗ uart_rx_hi γ (1/2) hh'.
+  Proof.
+    iIntros "H1 H2". iApply (ghost_var_update_halves with "H1 H2").
+  Qed.
+  Lemma uart_rx_hi_alloc (hh : option (list mobs)) :
+    ⊢ |==> ∃ γn : gname, ghost_var γn (1/2) hh ∗ ghost_var γn (1/2) hh.
+  Proof.
+    iMod (ghost_var_alloc hh) as (γn) "H".
+    iEval (rewrite -Qp.half_half) in "H".
+    iDestruct (ghost_var_split with "H") as "[H1 H2]".
+    iModIntro. iExists γn. iFrame.
+  Qed.
+
   (* THE ONE-SHOT that says uartinit's FCR flush has run.  Its exclusive half
      is what the PLIC invariant holds until the boot chain deposits the
      token; the persistent lower bound is what plicinithart needs before it
@@ -673,30 +720,68 @@ Section DevLoops.
      their difference IS the queue's length -- the arithmetic that turns a
      poll's data-ready into a pop's the-head-exists.
 
+     ...AND IT IS ORDERED (app-echo.md, lane CONS-CURSOR, C1).  Four more
+     clauses, and three pieces of vocabulary:
+
+     * the CHAIN: [hs] is in trace order, STRICTLY -- an earlier slot's
+       history is a proper prefix of a later one's.  That is what makes the
+       queue a SEQUENCE of input bytes rather than a bag of them, and it is
+       the only thing a reader further down the line can turn into "these
+       bytes arrived in this order";
+     * the ANCHOR [hl], the token's, strictly before every queued history --
+       so the order does not die when the queue drains;
+     * the TOP [ht], at or after the anchor and after everything queued.  It
+       is an EXPLICIT existential and not [last hs] on purpose: the push has
+       to know that its new history is after EVERY history the column holds,
+       and one bound that dominates them all says so without a single
+       [last]/[lookup] argument.  Its lower bound [obs_hist_lb] is the
+       column's only non-persistent-by-accident conjunct, and it is what the
+       push compares against the machine's own history.
+
      LOOP MUST BE OFF.  Under MCR bit 4 the transmitter's drain re-enters
      this UART's own receiver ([DevModel.uart_tx_pop]'s loopback arm) with no
      observation at all, so it would lengthen [u_rx] with no tag to file.
      The clause holds at power-on ([uart_mcr_reset] is OUT2 alone) and every
      transition but an MCR write preserves it. *)
   Definition uart_col_ok (u : uart_state) (hs : list (list mobs))
-      (np nk : nat) : Prop :=
+      (np nk : nat) (hl ht : option (list mobs)) : Prop :=
     np = (nk + length (u_rx u))%nat
     /\ length hs = length (u_rx u)
     /\ uart_loopback u = false
     /\ (forall (j : nat) (b : bv 8) (h : list mobs),
-          u_rx u !! j = Some b -> hs !! j = Some h -> obs_ends_in h b).
+          u_rx u !! j = Some b -> hs !! j = Some h -> obs_ends_in h b)
+    /\ (forall (i j : nat) (hi hj : list mobs),
+          hs !! i = Some hi -> hs !! j = Some hj -> (i < j)%nat ->
+          hist_ext hi hj)
+    /\ (forall (j : nat) (h : list mobs), hs !! j = Some h -> ohist_ext hl h)
+    /\ ohist_le hl ht
+    /\ (forall (j : nat) (h : list mobs),
+          hs !! j = Some h -> ohist_le (Some h) ht).
+
+  (* the lower bound at an optional history: nothing at all when there is
+     none, which is the boot state and the state after a flush that found an
+     empty queue. *)
+  Definition obs_hist_lb_o (o : option (list mobs)) : iProp Σ :=
+    match o with Some g => obs_hist_lb g | None => emp end.
+
+  Global Instance obs_hist_lb_o_persistent o : Persistent (obs_hist_lb_o o).
+  Proof. destruct o; apply _. Qed.
+  Global Instance obs_hist_lb_o_timeless o : Timeless (obs_hist_lb_o o).
+  Proof. destruct o; apply _. Qed.
 
   Definition uart_col (γ : uart_names) (u : uart_state)
-      (hs : list (list mobs)) (np nk : nat) : iProp Σ :=
-    (mono_nat_auth_own γ.(un_rxpush) 1 np ∗ uart_rx_popped γ nk ∗
-     ([∗ list] h ∈ hs, riscv_rx_tag h) ∗
-     ⌜uart_col_ok u hs np nk⌝)%I.
+      (hs : list (list mobs)) (np nk : nat)
+      (hl ht : option (list mobs)) : iProp Σ :=
+    (mono_nat_auth_own γ.(un_rxpush) 1 np ∗ uart_rx_popped γ nk hl ∗
+     ([∗ list] h ∈ hs, riscv_rx_tag h ∗ obs_hist_lb h) ∗
+     obs_hist_lb_o ht ∗
+     ⌜uart_col_ok u hs np nk hl ht⌝)%I.
 
   Definition uart_colE (γ : uart_names) (u : uart_state) : iProp Σ :=
-    (∃ hs np nk, uart_col γ u hs np nk)%I.
+    (∃ hs np nk hl ht, uart_col γ u hs np nk hl ht)%I.
 
-  Global Instance uart_col_timeless γ u hs np nk :
-    Timeless (uart_col γ u hs np nk).
+  Global Instance uart_col_timeless γ u hs np nk hl ht :
+    Timeless (uart_col γ u hs np nk hl ht).
   Proof. rewrite /uart_col /uart_rx_popped. apply _. Qed.
   Global Instance uart_colE_timeless γ u : Timeless (uart_colE γ u).
   Proof. rewrite /uart_colE. apply _. Qed.
@@ -705,7 +790,7 @@ Section DevLoops.
   Lemma uart_colE_loopback (γ : uart_names) (u : uart_state) :
     uart_colE γ u -∗ ⌜uart_loopback u = false⌝.
   Proof.
-    iIntros "H". iDestruct "H" as (hs np nk) "(_ & _ & _ & %Hok)".
+    iIntros "H". iDestruct "H" as (hs np nk hl ht) "(_ & _ & _ & _ & %Hok)".
     iPureIntro. exact (proj1 (proj2 (proj2 Hok))).
   Qed.
 
@@ -716,58 +801,126 @@ Section DevLoops.
     uart_colE γ u -∗ uart_colE γ u'.
   Proof.
     iIntros (Hrx Hlb) "H".
-    iDestruct "H" as (hs np nk) "(Ha & Hk & Hts & %Hok)".
-    iExists hs, np, nk. iFrame "Ha Hk Hts". iPureIntro.
-    destruct Hok as (H1 & H2 & H3 & H4).
+    iDestruct "H" as (hs np nk hl ht) "(Ha & Hk & Hts & Hht & %Hok)".
+    iExists hs, np, nk, hl, ht. iFrame "Ha Hk Hts Hht". iPureIntro.
+    destruct Hok as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
     rewrite /uart_col_ok Hrx Hlb. split_and!; assumption.
   Qed.
 
-  (* THE PUSH (the device thread's rx arm): the byte goes on the tail with
-     its history beside it. *)
-  Lemma uart_colE_push (γ : uart_names) (u u' : uart_state)
-      (b : bv 8) (h : list mobs) :
-    u_rx u' = (u_rx u ++ [b])%list ->
-    uart_loopback u' = uart_loopback u ->
-    obs_ends_in h b ->
-    riscv_rx_tag h -∗ uart_colE γ u ==∗ uart_colE γ u'.
+  (* THE PUSH (the device thread's rx arm), AS AN ACCESSOR.  The order the
+     new history has to satisfy is decided against the MACHINE'S OWN
+     history, which is why this takes [obs_auth h] -- the history BEFORE the
+     event -- reads the column's top out against it, and hands the auth
+     straight back so the trace permit can move it.  The wand that comes out
+     is the push itself, at the history the permit then produced. *)
+  Lemma uart_colE_push_acc (γ : uart_names) (u : uart_state) (h : list mobs) :
+    uart_colE γ u -∗ obs_auth h -∗
+      obs_auth h ∗
+      (∀ (u' : uart_state) (b : bv 8),
+         ⌜u_rx u' = (u_rx u ++ [b])%list⌝ -∗
+         ⌜uart_loopback u' = uart_loopback u⌝ -∗
+         riscv_rx_tag (h ++ [ObsUartIn b])%list -∗
+         obs_hist_lb (h ++ [ObsUartIn b])%list ==∗
+         uart_colE γ u').
   Proof.
-    iIntros (Hrx Hlb Hlast) "#Ht H".
-    iDestruct "H" as (hs np nk) "(Ha & Hk & Hts & %Hok)".
-    destruct Hok as (H1 & H2 & H3 & H4).
+    iIntros "H Hauth".
+    iDestruct "H" as (hs np nk hl ht) "(Ha & Hk & Hts & #Hht & %Hok)".
+    (* the top is at or before the machine's current history *)
+    iAssert (⌜ohist_le ht (Some h)⌝)%I as "%Htop".
+    { destruct ht as [g|]; [| done]. cbn [obs_hist_lb_o].
+      iDestruct (obs_hist_lb_prefix with "Hauth Hht") as %Hp.
+      iPureIntro. exact Hp. }
+    iFrame "Hauth".
+    iIntros (u' b) "%Hrx %Hlbk #Htg #Hlbn".
+    destruct Hok as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
     iMod (mono_nat_own_update (S np) with "Ha") as "[Ha _]"; [lia|].
-    iModIntro. iExists (hs ++ [h])%list, (S np), nk.
+    iModIntro.
+    set (hn := (h ++ [ObsUartIn b])%list).
+    (* every history the column holds is a prefix of [h], hence strictly
+       before the new one *)
+    assert (Hxall : forall (j : nat) (g : list mobs),
+              hs !! j = Some g -> hist_ext g hn).
+    { intros j g Hj.
+      pose proof (H8 j g Hj) as Hg.
+      assert (Hp : g `prefix_of` h).
+      { destruct ht as [t|]; [| done]. cbn in Hg, Htop. by etrans. }
+      exact (hist_ext_of_prefix g h hn Hp (hist_ext_snoc h (ObsUartIn b))). }
+    iExists (hs ++ [hn])%list, (S np), nk, hl, (Some hn).
     iFrame "Ha Hk".
-    iSplitL.
+    iSplitL "Hts".
     { rewrite big_sepL_app. iFrame "Hts". cbn [big_opL].
-      iSplitL; [iExact "Ht" | done]. }
-    { iPureIntro. rewrite /uart_col_ok Hrx Hlb !length_app H2 H3.
-      cbn [length]. split_and!; [lia | lia | reflexivity |].
+      iSplitL; [| done]. iSplitR; [iExact "Htg" | iExact "Hlbn"]. }
+    iSplitR; [iExact "Hlbn" |].
+    iPureIntro. rewrite /uart_col_ok Hrx Hlbk !length_app H2 H3.
+    cbn [length]. split_and!; [lia | lia | reflexivity | | | | | ].
+    - (* the byte and its history still belong together *)
       intros j c g Hj Hg.
       destruct (decide (j < length (u_rx u))%nat) as [Hlt|Hge].
-      - rewrite lookup_app_l in Hj; [|exact Hlt].
-        rewrite lookup_app_l in Hg; [|by rewrite H2].
+      + rewrite lookup_app_l in Hj; [| exact Hlt].
+        rewrite lookup_app_l in Hg; [| by rewrite H2].
         exact (H4 j c g Hj Hg).
-      - assert (Hj' : j = length (u_rx u)).
+      + assert (Hj' : j = length (u_rx u)).
         { apply lookup_lt_Some in Hj. rewrite length_app in Hj.
           cbn [length] in Hj. lia. }
-        subst j. rewrite lookup_app_r in Hj; [|lia].
+        subst j. rewrite lookup_app_r in Hj; [| lia].
         rewrite Nat.sub_diag in Hj. cbn in Hj. injection Hj as <-.
-        rewrite lookup_app_r in Hg; [|lia].
+        rewrite lookup_app_r in Hg; [| lia].
         rewrite H2 Nat.sub_diag in Hg. cbn in Hg. injection Hg as <-.
-        exact Hlast. }
+        exact (obs_ends_in_snoc h b).
+    - (* THE CHAIN *)
+      intros i j gi gj Hi Hj Hij.
+      destruct (decide (j < length hs)%nat) as [Hjlt | Hjge].
+      + rewrite lookup_app_l in Hi; [| lia].
+        rewrite lookup_app_l in Hj; [| lia].
+        exact (H5 i j gi gj Hi Hj Hij).
+      + assert (Hj' : j = length hs).
+        { apply lookup_lt_Some in Hj. rewrite length_app in Hj.
+          cbn [length] in Hj. lia. }
+        subst j. rewrite lookup_app_r in Hj; [| lia].
+        rewrite Nat.sub_diag in Hj. cbn in Hj. injection Hj as <-.
+        rewrite lookup_app_l in Hi; [| lia].
+        exact (Hxall i gi Hi).
+    - (* THE ANCHOR is still strictly before every queued history *)
+      intros j g Hj.
+      destruct (decide (j < length hs)%nat) as [Hjlt | Hjge].
+      + rewrite lookup_app_l in Hj; [| lia]. exact (H6 j g Hj).
+      + assert (Hj' : j = length hs).
+        { apply lookup_lt_Some in Hj. rewrite length_app in Hj.
+          cbn [length] in Hj. lia. }
+        subst j. rewrite lookup_app_r in Hj; [| lia].
+        rewrite Nat.sub_diag in Hj. cbn in Hj. injection Hj as <-.
+        exact (ohist_ext_of_le hl h hn
+                 (ohist_le_trans hl ht (Some h) H7 Htop)
+                 (hist_ext_snoc h (ObsUartIn b))).
+    - (* the anchor is at or before the NEW top *)
+      exact (ohist_le_trans hl ht (Some hn) H7
+               (ohist_le_trans ht (Some h) (Some hn) Htop
+                  (proj1 (hist_ext_snoc h (ObsUartIn b))))).
+    - (* ...and so is everything queued *)
+      intros j g Hj.
+      destruct (decide (j < length hs)%nat) as [Hjlt | Hjge].
+      + rewrite lookup_app_l in Hj; [| lia].
+        exact (proj1 (Hxall j g Hj)).
+      + assert (Hj' : j = length hs).
+        { apply lookup_lt_Some in Hj. rewrite length_app in Hj.
+          cbn [length] in Hj. lia. }
+        subst j. rewrite lookup_app_r in Hj; [| lia].
+        rewrite Nat.sub_diag in Hj. cbn in Hj. injection Hj as <-.
+        cbn. reflexivity.
   Qed.
 
   (* THE POLL: a non-empty FIFO means at least one more byte has been pushed
      than the token's holder has removed. *)
-  Lemma uart_col_poll (γ : uart_names) (u : uart_state) (k : nat) :
+  Lemma uart_col_poll (γ : uart_names) (u : uart_state) (k : nat)
+      (hl : option (list mobs)) :
     u_rx u <> [] ->
-    uart_colE γ u -∗ uart_rx_tok γ k -∗
-      uart_colE γ u ∗ uart_rx_tok γ k ∗ uart_rx_pushed_lb γ (S k).
+    uart_colE γ u -∗ uart_rx_tok γ k hl -∗
+      uart_colE γ u ∗ uart_rx_tok γ k hl ∗ uart_rx_pushed_lb γ (S k).
   Proof.
     iIntros (Hne) "H Htok".
-    iDestruct "H" as (hs np nk) "(Ha & Hk & Hts & %Hok)".
-    iDestruct (uart_rx_tok_agree with "Hk Htok") as %<-.
-    destruct Hok as (H1 & H2 & H3 & H4).
+    iDestruct "H" as (hs np nk hl0 ht) "(Ha & Hk & Hts & Hht & %Hok)".
+    iDestruct (uart_rx_tok_agree with "Hk Htok") as %[<- <-].
+    destruct Hok as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
     assert (Hle : (S nk <= np)%nat)
       by (destruct (u_rx u); [done | cbn [length] in H1; lia]).
     iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
@@ -775,7 +928,7 @@ Section DevLoops.
        two halves must be placed by hand: [iFrame] would put the caller's
        token into the column's own slot. *)
     iSplitR "Htok".
-    - iExists hs, np, nk. iFrame "Ha Hk Hts". iPureIntro.
+    - iExists hs, np, nk, hl0, ht. iFrame "Ha Hk Hts Hht". iPureIntro.
       rewrite /uart_col_ok. split_and!; assumption.
     - iSplitL "Htok"; [iExact "Htok"|].
       rewrite /uart_rx_pushed_lb.
@@ -784,56 +937,78 @@ Section DevLoops.
   Qed.
 
   (* THE POP: the lower bound the poll minted refutes the empty FIFO, the
-     head's tag comes out (persistent, so a copy stays), and the token's
-     count moves by one. *)
+     head's tag comes out (persistent, so a copy stays), the token's count
+     moves by one AND ITS ANCHOR MOVES TO THE POPPED HISTORY -- which the
+     column's chain says strictly extends the one it replaces.  That pair of
+     facts is what the console ring's own order is built out of. *)
   Lemma uart_col_pop (γ : uart_names) (u u' : uart_state) (k : nat)
-      (bt : bv 8) :
+      (hl : option (list mobs)) (bt : bv 8) :
     (forall b rx', u_rx u = b :: rx' ->
        bt = b /\ u_rx u' = rx' /\ uart_loopback u' = uart_loopback u) ->
-    uart_colE γ u -∗ uart_rx_tok γ k -∗ uart_rx_pushed_lb γ (S k) ==∗
-      uart_colE γ u' ∗ uart_rx_tok γ (S k) ∗
-      (∃ h, ⌜obs_ends_in h bt⌝ ∗ riscv_rx_tag h).
+    uart_colE γ u -∗ uart_rx_tok γ k hl -∗ uart_rx_pushed_lb γ (S k) ==∗
+      uart_colE γ u' ∗
+      (∃ h, ⌜obs_ends_in h bt⌝ ∗ ⌜ohist_ext hl h⌝ ∗
+            riscv_rx_tag h ∗ obs_hist_lb h ∗ uart_rx_tok γ (S k) (Some h)).
   Proof.
     iIntros (Hpop) "H Htok #Hlb".
-    iDestruct "H" as (hs np nk) "(Ha & Hk & Hts & %Hok)".
-    iDestruct (uart_rx_tok_agree with "Hk Htok") as %<-.
-    destruct Hok as (H1 & H2 & H3 & H4).
+    iDestruct "H" as (hs np nk hl0 ht) "(Ha & Hk & Hts & Hht & %Hok)".
+    iDestruct (uart_rx_tok_agree with "Hk Htok") as %[<- <-].
+    destruct Hok as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
     iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hge].
     destruct (u_rx u) as [| b rx'] eqn:Hrx.
     { cbn [length] in H1. lia. }
     destruct (Hpop b rx' eq_refl) as (-> & Hrx' & Hlb').
     destruct hs as [| hh hs']; [cbn [length] in H2; discriminate|].
-    iDestruct "Hts" as "[#Hth Hts]".
+    iDestruct "Hts" as "[[#Hth #Hlbh] Hts]".
     assert (Hhead : obs_ends_in hh b) by exact (H4 0%nat b hh eq_refl eq_refl).
-    iMod (uart_rx_tok_update γ nk (S nk) with "Hk Htok") as "[Hk Htok]".
-    iModIntro. iSplitR "Htok Hth".
-    - iExists hs', np, (S nk). iFrame "Ha Hk Hts". iPureIntro.
+    assert (Hanch : ohist_ext hl0 hh) by exact (H6 0%nat hh eq_refl).
+    iMod (uart_rx_tok_update γ nk (S nk) hl0 (Some hh) with "Hk Htok")
+      as "[Hk Htok]".
+    iModIntro. iSplitR "Htok".
+    - iExists hs', np, (S nk), (Some hh), ht. iFrame "Ha Hk Hts Hht".
+      iPureIntro.
       rewrite /uart_col_ok Hrx' Hlb'. cbn [length] in H1, H2.
-      split_and!; [lia | lia | exact H3 |].
-      intros j c g Hj Hg. exact (H4 (S j) c g Hj Hg).
-    - iSplitL "Htok"; [iExact "Htok"|].
-      iExists hh. iSplitR; [iPureIntro; exact Hhead | iExact "Hth"].
+      split_and!; [lia | lia | exact H3 | | | | |].
+      + intros j c g Hj Hg. exact (H4 (S j) c g Hj Hg).
+      + intros i j gi gj Hi Hj Hij.
+        exact (H5 (S i) (S j) gi gj Hi Hj ltac:(lia)).
+      + intros j g Hj. cbn.
+        exact (H5 0%nat (S j) hh g eq_refl Hj ltac:(lia)).
+      + exact (H8 0%nat hh eq_refl).
+      + intros j g Hj. exact (H8 (S j) g Hj).
+    - iExists hh. iFrame "Htok".
+      iSplitR; [iPureIntro; exact Hhead |].
+      iSplitR; [iPureIntro; exact Hanch |].
+      iSplitR; [iExact "Hth" | iExact "Hlbh"].
   Qed.
 
   (* THE FLUSH: an FCR write that clears the receive FIFO is a pop of
-     EVERYTHING, and needs the token for exactly that reason. *)
-  Lemma uart_colE_flush (γ : uart_names) (u u' : uart_state) (k : nat) :
+     EVERYTHING, and needs the token for exactly that reason.  THE ANCHOR
+     BECOMES THE TOP: the flushed bytes are gone, but the next byte to
+     arrive must still be known to be newer than them, and the top is the
+     one bound that dominates every history the column held. *)
+  Lemma uart_colE_flush (γ : uart_names) (u u' : uart_state) (k : nat)
+      (hl : option (list mobs)) :
     u_rx u' = [] ->
     uart_loopback u' = uart_loopback u ->
-    uart_colE γ u -∗ uart_rx_tok γ k ==∗
-      uart_colE γ u' ∗ ∃ k', uart_rx_tok γ k'.
+    uart_colE γ u -∗ uart_rx_tok γ k hl ==∗
+      uart_colE γ u' ∗ ∃ k' hl', uart_rx_tok γ k' hl'.
   Proof.
     iIntros (Hrx Hlb) "H Htok".
-    iDestruct "H" as (hs np nk) "(Ha & Hk & Hts & %Hok)".
-    iDestruct (uart_rx_tok_agree with "Hk Htok") as %<-.
-    destruct Hok as (H1 & H2 & H3 & H4).
-    iMod (uart_rx_tok_update γ nk np with "Hk Htok") as "[Hk Htok]".
-    iModIntro. iSplitR "Htok"; [| iExists np; iExact "Htok"].
-    iExists [], np, np. iFrame "Ha Hk".
+    iDestruct "H" as (hs np nk hl0 ht) "(Ha & Hk & Hts & #Hht & %Hok)".
+    iDestruct (uart_rx_tok_agree with "Hk Htok") as %[<- <-].
+    destruct Hok as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
+    iMod (uart_rx_tok_update γ nk np hl0 ht with "Hk Htok") as "[Hk Htok]".
+    iModIntro. iSplitR "Htok"; [| iExists np, ht; iExact "Htok"].
+    iExists [], np, np, ht, ht. iFrame "Ha Hk Hht".
     iSplitR; [done|].
     iPureIntro. rewrite /uart_col_ok Hrx Hlb H3.
-    cbn [length]. split_and!; [lia | reflexivity | reflexivity |].
-    intros j c g Hj. done.
+    cbn [length]. split_and!; [lia | reflexivity | reflexivity | | | | |].
+    - intros j c g Hj. done.
+    - intros i j gi gj Hi. done.
+    - intros j g Hj. done.
+    - destruct ht as [g|]; [cbn; reflexivity | exact I].
+    - intros j g Hj. done.
   Qed.
 
   (* The PLIC half carries [plic_ok] (DevModel.v): every hart's S-context
@@ -919,8 +1094,24 @@ Section DevLoops.
   (*  payload is three table rows, one ghost name, and an extra case in   *)
   (*  the two movers below; no statement outside this block moves.        *)
   (* ------------------------------------------------------------------ *)
+  (* THE RIGHT TO POP, AND THE RIGHT TO STORE WHAT WAS POPPED.  The receive
+     token alone is not a whole payload any more: the byte a hart pops has
+     to be filed in the console ring, and the ring's own picture of "the
+     newest byte I hold" must be known to be OLDER than the byte being
+     filed.  So the payload carries the consumer's high-water half beside
+     the token, with the pure clause that ties the two -- and that clause is
+     re-established at every pop (the anchor moves forward) and at every
+     store (the mark moves to the byte just filed). *)
+  Definition uart_rx_writer (γ : uart_names) (k : nat)
+      (hl : option (list mobs)) : iProp Σ :=
+    (uart_rx_tok γ k hl ∗
+     ∃ hh : option (list mobs), uart_rx_hi γ (1/2) hh ∗ ⌜ohist_le hh hl⌝)%I.
+
+  Definition plic_payload_uart (γ : uart_names) : iProp Σ :=
+    (∃ (k : nat) (hl : option (list mobs)), uart_rx_writer γ k hl)%I.
+
   Definition plic_payload (γ : uart_names) (i : N) : iProp Σ :=
-    (if (i =? uart_irq_id)%N then ∃ k : nat, uart_rx_tok γ k else emp)%I.
+    (if (i =? uart_irq_id)%N then plic_payload_uart γ else emp)%I.
   Definition plic_preinit (γ : uart_names) (i : N) : iProp Σ :=
     (if (i =? uart_irq_id)%N then uart_preinit γ else False)%I.
   Definition plic_inited (γ : uart_names) (i : N) : iProp Σ :=
@@ -973,12 +1164,12 @@ Section DevLoops.
     plic_slot γ p uart_irq_id -∗
       uart_preinit γ
       ∨ (uart_inited γ ∗
-         if p_claimed p uart_irq_id then emp else ∃ k : nat, uart_rx_tok γ k).
+         if p_claimed p uart_irq_id then emp else plic_payload_uart γ).
   Proof. rewrite /plic_slot. iIntros "H". iExact "H". Qed.
 
   Lemma plic_slot_uart_intro (γ : uart_names) (p : plic_state) :
     uart_inited γ -∗
-    (if p_claimed p uart_irq_id then emp else ∃ k : nat, uart_rx_tok γ k) -∗
+    (if p_claimed p uart_irq_id then emp else plic_payload_uart γ) -∗
     plic_slot γ p uart_irq_id.
   Proof.
     iIntros "#Hin Hpay". rewrite /plic_slot. iRight.
@@ -987,7 +1178,7 @@ Section DevLoops.
 
   Lemma plic_slot_uart_elim (γ : uart_names) (p : plic_state) :
     uart_inited γ -∗ plic_slot γ p uart_irq_id -∗
-    (if p_claimed p uart_irq_id then emp else ∃ k : nat, uart_rx_tok γ k).
+    (if p_claimed p uart_irq_id then emp else plic_payload_uart γ).
   Proof.
     iIntros "#Hin Hu".
     iDestruct (plic_slot_uart_cases with "Hu") as "[Hpre | [_ Hpay]]".
@@ -1017,7 +1208,7 @@ Section DevLoops.
     uart_inited γ -∗ plic_slots γ p -∗
       plic_slots γ (snd (plic_claim p c)) ∗
       (⌜ fst (plic_claim p c) = Z_to_bv 32 (Z.of_N uart_irq_id) ⌝ -∗
-         ∃ k : nat, uart_rx_tok γ k).
+         plic_payload_uart γ).
   Proof.
     intros Hok. iIntros "#Hin H".
     iDestruct (plic_slots_uart with "H") as "Hu".
@@ -1060,7 +1251,7 @@ Section DevLoops.
   (* ...and a completion puts it back. *)
   Lemma plic_slots_complete (γ : uart_names) (p : plic_state) (i : N) :
     uart_inited γ -∗ plic_slots γ p -∗
-    (⌜ i = uart_irq_id ⌝ -∗ ∃ k : nat, uart_rx_tok γ k) -∗
+    (⌜ i = uart_irq_id ⌝ -∗ plic_payload_uart γ) -∗
     plic_slots γ (plic_complete p i).
   Proof.
     iIntros "#Hin H Htok".
@@ -1177,7 +1368,7 @@ Section DevLoops.
      flush and deposits it afterwards ([uart_rx_tok_deposit]). *)
   Lemma dev_inv_alloc E γ γd :
     dev_inv_body γ γd -∗ perm_inv_body gen_id (dn_perm γd) -∗
-    uart_rx_tok γ 0 ={E}=∗ dev_inv γ γd ∗ uart_rx_tok γ 0.
+    uart_rx_tok γ 0 None ={E}=∗ dev_inv γ γd ∗ uart_rx_tok γ 0 None.
   Proof.
     iIntros "Hbody Hperm Htok". rewrite /dev_inv_body.
     iDestruct "Hbody" as (u p v)
@@ -1207,21 +1398,26 @@ Section DevLoops.
      parks [emp] and drops the token.  Nothing downstream is weakened by
      that: a claim hands out the payload only from an OUT-of-service slot,
      and this branch leaves the slot exactly as an in-service one must look. *)
-  Lemma uart_rx_tok_deposit E γ (k : nat) :
+  Lemma uart_rx_tok_deposit E γ (k : nat) (hl hh : option (list mobs)) :
     ↑plicN ⊆ E ->
-    plic_inv γ -∗ uart_rx_tok γ k ={E}=∗ uart_inited γ.
+    ohist_le hh hl ->
+    plic_inv γ -∗ uart_rx_tok γ k hl -∗ uart_rx_hi γ (1/2) hh
+      ={E}=∗ uart_inited γ.
   Proof.
-    iIntros (Hmask) "#Hpinv Htok".
+    iIntros (Hmask Hle) "#Hpinv Htok Hhi".
     iInv "Hpinv" as ">Hbody" "Hclose".
     iDestruct "Hbody" as (p) "(Hp & %Hpok & Hslots)".
     iDestruct (plic_slots_uart with "Hslots") as "Hu".
     iDestruct (plic_slot_uart_cases with "Hu") as "[Hpre | [#Hin Hrest]]".
     - iMod (uart_preinit_fire with "Hpre") as "#Hin".
-      iMod ("Hclose" with "[Hp Htok]") as "_".
+      iMod ("Hclose" with "[Hp Htok Hhi]") as "_".
       { iNext. iExists p. iFrame "Hp". iSplitR; [iPureIntro; exact Hpok|].
         iApply plic_slots_of_uart.
         iApply (plic_slot_uart_intro with "Hin").
-        destruct (p_claimed p uart_irq_id); [done | by iExists k]. }
+        destruct (p_claimed p uart_irq_id); [done |].
+        rewrite /plic_payload_uart /uart_rx_writer.
+        iExists k, hl. iFrame "Htok". iExists hh. iFrame "Hhi".
+        iPureIntro. exact Hle. }
       by iModIntro.
     - (* the deposit has already run: the slot's own payload is the token's
          partner, so this one is spare and is simply dropped *)
@@ -1257,7 +1453,9 @@ Section DevLoops.
                 (* the receive side: the column at an empty FIFO, the token
                    the boot chain carries, and the one-shot the PLIC
                    invariant's pre-deposit arm holds *)
-                uart_colE γ u ∗ uart_rx_tok γ 0 ∗ uart_preinit γ.
+                uart_colE γ u ∗ uart_rx_tok γ 0 None ∗
+                uart_rx_hi γ (1/2) None ∗ uart_rx_hi γ (1/2) None ∗
+                uart_preinit γ.
   Proof.
     intros Hrx Hlb.
     iMod (own_alloc (●ML (uart_acc u : list (leibnizO (bv 8))))) as (γa) "Ha";
@@ -1279,22 +1477,30 @@ Section DevLoops.
     iDestruct "Hd" as "[Hd1 Hd2]".
     (* the receive side's three *)
     iMod (mono_nat_own_alloc 0%nat) as (γpu) "[Hpu _]".
-    iMod (ghost_var_alloc 0%nat) as (γpo) "Hpo".
+    iMod (ghost_var_alloc (0%nat, @None (list mobs))) as (γpo) "Hpo".
     iEval (rewrite -Qp.half_half) in "Hpo".
     iDestruct (ghost_var_split with "Hpo") as "[Hpo1 Hpo2]".
+    iMod (ghost_var_alloc (@None (list mobs))) as (γhi) "Hhi".
+    iEval (rewrite -Qp.half_half) in "Hhi".
+    iDestruct (ghost_var_split with "Hhi") as "[Hhi1 Hhi2]".
     iMod (mono_nat_own_alloc 0%nat) as (γin) "[Hin _]".
-    iModIntro. iExists (UartNames γa γb γc γd γpu γpo γin).
+    iModIntro. iExists (UartNames γa γb γc γd γpu γpo γhi γin).
     rewrite /uart_sent_auth /uart_out_auth /uart_tx_auth /uart_tx_own
             /uart_dlab_auth /uart_dlab_is /uart_sent /uart_colE /uart_col
-            /uart_rx_tok /uart_rx_popped /uart_preinit /=.
+            /uart_rx_tok /uart_rx_popped /uart_rx_hi /uart_preinit /=.
     iFrame "Ha Hb Hc1 Hd1 Hc2 Hsent Hd2".
     (* the column's own half of the pop counter and the caller's token are
-       the SAME proposition, so the last three are placed by hand *)
-    iSplitR "Hpo2 Hin".
-    { iExists [], 0%nat, 0%nat. iFrame "Hpu Hpo1". iSplitR; [done|].
+       the SAME proposition, so the rest are placed by hand *)
+    iSplitR "Hpo2 Hhi1 Hhi2 Hin".
+    { iExists [], 0%nat, 0%nat, None, None. iFrame "Hpu Hpo1".
+      iSplitR; [done|]. iSplitR; [done|].
       iPureIntro. rewrite /uart_col_ok Hrx Hlb. cbn [length].
-      split_and!; [done | done | done | intros j b h Hj; done]. }
-    iSplitL "Hpo2"; [iExact "Hpo2" | iExact "Hin"].
+      split_and!; [done | done | done | intros j b h Hj; done
+                  | intros i j hi hj Hi; done | intros j h Hj; done
+                  | exact I | intros j h Hj; done]. }
+    iSplitL "Hpo2"; [iExact "Hpo2" |].
+    iSplitL "Hhi1"; [iExact "Hhi1" |].
+    iSplitL "Hhi2"; [iExact "Hhi2" | iExact "Hin"].
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1363,7 +1569,8 @@ Section DevLoops.
     iEval (rewrite Heq /obs_pred_triv) in "HP".
     iDestruct "HP" as (h') ">Hfrag".
     iDestruct (obs_agree with "Hauth Hfrag") as %<-.
-    iMod (obs_update _ (h ++ κ)%list with "Hauth Hfrag") as "[Hauth Hfrag]".
+    iMod (obs_update _ (h ++ κ)%list (ex_intro _ κ eq_refl)
+            with "Hauth Hfrag") as "[Hauth Hfrag]".
     iMod ("Hclose" with "[Hfrag]") as "_".
     { iNext. rewrite Heq /obs_pred_triv. iExists (h ++ κ)%list. iExact "Hfrag". }
     iModIntro. iFrame "Hg Hauth". iApply uart_tag_of_triv. exact Htag.
@@ -1413,7 +1620,8 @@ Section DevLoops.
         iModIntro. rewrite app_nil_r. iFrame "Hg Hauth"; try done.
       + iMod ("Htx" $! h b (duart d) _ with "[//] [//] [//] [//] Hg HR")
           as "[Hg HR]".
-        iMod (obs_update _ (h ++ [ObsUartOut b])%list with "Hauth Hfrag")
+        iMod (obs_update _ (h ++ [ObsUartOut b])%list
+                (ex_intro _ [ObsUartOut b] eq_refl) with "Hauth Hfrag")
           as "[Hauth Hfrag]".
         iMod ("Hclose" with "[Hfrag HR]") as "_".
         { iNext. rewrite Heq /obs_ledger. iExists _. iFrame. }
@@ -1422,7 +1630,8 @@ Section DevLoops.
       unfold set_duart in Hd'. injection Hd' as ->.
       iMod ("Hrx" $! h b (duart d) _ with "[//] [//] Hg HR")
         as "(Hg & HR & Htg)".
-      iMod (obs_update _ (h ++ [ObsUartIn b])%list with "Hauth Hfrag")
+      iMod (obs_update _ (h ++ [ObsUartIn b])%list
+              (ex_intro _ [ObsUartIn b] eq_refl) with "Hauth Hfrag")
         as "[Hauth Hfrag]".
       iMod ("Hclose" with "[Hfrag HR]") as "_".
       { iNext. rewrite Heq /obs_ledger. iExists _. iFrame. }
@@ -1507,14 +1716,21 @@ Section DevLoops.
       (* the rx arm's tag is the application's claim about this byte, at the
          history it arrived at -- and it is what the column files beside the
          byte, so every later reader of the FIFO's head gets a copy. *)
+      (* THE COLUMN'S ORDER IS DECIDED BEFORE THE EVENT.  The column holds a
+         lower bound on the newest history it has seen; read against the
+         machine's history AS IT IS NOW, that bound says every queued byte
+         arrived at or before [h] -- and the byte about to arrive is at
+         [h ++ [ObsUartIn b]], strictly after.  So the accessor is taken
+         here, with the auth in hand and BEFORE the permit moves it. *)
+      iDestruct (uart_colE_push_acc γ u h with "Hcol Hoauth")
+        as "[Hoauth Hpush]".
       iMod ("Hperm" $! h [ObsUartIn b] d u' with "[//] [//] [//] Hg Hoauth")
         as "(Hg & Hoauth & #Htg)".
+      iDestruct (obs_auth_lb with "Hoauth") as "[Hoauth #Hlbn]".
       (* THE COLUMN: the byte goes on the tail of [u_rx] and its history --
          which ends with exactly this event -- on the tail of the column. *)
       destruct (uart_rx_push_rx u b u' Hrx) as [Hrxe Hlbe].
-      iMod (uart_colE_push γ u u' b (h ++ [ObsUartIn b])%list Hrxe Hlbe
-              (obs_ends_in_snoc h b) with "[] Hcol") as "Hcol".
-      { iExact "Htg". }
+      iMod ("Hpush" $! u' b with "[//] [//] Htg Hlbn") as "Hcol".
       iMod ("Hclose" with "[Hu' Hg Hcol]") as "_".
       { iNext. iExists u'. iFrame. }
       iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".

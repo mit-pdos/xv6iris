@@ -388,18 +388,19 @@ Section WpSconfUartAccess.
      lower bound that survives to the pop when DR was set. *)
   Lemma wp_uart_lsr_read_rx_s_sconf (γd : uart_names) (γv : disk_names)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
-      (m : regfile) (n : nat) (k : nat) (b : bool) :
+      (m : regfile) (n : nat) (k : nat) (hl : option (list mobs))
+      (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
     add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 5 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
-    dev_inv γd γv -∗ uart_rx_tok γd k -∗
+    dev_inv γd γv -∗ uart_rx_tok γd k hl -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      uart_rx_tok γd k -∗
+      uart_rx_tok γd k hl -∗
       (* DR set means a byte is queued that this token's holder has not
          removed, and that is a MONOTONE fact: nobody else can un-queue it *)
       (⌜ rx_empty bt = false ⌝ -∗ uart_rx_pushed_lb γd (S k)) -∗
@@ -411,8 +412,8 @@ Section WpSconfUartAccess.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa 5)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 5 pc false true rd rs1 imm
-              m n (uart_rx_tok γd k)
-              (fun bt => uart_rx_tok γd k ∗
+              m n (uart_rx_tok γd k hl)
+              (fun bt => uart_rx_tok γd k hl ∗
                  (⌜ rx_empty bt = false ⌝ -∗ uart_rx_pushed_lb γd (S k)))%I b p
               ltac:(unfold uart_size; lia) Hrd Hrdok
               ltac:(rewrite Haddr; vm_compute; reflexivity)
@@ -428,7 +429,7 @@ Section WpSconfUartAccess.
       destruct (uart_rx_ready u) eqn:Hdr.
       + assert (Hne : u_rx u <> []).
         { intro Hnil. rewrite /uart_rx_ready Hnil in Hdr. discriminate. }
-        iDestruct (uart_col_poll γd u k Hne with "Hcol Htok")
+        iDestruct (uart_col_poll γd u k hl Hne with "Hcol Htok")
           as "(Hcol & Htok & #Hlb)".
         iModIntro. iSplitL "Hg"; [iExact "Hg"|].
         iSplitL "Hcol"; [iExact "Hcol"|].
@@ -450,20 +451,28 @@ Section WpSconfUartAccess.
      moves by one. *)
   Lemma wp_uart_rhr_pop_s_sconf (γd : uart_names) (γv : disk_names)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
-      (m : regfile) (n : nat) (k : nat) (b : bool) :
+      (m : regfile) (n : nat) (k : nat) (hl : option (list mobs))
+      (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
     add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 0 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_dlab_off γd -∗
-    uart_rx_tok γd k -∗ uart_rx_pushed_lb γd (S k) -∗
+    uart_rx_tok γd k hl -∗ uart_rx_pushed_lb γd (S k) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ c : bv 8,
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of c)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      uart_rx_tok γd (S k) -∗
-      (∃ h : list mobs, ⌜ obs_ends_in h c ⌝ ∗ riscv_rx_tag h) -∗
+      (* THE POPPED BYTE'S HISTORY, AND THE ORDER (app-echo.md, lane
+         CONS-CURSOR, C1).  The token comes back AT that history, and the
+         history strictly extends the anchor it replaces, so a consumer that
+         files popped bytes somewhere knows this one is newer than every one
+         it filed before.  The token rides INSIDE the existential because
+         its new anchor IS the popped history. *)
+      (∃ h : list mobs,
+         ⌜ obs_ends_in h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
+         riscv_rx_tag h ∗ obs_hist_lb h ∗ uart_rx_tok γd (S k) (Some h)) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -472,9 +481,11 @@ Section WpSconfUartAccess.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa 0)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 0 pc false true rd rs1 imm
-              m n (uart_rx_tok γd k)
-              (fun c => uart_rx_tok γd (S k) ∗
-                 (∃ h : list mobs, ⌜ obs_ends_in h c ⌝ ∗ riscv_rx_tag h))%I b p
+              m n (uart_rx_tok γd k hl)
+              (fun c => ∃ h : list mobs,
+                 ⌜ obs_ends_in h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
+                 riscv_rx_tag h ∗ obs_hist_lb h ∗
+                 uart_rx_tok γd (S k) (Some h))%I b p
               ltac:(unfold uart_size; lia) Hrd Hrdok
               ltac:(rewrite Haddr; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
@@ -482,17 +493,17 @@ Section WpSconfUartAccess.
               with "Hcg Hpc Hinstr Hdinv Htok [] [Hcont]").
     - iIntros (u bt u') "%Hread Hg Hcol Htok".
       iDestruct (uart_ghosts_dlab_off with "Hdlab Hg") as %Hd.
-      iMod (uart_col_pop γd u u' k bt
+      iMod (uart_col_pop γd u u' k hl bt
               ltac:(intros bb rx' Hrx;
                     exact (uart_read_rhr_pop u bb rx' bt u' Hd Hrx Hread))
-              with "Hcol Htok Hlb") as "(Hcol & Htok & Hh)".
+              with "Hcol Htok Hlb") as "(Hcol & Hh)".
       (* the four transmitter ghosts are untouched by any read *)
       destruct (uart_read_stable u 0 bt u' Hread) as (Ha & Ho & Hdl).
       iDestruct (uart_ghosts_stable γd u u' Ha Ho Hdl with "Hg") as "Hg".
-      iModIntro. iFrame "Hg Hcol Htok Hh".
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1 c) "Hcg Hpc [Htok Hh]".
+      iModIntro. iFrame "Hg Hcol Hh".
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1 c) "Hcg Hpc Hh".
       iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
-      iApply ("Hcont" $! c with "Hcg Hpc Htok Hh").
+      iApply ("Hcont" $! c with "Hcg Hpc Hh").
   Qed.
 
   (* THE FCR WRITE (offset 2).  Bit 1, and a toggle of bit 0, CLEAR the
@@ -501,13 +512,14 @@ Section WpSconfUartAccess.
      into the boot chain rather than into the PLIC invariant. *)
   Lemma wp_uart_fcr_write_s_sconf (γd : uart_names) (γv : disk_names)
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
-      (imm : mword 12) (m : regfile) (n : nat) (k : nat) (R S : iProp Σ)
+      (imm : mword 12) (m : regfile) (n : nat) (k : nat)
+      (hl : option (list mobs)) (R S : iProp Σ)
       (b : bool) :
     let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
     add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 2 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
-    dev_inv γd γv -∗ uart_rx_tok γd k -∗ R -∗
+    dev_inv γd γv -∗ uart_rx_tok γd k hl -∗ R -∗
     (* the transmitter side of an FCR write is the caller's own business
        (bit 2 clears the TX FIFO): it runs the usual ghost step beside the
        column's *)
@@ -516,7 +528,7 @@ Section WpSconfUartAccess.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      (∃ k' : nat, uart_rx_tok γd k') -∗
+      (∃ (k' : nat) (hl' : option (list mobs)), uart_rx_tok γd k' hl') -∗
       S -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -530,8 +542,9 @@ Section WpSconfUartAccess.
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     destruct (uart_geom_ok 2 ltac:(unfold uart_size; lia)) as (Hg1 & Hg2 & Hg3).
     iApply (Uart.wp_sb_uart_s_sconf kt (CID:=CID) γd γv 2 pc false rs2 rs1 imm
-              m n (uart_rx_tok γd k ∗ R)%I
-              ((∃ k' : nat, uart_rx_tok γd k') ∗ S)%I b p
+              m n (uart_rx_tok γd k hl ∗ R)%I
+              ((∃ (k' : nat) (hl' : option (list mobs)),
+                  uart_rx_tok γd k' hl') ∗ S)%I b p
               ltac:(unfold uart_size; lia)
               ltac:(rewrite Haddr; exact Hg1)
               ltac:(rewrite Haddr; exact Hg2)
@@ -542,11 +555,11 @@ Section WpSconfUartAccess.
       destruct (uart_write_fcr_rx u sb u' Hwrite) as [Hrxe Hlbe].
       iMod ("Hstep" $! u u' with "[//] Hg HR") as "[Hg HS]".
       destruct (uart_fcr_clr_rx u sb) eqn:Hclr.
-      + iMod (uart_colE_flush γd u u' k Hrxe Hlbe with "Hcol Htok")
+      + iMod (uart_colE_flush γd u u' k hl Hrxe Hlbe with "Hcol Htok")
           as "[Hcol Htok]".
         iModIntro. iFrame "Hg Hcol Htok HS".
       + iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
-        iModIntro. iFrame "Hg Hcol HS". by iExists k.
+        iModIntro. iFrame "Hg Hcol HS". iExists k, hl. iExact "Htok".
     - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Htok HS]".
       iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok HS").
       iPureIntro. exact Hs1.

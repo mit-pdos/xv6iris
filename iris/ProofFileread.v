@@ -447,11 +447,12 @@ Section ProofFileread.
     (dev_major Cf' <= NDEV_max)%Z ->
     fileread_dev_env fn' (dev_major Cf') -∗
     ⌜frn_rp fn' (dev_major Cf') = (zero_reg : mword 64)
-      \/ frn_rp fn' (dev_major Cf')
-          = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
+      \/ (dev_major Cf' = CONSOLE
+           /\ frn_rp fn' (dev_major Cf')
+              = (mword_of_int KernelSyms.consoleread : mword 64))⌝ ∗
     a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn' (dev_major Cf')}
       frn_rp fn' (dev_major Cf') ∗
-    is_conslock (frn_cons fn').
+    is_conslock fsc_cons AppInv.app_sup (frn_cons fn').
   Proof.
     intro H. rewrite /fileread_dev_env /fileread_dev_caps.
     case_decide as H'; [by iIntros "$"|].
@@ -464,11 +465,12 @@ Section ProofFileread.
   Local Lemma fr_dev_in_back (fn' : fread_names) (Cf' : fcontent) :
     (dev_major Cf' <= NDEV_max)%Z ->
     ⌜frn_rp fn' (dev_major Cf') = (zero_reg : mword 64)
-      \/ frn_rp fn' (dev_major Cf')
-          = (mword_of_int KernelSyms.consoleread : mword 64)⌝ -∗
+      \/ (dev_major Cf' = CONSOLE
+           /\ frn_rp fn' (dev_major Cf')
+              = (mword_of_int KernelSyms.consoleread : mword 64))⌝ -∗
     a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn' (dev_major Cf')}
       frn_rp fn' (dev_major Cf') -∗
-    is_conslock (frn_cons fn') -∗
+    is_conslock fsc_cons AppInv.app_sup (frn_cons fn') -∗
     fileread_dev_env fn' (dev_major Cf').
   Proof.
     intro H. rewrite /fileread_dev_env /fileread_dev_caps.
@@ -502,7 +504,9 @@ Section ProofFileread.
       (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
       (Fr : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-    : wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks Fr.
+      (Rd : nat -> nat -> iProp Σ)
+    : wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks Fr
+        Rd.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj addr ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn Heb Hbelow.
@@ -763,7 +767,7 @@ Section ProofFileread.
       { cbn [umem_wr]. rewrite HVid. iExact "Hpriv". }
       { by iApply fileread_env_out_of_env. }
       { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-        iApply (fileread_extra_unreadable inumx γox Cf st n Fr
+        iApply (fileread_extra_unreadable inumx γox Cf st n Fr Rd
                   (mword_of_int (-1) : mword 64) _ _ Hok Hrdz0). }
     - (* ===============================================================
          READABLE: spill s1/s3, park the three arguments, dispatch on the
@@ -1081,7 +1085,7 @@ Section ProofFileread.
            piece goes back exactly as it came in and the caller eliminates the
            returned conjunction to its own refund. *)
         { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-          iApply (fileread_extra_neg st n Fr _ _ Hneg with "Hau"). } }
+          iApply (fileread_extra_neg st n Fr Rd _ _ Hneg with "Hau"). } }
       (* [Z_lt_dec] leaves the negation; every use below wants the [<=]. *)
       assert (Hn0 : (0 <= n)%Z) by lia.
       (* ===========================================================
@@ -1358,7 +1362,7 @@ Section ProofFileread.
           iFrame "Hpipe Hpref Hiru Hoh". }
         { by iApply fileread_env_out_of_env. }
         { iSplitR; [iPureIntro; exact Hretpr |].
-          iApply (fileread_extra_of_pipe inumx γox Cf st n Fr _ _ _ Hok Htyp). }
+          iApply (fileread_extra_of_pipe inumx γox Cf st n Fr Rd _ _ _ Hok Htyp). }
       + (* ---- +0x22 c.li a4,3 ; +0x24 beq a5,a4 -> FD_DEVICE ---- *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x24))
                   (mword_of_int 70 : mword 13) Ra4 Ra5 B5 (K - 6)%nat b
@@ -1683,8 +1687,12 @@ Section ProofFileread.
              assert (Hpp96 : add_vec_int (mword_of_int (FR + 0x94) : mword 64) 2
                              = mword_of_int (FR + 0x96)) by (apply bv_eq; vm_compute; reflexivity).
              iEval (rewrite Hpp96) in "Hpc".
-             (* the environment says the slot is either NULL or the console's *)
-             destruct Hrp as [Hrp0 | Hrpc].
+             (* the environment says the slot is either NULL or the
+                console's -- and, in the second case, that the MAJOR is
+                [CONSOLE], which is what lets this arm recognise the call it
+                is about to make as a console read and pay for it
+                ([SpecFileread.fileread_dev_env]'s tie). *)
+             destruct Hrp as [Hrp0 | [Hmjc Hrpc]].
              ** (* ---- NULL: +0x90 taken -> +0xba, return -1 ---- *)
                 assert (Htgtc4 : add_vec (mword_of_int (FR + 0x96) : mword 64)
                           (sign_extend' 64 (sign_extend' 13
@@ -1742,7 +1750,7 @@ Section ProofFileread.
                 iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
                           with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                [Hpriv] [Hslot] []").
+                                [Hpriv] [Hslot] [Hau]").
                 { exact Hcsf. }
                 { apply uptd_ext_sz_refl. }
                 { apply Z.le_max_l. }
@@ -1763,8 +1771,25 @@ Section ProofFileread.
                   iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
                   by left. }
                 { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-                  iApply (fileread_extra_of_dev_m1 inumx γox Cf st n Fr _ _ Hok Htyd). }
-             ** (* ---- the console's read: the INDIRECT CALL at +0x94 ---- *)
+                  iApply (fileread_extra_of_dev_m1 inumx γox Cf st n Fr Rd _ _ Hok Htyd
+                          with "Hau"). }
+             ** (* ---- the console's read: the INDIRECT CALL at +0x94 ----
+
+                   THE CALLER'S PAYMENT, OPENED ONCE.  The major is
+                   [CONSOLE] (the environment's tie), so [fileread_in]'s
+                   device arm is the accessor
+                   [ConsoleInv.cons_acc fsc_cons app_sup Rd], and
+                   [cons_acc_open] turns it into ONE payment
+                   ([ConsoleInv.cons_pay] at whichever [ord] the caller's
+                   disjunct decided) plus the wand that turns consoleread's
+                   [cons_out] back into the [Rd] the caller asked for.  The
+                   walk below never case-splits on the disjunct. *)
+                destruct (fileread_st_device_rd inumx γox Cf st Hok Htyd Hrdnz)
+                  as (wbd & Hstd).
+                iDestruct (fileread_in_dev_console st wbd (dev_major Cf) Fr Rd
+                             Hstd Hmjc with "Hau") as "Hacc".
+                iDestruct (ConsoleInv.cons_acc_open with "Hacc")
+                  as (ord) "[Hpay Hback]".
                 iApply (wp_cbeqz_fall_s_sconf (mword_of_int (FR + 0x96))
                           (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 7)) Ra5
                           D9 (K - 6)%nat b Hc7 ltac:(vm_compute; discriminate)
@@ -1829,17 +1854,22 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CID CID58 0%nat eb pj b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
                 iApply (Consoleread.wp_consoleread_sconf fsc_kalloc γf γs j γlp
-                          (frn_cons fn)
+                          (frn_cons fn) fsc_cons AppInv.app_sup
                           E2 (K - 6)%nat eb pidv U n b
-                          lks Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn)
+                          lks ord Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn)
                           (fr_av_cons K HK) Heb
                           ltac:(lkbelow)
-                          with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv
+                          with "Hcg Hcnt Htext Hpc Hconslk Hpay Hpriv Hkenv
                                 Hprocs").
                 all: try lkbelow.
-                iIntros (CIDcr Hscr mf r P' dcr bscr hscr)
-                  "%Hcscr %Hupt %Hrr %Hdcr %Htiecr %Hra0 %Htagcr #Htagsc Hcg Hcnt Hpc
+                iIntros (CIDcr Hscr mf r P' dcr dccr curcr bscr hscr slcr)
+                  "%Hcscr %Hupt %Hrr %Hdcr %Htiecr %Hra0 %Htagcr #Htagsc
+                   #Hlbcr #Hwin Hout Hcg Hcnt Hpc
                    Hpriv".
+                (* the caller's own answer, at the position the ring's
+                   committed sequence stood at and the advance the cursor
+                   made: whatever [Rd] it chose when it paid. *)
+                iDestruct ("Hback" with "Hout") as "Hrd".
                 (* consoleread copies to its own a1, which is fileread's
                    [addr] carried in s2 *)
                 assert (HE2a1 : E2 !!! Regidx Ra1 = m !!! Regidx Ra1).
@@ -1927,7 +1957,7 @@ Section ProofFileread.
                 iApply ("Hcont" $! mfin (mword_of_int r) P' dcr bscr
                           with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                Hpriv [Hslot] []").
+                                Hpriv [Hslot] [Hrd]").
                 { exact Hcsf. }
                 { exact Hupt. }
                 { exact Hdcr. }
@@ -1945,7 +1975,7 @@ Section ProofFileread.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { iApply (fr_env_out_dev fn st Cf inumx _ Hok Htyd).
                   iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
-                  by right. }
+                  right. split; [exact Hmjc | exact Hrpc]. }
                 { iSplitR; [iPureIntro;
                             apply (fr_ret_of_cons n r Hn0);
                             rewrite Z.max_r in Hrr; lia |].
@@ -1961,12 +1991,12 @@ Section ProofFileread.
                   destruct (decide (bv_unsigned (fc_major Cf) = CONSOLE))
                     as [Emj | Nmj]; last first.
                   { iApply (fileread_extra_of_dev_other inumx γox Cf st n Fr
-                              _ _ _ Hok Htyd Nmj). }
+                              Rd _ _ _ Hok Htyd Nmj). }
                   iApply (fileread_extra_of_dev_console inumx γox Cf st n Fr
-                            _ _ _ Hok Htyd Emj).
+                            Rd _ _ _ Hok Htyd Emj).
                   destruct (Z.le_gt_cases 0 r) as [H0 | H0]; last first.
                   { assert (Hm1 : r = (-1)%Z) by lia. rewrite Hm1.
-                    iApply console_receipt_m1. }
+                    iApply (console_receipt_m1 Rd curcr dccr with "Hrd"). }
                   assert (Hdb : Z.of_nat dcr = bv_unsigned (mword_of_int r : mword 64)).
                   { assert (H31 : (2 ^ 31)%Z = 2147483648%Z)
                       by (vm_compute; reflexivity).
@@ -1976,9 +2006,19 @@ Section ProofFileread.
                     apply bvw64_small. rewrite H64. rewrite H31 in Hn.
                     destruct (Z.max_spec 0 n) as [[_ Hm] | [_ Hm]];
                       rewrite Hm in Hrr; lia. }
+                  (* THE RECEIPT IS THE ARM consoleread CAME BACK ON: the
+                     window when nobody read behind this call's back, and
+                     the credential when somebody did (SpecConsoleread.v's
+                     post says why the kernel cannot exclude them). *)
+                  iDestruct "Hwin" as "[(%Hwincr & %Hchcr & %Hdcrng) | Hcred]";
+                    last first.
+                  { iApply (console_receipt_of_dirty (us_M U) (m !!! Regidx Ra1)
+                              (mword_of_int r) dcr dccr curcr bscr Rd hscr slcr
+                              Hdb Htagcr with "Htagsc Hlbcr Hcred Hrd"). }
                   iApply (console_receipt_of_run (us_M U) (m !!! Regidx Ra1)
-                            (mword_of_int r) dcr bscr hscr Hdb Htagcr
-                            with "Htagsc"). }
+                            (mword_of_int r) dcr dccr curcr bscr Rd hscr slcr
+                            Hdb Hwincr Hchcr Hdcrng
+                            with "Htagsc Hlbcr Hrd"). }
           ++ (* --------- the major is OUT OF RANGE: return -1 ------------
                 The [bltu] is taken before the table is ever indexed, so the
                 environment is [emp] and the caller owed nothing. *)
@@ -2041,7 +2081,7 @@ Section ProofFileread.
              iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
                        with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                              [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                             [Hpriv] [Henv] []").
+                             [Hpriv] [Henv] [Hau]").
              { exact Hcsf. }
              { apply uptd_ext_sz_refl. }
              { apply Z.le_max_l. }
@@ -2060,7 +2100,8 @@ Section ProofFileread.
              { cbn [umem_wr]. rewrite HVid. iExact "Hpriv". }
              { by iApply (fr_env_out_dev fn st Cf inumx _ Hok Htyd). }
              { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
-               iApply (fileread_extra_of_dev_m1 inumx γox Cf st n Fr _ _ Hok Htyd). }
+               iApply (fileread_extra_of_dev_m1 inumx γox Cf st n Fr Rd _ _ Hok Htyd
+                          with "Hau"). }
         * (* ---- +0x28 c.li a4,2 ; +0x2a bne a5,a4 -> panic ---- *)
           iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x2a))
                     (mword_of_int 78 : mword 13) Ra4 Ra5 B6 (K - 6)%nat b
@@ -2147,7 +2188,7 @@ Section ProofFileread.
              (* THE CALLER'S ONE PIECE, still paired with its refund: the
                 fire below takes the pair and spends the AU side, since the
                 refund's one arm (the sign guard) is behind us. *)
-             iDestruct (fileread_in_inode_of st wbx (bv_unsigned inm) γo0 Fr
+             iDestruct (fileread_in_inode_of st wbx (bv_unsigned inm) γo0 Fr Rd
                           Hstm with "Hau") as "Hau".
              (* ...and the descriptor's offset row, which is what the FIRE
                 advances [f->off] out of (the piece-shape rule: the client
@@ -2937,7 +2978,7 @@ Section ProofFileread.
                    ok arm at the exact count. *)
                 { iSplitR; [iPureIntro; exact Hretok |].
                   iApply (fileread_extra_inode_of st wbx (bv_unsigned inm) γo0
-                            n Fr _ _ _ Hstm).
+                            n Fr Rd _ _ _ Hstm).
                   destruct Hskip as [H1 | [H1 Ht0]].
                   { rewrite /read_arms /read_post_fail. iRight.
                     iSplitR; [iPureIntro; exact H1 |]. iRight.
@@ -3289,7 +3330,7 @@ Section ProofFileread.
                    own equation, carried down by [Hcase]. *)
                 { iSplitR; [iPureIntro; exact Hretok2 |].
                   iApply (fileread_extra_inode_of st wbx (bv_unsigned inm) γo0
-                            n Fr _ _ _ Hstm).
+                            n Fr Rd _ _ _ Hstm).
                   rewrite /read_arms /read_post_ok. iLeft.
                   iExists avf, (Z.to_nat (bv_unsigned v)),
                     (abs_row (era_node dnl bml data)), tot.

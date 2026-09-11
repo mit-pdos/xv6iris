@@ -269,14 +269,14 @@ Qed.
 Lemma fs_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
     (cov : gset Z) (ls : Z) (CT N : Type)
     (app_fs : CT -> N -> FsAbsDefs.aview -> iProp Σ)
-    (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs : gname) (c : CT)
+    (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs γhist : gname) (c : CT)
     (T : list mobs) (Tg : list mobs -> iProp Σ)
     (HTg : forall h, Persistent (Tg h)) (HTgt : forall h, Timeless (Tg h))
     (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
           (xv6_slot N app_fs cov ls γd γsw γreg γstart c)
-          γobs T (obs_pred_at γobs) Tg HTg HTgt CT c) g' -∗
+          γobs T (obs_pred_at γobs) γhist Tg HTg HTgt CT c) g' -∗
     ▷ xv6_slot N app_fs cov ls γd γsw γreg γstart c -∗
     ◇ ⌜fs_boot_pure cov ls (v_disk (g'.(gdev).(dvirtio)))⌝.
 Proof.
@@ -284,7 +284,7 @@ Proof.
            (xv6_slot N app_fs cov ls)
            (fs_boot_pure cov ls)
            (xv6_slot_project N app_fs cov ls)
-           Hinv γgen γstart γreg γd γsw γobs T (obs_pred_at γobs)
+           Hinv γgen γstart γreg γd γsw γobs T (obs_pred_at γobs) γhist
            Tg HTg HTgt c g').
 Qed.
 
@@ -312,14 +312,14 @@ Definition xv6_trace_pure (cov : gset Z) (ls : Z) (g : gstate) : Prop :=
 Lemma xv6_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
     (cov : gset Z) (ls : Z) (CT N : Type)
     (app_fs : CT -> N -> FsAbsDefs.aview -> iProp Σ)
-    (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs : gname) (c : CT)
+    (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs γhist : gname) (c : CT)
     (T : list mobs) (Tg : list mobs -> iProp Σ)
     (HTg : forall h, Persistent (Tg h)) (HTgt : forall h, Timeless (Tg h))
     (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
           (xv6_slot N app_fs cov ls γd γsw γreg γstart c)
-          γobs T (obs_pred_at γobs) Tg HTg HTgt CT c) g' -∗
+          γobs T (obs_pred_at γobs) γhist Tg HTg HTgt CT c) g' -∗
     ▷ xv6_slot N app_fs cov ls γd γsw γreg γstart c -∗
     ◇ ⌜xv6_trace_pure cov ls g'⌝.
 Proof.
@@ -328,7 +328,7 @@ Proof.
      not spent and the disk projection still has it *)
   iDestruct (power_interp_resv_ok with "Hsi") as %Hresv.
   iDestruct (fs_trace_hook Σ cov ls CT N app_fs Hinv γgen γstart γreg γd γsw
-               γobs c T Tg HTg HTgt g' with "Hsi HP") as ">%Hdisk".
+               γobs γhist c T Tg HTg HTgt g' with "Hsi HP") as ">%Hdisk".
   iModIntro. iPureIntro. split; [exact Hdisk | exact Hresv].
 Qed.
 
@@ -585,10 +585,10 @@ Section SystemBoot.
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (MkAppcfg N A r) (fun _ => emp)%I gsn gln gtn Hbf Hbundle
             with "Hok Hxfer Hseamg Hdursnap Hres")
-      as (Hfd Hir Hpav Hbs Hwch HF γd γv Rspent γi ξd)
-      "(%Hdimg & %Happ & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
+      as (Hfd Hir Hpav Hbs Hwch HF γd γv cnm Rspent γi ξd)
+      "(%Hdimg & %Hcnu & %Happ & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Hchb & Huart &
-        Htok & Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
+        Htok & Hhi & Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
     (* THE FIRST PROCESS'S EXEC BUNDLE, off [Hinit_boot] at the era's own
        ghost classes -- which is why the hypothesis quantifies over them:
@@ -637,12 +637,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
+    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hhi Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
+      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hhi Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -675,11 +675,11 @@ Section SystemBoot.
            well as to goals: never leave a 30-premise [iApply] as the place a
            mismatch has to surface. *)
         iPoseProof (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
-                  (g.(gregs) 0%fin) iv DfracDiscarded γd γv γi ξd ps l0 b0 c0
+                  (g.(gregs) 0%fin) iv DfracDiscarded γd γv cnm γi ξd ps l0 b0 c0
                   (v_disk (g.(gdev).(dvirtio))) (fss_sb S) (fs_nib S) cov
                   XV6_DISK_BYTES S Pb Rspent
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  Hbundle) as "HP".
+                  Hcnu Hbundle) as "HP".
         iSpecialize ("HP" with "Htext").
         iSpecialize ("HP" with "Hdata").
         iSpecialize ("HP" with "Hh0").
@@ -713,8 +713,10 @@ Section SystemBoot.
         iSpecialize ("HP" with "Htx").
         iSpecialize ("HP" with "Hsent").
         iSpecialize ("HP" with "Hlb").
-        (* THE RECEIVE TOKEN, on its way to uartinit's FCR flush *)
+        (* THE RECEIVE TOKEN, on its way to uartinit's FCR flush, and the
+           ring's partner half of the HIGH-WATER MARK beside it *)
         iSpecialize ("HP" with "Htok").
+        iSpecialize ("HP" with "Hhi").
         iSpecialize ("HP" with "Hdlab").
         iSpecialize ("HP" with "Hcfg").
         iSpecialize ("HP" with "Hclaim").
@@ -892,26 +894,26 @@ Theorem xv6_power_adequacy_gen Σ
               ghost_var γobs (1/2)
                 (h ++ [if on then ObsPowerOff else ObsPowerOn])%list))
     (Hperm : forall (HR : riscvGS Σ) (GEN : GenId) (γ : uart_names),
-       (exists (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs : gname)
+       (exists (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs γhist : gname)
                (c : CT) (T : list mobs),
           riscv_fixedGS =
             boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
               (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
                  γd γsw γreg γstart c)
-              γobs T (Pt γobs c) (Tg c) (HTg c) (HTgt c) CT c) ->
+              γobs T (Pt γobs c) γhist (Tg c) (HTg c) (HTgt c) CT c) ->
        ⊢ obs_inv -∗ uart_obs_permit γ)
     (phi : gstate -> list mobs -> Prop)
     (* ...the slot [Hphi] holds at the end of the run is the COMPOSITE
        (round C): the application reads its durable claim off it beside the
        file system's record and the ledger *)
     (Hphi : forall (Hinv : invGS Σ)
-                   (γgen γstart γreg γd γsw γobs : gname) (c : CT)
+                   (γgen γstart γreg γd γsw γobs γhist : gname) (c : CT)
                    (T : list mobs) (g' : gstate) (h : list mobs),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
-               γobs T (Pt γobs c) (Tg c) (HTg c) (HTgt c) CT c) g' -∗
+               γobs T (Pt γobs c) γhist (Tg c) (HTg c) (HTgt c) CT c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
              γd γsw γreg γstart c -∗
@@ -1107,7 +1109,7 @@ Proof.
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS
      this obligation (crash.md's M0 gotcha, in the direction that works). *)
-  intros F HE gen g' Hbf Hpure Hi Gg Gs Gr Gt Gsw Gob Gcl GT ->.
+  intros F HE gen g' Hbf Hpure Hi Gg Gs Gr Gt Gsw Gob Ghist Gcl GT ->.
   (* THE RECORD'S SHAPE, substituted: every projection below reduces, which
      is what makes the crash slot's value -- and hence the seam -- visible
      to the boot cone at all.  [RiscvAdequacy.boot_fixedGS]'s header is the
@@ -1134,7 +1136,7 @@ Proof.
   { reflexivity. }
   (* the UART thread's permit, at the record the era boots over *)
   intros γ. apply (Hperm _ gen γ).
-  by exists Hi, Gg, Gs, Gr, Gt, Gsw, Gob, Gcl, GT.
+  by exists Hi, Gg, Gs, Gr, Gt, Gsw, Gob, Ghist, Gcl, GT.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1155,13 +1157,13 @@ Theorem xv6_power_adequacy Σ
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
     (phi : gstate -> Prop)
     (Hphi : forall (Hinv : invGS Σ)
-                   (γgen γstart γreg γd γsw γobs : gname) (c : unit)
+                   (γgen γstart γreg γd γsw γobs γhist : gname) (c : unit)
                    (T : list mobs) (g' : gstate),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot unit (fun _ _ _ => True%I) cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
-               γobs T (obs_pred_at γobs) rx_tag_triv
+               γobs T (obs_pred_at γobs) γhist rx_tag_triv
                (@rx_tag_triv_persistent Σ) (@rx_tag_triv_timeless Σ)
                unit c) g' -∗
          ▷ xv6_slot unit (fun _ _ _ => True%I) cov (FsImg.sb_logstart sb)
@@ -1195,13 +1197,13 @@ Proof.
             (obs_pred_at_alloc_cl (fun _ : unit => True%I))
             (fun γd γobs _ => obs_pred_at_step XV6_DISK_BYTES γd γobs)
             _ (fun g _ => phi g)
-            ltac:(intros Hinv γgen γstart γreg γd γsw γobs c T g' h;
+            ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                   iIntros "Hsi _ _ HP _";
-                  iApply (Hphi Hinv γgen γstart γreg γd γsw γobs c T g'
+                  iApply (Hphi Hinv γgen γstart γreg γd γsw γobs γhist c T g'
                             with "Hsi HP"))
             Hgen0 Hpow Himg n κs t2 g2 Hn).
   (* the permit at the trivial slot *)
-  intros HR GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Gcl & GT & Heq).
+  intros HR GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Ghist & Gcl & GT & Heq).
   apply (uart_obs_permit_triv γ); rewrite Heq; reflexivity.
 Qed.
 
@@ -1264,12 +1266,12 @@ Proof.
                              ltac:(iIntros "_"; iMod HR0 as "HR"; by iModIntro))
             (fun γd γobs _ => obs_ledger_at_step XV6_DISK_BYTES R HRt Hpow γd γobs)
             _ (fun _ h => P h)
-            ltac:(intros Hinv γgen γstart γreg γd γsw γobs c T g' h;
+            ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                   iIntros "_ Hauth _ _ HPt";
                   iApply (obs_ledger_at_phi R HRt P HR γobs h with "Hauth HPt"))
             Hgen0 Hpow0 Himg).
   (* the permit at the ledger: the client's two wands *)
-  intros HRg GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Gcl & GT & Heq).
+  intros HRg GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Ghist & Gcl & GT & Heq).
   refine (uart_obs_permit_ledger R Tg γ HRt _ _ (Htx HRg γ) (Hrx HRg γ));
     rewrite Heq; reflexivity.
 Qed.
@@ -1518,13 +1520,13 @@ Qed.
 Corollary xv6_power_adequacy_xv6Σ (g : gstate)
     (phi : gstate -> Prop)
     (Hphi : forall (Hinv : invGS xv6Σ)
-                   (γgen γstart γreg γd γsw γobs : gname) (c : unit)
+                   (γgen γstart γreg γd γsw γobs γhist : gname) (c : unit)
                    (T : list mobs) (g' : gstate),
        ⊢ @power_interp xv6Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
                   (FsImg.sb_logstart fsimg_sb) γd γsw γreg γstart c)
-               γobs T (obs_pred_at γobs) rx_tag_triv
+               γobs T (obs_pred_at γobs) γhist rx_tag_triv
                (@rx_tag_triv_persistent xv6Σ) (@rx_tag_triv_timeless xv6Σ)
                unit c) g' -∗
          ▷ xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
@@ -1586,10 +1588,10 @@ Proof.
      this corollary used to pass, by conversion on the record literal. *)
   exact (xv6_power_adequacy_xv6Σ g
            (xv6_trace_pure fsimg_cov (FsImg.sb_logstart fsimg_sb))
-           (fun Hinv γgen γstart γreg γd γsw γobs c T g' =>
+           (fun Hinv γgen γstart γreg γd γsw γobs γhist c T g' =>
               xv6_trace_hook xv6Σ fsimg_cov (FsImg.sb_logstart fsimg_sb)
                 unit unit (fun _ _ _ => True%I)
-                Hinv γgen γstart γreg γd γsw γobs c T
+                Hinv γgen γstart γreg γd γsw γobs γhist c T
                 rx_tag_triv (@rx_tag_triv_persistent xv6Σ)
                 (@rx_tag_triv_timeless xv6Σ) g')
            Hgen0 Hpow Hdisk).
@@ -1663,10 +1665,10 @@ Proof.
             (obs_pred_at_alloc_cl (fun _ : unit => True%I))
             (fun γd γobs _ => obs_pred_at_step XV6_DISK_BYTES γd γobs)
             _ (fun g h => obs_wf h g)
-            ltac:(intros Hinv γgen γstart γreg γd γsw γobs c T g' h;
+            ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                   iIntros "_ _ %Hwf _ _"; iModIntro; iPureIntro; exact Hwf)
             Hgen0 Hpow0 _).
-  { intros HR GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Gcl & GT & Heq).
+  { intros HR GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Ghist & Gcl & GT & Heq).
     apply (uart_obs_permit_triv γ); rewrite Heq; reflexivity. }
   rewrite Hdisk. exact fsimg_image_wf.
 Qed.

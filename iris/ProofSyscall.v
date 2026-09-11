@@ -914,7 +914,7 @@ Section SyscallVocab.
         !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId}
       (γf : gname) (pj : mword 64) (fn : fclose_names)
       : iProp Σ :=
-    (sysc_proc_env γf ∗ ConsoleInv.console_ready ∗ sysc_fs_env pj fn ∗
+    (sysc_proc_env γf ∗ SpecFileread.console_ready_app ∗ sysc_fs_env pj fn ∗
      (* THE STEADY ARM OF proc.c's [static int first]
         ([FirstTok.first_done]).  It is here, and LAST, for two reasons.
         HERE: fork is the one syscall that BUILDS a second process block,
@@ -1036,7 +1036,7 @@ Section SyscallVocab.
      process's copy costs nothing. *)
   Lemma syscall_env_console (γf : gname) (pj : mword 64)
  (fn : fclose_names) :
-    syscall_env γf pj fn -∗ ConsoleInv.console_ready.
+    syscall_env γf pj fn -∗ SpecFileread.console_ready_app.
   Proof. by iIntros "(_ & $ & _)". Qed.
 
   (* ...and the fork row, on its own for the same reason the console is:
@@ -2432,7 +2432,7 @@ Section SyscallVocab.
   (*  every cell is held at [DfracDiscarded], which is what                  *)
   (*  [SpecFileread.fileread_devsw_of_console] needs and what makes both     *)
   (*  equations [reflexivity] at the call.  [γc] comes from destructing      *)
-  (*  [ConsoleInv.console_ready] out of [syscall_env] ONCE -- which is why   *)
+  (*  [SpecFileread.console_ready_app] out of [syscall_env] ONCE -- which is why   *)
   (*  the gname is existential there and not a field of [fclose_names].      *)
   (* =================================================================== *)
   Definition sysc_fread_names (γcon : gname) (fn : fclose_names)
@@ -3135,7 +3135,7 @@ Section SyscallArms.
       (v0 : mword 64) :
     sysc_num (us_V U) = 5 ->
     pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
-    sysc_sys_in U sts gn cs f -∗ fileread_in (fd_st_of_key v0 sts) (rf_F f).
+    sysc_sys_in U sts gn cs f -∗ fileread_in (fd_st_of_key v0 sts) (rf_F f) (rf_ret f).
   Proof.
     intros Hn Hv0. iIntros "H".
     iDestruct (sysc_sys_in_at U sts gn cs f 5 Hn ltac:(vm_compute; discriminate)
@@ -3290,7 +3290,8 @@ Section SyscallArms.
        bytes at [v1] in the resume image [M'] *)
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
-    fileread_extra (fd_st_of_key v0 sts) (sys_rw_count v2) (rf_F f) r M' v1 -∗
+    fileread_extra (fd_st_of_key v0 sts) (sys_rw_count v2) (rf_F f)
+      (rf_ret f) r M' v1 -∗
     sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
   Proof.
     intros Hn Hv0 Hv1 Hv2. iIntros "H".
@@ -5302,10 +5303,10 @@ Section SyscallArms.
     (* filewrite's DEVICE arm wants the TX lock, not the cons lock --
        consolewrite drives the UART -- so what is destructed here is
        [printk_env]'s own existential.  The console table still comes from
-       [console_ready], but without its gname: the write column does not
+       [console_ready_app], but without its gname: the write column does not
        mention it. *)
     iDestruct (syscall_env_console with "Henvc") as "#Hcr".
-    iPoseProof (ConsoleInv.console_ready_devsw with "Hcr") as "#Htbl".
+    iPoseProof (SpecFileread.console_ready_app_devsw with "Hcr") as "#Htbl".
     iDestruct "Hpe" as "(_ & _ & _ & Hxl & _)".
     iDestruct "Hxl" as (γtxl) "#Htx".
     (* the ambient log, named: filewrite's FD_INODE arm write-locks inside
@@ -5459,8 +5460,11 @@ Section SyscallArms.
     (* the environment, carved out of [fs_ready] plus one slot unit *)
     iDestruct (sysc_bslot_split with "Hbs") as "[Hsl Hbs2]".
     (* THE CONSOLE, destructed ONCE: the arm builds the names record around
-       the gname it gets, which is the whole reason [console_ready] hides it
-       rather than [fclose_names] carrying it. *)
+       the gname it gets, which is the whole reason [console_ready_app]
+       leaves THAT existential rather than [fclose_names] carrying it.  The
+       ring's names and the credential are PINNED there ([fsc_cons],
+       [AppInv.app_sup]), because the receipt this arm relays is stated at
+       them. *)
     iDestruct (syscall_env_console with "Henvc") as (γcon) "#Hci".
     iDestruct (sysc_fileread_env γf γcon (proc_addr j) fn with "Hfsenv Hsl")
       as "[Hfse Hback]".
@@ -5475,11 +5479,12 @@ Section SyscallArms.
       as %Hfdk.
     iDestruct (sysc_dep_read U sts gn cs fdep v0
                  ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin") as "Hdepr".
-    iAssert (sys_read_in (us_V U) v0 sts (rf_F fdep)) with "[Hdepr]" as "Hsrin".
+    iAssert (sys_read_in (us_V U) v0 sts (rf_F fdep) (rf_ret fdep))
+      with "[Hdepr]" as "Hsrin".
     { rewrite /sys_read_in Hfdk. iExact "Hdepr". }
     iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γcon fn)
               pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
-              (rf_F fdep)
+              (rf_F fdep) (rf_ret fdep)
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Hsrin").

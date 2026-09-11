@@ -224,13 +224,13 @@ Theorem xv6_app_adequacy Σ
        record beside the application's durable claim at the same snapshot
        name) and the ledger side by side ---- *)
     (Hphi : forall (Hinv : invGS Σ)
-                   (γgen γstart γreg γd γsw γobs : gname) (c : app_fixed A)
+                   (γgen γstart γreg γd γsw γobs γhist : gname) (c : app_fixed A)
                    (T : list mobs) (g' : gstate) (h : list mobs),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
-               γobs T (obs_ledger_at (app_R A c) γobs)
+               γobs T (obs_ledger_at (app_R A c) γobs) γhist
                (app_tag A c) (Htagp c) (Htagt c) (app_fixed A) c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
@@ -248,16 +248,16 @@ Proof.
      the era boots over -- where [riscv_client] IS the fixed part the
      ledger was born with, by iota once the record's shape is destructed *)
   assert (Hperm : forall (HR : riscvGS Σ) (GEN : GenId) (γ : uart_names),
-      (exists (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs : gname)
+      (exists (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs γhist : gname)
               (c : app_fixed A) (T : list mobs),
          riscv_fixedGS =
            boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
              (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                 γd γsw γreg γstart c)
-             γobs T (obs_ledger_at (app_R A c) γobs)
+             γobs T (obs_ledger_at (app_R A c) γobs) γhist
              (app_tag A c) (Htagp c) (Htagt c) (app_fixed A) c) ->
       ⊢ obs_inv -∗ uart_obs_permit γ).
-  { intros HRg GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Gcl & GT & Heq).
+  { intros HRg GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Ghist & Gcl & GT & Heq).
     refine (uart_obs_permit_ledger (app_R A Gcl) (app_tag A Gcl) γ (HRt Gcl)
               _ _ (Htx HRg Gcl γ) (Hrx HRg Gcl γ));
       rewrite Heq; reflexivity. }
@@ -373,7 +373,7 @@ Proof.
            app_triv_xfer
            ltac:(intros c; exact (app_triv_init c _))
            app_triv_init_boot
-           ltac:(intros Hinv γgen γstart γreg γd γsw γobs c T g' h;
+           ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                  iIntros "_ _ _ _ _"; iModIntro; iPureIntro; exact Logic.I)
            Hgen0 Hpow0 _ n κs t2 g2 Hn)).
   rewrite Hdisk. exact fsimg_image_wf.

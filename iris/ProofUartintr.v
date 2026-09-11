@@ -155,7 +155,8 @@ Section UiCont.
          sie_cap_gpr KT1 mf av b pme -∗
          cpu_own lvl eb pme b lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
-         (∃ k' : nat, uart_rx_tok γu k') -∗
+         (∃ (k' : nat) (hl' : option (list mobs)),
+            uart_rx_writer γu k' hl') -∗
          WP (Loop : expr riscv_lang)))%I.
 
   (* re-anchor it at a hart reached mid-block.  Through the named definition
@@ -202,7 +203,7 @@ Section ProofUartintr.
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x4c)) -∗
     ui_frame sp0 m0 -∗
-    (∃ k' : nat, uart_rx_tok γu k') -∗
+    (∃ (k' : nat) (hl' : option (list mobs)), uart_rx_writer γu k' hl') -∗
     ui_ret_cont γu m0 av lvl eb pme b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -370,7 +371,7 @@ Section ProofUartintr.
       cpu_own (CID := CIDe) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
       ui_frame sp0 m0 -∗
-      (∃ k : nat, uart_rx_tok γu k) -∗
+      (∃ (k : nat) (hl : option (list mobs)), uart_rx_writer γu k hl) -∗
       ui_ret_cont (CID0 := CIDe) γu m0 av lvl eb pme b lks -∗
       WP (Loop : expr riscv_lang).
   Proof.
@@ -380,7 +381,7 @@ Section ProofUartintr.
     (* DLAB is off for good, out of the console credential's transmit lock:
        the RHR pop needs it to know offset 0 really is the receive register *)
     iAssert (uart_dlab_off γu) as "#Hdlab".
-    { iDestruct "Hccaps" as (γtx γc) "(#Htxl & _ & _ & _)".
+    { iDestruct "Hccaps" as (γtx γc cn) "(#Htxl & _ & _ & _ & _)".
       iDestruct "Htxl" as "[_ #Hd]". iExact "Hd". }
     assert (Jcall : add_vec (mword_of_int (KernelSyms.uartintr + 0x38) : mword 64)
                       (sign_extend' 64 (mword_of_int 2095362 : mword 21))
@@ -396,25 +397,26 @@ Section ProofUartintr.
       cpu_own (CID := CIDk) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
       ui_frame sp0 m0 -∗
-      (∃ k : nat, uart_rx_tok γu k) -∗
+      (∃ (k : nat) (hl : option (list mobs)), uart_rx_writer γu k hl) -∗
       ui_ret_cont (CID0 := CIDk) γu m0 av lvl eb pme b lks -∗
       WP (Loop : expr riscv_lang))%I with "[]" as "Loop".
     { iLöb as "IH".
       iIntros (CIDk M1) "%Hregs1 %Hls1 %Hls2 Hcg Hcnt Hpc Hfr Htok Hcont".
-      iDestruct "Htok" as (k) "Htok".
+      iDestruct "Htok" as (k hl) "[Htok Hhi]".
+      iDestruct "Hhi" as (hh) "[Hhi %Hhle]".
       assert (Hlsr : forall (CID' : CpuId), rget (CID := CID') M1 Rs1 = uart_pa 5)
         by (intros CID'; rgne; exact Hls1).
       assert (Hrhr : forall (CID' : CpuId), rget (CID := CID') M1 Rs2 = uart_pa 0)
         by (intros CID'; rgne; exact Hls2).
       iApply (UG.wp_uartgetc_inline γu γv M1 (av - 4)%nat Rs1 Rs2
-                (mword_of_int 13 : mword 8) k
+                (mword_of_int 13 : mword 8) k hl
                 (mword_of_int (KernelSyms.uartintr + 0x2c)) (mword_of_int (KernelSyms.uartintr + 0x30))
                 (mword_of_int (KernelSyms.uartintr + 0x32)) (mword_of_int (KernelSyms.uartintr + 0x34))
                 (mword_of_int (KernelSyms.uartintr + 0x38)) (mword_of_int (KernelSyms.uartintr + 0x4c)) b
                 (Hlsr _) (Hrhr _) ltac:(reg_neq) ltac:(reg_neq)
                 ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc [] [] [] [] Hdinv Hdlab Htok [Hcnt Hfr Hcont]").
+                with "Hcg Hpc [] [] [] [] Hdinv Hdlab Htok [Hcnt Hfr Hcont Hhi]").
       { iApply (uii2_2c with "Ht"). }
       { iEval (rewrite -UG.ug_cr7). iApply (uii2_30 with "Ht"). }
       { iApply (uii2_32 with "Ht"). }
@@ -432,11 +434,13 @@ Section ProofUartintr.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply (ui_tail γu m0 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> M1)
                   av lvl eb pme sp0 b lks Hrx Hsp0 Hav
-                  with "Ht Hcg Hcnt Hpc Hfr [Htok] Hcont").
-        by iExists k.
+                  with "Ht Hcg Hcnt Hpc Hfr [Htok Hhi] Hcont").
+        iExists k, hl. rewrite /uart_rx_writer. iFrame "Htok".
+        iExists hh. iFrame "Hhi". by iPureIntro.
       - (* a byte: hand it -- with its history and the application's claim
            about it -- to consoleintr, and go round again *)
-        iIntros (bt c) "_ Hcg Hpc Htok #Hh".
+        iIntros (bt c) "_ Hcg Hpc Hh".
+        iDestruct "Hh" as (h) "(%Hlast & %Hanch & #Htg & #Hlbh & Htok)".
         set (G0 := <[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
                    (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> M1)).
         change (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
@@ -454,6 +458,16 @@ Section ProofUartintr.
         destruct Hregs1' as (A2 & A19 & A20 & A21 & A22 & A23 & A24 & A25 & A26 & A27).
         assert (HG1ra : G1 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.uartintr + 0x38) : mword 64) 4)
           by (rewrite /G1 upd_eq; reflexivity).
+        (* a0 holds the byte, zero-extended by the [lbu] that popped it *)
+        assert (Ha0 : G1 !!! Regidx (mword_of_int 10 : mword 5)
+                      = (extend_value (n := 8) true (c : mword 8) : mword 64)).
+        { rewrite /G1 upd_ne; [| vm_compute; discriminate].
+          rewrite /G0 upd_eq. reflexivity. }
+        (* THE ORDER THE STORE NEEDS: the ring's mark is at or before the
+           popper's anchor, and the byte just popped is strictly after that
+           anchor, so the mark is strictly before the byte. *)
+        assert (Hhext : ObsTrace.ohist_ext hh h)
+          by exact (ObsTrace.ohist_ext_le_ext hh hl h Hhle Hanch).
         assert (HcsG1 : callee_saved M1 G1).
         { rewrite /G1 /G0.
           apply callee_saved_insert_r; [vm_compute; reflexivity|].
@@ -462,17 +476,12 @@ Section ProofUartintr.
           apply callee_saved_refl. }
         iDestruct (cpu_own_transport CIDk CIDj lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (Consoleintr.wp_consoleintr_sconf γu γv G1 γs pme lvl (av - 4)%nat eb b lks
-                  ltac:(lia)
+                  h c hh
+                  ltac:(lia) Ha0 Hlast Hhext
                   Hlen ltac:(lia) Hbelow
-                  with "Hcg Hcnt Ht Hpc Hpinv Hdinv Hccaps [Hh]").
+                  with "Hcg Hcnt Ht Hpc Hpinv Hdinv Hccaps Htg Hlbh Hhi").
         all: try lkbelow.
-        { (* a0 holds the byte, zero-extended by the [lbu] that popped it *)
-          iDestruct "Hh" as (h) "[%Hlast #Htg]".
-          iExists h, c. iSplitR.
-          { iPureIntro. rewrite /G1 upd_ne; [| vm_compute; discriminate].
-            rewrite /G0 upd_eq. reflexivity. }
-          iSplitR; [iPureIntro; exact Hlast | iExact "Htg"]. }
-        iIntros (CIDc Hsc Mf) "[%Hcsf %Hdomf] Hcg Hcnt Ht2 Hpc".
+        iIntros (CIDc Hsc Mf) "[%Hcsf %Hdomf] Hcg Hcnt Ht2 Hpc Hhi".
         iEval (rewrite HG1ra) in "Hpc".
         assert (P3c : ret_pc (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x38) : mword 64) 4)
                       = mword_of_int (KernelSyms.uartintr + 0x3c)) by pcw.
@@ -487,8 +496,10 @@ Section ProofUartintr.
         iDestruct (cpu_own_transport CIDc CIDz lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (ui_ret_cont_shift CIDk CIDz γu m0 av lvl eb pme b lks
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply ("IH" $! CIDz Mf with "[%] [%] [%] Hcg Hcnt Hpc Hfr [Htok] Hcont").
-        4: by iExists (S k).
+        iApply ("IH" $! CIDz Mf with "[%] [%] [%] Hcg Hcnt Hpc Hfr [Htok Hhi] Hcont").
+        4: { iExists (S k), (Some h). rewrite /uart_rx_writer. iFrame "Htok".
+             iDestruct "Hhi" as (hh') "[Hhi %Hle']".
+             iExists hh'. iFrame "Hhi". by iPureIntro. }
         + apply (ui_regs_cs m0 M1 Mf); [exact HcsMf | exact Hregs1].
         + rewrite (callee_saved_lookup HcsMf (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact Hls1.
         + rewrite (callee_saved_lookup HcsMf (mword_of_int 18) ltac:(vm_compute; reflexivity)). exact Hls2. }
@@ -518,7 +529,7 @@ Section ProofUartintr.
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x22)) -∗
     ui_frame sp0 m0 -∗
-    (∃ k : nat, uart_rx_tok γu k) -∗
+    (∃ (k : nat) (hl : option (list mobs)), uart_rx_writer γu k hl) -∗
     ui_ret_cont γu m0 av lvl eb pme b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -581,8 +592,8 @@ Section ProofUartintr.
   Lemma wp_uartintr_sconf (γu : uart_names) (γv : disk_names)
       (γs : list gname)
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool)
-      (k : nat) (lks : gset string)
-    : wp_uartintr_sconf_body γu γv γs m av lvl eb pme b k lks.
+      (k : nat) (hl : option (list mobs)) (lks : gset string)
+    : wp_uartintr_sconf_body γu γv γs m av lvl eb pme b k hl lks.
   Proof.
     cbv beta delta [wp_uartintr_sconf_body].
     intros pcE ret_tgt Hlen Hlvl Hav Hbelow.
@@ -771,7 +782,7 @@ Section ProofUartintr.
       iApply (ui_rx_setup γu γv γs m B2 av lvl eb pme sp0 b lks
                 HB2regs Hspm Hlen Hlvl Hav Hbelow
                 with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr [Htok] Hcont").
-      by iExists k.
+      by iExists k, hl.
     - (* THRE: wake the writers, then join the rx setup *)
       assert (Jtx : add_vec (mword_of_int (KernelSyms.uartintr + 0x20) : mword 64)
                       (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0"))))
@@ -860,7 +871,7 @@ Section ProofUartintr.
       iApply (ui_rx_setup γu γv γs m Mw av lvl eb pme sp0 b lks
                 HregsW Hspm Hlen Hlvl Hav Hbelow
                 with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr [Htok] Hcont").
-      by iExists k.
+      by iExists k, hl.
   Qed.
 
 End ProofUartintr.

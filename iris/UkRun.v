@@ -299,6 +299,38 @@ Section UkRun.
        (⌜psok n /\ n <> USYS_exec⌝
         ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs)))%I.
 
+  (* THE FAMILY-NAMED EXPLICIT DEPOSIT (app-echo.md, lane CONS-CURSOR, C3).
+     [udepw]'s explicit disjunct hides the deposited FAMILY under an
+     existential, which is exactly right for every leaf that DISCARDS its
+     post: the witness is minted and handed straight over.  A leaf that
+     HANDS THE POST TO THE PROGRAM cannot use that shape -- the program has
+     to read its post at the family it deposited, and an existential loses
+     it -- so this variant names the family, and [udepwf_udepw] is the
+     forgetful direction the other leaves still take.
+
+     NOT PERSISTENT, and that is the point.  [uxsup] can be a [□] over every
+     key because an exec bundle is inexhaustible; the console read's deposit
+     carries the READER TOKEN, which is exclusive, so the program supplies
+     it through this wand -- once, at whatever key the walk has reached --
+     rather than at every key. *)
+  Definition udepwf (N : uk_names Σ) (m : regfile) (pc : mword 64)
+      (n : Z) (fdep : sfam) : iProp Σ :=
+    (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname),
+       my_pay gn (ukn_pay N) -∗
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs))%I.
+
+  Lemma udepwf_udepw (N : uk_names Σ) (m : regfile) (pc : mword 64)
+      (n : Z) (fdep : sfam) :
+    udepwf N m pc n fdep -∗ udepw N m pc n.
+  Proof.
+    rewrite /udepwf /udepw. iIntros "H" (M pm sz fdv cw gn cs) "Hp Hh Hf".
+    iDestruct ("H" $! M pm sz fdv cw gn cs with "Hp Hh Hf") as "(Hh & Hf & Hb)".
+    iFrame "Hh Hf". iRight. iExists fdep. iExact "Hb".
+  Qed.
+
   (* the GENERIC route's supplier: a number the program admits *)
   Lemma udepw_of_psok (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) :

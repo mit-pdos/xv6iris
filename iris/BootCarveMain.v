@@ -532,7 +532,7 @@ Section BootCarveMain.
   (* lock consoleinit has just initialised.  The four bytes of padding   *)
   (* between the ring's end and [pr] are dropped, as everywhere.         *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_cons_res `{XI : TsoCtx.CurCtx} (g : gstate) :
+  Lemma boot_cons_res `{XI : TsoCtx.CurCtx} (g : gstate) (cn : cons_names) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= KernelSyms.cons ->
@@ -547,9 +547,19 @@ Section BootCarveMain.
     KernelSyms.cons mod 4 = 0 ->
     kmap_static_claims -∗
     boot_cran g (KernelSyms.cons + 24) (KernelSyms.cons + 164) -∗
-    cons_res.
+    (* THE RING'S THREE GHOST ROWS (app-echo.md, lane CONS-CURSOR, C2).
+       The cells alone are not the ring any more: its resource also carries
+       the committed sequence's authority, the ring's half of the
+       consumption cursor and its half of the receive side's HIGH-WATER
+       MARK.  All three come in from [ConsoleInv.cons_ghosts_alloc], which
+       runs beside the UART's mint (the mark's other half is the PLIC
+       payload's) -- the carve allocates nothing. *)
+    cons_stored_auth cn [] -∗
+    cons_cursor cn 0%nat -∗
+    cons_hi cn None -∗
+    cons_res cn.
   Proof.
-    intros Hmem Hlo Hbss Hhi Hal. iIntros "#Hcl H".
+    intros Hmem Hlo Hbss Hhi Hal. iIntros "#Hcl H Hsa Hcu Hhi".
     assert (Hal4 : forall k : Z, k mod 4 = 0 -> (KernelSyms.cons + k) mod 4 = 0)
       by (intros k Hk; rewrite Z.add_mod; [| lia]; rewrite Hal Hk; reflexivity).
     (* the four windows, in address order *)
@@ -603,8 +613,9 @@ Section BootCarveMain.
     iEval (rewrite (Hcell 160 ltac:(apply bv_eq; vm_compute; reflexivity))) in "He".
     rewrite /cons_res /a_cons_r /a_cons_w /a_cons_e.
     iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
-            (mword_of_int 0 : mword 32), bs, (replicate INPUT_BUF_SIZE None).
-    iFrame "Hr Hw He Hb".
+            (mword_of_int 0 : mword 32), bs, (replicate INPUT_BUF_SIZE None),
+            0%nat, 0%nat, [], [], None.
+    iFrame "Hr Hw He Hb Hsa Hcu Hhi".
     iSplitR; [iPureIntro; exact Hlen |].
     iSplitR; [iPureIntro; apply length_replicate |].
     (* the coupling at an EMPTY ring: every distance is zero, so the row's
@@ -616,7 +627,24 @@ Section BootCarveMain.
     { iPureIntro. rewrite /cons_ok H0 cons_bufz. lia. }
     iSplitR.
     { iPureIntro. intros k Hk. rewrite H0 in Hk. exfalso. lia. }
-    iApply cons_tags_none.
+    (* the committed prefix and the editable window are both EMPTY, so the
+       sequence clauses say nothing and the chain and the mark are free. *)
+    iSplitR.
+    { iPureIntro. split; [cbn [length]; rewrite H0; reflexivity |].
+      intros k Hk. rewrite H0 in Hk. exfalso. lia. }
+    iSplitR.
+    { iPureIntro. split; [cbn [length]; rewrite H0; reflexivity |].
+      intros j Hj. cbn [length] in Hj. exfalso. lia. }
+    iSplitR.
+    { iPureIntro. intros i j hi hj bi bj Hi.
+      rewrite lookup_nil in Hi. discriminate Hi. }
+    iSplitR.
+    { iPureIntro. intros j h b Hj.
+      rewrite lookup_nil in Hj. discriminate Hj. }
+    iSplitR; [iApply cons_tags_none |].
+    (* NOBODY HAS READ BEHIND THE TOKEN HOLDER'S BACK: the ring is born
+       clean, and the clean token that says so leaves with the reader. *)
+    iLeft. by iPureIntro.
   Qed.
 
   (* ------------------------------------------------------------------ *)

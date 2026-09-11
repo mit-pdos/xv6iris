@@ -281,7 +281,7 @@ Section ProofDevintr.
        arm claimed it and uartintr returned it, and this is where the
        completion parks it again. *)
     (⌜ irq = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
-       ∃ kk : nat, uart_rx_tok γu kk) -∗
+       plic_payload_uart γu) -∗
     pa_stk sp0 1 ↦₈[KT1] ra0 -∗
     pa_stk sp0 2 ↦₈[KT1] s00 -∗
     pa_stk sp0 3 ↦₈[KT1] s10 -∗
@@ -429,7 +429,7 @@ Section ProofDevintr.
     (* the deposit witness, out of the console credential: it is what the
        PLIC leaves need to know the invariant is past its pre-deposit arm *)
     iAssert (uart_inited γu) as "#Hinit".
-    { iDestruct "Hccaps" as (γtx γc) "(_ & _ & _ & #Hin)". iExact "Hin". }
+    { iDestruct "Hccaps" as (γtx γc cn) "(_ & _ & _ & _ & #Hin)". iExact "Hin". }
     iIntros "Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
@@ -892,9 +892,9 @@ Section ProofDevintr.
         assert (HU0ra : U0 !!! Regidx ra_idx
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) 4)
           by (rewrite /U0 upd_eq; reflexivity).
-        iDestruct ("Hrxtok" with "[%]") as (kk) "Htok"; [exact Huart|].
+        iDestruct ("Hrxtok" with "[%]") as (kk hlk) "Htok"; [exact Huart|].
         iApply (Uartintr.wp_uartintr_sconf γu γv γs U0 (av - 4)%nat lvl eb p false
-                  kk _ Hlen ltac:(lia) ltac:(lia)
+                  kk hlk _ Hlen ltac:(lia) ltac:(lia)
                   with "Hcg Hcnt Htext Hpc Hdev Hpinv Hccaps Htok").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc Htok".

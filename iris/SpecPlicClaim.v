@@ -101,7 +101,7 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
        popper of the receive FIFO. *)
     (⌜ m' !!! Regidx a0_idx
        = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
-       ∃ k : nat, uart_rx_tok γd k) -∗
+       plic_payload_uart γd) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

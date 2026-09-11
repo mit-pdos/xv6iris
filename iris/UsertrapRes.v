@@ -80,7 +80,8 @@ Require Import WireInv KptExecMap.   (* [park_world_open]'s rows *)
 Require Import FsReady.
 Require Import SpecConsoleintr.  (* [console_caps] -- devintr's console row *)
 Require Import TicksInv.         (* [is_tickslock] -- the tick keeper's real arm *)
-Require Import ConsoleInv.       (* [console_ready] -- resumer-supplied, park_globals *)
+Require Import ConsoleInv.       (* the console ring's invariant *)
+Require Import SpecFileread.     (* [console_ready_app] -- resumer-supplied, park_globals *)
 Require Import DiskInv.          (* [disk_geom] / [disk_res] *)
 Require Import SpecDevintr.
 Require Import SpecPrintk.
@@ -1916,7 +1917,7 @@ End UsertrapRes.
    record is read at the context of whatever thread RESUMES it, which is
    not the context of the thread that wrote it -- and since the M1 flip an
    [is_lock]/[inv] handle over a [<{ P }>] payload is a DIFFERENT
-   proposition at a different ξ (measured: [procs_inv], [console_ready],
+   proposition at a different ξ (measured: [procs_inv], the console row,
    [disk_geom], [is_kstack] and every discarded cell all fail to be
    CONVERTIBLE across two contexts; [is_tickslock], the wait lock, the
    nextpid lock, [procs_avail], [wire_inv], [kmap_at], [console_caps] and --
@@ -1950,7 +1951,7 @@ End UsertrapRes.
                         bounded, §0.12′ called it blocked; it was blocked,
                         and it is now done.)
      [console_caps] /
-     [console_ready]    consoleinit's two rows, which [fs_ready] does not
+     [console_ready_app] consoleinit's two rows, which [fs_ready] does not
                         carry
      [initproc ↦₈□]     the sealed cell userinit stores once
 
@@ -1963,7 +1964,11 @@ Definition park_globals `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fil
    is_lock (XI := ξ) γw wait_lock_addr "wait_lock"%string (wait_res_at) ∗
    is_ftable (XI := ξ) γft γf ∗
    console_caps (XI := ξ) fsc_uart ∗
-   console_ready (XI := ξ) ∗
+   (* THE CONSOLE, PINNED: [SpecFileread.console_ready_app] -- the read
+      syscall's arm needs the ring at the ambient [fsc_cons] and the
+      credential at [AppInv.app_sup] (app-echo.md, lane CONS-CURSOR, the
+      accessor ruling), so only the cons lock's gname is existential. *)
+   console_ready_app (XI := ξ) ∗
    is_tickslock (XI := ξ) γtl ∗
    (∃ γp : gname,
       is_lock (XI := ξ) γp PidLock.alp_pid_lock "nextpid"%string PidLock.nextpid_res_at) ∗

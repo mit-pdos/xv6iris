@@ -153,6 +153,14 @@ Class fscfg := MkFscfg {
      off LEDGER that once lived beside it is gone (tso-cutover r25: the off
      BOX, OffBox.v). *)
   fsc_fol       : gname;
+  (* THE CONSOLE RING'S GHOST NAMES (app-echo.md, lane CONS-CURSOR, C3).
+     The read syscall's receipt names the window of the ring's stored
+     sequence the call delivered, and the trap route's per-number post row
+     ([UexecExecInst.xv6_spost]) has to spell that receipt with no gname
+     parameter of its own -- so the names are AMBIENT, exactly as the
+     UART's are.  Per era, like everything else here: the ring is .bss and
+     a boot re-founds it empty. *)
+  fsc_cons      : cons_names;
   (* THE APPLICATION'S PREDICATE IS NOT HERE.  It was, for one round, a
      [Prop]-valued field; it is an [iProp] now (applications.md section 1,
      the owner's 2026-09-05 correction), which puts a [Σ] on it that this

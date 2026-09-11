@@ -93,8 +93,9 @@ Section ConsoleinitBody.
 
   Hypothesis wp_uartinit :
     forall `{CID : CpuId} (γd : uart_names) (m : regfile) (K : nat)
-      (l : list (bv 8)) (b0 : bool) (k : nat) (p : mword 64),
-      wp_uartinit_sconf_body γd m K l b0 k p.
+      (l : list (bv 8)) (b0 : bool) (k : nat) (hl : option (list mobs))
+      (p : mword 64),
+      wp_uartinit_sconf_body γd m K l b0 k hl p.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -103,9 +104,11 @@ Section ConsoleinitBody.
 
   Lemma wp_consoleinit_sconf_gen (γd : uart_names)
       (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool) (k : nat)
+      (hl : option (list mobs))
       (vclock : bv 32) (vcname vccpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64) :
-    wp_consoleinit_sconf_body γd m K l b0 k vclock vcname vccpu dread0 dwrite0 p.
+    wp_consoleinit_sconf_body γd m K l b0 k hl vclock vcname vccpu dread0
+      dwrite0 p.
   Proof.
     cbv beta delta [wp_consoleinit_sconf_body].
     intros pcE ret_tgt clk c_cname c_ccpu HK.
@@ -282,7 +285,7 @@ Section ConsoleinitBody.
     iEval (rewrite Htgtua) in "Hpc".
     assert (HU0sp : U0 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
       by (rewrite /U0 upd_ne; [exact Hmilsp | reg_neq]).
-    iApply (wp_uartinit γd U0 (K - 2)%nat l b0 k p
+    iApply (wp_uartinit γd U0 (K - 2)%nat l b0 k hl p
               ltac:(lia) with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Htok Hdlab Hraw").
     iIntros (mu) "Hcg Hpc %Huacs Htx #Hsent' Htok #Hdoff Hfresh".
     assert (Hretua : ret_pc (U0 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.consoleinit + 0x20)).
@@ -514,10 +517,11 @@ End ConsoleinitBody.
 Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINIT.
   Definition wp_consoleinit_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γd : uart_names) (m : regfile) (K : nat)
-      (l : list (bv 8)) (b0 : bool) (k : nat)
+      (l : list (bv 8)) (b0 : bool) (k : nat) (hl : option (list mobs))
       (vclock : bv 32) (vcname vccpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64)
-      : wp_consoleinit_sconf_body γd m K l b0 k vclock vcname vccpu dread0 dwrite0 p :=
+      : wp_consoleinit_sconf_body γd m K l b0 k hl vclock vcname vccpu dread0
+          dwrite0 p :=
     (* Passed bare, [Initlock.wp_initlock_sconf]'s own implicit [CID] gets
        EAGERLY specialized to THIS definition's [CID] (typeclass-style
        implicit resolution fires on a bare reference), which is strictly
@@ -529,7 +533,7 @@ Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINI
     wp_consoleinit_sconf_gen
       (fun `(CID' : CpuId) m' vlock' vname' vcpu' s' K' b' p' =>
          Initlock.wp_initlock_sconf KT0 (CID:=CID') m' vlock' vname' vcpu' s' K' b' p')
-      (fun `(CID' : CpuId) γd' m' K' l' b0' k' p' =>
-         Uartinit.wp_uartinit_sconf (CID:=CID') γd' m' K' l' b0' k' p')
-      γd m K l b0 k vclock vcname vccpu dread0 dwrite0 p.
+      (fun `(CID' : CpuId) γd' m' K' l' b0' k' hl' p' =>
+         Uartinit.wp_uartinit_sconf (CID:=CID') γd' m' K' l' b0' k' hl' p')
+      γd m K l b0 k hl vclock vcname vccpu dread0 dwrite0 p.
 End ConsoleinitProof.
