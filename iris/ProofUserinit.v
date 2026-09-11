@@ -280,7 +280,7 @@ Section ProofUserinit.
     iIntros "Hcg Hcpu #Htext #Hkd Hpc #Hpenv #Hitl #Hitinv #Hesc #Hireg
              Hfirst #Hpersist Hfsinit
              #Hpinv #Hlpid
-             #Hdcaps #Hwaitlk #Hftable #Hcready #Hwire Hbundle #Htramp
+             #Hdcaps #Hwaitlk #Hftable #Hcready #Hwire Hbundle Hrdtok #Htramp
              Hkenv Hpav Hinitproc Hcont".
     (* the boot arm: at nesting level 0 the exit arm IS the entry base *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Heb. cbn in Heb. subst eb.
@@ -833,7 +833,7 @@ Section ProofUserinit.
             (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M) fdt0
             ∅ Hwf Hrest
             with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hrow Hbundle
-                  [Hks Hctx Hpriv Hkq Hgh Hxb Hfd Hirs]")
+                  Hrdtok [Hks Hctx Hpriv Hkq Hgh Hxb Hfd Hirs]")
       as "[Hrun Hpctx]".
     (* built row by row, not framed: the mode row is an [if] the frame
        cannot see through, and its boot arm carries [first_boot_persist],

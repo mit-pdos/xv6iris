@@ -483,6 +483,11 @@ Section UInitSh.
     assert (Ea1 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv))
                     (tf_arg_idx 1) = (mword_of_int 0x1000 : mword 64))
       by (etransitivity; [ exact (tf_of_arg1 m pc) | exact Ha1 ]).
+    (* THE DEPOSIT IS WANTED AT THIS PROGRAM'S OWN PAYLOAD (app-echo.md,
+       "SH-LINE RULING", R1): exec's bundle reads no payload, so the
+       re-keying is free ([UexecSG.sbundle_pay_of_sbundle]). *)
+    iApply (sbundle_pay_of_sbundle uslot USYS_exec _ _
+              ltac:(vm_compute; discriminate)).
     iApply (sbundle_exec_intro uslot
               (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv) P Pmiss Fo R).
     { (* init's own payload is the trivial one -- userinit's choice, which

@@ -128,6 +128,8 @@ Require Import SpecForkret.
 Require Import SpecForkretPark.
 Require Import ChildTok.  (* [my_pay] -- the boot mode's payload row *)
 Require Import ParkCap.   (* [park_token] *)
+Require Import FsCfg.      (* [fsc_cons] *)
+Require Import ConsoleInv.  (* [cons_reader] -- the boot mode's token row *)
 Require Import InitBoot.  (* [init_boot_bundle] -- the BOOT mode's payload *)
 Require Import UexecSlot. (* [uvis] / [uvis_of] *)
 Require Import UexecRet.  (* [uslot] -- required DIRECTLY, the seal does not
@@ -205,7 +207,7 @@ Definition forkret_park_pkg
           [ParkCap.park_pkg] is this verbatim. ---- *)
    (match Wk with
     | Some _ => FirstTok.first_done
-    | None => init_boot_bundle cw sts
+    | None => init_boot_bundle cw sts ∗ ConsoleInv.cons_reader fsc_cons 0%nat
     end) ∗
    (* ---- the residue closer, at every hart the record may resume on.
           It takes the two ALLOWANCES the park's own arguments carry

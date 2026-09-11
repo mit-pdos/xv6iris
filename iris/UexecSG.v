@@ -355,9 +355,18 @@ Class uexecSG (Σ : gFunctors) {sg_ctok : ctokG Σ} := {
   (* ...and the two bundle rows pass through the payload re-keying: a
      family re-keyed at a payload deposits and pays back exactly what it
      did before, which is what lets a leaf take its supplier's [f] and put
-     its own payload in it ([sfam_at]). *)
+     its own payload in it ([sfam_at]).
+     AT EVERY NUMBER BUT read (app-echo.md, "SH-LINE RULING", R1).  read's
+     deposit is a WAND FROM THE FAMILY'S OWN EXIT PAYLOAD
+     ([UexecExecInst.xv6_sbundle] at 5) -- the one branch that reads the
+     payload at all -- so re-keying is an identity on every OTHER number
+     and the side condition says exactly that.  A read leaf does not
+     re-key: it takes its deposit already minted at its own payload
+     ([sbundle_of_supply_ne] names it, and so does [UkRun.udep]'s law).
+     [spost_at_at] needs no such condition: no post reads the payload. *)
   sbundle_at_at : forall (X : uvis -d> iPropO Σ) (n : Z) (Q : Z -> iProp Σ)
       (f : sfam) (W : uvis),
+    n <> USYS_read ->
     sbundle_at X n (sfam_at Q f) W = sbundle_at X n f W;
   (* [spost_at_at] stops at the four arguments the re-keying touches and
      leaves the answer's five off: the post stands under the arm's own
@@ -384,13 +393,26 @@ Class uexecSG (Σ : gFunctors) {sg_ctok : ctokG Σ} := {
      the generic one does, and a program that does not takes the EXPLICIT
      route with its own families.  BUPD-SHAPED (the header): a bundle may
      hold a resource that is free but not derivable from [emp]. *)
-  sbundle_of_supply_ne : forall (X : uvis -d> iPropO Σ) (n : Z) (W : uvis),
-    n <> USYS_exec -> ⊢ □ ssupply ==∗ ∃ f : sfam, sbundle_at X n f W;
+  (* ...AND IT NAMES THE PAYLOAD (app-echo.md, "SH-LINE RULING", R1).
+     read's bundle is a wand from the family's own exit payload, so a leaf
+     can no longer mint at SOME family and re-key afterwards; the mint
+     takes the payload the leaf has to pay the trap's payment row at, and
+     the law holds at every [Q] because the console arm the read branch
+     concludes at is payable out of the persistent credential at any [P]
+     ([FsAbsInvFire.fsabs_fileread_in]). *)
+  sbundle_of_supply_ne : forall (X : uvis -d> iPropO Σ) (n : Z) (W : uvis)
+      (Q : Z -> iProp Σ),
+    n <> USYS_exec ->
+    ⊢ □ ssupply ==∗ ∃ f : sfam, ⌜sexit_pay f = Q⌝ ∗ sbundle_at X n f W;
   (* ...and the half the generic inhabitants use *)
   sbundle_of_supply : forall (X : uvis -d> iPropO Σ) (n : Z) (W : uvis),
     ⊢ my_pay (uvis_gen W) (fun _ => True)%I -∗ □ ssupply -∗
       □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => True)%I -∗ X W') ==∗
-      ∃ f : sfam, sbundle_at X n f W;
+      (* AT THE TRIVIAL PAYLOAD, and it says so: this half is the GENERIC
+         inhabitant's, whose slot family is indexed by the trivial payload
+         and whose deposit must therefore be at it too (R1 -- read's
+         branch reads the payload). *)
+      ∃ f : sfam, ⌜sexit_pay f = (fun _ => True)%I⌝ ∗ sbundle_at X n f W;
 }.
 
 Global Existing Instance sbundle_at_ne.
@@ -434,6 +456,35 @@ Section SBundle.
 
   Definition sbundle (X : uvis -d> iPropO Σ) (n : Z) (W : uvis) : iProp Σ :=
     (∃ f : sfam, sbundle_at X n f W)%I.
+
+  (* ...AND THE SAME THING AT A NAMED PAYLOAD (app-echo.md, "SH-LINE
+     RULING", R1).  read's deposit is a wand from the depositing process's
+     own exit payload, so what a leaf needs of its mint is not "a bundle at
+     some family" but "a bundle at a family whose payload is MINE" -- the
+     payload it is about to pay the trap's payment row at.  Every supplier
+     of a deposit produces this form; [sbundle] is what is left once the
+     family is forgotten. *)
+  Definition sbundle_pay (X : uvis -d> iPropO Σ) (n : Z) (Q : Z -> iProp Σ)
+      (W : uvis) : iProp Σ :=
+    (∃ f : sfam, ⌜sexit_pay f = Q⌝ ∗ sbundle_at X n f W)%I.
+
+  Lemma sbundle_of_pay (X : uvis -d> iPropO Σ) (n : Z) (Q : Z -> iProp Σ)
+      (W : uvis) :
+    sbundle_pay X n Q W -∗ sbundle X n W.
+  Proof. iIntros "H". iDestruct "H" as (f) "[_ Hb]". iExists f. iExact "Hb". Qed.
+
+  (* ...and the other direction AT EVERY NUMBER BUT read, which is the one
+     branch whose bundle reads the payload: a bundle at some family is
+     re-keyed to the caller's payload for free everywhere else. *)
+  Lemma sbundle_pay_of_sbundle (X : uvis -d> iPropO Σ) (n : Z)
+      (Q : Z -> iProp Σ) (W : uvis) :
+    n <> USYS_read ->
+    sbundle X n W -∗ sbundle_pay X n Q W.
+  Proof.
+    intros Hne. iIntros "H". iDestruct "H" as (f) "Hb".
+    iExists (sfam_at Q f). rewrite (sbundle_at_at X n Q f W Hne).
+    iSplitR; [ iPureIntro; apply sexit_pay_at | iExact "Hb" ].
+  Qed.
 
   Global Instance sbundle_ne (k : nat) :
     Proper (dist k ==> eq ==> eq ==> dist k) sbundle.

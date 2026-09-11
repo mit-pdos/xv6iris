@@ -491,9 +491,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -612,9 +615,12 @@ Section UkRunSys.
       [ exfalso; unfold USYS_chdir, USYS_exit in He; discriminate He | ].
     destruct (decide (USYS_chdir = USYS_fork)) as [He | _];
       [ exfalso; unfold USYS_chdir, USYS_fork in He; discriminate He | ].
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -766,9 +772,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -916,9 +925,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -1047,9 +1059,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -1216,9 +1231,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -1317,9 +1335,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -1435,9 +1456,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -1579,9 +1603,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -1703,9 +1730,12 @@ Section UkRunSys.
       [ exfalso; unfold USYS_exec, USYS_exit in He; discriminate He | ].
     destruct (decide (USYS_exec = USYS_fork)) as [He | _];
       [ exfalso; unfold USYS_exec, USYS_fork in He; discriminate He | ].
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -1816,9 +1846,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -2012,9 +2045,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -2211,9 +2247,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
@@ -2645,9 +2684,12 @@ Section UkRunSys.
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
-    iDestruct "Hdepn" as (fdep) "Hdepn".
-    iExists (sfam_at (ukn_pay N) fdep).
-    rewrite (sexit_pay_at (ukn_pay N) fdep) sbundle_at_at spost_at_at.
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
     cbn [uvis_gen uvis_of_run].
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].

@@ -3160,7 +3160,12 @@ Section SyscallArms.
       (v0 : mword 64) :
     sysc_num (us_V U) = 5 ->
     pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
-    sysc_sys_in U sts gn cs pid f -∗ fileread_in (fd_st_of_key v0 sts) (rf_F f) (rf_ret f).
+    (* AT THE FAMILY'S OWN EXIT PAYLOAD (app-echo.md, "SH-LINE RULING", R1):
+       read's deposit is a wand from it, and the payload the dispatcher
+       feeds the wand is the one it took off this very trap's payment row
+       ([SpecSyscall.sysc_pay_in] / [sysc_pay_in_ret]). *)
+    sysc_sys_in U sts gn cs pid f -∗
+    fileread_in (fd_st_of_key v0 sts) (rf_F f) (rf_ret f) (sexit_pay f (-1)).
   Proof.
     intros Hn Hv0. iIntros "H".
     iDestruct (sysc_sys_in_at U sts gn cs pid f 5 Hn ltac:(vm_compute; discriminate)
@@ -3315,7 +3320,11 @@ Section SyscallArms.
        bytes at [v1] in the resume image [M'] *)
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
-    fileread_extra (fd_st_of_key v0 sts) (sys_rw_count v2) (rf_F f)
+    (* THE PAYLOAD IS ALREADY PEELED: what the process is handed back is
+       the arm's payout alone, [SpecFileread.fileread_extra_core] -- the
+       borrowed payload went back on the trap's own resume row
+       ([SpecSyscall.sysc_pay_out]). *)
+    fileread_extra_core (fd_st_of_key v0 sts) (sys_rw_count v2) (rf_F f)
       (rf_ret f) r M' v1 -∗
     sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
@@ -5543,15 +5552,28 @@ Section SyscallArms.
       as %Hfdk.
     iDestruct (sysc_dep_read U sts gn cs pid fdep v0
                  ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin") as "Hdepr".
-    iAssert (sys_read_in (us_V U) v0 sts (rf_F fdep) (rf_ret fdep))
+    iAssert (sys_read_in (us_V U) v0 sts (rf_F fdep) (rf_ret fdep)
+               (sexit_pay fdep (-1)))
       with "[Hdepr]" as "Hsrin".
     { rewrite /sys_read_in Hfdk. iExact "Hdepr". }
+    (* ---- THE PAYLOAD, OFF THE PAYMENT ROW AND LENT TO THE CALL
+       (app-echo.md, "SH-LINE RULING", R1).  The dispatcher is entered past
+       +0xca's killed check, which is the OTHER path this resource pays
+       ([ProofUsertrapTail.ut_kexit] at status -1); this arm RETURNS, so it
+       opens the row at its own number ([SpecSyscall.sysc_pay_in_ret]) and
+       what it gets is exactly [sexit_pay fdep (-1)] -- the payload read's
+       deposit is a wand from.  It goes down into the call and comes back
+       off the post ([sys_read_arms_pay]), whence [sysc_pay_out]. ---- *)
+    iDestruct (sysc_pay_in_ret _ U
+                 ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
+    iEval (rewrite /sysc_pay_out /uexec_pay_arm) in "Hpayv".
     iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γcon fn)
               pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
-              (rf_F fdep) (rf_ret fdep)
+              (rf_F fdep) (rf_ret fdep) (sexit_pay fdep (-1))
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
-              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Hsrin").
+              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Hsrin Hpayv").
     iIntros (CIDy Hsy mf r P' dw bsw)
       "%Hcs %Hextz %Hdwle %Htie %Hmfa0 Hcg Hcpu Hpc Hpriv Hufrag _ Hout Harms".
     (* WHAT THE PROCESS GETS BACK: the arm's own payout, at the descriptor
@@ -5559,7 +5581,7 @@ Section SyscallArms.
        stays behind -- it reads [pv_ofile V], a kernel array -- and nothing
        here needs it: the round carries [UsysMemOk.usys_mem_ok] and
        [usys_fd_ok] already. *)
-    iDestruct (sys_read_arms_extra with "Harms") as "Hex".
+    iDestruct (sys_read_arms_pay with "Harms") as "[Hpayv Hex]".
     iEval (rewrite Hfdk) in "Hex".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
@@ -5587,10 +5609,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    (* the payment, opened at this arm's own number and handed back:
-       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
-    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
-                 with "Hdep") as "Hpayv".
+    (* the payment came back off the read's own post ([sys_read_arms_pay]
+       above), not off an untouched row: read BORROWED it. *)
+    iAssert (sysc_pay_out fdep) with "[Hpayv]" as "Hpayv".
+    { rewrite /sysc_pay_out /uexec_pay_arm. iExact "Hpayv". }
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (upd_usM (us_upt U P') (umem_wr (us_M U) v1 dw bsw)) sts sts gn cs cs ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)

@@ -239,6 +239,14 @@ Section UInitKernel.
        exit owes nobody anything -- userinit's choice, which the entry
        constructor writes into the record ([UkRun.ukn_pay]) and which
        init's own exit stub reads back. *)
+    (* NO CONSOLE READER TOKEN HERE (app-echo.md, "SH-LINE RULING", R3).
+       [InitBoot.init_boot_bundle] takes the token as its input and the
+       party that spends it is the bundle's BUILDER
+       ([PinnedExec.pinned_exec_bundle]'s linear [Pay], E2's), which is
+       where a premise for it belongs: this section deliberately binds
+       [ctokG] WITHOUT [xv6G] ([UexecSG]'s "prints alike, does not match"
+       note), so it cannot name [ConsoleInv.cons_reader] at all.  SH-LINE
+       is what gives init's run somewhere to put the token. *)
     my_pay (uvis_gen W) (fun _ => True)%I -∗
     uslot W.
   Proof.

@@ -43,7 +43,9 @@ Require Import ProcAvail.               (* [pavG] *)
 Require Import FileInvDefs.             (* [fileG] and its field instances *)
 Require Import FsAbsDefs.               (* [aview], [anode] *)
 Require Import FsBytesGamma.            (* [fs_gamma_L]: the live Γ *)
-Require Import FsCfg.                   (* [fsc_fs] *)
+Require Import FsCfg.                   (* [fsc_fs], [fsc_cons] *)
+Require Import ConsoleInv.              (* [cons_reader]: the console's READER
+                                           TOKEN, the boot bundle's input *)
 Require Import PieceFam.                (* [pfam] / [MkPfam] *)
 Require Import ChildTok.                (* [my_pay]: the pay fact the boot bundle is at *)
 Require Import UexecSlot.               (* [uvis] *)
@@ -110,8 +112,22 @@ Section InitBoot.
      the payload the slot wands hand the exec'd image is therefore
      [fun _ => True] -- which is exactly what a generic family can pay
      exit with ([UexecRet.uexec_pay_dep_triv]). *)
+  (* ...AND IT TAKES THE CONSOLE'S READER TOKEN AS AN INPUT (app-echo.md,
+     "SH-LINE RULING", R3).  The token is born with the ring at boot
+     ([ConsoleInv.cons_ghosts_boot]) and is THE KERNEL'S TO HAND, not the
+     application's to mint: [SystemAdequacy]'s [Hinit_boot] asks the
+     application for the bundle out of [app_inv] alone, and its statement
+     does not move.  So the token is a PREMISE OF THE BUNDLE, threaded
+     main -> userinit -> the park package's boot mode -> forkret's boot
+     arm, which applies it here before spending the bundle on
+     kexec("/init").  A constraining application builds the bundle HOLDING
+     the token and can therefore put it in the slot wand's conclusion --
+     [PinnedExec.pinned_exec_bundle]'s linear [Pay] is that slot, and it
+     is why no arity of [SpecKexec.exec_slot_pre] changes.  The generic
+     instance drops it ([init_boot_bundle_triv]). *)
   Definition init_boot_bundle (cw : Z) (sts : list fdstate) : iProp Σ :=
-    (∃ (P Pmiss : nat -> Z -> iProp Σ)
+    (cons_reader fsc_cons 0%nat -∗
+     ∃ (P Pmiss : nat -> Z -> iProp Σ)
        (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
        (R : iProp Σ),
        exec_au_pre (MkPfam uslot R) (fs_gamma_L fsc_fs) fsc_fs cw
@@ -126,6 +142,10 @@ Section InitBoot.
     init_boot_bundle cw sts.
   Proof.
     iIntros "#HS". rewrite /init_boot_bundle.
+    (* THE GENERIC INSTANCE DROPS THE TOKEN: a program that tracks nothing
+       reads the console on the persistent credential, not on the token
+       ([FsAbsInvFire.fsabs_fileread_in]). *)
+    iIntros "_".
     iExists (fun _ _ => True%I), (fun _ _ => True%I),
             (pfam_triv (fun _ _ _ => True%I)), True%I.
     iApply (exec_au_pre_triv_at uslot (fs_gamma_L fsc_fs) fsc_fs cw

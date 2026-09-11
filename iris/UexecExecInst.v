@@ -471,7 +471,15 @@ Section UexecExecInst.
       : iProp Σ :=
     (if decide (n = USYS_exec) then exec_sbundle X f W
      else if decide (n = 5) then
+       (* AT THE FAMILY'S OWN EXIT PAYLOAD (app-echo.md, "SH-LINE RULING",
+          R1).  read's deposit is a WAND from what this process's exit owes
+          at the kill status, because a program whose payload holds the
+          console reader token has handed that payload to the kernel at
+          this very trap ([UexecRet.uexec_pay_dep]) and holds no second
+          copy.  The kernel feeds the payment row's own resource back in
+          and the console arm returns it inside [rf_ret]. *)
        fileread_in (fd_st_of_key (xk_a W 0) (uvis_fd W)) (rf_F f) (rf_ret f)
+         (kf_xpay f (-1))
      else if decide (n = 9) then
        chdir_au_pre (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
          (cf_P f) (cf_Pmiss f) (cf_Fo f)
@@ -548,7 +556,12 @@ Section UexecExecInst.
       (cs' : gset gname)
       : iProp Σ :=
     (if decide (n = 5) then
-       fileread_extra (fd_st_of_key (xk_a W 0) (uvis_fd W))
+       (* THE PAYLOAD IS PEELED: what the PROCESS is told is
+          [SpecFileread.fileread_extra_core], the arm's payout without the
+          borrowed payload -- the payload goes back on the trap's own
+          resume row ([UexecRet.uexec_pay_arm]), so this post is unchanged
+          in force by R1. *)
+       fileread_extra_core (fd_st_of_key (xk_a W 0) (uvis_fd W))
          (sys_rw_count (xk_a W 2)) (rf_F f) (rf_ret f) r M' (xk_a W 1)
      else if decide (n = 9) then
        chdir_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
@@ -685,13 +698,24 @@ Section UexecExecInst.
      seed [UartSentLoc.uart_sent γu []], a mono-list lower bound at the empty
      list -- the algebra's unit, mintable by anyone but not derivable from
      [emp].  Every other branch is a closed fact or a wand off the supply. *)
-  Lemma xv6_sbundle_of_supply_ne (X : uvis -d> iPropO Σ) (n : Z) (W : uvis) :
-    n <> USYS_exec -> ⊢ □ xv6_ssupply ==∗ ∃ f : xfam, xv6_sbundle X n f W.
+  (* AT THE PAYLOAD THE CALLER NAMES (app-echo.md, "SH-LINE RULING", R1).
+     The point re-keyed at [Q] ([xfam_at]) is the witness: every branch but
+     read's ignores the payload, and read's -- the console arm -- is
+     payable out of the persistent credential at ANY [P]
+     ([FsAbsInvFire.fsabs_fileread_in]), because what it owes back is
+     [∀ cur dc, |==> P ∗ True] and a [∀] over a constant IS that constant.
+     Nothing is duplicated: the caller gets its [P] back at the ONE
+     position the read landed on. *)
+  Lemma xv6_sbundle_of_supply_ne (X : uvis -d> iPropO Σ) (n : Z) (W : uvis)
+      (Q : Z -> iProp Σ) :
+    n <> USYS_exec ->
+    ⊢ □ xv6_ssupply ==∗ ∃ f : xfam, ⌜kf_xpay f = Q⌝ ∗ xv6_sbundle X n f W.
   Proof.
     intros Hne. rewrite /xv6_ssupply. iIntros "#Hsup".
-    iAssert (|==> xv6_sbundle X n xfam_pt W)%I with "[]" as "Hb";
-      [ | iMod "Hb" as "Hb"; iModIntro; iExists xfam_pt; iExact "Hb" ].
-    rewrite /xv6_sbundle /xfam_pt /xfam_exec /=.
+    iAssert (|==> xv6_sbundle X n (xfam_at Q xfam_pt) W)%I with "[]" as "Hb";
+      [ | iMod "Hb" as "Hb"; iModIntro; iExists (xfam_at Q xfam_pt);
+          iSplitR; [ done | iExact "Hb" ] ].
+    rewrite /xv6_sbundle /xfam_at /xfam_pt /xfam_exec /=.
     destruct (decide (n = USYS_exec)) as [He | _];
       [ exfalso; exact (Hne He) | ].
     destruct (decide (n = 5)) as [_ | _];
@@ -725,11 +749,11 @@ Section UexecExecInst.
   Lemma xv6_sbundle_of_supply (X : uvis -d> iPropO Σ) (n : Z) (W : uvis) :
     ⊢ my_pay (uvis_gen W) (fun _ => True)%I -∗ □ xv6_ssupply -∗
       □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => True)%I -∗ X W') ==∗
-      ∃ f : xfam, xv6_sbundle X n f W.
+      ∃ f : xfam, ⌜kf_xpay f = (fun _ => True)%I⌝ ∗ xv6_sbundle X n f W.
   Proof.
     rewrite /xv6_ssupply. iIntros "#Hpay #Hsup #Hs".
     destruct (decide (n = USYS_exec)) as [He | Hne].
-    - iModIntro. iExists xfam_pt.
+    - iModIntro. iExists xfam_pt. iSplitR; [done |].
       rewrite /xv6_sbundle. destruct (decide (n = USYS_exec)) as [_ | Hc];
         [ | exfalso; exact (Hc He) ].
       rewrite /exec_sbundle /xfam_pt /xfam_exec /=.
@@ -758,7 +782,8 @@ Section UexecExecInst.
       rewrite /exec_slot_pre. iSplitR.
       + iIntros (av' i ff nl W') "_ _ _ _ Hp". iApply ("Hs" with "Hp").
       + iIntros (av' i a W') "_ _ _ _ Hp". iApply ("Hs" with "Hp").
-    - iApply (xv6_sbundle_of_supply_ne X n W Hne). iExact "Hsup".
+    - iApply (xv6_sbundle_of_supply_ne X n W (fun _ => True)%I Hne).
+      iExact "Hsup".
   Qed.
 
   (* THE RE-KEYING PASSES THROUGH BOTH BUNDLE ROWS ([UexecSG.sbundle_at_at]
@@ -767,10 +792,18 @@ Section UexecExecInst.
      [destruct f] rather than [eq_refl]: it turns the record into its
      constructor, so the projections in both bodies reduce by iota instead
      of by unfolding this file's twelve-number dispatch twice. *)
+  (* ...AT EVERY NUMBER BUT read, because the read branch now reads
+     [kf_xpay] (R1) and no other branch does. *)
   Lemma xfam_at_sbundle (X : uvis -d> iPropO Σ) (n : Z) (Q : Z -> iProp Σ)
       (f : xfam) (W : uvis) :
+    n <> USYS_read ->
     xv6_sbundle X n (xfam_at Q f) W = xv6_sbundle X n f W.
-  Proof. destruct f; reflexivity. Qed.
+  Proof.
+    intros Hne. rewrite /xv6_sbundle. destruct f.
+    destruct (decide (n = USYS_exec)) as [_ | _]; [reflexivity |].
+    destruct (decide (n = 5)) as [He | _]; [exfalso; exact (Hne He) |].
+    reflexivity.
+  Qed.
 
   Lemma xfam_at_spost (X : uvis -d> iPropO Σ) (n : Z) (Q : Z -> iProp Σ)
       (f : xfam) (W : uvis) :
@@ -837,7 +870,7 @@ Section UexecExecInst.
   Lemma sbundle_at_read_elim (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis) :
     sbundle_at X 5 f W -∗
     fileread_in (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
-      (rf_F f) (rf_ret f).
+      (rf_F f) (rf_ret f) (kf_xpay f (-1)).
   Proof.
     iIntros "H". rewrite /sbundle_at /= /xv6_sbundle /xk_a.
     xv6_skip. xv6_take. iExact "H".
@@ -986,7 +1019,7 @@ Section UexecExecInst.
   (* ================================================================== *)
   Lemma spost_at_read_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
       (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
-    fileread_extra (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
+    fileread_extra_core (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
       (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (rf_F f) (rf_ret f)
       r M' (tf_w (uvis_tf W) (tf_arg_idx 1)) -∗
     spost_at X 5 f W r M' fdv' cw' cs'.

@@ -1464,24 +1464,32 @@ Section ConsoleInv.
      deposit, so one leaf and one post serve both.  The holder's half goes
      INERT under the taint -- nothing reclaims it, and its continuation
      reads the console on the credential like anyone else. *)
+  (* THE INNER WAND IS A BASIC UPDATE (app-echo.md, "SH-LINE RULING", R2).
+     What a lease holder wants back is not only its token but its own
+     PROGRAM-SIDE POSITION moved to the new cursor, and a position it holds
+     as one half of a ghost pair moves by [ghost_var_update_halves] -- a
+     basic update.  So the caller's wand concludes under [|==>] on both
+     disjuncts, and the kernel, which is under a WP when it applies it,
+     absorbs the update with an [iMod] for free.  A bupd suffices: nothing
+     the caller does here opens an invariant. *)
   Definition cons_acc (cn : cons_names) (Wd : iProp Σ)
       (Rd : nat -> nat -> iProp Σ) : iProp Σ :=
     ((∃ n : nat, cons_reader cn n ∗
-        (∀ cur dc : nat, cons_out cn Wd (Some n) cur dc -∗ Rd cur dc))
-     ∨ (cons_dirty_cred Wd ∗ ∀ cur dc : nat, Rd cur dc))%I.
+        (∀ cur dc : nat, cons_out cn Wd (Some n) cur dc ==∗ Rd cur dc))
+     ∨ (cons_dirty_cred Wd ∗ ∀ cur dc : nat, |==> Rd cur dc))%I.
 
   (* the tainted/generic caller's constructor, which is the whole of
      [FsAbsInvFire.fsabs_fileread_in]'s console case *)
   Lemma cons_acc_cred (cn : cons_names) (Wd : iProp Σ)
       (Rd : nat -> nat -> iProp Σ) :
-    cons_dirty_cred Wd -∗ (∀ cur dc : nat, Rd cur dc) -∗ cons_acc cn Wd Rd.
+    cons_dirty_cred Wd -∗ (∀ cur dc : nat, |==> Rd cur dc) -∗ cons_acc cn Wd Rd.
   Proof. iIntros "#Hc HR". rewrite /cons_acc. iRight. by iFrame "Hc HR". Qed.
 
   (* ...and the lease holder's *)
   Lemma cons_acc_reader (cn : cons_names) (Wd : iProp Σ) (n : nat)
       (Rd : nat -> nat -> iProp Σ) :
     cons_reader cn n -∗
-    (∀ cur dc : nat, cons_out cn Wd (Some n) cur dc -∗ Rd cur dc) -∗
+    (∀ cur dc : nat, cons_out cn Wd (Some n) cur dc ==∗ Rd cur dc) -∗
     cons_acc cn Wd Rd.
   Proof.
     iIntros "Hrd Hw". rewrite /cons_acc. iLeft. iExists n. iFrame "Hrd Hw".
@@ -1499,7 +1507,7 @@ Section ConsoleInv.
     cons_acc cn Wd Rd -∗
     ∃ ord : option nat,
       cons_pay cn Wd ord ∗
-      (∀ cur dc : nat, cons_out cn Wd ord cur dc -∗ Rd cur dc).
+      (∀ cur dc : nat, cons_out cn Wd ord cur dc ==∗ Rd cur dc).
   Proof.
     rewrite /cons_acc. iIntros "[Hl | [#Hc Hr]]".
     - iDestruct "Hl" as (n) "[Hrd Hw]".
@@ -1516,13 +1524,15 @@ Section ConsoleInv.
      tainted caller owes nothing to begin with. *)
   Lemma cons_acc_ret (cn : cons_names) (Wd : iProp Σ)
       (Rd : nat -> nat -> iProp Σ) :
-    cons_acc cn Wd Rd -∗ ∃ cur dc : nat, Rd cur dc.
+    cons_acc cn Wd Rd ==∗ ∃ cur dc : nat, Rd cur dc.
   Proof.
-    rewrite /cons_acc. iIntros "[Hl | [_ Hr]]";
-      [ | iExists 0%nat, 0%nat; iApply "Hr" ].
-    iDestruct "Hl" as (n) "[Hrd Hw]".
-    iExists n, 0%nat. iApply ("Hw" $! n 0%nat).
-    rewrite /cons_out Nat.add_0_r. iFrame "Hrd". iLeft. by iPureIntro.
+    rewrite /cons_acc. iIntros "[Hl | [_ Hr]]".
+    - iDestruct "Hl" as (n) "[Hrd Hw]".
+      iMod ("Hw" $! n 0%nat with "[Hrd]") as "Hrd".
+      { rewrite /cons_out Nat.add_0_r. iFrame "Hrd". iLeft. by iPureIntro. }
+      iModIntro. iExists n, 0%nat. iExact "Hrd".
+    - iMod ("Hr" $! 0%nat 0%nat) as "Hr". iModIntro.
+      iExists 0%nat, 0%nat. iExact "Hr".
   Qed.
 
   Global Instance cons_res_timeless cn : Timeless (cons_res cn).

@@ -264,21 +264,29 @@ Section FsAbsInvFire.
      every generic corollary vacuous while the audit still printed the
      thirteen.  So the arm is payable from a PERSISTENT credential, and the
      one the generic slot already runs on is the one it takes. *)
-  Lemma fsabs_fileread_in (st : fdstate) :
+  (* AT AN ARBITRARY PAYLOAD [P] (app-echo.md, "SH-LINE RULING", R1).
+     read's input is a wand from the caller's exit payload, and the
+     generic family's is [True] ([UexecSG.sexit_pay_pt]) -- but the same
+     proof pays at ANY [P], and has to: a leaf re-keys the family it mints
+     at its OWN payload, which for a program with a real one is linear.
+     Nothing is duplicated: what the console arm owes is [∀ cur dc, |==>
+     P ∗ True], and a [∀] over a constant is that constant -- the caller
+     takes its [P] back at ONE position, the one the read landed on. *)
+  Lemma fsabs_fileread_in (st : fdstate) (P : iProp Σ) :
     app_sup -∗ fileread_in st (pfam_triv (fun _ _ _ _ => True%I))
-                            (fun _ _ => True%I).
+                            (fun _ _ => True%I) P.
   Proof.
-    rewrite /fileread_in.
-    destruct st as [| rb wb ty]; [by iIntros "_" |].
-    destruct rb; [| by iIntros "_"].
+    rewrite /fileread_in. iIntros "#Hsup HP".
+    destruct st as [| rb wb ty]; [iExact "HP" |].
+    destruct rb; [| iExact "HP"].
     destruct ty as [i γo | | ma].
-    - iIntros "_". iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo).
-    - by iIntros "_".
-    - case_decide; [| by iIntros "_"].
-      iIntros "#Hsup".
-      iApply (ConsoleInv.cons_acc_cred fsc_cons app_sup (fun _ _ => True%I)).
+    - iFrame "HP". iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo).
+    - iExact "HP".
+    - case_decide; [| iExact "HP"].
+      iApply (ConsoleInv.cons_acc_cred fsc_cons app_sup
+                (fun (_ _ : nat) => (P ∗ True)%I)).
       + rewrite /ConsoleInv.cons_dirty_cred. iModIntro. iExact "Hsup".
-      + iIntros (cur dc). done.
+      + iIntros (cur dc). iModIntro. by iFrame "HP".
   Qed.
 
 

@@ -68,6 +68,8 @@ Import Defs.
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Require Import ChildTok.  (* [my_pay] -- the boot arm's payload row *)
+Require Import FsCfg.      (* [fsc_cons] *)
+Require Import ConsoleInv.  (* [cons_reader] -- the boot mode's token row *)
 Require Import InitBoot.  (* [init_boot_bundle] -- the first process's exec
                                bundle, the BOOT mode's payload *)
 
@@ -186,7 +188,7 @@ Section ParkCap.
         ([InitBoot]'s header). *)
      (match Wk with
       | Some _ => first_done
-      | None => init_boot_bundle cw sts
+      | None => init_boot_bundle cw sts ∗ cons_reader fsc_cons 0%nat
       end) ∗
      (* THE CLOSER IS UNDER A LATER, the rows above are not: the cap needs
         the rows now, to deposit them into the twin, and only the closer is
@@ -487,6 +489,8 @@ Section ParkCap.
        fields the resume does not choose: kexec inherits the cwd and does
        not touch the descriptor array. *)
     init_boot_bundle (pv_cwi (us_V U)) sts -∗
+    (* ...and the reader token the bundle is a wand from (R3) *)
+    cons_reader fsc_cons 0%nat -∗
     (* THE CHILD'S ROWS, WITH THE BLOCK SPLIT: this parker is parking the
        FIRST PROCESS, and the boot rows travel as their own rows so that
        the record's mode is a resource forkret can read.  See
@@ -494,7 +498,7 @@ Section ParkCap.
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U false -∗
     |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
   Proof.
-    iIntros (Hwf Hrest) "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Hch Hbundle Hchild".
+    iIntros (Hwf Hrest) "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Hch Hbundle Hrdtok Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
@@ -509,7 +513,7 @@ Section ParkCap.
       [reflexivity | exact Hwf | exact Hkav |].
     iApply ("Hcap" $! cpu_id cur_ctx (un_w N) (un_ft N) (un_f N) (un_tk N) (un_pj N)
               (un_ks N) rest (un_pid N) U sts cs KSTACK_AV false
-              with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hch Hbundle] [] Hchild").
+              with "[%] [%] [%] Hrun [Hstack Hown Hclose Hfrag Hch Hbundle Hrdtok] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
     - exact Hkav.
@@ -523,7 +527,9 @@ Section ParkCap.
       (* the mode row: this park is the one whose resume still runs the
          boot arm, so the package carries no run key and carries instead
          the bundle that arm spends *)
-      iSplitL "Hbundle"; [iExact "Hbundle"|].
+      (* ...AND THE READER TOKEN BESIDE IT (R3): the boot arm applies the
+         bundle to it before spending the bundle. *)
+      iSplitL "Hbundle Hrdtok"; [iFrame "Hbundle Hrdtok"|].
       iNext.
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
       iIntros (h Xc pt' U') "%Hupt %Hnorm %Hptwf %Hfg %Hcg %Hgenp %Hcwi _ #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".

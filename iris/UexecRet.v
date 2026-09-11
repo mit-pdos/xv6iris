@@ -1834,11 +1834,14 @@ Section UexecRet.
          rewrite /uexec_fork_child_F sfork_pay_pt;
          iIntros (g' pidc) "Hp"; iApply "Hall";
          cbn [uvis_gen bump bump_at]; iExact "Hp" ] |].
+    (* THE MINT NAMES THE PAYLOAD NOW ([UexecSG.sbundle_of_supply], R1):
+       the generic inhabitant's is the trivial one, so the family that
+       comes back is already at it and nothing is re-keyed. *)
     iMod (sbundle_of_supply X (usys_num (uvis_tf W)) W with "Hpay Hsup Hall")
-      as (f) "Hb".
-    iModIntro. iExists (sfam_at (fun _ => True)%I f). iSplitR "Hb".
-    - iApply (uexec_pay_dep_triv sc W _ (sexit_pay_at _ f) with "Hpay").
-    - rewrite sbundle_at_at. iExact "Hb".
+      as (f) "[%Hfp Hb]".
+    iModIntro. iExists f. iSplitR "Hb".
+    - iApply (uexec_pay_dep_triv sc W f Hfp with "Hpay").
+    - iExact "Hb".
   Qed.
 
   (* every arm of the return is inhabited by a slot at every key -- and, on

@@ -72,8 +72,8 @@ Section UexecExecMint.
   Proof.
     rewrite /udep /Dsup /= /xv6_ssupply.
     iIntros "#Hsup". iSplitR; [ iModIntro; iExact "Hsup" | ].
-    iPureIntro. intros n W _ Hne.
-    exact (sbundle_of_supply_ne uslot n W Hne).
+    iPureIntro. intros n W Q _ Hne.
+    exact (sbundle_of_supply_ne uslot n W Q Hne).
   Qed.
 
   (* the loop's mint: the generic slot at every key, out of the supply.

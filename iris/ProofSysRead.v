@@ -321,9 +321,9 @@ Section ProofSysRead.
       (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (Fr : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-      (Rd : nat -> nat -> iProp Σ)
+      (Rd : nat -> nat -> iProp Σ) (P : iProp Σ)
     : wp_sys_read_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks
-        Fr Rd.
+        Fr Rd P.
   Proof.
     cbv beta delta [wp_sys_read_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq Heb.
@@ -343,7 +343,9 @@ Section ProofSysRead.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): fileread
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hci Hin Hcont".
+    (* [HP] is the caller's exit payload, relayed to fileread (R1): the
+       keyed input is a wand from it and both arms give it back. *)
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hci Hin HP Hcont".
     (* THE DEVICE COLUMN, PROJECTED.  What the contract holds is the console
        invariant -- one persistent proposition out of [syscall_env]; what
        fileread asks for is the read column, and this is the projection.  It
@@ -801,7 +803,7 @@ Section ProofSysRead.
          nose. *)
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
                 0%nat (fun _ => bv_0 8)
-                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv] []").
+                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv] [HP]").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
       { apply Z.le_max_l. }
@@ -811,8 +813,8 @@ Section ProofSysRead.
       { iApply (fileread_fs_env_out with "Henv"). }
       (* argfd answered NONE: the key is [FdClosed] and the arm is the landed
          blanket and nothing more. *)
-      { iApply (sys_read_arms_none (us_V U) v sts (sys_rw_count v2) Fr Rd
-                  (mword_of_int (-1) : mword 64) _ _ Hnone eq_refl). }
+      { iApply (sys_read_arms_none (us_V U) v sts (sys_rw_count v2) Fr Rd _
+                  (mword_of_int (-1) : mword 64) _ _ Hnone eq_refl with "HP"). }
     - (* ================= SUCCESS: the descriptor resolved ============= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & _ & Hfcell)".
       pose proof (arg_fd_lookup v (pv_ofile (us_V U)) fd fv Hsome)
@@ -954,16 +956,16 @@ Section ProofSysRead.
       (* THE KEYED INPUT, RELAYED: the caller's is at [sys_fd_st], this
          descriptor's row is what that key computes to, and the callee's is
          the same proposition at the same key. *)
-      iDestruct (sys_read_in_of (us_V U) v sts fd fv stf Fr Rd Hsome Hstq
+      iDestruct (sys_read_in_of (us_V U) v sts fd fv stf Fr Rd _ Hsome Hstq
                    with "Hin") as "Hin".
       iDestruct (read_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Fileread.wp_fileread_sconf γf γs j γlp kk qq stf fn pidv U
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
-                _ Fr Rd ltac:(lia) Hkk Hj Hgs Hlens
+                _ Fr Rd P ltac:(lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 (sys_rw_count_range v2) Heb
-                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hrow Hin").
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hrow Hin HP").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P' dw bsw)
         "%Hcsf %Hupt %Hdwle %Htie %Hrva Hcg Hcpu Hpc Href Hcore Hfout Harms".
@@ -1031,7 +1033,7 @@ Section ProofSysRead.
          sys_read relays fileread's return value untouched -- one match in
          the tree, not two. *)
       { iApply (sys_read_arms_of (us_V U) v sts fd fv stf (sys_rw_count v2)
-                  Fr Rd rv _ _ Hsome Hstq with "Harms"). }
+                  Fr Rd P rv _ _ Hsome Hstq with "Harms"). }
   Qed.
 
 End ProofSysRead.

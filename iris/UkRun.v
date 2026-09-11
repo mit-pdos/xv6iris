@@ -240,21 +240,30 @@ Section UkRun.
      is what keeps such a piece payable by a program whose supplier is
      [emp].  The ARM still demands a plain [sbundle]; the leaf runs the
      update inside its own WP step. *)
+  (* ...AND THE LAW NAMES THE PAYLOAD (app-echo.md, "SH-LINE RULING", R1).
+     read's bundle is a WAND FROM THE DEPOSITING PROCESS'S OWN EXIT
+     PAYLOAD, and a leaf must deposit at the family whose payload it is
+     about to pay the trap's payment row at ([UexecRet.uexec_pay_dep]) --
+     so the mint takes that payload rather than choosing a family and
+     leaving the leaf to re-key, which [UexecSG.sbundle_at_at] no longer
+     licenses at read.  Every [Q] is admissible: read's console arm is
+     payable out of the persistent credential at any [P]
+     ([FsAbsInvFire.fsabs_fileread_in]). *)
   Definition udep : iProp Σ :=
     (□ Dsup ∗
-     ⌜ forall (n : Z) (W : uvis),
+     ⌜ forall (n : Z) (W : uvis) (Q : Z -> iProp Σ),
          psok n -> n <> USYS_exec ->
-         ⊢ □ Dsup ==∗ sbundle uslot n W ⌝)%I.
+         ⊢ □ Dsup ==∗ sbundle_pay uslot n Q W ⌝)%I.
 
   Global Instance udep_persistent : Persistent udep.
   Proof. rewrite /udep. apply _. Qed.
 
   (* what a leaf does with it: mint the deposit the ecall arm asks for *)
-  Lemma udep_dep (n : Z) (W : uvis) :
-    psok n -> n <> USYS_exec -> udep -∗ |==> sbundle uslot n W.
+  Lemma udep_dep (n : Z) (W : uvis) (Q : Z -> iProp Σ) :
+    psok n -> n <> USYS_exec -> udep -∗ |==> sbundle_pay uslot n Q W.
   Proof.
     intros Hok Hne. iIntros "[#Hs %Hlaw]".
-    iApply (Hlaw n W Hok Hne). iExact "Hs".
+    iApply (Hlaw n W Q Hok Hne). iExact "Hs".
   Qed.
 
   (* [avail] is the FREE STACK, in words, below the current sp -- the
@@ -297,7 +306,11 @@ Section UkRun.
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
-        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs pidv)))%I.
+        (* AT THE PROGRAM'S OWN PAYLOAD (R1): the explicit deposit is
+           the one the leaf hands the trap beside [ukn_pay N (-1)], and
+           read's bundle is a wand from exactly that. *)
+        ∨ sbundle_pay uslot n (ukn_pay N)
+            (uvis_of_run m pc M pm sz fdv cw gn cs pidv)))%I.
 
   (* THE FAMILY-NAMED EXPLICIT DEPOSIT (app-echo.md, lane CONS-CURSOR, C3).
      [udepw]'s explicit disjunct hides the deposited FAMILY under an
@@ -315,7 +328,11 @@ Section UkRun.
      rather than at every key. *)
   Definition udepwf (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (fdep : sfam) : iProp Σ :=
-    (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+    ((* AT THE PROGRAM'S OWN PAYLOAD (R1), stated once rather than under
+        the key binders: read's deposit is a wand from it, and a program
+        that names its family names its payload with it. *)
+     ⌜sexit_pay fdep = ukn_pay N⌝ ∗
+     ∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
        (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32),
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
@@ -326,9 +343,9 @@ Section UkRun.
       (n : Z) (fdep : sfam) :
     udepwf N m pc n fdep -∗ udepw N m pc n.
   Proof.
-    rewrite /udepwf /udepw. iIntros "H" (M pm sz fdv cw gn cs pidv) "Hp Hh Hf".
+    rewrite /udepwf /udepw. iIntros "[%Hpay H]" (M pm sz fdv cw gn cs pidv) "Hp Hh Hf".
     iDestruct ("H" $! M pm sz fdv cw gn cs pidv with "Hp Hh Hf") as "(Hh & Hf & Hb)".
-    iFrame "Hh Hf". iRight. iExists fdep. iExact "Hb".
+    iFrame "Hh Hf". iRight. iExists fdep. iSplitR; [done | iExact "Hb"].
   Qed.
 
   (* the GENERIC route's supplier: a number the program admits *)
@@ -351,12 +368,12 @@ Section UkRun.
     udep -∗ my_pay gn (ukn_pay N) -∗ udepw N m pc n -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs pidv).
+    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv cw gn cs pidv).
   Proof.
     iIntros "#Hdep #Hmp Hsb Hheap Hufd".
     iDestruct ("Hsb" $! M pm sz fdv cw gn cs pidv with "Hmp Hheap Hufd")
       as "(Hheap & Hufd & [%Hok | Hb])"; iFrame "Hheap Hufd";
-      [ iApply (udep_dep n _ (proj1 Hok) (proj2 Hok) with "Hdep")
+      [ iApply (udep_dep n _ (ukn_pay N) (proj1 Hok) (proj2 Hok) with "Hdep")
       | by iModIntro ].
   Qed.
 
@@ -388,6 +405,10 @@ Section UkRun.
     uxsup -∗ udepw N m pc USYS_exec.
   Proof.
     iIntros "#Hx" (M pm sz fdv cw gn cs pidv) "_ Hh Hf". iFrame "Hh Hf". iRight.
+    (* exec's bundle reads no payload, so the re-keying to this program's
+       own one is free ([UexecSG.sbundle_pay_of_sbundle], R1) *)
+    iApply (sbundle_pay_of_sbundle uslot USYS_exec (ukn_pay N) _
+              ltac:(vm_compute; discriminate)).
     iApply "Hx".
   Qed.
 
@@ -425,7 +446,8 @@ Section UkRun.
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
-        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv)))%I.
+        ∨ sbundle_pay uslot n (ukn_pay N)
+            (uvis_of_run m pc M pm sz fdv c gn cs pidv)))%I.
 
   (* [udepw] IS THE ∀-CWD FORM, one direction.  The two differ only in
      where the [cw] binder sits, so the equivalence holds both ways; this
@@ -445,15 +467,20 @@ Section UkRun.
      the bundle at every [(M, pm, sz, fdv)] of this one cwd hands it back
      unread.  [udepw_at] is WEAKER to supply than the bare family, which is
      why the leaf can take it in the bare one's place. *)
+  (* AT EVERY NUMBER BUT read (R1): the supplier hands a bundle at SOME
+     family and the deposit is wanted at the leaf's own payload, which is a
+     free re-keying at every branch that does not read one. *)
   Lemma udepw_at_of_bundle (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) :
+    n <> USYS_read ->
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
        (fdv : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32),
        sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv)) -∗
     udepw_at N m pc n c.
   Proof.
-    iIntros "Hb" (M pm sz fdv gn cs pidv) "_ Hh Hf". iFrame "Hh Hf". iRight.
-    iApply "Hb".
+    intros Hne. iIntros "Hb" (M pm sz fdv gn cs pidv) "_ Hh Hf".
+    iFrame "Hh Hf". iRight.
+    iApply (sbundle_pay_of_sbundle uslot n (ukn_pay N) _ Hne). iApply "Hb".
   Qed.
 
   (* the trivial supplier at the ∀-key form, through the two above *)
@@ -461,8 +488,10 @@ Section UkRun.
       (c : Z) :
     uxsup -∗ udepw_at N m pc USYS_exec c.
   Proof.
-    iIntros "#Hx". iApply udepw_at_of_bundle. iIntros (M pm sz fdv gn cs pidv).
-    iApply "Hx".
+    iIntros "#Hx".
+    iApply (udepw_at_of_bundle N m pc USYS_exec c
+              ltac:(vm_compute; discriminate)).
+    iIntros (M pm sz fdv gn cs pidv). iApply "Hx".
   Qed.
 
   (* THE LEAF'S USE OF IT, [udepw_mint]'s shape at the fixed cwd *)
@@ -472,12 +501,12 @@ Section UkRun.
     udep -∗ my_pay gn (ukn_pay N) -∗ udepw_at N m pc n c -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv).
+    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv c gn cs pidv).
   Proof.
     iIntros "#Hdep #Hmp Hsb Hheap Hufd".
     iDestruct ("Hsb" $! M pm sz fdv gn cs with "Hmp Hheap Hufd")
       as "(Hheap & Hufd & [%Hok | Hb])"; iFrame "Hheap Hufd";
-      [ iApply (udep_dep n _ (proj1 Hok) (proj2 Hok) with "Hdep")
+      [ iApply (udep_dep n _ (ukn_pay N) (proj1 Hok) (proj2 Hok) with "Hdep")
       | by iModIntro ].
   Qed.
 

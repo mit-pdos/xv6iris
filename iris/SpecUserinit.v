@@ -233,6 +233,14 @@ Definition wp_userinit_sconf_body
      (allocproc's, [SpecAllocproc]'s postcondition).  Boot hands it down
      from [SystemAdequacy.xv6_power_adequacy_gen]'s [Hinit_boot]. *)
   init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0 -∗
+  (* ...AND THE CONSOLE'S READER TOKEN (app-echo.md, "SH-LINE RULING",
+     R3), which the bundle above is a wand FROM.  It is born with the ring
+     at boot ([ConsoleInv.cons_ghosts_boot]) and main has held it since;
+     userinit does nothing with it but stage it at the park, whose BOOT
+     mode carries it beside the bundle for forkret's boot arm to apply.
+     LINEAR -- it is the exclusive right to consume the console's input,
+     and the first process is where it goes. *)
+  ConsoleInv.cons_reader fsc_cons 0%nat -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   (* ---- the two counted regimes ----
      AT THE AMBIENT [fsc_kalloc], not at a threaded [γa], and that is what

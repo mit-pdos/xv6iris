@@ -240,6 +240,8 @@ Require Import KexecDefs.
 Require Import UsertrapRes UtResFits.
 Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, see the header *)
 Require Import UexecSlot.  (* [uvis] / [uvis_of] *)
+Require Import FsCfg.       (* [fsc_cons] *)
+Require Import ConsoleInv.  (* [cons_reader] -- the boot mode's token row *)
 Require Import InitBoot.   (* [init_boot_bundle] -- the first process's exec
                               bundle, which the boot arm spends *)
 Require Import UexecRet.   (* [uslot] -- the closer's new second output.
@@ -518,7 +520,8 @@ Definition wp_forkret_gen_body
      mints nothing.  [InitBoot.init_boot_bundle], [ParkCap.park_pkg]'s row.
      ---- *)
   (if steady then FirstTok.first_done
-   else init_boot_bundle (pv_cwi (us_V U)) sts) -∗
+   else init_boot_bundle (pv_cwi (us_V U)) sts
+        ∗ ConsoleInv.cons_reader fsc_cons 0%nat) -∗
   (* ---- the residue closer -- see the header, and [forkret_closer] above
      for why it is a name rather than the wand spelled out ---- *)
   forkret_closer URes W γs γw γft γf γtl p ksp (pv_fdg (us_V U))

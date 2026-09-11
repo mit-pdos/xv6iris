@@ -45,6 +45,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RiscvModelBytes.   (* [pa_add] -- how kexec indexes its byte runs *)
 Require Import PageGeom.
 Require Import InstrBytes WireInv.   (* [wire_inv] -- named by [fkr_tail]'s statement *)
+Require Import ConsoleInv. (* [cons_reader] -- the token the boot arm applies *)
 Require Import InitBoot. (* [init_boot_bundle] / [init_boot_path] -- the exec
                             bundle the boot arm spends, and "/init" *)
 Require Import KernelText.           (* [kernel_text] *)
@@ -963,6 +964,11 @@ Lemma fkr_boot
      THE KERNEL MINTS NOTHING -- the bundle is the application's, handed
      down from [SystemAdequacy.xv6_power_adequacy_gen]'s [Hinit_boot]. *)
   init_boot_bundle (pv_cwi (us_V U)) sts -∗
+  (* ...AND THE CONSOLE'S READER TOKEN, off the same row and for the same
+     reason (app-echo.md, "SH-LINE RULING", R3): the bundle is a WAND from
+     it, and this arm is where it is applied -- the token born with the
+     ring at boot reaches the first process's slot here and nowhere else. *)
+  ConsoleInv.cons_reader fsc_cons 0%nat -∗
   (* ...AND THE FIRST PROCESS'S PAYLOAD, beside it and off the same row of
      the package: kexec hands the exec'd image's slot the pay fact at this
      process's own generation ([SpecKexec.exec_slot_pre]), and <init>'s is
@@ -1003,7 +1009,7 @@ Proof.
      at; both are [Notation]s for literals, so [lia] sees them directly. *)
   assert (Hav2fs : (K_fsinit <= av2)%nat) by lia.
   iIntros "#Htext #Hwire #Hclaimmap Hpc #Hpinv Hcg Hcpu Hextc Hclmc #Hks
-           Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi HW Hbundle Hkq #Hmp Hgh Hxb #Hpg Hyield".
+           Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi HW Hbundle Hrdtok Hkq #Hmp Hgh Hxb #Hpg Hyield".
   iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hebb.
   (* ================================================================== *)
   (*  +0x14 .. +0x24: [if (first)] -- TAKEN, because the token is the      *)
@@ -1568,6 +1574,9 @@ Proof.
      The cursor, the miss family, the observation pair and the refund are
      the bundle's own; this arm reads none of them. *)
   iEval (rewrite /init_boot_bundle /init_boot_path) in "Hbundle".
+  (* THE TOKEN IS THE BUNDLE'S INPUT: applied HERE, once, at the one kexec
+     the first process ever gets ([InitBoot]'s note). *)
+  iDestruct ("Hbundle" with "Hrdtok") as "Hbundle".
   iDestruct "Hbundle" as (Pcur Pmiss Fo Rrf) "Hxpre".
   iApply (KX.wp_kexec_sconf (MkPfam uslot Rrf) γs j γl pd pav pu
 
@@ -2139,11 +2148,14 @@ Proof.
                  ltac:(wp_next_chain) with "Hext") as "Hext".
     iDestruct (cpu_claim_ext_transport CID CIDr eb p
                  ltac:(wp_next_chain) with "Hcx") as "Hcx".
+    (* the BOOT mode's row is the bundle AND the reader token it is a wand
+       from (app-echo.md, "SH-LINE RULING", R3) *)
+    iDestruct "Hmode" as "[Hmode Hrdtok]".
     iApply (fkr_boot (CID := CIDr) W j γs γl γw γft γf γtl pid U sts gn cs
               ks mr av av2 eb
               Hjlt Hgnw Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1
             with "Htext Hwire Hclaimmap Hpc Hpinv Hcg Hcpu Hext Hcx Hks
-                  Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hmode Hkq Hmp Hgh Hxb Hpg Hyield"). }
+                  Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hmode Hrdtok Hkq Hmp Hgh Hxb Hpg Hyield"). }
   (* ---------------- THE STEADY MODE: the block is whole ---------------- *)
   (* The token comes out at [proc_priv_split_cwd]'s three-way seam, which is
      where it joined the block; [cwd_ref] comes with it and goes straight

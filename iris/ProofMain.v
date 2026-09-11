@@ -1464,6 +1464,12 @@ Section ProofMain.
        ([InitBoot.init_boot_bundle]): this group does not read it either,
        and userinit's park hands it to forkret's boot arm *)
     init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0 -∗
+    (* ...AND THE CONSOLE'S READER TOKEN beside it (app-echo.md, "SH-LINE
+       RULING", R3): the bundle is a wand from it, this group does not read
+       it either, and userinit stages it at the park for forkret's boot arm.
+       It is the boot supply's own ([SpecMain]'s [cons_reader cn 0]), which
+       main no longer drops. *)
+    ConsoleInv.cons_reader fsc_cons 0%nat -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     console_caps γd -∗
     SpecFileread.console_ready_app -∗
@@ -1595,7 +1601,7 @@ Section ProofMain.
   Proof.
     intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures
            Huartq Hdiskq Hgeomok Hpkc.
-    iIntros "Hcg #Htext #Hkdata #Hdev #Hwire Hbundle #Htramp #Hccaps #Hcready #Htl #Hwaitlk
+    iIntros "Hcg #Htext #Hkdata #Hdev #Hwire Hbundle Hrdtok #Htramp #Hccaps #Hcready #Htl #Hwaitlk
              #Hpenv #Hkmem #Hcert #Hseam Hfolauth Hoffa Hfirst
              #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
@@ -2017,7 +2023,7 @@ Section ProofMain.
               ltac:(lia) Hnb8 Hdevq Hnibq
               with "Hcg Hcpu Htext Hkdata Hpc Hpanic Hitl Hitinv Hesc Hireg
                     Hfirst Hpersist Hfsinit
-                    Hpinv Hlpidlk Hdcaps Hwaitlk Hftable' Hcready Hwire Hbundle Htramp Hkenv
+                    Hpinv Hlpidlk Hdcaps Hwaitlk Hftable' Hcready Hwire Hbundle Hrdtok Htramp Hkenv
                     Hpavail Hinitproc").
     all: try lkbelow.
     iApply wp_next_off_intro.
@@ -2397,13 +2403,20 @@ Section ProofMain.
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hticks Hstvec Hq").
     iIntros (m4 γtl) "Hcg Hpc #Htl Hstvec Hq".
+    (* THE READER TOKEN, AT THE CONFIGURATION'S CONSOLE NAMES (app-echo.md,
+       "SH-LINE RULING", R3).  The boot supply hands it at [cn], the group
+       and everything above it names [fsc_cons], and [Hconsq] is the tie
+       [FsCfgBoot.fs_boot_supply] carries for exactly this.  main no longer
+       DROPS it: it goes to userinit, the park's boot mode and forkret's
+       boot arm, which spends it on the first process's exec bundle. *)
+    iEval (rewrite -Hconsq) in "Hrdtok".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
     iApply (mn_grp_fs γp γs γv γd γw γtl m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
               Pb Rspent
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok Hpkc
-              with "Hcg Htext Hkdata Hdev Hwire Hbundle Htramp Hccaps Hcready Htl Hwaitlock
+              with "Hcg Htext Hkdata Hdev Hwire Hbundle Hrdtok Htramp Hccaps Hcready Htl Hwaitlock
                     Hpenvc Hkmem Hcert Hseamc Hfolat Hoffa Hfirst
                     [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl
