@@ -2030,6 +2030,57 @@ token (E5(c) is answered: the token is needed; its shape is the program-side
 half of the console ring's consumption cursor, so a receipt states its bytes'
 positions by construction).  A console-ring survey precedes the E3 design.
 
+CONS-CURSOR LANDED (2026-09-11; briefs `brief-cons-cursor.md`, `-finish.md`,
+`-finish-2.md`; commit `40e97689f`, 48 files; three agents).  The kernel half
+of E3.  C1: `WpUart.uart_col_ok u hs np nk hl ht` carries the queued histories'
+strict-prefix CHAIN, a last-popped ANCHOR `hl` and an explicit TOP `ht`;
+"histories only grow" is `RiscvPtsto.obs_hist_lb`/`obs_hist_auth` (a
+`mono_list` on the MACHINE layer beside the trace ghost; `obs_auth h :=
+obs_half h ∗ obs_hist_auth h`, stepped by `obs_update`; `boot_fixedGS` has a
+positional `γhist`); the push is the accessor `uart_colE_push_acc` taken with
+`obs_auth h`; the pop yields `∃ h, obs_ends_in h bt ∗ ohist_ext hl h ∗
+riscv_rx_tag h ∗ obs_hist_lb h ∗ uart_rx_tok γ (S k) (Some h)`; the receive path
+carries `uart_rx_writer γ k hl` (token + the ring's high-water half `uart_rx_hi`
++ `⌜ohist_le hh hl⌝`) from the boot deposit through `plic_payload_uart`,
+uartintr and devintr into consoleintr (params `hb cb hh`, `ohist_ext hh hb`).
+C2: `ConsoleInv.cons_res cn` (:1398) = the COMMITTED prefix `st` (a `mono_list`
+`cons_stored_auth`, extended ONLY by `cons.w = cons.e`), the editable window `pd`
+(a list; backspace/C('U') pop its tail), `cons_chain`, `cons_below`, the cursor
+`cons_cursor cn nrd` (its other half is `cons_reader cn n` :1173) and the
+timeless dirty marker `(⌜cur = nrd⌝ ∨ cons_dirty_lb cn)`; `UartNames.cons_names
+= cn_uart cn_log cn_rd cn_dirty`, carried as `FsCfg.fsc_cons` (tie `⌜fsc_cons =
+cnm⌝` in `fs_boot_supply`); the credential escrow `cons_cred_inv cn Wd := inv
+consN (cons_clean_tok ∨ cons_dirty_lb ∗ □ Wd)` rides inside `is_conslock cn Wd
+γ` beside the handle (`cons_cred_pay`, `cons_cred_read` yields `▷ □ Wd` -- take
+it around a step), minted by main at `app_sup` from the boot's clean token;
+consoleintr's transitions `ct_gh_push`/`_commit`/`_pop`; consoleread's pop
+`cons_stored_pop`/`cons_pend_shift`; `console_caps` on the RAW lock handle (the
+interrupt path carries no `Wd`).  C3: `SpecConsoleread` takes `cons_pay cn Wd
+ord` (`Some nrd`: the token; `None`: `cons_dirty_cred Wd := □ Wd`) and returns
+the per-byte tags and `cons_stored_lb cn sl` UNCONDITIONALLY and `(⌜cons_window
+sl cur d bs hs⌝ ∗ ⌜cons_chain sl⌝ ∗ ⌜d ≤ dc ≤ d+1⌝ ∨ cons_dirty_cred Wd) ∗
+cons_out cn Wd ord cur dc` (the window under the same disjunction as the
+position: a second reader can pop while the copy loop SLEEPS); a token read
+moves the cursor at EVERY pop, a credential read pays the marker at every pop.
+`ConsoleInv.cons_acc cn Wd Rd` (:1467) is the ONE arm the syscall's deposit
+relays (`cons_acc_reader`/`cons_acc_cred`/`cons_acc_open`); `SpecFileread`:
+`fileread_in`'s console arm `cons_acc fsc_cons app_sup Rd`, `console_receipt Rd
+r M' addr` (:941; not persistent), `console_receipt_of_run`/`_of_dirty`,
+`console_recv Rd d g` (:1076), `console_ready_app := ∃ γ, console_inv fsc_cons
+app_sup γ` (:365; replaces the anonymous `console_ready` in `sysc_park_extra`,
+`park_world`, `park_globals`, `SpecUserinit`, `syscall_env`),
+`fileread_dev_env`'s clause `mj = CONSOLE` beside the consoleread address;
+`SpecSysRead`/`xv6_spost 5` relay `Rd`; `xfam.rf_ret : nat -> nat -> iProp`;
+`fsabs_fileread_in : app_sup -∗ …` (the credential disjunct); `xv6_ssupply :=
+app_sup` UNCHANGED; `UkRun.udepwf` (:316) the family-naming deposit;
+`UkRunSys.wp_uk_ecall_read_recv_body` the receipt-carrying leaf (the three
+existing read leaves unchanged).  Boot hands main `cons_reader cn 0 ∗
+cons_clean_tok cn` (`SpecMain.v:433-439`).  GONE: `console_ready` (+4),
+`cr_win`/`cr_run`/`cr_win_of_run`, `console_receipt_persistent`,
+`uart_colE_push`.  Two receipt shapes worth simplifying later: consoleread's
+`-1 ≤ r` arm is a killed process (unobservable from user mode); `cons_tagged` is
+subsumed by `cons_window`.
+
 #### E3 — THE INPUT LINE: DESIGN PROPOSAL (2026-09-11, coordinator; AWAITING THE OWNER'S RULING)
 
 FACTS (console-ring survey, verified): `ConsoleInv.cons_res` holds NO ghost state
