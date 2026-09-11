@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN → WX-INV → WX-WAIT → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -2090,6 +2090,56 @@ userinit's split; green with `children_inv` still stated-not-carried) →
 WX-INV (`brief-wx-inv.md`: carry it; kwait's row) → WX-WAIT
 (`brief-wx-wait.md`: the post, the route, the leaf, init) → ARM-c (1b) → L7.
 WX-PID is absorbed: pid uniqueness IS `pid_reg`.
+
+WX-EXIT LANDED (2026-09-10; briefs `brief-wx-exit.md`, `brief-wx-exit-finish.md`;
+commit `3f10fc4fa`, 101 files; the rulings below were given mid-lane).
+- THE BLOCK: `ProcInv.proc_priv_core` carries `∃ Q, gen_kq (pv_gen V) pa pid Q ∗
+  my_pay (pv_gen V) Q` and `∃ xsv, p_xstate pa ↦₄{1/2} xsv` (LAST);
+  `proc_priv_split_cwd` is five-way; kfork's split puts the kernel quarter in
+  the child's block, userinit's at `fun _ => True`.  `SchedCtx.proc_pub` holds
+  `p_xstate` at 1/2; kexit and freeproc reunite the halves to write.
+- THE ESCROW: `ChildTok.exit_tok γ pid xs := ∃ pa Q Q', gen_kq γ pa pid Q ∗ my_pay γ
+  Q' ∗ Q' xs` (single-armed), `gen_pay` ▷ `Q xs`, `exit_tok_intro`.  The ZOMBIE
+  dormant block (`ProcDefs.proc_dormant`/`_noctx`) holds `∃ xsv, p_xstate ↦₄{1/2}
+  xsv ∗ (if ZOMBIE then exit_tok (pv_gen V) pid (xstate_val xsv) else emp)` -- keyed
+  at the STORED status; the reaper agrees the two halves.  `ProcGeom.xstate_val`/
+  `xstate_of`/`exit_xs`; `SpecKexit.kexit_status m := xstate_of (m !!! a0)`;
+  kexit's premises `my_pay (pv_gen (us_V U)) Q -∗ Q (kexit_status m) -∗`.
+- THE PAYLOAD IS A FAMILY FIELD: `UexecSG.sexit_pay`, `sfam_at Q f`
+  (`sexit_pay_at`/`sfork_pay_at`/`sexit_pay_pt`/`sbundle_at_at`/`spost_at_at`);
+  `UexecExecInst.xfam.kf_xpay`, `xfam_at`.  The route carries `UexecRet.upay_at gn
+  sc tf f`: `uexec_pay_dep sc W f` at EVERY cause and number (at the exit ecall the
+  additive `sexit_pay f (exit_xs tf) ∧ sexit_pay f (-1)`), `uexec_pay_arm f :=
+  sexit_pay f (-1)` back at every resume (exit alone has no arm);
+  `SpecUsertrap.ut_pay_in`/`ut_pay_out`, `SpecSyscall.sysc_pay_in`/`sysc_pay_out`/
+  `sysc_pay_in_ret` are ungated rows of the posts that carry `f`.  sys_exit spends
+  the left conjunct; the three killed checks (`ProofUsertrapTail.ut_kexit`, status
+  -1 by `ut_kexit_status_neg1`; sites in ProofUsertrapSys/Arms/Tail) the right.
+- THE RUN KEEPS `Q (-1)`: `UkRun.uk_names Σ` has `ukn_pay`; `urun` carries the
+  linear `ukn_pay N (-1)` beside the persistent `my_pay gn (ukn_pay N)`; the engine
+  carries it as `UkStep.uk_paycont Q gn K` inside `uk_step_obl`/`uk_payload` under
+  the cycle's one ▷ (`urun_close`/`_upd` conclude `ukcq`; a leaf reads `ukc` back by
+  `ukcq_ukc`); every interrupt and page-fault arm pays its deposit at `sfam_at Q
+  sfam_pt`; `wp_uk_ecall_exit` takes `ukn_pay N (-1) -∗ ukn_pay N xs ∧ ukn_pay N
+  (-1)`; programs at `Class ukn_triv` pay by `ukn_triv_eq`.  The entry constructors
+  take `my_pay (uvis_gen W) Q` and give `⌜ukn_pay N = Q⌝`; the generic family and
+  the exec/boot wands take `my_pay (uvis_gen W) (fun _ => True)` (`exec_slot_pre`,
+  `exec_sbundle`, `init_boot_bundle_triv`; `uexecSG` indexed by `ctokG`,
+  `sfork_pay_pt`).
+- THE ORPHANS: kexit, under `wait_lock`, empties its row and moves the set into
+  `WaitInv.orphans_own O` (`ghost_var` at the second canonical name on `wchG`,
+  minted in `children_res_alloc`); `wait_res_at ξ := parents_res_at ξ ∗
+  children_res ∗ orphans_res`; `children_inv ps m O ip` STATED (a generation in
+  `O` is a slot whose parent cell holds `ip`), not carried.  `SpecReparent`
+  unchanged.
+- THE GENERATION PINS: `SpecForkret.forkret_closer` (+ ParkCap/SpecForkretParkPaid
+  copies) `⌜pv_gen (us_V U') = gn⌝`; `SpecUsertrap.ut_gen_kept` in `usertrap_post`;
+  `SpecSyscall`'s post `pv_gen (us_V U') = pv_gen (us_V U)`; `ProofUserretClosed.
+  Rut_at` `⌜pv_gen (us_V U) = gn⌝` discharged `eq_refl` at ParkCap.
+- Traps: a section that already binds `xv6G` must not declare its own `ctokG`
+  (`xv6_ctok` is the instance) and `uexecSG` is bound with braces -- the "prints
+  alike, does not match" failures; `spost_at_at` stops at the four arguments the
+  re-keying touches (the post stands under the arm's binders).
 
 #### WX-EXIT RULINGS (2026-09-10, coordinator, given mid-lane; the as-landed note supersedes anchors)
 - A KILLED PROCESS STILL PAYS `Q (-1)` (owner's ruling; this replaced a
