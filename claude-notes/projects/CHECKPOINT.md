@@ -23,23 +23,21 @@ patch: `projects/wx-briefs/`.
   until L7 puts the console-input resource in.
 - THE REMAINING ARC: `app-echo.md` "THE REMAINING ARC TO xv6_app_adequacy FOR
   ECHO — DESIGN".  E1 ECHO-PRED LANDED (2026-09-11; note "E1 ECHO-PRED LANDED").
-  Order corrected: E3 RECEIPT LEAF + reader token → E4 SH-ECHO → E2 INIT-BOOT →
-  E5 L7.  E3's design is RULED (owner, 2026-09-11: option (i) -- the trace property is
-  "wait for the $ prompt, type each character after its echo"; fallback: fix the
-  kernel's console overflow with UART flow control).  CONS-CURSOR (the kernel
-  half, `wx-briefs/brief-cons-cursor.md`): phase 1 landed as statements (13 reds);
-  its agent died to a login expiry; a SECOND agent ran `brief-cons-cursor-
-  finish.md` to 6 reds (7 of 13 green; the receive path end to end); a THIRD
-  runs `brief-cons-cursor-finish-2.md` (tree DIRTY on purpose, snapshot `conscur-inflight.patch`) under
-  the LEASE ruling (`app-echo.md` CONS-CURSOR RULINGS (5): the console arm takes
-  the token unconditionally through a fupd-shaped accessor; the generic slot's
-  supply gains the accessor; the lease itself is SH-LINE's); then SH-LINE (R5 + sh's gets under the receipt) → E4 SH-ECHO →
-  E2 INIT-BOOT → E5 (the discipline automaton, `good_out`, the identification
+  Order: E3 (CONS-CURSOR kernel half + SH-LINE program half) → E4 SH-ECHO →
+  E2 INIT-BOOT → E5 L7.  E3's discipline is RULED (owner: "wait for the $
+  prompt, type each character after its echo"; fallback: fix the kernel's console
+  overflow with UART flow control).  CONS-CURSOR LANDED: `40e97689f` (48 files;
+  VM build `conscur35` EXIT=0, audit = the thirteen, lemma_diff = ten justified
+  GONEs, vtest unaffected); note `app-echo.md` "CONS-CURSOR LANDED", rulings
+  (1)-(7) above it (the lease; the one-arm `cons_acc`; the window under the dirty
+  disjunction).  Tree CLEAN at the landing.
+- PID-KEY (`wx-briefs/brief-pid-key.md`, owner's request): `uvis` gains `uvis_pid`,
+  getpid's round row says it returns it; not bubbled to `urun`.  LAUNCHED
+  2026-09-11 (phase 1 then stop-and-report).
+- NEXT after PID-KEY: SH-LINE (`wx-briefs/brief-sh-line.md`, re-anchored at the
+  CONS-CURSOR landing) → E4 SH-ECHO → E2 INIT-BOOT → E5 L7 (design with the owner:
+  the per-character-echo discipline automaton, `good_out`, the identification
   gate, `Hphi`).
-- QUEUED (owner's request 2026-09-11): PID-KEY (`wx-briefs/brief-pid-key.md`):
-  `uvis` gains `uvis_pid`, getpid's round row says it returns it; not bubbled
-  to `urun`.  Launch when CONS-CURSOR lands (same files: SpecSyscall/
-  ProofSyscall/SpecUsertrap/UexecExecInst; one agent per checkout).
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run
