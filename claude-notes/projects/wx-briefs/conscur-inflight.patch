@@ -61,10 +61,10 @@ index 55a81cbab..2123d7e62 100644
        (∃ c0 : virtio_cfg,
           ⌜virtio_live c0 = false⌝ ∗ disk_cfg_is γv (DfracOwn (1/2)) c0) ∗
 diff --git a/iris/ConsoleInv.v b/iris/ConsoleInv.v
-index 8281ca684..addc00afe 100644
+index 8281ca684..73b106e19 100644
 --- a/iris/ConsoleInv.v
 +++ b/iris/ConsoleInv.v
-@@ -102,6 +102,10 @@ Require Import RiscvPtsto RiscvExtras.
+@@ -102,6 +102,11 @@ Require Import RiscvPtsto RiscvExtras.
  Require Import RiscvLang ObsTrace.   (* [mobs], [obs_ends_in]: the tag column's vocabulary *)
  Require Import VcGen.   (* [trunc32_unsigned]/[trunc32_sext]: the ring index's wrap *)
  Require Import WpLock.
@@ -72,10 +72,11 @@ index 8281ca684..addc00afe 100644
 +                               the ring's high-water mark is one of them *)
 +From iris.base_logic.lib Require Import ghost_var own.
 +From iris.algebra.lib Require Import mono_list.
++From iris.base_logic.lib Require Import mono_nat.   (* the ring's dirty marker: [cons_dirty_lb] *)
  Require Import TsoCtx CtxMorphTac.   (* the lock payload's context axis; [<{ }>] *)
  From Kernel Require KernelSyms.
  Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-@@ -115,6 +119,9 @@ Local Open Scope Z_scope.
+@@ -115,6 +120,9 @@ Local Open Scope Z_scope.
  
  Definition INPUT_BUF_SIZE : nat := 128.
  
@@ -85,7 +86,7 @@ index 8281ca684..addc00afe 100644
  (* sizeof(struct spinlock): the ring starts right after the lock, which is
     the first member -- so [&cons.lock = &cons], the a0 consoleinit passes to
     initlock (SpecConsoleinit.v). *)
-@@ -206,6 +213,119 @@ Definition cons_tagged (bs : nat -> bv 8) (hs : list (list mobs)) (d : nat)
+@@ -206,6 +214,171 @@ Definition cons_tagged (bs : nat -> bv 8) (hs : list (list mobs)) (d : nat)
  Lemma cons_tagged_0 (bs : nat -> bv 8) : cons_tagged bs [] 0.
  Proof. split; [reflexivity | intros j Hj; exfalso; lia]. Qed.
  
@@ -202,10 +203,282 @@ index 8281ca684..addc00afe 100644
 +    by apply lookup_app_l_Some.
 +Qed.
 +
++(* the same, for the "everything here is at or before [hh]" clause *)
++Lemma cons_below_prefix (l1 l2 : list (list mobs * bv 8))
++    (hh : option (list mobs)) :
++  l1 `prefix_of` l2 -> cons_below l2 hh -> cons_below l1 hh.
++Proof.
++  intros [k ->] Hb j h b Hj.
++  apply (Hb j h b). by apply lookup_app_l_Some.
++Qed.
++
++(* THE STORE'S TWO PURE OBLIGATIONS, once.  consoleintr files a byte whose
++   history is strictly newer than the ring's high-water mark, and the mark
++   is at or after everything the ring holds -- so the byte is strictly
++   after every byte in the ring, which is exactly what extends the chain
++   and moves the mark to the byte just filed. *)
++Lemma cons_chain_snoc (l : list (list mobs * bv 8))
++    (hh : option (list mobs)) (h : list mobs) (b : bv 8) :
++  cons_chain l -> cons_below l hh -> ohist_ext hh h ->
++  cons_chain (l ++ [(h, b)]).
++Proof.
++  intros Hch Hbl Hx i j hi hj bi bj Hi Hj Hij.
++  pose proof (lookup_lt_Some _ _ _ Hj) as Hjl0.
++  rewrite length_app in Hjl0. cbn [length] in Hjl0.
++  assert (Hil : (i < length l)%nat) by lia.
++  rewrite lookup_app_l in Hi; [| exact Hil].
++  destruct (decide (j < length l)%nat) as [Hjl | Hjl].
++  - rewrite lookup_app_l in Hj; [| exact Hjl].
++    exact (Hch i j hi hj bi bj Hi Hj Hij).
++  - assert (Hje : j = length l) by lia. subst j.
++    rewrite lookup_app_r in Hj; [| lia].
++    rewrite Nat.sub_diag in Hj. cbn in Hj.
++    injection Hj as <- <-.
++    exact (ohist_ext_le_ext (Some hi) hh h (Hbl i hi bi Hi) Hx).
++Qed.
++
++Lemma cons_below_snoc (l : list (list mobs * bv 8))
++    (hh : option (list mobs)) (h : list mobs) (b : bv 8) :
++  cons_below l hh -> ohist_ext hh h ->
++  cons_below (l ++ [(h, b)]) (Some h).
++Proof.
++  intros Hbl Hx j g c Hj.
++  pose proof (lookup_lt_Some _ _ _ Hj) as Hjl0.
++  rewrite length_app in Hjl0. cbn [length] in Hjl0.
++  destruct (decide (j < length l)%nat) as [Hjl | Hjl].
++  - rewrite lookup_app_l in Hj; [| exact Hjl].
++    destruct (ohist_ext_le_ext (Some g) hh h (Hbl j g c Hj) Hx) as [Hp _].
++    exact Hp.
++  - assert (Hje : j = length l) by lia. subst j.
++    rewrite lookup_app_r in Hj; [| lia].
++    rewrite Nat.sub_diag in Hj. cbn in Hj.
++    injection Hj as <- <-. exact (ohist_le_Some h).
++Qed.
++
  (* =====================================================================
     THE COUPLING'S ARITHMETIC
  
-@@ -662,8 +782,134 @@ Section ConsoleInv.
+@@ -507,6 +680,201 @@ Proof.
+     split_and!; [exact Ht0 | exact He0 | exact Hb0].
+ Qed.
+ 
++(* ---- THE RING'S THREE TRANSITIONS, as pure facts -------------------- *)
++
++(* (1) THE COMMIT, [cons.w = cons.e]: the editable window becomes part of
++   the committed prefix, and the window empties.  It is the ONLY transition
++   that extends [stored], and the code reaches it from '\n', from C('D')
++   and from the store that fills the ring (console.c's inner [if]). *)
++Lemma cons_stored_commit (r w e : mword 32) (cur : nat)
++    (st pd : list (list mobs * bv 8)) (bs : list (bv 8))
++    (ts : list (option (list mobs))) :
++  cons_ok r w e ->
++  cons_stored r w cur st bs ts -> cons_pend r w e pd bs ts ->
++  cons_stored r e cur (st ++ pd) bs ts.
++Proof.
++  intros Hok [Hlst Hst] [Hlpd Hpd].
++  pose proof (cons_sub_range w r) as Hwr.
++  pose proof (cons_sub_range e r) as Her.
++  pose proof (cons_sub_range e w) as Hew.
++  (* THE RING'S WINDOW SPLIT.  [w - r] and [e - w] add up to [e - r] at
++     width 32 because [cons_ok] pins both ends inside one 128-byte span:
++     [e - w] is congruent to [(e-r) - (w-r)], which is in [0,128], so the
++     wrap cannot bite. *)
++  assert (Hsplit : (bv_unsigned (sub_vec w r) + bv_unsigned (sub_vec e w)
++                    = bv_unsigned (sub_vec e r))%Z).
++  { assert (Hbig : (2 ^ 32)%Z = 4294967296%Z) by (vm_compute; reflexivity).
++    pose proof (cons_urange r) as Hr0. pose proof (cons_urange w) as Hw0.
++    pose proof (cons_urange e) as He0.
++    pose proof (cons_sub_range e r) as Her0.
++    pose proof (cons_sub_range w r) as Hwr0.
++    assert (Hok2 := Hok). rewrite /cons_ok cons_bufz in Hok2.
++    rewrite (cons_subz e w).
++    assert (Hcong : ((bv_unsigned e - bv_unsigned w)
++                     = (bv_unsigned (sub_vec e r) - bv_unsigned (sub_vec w r))
++                       + ((bv_unsigned e - bv_unsigned r) / 2 ^ 32
++                          - (bv_unsigned w - bv_unsigned r) / 2 ^ 32) * 2 ^ 32)%Z).
++    { rewrite !cons_subz.
++      pose proof (Z.div_mod (bv_unsigned e - bv_unsigned r) (2 ^ 32)
++                    ltac:(lia)) as He1.
++      pose proof (Z.div_mod (bv_unsigned w - bv_unsigned r) (2 ^ 32)
++                    ltac:(lia)) as Hw1.
++      lia. }
++    rewrite Hcong Z_mod_plus_full Z.mod_small; lia. }
++  split.
++  { rewrite length_app Hlst Hlpd. lia. }
++  intros k Hk.
++  destruct (Z_lt_ge_dec k (bv_unsigned (sub_vec w r))) as [Hlt | Hge].
++  - destruct (Hst k ltac:(lia)) as (h & b & Hs & Ht & He & Hb).
++    exists h, b. split_and!; [| exact Ht | exact He | exact Hb].
++    rewrite lookup_app_l; [exact Hs | rewrite Hlst; lia].
++  - set (j := Z.to_nat (k - bv_unsigned (sub_vec w r))).
++    assert (Hjlt : (j < length pd)%nat) by (rewrite Hlpd /j; lia).
++    destruct (Hpd j Hjlt) as (h & b & Hs & Ht & He & Hb).
++    assert (Hkj : (bv_unsigned (sub_vec w r) + Z.of_nat j = k)%Z)
++      by (rewrite /j; lia).
++    rewrite Hkj in Ht. rewrite Hkj in Hb.
++    exists h, b. split_and!; [| exact Ht | exact He | exact Hb].
++    rewrite lookup_app_r; [| rewrite Hlst; lia].
++    rewrite Hlst. replace (cur + Z.to_nat k - (cur + Z.to_nat (bv_unsigned (sub_vec w r))))%nat
++      with j by (rewrite /j; lia).
++    exact Hs.
++Qed.
++
++Lemma cons_pend_commit (r e : mword 32) (bs : list (bv 8))
++    (ts : list (option (list mobs))) :
++  cons_pend r e e [] bs ts.
++Proof.
++  split; [| intros j Hj; cbn [length] in Hj; lia].
++  cbn [length]. rewrite cons_sub_self. reflexivity.
++Qed.
++
++(* (2) THE STORE at [cons.e]: the editable window gains the byte, the
++   committed prefix is untouched because the slot written is outside it. *)
++Lemma cons_stored_ins (r w : mword 32) (cur : nat)
++    (st : list (list mobs * bv 8)) (bs : list (bv 8))
++    (ts : list (option (list mobs))) (i : nat) (h : list mobs) (b : bv 8)
++    (e : mword 32) :
++  cons_ok r w e ->
++  (bv_unsigned (sub_vec e r) < Z.of_nat INPUT_BUF_SIZE)%Z ->
++  i = cons_slot e 0 ->
++  cons_stored r w cur st bs ts ->
++  cons_stored r w cur st (<[i := cons_xlate b]> bs) (<[i := Some h]> ts).
++Proof.
++  intros Hok Hlt Hi [Hlst Hst]. subst i.
++  pose proof (cons_slot_end r e) as Hend.
++  pose proof (cons_sub_range w r) as Hwr0.
++  pose proof (cons_sub_range e r) as Her0.
++  rewrite cons_bufz in Hlt.
++  destruct Hok as [Hok1 Hok2].
++  split; [exact Hlst |].
++  intros k Hk.
++  destruct (Hst k Hk) as (g & c & Hs & Ht & He & Hb).
++  assert (Hr1 : (0 <= k < 128)%Z) by lia.
++  assert (Hr2 : (0 <= bv_unsigned (sub_vec e r) < 128)%Z) by lia.
++  assert (Hne : cons_slot r k <> cons_slot e 0).
++  { rewrite <- Hend. intro Hc.
++    pose proof (cons_slot_inj r k _ Hr1 Hr2 Hc) as Hk2. lia. }
++  exists g, c. split_and!; [exact Hs | | exact He |].
++  - rewrite list_lookup_insert_ne; [exact Ht | congruence].
++  - rewrite list_lookup_insert_ne; [exact Hb | congruence].
++Qed.
++
++Lemma cons_pend_push (r w e : mword 32) (pd : list (list mobs * bv 8))
++    (bs : list (bv 8)) (ts : list (option (list mobs))) (i : nat)
++    (h : list mobs) (b : bv 8) :
++  length bs = INPUT_BUF_SIZE -> length ts = INPUT_BUF_SIZE ->
++  cons_ok r w e ->
++  (bv_unsigned (sub_vec e r) < Z.of_nat INPUT_BUF_SIZE)%Z ->
++  i = cons_slot e 0 ->
++  obs_ends_in h b ->
++  cons_pend r w e pd bs ts ->
++  cons_pend r w (add_vec e (mword_of_int 1 : mword 32)) (pd ++ [(h, b)])
++    (<[i := cons_xlate b]> bs) (<[i := Some h]> ts).
++Proof.
++  intros Hlb Hlt Hok Hltr Hi Hends [Hlpd Hpd]. subst i.
++  assert (Hbig : (2 ^ 32)%Z = 4294967296%Z) by (vm_compute; reflexivity).
++  rewrite cons_bufz in Hltr.
++  pose proof (cons_sub_range e r) as Her.
++  pose proof (cons_sub_range e w) as Hew.
++  pose proof (cons_sub_range w r) as Hwr.
++  pose proof (cons_slot_end r e) as Hend.
++  (* the same window split as [cons_stored_commit]'s *)
++  assert (Hsplit : (bv_unsigned (sub_vec w r) + bv_unsigned (sub_vec e w)
++                    = bv_unsigned (sub_vec e r))%Z).
++  { pose proof (cons_urange r) as Hr0. pose proof (cons_urange w) as Hw0.
++    pose proof (cons_urange e) as He0.
++    pose proof (cons_sub_range e r) as Her0.
++    pose proof (cons_sub_range w r) as Hwr0.
++    assert (Hok2 := Hok). rewrite /cons_ok cons_bufz in Hok2.
++    rewrite (cons_subz e w).
++    assert (Hcong : ((bv_unsigned e - bv_unsigned w)
++                     = (bv_unsigned (sub_vec e r) - bv_unsigned (sub_vec w r))
++                       + ((bv_unsigned e - bv_unsigned r) / 2 ^ 32
++                          - (bv_unsigned w - bv_unsigned r) / 2 ^ 32) * 2 ^ 32)%Z).
++    { rewrite !cons_subz.
++      pose proof (Z.div_mod (bv_unsigned e - bv_unsigned r) (2 ^ 32)
++                    ltac:(lia)) as He1.
++      pose proof (Z.div_mod (bv_unsigned w - bv_unsigned r) (2 ^ 32)
++                    ltac:(lia)) as Hw1.
++      lia. }
++    rewrite Hcong Z_mod_plus_full Z.mod_small; lia. }
++  assert (Hinc : (bv_unsigned (sub_vec (add_vec e (mword_of_int 1 : mword 32)) w)
++                  = bv_unsigned (sub_vec e w) + 1)%Z).
++  { apply (cons_sub_inc e w). rewrite Hbig. lia. }
++  split.
++  { rewrite length_app Hlpd Hinc. cbn [length]. lia. }
++  intros j Hj. rewrite length_app Hlpd in Hj. cbn [length] in Hj.
++  destruct (decide (j < length pd)%nat) as [Hjl | Hjl].
++  - destruct (Hpd j Hjl) as (g & c & Hs & Ht & He & Hb).
++    assert (Hjl2 : (Z.of_nat j < bv_unsigned (sub_vec e w))%Z)
++      by (rewrite Hlpd in Hjl; lia).
++    assert (Hr1 : (0 <= bv_unsigned (sub_vec w r) + Z.of_nat j < 128)%Z)
++      by lia.
++    assert (Hr2 : (0 <= bv_unsigned (sub_vec e r) < 128)%Z) by lia.
++    assert (Hne : cons_slot r (bv_unsigned (sub_vec w r) + Z.of_nat j)
++                  <> cons_slot e 0).
++    { rewrite <- Hend. intro Hc.
++      pose proof (cons_slot_inj r _ _ Hr1 Hr2 Hc) as Hk2. lia. }
++    exists g, c. split_and!; [| | exact He |].
++    + rewrite lookup_app_l; [exact Hs | exact Hjl].
++    + rewrite list_lookup_insert_ne; [exact Ht | congruence].
++    + rewrite list_lookup_insert_ne; [exact Hb | congruence].
++  - assert (Hje : j = length pd) by lia. subst j.
++    assert (Hkey : (bv_unsigned (sub_vec w r) + Z.of_nat (length pd)
++                    = bv_unsigned (sub_vec e r))%Z) by (rewrite Hlpd; lia).
++    rewrite Hkey. rewrite <- Hend.
++    exists h, b. split_and!; [| | exact Hends |].
++    + rewrite lookup_app_r; [| lia]. rewrite Nat.sub_diag. reflexivity.
++    + rewrite list_lookup_insert; [reflexivity | rewrite Hlt; apply cons_slot_lt].
++    + rewrite list_lookup_insert; [reflexivity | rewrite Hlb; apply cons_slot_lt].
++Qed.
++
++(* (3) THE EDIT, backspace and C('U'): [cons.e] moves back one and the
++   window loses its LAST entry.  The committed prefix cannot be reached --
++   the code tests [cons.e != cons.w] first -- so [stored] never shrinks. *)
++Lemma cons_pend_pop (r w e : mword 32) (pd : list (list mobs * bv 8))
++    (x : list mobs * bv 8) (bs : list (bv 8))
++    (ts : list (option (list mobs))) :
++  (1 <= bv_unsigned (sub_vec e w))%Z ->
++  cons_pend r w e (pd ++ [x]) bs ts ->
++  cons_pend r w (add_vec e (mword_of_int (-1) : mword 32)) pd bs ts.
++Proof.
++  intros Hge [Hlpd Hpd].
++  assert (Hbig : (2 ^ 32)%Z = 4294967296%Z) by (vm_compute; reflexivity).
++  pose proof (cons_sub_range e w) as Hew.
++  assert (Hdec : (bv_unsigned (sub_vec (add_vec e (mword_of_int (-1) : mword 32)) w)
++                  = bv_unsigned (sub_vec e w) - 1)%Z)
++    by exact (cons_sub_dec e w Hge).
++  rewrite length_app in Hlpd. cbn [length] in Hlpd.
++  split; [rewrite Hdec; lia |].
++  intros j Hj.
++  destruct (Hpd j ltac:(rewrite length_app; cbn [length]; lia))
++    as (g & c & Hs & Ht & He & Hb).
++  exists g, c. split_and!; [| exact Ht | exact He | exact Hb].
++  rewrite lookup_app_l in Hs; [exact Hs | exact Hj].
++Qed.
++
+ (* ===================================================================== *)
+ (*  devsw[] -- THE DEVICE FUNCTION TABLE                                  *)
+ (*                                                                        *)
+@@ -591,6 +959,17 @@ Proof.
+   apply (f_equal (@bv_unsigned 64)) in H. vm_compute in H. discriminate.
+ Qed.
+ 
++(* THE CONSOLE'S OWN NAMESPACE, and the ONE invariant at it: the credential
++   escrow [cons_cred_inv] below.  It is disjoint from [AppInv.appN] and from
++   [WpLock.lockN] by construction, so the dispatcher's read arm -- which
++   runs its fancy updates at [⊤] ([ProofFileread]'s [iMod (proto_read_* ⊤
++   ..)]) -- may open it beside anything else the kernel holds.  The mask the
++   two accessors are stated at is therefore [⊤]; they are stated at an
++   arbitrary [E] with [↑consN ⊆ E] so a smaller-masked caller is not shut
++   out. *)
++Definition consN : namespace := nroot .@ "cons".
++Definition consE : coPset := ↑consN.
++
+ Section ConsoleInv.
+   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+   Context `{XI : CurCtx}.
+@@ -662,8 +1041,250 @@ Section ConsoleInv.
      iExact "H".
    Qed.
  
@@ -308,10 +581,13 @@ index 8281ca684..addc00afe 100644
 +     one this application says nothing about -- may call read(0, ..), and
 +     the generic slot's supply law ([UexecExecInst.xv6_sbundle_of_supply_ne],
 +     a FIELD of [UexecSG]'s class) has to answer for it at every syscall
-+     number; a deposit that demanded a token nobody has would make [uslot]
-+     unprovable outright.  What the kernel CAN do is RECORD that such a read
-+     happened, at the price of the credential the generic slot already
-+     holds, and let the token holder learn it.
++     number OUT OF A PERSISTENT SUPPLY ([□ ssupply] in both laws).  A
++     deposit that demanded an exclusive token is therefore not merely
++     unprovable: taken as a premise under a [□] it is INCONSISTENT (open it
++     three times and hold [ghost_var γ (1/2) _] thrice), so the arm has to
++     be payable from something persistent.  What the kernel does instead is
++     RECORD that such a read happened, at the price of the credential the
++     generic slot already holds, and let the token holder learn it.
 +
 +     So the ring carries TWO cursors.  [cur] is the ACTUAL consumed count --
 +     pure, the ring's own, moved by EVERY consoleread -- and it is what
@@ -320,85 +596,261 @@ index 8281ca684..addc00afe 100644
 +     token-holding read moves it (it needs both halves).  Between them sits
 +     the one clause that makes the whole thing honest:
 +
-+         ⌜cur = nrd⌝ ∨ cons_dirty Wd
++         ⌜cur = nrd⌝ ∨ cons_dirty_lb cn
 +
 +     -- either nobody has read behind the token holder's back, or somebody
-+     did and left [Wd] behind.  [Wd] is the PRICE: the application's supply
-+     credential, which the tokenless caller pays and the kernel never mints.
-+     It is an opaque parameter here rather than [AppInv.app_sup] itself
-+     because this file sits far below the application's invariant;
-+     [SpecFileread]'s console arm is where it is named ([app_sup]), and
-+     [SpecConsoleread] relays it.  Boxed ([cons_dirty] is [□]), so the token
-+     holder's receipt can carry a copy away and the ring keeps one. *)
-+  Definition cons_dirty (Wd : iProp Σ) : iProp Σ := (□ Wd)%I.
++     did.
 +
-+  Global Instance cons_dirty_persistent Wd : Persistent (cons_dirty Wd).
-+  Proof. rewrite /cons_dirty. apply _. Qed.
++     THE MARKER RIDES IN THE RING, THE CREDENTIAL DOES NOT, and the split is
++     forced by TIMELESSNESS: [cons_res] is a LOCK PAYLOAD, which acquire
++     strips a [▷] off, and the credential [Wd] is an arbitrary application
++     [iProp] ([AppInv.app_sup] over an abstract [app_pred]) that is not
++     timeless.  So the ring holds only [cons_dirty_lb] -- a [mono_nat] lower
++     bound at 1, persistent AND timeless -- and the credential sits in the
++     ESCROW INVARIANT [cons_cred_inv] carried beside the lock handle in
++     [is_conslock].  The payer deposits [□ Wd] there while setting the
++     marker; the token holder reads it back out of the marker.  Both opens
++     are atomic; nothing is held open across a step. *)
 +
-+  Definition cons_res (cn : cons_names) (Wd : iProp Σ) : iProp Σ :=
++  (* WHAT THE TOKENLESS CALLER PAYS.  Boxed, so the token holder's receipt
++     can carry a copy away.  [Wd] is an opaque parameter here rather than
++     [AppInv.app_sup] itself because this file sits far below the
++     application's invariant; [SpecFileread]'s console arm is where it is
++     named ([app_sup]), and [SpecConsoleread] relays it. *)
++  Definition cons_dirty_cred (Wd : iProp Σ) : iProp Σ := (□ Wd)%I.
++
++  Global Instance cons_dirty_cred_persistent Wd :
++    Persistent (cons_dirty_cred Wd).
++  Proof. rewrite /cons_dirty_cred. apply _. Qed.
++
++  (* THE RING'S MARKER and the CLEAN TOKEN it is made from.  One [mono_nat]
++     at [cn_dirty]: the authority at 0 is the exclusive clean token, minted
++     in the boot fupd beside the ring; the lower bound at 1 is the marker.
++     The two are incompatible ([mono_nat_lb_own_valid] gives [1 <= 0]),
++     which is what lets a holder of the marker rule out the escrow's clean
++     arm.  Both are timeless. *)
++  Definition cons_clean_tok (cn : cons_names) : iProp Σ :=
++    mono_nat_auth_own cn.(cn_dirty) 1 0%nat.
++  Definition cons_dirty_lb (cn : cons_names) : iProp Σ :=
++    mono_nat_lb_own cn.(cn_dirty) 1%nat.
++
++  Global Instance cons_dirty_lb_persistent cn : Persistent (cons_dirty_lb cn).
++  Proof. rewrite /cons_dirty_lb. apply _. Qed.
++  Global Instance cons_dirty_lb_timeless cn : Timeless (cons_dirty_lb cn).
++  Proof. rewrite /cons_dirty_lb. apply _. Qed.
++  Global Instance cons_clean_tok_timeless cn : Timeless (cons_clean_tok cn).
++  Proof. rewrite /cons_clean_tok. apply _. Qed.
++
++  Lemma cons_dirty_lb_clean cn :
++    cons_clean_tok cn -∗ cons_dirty_lb cn -∗ False.
++  Proof.
++    rewrite /cons_clean_tok /cons_dirty_lb. iIntros "Ha Hlb".
++    iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hle]. lia.
++  Qed.
++
++  (* THE ESCROW.  Its body is the one place [□ Wd] lives, and it is a
++     disjunction the marker decides: clean (nobody has paid) or dirty (the
++     marker is out and the credential is here).  Persistent by [inv], so it
++     rides in [is_conslock] and costs a caller nothing.  Spelled at the
++     [mono_nat] forms rather than at the three names above so that the two
++     accessors can strip the invariant's later off the timeless half
++     without unfolding anything. *)
++  Definition cons_cred_body (cn : cons_names) (Wd : iProp Σ) : iProp Σ :=
++    (mono_nat_auth_own cn.(cn_dirty) 1 0%nat
++     ∨ (mono_nat_lb_own cn.(cn_dirty) 1%nat ∗ □ Wd))%I.
++
++  Definition cons_cred_inv (cn : cons_names) (Wd : iProp Σ) : iProp Σ :=
++    inv consN (cons_cred_body cn Wd).
++
++  Global Instance cons_cred_inv_persistent cn Wd :
++    Persistent (cons_cred_inv cn Wd).
++  Proof. apply _. Qed.
++
++  (* the boot allocation: the clean token buys the escrow *)
++  Lemma cons_cred_inv_alloc (cn : cons_names) (Wd : iProp Σ) (E : coPset) :
++    cons_clean_tok cn ={E}=∗ cons_cred_inv cn Wd.
++  Proof.
++    iIntros "Hcl". rewrite /cons_cred_inv.
++    iApply (inv_alloc consN E (cons_cred_body cn Wd)).
++    iNext. rewrite /cons_cred_body. iLeft. iExact "Hcl".
++  Qed.
++
++  (* THE PAYER, at a mask that admits [consN].  It hands the credential in
++     and gets the marker out; a second payer finds the dirty arm and simply
++     takes a copy of the marker.  ATOMIC: the invariant is closed again
++     before anything else happens, so nothing is held open across a step --
++     which is the whole reason the credential is here and not in the
++     caller's hands across the sleeping call. *)
++  Lemma cons_cred_pay (cn : cons_names) (Wd : iProp Σ) (E : coPset) :
++    ↑consN ⊆ E ->
++    cons_cred_inv cn Wd -∗ cons_dirty_cred Wd ={E}=∗ cons_dirty_lb cn.
++  Proof.
++    intro HE. rewrite /cons_dirty_cred /cons_dirty_lb /cons_cred_inv.
++    iIntros "#Hinv #Hcred".
++    iInv "Hinv" as "Hbody" "Hclose".
++    iEval (rewrite /cons_cred_body) in "Hbody".
++    iDestruct "Hbody" as "[>Htok | [>#Hlb _]]".
++    - iMod (mono_nat_own_update 1%nat with "Htok") as "[_ #Hlb]"; [ lia | ].
++      iMod ("Hclose" with "[]") as "_".
++      { iNext. rewrite /cons_cred_body. iRight.
++        iSplitR; [ iExact "Hlb" | iExact "Hcred" ]. }
++      iModIntro. iExact "Hlb".
++    - iMod ("Hclose" with "[]") as "_".
++      { iNext. rewrite /cons_cred_body. iRight.
++        iSplitR; [ iExact "Hlb" | iExact "Hcred" ]. }
++      iModIntro. iExact "Hlb".
++  Qed.
++
++  (* THE READER.  The marker rules out the clean arm, so the credential is
++     there; it is PERSISTENT, so a copy comes out and the invariant closes
++     unchanged.  The [▷] is the invariant's own -- [Wd] is an arbitrary
++     application [iProp] and nothing strips a later off one -- and the site
++     that uses this ([ProofConsoleread]'s tokenless read, and the token
++     holder's receipt) takes the open around a machine step, where the step
++     strips it. *)
++  Lemma cons_cred_read (cn : cons_names) (Wd : iProp Σ) (E : coPset) :
++    ↑consN ⊆ E ->
++    cons_cred_inv cn Wd -∗ cons_dirty_lb cn ={E}=∗ ▷ cons_dirty_cred Wd.
++  Proof.
++    intro HE. rewrite /cons_dirty_cred /cons_dirty_lb /cons_cred_inv.
++    iIntros "#Hinv #Hlb".
++    iInv "Hinv" as "Hbody" "Hclose".
++    iEval (rewrite /cons_cred_body) in "Hbody".
++    iDestruct "Hbody" as "[>Htok | [_ #Hcred]]".
++    - iDestruct (mono_nat_lb_own_valid with "Htok Hlb") as %[_ Hle]. lia.
++    - iMod ("Hclose" with "[]") as "_".
++      { iNext. rewrite /cons_cred_body. iRight.
++        iSplitR; [ iExact "Hlb" | iExact "Hcred" ]. }
++      iModIntro. iExact "Hcred".
++  Qed.
++
++  Definition cons_res (cn : cons_names) : iProp Σ :=
 +    (∃ (r w e : mword 32) (bs : list (bv 8)) (ts : list (option (list mobs)))
 +       (cur nrd : nat) (st pd : list (list mobs * bv 8))
 +       (hh : option (list mobs)),
         a_cons_r ↦₄ r ∗
         a_cons_w ↦₄ w ∗
         a_cons_e ↦₄ e ∗
-@@ -671,10 +917,45 @@ Section ConsoleInv.
+@@ -671,10 +1292,109 @@ Section ConsoleInv.
         ⌜length ts = INPUT_BUF_SIZE⌝ ∗
         ⌜cons_ok r w e⌝ ∗
         ⌜cons_row r e bs ts⌝ ∗
 -       cons_data bs ∗ cons_tags ts)%I.
--
--  Global Instance cons_res_timeless : Timeless cons_res.
--  Proof. apply _. Qed.
 +       ⌜cons_stored r w cur st bs ts⌝ ∗
 +       ⌜cons_pend r w e pd bs ts⌝ ∗
 +       ⌜cons_chain (st ++ pd)⌝ ∗
 +       ⌜cons_below (st ++ pd) hh⌝ ∗
 +       cons_data bs ∗ cons_tags ts ∗
 +       cons_stored_auth cn st ∗ cons_cursor cn nrd ∗ cons_hi cn hh ∗
-+       (⌜cur = nrd⌝ ∨ cons_dirty Wd))%I.
++       (⌜cur = nrd⌝ ∨ cons_dirty_lb cn))%I.
 +
 +  (* WHAT A CONSOLE READ COSTS ITS CALLER, AND WHAT IT HANDS BACK.  One
-+     [option] and two arms, the same shape the syscall's deposit relays:
-+     [Some nrd] is a caller holding the reader token at its own position;
-+     [None] is a caller that holds none and pays the price instead.  The
-+     [None] arm is what the GENERIC slot's supply law discharges, which is
-+     why it exists at all. *)
++     [option] and two arms -- BELOW the fileread tier only: consoleread's
++     own contract keeps the two arms because the two callers reach it with
++     different resources, and [cons_acc] below is where the one arm the
++     SYSCALL's deposit relays is assembled out of them.  [Some nrd] is a
++     caller holding the reader token at its own position; [None] is a caller
++     that holds none and pays the credential instead. *)
 +  Definition cons_pay (cn : cons_names) (Wd : iProp Σ)
 +      (ord : option nat) : iProp Σ :=
 +    match ord with
 +    | Some nrd => cons_reader cn nrd
-+    | None => cons_dirty Wd
++    | None => cons_dirty_cred Wd
 +    end%I.
 +
 +  (* [cur] is where the ring's committed sequence actually stood when the
 +     call read it, and [dc] how far the cursor moved.  A token holder gets
 +     its half back at [cur + dc] together with the one fact it cares about:
 +     either the window it was just handed begins at ITS OWN position, or
-+     somebody read behind its back and left the price behind. *)
++     somebody read behind its back -- and then the CREDENTIAL, read out of
++     the escrow against the ring's marker, which is what sends the holder's
++     continuation generic. *)
 +  Definition cons_out (cn : cons_names) (Wd : iProp Σ) (ord : option nat)
 +      (cur dc : nat) : iProp Σ :=
 +    match ord with
 +    | Some nrd =>
-+        cons_reader cn (cur + dc)%nat ∗ (⌜cur = nrd⌝ ∨ cons_dirty Wd)
++        cons_reader cn (cur + dc)%nat ∗ (⌜cur = nrd⌝ ∨ cons_dirty_cred Wd)
 +    | None => emp
 +    end%I.
 +
-+  Global Instance cons_res_timeless cn Wd : Timeless (cons_res cn Wd).
++  (* ---- THE ONE ARM THE SYSCALL'S DEPOSIT RELAYS -----------------------
++
++     [cons_acc cn Wd Rd] is what a caller of read(0, ..) supplies, and [Rd
++     cur dc] is what that caller chooses to get back -- at the position
++     [cur] the ring's committed sequence stood at and the advance [dc] the
++     cursor made.  ONE ARM, TWO DISJUNCTS, and the caller picks:
++
++       a LEASE HOLDER hands in the reader token at its own [n] and a wand
++       that turns consoleread's [cons_out] into whatever it wants to know
++       (for sh: that the window began at ITS position, and its token back);
++
++       a TAINTED OR GENERIC caller hands in the credential it already holds
++       -- the application's claim of every view, which for a constraining
++       application is exactly what the taint provides -- and owes [Rd] at
++       every position, which for a caller that tracks nothing is [True].
++
++     THIS IS WHY THERE IS NO [option] ABOVE THE FILEREAD TIER: the two
++     callers differ in WHICH DISJUNCT they supply, not in the shape of the
++     deposit, so one leaf and one post serve both.  The holder's half goes
++     INERT under the taint -- nothing reclaims it, and its continuation
++     reads the console on the credential like anyone else. *)
++  Definition cons_acc (cn : cons_names) (Wd : iProp Σ)
++      (Rd : nat -> nat -> iProp Σ) : iProp Σ :=
++    ((∃ n : nat, cons_reader cn n ∗
++        (∀ cur dc : nat, cons_out cn Wd (Some n) cur dc -∗ Rd cur dc))
++     ∨ (cons_dirty_cred Wd ∗ ∀ cur dc : nat, Rd cur dc))%I.
++
++  (* the tainted/generic caller's constructor, which is the whole of
++     [FsAbsInvFire.fsabs_fileread_in]'s console case *)
++  Lemma cons_acc_cred (cn : cons_names) (Wd : iProp Σ)
++      (Rd : nat -> nat -> iProp Σ) :
++    cons_dirty_cred Wd -∗ (∀ cur dc : nat, Rd cur dc) -∗ cons_acc cn Wd Rd.
++  Proof. iIntros "#Hc HR". rewrite /cons_acc. iRight. by iFrame "Hc HR". Qed.
++
++  (* ...and the lease holder's *)
++  Lemma cons_acc_reader (cn : cons_names) (Wd : iProp Σ) (n : nat)
++      (Rd : nat -> nat -> iProp Σ) :
++    cons_reader cn n -∗
++    (∀ cur dc : nat, cons_out cn Wd (Some n) cur dc -∗ Rd cur dc) -∗
++    cons_acc cn Wd Rd.
 +  Proof.
-+    rewrite /cons_res /cons_stored_auth /cons_cursor /cons_hi /cons_dirty.
++    iIntros "Hrd Hw". rewrite /cons_acc. iLeft. iExists n. iFrame "Hrd Hw".
++  Qed.
+ 
+-  Global Instance cons_res_timeless : Timeless cons_res.
+-  Proof. apply _. Qed.
++  (* THE ARM THAT DELIVERED NOTHING.  Every -1 exit of the device arm -- a
++     null [devsw] slot, a major out of range, the [n < 0] sign guard, and
++     consoleread's own killed return -- has to hand the caller back what it
++     asked for without having read the ring at all.  It can: a lease holder
++     gets its own token back at its own position and zero advance, and a
++     tainted caller owes nothing to begin with. *)
++  Lemma cons_acc_ret (cn : cons_names) (Wd : iProp Σ)
++      (Rd : nat -> nat -> iProp Σ) :
++    cons_acc cn Wd Rd -∗ ∃ cur dc : nat, Rd cur dc.
++  Proof.
++    rewrite /cons_acc. iIntros "[Hl | [_ Hr]]";
++      [ | iExists 0%nat, 0%nat; iApply "Hr" ].
++    iDestruct "Hl" as (n) "[Hrd Hw]".
++    iExists n, 0%nat. iApply ("Hw" $! n 0%nat).
++    rewrite /cons_out Nat.add_0_r. iFrame "Hrd". iLeft. by iPureIntro.
++  Qed.
++
++  Global Instance cons_res_timeless cn : Timeless (cons_res cn).
++  Proof.
++    rewrite /cons_res /cons_stored_auth /cons_cursor /cons_hi /cons_dirty_lb.
 +    apply _.
 +  Qed.
  
  End ConsoleInv.
  
-@@ -701,8 +982,11 @@ Section ConsoleCtx.
+@@ -701,8 +1421,11 @@ Section ConsoleCtx.
    Definition cons_data_at (ξ : CtxId) (bs : list (bv 8)) : iProp Σ :=
      ([∗ list] j ↦ b ∈ bs,
         ctx_pointsto ξ (pa_add a_cons (cons_buf_off + j)) (DfracOwn 1) b)%I.
 -  Definition cons_res_at (ξ : CtxId) : iProp Σ :=
 -    (∃ (r w e : mword 32) (bs : list (bv 8)) (ts : list (option (list mobs))),
-+  Definition cons_res_at (cn : cons_names) (Wd : iProp Σ)
++  Definition cons_res_at (cn : cons_names)
 +      (ξ : CtxId) : iProp Σ :=
 +    (∃ (r w e : mword 32) (bs : list (bv 8)) (ts : list (option (list mobs)))
 +       (cur nrd : nat) (st pd : list (list mobs * bv 8))
@@ -406,7 +858,7 @@ index 8281ca684..addc00afe 100644
         ctx_word4_pointsto ξ a_cons_r (DfracOwn 1) r ∗
         ctx_word4_pointsto ξ a_cons_w (DfracOwn 1) w ∗
         ctx_word4_pointsto ξ a_cons_e (DfracOwn 1) e ∗
-@@ -710,20 +994,30 @@ Section ConsoleCtx.
+@@ -710,20 +1433,52 @@ Section ConsoleCtx.
         ⌜length ts = INPUT_BUF_SIZE⌝ ∗
         ⌜cons_ok r w e⌝ ∗
         ⌜cons_row r e bs ts⌝ ∗
@@ -418,15 +870,17 @@ index 8281ca684..addc00afe 100644
 +       ⌜cons_below (st ++ pd) hh⌝ ∗
 +       cons_data_at ξ bs ∗ cons_tags ts ∗
 +       cons_stored_auth cn st ∗ cons_cursor cn nrd ∗ cons_hi cn hh ∗
-+       (⌜cur = nrd⌝ ∨ cons_dirty Wd))%I.
-+  Lemma cons_res_at_cur (cn : cons_names) (Wd : iProp Σ) :
-+    cons_res_at cn Wd cur_ctx = cons_res cn Wd.
++       (⌜cur = nrd⌝ ∨ cons_dirty_lb cn))%I.
++  Lemma cons_res_at_cur (cn : cons_names) :
++    cons_res_at cn cur_ctx = cons_res cn.
    Proof. reflexivity. Qed.
 -  Global Instance cons_res_at_morph : CtxMorph cons_res_at.
 -  Proof. rewrite /cons_res_at /cons_data_at. ctx_morph_solve. Qed.
-+  Global Instance cons_res_at_morph (cn : cons_names) (Wd : iProp Σ) :
-+    CtxMorph (cons_res_at cn Wd).
-+  Proof. rewrite /cons_res_at /cons_data_at /cons_dirty. ctx_morph_solve. Qed.
++  Global Instance cons_res_at_morph (cn : cons_names) :
++    CtxMorph (cons_res_at cn).
++  Proof.
++    rewrite /cons_res_at /cons_data_at /cons_dirty_lb. ctx_morph_solve.
++  Qed.
  
    (* THE WHOLE CREDENTIAL.  Persistent, singleton, and taken by value: a
       caller of consoleread passes this and nothing else about the console.
@@ -434,17 +888,38 @@ index 8281ca684..addc00afe 100644
       the ring re-indexes to whichever context holds the lock. *)
 -  Definition is_conslock (γ : gname) : iProp Σ :=
 -    is_lock γ a_cons "cons"%string cons_res_at.
+-
+-  Global Instance is_conslock_persistent γ : Persistent (is_conslock γ).
++  (* ...AND THE ESCROW RIDES WITH IT (the timelessness split above).  The
++     lock's payload is the ring alone -- timeless, as acquire needs -- and
++     the credential [Wd] the ring's marker stands for is reached through the
++     persistent [cons_cred_inv] conjoined here, so every caller that already
++     takes [is_conslock] (consoleread, consoleintr, fileread) reaches it
++     without a new premise.  Both conjuncts are persistent and neither
++     mentions [XI], so [is_conslock] is still a CLOSED term. *)
 +  Definition is_conslock (cn : cons_names) (Wd : iProp Σ)
 +      (γ : gname) : iProp Σ :=
-+    is_lock γ a_cons "cons"%string (cons_res_at cn Wd).
- 
--  Global Instance is_conslock_persistent γ : Persistent (is_conslock γ).
++    (is_lock γ a_cons "cons"%string (cons_res_at cn) ∗ cons_cred_inv cn Wd)%I.
++
++  Lemma is_conslock_lock (cn : cons_names) (Wd : iProp Σ) (γ : gname) :
++    is_conslock cn Wd γ -∗ is_lock γ a_cons "cons"%string (cons_res_at cn).
++  Proof. rewrite /is_conslock. by iIntros "[$ _]". Qed.
++
++  Lemma is_conslock_cred (cn : cons_names) (Wd : iProp Σ) (γ : gname) :
++    is_conslock cn Wd γ -∗ cons_cred_inv cn Wd.
++  Proof. rewrite /is_conslock. by iIntros "[_ $]". Qed.
++
++  Lemma is_conslock_intro (cn : cons_names) (Wd : iProp Σ) (γ : gname) :
++    is_lock γ a_cons "cons"%string (cons_res_at cn) -∗
++    cons_cred_inv cn Wd -∗ is_conslock cn Wd γ.
++  Proof. rewrite /is_conslock. iIntros "#H1 #H2". by iFrame "H1 H2". Qed.
++
 +  Global Instance is_conslock_persistent cn Wd γ :
 +    Persistent (is_conslock cn Wd γ).
    Proof. apply _. Qed.
  
    (* =================================================================== *)
-@@ -751,10 +1045,12 @@ Section ConsoleCtx.
+@@ -751,10 +1506,12 @@ Section ConsoleCtx.
    Global Instance devsw_table_persistent : Persistent devsw_table.
    Proof. apply _. Qed.
  
@@ -460,7 +935,7 @@ index 8281ca684..addc00afe 100644
    Proof. apply _. Qed.
  
    (* THE GNAME-FREE FORM, which is what a bundle carries.  The cons lock has
-@@ -765,22 +1061,26 @@ Section ConsoleCtx.
+@@ -765,22 +1522,26 @@ Section ConsoleCtx.
       builds its callee's names record around what it got.  That is what keeps
       the console out of [fclose_names] (a positional record threaded through
       six files) and out of [FsReady.fs_ready]. *)
@@ -493,7 +968,7 @@ index 8281ca684..addc00afe 100644
    Proof. by iIntros "[_ $]". Qed.
  
    (* ---- ONE ENTRY, at a major the caller has already bounded ---------- *)
-@@ -1067,14 +1367,15 @@ Section ConsoleMorph.
+@@ -1067,24 +1828,25 @@ Section ConsoleMorph.
       forkret park carries [console_ready] in [UsertrapRes.park_globals]).
       The cons lock's payload is the closed [cons_res_at], so the handle
       moves by [WpLock.is_lock_morph] alone (its floor's transport). *)
@@ -504,16 +979,18 @@ index 8281ca684..addc00afe 100644
 +    CtxMorph (λ ξ0 : CtxId, console_inv (XI := ξ0) cn Wd γ).
    Proof.
      iIntros (ξ ξ') "Hd H". rewrite /console_inv /is_conslock.
-     iDestruct "H" as "[#Hlk Ht]".
+-    iDestruct "H" as "[#Hlk Ht]".
++    iDestruct "H" as "[[#Hlk #Hcr] Ht]".
      iMod (devsw_table_morph ξ ξ' with "Hd Ht") as "[Hd Ht]".
 -    iMod (is_lock_morph_local γ a_cons "cons"%string cons_res_at ξ ξ' with "Hd Hlk")
 -      as "[Hd #Hlk']".
-+    iMod (is_lock_morph_local γ a_cons "cons"%string (cons_res_at cn Wd) ξ ξ'
+-    iModIntro. iFrame "Hd Ht Hlk'".
++    iMod (is_lock_morph_local γ a_cons "cons"%string (cons_res_at cn) ξ ξ'
 +            with "Hd Hlk") as "[Hd #Hlk']".
-     iModIntro. iFrame "Hd Ht Hlk'".
++    iModIntro. iFrame "Hd Ht Hlk' Hcr".
    Qed.
  
-@@ -1082,9 +1383,9 @@ Section ConsoleMorph.
+   Global Instance console_ready_morph :
      CtxMorph (λ ξ0 : CtxId, console_ready (XI := ξ0)).
    Proof.
      iIntros (ξ ξ') "Hd H". rewrite /console_ready.
@@ -527,31 +1004,52 @@ index 8281ca684..addc00afe 100644
  
  
 diff --git a/iris/FsAbsInvFire.v b/iris/FsAbsInvFire.v
-index 49b0d6611..32ca8963f 100644
+index 49b0d6611..85f45e7d9 100644
 --- a/iris/FsAbsInvFire.v
 +++ b/iris/FsAbsInvFire.v
-@@ -247,13 +247,20 @@ Section FsAbsInvFire.
+@@ -247,14 +247,38 @@ Section FsAbsInvFire.
       row and no offset invariant is needed, and no application step is paid
       -- a read moves no row.  This is what makes read's bundle payable by
       an arbitrary user process under the ARM. *)
-+  (* ...AND AT [None] ON THE CONSOLE ARM (app-echo.md, lane CONS-CURSOR,
-+     C3).  A read of the console at [Some nrd] costs the READER TOKEN, which
-+     a generic process does not have and this supply cannot mint; at [None]
-+     the arm is [emp], exactly as it was before the cursor existed.  That is
-+     why the deposit's cursor is an [option] and not a [nat]: the law below
-+     is a FIELD of [UexecSG]'s class ([xv6_sbundle_of_supply_ne]) and has to
-+     hold at EVERY number for an arbitrary program. *)
++  (* ...AND THE CONSOLE ARM IS PAID FROM THE SUPPLY ITSELF (app-echo.md,
++     lane CONS-CURSOR, C3, and the LEASE ruling).  A read of the console
++     takes [ConsoleInv.cons_acc fsc_cons app_sup Rd] -- ONE ARM, two
++     disjuncts -- and this is the TAINTED one: the caller hands in the
++     credential it already holds, which is [app_sup] itself, and owes [Rd]
++     at every position, which at the generic family's [fun _ _ => True] is
++     free.
++
++     THAT IS WHY THE ARM IS NOT AN EXCLUSIVE TOKEN.  The law below is a
++     FIELD of [UexecSG]'s class ([xv6_sbundle_of_supply_ne]), stated at
++     [□ ssupply], and has to hold at EVERY number for an arbitrary program:
++     a console arm demanding the reader token would not merely be
++     unprovable there -- taken as a [□] premise it is INCONSISTENT (open it
++     three times and hold [ghost_var γ (1/2) _] thrice), which would make
++     every generic corollary vacuous while the audit still printed the
++     thirteen.  So the arm is payable from a PERSISTENT credential, and the
++     one the generic slot already runs on is the one it takes. *)
    Lemma fsabs_fileread_in (st : fdstate) :
 -    ⊢ fileread_in st (pfam_triv (fun _ _ _ _ => True%I)).
-+    ⊢ fileread_in st (pfam_triv (fun _ _ _ _ => True%I)) None.
++    app_sup -∗ fileread_in st (pfam_triv (fun _ _ _ _ => True%I))
++                            (fun _ _ => True%I).
    Proof.
      rewrite /fileread_in.
-     destruct st as [| rb wb ty]; [done |].
-     destruct rb; [| done].
+-    destruct st as [| rb wb ty]; [done |].
+-    destruct rb; [| done].
 -    destruct ty as [i γo | | ma]; [| done | done].
-+    destruct ty as [i γo | | ma]; [| done | by case_decide].
-     iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo).
+-    iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo).
++    destruct st as [| rb wb ty]; [by iIntros "_" |].
++    destruct rb; [| by iIntros "_"].
++    destruct ty as [i γo | | ma].
++    - iIntros "_". iApply (fsabs_aread (fs_gamma_L fsc_fs) i γo).
++    - by iIntros "_".
++    - case_decide; [| by iIntros "_"].
++      iIntros "#Hsup".
++      iApply (ConsoleInv.cons_acc_cred fsc_cons app_sup (fun _ _ => True%I)).
++      + rewrite /ConsoleInv.cons_dirty_cred. iModIntro. iExact "Hsup".
++      + iIntros (cur dc). done.
    Qed.
+ 
  
 diff --git a/iris/FsCfg.v b/iris/FsCfg.v
 index cda26fbda..30aaf8c94 100644
@@ -603,10 +1101,10 @@ index cd90461aa..998e63a1a 100644
      assert (Hset : (((((cov ∖ ({[ (1:Z) ]} : gset Z))
                           ∖ log_region_set (sb_logstart (fss_sb S)))
 diff --git a/iris/ObsTrace.v b/iris/ObsTrace.v
-index 830aae883..273f76d6e 100644
+index 830aae883..3e7d38c62 100644
 --- a/iris/ObsTrace.v
 +++ b/iris/ObsTrace.v
-@@ -229,6 +229,86 @@ Lemma obs_ends_in_snoc (h : list mobs) (b : bv 8) :
+@@ -229,6 +229,104 @@ Lemma obs_ends_in_snoc (h : list mobs) (b : bv 8) :
    obs_ends_in (h ++ [ObsUartIn b])%list b.
  Proof. by exists h. Qed.
  
@@ -670,6 +1168,24 @@ index 830aae883..273f76d6e 100644
 +  exact (hist_ext_of_prefix g h h' Hp Hx).
 +Qed.
 +
++(* "at or before" composed with "strictly before": the ring's high-water
++   mark sits at or before the popper's ANCHOR, and the byte just popped is
++   strictly after that anchor, so the mark is strictly before the byte.
++   That composition is what licenses consoleintr's store to extend the
++   ring's chain (app-echo.md, lane CONS-CURSOR, C2). *)
++Lemma ohist_ext_le_ext (a b : option (list mobs)) (h : list mobs) :
++  ohist_le a b -> ohist_ext b h -> ohist_ext a h.
++Proof.
++  destruct a as [x|]; [| done].
++  destruct b as [y|]; [| done]. cbn.
++  intros Hp Hx. exact (hist_ext_of_prefix x y h Hp Hx).
++Qed.
++
++(* "strictly before" implies "at or before" *)
++Lemma ohist_le_of_ext (a : option (list mobs)) (h : list mobs) :
++  ohist_ext a h -> ohist_le a (Some h).
++Proof. destruct a as [g|]; [| done]. cbn. by intros [Hp _]. Qed.
++
 +Lemma ohist_le_Some (h : list mobs) : ohist_le (Some h) (Some h).
 +Proof. cbn. reflexivity. Qed.
 +
@@ -693,6 +1209,1571 @@ index 830aae883..273f76d6e 100644
  Definition trace_shape (h : list mobs) (on : bool) : Prop :=
    foldl obs_step (Some false) h = Some on.
  
+diff --git a/iris/ProofConsoleinit.v b/iris/ProofConsoleinit.v
+index 800a54457..ea43ca31a 100644
+--- a/iris/ProofConsoleinit.v
++++ b/iris/ProofConsoleinit.v
+@@ -93,8 +93,9 @@ Section ConsoleinitBody.
+ 
+   Hypothesis wp_uartinit :
+     forall `{CID : CpuId} (γd : uart_names) (m : regfile) (K : nat)
+-      (l : list (bv 8)) (b0 : bool) (k : nat) (p : mword 64),
+-      wp_uartinit_sconf_body γd m K l b0 k p.
++      (l : list (bv 8)) (b0 : bool) (k : nat) (hl : option (list mobs))
++      (p : mword 64),
++      wp_uartinit_sconf_body γd m K l b0 k hl p.
+ 
+   Ltac reg_neq :=
+     lazymatch goal with
+@@ -103,9 +104,11 @@ Section ConsoleinitBody.
+ 
+   Lemma wp_consoleinit_sconf_gen (γd : uart_names)
+       (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool) (k : nat)
++      (hl : option (list mobs))
+       (vclock : bv 32) (vcname vccpu : bv 64)
+       (dread0 dwrite0 : mword 64) (p : mword 64) :
+-    wp_consoleinit_sconf_body γd m K l b0 k vclock vcname vccpu dread0 dwrite0 p.
++    wp_consoleinit_sconf_body γd m K l b0 k hl vclock vcname vccpu dread0
++      dwrite0 p.
+   Proof.
+     cbv beta delta [wp_consoleinit_sconf_body].
+     intros pcE ret_tgt clk c_cname c_ccpu HK.
+@@ -282,7 +285,7 @@ Section ConsoleinitBody.
+     iEval (rewrite Htgtua) in "Hpc".
+     assert (HU0sp : U0 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
+       by (rewrite /U0 upd_ne; [exact Hmilsp | reg_neq]).
+-    iApply (wp_uartinit γd U0 (K - 2)%nat l b0 k p
++    iApply (wp_uartinit γd U0 (K - 2)%nat l b0 k hl p
+               ltac:(lia) with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Htok Hdlab Hraw").
+     iIntros (mu) "Hcg Hpc %Huacs Htx #Hsent' Htok #Hdoff Hfresh".
+     assert (Hretua : ret_pc (U0 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.consoleinit + 0x20)).
+@@ -514,10 +517,11 @@ End ConsoleinitBody.
+ Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINIT.
+   Definition wp_consoleinit_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+       (γd : uart_names) (m : regfile) (K : nat)
+-      (l : list (bv 8)) (b0 : bool) (k : nat)
++      (l : list (bv 8)) (b0 : bool) (k : nat) (hl : option (list mobs))
+       (vclock : bv 32) (vcname vccpu : bv 64)
+       (dread0 dwrite0 : mword 64) (p : mword 64)
+-      : wp_consoleinit_sconf_body γd m K l b0 k vclock vcname vccpu dread0 dwrite0 p :=
++      : wp_consoleinit_sconf_body γd m K l b0 k hl vclock vcname vccpu dread0
++          dwrite0 p :=
+     (* Passed bare, [Initlock.wp_initlock_sconf]'s own implicit [CID] gets
+        EAGERLY specialized to THIS definition's [CID] (typeclass-style
+        implicit resolution fires on a bare reference), which is strictly
+@@ -529,7 +533,7 @@ Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINI
+     wp_consoleinit_sconf_gen
+       (fun `(CID' : CpuId) m' vlock' vname' vcpu' s' K' b' p' =>
+          Initlock.wp_initlock_sconf KT0 (CID:=CID') m' vlock' vname' vcpu' s' K' b' p')
+-      (fun `(CID' : CpuId) γd' m' K' l' b0' k' p' =>
+-         Uartinit.wp_uartinit_sconf (CID:=CID') γd' m' K' l' b0' k' p')
+-      γd m K l b0 k vclock vcname vccpu dread0 dwrite0 p.
++      (fun `(CID' : CpuId) γd' m' K' l' b0' k' hl' p' =>
++         Uartinit.wp_uartinit_sconf (CID:=CID') γd' m' K' l' b0' k' hl' p')
++      γd m K l b0 k hl vclock vcname vccpu dread0 dwrite0 p.
+ End ConsoleinitProof.
+diff --git a/iris/ProofConsoleintr.v b/iris/ProofConsoleintr.v
+index 722404f93..27154a7ef 100644
+--- a/iris/ProofConsoleintr.v
++++ b/iris/ProofConsoleintr.v
+@@ -461,8 +461,176 @@ Section CtBodies.
+     rewrite <- Hw. lia.
+   Qed.
+ 
++  (* =================================================================== *)
++  (*  THE RING'S GHOST HALF, as one proposition (app-echo.md, lane         *)
++  (*  CONS-CURSOR, C2).                                                    *)
++  (*                                                                       *)
++  (*  Every block of this function takes [ConsoleInv.cons_res] APART -- it *)
++  (*  reads and writes the three index words, so the ring cannot travel as *)
++  (*  an existential -- and the rest of the resource has to travel with it. *)
++  (*  Naming it keeps that to ONE conjunct and NO new binders: the committed *)
++  (*  prefix, the editable window, the consumed count, the reader's cursor,  *)
++  (*  the high-water mark and the dirty marker are all quantified HERE, and  *)
++  (*  only the two blocks that MOVE them ([ct_gh_commit], [ct_gh_push]) ever *)
++  (*  open it.                                                              *)
++  (* =================================================================== *)
++  Definition ct_gh `{XI : CurCtx} (cn : cons_names) (rr ww ee : mword 32)
++      (bs : list (bv 8)) (ts : list (option (list mobs))) : iProp Σ :=
++    (∃ (cur nrd : nat) (st pd : list (list mobs * bv 8))
++       (hh : option (list mobs)),
++       ⌜ cons_stored rr ww cur st bs ts ⌝ ∗
++       ⌜ cons_pend rr ww ee pd bs ts ⌝ ∗
++       ⌜ cons_chain (st ++ pd) ⌝ ∗
++       ⌜ cons_below (st ++ pd) hh ⌝ ∗
++       cons_stored_auth cn st ∗ cons_cursor cn nrd ∗ cons_hi cn hh ∗
++       (⌜ cur = nrd ⌝ ∨ cons_dirty_lb cn))%I.
++
++  (* the ring, assembled and taken apart, at the one shape every block of
++     this function speaks *)
++  Lemma ct_gh_res `{XI : CurCtx} (cn : cons_names) (rr ww ee : mword 32)
++      (bs : list (bv 8)) (ts : list (option (list mobs))) :
++    length bs = INPUT_BUF_SIZE -> length ts = INPUT_BUF_SIZE ->
++    cons_ok rr ww ee -> cons_row rr ee bs ts ->
++    a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗
++    cons_data bs -∗ cons_tags ts -∗ ct_gh cn rr ww ee bs ts -∗ cons_res cn.
++  Proof.
++    intros Hlb Hlt Hok Hrow.
++    iIntros "Hrc Hwc Hec Hdat Hts Hgh".
++    iDestruct "Hgh" as (cur nrd st pd hh)
++      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hmk)".
++    rewrite /cons_res. iExists rr, ww, ee, bs, ts, cur, nrd, st, pd, hh.
++    iFrame "Hrc Hwc Hec Hdat Hts Ha Hcur Hhi Hmk".
++    iPureIntro. split_and!;
++      [ exact Hlb | exact Hlt | exact Hok | exact Hrow | exact Hst | exact Hpd
++      | exact Hch | exact Hbl ].
++  Qed.
++
++  Lemma ct_res_gh `{XI : CurCtx} (cn : cons_names) :
++    cons_res cn -∗
++    ∃ (rr ww ee : mword 32) (bs : list (bv 8))
++      (ts : list (option (list mobs))),
++      ⌜ length bs = INPUT_BUF_SIZE ⌝ ∗ ⌜ length ts = INPUT_BUF_SIZE ⌝ ∗
++      ⌜ cons_ok rr ww ee ⌝ ∗ ⌜ cons_row rr ee bs ts ⌝ ∗
++      a_cons_r ↦₄ rr ∗ a_cons_w ↦₄ ww ∗ a_cons_e ↦₄ ee ∗
++      cons_data bs ∗ cons_tags ts ∗ ct_gh cn rr ww ee bs ts.
++  Proof.
++    iIntros "H". rewrite /cons_res.
++    iDestruct "H" as (rr ww ee bs ts cur nrd st pd hh)
++      "(Hrc & Hwc & Hec & %Hlb & %Hlt & %Hok & %Hrow & %Hst & %Hpd & %Hch &
++        %Hbl & Hdat & Hts & Ha & Hcur & Hhi & Hmk)".
++    iExists rr, ww, ee, bs, ts.
++    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
++    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
++    iFrame "Hrc Hwc Hec Hdat Hts".
++    rewrite /ct_gh. iExists cur, nrd, st, pd, hh.
++    iFrame "Ha Hcur Hhi Hmk". iPureIntro. split_and!;
++      [ exact Hst | exact Hpd | exact Hch | exact Hbl ].
++  Qed.
++
++  (* THE EDIT ([cons.e--], backspace and C('U')): the editable window loses
++     its last entry.  The committed prefix is out of reach -- the code tests
++     [cons.e != cons.w] first -- so [stored] never shrinks, and the chain
++     and the mark survive because a prefix of a chain is a chain. *)
++  Lemma ct_gh_pop `{XI : CurCtx} (cn : cons_names) (rr ww ee : mword 32)
++      (bs : list (bv 8)) (ts : list (option (list mobs))) :
++    ee <> ww ->
++    ct_gh cn rr ww ee bs ts -∗
++    ct_gh cn rr ww (add_vec ee (mword_of_int (-1) : mword 32)) bs ts.
++  Proof.
++    intro Hne. iIntros "Hgh".
++    iDestruct "Hgh" as (cur nrd st pd hh)
++      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hmk)".
++    pose proof (cons_sub_ne ee ww Hne) as Hge.
++    pose proof (proj1 Hpd) as Hlpd.
++    assert (Hpdne : pd <> []).
++    { intro Hc. rewrite Hc in Hlpd. cbn [length] in Hlpd. lia. }
++    set (dflt := (inhabitant : list mobs * bv 8)).
++    pose proof (app_removelast_last dflt Hpdne) as Hsplit.
++    assert (Hpfx : removelast pd `prefix_of` pd)
++      by (exists [last pd dflt]; exact Hsplit).
++    rewrite /ct_gh.
++    iExists cur, nrd, st, (removelast pd), hh.
++    iFrame "Ha Hcur Hhi Hmk". iPureIntro. split_and!.
++    - exact Hst.
++    - apply (cons_pend_pop rr ww ee (removelast pd) (last pd dflt) bs ts Hge).
++      rewrite <- Hsplit. exact Hpd.
++    - apply (cons_chain_prefix (st ++ removelast pd) (st ++ pd));
++        [ apply prefix_app; exact Hpfx | exact Hch ].
++    - apply (cons_below_prefix (st ++ removelast pd) (st ++ pd) hh);
++        [ apply prefix_app; exact Hpfx | exact Hbl ].
++  Qed.
++
++  (* THE COMMIT ([cons.w = cons.e]): the editable window becomes part of
++     the committed prefix, and the window empties.  THE ONLY TRANSITION THAT
++     EXTENDS [stored], reached from '\n', from C('D') and from the store
++     that fills the ring. *)
++  Lemma ct_gh_commit `{XI : CurCtx} (cn : cons_names) (rr ww ee : mword 32)
++      (bs : list (bv 8)) (ts : list (option (list mobs))) :
++    cons_ok rr ww ee ->
++    ct_gh cn rr ww ee bs ts ==∗ ct_gh cn rr ee ee bs ts.
++  Proof.
++    intro Hok. iIntros "Hgh".
++    iDestruct "Hgh" as (cur nrd st pd hh)
++      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hmk)".
++    iMod (cons_stored_append cn st pd with "Ha") as "Ha".
++    iModIntro. rewrite /ct_gh.
++    iExists cur, nrd, ((st ++ pd)%list), (@nil (list mobs * bv 8)), hh.
++    iFrame "Ha Hcur Hhi Hmk". iPureIntro. rewrite app_nil_r.
++    split_and!;
++      [ exact (cons_stored_commit rr ww ee cur st pd bs ts Hok Hst Hpd)
++      | exact (cons_pend_commit rr ee bs ts) | exact Hch | exact Hbl ].
++  Qed.
++
++  (* THE STORE at [cons.e]: the byte joins the editable window, its tag
++     joins the column, and the ring's HIGH-WATER MARK moves to it.  The
++     caller's half of the mark comes in and goes back out at the byte just
++     filed, which is what re-establishes the PLIC payload's own clause at
++     the popper's new anchor. *)
++  Lemma ct_gh_push `{XI : CurCtx} (cn : cons_names) (rr ww ee : mword 32)
++      (bs : list (bv 8)) (ts : list (option (list mobs)))
++      (i : nat) (h : list mobs) (c : bv 8) (hh : option (list mobs)) :
++    length bs = INPUT_BUF_SIZE -> length ts = INPUT_BUF_SIZE ->
++    cons_ok rr ww ee ->
++    (bv_unsigned (sub_vec ee rr) < Z.of_nat INPUT_BUF_SIZE)%Z ->
++    i = cons_slot ee 0 ->
++    obs_ends_in h c ->
++    ohist_ext hh h ->
++    uart_rx_hi (cn_uart cn) (1/2) hh -∗
++    ct_gh cn rr ww ee bs ts ==∗
++      uart_rx_hi (cn_uart cn) (1/2) (Some h) ∗
++      ct_gh cn rr ww (add_vec ee (mword_of_int 1 : mword 32))
++        (<[i := cons_xlate c]> bs) (<[i := Some h]> ts).
++  Proof.
++    intros Hlb Hlt Hok Hroom Hi Hends Hx.
++    iIntros "Hhi0 Hgh".
++    iDestruct "Hgh" as (cur nrd st pd hh1)
++      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hmk)".
++    (* the two halves of the mark agree, which is what makes the ambient
++       [ohist_ext hh h] a statement about the RING's own picture *)
++    rewrite /cons_hi /uart_rx_hi.
++    iDestruct (ghost_var_agree with "Hhi0 Hhi") as %<-.
++    iMod (ghost_var_update_halves (Some h) with "Hhi0 Hhi") as "[Hhi0 Hhi]".
++    iModIntro. iFrame "Hhi0". rewrite /ct_gh.
++    iExists cur, nrd, st, ((pd ++ [(h, c)])%list), (Some h).
++    iFrame "Ha Hcur Hhi Hmk". iPureIntro. rewrite app_assoc.
++    split_and!.
++    - exact (cons_stored_ins rr ww cur st bs ts i h c ee Hok Hroom Hi Hst).
++    - exact (cons_pend_push rr ww ee pd bs ts i h c Hlb Hlt Hok Hroom Hi
++               Hends Hpd).
++    - exact (cons_chain_snoc ((st ++ pd)%list) hh h c Hch Hbl Hx).
++    - exact (cons_below_snoc ((st ++ pd)%list) hh h c Hbl Hx).
++  Qed.
++
++  (* WHAT THE CALLER GETS BACK: the high-water half, at whatever history the
++     ring ended up holding -- the byte just filed if it was filed, and the
++     mark unmoved if the byte was dropped or merely edited away. *)
++  Definition ct_hi_out (γu : uart_names) (hb : list mobs) : iProp Σ :=
++    (∃ hh' : option (list mobs),
++       uart_rx_hi γu (1/2) hh' ∗ ⌜ ohist_le hh' (Some hb) ⌝)%I.
++
+   (* the function's own exit, as a [wp_next] at the entry hart *)
+-  Definition ct_ret `{CID0 : CpuId} `{XI : CurCtx} (pme : mword 64) (m0 : regfile)
++  Definition ct_ret `{CID0 : CpuId} `{XI : CurCtx} (γu : uart_names)
++      (hb : list mobs) (pme : mword 64) (m0 : regfile)
+       (K lvl : nat) (eb : bool) (b : bool) (lks : gset string) : iProp Σ :=
+     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
+        ∀ Mf : regfile,
+@@ -470,12 +638,14 @@ Section CtBodies.
+          sie_cap_gpr KT1 Mf K b pme -∗
+          cpu_own lvl eb pme b lks -∗
+          kernel_text -∗ pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
++         ct_hi_out γu hb -∗
+          WP (Loop : expr riscv_lang)))%I.
+ 
+   (* =================================================================== *)
+   (*  +0x110 .. +0x118 -- THE EPILOGUE.                                   *)
+   (* =================================================================== *)
+   Lemma ct_epi `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
++      (γu : uart_names) (hb : list mobs)
+       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
+       (sp0 : mword 64) (b : bool) (lks : gset string) :
+     m0 !!! Regidx csp_rs1 = sp0 ->
+@@ -487,12 +657,12 @@ Section CtBodies.
+     sie_cap_gpr KT1 M (K - 6)%nat b pme -∗
+     cpu_own lvl eb pme b lks -∗
+     pc_is (mword_of_int (CT + 0x110)) -∗
+-    ct_saved sp0 m0 -∗ ct_rest sp0 -∗
+-    ct_ret (CID0 := CID0) pme m0 K lvl eb b lks -∗
++    ct_saved sp0 m0 -∗ ct_rest sp0 -∗ ct_hi_out γu hb -∗
++    ct_ret (CID0 := CID0) γu hb pme m0 K lvl eb b lks -∗
+     WP (Loop : expr riscv_lang).
+   Proof.
+     intros Hm0sp HMsp HMcs HK Hcr.
+-    iIntros "#Ht Hcg Hcnt Hpc (K1 & K2 & K3) Hrest Hcont".
++    iIntros "#Ht Hcg Hcnt Hpc (K1 & K2 & K3) Hrest Hhiout Hcont".
+     assert (Hb1 : add_vec (pa_stk sp0 6%nat)
+                     (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))
+                   = pa_stk sp0 1) by (apply ct_slot_bridge; pcw).
+@@ -605,7 +775,7 @@ Section CtBodies.
+                  with "Hcnt") as "Hcnt".
+     rewrite /ct_ret.
+     iSpecialize ("Hcont" $! CIDr with "[%]"); [wp_next_chain|].
+-    iApply ("Hcont" $! E4 with "[%] Hcg Hcnt Ht Hpc").
++    iApply ("Hcont" $! E4 with "[%] Hcg Hcnt Ht Hpc Hhiout").
+     split; [exact Hcs | intro r; apply rf_to_gmap_dom].
+   Qed.
+ 
+@@ -629,6 +799,7 @@ Section ProofConsoleintr.
+   (*  is a continuation and the epilogue is written once.                 *)
+   (* =================================================================== *)
+   Definition ct_exit_prop `{CID0 : CpuId}
++      (γu : uart_names) (hb : list mobs) (cn : cons_names)
+       (γc : gname) (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
+       (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
+     (wp_next (CID0 := CID0) b pme (fun (CIDx : CpuId) =>
+@@ -640,11 +811,13 @@ Section ProofConsoleintr.
+          cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
+          arm_pay KT1 lvl eb pme -∗
+          locked γc cpu_id -∗
+-         cons_res -∗
++         cons_res cn -∗
+          ct_rest sp0 -∗
++         ct_hi_out γu hb -∗
+          WP (Loop : expr riscv_lang)))%I.
+ 
+-  Lemma ct_mk_exit (γc : gname) (pme : mword 64) (m0 : regfile) (K lvl : nat)
++  Lemma ct_mk_exit (γu : uart_names) (hb : list mobs) (cn : cons_names)
++      (γc : gname) (pme : mword 64) (m0 : regfile) (K lvl : nat)
+       (eb : bool) (b : bool) (sp0 : mword 64) (lks : gset string) :
+     m0 !!! Regidx csp_rs1 = sp0 ->
+     (consoleintr_stack <= K)%nat ->
+@@ -653,15 +826,16 @@ Section ProofConsoleintr.
+        [{["cons"]} ∪ lks], and release needs [lock_rank "cons"] to
+        drop back OUT of it cleanly, i.e. ["cons" ∉ lks]. *)
+     locks_below lks "cons" ->
+-    kernel_text -∗ is_conslock γc -∗ ct_saved sp0 m0 -∗
+-    ct_ret (CID0 := CID) pme m0 K lvl eb b lks -∗
+-    ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks.
++    kernel_text -∗
++    is_lock γc a_cons "cons"%string (cons_res_at cn) -∗ ct_saved sp0 m0 -∗
++    ct_ret (CID0 := CID) γu hb pme m0 K lvl eb b lks -∗
++    ct_exit_prop (CID0 := CID) γu hb cn γc pme m0 K lvl eb b sp0 lks.
+   Proof.
+     intros Hm0sp HK Hb Hbelow. subst b.
+     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
+     iIntros "#Ht #Hlk Hsaved Hcont".
+     rewrite /ct_exit_prop.
+-    iIntros (CIDx Hsx M) "%Hsp %Hcs Hcg Hpc Hcnt Hpay Hlocked Hres Hrest".
++    iIntros (CIDx Hsx M) "%Hsp %Hcs Hcg Hpc Hcnt Hpay Hlocked Hres Hrest Hhiout".
+     (* +0x104 auipc a0,0x12 ; +0x108 addi a0,a0,-272 : a0 := &cons *)
+     iApply (wp_auipc_s_sconf (mword_of_int (CT + 0x104)) Ra0 (mword_of_int 18 : mword 20)
+               M (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat false ltac:(nz) ltac:(rdok)
+@@ -715,7 +889,7 @@ Section ProofConsoleintr.
+       assert (N10 : r <> Ra0) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
+       rewrite /X3 upd_ne; [| congruence]. rewrite /X2 upd_ne; [| congruence].
+       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
+-    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string cons_res_at X3
++    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string (cons_res_at cn) X3
+               lvl eb pme (K - 6)%nat ({["cons"]} ∪ lks) HX3lka
+               ltac:(lia)
+               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
+@@ -729,11 +903,11 @@ Section ProofConsoleintr.
+     iEval (rewrite Hp110) in "Hpc".
+     assert (Hthr : forall r : mword 5, is_cs_idx r = true -> mr !!! Regidx r = M !!! Regidx r).
+     { intros r Hr. rewrite (callee_saved_lookup Hcsr r Hr). apply HthrX; exact Hr. }
+-    iApply (ct_epi (CID := CIDr) CIDr pme m0 mr K lvl eb sp0 _ lks Hm0sp
++    iApply (ct_epi (CID := CIDr) CIDr γu hb pme m0 mr K lvl eb sp0 _ lks Hm0sp
+               ltac:(rewrite (Hthr csp_rs1 ltac:(vm_compute; reflexivity)); exact Hsp)
+               ltac:(exact (ct_cs_hi_thr mr M m0 Hthr Hcs))
+               HK ltac:(intros _; reflexivity)
+-              with "Ht Hcg Hcnt Hpc Hsaved Hrest").
++              with "Ht Hcg Hcnt Hpc Hsaved Hrest Hhiout").
+     iApply (wp_next_retarget CID CIDr _ pme _ ltac:(wp_next_chain) with "Hcont").
+   Qed.
+ 
+@@ -745,6 +919,7 @@ Section ProofConsoleintr.
+   (*  register this block reads.                                          *)
+   (* =================================================================== *)
+   Definition ct_wake_prop `{CID0 : CpuId}
++      (γu : uart_names) (hb : list mobs) (cn : cons_names)
+       (γc : gname) (pme : mword 64) (m0 : regfile)
+       (K lvl : nat) (eb : bool) (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
+     (wp_next (CID0 := CID0) b pme (fun (CIDw : CpuId) =>
+@@ -769,12 +944,14 @@ Section ProofConsoleintr.
+          arm_pay KT1 lvl eb pme -∗
+          locked γc cpu_id -∗
+          a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗
+-         cons_data bs -∗ cons_tags ts -∗
++         cons_data bs -∗ cons_tags ts -∗ ct_gh cn rr ww ee bs ts -∗
+          ct_rest sp0 -∗
+-         ct_exit_prop (CID0 := CID0) γc pme m0 K lvl eb b sp0 lks -∗
++         ct_hi_out γu hb -∗
++         ct_exit_prop (CID0 := CID0) γu hb cn γc pme m0 K lvl eb b sp0 lks -∗
+          WP (Loop : expr riscv_lang)))%I.
+ 
+-  Lemma ct_mk_wake (γc : gname) (γs : list gname) (pme : mword 64) (m0 : regfile)
++  Lemma ct_mk_wake (γu : uart_names) (hb : list mobs) (cn : cons_names)
++      (γc : gname) (γs : list gname) (pme : mword 64) (m0 : regfile)
+       (K lvl : nat) (eb : bool) (b : bool) (sp0 : mword 64) (lks : gset string) :
+     (consoleintr_stack <= K)%nat ->
+     length γs = NPROC ->
+@@ -787,7 +964,7 @@ Section ProofConsoleintr.
+        below. *)
+     locks_below lks "cons" ->
+     kernel_text -∗ procs_inv γs -∗
+-    ct_wake_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks.
++    ct_wake_prop (CID0 := CID) γu hb cn γc pme m0 K lvl eb b sp0 lks.
+   Proof.
+     intros HK Hlen Hlvl Hb Hbelow. subst b.
+     assert (Hbelow_proc : locks_below ({["cons"]} ∪ lks) "proc").
+@@ -797,7 +974,7 @@ Section ProofConsoleintr.
+     rewrite /ct_wake_prop.
+     iIntros (CIDw Hsw M rr ww ee bs ts)
+       "%Hsp %Ha2 %Hcs %Hlenb %Hlent %Hok %Hrow Hcg Hpc Hcnt Hpay Hlocked
+-       Hrc Hwc Hec Hdat Hts Hrest EXIT".
++       Hrc Hwc Hec Hdat Hts Hgh Hrest Hhiout EXIT".
+     (* +0x156 auipc a5,0x12 *)
+     iApply (wp_auipc_s_sconf (mword_of_int (CT + 0x156)) Ra5 (mword_of_int 18 : mword 20)
+               M (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat false
+@@ -828,11 +1005,11 @@ Section ProofConsoleintr.
+     iEval (rewrite Hp15e) in "Hpc".
+     (* the store moved [cons.w] up to [cons.e]: the row is untouched (it
+        speaks of [r .. e)) and [cons_ok] holds because [w = e]. *)
+-    iAssert (cons_res) with "[Hrc Hwc Hec Hdat Hts]" as "Hres".
+-    { iExists rr, ee, ee, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+-      iPureIntro. split_and!;
+-        [ exact Hlenb | exact Hlent | exact (cons_ok_set_w rr ww ee Hok)
+-        | exact Hrow ]. }
++    iMod (ct_gh_commit cn rr ww ee bs ts Hok with "Hgh") as "Hgh".
++    iAssert (cons_res cn) with "[Hrc Hwc Hec Hdat Hts Hgh]" as "Hres".
++    { iApply (ct_gh_res cn rr ee ee bs ts Hlenb Hlent
++                (cons_ok_set_w rr ww ee Hok) Hrow
++                with "Hrc Hwc Hec Hdat Hts Hgh"). }
+     (* +0x15e auipc a0,0x12 ; +0x162 addi a0,a0,-210 : a0 := &cons.r *)
+     iApply (wp_auipc_s_sconf (mword_of_int (CT + 0x15e)) Ra0 (mword_of_int 18 : mword 20)
+               W1 (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat false
+@@ -904,7 +1081,8 @@ Section ProofConsoleintr.
+                     = mword_of_int (CT + 0x104)) by pcw.
+     iEval (rewrite Hj104) in "Hpc".
+     iSpecialize ("EXIT" $! CIDw with "[%]"); [wp_next_chain|].
+-    iApply ("EXIT" $! Mw with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked Hres Hrest").
++    iApply ("EXIT" $! Mw with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
++              Hhiout").
+     - rewrite (Hthr csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
+     - exact (ct_cs_hi_thr Mw M m0 Hthr Hcs).
+   Qed.
+@@ -914,6 +1092,7 @@ Section ProofConsoleintr.
+      +0x0de, +0x0e4 and +0x0ea -- once per way out of the kill-line loop --
+      so it is a lemma over its three pcs rather than three copies. *)
+   Lemma ct_restore23 `{CIDq : CpuId}
++      (γu : uart_names) (hb : list mobs) (cn : cons_names)
+       (γc : gname) (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
+       (b : bool) (sp0 : mword 64) (pc1 pc2 pc3 : mword 64)
+       (jimm : mword 11) (lks : gset string) :
+@@ -939,16 +1118,17 @@ Section ProofConsoleintr.
+     cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
+     arm_pay KT1 lvl eb pme -∗
+     locked γc cpu_id -∗
+-    cons_res -∗
++    cons_res cn -∗
++    ct_hi_out γu hb -∗
+     pa_stk sp0 4 ↦₈[KT1] (m0 !!! Regidx Rs2) -∗
+     pa_stk sp0 5 ↦₈[KT1] (m0 !!! Regidx Rs3) -∗
+     (∃ w : mword 64, pa_stk sp0 6 ↦₈[KT1] w) -∗
+-    ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
++    ct_exit_prop (CID0 := CID) γu hb cn γc pme m0 K lvl eb b sp0 lks -∗
+     WP (Loop : expr riscv_lang).
+   Proof.
+     intros Hsp Hthr Hq1 Hq2 Hjt Hal Hchain Hbelow.
+     destruct Hthr as (T4 & T5 & T6 & T7 & T8 & T9 & T10 & T11).
+-    iIntros "Hi1 Hi2 Hi3 Hcg Hpc Hcnt Hpay Hlocked Hres H4 H5 H6 EXIT".
++    iIntros "Hi1 Hi2 Hi3 Hcg Hpc Hcnt Hpay Hlocked Hres Hhiout H4 H5 H6 EXIT".
+     assert (Hb4 : add_vec (pa_stk sp0 6%nat)
+                     (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
+                   = pa_stk sp0 4) by (apply ct_slot_bridge; pcw).
+@@ -979,7 +1159,7 @@ Section ProofConsoleintr.
+     iEval (rewrite Hjt) in "Hpc".
+     iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+     iApply ("EXIT" $! R2 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked Hres
+-              [H4 H5 H6]").
++              [H4 H5 H6] Hhiout").
+     - rewrite /R2 upd_ne; [| reg_neq]. exact HR1sp.
+     - unfold ct_cs_hi. split_and!.
+       + rewrite /R2 upd_ne; [| reg_neq]. rewrite /R1 upd_eq. reflexivity.
+@@ -1007,7 +1187,7 @@ Section ProofConsoleintr.
+   (*  survive the loop.                                                    *)
+   (* =================================================================== *)
+   Definition ct_kill_prop `{CID0 : CpuId}
+-      (γc : gname)
++      (γu : uart_names) (hb : list mobs) (cn : cons_names) (γc : gname)
+       (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
+       (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
+     (wp_next (CID0 := CID0) b pme (fun (CIDk : CpuId) =>
+@@ -1029,20 +1209,22 @@ Section ProofConsoleintr.
+             ways in ([ct_kill_pre]'s [beq] at +0x0b4 and the back edge)
+             establish it. *)
+          ⌜ ee <> ww ⌝ -∗
+-         ct_exit_prop (CID0 := CID0) γc pme m0 K lvl eb b sp0 lks -∗
++         ct_exit_prop (CID0 := CID0) γu hb cn γc pme m0 K lvl eb b sp0 lks -∗
+          sie_cap_gpr KT1 M (trap_res b + (K - 6))%nat false pme -∗
+          pc_is (mword_of_int (CT + 0xb8)) -∗
+          cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
+          arm_pay KT1 lvl eb pme -∗
+          locked γc cpu_id -∗
+          a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗
+-         cons_data bs -∗ cons_tags ts -∗
++         cons_data bs -∗ cons_tags ts -∗ ct_gh cn rr ww ee bs ts -∗
++         ct_hi_out γu hb -∗
+          pa_stk sp0 4 ↦₈[KT1] (m0 !!! Regidx Rs2) -∗
+          pa_stk sp0 5 ↦₈[KT1] (m0 !!! Regidx Rs3) -∗
+          (∃ w : mword 64, pa_stk sp0 6 ↦₈[KT1] w) -∗
+          WP (Loop : expr riscv_lang)))%I.
+ 
+-  Lemma ct_mk_kill (γtx γc : gname) (γu : uart_names) (γv : disk_names)
++  Lemma ct_mk_kill (γu : uart_names) (hb : list mobs) (cn : cons_names)
++      (γtx γc : gname) (γv : disk_names)
+       (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
+       (b : bool) (sp0 : mword 64) (lks : gset string) :
+     (consoleintr_stack <= K)%nat ->
+@@ -1054,7 +1236,7 @@ Section ProofConsoleintr.
+     locks_below lks "cons" ->
+     kernel_text -∗
+     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
+-    ct_kill_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks.
++    ct_kill_prop (CID0 := CID) γu hb cn γc pme m0 K lvl eb b sp0 lks.
+   Proof.
+     intros HK Hlvl Hb Hbelow. subst b.
+     iIntros "#Ht #Hdev #Htxl #Hsub".
+@@ -1062,7 +1244,8 @@ Section ProofConsoleintr.
+     iLöb as "IH".
+     iIntros (CIDk Hsk M rr ww ee bs ts)
+       "%Hsp %Hs1 %Hs2 %Hs3 %Ha5 %Hthr %Hlenb %Hlent %Hok %Hrow %Hne
+-       EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts H4 H5 H6".
++       EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh Hhiout
++       H4 H5 H6".
+     (* ---- +0x0b8 c.addiw a5,a5,-1 ---- *)
+     iApply (wp_caddiw_s_sconf (mword_of_int (CT + 0xb8)) Ra5 (mword_of_int 63 : mword 6)
+               M (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat false
+@@ -1170,7 +1353,7 @@ Section ProofConsoleintr.
+                         (sign_extend' 64 (mword_of_int 38 : mword 13))
+                       = mword_of_int (CT + 0xea)) by pcw.
+       iEval (rewrite Hj0ea) in "Hpc".
+-      iApply (ct_restore23 (CIDq := CIDk) γc pme m0 L4 K lvl eb _ sp0
++      iApply (ct_restore23 (CIDq := CIDk) γu hb cn γc pme m0 L4 K lvl eb _ sp0
+                 (mword_of_int (CT + 0xea)) (mword_of_int (CT + 0xec))
+                 (mword_of_int (CT + 0xee)) (mword_of_int 11 : mword 11) lks
+                 HL4sp
+@@ -1178,13 +1361,12 @@ Section ProofConsoleintr.
+                 ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(vm_compute; reflexivity)
+                 ltac:(wp_next_chain) Hbelow
+                 with "[] [] [] Hcg Hpc Hcnt Hpay Hlocked
+-                      [Hrc Hwc Hec Hdat Hts] H4 H5 H6 EXIT").
++                      [Hrc Hwc Hec Hdat Hts Hgh] Hhiout H4 H5 H6 EXIT").
+       { iApply (cnti_0ea with "Ht"). }
+       { iApply (cnti_0ec with "Ht"). }
+       { iApply (cnti_0ee with "Ht"). }
+-      iExists rr, ww, ee, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+-      iPureIntro. split_and!;
+-        [ exact Hlenb | exact Hlent | exact Hok | exact Hrow ]. }
++      iApply (ct_gh_res cn rr ww ee bs ts Hlenb Hlent Hok Hrow
++                with "Hrc Hwc Hec Hdat Hts Hgh"). }
+     (* ---- an ordinary byte: erase it ---- *)
+     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0xc4)) (mword_of_int 38 : mword 13)
+               Rs2 Ra4 L4 (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat
+@@ -1328,7 +1510,8 @@ Section ProofConsoleintr.
+       iEval (rewrite Hbk) in "Hpc".
+       iSpecialize ("IH" $! CIDk with "[%]"); [wp_next_chain|].
+       iApply ("IH" $! L8 rr ww ee' bs ts with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+-                EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts H4 H5 H6").
++                EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts [Hgh]
++                Hhiout H4 H5 H6").
+       - rewrite (HthrL8 csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
+       - rewrite (HthrL8 Rs1 ltac:(vm_compute; reflexivity)). exact Hs1.
+       - rewrite (HthrL8 Rs2 ltac:(vm_compute; reflexivity)). exact Hs2.
+@@ -1340,7 +1523,11 @@ Section ProofConsoleintr.
+       - exact Hok'.
+       - exact Hrow'.
+       (* the back edge re-tests [cons.e != cons.w], which is the IH's clause *)
+-      - intro Hc; exact (ct_ne32 ww ee' Hmore (eq_sym Hc)). }
++      - intro Hc; exact (ct_ne32 ww ee' Hmore (eq_sym Hc)).
++      (* ...AND THE WINDOW LOST ITS LAST ENTRY: [cons.e--] pops the editable
++         window's tail, and the committed prefix is out of reach because the
++         loop's own guard says [cons.e != cons.w]. *)
++      - rewrite /ee'. iApply (ct_gh_pop cn rr ww ee bs ts Hne with "Hgh"). }
+     (* the line is empty: fall out at +0x0de *)
+     iApply (wp_bne_fall_s_sconf (mword_of_int (CT + 0xda)) (mword_of_int 8158 : mword 13)
+               Ra5 Ra4 L8 (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat
+@@ -1351,7 +1538,7 @@ Section ProofConsoleintr.
+     assert (Hp0de : add_vec_int (mword_of_int (CT + 0xda) : mword 64) 4
+                     = mword_of_int (CT + 0xde)) by pcw.
+     iEval (rewrite Hp0de) in "Hpc".
+-    iApply (ct_restore23 (CIDq := CIDk) γc pme m0 L8 K lvl eb _ sp0
++    iApply (ct_restore23 (CIDq := CIDk) γu hb cn γc pme m0 L8 K lvl eb _ sp0
+               (mword_of_int (CT + 0xde)) (mword_of_int (CT + 0xe0))
+               (mword_of_int (CT + 0xe2)) (mword_of_int 17 : mword 11) lks
+               ltac:(rewrite (HthrL8 csp_rs1 ltac:(vm_compute; reflexivity)); exact Hsp)
+@@ -1359,12 +1546,13 @@ Section ProofConsoleintr.
+               ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(vm_compute; reflexivity)
+               ltac:(wp_next_chain) Hbelow
+               with "[] [] [] Hcg Hpc Hcnt Hpay Hlocked
+-                    [Hrc Hwc Hec Hdat Hts] H4 H5 H6 EXIT").
++                    [Hrc Hwc Hec Hdat Hts Hgh] Hhiout H4 H5 H6 EXIT").
+     { iApply (cnti_0de with "Ht"). }
+     { iApply (cnti_0e0 with "Ht"). }
+     { iApply (cnti_0e2 with "Ht"). }
+-    iExists rr, ww, ee', bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+-    iPureIntro. split_and!; [ exact Hlenb | exact Hlent | exact Hok' | exact Hrow' ].
++    iApply (ct_gh_res cn rr ww ee' bs ts Hlenb Hlent Hok' Hrow'
++              with "Hrc Hwc Hec Hdat Hts [Hgh]").
++    rewrite /ee'. iApply (ct_gh_pop cn rr ww ee bs ts Hne with "Hgh").
+   Qed.
+ 
+   (* =================================================================== *)
+@@ -1374,10 +1562,13 @@ Section ProofConsoleintr.
+   (* =================================================================== *)
+   Lemma ct_cr `{CIDq : CpuId}
+       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
++      (cn : cons_names) (hh : option (list mobs))
+       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
+       (b : bool) (sp0 : mword 64) (lks : gset string)
+       (rr ww ee : mword 32) (bs : list (bv 8))
+       (ts : list (option (list mobs))) (h : list mobs) (c : bv 8) :
++    cn_uart cn = γu ->
++    ohist_ext hh h ->
+     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
+     ct_cs_hi M m0 ->
+     (consoleintr_stack <= K)%nat ->
+@@ -1407,15 +1598,18 @@ Section ProofConsoleintr.
+     arm_pay KT1 lvl eb pme -∗
+     locked γc cpu_id -∗
+     a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗
+-    cons_data bs -∗ cons_tags ts -∗
++    cons_data bs -∗ cons_tags ts -∗ ct_gh cn rr ww ee bs ts -∗
++    uart_rx_hi γu (1/2) hh -∗
+     ct_rest sp0 -∗
+-    ct_wake_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
+-    ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
++    ct_wake_prop (CID0 := CID) γu h cn γc pme m0 K lvl eb b sp0 lks -∗
++    ct_exit_prop (CID0 := CID) γu h cn γc pme m0 K lvl eb b sp0 lks -∗
+     WP (Loop : expr riscv_lang).
+   Proof.
+-    intros Hsp Hcs HK Hlvl Hchain Hbelow Hlenb Hlent Hok Hrow Hroom Hends Hc13.
++    intros Hcnu Hx Hsp Hcs HK Hlvl Hchain Hbelow Hlenb Hlent Hok Hrow Hroom
++           Hends Hc13.
+     iIntros "#Ht #Hdev #Htxl #Hsub #Htg Hcg Hpc Hcnt Hpay Hlocked
+-             Hrc Hwc Hec Hdat Hts Hrest WAKE EXIT".
++             Hrc Hwc Hec Hdat Hts Hgh Hhi Hrest WAKE EXIT".
++    rewrite <- Hcnu.
+     (* ---- +0x12e c.li a0,10 ; +0x130 jal consputc ---- *)
+     iApply (wp_cli_s_sconf (mword_of_int (CT + 0x12e)) Ra0 (mword_of_int 10 : mword 6)
+               (mword_of_int 10 : mword 64) M (trap_res b + (K - 6))%nat false
+@@ -1624,12 +1818,17 @@ Section ProofConsoleintr.
+     assert (Hbyte10 : trunc8 (mword_of_int 10 : mword 64) = cons_xlate c).
+     { rewrite Hc13 cons_xlate_cr. exact ct_trunc8_10. }
+     iDestruct (cons_tags_upd ts idx h with "Htg Hts") as "Hts".
++    (* THE GHOST HALF MOVES WITH THE BYTE: the editable window gains it and
++       the ring's high-water mark becomes its history. *)
++    iMod (ct_gh_push cn rr ww ee bs ts idx h c hh Hlenb Hlent Hok Hroom Hidx
++            Hends Hx with "Hhi Hgh") as "[Hhi Hgh]".
+     iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
+     iApply ("WAKE" $! D10 rr ww ee1
+               (<[idx := trunc8 (mword_of_int 10 : mword 64)]> bs)
+               (<[idx := Some h]> ts)
+               with "[%] [%] [%] [%] [%] [%] [%]
+-              Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hrest EXIT").
++              Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts [Hgh] Hrest
++              [Hhi] EXIT").
+     - rewrite (HthrA csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
+     - rewrite /D10 upd_ne; [| reg_neq]. rewrite /D9 upd_ne; [| reg_neq].
+       rewrite /D8 upd_ne; [| reg_neq]. rewrite /D7; apply upd_eq.
+@@ -1639,6 +1838,9 @@ Section ProofConsoleintr.
+     - rewrite /ee1. exact (cons_ok_inc_e rr ww ee Hok Hroom).
+     - rewrite Hbyte10 /ee1.
+       exact (cons_row_push rr ee idx bs ts h c Hlenb Hlent Hroom Hidx Hends Hrow).
++    - rewrite Hbyte10 /ee1. iExact "Hgh".
++    - rewrite /ct_hi_out. iExists (Some h). iFrame "Hhi".
++      iPureIntro. exact (ohist_le_Some h).
+   Qed.
+ 
+   (* =================================================================== *)
+@@ -1648,6 +1850,7 @@ Section ProofConsoleintr.
+   (* =================================================================== *)
+   Lemma ct_bs `{CIDq : CpuId}
+       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
++      (cn : cons_names) (hb : list mobs)
+       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
+       (b : bool) (sp0 : mword 64) (lks : gset string) :
+     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
+@@ -1665,13 +1868,15 @@ Section ProofConsoleintr.
+     cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
+     arm_pay KT1 lvl eb pme -∗
+     locked γc cpu_id -∗
+-    cons_res -∗
++    cons_res cn -∗
+     ct_rest sp0 -∗
+-    ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
++    ct_hi_out γu hb -∗
++    ct_exit_prop (CID0 := CID) γu hb cn γc pme m0 K lvl eb b sp0 lks -∗
+     WP (Loop : expr riscv_lang).
+   Proof.
+     intros Hsp Hcs HK Hlvl Hchain Hbelow.
+-    iIntros "#Ht #Hdev #Htxl #Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT".
++    iIntros "#Ht #Hdev #Htxl #Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
++             Hhiout EXIT".
+     (* ---- +0x0f0/+0x0f4 : a4 := &cons ---- *)
+     iApply (wp_auipc_s_sconf (mword_of_int (CT + 0xf0)) Ra4 (mword_of_int 18 : mword 20)
+               M (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+@@ -1695,8 +1900,8 @@ Section ProofConsoleintr.
+                     = mword_of_int (CT + 0xf8)) by pcw.
+     iEval (rewrite Hp0f8) in "Hpc".
+     (* ---- +0x0f8 lw a5,160(a4) ; +0x0fc lw a4,156(a4) ---- *)
+-    iDestruct "Hres" as (rr ww ee bs ts)
+-      "(Hrc & Hwc & Hec & %Hlenb & %Hlent & %Hok & %Hrow & Hdat & Hts)".
++    iDestruct (ct_res_gh cn with "Hres") as (rr ww ee bs ts)
++      "(%Hlenb & %Hlent & %Hok & %Hrow & Hrc & Hwc & Hec & Hdat & Hts & Hgh)".
+     assert (Hea : add_vec (B2 !!! Regidx Ra4)
+                     (sign_extend' 64 (mword_of_int 160 : mword 12)) = a_cons_e)
+       by (rewrite HB2a4; reflexivity).
+@@ -1749,12 +1954,11 @@ Section ProofConsoleintr.
+       iEval (rewrite Hp104) in "Hpc".
+       iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+       iApply ("EXIT" $! B4 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked
+-                [Hrc Hwc Hec Hdat Hts] Hrest").
++                [Hrc Hwc Hec Hdat Hts Hgh] Hrest Hhiout").
+       - rewrite (HthrB csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
+       - exact (ct_cs_hi_thr B4 M m0 HthrB Hcs).
+-      - iExists rr, ww, ee, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+-        iPureIntro. split_and!;
+-          [ exact Hlenb | exact Hlent | exact Hok | exact Hrow ]. }
++      - iApply (ct_gh_res cn rr ww ee bs ts Hlenb Hlent Hok Hrow
++                  with "Hrc Hwc Hec Hdat Hts Hgh"). }
+     (* ---- +0x11a .. +0x12c : erase it ---- *)
+     iApply (wp_bne_taken_s_sconf (mword_of_int (CT + 0x100)) (mword_of_int 26 : mword 13)
+               Ra5 Ra4 B4 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
+@@ -1881,12 +2085,12 @@ Section ProofConsoleintr.
+     iEval (rewrite Hj104) in "Hpc".
+     iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+     iApply ("EXIT" $! mcp with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked
+-              [Hrc Hwc Hec Hdat Hts] Hrest").
++              [Hrc Hwc Hec Hdat Hts Hgh] Hrest Hhiout").
+     - rewrite (HthrM csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
+     - exact (ct_cs_hi_thr mcp M m0 HthrM Hcs).
+-    - iExists rr, ww, ee1, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+-      iPureIntro. split_and!;
+-        [ exact Hlenb | exact Hlent | exact Hok' | exact Hrow' ].
++    - iApply (ct_gh_res cn rr ww ee1 bs ts Hlenb Hlent Hok' Hrow'
++                with "Hrc Hwc Hec Hdat Hts [Hgh]").
++      rewrite /ee1. iApply (ct_gh_pop cn rr ww ee bs ts Hew with "Hgh").
+   Qed.
+ 
+   (* =================================================================== *)
+@@ -1896,6 +2100,7 @@ Section ProofConsoleintr.
+   (*  loop or, on an already-empty line, leaves through the restore stub.  *)
+   (* =================================================================== *)
+   Lemma ct_kill_pre `{CIDq : CpuId}
++      (γu : uart_names) (cn : cons_names) (hb : list mobs)
+       (γc : gname) (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
+       (b : bool) (sp0 : mword 64) (lks : gset string) :
+     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
+@@ -1910,16 +2115,17 @@ Section ProofConsoleintr.
+     cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
+     arm_pay KT1 lvl eb pme -∗
+     locked γc cpu_id -∗
+-    cons_res -∗
++    cons_res cn -∗
+     ct_rest sp0 -∗
+-    ct_kill_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
+-    ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
++    ct_hi_out γu hb -∗
++    ct_kill_prop (CID0 := CID) γu hb cn γc pme m0 K lvl eb b sp0 lks -∗
++    ct_exit_prop (CID0 := CID) γu hb cn γc pme m0 K lvl eb b sp0 lks -∗
+     WP (Loop : expr riscv_lang).
+   Proof.
+     intros Hsp Hcs Hchain Hbelow.
+     pose proof (ct_cs_hi_top M m0 Hcs) as Htop.
+     destruct Hcs as (HS2 & HS3 & _ & _ & _ & _ & _ & _ & _ & _).
+-    iIntros "#Ht Hcg Hpc Hcnt Hpay Hlocked Hres Hrest KILL EXIT".
++    iIntros "#Ht Hcg Hpc Hcnt Hpay Hlocked Hres Hrest Hhiout KILL EXIT".
+     (* ---- +0x092/+0x094: the shrink-wrap ---- *)
+     iDestruct "Hrest" as "(R4 & R5 & H6)".
+     iDestruct "R4" as (u4) "H4". iDestruct "R5" as (u5) "H5".
+@@ -1970,8 +2176,8 @@ Section ProofConsoleintr.
+                     = mword_of_int (CT + 0x9e)) by pcw.
+     iEval (rewrite Hp09e) in "Hpc".
+     (* ---- +0x09e lw a5,160(a4) ; +0x0a2 lw a4,156(a4) ---- *)
+-    iDestruct "Hres" as (rr ww ee bs ts)
+-      "(Hrc & Hwc & Hec & %Hlenb & %Hlent & %Hok & %Hrow & Hdat & Hts)".
++    iDestruct (ct_res_gh cn with "Hres") as (rr ww ee bs ts)
++      "(%Hlenb & %Hlent & %Hok & %Hrow & Hrc & Hwc & Hec & Hdat & Hts & Hgh)".
+     assert (Hea : add_vec (E2 !!! Regidx Ra4)
+                     (sign_extend' 64 (mword_of_int 160 : mword 12)) = a_cons_e)
+       by (rewrite HE2a4; reflexivity).
+@@ -2082,20 +2288,19 @@ Section ProofConsoleintr.
+                         (sign_extend' 64 (mword_of_int 48 : mword 13))
+                       = mword_of_int (CT + 0xe4)) by pcw.
+       iEval (rewrite Hj0e4) in "Hpc".
+-      iApply (ct_restore23 (CIDq := CIDq) γc pme m0 E8 K lvl eb _ sp0
++      iApply (ct_restore23 (CIDq := CIDq) γu hb cn γc pme m0 E8 K lvl eb _ sp0
+                 (mword_of_int (CT + 0xe4)) (mword_of_int (CT + 0xe6))
+                 (mword_of_int (CT + 0xe8)) (mword_of_int 14 : mword 11) lks
+                 HE8sp HE8top
+                 ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(vm_compute; reflexivity)
+                 Hchain Hbelow
+                 with "[] [] [] Hcg Hpc Hcnt Hpay Hlocked
+-                      [Hrc Hwc Hec Hdat Hts] H4 H5 H6 EXIT").
++                      [Hrc Hwc Hec Hdat Hts Hgh] Hhiout H4 H5 H6 EXIT").
+       { iApply (cnti_0e4 with "Ht"). }
+       { iApply (cnti_0e6 with "Ht"). }
+       { iApply (cnti_0e8 with "Ht"). }
+-      iExists rr, ww, ee, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+-      iPureIntro. split_and!;
+-        [ exact Hlenb | exact Hlent | exact Hok | exact Hrow ]. }
++      iApply (ct_gh_res cn rr ww ee bs ts Hlenb Hlent Hok Hrow
++                with "Hrc Hwc Hec Hdat Hts Hgh"). }
+     (* ---- the line is not empty: enter the loop at +0x0b8 ---- *)
+     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0xb4)) (mword_of_int 48 : mword 13)
+               Ra5 Ra4 E8 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
+@@ -2111,7 +2316,8 @@ Section ProofConsoleintr.
+        re-tests. *)
+     iApply ("KILL" $! E8 rr ww ee bs ts
+               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+-              EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts H4 H5 H6");
++              EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh Hhiout
++              H4 H5 H6");
+       [ exact HE8sp | exact HE8s1 | exact HE8s2 | exact HE8s3 | exact HE8a5
+       | exact HE8top | exact Hlenb | exact Hlent | exact Hok | exact Hrow
+       | intro Hc; exact (ct_eqf32 ww ee Hemp (eq_sym Hc)) ].
+@@ -2124,10 +2330,13 @@ Section ProofConsoleintr.
+   (* =================================================================== *)
+   Lemma ct_store `{CIDq : CpuId}
+       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
++      (cn : cons_names) (hh : option (list mobs))
+       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
+       (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string)
+       (rr ww ee : mword 32) (bs : list (bv 8))
+       (ts : list (option (list mobs))) (h : list mobs) (c : bv 8) :
++    cn_uart cn = γu ->
++    ohist_ext hh h ->
+     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
+     M !!! Regidx Rs1 = cv ->
+     ct_cs_hi M m0 ->
+@@ -2159,16 +2368,18 @@ Section ProofConsoleintr.
+     arm_pay KT1 lvl eb pme -∗
+     locked γc cpu_id -∗
+     a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗
+-    cons_data bs -∗ cons_tags ts -∗
++    cons_data bs -∗ cons_tags ts -∗ ct_gh cn rr ww ee bs ts -∗
++    uart_rx_hi γu (1/2) hh -∗
+     ct_rest sp0 -∗
+-    ct_wake_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
+-    ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
++    ct_wake_prop (CID0 := CID) γu h cn γc pme m0 K lvl eb b sp0 lks -∗
++    ct_exit_prop (CID0 := CID) γu h cn γc pme m0 K lvl eb b sp0 lks -∗
+     WP (Loop : expr riscv_lang).
+   Proof.
+-    intros Hsp Hs1 Hcs HK Hlvl Hchain Hbelow Hlenb Hlent Hok Hrow Hroom
++    intros Hcnu Hx Hsp Hs1 Hcs HK Hlvl Hchain Hbelow Hlenb Hlent Hok Hrow Hroom
+            Hends Hcv Hc13.
+     iIntros "#Ht #Hdev #Htxl #Hsub #Htg Hcg Hpc Hcnt Hpay Hlocked
+-             Hrc Hwc Hec Hdat Hts Hrest WAKE EXIT".
++             Hrc Hwc Hec Hdat Hts Hgh Hhi Hrest WAKE EXIT".
++    rewrite <- Hcnu.
+     (* ---- +0x04e c.mv a0,s1 ; +0x050 jal consputc : the echo ---- *)
+     iApply (wp_cmv_s_sconf (mword_of_int (CT + 0x4e)) Ra0 Rs1 M
+               (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+@@ -2363,6 +2574,12 @@ Section ProofConsoleintr.
+                       (<[idx := Some h]> ts))
+       by (rewrite /ee1;
+           exact (cons_row_push rr ee idx bs ts h c Hlenb Hlent Hroom Hidx Hends Hrow)).
++    (* THE GHOST HALF MOVES WITH THE BYTE: the editable window gains it and
++       the ring's high-water mark becomes its history. *)
++    iMod (ct_gh_push cn rr ww ee bs ts idx h c hh Hlenb Hlent Hok Hroom Hidx
++            Hends Hx with "Hhi Hgh") as "[Hhi Hgh]".
++    (* [ee1] is [add_vec ee 1] by [set], so the window's new end needs no
++       rewriting: the two are the same term. *)
+     assert (Hp074 : add_vec_int (mword_of_int (CT + 0x70) : mword 64) 4
+                     = mword_of_int (CT + 0x74)) by pcw.
+     iEval (rewrite Hp074) in "Hpc".
+@@ -2422,9 +2639,12 @@ Section ProofConsoleintr.
+       iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
+       iApply ("WAKE" $! F10 rr ww ee1 (<[idx := cons_xlate c]> bs)
+                 (<[idx := Some h]> ts) with "[%] [%] [%] [%] [%] [%] [%]
+-                Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hrest EXIT");
++                Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh Hrest
++                [Hhi] EXIT");
+         [ exact Hsp10 | exact HF10a2 | exact Hcshi10
+-        | exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 ]. }
++        | exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 | ].
++      rewrite /ct_hi_out. iExists (Some h). iFrame "Hhi".
++      iPureIntro. exact (ohist_le_Some h). }
+     (* ---- +0x07a c.addi s1,s1,-4 ; +0x07c c.beqz s1 : is it C('D')? ---- *)
+     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (CT + 0x78)) (mword_of_int 111 : mword 8)
+               (Cregidx (mword_of_int 6)) Ra4 F10 (trap_res b + (K - 6))%nat false
+@@ -2477,9 +2697,12 @@ Section ProofConsoleintr.
+       iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
+       iApply ("WAKE" $! F11 rr ww ee1 (<[idx := cons_xlate c]> bs)
+                 (<[idx := Some h]> ts) with "[%] [%] [%] [%] [%] [%] [%]
+-                Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hrest EXIT");
++                Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh Hrest
++                [Hhi] EXIT");
+         [ exact Hsp11 | exact HF11a2 | exact Hcshi11
+-        | exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 ]. }
++        | exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 | ].
++      rewrite /ct_hi_out. iExists (Some h). iFrame "Hhi".
++      iPureIntro. exact (ohist_le_Some h). }
+     (* ---- +0x07e .. +0x08c : is the ring now full? ---- *)
+     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (CT + 0x7c)) (mword_of_int 109 : mword 8)
+               (Cregidx (mword_of_int 1)) Rs1 F11 (trap_res b + (K - 6))%nat false
+@@ -2578,12 +2801,14 @@ Section ProofConsoleintr.
+       iEval (rewrite Hj104) in "Hpc".
+       iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+       iApply ("EXIT" $! F15 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked
+-                [Hrc Hwc Hec Hdat Hts] Hrest").
++                [Hrc Hwc Hec Hdat Hts Hgh] Hrest [Hhi]").
+       - exact Hsp15.
+       - exact Hcshi15.
+-      - iExists rr, ww, ee1, (<[idx := cons_xlate c]> bs), (<[idx := Some h]> ts).
+-        iFrame "Hrc Hwc Hec Hdat Hts". iPureIntro. split_and!;
+-          [ exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 ]. }
++      - iApply (ct_gh_res cn rr ww ee1 (<[idx := cons_xlate c]> bs)
++                  (<[idx := Some h]> ts) Hlenb1 Hlent1 Hok1 Hrow1
++                  with "Hrc Hwc Hec Hdat Hts Hgh").
++      - rewrite /ct_hi_out. iExists (Some h). iFrame "Hhi".
++        iPureIntro. exact (ohist_le_Some h). }
+     (* the ring is exactly full: hand the line over at +0x090 *)
+     iApply (wp_bne_fall_s_sconf (mword_of_int (CT + 0x8c)) (mword_of_int 120 : mword 13)
+               Ra4 Ra5 F15 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
+@@ -2607,9 +2832,12 @@ Section ProofConsoleintr.
+     iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
+     iApply ("WAKE" $! F15 rr ww ee1 (<[idx := cons_xlate c]> bs)
+               (<[idx := Some h]> ts) with "[%] [%] [%] [%] [%] [%] [%]
+-              Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hrest EXIT");
++              Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh Hrest
++              [Hhi] EXIT");
+       [ exact Hsp15 | exact HF15a2 | exact Hcshi15
+-      | exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 ].
++      | exact Hlenb1 | exact Hlent1 | exact Hok1 | exact Hrow1 | ].
++    rewrite /ct_hi_out. iExists (Some h). iFrame "Hhi".
++    iPureIntro. exact (ohist_le_Some h).
+   Qed.
+ 
+   (* =================================================================== *)
+@@ -2619,10 +2847,13 @@ Section ProofConsoleintr.
+   (* =================================================================== *)
+   Lemma ct_dflt `{CIDq : CpuId}
+       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
++      (cn : cons_names) (hh : option (list mobs))
+       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
+       (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string)
+       (h : list mobs) (c : bv 8) :
+     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
++    cn_uart cn = γu ->
++    ohist_ext hh h ->
+     M !!! Regidx Rs1 = cv ->
+     ct_cs_hi M m0 ->
+     (consoleintr_stack <= K)%nat ->
+@@ -2646,15 +2877,21 @@ Section ProofConsoleintr.
+     cpu_own (S lvl) eb pme false ({["cons"]} ∪ lks) -∗
+     arm_pay KT1 lvl eb pme -∗
+     locked γc cpu_id -∗
+-    cons_res -∗
++    cons_res cn -∗
++    uart_rx_hi γu (1/2) hh -∗
+     ct_rest sp0 -∗
+-    ct_wake_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
+-    ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
++    ct_wake_prop (CID0 := CID) γu h cn γc pme m0 K lvl eb b sp0 lks -∗
++    ct_exit_prop (CID0 := CID) γu h cn γc pme m0 K lvl eb b sp0 lks -∗
+     WP (Loop : expr riscv_lang).
+   Proof.
+-    intros Hsp Hs1 Hcs HK Hlvl Hchain Hbelow Hends Hcv.
++    intros Hcnu Hx Hsp Hs1 Hcs HK Hlvl Hchain Hbelow Hends Hcv.
+     iIntros "#Ht #Hdev #Htxl #Hsub #Htg Hcg Hpc Hcnt Hpay Hlocked
+-             Hres Hrest WAKE EXIT".
++             Hres Hhi Hrest WAKE EXIT".
++    (* THE MARK GOES BACK UNMOVED ON EVERY ARM THAT DOES NOT STORE -- a NUL
++       byte and a full ring -- and it is already at or before this byte. *)
++    iAssert (ct_hi_out γu h) with "[Hhi]" as "Hhiout".
++    { rewrite /ct_hi_out. iExists hh. iFrame "Hhi".
++      iPureIntro. exact (ohist_le_of_ext hh h Hx). }
+     (* ---- +0x02c c.beqz s1 : [c != 0] ---- *)
+     destruct (eq_vec (cv : mword 64) (zero_reg : mword 64)) eqn:Hnul.
+     { iApply (wp_cbeqz_taken_s_sconf (mword_of_int (CT + 0x2c)) (mword_of_int 108 : mword 8)
+@@ -2670,7 +2907,8 @@ Section ProofConsoleintr.
+                       = mword_of_int (CT + 0x104)) by pcw.
+       iEval (rewrite Hj104) in "Hpc".
+       iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+-      iApply ("EXIT" $! M with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked Hres Hrest");
++      iApply ("EXIT" $! M with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
++                Hhiout");
+         [ exact Hsp | exact Hcs ]. }
+     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (CT + 0x2c)) (mword_of_int 108 : mword 8)
+               (Cregidx (mword_of_int 1)) Rs1 M (trap_res b + (K - 6))%nat false
+@@ -2681,6 +2919,8 @@ Section ProofConsoleintr.
+     assert (Hp02e : add_vec_int (mword_of_int (CT + 0x2c) : mword 64) 2
+                     = mword_of_int (CT + 0x2e)) by pcw.
+     iEval (rewrite Hp02e) in "Hpc".
++    iDestruct (ct_res_gh cn with "Hres") as (rr ww ee bs ts)
++      "(%Hlenb & %Hlent & %Hok & %Hrow & Hrc & Hwc & Hec & Hdat & Hts & Hgh)".
+     (* ---- +0x02e/+0x032 : a4 := &cons ---- *)
+     iApply (wp_auipc_s_sconf (mword_of_int (CT + 0x2e)) Ra4 (mword_of_int 18 : mword 20)
+               M (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+@@ -2707,8 +2947,8 @@ Section ProofConsoleintr.
+     (* the ring stays DESTRUCTED from here to the two arms that append:
+        the guard at +0x044 is a statement about THESE [cons.e] and
+        [cons.r], and [ConsoleInv.cons_res]'s existential would hide it. *)
+-    iDestruct "Hres" as (rr ww ee bs ts)
+-      "(Hrc & Hwc & Hec & %Hlenb & %Hlent & %Hok & %Hrow & Hdat & Hts)".
++    iDestruct (ct_res_gh cn with "Hres") as (rr ww ee bs ts)
++      "(%Hlenb & %Hlent & %Hok & %Hrow & Hrc & Hwc & Hec & Hdat & Hts & Hgh)".
+     assert (Hea : add_vec (G2 !!! Regidx Ra4)
+                     (sign_extend' 64 (mword_of_int 160 : mword 12)) = a_cons_e)
+       by (rewrite HG2a4; reflexivity).
+@@ -2787,12 +3027,11 @@ Section ProofConsoleintr.
+       iEval (rewrite Hj104) in "Hpc".
+       iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+       iApply ("EXIT" $! G6 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked
+-                [Hrc Hwc Hec Hdat Hts] Hrest").
++                [Hrc Hwc Hec Hdat Hts Hgh] Hrest Hhiout").
+       - rewrite (HthrG6 csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
+       - exact (ct_cs_hi_thr G6 M m0 HthrG6 Hcs).
+-      - iExists rr, ww, ee, bs, ts. iFrame "Hrc Hwc Hec Hdat Hts".
+-        iPureIntro. split_and!;
+-          [ exact Hlenb | exact Hlent | exact Hok | exact Hrow ]. }
++      - iApply (ct_gh_res cn rr ww ee bs ts Hlenb Hlent Hok Hrow
++                  with "Hrc Hwc Hec Hdat Hts Hgh"). }
+     iApply (wp_bltu_fall_s_sconf (mword_of_int (CT + 0x44)) (mword_of_int 192 : mword 13)
+               Ra5 Ra4 G6 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
+               ltac:(rgall; rewrite HG6a4 HG6a5; exact Hgd) with "Hcg Hpc []").
+@@ -2839,13 +3078,13 @@ Section ProofConsoleintr.
+                         (sign_extend' 64 (mword_of_int 228 : mword 13))
+                       = mword_of_int (CT + 0x12e)) by pcw.
+       iEval (rewrite Hj12e) in "Hpc".
+-      iApply (ct_cr (CIDq := CIDq) γtx γc γu γv pme m0 G7 K lvl eb b sp0 lks
+-                rr ww ee bs ts h c
++      iApply (ct_cr (CIDq := CIDq) γtx γc γu γv cn hh pme m0 G7 K lvl eb b sp0
++                lks rr ww ee bs ts h c Hcnu Hx
+                 HG7sp (ct_cs_hi_thr G7 M m0 HthrG7 Hcs) HK Hlvl Hchain Hbelow
+                 Hlenb Hlent Hok Hrow Hroom Hends
+                 ltac:(exact (ct_arg_eq13 c ltac:(rewrite <- Hcv; exact Hcr)))
+                 with "Ht Hdev Htxl Hsub Htg Hcg Hpc Hcnt Hpay Hlocked
+-                      Hrc Hwc Hec Hdat Hts Hrest WAKE EXIT"). }
++                      Hrc Hwc Hec Hdat Hts Hgh Hhi Hrest WAKE EXIT"). }
+     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0x4a)) (mword_of_int 228 : mword 13)
+               Ra5 Rs1 G7 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
+               ltac:(rgall; rewrite HG7s1 HG7a5; exact Hcr) with "Hcg Hpc []").
+@@ -2854,13 +3093,13 @@ Section ProofConsoleintr.
+     assert (Hp04e : add_vec_int (mword_of_int (CT + 0x4a) : mword 64) 4
+                     = mword_of_int (CT + 0x4e)) by pcw.
+     iEval (rewrite Hp04e) in "Hpc".
+-    iApply (ct_store (CIDq := CIDq) γtx γc γu γv pme m0 G7 K lvl eb b sp0 cv lks
+-              rr ww ee bs ts h c
++    iApply (ct_store (CIDq := CIDq) γtx γc γu γv cn hh pme m0 G7 K lvl eb b sp0
++              cv lks rr ww ee bs ts h c Hcnu Hx
+               HG7sp HG7s1 (ct_cs_hi_thr G7 M m0 HthrG7 Hcs) HK Hlvl Hchain Hbelow
+               Hlenb Hlent Hok Hrow Hroom Hends Hcv
+               ltac:(exact (ct_arg_ne13 c ltac:(rewrite <- Hcv; exact Hcr)))
+               with "Ht Hdev Htxl Hsub Htg Hcg Hpc Hcnt Hpay Hlocked
+-                    Hrc Hwc Hec Hdat Hts Hrest WAKE EXIT").
++                    Hrc Hwc Hec Hdat Hts Hgh Hhi Hrest WAKE EXIT").
+   Qed.
+ 
+   (* =================================================================== *)
+@@ -2874,15 +3113,15 @@ Section ProofConsoleintr.
+   Lemma wp_consoleintr_sconf (γu : uart_names) (γv : disk_names)
+       (m : regfile) (γs : list gname)
+       (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)
+-    : wp_consoleintr_sconf_body γu γv m γs pme lvl K eb b lks.
++      (hb : list mobs) (cb : bv 8) (hh : option (list mobs))
++    : wp_consoleintr_sconf_body γu γv m γs pme lvl K eb b lks hb cb hh.
+   Proof.
+     cbv beta delta [wp_consoleintr_sconf_body].
+-    intros rettgt HK Hlen Hlvl Hbelow.
+-    iIntros "Hcg Hcnt #Ht Hpc #Hpinv #Hdev #Hcaps Htag Hcont".
+-    iDestruct "Hcaps" as (γtx γc) "(#Htxl & #Hlk & #Hsub & #Hinitd)".
+-    (* THE BYTE'S TAG, opened once here and carried to the one arm that
+-       files it in the ring: the default arm's store. *)
+-    iDestruct "Htag" as (h c) "(%Hcva & %Hends & #Htg)".
++    intros rettgt HK Hcva Hends Hx Hlen Hlvl Hbelow.
++    iIntros "Hcg Hcnt #Ht Hpc #Hpinv #Hdev #Hcaps #Htg #Hlbh Hhi Hcont".
++    iDestruct "Hcaps" as (γtx γc cn) "(#Htxl & #Hlk & %Hcnu & #Hsub & #Hinitd)".
++    (* the byte and its history are the contract's own parameters now: the
++       arm that files the byte in the ring is the default arm's store. *)
+     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
+     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
+     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
+@@ -3046,19 +3285,23 @@ Section ProofConsoleintr.
+     (* ---- the three continuations, built the moment the frame is saved ---- *)
+     iAssert (ct_ret (CID0 := CID) pme m K lvl eb b lks) with "[Hcont]" as "Hcont".
+     { rewrite /ct_ret. iExact "Hcont". }
+-    iAssert (ct_exit_prop (CID0 := CID) γc pme m K lvl eb b sp0 lks)
++    iAssert (ct_exit_prop (CID0 := CID) γu hb cn γc pme m K lvl eb b sp0 lks)
+       with "[Hsaved Hcont]" as "EXIT".
+-    { iApply (ct_mk_exit γc pme m K lvl eb b sp0 lks Hspm HK Hbm Hbelow with "Ht Hlk Hsaved Hcont"). }
+-    iAssert (ct_wake_prop (CID0 := CID) γc pme m K lvl eb b sp0 lks) as "WAKE".
+-    { iApply (ct_mk_wake γc γs pme m K lvl eb b sp0 lks HK Hlen Hlvl Hbm Hbelow
+-                with "Ht Hpinv"). }
+-    iAssert (ct_kill_prop (CID0 := CID) γc pme m K lvl eb b sp0 lks) as "KILL".
+-    { iApply (ct_mk_kill γtx γc γu γv pme m K lvl eb b sp0 lks HK Hlvl Hbm Hbelow
+-                with "Ht Hdev Htxl Hsub"). }
++    { iApply (ct_mk_exit γu hb cn γc pme m K lvl eb b sp0 lks Hspm HK Hbm Hbelow
++                with "Ht Hlk Hsaved Hcont"). }
++    iAssert (ct_wake_prop (CID0 := CID) γu hb cn γc pme m K lvl eb b sp0 lks) as "WAKE".
++    { iApply (ct_mk_wake γu hb cn γc γs pme m K lvl eb b sp0 lks HK Hlen Hlvl Hbm
++                Hbelow with "Ht Hpinv"). }
++    iAssert (ct_kill_prop (CID0 := CID) γu hb cn γc pme m K lvl eb b sp0 lks) as "KILL".
++    { iApply (ct_mk_kill γu hb cn γtx γc γv pme m K lvl eb b sp0 lks HK Hlvl Hbm
++                Hbelow with "Ht Hdev Htxl Hsub"). }
++    (* THE MARK GOES BACK UNMOVED on every arm but the default's store, and
++       it is already at or before this byte.  Built per arm below, because
++       the default arm needs the half itself and not the bundle. *)
+     (* ---- +0x014 acquire(&cons.lock) ---- *)
+     iDestruct (cpu_own_transport CID CIDp9 lvl eb pme b ltac:(wp_next_chain)
+                  with "Hcnt") as "Hcnt".
+-    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string cons_res_at P5 lvl eb pme
++    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string (cons_res_at cn) P5 lvl eb pme
+               (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hbelow
+               with "Hcg Hcnt Ht Hpc []").
+     all: try lkbelow.
+@@ -3113,9 +3356,13 @@ Section ProofConsoleintr.
+                         (sign_extend' 64 (mword_of_int 120 : mword 13))
+                       = mword_of_int (CT + 0x92)) by pcw.
+       iEval (rewrite Hj092) in "Hpc".
+-      iApply (ct_kill_pre (CIDq := CIDaq) γc pme m S1 K lvl eb b sp0 lks
++      iAssert (ct_hi_out γu hb) with "[Hhi]" as "Hhiout".
++      { rewrite /ct_hi_out. iExists hh. iFrame "Hhi".
++        iPureIntro. exact (ohist_le_of_ext hh hb Hx). }
++      iApply (ct_kill_pre (CIDq := CIDaq) γu cn hb γc pme m S1 K lvl eb b sp0 lks
+                 HS1sp HS1cs Hchain Hbelow
+-                with "Ht Hcg Hpc Hcnt Hpay Hlocked Hres Hrest KILL EXIT"). }
++                with "Ht Hcg Hpc Hcnt Hpay Hlocked Hres Hrest Hhiout
++                      KILL EXIT"). }
+     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0x1a)) (mword_of_int 120 : mword 13)
+               Ra5 Rs1 S1 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
+               ltac:(rgall; rewrite HS1s1 HS1a5; exact Hku) with "Hcg Hpc []").
+@@ -3157,9 +3404,13 @@ Section ProofConsoleintr.
+                         (sign_extend' 64 (mword_of_int 206 : mword 13))
+                       = mword_of_int (CT + 0xf0)) by pcw.
+       iEval (rewrite Hj0f0) in "Hpc".
+-      iApply (ct_bs (CIDq := CIDaq) γtx γc γu γv pme m S2 K lvl eb b sp0 lks
++      iAssert (ct_hi_out γu hb) with "[Hhi]" as "Hhiout".
++      { rewrite /ct_hi_out. iExists hh. iFrame "Hhi".
++        iPureIntro. exact (ohist_le_of_ext hh hb Hx). }
++      iApply (ct_bs (CIDq := CIDaq) γtx γc γu γv cn hb pme m S2 K lvl eb b sp0 lks
+                 HS2sp HS2cs HK Hlvl Hchain Hbelow
+-                with "Ht Hdev Htxl Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT"). }
++                with "Ht Hdev Htxl Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
++                      Hhiout EXIT"). }
+     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0x22)) (mword_of_int 206 : mword 13)
+               Ra5 Rs1 S2 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
+               ltac:(rgall; rewrite HS2s1 HS2a5; exact Hdel) with "Hcg Hpc []").
+@@ -3201,9 +3452,13 @@ Section ProofConsoleintr.
+                         (sign_extend' 64 (mword_of_int 200 : mword 13))
+                       = mword_of_int (CT + 0xf0)) by pcw.
+       iEval (rewrite Hj0f0) in "Hpc".
+-      iApply (ct_bs (CIDq := CIDaq) γtx γc γu γv pme m S3 K lvl eb b sp0 lks
++      iAssert (ct_hi_out γu hb) with "[Hhi]" as "Hhiout".
++      { rewrite /ct_hi_out. iExists hh. iFrame "Hhi".
++        iPureIntro. exact (ohist_le_of_ext hh hb Hx). }
++      iApply (ct_bs (CIDq := CIDaq) γtx γc γu γv cn hb pme m S3 K lvl eb b sp0 lks
+                 HS3sp HS3cs HK Hlvl Hchain Hbelow
+-                with "Ht Hdev Htxl Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT"). }
++                with "Ht Hdev Htxl Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
++                      Hhiout EXIT"). }
+     (* ---- the default arm ---- *)
+     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0x28)) (mword_of_int 200 : mword 13)
+               Ra5 Rs1 S3 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
+@@ -3213,11 +3468,11 @@ Section ProofConsoleintr.
+     assert (Hp02c : add_vec_int (mword_of_int (CT + 0x28) : mword 64) 4
+                     = mword_of_int (CT + 0x2c)) by pcw.
+     iEval (rewrite Hp02c) in "Hpc".
+-    iApply (ct_dflt (CIDq := CIDaq) γtx γc γu γv pme m S3 K lvl eb b sp0 cv lks
+-              h c
++    iApply (ct_dflt (CIDq := CIDaq) γtx γc γu γv cn hh pme m S3 K lvl eb b sp0
++              cv lks hb cb Hcnu Hx
+               HS3sp HS3s1 HS3cs HK Hlvl Hchain Hbelow Hends Hcv
+-              with "Ht Hdev Htxl Hsub Htg Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
+-                    WAKE EXIT").
++              with "Ht Hdev Htxl Hsub Htg Hcg Hpc Hcnt Hpay Hlocked Hres Hhi
++                    Hrest WAKE EXIT").
+   Qed.
+ 
+ End ProofConsoleintr.
+diff --git a/iris/ProofDevintr.v b/iris/ProofDevintr.v
+index 1047bec4f..bff687bad 100644
+--- a/iris/ProofDevintr.v
++++ b/iris/ProofDevintr.v
+@@ -281,7 +281,7 @@ Section ProofDevintr.
+        arm claimed it and uartintr returned it, and this is where the
+        completion parks it again. *)
+     (⌜ irq = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
+-       ∃ kk : nat, uart_rx_tok γu kk) -∗
++       plic_payload_uart γu) -∗
+     pa_stk sp0 1 ↦₈[KT1] ra0 -∗
+     pa_stk sp0 2 ↦₈[KT1] s00 -∗
+     pa_stk sp0 3 ↦₈[KT1] s10 -∗
+@@ -429,7 +429,7 @@ Section ProofDevintr.
+     (* the deposit witness, out of the console credential: it is what the
+        PLIC leaves need to know the invariant is past its pre-deposit arm *)
+     iAssert (uart_inited γu) as "#Hinit".
+-    { iDestruct "Hccaps" as (γtx γc) "(_ & _ & _ & #Hin)". iExact "Hin". }
++    { iDestruct "Hccaps" as (γtx γc cn) "(_ & _ & _ & _ & #Hin)". iExact "Hin". }
+     iIntros "Hcont".
+     (* ===================== PROLOGUE (32-byte frame) ===================== *)
+     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
+@@ -892,9 +892,9 @@ Section ProofDevintr.
+         assert (HU0ra : U0 !!! Regidx ra_idx
+                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) 4)
+           by (rewrite /U0 upd_eq; reflexivity).
+-        iDestruct ("Hrxtok" with "[%]") as (kk) "Htok"; [exact Huart|].
++        iDestruct ("Hrxtok" with "[%]") as (kk hlk) "Htok"; [exact Huart|].
+         iApply (Uartintr.wp_uartintr_sconf γu γv γs U0 (av - 4)%nat lvl eb p false
+-                  kk _ Hlen ltac:(lia) ltac:(lia)
++                  kk hlk _ Hlen ltac:(lia) ltac:(lia)
+                   with "Hcg Hcnt Htext Hpc Hdev Hpinv Hccaps Htok").
+         all: try lkbelow.
+         iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc Htok".
+diff --git a/iris/ProofFileread.v b/iris/ProofFileread.v
+index 426821eca..d820a4162 100644
+--- a/iris/ProofFileread.v
++++ b/iris/ProofFileread.v
+@@ -451,7 +451,7 @@ Section ProofFileread.
+           = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
+     a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn' (dev_major Cf')}
+       frn_rp fn' (dev_major Cf') ∗
+-    is_conslock (frn_cons fn').
++    is_conslock fsc_cons AppInv.app_sup (frn_cons fn').
+   Proof.
+     intro H. rewrite /fileread_dev_env /fileread_dev_caps.
+     case_decide as H'; [by iIntros "$"|].
+@@ -468,7 +468,7 @@ Section ProofFileread.
+           = (mword_of_int KernelSyms.consoleread : mword 64)⌝ -∗
+     a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn' (dev_major Cf')}
+       frn_rp fn' (dev_major Cf') -∗
+-    is_conslock (frn_cons fn') -∗
++    is_conslock fsc_cons AppInv.app_sup (frn_cons fn') -∗
+     fileread_dev_env fn' (dev_major Cf').
+   Proof.
+     intro H. rewrite /fileread_dev_env /fileread_dev_caps.
+diff --git a/iris/ProofPlicClaim.v b/iris/ProofPlicClaim.v
+index e5c2df140..c33f72bc9 100644
+--- a/iris/ProofPlicClaim.v
++++ b/iris/ProofPlicClaim.v
+@@ -262,7 +262,7 @@ Section ProofPlicClaim.
+               a0_idx a5_idx (mword_of_int 4 : mword 12) N4 (n - 2)%nat plic_claim_ret_ok
+               emp%I
+               (fun cv => ⌜ cv = Z_to_bv 32 (Z.of_N uart_irq_id) ⌝ -∗
+-                           ∃ k : nat, uart_rx_tok γd k)%I
++                           plic_payload_uart γd)%I
+               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
+               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
+               ltac:(rewrite HN4a5; exact (ph_geom_canon _ (ph_sclaim_geom _ Hhart)))
+diff --git a/iris/ProofPlicComplete.v b/iris/ProofPlicComplete.v
+index 0095f56f6..18e16fd6a 100644
+--- a/iris/ProofPlicComplete.v
++++ b/iris/ProofPlicComplete.v
+@@ -304,7 +304,7 @@ Section ProofPlicComplete.
+               (mword_of_int 4 : mword 12) N4 (n - 4)%nat
+               (⌜ rget m0 a0_idx
+                  = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
+-                 ∃ k : nat, uart_rx_tok γd k)%I emp%I
++                 plic_payload_uart γd)%I emp%I
+               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
+               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
+               ltac:(rewrite HN4a5; exact (ph_geom_canon _ (ph_sclaim_geom _ Hhart)))
+diff --git a/iris/ProofSysRead.v b/iris/ProofSysRead.v
+index 6db31a139..b56890ebc 100644
+--- a/iris/ProofSysRead.v
++++ b/iris/ProofSysRead.v
+@@ -321,8 +321,9 @@ Section ProofSysRead.
+       (v v1 v2 : mword 64)
+       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+       (Fr : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
++      (Rd : nat -> nat -> iProp Σ)
+     : wp_sys_read_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks
+-        Fr.
++        Fr Rd.
+   Proof.
+     cbv beta delta [wp_sys_read_sconf_body].
+     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq Heb.
+@@ -810,7 +811,7 @@ Section ProofSysRead.
+       { iApply (fileread_fs_env_out with "Henv"). }
+       (* argfd answered NONE: the key is [FdClosed] and the arm is the landed
+          blanket and nothing more. *)
+-      { iApply (sys_read_arms_none (us_V U) v sts (sys_rw_count v2) Fr
++      { iApply (sys_read_arms_none (us_V U) v sts (sys_rw_count v2) Fr Rd
+                   (mword_of_int (-1) : mword 64) _ _ Hnone eq_refl). }
+     - (* ================= SUCCESS: the descriptor resolved ============= *)
+       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & _ & Hfcell)".
+@@ -953,14 +954,14 @@ Section ProofSysRead.
+       (* THE KEYED INPUT, RELAYED: the caller's is at [sys_fd_st], this
+          descriptor's row is what that key computes to, and the callee's is
+          the same proposition at the same key. *)
+-      iDestruct (sys_read_in_of (us_V U) v sts fd fv stf Fr Hsome Hstq
++      iDestruct (sys_read_in_of (us_V U) v sts fd fv stf Fr Rd Hsome Hstq
+                    with "Hin") as "Hin".
+       iDestruct (read_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
+       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
+                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
+       iApply (Fileread.wp_fileread_sconf γf γs j γlp kk qq stf fn pidv U
+                 S4 (av - 6)%nat eb (sys_rw_count v2) b
+-                _ Fr ltac:(lia) Hkk Hj Hgs Hlens
++                _ Fr Rd ltac:(lia) Hkk Hj Hgs Hlens
+                 HS4a0' HS4a2 (sys_rw_count_range v2) Heb
+                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hrow Hin").
+       all: try lkbelow.
+@@ -1030,7 +1031,7 @@ Section ProofSysRead.
+          sys_read relays fileread's return value untouched -- one match in
+          the tree, not two. *)
+       { iApply (sys_read_arms_of (us_V U) v sts fd fv stf (sys_rw_count v2)
+-                  Fr rv _ _ Hsome Hstq with "Harms"). }
++                  Fr Rd rv _ _ Hsome Hstq with "Harms"). }
+   Qed.
+ 
+ End ProofSysRead.
+diff --git a/iris/ProofSyscall.v b/iris/ProofSyscall.v
+index a5340765e..38d14db8c 100644
+--- a/iris/ProofSyscall.v
++++ b/iris/ProofSyscall.v
+@@ -3135,7 +3135,7 @@ Section SyscallArms.
+       (v0 : mword 64) :
+     sysc_num (us_V U) = 5 ->
+     pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
+-    sysc_sys_in U sts gn cs f -∗ fileread_in (fd_st_of_key v0 sts) (rf_F f).
++    sysc_sys_in U sts gn cs f -∗ fileread_in (fd_st_of_key v0 sts) (rf_F f) (rf_ret f).
+   Proof.
+     intros Hn Hv0. iIntros "H".
+     iDestruct (sysc_sys_in_at U sts gn cs f 5 Hn ltac:(vm_compute; discriminate)
+@@ -3290,7 +3290,8 @@ Section SyscallArms.
+        bytes at [v1] in the resume image [M'] *)
+     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
+     pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
+-    fileread_extra (fd_st_of_key v0 sts) (sys_rw_count v2) (rf_F f) r M' v1 -∗
++    fileread_extra (fd_st_of_key v0 sts) (sys_rw_count v2) (rf_F f)
++      (rf_ret f) r M' v1 -∗
+     sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+   Proof.
+     intros Hn Hv0 Hv1 Hv2. iIntros "H".
+@@ -5461,7 +5462,7 @@ Section SyscallArms.
+     (* THE CONSOLE, destructed ONCE: the arm builds the names record around
+        the gname it gets, which is the whole reason [console_ready] hides it
+        rather than [fclose_names] carrying it. *)
+-    iDestruct (syscall_env_console with "Henvc") as (γcon) "#Hci".
++    iDestruct (syscall_env_console with "Henvc") as (cncon Wdcon γcon) "#Hci".
+     iDestruct (sysc_fileread_env γf γcon (proc_addr j) fn with "Hfsenv Hsl")
+       as "[Hfse Hback]".
+     (* ---- THE CALLER'S INPUT IS THE PROCESS'S OWN DEPOSIT ----
+@@ -5475,11 +5476,12 @@ Section SyscallArms.
+       as %Hfdk.
+     iDestruct (sysc_dep_read U sts gn cs fdep v0
+                  ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin") as "Hdepr".
+-    iAssert (sys_read_in (us_V U) v0 sts (rf_F fdep)) with "[Hdepr]" as "Hsrin".
++    iAssert (sys_read_in (us_V U) v0 sts (rf_F fdep) (rf_ret fdep))
++      with "[Hdepr]" as "Hsrin".
+     { rewrite /sys_read_in Hfdk. iExact "Hdepr". }
+     iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γcon fn)
+               pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
+-              (rf_F fdep)
++              (rf_F fdep) (rf_ret fdep)
+               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
+               eq_refl eq_refl eq_refl
+               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Hsrin").
+diff --git a/iris/ProofUartinit.v b/iris/ProofUartinit.v
+index 5000b3313..72fb8a330 100644
+--- a/iris/ProofUartinit.v
++++ b/iris/ProofUartinit.v
+@@ -138,8 +138,8 @@ Section ProofUartinit.
+ 
+   Lemma wp_uartinit_sconf (γd : uart_names)
+       (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool) (k : nat)
+-      (p : mword 64)
+-    : wp_uartinit_sconf_body γd m K l b0 k p.
++      (hl : option (list mobs)) (p : mword 64)
++    : wp_uartinit_sconf_body γd m K l b0 k hl p.
+   Proof.
+     cbv beta delta [wp_uartinit_sconf_body].
+     intros pcE ret_tgt HK.
+@@ -484,9 +484,10 @@ Section ProofUartinit.
+     iApply (Uart.wp_sb_uart_uinv_s_sconf KT0 (CID:=CID) γd 2 (mword_of_int (KernelSyms.uartinit + 0x32)) false (mword_of_int 12 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 2 : mword 12)
+               R9 (K - 2)%nat
+               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false ∗
+-                 uart_rx_tok γd k)%I
++                 uart_rx_tok γd k hl)%I
+               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false ∗
+-                 ∃ k' : nat, uart_rx_tok γd k')%I
++                 ∃ (k' : nat) (hl' : option (list mobs)),
++                   uart_rx_tok γd k' hl')%I
+               false p
+               ltac:(unfold uart_size; lia)
+               ltac:(rgne; rewrite HR9a4; vm_compute; reflexivity)
+@@ -506,7 +507,7 @@ Section ProofUartinit.
+       match type of Hrxe with
+       | u_rx uu' = (if ?cl then [] else _) => destruct cl eqn:Hclr
+       end.
+-      + iMod (uart_colE_flush γd uu uu' k Hrxe Hlbe with "Hcol Htok")
++      + iMod (uart_colE_flush γd uu uu' k hl Hrxe Hlbe with "Hcol Htok")
+           as "[Hcol Htok]".
+         iModIntro. iSplitL "Hg";
+           [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
+@@ -514,7 +515,7 @@ Section ProofUartinit.
+       + iDestruct (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol") as "Hcol".
+         iModIntro. iSplitL "Hg";
+           [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
+-        iFrame "Hcol Ht Hd". by iExists k. }
++        iFrame "Hcol Ht Hd". iExists k, hl. iExact "Htok". }
+     iApply wp_next_off_intro.
+     iIntros "Hcg Hpc (Htx & Hdlab & Htok)".
+     assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x32) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
+diff --git a/iris/ProofUartintr.v b/iris/ProofUartintr.v
+index 2577a5470..3475c9688 100644
+--- a/iris/ProofUartintr.v
++++ b/iris/ProofUartintr.v
+@@ -155,7 +155,8 @@ Section UiCont.
+          sie_cap_gpr KT1 mf av b pme -∗
+          cpu_own lvl eb pme b lks -∗
+          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
+-         (∃ k' : nat, uart_rx_tok γu k') -∗
++         (∃ (k' : nat) (hl' : option (list mobs)),
++            uart_rx_writer γu k' hl') -∗
+          WP (Loop : expr riscv_lang)))%I.
+ 
+   (* re-anchor it at a hart reached mid-block.  Through the named definition
+@@ -202,7 +203,7 @@ Section ProofUartintr.
+     cpu_own lvl eb pme b lks -∗
+     pc_is (mword_of_int (KernelSyms.uartintr + 0x4c)) -∗
+     ui_frame sp0 m0 -∗
+-    (∃ k' : nat, uart_rx_tok γu k') -∗
++    (∃ (k' : nat) (hl' : option (list mobs)), uart_rx_writer γu k' hl') -∗
+     ui_ret_cont γu m0 av lvl eb pme b lks -∗
+     WP (Loop : expr riscv_lang).
+   Proof.
+@@ -370,7 +371,7 @@ Section ProofUartintr.
+       cpu_own (CID := CIDe) lvl eb pme b lks -∗
+       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
+       ui_frame sp0 m0 -∗
+-      (∃ k : nat, uart_rx_tok γu k) -∗
++      (∃ (k : nat) (hl : option (list mobs)), uart_rx_writer γu k hl) -∗
+       ui_ret_cont (CID0 := CIDe) γu m0 av lvl eb pme b lks -∗
+       WP (Loop : expr riscv_lang).
+   Proof.
+@@ -380,7 +381,7 @@ Section ProofUartintr.
+     (* DLAB is off for good, out of the console credential's transmit lock:
+        the RHR pop needs it to know offset 0 really is the receive register *)
+     iAssert (uart_dlab_off γu) as "#Hdlab".
+-    { iDestruct "Hccaps" as (γtx γc) "(#Htxl & _ & _ & _)".
++    { iDestruct "Hccaps" as (γtx γc cn) "(#Htxl & _ & _ & _ & _)".
+       iDestruct "Htxl" as "[_ #Hd]". iExact "Hd". }
+     assert (Jcall : add_vec (mword_of_int (KernelSyms.uartintr + 0x38) : mword 64)
+                       (sign_extend' 64 (mword_of_int 2095362 : mword 21))
+@@ -396,25 +397,26 @@ Section ProofUartintr.
+       cpu_own (CID := CIDk) lvl eb pme b lks -∗
+       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
+       ui_frame sp0 m0 -∗
+-      (∃ k : nat, uart_rx_tok γu k) -∗
++      (∃ (k : nat) (hl : option (list mobs)), uart_rx_writer γu k hl) -∗
+       ui_ret_cont (CID0 := CIDk) γu m0 av lvl eb pme b lks -∗
+       WP (Loop : expr riscv_lang))%I with "[]" as "Loop".
+     { iLöb as "IH".
+       iIntros (CIDk M1) "%Hregs1 %Hls1 %Hls2 Hcg Hcnt Hpc Hfr Htok Hcont".
+-      iDestruct "Htok" as (k) "Htok".
++      iDestruct "Htok" as (k hl) "[Htok Hhi]".
++      iDestruct "Hhi" as (hh) "[Hhi %Hhle]".
+       assert (Hlsr : forall (CID' : CpuId), rget (CID := CID') M1 Rs1 = uart_pa 5)
+         by (intros CID'; rgne; exact Hls1).
+       assert (Hrhr : forall (CID' : CpuId), rget (CID := CID') M1 Rs2 = uart_pa 0)
+         by (intros CID'; rgne; exact Hls2).
+       iApply (UG.wp_uartgetc_inline γu γv M1 (av - 4)%nat Rs1 Rs2
+-                (mword_of_int 13 : mword 8) k
++                (mword_of_int 13 : mword 8) k hl
+                 (mword_of_int (KernelSyms.uartintr + 0x2c)) (mword_of_int (KernelSyms.uartintr + 0x30))
+                 (mword_of_int (KernelSyms.uartintr + 0x32)) (mword_of_int (KernelSyms.uartintr + 0x34))
+                 (mword_of_int (KernelSyms.uartintr + 0x38)) (mword_of_int (KernelSyms.uartintr + 0x4c)) b
+                 (Hlsr _) (Hrhr _) ltac:(reg_neq) ltac:(reg_neq)
+                 ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw)
+                 ltac:(vm_compute; reflexivity)
+-                with "Hcg Hpc [] [] [] [] Hdinv Hdlab Htok [Hcnt Hfr Hcont]").
++                with "Hcg Hpc [] [] [] [] Hdinv Hdlab Htok [Hcnt Hfr Hcont Hhi]").
+       { iApply (uii2_2c with "Ht"). }
+       { iEval (rewrite -UG.ug_cr7). iApply (uii2_30 with "Ht"). }
+       { iApply (uii2_32 with "Ht"). }
+@@ -432,11 +434,13 @@ Section ProofUartintr.
+                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
+         iApply (ui_tail γu m0 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> M1)
+                   av lvl eb pme sp0 b lks Hrx Hsp0 Hav
+-                  with "Ht Hcg Hcnt Hpc Hfr [Htok] Hcont").
+-        by iExists k.
++                  with "Ht Hcg Hcnt Hpc Hfr [Htok Hhi] Hcont").
++        iExists k, hl. rewrite /uart_rx_writer. iFrame "Htok".
++        iExists hh. iFrame "Hhi". by iPureIntro.
+       - (* a byte: hand it -- with its history and the application's claim
+            about it -- to consoleintr, and go round again *)
+-        iIntros (bt c) "_ Hcg Hpc Htok #Hh".
++        iIntros (bt c) "_ Hcg Hpc Hh".
++        iDestruct "Hh" as (h) "(%Hlast & %Hanch & #Htg & #Hlbh & Htok)".
+         set (G0 := <[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
+                    (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> M1)).
+         change (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
+@@ -454,6 +458,16 @@ Section ProofUartintr.
+         destruct Hregs1' as (A2 & A19 & A20 & A21 & A22 & A23 & A24 & A25 & A26 & A27).
+         assert (HG1ra : G1 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.uartintr + 0x38) : mword 64) 4)
+           by (rewrite /G1 upd_eq; reflexivity).
++        (* a0 holds the byte, zero-extended by the [lbu] that popped it *)
++        assert (Ha0 : G1 !!! Regidx (mword_of_int 10 : mword 5)
++                      = (extend_value (n := 8) true (c : mword 8) : mword 64)).
++        { rewrite /G1 upd_ne; [| vm_compute; discriminate].
++          rewrite /G0 upd_eq. reflexivity. }
++        (* THE ORDER THE STORE NEEDS: the ring's mark is at or before the
++           popper's anchor, and the byte just popped is strictly after that
++           anchor, so the mark is strictly before the byte. *)
++        assert (Hhext : ObsTrace.ohist_ext hh h)
++          by exact (ObsTrace.ohist_ext_le_ext hh hl h Hhle Hanch).
+         assert (HcsG1 : callee_saved M1 G1).
+         { rewrite /G1 /G0.
+           apply callee_saved_insert_r; [vm_compute; reflexivity|].
+@@ -462,17 +476,12 @@ Section ProofUartintr.
+           apply callee_saved_refl. }
+         iDestruct (cpu_own_transport CIDk CIDj lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+         iApply (Consoleintr.wp_consoleintr_sconf γu γv G1 γs pme lvl (av - 4)%nat eb b lks
+-                  ltac:(lia)
++                  h c hh
++                  ltac:(lia) Ha0 Hlast Hhext
+                   Hlen ltac:(lia) Hbelow
+-                  with "Hcg Hcnt Ht Hpc Hpinv Hdinv Hccaps [Hh]").
++                  with "Hcg Hcnt Ht Hpc Hpinv Hdinv Hccaps Htg Hlbh Hhi").
+         all: try lkbelow.
+-        { (* a0 holds the byte, zero-extended by the [lbu] that popped it *)
+-          iDestruct "Hh" as (h) "[%Hlast #Htg]".
+-          iExists h, c. iSplitR.
+-          { iPureIntro. rewrite /G1 upd_ne; [| vm_compute; discriminate].
+-            rewrite /G0 upd_eq. reflexivity. }
+-          iSplitR; [iPureIntro; exact Hlast | iExact "Htg"]. }
+-        iIntros (CIDc Hsc Mf) "[%Hcsf %Hdomf] Hcg Hcnt Ht2 Hpc".
++        iIntros (CIDc Hsc Mf) "[%Hcsf %Hdomf] Hcg Hcnt Ht2 Hpc Hhi".
+         iEval (rewrite HG1ra) in "Hpc".
+         assert (P3c : ret_pc (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x38) : mword 64) 4)
+                       = mword_of_int (KernelSyms.uartintr + 0x3c)) by pcw.
+@@ -487,8 +496,10 @@ Section ProofUartintr.
+         iDestruct (cpu_own_transport CIDc CIDz lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+         iDestruct (ui_ret_cont_shift CIDk CIDz γu m0 av lvl eb pme b lks
+                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
+-        iApply ("IH" $! CIDz Mf with "[%] [%] [%] Hcg Hcnt Hpc Hfr [Htok] Hcont").
+-        4: by iExists (S k).
++        iApply ("IH" $! CIDz Mf with "[%] [%] [%] Hcg Hcnt Hpc Hfr [Htok Hhi] Hcont").
++        4: { iExists (S k), (Some h). rewrite /uart_rx_writer. iFrame "Htok".
++             iDestruct "Hhi" as (hh') "[Hhi %Hle']".
++             iExists hh'. iFrame "Hhi". by iPureIntro. }
+         + apply (ui_regs_cs m0 M1 Mf); [exact HcsMf | exact Hregs1].
+         + rewrite (callee_saved_lookup HcsMf (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact Hls1.
+         + rewrite (callee_saved_lookup HcsMf (mword_of_int 18) ltac:(vm_compute; reflexivity)). exact Hls2. }
+@@ -518,7 +529,7 @@ Section ProofUartintr.
+     cpu_own lvl eb pme b lks -∗
+     pc_is (mword_of_int (KernelSyms.uartintr + 0x22)) -∗
+     ui_frame sp0 m0 -∗
+-    (∃ k : nat, uart_rx_tok γu k) -∗
++    (∃ (k : nat) (hl : option (list mobs)), uart_rx_writer γu k hl) -∗
+     ui_ret_cont γu m0 av lvl eb pme b lks -∗
+     WP (Loop : expr riscv_lang).
+   Proof.
+@@ -581,8 +592,8 @@ Section ProofUartintr.
+   Lemma wp_uartintr_sconf (γu : uart_names) (γv : disk_names)
+       (γs : list gname)
+       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool)
+-      (k : nat) (lks : gset string)
+-    : wp_uartintr_sconf_body γu γv γs m av lvl eb pme b k lks.
++      (k : nat) (hl : option (list mobs)) (lks : gset string)
++    : wp_uartintr_sconf_body γu γv γs m av lvl eb pme b k hl lks.
+   Proof.
+     cbv beta delta [wp_uartintr_sconf_body].
+     intros pcE ret_tgt Hlen Hlvl Hav Hbelow.
+@@ -771,7 +782,7 @@ Section ProofUartintr.
+       iApply (ui_rx_setup γu γv γs m B2 av lvl eb pme sp0 b lks
+                 HB2regs Hspm Hlen Hlvl Hav Hbelow
+                 with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr [Htok] Hcont").
+-      by iExists k.
++      by iExists k, hl.
+     - (* THRE: wake the writers, then join the rx setup *)
+       assert (Jtx : add_vec (mword_of_int (KernelSyms.uartintr + 0x20) : mword 64)
+                       (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0"))))
+@@ -860,7 +871,7 @@ Section ProofUartintr.
+       iApply (ui_rx_setup γu γv γs m Mw av lvl eb pme sp0 b lks
+                 HregsW Hspm Hlen Hlvl Hav Hbelow
+                 with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr [Htok] Hcont").
+-      by iExists k.
++      by iExists k, hl.
+   Qed.
+ 
+ End ProofUartintr.
 diff --git a/iris/RiscvAdequacy.v b/iris/RiscvAdequacy.v
 index c17273fcf..97452a298 100644
 --- a/iris/RiscvAdequacy.v
@@ -1115,23 +3196,42 @@ index a20f6814d..c84141ed0 100644
 +      wp_consoleinit_sconf_body γd m K l b0 k hl vclock vcname vccpu dread0 dwrite0 p.
  End CONSOLEINIT.
 diff --git a/iris/SpecConsoleintr.v b/iris/SpecConsoleintr.v
-index cdb7f9069..77421483f 100644
+index cdb7f9069..3334737d4 100644
 --- a/iris/SpecConsoleintr.v
 +++ b/iris/SpecConsoleintr.v
-@@ -104,9 +104,9 @@ Section ConsoleCaps.
+@@ -103,10 +103,19 @@ Section ConsoleCaps.
+      it costs the bundle one conjunct and the morphism nothing.
       [uart_dlab_off γu] is already here, inside [is_txlock] (UartTxInv.v) --
       which is where uartintr's RHR pop reads it from. *)
++  (* THE CONS LOCK'S HANDLE AND NOT [ConsoleInv.is_conslock]: since the
++     credential escrow moved into [is_conslock] (ConsoleInv.v, the
++     timelessness split), that constant carries the application's [Wd], and
++     consoleintr has nothing to do with it -- it STORES bytes, it does not
++     read them, so the only thing it needs about the console is the ring's
++     lock.  Naming the handle directly keeps the interrupt path free of the
++     application parameter. *)
    Definition console_caps `{XI : CurCtx} (γu : uart_names) : iProp Σ :=
 -    (∃ γtx γc : gname,
 -       is_txlock γtx γu ∗ is_conslock γc ∗ uart_sent_sub γu [] ∗
 -       uart_inited γu)%I.
 +    (∃ (γtx γc : gname) (cn : cons_names),
-+       is_txlock γtx γu ∗ is_conslock cn γc ∗ ⌜cn_uart cn = γu⌝ ∗
++       is_txlock γtx γu ∗
++       WpLock.is_lock γc a_cons "cons"%string (cons_res_at cn) ∗
++       ⌜cn_uart cn = γu⌝ ∗
 +       uart_sent_sub γu [] ∗ uart_inited γu)%I.
  
    Global Instance console_caps_persistent `{XI : CurCtx} γu : Persistent (console_caps γu).
    Proof. rewrite /console_caps. apply _. Qed.
-@@ -123,9 +123,21 @@ End ConsoleCaps.
+@@ -115,7 +124,7 @@ Section ConsoleCaps.
+   Global Instance console_caps_morph γu :
+     CtxMorph (λ ξ, console_caps (XI := ξ) γu).
+   Proof.
+-    rewrite /console_caps /UartTxInv.is_txlock /ConsoleInv.is_conslock.
++    rewrite /console_caps /UartTxInv.is_txlock.
+     ctx_morph_solve.
+   Qed.
+ 
+@@ -123,9 +132,21 @@ End ConsoleCaps.
  
  Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
@@ -1154,7 +3254,7 @@ index cdb7f9069..77421483f 100644
    length γs = NPROC ->
    (* cons.lock's and wakeup's transient noff increments stay in int range *)
    (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
-@@ -155,16 +167,33 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fds
+@@ -155,16 +176,33 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fds
       each delivered byte's tag to its caller.  The three arms that do not
       append -- a NUL byte, a full ring, backspace/kill-line -- drop it, and
       a tag is persistent, so dropping costs nothing. *)
@@ -1192,7 +3292,7 @@ index cdb7f9069..77421483f 100644
        WP (Loop : expr riscv_lang)) -∗
    WP (Loop : expr riscv_lang).
  
-@@ -172,6 +201,7 @@ Module Type CONSOLEINTR.
+@@ -172,6 +210,7 @@ Module Type CONSOLEINTR.
    Parameter wp_consoleintr_sconf :
      forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
         (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
@@ -1298,7 +3398,7 @@ index fb4721c1d..6a2a244a2 100644
 +        ord.
  End CONSOLEREAD.
 diff --git a/iris/SpecFileread.v b/iris/SpecFileread.v
-index 3fe0a111d..b7aea1193 100644
+index 3fe0a111d..9eef2d7a6 100644
 --- a/iris/SpecFileread.v
 +++ b/iris/SpecFileread.v
 @@ -337,7 +337,7 @@ Section SpecFileread.
@@ -1320,38 +3420,52 @@ index 3fe0a111d..b7aea1193 100644
    Proof.
      intros Hrp Hdq. iIntros "#Hci".
      iDestruct (ConsoleInv.console_inv_conslock with "Hci") as "#Hlk".
-@@ -781,11 +782,29 @@ Section SpecFileread.
+@@ -781,11 +782,43 @@ Section SpecFileread.
       and takes it back UNMOVED ([FsAbsReadFire.aread_commit_at]), and the
       fire lemma advances it out of the descriptor's [foff_row], which this
       contract takes beside the input. *)
 +  (* ...AND THE CONSOLE ARM IS NO LONGER [emp] (app-echo.md, lane
-+     CONS-CURSOR, C3, and the owner's ruling on the tokenless read).  A read
-+     of the console SPENDS THE READER TOKEN when the caller has one: it hands
-+     in its cursor half at [Some nrd] and gets it back advanced, and its
-+     receipt then says whether the window it got starts at its own position.
++     CONS-CURSOR, C3, and the LEASE ruling).  A read of the console is
++     [ConsoleInv.cons_acc] at the application's credential [app_sup]: ONE
++     ARM, whose two disjuncts are the two kinds of caller.
 +
-+     ARM [None] IS WHY THIS IS AN [option] AND NOT A [nat].  THE KERNEL
-+     CANNOT MAKE CONSOLE READING EXCLUSIVE: the generic slot's supply law
++     A LEASE HOLDER supplies the reader token at its own cursor together
++     with the wand that turns consoleread's [cons_out] into what it wants to
++     know -- for sh, that the window began at ITS position, and the token
++     back advanced.  A TAINTED OR GENERIC CALLER supplies [app_sup] itself,
++     the credential it already holds, and owes [Rd] at every position, which
++     for a caller that tracks nothing is [True].
++
++     THAT IS WHY THERE IS NO [option] HERE ANY MORE.  The two callers differ
++     in WHICH DISJUNCT they hand in, not in the shape of the deposit, so one
++     leaf and one post serve both -- which the [option] could not do,
++     because a post cannot name a number a premise hid under an existential
++     and the [None] post was therefore [emp].  The [option] survives BELOW
++     this tier, in consoleread's own contract ([ConsoleInv.cons_pay] /
++     [cons_out]), where the two callers really do arrive holding different
++     resources.
++
++     THE KERNEL CANNOT MAKE CONSOLE READING EXCLUSIVE, and that is what the
++     second disjunct is for: the generic slot's supply law
 +     ([UexecExecInst.xv6_sbundle_of_supply_ne], a FIELD of [UexecSG]'s
 +     class) has to produce read's deposit at every number for an ARBITRARY
-+     program, and such a program holds no token.  So the [None] arm is
-+     payable -- with [AppInv.app_sup], the credential that program already
-+     has -- and the ring records the payment.  THE KERNEL NEVER MINTS IT;
-+     it is a price a caller pays, and [ARM-c] retired [app_sup] as a
-+     credential the kernel NEEDED, not as one a caller may spend. *)
++     program OUT OF A PERSISTENT SUPPLY ([□ ssupply]), and an exclusive
++     token is not merely absent there -- as a [□] premise it is
++     inconsistent.  [ARM-c] retired [app_sup] as a credential the kernel
++     NEEDED, not as one a caller may spend. *)
    Definition fileread_in (st : fdstate)
 -      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) : iProp Σ :=
 +      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-+      (ord : option nat) : iProp Σ :=
++      (Rd : nat -> nat -> iProp Σ) : iProp Σ :=
      match st with
      | FdOpen true _ (FdInode i γo) =>
          pf_at (aread_commit_at (fs_gamma_L fsc_fs) appE i γo) F
 +    | FdOpen true _ (FdDevice mj) =>
-+        if decide (mj = CONSOLE) then cons_pay fsc_cons app_sup ord else emp
++        if decide (mj = CONSOLE) then cons_acc fsc_cons app_sup Rd else emp
      | _ => emp
      end%I.
  
-@@ -832,10 +851,26 @@ Section SpecFileread.
+@@ -832,10 +865,33 @@ Section SpecFileread.
    (*  arm's three other exits (a null [devsw] slot, a major out of range,   *)
    (*  the [n < 0] sign guard) all answer -1 too, and take it.               *)
    (* =================================================================== *)
@@ -1360,29 +3474,36 @@ index 3fe0a111d..b7aea1193 100644
 -    (⌜r = (mword_of_int (-1) : mword 64)⌝
 -     ∨ ∃ (d : nat) (hs : list (list mobs)),
 +  (* ...AND IT IS A WINDOW, NOT A BAG (app-echo.md, lane CONS-CURSOR, C3).
-+     The receipt is stated at the reader's CURSOR [nrd]: the bytes it
-+     delivered are the ring's stored sequence at positions
-+     [nrd .. nrd + d), and the reader token comes back advanced by exactly
-+     [d].  [cons_stored_lb] is the bound on that sequence -- persistent, and
-+     any two of them agree on every index both have, so two successive reads
-+     by one holder of the token line up end to end -- and [cons_chain] is
-+     the order along it.
++     The receipt is stated at the position [cur] the ring's committed
++     sequence stood at: the bytes it delivered are that sequence at
++     [cur .. cur + d).  [cons_stored_lb] is the bound on the sequence --
++     persistent, and any two of them agree on every index both have, so two
++     successive reads by one holder of the token line up end to end -- and
++     [cons_chain] is the order along it.
 +
-+     THE RECEIPT IS NO LONGER PERSISTENT, and that is the point: it carries
-+     the token, which is exclusive.  The -1 arm hands the token back at an
-+     unknown advance, because consoleread's killed exit happens INSIDE its
-+     copy loop and may have delivered bytes already; nothing above reads
-+     that arm (a killed process is never resumed in user mode). *)
-+  Definition console_receipt (ord : option nat) (r : mword 64)
++     [cur] IS EXISTENTIAL AND [Rd cur dc] IS WHAT PINS IT.  The caller chose
++     [Rd] when it supplied [ConsoleInv.cons_acc]: a lease holder's returns
++     [⌜cur = its own n⌝] beside its token back, so its window is at its own
++     position and its next read begins where this one ended; a tainted or
++     generic caller's returns [True] and the window is just a window.  ONE
++     POST, both callers, and no [option].
++
++     THE RECEIPT IS NOT PERSISTENT: [Rd] carries whatever the caller asked
++     for, which for a lease holder is an exclusive token.  The -1 arm pays
++     [Rd] at an unknown position and advance, because consoleread's killed
++     exit happens INSIDE its copy loop and may have delivered bytes already;
++     nothing above reads that arm (a killed process is never resumed in user
++     mode). *)
++  Definition console_receipt (Rd : nat -> nat -> iProp Σ) (r : mword 64)
 +      (M' : gmap Z (bv 8)) (addr : mword 64) : iProp Σ :=
 +    ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
-+      ∃ cur d' : nat, cons_out fsc_cons app_sup ord cur d')
++      ∃ cur d' : nat, Rd cur d')
 +     ∨ ∃ (d dc cur : nat) (hs : list (list mobs))
 +         (sl : list (list mobs * bv 8)),
           ⌜Z.of_nat d = bv_unsigned r⌝ ∗ ⌜length hs = d⌝ ∗
           ⌜(forall i : nat, (i < d)%nat ->
               uint (add_vec_int addr (Z.of_nat i))
-@@ -843,48 +878,89 @@ Section SpecFileread.
+@@ -843,48 +899,91 @@ Section SpecFileread.
             forall j : nat, (j < d)%nat ->
               exists (h : list mobs) (b : bv 8),
                 hs !! j = Some h /\ obs_ends_in h b
@@ -1405,14 +3526,14 @@ index 3fe0a111d..b7aea1193 100644
 +         ⌜(d <= dc <= d + 1)%nat⌝ ∗
 +         ([∗ list] h ∈ hs, riscv_rx_tag h) ∗
 +         cons_stored_lb fsc_cons sl ∗
-+         cons_out fsc_cons app_sup ord cur dc)%I.
++         Rd cur dc)%I.
 +
-+  (* the -1 arm, at every caller that has one: whatever the caller paid
-+     comes back in the shape its own arm asks for *)
-+  Lemma console_receipt_m1 (ord : option nat) (cur d' : nat)
++  (* the -1 arm, at every caller: whatever the caller asked for comes back,
++     at a position and an advance it is not told *)
++  Lemma console_receipt_m1 (Rd : nat -> nat -> iProp Σ) (cur d' : nat)
 +      (M' : gmap Z (bv 8)) (addr : mword 64) :
-+    cons_out fsc_cons app_sup ord cur d' -∗
-+    console_receipt ord (mword_of_int (-1) : mword 64) M' addr.
++    Rd cur d' -∗
++    console_receipt Rd (mword_of_int (-1) : mword 64) M' addr.
 +  Proof.
 +    iIntros "Hrd". rewrite /console_receipt. iLeft. iSplitR; [done|].
 +    iExists cur, d'. iExact "Hrd".
@@ -1424,24 +3545,25 @@ index 3fe0a111d..b7aea1193 100644
       under exactly the linearity the receipt is guarded by. *)
    Lemma console_receipt_of_run (M : gmap Z (bv 8)) (addr : mword 64)
 -      (r : mword 64) (d : nat) (bs : nat -> bv 8) (hs : list (list mobs)) :
-+      (r : mword 64) (d dc nrd : nat) (bs : nat -> bv 8)
++      (r : mword 64) (d dc cur : nat) (bs : nat -> bv 8)
++      (Rd : nat -> nat -> iProp Σ)
 +      (hs : list (list mobs)) (sl : list (list mobs * bv 8)) :
      Z.of_nat d = bv_unsigned r ->
 -    cons_tagged bs hs d ->
-+    cons_window sl nrd d bs hs ->
++    cons_window sl cur d bs hs ->
 +    cons_chain sl ->
 +    (d <= dc <= d + 1)%nat ->
      ([∗ list] h ∈ hs, riscv_rx_tag h) -∗
 -    console_receipt r (umem_wr M addr d bs) addr.
 +    cons_stored_lb fsc_cons sl -∗
-+    cons_reader fsc_cons (nrd + dc)%nat -∗
-+    console_receipt nrd r (umem_wr M addr d bs) addr.
++    Rd cur dc -∗
++    console_receipt Rd r (umem_wr M addr d bs) addr.
    Proof.
 -    intros Hd [Hlen Htie]. iIntros "Hts".
 -    rewrite /console_receipt. iRight. iExists d, hs.
 +    intros Hd (Hsl & Hhl & Hwin) Hch Hdc.
 +    iIntros "Hts Hlb Hrd".
-+    rewrite /console_receipt. iRight. iExists d, hs, sl.
++    rewrite /console_receipt. iRight. iExists d, dc, cur, hs, sl.
 +    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
 +    iSplitR.
 +    { iPureIntro. intros Hlin j Hj.
@@ -1454,7 +3576,8 @@ index 3fe0a111d..b7aea1193 100644
 -    destruct (Htie j Hj) as (h & b & Hh & Hends & Hbs).
 -    exists h, b. split_and!; [exact Hh | exact Hends |].
 -    rewrite (umem_wr_lookup_in M addr d bs j Hj Hlin). by rewrite Hbs.
-+    iFrame "Hts Hlb". iExists dc. iSplitR; [by iPureIntro |]. iExact "Hrd".
++    iSplitR; [by iPureIntro |].
++    iFrame "Hts Hlb Hrd".
    Qed.
  
 +  (* THE PROGRAM-FACING SPELLING OF THE SAME WINDOW (app-echo.md, lane
@@ -1462,51 +3585,51 @@ index 3fe0a111d..b7aea1193 100644
 +     IMAGE, which no user-tier leaf can name -- a leaf hands its caller back
 +     the BYTES it owns ([UkRun.ubytes] at a source function), not an image.
 +     So this is the receipt read at that function: the [d] bytes the call
-+     delivered are the stored sequence at [nrd .. nrd + d), their histories
++     delivered are the stored sequence at [cur .. cur + d), their histories
 +     carry the application's tag, the chain says they are consecutive input
-+     events, and the reader token comes back advanced.  The bridge between
-+     the two forms is the leaf's own (the resume image IS the caller's run,
++     events, and [Rd cur dc] is whatever the caller asked to be told about
++     the position and the advance -- for a lease holder, that [cur] is its
++     own cursor and the token is back at [cur + dc].  The bridge between the
++     two forms is the leaf's own (the resume image IS the caller's run,
 +     written). *)
-+  Definition console_recv (nrd d : nat) (g : nat -> bv 8) : iProp Σ :=
-+    (∃ (hs : list (list mobs)) (sl : list (list mobs * bv 8)),
-+       ⌜cons_window sl nrd d g hs⌝ ∗ ⌜cons_chain sl⌝ ∗
++  Definition console_recv (Rd : nat -> nat -> iProp Σ) (d : nat)
++      (g : nat -> bv 8) : iProp Σ :=
++    (∃ (cur dc : nat) (hs : list (list mobs)) (sl : list (list mobs * bv 8)),
++       ⌜cons_window sl cur d g hs⌝ ∗ ⌜cons_chain sl⌝ ∗
 +       ([∗ list] hh ∈ hs, riscv_rx_tag hh) ∗
 +       cons_stored_lb fsc_cons sl ∗
-+       ∃ dc : nat, ⌜(d <= dc <= d + 1)%nat⌝ ∗
-+         cons_reader fsc_cons (nrd + dc)%nat)%I.
++       ⌜(d <= dc <= d + 1)%nat⌝ ∗ Rd cur dc)%I.
 +
    Definition fileread_extra (st : fdstate) (n : Z)
        (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-+      (ord : option nat)
++      (Rd : nat -> nat -> iProp Σ)
        (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) : iProp Σ :=
      match st with
      | FdOpen true _ (FdInode i γo) =>
          read_arms (fs_gamma_L fsc_fs) i γo n F r M' addr
      | FdOpen true _ (FdDevice mj) =>
 -        if decide (mj = CONSOLE) then console_receipt r M' addr else emp
-+        if decide (mj = CONSOLE)
-+        then match ord with
-+             | Some nrd => console_receipt nrd r M' addr
-+             | None => emp
-+             end
-+        else emp
++        (* UNIFORM: the receipt is paid at every caller now, because [Rd]
++           is the caller's own choice of what to be told and the [None]
++           arm -- which threw the window away -- is gone. *)
++        if decide (mj = CONSOLE) then console_receipt Rd r M' addr else emp
      | _ => emp
      end%I.
  
-@@ -893,85 +969,92 @@ Section SpecFileread.
+@@ -893,85 +992,95 @@ Section SpecFileread.
       it per arm is what makes "the unified contract implies each landed
       form" true BY CONSTRUCTION -- there is nothing to check. *)
    Definition fileread_arms (st : fdstate) (n : Z)
 -      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (ord : option nat)
++      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (Rd : nat -> nat -> iProp Σ)
        (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) : iProp Σ :=
 -    (⌜fileread_ret n r⌝ ∗ fileread_extra st n F r M' addr)%I.
-+    (⌜fileread_ret n r⌝ ∗ fileread_extra st n F ord r M' addr)%I.
++    (⌜fileread_ret n r⌝ ∗ fileread_extra st n F Rd r M' addr)%I.
  
 -  Lemma fileread_arms_ret st n F r M' addr :
 -    fileread_arms st n F r M' addr -∗ ⌜fileread_ret n r⌝.
-+  Lemma fileread_arms_ret st n F ord r M' addr :
-+    fileread_arms st n F ord r M' addr -∗ ⌜fileread_ret n r⌝.
++  Lemma fileread_arms_ret st n F Rd r M' addr :
++    fileread_arms st n F Rd r M' addr -∗ ⌜fileread_ret n r⌝.
    Proof. iIntros "[%H _]". by iPureIntro. Qed.
  
    (* ---- READING THE KEYED INPUT, BUILDING THE KEYED OUTPUT -------------
@@ -1515,53 +3638,53 @@ index 3fe0a111d..b7aea1193 100644
  
 -  Lemma fileread_in_inode wb i γo F :
 -    fileread_in (FdOpen true wb (FdInode i γo)) F -∗
-+  Lemma fileread_in_inode wb i γo F ord :
-+    fileread_in (FdOpen true wb (FdInode i γo)) F ord -∗
++  Lemma fileread_in_inode wb i γo F Rd :
++    fileread_in (FdOpen true wb (FdInode i γo)) F Rd -∗
      pf_at (aread_commit_at (fs_gamma_L fsc_fs) appE i γo) F.
    Proof. by iIntros "$". Qed.
  
 -  Lemma fileread_extra_inode wb i γo n F r M' addr :
-+  Lemma fileread_extra_inode wb i γo n F ord r M' addr :
++  Lemma fileread_extra_inode wb i γo n F Rd r M' addr :
      read_arms (fs_gamma_L fsc_fs) i γo n F r M' addr -∗
 -    fileread_extra (FdOpen true wb (FdInode i γo)) n F r M' addr.
-+    fileread_extra (FdOpen true wb (FdInode i γo)) n F ord r M' addr.
++    fileread_extra (FdOpen true wb (FdInode i γo)) n F Rd r M' addr.
    Proof. by iIntros "$". Qed.
  
    (* ...and the two at a state the walk holds only through an EQUATION: a
       descriptor's shape is derived from its content, not matched on. *)
    Lemma fileread_in_inode_of (st : fdstate) (wb : bool) (i : Z) (γo : gname)
 -      F :
-+      F ord :
++      F Rd :
      st = FdOpen true wb (FdInode i γo) ->
 -    fileread_in st F -∗ pf_at (aread_commit_at (fs_gamma_L fsc_fs) appE i γo) F.
-+    fileread_in st F ord -∗
++    fileread_in st F Rd -∗
 +    pf_at (aread_commit_at (fs_gamma_L fsc_fs) appE i γo) F.
    Proof. intros ->. by iIntros "$". Qed.
  
    Lemma fileread_extra_inode_of (st : fdstate) (wb : bool) (i : Z) (γo : gname)
 -      n F r M' addr :
-+      n F ord r M' addr :
++      n F Rd r M' addr :
      st = FdOpen true wb (FdInode i γo) ->
      read_arms (fs_gamma_L fsc_fs) i γo n F r M' addr -∗
 -    fileread_extra st n F r M' addr.
-+    fileread_extra st n F ord r M' addr.
++    fileread_extra st n F Rd r M' addr.
    Proof. intros ->. by iIntros "$". Qed.
  
    (* the three arms that pay nothing beyond the blanket *)
 -  Lemma fileread_extra_pipe rb wb n F r M' addr :
 -    ⊢ fileread_extra (FdOpen rb wb FdPipe) n F r M' addr.
-+  Lemma fileread_extra_pipe rb wb n F ord r M' addr :
-+    ⊢ fileread_extra (FdOpen rb wb FdPipe) n F ord r M' addr.
++  Lemma fileread_extra_pipe rb wb n F Rd r M' addr :
++    ⊢ fileread_extra (FdOpen rb wb FdPipe) n F Rd r M' addr.
    Proof. rewrite /fileread_extra. by destruct rb. Qed.
  
    (* THE DEVICE ARM, SPLIT THREE WAYS.  Every major but the console still
       pays nothing; the console pays the receipt, so a caller that has not
       resolved the major can only get out at -1. *)
 -  Lemma fileread_extra_dev_other rb wb (mj : Z) n F r M' addr :
-+  Lemma fileread_extra_dev_other rb wb (mj : Z) n F ord r M' addr :
++  Lemma fileread_extra_dev_other rb wb (mj : Z) n F Rd r M' addr :
      mj <> CONSOLE ->
 -    ⊢ fileread_extra (FdOpen rb wb (FdDevice mj)) n F r M' addr.
-+    ⊢ fileread_extra (FdOpen rb wb (FdDevice mj)) n F ord r M' addr.
++    ⊢ fileread_extra (FdOpen rb wb (FdDevice mj)) n F Rd r M' addr.
    Proof.
      intro Hmj. rewrite /fileread_extra. destruct rb; [| done].
      rewrite (decide_False (P := (mj = CONSOLE)) _ _ Hmj). done.
@@ -1569,28 +3692,31 @@ index 3fe0a111d..b7aea1193 100644
  
 -  Lemma fileread_extra_dev_m1 rb wb (mj : Z) n F M' addr :
 -    ⊢ fileread_extra (FdOpen rb wb (FdDevice mj)) n F
-+  (* THE -1 ARM NOW COSTS THE TOKEN BACK.  A device read that answers -1
-+     still consumed the caller's reader half at [fileread_in]'s console arm,
-+     so the arm that pays nothing else still has to return it. *)
-+  Lemma fileread_extra_dev_m1 rb wb (mj : Z) n F ord M' addr :
-+    fileread_in (FdOpen rb wb (FdDevice mj)) F ord -∗
-+    fileread_extra (FdOpen rb wb (FdDevice mj)) n F ord
++  (* THE -1 ARM STILL PAYS THE CALLER BACK.  A device read that answers -1
++     consumed the caller's [cons_acc] at [fileread_in]'s console arm, so the
++     arm that pays nothing else still owes [Rd] -- at a position and an
++     advance the caller is not told ([ConsoleInv.cons_acc_ret]: a lease
++     holder gets its own token back unmoved). *)
++  Lemma fileread_extra_dev_m1 rb wb (mj : Z) n F Rd M' addr :
++    fileread_in (FdOpen rb wb (FdDevice mj)) F Rd -∗
++    fileread_extra (FdOpen rb wb (FdDevice mj)) n F Rd
          (mword_of_int (-1) : mword 64) M' addr.
    Proof.
 -    rewrite /fileread_extra. destruct rb; [| done].
 -    case_decide as Hmj; [iApply console_receipt_m1 | done].
 +    rewrite /fileread_extra /fileread_in. destruct rb; [| by iIntros "$"].
 +    case_decide as Hmj; [| by iIntros "$"].
-+    destruct ord as [nrd |]; [| by iIntros "$"].
-+    iIntros "Hrd". iApply (console_receipt_m1 with "Hrd").
++    iIntros "Hacc".
++    iDestruct (cons_acc_ret with "Hacc") as (cur dc) "Hrd".
++    iApply (console_receipt_m1 with "Hrd").
    Qed.
  
 -  Lemma fileread_extra_dev_console rb wb n F r M' addr :
 -    console_receipt r M' addr -∗
 -    fileread_extra (FdOpen rb wb (FdDevice CONSOLE)) n F r M' addr.
-+  Lemma fileread_extra_dev_console rb wb n F (nrd : nat) r M' addr :
-+    console_receipt nrd r M' addr -∗
-+    fileread_extra (FdOpen rb wb (FdDevice CONSOLE)) n F (Some nrd) r M' addr.
++  Lemma fileread_extra_dev_console rb wb n F Rd r M' addr :
++    console_receipt Rd r M' addr -∗
++    fileread_extra (FdOpen rb wb (FdDevice CONSOLE)) n F Rd r M' addr.
    Proof.
      iIntros "H". rewrite /fileread_extra. destruct rb; [| done].
      case_decide as Hc; [iExact "H" | exfalso; by apply Hc].
@@ -1598,31 +3724,31 @@ index 3fe0a111d..b7aea1193 100644
  
 -  Lemma fileread_extra_closed n F r M' addr :
 -    ⊢ fileread_extra FdClosed n F r M' addr.
-+  Lemma fileread_extra_closed n F ord r M' addr :
-+    ⊢ fileread_extra FdClosed n F ord r M' addr.
++  Lemma fileread_extra_closed n F Rd r M' addr :
++    ⊢ fileread_extra FdClosed n F Rd r M' addr.
    Proof. done. Qed.
  
    (* ...at the key the WALK holds after the [f->type] branch: the descriptor's
       TYPE, not a state shape it would have to re-derive. *)
    Lemma fileread_extra_of_pipe (inum : mword 32) (γo : gname) (C : fcontent)
 -      (st : fdstate) n F r M' addr :
-+      (st : fdstate) n F ord r M' addr :
++      (st : fdstate) n F Rd r M' addr :
      fdstate_ok inum γo C st -> fc_type C = FD_PIPE ->
 -    ⊢ fileread_extra st n F r M' addr.
-+    ⊢ fileread_extra st n F ord r M' addr.
++    ⊢ fileread_extra st n F Rd r M' addr.
    Proof.
      intros Hok Ht.
      destruct (fdstate_ok_pipe inum γo C st Hok Ht) as (rb & wb & ->).
-@@ -979,40 +1062,42 @@ Section SpecFileread.
+@@ -979,40 +1088,42 @@ Section SpecFileread.
    Qed.
  
    Lemma fileread_extra_of_dev_m1 (inum : mword 32) (γo : gname) (C : fcontent)
 -      (st : fdstate) n F M' addr :
-+      (st : fdstate) n F ord M' addr :
++      (st : fdstate) n F Rd M' addr :
      fdstate_ok inum γo C st -> fc_type C = FD_DEVICE ->
 -    ⊢ fileread_extra st n F (mword_of_int (-1) : mword 64) M' addr.
-+    fileread_in st F ord -∗
-+    fileread_extra st n F ord (mword_of_int (-1) : mword 64) M' addr.
++    fileread_in st F Rd -∗
++    fileread_extra st n F Rd (mword_of_int (-1) : mword 64) M' addr.
    Proof.
      intros Hok Ht.
      destruct (fdstate_ok_device inum γo C st Hok Ht) as (rb & wb & ->).
@@ -1633,66 +3759,66 @@ index 3fe0a111d..b7aea1193 100644
    (* the majors that pay nothing, at the same key *)
    Lemma fileread_extra_of_dev_other (inum : mword 32) (γo : gname)
 -      (C : fcontent) (st : fdstate) n F r M' addr :
-+      (C : fcontent) (st : fdstate) n F ord r M' addr :
++      (C : fcontent) (st : fdstate) n F Rd r M' addr :
      fdstate_ok inum γo C st -> fc_type C = FD_DEVICE ->
      bv_unsigned (fc_major C) <> CONSOLE ->
 -    ⊢ fileread_extra st n F r M' addr.
-+    ⊢ fileread_extra st n F ord r M' addr.
++    ⊢ fileread_extra st n F Rd r M' addr.
    Proof.
      intros Hok Ht Hmj.
      destruct (fdstate_ok_device inum γo C st Hok Ht) as (rb & wb & Hst).
 -    rewrite Hst. iApply (fileread_extra_dev_other rb wb _ n F r M' addr Hmj).
 +    rewrite Hst.
-+    iApply (fileread_extra_dev_other rb wb _ n F ord r M' addr Hmj).
++    iApply (fileread_extra_dev_other rb wb _ n F Rd r M' addr Hmj).
    Qed.
  
    (* ...and the console's, at the key the walk holds after the [f->type]
       branch and the [devsw] load: the major it resolved IS [CONSOLE]. *)
    Lemma fileread_extra_of_dev_console (inum : mword 32) (γo : gname)
 -      (C : fcontent) (st : fdstate) n F r M' addr :
-+      (C : fcontent) (st : fdstate) n F (nrd : nat) r M' addr :
++      (C : fcontent) (st : fdstate) n F Rd r M' addr :
      fdstate_ok inum γo C st -> fc_type C = FD_DEVICE ->
      bv_unsigned (fc_major C) = CONSOLE ->
 -    console_receipt r M' addr -∗
 -    fileread_extra st n F r M' addr.
-+    console_receipt nrd r M' addr -∗
-+    fileread_extra st n F (Some nrd) r M' addr.
++    console_receipt Rd r M' addr -∗
++    fileread_extra st n F Rd r M' addr.
    Proof.
      intros Hok Ht Hmj. iIntros "H".
      destruct (fdstate_ok_device inum γo C st Hok Ht) as (rb & wb & Hst).
      rewrite Hmj in Hst. rewrite Hst.
 -    iApply (fileread_extra_dev_console rb wb n F r M' addr). iExact "H".
-+    iApply (fileread_extra_dev_console rb wb n F nrd r M' addr). iExact "H".
++    iApply (fileread_extra_dev_console rb wb n F Rd r M' addr). iExact "H".
    Qed.
  
    (* THE INODE ARM'S KEY, in one step.  Past the [f->readable] test and the
-@@ -1036,13 +1121,13 @@ Section SpecFileread.
+@@ -1036,13 +1147,13 @@ Section SpecFileread.
    (* the [f->readable == 0] early return: no arm of the match is armed
       there, because the only armed one is a READABLE descriptor *)
    Lemma fileread_extra_unreadable (inum : mword 32) (γo : gname)
 -      (C : fcontent) (st : fdstate) n F r M' addr :
-+      (C : fcontent) (st : fdstate) n F ord r M' addr :
++      (C : fcontent) (st : fdstate) n F Rd r M' addr :
      fdstate_ok inum γo C st ->
      (* the WORD the code tested, not a re-reading of it: the walk arrives
         with [beq a5,x0]'s own boolean *)
      eq_vec (zero_extend' 64 (fc_readable C : mword 8) : mword 64)
             (zero_reg : mword 64) = true ->
 -    ⊢ fileread_extra st n F r M' addr.
-+    ⊢ fileread_extra st n F ord r M' addr.
++    ⊢ fileread_extra st n F Rd r M' addr.
    Proof.
      destruct st as [| rb wb ty]; [by iIntros |].
      destruct rb; [| rewrite /fileread_extra; by iIntros].
-@@ -1055,16 +1140,20 @@ Section SpecFileread.
+@@ -1055,16 +1166,20 @@ Section SpecFileread.
       descriptor whose kind the walk has not read yet -- and it can, for
       free: the inode arm hands the piece back UNSPENT (which is the whole
       point of the refund), and every other arm is [emp]. *)
 -  Lemma fileread_extra_neg st n F M' addr :
-+  Lemma fileread_extra_neg st n F ord M' addr :
++  Lemma fileread_extra_neg st n F Rd M' addr :
      (n < 0)%Z ->
 -    fileread_in st F -∗
 -    fileread_extra st n F (mword_of_int (-1) : mword 64) M' addr.
-+    fileread_in st F ord -∗
-+    fileread_extra st n F ord (mword_of_int (-1) : mword 64) M' addr.
++    fileread_in st F Rd -∗
++    fileread_extra st n F Rd (mword_of_int (-1) : mword 64) M' addr.
    Proof.
 -    intros Hn. destruct st as [| rb wb ty]; [by iIntros |].
 -    destruct rb; [| by iIntros].
@@ -1703,60 +3829,61 @@ index 3fe0a111d..b7aea1193 100644
 -       | iIntros "_"; case_decide; [iApply console_receipt_m1 | done] ].
 +      [| by iIntros "$"
 +       | case_decide;
-+         [ destruct ord as [nrd |];
-+           [ iIntros "Hrd"; iApply (console_receipt_m1 with "Hrd")
-+           | by iIntros "$" ]
++         [ iIntros "Hacc";
++           iDestruct (cons_acc_ret with "Hacc") as (cur dc) "Hrd";
++           iApply (console_receipt_m1 with "Hrd")
 +         | by iIntros "$"] ].
      iIntros "Hc". by iApply (read_arms_neg with "Hc").
    Qed.
  
-@@ -1084,7 +1173,15 @@ Definition wp_fileread_sconf_body
+@@ -1084,7 +1199,16 @@ Definition wp_fileread_sconf_body
         observation RECEIPT, its [pf_refund] is what the caller gets back on
         the one arm that does not fire.  Both are ignored by every other arm,
         so a caller that does not care instantiates [pfam_triv (fun _ _ _ _ => True%I)]. *)
 -    (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) :=
 +    (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-+    (* THE CALLER'S CONSOLE CURSOR (app-echo.md, lane CONS-CURSOR, C3).  On
-+       the console arm a caller at [Some nrd] SPENDS the reader token at that
-+       cursor and gets it back advanced; at [None] it claims nothing and the
-+       arm is [emp], which is what the GENERIC slot's supply law pays
-+       ([FsAbsInvFire.fsabs_fileread_in]).  See this lane's report: the
-+       [None] arm is where the token discipline and [UexecSG]'s supply law
-+       do not yet meet. *)
-+    (ord : option nat) :=
++    (* WHAT THE CALLER ASKS TO BE TOLD ABOUT THE CONSOLE WINDOW (app-echo.md,
++       lane CONS-CURSOR, C3, and the LEASE ruling).  The console arm takes
++       [ConsoleInv.cons_acc fsc_cons app_sup Rd] -- one arm, two disjuncts --
++       and pays [Rd cur dc] at the position the ring's committed sequence
++       stood at and the advance the cursor made.  A lease holder instantiates
++       [Rd] with "[cur] is my own [n], and here is my token back"; a tainted
++       or generic caller with [fun _ _ => True], which is what the GENERIC
++       slot's supply law pays ([FsAbsInvFire.fsabs_fileread_in]). *)
++    (Rd : nat -> nat -> iProp Σ) :=
    let pcE : mword 64 := mword_of_int KernelSyms.fileread in
    let pj := proc_addr j in
    (* a1 = addr, the user destination all three arms copy to *)
-@@ -1144,7 +1241,7 @@ Definition wp_fileread_sconf_body
+@@ -1144,7 +1268,7 @@ Definition wp_fileread_sconf_body
    (* ---- THE CALLER'S INPUT, KEYED ON [st] ([fileread_in]) ----
       The observation commit conjoined with the caller's refund on an open,
       readable inode descriptor, [emp] everywhere else. *)
 -  fileread_in st F -∗
-+  fileread_in st F ord -∗
++  fileread_in st F Rd -∗
    (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
       (its bread / ilock / bwrite does), and a park moves the hart with
       interrupts off, so the crossing has nothing to do with SIE -- the
-@@ -1197,7 +1294,7 @@ Definition wp_fileread_sconf_body
+@@ -1197,7 +1321,7 @@ Definition wp_fileread_sconf_body
           THIS post's own resume image and destination, so it can name the
           bytes -- its unspent return or its fault reading on an inode,
           nothing anywhere else. *)
 -      fileread_arms st n F r (umem_wr (us_M U) addr d bs) addr -∗
-+      fileread_arms st n F ord r (umem_wr (us_M U) addr d bs) addr -∗
++      fileread_arms st n F Rd r (umem_wr (us_M U) addr d bs) addr -∗
        WP (Loop : expr riscv_lang)) -∗
    WP (Loop : expr riscv_lang).
  
-@@ -1214,6 +1311,7 @@ Module Type FILEREAD.
+@@ -1214,6 +1338,7 @@ Module Type FILEREAD.
        (fn : fread_names)
        (pidv : mword 32) (U : ustate)
        (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
 -      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)),
 -      wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks F.
-+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (ord : option nat),
++      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (Rd : nat -> nat -> iProp Σ),
 +      wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks F
-+        ord.
++        Rd.
  End FILEREAD.
 diff --git a/iris/SpecMain.v b/iris/SpecMain.v
-index 01e897f45..0d804f5a9 100644
+index 01e897f45..3dcb9b43a 100644
 --- a/iris/SpecMain.v
 +++ b/iris/SpecMain.v
 @@ -295,7 +295,7 @@ Section SpecMain.
@@ -1768,7 +3895,7 @@ index 01e897f45..0d804f5a9 100644
      ((∃ r w : mword 64,
          devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) ∗
       (* ...and the eighteen devsw entries consoleinit never writes, still as
-@@ -423,7 +423,14 @@ Section SpecMain.
+@@ -423,7 +423,20 @@ Section SpecMain.
          static global the init sequence brings under a lock -- and main needs
          it to run the [WpLock.newlock] that turns consoleinit's postcondition
          into [ConsoleInv.is_conslock], one half of [console_caps]. *)
@@ -1780,11 +3907,17 @@ index 01e897f45..0d804f5a9 100644
 +        with the boot supply.  THIS LANE hands it back to the top of the
 +        boot chain and drops it there; E2 routes it into
 +        [PinnedExec.init_boot_bundle] instead. *)
-+     cons_reader cn 0%nat)%I.
++     cons_reader cn 0%nat ∗
++     (* ...AND THE CLEAN TOKEN, the exclusive authority of the ring's DIRTY
++        MARKER ([ConsoleInv.cons_clean_tok]).  It is what main's [newlock]
++        spends to allocate the credential escrow
++        ([ConsoleInv.cons_cred_inv]) that rides in [is_conslock]: the ring
++        is born with nobody having read behind the token holder's back. *)
++     cons_clean_tok cn)%I.
  
    (* ------------------------------------------------------------------- *)
    (* This hart's own translation and trap resources.  [strans_bit bare]   *)
-@@ -453,6 +460,12 @@ Section SpecMain.
+@@ -453,6 +466,12 @@ Section SpecMain.
        (p0 : mword 64)
        (ps : list (mword 64)) (s1entry phystop : mword 64)
        (γd : uart_names) (γv : disk_names)
@@ -1797,7 +3930,7 @@ index 01e897f45..0d804f5a9 100644
        (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
        (* THE FILE SYSTEM'S BOOT-ERA MINT, as the era chose it: the disk's
           bytes, the parsed superblock, the inode region's block count and
-@@ -490,6 +503,9 @@ Section SpecMain.
+@@ -490,6 +509,9 @@ Section SpecMain.
      (* the disk's protocol is in its not-live arm at boot: virtio_disk_init
         makes it live, and its config half [c0] is how main knows so *)
      virtio_live c0 = false ->
@@ -1807,7 +3940,7 @@ index 01e897f45..0d804f5a9 100644
      (* the inode region is nonempty.  It is [BootShared.fs_boot_image_wf]'s
         fifth conjunct, and it reaches here as a PURE premise rather than as
         one of [fs_boot_supply]'s ties because the era holds it about [nib]
-@@ -548,7 +564,7 @@ Section SpecMain.
+@@ -548,7 +570,7 @@ Section SpecMain.
           P pos cur_ctx) -∗
      (* the boot supply *)
      main_locks_raw -∗
@@ -1816,7 +3949,7 @@ index 01e897f45..0d804f5a9 100644
      (* THE IMAGE'S WRITABLE INITIALIZED GLOBALS, which [kernel_data] stopped
         claiming when it was narrowed to [rodata_end].  This is
         [BootShared.main_data_raw], spelled out rather than named because
-@@ -663,7 +679,13 @@ Section SpecMain.
+@@ -663,7 +685,13 @@ Section SpecMain.
      (* THE RECEIVE TOKEN, born with the device invariant and carried by main
         to uartinit's FCR flush; main parks it in the PLIC invariant between
         consoleinit and plicinit, which is what mints [uart_inited]. *)
@@ -1831,7 +3964,7 @@ index 01e897f45..0d804f5a9 100644
      uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
      disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
      (* ...and the two disk ghosts the protocol invariant does NOT hold, minted
-@@ -718,7 +740,7 @@ Module Type MAIN.
+@@ -718,7 +746,7 @@ Module Type MAIN.
        (m : regfile) (K : nat)
        (p0 : mword 64)
        (ps : list (mword 64)) (s1entry phystop : mword 64)
@@ -1840,7 +3973,7 @@ index 01e897f45..0d804f5a9 100644
        (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
        (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
        (ndisk : nat)
-@@ -727,5 +749,5 @@ Module Type MAIN.
+@@ -727,5 +755,5 @@ Module Type MAIN.
        (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
        `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)},
        wp_main_boot_sconf_body m K p0 ps s1entry phystop
@@ -1848,7 +3981,7 @@ index 01e897f45..0d804f5a9 100644
 +        γd γv cn l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
  End MAIN.
 diff --git a/iris/SpecMainSecondary.v b/iris/SpecMainSecondary.v
-index 34e06e31e..7cda8156d 100644
+index 34e06e31e..18ab5cba8 100644
 --- a/iris/SpecMainSecondary.v
 +++ b/iris/SpecMainSecondary.v
 @@ -142,7 +142,8 @@ Section MainDepositMorph.
@@ -1856,8 +3989,8 @@ index 34e06e31e..7cda8156d 100644
    Global Instance is_txlock_morph γl γu : CtxMorph (λ ξ, is_txlock (XI := ξ) γl γu).
    Proof. rewrite /is_txlock. ctx_morph_solve. Qed.
 -  Global Instance is_conslock_morph γ : CtxMorph (λ ξ, is_conslock (XI := ξ) γ).
-+  Global Instance is_conslock_morph cn γ :
-+    CtxMorph (λ ξ, is_conslock (XI := ξ) cn γ).
++  Global Instance is_conslock_morph cn (Wd : iProp Σ) γ :
++    CtxMorph (λ ξ, is_conslock (XI := ξ) cn Wd γ).
    Proof. rewrite /is_conslock. ctx_morph_solve. Qed.
    Global Instance printk_env_morph γpr γd γv : CtxMorph (λ ξ, printk_env (XI := ξ) γpr γd γv).
    Proof. rewrite /printk_env. ctx_morph_solve. Qed.
@@ -1888,7 +4021,7 @@ index 5ff02dc6a..86a62ed1e 100644
      sie_cap_gpr KT1 m' n false p -∗
      pc_is ret_tgt -∗
 diff --git a/iris/SpecSysRead.v b/iris/SpecSysRead.v
-index 7a65fe1c4..59db9affb 100644
+index 7a65fe1c4..7bf56e2d2 100644
 --- a/iris/SpecSysRead.v
 +++ b/iris/SpecSysRead.v
 @@ -275,8 +275,9 @@ Section SpecSysRead.
@@ -1898,8 +4031,8 @@ index 7a65fe1c4..59db9affb 100644
 -      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) : iProp Σ :=
 -    fileread_in (sys_fd_st v (pv_ofile V) sts) F.
 +      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-+      (ord : option nat) : iProp Σ :=
-+    fileread_in (sys_fd_st v (pv_ofile V) sts) F ord.
++      (Rd : nat -> nat -> iProp Σ) : iProp Σ :=
++    fileread_in (sys_fd_st v (pv_ofile V) sts) F Rd.
  
    (* the LANDED return clause, verbatim, plus the arm's extra.  Stating the
       blanket unconditionally is what makes "the unified contract implies the
@@ -1907,16 +4040,16 @@ index 7a65fe1c4..59db9affb 100644
       [ProofSyscall] is written against. *)
    Definition sys_read_arms (V : pprivate) (v : mword 64) (sts : list fdstate)
        (n : Z) (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-+      (ord : option nat)
++      (Rd : nat -> nat -> iProp Σ)
        (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) : iProp Σ :=
      (⌜sys_read_ret V v n r⌝ ∗
 -     fileread_extra (sys_fd_st v (pv_ofile V) sts) n F r M' addr)%I.
-+     fileread_extra (sys_fd_st v (pv_ofile V) sts) n F ord r M' addr)%I.
++     fileread_extra (sys_fd_st v (pv_ofile V) sts) n F Rd r M' addr)%I.
  
 -  Lemma sys_read_arms_ret V v sts n F r M' addr :
 -    sys_read_arms V v sts n F r M' addr -∗ ⌜sys_read_ret V v n r⌝.
-+  Lemma sys_read_arms_ret V v sts n F ord r M' addr :
-+    sys_read_arms V v sts n F ord r M' addr -∗ ⌜sys_read_ret V v n r⌝.
++  Lemma sys_read_arms_ret V v sts n F Rd r M' addr :
++    sys_read_arms V v sts n F Rd r M' addr -∗ ⌜sys_read_ret V v n r⌝.
    Proof. iIntros "[%H _]". by iPureIntro. Qed.
  
    (* ...and the other projection, which is what the process gets back: the
@@ -1927,9 +4060,9 @@ index 7a65fe1c4..59db9affb 100644
 -  Lemma sys_read_arms_extra V v sts n F r M' addr :
 -    sys_read_arms V v sts n F r M' addr -∗
 -    fileread_extra (sys_fd_st v (pv_ofile V) sts) n F r M' addr.
-+  Lemma sys_read_arms_extra V v sts n F ord r M' addr :
-+    sys_read_arms V v sts n F ord r M' addr -∗
-+    fileread_extra (sys_fd_st v (pv_ofile V) sts) n F ord r M' addr.
++  Lemma sys_read_arms_extra V v sts n F Rd r M' addr :
++    sys_read_arms V v sts n F Rd r M' addr -∗
++    fileread_extra (sys_fd_st v (pv_ofile V) sts) n F Rd r M' addr.
    Proof. iIntros "[_ $]". Qed.
  
    (* ---- the key, read at the two shapes the walk reaches it in --------
@@ -1937,12 +4070,12 @@ index 7a65fe1c4..59db9affb 100644
       descriptor whose row the caller's own bundle names. *)
    Lemma sys_read_arms_none (V : pprivate) (v : mword 64) (sts : list fdstate)
        (n : Z) (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-+      (ord : option nat)
++      (Rd : nat -> nat -> iProp Σ)
        (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) :
      arg_fd v (pv_ofile V) = None ->
      r = (mword_of_int (-1) : mword 64) ->
 -    ⊢ sys_read_arms V v sts n F r M' addr.
-+    ⊢ sys_read_arms V v sts n F ord r M' addr.
++    ⊢ sys_read_arms V v sts n F Rd r M' addr.
    Proof.
      intros Hnone Hr. rewrite /sys_read_arms /sys_fd_st Hnone.
      iSplitR; [| done]. iPureIntro. left. split; [exact Hr | exact Hnone].
@@ -1951,11 +4084,11 @@ index 7a65fe1c4..59db9affb 100644
    Lemma sys_read_in_of (V : pprivate) (v : mword 64) (sts : list fdstate)
        (fd : nat) (fv : mword 64) (st : fdstate)
 -      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) :
-+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (ord : option nat) :
++      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (Rd : nat -> nat -> iProp Σ) :
      arg_fd v (pv_ofile V) = Some (fd, fv) ->
      sts !! fd = Some st ->
 -    sys_read_in V v sts F -∗ fileread_in st F.
-+    sys_read_in V v sts F ord -∗ fileread_in st F ord.
++    sys_read_in V v sts F Rd -∗ fileread_in st F Rd.
    Proof.
      intros Hsome Hst. rewrite /sys_read_in /sys_fd_st Hsome Hst /=.
      by iIntros "$".
@@ -1964,13 +4097,13 @@ index 7a65fe1c4..59db9affb 100644
    Lemma sys_read_arms_of (V : pprivate) (v : mword 64) (sts : list fdstate)
        (fd : nat) (fv : mword 64) (st : fdstate) (n : Z)
 -      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
-+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (ord : option nat)
++      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (Rd : nat -> nat -> iProp Σ)
        (r : mword 64) (M' : gmap Z (bv 8)) (addr : mword 64) :
      arg_fd v (pv_ofile V) = Some (fd, fv) ->
      sts !! fd = Some st ->
 -    fileread_arms st n F r M' addr -∗ sys_read_arms V v sts n F r M' addr.
-+    fileread_arms st n F ord r M' addr -∗
-+    sys_read_arms V v sts n F ord r M' addr.
++    fileread_arms st n F Rd r M' addr -∗
++    sys_read_arms V v sts n F Rd r M' addr.
    Proof.
      intros Hsome Hst. rewrite /sys_read_arms /sys_fd_st Hsome Hst /=.
      iIntros "[%Hret $]". iPureIntro. right. by exists fd, fv.
@@ -1982,7 +4115,7 @@ index 7a65fe1c4..59db9affb 100644
 +    (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
 +    (* the caller's console cursor, relayed to fileread (CONS-CURSOR C3);
 +       [None] is a caller that claims no window *)
-+    (ord : option nat) :=
++    (Rd : nat -> nat -> iProp Σ) :=
    let pcE : mword 64 := mword_of_int KernelSyms.sys_read in
    let pj := proc_addr j in
    let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -1991,13 +4124,13 @@ index 7a65fe1c4..59db9affb 100644
       the table's own values. *)
    fileread_fs_env γf fn -∗
 -  ConsoleInv.console_inv (frn_cons fn) -∗
-+  ConsoleInv.console_inv fsc_cons (frn_cons fn) -∗
++  ConsoleInv.console_inv fsc_cons AppInv.app_sup (frn_cons fn) -∗
    (* ---- THE CALLER'S INPUT, KEYED ON THE DESCRIPTOR ARGUMENT 0 NAMES
       ([sys_read_in], which is [SpecFileread.fileread_in] at [sys_fd_st]):
       the observation commit conjoined with the caller's refund on an open,
       readable inode, [emp] everywhere else. ---- *)
 -  sys_read_in (us_V U) v sts F -∗
-+  sys_read_in (us_V U) v sts F ord -∗
++  sys_read_in (us_V U) v sts F Rd -∗
    (* THE CROSSING IS THE LITERAL [true]: fileread parks, and a park moves the
       hart with interrupts off, so the crossing has nothing to do with SIE. *)
    wp_next true pj (fun (CID : CpuId) =>
@@ -2006,7 +4139,7 @@ index 7a65fe1c4..59db9affb 100644
           ⌜sys_read_ret⌝, and beside it what the arm the descriptor selects
           proved. ---- *)
 -      sys_read_arms (us_V U) v sts (sys_rw_count v2) F r
-+      sys_read_arms (us_V U) v sts (sys_rw_count v2) F ord r
++      sys_read_arms (us_V U) v sts (sys_rw_count v2) F Rd r
          (umem_wr (us_M U) v1 d bs) v1 -∗
        WP (Loop : expr riscv_lang)) -∗
    WP (Loop : expr riscv_lang).
@@ -2015,10 +4148,10 @@ index 7a65fe1c4..59db9affb 100644
        (v v1 v2 : mword 64)
        (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
 -      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)),
-+      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (ord : option nat),
++      (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ)) (Rd : nat -> nat -> iProp Σ),
        wp_sys_read_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks
 -        F.
-+        F ord.
++        F Rd.
  End SYSREAD.
 diff --git a/iris/SpecUartinit.v b/iris/SpecUartinit.v
 index 417df743c..d1d85bca3 100644
@@ -2203,7 +4336,7 @@ index 6468d5cd4..dd6e3ae73 100644
                 unit c) g' -∗
           ▷ xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
 diff --git a/iris/UartNames.v b/iris/UartNames.v
-index 97ae33b9c..aa6b2869b 100644
+index 97ae33b9c..b3c4afeb9 100644
 --- a/iris/UartNames.v
 +++ b/iris/UartNames.v
 @@ -33,9 +33,20 @@ From iris.base_logic.lib Require Import own.
@@ -2230,7 +4363,7 @@ index 97ae33b9c..aa6b2869b 100644
        un_init  the one-shot that says uartinit's FCR flush has run.  Its
                 exclusive half [uart_preinit] is what the PLIC invariant
                 holds before the boot chain deposits the token; the
-@@ -48,5 +59,28 @@ Record uart_names := UartNames {
+@@ -48,5 +59,40 @@ Record uart_names := UartNames {
    un_dlab   : gname;
    un_rxpush : gname;
    un_rxpop  : gname;
@@ -2253,90 +4386,118 @@ index 97ae33b9c..aa6b2869b 100644
 +              receipt hands out a lower bound of.
 +     cn_rd    the CONSUMPTION CURSOR, a [ghost_var] over the number of bytes
 +              consumed.  One half is in the ring's resource; the other IS
-+              the console-reader token. *)
++              the console-reader token.
++     cn_dirty the ONE-SHOT MARKER that says "a read without the token has
++              moved the ring's consumed count past the token holder's
++              cursor".  A [mono_nat]: the authority at 0 is the CLEAN token
++              (exclusive, minted at boot beside the ring), the lower bound
++              at 1 is the persistent, TIMELESS marker the ring's resource
++              carries ([ConsoleInv.cons_dirty_lb]).  The marker and not the
++              credential itself is what rides in [ConsoleInv.cons_res],
++              because the credential is an arbitrary application [iProp] and
++              a lock payload must be timeless; the credential lives in the
++              escrow invariant beside the lock handle
++              ([ConsoleInv.cons_cred_inv]). *)
 +Record cons_names := ConsNames {
-+  cn_uart : uart_names;
-+  cn_log  : gname;
-+  cn_rd   : gname;
++  cn_uart  : uart_names;
++  cn_log   : gname;
++  cn_rd    : gname;
++  cn_dirty : gname;
 +}.
 diff --git a/iris/UexecExecInst.v b/iris/UexecExecInst.v
-index 216eb358e..74b1f94b3 100644
+index 216eb358e..7faa7590e 100644
 --- a/iris/UexecExecInst.v
 +++ b/iris/UexecExecInst.v
-@@ -274,6 +274,14 @@ Section UexecExecInst.
+@@ -274,6 +274,19 @@ Section UexecExecInst.
         it and the arm reads it back, and [f] is what carries the two past
         each other.  LAST, again. *)
      kf_xpay  : Z -> iProp Σ;
-+    (* ---- read (5), second piece: THE CALLER'S CONSOLE CURSOR ----
-+       (app-echo.md, lane CONS-CURSOR, C3).  A read of the console spends
-+       the reader token at this cursor and returns it advanced by the count
-+       delivered, so the deposit's input arm and the post's receipt are both
-+       stated at it.  A FIELD OF THE FAMILIES because the process CHOOSES
-+       it when it builds an explicit deposit; the kernel only relays it.
-+       LAST, so every positional builder only gained a trailing argument. *)
-+    rf_nrd   : option nat;
++    (* ---- read (5), second piece: WHAT THE CALLER ASKS TO BE TOLD ABOUT
++       THE CONSOLE WINDOW ---- (app-echo.md, lane CONS-CURSOR, C3, and the
++       LEASE ruling).  A read of the console takes
++       [ConsoleInv.cons_acc fsc_cons app_sup (rf_ret f)] -- ONE ARM, whose
++       two disjuncts are a lease holder's token and a tainted caller's
++       credential -- and pays [rf_ret f cur dc] back: the position the
++       ring's committed sequence stood at, and the advance the cursor made.
++       A lease holder chooses "[cur] is my own [n], and here is my token
++       back at [cur + dc]"; a generic process chooses [fun _ _ => True].
++       A FIELD OF THE FAMILIES because the process CHOOSES it when it builds
++       an explicit deposit; the kernel only relays it.  LAST, so every
++       positional builder only gained a trailing argument. *)
++    rf_ret   : nat -> nat -> iProp Σ;
    }.
  
    (* THE RE-KEYING ([UexecSG.sfam_at]): the same families at another
-@@ -300,7 +308,8 @@ Section UexecExecInst.
+@@ -300,7 +313,8 @@ Section UexecExecInst.
         df_Farm  := df_Farm f; df_Fdots := df_Fdots f; df_Fun := df_Fun f;
         df_Fok   := df_Fok f; df_Fex := df_Fex f;
         kf_pay   := kf_pay f;
 -       kf_xpay  := Q |}.
 +       kf_xpay  := Q;
-+       rf_nrd   := rf_nrd f |}.
++       rf_ret   := rf_ret f |}.
  
    (* THE RECORD AT EXEC'S FOUR AND THE TRIVIAL FAMILIES ELSEWHERE.  The
       eight other numbers' fields are spelled at exactly the families the
-@@ -350,7 +359,13 @@ Section UexecExecInst.
+@@ -350,7 +364,15 @@ Section UexecExecInst.
         kf_pay   := pay;
         (* the process's OWN payload is the trivial one at every builder
            here: a leaf that has a real one re-keys with [xfam_at]. *)
 -       kf_xpay  := fun _ => True%I |}.
 +       kf_xpay  := fun _ => True%I;
-+       (* A GENERIC PROCESS CLAIMS NO CONSOLE WINDOW.  [None] makes read's
-+          deposit and receipt [emp] at the console exactly as they were
-+          before this lane, which is what keeps [xv6_sbundle_of_supply_ne]
-+          -- the generic slot's supply law, a FIELD of [UexecSG]'s class --
-+          provable at n = 5. *)
-+       rf_nrd   := None |}.
++       (* A GENERIC PROCESS CLAIMS NOTHING ABOUT THE CONSOLE WINDOW, and is
++          told nothing: at [fun _ _ => True] read's console arm is the
++          TAINTED disjunct of [ConsoleInv.cons_acc], payable out of
++          [AppInv.app_sup] alone, which is what keeps
++          [xv6_sbundle_of_supply_ne] -- the generic slot's supply law, a
++          FIELD of [UexecSG]'s class, stated at [□ ssupply] -- provable at
++          n = 5. *)
++       rf_ret   := fun _ _ => True%I |}.
  
    (* ...AT THE TRIVIAL PAYLOAD, which is what every generic process forks
       with: a generic child's exit owes its parent nothing.  The four-argument
-@@ -449,7 +464,7 @@ Section UexecExecInst.
+@@ -449,7 +471,7 @@ Section UexecExecInst.
        : iProp Σ :=
      (if decide (n = USYS_exec) then exec_sbundle X f W
       else if decide (n = 5) then
 -       fileread_in (fd_st_of_key (xk_a W 0) (uvis_fd W)) (rf_F f)
-+       fileread_in (fd_st_of_key (xk_a W 0) (uvis_fd W)) (rf_F f) (rf_nrd f)
++       fileread_in (fd_st_of_key (xk_a W 0) (uvis_fd W)) (rf_F f) (rf_ret f)
       else if decide (n = 9) then
         chdir_au_pre (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
           (cf_P f) (cf_Pmiss f) (cf_Fo f)
-@@ -527,7 +542,7 @@ Section UexecExecInst.
+@@ -527,7 +549,7 @@ Section UexecExecInst.
        : iProp Σ :=
      (if decide (n = 5) then
         fileread_extra (fd_st_of_key (xk_a W 0) (uvis_fd W))
 -         (sys_rw_count (xk_a W 2)) (rf_F f) r M' (xk_a W 1)
-+         (sys_rw_count (xk_a W 2)) (rf_F f) (rf_nrd f) r M' (xk_a W 1)
++         (sys_rw_count (xk_a W 2)) (rf_F f) (rf_ret f) r M' (xk_a W 1)
       else if decide (n = 9) then
         chdir_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
           (cf_P f) (cf_Pmiss f) (cf_Fo f) r cw'
-@@ -815,7 +830,7 @@ Section UexecExecInst.
+@@ -673,7 +695,7 @@ Section UexecExecInst.
+     destruct (decide (n = USYS_exec)) as [He | _];
+       [ exfalso; exact (Hne He) | ].
+     destruct (decide (n = 5)) as [_ | _];
+-      [ iModIntro; iApply fsabs_fileread_in | ].
++      [ iModIntro; iApply (fsabs_fileread_in with "Hsup") | ].
+     destruct (decide (n = 9)) as [_ | _];
+       [ iModIntro; iApply fsabs_chdir_pre | ].
+     destruct (decide (n = 15)) as [_ | _];
+@@ -815,7 +837,7 @@ Section UexecExecInst.
    Lemma sbundle_at_read_elim (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis) :
      sbundle_at X 5 f W -∗
      fileread_in (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
 -      (rf_F f).
-+      (rf_F f) (rf_nrd f).
++      (rf_F f) (rf_ret f).
    Proof.
      iIntros "H". rewrite /sbundle_at /= /xv6_sbundle /xk_a.
      xv6_skip. xv6_take. iExact "H".
-@@ -965,8 +980,8 @@ Section UexecExecInst.
+@@ -965,8 +987,8 @@ Section UexecExecInst.
    Lemma spost_at_read_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
        (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
      fileread_extra (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
 -      (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (rf_F f) r M'
 -      (tf_w (uvis_tf W) (tf_arg_idx 1)) -∗
-+      (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (rf_F f) (rf_nrd f)
++      (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (rf_F f) (rf_ret f)
 +      r M' (tf_w (uvis_tf W) (tf_arg_idx 1)) -∗
      spost_at X 5 f W r M' fdv' cw' cs'.
    Proof.

@@ -28,8 +28,9 @@ patch: `projects/wx-briefs/`.
   "wait for the $ prompt, type each character after its echo"; fallback: fix the
   kernel's console overflow with UART flow control).  CONS-CURSOR (the kernel
   half, `wx-briefs/brief-cons-cursor.md`): phase 1 landed as statements (13 reds);
-  its agent died to a login expiry; a SECOND agent runs `brief-cons-cursor-
-  finish.md` (tree DIRTY on purpose, snapshot `conscur-inflight.patch`) under
+  its agent died to a login expiry; a SECOND agent ran `brief-cons-cursor-
+  finish.md` to 6 reds (7 of 13 green; the receive path end to end); a THIRD
+  runs `brief-cons-cursor-finish-2.md` (tree DIRTY on purpose, snapshot `conscur-inflight.patch`) under
   the LEASE ruling (`app-echo.md` CONS-CURSOR RULINGS (5): the console arm takes
   the token unconditionally through a fupd-shaped accessor; the generic slot's
   supply gains the accessor; the lease itself is SH-LINE's); then SH-LINE (R5 + sh's gets under the receipt) → E4 SH-ECHO →
