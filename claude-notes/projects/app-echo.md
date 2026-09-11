@@ -2265,6 +2265,25 @@ abstract `SG`), not in `UShKernel`.
 ORDER: EXEC-PAY → OPEN-PIN → SH-LINE phase 2 → E4 → E2 (which also threads
 (3)'s equation) → E5.
 
+PINNING -- THE OWNER'S RULING (2026-09-11).  A "pin" is a pure fact about the
+abstract file-system view (e.g. `/sh` resolves to inode 13 whose bytes are the
+shell binary) that the application's durable claim guarantees of every view up
+to the taint (`echo_pred = taint ∨ pins`).  A "pinned bundle" is an APPLICATION
+lemma that answers a content-dependent syscall's observation families
+(exec's, open's) from the claim law: at each observation, "the observed row
+satisfies the pin, or the taint".  RULES: (1) pinned lemmas are part of the
+APPLICATION proof; they touch the kernel proofs in no way other than
+satisfying an AU/bundle precondition of a spec like exec's (`exec_slot_pre`)
+or open's (`open_in`); no kernel contract names a pin.  (2) The construction
+is expected to work even for an application that MODIFIES the file system:
+the pin lemma's obligation is to prove that the application's invariant keeps
+the binaries it runs unchanged -- `echo foo > /data` is fine as long as it does
+not overlap `/echo`, `/sh`, `/init`; the invariant says so and the pin
+transports.  (3) Before a second hand-rolled instance (open), FACTOR
+`PinnedExec`'s ingredients (`pex_P`/`pex_Pmiss`/`pex_recv`/`pex_Fo`) into one
+general "pinned observation family" lemma over a syscall's families, so exec
+and open are two instantiations rather than two copies.
+
 #### E3 — THE INPUT LINE: DESIGN PROPOSAL (2026-09-11, coordinator; AWAITING THE OWNER'S RULING)
 
 FACTS (console-ring survey, verified): `ConsoleInv.cons_res` holds NO ghost state
