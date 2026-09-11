@@ -163,6 +163,22 @@ Section AppCredsRaw.
     rewrite /app_xfer_raw. iIntros "!>" (r av) "#H".
     iModIntro. iSplitR; [iExact "H" |]. iExists r. iExact "H".
   Qed.
+
+  (* ...and the general law the pure one is an instance of: a claim that is
+     PERSISTENT AT EVERY INSTANCE AND EVERY VIEW duplicates, so the copy at
+     "fresh" names is the claim itself at the instance handed in.  This is
+     a lemma about the TRANSPORT, not about any application: it covers a
+     pure claim, a claim made of invariants, and -- what the echo
+     application's [taint ∨ pins] is -- a disjunction of a persistent
+     credential with a pure fact.  The later is stripped by nothing: [▷ P]
+     is persistent whenever [P] is. *)
+  Lemma app_xfer_raw_pers_or_pure {N} (A : N -> aview -> iProp Σ) :
+    (forall (r : N) (av : aview), Persistent (A r av)) ->
+    ⊢ app_xfer_raw A.
+  Proof.
+    intros HP. rewrite /app_xfer_raw. iIntros "!>" (r av) "#H".
+    iModIntro. iSplitR; [iExact "H" |]. iExists r. iExact "H".
+  Qed.
 End AppCredsRaw.
 
 (* ------------------------------------------------------------------ *)

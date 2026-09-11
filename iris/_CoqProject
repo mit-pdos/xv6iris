@@ -1603,7 +1603,11 @@ LinkConsolewrite.v
 # both files' generic layers and restates nothing, so only its own two
 # dinode vm_eq's compute.
 FsShPin.v
-AppEcho.v
+# ...and the same three sentences for ECHO, at inum 4 with ElfUser.echo_elf's
+# bytes -- what a verified /sh answers kexec's contract with at the console
+# line "echo hello world", and the third pin of the echo application's claim.
+# A FOURTH LEAF over the same cone, on FsShPin's mold.
+FsEchoPin.v
 # kexec's ONE contract: the walk, one observation of the file, and the
 # caller's own u-mode WP for the program observed (SpecKexec.v's header).
 # KexecDefs.v, far below, is the vocabulary leaf it is stated over.
@@ -1708,10 +1712,15 @@ UartAccepted.v
 UartSentResidue.v
 SystemUartAccepted.v
 # APPLICATIONS (claude-notes/design/applications.md): the record and the
-# whole-system theorem at one ([App.xv6_app_adequacy]); the echo
-# application's data and lane-free obligations (AppEcho, a leaf over the
-# era-0 pin files -- an image-check consumer, like them).
+# whole-system theorem at one ([App.xv6_app_adequacy]).
 App.v
+# The ECHO application: its discipline, fixed part, ledger, tag, the
+# [taint or pins] predicate over the three era-0 pin files, the record
+# [app_echo], and every hypothesis of App.xv6_app_adequacy except
+# [Hinit_boot] and [Hphi] discharged as a lemma at its fields.  It sits
+# HERE, above App.v, because the record and those dischargers are stated at
+# [App.xv6_app] and at the theorem's own binders.
+AppEcho.v
 
 # The stage-1 init program proof (first Uk generation) is GONE as of
 # 2026-08-30: UkInit.v was replaced by the urun port below, and its two
