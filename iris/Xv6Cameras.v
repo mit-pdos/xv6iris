@@ -1027,13 +1027,14 @@ Proof. solve_inG. Qed.
    instance handed out existentially. *)
 (* ...AND THE ORPHANS, ON THE SAME CLASS AND FOR THE SAME REASON.  A
    process's children do not die with it: kexit hands them to <init>
-   (kernel/proc.c's [reparent]), and the set of generations that were
-   handed over that way is the second thing <wait_lock> owns
-   ([WaitInv.orphans_own]).  It is a plain [ghost_var] at a set -- there is
-   ONE orphan set, not one per slot, so nothing has to say whose row it is
-   -- and its name is carried here beside the map's, minted in the same
-   boot fupd ([WaitInv.children_res_alloc]), so that no gname threads
-   through the tree. *)
+   (kernel/proc.c's [reparent]), and the generations that were handed over
+   that way are the second thing <wait_lock> owns ([WaitInv.orphans_own]).
+   It is a plain [ghost_var] at a MAP FROM THE NEW PARENT'S ADDRESS to the
+   generations reparented to it -- a second children table, keyed the way
+   the row values are, and the column a lock holder may move without
+   holding anybody's row.  Its name is carried here beside the map's,
+   minted in the same boot fupd ([WaitInv.children_res_alloc]), so that no
+   gname threads through the tree. *)
 (* ...AND THE TWO GHOSTS THAT SAY WHICH INCARNATION IS THE CURRENT ONE
    ([SlotGen.v] is the theory).  They ride this class for the reason the map
    and the orphans do -- a canonical name, minted in the same boot fupd
@@ -1075,14 +1076,20 @@ Definition sgen_map : Type :=
   gmap (SailStdpp.Values.mword 64) (dfrac_agreeR (leibnizO gname)).
 Definition sgenUR : ucmra :=
   gmapUR (SailStdpp.Values.mword 64) (dfrac_agreeR (leibnizO gname)).
+(* THE ORPHAN COLUMN'S TYPE, named here for [sgen_map]'s reason: it is a
+   second children table, keyed by the ADDRESS a reparent handed a
+   generation to, and spelling [gmap (mword 64) _] in another file resolves
+   [Countable (mword 64)] against whatever instances that file imports. *)
+Definition orph_map : Type :=
+  gmap (SailStdpp.Values.mword 64) (gset gname).
 Class wchGpreS (Σ : gFunctors) :=
   { wch_pre_inG :: ghost_mapG Σ gname (SailStdpp.Values.mword 64 * gset gname);
-    worph_pre_inG :: ghost_varG Σ (gset gname);
+    worph_pre_inG :: ghost_varG Σ orph_map;
     wsg_pre_inG :: inG Σ sgenUR;
     wpr_pre_inG :: ghost_mapG Σ Z gname }.
 Class wchG (Σ : gFunctors) :=
   WchG { wch_inG :: ghost_mapG Σ gname (SailStdpp.Values.mword 64 * gset gname);
-         worph_inG :: ghost_varG Σ (gset gname);
+         worph_inG :: ghost_varG Σ orph_map;
          wsg_inG :: inG Σ sgenUR;
          wpr_inG :: ghost_mapG Σ Z gname;
          wch_name : gname;
@@ -1094,7 +1101,7 @@ Global Instance wchG_preS `{!wchG Σ} : wchGpreS Σ :=
      wsg_pre_inG := wsg_inG; wpr_pre_inG := wpr_inG |}.
 Definition wchΣ : gFunctors :=
   #[ ghost_mapΣ gname (SailStdpp.Values.mword 64 * gset gname);
-     ghost_varΣ (gset gname);
+     ghost_varΣ orph_map;
      GFunctor sgenUR;
      ghost_mapΣ Z gname ].
 Global Instance subG_wchΣ {Σ} : subG wchΣ Σ -> wchGpreS Σ.

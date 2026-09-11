@@ -99,14 +99,14 @@ Section ProofSysWait.
   Lemma wp_sys_wait_sconf
       (γa γp γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-      (pid : mword 32) (U : ustate) (v0 : mword 64)
-    : wp_sys_wait_sconf_body γa γp γf γw γs j γl m av eb b lks pid U v0.
+      (pid : mword 32) (U : ustate) (v0 : mword 64) (cs : gset gname)
+    : wp_sys_wait_sconf_body γa γp γf γw γs j γl m av eb b lks pid U v0 cs.
   Proof.
     cbv beta delta [wp_sys_wait_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hv0 Hav Heb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs
-             #Hlk #Henv #Hplk Hpriv Hcont".
+             #Hlk #Henv #Hplk Hpriv Hmyrow Hcont".
     (* depth 0 forces the held set empty, so this body needs no order
        premise of its own -- every [locks_below] its callees raise is
        [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -297,12 +297,12 @@ Section ProofSysWait.
     { rewrite /B2 upd_ne; [| vm_compute; discriminate]. rewrite /B1 upd_eq. reflexivity. }
     (* ===================== kwait(p) ===================== *)
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kwait.wp_kwait_sconf γa γp γf γw γs j γl B2 (av - 4)%nat eb b pid U lks
+    iApply (Kwait.wp_kwait_sconf γa γp γf γw γs j γl B2 (av - 4)%nat eb b pid U lks cs
               Hj Hgl (sw_Kkw av Hav) Heb
-              with "Hcg Hcpu Htext Hpc Hprocs Hlk Henv Hplk Hpriv").
+              with "Hcg Hcpu Htext Hpc Hprocs Hlk Henv Hplk Hpriv Hmyrow").
     all: try lkbelow.
-    iIntros (CID11 Hk11 Mkw P' rv d bs)
-      "%Hkw %Hext %Hdle %Hnull Hcg Hcpu Hpc Hpriv".
+    iIntros (CID11 Hk11 Mkw P' rv d bs cs')
+      "%Hkw %Hext %Hdle %Hnull %Hmoved Hcg Hcpu Hpc Hpriv Hmyrow".
     rewrite HB2a0 in Hnull.
     destruct Hkw as (HcsKw & HKwa0).
     iEval (rewrite HB2a0) in "Hpriv".
@@ -422,8 +422,8 @@ Section ProofSysWait.
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID11 CID15 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E2 P' rv d bs
-              with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv").
+    iApply ("Hcont" $! E2 P' rv d bs cs'
+              with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hmyrow").
     { split; [| exact HE2a0].
       unfold callee_saved.
       split; [exact HE2sp|]. split; [exact HE2s0|].
@@ -432,6 +432,7 @@ Section ProofSysWait.
     { exact Hext. }
     { exact Hdle. }
     { exact Hnull. }
+    { exact Hmoved. }
   Qed.
 
 End ProofSysWait.

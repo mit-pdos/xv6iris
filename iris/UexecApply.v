@@ -459,7 +459,8 @@ Section Apply.
       - reflexivity.
       - reflexivity.
       - reflexivity. }
-    rewrite /uexec_arm_F /uexec_fork_parent_F /ufork_ans /uexec_ret_cont_F. cbv zeta.
+    rewrite /uexec_arm_F /uexec_fork_parent_F /ufork_ans /uexec_ret_cont_F
+            /uexec_wait_F /uexec_ret_cont_gen. cbv zeta.
     destruct (decide (sc = uecall_scause)) as [_ | _];
       [ | (* the payment is at the FAMILY and reads no key row, so the
              transparent arm transports exactly as its slot does *)
@@ -487,7 +488,45 @@ Section Apply.
         rewrite (Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw'
                    (uvis_gen W') cs').
         iApply ("H1" $! r fdv' cw' cs'). iPureIntro. exact Hr.
-    - (* the returning arms: the row transports by SS3 *)
+    - (* wait's arm: the returning arm with the kernel's answer in place of
+         the quiet row.  The answer reads the return value and the two
+         sets and no trapframe word, so it transports on the nose. *)
+      destruct (decide (usys_num (uvis_tf W') = USYS_wait)) as [_ | _].
+      { iSplit.
+        + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo Hcho Hsp".
+          iDestruct ("H" with "Hpay") as "H".
+          rewrite -(Hb r M' pi' szv' fdv' cw' gn' cs').
+          iApply ("H" $! r M' pi' szv' fdv' cw' gn' cs'
+                    with "[%] [%] [%] [%] [%] [Hcho] [Hsp]").
+          * exact (usys_mem_ok_args _ (uvis_tf W') (uvis_tf W) r _ _ _ _ _ _
+                     (eq_sym Ha0) (eq_sym Ha1) (eq_sym Ha2) Hmo).
+          * exact (usys_fd_ok_arg_cong _ (uvis_tf W') (uvis_tf W) _ _ _
+                     (eq_sym Ha0) Hfo).
+          * exact (usys_pipe_ok_arg_cong _ (uvis_tf W') (uvis_tf W) _ _ _ _ _
+                     (eq_sym Ha0) Hpo).
+          * exact Hco.
+          * exact Hgo.
+          * iExact "Hcho".
+          * iEval (rewrite (spost_at_cong S (usys_num (uvis_tf W')) f W' W r
+                              M' fdv' cw' cs' (skey_eq_sym W W' Hsk))) in "Hsp".
+            iExact "Hsp".
+        + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo Hcho Hsp".
+          iDestruct ("H" with "Hpay") as "H".
+          rewrite (Hb r M' pi' szv' fdv' cw' gn' cs').
+          iApply ("H" $! r M' pi' szv' fdv' cw' gn' cs'
+                    with "[%] [%] [%] [%] [%] [Hcho] [Hsp]").
+          * exact (usys_mem_ok_args _ (uvis_tf W) (uvis_tf W') r _ _ _ _ _ _
+                     Ha0 Ha1 Ha2 Hmo).
+          * exact (usys_fd_ok_arg_cong _ (uvis_tf W) (uvis_tf W') _ _ _
+                     Ha0 Hfo).
+          * exact (usys_pipe_ok_arg_cong _ (uvis_tf W) (uvis_tf W') _ _ _ _ _
+                     Ha0 Hpo).
+          * exact Hco.
+          * exact Hgo.
+          * iExact "Hcho".
+          * iEval (rewrite (spost_at_cong S (usys_num (uvis_tf W')) f W W' r
+                              M' fdv' cw' cs' Hsk)) in "Hsp". iExact "Hsp". } 
+    (* the returning arms: the row transports by SS3 *)
       iSplit.
       + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo %Hcho Hsp".
         iDestruct ("H" with "Hpay") as "H".
@@ -749,15 +788,17 @@ Section LoopApply.
               uvis_gen W = uvis_gen W' ->
               uvis_ch W = uvis_ch W' ->
               (S W : iProp Σ) ⊣⊢ S W')
-      (W W' : uvis) (f : sfam) (r : mword 64) :
+      (W W' : uvis) (f : sfam) (r : mword 64)
+      (* THE CHILDREN ROW IS A PARAMETER, for [UexecRet.uexec_ret_cont_gen]'s
+         reason: twenty entries answer with the pure "it did not move" and
+         wait answers with [uwait_ans].  The two instances below are the
+         only ones. *)
+      (CH : mword 64 -> gset gname -> iProp Σ) :
     length (uvis_tf W) = TFWORDS ->
-    (* the generation and the children set are the trapped key's: no
-       returning entry moves either ([UsysMemOk.usys_gen_ok] /
-       [usys_ch_ok] are the identity at every number this lane), so the
-       caller instantiates the resume key at them and both rows below are
-       [eq_sym] of these. *)
+    (* the generation is the trapped key's: no returning entry
+       re-incarnates its caller ([UsysMemOk.usys_gen_ok] is the identity at
+       every number), so the caller instantiates the resume key at it. *)
     uvis_gen W' = uvis_gen W ->
-    uvis_ch W' = uvis_ch W ->
     uround_bump_ok (uvis_tf (uvis_run W)) (uvis_tf W') r ->
     usys_mem_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W)) r
       (uvis_M W) (uvis_perm W) (uvis_sz W)
@@ -778,6 +819,9 @@ Section LoopApply.
     (* ...READ AT THE OUTGOING a0 WORD, which is where the dispatcher stored
        the return value and where both callers hold it; [Ha0] below is what
        identifies it with the round's own [r]. *)
+    (* ...AND THE CHILDREN ROW THE KERNEL ANSWERED WITH, at the same a0
+       word and at the set the round resumes on. *)
+    CH (uvis_tf W' !!! tf_arg_idx 0) (uvis_ch W') -∗
     spost_at S (usys_num (uvis_tf (uvis_run W))) f (uvis_run W)
       (uvis_tf W' !!! tf_arg_idx 0) (uvis_M W') (uvis_fd W') (uvis_cwd W')
       (uvis_ch W') -∗
@@ -792,14 +836,14 @@ Section LoopApply.
                      r' (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
        ⌜usys_cwd_ok (usys_num (uvis_tf (uvis_run W))) r' (uvis_cwd W) cw'⌝ -∗
        ⌜usys_gen_ok (usys_num (uvis_tf (uvis_run W))) (uvis_gen W) gn'⌝ -∗
-       ⌜usys_ch_ok (usys_num (uvis_tf (uvis_run W))) r' (uvis_ch W) cs'⌝ -∗
+       CH r' cs' -∗
        spost_at S (usys_num (uvis_tf (uvis_run W))) f (uvis_run W) r'
          M' fdv' cw' cs' -∗
        S (bump (uvis_run W) r' M' π' szv' fdv' cw' gn' cs')) -∗
     S W'.
   Proof.
-    intros Hl Hgn Hch [Hb1 Hb2] Hm Hfdrow Hpiperow Hcwrow.
-    iIntros "Hsp Hret".
+    intros Hl Hgn [Hb1 Hb2] Hm Hfdrow Hpiperow Hcwrow.
+    iIntros "Hch Hsp Hret".
     (* the two length side conditions the bump's readers take *)
     assert (Hla : (tf_arg_idx 0 < length (uvis_tf (uvis_run W)))%nat)
       by (rewrite (uvis_run_length W); unfold tf_arg_idx, TFWORDS; lia).
@@ -833,12 +877,13 @@ Section LoopApply.
                         (bump_tf (uvis_tf (uvis_run W)) r))
                      (bump_tf_a0 (uvis_tf (uvis_run W)) r Hla)))). }
     iEval (rewrite Ha0) in "Hsp".
+    iEval (rewrite Ha0) in "Hch".
     iDestruct ("Hret" $! r (uvis_M W') (uvis_perm W') (uvis_sz W')
                  (uvis_fd W') (uvis_cwd W') (uvis_gen W') (uvis_ch W')
-                 with "[%] [%] [%] [%] [%] [%] Hsp") as "Hs";
+                 with "[%] [%] [%] [%] [%] Hch Hsp") as "Hs";
       [ exact Hm | rewrite <- Ha0; exact Hfdrow
       | rewrite <- Ha0; exact Hpiperow | exact Hcwrow
-      | exact Hgn | exact Hch | ].
+      | exact Hgn | ].
     assert (Hp1 : tf_resume_pc (bump_tf (uvis_tf (uvis_run W)) r)
                   = tf_resume_pc (uvis_tf W')).
     { rewrite (tf_resume_pc_bump (uvis_tf (uvis_run W)) r Hle).
@@ -861,11 +906,13 @@ Section LoopApply.
        fork and wait arms that DO move the set restate them; nothing here
        has to anticipate that. *)
     uvis_gen W' = uvis_gen W ->
-    (* ...AND THE CHILDREN SET IS QUIET AT EVERY ENTRY BUT FORK, which is
-       the one this lane turns on: fork's own answer below says what the
-       set became, so the blanket premise is guarded off it. *)
+    (* ...AND THE CHILDREN SET IS QUIET AT EVERY ENTRY BUT THE TWO THAT
+       MOVE IT: fork's own answer below says what the set became, and
+       wait's says what the reap left, so the blanket premise is guarded
+       off both. *)
     (~ (sc = uecall_scause
-        /\ usys_num (uvis_tf (uvis_run W)) = USYS_fork) ->
+        /\ (usys_num (uvis_tf (uvis_run W)) = USYS_fork
+            \/ usys_num (uvis_tf (uvis_run W)) = USYS_wait)) ->
      uvis_ch W' = uvis_ch W) ->
     (sc <> uecall_scause -> uvis_fd W' = uvis_fd W) ->
     (* ...AND ON THE ECALL ARM, THE SYSCALL'S OWN ROW.  This is the premise
@@ -924,6 +971,13 @@ Section LoopApply.
       /\ usys_num (uvis_tf (uvis_run W)) = USYS_fork⌝ -∗
      ufork_ans (sfork_pay f) (uvis_tf W' !!! tf_arg_idx 0)
        (uvis_ch W) (uvis_ch W')) -∗
+    (* ...AND THE KERNEL'S WAIT ANSWER, on the same footing: the reap took
+       the reaped generation out of the caller's reading, and the row the
+       loop hands the process is what the set became.  Owed only at a wait
+       ecall; every other arm refutes the guard. *)
+    (⌜sc = uecall_scause
+      /\ usys_num (uvis_tf (uvis_run W)) = USYS_wait⌝ -∗
+     uwait_ans (uvis_tf W' !!! tf_arg_idx 0) (uvis_ch W) (uvis_ch W')) -∗
     (* ...AND THE ARMED POST the deposit bought, at the value the round
        bound.  Owed only on the RETURNING arm -- exit hands nothing back and
        fork pays no receipt (what its deposit buys is the CHILD's
@@ -946,7 +1000,7 @@ Section LoopApply.
     uexec_arm sc W f -∗ uslot W'.
   Proof.
     intros Hl Hgn Hch Hfd Hfdrow Hpiperow Hr.
-    iIntros "Hxo Hfo Hsp Hpay Hret".
+    iIntros "Hxo Hfo Hwo Hsp Hpay Hret".
     (* STEP A: the trapped key and its run projection are the same key *)
     iEval (rewrite (uexec_arm_run sc W f Hl)) in "Hret".
     destruct (decide (sc = uecall_scause)) as [Hec | Hne].
@@ -963,6 +1017,8 @@ Section LoopApply.
           as [Hx | _]; [ exfalso; rewrite Hexec in Hx; discriminate Hx | ].
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_fork))
           as [Hx | _]; [ exfalso; rewrite Hexec in Hx; discriminate Hx | ].
+        destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_wait))
+          as [Hx | _]; [ exfalso; rewrite Hexec in Hx; discriminate Hx | ].
         iDestruct ("Hxo" with "[%]") as "[%Hfail | Hslot]";
           [ split; [exact Hec | exact Hexec] | | ].
         * (* failed: the returning arm at [r = -1].  Its cwd row is the
@@ -976,14 +1032,20 @@ Section LoopApply.
           rewrite <- Hexec in Hm.
           assert (Hnec : USYS_exec <> USYS_chdir) by discriminate.
           assert (Hchq : uvis_ch W' = uvis_ch W)
-            by (apply Hch; intros [_ Hx]; rewrite Hexec in Hx; discriminate Hx).
+            by (apply Hch; intros [_ [Hx | Hx]]; rewrite Hexec in Hx;
+                discriminate Hx).
           assert (Hc : usys_cwd_ok (usys_num (uvis_tf (uvis_run W))) r
                          (uvis_cwd W) (uvis_cwd W')).
           { rewrite Hcwx. exact (usys_cwd_ok_refl_at _ USYS_exec r _ Hexec Hnec). }
-          iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r Hl
-                    Hgn Hchq Hb Hm
+          iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r
+                    (fun (r' : mword 64) (cs2 : gset gname) =>
+                       ⌜usys_ch_ok (usys_num (uvis_tf (uvis_run W))) r'
+                          (uvis_ch W) cs2⌝%I)
+                    Hl Hgn Hb Hm
                     (Hfdrow Hec) (Hpiperow Hec) Hc
-                    with "[Hsp] [Hpay Hret]").
+                    with "[] [Hsp] [Hpay Hret]").
+          (* the children row: this arm is not one of the two that move it *)
+          { iPureIntro. exact Hchq. }
           (* the post is at the a0 word, which the failure arm pins to [r] *)
           { iExact "Hsp". }
           iApply ("Hret" with "Hpay").
@@ -1087,14 +1149,37 @@ Section LoopApply.
         * (* the returning arms: the row is the round's own conjunct *)
           iDestruct ("Hsp" with "[%]") as "Hsp";
             [ split_and!; [ exact Hec | exact Hnex | exact Hnfk ] |].
-          assert (Hchq : uvis_ch W' = uvis_ch W)
-            by (apply Hch; intros [_ Hx]; exact (Hnfk Hx)).
-          iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r Hl
-                    Hgn Hchq Hb Hm
-                    (Hfdrow Hec) (Hpiperow Hec) Hc
-                    with "[Hsp] [Hpay Hret]").
-          { iExact "Hsp". }
-          iApply ("Hret" with "Hpay").
+          destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_wait))
+            as [Hwt | Hnwt].
+          -- (* WAIT'S ROW.  The reap moved the caller's children reading,
+                so the arm the process left is [UexecRet.uexec_wait_F] and
+                what pays its row is the kernel's answer -- fork's shape,
+                one number over.  Everything else about the arm is the
+                returning arm's: wait writes the exit status into the
+                caller's buffer, and that is what [usys_mem_ok]'s wait row
+                already says. *)
+             iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r
+                       (fun (r' : mword 64) (cs2 : gset gname) =>
+                          uwait_ans r' (uvis_ch W) cs2)
+                       Hl Hgn Hb Hm
+                       (Hfdrow Hec) (Hpiperow Hec) Hc
+                       with "[Hwo] [Hsp] [Hpay Hret]").
+             { iApply "Hwo". iPureIntro. split; [exact Hec | exact Hwt]. }
+             { iExact "Hsp". }
+             iApply ("Hret" with "Hpay").
+          -- assert (Hchq : uvis_ch W' = uvis_ch W)
+               by (apply Hch; intros [_ [Hx | Hx]];
+                   [ exact (Hnfk Hx) | exact (Hnwt Hx) ]).
+             iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r
+                       (fun (r' : mword 64) (cs2 : gset gname) =>
+                          ⌜usys_ch_ok (usys_num (uvis_tf (uvis_run W))) r'
+                             (uvis_ch W) cs2⌝%I)
+                       Hl Hgn Hb Hm
+                       (Hfdrow Hec) (Hpiperow Hec) Hc
+                       with "[] [Hsp] [Hpay Hret]").
+             { iPureIntro. exact Hchq. }
+             { iExact "Hsp". }
+             iApply ("Hret" with "Hpay").
     - (* ---- TRANSPARENT: interrupt, page fault, anything else ---- *)
       rewrite (uexec_arm_transparent sc (uvis_run W) f Hne).
       destruct (uround_ok_transparent sc (uvis_tf (uvis_run W))
@@ -1136,7 +1221,8 @@ Section LoopApply.
     sepc_v = tf_w (uvis_tf W) tf_epc_idx ->
     (sc <> uecall_scause -> fdv' = uvis_fd W) ->
     (~ (sc = uecall_scause
-        /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_fork) ->
+        /\ (usys_num (tf_of g (ret_pc sepc_v)) = USYS_fork
+            \/ usys_num (tf_of g (ret_pc sepc_v)) = USYS_wait)) ->
      cs' = uvis_ch W) ->
     (* ...and the ecall arm's row, forwarded verbatim -- see
        [uexec_ret_round_slot]'s own note.  Stated at [tf_of g] because that
@@ -1173,6 +1259,10 @@ Section LoopApply.
       /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_fork⌝ -∗
      ufork_ans (sfork_pay f) (pv_tf (us_V U') !!! tf_arg_idx 0)
        (uvis_ch W) cs') -∗
+    (* ...and WAIT'S, forwarded the same way *)
+    (⌜sc = uecall_scause
+      /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_wait⌝ -∗
+     uwait_ans (pv_tf (us_V U') !!! tf_arg_idx 0) (uvis_ch W) cs') -∗
     (⌜sc = uecall_scause
       /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_exit
       /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_fork⌝ -∗

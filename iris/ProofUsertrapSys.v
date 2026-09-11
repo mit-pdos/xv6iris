@@ -699,7 +699,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2 stsR csR)
-        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hchrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hchgg %Hgengg %Hcwig %Hsbrg %Hfkg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hch Hpc Hxo Hso Hfo Hpayv".
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hchrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hchgg %Hgengg %Hcwig %Hsbrg %Hfkg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hch Hpc Hxo Hso Hfo Hwo Hpayv".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -1021,6 +1021,14 @@ Section UtSysBlock.
       { rewrite /ut_fork_out /sysc_fork_out. iIntros "%Hc".
         iApply "Hfo". iPureIntro. destruct Hc as [_ Hc7].
         cbn [us_V]. rewrite <- Hn0. rewrite usys_num_epc in Hc7. exact Hc7. }
+      (* ...AND WAIT'S, on the same terms: one disjunction, one a0 word,
+         one guard shorter by the cause ([SpecUsertrap.ut_wait_out]). *)
+      iAssert (ut_wait_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+                 (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0) cs csR)%I
+        with "[Hwo]" as "Hwo".
+      { rewrite /ut_wait_out /sysc_wait_out. iIntros "%Hc".
+        iApply "Hwo". iPureIntro. destruct Hc as [_ Hc7].
+        cbn [us_V]. rewrite <- Hn0. rewrite usys_num_epc in Hc7. exact Hc7. }
       iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs
                  (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0)
                  (us_M (MkUstate V2 M2))
@@ -1057,13 +1065,16 @@ Section UtSysBlock.
                    through the prologue's epc insert.  The guard is the trap
                    tail's -- not an ecall, or not fork -- and the ecall half
                    is [Hscec], so what is left is the number. *)
-                ltac:(intros Hg; apply Hchrow; intro Hf; apply Hg;
-                      split; [exact Hscec | rewrite Hn0; exact Hf])
+                ltac:(intros Hg; apply Hchrow;
+                      [ intro Hf; apply Hg; split;
+                          [exact Hscec | left; rewrite Hn0; exact Hf]
+                      | intro Hw; apply Hg; split;
+                          [exact Hscec | right; rewrite Hn0; exact Hw] ])
                 Hfde Hpipe Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
                 Hmiev Hmenvv Hrda
-                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hpayv Hcont] Hframe Hxo Hfo Hso
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hwo Hso Hpayv Hcont] Hframe Hxo Hfo Hwo Hso
                       Hmy2 Hpayv Hcont").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].

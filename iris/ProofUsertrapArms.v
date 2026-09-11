@@ -641,6 +641,11 @@ Section Ut56.
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs) as "Hfo".
     { iApply (ut_fork_out_quiet _ _ _ _ _ _ Hnec). }
+    (* ...and wait's, refuted through the same cause *)
+    iAssert (ut_wait_out scv
+               (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+               (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs) as "Hwo".
+    { iApply (ut_wait_out_quiet _ _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs
                (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts
                (pv_cwi (us_V U)) cs)%I as "Hso".
@@ -654,7 +659,7 @@ Section Ut56.
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               Hmiev Hmenvv Hrd
-              with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hpayv Hcont] Hframe Hxo Hfo Hso
+              with "Htext Hpc Hcg [-Hframe Hxo Hfo Hwo Hso Hpayv Hcont] Hframe Hxo Hfo Hwo Hso
                     Hmyp Hpayv Hcont").
     all: try lkbelow.
     iApply (ua_hold_on Rsys N U _ sts cs with "Hcpu [-Hclm Hown] Hclm [-]").
@@ -1091,6 +1096,11 @@ Section UtD0.
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs) as "Hfo".
     { iApply (ut_fork_out_quiet _ _ _ _ _ _ Hnec). }
+    (* ...and wait's, refuted through the same cause *)
+    iAssert (ut_wait_out scv
+               (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+               (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs) as "Hwo".
+    { iApply (ut_wait_out_quiet _ _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs
                  (pv_tf (us_V (MkUstate V' (us_M U))) !!! tf_arg_idx 0)
                  (us_M (MkUstate V' (us_M U)))
@@ -1105,7 +1115,7 @@ Section UtD0.
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd'
-                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hpayv Hcont] Hframe Hxo Hfo Hso
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hwo Hso Hpayv Hcont] Hframe Hxo Hfo Hwo Hso
                       Hmyp Hpayv Hcont").
       all: try lkbelow.
       iApply (ua_hold_on Rsys N (MkUstate V' (us_M U)) _ sts cs with "Hcpu Hcsrs Hclm [-]").
@@ -1288,6 +1298,11 @@ Section UtE8.
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs) as "Hfo".
     { iApply (ut_fork_out_quiet _ _ _ _ _ _ Hnec). }
+    (* ...and wait's, refuted through the same cause *)
+    iAssert (ut_wait_out scv
+               (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+               (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs) as "Hwo".
+    { iApply (ut_wait_out_quiet _ _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs
                  (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts
                  (pv_cwi (us_V U)) cs)%I as "Hso".
@@ -1301,7 +1316,7 @@ Section UtE8.
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hpayv Hcont] Hframe Hxo Hfo Hso
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hwo Hso Hpayv Hcont] Hframe Hxo Hfo Hwo Hso
                       Hmyp Hpayv Hcont").
       iApply (ua_hold_on Rsys N U _ sts cs with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].

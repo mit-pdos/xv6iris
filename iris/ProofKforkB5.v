@@ -510,8 +510,7 @@ Section ProofKforkB5.
     (* -------------------------------------------------------------- *)
     (* +0x0d4 sd s5,56(s4) : np->parent = p  -- regime OFF (wait_lock held) *)
     (* -------------------------------------------------------------- *)
-    iDestruct "Hwaitres" as "[Hpo [Hch Ho]]".
-    iDestruct "Hpo" as (ps) "[Hpo Hgh]".
+    iDestruct "Hwaitres" as (ps gs mch O) "(Hpo & Hch & Ho & Hci)".
     iDestruct (WaitInv.parents_own_length with "Hpo") as %Hpolen.
     destruct (lookup_lt_is_Some_2 ps j ltac:(rewrite Hpolen; exact Hj)) as [vold Hvold].
     iDestruct (WaitInv.parents_own_acc ps j vold Hvold with "Hpo") as "[Hpcell Hpoback]".
@@ -532,35 +531,31 @@ Section ProofKforkB5.
        parent's row came in off its residue, and the child's generation --
        [ProcDefs.pv_gen] of the block being parked -- is what joins the set.
        NO FRESHNESS IS OWED: the move is a set union. *)
+    (* THE DEPOSIT GOES IN WITH THE CELL.  The slot had no entry -- and
+       that is a RESOURCE fact, not an assumption: the caller kept THREE
+       QUARTERS of the child's slot generation, and three quarters beside
+       three quarters do not compose ([WaitInv.children_inv_no_entry],
+       [SlotGen.slot_gen_tq_excl]), so the cell this store fills read 0.
+       THE PARENT'S ADDRESS IS A PROC SLOT'S and hence nonzero, but this
+       block is stated at an opaque [pme] and nothing on the route carries
+       the fact; at [pme = 0] the entry is [emp], the deposit is dropped
+       and every tie of the invariant is guarded away
+       ([WaitInv.children_inv_fork] takes no premise on it). *)
+    iDestruct (WaitInv.children_inv_no_entry ps gs mch O j (ProcDefs.pv_gen (us_V Uc))
+                 ltac:(rewrite Hpolen; exact Hj) with "Hci Hsg34") as %Hnoent.
+    iDestruct (WaitInv.children_own_lookup with "Hch Hprow") as %Hrowl.
     iApply fupd_wp.
-    iDestruct "Hch" as (mch) "Hch".
     iMod (WaitInv.children_own_upd mch gpar pme csPar
             (csPar ∪ {[ProcDefs.pv_gen (us_V Uc)]}) with "Hch Hprow")
       as "[Hch Hprow]".
     iModIntro.
-    iAssert (WaitInv.children_res) with "[Hch]" as "Hch";
-      [ iExists _; iExact "Hch" | ].
-    (* THE DEPOSIT GOES IN WITH THE CELL.  The slot had no entry -- and
-       that is a RESOURCE fact, not an assumption: the caller kept THREE
-       QUARTERS of the child's slot generation, and three quarters beside
-       three quarters do not compose ([WaitInv.gen_halves_no_entry],
-       [SlotGen.slot_gen_tq_excl]), so the cell this store fills read 0. *)
-    iDestruct (WaitInv.gen_halves_no_entry ps j (ProcDefs.pv_gen (us_V Uc))
-                 ltac:(rewrite Hpolen; exact Hj) with "Hgh Hsg34") as %Hnoent.
-    iAssert (WaitInv.gen_halves (<[j := pme]> ps)) with "[Hgh Hsg34 Hpr34]" as "Hgh".
-    { rewrite /WaitInv.gen_halves.
-      iDestruct (big_sepL_insert_acc _ ps j (zero_reg : mword 64) Hnoent with "Hgh")
-        as "[_ Hback]".
-      iApply ("Hback" $! pme).
-      (* THE PARENT'S ADDRESS IS A PROC SLOT'S and hence nonzero, but this
-         block is stated at an opaque [pme] and nothing on the route carries
-         the fact; at [pme = 0] the clause is [emp] and the deposit is
-         simply dropped, which is sound and costs no premise. *)
-      destruct (bool_decide (pme = (zero_reg : mword 64))); [done |].
-      iExists (ProcDefs.pv_gen (us_V Uc)), pid_c.
-      iFrame "Hsg34 Hpr34 Hgslot Hgpid". }
-    iAssert (WaitInv.wait_res) with "[Hpo Hgh Hch Ho]" as "Hwaitres".
-    { iFrame "Hch Ho". iExists (<[j := pme]> ps). iFrame "Hpo Hgh". }
+    iDestruct (WaitInv.children_inv_fork ps gs mch O j pme
+                 (ProcDefs.pv_gen (us_V Uc)) pid_c gpar csPar Hnoent Hrowl
+                 with "Hci Hsg34 Hpr34 Hgslot Hgpid") as "Hci".
+    iAssert (WaitInv.wait_res) with "[Hpo Hch Ho Hci]" as "Hwaitres".
+    { iExists (<[j := pme]> ps), (<[j := ProcDefs.pv_gen (us_V Uc)]> gs),
+              (<[gpar := (pme, csPar ∪ {[ProcDefs.pv_gen (us_V Uc)]})]> mch), O.
+      iFrame "Hpo Hch Ho Hci". }
     assert (Hpp_d8 : add_vec_int (mword_of_int (KF + 0xd4) : mword 64) 4 = mword_of_int (KF + 0xd8))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_d8) in "Hpc".

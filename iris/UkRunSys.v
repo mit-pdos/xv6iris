@@ -57,6 +57,9 @@ Require Import RiscvExtras. (* [uint_unsigned] *)
 Require Import RiscvModelBytes. (* [nth_byte] -- pipe's two reported words *)
 Require Import TsoCtx.
 Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
+Require Import UserChildren. (* [uch] / [uch_update] -- the program's half of
+                                its children reading, which wait moves, and
+                                [ch_reaped], the row the wait leaf reports *)
 Local Open Scope Z_scope.
 Import Defs.
 From Stdlib Require Import ZArith Bool Lia List FunctionalExtensionality.
@@ -475,6 +478,10 @@ Section UkRunSys.
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
     destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
+    (* ...and wait, which has an arm of its own now ([UexecRet.uexec_wait_F]):
+       this leaf is for the numbers that move NOTHING, and wait moves the
+       caller's children reading. *)
+    destruct (decide (n = USYS_wait)) as [He | _]; [ exfalso; exact (H3 He) | ].
     (* THE ROW COMES IN BESIDE THE IMAGE'S NOW.  A quiet syscall's fd row is
        [fdv' = fdv] ([UsysMemOk.usys_fd_ok_quiet]), so this leaf could pin
        the descriptor view -- it does not yet, because [urun] hides the view
@@ -1738,22 +1745,34 @@ Section UkRunSys.
   (* untouched and the leaf can hand the SAME run on -- exactly the quiet  *)
   (* row's shape.  This is the arm init and sh both take.                  *)
   (* ------------------------------------------------------------------- *)
+  (* WAIT MOVES THE CALLER'S CHILDREN READING, so the leaf takes the
+     program's half of it and hands it back at what the reap left -- the
+     fork leaf's shape ([UkFork.wp_uk_ecall_fork]'s [Sc]).  The move itself
+     is [UserChildren.uch_update] against the authority [urun] carries: the
+     kernel's answer says what the set became ([UexecRet.uwait_ans]) and
+     the two halves are moved together here, which is the only place both
+     are in one hand.  WHICH generation left, and the escrow that redeems
+     it, ride beside the set with WX-WAIT; [UserChildren.ch_reaped] is what this
+     leaf reports. *)
   Lemma wp_uk_ecall_wait_null (N : uk_names Σ) (h : CpuId) (m : regfile)
-      (pc : mword 64) (avail : nat) :
+      (pc : mword 64) (avail : nat) (Sc : gset gname) :
     usysno m = USYS_wait ->
     uint (m !!! Regidx (mword_of_int 10)) = 0 ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     urun N h m pc avail -∗
     udepw N m pc USYS_wait -∗
-    (∀ (h' : CpuId) (r : mword 64),
+    uch (ukn_ch N) Sc -∗
+    (∀ (h' : CpuId) (r : mword 64) (Sc' : gset gname),
+       ⌜ch_reaped Sc Sc'⌝ -∗
        urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
+       uch (ukn_ch N) Sc' -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hz Hal4.
-    iIntros "#Hi Hrun Hsb Hcont".
+    iIntros "#Hi Hrun Hsb Hch Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
                 with "Hdep Hmy Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
@@ -1786,6 +1805,11 @@ Section UkRunSys.
       [ exfalso; unfold USYS_wait, USYS_exit in He; discriminate He | ].
     destruct (decide (USYS_wait = USYS_fork)) as [He | _];
       [ exfalso; unfold USYS_wait, USYS_fork in He; discriminate He | ].
+    (* ...and THIS number is the one with an arm of its own beside fork's:
+       the reap moved the reading, so the row the process gets back is the
+       kernel's answer ([UexecRet.uexec_wait_F]). *)
+    destruct (decide (USYS_wait = USYS_wait)) as [_ | Hwne];
+      [ | exfalso; exact (Hwne eq_refl) ].
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
@@ -1796,7 +1820,7 @@ Section UkRunSys.
     iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros "Hpayv".
-    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow Hans _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -1810,8 +1834,21 @@ Section UkRunSys.
        authority beside it, and the children authority is already at
        the set the process resumes at. *)
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
-    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
-    subst gn' cs'.
+    subst gn'.
+    (* THE SET MOVED, AND BOTH HALVES MOVE WITH IT.  The program's half came
+       in with the call and the engine's rides [urun]; the answer says what
+       the reap left, and [UserChildren.uch_update] is the one step that can
+       take them there. *)
+    iDestruct (uch_agree with "Hcha Hch") as %<-.
+    iAssert (⌜ch_reaped cs cs'⌝)%I with "[Hans]" as %Hmoved.
+    { rewrite /uwait_ans. iDestruct "Hans" as "[[%Hr %He] | (%γ' & %He)]";
+        iPureIntro; [ left; exact He | right; exists γ'; exact He ]. }
+    (* the goal here is the SLOT, not a [WP], so the update rides
+       [UexecRet.uslot_bupd] -- the same door every other leaf that moves a
+       ghost half in this position uses. *)
+    iApply uslot_bupd.
+    iMod (uch_update (ukn_ch N) cs cs cs' with "Hcha Hch") as "[Hcha Hch]".
+    iModIntro.
     destruct (usys_mem_ok_wait_null USYS_wait _ r _ _ _ _ _ _
                 eq_refl Ha0 Hok) as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -1824,13 +1861,43 @@ Section UkRunSys.
     { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
         vm_compute; discriminate. }
     subst fdv'.
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs r Hx0 Hal4).
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs' r Hx0 Hal4).
     iApply ukcq_ukc.
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep").
     iIntros (h') "Hrun".
-    iApply ("Hcont" $! h' r with "Hrun").
+    iApply ("Hcont" $! h' r cs' with "[%] Hrun Hch"); [ exact Hmoved ].
   Qed.
+
+  (* ...AND THE INDEX-FREE FORM.  A program that hands its children to a
+     call whose answer it does not read carries [UserChildren.uch_any]:
+     the set goes in and comes back existentially, so the leaf's move
+     costs the caller no binder.  init and sh call this one. *)
+  Lemma wp_uk_ecall_wait_any (N : uk_names Σ) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) :
+    usysno m = USYS_wait ->
+    uint (m !!! Regidx (mword_of_int 10)) = 0 ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_wait -∗
+    uch_any (ukn_ch N) -∗
+    (∀ (h' : CpuId) (r : mword 64),
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       uch_any (ukn_ch N) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Hz Hal4. iIntros "#Hi Hrun Hsb Hch Hcont".
+    iDestruct "Hch" as (Sc) "Hch".
+    iApply (wp_uk_ecall_wait_null N h m pc avail Sc Hn Hz Hal4
+              with "Hi Hrun Hsb Hch").
+    iIntros (h' r Sc') "_ Hrun Hch".
+    iApply ("Hcont" $! h' r with "Hrun [Hch]").
+    iApply (uch_any_of with "Hch").
+  Qed.
+
 
   (* ------------------------------------------------------------------- *)
   (* ecall, at a WINDOW syscall.  Four entries -- read, wait at a status   *)
@@ -1880,6 +1947,10 @@ Section UkRunSys.
        window call at all -- so it is excluded here and owes a leaf of its
        own; the other three are outside the domain and cost nothing. *)
     n <> USYS_close -> n <> USYS_dup -> n <> USYS_open -> n <> USYS_pipe ->
+    (* ...AND IT IS NOT WAIT, which moves the caller's children reading and
+       has its own leaves ([wp_uk_ecall_wait_null] / [_any]): this one
+       re-closes the run at the set it opened at. *)
+    n <> USYS_wait ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     urun N h m pc avail -∗
@@ -1894,7 +1965,7 @@ Section UkRunSys.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hwin Hcapk Hcl Hdp Hop Hpp Hal4.
+    intros Hn Hwin Hcapk Hcl Hdp Hop Hpp Hwt Hal4.
     iIntros "#Hi Hrun Hsb Hbuf Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs
@@ -1937,6 +2008,7 @@ Section UkRunSys.
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
     destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
+    destruct (decide (n = USYS_wait)) as [He | _]; [ exfalso; exact (Hwt He) | ].
     (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
        law mints at some [f] and this leaf, which discards its post,
        hands that witness straight over. *)
@@ -2359,6 +2431,9 @@ Section UkRunSys.
               (* read is none of the four -- by computation on the number *)
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              (* ...and read is not wait either, so the children reading it
+                 opened at is the one it re-closes at *)
+              ltac:(vm_compute; discriminate)
               Hal4 with "Hi Hrun Hsb Hbuf").
     iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
     iApply ("Hcont" $! h' r d g with "[%] [%] Hrun Hbuf");

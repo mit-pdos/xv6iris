@@ -331,8 +331,8 @@ Section UkShFork.
       (* ---- wait((int * )0) ---- *)
       iApply (UkShRun.wp_kshr_wait Hpsok N hD mC
                 (2 + (UkShDiag.ush_Dg + (66 + n))) Ha0_C
-                with "Hcode Hrun").
-      iIntros (hE ret) "Hrun".
+                with "Hcode Hrun Hch").
+      iIntros (hE ret) "Hrun Hch".
       rewrite Hra_C.
       assert (Eret2 : ret_pc (mword_of_int 0x938 : mword 64)
                       = mword_of_int 0x938)

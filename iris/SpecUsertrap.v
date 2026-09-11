@@ -264,15 +264,16 @@ Definition ut_round (sepc_v sc_v : mword 64) (U U' : ustate) : Prop :=
 Definition ut_fd_kept (sc_v : mword 64) (sts sts' : list fdstate) : Prop :=
   sc_v <> uecall_scause -> sts' = sts.
 
-(* ...AND THE CHILDREN SET'S ROW, guarded off FORK rather than off the
-   cause.  Every entry but fork keeps the reading ([UsysMemOk.usys_ch_ok]
-   is the identity at every number), and fork's move is not a pure fact at
-   all: it carries the child's token, so it lives in [ut_fork_out] below.
-   The guard is [UexecApply.uexec_ret_round_slot]'s own, so the premise
-   travels to the loop verbatim. *)
+(* ...AND THE CHILDREN SET'S ROW, guarded off the TWO ENTRIES THAT MOVE IT
+   rather than off the cause.  Every other entry keeps the reading, and
+   neither of those two moves is a pure fact: fork's carries the child's
+   token ([ut_fork_out] below) and wait's carries the escrow the reap
+   redeems.  The guard is [UexecApply.uexec_ret_round_slot]'s own, so the
+   premise travels to the loop verbatim. *)
 Definition ut_ch_kept (sc_v : mword 64) (tf : list (mword 64))
     (cs cs' : gset gname) : Prop :=
-  ~ (sc_v = uecall_scause /\ usys_num tf = USYS_fork) -> cs' = cs.
+  ~ (sc_v = uecall_scause /\
+     (usys_num tf = USYS_fork \/ usys_num tf = USYS_wait)) -> cs' = cs.
 
 (* ...AND THE GENERATION'S, WITH NO GUARD AT ALL.  A round never
    re-incarnates the process it runs: the generation is minted once, at
@@ -297,6 +298,7 @@ Proof.
   intros Hn H Hg. apply H. intros [He Hf]. apply Hg. split; [exact He |].
   rewrite <- Hn. exact Hf.
 Qed.
+
 
 (* ...AND THE ECALL'S OWN HALF, which used to be missing.  [ut_fd_kept]
    above is the whole statement for four of the five causes and says
@@ -536,6 +538,53 @@ Lemma ut_fork_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI 
 Proof.
   intros Hne. rewrite /ut_fork_out. iIntros "%Hc". exfalso.
   exact (Hne (proj1 Hc)).
+Qed.
+
+(* ===================================================================== *)
+(* ...AND WAIT'S, on fork's footing exactly: the reap took the reaped      *)
+(* generation out of the caller's children reading, and what the loop      *)
+(* hands the process is what the set became ([UexecRet.uwait_ans]).  The   *)
+(* escrow and the two facts that identify the generation ride beside it    *)
+(* with WX-WAIT; the row itself is the set's move.                         *)
+(* ===================================================================== *)
+Definition ut_wait_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    {SG : uexecSG Σ}
+    (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64)
+    (cs cs' : gset gname)
+    : iProp Σ :=
+  (⌜sc_v = uecall_scause /\ usys_num tf = USYS_wait⌝ -∗
+     uwait_ans r cs cs')%I.
+
+Lemma ut_wait_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    {SG : uexecSG Σ}
+    (sc_v : mword 64) (tf1 tf2 : list (mword 64)) (r1 r2 : mword 64)
+    (cs cs' : gset gname) :
+  usys_num tf1 = usys_num tf2 -> r1 = r2 ->
+  ut_wait_out sc_v tf1 r1 cs cs' -∗ ut_wait_out sc_v tf2 r2 cs cs'.
+Proof.
+  intros Hn Hr. rewrite /ut_wait_out. subst r2. iIntros "H %Hc".
+  iApply "H". iPureIntro. split; [exact (proj1 Hc) |].
+  rewrite Hn. exact (proj2 Hc).
+Qed.
+
+Lemma ut_wait_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    {SG : uexecSG Σ}
+    (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64)
+    (cs cs' : gset gname) :
+  sc_v <> uecall_scause -> ⊢ ut_wait_out sc_v tf r cs cs'.
+Proof.
+  intros Hne. rewrite /ut_wait_out. iIntros "%Hc". exfalso.
+  exact (Hne (proj1 Hc)).
+Qed.
+
+Lemma ut_wait_out_quiet_n `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    {SG : uexecSG Σ}
+    (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64)
+    (cs cs' : gset gname) :
+  usys_num tf <> USYS_wait -> ⊢ ut_wait_out sc_v tf r cs cs'.
+Proof.
+  intros Hne. rewrite /ut_wait_out. iIntros "%Hc". exfalso.
+  exact (Hne (proj2 Hc)).
 Qed.
 
 Lemma ut_fork_out_quiet_n `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
@@ -1079,6 +1128,10 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
       (uint (pv_sz (us_V U))) U' sts sts' gn cs -∗
     (* ...AND FORK'S: the parent's child token -- see [ut_fork_out] *)
     ut_fork_out f sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
+      (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
+    (* ...AND WAIT'S: what the reap left the caller's reading -- see
+       [ut_wait_out] *)
+    ut_wait_out sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
       (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
     (* ...AND THE SYSCALL CHANNEL'S, at the same entry frame and read at the
        a0 word the round left -- [ut_sys_out].  The dispatcher produces it,

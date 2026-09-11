@@ -45,6 +45,8 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             which rides inside [urun] *)
 Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import UserChildren. (* [uch_any] -- init's own half of its children
+                                set; wait moves it, and init does not read it *)
 Require Import UserCwd.  (* [ucwd]: the process's own half of its cwd -- the
                             exec leaf is indexed by it *)
 Require FsImg.           (* [FsImg.ROOTINO]: init never chdirs, so its
@@ -616,16 +618,21 @@ Section UkInit.
     uint (m !!! Regidx a0_idx) = 0 ->
     init_code γt -∗
     urun N h m (mword_of_int InitSyms.wait) avail -∗
+    (* THE REAP MOVES THE CHILDREN READING, and init never names it: the
+       index-free half goes in and comes back, so the move costs this
+       statement no binder ([UkRunSys.wp_uk_ecall_wait_any]). *)
+    UserChildren.uch_any (ukn_ch N) -∗
     (∀ (h' : CpuId) (ret : mword 64),
        urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 3 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
+       UserChildren.uch_any (ukn_ch N) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hz.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hcode Hrun Hch Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hwait.
     iApply (wp_uk_cli N h m (mword_of_int 0x37a)
               (mword_of_int 3 : mword 6) a7_idx avail
@@ -648,12 +655,12 @@ Section UkInit.
       rewrite (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
                  (mword_of_int 3 : mword 64) ltac:(vm_compute; discriminate)).
       exact Hz. }
-    iApply (wp_uk_ecall_wait_null N h1 m1 (mword_of_int 0x37c) avail
+    iApply (wp_uk_ecall_wait_any N h1 m1 (mword_of_int 0x37c) avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 3 : mword 64));
                     vm_compute; reflexivity)
               Ha0 ltac:(vm_compute; reflexivity)
-              with "[] Hrun []").
+              with "[] Hrun [] Hch").
     { iApply (uis_init_37c with "Hcode"). }
     { iApply udepw_of_psok; [ apply Hpsok | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
@@ -661,7 +668,7 @@ Section UkInit.
                  = mword_of_int 0x380)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1.
-    iIntros (h2 ret) "Hrun".
+    iIntros (h2 ret) "Hrun Hch".
     set (m2 := <[Regidx a0_idx := ret]> m1).
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
     { unfold m2, m1.
@@ -678,7 +685,7 @@ Section UkInit.
               with "[] Hrun").
     { iApply (uis_init_380 with "Hcode"). }
     iIntros (h3) "Hrun".
-    iApply ("Hcont" $! h3 ret with "Hrun").
+    iApply ("Hcont" $! h3 ret with "Hrun Hch").
   Qed.
 
 End UkInit.

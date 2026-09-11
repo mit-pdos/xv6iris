@@ -98,7 +98,7 @@ Notation sys_wait_stack := ((4 + K_kwait)%nat) (only parsing).
 Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa γp γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    (pid : mword 32) (U : ustate) (v0 : mword 64) :=
+    (pid : mword 32) (U : ustate) (v0 : mword 64) (cs : gset gname) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_wait in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -118,11 +118,16 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   (* <pid_lock>, for kwait's freeproc (upstream ded23f2) *)
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
   proc_priv γf pj pid U -∗
+  (* ...AND THE CALLER'S OWN CHILDREN ROW, relayed to kwait, which is
+     what moves it ([SpecKwait]).  sys_wait does nothing with it -- the
+     mold is sys_exit's relay of the same row to kexit. *)
+  ch_frag (pv_chg (us_V U)) pj cs -∗
   wp_next b pj (fun (CID : CpuId) =>
   (* kwait's window, verbatim: the only write is copyout's four-byte
      [xstate] at [v0], the syscall's own argument 0, and only when
      [v0 <> 0].  See SpecKwait.v's header. *)
-    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (bs : nat -> bv 8),
+    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (bs : nat -> bv 8)
+      (cs' : gset gname),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
@@ -131,10 +136,15 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
          [addr != 0] test, relayed.  [v0] is the syscall's argument 0, so a
          caller passing a null status pointer keeps every byte it held. *)
       ⌜ v0 = (zero_reg : mword 64) -> d = 0%nat ⌝ -∗
+      (* ...AND WHAT THE REAP DID TO THE CALLER'S READING: at most one
+         generation left it ([UserChildren.ch_reaped]). *)
+      ⌜ ch_reaped cs cs' ⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_usM (us_upt U P') (umem_wr (us_M U) v0 d bs)) -∗
+      (* the row, back at what the reap left it -- kwait's, verbatim *)
+      ch_frag (pv_chg (us_V U)) pj cs' -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -143,6 +153,6 @@ Module Type SYSWAIT.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa γp γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-      (pid : mword 32) (U : ustate) (v0 : mword 64),
-      wp_sys_wait_sconf_body γa γp γf γw γs j γl m av eb b lks pid U v0.
+      (pid : mword 32) (U : ustate) (v0 : mword 64) (cs : gset gname),
+      wp_sys_wait_sconf_body γa γp γf γw γs j γl m av eb b lks pid U v0 cs.
 End SYSWAIT.

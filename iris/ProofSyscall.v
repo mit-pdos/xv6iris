@@ -1781,6 +1781,9 @@ Section SyscallVocab.
            the set its children reading grew to --
            see [SpecSyscall.sysc_fork_out] *)
         sysc_fork_out f U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
+        (* ...and WAIT'S: the set its children reading shrank to --
+           see [SpecSyscall.sysc_wait_out] *)
+        sysc_wait_out U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
         (* ...AND THE PAYMENT, going back out: this arm RETURNS, so the
            payload the caller handed over is handed back
            ([SpecSyscall.sysc_pay_out]).  The one arm that does not is
@@ -2037,6 +2040,8 @@ Section SyscallVocab.
        immediately after [Hcont] *)
     (* AT THE RECORD'S OWN a0 WORD, like the syscall channel's row below *)
     sysc_fork_out f U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
+    (* ...AND WAIT'S, on fork's footing exactly *)
+    sysc_wait_out U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
     (* the exec channel's answer, carried like the rows above it *)
     sysc_exec_out U U' sts sts' gn cs -∗
     (* ...and the syscall channel's, carried the same way: the epilogue
@@ -2051,7 +2056,7 @@ Section SyscallVocab.
   Proof.
     intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng.
     set (sp0 := m !!! Regidx csp_rs1).
-    iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hxo Hso Hpayv".
+    iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hwo Hxo Hso Hpayv".
     assert (Hb1 : pa_stk sp0 1 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
       by (apply (sysc_stk sp0 1 3); lia).
     assert (Hb2 : pa_stk sp0 2 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))
@@ -2196,7 +2201,7 @@ Section SyscallVocab.
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).
       reflexivity. }
     iApply ("Hcont" $! T5 U' sts' cs'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hxo Hso Hfo Hpayv").
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hxo Hso Hfo Hwo Hpayv").
     { unfold callee_saved.
       split_and!.
       - exact HT5sp.
@@ -2809,6 +2814,8 @@ Section SyscallRet.
     (* ...AND FORK'S, carried the same way and FIRST of the three, so an
        arm that owes nothing discharges it in the hole after [Hcont] *)
     sysc_fork_out f U (E !!! Regidx Ra0) cs cs' -∗
+    (* ...AND WAIT'S, at the same word *)
+    sysc_wait_out U (E !!! Regidx Ra0) cs cs' -∗
     sysc_exec_out U
       (us_tf U' (<[tf_arg_idx 0 := E !!! Regidx Ra0]> (pv_tf (us_V U'))))
       sts sts' gn cs -∗
@@ -2826,7 +2833,7 @@ Section SyscallRet.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng.
-    iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hxo Hso Hpayv".
+    iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hwo Hxo Hso Hpayv".
     (* the stored word, as the store lemma spells it *)
     assert (Hrg : rget E Ra0 = E !!! Regidx Ra0) by (rgne; reflexivity).
     iEval (rewrite -Hrg) in "Hxo".
@@ -2959,12 +2966,13 @@ Section SyscallRet.
               Hne2
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_chg]; exact Hchg)
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_gen]; exact Hgeng)
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag [Hrow] Hpc Hcont [Hfo] Hxo [Hso] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag [Hrow] Hpc Hcont [Hfo] [Hwo] Hxo [Hso] Hpayv").
     (* the row is keyed on the ENTRY record's [pv_chg], which the a0 store
        does not move *)
     - iExact "Hrow".
-    (* both rows are read at the a0 word the store just wrote *)
+    (* the three answer rows are read at the a0 word the store just wrote *)
     - iEval (rewrite Hsoword). iExact "Hfo".
+    - iEval (rewrite Hsoword). iExact "Hwo".
     - iEval (rewrite Hsoword). iExact "Hso".
   Qed.
 
@@ -3653,9 +3661,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -3960,9 +3970,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -4007,11 +4019,11 @@ Section SyscallArms.
     iDestruct (syscall_env_all with "Henvc") as (γp γw' γft γtk)
       "(#Hkalloc & #Hnextpid & _ & #Hwaitlk & _)".
     (* ---- the call ---- *)
-    iApply (SysWait.wp_sys_wait_sconf fsc_kalloc γp γf γw' γs j γl M (av - 4)%nat true true lks pid U v0
+    iApply (SysWait.wp_sys_wait_sconf fsc_kalloc γp γf γw' γs j γl M (av - 4)%nat true true lks pid U v0 cs
               Hj Hgamma Hv0 ltac:(lia) eq_refl
-              with "Hcg Hcpu Htext Hdata Hpc Hprocs Hwaitlk Hkalloc Hnextpid Hpriv").
-    iIntros (CIDy Hsy mf P' rv dw bsw)
-      "%Hcs %Hext %Hdwle %Hnullw Hcg Hcpu Hpc Hpriv".
+              with "Hcg Hcpu Htext Hdata Hpc Hprocs Hwaitlk Hkalloc Hnextpid Hpriv Hrow").
+    iIntros (CIDy Hsy mf P' rv dw bsw cs')
+      "%Hcs %Hext %Hdwle %Hnullw %Hmoved Hcg Hcpu Hpc Hpriv Hrow".
     destruct Hcs as [Hcs _].
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt (us_V U))).
     { destruct (uptd_ext_sz_ext (pv_sz (us_V U)) (pv_upt (us_V U)) P' Hext) as (_ & Htf & _).
@@ -4038,7 +4050,7 @@ Section SyscallArms.
     iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
                  with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (upd_usM (us_upt U P') (umem_wr (us_M U) v0 dw bsw)) sts sts gn cs cs lks av m mf fdep
+              (upd_usM (us_upt U P') (umem_wr (us_M U) v0 dw bsw)) sts sts gn cs cs' lks av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(assert (Hv0t : pv_tf (us_V U) !!! tf_arg_idx 0 = v0)
                       by (apply list_lookup_total_correct, Hv0);
@@ -4060,17 +4072,22 @@ Section SyscallArms.
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (* ...and fork's answer: not this entry's number *)
               (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
-              (* ...and the children set's row: not fork's number *)
-              (sysc_ch_ok_refl _ _)
+              (* ...and the children set's row: wait is one of the two
+                 numbers it exempts, because the reap MOVES the set *)
+              ltac:(intros _ Hw; exfalso; apply Hw;
+                    unfold UsysMemOk.USYS_wait in *; lia)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...AND WAIT'S ANSWER, which this arm alone owes: the set kwait left,
+       out of the pure row it returned *)
+    { iApply (sysc_wait_out_intro _ _ cs cs' Hmoved). }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -4169,9 +4186,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -4264,9 +4283,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -4359,9 +4380,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -4559,9 +4582,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -4730,10 +4755,12 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [Hans] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [Hans] [] [] [] Hpayv").
     (* ...AND FORK'S ANSWER, which this arm alone owes.  It was already
        packed at [cs'] above, so there is nothing left to say. *)
     { iExact "Hans". }
+    (* wait answers nothing at this entry *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -4980,9 +5007,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] Hxo [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] Hxo [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     (* exec's process never resumes on success, so its [spost_at] is [emp]
        ([UexecExecInst.xv6_spost]) and the row is free. *)
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
@@ -5200,9 +5229,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -5373,9 +5404,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hex] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hex] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     rewrite Hmfa0.
     iApply (sysc_out_write U sts gn cs fdep v0 v1 v2 r _ _ _ _
@@ -5521,9 +5554,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hex] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hex] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     rewrite Hmfa0.
     iApply (sysc_out_read U sts gn cs fdep v0 v1 v2 r _ _ _ _
@@ -5632,9 +5667,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -5800,9 +5837,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hrcpt] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hrcpt] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_chdir U sts gn cs fdep _ _ sts (pv_cwi V') _
               ltac:(rewrite Hnum; reflexivity) with "Hrcpt").
@@ -5934,9 +5973,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_unlink U sts gn cs fdep (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) with "Harms").
@@ -6057,9 +6098,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_link U sts gn cs fdep (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) with "Harms").
@@ -6235,10 +6278,12 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     iApply (sysc_iref_join3 with "Hir Hiru").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -6535,10 +6580,12 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     iApply (sysc_iref_join3 with "Hir Hiru").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
@@ -6696,9 +6743,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_mkdir U sts gn cs fdep (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) with "Harms").
@@ -6831,9 +6880,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_mknod U sts gn cs fdep v1 v2 (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) Hv1 Hv2 with "Harms").
@@ -7106,9 +7157,11 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hrcpt] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hrcpt] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_out_open U sts gn cs fdep v1 _ _ sts' (pv_cwi V') _
               ltac:(rewrite Hnum; reflexivity) Hv1 with "Hrcpt").
@@ -7534,9 +7587,11 @@ Section SyscallArms.
               eq_refl
               (* ...and its generation, likewise *)
               eq_refl
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
+    (* ...and wait answers nothing here either *)
+    { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7_range _ Hrange)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ (sysc_num (us_V U)) eq_refl
               ltac:(unfold sysc_num_nofs; lia)).

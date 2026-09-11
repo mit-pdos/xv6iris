@@ -492,15 +492,47 @@ Section SyscExec.
     intros Hne. rewrite /sysc_fork_out. iIntros "%Hc". exfalso. exact (Hne Hc).
   Qed.
 
-  (* ...AND THE PURE HALF, for the twenty-one entries that keep the set.
-     fork is the one exception and its arm is the resource above; wait's
-     and exit's arrive with their own lanes. *)
+  (* ...AND THE DISPATCHER'S WAIT ROW, on fork's mold exactly.  wait is the
+     other entry that moves the caller's children reading: a reap takes the
+     reaped generation OUT of it, and every failing arm leaves it alone.
+     The escrow and the facts that identify the generation ride beside the
+     set with WX-WAIT; what is here is the move the wait-lock invariant
+     forces ([WaitInv.children_inv_reap]). *)
+  Definition sysc_wait_out (U : ustate) (r : mword 64)
+      (cs cs' : gset gname) : iProp Σ :=
+    (⌜sysc_num (us_V U) = UsysMemOk.USYS_wait⌝ -∗ uwait_ans r cs cs')%I.
+
+  Lemma sysc_wait_out_ne (U : ustate) (r : mword 64) (cs cs' : gset gname) :
+    sysc_num (us_V U) <> UsysMemOk.USYS_wait -> ⊢ sysc_wait_out U r cs cs'.
+  Proof.
+    intros Hne. rewrite /sysc_wait_out. iIntros "%Hc". exfalso. exact (Hne Hc).
+  Qed.
+
+  (* ...and what the wait arm itself pays, out of the pure row kwait
+     returns.  THE ARM THAT MOVED NOTHING STILL ANSWERS AT THE SECOND
+     DISJUNCT, at a generation FRESH for the set: removing one that was
+     never in it is the identity, and it keeps the answer's shape the one
+     WX-WAIT grows (the escrow rides beside [γ']). *)
+  Lemma sysc_wait_out_intro (U : ustate) (r : mword 64) (cs cs' : gset gname) :
+    ch_reaped cs cs' -> ⊢ sysc_wait_out U r cs cs'.
+  Proof.
+    intro Hm. rewrite /sysc_wait_out /uwait_ans. iIntros "_".
+    destruct Hm as [-> | [γ' ->]].
+    - iRight. iExists (fresh cs). iPureIntro.
+      pose proof (is_fresh cs) as Hf. set_solver.
+    - iRight. iExists γ'. done.
+  Qed.
+
+  (* ...AND THE PURE HALF, for the twenty entries that keep the set.  fork
+     and wait are the exceptions and their moves are the resources above;
+     exit's arrives with its own lane. *)
   Definition sysc_ch_ok (V : pprivate) (cs cs' : gset gname) : Prop :=
-    sysc_num V <> UsysMemOk.USYS_fork -> cs' = cs.
+    sysc_num V <> UsysMemOk.USYS_fork -> sysc_num V <> UsysMemOk.USYS_wait ->
+    cs' = cs.
 
   Lemma sysc_ch_ok_refl (V : pprivate) (cs : gset gname) :
     sysc_ch_ok V cs cs.
-  Proof. intros _. reflexivity. Qed.
+  Proof. intros _ _. reflexivity. Qed.
 
   (* the numbers that owe nothing, as one premise an arm discharges from its
      own table index by [lia] *)
@@ -723,8 +755,8 @@ Definition wp_syscall_sconf_body
       (* ...and PIPE's two rows joined, so a caller can close what it got *)
       ⌜ sysc_pipe_ok (us_V U) (us_M U) (us_M U')
                      (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ⌝ -∗
-      (* ...and which entries moved the children set: fork alone, and its
-         move is the resource below and not this row *)
+      (* ...and which entries moved the children set: fork and wait, and
+         their moves are the resources below and not this row *)
       ⌜ sysc_ch_ok (us_V U) cs cs' ⌝ -∗
       (* ...AND THIS ARM RETURNED, WHICH RULES [exit] OUT (milestone J,
          K1).  [sysc_mem_ok] does NOT: exit falls into the quiet
@@ -868,6 +900,9 @@ Definition wp_syscall_sconf_body
       (* ...and FORK'S: the parent's child token and the set its children
          reading grew to -- see [sysc_fork_out] *)
       sysc_fork_out f U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
+      (* ...and WAIT'S: the set its children reading shrank to -- see
+         [sysc_wait_out] *)
+      sysc_wait_out U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
       (* ...AND THE PAYMENT, coming back: this arm RETURNS, so the payload
          the caller handed over goes back to it -- see [sysc_pay_out] *)
       sysc_pay_out f -∗

@@ -524,7 +524,7 @@ Section UserretClosed.
       "%Huptpt' %Hround' %Hfdkept %Hchkept %Hgenk2 %Hfdecall %Hpipecall %Hpcret' %Hgprtie'
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
-       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds' Hxo Hfo Hso Hpay".
+       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds' Hxo Hfo Hwo Hso Hpay".
     (* the three frozen CSRs, duplicated out of the residue for [user_cfg] *)
     iDestruct (UV.usertrap_res_csrs_open (CID := CID') pt' ksp U2 with "Hures'")
       as "[Hcsrs Hcback]".
@@ -598,6 +598,9 @@ Section UserretClosed.
        kernel's own answer says what it became -- the row moved under the
        lock kfork holds. ---- *)
     iEval (rewrite /SpecUsertrap.ut_fork_out) in "Hfo".
+    (* ...and wait's, on the same terms: the reap moved the row under the
+       lock kwait holds, and this is what says where it left it. *)
+    iEval (rewrite /SpecUsertrap.ut_wait_out) in "Hwo".
     (* ...AND THE EXEC ANSWER AT THE SET THE ROUND RESUMES AT: exec is not
        fork, so on that arm the set did not move and the row's slot is at
        the same key. *)
@@ -621,10 +624,13 @@ Section UserretClosed.
       with "[Hxo]" as "Hxo".
     { iIntros "%Hg".
       assert (Hnf : ~ (sc = uecall_scause
-                       /\ usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
-                                      (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
-                          = USYS_fork)).
-      { intros [_ Hx]. rewrite (proj2 Hg) in Hx. discriminate Hx. }
+                       /\ (usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                       (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                           = USYS_fork
+                           \/ usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                                          (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
+                              = USYS_wait))).
+      { intros [_ [Hx | Hx]]; rewrite (proj2 Hg) in Hx; discriminate Hx. }
       rewrite (Hchkept Hnf). iApply "Hxo". iPureIntro. exact Hg. }
     iDestruct (uexec_ret_round_slot_of sc W fdep (tf_resume_gpr0 (uvis_tf W))
                  (tf_w (uvis_tf W) tf_epc_idx) U2 sts2 cs2
@@ -646,11 +652,13 @@ Section UserretClosed.
                     key the deposit went down at -- which differs from the
                     round's run projection in none of [UexecSG.skey_eq]'s six
                     rows, exactly as it did on the way in. *)
-                 with "Hxo Hfo [Hso] Hpay Hret") as "Hslot";
+                 with "Hxo Hfo Hwo [Hso] Hpay Hret") as "Hslot";
       [ iIntros "%Hg"; destruct Hg as (Hgec & Hgex & Hgfk);
-        (* this arm is not fork, so the set the round resumes at is the
-           trapped one and the row transports at the trapped key *)
-        rewrite (Hchkept (fun Hbad => Hgfk (proj2 Hbad)));
+        (* THE ROW IS AT THE SET THE ROUND RESUMES AT, whatever it is: at
+           wait that set is what the reap left and the trapped one is gone,
+           so the transport must NOT go through [Hchkept].  The armed post
+           reads the set only as its own last argument, and both sides name
+           the same [cs2]. *)
         iDestruct ("Hso" $! (usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
                                (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
                      with "[%]") as "Hso";
@@ -664,7 +672,7 @@ Section UserretClosed.
                                 (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
                              (uvis_M W)) (uvis_fd W) (uvis_gen W) (uvis_ch W))
                  (uvis_run W) (pv_tf (us_V U2) !!! tf_arg_idx 0)
-                 (us_M U2) sts2 (pv_cwi (us_V U2)) (uvis_ch W)
+                 (us_M U2) sts2 (pv_cwi (us_V U2)) cs2
                  ltac:(rewrite /skey_eq; split_and!;
                        [ reflexivity | reflexivity | reflexivity
                        | reflexivity | reflexivity

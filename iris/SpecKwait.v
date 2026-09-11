@@ -67,6 +67,16 @@
      putting it there would make the documented lock order wait_lock ->
      p->lock unstateable.  See WaitInv.v.
 
+   * IT MOVES THE CALLER'S CHILDREN ROW, and that is what makes a reap a
+     reap rather than a store.  The row ([WaitInv.ch_frag], off the trap
+     residue) is handed in at [cs] and comes back at [cs'], and the
+     contract says the reading moved by at most one member: the reap takes
+     the reaped generation out of it -- out of BOTH columns of the
+     wait-lock invariant, which is where "that zombie is my child" lives
+     ([WaitInv.children_inv_reap]) -- and every failing arm returns it
+     unmoved.  WHICH generation left, the escrow that redeems it and the
+     uniqueness that makes the returned pid name it are WX-WAIT's.
+
    * IT REACHES A ZOMBIE'S PRIVATE BLOCK, WHICH NOTHING ELSE DOES.  The
      child's [ProcInv.proc_dormant _ ZOMBIE] comes out of the child's own
      lock through [SchedCtx.proc_slots]'s [inv_dormant] guard, and
@@ -156,7 +166,7 @@ Notation K_kwait := (62%nat) (only parsing).
 Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa γp γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
-    (pid : mword 32) (U : ustate) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (lks : gset string) (cs : gset gname) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kwait in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -186,6 +196,13 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
   (* the caller's own private block: copyout reads p->pagetable and p->sz *)
   proc_priv γf pj pid U -∗
+  (* ...AND THE CALLER'S OWN CHILDREN ROW, which is what makes a reap a
+     reap.  It rides the trap residue ([UsertrapRes.ut_own]) beside the
+     descriptor fragments, kwait holds <wait_lock> -- the authority the row
+     belongs to -- across everything it does, and the reap MOVES it: the
+     reaped generation leaves the set.  The mold is sys_exit's, which
+     relays the same row to kexit ([SpecKexit]). *)
+  ch_frag (pv_chg (us_V U)) pj cs -∗
   wp_next b pj (fun (CID : CpuId) =>
     (* THE ONLY THING kwait WRITES IS THE FOUR-BYTE EXIT STATUS, AT [addr],
        AND ONLY WHEN [addr <> 0].  [d] is the count copyout actually placed
@@ -196,7 +213,8 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
        carried -- that is a [fs-syscall-specs]-tier claim, not this one's.
        A caller reads its own untouched bytes back with
        [UserPtTree.umem_wr_lookup_out]. *)
-    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (bs : nat -> bv 8),
+    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (bs : nat -> bv 8)
+      (cs' : gset gname),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
@@ -207,10 +225,23 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
          everything it held across the call.  Without this the row would
          still permit a four-byte write at address 0. *)
       ⌜ addr = (zero_reg : mword 64) -> d = 0%nat ⌝ -∗
+      (* ...AND WHAT THE REAP DID TO THE CALLER'S READING: at most one
+         generation left it ([UserChildren.ch_reaped]). *)
+      ⌜ ch_reaped cs cs' ⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
+      (* THE ROW COMES BACK AT WHAT THE REAP LEFT IT.  A reap takes ONE
+         generation out of the caller's reading -- the one it reaped, and
+         [WaitInv.children_inv_reap] takes it out of both columns of the
+         invariant -- and every failing arm returns the set unmoved (the C
+         returns before [pp->parent = 0], so nothing was reaped).  WHICH
+         generation left, the escrow that redeems it and the uniqueness
+         that makes the returned pid name it are WX-WAIT's; what this
+         contract says is that the reading MOVED BY AT MOST ONE MEMBER and
+         that the caller keeps its row. *)
+      ch_frag (pv_chg (us_V U)) pj cs' -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -219,6 +250,6 @@ Module Type KWAIT.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa γp γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
-      (pid : mword 32) (U : ustate) (lks : gset string),
-      wp_kwait_sconf_body γa γp γf γw γs j γl m av eb b pid U lks.
+      (pid : mword 32) (U : ustate) (lks : gset string) (cs : gset gname),
+      wp_kwait_sconf_body γa γp γf γw γs j γl m av eb b pid U lks cs.
 End KWAIT.

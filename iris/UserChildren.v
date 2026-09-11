@@ -110,3 +110,21 @@ Section UserChildren.
   Proof. iIntros "H". iExists S. iExact "H". Qed.
 
 End UserChildren.
+
+(* ===================================================================== *)
+(* WHAT A REAP DOES TO THE READING, as the one PURE row every party from  *)
+(* kwait to the trap loop relays: AT MOST ONE generation leaves it -- the *)
+(* one that was reaped, which [WaitInv.children_inv_reap] takes out of    *)
+(* both columns of the wait-lock invariant -- and every failing arm       *)
+(* leaves it alone, because the C returns before [pp->parent = 0].  WHICH *)
+(* generation left, and the escrow that redeems it, ride beside this with *)
+(* WX-WAIT.  Outside the section: it names no ghost and no class.         *)
+(* ===================================================================== *)
+Definition ch_reaped (cs cs' : gset gname) : Prop :=
+  cs' = cs \/ exists γ' : gname, cs' = cs ∖ {[γ']}.
+
+Lemma ch_reaped_refl (cs : gset gname) : ch_reaped cs cs.
+Proof. left. reflexivity. Qed.
+
+Lemma ch_reaped_del (cs : gset gname) (γ' : gname) : ch_reaped cs (cs ∖ {[γ']}).
+Proof. right. exists γ'. reflexivity. Qed.

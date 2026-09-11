@@ -1154,8 +1154,8 @@ Section UkInitMain.
         vm_compute. reflexivity. }
       (* ---- wait(0) ---- *)
       iApply (wp_kinit_wait N Hpsok hw2 mw2 (12 + (12 + (4 + n))) Ha0w2
-                with "Hcode Hrun").
-      iIntros (hw3 ret) "Hrun".
+                with "Hcode Hrun Hch").
+      iIntros (hw3 ret) "Hrun Hch".
       assert (Eretw : ret_pc (mw2 !!! Regidx ra_idx)
                       = (mword_of_int 0x4a : mword 64))
         by (rewrite Hraw2; apply bv_eq; vm_compute; reflexivity).

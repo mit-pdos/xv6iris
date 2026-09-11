@@ -370,6 +370,9 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
     (* ...AND FORK'S, forwarded the same way -- [SpecUsertrap.ut_fork_out] *)
     ut_fork_out f sc_v (tf_of g (ret_pc sepc_v))
       (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
+    (* ...AND WAIT'S, forwarded the same way -- [SpecUsertrap.ut_wait_out] *)
+    ut_wait_out sc_v (tf_of g (ret_pc sepc_v))
+      (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
     (* ...AND THE SYSCALL CHANNEL'S, forwarded at this boundary's own entry
        key -- the same one the deposit went down at
        ([wp_uservec_pt_body]'s pre row below) -- and read at the a0 word of

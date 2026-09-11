@@ -838,6 +838,25 @@ Section UexecRet.
          ⌜cs' = cs ∪ {[γ]}⌝ ∗
          child_tok γ pidv Q)%I.
 
+  (* ...AND WHAT WAIT ANSWERS ITS CALLER, in the two arms wait has.  It
+     FAILS -- the caller has no children, it was killed, or copyout could
+     not place the status -- and then it returns -1 and the caller's
+     children reading does not move (the C returns before [pp->parent =
+     0], so nothing was reaped).  It REAPS, and then the generation it
+     reaped leaves that reading, whichever of the two columns of the
+     wait-lock invariant it was in ([WaitInv.children_inv_reap] takes it
+     out of both).
+       THE SET'S MOVE IS ALL THIS SAYS.  The escrow the reap redeems and
+     the two facts that identify [γ'] -- that it is the caller's own
+     child and that no other child of the caller carries the returned pid
+     -- ride beside it, and are what makes a returned pid name a
+     generation.  The set is READ and not chosen, exactly as fork's is:
+     the row is [WaitInv.ch_frag] off the kernel's residue and kwait moves
+     it under <wait_lock>. *)
+  Definition uwait_ans (r : mword 64) (cs cs' : gset gname) : iProp Σ :=
+    (⌜r = (mword_of_int (-1) : mword 64) /\ cs' = cs⌝
+     ∨ ∃ γ' : gname, ⌜cs' = cs ∖ {[γ']}⌝)%I.
+
   (* the parent's arm: a NONZERO return, the key it trapped at bumped, and
      fork's answer at that return value. *)
   Definition uexec_fork_parent_F (X : uvis -d> iPropO Σ) (W : uvis)
@@ -968,9 +987,13 @@ Section UexecRet.
 
   (* the returning arm's CONTINUATION: the four pure rows, the syscall's
      armed post [spost_at] -- what the process gets back for the bundle it
-     deposited -- and the next slot at the bumped key. *)
-  Definition uexec_ret_cont_F (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
-      (W : uvis) : iProp Σ :=
+     deposited -- and the next slot at the bumped key.
+       THE CHILDREN ROW IS A PARAMETER, because the two entries that MOVE
+     the reading answer with a resource and the other twenty with a pure
+     row: [uexec_ret_cont_F] is this at the pure one, [uexec_wait_F] at
+     wait's answer.  One continuation, one varying axis. *)
+  Definition uexec_ret_cont_gen (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
+      (W : uvis) (CH : mword 64 -> gset gname -> iProp Σ) : iProp Σ :=
     (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
        (szv' : Z) (fdv' : list fdstate) (cw' : Z) (g' : gname)
        (cs' : gset gname),
@@ -1006,10 +1029,10 @@ Section UexecRet.
           re-incarnate its caller, and exec keeps the identity.
           [UsysMemOk.v] SS2e. *)
        ⌜usys_gen_ok n (uvis_gen W) g'⌝ -∗
-       (* ...AND THE CHILDREN SET, off the same return value: this lane's
-          table is quiet at every number, and wait's row -- which child the
-          returned pid names -- lands with WX-WAIT.  [UsysMemOk.v] SS2f. *)
-       ⌜usys_ch_ok n r (uvis_ch W) cs'⌝ -∗
+       (* ...AND THE CHILDREN SET, off the same return value: the row the
+          number's own answer carries -- pure and quiet at the twenty
+          entries that keep the reading, [uwait_ans] at wait, which reaps. *)
+       CH r cs' -∗
        (* THE SYSCALL'S ARMED POST, back under the same ∀: the unfired
           pieces of the bundle the process deposited, its receipts and its
           cursors.  [emp] at every number without a contract, and at exec,
@@ -1029,6 +1052,24 @@ Section UexecRet.
        spost_at X n f W r M' fdv' cw' cs' -∗
        X (bump W r M' π' szv' fdv' cw' g' cs'))%I.
 
+  (* the twenty entries that keep the reading: the row is pure and says the
+     set did not move ([UsysMemOk.usys_ch_ok]). *)
+  Definition uexec_ret_cont_F (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
+      (W : uvis) : iProp Σ :=
+    uexec_ret_cont_gen X n f W
+      (fun (r : mword 64) (cs' : gset gname) => ⌜usys_ch_ok n r (uvis_ch W) cs'⌝%I).
+
+  (* ...AND WAIT'S OWN ARM, on fork's footing: the reap MOVED the reading,
+     so the row is the kernel's answer and not a claim that nothing
+     happened.  Everything else about the arm is the returning arm's --
+     wait writes the exit status into the caller's buffer, so the image,
+     the descriptor view and the receipt are all read exactly as they are
+     at every other returning entry. *)
+  Definition uexec_wait_F (X : uvis -d> iPropO Σ) (n : Z) (f : sfam)
+      (W : uvis) : iProp Σ :=
+    uexec_ret_cont_gen X n f W
+      (fun (r : mword 64) (cs' : gset gname) => uwait_ans r (uvis_ch W) cs').
+
   (* THE ARM WITHOUT THE DEPOSIT -- today's return, read at the fixpoint
      variable.  The trap loop's round is stated over this
      ([UexecApply.uexec_ret_round_slot]): the loop splits the deposit off
@@ -1044,6 +1085,8 @@ Section UexecRet.
        if decide (n = USYS_exit) then emp
        else if decide (n = USYS_fork) then
          (uexec_pay_arm f -∗ uexec_fork_parent_F X W (sfork_pay f))
+       else if decide (n = USYS_wait) then
+         (uexec_pay_arm f -∗ uexec_wait_F X n f W)
        else (uexec_pay_arm f -∗ uexec_ret_cont_F X n f W)
      else (uexec_pay_arm f -∗ X W))%I.
 
@@ -1085,6 +1128,9 @@ Section UexecRet.
           let n := usys_num (uvis_tf W) in
           if decide (n = USYS_exit) then emp
           else if decide (n = USYS_fork) then uexec_fork_F X W f
+          else if decide (n = USYS_wait) then
+            (sbundle_at X n f W ∗
+             (uexec_pay_arm f -∗ uexec_wait_F X n f W))
           else (sbundle_at X n f W ∗
                 (uexec_pay_arm f -∗ uexec_ret_cont_F X n f W))
         else (uexec_pay_arm f -∗ X W)))%I.
@@ -1219,7 +1265,8 @@ Section UexecRet.
   Local Instance uslot_F_contractive : Contractive uslot_F.
   Proof.
     rewrite /uslot_F /uvb_F /ukont_F /ukb_F /uexec_ret_F /uexec_fork_F
-            /uexec_fork_parent_F /ufork_ans /uexec_ret_cont_F.
+            /uexec_fork_parent_F /ufork_ans /uexec_ret_cont_F
+            /uexec_wait_F /uwait_ans /uexec_ret_cont_gen.
     solve_contractive_wide.
   Qed.
 
@@ -1445,6 +1492,25 @@ Section UexecRet.
            ⌜cw' = uvis_cwd W⌝ -∗
            uslot (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
                     fdv' cw' g' ∅)))
+     else if decide (n = USYS_wait) then
+       (* WAIT'S ARM, one row different from the returning arm below: the
+          reap MOVED the caller's children reading, so what pays that row
+          is the kernel's answer ([uwait_ans]) and not a claim that the set
+          stood still. *)
+       (sbundle_at uslot n f W ∗
+        (uexec_pay_arm f -∗
+         ∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
+           (szv' : Z) (fdv' : list fdstate) (cw' : Z) (g' : gname)
+           (cs' : gset gname),
+           ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
+                        M' π' szv'⌝ -∗
+           ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
+           ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
+           ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
+           ⌜usys_gen_ok n (uvis_gen W) g'⌝ -∗
+           uwait_ans r (uvis_ch W) cs' -∗
+           spost_at uslot n f W r M' fdv' cw' cs' -∗
+           uslot (bump W r M' π' szv' fdv' cw' g' cs')))
      else
        (* THE DEPOSIT, beside the arm and AT THE SAME FAMILIES: the
           process's bundle for this number at this key ([UexecSG]), the
@@ -1485,6 +1551,8 @@ Section UexecRet.
      if decide (n = USYS_exit) then emp
      else if decide (n = USYS_fork) then
        (uexec_pay_arm f -∗ uexec_fork_parent_F uslot W (sfork_pay f))
+     else if decide (n = USYS_wait) then
+       (uexec_pay_arm f -∗ uexec_wait_F uslot n f W)
      else (uexec_pay_arm f -∗ uexec_ret_cont_F uslot n f W)).
   Proof.
     intros ->. rewrite /uexec_arm /uexec_arm_F.
@@ -1546,7 +1614,10 @@ Section UexecRet.
         [ iFrame "Hpay";
           iApply (uexec_fork_child_of X W (sfork_pay f) with "Hc")
         | iExact "Hp" ]. }
-    iDestruct "H" as "[Hd Ha]". iFrame "Hpay Hd Ha".
+    (* wait splits like every other returning number: the bundle goes down
+       and the arm -- its own, at [uexec_wait_F] -- stays. *)
+    destruct (decide (usys_num (uvis_tf W) = USYS_wait));
+      iDestruct "H" as "[Hd Ha]"; iFrame "Hpay Hd Ha".
   Qed.
 
   Lemma uexec_ret_F_join (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
@@ -1563,7 +1634,7 @@ Section UexecRet.
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
     { iFrame "Hpay". iSplitL "Ha";
         [ iExact "Ha" | iApply (uexec_fork_child_to X W (sfork_pay f) with "Hd") ]. }
-    iFrame "Hpay Hd Ha".
+    destruct (decide (usys_num (uvis_tf W) = USYS_wait)); iFrame "Hpay Hd Ha".
   Qed.
 
   Lemma uexec_ret_split (sc : mword 64) (W : uvis) :
@@ -1652,7 +1723,14 @@ Section UexecRet.
     { rewrite /uexec_fork_parent_F. iIntros "_".
       iIntros (r fdv' cw' cs' _ _ _) "_". iApply "H".
       cbn [uvis_gen bump]. iExact "Hpay". }
-    rewrite /uexec_ret_cont_F. iIntros "_".
+    (* wait's arm differs from the returning arm in ONE row, and a generic
+       process reads neither: the answer is dropped like the receipt. *)
+    destruct (decide (usys_num (uvis_tf W) = USYS_wait)).
+    { rewrite /uexec_wait_F /uexec_ret_cont_gen. iIntros "_".
+      iIntros (r M' π' szv' fdv' cw' g' cs' _ _ _ _ Hg) "_ _".
+      rewrite (usys_gen_ok_quiet _ _ _ Hg). iApply "H".
+      cbn [uvis_gen bump]. iExact "Hpay". }
+    rewrite /uexec_ret_cont_F /uexec_ret_cont_gen. iIntros "_".
     iIntros (r M' π' szv' fdv' cw' g' cs' _ _ _ _ Hg _) "_".
     rewrite (usys_gen_ok_quiet _ _ _ Hg). iApply "H".
     cbn [uvis_gen bump]. iExact "Hpay".

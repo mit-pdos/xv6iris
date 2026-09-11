@@ -1164,8 +1164,7 @@ Section KexitPark.
                     = mword_of_int (KX + 0x6c))
       by (rewrite HP2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc6c) in "Hpc".
-    iDestruct "Hres" as "[Hpar [Hch Ho]]".
-    iDestruct "Hpar" as (ps) "[Hpar Hghp]".
+    iDestruct "Hres" as (ps gs mc O) "(Hpar & Hch & Ho & Hci)".
     iDestruct (parents_own_length with "Hpar") as "%Hpslen".
     (* THE CHILDREN MOVE, and this is the only place it can happen: the
        authority is <wait_lock>'s and the row is the dying process's own,
@@ -1175,13 +1174,10 @@ Section KexitPark.
        this process's row and into the orphans ([WaitInv.orphans_own]).
        What the park then hands the ZOMBIE block is the row at [∅]. *)
     iApply fupd_wp.
-    iDestruct "Hch" as (mc) "Hch".
+    iDestruct (children_own_lookup with "Hch Hrow") as %Hrowl.
     iMod (children_own_upd mc (pv_chg (us_V U)) pj cs ∅ with "Hch Hrow")
       as "[Hch Hrow]".
-    iDestruct "Ho" as (O) "Ho".
-    iMod (orphans_add O cs with "Ho") as "Ho".
-    iAssert (children_res) with "[Hch]" as "Hch"; [ iExists _; iExact "Hch" | ].
-    iAssert (orphans_res) with "[Ho]" as "Ho"; [ iExists _; iExact "Ho" | ].
+    iMod (orphans_add O pj ip cs with "Ho") as "Ho".
     iModIntro.
     assert (Hacq_s3 : macq !!! Regidx (mword_of_int 19 : mword 5) = pj).
     { rewrite (callee_saved_lookup Hcsa (mword_of_int 19 : mword 5) ltac:(vm_compute; reflexivity)).
@@ -1258,13 +1254,16 @@ Section KexitPark.
     iIntros (Mrp) "[%Hcsr %Hdomr] Hcg Hown Htext2 Hpc Hinit Hpar".
     (* reparent's output table is indexed by the a0 IT saw, which is [p] *)
     iEval (rewrite HP4a0) in "Hpar".
-    (* THE PAYLOAD'S GENERATION SHARES FOLLOW THE CELLS.  Every cell
-       reparent rewrote held this process's address and now holds <init>'s;
-       both are occupied, so each entry rides across where it was
-       ([WaitInv.gen_halves_rp_map]).  This process's OWN entry is not
-       touched -- its cell names its parent, which reparent does not
-       read. *)
-    iDestruct (gen_halves_rp_map pj ip ps (proc_addr_nonzero j Hj) with "Hghp") as "Hghp".
+    (* THE INVARIANT FOLLOWS THE CELLS.  Every cell reparent rewrote held
+       this process's address and now holds <init>'s, so each entry rides
+       across where it was and the two columns of this process -- its own
+       row, emptied above, and the orphans it had itself been given -- are
+       now <init>'s orphans ([WaitInv.op_map]).  This process's OWN entry
+       is untouched: its cell names its parent, which reparent does not
+       read.  NO PREMISE ON [ip]: at a zero address every tie is guarded
+       away. *)
+    iDestruct (children_inv_reparent ps gs mc O pj ip (pv_chg (us_V U)) cs
+                 (proc_addr_nonzero j Hj) Hrowl with "Hci") as "Hci".
     assert (Hpc72 : ret_pc (P4 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x72))
       by (rewrite HP4ra; apply bv_eq; vm_compute; reflexivity).
@@ -1588,8 +1587,11 @@ Section KexitPark.
               (wait_res_at) PC 1%nat eb pj (trap_res b + av)%nat
               ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
               ltac:(rewrite HPCa0; apply addv_sext0) ltac:(lia)
-              with "Hcg Htext Hpc Hwl Hlkw [Hpar Hghp Hch Ho] Hown Hpay2").
-    { iFrame "Hch Ho". iExists _. iFrame "Hpar Hghp". }
+              with "Hcg Htext Hpc Hwl Hlkw [Hpar Hch Ho Hci] Hown Hpay2").
+    { iExists (rp_map pj ip ps), gs,
+              (<[pv_chg (us_V U) := (pj, (∅ : gset gname))]> mc),
+              (op_map pj ip O cs).
+      iFrame "Hpar Hch Ho Hci". }
     iApply wp_next_off_intro.
     iIntros (mrel) "Hcg Hpc %Hcsrel Hown".
     assert (Hpc96 : ret_pc (PC !!! Regidx (mword_of_int 1 : mword 5))
