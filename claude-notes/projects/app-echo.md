@@ -2090,7 +2090,12 @@ R4 OVERFLOW -- RULED BY THE OWNER (2026-09-11): OPTION (i).  THE TOP-LEVEL TRACE
   discipline a dropped byte is never echoed and the user never types the next
   one -- the stored sequence is therefore ALWAYS the trace's input sequence
   minus at most its last byte, and `good_out` (a prefix property) survives a
-  drop; the proof of that is E5's, over the whole-system automaton.  FALLBACK
+  drop; the proof of that is E5's, over the whole-system automaton.  The owner
+  allows EITHER form -- wait for each whole command to finish before the next,
+  or character-by-character -- whichever is easier; the character form is the
+  working choice because its no-drop argument is local (a byte is typed only
+  after the previous one was stored and echoed), while the whole-command form
+  needs the ring to be provably empty at the prompt.  FALLBACK
   (owner): if this does not work out, FIX THE KERNEL -- when the console
   buffer is full, stop taking UART input, so flow control propagates through
   the UART to the input wires (a `kernel-defects.md` item + an upstream
