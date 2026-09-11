@@ -2086,6 +2086,22 @@ The escrow IS keyed at the stored status through the half-cell (WX-EXIT's
 ruling below), so the copied-out word and the escrow's `xs` agree at the
 reaper through `proc_pub`'s half of `p_xstate` against the ZOMBIE block's.
 
+WX-INV RULING (2026-09-11, taken by the lane, accepted): THE ORPHANS ARE A
+SECOND CHILDREN TABLE KEYED BY ADDRESS, `Xv6Cameras.orph_map = gmap (mword 64)
+(gset gname)`, not an `ip`-pinned set.  The `initproc` cell is unshareable when
+`wait_lock` goes up (main's `newlock` precedes userinit's write, and the only
+later share is the discarded one), and an unpinned `∃ ip` cannot be
+re-established by kexit once `O ≠ ∅`.  So `children_inv ps gs m O` names no
+`ip`; the children of an address are its row (only its owner moves it) ∪
+`orph_row O pa` (any lock holder moves it); reparent's `op_map pa ip O S` moves
+the dying row into the key `ip`; the reap removes γ' from BOTH columns, so
+`cs' = cs ∖ {[γ']}` is uniform; (W2) reads `γ' ∈ cs ∨ γ' ∈ orph_row O pj`; (W3)
+is the separate `children_inv_pid` (a □ over `cs` cannot be produced with the
+spatial invariant in hand -- WX-WAIT extracts the persistent summary by set
+induction under the lock).  `gs : list gname` is an explicit column with
+`Some`-lookups; every tie is guarded on a nonzero address so the writers stay
+premise-free.
+
 ORDER: WX-GEN (`brief-wx-gen.md`: the two ghosts, `nextpid_res_at`'s list
 and authority, allocproc/freeproc, the block's halves, kfork's and
 userinit's split; green with `children_inv` still stated-not-carried) →
