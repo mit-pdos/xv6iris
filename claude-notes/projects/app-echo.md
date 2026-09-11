@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV (LANDED) → WX-WAIT (LANDED) → ARM-c (1b) (echo's discharge of `Hinit_boot`) → L7.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV (LANDED) → WX-WAIT (LANDED) → E1 ECHO-PRED → E2 INIT-BOOT (ARM-c 1b) → E3 RECEIPT LEAF → E4 SH-ECHO → E5 L7 (design first).  See "THE REMAINING ARC".
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -2003,6 +2003,87 @@ WX-RES + WX-ROW LANDED (2026-09-10; briefs `brief-wx-res.md`,
 - Traps: `SpecForkretPark`'s binders need `!wchG Σ` (the dormant block reaches
   `proc_ctx`); the adequacy top needs `!wchGpreS Σ` and `Hinit_boot` a `!wchG Σ`
   binder (the era's instance comes out of `boot_shared_alloc`).
+
+#### THE REMAINING ARC TO `xv6_app_adequacy` FOR ECHO — DESIGN (2026-09-11, coordinator, from a read-only survey of the tree)
+
+WHERE THE TREE IS.  Below the application everything is in: the trap route
+carries generations, children sets, fork/exit payloads and wait escrows; the
+input TAG travels from the rx wand through the UART column, consoleintr, the
+console ring and consoleread into `SpecFileread.console_receipt` and out to the
+process's `spost_at` at syscall 5; the output side has the matching LOCATED
+receipt (`SpecConsolewrite.cons_sent_cnt` → `SpecFilewrite.write_cons_arms` →
+`spost_at` at 16) naming the caller's own bytes; init execs sh on a pinned
+bundle from `era0_sh_pins` (`UInitSh`).  Every payload is `fun _ => True`; no
+u-tier leaf hands a program its `spost_at` (`UkRunSys.v:~492` says the quiet
+leaf discards it); nothing consumes the taint; `AppEcho.v` builds no `xv6_app`
+value and its `echo_fs` is the pins ALONE; there is no `/echo` pin; `Happ_init`
+is proved at a shape one bridge short of the theorem's; `Hinit_boot` and `Hphi`
+are open; sh rests on three undischarged facts (`ushf_lexable`,
+`ushd_clw_text_ty`, `ushm_sbrk_never_fails`) and execs on the generic `uxsup`.
+
+THE THREE SEAMS, IN ORDER (each a lane):
+E1 ECHO-PRED (`brief-echo-pred.md`).  `echo_pred γ _ av := mono_nat_lb_own γ 1 ∨
+  ⌜echo_fs_pure av⌝` (the ruled `taint ∨ pins`; `app_pred` receives `app_fixed
+  = γ`, so the taint is nameable); `echo_fs_pure` gains the `/echo` pin (a
+  `FsEchoPin.v` on `FsShPin`'s mold: `ECHO_INO = 4`, `echo_path`, `era0_echo_pins`,
+  its recovery lemma); `Happ_xfer` for pure ∨ persistent; the `Happ_init` bridge
+  at the theorem's literal shape; `echo_sup_of_taint : mono_nat_lb_own γ 1 -∗
+  app_sup_raw (echo_pred γ) r`; the record `app_echo : xv6_app Σ` with every
+  hypothesis but `Hinit_boot`/`Hphi` discharged as LEMMAS and still no theorem
+  (the GAP-premise trap).
+E2 ARM-c (1b) INIT-BOOT (`brief-init-boot.md`, after E1).  echo's `Hinit_boot`:
+  `app_inv fsc_fs -∗ |==> init_boot_bundle ROOTINO fdt0` built by
+  `PinnedExec.pinned_exec_bundle` at `Pin := era0_pins`, hops `[ROOTINO; 7]`,
+  `f := init_elf`, `T := taint`, `Q := fun _ => True` (E5 changes it): the claim
+  law from `echo_pred`; the pins arm answered by `UInitKernel.init_slot_of_kexec`
+  (init's program at the observed image, `uvis_cwd = ROOTINO` from the bundle's
+  statement); the taint arm `□ (∀ W', T -∗ my_pay … -∗ uslot W')` paid by
+  `UexecExecMint.uslot_mint` on `echo_sup_of_taint`.  Mirror `UInitSh`.
+E3 RECEIPT LEAF + SH'S LINE (`brief-receipt-leaf.md`).  A u-tier READ leaf that
+  returns the process's `spost_at` (the `udepw` explicit-disjunct route,
+  UkRun.v:~298) and, from it, `console_receipt`'s per-byte tags; `echo_tag h :=
+  ⌜disc h⌝ ∨ taint`, so sh's line buffer carries `⌜the line is a prefix of
+  echo_line⌝ ∨ taint`; `ushf_lexable` is DISCHARGED from that (disciplined:
+  "echo hello world" lexes; tainted: the taint pays every later obligation --
+  sh's continuation goes generic).  This is where the taint is first CONSUMED.
+  `ushd_clw_text_ty` and `ushm_sbrk_never_fails` are separate gaps (a text-load
+  leaf; a real assumption about sbrk) -- close the first, and state the second
+  as an explicit premise of sh's program lemma until it can be proved.
+E4 SH-ECHO (`brief-sh-echo.md`).  `UShEcho.v` on `UInitSh`'s mold: sh's exec of
+  the parsed command through `pinned_exec_bundle` at `era0_echo_pins`, hops
+  `[ROOTINO; ECHO_INO]`, `T := taint`; the disciplined branch knows the command
+  is "echo hello world" (E3), the tainted branch answers with the generic slot
+  from the taint; `uxsup` leaves `UkShMain.wp_kshm_child`/`ushf_rest_of_body`.
+  echo's entry stays `UEchoKernel.echo_uexec_slot`, reached now through the
+  pinned route rather than `UexecCond.cond_entry_slot`'s generic gate.
+E5 L7 — THE OUTPUT SIDE (design session with the owner BEFORE any brief).  Open
+  questions: (a) THE IDENTIFICATION GATE -- `Htx`/`Hrx` quantify over an
+  arbitrary `γ : uart_names`, so no ledger fact can be about the era's
+  accepted-byte trace (`SystemUartAccepted.v:29-43`); the located write receipt
+  (`uart_sent_from fsc_uart tr0 bs`) cannot become a statement about
+  `ObsUartOut` until the ledger's wands are stated at the era's names (or the
+  receipt is transported to the ledger's `γ`).  (b) `good_out`/`echo_out`/
+  `pristine` do not exist; the expected stream per cycle is init's
+  "init: starting sh
+", sh's "$ ", echo's "hello world
+", "$ " …; `app_phi`
+  for echo is unwritten and `Hphi` needs the durable claim's taint arm plus
+  `echo_R_untainted`.  (c) THE CONSOLE-READER TOKEN: the WAIT-EXIT payload was
+  built to carry the console-input ownership; the survey finds no existing
+  resource can serve (`uart_rx_tok` is the PLIC's; `UserFd.ufd` is copied by
+  fork), so it is a NEW application-owned exclusive token that `Hinit_boot`'s
+  bundle delivers to init, init lends as `Q xs := reader ∨ T` at its fork,
+  sh pays back at exit and kill, init recovers at `wp_kinit_wait`; giving init
+  and sh a real `ukn_pay` removes the `ukn_triv` class instance from every
+  program lemma.  Whether the theorem NEEDS the token (the tag route may
+  already give sh its line; the token is what makes "one reader" a resource
+  rather than a consequence of the process tree) is the first thing to settle
+  with the owner.
+STALE NOTES the survey found (fix on the way past): `design/user-wp-slot.md`
+§0′ items 2-4 (fork's row, the Uk engine, and item 4's blocker are all landed
+-- `cons_sent_cnt` names the user source), its `UkEchoKernel` name (the file is
+`UEchoKernel.v`); `design/applications.md` has no §6; `SpecKkill.v:~40`'s
+"no resource ties a pid to a slot".
 
 #### WX-GEN / WX-INV / WX-WAIT — DESIGN (2026-09-10, coordinator; supersedes the lane list's WX-INV/WX-WAIT/WX-PID entries)
 

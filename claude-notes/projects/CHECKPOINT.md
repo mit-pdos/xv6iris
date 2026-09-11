@@ -21,16 +21,14 @@ patch: `projects/wx-briefs/`.
   Tree CLEAN.  The WAIT-EXIT design of record is now fully landed (WX-KEY, WX-FORK,
   WX-RES+ROW, WX-EXIT, WX-GEN, WX-INV, WX-WAIT); every payload is `fun _ => True`
   until L7 puts the console-input resource in.
-- IN PROGRESS (2026-09-11): a read-only SURVEY of the application layer (App.v's
-  six hypothesis families and their generic/echo dischargers; AppEcho.v; the
-  programs' payloads; the UART tx side and `good_out`/`Hphi`; the console-input
-  resource for the payload; the gap list) -- the design of the remaining arc
-  (L6 finish / ARM-c (1b) / L7 / the echo instance) is written from it into
-  `app-echo.md` before any brief.
-- NEXT: ARM-c (1b) (echo discharges `Hinit_boot`; needs the taint -- see
-  `app-echo.md` "ARM-c (1a) LANDED" and the L2 plan) → L7.  Re-read the plan and
-  write the brief before launching; the WX lanes changed the slot/deposit shapes
-  (`uexec_pay_dep`, `my_pay`, `sexit_pay`) that (1b)'s discharge builds on.
+- THE REMAINING ARC is designed from a read-only survey: `app-echo.md` "THE
+  REMAINING ARC TO xv6_app_adequacy FOR ECHO — DESIGN" -- E1 ECHO-PRED
+  (`wx-briefs/brief-echo-pred.md`, LAUNCHED 2026-09-11, phase 1 then
+  stop-and-report) → E2 INIT-BOOT (ARM-c 1b) → E3 RECEIPT LEAF + sh's line →
+  E4 SH-ECHO → E5 L7 (a design session with the owner first: the UART
+  identification gate, `good_out`/`Hphi`, whether the console-reader token is
+  needed).  Briefs for E2-E4 are written at each landing from the previous
+  as-landed note.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run
