@@ -2207,6 +2207,24 @@ half goes inert under the taint, which is the lease's "reclaim".  The general
 two-disjunct lease invariant of (5) is held in reserve for a token that has NO
 persistent stand-in.
 
+CONS-CURSOR RULING (7) (2026-09-11): THE WINDOW IS PROMISED EXACTLY WHERE THE
+POSITION IS.  consoleread's copy loop releases `cons.lock` to sleep, and a
+tainted reader (paying the persistent credential) can consume bytes in
+between; the kernel cannot exclude it, so a contiguous window cannot be
+promised unconditionally.  The post is `cons_stored_lb cn sl -∗ (⌜cons_window
+sl cur d bs hs⌝ ∗ ⌜cons_chain sl⌝ ∗ ⌜d ≤ dc ≤ d+1⌝ ∨ cons_dirty_cred Wd) -∗
+cons_out cn Wd ord cur dc -∗ …`; the per-byte tags and `cons_tagged` stay
+unconditional.  A token read moves the cursor at EVERY pop (a credential read
+pays the marker at every pop), so the ring's clause holds at each release.
+Also landed: the boot mint (`cons_ghosts_boot`/`cons_ghosts_alloc`; the
+`fsc_cons = cnm` tie in `fs_boot_supply`), main's console mint (`newlock` at
+`cons_res_at cn`, `cons_cred_inv_alloc` at `app_sup`, `is_conslock_intro`),
+`SpecFileread.console_ready_app := ∃ γ, console_inv fsc_cons app_sup γ`
+replacing the anonymous `console_ready` in the park/env/userinit surfaces (the
+pin lives at the tier that names both the era's console and the application),
+`fileread_dev_env`'s pure clause strengthened to `mj = CONSOLE` beside the
+consoleread address, `cons_acc_open`.
+
 #### THE REMAINING ARC TO `xv6_app_adequacy` FOR ECHO — DESIGN (2026-09-11, coordinator, from a read-only survey of the tree)
 
 WHERE THE TREE IS.  Below the application everything is in: the trap route
