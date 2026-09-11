@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV (LANDED) → WX-WAIT → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV (LANDED) → WX-WAIT (LANDED) → ARM-c (1b) → L7 → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -2139,6 +2139,35 @@ userinit's split; green with `children_inv` still stated-not-carried) →
 WX-INV (`brief-wx-inv.md`: carry it; kwait's row) → WX-WAIT
 (`brief-wx-wait.md`: the post, the route, the leaf, init) → ARM-c (1b) → L7.
 WX-PID is absorbed: pid uniqueness IS `pid_reg`.
+
+WX-WAIT LANDED (2026-09-11; brief `brief-wx-wait.md`; commit `f3f77bb51`, 15 files).
+WAIT RETURNS THE REAPED CHILD'S ESCROW.  `UserChildren.wait_ans rv xs cs cs'` is
+the ONE answer kwait, sys_wait, the dispatcher, the round and the leaf relay:
+`⌜rv = -1 ∧ cs' = cs⌝`, or `∃ γ', ⌜cs' = cs ∖ {[γ']}⌝ ∗ exit_tok γ' rv xs ∗ gen_uniq
+cs rv γ'`.  `UexecRet.uwait_ans r cs cs' := ∃ rv xs, ⌜r = sign_extend' 64 rv⌝ ∗
+wait_ans rv xs cs cs'` puts it at the a0 word; `sysc_wait_out`/`ut_wait_out`/
+`uexec_wait_F` carry it unopened.  THE -1 ARM SAYS ONLY THAT NOTHING MOVED (see
+"WX-WAIT RULINGS"); `children_inv_empty` has no consumer.  PID UNIQUENESS HANDS
+OUT EACH MEMBER'S PID: `ChildTok.gen_uniq cs pid γ' := [∗ set] γ ∈ cs, ∃ pidγ,
+gen_pid γ pidγ ∗ ⌜pidγ = pid → γ = γ'⌝`, `gen_uniq_tok` pairs it with `child_tok`;
+`WaitInv.children_inv_pid_all` extracts it under the lock by set induction over
+the read-only accessor `children_inv_pid_one`, BEFORE `children_inv_reap`.  THE
+ESCROW IS KEYED AT THE COPIED-OUT WORD: kwait's window is `umem_wr … d (nth_byte
+xw)` at ONE status word (the `bs` binder is gone), and `kw_reap` -- which takes
+`proc_pub` OPENED -- agrees both `p_xstate` halves and both `p_pid` shares, so the
+escrow is at `xstate_val xw` and at the pid a0 carries.  INIT REDEEMS
+(`UkInitMain.v`): its fork stub is the indexed leaf at `Q := fun _ => True`; the
+wait head @0x44 carries `uch γch cs ∗ child_tok γsh pidsh Q ∗ ⌜γsh ∈ cs⌝ ∗ ⌜s1 =
+sign_extend' 64 pidsh⌝`; `ret = s1` gives `γ' = γsh` (`gen_uniq_tok`) and
+`gen_pay_timeless` the payload (L7's resource arrives here); an orphan is refuted
+by `exit_tok_tok_ne`, keeping the shell in the set; the 0x32 head still takes
+`uch_any`, so `UInitKernel` and the adequacy top did not move.  `UkInit.wp_kinit_
+wait` is INDEXED.  GONE: `sysc_wait_out_intro` (it fabricated a reap at `fresh cs`),
+replaced by `sysc_wait_out_of`.  KWAIT/SYSWAIT/SYSCALL Parameters retyped in place.
+FOLLOW-UP outside the lane: `SpecKkill.v:~40` says "no resource in the tree ties
+a pid to a slot" -- false since WX-GEN (`pid_reg` + `gen_slot`); what is true is
+that nothing kkill's caller holds determines the match.  Narrow it when that
+file is next touched (its cone is large).
 
 WX-INV LANDED (2026-09-11; brief `brief-wx-inv.md`; commit `5b228fcad` rebased over
 the XV6_REV bump `92e0b0415`; 25 files).  THE WAIT-LOCK INVARIANT IS CARRIED:

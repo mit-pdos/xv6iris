@@ -14,19 +14,17 @@ patch: `projects/wx-briefs/`.
   nightly dead-import sweep `086c81b9f`).
 
 ## State of main (2026-09-10, latest)
-- Landed 2026-09-10/11, newest first: WX-INV `5b228fcad`, WX-GEN `d4a70aa12`, WX-EXIT
+- Landed 2026-09-10/11, newest first: WX-WAIT `f3f77bb51`, WX-INV `5b228fcad`, WX-GEN `d4a70aa12`, WX-EXIT
   `3f10fc4fa`, WX-RES + WX-ROW `96de38269`, WX-FORK, WX-KEY.  Notes in `app-echo.md` ("… LANDED").
-- WX-INV LANDED: `5b228fcad` (25 files; gated pre-rebase on VM build `wxinv24`,
-  audit = the thirteen, lemma_diff clean), then REBASED over the XV6_REV bump
-  `92e0b0415` (panic loses its printk calls; the image relayouts; `panic_env` is
-  `emp`).  The post-rebase full VM rebuild (`run-on-gcp --proofs -k`) + audit is
-  the gate before the push; the relayout residue check (`RELAYOUT_OLD_REV=92e0b0415^
-  tools/relayout_batch.py --residue --allow-shape=CodePanic.v`) shows nothing
-  stale in the lane's files.  Note: `app-echo.md` "WX-INV LANDED".
-- Post-rebase gate PASSED (full VM rebuild 1428 files EXIT=0, audit = the thirteen);
-  pushed.  WX-WAIT LAUNCHED (2026-09-11; fresh Opus agent on
-  `wx-briefs/brief-wx-wait.md`, phase 1 then stop-and-report).  Then ARM-c (1b), L7.  If found dirty with no agent alive: back up, build once, read the
-  red list, relaunch on a continuation brief.
+- WX-WAIT LANDED: `f3f77bb51` (15 files; VM build `wxwait4` EXIT=0, audit = the
+  thirteen, lemma_diff = one justified GONE).  Note: `app-echo.md` "WX-WAIT LANDED".
+  Tree CLEAN.  The WAIT-EXIT design of record is now fully landed (WX-KEY, WX-FORK,
+  WX-RES+ROW, WX-EXIT, WX-GEN, WX-INV, WX-WAIT); every payload is `fun _ => True`
+  until L7 puts the console-input resource in.
+- NEXT: ARM-c (1b) (echo discharges `Hinit_boot`; needs the taint -- see
+  `app-echo.md` "ARM-c (1a) LANDED" and the L2 plan) → L7.  Re-read the plan and
+  write the brief before launching; the WX lanes changed the slot/deposit shapes
+  (`uexec_pay_dep`, `my_pay`, `sexit_pay`) that (1b)'s discharge builds on.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run
