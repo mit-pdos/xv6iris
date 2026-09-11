@@ -166,6 +166,32 @@ Global Arguments ukn_pay {_} _.
 Class ukn_triv {Σ : gFunctors} (N : uk_names Σ) : Prop :=
   ukn_triv_eq : ukn_pay N = (fun _ => True)%I.
 
+(* ...AND THE WEAKER FACT A PROGRAM WITH A REAL PAYLOAD STILL HAS
+   (app-echo.md, "SH-LINE RULING"): the payload DOES NOT READ THE STATUS.
+
+   The only thing a program does with its own payload between its entry and
+   its exit is pay [UkRunSys.wp_uk_ecall_exit]'s premise
+   [ukn_pay N (-1) -∗ ukn_pay N xs ∧ ukn_pay N (-1)], and that premise is
+   provable from ONE resource exactly when the two sides are the SAME
+   proposition.  A shell that is lent the console's reader token owes its
+   parent that token whether it exits or is killed
+   ([UserConsole.ucons_pay] is constant by [ucons_pay_const]), so this is
+   the class its files carry where they used to carry [ukn_triv] -- and
+   nothing else about the payload leaks into a program statement.
+
+   A CLASS, for [ukn_triv]'s reasons, and with no parameter: a parameter
+   would have to be guessed by instance resolution at every call site. *)
+Class ukn_const {Σ : gFunctors} (N : uk_names Σ) : Prop :=
+  ukn_const_eq : forall x y : Z, ukn_pay N x = ukn_pay N y.
+
+(* the trivial payload is a constant one.  NOT an [Instance]: a program
+   file carries exactly one of the two as a section hypothesis, and a
+   resolution path from [ukn_triv] would make both available in the files
+   that carry [ukn_triv] and neither statement say which it meant. *)
+Lemma ukn_const_of_triv {Σ : gFunctors} (N : uk_names Σ) :
+  ukn_triv N -> ukn_const N.
+Proof. intros Ht x y. by rewrite Ht. Qed.
+
 Section UkRun.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.

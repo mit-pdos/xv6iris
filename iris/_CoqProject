@@ -1066,6 +1066,12 @@ ProofUartwrite.v
 LinkUartwrite.v
 W32Arith.v
 ConsoleInv.v
+# UserConsole = the PROGRAM side of the console reader's cursor: the
+# position pair [upos]/[upos_a] (UserChildren.v's mold), the reader token
+# and the stored-sequence bound spelled at the narrow ghost class a user
+# program binds, and [ucons_pay] -- the exit payload a shell that reads
+# the console owes its parent.  See its header.
+UserConsole.v
 CodeConsolewrite.v
 CodeConsoleread.v
 CodeConsoleintr.v
@@ -1994,3 +2000,11 @@ UkShMain.v
 # cannot supply about a line the user typed -- that second one is stage 5's
 # [ush_simple] scope and not this file's.
 UkShFork.v
+# UConsLine = SH-LINE'S STATEMENTS: the shapes the lane's phase 2 rewires
+# to, typechecked before the sweep -- the ledger that knows fd 0 is the
+# console, sh's read leaf with the receipt KEPT, the [gets] loop's line
+# invariant, the two pure facts that discharge [UkShFork.ushf_lexable],
+# and init's LINEAR exec supply for the child it lends the console to.
+# Its header records the two things the tree does not have yet: a payload
+# that crosses exec, and a pinned open that says fd 0 is the console.
+UConsLine.v

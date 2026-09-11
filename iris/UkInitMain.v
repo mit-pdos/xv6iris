@@ -744,9 +744,14 @@ Section UkInitMain.
     iIntros (h1) "Hrun".
     set (mf1 := <[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m).
     (* ---- 0x36c  ecall -- the leaf that returns twice ---- *)
-    (* init holds no descriptor handles at this point -- its console fds are
-       opened AFTER the fork, in the child's exec'd image -- so the handle
-       set fork carries across is empty and both extra premises are [emp]. *)
+    (* init holds no descriptor handles at this point -- NOT because its
+       console descriptors are opened later (they are not: the open is at
+       0x16, the two dups at 0x20 and 0x26, all of them BEFORE this fork at
+       0x38) but because it DROPS them: [wp_kinit_open] discards the handle
+       the tracked open leaf mints and [wp_kinit_dup] goes through
+       [UkRunSys.wp_uk_ecall_dup_untracked], which mints none.  So the
+       handle set fork carries across is empty and both extra premises are
+       [emp]. *)
     iApply (wp_uk_ecall_fork N h1 mf1 (mword_of_int 0x36c) avail szv
               l ∅ FsImg.ROOTINO Sc (fun _ => True)%I
               (fun gt gd _ =>
