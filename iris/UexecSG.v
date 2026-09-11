@@ -176,6 +176,8 @@ Require Import ProcGeom.     (* [tf_arg_idx] -- the argument words the key
 Require Import FdSlots.
 Require Import UsysMemOk.    (* [USYS_exec] -- the one number whose bundle
                                 carries a slot wand *)
+Require Import ChildTok.     (* [my_pay]: the credential the generic family
+                                takes, and the class's own index *)
 Require Import UexecSlot.    (* [uvis] and its projections: the key *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -215,7 +217,22 @@ Proof.
     | exact Hg | exact Hch ].
 Qed.
 
-Class uexecSG (Σ : gFunctors) := {
+(* THE CLASS IS INDEXED BY [ChildTok.ctokG], and by nothing else new.  The
+   index is a NAMED implicit ([{sg_ctok : ctokG Σ}]) and not a generalizable
+   binder: inside a [Context] a backtick-generalizable class argument is
+   GENERALIZED INTO A FRESH VARIABLE rather than resolved, and a file whose
+   [ctokG] comes off [Xv6G]'s field would then hold two of them -- one in
+   the class's index and one in every [my_pay] it writes -- which print
+   identically and do not match.  Named and non-generalizable, the index is
+   filled by instance resolution at every binding site.  The
+   generic-family law below hands a slot the ONE credential a slot needs of
+   the kernel -- the process's own knowledge of what its exit owes
+   ([ChildTok.my_pay] at the key's generation, trivial for a generic
+   process) -- because exit's deposit is a PAYMENT ([UexecRet.
+   uexec_pay_dep]) and a family that is safe at every key has to be able
+   to make it.  Every file that binds this class already has a [ctokG] in
+   scope (its own, or [Xv6G]'s field), so the index costs no binder. *)
+Class uexecSG (Σ : gFunctors) {sg_ctok : ctokG Σ} := {
   (* THE PROCESS'S CHOICE OF FAMILIES: its receipt, refund and cursor
      families for every syscall at once, as one value (the header says why
      it is not indexed by the number).  The arm binds it existentially and
@@ -249,6 +266,46 @@ Class uexecSG (Σ : gFunctors) := {
      [sfam_pt] with the one field that fork does read. *)
   sfam_pay : (Z -> iProp Σ) -> sfam;
   sfork_pay_pay : forall Q : Z -> iProp Σ, sfork_pay (sfam_pay Q) = Q;
+  (* ...AND THE POINT'S PAYLOAD IS THE TRIVIAL ONE.  The point is what a
+     party that deposits nothing names ([sfam_pt]), and a process forked by
+     one owes its parent nothing -- which is what lets the GENERIC family
+     answer fork's child slot at the credential it is indexed by
+     ([UexecRet.uexec_dep_F_of_supply]). *)
+  sfork_pay_pt : sfork_pay sfam_pt = (fun _ => True)%I;
+
+  (* THE PROCESS'S OWN PAYLOAD, on [sfork_pay]'s footing and for its
+     reason.  What a process's exit owes its parent is chosen by the
+     DEPOSIT ([UexecRet.uexec_pay_dep], which pays it) and read back by the
+     ARM ([uexec_pay_arm], which takes it at every resume), and the two are
+     split at the trap and carried past each other through the whole kernel
+     excursion -- so the payload must travel with something the route
+     already carries, and [f] is exactly that thing.  An [∃ Q] on each side
+     does not split: the two halves would bind two unrelated payloads, and
+     what came back would be "some payload of my generation", which a
+     process can match to its own only through [ChildTok.gen_agree]'s
+     later.
+
+     WHAT IT MEANS: [sexit_pay f xs] is what THIS process's exit at status
+     [xs] owes ([ChildTok]'s [Q] at its own generation).  [sfork_pay f] is
+     the same thing one generation down. *)
+  sexit_pay : sfam -> Z -> iProp Σ;
+  (* ...and the guarantee that the process may CHOOSE it without giving up
+     the families its bundles are at: [sfam_at Q f] is [f] re-keyed at the
+     payload [Q], every other field passing through.  A leaf holds its
+     bundles at whatever [f] its supplier minted and its payload at
+     [UkRun.ukn_pay] of its own record, and this is what puts the two in
+     one value. *)
+  sfam_at : (Z -> iProp Σ) -> sfam -> sfam;
+  sexit_pay_at : forall (Q : Z -> iProp Σ) (f : sfam),
+    sexit_pay (sfam_at Q f) = Q;
+  sfork_pay_at : forall (Q : Z -> iProp Σ) (f : sfam),
+    sfork_pay (sfam_at Q f) = sfork_pay f;
+  (* ...AND THE POINT'S PAYLOAD IS THE TRIVIAL ONE, [sfork_pay_pt]'s twin:
+     the point is what a party that deposits nothing names, and a GENERIC
+     process owes its parent nothing -- which is what lets the generic
+     family pay the deposit's payment row out of the one credential it is
+     indexed by ([UexecRet.uexec_dep_F_of_supply]). *)
+  sexit_pay_pt : sexit_pay sfam_pt = (fun _ => True)%I;
 
   (* what the process deposits at an ecall of number [n] from key [W], at
      ITS OWN families [f] -- [emp] at every number without a contract *)
@@ -289,6 +346,22 @@ Class uexecSG (Σ : gFunctors) := {
     skey_eq W W' ->
     spost_at X n f W r M' fdv' cw' cs' ⊣⊢ spost_at X n f W' r M' fdv' cw' cs';
 
+  (* ...and the two bundle rows pass through the payload re-keying: a
+     family re-keyed at a payload deposits and pays back exactly what it
+     did before, which is what lets a leaf take its supplier's [f] and put
+     its own payload in it ([sfam_at]). *)
+  sbundle_at_at : forall (X : uvis -d> iPropO Σ) (n : Z) (Q : Z -> iProp Σ)
+      (f : sfam) (W : uvis),
+    sbundle_at X n (sfam_at Q f) W = sbundle_at X n f W;
+  (* [spost_at_at] stops at the four arguments the re-keying touches and
+     leaves the answer's five off: the post stands under the arm's own
+     binders ([r], [M'], [fdv'], [cw'], [cs']), so a fully applied left-hand
+     side is not a subterm any leaf can rewrite there, and the partial
+     application -- closed under those binders -- is. *)
+  spost_at_at : forall (X : uvis -d> iPropO Σ) (n : Z) (Q : Z -> iProp Σ)
+      (f : sfam) (W : uvis),
+    spost_at X n (sfam_at Q f) W = spost_at X n f W;
+
   (* the bundles are covariant in the slot family: the only place it occurs
      is exec's wand CONCLUSION *)
   sbundle_at_mono : forall (X Y : uvis -d> iPropO Σ) (n : Z) (f : sfam)
@@ -309,7 +382,9 @@ Class uexecSG (Σ : gFunctors) := {
     n <> USYS_exec -> ⊢ □ ssupply ==∗ ∃ f : sfam, sbundle_at X n f W;
   (* ...and the half the generic inhabitants use *)
   sbundle_of_supply : forall (X : uvis -d> iPropO Σ) (n : Z) (W : uvis),
-    ⊢ □ ssupply -∗ □ (∀ W' : uvis, X W') ==∗ ∃ f : sfam, sbundle_at X n f W;
+    ⊢ my_pay (uvis_gen W) (fun _ => True)%I -∗ □ ssupply -∗
+      □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => True)%I -∗ X W') ==∗
+      ∃ f : sfam, sbundle_at X n f W;
 }.
 
 Global Existing Instance sbundle_at_ne.
@@ -345,7 +420,11 @@ Ltac solve_contractive_wide :=
 (* [sbundle_at] at its own [f] and takes [spost_at] back at that [f].     *)
 (* ===================================================================== *)
 Section SBundle.
-  Context `{SG : uexecSG Σ}.
+  Context {Σ : gFunctors}.
+  (* [ChildTok.ctokG] BEFORE the class, which is indexed by it: see the
+     class's own note. *)
+  Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
 
   Definition sbundle (X : uvis -d> iPropO Σ) (n : Z) (W : uvis) : iProp Σ :=
     (∃ f : sfam, sbundle_at X n f W)%I.

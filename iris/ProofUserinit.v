@@ -101,6 +101,7 @@ Require Import DirentEnc PathElems.
 Require Import ProcGeom.
 Require Import ProcDefs.
 Require Import FileInvDefs.
+Require Import ChildTok.  (* [gen_split] -- the first process's incarnation *)
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import ProcAvail.
@@ -212,7 +213,7 @@ Require Import UserFd.   (* [ufdG] -- the program's descriptor-table class,
 Section PstateRunnableHelper.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
-  (* NO [Context `{SG : uexecSG Σ}]: this file sits ABOVE
+  (* NO [Context {SG : uexecSG Σ}]: this file sits ABOVE
      [UexecExecInst], so the deposit class it speaks is that file's
      INSTANCE, and so is the one the specs it inhabits were stated at.  A
      section variable here would be a SECOND class of the same type, and the
@@ -435,10 +436,22 @@ Section ProofUserinit.
         rewrite avail_sub_Some in Hz0. unfold avail_zero in Hz0.
         exfalso. lia. }
     iDestruct "Hgot" as (j γl ch pid U root tfp ks rest nc)
-      "(%Hfacts & Hheld & Hhart & Hpriv & Hgen & Hfrag & Hrow & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
+      "(%Hfacts & Hheld & Hhart & Hpriv & Hgen & Hfrag & Hrow & Hxb & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
         & Hctx & Hcg & Hcpu & Hpay & Hkenv & Hpav)".
     destruct U as [V M].
     destruct Hfacts as (Hrv & Hj & Hgl & _ & _ & _ & Hcwd0 & Hrest & Hnc).
+    (* THE FIRST PROCESS'S GENERATION, CUT.  allocproc minted it whole at
+       the TRIVIAL payload so that a forking parent could still choose one
+       ([ChildTok.gen_set]); <init> has no parent, so nothing re-chooses it
+       and the split happens here, at the payload it was minted at.  The
+       PARENT'S QUARTER IS DROPPED -- there is no parent to hold it, and
+       nothing will ever redeem <init>'s exit -- while the kernel's quarter
+       and the persistent [my_pay] ride the park's boot rows
+       ([ParkCap.park_child]) to forkret, which puts the first back into
+       the block and hands the second to kexec("/init"). *)
+    iApply fupd_wp.
+    iMod (gen_split with "Hgen") as "(_ & Hkq & #Hmp)".
+    iModIntro.
     (* [Hkfree] is KEPT: the paid park is anchored on the child's free
        kernel stack ([ProcDefs.kstack_free_at] spells it at [ks] below). *)
     iDestruct "Hks" as "#Hks".
@@ -810,7 +823,7 @@ Section ProofUserinit.
             (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M) fdt0
             ∅ Hwf Hrest
             with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hrow Hbundle
-                  [Hks Hctx Hpriv Hfd Hirs]")
+                  [Hks Hctx Hpriv Hkq Hxb Hfd Hirs]")
       as "[Hrun Hpctx]".
     (* built row by row, not framed: the mode row is an [if] the frame
        cannot see through, and its boot arm carries [first_boot_persist],
@@ -818,9 +831,15 @@ Section ProofUserinit.
     { rewrite /park_child.
       iSplitR; [iExact "Hks"|].
       iSplitL "Hctx"; [iExact "Hctx"|].
-      iSplitL "Hpriv"; [iExact "Hpriv"|].
-      iSplitL "Hfd"; [iExact "Hfd"|].
-      iExact "Hirs". }
+      iSplitL "Hpriv Hkq Hxb"; [| iSplitL "Hfd"; [iExact "Hfd" | iExact "Hirs"]].
+      (* the three block rows the boot arm carries, and the incarnation's
+         pair beside them *)
+      iDestruct "Hpriv" as "(Hpnc & Hcref & Hfb)".
+      iSplitL "Hpnc"; [iExact "Hpnc"|].
+      iSplitL "Hcref"; [iExact "Hcref"|].
+      iSplitL "Hfb"; [iExact "Hfb"|].
+      iSplitL "Hkq"; [iExact "Hkq"|].
+      iSplitR; [iExact "Hmp" | iExact "Hxb"]. }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")
       as "Hpwhole".

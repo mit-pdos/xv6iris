@@ -129,7 +129,7 @@ Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 
 Section PstateUsedHelper.
   Context `{!riscvGS Σ}.
-  (* NO [Context `{SG : uexecSG Σ}]: this file sits ABOVE
+  (* NO [Context {SG : uexecSG Σ}]: this file sits ABOVE
      [UexecExecInst], so the deposit class it speaks is that file's
      INSTANCE, and so is the one the specs it inhabits were stated at.  A
      section variable here would be a SECOND class of the same type, and the
@@ -497,7 +497,7 @@ Section ProofKforkB5.
     (* -------------------------------------------------------------- *)
     (* +0x0d4 sd s5,56(s4) : np->parent = p  -- regime OFF (wait_lock held) *)
     (* -------------------------------------------------------------- *)
-    iDestruct "Hwaitres" as "[Hpo Hch]".
+    iDestruct "Hwaitres" as "[Hpo [Hch Ho]]".
     iDestruct "Hpo" as (ps) "Hpo".
     iDestruct (WaitInv.parents_own_length with "Hpo") as %Hpolen.
     destruct (lookup_lt_is_Some_2 ps j ltac:(rewrite Hpolen; exact Hj)) as [vold Hvold].
@@ -527,8 +527,8 @@ Section ProofKforkB5.
     iModIntro.
     iAssert (WaitInv.children_res) with "[Hch]" as "Hch";
       [ iExists _; iExact "Hch" | ].
-    iAssert (WaitInv.wait_res) with "[Hpo Hch]" as "Hwaitres".
-    { iFrame "Hch". iExists (<[j := pme]> ps). iExact "Hpo". }
+    iAssert (WaitInv.wait_res) with "[Hpo Hch Ho]" as "Hwaitres".
+    { iFrame "Hch Ho". iExists (<[j := pme]> ps). iExact "Hpo". }
     assert (Hpp_d8 : add_vec_int (mword_of_int (KF + 0xd4) : mword 64) 4 = mword_of_int (KF + 0xd8))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_d8) in "Hpc".

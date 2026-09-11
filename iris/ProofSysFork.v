@@ -93,7 +93,7 @@ Module SysForkProof (Kfork : KFORK) : SYSFORK.
 Section ProofSysFork.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
             !irefslotG Σ, !pavG Σ, !wchG Σ}.
-  (* NO [Context `{SG : uexecSG Σ}]: this file sits ABOVE
+  (* NO [Context {SG : uexecSG Σ}]: this file sits ABOVE
      [UexecExecInst], so the deposit class it speaks is that file's
      INSTANCE, and so is the one the specs it inhabits were stated at.  A
      section variable here would be a SECOND class of the same type, and the

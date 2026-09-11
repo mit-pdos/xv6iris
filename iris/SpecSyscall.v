@@ -416,6 +416,48 @@ Section SyscExec.
          my_pay g' (sfork_pay f) -∗
          uslot (uvis_of (kfork_child U) sts g' ∅))%I.
 
+  (* THE PAYMENT, the one deposit that is neither a bundle nor a slot: the
+     process's own knowledge of what its exit owes its parent
+     ([ChildTok.my_pay]) and that payload PAID.  The exit arm hands it to
+     [SpecSysExit], which hands it to kexit, which parks it as the ZOMBIE
+     ESCROW ([ChildTok.exit_tok]) together with the quarter the private
+     block carries; every other arm hands it straight back out
+     ([sysc_pay_out]) except the one that finds the process killed, which
+     spends it on [kexit(-1)].
+     UNGATED, at every number: the dispatcher is entered at +0xca's far
+     side, but the tail's killed check is not, and a process torn down
+     there owes the payload at -1 whatever it called.  TWO-ARMED ONLY AT
+     EXIT ([UexecRet.upay_at]'s own shape).
+     AT THE BLOCK'S OWN GENERATION, which is where the block's quarter is
+     keyed and therefore what kexit's contract asks for.
+     AT THE DEPOSIT'S OWN FAMILIES, for [sysc_fork_in]'s reason: the
+     payload is a field of them, so what goes down and what comes back are
+     at ONE predicate. *)
+  Definition sysc_pay_in (f : sfam) (U : ustate) : iProp Σ :=
+    upay_at (pv_gen (us_V U)) uecall_scause (pv_tf (us_V U)) f.
+
+  (* ...AND WHAT COMES BACK: the payload at the kill status, for the arm
+     that resumes the process. *)
+  Definition sysc_pay_out (f : sfam) : iProp Σ :=
+    uexec_pay_arm f.
+
+  (* THE ONE MOVE A RETURNING ARM MAKES WITH IT: the row is two-armed only
+     at exit, so at every other number what comes out is the payload at the
+     kill status -- which is exactly what the arm hands back.  [sysc_num]
+     and [UsysMemOk.usys_num] are one reading of one word, so the arm's own
+     table index is what discharges the guard. *)
+  Lemma sysc_pay_in_ret (f : sfam) (U : ustate) :
+    sysc_num (us_V U) <> UsysMemOk.USYS_exit ->
+    sysc_pay_in f U -∗ sysc_pay_out f.
+  Proof.
+    intros Hne. rewrite /sysc_pay_in /sysc_pay_out /upay_at /uexec_pay_arm.
+    iIntros "[_ H]".
+    destruct (decide (uecall_scause = uecall_scause)) as [_ | Hc];
+      [ | exfalso; exact (Hc eq_refl) ].
+    destruct (decide (usys_num (pv_tf (us_V U)) = UsysMemOk.USYS_exit))
+      as [He | _]; [ exfalso; exact (Hne He) | iExact "H" ].
+  Qed.
+
   Lemma sysc_fork_in_ne (f : sfam) (U : ustate) (sts : list fdstate) :
     sysc_num (us_V U) <> UsysMemOk.USYS_fork -> ⊢ sysc_fork_in f U sts.
   Proof.
@@ -610,6 +652,9 @@ Definition wp_syscall_sconf_body
   sysc_sys_in U sts gn cs f -∗
   (* ...and fork's, which is a SLOT and not a bundle -- see [sysc_fork_in] *)
   sysc_fork_in f U sts -∗
+  (* ...and the PAYMENT, which is neither and is owed at every number --
+     see [sysc_pay_in] *)
+  sysc_pay_in f U -∗
   (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
      TABLE ENTRY NOT RETURN WITHOUT THE CONTRACT SAYING WHICH ONE.
 
@@ -748,6 +793,13 @@ Definition wp_syscall_sconf_body
          the SLOT thereafter.  So the row below is stated at the ENTRY
          record and this equation is what lets the caller re-key it. *)
       ⌜ pv_chg (us_V U') = pv_chg (us_V U) ⌝ -∗
+      (* ...AND THE GENERATION, on exactly those terms and for the same
+         reason: a [ProcDefs.pv_gen] is chosen by <allocproc> and belongs to
+         the INCARNATION, and no entry re-incarnates its own caller -- fork
+         mints the CHILD's and exec keeps its caller's
+         ([KexecDefs.KexecOkQ]).  The payment row and the trap tail's
+         [SpecUsertrap.ut_gen_kept] are keyed by it. *)
+      ⌜ pv_gen (us_V U') = pv_gen (us_V U) ⌝ -∗
       (* ...and the cwd's inum (lane C1): chdir (9) is the one entry that
          moves it, AND ONLY WHEN IT SUCCEEDS (lane C2: a chdir that returns
          -1 hands the block back at the inum it came in with, which is what
@@ -816,6 +868,9 @@ Definition wp_syscall_sconf_body
       (* ...and FORK'S: the parent's child token and the set its children
          reading grew to -- see [sysc_fork_out] *)
       sysc_fork_out f U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
+      (* ...AND THE PAYMENT, coming back: this arm RETURNS, so the payload
+         the caller handed over goes back to it -- see [sysc_pay_out] *)
+      sysc_pay_out f -∗
       WP (Loop : expr riscv_lang))
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).

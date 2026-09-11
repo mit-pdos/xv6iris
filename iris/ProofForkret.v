@@ -229,6 +229,12 @@ Lemma fkr_tail
   let p   : mword 64 := proc_addr j in
   let ksp : mword 64 := add_vec ks (mword_of_int 4096) in
   (j < NPROC)%nat ->
+  (* THE PARKED RECORD'S GENERATION IS THE SLOT'S.  [ParkCap.park_cap]
+     passes the block's own [ProcDefs.pv_gen] for [gn], so this is
+     [eq_refl] at every real call; it is stated because the tail hands it to
+     the closer, whose pin the exit deposit crosses by
+     ([SpecForkret.forkret_closer]). *)
+  pv_gen (us_V U) = gn ->
   (K_prepare_return <= av2)%nat ->
   av = (6 + (trap_res eb + av2))%nat ->
   mt !!! Regidx csp_rs1 = pa_stk ksp 6 ->
@@ -281,7 +287,7 @@ Lemma fkr_tail
                  pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
-  intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1.
+  intros p ksp Hjlt Hgn Hpr Havsum Hmtsp Hmts1.
   iIntros "#Htext #Hwire #Hclaimmap Hpc Hcg Hcpu Hext Hcx #Hks Hf16 Hpv #Hdone HW Hbslot #Hpg Hyield".
   (*  +0x64: jal ra, prepare_return.                                     *)
   (* ================================================================== *)
@@ -352,6 +358,11 @@ Proof.
              (* ...nor its children-row name, for the same reason and on the
                 same route: the closer is stated at the parked process's *)
              ⌜pv_chg V' = pv_chg (us_V U)⌝ ∗
+             (* ...nor its GENERATION, which the closer's own pin names:
+                the slot it yields is keyed at [gn] and the block at
+                [ProcDefs.pv_gen], and the exit deposit has to cross from
+                one to the other ([SpecForkret.forkret_closer]). *)
+             ⌜pv_gen V' = pv_gen (us_V U)⌝ ∗
              (* ...nor the cwd's inum *)
              ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
              (* ...nor the break.  [upd_tf] rewrites the word list and
@@ -366,9 +377,10 @@ Proof.
                 sret's to is the [sepc] cell prepare_return wrote from it. *)
              ⌜tf_ueq (pv_tf (us_V U)) (pv_tf V')⌝ ∗
              UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid (MkUstate V' ((us_M U))))%I
-    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcg & %Hcwi & %Hpsz & %Htueq & #Htfk & Hpv)".
+    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcg & %Hgenk & %Hcwi & %Hpsz & %Htueq & #Htfk & Hpv)".
   { iExists (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat ksp (cid_word (CID := CIDf)))).
     iFrame "Hpv". iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
@@ -755,13 +767,15 @@ Proof.
      closer yields no slot and the one spent below is [Hbslot], exec's own
      receipt, re-keyed the same way. *)
   iDestruct ("Hyield" $! CIDf XI pt (MkUstate (upd_upt V' pt) (us_M U))
-               with "[%] [%] [%] [%] [%] [%] [%] Hpg Htfk' Hdone HW Htc Hyld")
-    as "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | | | | ].
+               with "[%] [%] [%] [%] [%] [%] [%] [%] Hpg Htfk' Hdone HW Htc Hyld")
+    as "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | | | | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
      moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
   { exact Hfg. }
   (* ...nor its children-row name *)
   { exact Hcg. }
+  (* ...nor its generation, which is the pin the exit deposit crosses by *)
+  { rewrite Hgenk. exact Hgn. }
   (* ...nor [pv_cwi] *)
   { exact Hcwi. }
   (* THE STEADY MODE'S RUN KEY, which is the whole of what this arm owes the
@@ -829,6 +843,8 @@ Proof.
             (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs
             (loop_ok_loop_ucfg mdv0 Hmask pt Hnorm Hptwf)
             Hjlt
+            (* the resumed record's generation is the parked block's *)
+            ltac:(cbn [us_V upd_upt pv_gen]; rewrite Hgenk; exact Hgn)
             Hretms Hmapwf HSEa0
             (conj (kvi_satp_mode _) (conj (kvi_satp_asid _) (kvi_satp_ppn _)))
             Hcov Haccwf
@@ -903,6 +919,8 @@ Lemma fkr_boot
   let p   : mword 64 := proc_addr j in
   let ksp : mword 64 := add_vec ks (mword_of_int 4096) in
   (j < NPROC)%nat ->
+  (* the parked record's generation is the slot's -- see [fkr_tail] *)
+  pv_gen (us_V U) = gn ->
   γs !! j = Some γl ->
   (K_kexec <= av2)%nat ->
   av = (6 + (trap_res eb + av2))%nat ->
@@ -945,6 +963,15 @@ Lemma fkr_boot
      THE KERNEL MINTS NOTHING -- the bundle is the application's, handed
      down from [SystemAdequacy.xv6_power_adequacy_gen]'s [Hinit_boot]. *)
   init_boot_bundle (pv_cwi (us_V U)) sts -∗
+  (* ...AND THE FIRST PROCESS'S PAYLOAD, beside it and off the same row of
+     the package: kexec hands the exec'd image's slot the pay fact at this
+     process's own generation ([SpecKexec.exec_slot_pre]), and <init>'s is
+     the trivial one ([ParkCap.park_pkg]'s boot arm). *)
+  gen_kq (pv_gen (us_V U)) p pid (fun _ => True)%I -∗
+  my_pay (pv_gen (us_V U)) (fun _ => True)%I -∗
+  (* ...and the slot's half of [p->xstate], which the block this arm closes
+     carries ([ProcInv.proc_priv_core]) *)
+  (∃ xsv : mword 32, p_xstate p ↦₄{DfracOwn (1/2)} xsv) -∗
   (* THE RESIDUE CLOSER, by name: [SpecForkret.forkret_closer] is the wand
      this used to spell out.  It is ~13 % of the Iris context of every step
      of this walk, and a proofmode step's term carries the whole context
@@ -967,13 +994,13 @@ Lemma fkr_boot
                  sts gn cs None pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
-  intros p ksp Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1.
+  intros p ksp Hjlt Hgnb Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1.
   pose proof Hkx as Hkx'.
   (* fsinit's 88 sits under kexec's 184, which is what this arm is budgeted
      at; both are [Notation]s for literals, so [lia] sees them directly. *)
   assert (Hav2fs : (K_fsinit <= av2)%nat) by lia.
   iIntros "#Htext #Hwire #Hclaimmap Hpc #Hpinv Hcg Hcpu Hextc Hclmc #Hks
-           Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi HW Hbundle #Hpg Hyield".
+           Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi HW Hbundle Hkq #Hmp Hxb #Hpg Hyield".
   iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hebb.
   (* ================================================================== *)
   (*  +0x14 .. +0x24: [if (first)] -- TAKEN, because the token is the      *)
@@ -1486,9 +1513,13 @@ Proof.
     iExact "Hdlock". }
   (* ---- the process block, put back together: the token is the steady
          arm now, so this is [proc_priv] again rather than the deficit ---- *)
-  iAssert (proc_priv γf p pid U) with "[Hpbare Hcwd Hofiles]" as "Hpriv".
+  iAssert (proc_priv γf p pid U) with "[Hpbare Hcwd Hofiles Hkq Hxb]" as "Hpriv".
   { rewrite /proc_priv proc_priv_core_bare.
-    iFrame "Hpbare Hcwd Hftok Hofiles". }
+    iFrame "Hpbare Hcwd Hftok Hofiles Hxb".
+    (* the incarnation's pair, back in the block: this arm is where the
+       first process's block is closed, and the pair joined at the same
+       seam the token does *)
+    iExists (fun _ => True)%I. iFrame "Hkq Hmp". }
   (* ---- the path, at a0 ---- *)
   iPoseProof (fkr_init_path_run with "Hkdata") as "Hpath".
   iEval (rewrite -HD5a0) in "Hpath".
@@ -1544,7 +1575,7 @@ Proof.
             pid U sts gn cs
             DfracDiscarded DfracDiscarded (DfracOwn 1) DfracDiscarded DfracDiscarded
             D5 av2 eb eb ∅
-            Pcur Pmiss Fo
+            (fun _ => True)%I Pcur Pmiss Fo
             Hkx Hdev Hnib0 Hlg Hsize Hbm0
             Hbmcov Hbmlog Hist0 Hcovb Hiregb
             fkr_init_path_cstr ltac:(kxarith)
@@ -1553,7 +1584,15 @@ Proof.
             ltac:(intros; kxarith)
             Hjlt Hgl
             with "Hcg Hcpu Hextc Hclmc Htext Hpc Hfab Hkaenv Hbms Hist HbitsS
-                  Hpriv Hpath Hargv Hargs Hsl3 Hirs2 Hxpre").
+                  Hpriv Hpath Hargv Hargs Hsl3 Hirs2 [Hmp Hxpre]").
+  { (* THE FIRST PROCESS'S PAYLOAD, off the park package's boot arm: <init>
+       has no parent, so userinit split its incarnation at [fun _ => True]
+       ([ParkCap.park_pkg]'s [None] row), and that is the fact kexec hands
+       the exec'd image's slot.  kexec names it at the KEY's generation and
+       the package hands it at the BLOCK's; the two are the parked pin
+       ([SpecForkret.forkret_closer]'s [gn]), so the goal is re-keyed by it
+       before the row goes in. *)
+    rewrite <- Hgnb. iFrame "Hmp Hxpre". }
   (* ================================================================== *)
   (*  +0x56 .. +0x60: [p->trapframe->a0 = kexec(...)], then the test.     *)
   (* ================================================================== *)
@@ -1588,6 +1627,14 @@ Proof.
     - exact (f_equal pv_chg HV').
     - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hchg & _).
       exact Hchg. }
+  (* ...and the GENERATION, which exec keeps for the same reason: it is the
+     same incarnation of the same slot ([KexecDefs.kexec_ok]).  The tail
+     hands it to the closer's pin. *)
+  assert (Hgenk : pv_gen V' = pv_gen (us_V U)).
+  { destruct Hkok as [ (_ & HV') | Hs ].
+    - exact (f_equal pv_gen HV').
+    - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hgen & _).
+      exact Hgen. }
   assert (Hpck : ret_pc (D5 !!! Regidx Rra : mword 64) = mword_of_int (FR + 0x56))
     by (rewrite HD5ra; pcw).
   iEval (rewrite Hpck) in "Hpc".
@@ -1828,7 +1875,9 @@ Proof.
     iEval (rewrite Hkeyeq) in "Hbslot".
     iApply (fkr_tail W j γs γw γft γf γtl pid
               (MkUstate (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V'))) M')
-              sts gn cs ks E4 av av2 eb false Hjlt Hav2k Havsum HE4sp HE4s1
+              sts gn cs ks E4 av av2 eb false Hjlt
+              ltac:(cbn [us_V upd_tf pv_gen]; rewrite Hgenk; exact Hgnb)
+              Hav2k Havsum HE4sp HE4s1
               with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
                     Hpriv Hdone HW Hbslot Hpg [Hyield]").
     (* [upd_tf] does not touch [pv_fdg], so the closer the caller handed in
@@ -1848,7 +1897,7 @@ Theorem wp_forkret
       j γs γl γw γft γf γtl pid U sts gn cs ks m av av2 eb steady.
 Proof.
   cbv beta delta [wp_forkret_gen_body].
-  intros pcE p ksp Hjlt Hgl Hav2 Hkx Hut Hsp.
+  intros pcE p ksp Hjlt Hgnw Hgl Hav2 Hkx Hut Hsp.
   (* the tail's own budget: prepare_return's 12 is under kexec's 184 *)
   assert (Hpr : (K_prepare_return <= av2)%nat) by lia.
   (* the budget in numbers [lia] can see *)
@@ -2073,8 +2122,12 @@ Proof.
     (* the mode's [if] resolved by name, so the proofmode sees the sep *)
     iAssert (proc_priv_nocwd γf p pid U
              ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U))
-             ∗ FirstTok.first_boot)%I with "[Hpv]" as "Hblk"; [iExact "Hpv"|].
-    iDestruct "Hblk" as "(Hpnc & Hcwd & Hfb)".
+             ∗ FirstTok.first_boot
+             ∗ gen_kq (pv_gen (us_V U)) p pid (fun _ => True)%I
+             ∗ my_pay (pv_gen (us_V U)) (fun _ => True)%I
+             ∗ (∃ xsv : mword 32, p_xstate p ↦₄{DfracOwn (1/2)} xsv))%I
+      with "[Hpv]" as "Hblk"; [iExact "Hpv"|].
+    iDestruct "Hblk" as "(Hpnc & Hcwd & Hfb & Hkq & #Hmp & Hxb)".
     iDestruct (first_boot_open with "Hfb") as "(Hf1 & #Hbp & #Hka & Hfsi)".
     (* the two [_ext] halves are still at the entry hart; the release moved
        the binder, so they come across before the arm is entered *)
@@ -2084,16 +2137,16 @@ Proof.
                  ltac:(wp_next_chain) with "Hcx") as "Hcx".
     iApply (fkr_boot (CID := CIDr) W j γs γl γw γft γf γtl pid U sts gn cs
               ks mr av av2 eb
-              Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1
+              Hjlt Hgnw Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1
             with "Htext Hwire Hclaimmap Hpc Hpinv Hcg Hcpu Hext Hcx Hks
-                  Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hmode Hpg Hyield"). }
+                  Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hmode Hkq Hmp Hxb Hpg Hyield"). }
   (* ---------------- THE STEADY MODE: the block is whole ---------------- *)
   (* The token comes out at [proc_priv_split_cwd]'s three-way seam, which is
      where it joined the block; [cwd_ref] comes with it and goes straight
      back on the arm that continues here. *)
   iAssert (proc_priv γf p pid U)%I with "[Hpv]" as "Hblk"; [iExact "Hpv"|].
   iEval (rewrite proc_priv_split_cwd) in "Hblk".
-  iDestruct "Hblk" as "(Hpnc & Hcwd & Hftok)".
+  iDestruct "Hblk" as "(Hpnc & Hcwd & Hftok & Hgq & Hxb)".
   iDestruct (first_tok_open with "Hftok") as "[Hboot | #Hdone]".
   { (* THE BOOT ARM IS DEAD HERE, and this is where the park's promise is
        cashed rather than merely believed.  A steady package promises the
@@ -2110,10 +2163,12 @@ Proof.
      the closer and take the cell out for the [c.lw] at +0x1c. *)
   iAssert (first_done) as "#Hdone2"; [iExact "Hdone"|].
   iDestruct "Hdone" as "#[Hfirst Hfsready]".
-  iAssert (proc_priv γf p pid U) with "[Hpnc Hcwd]" as "Hpv".
+  iAssert (proc_priv γf p pid U) with "[Hpnc Hcwd Hgq Hxb]" as "Hpv".
   { iApply (bi.equiv_entails_1_2 _ _ (proc_priv_split_cwd γf p pid U)).
     iSplitL "Hpnc"; [iExact "Hpnc" |].
-    iSplitL "Hcwd"; [iExact "Hcwd" |]. iExact "Hftok". }
+    iSplitL "Hcwd"; [iExact "Hcwd" |].
+    iSplitR "Hgq Hxb"; [iExact "Hftok" |].
+    iSplitL "Hgq"; [iExact "Hgq" | iExact "Hxb"]. }
   (* ================================================================== *)
   (*  +0x14 .. +0x24: [if (first)] -- refuted by the discarded cell.      *)
   (* ================================================================== *)
@@ -2226,7 +2281,7 @@ Proof.
   iAssert (emp)%I with "[]" as "Hnoslot"; [iEmpIntro|].
   iApply (fkr_tail (CID := CID6) W j γs γw γft γf γtl pid U sts gn cs
             ks T4 av av2 eb true
-            Hjlt Hpr Havsum HT4sp HT4s1
+            Hjlt Hgnw Hpr Havsum HT4sp HT4s1
           with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv
                 Hdone2 HW Hnoslot Hpg Hyield").
 Qed.

@@ -274,6 +274,18 @@ Definition ut_ch_kept (sc_v : mword 64) (tf : list (mword 64))
     (cs cs' : gset gname) : Prop :=
   ~ (sc_v = uecall_scause /\ usys_num tf = USYS_fork) -> cs' = cs.
 
+(* ...AND THE GENERATION'S, WITH NO GUARD AT ALL.  A round never
+   re-incarnates the process it runs: the generation is minted once, at
+   [allocproc], and exec keeps it ([KexecOkQ] states [pv_gen V' = pv_gen V]).
+   The loop needs it TOLD because the slot it resumes is keyed at
+   [UexecSlot.uvis_gen] while the kernel's block names [ProcDefs.pv_gen], and
+   the exit deposit is the one row that has to travel from one to the other
+   -- [SpecKexit]'s escrow is built out of the BLOCK's quarter and the
+   PROCESS's payload, so the two names must be one.  [ut_fd_kept]'s mould,
+   without the cause guard. *)
+Definition ut_gen_kept (U U' : ustate) : Prop :=
+  pv_gen (us_V U') = pv_gen (us_V U).
+
 (* ...across any two frames the save walk leaves agreeing on the syscall
    number, which is how it travels from usertrap's post to uservec's --
    [ut_fd_ecall_in]'s route exactly. *)
@@ -418,7 +430,7 @@ Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
    row ([ut_fork_in] below), so at those two this row must not ask for a
    bundle. *)
 Definition ut_sys_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (* [gn] and [cs] ride beside [sts] for its reason: the key carries the
        process's generation and its live children's, [ustate] carries
@@ -446,7 +458,7 @@ Definition ut_sys_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : C
    none is a projection of the entry frame ([UexecSG.spost_at]).  They are
    the same components [ut_exec_out] already takes off the exit side. *)
 Definition ut_sys_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) (gn : gname) (cs : gset gname) (r : mword 64)
     (M' : gmap Z (bv 8))
@@ -457,7 +469,7 @@ Definition ut_sys_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
      spost_at uslot n f (uvis_of U sts gn cs) r M' sts' cw' cs')%I.
 
 Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (sc_v : mword 64) (tf : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
     (U' : ustate) (sts sts' : list fdstate) (gn : gname) (cs : gset gname)
@@ -494,7 +506,7 @@ Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
    [UexecRet.ufork_ans] exactly, which is what the loop's fork answer
    wants, so the row IS it. *)
 Definition ut_fork_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64)
     (cs cs' : gset gname)
     : iProp Σ :=
@@ -505,7 +517,7 @@ Definition ut_fork_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
    across any two frames the save walk leaves agreeing on the number --
    which is what carries it from usertrap's post to uservec's. *)
 Lemma ut_fork_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (f : sfam) (sc_v : mword 64) (tf1 tf2 : list (mword 64)) (r1 r2 : mword 64)
     (cs cs' : gset gname) :
   usys_num tf1 = usys_num tf2 -> r1 = r2 ->
@@ -517,7 +529,7 @@ Proof.
 Qed.
 
 Lemma ut_fork_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64)
     (cs cs' : gset gname) :
   sc_v <> uecall_scause -> ⊢ ut_fork_out f sc_v tf r cs cs'.
@@ -527,7 +539,7 @@ Proof.
 Qed.
 
 Lemma ut_fork_out_quiet_n `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64)
     (cs cs' : gset gname) :
   usys_num tf <> USYS_fork -> ⊢ ut_fork_out f sc_v tf r cs cs'.
@@ -571,7 +583,7 @@ Proof. reflexivity. Qed.
 (* makes this record [KforkChild.kfork_child]'s at the dispatcher.         *)
 (* ===================================================================== *)
 Definition ut_fork_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (f : sfam)
     (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) : iProp Σ :=
@@ -605,7 +617,7 @@ Definition ut_fork_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
    its bump is a pure relation and never computed.  Everything else is
    read off the record: image, permission projection, break, cwd. *)
 Lemma ut_fork_in_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (f : sfam)
     (sc_v : mword 64) (tf tf' : list (mword 64)) (U U' : ustate)
     (sts : list fdstate) :
@@ -657,12 +669,77 @@ Proof.
   iExact "H".
 Qed.
 
+(* ===================================================================== *)
+(* THE PAYMENT: THE PAYLOAD, GOING DOWN AT EVERY TRAP.                    *)
+(*                                                                        *)
+(* [UexecRet.uexec_pay_dep] is what the process hands over at a kernel     *)
+(* entry -- its own knowledge of the payload its exit owes                 *)
+(* ([ChildTok.my_pay]) and that payload PAID -- and this row is how it     *)
+(* reaches the arms and, at the exit number, [SpecSysExit] and             *)
+(* [SpecKexit], which park it as the ZOMBIE escrow.                        *)
+(*                                                                        *)
+(* UNGATED: AT EVERY CAUSE AND EVERY NUMBER.  usertrap's killed check runs *)
+(* on every arm -- at +0xca before [syscall()], at the device arm's        *)
+(* +0xf6, and at the tail's +0xa6 -- and each of those calls [exit(-1)],   *)
+(* which owes [kexit] the payload at -1.  A process torn down at a timer   *)
+(* interrupt pays out of the same deposit as one torn down at a syscall,   *)
+(* so the row cannot be guarded on the ecall cause.                        *)
+(*                                                                        *)
+(* TWO-ARMED ONLY AT EXIT, and the ∧ is the ADDITIVE conjunction: the kill *)
+(* check at +0xca runs BEFORE [syscall()], so a process that trapped with  *)
+(* the exit number may still be torn down at -1 rather than at the status  *)
+(* it asked for.  Whichever conjunct the arm needs is the one it takes.    *)
+(*                                                                        *)
+(* AT THE BLOCK'S OWN GENERATION [ProcDefs.pv_gen], not at the key's       *)
+(* [gn]: the party that spends this is kexit, which holds the private      *)
+(* block and whose kernel quarter is keyed there ([ProcInv.               *)
+(* proc_priv_core]), and the loop -- which BUILDS the key, at the very     *)
+(* field the park keyed it by ([ParkCap.park_cap]) -- is the one party     *)
+(* that has the identification in hand.                                    *)
+(*                                                                        *)
+(* AT THE DEPOSIT'S OWN FAMILIES [f], for [ut_sys_in]'s reason and         *)
+(* [ut_fork_in]'s: the payload is a field of them ([UexecSG.sexit_pay]),   *)
+(* so the payment that goes down and the payment that comes back out       *)
+(* ([ut_pay_out], a row of [usertrap_post]) are at ONE predicate.          *)
+(* ===================================================================== *)
+Definition ut_pay_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    {SG : uexecSG Σ}
+    (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate) : iProp Σ :=
+  upay_at (pv_gen (us_V U)) sc_v tf f.
+
+(* the row's congruence: it reads the number and argument 0, both of which
+   [TfUser.tf_ueq] carries (its second clause covers indices 5..35, and
+   [tf_arg_idx 0] is 14). *)
+Lemma ut_pay_in_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    {SG : uexecSG Σ}
+    (f : sfam) (sc_v : mword 64) (tf tf' : list (mword 64)) (U U' : ustate) :
+  tf_ueq tf tf' ->
+  pv_gen (us_V U') = pv_gen (us_V U) ->
+  ut_pay_in f sc_v tf U -∗ ut_pay_in f sc_v tf' U'.
+Proof.
+  intros Hu Hg. rewrite /ut_pay_in.
+  iApply (upay_at_ueq _ _ sc_v tf tf' f
+            (tf_ueq_num tf tf' Hu)
+            (proj2 Hu (tf_arg_idx 0) ltac:(unfold tf_arg_idx; lia))
+            (eq_sym Hg)).
+Qed.
+
+(* ...AND WHAT COMES BACK, at the same families: the payload at the kill
+   status, returned to whatever resumes the process.  A ROW OF
+   [usertrap_post] and UNGATED, for the IN row's reason -- every arm that
+   returns to user mode returns it, and the three that do not are the
+   three that spend it on [kexit(-1)]. *)
+Definition ut_pay_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
+    {SG : uexecSG Σ}
+    (f : sfam) : iProp Σ :=
+  uexec_pay_arm f.
+
 (* the quiet readings, for the four non-ecall causes.  Only the OUT rows
    need one: a deposit going DOWN is simply dropped by an arm that owes
    nothing ([ProofUsertrap]'s device demultiplexer), so [ut_sys_in] and
    [ut_fork_in] have no quiet reading at all. *)
 Lemma ut_sys_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) (r : mword 64) (M' : gmap Z (bv 8))
     (sts' : list fdstate) (cw' : Z) (gn : gname) (cs cs' : gset gname) :
@@ -672,7 +749,7 @@ Proof.
 Qed.
 
 Lemma ut_exec_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (sc_v : mword 64) (tf : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
     (U' : ustate) (sts sts' : list fdstate) (gn : gname) (cs : gset gname) :
@@ -686,7 +763,7 @@ Qed.
    what carries it across the prologue's epc rewrite and uservec's save
    walk ([UexecSG.sbundle_at_cong]) *)
 Lemma ut_sys_in_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf tf' : list (mword 64))
     (U U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname) :
   usys_num tf = usys_num tf' ->
@@ -713,7 +790,7 @@ Qed.
 (* ...and the post row's, at the same six rows: what comes back is read at
    the same key ([UexecSG.spost_at_cong]) *)
 Lemma ut_sys_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (n : Z) (f : sfam) (sc_v : mword 64) (tf tf' : list (mword 64))
     (U U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
     (r : mword 64)
@@ -749,7 +826,7 @@ Qed.
    a0 word, image, permission map and break -- all inside [tf_ueq]'s
    reach. *)
 Lemma ut_exec_out_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
-    `{SG : uexecSG Σ}
+    {SG : uexecSG Σ}
     (sc_v : mword 64) (tf tf' : list (mword 64)) (M : gmap Z (bv 8))
     (π : gmap (mword 27) uperm) (szv : Z)
     (U' U'' : ustate) (sts sts' : list fdstate) (gn : gname)
@@ -796,7 +873,12 @@ Definition ut_pro (sepc_v : mword 64) (U U' : ustate) : Prop :=
   /\ pv_sz (us_V U') = pv_sz (us_V U)
   /\ us_M U' = us_M U
   (* ...and the cwd's inum, which the prologue's one store does not touch *)
-  /\ pv_cwi (us_V U') = pv_cwi (us_V U).
+  /\ pv_cwi (us_V U') = pv_cwi (us_V U)
+  (* ...AND THE GENERATION, on the same footing: the prologue writes ONE
+     trapframe word, so the record it hands on is the same incarnation --
+     which is what the payment row ([ut_pay_in]) and the post's
+     [ut_gen_kept] are keyed by. *)
+  /\ pv_gen (us_V U') = pv_gen (us_V U).
 
 (* THE ENTRY INSTANCE: at the record the prologue hands on, the round has
    done nothing yet, so every arm of the relation is an identity. *)
@@ -807,7 +889,7 @@ Lemma ut_round_entry (sepc_v sc_v : mword 64) (U U' : ustate) :
   sc_v <> uecall_scause ->
   ut_pro sepc_v U U' -> ut_round sepc_v sc_v U U'.
 Proof.
-  intros Hne (Htf & Hupt & Hsz & HM & Hcwi). unfold ut_round, uround_ok.
+  intros Hne (Htf & Hupt & Hsz & HM & Hcwi & _). unfold ut_round, uround_ok.
   destruct (decide (sc_v = uecall_scause)) as [Heq | _]; [ contradiction (Hne Heq) | ].
   rewrite Htf Hupt Hsz HM Hcwi. unfold uround_id_ok.
   split_and!; reflexivity.
@@ -906,6 +988,8 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
     ⌜ut_fd_kept sc_v sts sts'⌝ -∗
     (* ...and the children set's, guarded off fork -- see [ut_ch_kept] *)
     ⌜ut_ch_kept sc_v (pv_tf (us_V U)) cs cs'⌝ -∗
+    (* ...and the generation's, unguarded -- see [ut_gen_kept] *)
+    ⌜ut_gen_kept U U'⌝ -∗
     ⌜ut_fd_ecall sc_v (pv_tf (us_V U)) (pv_tf (us_V U')) sts sts'⌝ -∗
     (* ...and pipe's join, off the same pair -- see [ut_pipe_ecall] *)
     ⌜ut_pipe_ecall sc_v (pv_tf (us_V U)) (pv_tf (us_V U'))
@@ -1004,6 +1088,11 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        ut_sys_out n f sc_v (pv_tf (us_V U)) U sts gn cs
          (pv_tf (us_V U') !!! tf_arg_idx 0) (us_M U') sts'
          (pv_cwi (us_V U')) cs') -∗
+    (* ...AND THE PAYMENT, COMING BACK.  Ungated, for [ut_pay_in]'s reason:
+       every arm that returns to its caller returns it, and the three that
+       do not are the three that spend it on [kexit(-1)] -- those diverge
+       and owe this post nothing. *)
+    ut_pay_out f -∗
     WP (Loop : expr riscv_lang)).
 
 (* [R] IS A HART-INDEXED FAMILY, AND IT HAS TO BE.  usertrap is handed the
@@ -1083,6 +1172,10 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
      and stated at the frame the PROLOGUE leaves (the entry record's epc
      word is still the previous round's) -- [ut_fork_in] *)
   ut_fork_in f sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))) U sts -∗
+  (* ...AND THE PAYMENT, which is neither and is owed at EVERY cause and
+     every number, at the same frame fork's row is stated at
+     -- [ut_pay_in] *)
+  ut_pay_in f sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))) U -∗
   (* THE CROSSING: usertrap parks (yield, and every sleeping syscall), so it
      may return on a different hart -- and the bundle comes back at THAT
      hart, which is why [R] is a family (see the note above). *)

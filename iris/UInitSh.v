@@ -61,6 +61,7 @@ Require Import ProcAvail.       (* [pavG] *)
 Require Import FileInvDefs.     (* [fileG], and its [appcfg] / [icfg] fields *)
 Require Import UserFd.
 Require Import UserHeap.
+Require Import ChildTok.  (* [my_pay]: the exec wands' pay fact *)
 Require Import UexecSlot UexecRet UsysMemOk UexecSG.
 Require Import UkRun.
 Require Import UCodeInit UkInit.
@@ -339,7 +340,7 @@ Section UInitSh.
                 (udata_lo (uvis_M W') (uvis_perm W') (uvis_sz W')),
              ubyte γd k b) -∗
           ∃ f : nat -> bv 8, Rsh γt γd γs ∗ ubytes γd sh_buf sh_nbuf f)
-     ∗ (∀ N : uk_names,
+     ∗ (∀ N : uk_names Σ,
           ush_rest N (Rsh (ukn_t N) (ukn_d N) (ukn_s N))))%I.
 
   Global Instance sh_pay_persistent Rsh n0 : Persistent (sh_pay Rsh n0).
@@ -353,11 +354,16 @@ Section UInitSh.
   (* Timeless because the claim sits under [AppInv.app_body]'s later and   *)
   (* each fire strips it ([PinnedExec]'s header).                          *)
   (* ------------------------------------------------------------------- *)
+  (* THE TAINT ARM IS INDEXED BY THE PAY FACT, at the TRIVIAL payload: a
+     tainted process runs on the generic family, which is itself indexed by
+     it ([UexecExecMint.uslot_mint]), and the payload of the process init
+     execs sh into is the one init chose at the fork that made it -- trivial
+     at this lane (L7 is what makes it the console-input resource). *)
   Definition init_sh_slot (T : iProp Σ) (Pay : iProp Σ) : iProp Σ :=
     (app_inv fsc_fs
      ∗ □ (∀ v : aview, app_pred app_run v -∗
                          app_pred app_run v ∗ (⌜FsShPin.era0_sh_pins v⌝ ∨ T))
-     ∗ □ (T -∗ ∀ W : uvis, uslot W)
+     ∗ □ (∀ W : uvis, T -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W)
      ∗ Pay)%I.
 
   Global Instance init_sh_slot_persistent T Pay `{!Persistent Pay} :
@@ -430,8 +436,8 @@ Section UInitSh.
        standard streams, and the only descriptor fact this constructor
        needs is [length fdv = NOFILE], which comes off the LENT authority
        ([UserFd.ufd_auth_len]) rather than off the ledger. *)
-    iModIntro. iIntros (N m pc) "%Ha0 %Ha1 #Hro #Hargv _".
-    rewrite /udepw_at. iIntros (M pm sz fdv gn cs) "Hheap Hufd".
+    iModIntro. iIntros (N m pc) "%Hpeq %Ha0 %Ha1 #Hro #Hargv _".
+    rewrite /udepw_at. iIntros (M pm sz fdv gn cs) "#Hmpay Hheap Hufd".
     (* ---- the two image readings, off the lent heap ---- *)
     iAssert (⌜uimg_sub UCodeInit.init_ro M⌝)%I as %Hsro.
     { iIntros (a b Hb).
@@ -454,17 +460,19 @@ Section UInitSh.
                   ⌜kexec_image_ok ElfUser.sh_elf na alen afun fdv W'⌝ -∗
                   ⌜exec_args_of M (mword_of_int 0x1000 : mword 64)
                      na alen afun⌝ -∗
+                  my_pay (uvis_gen W') (fun _ => True)%I -∗
                   sh_pay Rsh n0 -∗ uslot W'))%I as "#Hcon".
-    { iModIntro. iIntros (na alen afun W') "%Hok %Hargs [#Hp1 #Hp2]".
+    { iModIntro. iIntros (na alen afun W') "%Hok %Hargs #Hmp [#Hp1 #Hp2]".
       destruct (init_args_det M na alen afun Hsav Hsro Hargs) as [-> Halen].
       iApply (sh_slot_of_kexec Hpsok Rsh 1%nat alen afun fdv W' n0 Hok
-                (init_sh_room alen n0 Halen Hn0) Hlen with "[] Hdep Hp2").
+                (init_sh_room alen n0 Halen Hn0) Hlen with "[] Hdep Hp2 Hmp").
       iModIntro. iIntros (γt γd γs) "Hsz Hlo".
       iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo"). }
     (* ---- the bundle ---- *)
     iDestruct (pinned_exec_bundle fsc_fs uslot FsShPin.era0_sh_pins T
                  FsImg.ROOTINO init_sh_pl [FsImg.ROOTINO; FsShPin.SH_INO]
                  FsShPin.SH_INO ElfUser.sh_elf 1%nat (sh_pay Rsh n0)
+                 (fun _ => True)%I
                  M (mword_of_int 0x9a8) (mword_of_int 0x1000) fdv
                  init_sh_pin_resolves sh_elf_loadable
                  (init_sh_path_of M Hsro)
@@ -477,6 +485,9 @@ Section UInitSh.
       by (etransitivity; [ exact (tf_of_arg1 m pc) | exact Ha1 ]).
     iApply (sbundle_exec_intro uslot
               (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs) P Pmiss Fo R).
+    { (* init's own payload is the trivial one -- userinit's choice, which
+         the entry constructor wrote into the record *)
+      cbn [uvis_gen uvis_of_run]. rewrite -Hpeq. iExact "Hmpay". }
     rewrite Ea0 Ea1. iExact "Hb".
   Qed.
 

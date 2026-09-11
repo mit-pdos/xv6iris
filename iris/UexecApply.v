@@ -362,7 +362,7 @@ Section Apply.
      through the bundle and must not bind it again. *)
   Context `{!ctokG Σ}.
   Context `{GEN : GenId}.
-  Context `{SG : uexecSG Σ}.
+  Context {SG : uexecSG Σ}.
 
   (* THE SLOT SEES FOUR PROJECTIONS OF ITS KEY AND NOTHING ELSE.
      [uslot_ukc] is the whole content: the slot IS [ukc] at
@@ -461,7 +461,10 @@ Section Apply.
       - reflexivity. }
     rewrite /uexec_arm_F /uexec_fork_parent_F /ufork_ans /uexec_ret_cont_F. cbv zeta.
     destruct (decide (sc = uecall_scause)) as [_ | _];
-      [ | exact (HS W W' Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch) ].
+      [ | (* the payment is at the FAMILY and reads no key row, so the
+             transparent arm transports exactly as its slot does *)
+        apply bi.wand_proper;
+        [ reflexivity | exact (HS W W' Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch) ] ].
     (* [Hfd] joins the other four: the returning arm's row reads the ENTRY
        descriptor view, so both sides have to name the same one before the
        trapframe transport can be the only difference left.  [Hcw] the
@@ -474,17 +477,20 @@ Section Apply.
          carries.  The child's continuation went down as the deposit and
          is not part of the arm ([UexecRet.uexec_dep_F]). *)
       iSplit.
-      + iIntros "H1" (r fdv' cw' cs' Hr).
+      + iIntros "H1 Hpay" (r fdv' cw' cs' Hr).
+        iDestruct ("H1" with "Hpay") as "H1".
         rewrite -(Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw'
                     (uvis_gen W') cs').
         iApply ("H1" $! r fdv' cw' cs'). iPureIntro. exact Hr.
-      + iIntros "H1" (r fdv' cw' cs' Hr).
+      + iIntros "H1 Hpay" (r fdv' cw' cs' Hr).
+        iDestruct ("H1" with "Hpay") as "H1".
         rewrite (Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw'
                    (uvis_gen W') cs').
         iApply ("H1" $! r fdv' cw' cs'). iPureIntro. exact Hr.
     - (* the returning arms: the row transports by SS3 *)
       iSplit.
-      + iIntros "H" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo %Hcho Hsp".
+      + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo %Hcho Hsp".
+        iDestruct ("H" with "Hpay") as "H".
         rewrite -(Hb r M' pi' szv' fdv' cw' gn' cs').
         iApply ("H" $! r M' pi' szv' fdv' cw' gn' cs'
                   with "[%] [%] [%] [%] [%] [%] [Hsp]").
@@ -505,7 +511,8 @@ Section Apply.
         * iEval (rewrite (spost_at_cong S (usys_num (uvis_tf W')) f W' W r
                             M' fdv' cw' cs' (skey_eq_sym W W' Hsk))) in "Hsp".
           iExact "Hsp".
-      + iIntros "H" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo %Hcho Hsp".
+      + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo %Hcho Hsp".
+        iDestruct ("H" with "Hpay") as "H".
         rewrite (Hb r M' pi' szv' fdv' cw' gn' cs').
         iApply ("H" $! r M' pi' szv' fdv' cw' gn' cs'
                   with "[%] [%] [%] [%] [%] [%] [Hsp]").
@@ -685,7 +692,7 @@ Section LoopApply.
      through the bundle and must not bind it again. *)
   Context `{!ctokG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
-  Context `{SG : uexecSG Σ}.
+  Context {SG : uexecSG Σ}.
 
   (* ------------------------------------------------------------------ *)
   (* STEPS A + B: the returned [uexec_ret], re-keyed at the resume state. *)
@@ -930,10 +937,16 @@ Section LoopApply.
        spost_at uslot (usys_num (uvis_tf (uvis_run W))) f (uvis_run W)
          (uvis_tf W' !!! tf_arg_idx 0) (uvis_M W') (uvis_fd W')
          (uvis_cwd W') (uvis_ch W')) -∗
+    (* THE PAYMENT, GOING BACK.  The loop took it at the trap
+       ([UexecRet.uexec_pay_dep]) and every arm that RESUMES the process
+       hands it back -- which is what this lemma's [uexec_arm] asks for.
+       The kill path is the one that does not resume, and it is the one
+       that spends it. *)
+    uexec_pay_arm f -∗
     uexec_arm sc W f -∗ uslot W'.
   Proof.
     intros Hl Hgn Hch Hfd Hfdrow Hpiperow Hr.
-    iIntros "Hxo Hfo Hsp Hret".
+    iIntros "Hxo Hfo Hsp Hpay Hret".
     (* STEP A: the trapped key and its run projection are the same key *)
     iEval (rewrite (uexec_arm_run sc W f Hl)) in "Hret".
     destruct (decide (sc = uecall_scause)) as [Hec | Hne].
@@ -969,10 +982,16 @@ Section LoopApply.
           { rewrite Hcwx. exact (usys_cwd_ok_refl_at _ USYS_exec r _ Hexec Hnec). }
           iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r Hl
                     Hgn Hchq Hb Hm
-                    (Hfdrow Hec) (Hpiperow Hec) Hc with "[Hsp] Hret").
+                    (Hfdrow Hec) (Hpiperow Hec) Hc
+                    with "[Hsp] [Hpay Hret]").
           (* the post is at the a0 word, which the failure arm pins to [r] *)
-          iExact "Hsp".
-        * (* succeeded: the new image's slot, out of the deposit *)
+          { iExact "Hsp". }
+          iApply ("Hret" with "Hpay").
+        * (* succeeded: the new image's slot, out of the deposit.  The
+             payment is DROPPED here: this arm's process is gone -- the
+             record the kernel resumes is a different program's -- and the
+             run that image starts is built by its own entry constructor
+             ([UkRun.uslot_of_urun]), which is where its payload enters. *)
           iExact "Hslot".
       + cbv zeta.
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_exit))
@@ -1053,6 +1072,7 @@ Section LoopApply.
             [ split; [ exact Hec | exact Hfk ] | ].
           iEval (rewrite Ha0r) in "Hans".
           rewrite /uexec_fork_parent_F.
+          iDestruct ("Hret" with "Hpay") as "Hret".
           iDestruct ("Hret" $! r (uvis_fd W') (uvis_cwd W') (uvis_ch W')
                        with "[%] [%] [%] Hans") as "Hs";
             [ exact Hrne | exact Hfd' | exact Hcw' | ].
@@ -1071,8 +1091,10 @@ Section LoopApply.
             by (apply Hch; intros [_ Hx]; exact (Hnfk Hx)).
           iApply (uexec_ret_F_returning uslot uslot_key_cong W W' f r Hl
                     Hgn Hchq Hb Hm
-                    (Hfdrow Hec) (Hpiperow Hec) Hc with "[Hsp] Hret").
-          iExact "Hsp".
+                    (Hfdrow Hec) (Hpiperow Hec) Hc
+                    with "[Hsp] [Hpay Hret]").
+          { iExact "Hsp". }
+          iApply ("Hret" with "Hpay").
     - (* ---- TRANSPARENT: interrupt, page fault, anything else ---- *)
       rewrite (uexec_arm_transparent sc (uvis_run W) f Hne).
       destruct (uround_ok_transparent sc (uvis_tf (uvis_run W))
@@ -1081,6 +1103,7 @@ Section LoopApply.
                   (uvis_tf W') Hne Hr) as [[Hi1 Hi2] [HM [Hpi [Hsz Hcw]]]].
       assert (Hchq : uvis_ch W' = uvis_ch W)
         by (apply Hch; intros [Hx _]; exact (Hne Hx)).
+      iDestruct ("Hret" with "Hpay") as "Hret".
       iEval (rewrite (uslot_key_cong (uvis_run W) W'
                         (eq_sym Hi1) (eq_sym Hi2)
                         (eq_sym HM) (eq_sym Hpi) (eq_sym Hsz)
@@ -1156,6 +1179,8 @@ Section LoopApply.
        spost_at uslot (usys_num (tf_of g (ret_pc sepc_v))) f
          (uvis_run W) (pv_tf (us_V U') !!! tf_arg_idx 0)
          (us_M U') fdv' (pv_cwi (us_V U')) cs') -∗
+    (* the payment, going back -- see [uexec_ret_round_slot] *)
+    uexec_pay_arm f -∗
     uexec_arm sc W f -∗
     uslot (uvis_of U' fdv' (uvis_gen W) cs').
   Proof.

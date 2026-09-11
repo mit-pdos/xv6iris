@@ -90,7 +90,7 @@ Section UserretUser.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-  Context `{SG : uexecSG Σ}.
+  Context {SG : uexecSG Σ}.
 
   Lemma wp_userret_user (C : ucfg) (pt : uptd)
       (* THE PROCESS'S MEMORY, NAMED AT THE LAZY TIER (milestone J, S3).  The

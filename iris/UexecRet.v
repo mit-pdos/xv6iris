@@ -650,7 +650,7 @@ Section UexecRet.
      under its own [∀ r] -- see UexecSG.v.  A class and not a parameter for
      the reason this file's cone is the reason: the concrete bundles live
      above the whole file-system tower. *)
-  Context `{SG : uexecSG Σ}.
+  Context {SG : uexecSG Σ}.
 
   (* (A) what user execution hands back, at the fixpoint variable [X].
      THREE PIECES, spelled apart so the trap loop can read the arm back
@@ -658,6 +658,156 @@ Section UexecRet.
      UexecApply.v are stated over) and an ecall leaf can build the deposit
      on its own ([uexec_dep_F]).  [uexec_ret_F] -- the one the fixpoint is
      taken of -- is the two together on the returning arm. *)
+
+  (* ===================================================================== *)
+  (* THE PAYMENT: THE PAYLOAD, HANDED OVER AT EVERY TRAP AND TAKEN BACK AT  *)
+  (* EVERY RESUME.                                                          *)
+  (*                                                                        *)
+  (* A process's exit owes its parent a payload ([ChildTok]'s [Q], at its    *)
+  (* own generation).  A KILLED process pays it too: [kill] marks it, the    *)
+  (* kernel tears it down at its next trap with [exit(-1)], and nothing the  *)
+  (* PROGRAM does can pay at that moment -- so what pays is what the program *)
+  (* handed the kernel when it trapped.  Hence the two rows below: the RUN   *)
+  (* keeps [Q (-1)] between traps (that is why it is [UkRun.urun]'s conjunct *)
+  (* and not a row of the kernel's block), every kernel entry deposits it,   *)
+  (* and every resume hands it back.  The kernel spends it only on the kill  *)
+  (* path ([SpecUsertrap]'s three [kexit(-1)] sites, at [kexit_status = -1]) *)
+  (* and returns it otherwise.                                               *)
+  (*                                                                        *)
+  (* AT THE EXIT ECALL THE PAYMENT IS TWO-ARMED, and the ∧ is the ADDITIVE   *)
+  (* conjunction: the kill check at usertrap's +0xca runs BEFORE syscall(),  *)
+  (* so a process that trapped with the exit number may still be torn down   *)
+  (* at -1 rather than at the status it asked for.  The kernel eliminates    *)
+  (* whichever conjunct it takes; a program whose payload is one resource    *)
+  (* for every status pays it by [R ⊢ R ∧ R].  The exit status is            *)
+  (* [ProcGeom.exit_xs] of the trapping frame -- argument 0 read as a signed *)
+  (* 32-bit word, the very value [sys_exit]'s [argint(0,&n)] takes out and   *)
+  (* [kexit] stores into [p->xstate], so the status the parent is told about *)
+  (* and the status the payload was paid at are one reading of one word.     *)
+  (*                                                                        *)
+  (* [Q] IS THE FAMILIES' OWN FIELD ([UexecSG.sexit_pay]) and not an [∃]:    *)
+  (* the deposit and the arm are split at the trap and carried past each     *)
+  (* other through the whole kernel excursion, so the payload the process    *)
+  (* pays and the payload it is handed back have to be ONE predicate, and    *)
+  (* [f] is the value the route already carries.  [my_pay] beside it is what *)
+  (* makes the row payable at all: a process may only name the payload it    *)
+  (* can prove is its own, and a generation's payload is fixed once the      *)
+  (* quarters are out ([ChildTok.gen_set] runs before [gen_split]).  A       *)
+  (* generic process's is [fun _ => True] and it pays both rows for free.    *)
+  (* ===================================================================== *)
+  (* THE ROW ITSELF, at a GENERATION AND A FRAME rather than at a key: the
+     process deposits it at the key's [uvis_gen], the kernel route carries
+     it at the BLOCK's [ProcDefs.pv_gen] ([SpecUsertrap.ut_pay_in]), and
+     the two are one generation by the trap route's own pin.  One
+     definition, so the two readings cannot drift. *)
+  Definition upay_at (gn : gname) (sc : mword 64) (tf : list (mword 64))
+      (f : sfam) : iProp Σ :=
+    (my_pay gn (sexit_pay f) ∗
+     (if decide (sc = uecall_scause) then
+        if decide (usys_num tf = USYS_exit)
+        then sexit_pay f (exit_xs tf) ∧ sexit_pay f (-1)
+        else sexit_pay f (-1)
+      else sexit_pay f (-1)))%I.
+
+  (* the row reads the number and argument 0, both of which [TfUser.tf_ueq]
+     carries, and the generation is a parameter -- so it transports across
+     the save walk exactly as the fork and syscall rows do. *)
+  Lemma upay_at_ueq (gn gn' : gname) (sc : mword 64) (tf tf' : list (mword 64))
+      (f : sfam) :
+    usys_num tf = usys_num tf' ->
+    tf !!! tf_arg_idx 0 = tf' !!! tf_arg_idx 0 ->
+    gn = gn' ->
+    upay_at gn sc tf f -∗ upay_at gn' sc tf' f.
+  Proof.
+    intros Hn Ha ->. rewrite /upay_at Hn (exit_xs_arg0 tf tf' Ha). auto.
+  Qed.
+
+  Definition uexec_pay_dep (sc : mword 64) (W : uvis) (f : sfam) : iProp Σ :=
+    upay_at (uvis_gen W) sc (uvis_tf W) f.
+
+  (* ...AND WHAT COMES BACK AT THE RESUME, which is the same payload at the
+     kill status: the kernel took the deposit at the trap and hands this
+     back at every arm that resumes the process.  Exit has no arm. *)
+  Definition uexec_pay_arm (f : sfam) : iProp Σ := sexit_pay f (-1).
+
+  (* the row at a TRIVIALLY-PAID process -- every generic one, and <init>,
+     whose parent is nobody.  It pays out of its own persistent knowledge
+     and nothing else, which is the ONE fact a generic slot needs of the
+     kernel and the reason the generic family is indexed by it
+     ([UexecExecInst.xv6_sbundle_of_supply], [UexecCond.cond_entry_slot]). *)
+  Lemma uexec_pay_dep_triv (sc : mword 64) (W : uvis) (f : sfam) :
+    sexit_pay f = (fun _ => True)%I ->
+    my_pay (uvis_gen W) (fun _ => True)%I -∗ uexec_pay_dep sc W f.
+  Proof.
+    intros Hf. rewrite /uexec_pay_dep /upay_at Hf. iIntros "#H". iFrame "H".
+    destruct (decide (sc = uecall_scause));
+      [ destruct (decide (usys_num (uvis_tf W) = USYS_exit));
+        [ iSplit; done | done ] | done ].
+  Qed.
+
+  (* ...and the arm at the same family, which costs nothing either *)
+  Lemma uexec_pay_arm_triv (f : sfam) :
+    sexit_pay f = (fun _ => True)%I -> ⊢ uexec_pay_arm f.
+  Proof. intros Hf. rewrite /uexec_pay_arm Hf. done. Qed.
+
+  (* THE THREE SHAPES A LEAF PAYS IT IN.  Each is the definition at one
+     branch of its guard, stated at the RUN key a U-tier leaf traps from
+     and at the family re-keyed at that run's payload
+     ([UexecSG.sfam_at]). *)
+  (* (a) off the ecall cause -- an interrupt or a page fault.  Nothing
+     about the number is known and none is read. *)
+  Lemma uexec_pay_dep_ne (sc : mword 64) (W : uvis) (Q : Z -> iProp Σ)
+      (f : sfam) :
+    sc <> uecall_scause ->
+    sexit_pay f = Q ->
+    my_pay (uvis_gen W) Q -∗ Q (-1) -∗ uexec_pay_dep sc W f.
+  Proof.
+    intros Hne Hf. iIntros "#Hmy HQ". rewrite /uexec_pay_dep /upay_at Hf. iFrame "Hmy".
+    destruct (decide (sc = uecall_scause)); [ contradiction | iExact "HQ" ].
+  Qed.
+
+  (* (b) at an ecall of a RETURNING number: one payment, at the kill
+     status, and the process is resumed with it. *)
+  Lemma uexec_pay_dep_ret (n : Z) (m : regfile) (pc : mword 64)
+      (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+      (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
+      (Q : Z -> iProp Σ) (f : sfam) :
+    usys_num (tf_of m pc) = n ->
+    n <> USYS_exit ->
+    sexit_pay f = Q ->
+    my_pay gn Q -∗ Q (-1) -∗
+    uexec_pay_dep uecall_scause (uvis_of_run m pc M pm sz fdv cw gn cs) f.
+  Proof.
+    intros Hn Hx Hf. iIntros "#Hmy HQ". rewrite /uexec_pay_dep /upay_at Hf.
+    cbn [uvis_gen uvis_tf uvis_of_run]. iFrame "Hmy".
+    destruct (decide (uecall_scause = uecall_scause)) as [_ | Hc];
+      [ | exfalso; exact (Hc eq_refl) ].
+    rewrite Hn. destruct (decide (n = USYS_exit)) as [He | _];
+      [ exfalso; exact (Hx He) | iExact "HQ" ].
+  Qed.
+
+  (* (c) at the EXIT ecall: the two-armed payment.  The program supplies
+     the WAND rather than the ∧ itself, because both conjuncts are proved
+     from the one resource the run keeps -- which is what the additive
+     conjunction is for. *)
+  Lemma uexec_pay_dep_exit (m : regfile) (pc : mword 64)
+      (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+      (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
+      (Q : Z -> iProp Σ) (f : sfam) :
+    usys_num (tf_of m pc) = USYS_exit ->
+    sexit_pay f = Q ->
+    my_pay gn Q -∗ Q (-1) -∗
+    (Q (-1) -∗ Q (exit_xs (tf_of m pc)) ∧ Q (-1)) -∗
+    uexec_pay_dep uecall_scause (uvis_of_run m pc M pm sz fdv cw gn cs) f.
+  Proof.
+    intros Hn Hf. iIntros "#Hmy HQ Hw". rewrite /uexec_pay_dep /upay_at Hf.
+    cbn [uvis_gen uvis_tf uvis_of_run]. iFrame "Hmy".
+    destruct (decide (uecall_scause = uecall_scause)) as [_ | Hc];
+      [ | exfalso; exact (Hc eq_refl) ].
+    rewrite Hn. destruct (decide (USYS_exit = USYS_exit)) as [_ | Hc];
+      [ | exfalso; exact (Hc eq_refl) ].
+    iApply ("Hw" with "HQ").
+  Qed.
 
   (* ------------------------------------------------------------------- *)
   (* FORK'S TWO SLOTS, and they travel in OPPOSITE DIRECTIONS.            *)
@@ -756,9 +906,14 @@ Section UexecRet.
      exit will owe, and the kernel supplies that knowledge out of the
      generation it minted ([ChildTok.gen_split]).  Persistent, so it costs
      the child nothing to carry into every later trap. *)
+  (* THE PARENT'S LEG TAKES THE PAYMENT BACK, because it is the leg that
+     RESUMES: fork's parent arm is what the kernel hands the return value
+     through, so the payload the trap deposited comes back on it
+     ([uexec_pay_arm]).  The child's leg is a slot and takes none -- a
+     fresh process is resumed with its own. *)
   Definition uexec_fork_F (X : uvis -d> iPropO Σ) (W : uvis) (f : sfam)
       : iProp Σ :=
-    (uexec_fork_parent_F X W (sfork_pay f) ∗
+    ((uexec_pay_arm f -∗ uexec_fork_parent_F X W (sfork_pay f)) ∗
      (∀ (fdv' : list fdstate) (cw' : Z) (g' : gname),
         my_pay g' (sfork_pay f) -∗
         (* THE CHILD'S TABLE IS THE PARENT'S.  fork() copies it --
@@ -878,14 +1033,19 @@ Section UexecRet.
      variable.  The trap loop's round is stated over this
      ([UexecApply.uexec_ret_round_slot]): the loop splits the deposit off
      before the excursion and re-keys what is left afterwards. *)
+  (* THE PAYMENT COMES BACK IN THROUGH THIS ARM, at the very family the
+     deposit was made at: the kernel took [uexec_pay_dep]'s payload at the
+     trap and gives it back to whatever resumes the process.  Exit alone
+     has no arm to give it back through. *)
   Definition uexec_arm_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
       (f : sfam) : iProp Σ :=
     (if decide (sc = uecall_scause) then
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
-       else if decide (n = USYS_fork) then uexec_fork_parent_F X W (sfork_pay f)
-       else uexec_ret_cont_F X n f W
-     else X W)%I.
+       else if decide (n = USYS_fork) then
+         (uexec_pay_arm f -∗ uexec_fork_parent_F X W (sfork_pay f))
+       else (uexec_pay_arm f -∗ uexec_ret_cont_F X n f W)
+     else (uexec_pay_arm f -∗ X W))%I.
 
   (* ...AND THE DEPOSIT ALONE: what the process owes at this trap.  [emp]
      off the returning arm -- exit returns nothing -- and [emp] at every
@@ -894,14 +1054,18 @@ Section UexecRet.
      deposit is not a bundle but a SLOT: the process hands the kernel the
      WP the child will run, at the one record the child resumes at, and
      the trap route carries it to [SpecKfork]'s slot premise. *)
+  (* ...AND THE PAYMENT GOES DOWN WITH IT, at every cause and every number:
+     the kill check runs on every arm of usertrap, so the kernel has to
+     hold the payload whatever the process trapped for. *)
   Definition uexec_dep_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
       (f : sfam) : iProp Σ :=
-    (if decide (sc = uecall_scause) then
-       let n := usys_num (uvis_tf W) in
-       if decide (n = USYS_exit) then emp
-       else if decide (n = USYS_fork) then uexec_fork_child_F X W (sfork_pay f)
-       else sbundle_at X n f W
-     else emp)%I.
+    (uexec_pay_dep sc W f ∗
+     (if decide (sc = uecall_scause) then
+        let n := usys_num (uvis_tf W) in
+        if decide (n = USYS_exit) then emp
+        else if decide (n = USYS_fork) then uexec_fork_child_F X W (sfork_pay f)
+        else sbundle_at X n f W
+      else emp))%I.
 
   (* ...AND THE TWO TOGETHER, WITH THE FAMILIES BOUND ONCE, OUTSIDE BOTH.
      That [∃] is the deposit shape: what comes back is a post at the
@@ -909,14 +1073,21 @@ Section UexecRet.
      ([UexecSG.v]'s header).  Its price is that the two halves can no
      longer be split blind -- [uexec_ret_F_split] hands out the witness
      beside them and every consumer carries it. *)
+  (* THE FAMILIES ARE BOUND ONCE, OUTSIDE EVERYTHING, and that is what the
+     payment costs: the payload is a field of [f] ([UexecSG.sexit_pay]), so
+     the ∃ that used to sit inside the returning branch has to cover the
+     transparent arm and exit as well -- every arm pays. *)
   Definition uexec_ret_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
       : iProp Σ :=
-    (if decide (sc = uecall_scause) then
-       let n := usys_num (uvis_tf W) in
-       if decide (n = USYS_exit) then emp
-       else if decide (n = USYS_fork) then (∃ f : sfam, uexec_fork_F X W f)
-       else (∃ f : sfam, sbundle_at X n f W ∗ uexec_ret_cont_F X n f W)
-     else X W)%I.
+    (∃ f : sfam,
+       uexec_pay_dep sc W f ∗
+       (if decide (sc = uecall_scause) then
+          let n := usys_num (uvis_tf W) in
+          if decide (n = USYS_exit) then emp
+          else if decide (n = USYS_fork) then uexec_fork_F X W f
+          else (sbundle_at X n f W ∗
+                (uexec_pay_arm f -∗ uexec_ret_cont_F X n f W))
+        else (uexec_pay_arm f -∗ X W)))%I.
 
   (* (B) the kernel obligation: its later-free BODY, and the guarded form *)
   Definition ukb_F (X : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : TsoCtx.CurCtx}
@@ -1096,6 +1267,36 @@ Section UexecRet.
        uvb (CID := h) (XI := xi) C pt Rfd Rut szv π fdv cw g cs M m pc -∗
        WP (Loop : expr riscv_lang))%I.
 
+  (* ...AND THE CONTINUATION WITH THE PAYMENT BESIDE IT, which is what a
+     leaf actually hands the engine and what [UkRun.urun_close] builds.
+     The RUN keeps [Q (-1)] between traps (the owner's ruling: a program
+     that was lent a resource goes on holding it, so it cannot rest in the
+     kernel's block or in the parked record), every kernel entry takes it
+     ([UexecRet.uexec_pay_dep]) and every resume hands it back
+     ([uexec_pay_arm]) -- so a continuation that will be resumed is one the
+     payment has to reach, and the wand is where it enters.  [my_pay]
+     beside it is what says the payload is this process's own.
+     THE ENGINE IS WHY IT IS PACKAGED: an interrupt can trap between any
+     two instructions, and the arm the kernel takes there has to be paid
+     out of something the ENGINE holds -- the run's copy is inside the
+     leaf's closure by then. *)
+  Definition ukcq (Q : Z -> iProp Σ) (π : gmap (mword 27) uperm)
+      (M : gmap Z (bv 8)) (szv : Z) (fdv : list fdstate) (cw : Z)
+      (g : gname) (cs : gset gname) (m : regfile) (pc : mword 64) : iProp Σ :=
+    (my_pay g Q ∗ Q (-1) ∗ (Q (-1) -∗ ukc π M szv fdv cw g cs m pc))%I.
+
+  (* ...AND THE WAY BACK DOWN, for a leaf that is NOT handing the engine a
+     step but closing a trap: the arm has already handed the payload back
+     ([uexec_pay_arm]), so the leaf spends the copy [ukcq] carries on
+     [ukcq]'s own wand and reads the plain continuation underneath.  The
+     run the wand rebuilds is at that very payload, so nothing is lost:
+     this is the same payment arriving by the shorter route. *)
+  Lemma ukcq_ukc (Q : Z -> iProp Σ) (π : gmap (mword 27) uperm)
+      (M : gmap Z (bv 8)) (szv : Z) (fdv : list fdstate) (cw : Z)
+      (g : gname) (cs : gset gname) (m : regfile) (pc : mword 64) :
+    ukcq Q π M szv fdv cw g cs m pc -∗ ukc π M szv fdv cw g cs m pc.
+  Proof. iIntros "(_ & Hpay & Hk)". iApply ("Hk" with "Hpay"). Qed.
+
   Lemma uslot_unfold (W : uvis) :
     uslot W ⊣⊢
     (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
@@ -1220,15 +1421,18 @@ Section UexecRet.
   Lemma uexec_ret_ecall (sc : mword 64) (W : uvis) :
     sc = uecall_scause ->
     uexec_ret sc W ⊣⊢
-    (let n := usys_num (uvis_tf W) in
-     if decide (n = USYS_exit) then emp
-     else if decide (n = USYS_fork) then
+    (∃ f : sfam,
+     uexec_pay_dep sc W f ∗
+     (let n := usys_num (uvis_tf W) in
+      if decide (n = USYS_exit) then emp
+      else if decide (n = USYS_fork) then
        (* FORK'S TWO LEGS, AT THE FAMILIES THE PROCESS CHOSE -- which is
           where its child's EXIT PAYLOAD lives ([UexecSG.sfork_pay]).  The
-          parent's leg gets the child token at that payload; the child's
-          leg is deposited under [ChildTok.my_pay] of the very same one. *)
-       (∃ f : sfam,
-        (∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname),
+          parent's leg gets the child token at that payload, and the
+          process's OWN payload back with it; the child's leg is deposited
+          under [ChildTok.my_pay] of the very same one. *)
+       ((uexec_pay_arm f -∗
+         ∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname),
            ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
            ⌜fdv' = uvis_fd W⌝ -∗
            ⌜cw' = uvis_cwd W⌝ -∗
@@ -1244,13 +1448,13 @@ Section UexecRet.
      else
        (* THE DEPOSIT, beside the arm and AT THE SAME FAMILIES: the
           process's bundle for this number at this key ([UexecSG]), the
-          families bound once outside both legs.  It is [emp] at every
+          families bound once outside every leg.  It is [emp] at every
           number the instance has no contract for, but a leaf below the
           file-system tower cannot see that -- it pays out of the supply
           instead ([UexecSG.sbundle_of_supply_ne]). *)
-       (∃ f : sfam,
-        sbundle_at uslot n f W ∗
-        (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
+       (sbundle_at uslot n f W ∗
+        (uexec_pay_arm f -∗
+         ∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
            (szv' : Z) (fdv' : list fdstate) (cw' : Z) (g' : gname)
            (cs' : gset gname),
            ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
@@ -1266,29 +1470,35 @@ Section UexecRet.
            ⌜usys_gen_ok n (uvis_gen W) g'⌝ -∗
            ⌜usys_ch_ok n r (uvis_ch W) cs'⌝ -∗
            spost_at uslot n f W r M' fdv' cw' cs' -∗
-           uslot (bump W r M' π' szv' fdv' cw' g' cs')))).
+           uslot (bump W r M' π' szv' fdv' cw' g' cs'))))).
   Proof.
     intros ->. rewrite /uexec_ret /uexec_ret_F.
     destruct (decide (uecall_scause = uecall_scause)); [ reflexivity | contradiction ].
   Qed.
 
   (* ...and the same at the DEPOSIT-FREE arm, which is what the loop's round
-     is stated over *)
+     is stated over.  The payment rides IN, at the deposit's own family. *)
   Lemma uexec_arm_ecall (sc : mword 64) (W : uvis) (f : sfam) :
     sc = uecall_scause ->
     uexec_arm sc W f ⊣⊢
     (let n := usys_num (uvis_tf W) in
      if decide (n = USYS_exit) then emp
-     else if decide (n = USYS_fork) then uexec_fork_parent_F uslot W (sfork_pay f)
-     else uexec_ret_cont_F uslot n f W).
+     else if decide (n = USYS_fork) then
+       (uexec_pay_arm f -∗ uexec_fork_parent_F uslot W (sfork_pay f))
+     else (uexec_pay_arm f -∗ uexec_ret_cont_F uslot n f W)).
   Proof.
     intros ->. rewrite /uexec_arm /uexec_arm_F.
     destruct (decide (uecall_scause = uecall_scause)); [ reflexivity | contradiction ].
   Qed.
 
+  (* THE TRANSPARENT ARM PAYS TOO, and that is the whole of what the kill
+     path costs the four non-ecall causes: a process the kernel tears down
+     at a timer interrupt or a page fault pays out of the same deposit as
+     one torn down at a syscall. *)
   Lemma uexec_ret_transparent (sc : mword 64) (W : uvis) :
     sc <> uecall_scause ->
-    uexec_ret sc W ⊣⊢ uslot W.
+    uexec_ret sc W ⊣⊢
+    (∃ f : sfam, uexec_pay_dep sc W f ∗ (uexec_pay_arm f -∗ uslot W)).
   Proof.
     intros Hne. rewrite /uexec_ret /uexec_ret_F.
     destruct (decide (sc = uecall_scause)); [ contradiction | reflexivity ].
@@ -1296,7 +1506,7 @@ Section UexecRet.
 
   Lemma uexec_arm_transparent (sc : mword 64) (W : uvis) (f : sfam) :
     sc <> uecall_scause ->
-    uexec_arm sc W f ⊣⊢ uslot W.
+    uexec_arm sc W f ⊣⊢ (uexec_pay_arm f -∗ uslot W).
   Proof.
     intros Hne. rewrite /uexec_arm /uexec_arm_F.
     destruct (decide (sc = uecall_scause)); [ contradiction | reflexivity ].
@@ -1311,24 +1521,32 @@ Section UexecRet.
      so what the loop learns when it takes the deposit apart is WHICH
      families the process chose, and it carries that witness to the
      dispatcher and back to the return. *)
+  (* THE PAYMENT SPLITS WITH THE FAMILIES, and it is why the ∃ is now
+     outermost: the deposit's payment and the arm that hands it back are at
+     one [f], so the witness the loop learns names both. *)
   Lemma uexec_ret_F_split (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis) :
     uexec_ret_F X sc W -∗
     ∃ f : sfam, uexec_dep_F X sc W f ∗ uexec_arm_F X sc W f.
   Proof.
     rewrite /uexec_ret_F /uexec_dep_F /uexec_arm_F. cbv zeta.
-    iIntros "H".
+    iIntros "H". iDestruct "H" as (f) "[Hpay H]". iExists f.
     destruct (decide (sc = uecall_scause));
-      [| iExists sfam_pt; iSplitR; [done | iExact "H"]].
+      [| iFrame "Hpay H"].
+    (* EXIT SPLITS THE OTHER WAY ROUND from every returning number: its
+       DEPOSIT is the payment and its ARM is [emp], because exit does not
+       return. *)
     destruct (decide (usys_num (uvis_tf W) = USYS_exit));
-      [ iExists sfam_pt; iSplitR; [done | iExact "H"] |].
+      [ iFrame "Hpay H" |].
     (* FORK SPLITS FOR REAL: the child conjunct is the deposit and the
        parent conjunct the arm, and the child's [∀ fdv' cw'] guards
        collapse by reflexivity on the way down
        ([uexec_fork_child_of]). *)
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { iDestruct "H" as (f) "[Hp Hc]". iExists f. iSplitL "Hc";
-        [ iApply (uexec_fork_child_of X W (sfork_pay f) with "Hc") | iExact "Hp" ]. }
-    iDestruct "H" as (f) "[Hd Ha]". iExists f. iFrame "Hd Ha".
+    { iDestruct "H" as "[Hp Hc]". iSplitR "Hp";
+        [ iFrame "Hpay";
+          iApply (uexec_fork_child_of X W (sfork_pay f) with "Hc")
+        | iExact "Hp" ]. }
+    iDestruct "H" as "[Hd Ha]". iFrame "Hpay Hd Ha".
   Qed.
 
   Lemma uexec_ret_F_join (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
@@ -1336,15 +1554,16 @@ Section UexecRet.
     uexec_dep_F X sc W f -∗ uexec_arm_F X sc W f -∗ uexec_ret_F X sc W.
   Proof.
     rewrite /uexec_ret_F /uexec_dep_F /uexec_arm_F. cbv zeta.
-    iIntros "Hd Ha".
-    destruct (decide (sc = uecall_scause)); [| iExact "Ha"].
-    destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ iExact "Ha" |].
+    iIntros "[Hpay Hd] Ha". iExists f.
+    destruct (decide (sc = uecall_scause)); [| iFrame "Hpay Ha"].
+    (* exit's payment is the DEPOSIT half; its arm is [emp] *)
+    destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ iFrame "Hpay Hd" |].
     (* ...and joins back: the deposit's one record re-guards
        ([uexec_fork_child_to]) *)
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { iExists f. iSplitL "Ha";
+    { iFrame "Hpay". iSplitL "Ha";
         [ iExact "Ha" | iApply (uexec_fork_child_to X W (sfork_pay f) with "Hd") ]. }
-    iExists f. iFrame "Hd Ha".
+    iFrame "Hpay Hd Ha".
   Qed.
 
   Lemma uexec_ret_split (sc : mword 64) (W : uvis) :
@@ -1361,45 +1580,95 @@ Section UexecRet.
 
   (* ...and what the GENERIC inhabitants use: the supply beside a generic
      slot family, which is what answers exec's wand *)
+  (* THE PAY FACT IS A PREMISE, and it is the exit row's: a generic slot
+     traps at every number, exit included, and exit's deposit is a PAYMENT
+     ([uexec_pay_dep]).  At the trivial payload it costs nothing, which is
+     why the family is indexed by exactly this fact and by nothing else. *)
   Lemma uexec_dep_F_of_supply (X : uvis -d> iPropO Σ) (sc : mword 64)
       (W : uvis) :
-    □ ssupply -∗ □ (∀ W' : uvis, X W') ==∗ ∃ f : sfam, uexec_dep_F X sc W f.
+    my_pay (uvis_gen W) (fun _ => True)%I -∗
+    □ ssupply -∗
+    □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => True)%I -∗ X W') ==∗
+    ∃ f : sfam, uexec_dep_F X sc W f.
   Proof.
-    rewrite /uexec_dep_F. cbv zeta. iIntros "#Hsup #Hall".
-    destruct (decide (sc = uecall_scause)); [| iModIntro; by iExists sfam_pt].
+    rewrite /uexec_dep_F. cbv zeta. iIntros "#Hpay #Hsup #Hall".
+    (* THE PAYMENT ROW IS PAID AT THE POINT'S PAYLOAD, which is the trivial
+       one ([UexecSG.sexit_pay_pt]) -- a generic process owes its parent
+       nothing, at every cause and every number.  The returning branch mints
+       its bundle at a family the supply chooses, so it re-keys that one at
+       the trivial payload ([sfam_at]) and the bundle passes through
+       ([sbundle_at_at]). *)
+    destruct (decide (sc = uecall_scause));
+      [| iModIntro; iExists sfam_pt; iSplitL;
+         [ iApply (uexec_pay_dep_triv sc W sfam_pt sexit_pay_pt with "Hpay")
+         | done ]].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit));
-      [iModIntro; by iExists sfam_pt |].
+      [iModIntro; iExists sfam_pt; iSplitL;
+       [ iApply (uexec_pay_dep_triv sc W sfam_pt sexit_pay_pt with "Hpay")
+       | done ] |].
     (* fork's deposit is a slot at ONE record, which the generic family
-       has at every record *)
+       has at every record -- AND THE KERNEL HANDS IT THE CHILD'S PAY
+       FACT, at the payload this family forks with ([UexecSG.sfam_pay] of
+       [sfam_pt], the trivial one), which is exactly what the child's slot
+       is indexed by. *)
+    (* THE CHILD'S SLOT, at the key the deposit names: [Hall]'s credential
+       is at THAT key's generation, which is the child's [g'] once the
+       key's projection is reduced. *)
     destruct (decide (usys_num (uvis_tf W) = USYS_fork));
-      [iModIntro; iExists sfam_pt; rewrite /uexec_fork_child_F;
-       iIntros (g') "_"; iApply "Hall" |].
-    iApply (sbundle_of_supply X (usys_num (uvis_tf W)) W with "Hsup Hall").
+      [iModIntro; iExists sfam_pt; iSplitL;
+       [ iApply (uexec_pay_dep_triv sc W sfam_pt sexit_pay_pt with "Hpay") |
+         rewrite /uexec_fork_child_F sfork_pay_pt;
+         iIntros (g') "Hp"; iApply "Hall"; cbn [uvis_gen bump]; iExact "Hp" ] |].
+    iMod (sbundle_of_supply X (usys_num (uvis_tf W)) W with "Hpay Hsup Hall")
+      as (f) "Hb".
+    iModIntro. iExists (sfam_at (fun _ => True)%I f). iSplitR "Hb".
+    - iApply (uexec_pay_dep_triv sc W _ (sexit_pay_at _ f) with "Hpay").
+    - rewrite sbundle_at_at. iExact "Hb".
   Qed.
 
   (* every arm of the return is inhabited by a slot at every key -- and, on
      the returning arm, by the supply *)
+  (* THE ARM'S KEYS ALL CARRY THIS PROCESS'S OWN GENERATION -- no syscall
+     re-incarnates its caller ([UsysMemOk.usys_gen_ok] is quiet at every
+     number) -- so ONE pay fact, at the entry key, reaches every slot the
+     arm has to produce. *)
+  (* THE ARM TAKES THE PAYMENT BACK AND DROPS IT: a generic process's
+     payload is [fun _ => True], so the resource the kernel returns is
+     nothing at all and the slot it produces owes nothing of it. *)
   Lemma uexec_arm_of_all (sc : mword 64) (W : uvis) (f : sfam) :
-    □ (∀ W' : uvis, uslot W') -∗ uexec_arm sc W f.
+    my_pay (uvis_gen W) (fun _ => True)%I -∗
+    □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W') -∗
+    uexec_arm sc W f.
   Proof.
-    iIntros "#H". rewrite /uexec_arm /uexec_arm_F.
-    destruct (decide (sc = uecall_scause)); [ | iApply "H" ].
+    iIntros "#Hpay #H". rewrite /uexec_arm /uexec_arm_F.
+    destruct (decide (sc = uecall_scause));
+      [ | iIntros "_"; iApply ("H" with "Hpay") ].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
+    (* THE RESUME KEY'S GENERATION IS THIS PROCESS'S, so the credential
+       transports -- but only after the key's projection is REDUCED: the
+       family is quantified over the key and its premise reads that key's
+       [uvis_gen], which is [bump]'s own argument. *)
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { rewrite /uexec_fork_parent_F.
-      iIntros (r fdv' cw' cs' _ _ _) "_". iApply "H". }
-    rewrite /uexec_ret_cont_F.
-    iIntros (r M' π' szv' fdv' cw' g' cs' _ _ _ _ _ _) "_". iApply "H".
+    { rewrite /uexec_fork_parent_F. iIntros "_".
+      iIntros (r fdv' cw' cs' _ _ _) "_". iApply "H".
+      cbn [uvis_gen bump]. iExact "Hpay". }
+    rewrite /uexec_ret_cont_F. iIntros "_".
+    iIntros (r M' π' szv' fdv' cw' g' cs' _ _ _ _ Hg _) "_".
+    rewrite (usys_gen_ok_quiet _ _ _ Hg). iApply "H".
+    cbn [uvis_gen bump]. iExact "Hpay".
   Qed.
 
   Lemma uexec_ret_of_all (sc : mword 64) (W : uvis) :
-    □ ssupply -∗ □ (∀ W' : uvis, uslot W') ==∗ uexec_ret sc W.
+    my_pay (uvis_gen W) (fun _ => True)%I -∗
+    □ ssupply -∗
+    □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W') ==∗
+    uexec_ret sc W.
   Proof.
-    iIntros "#Hsup #H".
-    iMod (uexec_dep_F_of_supply uslot sc W with "Hsup H") as (f) "Hdep".
+    iIntros "#Hpay #Hsup #H".
+    iMod (uexec_dep_F_of_supply uslot sc W with "Hpay Hsup H") as (f) "Hdep".
     iModIntro.
     iApply (uexec_ret_join sc W f with "Hdep []").
-    iApply (uexec_arm_of_all sc W f with "H").
+    iApply (uexec_arm_of_all sc W f with "Hpay H").
   Qed.
 
 End UexecRet.
@@ -1429,7 +1698,7 @@ Section UexecRetGen.
   Context `{!ufdG Σ}.
   Context `{!ctokG Σ}.
   Context `{GEN : GenId}.
-  Context `{SG : uexecSG Σ}.
+  Context {SG : uexecSG Σ}.
 
   (* THE SUPPLY IS A PREMISE, and it has to be.  The generic inhabitant is
      safe from every state, so at every ecall it owes the number's deposit
@@ -1443,10 +1712,21 @@ Section UexecRetGen.
      bundles instead and needs no supply; it carries one only to answer
      exec's wand, and then through its own entry constructor
      ([UexecCond.cond_entry_slot]). *)
-  Lemma uexec_wp_uslot (W : uvis) : □ ssupply -∗ □ uexec_wp -∗ uslot W.
+  (* THE PAY FACT IS THE ONE THING THE GENERIC INHABITANT NEEDS OF THE
+     KERNEL, and it is what indexes the family: a process that traps at
+     every state traps at exit too, and exit's deposit is a PAYMENT
+     ([uexec_pay_dep]).  At the TRIVIAL payload, which is the only one a
+     generic process ever has -- its parent was generic, or it is <init> --
+     so this costs its holder nothing.  It rides the Löb: the recursive
+     occurrence is the same family, and the kernel hands the child's copy
+     at fork ([uexec_dep_F_of_supply]). *)
+  Lemma uexec_wp_uslot (W : uvis) :
+    □ ssupply -∗ □ uexec_wp -∗
+    my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
     iIntros "#Hsup #Hwp".
     iLöb as "IH" forall (W).
+    iIntros "#Hpay".
     rewrite uslot_unfold.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     rewrite /uvb /uvb_F.
@@ -1470,8 +1750,9 @@ Section UexecRetGen.
        ([UexecSG.v]'s header) and this is the last point at which the goal
        is a WP, which is what absorbs the update.  [Hk]'s payload takes a
        plain [uexec_ret]. *)
-    iMod (uexec_ret_of_all sc W' with "Hsup []") as "Hret".
-    { iModIntro. iIntros (W''). iApply "IH". }
+    iMod (uexec_ret_of_all sc W' with "[] Hsup []") as "Hret".
+    { rewrite Hgnw. iExact "Hpay". }
+    { iModIntro. iIntros (W'') "Hp". iApply ("IH" with "Hp"). }
     iApply ("Hk" $! W' sc stv with "[%] [%] [%] [%] [%] [%] [Htm Hfrag Hret]");
       [ exact Hperm | exact Hszw | exact Hfdw | exact Hcww | exact Hgnw
       | exact Hchw | ].

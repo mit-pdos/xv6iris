@@ -291,6 +291,7 @@ Require Import UmodeAbi.        (* [uimg_sub]                                *)
 Require Import KexecBuilt.      (* [kxb_perm_ok], [kexec_seg_perm], [kexec_pg]: the
                                    permission projection kexec builds (its home) *)
 Require Import UserFd.          (* [ufdG] -- UexecRet's section binds it     *)
+Require Import ChildTok.        (* [my_pay]: the exec wand's pay fact          *)
 Require Import UexecSlot.       (* [uvis], [uvis_of], [tf_w]                 *)
 Require Import FsAbsEra.        (* [ax_hops_triv]: the trivial hop family  *)
 Require Import SysOpenDefs.   (* [namei_walk_pre_era], [namei_walk_dead_era],
@@ -701,7 +702,22 @@ Section KexecAU.
      neither identify the file arm (a) observed nor refute arm (b); the
      cursor is therefore SPENT here and no longer returned by
      [exec_post_ok]'s success arms. *)
-  Definition exec_slot_pre (S : uvis -> iProp Σ) (Pfin : Z -> iProp Σ)
+  (* THE PAY FACT IS A PREMISE OF BOTH WANDS, and it is what lets the
+     exec'd image's slot be built at all.  A slot is keyed by what its
+     process's exit owes ([UkRun.ukn_pay], backed by [ChildTok.my_pay] of
+     the process's generation), and exec KEEPS the generation -- the slot
+     is not re-incarnated, only its image is ([KexecDefs.KexecOkQ]:
+     [pv_gen V' = pv_gen V]) -- so the fact the exec'ing process handed in
+     with its bundle is exactly the fact the NEW image's constructor needs,
+     at the new key's own generation.  The kernel relays it: it holds it
+     off the deposit ([UexecExecInst.exec_sbundle]) and applies both wands
+     at the key it built, whose [uvis_gen] is the caller's own.
+     [Q] IS THE PROCESS'S OWN NAMING of its payload, for the reason the
+     exit deposit's is ([UexecRet.uexec_pay_dep]): a process may only ever
+     name the payload it can prove is its own, and the generic family names
+     the trivial one. *)
+  Definition exec_slot_pre (S : uvis -> iProp Σ) (Q : Z -> iProp Σ)
+      (Pfin : Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
@@ -710,12 +726,14 @@ Section KexecAU.
         Φo av i (MkAnode (AFile f) nl) -∗
         ⌜kexec_loadable f⌝ -∗
         ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
+        my_pay (uvis_gen W') Q -∗
         S W')
      ∗ (∀ (av : aview) (i : Z) (a : anode) (W' : uvis),
           Pfin i -∗
           Φo av i a -∗
           ⌜~ anode_loadable a⌝ -∗
           ⌜exec_key_ok na alen sts W'⌝ -∗
+          my_pay (uvis_gen W') Q -∗
           S W'))%I.
 
   (* everything the caller hands in *)
@@ -733,7 +751,7 @@ Section KexecAU.
      something about the inums THIS walk visits, which the universally
      quantified form cannot. *)
   Definition exec_au_pre (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
-      (cw : Z)
+      (cw : Z) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
@@ -741,7 +759,7 @@ Section KexecAU.
       (sts : list fdstate) : iProp Σ :=
     (ex_start γfs cw P Pmiss pl
      ∗ pf_at (aopen_commit_at Γ appE) Fo
-     ∗ pf_at (fun S => exec_slot_pre S (P (length (path_elems pl)))
+     ∗ pf_at (fun S => exec_slot_pre S Q (P (length (path_elems pl)))
                          Fo.(pf_recv) na alen afun sts) Fs)%I.
 
   (* THE BUNDLE A CALLER THAT TRACKS NOTHING HANDS IN, and it is free
@@ -753,12 +771,16 @@ Section KexecAU.
      Nothing of the abstract state is spent, so no invariant is needed on
      either side.  [InitBoot.init_boot_bundle_triv] is the caller: the
      first process's exec bundle, over the generic mint. *)
+  (* THE FAMILY IS INDEXED BY THE PAY FACT, exactly as the generic slot
+     family is ([UexecRet.uexec_wp_uslot]): what answers both wands is a
+     slot at every key GIVEN the trivial payload at that key's generation,
+     which is the only payload a generic process ever has. *)
   Lemma exec_au_pre_triv_at (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
-    □ (∀ W : uvis, S W) -∗
-    exec_au_pre (MkPfam S True%I) Γ γfs cw
+    □ (∀ W : uvis, my_pay (uvis_gen W) (fun _ => True)%I -∗ S W) -∗
+    exec_au_pre (MkPfam S True%I) Γ γfs cw (fun _ => True%I)
       (fun _ _ => True%I) (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I))
       pl na alen afun sts.
   Proof.
@@ -773,8 +795,8 @@ Section KexecAU.
        [pf_at_triv]. *)
     rewrite /pf_at /=. iSplit; [| done].
     rewrite /exec_slot_pre. iSplitR.
-    - iIntros (av i f nl W') "_ _ _ _". iApply "HS".
-    - iIntros (av i a W') "_ _ _ _". iApply "HS".
+    - iIntros (av i f nl W') "_ _ _ _ Hp". iApply ("HS" with "Hp").
+    - iIntros (av i a W') "_ _ _ _ Hp". iApply ("HS" with "Hp").
   Qed.
 
   (* ...and the one a caller that wants nothing back hands in: the slot
@@ -783,42 +805,42 @@ Section KexecAU.
   Lemma exec_au_pre_triv Γ (γfs : fs_names) (cw : Z) (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
-    ⊢ exec_au_pre (MkPfam (fun _ => emp%I) True%I) Γ γfs cw
+    ⊢ exec_au_pre (MkPfam (fun _ => emp%I) True%I) Γ γfs cw (fun _ => True%I)
         (fun _ _ => True%I) (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I))
         pl na alen afun sts.
   Proof.
     iApply (exec_au_pre_triv_at (fun _ => emp%I)).
-    iIntros "!>" (W). iEmpIntro.
+    iIntros "!>" (W) "_". iEmpIntro.
   Qed.
 
   (* non-expansive in the slot predicate: UexecExecInst.v instantiates
      [S] at a fixpoint variable, and the fixpoint's contractivity proof
      needs this of the bundle *)
   Lemma exec_slot_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ)
-      (Pfin : Z -> iProp Σ)
+      (Q : Z -> iProp Σ) (Pfin : Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
     S ≡{n}≡ S' ->
-    exec_slot_pre S Pfin Φo na alen afun sts
-    ≡{n}≡ exec_slot_pre S' Pfin Φo na alen afun sts.
+    exec_slot_pre S Q Pfin Φo na alen afun sts
+    ≡{n}≡ exec_slot_pre S' Q Pfin Φo na alen afun sts.
   Proof. intros HS. rewrite /exec_slot_pre. solve_proper. Qed.
 
   (* ...and at the PAIR the bundle takes: the refund does not move with the
      fixpoint, so it is an ordinary binder here. *)
   Lemma exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
-      Γ (γfs : fs_names) (cw : Z)
+      Γ (γfs : fs_names) (cw : Z) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
     S ≡{n}≡ S' ->
-    exec_au_pre (MkPfam S Rs) Γ γfs cw P Pmiss Fo pl na alen afun sts
-    ≡{n}≡ exec_au_pre (MkPfam S' Rs) Γ γfs cw P Pmiss Fo pl na alen afun sts.
+    exec_au_pre (MkPfam S Rs) Γ γfs cw Q P Pmiss Fo pl na alen afun sts
+    ≡{n}≡ exec_au_pre (MkPfam S' Rs) Γ γfs cw Q P Pmiss Fo pl na alen afun sts.
   Proof.
     intros HS. rewrite /exec_au_pre /pf_at. cbn [pf_recv pf_refund].
-    by rewrite (exec_slot_pre_ne n S S' (P (length (path_elems pl)))
+    by rewrite (exec_slot_pre_ne n S S' Q (P (length (path_elems pl)))
                   Fo.(pf_recv) na alen afun sts HS).
   Qed.
 
@@ -867,18 +889,18 @@ Section KexecAU.
 
   (* ret = -1 (header, OUT): the three-way fold of the bundle *)
   Definition exec_post_fail (Fs : pfam Σ (uvis -> iProp Σ)) Γ
-      (γfs : fs_names) (cw : Z)
+      (γfs : fs_names) (cw : Z) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
     ((* (i) nothing fs-visible happened *)
-     exec_au_pre Fs Γ γfs cw P Pmiss Fo pl na alen afun sts
+     exec_au_pre Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts
      ∨ ((* (ii) the walk died at some hop: the era refund shape *)
           (namei_walk_dead_era γfs P Pmiss pl
              ∗ pf_at (aopen_commit_at Γ appE) Fo
-             ∗ pf_at (fun S => exec_slot_pre S (P (length (path_elems pl)))
+             ∗ pf_at (fun S => exec_slot_pre S Q (P (length (path_elems pl)))
                                  Fo.(pf_recv) na alen afun sts)
                  Fs)
           ∨ (* (iii) the walk completed and the node was observed; exec
@@ -889,14 +911,14 @@ Section KexecAU.
              P (length (path_elems pl)) i
              ∗ ⌜arow_at av i a⌝ ∗ Fo.(pf_recv) av i a
              ∗ ⌜exec_fail_ok a na alen c⌝
-             ∗ pf_at (fun S => exec_slot_pre S (P (length (path_elems pl)))
+             ∗ pf_at (fun S => exec_slot_pre S Q (P (length (path_elems pl)))
                                  Fo.(pf_recv) na alen afun sts)
                  Fs)))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, beside
      the landed result relation's own failure equation *)
   Definition exec_arms (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
-      (cw : Z)
+      (cw : Z) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
@@ -904,7 +926,7 @@ Section KexecAU.
       (sts : list fdstate) (gn : gname) (cs : gset gname)
       (U U' : ustate) (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U /\ us_M U' = us_M U⌝
-      ∗ exec_post_fail Fs Γ γfs cw P Pmiss Fo pl na alen afun sts)
+      ∗ exec_post_fail Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts)
      ∨ exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs U U' r)%I.
 
   (* SANITY: the arms imply the landed result relation, so the parallel
@@ -913,13 +935,14 @@ Section KexecAU.
      success arm at the file's entry. *)
   Lemma exec_arms_landed (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
       (cw : Z)
+      (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (gn : gname) (cs : gset gname)
     (U U' : ustate) (r : mword 64) :
-    exec_arms Fs Γ γfs cw P Pmiss Fo pl na alen afun sts gn cs U U' r ⊢
+    exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs U U' r ⊢
       ⌜exists (entry spv szv' : mword 64),
          kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝.
   Proof.
@@ -945,16 +968,17 @@ Section KexecAU.
      [%] and the resource. *)
   Lemma exec_arms_landed_keep (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
       (cw : Z)
+      (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (gn : gname) (cs : gset gname)
     (U U' : ustate) (r : mword 64) :
-    exec_arms Fs Γ γfs cw P Pmiss Fo pl na alen afun sts gn cs U U' r ⊢
+    exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs U U' r ⊢
       ⌜exists (entry spv szv' : mword 64),
          kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝
-      ∧ exec_arms Fs Γ γfs cw P Pmiss Fo pl na alen afun sts gn cs U U' r.
+      ∧ exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs U U' r.
   Proof.
     iIntros "H". iSplit; [| iExact "H"].
     iApply (exec_arms_landed with "H").
@@ -1106,14 +1130,24 @@ Definition wp_kexec_sconf_body
     (dqb dqs dqa dqpv dqas : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
+    (Q : Z -> iProp Σ)
     (P Pmiss : nat -> Z -> iProp Σ)
     (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :=
   let Γfs := fs_gamma_L fsc_fs in
   wp_kexec_frame gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
     pidv U dqb dqs dqa dqpv dqas m K eb b lks
-    (exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+    (* THE PAY FACT RIDES IN WITH THE BUNDLE, and the kernel does one thing
+       with it: hands it to the slot wands at the key it built
+       ([exec_slot_pre]).  It is the exec'ing process's own persistent
+       knowledge of what its exit owes ([ChildTok.my_pay] at [gn], which is
+       the generation exec keeps), and it comes off the deposit
+       ([UexecExecInst.exec_sbundle]) rather than out of the block, because
+       the block's own copy is at an existential payload and the caller's
+       wands are at ITS naming of it. *)
+    (my_pay gn Q ∗
+     exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) Q P Pmiss Fo
        (bview plen pfun) na alen afun sts)
-    (exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+    (exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) Q P Pmiss Fo
        (bview plen pfun) na alen afun sts gn cs U).
 
 (* ===================================================================== *)
@@ -1137,8 +1171,9 @@ Module Type KEXEC.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
+      (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)),
       wp_kexec_sconf_body Fs gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
-        pidv U sts gn cs dqb dqs dqa dqpv dqas m K eb b lks P Pmiss Fo.
+        pidv U sts gn cs dqb dqs dqa dqpv dqas m K eb b lks Q P Pmiss Fo.
 End KEXEC.

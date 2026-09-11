@@ -242,7 +242,7 @@ Section ProofFreeproc.
     pose proof (fr_cap K HK) as (Hc4 & Hckf & Hcpf).
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hcpu #Htext Hpc #Hplk Hheld Hrest Hrow Hpg Htf #Henv Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hplk Hheld Hrest Hrow Hxb Hpg Htf #Henv Hcont".
     iDestruct "Hrest" as "(%Hpure & Hpid & Hfields & Hof & Hunits & Hspare & Hkst & Hctx)".
     destruct Hpure as (Hofv & Hcwdv & Hszb).
     iDestruct "Hheld" as "(Hlk & Hstate & Hpsg & Hchan & Hpub)".
@@ -268,6 +268,18 @@ Section ProofFreeproc.
        tail block can just join them. *)
     iDestruct (ctx_word4_pointsto_agree with "Hpid Hpid2") as %Hpideq.
     subst pid2.
+    (* THE xstate CELL, JOINED.  [p->xstate = 0] is a write, so the two
+       halves -- <p->lock>'s out of [proc_held] and the slot's out of the
+       block -- come together here and are re-split at the hand-back.  They
+       name the same word for free ([ctx_word4_pointsto_agree]). *)
+    iDestruct "Hxb" as (xsb) "Hxb".
+    iDestruct (ctx_word4_pointsto_agree with "Hxstate Hxb") as %Hxseq.
+    subst xsb.
+    assert (Hxhalf : (1/2 + 1/2)%Qp = 1%Qp) by compute_done.
+    iAssert (p_xstate pa ↦₄{DfracOwn (1/2 + 1/2)} xs)%I
+      with "[Hxstate Hxb]" as "Hxstate".
+    { rewrite ctx_word4_pointsto_frac_split. iFrame "Hxstate Hxb". }
+    iEval (rewrite Hxhalf) in "Hxstate".
 
     (* ================================================================= *)
     (* §A  PROLOGUE: the 32-byte frame; only three slots are written.     *)
@@ -783,8 +795,13 @@ Section ProofFreeproc.
       iDestruct (cpu_own_transport CIDrel CIDzd ilvl eb pme false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDzd with "[]"); [ iPureIntro; wp_next_chain | ].
-      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid2]
-                                  [Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hrow Hpg Htf]").
+      (* THE ZEROED xstate CELL, RE-SPLIT: <p->lock>'s half goes back into
+         [proc_held]'s public payload, the slot's into the UNUSED block. *)
+      assert (Hxhalf2 : (1/2 + 1/2)%Qp = 1%Qp) by compute_done.
+      iEval (rewrite -Hxhalf2 ctx_word4_pointsto_frac_split) in "Hxstate".
+      iDestruct "Hxstate" as "[Hxs1 Hxs2]".
+      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxs1 Hpid2]
+                                  [Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hrow Hxs2 Hpg Htf]").
       { (* callee_saved mm E3 *)
         assert (HE3thr : fr_thr mm E3).
         { thr_done. }
@@ -811,14 +828,14 @@ Section ProofFreeproc.
         iFrame "Hchan".
         iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
                 (mword_of_int 0 : mword 32).
-        iFrame "Hkilled Hxstate Hpid2". }
+        iFrame "Hkilled Hxs1 Hpid2". }
       { (* proc_dormant pa UNUSED, at the emptied V *)
         iApply (fp_to_dormant_unused pa
                   (MkPPriv (zero_reg : mword 64) (pv_upt V) (pv_tf V)
                            (pv_ofile V) (pv_fdg V) (pv_cwd V) (<[0%nat := (mword_of_int 0 : mword 8)]> (pv_name V))
                            (pv_cwi V) (pv_gen V) (pv_chg V))
-                  (mword_of_int 0 : mword 32) (pv_sz V)
-                  with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hrow] [Hpg] [Htf]").
+                  (mword_of_int 0 : mword 32) (pv_sz V) (mword_of_int 0 : mword 32)
+                  with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hrow] [Hxs2] [Hpg] [Htf]").
         - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
           iSplitR.
           { iPureIntro. split_and!; [exact Hofv | exact Hcwdv |].
@@ -830,6 +847,7 @@ Section ProofFreeproc.
           rewrite /pname_cells. iExact "Hnm".
         (* the row's key is [pv_chg], which the emptied block keeps *)
         - cbn [pv_chg]. iExact "Hrow".
+        - iExact "Hxs2".
         - rewrite /fp_pt. iExact "Hpg".
         - rewrite /fp_tf. iExact "Htf". } }
 

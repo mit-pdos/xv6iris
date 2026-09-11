@@ -242,7 +242,7 @@ Section UexecCond.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context `{SG : uexecSG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
   (* THE CONDITIONAL CONSTRUCTOR: a verified program's slot when its gate
@@ -254,7 +254,7 @@ Section UexecCond.
   (* the gate's yes branch: sync's own slot *)
   Lemma sync_gate_slot (W : uvis) :
     (forall k : Z, k <> USYS_exec -> psok k) ->
-    sync_gate W -> udep -∗ uslot W.
+    sync_gate W -> udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
     intros Hpsok (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen & Hstop).
     exact (sync_uexec_slot W Hpc
@@ -267,7 +267,7 @@ Section UexecCond.
   (* ...and echo's *)
   Lemma echo_gate_slot (W : uvis) :
     (forall k : Z, k <> USYS_exec -> psok k) ->
-    echo_gate W -> udep -∗ uslot W.
+    echo_gate W -> udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
     intros Hpsok (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs
             & Hfdlen & Hstop).
@@ -285,19 +285,28 @@ Section UexecCond.
      and its minting law.  The generic tail additionally needs [□ ssupply]
      itself, because [uexec_wp_uslot] mints a bundle at EVERY number
      ([UexecRet.uexec_ret_of_all]). *)
+  (* THE PAY FACT IS THE ENTRY'S OTHER PREMISE, beside the supplier: every
+     branch of this slot may trap at exit, and exit's deposit is a PAYMENT
+     ([UexecRet.uexec_pay_dep]).  AT THE TRIVIAL PAYLOAD, which is the
+     only one a generic process ever has -- its parent was generic, or it
+     is <init> -- and which the two verified branches (sync, echo) also
+     run at this lane.  The kernel is what hands it in: [SpecKexec.
+     exec_slot_pre]'s wands at an exec, the fork deposit's own premise at a
+     fork, and [SpecUserinit] at boot. *)
   Lemma cond_entry_slot (W : uvis) :
     (* the numbers every branch may route through the supplier; the mint
        sites see the instance and discharge it ([UexecSG.v]'s header for why
        it travels beside [udep] rather than inside its law) *)
     (forall k : Z, k <> USYS_exec -> psok k) ->
-    udep -∗ □ ssupply -∗ □ uexec_wp -∗ uslot W.
+    udep -∗ □ ssupply -∗ □ uexec_wp -∗
+    my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
-    intros Hpsok. iIntros "#Hdep #Hsup #Hgen".
+    intros Hpsok. iIntros "#Hdep #Hsup #Hgen #Hpay".
     destruct (decide (sync_gate W)) as [Hgate | _].
-    { iApply (sync_gate_slot W Hpsok Hgate with "Hdep"). }
+    { iApply (sync_gate_slot W Hpsok Hgate with "Hdep Hpay"). }
     destruct (decide (echo_gate W)) as [Hgate | _].
-    { iApply (echo_gate_slot W Hpsok Hgate with "Hdep"). }
-    iApply (uexec_wp_uslot W with "Hsup Hgen").
+    { iApply (echo_gate_slot W Hpsok Hgate with "Hdep Hpay"). }
+    iApply (uexec_wp_uslot W with "Hsup Hgen Hpay").
   Qed.
 
 End UexecCond.

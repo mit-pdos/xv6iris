@@ -78,17 +78,21 @@ Section UkShMalloc.
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
 
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
+     CLASS so that it reaches the exit ecall without an argument at every
+     call site ([UkRun.ukn_triv]). *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -1228,11 +1232,11 @@ Section UkShMalloc.
   Proof.
     iIntros "Hrun".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs)
-      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
     iDestruct (UkStep.uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
     iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw, gn, cs.
-    iFrame "Hheap Hstk Hufd Hcwda Hcha Hdep Hb".
+    iFrame "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep Hb".
     iPureIntro. split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 

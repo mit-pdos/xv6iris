@@ -945,7 +945,10 @@ Section ProofMain.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt".
     iIntros "Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hchb Hnpid Hprocs Hppub Hpshare Hfds Hirs Hbss Hparks Hpst Hcont".
-    iDestruct "Hchb" as "[Hchres Hchrows]".
+    (* THE ORPHAN VAR IS THE MIDDLE ONE ([WaitInv.children_boot]): the boot
+       fupd mints it at [∅] beside the map's authority, and it goes into
+       <wait_lock>'s payload with the children half. *)
+    iDestruct "Hchb" as "[Hchres [Horph Hchrows]]".
     iDestruct "Hlkmem" as (vkl vkn vkc) "(Hkw & Hkn & Hkc)".
     iDestruct "Hkpt" as (kpt0) "Hkpt".
     (* ---- +0x6e jal kinit ---- *)
@@ -1187,7 +1190,7 @@ Section ProofMain.
        CANONICAL ([Xv6Cameras.wch_name]) -- a row of it has to be spellable
        in [ProcDefs.proc_dormant] -- so nothing travels with the lock's own
        gname any more. *)
-    iDestruct (WaitInv.wait_res_alloc with "Hwres Hchres") as "Hwres".
+    iDestruct (WaitInv.wait_res_alloc with "Hwres Hchres Horph") as "Hwres".
     iMod (newlock ⊤ wait_lock_addr "wait_lock"%string (wait_res_at)
             with "Hwnm Hrun Hww Hwc0 Hwres") as "[Hrun Hwl0]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".

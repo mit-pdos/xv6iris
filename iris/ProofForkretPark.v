@@ -79,6 +79,7 @@ Require Import RiscvExtras.
 Require Import IntrDefs.
 Require Import ProcGeom.
 Require Import ProcDefs.
+Require Import ChildTok.  (* [gen_kq] / [my_pay]: the boot arm's pair *)
 Require Import SwtchCtx.
 Require Import FdSlots.
 Require Import FileInvDefs.
@@ -127,7 +128,7 @@ Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-  (* NO [Context `{SG : uexecSG Σ}]: this file sits ABOVE
+  (* NO [Context {SG : uexecSG Σ}]: this file sits ABOVE
      [UexecExecInst], so the deposit class it speaks is that file's
      INSTANCE, and so is the one the specs it inhabits were stated at.  A
      section variable here would be a SECOND class of the same type, and the
@@ -211,7 +212,15 @@ Global Instance fkp_park_block_morph
   CtxMorph (λ ξ, (if steady then proc_priv (XI := ξ) γf pa pid U
                   else proc_priv_nocwd (XI := ξ) γf pa pid U
                        ∗ cwd_ref_at (XI := ξ) (pv_cwd (us_V U)) (pv_cwi (us_V U))
-                       ∗ FirstTok.first_boot (XI := ξ))%I).
+                       ∗ FirstTok.first_boot (XI := ξ)
+                       (* the incarnation's pair names no context, so the
+                          transport is the identity on both halves *)
+                       ∗ ChildTok.gen_kq (pv_gen (us_V U)) pa pid
+                           (fun _ => True)%I
+                       ∗ ChildTok.my_pay (pv_gen (us_V U)) (fun _ => True)%I
+                       ∗ (∃ xsv : mword 32,
+                            ctx_word4_pointsto ξ (p_xstate pa)
+                              (DfracOwn (1/2)) xsv))%I).
 (* the last conjunct of a [sep] comes back ETA-REDUCED, so the solver's
    head-symbol dispatch does not see it as a λ; [first_boot_morph] by name
    closes it (CtxMorphTac.v's two spellings of [ctx_parked_morph] are the
@@ -260,10 +269,20 @@ Proof.
      steady mode, and on the boot mode the deficit block, the cwd reference
      and [FirstTok.first_boot]'s rows -- three transports under one [if],
      which [ctx_morph_if] takes apart. *)
+  (* THE INCARNATION'S PAIR RIDES IN THE SAME [if]: both halves are
+     saved-predicate fragments and name no context, so the transport is the
+     identity on them ([ChildTok] is context-free). *)
   iMod (ctx_move (R := λ ξ, (if steady then proc_priv (XI := ξ) γf (proc_addr j) pid U
                              else proc_priv_nocwd (XI := ξ) γf (proc_addr j) pid U
                                   ∗ cwd_ref_at (XI := ξ) (pv_cwd (us_V U)) (pv_cwi (us_V U))
-                                  ∗ FirstTok.first_boot (XI := ξ))%I)
+                                  ∗ FirstTok.first_boot (XI := ξ)
+                                  ∗ ChildTok.gen_kq (pv_gen (us_V U)) (proc_addr j) pid
+                                      (fun _ => True)%I
+                                  ∗ ChildTok.my_pay (pv_gen (us_V U))
+                                      (fun _ => True)%I
+                                  ∗ (∃ xsv : mword 32,
+                                       ctx_word4_pointsto ξ (p_xstate (proc_addr j))
+                                         (DfracOwn (1/2)) xsv))%I)
           cur_ctx XIc with "Hrun Hthr Hpriv") as "(Hrun & Hthr & Hpriv)".
   (* ...and the mode row, which forkret reads at ITS context: the boot arm's
      [first_addr ↦₄ 1] comes out of the block that was just moved, so the
@@ -298,6 +317,12 @@ Proof.
              ⌜pv_fdg (us_V U') = pv_fdg (us_V U)⌝ -∗
              (* ...and its children-row name, on the same route *)
              ⌜pv_chg (us_V U') = pv_chg (us_V U)⌝ -∗
+             (* ...AND ITS GENERATION, the pin the exit deposit crosses on:
+                the slot this closer yields is keyed at the parked block's
+                own [ProcDefs.pv_gen] ([SpecForkret.forkret_closer]'s [gn]),
+                and the resumed record names the same incarnation -- nothing
+                between the park and the resume re-incarnates the slot. *)
+             ⌜pv_gen (us_V U') = pv_gen (us_V U)⌝ -∗
              ⌜pv_cwi (us_V U') = pv_cwi (us_V U)⌝ -∗
              (* ...and, on the steady mode, the parked run key -- passed
                 straight through to the package's own closer *)
@@ -318,11 +343,11 @@ Proof.
                 | None => emp
                 end))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcg %Hcwi %Hrk #Hglob #Htfk Hdone HW #Htc Hy".
+  { iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcg %Hgen %Hcwi %Hrk #Hglob #Htfk Hdone HW #Htc Hy".
     iApply ("Hclose" $! h Xc pt' U'
-              with "[%] [%] [%] [%] [%] [%] [%] Hglob Htfk Hdone HW Htc Hy Hfd Hirsp");
-      [exact HV | exact Hnorm | exact Hptwf | exact Hfg | exact Hcg | exact Hcwi
-      | exact Hrk]. }
+              with "[%] [%] [%] [%] [%] [%] [%] [%] Hglob Htfk Hdone HW Htc Hy Hfd Hirsp");
+      [exact HV | exact Hnorm | exact Hptwf | exact Hfg | exact Hcg | exact Hgen
+      | exact Hcwi | exact Hrk]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
   iDestruct "Hpay" as (A' cret backr) "[Hrec Hpay]".
   (* the payload can only be the DISPATCH one -- the parking disjunct would
@@ -383,7 +408,7 @@ Proof.
   iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γw γft γf γtl pid U sts
             (pv_gen (us_V U)) cs ks m av
             (av - 6 - trap_res eb')%nat eb' steady
-            Hj Hgl Hbud Hkx Hut Hsp
+            Hj eq_refl Hgl Hbud Hkx Hut Hsp
           with "Htext Hwire Hkmap Hpc [] [] Hcg Hcpu Htc Hclm
                 Hlocked HR Hksc [Hpriv] HW Hmode Hclose").
   (* THE THREE MOVED ROWS -- [procs_inv], [park_globals]'s handles and the
@@ -431,11 +456,11 @@ Proof.
      one hypothesis, on either arm *)
   iSplitL "Hmode"; [iExact "Hmode"|].
   iNext.
-  iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcg %Hcwi %Hrk #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
+  iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcg %Hgen %Hcwi %Hrk #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
   iApply ("Hclose" $! h Xc pt' U'
-            with "[%] [%] [%] [%] [%] [%] [%] Hglob Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
-    [exact HV | exact Hnorm | exact Hptwf | exact Hfg | exact Hcg | exact Hcwi
-    | exact Hrk].
+            with "[%] [%] [%] [%] [%] [%] [%] [%] Hglob Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
+    [exact HV | exact Hnorm | exact Hptwf | exact Hfg | exact Hcg | exact Hgen
+    | exact Hcwi | exact Hrk].
 Qed.
 
 End ForkretParkProof.

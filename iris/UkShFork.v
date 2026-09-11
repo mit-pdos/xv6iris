@@ -94,7 +94,11 @@ Section UkShFork.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
+     CLASS so that it reaches the exit ecall without an argument at every
+     call site ([UkRun.ukn_triv]). *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -102,10 +106,10 @@ Section UkShFork.
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
   Local Notation γch := (ukn_ch N).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -189,7 +193,7 @@ Section UkShFork.
   (* §3 THE ARM.                                                            *)
   (* ===================================================================== *)
   Lemma wp_kshf_fork
-      (Hsbrk : forall (N' : uk_names) (sz n : Z) (r : mword 64),
+      (Hsbrk : forall (N' : uk_names Σ) (sz n : Z) (r : mword 64),
          UkShMalloc.ushm_sbrk_ans N' sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
          UkShMalloc.ushm_sbrk_ans N' sz n r)
@@ -371,7 +375,7 @@ Section UkShFork.
       + exact HregsD.
       + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hustd Hcwd Hch".
     - (* ================= THE CHILD: parse, run, exec =================== *)
-      iIntros (N' hA mA) "%HcsA %Ha0A #Hcode' Hpay Hsz Hustd Hcwd Hch _ Hrun".
+      iIntros (N' hA mA) "%Hti' %HcsA %Ha0A #Hcode' Hpay Hsz Hustd Hcwd Hch _ Hrun".
       iDestruct "Hpay" as "(_ & #Hro' & #Hjt' & Hdat & Hbuf)".
       (* ---- 0x930  c.beqz a0,0x9c0 -- TAKEN: this is the child ---- *)
       iApply (wp_uk_cbeqz N' hA mA (mword_of_int 0x930)
@@ -437,7 +441,7 @@ Section UkShFork.
   (* second is stage 5's [ush_simple] scope and not this file's.            *)
   (* ===================================================================== *)
   Lemma wp_kshm_body
-      (Hsbrk : forall (N' : uk_names) (sz n : Z) (r : mword 64),
+      (Hsbrk : forall (N' : uk_names Σ) (sz n : Z) (r : mword 64),
          UkShMalloc.ushm_sbrk_ans N' sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
          UkShMalloc.ushm_sbrk_ans N' sz n r)
@@ -793,7 +797,7 @@ Section UkShFork.
         (length toks < 10)%nat.
 
   Lemma ushf_rest_of_body
-      (Hsbrk : forall (N' : uk_names) (sz n : Z) (r : mword 64),
+      (Hsbrk : forall (N' : uk_names Σ) (sz n : Z) (r : mword 64),
          UkShMalloc.ushm_sbrk_ans N' sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
          UkShMalloc.ushm_sbrk_ans N' sz n r)

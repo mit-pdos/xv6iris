@@ -138,10 +138,10 @@ Section UkShDiagStr.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
   (* ONE BYTE OF A STRING, IN WHICHEVER HALF IT LIVES -- AND AT WHATEVER
@@ -246,7 +246,7 @@ Section UkShDiagStr.
 
   (* the one load, at either half.  Stated at [wp_uk_lbu]'s shape, dfrac
      replaced by the half. *)
-  Lemma wp_shd_lbu (N : uk_names) (h : CpuId) (m : regfile)
+  Lemma wp_shd_lbu (N : uk_names Σ) (h : CpuId) (m : regfile)
       (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5) (tx : bool)
       (dq : dfrac) (a : Z) (b0 : mword 8) (avail : nat) :
     unot_sp rd ->
@@ -275,7 +275,7 @@ Section UkShDiagStr.
   Qed.
 
   (* the heap's own bounds, read off whichever half the string is in *)
-  Lemma urun_shd_sb_bnd (N : uk_names) (h : CpuId) (m : regfile)
+  Lemma urun_shd_sb_bnd (N : uk_names Σ) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (tx : bool) (dq : dfrac) (a : Z)
       (b : bv 8) :
     urun N h m pc avail -∗ shd_sb (ukn_t N) (ukn_d N) tx dq a b -∗
@@ -291,7 +291,7 @@ Section UkShDiagStr.
       iPureIntro. exact Hbnd.
   Qed.
 
-  Lemma urun_shd_str_bnd (N : uk_names) (h : CpuId) (m : regfile)
+  Lemma urun_shd_str_bnd (N : uk_names Σ) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (tx : bool) (dq : dfrac) (a : Z)
       (len : nat) (f : nat -> bv 8) :
     urun N h m pc avail -∗ shd_str (ukn_t N) (ukn_d N) tx dq a len f -∗
@@ -373,10 +373,10 @@ Section UkShDiagLit.
   Context `{!riscvGS Σ}.
 
   Context `{!ufdG Σ}.
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* the literal, as the resource vprintf reads *)
   Lemma shd_lit_str (γt : gname) (base : Z) (len : nat) :
@@ -417,17 +417,21 @@ Section UkShDiagPutc.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
+     CLASS so that it reaches the exit ecall without an argument at every
+     call site ([UkRun.ukn_triv]). *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -871,17 +875,21 @@ Section UkShDiagVprintf.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
+     CLASS so that it reaches the exit ecall without an argument at every
+     call site ([UkRun.ukn_triv]). *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -2982,7 +2990,11 @@ Section UkShDiagVprintfS.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
+     CLASS so that it reaches the exit ecall without an argument at every
+     call site ([UkRun.ukn_triv]). *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -2998,10 +3010,10 @@ Section UkShDiagVprintfS.
   Context (tx : bool).
   (* the share the DATA half is borrowed at; the text half ignores it *)
   Context (dqs : dfrac).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -5560,7 +5572,11 @@ Section UkShDiagFprintf.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
+     CLASS so that it reaches the exit ecall without an argument at every
+     call site ([UkRun.ukn_triv]). *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -5576,10 +5592,10 @@ Section UkShDiagFprintf.
   Context (tx : bool).
   (* the share the DATA half is borrowed at; the text half ignores it *)
   Context (dqs : dfrac).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -6889,10 +6905,10 @@ Section UkShDiagFmt.
   Context `{!riscvGS Σ}.
 
   Context `{!ufdG Σ}.
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -6945,17 +6961,21 @@ Section UkShDiagRun.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
+     CLASS so that it reaches the exit ecall without an argument at every
+     call site ([UkRun.ukn_triv]). *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -7322,10 +7342,10 @@ Section UkShDiagLeaf.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -7356,7 +7376,7 @@ Section UkShDiagLeaf.
   Qed.
 
   Lemma ush_diag_leaf_holds :
-    forall (N : uk_names) (h : CpuId) (m : regfile) (pc : Z) (n : nat),
+    forall (N : uk_names Σ) `{!ukn_triv N} (h : CpuId) (m : regfile) (pc : Z) (n : nat),
       ush_diag_at pc m ->
       shk_code (ukn_t N) -∗
       shk_rodata (ukn_t N) -∗
@@ -7364,7 +7384,7 @@ Section UkShDiagLeaf.
       urun N h m (mword_of_int pc) (ush_Dg + n) -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros N h m pc n Hat.
+    intros N Hti h m pc n Hat.
     iIntros "#Hcode #Hro Hres Hrun".
     destruct Hat as [ [-> Hmsg] | [ [-> Hal] | [-> Hal] ] ].
     - (* =============== panic, at one of the three messages =============== *)
@@ -7546,7 +7566,7 @@ Section UkShDiagLeaf.
      down (WpUmodeTextLoad.v), so this is a genuine gap and one engine leaf
      discharges it here and in [UkShParse.v]. *)
   Definition ushd_clw_text_ty : Prop :=
-    forall (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
+    forall (N : uk_names Σ) (h : CpuId) (m : regfile) (pc : mword 64)
            (uimm : mword 5) (crs1 crd : mword 3) (rs1 rd : mword 5) (a : Z)
            (wv : mword 32) (avail : nat),
       unot_sp rd ->
@@ -7567,7 +7587,7 @@ Section UkShDiagLeaf.
 
   Lemma wp_kshr_runcmd_final (Hclw : ushd_clw_text_ty) (c : ushcmd) :
     ush_simple c ->
-    forall (N : uk_names) (h : CpuId) (m : regfile) (t szv : Z)
+    forall (N : uk_names Σ) `{!ukn_triv N} (h : CpuId) (m : regfile) (t szv : Z)
            (ld : list fdstate) (n : nat),
       m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
       shk_code (ukn_t N) -∗
@@ -7582,7 +7602,7 @@ Section UkShDiagLeaf.
       WP (Loop : expr riscv_lang).
   Proof. exact (wp_kshr_runcmd ush_Dg Hpsok Hclw ush_diag_leaf_holds c). Qed.
 
-  Lemma wp_kshr_fork1_final (N : uk_names)
+  Lemma wp_kshr_fork1_final (N : uk_names Σ) `{!ukn_triv N}
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
       (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
       (h : CpuId) (m : regfile) (n : nat) :
@@ -7605,7 +7625,13 @@ Section UkShDiagLeaf.
           (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
           (2 + (ush_Dg + n)) -∗
         WP (Loop : expr riscv_lang)) ∗
-     (∀ (N' : uk_names) (h' : CpuId) (m' : regfile),
+     (∀ (N' : uk_names Σ) (h' : CpuId) (m' : regfile),
+        (* THE CHILD'S RECORD PAYS THE SAME NOTHING ITS PARENT DOES: the
+           payload the fork's split put on the child's generation is the
+           parent's ([UkFork]'s child arm gives the equation), and this
+           program's is trivial -- so the arm hands the class on and every
+           leaf below it, exit included, resolves it. *)
+        ⌜ ukn_triv N' ⌝ -∗
         ⌜ ucallee_saved m m' ⌝ -∗
         ⌜ m' !!! Regidx a0_idx = (mword_of_int 0 : mword 64) ⌝ -∗
         shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗

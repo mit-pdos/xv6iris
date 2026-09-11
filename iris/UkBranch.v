@@ -16,7 +16,7 @@
 (* The statements are WpUmodeBranch.v's with                              *)
 (* [uv_cap_gpr C pt Ψ M m ∗ pc_is pc] read as [uvb C pt Rfd Rut sz π fdv cw gn cs M m pc]  *)
 (* and [∀ CID0, uv_cap_gpr … M m -∗ pc_is pc' -∗ WP] read as              *)
-(* [ukc π M sz fdv cw gn cs m pc']; the pure premises, the value convention and the       *)
+(* [ukcq Qp π M sz fdv cw gn cs m pc']; the pure premises, the value convention and the       *)
 (* proofs are unchanged.  The section carries the ambient table's guard   *)
 (* ([loop_ok C pt], [perm_of (ud_um pt) sz = π]), which is what lets the  *)
 (* retiring arm hand the bundle at THIS table to a continuation that      *)
@@ -58,10 +58,13 @@ Section UkBranch.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  (* the payload the run keeps -- implicit, read off the continuation
+     ([UexecRet.ukcq]); no call site names it *)
+  Context {Qp : Z -> iProp Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,
@@ -122,13 +125,13 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ▷ ukc π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    ▷ ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign.
     iIntros "Hb Hcont".
     (* re-shape the continuation into the funnel's [uv_upd]/[uv_next] form *)
-    iAssert (▷ ukc π M sz fdv cw gn cs (uv_upd m None)
+    iAssert (▷ ukcq Qp π M sz fdv cw gn cs (uv_upd m None)
                (uv_next (if taken then Some tgt else None)
                   (add_vec_int pc (if is_rvc then 2 else 4))))%I
       with "[Hcont]" as "Hcont".
@@ -176,7 +179,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign.
@@ -198,7 +201,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
+    ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
@@ -221,7 +224,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ▷ ukc π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
+    ▷ ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
@@ -250,7 +253,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ▷ ukc π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
+    ▷ ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
@@ -270,7 +273,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
+    ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
@@ -296,7 +299,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0")))) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 2) -∗
+    ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr Htaken Htgt Halign.
@@ -333,7 +336,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0")))) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 2) -∗
+    ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr Htaken Htgt Halign.

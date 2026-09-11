@@ -64,6 +64,7 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
 Require Import WpMmodeLeafBase.
+Require Import ChildTok.  (* [my_pay]: the exit deposit's own naming *)
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
@@ -104,7 +105,10 @@ Definition wp_sys_exit_sconf_body
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
     (pid : mword 32) (U : ustate) (sts : list fdstate)
-    (v0 : mword 64) (lks : gset string) (cs : gset gname) :=
+    (v0 : mword 64) (lks : gset string) (cs : gset gname)
+    (* the exit deposit's own payload -- see the premise at the foot of the
+       list *)
+    (Q : Z -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exit in
   let pj := proc_addr j in
   fn = MkFCloseNames γs j γl pd pav pu
@@ -184,6 +188,14 @@ Definition wp_sys_exit_sconf_body
      fragment bundle ([UsertrapRes.ut_own]) and, like it, does not come back
      to the caller: there is no caller to come back to. *)
   ch_frag (pv_chg (us_V U)) pj cs -∗
+  (* ...AND THE EXIT DEPOSIT, relayed to kexit verbatim: the process's own
+     knowledge of the payload its exit owes and that payload PAID at the
+     status its trapframe carries ([ProcGeom.exit_xs], the very word
+     [argint(0,&n)] reads out one instruction below).  sys_exit does
+     nothing with it -- kexit is what parks it as the ZOMBIE escrow
+     ([SpecKexit]) -- so it is stated here exactly as kexit states it. *)
+  my_pay (pv_gen (us_V U)) Q -∗
+  Q (exit_xs (pv_tf (us_V U))) -∗
   (* NO continuation: sys_exit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
 
@@ -197,9 +209,9 @@ Module Type SYSEXIT.
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
-    (v0 : mword 64) (lks : gset string) (cs : gset gname),
+    (v0 : mword 64) (lks : gset string) (cs : gset gname) (Q : Z -> iProp Σ),
       wp_sys_exit_sconf_body γft γf γw γs j γl pd pav pu
  ip dqi
 
-                             on fn m av eb b pid U sts v0 lks cs.
+                             on fn m av eb b pid U sts v0 lks cs Q.
 End SYSEXIT.

@@ -249,11 +249,11 @@ Section UShKernel.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context `{SG : uexecSG Σ}.
-  Context `{PS : uprogSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
   (* THE NUMBERS SH ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis here as it is in the program files, and the exec dispatcher
      -- which sees the instance -- discharges it, exactly as it discharges
@@ -266,7 +266,7 @@ Section UShKernel.
   (* ------------------------------------------------------------------- *)
   (* SS1 UkSh's Hypothesis, discharged (header).                          *)
   (* ------------------------------------------------------------------- *)
-  Lemma ush_read_leaf_of_win (N : uk_names) :
+  Lemma ush_read_leaf_of_win (N : uk_names Σ) :
     forall (h : CpuId) (m : regfile) (pc : mword 64) (a : Z) (k : nat)
            (f : nat -> bv 8) (avail : nat),
       usysno m = USYS_read ->
@@ -349,18 +349,26 @@ Section UShKernel.
        obligation; the exec bundle rides in through [ush_rest], whose
        discharge takes [UkRun.uxsup].) *)
     udep -∗
-    (∀ N : uk_names,
+    (∀ N : uk_names Σ,
        ush_rest N (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
+    (* THE PAY FACT, at the trivial payload: sh's exit owes its parent
+       nothing this lane (L7 is what changes it), and the entry constructor
+       is what writes it into the record ([UkRun.ukn_pay]). *)
+    my_pay (uvis_gen W) (fun _ => True)%I -∗
     uslot W.
   Proof.
     intros Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop.
-    iIntros "#Hpay #Hdep #Hrest".
-    iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Hal8
-              Hroom Hstk Hfdlen Hstop with "Hdep").
+    iIntros "#Hpay #Hdep #Hrest #Hmp".
+    iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) (fun _ => True)%I
+              Hal8 Hroom Hstk Hfdlen Hstop with "Hdep Hmp []").
+    (* the payload at the trivial one: this process owes its parent
+       nothing, so what its run carries between traps is [True] *)
+    { done. }
     (* sh's own half of its children set travels in [UkSh.ush_pstate]
        beside the ledger and the cwd: fork1 MOVES the set, so the fragment
        goes down the chain index-free ([UserChildren.uch_any]). *)
-    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf Hchf Dlo _ Hrun".
+    iIntros (N h) "%Hpayeq %Hsz Hszf #Ht Hstd Hcwf Hchf Dlo _ Hrun".
+    pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
     rewrite Hpc.
     (* [R] and the line buffer, out of the data below the frame *)
     iDestruct ("Hpay" $! (ukn_t N) (ukn_d N) (ukn_s N) with "Hszf Dlo")
@@ -400,8 +408,10 @@ Section UShKernel.
         ∃ f : nat -> bv 8, R γt γd γs ∗ ubytes γd sh_buf sh_nbuf f) -∗
     (* the deposit supplier, passed straight through *)
     udep -∗
-    (∀ N : uk_names,
+    (∀ N : uk_names Σ,
        ush_rest N (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
+    (* the pay fact, passed straight through: see [sh_uexec_slot] *)
+    my_pay (uvis_gen W') (fun _ => True)%I -∗
     uslot W'.
   Proof.
     intros Hok Hroom Hlen.

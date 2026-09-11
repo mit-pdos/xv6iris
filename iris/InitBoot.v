@@ -45,6 +45,7 @@ Require Import FsAbsDefs.               (* [aview], [anode] *)
 Require Import FsBytesGamma.            (* [fs_gamma_L]: the live Γ *)
 Require Import FsCfg.                   (* [fsc_fs] *)
 Require Import PieceFam.                (* [pfam] / [MkPfam] *)
+Require Import ChildTok.                (* [my_pay]: the pay fact the boot bundle is at *)
 Require Import UexecSlot.               (* [uvis] *)
 Require Import UserFd.                  (* [ufdG] *)
 Require Import UexecSG.                 (* [uexecSG] *)
@@ -81,7 +82,13 @@ Section InitBoot.
      not match), and the park package that carries this row is built at
      the PARKER's context and spent at the RESUMER's. *)
   Context `{GEN : GenId}.
-  Context `{SG : uexecSG Σ}.
+  (* NO [ctokG] BINDER OF ITS OWN: [Xv6G.xv6_ctok] is in scope, and a second
+     [Context `{!ctokG Σ}] beside it would win instance resolution here while
+     every file that has only [xv6G] resolves to the field -- two instances
+     that print alike and do not match ([UexecSG]'s note).  The class index
+     is met by the field; the SG binder is NON-generalizing (braces) so that
+     it resolves rather than abstracting a fresh one. *)
+  Context {SG : uexecSG Σ}.
 
   (* WHAT THE APPLICATION OWES THE KERNEL ABOUT USER EXECUTION, and it is
      the only thing it owes: kexec's caller-side bundle at "/init", at the
@@ -98,24 +105,34 @@ Section InitBoot.
 
      [na = 1] and the single argument being the path again is forkret's
      call verbatim: [kexec("/init", (char *[]){"/init", 0})]. *)
+  (* AT THE TRIVIAL PAYLOAD.  <init> has no parent, so its exit owes
+     nobody anything: userinit's own choice ([SpecUserinit] states it), and
+     the payload the slot wands hand the exec'd image is therefore
+     [fun _ => True] -- which is exactly what a generic family can pay
+     exit with ([UexecRet.uexec_pay_dep_triv]). *)
   Definition init_boot_bundle (cw : Z) (sts : list fdstate) : iProp Σ :=
     (∃ (P Pmiss : nat -> Z -> iProp Σ)
        (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
        (R : iProp Σ),
        exec_au_pre (MkPfam uslot R) (fs_gamma_L fsc_fs) fsc_fs cw
-         P Pmiss Fo init_boot_path
+         (fun _ => True%I) P Pmiss Fo init_boot_path
          1%nat (fun _ => 5%nat) (fun _ => init_boot_bytes) sts)%I.
 
   (* THE GENERIC APPLICATION'S: a slot at every key answers both wands and
      tracks nothing.  [App.xv6_app_adequacy_triv_xv6Σ] reaches the family
      through [AppInv.app_sup_raw_triv] and [UexecExecMint.uslot_mint]. *)
   Lemma init_boot_bundle_triv (cw : Z) (sts : list fdstate) :
-    □ (∀ W : uvis, uslot W) -∗ init_boot_bundle cw sts.
+    □ (∀ W : uvis, my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W) -∗
+    init_boot_bundle cw sts.
   Proof.
     iIntros "#HS". rewrite /init_boot_bundle.
     iExists (fun _ _ => True%I), (fun _ _ => True%I),
             (pfam_triv (fun _ _ _ => True%I)), True%I.
-    iApply (exec_au_pre_triv_at uslot with "HS").
+    iApply (exec_au_pre_triv_at uslot (fs_gamma_L fsc_fs) fsc_fs cw
+              init_boot_path 1%nat (fun _ => 5%nat) (fun _ => init_boot_bytes)
+              sts).
+    iModIntro. iIntros (W) "Hp".
+    iApply "HS". iExact "Hp".
   Qed.
 
 End InitBoot.

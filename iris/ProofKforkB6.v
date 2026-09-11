@@ -313,6 +313,11 @@ Section KforkPrologue.
            dormant block ([SpecAllocproc.allocproc_post]): the success path
            parks it with the child. *)
         WaitInv.ch_frag (ProcDefs.pv_chg (us_V Uc')) npa ∅ -∗
+        (* ...AND THE CHILD SLOT'S HALF OF [p->xstate], out of the same
+           dormant block and on the row's footing: the block the child is
+           parked with carries it ([ProcInv.proc_priv_core]), because the
+           ZOMBIE park keys its escrow at what the cell reads. *)
+        (∃ xsv : mword 32, p_xstate npa ↦₄{DfracOwn (1/2)} xsv) -∗
         (* the new slot's ALLOCATION MARKER, minted by allocproc and needed
            by whoever finally parks the slot at USED / RUNNABLE
            ([SchedCtx.proc_slots_park]).  Persistent. *)
@@ -403,6 +408,11 @@ Section KforkPrologue.
            child's ghost state that CANNOT be dropped here -- the name is
            the slot's, not the incarnation's. *)
         WaitInv.ch_frag (ProcDefs.pv_chg (us_V Uc)) npa ∅ -∗
+        (* ...AND THE CHILD SLOT'S HALF OF [p->xstate], beside the row and
+           on its footing ([kfk_pro_exit3]'s own conjunct): this exit frees
+           the slot, so the half goes back into freeproc's UNUSED block
+           ([SpecFreeproc]) with the row. *)
+        (∃ xsv : mword 32, p_xstate npa ↦₄{DfracOwn (1/2)} xsv) -∗
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
         ProcGeom.hart_at_any npa -∗
         FdSlots.fd_slots FDSPARE -∗
@@ -805,7 +815,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Uc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & Hcgen & Hcfrag & Hcrow & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
+        "(%Hpures & Hheld & Hhart & Hcpriv & Hcgen & Hcfrag & Hcrow & Hcxb & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Uc as [Vc Mc].
       destruct Hpures as (Hrv & HjN & Hgamma & Hpidc & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
@@ -1169,6 +1179,7 @@ Section KforkPrologue.
         iSpecialize ("Hcont7c" with "Hpfrag").
         iSpecialize ("Hcont7c" with "HCpriv").
         iSpecialize ("Hcont7c" with "Hcrow").
+        iSpecialize ("Hcont7c" with "Hcxb").
         iSpecialize ("Hcont7c" with "Hheld").
         iSpecialize ("Hcont7c" with "Hhart").
         iSpecialize ("Hcont7c" with "Hfdsp").
@@ -1460,7 +1471,7 @@ Section KforkPrologue.
                   (MkUstate (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc)) (us_M Up))
                   (ud_tfp (pv_upt (us_V Up))) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv Hpfrag HCpriv
-                        Hcgen Hcfrag Hcrow
+                        Hcgen Hcfrag Hcrow Hcxb
                         Hmk Hheld Hhart Hfdsp Hirsp Hbslp Hkstk [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
         * exact HN10sp.
         * exact HN10s4.

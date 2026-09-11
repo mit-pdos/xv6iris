@@ -1736,6 +1736,9 @@ Section SyscallVocab.
         (* ...and the children row's name, which no syscall reassigns
            either -- see [SpecSyscall]'s own clause *)
         ⌜ pv_chg (us_V U') = pv_chg (us_V U) ⌝ -∗
+        (* ...and the generation's, on the same terms -- see
+           [SpecSyscall]'s own row *)
+        ⌜ pv_gen (us_V U') = pv_gen (us_V U) ⌝ -∗
         (* ...and the cwd's inum: chdir (9) alone moves it, and only when
            it succeeds (lanes C1/C2) *)
         ⌜ (sysc_num (us_V U) = 9 /\ uint (pv_tf (us_V U') !!! tf_arg_idx 0) = 0)
@@ -1778,6 +1781,11 @@ Section SyscallVocab.
            the set its children reading grew to --
            see [SpecSyscall.sysc_fork_out] *)
         sysc_fork_out f U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
+        (* ...AND THE PAYMENT, going back out: this arm RETURNS, so the
+           payload the caller handed over is handed back
+           ([SpecSyscall.sysc_pay_out]).  The one arm that does not is
+           [sys_exit], which never reaches this continuation. *)
+        sysc_pay_out f -∗
         WP (Loop : expr riscv_lang))%I).
 
   (* THE EXIT SLOT, as the dispatch sees it: the caller's return
@@ -1901,6 +1909,11 @@ Section SyscallVocab.
        [SpecSysFork], every other arm refutes its guard off its own [Hnum]
        ([SpecSyscall.sysc_fork_in_ne]) and drops it *)
     sysc_fork_in fdep U sts -∗
+    (* ...and the PAYMENT, owed at every number: the exit arm forwards its
+       ∧'s LEFT conjunct to [SpecSysExit] (which relays it to kexit, which
+       parks it as the ZOMBIE escrow) and every other arm hands the RIGHT
+       one back out ([SpecSyscall.sysc_pay_out]) *)
+    sysc_pay_in fdep U -∗
     WP (Loop : expr riscv_lang).
 
   (* ------------------------------------------------------------------- *)
@@ -1999,6 +2012,8 @@ Section SyscallVocab.
        [pv_fdg] clause's twin, and what lets the trap route re-key the row
        to the record the entry left. *)
     pv_chg (us_V U') = pv_chg (us_V U) ->
+    (* ...and the generation's, on the same terms *)
+    pv_gen (us_V U') = pv_gen (us_V U) ->
     sie_cap_gpr KT1 E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
@@ -2029,11 +2044,14 @@ Section SyscallVocab.
        read at is the one its caller already stored into *)
     sysc_sys_out U sts gn cs f (pv_tf (us_V U') !!! tf_arg_idx 0)
       (us_M U') sts' (pv_cwi (us_V U')) cs' -∗
+    (* ...AND THE PAYMENT, carried the same way: this tail RETURNS, so the
+       payload goes back to the caller ([SpecSyscall.sysc_pay_out]) *)
+    sysc_pay_out f -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg.
+    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng.
     set (sp0 := m !!! Regidx csp_rs1).
-    iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hxo Hso".
+    iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hxo Hso Hpayv".
     assert (Hb1 : pa_stk sp0 1 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
       by (apply (sysc_stk sp0 1 3); lia).
     assert (Hb2 : pa_stk sp0 2 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))
@@ -2178,7 +2196,7 @@ Section SyscallVocab.
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).
       reflexivity. }
     iApply ("Hcont" $! T5 U' sts' cs'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hxo Hso Hfo").
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hxo Hso Hfo Hpayv").
     { unfold callee_saved.
       split_and!.
       - exact HT5sp.
@@ -2208,6 +2226,8 @@ Section SyscallVocab.
     { exact Hud. }
     { exact Hfg. }
     { exact Hchg. }
+    (* ...and the generation's, likewise the arm's own statement *)
+    { exact Hgeng. }
     { exact Hcwi. }
     { exact Hsbr. }
     exact Hfk.
@@ -2761,6 +2781,8 @@ Section SyscallRet.
        [pv_fdg] clause's twin, and what lets the trap route re-key the row
        to the record the entry left. *)
     pv_chg (us_V U') = pv_chg (us_V U) ->
+    (* ...and the generation's, on the same terms *)
+    pv_gen (us_V U') = pv_gen (us_V U) ->
     sie_cap_gpr KT1 E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
@@ -2799,10 +2821,12 @@ Section SyscallRet.
        word and nothing else, so the cwd inum the row is read at is [U']'s. *)
     sysc_sys_out U sts gn cs f (E !!! Regidx Ra0) (us_M U') sts'
       (pv_cwi (us_V U')) cs' -∗
+    (* ...AND THE PAYMENT, carried the same way *)
+    sysc_pay_out f -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg.
-    iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hxo Hso".
+    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng.
+    iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hxo Hso Hpayv".
     (* the stored word, as the store lemma spells it *)
     assert (Hrg : rget E Ra0 = E !!! Regidx Ra0) by (rgne; reflexivity).
     iEval (rewrite -Hrg) in "Hxo".
@@ -2934,7 +2958,8 @@ Section SyscallRet.
               Hchrow
               Hne2
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_chg]; exact Hchg)
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag [Hrow] Hpc Hcont [Hfo] Hxo [Hso]").
+              ltac:(cbn [us_V us_tf upd_usV upd_tf pv_gen]; exact Hgeng)
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag [Hrow] Hpc Hcont [Hfo] Hxo [Hso] Hpayv").
     (* the row is keyed on the ENTRY record's [pv_chg], which the a0 store
        does not move *)
     - iExact "Hrow".
@@ -3414,16 +3439,22 @@ Section SyscallArms.
     pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     sysc_sys_in U sts gn cs f -∗
+    (* THE PAY FACT COMES OUT WITH THE BUNDLE, at the family's own payload:
+       the exec'ing process handed it over so that kexec can hand it to the
+       new image's slot ([SpecKexec.exec_slot_pre]'s wands). *)
+    my_pay gn (kf_pay f) ∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (gmap Z FsAbsDefs.anode -> Z -> FsAbsDefs.anode -> iProp Σ))
       (Rs : iProp Σ),
       sys_exec_au_pre (MkPfam uslot Rs) (fs_gamma_L fsc_fs) fsc_fs
-        (pv_cwi (us_V U)) P Pmiss Fo (us_M U) v0 v1 sts.
+        (pv_cwi (us_V U)) (kf_pay f) P Pmiss Fo (us_M U) v0 v1 sts.
   Proof.
     intros Hn Hv0 Hv1. iIntros "H".
     iDestruct (sysc_sys_in_at U sts gn cs f 7 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
-    iDestruct (sbundle_at_exec_elim uslot f _ with "H") as "H".
+    iDestruct (sbundle_at_exec_elim uslot f _ with "H") as "[Hmp H]".
+    cbn [uvis_gen uvis_of] in *.
+    iFrame "Hmp".
     iExists (xf_P f), (xf_Pmiss f), (xf_Fo f), (xf_Rs f).
     rewrite /uvis_of /tf_w. cbn [uvis_M uvis_tf uvis_fd].
     rewrite (list_lookup_total_correct _ _ _ Hv0).
@@ -3563,7 +3594,7 @@ Section SyscallArms.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     (* a RETURNING arm takes the left conjunct and forgets the closer *)
     iDestruct "Hcont" as "[Hcont _]".
     (* the table entry's address IS [sys_getpid]'s entry pc *)
@@ -3594,6 +3625,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U sts sts gn cs cs lks av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -3615,7 +3650,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3826,7 +3864,7 @@ Section SyscallArms.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     (* a RETURNING arm takes the left conjunct and forgets the closer *)
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 12) : mword 64)
@@ -3884,6 +3922,10 @@ Section SyscallArms.
        [sysc_sbrk_ok_of_ok] above.  The one thing that row needs beyond
        [sys_sbrk_ok] is the lazy image's domain law, which is [proc_priv]'s
        ([sysc_priv_mem_dom], a pure read that does not spend the block). *)
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U
               (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') sts sts gn cs cs lks av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
@@ -3915,7 +3957,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3945,7 +3990,7 @@ Section SyscallArms.
       by (lia).
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     (* a RETURNING arm takes the left conjunct and forgets the closer *)
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 3) : mword 64)
@@ -3988,6 +4033,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (upd_usM (us_upt U P') (umem_wr (us_M U) v0 dw bsw)) sts sts gn cs cs lks av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
@@ -4016,7 +4065,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4057,7 +4109,7 @@ Section SyscallArms.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     (* a RETURNING arm takes the left conjunct and forgets the closer *)
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 14) : mword 64)
@@ -4089,6 +4141,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U sts sts gn cs cs ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -4110,7 +4166,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4139,7 +4198,7 @@ Section SyscallArms.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     (* a RETURNING arm takes the left conjunct and forgets the closer *)
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 6) : mword 64)
@@ -4177,6 +4236,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U sts sts gn cs cs ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -4198,7 +4261,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4226,7 +4292,7 @@ Section SyscallArms.
       by (lia).
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     (* a RETURNING arm takes the left conjunct and forgets the closer *)
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 13) : mword 64)
@@ -4265,6 +4331,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U U sts sts gn cs cs ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -4286,7 +4356,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4332,6 +4405,10 @@ Section SyscallArms.
          syscall reassigns a live process's [ProcDefs.pv_chg] either, and
          the trap route's residue is keyed on it. *)
       ⌜pv_chg V' = pv_chg (us_V U)⌝ ∗
+      (* ...and the generation, for the same reason and one more: the trap
+         route's payment is keyed on it ([SpecSyscall]'s own row), and dup
+         installs a descriptor, not an incarnation. *)
+      ⌜pv_gen V' = pv_gen (us_V U)⌝ ∗
       ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
       ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
@@ -4347,13 +4424,13 @@ Section SyscallArms.
     iIntros "[[[%Hr _] [Hp Hfr]] | [Hb | Hc]]".
     - iExists (us_V U), sts. iFrame "Hp Hfr". iPureIntro.
       split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
-                  | apply uptd_ext_sz_refl | reflexivity |].
+                  | reflexivity | apply uptd_ext_sz_refl | reflexivity |].
       (* nothing was installed: the row's right disjunct *)
       by right.
     - iDestruct "Hb" as (fd0 fv) "[[%Hr _] [Hp Hfr]]".
       iExists (us_V U), sts. iFrame "Hp Hfr". iPureIntro.
       split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
-                  | apply uptd_ext_sz_refl | reflexivity |].
+                  | reflexivity | apply uptd_ext_sz_refl | reflexivity |].
       (* nothing was installed: the row's right disjunct *)
       by right.
     - iDestruct "Hc" as (fd0 fd1 fv l) "[[%Hr [%Ha [%Hfl %Hcl]]] [Hp Hfr]]".
@@ -4379,7 +4456,7 @@ Section SyscallArms.
       iExists (upd_ofile (us_V U) fd1 fv), (<[fd1 := sts !!! fd0]> sts).
       iFrame "Hp Hfr". iPureIntro.
       split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
-                  | apply uptd_ext_sz_refl | reflexivity |].
+                  | reflexivity | apply uptd_ext_sz_refl | reflexivity |].
       (* THE TWO INDICES ARE THE POST'S.  The row reads the returned and the
          argument descriptor as C [int]s; the post names them [fd1] and
          [fd0].  [usys_retfd_moi] is the return's round trip -- a descriptor
@@ -4410,7 +4487,7 @@ Section SyscallArms.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     (* a RETURNING arm takes the left conjunct and forgets the closer *)
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 10) : mword 64)
@@ -4436,7 +4513,7 @@ Section SyscallArms.
     iDestruct (sysc_dup_priv _ _ _ _ _ _ _ Hnum
                  (list_lookup_total_correct _ _ _ Hv0) Hoflen with "Hpost")
       as (V' sts')
-      "(%Htfp' & %Hfg' & %Hchg' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
+      "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -4454,6 +4531,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U (upd_usV U V')
               sts sts' gn cs cs ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
@@ -4475,7 +4556,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4503,7 +4587,7 @@ Section SyscallArms.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ Hfin".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ Hfin Hdep".
     (* a RETURNING arm takes the left conjunct and forgets the closer *)
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 1) : mword 64)
@@ -4612,6 +4696,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U sts sts gn cs cs' ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -4639,7 +4727,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [Hans] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [Hans] [] [] Hpayv").
     (* ...AND FORK'S ANSWER, which this arm alone owes.  It was already
        packed at [cs'] above, so there is nothing left to say. *)
     { iExact "Hans". }
@@ -4713,7 +4804,7 @@ Section SyscallArms.
       by (lia).
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _ Hdep".
     (* a RETURNING arm takes the left conjunct and forgets the closer *)
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 7) : mword 64)
@@ -4755,15 +4846,16 @@ Section SyscallArms.
        opened here. ---- *)
     iDestruct (sysc_exec_in_open U sts gn cs fdep v0 v1
                  ltac:(rewrite Hnum; reflexivity) Hv0 Hv1
-                 with "Hxin") as (P Pmiss Fo Rs) "Hau".
+                 with "Hxin") as "[#Hmp Hau]".
+    iDestruct "Hau" as (P Pmiss Fo Rs) "Hau".
     iApply (SysExec.wp_sys_exec_sconf (MkPfam uslot Rs) γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 v1 pid U sts gn cs M (av - 4)%nat true true lks
-              P Pmiss Fo
+              (kf_pay fdep) P Pmiss Fo
               ltac:(lia) Hroot Hnib0 Hlg Hsize
               Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hj Hgamma eq_refl Hv0 Hv1
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hfab Hbmp Hisp Hbmr Hbs
-                    Hkalloc Hire Hpriv Hau").
+                    Hkalloc Hire Hpriv Hmp Hau").
     iIntros (CIDy Hsy mf P' M') "%Hcs %Hext Hcg Hcpu Htcx' Hccx' Hpc
                               _ _ Hbs Hka' Hire' Harms".
     rewrite /sys_exec_arms.
@@ -4782,13 +4874,17 @@ Section SyscallArms.
     iAssert (⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt (us_V U))
              /\ pv_fdg V' = pv_fdg (us_V U)
              /\ pv_chg V' = pv_chg (us_V U)
+             (* ...and the generation: exec keeps the process's identity
+                ([SpecKexec.exec_key]'s own note), and the trap route's
+                payment is keyed on it *)
+             /\ pv_gen V' = pv_gen (us_V U)
              /\ pv_cwi V' = pv_cwi (us_V U)⌝ ∗
              sysc_exec_out U
                (us_tf (MkUstate V' Mk)
                   (<[tf_arg_idx 0 := mf !!! Regidx Ra0]>
                      (pv_tf (us_V (MkUstate V' Mk)))))
                sts sts gn cs)%I
-      with "[Harm]" as "[(%Htfp' & %Hfg' & %Hchg' & %Hcwi') Hxo]".
+      with "[Harm]" as "[(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi') Hxo]".
     { iDestruct "Harm" as "[[(%Hr & %HV & %HM) _] | Hok]".
       - (* FAILED *)
         cbn [us_V us_M] in HV, HM.
@@ -4798,6 +4894,7 @@ Section SyscallArms.
             cbn [pv_upt upd_upt pv_fdg]. exact Htf.
           - exact (f_equal pv_fdg HV).
           - exact (f_equal pv_chg HV).
+          - exact (f_equal pv_gen HV).
           - exact (f_equal pv_cwi HV). }
         rewrite /sysc_exec_out. iIntros "_". iLeft. iPureIntro.
         rewrite /sysc_exec_failed.
@@ -4814,13 +4911,14 @@ Section SyscallArms.
           iDestruct "Ha" as (f nl) "(_ & _ & %Hkx & _ & Hslot)".
           destruct Hkx as (e & spv & szv' & _ & Hne & Hkok).
           cbn [us_V] in Hkok.
-          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & _ & Hchg & _)];
+          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & Hgen & Hchg & _)];
             [exact (False_ind _ (Hne Hm1)) |].
           iSplitR.
           { iPureIntro. split_and!.
             - rewrite Htf'. cbn [pv_upt upd_upt pv_fdg]. exact Htf.
             - revert Hfg. cbn [pv_fdg upd_upt]. exact id.
             - revert Hchg. cbn [pv_chg upd_upt]. exact id.
+            - revert Hgen. cbn [pv_gen upd_upt]. exact id.
             - revert Hcwi. cbn [pv_cwi upd_upt pv_gen pv_chg]. exact id. }
           rewrite /sysc_exec_out. iIntros "_". iRight.
           rewrite /exec_key. rewrite Hr. cbn [us_V]. iExact "Hslot".
@@ -4829,13 +4927,14 @@ Section SyscallArms.
           iDestruct "Hb" as "(_ & %Hok & Hslot)".
           destruct Hok as (entry & spv & szv' & Hne & Hkok).
           cbn [us_V] in Hkok.
-          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & _ & Hchg & _)];
+          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & Hgen & Hchg & _)];
             [exact (False_ind _ (Hne Hm1)) |].
           iSplitR.
           { iPureIntro. split_and!.
             - rewrite Htf'. cbn [pv_upt upd_upt pv_fdg]. exact Htf.
             - revert Hfg. cbn [pv_fdg upd_upt]. exact id.
             - revert Hchg. cbn [pv_chg upd_upt]. exact id.
+            - revert Hgen. cbn [pv_gen upd_upt]. exact id.
             - revert Hcwi. cbn [pv_cwi upd_upt pv_gen pv_chg]. exact id. }
           rewrite /sysc_exec_out. iIntros "_". iRight.
           rewrite /exec_key. rewrite Hr. cbn [us_V]. iExact "Hslot". }
@@ -4855,6 +4954,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (MkUstate V' Mk)
               sts sts gn cs cs lks av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
@@ -4874,7 +4977,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] Hxo []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] Hxo [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* exec's process never resumes on success, so its [spost_at] is [emp]
@@ -4924,7 +5030,26 @@ Section SyscallArms.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
+    (* THE PAYMENT, off the route's own row: this arm's number IS
+       [USYS_exit] ([Hnum] at [k = 2]), so the row is at its TWO-ARMED
+       branch and this arm takes the ∧'s LEFT conjunct -- the payload at
+       the status the process asked for.  (The right one is what the killed
+       check upstream takes; only one of the two ever runs.)  sys_exit
+       relays both pieces to kexit, which parks them as the ZOMBIE
+       escrow. *)
+    rewrite /sysc_pay_in /upay_at.
+    iDestruct "Hdep" as "[#Hmy HQ]".
+    destruct (decide (uecall_scause = uecall_scause)) as [_ | Hcne];
+      [ | exfalso; exact (Hcne eq_refl) ].
+    (* the guard reads the frame's word directly ([UsysMemOk.usys_num]);
+       this entry's number is the same word ([SpecSyscall.sysc_num]) *)
+    change (usys_num (pv_tf (us_V U))) with (sysc_num (us_V U)).
+    rewrite Hnum.
+    destruct (decide (UsysMemOk.USYS_exit = USYS_exit)) as [_ | Hcne];
+      [ | exfalso; exact (Hcne eq_refl) ].
+    iDestruct "HQ" as "[HQ _]".
+    set (Qd := sexit_pay fdep).
     assert (Hpce : (mword_of_int (sysc_target 2) : mword 64)
                    = mword_of_int KernelSyms.sys_exit) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
@@ -4976,12 +5101,12 @@ Section SyscallArms.
 
 
               None fn
-              M (av - 4)%nat true true pid U sts v0 ∅ cs
+              M (av - 4)%nat true true pid U sts v0 ∅ cs Qd
               (sysc_fn_eta fn pid Hpidt Hdq)
               Hjn Hlk Hv0 ltac:(lia) Hlg eq_refl (locks_below_empty "log")
               with "Hcg Hkcl4 Hcpu Htext Hdata Hpc Hpi Hpanic Hwaitlk Hftable
                     Hkmem Hka Hbio' Hlog Hseam Hgen Hdevi Hgeom Hdlock Hbs
-                    Hrdy Hip Hfd Hir Hpriv Hufrag Hrow").
+                    Hrdy Hip Hfd Hir Hpriv Hufrag Hrow Hmy HQ").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -5003,7 +5128,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 22) : mword 64)
                    = mword_of_int KernelSyms.sys_sync) by reflexivity.
@@ -5047,6 +5172,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U U
               sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -5068,7 +5197,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5099,7 +5231,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 16) : mword 64)
                    = mword_of_int KernelSyms.sys_write) by reflexivity.
@@ -5165,10 +5297,10 @@ Section SyscallArms.
       as %Hfdk.
     iDestruct (sysc_dep_write U sts gn cs fdep v0 v1 v2
                  ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hxin")
-      as "Hdep".
+      as "Hdepw".
     iAssert (sys_write_in (us_V U) v0 sts (sys_rw_count v2) (us_M U) v1
-               (wf_Q fdep) (wf_tr0 fdep)) with "[Hdep]" as "Hswin".
-    { rewrite /sys_write_in Hfdk. iExact "Hdep". }
+               (wf_Q fdep) (wf_tr0 fdep)) with "[Hdepw]" as "Hswin".
+    { rewrite /sys_write_in Hfdk. iExact "Hdepw". }
     iApply (SysWrite.wp_sys_write_sconf γf γs j γl
               (sysc_fwrite_names γtxl γs j γl fn)
               pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
@@ -5213,6 +5345,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (us_upt U P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -5234,7 +5370,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hex]").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hex] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5255,7 +5394,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 5) : mword 64)
                    = mword_of_int KernelSyms.sys_read) by reflexivity.
@@ -5298,9 +5437,9 @@ Section SyscallArms.
     iDestruct (sysc_fd_key γf (proc_addr j) pid U sts v0 with "Hpriv Hufrag")
       as %Hfdk.
     iDestruct (sysc_dep_read U sts gn cs fdep v0
-                 ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin") as "Hdep".
-    iAssert (sys_read_in (us_V U) v0 sts (rf_F fdep)) with "[Hdep]" as "Hsrin".
-    { rewrite /sys_read_in Hfdk. iExact "Hdep". }
+                 ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin") as "Hdepr".
+    iAssert (sys_read_in (us_V U) v0 sts (rf_F fdep)) with "[Hdepr]" as "Hsrin".
+    { rewrite /sys_read_in Hfdk. iExact "Hdepr". }
     iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γcon fn)
               pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
               (rf_F fdep)
@@ -5342,6 +5481,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (upd_usM (us_upt U P') (umem_wr (us_M U) v1 dw bsw)) sts sts gn cs cs ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
@@ -5375,7 +5518,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hex]").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hex] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5396,7 +5542,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 8) : mword 64)
                    = mword_of_int KernelSyms.sys_fstat) by reflexivity.
@@ -5452,6 +5598,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (upd_usM (us_upt U P') (umem_wr (us_M U) v1 dw bsw)) sts sts gn cs cs ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
@@ -5479,7 +5629,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5507,7 +5660,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 9) : mword 64)
                    = mword_of_int KernelSyms.sys_chdir) by reflexivity.
@@ -5570,6 +5723,9 @@ Section SyscallArms.
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
                (* ...and the children row's name, for [pv_fdg]'s reason *)
                ⌜pv_chg V' = pv_chg (us_V U)⌝ ∗
+               (* ...and the generation, which the trap route's payment is
+                  keyed on: chdir moves a cwd, not an incarnation *)
+               ⌜pv_gen V' = pv_gen (us_V U)⌝ ∗
                (* ...and the cwd's inum moved ONLY IF THE CALL SUCCEEDED
                   (lane C2): the -1 arm hands the block back as it was *)
                ⌜uint (mf !!! Regidx (mword_of_int 10 : mword 5)) = 0
@@ -5583,15 +5739,16 @@ Section SyscallArms.
                  (cf_P fdep) (cf_Pmiss fdep) (cf_Fo fdep)
                  (mf !!! Regidx (mword_of_int 10 : mword 5)) (pv_cwi V'))%I
       with "[Hpv Hrc]" as
-      (V') "(%Htfp' & %Hfg' & %Hchg' & %Hcw' & %Htfw' & %Hupte' & %Hszv' & Hpriv & Hrcpt)".
+      (V') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcw' & %Htfw' & %Hupte' & %Hszv' & Hpriv & Hrcpt)".
     { pose proof Hextz as Hue. destruct Hext as (_ & Htf & _).
       destruct Hdisj as [[Hr ->] | [Hr (ipv & z & ->)]].
       - iExists (upd_upt (us_V U) P'). iFrame "Hpv Hrc". iPureIntro.
-        split_and!; [exact Htf | reflexivity | reflexivity | right; reflexivity | reflexivity
-                     | exact Hue | reflexivity].
+        split_and!; [exact Htf | reflexivity | reflexivity | reflexivity
+                     | right; reflexivity | reflexivity | exact Hue | reflexivity].
       - iExists (upd_cwi (upd_cwd (upd_upt (us_V U) P') ipv) z).
         iFrame "Hpv Hrc". iPureIntro.
-        split_and!; [exact Htf | reflexivity | reflexivity | left; rewrite Hr; reflexivity
+        split_and!; [exact Htf | reflexivity | reflexivity | reflexivity
+                     | left; rewrite Hr; reflexivity
                      | reflexivity | exact Hue | reflexivity]. }
     iDestruct (sysc_iref_join with "Hirk Hirc") as "Hir".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
@@ -5611,6 +5768,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (MkUstate V' (us_M U))
               sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -5636,7 +5797,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hrcpt]").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hrcpt] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5673,7 +5837,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 18) : mword 64)
                    = mword_of_int KernelSyms.sys_unlink) by reflexivity.
@@ -5742,6 +5906,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (us_upt U P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -5763,7 +5931,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms]").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5784,7 +5955,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 19) : mword 64)
                    = mword_of_int KernelSyms.sys_link) by reflexivity.
@@ -5858,6 +6029,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (us_upt U P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -5879,7 +6054,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms]").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5908,7 +6086,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 21) : mword 64)
                    = mword_of_int KernelSyms.sys_close) by reflexivity.
@@ -5954,6 +6132,9 @@ Section SyscallArms.
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
                (* ...and the children row's name, for [pv_fdg]'s reason *)
                ⌜pv_chg V' = pv_chg (us_V U)⌝ ∗
+               (* ...and the generation beside it: the trap route's payment
+                  is keyed on it and close installs no incarnation *)
+               ⌜pv_gen V' = pv_gen (us_V U)⌝ ∗
                ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
@@ -5963,7 +6144,7 @@ Section SyscallArms.
                proc_priv γf (proc_addr j) pid (MkUstate V' ((us_M U))) ∗
                fd_frags (pv_fdg (us_V U)) sts')%I
       with "[Hpost]" as (V' sts')
-        "(%Htfp' & %Hfg' & %Hchg' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
+        "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (21 = USYS_close)) as [_ | Hcc];
         [| exfalso; exact (Hcc eq_refl)].
@@ -5978,7 +6159,7 @@ Section SyscallArms.
         iDestruct (proc_priv_states_agree with "Hpv Hfr") as %Hag.
         iExists (us_V U), sts. iFrame "Hpv Hfr". iPureIntro.
         split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
-                    | apply uptd_ext_sz_refl | reflexivity |].
+                    | reflexivity | apply uptd_ext_sz_refl | reflexivity |].
         split.
         + (* the failure arm returns -1, so the guard is false *)
           rewrite decide_False; [reflexivity |].
@@ -6002,7 +6183,7 @@ Section SyscallArms.
                 (<[fd := FdClosed]> sts).
         iFrame "Hpv Hfr". iPureIntro.
         split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
-                    | apply uptd_ext_sz_refl | reflexivity |].
+                    | reflexivity | apply uptd_ext_sz_refl | reflexivity |].
         split.
         + (* success returns 0, and the row's index is [arg_fd]'s own *)
           rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
@@ -6028,6 +6209,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (upd_usV U V')
               sts sts' gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -6047,7 +6232,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     iApply (sysc_iref_join3 with "Hir Hiru").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -6091,7 +6279,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 4) : mword 64)
                    = mword_of_int KernelSyms.sys_pipe) by reflexivity.
@@ -6158,6 +6346,9 @@ Section SyscallArms.
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
                (* ...and the children row's name, for [pv_fdg]'s reason *)
                ⌜pv_chg V' = pv_chg (us_V U)⌝ ∗
+               (* ...and the generation, which the trap route's payment is
+                  keyed on: pipe opens two descriptors, not an incarnation *)
+               ⌜pv_gen V' = pv_gen (us_V U)⌝ ∗
                ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
@@ -6172,7 +6363,7 @@ Section SyscallArms.
                              sts sts'⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' M') ∗
                fd_frags (pv_fdg (us_V U)) sts')%I with "[Hpv]" as
-      (V' sts') "(%Htfp' & %Hfg' & %Hchg' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow
+      (V' sts') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow
                   & %Hpiperow & Hpriv & Hufrag)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (4 = USYS_close)) as [Hcc | _]; [discriminate Hcc |].
@@ -6184,7 +6375,7 @@ Section SyscallArms.
           | (%fd0 & %fd1 & %l & %k0 & %k1 &
              (%Hr & %Hfl & %Hne & %Hcl0 & %Hcl1 & %Hd8 & %Hbytes) & Hpv & Hb)]".
       - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | |].
         { rewrite decide_False; [reflexivity |].
           rewrite Hr. vm_compute. discriminate. }
         (* a failed pipe returned -1, so the joined row's [uint r = 0]
@@ -6271,7 +6462,7 @@ Section SyscallArms.
                 (<[fd1 := FdOpen false true FdPipe]>
                    (<[fd0 := FdOpen true false FdPipe]> sts)).
         iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | |].
         { rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
         (* the table's row binds the two NUMBERS existentially -- at this
            vocabulary they are reported by being WRITTEN -- and the post
@@ -6312,6 +6503,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (MkUstate V' M')
               sts sts' gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(assert (Hv0t : pv_tf (us_V U) !!! tf_arg_idx 0 = v0)
@@ -6337,7 +6532,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     iApply (sysc_iref_join3 with "Hir Hiru").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -6386,7 +6584,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 20) : mword 64)
                    = mword_of_int KernelSyms.sys_mkdir) by reflexivity.
@@ -6470,6 +6668,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (us_upt U P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -6491,7 +6693,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms]").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -6518,7 +6723,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 17) : mword 64)
                    = mword_of_int KernelSyms.sys_mknod) by reflexivity.
@@ -6598,6 +6803,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (us_upt U P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -6619,7 +6828,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms]").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -6659,7 +6871,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 15) : mword 64)
                    = mword_of_int KernelSyms.sys_open) by reflexivity.
@@ -6791,6 +7003,9 @@ Section SyscallArms.
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
                (* ...and the children row's name, for [pv_fdg]'s reason *)
                ⌜pv_chg V' = pv_chg (us_V U)⌝ ∗
+               (* ...and the generation, which the trap route's payment is
+                  keyed on: open installs a descriptor, not an incarnation *)
+               ⌜pv_gen V' = pv_gen (us_V U)⌝ ∗
                ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
@@ -6806,7 +7021,7 @@ Section SyscallArms.
                  (of_Fok fdep) (of_Fex fdep) (of_Fo fdep) (of_Ft fdep) sts
                  (mf !!! Regidx (mword_of_int 10 : mword 5)) sts')%I
       with "[Hpv Hb Hrc]" as
-      (V' sts') "(%Htfp' & %Hfg' & %Hchg' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag & Hrcpt)".
+      (V' sts') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag & Hrcpt)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (15 = USYS_close)) as [Hcc | _]; [discriminate Hcc |].
       destruct (decide (15 = USYS_dup)) as [Hcd | _]; [discriminate Hcd |].
@@ -6815,7 +7030,7 @@ Section SyscallArms.
         [(Hr & -> & ->)
         | (fd & ll & kf & rb & wb & tp & Hr & Hfrees & -> & Hcl & ->)].
       - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb Hrc". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity |].
         (* the failure arm installs nothing: the row's right disjunct *)
         by right.
       - (* FDALLOC'S SCAN, CONVERTED -- the same three lines as dup's arm.
@@ -6842,7 +7057,7 @@ Section SyscallArms.
         iExists (upd_ofile (upd_upt (us_V U) P') fd (fnode kf)),
                 (<[fd := FdOpen rb wb tp]> sts).
         iFrame "Hpv Hb Hrc". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity |].
         (* the table's open row binds the descriptor, the mode bits and the
            type existentially; the split names all three, so the arm
            exhibits them. *)
@@ -6865,6 +7080,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
+                 with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (MkUstate V' (us_M U))
               sts sts' gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -6884,7 +7103,10 @@ Section SyscallArms.
               (sysc_num_ne2 _ _ Hnum eq_refl)
               (* ...and the children row's NAME: this entry does not move it *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hrcpt]").
+              (* ...and the generation's, on the same terms: no entry
+                 re-incarnates its own caller *)
+              ltac:(first [exact eq_refl | assumption])
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [Hrcpt] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -7013,6 +7235,7 @@ Section SyscallArms.
       fdep -∗
     sysc_sys_in U sts gn cs fdep -∗
     sysc_fork_in fdep U sts -∗
+    sysc_pay_in fdep U -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hj Hpj HMsp HMs1 HMother Hav Hrange.
@@ -7020,7 +7243,7 @@ Section SyscallArms.
       by (lia).
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
     iDestruct (syscall_env_all with "Henvc") as (γp γw' γft γtk)
@@ -7280,6 +7503,11 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (cpu_own_transport CIDf CIDi 0%nat true (proc_addr j) true Hcrfi
                  with "Hcpu") as "Hcpu".
+    (* the payment, opened at this arm's own number and handed back:
+       this arm RETURNS ([SpecSyscall.sysc_pay_in_ret]). *)
+    iDestruct (sysc_pay_in_ret _ U ltac:(unfold UsysMemOk.USYS_exit;
+                           exact (sysc_num_ne2_range _ Hrange))
+                 with "Hdep") as "Hpayv".
     iApply (sysc_epilogue_tail (CID := CIDi) γf (proc_addr j) fn dqi ip pid U
               (us_tf U (<[tf_arg_idx 0 := rget G1 Ra4]> (pv_tf (us_V U))))
               sts sts gn cs cs ∅ av m G1 fdep HG1sp HG1rest ltac:(lia)
@@ -7304,7 +7532,9 @@ Section SyscallArms.
               (sysc_num_ne2_range _ Hrange)
               (* the fallback runs no entry, so the row's name is the entry's *)
               eq_refl
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] []").
+              (* ...and its generation, likewise *)
+              eq_refl
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7_range _ Hrange)).
@@ -7349,7 +7579,7 @@ Section SyscallMain.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "#Hwl Hcg Hcpu #Htext #Hdata Hpc Hprocs Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hxin Hfin Hcont".
+    iIntros "#Hwl Hcg Hcpu #Htext #Hdata Hpc Hprocs Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hxin Hfin Hein Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (A0 := <[Regidx csp_rs1 := regval_into_reg
@@ -7815,7 +8045,7 @@ Section SyscallMain.
       iDestruct (cpu_own_transport CID8 CID22 0%nat true pj true Hcr8_22 with "Hcpu") as "Hcpu".
       iApply (sysc_arm_dispatch (CID := CID22) k γf γw pj γs j γl fn dqi ip pid U sts gn cs lks av m D0 fdep Hk
                 Hj Hgamma eq_refl HD0armsp HD0s2 HD0ra HD0other HD0avb Hpidt Hsysc_num
-                with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag Hrow] Hr24 Hr16 Hr8 Hr0 Hdata Hcont Hxin Hfin").
+                with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag Hrow] Hr24 Hr16 Hr8 Hr0 Hdata Hcont Hxin Hfin Hein").
       { iApply (sysc_arm_pre_intro with
           "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag Hrow Hwl"). }
     - (* ---------------- OUT OF RANGE: the printk fallback ---------------- *)
@@ -7909,7 +8139,7 @@ Section SyscallMain.
       iApply (sysc_fallback (CID := CID15) γf γw pj γs j fn dqi ip pid U sts gn cs
                 lks av m B5 fdep
                 Hj eq_refl HB5armsp HB5s1 HB5other HB5avb Hrange'
-                with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag Hrow] Hr24 Hr16 Hr8 Hr0 Hdata Hcont Hxin Hfin").
+                with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag Hrow] Hr24 Hr16 Hr8 Hr0 Hdata Hcont Hxin Hfin Hein").
       { iApply (sysc_arm_pre_intro with
           "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag Hrow Hwl"). }
   Qed.

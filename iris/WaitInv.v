@@ -307,15 +307,63 @@ Section WaitInv.
      WX-WAIT is what consumes it: fork needs no freshness ([cs ∪ {[γ]}]
      is a set union), and the reap is where "a live generation is in
      exactly one parent's set" is spent. *)
+  (* ...AND THE ORPHANS' OWN ROW, on the same footing: a generation in the
+     orphan set is the generation of a slot whose parent cell holds
+     <init>'s address.  That is what [reparent] wrote, and it is the fact
+     init's wait needs to know that what it reaps is one of the children
+     kexit handed it.  [ip] is the [initproc] cell's value -- the pointer
+     kexit and reparent both read (write-once; [SpecReparent]'s premise). *)
   Definition children_inv (ps : list (mword 64))
-      (m : gmap gname (mword 64 * gset gname)) : iProp Σ :=
-    ([∗ map] γ0 ↦ pS ∈ m, [∗ set] γ ∈ pS.2,
-       ∃ k : nat, gen_slot γ (proc_addr k) ∗ ⌜ps !! k = Some pS.1⌝)%I.
+      (m : gmap gname (mword 64 * gset gname)) (O : gset gname)
+      (ip : mword 64) : iProp Σ :=
+    (([∗ map] γ0 ↦ pS ∈ m, [∗ set] γ ∈ pS.2,
+        ∃ k : nat, gen_slot γ (proc_addr k) ∗ ⌜ps !! k = Some pS.1⌝) ∗
+     ([∗ set] γ ∈ O,
+        ∃ k : nat, gen_slot γ (proc_addr k) ∗ ⌜ps !! k = Some ip⌝))%I.
 
   (* the children map's own existential closure, the shape every party
      that does not read it carries: one opaque conjunct. *)
   Definition children_res : iProp Σ :=
     (∃ m : gmap gname (mword 64 * gset gname), children_own_at m)%I.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE ORPHANS, wait_lock's third half.                                 *)
+  (*                                                                      *)
+  (* kernel/proc.c's [reparent(p)] walks the table and gives every child  *)
+  (* of the exiting process to <init>.  The GENERATIONS that were handed  *)
+  (* over that way are this set: kexit, holding this lock and its own     *)
+  (* row, empties the row into it ([children_own_upd] to [∅] and          *)
+  (* [orphans_add] here) at the same moment it moves the parent cells.    *)
+  (*                                                                      *)
+  (* WHOLLY THE KERNEL'S -- no fragment, no per-slot row.  There is one   *)
+  (* orphan set and it belongs to <init>, whose own [UexecSlot.uvis_ch]   *)
+  (* is read off ITS row, which kexit cannot touch (it does not hold      *)
+  (* init's row).  So the two are separate resources and what ties them   *)
+  (* -- init's wait reaping an orphan -- is stated where init's wait is,  *)
+  (* not here.                                                            *)
+  (*                                                                      *)
+  (* A [ghost_var] at the whole set, at the canonical name                *)
+  (* [Xv6Cameras.worph_name]: exclusive ownership is what makes the move  *)
+  (* a move, and a lock payload that owns the whole thing needs no        *)
+  (* fragment algebra. *)
+  Definition orphans_own (O : gset gname) : iProp Σ :=
+    ghost_var worph_name 1 O.
+
+  Global Instance orphans_own_timeless O : Timeless (orphans_own O).
+  Proof. apply _. Qed.
+
+  (* the move: the lock holder adds a dying process's children to the set *)
+  Lemma orphans_add (O S : gset gname) :
+    orphans_own O ==∗ orphans_own (O ∪ S).
+  Proof.
+    iIntros "H". rewrite /orphans_own.
+    by iMod (ghost_var_update (O ∪ S) with "H") as "$".
+  Qed.
+
+  (* ...and its existential closure, the shape every party that does not
+     read it carries *)
+  Definition orphans_res : iProp Σ :=
+    (∃ O : gset gname, orphans_own O)%I.
 
   (* WHAT THE BOOT FUPD HANDS MAIN, in one row: the authority the wait lock
      goes up over, and the NPROC rows the proc-table assembly deposits into
@@ -323,12 +371,15 @@ Section WaitInv.
      predicate rather than two, because every party between the mint and
      main -- [BootShared], [BootChain], [SpecMain] -- carries it unopened. *)
   Definition children_boot : iProp Σ :=
-    (children_res ∗
+    (children_res ∗ orphans_res ∗
      [∗ list] i ∈ seq 0 NPROC, ∃ γ0 : gname, ch_frag γ0 (proc_addr i) ∅)%I.
 
-  (* what [wait_lock] protects: the parent cells and the children sets. *)
+  (* what [wait_lock] protects: the parent cells, the children sets and the
+     orphans.  THE ORPHANS LAST, so every destruct of this payload is
+     [[Hps [Hch Ho]]]-shaped and the two existing halves keep their
+     spelling. *)
   Definition wait_res_at (ξ : CtxId) : iProp Σ :=
-    (parents_res_at ξ ∗ children_res)%I.
+    (parents_res_at ξ ∗ children_res ∗ orphans_res)%I.
   Definition wait_res : iProp Σ := wait_res_at cur_ctx.
 
   Global Instance parents_res_at_morph : CtxMorph parents_res_at.
@@ -384,8 +435,8 @@ Section WaitInv.
      and the children authority the boot fupd already minted, together, are
      what [wait_lock]'s [is_lock] goes up over. *)
   Lemma wait_res_alloc :
-    parents_res -∗ children_res -∗ wait_res.
-  Proof. iIntros "Hp Hc". iFrame "Hp Hc". Qed.
+    parents_res -∗ children_res -∗ orphans_res -∗ wait_res.
+  Proof. iIntros "Hp Hc Ho". iFrame "Hp Hc Ho". Qed.
 
   Lemma parents_own_length ps : parents_own ps -∗ ⌜length ps = NPROC⌝.
   Proof. iIntros "[% _]". done. Qed.
@@ -469,8 +520,12 @@ Section WaitInvBoot.
   Proof.
     iMod (ghost_map_alloc (∅ : gmap gname (mword 64 * gset gname))) as (γ) "[Ha _]".
     iMod (ch_rows_alloc γ NPROC 0 ∅ with "Ha") as (m') "[Ha Hrows]".
-    iModIntro. iExists (WchG Σ _ γ). rewrite /children_boot /children_res.
-    iSplitL "Ha"; [iExists m'; iExact "Ha" | iExact "Hrows"].
+    (* the orphan set is born EMPTY: nothing has exited at boot *)
+    iMod (ghost_var_alloc (∅ : gset gname)) as (γo) "Ho".
+    iModIntro. iExists (WchG Σ _ _ γ γo).
+    rewrite /children_boot /children_res /orphans_res /orphans_own.
+    iSplitL "Ha"; [iExists m'; iExact "Ha" |].
+    iSplitL "Ho"; [iExists (∅ : gset gname); iExact "Ho" | iExact "Hrows"].
   Qed.
 End WaitInvBoot.
 

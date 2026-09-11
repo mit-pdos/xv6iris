@@ -236,6 +236,11 @@ Section Ut56.
       (fdep : sfam) :
     printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
+    (* THE GENERATION THE PROLOGUE KEPT, relayed to the tail below: the
+       record this arm parks is the entry's incarnation, which is what the
+       post's [SpecUsertrap.ut_gen_kept] and the payment row are keyed
+       by. *)
+    ut_gen_kept U0 U ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -262,16 +267,23 @@ Section Ut56.
     ut_hold Rsys N U false lks sts cs -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
+    (* THE PAYMENT, CARRIED.  These are the TRANSPARENT arms -- a fault, a
+       device interrupt, an unexpected cause -- and each of them reaches a
+       killed check ([SpecUsertrap.ut_pay_in] is owed at every cause for
+       exactly that reason): the arm either spends the payload on
+       [kexit(-1)] or hands it back through the post's own row. *)
+    my_pay (pv_gen (us_V U)) (sexit_pay fdep) -∗
+    sexit_pay fdep (-1) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts gn cs epv scv fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
+    intros Hpk Hwf Hgenr Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
+    iIntros "#Htext Hpc Hcg Hhold Hframe #Hmyp Hpayv Hcont".
     iDestruct (ua_hold_off Rsys N U _ sts cs with "Hhold") as
       "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     (* depth 0 forces the held set empty, so the printk / killed / setkilled
@@ -635,14 +647,15 @@ Section Ut56.
     { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
     iApply (T.ut_a6 Rsys N U0 U pt ksp m0 S1 av nx false
               mie_v menvcfg0 epv scv lks sts sts gn cs cs fdep
-              Hwf' ltac:(intros _; reflexivity)
+              Hwf' Hgenr ltac:(intros _; reflexivity)
               (* the children set does not move on a transparent arm *)
               ltac:(intros _; reflexivity)
               ltac:(intros Hc; exfalso; exact (Hnec Hc))
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               Hmiev Hmenvv Hrd
-              with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hcont] Hframe Hxo Hfo Hso Hcont").
+              with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hpayv Hcont] Hframe Hxo Hfo Hso
+                    Hmyp Hpayv Hcont").
     all: try lkbelow.
     iApply (ua_hold_on Rsys N U _ sts cs with "Hcpu [-Hclm Hown] Hclm [-]").
     - rewrite /trap_csrs.
@@ -693,6 +706,11 @@ Section UtD0.
       (fdep : sfam) :
     printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
+    (* THE GENERATION THE PROLOGUE KEPT, relayed to the tail below: the
+       record this arm parks is the entry's incarnation, which is what the
+       post's [SpecUsertrap.ut_gen_kept] and the payment row are keyed
+       by. *)
+    ut_gen_kept U0 U ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -719,16 +737,23 @@ Section UtD0.
     ut_hold Rsys N U false lks sts cs -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
+    (* THE PAYMENT, CARRIED.  These are the TRANSPARENT arms -- a fault, a
+       device interrupt, an unexpected cause -- and each of them reaches a
+       killed check ([SpecUsertrap.ut_pay_in] is owed at every cause for
+       exactly that reason): the arm either spends the payload on
+       [kexit(-1)] or hands it back through the post's own row. *)
+    my_pay (pv_gen (us_V U)) (sexit_pay fdep) -∗
+    sexit_pay fdep (-1) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts gn cs epv scv fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
+    intros Hpk Hwf Hgenr Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
+    iIntros "#Htext Hpc Hcg Hhold Hframe #Hmyp Hpayv Hcont".
     iDestruct (ua_hold_off Rsys N U _ sts cs with "Hhold") as
       "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     (* depth 0 forces the held set empty, so the printk / killed / setkilled
@@ -994,9 +1019,9 @@ Section UtD0.
       iDestruct ("Hownback" $! U sts cs with "Hpv Hufr Hch Hsy") as "Hown".
       iApply (ut_56 Rsys N U0 U pt ksp m0 mr av nx
                 mie_v menvcfg0 epv scv lks sts gn cs fdep
-                Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
+                Hpk Hwf' Hgenr Hav Hnx Htfpe Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd Hnec
-                with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+                with "Htext Hpc Hcg [-Hframe Hpayv Hcont] Hframe Hmyp Hpayv Hcont").
       iApply (ua_hold_on Rsys N U _ sts cs with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
     - (* ---- vmfault backed a page: the [bnez] is taken, to +0xa6 ---- *)
@@ -1073,14 +1098,15 @@ Section UtD0.
       { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
       iApply (T.ut_a6 Rsys N U0 (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
                 mie_v menvcfg0 epv scv lks sts sts gn cs cs fdep
-                Hwf' ltac:(intros _; reflexivity)
+                Hwf' Hgenr ltac:(intros _; reflexivity)
                 (* the children set does not move on a transparent arm *)
                 ltac:(intros _; reflexivity)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc))
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd'
-                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hcont] Hframe Hxo Hfo Hso Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hpayv Hcont] Hframe Hxo Hfo Hso
+                      Hmyp Hpayv Hcont").
       all: try lkbelow.
       iApply (ua_hold_on Rsys N (MkUstate V' (us_M U)) _ sts cs with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
@@ -1116,6 +1142,11 @@ Section UtE8.
       (* the deposit's families, relayed to the tails *)
       (fdep : sfam) :
     ut_wf N ->
+    (* THE GENERATION THE PROLOGUE KEPT, relayed to the tail below: the
+       record this arm parks is the entry's incarnation, which is what the
+       post's [SpecUsertrap.ut_gen_kept] and the payment row are keyed
+       by. *)
+    ut_gen_kept U0 U ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -1142,16 +1173,23 @@ Section UtE8.
     ut_hold Rsys N U false lks sts cs -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
+    (* THE PAYMENT, CARRIED.  These are the TRANSPARENT arms -- a fault, a
+       device interrupt, an unexpected cause -- and each of them reaches a
+       killed check ([SpecUsertrap.ut_pay_in] is owed at every cause for
+       exactly that reason): the arm either spends the payload on
+       [kexit(-1)] or hands it back through the post's own row. *)
+    my_pay (pv_gen (us_V U)) (sexit_pay fdep) -∗
+    sexit_pay fdep (-1) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts gn cs epv scv fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
+    intros Hwf Hgenr Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
+    iIntros "#Htext Hpc Hcg Hhold Hframe #Hmyp Hpayv Hcont".
     iDestruct (ua_hold_off Rsys N U _ sts cs with "Hhold") as
       "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     (* depth 0 forces the held set empty, so the printk / killed / setkilled
@@ -1256,14 +1294,15 @@ Section UtE8.
       { iIntros (n). iApply (ut_sys_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
       iApply (T.ut_fa Rsys N U0 U pt ksp m0 mf av nx false
                 mie_v menvcfg0 epv scv lks sts sts gn cs cs fdep
-                Hwf' ltac:(intros _; reflexivity)
+                Hwf' Hgenr ltac:(intros _; reflexivity)
                 (* the children set does not move on a transparent arm *)
                 ltac:(intros _; reflexivity)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc))
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hcont] Hframe Hxo Hfo Hso Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hfo Hso Hpayv Hcont] Hframe Hxo Hfo Hso
+                      Hmyp Hpayv Hcont").
       iApply (ua_hold_on Rsys N U _ sts cs with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
     - (* KILLED: fall through to +0xf2's [c.j +0xf6], then kexit(-1). *)
@@ -1340,11 +1379,20 @@ Section UtE8.
       iDestruct (kstack_closer_frame (un_pj N) ksp av 4 ltac:(lia)
                    with "Hkcl Hfr") as "Hkcl4".
       iEval (rewrite -Hnx -HKsp) in "Hkcl4".
+      (* THE KILLED DEVICE ARM IS PAID AT -1, out of the payment the process
+         deposited when it trapped: this cause is not an ecall at all, and
+         the kill check runs on it exactly as it does on the syscall arm --
+         which is why [SpecUsertrap.ut_pay_in] is owed at every cause. *)
       iApply (T.ut_kexit Rsys N U
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K1)
-                nx false lks sts cs Hwf' ltac:(lia) ltac:(lkbelow)
-                with "Htext Hpc Hcg Hkcl4 [-]").
+                nx false lks sts cs (sexit_pay fdep) Hwf' ltac:(lia)
+                ltac:(eapply T.ut_kexit_status_neg1;
+                      [ rewrite upd_ne;
+                        [ subst K1; apply upd_eq | vm_compute; discriminate ]
+                      | vm_compute; reflexivity ])
+                ltac:(lkbelow)
+                with "Htext Hpc Hcg Hkcl4 Hmyp Hpayv [-]").
       iApply (ua_hold_on Rsys N U _ sts cs with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
   Qed.

@@ -126,6 +126,7 @@ Require Import UsertrapRes UtResFits.
 Require Import FirstTok.
 Require Import SpecForkret.
 Require Import SpecForkretPark.
+Require Import ChildTok.  (* [my_pay] -- the boot mode's payload row *)
 Require Import ParkCap.   (* [park_token] *)
 Require Import InitBoot.  (* [init_boot_bundle] -- the BOOT mode's payload *)
 Require Import UexecSlot. (* [uvis] / [uvis_of] *)
@@ -244,6 +245,7 @@ Definition forkret_park_pkg
       ⌜pv_fdg (us_V U') = g⌝ -∗
       (* ...and its children row -- see [γch] above *)
       ⌜pv_chg (us_V U') = γch⌝ -∗
+      ⌜pv_gen (us_V U') = gn⌝ -∗
       ⌜pv_cwi (us_V U') = cw⌝ -∗
       (* ...AND, ON THE STEADY MODE, THAT THE RESUMED RECORD CARRIES THE
          PARKED RUN KEY ([UexecRet.urun_eq]).  forkret's steady arm has
@@ -338,7 +340,17 @@ Definition forkret_park_paid_body
     (if steady then proc_priv γf pa pid U
      else proc_priv_nocwd γf pa pid U
           ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U))
-          ∗ first_boot) -∗
+          ∗ first_boot
+          (* ...AND THE INCARNATION'S PAIR, at the trivial payload: the
+             boot park is <init>'s, which has no parent to owe, and the
+             pair joins the block at the same store the working directory
+             and the token do ([ProcInv.proc_priv_split_cwd] is four-way).
+             forkret's boot arm hands the persistent half to
+             kexec("/init") for the exec'd image's slot
+             ([SpecKexec.exec_slot_pre]). *)
+          ∗ gen_kq (pv_gen (us_V U)) pa pid (fun _ => True)%I
+          ∗ my_pay (pv_gen (us_V U)) (fun _ => True)%I
+          ∗ (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv)) -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
     |==> own_context cur_ctx ∗ proc_ctx γs pa.

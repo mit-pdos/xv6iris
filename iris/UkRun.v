@@ -120,24 +120,61 @@ Require Import UserCwd.  (* [ucwd_auth] -- the PROGRAM's own view of its
 (* the engine has always used, with five [Local Notation]s at the top of  *)
 (* its section; the engine's own leaves spell the projections out.        *)
 (* ===================================================================== *)
-Record uk_names := MkUkNames {
+(* THE RECORD IS Σ-PARAMETRIC, and the field that makes it so is the last
+   one: a run is keyed by WHAT ITS EXIT OWES, which is an [iProp] and not a
+   ghost name.  It belongs here for the same reason the five names do --
+   every leaf that touches [urun] needs it at once, and exit's leaf reads
+   it -- and it is a FIELD rather than a parameter of [urun] because the
+   record is what an entry constructor mints and what a program file binds
+   once ([uslot_of_urun] and its two siblings take the pay fact and put it
+   here). *)
+Record uk_names (Σ : gFunctors) := MkUkNames {
   ukn_t : gname;   (* the text map's authority ([UserHeap.utext]'s) *)
   ukn_d : gname;   (* the data map's ([ubyte], [ustack], the slack) *)
   ukn_s : gname;   (* the break ([usz], a half of a ghost variable) *)
   ukn_fd : gname;  (* the descriptor table's ([UserFd.ufd_auth]) *)
   ukn_cwd : gname; (* the working directory's ([UserCwd.ucwd_auth]) *)
-  ukn_ch : gname   (* the live children's ([UserChildren.uch_auth]) *)
+  ukn_ch : gname;  (* the live children's ([UserChildren.uch_auth]) *)
+  (* THE EXIT PAYLOAD: what this process's exit owes its parent, as a
+     function of the status it exits with.  [ChildTok.my_pay] of the
+     process's own generation is what BACKS it -- [urun] carries that fact
+     at this very predicate -- so a run cannot name a payload that is not
+     its own, and exit's leaf ([UkRunSys.wp_uk_ecall_exit]) pays exactly
+     this at exactly the status the program passes. *)
+  ukn_pay : Z -> iProp Σ
 }.
+Global Arguments MkUkNames {_} _ _ _ _ _ _ _.
+Global Arguments ukn_t {_} _.
+Global Arguments ukn_d {_} _.
+Global Arguments ukn_s {_} _.
+Global Arguments ukn_fd {_} _.
+Global Arguments ukn_cwd {_} _.
+Global Arguments ukn_ch {_} _.
+Global Arguments ukn_pay {_} _.
+
+(* THE TRIVIAL PAYLOAD, AS A CLASS.  A program whose exit owes its parent
+   nothing has to be able to SAY so at its exit ecall
+   ([UkRunSys.wp_uk_ecall_exit] is a payment), and the fact is fixed by
+   whoever minted the record -- an entry constructor
+   ([UkRun.uslot_of_urun*]'s row) or fork's child arm ([UkFork]).  A CLASS
+   rather than a plain hypothesis so that it travels the way a ghost class
+   does: a file's section carries one, every lemma that needs it is
+   generalized over it, and a CROSS-FILE call fills it by instance
+   resolution instead of by an extra argument at every site.  L7 is what
+   gives init and sh a payload that is not this one; the class then simply
+   has no instance for them. *)
+Class ukn_triv {Σ : gFunctors} (N : uk_names Σ) : Prop :=
+  ukn_triv_eq : ukn_pay N = (fun _ => True)%I.
 
 Section UkRun.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
-  Context `{SG : uexecSG Σ}.
-  Context `{PS : uprogSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
   (* NO ambient [CpuId]: the hart is an explicit argument of [urun], and the
      [WP] under that binder resolves to the one bound there -- the trick
      [UexecRet.ukc] uses. *)
@@ -245,21 +282,29 @@ Section UkRun.
      key, which is what exec takes always, and what a program with a
      key-reading bundle (init's mknod, a constraining application's write)
      takes at its own numbers. *)
-  Definition udepw (N : uk_names) (m : regfile) (pc : mword 64)
+  (* THE PAY FACT IS LENT WITH THE HEAP.  The exec bundle a supplier may
+     have to produce carries the depositing process's own knowledge of its
+     payload ([UexecExecInst.exec_sbundle]), which is keyed at the KEY's
+     generation -- bound by this ∀, so it cannot come from anywhere but
+     here.  The run holds it ([urun]'s own conjunct) and the minting law
+     below is what lends it; persistent, so lending costs nothing and
+     nothing has to come back. *)
+  Definition udepw (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) : iProp Σ :=
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
        (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname),
+       my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
         ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs)))%I.
 
   (* the GENERIC route's supplier: a number the program admits *)
-  Lemma udepw_of_psok (N : uk_names) (m : regfile) (pc : mword 64)
+  Lemma udepw_of_psok (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) :
     psok n -> n <> USYS_exec -> ⊢ udepw N m pc n.
   Proof.
-    intros Hok Hne. rewrite /udepw. iIntros (M pm sz fdv cw gn cs) "Hh Hf".
+    intros Hok Hne. rewrite /udepw. iIntros (M pm sz fdv cw gn cs) "_ Hh Hf".
     iFrame "Hh Hf". iLeft. iPureIntro. exact (conj Hok Hne).
   Qed.
 
@@ -268,16 +313,16 @@ Section UkRun.
      deposit can have been taken and no side condition is owed here. *)
   (* ...UNDER A BASIC UPDATE, since the law is (UexecSG.v's header).  Every
      call site is inside its leaf's own WP goal, which absorbs it. *)
-  Lemma udepw_mint (N : uk_names) (m : regfile) (pc : mword 64)
+  Lemma udepw_mint (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
-    udep -∗ udepw N m pc n -∗
+    udep -∗ my_pay gn (ukn_pay N) -∗ udepw N m pc n -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
     sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs).
   Proof.
-    iIntros "#Hdep Hsb Hheap Hufd".
-    iDestruct ("Hsb" $! M pm sz fdv cw gn cs with "Hheap Hufd")
+    iIntros "#Hdep #Hmp Hsb Hheap Hufd".
+    iDestruct ("Hsb" $! M pm sz fdv cw gn cs with "Hmp Hheap Hufd")
       as "(Hheap & Hufd & [%Hok | Hb])"; iFrame "Hheap Hufd";
       [ iApply (udep_dep n _ (proj1 Hok) (proj2 Hok) with "Hdep")
       | by iModIntro ].
@@ -307,10 +352,10 @@ Section UkRun.
 
   (* what an exec leaf's caller does with it: the explicit disjunct of
      [udepw], at whatever key the walk has reached *)
-  Lemma udepw_of_uxsup (N : uk_names) (m : regfile) (pc : mword 64) :
+  Lemma udepw_of_uxsup (N : uk_names Σ) (m : regfile) (pc : mword 64) :
     uxsup -∗ udepw N m pc USYS_exec.
   Proof.
-    iIntros "#Hx" (M pm sz fdv cw gn cs) "Hh Hf". iFrame "Hh Hf". iRight.
+    iIntros "#Hx" (M pm sz fdv cw gn cs) "_ Hh Hf". iFrame "Hh Hf". iRight.
     iApply "Hx".
   Qed.
 
@@ -340,10 +385,11 @@ Section UkRun.
      bundle is stated at, so the only way to state them is to hand the
      supplier the authorities they are read off and take them back beside
      the bundle. *)
-  Definition udepw_at (N : uk_names) (m : regfile) (pc : mword 64)
+  Definition udepw_at (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) : iProp Σ :=
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
        (fdv : list fdstate) (gn : gname) (cs : gset gname),
+       my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
@@ -355,31 +401,31 @@ Section UkRun.
      rather than redefining [udepw] as [∀ cw, udepw_at … cw] is what keeps
      the ∀-ORDER at [udepw]'s twenty-odd use sites ([iDestruct ("Hsb" $! M
      pm sz fdv cw)]) unmoved. *)
-  Lemma udepw_at_of_udepw (N : uk_names) (m : regfile) (pc : mword 64)
+  Lemma udepw_at_of_udepw (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) :
     udepw N m pc n -∗ udepw_at N m pc n c.
   Proof.
-    iIntros "Hd" (M pm sz fdv gn cs) "Hh Hf".
-    iApply ("Hd" $! M pm sz fdv c gn cs with "Hh Hf").
+    iIntros "Hd" (M pm sz fdv gn cs) "Hmp Hh Hf".
+    iApply ("Hd" $! M pm sz fdv c gn cs with "Hmp Hh Hf").
   Qed.
 
   (* ...AND THE SUPPLIER THAT IGNORES THE LOAN: a caller that already has
      the bundle at every [(M, pm, sz, fdv)] of this one cwd hands it back
      unread.  [udepw_at] is WEAKER to supply than the bare family, which is
      why the leaf can take it in the bare one's place. *)
-  Lemma udepw_at_of_bundle (N : uk_names) (m : regfile) (pc : mword 64)
+  Lemma udepw_at_of_bundle (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) :
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
        (fdv : list fdstate) (gn : gname) (cs : gset gname),
        sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs)) -∗
     udepw_at N m pc n c.
   Proof.
-    iIntros "Hb" (M pm sz fdv gn cs) "Hh Hf". iFrame "Hh Hf". iRight.
+    iIntros "Hb" (M pm sz fdv gn cs) "_ Hh Hf". iFrame "Hh Hf". iRight.
     iApply "Hb".
   Qed.
 
   (* the trivial supplier at the ∀-key form, through the two above *)
-  Lemma udepw_at_of_uxsup (N : uk_names) (m : regfile) (pc : mword 64)
+  Lemma udepw_at_of_uxsup (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (c : Z) :
     uxsup -∗ udepw_at N m pc USYS_exec c.
   Proof.
@@ -388,22 +434,22 @@ Section UkRun.
   Qed.
 
   (* THE LEAF'S USE OF IT, [udepw_mint]'s shape at the fixed cwd *)
-  Lemma udepw_at_mint (N : uk_names) (m : regfile) (pc : mword 64)
+  Lemma udepw_at_mint (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (sz : Z) (fdv : list fdstate) (gn : gname) (cs : gset gname) :
-    udep -∗ udepw_at N m pc n c -∗
+    udep -∗ my_pay gn (ukn_pay N) -∗ udepw_at N m pc n c -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
     sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs).
   Proof.
-    iIntros "#Hdep Hsb Hheap Hufd".
-    iDestruct ("Hsb" $! M pm sz fdv gn cs with "Hheap Hufd")
+    iIntros "#Hdep #Hmp Hsb Hheap Hufd".
+    iDestruct ("Hsb" $! M pm sz fdv gn cs with "Hmp Hheap Hufd")
       as "(Hheap & Hufd & [%Hok | Hb])"; iFrame "Hheap Hufd";
       [ iApply (udep_dep n _ (proj1 Hok) (proj2 Hok) with "Hdep")
       | by iModIntro ].
   Qed.
 
-  Definition urun (N : uk_names) (h : CpuId) (m : regfile) (pc : mword 64)
+  Definition urun (N : uk_names Σ) (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) : iProp Σ :=
     (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ) (sz : Z)
@@ -452,6 +498,25 @@ Section UkRun.
           this half, which is what makes wait(2)'s two arms mean
           something. *)
        uch_auth (ukn_ch N) cs ∗
+       (* ...AND THE PROCESS'S OWN KNOWLEDGE OF ITS EXIT PAYLOAD, at the
+          generation the key carries.  PERSISTENT, so it costs no leaf
+          anything to thread; it is here because [gn] is bound by this
+          existential and this is therefore the only place the record's
+          [ukn_pay] can be tied to the process's actual generation.  It is
+          what exit's leaf pays the trap loop's deposit row with
+          ([UexecRet.uexec_pay_dep]), and it is what an entry constructor
+          receives and mints the record at. *)
+       my_pay gn (ukn_pay N) ∗
+       (* ...AND THE PAYLOAD ITSELF, AT THE KILL STATUS.  Linear, and it
+          lives HERE rather than in the kernel's block because it is the
+          PROGRAM's between traps: a process that was lent a resource goes
+          on holding it while it runs.  Every kernel entry takes it
+          ([UexecRet.uexec_pay_dep]) and every resume hands it back
+          ([uexec_pay_arm]); the kernel spends it only on the kill path,
+          where the process's own continuation is never delivered and
+          nothing the program does could pay.  At [ukn_triv] it is [True]
+          and costs nothing. *)
+       ukn_pay N (-1) ∗
        udep ∗
        uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw gn cs M m pc)%I.
 
@@ -462,14 +527,14 @@ Section UkRun.
      has to do about the working directory, and it is why the program's
      half rides through every call untouched.  [UserFd.ufd_auth_quiet]'s
      twin, one value wide. *)
-  Lemma ucwd_auth_quiet (N : uk_names) (cw cw' : Z) :
+  Lemma ucwd_auth_quiet (N : uk_names Σ) (cw cw' : Z) :
     cw' = cw -> ucwd_auth (ukn_cwd N) cw -∗ ucwd_auth (ukn_cwd N) cw'.
   Proof. intros ->. iIntros "$". Qed.
 
   (* THE MOVER, for the day a chdir leaf exists.  [UsysMemOk.usys_cwd_ok]
      has exactly one non-quiet row and no leaf takes it yet; when one does,
      this is the step it runs, with the new inum coming off the row. *)
-  Lemma ucwd_move (N : uk_names) (c c' : Z) :
+  Lemma ucwd_move (N : uk_names Σ) (c c' : Z) :
     ucwd_auth (ukn_cwd N) c -∗ ucwd (ukn_cwd N) c ==∗
     ucwd_auth (ukn_cwd N) c' ∗ ucwd (ukn_cwd N) c'.
   Proof. iApply ucwd_update. Qed.
@@ -479,12 +544,12 @@ Section UkRun.
      re-closes [urun] at the very set it trapped from and this re-key is
      all it has to do.  [ucwd_auth_quiet]'s twin; fork's, wait's and
      exit's leaves will spend [uch_move] instead. *)
-  Lemma uch_auth_quiet (N : uk_names) (cs cs' : gset gname) :
+  Lemma uch_auth_quiet (N : uk_names Σ) (cs cs' : gset gname) :
     cs' = cs -> uch_auth (ukn_ch N) cs -∗ uch_auth (ukn_ch N) cs'.
   Proof. intros ->. iIntros "$". Qed.
 
   (* THE MOVER, for the day a fork/wait/exit leaf moves the set. *)
-  Lemma uch_move (N : uk_names) (S S' : gset gname) :
+  Lemma uch_move (N : uk_names Σ) (S S' : gset gname) :
     uch_auth (ukn_ch N) S -∗ uch (ukn_ch N) S ==∗
     uch_auth (ukn_ch N) S' ∗ uch (ukn_ch N) S'.
   Proof. iApply uch_update. Qed.
@@ -503,7 +568,7 @@ Section UkRun.
   (* [sz] is a parameter: [urun] hides the break existentially, but a leaf
      that is closing back up has just destructed it, so it can say which one.
      Re-introducing the existential at THAT size is all this does. *)
-  Lemma urun_close (N : uk_names) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+  Lemma urun_close (N : uk_names Σ) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
       (m : regfile) (pc : mword 64)
       (avail : nat) :
@@ -515,17 +580,28 @@ Section UkRun.
     ucwd_auth (ukn_cwd N) cw -∗
     (* ...and the children authority, at the same [cs] the key is at *)
     uch_auth (ukn_ch N) cs -∗
+    (* ...and the process's own knowledge of its exit payload, back at the
+       same generation -- persistent, like the supplier below *)
+    my_pay gn (ukn_pay N) -∗
+    (* ...AND THE PAYLOAD THE RUN KEEPS, which is what this close HANDS THE
+       ENGINE: the conclusion is the continuation WITH the payment beside it
+       ([UexecRet.ukcq]), because an interrupt can trap between any two
+       instructions and the kernel has to be paid there too.  The run the
+       continuation rebuilds is at the payload the engine HANDS BACK -- the
+       same predicate, by the family the deposit and the arm share. *)
+    ukn_pay N (-1) -∗
     (* the deposit supplier and its law, back at the same key -- persistent,
        so a leaf that destructed [urun] hands the very copy it read *)
     udep -∗
     (∀ h : CpuId, urun N h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
-    ukc pm M sz fdv cw gn cs m pc.
+    ukcq (ukn_pay N) pm M sz fdv cw gn cs m pc.
   Proof.
-    iIntros "Hheap Hstk Hufd Hcwd Hch #Hdep Hcont".
+    iIntros "Hheap Hstk Hufd Hcwd Hch #Hmy Hpay #Hdep Hcont".
+    rewrite /ukcq. iFrame "Hmy Hpay". iIntros "Hpay".
     rewrite /ukc. iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h).
     iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw, gn, cs.
-    iFrame "Hheap Hstk Hufd Hcwd Hch Hdep Hb". iPureIntro.
+    iFrame "Hheap Hstk Hufd Hcwd Hch Hmy Hpay Hdep Hb". iPureIntro.
     split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
@@ -547,7 +623,7 @@ Section UkRun.
 
   (* ...and the same when the instruction WROTE a register: the free stack
      is keyed by sp, and [unot_sp] says this write was not to sp. *)
-  Lemma urun_close_upd (N : uk_names) (M : gmap Z (bv 8))
+  Lemma urun_close_upd (N : uk_names Σ) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
       (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
       (pc' : mword 64) (avail : nat) :
@@ -557,13 +633,15 @@ Section UkRun.
     ufd_auth (ukn_fd N) fdv -∗
     ucwd_auth (ukn_cwd N) cw -∗
     uch_auth (ukn_ch N) cs -∗
+    my_pay gn (ukn_pay N) -∗
+    ukn_pay N (-1) -∗
     udep -∗
     (∀ h : CpuId, urun N h (<[Regidx rd := v]> m) pc' avail -∗
                   WP (Loop : expr riscv_lang)) -∗
-    ukc pm M sz fdv cw gn cs (<[Regidx rd := v]> m) pc'.
+    ukcq (ukn_pay N) pm M sz fdv cw gn cs (<[Regidx rd := v]> m) pc'.
   Proof.
-    intros Hns. iIntros "Hheap Hstk Hufd Hcwd Hch #Hdep Hcont".
-    iApply (urun_close with "Hheap [Hstk] Hufd Hcwd Hch Hdep Hcont").
+    intros Hns. iIntros "Hheap Hstk Hufd Hcwd Hch #Hmy Hpay #Hdep Hcont".
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcwd Hch Hmy Hpay Hdep Hcont").
     rewrite (unot_sp_upd rd v m Hns). iExact "Hstk".
   Qed.
 
@@ -815,7 +893,7 @@ Section UkRun.
 
   (* ...and what a PROGRAM can read off its own run, without opening it: the
      two stack facts every prologue used to take as premises. *)
-  Lemma urun_stack (N : uk_names) (h : CpuId) (m : regfile)
+  Lemma urun_stack (N : uk_names Σ) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
     urun N h m pc avail -∗
     ⌜ uint (m !!! Regidx csp_rs1) mod 8 = 0
@@ -899,7 +977,7 @@ Section UkRun.
   (* needs it: sh reads and writes its line buffer, which the lossy entry  *)
   (* would drop.                                                          *)
   (* ------------------------------------------------------------------- *)
-  Lemma uslot_of_urun_all (W : uvis) (avail : nat) :
+  Lemma uslot_of_urun_all (W : uvis) (avail : nat) (Q : Z -> iProp Σ) :
     uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
     8 * Z.of_nat avail
       <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
@@ -913,7 +991,27 @@ Section UkRun.
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (* ...and the deposit supplier, exactly as [uslot_of_urun] takes it *)
     udep -∗
-    (∀ (N : uk_names) (h : CpuId),
+    (* ...AND THE PROCESS'S OWN KNOWLEDGE OF ITS EXIT PAYLOAD.  A [urun]
+       carries it ([ChildTok.my_pay] at the key's generation) because the
+       exit leaf pays the trap loop's deposit row out of it
+       ([UkRunSys.wp_uk_ecall_exit]), and a constructor is the only place
+       it can enter: the record it mints is what fixes [ukn_pay].  The
+       kernel is what hands it over -- fork through the child slot's
+       premise, exec through [SpecKexec.exec_slot_pre]'s wands, and
+       userinit at the trivial payload. *)
+    my_pay (uvis_gen W) Q -∗
+    (* ...AND THE PAYLOAD ITSELF, at the kill status.  A constructor is
+       where it enters, as the fact is: the run this builds carries it
+       between traps ([urun]'s own conjunct), hands it to the kernel at
+       every entry and is handed it back at every resume.  Whoever builds
+       the slot supplies it -- fork's child arm out of the payload the
+       parent chose, exec through [SpecKexec.exec_slot_pre]'s wands, and
+       userinit at the trivial payload, where it is [True]. *)
+    Q (-1) -∗
+    (∀ (N : uk_names Σ) (h : CpuId),
+       (* the record's payload IS the one that came in, which is what lets
+          the program's proof read its own [ukn_pay] *)
+       ⌜ ukn_pay N = Q ⌝ -∗
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz (ukn_s N) (uvis_sz W) -∗
        utext_all (ukn_t N) (uvis_M W) (uvis_perm W) -∗
@@ -945,7 +1043,7 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep Hprog".
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep #Hpay Hpayv Hprog".
     rewrite uslot_ukc /ukc.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
@@ -1008,22 +1106,24 @@ Section UkRun.
       unfold f. rewrite Hb'. reflexivity. }
     iDestruct (ubytes_of_map γd _ base (8 * avail) f Hf with "Dmid") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch) h
-                   with "[%] Hszf Ht Hstd Hcwf Hchf Dlo Dtop");
-      [ exact Hsz | ].
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch Q) h
+                   with "[%] [%] Hszf Ht Hstd Hcwf Hchf Dlo Dtop");
+      [ reflexivity | exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
       (uvis_cwd W), (uvis_gen W), (uvis_ch W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd Hcwa Hcha Hdep".
+    (* the record is minted at [Q], so the payload the constructor was
+       handed IS the run's [ukn_pay N (-1)] *)
+    iFrame "Hheap Hstk Hufd Hcwa Hcha Hpay Hpayv Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
   Qed.
 
-  Lemma uslot_of_urun (W : uvis) (avail : nat) :
+  Lemma uslot_of_urun (W : uvis) (avail : nat) (Q : Z -> iProp Σ) :
     (* the resume sp is word-aligned -- what [ustack] now asserts, and the
        one place it is an obligation rather than a consequence, since it is
        a fact about the process the kernel set up *)
@@ -1055,7 +1155,27 @@ Section UkRun.
        ([Dsup := ssupply], every number admitted); a verified program's
        constructor passes its own. *)
     udep -∗
-    (∀ (N : uk_names) (h : CpuId),
+    (* ...AND THE PROCESS'S OWN KNOWLEDGE OF ITS EXIT PAYLOAD.  A [urun]
+       carries it ([ChildTok.my_pay] at the key's generation) because the
+       exit leaf pays the trap loop's deposit row out of it
+       ([UkRunSys.wp_uk_ecall_exit]), and a constructor is the only place
+       it can enter: the record it mints is what fixes [ukn_pay].  The
+       kernel is what hands it over -- fork through the child slot's
+       premise, exec through [SpecKexec.exec_slot_pre]'s wands, and
+       userinit at the trivial payload. *)
+    my_pay (uvis_gen W) Q -∗
+    (* ...AND THE PAYLOAD ITSELF, at the kill status.  A constructor is
+       where it enters, as the fact is: the run this builds carries it
+       between traps ([urun]'s own conjunct), hands it to the kernel at
+       every entry and is handed it back at every resume.  Whoever builds
+       the slot supplies it -- fork's child arm out of the payload the
+       parent chose, exec through [SpecKexec.exec_slot_pre]'s wands, and
+       userinit at the trivial payload, where it is [True]. *)
+    Q (-1) -∗
+    (∀ (N : uk_names Σ) (h : CpuId),
+       (* the record's payload IS the one that came in, which is what lets
+          the program's proof read its own [ukn_pay] *)
+       ⌜ ukn_pay N = Q ⌝ -∗
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz (ukn_s N) (uvis_sz W) -∗
        utext_all (ukn_t N) (uvis_M W) (uvis_perm W) -∗
@@ -1084,7 +1204,7 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep #Hpay Hpayv Hprog". rewrite uslot_ukc /ukc.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -1122,16 +1242,18 @@ Section UkRun.
       unfold f. unfold D, base in *. rewrite Hb. reflexivity. }
     iDestruct (ubytes_of_map γd D base (8 * avail) f Hf with "Hd") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch) h
-                   with "[%] Hszf Ht Hstd Hcwf Hchf");
-      [ exact Hsz | ].
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch Q) h
+                   with "[%] [%] Hszf Ht Hstd Hcwf Hchf");
+      [ reflexivity | exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
       (uvis_cwd W), (uvis_gen W), (uvis_ch W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd Hcwa Hcha Hdep".
+    (* the record is minted at [Q], so the payload the constructor was
+       handed IS the run's [ukn_pay N (-1)] *)
+    iFrame "Hheap Hstk Hufd Hcwa Hcha Hpay Hpayv Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
@@ -1152,7 +1274,7 @@ Section UkRun.
   (* disjoint from any other, so no caller and no entry gate ever has to   *)
   (* decide whether two argv slots point at the same string.               *)
   (* ------------------------------------------------------------------- *)
-  Lemma uslot_of_urun_ro (W : uvis) (avail : nat) :
+  Lemma uslot_of_urun_ro (W : uvis) (avail : nat) (Q : Z -> iProp Σ) :
     uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
     8 * Z.of_nat avail
       <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
@@ -1177,7 +1299,27 @@ Section UkRun.
        ([Dsup := ssupply], every number admitted); a verified program's
        constructor passes its own. *)
     udep -∗
-    (∀ (N : uk_names) (h : CpuId),
+    (* ...AND THE PROCESS'S OWN KNOWLEDGE OF ITS EXIT PAYLOAD.  A [urun]
+       carries it ([ChildTok.my_pay] at the key's generation) because the
+       exit leaf pays the trap loop's deposit row out of it
+       ([UkRunSys.wp_uk_ecall_exit]), and a constructor is the only place
+       it can enter: the record it mints is what fixes [ukn_pay].  The
+       kernel is what hands it over -- fork through the child slot's
+       premise, exec through [SpecKexec.exec_slot_pre]'s wands, and
+       userinit at the trivial payload. *)
+    my_pay (uvis_gen W) Q -∗
+    (* ...AND THE PAYLOAD ITSELF, at the kill status.  A constructor is
+       where it enters, as the fact is: the run this builds carries it
+       between traps ([urun]'s own conjunct), hands it to the kernel at
+       every entry and is handed it back at every resume.  Whoever builds
+       the slot supplies it -- fork's child arm out of the payload the
+       parent chose, exec through [SpecKexec.exec_slot_pre]'s wands, and
+       userinit at the trivial payload, where it is [True]. *)
+    Q (-1) -∗
+    (∀ (N : uk_names Σ) (h : CpuId),
+       (* the record's payload IS the one that came in, which is what lets
+          the program's proof read its own [ukn_pay] *)
+       ⌜ ukn_pay N = Q ⌝ -∗
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz (ukn_s N) (uvis_sz W) -∗
        utext_all (ukn_t N) (uvis_M W) (uvis_perm W) -∗
@@ -1211,7 +1353,7 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep #Hpay Hpayv Hprog". rewrite uslot_ukc /ukc.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -1261,16 +1403,18 @@ Section UkRun.
                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D)
                  base (8 * avail) f Hf with "Dlo") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch) h
-                   with "[%] Hszf Ht Hstd Hcwf Hchf Dhi");
-      [ exact Hsz | ].
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch Q) h
+                   with "[%] [%] Hszf Ht Hstd Hcwf Hchf Dhi");
+      [ reflexivity | exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
       (uvis_cwd W), (uvis_gen W), (uvis_ch W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
-    iFrame "Hheap Hstk Hufd Hcwa Hcha Hdep".
+    (* the record is minted at [Q], so the payload the constructor was
+       handed IS the run's [ukn_pay N (-1)] *)
+    iFrame "Hheap Hstk Hufd Hcwa Hcha Hpay Hpayv Hdep".
     rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].

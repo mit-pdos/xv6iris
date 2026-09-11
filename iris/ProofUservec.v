@@ -157,7 +157,7 @@ Section UservecAllPt.
        unify through the definition. See claude-notes/optimization.md. *)
     unfold uservec_gpr.
     intros Hstvec Hdqc Hmie Hjlt Hnorm Hptwf.
-    iIntros "#Hkt #Hhw #Hinv #Hclaim #Hcreds Hframe Hures Hxin Hfin Hcont".
+    iIntros "#Hkt #Hhw #Hinv #Hclaim #Hcreds Hframe Hures Hxin Hfin Hein Hcont".
     (* ============ open the trapped machine ============ *)
     (* AT NAMED DATA (milestone J1a).  [user_trap_frame] is definitionally the
        ∃ over [user_trap_frame_at], so this is the same premise with its five
@@ -1636,7 +1636,7 @@ Section UservecAllPt.
               ms_v sc_v stval_v sepc_v vksp (uc_mie C) (uc_mideleg C) MENVCFG_S _ sts
               gn cs fdep
               Hums Hjlt Hspv' Htpv' Hmie Hmm Hmenvval0
-              with "Hkt Hpc Hhw Hinv Hhs Hpriv Hms Hsc Hstval Hsepc Hstvec Hmie Hmdl Hmenv Hfile Hures' [Hxin] [Hfin]").
+              with "Hkt Hpc Hhw Hinv Hhs Hpriv Hms Hsc Hstval Hsepc Hstvec Hmie Hmdl Hmenv Hfile Hures' [Hxin] [Hfin] [Hein]").
     { (* THE BUNDLE ACROSS THE SAVE WALK: the saved frame is [g]'s registers
          at the two words the bundle's key and guard read (a1, a7) -- the
          agreement the round crosses by, restricted to two indices, hence
@@ -1683,13 +1683,30 @@ Section UservecAllPt.
                     eq_refl eq_refl eq_refl eq_refl
                     with "Hfin")
       end. }
+    { (* THE PAYMENT ACROSS THE SAVE WALK.  The row reads the number and
+         argument 0 only, both of which [TfUser.tf_ueq] carries, and the
+         generation is the same record's. *)
+      match goal with
+      | |- environments.envs_entails _ (SpecUsertrap.ut_pay_in _ _ ?TF ?UU) =>
+          assert (Hueqe : TfUser.tf_ueq (tf_of g (ret_pc sepc_v)) TF)
+            by (apply TfUser.tf_ueq_sym;
+                cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
+                split; [ reflexivity | ];
+                intros i Hi;
+                do 36 (destruct i as [| i]; [ first [ reflexivity | lia ] | ]);
+                lia);
+          iApply (ut_pay_in_ueq _ sc_v (tf_of g (ret_pc sepc_v)) TF
+                    (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU
+                    Hueqe eq_refl
+                    with "Hein")
+      end. }
     iApply wp_next_intro. iIntros (CID2).
     iEval (rewrite /usertrap_post).
     (* [usertrap_post] names where the round left the descriptor states *)
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2 cs2)
-      "%Huptpt2 %Hrd2 %Hfdk2 %Hchk2 %Hfde2 %Hpipe2 %Hpcret
+      "%Huptpt2 %Hrd2 %Hfdk2 %Hchk2 %Hgenk2 %Hfde2 %Hpipe2 %Hpcret
        %Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
-       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2 Hxo2 Hfo2 Hso2".
+       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2 Hxo2 Hfo2 Hso2 Hpay2".
     (* x0 IS ZERO in the file usertrap handed back -- the one fact the
        register-file tie below needs of the base ([UexecRet.userret_gpr_x0]). *)
     iDestruct (gpr_file_x0 mf (mword_of_int 0) ltac:(vm_compute; reflexivity)
@@ -1845,8 +1862,9 @@ Section UservecAllPt.
                 have to solve [us_M ?U' =?= us_M U2], which is not a pattern;
                 deferred to a goal, [?U'] is already resolved by the time the
                 (purely iota) conversion is checked. *)
-             with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
-                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2 Hcreds2 [Hxo2] [Hfo2] [Hso2]").
+             with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
+                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2 Hcreds2 [Hxo2] [Hfo2] [Hso2]
+                    Hpay2").
     - (* the descriptor the residue is keyed at IS the one handed over *)
       reflexivity.
     - (* THE ROUND, read at the machine that trapped.  usertrap's [tf0] is
@@ -1890,6 +1908,9 @@ Section UservecAllPt.
       refine (SpecUsertrap.ut_ch_kept_cong _ _ _ _ _ _ Hchk2);
         cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
         unfold UsysMemOk.usys_num, tf_arg_idx, tf_of; reflexivity.
+    - (* ...and the generation's, verbatim: neither the save walk nor the
+         restore names it ([SpecUsertrap.ut_gen_kept]). *)
+      exact Hgenk2.
     - (* ...AND THE ECALL'S OWN ROW, across the save walk.  The row reads the
          entry trapframe at exactly two words -- a7 for the syscall number,
          a0 for its argument -- and usertrap read them off the SAVED frame

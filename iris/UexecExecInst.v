@@ -268,7 +268,39 @@ Section UexecExecInst.
        travels with both -- see [UexecSG.v]'s [sfork_pay].  LAST, so every
        positional builder only gained a trailing argument. *)
     kf_pay   : Z -> iProp Σ;
+    (* ---- exit (2): THIS PROCESS'S OWN EXIT PAYLOAD
+       ([UexecSG.sexit_pay]) ---- What the process's own exit owes its
+       parent, on [kf_pay]'s footing and for its reason: the deposit pays
+       it and the arm reads it back, and [f] is what carries the two past
+       each other.  LAST, again. *)
+    kf_xpay  : Z -> iProp Σ;
   }.
+
+  (* THE RE-KEYING ([UexecSG.sfam_at]): the same families at another
+     payload.  Every other field passes through, so the two bundle rows are
+     unmoved and a leaf can take its supplier's [f] and put its own
+     [UkRun.ukn_pay] in it. *)
+  Definition xfam_at (Q : Z -> iProp Σ) (f : xfam) : xfam :=
+    {| xf_P := xf_P f; xf_Pmiss := xf_Pmiss f; xf_Fo := xf_Fo f;
+       xf_Rs := xf_Rs f;
+       rf_F     := rf_F f;
+       cf_P     := cf_P f; cf_Pmiss := cf_Pmiss f; cf_Fo := cf_Fo f;
+       of_P     := of_P f; of_Pmiss := of_Pmiss f;
+       of_Farm  := of_Farm f; of_Fun := of_Fun f; of_Fok := of_Fok f;
+       of_Fex   := of_Fex f; of_Fo := of_Fo f; of_Ft := of_Ft f;
+       wf_Q     := wf_Q f; wf_tr0 := wf_tr0 f;
+       nf_P     := nf_P f; nf_Pmiss := nf_Pmiss f;
+       nf_Farm  := nf_Farm f; nf_Fun := nf_Fun f; nf_Fok := nf_Fok f;
+       nf_Fex   := nf_Fex f;
+       uf_P     := uf_P f; uf_Pmiss := uf_Pmiss f;
+       uf_Fent  := uf_Fent f; uf_Ftgt := uf_Ftgt f; uf_Fex := uf_Fex f;
+       uf_Fmiss := uf_Fmiss f;
+       lf_Ftgt  := lf_Ftgt f; lf_Fent := lf_Fent f; lf_Funt := lf_Funt f;
+       df_P     := df_P f; df_Pmiss := df_Pmiss f;
+       df_Farm  := df_Farm f; df_Fdots := df_Fdots f; df_Fun := df_Fun f;
+       df_Fok   := df_Fok f; df_Fex := df_Fex f;
+       kf_pay   := kf_pay f;
+       kf_xpay  := Q |}.
 
   (* THE RECORD AT EXEC'S FOUR AND THE TRIVIAL FAMILIES ELSEWHERE.  The
      eight other numbers' fields are spelled at exactly the families the
@@ -315,7 +347,10 @@ Section UexecExecInst.
        df_Fun   := pfam_triv (fun _ _ => True%I);
        df_Fok   := pfam_triv (fun _ _ _ _ => True%I);
        df_Fex   := pfam_triv (fun _ _ _ _ => True%I);
-       kf_pay   := pay |}.
+       kf_pay   := pay;
+       (* the process's OWN payload is the trivial one at every builder
+          here: a leaf that has a real one re-keys with [xfam_at]. *)
+       kf_xpay  := fun _ => True%I |}.
 
   (* ...AT THE TRIVIAL PAYLOAD, which is what every generic process forks
      with: a generic child's exit owes its parent nothing.  The four-argument
@@ -346,10 +381,20 @@ Section UexecExecInst.
   (* what the program hands over at its exec ecall, at the trapping key
      [W] and at ITS OWN families [f]; the bundle's slot wand concludes at
      [X], the recursive occurrence (see the header) *)
+  (* THE PAY FACT RIDES IN THE BUNDLE.  exec builds a slot for the NEW
+     image, and a slot is keyed by what its process's exit owes
+     ([UkRun.ukn_pay]); exec keeps the process's generation, so the fact
+     the depositing process holds is the fact that slot needs -- and the
+     kernel can only hand it to [SpecKexec.exec_slot_pre]'s wands if it
+     was given it.  AT THE FAMILY'S OWN PAYLOAD [kf_pay], which is where a
+     process's choice of payload lives ([UexecSG.sfork_pay]), so the
+     payload the wands are stated at and the payload this fact is at are
+     the same one by construction. *)
   Definition exec_sbundle (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
       : iProp Σ :=
-    (sys_exec_au_pre (MkPfam X (xf_Rs f)) (fs_gamma_L fsc_fs) fsc_fs
-       (uvis_cwd W) (xf_P f) (xf_Pmiss f) (xf_Fo f)
+    (my_pay (uvis_gen W) (kf_pay f) ∗
+     sys_exec_au_pre (MkPfam X (xf_Rs f)) (fs_gamma_L fsc_fs) fsc_fs
+       (uvis_cwd W) (kf_pay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
        (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
        (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W))%I.
 
@@ -357,22 +402,30 @@ Section UexecExecInst.
     Proper (dist n ==> eq ==> eq ==> dist n) exec_sbundle.
   Proof.
     intros X Y HXY f ? <- W ? <-. rewrite /exec_sbundle.
-    exact (sys_exec_au_pre_ne n X Y (xf_Rs f) (fs_gamma_L fsc_fs) fsc_fs
-             (uvis_cwd W) (xf_P f) (xf_Pmiss f) (xf_Fo f)
-             (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
-             (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) HXY).
+    (* the pay row does not mention the slot predicate, so it is untouched
+       by the distance; only the AU half moves *)
+    rewrite (sys_exec_au_pre_ne n X Y (xf_Rs f) (fs_gamma_L fsc_fs) fsc_fs
+               (uvis_cwd W) (kf_pay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
+               (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
+               (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) HXY).
+    reflexivity.
   Qed.
 
+  (* THE GENERATION IS A PREMISE NOW, beside the five readings the AU half
+     uses: the bundle carries the depositing process's pay fact, which is
+     keyed at the key's own generation ([UexecSG.skey_eq] carries the
+     equality, so no caller gains an obligation). *)
   Lemma exec_sbundle_cong (X : uvis -d> iPropO Σ) (f : xfam) (W W' : uvis) :
     uvis_M W = uvis_M W' ->
     tf_w (uvis_tf W) (tf_arg_idx 0) = tf_w (uvis_tf W') (tf_arg_idx 0) ->
     tf_w (uvis_tf W) (tf_arg_idx 1) = tf_w (uvis_tf W') (tf_arg_idx 1) ->
     uvis_fd W = uvis_fd W' ->
     uvis_cwd W = uvis_cwd W' ->
+    uvis_gen W = uvis_gen W' ->
     exec_sbundle X f W ⊣⊢ exec_sbundle X f W'.
   Proof.
-    intros HM Hpv Hav Hfd Hcw.
-    rewrite /exec_sbundle HM Hpv Hav Hfd Hcw. reflexivity.
+    intros HM Hpv Hav Hfd Hcw Hgn.
+    rewrite /exec_sbundle HM Hpv Hav Hfd Hcw Hgn. reflexivity.
   Qed.
 
   (* ===================================================================== *)
@@ -535,10 +588,10 @@ Section UexecExecInst.
       (W W' : uvis) :
     skey_eq W W' -> xv6_sbundle X n f W ⊣⊢ xv6_sbundle X n f W'.
   Proof.
-    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & _ & _).
+    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & Hgn & _).
     rewrite /xv6_sbundle.
     destruct (decide (n = USYS_exec)) as [_ | _];
-      [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw) | ].
+      [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw Hgn) | ].
     rewrite /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw.
     reflexivity.
   Qed.
@@ -572,8 +625,10 @@ Section UexecExecInst.
       [ | xv6_num_cases; iExact "Hb" ].
     rewrite /exec_sbundle.
     rewrite /sys_exec_au_pre.
-    iDestruct "Hb" as "(Hwalk & Hcommit & Hslot)".
-    iFrame "Hwalk Hcommit".
+    (* the pay row is untouched by the slot's monotonicity: it mentions no
+       slot predicate *)
+    iDestruct "Hb" as "(#Hmp & Hwalk & Hcommit & Hslot)".
+    iFrame "Hmp Hwalk Hcommit".
     rewrite /pf_at. cbn [pf_recv pf_refund].
     iSplit; [ | iDestruct "Hslot" as "[_ $]" ].
     iDestruct "Hslot" as "[Hslot _]".
@@ -586,13 +641,13 @@ Section UexecExecInst.
     rewrite /exec_slot_pre.
     iDestruct "Hslot" as "[Hsa Hsb]".
     iSplitL "Hsa".
-    - iIntros (av i ff nl W') "HP Ho %Hld %Him".
+    - iIntros (av i ff nl W') "HP Ho %Hld %Him Hpy".
       iApply "Hup".
-      iApply ("Hsa" $! av i ff nl W' with "HP Ho [%] [%]");
+      iApply ("Hsa" $! av i ff nl W' with "HP Ho [%] [%] Hpy");
         [ exact Hld | exact Him ].
-    - iIntros (av i a W') "HP Ho %Hnl %Hkk".
+    - iIntros (av i a W') "HP Ho %Hnl %Hkk Hpy".
       iApply "Hup".
-      iApply ("Hsb" $! av i a W' with "HP Ho [%] [%]");
+      iApply ("Hsb" $! av i a W' with "HP Ho [%] [%] Hpy");
         [ exact Hnl | exact Hkk ].
   Qed.
 
@@ -639,15 +694,26 @@ Section UexecExecInst.
   (* ...and the half the generic inhabitants use: the same eight branches
      plus exec, whose fs half is [fsabs_exec_half] out of the invariant and
      whose slot wand a generic family answers at every key. *)
+  (* THE FAMILY IS INDEXED BY THE PAY FACT ([UexecSG]'s own law): a slot
+     that is safe at every key has to be able to pay exit's deposit, and
+     the credential for that is the trivial payload at the key's own
+     generation.  The exec branch RELAYS it -- both slot wands hand one in
+     at the resume key, at this family's payload, which for the generic
+     record is exactly [fun _ => True]. *)
   Lemma xv6_sbundle_of_supply (X : uvis -d> iPropO Σ) (n : Z) (W : uvis) :
-    ⊢ □ xv6_ssupply -∗ □ (∀ W' : uvis, X W') ==∗ ∃ f : xfam, xv6_sbundle X n f W.
+    ⊢ my_pay (uvis_gen W) (fun _ => True)%I -∗ □ xv6_ssupply -∗
+      □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => True)%I -∗ X W') ==∗
+      ∃ f : xfam, xv6_sbundle X n f W.
   Proof.
-    rewrite /xv6_ssupply. iIntros "#Hsup #Hs".
+    rewrite /xv6_ssupply. iIntros "#Hpay #Hsup #Hs".
     destruct (decide (n = USYS_exec)) as [He | Hne].
     - iModIntro. iExists xfam_pt.
       rewrite /xv6_sbundle. destruct (decide (n = USYS_exec)) as [_ | Hc];
         [ | exfalso; exact (Hc He) ].
       rewrite /exec_sbundle /xfam_pt /xfam_exec /=.
+      (* the bundle's own pay row, which the exec'ing process hands the
+         kernel so that the kernel can hand it to the new image's slot *)
+      iSplitR; [ iExact "Hpay" | ].
       (* read-kind only ([fsabs_exec_half]): the environment is carried, not
          spent *)
       iDestruct (fsabs_exec_half (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W))
@@ -668,10 +734,26 @@ Section UexecExecInst.
       rewrite /sys_exec_slot_pre. iIntros (pl na alen afun) "_ _".
       (* the generic family answers BOTH success arms' wands *)
       rewrite /exec_slot_pre. iSplitR.
-      + iIntros (av' i ff nl W') "_ _ _ _". iApply "Hs".
-      + iIntros (av' i a W') "_ _ _ _". iApply "Hs".
+      + iIntros (av' i ff nl W') "_ _ _ _ Hp". iApply ("Hs" with "Hp").
+      + iIntros (av' i a W') "_ _ _ _ Hp". iApply ("Hs" with "Hp").
     - iApply (xv6_sbundle_of_supply_ne X n W Hne). iExact "Hsup".
   Qed.
+
+  (* THE RE-KEYING PASSES THROUGH BOTH BUNDLE ROWS ([UexecSG.sbundle_at_at]
+     / [spost_at_at]): neither reads [kf_xpay], so re-keying the payload
+     leaves what the process deposits and what it is handed back alone.
+     [destruct f] rather than [eq_refl]: it turns the record into its
+     constructor, so the projections in both bodies reduce by iota instead
+     of by unfolding this file's twelve-number dispatch twice. *)
+  Lemma xfam_at_sbundle (X : uvis -d> iPropO Σ) (n : Z) (Q : Z -> iProp Σ)
+      (f : xfam) (W : uvis) :
+    xv6_sbundle X n (xfam_at Q f) W = xv6_sbundle X n f W.
+  Proof. destruct f; reflexivity. Qed.
+
+  Lemma xfam_at_spost (X : uvis -d> iPropO Σ) (n : Z) (Q : Z -> iProp Σ)
+      (f : xfam) (W : uvis) :
+    xv6_spost X n (xfam_at Q f) W = xv6_spost X n f W.
+  Proof. destruct f; reflexivity. Qed.
 
   Global Instance uexecSG_xv6 : uexecSG Σ :=
     {| sfam := xfam;
@@ -679,6 +761,14 @@ Section UexecExecInst.
        sfork_pay := kf_pay;
        sfam_pay := xfam_pay;
        sfork_pay_pay := fun Q => eq_refl;
+       sfork_pay_pt := eq_refl;
+       sexit_pay := kf_xpay;
+       sfam_at := xfam_at;
+       sexit_pay_at := fun Q f => eq_refl;
+       sfork_pay_at := fun Q f => eq_refl;
+       sexit_pay_pt := eq_refl;
+       sbundle_at_at := xfam_at_sbundle;
+       spost_at_at := xfam_at_spost;
        sbundle_at := xv6_sbundle;
        spost_at := xv6_spost;
        sbundle_at_ne := xv6_sbundle_ne;
@@ -802,38 +892,45 @@ Section UexecExecInst.
     xv6_skip. xv6_take. iExact "H".
   Qed.
 
+  (* THE PAY ROW COMES IN BESIDE THE AU HALF, and at the TRIVIAL payload:
+     [xfam_exec] is the record at the generic payload ([kf_pay] of
+     [xfam_exec] is [fun _ => True]), which is what a process that answers
+     for no abstract state forks and execs with. *)
   Lemma sbundle_at_exec_intro (X : uvis -d> iPropO Σ) (W : uvis)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
+    my_pay (uvis_gen W) (fun _ => True)%I -∗
     sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
-      P Pmiss Fo
+      (fun _ => True)%I P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) -∗
     sbundle_at X USYS_exec (xfam_exec P Pmiss Fo Rs) W.
   Proof.
-    iIntros "H". rewrite /sbundle_at /= /xv6_sbundle.
+    iIntros "Hmp H". rewrite /sbundle_at /= /xv6_sbundle.
     destruct (decide (USYS_exec = USYS_exec)) as [_ | Hc];
       [ | exfalso; exact (Hc eq_refl) ].
-    rewrite /exec_sbundle /=. iExact "H".
+    rewrite /exec_sbundle /=. iFrame "Hmp". iExact "H".
   Qed.
 
   Lemma sbundle_exec_intro (X : uvis -d> iPropO Σ) (W : uvis)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
+    my_pay (uvis_gen W) (fun _ => True)%I -∗
     sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
-      P Pmiss Fo
+      (fun _ => True)%I P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) -∗
     sbundle X USYS_exec W.
   Proof.
-    iIntros "H". rewrite /sbundle. iExists (xfam_exec P Pmiss Fo Rs).
-    iApply (sbundle_at_exec_intro X W P Pmiss Fo Rs with "H").
+    iIntros "Hmp H". rewrite /sbundle. iExists (xfam_exec P Pmiss Fo Rs).
+    iApply (sbundle_at_exec_intro X W P Pmiss Fo Rs with "Hmp H").
   Qed.
 
   Lemma sbundle_at_exec_elim (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis) :
     sbundle_at X USYS_exec f W -∗
+    my_pay (uvis_gen W) (kf_pay f) ∗
     sys_exec_au_pre (MkPfam X (xf_Rs f)) (fs_gamma_L fsc_fs) fsc_fs
-      (uvis_cwd W) (xf_P f) (xf_Pmiss f) (xf_Fo f)
+      (uvis_cwd W) (kf_pay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W).
   Proof.
@@ -845,16 +942,18 @@ Section UexecExecInst.
 
   Lemma sbundle_exec_elim (X : uvis -d> iPropO Σ) (W : uvis) :
     sbundle X USYS_exec W -∗
-    ∃ (P Pmiss : nat -> Z -> iProp Σ)
+    ∃ (Q : Z -> iProp Σ) (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ),
+      my_pay (uvis_gen W) Q ∗
       sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
-        P Pmiss Fo
+        Q P Pmiss Fo
         (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
         (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W).
   Proof.
     iIntros "H". rewrite /sbundle. iDestruct "H" as (f) "H".
     iDestruct (sbundle_at_exec_elim X f W with "H") as "H".
-    iExists (xf_P f), (xf_Pmiss f), (xf_Fo f), (xf_Rs f). iExact "H".
+    iExists (kf_pay f), (xf_P f), (xf_Pmiss f), (xf_Fo f), (xf_Rs f).
+    iExact "H".
   Qed.
 
   (* ================================================================== *)

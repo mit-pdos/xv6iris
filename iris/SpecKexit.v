@@ -116,6 +116,7 @@ Require Import WpMmodeLeafBase.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
+Require Import ChildTok.  (* [my_pay]: the exit deposit's own naming *)
 Require Import ProcDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
@@ -146,6 +147,16 @@ Import Defs.
    (68 -- a descriptor may name an inode file, so its own arm reaches iput);
    iput wants 60, end_op 58, reparent 24, sched 16. *)
 Notation K_kexit := (90%nat) (only parsing).
+(* THE STATUS ARGUMENT, READ ONCE.  [void exit(int status)] takes it in
+   a0, and this function stores its low 32 bits into [p->xstate]; the
+   escrow the ZOMBIE park carries is keyed at what that cell then reads
+   ([ProcGeom.xstate_val]), so the two are the same [Z] and no lemma has to
+   relate them.  On the exit-SYSCALL route it is also
+   [ProcGeom.exit_xs (pv_tf (us_V U))] -- sys_exit passes argument 0 of the
+   trapframe -- and on the killed route it is -1. *)
+Definition kexit_status (m : regfile) : Z :=
+  xstate_of (m !!! Regidx (mword_of_int 10 : mword 5)).
+
 Definition wp_kexit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -157,7 +168,10 @@ Definition wp_kexit_sconf_body
                (* kmem.lock, kalloc   *)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    (pid : mword 32) (U : ustate) (cs : gset gname) :=
+    (pid : mword 32) (U : ustate) (cs : gset gname)
+    (* the exit deposit's own payload -- see the premise at the foot of the
+       list *)
+    (Q : Z -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kexit in
   let pj := proc_addr j in
   (* [fn] is not an extra degree of freedom: it is exactly kexit's own ghosts,
@@ -258,6 +272,10 @@ Definition wp_kexit_sconf_body
      [ld a0,336(s3)].  The two rejoin into the [1 + IREFSPARE] the ZOMBIE
      block parks. *)
   iref_slots IREFSPARE -∗
+  (* THE BLOCK, WHOLE.  It carries the process's half of [p->xstate]
+     ([ProcInv.proc_priv_core]), which this function joins with <p->lock>'s
+     at [p->xstate = status], re-splits, and parks beside the escrow keyed
+     at what the cell then reads ([ProcDefs.proc_dormant]). *)
   proc_priv γf pj pid U -∗
   (* THE fd-STATE FRAGMENT BUNDLE.  kexit closes every descriptor, and after
      [ProcInv]'s auth/frag split a close is a retype that needs both halves.
@@ -267,10 +285,31 @@ Definition wp_kexit_sconf_body
   (* ...AND THE SLOT'S CHILDREN ROW, which does come back -- to the SLOT.
      It rides the trap residue beside the fragment bundle
      ([UsertrapRes.ut_own]), and kexit hands it to the ZOMBIE block it parks
-     ([kexit_park_pay]), which is where allocproc finds it again.  The set is
-     the caller's: kexit reads nothing off it and moves nothing into it --
-     reparent moves the PARENT cells, not this row. *)
+     ([kexit_park_pay]), which is where allocproc finds it again.  The set
+     is the caller's, and kexit EMPTIES it: at +0x60 it holds <wait_lock>,
+     which is what reparent(p) needs to move the children's parent cells,
+     and moving the row's own set to [∅] -- into <init>'s orphans
+     ([WaitInv.orphans_own]) -- is the ghost half of that same C statement.
+     So what is parked is the row at [∅] ([ProcDefs.proc_dormant]). *)
   ch_frag (pv_chg (us_V U)) pj cs -∗
+  (* ...AND THE EXIT DEPOSIT, WHICH IS WHAT MAKES THE ZOMBIE WORTH REAPING.
+     The exiting process's own knowledge of the payload its exit owes its
+     parent, and that payload PAID AT THIS CALL'S STATUS ARGUMENT
+     ([kexit_status], the word this function stores into [p->xstate] and
+     the word the ZOMBIE escrow is therefore keyed at).  It comes down the
+     trap route from the U-mode slot's deposit
+     ([UexecRet.uexec_pay_dep]) through [SpecSyscall.sysc_pay_in] and
+     [SpecSysExit] on the exit-syscall route, and straight off the trap
+     loop's own copy on the killed route -- where the status is -1 and the
+     process's program never runs again.  kexit spends it, together with
+     the quarter its private block carries ([ProcInv.proc_priv_core]), on
+     the ESCROW it parks in the ZOMBIE slot ([ChildTok.exit_tok]).  [Q] IS
+     THE PROCESS'S OWN NAMING of the payload: the block's quarter names the
+     same predicate, but agreement between them costs a later and the
+     escrow carries both so that nothing on this path has to pay it
+     ([ChildTok.gen_pay] does, at the reaper). *)
+  my_pay (pv_gen (us_V U)) Q -∗
+  Q (kexit_status m) -∗
   (* NO continuation: kexit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
 
@@ -292,10 +331,16 @@ Section KexitSeals.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma kexit_park_pay (γf : gname) (j : nat) (pid : mword 32) (U : ustate)
-      (cs : gset gname) :
+      (Q : Z -> iProp Σ) (xsv : mword 32) :
     pv_ofile (us_V U) = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd (us_V U) = (zero_reg : mword 64) ->
-    proc_priv_nocwd γf (proc_addr j) pid U -∗ fd_slots FDSPARE -∗
+    proc_priv_nocwd γf (proc_addr j) pid U -∗
+    (* the incarnation's pair, split off with the working directory
+       ([ProcInv.proc_priv_split_cwd]) and spent here on the escrow *)
+    (∃ Q0 : Z -> iProp Σ,
+       gen_kq (pv_gen (us_V U)) (proc_addr j) pid Q0
+       ∗ my_pay (pv_gen (us_V U)) Q0) -∗
+    fd_slots FDSPARE -∗
     iref_slots (1 + IREFSPARE) -∗
     (* AND THE BIO ALLOWANCE, on exactly the same argument as the stack
        below: a dormant slot owns three units, allocproc hands them to the
@@ -311,17 +356,27 @@ Section KexitSeals.
        gives it back.  It can, because its swtch never returns: no record is
        parked, so nothing of the page is captured in a continuation. *)
     kstack_free (proc_addr j) -∗
-    (* AND THE SLOT'S CHILDREN ROW, LAST.  It rode the dying process's trap
-       residue ([UsertrapRes.ut_own]) down to here, and the ZOMBIE block is
-       where it goes back to the slot it belongs to
+    (* AND THE SLOT'S CHILDREN ROW, AT [∅].  It rode the dying process's
+       trap residue ([UsertrapRes.ut_own]) down to here and was emptied
+       under <wait_lock> at the reparent, and the ZOMBIE block is where it
+       goes back to the slot it belongs to
        ([ProcInv.proc_priv_to_dormant_zombie]). *)
-    ch_frag (pv_chg (us_V U)) (proc_addr j) cs -∗
+    ch_frag (pv_chg (us_V U)) (proc_addr j) ∅ -∗
+    (* ...AND THE SLOT'S HALF OF [p->xstate], AT THE STATUS JUST STORED.
+       kexit holds both halves at the store (its block's and <p->lock>'s
+       through [SchedCtx.proc_pub]), writes the whole cell and re-splits;
+       this is the half that goes back into the block, and the escrow below
+       is keyed at what it reads. *)
+    p_xstate (proc_addr j) ↦₄{DfracOwn (1/2)} xsv -∗
+    (* ...AND THE EXIT DEPOSIT, spent here on the escrow the block parks *)
+    my_pay (pv_gen (us_V U)) Q -∗
+    Q (xstate_val xsv) -∗
     park_pay (proc_addr j) ZOMBIE.
   Proof.
     intros Hof Hcwd. rewrite /park_pay inv_dormant_ZOMBIE.
-    iIntros "Hpriv Hsp Hir Hbs Hkst Hrow".
-    iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid U cs Hof Hcwd
-              with "Hpriv Hsp Hir Hbs Hkst Hrow").
+    iIntros "Hpriv Hgq Hsp Hir Hbs Hkst Hrow Hxs Hmy HQ".
+    iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid U Q xsv Hof Hcwd
+              with "Hpriv Hgq Hsp Hir Hbs Hkst Hrow Hxs Hmy HQ").
   Qed.
 
 End KexitSeals.
@@ -335,9 +390,9 @@ Module Type KEXIT.
       (ip : mword 64) (dqi : dfrac)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-      (pid : mword 32) (U : ustate) (cs : gset gname),
+      (pid : mword 32) (U : ustate) (cs : gset gname) (Q : Z -> iProp Σ),
       wp_kexit_sconf_body γft γf γw γs j γl pd pav pu
  ip dqi
 
-                          on fn m av eb b lks pid U cs.
+                          on fn m av eb b lks pid U cs Q.
 End KEXIT.

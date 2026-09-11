@@ -50,6 +50,7 @@ Require Import UserPtTree ProcPtOwn.
 Require Import Pt4kWalk CommonWalk PtTree KptPt TrampPt KMap.
 Require Import SwtchCtx.
 Require Import FdSlots FileInvDefs.
+Require Import ChildTok.  (* [gen_kq] / [my_pay]: the block's generation *)
 Require Export ProcDefs.
 (* [Typeclasses Opaque] is compilation-local: repeat the declaration here so
    broad [iFrame] calls do not unfold the 4 KiB [tf_page] big-op imported
@@ -1224,6 +1225,26 @@ Section ProcInv.
   (* THE MEMORY CONJUNCT IS THE LAZY sz-REGION VIEW -- see
      [ProcDefs.proc_priv_bare]'s note for why (vmfault, and hence copyin
      and every fault-only path, preserves it). *)
+  (* ---- THE LAST CONJUNCT IS THIS INCARNATION'S GENERATION -------------
+     [ChildTok]'s KERNEL QUARTER and, beside it, the process's own
+     persistent knowledge of the payload its exit owes.  The pair is the
+     process's identity as a wait()-side resource holder:
+
+       [gen_kq] is LINEAR and there is exactly one, which is what makes
+       "the payload is paid once" a theorem: kexit spends it on the ZOMBIE
+       escrow ([ChildTok.exit_tok], parked in [ProcDefs.proc_dormant]) and
+       no second block can hold another.
+       [my_pay] is PERSISTENT and is what the process's own U-mode slot is
+       built against ([UkRun.ukn_pay]) -- the exec bridge hands it to the
+       new image's slot ([SpecKexec.exec_slot_pre]), and the exit deposit
+       is stated at it.
+
+     THE PAYLOAD IS EXISTENTIAL HERE.  A block does not get to say what its
+     process owes: the parent chose it at fork ([ChildTok.gen_set]), and
+     what a holder of the block may do with it is exactly what agreement
+     allows.  allocproc mints the pair at the trivial payload
+     ([ChildTok.gen_alloc] then [gen_split]); kfork re-chooses it before the
+     split; exec preserves it ([KexecDefs.KexecOkQ] keeps [pv_gen]). *)
   Definition proc_priv_core (pa : mword 64) (pid : mword 32) (U : ustate) : iProp Σ :=
     (⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝ ∗
      ⌜um_below (pv_sz (us_V U)) (ud_um (pv_upt (us_V U)))⌝ ∗
@@ -1232,7 +1253,18 @@ Section ProcInv.
      proc_ptm_at pa (pv_upt (us_V U)) (uint (pv_sz (us_V U))) (us_M U) ∗
      tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) ∗
      cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗
-     first_tok)%I.
+     first_tok ∗
+     (∃ Q : Z -> iProp Σ,
+        gen_kq (pv_gen (us_V U)) pa pid Q ∗ my_pay (pv_gen (us_V U)) Q) ∗
+     (* ...AND THE PROCESS'S HALF OF ITS OWN [p->xstate] CELL, whose other
+        half is <p->lock>'s ([SchedCtx.proc_pub]).  The value is
+        existential: nothing a running process does reads it, and the one
+        step that writes it -- kexit's [p->xstate = status] -- holds the
+        lock and therefore both halves.  It is HERE rather than in the
+        public payload because the ZOMBIE park keys its escrow at the
+        cell's status ([ChildTok.exit_tok]) and the park is built out of
+        this block. *)
+     (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv))%I.
 
   (* ...AND ITS FILE-LAYER-FREE PART, WHICH IS WHAT THE BLOCK LAYER TAKES.
      [ProcDefs.proc_priv_bare] is this minus [cwd_ref]; the note at its
@@ -1241,13 +1273,17 @@ Section ProcInv.
      and rejoins with a rewrite -- no borrow and no closer to carry. *)
   Lemma proc_priv_core_bare (pa : mword 64) (pid : mword 32) (U : ustate) :
     proc_priv_core pa pid U ⊣⊢
-    proc_priv_bare pa pid U ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗ first_tok.
+    proc_priv_bare pa pid U ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗
+    first_tok ∗
+    (∃ Q : Z -> iProp Σ,
+       gen_kq (pv_gen (us_V U)) pa pid Q ∗ my_pay (pv_gen (us_V U)) Q) ∗
+    (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv).
   Proof.
     rewrite /proc_priv_core /proc_priv_bare. iSplit.
-    - iIntros "(%A & %B & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
-      iFrame "Hc Hft Hpid Hf Hpt Htfp". iSplitR; [done|]. done.
-    - iIntros "[(%A & %B & Hpid & Hf & Hpt & Htfp) [Hc Hft]]".
-      iFrame "Hpid Hf Hpt Htfp Hc Hft". iSplitR; [done|]. done.
+    - iIntros "(%A & %B & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs)".
+      iFrame "Hc Hft Hgq Hxs Hpid Hf Hpt Htfp". iSplitR; [done|]. done.
+    - iIntros "[(%A & %B & Hpid & Hf & Hpt & Htfp) [Hc [Hft [Hgq Hxs]]]]".
+      iFrame "Hpid Hf Hpt Htfp Hc Hft Hgq Hxs". iSplitR; [done|]. done.
   Qed.
 
   (* THE BORROW FORM.  Every fs callee below the file layer -- bread, bmap,
@@ -1259,7 +1295,7 @@ Section ProcInv.
     proc_priv_core pa pid U -∗
     proc_priv_bare pa pid U ∗ (proc_priv_bare pa pid U -∗ proc_priv_core pa pid U).
   Proof.
-    rewrite proc_priv_core_bare. iIntros "[Hb [Hc Hft]]".
+    rewrite proc_priv_core_bare. iIntros "[Hb [Hc [Hft [Hgq Hxs]]]]".
     iSplitL "Hb"; [iExact "Hb"|]. iIntros "Hb". iFrame.
   Qed.
 
@@ -1341,6 +1377,16 @@ Section ProcInv.
      other consumer of [proc_fields] is untouched.  A holder of the deficit
      block still owns the cell and writes it with
      [proc_priv_nocwd_cwd]. *)
+  (* THE GENERATION'S PAIR IS NOT HERE, and that is what makes the deficit
+     block the PRE-FORK shape.  allocproc returns the incarnation's
+     ownership WHOLE and beside the block ([SpecAllocproc]'s post,
+     [ChildTok.gen_own] at [DfracOwn 1] and the trivial payload) precisely
+     so that the forking parent can still CHOOSE the payload
+     ([ChildTok.gen_set]) -- which is possible only at full ownership.  The
+     split into the kernel's quarter and the persistent [my_pay] happens at
+     the same store the working directory and the token join at
+     ([proc_priv_split_cwd] is four-way for that reason), which is where
+     the block becomes [proc_priv]. *)
   Definition proc_priv_nocwd (γf : gname) (pa : mword 64) (pid : mword 32)
       (U : ustate) : iProp Σ :=
     (⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝ ∗
@@ -1351,20 +1397,27 @@ Section ProcInv.
      tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) ∗
      proc_ofiles γf (pv_fdg (us_V U)) pa (pv_ofile (us_V U)))%I.
 
-  (* THREE-WAY since the token joined the block.  The deficit block is the
-     PRE-PARK shape -- what allocproc returns -- and neither the working
-     directory nor [FirstTok.first_tok] is installed yet, so both split off
-     at the same seam and rejoin at the same store. *)
+  (* FOUR-WAY since the generation joined the block.  The deficit block is
+     the PRE-PARK shape -- what allocproc returns -- and neither the working
+     directory, nor [FirstTok.first_tok], nor the incarnation's own pair is
+     installed yet, so all three split off at the same seam and rejoin at
+     the same store.  The pair is LAST: kfork chooses the payload and splits
+     ([ChildTok.gen_set], [gen_split]) between allocproc's return and this
+     store, and userinit does the same at the trivial payload. *)
   Lemma proc_priv_split_cwd (γf : gname) (pa : mword 64) (pid : mword 32)
       (U : ustate) :
     proc_priv γf pa pid U ⊣⊢
-    proc_priv_nocwd γf pa pid U ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗ first_tok.
+    proc_priv_nocwd γf pa pid U ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗
+    first_tok ∗
+    (∃ Q : Z -> iProp Σ,
+       gen_kq (pv_gen (us_V U)) pa pid Q ∗ my_pay (pv_gen (us_V U)) Q) ∗
+    (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv).
   Proof.
     rewrite /proc_priv /proc_priv_core /proc_priv_nocwd.
     iSplit.
-    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
-      iFrame "Hc Hft". iSplitR; [done|]. iSplitR; [done|]. iFrame.
-    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) [Hc Hft]]".
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
+      iFrame "Hc Hft Hgq Hxs". iSplitR; [done|]. iSplitR; [done|]. iFrame.
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) [Hc [Hft [Hgq Hxs]]]]".
       iSplitR "Ho"; [|iExact "Ho"].
       iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
@@ -1377,7 +1430,7 @@ Section ProcInv.
     proc_priv γf pa pid U -∗
     proc_priv_bare pa pid U ∗ (proc_priv_bare pa pid U -∗ proc_priv γf pa pid U).
   Proof.
-    rewrite /proc_priv proc_priv_core_bare. iIntros "[[Hb [Hc Hft]] Ho]".
+    rewrite /proc_priv proc_priv_core_bare. iIntros "[[Hb [Hc [Hft [Hgq Hxs]]]] Ho]".
     iSplitL "Hb"; [iExact "Hb"|]. iIntros "Hb". iFrame.
   Qed.
 
@@ -1425,7 +1478,13 @@ Section ProcInv.
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
      cwd_ref_at (pv_cwd V) (pv_cwi V) ∗
      proc_ofiles γf (pv_fdg V) pa (pv_ofile V) ∗
-     first_tok)%I.
+     first_tok ∗
+     (* the incarnation's pair, exactly as the whole block carries it
+        ([proc_priv_core]): this shape drops the MEMORY conjunct and
+        nothing else *)
+     (∃ Q : Z -> iProp Σ, gen_kq (pv_gen V) pa pid Q ∗ my_pay (pv_gen V) Q) ∗
+     (* ...and the process's half of [p->xstate], for the same reason *)
+     (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv))%I.
 
   (* THE TRAPFRAME BOUND, off the residue's own half of the block.  Same
      conjunct [proc_priv_sz_maxsz] reads, at the form the trap loop holds
@@ -1455,12 +1514,12 @@ Section ProcInv.
     rewrite /proc_priv /proc_priv_core /proc_priv_nopt proc_ptm_at_split
             /proc_pt_cells.
     iSplit.
-    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & ((Hc1 & Hc2) & Hpt) & Htfp & Hc & Hft) Ho]".
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & ((Hc1 & Hc2) & Hpt) & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
       iFrame "Hpt". iSplitR; [done|]. iSplitR; [done|].
-      iFrame "Hpid Hf Hc1 Hc2 Htfp Hc Ho Hft".
-    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & (Hc1 & Hc2) & Htfp & Hc & Ho & Hft) Hpt]".
+      iFrame "Hpid Hf Hc1 Hc2 Htfp Hc Ho Hft Hgq Hxs".
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & (Hc1 & Hc2) & Htfp & Hc & Ho & Hft & Hgq & Hxs) Hpt]".
       iFrame "Ho". iSplitR; [done|]. iSplitR; [done|].
-      iFrame "Hpid Hf Hc1 Hc2 Hpt Htfp Hc Hft".
+      iFrame "Hpid Hf Hc1 Hc2 Hpt Htfp Hc Hft Hgq Hxs".
   Qed.
 
   (* THE TRAPFRAME BORROW at the reduced block -- same statement as
@@ -1648,7 +1707,8 @@ Section ProcInv.
     proc_priv_core pa pid (us_ofile U fd v) ⊣⊢ proc_priv_core pa pid U.
   Proof.
     rewrite /proc_priv_core.
-    by cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+    by cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg
+            pv_cwi pv_gen pv_chg].
   Qed.
 
   (* BUILDING one: allocproc is the only producer, and this is exactly its
@@ -1695,12 +1755,23 @@ Section ProcInv.
        and must not: allocproc produces the deficit block, and allocproc
        does not park a RUNNABLE or SLEEPING process. *)
     first_tok -∗
+    (* ...AND THE INCARNATION'S PAIR, on the token's footing and at the
+       same seam: the payload is chosen and split between allocproc's
+       return and this store ([ChildTok.gen_set] then [gen_split]), so the
+       deficit block cannot carry it and the whole block cannot be built
+       without it. *)
+    (∃ Q : Z -> iProp Σ,
+       gen_kq (pv_gen (us_V U)) pa pid Q ∗ my_pay (pv_gen (us_V U)) Q) -∗
+    (* ...AND THE SLOT'S HALF OF [p->xstate], on the same footing and at the
+       same seam: it comes out of the dormant block with the row
+       ([SpecAllocproc.allocproc_post]) and joins the block here. *)
+    (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv) -∗
     proc_priv γf pa pid (us_pt U P ws).
   Proof.
-    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho Hc Hft".
+    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho Hc Hft Hgq Hxs".
     iDestruct (proc_priv_nocwd_intro γf pa pid U P ws Hsz Hbel
                  with "Hpid Hf Hpt Htf Ho") as "H".
-    iApply proc_priv_split_cwd. iFrame "H Hft".
+    iApply proc_priv_split_cwd. iFrame "H Hft Hgq Hxs".
     by cbn [upd_pt pv_cwd pv_fdg pv_cwi pv_gen pv_chg].
   Qed.
 
@@ -1720,7 +1791,7 @@ Section ProcInv.
     p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
     (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv γf pa pid U).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
@@ -1756,7 +1827,7 @@ Section ProcInv.
     (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt (us_V U))) -∗
        proc_priv γf pa pid U).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_ptm_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
     iSplitL "Hq1"; [iExact "Hq1"|].
@@ -1779,7 +1850,7 @@ Section ProcInv.
        p_cwd pa ↦₈ v' -∗ cwd_ref_at v' z' -∗
        proc_priv γf pa pid (us_cwi (us_cwd U v') z')).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iSplitL "Hcwd"; [iExact "Hcwd"|].
     (* [iExact], not [iFrame]: the hypothesis and the goal are the same
@@ -1797,7 +1868,9 @@ Section ProcInv.
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
     iSplitL "Hpt"; [iExact "Hpt"|].
     iSplitL "Htfp"; [iExact "Htfp"|].
-    iSplitL "Hc"; [iExact "Hc"|]. iExact "Hft".
+    iSplitL "Hc"; [iExact "Hc"|].
+    iSplitL "Hft"; [iExact "Hft"|].
+    iSplitL "Hgq"; [iExact "Hgq"|]. iExact "Hxs".
   Qed.
 
   (* THE WORKING DIRECTORY AND THE PID QUARTER TOGETHER, because kexit needs
@@ -1828,7 +1901,7 @@ Section ProcInv.
   Proof.
     (* one [rewrite] does both occurrences -- the hypothesis AND the one
        under the wand -- so the give-back needs no second one. *)
-    rewrite /proc_priv proc_priv_core_bare. iIntros "[[Hb [Hc Hft]] Ho]".
+    rewrite /proc_priv proc_priv_core_bare. iIntros "[[Hb [Hc [Hft [Hgq Hxs]]]] Ho]".
     iSplitL "Hb"; [iExact "Hb"|]. iSplitL "Hc"; [iExact "Hc"|].
     iIntros "Hb Hc". iFrame.
   Qed.
@@ -1841,7 +1914,7 @@ Section ProcInv.
        p_cwd pa ↦₈ v' -∗ cwd_ref_at v' z' -∗ p_pid pa ↦₄{DfracOwn (1/4)} pid -∗
        proc_priv γf pa pid (us_cwi (us_cwd U v') z')).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq ctx_word4_pointsto_frac_split.
@@ -1861,7 +1934,9 @@ Section ProcInv.
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
     iSplitL "Hpt"; [iExact "Hpt"|].
     iSplitL "Htfp"; [iExact "Htfp"|].
-    iSplitL "Hc"; [iExact "Hc"|]. iExact "Hft".
+    iSplitL "Hc"; [iExact "Hc"|].
+    iSplitL "Hft"; [iExact "Hft"|].
+    iSplitL "Hgq"; [iExact "Hgq"|]. iExact "Hxs".
   Qed.
 
   (* The array's length, which a caller needs BEFORE it knows which
@@ -1918,7 +1993,7 @@ Section ProcInv.
     (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt (us_V U))) -∗
      tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) -∗ proc_priv γf pa pid U).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_ptm_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
     iFrame "Hq1 Htfp".
@@ -1948,7 +2023,7 @@ Section ProcInv.
        tf_page (ud_tfp (pv_upt (us_V U))) ws' -∗
        proc_priv γf pa pid (us_tf U ws')).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_ptm_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iFrame "Htfc Htfp".
     iIntros (ws') "Htfc Htfp".
@@ -1957,7 +2032,7 @@ Section ProcInv.
     iSplitR "Ho"; [| iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
-    iFrame "Hpid Hf Hpg Htfc Hptt Htfp Hc Hft".
+    iFrame "Hpid Hf Hpg Htfc Hptt Htfp Hc Hft Hgq Hxs".
   Qed.
 
   (* [upd_tf] at the contents it lent out is the identity -- the record eta a
@@ -2002,7 +2077,7 @@ Section ProcInv.
        proc_ptm P' (uint szv) M' -∗
        proc_priv γf pa pid (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv)) M')).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_fields /proc_ptm_at.
     iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
@@ -2017,7 +2092,7 @@ Section ProcInv.
     iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
-    iFrame "Hpg Htfc Hptt Htfp Hc Hft".
+    iFrame "Hpg Htfc Hptt Htfp Hc Hft Hgq Hxs".
   Qed.
 
   (* THE COPY INSTANCE: the size stays put and the descriptor only GREW --
@@ -2080,7 +2155,7 @@ Section ProcInv.
     p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
     (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv_core pa pid U).
   Proof.
-    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
@@ -2110,7 +2185,7 @@ Section ProcInv.
     (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt (us_V U))) -∗
      tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) -∗ proc_priv_core pa pid U).
   Proof.
-    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs)".
     rewrite /proc_ptm_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
     iFrame "Hq1 Htfp".
@@ -2134,7 +2209,7 @@ Section ProcInv.
        proc_ptm P' (uint szv) M' -∗
        proc_priv_core pa pid (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv)) M')).
   Proof.
-    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs)".
     rewrite /proc_fields /proc_ptm_at.
     iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
@@ -2148,7 +2223,7 @@ Section ProcInv.
     iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
-    iFrame "Hpg Htfc Hptt Htfp Hc Hft".
+    iFrame "Hpg Htfc Hptt Htfp Hc Hft Hgq Hxs".
   Qed.
 
   Lemma proc_priv_core_copy (pa : mword 64) (pid : mword 32) (U : ustate) :
@@ -2219,7 +2294,7 @@ Section ProcInv.
        tf_page (ud_tfp P') ws' -∗
        proc_priv γf pa pid (upd_usM (upd_usV U (upd_sz (upd_pt (us_V U) P' ws') szv)) M')).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_fields /proc_ptm_at.
     iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
@@ -2232,7 +2307,7 @@ Section ProcInv.
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb'|].
     iSplitR; [iPureIntro; exact Hbel'|].
-    iFrame "Hpid Hpg Htfc Hptt Htfp Hc Hft".
+    iFrame "Hpid Hpg Htfc Hptt Htfp Hc Hft Hgq Hxs".
     iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl.
   Qed.
 
@@ -2247,7 +2322,7 @@ Section ProcInv.
        pname_cells pa (DfracOwn 1) ns -∗
        proc_priv γf pa pid (us_name U ns)).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_fields.
     iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iSplitR; [iPureIntro; exact Hnl|].
@@ -2258,7 +2333,7 @@ Section ProcInv.
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
-    iFrame "Hpid Hpt Htfp Hc Hft Hsz Hcwd Hnm".
+    iFrame "Hpid Hpt Htfp Hc Hft Hgq Hxs Hsz Hcwd Hnm".
     iPureIntro. exact Hnl'.
   Qed.
 
@@ -2270,15 +2345,16 @@ Section ProcInv.
     ofile_slot γf (pv_fdg (us_V U)) pa fd v ∗
     (∀ v', ofile_slot γf (pv_fdg (us_V U)) pa fd v' -∗ proc_priv γf pa pid (us_ofile U fd v')).
   Proof.
-    iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) [%Hlen Ho]]".
+    iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) [%Hlen Ho]]".
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
     rewrite /proc_priv /proc_priv_core /proc_ofiles.
-    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg
+         pv_cwi pv_gen pv_chg].
     iSplitR "Ho".
     { iSplitR; [iPureIntro; exact Hszb|].
       iSplitR; [iPureIntro; exact Hbel|].
-      iFrame "Hpid Hf Hpt Htfp Hc Hft". }
+      iFrame "Hpid Hf Hpt Htfp Hc Hft Hgq Hxs". }
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
 
@@ -2296,19 +2372,20 @@ Section ProcInv.
     (∀ v', p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ ofile_slot γf (pv_fdg (us_V U)) pa fd v' -∗
            proc_priv γf pa pid (us_ofile U fd v')).
   Proof.
-    iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) [%Hlen Ho]]".
+    iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) [%Hlen Ho]]".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hq1 Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
     rewrite /proc_priv /proc_priv_core /proc_ofiles.
-    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg
+         pv_cwi pv_gen pv_chg].
     iSplitR "Ho".
     { iSplitR; [iPureIntro; exact Hszb|].
       iSplitR; [iPureIntro; exact Hbel|].
       rewrite Hq ctx_word4_pointsto_frac_split.
-      iFrame "Hq1 Hq2 Hf Hpt Htfp Hc Hft". }
+      iFrame "Hq1 Hq2 Hf Hpt Htfp Hc Hft Hgq Hxs". }
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
 
@@ -2518,6 +2595,12 @@ Section ProcInv.
        p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
        proc_fields pa (DfracOwn 1) V ∗
        ofile_cells pa (pv_ofile V) ∗
+       (* ...AND THE SLOT'S HALF OF [p->xstate].  The carve produces the
+          whole cell and cuts it here: <p->lock>'s half goes into
+          [SchedCtx.proc_pub] and this one rides the slot, because the
+          ZOMBIE park keys its escrow at what the cell reads
+          ([ProcDefs.proc_dormant]). *)
+       (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv) ∗
        own_ctx (p_context pa) ∗
        p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
        p_trapframe pa ↦₈ (zero_reg : mword 64))%I.
@@ -2547,14 +2630,18 @@ Section ProcInv.
     ch_frag γ0 pa ∅ -∗
     proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs Hir Hbs Hkst Hch".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hxs & Hctx & Hpg & Htf) Hs Hir Hbs Hkst Hch".
     iDestruct (fd_slots_split with "Hs") as "[Hs Hsp]".
     iExists (upd_chg V γ0), pid.
     cbn [upd_chg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi pv_gen pv_chg].
     (* BOTH [st]-keyed disjuncts take their [else] branch, and the row's has
        to be reduced before it can be framed. *)
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
-    iFrame "Hpid Hf Ho Hsp Hir Hbs Hkst Hch Hctx". iSplit; [done|].
+    iDestruct "Hxs" as (xsv) "Hxc".
+    iAssert (∃ v : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} v ∗ emp)%I
+      with "[Hxc]" as "Hxsrow"; [ iExists xsv; iFrame "Hxc" |].
+    iFrame "Hpid Hf Ho Hsp Hir Hbs Hkst Hch Hxsrow Hctx".
+    iSplit; [done|].
     iSplitL "Hs".
     { iApply fd_slots_to_any. by rewrite Hof length_replicate. }
     iFrame "Hpg Htf".
@@ -2629,6 +2716,10 @@ Section ProcInv.
        ([SpecForkretParkPaid.forkret_park_pkg]), and the reason a slot owns
        one at all. *)
     kstack_free pa ∗
+    (* ...AND THE SLOT'S HALF OF [p->xstate], out with them: the process
+       that takes this slot carries it in its block until it exits
+       ([proc_priv_core]), and freeproc gives it back. *)
+    (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv) ∗
     ∃ (V : pprivate) (pid : mword 32),
       ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
        pv_cwd V = (zero_reg : mword 64) /\
@@ -2650,13 +2741,15 @@ Section ProcInv.
          descriptors were unstateable as a direct consequence. *)
       fd_frags (pv_fdg V) fdt0.
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hctx & Haddr)".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hxs & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iDestruct "Haddr" as "[Hpg Htf]".
+    iDestruct "Hxs" as (xsv) "[Hxc _]".
     iMod (fd_st_alloc NOFILE) as (γd) "Hst".
     iDestruct (fd_st_both_split γd NOFILE with "Hst") as "[Hauth Hfrag]".
     iDestruct (fd_frags_of_closed γd with "Hfrag") as "Hfrag".
     iModIntro. iFrame "Hctx Hpg Htf Hsp Hir Hbs Hkst".
+    iSplitL "Hxc"; [ iExists xsv; iExact "Hxc" |].
     iExists (upd_fdg V γd), pid.
     cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi pv_gen pv_chg].
     iSplit; [done|]. iFrame "Hpid Hf Hch".
@@ -2720,11 +2813,25 @@ Section ProcInv.
      this [V] does not exist.  kexit arrives in exactly that state -- it has
      already spent its reference on [iput] -- so the premise is the one it
      can actually pay. *)
+  (* [Q'] IS THE DEPOSIT'S OWN PAYLOAD, not the block's.  What the exiting
+     process pays at the trap boundary is stated at the predicate IT can
+     name ([ChildTok.my_pay], which its slot was built against); the block's
+     quarter names the same one, but only up to the saved predicate's later,
+     and the escrow is what carries both so that nothing here has to strip
+     it ([ChildTok.exit_tok]). *)
   Lemma proc_priv_to_dormant_zombie (γf : gname) (pa : mword 64)
-      (pid : mword 32) (U : ustate) (cs : gset gname) :
+      (pid : mword 32) (U : ustate) (Q' : Z -> iProp Σ) (xsv : mword 32) :
     pv_ofile (us_V U) = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd (us_V U) = (zero_reg : mword 64) ->
-    proc_priv_nocwd γf pa pid U -∗ fd_slots FDSPARE -∗
+    proc_priv_nocwd γf pa pid U -∗
+    (* AND THE INCARNATION'S PAIR, which the deficit block does not carry
+       ([proc_priv_split_cwd] is what splits it off): the KERNEL'S QUARTER
+       is what the escrow below is built out of, and the [my_pay] beside it
+       is the block's own copy, which nothing here reads -- the deposit's
+       is what the payload is paid at. *)
+    (∃ Q0 : Z -> iProp Σ,
+       gen_kq (pv_gen (us_V U)) pa pid Q0 ∗ my_pay (pv_gen (us_V U)) Q0) -∗
+    fd_slots FDSPARE -∗
     iref_slots (1 + IREFSPARE) -∗
     (* AND THE BIO ALLOWANCE BACK.  THIS IS THE RECLAIM, and without it the
        supply would drain: a dormant slot owns three units, allocproc hands
@@ -2740,21 +2847,41 @@ Section ProcInv.
        step a pass-through, and it is the whole reason the exit path has to
        reassemble the page (SpecKexit.v's park). *)
     kstack_free pa -∗
-    (* THE SLOT'S CHILDREN ROW, LAST among the spatial premises.  A ZOMBIE
-       block carries the row of the slot it is parking ([ProcDefs.proc_
-       dormant_noctx]'s [∃ S] arm), and this is the only route a row ever
-       takes into one: the process holds it off its trap residue
-       ([UsertrapRes.ut_own]) all the way down kexit, at whatever set its
-       children left it. *)
-    ch_frag (pv_chg (us_V U)) pa cs -∗ proc_dormant_noctx pa ZOMBIE.
+    (* THE SLOT'S CHILDREN ROW, AT [∅].  A ZOMBIE block carries the row of
+       the slot it is parking, and this is the only route a row ever takes
+       into one: the process holds it off its trap residue
+       ([UsertrapRes.ut_own]) all the way down kexit -- which EMPTIES it
+       under the <wait_lock> it is holding at the store, moving its
+       children to <init>'s orphans ([WaitInv.orphans_own]), before it
+       parks.  So a zombie's row is empty, exactly as an unused slot's
+       is. *)
+    ch_frag (pv_chg (us_V U)) pa ∅ -∗
+    (* AND THE SLOT'S HALF OF [p->xstate], at the status the caller just
+       stored: the escrow below is keyed at what this half reads, which is
+       what ties the payload to the word wait() copies out. *)
+    p_xstate pa ↦₄{DfracOwn (1/2)} xsv -∗
+    (* AND THE EXIT DEPOSIT, which is what the ZOMBIE arm is for.  The
+       process's own knowledge of its payload and the payload PAID at that
+       same status: the trap route brought both down
+       ([UexecRet.uexec_pay_dep]), and together with the block's own
+       quarter they are the escrow the reaping parent redeems. *)
+    my_pay (pv_gen (us_V U)) Q' -∗
+    Q' (xstate_val xsv) -∗
+    proc_dormant_noctx pa ZOMBIE.
   Proof.
-    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hsp Hir Hbs Hkst Hrow".
+    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hgq Hsp Hir Hbs Hkst Hrow Hxs #Hmy HQ".
     iDestruct (proc_ofiles_null_split γf (pv_fdg (us_V U)) pa (pv_ofile (us_V U)) Hof with "Ho") as "[Ho Hs]".
-    iExists (us_V U), pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst".
+    iDestruct "Hgq" as (Q) "[Hkq _]".
+    iExists (us_V U), pid. iSplit; [by iPureIntro|].
+    iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hrow".
+    iSplitL "Hxs Hkq HQ".
+    { iExists xsv. iFrame "Hxs".
+      rewrite bool_decide_eq_true_2; [| reflexivity].
+      iApply (exit_tok_intro with "Hkq Hmy HQ"). }
     rewrite bool_decide_eq_true_2; [| reflexivity].
-    iSplitL "Hrow"; [iExists cs; iExact "Hrow"|].
     iSplitR; [iPureIntro; exact Hbel|].
-    iSplitL "Hpt"; [iApply (proc_ptm_at_forget with "Hpt")|]. iFrame "Htfp".
+    iSplitL "Hpt"; [iApply (proc_ptm_at_forget with "Hpt")|].
+    iExact "Htfp".
   Qed.
 
   (* =================================================================== *)

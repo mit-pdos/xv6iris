@@ -148,9 +148,40 @@ Section ChildTok.
     gen_own γ (DfracOwn (1/4)%Qp) pa pid Q.
 
   (* THE ESCROW.  What a ZOMBIE slot holds for its parent: the kernel's
-     quarter and the payload PAID at the status the process exited with. *)
+     quarter of the dead incarnation's generation, and the payload PAID at
+     the status the slot's [p_xstate] cell now reads.
+
+     WHY TWO PREDICATES AND NOT ONE.  The party that pays is the exiting
+     PROCESS, and what it deposits at the trap boundary is its own
+     [my_pay γ Q'] beside [Q' xs] ([UexecRet.uexec_dep_F] at [USYS_exit]):
+     a slot may only ever name the payload it can prove it has, which is
+     what the persistent half is.  The party that HOLDS the kernel's
+     quarter is kexit, out of the dying process's private block
+     ([ProcInv.proc_priv_core]), and its [Q] is bound by that block's own
+     existential.  The two are THE SAME PREDICATE -- agreement of two
+     pieces of one generation -- but only up to the saved predicate's
+     later, so pairing them here rather than rewriting one into the other
+     is what keeps kexit's park later-free.  [gen_pay] pays the ▷ once, at
+     the reaper, where it costs nothing.
+
+     A KILL IS PAID TOO, AND OUT OF THE SAME PAYLOAD.  A process that
+     [kill] marked is torn down by the kernel at its next trap, which runs
+     [exit(-1)] with the process's own continuation undelivered -- so
+     nothing the PROGRAM does can pay at that moment.  What pays is what
+     the program handed the kernel when it trapped: its run carries
+     [UkRun.ukn_pay N (-1)] as a linear conjunct precisely so that the
+     kernel can spend it on the kill path, and hands it back at every
+     resume that is not one ([UexecRet.uexec_pay_dep] / [uexec_pay_arm]).
+     So a parent gets [Q (-1)] whether its child called [exit(-1)] or was
+     killed, and there is exactly one arm here.
+
+     KEYED AT THE STORED STATUS.  [xs] is the value in the slot's
+     [p_xstate] cell, whose other half rides this same block
+     ([ProcDefs.proc_dormant]); the reaper holds [p->lock], so the half it
+     reads through [SchedCtx.proc_pub] and the half beside this escrow
+     agree, and the status it copies out to the parent IS this [xs]. *)
   Definition exit_tok γ pid xs : iProp Σ :=
-    (∃ pa Q, gen_kq γ pa pid Q ∗ Q xs)%I.
+    (∃ pa Q Q', gen_kq γ pa pid Q ∗ my_pay γ Q' ∗ Q' xs)%I.
 
   (* ------------------------------------------------------------------ *)
   (* AGREEMENT.                                                          *)
@@ -229,8 +260,9 @@ Section ChildTok.
   Proof.
     iIntros "Ht He".
     iDestruct "Ht" as (pa) "Ht".
-    iDestruct "He" as (pa' Q') "[Hk HQ]".
-    iDestruct (gen_agree with "Ht Hk") as "[_ Heq]".
+    iDestruct "He" as (pa' Q0 Q') "[Hk [Hmy HQ]]".
+    iDestruct "Hmy" as (pa'' pid') "Hmy".
+    iDestruct (gen_agree with "Ht Hmy") as "[_ Heq]".
     iNext. iSpecialize ("Heq" $! xs). by iRewrite "Heq".
   Qed.
 
@@ -292,11 +324,13 @@ Section ChildTok.
     iExists pa, pid. iExact "Hp".
   Qed.
 
-  (* the escrow, built: what kexit does with the block's quarter and the
-     payload the exiting process deposited. *)
-  Lemma exit_tok_intro γ pa pid Q xs :
-    gen_kq γ pa pid Q -∗ Q xs -∗ exit_tok γ pid xs.
-  Proof. iIntros "Hk HQ". iExists pa, Q. iFrame "Hk HQ". Qed.
+  (* the escrow, built PAID: what kexit does with the block's quarter and
+     the DEPOSIT the exiting process made at the trap boundary -- the
+     process's own [my_pay] and the payload paid at the status kexit
+     stored. *)
+  Lemma exit_tok_intro γ pa pid Q Q' xs :
+    gen_kq γ pa pid Q -∗ my_pay γ Q' -∗ Q' xs -∗ exit_tok γ pid xs.
+  Proof. iIntros "Hk #Hmy HQ". iExists pa, Q, Q'. iFrame "Hk Hmy HQ". Qed.
 
 End ChildTok.
 

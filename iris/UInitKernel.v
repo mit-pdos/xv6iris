@@ -168,11 +168,11 @@ Section UInitKernel.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context `{SG : uexecSG Σ}.
-  Context `{PS : uprogSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* NO [Context {CID : CpuId}] and no ambient [CurCtx]: the slot binds the
      hart itself, and the run binds its own context ([UShKernel]'s note). *)
@@ -235,16 +235,24 @@ Section UInitKernel.
        exec("sh", argv): its OWN, at its own two argument registers and at
        the root, not the generic bundle at every key. *)
     UkInit.init_exec_sup -∗
+    (* THE PAY FACT, at the trivial payload: <init> has no parent, so its
+       exit owes nobody anything -- userinit's choice, which the entry
+       constructor writes into the record ([UkRun.ukn_pay]) and which
+       init's own exit stub reads back. *)
+    my_pay (uvis_gen W) (fun _ => True)%I -∗
     uslot W.
   Proof.
     intros Hpc Hsub Hx Hwd Hszd Hbase Hal8 Hroom Hstk Hfdlen Hstop Hcw Hpsok.
-    iIntros "#Hdep #Hxs".
-    iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0)))))
-              Hal8 Hroom Hstk Hfdlen Hstop with "Hdep").
+    iIntros "#Hdep #Hxs #Hmp".
+    iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0))))) (fun _ => True)%I
+              Hal8 Hroom Hstk Hfdlen Hstop with "Hdep Hmp []").
+    (* the payload at the trivial one -- <init> has no parent *)
+    { done. }
     (* init's own half of its children set travels with its cwd: nothing
        on init's walk READS it, but fork MOVES it, so the fragment goes
        down the chain index-free ([UserChildren.uch_any]). *)
-    iIntros (N h) "%Hsz Hszf #Ht Hstd Hcwf Hchf Dlo _ Hrun".
+    iIntros (N h) "%Hpayeq %Hsz Hszf #Ht Hstd Hcwf Hchf Dlo _ Hrun".
+    pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
     (* ---- the argument vector, out of the data below the frame ---- *)
     assert (Hsub16 :
               init_argv_map
@@ -297,7 +305,9 @@ Section UInitKernel.
        the caller's block held.  ARM-c (1) discharges it. *)
     uvis_cwd W' = FsImg.ROOTINO ->
     (forall k : Z, k <> USYS_exec -> psok k) ->
-    udep -∗ UkInit.init_exec_sup -∗ uslot W'.
+    (* the pay fact, passed straight through: see [init_uexec_slot] *)
+    udep -∗ UkInit.init_exec_sup -∗
+    my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W'.
   Proof.
     intros Hok Hroom Hlen Hcw Hpsok.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row --

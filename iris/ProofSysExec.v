@@ -130,7 +130,7 @@ Section SysExecAUBridge.
 
   (* (1) the caller's WP, instantiated at the vector the walk built *)
   Lemma sys_exec_au_pre_at (Fs : pfam Σ (uvis -> iProp Σ)) Γ
-      (γfs : fs_names) (cw : Z)
+      (γfs : fs_names) (cw : Z) (Qpay : Z -> iProp Σ)
       (Pw Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Mim : gmap Z (bv 8)) (pvp avp : mword 64) (sts : list fdstate)
@@ -138,8 +138,8 @@ Section SysExecAUBridge.
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
     exec_path_of Mim pvp pl ->
     exec_args_of Mim avp na alen afun ->
-    sys_exec_au_pre Fs Γ γfs cw Pw Pmiss Fo Mim pvp avp sts -∗
-    exec_au_pre Fs Γ γfs cw Pw Pmiss Fo pl na alen afun sts.
+    sys_exec_au_pre Fs Γ γfs cw Qpay Pw Pmiss Fo Mim pvp avp sts -∗
+    exec_au_pre Fs Γ γfs cw Qpay Pw Pmiss Fo pl na alen afun sts.
   Proof.
     intros Hpsh Hsh. rewrite /sys_exec_au_pre /exec_au_pre.
     iIntros "(Hera & Hcom & Hslot)".
@@ -236,7 +236,7 @@ Section SysExecBreakAU.
       (uvf : nat -> mword 64)
       (* ---- the AU side ---- *)
       (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (Mim : gmap Z (bv 8)) (pvp avp : mword 64)
+      (Mim : gmap Z (bv 8)) (pvp avp : mword 64) (Qpay : Z -> iProp Σ)
       (Pw Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :
     (K_sys_exec <= K)%nat ->
@@ -281,7 +281,11 @@ Section SysExecBreakAU.
     (* the caller's bundle, still quantified over every argument vector of
        the right shape: the instantiation happens below, at the vector the
        fill loop actually built. *)
-    sys_exec_au_pre Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo Mim pvp avp sts -∗
+    (* the pay fact, relayed to kexec: the exec'ing process's own knowledge
+       of what its exit owes, which the new image's slot is built against
+       ([SpecKexec.exec_slot_pre]) *)
+    my_pay gn Qpay -∗
+    sys_exec_au_pre Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Qpay Pw Pmiss Fo Mim pvp avp sts -∗
     sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun uvf (mword_of_int (SX + 0xb6) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
@@ -294,7 +298,7 @@ Section SysExecBreakAU.
         (* the armed post, at the block the copy-ins left and the returned
            a0; [exec_arms_landed] turns it back into the landed
            [kexec_ok] whenever a caller wants that instead. *)
-        exec_arms Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo
+        exec_arms Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Qpay Pw Pmiss Fo
                   (bview plen pfun) i alen afun sts gn cs
                   (us_upt U P) U' (mf !!! Regidx Ra0) -∗
         (* the READING the walk established, which the composition needs to
@@ -315,7 +319,7 @@ Section SysExecBreakAU.
     intros HK Hlb Hsp0 Hplen Hpcstr Hpof Hav Him Hnul Halp Hroot Hnib0
            Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl Hbt Hebt.
     destruct (sx_kb K HK) as (Kkx & Kar & Kaa & Kfa & Kfs & K14 & K2 & K60 & Kpop).
-    iIntros "#Htext #Hfab #Hka Hbmp Hisp #Hbmr Hbs Hir Hau Hst".
+    iIntros "#Htext #Hfab #Hka Hbmp Hisp #Hbmr Hbs Hir #Hmp Hau Hst".
     rewrite /sx_body.
     iDestruct "Hst" as "((%Hi32 & %Hext & %Hok & %Havok & %HR) & Hpc & Hcg & Hcnt &
                          Hpriv & Hcarry & F59 & F60 & Harr & Hpgs)".
@@ -344,7 +348,7 @@ Section SysExecBreakAU.
       - exact (sx_avf_eq uvf i).
       - intros j Hj. rewrite (sx_avf_lt uvf i j Hj).
         exact (proj2 (proj2 (Havok j Hj))). }
-    iDestruct (sys_exec_au_pre_at Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Fo
+    iDestruct (sys_exec_au_pre_at Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Qpay Pw Pmiss Fo
                  Mim pvp avp sts (bview plen pfun) i alen afun
                  Hpof Hargs with "Hau") as "Hau".
     iDestruct (sx_carry_open sp0 m plen pfun rest with "Hcarry")
@@ -495,7 +499,7 @@ Section SysExecBreakAU.
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
               pid (us_upt U P) sts gn cs
               dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
-              N6 (K - 60)%nat eb b lks Pw Pmiss Fo
+              N6 (K - 60)%nat eb b lks Qpay Pw Pmiss Fo
               Kkx Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
               Hcb Hireg Hpcstr ltac:(lia)
               ltac:(intros j Hj; rewrite (sx_avf_lt pg i j Hj);
@@ -507,13 +511,15 @@ Section SysExecBreakAU.
                     lia)
               Hjp Hgl
               with "Hcg Hcnt [] [] Htext Hpc Hfab Hka Hbmp Hisp Hbmr Hpriv
-                    Hpb Havf Hpgs Hbs Hir Hau").
+                    Hpb Havf Hpgs Hbs Hir [Hmp Hau]").
     (* kexec is eb-generic now; sys_exec is still at [eb = true], where the
        complement is [emp].  Its crossing also moved from [b] to the literal
        [true] -- free here, since [b = true] makes the two coincide, and
        everything sys_exec frames across the call is hart-free. *)
     { rewrite Hebt /trap_csrs_ext. done. }
     { rewrite Hebt /cpu_claim_ext. done. }
+    { (* the bundle kexec takes is the pay fact BESIDE the AU half *)
+      iSplitR; [ iExact "Hmp" | iExact "Hau" ]. }
     iIntros (CID8 Hq8 mf U') "%Hcsf Harms Hcg Hcnt _ _ Hpc
              Hbmp Hisp Hka2 Hpriv Hpb Havf Hpgs Hbs Hir".
     iEval (rewrite HN6ra) in "Hpc".
@@ -618,18 +624,19 @@ Section SysExecWhole.
       (gn : gname) (cs : gset gname)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
+      (Qpay : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :
       wp_sys_exec_sconf_body Fs γf gs j gl pd pav pu dqb dqs v0 v1 pid U sts
         gn cs
-        m K eb b lks P Pmiss Fo.
+        m K eb b lks Qpay P Pmiss Fo.
   Proof.
     cbv beta zeta delta [wp_sys_exec_sconf_body].
     intros HK Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
            Hcb Hireg Hjp Hgl Hebt Harg0 Harg1.
     subst eb.
     iIntros "Hcg Hcnt Htcx Hccx #Htext #Hdata Hpc #Hfab Hbmp Hisp #Hbmr
-             Hbs #Hka Hir Hpriv Hau Hcont".
+             Hbs #Hka Hir Hpriv #Hmp Hau Hcont".
     (* ---- the interrupt index, and the held-lock set ---- *)
     iDestruct (sie_b_agree m 0%nat K true b (proc_addr j) lks
                  with "Hcg Hcnt") as %Hb.
@@ -723,11 +730,11 @@ Section SysExecWhole.
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
       iApply (sx_break_au (CID0 := CID3) Fs gs j gl pd pav pu γf
                 dqb dqs pid U K true true ∅ sp0 m plen pfun rst v1
-                M3 P3 i3 pg3 al3 af3 uv3 sts gn cs (us_M U) v0 v1 P Pmiss Fo
+                M3 P3 i3 pg3 al3 af3 uv3 sts gn cs (us_M U) v0 v1 Qpay P Pmiss Fo
                 HK Hlb eq_refl Hplen Hpcstr Hpof
                 eq_refl eq_refl Hnul3 Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
-                with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hau Hbrk").
+                with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hmp Hau Hbrk").
       iIntros (CID4 Hq4 mf Ubk)
         "%Hcs Harms %Hargs %Hext3 Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].

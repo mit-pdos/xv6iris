@@ -67,6 +67,7 @@ Import Defs.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import ChildTok.  (* [my_pay] -- the boot arm's payload row *)
 Require Import InitBoot.  (* [init_boot_bundle] -- the first process's exec
                                bundle, the BOOT mode's payload *)
 
@@ -75,7 +76,13 @@ Section ParkCap.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
-  Context `{SG : uexecSG Σ}.
+  (* NO [ctokG] BINDER OF ITS OWN: [Xv6G.xv6_ctok] is in scope and meets the
+     class's index; a second [Context `{!ctokG Σ}] beside it would win
+     resolution here while every file that has only [xv6G] resolves to the
+     field -- two instances that print alike and do not match ([UexecSG]'s
+     note).  The SG binder is NON-generalizing (braces) so that its index
+     resolves rather than abstracting a fresh one. *)
+  Context {SG : uexecSG Σ}.
 
   (* the saved-context head the park installs: forkret's entry, and the
      kernel stack's top -- [SpecAllocproc.forkret_pc]'s value *)
@@ -193,6 +200,7 @@ Section ParkCap.
         ⌜pv_fdg (us_V U') = g⌝ -∗
         (* ...and its children row -- see [γch] above *)
         ⌜pv_chg (us_V U') = γch⌝ -∗
+        ⌜pv_gen (us_V U') = gn⌝ -∗
         (* ...and is at the parked process's working directory: nothing
            between park and resume calls chdir (forkret's boot arm runs
            kexec, which inherits it) *)
@@ -269,10 +277,27 @@ Section ParkCap.
       (rest : list (mword 64)) (pid : mword 32) (U : ustate) (steady : bool) : iProp Σ :=
     (is_kstack pa ks ∗
      ctx_cells (p_context pa) (park_forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
+     (* THE BOOT ARM HANDS THE BLOCK SPLIT, and the incarnation's pair is
+        one of the pieces: it joins the block at the same store the working
+        directory and the token do ([ProcInv.proc_priv_split_cwd] is
+        four-way), so a parker that has not closed the block yet carries it
+        beside them. *)
      (if steady then proc_priv γf pa pid U
       else proc_priv_nocwd γf pa pid U
            ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U))
-           ∗ first_boot) ∗
+           ∗ first_boot
+           (* AT THE TRIVIAL PAYLOAD, and this arm is the one place it can
+              be said: the boot park is <init>'s, and <init> has no parent
+              to owe ([SpecUserinit] splits its incarnation at
+              [fun _ => True] and drops the parent's quarter).  The
+              persistent half is what forkret's boot arm hands
+              kexec("/init") for the exec'd image's slot
+              ([SpecKexec.exec_slot_pre]). *)
+           ∗ gen_kq (pv_gen (us_V U)) pa pid (fun _ => True)%I
+           ∗ my_pay (pv_gen (us_V U)) (fun _ => True)%I
+           (* ...and the slot's half of [p->xstate], which the block the
+              boot arm closes carries ([ProcInv.proc_priv_core]) *)
+           ∗ (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv)) ∗
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE)%I.
 
@@ -489,7 +514,7 @@ Section ParkCap.
       iSplitL "Hbundle"; [iExact "Hbundle"|].
       iNext.
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
-      iIntros (h Xc pt' U') "%Hupt %Hnorm %Hptwf %Hfg %Hcg %Hcwi _ #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+      iIntros (h Xc pt' U') "%Hupt %Hnorm %Hptwf %Hfg %Hcg %Hgenp %Hcwi _ #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       (* the parked bundle, re-keyed onto the resumed record *)
       iEval (rewrite -Hfg) in "Hfrag".
       iEval (rewrite -Hcg) in "Hch".
@@ -606,7 +631,7 @@ Section ParkCap.
       iNext.
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
       iIntros (h Xc pt' U')
-        "%Hupt %Hnorm %Hptwf %Hfg %Hcg %Hcwi %Hrk #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+        "%Hupt %Hnorm %Hptwf %Hfg %Hcg %Hgenp %Hcwi %Hrk #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       iEval (rewrite -Hfg) in "Hfrag".
       iEval (rewrite -Hcg) in "Hch".
       iSplitR "Hslot".

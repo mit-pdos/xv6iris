@@ -229,6 +229,13 @@ Definition allocproc_post
           park and from there into [UsertrapRes.ut_own], where fork spends
           it; a FAILURE TAIL hands it straight back to freeproc. *)
        ch_frag (pv_chg (us_V U)) (proc_addr j) ∅ ∗
+       (* ...AND THE SLOT'S HALF OF [p->xstate], out of the dormant block
+          with the row and for its reason: the block a running process
+          holds carries it ([ProcInv.proc_priv_core]), because the ZOMBIE
+          park keys its escrow at what the cell reads.  It joins the block
+          at the same store the working directory, the token and the pair
+          do ([ProcInv.proc_priv_split_cwd] is five-way). *)
+       (∃ xsv : mword 32, p_xstate (proc_addr j) ↦₄{DfracOwn (1/2)} xsv) ∗
        (* THE SLOT IS NOW ALLOCATED.  Persistent, minted here out of
           [procs_avail]'s authority, and what the caller hands to
           [SchedCtx.proc_slots_park] when it releases the slot at USED or

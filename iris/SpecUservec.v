@@ -259,6 +259,11 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
        the fact and leave it unstatable. *)
     ⌜SpecUsertrap.ut_fd_kept sc_v sts sts'⌝ -∗
     ⌜SpecUsertrap.ut_ch_kept sc_v (tf_of g (ret_pc sepc_v)) cs cs'⌝ -∗
+    (* ...and the generation's, which the loop reads to convert the exit
+       deposit's [ChildTok.my_pay] onto the block's own name
+       ([SpecUsertrap.ut_gen_kept]) *)
+    ⌜SpecUsertrap.ut_gen_kept
+       (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) U'⌝ -∗
     ⌜SpecUsertrap.ut_fd_ecall sc_v (tf_of g (ret_pc sepc_v))
        (pv_tf (us_V U')) sts sts'⌝ -∗
     (* ...and pipe's join, off the same two frames.  The ENTRY image is [M],
@@ -376,6 +381,9 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
          gn cs
          (pv_tf (us_V U') !!! tf_arg_idx 0) (us_M U') sts'
          (pv_cwi (us_V U')) cs') -∗
+    (* ...AND THE PAYMENT, coming back: usertrap took it at the trap and
+       every arm that returns hands it back ([SpecUsertrap.ut_pay_out]). *)
+    ut_pay_out f -∗
     WP (Loop : expr riscv_lang)).
 Global Typeclasses Opaque uservec_post.
 
@@ -501,6 +509,12 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} 
      ([SpecUsertrap.ut_fork_in]) *)
   ut_fork_in f sc_v (tf_of g (ret_pc sepc_v))
     (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts -∗
+  (* ...and THE PAYMENT, which is neither a slot nor a bundle and is owed
+     at every cause and every number: the process's own payload, at the
+     status word argument 0 holds and at the kill status
+     ([SpecUsertrap.ut_pay_in]) *)
+  ut_pay_in f sc_v (tf_of g (ret_pc sepc_v))
+    (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) -∗
   wp_next true (proc_addr j) (fun CID' : CpuId =>
     uservec_post (CID := CID') (URes CID') C pt vksp U M g sts gn cs
       sepc_v sc_v f) -∗

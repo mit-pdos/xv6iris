@@ -86,7 +86,11 @@ Section UkShMain.
 
   (* the four ghost names a program proof runs at, as every file in the
      lane binds them *)
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
+     CLASS so that it reaches the exit ecall without an argument at every
+     call site ([UkRun.ukn_triv]). *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -94,10 +98,10 @@ Section UkShMain.
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
   Local Notation γch := (ukn_ch N).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570

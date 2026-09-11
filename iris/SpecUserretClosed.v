@@ -145,6 +145,13 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   (* ---- the loop's own shape, re-established every round ---- *)
   loop_ok C pt ->
   (j < NPROC)%nat ->
+  (* THE RESUMED RECORD'S GENERATION IS THE BLOCK'S OWN.  The slot this
+     entry runs is keyed at [gn] and the block names [ProcDefs.pv_gen]; the
+     exit deposit crosses from one to the other at kexit
+     ([SpecKexit]'s escrow), so the loop's residue records it
+     ([ProofUserretClosed.Rut_at]).  [ParkCap.park_cap] passes the block's
+     own [pv_gen], so it is [eq_refl] at every real call. *)
+  pv_gen (us_V U) = gn ->
   (* ---- the pre-sret mstatus: userret's own premises (the sret decodes to
          User and does not trap) plus the pins the user-mode invariant
          carries across the sret -- which is exactly what usertrap's exit

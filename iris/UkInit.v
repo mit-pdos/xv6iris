@@ -60,17 +60,25 @@ Section UkInit.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THE PROGRAM'S PAYLOAD, as a section hypothesis: this program's exit
+     owes its parent nothing at this lane, and the entry constructor is
+     what fixes it ([UkRun.uslot_of_urun*] mint the record at the payload
+     the kernel handed them).  A SECTION hypothesis rather than a premise
+     on the exit stub, so that every lemma between the entry and the ecall
+     is generalized over it automatically and no intermediate statement has
+     to carry it by hand. *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -418,6 +426,11 @@ Section UkInit.
     iApply ("Hcont" $! h3 ret with "Hrun").
   Qed.
 
+  (* THE PAYLOAD IS TRIVIAL AT THIS LANE.  exit's leaf is a PAYMENT
+     ([UkRunSys.wp_uk_ecall_exit]): the program owes what its record says
+     its exit owes.  init's record is minted at [fun _ => True] -- userinit
+     forks it from nobody -- so the premise is the equation and the payment
+     is [I]. *)
   Lemma wp_kinit_exit (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
     urun N h m (mword_of_int InitSyms.exit) avail -∗
@@ -445,8 +458,12 @@ Section UkInit.
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 2 : mword 64));
                     vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] [] Hrun").
     { iApply (uis_init_374 with "Hcode"). }
+    (* AT THE TRIVIAL PAYLOAD BOTH CONJUNCTS ARE FREE: this program owes
+       its parent nothing, at its own status and at the kill status alike
+       ([UkRun.ukn_triv]). *)
+    { rewrite (ukn_triv_eq (N := N)). iIntros "_". iSplit; done. }
   Qed.
 
   (* ===================================================================== *)
@@ -487,7 +504,14 @@ Section UkInit.
      which costs nothing: the only path past a returning exec is the
      diagnostic and exit(1). *)
   Definition init_exec_sup : iProp Σ :=
-    (□ (∀ (N' : uk_names) (m : regfile) (pc : mword 64),
+    (□ (∀ (N' : uk_names Σ) (m : regfile) (pc : mword 64),
+          (* THE RECORD'S PAYLOAD, as a pure row: the exec bundle carries
+             the depositing process's own [ChildTok.my_pay] at it
+             ([UexecExecInst.exec_sbundle]), and the supplier is lent that
+             fact at [UkRun.udepw_at]'s [ukn_pay N'].  A process that execs
+             at this lane owes its parent nothing, and its record says so --
+             the entry constructor's row, or [UkFork]'s child arm. *)
+          ⌜ ukn_pay N' = (fun _ => True)%I ⌝ -∗
           ⌜ m !!! Regidx a0_idx = (mword_of_int 0x9a8 : mword 64) ⌝ -∗
           ⌜ m !!! Regidx a1_idx = (mword_of_int 0x1000 : mword 64) ⌝ -∗
           init_rodata (ukn_t N') -∗
@@ -502,7 +526,7 @@ Section UkInit.
      at init's *)
   Lemma init_exec_sup_of_uxsup : uxsup -∗ init_exec_sup.
   Proof.
-    iIntros "#Hx". iModIntro. iIntros (N' m pc) "_ _ _ _ _".
+    iIntros "#Hx". iModIntro. iIntros (N' m pc) "_ _ _ _ _ _".
     iApply (udepw_at_of_uxsup with "Hx").
   Qed.
 

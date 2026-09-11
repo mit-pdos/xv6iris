@@ -1749,7 +1749,7 @@ Section ProofAllocproc.
            update because a fresh process gets a fresh per-descriptor ghost
            (FdSlots.v).  It is the one place a [pv_fdg] is chosen. *)
         iMod (proc_dormant_unused γf (proc_addr k) with "Hdorm")
-          as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hbsp & Hkst & Hrest)".
+          as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hbsp & Hkst & Hxb & Hrest)".
         iModIntro.
         iDestruct "Hrest" as (V pid0)
           "([%Hof [%Hcwd %Hszb]] & Hpidhalf & Hfields & Hofiles & Hrow & Hfrag)".
@@ -1996,7 +1996,7 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γp γa T2 k γl V pidn USED ch None None
                     (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) Hk (ap_lvlS lvl Hlvl) HT2a0
-                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] Hrow [Hpgcell] [Htfcell] Henvb").
+                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] Hrow Hxb [Hpgcell] [Htfcell] Henvb").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
@@ -2368,7 +2368,7 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γp γa U2 k γl V pidn USED ch None (Some (tfp, tfws))
                     (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) Hk (ap_lvlS lvl Hlvl) HU2a0
-                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] Hrow [Hpgcell] [Htfcell Htfpage] Henvb").
+                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] Hrow Hxb [Hpgcell] [Htfcell Htfpage] Henvb").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
@@ -2862,7 +2862,7 @@ Section ProofAllocproc.
         { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
           iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
         iFrame "Hkst".
-        iFrame "Hpark Hpriv Hgen Hfrag Hrow Hmk Hspare Hirsp Hbsp Hks".
+        iFrame "Hpark Hpriv Hgen Hfrag Hrow Hxb Hmk Hspare Hirsp Hbsp Hks".
         iSplitL "Hc0 Hc1 Hcrest".
         { rewrite ctx_cells_run !big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0.
           iFrame "Hc0 Hc1 Hcrest". }

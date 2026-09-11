@@ -315,10 +315,10 @@ Section UkBundle.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
 
   Lemma uvb_elim (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (sz : Z)
@@ -456,10 +456,10 @@ End UkBundle.
 Section UkObl.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
 
   (* [sz] is a PARAMETER, not quantified: an instruction step does not call
      sbrk, so the process's break is the same on re-entry.  It used to be
@@ -467,7 +467,20 @@ Section UkObl.
      [ukc] quantified [sz] too -- now that the key carries the break, the
      obligation has to be at THE size, and saying so is what makes the
      caller's continuation usable here. *)
-  Definition uk_step_obl (π : gmap (mword 27) uperm) (Kc : iProp Σ) (sz : Z)
+  (* THE PAYMENT, PACKAGED WITH WHATEVER THE STEP CONTINUES INTO.  An
+     interrupt can trap between any two instructions and the kernel may
+     tear the process down there ([SpecUsertrap]'s killed check runs on
+     every arm), so the payload has to be in the ENGINE's hands at every
+     arm -- the run's own copy is inside the leaf's closure by then.  It
+     rides the payload as this triple: the process's knowledge of its
+     payload, the payload itself, and the continuation the payload is
+     handed BACK into ([UexecRet.uexec_pay_arm] is what the resume returns
+     and this wand is where it goes). *)
+  Definition uk_paycont (Q : Z -> iProp Σ) (gn : gname) (K : iProp Σ) : iProp Σ :=
+    (my_pay gn Q ∗ Q (-1) ∗ (Q (-1) -∗ K))%I.
+
+  Definition uk_step_obl (π : gmap (mword 27) uperm) (Kc : iProp Σ)
+      (Q : Z -> iProp Σ) (sz : Z)
       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
     (∀ (R : iProp Σ) (CIDo : CpuId) (XIo : TsoCtx.CurCtx)
@@ -489,7 +502,7 @@ Section UkObl.
        (* the residue slot carries the BORROW WAND, not [Rut pt]: the loop
           body took the running token out of the residue at the cycle's
           head (A6.140), and whichever arm ends the step restores it *)
-       (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut pt) ∗ Rfd fdv ∗ ukb (CID := CIDo) C pt Rfd Rut sz π fdv cw gn cs ∗ (Kc ∧ ukc π M sz fdv cw gn cs m pc)) -∗
+       (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut pt) ∗ Rfd fdv ∗ ukb (CID := CIDo) C pt Rfd Rut sz π fdv cw gn cs ∗ uk_paycont Q gn (Kc ∧ ukc π M sz fdv cw gn cs m pc)) -∗
        resv_any cpu_id -∗
        hreg_frame rsA u_Drw -∗
        hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
@@ -506,6 +519,7 @@ Section UkObl.
             (fun _ : ext_fetch_addr_error => False)))%I.
 
   Definition uk_ih (π : gmap (mword 27) uperm) (Kc : iProp Σ)
+      (Q : Z -> iProp Σ)
       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
     (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
@@ -517,15 +531,23 @@ Section UkObl.
        (sz : Z),
        ⌜loop_ok C pt⌝ -∗ ⌜perm_of (ud_um pt) sz = π⌝ -∗
        uvb (CID := h) (XI := xi) C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-       □ uk_step_obl π Kc sz fdv cw gn cs M m pc -∗ ▷ Kc -∗ WP (Loop : expr riscv_lang))%I.
+       □ uk_step_obl π Kc Q sz fdv cw gn cs M m pc -∗
+       (* THE PAYMENT RIDES THE STEP'S OWN LATER, with the continuation it
+          is handed back into: the payload this builds is proved under the
+          cycle's [▷], so nothing here needs the resource before the machine
+          has stepped -- and a caller holding [UexecRet.ukcq] under a later
+          hands it over verbatim. *)
+       ▷ (my_pay gn Q ∗ Q (-1) ∗ (Q (-1) -∗ Kc)) -∗
+       WP (Loop : expr riscv_lang))%I.
 
   (* the payload the wrapper hands the closer at the cycle's tail *)
   Definition uk_payload `{CID : CpuId} (sz : Z) (π : gmap (mword 27) uperm)
       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (Kc : iProp Σ)
+      (Q : Z -> iProp Σ)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64)
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ) : iProp Σ :=
-    ((Kc ∧ ukc π M sz fdv cw gn cs m pc) ∗
+    (uk_paycont Q gn (Kc ∧ ukc π M sz fdv cw gn cs m pc) ∗
      (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt) ∗
      Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs)%I.
 
@@ -538,10 +560,10 @@ Section UkArms.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
 
   (* the RETIRING payload: the process runs on, at the new file and pc,
      under the bundle rebuilt from the landing *)
@@ -607,7 +629,7 @@ Section UkArms.
      TRANSPARENT arm of the return -- the slot at that same key, which is
      the Löb hypothesis re-packed. *)
   Lemma uk_arm_intr (Rut : uptd -> iProp Σ) (sz : Z) (π : gmap (mword 27) uperm)
-      (Kc : iProp Σ) (M Mp : gmap Z (bv 8)) (m : regfile)
+      (Kc : iProp Σ) (Q : Z -> iProp Σ) (M Mp : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) (t : ptree) (usatp : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
       (rs1 rsA : regstate) (i : InterruptType) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
@@ -620,7 +642,7 @@ Section UkArms.
     TsoCtx.own_context XI -∗
     uv_bytes pt Mp t -∗
     uv_res pt Mp t usatp pcfg paddr -∗
-    uv_step_post C (uk_payload sz π fdv cw gn cs Kc M m pc C pt Rfd Rut) rs1
+    uv_step_post C (uk_payload sz π fdv cw gn cs Kc Q M m pc C pt Rfd Rut) rs1
       (Step_Pending_Interrupt (i, Supervisor)).
   Proof.
     intros Hpre Hpure Hal2.
@@ -670,7 +692,7 @@ Section UkArms.
                  (u_trap_rs rsA (Interrupt i) None pc (uc_stvec C)) u_Dro
                  ltac:(intros r Hr; apply Hag, elem_of_union_r, Hr)).
     iFrame "Hrw Hro".
-    iApply (uv_psi_trap C pt (uk_payload sz π fdv cw gn cs Kc M m pc C pt Rfd Rut) Mp m t usatp pcfg paddr
+    iApply (uv_psi_trap C pt (uk_payload sz π fdv cw gn cs Kc Q M m pc C pt Rfd Rut) Mp m t usatp pcfg paddr
               (u_trap_rs rsA (Interrupt i) None pc (uc_stvec C))
               (utrap_scause (Interrupt i) (register_lookup (R_bitvector_64 scause) rsA))
               (tval None) pc
@@ -696,11 +718,11 @@ Section UkArms.
               ltac:(uv_trap_peel; exact Lpaddr)
               Htok ltac:(uv_trap_peel; exact Htlbok)
               with "Hany Hmm Hres Hctx []").
-    iIntros "Hframe Hctx (Hkc & Hbak & Hfdr & Hkb)".
+    iIntros "Hframe Hctx ((#Hmyp & Hpayv & Hkc) & Hbak & Hfdr & Hkb)".
     iDestruct ("Hbak" with "Hctx") as "Hrut".
     iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs)
               (utrap_scause (Interrupt i) (register_lookup (R_bitvector_64 scause) rsA))
-              (tval None) with "[%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hkc]");
+              (tval None) with "[%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hkc Hpayv]");
       [ reflexivity | reflexivity | reflexivity | reflexivity
       | reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
@@ -715,7 +737,22 @@ Section UkArms.
     iApply (bi.equiv_entails_1_2 _ _
               (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv cw gn cs)
                  (utrap_scause_intr_ne i (register_lookup (R_bitvector_64 scause) rsA)))).
+    (* THE PAYMENT AT THE TRANSPARENT ARM: the deposit is paid out of the
+       copy the payload carries, and the arm gives it back -- so the wand
+       into the continuation is applied to what the RESUME returns, not to
+       the copy just spent.  The family is the one the payload's payload
+       predicate names ([UexecSG.sfam_at] at [Q]), and the deposit's
+       [my_pay] is the run's own. *)
+    iExists (sfam_at Q sfam_pt).
+    rewrite /uexec_pay_arm (sexit_pay_at Q sfam_pt).
+    iSplitL "Hpayv";
+      [ iApply (uexec_pay_dep_ne _ (uvis_of_run m pc M π sz fdv cw gn cs) _ (sfam_at Q sfam_pt)
+                  (utrap_scause_intr_ne i
+                     (register_lookup (R_bitvector_64 scause) rsA))
+                  (sexit_pay_at Q sfam_pt) with "Hmyp Hpayv") | ].
+    iIntros "Hpayv".
     rewrite (uslot_run m pc M π sz fdv cw gn cs Hx0 Hal2).
+    iDestruct ("Hkc" with "Hpayv") as "Hkc".
     iDestruct "Hkc" as "[_ Hkc]". iExact "Hkc".
   Qed.
 
@@ -727,20 +764,21 @@ End UkArms.
 Section UkStepEngine.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
 
   Lemma wp_uk_step_gen (π : gmap (mword 27) uperm) (Kc : iProp Σ)
+      (Q : Z -> iProp Σ)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    ⊢ uk_ih π Kc fdv cw gn cs M m pc.
+    ⊢ uk_ih π Kc Q fdv cw gn cs M m pc.
   Proof.
     intros Hal2.
     rewrite /uk_ih.
     iLöb as "IH".
-    iIntros (CID XIv C pt Rfd Rut HRut sz) "%Hlo %Hpm Hb #Hobl Hkc".
+    iIntros (CID XIv C pt Rfd Rut HRut sz) "%Hlo %Hpm Hb #Hobl Hpay3".
     iDestruct (uvb_elim with "Hb")
       as (Mp) "(%Hpure & #Hamb & Hregs & Hutlb & Humem & Hfdv & Hcfg & Hgpr & Hpc & Hrut & Hk)".
     (* A6.140: borrow the running token out of the residue for this step;
@@ -847,7 +885,7 @@ Section UkStepEngine.
        under one later) goes into the payload; the wrapper strips the later *)
     (* ---- the one cycle ---- *)
     iApply (swp_exec_step_full u_Drw u_Dro (u_Df (uc_dqc C)) RS (wrap_pre RS)
-              (uv_land RS) (uv_psi C (uk_payload sz π fdv cw gn cs Kc M m pc C pt Rfd Rut))
+              (uv_land RS) (uv_psi C (uk_payload sz π fdv cw gn cs Kc Q M m pc C pt Rfd Rut))
               u_disj u_w_cy u_w_ti u_w_ip u_in_priv u_w_hart u_in_hart
               u_in_mc u_in_micfg u_w_mi u_in_mi u_w_ms u_in_ms
               u_w_PC u_in_PC u_in_nPC
@@ -855,7 +893,7 @@ Section UkStepEngine.
               ltac:(intros st rs2 H; exact (proj1 H))
               ltac:(intros st rs2 H; exact (proj1 (proj2 H)))
               ltac:(intros r _; reflexivity)
-              with "Hcert Hresv Hrw Hro [Hmm Hcl Hctx] [Hkc Hbak Hfdv Hk]").
+              with "Hcert Hresv Hrw Hro [Hmm Hcl Hctx] [Hpay3 Hbak Hfdv Hk]").
     - (* ================= THE BODY SLOT ================= *)
       iIntros "Hfrag Hrw Hro".
       iApply (swp_mono with "[] [-]").
@@ -866,13 +904,13 @@ Section UkStepEngine.
                     uv_bytes pt Mp t ∗
                     uv_res pt Mp t usatp pcfg paddr)%I
                    (fun (ii : InterruptType) (pr : Privilege) =>
-                      uv_step_post C (uk_payload sz π fdv cw gn cs Kc M m pc C pt Rfd Rut) RS
+                      uv_step_post C (uk_payload sz π fdv cw gn cs Kc Q M m pc C pt Rfd Rut) RS
                         (Step_Pending_Interrupt (ii, pr)))
                    (fun (r : ExecutionResult) (ib : mword 32) =>
-                      uv_step_post C (uk_payload sz π fdv cw gn cs Kc M m pc C pt Rfd Rut) RS
+                      uv_step_post C (uk_payload sz π fdv cw gn cs Kc Q M m pc C pt Rfd Rut) RS
                         (Step_Execute (r, ib)))
                    (fun (xv : mword 64) (e : ExceptionType) =>
-                      uv_step_post C (uk_payload sz π fdv cw gn cs Kc M m pc C pt Rfd Rut) RS
+                      uv_step_post C (uk_payload sz π fdv cw gn cs Kc Q M m pc C pt Rfd Rut) RS
                         (Step_Fetch_Failure (Virtaddr xv, e)))
                    (fun _ : ext_fetch_addr_error => False%I)
                    u_disj u_in_priv u_in_PC u_w_nPC LcpA
@@ -918,7 +956,7 @@ Section UkStepEngine.
           subst pr.
           iDestruct "HWd" as "(Hfrag & Hctx & Hmm & Hres)".
           iDestruct (resv_any_intro cpu_id None with "Hfrag") as "Hany".
-          iApply (uk_arm_intr C pt Rfd Rut sz π Kc M Mp m pc t usatp pcfg paddr RS
+          iApply (uk_arm_intr C pt Rfd Rut sz π Kc Q M Mp m pc t usatp pcfg paddr RS
                     (wrap_pre RS) ii fdv cw gn cs Hpre Hpure Hal2
                     with "Hcert Hany Hrw Hro Hctx Hmm Hres").
         * iFrame.
@@ -926,25 +964,35 @@ Section UkStepEngine.
         iIntros "HWd Hrw Hro".
         iDestruct "HWd" as "(Hfrag & Hctx & Hmm & Hres)".
         iDestruct (resv_any_intro cpu_id None with "Hfrag") as "Hany".
-        iApply ("Hobl" $! (uk_payload sz π fdv cw gn cs Kc M m pc C pt Rfd Rut) CID XIv C pt Rfd Rut HRut Mp t RS
+        iApply ("Hobl" $! (uk_payload sz π fdv cw gn cs Kc Q M m pc C pt Rfd Rut) CID XIv C pt Rfd Rut HRut Mp t RS
                   (wrap_pre RS) usatp pcfg paddr
                   with "[%] [%] [%] [%] Hamb [] Hany Hrw Hro Hctx Hmm Hres");
           [ exact Hlo | exact Hpm | exact Hpure | exact Hpre | ].
         rewrite /uk_payload. iIntros "(Hkc & Hbak & Hfdr & Hkb)". iFrame "Hbak Hfdr Hkb Hkc".
     - (* ================= THE CYCLE'S TAIL ================= *)
       iNext. iIntros (rs3 rs2) "%Hag Hrw Hro (Hctx & Hresv & Hcl)".
-      iApply ("Hcl" $! rs3 with "[%] Hrw Hro Hctx Hresv [Hkc Hbak Hfdv Hk]");
+      iApply ("Hcl" $! rs3 with "[%] Hrw Hro Hctx Hresv [Hpay3 Hbak Hfdv Hk]");
         [ exact (uv_tail_of RS rs2 rs3 Hag) | ].
-      rewrite /uk_payload.
+      (* the step is over, so the payment's later is spent and the three
+         pieces are in hand *)
+      iDestruct "Hpay3" as "(#Hmyp & Hpayv & Hkc)".
+      rewrite /uk_payload /uk_paycont.
       (* [Hfdv] is the [Rfd fdv] [uvb_elim] handed out at the cycle's head;
          the payload carries it back to the next bundle.  NOT [Hfrag] --
          that name is taken twice below, by the fetch's [HWd] split. *)
-      iSplitL "Hkc"; [ | iFrame "Hbak Hfdv Hk" ].
-      iSplit; [ iExact "Hkc" | ].
+      iSplitL "Hkc Hpayv"; [ | iFrame "Hbak Hfdv Hk" ].
+      (* THE PAYMENT GOES INTO THE PAYLOAD AND COMES BACK OUT OF THE WAND:
+         whichever arm ends this step is handed it, and the one that
+         RESUMES (the retire arm below, or the trap's own arm) puts it back
+         into the continuation. *)
+      iFrame "Hmyp Hpayv". iIntros "Hpayv".
+      iSplit; [ iApply ("Hkc" with "Hpayv") | ].
       rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut' HRut') "%Hlo' %Hpm' Hb".
       rewrite /uk_ih.
-      iApply ("IH" $! h' xi' C' pt' Rfd' Rut' HRut' sz with "[%] [%] Hb Hobl [Hkc]");
-        [ exact Hlo' | exact Hpm' | iNext; iExact "Hkc" ].
+      iApply ("IH" $! h' xi' C' pt' Rfd' Rut' HRut' sz
+                with "[%] [%] Hb Hobl [Hmyp Hpayv Hkc]");
+        [ exact Hlo' | exact Hpm'
+        | iNext; iFrame "Hmyp Hpayv"; iExact "Hkc" ].
   Qed.
 
 End UkStepEngine.
@@ -957,10 +1005,10 @@ Section UkFunnel.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,
@@ -968,15 +1016,16 @@ Section UkFunnel.
                                     (TsoCtx.own_context XI -∗ Rut pt')).
 
   (* the engine at the ambient hart and table *)
-  Lemma wp_uk_step (Kc : iProp Σ) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
+  Lemma wp_uk_step (Kc : iProp Σ) (Q : Z -> iProp Σ) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗ □ uk_step_obl π Kc sz fdv cw gn cs M m pc -∗
-    ▷ Kc -∗ WP (Loop : expr riscv_lang).
+    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗ □ uk_step_obl π Kc Q sz fdv cw gn cs M m pc -∗
+    ▷ (my_pay gn Q ∗ Q (-1) ∗ (Q (-1) -∗ Kc)) -∗ WP (Loop : expr riscv_lang).
   Proof.
     intros Hal2.
-    iIntros "Hb #Hobl Hkc".
-    iPoseProof (wp_uk_step_gen π Kc M m pc fdv cw gn cs Hal2) as "H". rewrite /uk_ih.
-    iApply ("H" $! CID XI C pt Rfd Rut HRut sz with "[%] [%] Hb Hobl Hkc"); [ exact Hlo | exact Hpm ].
+    iIntros "Hb #Hobl Hpay3".
+    iPoseProof (wp_uk_step_gen π Kc Q M m pc fdv cw gn cs Hal2) as "H". rewrite /uk_ih.
+    iApply ("H" $! CID XI C pt Rfd Rut HRut sz
+              with "[%] [%] Hb Hobl Hpay3"); [ exact Hlo | exact Hpm ].
   Qed.
 
 End UkFunnel.
@@ -985,10 +1034,10 @@ Section UkPostFetch.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
 
   (* everything from the FETCHED file on: the leaf's value-precise execute,
      and the payload that rebuilds [uvb] at the new file *)
@@ -1178,10 +1227,10 @@ Section UkObligation.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
 
   Lemma uk_obl_base (R : iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (M Mp : gmap Z (bv 8))
@@ -1467,10 +1516,15 @@ Section UkRetire.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  (* THE PAYLOAD THE RUN KEEPS, as an IMPLICIT section variable: the leaves
+     below thread it (their continuation is [UexecRet.ukcq] at it) and no
+     call site names it -- it is read off the continuation the caller
+     supplies. *)
+  Context {Qp : Z -> iProp Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,
@@ -1521,14 +1575,18 @@ Section UkRetire.
        exec (execute (uv_exp i o)) s_pc
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ▷ ukc π M sz fdv cw gn cs (uv_upd m wr) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
+    ▷ ukcq Qp π M sz fdv cw gn cs (uv_upd m wr) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hwrok Hg1 Hg2 Hexec.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
     iIntros "Hb Hcont".
-    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ M m pc fdv cw gn cs Hal2 with "Hb [] Hcont").
+    (* THE PAYMENT GOES TO THE ENGINE WITH THE CONTINUATION, under the same
+       later ([UexecRet.ukcq] is exactly the triple the engine takes). *)
+    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ Qp M m pc fdv cw gn cs Hal2
+              with "Hb [] [Hcont]").
+    2:{ iNext. rewrite /ukcq. iExact "Hcont". }
     iModIntro.
     rewrite /uk_step_obl.
     iIntros (R CIDo XIo C' pt' Rfd' Rut' HRut' Mp' t rs1 rsA usatp pcfg paddr)
@@ -1549,6 +1607,10 @@ Section UkRetire.
                 (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
               WP (Loop : expr riscv_lang)))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hkc)".
+      (* the step RETIRED, so the payment goes straight back into the
+         continuation and nothing was deposited *)
+      iDestruct "Hkc" as "(_ & Hpayv & Hkc)".
+      iDestruct ("Hkc" with "Hpayv") as "Hkc".
       iDestruct "Hkc" as "[Hkc _]".
       iFrame "Hbak Hfdr Hkb". iIntros "Hb".
       rewrite /ukc.
@@ -1612,7 +1674,7 @@ Section UkRetire.
        exec (execute (uv_exp i o)) s_pc
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs (uv_upd m wr) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
+    ukcq Qp π M sz fdv cw gn cs (uv_upd m wr) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hwrok Hg1 Hg2 Hexec.
@@ -1632,10 +1694,10 @@ Section UkEcallPost.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
 
   Lemma uk_ecall_post_fetch (R : iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm)
@@ -1881,10 +1943,15 @@ Section UkEcall.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  (* THE PAYLOAD THE RUN KEEPS, as an IMPLICIT section variable: the leaves
+     below thread it (their continuation is [UexecRet.ukcq] at it) and no
+     call site names it -- it is read off the continuation the caller
+     supplies. *)
+  Context {Qp : Z -> iProp Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,
@@ -1898,15 +1965,21 @@ Section UkEcall.
        register_lookup (R_bitvector_64 PC) s.(sregs) = pc ->
        goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs) -∗
+    (* THE PAYMENT ENTERS HERE AND THE RETURN IS BEHIND IT: an ecall traps
+       at once, so what the leaf owes is its return AT the payload -- the
+       deposit inside it is paid out of this very copy
+       ([UexecRet.uexec_pay_dep]). *)
+    my_pay gn Qp -∗ Qp (-1) -∗
+    (Qp (-1) -∗ uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hg.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
-    iIntros "Hb Hret".
-    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ M m pc fdv cw gn cs Hal2 with "Hb [] [Hret]").
-    2:{ iNext. iExact "Hret". }
+    iIntros "Hb #Hmyp Hpayv Hret".
+    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ Qp M m pc fdv cw gn cs Hal2
+              with "Hb [] [Hmyp Hpayv Hret]").
+    2:{ iNext. iFrame "Hmyp Hpayv". iExact "Hret". }
     iModIntro.
     rewrite /uk_step_obl.
     iIntros (R CIDo XIo C' pt' Rfd' Rut' HRut' Mp' t rs1 rsA usatp pcfg paddr)
@@ -1915,6 +1988,8 @@ Section UkEcall.
              ukb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs ∗
              uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hkc)".
+      iDestruct "Hkc" as "(_ & Hpayv & Hkc)".
+      iDestruct ("Hkc" with "Hpayv") as "Hkc".
       iDestruct "Hkc" as "[Hkc _]". iFrame "Hbak Hfdr Hkb". iExact "Hkc". }
     destruct (uk_instr_mapped π M Mp' pc false (ECALL tt) pt' sz
                 (loop_ok_wf C' pt' Hlo') Hpm' Hpure Hui)

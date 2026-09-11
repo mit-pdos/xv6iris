@@ -159,9 +159,19 @@ Section SchedCtx.
      [ctx_word4_pointsto_agree].  Bundled EXISTENTIALLY so that growing the
      invariant by these three cells costs every existing caller one opaque
      conjunct instead of three new spec parameters. *)
+  (* [p_xstate] IS HALF A CELL HERE.  The other half rides the process --
+     [ProcInv.proc_priv_core] while it runs, [ProcDefs.proc_dormant] while
+     the slot is parked -- because the ZOMBIE park's escrow is keyed at the
+     status the cell holds ([ChildTok.exit_tok]) and a reaper that copies
+     the status out must know that what it reads is what the escrow was
+     built at.  Holding p->lock gives both halves, so the two agree by
+     [ctx_word4_pointsto_agree]; the writers (kexit's [p->xstate = status],
+     freeproc's [p->xstate = 0]) hold p->lock and therefore write the whole
+     cell and re-split it. *)
   Definition proc_pub (pa : mword 64) : iProp Σ :=
     (∃ (kl xs pid : mword 32),
-       p_killed pa ↦₄ kl ∗ p_xstate pa ↦₄ xs ∗ p_pid pa ↦₄{DfracOwn (1/4)} pid)%I.
+       p_killed pa ↦₄ kl ∗ p_xstate pa ↦₄{DfracOwn (1/2)} xs ∗
+       p_pid pa ↦₄{DfracOwn (1/4)} pid)%I.
 
   (* THE SLOT'S GENERATION IS NOT HERE.  A generation is a SAVED PREDICATE
      carrying the slot, the pid and the process's exit payload

@@ -79,13 +79,19 @@ Section UexecExecMint.
   (* the loop's mint: the generic slot at every key, out of the supply.
      [UexecCond.cond_entry_slot]'s [psok] premise is the instance's own
      (every number is admitted); its [□ ssupply] is the credential. *)
-  Lemma uslot_mint : app_sup -∗ □ uexec_wp -∗ □ (∀ W : uvis, uslot W).
+  (* THE FAMILY IS INDEXED BY THE PAY FACT ([UexecCond.cond_entry_slot]'s
+     own premise): a slot at EVERY key is a slot that may trap at exit at
+     every key, and exit's deposit is a payment.  At the trivial payload,
+     which is the only one a generic process has. *)
+  Lemma uslot_mint :
+    app_sup -∗ □ uexec_wp -∗
+    □ (∀ W : uvis, my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W).
   Proof.
     iIntros "#Hsup #Hgen".
     iDestruct (udep_gen with "Hsup") as "#Hdep".
-    iIntros "!>" (W).
+    iIntros "!>" (W) "#Hpay".
     iApply (UexecCond.cond_entry_slot W ltac:(intros k _; exact I)
-              with "Hdep [] Hgen").
+              with "Hdep [] Hgen Hpay").
     rewrite /ssupply /= /xv6_ssupply. iModIntro. iExact "Hsup".
   Qed.
 End UexecExecMint.

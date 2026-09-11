@@ -233,6 +233,7 @@ Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import FdSlots FileInvDefs.
 Require Import ProcInv ProcPtOwn.
+Require Import ChildTok.  (* [gen_kq] / [my_pay]: the boot mode's pair *)
 Require Import SchedCtx.   (* [procs_inv] / [proc_lock_res] -- p->lock is the table's slot [j] *)
 Require Import IrefSlots ProcAvail.
 Require Import KexecDefs.
@@ -261,7 +262,7 @@ Section SpecForkret.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-  Context `{SG : uexecSG Σ}.
+  Context {SG : uexecSG Σ}.
 
   (* WHAT forkret'S TAIL HANDS THE TRAP LOOP.  [ut_trap_parked] is the
      trap-side residue with the translation slot dropped (the switch inside
@@ -328,6 +329,14 @@ Definition forkret_closer
      ⌜pv_fdg (us_V U') = g⌝ -∗
      (* ...and its children row -- see [γch] above *)
      ⌜pv_chg (us_V U') = γch⌝ -∗
+     (* ...AND ITS GENERATION, beside the two names above and for a reason
+        of the same kind: the slot the closer yields is keyed at [gn]
+        ([UexecSlot.uvis_gen]) while the block it yields names
+        [ProcDefs.pv_gen], and the exit deposit has to travel from one to
+        the other -- [SpecKexit]'s escrow is built out of the BLOCK's
+        quarter and the PROCESS's payload.  Nothing between the park and the
+        resume re-incarnates the slot, so the resumer can say it. *)
+     ⌜pv_gen (us_V U') = gn⌝ -∗
      (* ...and the resumed record is at the parked process's working
         directory: the slot row the parker captured is restricted to it *)
      ⌜pv_cwi (us_V U') = cw⌝ -∗
@@ -421,6 +430,11 @@ Definition wp_forkret_gen_body
   let p   : mword 64 := proc_addr j in
   let ksp : mword 64 := add_vec ks (mword_of_int 4096) in
   (j < NPROC)%nat ->
+  (* THE PARKED RECORD'S GENERATION IS THE SLOT'S OWN.  [ParkCap.park_cap]
+     passes the block's [ProcDefs.pv_gen] for [gn], so this is [eq_refl] at
+     every real call; it is stated because forkret hands it to the residue
+     closer, whose pin the exit deposit crosses by ([forkret_closer]). *)
+  pv_gen (us_V U) = gn ->
   (* the slot this process's lock is, which is what makes [procs_inv] below
      name p->lock rather than merely some lock *)
   γs !! j = Some γl ->
@@ -472,7 +486,16 @@ Definition wp_forkret_gen_body
   (if steady then proc_priv γf p pid U
    else proc_priv_nocwd γf p pid U
         ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U))
-        ∗ FirstTok.first_boot) -∗
+        ∗ FirstTok.first_boot
+        (* ...AND THE INCARNATION'S PAIR, at the trivial payload: <init> has
+           no parent to owe, and the pair joins the block at the same seam
+           the working directory and the token do
+           ([ProcInv.proc_priv_split_cwd] is four-way).  The boot arm hands
+           the persistent half to kexec("/init") for the exec'd image's slot
+           ([SpecKexec.exec_slot_pre]). *)
+        ∗ ChildTok.gen_kq (pv_gen (us_V U)) p pid (fun _ => True)%I
+        ∗ ChildTok.my_pay (pv_gen (us_V U)) (fun _ => True)%I
+        ∗ (∃ xsv : mword 32, p_xstate p ↦₄{DfracOwn (1/2)} xsv)) -∗
   W -∗
   (* ---- THE STEADY PARK'S EVIDENCE THAT THE BOOT ARM IS DEAD, and nothing
      on the other mode.  A parker that promises the resume lands on the

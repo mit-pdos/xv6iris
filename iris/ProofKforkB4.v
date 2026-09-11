@@ -159,20 +159,22 @@ Section KforkB4Res.
     (∀ ns : list (bv 8), ⌜length ns = PNAMELEN⌝ -∗ pname_cells pa (DfracOwn 1) ns -∗
        proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns (pv_cwi (us_V U)) (pv_gen (us_V U)) (pv_chg (us_V U))))).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iSplitL "Hnm"; [iExact "Hnm" |].
     iSplitR; [done |].
     iIntros (ns) "%Hnl' Hnm'".
     rewrite /proc_priv /proc_priv_core /proc_fields.
-    cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+    cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_gen pv_chg].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm'".
     { iFrame "Hsz Hcwd Hnm'". iPureIntro. exact Hnl'. }
     iSplitL "Hpt"; [iExact "Hpt"|].
     iSplitL "Htfp"; [iExact "Htfp"|].
-    iSplitL "Hc"; [iExact "Hc"|]. iExact "Hft".
+    iSplitL "Hc"; [iExact "Hc"|].
+    iSplitL "Hft"; [iExact "Hft"|].
+    iSplitL "Hgq"; [iExact "Hgq"|]. iExact "Hxs".
   Qed.
 
   (* THE CHILD'S OWN cwd REFERENCE, out of the reference idup MINTS.
@@ -264,6 +266,20 @@ Section KforkB4Proof.
        [np->cwd] at 0 and nothing has set it, so there is no [proc_priv] at
        this [Vc].  The [sd a0,336(s4)] below is what closes the window. *)
     proc_priv_nocwd γf npa pid_c Uc -∗
+    (* ...AND THE CHILD'S GENERATION, cut: the KERNEL'S QUARTER and the
+       persistent [ChildTok.my_pay] beside it.  The pair joins the block at
+       the same store the working directory and the token do
+       ([ProcInv.proc_priv_split_cwd] is four-way), so a caller that has
+       already chosen the child's payload and split its generation
+       ([ChildTok.gen_set], [gen_split]) hands the two halves it keeps
+       here. *)
+    (∃ Q0 : Z -> iProp Σ,
+       gen_kq (pv_gen (us_V Uc)) npa pid_c Q0 ∗ my_pay (pv_gen (us_V Uc)) Q0) -∗
+    (* ...AND THE CHILD SLOT'S HALF OF [p->xstate], on the pair's footing:
+       it comes out of the dormant block with allocproc's hand-over and
+       joins the block at this same store ([ProcInv.proc_priv_split_cwd] is
+       five-way). *)
+    (∃ xsv : mword 32, p_xstate npa ↦₄{DfracOwn (1/2)} xsv) -∗
     wp_next false pme (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜(forall r : mword 5, is_cs_idx r = true -> r <> Rs1 ->
@@ -295,7 +311,7 @@ Section KforkB4Proof.
   Proof.
     intros HK Hlvl Hms5 Hms4 Hfresh.
     iIntros "Hcg Hown #Htext Hpc #Hitb #Hitinv #Hireg Hir Hparent #Hfdone
-             Hchild Hcont".
+             Hchild Hgq Hxb Hcont".
     iDestruct (iref_slots_split 1 IREFSPARE with "Hir") as "[Hirs Hirsp]".
     (* ------------------------------------------------------------- *)
     (* +0xa4: ld a0,336(s5) -- a0 := p->cwd.                          *)
@@ -433,13 +449,21 @@ Section KforkB4Proof.
     iEval (rewrite -(proc_priv_nocwd_cwi γf npa pid_c _ (pv_cwi (us_V Up)))) in "Hchild2".
     (* THE WINDOW CLOSES HERE: cell + reference = the real block. *)
     iAssert (proc_priv γf npa pid_c (us_cwi (us_cwd Uc (ientry ck)) (pv_cwi (us_V Up))))
-      with "[Hchild2 Hccref2]" as "Hchild2".
+      with "[Hchild2 Hccref2 Hgq Hxb]" as "Hchild2".
     { iApply proc_priv_split_cwd. iFrame "Hchild2".
       iSplitL "Hccref2";
         [by cbn [us_cwi us_cwd upd_usV us_V upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg pv_gen pv_chg] |].
-      (* THE MINT.  The child's token is the steady arm of the disjunction,
-         built from the persistent [first_done] the caller threaded in. *)
-      iApply (first_tok_of_done with "Hfdone"). }
+      iSplitR "Hgq Hxb";
+        [ (* THE MINT.  The child's token is the steady arm of the
+             disjunction, built from the persistent [first_done] the caller
+             threaded in. *)
+          iApply (first_tok_of_done with "Hfdone") | ].
+      (* ...AND THE GENERATION'S PAIR AND THE xstate HALF, at the block's own
+         name: the two updates the window makes ([np->cwd], [np->name]) do
+         not touch either. *)
+      iSplitL "Hgq";
+        [ by cbn [us_cwi us_cwd upd_usV us_V upd_cwi upd_cwd pv_gen pv_fdg pv_chg]
+        | iExact "Hxb" ]. }
     set (Vc2 := upd_cwi (upd_cwd (us_V Uc) (ientry ck)) (pv_cwi (us_V Up))).
     (* the store touches no register *)
     set (M2 := mr).

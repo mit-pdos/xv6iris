@@ -2104,12 +2104,24 @@ Section BootCarveMain.
     { rewrite -!TsoCtx.ctx_word4_pointsto_frac_split.
       assert (Hq : (1/2 + (1/4 + 1/4))%Qp = 1%Qp) by compute_done.
       rewrite Hq. iExact "Hpid". }
+    (* ...AND THE xstate CELL, CUT IN TWO: the slot's half rides the dormant
+       block ([ProcInv.proc_dormant_nofd]) and <p->lock>'s half is
+       [SchedCtx.proc_pub]'s.  The escrow a ZOMBIE parks is keyed at what
+       the cell reads, and the reaper holds the lock, so the two halves are
+       what tie the status wait() copies out to the payload. *)
+    iAssert (TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 44))
+               (DfracOwn (1/2)) vxs ∗
+             TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 44))
+               (DfracOwn (1/2)) vxs)%I with "[Hxs]" as "[Hxs1 Hxs2]".
+    { rewrite -TsoCtx.ctx_word4_pointsto_frac_split.
+      assert (Hq2 : (1/2 + 1/2)%Qp = 1%Qp) by compute_done.
+      rewrite Hq2. iExact "Hxs". }
     rewrite /proc_slot_raw /proc_raw /proc_pub /proc_dormant_nofd /proc_fields
             /pid_lock_share /pid_lock_share_at
             /p_state /p_chan /p_parent /p_killed /p_xstate /p_pid /p_kstack /p_sz
             /p_pagetable /p_trapframe /p_context /p_cwd
             E48 E72 E80 E88 !off_of_z.
-    iSplitL "Hlk Hst Hks Hpid1 Hsz Hcwd Hnm Hof Hctx Hpg Htf".
+    iSplitL "Hlk Hst Hks Hpid1 Hsz Hcwd Hnm Hof Hxs1 Hctx Hpg Htf".
     { iExists vst, vks.
       iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hst"; [iExact "Hst" |].
       iSplitL "Hks"; [iExact "Hks" |].
@@ -2127,12 +2139,14 @@ Section BootCarveMain.
       iSplitL "Hsz Hcwd Hnm".
       { iSplitL "Hsz"; [iExact "Hsz" |]. iSplitL "Hcwd"; [iExact "Hcwd" |].
         iSplitR; [iPureIntro; exact Hbs |]. iExact "Hnm". }
-      iSplitL "Hof"; [iExact "Hof" |]. iSplitL "Hctx"; [iExact "Hctx" |].
+      iSplitL "Hof"; [iExact "Hof" |].
+      iSplitL "Hxs1"; [iExists vxs; iExact "Hxs1" |].
+      iSplitL "Hctx"; [iExact "Hctx" |].
       iSplitL "Hpg"; [iExact "Hpg" |]. iExact "Htf". }
     iSplitR "Hpar Hpid3".
     { iSplitL "Hch"; [iExists vch; iExact "Hch" |].
       iExists vkl, vxs, vpid.
-      iSplitL "Hkl"; [iExact "Hkl" |]. iSplitL "Hxs"; [iExact "Hxs" |].
+      iSplitL "Hkl"; [iExact "Hkl" |]. iSplitL "Hxs2"; [iExact "Hxs2" |].
       iExact "Hpid2". }
     iSplitL "Hpar"; [iExists vpar; iExact "Hpar" |].
     iExists vpid. iExact "Hpid3".

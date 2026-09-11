@@ -56,17 +56,21 @@ Section UkShLoop.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
+     CLASS so that it reaches the exit ecall without an argument at every
+     call site ([UkRun.ukn_triv]). *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
   Local Notation γs := (ukn_s N).
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
   (* the DATA a turn of the loop needs and does not create.  [8208] is

@@ -127,18 +127,18 @@ Section ProofSysExit.
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
-      (v0 : mword 64) (lks : gset string) (cs : gset gname)
+      (v0 : mword 64) (lks : gset string) (cs : gset gname) (Q : Z -> iProp Σ)
     : wp_sys_exit_sconf_body γft γf γw γs j γl pd pav pu
  ip dqi
 
-                             on fn m av eb b pid U sts v0 lks cs.
+                             on fn m av eb b pid U sts v0 lks cs Q.
   Proof.
     cbv beta delta [wp_sys_exit_sconf_body].
     intros pcE pj Hfn Hj Hgl Hv0 Hav Hgeo Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcl Hcpu #Htext #Hdata Hpc #Hprocs #Hpenv
              #Hlk #Hft #Hkl Hkav #Hbio #Hlog #Hcrash #Hcert #Hdev #Hgeom
-             #Hdlk Hbs Hrdy Hip Hfds Hirs Hpriv Hufrag Hrow".
+             #Hdlk Hbs Hrdy Hip Hfds Hirs Hpriv Hufrag Hrow #Hmy HQ".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
@@ -346,13 +346,34 @@ Section ProofSysExit.
     iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl pd pav pu
  ip dqi
 
-              on fn B2 (av - 4)%nat eb b lks pid (upd_usM U _) cs Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow
+              on fn B2 (av - 4)%nat eb b lks pid (upd_usM U _) cs Q Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow
               with "Hcg Hcl4 Hcpu [] [] Htext Hdata Hpc Hprocs Hpenv Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
-                    Hrdy Hip Hfds Hirs Hpriv Hufrag Hrow").
+                    Hrdy Hip Hfds Hirs Hpriv Hufrag Hrow Hmy [HQ]").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
+    { (* THE DEPOSIT RIDES THROUGH UNTOUCHED, AND AT THE SAME STATUS.  The
+         payload was paid at [ProcGeom.exit_xs] of the trapframe -- argument
+         0 -- and this call passes exactly that word in a0, so kexit's own
+         reading of its argument ([SpecKexit.kexit_status]) is the same [Z].
+         [argint] reads the frame and does not write it, and the image
+         update leaves the block's own trapframe alone. *)
+      cbn [upd_usM us_V].
+      (* [kexit_status B2] is [ProcGeom.xstate_of] of the a0 this call
+         loaded, and the deposit is at [exit_xs] of the frame's argument 0 --
+         the same word ([Hv0]) up to the [sw]/[lw] truncation. *)
+      assert (Hks : kexit_status B2 = exit_xs (pv_tf (us_V U))).
+      { rewrite /kexit_status /exit_xs /xstate_of /xstate_val /B2.
+        rewrite (upd_ne B1 (Regidx Rra) (Regidx (mword_of_int 10 : mword 5)) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite /B1 upd_eq.
+        rewrite (list_lookup_total_correct _ _ _ Hv0).
+        (* [arg_int32] IS [trunc32] ([SpecArgint]), and truncating a
+           sign-extension of a truncation is the truncation
+           ([RiscvExtras.trunc32_sext64]). *)
+        f_equal. apply trunc32_sext64. }
+      rewrite Hks. iExact "HQ". }
   Qed.
 
 End ProofSysExit.

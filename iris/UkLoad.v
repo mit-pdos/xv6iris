@@ -239,10 +239,10 @@ Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Section UkLoadExecErr.
   Context (k : Z).
   Context (Hkw : vmem_width k).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
 
   (* the [execute (LOAD ...)] fact when the access FAULTS: WpUmodeLoad's
      [exec_execute_LOAD_k_u_walk] with [Ok dv] read as [Err er].  No
@@ -319,10 +319,13 @@ Section UkLoadPostFetch.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  (* the payload the run keeps -- implicit; the trap arm below deposits
+     it and hands it back ([UexecRet.uexec_pay_dep]) *)
+  Context {Qp : Z -> iProp Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* The geometry-agnostic middle: from the FETCHED file, write nextPC,    *)
@@ -667,7 +670,8 @@ Section UkLoadPostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs ∗ uslot (uvis_of_run m pc M π sz fdv cw gn cs)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs ∗
+          UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs))) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
     uv_bytes pt Mp t' -∗
@@ -896,6 +900,16 @@ Section UkLoadPostFetch.
               (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv cw gn cs)
                  (utrap_scause_load_ne
                     (register_lookup (R_bitvector_64 scause) rsx)))).
+    (* THE PAYMENT AT THE FAULT ARM: a page fault is a kernel entry like
+       any other, so the deposit is paid out of the copy the payload
+       carries and the arm gives it back ([UexecRet.uexec_pay_dep]). *)
+    iDestruct "Hret" as "(#Hmyp & Hpayv & Hret)".
+    iExists (sfam_at Qp sfam_pt).
+    rewrite /uexec_pay_arm (sexit_pay_at Qp sfam_pt).
+    iSplitL "Hpayv";
+      [ iApply (uexec_pay_dep_ne _ (uvis_of_run m pc M π sz fdv cw gn cs) _ (sfam_at Qp sfam_pt)
+                  (utrap_scause_load_ne (register_lookup (R_bitvector_64 scause) rsx))
+                  (sexit_pay_at Qp sfam_pt) with "Hmyp Hpayv") | ].
     iExact "Hret".
   Qed.
 
@@ -905,10 +919,13 @@ Section UkLoadObl.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  (* the payload the run keeps -- implicit; the trap arm below deposits
+     it and hands it back ([UexecRet.uexec_pay_dep]) *)
+  Context {Qp : Z -> iProp Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* §5 THE OBLIGATION, once per FETCH SHAPE -- the load twins of          *)
@@ -947,7 +964,7 @@ Section UkLoadObl.
     (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs ∗
           ((uvb C pt Rfd Rut sz π fdv cw gn cs M (<[Regidx lrd := regval_into_reg wval]> m)
               (add_vec_int pc 4) -∗ WP (Loop : expr riscv_lang))
-           ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs))) -∗
+           ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs)))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
@@ -1097,7 +1114,7 @@ Section UkLoadObl.
     (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs ∗
           ((uvb C pt Rfd Rut sz π fdv cw gn cs M (<[Regidx lrd := regval_into_reg wval]> m)
               (add_vec_int pc 2) -∗ WP (Loop : expr riscv_lang))
-           ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs))) -∗
+           ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs)))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
@@ -1228,10 +1245,13 @@ Section UkLoad.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  (* the payload the run keeps -- implicit, read off the continuation
+     ([UexecRet.ukcq]); no call site names it *)
+    Context {Qp : Z -> iProp Σ}.
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
   (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
   Hypothesis (HRut : forall pt' : uptd,
@@ -1285,7 +1305,7 @@ Section UkLoad.
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     wval = extend_value is_unsigned (uM_word M (uint va) k) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ▷ ukc π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m)
+    ▷ ukcq Qp π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m)
         (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1293,7 +1313,11 @@ Section UkLoad.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
     iIntros "Hb Hcont".
-    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ M m pc fdv cw gn cs Hal2 with "Hb [] Hcont").
+    (* the payment goes to the engine with the continuation, under the same
+       later ([UexecRet.ukcq]) *)
+    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ Qp M m pc fdv cw gn cs Hal2
+              with "Hb [] [Hcont]").
+    2:{ iNext. rewrite /ukcq. iExact "Hcont". }
     iModIntro.
     rewrite /uk_step_obl.
     iIntros (R CIDo XIo C' pt' Rfd' Rut' HRut' Mp' t rs1s rsA usatp pcfg paddr)
@@ -1343,14 +1367,20 @@ Section UkLoad.
                  (<[Regidx rd := regval_into_reg wval]> m)
                  (add_vec_int pc (if is_rvc then 2 else 4)) -∗
                WP (Loop : expr riscv_lang))
-              ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs)))%I with "[Hk]" as "Hk".
+              ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs))))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iFrame "Hrut Hfdr Hkb". iSplit.
-      - iDestruct "Hkc" as "[Hkc _]".
+      - (* the RETIRE leg: the payment goes straight back into the
+           continuation *)
+        iDestruct "Hkc" as "(_ & Hpayv & Hkc)".
+        iDestruct ("Hkc" with "Hpayv") as "[Hkc _]".
         iIntros "Hb". rewrite /ukc.
         iApply ("Hkc" $! CIDo XIo C' pt' Rfd' Rut' HRut' with "[%] [%] Hb");
           [ exact Hlo' | exact Hpm' ].
-      - iDestruct "Hkc" as "[_ Hkc]".
+      - (* the FAULT leg: the payment is handed to the kernel with the
+           slot, and the arm hands it back into the continuation *)
+        iDestruct "Hkc" as "(#Hmyp & Hpayv & Hkc)". iFrame "Hmyp Hpayv".
+        iIntros "Hpayv". iDestruct ("Hkc" with "Hpayv") as "[_ Hkc]".
         rewrite (uslot_run m pc M π sz fdv cw gn cs Hx0 Hal2). iExact "Hkc". }
     iPoseProof (uv_swp_fetch_uinstr (CID := CIDo) (XI := XIo) pt' Mp' t (uc_dqc C')
                   rsA pc is_rvc i Hinj Hui' LpcA LcpA (proj1 HmsokA) LmenvA
@@ -1393,7 +1423,7 @@ Section UkLoad.
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     wval = extend_value is_unsigned (uM_word M (uint va) k) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m)
+    ukcq Qp π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m)
         (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1424,7 +1454,7 @@ Section UkLoad.
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     wval = uM_word M (uint va) 8 ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    ukcq Qp π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hva Hkok Hcanon Hpg Hal HMb Hwval.
@@ -1458,7 +1488,7 @@ Section UkLoad.
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     wval = uM_word M (uint va) 8 ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    ukcq Qp π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hva Hkok Hcanon Hpg Hal HMb Hwval.
@@ -1494,7 +1524,7 @@ Section UkLoad.
     M !! (uint va) = Some bb ->
     wval = zero_extend' 64 bb ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    ukcq Qp π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hva Hkok Hcanon Hbb Hwval.
@@ -1531,7 +1561,7 @@ Section UkLoad.
     uM_bytes M (uint va) 4 wv ->
     wval = sign_extend' 64 wv ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    ukcq Qp π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hva Hkok Hcanon Hpg Hal Hbw Hwval.
@@ -1562,7 +1592,7 @@ Section UkLoad.
     uM_bytes M (uint va) 4 wv ->
     wval = zero_extend' 64 wv ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    ukcq Qp π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hva Hkok Hcanon Hpg Hal Hbw Hwval.
@@ -1597,7 +1627,7 @@ Section UkLoad.
     uM_bytes M (uint va) 4 wv ->
     wval = sign_extend' 64 wv ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    ukcq Qp π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr1 Hcrd Hrd Hva Hkok Hcanon Hpg Hal Hbw Hwval.
@@ -1639,7 +1669,7 @@ Section UkLoad.
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     uM_bytes M (uint va) 8 wval ->
     uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukc π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    ukcq Qp π M sz fdv cw gn cs (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr1 Hcrd Hrd Hva Hkok Hcanon Hpg Hal Hbw.

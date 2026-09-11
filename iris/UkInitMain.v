@@ -66,7 +66,11 @@ Section UkInitMain.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context (N : uk_names).
+  Context (N : uk_names Σ).
+  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
+     CLASS so that it reaches the exit ecall without an argument at every
+     call site ([UkRun.ukn_triv]). *)
+  Context `{Hpay : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -74,10 +78,10 @@ Section UkInitMain.
   Local Notation γfd := (ukn_fd N).
   Local Notation γcwd := (ukn_cwd N).
   Local Notation γch := (ukn_ch N).
-  Context `{SG : uexecSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
@@ -118,7 +122,7 @@ Section UkInitMain.
   (* returns, so each is a WP with no continuation at all -- which is also   *)
   (* why they need no frame word and no register fact beyond the budget.     *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kinit_main_die_df (N' : uk_names) (hdf : CpuId) (mdf0 : regfile) (n : nat) :
+  Lemma wp_kinit_main_die_df (N' : uk_names Σ) `{!ukn_triv N'} (hdf : CpuId) (mdf0 : regfile) (n : nat) :
     init_code (ukn_t N') -∗ init_rodata (ukn_t N') -∗
     urun N' hdf mdf0 (mword_of_int 0x84) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
@@ -226,7 +230,7 @@ Section UkInitMain.
     iApply (wp_kinit_exit N' hdf6 _ (12 + (12 + (4 + n))) with "Hcode Hrun").
   Qed.
 
-  Lemma wp_kinit_main_die_de (N' : uk_names) (hde : CpuId) (mde0 : regfile) (n : nat) :
+  Lemma wp_kinit_main_die_de (N' : uk_names Σ) `{!ukn_triv N'} (hde : CpuId) (mde0 : regfile) (n : nat) :
     init_code (ukn_t N') -∗ init_rodata (ukn_t N') -∗
     urun N' hde mde0 (mword_of_int 0xaa) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
@@ -334,7 +338,7 @@ Section UkInitMain.
     iApply (wp_kinit_exit N' hde6 _ (12 + (12 + (4 + n))) with "Hcode Hrun").
   Qed.
 
-  Lemma wp_kinit_main_die_dw (N' : uk_names) (hdw : CpuId) (mdw0 : regfile) (n : nat) :
+  Lemma wp_kinit_main_die_dw (N' : uk_names Σ) `{!ukn_triv N'} (hdw : CpuId) (mdw0 : regfile) (n : nat) :
     init_code (ukn_t N') -∗ init_rodata (ukn_t N') -∗
     urun N' hdw mdw0 (mword_of_int 0x52) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
@@ -459,7 +463,7 @@ Section UkInitMain.
   (* only path back through here is the one where the kernel looked at       *)
   (* neither.                                                                *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kinit_main_child (N' : uk_names) (h : CpuId) (m : regfile) (n : nat) :
+  Lemma wp_kinit_main_child (N' : uk_names Σ) `{!ukn_triv N'} (h : CpuId) (m : regfile) (n : nat) :
     init_code (ukn_t N') -∗
     (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
        arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
@@ -594,7 +598,8 @@ Section UkInitMain.
     iApply (wp_kinit_exec N' hc5 mc5 (12 + (12 + (4 + n))) FsImg.ROOTINO
               with "Hcode Hrun Hcwd [Hstd]").
     { iApply ("Hxs" $! N' (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> mc5)
-                (mword_of_int 0x3ac) with "[%] [%] Hro Hargv Hstd").
+                (mword_of_int 0x3ac) with "[%] [%] [%] Hro Hargv Hstd").
+      - exact (ukn_triv_eq (N := N')).
       - rewrite (upd_ne mc5 (Regidx a7_idx) (Regidx a0_idx)
                    (mword_of_int 7 : mword 64)
                    ltac:(vm_compute; discriminate)).
@@ -688,7 +693,13 @@ Section UkInitMain.
              (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m))
           (ret_pc (m !!! Regidx ra_idx)) avail -∗
         WP (Loop : expr riscv_lang)) ∗
-     (∀ (N' : uk_names) (h' : CpuId),
+     (∀ (N' : uk_names Σ) (h' : CpuId),
+        (* THE CHILD'S RECORD PAYS THE SAME NOTHING ITS PARENT DOES: the
+           payload the fork's split put on the child's generation is the
+           parent's ([UkFork]'s child arm gives the equation), and this
+           program's is trivial -- so the arm hands the class on and every
+           leaf below it, exit included, resolves it. *)
+        ⌜ ukn_triv N' ⌝ -∗
         (init_code (ukn_t N') ∗ init_rodata (ukn_t N') ∗ init_argv (ukn_d N'))
           -∗ usz (ukn_s N') szv -∗
         ustd_any (ukn_fd N') -∗
@@ -774,7 +785,8 @@ Section UkInitMain.
          child execs, and nothing before the exec allocates. *)
       (* the child's own children fragment is [∅] and init's child execs
          before it forks, so nothing here reads it *)
-      iIntros (N' hc) "Hpay Hsz Hstd _ Hcwd _ Hrun".
+      iIntros (N' hc) "%Hpeq Hpay Hsz Hstd _ Hcwd _ Hrun".
+      pose proof (Hpeq : UkRun.ukn_triv N') as Hti'.
       set (mk := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]> mf1).
       assert (Hrak : mk !!! Regidx ra_idx = m !!! Regidx ra_idx).
       { rewrite /mk (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) _
@@ -788,7 +800,8 @@ Section UkInitMain.
                 with "[] Hrun").
       { iApply (uis_init_370 with "Hck"). }
       iIntros (hc2) "Hrun".
-      iApply ("Hchi" $! N' hc2 with "[] Hsz [Hstd] Hcwd Hrun").
+      iApply ("Hchi" $! N' hc2 with "[%] [] Hsz [Hstd] Hcwd Hrun").
+      { exact Hpeq. }
       { iFrame "Hck Hrk Hak". }
       { iExists l. iFrame "Hstd". }
   Qed.
@@ -1028,7 +1041,8 @@ Section UkInitMain.
           iApply ("IH2" $! hp3 mp1 with "[] Hsz Hstd Hcwd Hch Hrun").
           iPureIntro. exact Hs2p1.
       + (* ------------- the CHILD: r = 0 ------------- *)
-        iIntros (N' hc) "(#Hck & #Hrk & #Hak) Hsz Hstd Hcwd Hrun".
+        iIntros (N' hc) "%Hpeq (#Hck & #Hrk & #Hak) Hsz Hstd Hcwd Hrun".
+        pose proof (Hpeq : UkRun.ukn_triv N') as Hti'.
         set (mc0 := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
                       (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> ml4)).
         assert (Ha0c0 : mc0 !!! Regidx a0_idx = (mword_of_int 0 : mword 64))

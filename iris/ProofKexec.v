@@ -595,6 +595,7 @@ Section KexecAUExit.
   Definition kxau_QF : mword 64 -> ustate -> Prop := fun _ _ => False.
 
   Lemma kxau_close_fail `{CIDx : CpuId} (Fs : pfam Σ (uvis -> iProp Σ))
+      (Qpay : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (gf : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
@@ -605,11 +606,11 @@ Section KexecAUExit.
       (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
       (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64) (dqas : dfrac) :
     kxau_ret (CID := CIDx)
-      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
          (bview plen pfun) na alen afun sts gn cs U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
-    SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+    SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
       (bview plen pfun) na alen afun sts -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       kxau_QF (fun _ : KexecOkQ.kxf_cause => Logic.True)
@@ -634,6 +635,7 @@ Section KexecAUExit.
   (*  CONVERSION 2: everything past +0x090, at the RECEIPT.               *)
   (* ------------------------------------------------------------------ *)
   Lemma kxau_close `{CIDx : CpuId} (Fs : pfam Σ (uvis -> iProp Σ))
+      (Qpay : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8)) (zi : Z)
@@ -649,12 +651,19 @@ Section KexecAUExit.
     (forall j : nat, (j < 64)%nat -> ef j = file_byte datl j) ->
     length (pv_tf (us_V U)) = TFWORDS ->
     (na <= MAXARG)%nat ->
+    (* THE PAY FACT, STRAIGHT THROUGH.  The slot piece's two wands are at
+       the exec'ing process's own naming of its payload
+       ([SpecKexec.exec_slot_pre]), and the key this conversion builds is at
+       the generation exec keeps, so what the wand asks for is exactly the
+       bundle's own row ([SpecKexec.wp_kexec_body]).  Persistent, so passing
+       it costs the caller nothing. *)
+    my_pay gn Qpay -∗
     kxau_ret (CID := CIDx)
-      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
          pl na alen afun sts gn cs U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
-    PA.kxa_receipt Fs P Fo (length (path_elems pl)) zi na alen afun sts dn bm datl -∗
+    PA.kxa_receipt Fs P Fo Qpay (length (path_elems pl)) zi na alen afun sts dn bm datl -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       (KexecBridge.exec_built_Q (kxc_fb datl dn) ef na alen afun)
       (kxau_QFp (kxc_fb datl dn) na alen)
@@ -662,7 +671,7 @@ Section KexecAUExit.
       na alen plen pv dqpv pfun av dqa avf aslen dqas afun.
   Proof.
     intros Hag Htflen Hnamax.
-    iIntros "Hret Hrcpt". rewrite /KexecOkQ.kexec_closer.
+    iIntros "#Hmp Hret Hrcpt". rewrite /KexecOkQ.kexec_closer.
     iIntros (mf U' entry spv szv') "%Hcs %Hq".
     iIntros "Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath Hargv Hargs Hbs Hirs".
     rewrite /kxau_ret.
@@ -718,7 +727,8 @@ Section KexecAUExit.
            for the arm that did not happen, go with it. *)
         iDestruct (pf_at_au with "Hsl") as "[Hsl _]".
         iApply ("Hsl" $! av0 zi (kxc_fb datl dn) nl
-                  (SpecKexec.exec_key U' sts gn cs na) with "HP HΦ [%] [%]");
+                  (SpecKexec.exec_key U' sts gn cs na)
+                  with "HP HΦ [%] [%] Hmp");
           [exact Hload | exact Himg].
     - (* NOT A LOADABLE FILE.  Arm (b) on success, [EfNotLoadable] on a
          failure past the lock. *)
@@ -759,7 +769,8 @@ Section KexecAUExit.
            goes into the wand, and the kernel mints nothing. *)
         iDestruct (pf_at_au with "Hsl") as "[_ Hsl]".
         iApply ("Hsl" $! av0 zi (abs_row (FsStateEra.era_node dn bm datl))
-                  (SpecKexec.exec_key U' sts gn cs na) with "HP HΦ [%] [%]").
+                  (SpecKexec.exec_key U' sts gn cs na)
+                  with "HP HΦ [%] [%] Hmp").
         { exact Hnl. }
         { exact (SpecKexec.kexec_ok_exec_key_ok U U' sts gn cs
                    (mf !!! Regidx Ra0)
@@ -807,10 +818,11 @@ Section KexecAUMain.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
+      (Qpay : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) :
     SpecKexec.wp_kexec_sconf_body Fs gs jp gl pd pav pu gf plen pfun na avf alen
-      aslen afun pidv U sts gn cs dqb dqs dqa dqpv dqas m K eb b lks P Pmiss Fo.
+      aslen afun pidv U sts gn cs dqb dqs dqa dqpv dqas m K eb b lks Qpay P Pmiss Fo.
   Proof.
     rewrite /SpecKexec.wp_kexec_sconf_body /SpecKexec.wp_kexec_frame.
     intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0
@@ -818,10 +830,11 @@ Section KexecAUMain.
            Halen_b Halen_c Halen_4 Hjp Hgs.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hka Hbm Hins Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hau Hcont".
-    (* ---- THE BUNDLE, OPENED (SpecKexec sect. 2): the walk premise,
-       the one observation, and the program's WP. ---- *)
+    (* ---- THE BUNDLE, OPENED (SpecKexec sect. 2): the pay fact the
+       exec'ing process handed in, the walk premise, the one observation,
+       and the program's WP. ---- *)
     rewrite /SpecKexec.exec_au_pre.
-    iDestruct "Hau" as "(Hwalk & Hoc & Hsl)".
+    iDestruct "Hau" as "(#Hmp & Hwalk & Hoc & Hsl)".
     (* the trapframe's length, read off the block ONCE: the image closer
        ([KexecBridge.exec_image_ok_of_ok_q]) wants it about the INCOMING
        state, and at the exit only [U'] is in hand. *)
@@ -837,7 +850,7 @@ Section KexecAUMain.
     (* ---- THE EXIT, NAMED.  [kxau_ret] IS the contract's continuation. ---- *)
     iAssert (wp_next true (proc_addr jp) (fun CID : CpuId =>
                kxau_ret (CID := CID)
-                 (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Fo
+                 (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
                     (bview plen pfun) na alen afun sts gn cs U)
                  gf fsc_kalloc (proc_addr jp) pidv m
                  (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs fsc_bmapstart
@@ -848,7 +861,7 @@ Section KexecAUMain.
        [Q := False] below +0x090: phase A allocates nothing, so its own
        tails only ever prove [kexec_ok_q]'s FAILURE arm. ---- *)
     iApply (PA.kxc_phaseA_au (CID0 := CID0) Fs kxau_QF
-              (fun _ : KexecOkQ.kxf_cause => Logic.True)
+              (fun _ : KexecOkQ.kxf_cause => Logic.True) Qpay
               gs jp gl pd pav pu gf
               plen pfun na avf alen aslen afun pidv U sts dqb dqs dqa dqpv dqas
               m K eb eb ∅
@@ -863,7 +876,7 @@ Section KexecAUMain.
                     Hins Hbits Hpriv Hpath Hargv Hargs Hbs Hirs Hcont [] []").
     { (* arms (i) and (ii): the refund rides straight into [exec_arms] *)
       iModIntro. iIntros (CX) "HK Hfail".
-      iApply (kxau_close_fail (CIDx := CX) Fs P Pmiss Fo gf (proc_addr jp) pidv U
+      iApply (kxau_close_fail (CIDx := CX) Fs Qpay P Pmiss Fo gf (proc_addr jp) pidv U
                 sts gn cs m (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs na alen
                 aslen afun plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1)
                 dqa avf dqas with "HK Hfail"). }
@@ -890,11 +903,11 @@ Section KexecAUMain.
                       (m !!! Regidx Ra1) dqa avf aslen dqas afun)
                  _ with "[] Hrcpt Hcont") as "Hcont".
     { iIntros (CX) "HK HR".
-      iApply (kxau_close (CIDx := CX) Fs P Pmiss Fo (bview plen pfun) zi dnf bmf
+      iApply (kxau_close (CIDx := CX) Fs Qpay P Pmiss Fo (bview plen pfun) zi dnf bmf
                 datl ef gf (proc_addr jp) pidv U sts gn cs m
                 (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs na alen aslen afun
                 plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1) dqa avf dqas
-                Hef Htflen ltac:(lia) with "HK HR"). }
+                Hef Htflen ltac:(lia) with "Hmp HK HR"). }
     (* ---- THE FAILURE-SIDE PLUG'S TWO PREMISES (S5).  Both are the SAME
        observation: the cone's tails speak about the header buffer [ef] and
        the loop's [sz], and only a LOADABLE file makes [ef] the file's own

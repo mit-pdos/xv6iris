@@ -1025,13 +1025,28 @@ Proof. solve_inG. Qed.
    adequacy, the NAME may not, so it is minted inside the boot fupd
    ([WaitInv.children_res_alloc], called from [BootShared]) and the
    instance handed out existentially. *)
+(* ...AND THE ORPHANS, ON THE SAME CLASS AND FOR THE SAME REASON.  A
+   process's children do not die with it: kexit hands them to <init>
+   (kernel/proc.c's [reparent]), and the set of generations that were
+   handed over that way is the second thing <wait_lock> owns
+   ([WaitInv.orphans_own]).  It is a plain [ghost_var] at a set -- there is
+   ONE orphan set, not one per slot, so nothing has to say whose row it is
+   -- and its name is carried here beside the map's, minted in the same
+   boot fupd ([WaitInv.children_res_alloc]), so that no gname threads
+   through the tree. *)
 Class wchGpreS (Σ : gFunctors) :=
-  { wch_pre_inG :: ghost_mapG Σ gname (SailStdpp.Values.mword 64 * gset gname) }.
+  { wch_pre_inG :: ghost_mapG Σ gname (SailStdpp.Values.mword 64 * gset gname);
+    worph_pre_inG :: ghost_varG Σ (gset gname) }.
 Class wchG (Σ : gFunctors) :=
   WchG { wch_inG :: ghost_mapG Σ gname (SailStdpp.Values.mword 64 * gset gname);
-         wch_name : gname }.
-Global Instance wchG_preS `{!wchG Σ} : wchGpreS Σ := {| wch_pre_inG := wch_inG |}.
-Definition wchΣ : gFunctors := #[ ghost_mapΣ gname (SailStdpp.Values.mword 64 * gset gname) ].
+         worph_inG :: ghost_varG Σ (gset gname);
+         wch_name : gname;
+         worph_name : gname }.
+Global Instance wchG_preS `{!wchG Σ} : wchGpreS Σ :=
+  {| wch_pre_inG := wch_inG; worph_pre_inG := worph_inG |}.
+Definition wchΣ : gFunctors :=
+  #[ ghost_mapΣ gname (SailStdpp.Values.mword 64 * gset gname);
+     ghost_varΣ (gset gname) ].
 Global Instance subG_wchΣ {Σ} : subG wchΣ Σ -> wchGpreS Σ.
 Proof. solve_inG. Qed.
 

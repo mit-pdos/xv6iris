@@ -58,11 +58,11 @@ Section USyncKernel.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context `{SG : uexecSG Σ}.
-  Context `{PS : uprogSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* NO [Context {CID : CpuId}]: the slot binds the hart itself. *)
 
@@ -161,15 +161,22 @@ Section USyncKernel.
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (forall k : Z, k <> USYS_exec -> psok k) ->
-    udep -∗ uslot W.
+    (* THE PAY FACT, at the trivial payload: sync's exit owes its parent
+       nothing this lane, and the entry constructor is what puts it in the
+       record ([UkRun.ukn_pay]). *)
+    udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
     intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen Hstop Hpsok.
-    iIntros "#Hdep".
-    iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata Hfdlen Hstop with "Hdep").
+    iIntros "#Hdep #Hpay".
+    iApply (uslot_of_urun W 4 (fun _ => True)%I Hal8 ltac:(lia) Hdata Hfdlen Hstop
+              with "Hdep Hpay []").
+    (* the payload at the trivial one *)
+    { done. }
     (* sync makes no descriptor call, so its ledger is dropped here *)
     (* sync makes no descriptor call and no chdir, so its ledger and its
        working directory are both dropped here *)
-    iIntros (N h) "%Hsz Hszf #Ht _ _ _ Hrun".
+    iIntros (N h) "%Hpayeq %Hsz Hszf #Ht _ _ _ Hrun".
+    pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
     rewrite Hpc.
     iApply (wp_ksync_start N Hpsok h (tf_resume_gpr0 (uvis_tf W))
               (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0

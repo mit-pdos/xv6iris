@@ -161,7 +161,7 @@ Section UkFork.
      whole-system bundle.  A file that binds [Xv6G.xv6G] gets the class
      through the bundle and must not bind it again. *)
   Context `{!ctokG Σ}.
-  Context `{SG : uexecSG Σ}.
+  Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
   (* the conversion: a big-op over the run's map IS the big-op over the run *)
@@ -781,7 +781,7 @@ Section UkFork.
      licenses re-minting them at the child's name, so a caller says only
      what it actually holds; one holding nothing passes the empty map and
      the two extra premises are [emp]. *)
-  Lemma wp_uk_ecall_fork (N : uk_names) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_fork (N : uk_names Σ) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (szv : Z) (l : list fdstate)
       (D : gmap nat fdstate) (c : Z)
       (* THE CALLER'S LIVE CHILDREN, and THE PAYLOAD ITS CHILD'S EXIT WILL
@@ -796,6 +796,14 @@ Section UkFork.
     usysno m = USYS_fork ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    (* ...AND THE CHILD'S PAYLOAD ITSELF, at the kill status.  The parent
+       chose [Q]; the child's RUN carries [Q (-1)] from its first
+       instruction, because the kernel may tear the child down at any trap
+       and nothing its program does could pay then
+       ([UexecRet.uexec_pay_dep]).  So the resource crosses HERE: a parent
+       that lends its child a resource lends it at the fork.  At
+       [fun _ => True] it costs nothing. *)
+    Q (-1) -∗
     P (ukn_t N) (ukn_d N) (ukn_s N) -∗
     usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
@@ -850,10 +858,14 @@ Section UkFork.
         open, which is what parked sh's runner.  The parent's own handles
         are NOT consumed: it keeps its table and its authority, and the
         child's are freshly minted at γfd'. *)
-     (∀ (N' : uk_names) (h' : CpuId) (γ' : gname),
+     (∀ (N' : uk_names Σ) (h' : CpuId) (γ' : gname),
         (* THE CHILD LEARNS ITS OWN PAYLOAD: what its exit owes its parent,
            persistent, out of the generation the kernel minted for it
-           ([ChildTok.my_pay]).  A child that pays nothing ignores it. *)
+           ([ChildTok.my_pay]).  A child that pays nothing ignores it.
+           ...AND ITS RECORD IS KEYED AT IT: the arm MINTS the child's
+           record, so it is the party that says what its [UkRun.ukn_pay]
+           is, exactly as an entry constructor does. *)
+        ⌜ ukn_pay N' = Q ⌝ -∗
         my_pay γ' Q -∗
         P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
         (* ...and the child gets the same descriptors at its OWN name --
@@ -876,8 +888,8 @@ Section UkFork.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hal4. iIntros "#Hi HP Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hdep & Hb)".
+    intros Hn Hal4. iIntros "#Hi Hpayc HP Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
     (* the caller's half pins the key's working directory *)
     iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
     (* ...and its other half pins the key's children set, which is why the
@@ -916,7 +928,10 @@ Section UkFork.
                  UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
                    s pc ltac:(vm_compute; reflexivity)
                    ltac:(vm_compute; reflexivity) Hp Hc)
-              with "Hb").
+              with "Hb Hmy Hpayv").
+    (* the engine hands the payment back into the return: what the leaf
+       proves is the deposit AT that payload ([UexecRet.uexec_pay_dep]) *)
+    iIntros "Hpayv".
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn Sc))
                    = USYS_fork).
@@ -931,13 +946,24 @@ Section UkFork.
        the only field either leg reads is the child's exit payload -- so
        the point family at [Q] is exactly what the two legs need
        ([UexecSG.sfam_pay] / [sfork_pay_pay]). *)
-    iExists (sfam_pay Q). rewrite sfork_pay_pay.
+    iExists (sfam_at (ukn_pay N) (sfam_pay Q)).
+    rewrite (sfork_pay_at (ukn_pay N) (sfam_pay Q)) sfork_pay_pay.
+    (* THE PAYMENT, at the PARENT's own payload -- the child's is [Q], and
+       the two live in one value ([UexecSG.sfam_at]).  The run hands it
+       over and fork's parent arm hands it back. *)
+    rewrite /uexec_pay_arm (sexit_pay_at (ukn_pay N) (sfam_pay Q)).
+    iSplitL "Hpayv";
+      [ iApply (uexec_pay_dep_ret USYS_fork m pc M pm sz fdv c gn Sc _
+                  (sfam_at (ukn_pay N) (sfam_pay Q))
+                  ltac:(rewrite tf_of_num; exact Hn)
+                  ltac:(unfold USYS_fork, USYS_exit; lia)
+                  (sexit_pay_at (ukn_pay N) (sfam_pay Q)) with "Hmy Hpayv") | ].
     (* the PARENT keeps the descriptor authority it had -- fork does not
        touch the parent's table -- and the CHILD mints its own below. *)
     iSplitL "Hpar HP Hsz Hstd HD Hcwd Hheap Hstk Hufd Hcwda Hcha Hchf".
     (* ---- the parent: same heap, r <> 0, and the children set grown by
        the child's generation ---- *)
-    - iIntros (r fdv' cw' cs') "%Hr %Hfv %Hcv Hans". subst fdv' cw'.
+    - iIntros "Hpayv" (r fdv' cw' cs') "%Hr %Hfv %Hcv Hans". subst fdv' cw'.
       (* FORK'S TWO ARMS, and the mirror moves on the second: both halves
          of the program's children variable are in hand -- the engine's
          inside the [urun] just destructed, the program's as a premise --
@@ -969,15 +995,16 @@ Section UkFork.
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn Sc
                  cs2 r Hx0 Hal4).
+      iApply ukcq_ukc.
       iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv c gn
                 cs2 (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hcwda Hcha Hdep").
+                with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep").
       iIntros (h') "Hrun".
       iApply ("Hpar" $! h' r with "[%] Harm HP Hsz Hstd HD Hcwd Hrun").
       exact Hr.
     (* ---- the child: fresh heap, r = 0, payload rebuilt at the new names *)
-    - iIntros (fdv' cw' g') "Hmp %Hfdv' %Hcv'". subst fdv' cw'.
+    - iIntros (fdv' cw' g') "#Hmp %Hfdv' %Hcv'". subst fdv' cw'.
       (* THE CHILD'S OWN DESCRIPTOR AUTHORITY, minted at the view the kernel
          handed it -- BEFORE the key is rewritten to [ukc], since the update
          is absorbed by the [uslot] and not by what it unfolds to.  The
@@ -1003,14 +1030,22 @@ Section UkFork.
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn g' Sc ∅
                  (mword_of_int 0) Hx0 Hal4).
-      iApply (urun_close_upd (MkUkNames γt' γd' γs' γfd' γc' γch') M pm m
+      (* THE CHILD'S RECORD IS MINTED AT THE PARENT'S CHOSEN PAYLOAD, and
+         the fact that BACKS it is the [ChildTok.my_pay] the kernel handed
+         in on this very arm ([SpecSyscall.sysc_fork_in]): the parent chose
+         [Q] at the ecall, kfork set it on the child's generation, and the
+         child's run is keyed by it -- which is what makes the child's own
+         exit leaf able to pay what its parent will redeem. *)
+      iApply ukcq_ukc.
+      iApply (urun_close_upd (MkUkNames γt' γd' γs' γfd' γc' γch' Q) M pm m
                 (mword_of_int 10)
                 (mword_of_int 0) sz fdv c g' ∅ (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap' Hstk' Hufd' Hcwa' Hcha' Hdep").
+                with "Hheap' Hstk' Hufd' Hcwa' Hcha' Hmp Hpayc Hdep").
       iIntros (h') "Hrun".
-      iApply ("Hchild" $! (MkUkNames γt' γd' γs' γfd' γc' γch') h' g'
-                with "Hmp HP' Hsz' Hstd' Hfrag' Hcwf' Hchf' Hrun").
+      iApply ("Hchild" $! (MkUkNames γt' γd' γs' γfd' γc' γch' Q) h' g'
+                with "[%] Hmp HP' Hsz' Hstd' Hfrag' Hcwf' Hchf' Hrun").
+      reflexivity.
   Qed.
 
   (* ===================================================================== *)
@@ -1030,7 +1065,7 @@ Section UkFork.
   (* [⌜r <> 0⌝] STAYS: init and sh both branch on it, and it is the one    *)
   (* thing about the return value an untracking caller reads.              *)
   (* ===================================================================== *)
-  Lemma wp_uk_ecall_fork_any (N : uk_names) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_fork_any (N : uk_names Σ) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (szv : Z) (l : list fdstate)
       (D : gmap nat fdstate) (c : Z)
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P} :
@@ -1054,7 +1089,11 @@ Section UkFork.
         urun N h' (<[Regidx (mword_of_int 10) := r]> m)
           (add_vec_int pc 4) avail -∗
         WP (Loop : expr riscv_lang)) ∗
-     (∀ (N' : uk_names) (h' : CpuId),
+     (∀ (N' : uk_names Σ) (h' : CpuId),
+        (* THE CHILD'S PAYLOAD IS THE TRIVIAL ONE at this statement: a
+           caller that will not redeem a token forks at [fun _ => True],
+           and the record the arm mints says so ([UkRun.ukn_pay]). *)
+        ⌜ ukn_pay N' = (fun _ => True)%I ⌝ -∗
         P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
         UserFd.ustd (ukn_fd N') l -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
@@ -1073,7 +1112,8 @@ Section UkFork.
        parent's, so the set has to be a name for the length of the call *)
     iDestruct "Hch" as (Sc) "Hchf".
     iApply (wp_uk_ecall_fork N h m pc avail szv l D c Sc (fun _ => True%I) P
-              Hn Hal4 with "Hi HP Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]").
+              Hn Hal4 with "Hi [] HP Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]");
+      [ done | ].
     iSplitL "Hpar".
     - iIntros (h' r) "%Hr Hans HP Hsz Hstd HD Hcwd Hrun".
       (* BOTH ARMS GIVE THE FRAGMENT BACK, and the token the pid arm mints
@@ -1086,8 +1126,9 @@ Section UkFork.
           iApply (uch_any_of with "Hf"). }
       iApply ("Hpar" $! h' r with "[%] HP Hsz Hstd HD Hcwd Hch Hrun").
       exact Hr.
-    - iIntros (N' h' γ') "_ HP Hsz Hstd HD Hcwd Hchf' Hrun".
-      iApply ("Hchild" $! N' h' with "HP Hsz Hstd HD Hcwd [Hchf'] Hrun").
+    - iIntros (N' h' γ') "%Hpeq _ HP Hsz Hstd HD Hcwd Hchf' Hrun".
+      iApply ("Hchild" $! N' h' with "[%] HP Hsz Hstd HD Hcwd [Hchf'] Hrun");
+        [ exact Hpeq | ].
       iApply (uch_any_of with "Hchf'").
   Qed.
 
@@ -1110,7 +1151,7 @@ Section UkFork.
   (* address-space facts, so they never enter the payload -- whoever holds *)
   (* them splits them between the two continuations at the [∗].            *)
   (* ===================================================================== *)
-  Lemma wp_uk_ecall_fork_argv (N : uk_names) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_fork_argv (N : uk_names Σ) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (szv : Z)
       (M0 : gmap Z (bv 8)) (pm0 : gmap (mword 27) uperm)
       (av : Z) (args : list uarg) (l : list fdstate) (D : gmap nat fdstate)
@@ -1118,6 +1159,8 @@ Section UkFork.
     usysno m = USYS_fork ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    (* the child's payload, relayed -- see [wp_uk_ecall_fork] *)
+    Q (-1) -∗
     utext_all (ukn_t N) M0 pm0 -∗
     uargv (ukn_d N) av args -∗
     usz (ukn_s N) szv -∗
@@ -1151,7 +1194,8 @@ Section UkFork.
         one name could not carry both.  (This is why the descriptor name is a
         FIELD of the record rather than an ambient: an ambient name would
         make this arm unprovable.) *)
-     (∀ (N' : uk_names) (h' : CpuId) (γ' : gname),
+     (∀ (N' : uk_names Σ) (h' : CpuId) (γ' : gname),
+        ⌜ ukn_pay N' = Q ⌝ -∗
         my_pay γ' Q -∗
         utext_all (ukn_t N') M0 pm0 -∗
         uargv (ukn_d N') av args -∗
@@ -1174,17 +1218,18 @@ Section UkFork.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hal4.
-    iIntros "#Hi #Htext #Hargv Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]".
+    iIntros "#Hi Hpayc #Htext #Hargv Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]".
     iApply (wp_uk_ecall_fork N h m pc avail szv l D c Sc Q
               (fun γt0 γd0 γs0 => (utext_all γt0 M0 pm0 ∗ uargv γd0 av args)%I)
-              Hn Hal4 with "Hi [] Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]").
+              Hn Hal4 with "Hi Hpayc [] Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]").
     { iSplitR; [ iExact "Htext" | iExact "Hargv" ]. }
     iSplitL "Hpar".
     - iIntros (h' r) "%Hr Harm _ Hsz Hstd HD Hcwd Hrun".
       iApply ("Hpar" $! h' r with "[%] Harm Hsz Hstd HD Hcwd Hrun"). exact Hr.
-    - iIntros (N' h' γ') "Hmp [Ht' Ha'] Hsz' Hstd' Hfrag' Hcwd' Hch' Hrun".
+    - iIntros (N' h' γ') "%Hpeq Hmp [Ht' Ha'] Hsz' Hstd' Hfrag' Hcwd' Hch' Hrun".
       iApply ("Hchild" $! N' h' γ'
-                with "Hmp Ht' Ha' Hsz' Hstd' Hfrag' Hcwd' Hch' Hrun").
+                with "[%] Hmp Ht' Ha' Hsz' Hstd' Hfrag' Hcwd' Hch' Hrun").
+      exact Hpeq.
   Qed.
 
 End UkFork.

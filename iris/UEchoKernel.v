@@ -100,11 +100,11 @@ Section UEchoKernel.
   (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
-  Context `{SG : uexecSG Σ}.
-  Context `{PS : uprogSG Σ}.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  Context {SG : uexecSG Σ}.
+  Context `{PS : uprogSG Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* §2 THE VECTOR, OUT OF THE PERSISTED AREA.                            *)
@@ -425,20 +425,25 @@ Section UEchoKernel.
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (forall k : Z, k <> USYS_exec -> psok k) ->
-    udep -∗ uslot W.
+    (* THE PAY FACT, at the trivial payload: echo's exit owes its parent
+       nothing this lane ([UkRun.ukn_pay] is what the record carries). *)
+    udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
     intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen Hstop Hpsok.
-    iIntros "#Hdep".
+    iIntros "#Hdep #Hpay".
     assert (Hsp0 : 0 <= uint (uvis_sp W)) by lia.
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
-    iApply (uslot_of_urun_ro W 12 Hal8
+    iApply (uslot_of_urun_ro W 12 (fun _ => True)%I Hal8
               ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop
-              with "Hdep").
+              with "Hdep Hpay []").
+    (* the payload at the trivial one *)
+    { done. }
     (* echo makes no descriptor call, so its ledger is dropped here *)
     (* echo makes no descriptor call, no chdir and no fork, so its ledger,
        its working directory and its children set are all dropped here *)
-    iIntros (N h) "%Hsz Hszf #Ht _ _ _ #HA Hrun".
+    iIntros (N h) "%Hpayeq %Hsz Hszf #Ht _ _ _ #HA Hrun".
+    pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
     rewrite Hpc.
     iApply (wp_kecho_start N Hpsok h (tf_resume_gpr0 (uvis_tf W))
               (uvis_av W)

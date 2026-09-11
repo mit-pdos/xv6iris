@@ -192,6 +192,36 @@ Definition tf_khartid_idx : nat := 4%nat.
    range: sp is a saved register, not a syscall argument. *)
 Definition tf_sp_idx      : nat := 6%nat.
 
+(* THE EXIT STATUS A TRAPPING FRAME CARRIES: the signed 32-bit reading of
+   argument 0, which is what [sys_exit]'s [argint(0,&n)] takes out of the
+   frame and what [kexit] stores into [p->xstate].  It is a reading of the
+   FRAME, exactly as [UsysMemOk.usys_num] is a reading of a7, so it is
+   statable everywhere the frame is -- which is what the exit deposit
+   ([UexecRet.uexec_dep_F] at [USYS_exit]) and the ZOMBIE escrow
+   ([ProcDefs.proc_dormant]) both need, and they sit on opposite sides of
+   the kernel/U-tier split. *)
+(* THE STATUS READING, ONCE.  [exit(int status)] takes an [int]: the
+   register's low 32 bits, signed -- which is the word [p->xstate = status]
+   stores and the word wait() copies back out.  Both the trapframe reading
+   ([exit_xs]) and the register reading (kexit's own argument) are this
+   function, so the two never have to be related by a lemma. *)
+(* the reading of the CELL, which already holds the 32-bit word *)
+Definition xstate_val (w : mword 32) : Z := bv_signed w.
+
+(* ...and of a REGISTER, through the word an [sw] commits
+   ([RiscvExtras.trunc32]).  Stating it through the store's own truncation
+   is what makes "the cell reads back at the register's status" hold by
+   [reflexivity] at every site. *)
+Definition xstate_of (v : mword 64) : Z := xstate_val (trunc32 v).
+
+Definition exit_xs (tf : list (mword 64)) : Z :=
+  xstate_of (tf !!! tf_arg_idx 0).
+
+(* ...and two frames that agree on argument 0 agree on it *)
+Lemma exit_xs_arg0 (tf tf' : list (mword 64)) :
+  tf !!! tf_arg_idx 0 = tf' !!! tf_arg_idx 0 -> exit_xs tf = exit_xs tf'.
+Proof. intro H. unfold exit_xs. rewrite H. reflexivity. Qed.
+
 (* THE FACT ABOUT THE TRAPFRAME'S FOUR KERNEL WORDS that the trap loop
    needs at every trap: kernel_satp is a Sv39 / asid-0 satp rooted at
    [kroot], kernel_sp is the process's kernel stack top [ksp] (which is what
