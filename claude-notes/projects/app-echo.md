@@ -2081,6 +2081,20 @@ cons_clean_tok cn` (`SpecMain.v:433-439`).  GONE: `console_ready` (+4),
 `-1 ≤ r` arm is a killed process (unobservable from user mode); `cons_tagged` is
 subsumed by `cons_window`.
 
+PID-KEY LANDED (2026-09-11; brief `brief-pid-key.md`; 58 files; the rulings
+below are as landed).  `UexecSlot.uvis_pid : mword 32` (LAST); `uvis_of U sts g
+cs pid`, `uvis_of_run … g cs pidv`, `exec_key U' sts gn cs pidv na`; `bump` keeps
+the pid (`bump_at` names it; fork's child key `bump_at … g' ∅ pidc`, `∀ g'
+pidc`, at allocproc's `pid_c`); `skey_eq` gains the clause, `uslot_of_urun_eq` a
+fourth premise; `ukb_F`'s seventh pin `⌜uvis_pid W' = pidv⌝`; `urun` hides it
+(no program statement moved).  THE RESIDUE IS INDEXED BY THE PID
+(`usertrap_res*`/`ut_res*`/`ut_own*`/`ut_hold`; `UsertrapRes.un_fn N pid`);
+`un_pid` stays the parker's field.  `UsysMemOk.usys_ret_pid n r pid := n =
+USYS_getpid → r = sign_extend' 64 pid` is the last pure row of
+`uexec_ret_cont_gen`, carried `sys_getpid` → `SpecSyscall.sysc_ret_pid` →
+`SpecUsertrap.ut_ret_pid` → uservec → `uexec_ret_round_slot`.  Not bubbled to
+`urun` (owner).
+
 PID-KEY RULINGS (2026-09-11, owner's request; phase 1): `uvis_pid : mword 32` is
 the LAST field of `UexecSlot.uvis` (every constructor site is an append);
 `uvis_of U sts g cs pid`, `uvis_of_run … g cs pidv`; `bump` KEEPS the pid and is

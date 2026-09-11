@@ -31,11 +31,10 @@ patch: `projects/wx-briefs/`.
   GONEs, vtest unaffected); note `app-echo.md` "CONS-CURSOR LANDED", rulings
   (1)-(7) above it (the lease; the one-arm `cons_acc`; the window under the dirty
   disjunction).  Tree CLEAN at the landing.
-- PID-KEY (`wx-briefs/brief-pid-key.md`, owner's request): `uvis` gains `uvis_pid`,
-  getpid's round row says it returns it; not bubbled to `urun`.  LAUNCHED
-  2026-09-11 (phase 1 then stop-and-report).
-- NEXT after PID-KEY: SH-LINE (`wx-briefs/brief-sh-line.md`, re-anchored at the
-  CONS-CURSOR landing) → E4 SH-ECHO → E2 INIT-BOOT → E5 L7 (design with the owner:
+- PID-KEY LANDED (2026-09-11; 58 files; VM build `pidkey56` EXIT=0, audit = the
+  thirteen, lemma_diff clean).  Note: `app-echo.md` "PID-KEY LANDED".  Tree CLEAN.
+- NEXT: SH-LINE (`wx-briefs/brief-sh-line.md`, re-anchored at the CONS-CURSOR
+  landing; LAUNCHED 2026-09-11, phase 1 then stop-and-report) → E4 SH-ECHO → E2 INIT-BOOT → E5 L7 (design with the owner:
   the per-character-echo discipline automaton, `good_out`, the identification
   gate, `Hphi`).
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
