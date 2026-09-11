@@ -2016,16 +2016,18 @@ it says γ was SOME incarnation of slot pa, never the CURRENT one -- a parent
 that never waits keeps `child_tok` of a long-dead generation while the slot
 is re-used -- and pid uniqueness lives in `pid_lock`'s payload, which kwait
 cannot open.  Neither fact can be a pure invariant over `(ps, m)`; both have
-to be RESOURCES whose halves meet.  Two exclusive ghosts do it, each with one
-half in the child's PRIVATE BLOCK and one half in the wait-lock invariant:
+to be RESOURCES whose halves meet.  Two exclusive ghosts do it, each split 1/4 : 3/4 -- a QUARTER in the child's
+PRIVATE BLOCK and THREE QUARTERS in the wait-lock invariant (not halves: at
++0xd4 kfork must derive `ps !! j = 0` from its own share against a would-be
+stale entry's, and 1/2 + 1/2 is consistent while 3/4 + 3/4 is not):
 
 - `slot_gen k dq γ` -- "slot k's current generation is γ".  One canonical
   `own` at `gmapUR nat (dfrac_agreeR (leibnizO gname))`: halves agree, the
   whole updates with no authority.  The UNUSED dormant block holds it WHOLE
   (at the last incarnation's name -- the `pv_fdg`/`pv_chg` junk precedent);
   allocproc updates it to `pv_gen` and hands it out whole; kfork/userinit put
-  ONE HALF into the block (`proc_priv_core`, keyed at `pv_gen (us_V U)`);
-  kfork deposits the other half in the invariant at +0xd4; kwait reunites
+  a QUARTER into the block (`proc_priv_core`, keyed at `pv_gen (us_V U)`);
+  kfork deposits the three quarters in the invariant at +0xd4; kwait reunites
   them at the reap and freeproc puts the whole back.  It is what ties "the
   ZOMBIE block in my hands" to "entry k of the invariant".
 - `pid_reg pid dq γ := pid ↪[wpr_name]{dq} γ` -- "pid is registered to
@@ -2036,9 +2038,9 @@ half in the child's PRIVATE BLOCK and one half in the wait-lock invariant:
   the generation is MINTED THERE TOO -- `gen_alloc` moves into
   `wp_ap_pidsec`, since the mint needs the pid and the registration needs the
   name), freeproc DELETES at its `p->pid = 0` (it takes both halves: kwait
-  reunites, allocproc's failure tails hold the whole).  One half in the
-  block beside `slot_gen`'s, the other deposited by kfork at +0xd4.  Two
-  halves at one key AGREE on the generation, which is exactly (W3).
+  reunites, allocproc's failure tails hold the whole).  A quarter in the
+  block beside `slot_gen`'s, three quarters deposited by kfork at +0xd4.  Two
+  shares at one key AGREE on the generation, which is exactly (W3).
   Init: userinit puts the halves in init's block and DROPS the spares (init
   has no parent and is never reaped; state it).
 
@@ -2047,7 +2049,7 @@ together: `wait_res_at ξ := ∃ ps m O, parents_own_at ξ ps ∗ children_own_a
 m ∗ orphans_own O ∗ children_inv ps m O ip` (ip = initproc's address, a
 parameter or the pinned symbol) with
   `children_inv ps m O ip := [∗ list] k ↦ v ∈ ps, if v = 0 then emp else
-     ∃ γ pid, slot_gen k (1/2) γ ∗ pid_reg pid (1/2) γ ∗ gen_slot γ (proc_addr k)
+     ∃ γ pid, slot_gen k (3/4) γ ∗ pid_reg pid (3/4) γ ∗ gen_slot γ (proc_addr k)
        ∗ gen_pid γ pid ∗ ⌜γ ∈ rowset m v ∨ (v = ip ∧ γ ∈ O)⌝`
   plus the pure converse `∀ γ0 v S, m !! γ0 = Some (v, S) → ∀ γ ∈ S, ∃ k,
   ps !! k = Some v ∧ entry k is γ` and the same for `O` at `ip`, and owner
@@ -2055,8 +2057,8 @@ parameter or the pinned symbol) with
   are per slot at distinct addresses from boot).  Every other pure fact is a
   RESOURCE consequence: one entry per slot by the list; γ → slot unique by
   `gen_slot` agreement; γ → pid by `gen_pid` agreement; "slot j has no
-  entry" at kfork's +0xd4 from kfork holding `slot_gen j` WHOLE against a
-  would-be half.  RE-ESTABLISHMENT: kfork at +0xd4 (`ps' = <[j := pme]> ps`,
+  entry" at kfork's +0xd4 from kfork's three quarters of `slot_gen j` against
+  a would-be entry's three quarters.  RE-ESTABLISHMENT: kfork at +0xd4 (`ps' = <[j := pme]> ps`,
   row `cs ∪ {γ}`, new entry j from the halves it kept); kexit's ZOMBIE store
   (`rp_map` sends every cell at `pa_e` to `ip`; its row `S` moves into `O`;
   entries of its children re-satisfy the clause at `ip`; its OWN entry is
@@ -2071,9 +2073,9 @@ THE POST (WX-WAIT).  `kwait`'s success arm: `r = pid' ∗ exit_tok γ' pid' xs
 ∗ (⌜γ' ∈ cs⌝ ∨ ⌜pj = ip ∧ γ' ∈ O⌝) ∗ □ (∀ γ, ⌜γ ∈ cs⌝ → gen_pid γ pid' -∗
 ⌜γ = γ'⌝) ∗ row at cs ∖ {γ'}`; the -1 arm: `⌜cs = ∅⌝ ∗ row at cs`.  The
 proof of (W2): entry k of the invariant against the ZOMBIE block's
-`slot_gen k (1/2) (pv_gen Vc)`; of (W3): a `γ ∈ cs` has an entry at some
-slot with `pid_reg pid_γ (1/2) γ` and `gen_pid γ pid_γ`; `gen_pid γ pid'`
-gives `pid_γ = pid'`, and the block's `pid_reg pid' (1/2) γ'` agrees: `γ =
+`slot_gen k (1/4) (pv_gen Vc)`; of (W3): a `γ ∈ cs` has an entry at some
+slot with `pid_reg pid_γ (3/4) γ` and `gen_pid γ pid_γ`; `gen_pid γ pid'`
+gives `pid_γ = pid'`, and the block's `pid_reg pid' (1/4) γ'` agrees: `γ =
 γ'`; of (W5): the scan found no cell at `pj`, so the converse empties `cs`.
 The u-tier row relays `cs' = cs ∖ {γ'}` (`usys_ch_ok` stays pure-quiet; the
 move rides the answer like fork's), the leaf `wp_uk_ecall_wait` returns the
