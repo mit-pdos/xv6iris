@@ -2118,6 +2118,53 @@ family; the index used directly where `un_pid N` was spelled; `Rut_at`,
 `forkret_closer`, `park_pkg` thread it; the park mints the tie), the `sts`/`cs`
 sweep shape.
 
+SH-LINE RULING (2026-09-11, after the lane's phase-1 stop): THE TOKEN IS IN THE
+PAYLOAD; THE POSITION IS A PROGRAM-SIDE GHOST; THE READ TAKES THE PAYLOAD
+THROUGH A WAND.  The friction: the kill path can return only `Q (-1)` to init,
+so the reader token must be inside `Q (-1)` (linear in `urun`, abstract to the
+program); but `gets` needs the token's POSITION as a named value between reads,
+which only a held ghost share gives -- and two copies of one half would be
+vacuous.  Ruled:
+- `Q xs := (∃ n, cons_reader fsc_cons n ∗ pos_a γ n) ∨ echo_taint` with a FRESH
+  ghost_var pair per child (`γ` minted by init before the fork at the token's
+  current position; `pos γ n` handed to the child through the fork's slot
+  piece and across the exec through `pinned_exec_bundle`'s LINEAR `Pay`, so
+  `init_sh_slot`/`init_exec_sup` become linear for the CHILD's one exec while
+  the parent keeps its persistent structure); sh holds `pos γ n` in
+  `ush_pstate`; at wait init gets `Q` back (`cons_reader n ∗ pos_a γ n`), drops
+  `pos_a`, mints `γ'` at that `n`, and forks again.  sh's exit pays `Q xs ∧ Q
+  (-1)` trivially (one resource, both sides).
+- THE READ'S CONSOLE ARM IS A WAND FROM THE PAYLOAD.  The dispatcher already
+  holds `sexit_pay f (-1)` (`sysc_pay_in`) beside the deposit and returns it at
+  the resume (`sysc_pay_out`); it never needs it twice (kill spends it at
+  +0xca BEFORE dispatch; the read arm feeds it and takes it back).  So
+  `fileread_in st F Rd P := P -∗ (… console arm: cons_acc fsc_cons app_sup (fun
+  cur dc => P ∗ Rd cur dc) …)` and `fileread_extra … P := P ∗ (…)`, with `P :=
+  sexit_pay f (-1)` at `xv6_sbundle` 5 (the family element carries it; `True`
+  for the generic family, so `fsabs_fileread_in` is unchanged in force);
+  `SpecSysRead` relays `P` in and out; the dispatcher's read arm feeds it and
+  peels it off the post for `sysc_pay_out`; `xv6_spost` 5 (what the process
+  sees) does NOT carry `P`.  The program builds `P -∗ cons_acc …` holding only
+  `pos γ n`: left disjunct -- agree `n`, `cons_acc_reader` at `n`, and the `Rd`
+  wand (now `==∗`: `cons_acc`'s inner wand becomes a bupd so the pos pair can be
+  updated to `cur + dc` with both halves in hand) rebuilds `P` at the new
+  position and returns `pos γ (cur+dc)` plus `⌜cur = n⌝ ∨ echo_taint` (the
+  dirty credential `□ app_sup` gives the taint by `echo_taint_of_sup`: some
+  view fails the pins); right disjunct -- `cons_acc_cred` from
+  `echo_sup_of_taint`, `P` (the taint) returned by persistence.
+- THE TOKEN'S BOOT ROUTE: main today DROPS `cons_reader cn 0`
+  (`ProofMain.v:~2313`); it goes to userinit (`SpecUserinit` already carries
+  the pinned console) and into init's slot: `InitBoot.init_boot_bundle`'s slot
+  piece gains `cons_reader fsc_cons 0` as an INPUT of the slot wand (the generic
+  instance ignores it), threaded main → userinit → the park package → forkret's
+  boot arm → the kexec of /init.  `Hinit_boot`'s statement is unchanged (the
+  token is the kernel's to hand, not the application's to mint).
+- ALSO: init's `open` is already tracked (it discards the handle); only its two
+  `dup`s are untracked -- S3 is "keep open's handle, switch dup".
+LANES: CONS-ROUTE (kernel: the `P` wand through read; `cons_acc`'s bupd; init's
+token route) → SH-LINE (program: `pos`, `Q`, init's fork/wait/loop, the linear
+`Pay` across exec, sh's entry/`ush_pstate`/`gets`, `ushf_lexable` discharged).
+
 #### E3 — THE INPUT LINE: DESIGN PROPOSAL (2026-09-11, coordinator; AWAITING THE OWNER'S RULING)
 
 FACTS (console-ring survey, verified): `ConsoleInv.cons_res` holds NO ghost state
