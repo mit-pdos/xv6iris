@@ -2144,29 +2144,42 @@ C('D') and ring-full); the editable window `w..e` is an ordinary list `pd`
 consoleread exits pop a byte and never deliver it (the C('D') arm with nothing
 delivered yet; the copyout-failure break past `cons.r++`) -- the swallowed byte
 sits at `nrd + d`; under the owner's discipline `dc = d` (no ^D), an application
-argument.  (5) THE TOKEN ESCROW -- RULED WITH THE OWNER (2026-09-11; this REPLACES the
-"priced tokenless read" briefly considered).  The kernel's console arm requires
-`cons_reader n` UNCONDITIONALLY: one arm, no price, no second cursor, no dirty
-mark.  A generic (tainted) process can still read fd 0 at the console because
-THE APPLICATION SWITCHES REGIME AT THE TAINT: every kernel token a proven
-process spends (the reader token first; others as they appear) lives, in the
-tainted regime, in a system-wide ESCROW invariant the generic supply opens.
-Before the taint the proven holder (sh, via init's fork payload) owns the token
-outright; at the receipt where sh's tag comes back tainted, sh DEPOSITS the
-token into the escrow and continues as a generic process whose supply is the
-taint; the generic slot's read borrows the token from the escrow and returns it
-at whatever position (in the tainted regime nobody cares where the cursor is,
-so the escrow holds it existentially).  `xv6_ssupply` (a definition, not the
-class field) becomes "the claim holds of every view AND the escrow is open"
-(`app_sup ∗ escrow_open`); `fsabs_fileread_in` pays read's console arm at every
-state by borrowing.  The escrow is an Iris invariant (a linear resource moves
-under a persistent trigger; the deposit happens outside any lock, at sh's
-receipt).  CONS-CURSOR lands the kernel arm and STATES the generic read
-discharge's need (the read leaf at `Some` only; `fsabs_fileread_in`'s console
-case left as the one explicit premise of the supply law's instance until
-SH-LINE builds the escrow); SH-LINE builds the escrow, the switch at sh's
-receipt, and the tracked open/dup in init so sh's fd 0 is `FdDevice CONSOLE`
-in the descriptor ghost (today init drops its handles and sh assumes nothing).
+argument.  (5) THE LEASE -- RULED WITH THE OWNER (2026-09-11; supersedes the "priced
+tokenless read" and the "deposit at sh's receipt").  The kernel's console arm
+requires `cons_reader n` UNCONDITIONALLY (one arm, no price, no second cursor).
+A VERIFIED process never owns the token outright: it holds a LEASE, which gives
+it full knowledge and ownership of the token's state EXCEPT that the token is
+reclaimed when the world enters the taint.  For a token `T : S → iProp` and the
+one-shot pair `untainted_tok` (exclusive) / `tainted` (persistent):
+    lease T s := ghost_half s ∗ inv N ((untainted_tok ∗ ∃ s', ghost_other_half s' ∗ T s')
+                                     ∨ (tainted ∗ ∃ s', T s'))
+  -- the holder opens the invariant and CASE-SPLITS: first disjunct, the halves
+  agree (`s' = s`), it uses `T s`, updates both halves, closes; second, it
+  learns `tainted` (the taint) and its continuation goes generic.  The
+  disjunct is decided by the INVARIANT, not the holder (a proven process holds
+  nothing about the taint).  In the tainted regime anyone holding `tainted`
+  borrows `T` at an existential state and returns it at any state -- the
+  generic slot's syscall payment; the lease holder's half is then inert.
+  The taint's MINTER (the UART rx wand's off-discipline branch, which today
+  produces `echo_tag`'s right arm) consumes `untainted_tok` and produces
+  `tainted` at the first bad byte; the one-shot lives in the ledger's slot
+  beside the application's ghosts.  Every token a verified process spends is
+  held this way (the reader token first), because any of them may have to
+  become ownership in the existentially-quantified arbitrary-state invariant
+  the generic tainted slot needs for arbitrary syscalls.
+  THE TOKEN CROSSES THE ECALL THROUGH A FUPD: the read leaf's deposit hands
+  the kernel `|={E}=> cons_reader n ∗ (cons_reader (n+dc) ={E}=∗ …)`-shaped
+  access (the mask admits the lease's invariant), so ONE leaf serves a lease
+  holder (first disjunct: the receipt at its own position, contiguous bytes,
+  tags) and a tainted process (second disjunct: the token at some position,
+  the window existential) -- and `fsabs_fileread_in`'s console case is the
+  second-disjunct instance, at `xv6_ssupply := app_sup ∗ tainted`.
+  Layers: KERNEL unchanged beyond the arm; APPLICATION `reader_lease n :=
+  lease cons_reader n`, born at boot beside the ring (the boot bundle delivers
+  it to init), lent at init's fork (`Q xs := reader_lease _ ∨ …` -- decide the
+  exact shape in SH-LINE), held by sh across `gets`, paid back at exit and
+  kill, recovered by init at wait.  SH-LINE also switches init to the TRACKED
+  open/dup leaves so sh's fd 0 is `FdDevice CONSOLE` in the descriptor ghost.
 
 #### THE REMAINING ARC TO `xv6_app_adequacy` FOR ECHO — DESIGN (2026-09-11, coordinator, from a read-only survey of the tree)
 
