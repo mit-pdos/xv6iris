@@ -24,24 +24,18 @@
 (* application speaks about with the map the kernel lends at the fire.    *)
 (*                                                                       *)
 (* THE THREE PIECES, one per conjunct of                                  *)
-(* [SpecSysExec.sys_exec_au_pre]:                                         *)
+(* [SpecSysExec.sys_exec_au_pre], and TWO OF THEM ARE NOT EXEC'S.  The    *)
+(* cursor ([PinnedObs.pobs_P] / [pobs_Pmiss]) and the observation         *)
+(* ([PinnedObs.pobs_Fo], fired by [pobs_aopen]) say nothing about which   *)
+(* syscall is walking, so they are stated once in [PinnedObs.v] -- with   *)
+(* the walk [pobs_walk] and the step [pobs_node] that reads the observed  *)
+(* node off the terminal cursor and the receipt.  This file is exec's own *)
+(* third piece and the assembly:                                          *)
 (*                                                                       *)
-(*  THE CURSOR [pex_P] / [pex_Pmiss]: the walk's inum at hop [k] is the   *)
-(*  pinned run's, or the taint.  Each hop opens [app_inv] inside its own  *)
-(*  [={⊤}=∗], reads the claim, and reads the LENT entry map against the   *)
-(*  invariant's authority ([pex_elend_aents]) -- [FsAbs.apn_hop_rd]'s     *)
-(*  reasoning with the pin coming from the invariant rather than from     *)
-(*  held shares.  A miss is the taint: at a pinned path there is none,    *)
-(*  and the arm is unreachable rather than false.                         *)
-(*                                                                       *)
-(*  THE OBSERVATION [pex_Fo]: [FsAbsInvFire.fsabs_aopen]'s mold with the  *)
-(*  receipt enriched by the claim -- the row the kernel observed, beside  *)
-(*  "the pins hold of the very view it observed it in, or the taint".     *)
-(*                                                                       *)
-(*  THE SLOT PIECE [pex_slot]: arm (a) reads the cursor at the walk's     *)
-(*  terminal hop together with the receipt, so the observed node IS the   *)
-(*  pinned file and the caller's constructor answers from                 *)
-(*  [kexec_image_ok]; arm (b) is REFUTED by the same pair, since a pinned *)
+(*  THE SLOT PIECE [pex_slot]: arm (a) reads [PinnedObs.pobs_node] at the *)
+(*  walk's terminal hop together with the receipt, so the observed node   *)
+(*  IS the pinned file and the caller's constructor answers from          *)
+(*  [kexec_image_ok]; arm (b) is REFUTED by the same step, since a pinned *)
 (*  file is loadable.  Either arm at the taint goes to the generic slot.  *)
 (*                                                                       *)
 (* THE REFUND is the payload [Pay].  exec can fail -- the file is there   *)
@@ -102,6 +96,9 @@ Require Import PieceFam.        (* [pfam] / [pf_at] *)
 Require Import FsAbsEra.        (* [ex_start], [ex_hop], [elend], [um_start_of] *)
 Require Import FsAbsDefs.       (* [arun], [arow_at], [aents], [astep], [abs_view] *)
 Require Import FsAbs.           (* [astate_q_intro] (FsAbs's own rule: LAST) *)
+Require Import PinnedObs.       (* the pinned observation family, factored:
+                                   [pin_resolves_at], [pobs_P]/[pobs_Pmiss],
+                                   [pobs_recv]/[pobs_Fo], [pinned_obs] *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -110,8 +107,8 @@ Local Open Scope Z_scope.
 (*  1.  THE PIN, AS THE PURE INPUT                                        *)
 (* ===================================================================== *)
 
-(* What the three pieces read off the application's claim, and nothing
-   else: the walk's START inum is the run's head (the C3 start rule at
+(* [PinnedObs.pin_resolves_at] AT A FILE NODE, which is the only shape exec
+   can use: the walk's START inum is the run's head (the C3 start rule at
    this path -- absolute paths ignore [cw], relative ones take it), the
    run's LAST inum is [ino], and at every view the claim admits the run
    is a run and [ino] holds the file [f] at nlink [nl].
@@ -122,12 +119,7 @@ Local Open Scope Z_scope.
    the [forall v] arm, at [hops := [ROOTINO; SH_INO]]). *)
 Definition pin_resolves (Pin : aview -> Prop) (cw : Z) (pl : list (bv 8))
     (hops : list Z) (ino : Z) (f : elf_bytes) (nl : nat) : Prop :=
-  um_start_of cw pl = hops !!! 0%nat
-  /\ hops !!! (length (path_elems pl)) = ino
-  /\ (forall v : aview,
-        Pin v ->
-        arun v (hops !!! 0%nat) (path_elems pl) hops
-        /\ v !! ino = Some (MkAnode (AFile f) nl)).
+  pin_resolves_at Pin cw pl hops ino (MkAnode (AFile f) nl).
 
 Section PinnedExec.
   (* [SpecSysExec.SysExecAU]'s ghost list verbatim.  NO [CpuId] and NO
@@ -140,193 +132,17 @@ Section PinnedExec.
   Context `{GEN : GenId}.
 
   (* ------------------------------------------------------------------ *)
-  (*  2.  THE THREE FAMILIES                                             *)
+  (*  2-5.  THE WALK, THE OBSERVATION AND THE NODE: [PinnedObs]           *)
+  (*                                                                      *)
+  (*  The cursor family [PinnedObs.pobs_P] / [pobs_Pmiss], the observation *)
+  (*  [pobs_Fo] and its fire [pobs_aopen], the per-hop step [pobs_hop] and *)
+  (*  the walk [pobs_walk], and the identification [pobs_node] are stated  *)
+  (*  ONCE THERE, over any syscall whose bundle is "walk a path, observe   *)
+  (*  the node" -- they were written here first and say nothing about      *)
+  (*  exec.  What is left in this file is exec's OWN piece: the two slot   *)
+  (*  wands below, and the bundle that assembles them with the general     *)
+  (*  lemma.                                                              *)
   (* ------------------------------------------------------------------ *)
-
-  (* THE CURSOR: at hop [k] the walk stands on the pinned run's inum, or
-     the application is already tainted. *)
-  (* SPELLED AT ALL FOUR ARGUMENTS, not as a two-argument lambda: every
-     consumer meets it applied, and [rewrite /pex_P] then reduces without a
-     beta step (a [/=] here would be [simpl] on a syscall-altitude goal). *)
-  Definition pex_P (T : iProp Σ) (hops : list Z) (k : nat) (d : Z) : iProp Σ :=
-    (⌜d = hops !!! k⌝ ∨ T)%I.
-
-  (* ...and a MISS is the taint outright: at a pinned path the entry is
-     there, so this arm is only ever reached under [T]. *)
-  Definition pex_Pmiss (T : iProp Σ) (k : nat) (d : Z) : iProp Σ := T.
-
-  (* THE OBSERVATION'S RECEIPT: the row the kernel observed, plus the pin
-     AT THE VIEW IT OBSERVED IT IN.  Without the second conjunct the row
-     names an arbitrary [aview] and the slot piece cannot identify the
-     file. *)
-  Definition pex_recv (Pin : aview -> Prop) (T : iProp Σ)
-      (v : aview) (i : Z) (a : anode) : iProp Σ :=
-    (⌜arow_at v i a⌝ ∗ (⌜Pin v⌝ ∨ T))%I.
-
-  (* the piece's pair: the receipt above beside the TRIVIAL refund -- the
-     observation is a read, and reading the invariant spends nothing *)
-  Definition pex_Fo (Pin : aview -> Prop) (T : iProp Σ)
-      : pfam Σ (aview -> Z -> anode -> iProp Σ) :=
-    pfam_triv (pex_recv Pin T).
-
-  Global Instance pex_P_persistent (T : iProp Σ) (hops : list Z) k d :
-    Persistent T -> Persistent (pex_P T hops k d).
-  Proof. intros. rewrite /pex_P. apply _. Qed.
-
-  Global Instance pex_recv_persistent (Pin : aview -> Prop) (T : iProp Σ)
-      v i a :
-    Persistent T -> Persistent (pex_recv Pin T v i a).
-  Proof. intros. rewrite /pex_recv. apply _. Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (*  3.  READING THE LENT ENTRY MAP AGAINST THE INVARIANT'S AUTHORITY    *)
-  (* ------------------------------------------------------------------ *)
-
-  (* [FsAbsEra.elend_aents] with the reading taken straight off the
-     [ghost_map_auth] rather than off an [astate] the caller holds: the
-     application's invariant owns half the authority, and half is all an
-     agreement needs.  This is the step [FsAbsEra.elend_astate_q]'s note
-     calls "a consumer that opens ftopN INSIDE the hop's fupd" -- here the
-     half comes out of [appN] instead. *)
-  Lemma pex_elend_aents (γfs : fs_names) (q : Qp) (I : gmap Z fs_node)
-      (d : Z) (dq : dfrac) (ents : gmap fname Z) :
-    ghost_map_auth (fs_top γfs) q I -∗
-    elend (fs_gamma_L γfs) d dq ents -∗
-    ⌜aents (abs_view I) d = Some ents⌝.
-  Proof.
-    iIntros "Hh HF".
-    iDestruct (astate_q_intro (fs_gamma_L γfs) q I with "Hh") as "Hst".
-    iApply (elend_aents (fs_gamma_L γfs) (abs_view I) d dq ents with "[Hst] HF").
-    iApply astate_of_q. iExact "Hst".
-  Qed.
-
-  (* ...and the same reading at the STEP, which is the form the run's own
-     [FsAbsDefs.arun_step_tot] is stated in.  The last line is
-     [reflexivity]: [astep] IS the bind, and the lend has just named what
-     it binds. *)
-  Lemma pex_elend_astep (γfs : fs_names) (q : Qp) (I : gmap Z fs_node)
-      (d : Z) (dq : dfrac) (ents : gmap fname Z) (s : fname) :
-    ghost_map_auth (fs_top γfs) q I -∗
-    elend (fs_gamma_L γfs) d dq ents -∗
-    ⌜astep (abs_view I) d s = ents !! s⌝.
-  Proof.
-    iIntros "Hh HF".
-    iDestruct (pex_elend_aents γfs q I d dq ents with "Hh HF") as %Hae.
-    iPureIntro. rewrite /astep Hae. reflexivity.
-  Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (*  4.  THE OBSERVATION                                                 *)
-  (* ------------------------------------------------------------------ *)
-
-  (* THE FIRE, and the mask discipline is the whole content: the commit is
-     owed at [appE] = [↑appN], so the caller's fupd may open [appN] and
-     must close it before it returns.  Inside, the kernel's lent half and
-     the invariant's half AGREE on the map ([ghost_map_auth_agree]), which
-     is what makes the claim -- stated about [abs_view I'] for the
-     invariant's own [I'] -- a claim about the very view the receipt
-     names.  The claim law is DUPLICATING because the body has to be
-     closed with it still there; its output is Timeless, so the later off
-     [app_body] strips inside the same fupd. *)
-  Lemma pex_aopen (γfs : fs_names) (Pin : aview -> Prop) (T : iProp Σ)
-      `{!Persistent T} `{!Timeless T} :
-    □ (∀ v : aview, app_pred app_run v -∗
-                      app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
-    app_inv γfs -∗
-    pf_at (aopen_commit_at (fs_gamma_L γfs) appE) (pex_Fo Pin T).
-  Proof.
-    iIntros "#Hcl #Hinv". rewrite /pex_Fo. iApply pf_at_triv.
-    rewrite /aopen_commit_at /pex_recv. iIntros (I i a) "%Hrow Hka".
-    iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
-    iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp]" as "Hpc".
-    { iNext. iApply ("Hcl" with "Hp"). }
-    iDestruct "Hpc" as "[Hp Hc]".
-    iMod "Hc".
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
-      iPureIntro. exact Hdom. }
-    iModIntro. iFrame "Hka".
-    iSplitR; [ by iPureIntro | ]. iExact "Hc".
-  Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (*  5.  THE CURSOR                                                      *)
-  (* ------------------------------------------------------------------ *)
-
-  (* ONE HOP.  The pinned arm opens [appN] inside the hop's own fupd,
-     reads the claim, reads the lent entry map against the invariant's
-     authority, and steps the run: [arun]'s step at hop [k] is an [astep],
-     which is a bind through [anode_ents], so the lent map IS the pinned
-     directory's and the entry is the run's next inum.  The tainted arm
-     answers both branches with [T] and opens nothing. *)
-  Lemma pex_hop (γfs : fs_names) (Pin : aview -> Prop) (T : iProp Σ)
-      `{!Persistent T} `{!Timeless T}
-      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
-      (f : elf_bytes) (nl : nat) (k : nat) (s : fname) :
-    pin_resolves Pin cw pl hops ino f nl ->
-    path_elems pl !! k = Some s ->
-    □ (∀ v : aview, app_pred app_run v -∗
-                      app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
-    app_inv γfs -∗
-    ex_hop γfs (pex_P T hops) (pex_Pmiss T) k s.
-  Proof.
-    intros (_ & _ & Hpin) Hk. iIntros "#Hcl #Hinv".
-    rewrite /ex_hop /ax_hop /pex_P /pex_Pmiss.
-    iIntros (d ents dqv) "HP HF".
-    iDestruct "HP" as "[%Hd | #HT]"; last first.
-    { (* tainted: both branches are the taint *)
-      iModIntro. iFrame "HF".
-      destruct (ents !! s) as [c |]; [ by iRight | iExact "HT" ]. }
-    subst d.
-    iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom & #Hx)".
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp]" as "Hpc".
-    { iNext. iApply ("Hcl" with "Hp"). }
-    iDestruct "Hpc" as "[Hp Hc]".
-    iMod "Hc".
-    iDestruct (pex_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
-                 with "Hh HF") as %Hae.
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
-      iPureIntro. exact Hdom. }
-    iModIntro. iFrame "HF".
-    iDestruct "Hc" as "[%HP | #HT]"; last first.
-    { destruct (ents !! s) as [c |]; [ by iRight | iExact "HT" ]. }
-    destruct (Hpin (abs_view I) HP) as [Hrun _].
-    pose proof (arun_step_tot (abs_view I) (hops !!! 0%nat) (path_elems pl)
-                  hops k s Hrun Hk) as Hst.
-    rewrite Hae in Hst. rewrite Hst. by iLeft.
-  Qed.
-
-  (* THE WHOLE WALK, at the ONE path the pin is about.  The start rule's
-     answer is the run's head, which is [pin_resolves]'s first conjunct;
-     everything after it is [pex_hop] under the big-op. *)
-  Lemma pex_walk (γfs : fs_names) (Pin : aview -> Prop) (T : iProp Σ)
-      `{!Persistent T} `{!Timeless T}
-      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
-      (f : elf_bytes) (nl : nat) :
-    pin_resolves Pin cw pl hops ino f nl ->
-    □ (∀ v : aview, app_pred app_run v -∗
-                      app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
-    app_inv γfs -∗
-    ex_start γfs cw (pex_P T hops) (pex_Pmiss T) pl.
-  Proof.
-    intros Hres. iIntros "#Hcl #Hinv".
-    pose proof Hres as Hres'. destruct Hres' as (Hstart & _ & _).
-    rewrite /ex_start. iIntros (r Hr). iModIntro. iSplitR.
-    { rewrite /pex_P. iLeft. iPureIntro. by rewrite Hr Hstart. }
-    rewrite /ex_hops_from /ax_hops_from.
-    iApply big_sepL_intro. iIntros "!>" (j s Hj).
-    rewrite lookup_drop in Hj.
-    iApply (pex_hop γfs Pin T cw pl hops ino f nl (0 + j)%nat s Hres Hj
-              with "Hcl Hinv").
-  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  6.  THE SLOT PIECE                                                  *)
@@ -384,43 +200,30 @@ Section PinnedExec.
        key's payload give a slot at this key". *)
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ X W') -∗
     Pay -∗
-    pf_at (fun S => sys_exec_slot_pre S Q (pex_P T hops) (pex_recv Pin T)
+    pf_at (fun S => sys_exec_slot_pre S Q (pobs_P T hops) (pobs_recv Pin T)
                       M pv av sts) (MkPfam X Pay).
   Proof.
     intros Hres Hload Hpath. iIntros "#Hcon #Hgen HPay".
-    destruct Hres as (_ & Hfin & Hpin).
     rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [ | iExact "HPay" ].
     rewrite /sys_exec_slot_pre. iIntros (pl' na alen afun) "%Hpath' %Hargs".
     rewrite (exec_path_of_uniq M pv pl' pl Hpath' Hpath).
-    rewrite /exec_slot_pre /pex_P /pex_recv. iSplitL "HPay".
+    rewrite /exec_slot_pre. iSplitL "HPay".
     - (* ---- ARM (a): the observed node IS the pinned file ---- *)
-      iIntros (av' i f' nl' W') "HP [%Hrow Hc] %Hload' %Hok #Hp HQ".
-      iDestruct "HP" as "[%Hi | #HT]"; last first.
+      iIntros (av' i f' nl' W') "HP Hrecv %Hload' %Hok #Hp HQ".
+      iDestruct (pobs_node Pin T cw pl hops ino (MkAnode (AFile f) nl)
+                   av' i (MkAnode (AFile f') nl') Hres with "HP Hrecv")
+        as "[%Hid | #HT]"; last first.
       { iApply ("Hgen" with "HT Hp HQ"). }
-      iDestruct "Hc" as "[%HP | #HT]"; last first.
-      { iApply ("Hgen" with "HT Hp HQ"). }
-      destruct (Hpin av' HP) as [_ Hrowpin].
-      rewrite Hfin in Hi. subst i.
-      destruct (decide (nl' = 0%nat)) as [Hz | Hnz].
-      { exfalso. rewrite (arow_at_gone av' ino _ Hrow Hz) in Hrowpin.
-        discriminate Hrowpin. }
-      rewrite (arow_at_live av' ino _ Hrow Hnz) in Hrowpin.
-      simplify_eq.
+      destruct Hid as [_ Hnode]. injection Hnode; intros Hnl Hf; subst.
       iApply ("Hcon" $! na alen afun W' with "[%] [%] Hp HQ HPay");
         [ exact Hok | exact Hargs ].
     - (* ---- ARM (b): a pinned file IS loadable, so this arm is dead ---- *)
-      iIntros (av' i a W') "HP [%Hrow Hc] %Hnload %Hkey #Hp HQ".
-      iDestruct "HP" as "[%Hi | #HT]"; last first.
+      iIntros (av' i a W') "HP Hrecv %Hnload %Hkey #Hp HQ".
+      iDestruct (pobs_node Pin T cw pl hops ino (MkAnode (AFile f) nl)
+                   av' i a Hres with "HP Hrecv")
+        as "[%Hid | #HT]"; last first.
       { iApply ("Hgen" with "HT Hp HQ"). }
-      iDestruct "Hc" as "[%HP | #HT]"; last first.
-      { iApply ("Hgen" with "HT Hp HQ"). }
-      destruct (Hpin av' HP) as [_ Hrowpin].
-      rewrite Hfin in Hi. subst i.
-      destruct (decide (an_nlink a = 0%nat)) as [Hz | Hnz].
-      { exfalso. rewrite (arow_at_gone av' ino a Hrow Hz) in Hrowpin.
-        discriminate Hrowpin. }
-      rewrite (arow_at_live av' ino a Hrow Hnz) in Hrowpin.
-      simplify_eq.
+      destruct Hid as [_ ->].
       exfalso. apply Hnload. exists f, nl.
       split; [ reflexivity | exact Hload ].
   Qed.
@@ -454,17 +257,18 @@ Section PinnedExec.
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ X W') -∗
     Pay -∗
     sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw Q
-      (pex_P T hops) (pex_Pmiss T) (pex_Fo Pin T) M pv av sts.
+      (pobs_P T hops) (pobs_Pmiss T) (pobs_Fo Pin T) M pv av sts.
   Proof.
     intros Hres Hload Hpath.
     iIntros "#Hcl #Hinv #Hcon #Hgen HPay".
     rewrite /sys_exec_au_pre. iSplitR.
     { iIntros (pl') "%Hpath'".
       rewrite (exec_path_of_uniq M pv pl' pl Hpath' Hpath).
-      iApply (pex_walk γfs Pin T cw pl hops ino f nl Hres with "Hcl Hinv"). }
+      iApply (pobs_walk γfs Pin T cw pl hops ino (MkAnode (AFile f) nl)
+                Hres with "Hcl Hinv"). }
     iSplitR.
-    { iApply (pex_aopen γfs Pin T with "Hcl Hinv"). }
-    rewrite /pex_Fo /pfam_triv. cbn [pf_recv].
+    { iApply (pobs_aopen γfs Pin T with "Hcl Hinv"). }
+    rewrite /pobs_Fo /pfam_triv. cbn [pf_recv].
     iApply (pex_slot γfs X Pin T cw pl hops ino f nl Pay Q M pv av sts
               Hres Hload Hpath with "Hcon Hgen HPay").
   Qed.
@@ -496,7 +300,7 @@ Section PinnedExec.
         M pv av sts.
   Proof.
     intros Hres Hload Hpath. iIntros "#Hcl #Hinv #Hcon #Hgen HPay".
-    iExists (pex_P T hops), (pex_Pmiss T), (pex_Fo Pin T), Pay.
+    iExists (pobs_P T hops), (pobs_Pmiss T), (pobs_Fo Pin T), Pay.
     iApply (pinned_exec_bundle_at γfs X Pin T cw pl hops ino f nl Pay Q
               M pv av sts Hres Hload Hpath with "Hcl Hinv Hcon Hgen HPay").
   Qed.

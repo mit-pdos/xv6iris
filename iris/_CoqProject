@@ -1638,6 +1638,13 @@ KexecImageAlg.v
 ElfLoadable.v
 KexecBridge.v
 SpecSysExec.v
+# PinnedObs = THE PINNED OBSERVATION FAMILY, once and syscall-agnostically:
+# the walk cursor, the terminal observation and the step that identifies the
+# observed node, all read off the application's claim law by opening
+# AppInv.app_inv inside each fire.  Every "walk a path, observe the node"
+# bundle is this lemma plus that syscall's own piece; PinnedExec is the
+# first instance.
+PinnedObs.v
 # PinnedExec = a verified program's OWN exec deposit, from a PIN on the
 # abstract view: the walk cursor and the terminal observation read the
 # application's claim by opening AppInv.app_inv inside each fire, and the
