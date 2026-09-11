@@ -2358,13 +2358,18 @@ and 17 of `xv6_sbundle`/`xv6_spost` stated at the argument's path; the walk
 piece at THAT path). A kernel lane (`brief-path-args.md`).  chdir/unlink stay
 `∀ pl` until a consumer needs them.
 FACT 3: init's open can FAIL for reasons unrelated to the pin (`filealloc`/
-`fdalloc` exhaustion).  RULED BY THE OWNER (2026-09-11): that arm is
-ACCEPTABLE -- if init cannot start sh, sh never prints "$ ", the disciplined
-user never types, and the trace theorem holds (vacuously on that run).  So
-init's proof on the failure arm owes only SAFETY: it continues on the generic
-slot (the generic family at every key, no console ledger, no pinned exec of
-sh), and `good_out` is a prefix property that an empty output satisfies.  No
-room premise, no attempt to prove the open cannot fail.
+`fdalloc` exhaustion).  RULED BY THE OWNER (2026-09-11, correcting a first
+"safety-only" ruling): init REALLY MUST START SH -- a generic-safety
+continuation may write anything to the console, so `good_out` would not
+follow; sh's proof is what says what reaches stdout.  So the second open is
+PROVED TO SUCCEED at init: `fdalloc` cannot fail (init's ledger is all-closed,
+`fd_lowest_closed fdt0 = Some 0`) and `filealloc` cannot fail at boot -- find
+the resource that says so (a free-file-struct allowance on the mold of
+`fd_slots`/`iref_slots`/`bslots`, owned by the dormant slot and carried by the
+process; `FileInv.ftable_res` has NFILE slots); if the tree has none for file
+structs, ADD it (a small kernel lane: `filealloc`'s contract takes a unit and
+its failure arm is refuted by it; the units are born at boot in the ftable
+mint and threaded like the other allowances) rather than stating a premise.
 ORDER: PATH-ARGS (kernel) → OPEN-PIN resumed (application: the two-state claim,
 `cons_made`, init's mknod step, the pinned second open on `PinnedObs`, the
 receipt-keeping open leaf, init's named ledger + tracked dups) → SH-LINE phase 2
