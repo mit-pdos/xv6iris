@@ -490,11 +490,14 @@ Definition wp_forkret_gen_body
         (* ...AND THE INCARNATION'S PAIR, at the trivial payload: <init> has
            no parent to owe, and the pair joins the block at the same seam
            the working directory and the token do
-           ([ProcInv.proc_priv_split_cwd] is four-way).  The boot arm hands
+           ([ProcInv.proc_priv_split_cwd] is six-way).  The boot arm hands
            the persistent half to kexec("/init") for the exec'd image's slot
            ([SpecKexec.exec_slot_pre]). *)
         ∗ ChildTok.gen_kq (pv_gen (us_V U)) p pid (fun _ => True)%I
         ∗ ChildTok.my_pay (pv_gen (us_V U)) (fun _ => True)%I
+        (* ...and the two quarters, on the pair's footing
+           ([SlotGen.gen_halves_priv]) *)
+        ∗ gen_halves_priv p pid (pv_gen (us_V U))
         ∗ (∃ xsv : mword 32, p_xstate p ↦₄{DfracOwn (1/2)} xsv)) -∗
   W -∗
   (* ---- THE STEADY PARK'S EVIDENCE THAT THE BOOT ARM IS DEAD, and nothing

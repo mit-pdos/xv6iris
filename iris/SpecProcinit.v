@@ -189,7 +189,7 @@ Section ProcinitSeals.
      -- there is no gap between what procinit hands back and what the proc
      lock has to protect.  Stated and checked here because an unproven
      contract is otherwise only as good as my reading of SchedCtx. *)
-  Lemma proc_ready_lock_res (γl : gname) (i : nat) (ch : mword 64) (γ0 : gname) :
+  Lemma proc_ready_lock_res (γl : gname) (i : nat) (ch : mword 64) (γ0 g : gname) :
     proc_ready i -∗
     p_chan (proc_addr i) ↦₈ ch -∗
     proc_pub (proc_addr i) -∗
@@ -206,17 +206,20 @@ Section ProcinitSeals.
        so the row boot minted joins the block at the same step the stack
        does ([ProcInv.proc_dormant_prestk_seal]). *)
     ch_frag γ0 (proc_addr i) ∅ -∗
+    (* ...AND THE SLOT'S GENERATION WHOLE, on the row's route
+       ([SlotGen.slot_gen], minted with the rows) *)
+    slot_gen (proc_addr i) (DfracOwn 1) g -∗
     lk_fresh (proc_addr i) "proc"%string ∗
     p_kstack (proc_addr i) ↦₈ kstack_va i ∗
     proc_lock_res γs γl (proc_addr i).
   Proof.
-    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hkst Hrow".
+    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hkst Hrow Hsg".
     iFrame "Hlk Hks".
     rewrite /proc_lock_res /proc_lock_res_at.
     iExists UNUSED, ch. iFrame "Hst Hg Hch Hpub".
     change (proc_slots_at γs cur_ctx (proc_addr i) UNUSED) with (proc_slots γs (proc_addr i) UNUSED).
-    iApply (proc_slots_unused_intro with "[Hdorm Hkst Hrow] Hpark").
-    iApply (proc_dormant_prestk_seal with "Hdorm Hkst Hrow").
+    iApply (proc_slots_unused_intro with "[Hdorm Hkst Hrow Hsg] Hpark").
+    iApply (proc_dormant_prestk_seal with "Hdorm Hkst Hrow Hsg").
   Qed.
 
 End ProcinitSeals.
@@ -267,7 +270,10 @@ Section ProcinitProcsInv.
         its reason: procinit cannot make one (the authority is
         <wait_lock>'s), so boot's row travels here and pass 3 seals it into
         the dormant block ([ProcInv.proc_dormant_prestk_seal]). *)
-     (∃ γ0 : gname, ch_frag γ0 (proc_addr i) ∅) ∗
+     (* ...AND THE SLOT'S GENERATION WHOLE, on the row's own route and for
+        its reason ([SlotGen.slot_gen], minted with the rows). *)
+     (∃ γ0 g : gname,
+        ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g) ∗
      hart_at_any (proc_addr i) ∗
      pstate_lock (proc_addr i) UNUSED ∗
      (* the slot's kernel stack, still spelled at [kstack_va i] because
@@ -275,17 +281,18 @@ Section ProcinitProcsInv.
         two become [kstack_free]. *)
      stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV)%I.
 
-  Lemma proc_ready_split (i : nat) (ch : mword 64) (γ0 : gname) :
+  Lemma proc_ready_split (i : nat) (ch : mword 64) (γ0 g : gname) :
     proc_ready i -∗ p_chan (proc_addr i) ↦₈ ch -∗ proc_pub (proc_addr i) -∗
     hart_at_any (proc_addr i) -∗ pstate_lock (proc_addr i) UNUSED -∗
     stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV -∗
-    ch_frag γ0 (proc_addr i) ∅ -∗
+    ch_frag γ0 (proc_addr i) ∅ -∗ slot_gen (proc_addr i) (DfracOwn 1) g -∗
     lk_fresh (proc_addr i) "proc"%string ∗ proc_res i.
   Proof.
     rewrite /proc_ready /proc_res.
-    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hstk Hrow".
+    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hstk Hrow Hsg".
     iFrame "Hks Hst Hpub Hdorm Hpark Hg Hstk".
-    iSplitR "Hrow"; [iExists ch; iExact "Hch" | iExists γ0; iExact "Hrow"].
+    iSplitR "Hrow Hsg"; [iExists ch; iExact "Hch" |].
+    iExists γ0, g. iFrame "Hrow Hsg".
   Qed.
 
   (* PASS ONE, generic: pick [n] lock ghost names, each with the wand that
@@ -344,7 +351,9 @@ Section ProcinitProcsInv.
        ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
          proc_pub (proc_addr i)) ∗ hart_full i (0%fin : CPU)) ∗
        pstate_full i UNUSED) -∗
-    ([∗ list] i ∈ seq 0 NPROC, ∃ γ0 : gname, ch_frag γ0 (proc_addr i) ∅) -∗
+    ([∗ list] i ∈ seq 0 NPROC,
+       ∃ γ0 g : gname,
+         ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g) -∗
     kstack_bank -∗
     own_context cur_ctx
     ={E}=∗ own_context cur_ctx ∗ ∃ γs : list gname, procs_inv γs.
@@ -361,13 +370,15 @@ Section ProcinitProcsInv.
                                  proc_pub (proc_addr i)) ∗ hart_full i (0%fin : CPU)) ∗
                                pstate_full i UNUSED) ∗
                               stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV) ∗
-                              (∃ γ0 : gname, ch_frag γ0 (proc_addr i) ∅))%I)
+                              (∃ γ0 g : gname,
+                                 ch_frag γ0 (proc_addr i) ∅ ∗
+                                 slot_gen (proc_addr i) (DfracOwn 1) g))%I)
                  (fun _ i => (lk_fresh (proc_addr i) "proc"%string ∗ proc_res i)%I)
                  (seq 0 NPROC) with "Hin []") as "Hin".
-    { iIntros "!>" (k i Hk) "[[(((Hrdy & Hch & Hpub) & Hpark) & Hg) Hstk] (%γ0 & Hrow)]".
+    { iIntros "!>" (k i Hk) "[[(((Hrdy & Hch & Hpub) & Hpark) & Hg) Hstk] (%γ0 & %g & Hrow & Hsg)]".
       apply lookup_seq in Hk. destruct Hk as [-> Hlt].
       iDestruct "Hch" as (ch) "Hch".
-      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg] Hstk Hrow").
+      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg] Hstk Hrow Hsg").
       { iApply (hart_at_any_intro k (0%fin : CPU) Hlt with "Hpark"). }
       (* UNUSED is [unclaimed], so the whole variable is the lock's share *)
       rewrite /pstate_lock unclaimed_UNUSED.
@@ -392,7 +403,7 @@ Section ProcinitProcsInv.
                   (proc_lock_pay γs g (proc_addr i)) ∗
                 ∃ ks : mword 64, is_kstack (proc_addr i) ks))%I as "Hstep".
     { iApply big_sepL_intro.
-      iIntros "!>" (i g _) "Hrun [Hmk (Hks & Hst & Hch & Hpub & Hdorm & (%γ0 & Hrow) & Hpark & Hg & Hstk)]".
+      iIntros "!>" (i g _) "Hrun [Hmk (Hks & Hst & Hch & Hpub & Hdorm & (%γ0 & %gg & Hrow & Hsg) & Hpark & Hg & Hstk)]".
       iMod (ctx_word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
       (* THE DEPOSIT: the persisted cell is [is_kstack], and with the words
@@ -401,12 +412,12 @@ Section ProcinitProcsInv.
       { iApply (kstack_free_intro (proc_addr i) (kstack_va i)
                   with "[] Hstk"). iExact "Hksp". }
       iMod ("Hmk" $! ((proc_lock_pay γs g (proc_addr i)))
-              with "[%] Hrun [Hst Hg Hch Hpub Hdorm Hrow Hpark Hkst]") as "[Hrun #Hlk]".
+              with "[%] Hrun [Hst Hg Hch Hpub Hdorm Hrow Hsg Hpark Hkst]") as "[Hrun #Hlk]".
       { apply _. }
       { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch
-                  with "Hst Hg Hch Hpub [Hdorm Hrow Hpark Hkst]").
-        iApply (proc_slots_unused_intro with "[Hdorm Hrow Hkst] Hpark").
-        iApply (proc_dormant_prestk_seal with "Hdorm Hkst Hrow"). }
+                  with "Hst Hg Hch Hpub [Hdorm Hrow Hsg Hpark Hkst]").
+        iApply (proc_slots_unused_intro with "[Hdorm Hrow Hsg Hkst] Hpark").
+        iApply (proc_dormant_prestk_seal with "Hdorm Hkst Hrow Hsg"). }
       iModIntro. iFrame "Hrun Hlk". iExists (kstack_va i). iExact "Hksp". }
     iMod (big_sepL_fupd_thread E (own_context cur_ctx)
             with "Hrun Hstep Hmk") as "[Hrun Hmk]".

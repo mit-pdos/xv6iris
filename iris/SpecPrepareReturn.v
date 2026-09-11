@@ -203,7 +203,7 @@ Proof.
 Qed.
 
 Definition wp_prepare_return_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname) (ks : mword 64) (pid : mword 32) (U : ustate)
     (m : regfile) (av : nat) (p : mword 64)
     (epc : mword 64) (b : bool) (lks : gset string) :=
@@ -292,7 +292,7 @@ Definition wp_prepare_return_sconf_body
 
 Module Type PREPARE_RETURN.
   Parameter wp_prepare_return_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname) (ks : mword 64) (pid : mword 32) (U : ustate)
       (m : regfile) (av : nat) (p : mword 64)
       (epc : mword 64) (b : bool) (lks : gset string),

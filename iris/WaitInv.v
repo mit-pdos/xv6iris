@@ -88,6 +88,11 @@ Require Import ChildTok.
    the reason the bundle's own header gives: a class that carries a gname
    is not a member of it. *)
 Require Import Xv6Cameras.
+(* [SlotGen.slot_gen] / [pid_reg] -- the two halves the payload's
+   [gen_halves] holds, on the same canonical class.  EXPORTED, because
+   [ProcDefs.proc_dormant] (which requires this file) carries a pair of
+   them and every file that opens a dormant block needs the vocabulary. *)
+Require Export SlotGen.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -191,9 +196,106 @@ Section WaitInv.
   Global Instance parents_own_at_morph ps : CtxMorph (λ ξ, parents_own_at ξ ps).
   Proof. rewrite /parents_own_at. ctx_morph_solve. Qed.
 
-  (* the parent cells' own existential closure -- what the BOOT CARVE
-     produces, before there is a children ghost to pair it with. *)
-  Definition parents_res_at (ξ : CtxId) : iProp Σ := (∃ ps, parents_own_at ξ ps)%I.
+  (* ------------------------------------------------------------------ *)
+  (* THE GENERATION SHARES THE PAYLOAD HOLDS, one per OCCUPIED parent     *)
+  (* cell.                                                               *)
+  (*                                                                      *)
+  (* A nonzero cell [ps !! k] means slot [k] holds a live child of the
+     process at that address, and what the forking parent deposited here
+     when it wrote the cell is THREE QUARTERS of each of that child's two
+     exclusive ghosts ([SlotGen]): of -- slot [k]'s current generation is
+     γ -- and of -- pid is registered to γ.  The reaper reunites them with
+     the quarters the ZOMBIE block carries ([ProcDefs.proc_dormant]) and
+     hands the wholes to freeproc.
+       THE CELL IS ZEROED AT THE REAP, and that is what the [v = 0] keying
+     stands on: kwait does [pp->parent = 0] before it calls freeproc
+     (kernel/proc.c), so the entry leaves the payload at the same step the
+     slot stops being anybody's child.                                    *)
+  (*                                                                      *)
+  (* THE TWO PERSISTENT READINGS RIDE BESIDE THEM, because they cost      *)
+  (* nothing and are what make the halves speak: [gen_slot] pins the      *)
+  (* entry to slot [k] and [gen_pid] names the generation's pid, so a     *)
+  (* reaper comparing pids is comparing generations.                      *)
+  (*                                                                      *)
+  (* WITHOUT THE PURE TIE to the children map: that an entry's generation *)
+  (* is in the row of the process the cell names is the invariant         *)
+  (* [children_inv] states and the payload does not carry yet (lane       *)
+  (* WX-INV).  This is its RESOURCE half, and it is carried.              *)
+  (* ------------------------------------------------------------------ *)
+  Definition gen_halves (ps : list (mword 64)) : iProp Σ :=
+    ([∗ list] k ↦ v ∈ ps,
+       if bool_decide (v = (zero_reg : mword 64)) then emp
+       else ∃ (γ : gname) (pid : mword 32),
+              slot_gen (proc_addr k) (DfracOwn (3/4)) γ ∗
+              pid_reg pid (DfracOwn (3/4)) γ ∗
+              gen_slot γ (proc_addr k) ∗ gen_pid γ pid)%I.
+
+  (* AT BOOT EVERY CELL IS ZERO and the whole row is [emp]: no process has
+     a parent until kfork writes one. *)
+  Lemma gen_halves_zeros (ps : list (mword 64)) :
+    (forall (k : nat) (v : mword 64), ps !! k = Some v -> v = (zero_reg : mword 64)) ->
+    ⊢ gen_halves ps.
+  Proof.
+    intro Hz. rewrite /gen_halves.
+    iApply big_sepL_intro. iIntros "!>" (k v Hv).
+    rewrite (bool_decide_eq_true_2 (v = (zero_reg : mword 64)) (Hz k v Hv)).
+    done.
+  Qed.
+
+  (* WHAT KFORK READS OFF THE PAYLOAD AT +0xd4: the slot it is about to
+     give a child has no entry, so its parent cell is 0 and the insert is
+     an insert.  THREE QUARTERS beside three quarters is what refutes the
+     alternative ([SlotGen.slot_gen_tq_excl]) -- kfork cannot hold the
+     WHOLE here, because the child's block, sealed at its first
+     [release(&np->lock)], already carries its quarter. *)
+  Lemma gen_halves_no_entry (ps : list (mword 64)) (j : nat) (g : gname) :
+    (j < length ps)%nat ->
+    gen_halves ps -∗ slot_gen (proc_addr j) (DfracOwn (3/4)) g -∗
+    ⌜ps !! j = Some (zero_reg : mword 64)⌝.
+  Proof.
+    intro Hj. iIntros "Hgh Hsg".
+    destruct (lookup_lt_is_Some_2 ps j Hj) as [v Hv].
+    rewrite /gen_halves.
+    iDestruct (big_sepL_lookup _ _ j v Hv with "Hgh") as "He".
+    destruct (bool_decide (v = (zero_reg : mword 64))) eqn:Hb.
+    - apply bool_decide_eq_true in Hb as ->. iPureIntro. exact Hv.
+    - iDestruct "He" as (γ pid) "(Hsg' & _)".
+      iDestruct (slot_gen_tq_excl with "Hsg Hsg'") as %[].
+  Qed.
+
+  (* REPARENT MOVES NO ENTRY.  kexit hands its children to <init>, i.e.
+     rewrites the cells that hold its own address to [ip]; its address is a
+     proc slot's and hence nonzero, so every such cell was on the occupied
+     side of the guard and stays there -- the entry rides across untouched.
+     This is the whole of what the pass-through at kexit's reparent costs.
+       NO PREMISE ON [ip], and it is not needed: at [ip = 0] the clause the
+     entry has to satisfy is [emp], and an entry satisfies that by being
+     dropped.  <init>'s address is of course nonzero, but nothing on this
+     path has the fact in hand and making the caller produce it would buy a
+     premise for nothing. *)
+  Lemma gen_halves_rp_map (p ip : mword 64) (ps : list (mword 64)) :
+    p <> (zero_reg : mword 64) ->
+    gen_halves ps -∗ gen_halves (rp_map p ip ps).
+  Proof.
+    intro Hp. rewrite /gen_halves /rp_map big_sepL_fmap.
+    iIntros "H". iApply (big_sepL_mono with "H").
+    iIntros (k v _) "H". rewrite /rp_slot.
+    destruct (eq_vec v p) eqn:Hvp.
+    - (* the cell named the exiting process, so it now names <init> *)
+      apply eq_vec_true_iff in Hvp as ->.
+      assert (Hb1 : bool_decide (p = (zero_reg : mword 64)) = false)
+        by (apply bool_decide_eq_false_2; exact Hp).
+      iEval (rewrite Hb1) in "H".
+      destruct (bool_decide (ip = (zero_reg : mword 64))); [done | iExact "H"].
+    - iExact "H".
+  Qed.
+
+  (* the parent cells AND the halves that go with them -- what the BOOT
+     CARVE produces, and the shape [wait_res_at] carries.  ONE existential
+     over both, because a half is indexed by the cell it belongs to: the
+     pair is what a lock holder opens and what it has to put back. *)
+  Definition parents_res_at (ξ : CtxId) : iProp Σ :=
+    (∃ ps, parents_own_at ξ ps ∗ gen_halves ps)%I.
   Definition parents_res : iProp Σ := parents_res_at cur_ctx.
 
   (* ------------------------------------------------------------------ *)
@@ -370,12 +472,25 @@ Section WaitInv.
      the slots' dormant blocks ([SpecProcinit.procs_inv_alloc]).  ONE
      predicate rather than two, because every party between the mint and
      main -- [BootShared], [BootChain], [SpecMain] -- carries it unopened. *)
+  (* ...AND THE TWO GENERATION GHOSTS' OWN BOOT SHARE, on the rows'
+     footing: the NPROC slot-generation WHOLES ([SlotGen.slot_gen], one per
+     slot, at an arbitrary name -- there is no incarnation yet, and the
+     block that receives one records it) travel INTO the dormant blocks
+     beside the rows, and the pid register's authority travels to main's
+     [newlock] for <pid_lock> ([PidLock.nextpid_res_at]), EMPTY because no
+     pid has been handed out.  Both are minted in this file's boot fupd for
+     [children_res]'s reason: the names are canonical, so they cannot be
+     minted anywhere a gname would have to thread. *)
   Definition children_boot : iProp Σ :=
     (children_res ∗ orphans_res ∗
-     [∗ list] i ∈ seq 0 NPROC, ∃ γ0 : gname, ch_frag γ0 (proc_addr i) ∅)%I.
+     pid_reg_auth (∅ : gmap Z gname) ∗
+     [∗ list] i ∈ seq 0 NPROC,
+       ∃ γ0 g : gname,
+         ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g)%I.
 
-  (* what [wait_lock] protects: the parent cells, the children sets and the
-     orphans.  THE ORPHANS LAST, so every destruct of this payload is
+  (* what [wait_lock] protects: the parent cells WITH the generation halves
+     that go with them ([parents_res_at] is the pair), the children sets and
+     the orphans.  THE ORPHANS LAST, so every destruct of this payload is
      [[Hps [Hch Ho]]]-shaped and the two existing halves keep their
      spelling. *)
   Definition wait_res_at (ξ : CtxId) : iProp Σ :=
@@ -388,26 +503,28 @@ Section WaitInv.
   Proof. rewrite /wait_res_at. ctx_morph_solve. Qed.
 
   (* THE BOOT CARVE'S SHAPE, GATHERED.  [BootCarveMain.boot_procs_raw] hands
-     the parent cells out one existential per slot; [parents_own] wants ONE
+     the parent cells out one per slot; [parents_own] wants ONE
      list.  The conversion is an induction with an OFFSET, because
      [seq k (S n)] is [k :: seq (S k) n] -- the tail's table indices shift by
      one while the [j] in [parents_own]'s big-op is an index into the LIST.
      Stated here rather than at the carve so that [parents_res]'s shape stays
      this file's business. *)
+  (* THE CELLS ARRIVE PINNED AT ZERO, which is what makes the halves above
+     payable at boot.  [struct proc] is .bss, so [p->parent] is zero in the
+     image and the carve says so ([BootCarveMain.boot_proc_slot] takes it
+     with [BootCarve.boot_cran_cell8_bss], exactly as it takes [p->cwd] and
+     the two address-space cells). *)
   Lemma parents_cells_gather (n k : nat) :
-    ([∗ list] i ∈ seq k n, ∃ pv : mword 64, p_parent (proc_addr i) ↦₈ pv)
-    -∗ ∃ ps : list (mword 64), ⌜length ps = n⌝ ∗
-         ([∗ list] j ↦ v ∈ ps, p_parent (proc_addr (k + j)) ↦₈ v).
+    ([∗ list] i ∈ seq k n, p_parent (proc_addr i) ↦₈ (zero_reg : mword 64))
+    -∗ [∗ list] j ↦ v ∈ replicate n (zero_reg : mword 64),
+         p_parent (proc_addr (k + j)) ↦₈ v.
   Proof.
     revert k. induction n as [|n IH]; intros k.
-    - iIntros "_". iExists []. iSplit; [done | done].
-    - cbn [seq]. rewrite big_sepL_cons.
-      iIntros "[Hhd Htl]". iDestruct "Hhd" as (v0) "Hhd".
-      iDestruct (IH (S k) with "Htl") as (ps) "[%Hlen Htl]".
-      iExists (v0 :: ps).
-      iSplit; [iPureIntro; cbn [length]; lia |].
-      rewrite big_sepL_cons.
+    - iIntros "_". done.
+    - cbn [seq replicate]. rewrite !big_sepL_cons.
+      iIntros "[Hhd Htl]".
       iSplitL "Hhd"; [rewrite Nat.add_0_r; iExact "Hhd" |].
+      iDestruct (IH (S k) with "Htl") as "Htl".
       iApply (big_sepL_mono with "Htl").
       iIntros (j v _) "Hv".
       replace (k + S j)%nat with (S k + j)%nat by lia.
@@ -421,14 +538,22 @@ Section WaitInv.
      travels to main with everything else the carve hands over;
      [wait_res_alloc] below is only the pairing. *)
   Lemma parents_res_of_cells :
-    ([∗ list] i ∈ seq 0 NPROC, ∃ pv : mword 64, p_parent (proc_addr i) ↦₈ pv)
+    ([∗ list] i ∈ seq 0 NPROC, p_parent (proc_addr i) ↦₈ (zero_reg : mword 64))
     -∗ parents_res.
   Proof.
     iIntros "H".
-    iDestruct (parents_cells_gather NPROC 0 with "H") as (ps) "[%Hlen H]".
-    iExists ps. rewrite /parents_own /parents_own_at.
-    iSplit; [iPureIntro; exact Hlen |].
-    iApply (big_sepL_mono with "H"). iIntros (j v _) "Hv". iExact "Hv".
+    iDestruct (parents_cells_gather NPROC 0 with "H") as "H".
+    rewrite /parents_res /parents_res_at.
+    iExists (replicate NPROC (zero_reg : mword 64)).
+    iSplitL "H".
+    { rewrite /parents_own_at.
+      iSplit; [iPureIntro; apply length_replicate |].
+      iApply (big_sepL_mono with "H"). iIntros (j v _) "Hv". iExact "Hv". }
+    assert (Hz : forall (k : nat) (v : mword 64),
+                   replicate NPROC (zero_reg : mword 64) !! k = Some v ->
+                   v = (zero_reg : mword 64)).
+    { intros k v Hv. apply lookup_replicate in Hv as [Hv0 _]. exact Hv0. }
+    iApply (gen_halves_zeros _ Hz).
   Qed.
 
   (* THE PAIRING, in main's own update: the parent cells the carve hands it
@@ -475,7 +600,9 @@ Section WaitInv.
 End WaitInv.
 
 (* ===================================================================== *)
-(* BOOT: mint the children map's canonical name and its NPROC rows.      *)
+(* BOOT: mint the four canonical names this class carries -- the         *)
+(* children map and its NPROC rows, the orphan set, the NPROC            *)
+(* slot-generation wholes and the empty pid register.                    *)
 (* OUTSIDE the section, over the FUNCTOR half only, because it is what   *)
 (* creates the name-carrying instance ([ProcAvail.procs_avail_alloc]'s   *)
 (* shape, [FdSlots.fd_slots_alloc]'s reason).                            *)
@@ -522,10 +649,20 @@ Section WaitInvBoot.
     iMod (ch_rows_alloc γ NPROC 0 ∅ with "Ha") as (m') "[Ha Hrows]".
     (* the orphan set is born EMPTY: nothing has exited at boot *)
     iMod (ghost_var_alloc (∅ : gset gname)) as (γo) "Ho".
-    iModIntro. iExists (WchG Σ _ _ γ γo).
-    rewrite /children_boot /children_res /orphans_res /orphans_own.
+    (* the NPROC slot-generation wholes, all at ONE arbitrary name (the
+       children map's own will do -- nothing reads it) *)
+    iMod (slot_gen_rows_alloc γ) as (γsg) "Hsg".
+    (* ...and the pid register, empty *)
+    iMod (ghost_map_alloc_empty (K := Z) (V := gname)) as (γpr) "Hpr".
+    iModIntro. iExists (WchG Σ _ _ _ _ γ γo γsg γpr).
+    rewrite /children_boot /children_res /orphans_res /orphans_own
+            /pid_reg_auth /slot_gen.
     iSplitL "Ha"; [iExists m'; iExact "Ha" |].
-    iSplitL "Ho"; [iExists (∅ : gset gname); iExact "Ho" | iExact "Hrows"].
+    iSplitL "Ho"; [iExists (∅ : gset gname); iExact "Ho" |].
+    iSplitL "Hpr"; [iExact "Hpr" |].
+    iDestruct (big_sepL_sep_2 with "Hrows Hsg") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (k i _) "[(%γ0 & Hrow) Hsg]".
+    iExists γ0, γ. iFrame "Hrow Hsg".
   Qed.
 End WaitInvBoot.
 

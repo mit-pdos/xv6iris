@@ -206,7 +206,7 @@ Proof. rewrite /is_kstack. ctx_morph_solve. Qed.
    structural instances by name, because plain search does not always
    decompose a [sep] (CtxMorphTac.v's header). *)
 Global Instance fkp_park_block_morph
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !wchG Σ}
     `{GEN : GenId}
     (steady : bool) (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
   CtxMorph (λ ξ, (if steady then proc_priv (XI := ξ) γf pa pid U
@@ -218,6 +218,9 @@ Global Instance fkp_park_block_morph
                        ∗ ChildTok.gen_kq (pv_gen (us_V U)) pa pid
                            (fun _ => True)%I
                        ∗ ChildTok.my_pay (pv_gen (us_V U)) (fun _ => True)%I
+                       (* ...and the two quarters, context-free for the
+                          pair's reason ([SlotGen] names no context) *)
+                       ∗ SlotGen.gen_halves_priv pa pid (pv_gen (us_V U))
                        ∗ (∃ xsv : mword 32,
                             ctx_word4_pointsto ξ (p_xstate pa)
                               (DfracOwn (1/2)) xsv))%I).
@@ -280,6 +283,8 @@ Proof.
                                       (fun _ => True)%I
                                   ∗ ChildTok.my_pay (pv_gen (us_V U))
                                       (fun _ => True)%I
+                                  ∗ SlotGen.gen_halves_priv (proc_addr j) pid
+                                      (pv_gen (us_V U))
                                   ∗ (∃ xsv : mword 32,
                                        ctx_word4_pointsto ξ (p_xstate (proc_addr j))
                                          (DfracOwn (1/2)) xsv))%I)

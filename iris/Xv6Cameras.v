@@ -1034,19 +1034,69 @@ Proof. solve_inG. Qed.
    -- and its name is carried here beside the map's, minted in the same
    boot fupd ([WaitInv.children_res_alloc]), so that no gname threads
    through the tree. *)
+(* ...AND THE TWO GHOSTS THAT SAY WHICH INCARNATION IS THE CURRENT ONE
+   ([SlotGen.v] is the theory).  They ride this class for the reason the map
+   and the orphans do -- a canonical name, minted in the same boot fupd
+   ([WaitInv.children_res_alloc]) -- and because the parties that hold their
+   halves are the same three: the process's private block, the slot's
+   dormant block, and <wait_lock>'s payload.
+
+   [sgenUR] -- THE SLOT'S CURRENT GENERATION, keyed by the slot's ADDRESS
+   ([ProcGeom.proc_addr], which is what [ProcDefs.proc_dormant] and
+   [ProcInv.proc_priv] are stated at).  Fractional agreement and NO
+   authority: the whole updates on its own (allocproc, at the mint), two
+   halves agree, and the whole excludes any other fraction -- which is what
+   makes -- this ZOMBIE block is entry k of the wait-lock invariant -- a
+   resource fact rather than a pure one.
+
+   [ghost_mapG Σ Z gname] -- THE PID REGISTER, keyed by the pid's VALUE.
+   Here the AUTHORITY is real and it lives in <pid_lock>'s payload
+   ([PidLock.nextpid_res_at]), because a pid is CHOSEN -- allocproc's scan
+   is what proves the key fresh, and that scan runs under that lock and no
+   other.  Two halves at one key agree on the generation, which is the pid
+   uniqueness PidLock's header used to record as a further step.
+     AT [Z] AND NOT AT [mword 32]: a ghost map's class carries its key's
+   [Countable], so a client that spells the key type re-resolves that
+   instance -- and an [mword] has two in this tree (stdpp's [bv_countable]
+   and [SailStdpp.Instances.Countable_mword], the leak durable-notes
+   records), so the class a client builds need not be the one this field
+   has.  [Z] has exactly one.  Nothing is lost: two pids with one value
+   ARE one pid ([bv_eq]). *)
+(* THE MAP TYPE IS NAMED TOO, and it is what [SlotGen] states its own
+   definitions at.  A ucmra's CARRIER is not a map type as far as
+   unification is concerned (it cannot ensure that [ucmra -> Type] is a
+   subtype of [Type -> Type]), so the map lemmas cannot see through
+   [sgenUR]; and spelling [gmap (mword 64) _] again in another file
+   resolves [Countable (mword 64)] against whatever instances THAT file
+   happens to import (stdpp's [bv_countable] vs [SailStdpp.Instances.
+   Countable_mword] -- the leak durable-notes records), which is a
+   DIFFERENT map type.  Naming it here fixes the instances once. *)
+Definition sgen_map : Type :=
+  gmap (SailStdpp.Values.mword 64) (dfrac_agreeR (leibnizO gname)).
+Definition sgenUR : ucmra :=
+  gmapUR (SailStdpp.Values.mword 64) (dfrac_agreeR (leibnizO gname)).
 Class wchGpreS (Σ : gFunctors) :=
   { wch_pre_inG :: ghost_mapG Σ gname (SailStdpp.Values.mword 64 * gset gname);
-    worph_pre_inG :: ghost_varG Σ (gset gname) }.
+    worph_pre_inG :: ghost_varG Σ (gset gname);
+    wsg_pre_inG :: inG Σ sgenUR;
+    wpr_pre_inG :: ghost_mapG Σ Z gname }.
 Class wchG (Σ : gFunctors) :=
   WchG { wch_inG :: ghost_mapG Σ gname (SailStdpp.Values.mword 64 * gset gname);
          worph_inG :: ghost_varG Σ (gset gname);
+         wsg_inG :: inG Σ sgenUR;
+         wpr_inG :: ghost_mapG Σ Z gname;
          wch_name : gname;
-         worph_name : gname }.
+         worph_name : gname;
+         wsg_name : gname;
+         wpr_name : gname }.
 Global Instance wchG_preS `{!wchG Σ} : wchGpreS Σ :=
-  {| wch_pre_inG := wch_inG; worph_pre_inG := worph_inG |}.
+  {| wch_pre_inG := wch_inG; worph_pre_inG := worph_inG;
+     wsg_pre_inG := wsg_inG; wpr_pre_inG := wpr_inG |}.
 Definition wchΣ : gFunctors :=
   #[ ghost_mapΣ gname (SailStdpp.Values.mword 64 * gset gname);
-     ghost_varΣ (gset gname) ].
+     ghost_varΣ (gset gname);
+     GFunctor sgenUR;
+     ghost_mapΣ Z gname ].
 Global Instance subG_wchΣ {Σ} : subG wchΣ Σ -> wchGpreS Σ.
 Proof. solve_inG. Qed.
 

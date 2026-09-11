@@ -300,6 +300,13 @@ Section KforkArms.
        UNUSED block ([SpecFreeproc]).  It is at [∅] -- allocproc handed it
        out at [∅] and this arm never reached the fork that would move it. *)
     WaitInv.ch_frag (ProcDefs.pv_chg (us_V Uc)) npa ∅ -∗
+    (* ...AND THE CHILD'S TWO EXCLUSIVE GHOSTS, BOTH WHOLE, beside the row:
+       this arm frees the slot, and freeproc is what puts the generation
+       back into the UNUSED block and deletes the pid's registration
+       ([SpecFreeproc]).  Nothing was split off them -- the split is at the
+       block assembly, which this arm never reaches. *)
+    SlotGen.slot_gen npa (DfracOwn 1) (pv_gen (us_V Uc)) -∗
+    SlotGen.pid_reg pid_c (DfracOwn 1) (pv_gen (us_V Uc)) -∗
     (* ...and the child slot's half of [p->xstate], which goes back into the
        UNUSED block with the row ([SpecFreeproc]) *)
     (∃ xsv : mword 32, p_xstate npa ↦₄{DfracOwn (1/2)} xsv) -∗
@@ -329,7 +336,7 @@ Section KforkArms.
       Hofnull Hcwdnull HMtthr Hbelow.
     subst npa.
     iIntros "#Hprocs #Hplock Hcg Hcpu Hpay #Htext Hpc Hframe
-             Hpv Hpfrag Hprow HCpriv Hcrow Hcxb Hheld Hhart Hfd Hir Hbsl Hctx Hkst Hkalloc Hcont".
+             Hpv Hpfrag Hprow HCpriv Hcrow Hcsg Hcpr Hcxb Hheld Hhart Hfd Hir Hbsl Hctx Hkst Hkalloc Hcont".
     iDestruct "Hframe" as (w4 w5) "Hframe".
     rewrite /ProofKfork.kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
@@ -340,11 +347,11 @@ Section KforkArms.
     iDestruct (SchedCtx.procs_inv_lookup γs j γl2 Hgamma with "Hprocs") as "#Hislock".
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Uc Hofnull Hcwdnull
                  with "HCpriv Hfd Hir Hbsl Hctx Hkst") as "(Hfprest & Hfppt & Hfptf)".
-    iApply (B1.kfk_exit_uvmcopy γs fsc_kalloc γp fsc_kpages γl2 j ch (us_V Uc) pid_c (pv_upt (us_V Uc)) (pv_tf (us_V Uc))
+    iApply (B1.kfk_exit_uvmcopy γs fsc_kalloc γp fsc_kpages γl2 j ch (us_V Uc) (pv_gen (us_V Uc)) pid_c (pv_upt (us_V Uc)) (pv_tf (us_V Uc))
               m Mt K sp0 ra0 s00 s10 s50 pme eb b lvl lks
               HK Hlvl HjN Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
               with "Hcg Hcpu Hpay Htext Hpc Hb1 Hb2 Hb3 Hb4x Hb5x Hb6 Hb7 Hb8
-                    Hheld Hhart Hislock Hplock Hkalloc Hfprest Hcrow Hcxb Hfppt Hfptf").
+                    Hheld Hhart Hislock Hplock Hkalloc Hfprest Hcrow Hcxb Hcsg Hcpr Hfppt Hfptf").
     all: try lkbelow.
     iIntros (CID Hcross mf) "%Hpf Hcg Hpc Hcpu2 Hkalloc2".
     destruct Hpf as [Hcsmf Hmfa0].
@@ -563,6 +570,12 @@ Section KforkArms.
        and the three pieces cut ([ChildTok.gen_set] / [gen_split]). *)
     ChildTok.gen_own (pv_gen (us_V Uc')) (DfracOwn 1) npa pid_c
       (fun _ => True)%I -∗
+    (* ...AND THE CHILD SLOT'S TWO EXCLUSIVE GHOSTS, BOTH WHOLE, cut at the
+       same point and 3/4 : 1/4 ([SlotGen.slot_gen_quarters]): the quarters
+       close the child's block, the three quarters are the deposit
+       [ProofKforkB5.kfk_b5] makes under <wait_lock>. *)
+    SlotGen.slot_gen npa (DfracOwn 1) (pv_gen (us_V Uc')) -∗
+    SlotGen.pid_reg pid_c (DfracOwn 1) (pv_gen (us_V Uc')) -∗
     (* the child's descriptor-state fragments, minted with its block by
        allocproc AT [fdt0]: the scan retypes them one at a time, at the
        parent's own entries, and the whole table goes into the child's
@@ -626,7 +639,7 @@ Section KforkArms.
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
       Hofnull Hcwdnull Hpidc Hshsz Hshimg Hshperm Hbelow.
     subst tfsrc tfdst.
-    iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag Hprow HCpriv Hcgen Hcfrag Hcrow Hcxb #Hmk
+    iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag Hprow HCpriv Hcgen Hcsg Hcpr Hcfrag Hcrow Hcxb #Hmk
              Hheld Hhart Hfd Hbsl Hkst Hctxex Hpay Hkalloc #Hwlock #Hft
              Hitb Hitinv #Hireg Hirs #Hfdone #Hworld #Htoken Hjslot Hcont".
     iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
@@ -704,7 +717,7 @@ Section KforkArms.
     iSpecialize ("Hb3app" $! 0%nat Mx
       with "[%] [%] [Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                      Hheld Hhart Hfd Hbsl Hkst Hpay Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Hjslot Hcgen Hcont
-                     Hprow Hcrow Hcxb]
+                     Hprow Hcrow Hcxb Hcsg Hcpr]
             Hcg Hcpu Hpc Hpv [HCpriv] Hpfrag Hcfrag").
     - unfold NOFILE. lia.
     - split_and!.
@@ -734,6 +747,28 @@ Section KforkArms.
               with "Hcgen") as "Hcgen".
       iMod (gen_split with "Hcgen") as "(Htok & Hkq & #Hmp)".
       iModIntro.
+      (* ...AND THE TWO EXCLUSIVE GHOSTS, CUT THE SAME WAY AND AT THE SAME
+         POINT, 3/4 : 1/4 ([SlotGen.slot_gen_quarters]).  The QUARTERS go
+         into the child's block with the kernel's quarter of the generation
+         (B4's store closes it); the THREE QUARTERS are the deposit B5 makes
+         under <wait_lock> at the store that fills the child's parent cell
+         ([WaitInv.gen_halves]).  The split is uneven so that B5 can REFUTE
+         a pre-existing entry for the slot ([gen_halves_no_entry]) -- by
+         then the child's block is closed and kfork no longer holds the
+         whole. *)
+      iEval (rewrite slot_gen_quarters) in "Hcsg".
+      iDestruct "Hcsg" as "[Hsg34 Hsg14]".
+      iEval (rewrite pid_reg_quarters) in "Hcpr".
+      iDestruct "Hcpr" as "[Hpr34 Hpr14]".
+      (* the generation's two persistent readings, off the discarded half
+         and the kernel quarter: the deposit carries them so that a reaper
+         can read an entry as -- this slot, this pid. *)
+      iAssert (ChildTok.gen_slot (pv_gen (us_V Uc')) npa ∗
+               ChildTok.gen_pid (pv_gen (us_V Uc')) pid_c)%I as "#Hgsp".
+      { iDestruct "Hmp" as (pa0 pid0) "#Hmo".
+        iDestruct (gen_agree_pure with "Hmo Hkq") as %[-> ->].
+        iSplit; [iExists pid_c, Q; iExact "Hmo" | iExists npa, Q; iExact "Hmo"]. }
+      iDestruct "Hgsp" as "[#Hgslot #Hgpid]".
       (* ---- ProofKforkB4: idup / safestrcpy / pid read ---- *)
       iApply (B4.kfk_b4 γf
                 pid_p pid_c Up
@@ -741,11 +776,14 @@ Section KforkArms.
                 Mx2 (trap_res b) K (S lvl) eb ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) Hd4 Hd3
                 with "Hsc Hown Htext Hpcx Hitb Hitinv Hireg Hirs Hpvx Hfdone
-                      Hpvcx [Hkq] Hcxb").
+                      Hpvcx [Hkq] Hcxb [Hsg14 Hpr14]").
       all: try lkbelow.
       { (* the pair, at the child block's own generation: [kfk_childV] is an
            [upd_*] chain that preserves [pv_gen] *)
         iExists Q. cbn [us_V]. rewrite /kfk_childV /V2 /V1. iFrame "Hkq Hmp". }
+      { (* ...and the two quarters, at that same field *)
+        rewrite /SlotGen.gen_halves_priv. cbn [us_V].
+        rewrite /kfk_childV /V2 /V1. iFrame "Hsg14 Hpr14". }
       iApply wp_next_off_intro.
       iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4 Hirsp".
       destruct Hp4 as (Hthr4 & Hpid4).
@@ -777,6 +815,11 @@ Section KforkArms.
       iEval (rewrite Hnpa) in "Hcrow".
       iEval (rewrite Hnpa) in "Hmk".
       iEval (rewrite Hnpa) in "Hkst".
+      (* the deposit B5 makes is keyed at the slot's address and at the
+         block's own generation, so both spellings are converted here with
+         the rest *)
+      iEval (rewrite Hnpa) in "Hsg34".
+      iEval (rewrite Hnpa) in "Hgslot".
       (* THE RUN KEY.  The slot arrived at [uvis_of (kfork_child Up) stsP],
          the record [SpecKfork] states from the parent; the child is parked
          at [MkUstate Vc4 (us_M Uc')].  The two agree on every projection a
@@ -813,6 +856,10 @@ Section KforkArms.
          the in-lock index we are handing it is spelled [trap_res b + (K - 8)],
          and B5's entry index has to be syntactically that. *)
       iEval (rewrite -Hcgn4) in "Hmp".
+      iEval (rewrite -Hcgn4) in "Hsg34".
+      iEval (rewrite -Hcgn4) in "Hpr34".
+      iEval (rewrite -Hcgn4) in "Hgslot".
+      iEval (rewrite -Hcgn4) in "Hgpid".
       iSpecialize ("Hjslot" $! (pv_gen Vc4) with "Hmp").
       iApply (B5.kfk_b5 γs γf γw γl γl2 j mf4 K lvl eb b
                 pme ks pid_c (MkUstate Vc4 ((us_M Uc'))) stsP
@@ -823,7 +870,7 @@ Section KforkArms.
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 Hurun eq_refl eq_refl eq_refl
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock Hft Hworld Htoken Hfdone
-                      Hheld Hhart Hpvcx4 Hcfrag Hcrow Hprow Hjslot Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
+                      Hheld Hhart Hpvcx4 Hcfrag Hcrow Hprow Hsg34 Hpr34 Hgslot Hgpid Hjslot Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
       all: try lkbelow.
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
          not [wp_next_off_intro] -- the brief's correction (a). *)
@@ -971,7 +1018,7 @@ Section KforkMain.
       iIntros (CIDh Hxh). iIntros (CID2 Hx2 Mt npa j γl2 pid_c ch Uc).
       destruct Uc as [Vc Mc].
       iIntros "%HMtsp %HMts4 %HMts5 %HMta0 %HMtthr %Hpures".
-      iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcrow Hcxb Hheld Hhart Hfd Hir Hbslp Hctx Hkstk Hpay Hcpu Hke HR".
+      iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcrow Hcsg Hcpr Hcxb Hheld Hhart Hfd Hir Hbslp Hctx Hkstk Hpay Hcpu Hke HR".
       iDestruct "HR" as "[Hrow HR]".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       iApply (kfork_arm2 (CID0 := CID2) γp γf γl2 γs m K lvl eb b pme
@@ -982,7 +1029,7 @@ Section KforkMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp ltac:(rewrite HMts4 Hnpa; reflexivity) Hnpa HjN Hgamma
                 Hofn Hcwdn HMtthr ltac:(lkbelow)
-                with "Hprocs Hplock Hcg Hcpu Hpay Ht Hpc Hframe Hpv Hpfrag Hrow HCp Hcrow Hcxb Hheld Hhart
+                with "Hprocs Hplock Hcg Hcpu Hpay Ht Hpc Hframe Hpv Hpfrag Hrow HCp Hcrow Hcsg Hcpr Hcxb Hheld Hhart
                       Hfd Hir Hbslp Hctx Hkstk Hke [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
          position: the hole's expected type is still an evar there, which is
@@ -994,7 +1041,7 @@ Section KforkMain.
       iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Uc' tfsrc tfdst).
       destruct Uc' as [Vc' Mc].
       iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures %Hshare".
-      iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcgen Hcfrag Hcrow Hcxb #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
+      iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcgen Hcsg Hcpr Hcfrag Hcrow Hcxb #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
                Hke #Hwl #Hft #Hit #Hiti HR".
       iDestruct "HR" as "[Hrow HR]".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn & Hpidc).
@@ -1009,7 +1056,7 @@ Section KforkMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn Hpidc Hshsz Hshimg Hshperm ltac:(lkbelow)
-                with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag Hrow HCp Hcgen Hcfrag Hcrow Hcxb Hmk Hheld Hhart
+                with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag Hrow HCp Hcgen Hcsg Hcpr Hcfrag Hcrow Hcxb Hmk Hheld Hhart
                       Hfd Hbsl Hkst Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone Hworld Htoken Hjslot
                       [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument

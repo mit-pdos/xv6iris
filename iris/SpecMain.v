@@ -317,7 +317,8 @@ Section SpecMain.
         [struct proc] that belongs to THAT lock (upstream ded23f2's pid scan
         reads all 64 under it), carved beside [proc_pub]'s quarter and routed
         to main's [newlock] for [PidLock.nextpid_res]. *)
-     ([∗ list] i ∈ seq 0 NPROC, pid_lock_share (proc_addr i)) ∗
+     ([∗ list] i ∈ seq 0 NPROC,
+        pid_lock_share (proc_addr i) (mword_of_int 0 : mword 32)) ∗
      (* ...AND WHAT wait_lock IS OVER.  [WaitInv.parents_res] is [∃ ps,
         parents_own ps], the NPROC [p_parent] cells -- the one part of a
         [struct proc] that belongs to a lock OTHER than p->lock, which is

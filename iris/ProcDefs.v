@@ -631,6 +631,20 @@ Section ProcDefs.
           under the <wait_lock> kexit holds at the store), so what it parks
           is an EMPTY row -- and the reap therefore has nothing to reset. *)
        ch_frag (pv_chg V) pa ∅ ∗
+       (* ...AND THE SLOT'S PIECES OF THE TWO EXCLUSIVE GENERATION GHOSTS
+          ([SlotGen.gen_halves_dorm]), beside the row and on its footing.
+          At UNUSED the slot owns this slot's current generation WHOLE --
+          at the last incarnation's name, which is junk exactly as [pv_chg]
+          is junk between processes -- and the pure fact that its pid cell
+          is 0, which is what freeproc's [p->pid = 0] leaves and what the
+          .bss carve founds.  At ZOMBIE it owns the two QUARTERS the dead
+          process's private block carried ([ProcInv.proc_priv_core]); the
+          other three quarters are in <wait_lock>'s payload
+          ([WaitInv.gen_halves]),
+          deposited by whoever forked it, and the reap is where the two
+          meet.  allocproc takes the whole out and re-keys it to the
+          incarnation it mints; freeproc puts a whole back. *)
+       gen_halves_dorm pa pid (pv_gen V) st ∗
        (* THE SLOT'S HALF OF [p->xstate], AND -- AT A ZOMBIE -- THE EXIT
           ESCROW KEYED AT WHAT THAT HALF READS.  The other half is
           <p->lock>'s ([SchedCtx.proc_pub]); the two are one cell, so the
@@ -700,6 +714,9 @@ Section ProcDefs.
           under the <wait_lock> kexit holds at the store), so what it parks
           is an EMPTY row -- and the reap therefore has nothing to reset. *)
        ch_frag (pv_chg V) pa ∅ ∗
+       (* the slot's pieces of the two generation ghosts -- see
+          [proc_dormant] *)
+       gen_halves_dorm pa pid (pv_gen V) st ∗
        (* the slot's half of [p->xstate] and, at a ZOMBIE, the escrow keyed
           at what it reads -- see [proc_dormant] *)
        (∃ xsv : mword 32,
@@ -721,11 +738,11 @@ Section ProcDefs.
     proc_dormant pa st ⊣⊢ proc_dormant_noctx pa st ∗ own_ctx (p_context pa).
   Proof.
     iSplit.
-    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hxs & Hctx & Haddr)".
-      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hch Hxs Haddr".
+    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Hctx & Haddr)".
+      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hch Hgh Hxs Haddr".
       iPureIntro; exact Hfacts.
-    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hxs & Haddr) Hctx]".
-      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hch Hxs Hctx Haddr".
+    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Haddr) Hctx]".
+      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hch Hgh Hxs Hctx Haddr".
       iPureIntro; exact Hfacts.
   Qed.
 
@@ -817,7 +834,7 @@ Qed.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /proc_dormant_noctx.
     iDestruct "H" as (V pid)
-      "(%Hf & Hpid & Hfl & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hxs & Haddr)".
+      "(%Hf & Hpid & Hfl & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Haddr)".
     (* [p_pid] is [↦₄]: context-indexed since M1 stage 2 *)
     iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hpid") as "[Hd Hpid]".
     iMod (proc_fields_morph pa (DfracOwn 1) V ξ ξ' with "Hd Hfl") as "[Hd Hfl]".

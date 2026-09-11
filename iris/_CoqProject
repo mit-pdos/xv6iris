@@ -485,6 +485,9 @@ WpSconfSfence.v
 WpPushOffCsr.v
 CodeMycpu.v
 ProcGeom.v
+# the two exclusive generation ghosts (the slot's current incarnation and
+# the pid register); [WaitInv] carries their halves and exports them.
+SlotGen.v
 WaitInv.v
 KernelBaseDecode.v
 KernelRvcDecode.v

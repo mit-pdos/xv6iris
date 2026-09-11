@@ -146,10 +146,16 @@ Section SchedCtx.
      so nothing above the two writers -- allocproc and freeproc, which hold all
      three -- had to move.  Over an EXPLICIT context, because the lock payload
      it lives in is λ-converted (PidLock.v). *)
-  Definition pid_lock_share_at (ξ : TsoCtx.CtxId) (pa : mword 64) : iProp Σ :=
-    (∃ v : mword 32, TsoCtx.ctx_word4_pointsto ξ (p_pid pa) (DfracOwn (1/4)) v)%I.
-  Definition pid_lock_share (pa : mword 64) : iProp Σ :=
-    pid_lock_share_at TsoCtx.cur_ctx pa.
+  (* AT AN EXPLICIT VALUE, because the payload has to say what the scan
+     read: <pid_lock> carries the 64 quarters as a LIST of values
+     ([PidLock.nextpid_res_at]), and what allocproc's scan proves -- the
+     candidate is in no slot -- is a fact about that list.  The pid
+     REGISTER's domain fact is stated against it. *)
+  Definition pid_lock_share_at (ξ : TsoCtx.CtxId) (pa : mword 64)
+      (v : mword 32) : iProp Σ :=
+    TsoCtx.ctx_word4_pointsto ξ (p_pid pa) (DfracOwn (1/4)) v.
+  Definition pid_lock_share (pa : mword 64) (v : mword 32) : iProp Σ :=
+    pid_lock_share_at TsoCtx.cur_ctx pa v.
 
   (* The lock-protected cells whose VALUES no protocol step needs to name:
      killed and xstate (mutable under p->lock, read by kill / wait), and the

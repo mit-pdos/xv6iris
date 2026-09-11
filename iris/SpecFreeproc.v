@@ -166,30 +166,45 @@ Section SpecFreeproc.
      its reason: at a ZOMBIE the escrow is keyed at what it reads, so the
      value has to be spellable at the bridge, and freeproc's [p->xstate = 0]
      needs the half in hand to join <p->lock>'s. *)
+  (* ...AND THE SLOT'S GENERATION COMES OUT WHOLE, with the pure fact that
+     the pid cell is 0 ([SlotGen.gen_halves_dorm]'s UNUSED arm): an UNUSED
+     slot's incarnation is over, so nobody holds a piece and nothing is
+     registered at its pid. *)
   Lemma fp_of_dormant_unused (pa : mword 64) :
     proc_dormant pa UNUSED ⊢
       ∃ (V : pprivate) (pid : mword 32) (xsv : mword 32),
         fp_rest pa V pid ∗ ch_frag (pv_chg V) pa ∅ ∗
+        ⌜bv_unsigned pid = 0⌝ ∗ slot_gen pa (DfracOwn 1) (pv_gen V) ∗
         p_xstate pa ↦₄{DfracOwn (1/2)} xsv ∗
         fp_pt pa (pv_sz V) None ∗ fp_tf pa None.
   Proof.
     rewrite /proc_dormant fp_unused_not_zombie.
-    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hch & Hxs & Hctx & Hpg & Htf)".
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Hctx & Hpg & Htf)".
     iDestruct "Hxs" as (xsv) "[Hxc _]".
+    rewrite /gen_halves_dorm fp_unused_not_zombie.
+    iDestruct "Hgh" as "[%Hpid0 Hsg]".
     iExists V, pid, xsv. rewrite /fp_rest /fp_pt /fp_tf.
-    iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hxc Hctx Hpg Htf". iPureIntro. exact Hpure.
+    iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hsg Hxc Hctx Hpg Htf".
+    iSplitR; [iPureIntro; exact Hpure |].
+    iPureIntro; exact Hpid0.
   Qed.
 
   Lemma fp_to_dormant_unused (pa : mword 64) (V : pprivate) (pid : mword 32)
       (szv : mword 64) (xsv : mword 32) :
+    bv_unsigned pid = 0 ->
     fp_rest pa V pid -∗ ch_frag (pv_chg V) pa ∅ -∗
+    slot_gen pa (DfracOwn 1) (pv_gen V) -∗
     p_xstate pa ↦₄{DfracOwn (1/2)} xsv -∗
     fp_pt pa szv None -∗ fp_tf pa None -∗
     proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hctx) Hch Hxc Hpg Htf".
+    intro Hpid0.
+    iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hctx) Hch Hsg Hxc Hpg Htf".
     rewrite /fp_pt /fp_tf /proc_dormant fp_unused_not_zombie.
-    iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hctx Hpg Htf".
+    iAssert (gen_halves_dorm pa pid (pv_gen V) UNUSED) with "[Hsg]" as "Hgh".
+    { rewrite /gen_halves_dorm fp_unused_not_zombie.
+      iSplitR; [iPureIntro; exact Hpid0 | iExact "Hsg"]. }
+    iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hgh Hctx Hpg Htf".
     iSplitR; [iPureIntro; exact Hpure |].
     iExists xsv. iFrame "Hxc".
   Qed.
@@ -222,18 +237,25 @@ Section SpecFreeproc.
      the status its [p->xstate] cell holds.  It is what the reaping parent
      redeems ([ChildTok.gen_pay]); freeproc itself has no use for it, so it
      comes out here rather than being consumed. *)
+  (* ...AND THE ZOMBIE BLOCK'S TWO HALVES COME OUT BESIDE THE ESCROW
+     ([SlotGen.gen_halves_priv]): they are what the reaper agrees against
+     the entry its own parent cell names ([WaitInv.gen_halves]), and
+     reuniting them is what makes the WHOLES this function's premises
+     ask for. *)
   Lemma fp_of_dormant_zombie (pa : mword 64) :
     proc_dormant pa ZOMBIE ⊢
       ∃ (V : pprivate) (pid : mword 32) (xsv : mword 32),
         fp_rest pa V pid ∗ ch_frag (pv_chg V) pa ∅ ∗
+        gen_halves_priv pa pid (pv_gen V) ∗
         p_xstate pa ↦₄{DfracOwn (1/2)} xsv ∗
         exit_tok (pv_gen V) pid (xstate_val xsv) ∗
         fp_pt pa (pv_sz V) (Some (pv_upt V)) ∗
         fp_tf pa (Some (ud_tfp (pv_upt V), pv_tf V)).
   Proof.
     rewrite /proc_dormant fp_zombie_is_zombie.
-    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hch & Hxs & Hctx & %Hbel & Hpt & Htfp)".
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Hctx & %Hbel & Hpt & Htfp)".
     iDestruct "Hxs" as (xsv) "[Hxc Hesc]".
+    rewrite /gen_halves_dorm fp_zombie_is_zombie.
     iExists V, pid, xsv.
     (* both [page_valid]s come out of the table: the trapframe's from
        [proc_pt_wf], the root's from the tree's node claim. *)
@@ -245,6 +267,7 @@ Section SpecFreeproc.
     iSplitL "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx".
     { iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx". iPureIntro. exact Hpure. }
     iSplitL "Hch"; [iExact "Hch" |].
+    iSplitL "Hgh"; [iExact "Hgh" |].
     iSplitL "Hxc"; [iExact "Hxc" |].
     iSplitL "Hesc"; [iExact "Hesc" |].
     iSplitL "Hpg Hpt".
@@ -277,7 +300,7 @@ Section SpecFreeproc.
      this hart.  So [false] is what the callers actually have. *)
   Definition wp_freeproc_sconf_body
       (γp γa : gname) (mm : regfile)
-      (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
+      (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
       (ilvl : nat) (lks : gset string) :=
@@ -315,6 +338,22 @@ Section SpecFreeproc.
        pay: allocproc's failure tails have the row allocproc just took, and
        the reaper empties the zombie's under the <wait_lock> it holds. *)
     ch_frag (pv_chg V) pa ∅ -∗
+    (* ...AND THE INCARNATION'S TWO EXCLUSIVE GHOSTS, BOTH WHOLE, AT THE
+       CALLER'S NAME [g].  A free parameter and not [pv_gen V], because
+       allocproc's failure tails hold the generation the pid section MINTED
+       while the block they carry is still the dormant one they took, whose
+       [pv_gen] is the junk it was sealed at; the UNUSED block this function
+       rebuilds records [g] and the two agree from there on.  This is where
+       a generation DIES: the slot's [SlotGen.slot_gen] goes back into the
+       UNUSED block, and the pid
+       REGISTRATION is deleted from <pid_lock>'s authority at the
+       [p->pid = 0] this function makes -- which is why the whole fragment
+       and not a half is the premise.  Both callers can pay: the reaper
+       reunited the ZOMBIE block's halves with the deposit its own row's
+       entry carried ([WaitInv.gen_halves]), and allocproc's failure tails
+       never split what allocproc gave them. *)
+    slot_gen pa (DfracOwn 1) g -∗
+    pid_reg pid (DfracOwn 1) g -∗
     (* ...AND THE SLOT'S HALF OF [p->xstate].  freeproc's [p->xstate = 0]
        is a write, so it needs the whole cell: <p->lock>'s half arrives
        inside [proc_held] ([SchedCtx.proc_pub]) and this is the block's.
@@ -344,9 +383,9 @@ Module Type FREEPROC.
        Parameter must not re-introduce it. *)
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γp γa : gname) (mm : regfile)
-      (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
+      (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
       (ilvl : nat) (lks : gset string),
-      wp_freeproc_sconf_body γp γa mm j γl V pid st ch opt otf K eb pme ilvl lks.
+      wp_freeproc_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks.
 End FREEPROC.

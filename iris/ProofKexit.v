@@ -1058,6 +1058,12 @@ Section KexitPark.
     (* ...AND THE PROCESS'S HALF OF [p->xstate], which the store below joins
        with <p->lock>'s and the park keeps ([SpecKexit.kexit_park_pay]) *)
     (∃ xsv : mword 32, p_xstate pj ↦₄{DfracOwn (1/2)} xsv) -∗
+    (* ...AND THE INCARNATION'S TWO QUARTERS, split off the block with the
+       pair ([ProcInv.proc_priv_split_cwd]) and parked unchanged: a ZOMBIE
+       block holds what its process's block held ([SlotGen.gen_halves_priv]),
+       and the reaper is what reunites them with the deposit the parent's
+       entry carries. *)
+    gen_halves_priv pj pid (pv_gen (us_V U)) -∗
     (* ...AND THE EXIT DEPOSIT, which the park spends on the escrow, PAID AT
        THE STATUS THIS CALL STORES ([ProcGeom.xstate_of] of the argument the
        prologue moved into s4) *)
@@ -1067,7 +1073,7 @@ Section KexitPark.
   Proof.
     intros pj Hj Hgl Hav Hregs Hof Hcwd Hfresh.
     destruct Hregs as (Hs3 & Hs4 & Hsp0 & Hdom).
-    iIntros "Hcg Hcloser Hown Htce Hcce #Htext Hpc #Hprocs #Hwl Hinit Hsp Hir Hbs Hpriv Hgq Hrow Hxb #Hmy HQ".
+    iIntros "Hcg Hcloser Hown Htce Hcce #Htext Hpc #Hprocs #Hwl Hinit Hsp Hir Hbs Hpriv Hgq Hrow Hxb Hgh #Hmy HQ".
     (* THE SCHED CROSSING NEEDS THE EXACT SINGLETON: swtch is contracted at
        [{["proc"]}] on both sides (SpecSwtch.v), xv6's own
        [panic("sched locks")] discipline.  [kx_park] enters at depth 0, so the
@@ -1159,7 +1165,7 @@ Section KexitPark.
       by (rewrite HP2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc6c) in "Hpc".
     iDestruct "Hres" as "[Hpar [Hch Ho]]".
-    iDestruct "Hpar" as (ps) "Hpar".
+    iDestruct "Hpar" as (ps) "[Hpar Hghp]".
     iDestruct (parents_own_length with "Hpar") as "%Hpslen".
     (* THE CHILDREN MOVE, and this is the only place it can happen: the
        authority is <wait_lock>'s and the row is the dying process's own,
@@ -1252,6 +1258,13 @@ Section KexitPark.
     iIntros (Mrp) "[%Hcsr %Hdomr] Hcg Hown Htext2 Hpc Hinit Hpar".
     (* reparent's output table is indexed by the a0 IT saw, which is [p] *)
     iEval (rewrite HP4a0) in "Hpar".
+    (* THE PAYLOAD'S GENERATION SHARES FOLLOW THE CELLS.  Every cell
+       reparent rewrote held this process's address and now holds <init>'s;
+       both are occupied, so each entry rides across where it was
+       ([WaitInv.gen_halves_rp_map]).  This process's OWN entry is not
+       touched -- its cell names its parent, which reparent does not
+       read. *)
+    iDestruct (gen_halves_rp_map pj ip ps (proc_addr_nonzero j Hj) with "Hghp") as "Hghp".
     assert (Hpc72 : ret_pc (P4 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x72))
       by (rewrite HP4ra; apply bv_eq; vm_compute; reflexivity).
@@ -1575,8 +1588,8 @@ Section KexitPark.
               (wait_res_at) PC 1%nat eb pj (trap_res b + av)%nat
               ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
               ltac:(rewrite HPCa0; apply addv_sext0) ltac:(lia)
-              with "Hcg Htext Hpc Hwl Hlkw [Hpar Hch Ho] Hown Hpay2").
-    { iFrame "Hch Ho". iExists _. iExact "Hpar". }
+              with "Hcg Htext Hpc Hwl Hlkw [Hpar Hghp Hch Ho] Hown Hpay2").
+    { iFrame "Hch Ho". iExists _. iFrame "Hpar Hghp". }
     iApply wp_next_off_intro.
     iIntros (mrel) "Hcg Hpc %Hcsrel Hown".
     assert (Hpc96 : ret_pc (PC !!! Regidx (mword_of_int 1 : mword 5))
@@ -1622,7 +1635,7 @@ Section KexitPark.
     iApply (Sched.wp_sched_sconf (CID := CIDa)  γs j γl ZOMBIE ch0 PD (trap_res b + av)%nat eb
               Hj Hgl park_ok_ZOMBIE ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh Hgen]
-                    [Hpriv Hgq Hsp Hir Hbs Hcloser Hrow Hxb HQ] Hpay Hcpuemp Hoc Htag Hvc").
+                    [Hpriv Hgq Hsp Hir Hbs Hcloser Hrow Hxb Hgh HQ] Hpay Hcpuemp Hoc Htag Hvc").
     { rewrite /proc_held. iFrame "Hlkp Hstate Hpg Hchan".
       iExists kl, (trunc32 (rget (CID := CIDa) mlk (mword_of_int 20 : mword 5))), pidv.
       iFrame "Hkilled Hxstate Hpidh Hgen". }
@@ -1641,7 +1654,7 @@ Section KexitPark.
       iApply (kexit_park_pay γf j pid U Q
                 (trunc32 (rget (CID := CIDa) mlk (mword_of_int 20 : mword 5)))
                 Hof Hcwd
-                with "Hpriv Hgq Hsp Hir Hbs Hkst Hrow Hxb Hmy [HQ]").
+                with "Hpriv Hgq Hsp Hir Hbs Hkst Hrow Hxb Hmy [HQ] Hgh").
       (* the cell holds what the [sw] committed, and the deposit was paid at
          [ProcGeom.xstate_of] of the same register -- the same [Z], because
          [xstate_of] is stated through the store's own [trunc32]. *)
@@ -1777,7 +1790,7 @@ Section KexitRest.
        chance to run it (the logic is affine, so the leak is sound and the
        kernel's own "at most one" is unaffected). *)
     iDestruct (proc_priv_split_cwd γf pj pid U with "Hpriv")
-      as "[Hpriv [Href [Hfdone [Hgq Hxb]]]]".
+      as "[Hpriv [Href [Hfdone [Hgq [Hxb Hgh]]]]]".
     iClear "Hfdone".
     (* THE BLOCK, NOT A QUARTER OF [p->pid].  begin_op, iput and end_op all
        take [proc_priv_bare] now, and [p->cwd] lives INSIDE it -- so the cell
@@ -2023,10 +2036,12 @@ Section KexitRest.
               ltac:(cbn [upd_cwd pv_cwd pv_fdg]; reflexivity)
               Hfresh_wl
               with "Hcg Hcloser Hown Htce Hcce Htext Hpc Hprocs Hwl Hinit Hsp Hir Hbsl
-                    Hpriv [Hgq] Hrow Hxb Hmy [HQ]").
+                    Hpriv [Hgq] Hrow Hxb [Hgh] Hmy [HQ]").
     { (* the pair is keyed at the block's generation, which zeroing
          [p->cwd] does not touch *)
       cbn [us_cwd upd_usV us_V upd_cwd pv_gen]. iExact "Hgq". }
+    { (* ...and so are the two quarters *)
+      cbn [us_cwd upd_usV us_V upd_cwd pv_gen]. iExact "Hgh". }
     { (* the deposit's payload is at this call's status argument, which the
          block does not name at all *)
       iExact "HQ". }

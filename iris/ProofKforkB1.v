@@ -118,7 +118,7 @@ Section KforkB1Proof.
   Lemma kfk_exit_uvmcopy
       (γs : list gname) (γa γp : gname) (γk : gname * gname) (γl : gname)
       (j : nat) (ch : mword 64)
-      (V : pprivate) (pid : mword 32) (P : uptd) (ws : list (mword 64))
+      (V : pprivate) (g : gname) (pid : mword 32) (P : uptd) (ws : list (mword 64))
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 : mword 64)
       (pme : mword 64) (eb b : bool) (lvl : nat) (lks : gset string) :
@@ -186,6 +186,13 @@ Section KforkB1Proof.
     (* ...and the slot's half of [p->xstate], which freeproc's
        [p->xstate = 0] joins with <p->lock>'s and re-splits *)
     (∃ xsv : mword 32, p_xstate (proc_addr j) ↦₄{DfracOwn (1/2)} xsv) -∗
+    (* ...AND THE CHILD'S TWO EXCLUSIVE GHOSTS, BOTH WHOLE: this arm never
+       forked, so nothing was split off them and freeproc takes them back
+       ([SpecFreeproc]).  At the caller's [g], which is the generation
+       allocproc minted for the slot -- the block this tail carries is the
+       dormant one, whose [pv_gen] is junk. *)
+    slot_gen (proc_addr j) (DfracOwn 1) g -∗
+    pid_reg pid (DfracOwn 1) g -∗
     fp_pt (proc_addr j) (pv_sz V) (Some P) -∗
     fp_tf (proc_addr j) (Some (ud_tfp P, ws)) -∗
     wp_next (match lvl with O => eb | S _ => false end) pme (fun (CID : CpuId) =>
@@ -200,7 +207,7 @@ Section KforkB1Proof.
   Proof.
     intros HK Hlvl Hj Hb Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hmts4 Hthr Hfresh.
     iIntros "Hcg Hcpu Hpay #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-              Hheld Hhaa #Hislock #Hpidlk #Henv Hfprest Hfprow Hfpxb Hfppt Hfptf Hcont".
+              Hheld Hhaa #Hislock #Hpidlk #Henv Hfprest Hfprow Hfpxb Hfpsg Hfppr Hfppt Hfptf Hcont".
     (* freeproc is stated at the ANONYMOUS bundle ([kalloc_env], count
        existentially quantified), so hand it the projection; both forms are
        persistent at [None], so "Henv" survives for our own postcondition. *)
@@ -238,10 +245,10 @@ Section KforkB1Proof.
     assert (HT1a0 : T1 !!! Regidx Ra0 = proc_addr j)
       by (rewrite /T1 upd_ne; [exact HT0a0 | vm_compute; discriminate]).
     (* ---- freeproc ---- *)
-    iApply (FP.wp_freeproc_sconf γp γa T1 j γl V pid USED ch (Some P) (Some (ud_tfp P, ws))
+    iApply (FP.wp_freeproc_sconf γp γa T1 j γl V g pid USED ch (Some P) (Some (ud_tfp P, ws))
               (trap_res b + (K - 8))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
               ltac:(pose proof (kfkb1_K44 K HK); lia) Hj (kfkb1_lvlS lvl Hlvl) HT1a0
-              with "Hcg Hcpu Htext Hpc Hpidlk Hheld Hfprest Hfprow Hfpxb Hfppt Hfptf Henvb").
+              with "Hcg Hcpu Htext Hpc Hpidlk Hheld Hfprest Hfprow Hfpsg Hfppr Hfpxb Hfppt Hfptf Henvb").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mfp) "Hcg Hcpu Hpc %Hcsfp Hheld Hdorm".

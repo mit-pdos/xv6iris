@@ -125,7 +125,7 @@ Proof. vm_compute; reflexivity. Qed.
 Module SysDupProof (Argfd : ARGFD) (Fdalloc : FDALLOC) (Filedup : FILEDUP) : SYSDUP.
 
 Section ProofSysDup.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1  : mword 5).

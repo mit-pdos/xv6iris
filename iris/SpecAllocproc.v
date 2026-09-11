@@ -209,6 +209,19 @@ Definition allocproc_post
           makes [UexecSlot.uvis_gen] a reading of the block. *)
        gen_own (pv_gen (us_V U)) (DfracOwn 1) (proc_addr j) pid
                (fun _ => True)%I ∗
+       (* ...AND THE TWO EXCLUSIVE GHOSTS THAT SAY THIS INCARNATION IS THE
+          SLOT'S CURRENT ONE, BOTH WHOLE ([SlotGen]).  The generation's
+          came out of the dormant block and was re-keyed here; the pid's
+          was INSERTED here, into the register <pid_lock> carries, at the
+          very store that put the pid in the cell -- the scan is what
+          proved the key free.  WHOLE for [gen_own]'s reason: the caller is
+          the party that splits, keeping a QUARTER of each for the child's
+          block ([ProcInv.proc_priv_core]) and depositing the other three
+          quarters under <wait_lock> ([WaitInv.gen_halves]); a failure tail
+          hands both wholes straight to freeproc, which is what deregisters
+          the pid. *)
+       slot_gen (proc_addr j) (DfracOwn 1) (pv_gen (us_V U)) ∗
+       pid_reg pid (DfracOwn 1) (pv_gen (us_V U)) ∗
        (* THE DESCRIPTOR-STATE FRAGMENTS, minted here with the block: this
           is the one function that chooses a process's [pv_fdg]
           ([ProcInv.proc_dormant_unused]), so it is the one place the
@@ -234,7 +247,7 @@ Definition allocproc_post
           holds carries it ([ProcInv.proc_priv_core]), because the ZOMBIE
           park keys its escrow at what the cell reads.  It joins the block
           at the same store the working directory, the token and the pair
-          do ([ProcInv.proc_priv_split_cwd] is five-way). *)
+          do ([ProcInv.proc_priv_split_cwd] is six-way). *)
        (∃ xsv : mword 32, p_xstate (proc_addr j) ↦₄{DfracOwn (1/2)} xsv) ∗
        (* THE SLOT IS NOW ALLOCATED.  Persistent, minted here out of
           [procs_avail]'s authority, and what the caller hands to

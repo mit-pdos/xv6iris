@@ -305,6 +305,13 @@ Section KforkPrologue.
            preserves it. *)
         ChildTok.gen_own (pv_gen (us_V Uc')) (DfracOwn 1) npa pid_c
           (fun _ => True)%I -∗
+        (* ...AND THE CHILD SLOT'S TWO EXCLUSIVE GHOSTS, BOTH WHOLE, off
+           the same arm: the forking process is the party that splits them
+           ([SlotGen.slot_gen_quarters], [pid_reg_quarters]) -- a quarter
+           into the child's block, three quarters into the deposit it makes
+           under <wait_lock> ([WaitInv.gen_halves]). *)
+        SlotGen.slot_gen npa (DfracOwn 1) (pv_gen (us_V Uc')) -∗
+        SlotGen.pid_reg pid_c (DfracOwn 1) (pv_gen (us_V Uc')) -∗
         (* the child's descriptor-state fragments, out of allocproc with its
            block AT [fdt0] -- the copy loop retypes them at the parent's own
            entries and the whole table parks with the child. *)
@@ -408,6 +415,16 @@ Section KforkPrologue.
            child's ghost state that CANNOT be dropped here -- the name is
            the slot's, not the incarnation's. *)
         WaitInv.ch_frag (ProcDefs.pv_chg (us_V Uc)) npa ∅ -∗
+        (* ...AND THE CHILD'S TWO EXCLUSIVE GHOSTS, BOTH WHOLE, beside the
+           row and for its reason: this exit frees the slot, and freeproc is
+           what puts the slot's generation back into the UNUSED block and
+           DELETES the pid's registration ([SpecFreeproc]).  Nothing was
+           split off them -- the split is at the block assembly, which this
+           path never reaches -- so they arrive whole.  The generation
+           itself ([ChildTok.gen_own]) is simply dropped: the name dies with
+           the incarnation that never started. *)
+        SlotGen.slot_gen npa (DfracOwn 1) (pv_gen (us_V Uc)) -∗
+        SlotGen.pid_reg pid_c (DfracOwn 1) (pv_gen (us_V Uc)) -∗
         (* ...AND THE CHILD SLOT'S HALF OF [p->xstate], beside the row and
            on its footing ([kfk_pro_exit3]'s own conjunct): this exit frees
            the slot, so the half goes back into freeproc's UNUSED block
@@ -815,7 +832,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Uc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & Hcgen & Hcfrag & Hcrow & Hcxb & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
+        "(%Hpures & Hheld & Hhart & Hcpriv & Hcgen & Hcsg & Hcpr & Hcfrag & Hcrow & Hcxb & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Uc as [Vc Mc].
       destruct Hpures as (Hrv & HjN & Hgamma & Hpidc & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
@@ -1179,6 +1196,8 @@ Section KforkPrologue.
         iSpecialize ("Hcont7c" with "Hpfrag").
         iSpecialize ("Hcont7c" with "HCpriv").
         iSpecialize ("Hcont7c" with "Hcrow").
+        iSpecialize ("Hcont7c" with "Hcsg").
+        iSpecialize ("Hcont7c" with "Hcpr").
         iSpecialize ("Hcont7c" with "Hcxb").
         iSpecialize ("Hcont7c" with "Hheld").
         iSpecialize ("Hcont7c" with "Hhart").
@@ -1471,7 +1490,7 @@ Section KforkPrologue.
                   (MkUstate (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc)) (us_M Up))
                   (ud_tfp (pv_upt (us_V Up))) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv Hpfrag HCpriv
-                        Hcgen Hcfrag Hcrow Hcxb
+                        Hcgen Hcsg Hcpr Hcfrag Hcrow Hcxb
                         Hmk Hheld Hhart Hfdsp Hirsp Hbslp Hkstk [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
         * exact HN10sp.
         * exact HN10s4.

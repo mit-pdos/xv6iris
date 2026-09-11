@@ -280,7 +280,7 @@ Section ParkCap.
      (* THE BOOT ARM HANDS THE BLOCK SPLIT, and the incarnation's pair is
         one of the pieces: it joins the block at the same store the working
         directory and the token do ([ProcInv.proc_priv_split_cwd] is
-        four-way), so a parker that has not closed the block yet carries it
+        six-way), so a parker that has not closed the block yet carries it
         beside them. *)
      (if steady then proc_priv γf pa pid U
       else proc_priv_nocwd γf pa pid U
@@ -295,6 +295,11 @@ Section ParkCap.
               ([SpecKexec.exec_slot_pre]). *)
            ∗ gen_kq (pv_gen (us_V U)) pa pid (fun _ => True)%I
            ∗ my_pay (pv_gen (us_V U)) (fun _ => True)%I
+           (* ...AND THE TWO QUARTERS ([SlotGen.gen_halves_priv]), on the
+              pair's footing: <init>'s three quarters were dropped at the
+              split ([SpecUserinit]) -- it has no parent, so no entry is
+              deposited under <wait_lock> and its parent cell stays 0. *)
+           ∗ gen_halves_priv pa pid (pv_gen (us_V U))
            (* ...and the slot's half of [p->xstate], which the block the
               boot arm closes carries ([ProcInv.proc_priv_core]) *)
            ∗ (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv)) ∗

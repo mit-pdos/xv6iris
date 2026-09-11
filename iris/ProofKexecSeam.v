@@ -532,7 +532,7 @@ End KexecBFrameB.
 (*  THE TWO OUTPUT STATES.                                                *)
 (* ===================================================================== *)
 Section KexecBSeam.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.  (* NB: icacheG + icfg come
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !wchG Σ}.  (* NB: icacheG + icfg come
               from [fileG] -- ProofKexecACode.v's header records why a standalone
               [!icacheG Σ] beside [!fileG Σ] is a SECOND instance. *)
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.

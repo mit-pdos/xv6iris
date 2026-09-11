@@ -371,12 +371,18 @@ Section KexitSeals.
     (* ...AND THE EXIT DEPOSIT, spent here on the escrow the block parks *)
     my_pay (pv_gen (us_V U)) Q -∗
     Q (xstate_val xsv) -∗
+    (* ...AND THE INCARNATION'S TWO HALVES, split off with the working
+       directory like the pair above ([ProcInv.proc_priv_split_cwd]) and
+       parked unchanged: a ZOMBIE block holds what its process's block held
+       ([SlotGen.gen_halves_priv]), and the reaper is what reunites them
+       with the deposit the parent's entry carries. *)
+    gen_halves_priv (proc_addr j) pid (pv_gen (us_V U)) -∗
     park_pay (proc_addr j) ZOMBIE.
   Proof.
     intros Hof Hcwd. rewrite /park_pay inv_dormant_ZOMBIE.
-    iIntros "Hpriv Hgq Hsp Hir Hbs Hkst Hrow Hxs Hmy HQ".
+    iIntros "Hpriv Hgq Hsp Hir Hbs Hkst Hrow Hxs Hmy HQ Hgh".
     iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid U Q xsv Hof Hcwd
-              with "Hpriv Hgq Hsp Hir Hbs Hkst Hrow Hxs Hmy HQ").
+              with "Hpriv Hgq Hsp Hir Hbs Hkst Hrow Hxs Hmy HQ Hgh").
   Qed.
 
 End KexitSeals.

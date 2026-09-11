@@ -2003,7 +2003,7 @@ Proof.
   done.
 Qed.
 
-Lemma is_kstack_agree_x `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !bioslotG Σ} `{!ufdG Σ}
+Lemma is_kstack_agree_x `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ, !bioslotG Σ} `{!ufdG Σ}
     (ξ1 ξ2 : CtxId) (pa ks ks' : mword 64) :
   is_kstack (XI := ξ1) pa ks -∗ is_kstack (XI := ξ2) pa ks' -∗ ⌜ks = ks'⌝.
 Proof.

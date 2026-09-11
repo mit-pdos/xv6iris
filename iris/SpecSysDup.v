@@ -202,7 +202,7 @@ Proof.
   exact (dup_frags_rows sts fd0 fd1 _ FdClosed H0 H1 Hne).
 Qed.
 Section SpecSysDup.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
      carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
      definitions below mention the block, so the section has to bind it. *)
@@ -313,7 +313,7 @@ Section SpecSysDup.
 
 End SpecSysDup.
 
-Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
+Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
     (b : bool) (lks : gset string) :=
@@ -357,7 +357,7 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG
 
 Module Type SYSDUP.
   Parameter wp_sys_dup_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
     (b : bool) (lks : gset string),

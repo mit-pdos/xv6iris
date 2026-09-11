@@ -433,9 +433,11 @@ Proof.
 Qed.
 
 Section BootBssChain.
-  (* NO [fileG] BINDER -- see [BootBss]. *)
+  (* NO [fileG] BINDER -- see [BootBss].  [wchG] IS bound: the proc slots
+     this chain carves reach [ProcInv.proc_dormant_nofd] and
+     [SchedCtx.pid_lock_share], both of which name the wait-lock class. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            !irefslotG Σ}.
+            !irefslotG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
 
   (* ONE hart's memory share, exactly as [BootHart.boot_hart_res] spells it

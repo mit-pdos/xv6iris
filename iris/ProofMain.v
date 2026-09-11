@@ -882,7 +882,8 @@ Section ProofMain.
        (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗ proc_pub (proc_addr i)) -∗
     (* <pid_lock>'s quarter of every pid cell: the second half of
        [PidLock.nextpid_res], sealed with the .data word two assemblies down *)
-    ([∗ list] i ∈ seq 0 NPROC, pid_lock_share (proc_addr i)) -∗
+    ([∗ list] i ∈ seq 0 NPROC,
+       pid_lock_share (proc_addr i) (mword_of_int 0 : mword 32)) -∗
     fd_slots (NPROC * (NOFILE + FDSPARE)) -∗
     iref_slots (NPROC * (1 + IREFSPARE)) -∗
     (* the bio allowance for every slot, three units each, routed to procinit
@@ -948,7 +949,7 @@ Section ProofMain.
     (* THE ORPHAN VAR IS THE MIDDLE ONE ([WaitInv.children_boot]): the boot
        fupd mints it at [∅] beside the map's authority, and it goes into
        <wait_lock>'s payload with the children half. *)
-    iDestruct "Hchb" as "[Hchres [Horph Hchrows]]".
+    iDestruct "Hchb" as "[Hchres [Horph [Hpreg Hchrows]]]".
     iDestruct "Hlkmem" as (vkl vkn vkc) "(Hkw & Hkn & Hkc)".
     iDestruct "Hkpt" as (kpt0) "Hkpt".
     (* ---- +0x6e jal kinit ---- *)
@@ -1163,7 +1164,7 @@ Section ProofMain.
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ alp_pid_lock "nextpid"%string nextpid_res_at
-            with "Hpnm Hrun Hpw Hpc0 [Hnpid Hpshare]") as "[Hrun Hpid0]".
+            with "Hpnm Hrun Hpw Hpc0 [Hnpid Hpshare Hpreg]") as "[Hrun Hpid0]".
     (* the payload's [1 <= nextpid <= PIDMAX] is FOUNDED here: the .data
        word arrives at the pinned value the loader left ([BootShared]'s
        carve), so the invariant the scan keeps has an inhabitant. *)
@@ -1172,7 +1173,16 @@ Section ProofMain.
         assert (Hv : bv_unsigned (mword_of_int 1 : mword 32) = 1)
           by (vm_compute; reflexivity).
         rewrite Hv. unfold PIDMAX. lia. }
-      iFrame "Hpshare". }
+      (* THE PID REGISTER ENTERS THE PAYLOAD HERE, empty: nothing has been
+         handed out, and the .bss carve pinned every pid cell at 0, so the
+         domain fact holds vacuously ([SlotGen.pid_reg_dom_empty]). *)
+      iExists (replicate NPROC (mword_of_int 0 : mword 32)),
+              (∅ : gmap Z gname).
+      iFrame "Hpreg". iSplitR.
+      { iPureIntro. split; [apply length_replicate | apply pid_reg_dom_empty]. }
+      iDestruct (pid_shares_gather NPROC 0 (mword_of_int 0 : mword 32)
+                   with "Hpshare") as "Hpshare".
+      iApply (big_sepL_mono with "Hpshare"). iIntros (i v _) "Hs". iExact "Hs". }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hpid0" as (γp) "#Hpidlock".
     (* ---- ASSEMBLY 2c: the wait_lock, and it is the SAME move.  procinit

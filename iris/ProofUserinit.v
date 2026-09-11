@@ -436,7 +436,7 @@ Section ProofUserinit.
         rewrite avail_sub_Some in Hz0. unfold avail_zero in Hz0.
         exfalso. lia. }
     iDestruct "Hgot" as (j γl ch pid U root tfp ks rest nc)
-      "(%Hfacts & Hheld & Hhart & Hpriv & Hgen & Hfrag & Hrow & Hxb & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
+      "(%Hfacts & Hheld & Hhart & Hpriv & Hgen & Hsg & Hpr & Hfrag & Hrow & Hxb & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
         & Hctx & Hcg & Hcpu & Hpay & Hkenv & Hpav)".
     destruct U as [V M].
     destruct Hfacts as (Hrv & Hj & Hgl & _ & _ & _ & Hcwd0 & Hrest & Hnc).
@@ -452,6 +452,16 @@ Section ProofUserinit.
     iApply fupd_wp.
     iMod (gen_split with "Hgen") as "(_ & Hkq & #Hmp)".
     iModIntro.
+    (* ...AND THE TWO EXCLUSIVE GHOSTS, SPLIT THE SAME WAY AND THE THREE
+       QUARTERS DROPPED.  They are what a forking parent deposits under
+       <wait_lock> for its child ([WaitInv.gen_halves]); <init> has no
+       parent, its parent cell is 0 at boot and nothing ever writes it, so
+       there is no entry for its slot and nothing to hold them.  The
+       quarters ride the park into its block, exactly as the pair does. *)
+    rewrite slot_gen_quarters. iDestruct "Hsg" as "[_ Hsg]".
+    rewrite pid_reg_quarters. iDestruct "Hpr" as "[_ Hpr]".
+    iAssert (gen_halves_priv (proc_addr j) pid (pv_gen V))
+      with "[Hsg Hpr]" as "Hgh"; [iFrame "Hsg Hpr" |].
     (* [Hkfree] is KEPT: the paid park is anchored on the child's free
        kernel stack ([ProcDefs.kstack_free_at] spells it at [ks] below). *)
     iDestruct "Hks" as "#Hks".
@@ -823,7 +833,7 @@ Section ProofUserinit.
             (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M) fdt0
             ∅ Hwf Hrest
             with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hrow Hbundle
-                  [Hks Hctx Hpriv Hkq Hxb Hfd Hirs]")
+                  [Hks Hctx Hpriv Hkq Hgh Hxb Hfd Hirs]")
       as "[Hrun Hpctx]".
     (* built row by row, not framed: the mode row is an [if] the frame
        cannot see through, and its boot arm carries [first_boot_persist],
@@ -831,7 +841,7 @@ Section ProofUserinit.
     { rewrite /park_child.
       iSplitR; [iExact "Hks"|].
       iSplitL "Hctx"; [iExact "Hctx"|].
-      iSplitL "Hpriv Hkq Hxb"; [| iSplitL "Hfd"; [iExact "Hfd" | iExact "Hirs"]].
+      iSplitL "Hpriv Hkq Hgh Hxb"; [| iSplitL "Hfd"; [iExact "Hfd" | iExact "Hirs"]].
       (* the three block rows the boot arm carries, and the incarnation's
          pair beside them *)
       iDestruct "Hpriv" as "(Hpnc & Hcref & Hfb)".
@@ -839,7 +849,8 @@ Section ProofUserinit.
       iSplitL "Hcref"; [iExact "Hcref"|].
       iSplitL "Hfb"; [iExact "Hfb"|].
       iSplitL "Hkq"; [iExact "Hkq"|].
-      iSplitR; [iExact "Hmp" | iExact "Hxb"]. }
+      iSplitR; [iExact "Hmp" |].
+      iSplitL "Hgh"; [iExact "Hgh" | iExact "Hxb"]. }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")
       as "Hpwhole".

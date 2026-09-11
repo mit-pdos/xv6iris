@@ -227,11 +227,11 @@ Section ProofFreeproc.
 
   Lemma wp_freeproc_sconf
       (γp γa : gname) (mm : regfile)
-      (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
+      (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
       (ilvl : nat) (lks : gset string)
-    : wp_freeproc_sconf_body γp γa mm j γl V pid st ch opt otf K eb pme ilvl lks.
+    : wp_freeproc_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks.
   Proof.
     cbv beta delta [wp_freeproc_sconf_body].
     intros pcE pa ret_tgt HK Hj Hilvl Ha0 Hbelow_pid.
@@ -242,7 +242,7 @@ Section ProofFreeproc.
     pose proof (fr_cap K HK) as (Hc4 & Hckf & Hcpf).
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hcpu #Htext Hpc #Hplk Hheld Hrest Hrow Hxb Hpg Htf #Henv Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hplk Hheld Hrest Hrow Hsg Hpr Hxb Hpg Htf #Henv Hcont".
     iDestruct "Hrest" as "(%Hpure & Hpid & Hfields & Hof & Hunits & Hspare & Hkst & Hctx)".
     destruct Hpure as (Hofv & Hcwdv & Hszb).
     iDestruct "Hheld" as "(Hlk & Hstate & Hpsg & Hchan & Hpub)".
@@ -420,7 +420,7 @@ Section ProofFreeproc.
         p_sz pa ↦₈ pv_sz V -∗
         WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hr24 Hr16 Hr8 Hr0 Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid Hpid2
-             Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hrow]" as "ZERO".
+             Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hrow Hsg Hpr]" as "ZERO".
     { iIntros (CIDz Hsz0 me pgv).
       iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcpu Hpc Hpg Htf Hsz".
       (* release below spells the window index at its own exit arm; the two
@@ -526,12 +526,15 @@ Section ProofFreeproc.
       assert (Hacq_s1 : macq !!! Regidx Rs1 = pa).
       { rewrite (callee_saved_lookup Hcsacq Rs1 ltac:(vm_compute; reflexivity)). exact HZ3s1. }
       assert (Hacq_thr : fr_thr mm macq) by exact (fr_thr_cs mm Z3 macq Hcsacq HZ3thr).
-      (* the lock's quarter of THIS slot's pid cell, out of its payload *)
-      iDestruct "HR" as "[Hnp Hshares]".
-      assert (Hsj : seq 0 NPROC !! j = Some j). { apply lookup_seq_lt. exact Hj. }
-      iDestruct (big_sepL_lookup_acc _ (seq 0 NPROC) j j Hsj with "Hshares") as "[Hshj Hshback]".
-      iDestruct "Hshj" as (pid3) "Hpid3".
-      iEval (rewrite Hpaj) in "Hpid3".
+      (* the lock's quarter of THIS slot's pid cell, out of its payload,
+         AND the pid register whose key this store is about to free *)
+      iDestruct "HR" as "[Hnp (%pids & %R & [%Hplen %Hpdom] & Hshares & Hauth)]".
+      assert (Hsj : is_Some (pids !! j)) by (apply lookup_lt_is_Some_2; rewrite Hplen; exact Hj).
+      destruct Hsj as [pid3 Hsj].
+      iDestruct (big_sepL_insert_acc _ pids j pid3 Hsj with "Hshares") as "[Hshj Hshback]".
+      rewrite /pid_lock_share_at.
+      iEval (rewrite Hpaj) in "Hshj".
+      iRename "Hshj" into "Hpid3".
       (* +0x36 sw zero,48(s1) : p->pid = 0.  ALL THREE pieces are needed --
          the block's half, [proc_pub]'s quarter and <pid_lock>'s quarter. *)
       iDestruct (p_pid_join3 pa pid pid pid3 with "Hpid2 Hpid Hpid3") as "[%Hpeq Hpidf]".
@@ -544,10 +547,25 @@ Section ProofFreeproc.
       iIntros "Hcg Hpc Hpidf".
       iEval (rgne; rewrite Hacq_s1 fr_off_48) in "Hpidf".
       iDestruct (p_pid_split3 with "Hpidf") as "(Hpid2 & Hpid & Hpid3)".
-      iDestruct ("Hshback" with "[Hpid3]") as "Hshares".
-      { iEval (rewrite -Hpaj) in "Hpid3". iExists _. iExact "Hpid3". }
-      iAssert nextpid_res with "[Hnp Hshares]" as "HR".
-      { rewrite /nextpid_res /nextpid_res_at. iFrame "Hnp Hshares". }
+      iDestruct ("Hshback" $! (mword_of_int 0 : mword 32) with "[Hpid3]") as "Hshares".
+      { rewrite /pid_lock_share_at. iEval (rewrite -Hpaj) in "Hpid3". iExact "Hpid3". }
+      (* THE REGISTRATION DIES HERE, at the store that zeroes the cell: the
+         reaper reunited the incarnation's two shares and handed this
+         function the whole fragment, so the key goes out of the authority
+         and the payload's domain fact is re-established against the list
+         with slot [j] now holding 0 ([SlotGen.pid_reg_dom_delete]). *)
+      iApply fupd_wp.
+      iMod (pid_reg_delete R pid g with "Hauth Hpr") as "Hauth".
+      iModIntro.
+      iAssert nextpid_res with "[Hnp Hshares Hauth]" as "HR".
+      { rewrite /nextpid_res /nextpid_res_at. iFrame "Hnp".
+        iExists (<[j := (mword_of_int 0 : mword 32)]> pids),
+                (delete (bv_unsigned pid) R).
+        iFrame "Hshares Hauth". iPureIntro. split.
+        - rewrite length_insert. exact Hplen.
+        - apply (pid_reg_dom_delete R pids j pid (mword_of_int 0 : mword 32)
+                   Hpdom).
+          rewrite (proj2 Hpeq). exact Hsj. }
       assert (Hq3a : add_vec_int (mword_of_int (FR + 0x36) : mword 64) 4 = mword_of_int (FR + 0x3a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq3a) in "Hpc".
@@ -801,7 +819,7 @@ Section ProofFreeproc.
       iEval (rewrite -Hxhalf2 ctx_word4_pointsto_frac_split) in "Hxstate".
       iDestruct "Hxstate" as "[Hxs1 Hxs2]".
       iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxs1 Hpid2]
-                                  [Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hrow Hxs2 Hpg Htf]").
+                                  [Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hrow Hsg Hxs2 Hpg Htf]").
       { (* callee_saved mm E3 *)
         assert (HE3thr : fr_thr mm E3).
         { thr_done. }
@@ -833,9 +851,10 @@ Section ProofFreeproc.
         iApply (fp_to_dormant_unused pa
                   (MkPPriv (zero_reg : mword 64) (pv_upt V) (pv_tf V)
                            (pv_ofile V) (pv_fdg V) (pv_cwd V) (<[0%nat := (mword_of_int 0 : mword 8)]> (pv_name V))
-                           (pv_cwi V) (pv_gen V) (pv_chg V))
+                           (pv_cwi V) g (pv_chg V))
                   (mword_of_int 0 : mword 32) (pv_sz V) (mword_of_int 0 : mword 32)
-                  with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hrow] [Hxs2] [Hpg] [Htf]").
+                  ltac:(vm_compute; reflexivity)
+                  with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hrow] [Hsg] [Hxs2] [Hpg] [Htf]").
         - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
           iSplitR.
           { iPureIntro. split_and!; [exact Hofv | exact Hcwdv |].
@@ -847,6 +866,8 @@ Section ProofFreeproc.
           rewrite /pname_cells. iExact "Hnm".
         (* the row's key is [pv_chg], which the emptied block keeps *)
         - cbn [pv_chg]. iExact "Hrow".
+        (* ...and so is [pv_gen], which the slot's generation is keyed at *)
+        - cbn [pv_gen]. iExact "Hsg".
         - iExact "Hxs2".
         - rewrite /fp_pt. iExact "Hpg".
         - rewrite /fp_tf. iExact "Htf". } }

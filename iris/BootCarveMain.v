@@ -1945,12 +1945,18 @@ Section BootCarveMain.
      ((∃ ch : SailStdpp.Values.mword 64,
          TsoCtx.ctx_word_pointsto XI (p_chan a) (DfracOwn 1) ch) ∗ proc_pub a) ∗
      (* the parent cell, which belongs to wait_lock rather than to p->lock --
-        see the split at +56 below *)
-     (∃ pv : SailStdpp.Values.mword 64,
-        TsoCtx.ctx_word_pointsto XI (p_parent a) (DfracOwn 1) pv) ∗
+        see the split at +56 below.  PINNED AT ZERO, like the four cells
+        above: [struct proc] is .bss, and the lock's payload needs the
+        value -- what [WaitInv.gen_halves] owes at a parent cell is decided
+        by whether it is zero. *)
+     TsoCtx.ctx_word_pointsto XI (p_parent a) (DfracOwn 1) (zero_reg : mword 64) ∗
      (* ...and <pid_lock>'s quarter of the pid cell (the third owner of +48,
-        since upstream ded23f2's pid scan reads it under that lock alone) *)
-     pid_lock_share a)%I.
+        since upstream ded23f2's pid scan reads it under that lock alone),
+        PINNED AT ZERO for the parent cell's reason: <pid_lock>'s payload
+        carries the 64 values as a list ([PidLock.nextpid_res_at]) and the
+        dormant block owes [p->pid = 0] at UNUSED
+        ([SlotGen.gen_halves_dorm]). *)
+     pid_lock_share a (mword_of_int 0 : mword 32))%I.
 
   Lemma boot_proc_slot `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
@@ -2062,10 +2068,14 @@ Section BootCarveMain.
                  with "Hcl Hkl") as (vkl) "Hkl".
     iDestruct (boot_cran_cell4 g (A + 44) Hmem ltac:(lia) ltac:(lia) M44
                  with "Hcl Hxs") as (vxs) "Hxs".
-    iDestruct (boot_cran_cell4 g (A + 48) Hmem ltac:(lia) ltac:(lia) M48
-                 with "Hcl Hpid") as (vpid) "Hpid".
-    iDestruct (boot_cran_cell8 g (A + 56) Hmem ltac:(lia) ltac:(lia) M56
-                 with "Hcl Hpar") as (vpar) "Hpar".
+    iDestruct (boot_cran_cell4_bss g (A + 48) (mword_of_int 0 : mword 32) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia) M48
+                 ltac:(intros j _; apply (nth_byte_zero (mword_of_int 0 : mword 32) j);
+                       vm_compute; reflexivity)
+                 with "Hcl Hpid") as "Hpid".
+    iDestruct (boot_cran_cell8_bss g (A + 56) (zero_reg : mword 64) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia) M56 nth_byte_zero8
+                 with "Hcl Hpar") as "Hpar".
     iDestruct (boot_cran_cell8 g (A + 64) Hmem ltac:(lia) ltac:(lia) M64
                  with "Hcl Hks") as (vks) "Hks".
     iDestruct (boot_cran_cell8_bss g (A + 72) (zero_reg : mword 64) Hmem
@@ -2095,11 +2105,11 @@ Section BootCarveMain.
     (* the pid cell has THREE owners: the dormant block's half, the slot
        lock's quarter ([proc_pub]) and <pid_lock>'s quarter *)
     iAssert (TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 48))
-               (DfracOwn (1/2)) vpid ∗
+               (DfracOwn (1/2)) (mword_of_int 0 : mword 32) ∗
              (TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 48))
-                (DfracOwn (1/4)) vpid ∗
+                (DfracOwn (1/4)) (mword_of_int 0 : mword 32) ∗
               TsoCtx.ctx_word4_pointsto XI (pa_of_z (A + 48))
-                (DfracOwn (1/4)) vpid))%I with "[Hpid]"
+                (DfracOwn (1/4)) (mword_of_int 0 : mword 32)))%I with "[Hpid]"
       as "[Hpid1 [Hpid2 Hpid3]]".
     { rewrite -!TsoCtx.ctx_word4_pointsto_frac_split.
       assert (Hq : (1/2 + (1/4 + 1/4))%Qp = 1%Qp) by compute_done.
@@ -2131,10 +2141,12 @@ Section BootCarveMain.
                  (* the fd-state name is JUNK on a dormant slot: it has no
                     descriptors, and allocproc mints the real one. *)
                  1%positive
-                 (zero_reg : mword 64) bs 0 1%positive 1%positive), vpid.
+                 (zero_reg : mword 64) bs 0 1%positive 1%positive),
+        (mword_of_int 0 : mword 32).
       cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
       iSplitR; [iPureIntro; split_and!;
-                [reflexivity | reflexivity | vm_compute; discriminate] |].
+                [reflexivity | reflexivity | vm_compute; discriminate
+                 | vm_compute; reflexivity] |].
       iSplitL "Hpid1"; [iExact "Hpid1" |].
       iSplitL "Hsz Hcwd Hnm".
       { iSplitL "Hsz"; [iExact "Hsz" |]. iSplitL "Hcwd"; [iExact "Hcwd" |].
@@ -2145,11 +2157,11 @@ Section BootCarveMain.
       iSplitL "Hpg"; [iExact "Hpg" |]. iExact "Htf". }
     iSplitR "Hpar Hpid3".
     { iSplitL "Hch"; [iExists vch; iExact "Hch" |].
-      iExists vkl, vxs, vpid.
+      iExists vkl, vxs, (mword_of_int 0 : mword 32).
       iSplitL "Hkl"; [iExact "Hkl" |]. iSplitL "Hxs2"; [iExact "Hxs2" |].
       iExact "Hpid2". }
-    iSplitL "Hpar"; [iExists vpar; iExact "Hpar" |].
-    iExists vpid. iExact "Hpid3".
+    iSplitL "Hpar"; [iExact "Hpar" |].
+    iExact "Hpid3".
   Qed.
 
   (* ...and the 64 slots, out of the one [proc[]] range: ONE family, whose
@@ -2167,10 +2179,11 @@ Section BootCarveMain.
           proc_pub (proc_addr i)) ∗
        (* ...and the parent cells, which are wait_lock's, not p->lock's *)
        ([∗ list] i ∈ seq 0 NPROC,
-          ∃ pv : SailStdpp.Values.mword 64,
-            TsoCtx.ctx_word_pointsto XI (p_parent (proc_addr i)) (DfracOwn 1) pv) ∗
+          TsoCtx.ctx_word_pointsto XI (p_parent (proc_addr i)) (DfracOwn 1)
+            (zero_reg : mword 64)) ∗
        (* ...and <pid_lock>'s quarter of every pid cell, which is that lock's *)
-       ([∗ list] i ∈ seq 0 NPROC, pid_lock_share (proc_addr i)).
+       ([∗ list] i ∈ seq 0 NPROC,
+          pid_lock_share (proc_addr i) (mword_of_int 0 : mword 32)).
   Proof.
     intro Hmem. iIntros "#Hcl H".
     iDestruct (boot_cran_stride_family_seq g proc_slot_raw

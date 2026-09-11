@@ -344,12 +344,15 @@ Definition forkret_park_paid_body
           (* ...AND THE INCARNATION'S PAIR, at the trivial payload: the
              boot park is <init>'s, which has no parent to owe, and the
              pair joins the block at the same store the working directory
-             and the token do ([ProcInv.proc_priv_split_cwd] is four-way).
+             and the token do ([ProcInv.proc_priv_split_cwd] is six-way).
              forkret's boot arm hands the persistent half to
              kexec("/init") for the exec'd image's slot
              ([SpecKexec.exec_slot_pre]). *)
           ∗ gen_kq (pv_gen (us_V U)) pa pid (fun _ => True)%I
           ∗ my_pay (pv_gen (us_V U)) (fun _ => True)%I
+          (* ...and the two quarters, on the pair's footing
+             ([SlotGen.gen_halves_priv]) *)
+          ∗ gen_halves_priv pa pid (pv_gen (us_V U))
           ∗ (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv)) -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗

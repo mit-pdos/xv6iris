@@ -140,7 +140,7 @@ Qed.
 Module FetchstrProof (Myproc : MYPROC) (Copyinstr : COPYINSTR) (Strlen : STRLEN) : FETCHSTR.
 
 Section ProofFetchstr.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=

@@ -493,7 +493,7 @@ End ProofKforkParts.
 (*  THE RESOURCE-LEVEL BRIDGES.                                         *)
 (* =================================================================== *)
 Section KforkRes.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
 
@@ -720,7 +720,7 @@ End KforkRes.
 (*  [proc_pt_wf]'s last conjunct -- see [proc_priv_tfp_valid].            *)
 (* =================================================================== *)
 Section KforkFreeproc.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* IT TAKES THE DEFICIT BLOCK, and that is forced: the premise

@@ -1264,7 +1264,26 @@ Section ProcInv.
         public payload because the ZOMBIE park keys its escrow at the
         cell's status ([ChildTok.exit_tok]) and the park is built out of
         this block. *)
-     (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv))%I.
+     (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv) ∗
+     (* ---- AND THE TWO HALVES THAT SAY THIS INCARNATION IS THE CURRENT
+        ONE ([SlotGen.gen_halves_priv]) -----------------------------------
+        A QUARTER of -- slot [pa]'s current generation is [pv_gen] -- and
+        a quarter of -- this pid is registered to [pv_gen].  The other
+        THREE QUARTERS of each are in <wait_lock>'s payload
+        ([WaitInv.gen_halves]), deposited by whoever forked this process
+        (the split is uneven for [SlotGen.slot_gen_quarters]'s reason),
+        and the two meet at the reap: the reaper agrees the slot shares to
+        learn that the ZOMBIE block in its hands IS the entry its parent
+        cell names, and agrees the pid shares to learn that no other child
+        of its own carries that pid.
+          The pair is LINEAR and there is exactly one, which is what makes
+        both readings exclusive rather than historical -- [ChildTok]'s own
+        [gen_slot] / [gen_pid] are persistent and say only that this
+        generation ONCE ran in this slot at this pid.
+          BUNDLED as one conjunct rather than two, because it always moves
+        as one: the ZOMBIE park is literally this pair crossing into
+        [ProcDefs.proc_dormant]'s [SlotGen.gen_halves_dorm]. *)
+     gen_halves_priv pa pid (pv_gen (us_V U)))%I.
 
   (* ...AND ITS FILE-LAYER-FREE PART, WHICH IS WHAT THE BLOCK LAYER TAKES.
      [ProcDefs.proc_priv_bare] is this minus [cwd_ref]; the note at its
@@ -1277,7 +1296,8 @@ Section ProcInv.
     first_tok ∗
     (∃ Q : Z -> iProp Σ,
        gen_kq (pv_gen (us_V U)) pa pid Q ∗ my_pay (pv_gen (us_V U)) Q) ∗
-    (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv).
+    (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv) ∗
+    gen_halves_priv pa pid (pv_gen (us_V U)).
   Proof.
     rewrite /proc_priv_core /proc_priv_bare. iSplit.
     - iIntros "(%A & %B & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs)".
@@ -1385,7 +1405,7 @@ Section ProcInv.
      ([ChildTok.gen_set]) -- which is possible only at full ownership.  The
      split into the kernel's quarter and the persistent [my_pay] happens at
      the same store the working directory and the token join at
-     ([proc_priv_split_cwd] is four-way for that reason), which is where
+     ([proc_priv_split_cwd] is six-way for that reason), which is where
      the block becomes [proc_priv]. *)
   Definition proc_priv_nocwd (γf : gname) (pa : mword 64) (pid : mword 32)
       (U : ustate) : iProp Σ :=
@@ -1397,13 +1417,17 @@ Section ProcInv.
      tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) ∗
      proc_ofiles γf (pv_fdg (us_V U)) pa (pv_ofile (us_V U)))%I.
 
-  (* FOUR-WAY since the generation joined the block.  The deficit block is
-     the PRE-PARK shape -- what allocproc returns -- and neither the working
-     directory, nor [FirstTok.first_tok], nor the incarnation's own pair is
-     installed yet, so all three split off at the same seam and rejoin at
-     the same store.  The pair is LAST: kfork chooses the payload and splits
-     ([ChildTok.gen_set], [gen_split]) between allocproc's return and this
-     store, and userinit does the same at the trivial payload. *)
+  (* SIX-WAY.  The deficit block is the PRE-PARK shape -- what allocproc
+     returns -- and none of the working directory, [FirstTok.first_tok],
+     the incarnation's own pair, its half of [p->xstate] or its two
+     exclusive quarters is installed yet, so all of them split off at the
+     same seam and rejoin at the same store.  The generation's pieces are
+     LAST: kfork chooses the payload and splits it ([ChildTok.gen_set],
+     [gen_split]) and splits the two exclusive ghosts
+     ([SlotGen.slot_gen_quarters], [pid_reg_quarters]) between allocproc's
+     return and this store, keeping the three quarters for the deposit it
+     makes under <wait_lock>; userinit does the same at the trivial payload
+     and drops them (init has no parent and is never reaped). *)
   Lemma proc_priv_split_cwd (γf : gname) (pa : mword 64) (pid : mword 32)
       (U : ustate) :
     proc_priv γf pa pid U ⊣⊢
@@ -1411,7 +1435,8 @@ Section ProcInv.
     first_tok ∗
     (∃ Q : Z -> iProp Σ,
        gen_kq (pv_gen (us_V U)) pa pid Q ∗ my_pay (pv_gen (us_V U)) Q) ∗
-    (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv).
+    (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv) ∗
+    gen_halves_priv pa pid (pv_gen (us_V U)).
   Proof.
     rewrite /proc_priv /proc_priv_core /proc_priv_nocwd.
     iSplit.
@@ -1483,8 +1508,10 @@ Section ProcInv.
         ([proc_priv_core]): this shape drops the MEMORY conjunct and
         nothing else *)
      (∃ Q : Z -> iProp Σ, gen_kq (pv_gen V) pa pid Q ∗ my_pay (pv_gen V) Q) ∗
-     (* ...and the process's half of [p->xstate], for the same reason *)
-     (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv))%I.
+     (* ...and the process's half of [p->xstate] and the incarnation's two
+        halves, for the same reason *)
+     (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv) ∗
+     gen_halves_priv pa pid (pv_gen V))%I.
 
   (* THE TRAPFRAME BOUND, off the residue's own half of the block.  Same
      conjunct [proc_priv_sz_maxsz] reads, at the form the trap loop holds
@@ -1766,12 +1793,18 @@ Section ProcInv.
        same seam: it comes out of the dormant block with the row
        ([SpecAllocproc.allocproc_post]) and joins the block here. *)
     (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv) -∗
+    (* ...AND THE INCARNATION'S TWO HALVES, at the same seam and for the
+       pair's reason: the caller holds both WHOLE from allocproc
+       ([SlotGen.slot_gen] / [pid_reg] at [DfracOwn 1]) and splits them
+       here, keeping the other halves for the deposit it makes under
+       <wait_lock> ([WaitInv.gen_halves]). *)
+    gen_halves_priv pa pid (pv_gen (us_V U)) -∗
     proc_priv γf pa pid (us_pt U P ws).
   Proof.
-    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho Hc Hft Hgq Hxs".
+    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho Hc Hft Hgq Hxs Hgh".
     iDestruct (proc_priv_nocwd_intro γf pa pid U P ws Hsz Hbel
                  with "Hpid Hf Hpt Htf Ho") as "H".
-    iApply proc_priv_split_cwd. iFrame "H Hft Hgq Hxs".
+    iApply proc_priv_split_cwd. iFrame "H Hft Hgq Hxs Hgh".
     by cbn [upd_pt pv_cwd pv_fdg pv_cwi pv_gen pv_chg].
   Qed.
 
@@ -2587,11 +2620,19 @@ Section ProcInv.
      thing boot has to route, and [proc_dormant_seal] is that step.  Fixed at
      UNUSED -- procinit produces no ZOMBIEs -- so the two address-space cells
      are the zeroed pair. *)
+  (* THE PID CELL IS ZERO, and that is a fact about the IMAGE: [struct proc]
+     is .bss, so the carve hands this cell out pinned
+     ([BootCarveMain.boot_proc_slot], with [BootCarve.boot_cran_cell4_bss]).
+     It is here because the UNUSED dormant block owes it
+     ([SlotGen.gen_halves_dorm]) and this is the shape the block is sealed
+     from: the pid register's domain fact ([SlotGen.pid_reg_dom]) survives
+     allocproc's [p->pid = pid] only because the cell it overwrites held 0,
+     and 0 is registered to nothing. *)
   Definition proc_dormant_nofd (pa : mword 64) : iProp Σ :=
     (∃ (V : pprivate) (pid : mword 32),
        ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
         pv_cwd V = (zero_reg : mword 64) /\
-        uint (pv_sz V) <= uvm_maxsz⌝ ∗
+        uint (pv_sz V) <= uvm_maxsz /\ bv_unsigned pid = 0⌝ ∗
        p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
        proc_fields pa (DfracOwn 1) V ∗
        ofile_cells pa (pv_ofile V) ∗
@@ -2624,23 +2665,32 @@ Section ProcInv.
      and the SEAL is what writes that name into the block ([upd_chg]): the
      [pv_chg] the .bss carve left is junk, exactly as [pv_fdg] is until
      [proc_dormant_unused] chooses one. *)
-  Lemma proc_dormant_seal (pa : mword 64) (γ0 : gname) :
+  (* ...AND SO DOES THE SLOT'S GENERATION WHOLE ([SlotGen.slot_gen]), by the
+     row's route and for its reason: boot is the only party that can mint
+     one ([WaitInv.children_res_alloc], NPROC of them), and it arrives at a
+     name of its own which the SEAL writes into the block ([upd_gen]) --
+     the [pv_gen] the .bss carve left is junk until then, exactly as
+     [pv_chg] is. *)
+  Lemma proc_dormant_seal (pa : mword 64) (γ0 g : gname) :
     proc_dormant_nofd pa -∗ fd_slots (NOFILE + FDSPARE) -∗
     iref_slots (1 + IREFSPARE) -∗ bslots 3 -∗ kstack_free pa -∗
-    ch_frag γ0 pa ∅ -∗
+    ch_frag γ0 pa ∅ -∗ slot_gen pa (DfracOwn 1) g -∗
     proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hxs & Hctx & Hpg & Htf) Hs Hir Hbs Hkst Hch".
+    iIntros "(%V & %pid & [%Hof [%Hcwd [%Hsz %Hpid0]]] & Hpid & Hf & Ho & Hxs & Hctx & Hpg & Htf) Hs Hir Hbs Hkst Hch Hsg".
     iDestruct (fd_slots_split with "Hs") as "[Hs Hsp]".
-    iExists (upd_chg V γ0), pid.
-    cbn [upd_chg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi pv_gen pv_chg].
+    iExists (upd_gen (upd_chg V γ0) g), pid.
+    cbn [upd_chg upd_gen pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi pv_gen pv_chg].
     (* BOTH [st]-keyed disjuncts take their [else] branch, and the row's has
        to be reduced before it can be framed. *)
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iDestruct "Hxs" as (xsv) "Hxc".
     iAssert (∃ v : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} v ∗ emp)%I
       with "[Hxc]" as "Hxsrow"; [ iExists xsv; iFrame "Hxc" |].
-    iFrame "Hpid Hf Ho Hsp Hir Hbs Hkst Hch Hxsrow Hctx".
+    iAssert (gen_halves_dorm pa pid g UNUSED) with "[Hsg]" as "Hgh".
+    { rewrite /gen_halves_dorm bool_decide_eq_false_2; [| vm_compute; discriminate].
+      iSplitR; [iPureIntro; exact Hpid0 | iExact "Hsg"]. }
+    iFrame "Hpid Hf Ho Hsp Hir Hbs Hkst Hch Hgh Hxsrow Hctx".
     iSplit; [done|].
     iSplitL "Hs".
     { iApply fd_slots_to_any. by rewrite Hof length_replicate. }
@@ -2669,12 +2719,13 @@ Section ProcInv.
     iref_slots (1 + IREFSPARE) -∗ bslots 3 -∗ proc_dormant_prestk pa.
   Proof. iIntros "H Hs Hir Hbs". iFrame "H Hs Hir Hbs". Qed.
 
-  Lemma proc_dormant_prestk_seal (pa : mword 64) (γ0 : gname) :
+  Lemma proc_dormant_prestk_seal (pa : mword 64) (γ0 g : gname) :
     proc_dormant_prestk pa -∗ kstack_free pa -∗ ch_frag γ0 pa ∅ -∗
+    slot_gen pa (DfracOwn 1) g -∗
     proc_dormant pa UNUSED.
   Proof.
-    iIntros "(Hd & Hs & Hir & Hbs) Hkst Hch".
-    iApply (proc_dormant_seal with "Hd Hs Hir Hbs Hkst Hch").
+    iIntros "(Hd & Hs & Hir & Hbs) Hkst Hch Hsg".
+    iApply (proc_dormant_seal with "Hd Hs Hir Hbs Hkst Hch Hsg").
   Qed.
 
   (* allocproc's move: it finds an UNUSED slot, so the two address-space
@@ -2721,9 +2772,14 @@ Section ProcInv.
        ([proc_priv_core]), and freeproc gives it back. *)
     (∃ xsv : mword 32, p_xstate pa ↦₄{DfracOwn (1/2)} xsv) ∗
     ∃ (V : pprivate) (pid : mword 32),
+      (* THE PID CELL IS STILL ZERO, and allocproc spends it at the pid
+         section's [ghost_map_insert]: the cell its [p->pid = pid] store
+         overwrites is registered to nothing, which is what keeps
+         <pid_lock>'s domain fact ([SlotGen.pid_reg_dom]) true across the
+         store. *)
       ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
        pv_cwd V = (zero_reg : mword 64) /\
-       uint (pv_sz V) <= uvm_maxsz⌝ ∗
+       uint (pv_sz V) <= uvm_maxsz /\ bv_unsigned pid = 0⌝ ∗
       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
       proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf (pv_fdg V) pa (pv_ofile V) ∗
       (* THE SLOT'S CHILDREN ROW, out with the block and EMPTY -- the one
@@ -2732,6 +2788,13 @@ Section ProcInv.
          is the row boot put in the slot, at the name the block records
          ([ProcDefs.pv_chg]), and freeproc puts it back. *)
       ch_frag (pv_chg V) pa ∅ ∗
+      (* ...AND THE SLOT'S GENERATION, WHOLE.  Nobody else holds a piece --
+         an UNUSED slot's incarnation is over -- which is exactly what lets
+         allocproc re-key it to the incarnation it is about to mint
+         ([SlotGen.slot_gen_update], at no authority).  It is at the block's
+         own [pv_gen], which is junk here and is replaced by the same step.
+         freeproc puts a whole back. *)
+      slot_gen pa (DfracOwn 1) (pv_gen V) ∗
       (* THE FRAGMENT BUNDLE, out with the block and BESIDE it -- inside the
          existential because it is keyed on the [pv_fdg] this step just
          chose.  It travels with [fd_slots FDSPARE] from here to
@@ -2741,10 +2804,14 @@ Section ProcInv.
          descriptors were unstateable as a direct consequence. *)
       fd_frags (pv_fdg V) fdt0.
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hxs & Hctx & Haddr)".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iDestruct "Haddr" as "[Hpg Htf]".
     iDestruct "Hxs" as (xsv) "[Hxc _]".
+    (* the UNUSED arm of the block's generation pieces: the pure zero and
+       the whole ([SlotGen.gen_halves_dorm]) *)
+    rewrite /gen_halves_dorm bool_decide_eq_false_2; [| vm_compute; discriminate].
+    iDestruct "Hgh" as "[%Hpid0 Hsg]".
     iMod (fd_st_alloc NOFILE) as (γd) "Hst".
     iDestruct (fd_st_both_split γd NOFILE with "Hst") as "[Hauth Hfrag]".
     iDestruct (fd_frags_of_closed γd with "Hfrag") as "Hfrag".
@@ -2752,7 +2819,7 @@ Section ProcInv.
     iSplitL "Hxc"; [ iExists xsv; iExact "Hxc" |].
     iExists (upd_fdg V γd), pid.
     cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi pv_gen pv_chg].
-    iSplit; [done|]. iFrame "Hpid Hf Hch".
+    iSplit; [done|]. iFrame "Hpid Hf Hch Hsg".
     iSplitR "Hfrag"; [| rewrite /fdt0; iExact "Hfrag"].
     iDestruct (fd_st_closed_to_any γd (replicate NOFILE (zero_reg : mword 64))
                  with "[Hauth]") as "Hst"; [by rewrite length_replicate|].
@@ -2867,13 +2934,23 @@ Section ProcInv.
        quarter they are the escrow the reaping parent redeems. *)
     my_pay (pv_gen (us_V U)) Q' -∗
     Q' (xstate_val xsv) -∗
+    (* AND THE INCARNATION'S TWO HALVES, which the deficit block does not
+       carry either: a ZOMBIE block holds exactly what its process's block
+       held ([ProcInv.proc_priv_core]), and this is the only route they
+       take into one.  The reaper reunites them with the deposit its own
+       parent cell's entry carries ([WaitInv.gen_halves]) and hands the
+       wholes to freeproc. *)
+    gen_halves_priv pa pid (pv_gen (us_V U)) -∗
     proc_dormant_noctx pa ZOMBIE.
   Proof.
-    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hgq Hsp Hir Hbs Hkst Hrow Hxs #Hmy HQ".
+    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hgq Hsp Hir Hbs Hkst Hrow Hxs #Hmy HQ Hgh".
     iDestruct (proc_ofiles_null_split γf (pv_fdg (us_V U)) pa (pv_ofile (us_V U)) Hof with "Ho") as "[Ho Hs]".
     iDestruct "Hgq" as (Q) "[Hkq _]".
+    iAssert (gen_halves_dorm pa pid (pv_gen (us_V U)) ZOMBIE) with "[Hgh]" as "Hghd".
+    { rewrite /gen_halves_dorm bool_decide_eq_true_2; [| reflexivity].
+      iExact "Hgh". }
     iExists (us_V U), pid. iSplit; [by iPureIntro|].
-    iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hrow".
+    iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hrow Hghd".
     iSplitL "Hxs Hkq HQ".
     { iExists xsv. iFrame "Hxs".
       rewrite bool_decide_eq_true_2; [| reflexivity].

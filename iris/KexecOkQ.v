@@ -330,7 +330,7 @@ Definition kexec_closer `{XI : TsoCtx.CurCtx}
        through the gFunctors instances and this file alone reached 300 GB
        before it was killed.  A missing class is not a clean failure here;
        cap the memory when experimenting with this binder list. *)
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !wchG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (* the hole, WIDENED to the final process state: [kexec_ok_q]'s own
        slot is still a claim on [entry], and the row below plugs it with

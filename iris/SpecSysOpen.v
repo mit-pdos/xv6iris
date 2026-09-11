@@ -373,7 +373,7 @@ Definition so_wr_of (om : mword 32) : bool :=
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section SpecSysOpen.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ}.
   Context `{!ufdG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
      carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The

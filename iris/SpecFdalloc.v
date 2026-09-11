@@ -245,7 +245,7 @@ Proof.
 Qed.
 
 Section SpecFdalloc.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ}.
 
   (* fdalloc's result, keyed by the returned a0.  The two arms are decided
      by the process's own descriptor array, so the disjunction is a CASE
@@ -274,7 +274,7 @@ Section SpecFdalloc.
 
 End SpecFdalloc.
 
-Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname) (k : nat) (D : gset nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (U : ustate) (b : bool) (lks : gset string) :=
@@ -306,7 +306,7 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG
 
 Module Type FDALLOC.
   Parameter wp_fdalloc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γf : gname) (k : nat) (D : gset nat)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (U : ustate) (b : bool) (lks : gset string),
       wp_fdalloc_sconf_body γf k D m av n eb p pid U b lks.

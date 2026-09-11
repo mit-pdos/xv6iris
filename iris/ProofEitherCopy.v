@@ -404,7 +404,7 @@ Module EitherCopyoutProof (Myproc : MYPROC) (Copyout : COPYOUT) (Memmove : MEMMO
   : EITHER_COPYOUT.
 
 Section ProofEitherCopyout.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
@@ -1158,7 +1158,7 @@ Module EitherCopyinProof (Myproc : MYPROC) (Copyin : COPYIN) (Memmove : MEMMOVE)
   : EITHER_COPYIN.
 
 Section ProofEitherCopyin.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not

@@ -969,6 +969,9 @@ Lemma fkr_boot
      the trivial one ([ParkCap.park_pkg]'s boot arm). *)
   gen_kq (pv_gen (us_V U)) p pid (fun _ => True)%I -∗
   my_pay (pv_gen (us_V U)) (fun _ => True)%I -∗
+  (* ...and the two quarters, which join the block at the same seam
+     ([SlotGen.gen_halves_priv]) *)
+  gen_halves_priv p pid (pv_gen (us_V U)) -∗
   (* ...and the slot's half of [p->xstate], which the block this arm closes
      carries ([ProcInv.proc_priv_core]) *)
   (∃ xsv : mword 32, p_xstate p ↦₄{DfracOwn (1/2)} xsv) -∗
@@ -1000,7 +1003,7 @@ Proof.
      at; both are [Notation]s for literals, so [lia] sees them directly. *)
   assert (Hav2fs : (K_fsinit <= av2)%nat) by lia.
   iIntros "#Htext #Hwire #Hclaimmap Hpc #Hpinv Hcg Hcpu Hextc Hclmc #Hks
-           Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi HW Hbundle Hkq #Hmp Hxb #Hpg Hyield".
+           Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi HW Hbundle Hkq #Hmp Hgh Hxb #Hpg Hyield".
   iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hebb.
   (* ================================================================== *)
   (*  +0x14 .. +0x24: [if (first)] -- TAKEN, because the token is the      *)
@@ -1513,9 +1516,9 @@ Proof.
     iExact "Hdlock". }
   (* ---- the process block, put back together: the token is the steady
          arm now, so this is [proc_priv] again rather than the deficit ---- *)
-  iAssert (proc_priv γf p pid U) with "[Hpbare Hcwd Hofiles Hkq Hxb]" as "Hpriv".
+  iAssert (proc_priv γf p pid U) with "[Hpbare Hcwd Hofiles Hkq Hxb Hgh]" as "Hpriv".
   { rewrite /proc_priv proc_priv_core_bare.
-    iFrame "Hpbare Hcwd Hftok Hofiles Hxb".
+    iFrame "Hpbare Hcwd Hftok Hofiles Hxb Hgh".
     (* the incarnation's pair, back in the block: this arm is where the
        first process's block is closed, and the pair joined at the same
        seam the token does *)
@@ -2125,9 +2128,10 @@ Proof.
              ∗ FirstTok.first_boot
              ∗ gen_kq (pv_gen (us_V U)) p pid (fun _ => True)%I
              ∗ my_pay (pv_gen (us_V U)) (fun _ => True)%I
+             ∗ gen_halves_priv p pid (pv_gen (us_V U))
              ∗ (∃ xsv : mword 32, p_xstate p ↦₄{DfracOwn (1/2)} xsv))%I
       with "[Hpv]" as "Hblk"; [iExact "Hpv"|].
-    iDestruct "Hblk" as "(Hpnc & Hcwd & Hfb & Hkq & #Hmp & Hxb)".
+    iDestruct "Hblk" as "(Hpnc & Hcwd & Hfb & Hkq & #Hmp & Hgh & Hxb)".
     iDestruct (first_boot_open with "Hfb") as "(Hf1 & #Hbp & #Hka & Hfsi)".
     (* the two [_ext] halves are still at the entry hart; the release moved
        the binder, so they come across before the arm is entered *)
@@ -2139,7 +2143,7 @@ Proof.
               ks mr av av2 eb
               Hjlt Hgnw Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1
             with "Htext Hwire Hclaimmap Hpc Hpinv Hcg Hcpu Hext Hcx Hks
-                  Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hmode Hkq Hmp Hxb Hpg Hyield"). }
+                  Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hmode Hkq Hmp Hgh Hxb Hpg Hyield"). }
   (* ---------------- THE STEADY MODE: the block is whole ---------------- *)
   (* The token comes out at [proc_priv_split_cwd]'s three-way seam, which is
      where it joined the block; [cwd_ref] comes with it and goes straight
