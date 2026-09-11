@@ -23,8 +23,9 @@ patch: `projects/wx-briefs/`.
   the gate before the push; the relayout residue check (`RELAYOUT_OLD_REV=92e0b0415^
   tools/relayout_batch.py --residue --allow-shape=CodePanic.v`) shows nothing
   stale in the lane's files.  Note: `app-echo.md` "WX-INV LANDED".
-- NEXT: WX-WAIT (`wx-briefs/brief-wx-wait.md`, re-anchored at this landing), then
-  ARM-c (1b), L7.  If found dirty with no agent alive: back up, build once, read the
+- Post-rebase gate PASSED (full VM rebuild 1428 files EXIT=0, audit = the thirteen);
+  pushed.  WX-WAIT LAUNCHED (2026-09-11; fresh Opus agent on
+  `wx-briefs/brief-wx-wait.md`, phase 1 then stop-and-report).  Then ARM-c (1b), L7.  If found dirty with no agent alive: back up, build once, read the
   red list, relaunch on a continuation brief.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
