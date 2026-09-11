@@ -2079,7 +2079,26 @@ R3 THE RECEIPT: consoleread returns, for a read of d bytes at token n, `stored
   `buffer[0..i) = bytes of stored[n0..n0+i)` and the last byte's tag; with
   `disc h_last` and CONTIGUOUS input indices the line is a prefix of
   `echo_line`; with the taint the continuation goes generic.
-R4 OVERFLOW (THE OWNER'S CALL -- it is about the THEOREM).  Consecutive stored
+R4 OVERFLOW -- RULED BY THE OWNER (2026-09-11): OPTION (i).  THE TOP-LEVEL TRACE
+  PROPERTY IS: wait for the "$ " shell prompt, then type "echo hello world\n"
+  ONE CHARACTER AT A TIME, waiting for each character to be ECHOED BACK before
+  typing the next.  Consequences: (a) `disc` becomes an automaton over the
+  interleaved `ObsUartIn`/`ObsUartOut` trace, not a prefix predicate over
+  inputs alone (E5 restates `AppEcho.disc`/`disc_seg`/`star_prefix`, `echo_R`'s
+  phase and the closure laws); (b) consoleintr ECHOES a byte only when it
+  STORES it (the `consputc` is inside the ring-not-full branch), so under this
+  discipline a dropped byte is never echoed and the user never types the next
+  one -- the stored sequence is therefore ALWAYS the trace's input sequence
+  minus at most its last byte, and `good_out` (a prefix property) survives a
+  drop; the proof of that is E5's, over the whole-system automaton.  FALLBACK
+  (owner): if this does not work out, FIX THE KERNEL -- when the console
+  buffer is full, stop taking UART input, so flow control propagates through
+  the UART to the input wires (a `kernel-defects.md` item + an upstream
+  change; then every `ObsUartIn` is stored and contiguity is free).
+  The kernel lane below (CONS-CURSOR) is needed under BOTH: it provides the
+  ORDER of stored bytes and the cursor; which bytes are missing is the
+  application's argument.
+R4-old, for the record: OVERFLOW (THE OWNER'S CALL -- it is about the THEOREM).  Consecutive stored
   bytes are consecutive INPUT bytes only if nothing was dropped; under `disc`
   no control byte occurs, but a ring FULL (128 unconsumed) drops silently, and
   the adversary controls input timing, so `disc κs → good_out κs` as stated is

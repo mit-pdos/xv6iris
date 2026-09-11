@@ -24,10 +24,13 @@ patch: `projects/wx-briefs/`.
 - THE REMAINING ARC: `app-echo.md` "THE REMAINING ARC TO xv6_app_adequacy FOR
   ECHO — DESIGN".  E1 ECHO-PRED LANDED (2026-09-11; note "E1 ECHO-PRED LANDED").
   Order corrected: E3 RECEIPT LEAF + reader token → E4 SH-ECHO → E2 INIT-BOOT →
-  E5 L7.  E3's DESIGN PROPOSAL is written (`app-echo.md` "E3 — THE INPUT LINE: DESIGN
-  PROPOSAL", R1-R5) and AWAITS THE OWNER'S RULING -- R4 (ring overflow) is a
-  question about the theorem statement itself.  Do not launch E3 before the
-  ruling.  Tree CLEAN.
+  E5 L7.  E3's design is RULED (owner, 2026-09-11: option (i) -- the trace property is
+  "wait for the $ prompt, type each character after its echo"; fallback: fix the
+  kernel's console overflow with UART flow control).  CONS-CURSOR (the kernel
+  half, `wx-briefs/brief-cons-cursor.md`) LAUNCHED 2026-09-11, phase 1 then
+  stop-and-report; then SH-LINE (R5 + sh's gets under the receipt) → E4 SH-ECHO →
+  E2 INIT-BOOT → E5 (the discipline automaton, `good_out`, the identification
+  gate, `Hphi`).
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run
