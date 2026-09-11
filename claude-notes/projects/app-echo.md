@@ -2030,6 +2030,80 @@ token (E5(c) is answered: the token is needed; its shape is the program-side
 half of the console ring's consumption cursor, so a receipt states its bytes'
 positions by construction).  A console-ring survey precedes the E3 design.
 
+#### E3 — THE INPUT LINE: DESIGN PROPOSAL (2026-09-11, coordinator; AWAITING THE OWNER'S RULING)
+
+FACTS (console-ring survey, verified): `ConsoleInv.cons_res` holds NO ghost state
+(three `↦₄` index cells, 128 `↦ₘ` bytes, a PERSISTENT per-slot tag column
+`cons_tags`, two pure clauses); `cons_row` ties slot k to a history `h` with
+`obs_ends_in h b` and NOTHING orders the histories (`SpecConsoleread.v:79-85`
+says so); the UART rx column `uart_col_ok` records only a per-slot
+`obs_ends_in` -- the order is true at the push (`WpUart.v:1510-1517`) and
+discarded; `uart_rx_tok` is the PLIC's (FIFO pops, not reads); every u-tier
+read leaf binds its `spost_at` as `_`; sh's `gets` reads ONE byte per `read()`
+into a one-byte frame slot and its walk never learns whether the byte was a
+newline; nothing prevents two processes from reading the console (no
+descriptor resource at the read leaves, `emp` at fileread's console arm,
+`is_conslock` persistent); `UserFd.ufd` is exclusive only per process name and
+fork duplicates the table; consoleintr STORES only non-control bytes and DROPS
+a byte when the ring is full (`e - r == 128`).
+
+WHAT SH NEEDS.  For the pinned exec of `/echo` (E4) sh's disciplined branch must
+know its line IS "echo hello world": the bytes it read are the CONSECUTIVE next
+input bytes of a disciplined trace.  Lexability alone might survive a
+subsequence; the exec cannot.  Two ingredients: (a) the POSITION of each stored
+byte in the input stream, and (b) that sh's reads take consecutive stored
+bytes (one reader; FIFO).
+
+PROPOSAL.
+R1 INPUT INDEX IN THE COLUMN (UART, pure): `uart_col_ok` gains `∀ j h, hs !! j =
+  Some h → length (ins h) = nk + j + 1` (the j-th queued history has input
+  index pops-so-far + j + 1), founded from the permit invariant `length (ins h)
+  = np` (every push IS an `ObsUartIn`; the permit's rx wand fires at the
+  ledger's own `h`); the pop then yields `⌜length (ins h) = S k⌝` beside the
+  tag -- the k-th pop is the k-th input byte.  No chain, no list.
+R2 THE RING'S STORED SEQUENCE (console): `cons_res` gains an append-only ghost
+  list `stored : list (list mobs * bv 8)` (a `mono_list`), `cons_row` keyed to
+  it (slot for the k-th unconsumed byte = `stored !! (consumed + k)`), and a
+  CONSUMED cursor `ghost_var cons_rd (1/2) n` whose other half is THE READER
+  TOKEN `cons_reader n`.  consoleintr appends `(h, b)` at its store with
+  `length (ins h) = the pop index`; the ring's `⌜input indices strictly
+  increase along stored⌝` needs "the last stored index < this pop's": keep
+  `cons_hi` (a `ghost_var` half in `cons_res`, the other half beside
+  `uart_rx_tok` in the PLIC payload with `⌜hi ≤ k⌝`) -- the interrupt
+  handler's cursor, where the popper's state already lives.
+R3 THE RECEIPT: consoleread returns, for a read of d bytes at token n, `stored
+  !! (n + j)`'s byte and tag for j < d and the token at n + d;
+  `SpecFileread.console_receipt`/`cons_tagged` state "the d-byte window at n";
+  a NEW u-tier read leaf routes it through `udepw`'s explicit disjunct
+  (`UkRun.v:299`) instead of `udepw_of_psok`; sh's `gets` invariant carries
+  `buffer[0..i) = bytes of stored[n0..n0+i)` and the last byte's tag; with
+  `disc h_last` and CONTIGUOUS input indices the line is a prefix of
+  `echo_line`; with the taint the continuation goes generic.
+R4 OVERFLOW (THE OWNER'S CALL -- it is about the THEOREM).  Consecutive stored
+  bytes are consecutive INPUT bytes only if nothing was dropped; under `disc`
+  no control byte occurs, but a ring FULL (128 unconsumed) drops silently, and
+  the adversary controls input timing, so `disc κs → good_out κs` as stated is
+  FALSE (type 129 bytes before sh's first read).  Options: (i) refine `disc`
+  trace-expressibly: each input line is typed only after the previous prompt's
+  `ObsUartOut` ("$ ") -- what a human at a console does; bounds the outstanding
+  input to one line (17 < 128); (ii) weaken `good_out` to speak of the lines sh
+  consumed; (iii) treat a drop as a taint (consoleintr cannot mint the
+  application's taint; would need the rx wand to see the ring).  RECOMMENDED:
+  (i).
+R5 THE TOKEN'S ROUTE (already built by WAIT-EXIT): `Hinit_boot`'s bundle
+  delivers `cons_reader 0` to init (born in the boot fupd beside the ring;
+  main's `newlock` for cons.lock seals the other half); init's fork chooses `Q
+  xs := cons_reader ∨ echo_taint`; sh's run holds it as `ukn_pay N (-1)`; sh
+  pays it at exit and kill; init recovers it at `wp_kinit_wait`; the `ukn_triv`
+  instances leave init and sh (the sites are listed in the survey: nine
+  `fun _ => True` sites and ~30 `ukn_triv` contexts).  echo never reads, so
+  sh keeps the token across its fork (echo's `Q` stays trivial).
+COST: R1 is small (WpUart column + permit); R2 touches `ConsoleInv`,
+`SpecConsoleintr`/`ProofConsoleintr`, `SpecConsoleread`/`ProofConsoleread`, the
+PLIC payload, boot; R3 touches `SpecFileread`, `SpecSysRead`, the read leaf,
+`UkSh`'s `gets`; R5 is the payload sweep over init/sh.  Order: R1 → R2 → R3
+(kernel, one lane "CONS-CURSOR") → R5 + sh's line (lane "SH-LINE") → E4.
+
 #### THE REMAINING ARC TO `xv6_app_adequacy` FOR ECHO — DESIGN (2026-09-11, coordinator, from a read-only survey of the tree)
 
 WHERE THE TREE IS.  Below the application everything is in: the trap route
