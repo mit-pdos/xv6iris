@@ -18,8 +18,10 @@ patch: `projects/wx-briefs/`.
   EXIT=0, `make audit-only` = the thirteen, `lemma_diff` clean).  As-landed note
   and the mid-lane rulings: `app-echo.md` "WX-EXIT LANDED" / "WX-EXIT RULINGS".
   Before it: WX-RES + WX-ROW `96de38269`.  Tree CLEAN.
-- NEXT: WX-GEN (`wx-briefs/brief-wx-gen.md`; design in `app-echo.md` "WX-GEN /
-  WX-INV / WX-WAIT — DESIGN"), then WX-INV, WX-WAIT, ARM-c (1b), L7.  Owner's
+- WX-GEN LAUNCHED (2026-09-10; fresh Opus agent on `wx-briefs/brief-wx-gen.md`,
+  phase 1 then stop-and-report; design in `app-echo.md` "WX-GEN / WX-INV / WX-WAIT
+  — DESIGN").  Then WX-INV, WX-WAIT, ARM-c (1b), L7.  If found dirty with no agent
+  alive: back up, build once, read the red list, relaunch on a continuation brief.  Owner's
   standing instruction: keep going through checkpoints -- land, note, launch.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
