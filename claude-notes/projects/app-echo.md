@@ -2102,6 +2102,20 @@ induction under the lock).  `gs : list gname` is an explicit column with
 `Some`-lookups; every tie is guarded on a nonzero address so the writers stay
 premise-free.
 
+WX-INV RULING 2 (2026-09-11): the lane CARRIES THE ROW HALF OF WAIT'S ROUTE,
+on the fork precedent -- carrying the invariant forces the reap to take γ' out
+of the reaper's row, the row is the residue's fragment, so the resume key's
+`uvis_ch` moves and `ut_ch_kept`/`usys_ch_ok` must exempt wait as they exempt
+fork.  So: a wait ARM at the round (`uexec_wait_F` beside `uexec_fork_parent_F`)
+carrying `uwait_ans r cs cs'` (`⌜r = -1 ∧ cs' = cs⌝ ∨ ∃ γ', ⌜cs' = cs ∖ {[γ']}⌝`;
+WX-WAIT widens the second disjunct with the escrow and the facts); the leaf
+`wp_uk_ecall_wait` takes `uch (ukn_ch N) cs` and returns it moved with
+`ch_reaped cs cs'` (its statement grows the way `wp_uk_ecall_fork`'s did), and
+the index-free `wp_uk_ecall_wait_any` at `uch_any` is what init and sh call.
+`children_inv_reap` returns `slot_gen` whole and `pid_reg` at 3/4 with `∃ pide,
+gen_pid g pide` (the reaper aligns the pid through the escrow's quarter, since
+the ZOMBIE block holds an owned share and `gen_pid` needs the discarded one).
+
 ORDER: WX-GEN (`brief-wx-gen.md`: the two ghosts, `nextpid_res_at`'s list
 and authority, allocproc/freeproc, the block's halves, kfork's and
 userinit's split; green with `children_inv` still stated-not-carried) →
