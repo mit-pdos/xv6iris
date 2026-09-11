@@ -607,7 +607,7 @@ Section KexecAUExit.
       (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64) (dqas : dfrac) :
     kxau_ret (CID := CIDx)
       (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
-         (bview plen pfun) na alen afun sts gn cs U)
+         (bview plen pfun) na alen afun sts gn cs pidv U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
     SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
@@ -660,7 +660,7 @@ Section KexecAUExit.
     my_pay gn Qpay -∗
     kxau_ret (CID := CIDx)
       (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
-         pl na alen afun sts gn cs U)
+         pl na alen afun sts gn cs pidv U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
     PA.kxa_receipt Fs P Fo Qpay (length (path_elems pl)) zi na alen afun sts dn bm datl -∗
@@ -710,7 +710,7 @@ Section KexecAUExit.
         { destruct Hsucc as (_ & Hr & _). rewrite Hr.
           exact (kxau_argc_ne_m1 na Hnamax). }
         destruct (exec_image_ok_of_ok_q (kxc_fb datl dn) ef (us_V U) U' sts
-                    gn cs na alen afun (mf !!! Regidx Ra0) entry spv szv'
+                    gn cs pidv na alen afun (mf !!! Regidx Ra0) entry spv szv'
                     Hload Hag' Htflen ltac:(by right) Hne) as (Himg & Hokx).
         rewrite /SpecKexec.exec_arms. iRight.
         rewrite /SpecKexec.exec_post_ok.
@@ -727,7 +727,7 @@ Section KexecAUExit.
            for the arm that did not happen, go with it. *)
         iDestruct (pf_at_au with "Hsl") as "[Hsl _]".
         iApply ("Hsl" $! av0 zi (kxc_fb datl dn) nl
-                  (SpecKexec.exec_key U' sts gn cs na)
+                  (SpecKexec.exec_key U' sts gn cs pidv na)
                   with "HP HΦ [%] [%] Hmp");
           [exact Hload | exact Himg].
     - (* NOT A LOADABLE FILE.  Arm (b) on success, [EfNotLoadable] on a
@@ -769,10 +769,10 @@ Section KexecAUExit.
            goes into the wand, and the kernel mints nothing. *)
         iDestruct (pf_at_au with "Hsl") as "[_ Hsl]".
         iApply ("Hsl" $! av0 zi (abs_row (FsStateEra.era_node dn bm datl))
-                  (SpecKexec.exec_key U' sts gn cs na)
+                  (SpecKexec.exec_key U' sts gn cs pidv na)
                   with "HP HΦ [%] [%] Hmp").
         { exact Hnl. }
-        { exact (SpecKexec.kexec_ok_exec_key_ok U U' sts gn cs
+        { exact (SpecKexec.kexec_ok_exec_key_ok U U' sts gn cs pidv
                    (mf !!! Regidx Ra0)
                    entry spv szv' na alen Htflen Hne Hkok). }
   Qed.
@@ -851,7 +851,7 @@ Section KexecAUMain.
     iAssert (wp_next true (proc_addr jp) (fun CID : CpuId =>
                kxau_ret (CID := CID)
                  (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
-                    (bview plen pfun) na alen afun sts gn cs U)
+                    (bview plen pfun) na alen afun sts gn cs pidv U)
                  gf fsc_kalloc (proc_addr jp) pidv m
                  (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs fsc_bmapstart
                  na plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1) dqa

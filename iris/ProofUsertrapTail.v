@@ -134,7 +134,7 @@ Section ProofUsertrapTail.
   Proof. intros H1 H2. unfold kexit_status. rewrite H1. exact H2. Qed.
 
   Lemma ut_kexit (N : ut_names) (U : ustate) (m : regfile) (nx : nat)
-      (b : bool) (lks : gset string) (sts : list fdstate) (cs : gset gname)
+      (b : bool) (lks : gset string) (sts : list fdstate) (cs : gset gname) (pid : mword 32)
       (* THE DYING PROCESS'S PAYLOAD, at the predicate the trap route
          carries it at ([UexecSG.sexit_pay] of the deposit's families). *)
       (Q : Z -> iProp Σ) :
@@ -165,7 +165,7 @@ Section ProofUsertrapTail.
        kexit parks in the ZOMBIE escrow is what came in with the trap. *)
     my_pay (pv_gen (us_V U)) Q -∗
     Q (-1) -∗
-    ut_hold Rsys N U b lks sts cs -∗
+    ut_hold Rsys N U b lks sts cs pid -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hnx Hst Hbelow. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -181,7 +181,7 @@ Section ProofUsertrapTail.
               (un_ip N) (un_dqi N)
 
 
-              None (un_fn N) m nx b b _ (un_pid N) (upd_usM U _) cs Q eq_refl Hj Hjl Hnx Hlg Hbelow
+              None (un_fn N pid) m nx b b _ pid (upd_usM U _) cs Q eq_refl Hj Hjl Hnx Hlg Hbelow
               with "Hcg Hcl Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpe Hw Hft Hkm Hav
                     Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hfsr Hip Hfd Hir Hpv [Hufr] Hrow
                     Hmyp [Hpayv]").
@@ -227,6 +227,7 @@ Section UtRet2.
          stated against -- and [sts] is what this tail is parking.  They
          differ on exactly one arm. *)
       (sts0 sts : list fdstate) (gn : gname) (cs cs2 : gset gname)
+      (pid : mword 32)
       (* the deposit's families, relayed with the syscall channel's row *)
       (fdep : sfam) :
     ut_wf N ->
@@ -260,6 +261,10 @@ Section UtRet2.
        descriptor row does. *)
     ut_pipe_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U))
                   (us_M U0) (us_M U) sts0 sts ->
+    (* ...and getpid's answer, off the same two records: these tails move
+       neither the number nor the a0 word, so it rides across exactly as
+       the descriptor and pipe rows do ([SpecUsertrap.ut_ret_pid]). *)
+    ut_ret_pid scw (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -297,14 +302,14 @@ Section UtRet2.
     (* the four kernel words prepare_return just wrote, as the residue
        states them -- see [UsertrapRes.ut_tfk] *)
     ut_tfk ksp (us_V U) -∗
-    ut_env Rsys N U sts cs2 -∗
+    ut_env Rsys N U sts cs2 pid -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
+      (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
     ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
@@ -316,7 +321,7 @@ Section UtRet2.
        the record it parks, at the resume view it parks it at --
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
-       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs
+       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs pid
          (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U)) cs2) -∗
     (* THE PAYMENT, CARRIED.  The process handed its payload over when it
        trapped ([SpecUsertrap.ut_pay_in]); this tail either spends it on
@@ -330,10 +335,10 @@ Section UtRet2.
     sexit_pay fdep (-1) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts0 gn cs epw scw fdep) -∗
+                     mie_v menvcfg0 U0 sts0 gn cs pid epw scw fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hgenk Hfdk Hchk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv Hrd Hepcw.
+    intros Hwf Hgenk Hfdk Hchk Hfde Hpipe Hpidr Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv Hrd Hepcw.
     (* the budget, in numbers [lia] can see -- every one of these is a
        [Definition] and the index arithmetic below is what needs them *)
     pose proof Hav as Hav'.
@@ -699,7 +704,7 @@ Section UtRet2.
     iDestruct ("Hownback" $! U sts cs2 with "Hpv Hufr Hch Hsy") as "Hown".
     iApply ("Hcont" $! (pv_upt (us_V U)) (tp_pin S9) msg
               (kvi_satp_word (ud_root (pv_upt (us_V U)))) (mepc_val uepc) scv stv mdv0 U
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
                     Hmie Hmdl Hmenv Hhw Hmin [-Hxo Hfo Hwo Hso Hpayv] Hxo Hfo Hwo Hso
                     Hpayv").
@@ -721,6 +726,8 @@ Section UtRet2.
       exact Hfde.
     - (* ...and pipe's join, likewise untouched by this tail *)
       exact Hpipe.
+    - (* ...and getpid's answer, likewise: the tail stores no a0 word *)
+      exact Hpidr.
     - (* [ret_pc (mepc_val uepc) = tf_resume_pc (pv_tf (us_V U))]: [mepc_val]
          IS [ret_pc], which is idempotent, and the epc word is [uepc]. *)
       unfold tf_resume_pc, tf_w. rewrite Hepcw. exact (ret_pc_idem uepc).
@@ -786,6 +793,7 @@ Section UtRet.
          stated against -- and [sts] is what this tail is parking.  They
          differ on exactly one arm. *)
       (sts0 sts : list fdstate) (gn : gname) (cs cs2 : gset gname)
+      (pid : mword 32)
       (* the deposit's families, relayed with the syscall channel's row *)
       (fdep : sfam) :
     ut_wf N ->
@@ -819,6 +827,10 @@ Section UtRet.
        descriptor row does. *)
     ut_pipe_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U))
                   (us_M U0) (us_M U) sts0 sts ->
+    (* ...and getpid's answer, off the same two records: these tails move
+       neither the number nor the a0 word, so it rides across exactly as
+       the descriptor and pipe rows do ([SpecUsertrap.ut_ret_pid]). *)
+    ut_ret_pid scw (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -834,14 +846,14 @@ Section UtRet.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
-    ut_hold Rsys N U b lks sts cs2 -∗
+    ut_hold Rsys N U b lks sts cs2 pid -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
+      (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
     ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
@@ -853,7 +865,7 @@ Section UtRet.
        the record it parks, at the resume view it parks it at --
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
-       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs
+       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs pid
          (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U)) cs2) -∗
     (* THE PAYMENT, CARRIED.  The process handed its payload over when it
        trapped ([SpecUsertrap.ut_pay_in]); this tail either spends it on
@@ -867,10 +879,10 @@ Section UtRet.
     sexit_pay fdep (-1) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts0 gn cs epw scw fdep) -∗
+                     mie_v menvcfg0 U0 sts0 gn cs pid epw scw fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hgenk Hfdk Hchk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
+    intros Hwf Hgenk Hfdk Hchk Hfde Hpipe Hpidr Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -909,7 +921,7 @@ Section UtRet.
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iDestruct (trap_csrs_ext_transport CID CID1 b (un_pj N)
                  ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
-    iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) (un_pid N) U
+    iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) pid U
               M1 nx (un_pj N) uepc b lks ltac:(lia) Hepc
               with "Hcg Hcpu Hcsrs Htext Hpc Hkst Hpv [-]").
     iIntros (CIDp Hkp mf ksat kroot vb)
@@ -969,7 +981,7 @@ Section UtRet.
                     = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))).
     { cbn [us_V]. rewrite HVrupt HVrsz. reflexivity. }
     iDestruct (ut_exec_out_ueq scw _ _ _ _ _ U (MkUstate Vr (us_M U)) sts0 sts
-                 gn cs
+                 gn cs pid
                  (tf_ueq_refl _) HVru eq_refl HVrpi HVrsz HVrcwi with "Hxo") as "Hxo".
     (* ...and the syscall channel's row across the same re-arming.  It reads
        the parked frame at a0 alone, which is what [tf_ueq] is blind to --
@@ -1006,14 +1018,22 @@ Section UtRet.
                 _ _ sts0 sts _ Hpipe).
       cbn [us_V]. rewrite HVrtf.
       exact (tf_ueq_arg _ _ 0 ltac:(lia) (prepare_return_tf_ueq _ _ _ _)). }
+    (* ...and getpid's answer across the same re-arming, off the same word:
+       prepare_return re-arms the four KERNEL words and a0 is not one of
+       them ([SpecUsertrap.ut_ret_pid_out]). *)
+    assert (Hpidrr : ut_ret_pid scw (pv_tf (us_V U0))
+                       (pv_tf (us_V (MkUstate Vr (us_M U)))) pid).
+    { refine (ut_ret_pid_out scw (pv_tf (us_V U0)) (pv_tf (us_V U)) _ _ _ Hpidr).
+      cbn [us_V]. rewrite HVrtf.
+      exact (tf_ueq_arg _ _ 0 ltac:(lia) (prepare_return_tf_ueq _ _ _ _)). }
     assert (Hepcw : pv_tf (us_V (MkUstate Vr (us_M U))) !!! tf_epc_idx = uepc).
     { cbn [us_V]. rewrite HVrtf.
       rewrite <- (tf_ueq_epc _ _ (prepare_return_tf_ueq (pv_tf (us_V U)) ksat
                     (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))).
       apply list_lookup_total_correct. exact Hepc. }
     iApply (ut_ret2 (CID := CIDp) Rsys N U0 (MkUstate Vr _) pt ksp m0 mf av nx b uepc vb
-              mie_v menvcfg0 epw scw lks sts0 sts gn cs cs2 fdep
-              Hwf' ltac:(cbn [us_V]; exact Hgenk) Hfdk Hchk Hfder Hpiper Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
+              mie_v menvcfg0 epw scw lks sts0 sts gn cs cs2 pid fdep
+              Hwf' ltac:(cbn [us_V]; exact Hgenk) Hfdk Hchk Hfder Hpiper Hpidrr Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
               ltac:(rewrite (callee_saved_lookup Hcspr csp_rs1
                               ltac:(vm_compute; reflexivity)); exact HM1sp)
               ltac:(rewrite (callee_saved_lookup Hcspr Rs1
@@ -1049,6 +1069,7 @@ Section UtA6.
          stated against -- and [sts] is what this tail is parking.  They
          differ on exactly one arm. *)
       (sts0 sts : list fdstate) (gn : gname) (cs cs2 : gset gname)
+      (pid : mword 32)
       (* the deposit's families, relayed with the syscall channel's row *)
       (fdep : sfam) :
     ut_wf N ->
@@ -1082,6 +1103,10 @@ Section UtA6.
        descriptor row does. *)
     ut_pipe_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U))
                   (us_M U0) (us_M U) sts0 sts ->
+    (* ...and getpid's answer, off the same two records: these tails move
+       neither the number nor the a0 word, so it rides across exactly as
+       the descriptor and pipe rows do ([SpecUsertrap.ut_ret_pid]). *)
+    ut_ret_pid scw (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -1102,14 +1127,14 @@ Section UtA6.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
-    ut_hold Rsys N U b lks sts cs2 -∗
+    ut_hold Rsys N U b lks sts cs2 pid -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
+      (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
     ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
@@ -1121,7 +1146,7 @@ Section UtA6.
        the record it parks, at the resume view it parks it at --
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
-       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs
+       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs pid
          (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U)) cs2) -∗
     (* THE PAYMENT, CARRIED.  The process handed its payload over when it
        trapped ([SpecUsertrap.ut_pay_in]); this tail either spends it on
@@ -1135,10 +1160,10 @@ Section UtA6.
     sexit_pay fdep (-1) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts0 gn cs epw scw fdep) -∗
+                     mie_v menvcfg0 U0 sts0 gn cs pid epw scw fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hgenk Hfdk Hchk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hbelow.
+    intros Hwf Hgenk Hfdk Hchk Hfde Hpipe Hpidr Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hbelow.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1323,7 +1348,7 @@ Section UtA6.
       iApply (ut_kexit (CID := CID7) Rsys N U
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
-                nx b lks sts cs2 (sexit_pay fdep) Hwf' ltac:(lia)
+                nx b lks sts cs2 pid (sexit_pay fdep) Hwf' ltac:(lia)
                 ltac:(eapply ut_kexit_status_neg1;
                       [ rewrite upd_ne;
                         [ subst K2; apply upd_eq | vm_compute; discriminate ]
@@ -1354,8 +1379,8 @@ Section UtA6.
       iDestruct (wp_next_retarget CID3 CID4 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID4) Rsys N U0 U pt ksp m0 mf av nx b
-                mie_v menvcfg0 epw scw lks sts0 sts gn cs cs2 fdep
-                Hwf' ltac:(exact Hgenk) Hfdk Hchk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
+                mie_v menvcfg0 epw scw lks sts0 sts gn cs cs2 pid fdep
+                Hwf' ltac:(exact Hgenk) Hfdk Hchk Hfde Hpipe Hpidr Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hxo Hfo Hwo Hso Hpayv Hcont] Hframe Hxo Hfo Hwo Hso
                       Hmyp Hpayv Hcont").
@@ -1389,6 +1414,7 @@ Section UtFa.
          stated against -- and [sts] is what this tail is parking.  They
          differ on exactly one arm. *)
       (sts0 sts : list fdstate) (gn : gname) (cs cs2 : gset gname)
+      (pid : mword 32)
       (* the deposit's families, relayed with the syscall channel's row *)
       (fdep : sfam) :
     ut_wf N ->
@@ -1422,6 +1448,10 @@ Section UtFa.
        descriptor row does. *)
     ut_pipe_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U))
                   (us_M U0) (us_M U) sts0 sts ->
+    (* ...and getpid's answer, off the same two records: these tails move
+       neither the number nor the a0 word, so it rides across exactly as
+       the descriptor and pipe rows do ([SpecUsertrap.ut_ret_pid]). *)
+    ut_ret_pid scw (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -1437,14 +1467,14 @@ Section UtFa.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
-    ut_hold Rsys N U b lks sts cs2 -∗
+    ut_hold Rsys N U b lks sts cs2 pid -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts gn cs -∗
+      (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
     ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
@@ -1456,7 +1486,7 @@ Section UtFa.
        the record it parks, at the resume view it parks it at --
        [SpecUsertrap.ut_sys_out] *)
     (∀ n : Z,
-       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs
+       ut_sys_out n fdep scw (pv_tf (us_V U0)) U0 sts0 gn cs pid
          (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts (pv_cwi (us_V U)) cs2) -∗
     (* THE PAYMENT, CARRIED.  The process handed its payload over when it
        trapped ([SpecUsertrap.ut_pay_in]); this tail either spends it on
@@ -1470,10 +1500,10 @@ Section UtFa.
     sexit_pay fdep (-1) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts0 gn cs epw scw fdep) -∗
+                     mie_v menvcfg0 U0 sts0 gn cs pid epw scw fdep) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hgenk Hfdk Hchk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
+    intros Hwf Hgenk Hfdk Hchk Hfde Hpipe Hpidr Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1531,8 +1561,8 @@ Section UtFa.
       iDestruct (wp_next_retarget CID CID2 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID2) Rsys N U0 U pt ksp m0 M1 av nx b
-                mie_v menvcfg0 epw scw lks sts0 sts gn cs cs2 fdep
-                Hwf' ltac:(exact Hgenk) Hfdk Hchk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
+                mie_v menvcfg0 epw scw lks sts0 sts gn cs cs2 pid fdep
+                Hwf' ltac:(exact Hgenk) Hfdk Hchk Hfde Hpipe Hpidr Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hxo Hfo Hwo Hso Hpayv Hcont] Hframe Hxo Hfo Hwo Hso
                       Hmyp Hpayv Hcont").
@@ -1620,8 +1650,8 @@ Section UtFa.
       iDestruct (wp_next_retarget CID4 CID5 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID5) Rsys N U0 U pt ksp m0 mf av nx b
-                mie_v menvcfg0 epw scw lks sts0 sts gn cs cs2 fdep
-                Hwf' ltac:(exact Hgenk) Hfdk Hchk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
+                mie_v menvcfg0 epw scw lks sts0 sts gn cs cs2 pid fdep
+                Hwf' ltac:(exact Hgenk) Hfdk Hchk Hfde Hpipe Hpidr Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hxo Hfo Hwo Hso Hpayv Hcont] Hframe Hxo Hfo Hwo Hso
                       Hmyp Hpayv Hcont").

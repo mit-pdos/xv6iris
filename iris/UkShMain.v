@@ -332,7 +332,7 @@ Section UkShMain.
     ⌜ forall j : nat, (j < nb)%nat -> 0 <= a + Z.of_nat j < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hbs".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs)
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv)
       "(_ & _ & _ & Hheap & _)".
     iDestruct (uheap_ubytes_img γt γd γs M pm sz a nb fb with "Hheap Hbs")
       as %Hall.

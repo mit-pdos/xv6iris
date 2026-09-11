@@ -1758,6 +1758,12 @@ Section SyscallVocab.
         ⌜ sysc_num (us_V U) <> UsysMemOk.USYS_fork
           \/ pv_tf (us_V U') !!! tf_arg_idx 0 = (mword_of_int (-1) : mword 64)
           \/ (1 <= sint (pv_tf (us_V U') !!! tf_arg_idx 0) <= PIDMAX)%Z ⌝ -∗
+        (* ...AND GETPID'S ANSWER, beside fork's and for its reason: a fact
+           about the RETURN VALUE that no table of state moves can carry.
+           [SpecSyscall.sysc_ret_pid], at the stored a0 word and at this
+           dispatch's own [pid] index; every entry but getpid pays it with
+           [sysc_ret_pid_ne] off its number. *)
+        ⌜ sysc_ret_pid (us_V U) (pv_tf (us_V U') !!! tf_arg_idx 0) pid ⌝ -∗
         sie_cap_gpr KT1 mf av true pj -∗
         cpu_own 0%nat true pj true lks -∗
         bslots 3 -∗
@@ -1771,11 +1777,11 @@ Section SyscallVocab.
         ch_frag (pv_chg (us_V U)) pj cs' -∗
         pc_is ret_tgt -∗
         (* ...and the exec channel's answer -- [SpecSyscall.sysc_exec_out] *)
-        sysc_exec_out U U' sts sts' gn cs -∗
+        sysc_exec_out U U' sts sts' gn cs pid -∗
         (* ...and the SYSCALL CHANNEL's, at the entry key and the stored
            return value, and at the RESUME VIEW the entry leaves --
            [SpecSyscall.sysc_sys_out] *)
-        sysc_sys_out U sts gn cs f (pv_tf (us_V U') !!! tf_arg_idx 0)
+        sysc_sys_out U sts gn cs pid f (pv_tf (us_V U') !!! tf_arg_idx 0)
           (us_M U') sts' (pv_cwi (us_V U')) cs' -∗
         (* ...and FORK'S: the parent's quarter of the child's generation and
            the set its children reading grew to --
@@ -1907,7 +1913,7 @@ Section SyscallVocab.
       fdep -∗
     (* the process's deposit for the number it trapped with; an arm without
        a contract drops it *)
-    sysc_sys_in U sts gn cs fdep -∗
+    sysc_sys_in U sts gn cs pid fdep -∗
     (* ...and fork's, which is a SLOT: the fork arm forwards it to
        [SpecSysFork], every other arm refutes its guard off its own [Hnum]
        ([SpecSyscall.sysc_fork_in_ne]) and drops it *)
@@ -2017,6 +2023,10 @@ Section SyscallVocab.
     pv_chg (us_V U') = pv_chg (us_V U) ->
     (* ...and the generation's, on the same terms *)
     pv_gen (us_V U') = pv_gen (us_V U) ->
+    (* ...AND GETPID'S ANSWER, at the stored a0 word: the epilogue carries
+       it exactly as it carries the fd and cwd rows -- see
+       [SpecSyscall.sysc_ret_pid]. *)
+    sysc_ret_pid (us_V U) (pv_tf (us_V U') !!! tf_arg_idx 0) pid ->
     sie_cap_gpr KT1 E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
@@ -2043,18 +2053,18 @@ Section SyscallVocab.
     (* ...AND WAIT'S, on fork's footing exactly *)
     sysc_wait_out U (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
     (* the exec channel's answer, carried like the rows above it *)
-    sysc_exec_out U U' sts sts' gn cs -∗
+    sysc_exec_out U U' sts sts' gn cs pid -∗
     (* ...and the syscall channel's, carried the same way: the epilogue
        restores registers and touches no trapframe, so the record the row is
        read at is the one its caller already stored into *)
-    sysc_sys_out U sts gn cs f (pv_tf (us_V U') !!! tf_arg_idx 0)
+    sysc_sys_out U sts gn cs pid f (pv_tf (us_V U') !!! tf_arg_idx 0)
       (us_M U') sts' (pv_cwi (us_V U')) cs' -∗
     (* ...AND THE PAYMENT, carried the same way: this tail RETURNS, so the
        payload goes back to the caller ([SpecSyscall.sysc_pay_out]) *)
     sysc_pay_out f -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng.
+    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng Hpidrow.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hwo Hxo Hso Hpayv".
     assert (Hb1 : pa_stk sp0 1 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
@@ -2201,7 +2211,7 @@ Section SyscallVocab.
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).
       reflexivity. }
     iApply ("Hcont" $! T5 U' sts' cs'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hxo Hso Hfo Hwo Hpayv").
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hxo Hso Hfo Hwo Hpayv").
     { unfold callee_saved.
       split_and!.
       - exact HT5sp.
@@ -2235,7 +2245,8 @@ Section SyscallVocab.
     { exact Hgeng. }
     { exact Hcwi. }
     { exact Hsbr. }
-    exact Hfk.
+    { exact Hfk. }
+    exact Hpidrow.
   Qed.
 
   (* the jalr's target, at a symbolic table index -- [ret_pc] is the
@@ -2788,6 +2799,12 @@ Section SyscallRet.
     pv_chg (us_V U') = pv_chg (us_V U) ->
     (* ...and the generation's, on the same terms *)
     pv_gen (us_V U') = pv_gen (us_V U) ->
+    (* ...AND GETPID'S ANSWER, at the return REGISTER for sbrk's and fork's
+       reason: the [sd a0,112(s2)] below is what turns it into the stored
+       word form every layer above reads.  Free at every other arm off its
+       own index ([SpecSyscall.sysc_ret_pid_ne]); getpid's arm has it from
+       [SpecSysGetpid]'s own post. *)
+    sysc_ret_pid (us_V U) (E !!! Regidx (mword_of_int 10 : mword 5)) pid ->
     sie_cap_gpr KT1 E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
@@ -2818,7 +2835,7 @@ Section SyscallRet.
     sysc_wait_out U (E !!! Regidx Ra0) cs cs' -∗
     sysc_exec_out U
       (us_tf U' (<[tf_arg_idx 0 := E !!! Regidx Ra0]> (pv_tf (us_V U'))))
-      sts sts' gn cs -∗
+      sts sts' gn cs pid -∗
     (* ...AND THE SYSCALL CHANNEL'S, AT THE RETURN REGISTER.  An arm's
        contract states its armed post at the value its entry returned, which
        is [a0]; the [sd a0,112(s2)] below is what makes that the trapframe
@@ -2826,13 +2843,13 @@ Section SyscallRet.
        this lemma's, exactly as it is for the descriptor and cwd rows.
        The resume view is the record's own: the store below moves the a0
        word and nothing else, so the cwd inum the row is read at is [U']'s. *)
-    sysc_sys_out U sts gn cs f (E !!! Regidx Ra0) (us_M U') sts'
+    sysc_sys_out U sts gn cs pid f (E !!! Regidx Ra0) (us_M U') sts'
       (pv_cwi (us_V U')) cs' -∗
     (* ...AND THE PAYMENT, carried the same way *)
     sysc_pay_out f -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng.
+    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng Hpidrow.
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hwo Hxo Hso Hpayv".
     (* the stored word, as the store lemma spells it *)
     assert (Hrg : rget E Ra0 = E !!! Regidx Ra0) by (rgne; reflexivity).
@@ -2906,6 +2923,12 @@ Section SyscallRet.
                         !!! tf_arg_idx 0) <= PIDMAX)%Z).
     { rewrite list_lookup_total_insert; [| exact Hi14].
       rgne. exact Hfk. }
+    (* ...and getpid's answer makes the same move, off the same word *)
+    assert (Hpidstored : sysc_ret_pid (us_V U)
+              (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0)
+              pid).
+    { rewrite list_lookup_total_insert; [| exact Hi14].
+      rgne. exact Hpidrow. }
     (* ...and the syscall channel's row makes the same move from the
        register to the slot, by the very word the [sd] just wrote *)
     assert (Hsoword : <[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U'))
@@ -2966,6 +2989,7 @@ Section SyscallRet.
               Hne2
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_chg]; exact Hchg)
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_gen]; exact Hgeng)
+              ltac:(cbn [us_V us_tf upd_usV upd_tf pv_tf]; exact Hpidstored)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag [Hrow] Hpc Hcont [Hfo] [Hwo] Hxo [Hso] Hpayv").
     (* the row is keyed on the ENTRY record's [pv_chg], which the a0 store
        does not move *)
@@ -3098,9 +3122,10 @@ Section SyscallArms.
      number ([sysc_arm_goal]'s [Hnum]) and reads that branch and no other;
      [UexecExecInst]'s eight [sbundle_at_*_elim] readers are the branches. *)
   Lemma sysc_sys_in_at (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam) (k : Z) :
+      (pid : mword 32) (f : sfam) (k : Z) :
     sysc_num (us_V U) = k -> k <> USYS_exit -> k <> USYS_fork ->
-    sysc_sys_in U sts gn cs f -∗ sbundle_at uslot k f (uvis_of U sts gn cs).
+    sysc_sys_in U sts gn cs pid f -∗
+    sbundle_at uslot k f (uvis_of U sts gn cs pid).
   Proof.
     intros Hn H1 H2. rewrite /sysc_sys_in. iIntros "H".
     iApply ("H" $! k with "[%]"). split_and!; assumption.
@@ -3131,14 +3156,14 @@ Section SyscallArms.
   Qed.
 
   Lemma sysc_dep_read (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (v0 : mword 64) :
     sysc_num (us_V U) = 5 ->
     pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
-    sysc_sys_in U sts gn cs f -∗ fileread_in (fd_st_of_key v0 sts) (rf_F f) (rf_ret f).
+    sysc_sys_in U sts gn cs pid f -∗ fileread_in (fd_st_of_key v0 sts) (rf_F f) (rf_ret f).
   Proof.
     intros Hn Hv0. iIntros "H".
-    iDestruct (sysc_sys_in_at U sts gn cs f 5 Hn ltac:(vm_compute; discriminate)
+    iDestruct (sysc_sys_in_at U sts gn cs pid f 5 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_read_elim uslot f _ with "H") as "H".
     rewrite /uvis_of /tf_w. cbn [uvis_tf uvis_fd].
@@ -3146,18 +3171,18 @@ Section SyscallArms.
   Qed.
 
   Lemma sysc_dep_write (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (v0 v1 v2 : mword 64) :
     sysc_num (us_V U) = 16 ->
     pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
-    sysc_sys_in U sts gn cs f -∗
+    sysc_sys_in U sts gn cs pid f -∗
     filewrite_in (fd_st_of_key v0 sts) (sys_rw_count v2) (us_M U) v1
       (wf_Q f) (wf_tr0 f).
   Proof.
     intros Hn Hv0 Hv1 Hv2. iIntros "H".
-    iDestruct (sysc_sys_in_at U sts gn cs f 16 Hn ltac:(vm_compute; discriminate)
+    iDestruct (sysc_sys_in_at U sts gn cs pid f 16 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_write_elim uslot f _ with "H") as "H".
     rewrite /uvis_of /tf_w. cbn [uvis_tf uvis_fd uvis_M].
@@ -3167,31 +3192,31 @@ Section SyscallArms.
   Qed.
 
   Lemma sysc_dep_chdir (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam) :
+      (pid : mword 32) (f : sfam) :
     sysc_num (us_V U) = 9 ->
-    sysc_sys_in U sts gn cs f -∗
+    sysc_sys_in U sts gn cs pid f -∗
     chdir_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
       (cf_P f) (cf_Pmiss f) (cf_Fo f).
   Proof.
     intros Hn. iIntros "H".
-    iDestruct (sysc_sys_in_at U sts gn cs f 9 Hn ltac:(vm_compute; discriminate)
+    iDestruct (sysc_sys_in_at U sts gn cs pid f 9 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_chdir_elim uslot f _ with "H") as "H".
     rewrite /uvis_of. cbn [uvis_cwd]. iExact "H".
   Qed.
 
   Lemma sysc_dep_open (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (v1 : mword 64) :
     sysc_num (us_V U) = 15 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
-    sysc_sys_in U sts gn cs f -∗
+    sysc_sys_in U sts gn cs pid f -∗
     open_in (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) v1
       (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
       (of_Fo f) (of_Ft f).
   Proof.
     intros Hn Hv1. iIntros "H".
-    iDestruct (sysc_sys_in_at U sts gn cs f 15 Hn ltac:(vm_compute; discriminate)
+    iDestruct (sysc_sys_in_at U sts gn cs pid f 15 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_open_elim uslot f _ with "H") as "H".
     rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf].
@@ -3199,18 +3224,18 @@ Section SyscallArms.
   Qed.
 
   Lemma sysc_dep_mknod (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (v1 v2 : mword 64) :
     sysc_num (us_V U) = 17 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
-    sysc_sys_in U sts gn cs f -∗
+    sysc_sys_in U sts gn cs pid f -∗
     mknod_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
       (dev_arg v1) (dev_arg v2)
       (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f).
   Proof.
     intros Hn Hv1 Hv2. iIntros "H".
-    iDestruct (sysc_sys_in_at U sts gn cs f 17 Hn ltac:(vm_compute; discriminate)
+    iDestruct (sysc_sys_in_at U sts gn cs pid f 17 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_mknod_elim uslot f _ with "H") as "H".
     rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf].
@@ -3219,41 +3244,41 @@ Section SyscallArms.
   Qed.
 
   Lemma sysc_dep_unlink (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam) :
+      (pid : mword 32) (f : sfam) :
     sysc_num (us_V U) = 18 ->
-    sysc_sys_in U sts gn cs f -∗
+    sysc_sys_in U sts gn cs pid f -∗
     unlink_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
       (uf_P f) (uf_Pmiss f) (uf_Fent f) (uf_Ftgt f) (uf_Fex f) (uf_Fmiss f).
   Proof.
     intros Hn. iIntros "H".
-    iDestruct (sysc_sys_in_at U sts gn cs f 18 Hn ltac:(vm_compute; discriminate)
+    iDestruct (sysc_sys_in_at U sts gn cs pid f 18 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_unlink_elim uslot f _ with "H") as "H".
     rewrite /uvis_of. cbn [uvis_cwd]. iExact "H".
   Qed.
 
   Lemma sysc_dep_link (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam) :
+      (pid : mword 32) (f : sfam) :
     sysc_num (us_V U) = 19 ->
-    sysc_sys_in U sts gn cs f -∗
+    sysc_sys_in U sts gn cs pid f -∗
     link_commits (fs_gamma_L fsc_fs) (lf_Ftgt f) (lf_Fent f) (lf_Funt f).
   Proof.
     intros Hn. iIntros "H".
-    iDestruct (sysc_sys_in_at U sts gn cs f 19 Hn ltac:(vm_compute; discriminate)
+    iDestruct (sysc_sys_in_at U sts gn cs pid f 19 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iApply (sbundle_at_link_elim uslot f _ with "H").
   Qed.
 
   Lemma sysc_dep_mkdir (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam) :
+      (pid : mword 32) (f : sfam) :
     sysc_num (us_V U) = 20 ->
-    sysc_sys_in U sts gn cs f -∗
+    sysc_sys_in U sts gn cs pid f -∗
     mkdir_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
       (df_P f) (df_Pmiss f) (df_Farm f) (df_Fdots f) (df_Fun f)
       (df_Fok f) (df_Fex f).
   Proof.
     intros Hn. iIntros "H".
-    iDestruct (sysc_sys_in_at U sts gn cs f 20 Hn ltac:(vm_compute; discriminate)
+    iDestruct (sysc_sys_in_at U sts gn cs pid f 20 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_mkdir_elim uslot f _ with "H") as "H".
     rewrite /uvis_of. cbn [uvis_cwd]. iExact "H".
@@ -3268,12 +3293,12 @@ Section SyscallArms.
   (* what moves it there from the contract's [sys_fd_st].                    *)
   (* ================================================================== *)
   Lemma sysc_sys_out_at (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate)
       (cw' : Z) (cs' : gset gname) (k : Z) :
     sysc_num (us_V U) = k -> k <> USYS_exit -> k <> USYS_fork ->
-    spost_at uslot k f (uvis_of U sts gn cs) r M' sts' cw' cs' -∗
-    sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+    spost_at uslot k f (uvis_of U sts gn cs pid) r M' sts' cw' cs' -∗
+    sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
     intros Hn H1 H2. rewrite /sysc_sys_out. iIntros "H" (n) "%Hg".
     assert (Hk : n = k) by (rewrite <- (proj1 Hg); exact Hn).
@@ -3281,7 +3306,7 @@ Section SyscallArms.
   Qed.
 
   Lemma sysc_out_read (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (v0 v1 v2 r : mword 64) (M' : gmap Z (bv 8))
       (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
     sysc_num (us_V U) = 5 ->
@@ -3292,13 +3317,13 @@ Section SyscallArms.
     pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
     fileread_extra (fd_st_of_key v0 sts) (sys_rw_count v2) (rf_F f)
       (rf_ret f) r M' v1 -∗
-    sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+    sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
     intros Hn Hv0 Hv1 Hv2. iIntros "H".
-    iApply (sysc_sys_out_at U sts gn cs f r M' sts' cw' cs' 5 Hn
+    iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 5 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
-    iApply (spost_at_read_intro uslot f (uvis_of U sts gn cs) r M' sts' cw' cs').
+    iApply (spost_at_read_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
     rewrite /uvis_of /tf_w. cbn [uvis_tf uvis_fd].
     rewrite (list_lookup_total_correct _ _ _ Hv0)
             (list_lookup_total_correct _ _ _ Hv1)
@@ -3312,18 +3337,18 @@ Section SyscallArms.
      view is free here -- chdir moves no descriptor and branch 9 of
      [UexecExecInst.xv6_spost] ignores it. *)
   Lemma sysc_out_chdir (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
     sysc_num (us_V U) = 9 ->
     chdir_receipt (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
       (cf_P f) (cf_Pmiss f) (cf_Fo f) r cw' -∗
-    sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+    sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
     intros Hn. iIntros "H".
-    iApply (sysc_sys_out_at U sts gn cs f r M' sts' cw' cs' 9 Hn
+    iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 9 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
-    iApply (spost_at_chdir_intro uslot f (uvis_of U sts gn cs) r M' sts' cw' cs').
+    iApply (spost_at_chdir_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
     rewrite /uvis_of. cbn [uvis_cwd]. iExact "H".
   Qed.
 
@@ -3331,26 +3356,26 @@ Section SyscallArms.
      view the call resumes at.  The working directory is free here for the
      mirror-image reason. *)
   Lemma sysc_out_open (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (v1 r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
     sysc_num (us_V U) = 15 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     open_receipt (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) v1
       (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
       (of_Fo f) (of_Ft f) sts r sts' -∗
-    sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+    sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
     intros Hn Hv1. iIntros "H".
-    iApply (sysc_sys_out_at U sts gn cs f r M' sts' cw' cs' 15 Hn
+    iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 15 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
-    iApply (spost_at_open_intro uslot f (uvis_of U sts gn cs) r M' sts' cw' cs').
+    iApply (spost_at_open_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
     rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf uvis_fd].
     rewrite (list_lookup_total_correct _ _ _ Hv1). iExact "H".
   Qed.
 
   Lemma sysc_out_write (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (v0 v1 v2 r : mword 64) (M' : gmap Z (bv 8))
       (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
     sysc_num (us_V U) = 16 ->
@@ -3359,13 +3384,13 @@ Section SyscallArms.
     pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
     filewrite_extra (fd_st_of_key v0 sts) (sys_rw_count v2) (us_M U) v1
       (wf_Q f) (wf_tr0 f) r -∗
-    sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+    sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
     intros Hn Hv0 Hv1 Hv2. iIntros "H".
-    iApply (sysc_sys_out_at U sts gn cs f r M' sts' cw' cs' 16 Hn
+    iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 16 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
-    iApply (spost_at_write_intro uslot f (uvis_of U sts gn cs) r M' sts' cw' cs').
+    iApply (spost_at_write_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
     rewrite /uvis_of /tf_w. cbn [uvis_tf uvis_fd uvis_M].
     rewrite (list_lookup_total_correct _ _ _ Hv0)
             (list_lookup_total_correct _ _ _ Hv1)
@@ -3373,7 +3398,7 @@ Section SyscallArms.
   Qed.
 
   Lemma sysc_out_mknod (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (v1 v2 r : mword 64) (M' : gmap Z (bv 8))
       (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
     sysc_num (us_V U) = 17 ->
@@ -3382,72 +3407,72 @@ Section SyscallArms.
     mknod_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
       (dev_arg v1) (dev_arg v2)
       (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f) r -∗
-    sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+    sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
     intros Hn Hv1 Hv2. iIntros "H".
-    iApply (sysc_sys_out_at U sts gn cs f r M' sts' cw' cs' 17 Hn
+    iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 17 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
-    iApply (spost_at_mknod_intro uslot f (uvis_of U sts gn cs) r M' sts' cw' cs').
+    iApply (spost_at_mknod_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
     rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf].
     rewrite (list_lookup_total_correct _ _ _ Hv1)
             (list_lookup_total_correct _ _ _ Hv2). iExact "H".
   Qed.
 
   Lemma sysc_out_unlink (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
     sysc_num (us_V U) = 18 ->
     unlink_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
       (uf_P f) (uf_Pmiss f) (uf_Fent f) (uf_Ftgt f) (uf_Fex f) (uf_Fmiss f) r -∗
-    sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+    sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
     intros Hn. iIntros "H".
-    iApply (sysc_sys_out_at U sts gn cs f r M' sts' cw' cs' 18 Hn
+    iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 18 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
-    iApply (spost_at_unlink_intro uslot f (uvis_of U sts gn cs) r M' sts' cw' cs').
+    iApply (spost_at_unlink_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
     rewrite /uvis_of. cbn [uvis_cwd]. iExact "H".
   Qed.
 
   Lemma sysc_out_link (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
     sysc_num (us_V U) = 19 ->
     link_arms (fs_gamma_L fsc_fs) (lf_Ftgt f) (lf_Fent f) (lf_Funt f) r -∗
-    sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+    sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
     intros Hn. iIntros "H".
-    iApply (sysc_sys_out_at U sts gn cs f r M' sts' cw' cs' 19 Hn
+    iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 19 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
-    iApply (spost_at_link_intro uslot f (uvis_of U sts gn cs) r M' sts' cw' cs' with "H").
+    iApply (spost_at_link_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs' with "H").
   Qed.
 
   Lemma sysc_out_mkdir (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
     sysc_num (us_V U) = 20 ->
     mkdir_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
       (df_P f) (df_Pmiss f) (df_Farm f) (df_Fdots f) (df_Fun f)
       (df_Fok f) (df_Fex f) r -∗
-    sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+    sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
     intros Hn. iIntros "H".
-    iApply (sysc_sys_out_at U sts gn cs f r M' sts' cw' cs' 20 Hn
+    iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 20 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
-    iApply (spost_at_mkdir_intro uslot f (uvis_of U sts gn cs) r M' sts' cw' cs').
+    iApply (spost_at_mkdir_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
     rewrite /uvis_of. cbn [uvis_cwd]. iExact "H".
   Qed.
 
   Lemma sysc_exec_in_open (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
-      (f : sfam)
+      (pid : mword 32) (f : sfam)
       (v0 v1 : mword 64) :
     sysc_num (us_V U) = 7 ->
     pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
-    sysc_sys_in U sts gn cs f -∗
+    sysc_sys_in U sts gn cs pid f -∗
     (* THE PAY FACT COMES OUT WITH THE BUNDLE, at the family's own payload:
        the exec'ing process handed it over so that kexec can hand it to the
        new image's slot ([SpecKexec.exec_slot_pre]'s wands). *)
@@ -3459,7 +3484,7 @@ Section SyscallArms.
         (pv_cwi (us_V U)) (kf_pay f) P Pmiss Fo (us_M U) v0 v1 sts.
   Proof.
     intros Hn Hv0 Hv1. iIntros "H".
-    iDestruct (sysc_sys_in_at U sts gn cs f 7 Hn ltac:(vm_compute; discriminate)
+    iDestruct (sysc_sys_in_at U sts gn cs pid f 7 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_exec_elim uslot f _ with "H") as "[Hmp H]".
     cbn [uvis_gen uvis_of] in *.
@@ -3615,7 +3640,12 @@ Section SyscallArms.
               ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpriv").
     iIntros (CIDy Hsy mf) "%Hmf Hcg Hcpu Hpc Hpriv".
-    destruct Hmf as [Hcs _].
+    (* THE SECOND CONJUNCT IS KEPT, and this is the whole of the PID-KEY
+       lane inside the dispatcher: [a0 = sign_extend' 64 pid] is what
+       getpid ANSWERS, and [sysc_ret_pid] is that reading carried out to
+       the trap route ([SpecSyscall.sysc_ret_pid], [SpecUsertrap.ut_ret_pid],
+       [UsysMemOk.usys_ret_pid]).  It used to be dropped here. *)
+    destruct Hmf as [Hcs Hpidw].
     (* ---- what the callee's [callee_saved] gives the shared tail ---- *)
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -3662,13 +3692,17 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's ANSWER, which is this entry's whole content:
+                 [SpecSysGetpid]'s post says [a0 = sign_extend' 64 pid] and
+                 the row is that reading, kept rather than dropped *)
+              (sysc_ret_pid_of _ _ _ Hpidw)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -3971,13 +4005,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -4084,6 +4121,9 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [Hans] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -4093,8 +4133,8 @@ Section SyscallArms.
        uniqueness that names the generation; there is nothing here to
        fabricate. *)
     { iApply (sysc_wait_out_of U _ rv (xstate_val xw) cs cs' Ha0w with "Hans"). }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -4191,13 +4231,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -4288,13 +4331,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -4385,13 +4431,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -4587,13 +4636,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -4760,14 +4812,17 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [Hans] [] [] [] Hpayv").
     (* ...AND FORK'S ANSWER, which this arm alone owes.  It was already
        packed at [cs'] above, so there is nothing left to say. *)
     { iExact "Hans". }
     (* wait answers nothing at this entry *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -4876,7 +4931,7 @@ Section SyscallArms.
        PROCESS (the trapping key's own era predicates), not from the
        environment, so nothing of [syscall_env]'s fs-abstract side is
        opened here. ---- *)
-    iDestruct (sysc_exec_in_open U sts gn cs fdep v0 v1
+    iDestruct (sysc_exec_in_open U sts gn cs pid fdep v0 v1
                  ltac:(rewrite Hnum; reflexivity) Hv0 Hv1
                  with "Hxin") as "[#Hmp Hau]".
     iDestruct "Hau" as (P Pmiss Fo Rs) "Hau".
@@ -4915,7 +4970,7 @@ Section SyscallArms.
                (us_tf (MkUstate V' Mk)
                   (<[tf_arg_idx 0 := mf !!! Regidx Ra0]>
                      (pv_tf (us_V (MkUstate V' Mk)))))
-               sts sts gn cs)%I
+               sts sts gn cs pid)%I
       with "[Harm]" as "[(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi') Hxo]".
     { iDestruct "Harm" as "[[(%Hr & %HV & %HM) _] | Hok]".
       - (* FAILED *)
@@ -5012,6 +5067,9 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] Hxo [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -5019,7 +5077,7 @@ Section SyscallArms.
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     (* exec's process never resumes on success, so its [spost_at] is [emp]
        ([UexecExecInst.xv6_spost]) and the row is free. *)
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -5234,13 +5292,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -5331,7 +5392,7 @@ Section SyscallArms.
        HERE: it rides the client's own chain node. *)
     iDestruct (sysc_fd_key γf (proc_addr j) pid U sts v0 with "Hpriv Hufrag")
       as %Hfdk.
-    iDestruct (sysc_dep_write U sts gn cs fdep v0 v1 v2
+    iDestruct (sysc_dep_write U sts gn cs pid fdep v0 v1 v2
                  ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hxin")
       as "Hdepw".
     iAssert (sys_write_in (us_V U) v0 sts (sys_rw_count v2) (us_M U) v1
@@ -5409,14 +5470,17 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hex] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     rewrite Hmfa0.
-    iApply (sysc_out_write U sts gn cs fdep v0 v1 v2 r _ _ _ _
+    iApply (sysc_out_write U sts gn cs pid fdep v0 v1 v2 r _ _ _ _
               ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hex").
   Qed.
 
@@ -5477,7 +5541,7 @@ Section SyscallArms.
        [sysc_fd_key] turns it into the contract's [sys_fd_st]. *)
     iDestruct (sysc_fd_key γf (proc_addr j) pid U sts v0 with "Hpriv Hufrag")
       as %Hfdk.
-    iDestruct (sysc_dep_read U sts gn cs fdep v0
+    iDestruct (sysc_dep_read U sts gn cs pid fdep v0
                  ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin") as "Hdepr".
     iAssert (sys_read_in (us_V U) v0 sts (rf_F fdep) (rf_ret fdep))
       with "[Hdepr]" as "Hsrin".
@@ -5563,14 +5627,17 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hex] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     rewrite Hmfa0.
-    iApply (sysc_out_read U sts gn cs fdep v0 v1 v2 r _ _ _ _
+    iApply (sysc_out_read U sts gn cs pid fdep v0 v1 v2 r _ _ _ _
               ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hex").
   Qed.
 
@@ -5676,13 +5743,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -5744,7 +5814,7 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hbmp Hisp Hbmr Hkalloc Hprocs Hirc Hpriv [Hxin]").
-    { iApply (sysc_dep_chdir U sts gn cs fdep ltac:(rewrite Hnum; reflexivity)
+    { iApply (sysc_dep_chdir U sts gn cs pid fdep ltac:(rewrite Hnum; reflexivity)
                 with "Hxin"). }
     iIntros (CIDy Hsy mf P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ Hirc Harms".
@@ -5846,13 +5916,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hrcpt] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_out_chdir U sts gn cs fdep _ _ sts (pv_cwi V') _
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_out_chdir U sts gn cs pid fdep _ _ sts (pv_cwi V') _
               ltac:(rewrite Hnum; reflexivity) with "Hrcpt").
   Qed.
 
@@ -5925,7 +5998,7 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hiru Hpriv [Hxin]").
-    { iApply (sysc_dep_unlink U sts gn cs fdep ltac:(rewrite Hnum; reflexivity)
+    { iApply (sysc_dep_unlink U sts gn cs pid fdep ltac:(rewrite Hnum; reflexivity)
                 with "Hxin"). }
     iIntros (CIDy Hsy mf P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv Harms".
@@ -5982,13 +6055,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_out_unlink U sts gn cs fdep (mf !!! Regidx Ra0) _ _ _ _
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_out_unlink U sts gn cs pid fdep (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) with "Harms").
   Qed.
 
@@ -6050,7 +6126,7 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hirl Hpriv [Hxin]").
-    { iApply (sysc_dep_link U sts gn cs fdep ltac:(rewrite Hnum; reflexivity)
+    { iApply (sysc_dep_link U sts gn cs pid fdep ltac:(rewrite Hnum; reflexivity)
                 with "Hxin"). }
     iIntros (CIDy Hsy mf P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv Harms".
@@ -6107,13 +6183,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_out_link U sts gn cs fdep (mf !!! Regidx Ra0) _ _ _ _
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_out_link U sts gn cs pid fdep (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) with "Harms").
   Qed.
 
@@ -6287,14 +6366,17 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     iApply (sysc_iref_join3 with "Hir Hiru").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -6589,14 +6671,17 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     iApply (sysc_iref_join3 with "Hir Hiru").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 
@@ -6690,7 +6775,7 @@ Section SyscallArms.
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv
                     [Hxin]").
-    { iApply (sysc_dep_mkdir U sts gn cs fdep ltac:(rewrite Hnum; reflexivity)
+    { iApply (sysc_dep_mkdir U sts gn cs pid fdep ltac:(rewrite Hnum; reflexivity)
                 with "Hxin"). }
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0 Harms".
@@ -6752,13 +6837,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_out_mkdir U sts gn cs fdep (mf !!! Regidx Ra0) _ _ _ _
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_out_mkdir U sts gn cs pid fdep (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) with "Harms").
   Qed.
 
@@ -6827,7 +6915,7 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv [Hxin]").
-    { iApply (sysc_dep_mknod U sts gn cs fdep v1 v2
+    { iApply (sysc_dep_mknod U sts gn cs pid fdep v1 v2
                 ltac:(rewrite Hnum; reflexivity) Hv1 Hv2 with "Hxin"). }
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv Harms".
@@ -6889,13 +6977,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_out_mknod U sts gn cs fdep v1 v2 (mf !!! Regidx Ra0) _ _ _ _
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_out_mknod U sts gn cs pid fdep v1 v2 (mf !!! Regidx Ra0) _ _ _ _
               ltac:(rewrite Hnum; reflexivity) Hv1 Hv2 with "Harms").
   Qed.
 
@@ -7029,7 +7120,7 @@ Section SyscallArms.
                       Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
                       Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
                       Hfd0 Hpriv Hufrag [Hxin]").
-      { iApply (sysc_dep_open U sts gn cs fdep v1
+      { iApply (sysc_dep_open U sts gn cs pid fdep v1
                   ltac:(rewrite Hnum; reflexivity) Hv1 with "Hxin"). }
       iIntros (CIDy Hsy mf ns' P')
         "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
@@ -7166,13 +7257,16 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
+              (* ...and getpid's answer: not this entry's number *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hrcpt] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_out_open U sts gn cs fdep v1 _ _ sts' (pv_cwi V') _
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
+    iApply (sysc_out_open U sts gn cs pid fdep v1 _ _ sts' (pv_cwi V') _
               ltac:(rewrite Hnum; reflexivity) Hv1 with "Hrcpt").
   Qed.
 
@@ -7295,7 +7389,7 @@ Section SyscallArms.
     kernel_data -∗
     sysc_hcont_ty γf pj fn dqi ip pid U sts gn cs lks av m (ret_pc (m !!! Regidx Rra))
       fdep -∗
-    sysc_sys_in U sts gn cs fdep -∗
+    sysc_sys_in U sts gn cs pid fdep -∗
     sysc_fork_in fdep U sts -∗
     sysc_pay_in fdep U -∗
     WP (Loop : expr riscv_lang).
@@ -7596,13 +7690,17 @@ Section SyscallArms.
               eq_refl
               (* ...and its generation, likewise *)
               eq_refl
+              (* ...and getpid's answer: the fallback's number is out of
+                 range, so certainly not getpid's *)
+              ltac:(apply (sysc_ret_pid_ne _ _ _ _ eq_refl);
+                    unfold UsysMemOk.USYS_getpid in *; lia)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7_range _ Hrange)).
-    iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ (sysc_num (us_V U)) eq_refl
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ (sysc_num_ne7_range _ Hrange)).
+    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ (sysc_num (us_V U)) eq_refl
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.
 

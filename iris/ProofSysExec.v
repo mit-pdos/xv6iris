@@ -167,11 +167,11 @@ Section SysExecAUBridge.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
-      (sts : list fdstate) (gn : gname) (cs : gset gname)
+      (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
       (U1 U2 U' : ustate) (r : mword 64) :
     us_V U1 = us_V U2 ->
-    exec_post_ok Fs Γ Pw Fo pl na alen afun sts gn cs U1 U' r -∗
-    exec_post_ok Fs Γ Pw Fo pl na alen afun sts gn cs U2 U' r.
+    exec_post_ok Fs Γ Pw Fo pl na alen afun sts gn cs pidv U1 U' r -∗
+    exec_post_ok Fs Γ Pw Fo pl na alen afun sts gn cs pidv U2 U' r.
   Proof.
     intro HV. rewrite /exec_post_ok HV. iIntros "H". iExact "H".
   Qed.
@@ -299,7 +299,7 @@ Section SysExecBreakAU.
            a0; [exec_arms_landed] turns it back into the landed
            [kexec_ok] whenever a caller wants that instead. *)
         exec_arms Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Qpay Pw Pmiss Fo
-                  (bview plen pfun) i alen afun sts gn cs
+                  (bview plen pfun) i alen afun sts gn cs pid
                   (us_upt U P) U' (mf !!! Regidx Ra0) -∗
         (* the READING the walk established, which the composition needs to
            name the vector in [sys_exec_arms] *)
@@ -763,7 +763,7 @@ Section SysExecWhole.
           iSplitR; [iPureIntro; exact Hpof |].
           iSplitR; [iPureIntro; exact Hargs |].
           iApply (exec_post_ok_V Fs (fs_gamma_L fsc_fs) P Fo
-                    (bview plen pfun) i3 al3 af3 sts gn cs
+                    (bview plen pfun) i3 al3 af3 sts gn cs pid
                     (us_upt U P3)
                     (MkUstate (upd_upt (us_V U) P3) (us_M U))
                     Ubk (mf !!! Regidx Ra0 : mword 64) eq_refl with "Hok"). }

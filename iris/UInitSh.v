@@ -437,7 +437,7 @@ Section UInitSh.
        needs is [length fdv = NOFILE], which comes off the LENT authority
        ([UserFd.ufd_auth_len]) rather than off the ledger. *)
     iModIntro. iIntros (N m pc) "%Hpeq %Ha0 %Ha1 #Hro #Hargv _".
-    rewrite /udepw_at. iIntros (M pm sz fdv gn cs) "#Hmpay Hheap Hufd".
+    rewrite /udepw_at. iIntros (M pm sz fdv gn cs pidv) "#Hmpay Hheap Hufd".
     (* ---- the two image readings, off the lent heap ---- *)
     iAssert (⌜uimg_sub UCodeInit.init_ro M⌝)%I as %Hsro.
     { iIntros (a b Hb).
@@ -477,14 +477,14 @@ Section UInitSh.
                  init_sh_pin_resolves sh_elf_loadable
                  (init_sh_path_of M Hsro)
                  with "Hcl Hinv Hcon Hgen Hpay") as (P Pmiss Fo R) "Hb".
-    assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs))
+    assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv))
                     (tf_arg_idx 0) = (mword_of_int 0x9a8 : mword 64))
       by (etransitivity; [ exact (tf_of_arg0 m pc) | exact Ha0 ]).
-    assert (Ea1 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs))
+    assert (Ea1 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv))
                     (tf_arg_idx 1) = (mword_of_int 0x1000 : mword 64))
       by (etransitivity; [ exact (tf_of_arg1 m pc) | exact Ha1 ]).
     iApply (sbundle_exec_intro uslot
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs) P Pmiss Fo R).
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv) P Pmiss Fo R).
     { (* init's own payload is the trivial one -- userinit's choice, which
          the entry constructor wrote into the record *)
       cbn [uvis_gen uvis_of_run]. rewrite -Hpeq. iExact "Hmpay". }

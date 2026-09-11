@@ -82,10 +82,10 @@ Section UkBranch.
      the literal [mword_of_int 0] and the compressed branches need it at
      [WpMmodeLeafBase.cli_rs1].  Same proof, one binder wider. *)
   Local Lemma uvb_zero_at (r : mword 5) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
     uint r = 0 ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ⌜m !!! Regidx r = zero_reg⌝ ∗ uvb C pt Rfd Rut sz π fdv cw gn cs M m pc.
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ⌜m !!! Regidx r = zero_reg⌝ ∗ uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc.
   Proof.
     intros Hr.
     rewrite /uvb /uvb_F.
@@ -103,7 +103,7 @@ Section UkBranch.
   (* are instances rather than re-proofs.                                  *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_btype_gen_later (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (is_rvc : bool) (i : instruction) (o : option instruction)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (is_rvc : bool) (i : instruction) (o : option instruction)
       (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
       (taken : bool) (tgt : mword 64) :
     uk_instr π M pc is_rvc i ->
@@ -124,19 +124,19 @@ Section UkBranch.
     taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ▷ ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ▷ ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign.
     iIntros "Hb Hcont".
     (* re-shape the continuation into the funnel's [uv_upd]/[uv_next] form *)
-    iAssert (▷ ukcq Qp π M sz fdv cw gn cs (uv_upd m None)
+    iAssert (▷ ukcq Qp π M sz fdv cw gn cs pidv (uv_upd m None)
                (uv_next (if taken then Some tgt else None)
                   (add_vec_int pc (if is_rvc then 2 else 4))))%I
       with "[Hcont]" as "Hcont".
     { iNext. rewrite uk_next_bool. iExact "Hcont". }
-    iApply (wp_uk_retire_later C pt Rfd Rut π sz Hlo Hpm HRut M m pc fdv cw gn cs is_rvc i o
+    iApply (wp_uk_retire_later C pt Rfd Rut π sz Hlo Hpm HRut M m pc fdv cw gn cs pidv is_rvc i o
               (if taken then Some tgt else None) None
               Hui Hred Hlpad I Hg1
               ltac:(intros s_pc Lpc Lnpc Lcp Hag Hvals;
@@ -157,7 +157,7 @@ Section UkBranch.
   (* the later-FREE restatement, which is what the compressed instances and
      every bounded-loop caller take *)
   Lemma wp_uk_btype_gen (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (is_rvc : bool) (i : instruction) (o : option instruction)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (is_rvc : bool) (i : instruction) (o : option instruction)
       (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
       (taken : bool) (tgt : mword 64) :
     uk_instr π M pc is_rvc i ->
@@ -178,13 +178,13 @@ Section UkBranch.
     taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign.
     iIntros "Hb Hcont".
-    iApply (wp_uk_btype_gen_later M m pc fdv cw gn cs is_rvc i o imm rs2 rs1 op taken tgt
+    iApply (wp_uk_btype_gen_later M m pc fdv cw gn cs pidv is_rvc i o imm rs2 rs1 op taken tgt
               Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign
               with "Hb [Hcont]").
     iApply bi.later_intro. iExact "Hcont".
@@ -194,18 +194,18 @@ Section UkBranch.
   (* beq / bne / blt / bge / bltu / bgeu -- ONE leaf.                      *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_btype (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
       (taken : bool) (tgt : mword 64) :
     uk_instr π M pc false (BTYPE (imm, Regidx rs2, Regidx rs1, op)) ->
     taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
-    exact (wp_uk_btype_gen M m pc fdv cw gn cs false
+    exact (wp_uk_btype_gen M m pc fdv cw gn cs pidv false
              (BTYPE (imm, Regidx rs2, Regidx rs1, op)) None
              imm rs2 rs1 op taken tgt
              Hui (fun _ => I) eq_refl
@@ -217,18 +217,18 @@ Section UkBranch.
   (* ... and the same leaf handing the step's later OUT, which is what a
      caller closing an UNBOUNDED loop across this branch needs. *)
   Lemma wp_uk_btype_later (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
       (taken : bool) (tgt : mword 64) :
     uk_instr π M pc false (BTYPE (imm, Regidx rs2, Regidx rs1, op)) ->
     taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ▷ ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ▷ ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
-    exact (wp_uk_btype_gen_later M m pc fdv cw gn cs false
+    exact (wp_uk_btype_gen_later M m pc fdv cw gn cs pidv false
              (BTYPE (imm, Regidx rs2, Regidx rs1, op)) None
              imm rs2 rs1 op taken tgt
              Hui (fun _ => I) eq_refl
@@ -245,40 +245,40 @@ Section UkBranch.
   (* [zero_reg].                                                           *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_btype0_later (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (imm : mword 13) (rs1 : mword 5) (op : bop)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (imm : mword 13) (rs1 : mword 5) (op : bop)
       (taken : bool) (tgt : mword 64) :
     uk_instr π M pc false
       (BTYPE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, op)) ->
     taken = uv_btaken op (m !!! Regidx rs1) zero_reg ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ▷ ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ▷ ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
     iIntros "Hb Hcont".
     iDestruct (uvb_x0 with "Hb") as "[%Hz Hb]".
-    iApply (wp_uk_btype_later M m pc fdv cw gn cs imm (mword_of_int 0 : mword 5) rs1 op
+    iApply (wp_uk_btype_later M m pc fdv cw gn cs pidv imm (mword_of_int 0 : mword 5) rs1 op
               taken tgt Hui ltac:(rewrite Hz; exact Htaken) Htgt Halign
               with "Hb Hcont").
   Qed.
 
   Lemma wp_uk_btype0 (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (imm : mword 13) (rs1 : mword 5) (op : bop)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (imm : mword 13) (rs1 : mword 5) (op : bop)
       (taken : bool) (tgt : mword 64) :
     uk_instr π M pc false
       (BTYPE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, op)) ->
     taken = uv_btaken op (m !!! Regidx rs1) zero_reg ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
     iIntros "Hb Hcont".
-    iApply (wp_uk_btype0_later M m pc fdv cw gn cs imm rs1 op taken tgt
+    iApply (wp_uk_btype0_later M m pc fdv cw gn cs pidv imm rs1 op taken tgt
               Hui Htaken Htgt Halign with "Hb [Hcont]").
     iApply bi.later_intro. iExact "Hcont".
   Qed.
@@ -291,22 +291,22 @@ Section UkBranch.
   (* the bundle.                                                           *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_cbeqz (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (imm : mword 8) (cr : mword 3) (rs : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (imm : mword 8) (cr : mword 3) (rs : mword 5)
       (taken : bool) (tgt : mword 64) :
     uk_instr π M pc true (C_BEQZ (imm, Cregidx cr)) ->
     creg2reg_idx (Cregidx cr) = Regidx rs ->
     taken = eq_vec (m !!! Regidx rs) zero_reg ->
     tgt = add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0")))) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr Htaken Htgt Halign.
     iIntros "Hb Hcont".
-    iDestruct (uvb_zero_at cli_rs1 M m pc fdv cw gn cs ltac:(vm_compute; reflexivity)
+    iDestruct (uvb_zero_at cli_rs1 M m pc fdv cw gn cs pidv ltac:(vm_compute; reflexivity)
                  with "Hb") as "[%Hz Hb]".
-    iApply (wp_uk_btype_gen M m pc fdv cw gn cs true (C_BEQZ (imm, Cregidx cr))
+    iApply (wp_uk_btype_gen M m pc fdv cw gn cs pidv true (C_BEQZ (imm, Cregidx cr))
               (Some (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")),
                             Regidx cli_rs1, Regidx rs, BEQ)))
               (sign_extend' 13 (concat_vec imm ('b"0"))) cli_rs1 rs BEQ taken tgt
@@ -328,22 +328,22 @@ Section UkBranch.
   (* [c.bnez a4,-0x8], the backward edge of a bounded loop).               *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_cbnez (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (imm : mword 8) (cr : mword 3) (rs : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (imm : mword 8) (cr : mword 3) (rs : mword 5)
       (taken : bool) (tgt : mword 64) :
     uk_instr π M pc true (C_BNEZ (imm, Cregidx cr)) ->
     creg2reg_idx (Cregidx cr) = Regidx rs ->
     taken = neq_vec (m !!! Regidx rs) zero_reg ->
     tgt = add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0")))) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π M sz fdv cw gn cs m (if taken then tgt else add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr Htaken Htgt Halign.
     iIntros "Hb Hcont".
-    iDestruct (uvb_zero_at cli_rs1 M m pc fdv cw gn cs ltac:(vm_compute; reflexivity)
+    iDestruct (uvb_zero_at cli_rs1 M m pc fdv cw gn cs pidv ltac:(vm_compute; reflexivity)
                  with "Hb") as "[%Hz Hb]".
-    iApply (wp_uk_btype_gen M m pc fdv cw gn cs true (C_BNEZ (imm, Cregidx cr))
+    iApply (wp_uk_btype_gen M m pc fdv cw gn cs pidv true (C_BNEZ (imm, Cregidx cr))
               (Some (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")),
                             Regidx cli_rs1, Regidx rs, BNE)))
               (sign_extend' 13 (concat_vec imm ('b"0"))) cli_rs1 rs BNE taken tgt

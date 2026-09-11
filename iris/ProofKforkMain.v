@@ -625,7 +625,8 @@ Section KforkArms.
        which this proof re-keys onto the record the child is actually parked
        at.  LINEAR, unlike the two rows above it: see [SpecKfork]'s premise
        of the same name. *)
-    (∀ γ : gname, my_pay γ Q -∗ uslot (uvis_of (kfork_child Up) stsP γ ∅)) -∗
+    (∀ (γ : gname) (pidc : mword 32),
+       my_pay γ Q -∗ uslot (uvis_of (kfork_child Up) stsP γ ∅ pidc)) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
@@ -841,7 +842,7 @@ Section KforkArms.
       { destruct HVc4 as (_ & _ & _ & _ & _ & _ & _ & _ & Hg & _).
         rewrite Hg. rewrite /kfk_childV /V2 /V1. reflexivity. }
       assert (Hurun : urun_eq
-                        (uvis_of (kfork_child Up) stsP (pv_gen Vc4) ∅)
+                        (uvis_of (kfork_child Up) stsP (pv_gen Vc4) ∅ pid_c)
                         (MkUstate Vc4 ((us_M Uc')))).
       { destruct HVc4 as (Hs & Hu & Ht & _ & _ & _ & _ & Hc & _ & _).
         apply urun_eq_kfork_child.
@@ -860,15 +861,19 @@ Section KforkArms.
       iEval (rewrite -Hcgn4) in "Hpr34".
       iEval (rewrite -Hcgn4) in "Hgslot".
       iEval (rewrite -Hcgn4) in "Hgpid".
-      iSpecialize ("Hjslot" $! (pv_gen Vc4) with "Hmp").
+      (* THE CHILD'S PID IS ALLOCPROC'S, and this is where fork's ∀-bound
+         one is instantiated: [pid_c] is the number <allocpid> chose, the
+         one [kfork_post]'s success arm returns and the one the park keys
+         the child's slot at ([ParkCap.park_cap] passes [un_pid N]). *)
+      iSpecialize ("Hjslot" $! (pv_gen Vc4) pid_c with "Hmp").
       iApply (B5.kfk_b5 γs γf γw γl γl2 j mf4 K lvl eb b
                 pme ks pid_c (MkUstate Vc4 ((us_M Uc'))) stsP
                 ∅
-                (uvis_of (kfork_child Up) stsP (pv_gen Vc4) ∅)
+                (uvis_of (kfork_child Up) stsP (pv_gen Vc4) ∅ pid_c)
                 (pv_chg (us_V Up)) csP ch rest
                 (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
-                Hurun eq_refl eq_refl eq_refl
+                Hurun eq_refl eq_refl eq_refl eq_refl
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock Hft Hworld Htoken Hfdone
                       Hheld Hhart Hpvcx4 Hcfrag Hcrow Hprow Hsg34 Hpr34 Hgslot Hgpid Hjslot Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
       all: try lkbelow.

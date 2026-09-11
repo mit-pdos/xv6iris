@@ -343,12 +343,15 @@ Section SyscExec.
   (* [gn] and [cs] ride beside [sts] for its reason -- the key carries the
      process's generation and its live children's, [ustate] carries
      neither, and the dispatcher is handed both by the boundary. *)
+  (* ...and [pid] rides beside them, off the same kind of thing: the key
+     carries the process's pid and [ustate] does not -- it is
+     [ProcInv.proc_priv]'s own index, which this contract already takes. *)
   Definition sysc_sys_in (U : ustate) (sts : list fdstate) (gn : gname)
-      (cs : gset gname) (f : sfam)
+      (cs : gset gname) (pid : mword 32) (f : sfam)
       : iProp Σ :=
     (∀ n : Z,
        ⌜sysc_num (us_V U) = n /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
-       sbundle_at uslot n f (uvis_of U sts gn cs))%I.
+       sbundle_at uslot n f (uvis_of U sts gn cs pid))%I.
 
   (* ...AND WHAT COMES BACK, at the same key and the SAME families: the
      syscall's armed post, read at the value the dispatcher returned.  This
@@ -378,13 +381,13 @@ Section SyscExec.
      returns and fork pays no receipt -- its deposit is a slot, and what it
      buys is the CHILD's execution, not a post to the parent. *)
   Definition sysc_sys_out (U : ustate) (sts : list fdstate) (gn : gname)
-      (cs : gset gname) (f : sfam)
+      (cs : gset gname) (pid : mword 32) (f : sfam)
       (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z)
       (cs' : gset gname)
       : iProp Σ :=
     (∀ n : Z,
        ⌜sysc_num (us_V U) = n /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
-       spost_at uslot n f (uvis_of U sts gn cs) r M' sts' cw' cs')%I.
+       spost_at uslot n f (uvis_of U sts gn cs pid) r M' sts' cw' cs')%I.
 
   (* FORK'S DEPOSIT, the one that is a SLOT.  Every other number's deposit
      is a bundle at the entry key ([sysc_sys_in]); fork's is the WP its
@@ -409,12 +412,17 @@ Section SyscExec.
      ([ChildTok.gen_split]).  [f] is here for that: it is what carries the
      payload past the excursion, so the payload the child is told about
      and the payload the parent's token comes back at are the same one. *)
+  (* THE CHILD'S PID IS ∀-BOUND BESIDE ITS GENERATION, and for the same
+     reason: <allocpid> chooses it inside the call, so the depositing
+     process cannot name it and undertakes to be safe at whichever number
+     comes out.  The kernel instantiates it at allocproc's
+     ([SpecKfork]'s slot premise, kfork's [pid_c]). *)
   Definition sysc_fork_in (f : sfam) (U : ustate) (sts : list fdstate)
       : iProp Σ :=
     (⌜sysc_num (us_V U) = UsysMemOk.USYS_fork⌝ -∗
-       ∀ g' : gname,
+       ∀ (g' : gname) (pidc : mword 32),
          my_pay g' (sfork_pay f) -∗
-         uslot (uvis_of (kfork_child U) sts g' ∅))%I.
+         uslot (uvis_of (kfork_child U) sts g' ∅ pidc))%I.
 
   (* THE PAYMENT, the one deposit that is neither a bundle nor a slot: the
      process's own knowledge of what its exit owes its parent
@@ -532,6 +540,28 @@ Section SyscExec.
     sysc_ch_ok V cs cs.
   Proof. intros _ _. reflexivity. Qed.
 
+  (* ...AND GETPID'S ANSWER, the one row about a RETURN VALUE that no table
+     of state moves can carry: [sys_getpid] returns [p->pid], sign-extended
+     by the [c.lw] that loads it ([SpecSysGetpid]'s header), and [pid] is
+     this contract's own index.  The U tier's reading is
+     [UsysMemOk.usys_ret_pid]; every entry but getpid discharges it from
+     its own table index ([sysc_ret_pid_ne]), exactly as fork's and sbrk's
+     answers are. *)
+  Definition sysc_ret_pid (V : pprivate) (r : mword 64) (pid : mword 32) : Prop :=
+    UsysMemOk.usys_ret_pid (sysc_num V) r pid.
+
+  Lemma sysc_ret_pid_ne (V : pprivate) (r : mword 64) (pid : mword 32) (k : Z) :
+    sysc_num V = k -> k <> UsysMemOk.USYS_getpid -> sysc_ret_pid V r pid.
+  Proof.
+    intros Hk Hne. unfold sysc_ret_pid.
+    apply UsysMemOk.usys_ret_pid_ne. rewrite Hk. exact Hne.
+  Qed.
+
+  (* ...and the direction getpid's own arm supplies it *)
+  Lemma sysc_ret_pid_of (V : pprivate) (r : mword 64) (pid : mword 32) :
+    r = (sign_extend' 64 pid : mword 64) -> sysc_ret_pid V r pid.
+  Proof. intros Hr. exact (UsysMemOk.usys_ret_pid_of _ r pid Hr). Qed.
+
   (* the numbers that owe nothing, as one premise an arm discharges from its
      own table index by [lia] *)
   Definition sysc_num_nofs (k : Z) : Prop :=
@@ -539,16 +569,16 @@ Section SyscExec.
        \/ k = 20).
 
   Lemma sysc_sys_out_quiet (U : ustate) (sts : list fdstate) (gn : gname)
-      (cs : gset gname) (f : sfam)
+      (cs : gset gname) (pid : mword 32) (f : sfam)
       (r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z)
       (cs' : gset gname) (k : Z) :
     sysc_num (us_V U) = k -> sysc_num_nofs k ->
-    ⊢ sysc_sys_out U sts gn cs f r M' sts' cw' cs'.
+    ⊢ sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
     intros Hk Hno. rewrite /sysc_sys_out. iIntros (n) "%Hg".
     assert (Hn : sysc_num_nofs n)
       by (rewrite <- (proj1 Hg); rewrite Hk; exact Hno).
-    iApply (spost_at_emp uslot n f (uvis_of U sts gn cs) r M' sts' cw' cs' Hn).
+    iApply (spost_at_emp uslot n f (uvis_of U sts gn cs pid) r M' sts' cw' cs' Hn).
   Qed.
 
   (* r = -1 and nothing of the process moved but a0: the trapframe up to
@@ -571,15 +601,15 @@ Section SyscExec.
      else out of its [SpecKexec.exec_key_ok] wand -- so the channel has no
      third disjunct and the round mints nothing at exec. *)
   Definition sysc_exec_out (U U' : ustate) (sts sts' : list fdstate)
-      (gn : gname) (cs : gset gname) : iProp Σ :=
+      (gn : gname) (cs : gset gname) (pid : mword 32) : iProp Σ :=
     (⌜sysc_num (us_V U) = 7⌝ -∗
        (⌜sysc_exec_failed U U' sts sts'⌝
-        ∨ uslot (uvis_of U' sts' gn cs)))%I.            (* the new image's slot *)
+        ∨ uslot (uvis_of U' sts' gn cs pid)))%I.        (* the new image's slot *)
 
   (* every other entry owes nothing *)
   Lemma sysc_exec_out_ne (U U' : ustate) (sts sts' : list fdstate)
-      (gn : gname) (cs : gset gname) :
-    sysc_num (us_V U) <> 7 -> ⊢ sysc_exec_out U U' sts sts' gn cs.
+      (gn : gname) (cs : gset gname) (pid : mword 32) :
+    sysc_num (us_V U) <> 7 -> ⊢ sysc_exec_out U U' sts sts' gn cs pid.
   Proof.
     intro Hne. rewrite /sysc_exec_out.
     iIntros "%Hk". exfalso. exact (Hne Hk).
@@ -679,7 +709,7 @@ Definition wp_syscall_sconf_body
   ch_frag (pv_chg (us_V U)) pj cs -∗
   (* the process's deposit for whatever number it trapped with -- see
      [sysc_sys_in] *)
-  sysc_sys_in U sts gn cs f -∗
+  sysc_sys_in U sts gn cs pid f -∗
   (* ...and fork's, which is a SLOT and not a bundle -- see [sysc_fork_in] *)
   sysc_fork_in f U sts -∗
   (* ...and the PAYMENT, which is neither and is owed at every number --
@@ -872,6 +902,15 @@ Definition wp_syscall_sconf_body
       ⌜ sysc_num (us_V U) <> UsysMemOk.USYS_fork
         \/ pv_tf (us_V U') !!! tf_arg_idx 0 = (mword_of_int (-1) : mword 64)
         \/ (1 <= sint (pv_tf (us_V U') !!! tf_arg_idx 0) <= PIDMAX)%Z ⌝ -∗
+      (* ...AND GETPID'S ANSWER, beside fork's and sbrk's and for their
+         reason: it is a fact about the RETURN VALUE that no table of state
+         moves can carry.  getpid (11) returns [p->pid] sign-extended, and
+         [pid] is this contract's own index -- so the value the user sees
+         is tied to the cell the kernel holds, which is what the U tier's
+         [UsysMemOk.usys_ret_pid] needs to say what getpid(2) answers.
+         Read at the OUTGOING a0 word, as the fd and cwd rows are; every
+         other entry escapes by its number ([sysc_ret_pid_ne]). *)
+      ⌜ sysc_ret_pid (us_V U) (pv_tf (us_V U') !!! tf_arg_idx 0) pid ⌝ -∗
       sie_cap_gpr KT1 mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
       bslots 3 -∗
@@ -886,14 +925,14 @@ Definition wp_syscall_sconf_body
       pc_is ret_tgt -∗
       (* ...and the exec channel's answer: on exec, the failure facts or
          the new image's slot at the resume record [U'] *)
-      sysc_exec_out U U' sts sts' gn cs -∗
+      sysc_exec_out U U' sts sts' gn cs pid -∗
       (* ...and the SYSCALL CHANNEL's: the armed post of whatever contract
          the number ran, at the process's own families, at the return
          value the a0 slot now holds, and at the RESUME VIEW the round
          leaves -- the block's image, the descriptor states [sts'] and its
          own cwd inum, which are what read's, chdir's and open's receipts
          are about; see [sysc_sys_out] *)
-      sysc_sys_out U sts gn cs f (pv_tf (us_V U') !!! tf_arg_idx 0)
+      sysc_sys_out U sts gn cs pid f (pv_tf (us_V U') !!! tf_arg_idx 0)
         (us_M U') sts' (pv_cwi (us_V U')) cs' -∗
       (* ...and FORK'S: the parent's child token and the set its children
          reading grew to -- see [sysc_fork_out] *)

@@ -195,8 +195,12 @@ Section UserretClosed.
      trap-out and the trap-in can move the set (moving it takes
      <wait_lock>), and the program mirrors the reading with
      [UserChildren.uch]. *)
+  (* ...AND THE PID, the residue's own index now ([UsertrapRes.ut_res_bare]):
+     the loop hands usertrap the number its block is at, and the resume key
+     is built at the same one, so getpid's answer and the kernel's cell are
+     one value by construction. *)
   Definition Rut_at (h : CpuId) (sz : Z) (γfd : gname) (cw : Z)
-      (gn : gname) (cs : gset gname) : uptd -> iProp Σ :=
+      (gn : gname) (cs : gset gname) (pid : mword 32) : uptd -> iProp Σ :=
     fun p => (∃ (ksp : mword 64) (U : ustate),
                 (* the closer LEADS: at the entry the record it produces is
                    only known once the trapframe words are back, so a
@@ -210,7 +214,7 @@ Section UserretClosed.
                 TsoCtx.own_context TsoCtx.cur_ctx ∗
                 (∀ sts' : list fdstate,
                    FdSlots.fd_frags γfd sts' -∗ TsoCtx.own_context TsoCtx.cur_ctx -∗
-                   UV.usertrap_res_bare (CID := h) p ksp U sts' cs) ∗
+                   UV.usertrap_res_bare (CID := h) p ksp U sts' cs pid) ∗
                 ⌜uint (pv_sz (us_V U)) = sz⌝ ∗
                 ⌜pv_fdg (us_V U) = γfd⌝ ∗
                 (* ...and the block's cwd inum, which the trap-out key's
@@ -228,7 +232,7 @@ Section UserretClosed.
                 ⌜pv_gen (us_V U) = gn⌝)%I.
 
   Lemma Rut_at_intro (h : CpuId) (sz : Z) (γfd : gname) (cw : Z)
-      (gn : gname) (cs : gset gname) (p : uptd)
+      (gn : gname) (cs : gset gname) (pid : mword 32) (p : uptd)
       (ksp : mword 64) (U : ustate) :
     uint (pv_sz (us_V U)) = sz ->
     pv_fdg (us_V U) = γfd ->
@@ -237,8 +241,8 @@ Section UserretClosed.
     TsoCtx.own_context TsoCtx.cur_ctx -∗
     (∀ sts' : list fdstate,
        FdSlots.fd_frags γfd sts' -∗ TsoCtx.own_context TsoCtx.cur_ctx -∗
-       UV.usertrap_res_bare (CID := h) p ksp U sts' cs) -∗
-    Rut_at h sz γfd cw gn cs p.
+       UV.usertrap_res_bare (CID := h) p ksp U sts' cs pid) -∗
+    Rut_at h sz γfd cw gn cs pid p.
   Proof.
     intros Hsz Hg Hc Hgn. iIntros "Hctx H". rewrite /Rut_at. iExists ksp, U.
     iSplitL "Hctx"; [ iExact "Hctx" |].
@@ -251,10 +255,10 @@ Section UserretClosed.
   (* the accessor every U-mode loop lemma takes as [HRut]: the token is a
      conjunct, so borrowing it is a split and a re-pack *)
   Lemma Rut_at_acc (h : CpuId) (sz : Z) (γfd : gname) (cw : Z)
-      (gn : gname) (cs : gset gname) (p : uptd) :
-    ⊢ Rut_at h sz γfd cw gn cs p -∗
+      (gn : gname) (cs : gset gname) (pid : mword 32) (p : uptd) :
+    ⊢ Rut_at h sz γfd cw gn cs pid p -∗
       TsoCtx.own_context TsoCtx.cur_ctx ∗
-      (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut_at h sz γfd cw gn cs p).
+      (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut_at h sz γfd cw gn cs pid p).
   Proof.
     iIntros "H". iDestruct "H" as (ksp U) "(Hctx & Hclose & %Hsz & %Hg & %Hc & %Hgn)".
     iFrame "Hctx". iIntros "Hctx". iExists ksp, U. iFrame "Hctx Hclose".
@@ -293,7 +297,8 @@ Section UserretClosed.
             loop's instantiation [Rfd] IS [fd_frags γfd] -- so the round's
             entry now carries the process's fd view as a RESOURCE, at the
             value its own key names. *)
-         (trapped_machine (CID := h) C pt (Rut_at h sz γfd cw (uvis_gen W) (uvis_ch W)) sz sc stv W
+         (trapped_machine (CID := h) C pt
+            (Rut_at h sz γfd cw (uvis_gen W) (uvis_ch W) (uvis_pid W)) sz sc stv W
           ∗ FdSlots.fd_frags γfd (uvis_fd W)
           ∗ uexec_ret sc W) -∗
          WP (Loop : expr riscv_lang)).
@@ -427,7 +432,7 @@ Section UserretClosed.
                         (tf_of (tf_resume_gpr0 (uvis_tf W))
                            (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
                      (uvis_M W))
-                  (uvis_fd W) (uvis_gen W) (uvis_ch W))
+                  (uvis_fd W) (uvis_gen W) (uvis_ch W) (uvis_pid W))
              ∗ SpecUsertrap.ut_fork_in fdep sc
                   (tf_of (tf_resume_gpr0 (uvis_tf W))
                      (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
@@ -456,12 +461,15 @@ Section UserretClosed.
             [ exfalso; rewrite Hfk in He; discriminate He | ].
           destruct (decide (usys_num (uvis_tf W) = USYS_fork)) as [_ | Hc];
             [ | exfalso; exact (Hc Hfk) ].
-          iIntros (g') "Hmp".
+          (* THE CHILD'S PID IS ∀-BOUND, beside its generation: the process
+             deposited a family over every number <allocpid> might choose
+             and the kernel instantiates it ([UexecRet.uexec_fork_child_F]). *)
+          iIntros (g' pidc) "Hmp".
           rewrite /uexec_fork_child_F SpecUsertrap.uvis_of_us_tf.
-          iSpecialize ("Hxin" $! g'). iSpecialize ("Hxin" with "Hmp").
+          iSpecialize ("Hxin" $! g' pidc). iSpecialize ("Hxin" with "Hmp").
           iEval (rewrite (uslot_key_cong
-                            (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W)
-                               (uvis_sz W) (uvis_fd W) (uvis_cwd W) g' ∅)
+                            (bump_at W (mword_of_int 0) (uvis_M W) (uvis_perm W)
+                               (uvis_sz W) (uvis_fd W) (uvis_cwd W) g' ∅ pidc)
                             (MkUvis
                                (bump_tf (tf_of (tf_resume_gpr0 (uvis_tf W))
                                            (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
@@ -472,9 +480,9 @@ Section UserretClosed.
                                (uint (pv_sz (us_V (us_upt U0 pt))))
                                (uvis_fd W)
                                (pv_cwi (us_V (us_upt U0 pt)))
-                               g' ∅)
+                               g' ∅ pidc)
                             Hgpr0 Hpc0 eq_refl (eq_sym Hpi0) (eq_sym Hsz0)
-                            eq_refl (eq_sym Hcw0) eq_refl eq_refl)) in "Hxin".
+                            eq_refl (eq_sym Hcw0) eq_refl eq_refl eq_refl)) in "Hxin".
           iExact "Hxin".
       - iSplitL "Hxin".
         + (* the pre row is the deposit at the RUN projection of the trapped
@@ -502,7 +510,8 @@ Section UserretClosed.
                                   | exact (eq_sym (uvis_run_arg2 W))
                                   | reflexivity
                                   | exact (eq_trans Hcww (eq_sym Hcwi))
-                                  | reflexivity | reflexivity ]))
+                                  | reflexivity | reflexivity
+                                  | reflexivity ]))
           end.
           iExact "Hxin".
         + (* not fork, so the fork row is vacuous *)
@@ -511,7 +520,7 @@ Section UserretClosed.
     (* ---- one round.  [Hret] -- the linear return user execution handed
            back -- is FRAMED across the crossing (R-a / K8). ---- *)
     iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp
-              (us_upt U0 pt) (uvis_fd W) (uvis_gen W) (uvis_ch W) fdep
+              (us_upt U0 pt) (uvis_fd W) (uvis_gen W) (uvis_ch W) (uvis_pid W) fdep
               (uvis_M W)
               (tf_resume_gpr0 (uvis_tf W))
               ms_v sc stv (tf_w (uvis_tf W) tf_epc_idx)
@@ -521,7 +530,7 @@ Section UserretClosed.
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2 cs2)
-      "%Huptpt' %Hround' %Hfdkept %Hchkept %Hgenk2 %Hfdecall %Hpipecall %Hpcret' %Hgprtie'
+      "%Huptpt' %Hround' %Hfdkept %Hchkept %Hgenk2 %Hfdecall %Hpipecall %Hpidrow %Hpcret' %Hgprtie'
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
        Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds' Hxo Hfo Hwo Hso Hpay".
@@ -564,7 +573,7 @@ Section UserretClosed.
     iDestruct (UV.usertrap_res_bare_fd_open pt' ksp U2 sts2 with "Hures'")
       as "(Hfrag2 & Hctx2 & Hclose2)".
     iDestruct (Rut_at_intro CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2))
-                 (pv_cwi (us_V U2)) (uvis_gen W) cs2 pt' ksp U2
+                 (pv_cwi (us_V U2)) (uvis_gen W) cs2 (uvis_pid W) pt' ksp U2
                  eq_refl eq_refl eq_refl
                  (* the round keeps the generation ([SpecUsertrap.ut_gen_kept]),
                     and the entry residue's was the key's *)
@@ -620,7 +629,7 @@ Section UserretClosed.
                       (perm_of (ud_um (pv_upt (us_V U2))) (uint (pv_sz (us_V U2))))
                       (uint (pv_sz (us_V U2)))
                  /\ sts2 = uvis_fd W⌝
-              ∨ uslot (uvis_of U2 sts2 (uvis_gen W) cs2)))%I
+              ∨ uslot (uvis_of U2 sts2 (uvis_gen W) cs2 (uvis_pid W))))%I
       with "[Hxo]" as "Hxo".
     { iIntros "%Hg".
       assert (Hnf : ~ (sc = uecall_scause
@@ -644,7 +653,10 @@ Section UserretClosed.
                  Hfdecall
                  (* ...and pipe's join beside it, from the same three hops
                     and stated at the same trapframe pair *)
-                 Hpipecall Hround'
+                 Hpipecall
+                 (* ...and getpid's answer, from the same three hops and at
+                    the same trapframe pair -- [SpecUsertrap.ut_ret_pid] *)
+                 Hpidrow Hround'
                  (* ...AND THE SYSCALL'S ARMED POST, back under the arm's own
                     [∀ r], AT THE FAMILIES THE DEPOSIT WAS MADE AT ([fdep],
                     the witness the split handed out).  It comes off
@@ -670,18 +682,19 @@ Section UserretClosed.
                  (uvis_of (upd_usM (us_tf (us_upt U0 pt)
                              (tf_of (tf_resume_gpr0 (uvis_tf W))
                                 (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
-                             (uvis_M W)) (uvis_fd W) (uvis_gen W) (uvis_ch W))
+                             (uvis_M W)) (uvis_fd W) (uvis_gen W) (uvis_ch W)
+                             (uvis_pid W))
                  (uvis_run W) (pv_tf (us_V U2) !!! tf_arg_idx 0)
                  (us_M U2) sts2 (pv_cwi (us_V U2)) cs2
                  ltac:(rewrite /skey_eq; split_and!;
                        [ reflexivity | reflexivity | reflexivity
                        | reflexivity | reflexivity
                        | exact (eq_trans Hcwi (eq_sym Hcww))
-                       | reflexivity | reflexivity ]))) in "Hso";
+                       | reflexivity | reflexivity | reflexivity ]))) in "Hso";
         iExact "Hso" | ].
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)
-    assert (Hpi2 : uvis_perm (uvis_of U2 sts2 (uvis_gen W) cs2)
+    assert (Hpi2 : uvis_perm (uvis_of U2 sts2 (uvis_gen W) cs2 (uvis_pid W))
                    = perm_of (ud_um pt') (uint (pv_sz (us_V U2))))
       by (cbn [uvis_of uvis_perm]; rewrite Huptpt'; reflexivity).
     (* [Rfd] IS THE PROCESS'S OWN FRAGMENTS, at its own ghost name.  The
@@ -692,18 +705,18 @@ Section UserretClosed.
     iApply (uslot_apply_loop (CID := CID') (loop_ucfg mdv0 Hmm) pt'
               (FdSlots.fd_frags (pv_fdg (us_V U2)))
               (Rut_at CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2))
-                 (pv_cwi (us_V U2)) (uvis_gen W) cs2)
+                 (pv_cwi (us_V U2)) (uvis_gen W) cs2 (uvis_pid W))
               (Rut_at_acc CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2))
-                 (pv_cwi (us_V U2)) (uvis_gen W) cs2)
+                 (pv_cwi (us_V U2)) (uvis_gen W) cs2 (uvis_pid W))
               (uint (pv_sz (us_V U2)))
-              sts2 (pv_cwi (us_V U2)) (uvis_gen W) cs2
-              (uvis_of U2 sts2 (uvis_gen W) cs2) (us_M U2) mf
+              sts2 (pv_cwi (us_V U2)) (uvis_gen W) cs2 (uvis_pid W)
+              (uvis_of U2 sts2 (uvis_gen W) cs2 (uvis_pid W)) (us_M U2) mf
               (sret_ms5 ms') sc' stval' uepc (ret_pc uepc)
               (loop_ok_loop_ucfg mdv0 Hmm pt' Hnorm' Hptwf')
               Hszok
               (user_mstatus_ok_sret_ms5 ms' HSXL HMXR HFS HVS HTVM HTSR
                  HXS HSD HMPP HSPIE)
-              Hpi2 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
+              Hpi2 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
               (eq_sym Hgprtie') (eq_sym Hpcret')
               with "Hslot Hhw' Hmin' Hwire Hregs' Hupt' Hfrag2 Hcfg' Hrut' [-]").
     (* the next round's contract, under the later the bundle takes it at --
@@ -716,7 +729,7 @@ Section UserretClosed.
     (* the middle conjunct IS the descriptor view coming back -- [Rfd] here
        is [fd_frags (pv_fdg (us_V U2))], so this is the process's own
        fragments at the trap-out key's own [uvis_fd]. *)
-    iIntros (W2 sc2 stv2) "%Hp2 %Hs2 %Hf2 %Hc2 %Hgn2 %Hch2 (Hframe2 & Hfrag2' & Hret2)".
+    iIntros (W2 sc2 stv2) "%Hp2 %Hs2 %Hf2 %Hc2 %Hgn2 %Hch2 %Hpid2 (Hframe2 & Hfrag2' & Hret2)".
     (* the [Rut] the next round is re-entered at is the one this round
        parked: [cs2] is the residue's index and the trap-out key reads the
        same set ([UexecRet.ukb_F]'s own pin), so the frame is re-spelled at
@@ -728,6 +741,10 @@ Section UserretClosed.
        cannot re-incarnate the process), and the Löb hypothesis is at the
        trap-out key's own reading. *)
     iEval (rewrite -Hgn2) in "Hframe2".
+    (* ...and for the PID, on the same terms: the round parked the residue
+       at the entry key's [uvis_pid] and the trap-out key carries the same
+       number ([UexecRet.ukb_F]'s seventh pin). *)
+    iEval (rewrite -Hpid2) in "Hframe2".
     iApply ("IH" $! CID' (loop_ucfg mdv0 Hmm) pt' (uint (pv_sz (us_V U2)))
               (pv_fdg (us_V U2)) (pv_cwi (us_V U2)) W2 sc2 stv2
               with "[%] [%] [%] [%] Hhw' Hmin' Hcreds' [$Hframe2 $Hfrag2' $Hret2]").
@@ -794,9 +811,10 @@ End Res.
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)
-      (fdv : list fdstate) (gn : gname) (cs : gset gname) :
+      (fdv : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32) :
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U fdv fdv gn cs.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U fdv fdv gn cs
+        pidv.
   Proof.
     cbv beta delta [wp_userret_closed_body].
     intros Hok Hj Hgnw Hretms Hwf Ha0 Hsatpr Hinj Hacc.
@@ -861,11 +879,11 @@ End Res.
     iDestruct (tf_page_open36 (ud_tfp pt) ws Hlenws with "Htfp") as
       (u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280) "(-> & Hu0 & Hu8 & Hu16 & Hu24 & Hu32 & Htf40 & Htf48 & Htf56 & Htf64 & Htf72 & Htf80 & Htf88 & Htf96 & Htf104 & Htf112 & Htf120 & Htf128 & Htf136 & Htf144 & Htf152 & Htf160 & Htf168 & Htf176 & Htf184 & Htf192 & Htf200 & Htf208 & Htf216 & Htf224 & Htf232 & Htf240 & Htf248 & Htf256 & Htf264 & Htf272 & Htf280 & Htail)".
     iApply (RU.wp_userret_user C pt (uint (pv_sz (us_V U))) fdv (pv_cwi (us_V U))
-              gn cs (us_M U)
+              gn cs pidv (us_M U)
               (FdSlots.fd_frags (pv_fdg (us_V U)))
-              (LP.Rut_at CID (uint (pv_sz (us_V U))) (pv_fdg (us_V U)) (pv_cwi (us_V U)) gn cs)
+              (LP.Rut_at CID (uint (pv_sz (us_V U))) (pv_fdg (us_V U)) (pv_cwi (us_V U)) gn cs pidv)
               (LP.Rut_at_acc CID (uint (pv_sz (us_V U))) (pv_fdg (us_V U))
-                 (pv_cwi (us_V U)) gn cs)
+                 (pv_cwi (us_V U)) gn cs pidv)
               kroot m usatp
               mstatus0 sepc0 sc_v stval_v
               u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280 u112 (DfracOwn 1)
@@ -907,7 +925,7 @@ End Res.
       (* the fd pin is dropped: the loop's Löb hypothesis is ∀-general in
          the key, so it is proved at whatever descriptor view the trap-out
          key names. *)
-      iIntros (W sc stv) "%Hp %Hs %Hf %Hc %Hgn %Hch (Hframe & Hfrag' & Hret)".
+      iIntros (W sc stv) "%Hp %Hs %Hf %Hc %Hgn %Hch %Hpidk (Hframe & Hfrag' & Hret)".
       (* the residue this round parked is indexed by [cs], and the trap-out
          key reads the same set ([UexecRet.ukb_F]'s own pin) -- so the
          [Rut] the loop is re-entered at is the one it was handed. *)
@@ -917,6 +935,8 @@ End Res.
          trap-out key's [uvis_gen], which [UexecRet.ukb_F]'s fifth pin says
          is that one. *)
       iEval (rewrite -Hgn) in "Hframe".
+      (* ...and the PID, the seventh pin, on exactly those terms *)
+      iEval (rewrite -Hpidk) in "Hframe".
       iApply ("Hloop" $! CID C pt (uint (pv_sz (us_V U))) (pv_fdg (us_V U))
                 (pv_cwi (us_V U)) W sc stv
                 with "[%] [%] [%] [%] Hhw Hmin Hcreds [$Hframe $Hfrag' Hret]").

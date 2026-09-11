@@ -271,7 +271,7 @@ Lemma fkr_tail
      [uslot (exec_key U' sts 1)], which is this record's key at the
      descriptor states the park named.  The tail re-keys it onto the record
      userret resumes with exactly as it re-keys the closer's. *)
-  (if steady then emp else uslot (uvis_of U sts gn cs)) -∗
+  (if steady then emp else uslot (uvis_of U sts gn cs pid)) -∗
   (* THE RESIDUE CLOSER, by name: [SpecForkret.forkret_closer] is the wand
      this used to spell out.  It is ~13 % of the Iris context of every step
      of this walk, and a proofmode step's term carries the whole context
@@ -283,7 +283,7 @@ Lemma fkr_tail
   forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
                  W γs γw γft γf γtl p ksp (pv_fdg (us_V U))
                  (pv_chg (us_V U)) (pv_cwi (us_V U))
-                 sts gn cs (if steady then Some (uvis_of U [] gn cs) else None)
+                 sts gn cs (if steady then Some (uvis_of U [] gn cs pid) else None)
                  pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
@@ -785,9 +785,9 @@ Proof.
      the size and the cwd untouched, the image the same map.  The [None]
      mode asks nothing. *)
   { destruct steady; [| exact I].
-    refine (urun_eq_resume (uvis_of U [] gn cs) U
+    refine (urun_eq_resume (uvis_of U [] gn cs pid) U
               (MkUstate (upd_upt V' pt) (us_M U))
-              (urun_eq_of U [] gn cs) _ _ _ _ _).
+              (urun_eq_of U [] gn cs pid) _ _ _ _ _).
     - exact Htueq.
     - reflexivity.
     - exact Hpsz.
@@ -814,22 +814,22 @@ Proof.
      record the boot arm reached kexec's return with -- so it is re-keyed
      here by exactly the fact the steady mode's closer premise is
      discharged by ([UexecRet.urun_eq_resume]). *)
-  iAssert (uslot (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs))
+  iAssert (uslot (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs pid))
     with "[Hslot Hbslot]" as "Hslot".
   { destruct steady; [iExact "Hslot" |].
     iApply (bi.equiv_entails_1_1 _ _
-              (uslot_of_urun_eq (uvis_of U sts gn cs)
-                 (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs
-                 (urun_eq_resume (uvis_of U sts gn cs) U
+              (uslot_of_urun_eq (uvis_of U sts gn cs pid)
+                 (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs pid
+                 (urun_eq_resume (uvis_of U sts gn cs pid) U
                     (MkUstate (upd_upt V' pt) (us_M U))
-                    (urun_eq_of U sts gn cs) Htueq eq_refl Hpsz Hcwi eq_refl)
-                 eq_refl eq_refl eq_refl)).
+                    (urun_eq_of U sts gn cs pid) Htueq eq_refl Hpsz Hcwi eq_refl)
+                 eq_refl eq_refl eq_refl eq_refl)).
     iExact "Hbslot". }
   assert (Hpcslot : tf_resume_pc
                       (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts
-                                  gn cs))
+                                  gn cs pid))
                     = ret_pc (mepc_val epc)).
-  { change (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs))
+  { change (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs pid))
       with (pv_tf V').
     rewrite <- (tf_ueq_resume_pc (pv_tf (us_V U)) (pv_tf V') Htueq).
     unfold tf_resume_pc, tf_w.
@@ -840,7 +840,7 @@ Proof.
   iApply (UC.wp_userret_closed (CID := CIDf)
             (loop_ucfg mdv0 Hmask) pt kroot j ksp (tp_pin SE)
             (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv
-            (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs
+            (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs pid
             (loop_ok_loop_ucfg mdv0 Hmask pt Hnorm Hptwf)
             Hjlt
             (* the resumed record's generation is the parked block's *)
@@ -1820,7 +1820,7 @@ Proof.
        loadable file, arm (b) because the bundle's second wand pays for a
        node that is not).  That key is the resumed record with argc stored
        in a0, which is the record this arm reaches [fkr_tail] at. *)
-    iAssert (uslot (exec_key (MkUstate V' M') sts gn cs 1%nat)) with "[Harms]" as "Hbslot".
+    iAssert (uslot (exec_key (MkUstate V' M') sts gn cs pid 1%nat)) with "[Harms]" as "Hbslot".
     { rewrite /exec_arms.
       iDestruct "Harms" as "[[%Hf _] | Hok']".
       { destruct Hf as (Hrm1 & _). exfalso.
@@ -1870,10 +1870,10 @@ Proof.
     assert (Ha0v : rget E1 Ra0 = (mword_of_int (Z.of_nat 1) : mword 64)).
     { rgne. rewrite /E1 upd_ne; [exact Hr | reg_neq]. }
     assert (Hkeyeq :
-              exec_key (MkUstate V' M') sts gn cs 1%nat
+              exec_key (MkUstate V' M') sts gn cs pid 1%nat
               = uvis_of (MkUstate (upd_tf V'
                             (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V'))) M')
-                        sts gn cs).
+                        sts gn cs pid).
     { rewrite /exec_key Ha0v. reflexivity. }
     iEval (rewrite Hkeyeq) in "Hbslot".
     iApply (fkr_tail W j γs γw γft γf γtl pid

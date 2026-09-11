@@ -357,7 +357,15 @@ Definition wp_kfork_sconf_body
      may READ the payload its child's exit owes, because a verified child
      has to prove that exit.  kfork hands it over out of the split it
      makes ([ChildTok.gen_split]); a generic child ignores it. *)
-  (∀ g' : gname, my_pay g' Q -∗ uslot (uvis_of (kfork_child Up) stsP g' ∅)) -∗
+  (* ...AND SO IS ITS PID, on exactly the generation's terms: <allocpid>
+     chooses it inside this call, so the CALLER cannot name it either.  IT
+     IS THE PID THE POST RETURNS: kfork parks the child at the number
+     [kfork_post]'s success arm hands back as [pidv], so a parent holding
+     [ChildTok.child_tok γ pidv Q] knows the pid its child's key is at --
+     [ChildTok.gen_pid] reads it off the token -- and a verified parent can
+     therefore say what its child's getpid(2) will answer. *)
+  (∀ (g' : gname) (pidc : mword 32),
+     my_pay g' Q -∗ uslot (uvis_of (kfork_child Up) stsP g' ∅ pidc)) -∗
   (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
      take out of the parent's block: the parent's token may be the EXCLUSIVE
      boot arm, and the child needs a token of its own.  [first_done] is

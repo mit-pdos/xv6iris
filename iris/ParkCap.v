@@ -92,7 +92,7 @@ Section ParkCap.
      is this, verbatim).  [W] is what the residue closer is handed at the
      resume beside [first_done] and the timer capability. *)
   Definition park_pkg `{XI : CurCtx}
-      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ) (W : iProp Σ)
       (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64)
       (* the parked process's fd-state ghost name -- see
          [SpecForkretParkPaid.forkret_park_pkg], which is this verbatim *)
@@ -253,9 +253,15 @@ Section ParkCap.
            record's slot comes out of kexec, through the exec bundle the
            package's row above handed the boot arm, so there is nothing for
            the closer to produce and nothing for the kernel to mint. *)
-        (URB h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts cs
+        (URB h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts cs pid
          ∗ match Wk with
-           | Some _ => uslot (uvis_of U' sts gn cs)
+           (* ...AND AT THE PARKED PROCESS'S PID, which the package
+              already carries ([pid] below, the number the resumed block is
+              at): the key records it ([UexecSlot.uvis_pid]) because
+              getpid(2) answers with it, and the park is where it is read
+              -- the closer hands back [proc_priv_nopt ... pid ...], so the
+              slot and the block name one number by construction. *)
+           | Some _ => uslot (uvis_of U' sts gn cs pid)
            | None => emp
            end)))%I.
 
@@ -309,7 +315,7 @@ Section ParkCap.
   (* THE CAP, at a given [W]: the statement of
      [SpecForkretParkPaid.forkret_park_paid_body], as a [□] wand *)
   Definition park_cap
-      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (hp : CpuId) (ξp : CtxId) (γw γft γf γtl : gname) (pa ks : mword 64)
          (rest : list (mword 64)) (pid : mword 32) (U : ustate)
@@ -344,7 +350,7 @@ Section ParkCap.
        own_context (CID := hp) ξp -∗
        park_pkg (XI := ξp) URB W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
          (pv_chg (us_V U)) (pv_cwi (us_V U)) sts (pv_gen (us_V U)) cs
-         (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs) else None)
+         (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs pid) else None)
          pid av -∗
        (* ...and [W] itself, for forkret to hand the closer: under the same
           later, for the same reason *)
@@ -362,7 +368,7 @@ Section ParkCap.
      the records of THIS table ([un_s N = γs]), which is all the token for
      [γs] ever parks *)
   Definition park_chan
-      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (ξp : CtxId) (N : ut_names) (av : nat),
        ⌜un_s N = γs⌝ -∗ ⌜ut_wf N⌝ -∗ ⌜(K_usertrap <= av)%nat⌝ -∗
@@ -390,12 +396,13 @@ Section ParkCap.
                 fragments: this mirrors [UsertrapRes.ut_park_intro_body]
                 row for row. *)
              ch_frag (pv_chg (us_V U')) (un_pj N) cs -∗
-             URB h Xc pt' (add_vec (un_ks N) (mword_of_int 4096)) U' sts cs)))%I.
+             URB h Xc pt' (add_vec (un_ks N) (mword_of_int 4096)) U' sts cs
+               (un_pid N))))%I.
 
   (* THE TOKEN: some residue, its cap and its channel, both at [W := the
      token itself] *)
   Definition park_token_F (γs : list gname) (X : iProp Σ) : iProp Σ :=
-    (∃ URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ,
+    (∃ URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ,
        park_cap URB X γs ∗ park_chan URB X γs)%I.
 
   Local Instance park_token_F_contractive γs : Contractive (park_token_F γs).
@@ -591,7 +598,7 @@ Section ParkCap.
     (* AT THE BLOCK'S OWN GENERATION: the key's [UexecSlot.uvis_gen] is
        the field [ProcDefs.pv_gen], so the parked slot is keyed at it and
        nothing here chooses. *)
-    uslot (uvis_of U sts (pv_gen (us_V U)) cs) -∗
+    uslot (uvis_of U sts (pv_gen (us_V U)) cs (un_pid N)) -∗
     (* the child's rows with the block WHOLE -- the steady mode's shape *)
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U true -∗
     |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
@@ -649,12 +656,12 @@ Section ParkCap.
            neither, so the closer's premise is the fact this needs.  Then
            [uslot_of_urun_eq] moves the slot onto the record the resume
            produces, at the descriptor states the residue is about to carry. *)
-        assert (Hrk' : urun_eq (uvis_of U sts (pv_gen (us_V U)) cs) U')
+        assert (Hrk' : urun_eq (uvis_of U sts (pv_gen (us_V U)) cs (un_pid N)) U')
           by exact Hrk.
         iApply (bi.equiv_entails_1_1 _ _
-                  (uslot_of_urun_eq (uvis_of U sts (pv_gen (us_V U)) cs) U'
-                     sts (pv_gen (us_V U)) cs Hrk'
-                     eq_refl eq_refl eq_refl)).
+                  (uslot_of_urun_eq (uvis_of U sts (pv_gen (us_V U)) cs (un_pid N)) U'
+                     sts (pv_gen (us_V U)) cs (un_pid N) Hrk'
+                     eq_refl eq_refl eq_refl eq_refl)).
         iExact "Hslot".
     - iNext. iExact "Htok".
   Qed.
@@ -666,7 +673,7 @@ Section ParkCap.
   (* [usertrap_res_bare_park], both at [URB := usertrap_res_bare].          *)
   (* ------------------------------------------------------------------- *)
   Lemma park_token_intro_of
-      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ) (γs : list gname) :
+      (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ) (γs : list gname) :
     (forall N av, ut_park_intro_body URB (park_token (un_s N)) N av) ->
     park_cap URB (park_token γs) γs -∗
     park_token γs.

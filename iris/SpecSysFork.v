@@ -170,7 +170,15 @@ Definition wp_sys_fork_sconf_body
      ...AND THE SLOT MAY READ THE CHILD'S OWN PAYLOAD ([ChildTok.my_pay]
      of the [Q] this call is at): kfork hands it over out of the split it
      makes, and a verified child needs it to prove its own exit. *)
-  (∀ g' : gname, my_pay g' Q -∗ uslot (uvis_of (kfork_child U) sts g' ∅)) -∗
+  (* ...AND SO IS ITS PID, on exactly the generation's terms: <allocpid>
+     chooses it inside this call, so the CALLER cannot name it either.  IT
+     IS THE PID THE POST RETURNS: kfork parks the child at the number
+     [kfork_post]'s success arm hands back as [pidv], so a parent holding
+     [ChildTok.child_tok γ pidv Q] knows the pid its child's key is at --
+     [ChildTok.gen_pid] reads it off the token -- and a verified parent can
+     therefore say what its child's getpid(2) will answer. *)
+  (∀ (g' : gname) (pidc : mword 32),
+     my_pay g' Q -∗ uslot (uvis_of (kfork_child U) sts g' ∅ pidc)) -∗
   proc_priv γf p pid U -∗
   (* THE PARENT'S DESCRIPTOR STATES.  fork's whole effect on descriptors is
      that the CHILD gets these -- [SpecKfork]'s copy loop retypes the child's

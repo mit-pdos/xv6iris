@@ -131,7 +131,7 @@ Qed.
 
 Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* the kernel-side residue, abstract exactly as [SpecUservec] takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ)
     (C : ucfg) (pt : uptd)
     (kroot : mword 44) (j : nat) (ksp : mword 64)
     (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)
@@ -141,7 +141,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
     (fdv : list fdstate) (sts : list fdstate)
     (* ...and the two WAIT-EXIT readings the slot is keyed at, beside
        [fdv] and for its reason *)
-    (gn : gname) (cs : gset gname) :=
+    (gn : gname) (cs : gset gname) (pidv : mword 32) :=
   (* ---- the loop's own shape, re-established every round ---- *)
   loop_ok C pt ->
   (j < NPROC)%nat ->
@@ -207,10 +207,10 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
          that one lemma plus the equation between its own [sepc] value and
          the trapframe's epc word. ---- *)
   ukc (perm_of (ud_um pt) (uint (pv_sz (us_V U)))) (us_M U)
-      (uint (pv_sz (us_V U))) fdv (pv_cwi (us_V U)) gn cs
+      (uint (pv_sz (us_V U))) fdv (pv_cwi (us_V U)) gn cs pidv
       (tf_resume_gpr0 (pv_tf (us_V U))) (ret_pc sepc0) -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)
-  URes CID pt ksp U sts cs -∗
+  URes CID pt ksp U sts cs pidv -∗
   WP (Loop : expr riscv_lang).
 
 
@@ -232,7 +232,8 @@ Module Type USERRET_CLOSED.
          the entry they are the same descriptor states -- see
          [ParkCap.park_pkg]'s shared existential, which is where the entry's
          two halves come from. *)
-      (sts : list fdstate) (gn : gname) (cs : gset gname),
+      (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32),
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U sts sts gn cs.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U sts sts gn cs
+        pidv.
 End USERRET_CLOSED.

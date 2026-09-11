@@ -292,12 +292,12 @@ Section UkRun.
   Definition udepw (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) : iProp Σ :=
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname),
+       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32),
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
-        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs)))%I.
+        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs pidv)))%I.
 
   (* THE FAMILY-NAMED EXPLICIT DEPOSIT (app-echo.md, lane CONS-CURSOR, C3).
      [udepw]'s explicit disjunct hides the deposited FAMILY under an
@@ -316,18 +316,18 @@ Section UkRun.
   Definition udepwf (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (fdep : sfam) : iProp Σ :=
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname),
+       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32),
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs))%I.
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv))%I.
 
   Lemma udepwf_udepw (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (fdep : sfam) :
     udepwf N m pc n fdep -∗ udepw N m pc n.
   Proof.
-    rewrite /udepwf /udepw. iIntros "H" (M pm sz fdv cw gn cs) "Hp Hh Hf".
-    iDestruct ("H" $! M pm sz fdv cw gn cs with "Hp Hh Hf") as "(Hh & Hf & Hb)".
+    rewrite /udepwf /udepw. iIntros "H" (M pm sz fdv cw gn cs pidv) "Hp Hh Hf".
+    iDestruct ("H" $! M pm sz fdv cw gn cs pidv with "Hp Hh Hf") as "(Hh & Hf & Hb)".
     iFrame "Hh Hf". iRight. iExists fdep. iExact "Hb".
   Qed.
 
@@ -336,7 +336,7 @@ Section UkRun.
       (n : Z) :
     psok n -> n <> USYS_exec -> ⊢ udepw N m pc n.
   Proof.
-    intros Hok Hne. rewrite /udepw. iIntros (M pm sz fdv cw gn cs) "_ Hh Hf".
+    intros Hok Hne. rewrite /udepw. iIntros (M pm sz fdv cw gn cs pidv) "_ Hh Hf".
     iFrame "Hh Hf". iLeft. iPureIntro. exact (conj Hok Hne).
   Qed.
 
@@ -347,14 +347,14 @@ Section UkRun.
      call site is inside its leaf's own WP goal, which absorbs it. *)
   Lemma udepw_mint (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-      (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
+      (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
     udep -∗ my_pay gn (ukn_pay N) -∗ udepw N m pc n -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs).
+    sbundle uslot n (uvis_of_run m pc M pm sz fdv cw gn cs pidv).
   Proof.
     iIntros "#Hdep #Hmp Hsb Hheap Hufd".
-    iDestruct ("Hsb" $! M pm sz fdv cw gn cs with "Hmp Hheap Hufd")
+    iDestruct ("Hsb" $! M pm sz fdv cw gn cs pidv with "Hmp Hheap Hufd")
       as "(Hheap & Hufd & [%Hok | Hb])"; iFrame "Hheap Hufd";
       [ iApply (udep_dep n _ (proj1 Hok) (proj2 Hok) with "Hdep")
       | by iModIntro ].
@@ -387,7 +387,7 @@ Section UkRun.
   Lemma udepw_of_uxsup (N : uk_names Σ) (m : regfile) (pc : mword 64) :
     uxsup -∗ udepw N m pc USYS_exec.
   Proof.
-    iIntros "#Hx" (M pm sz fdv cw gn cs) "_ Hh Hf". iFrame "Hh Hf". iRight.
+    iIntros "#Hx" (M pm sz fdv cw gn cs pidv) "_ Hh Hf". iFrame "Hh Hf". iRight.
     iApply "Hx".
   Qed.
 
@@ -420,12 +420,12 @@ Section UkRun.
   Definition udepw_at (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) : iProp Σ :=
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-       (fdv : list fdstate) (gn : gname) (cs : gset gname),
+       (fdv : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32),
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
-        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs)))%I.
+        ∨ sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv)))%I.
 
   (* [udepw] IS THE ∀-CWD FORM, one direction.  The two differ only in
      where the [cw] binder sits, so the equivalence holds both ways; this
@@ -437,8 +437,8 @@ Section UkRun.
       (n : Z) (c : Z) :
     udepw N m pc n -∗ udepw_at N m pc n c.
   Proof.
-    iIntros "Hd" (M pm sz fdv gn cs) "Hmp Hh Hf".
-    iApply ("Hd" $! M pm sz fdv c gn cs with "Hmp Hh Hf").
+    iIntros "Hd" (M pm sz fdv gn cs pidv) "Hmp Hh Hf".
+    iApply ("Hd" $! M pm sz fdv c gn cs pidv with "Hmp Hh Hf").
   Qed.
 
   (* ...AND THE SUPPLIER THAT IGNORES THE LOAN: a caller that already has
@@ -448,11 +448,11 @@ Section UkRun.
   Lemma udepw_at_of_bundle (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) :
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-       (fdv : list fdstate) (gn : gname) (cs : gset gname),
-       sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs)) -∗
+       (fdv : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32),
+       sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv)) -∗
     udepw_at N m pc n c.
   Proof.
-    iIntros "Hb" (M pm sz fdv gn cs) "_ Hh Hf". iFrame "Hh Hf". iRight.
+    iIntros "Hb" (M pm sz fdv gn cs pidv) "_ Hh Hf". iFrame "Hh Hf". iRight.
     iApply "Hb".
   Qed.
 
@@ -461,18 +461,18 @@ Section UkRun.
       (c : Z) :
     uxsup -∗ udepw_at N m pc USYS_exec c.
   Proof.
-    iIntros "#Hx". iApply udepw_at_of_bundle. iIntros (M pm sz fdv gn cs).
+    iIntros "#Hx". iApply udepw_at_of_bundle. iIntros (M pm sz fdv gn cs pidv).
     iApply "Hx".
   Qed.
 
   (* THE LEAF'S USE OF IT, [udepw_mint]'s shape at the fixed cwd *)
   Lemma udepw_at_mint (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (c : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (sz : Z) (fdv : list fdstate) (gn : gname) (cs : gset gname) :
+      (sz : Z) (fdv : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32) :
     udep -∗ my_pay gn (ukn_pay N) -∗ udepw_at N m pc n c -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs).
+    sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv).
   Proof.
     iIntros "#Hdep #Hmp Hsb Hheap Hufd".
     iDestruct ("Hsb" $! M pm sz fdv gn cs with "Hmp Hheap Hufd")
@@ -497,7 +497,7 @@ Section UkRun.
           holds names it -- and its live children [cs] do: the authority
           below is what ties a program's [UserChildren.uch] to the set the
           key is at. *)
-       (gn : gname) (cs : gset gname),
+       (gn : gname) (cs : gset gname) (pidv : mword 32),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        (* A6.140: the residue-token accessor rides the bundle as a PURE
           fact, so a leaf that re-enters [ukc] can hand it back over *)
@@ -550,7 +550,7 @@ Section UkRun.
           and costs nothing. *)
        ukn_pay N (-1) ∗
        udep ∗
-       uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw gn cs M m pc)%I.
+       uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw gn cs pidv M m pc)%I.
 
   (* THE ROUND'S EFFECT ON THE CWD, AT EVERY NUMBER BUT CHDIR.  A leaf
      re-closes [urun] at the [cw'] the round resumed the process at, and
@@ -601,7 +601,7 @@ Section UkRun.
      that is closing back up has just destructed it, so it can say which one.
      Re-introducing the existential at THAT size is all this does. *)
   Lemma urun_close (N : uk_names Σ) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
+      (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32)
       (m : regfile) (pc : mword 64)
       (avail : nat) :
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗
@@ -626,13 +626,13 @@ Section UkRun.
        so a leaf that destructed [urun] hands the very copy it read *)
     udep -∗
     (∀ h : CpuId, urun N h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
-    ukcq (ukn_pay N) pm M sz fdv cw gn cs m pc.
+    ukcq (ukn_pay N) pm M sz fdv cw gn cs pidv m pc.
   Proof.
     iIntros "Hheap Hstk Hufd Hcwd Hch #Hmy Hpay #Hdep Hcont".
     rewrite /ukcq. iFrame "Hmy Hpay". iIntros "Hpay".
     rewrite /ukc. iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h).
-    iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw, gn, cs.
+    iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw, gn, cs, pidv.
     iFrame "Hheap Hstk Hufd Hcwd Hch Hmy Hpay Hdep Hb". iPureIntro.
     split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
@@ -657,7 +657,7 @@ Section UkRun.
      is keyed by sp, and [unot_sp] says this write was not to sp. *)
   Lemma urun_close_upd (N : uk_names Σ) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
-      (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
+      (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32)
       (pc' : mword 64) (avail : nat) :
     unot_sp rd ->
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗
@@ -670,7 +670,7 @@ Section UkRun.
     udep -∗
     (∀ h : CpuId, urun N h (<[Regidx rd := v]> m) pc' avail -∗
                   WP (Loop : expr riscv_lang)) -∗
-    ukcq (ukn_pay N) pm M sz fdv cw gn cs (<[Regidx rd := v]> m) pc'.
+    ukcq (ukn_pay N) pm M sz fdv cw gn cs pidv (<[Regidx rd := v]> m) pc'.
   Proof.
     intros Hns. iIntros "Hheap Hstk Hufd Hcwd Hch #Hmy Hpay #Hdep Hcont".
     iApply (urun_close with "Hheap [Hstk] Hufd Hcwd Hch Hmy Hpay Hdep Hcont").
@@ -932,7 +932,7 @@ Section UkRun.
       /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwd & Hch & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwd & Hch & #Hdep & Hb)".
     iDestruct (ustack_align with "Hstk") as %Hal.
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
     iPureIntro. exact (conj Hal Hroom).
@@ -1143,7 +1143,7 @@ Section UkRun.
       [ reflexivity | exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
-      (uvis_cwd W), (uvis_gen W), (uvis_ch W).
+      (uvis_cwd W), (uvis_gen W), (uvis_ch W), (uvis_pid W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
@@ -1279,7 +1279,7 @@ Section UkRun.
       [ reflexivity | exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
-      (uvis_cwd W), (uvis_gen W), (uvis_ch W).
+      (uvis_cwd W), (uvis_gen W), (uvis_ch W), (uvis_pid W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
@@ -1440,7 +1440,7 @@ Section UkRun.
       [ reflexivity | exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
-      (uvis_cwd W), (uvis_gen W), (uvis_ch W).
+      (uvis_cwd W), (uvis_gen W), (uvis_ch W), (uvis_pid W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].

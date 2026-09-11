@@ -197,6 +197,13 @@ Section ProofKforkB5.
        lane's fork arm is what makes the choice non-trivial. *)
     uvis_gen Wk = pv_gen (us_V Uc) ->
     uvis_ch Wk = csP ->
+    (* ...AND ITS PID, on the generation's terms: the park keys the child's
+       slot at the RESIDUE'S index ([UsertrapRes.ut_res_bare]'s, which
+       [ParkCap.park_cap] passes as [un_pid N] = allocproc's [pid_c]), so
+       what the caller owes is that its key is at that number.  This is
+       where fork's ∀-bound child pid ([SpecKfork]'s slot premise) is
+       instantiated. *)
+    uvis_pid Wk = pid_c ->
     (* THE FRESHNESS PREMISE, AT THE LOWEST RANK THIS BLOCK TOUCHES:
        "wait_lock" (10), acquired directly at +0xd0; "proc" (11), released
        immediately on entry and re-acquired at +0xe6, is higher and follows
@@ -292,7 +299,7 @@ Section ProofKforkB5.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hurun Hkfd Hkgn Hkch Hfresh.
+    intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hurun Hkfd Hkgn Hkch Hkpid Hfresh.
     iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv Hfrag Hcrow Hprow Hsg34 Hpr34 #Hgslot #Hgpid Hjslot #Hmk
              Hfd Hirsp Hbsl Hkfree #Hks Hctx Hcont".
     (* -------------------------------------------------------------- *)
@@ -351,7 +358,7 @@ Section ProofKforkB5.
        caller's slot is at [Wk], which has that record's run key, and the
        congruence is what carries it there. *)
     iEval (rewrite (uslot_of_urun_eq Wk Uc stsP (pv_gen (us_V Uc)) csP
-                      Hurun Hkfd Hkgn Hkch))
+                      pid_c Hurun Hkfd Hkgn Hkch Hkpid))
       in "Hjslot".
     iMod (park_token_park_steady N rest Uc stsP csP Hwf Hrest
             with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfdone Hfrag Hcrow Hjslot

@@ -142,7 +142,7 @@ Definition forkret_park_pkg
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
-    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ)
     (* what the closer is handed at the resume beside [first_done] -- the
        park token, abstract here; see [SpecForkret] and ParkCap.v *)
     (W : iProp Σ)
@@ -273,15 +273,15 @@ Definition forkret_park_pkg
          residue.  [ParkCap.park_pkg] is this verbatim; the note there is
          the design.  ONE [sts] for the residue and the key -- the
          package's argument. *)
-      (URes h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts cs
+      (URes h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts cs pid
        ∗ match Wk with
-         | Some _ => uslot (uvis_of U' sts gn cs)
+         | Some _ => uslot (uvis_of U' sts gn cs pid)
          | None => emp
          end)))%I.
 
 Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ) (W : iProp Σ)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ) (W : iProp Σ)
     (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (U : ustate) (sts : list fdstate)
     (* THE GENERATION IS THE BLOCK'S FIELD, not a parameter: see
@@ -323,7 +323,7 @@ Definition forkret_park_paid_body
   ⊢ own_context cur_ctx -∗
     forkret_park_pkg URes W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
       (pv_chg (us_V U)) (pv_cwi (us_V U)) sts (pv_gen (us_V U)) cs
-      (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs) else None)
+      (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs pid) else None)
       pid av -∗
     ▷ W -∗
     is_kstack pa ks -∗

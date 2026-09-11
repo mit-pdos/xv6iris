@@ -116,6 +116,12 @@ Definition USYS_close : Z := 21.
    entry that may change it. *)
 Definition USYS_chdir : Z := 9.
 
+(* ...and the one that ANSWERS with a reading of the key (kernel/syscall.h):
+   getpid(2) returns [p->pid], which is [UexecSlot.uvis_pid].  It moves
+   nothing at all -- it is the only entry whose whole content is its return
+   value, and SS2g below is that content. *)
+Definition USYS_getpid : Z := 11.
+
 (* [read]'s count, as the C reads it: argument 2 into an [int].  The read
    row is the one whose length is not a constant.  Definitionally
    [SpecSyscall.sysc_rdcount V] at [tf := pv_tf V]. *)
@@ -707,6 +713,44 @@ Proof. exact id. Qed.
 Lemma usys_ch_ok_refl (n : Z) (r : mword 64) (cs : gset gname) :
   usys_ch_ok n r cs cs.
 Proof. reflexivity. Qed.
+
+(* ===================================================================== *)
+(* SS2g THE PID ROW: what getpid(2) ANSWERS.                               *)
+(*                                                                         *)
+(* [pid] is the process's own pid ([UexecSlot.uvis_pid], the number the    *)
+(* kernel's [p->pid] cell holds and every contract on the trap route       *)
+(* carries as its [pid] index); [r] is the a0 word the round returns.      *)
+(* getpid is the one entry whose whole content is its return value:        *)
+(*                                                                         *)
+(*     uint64 sys_getpid(void) { return myproc()->pid; }                   *)
+(*                                                                         *)
+(* and the [c.lw] that loads it is a SIGNED 32-bit load widened to the     *)
+(* [uint64] return type, which is exactly [sign_extend' 64]                *)
+(* ([SpecSysGetpid]'s header).  THERE IS NO "AFTER" PID: nothing moves the *)
+(* field, so this row is about the ANSWER and not about a move -- which is *)
+(* why it has no [pid'] the way [usys_gen_ok] has a [g'], and why the      *)
+(* returning arm's [UexecRet.bump] keeps [uvis_pid] structurally rather    *)
+(* than taking a parameter for it.                                         *)
+(*                                                                         *)
+(* QUIET AT EVERY OTHER NUMBER, discharged from the arm's own index by     *)
+(* [usys_ret_pid_ne] -- the shape [SpecSyscall.sysc_fork_out_ne] has.      *)
+(* ===================================================================== *)
+Definition usys_ret_pid (n : Z) (r : mword 64) (pid : mword 32) : Prop :=
+  n = USYS_getpid -> r = (sign_extend' 64 pid : mword 64).
+
+Lemma usys_ret_pid_ne (n : Z) (r : mword 64) (pid : mword 32) :
+  n <> USYS_getpid -> usys_ret_pid n r pid.
+Proof. intros Hne Hn. contradiction (Hne Hn). Qed.
+
+(* ...and the row in the direction getpid's own arm supplies it *)
+Lemma usys_ret_pid_of (n : Z) (r : mword 64) (pid : mword 32) :
+  r = (sign_extend' 64 pid : mword 64) -> usys_ret_pid n r pid.
+Proof. intros Hr _. exact Hr. Qed.
+
+(* ...and what a program calling getpid LEARNS *)
+Lemma usys_ret_pid_getpid (r : mword 64) (pid : mword 32) :
+  usys_ret_pid USYS_getpid r pid -> r = (sign_extend' 64 pid : mword 64).
+Proof. intros H. exact (H eq_refl). Qed.
 
 (* the sixteen quiet entries, by name: what a program calling one of them
    learns.  Stated for the row shape rather than per number so a program

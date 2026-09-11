@@ -470,11 +470,13 @@ Definition kexec_ok_exec (f : elf_bytes) (V V' : pprivate) (r : mword 64)
    IDENTITY (the generation survives an exec -- the slot is not
    re-incarnated, only its image is) and its children (exec does not reap),
    so both come in from the caller and go straight into the key. *)
+(* ...and so does [pidv], the process's pid: exec KEEPS it (it is the same
+   process running a new image), so it too comes in from the caller. *)
 Definition exec_key (U' : ustate) (sts : list fdstate) (gn : gname)
-    (cs : gset gname) (na : nat) : uvis :=
+    (cs : gset gname) (pidv : mword 32) (na : nat) : uvis :=
   uvis_of (us_tf U' (<[tf_arg_idx 0 := (mword_of_int (Z.of_nat na) : mword 64)]>
                        (pv_tf (us_V U'))))
-          sts gn cs.
+          sts gn cs pidv.
 
 (* WHAT A SUCCESSFUL kexec PINS ABOUT THE RESUME KEY WHEN THE NODE IS NOT A
    LOADABLE FILE (header, THE ACCEPTANCE PREDICATE).  [KexecDefs.kexec_ok]'s
@@ -506,9 +508,9 @@ Definition exec_key_ok (na : nat) (alen : nat -> nat) (sts : list fdstate)
    [kexec_ok_exec] by [kexec_ok_exec_cwi]).  So [kexec_image_ok] names no
    cwd -- the key is [uvis_of] of the post-exec block, whose inum the entry
    block already pins. *)
-Lemma exec_key_cwd (U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
+Lemma exec_key_cwd (U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
     (na : nat) :
-  uvis_cwd (exec_key U' sts gn cs na) = pv_cwi (us_V U').
+  uvis_cwd (exec_key U' sts gn cs pidv na) = pv_cwi (us_V U').
 Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
 
 Lemma kexec_ok_exec_cwi (f : elf_bytes) (V V' : pprivate) (r : mword 64)
@@ -523,20 +525,20 @@ Qed.
 (* THE KEY'S THREE OTHER READINGS, beside [exec_key_cwd]: the trapframe is
    the post-exec frame with argc inserted, the size and the descriptor view
    are the block's. *)
-Lemma exec_key_tf (U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
+Lemma exec_key_tf (U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
     (na : nat) :
-  uvis_tf (exec_key U' sts gn cs na)
+  uvis_tf (exec_key U' sts gn cs pidv na)
   = <[tf_arg_idx 0 := (mword_of_int (Z.of_nat na) : mword 64)]> (pv_tf (us_V U')).
 Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
 
-Lemma exec_key_sz (U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
+Lemma exec_key_sz (U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
     (na : nat) :
-  uvis_sz (exec_key U' sts gn cs na) = uint (pv_sz (us_V U')).
+  uvis_sz (exec_key U' sts gn cs pidv na) = uint (pv_sz (us_V U')).
 Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
 
-Lemma exec_key_fd (U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
+Lemma exec_key_fd (U' : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
     (na : nat) :
-  uvis_fd (exec_key U' sts gn cs na) = sts.
+  uvis_fd (exec_key U' sts gn cs pidv na) = sts.
 Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
 
 (* THE SUCCESS CONJUNCTS AT THE RESUME KEY.  [KexecDefs.kexec_ok]'s second
@@ -547,12 +549,12 @@ Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
    it was.  This is the fact success arm (b) hands the deposit's second
    wand. *)
 Lemma kexec_ok_exec_key_ok (U U' : ustate) (sts : list fdstate)
-    (gn : gname) (cs : gset gname)
+    (gn : gname) (cs : gset gname) (pidv : mword 32)
     (r entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) :
   length (pv_tf (us_V U)) = TFWORDS ->
   r <> (mword_of_int (-1) : mword 64) ->
   kexec_ok (us_V U) (us_V U') r entry spv szv' na alen ->
-  exec_key_ok na alen sts (exec_key U' sts gn cs na).
+  exec_key_ok na alen sts (exec_key U' sts gn cs pidv na).
 Proof.
   intros Hlen Hne Hok.
   destruct Hok as [(Hr & _) | Hok]; [ contradiction (Hne Hr) | ].
@@ -862,7 +864,7 @@ Section KexecAU.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
-      (sts : list fdstate) (gn : gname) (cs : gset gname)
+      (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
       (U U' : ustate) (r : mword 64) : iProp Σ :=
     (∃ (i : Z) (av : aview) (a : anode),
        ⌜arow_at av i a⌝ ∗
@@ -873,8 +875,8 @@ Section KexecAU.
            ⌜a = MkAnode (AFile f) nl⌝ ∗
            ⌜kexec_loadable f⌝ ∗
            ⌜kexec_ok_exec f (us_V U) (us_V U') r na alen⌝ ∗
-           ⌜kexec_image_ok f na alen afun sts (exec_key U' sts gn cs na)⌝ ∗
-           Fs.(pf_recv) (exec_key U' sts gn cs na))
+           ⌜kexec_image_ok f na alen afun sts (exec_key U' sts gn cs pidv na)⌝ ∗
+           Fs.(pf_recv) (exec_key U' sts gn cs pidv na))
         ∨ (* (b) anything else the code accepted (header): the landed
              success conjuncts at some entry, and the caller's OWN WP at
              the resume key -- the deposit's SECOND wand, applied to the
@@ -885,7 +887,7 @@ Section KexecAU.
          ⌜exists (entry spv szv' : mword 64),
             r <> (mword_of_int (-1) : mword 64)
             /\ kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝ ∗
-         Fs.(pf_recv) (exec_key U' sts gn cs na))))%I.
+         Fs.(pf_recv) (exec_key U' sts gn cs pidv na))))%I.
 
   (* ret = -1 (header, OUT): the three-way fold of the bundle *)
   Definition exec_post_fail (Fs : pfam Σ (uvis -> iProp Σ)) Γ
@@ -923,11 +925,11 @@ Section KexecAU.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
-      (sts : list fdstate) (gn : gname) (cs : gset gname)
+      (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
       (U U' : ustate) (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U /\ us_M U' = us_M U⌝
       ∗ exec_post_fail Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts)
-     ∨ exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs U U' r)%I.
+     ∨ exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs pidv U U' r)%I.
 
   (* SANITY: the arms imply the landed result relation, so the parallel
      form never contradicts [KexecDefs.kexec_ok] -- the failure arm is the
@@ -940,9 +942,9 @@ Section KexecAU.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
-      (sts : list fdstate) (gn : gname) (cs : gset gname)
+      (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
     (U U' : ustate) (r : mword 64) :
-    exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs U U' r ⊢
+    exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs pidv U U' r ⊢
       ⌜exists (entry spv szv' : mword 64),
          kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝.
   Proof.
@@ -973,12 +975,12 @@ Section KexecAU.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
-      (sts : list fdstate) (gn : gname) (cs : gset gname)
+      (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
     (U U' : ustate) (r : mword 64) :
-    exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs U U' r ⊢
+    exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs pidv U U' r ⊢
       ⌜exists (entry spv szv' : mword 64),
          kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝
-      ∧ exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs U U' r.
+      ∧ exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs pidv U U' r.
   Proof.
     iIntros "H". iSplit; [| iExact "H"].
     iApply (exec_arms_landed with "H").
@@ -996,10 +998,10 @@ Section KexecAU.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
-      (sts : list fdstate) (gn : gname) (cs : gset gname)
+      (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
       (U U' : ustate) (r : mword 64) :
-    exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs U U' r ⊢
-      ⌜r <> (mword_of_int (-1) : mword 64)⌝ ∗ Fs.(pf_recv) (exec_key U' sts gn cs na).
+    exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs pidv U U' r ⊢
+      ⌜r <> (mword_of_int (-1) : mword 64)⌝ ∗ Fs.(pf_recv) (exec_key U' sts gn cs pidv na).
   Proof.
     rewrite /exec_post_ok. iIntros "H".
     iDestruct "H" as (i av a) "(_ & [Ha | Hb])".
@@ -1148,7 +1150,7 @@ Definition wp_kexec_sconf_body
      exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) Q P Pmiss Fo
        (bview plen pfun) na alen afun sts)
     (exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) Q P Pmiss Fo
-       (bview plen pfun) na alen afun sts gn cs U).
+       (bview plen pfun) na alen afun sts gn cs pidv U).
 
 (* ===================================================================== *)
 (*  4.  THE SEAL                                                          *)

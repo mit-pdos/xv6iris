@@ -421,7 +421,7 @@ Section UkStorePostFetch.
       (imm : mword 12) (sr1 sr2 : mword 5)
       (w_st va wval : mword 64) (ib : mword 32) (t' : ptree)
       (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (rsE rs2 : regstate) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
+      (paddr : type_of_register pmpaddr_n) (rsE rs2 : regstate) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
     ustore_width kk ->
     uv_redirect i o ->
     uv_exp i o = STORE (imm, Regidx sr2, Regidx sr1, kk) ->
@@ -467,8 +467,8 @@ Section UkStorePostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs ∗
-          (uvb C pt Rfd Rut sz π fdv cw gn cs (uM_store M (uint va) kk wval) m (add_vec_int pc dpc) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
+          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv (uM_store M (uint va) kk wval) m (add_vec_int pc dpc) -∗
            WP (Loop : expr riscv_lang))) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
@@ -692,7 +692,7 @@ Section UkStorePostFetch.
     iFrame "Hrw Hro".
     iApply (uk_psi_active C pt Rfd R Rut sz π (uM_store M (uint va) kk wval) Mp'
               m (add_vec_int pc dpc) t'' usatp pcfg paddr
-              rsw fdv cw gn cs
+              rsw fdv cw gn cs pidv
               (Tw _ _ Lhs2 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity))
               (Tw _ _ Lcp2 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity))
               ltac:(rewrite (Tw (R_bitvector_64 mstatus) _ eq_refl
@@ -753,7 +753,7 @@ Section UkStorePostFetch.
       (imm : mword 12) (sr1 sr2 : mword 5)
       (va wval : mword 64) (ib : mword 32) (t' : ptree)
       (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (rsE rs2 : regstate) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
+      (paddr : type_of_register pmpaddr_n) (rsE rs2 : regstate) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
     ustore_width kk ->
     uv_redirect i o ->
     uv_exp i o = STORE (imm, Regidx sr2, Regidx sr1, kk) ->
@@ -793,8 +793,8 @@ Section UkStorePostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs ∗
-          UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs))) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
+          UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv))) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
     uv_bytes pt Mp t' -∗
@@ -1009,21 +1009,21 @@ Section UkStorePostFetch.
     iIntros "Hframe Hctx HR".
     iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hret)".
     iDestruct ("Hbak" with "Hctx") as "Hrut".
-    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs)
+    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv)
               (utrap_scause (rv64d_types.Exception (E_SAMO_Page_Fault tt))
                  (register_lookup (R_bitvector_64 scause) rsx))
               (tval (xtval_exception_value (E_SAMO_Page_Fault tt) va))
-              with "[%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hret]");
+              with "[%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hret]");
       [ reflexivity | reflexivity | reflexivity | reflexivity
-      | reflexivity | reflexivity | ].
+      | reflexivity | reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
-    { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv cw gn cs Hpure Hx0
+    { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv cw gn cs pidv Hpure Hx0
                 with "Hframe Hrut"). }
     (* the bundle takes the descriptor view back at the trap ([ukb_F]'s
        second conjunct); the key is built AT [fdv], so this is [Rfd fdv] *)
     iSplitL "Hfdr"; [ iExact "Hfdr" | ].
     iApply (bi.equiv_entails_1_2 _ _
-              (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv cw gn cs)
+              (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv cw gn cs pidv)
                  (utrap_scause_samo_ne
                     (register_lookup (R_bitvector_64 scause) rsx)))).
     (* THE PAYMENT AT THE FAULT ARM: a page fault is a kernel entry like
@@ -1033,7 +1033,7 @@ Section UkStorePostFetch.
     iExists (sfam_at Qp sfam_pt).
     rewrite /uexec_pay_arm (sexit_pay_at Qp sfam_pt).
     iSplitL "Hpayv";
-      [ iApply (uexec_pay_dep_ne _ (uvis_of_run m pc M π sz fdv cw gn cs) _ (sfam_at Qp sfam_pt)
+      [ iApply (uexec_pay_dep_ne _ (uvis_of_run m pc M π sz fdv cw gn cs pidv) _ (sfam_at Qp sfam_pt)
                   (utrap_scause_samo_ne (register_lookup (R_bitvector_64 scause) rsx))
                   (sexit_pay_at Qp sfam_pt) with "Hmyp Hpayv") | ].
     iExact "Hret".
@@ -1064,7 +1064,7 @@ Section UkStoreObl.
       (i : instruction) (o : option instruction) (kk : Z) (imm : mword 12)
       (sr1 sr2 : mword 5) (va wval : mword 64)
       (t : ptree) (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (rs1 rsA : regstate) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
+      (paddr : type_of_register pmpaddr_n) (rs1 rsA : regstate) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
     uv_pre C pt Mp m pc t rs1 rsA usatp pcfg paddr ->
     uk_pt_pure pt sz M Mp ->
     udecode_base w i ->
@@ -1084,10 +1084,10 @@ Section UkStoreObl.
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_Base w) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs ∗
-          ((uvb C pt Rfd Rut sz π fdv cw gn cs (uM_store M (uint va) kk wval) m (add_vec_int pc 4) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
+          ((uvb C pt Rfd Rut sz π fdv cw gn cs pidv (uM_store M (uint va) kk wval) m (add_vec_int pc 4) -∗
             WP (Loop : expr riscv_lang))
-           ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs)))) -∗
+           ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv)))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
@@ -1153,7 +1153,7 @@ Section UkStoreObl.
     iIntros "Hrw Hro".
     destruct Hdisp as [ (w_st & Hl & Hchk & Hntx & HMb) | Hfault ].
     - iApply (uk_store_post_fetch C pt Rfd R Rut sz π M Mp m pc 4 kk i o imm sr1 sr2 w_st va wval
-              (zero_extend' 32 w) t' usatp pcfg paddr rs1 rs2 fdv cw gn cs
+              (zero_extend' 32 w) t' usatp pcfg paddr rs1 rs2 fdv cw gn cs pidv
               Hkw Hred Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb Hntx Hinj Hg1
               Hpins2
               (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
@@ -1178,7 +1178,7 @@ Section UkStoreObl.
       iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iDestruct "Hkc" as "[Hkc _]". iFrame "Hrut Hfdr Hkb Hkc".
     - iApply (uk_store_fault_post_fetch C pt Rfd R Rut sz π M Mp m pc 4 kk i o imm sr1 sr2 va wval
-              (zero_extend' 32 w) t' usatp pcfg paddr rs1 rs2 fdv cw gn cs
+              (zero_extend' 32 w) t' usatp pcfg paddr rs1 rs2 fdv cw gn cs pidv
               Hkw Hred Hexp Hva Hwval Hfault Hpg Hinj Hg1
               Hpins2
               (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
@@ -1210,7 +1210,7 @@ Section UkStoreObl.
       (i : instruction) (o : option instruction) (kk : Z) (imm : mword 12)
       (sr1 sr2 : mword 5) (va wval : mword 64)
       (t : ptree) (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (rs1 rsA : regstate) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) :
+      (paddr : type_of_register pmpaddr_n) (rs1 rsA : regstate) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
     uv_pre C pt Mp m pc t rs1 rsA usatp pcfg paddr ->
     uk_pt_pure pt sz M Mp ->
     udecode_rvc h i ->
@@ -1230,10 +1230,10 @@ Section UkStoreObl.
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_RVC h) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs ∗
-          ((uvb C pt Rfd Rut sz π fdv cw gn cs (uM_store M (uint va) kk wval) m (add_vec_int pc 2) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
+          ((uvb C pt Rfd Rut sz π fdv cw gn cs pidv (uM_store M (uint va) kk wval) m (add_vec_int pc 2) -∗
             WP (Loop : expr riscv_lang))
-           ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs)))) -∗
+           ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv)))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
@@ -1304,7 +1304,7 @@ Section UkStoreObl.
     iIntros "Hrw Hro".
     destruct Hdisp as [ (w_st & Hl & Hchk & Hntx & HMb) | Hfault ].
     - iApply (uk_store_post_fetch C pt Rfd R Rut sz π M Mp m pc 2 kk i o imm sr1 sr2 w_st va wval
-              (zero_extend' 32 h) t' usatp pcfg paddr rs1 rs2 fdv cw gn cs
+              (zero_extend' 32 h) t' usatp pcfg paddr rs1 rs2 fdv cw gn cs pidv
               Hkw Hred Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb Hntx Hinj Hg1
               Hpins2
               (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
@@ -1329,7 +1329,7 @@ Section UkStoreObl.
       iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iDestruct "Hkc" as "[Hkc _]". iFrame "Hrut Hfdr Hkb Hkc".
     - iApply (uk_store_fault_post_fetch C pt Rfd R Rut sz π M Mp m pc 2 kk i o imm sr1 sr2 va wval
-              (zero_extend' 32 h) t' usatp pcfg paddr rs1 rs2 fdv cw gn cs
+              (zero_extend' 32 h) t' usatp pcfg paddr rs1 rs2 fdv cw gn cs pidv
               Hkw Hred Hexp Hva Hwval Hfault Hpg Hinj Hg1
               Hpins2
               (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
@@ -1392,7 +1392,7 @@ Section UkStore.
     exists q : uperm, uperm_at π va = Some q /\ up_W q = true.
 
   Lemma wp_uk_store_later (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (is_rvc : bool) (i : instruction) (o : option instruction)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (is_rvc : bool) (i : instruction) (o : option instruction)
       (imm : mword 12) (rs1 rs2 : mword 5) (k : Z)
       (va wval : mword 64) :
     ustore_width k ->
@@ -1413,8 +1413,8 @@ Section UkStore.
     is_aligned_vaddr (Virtaddr va) k = true ->
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ▷ ukcq Qp π (uM_store M (uint va) k wval) sz fdv cw gn cs m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ▷ ukcq Qp π (uM_store M (uint va) k wval) sz fdv cw gn cs pidv m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hpg Hal HMb.
@@ -1423,7 +1423,7 @@ Section UkStore.
     iIntros "Hb Hcont".
     (* the payment goes to the engine with the continuation, under the same
        later ([UexecRet.ukcq]) *)
-    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ Qp M m pc fdv cw gn cs Hal2
+    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ Qp M m pc fdv cw gn cs pidv Hal2
               with "Hb [] [Hcont]").
     2:{ iNext. rewrite /ukcq. iExact "Hcont". }
     iModIntro.
@@ -1479,11 +1479,11 @@ Section UkStore.
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
     (* the continuation at THIS table, out of the table-generic one *)
-    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv cw gn cs ∗
-             ((uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs (uM_store M (uint va) k wval) m
+    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv cw gn cs pidv ∗
+             ((uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv (uM_store M (uint va) k wval) m
                  (add_vec_int pc (if is_rvc then 2 else 4)) -∗
                WP (Loop : expr riscv_lang))
-              ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs))))%I with "[Hk]" as "Hk".
+              ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv))))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iFrame "Hrut Hfdr Hkb". iSplit.
       - (* the RETIRE leg: the payment goes straight back into the
@@ -1497,26 +1497,26 @@ Section UkStore.
            slot, and the arm hands it back into the continuation *)
         iDestruct "Hkc" as "(#Hmyp & Hpayv & Hkc)". iFrame "Hmyp Hpayv".
         iIntros "Hpayv". iDestruct ("Hkc" with "Hpayv") as "[_ Hkc]".
-        rewrite (uslot_run m pc M π sz fdv cw gn cs Hx0 Hal2). iExact "Hkc". }
+        rewrite (uslot_run m pc M π sz fdv cw gn cs pidv Hx0 Hal2). iExact "Hkc". }
     iPoseProof (uv_swp_fetch_uinstr (CID := CIDo) (XI := XIo) pt' Mp' t (uc_dqc C')
                   rsA pc is_rvc i Hinj Hui' LpcA LcpA (proj1 HmsokA) LmenvA
                   HpinsA Htok) as "Hf".
     destruct is_rvc.
     - iDestruct "Hf" as (h) "[[%HisRVC %Hdecrvc] Hbridge]".
       iApply (uk_store_obl_rvc C' pt' Rfd' R Rut' sz π M Mp' m pc h i o k imm rs1 rs2 va wval
-                t usatp pcfg paddr rs1s rsA fdv cw gn cs Hpre Hpure Hdecrvc Hkw Hred Hg1 Hexp
+                t usatp pcfg paddr rs1s rsA fdv cw gn cs pidv Hpre Hpure Hdecrvc Hkw Hred Hg1 Hexp
                 Hva Hwval Hdisp Hcanon Hpg Hal
                 with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
     - iDestruct "Hf" as (w) "[[%HnRVC %Hdecbase] Hbridge]".
       iApply (uk_store_obl_base C' pt' Rfd' R Rut' sz π M Mp' m pc w i o k imm rs1 rs2 va wval
-                t usatp pcfg paddr rs1s rsA fdv cw gn cs Hpre Hpure Hdecbase Hkw Hred Hg1 Hexp
+                t usatp pcfg paddr rs1s rsA fdv cw gn cs pidv Hpre Hpure Hdecbase Hkw Hred Hg1 Hexp
                 Hva Hwval Hdisp Hcanon Hpg Hal
                 with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
   Qed.
 
   (* the later-free restatement: the shape every instance takes *)
   Lemma wp_uk_store (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (is_rvc : bool) (i : instruction) (o : option instruction)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (is_rvc : bool) (i : instruction) (o : option instruction)
       (imm : mword 12) (rs1 rs2 : mword 5) (k : Z)
       (va wval : mword 64) :
     ustore_width k ->
@@ -1537,13 +1537,13 @@ Section UkStore.
     is_aligned_vaddr (Virtaddr va) k = true ->
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π (uM_store M (uint va) k wval) sz fdv cw gn cs m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π (uM_store M (uint va) k wval) sz fdv cw gn cs pidv m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hpg Hal HMb.
     iIntros "Hb Hcont".
-    iApply (wp_uk_store_later M m pc fdv cw gn cs is_rvc i o imm rs1 rs2 k va wval
+    iApply (wp_uk_store_later M m pc fdv cw gn cs pidv is_rvc i o imm rs1 rs2 k va wval
               Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hpg Hal HMb
               with "Hb [Hcont]").
     iApply bi.later_intro. iExact "Hcont".
@@ -1554,7 +1554,7 @@ Section UkStore.
   (* premises replaced by the key's [uk_store_ok].                          *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_sd (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (imm : mword 12) (rs1 rs2 : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (imm : mword 12) (rs1 rs2 : mword 5)
       (va wval : mword 64) :
     uk_instr π M pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) ->
     va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
@@ -1564,13 +1564,13 @@ Section UkStore.
     Z.rem (uint va) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π (uM_store8 M (uint va) wval) sz fdv cw gn cs m (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π (uM_store8 M (uint va) wval) sz fdv cw gn cs pidv m (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hva Hwval Hsok Hcanon Hpg Hal HMb.
     iIntros "Hb Hcont".
-    iApply (wp_uk_store M m pc fdv cw gn cs false
+    iApply (wp_uk_store M m pc fdv cw gn cs pidv false
               (STORE (imm, Regidx rs2, Regidx rs1, 8)) None
               imm rs1 rs2 8 va wval
               ustore_width_8 Hui ltac:(intro s; exact I) I eq_refl eq_refl
@@ -1579,7 +1579,7 @@ Section UkStore.
   Qed.
 
   Lemma wp_uk_sw (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (imm : mword 12) (rs1 rs2 : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (imm : mword 12) (rs1 rs2 : mword 5)
       (va wval : mword 64) :
     uk_instr π M pc false (STORE (imm, Regidx rs2, Regidx rs1, 4)) ->
     va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
@@ -1589,13 +1589,13 @@ Section UkStore.
     Z.rem (uint va) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π (uM_store M (uint va) 4 wval) sz fdv cw gn cs m (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π (uM_store M (uint va) 4 wval) sz fdv cw gn cs pidv m (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hva Hwval Hsok Hcanon Hpg Hal HMb.
     iIntros "Hb Hcont".
-    iApply (wp_uk_store M m pc fdv cw gn cs false
+    iApply (wp_uk_store M m pc fdv cw gn cs pidv false
               (STORE (imm, Regidx rs2, Regidx rs1, 4)) None
               imm rs1 rs2 4 va wval
               ustore_width_4 Hui ltac:(intro s; exact I) I eq_refl eq_refl
@@ -1604,7 +1604,7 @@ Section UkStore.
   Qed.
 
   Lemma wp_uk_sb (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (imm : mword 12) (rs1 rs2 : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (imm : mword 12) (rs1 rs2 : mword 5)
       (va wval : mword 64) (bb : mword 8) :
     uk_instr π M pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) ->
     va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
@@ -1612,13 +1612,13 @@ Section UkStore.
     uk_store_ok va ->
     uva_canon va ->
     M !! (uint va) = Some bb ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π (uM_store M (uint va) 1 wval) sz fdv cw gn cs m (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π (uM_store M (uint va) 1 wval) sz fdv cw gn cs pidv m (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hva Hwval Hsok Hcanon Hbb.
     iIntros "Hb Hcont".
-    iApply (wp_uk_store M m pc fdv cw gn cs false
+    iApply (wp_uk_store M m pc fdv cw gn cs pidv false
               (STORE (imm, Regidx rs2, Regidx rs1, 1)) None
               imm rs1 rs2 1 va wval
               ustore_width_1 Hui ltac:(intro s; exact I) I eq_refl eq_refl
@@ -1631,7 +1631,7 @@ Section UkStore.
   Qed.
 
   Lemma wp_uk_csdsp (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (uimm : mword 6) (rs2 : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (uimm : mword 6) (rs2 : mword 5)
       (tgt wval : mword 64) :
     uk_instr π M pc true (C_SDSP (uimm, Regidx rs2)) ->
     tgt = add_vec (m !!! Regidx csp_rs1)
@@ -1642,13 +1642,13 @@ Section UkStore.
     Z.rem (uint tgt) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr tgt) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint tgt + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π (uM_store8 M (uint tgt) wval) sz fdv cw gn cs m (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π (uM_store8 M (uint tgt) wval) sz fdv cw gn cs pidv m (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htgt Hwval Hsok Hcanon Hpg Hal HMb.
     iIntros "Hb Hcont".
-    iApply (wp_uk_store M m pc fdv cw gn cs true (C_SDSP (uimm, Regidx rs2))
+    iApply (wp_uk_store M m pc fdv cw gn cs pidv true (C_SDSP (uimm, Regidx rs2))
               (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
                             Regidx rs2, Regidx csp_rs1, 8)))
               (zero_extend' 12 (concat_vec uimm ('b"000")))
@@ -1662,7 +1662,7 @@ Section UkStore.
   Qed.
 
   Lemma wp_uk_csd (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (uimm : mword 5) (cr1 cr2 : mword 3) (rs1 rs2 : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (uimm : mword 5) (cr1 cr2 : mword 3) (rs1 rs2 : mword 5)
       (va wval : mword 64) :
     uk_instr π M pc true (C_SD (uimm, Cregidx cr1, Cregidx cr2)) ->
     creg2reg_idx (Cregidx cr1) = Regidx rs1 ->
@@ -1675,13 +1675,13 @@ Section UkStore.
     Z.rem (uint va) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π (uM_store8 M (uint va) wval) sz fdv cw gn cs m (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π (uM_store8 M (uint va) wval) sz fdv cw gn cs pidv m (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr1 Hcr2 Hva Hwval Hsok Hcanon Hpg Hal HMb.
     iIntros "Hb Hcont".
-    iApply (wp_uk_store M m pc fdv cw gn cs true (C_SD (uimm, Cregidx cr1, Cregidx cr2))
+    iApply (wp_uk_store M m pc fdv cw gn cs pidv true (C_SD (uimm, Cregidx cr1, Cregidx cr2))
               (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
                             Regidx rs2, Regidx rs1, 8)))
               (zero_extend' 12 (concat_vec uimm ('b"000")))
@@ -1699,7 +1699,7 @@ Section UkStore.
   Qed.
 
   Lemma wp_uk_csw (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (uimm : mword 5) (cr1 cr2 : mword 3) (rs1 rs2 : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (uimm : mword 5) (cr1 cr2 : mword 3) (rs1 rs2 : mword 5)
       (va wval : mword 64) :
     uk_instr π M pc true (C_SW (uimm, Cregidx cr1, Cregidx cr2)) ->
     creg2reg_idx (Cregidx cr1) = Regidx rs1 ->
@@ -1712,13 +1712,13 @@ Section UkStore.
     Z.rem (uint va) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs M m pc -∗
-    ukcq Qp π (uM_store M (uint va) 4 wval) sz fdv cw gn cs m (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    ukcq Qp π (uM_store M (uint va) 4 wval) sz fdv cw gn cs pidv m (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr1 Hcr2 Hva Hwval Hsok Hcanon Hpg Hal HMb.
     iIntros "Hb Hcont".
-    iApply (wp_uk_store M m pc fdv cw gn cs true (C_SW (uimm, Cregidx cr1, Cregidx cr2))
+    iApply (wp_uk_store M m pc fdv cw gn cs pidv true (C_SW (uimm, Cregidx cr1, Cregidx cr2))
               (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"00")),
                             Regidx rs2, Regidx rs1, 4)))
               (zero_extend' 12 (concat_vec uimm ('b"00")))

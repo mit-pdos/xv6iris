@@ -417,7 +417,7 @@ Section SysExecAU.
         ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
              (afun : nat -> nat -> bv 8),
              ⌜exec_path_of M pv pl⌝ ∗ ⌜exec_args_of M av na alen afun⌝ ∗
-             exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs
+             exec_post_ok Fs Γ P Fo pl na alen afun sts gn cs pid
                (MkUstate V M) U' r)))%I.
 
   (* SANITY: the arms imply the landed [SysExecDefs.sys_exec_post] *)
@@ -438,7 +438,7 @@ Section SysExecAU.
       iFrame "Hp". iPureIntro. left. split; [exact Hr | exact HV].
     - iDestruct "H" as (pl na alen afun) "[_ [_ H]]".
       iDestruct (exec_arms_landed Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs
-                   (MkUstate V M) U' r with "[H]") as %(entry & spv & szv' & Hok).
+                   pid (MkUstate V M) U' r with "[H]") as %(entry & spv & szv' & Hok).
       { rewrite /exec_arms. iRight. iExact "H". }
       iExists U', na, alen, entry, spv, szv'. iFrame "Hp". iPureIntro. exact Hok.
   Qed.

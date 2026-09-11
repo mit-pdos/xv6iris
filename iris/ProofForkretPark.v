@@ -331,7 +331,7 @@ Proof.
              ⌜pv_cwi (us_V U') = pv_cwi (us_V U)⌝ -∗
              (* ...and, on the steady mode, the parked run key -- passed
                 straight through to the package's own closer *)
-             ⌜match (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs) else None) with
+             ⌜match (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs pid) else None) with
                | Some W0 => urun_eq W0 U' | None => True end⌝ -∗
              (* ...and the resumer's globals, at ITS context (L8, A12.19) *)
              UsertrapRes.park_globals Xc γs γw γft γf γtl -∗
@@ -342,9 +342,9 @@ Proof.
              forkret_yield (CID := h) (XI := Xc) γf (proc_addr j)
                (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
              (FR.usertrap_res_bare (CID := h) (XI := Xc) pt'
-                (add_vec ks (mword_of_int 4096)) U' sts cs
-              ∗ match (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs) else None) with
-                | Some _ => uslot (uvis_of U' sts (pv_gen (us_V U)) cs)
+                (add_vec ks (mword_of_int 4096)) U' sts cs pid
+              ∗ match (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs pid) else None) with
+                | Some _ => uslot (uvis_of U' sts (pv_gen (us_V U)) cs pid)
                 | None => emp
                 end))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".

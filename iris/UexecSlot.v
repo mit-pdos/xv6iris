@@ -85,8 +85,9 @@ Import Defs.
 (* [uvis_fd] is the DESCRIPTOR VIEW (FdSlots.v): one [fdstate] per          *)
 (* descriptor, taken by [uvis_of] from the [fd_frags] bundle the boundary   *)
 (* holds.  [uvis_cwd] is the WORKING DIRECTORY's inum ([ProcDefs.pv_cwi]),  *)
-(* taken off the block.  Future user-visible state (the pid) becomes a     *)
-(* FIELD the same way, never an arity change here or at a consumer.        *)
+(* taken off the block, and [uvis_pid] is the process's pid, taken off     *)
+(* [proc_priv]'s own index.  Future user-visible state becomes a FIELD the *)
+(* same way, never an arity change here or at a consumer.                  *)
 (* ===================================================================== *)
 Record uvis := MkUvis {
   uvis_tf   : list (mword 64);
@@ -141,6 +142,27 @@ Record uvis := MkUvis {
      init's, wait removes the one it reaped; every other entry keeps it
      ([UsysMemOk.usys_ch_ok]). *)
   uvis_ch   : gset gname;
+  (* THE PROCESS'S PID.  It is user-visible because getpid(2) returns it --
+     [UsysMemOk.usys_ret_pid] is the row that says the answer IS this
+     field -- so a contract that cannot name it cannot say what that call
+     observes.
+
+     A VALUE, for [uvis_fd]'s reason and [uvis_gen]'s: the kernel holds the
+     cell ([p->pid], which [ProcInv.proc_priv] carries at 1/2 and which
+     every kernel contract on the trap route names as [pid]), and the key
+     carries the number the boundary read off it.  [uvis_of] takes it as a
+     PARAMETER for [sts]'s reason -- [ustate] does not carry it, it is
+     [proc_priv]'s own index -- and every call site is a place holding the
+     block.
+
+     NOBODY MOVES IT.  Exec keeps it (a pid survives exec: it is the same
+     process), and no syscall re-numbers its caller, which is why the
+     returning arm's [UexecRet.bump] KEEPS it rather than taking it as a
+     parameter.  fork's CHILD gets allocproc's, which the depositing parent
+     cannot name, so the child's key ∀-binds it exactly as it ∀-binds the
+     child's generation ([UexecRet.uexec_fork_child_F], [SpecKfork]'s slot
+     premise). *)
+  uvis_pid  : mword 32;
 }.
 
 (* the projection from the kernel's process state to the slot's key: drop
@@ -155,14 +177,17 @@ Record uvis := MkUvis {
    its children set, so both come from the kernel state the boundary is
    holding -- the slot's generation cell and the [wait_lock] children cell.
    Every call site is a place that already has them in reach. *)
+(* ...and [pid] rides beside them, off the same kind of thing: the pid is
+   [ProcInv.proc_priv]'s own index rather than a field of [ustate], so the
+   boundary that holds the block is what names it. *)
 Definition uvis_of (U : ustate) (sts : list fdstate) (g : gname)
-    (cs : gset gname) : uvis :=
+    (cs : gset gname) (pid : mword 32) : uvis :=
   MkUvis (pv_tf (us_V U)) (us_M U)
          (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
          (uint (pv_sz (us_V U)))
          sts
          (pv_cwi (us_V U))
-         g cs.
+         g cs pid.
 
 (* ===================================================================== *)
 (* SS1 The trapframe as a word reader.                                     *)

@@ -204,17 +204,23 @@ Definition skey_eq (W W' : uvis) : Prop :=
      off the key.  Neither moves under the epc bump, so every prover of
      this congruence still discharges it componentwise. *)
   /\ uvis_gen W = uvis_gen W'
-  /\ uvis_ch W = uvis_ch W'.
+  /\ uvis_ch W = uvis_ch W'
+  (* ...AND THE PID.  getpid(2)'s answer is a reading of the key
+     ([UexecSlot.uvis_pid]), so a bundle for it is about the pid and the
+     pid belongs to the data a bundle may read.  It does not move under the
+     epc bump either, so every prover of this congruence still discharges
+     it componentwise. *)
+  /\ uvis_pid W = uvis_pid W'.
 
 Lemma skey_eq_refl (W : uvis) : skey_eq W W.
 Proof. rewrite /skey_eq. split_and!; reflexivity. Qed.
 
 Lemma skey_eq_sym (W W' : uvis) : skey_eq W W' -> skey_eq W' W.
 Proof.
-  rewrite /skey_eq. intros (HM & H0 & H1 & H2 & Hfd & Hcw & Hg & Hch).
+  rewrite /skey_eq. intros (HM & H0 & H1 & H2 & Hfd & Hcw & Hg & Hch & Hpid).
   split_and!; symmetry;
     [ exact HM | exact H0 | exact H1 | exact H2 | exact Hfd | exact Hcw
-    | exact Hg | exact Hch ].
+    | exact Hg | exact Hch | exact Hpid ].
 Qed.
 
 (* THE CLASS IS INDEXED BY [ChildTok.ctokG], and by nothing else new.  The

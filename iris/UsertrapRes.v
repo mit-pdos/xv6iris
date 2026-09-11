@@ -507,11 +507,17 @@ Section UsertrapRes.
      environment index -- DERIVED, see the note above. *)
   Definition un_pj (N : ut_names) : mword 64 := proc_addr (un_j N).
 
-  Definition un_fn (N : ut_names) : fclose_names :=
+  (* [pid] is the RESIDUE'S INDEX and not [un_pid N]: the residue is indexed
+     by the process's pid exactly as it is by its descriptor states and its
+     children set, so the tie the dispatcher's contract asks for
+     ([SpecSyscall]'s [fcn_pid fn = pid]) is [reflexivity] here instead of
+     an equation the trap boundary -- which cannot see inside the sealed
+     residue's [∃ N] -- would have no way to state. *)
+  Definition un_fn (N : ut_names) (pid : mword 32) : fclose_names :=
     MkFCloseNames (un_s N) (un_j N) (un_l N)
  (un_pd N) (un_pav N) (un_pu N)
 
-      (un_pid N) (DfracOwn (1/4))
+      pid (DfracOwn (1/4))
 .
 
   (* NO FIELD OF [ut_names] MOVES ACROSS A SYSCALL.  The block bitmap used
@@ -738,7 +744,7 @@ Section UsertrapRes.
      plus [proc_priv], which every callee gives back at a MOVED record, which
      is why [V] is a parameter of this half and not of [ut_caps]. *)
   Definition ut_own (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (N : ut_names) (U : ustate) (sts : list fdstate) (cs : gset gname) : iProp Σ :=
+      (N : ut_names) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) : iProp Σ :=
     (bslots 3 ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) ∗
      fd_slots FDSPARE ∗
@@ -746,7 +752,7 @@ Section UsertrapRes.
      (* THE PROCESS BLOCK.  The one owner of the user page table and of the
         trapframe page (at the VA tier) -- which is why SpecUsertrap.v's
         boundary hands over neither. *)
-     proc_priv (un_f N) (un_pj N) (un_pid N) U ∗
+     proc_priv (un_f N) (un_pj N) pid U ∗
      (* THE DESCRIPTOR-STATE FRAGMENTS ([FdSlots.fd_frags]), BESIDE the
         block and not inside it.  This is their home: they are what an fd
         operation must spend to retype a descriptor (the array holds only
@@ -787,11 +793,11 @@ Section UsertrapRes.
         [wp_uservec_pt] instead -- projects/user-wp-slot.md SS4c, refutation
         R-a: a keyed row cannot live here, because the residue's index moves
         inside the round while [ut_own_priv]'s closer is ∀-general in it. *)
-     Rsys (un_f N) (un_pj N) (un_fn N))%I.
+     Rsys (un_f N) (un_pj N) (un_fn N pid))%I.
 
   Definition ut_env (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (N : ut_names) (U : ustate) (sts : list fdstate) (cs : gset gname) : iProp Σ :=
-    (ut_caps N ∗ ut_own Rsys N U sts cs)%I.
+      (N : ut_names) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) : iProp Σ :=
+    (ut_caps N ∗ ut_own Rsys N U sts cs pid)%I.
 
   (* the process block and the syscall environment, borrowed together and
      handed back at a moved record: syscall wants both, prepare_return and
@@ -800,9 +806,9 @@ Section UsertrapRes.
      that retypes a descriptor needs both, and one that does not simply
      hands the bundle straight back. *)
   Lemma ut_own_priv (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ) (N : ut_names)
-      (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_own Rsys N U sts cs -∗
-    proc_priv (un_f N) (un_pj N) (un_pid N) U ∗
+      (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_own Rsys N U sts cs pid -∗
+    proc_priv (un_f N) (un_pj N) pid U ∗
     (* HANDED OUT AT THE NAMED STATES.  A caller that only wants to spend a
        descriptor weakens with [FdSlots.fd_frags_any]'s introduction and
        hands back an ∃, which is why the closer below binds [sts']
@@ -811,17 +817,17 @@ Section UsertrapRes.
     (* ...AND THE CHILDREN ROW AT THE NAMED SET, on the same terms: fork
        is the caller that states a DELTA on it. *)
     ch_frag (pv_chg (us_V U)) (un_pj N) cs ∗
-    Rsys (un_f N) (un_pj N) (un_fn N) ∗
+    Rsys (un_f N) (un_pj N) (un_fn N pid) ∗
     (* THE MOVED IMAGE TRAVELS WITH THE MOVED DESCRIPTOR.  [M] is a
        conjunct of exactly one row -- the block -- so the closer is
        ∀-general in it at no cost, and the vmfault arm of the trap
        (ProofUsertrapArms' [ut_d0]) is the caller that needs it: backing a
        page extends the image, and [ut_own] must be rebuilt at the new one. *)
     (∀ (U' : ustate) (sts' : list fdstate) (cs' : gset gname),
-       proc_priv (un_f N) (un_pj N) (un_pid N) U' -∗
+       proc_priv (un_f N) (un_pj N) pid U' -∗
        fd_frags (pv_fdg (us_V U')) sts' -∗
        ch_frag (pv_chg (us_V U')) (un_pj N) cs' -∗
-       Rsys (un_f N) (un_pj N) (un_fn N) -∗ ut_own Rsys N U' sts' cs').
+       Rsys (un_f N) (un_pj N) (un_fn N pid) -∗ ut_own Rsys N U' sts' cs' pid).
   Proof.
     iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy)".
     iFrame "Hpv Hfr Hch Hsy". iIntros (U' sts' cs') "Hpv Hfr Hch Hsy".
@@ -837,16 +843,16 @@ Section UsertrapRes.
      search degenerate (durable-notes.md's "failing tactic looks like a
      hang" family). *)
   Lemma ut_own_rebuild (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ) (N : ut_names)
-      (U : ustate) (sts : list fdstate) (cs : gset gname) :
+      (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
     bslots 3 -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
-    proc_priv (un_f N) (un_pj N) (un_pid N) U -∗
+    proc_priv (un_f N) (un_pj N) pid U -∗
     fd_frags (pv_fdg (us_V U)) sts -∗
     ch_frag (pv_chg (us_V U)) (un_pj N) cs -∗
-    Rsys (un_f N) (un_pj N) (un_fn N) -∗
-    ut_own Rsys N U sts cs.
+    Rsys (un_f N) (un_pj N) (un_fn N pid) -∗
+    ut_own Rsys N U sts cs pid.
   Proof.
     rewrite /ut_own.
     iIntros "Hb Hip Hfd Hir Hpv Hfr Hch Hsy".
@@ -946,7 +952,7 @@ Section UsertrapRes.
   (* [usertrap_res] itself.                                              *)
   (* ------------------------------------------------------------------- *)
   Definition ut_res (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname)
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32)
       : iProp Σ :=
     (∃ (N : ut_names) (av : nat),
        (* THE PROCESS RUNNING IS THE ONE WHOSE TABLE THE TRAMPOLINE PARKED.
@@ -972,13 +978,13 @@ Section UsertrapRes.
        ut_tfk ksp (us_V U) ∗
        timer_cap ∗
        ut_trap (un_pj N) ksp av ∅ ∗
-       ut_env Rsys N U sts cs)%I.
+       ut_env Rsys N U sts cs pid)%I.
 
   (* [ut_res]'s parked twin -- see [ut_trap_parked]'s header.  This is what
      survives user execution (no [satp]); [ut_res] itself is what usertrap
      consumes. *)
   Definition ut_res_parked (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname)
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32)
       : iProp Σ :=
     (∃ (N : ut_names) (av : nat),
        ⌜ pv_upt (us_V U) = pt ⌝ ∗
@@ -997,14 +1003,14 @@ Section UsertrapRes.
        ut_tfk ksp (us_V U) ∗
        timer_cap ∗
        ut_trap_parked (un_pj N) ksp av ∅ ∗
-       ut_env Rsys N U sts cs)%I.
+       ut_env Rsys N U sts cs pid)%I.
 
   (* THE TRANSLATION BORROW, lifted to the residue.  [_close] is uservec's
      move (its exit switch just produced [tlb_res_pt kroot]); [_open] is
      userret's (its entry switch is about to consume it). *)
   Lemma ut_res_tlb_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (kroot : mword 44) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_parked Rsys pt ksp U sts cs -∗ tlb_res_pt kroot -∗ ut_res Rsys pt ksp U sts cs.
+      (pt : uptd) (ksp : mword 64) (kroot : mword 44) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_parked Rsys pt ksp U sts cs pid -∗ tlb_res_pt kroot -∗ ut_res Rsys pt ksp U sts cs pid.
   Proof.
     iIntros "H Hkres".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
@@ -1026,9 +1032,9 @@ Section UsertrapRes.
   Qed.
 
   Lemma ut_res_tlb_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res Rsys pt ksp U sts cs -∗
-    ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_res_parked Rsys pt ksp U sts cs.
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res Rsys pt ksp U sts cs pid -∗
+    ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_res_parked Rsys pt ksp U sts cs pid.
   Proof.
     iIntros "H".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
@@ -1050,14 +1056,14 @@ Section UsertrapRes.
      [ut_own_priv] + [proc_priv_tf_open]; the closer moves [V] to
      [upd_tf V ws'] (its [pv_upt] is unchanged, so [pt] is unaffected). *)
   Lemma ut_res_tf_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_parked Rsys pt ksp U sts cs -∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_parked Rsys pt ksp U sts cs pid -∗
     ∃ kroot : mword 44,
       kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
       tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
       (∀ ws' : list (mword 64),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
-         ut_res_parked Rsys pt ksp (us_tf U ws') sts cs).
+         ut_res_parked Rsys pt ksp (us_tf U ws') sts cs pid).
   Proof.
     iIntros "H".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
@@ -1135,29 +1141,29 @@ Section UsertrapRes.
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N))%I.
 
   Definition ut_own_nopt (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (N : ut_names) (V : pprivate) (sts : list fdstate) (cs : gset gname) : iProp Σ :=
+      (N : ut_names) (V : pprivate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) : iProp Σ :=
     (bslots 3 ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) ∗
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE ∗
-     proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V ∗
+     proc_priv_nopt (un_f N) (un_pj N) pid V ∗
      (* the descriptor-state fragments, at the named states -- [ut_own]'s
         note explains why the residue is indexed by them *)
      fd_frags (pv_fdg V) sts ∗
      (* ...and the children row beside them, at the named set -- same note *)
      ch_frag (pv_chg V) (un_pj N) cs ∗
-     Rsys (un_f N) (un_pj N) (un_fn N))%I.
+     Rsys (un_f N) (un_pj N) (un_fn N pid))%I.
 
   Definition ut_env_nopt (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (N : ut_names) (V : pprivate) (sts : list fdstate) (cs : gset gname) : iProp Σ :=
-    (ut_caps N ∗ ut_own_nopt Rsys N V sts cs)%I.
+      (N : ut_names) (V : pprivate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) : iProp Σ :=
+    (ut_caps N ∗ ut_own_nopt Rsys N V sts cs pid)%I.
 
 
   Lemma ut_own_pt_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (N : ut_names) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_own_nopt Rsys N (us_V U) sts cs -∗
+      (N : ut_names) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_own_nopt Rsys N (us_V U) sts cs pid -∗
     proc_ptm (pv_upt (us_V U)) (uint (pv_sz (us_V U))) (us_M U) -∗
-    ut_own Rsys N U sts cs.
+    ut_own Rsys N U sts cs pid.
   Proof.
     rewrite /ut_own /ut_own_nopt proc_priv_split_pt.
     iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy) Hpt".
@@ -1165,8 +1171,8 @@ Section UsertrapRes.
   Qed.
 
   Lemma ut_own_pt_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (N : ut_names) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_own Rsys N U sts cs -∗ ut_own_nopt Rsys N (us_V U) sts cs ∗
+      (N : ut_names) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_own Rsys N U sts cs pid -∗ ut_own_nopt Rsys N (us_V U) sts cs pid ∗
     proc_ptm (pv_upt (us_V U)) (uint (pv_sz (us_V U))) (us_M U).
   Proof.
     rewrite /ut_own /ut_own_nopt proc_priv_split_pt.
@@ -1176,17 +1182,17 @@ Section UsertrapRes.
 
   (* the borrow accessor, at the reduced environment -- [ut_own_priv]'s twin *)
   Lemma ut_own_nopt_priv (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ) (N : ut_names)
-      (V : pprivate) (sts : list fdstate) (cs : gset gname) :
-    ut_own_nopt Rsys N V sts cs -∗
-    proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V ∗
+      (V : pprivate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_own_nopt Rsys N V sts cs pid -∗
+    proc_priv_nopt (un_f N) (un_pj N) pid V ∗
     fd_frags (pv_fdg V) sts ∗
     ch_frag (pv_chg V) (un_pj N) cs ∗
-    Rsys (un_f N) (un_pj N) (un_fn N) ∗
+    Rsys (un_f N) (un_pj N) (un_fn N pid) ∗
     (∀ (V' : pprivate) (sts' : list fdstate) (cs' : gset gname),
-       proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
+       proc_priv_nopt (un_f N) (un_pj N) pid V' -∗
        fd_frags (pv_fdg V') sts' -∗
        ch_frag (pv_chg V') (un_pj N) cs' -∗
-       Rsys (un_f N) (un_pj N) (un_fn N) -∗ ut_own_nopt Rsys N V' sts' cs').
+       Rsys (un_f N) (un_pj N) (un_fn N pid) -∗ ut_own_nopt Rsys N V' sts' cs' pid).
   Proof.
     iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy)".
     iFrame "Hpv Hfr Hch Hsy". iIntros (V' sts' cs') "Hpv Hfr Hch Hsy".
@@ -1196,11 +1202,11 @@ Section UsertrapRes.
   (* the descriptor's derived footprint field is invisible to the reduced
      environment -- see [ProcInv.proc_priv_nopt_upt_irrel] *)
   Lemma ut_own_nopt_upt_irrel (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (N : ut_names) (V : pprivate) (sts : list fdstate) (cs : gset gname) (Q : uptd) :
+      (N : ut_names) (V : pprivate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) (Q : uptd) :
     ud_root (pv_upt V) = ud_root Q ->
     ud_tfp (pv_upt V) = ud_tfp Q ->
     ud_um (pv_upt V) = ud_um Q ->
-    ut_own_nopt Rsys N V sts cs ⊣⊢ ut_own_nopt Rsys N (upd_upt V Q) sts cs.
+    ut_own_nopt Rsys N V sts cs pid ⊣⊢ ut_own_nopt Rsys N (upd_upt V Q) sts cs pid.
   Proof.
     intros Hr Ht Hu.
     rewrite /ut_own_nopt (proc_priv_nopt_upt_irrel _ _ _ V Q Hr Ht Hu).
@@ -1208,7 +1214,7 @@ Section UsertrapRes.
   Qed.
 
   Definition ut_res_bare (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname)
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32)
       : iProp Σ :=
     (∃ (N : ut_names) (av : nat),
        ⌜ pv_upt (us_V U) = pt ⌝ ∗
@@ -1227,7 +1233,7 @@ Section UsertrapRes.
        ut_tfk ksp (us_V U) ∗
        timer_cap ∗
        ut_trap_parked (un_pj N) ksp av ∅ ∗
-       ut_env_nopt Rsys N (us_V U) sts cs)%I.
+       ut_env_nopt Rsys N (us_V U) sts cs pid)%I.
 
   (* THE TIMER CAPABILITY'S mcounteren PIN, READ OUT OF THE BARE RESIDUE.
      The U tier needs [mcounteren ↦ᵣ□] -- a U-mode [csrr] of a counter CSR
@@ -1240,8 +1246,8 @@ Section UsertrapRes.
      already holds rather than from a new premise.  Persistent, hence handed
      straight back. *)
   Lemma ut_res_bare_sstc (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_bare Rsys pt ksp U sts cs -∗ sstc_enabled ∗ ut_res_bare Rsys pt ksp U sts cs.
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗ sstc_enabled ∗ ut_res_bare Rsys pt ksp U sts cs pid.
   Proof.
     (* READ THE CAPABILITY OUT WITHOUT TAKING THE BUNDLE APART.  Destructuring
        [ut_caps] here meant rebuilding it conjunct-by-conjunct against the
@@ -1278,8 +1284,8 @@ Section UsertrapRes.
      PURE CONCLUSION, so [iDestruct .. as %H] keeps the bundle and nothing
      has to be rebuilt (same idiom as [ProcInv.proc_priv_sz_bound]). *)
   Lemma ut_res_bare_sz (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_bare Rsys pt ksp U sts cs -∗ ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝.
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗ ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝.
   Proof.
     iIntros "H".
     iDestruct "H" as (N av) "(_ & _ & _ & _ & _ & _ & _ & (_ & Hown))".
@@ -1293,11 +1299,11 @@ Section UsertrapRes.
      the process's exec bundle ([UexecExecMint]).  Persistent conclusion;
      the residue is spent, and the loop reads it once at its entry. *)
   Lemma ut_res_bare_fsabs (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
     (forall (γ : gname) (pj : mword 64) (fn : fclose_names),
        ⊢ Rsys γ pj fn -∗ FirstTok.fsabs_env ∗ Rsys γ pj fn) ->
-    ut_res_bare Rsys pt ksp U sts cs -∗
-    FirstTok.fsabs_env ∗ ut_res_bare Rsys pt ksp U sts cs.
+    ut_res_bare Rsys pt ksp U sts cs pid -∗
+    FirstTok.fsabs_env ∗ ut_res_bare Rsys pt ksp U sts cs pid.
   Proof.
     intros Henv. iIntros "H".
     iDestruct "H" as (N av)
@@ -1334,9 +1340,9 @@ Section UsertrapRes.
      bytes, so [ut_res_ptm_close] re-parks at whatever image the caller
      hands back. *)
   Lemma ut_res_ptm_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_parked Rsys pt ksp U sts cs -∗
-    proc_ptm pt (uint (pv_sz (us_V U))) (us_M U) ∗ ut_res_bare Rsys pt ksp U sts cs.
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_parked Rsys pt ksp U sts cs pid -∗
+    proc_ptm pt (uint (pv_sz (us_V U))) (us_M U) ∗ ut_res_bare Rsys pt ksp U sts cs pid.
   Proof.
     iIntros "H".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
@@ -1356,15 +1362,15 @@ Section UsertrapRes.
   Qed.
 
   Lemma ut_res_ptm_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) (sts : list fdstate) (cs : gset gname) :
-    ut_res_bare Rsys pt ksp U sts cs -∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗
     proc_ptm pt (uint (pv_sz (us_V U))) M -∗
-    ut_res_parked Rsys pt ksp (upd_usM U M) sts cs.
+    ut_res_parked Rsys pt ksp (upd_usM U M) sts cs pid.
   Proof.
     iIntros "H Hpt".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     subst pt.
-    iDestruct (ut_own_pt_close Rsys N (upd_usM U M) sts cs with "Hown Hpt") as "Hown".
+    iDestruct (ut_own_pt_close Rsys N (upd_usM U M) sts cs pid with "Hown Hpt") as "Hown".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
     iExists N, av. rewrite /ut_env.
     iSplitR; [iPureIntro; reflexivity |].
@@ -1378,9 +1384,9 @@ Section UsertrapRes.
   Qed.
 
   Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) (sts : list fdstate) (cs : gset gname) :
-    ut_res_bare Rsys pt ksp U sts cs -∗ proc_pt pt M -∗
-    ∃ Mz : gmap Z (bv 8), ut_res_parked Rsys pt ksp (upd_usM U Mz) sts cs.
+      (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗ proc_pt pt M -∗
+    ∃ Mz : gmap Z (bv 8), ut_res_parked Rsys pt ksp (upd_usM U Mz) sts cs pid.
   Proof.
     iIntros "H Hpt".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
@@ -1392,7 +1398,7 @@ Section UsertrapRes.
        free: any lazy image over the same address space will do, and
        [proc_pt_ptm_any] produces one. *)
     iDestruct (proc_pt_ptm_any (pv_upt (us_V U)) (uint (pv_sz (us_V U))) M with "Hpt") as (Mz) "Hpt".
-    iDestruct (ut_own_pt_close Rsys N (upd_usM U Mz) sts cs with "Hown Hpt") as "Hown".
+    iDestruct (ut_own_pt_close Rsys N (upd_usM U Mz) sts cs pid with "Hown Hpt") as "Hown".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
     iExists Mz. iExists N, av. rewrite /ut_env.
     iSplitR; [iPureIntro; reflexivity |].
@@ -1406,8 +1412,8 @@ Section UsertrapRes.
   Qed.
 
   Lemma ut_res_pt_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_parked Rsys pt ksp U sts cs -∗ proc_pt_any pt ∗ ut_res_bare Rsys pt ksp U sts cs.
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_parked Rsys pt ksp U sts cs pid -∗ proc_pt_any pt ∗ ut_res_bare Rsys pt ksp U sts cs pid.
   Proof.
     iIntros "H".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
@@ -1433,14 +1439,14 @@ Section UsertrapRes.
      loop hand the user tier a descriptor whose [udata_cov] holds by
      construction -- see [ProcPtOwn.user_pt_inv_close]. *)
   Lemma ut_res_bare_norm (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_bare Rsys pt ksp U sts cs -∗
-    ut_res_bare Rsys (ud_norm pt) ksp (us_upt U (ud_norm pt)) sts cs.
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗
+    ut_res_bare Rsys (ud_norm pt) ksp (us_upt U (ud_norm pt)) sts cs pid.
   Proof.
     iIntros "H".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     subst pt.
-    rewrite (ut_own_nopt_upt_irrel Rsys N (us_V U) sts cs
+    rewrite (ut_own_nopt_upt_irrel Rsys N (us_V U) sts cs pid
                (ud_norm (pv_upt (us_V U))) eq_refl eq_refl eq_refl).
     iExists N, av.
     iDestruct (ut_tfk_upd_upt _ _ (ud_norm (pv_upt (us_V U))) with "Htfk") as "#Htfk'".
@@ -1477,8 +1483,8 @@ Section UsertrapRes.
      closer IS that residue, and the trap loop holds it exactly so
      ([ProofUserretClosed.Rut_at]). *)
   Lemma ut_res_bare_fd_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_bare Rsys pt ksp U sts cs -∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗
     fd_frags (pv_fdg (us_V U)) sts ∗
     (* ...AND THE RUNNING TOKEN (A6.140 / r12): what parks across user
        execution is the residue MINUS the view and MINUS the token -- the
@@ -1487,7 +1493,7 @@ Section UsertrapRes.
     own_context cur_ctx ∗
     (∀ sts' : list fdstate,
        fd_frags (pv_fdg (us_V U)) sts' -∗ own_context cur_ctx -∗
-       ut_res_bare Rsys pt ksp U sts' cs).
+       ut_res_bare Rsys pt ksp U sts' cs pid).
   Proof.
     iIntros "H".
     iDestruct "H" as (N av)
@@ -1526,8 +1532,8 @@ Section UsertrapRes.
      restore walk reads -- so it opens them together and closes them
      together. *)
   Lemma ut_res_bare_fd_tf_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_bare Rsys pt ksp U sts cs -∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗
     fd_frags (pv_fdg (us_V U)) sts ∗
     ∃ kroot : mword 44,
       kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
@@ -1537,7 +1543,7 @@ Section UsertrapRes.
       (∀ (ws' : list (mword 64)) (sts' : list fdstate),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
          fd_frags (pv_fdg (us_V U)) sts' -∗ own_context cur_ctx -∗
-         ut_res_bare Rsys pt ksp (us_tf U ws') sts' cs).
+         ut_res_bare Rsys pt ksp (us_tf U ws') sts' cs pid).
   Proof.
     iIntros "H".
     iDestruct "H" as (N av)
@@ -1573,8 +1579,8 @@ Section UsertrapRes.
   Qed.
 
   Lemma ut_res_bare_tf_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_bare Rsys pt ksp U sts cs -∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗
     ∃ kroot : mword 44,
       kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
       tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
@@ -1582,7 +1588,7 @@ Section UsertrapRes.
       (∀ ws' : list (mword 64),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
          own_context cur_ctx -∗
-         ut_res_bare Rsys pt ksp (us_tf U ws') sts cs).
+         ut_res_bare Rsys pt ksp (us_tf U ws') sts cs pid).
   Proof.
     iIntros "H".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
@@ -1627,9 +1633,9 @@ Section UsertrapRes.
      the closer wand as the parked remainder.  Open/close, not a tier of its
      own: nothing needs a name for "the residue minus its CSRs". *)
   Lemma ut_res_bare_csrs_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_bare Rsys pt ksp U sts cs -∗
-    hart_csrs ∗ (hart_csrs -∗ ut_res_bare Rsys pt ksp U sts cs).
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗
+    hart_csrs ∗ (hart_csrs -∗ ut_res_bare Rsys pt ksp U sts cs pid).
   Proof.
     iIntros "H".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
@@ -1662,14 +1668,14 @@ Section UsertrapRes.
      residue, so neither can be applied to the other's remainder -- a sealed
      bundle's simultaneous borrows have to come out of ONE opener. *)
   Lemma ut_res_bare_tf_csrs_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) :
-    ut_res_bare Rsys pt ksp U sts cs -∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗
     ∃ kroot : mword 44,
       kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
       tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗ hart_csrs ∗ own_context cur_ctx ∗
       (∀ ws' : list (mword 64),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ own_context cur_ctx -∗
-         ut_res_bare Rsys pt ksp (us_tf U ws') sts cs).
+         ut_res_bare Rsys pt ksp (us_tf U ws') sts cs pid).
   Proof.
     iIntros "H".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
@@ -1864,11 +1870,11 @@ Section UsertrapRes.
      +0xa6 is reached at [true] from the syscall arm and at [false] from the
      other four. *)
   Definition ut_hold (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (N : ut_names) (U : ustate) (b : bool) (lks : gset string) (sts : list fdstate) (cs : gset gname) : iProp Σ :=
+      (N : ut_names) (U : ustate) (b : bool) (lks : gset string) (sts : list fdstate) (cs : gset gname) (pid : mword 32) : iProp Σ :=
     (cpu_own 0%nat b (un_pj N) b lks ∗
      trap_csrs_ext KT1 b ∗
      cpu_claim_ext b (un_pj N) ∗
-     ut_env Rsys N U sts cs)%I.
+     ut_env Rsys N U sts cs pid)%I.
 
   (* the index arithmetic, once.  [nx] is a block's own stack index and [av]
      the entry budget; the four frame slots are spent and, on the syscall
@@ -2160,7 +2166,7 @@ Proof. rewrite /park_env. apply _. Qed.
 Definition ut_park_intro_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId}
-    (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ)
+    (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ)
     (W : iProp Σ)
     (N : ut_names) (av : nat) : Prop :=
   ut_wf N ->
@@ -2186,7 +2192,8 @@ Definition ut_park_intro_body
           INSTALLED the child's under [wait_lock]) and the resume hands it
           into the residue at the set the parker named. *)
        ch_frag (pv_chg (us_V U')) (un_pj N) cs' -∗
-       URB h Xc pt' (add_vec (un_ks N) (mword_of_int 4096)) U' sts' cs').
+       URB h Xc pt' (add_vec (un_ks N) (mword_of_int 4096)) U' sts' cs'
+         (un_pid N)).
 
 (* THE PARK'S HALF OF THE RESIDUE, ACROSS CONTEXTS (L8, A12.19).  The parker
    is at [ξp] and holds [ut_park_caps] and [park_own] there; the closer is
@@ -2211,7 +2218,8 @@ Lemma ut_res_bare_park
   (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate) (sts' : list fdstate) (cs' : gset gname),
      ⌜pv_upt (us_V U') = pt'⌝ -∗
      park_globals Xc (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N) -∗
-     (FirstTok.first_done (XI := Xc) -∗ W -∗ Rsys Xc (un_f N) (un_pj N) (un_fn N)) -∗
+     (FirstTok.first_done (XI := Xc) -∗ W -∗
+        Rsys Xc (un_f N) (un_pj N) (un_fn N (un_pid N))) -∗
      ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
      FirstTok.first_done (XI := Xc) -∗
      W -∗
@@ -2224,7 +2232,7 @@ Lemma ut_res_bare_park
      fd_frags (pv_fdg (us_V U')) sts' -∗
      ch_frag (pv_chg (us_V U')) (un_pj N) cs' -∗
      ut_res_bare (CID := h) (XI := Xc) (Rsys Xc) pt'
-       (add_vec (un_ks N) (mword_of_int 4096)) U' sts' cs').
+       (add_vec (un_ks N) (mword_of_int 4096)) U' sts' cs' (un_pid N)).
 Proof.
   iIntros (Hwf Hav ξp) "#Hpark Hown".
   iIntros (h Xc pt' U' sts' cs') "%Hupt #Hglob Hderive #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref Hfrag Hch".
@@ -2323,9 +2331,9 @@ Qed.
 Lemma ut_hold_transport
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
     (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-    (N : ut_names) (U : ustate) (b : bool) (lks : gset string) (sts : list fdstate) (cs : gset gname) :
+    (N : ut_names) (U : ustate) (b : bool) (lks : gset string) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
   (b = false \/ un_pj N = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
-  ut_hold (CID := CID0) Rsys N U b lks sts cs -∗ ut_hold (CID := CID1) Rsys N U b lks sts cs.
+  ut_hold (CID := CID0) Rsys N U b lks sts cs pid -∗ ut_hold (CID := CID1) Rsys N U b lks sts cs pid.
 Proof.
   intros Heq. rewrite /ut_hold. iIntros "(Hcpu & Hcsrs & Hclm & Henv)".
  iDestruct (cpu_own_transport CID0 CID1 0%nat b (un_pj N) b  Heq

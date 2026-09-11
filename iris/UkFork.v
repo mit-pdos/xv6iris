@@ -889,7 +889,7 @@ Section UkFork.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hal4. iIntros "#Hi Hpayc HP Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
     (* the caller's half pins the key's working directory *)
     iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
     (* ...and its other half pins the key's children set, which is why the
@@ -921,7 +921,7 @@ Section UkFork.
       "(Hheap' & Hsz' & #Htf' & #Hpf' & Hdf')".
     iMod ("Hrebuild" $! γt' γd' γs' with "Htf' Hpf' Hdf'") as "[HP' Hstk']".
     (* ---- the trap ---- *)
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c gn Sc Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c gn Sc pidv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -933,7 +933,7 @@ Section UkFork.
        proves is the deposit AT that payload ([UexecRet.uexec_pay_dep]) *)
     iIntros "Hpayv".
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn Sc))
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn Sc pidv))
                    = USYS_fork).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
@@ -953,7 +953,7 @@ Section UkFork.
        over and fork's parent arm hands it back. *)
     rewrite /uexec_pay_arm (sexit_pay_at (ukn_pay N) (sfam_pay Q)).
     iSplitL "Hpayv";
-      [ iApply (uexec_pay_dep_ret USYS_fork m pc M pm sz fdv c gn Sc _
+      [ iApply (uexec_pay_dep_ret USYS_fork m pc M pm sz fdv c gn Sc pidv _
                   (sfam_at (ukn_pay N) (sfam_pay Q))
                   ltac:(rewrite tf_of_num; exact Hn)
                   ltac:(unfold USYS_fork, USYS_exit; lia)
@@ -984,27 +984,27 @@ Section UkFork.
         - destruct Hm1 as [Hm1 Hcs]. iModIntro. iExists Sc.
           iSplitR; [iPureIntro; exact Hcs |]. iFrame "Hcha".
           iLeft. iSplitR; [iPureIntro; exact Hm1 |]. iExact "Hchf".
-        - iDestruct "Hpid" as (γ pidv) "(%Hpv & %Hcs & Htok)".
+        - iDestruct "Hpid" as (γ pidk) "(%Hpv & %Hcs & Htok)".
           iMod (uch_update (ukn_ch N) Sc Sc (Sc ∪ {[γ]}) with "Hcha Hchf")
             as "[Hcha Hchf]".
           iModIntro. iExists (Sc ∪ {[γ]}).
           iSplitR; [iPureIntro; exact Hcs |]. iFrame "Hcha".
-          iRight. iExists γ, pidv. iSplitR; [iPureIntro; exact Hpv |].
+          iRight. iExists γ, pidk. iSplitR; [iPureIntro; exact Hpv |].
           iFrame "Htok Hchf". }
       iDestruct "Hmv" as (cs2) "(%Hcs2 & Hcha & Harm)". subst cs'.
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn Sc
-                 cs2 r Hx0 Hal4).
+                 cs2 pidv r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv c gn
-                cs2 (add_vec_int pc 4) avail
+                cs2 pidv (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep").
       iIntros (h') "Hrun".
       iApply ("Hpar" $! h' r with "[%] Harm HP Hsz Hstd HD Hcwd Hrun").
       exact Hr.
     (* ---- the child: fresh heap, r = 0, payload rebuilt at the new names *)
-    - iIntros (fdv' cw' g') "#Hmp %Hfdv' %Hcv'". subst fdv' cw'.
+    - iIntros (fdv' cw' g' pidc) "#Hmp %Hfdv' %Hcv'". subst fdv' cw'.
       (* THE CHILD'S OWN DESCRIPTOR AUTHORITY, minted at the view the kernel
          handed it -- BEFORE the key is rewritten to [ukc], since the update
          is absorbed by the [uslot] and not by what it unfolds to.  The
@@ -1028,8 +1028,8 @@ Section UkFork.
          are full, and one name cannot carry two processes' sets. *)
       iMod (uch_alloc (∅ : gset gname)) as (γch') "[Hcha' Hchf']".
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn g' Sc ∅
-                 (mword_of_int 0) Hx0 Hal4).
+      rewrite (uslot_bump_at_run m pc M M pm pm sz sz fdv fdv c c gn g' Sc ∅
+                 pidv pidc (mword_of_int 0) Hx0 Hal4).
       (* THE CHILD'S RECORD IS MINTED AT THE PARENT'S CHOSEN PAYLOAD, and
          the fact that BACKS it is the [ChildTok.my_pay] the kernel handed
          in on this very arm ([SpecSyscall.sysc_fork_in]): the parent chose
@@ -1039,7 +1039,7 @@ Section UkFork.
       iApply ukcq_ukc.
       iApply (urun_close_upd (MkUkNames γt' γd' γs' γfd' γc' γch' Q) M pm m
                 (mword_of_int 10)
-                (mword_of_int 0) sz fdv c g' ∅ (add_vec_int pc 4) avail
+                (mword_of_int 0) sz fdv c g' ∅ pidc (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap' Hstk' Hufd' Hcwa' Hcha' Hmp Hpayc Hdep").
       iIntros (h') "Hrun".

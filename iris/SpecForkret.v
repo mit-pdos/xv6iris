@@ -287,7 +287,7 @@ End SpecForkret.
    into named definitions"). *)
 Definition forkret_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ)
     (W : iProp Σ) (γs : list gname) (γw γft γf γtl : gname) (p ksp : mword 64)
     (* the parked process's fd-state ghost name *)
     (g : gname)
@@ -383,9 +383,9 @@ Definition forkret_closer
         the package handed that arm.  See [ParkCap.park_pkg], of which this
         is the forkret-side spelling; one [sts] for the residue's fragments
         and the slot's key, and it is the package's argument. *)
-     (URes h Xc pt' ksp U' sts cs
+     (URes h Xc pt' ksp U' sts cs pid
       ∗ match Wk with
-        | Some _ => uslot (uvis_of U' sts gn cs)
+        | Some _ => uslot (uvis_of U' sts gn cs pid)
         | None => emp
         end))%I.
 
@@ -398,7 +398,7 @@ Definition wp_forkret_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
-    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> iProp Σ)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> gset gname -> mword 32 -> iProp Σ)
     (* WHAT THE RESIDUE CLOSER IS HANDED BESIDE [first_done] -- the park
        token ([ParkCap.park_token]) in practice, abstract here: forkret
        holds it ([W -∗] below), reads nothing off it, and hands it to the
@@ -523,7 +523,7 @@ Definition wp_forkret_gen_body
      for why it is a name rather than the wand spelled out ---- *)
   forkret_closer URes W γs γw γft γf γtl p ksp (pv_fdg (us_V U))
     (pv_chg (us_V U)) (pv_cwi (us_V U))
-    sts gn cs (if steady then Some (uvis_of U [] gn cs) else None) pid av -∗
+    sts gn cs (if steady then Some (uvis_of U [] gn cs pid) else None) pid av -∗
   WP (Loop : expr riscv_lang).
 
 (* The residue is the module-type parameter it is everywhere else: forkret's

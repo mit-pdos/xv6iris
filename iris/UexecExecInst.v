@@ -610,7 +610,7 @@ Section UexecExecInst.
       (W W' : uvis) :
     skey_eq W W' -> xv6_sbundle X n f W ⊣⊢ xv6_sbundle X n f W'.
   Proof.
-    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & Hgn & _).
+    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & Hgn & _ & _).
     rewrite /xv6_sbundle.
     destruct (decide (n = USYS_exec)) as [_ | _];
       [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw Hgn) | ].
@@ -627,7 +627,7 @@ Section UexecExecInst.
     skey_eq W W' ->
     xv6_spost X n f W r M' fdv' cw' cs' ⊣⊢ xv6_spost X n f W' r M' fdv' cw' cs'.
   Proof.
-    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & _ & _).
+    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & _ & _ & _).
     rewrite /xv6_spost /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw.
     reflexivity.
   Qed.
