@@ -36,6 +36,10 @@ patch: `projects/wx-briefs/`.
   supply gains the accessor; the lease itself is SH-LINE's); then SH-LINE (R5 + sh's gets under the receipt) → E4 SH-ECHO →
   E2 INIT-BOOT → E5 (the discipline automaton, `good_out`, the identification
   gate, `Hphi`).
+- QUEUED (owner's request 2026-09-11): PID-KEY (`wx-briefs/brief-pid-key.md`):
+  `uvis` gains `uvis_pid`, getpid's round row says it returns it; not bubbled
+  to `urun`.  Launch when CONS-CURSOR lands (same files: SpecSyscall/
+  ProofSyscall/SpecUsertrap/UexecExecInst; one agent per checkout).
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run
