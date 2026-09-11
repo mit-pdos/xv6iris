@@ -2284,6 +2284,30 @@ transports.  (3) Before a second hand-rolled instance (open), FACTOR
 general "pinned observation family" lemma over a syscall's families, so exec
 and open are two instantiations rather than two copies.
 
+EXEC-PAY RULINGS (2026-09-11, phase 1): (1) `SpecKexec.exec_slot_pre`'s two wands
+take `Q (-1)` beside `my_pay (uvis_gen W') Q`; `exec_post_ok` gains `Q` and its
+two success arms are wands `Q (-1) -∗ Fs.(pf_recv) (exec_key …)` (kexec never
+holds the payment; the dispatcher does); `SpecSyscall.sysc_exec_out f …`'s
+success arm is `sexit_pay f (-1) -∗ uslot (uvis_of U' sts' gn cs pid)`
+(`ut_exec_out` likewise); `sysc_pay_out` stays UNCONDITIONAL on the returning
+post -- it is definitionally `sexit_pay f (-1)`, consumed by the `uslot` wand on
+the exec-success arm and resuming the old key on every other (one resource,
+exclusive arms); the round (`uexec_ret_round_slot`'s exec answer `uexec_pay_arm
+f -∗ uslot W'`) feeds the single payment to whichever continuation it takes;
+`uexec_arm_F` unchanged.  (2) EXEC'S DEPOSIT NAMED THE WRONG PAYLOAD:
+`UexecExecInst.exec_sbundle` read `kf_pay f` (= `sfork_pay`, what this process's
+CHILD's exit owes) while `sysc_pay_in` carries `sexit_pay f` (what THIS
+process's exit owes); exec keeps the process, so the honest field is `kf_xpay`
+-- rebased, with `sbundle_at_at`/`sbundle_pay_of_sbundle`/`xfam_at_sbundle`/
+`udepw_at_of_bundle` guarded `n <> USYS_exec` beside `n <> USYS_read`,
+`sbundle_pay_exec_intro` naming the payload at the mint, `UkRun.uxsup := □ ∀ W,
+sbundle_pay uslot USYS_exec (fun _ => True) W`.  (3) `PinnedExec`'s constructor
+wand and taint arm both gain `Q (-1) -∗` -- the Q-generic seam sh's payload
+takes; the four entry constructors (`UShKernel`, `UInitKernel`, `USyncKernel`,
+`UEchoKernel`) stay at the trivial payload until SH-LINE phase 2 drops
+`ukn_triv` from sh's proof.  (4) forkret's boot arm hands `True` (init's bundle
+is at the trivial payload).
+
 #### E3 — THE INPUT LINE: DESIGN PROPOSAL (2026-09-11, coordinator; AWAITING THE OWNER'S RULING)
 
 FACTS (console-ring survey, verified): `ConsoleInv.cons_res` holds NO ghost state
