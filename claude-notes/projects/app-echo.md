@@ -2165,6 +2165,34 @@ LANES: CONS-ROUTE (kernel: the `P` wand through read; `cons_acc`'s bupd; init's
 token route) → SH-LINE (program: `pos`, `Q`, init's fork/wait/loop, the linear
 `Pay` across exec, sh's entry/`ush_pstate`/`gets`, `ushf_lexable` discharged).
 
+CONS-ROUTE RULINGS (2026-09-11, phase 1): (1) THE MINT NAMES THE PAYLOAD.  Once
+the read bundle reads the exit payload (`xv6_sbundle` at 5 takes `kf_xpay f
+(-1)`), `UexecSG.sbundle_at_at` (the equation "re-keying the payload changes no
+bundle") is FALSE at read, so it is guarded by `n <> USYS_read`, and the supply
+law names the payload up front: `sbundle_pay X n Q W := ∃ f, ⌜sexit_pay f = Q⌝ ∗
+sbundle_at X n f W`, `sbundle_of_supply_ne` at a chosen `Q`, `UkRun.udep`'s law
+and `udepw`'s explicit disjunct at `sbundle_pay … (ukn_pay N)`, `udepwf` carrying
+`⌜sexit_pay fdep = ukn_pay N⌝`; the fourteen leaves in `UkRunSys` got shorter,
+no leaf statement moved.  (2) `fileread_in st F Rd P` is ONE match with `P` in
+every arm (`P -∗ match st with | inode => P ∗ … | console => cons_acc … (fun cur
+dc => P ∗ Rd cur dc) | _ => P end`); `fileread_extra … P := P ∗
+fileread_extra_core …` and `xv6_spost` 5 names the core (the dispatcher peels
+`P`); `fsabs_fileread_in` at an arbitrary `P` (the credential arm owes `∀ cur dc,
+|==> P ∗ True`, a constant).  (3) THE TOKEN IS AN INPUT OF THE WHOLE BOOT
+BUNDLE: `InitBoot.init_boot_bundle cw sts := cons_reader fsc_cons 0 -∗ ∃ …,
+exec_au_pre …` -- it cannot ride the slot piece's `R` (`PieceFam.pf_at` is an
+ADDITIVE conjunction and would lose a linear resource) -- so `Hinit_boot` is
+unchanged, `init_boot_bundle_triv` drops it, and a constraining application
+HOLDS it while it answers the slot wand, reaching init's slot through
+`pinned_exec_bundle`'s existing linear `Pay` (E2/SH-LINE).  Route: `SpecMain`
+→ `ProofMain.mn_grp_fs` → `SpecUserinit` (beside `console_ready_app`) →
+`ParkCap.park_pkg`'s boot mode (`init_boot_bundle cw sts ∗ cons_reader
+fsc_cons 0`) → `SpecForkret`'s boot row → `ProofForkret.fkr_boot` applies the
+bundle to it before the kexec of /init.  (4) `UInitKernel`'s two lemmas carry no
+premise (their section binds `ctokG` without `xv6G` -- the "prints alike"
+trap); the token is consumed at the bundle's builder.  (5) `cons_acc`'s inner
+wand is a bupd; `cons_acc_ret` and the `_m1`/`_neg` helpers are `==∗`-shaped.
+
 #### E3 — THE INPUT LINE: DESIGN PROPOSAL (2026-09-11, coordinator; AWAITING THE OWNER'S RULING)
 
 FACTS (console-ring survey, verified): `ConsoleInv.cons_res` holds NO ghost state
