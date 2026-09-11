@@ -2323,6 +2323,53 @@ takes; the four entry constructors (`UShKernel`, `UInitKernel`, `USyncKernel`,
 `ukn_triv` from sh's proof.  (4) forkret's boot arm hands `True` (init's bundle
 is at the trivial payload).
 
+OPEN-PIN FINDINGS -- RULED WITH THE OWNER (2026-09-11; "both need to be fixed").
+FACT 1: THE TRACKED IMAGE HAS NO CONSOLE NODE.  mkfs creates no device inode
+(inodes 2-22 are all T_FILE, no `console` entry; `mkfs.c` never mentions it);
+init's first `open("console")` always fails at era 0 and init's REPAIR ARM
+(`UkInitMain.wp_kinit_main_repair` @0x64) does `mknod("console", CONSOLE, 0)` and
+opens again.  So "fd 0 is the console" is a fact INIT'S OWN WRITE establishes --
+the owner's "application modifies the file system" case.  RULED: the
+application's claim becomes TWO-STATE about the console: `echo_fs_pure av :=
+pins ∧ cons_state av` with `cons_state av := (no device node in av ∧ no
+`console` entry in the root) ∨ (the root's `console` entry resolves to a node
+`ADev CONSOLE 0` and it is the only device node)`, and a PERSISTENT
+`cons_made` fact (a mono flag in `app_fixed`'s ghost, minted when init's mknod
+step fires) such that `cons_made ∗ echo_pred … av ⊢ taint ∨ (pins ∧ state 2)`.
+init's mknod pays `AppInv.app_top_update`'s step (the claim survives inserting
+the device node at a free inum and its root entry -- the pins name other
+inodes; `cons_state` moves 1 → 2) and mints `cons_made`; init's SECOND open is
+the pinned one at state 2.  The pin lemma's obligation, as the owner said: the
+invariant keeps the binaries unchanged; `echo foo > /data`-style writes are
+provable the same way.
+FACT 2: OPEN'S AND MKNOD'S BUNDLES CANNOT NAME THE PATH.  `open_au_pre_plain`
+contains `namei_walk_pre_era` (the walk at EVERY path, `∀ pl`) and row 15 of
+`xv6_sbundle` reads the omode but not the path pointer; `open_receipt_plain`
+binds `pl` existentially and ties it to nothing; mknod (row 17) likewise.  A
+pinned cursor is sound at ONE path, and a receipt that does not name the path
+cannot say WHICH file was opened -- exec solved exactly this by carrying the
+path pointer (`SpecSysExec.exec_path_of M pv pl`, `sys_exec_au_pre` quantifying
+over `⌜exec_path_of M pv pl⌝`); the earlier ruling "open/chdir/unlink keep the
+∀ pl form" was for lack of a consumer.  RULED: PATH-ARGS -- open and mknod
+carry their path argument as exec does (`open_path_of`/`mknod_path_of` at
+trapframe argument 0 through `SpecFetchstr.fetchstr_got`; `open_au_pre_plain`/
+`_create`, `open_receipt_plain`/`_create`, `mknod_au_pre`/its receipt, rows 15
+and 17 of `xv6_sbundle`/`xv6_spost` stated at the argument's path; the walk
+piece at THAT path). A kernel lane (`brief-path-args.md`).  chdir/unlink stay
+`∀ pl` until a consumer needs them.
+FACT 3: init's open can FAIL for reasons unrelated to the pin (`filealloc`/
+`fdalloc` exhaustion); on that arm init has no exec supplier.  RULED: prove
+the second open cannot fail at init -- the file table and init's descriptor
+table are fresh (find the room resource: `FileInv`'s `iref_slots NFILE`-style
+free-slot units and `UserFd`'s all-closed ledger `fdt0`); if the tree has no
+room resource for `filealloc`, STATE the room as an explicit premise of init's
+program lemma and record it as a gap (no vacuity: the premise is satisfiable
+at boot).
+ORDER: PATH-ARGS (kernel) → OPEN-PIN resumed (application: the two-state claim,
+`cons_made`, init's mknod step, the pinned second open on `PinnedObs`, the
+receipt-keeping open leaf, init's named ledger + tracked dups) → SH-LINE phase 2
+→ E4 → E2 → E5.  `PinnedObs` (the factoring) is LANDED.
+
 #### E3 — THE INPUT LINE: DESIGN PROPOSAL (2026-09-11, coordinator; AWAITING THE OWNER'S RULING)
 
 FACTS (console-ring survey, verified): `ConsoleInv.cons_res` holds NO ghost state
