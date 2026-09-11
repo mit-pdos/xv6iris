@@ -2081,6 +2081,29 @@ cons_clean_tok cn` (`SpecMain.v:433-439`).  GONE: `console_ready` (+4),
 `-1 ≤ r` arm is a killed process (unobservable from user mode); `cons_tagged` is
 subsumed by `cons_window`.
 
+PID-KEY RULINGS (2026-09-11, owner's request; phase 1): `uvis_pid : mword 32` is
+the LAST field of `UexecSlot.uvis` (every constructor site is an append);
+`uvis_of U sts g cs pid`, `uvis_of_run … g cs pidv`; `bump` KEEPS the pid and is
+the instance of the new `bump_at` (full arity) at the caller's pid -- fork's
+child arm is the one former that names a DIFFERENT process's pid (`bump_at …
+g' ∅ pidc`, `∀ g' pidc`); `exec_key … pidv na` (exec keeps it); `skey_eq` gains
+the clause; `urun_eq` cannot (a `ustate` carries no pid) -- it is a fourth
+premise of `uslot_of_urun_eq`; the U-tier fixpoint bodies carry `pidv` beside
+`cs` with `ukb_F`'s seventh pin `⌜uvis_pid W' = pidv⌝` (load-bearing: the
+kernel knows only its own `p->pid`); NO `urun` conjunct.  getpid's row
+`UsysMemOk.usys_ret_pid n r pid := n = USYS_getpid → r = sign_extend' 64 pid`,
+LAST among `uexec_ret_cont_gen`'s pure rows, produced from
+`wp_sys_getpid_sconf`'s post through `SpecSyscall.sysc_ret_pid` (the returning
+post at the outgoing a0 word), `SpecUsertrap.ut_ret_pid` in `usertrap_post`,
+uservec's forward, and `uexec_ret_round_slot`'s premise (`uvis_pid W' = uvis_pid
+W` by `eq_refl`).  THE ONE FRICTION, RULED: the residue's pid lives in the
+sealed names (`un_pid N` under `ut_res_bare`'s `∃ N`), so nothing outside the
+seal could tie the dispatcher's row at `un_pid N` to usertrap's `pid` -- the
+residue is INDEXED BY THE PID (`usertrap_res_bare pt ksp U sts cs pid` and
+family; the index used directly where `un_pid N` was spelled; `Rut_at`,
+`forkret_closer`, `park_pkg` thread it; the park mints the tie), the `sts`/`cs`
+sweep shape.
+
 #### E3 — THE INPUT LINE: DESIGN PROPOSAL (2026-09-11, coordinator; AWAITING THE OWNER'S RULING)
 
 FACTS (console-ring survey, verified): `ConsoleInv.cons_res` holds NO ghost state
