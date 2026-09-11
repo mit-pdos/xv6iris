@@ -33,13 +33,14 @@ patch: `projects/wx-briefs/`.
   disjunction).  Tree CLEAN at the landing.
 - PID-KEY LANDED (2026-09-11; 58 files; VM build `pidkey56` EXIT=0, audit = the
   thirteen, lemma_diff clean).  Note: `app-echo.md` "PID-KEY LANDED".  Tree CLEAN.
-- SH-LINE phase 1 STOPPED on design friction (the token in the payload vs the
-  position in `gets`); RULED in `app-echo.md` "SH-LINE RULING" (payload holds the
-  token + a per-child position pair; the read's console arm is a wand from the
-  payload; init's token route).  CONS-ROUTE (`wx-briefs/brief-cons-route.md`,
-  the kernel part) LAUNCHED 2026-09-11; then SH-LINE re-scoped (program part) → E4 SH-ECHO → E2 INIT-BOOT → E5 L7 (design with the owner:
-  the per-character-echo discipline automaton, `good_out`, the identification
-  gate, `Hphi`).
+- CONS-ROUTE LANDED (2026-09-11; 24 files; VM build `consroute10` EXIT=0, audit =
+  the thirteen, lemma_diff clean).  Notes: `app-echo.md` "SH-LINE RULING",
+  "CONS-ROUTE LANDED".  Tree CLEAN.
+- NEXT: SH-LINE (`wx-briefs/brief-sh-line.md`, re-scoped to the ruling: the
+  position pair, `Qsh`, init's fork/wait, the linear `Pay` across exec, fd 0 =
+  console, the payload-wand read, `ushf_lexable` discharged; LAUNCHED 2026-09-11,
+  phase 1 then stop-and-report) → E4 SH-ECHO → E2 INIT-BOOT → E5 L7 (design with
+  the owner).
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run

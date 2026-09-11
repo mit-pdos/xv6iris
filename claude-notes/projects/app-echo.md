@@ -2165,6 +2165,31 @@ LANES: CONS-ROUTE (kernel: the `P` wand through read; `cons_acc`'s bupd; init's
 token route) → SH-LINE (program: `pos`, `Q`, init's fork/wait/loop, the linear
 `Pay` across exec, sh's entry/`ush_pstate`/`gets`, `ushf_lexable` discharged).
 
+CONS-ROUTE LANDED (2026-09-11; brief `brief-cons-route.md`; 24 files; the
+rulings below are as landed).  R1 `SpecFileread.fileread_in st F Rd P` (one
+match, `P` in every arm; the console arm `cons_acc fsc_cons app_sup (fun cur dc
+=> P ∗ Rd cur dc)`); `fileread_extra … P := P ∗ fileread_extra_core …`;
+`xv6_sbundle` at 5 at `kf_xpay f (-1)`; `xv6_spost` 5 = the core (unchanged in
+force); `SpecSysRead` relays `P` (`sys_read_arms_pay`); `ProofSyscall.
+sysc_arm_read` opens `sysc_pay_in_ret` BEFORE the call, feeds `sexit_pay fdep
+(-1)`, peels it off the post for `sysc_pay_out`; `fsabs_fileread_in` at an
+arbitrary `P`.  THE MINT NAMES THE PAYLOAD: `UexecSG.sbundle_at_at` guarded `n <>
+USYS_read`; `sbundle_pay X n Q W := ∃ f, ⌜sexit_pay f = Q⌝ ∗ sbundle_at X n f W`;
+`sbundle_of_supply_ne` at a chosen `Q`; `UkRun.udep`'s law and `udepw`'s
+explicit disjunct at `sbundle_pay … (ukn_pay N)`; `udepwf` carries `⌜sexit_pay
+fdep = ukn_pay N⌝`; `sbundle_pay_of_sbundle` at `n <> USYS_read`
+(`UInitSh.init_exec_sup_of_sh_slot` uses it at exec).  R2 `cons_acc`'s inner
+wand is `==∗` on both disjuncts (`ConsoleInv.v:~1478`).  R3 `InitBoot.
+init_boot_bundle cw sts := cons_reader fsc_cons 0 -∗ ∃ …, exec_au_pre …`
+(:~129); route `ProofMain.mn_grp_fs` (:~1472) → `SpecUserinit` (:~243) →
+`ParkCap.park_pkg`'s boot mode (:~191, `park_token_park` :~493) →
+`SpecForkret`'s boot row → `ProofForkret.fkr_boot` (:~971; applied at :~1579
+before the kexec of /init); `Hinit_boot` unchanged; `UInitKernel` takes no
+premise (SH-LINE consumes the token at the pinned builder's `Pay`).  Sealed
+Parameters retyped in place: `FILEREAD.wp_fileread_sconf`, `SYSREAD.
+wp_sys_read_sconf`, the `uexecSG` fields `sbundle_at_at`/`sbundle_of_supply_ne`/
+`sbundle_of_supply`.
+
 CONS-ROUTE RULINGS (2026-09-11, phase 1): (1) THE MINT NAMES THE PAYLOAD.  Once
 the read bundle reads the exit payload (`xv6_sbundle` at 5 takes `kf_xpay f
 (-1)`), `UexecSG.sbundle_at_at` (the equation "re-keying the payload changes no
