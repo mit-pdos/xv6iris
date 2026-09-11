@@ -21,6 +21,12 @@ patch: `projects/wx-briefs/`.
   Tree CLEAN.  The WAIT-EXIT design of record is now fully landed (WX-KEY, WX-FORK,
   WX-RES+ROW, WX-EXIT, WX-GEN, WX-INV, WX-WAIT); every payload is `fun _ => True`
   until L7 puts the console-input resource in.
+- IN PROGRESS (2026-09-11): a read-only SURVEY of the application layer (App.v's
+  six hypothesis families and their generic/echo dischargers; AppEcho.v; the
+  programs' payloads; the UART tx side and `good_out`/`Hphi`; the console-input
+  resource for the payload; the gap list) -- the design of the remaining arc
+  (L6 finish / ARM-c (1b) / L7 / the echo instance) is written from it into
+  `app-echo.md` before any brief.
 - NEXT: ARM-c (1b) (echo discharges `Hinit_boot`; needs the taint -- see
   `app-echo.md` "ARM-c (1a) LANDED" and the L2 plan) → L7.  Re-read the plan and
   write the brief before launching; the WX lanes changed the slot/deposit shapes
