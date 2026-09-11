@@ -21,14 +21,13 @@ patch: `projects/wx-briefs/`.
   Tree CLEAN.  The WAIT-EXIT design of record is now fully landed (WX-KEY, WX-FORK,
   WX-RES+ROW, WX-EXIT, WX-GEN, WX-INV, WX-WAIT); every payload is `fun _ => True`
   until L7 puts the console-input resource in.
-- THE REMAINING ARC is designed from a read-only survey: `app-echo.md` "THE
-  REMAINING ARC TO xv6_app_adequacy FOR ECHO — DESIGN" -- E1 ECHO-PRED
-  (`wx-briefs/brief-echo-pred.md`, LAUNCHED 2026-09-11, phase 1 then
-  stop-and-report) → E2 INIT-BOOT (ARM-c 1b) → E3 RECEIPT LEAF + sh's line →
-  E4 SH-ECHO → E5 L7 (a design session with the owner first: the UART
-  identification gate, `good_out`/`Hphi`, whether the console-reader token is
-  needed).  Briefs for E2-E4 are written at each landing from the previous
-  as-landed note.
+- THE REMAINING ARC: `app-echo.md` "THE REMAINING ARC TO xv6_app_adequacy FOR
+  ECHO — DESIGN".  E1 ECHO-PRED LANDED (2026-09-11; note "E1 ECHO-PRED LANDED").
+  Order corrected: E3 RECEIPT LEAF + reader token → E4 SH-ECHO → E2 INIT-BOOT →
+  E5 L7.  E3 needs a DESIGN first (the console-reader token = the program-side
+  half of the console ring's consumption cursor; a read-only console-ring survey
+  is in progress; the design goes to the owner before any brief because it
+  touches the console invariant and the theorem's input story).  Tree CLEAN.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run

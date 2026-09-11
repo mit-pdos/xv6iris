@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV (LANDED) → WX-WAIT (LANDED) → E1 ECHO-PRED → E2 INIT-BOOT (ARM-c 1b) → E3 RECEIPT LEAF → E4 SH-ECHO → E5 L7 (design first).  See "THE REMAINING ARC".
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV (LANDED) → WX-WAIT (LANDED) → E1 ECHO-PRED (LANDED) → E3 RECEIPT LEAF + reader token (design first) → E4 SH-ECHO → E2 INIT-BOOT (ARM-c 1b) → E5 L7 (design first).  See "THE REMAINING ARC".
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -2003,6 +2003,32 @@ WX-RES + WX-ROW LANDED (2026-09-10; briefs `brief-wx-res.md`,
 - Traps: `SpecForkretPark`'s binders need `!wchG Σ` (the dormant block reaches
   `proc_ctx`); the adequacy top needs `!wchGpreS Σ` and `Hinit_boot` a `!wchG Σ`
   binder (the era's instance comes out of `boot_shared_alloc`).
+
+E1 ECHO-PRED LANDED (2026-09-11; brief `brief-echo-pred.md`; commit follows this
+note's).  `FsEchoPin.v` is `FsShPin.v` at inum 4 (`ECHO_INO`, `echo_path`,
+`echo_bytes = ElfUser.echo_elf`, `era0_echo_pins`, the boot transport, the
+resource forms).  `AppEcho.echo_taint γ := mono_nat_lb_own γ 1` is the ONE
+definition behind `echo_tag`'s right arm, `echo_pred`'s left arm,
+`echo_R_untainted` and `echo_sup_of_taint : echo_taint γ -∗ app_sup_raw
+(echo_pred γ) r`; `echo_pred γ _ av := echo_taint γ ∨ ⌜echo_fs_pure av⌝` over
+the three era-0 pins; `echo_names := unit`.  `AppInv.app_xfer_raw_pers_or_pure`
+pays `echo_xfer`.  `echo_init_img` is `Happ_init` at the theorem's literal shape
+(three steps: `img_snap_ok` at `Himg`, the era-0 disk equation identifies the
+map with `era0_D`, `era0_recovery`; then the pins -- right disjunct).
+`app_echo : xv6_app Σ` with `echo_phi := fun _ _ => True` (a PLACEHOLDER; E5
+writes `good_out`); the ten dischargers `echo_Hbirth … echo_Happ_init` stand at
+`App.xv6_app_adequacy`'s binders (`echo_Htx`/`echo_Hrx` carry `uartGhostG`,
+`echo_Happ_init` the three era-0 equations as premises); `Hinit_boot` (E2) and
+`Hphi` (E5) open; NO theorem.  GONE: `echo_fs`, `echo_fs_intro`.  `AppEcho.v` sits
+after `App.v` in `_CoqProject`.  `Happ_sup` no longer occurs anywhere in the
+tree (the credential `app_sup_raw` does).
+ORDER CORRECTION (2026-09-11): E2's pins arm needs init's exec supply for sh,
+which needs sh's entry (`ush_rest`), which needs E3's lexability discharge and
+E4's pinned exec route -- so E3 → E4 → E2.  And E3's disciplined branch needs
+sh's line to be the CONTIGUOUS next input, which needs the console-reader
+token (E5(c) is answered: the token is needed; its shape is the program-side
+half of the console ring's consumption cursor, so a receipt states its bytes'
+positions by construction).  A console-ring survey precedes the E3 design.
 
 #### THE REMAINING ARC TO `xv6_app_adequacy` FOR ECHO — DESIGN (2026-09-11, coordinator, from a read-only survey of the tree)
 
