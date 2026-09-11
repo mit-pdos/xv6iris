@@ -2116,6 +2116,23 @@ the index-free `wp_uk_ecall_wait_any` at `uch_any` is what init and sh call.
 gen_pid g pide` (the reaper aligns the pid through the escrow's quarter, since
 the ZOMBIE block holds an owned share and `gen_pid` needs the discarded one).
 
+WX-WAIT RULINGS (2026-09-11): (1) THE -1 ARM IS WEAK: `⌜rv = -1 ∧ cs' = cs⌝`,
+no `cs = ∅` -- kwait returns -1 from three exits and only one is childless (a
+killed caller at `!havekids || killed(p)`, and the copyout-failure tail after a
+ZOMBIE was found, both return -1 with a non-empty row), and no caller-held
+premise excludes them.  The design of record's "if the parent has no other
+children wait cannot return -1" is NOT a fact of this kernel's wait; init exits
+on that arm, so the echo theorem does not need it.  (2) `gen_uniq cs pid γ' :=
+[∗ set] γ ∈ cs, ∃ pidγ, gen_pid γ pidγ ∗ ⌜pidγ = pid → γ = γ'⌝` -- the summary
+HANDS OUT each member's pid, because a parent's `child_tok` is a quarter and
+cannot derive the discarded `gen_pid`; produced under the lock by
+`children_inv_pid_all` before the reap.  (3) ONE answer predicate `wait_ans rv xs
+cs cs'` relayed verbatim by `uwait_ans`/`sysc_wait_out`/`ut_wait_out`/
+`uexec_wait_F`; membership DROPPED from the post (`O` is the invariant's, so any
+post-side spelling is vacuous); the escrow at `xstate_val xw` with `xw` the one
+status word every copyout arm writes a prefix of; init's `wp_kinit_wait` is
+INDEXED and its fork stub becomes the indexed leaf at `fun _ => True`.
+
 ORDER: WX-GEN (`brief-wx-gen.md`: the two ghosts, `nextpid_res_at`'s list
 and authority, allocproc/freeproc, the block's halves, kfork's and
 userinit's split; green with `children_inv` still stated-not-carried) →
