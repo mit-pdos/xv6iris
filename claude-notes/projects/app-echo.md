@@ -2181,6 +2181,32 @@ one-shot pair `untainted_tok` (exclusive) / `tainted` (persistent):
   kill, recovered by init at wait.  SH-LINE also switches init to the TRACKED
   open/dup leaves so sh's fd 0 is `FdDevice CONSOLE` in the descriptor ghost.
 
+CONS-CURSOR RULING (6) (2026-09-11) -- HOW THE LEASE ACTUALLY LANDS FOR THE
+READER TOKEN.  Two facts constrain (5): the generic slot's supply is used under
+`□` (`UexecSG.sbundle_of_supply_ne`), so nothing exclusive can come out of it
+(three copies of one ghost half is `False` -- adding the accessor to
+`xv6_ssupply` would make every generic corollary VACUOUS while the audit still
+printed the thirteen); and an invariant accessor cannot stay open across
+consoleread, which SLEEPS in its copy loop.  So the token that crosses the ecall
+for a TAINTED process is not the reader ghost but a PERSISTENT CREDENTIAL that
+stands in for it at the fileread tier: `ConsoleInv.cons_acc cn Wd Rd := (∃ n,
+cons_reader cn n ∗ (∀ cur dc, cons_out cn Wd (Some n) cur dc -∗ Rd cur dc)) ∨
+(cons_dirty_cred Wd ∗ ∀ cur dc, Rd cur dc)` -- the LEASE HOLDER pays its token
+and names what it wants back at its own position; the tainted caller pays the
+credential it already holds (`□ app_sup`, which `echo_sup_of_taint` gives from
+the taint) and gets a read at some position.  ONE arm at fileread, ONE leaf
+(`rf_ret : nat -> nat -> iProp` on `xfam`; `fun _ _ => True` for the generic
+family); `xv6_ssupply` stays `app_sup`; no new hypothesis on any theorem;
+consoleread's kernel contract stays token-in/token-out with no fupd.  The ring
+keeps its pure consumed count `cur` beside the single cursor ghost `nrd`; a
+tokenless read sets a TIMELESS marker in `cons_res` (`cn_dirty`) and deposits
+`□ Wd` in a persistent invariant beside `is_conslock` (`cons_res` must stay
+timeless -- the previous agent's `□ Wd` inside the payload broke that); the
+holder's receipt says `⌜cur = nrd⌝ ∨ (the marker, hence □ Wd)`; the holder's
+half goes inert under the taint, which is the lease's "reclaim".  The general
+two-disjunct lease invariant of (5) is held in reserve for a token that has NO
+persistent stand-in.
+
 #### THE REMAINING ARC TO `xv6_app_adequacy` FOR ECHO — DESIGN (2026-09-11, coordinator, from a read-only survey of the tree)
 
 WHERE THE TREE IS.  Below the application everything is in: the trap route
