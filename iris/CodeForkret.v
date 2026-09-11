@@ -23,7 +23,6 @@ Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
-Require Import KernelDecode08.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
@@ -42,7 +41,6 @@ Require Import KernelDecode25.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
-Require Import KernelDecode29.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
@@ -91,9 +89,9 @@ Section CodeForkret.
   Proof. mk_base (KernelSyms.forkret + 0x14) (mword_of_int 0x00009797 : mword 32)
     (mword_of_int (KernelSyms.forkret + 0x14) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00009797. Qed.
 
-  Lemma fkr_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x18) : mword 64) false (ITYPE (mword_of_int 2336 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.forkret + 0x18) (mword_of_int 0x92078793 : mword 32)
-    (mword_of_int (KernelSyms.forkret + 0x18) : mword 64) (ITYPE (mword_of_int 2336 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_92078793. Qed.
+  Lemma fkr_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x18) : mword 64) false (ITYPE (mword_of_int 2350 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.forkret + 0x18) (mword_of_int 0x92e78793 : mword 32)
+    (mword_of_int (KernelSyms.forkret + 0x18) : mword 64) (ITYPE (mword_of_int 2350 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_92e78793. Qed.
 
   Lemma fkr_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x1c) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.forkret + 0x1c) (mword_of_int 0x439c : mword 16)
@@ -123,9 +121,9 @@ Section CodeForkret.
   Proof. mk_base (KernelSyms.forkret + 0x2c) (mword_of_int 0x00009797 : mword 32)
     (mword_of_int (KernelSyms.forkret + 0x2c) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00009797. Qed.
 
-  Lemma fkr_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x30) : mword 64) false (ITYPE (mword_of_int 2312 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.forkret + 0x30) (mword_of_int 0x90878793 : mword 32)
-    (mword_of_int (KernelSyms.forkret + 0x30) : mword 64) (ITYPE (mword_of_int 2312 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_90878793. Qed.
+  Lemma fkr_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x30) : mword 64) false (ITYPE (mword_of_int 2326 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.forkret + 0x30) (mword_of_int 0x91678793 : mword 32)
+    (mword_of_int (KernelSyms.forkret + 0x30) : mword 64) (ITYPE (mword_of_int 2326 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_91678793. Qed.
 
   Lemma fkr_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x34) : mword 64) false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4, zreg, zreg)).
   Proof. mk_base (KernelSyms.forkret + 0x34) (mword_of_int 0x0310000f : mword 32)
@@ -139,9 +137,9 @@ Section CodeForkret.
   Proof. mk_base (KernelSyms.forkret + 0x3c) (mword_of_int 0x00006797 : mword 32)
     (mword_of_int (KernelSyms.forkret + 0x3c) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00006797. Qed.
 
-  Lemma fkr_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x40) : mword 64) false (ITYPE (mword_of_int 2104 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.forkret + 0x40) (mword_of_int 0x83878793 : mword 32)
-    (mword_of_int (KernelSyms.forkret + 0x40) : mword 64) (ITYPE (mword_of_int 2104 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_83878793. Qed.
+  Lemma fkr_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x40) : mword 64) false (ITYPE (mword_of_int 2118 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.forkret + 0x40) (mword_of_int 0x84678793 : mword 32)
+    (mword_of_int (KernelSyms.forkret + 0x40) : mword 64) (ITYPE (mword_of_int 2118 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_84678793. Qed.
 
   Lemma fkr_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x44) : mword 64) false (STORE (mword_of_int 4048 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 8), 8)).
   Proof. mk_base (KernelSyms.forkret + 0x44) (mword_of_int 0xfcf43823 : mword 32)
@@ -215,17 +213,17 @@ Section CodeForkret.
   Proof. mk_base (KernelSyms.forkret + 0x74) (mword_of_int 0x00004797 : mword 32)
     (mword_of_int (KernelSyms.forkret + 0x74) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00004797. Qed.
 
-  Lemma fkr_78 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x78) : mword 64) false (ITYPE (mword_of_int 1820 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.forkret + 0x78) (mword_of_int 0x71c78793 : mword 32)
-    (mword_of_int (KernelSyms.forkret + 0x78) : mword 64) (ITYPE (mword_of_int 1820 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_71c78793. Qed.
+  Lemma fkr_78 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x78) : mword 64) false (ITYPE (mword_of_int 1850 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.forkret + 0x78) (mword_of_int 0x73a78793 : mword 32)
+    (mword_of_int (KernelSyms.forkret + 0x78) : mword 64) (ITYPE (mword_of_int 1850 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_73a78793. Qed.
 
   Lemma fkr_7c : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x7c) : mword 64) false (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 13), AUIPC)).
   Proof. mk_base (KernelSyms.forkret + 0x7c) (mword_of_int 0x00004697 : mword 32)
     (mword_of_int (KernelSyms.forkret + 0x7c) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 13), AUIPC)) kd_00004697. Qed.
 
-  Lemma fkr_80 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x80) : mword 64) false (ITYPE (mword_of_int 1656 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)).
-  Proof. mk_base (KernelSyms.forkret + 0x80) (mword_of_int 0x67868693 : mword 32)
-    (mword_of_int (KernelSyms.forkret + 0x80) : mword 64) (ITYPE (mword_of_int 1656 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)) kd_67868693. Qed.
+  Lemma fkr_80 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x80) : mword 64) false (ITYPE (mword_of_int 1686 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)).
+  Proof. mk_base (KernelSyms.forkret + 0x80) (mword_of_int 0x69668693 : mword 32)
+    (mword_of_int (KernelSyms.forkret + 0x80) : mword 64) (ITYPE (mword_of_int 1686 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)) kd_69668693. Qed.
 
   Lemma fkr_84 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x84) : mword 64) true (RTYPE (creg2reg_idx (Cregidx (mword_of_int 5)), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SUB)).
   Proof. mk_rvc (KernelSyms.forkret + 0x84) (mword_of_int 0x8f95 : mword 16)
@@ -275,12 +273,12 @@ Section CodeForkret.
   Proof. mk_base (KernelSyms.forkret + 0x9a) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.forkret + 0x9a) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma fkr_9e : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x9e) : mword 64) false (ITYPE (mword_of_int 2018 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.forkret + 0x9e) (mword_of_int 0x7e250513 : mword 32)
-    (mword_of_int (KernelSyms.forkret + 0x9e) : mword 64) (ITYPE (mword_of_int 2018 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_7e250513. Qed.
+  Lemma fkr_9e : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0x9e) : mword 64) false (ITYPE (mword_of_int 2032 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.forkret + 0x9e) (mword_of_int 0x7f050513 : mword 32)
+    (mword_of_int (KernelSyms.forkret + 0x9e) : mword 64) (ITYPE (mword_of_int 2032 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_7f050513. Qed.
 
-  Lemma fkr_a2 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0xa2) : mword 64) false (JAL (mword_of_int 2092646 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.forkret + 0xa2) (mword_of_int 0xe67fe0ef : mword 32)
-    (mword_of_int (KernelSyms.forkret + 0xa2) : mword 64) (JAL (mword_of_int 2092646 : mword 21, Regidx (mword_of_int 1))) kd_e67fe0ef. Qed.
+  Lemma fkr_a2 : kernel_text -∗ instr (mword_of_int (KernelSyms.forkret + 0xa2) : mword 64) false (JAL (mword_of_int 2092676 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.forkret + 0xa2) (mword_of_int 0xe85fe0ef : mword 32)
+    (mword_of_int (KernelSyms.forkret + 0xa2) : mword 64) (JAL (mword_of_int 2092676 : mword 21, Regidx (mword_of_int 1))) kd_e85fe0ef. Qed.
 
 End CodeForkret.

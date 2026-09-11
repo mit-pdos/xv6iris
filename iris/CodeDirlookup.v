@@ -158,9 +158,9 @@ Section CodeDirlookup.
   Proof. mk_base (KernelSyms.dirlookup + 0x3a) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.dirlookup + 0x3a) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma dli_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlookup + 0x3e) : mword 64) false (ITYPE (mword_of_int 3172 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.dirlookup + 0x3e) (mword_of_int 0xc6450513 : mword 32)
-    (mword_of_int (KernelSyms.dirlookup + 0x3e) : mword 64) (ITYPE (mword_of_int 3172 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c6450513. Qed.
+  Lemma dli_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlookup + 0x3e) : mword 64) false (ITYPE (mword_of_int 3186 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.dirlookup + 0x3e) (mword_of_int 0xc7250513 : mword 32)
+    (mword_of_int (KernelSyms.dirlookup + 0x3e) : mword 64) (ITYPE (mword_of_int 3186 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c7250513. Qed.
 
   Lemma dli_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlookup + 0x42) : mword 64) false (JAL (mword_of_int 2084824 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.dirlookup + 0x42) (mword_of_int 0xfd9fc0ef : mword 32)
@@ -170,13 +170,13 @@ Section CodeDirlookup.
   Proof. mk_base (KernelSyms.dirlookup + 0x46) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.dirlookup + 0x46) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma dli_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlookup + 0x4a) : mword 64) false (ITYPE (mword_of_int 3184 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.dirlookup + 0x4a) (mword_of_int 0xc7050513 : mword 32)
-    (mword_of_int (KernelSyms.dirlookup + 0x4a) : mword 64) (ITYPE (mword_of_int 3184 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c7050513. Qed.
+  Lemma dli_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlookup + 0x4a) : mword 64) false (ITYPE (mword_of_int 3198 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.dirlookup + 0x4a) (mword_of_int 0xc7e50513 : mword 32)
+    (mword_of_int (KernelSyms.dirlookup + 0x4a) : mword 64) (ITYPE (mword_of_int 3198 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c7e50513. Qed.
 
-  Lemma dli_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlookup + 0x4e) : mword 64) false (JAL (mword_of_int 2084772 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.dirlookup + 0x4e) (mword_of_int 0xfa5fc0ef : mword 32)
-    (mword_of_int (KernelSyms.dirlookup + 0x4e) : mword 64) (JAL (mword_of_int 2084772 : mword 21, Regidx (mword_of_int 1))) kd_fa5fc0ef. Qed.
+  Lemma dli_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlookup + 0x4e) : mword 64) false (JAL (mword_of_int 2084802 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.dirlookup + 0x4e) (mword_of_int 0xfc3fc0ef : mword 32)
+    (mword_of_int (KernelSyms.dirlookup + 0x4e) : mword 64) (JAL (mword_of_int 2084802 : mword 21, Regidx (mword_of_int 1))) kd_fc3fc0ef. Qed.
 
   Lemma dli_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlookup + 0x52) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 9), Regidx (mword_of_int 9))).
   Proof. mk_rvc (KernelSyms.dirlookup + 0x52) (mword_of_int 0x24c1 : mword 16)

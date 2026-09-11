@@ -265,3 +265,27 @@ run-on-gcp --no-sync bash -c 'git -C xv6-riscv rev-parse HEAD; grep -oP "XV6_REV
 
 Two lines that disagree is the bug; fix it remotely the same way as locally
 (fetch, `checkout --detach $REV`, rebuild the kernel **and** the user ELFs).
+
+**"Rebuild" means FORCE it, and this is where the reproducibility check lies to
+you.** `$(KERNEL_ELF)`'s prerequisite is order-only, so after a remote
+`git checkout` the ELF on the VM is whatever it was — `make dump-force` then
+happily re-dumps the STALE binary and hands you md5s that differ from yours.
+That reads exactly like the toolchain divergence this check exists to detect,
+and it is not. The tell is one symbol: at 06ea57f the VM reported
+`unreachable = 0x8000083c` (the PRE-bump address) while the local dump said
+`0x8000081e`. So before believing a mismatch:
+
+```sh
+run-on-gcp --no-sync bash -lc 'cd <tree> && ls -la xv6-riscv/kernel/kernel'
+```
+
+An mtime older than your checkout is the whole story. The fix is
+`make -C xv6-riscv clean && make -C xv6-riscv kernel/kernel && make -C xv6-riscv fs.img`
+remotely, THEN `dump-force`. Done that way at 06ea57f all 24 tracked dumps came
+back byte-identical.
+
+**And `dump-force` is `rm -f` + regenerate, so it stamps new mtimes even when
+the content is unchanged** (unlike a plain `make dump`, where the dumper leaves
+an unchanged output alone). Every `.vo` below `kernel-rocq/` is therefore stale
+afterwards and the next build is a FULL one — so run this check when you can
+afford that, not between red rounds.

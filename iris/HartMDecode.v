@@ -82,8 +82,11 @@ Proof. reflexivity. Qed.
 (* 3. The pilot's word: [c.sw a4,0(a5)] at [main+0xb0].                    *)
 (* ====================================================================== *)
 
-Definition hp_half : SailStdpp.Values.mword 16 :=
-  subrange_vec_dec (hp_wf : SailStdpp.Values.mword 32) 15 0.
+(* Since 06ea57f the fetch at [main+0xb0] is a 2-BYTE read (the address is
+   2-aligned there now -- HartPilot.v's header has the why), so the fetched
+   word IS the halfword the compressed decoder wants.  This used to slice
+   the low half out of a 4-byte fetch. *)
+Definition hp_half : SailStdpp.Values.mword 16 := hp_wf.
 
 Lemma hp_isRVC : isRVC hp_half = true.
 Proof. vm_cast_no_check (eq_refl true). Qed.

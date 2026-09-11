@@ -452,16 +452,16 @@ Section ProofCreateMkdir.
     iEval (rewrite Hq100) in "Hpc".
     (* ===== +0x100 addi a1,a1,2450 : a1 = &"." ======================= *)
     iApply (wp_addi4_s_sconf (mword_of_int (CK + 0x100)) Ra1 Ra1
-              (mword_of_int 2296 : mword 12) Z2 (K - 10)%nat b
+              (mword_of_int 2310 : mword 12) Z2 (K - 10)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (cri_100 with "Htext"). }
     iIntros (CIDm3 Hqm3) "Hcg Hpc".
     pose (Z3 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (rget Z2 Ra1)
-                     (sign_extend' 64 (mword_of_int 2296 : mword 12)))]> Z2).
+                     (sign_extend' 64 (mword_of_int 2310 : mword 12)))]> Z2).
     change (<[Regidx Ra1 := regval_into_reg
                   (add_vec (rget Z2 Ra1)
-                     (sign_extend' 64 (mword_of_int 2296 : mword 12)))]> Z2) with Z3.
+                     (sign_extend' 64 (mword_of_int 2310 : mword 12)))]> Z2) with Z3.
     assert (HZ3a1 : Z3 !!! Regidx Ra1 = mword_of_int cr_dot_addr).
     { rewrite /Z3 upd_eq. rewrite rget_ne;
         [| intro Hz1; injection Hz1 as Hz2; vm_compute in Hz2; congruence ].
@@ -934,16 +934,16 @@ Section ProofCreateMkdir.
       iEval (rewrite Hq114) in "Hpc".
       (* ===== +0x114 addi a1,a1,2438 : a1 = &".." ==================== *)
       iApply (wp_addi4_s_sconf (mword_of_int (CK + 0x114)) Ra1 Ra1
-                (mword_of_int 2284 : mword 12) Y2 (K - 10)%nat b
+                (mword_of_int 2298 : mword 12) Y2 (K - 10)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
       { iApply (cri_114 with "Htext"). }
       iIntros (CIDe4 Hqe4) "Hcg Hpc".
       pose (Y3 := <[Regidx Ra1 := regval_into_reg
                     (add_vec (rget Y2 Ra1)
-                       (sign_extend' 64 (mword_of_int 2284 : mword 12)))]> Y2).
+                       (sign_extend' 64 (mword_of_int 2298 : mword 12)))]> Y2).
       change (<[Regidx Ra1 := regval_into_reg
                     (add_vec (rget Y2 Ra1)
-                       (sign_extend' 64 (mword_of_int 2284 : mword 12)))]> Y2) with Y3.
+                       (sign_extend' 64 (mword_of_int 2298 : mword 12)))]> Y2) with Y3.
       assert (HY3a1 : Y3 !!! Regidx Ra1 = mword_of_int cr_dotdot_addr).
       { rewrite /Y3 upd_eq. rewrite rget_ne;
           [| intro Hz1; injection Hz1 as Hz2; vm_compute in Hz2; congruence ].

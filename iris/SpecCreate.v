@@ -163,10 +163,10 @@
      +0xbc  mv a0,s1 / +0xbe jal iunlockput (dp) / mv s3,s2 / j +0x60
                                               [ARM C-OK -- the LOCKED ip]
      +0xc6  mv a0,s1 / jal iunlockput (dp) / j +0x60      [ARM A-FAIL body]
-     +0xce  lw a2,4(s2) / auipc+addi a1 = 0x800075c0 (".") / mv a0,s2
+     +0xce  lw a2,4(s2) / auipc+addi a1 = 0x800075b0 (".") / mv a0,s2
      +0xdc  jal dirlink   (ip, ".", ip->inum)
      +0xe0  bltz a0 -> +0x11c
-     +0xe4  lw a2,4(s1) (dp->inum) / a1 = 0x800075c8 ("..") / mv a0,s2
+     +0xe4  lw a2,4(s1) (dp->inum) / a1 = 0x800075b8 ("..") / mv a0,s2
      +0xf0  jal dirlink   (ip, "..", dp->inum)
      +0xf4  bltz a0 -> +0x11c
      +0xf8  lw a2,4(s2) / addi a1,s0,-80 / mv a0,s1

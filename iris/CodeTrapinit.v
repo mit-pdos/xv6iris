@@ -17,7 +17,6 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode01.
-Require Import KernelDecode02.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
@@ -59,17 +58,17 @@ Section CodeTrapinit.
   Proof. mk_base (KernelSyms.trapinit + 0x8) (mword_of_int 0x00005597 : mword 32)
     (mword_of_int (KernelSyms.trapinit + 0x8) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_00005597. Qed.
 
-  Lemma tri_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0xc) : mword 64) false (ITYPE (mword_of_int 3590 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.trapinit + 0xc) (mword_of_int 0xe0658593 : mword 32)
-    (mword_of_int (KernelSyms.trapinit + 0xc) : mword 64) (ITYPE (mword_of_int 3590 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_e0658593. Qed.
+  Lemma tri_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0xc) : mword 64) false (ITYPE (mword_of_int 3604 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.trapinit + 0xc) (mword_of_int 0xe1458593 : mword 32)
+    (mword_of_int (KernelSyms.trapinit + 0xc) : mword 64) (ITYPE (mword_of_int 3604 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_e1458593. Qed.
 
   Lemma tri_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x10) : mword 64) false (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.trapinit + 0x10) (mword_of_int 0x00016517 : mword 32)
     (mword_of_int (KernelSyms.trapinit + 0x10) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00016517. Qed.
 
-  Lemma tri_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x14) : mword 64) false (ITYPE (mword_of_int 3406 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.trapinit + 0x14) (mword_of_int 0xd4e50513 : mword 32)
-    (mword_of_int (KernelSyms.trapinit + 0x14) : mword 64) (ITYPE (mword_of_int 3406 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_d4e50513. Qed.
+  Lemma tri_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x14) : mword 64) false (ITYPE (mword_of_int 3420 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.trapinit + 0x14) (mword_of_int 0xd5c50513 : mword 32)
+    (mword_of_int (KernelSyms.trapinit + 0x14) : mword 64) (ITYPE (mword_of_int 3420 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_d5c50513. Qed.
 
   Lemma tri_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x18) : mword 64) false (JAL (mword_of_int 2090696 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.trapinit + 0x18) (mword_of_int 0xec8fe0ef : mword 32)

@@ -16,6 +16,7 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode03.
@@ -101,9 +102,9 @@ Section CodeFreewalk.
   Proof. mk_base (KernelSyms.freewalk + 0x18) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.freewalk + 0x18) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma fwi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x1c) : mword 64) false (ITYPE (mword_of_int 3574 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.freewalk + 0x1c) (mword_of_int 0xdf650513 : mword 32)
-    (mword_of_int (KernelSyms.freewalk + 0x1c) : mword 64) (ITYPE (mword_of_int 3574 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_df650513. Qed.
+  Lemma fwi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x1c) : mword 64) false (ITYPE (mword_of_int 3588 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.freewalk + 0x1c) (mword_of_int 0xe0450513 : mword 32)
+    (mword_of_int (KernelSyms.freewalk + 0x1c) : mword 64) (ITYPE (mword_of_int 3588 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_e0450513. Qed.
 
   Lemma fwi_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x20) : mword 64) false (JAL (mword_of_int 2094322 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.freewalk + 0x20) (mword_of_int 0xcf2ff0ef : mword 32)

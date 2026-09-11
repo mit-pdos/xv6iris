@@ -17,7 +17,7 @@
      +0x0a            jal ra,allocproc           (0x80001b06)
      +0x0e            c.mv s1,a0                 s1 = p
      +0x10 .. +0x14   auipc a5,0x8; sd a0,1796(a5)     initproc = p
-     +0x18 .. +0x1c   auipc a0,0x5; addi a0,a0,1484    a0 = "/" (0x80007190)
+     +0x18 .. +0x1c   auipc a0,0x5; addi a0,a0,1484    a0 = "/" (0x80007180)
      +0x20            jal ra,namei               (0x80003a92)
      +0x24            sd a0,336(s1)              p->cwd = ip
      +0x28            c.li a5,3                  RUNNABLE
@@ -30,7 +30,7 @@
 
    Every [jal] target was resolved numerically against KernelSyms; so was
    [initproc] (0x8000a2b0, the auipc/sd pair) and the "/" literal
-   (0x80007190, the auipc/addi pair).  THIS KERNEL'S userinit is SHORTER
+   (0x80007180, the auipc/addi pair).  THIS KERNEL'S userinit is SHORTER
    than upstream's -- no uvmfirst, no trapframe writes, no safestrcpy --
    and the decode is what says so: three calls, two stores, nothing else.
 
@@ -174,11 +174,11 @@ Lemma uin_frm3 (X : mword 64) :
   = pa_stk X 3.
 Proof. apply uin_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
-(* THE "/" LITERAL.  Two bytes of .rodata at 0x80007190, which is what the
+(* THE "/" LITERAL.  Two bytes of .rodata at 0x80007180, which is what the
    [auipc a0,0x5] / [addi a0,a0,1484] pair at +0x18/+0x1c computes.  Named
    (never an inline [ltac:] argument to [kernel_data_window] --
    claude-notes/optimization.md). *)
-Definition uin_slash_addr : Z := 0x80007190.
+Definition uin_slash_addr : Z := 0x80007180.
 Definition uin_slash_w : mword 16 := mword_of_int 0x2f.
 
 Lemma uin_slash_bytes : forall j : nat, (j < 2)%nat ->
@@ -498,12 +498,12 @@ Section ProofUserinit.
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 sd a0,1796(a5) : initproc = p ===== *)
     assert (Hinitaddr : add_vec (rget R5 Ra5)
-                          (sign_extend' 64 (mword_of_int 1680 : mword 12))
+                          (sign_extend' 64 (mword_of_int 1694 : mword 12))
                         = (mword_of_int KernelSyms.initproc : mword 64)).
     { assert (Hr : rget R5 Ra5 = R5 !!! Regidx Ra5) by (rgne; reflexivity).
       rewrite Hr /R5 upd_eq. pcw. }
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0)
-              (mword_of_int (UI + 0x14)) Ra0 Ra5 (mword_of_int 1680 : mword 12)
+              (mword_of_int (UI + 0x14)) Ra0 Ra5 (mword_of_int 1694 : mword 12)
               R5 (trap_res b + (K - 4))%nat v0 false
               with "Hcg Hpc [] [Hinitproc]").
     { iApply (uin_14 with "Htext"). }
@@ -537,13 +537,13 @@ Section ProofUserinit.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== +0x1c addi a0,a0,1484 : a0 = "/" ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (UI + 0x1c)) Ra0 Ra0
-              (mword_of_int 1432 : mword 12) R6 (trap_res b + (K - 4))%nat false
+              (mword_of_int 1446 : mword 12) R6 (trap_res b + (K - 4))%nat false
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (uin_1c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (R7 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (rget R6 Ra0)
-                     (sign_extend' 64 (mword_of_int 1432 : mword 12)))]> R6).
+                     (sign_extend' 64 (mword_of_int 1446 : mword 12)))]> R6).
     assert (HR7a0 : (R7 !!! Regidx Ra0 : mword 64)
                     = (mword_of_int uin_slash_addr : mword 64)).
     { rewrite /R7 upd_eq.

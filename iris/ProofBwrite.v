@@ -398,7 +398,7 @@ Section ProofBwrite.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
     (* ===== +0x18 jal ra,virtio_disk_rw ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bwrite + 0x18)) Rra (mword_of_int 0x2c60 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bwrite + 0x18)) Rra (mword_of_int 0x2c5e : mword 21)
               D2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (bwi_18 with "Htext"). }
@@ -406,7 +406,7 @@ Section ProofBwrite.
     set (D3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.bwrite + 0x18) : mword 64) 4)]> D2).
     assert (Htgtrw : add_vec (mword_of_int (KernelSyms.bwrite + 0x18) : mword 64)
-                       (sign_extend' 64 (mword_of_int 0x2c60 : mword 21))
+                       (sign_extend' 64 (mword_of_int 0x2c5e : mword 21))
                      = mword_of_int KernelSyms.virtio_disk_rw)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtrw) in "Hpc".

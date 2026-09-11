@@ -34,7 +34,7 @@ Import Defs.
    KernelSyms.initsleeplock+0x10 resolves here); the caller extracts the persistent
    ∀-context string fact ([TsoCtx.ctx_string_all], the derived context-free
    form of [↦ₛ]) from [kernel_data] via [kernel_data_string_all]. *)
-Definition sl_str_addr : mword 64 := mword_of_int 0x80007568.
+Definition sl_str_addr : mword 64 := mword_of_int 0x80007558.
 
 Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (m : regfile) (s : string)

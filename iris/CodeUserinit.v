@@ -16,9 +16,9 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode01.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
-Require Import KernelDecode05.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
@@ -75,17 +75,17 @@ Section CodeUserinit.
   Proof. mk_base (KernelSyms.userinit + 0x10) (mword_of_int 0x00008797 : mword 32)
     (mword_of_int (KernelSyms.userinit + 0x10) : mword 64) (UTYPE (mword_of_int 8 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00008797. Qed.
 
-  Lemma uin_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.userinit + 0x14) : mword 64) false (STORE (mword_of_int 1680 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
-  Proof. mk_base (KernelSyms.userinit + 0x14) (mword_of_int 0x68a7b823 : mword 32)
-    (mword_of_int (KernelSyms.userinit + 0x14) : mword 64) (STORE (mword_of_int 1680 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_68a7b823. Qed.
+  Lemma uin_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.userinit + 0x14) : mword 64) false (STORE (mword_of_int 1694 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
+  Proof. mk_base (KernelSyms.userinit + 0x14) (mword_of_int 0x68a7bf23 : mword 32)
+    (mword_of_int (KernelSyms.userinit + 0x14) : mword 64) (STORE (mword_of_int 1694 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_68a7bf23. Qed.
 
   Lemma uin_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.userinit + 0x18) : mword 64) false (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.userinit + 0x18) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.userinit + 0x18) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma uin_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.userinit + 0x1c) : mword 64) false (ITYPE (mword_of_int 1432 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.userinit + 0x1c) (mword_of_int 0x59850513 : mword 32)
-    (mword_of_int (KernelSyms.userinit + 0x1c) : mword 64) (ITYPE (mword_of_int 1432 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_59850513. Qed.
+  Lemma uin_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.userinit + 0x1c) : mword 64) false (ITYPE (mword_of_int 1446 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.userinit + 0x1c) (mword_of_int 0x5a650513 : mword 32)
+    (mword_of_int (KernelSyms.userinit + 0x1c) : mword 64) (ITYPE (mword_of_int 1446 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_5a650513. Qed.
 
   Lemma uin_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.userinit + 0x20) : mword 64) false (JAL (mword_of_int 7878 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.userinit + 0x20) (mword_of_int 0x6c7010ef : mword 32)

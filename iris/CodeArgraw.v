@@ -16,7 +16,6 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
@@ -91,9 +90,9 @@ Section CodeArgraw.
   Proof. mk_base (KernelSyms.argraw + 0x18) (mword_of_int 0x00005717 : mword 32)
     (mword_of_int (KernelSyms.argraw + 0x18) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_00005717. Qed.
 
-  Lemma ari_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + 0x1c) : mword 64) false (ITYPE (mword_of_int 4076 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.argraw + 0x1c) (mword_of_int 0xfec70713 : mword 32)
-    (mword_of_int (KernelSyms.argraw + 0x1c) : mword 64) (ITYPE (mword_of_int 4076 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_fec70713. Qed.
+  Lemma ari_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + 0x1c) : mword 64) false (ITYPE (mword_of_int 4090 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.argraw + 0x1c) (mword_of_int 0xffa70713 : mword 32)
+    (mword_of_int (KernelSyms.argraw + 0x1c) : mword 64) (ITYPE (mword_of_int 4090 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_ffa70713. Qed.
 
   Lemma ari_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + 0x20) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.argraw + 0x20) (mword_of_int 0x94ba : mword 16)
@@ -203,9 +202,9 @@ Section CodeArgraw.
   Proof. mk_base (KernelSyms.argraw + 0x54) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.argraw + 0x54) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma ari_58 : kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + 0x58) : mword 64) false (ITYPE (mword_of_int 3008 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.argraw + 0x58) (mword_of_int 0xbc050513 : mword 32)
-    (mword_of_int (KernelSyms.argraw + 0x58) : mword 64) (ITYPE (mword_of_int 3008 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_bc050513. Qed.
+  Lemma ari_58 : kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + 0x58) : mword 64) false (ITYPE (mword_of_int 3022 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.argraw + 0x58) (mword_of_int 0xbce50513 : mword 32)
+    (mword_of_int (KernelSyms.argraw + 0x58) : mword 64) (ITYPE (mword_of_int 3022 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_bce50513. Qed.
 
   Lemma ari_5c : kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + 0x5c) : mword 64) false (JAL (mword_of_int 2089068 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.argraw + 0x5c) (mword_of_int 0x86cfe0ef : mword 32)

@@ -28,7 +28,6 @@ Require Import KernelDecode08.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
-Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
@@ -62,9 +61,9 @@ Section CodeInstallTrans.
   Proof. mk_base KernelSyms.install_trans (mword_of_int 0x0001f797 : mword 32)
     (mword_of_int KernelSyms.install_trans : mword 64) (UTYPE (mword_of_int 31 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_0001f797. Qed.
 
-  Lemma iti_04 : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x4) : mword 64) false (LOAD (mword_of_int 2094 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (KernelSyms.install_trans + 0x4) (mword_of_int 0x82e7a783 : mword 32)
-    (mword_of_int (KernelSyms.install_trans + 0x4) : mword 64) (LOAD (mword_of_int 2094 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_82e7a783. Qed.
+  Lemma iti_04 : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x4) : mword 64) false (LOAD (mword_of_int 2108 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (KernelSyms.install_trans + 0x4) (mword_of_int 0x83c7a783 : mword 32)
+    (mword_of_int (KernelSyms.install_trans + 0x4) : mword 64) (LOAD (mword_of_int 2108 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_83c7a783. Qed.
 
   Lemma iti_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x8) : mword 64) false (BTYPE (mword_of_int 194 : mword 13, Regidx (mword_of_int 15), zreg, BGE)).
   Proof. mk_base (KernelSyms.install_trans + 0x8) (mword_of_int 0x0cf05163 : mword 32)
@@ -126,9 +125,9 @@ Section CodeInstallTrans.
   Proof. mk_base (KernelSyms.install_trans + 0x26) (mword_of_int 0x0001fa97 : mword 32)
     (mword_of_int (KernelSyms.install_trans + 0x26) : mword 64) (UTYPE (mword_of_int 31 : mword 20, Regidx (mword_of_int 21), AUIPC)) kd_0001fa97. Qed.
 
-  Lemma iti_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x2a) : mword 64) false (ITYPE (mword_of_int 2060 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)).
-  Proof. mk_base (KernelSyms.install_trans + 0x2a) (mword_of_int 0x80ca8a93 : mword 32)
-    (mword_of_int (KernelSyms.install_trans + 0x2a) : mword 64) (ITYPE (mword_of_int 2060 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)) kd_80ca8a93. Qed.
+  Lemma iti_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x2a) : mword 64) false (ITYPE (mword_of_int 2074 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)).
+  Proof. mk_base (KernelSyms.install_trans + 0x2a) (mword_of_int 0x81aa8a93 : mword 32)
+    (mword_of_int (KernelSyms.install_trans + 0x2a) : mword 64) (ITYPE (mword_of_int 2074 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)) kd_81aa8a93. Qed.
 
   Lemma iti_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x2e) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)).
   Proof. mk_rvc (KernelSyms.install_trans + 0x2e) (mword_of_int 0x4981 : mword 16)
@@ -138,17 +137,17 @@ Section CodeInstallTrans.
   Proof. mk_base (KernelSyms.install_trans + 0x30) (mword_of_int 0x00004c17 : mword 32)
     (mword_of_int (KernelSyms.install_trans + 0x30) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 24), AUIPC)) kd_00004c17. Qed.
 
-  Lemma iti_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x34) : mword 64) false (ITYPE (mword_of_int 2418 : mword 12, Regidx (mword_of_int 24), Regidx (mword_of_int 24), ADDI)).
-  Proof. mk_base (KernelSyms.install_trans + 0x34) (mword_of_int 0x972c0c13 : mword 32)
-    (mword_of_int (KernelSyms.install_trans + 0x34) : mword 64) (ITYPE (mword_of_int 2418 : mword 12, Regidx (mword_of_int 24), Regidx (mword_of_int 24), ADDI)) kd_972c0c13. Qed.
+  Lemma iti_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x34) : mword 64) false (ITYPE (mword_of_int 2432 : mword 12, Regidx (mword_of_int 24), Regidx (mword_of_int 24), ADDI)).
+  Proof. mk_base (KernelSyms.install_trans + 0x34) (mword_of_int 0x980c0c13 : mword 32)
+    (mword_of_int (KernelSyms.install_trans + 0x34) : mword 64) (ITYPE (mword_of_int 2432 : mword 12, Regidx (mword_of_int 24), Regidx (mword_of_int 24), ADDI)) kd_980c0c13. Qed.
 
   Lemma iti_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x38) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 20), AUIPC)).
   Proof. mk_base (KernelSyms.install_trans + 0x38) (mword_of_int 0x0001ea17 : mword 32)
     (mword_of_int (KernelSyms.install_trans + 0x38) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 20), AUIPC)) kd_0001ea17. Qed.
 
-  Lemma iti_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x3c) : mword 64) false (ITYPE (mword_of_int 1994 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
-  Proof. mk_base (KernelSyms.install_trans + 0x3c) (mword_of_int 0x7caa0a13 : mword 32)
-    (mword_of_int (KernelSyms.install_trans + 0x3c) : mword 64) (ITYPE (mword_of_int 1994 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_7caa0a13. Qed.
+  Lemma iti_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x3c) : mword 64) false (ITYPE (mword_of_int 2008 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
+  Proof. mk_base (KernelSyms.install_trans + 0x3c) (mword_of_int 0x7d8a0a13 : mword 32)
+    (mword_of_int (KernelSyms.install_trans + 0x3c) : mword 64) (ITYPE (mword_of_int 2008 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_7d8a0a13. Qed.
 
   Lemma iti_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x40) : mword 64) false (ITYPE (mword_of_int 1024 : mword 12, zreg, Regidx (mword_of_int 23), ADDI)).
   Proof. mk_base (KernelSyms.install_trans + 0x40) (mword_of_int 0x40000b93 : mword 32)
@@ -170,9 +169,9 @@ Section CodeInstallTrans.
   Proof. mk_rvc (KernelSyms.install_trans + 0x4c) (mword_of_int 0x8562 : mword 16)
     (mword_of_int (KernelSyms.install_trans + 0x4c) : mword 64) (RTYPE (Regidx (mword_of_int 24), zreg, Regidx (mword_of_int 10), ADD)) kd_8562 exec_execute_C_MV. Qed.
 
-  Lemma iti_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x4e) : mword 64) false (JAL (mword_of_int 2083166 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.install_trans + 0x4e) (mword_of_int 0x95ffc0ef : mword 32)
-    (mword_of_int (KernelSyms.install_trans + 0x4e) : mword 64) (JAL (mword_of_int 2083166 : mword 21, Regidx (mword_of_int 1))) kd_95ffc0ef. Qed.
+  Lemma iti_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x4e) : mword 64) false (JAL (mword_of_int 2083196 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.install_trans + 0x4e) (mword_of_int 0x97dfc0ef : mword 32)
+    (mword_of_int (KernelSyms.install_trans + 0x4e) : mword 64) (JAL (mword_of_int 2083196 : mword 21, Regidx (mword_of_int 1))) kd_97dfc0ef. Qed.
 
   Lemma iti_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.install_trans + 0x52) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 15 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.install_trans + 0x52) (mword_of_int 0xa839 : mword 16)

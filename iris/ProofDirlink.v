@@ -119,10 +119,10 @@ Set Printing Depth 40.
 
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  dirlink's one live arm is [panic("dirlink read")] *)
-(*  at +0x68; the literal sits at 0x800074e8 in .rodata.  Hoisted as      *)
+(*  at +0x68; the literal sits at 0x800074d8 in .rodata.  Hoisted as      *)
 (*  NAMED pure lemmas rather than inline [ltac:] -- see optimization.md.  *)
 (* ===================================================================== *)
-Definition dl_msg_a : Z := 0x800074e8.
+Definition dl_msg_a : Z := 0x800074d8.
 Definition dl_msg : string := "dirlink read".
 
 Lemma dl_panic_K (K : nat) : (K_dirlink <= K)%nat -> (panic_stack <= K - 10)%nat.
@@ -3073,25 +3073,25 @@ Section ProofDirlinkMain.
             iEval (rewrite Hpp64) in "Hpc".
             (* +0x64 addi a0,a0,2790 *)
             iApply (wp_addi4_s_sconf (mword_of_int (DK + 0x64)) Ra0 Ra0
-                      (mword_of_int 2668 : mword 12) PB1 (K - 10)%nat b
+                      (mword_of_int 2682 : mword 12) PB1 (K - 10)%nat b
                       ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
             { iApply (dki_64 with "Htext"). }
             iIntros (CIDpa3 Hqpa3) "Hcg Hpc".
             pose (PB2 := <[Regidx Ra0 := regval_into_reg
                            (add_vec (rget PB1 Ra0)
-                              (sign_extend' 64 (mword_of_int 2668 : mword 12)))]> PB1).
+                              (sign_extend' 64 (mword_of_int 2682 : mword 12)))]> PB1).
             assert (Hpp68 : add_vec_int (mword_of_int (DK + 0x64) : mword 64) 4
                             = mword_of_int (DK + 0x68)) by pcw.
             iEval (rewrite Hpp68) in "Hpc".
             (* +0x68 jal ra,panic -- and panic() never returns *)
             iApply (wp_jal_s_sconf (mword_of_int (DK + 0x68)) Rra
-                      (mword_of_int 2084240 : mword 21) PB2 (K - 10)%nat b
+                      (mword_of_int 2084270 : mword 21) PB2 (K - 10)%nat b
                       ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                       with "Hcg Hpc []").
             { iApply (dki_68 with "Htext"). }
             iIntros (CIDpa4 Hqpa4) "Hcg Hpc".
             assert (Htgtpn : add_vec (mword_of_int (DK + 0x68) : mword 64)
-                               (sign_extend' 64 (mword_of_int 2084240 : mword 21))
+                               (sign_extend' 64 (mword_of_int 2084270 : mword 21))
                              = mword_of_int KernelSyms.panic) by pcw.
             iEval (rewrite Htgtpn) in "Hpc".
             (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----

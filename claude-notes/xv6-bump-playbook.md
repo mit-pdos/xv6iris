@@ -167,6 +167,31 @@ the guard: the file still contributes its QUARANTINED map, and the batch prints
 which hand-written files that map would reach — the flag is free only when that
 prints `no hand-written file`.
 
+**When it is NOT free, `--skip=Code<F>.v` is usually what you want**, and it is
+the third outcome `--allow-shape` does not cover: the reshaped function HAS a
+proof, so the map is not free, but you are rewriting that proof by hand anyway
+— and meanwhile the map actively CORRUPTS every other file that merely names
+the symbol. `--skip` drops the source entirely, map and all.
+
+**Why a caller is reached at all: a bare `KernelSyms.<sym>` in a caller's proof
+is a CALL TARGET, not an anchor into the callee's body.** A panic arm asserts
+`… = mword_of_int KernelSyms.panic` to say what its `jal` hits; the scan reads
+that as "anchor at panic+0" and applies panic's offset-0/+4 map to every
+immediate below it, to the end of the file. At 06ea57f (panic lost its printks)
+panic's map was `32 -> 48` and `2 -> 0` at exactly those offsets — values that
+are everywhere in frame arithmetic — so `apply` proposed rewriting ilock's own
+`addi sp,sp,-32`, fileread's `a_foff` displacement, and a `Cregidx 2`. The
+build catches it, but only after a wasted round.
+
+**And a symbol's own name anchors ONLY when qualified** — `relayout_map.py` was
+fixed at that bump to require the `KernelSyms.` prefix, because `panic`,
+`acquire`, `main`, `sched`, `release` are ordinary English in a proof's prose
+and with the prefix optional every such COMMENT re-anchored the scan, silently,
+for the rest of the file. A DECLARED alias (`PA`, `FR`, `KX`) still anchors
+bare; that is what an alias is for. Validate any change to that rule by
+diffing the whole-tree dry run before and after: at 06ea57f the only
+difference was the bogus pairs disappearing, 874 substitutions unchanged.
+
 ### `fix_proof_imms.py` is the primary sweep, and it is keyed on the pc
 
 `relayout_*` map old immediate → new and look for the old VALUE near an anchor.
@@ -237,7 +262,18 @@ Anything not anchored on a `KernelSyms.<sym> + off`:
 
 - **The thin-wrapper pattern**, where a function's immediates are *arguments* to
   a shared lemma (`ilw_code KernelSyms.fileinit (mword_of_int 3) …`). No anchor
-  on the line, so only `residue` reports it.
+  on the line, so only `residue` reports it — **and `residue` only reports it
+  when the stale value happens to collide with some map entry**, so do not treat
+  a quiet `residue` as coverage here. The closed form is to enumerate the sites
+  and re-derive each from the image: `grep -rn "ilw_code KernelSyms\." iris/*.v`
+  is the whole list (three files at 06ea57f: fileinit, printkinit, trapinit),
+  and the five immediates are read straight off `+0x08`/`+0x0c`/`+0x10`/`+0x14`/
+  `+0x18`. **Compute them, do not eyeball them**: they are the UNSIGNED 12-bit
+  encodings, so objdump's `addi a0,a0,-1304` is the proof's `2792`. At 06ea57f
+  each `addi` moved `+14` (the pc moved `-0x1e` while the data target moved
+  `-0x10`) and both `jal`s were unchanged, caller and callee having shifted
+  together — which is exactly the pattern that makes an arithmetic guess look
+  right and be wrong.
 - **A block lemma inside one proof with the same shape**, where the two
   spellings sit a hundred lines apart: the tool fixes the `assert`s (they spell
   the pc) and cannot see the argument list. The file then fails at the `iApply`
@@ -335,7 +371,17 @@ spec.
 **And that form is the symbolic one that nobody converted.** `etext` IS the base
 of `.rodata`, so every such definition is `KernelSyms.etext + <offset>`, and
 written that way an ordinary text-growing bump carries it for free — only a
-`.rodata` *reordering* touches the offset. Convert one whenever a bump makes you
+`.rodata` *reordering* touches the offset.
+
+**REMOVING A STRING IS A REORDERING, and it is the case where the symbolic form
+is the DANGEROUS one.** At 06ea57f panic's two literals left `.rodata` while
+`etext` stayed put (it is page-aligned, and .text shrank by only 32 bytes), so
+every later string moved `-0x10` and every `etext + <off>` moved with it. A hex
+sweep does not see those, and the two spellings then DISAGREE inside one file:
+`ProofVirtioDiskInit.v` had its `0x80007650` rewritten to `0x80007640` and its
+`KernelSyms.etext + 0x650` left alone, four lines apart. **So sweep both
+spellings in the same pass** — `grep -rn "etext + 0x" iris/*.v` is the whole
+list (three sites in two files) — and derive each from CONTENT like the rest. Convert one whenever a bump makes you
 touch it, in the `ltac:(eval vm_compute in …)` shape so the body is still a
 plain `Z` literal downstream:
 
@@ -434,6 +480,33 @@ surface one build round at a time.
   no cascade. **But a function that SHRANK can still have grown its frame**,
   because gcc takes the freed register pressure as licence to reallocate. So "the
   C only deleted code" does not license skipping the check.
+
+### 4d-bis. A parity flip changes FETCH WIDTHS, not just jump targets
+
+`execution-model.md`'s standing warning is that an odd-halfword shift flips
+jump/branch/return-target PARITY and breaks the 4-aligned jump leaves. It has a
+second, quieter consequence: **`fetch` branches on 4-alignment too**, so a pc
+that moves from 4-aligned to 2-aligned turns ONE 4-byte read into a 2-byte read
+(and, for a 32-bit instruction, into a 2+2 split fetch). Any proof that pins a
+CONCRETE pc therefore changes shape even though its instruction, its offset in
+its function and its very bytes are identical.
+
+At 06ea57f this hit exactly one file: `HartPilot.v`, whose pilot is `sw
+a4,0(a5)` at `main+0xb0`. panic lost 30 bytes, main moved `-0x1e`, and
+`main+0xb0` went 0x80000ee0 → 0x80000ec2. The tell is **`Tactic failure: not a
+read node`** from the `hread_req_at 4` probe — which reads like the pilot broke
+and means only that the width is now 2. The fix is a one-line instantiation
+(`wp_hart_rw_seq` is parametric in `nf`) plus the fetched word narrowing from
+`bv 32` to `bv 16`, and then the consumer that sliced the low half out of the
+4-byte word (`HartMDecode.hp_half`) becomes the identity.
+
+- **Re-measure the node counts, do not adjust them.** The first stretch went
+  106 → 107. Put `Eval vm_compute in (hcount …)` next to the lemmas, compile
+  once, harvest all three, delete the probes — one round instead of three.
+- **Whole-function proofs are immune**, because they spell `KernelSyms.f +
+  off` and the leaves take alignment as a premise. Only a file naming an
+  ABSOLUTE pc is exposed, so `grep -l 'mword_of_int (0x8[0-9a-f]*)' iris/*.v`
+  bounds the blast radius before you build.
 
 ### 4e. Register reallocation — not always a rename
 
@@ -543,6 +616,38 @@ output means the file can be worked on concurrently with any other.
    made obsolete**.
 
 ## 8. Expect a bump to DELETE work
+
+**But first: almost nothing in a CONTRACT is ever forced to change.** When a
+bump guts a function, the reflex is to retighten its spec to match, and that is
+the expensive choice — it moves every call site. A precondition that is merely
+unused is still provable: Iris is affine, so surplus resources are dropped; a
+stack bound that is no longer tight is still a bound; pure side conditions
+become unused hypotheses. **Ask what the bump MAKES UNPROVABLE, not what it
+makes untidy**, and change only that. At 06ea57f panic went from fourteen
+instructions to five and its contract needed exactly ONE edit; keeping
+`panic_stack` at 52 against a function that now uses 2 meant not one caller's
+budget moved.
+
+**When the point of the bump IS to shed a resource, EMPTY the credential, do
+not delete it.** 06ea57f exists to get the UART out of panic's cone, so
+`panic_env` had to stop carrying `is_lock`/`dev_inv`/`is_txlock`. Three ways to
+do that, and only one is cheap:
+
+| | cost |
+|---|---|
+| delete the definition | breaks the ~90 specs that name it |
+| drop the premise from the contract | every call site stops passing it |
+| **`Definition panic_env : iProp Σ := emp`** | **nothing changes, anywhere** |
+
+The third reaches further than the second, too: every one of those ninety
+premises becomes weightless at the same time, so no UART resource is demanded
+anywhere in the cone — where dropping the premise would have left the callers
+still carrying the real thing. Use `emp` and not `True` so it is the unit of
+`∗` and a site that frames it pays literally nothing; the constructors become
+`by iIntros "_"` (sound in an affine BI, where `P ⊢ emp`). **Leave a comment at
+the definition saying it is now vacuous**, because a premise that still LOOKS
+like a credential will otherwise be read as evidence that its function needs
+one. Shedding the ninety premises is a separate sweep, and a separate commit.
 
 Most bumps here are dominated by deletion: upstream fixing a conflation retires
 whatever the proofs had built to describe it, and the retirement is usually

@@ -568,7 +568,7 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Htk H]".
     iDestruct (boot_cran_cell4 g KernelSyms.ticks Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Htk") as (vtk) "Htk".
-    (* ---- 0x8000a270 stack0[8][4096]: the per-hart stack family ---- *)
+    (* ---- 0x8000a260 stack0[8][4096]: the per-hart stack family ---- *)
     iDestruct (bss_cut g (KernelSyms.ticks + 4) KernelSyms.stack0
                  (KernelSyms.stack0 + 4096 * Z.of_nat NCPU) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hstk H]".

@@ -26,7 +26,7 @@ Require Import TsoCtx.
 (* The address of the string literal "pr" that printkinit passes as initlock's
    [name] argument.  It sits in .rodata just past etext and has no ELF symbol of
    its own, so it is spelled out here (see kernel.asm: 80007028 <etext+0x28>). *)
-Definition pr_name_str : Z := 0x80007028%Z.
+Definition pr_name_str : Z := 0x80007018%Z.
 
 (* printkinit() = initlock(&pr.lock, "pr").  It takes no arguments and touches
    no state beyond the three fields of the global [pr.lock]: the caller hands

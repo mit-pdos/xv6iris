@@ -325,9 +325,9 @@ Section CodeKfork.
   Proof. mk_base (KernelSyms.kfork + 0xc8) (mword_of_int 0x00010517 : mword 32)
     (mword_of_int (KernelSyms.kfork + 0xc8) : mword 64) (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00010517. Qed.
 
-  Lemma kfk_0cc : kernel_text -∗ instr (mword_of_int (KernelSyms.kfork + 0xcc) : mword 64) false (ITYPE (mword_of_int 1626 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kfork + 0xcc) (mword_of_int 0x65a50513 : mword 32)
-    (mword_of_int (KernelSyms.kfork + 0xcc) : mword 64) (ITYPE (mword_of_int 1626 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_65a50513. Qed.
+  Lemma kfk_0cc : kernel_text -∗ instr (mword_of_int (KernelSyms.kfork + 0xcc) : mword 64) false (ITYPE (mword_of_int 1640 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kfork + 0xcc) (mword_of_int 0x66850513 : mword 32)
+    (mword_of_int (KernelSyms.kfork + 0xcc) : mword 64) (ITYPE (mword_of_int 1640 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_66850513. Qed.
 
   Lemma kfk_0d0 : kernel_text -∗ instr (mword_of_int (KernelSyms.kfork + 0xd0) : mword 64) false (JAL (mword_of_int 2092652 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.kfork + 0xd0) (mword_of_int 0xe6dfe0ef : mword 32)
@@ -341,9 +341,9 @@ Section CodeKfork.
   Proof. mk_base (KernelSyms.kfork + 0xd8) (mword_of_int 0x00010517 : mword 32)
     (mword_of_int (KernelSyms.kfork + 0xd8) : mword 64) (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00010517. Qed.
 
-  Lemma kfk_0dc : kernel_text -∗ instr (mword_of_int (KernelSyms.kfork + 0xdc) : mword 64) false (ITYPE (mword_of_int 1610 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kfork + 0xdc) (mword_of_int 0x64a50513 : mword 32)
-    (mword_of_int (KernelSyms.kfork + 0xdc) : mword 64) (ITYPE (mword_of_int 1610 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_64a50513. Qed.
+  Lemma kfk_0dc : kernel_text -∗ instr (mword_of_int (KernelSyms.kfork + 0xdc) : mword 64) false (ITYPE (mword_of_int 1624 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kfork + 0xdc) (mword_of_int 0x65850513 : mword 32)
+    (mword_of_int (KernelSyms.kfork + 0xdc) : mword 64) (ITYPE (mword_of_int 1624 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_65850513. Qed.
 
   Lemma kfk_0e0 : kernel_text -∗ instr (mword_of_int (KernelSyms.kfork + 0xe0) : mword 64) false (JAL (mword_of_int 2092772 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.kfork + 0xe0) (mword_of_int 0xee5fe0ef : mword 32)

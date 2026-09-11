@@ -24,6 +24,7 @@ Require Import KernelDecode05.
 Require Import KernelDecode07.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
+Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
@@ -96,9 +97,9 @@ Section CodeProcPagetable.
   Proof. mk_base (KernelSyms.proc_pagetable + 0x18) (mword_of_int 0x00004697 : mword 32)
     (mword_of_int (KernelSyms.proc_pagetable + 0x18) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 13), AUIPC)) kd_00004697. Qed.
 
-  Lemma ppti_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x1c) : mword 64) false (ITYPE (mword_of_int 1590 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)).
-  Proof. mk_base (KernelSyms.proc_pagetable + 0x1c) (mword_of_int 0x63668693 : mword 32)
-    (mword_of_int (KernelSyms.proc_pagetable + 0x1c) : mword 64) (ITYPE (mword_of_int 1590 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)) kd_63668693. Qed.
+  Lemma ppti_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x1c) : mword 64) false (ITYPE (mword_of_int 1620 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)).
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x1c) (mword_of_int 0x65468693 : mword 32)
+    (mword_of_int (KernelSyms.proc_pagetable + 0x1c) : mword 64) (ITYPE (mword_of_int 1620 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI)) kd_65468693. Qed.
 
   Lemma ppti_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + 0x20) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 12), LUI)).
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x20) (mword_of_int 0x6605 : mword 16)

@@ -125,9 +125,9 @@ Section CodeSleepPrepare.
   Proof. mk_base (KernelSyms.sleep_prepare + 0x30) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.sleep_prepare + 0x30) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma spri_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep_prepare + 0x34) : mword 64) false (ITYPE (mword_of_int 648 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.sleep_prepare + 0x34) (mword_of_int 0x28850513 : mword 32)
-    (mword_of_int (KernelSyms.sleep_prepare + 0x34) : mword 64) (ITYPE (mword_of_int 648 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_28850513. Qed.
+  Lemma spri_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep_prepare + 0x34) : mword 64) false (ITYPE (mword_of_int 662 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.sleep_prepare + 0x34) (mword_of_int 0x29650513 : mword 32)
+    (mword_of_int (KernelSyms.sleep_prepare + 0x34) : mword 64) (ITYPE (mword_of_int 662 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_29650513. Qed.
 
   Lemma spri_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep_prepare + 0x38) : mword 64) false (JAL (mword_of_int 2091228 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.sleep_prepare + 0x38) (mword_of_int 0x8ddfe0ef : mword 32)

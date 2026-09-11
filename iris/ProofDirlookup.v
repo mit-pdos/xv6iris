@@ -117,11 +117,11 @@ Set Printing Depth 40.
 
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  dirlookup's one live arm is the SHORT READ,       *)
-(*  [panic("dirlookup read")] at +0x4e; the literal sits at 0x800074d8    *)
+(*  [panic("dirlookup read")] at +0x4e; the literal sits at 0x800074c8    *)
 (*  in .rodata, fourteen characters and a NUL.  NAMED pure lemmas, not    *)
 (*  inline [ltac:] -- see optimization.md and the panic recipe.           *)
 (* ===================================================================== *)
-Definition dlk_msg_a : Z := 0x800074d8.
+Definition dlk_msg_a : Z := 0x800074c8.
 Definition dlk_msg : string := "dirlookup read".
 
 Lemma dlk_panic_K (K : nat) : (K_dirlookup <= K)%nat -> (panic_stack <= K - 12)%nat.
@@ -1708,25 +1708,25 @@ Section ProofDirlookupMain.
           iEval (rewrite Hpp4a) in "Hpc".
           (* +0x4a addi a0,a0,3290 : ...and its low part *)
           iApply (wp_addi4_s_sconf (mword_of_int (DL + 0x4a)) Ra0 Ra0
-                    (mword_of_int 3184 : mword 12) PA1 (K - 12)%nat b
+                    (mword_of_int 3198 : mword 12) PA1 (K - 12)%nat b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
           { iApply (dli_4a with "Htext"). }
           iIntros (CIDpa3 Hqpa3) "Hcg Hpc".
           set (PA2 := <[Regidx Ra0 := regval_into_reg
                          (add_vec (rget PA1 Ra0)
-                            (sign_extend' 64 (mword_of_int 3184 : mword 12)))]> PA1).
+                            (sign_extend' 64 (mword_of_int 3198 : mword 12)))]> PA1).
           assert (Hpp4e : add_vec_int (mword_of_int (DL + 0x4a) : mword 64) 4
                           = mword_of_int (DL + 0x4e)) by pcw.
           iEval (rewrite Hpp4e) in "Hpc".
           (* +0x4e jal ra,panic -- and panic() never returns *)
           iApply (wp_jal_s_sconf (mword_of_int (DL + 0x4e)) Rra
-                    (mword_of_int 2084772 : mword 21) PA2 (K - 12)%nat b
+                    (mword_of_int 2084802 : mword 21) PA2 (K - 12)%nat b
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (dli_4e with "Htext"). }
           iIntros (CIDpa4 Hqpa4) "Hcg Hpc".
           assert (Htgtpn : add_vec (mword_of_int (DL + 0x4e) : mword 64)
-                             (sign_extend' 64 (mword_of_int 2084772 : mword 21))
+                             (sign_extend' 64 (mword_of_int 2084802 : mword 21))
                            = mword_of_int KernelSyms.panic) by pcw.
           iEval (rewrite Htgtpn) in "Hpc".
           (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----

@@ -14,7 +14,7 @@
 
    @ KernelSyms.argraw = 0x8000271a, 30 instructions.  gcc compiles the
    switch to a JUMP TABLE: the six 4-byte self-relative offsets at
-   0x80007758 (.rodata, inside [kernel_data]) are indexed by n, added to the
+   0x80007768 (.rodata, inside [kernel_data]) are indexed by n, added to the
    table base, and entered with an indirect [c.jr a5].  So this is the first
    proof in the tree over a computed indirect jump -- see ProofArgraw.v.
 

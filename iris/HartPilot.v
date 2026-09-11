@@ -3,8 +3,23 @@
    state, with the certification in the finding-F8 form (unevaluated cursor
    compositions + small VM-checked projections).  The instruction is
    [sw a4,0(a5)] = 0xc398 at [main+0xb0] -- the same instruction the weak
-   branch's spike measured (WeakEvStarted §5), so the numbers are directly
-   comparable (spike: 107/178/8 silent nodes, ~0.1-0.3 s per stretch).
+   branch's spike measured (WeakEvStarted §5).
+
+   ITS FETCH IS A 2-BYTE READ SINCE 06ea57f, and that is the one thing the
+   bump changed here.  The instruction, its offset in main and even its two
+   bytes are identical; but panic shrank by 30 bytes, so main moved -0x1e --
+   an ODD multiple of 2 -- and [main+0xb0] went from 0x80000ee0 (4-aligned,
+   ONE 4-byte fetch that also grabbed the next instruction's [b771]) to
+   0x80000ec2 (2-aligned, so [fetch] takes the 2-byte arm and [isRVC] ends
+   it there).  See execution-model.md "Fetch geometry", and its standing
+   warning that an odd-halfword shift flips PARITY and not just addresses.
+   [wp_hart_rw_seq] is parametric in the fetch width, so the instance moved
+   from [nf = 4] to [nf = 2] and nothing else about the kit did.  The first
+   stretch's node count moved with it, 106 -> 107, and the measurement now
+   reads 107/178/8 -- which is the weak branch's spike (WeakEvStarted §5)
+   EXACTLY, where before the bump it was one node off.  The spike measured
+   this instruction at a 2-aligned pc; the parity flip did not break the
+   comparison, it completed it.
 
    WHAT THIS FILE IS EVIDENCE FOR (and what it is not).  It exercises every
    kit piece end to end -- restart is the caller's context, then
@@ -198,12 +213,13 @@ Definition hp_pc : SailStdpp.Values.mword 64 :=
 Definition hp_flag : Arch.pa :=
   SailStdpp.Values.mword_of_int KernelSyms.started.
 
-(* the fetched word: [c398 = sw a4,0(a5)] plus the next instruction's two
-   bytes ([b771]) -- [main+0xb0] is 4-aligned, so the fetch is ONE 4-byte
-   read (fetch geometry; the decoder consumes the low half).  The bytes are
-   the IMAGE's ([CodeMain.mni_b0]/[mni_b2] state the same two words). *)
-Definition hp_word : Z := 0xb771c398.
-Definition hp_wf : bv 32 := Z_to_bv 32 hp_word.
+(* the fetched halfword: [c398 = sw a4,0(a5)].  [main+0xb0] is 2-aligned
+   (see the header), so the fetch is ONE 2-byte read and [isRVC] stops it
+   there -- the next instruction's [b771] is NOT part of this fetch, as it
+   was while the address was 4-aligned.  The bytes are the IMAGE's
+   ([CodeMain.mni_b0] states the same word). *)
+Definition hp_word : Z := 0xc398.
+Definition hp_wf : bv 16 := Z_to_bv 16 hp_word.
 
 (* the stored word: a4's low 4 bytes *)
 Definition hp_one : bv 32 := Z_to_bv 32 1.
@@ -241,8 +257,8 @@ Definition hp_x1 : hcur := hsil 400 hp_D hp_x0.
 Definition hp_x2 : hcur := hsil 600 hp_D (hcur_read (bv_unsigned hp_wf) hp_x1).
 Definition hp_x3 : hcur := hsil 400 hp_D (hcur_write hp_x2).
 
-Definition hp_reqf : Interface.ReadReq.t 4 :=
-  ltac:(let x := eval vm_compute in (hread_req_at 4 hp_x1.2) in
+Definition hp_reqf : Interface.ReadReq.t 2 :=
+  ltac:(let x := eval vm_compute in (hread_req_at 2 hp_x1.2) in
         lazymatch x with Some ?r => exact r | _ => fail 1 "not a read node" end).
 
 Definition hp_reqw : Interface.WriteReq.t 4 :=
@@ -256,14 +272,14 @@ Definition hp_reqw : Interface.WriteReq.t 4 :=
 (*    certification premises §6 consumes.                                   *)
 (* ====================================================================== *)
 
-Lemma hp_len1 : hcount 400 hp_D hp_x0 = 106%nat.
-Proof. vm_cast_no_check (eq_refl 106%nat). Qed.
+Lemma hp_len1 : hcount 400 hp_D hp_x0 = 107%nat.
+Proof. vm_cast_no_check (eq_refl 107%nat). Qed.
 Lemma hp_len2 : hcount 600 hp_D (hcur_read (bv_unsigned hp_wf) hp_x1) = 178%nat.
 Proof. vm_cast_no_check (eq_refl 178%nat). Qed.
 Lemma hp_len3 : hcount 400 hp_D (hcur_write hp_x2) = 8%nat.
 Proof. vm_cast_no_check (eq_refl 8%nat). Qed.
 
-Lemma hp_fetch_req : hread_req_at 4 hp_x1.2 = Some hp_reqf.
+Lemma hp_fetch_req : hread_req_at 2 hp_x1.2 = Some hp_reqf.
 Proof. vm_cast_no_check (eq_refl (Some hp_reqf)). Qed.
 Lemma hp_fetch_ram : dev_addr (Interface.ReadReq.pa hp_reqf) = false.
 Proof. vm_cast_no_check (eq_refl false). Qed.
@@ -493,9 +509,9 @@ Section pilot.
     gen_cert -∗
     resv_frag cpu_id rr -∗
     hreg_frame hp_rs0 hp_D -∗
-    ([∗ list] j ∈ seq 0 4,
+    ([∗ list] j ∈ seq 0 2,
        (pa_add (Interface.ReadReq.pa hp_reqf) j) ↦ₚ{dqf} nth_byte hp_wf j) -∗
-    TsoCtx.pristine_win (Interface.ReadReq.pa hp_reqf) 4 -∗
+    TsoCtx.pristine_win (Interface.ReadReq.pa hp_reqf) 2 -∗
     ([∗ list] j ∈ seq 0 4, (pa_add hp_flag j) ↦ₚ nth_byte vold j) -∗
     (∀ (σw : mstate) (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
        (tv : nat) (V : agent -> nat) (b : bool),
@@ -524,7 +540,7 @@ Section pilot.
     have Hx3 : hp_x3 = hsil 400 hp_D (hcur_write hp_x2) by reflexivity.
     iIntros "#Hcert Hfrag Hrf Hfetch #Hpr Hold Hwobl Hcont".
     iApply (wp_hart_rw_seq hp_D 400 600 400 hp_x0 hp_x1 hp_x2 hp_x3
-              4 hp_reqf hp_wf 4 hp_reqw vold dqf rr
+              2 hp_reqf hp_wf 4 hp_reqw vold dqf rr
               Hx1 Hx2 Hx3 hp_fetch_req hp_fetch_ram hp_fetch_ifetch
               hp_store_req hp_store_ram hp_tail_ret
               with "Hcert Hfrag Hrf Hfetch Hpr [Hold] Hwobl [Hcont]").

@@ -84,7 +84,7 @@ Require Import TsoCtx.
 (* The address of the string literal "pipe" that pipealloc passes to initlock.
    It sits in .rodata past etext with no ELF symbol of its own, so it is spelled
    out here (kernel.asm: 80007598 <etext+0x598>). *)
-Definition pipe_name_str : Z := 0x800075b8%Z.
+Definition pipe_name_str : Z := 0x800075a8%Z.
 
 Section SpecPipealloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.

@@ -232,10 +232,24 @@ def apply_map(proof_file, changes, syms, aliases=()):
     # function's alias to the first's map.
     for a in aliases:
         alias_of.setdefault(a, aliases[a] if isinstance(aliases, dict) else syms[0])
-    names = sorted(alias_of, key=len, reverse=True)
-    anchor_re = re.compile(r'(?:KernelSyms\.)?\b(' + '|'.join(map(re.escape, names))
-                           + r')\b\s*\+\s*(0x[0-9a-fA-F]+|\d+)')
-    bare_re = re.compile(r'(?:KernelSyms\.)?\b(' + '|'.join(map(re.escape, names)) + r')\b')
+    # A SYMBOL'S OWN NAME ANCHORS ONLY WHEN QUALIFIED.  `panic`, `acquire`,
+    # `main`, `sched`, `release` are ordinary English in a proof's prose, and
+    # with the `KernelSyms.` prefix OPTIONAL every such COMMENT re-anchored the
+    # scan -- silently, and for the whole rest of the file.  Real case (the
+    # 06ea57f bump, where panic lost its two printk calls): ilock's comment
+    # "the two dead panic tests" put everything below it under panic's map,
+    # whose prologue entries are 32 -> 48 and 2 -> 0, and those values are
+    # everywhere in frame arithmetic -- so `apply` proposed rewriting ilock's
+    # own `addi sp,sp,-32` and even a `Cregidx 2`.  A DECLARED ALIAS (`PA`,
+    # `FR`, `KX`) still anchors bare: that is exactly what an alias is for.
+    sym_set = set(syms)
+    qual = sorted((n for n in alias_of if n in sym_set), key=len, reverse=True)
+    bare = sorted((n for n in alias_of if n not in sym_set), key=len, reverse=True)
+    NEVER = r'(?!x)x'          # keeps the group when a side is empty
+    core = (r'(?:KernelSyms\.(' + ('|'.join(map(re.escape, qual)) or NEVER)
+            + r')|\b(' + ('|'.join(map(re.escape, bare)) or NEVER) + r')\b)')
+    anchor_re = re.compile(core + r'\s*\+\s*(0x[0-9a-fA-F]+|\d+)')
+    bare_re = re.compile(core)
     lines = text.split('\n')
     cur, out, log = None, [], []
     for i, line in enumerate(lines):
@@ -250,14 +264,15 @@ def apply_map(proof_file, changes, syms, aliases=()):
         # mword 4088` -- a 4088-BIT WORD.  That one happened to fail loudly,
         # but a width that stays plausible would not: `mword 12` -> `mword 20`
         # is a well-typed lie.  Same rule as the register fields: freeze them.
-        spans = [m.span(2) for m in anchor_re.finditer(line)] \
+        spans = [m.span(3) for m in anchor_re.finditer(line)] \
               + [m.span(g) for m in WIDTH_RE.finditer(line)
                  for g in (1, 2, 3) if m.group(g) is not None]
         spans.sort()
         # re-anchor on the LAST symbol reference in the line
-        anchors = [((alias_of[m.group(1)], int(m.group(2), 0)), m.start())
+        anchors = [((alias_of[m.group(1) or m.group(2)], int(m.group(3), 0)), m.start())
                    for m in anchor_re.finditer(line)]
-        bares = [((alias_of[m.group(1)], 0), m.start()) for m in bare_re.finditer(line)
+        bares = [((alias_of[m.group(1) or m.group(2)], 0), m.start())
+                 for m in bare_re.finditer(line)
                  if not line[m.end():m.end() + 3].strip().startswith('+')]
         if anchors or bares:
             cur = max(anchors + bares, key=lambda t: t[1])[0]

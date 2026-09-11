@@ -29,6 +29,7 @@ proof) and is the only case where the flag is free.
     relayout_batch.py            # dry run: what would change, per file
     relayout_batch.py --write    # do it
     relayout_batch.py --residue  # the MANDATORY post-step, over every pair
+    relayout_batch.py --skip=CodePanic.v   # drop a source whose proof is hand-rewritten
 """
 import os, re, sys, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -117,11 +118,23 @@ def main():
     write = '--write' in sys.argv
     residue = '--residue' in sys.argv
     allowed = {a.split('=', 1)[1] for a in sys.argv if a.startswith('--allow-shape=')}
+    # `--skip=Code<F>.v` DROPS a source entirely, map and all.  It is the third
+    # outcome `--allow-shape` does not cover: the reshaped function HAS a proof,
+    # so the quarantined map is not free, but that proof is being rewritten by
+    # hand anyway -- and meanwhile the map actively corrupts every OTHER file
+    # that merely names the symbol.  A caller's proof says `KernelSyms.panic`
+    # to assert what its `jal` targets; that is a CALL TARGET, not an anchor
+    # into panic's body, and the scan has no way to tell.  It then reads the
+    # caller's own immediates at panic's offsets 0 and 4 -- see the 06ea57f
+    # bump, where it proposed rewriting ilock's frame and a register index.
+    skipped = {a.split('=', 1)[1] for a in sys.argv if a.startswith('--skip=')}
     codes = sorted(f for f in os.listdir(R.IRIS)
                    if f.startswith('Code') and f.endswith('.v'))
     anchors, aliases = build_index()
     pairs, blocked = [], []
     for c in codes:
+        if c in skipped:
+            continue
         changes, reshaped = R.build_map(c)
         if reshaped and c not in allowed:
             blocked.append((c, reshaped))
@@ -136,6 +149,9 @@ def main():
         for c, rs in blocked:
             print(f'  {c}: {len(rs)} reshaped offsets')
         return 1
+
+    for c in sorted(skipped):
+        print(f'SKIPPED {c}: its map contributes nothing; rewrite its proof by hand')
 
     for c in sorted(allowed):
         reach = sorted({t for s, t, _, _ in pairs if s == c})

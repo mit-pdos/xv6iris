@@ -491,13 +491,13 @@ Proof.
                  = mword_of_int (FR + 0x78)) by pcw.
   iEval (rewrite Hp78) in "Hpc".
   iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x78)) Ra5 Ra5
-            (mword_of_int 1820 : mword 12) S5 (trap_res eb + av2)%nat false
+            (mword_of_int 1850 : mword 12) S5 (trap_res eb + av2)%nat false
             ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
   { iApply (fkr_78 with "Htext"). }
   iApply wp_next_off_intro. iIntros "Hcg Hpc".
   set (S6 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget S5 Ra5)
-                    (sign_extend' 64 (mword_of_int 1820 : mword 12)))]> S5).
+                    (sign_extend' 64 (mword_of_int 1850 : mword 12)))]> S5).
   assert (HS6a5 : rget S6 Ra5 = (mword_of_int KernelSyms.userret : mword 64)).
   { rgne. rewrite /S6 upd_eq. rgne. rewrite /S5 upd_eq. exact fkr_userret_addr. }
   assert (Hp7c : add_vec_int (mword_of_int (FR + 0x78) : mword 64) 4
@@ -516,13 +516,13 @@ Proof.
                  = mword_of_int (FR + 0x80)) by pcw.
   iEval (rewrite Hp80) in "Hpc".
   iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x80)) Ra3 Ra3
-            (mword_of_int 1656 : mword 12) S7 (trap_res eb + av2)%nat false
+            (mword_of_int 1686 : mword 12) S7 (trap_res eb + av2)%nat false
             ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
   { iApply (fkr_80 with "Htext"). }
   iApply wp_next_off_intro. iIntros "Hcg Hpc".
   set (S8 := <[Regidx Ra3 := regval_into_reg
                  (add_vec (rget S7 Ra3)
-                    (sign_extend' 64 (mword_of_int 1656 : mword 12)))]> S7).
+                    (sign_extend' 64 (mword_of_int 1686 : mword 12)))]> S7).
   assert (HS8a3 : rget S8 Ra3 = (mword_of_int KernelSyms.trampoline : mword 64)).
   { rgne. rewrite /S8 upd_eq. rgne. rewrite /S7 upd_eq. exact fkr_trampoline_addr. }
   assert (HS8a5 : rget S8 Ra5 = (mword_of_int KernelSyms.userret : mword 64)).
@@ -1023,13 +1023,13 @@ Proof.
   iEval (rewrite Hbp18) in "Hpc".
   (* ---- +0x18: addi a5,a5,-1712 -- a5 = &first ---- *)
   iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x18)) Ra5 Ra5
-            (mword_of_int 2336 : mword 12) B1 av2 eb
+            (mword_of_int 2350 : mword 12) B1 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
   { iApply (fkr_18 with "Htext"). }
   iIntros (CIDb2 Hkb2) "Hcg Hpc".
   set (B2 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget B1 Ra5)
-                    (sign_extend' 64 (mword_of_int 2336 : mword 12)))]> B1).
+                    (sign_extend' 64 (mword_of_int 2350 : mword 12)))]> B1).
   assert (HB2a5 : rget B2 Ra5 = first_addr).
   { rgne. rewrite /B2 upd_eq. rgne. rewrite /B1 upd_eq. exact fkr_first_addr. }
   assert (Hbp1c : add_vec_int (mword_of_int (FR + 0x18) : mword 64) 4
@@ -1262,13 +1262,13 @@ Proof.
   iEval (rewrite Hcp30) in "Hpc".
   (* ---- +0x30: addi a5,a5,-1736 -- a5 = &first ---- *)
   iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x30)) Ra5 Ra5
-            (mword_of_int 2312 : mword 12) C1 av2 eb
+            (mword_of_int 2326 : mword 12) C1 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
   { iApply (fkr_30 with "Htext"). }
   iIntros (CIDb10 Hkb10) "Hcg Hpc".
   set (C2 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget C1 Ra5)
-                    (sign_extend' 64 (mword_of_int 2312 : mword 12)))]> C1).
+                    (sign_extend' 64 (mword_of_int 2326 : mword 12)))]> C1).
   assert (HC2a5 : rget C2 Ra5 = first_addr).
   { rgne. rewrite /C2 upd_eq. rgne. rewrite /C1 upd_eq. exact fkr_first_addr2. }
   assert (Hcp34 : add_vec_int (mword_of_int (FR + 0x30) : mword 64) 4
@@ -1379,13 +1379,13 @@ Proof.
   iEval (rewrite Hdp40) in "Hpc".
   (* ---- +0x40: addi a5,a5,2104 -- a5 = the "/init" literal ---- *)
   iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x40)) Ra5 Ra5
-            (mword_of_int 2104 : mword 12) D1 av2 eb
+            (mword_of_int 2118 : mword 12) D1 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
   { iApply (fkr_40 with "Htext"). }
   iIntros (CIDb14 Hkb14) "Hcg Hpc".
   set (D2 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget D1 Ra5)
-                    (sign_extend' 64 (mword_of_int 2104 : mword 12)))]> D1).
+                    (sign_extend' 64 (mword_of_int 2118 : mword 12)))]> D1).
   assert (HD2a5 : rget D2 Ra5 = (mword_of_int fkr_init_path : mword 64)).
   { rgne. rewrite /D2 upd_eq. rgne. rewrite /D1 upd_eq. exact fkr_init_path_addr. }
   assert (HD2s0 : rget D2 Rs0 = ksp).
@@ -1779,13 +1779,13 @@ Proof.
     iEval (rewrite Hpp9e) in "Hpc".
     (* ---- +0x9e: addi a0,a0,2018 -- a0 = the "exec" literal ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x9e)) Ra0 Ra0
-              (mword_of_int 2018 : mword 12) P1 av2 eb
+              (mword_of_int 2032 : mword 12) P1 av2 eb
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (fkr_9e with "Htext"). }
     iIntros (CIDk8 Hkk8) "Hcg Hpc".
     set (P2 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget P1 Ra0)
-                      (sign_extend' 64 (mword_of_int 2018 : mword 12)))]> P1).
+                      (sign_extend' 64 (mword_of_int 2032 : mword 12)))]> P1).
     assert (HP2a0 : P2 !!! Regidx Ra0 = (mword_of_int fkr_exec_msg : mword 64)).
     { rewrite /P2 upd_eq. rgne. rewrite /P1 upd_eq. exact fkr_exec_msg_addr. }
     assert (Hppa2 : add_vec_int (mword_of_int (FR + 0x9e) : mword 64) 4
@@ -1793,7 +1793,7 @@ Proof.
     iEval (rewrite Hppa2) in "Hpc".
     (* ---- +0xa2: jal ra, panic -- and forkret ends here ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (FR + 0xa2)) Rra
-              (mword_of_int 2092646 : mword 21) P2 av2 eb
+              (mword_of_int 2092676 : mword 21) P2 av2 eb
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (fkr_a2 with "Htext"). }
@@ -2190,13 +2190,13 @@ Proof.
   iEval (rewrite Hp18) in "Hpc".
   (* ---- +0x18: addi a5,a5,-1712 -- a5 = &first ---- *)
   iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x18)) Ra5 Ra5
-            (mword_of_int 2336 : mword 12) T1 av2 eb
+            (mword_of_int 2350 : mword 12) T1 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
   { iApply (fkr_18 with "Htext"). }
   iIntros (CID2 Hk2) "Hcg Hpc".
   set (T2 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget T1 Ra5)
-                    (sign_extend' 64 (mword_of_int 2336 : mword 12)))]> T1).
+                    (sign_extend' 64 (mword_of_int 2350 : mword 12)))]> T1).
   assert (HT2a5 : rget T2 Ra5 = first_addr).
   { rgne. rewrite /T2 upd_eq. rgne. rewrite /T1 upd_eq. exact fkr_first_addr. }
   assert (Hp1c : add_vec_int (mword_of_int (FR + 0x18) : mword 64) 4

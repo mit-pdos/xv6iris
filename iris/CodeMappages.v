@@ -42,6 +42,7 @@ Require Import KernelDecode25.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
+Require Import KernelDecode29.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
@@ -226,9 +227,9 @@ Section CodeMappages.
   Proof. mk_base (KernelSyms.mappages + 0x6a) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.mappages + 0x6a) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma mi_6e : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x6e) : mword 64) false (ITYPE (mword_of_int 106 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.mappages + 0x6e) (mword_of_int 0x06a50513 : mword 32)
-    (mword_of_int (KernelSyms.mappages + 0x6e) : mword 64) (ITYPE (mword_of_int 106 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_06a50513. Qed.
+  Lemma mi_6e : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x6e) : mword 64) false (ITYPE (mword_of_int 120 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.mappages + 0x6e) (mword_of_int 0x07850513 : mword 32)
+    (mword_of_int (KernelSyms.mappages + 0x6e) : mword 64) (ITYPE (mword_of_int 120 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_07850513. Qed.
 
   Lemma mi_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x72) : mword 64) false (JAL (mword_of_int 2095078 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.mappages + 0x72) (mword_of_int 0xfe6ff0ef : mword 32)
@@ -238,9 +239,9 @@ Section CodeMappages.
   Proof. mk_base (KernelSyms.mappages + 0x76) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.mappages + 0x76) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma mi_7a : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x7a) : mword 64) false (ITYPE (mword_of_int 126 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.mappages + 0x7a) (mword_of_int 0x07e50513 : mword 32)
-    (mword_of_int (KernelSyms.mappages + 0x7a) : mword 64) (ITYPE (mword_of_int 126 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_07e50513. Qed.
+  Lemma mi_7a : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x7a) : mword 64) false (ITYPE (mword_of_int 140 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.mappages + 0x7a) (mword_of_int 0x08c50513 : mword 32)
+    (mword_of_int (KernelSyms.mappages + 0x7a) : mword 64) (ITYPE (mword_of_int 140 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_08c50513. Qed.
 
   Lemma mi_7e : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x7e) : mword 64) false (JAL (mword_of_int 2095066 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.mappages + 0x7e) (mword_of_int 0xfdaff0ef : mword 32)
@@ -250,9 +251,9 @@ Section CodeMappages.
   Proof. mk_base (KernelSyms.mappages + 0x82) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.mappages + 0x82) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma mi_86 : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x86) : mword 64) false (ITYPE (mword_of_int 146 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.mappages + 0x86) (mword_of_int 0x09250513 : mword 32)
-    (mword_of_int (KernelSyms.mappages + 0x86) : mword 64) (ITYPE (mword_of_int 146 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_09250513. Qed.
+  Lemma mi_86 : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x86) : mword 64) false (ITYPE (mword_of_int 160 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.mappages + 0x86) (mword_of_int 0x0a050513 : mword 32)
+    (mword_of_int (KernelSyms.mappages + 0x86) : mword 64) (ITYPE (mword_of_int 160 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_0a050513. Qed.
 
   Lemma mi_8a : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x8a) : mword 64) false (JAL (mword_of_int 2095054 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.mappages + 0x8a) (mword_of_int 0xfceff0ef : mword 32)
@@ -262,9 +263,9 @@ Section CodeMappages.
   Proof. mk_base (KernelSyms.mappages + 0x8e) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.mappages + 0x8e) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma mi_92 : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x92) : mword 64) false (ITYPE (mword_of_int 150 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.mappages + 0x92) (mword_of_int 0x09650513 : mword 32)
-    (mword_of_int (KernelSyms.mappages + 0x92) : mword 64) (ITYPE (mword_of_int 150 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_09650513. Qed.
+  Lemma mi_92 : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x92) : mword 64) false (ITYPE (mword_of_int 164 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.mappages + 0x92) (mword_of_int 0x0a450513 : mword 32)
+    (mword_of_int (KernelSyms.mappages + 0x92) : mword 64) (ITYPE (mword_of_int 164 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_0a450513. Qed.
 
   Lemma mi_96 : kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + 0x96) : mword 64) false (JAL (mword_of_int 2095042 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.mappages + 0x96) (mword_of_int 0xfc2ff0ef : mword 32)

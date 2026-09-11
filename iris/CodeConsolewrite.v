@@ -29,9 +29,10 @@ Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
-Require Import KernelDecode16.
+Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
+Require Import KernelDecode20.
 Require Import KernelDecode22.
 Require Import KernelDecode25.
 Require Import KernelDecode27.
@@ -164,9 +165,9 @@ Section CodeConsolewrite.
   Proof. mk_rvc (KernelSyms.consolewrite + 0x44) (mword_of_int 0x8556 : mword 16)
     (mword_of_int (KernelSyms.consolewrite + 0x44) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) kd_8556 exec_execute_C_MV. Qed.
 
-  Lemma cnwi_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.consolewrite + 0x46) : mword 64) false (JAL (mword_of_int 8676 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consolewrite + 0x46) (mword_of_int 0x1e4020ef : mword 32)
-    (mword_of_int (KernelSyms.consolewrite + 0x46) : mword 64) (JAL (mword_of_int 8676 : mword 21, Regidx (mword_of_int 1))) kd_1e4020ef. Qed.
+  Lemma cnwi_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.consolewrite + 0x46) : mword 64) false (JAL (mword_of_int 8646 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consolewrite + 0x46) (mword_of_int 0x1c6020ef : mword 32)
+    (mword_of_int (KernelSyms.consolewrite + 0x46) : mword 64) (JAL (mword_of_int 8646 : mword 21, Regidx (mword_of_int 1))) kd_1c6020ef. Qed.
 
   Lemma cnwi_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.consolewrite + 0x4a) : mword 64) false (BTYPE (mword_of_int 58 : mword 13, Regidx (mword_of_int 24), Regidx (mword_of_int 10), BEQ)).
   Proof. mk_base (KernelSyms.consolewrite + 0x4a) (mword_of_int 0x03850d63 : mword 32)
@@ -180,9 +181,9 @@ Section CodeConsolewrite.
   Proof. mk_rvc (KernelSyms.consolewrite + 0x50) (mword_of_int 0x8556 : mword 16)
     (mword_of_int (KernelSyms.consolewrite + 0x50) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) kd_8556 exec_execute_C_MV. Qed.
 
-  Lemma cnwi_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.consolewrite + 0x52) : mword 64) false (JAL (mword_of_int 1952 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consolewrite + 0x52) (mword_of_int 0x7a0000ef : mword 32)
-    (mword_of_int (KernelSyms.consolewrite + 0x52) : mword 64) (JAL (mword_of_int 1952 : mword 21, Regidx (mword_of_int 1))) kd_7a0000ef. Qed.
+  Lemma cnwi_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.consolewrite + 0x52) : mword 64) false (JAL (mword_of_int 1922 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consolewrite + 0x52) (mword_of_int 0x782000ef : mword 32)
+    (mword_of_int (KernelSyms.consolewrite + 0x52) : mword 64) (JAL (mword_of_int 1922 : mword 21, Regidx (mword_of_int 1))) kd_782000ef. Qed.
 
   Lemma cnwi_56 : kernel_text -∗ instr (mword_of_int (KernelSyms.consolewrite + 0x56) : mword 64) false (RTYPEW (Regidx (mword_of_int 9), Regidx (mword_of_int 18), Regidx (mword_of_int 9), ADDW)).
   Proof. mk_base (KernelSyms.consolewrite + 0x56) (mword_of_int 0x009904bb : mword 32)

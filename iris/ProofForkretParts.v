@@ -54,8 +54,8 @@ Notation FR := KernelSyms.forkret.
    is stated against the name rather than against a bare hex constant.  The
    dump agrees: [kernel.asm] annotates the two auipc/addi pairs with
    [# 80007180 <etext+0x180>] and [# 80007188 <etext+0x188>] respectively. *)
-Definition fkr_init_path : Z := 0x80007180.   (* the string "/init" *)
-Definition fkr_exec_msg  : Z := 0x80007188.   (* the string "exec"  *)
+Definition fkr_init_path : Z := 0x80007170.   (* the string "/init" *)
+Definition fkr_exec_msg  : Z := 0x80007178.   (* the string "exec"  *)
 
 (* ---- +0x14 auipc a5,0x9 / +0x18 addi a5,a5,-1712 : &first ---- *)
 (* the immediate READS as 2384 and SIGN-EXTENDS to -1712; read as positive
@@ -68,7 +68,7 @@ Definition fkr_exec_msg  : Z := 0x80007188.   (* the string "exec"  *)
 Lemma fkr_first_addr :
   add_vec (add_vec (mword_of_int (FR + 0x14) : mword 64)
              (auipc_off (mword_of_int 9 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2336 : mword 12))
+    (sign_extend' 64 (mword_of_int 2350 : mword 12))
   = (mword_of_int KernelSyms.first_1 : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -123,7 +123,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Lemma fkr_first_addr2 :
   add_vec (add_vec (mword_of_int (FR + 0x2c) : mword 64)
              (auipc_off (mword_of_int 9 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2312 : mword 12))
+    (sign_extend' 64 (mword_of_int 2326 : mword 12))
   = (mword_of_int KernelSyms.first_1 : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -131,7 +131,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Lemma fkr_init_path_addr :
   add_vec (add_vec (mword_of_int (FR + 0x3c) : mword 64)
              (auipc_off (mword_of_int 6 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2104 : mword 12))
+    (sign_extend' 64 (mword_of_int 2118 : mword 12))
   = (mword_of_int fkr_init_path : mword 64).
 Proof. rewrite /fkr_init_path. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -194,7 +194,7 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma fkr_exec_msg_addr :
   add_vec (add_vec (mword_of_int (FR + 0x9a) : mword 64)
              (auipc_off (mword_of_int 5 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2018 : mword 12))
+    (sign_extend' 64 (mword_of_int 2032 : mword 12))
   = (mword_of_int fkr_exec_msg : mword 64).
 Proof. rewrite /fkr_exec_msg. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -203,7 +203,7 @@ Proof. rewrite /fkr_exec_msg. apply bv_eq. vm_compute. reflexivity. Qed.
    far below forkret in the image. *)
 Lemma fkr_panic_tgt :
   add_vec (mword_of_int (FR + 0xa2) : mword 64)
-    (sign_extend' 64 (mword_of_int 2092646 : mword 21))
+    (sign_extend' 64 (mword_of_int 2092676 : mword 21))
   = (mword_of_int KernelSyms.panic : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -211,7 +211,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Lemma fkr_userret_addr :
   add_vec (add_vec (mword_of_int (FR + 0x74) : mword 64)
              (auipc_off (mword_of_int 4 : mword 20)))
-    (sign_extend' 64 (mword_of_int 1820 : mword 12))
+    (sign_extend' 64 (mword_of_int 1850 : mword 12))
   = (mword_of_int KernelSyms.userret : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -219,7 +219,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Lemma fkr_trampoline_addr :
   add_vec (add_vec (mword_of_int (FR + 0x7c) : mword 64)
              (auipc_off (mword_of_int 4 : mword 20)))
-    (sign_extend' 64 (mword_of_int 1656 : mword 12))
+    (sign_extend' 64 (mword_of_int 1686 : mword 12))
   = (mword_of_int KernelSyms.trampoline : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -258,8 +258,8 @@ Proof. vm_compute. reflexivity. Qed.
 (*  file -- that the six bytes at [fkr_init_path] really spell "/init"    *)
 (*  and the five at [fkr_exec_msg] really spell "exec" -- read off        *)
 (*  [KernelData.kernel_data] and pinned here rather than in the walk.     *)
-(*  (Checked: 0x80007180..85 = 47 105 110 105 116 0, and                  *)
-(*  0x80007188..8c = 101 120 101 99 0.)                                   *)
+(*  (Checked: 0x80007170..85 = 47 105 110 105 116 0, and                  *)
+(*  0x80007178..8c = 101 120 101 99 0.)                                   *)
 (* ===================================================================== *)
 
 (* The path bytes are [InitBoot.init_boot_bytes] -- the naming FUNCTION

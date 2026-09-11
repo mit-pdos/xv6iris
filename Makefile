@@ -100,7 +100,16 @@ SAIL_RISCV_REV ?= 070832a1e4b086f0c6f7635de54cc2b4cfd66993
 # retry scan over proc[] under pid_lock and gcc INLINES it into allocproc
 # (the <allocpid> symbol is gone), freeproc takes pid_lock around p->pid = 0,
 # everything after proc.c's allocproc moves +0x34, .eh_frame shrinks so
-# every .data/.bss symbol moves -0x30; fs.img and the user dumps unchanged).
+# every .data/.bss symbol moves -0x30; fs.img and the user dumps unchanged;
+# ded23f2 -> 06ea57f: no console output on panic -- panic()'s two printk
+# calls are COMMENTED OUT, so panic goes 40 bytes -> 10 (gcc keeps the now
+# dead frame under -fno-omit-frame-pointer), .text shrinks and everything
+# after panic moves -0x1e (the plic/virtio/kernelvec tail -0x20, an
+# alignment boundary absorbing two more), the literals "panic: " and "%s\n"
+# leave .rodata so every string at or above 0x80007018 moves -0x10 -- etext
+# itself does NOT move, being page-aligned -- and .data/.bss move -0x10;
+# panic is the ONLY function whose shape changed, every other diff is an
+# immediate; fs.img and the user dumps unchanged).
 # Nothing here is a local commit:
 # `git -C xv6-riscv checkout --detach $(XV6_REV)` reproduces the image, and
 # that is the whole recipe.
@@ -110,7 +119,7 @@ SAIL_RISCV_REV ?= 070832a1e4b086f0c6f7635de54cc2b4cfd66993
 # stays reachable only from your local clone -- expect the diff between two
 # consecutive pins to be an upstream commit that landed UNDER the series, not
 # on top of it.
-XV6_REV ?= ded23f2aa3e8a355d82ee1735a60c9d41f26877c
+XV6_REV ?= 06ea57f82efe959c899445dad709c35c8aa23ea0
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v \
               $(KDUMP)/KernelElfRaw.v $(KDUMP)/FsImgRaw.v

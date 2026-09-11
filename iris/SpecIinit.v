@@ -71,8 +71,8 @@ Qed.
    to every initsleeplock.  Both sit in .rodata past etext with no ELF symbol
    of their own, so they are spelled out here; the proof reads their bytes out
    of [kernel_data] with [kernel_data_string]. *)
-Definition itable_name_str : Z := 0x80007440.
-Definition inode_name_str : Z := 0x80007448.
+Definition itable_name_str : Z := 0x80007430.
+Definition inode_name_str : Z := 0x80007438.
 
 (* ------------------------------------------------------------------ *)
 

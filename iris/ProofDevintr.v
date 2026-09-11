@@ -308,7 +308,7 @@ Section ProofDevintr.
     assert (Hpc64 : add_vec_int (mword_of_int (KernelSyms.devintr + 0x62) : mword 64) 2 = mword_of_int (KernelSyms.devintr + 0x64)) by pcw.
     iEval (rewrite Hpc64) in "Hpc".
     (* ---- +0x64: jal ra,plic_complete ---- *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.devintr + 0x64)) ra_idx (mword_of_int 12484 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.devintr + 0x64)) ra_idx (mword_of_int 12482 : mword 21)
               T0 k false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -319,7 +319,7 @@ Section ProofDevintr.
     change (<[Regidx ra_idx := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.devintr + 0x64) : mword 64) 4)]> T0) with T1.
     assert (Hjpc : add_vec (mword_of_int (KernelSyms.devintr + 0x64) : mword 64)
-                     (sign_extend' 64 (mword_of_int 12484 : mword 21))
+                     (sign_extend' 64 (mword_of_int 12482 : mword 21))
                    = mword_of_int KernelSyms.plic_complete) by pcw.
     iEval (rewrite Hjpc) in "Hpc".
     assert (HT1ra : T1 !!! Regidx ra_idx
@@ -626,7 +626,7 @@ Section ProofDevintr.
       assert (Hpc2c : add_vec_int (mword_of_int (KernelSyms.devintr + 0x2a) : mword 64) 2 = mword_of_int (KernelSyms.devintr + 0x2c)) by pcw.
       iEval (rewrite Hpc2c) in "Hpc".
       (* ---- +0x2c: jal ra,plic_claim ---- *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.devintr + 0x2c)) ra_idx (mword_of_int 12508 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.devintr + 0x2c)) ra_idx (mword_of_int 12506 : mword 21)
                 A5 (av - 4)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
@@ -637,7 +637,7 @@ Section ProofDevintr.
       change (<[Regidx ra_idx := regval_into_reg
           (add_vec_int (mword_of_int (KernelSyms.devintr + 0x2c) : mword 64) 4)]> A5) with B0.
       assert (Hjclaim : add_vec (mword_of_int (KernelSyms.devintr + 0x2c) : mword 64)
-                          (sign_extend' 64 (mword_of_int 12508 : mword 21))
+                          (sign_extend' 64 (mword_of_int 12506 : mword 21))
                         = mword_of_int KernelSyms.plic_claim) by pcw.
       iEval (rewrite Hjclaim) in "Hpc".
       assert (HB0ra : B0 !!! Regidx ra_idx
@@ -986,7 +986,7 @@ Section ProofDevintr.
             by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
           rewrite /V0 upd_ne; [| congruence]. exact (HB3thr r Hr Ncsp N8 N9). }
         (* +0x4e: jal ra,virtio_disk_intr *)
-        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.devintr + 0x4e)) ra_idx (mword_of_int 13682 : mword 21)
+        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.devintr + 0x4e)) ra_idx (mword_of_int 13680 : mword 21)
                   V0 (av - 4)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
@@ -997,7 +997,7 @@ Section ProofDevintr.
         change (<[Regidx ra_idx := regval_into_reg
             (add_vec_int (mword_of_int (KernelSyms.devintr + 0x4e) : mword 64) 4)]> V0) with V1.
         assert (Hjvi : add_vec (mword_of_int (KernelSyms.devintr + 0x4e) : mword 64)
-                         (sign_extend' 64 (mword_of_int 13682 : mword 21))
+                         (sign_extend' 64 (mword_of_int 13680 : mword 21))
                        = mword_of_int KernelSyms.virtio_disk_intr) by pcw.
         iEval (rewrite Hjvi) in "Hpc".
         assert (HV1ra : V1 !!! Regidx ra_idx

@@ -324,9 +324,9 @@ Section CodeBmap.
   Proof. mk_base (KernelSyms.bmap + 0xb4) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.bmap + 0xb4) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma bmi_b8 : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) false (ITYPE (mword_of_int 962 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.bmap + 0xb8) (mword_of_int 0x3c250513 : mword 32)
-    (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) (ITYPE (mword_of_int 962 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_3c250513. Qed.
+  Lemma bmi_b8 : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) false (ITYPE (mword_of_int 976 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.bmap + 0xb8) (mword_of_int 0x3d050513 : mword 32)
+    (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) (ITYPE (mword_of_int 976 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_3d050513. Qed.
 
   Lemma bmi_bc : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xbc) : mword 64) false (JAL (mword_of_int 2086862 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.bmap + 0xbc) (mword_of_int 0xfcefd0ef : mword 32)

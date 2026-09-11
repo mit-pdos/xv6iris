@@ -129,13 +129,13 @@ Set Printing Depth 40.
 
 (* ===================================================================== *)
 (*  The no-inodes format string, in .rodata just above etext.             *)
-(*  [auipc a0,0x4 / addi a0,a0,850] at +0x72 resolves to 0x80007438.      *)
+(*  [auipc a0,0x4 / addi a0,a0,850] at +0x72 resolves to 0x80007428.      *)
 (*  Hoisted as NAMED pure lemmas -- never an inline [ltac:] argument to    *)
 (*  [kernel_data_string] (claude-notes/optimization.md).                   *)
 (* ===================================================================== *)
 Definition ia_msg : string :=
   ("ialloc: no inodes" ++ String (Ascii.ascii_of_nat 10) EmptyString)%string.
-Definition ia_msg_addr : Z := 0x80007450.
+Definition ia_msg_addr : Z := 0x80007440.
 
 Lemma ia_msg_bytes `{XI : CurCtx} : forall j b, cstring_bytes ia_msg !! j = Some b ->
   KernelData.kernel_data !! (ia_msg_addr + Z.of_nat j)%Z = Some b.
@@ -993,13 +993,13 @@ Section IallocOut.
     iEval (rewrite Hpp76) in "Hpc".
     (* ===== +0x76 addi a0,a0,850 : a0 := &"ialloc: no inodes\n" ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.ialloc + 0x76)) Ra0 Ra0
-              (mword_of_int 788 : mword 12) Q7 (K - 8)%nat b
+              (mword_of_int 802 : mword 12) Q7 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (iali_76 with "Htext"). }
     iIntros (CID8 Hq8) "Hcg Hpc".
     set (Q8 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (rget Q7 Ra0)
-                     (sign_extend' 64 (mword_of_int 788 : mword 12)))]> Q7).
+                     (sign_extend' 64 (mword_of_int 802 : mword 12)))]> Q7).
     assert (HQ8a0 : Q8 !!! Regidx Ra0 = (mword_of_int ia_msg_addr : mword 64)).
     { rewrite /Q8 upd_eq. rgne. rewrite /Q7 upd_eq.
       unfold ia_msg_addr. pcw. }
@@ -1013,7 +1013,7 @@ Section IallocOut.
     iEval (rewrite Hpp7a) in "Hpc".
     (* ===== +0x7a jal ra,printk ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ialloc + 0x7a)) Rra
-              (mword_of_int 2085822 : mword 21) Q8 (K - 8)%nat b
+              (mword_of_int 2085852 : mword 21) Q8 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (iali_7a with "Htext"). }
@@ -1021,7 +1021,7 @@ Section IallocOut.
     set (Q9 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ialloc + 0x7a) : mword 64) 4)]> Q8).
     assert (Htgtpk : add_vec (mword_of_int (KernelSyms.ialloc + 0x7a) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2085822 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2085852 : mword 21))
                      = mword_of_int KernelSyms.printk) by pcw.
     iEval (rewrite Htgtpk) in "Hpc".
     assert (HQ9a0 : Q9 !!! Regidx Ra0 = (mword_of_int ia_msg_addr : mword 64))
@@ -3002,12 +3002,12 @@ Section IallocMain.
     iEval (rewrite Hpp0c) in "Hpc".
     (* ===== +0x0c lw a4,2108(a4) : a4 := sb.ninodes ===== *)
     assert (Hnadr : add_vec (rget R3 Ra4)
-                      (sign_extend' 64 (mword_of_int 1994 : mword 12))
+                      (sign_extend' 64 (mword_of_int 2008 : mword 12))
                     = sb_ninodes).
     { rgne. rewrite HR3a4. rewrite /sb_ninodes /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hnadr) in "Hsbn".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ialloc + 0xc)) Ra4 Ra4
-              (mword_of_int 1994 : mword 12) R3 (K - 8)%nat
+              (mword_of_int 2008 : mword 12) R3 (K - 8)%nat
               (mword_of_int fsc_ninodes : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hsbn").
     { iApply (iali_0c with "Htext"). }
@@ -3285,13 +3285,13 @@ Section IallocMain.
     iEval (rewrite Hpp2c) in "Hpc".
     (* ===== +0x2c addi s4,s4,2064 : s4 := &sb ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.ialloc + 0x2c)) Rs4 Rs4
-              (mword_of_int 1950 : mword 12) R9 (K - 8)%nat b
+              (mword_of_int 1964 : mword 12) R9 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (iali_2c with "Htext"). }
     iIntros (CID19 Hq19) "Hcg Hpc".
     set (RA := <[Regidx Rs4 := regval_into_reg
                   (add_vec (rget R9 Rs4)
-                     (sign_extend' 64 (mword_of_int 1950 : mword 12)))]> R9).
+                     (sign_extend' 64 (mword_of_int 1964 : mword 12)))]> R9).
     assert (HRAs4 : RA !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64)).
     { rewrite /RA upd_eq. rgne. rewrite HR9s4. pcw. }
     assert (HRAs2 : RA !!! Regidx Rs2

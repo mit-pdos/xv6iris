@@ -1,8 +1,8 @@
 (* SpecPanic.v -- panic()'s contract.
 
      void panic(char *s) {
-       printk("panic: ");
-       printk("%s\n", s);
+       // printk("panic: ");
+       // printk("%s\n", s);
        for (;;) ;
      }
 
@@ -12,8 +12,18 @@
    That is what makes a panic arm cheap to close, and it is the one thing
    [PanicStub.panic_wp] (the placeholder this replaces) already got right.
 
-   THE PRECONDITION IS FORCED BY THE TWO printk CALLS, which are ordinary
-   calls with an ordinary contract ([SpecPrintk.PRINTK]).  Four parts:
+   THE PRECONDITION IS DELIBERATELY LOOSE, AND STAYED THAT WAY ACROSS
+   06ea57f.  Upstream commented the two printk calls out ("no console output
+   on panic, for now"), so the five instructions that are left -- a frame
+   -fno-omit-frame-pointer still builds, ra and s0 saved into it, the frame
+   pointer set, and the self-jump -- use almost none of what follows.  The
+   contract was NOT retightened to match, and nothing forced it to be: a
+   premise that is merely unused is still provable (Iris is affine, so the
+   surplus resources are dropped), a stack bound that is not tight is still
+   a bound, and the pure side conditions become unused hypotheses.  Leaving
+   them costs nothing and keeps every call site's budget and plumbing exactly
+   as it was.  Parts 1-3 are therefore described below as what they WERE for;
+   only part 4 actually went away.
 
    1. THE MESSAGE.  [a0] is the vararg of a "%s" directive, so it is described
       exactly as printk describes one: a [pk_arg_desc] of kind [PkStr] -- a
@@ -34,10 +44,15 @@
       [n], panic's is arbitrary: a panic arm is normally reached with locks
       already held.
 
-   4. [panic_env], the persistent credentials printk needs, bundled so a call
-      site threads one hypothesis and not four: pr.lock's [is_lock] (whose
-      resource is [emp] -- see [SpecPrintk.pr_res]), the device invariant
-      and the tx_lock credential.
+   4. [panic_env] -- WHICH IS NOW [emp], and is the one part this bump did
+      change.  It used to bundle the persistent credentials printk needs, so
+      a call site threaded one hypothesis and not four: pr.lock's [is_lock]
+      (whose resource is [emp] -- see [SpecPrintk.pr_res]), the device
+      invariant and the tx_lock credential.  Since panic no longer prints it
+      needs none of them, and leaving them demanded would forfeit the whole
+      point of the upstream change.  The premise STAYS in the contract below
+      and the definition is emptied instead -- see the note at the definition
+      for why that is what costs no call site anything.
 
       AND NOT A [uart_sent_sub].  printk threads that claim IN as well as out
       ([SpecPrintk.v]: [uart_sent_sub γd bs] in, [uart_sent_sub γd (bs ++ cs)]
@@ -111,6 +126,12 @@ Section PanicEnv.
   Proof. apply _. Qed.
 
   (* ---- THE GHOST NAMES ARE EXISTENTIAL, AND NOTHING IS LOST BY IT --------
+     HISTORICAL as of 06ea57f -- [panic_env] is [emp] now (next block), so
+     there are no names left to existentially close over.  Kept because it
+     is the argument to re-make if panic ever prints again, and because it
+     is why the ninety specs below panic take a NAMELESS token and so cost
+     nothing to leave in place while they are shed.
+
      A call site threads ONE nameless persistent token; no spec below panic
      gains a parameter.  Two independent reasons this is not a weakening.
 
@@ -138,25 +159,45 @@ Section PanicEnv.
      ([uart_tx_own], [uart_sent], [uart_dlab_off]).  γv is baggage: panic
      touches nothing disk, and it is here only because [dev_inv] bundles all
      four devices. *)
-  Definition panic_env : iProp Σ :=
-    (∃ (γpr γl : gname) (γd : uart_names) (γv : disk_names),
-       panic_env_at γpr γl γd γv)%I.
+  (* ---- AND SINCE 06ea57f IT IS [emp] ---------------------------------
+     panic no longer prints, so it needs no console credential -- and the
+     POINT of the upstream change was to get the UART out of the panic
+     cone, so this must not go on asking for one.
+
+     EMPTIED RATHER THAN DELETED, deliberately.  [panic_env] is named as a
+     premise by some ninety specs, every one of them carrying it for no
+     reason but to hand it to panic.  Deleting the definition breaks all of
+     them at once; dropping it from [wp_panic_sconf_body] alone still makes
+     every call site stop passing it.  Defining it as [emp] instead reaches
+     the actual goal -- no UART resource is demanded ANYWHERE in the panic
+     cone, since every one of those ninety premises is now weightless too --
+     and costs not one line at a call site.  [emp] and not [True] so it is
+     the unit of [∗] and a site that frames it pays literally nothing.
+
+     The three credentials live on in [panic_env_at] because
+     [SpecPrintk.printk_env_panic] still converts one, and because it
+     records what the console cone actually needs should panic ever print
+     again.  Both constructors now discard their arguments; that is sound
+     in an affine BI, where [P ⊢ emp] for every [P].
+
+     A SITE THAT CARRIES [panic_env] IS THEREFORE NOT EVIDENCE OF ANYTHING
+     any more.  Shedding those ninety premises is a separate sweep, and
+     until it happens do not read one as "this function needs the
+     console". *)
+  Definition panic_env : iProp Σ := emp%I.
 
   Global Instance panic_env_persistent : Persistent panic_env.
   Proof. apply _. Qed.
 
   Lemma panic_env_intro γpr γl γd γv :
     panic_env_at γpr γl γd γv -∗ panic_env.
-  Proof. iIntros "#H". iExists γpr, γl, γd, γv. iExact "H". Qed.
+  Proof. by iIntros "_". Qed.
 
   (* the shape a site actually has in hand: the three credentials loose. *)
   Lemma panic_env_of γpr γl γd γv :
     is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     dev_inv γd γv -∗ is_txlock γl γd -∗ panic_env.
-  Proof.
-    iIntros "#Hl #Hd #Ht". iExists γpr, γl, γd, γv.
-    rewrite /panic_env_at. by iFrame "Hl Hd Ht".
-  Qed.
+  Proof. by iIntros "_ _ _". Qed.
 
 End PanicEnv.
 

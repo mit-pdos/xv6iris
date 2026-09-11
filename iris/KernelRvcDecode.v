@@ -917,7 +917,11 @@ Lemma stk_pop (X v : mword 64) (k : nat) :
   add_vec (StackOwn.pa_stk X k) v = X.
 Proof. apply frame_cancel. Qed.
 
-(* -16 / +16, both a plain [c.addi sp]. *)
+(* -16 / +16, both a plain [c.addi sp].  The PUSH spells 48, which is -16 in
+   the 6-bit field; the POP spells 16 outright. *)
+Lemma stk_push_16 (X : mword 64) :
+  add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) = StackOwn.pa_stk X 2.
+Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 Lemma stk_pop_16 (X : mword 64) :
   add_vec (StackOwn.pa_stk X 2) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.

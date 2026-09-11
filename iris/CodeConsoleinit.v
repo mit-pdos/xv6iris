@@ -20,15 +20,12 @@ Require Import KernelDecode01.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
-Require Import KernelDecode08.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode16.
-Require Import KernelDecode18.
-Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode31.
@@ -70,25 +67,25 @@ Section CodeConsoleinit.
   Proof. mk_base (KernelSyms.consoleinit + 0x10) (mword_of_int 0x00012517 : mword 32)
     (mword_of_int (KernelSyms.consoleinit + 0x10) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00012517. Qed.
 
-  Lemma cii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x14) : mword 64) false (ITYPE (mword_of_int 3672 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.consoleinit + 0x14) (mword_of_int 0xe5850513 : mword 32)
-    (mword_of_int (KernelSyms.consoleinit + 0x14) : mword 64) (ITYPE (mword_of_int 3672 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_e5850513. Qed.
+  Lemma cii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x14) : mword 64) false (ITYPE (mword_of_int 3656 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.consoleinit + 0x14) (mword_of_int 0xe4850513 : mword 32)
+    (mword_of_int (KernelSyms.consoleinit + 0x14) : mword 64) (ITYPE (mword_of_int 3656 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_e4850513. Qed.
 
-  Lemma cii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) false (JAL (mword_of_int 1786 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consoleinit + 0x18) (mword_of_int 0x6fa000ef : mword 32)
-    (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) (JAL (mword_of_int 1786 : mword 21, Regidx (mword_of_int 1))) kd_6fa000ef. Qed.
+  Lemma cii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) false (JAL (mword_of_int 1756 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consoleinit + 0x18) (mword_of_int 0x6dc000ef : mword 32)
+    (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) (JAL (mword_of_int 1756 : mword 21, Regidx (mword_of_int 1))) kd_6dc000ef. Qed.
 
-  Lemma cii_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x1c) : mword 64) false (JAL (mword_of_int 1070 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consoleinit + 0x1c) (mword_of_int 0x42e000ef : mword 32)
-    (mword_of_int (KernelSyms.consoleinit + 0x1c) : mword 64) (JAL (mword_of_int 1070 : mword 21, Regidx (mword_of_int 1))) kd_42e000ef. Qed.
+  Lemma cii_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x1c) : mword 64) false (JAL (mword_of_int 1040 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consoleinit + 0x1c) (mword_of_int 0x410000ef : mword 32)
+    (mword_of_int (KernelSyms.consoleinit + 0x1c) : mword 64) (JAL (mword_of_int 1040 : mword 21, Regidx (mword_of_int 1))) kd_410000ef. Qed.
 
   Lemma cii_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x20) : mword 64) false (UTYPE (mword_of_int 34 : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (KernelSyms.consoleinit + 0x20) (mword_of_int 0x00022797 : mword 32)
     (mword_of_int (KernelSyms.consoleinit + 0x20) : mword 64) (UTYPE (mword_of_int 34 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00022797. Qed.
 
-  Lemma cii_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x24) : mword 64) false (ITYPE (mword_of_int 4024 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.consoleinit + 0x24) (mword_of_int 0xfb878793 : mword 32)
-    (mword_of_int (KernelSyms.consoleinit + 0x24) : mword 64) (ITYPE (mword_of_int 4024 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_fb878793. Qed.
+  Lemma cii_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x24) : mword 64) false (ITYPE (mword_of_int 4008 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.consoleinit + 0x24) (mword_of_int 0xfa878793 : mword 32)
+    (mword_of_int (KernelSyms.consoleinit + 0x24) : mword 64) (ITYPE (mword_of_int 4008 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_fa878793. Qed.
 
   Lemma cii_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x28) : mword 64) false (UTYPE (mword_of_int 0 : mword 20, Regidx (mword_of_int 14), AUIPC)).
   Proof. mk_base (KernelSyms.consoleinit + 0x28) (mword_of_int 0x00000717 : mword 32)

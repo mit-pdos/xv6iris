@@ -1163,7 +1163,7 @@ Section CwBodies.
       iEval (rewrite Pb46) in "Hpc".
       (* +0x46  jal either_copyin *)
       iApply (wp_jal_s_sconf (mword_of_int (CW + 0x46)) Rra
-                (mword_of_int 8676 : mword 21) B5 (av - 16)%nat true
+                (mword_of_int 8646 : mword 21) B5 (av - 16)%nat true
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnwi_46 with "Ht"). }
       iIntros (CIDc6 Hsc6) "Hcg Hpc".
@@ -1172,7 +1172,7 @@ Section CwBodies.
       change (<[Regidx Rra := regval_into_reg
           (add_vec_int (mword_of_int (CW + 0x46) : mword 64) 4)]> B5) with B6.
       assert (Jeci : add_vec (mword_of_int (CW + 0x46) : mword 64)
-                       (sign_extend' 64 (mword_of_int 8676 : mword 21))
+                       (sign_extend' 64 (mword_of_int 8646 : mword 21))
                      = mword_of_int KernelSyms.either_copyin) by pcw.
       iEval (rewrite Jeci) in "Hpc".
       assert (HB6a0 : B6 !!! Regidx Ra0 = buf)
@@ -1298,7 +1298,7 @@ Section CwBodies.
         iEval (rewrite P52) in "Hpc".
         (* +0x52  jal uartwrite *)
         iApply (wp_jal_s_sconf (mword_of_int (CW + 0x52)) Rra
-                  (mword_of_int 1952 : mword 21) D2 (av - 16)%nat true
+                  (mword_of_int 1922 : mword 21) D2 (av - 16)%nat true
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (cnwi_52 with "Ht"). }
         iIntros (CIDcb Hscb) "Hcg Hpc".
@@ -1307,7 +1307,7 @@ Section CwBodies.
         change (<[Regidx Rra := regval_into_reg
             (add_vec_int (mword_of_int (CW + 0x52) : mword 64) 4)]> D2) with D3.
         assert (Juw : add_vec (mword_of_int (CW + 0x52) : mword 64)
-                        (sign_extend' 64 (mword_of_int 1952 : mword 21))
+                        (sign_extend' 64 (mword_of_int 1922 : mword 21))
                       = mword_of_int KernelSyms.uartwrite) by pcw.
         iEval (rewrite Juw) in "Hpc".
         assert (HD3a0 : D3 !!! Regidx Ra0 = buf)

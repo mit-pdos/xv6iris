@@ -16,16 +16,11 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode00.
-Require Import KernelDecode04.
-Require Import KernelDecode05.
-Require Import KernelDecode12.
-Require Import KernelDecode13.
-Require Import KernelDecode19.
-Require Import KernelDecode21.
+Require Import KernelDecode06.
+Require Import KernelDecode07.
+Require Import KernelDecode11.
 Require Import KernelDecode22.
-Require Import KernelDecode26.
-Require Import KernelDecode27.
+Require Import KernelDecode24.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -34,62 +29,26 @@ Section CodePanic.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* ---- panic @ KernelSyms.panic, 40 bytes ---- *)
+  (* ---- panic @ KernelSyms.panic, 10 bytes ---- *)
 
-  Lemma pni_00 : kernel_text -∗ instr (mword_of_int KernelSyms.panic : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)).
-  Proof. mk_rvc KernelSyms.panic (mword_of_int 0x1101 : mword 16)
-    (mword_of_int KernelSyms.panic : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)) kd_1101 exec_execute_C_ADDI. Qed.
+  Lemma pni_00 : kernel_text -∗ instr (mword_of_int KernelSyms.panic : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)).
+  Proof. mk_rvc KernelSyms.panic (mword_of_int 0x1141 : mword 16)
+    (mword_of_int KernelSyms.panic : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)) kd_1141 exec_execute_C_ADDI. Qed.
 
-  Lemma pni_02 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x2) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
-  Proof. mk_rvc (KernelSyms.panic + 0x2) (mword_of_int 0xec06 : mword 16)
-    (mword_of_int (KernelSyms.panic + 0x2) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) kd_ec06 exec_execute_C_SDSP. Qed.
+  Lemma pni_02 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x2) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
+  Proof. mk_rvc (KernelSyms.panic + 0x2) (mword_of_int 0xe406 : mword 16)
+    (mword_of_int (KernelSyms.panic + 0x2) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) kd_e406 exec_execute_C_SDSP. Qed.
 
-  Lemma pni_04 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x4) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
-  Proof. mk_rvc (KernelSyms.panic + 0x4) (mword_of_int 0xe822 : mword 16)
-    (mword_of_int (KernelSyms.panic + 0x4) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) kd_e822 exec_execute_C_SDSP. Qed.
+  Lemma pni_04 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x4) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
+  Proof. mk_rvc (KernelSyms.panic + 0x4) (mword_of_int 0xe022 : mword 16)
+    (mword_of_int (KernelSyms.panic + 0x4) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) kd_e022 exec_execute_C_SDSP. Qed.
 
-  Lemma pni_06 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x6) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)).
-  Proof. mk_rvc (KernelSyms.panic + 0x6) (mword_of_int 0xe426 : mword 16)
-    (mword_of_int (KernelSyms.panic + 0x6) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) kd_e426 exec_execute_C_SDSP. Qed.
+  Lemma pni_06 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x6) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
+  Proof. mk_rvc (KernelSyms.panic + 0x6) (mword_of_int 0x0800 : mword 16)
+    (mword_of_int (KernelSyms.panic + 0x6) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0800 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma pni_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x8) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
-  Proof. mk_rvc (KernelSyms.panic + 0x8) (mword_of_int 0x1000 : mword 16)
-    (mword_of_int (KernelSyms.panic + 0x8) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_1000 exec_execute_C_ADDI4SPN. Qed.
-
-  Lemma pni_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0xa) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
-  Proof. mk_rvc (KernelSyms.panic + 0xa) (mword_of_int 0x84aa : mword 16)
-    (mword_of_int (KernelSyms.panic + 0xa) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
-
-  Lemma pni_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0xc) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)).
-  Proof. mk_base (KernelSyms.panic + 0xc) (mword_of_int 0x00006517 : mword 32)
-    (mword_of_int (KernelSyms.panic + 0xc) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
-
-  Lemma pni_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x10) : mword 64) false (ITYPE (mword_of_int 2040 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.panic + 0x10) (mword_of_int 0x7f850513 : mword 32)
-    (mword_of_int (KernelSyms.panic + 0x10) : mword 64) (ITYPE (mword_of_int 2040 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_7f850513. Qed.
-
-  Lemma pni_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x14) : mword 64) false (JAL (mword_of_int 2096346 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.panic + 0x14) (mword_of_int 0xcdbff0ef : mword 32)
-    (mword_of_int (KernelSyms.panic + 0x14) : mword 64) (JAL (mword_of_int 2096346 : mword 21, Regidx (mword_of_int 1))) kd_cdbff0ef. Qed.
-
-  Lemma pni_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x18) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 11), ADD)).
-  Proof. mk_rvc (KernelSyms.panic + 0x18) (mword_of_int 0x85a6 : mword 16)
-    (mword_of_int (KernelSyms.panic + 0x18) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 11), ADD)) kd_85a6 exec_execute_C_MV. Qed.
-
-  Lemma pni_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x1a) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)).
-  Proof. mk_base (KernelSyms.panic + 0x1a) (mword_of_int 0x00006517 : mword 32)
-    (mword_of_int (KernelSyms.panic + 0x1a) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
-
-  Lemma pni_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x1e) : mword 64) false (ITYPE (mword_of_int 2034 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.panic + 0x1e) (mword_of_int 0x7f250513 : mword 32)
-    (mword_of_int (KernelSyms.panic + 0x1e) : mword 64) (ITYPE (mword_of_int 2034 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_7f250513. Qed.
-
-  Lemma pni_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x22) : mword 64) false (JAL (mword_of_int 2096332 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.panic + 0x22) (mword_of_int 0xccdff0ef : mword 32)
-    (mword_of_int (KernelSyms.panic + 0x22) : mword 64) (JAL (mword_of_int 2096332 : mword 21, Regidx (mword_of_int 1))) kd_ccdff0ef. Qed.
-
-  Lemma pni_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x26) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 0 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (KernelSyms.panic + 0x26) (mword_of_int 0xa001 : mword 16)
-    (mword_of_int (KernelSyms.panic + 0x26) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 0 : mword 11) ('b"0")), zreg)) kd_a001 exec_execute_C_J. Qed.
+  Lemma pni_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.panic + 0x8) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 0 : mword 11) ('b"0")), zreg)).
+  Proof. mk_rvc (KernelSyms.panic + 0x8) (mword_of_int 0xa001 : mword 16)
+    (mword_of_int (KernelSyms.panic + 0x8) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 0 : mword 11) ('b"0")), zreg)) kd_a001 exec_execute_C_J. Qed.
 
 End CodePanic.

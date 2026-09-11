@@ -98,11 +98,11 @@ Notation FW := KernelSyms.filewrite (only parsing).
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  filewrite's one live arm is [panic("filewrite")]  *)
 (*  at +0x11e -- the ELSE of the type dispatch; the literal sits at       *)
-(*  0x800075a8 in .rodata, nine characters and a NUL.  Hoisted as NAMED   *)
+(*  0x80007598 in .rodata, nine characters and a NUL.  Hoisted as NAMED   *)
 (*  pure lemmas rather than inline [ltac:] -- see optimization.md, and    *)
 (*  the panic recipe's third trap ([lia]/[lkbelow] against an evar).      *)
 (* ===================================================================== *)
-Definition fw_msg_a : Z := 0x800075a8.
+Definition fw_msg_a : Z := 0x80007598.
 Definition fw_msg : string := "filewrite".
 
 Lemma fw_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
@@ -1224,14 +1224,14 @@ Section ProofFilewriteParts.
                     = mword_of_int (FW + 0x7a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp7a) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (FW + 0x7a)) Ra4 Ra4
-              (mword_of_int 54 : mword 12) D2 K b
+              (mword_of_int 68 : mword 12) D2 K b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fwri_07a with "Htext"). }
     iIntros (CID3 Hq3) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (D3 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (D2 !!! Regidx Ra4)
-                     (sign_extend' 64 (mword_of_int 54 : mword 12)))]> D2).
+                     (sign_extend' 64 (mword_of_int 68 : mword 12)))]> D2).
     assert (HD3a4 : D3 !!! Regidx Ra4 = (mword_of_int KernelSyms.devsw : mword 64)).
     { rewrite /D3 upd_eq /D2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HD3a5 : D3 !!! Regidx Ra5 = (mword_of_int (16 * mj) : mword 64)).
@@ -1424,26 +1424,26 @@ Section ProofFilewriteParts.
                      = mword_of_int (FW + 0x112)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp112) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (FW + 0x112)) Ra0 Ra0
-              (mword_of_int 326 : mword 12) P1 K b
+              (mword_of_int 340 : mword 12) P1 K b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fwri_112 with "Htext"). }
     iIntros (CID8 Hq8) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (P2 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (P1 !!! Regidx Ra0)
-                     (sign_extend' 64 (mword_of_int 326 : mword 12)))]> P1).
+                     (sign_extend' 64 (mword_of_int 340 : mword 12)))]> P1).
     assert (Hpp116 : add_vec_int (mword_of_int (FW + 0x112) : mword 64) 4
                      = mword_of_int (FW + 0x116)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp116) in "Hpc".
     (* ---- +0x11e jal ra,panic ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0x116)) Rra
-              (mword_of_int 2081706 : mword 21) P2 K b
+              (mword_of_int 2081736 : mword 21) P2 K b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (fwri_116 with "Htext"). }
     iIntros (CID9 Hq9) "Hcg Hpc".
     assert (Htgtpanic : add_vec (mword_of_int (FW + 0x116) : mword 64)
-              (sign_extend' 64 (mword_of_int 2081706 : mword 21))
+              (sign_extend' 64 (mword_of_int 2081736 : mword 21))
               = mword_of_int KernelSyms.panic)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpanic) in "Hpc".

@@ -1467,13 +1467,13 @@ Section ProofPipealloc.
     assert (Hpp4c : add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x48) : mword 64) 4 = mword_of_int (KernelSyms.pipealloc + 0x4c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4c) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.pipealloc + 0x4c)) Ra1 Ra1 (mword_of_int 0xde : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.pipealloc + 0x4c)) Ra1 Ra1 (mword_of_int 0xec : mword 12)
               G3 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pai_4c with "Htext"). }
     iIntros (CID31 Hs31) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (G4 := <[Regidx Ra1 := regval_into_reg
-                  (add_vec (G3 !!! Regidx Ra1) (sign_extend' 64 (mword_of_int 222 : mword 12)))]> G3).
+                  (add_vec (G3 !!! Regidx Ra1) (sign_extend' 64 (mword_of_int 236 : mword 12)))]> G3).
     assert (HG4a1 : G4 !!! Regidx Ra1 = (mword_of_int pipe_name_str : mword 64)).
     { rewrite /G4 upd_eq /G3 upd_eq. unfold pipe_name_str.
       apply bv_eq; vm_compute; reflexivity. }
