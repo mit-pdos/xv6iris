@@ -14,14 +14,18 @@ patch: `projects/wx-briefs/`.
   nightly dead-import sweep `086c81b9f`).
 
 ## State of main (2026-09-10, latest)
-- Landed today, newest first: WX-GEN `d4a70aa12`, WX-EXIT `3f10fc4fa`, WX-RES +
-  WX-ROW `96de38269`, WX-FORK, WX-KEY.  Notes in `app-echo.md` ("… LANDED").
-- WX-GEN LANDED: `d4a70aa12` (62 files + `iris/SlotGen.v`), gated on the VM (build
-  `wxgen21` EXIT=0, audit = the thirteen, lemma_diff clean).  Note: `app-echo.md`
-  "WX-GEN LANDED".  Tree CLEAN.
-- NEXT: WX-INV (`wx-briefs/brief-wx-inv.md`, re-anchored at this landing; launched
-  2026-09-10), then WX-WAIT, ARM-c (1b), L7.  If found dirty with no agent alive:
-  back up, build once, read the red list, relaunch on a continuation brief.
+- Landed 2026-09-10/11, newest first: WX-INV `5b228fcad`, WX-GEN `d4a70aa12`, WX-EXIT
+  `3f10fc4fa`, WX-RES + WX-ROW `96de38269`, WX-FORK, WX-KEY.  Notes in `app-echo.md` ("… LANDED").
+- WX-INV LANDED: `5b228fcad` (25 files; gated pre-rebase on VM build `wxinv24`,
+  audit = the thirteen, lemma_diff clean), then REBASED over the XV6_REV bump
+  `92e0b0415` (panic loses its printk calls; the image relayouts; `panic_env` is
+  `emp`).  The post-rebase full VM rebuild (`run-on-gcp --proofs -k`) + audit is
+  the gate before the push; the relayout residue check (`RELAYOUT_OLD_REV=92e0b0415^
+  tools/relayout_batch.py --residue --allow-shape=CodePanic.v`) shows nothing
+  stale in the lane's files.  Note: `app-echo.md` "WX-INV LANDED".
+- NEXT: WX-WAIT (`wx-briefs/brief-wx-wait.md`, re-anchored at this landing), then
+  ARM-c (1b), L7.  If found dirty with no agent alive: back up, build once, read the
+  red list, relaunch on a continuation brief.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run

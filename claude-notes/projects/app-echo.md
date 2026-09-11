@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV → WX-WAIT → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV (LANDED) → WX-WAIT → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -2122,6 +2122,48 @@ userinit's split; green with `children_inv` still stated-not-carried) →
 WX-INV (`brief-wx-inv.md`: carry it; kwait's row) → WX-WAIT
 (`brief-wx-wait.md`: the post, the route, the leaf, init) → ARM-c (1b) → L7.
 WX-PID is absorbed: pid uniqueness IS `pid_reg`.
+
+WX-INV LANDED (2026-09-11; brief `brief-wx-inv.md`; commit `5b228fcad` rebased over
+the XV6_REV bump `92e0b0415`; 25 files).  THE WAIT-LOCK INVARIANT IS CARRIED:
+`WaitInv.wait_res_at ξ := ∃ ps gs m O, parents_own_at ξ ps ∗ children_own_at m ∗
+orphans_own O ∗ children_inv ps gs m O` (:1248) with `children_inv ps gs m O :=
+gen_halves ps gs ∗ ⌜inv_pure ps gs m O⌝` (:702; `gen_halves` holds, per NONZERO
+parent cell, `⌜gs !! k = Some g⌝ ∗ slot_gen (proc_addr k) (3/4) g ∗ pid_reg pid
+(3/4) g ∗ gen_slot g (proc_addr k) ∗ gen_pid g pid`; `inv_pure` :251 =
+`length ps = NPROC ∧ length gs = length ps ∧ rows_unique m ∧ inv_gens ∧ inv_rows ∧
+inv_orph ∧ inv_slots`, every tie guarded on a nonzero address so the writers are
+premise-free).  THE ORPHANS ARE A TABLE KEYED BY ADDRESS: `Xv6Cameras.orph_map =
+gmap (mword 64) (gset gname)`, `orph_row O pa` (:199), `op_map pa ip O S` (reparent
+moves the dying row into the key `ip`), `orphans_add`/`orphans_del`; NO `ip` is
+named anywhere -- the `initproc` cell is unshareable when `wait_lock` goes up
+(main's `newlock` precedes userinit's write) and an unpinned `∃ ip` cannot be
+re-established once `O ≠ ∅`.  FIVE CONSEQUENCE LEMMAS carry the writers:
+`children_inv_fork` (kfork's +0xd4, after `children_inv_no_entry` reads the empty
+cell from kfork's three quarters), `children_inv_reparent` (kexit's `kx_park`:
+`rp_map`, the dying row to `∅`, `op_map`), `children_inv_reap` :1035 (kwait: entry
+k out, `slot_gen` WHOLE and `pid_reg` at 3/4 back with `∃ pide, gen_pid g pide`
+-- the reaper aligns the pid through the escrow's quarter; γ' removed from BOTH
+columns, so `cs' = cs ∖ {[γ']}` is uniform; yields (W2) `⌜g ∈ cs ∨ g ∈ orph_row O
+pj⌝`), `children_inv_pid` :1172 ((W3) per γ: `g ∈ cs → gen_pid g pid -∗ pid_reg
+pid dq g' -∗ ⌜g = g'⌝`; a □ over `cs` cannot be produced with the spatial
+invariant in hand -- WX-WAIT extracts the summary by set induction under the
+lock), `children_inv_empty` :1200 ((W5): no cell at `pj` → `cs = ∅ ∧ orph_row O
+pj = ∅`).  THE REAPER'S ROW RIDES WAIT'S ROUTE on the fork precedent: `SpecKwait`
+(:205/:230) and `SpecSysWait` (:124/:141/:147) take `ch_frag (pv_chg (us_V U)) pj
+cs` and return it at `cs'` with `⌜UserChildren.ch_reaped cs cs'⌝` (:123: `cs' = cs
+∨ ∃ γ', cs' = cs ∖ {[γ']}`); `SpecSyscall.sysc_wait_out U r cs cs'` (:501, `_ne`
+at the other numbers) and `SpecUsertrap.ut_wait_out` (:550) relay it;
+`usys_ch_ok`/`ut_ch_kept` exempt wait beside fork; `UexecRet.uwait_ans r cs cs'`
+(:856) and the ARM `uexec_wait_F` (:1068) beside `uexec_fork_parent_F`
+(`uexec_ret_round_slot` abstracts the returning continuation over the children
+row); the leaf `UkRunSys.wp_uk_ecall_wait_null` (:1757) takes `uch (ukn_ch N) cs`
+and returns it moved (`uch_agree` then `uch_update`), `wp_uk_ecall_wait_any`
+(:1876) is the index-free form; `UkInit.wp_kinit_wait` (:617) carries `uch_any`.
+Boot: `parents_res_at` is the all-zero boot shape, `children_boot` carries
+`children_res_boot` (rows unique and empty) and `orphans_own ∅`.  Retyped sealed
+Parameters: KWAIT, SYSWAIT, SYSCALL's post.  Two lane-taken rulings, accepted:
+`gs` as an explicit column with `Some`-lookups; `inv_gens` carried purely and
+re-established from the persistent `gen_slot`.
 
 WX-GEN LANDED (2026-09-10; brief `brief-wx-gen.md`; commit `d4a70aa12`, 62 files +
 `iris/SlotGen.v`).  Two exclusive ghosts on `Xv6Cameras.wchG` (no new class binder):
