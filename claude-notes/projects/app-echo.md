@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN → WX-INV → WX-WAIT → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV → WX-WAIT → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
@@ -2092,6 +2092,39 @@ userinit's split; green with `children_inv` still stated-not-carried) →
 WX-INV (`brief-wx-inv.md`: carry it; kwait's row) → WX-WAIT
 (`brief-wx-wait.md`: the post, the route, the leaf, init) → ARM-c (1b) → L7.
 WX-PID is absorbed: pid uniqueness IS `pid_reg`.
+
+WX-GEN LANDED (2026-09-10; brief `brief-wx-gen.md`; commit `d4a70aa12`, 62 files +
+`iris/SlotGen.v`).  Two exclusive ghosts on `Xv6Cameras.wchG` (no new class binder):
+`SlotGen.slot_gen pa dq γ` (`own` at `gmapUR (mword 64) (dfrac_agreeR (leibnizO
+gname))`, no authority: `slot_gen_agree`, `slot_gen_quarters` 3/4:1/4,
+`slot_gen_update` whole, `slot_gen_tq_excl` 3/4 beside 3/4) and `pid_reg pid dq γ`
+(a `ghost_map` KEYED AT `Z = bv_unsigned pid` -- an `mword` key re-resolves
+`Countable` to the wrong instance), whose authority `pid_reg_auth R` sits in
+`PidLock.nextpid_res_at` beside the 64 pid cells' VALUES as a list `pids`
+(`pid_lock_share_at ξ pa v` is value-explicit) with `pid_reg_dom R pids`
+(registered ⊆ nonzero held; the `⊆` direction is all the insert needs).  THE SPLIT
+IS 3/4 : 1/4: the block keeps `gen_halves_priv pa pid γ` (the quarters, LAST in
+`proc_priv_core`; `proc_priv_split_cwd` six-way), the forking parent deposits the
+three quarters with `gen_slot`/`gen_pid` into `WaitInv.gen_halves ps` -- INSIDE
+`parents_res_at ξ := ∃ ps, parents_own_at ξ ps ∗ gen_halves ps`, one entry per
+NONZERO parent cell (sound because kwait's `pp->parent = 0` precedes `freeproc`) --
+at its `np->parent = p` under `wait_lock`, where `gen_halves_no_entry` (three
+quarters against a would-be entry's) proves the cell was zero.  `ProcDefs`'s
+dormant block carries `gen_halves_dorm`: the whole plus `⌜pid cell = 0⌝` at
+UNUSED, the block's quarters at ZOMBIE.  allocproc mints the generation IN the
+pid section (`wp_ap_pidsec`: the scan proves the candidate is in no slot, the
+insert follows; `ap_pid_post` hands out `gen_own`, `slot_gen` and `pid_reg`
+whole); freeproc takes both wholes at an explicit `g` and deletes the
+registration at `p->pid = 0`; kwait's reap reunites 3/4 + 1/4; kexit's reparent
+passes the entries through (`gen_halves_rp_map`); userinit keeps init's quarters
+and drops the three quarters (init's cell is 0 forever).  The boot carve pins
+`p->pid` and `p->parent` at zero (`BootCarveMain.boot_proc_slot`), which is what
+lets boot pay; `children_boot` carries `pid_reg_auth ∅` and a whole `slot_gen`
+per slot to the dormant seal.  Two premise-free affine weakenings, commented at
+the sites: `gen_halves_rp_map` takes no `ip ≠ 0` and kfork's deposit no `pme ≠ 0`
+(at a zero address the entry is `emp` and the deposit is dropped; kwait's reap,
+where the fact is spent, carries `kw_pme_nz`).  `children_inv` stays STATED
+(WX-INV carries it).
 
 WX-EXIT LANDED (2026-09-10; briefs `brief-wx-exit.md`, `brief-wx-exit-finish.md`;
 commit `3f10fc4fa`, 101 files; the rulings below were given mid-lane).

@@ -14,15 +14,14 @@ patch: `projects/wx-briefs/`.
   nightly dead-import sweep `086c81b9f`).
 
 ## State of main (2026-09-10, latest)
-- WX-EXIT LANDED: `3f10fc4fa` (iris, 101 files), gated on the VM (build `wxexit60`
-  EXIT=0, `make audit-only` = the thirteen, `lemma_diff` clean).  As-landed note
-  and the mid-lane rulings: `app-echo.md` "WX-EXIT LANDED" / "WX-EXIT RULINGS".
-  Before it: WX-RES + WX-ROW `96de38269`.  Tree CLEAN.
-- WX-GEN LAUNCHED (2026-09-10; fresh Opus agent on `wx-briefs/brief-wx-gen.md`,
-  phase 1 then stop-and-report; design in `app-echo.md` "WX-GEN / WX-INV / WX-WAIT
-  — DESIGN").  Then WX-INV, WX-WAIT, ARM-c (1b), L7.  If found dirty with no agent
-  alive: back up, build once, read the red list, relaunch on a continuation brief.  Owner's
-  standing instruction: keep going through checkpoints -- land, note, launch.
+- Landed today, newest first: WX-GEN `d4a70aa12`, WX-EXIT `3f10fc4fa`, WX-RES +
+  WX-ROW `96de38269`, WX-FORK, WX-KEY.  Notes in `app-echo.md` ("… LANDED").
+- WX-GEN LANDED: `d4a70aa12` (62 files + `iris/SlotGen.v`), gated on the VM (build
+  `wxgen21` EXIT=0, audit = the thirteen, lemma_diff clean).  Note: `app-echo.md`
+  "WX-GEN LANDED".  Tree CLEAN.
+- NEXT: WX-INV (`wx-briefs/brief-wx-inv.md`, re-anchored at this landing; launched
+  2026-09-10), then WX-WAIT, ARM-c (1b), L7.  If found dirty with no agent alive:
+  back up, build once, read the red list, relaunch on a continuation brief.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run
