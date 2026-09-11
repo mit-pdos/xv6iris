@@ -39,9 +39,10 @@ patch: `projects/wx-briefs/`.
 - SH-LINE phase 1 LANDED (additive: `UserConsole.v`, `UConsLine.v`, `ukn_const`; VM
   build `shline4` EXIT=0, audit = the thirteen, lemma_diff clean) and found two
   more kernel seams, RULED in `app-echo.md` "SH-LINE PHASE 1 LANDED + TWO MORE
-  KERNEL SEAMS RULED": EXEC-PAY (the payload into the exec'd slot;
-  `wx-briefs/brief-exec-pay.md`, LAUNCHED 2026-09-11) → OPEN-PIN (a pinned open of
-  /console so fd 0 is the console device; brief to write) → SH-LINE phase 2 (a
+  KERNEL SEAMS RULED": EXEC-PAY LANDED (21 files; VM build
+  `execpay5` EXIT=0, audit = the thirteen, lemma_diff clean; note "EXEC-PAY
+  LANDED") → OPEN-PIN (`wx-briefs/brief-open-pin.md`, under the owner's PINNING
+  ruling: application-side only, factor PinnedExec first; LAUNCHED 2026-09-11) → SH-LINE phase 2 (a
   fresh agent on a continuation of `brief-sh-line.md`) → E4 → E2 (also threads
   `riscv_rx_tag = app_tag` into `Hinit_boot`) → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot

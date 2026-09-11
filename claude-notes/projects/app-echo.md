@@ -2284,6 +2284,21 @@ transports.  (3) Before a second hand-rolled instance (open), FACTOR
 general "pinned observation family" lemma over a syscall's families, so exec
 and open are two instantiations rather than two copies.
 
+EXEC-PAY LANDED (2026-09-11; brief `brief-exec-pay.md`; 21 files; the rulings
+below are as landed).  THE EXIT PAYLOAD CROSSES exec: `exec_slot_pre`'s wands
+take `Q (-1)`; `exec_post_ok Fs Γ Q …`'s success arms are wands
+`exec_post_ok_recv` hands back; `sysc_exec_out f`/`ut_exec_out f`'s success arm
+is `sexit_pay f (-1) -∗ uslot …`; `sysc_pay_out` unconditional, consumed on
+that arm; the round's exec answer `uexec_pay_arm f -∗ uslot W'`; forkret's boot
+arm pays `True`.  Exec's deposit at `kf_xpay` (this process's payload);
+`sbundle_at_at` & co. guarded `n <> USYS_read -> n <> USYS_exec`;
+`sbundle_pay_exec_intro`; `uxsup` at the trivial payload with `udepw_of_uxsup`
+taking `ukn_triv`.  `PinnedExec`'s constructor and taint wands gain `Q (-1) -∗`;
+`UConsLine.init_exec_sup_lin` has no payload premise.  The four entry
+constructors keep the trivial payload and their `done` (SH-LINE phase 2 frees
+sh's).  Sealed Parameters retyped through their bodies: KEXEC, SYSEXEC,
+SYSCALL, USERTRAP, USERVEC.
+
 EXEC-PAY RULINGS (2026-09-11, phase 1): (1) `SpecKexec.exec_slot_pre`'s two wands
 take `Q (-1)` beside `my_pay (uvis_gen W') Q`; `exec_post_ok` gains `Q` and its
 two success arms are wands `Q (-1) -∗ Fs.(pf_recv) (exec_key …)` (kexec never
