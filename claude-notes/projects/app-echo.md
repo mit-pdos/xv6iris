@@ -1775,7 +1775,7 @@ so the loop generalises over the ledger and the fall-through `close(fd)`
 spends the handle as today.  REDIR is refuted in the verified command set,
 so nothing else moves.  Then `UkInit.ustd_open` is deleted, `init_exec_sup`
 takes `ustd_any`, and D closes.  Brief `brief-std-ledger-d-finish.md`.
-ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV (LANDED) → WX-WAIT (LANDED) → ARM-c (1b) → L7 → WX-INV (`wait_res_at` binds parents and map together and carries `children_inv` + orphans) → WX-WAIT → WX-PID → (1b) echo's discharge.
+ORDER: STD-LEDGER + D FINISH (LANDED) → ARM-c (1a) (LANDED) → WX-KEY (LANDED) → WX-FORK (LANDED) → WX-RES + WX-ROW (LANDED) → WX-EXIT (LANDED) → WX-GEN (LANDED) → WX-INV (LANDED) → WX-WAIT (LANDED) → ARM-c (1b) (echo's discharge of `Hinit_boot`) → L7.
 
 STD-LEDGER LANDED (2026-09-09; brief `brief-std-ledger-d-finish.md` part A).
 sh is verified at ANY standard-stream ledger: `UkSh.ush_std l` is
