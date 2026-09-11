@@ -41,6 +41,9 @@ From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_var.
+Require Import SailStdpp.Base SailStdpp.Values.
+Require Import ChildTok.   (* [exit_tok] / [gen_uniq] -- what a reap answers
+                              with beside the set it moved *)
 Local Open Scope Z_scope.
 
 Section UserChildren.
@@ -117,8 +120,10 @@ End UserChildren.
 (* one that was reaped, which [WaitInv.children_inv_reap] takes out of    *)
 (* both columns of the wait-lock invariant -- and every failing arm       *)
 (* leaves it alone, because the C returns before [pp->parent = 0].  WHICH *)
-(* generation left, and the escrow that redeems it, ride beside this with *)
-(* WX-WAIT.  Outside the section: it names no ghost and no class.         *)
+(* generation left, and the escrow that redeems it, are [wait_ans] below; *)
+(* this is that answer's pure shadow, for the relays that only need to    *)
+(* know the reading moved.  Outside the section: it names no ghost and no *)
+(* class.                                                                 *)
 (* ===================================================================== *)
 Definition ch_reaped (cs cs' : gset gname) : Prop :=
   cs' = cs \/ exists γ' : gname, cs' = cs ∖ {[γ']}.
@@ -128,3 +133,59 @@ Proof. left. reflexivity. Qed.
 
 Lemma ch_reaped_del (cs : gset gname) (γ' : gname) : ch_reaped cs (cs ∖ {[γ']}).
 Proof. right. exists γ'. reflexivity. Qed.
+
+(* ===================================================================== *)
+(* WHAT A WAIT ANSWERS, IN THE TWO ARMS wait() HAS -- the ONE predicate   *)
+(* every party from kwait to the program relays.                         *)
+(*                                                                       *)
+(* IT FAILED and returned -1: the caller has no children at all, or it    *)
+(* was killed, or copyout could not place the status.  Nothing was        *)
+(* reaped (the C returns before [pp->parent = 0]), so the caller's        *)
+(* children reading does not move.  THE -1 ARM CLAIMS NOTHING ABOUT THE   *)
+(* SET, and that is forced by the code and not a weakening: two of those  *)
+(* three exits happen with children present.                             *)
+(*                                                                       *)
+(* IT REAPED, and then it returns THAT child's pid and three things ride  *)
+(* with it:                                                              *)
+(*   the reaped generation leaves the caller's reading                    *)
+(*     ([WaitInv.children_inv_reap] takes it out of both columns of the   *)
+(*     wait-lock invariant, so the move is [cs ∖ {γ'}] whether the zombie *)
+(*     was the caller's own child or an orphan reparented to it);         *)
+(*   the ESCROW ([ChildTok.exit_tok]) the zombie's exit parked, at the    *)
+(*     status its [p->xstate] cell holds -- which is the very word the    *)
+(*     copyout put in the caller's buffer;                                *)
+(*   and PID UNIQUENESS over the caller's reading                         *)
+(*     ([ChildTok.gen_uniq]): no other child of this caller carries the   *)
+(*     returned pid, which is what makes the returned NUMBER name the     *)
+(*     generation the escrow is at.  A parent holding                     *)
+(*     [ChildTok.child_tok] for a child it forked spends the two together *)
+(*     ([ChildTok.gen_uniq_tok] then [ChildTok.gen_pay]).                 *)
+(*                                                                       *)
+(* THE ARMS ARE DISJOINT AT THE RETURN VALUE: a reaped pid is in          *)
+(* [1, PIDMAX], so a caller that reads a nonnegative result knows it is   *)
+(* on the second arm without holding anything. *)
+(* ===================================================================== *)
+Section WaitAns.
+  Context `{!ctokG Σ}.
+
+  Definition wait_ans (rv : mword 32) (xs : Z) (cs cs' : gset gname) : iProp Σ :=
+    (⌜rv = (mword_of_int (-1) : mword 32) /\ cs' = cs⌝
+     ∨ ∃ γ' : gname,
+         ⌜cs' = cs ∖ {[γ']}⌝ ∗ exit_tok γ' rv xs ∗ gen_uniq cs rv γ')%I.
+
+  (* the pure row, which is all the twenty-odd relays between kwait and the
+     program ever look at *)
+  Lemma wait_ans_reaped (rv : mword 32) (xs : Z) (cs cs' : gset gname) :
+    wait_ans rv xs cs cs' -∗ ⌜ch_reaped cs cs'⌝.
+  Proof.
+    iIntros "[[_ %He] | (%γ' & %He & _)]"; iPureIntro.
+    - left. exact He.
+    - right. exists γ'. exact He.
+  Qed.
+
+  (* the failing arm, for the three exits that reap nothing *)
+  Lemma wait_ans_neg (xs : Z) (cs : gset gname) :
+    ⊢ wait_ans (mword_of_int (-1) : mword 32) xs cs cs.
+  Proof. iLeft. iPureIntro. split; reflexivity. Qed.
+
+End WaitAns.

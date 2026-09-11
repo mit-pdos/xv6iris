@@ -1751,9 +1751,12 @@ Section UkRunSys.
      is [UserChildren.uch_update] against the authority [urun] carries: the
      kernel's answer says what the set became ([UexecRet.uwait_ans]) and
      the two halves are moved together here, which is the only place both
-     are in one hand.  WHICH generation left, and the escrow that redeems
-     it, ride beside the set with WX-WAIT; [UserChildren.ch_reaped] is what this
-     leaf reports. *)
+     are in one hand.  THE ANSWER IS WHAT THE LEAF REPORTS, unopened: on
+     its reaping arm it names the generation that left the set, hands over
+     that child's ESCROW ([ChildTok.exit_tok] -- the payload its exit paid)
+     and the pid uniqueness that makes the returned number identify it, so
+     a program holding [ChildTok.child_tok] for a child it forked redeems
+     the payload here ([ChildTok.gen_uniq_tok], then [ChildTok.gen_pay]). *)
   Lemma wp_uk_ecall_wait_null (N : uk_names Σ) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (Sc : gset gname) :
     usysno m = USYS_wait ->
@@ -1764,7 +1767,7 @@ Section UkRunSys.
     udepw N m pc USYS_wait -∗
     uch (ukn_ch N) Sc -∗
     (∀ (h' : CpuId) (r : mword 64) (Sc' : gset gname),
-       ⌜ch_reaped Sc Sc'⌝ -∗
+       uwait_ans r Sc Sc' -∗
        urun N h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        uch (ukn_ch N) Sc' -∗
@@ -1840,9 +1843,6 @@ Section UkRunSys.
        the reap left, and [UserChildren.uch_update] is the one step that can
        take them there. *)
     iDestruct (uch_agree with "Hcha Hch") as %<-.
-    iAssert (⌜ch_reaped cs cs'⌝)%I with "[Hans]" as %Hmoved.
-    { rewrite /uwait_ans. iDestruct "Hans" as "[[%Hr %He] | (%γ' & %He)]";
-        iPureIntro; [ left; exact He | right; exists γ'; exact He ]. }
     (* the goal here is the SLOT, not a [WP], so the update rides
        [UexecRet.uslot_bupd] -- the same door every other leaf that moves a
        ghost half in this position uses. *)
@@ -1866,7 +1866,7 @@ Section UkRunSys.
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep").
     iIntros (h') "Hrun".
-    iApply ("Hcont" $! h' r cs' with "[%] Hrun Hch"); [ exact Hmoved ].
+    iApply ("Hcont" $! h' r cs' with "Hans Hrun Hch").
   Qed.
 
   (* ...AND THE INDEX-FREE FORM.  A program that hands its children to a

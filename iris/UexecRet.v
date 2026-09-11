@@ -111,6 +111,8 @@ Require Import UserPerm.     (* [uperm] / [perm_of] *)
 Require Import FdSlots.      (* [fdstate] -- the descriptor view in the key *)
 Require Import ProcDefs.     (* [ustate] / [us_V] / [us_M] -- the kernel record
                                 the RUN KEY below is matched against *)
+Require Import UserChildren. (* [wait_ans] -- the kernel's own two-armed
+                                answer to wait(), relayed at the a0 word *)
 Require Import ChildTok.     (* [child_tok] / [my_pay] -- fork's two pieces of
                                 the child's generation *)
 Require Import UexecSG.      (* [uexecSG]: [sbundle_at] / [spost_at] / [ssupply] --
@@ -838,24 +840,48 @@ Section UexecRet.
          ⌜cs' = cs ∪ {[γ]}⌝ ∗
          child_tok γ pidv Q)%I.
 
-  (* ...AND WHAT WAIT ANSWERS ITS CALLER, in the two arms wait has.  It
-     FAILS -- the caller has no children, it was killed, or copyout could
-     not place the status -- and then it returns -1 and the caller's
-     children reading does not move (the C returns before [pp->parent =
-     0], so nothing was reaped).  It REAPS, and then the generation it
-     reaped leaves that reading, whichever of the two columns of the
-     wait-lock invariant it was in ([WaitInv.children_inv_reap] takes it
-     out of both).
-       THE SET'S MOVE IS ALL THIS SAYS.  The escrow the reap redeems and
-     the two facts that identify [γ'] -- that it is the caller's own
-     child and that no other child of the caller carries the returned pid
-     -- ride beside it, and are what makes a returned pid name a
-     generation.  The set is READ and not chosen, exactly as fork's is:
-     the row is [WaitInv.ch_frag] off the kernel's residue and kwait moves
-     it under <wait_lock>. *)
+  (* ...AND WHAT WAIT ANSWERS ITS CALLER: the kernel's own answer
+     ([UserChildren.wait_ans]) at the a0 WORD, which is the [int] the
+     syscall returns sign-extended.  It FAILS -- the caller has no
+     children, it was killed, or copyout could not place the status -- and
+     then it returns -1 and the caller's children reading does not move
+     (the C returns before [pp->parent = 0], so nothing was reaped).  It
+     REAPS, and then the generation it reaped leaves that reading
+     (whichever of the two columns of the wait-lock invariant it was in --
+     [WaitInv.children_inv_reap] takes it out of both), and the ESCROW
+     that generation's exit parked comes back with the pid uniqueness that
+     makes the returned number name it.
+       THE STATUS THE ESCROW IS KEYED AT IS EXISTENTIAL HERE and pinned in
+     the kernel's own post: this tier hands the program no reading of its
+     own buffer, so the word is the escrow's key and nothing else.  The set
+     is READ and not chosen, exactly as fork's is: the row is
+     [WaitInv.ch_frag] off the kernel's residue and kwait moves it under
+     <wait_lock>. *)
   Definition uwait_ans (r : mword 64) (cs cs' : gset gname) : iProp Σ :=
-    (⌜r = (mword_of_int (-1) : mword 64) /\ cs' = cs⌝
-     ∨ ∃ γ' : gname, ⌜cs' = cs ∖ {[γ']}⌝)%I.
+    (∃ (rv : mword 32) (xs : Z),
+       ⌜r = (sign_extend' 64 rv : mword 64)⌝ ∗ wait_ans rv xs cs cs')%I.
+
+  (* the failing arm, at the word the [li -1] tails leave in a0 *)
+  Lemma sext_neg1_64 :
+    (sign_extend' 64 (mword_of_int (-1) : mword 32) : mword 64)
+    = (mword_of_int (-1) : mword 64).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+  Lemma uwait_ans_neg1 (cs : gset gname) :
+    ⊢ uwait_ans (mword_of_int (-1) : mword 64) cs cs.
+  Proof.
+    iExists (mword_of_int (-1) : mword 32), 0%Z.
+    iSplitR; [iPureIntro; symmetry; exact sext_neg1_64 |].
+    iApply wait_ans_neg.
+  Qed.
+
+  (* ...and the pure row, for the relays that only want the set's move *)
+  Lemma uwait_ans_reaped (r : mword 64) (cs cs' : gset gname) :
+    uwait_ans r cs cs' -∗ ⌜ch_reaped cs cs'⌝.
+  Proof.
+    iIntros "H". iDestruct "H" as (rv xs) "[_ Ha]".
+    iApply (wait_ans_reaped with "Ha").
+  Qed.
 
   (* the parent's arm: a NONZERO return, the key it trapped at bumped, and
      fork's answer at that return value. *)

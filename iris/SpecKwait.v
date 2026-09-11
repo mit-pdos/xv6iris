@@ -70,12 +70,13 @@
    * IT MOVES THE CALLER'S CHILDREN ROW, and that is what makes a reap a
      reap rather than a store.  The row ([WaitInv.ch_frag], off the trap
      residue) is handed in at [cs] and comes back at [cs'], and the
-     contract says the reading moved by at most one member: the reap takes
-     the reaped generation out of it -- out of BOTH columns of the
-     wait-lock invariant, which is where "that zombie is my child" lives
+     contract says which member left: the reap takes the reaped generation
+     out of it -- out of BOTH columns of the wait-lock invariant, which is
+     where "that zombie is my child" lives
      ([WaitInv.children_inv_reap]) -- and every failing arm returns it
-     unmoved.  WHICH generation left, the escrow that redeems it and the
-     uniqueness that makes the returned pid name it are WX-WAIT's.
+     unmoved.  The answer names that generation, so the row's move and the
+     escrow that redeems it are one statement
+     ([UserChildren.wait_ans]).
 
    * IT REACHES A ZOMBIE'S PRIVATE BLOCK, WHICH NOTHING ELSE DOES.  The
      child's [ProcInv.proc_dormant _ ZOMBIE] comes out of the child's own
@@ -84,13 +85,20 @@
      precondition.  That bridge is exactly the gap SpecFreeproc.v used to
      record as unwritten; closing it is what made this proof possible.
 
-   * WHAT IT SAYS ABOUT THE RESULT IS ALL THAT IS TRUE.  Nothing in the tree
-     ties a pid to a slot ([SchedCtx.proc_pub] quantifies every slot's pid
-     existentially), and nothing ties a parent cell to a process, so the
-     return value can only be reported as SOME sign-extended [int] -- the
-     same honesty as kkill's and killed's.  Note this covers both arms: the
-     found arm returns [pp->pid] through an [lw] (hence sign-extended) and
-     the three failure arms return [li -1].
+   * WHAT IT SAYS ABOUT THE RESULT IS THE REAPED CHILD'S ESCROW.  The
+     return value is a sign-extended [int] ([lw] of [pp->pid] on the found
+     arm, [li -1] on the three failure arms), and on the found arm it NAMES
+     the generation kwait reaped: the post's [UserChildren.wait_ans] hands
+     out that generation's escrow ([ChildTok.exit_tok], the payload its
+     exit paid, keyed at the status this call copied out) together with the
+     pid uniqueness over the caller's own children ([ChildTok.gen_uniq])
+     that makes the number identify it.  Both come off the wait-lock
+     invariant, which the reaper holds open across the reap
+     ([WaitInv.children_inv_reap] / [children_inv_pid]).
+     THE -1 ARM SAYS ONLY THAT NOTHING MOVED, and that is the code: of its
+     three exits only the childless one has an empty children reading --
+     the other two are a killed caller and a copyout that could not place
+     the status, and both happen with children present.
 
    NOT here: [arm_pay].  kwait's own acquire(&wait_lock) produces the
    level-0 pay that sleep wants, and every exit's release consumes it, so
@@ -108,16 +116,19 @@
    [uptd_ext_sz], exactly as fetchaddr's is.  On the three arms that never
    call copyout, [P' = pv_upt V].
 
-   WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE.  The only
-   write kwait can make to user memory is copyout's: the found zombie's
-   four-byte [xstate] at [addr], and only when [addr <> 0].  The post
-   therefore carries [umem_wr (us_M U) addr d bs] for some [d <= 4] and some
-   [bs] -- [bs] cannot be pinned to the child's exit status here, because
-   nothing in the tree ties a pid to a private block ([fs-syscall-specs]
-   territory, not this contract's).  The [addr = 0] arm, the no-zombie-child
-   arm, and copyout's own failure prefix all move nothing: they instantiate
-   [d := 0], where [umem_wr M addr 0 bs = M] on the nose.  A caller reads its
-   own untouched bytes back with [UserPtTree.umem_wr_lookup_out]. *)
+   WHAT STAYS EXISTENTIAL IS A LENGTH, NOT AN IMAGE.  The only write kwait
+   can make to user memory is copyout's: the found zombie's four-byte
+   [xstate] at [addr], and only when [addr <> 0].  The post therefore
+   carries [umem_wr (us_M U) addr d (nth_byte xw)] for some [d <= 4] and
+   some four-byte STATUS WORD [xw] -- the bytes are that word's, at every
+   arm, because a partial copyout still copies a prefix of it.  [xw] is the
+   word the ESCROW is keyed at as well (the reaper holds both halves of
+   [pp->xstate]), which is what ties the number a parent reads out of its
+   own buffer to the payload it redeems.  The [addr = 0] arm, the
+   no-zombie-child arm, and copyout's own failure prefix all move nothing:
+   they instantiate [d := 0], where [umem_wr M addr 0 bs = M] on the nose.
+   A caller reads its own untouched bytes back with
+   [UserPtTree.umem_wr_lookup_out]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -129,6 +140,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import RiscvExtras.
+Require Import RiscvModelBytes.   (* [nth_byte] -- the status word the copyout places *)
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
@@ -208,12 +220,11 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
        AND ONLY WHEN [addr <> 0].  [d] is the count copyout actually placed
        ([d = 0] on the [addr = 0] arm, on the no-zombie-child arm, and on
        copyout's own failure prefix; [d <= 4] on the success arm, where
-       [sizeof(pp->xstate) = 4]).  [bs] is left existential because nothing
-       in the tree ties a pid to the private exit-status word a zombie
-       carried -- that is a [fs-syscall-specs]-tier claim, not this one's.
-       A caller reads its own untouched bytes back with
+       [sizeof(pp->xstate) = 4]), and the bytes are those of ONE status
+       word [xw] -- the zombie's, which is also the word the escrow below
+       is keyed at.  A caller reads its own untouched bytes back with
        [UserPtTree.umem_wr_lookup_out]. *)
-    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (bs : nat -> bv 8)
+    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (xw : mword 32)
       (cs' : gset gname),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
@@ -225,22 +236,28 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
          everything it held across the call.  Without this the row would
          still permit a four-byte write at address 0. *)
       ⌜ addr = (zero_reg : mword 64) -> d = 0%nat ⌝ -∗
-      (* ...AND WHAT THE REAP DID TO THE CALLER'S READING: at most one
-         generation left it ([UserChildren.ch_reaped]). *)
-      ⌜ ch_reaped cs cs' ⌝ -∗
+      (* ...AND WHAT THE CALL ANSWERED, in wait's two arms
+         ([UserChildren.wait_ans]): -1 and nothing moved, or the reaped
+         child's pid with its ESCROW, the pid uniqueness that makes the
+         number name a generation, and the caller's reading at what the
+         reap left it.  THE ESCROW IS AT THE WORD THE COPYOUT PLACED:
+         [xw] is the same status the window above is written from, because
+         the reaper holds both halves of the zombie's [p->xstate] and the
+         escrow is keyed at what that cell reads
+         ([ProcDefs.proc_dormant]'s ZOMBIE arm). *)
+      wait_ans rv (xstate_val xw) cs cs' -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pid (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
+      proc_priv γf pj pid
+        (upd_usM (us_upt U P') (umem_wr (us_M U) addr d (fun i => nth_byte xw i))) -∗
       (* THE ROW COMES BACK AT WHAT THE REAP LEFT IT.  A reap takes ONE
          generation out of the caller's reading -- the one it reaped, and
          [WaitInv.children_inv_reap] takes it out of both columns of the
          invariant -- and every failing arm returns the set unmoved (the C
          returns before [pp->parent = 0], so nothing was reaped).  WHICH
-         generation left, the escrow that redeems it and the uniqueness
-         that makes the returned pid name it are WX-WAIT's; what this
-         contract says is that the reading MOVED BY AT MOST ONE MEMBER and
-         that the caller keeps its row. *)
+         generation left is the answer's own [γ'], beside the escrow that
+         redeems it. *)
       ch_frag (pv_chg (us_V U)) pj cs' -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

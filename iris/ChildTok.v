@@ -248,6 +248,86 @@ Section ChildTok.
     iDestruct (gen_agree with "H1 H2") as "[_ $]".
   Qed.
 
+  (* ...and the ESCROW names the pid it is keyed at, off the discarded
+     half it carries beside the kernel's quarter: the two are pieces of one
+     generation, so they agree on the pid, and the persistent reading is
+     therefore free to whoever holds the escrow.  A reaping parent spends
+     it to tell the generation it reaped from the one it is waiting for. *)
+  Lemma exit_tok_pid γ pid xs : exit_tok γ pid xs -∗ gen_pid γ pid.
+  Proof.
+    iIntros "H". iDestruct "H" as (pa Q Q') "(Hk & Hmy & _)".
+    iDestruct "Hmy" as (pa' pid') "#Hmy".
+    iDestruct (gen_agree_pure with "Hk Hmy") as %[_ Hpid].
+    rewrite /gen_pid Hpid. iExists pa', Q'. iExact "Hmy".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* PID UNIQUENESS OVER A SET OF GENERATIONS -- what makes a returned    *)
+  (* pid NAME one of them.                                                *)
+  (*                                                                      *)
+  (* wait() returns a pid, and a pid is reused; what a parent needs is    *)
+  (* that no OTHER child of its own carries the pid it was just handed,   *)
+  (* so that the returned number identifies the generation whose escrow   *)
+  (* came with it.  That is a fact about the whole set [cs] of the        *)
+  (* parent's live children, and it is PERSISTENT: each member's pid is   *)
+  (* the persistent reading of its own generation, and the implication    *)
+  (* beside it is pure.  It can therefore be extracted under <wait_lock>  *)
+  (* -- where the registrations that prove it live                        *)
+  (* ([WaitInv.children_inv_pid]) -- and survive the release.             *)
+  (*                                                                      *)
+  (* A BIG-OP AND NOT A [□]-WAND OVER [gen_pid]: the party that spends it *)
+  (* holds [child_tok], a QUARTER, and a quarter cannot produce           *)
+  (* [gen_pid] -- the readings come off the DISCARDED half alone.  So the *)
+  (* summary has to HAND OUT each member's pid rather than ask for it,    *)
+  (* which is what [gen_uniq_tok] then pairs with the parent's token.     *)
+  (* ------------------------------------------------------------------ *)
+  Definition gen_uniq (cs : gset gname) (pid : mword 32) (γ' : gname) : iProp Σ :=
+    ([∗ set] γ ∈ cs, ∃ pidγ : mword 32,
+       gen_pid γ pidγ ∗ ⌜pidγ = pid -> γ = γ'⌝)%I.
+
+  Global Instance gen_uniq_persistent cs pid γ' : Persistent (gen_uniq cs pid γ').
+  Proof. apply _. Qed.
+
+  (* one member's reading, out of the summary *)
+  Lemma gen_uniq_at (cs : gset gname) (pid : mword 32) (γ' γ : gname) :
+    γ ∈ cs ->
+    gen_uniq cs pid γ' -∗ ∃ pidγ : mword 32,
+      gen_pid γ pidγ ∗ ⌜pidγ = pid -> γ = γ'⌝.
+  Proof.
+    intro Hin. iIntros "H".
+    iApply (big_sepS_elem_of _ cs γ Hin with "H").
+  Qed.
+
+  (* THE FORM A PARENT SPENDS: it holds a token for one of its children at
+     the pid it forked, and the reaper's summary says that child IS the
+     generation the escrow is at. *)
+  Lemma gen_uniq_tok (cs : gset gname) (pid : mword 32) (γ' γ : gname)
+      (Q : Z -> iProp Σ) :
+    γ ∈ cs ->
+    gen_uniq cs pid γ' -∗ child_tok γ pid Q -∗ ⌜γ = γ'⌝.
+  Proof.
+    intro Hin. iIntros "Hu Ht".
+    iDestruct (gen_uniq_at cs pid γ' γ Hin with "Hu") as (pidγ) "[Hgp %Himp]".
+    iDestruct (child_tok_pid with "Ht Hgp") as %Heq.
+    iPureIntro. exact (Himp (eq_sym Heq)).
+  Qed.
+
+  (* ...AND ITS CONTRAPOSITIVE, which is what a parent whose wait returned
+     SOMEBODY ELSE'S pid spends: the generation that was reaped is not the
+     one it is waiting for, so its own child is still in the set the reap
+     left. *)
+  Lemma exit_tok_tok_ne γ' γ (pid pid' : mword 32) (xs : Z) (Q : Z -> iProp Σ) :
+    pid <> pid' ->
+    exit_tok γ' pid xs -∗ child_tok γ pid' Q -∗ ⌜γ <> γ'⌝.
+  Proof.
+    intro Hne. iIntros "He Ht".
+    iDestruct (exit_tok_pid with "He") as "#Hgp".
+    destruct (decide (γ = γ')) as [-> | Hd].
+    - iDestruct (child_tok_pid with "Ht Hgp") as %Heq.
+      iPureIntro. exfalso. exact (Hne (eq_sym Heq)).
+    - iPureIntro. exact Hd.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* THE PAYMENT RULE -- what the whole file exists for.                  *)
   (*                                                                      *)

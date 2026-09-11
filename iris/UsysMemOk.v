@@ -691,10 +691,11 @@ Proof. reflexivity. Qed.
 (* reason its descriptor copy is not: the fork arm of                      *)
 (* [UexecRet.uexec_ret_F] says it directly, at the generation the deposit  *)
 (* names.  Exit never returns.  So the row that remains for the generic    *)
-(* returning arm is the QUIET one at every number, and wait's arm arrives  *)
-(* with WX-WAIT.  [r] rides along because wait's row will read it (which   *)
-(* child was reaped is the return value's pid), exactly as [usys_cwd_ok]   *)
-(* reads it for chdir's failure case.                                      *)
+(* returning arm is the QUIET one at every number, and wait has an arm of  *)
+(* its own beside fork's ([UexecRet.uexec_wait_F]).  [r] rides along       *)
+(* because wait's answer reads it -- which child was reaped is the return  *)
+(* value's pid -- exactly as [usys_cwd_ok] reads it for chdir's failure    *)
+(* case.                                                                   *)
 (* ===================================================================== *)
 Definition usys_ch_ok (n : Z) (r : mword 64) (cs cs' : gset gname) : Prop :=
   cs' = cs.

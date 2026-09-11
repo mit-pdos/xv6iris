@@ -4022,9 +4022,9 @@ Section SyscallArms.
     iApply (SysWait.wp_sys_wait_sconf fsc_kalloc γp γf γw' γs j γl M (av - 4)%nat true true lks pid U v0 cs
               Hj Hgamma Hv0 ltac:(lia) eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hprocs Hwaitlk Hkalloc Hnextpid Hpriv Hrow").
-    iIntros (CIDy Hsy mf P' rv dw bsw cs')
-      "%Hcs %Hext %Hdwle %Hnullw %Hmoved Hcg Hcpu Hpc Hpriv Hrow".
-    destruct Hcs as [Hcs _].
+    iIntros (CIDy Hsy mf P' rv dw xw cs')
+      "%Hcs %Hext %Hdwle %Hnullw Hans Hcg Hcpu Hpc Hpriv Hrow".
+    destruct Hcs as [Hcs Ha0w].
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt (us_V U))).
     { destruct (uptd_ext_sz_ext (pv_sz (us_V U)) (pv_upt (us_V U)) P' Hext) as (_ & Htf & _).
       exact Htf. }
@@ -4050,12 +4050,13 @@ Section SyscallArms.
     iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
                  with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (upd_usM (us_upt U P') (umem_wr (us_M U) v0 dw bsw)) sts sts gn cs cs' lks av m mf fdep
+              (upd_usM (us_upt U P') (umem_wr (us_M U) v0 dw (fun i => nth_byte xw i))) sts sts gn cs cs' lks av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(assert (Hv0t : pv_tf (us_V U) !!! tf_arg_idx 0 = v0)
                       by (apply list_lookup_total_correct, Hv0);
                     apply (sysc_mem_ok_wait (us_V U) (upd_upt (us_V U) P') (us_M U)
-                             (umem_wr (us_M U) v0 dw bsw) (Z.of_nat 3) dw bsw
+                             (umem_wr (us_M U) v0 dw (fun i => nth_byte xw i)) (Z.of_nat 3) dw
+                             (fun i => nth_byte xw i)
                              Hnum ltac:(lia) ltac:(lia)
                              ltac:(rewrite Hv0t; exact Hnullw));
                     rewrite Hv0t; reflexivity)
@@ -4082,12 +4083,15 @@ Section SyscallArms.
               (* ...and the generation's, on the same terms: no entry
                  re-incarnates its own caller *)
               ltac:(first [exact eq_refl | assumption])
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [] Hpayv").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [Hans] [] [] Hpayv").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
-    (* ...AND WAIT'S ANSWER, which this arm alone owes: the set kwait left,
-       out of the pure row it returned *)
-    { iApply (sysc_wait_out_intro _ _ cs cs' Hmoved). }
+    (* ...AND WAIT'S ANSWER, which this arm alone owes: kwait's own, at the
+       a0 word this arm is indexed by ([SpecSyscall.sysc_wait_out_of]).  On
+       its reaping arm it carries the reaped child's escrow and the pid
+       uniqueness that names the generation; there is nothing here to
+       fabricate. *)
+    { iApply (sysc_wait_out_of U _ rv (xstate_val xw) cs cs' Ha0w with "Hans"). }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     iApply (sysc_sys_out_quiet U sts gn cs fdep _ _ _ _ _ _ Hnum
               ltac:(unfold sysc_num_nofs; lia)).

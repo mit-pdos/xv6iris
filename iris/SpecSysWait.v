@@ -40,23 +40,25 @@
    argument is then named the way sys_sbrk names its two: as a fact about
    the block's own trapframe record, [pv_tf V !! tf_arg_idx 0 = Some v0].
 
-   WHAT IT SAYS ABOUT THE RESULT is kwait's verbatim -- SOME sign-extended
-   [int] -- and for kwait's reason: nothing in the tree ties a pid to a
-   slot.  [v0] DOES appear in the postcondition, as the base of the write
-   window below; copyout's failure arm still returns -1 just as a missing
-   child does, so no resource distinguishes them.
+   WHAT IT SAYS ABOUT THE RESULT is kwait's verbatim: a sign-extended [int]
+   which, on the reaping arm, NAMES the generation whose escrow comes back
+   with it ([UserChildren.wait_ans]).  [v0] DOES appear in the
+   postcondition, as the base of the write window below; copyout's failure
+   arm returns -1 just as a missing child does, and both land on the
+   answer's first arm, which claims only that nothing moved.
 
    THE PRIVATE BLOCK GOES IN AND COMES BACK AT AN EXTENDED DESCRIPTOR
    ([uptd_ext_sz]), which is kwait's copyout, unchanged: argaddr touches no
    user page.
 
-   WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE, again
-   kwait's verbatim: the post carries [umem_wr (us_M U) v0 d bs] for some
-   [d <= 4] and some [bs], based at [v0] -- the syscall's own argument 0,
-   the address argaddr fetched and kwait's [addr].  [v0 = 0], the no-zombie-
-   child arm, and copyout's own failure prefix all move nothing ([d = 0],
-   and [umem_wr M v0 0 bs = M] on the nose).  A caller reads its own
-   untouched bytes back with [UserPtTree.umem_wr_lookup_out]. *)
+   WHAT STAYS EXISTENTIAL IS A LENGTH, NOT AN IMAGE, again kwait's
+   verbatim: the post carries [umem_wr (us_M U) v0 d (nth_byte xw)] for
+   some [d <= 4] and the four-byte status word [xw] the escrow is keyed at,
+   based at [v0] -- the syscall's own argument 0, the address argaddr
+   fetched and kwait's [addr].  [v0 = 0], the no-zombie-child arm, and
+   copyout's own failure prefix all move nothing ([d = 0], and [umem_wr M
+   v0 0 bs = M] on the nose).  A caller reads its own untouched bytes back
+   with [UserPtTree.umem_wr_lookup_out]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -68,6 +70,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import RiscvExtras.
+Require Import RiscvModelBytes.   (* [nth_byte] -- the status word kwait places *)
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
@@ -126,7 +129,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   (* kwait's window, verbatim: the only write is copyout's four-byte
      [xstate] at [v0], the syscall's own argument 0, and only when
      [v0 <> 0].  See SpecKwait.v's header. *)
-    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (bs : nat -> bv 8)
+    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (xw : mword 32)
       (cs' : gset gname),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
@@ -136,13 +139,17 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
          [addr != 0] test, relayed.  [v0] is the syscall's argument 0, so a
          caller passing a null status pointer keeps every byte it held. *)
       ⌜ v0 = (zero_reg : mword 64) -> d = 0%nat ⌝ -∗
-      (* ...AND WHAT THE REAP DID TO THE CALLER'S READING: at most one
-         generation left it ([UserChildren.ch_reaped]). *)
-      ⌜ ch_reaped cs cs' ⌝ -∗
+      (* ...AND WHAT THE CALL ANSWERED, kwait's verbatim
+         ([UserChildren.wait_ans]): -1 with nothing moved, or the reaped
+         child's pid with its escrow -- at the status word this call
+         copied out -- the pid uniqueness over the caller's children, and
+         the reading at what the reap left it. *)
+      wait_ans rv (xstate_val xw) cs cs' -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pid (upd_usM (us_upt U P') (umem_wr (us_M U) v0 d bs)) -∗
+      proc_priv γf pj pid
+        (upd_usM (us_upt U P') (umem_wr (us_M U) v0 d (fun i => nth_byte xw i))) -∗
       (* the row, back at what the reap left it -- kwait's, verbatim *)
       ch_frag (pv_chg (us_V U)) pj cs' -∗
       WP (Loop : expr riscv_lang)) -∗

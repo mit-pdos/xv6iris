@@ -495,9 +495,9 @@ Section SyscExec.
   (* ...AND THE DISPATCHER'S WAIT ROW, on fork's mold exactly.  wait is the
      other entry that moves the caller's children reading: a reap takes the
      reaped generation OUT of it, and every failing arm leaves it alone.
-     The escrow and the facts that identify the generation ride beside the
-     set with WX-WAIT; what is here is the move the wait-lock invariant
-     forces ([WaitInv.children_inv_reap]). *)
+     The escrow the reap hands back and the pid uniqueness that identifies
+     the generation ride in the same answer ([UexecRet.uwait_ans], which is
+     kwait's own [UserChildren.wait_ans] at the a0 word). *)
   Definition sysc_wait_out (U : ustate) (r : mword 64)
       (cs cs' : gset gname) : iProp Σ :=
     (⌜sysc_num (us_V U) = UsysMemOk.USYS_wait⌝ -∗ uwait_ans r cs cs')%I.
@@ -508,19 +508,17 @@ Section SyscExec.
     intros Hne. rewrite /sysc_wait_out. iIntros "%Hc". exfalso. exact (Hne Hc).
   Qed.
 
-  (* ...and what the wait arm itself pays, out of the pure row kwait
-     returns.  THE ARM THAT MOVED NOTHING STILL ANSWERS AT THE SECOND
-     DISJUNCT, at a generation FRESH for the set: removing one that was
-     never in it is the identity, and it keeps the answer's shape the one
-     WX-WAIT grows (the escrow rides beside [γ']). *)
-  Lemma sysc_wait_out_intro (U : ustate) (r : mword 64) (cs cs' : gset gname) :
-    ch_reaped cs cs' -> ⊢ sysc_wait_out U r cs cs'.
+  (* ...and what the wait arm itself pays: the answer kwait returned,
+     re-keyed at the a0 WORD the arm is indexed by.  There is nothing to
+     fabricate -- the escrow and the uniqueness are resources, so the only
+     way to this row is the call's own post. *)
+  Lemma sysc_wait_out_of (U : ustate) (r : mword 64) (rv : mword 32) (xs : Z)
+      (cs cs' : gset gname) :
+    r = (sign_extend' 64 rv : mword 64) ->
+    wait_ans rv xs cs cs' -∗ sysc_wait_out U r cs cs'.
   Proof.
-    intro Hm. rewrite /sysc_wait_out /uwait_ans. iIntros "_".
-    destruct Hm as [-> | [γ' ->]].
-    - iRight. iExists (fresh cs). iPureIntro.
-      pose proof (is_fresh cs) as Hf. set_solver.
-    - iRight. iExists γ'. done.
+    intros ->. rewrite /sysc_wait_out /uwait_ans. iIntros "H %Hn".
+    iExists rv, xs. iSplitR; [done | iExact "H"].
   Qed.
 
   (* ...AND THE PURE HALF, for the twenty entries that keep the set.  fork

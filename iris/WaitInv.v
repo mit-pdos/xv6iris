@@ -1192,6 +1192,92 @@ Section WaitInv.
     done.
   Qed.
 
+  (* ONE MEMBER OF THE ROW, READ WITHOUT SPENDING THE INVARIANT.  The same
+     argument as [children_inv_pid], packaged as an ACCESSOR: what comes
+     out is PERSISTENT (the member's own pid, and a pure implication), so
+     the caller can take it for every member in turn and keep the payload.
+     That is what the summary below is built out of. *)
+  Lemma children_inv_pid_one (ps : list (mword 64)) (gs : list gname)
+      (m : gmap gname (mword 64 * gset gname)) (O : orph_map)
+      (γ0 : gname) (pj : mword 64) (cs : gset gname)
+      (g g' : gname) (pid : mword 32) (dq : dfrac) :
+    pj <> (zero_reg : mword 64) ->
+    m !! γ0 = Some (pj, cs) ->
+    g ∈ cs ->
+    children_inv ps gs m O -∗ pid_reg pid dq g' -∗
+    (∃ pidg : mword 32, gen_pid g pidg ∗ ⌜pidg = pid -> g = g'⌝) ∗
+    children_inv ps gs m O ∗ pid_reg pid dq g'.
+  Proof.
+    intros Hpj Hm Hin. rewrite /children_inv. iIntros "[Hgh %Hp] Hpr".
+    pose proof Hp as Hp'.
+    destruct Hp as (Hlps & Hlgs & Hru & Hig & Hir & Hio & Hisl).
+    destruct (Hir γ0 pj cs g Hm Hpj Hin) as (k & Hk & Hgk).
+    iDestruct (gen_halves_acc ps gs k pj Hk with "Hgh") as "[He Hback]".
+    destruct (bool_decide (pj = (zero_reg : mword 64))) eqn:Hb.
+    { apply bool_decide_eq_true in Hb. exfalso. exact (Hpj Hb). }
+    iDestruct "He" as (g0 pid0) "(%Hg0 & Hsg0 & Hpr0 & #Hgs0 & #Hgp0)".
+    assert (Hgg : g0 = g) by congruence. subst g0.
+    (* the implication, decided here: at the reaped pid the two shares are
+       at ONE key and agree on the generation; at any other pid there is
+       nothing to say. *)
+    iAssert (⌜pid0 = pid -> g = g'⌝)%I with "[Hpr0 Hpr]" as %Himp.
+    { destruct (decide (pid0 = pid)) as [-> | Hne].
+      - iDestruct (pid_reg_agree pid pid (DfracOwn (3/4)) dq g g' eq_refl
+                     with "Hpr0 Hpr") as %->.
+        iPureIntro. intros _. reflexivity.
+      - iPureIntro. intro Hc. exfalso. exact (Hne Hc). }
+    iSplitR; [iExists pid0; iFrame "Hgp0"; iPureIntro; exact Himp |].
+    iFrame "Hpr".
+    iDestruct ("Hback" $! pj with "[Hsg0 Hpr0]") as "Hgh".
+    { rewrite Hb. iExists g, pid0. iFrame "Hsg0 Hpr0 Hgs0 Hgp0".
+      iPureIntro. exact Hgk. }
+    rewrite (list_insert_id ps k pj Hk). iFrame "Hgh". iPureIntro. exact Hp'.
+  Qed.
+
+  (* ...AND THE SUMMARY OVER A SUBSET, by set induction: one member is
+     borrowed at a time and the payload goes back untouched. *)
+  Lemma children_inv_pid_sub (ps : list (mword 64)) (gs : list gname)
+      (m : gmap gname (mword 64 * gset gname)) (O : orph_map)
+      (γ0 : gname) (pj : mword 64) (cs : gset gname)
+      (g' : gname) (pid : mword 32) (dq : dfrac) (X : gset gname) :
+    pj <> (zero_reg : mword 64) ->
+    m !! γ0 = Some (pj, cs) ->
+    X ⊆ cs ->
+    children_inv ps gs m O -∗ pid_reg pid dq g' -∗
+    ([∗ set] g ∈ X, ∃ pidg : mword 32,
+       gen_pid g pidg ∗ ⌜pidg = pid -> g = g'⌝) ∗
+    children_inv ps gs m O ∗ pid_reg pid dq g'.
+  Proof.
+    intros Hpj Hm.
+    induction X as [| g X Hnotin IH] using set_ind_L; intro Hsub.
+    - iIntros "Hci Hpr". rewrite big_sepS_empty. iFrame "Hci Hpr".
+    - iIntros "Hci Hpr".
+      rewrite (big_sepS_insert _ X g Hnotin).
+      iDestruct (children_inv_pid_one ps gs m O γ0 pj cs g g' pid dq
+                   Hpj Hm ltac:(set_solver) with "Hci Hpr") as "(#Hone & Hci & Hpr)".
+      iDestruct (IH ltac:(set_solver) with "Hci Hpr") as "(#Hrest & Hci & Hpr)".
+      iFrame "Hci Hpr". iSplitR; [iExact "Hone" | iExact "Hrest"].
+  Qed.
+
+  (* (W3) FOR THE WHOLE ROW, which is what the reaper's post carries out
+     from under the lock ([ChildTok.gen_uniq]): no child of this caller
+     but [g'] carries the pid it is registered at.  PERSISTENT, so it
+     survives the release; the caller that spends it holds a QUARTER of
+     one of those generations ([ChildTok.gen_uniq_tok]). *)
+  Lemma children_inv_pid_all (ps : list (mword 64)) (gs : list gname)
+      (m : gmap gname (mword 64 * gset gname)) (O : orph_map)
+      (γ0 : gname) (pj : mword 64) (cs : gset gname)
+      (g' : gname) (pid : mword 32) (dq : dfrac) :
+    pj <> (zero_reg : mword 64) ->
+    m !! γ0 = Some (pj, cs) ->
+    children_inv ps gs m O -∗ pid_reg pid dq g' -∗
+    gen_uniq cs pid g' ∗ children_inv ps gs m O ∗ pid_reg pid dq g'.
+  Proof.
+    intros Hpj Hm. rewrite /gen_uniq. iIntros "Hci Hpr".
+    iApply (children_inv_pid_sub ps gs m O γ0 pj cs g' pid dq cs Hpj Hm
+              ltac:(reflexivity) with "Hci Hpr").
+  Qed.
+
   (* (W5), THE EMPTY ROW.  The scan found no cell holding the reaper's
      address, so by the two converses NEITHER of its columns can hold
      anything: a childless wait() returns -1 and the caller's row is

@@ -663,7 +663,8 @@ Section UkInitMain.
   (* catalog: without [init_code] at the child's text name the child cannot  *)
 (* even walk its return.                                                   *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kinit_fork (szv : Z) (h : CpuId) (m : regfile) (avail : nat) :
+  Lemma wp_kinit_fork (szv : Z) (h : CpuId) (m : regfile) (avail : nat)
+      (Sc : gset gname) :
     init_code γt -∗ init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
     (* THE LEDGER.  fork copies the descriptor table, so the child wakes
        on the parent's, and the child is the arm that execs sh -- which
@@ -675,19 +676,27 @@ Section UkInitMain.
        reads it, but the child's half is minted at the parent's value and
        the leaf needs one to name ([UkFork.wp_uk_ecall_fork]) *)
     UserCwd.ucwd γcwd FsImg.ROOTINO -∗
-    (* ...AND ITS OWN HALF OF ITS CHILDREN SET, index-free: fork MOVES the
-       set and an update needs both halves, so the fragment has to reach
-       the leaf -- but init never asks which children it has, so it
-       carries [UserChildren.uch_any] and drops the token the pid arm
-       mints ([UkFork.wp_uk_ecall_fork_any]). *)
-    UserChildren.uch_any γch -∗
+    (* ...AND ITS OWN HALF OF ITS CHILDREN SET, AT THE SET ITSELF: fork
+       MOVES it and an update needs both halves, and init is a program that
+       READS the answer -- the child it forks is the one it waits for, so
+       the pid arm's token is what its wait redeems
+       ([UkFork.wp_uk_ecall_fork] at [Q := fun _ => True]; L7 puts the
+       console-input resource in that payload). *)
+    UserChildren.uch γch Sc -∗
     urun N h m (mword_of_int InitSyms.fork) avail -∗
     ((∀ (h' : CpuId) (r : mword 64),
         ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
+        (* FORK'S TWO ARMS, relayed: it failed and the set did not move, or
+           it returned the child's pid with the quarter of that child's
+           generation a later wait() redeems. *)
+        ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ UserChildren.uch γch Sc)
+         ∨ ∃ (γ : gname) (pidv : mword 32),
+             ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
+             child_tok γ pidv (fun _ => True)%I ∗
+             UserChildren.uch γch (Sc ∪ {[γ]})) -∗
         (init_code γt ∗ init_rodata γt ∗ init_argv γd) -∗ usz γs szv -∗
         ustd_any γfd -∗
         UserCwd.ucwd γcwd FsImg.ROOTINO -∗
-        UserChildren.uch_any γch -∗
         urun N h'
           (<[Regidx a0_idx := r]>
              (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m))
@@ -738,8 +747,8 @@ Section UkInitMain.
     (* init holds no descriptor handles at this point -- its console fds are
        opened AFTER the fork, in the child's exec'd image -- so the handle
        set fork carries across is empty and both extra premises are [emp]. *)
-    iApply (wp_uk_ecall_fork_any N h1 mf1 (mword_of_int 0x36c) avail szv
-              l ∅ FsImg.ROOTINO
+    iApply (wp_uk_ecall_fork N h1 mf1 (mword_of_int 0x36c) avail szv
+              l ∅ FsImg.ROOTINO Sc (fun _ => True)%I
               (fun gt gd _ =>
                  (init_code gt ∗ init_rodata gt ∗ init_argv gd)%I)
               ltac:(unfold mf1, usysno;
@@ -747,8 +756,11 @@ Section UkInitMain.
                                (mword_of_int 1 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] [] Hsz Hstd [] Hcwd Hch Hrun").
+              with "[] [] [] Hsz Hstd [] Hcwd Hch Hrun").
     { iApply (uis_init_36c with "Hcode"). }
+    (* the payload the child's run carries from its first instruction, at
+       this program's trivial choice *)
+    { done. }
     { iFrame "Hcode Hro Hargv". }
     { rewrite big_sepM_empty. done. }
     assert (E36c : add_vec_int (mword_of_int 0x36c : mword 64) 4
@@ -763,7 +775,7 @@ Section UkInitMain.
                ltac:(vm_compute; discriminate)). }
     iSplitL "Hpar".
     - (* the PARENT resumes under the names it already had *)
-      iIntros (hp r) "%Hrnz Hpay Hsz Hstd _ Hcwd Hch Hrun".
+      iIntros (hp r) "%Hrnz Hans Hpay Hsz Hstd _ Hcwd Hrun".
       set (mp := <[Regidx a0_idx := r]> mf1).
       assert (Hrap : mp !!! Regidx ra_idx = m !!! Regidx ra_idx).
       { rewrite /mp (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) r
@@ -777,7 +789,7 @@ Section UkInitMain.
                 with "[] Hrun").
       { iApply (uis_init_370 with "Hcp"). }
       iIntros (hp2) "Hrun".
-      iApply ("Hpar" $! hp2 r with "[] [] Hsz [Hstd] Hcwd Hch Hrun").
+      iApply ("Hpar" $! hp2 r with "[] Hans [] Hsz [Hstd] Hcwd Hrun").
       { iPureIntro. exact Hrnz. }
       { iFrame "Hcp Hrp Hap". }
       { iExists l. iFrame "Hstd". }
@@ -785,7 +797,7 @@ Section UkInitMain.
          child execs, and nothing before the exec allocates. *)
       (* the child's own children fragment is [∅] and init's child execs
          before it forks, so nothing here reads it *)
-      iIntros (N' hc) "%Hpeq Hpay Hsz Hstd _ Hcwd _ Hrun".
+      iIntros (N' hc γ') "%Hpeq _ Hpay Hsz Hstd _ Hcwd _ Hrun".
       pose proof (Hpeq : UkRun.ukn_triv N') as Hti'.
       set (mk := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]> mf1).
       assert (Hrak : mk !!! Regidx ra_idx = m !!! Regidx ra_idx).
@@ -817,11 +829,24 @@ Section UkInitMain.
   (* conjuncts of one [iLöb], and the [∧] is doing real work: it lets both   *)
   (* arms use the SAME [usz], which a [∗] would have to split.               *)
   (*                                                                        *)
-  (* THE INVARIANT IS ONE REGISTER PIN.  s2 holds the "init: starting sh"    *)
-  (* pointer; everything else the loop needs is inside [urun].  In           *)
-  (* particular nothing is assumed about what wait RETURNS: its result is    *)
-  (* compared against s1, and all three outcomes -- the child was reaped, an *)
-  (* orphan was reaped, the call failed -- are legal continuations of init.  *)
+  (* THE RESTART HEAD'S INVARIANT IS ONE REGISTER PIN.  s2 holds the        *)
+  (* "init: starting sh" pointer; everything else it needs is inside        *)
+  (* [urun].  Nothing is assumed about what wait RETURNS: its result is     *)
+  (* compared against s1, and all three outcomes -- the child was reaped,   *)
+  (* an orphan was reaped, the call failed -- are legal continuations.      *)
+  (*                                                                        *)
+  (* THE WAIT HEAD'S CARRIES THE SHELL IT IS WAITING FOR.  Between the fork  *)
+  (* and the [beq a0,s1] that leaves this loop, init holds a QUARTER of the  *)
+  (* generation it forked ([ChildTok.child_tok] at this program's trivial    *)
+  (* payload), that generation is in the children set its half pins, and s1  *)
+  (* holds its pid sign-extended.  Those three are what turn "wait returned  *)
+  (* s1" into "the shell I started is the process that exited":              *)
+  (* [ChildTok.gen_uniq_tok] against the answer's uniqueness summary names   *)
+  (* the generation, and [ChildTok.gen_pay] then redeems the payload.  On an *)
+  (* orphan the SAME token refutes the identification                        *)
+  (* ([ChildTok.exit_tok_tok_ne]), which is what keeps the shell in the set  *)
+  (* across a round.  L7 puts the console-input resource in the payload, and *)
+  (* this is where it comes back.                                            *)
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_main_loop (szv : Z) (n : nat) :
     init_code γt -∗
@@ -843,12 +868,16 @@ Section UkInitMain.
         UserChildren.uch_any γch -∗
         urun N h m (mword_of_int 0x32) (12 + (12 + (4 + n))) -∗
         WP (Loop : expr riscv_lang))
-     ∧ (∀ (h : CpuId) (m : regfile),
+     ∧ (∀ (h : CpuId) (m : regfile) (cs : gset gname)
+          (γsh : gname) (pidsh : mword 32),
           ⌜ m !!! Regidx s2_idx = mword_of_int LIT_START ⌝ -∗
+          ⌜ m !!! Regidx s1_idx = (sign_extend' 64 pidsh : mword 64) ⌝ -∗
+          ⌜ γsh ∈ cs ⌝ -∗
           usz γs szv -∗
           ustd_any γfd -∗
           UserCwd.ucwd γcwd FsImg.ROOTINO -∗
-          UserChildren.uch_any γch -∗
+          UserChildren.uch γch cs -∗
+          child_tok γsh pidsh (fun _ => True)%I -∗
           urun N h m (mword_of_int 0x44) (12 + (12 + (4 + n))) -∗
           WP (Loop : expr riscv_lang))).
   Proof.
@@ -942,12 +971,15 @@ Section UkInitMain.
       assert (Eretf : ret_pc (ml4 !!! Regidx ra_idx)
                       = (mword_of_int 0x3c : mword 64))
         by (rewrite Hral4; apply bv_eq; vm_compute; reflexivity).
-      iApply (wp_kinit_fork szv hl4 ml4 (12 + (12 + (4 + n)))
+      (* the set the fork moves has to be NAMED, because the answer says
+         what it became and the wait head is indexed by it *)
+      iDestruct "Hch" as (Sc) "Hch".
+      iApply (wp_kinit_fork szv hl4 ml4 (12 + (12 + (4 + n))) Sc
                 with "Hcode Hro Hargv Hsz Hstd Hcwd Hch Hrun").
       rewrite Eretf.
       iSplitR "".
       + (* ------------- the PARENT: r <> 0 ------------- *)
-        iIntros (hp r) "%Hrnz (#Hcp & #Hrp & #Hap) Hsz Hstd Hcwd Hch Hrun".
+        iIntros (hp r) "%Hrnz Hans (#Hcp & #Hrp & #Hap) Hsz Hstd Hcwd Hrun".
         set (mp0 := <[Regidx a0_idx := r]>
                       (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> ml4)).
         assert (Ha0p0 : mp0 !!! Regidx a0_idx = r)
@@ -1037,9 +1069,21 @@ Section UkInitMain.
             by (apply bv_eq; vm_compute; reflexivity).
           rewrite E42p.
           iIntros (hp3) "Hrun".
+          (* THE FORK SUCCEEDED, so the answer is on its pid arm: the -1
+             disjunct cannot be, because the [blt] above was not taken. *)
+          iDestruct "Hans" as "[[%Hrm1 Hch] | (%γsh & %pidsh & %Hrpid & Htok & Hch)]".
+          { exfalso. rewrite Ha0p1 Hrm1 in Hblt. vm_compute in Hblt.
+            discriminate Hblt. }
+          assert (Hs1p1 : mp1 !!! Regidx s1_idx
+                          = (sign_extend' 64 pidsh : mword 64)).
+          { rewrite /mp1 (upd_eq mp0 (Regidx s1_idx) (regval_into_reg _)).
+            rewrite Ha0p0 Hrpid. apply add_vec_zero_l. }
           iDestruct "IH" as "[_ IH2]".
-          iApply ("IH2" $! hp3 mp1 with "[] Hsz Hstd Hcwd Hch Hrun").
-          iPureIntro. exact Hs2p1.
+          iApply ("IH2" $! hp3 mp1 (Sc ∪ {[γsh]}) γsh pidsh
+                    with "[] [] [] Hsz Hstd Hcwd Hch Htok Hrun").
+          { iPureIntro. exact Hs2p1. }
+          { iPureIntro. exact Hs1p1. }
+          { iPureIntro. set_solver. }
       + (* ------------- the CHILD: r = 0 ------------- *)
         iIntros (N' hc) "%Hpeq (#Hck & #Hrk & #Hak) Hsz Hstd Hcwd Hrun".
         pose proof (Hpeq : UkRun.ukn_triv N') as Hti'.
@@ -1106,7 +1150,7 @@ Section UkInitMain.
         iApply (wp_kinit_main_child N' hc3 mc1 n
                   with "Hck Hxs Hrk Hak Hcwd Hstd Hrun").
     - (* ==================== the WAIT head @0x44 ==================== *)
-      iIntros (h m) "%Hs2 Hsz Hstd Hcwd Hch Hrun".
+      iIntros (h m cs γsh pidsh) "%Hs2 %Hs1 %Hin Hsz Hstd Hcwd Hch Htok Hrun".
       (* ---- 0x44  c.li a0,0 -- the NULL status pointer ---- *)
       iApply (wp_uk_cli N h m (mword_of_int 0x44)
                 (mword_of_int 0 : mword 6) a0_idx (12 + (12 + (4 + n)))
@@ -1125,6 +1169,13 @@ Section UkInitMain.
       assert (Hs2w1 : mw1 !!! Regidx s2_idx = mword_of_int LIT_START).
       { rewrite <- Hs2.
         exact (upd_ne m (Regidx a0_idx) (Regidx s2_idx) _
+                 ltac:(vm_compute; discriminate)). }
+      (* s1 -- the pid of the shell this loop is waiting for -- is written
+         once, at 0x3c before the loop, and nothing between here and the
+         [beq] touches it *)
+      assert (Hs1w1 : mw1 !!! Regidx s1_idx = (sign_extend' 64 pidsh : mword 64)).
+      { rewrite <- Hs1.
+        exact (upd_ne m (Regidx a0_idx) (Regidx s1_idx) _
                  ltac:(vm_compute; discriminate)). }
       (* ---- 0x46  jal ra,0x37a <wait> ---- *)
       iApply (wp_uk_jal N hw1 mw1 (mword_of_int 0x46)
@@ -1147,15 +1198,19 @@ Section UkInitMain.
       { rewrite <- Hs2w1.
         exact (upd_ne mw1 (Regidx ra_idx) (Regidx s2_idx) _
                  ltac:(vm_compute; discriminate)). }
+      assert (Hs1w2 : mw2 !!! Regidx s1_idx = (sign_extend' 64 pidsh : mword 64)).
+      { rewrite <- Hs1w1.
+        exact (upd_ne mw1 (Regidx ra_idx) (Regidx s1_idx) _
+                 ltac:(vm_compute; discriminate)). }
       assert (Ha0w2 : uint (mw2 !!! Regidx a0_idx) = 0).
       { rewrite (upd_ne mw1 (Regidx ra_idx) (Regidx a0_idx) _
                    ltac:(vm_compute; discriminate)).
         rewrite (upd_eq m (Regidx a0_idx) (regval_into_reg _)).
         vm_compute. reflexivity. }
       (* ---- wait(0) ---- *)
-      iApply (wp_kinit_wait N Hpsok hw2 mw2 (12 + (12 + (4 + n))) Ha0w2
+      iApply (wp_kinit_wait N Hpsok hw2 mw2 (12 + (12 + (4 + n))) cs Ha0w2
                 with "Hcode Hrun Hch").
-      iIntros (hw3 ret) "Hrun Hch".
+      iIntros (hw3 ret cs') "Hans Hrun Hch".
       assert (Eretw : ret_pc (mw2 !!! Regidx ra_idx)
                       = (mword_of_int 0x4a : mword 64))
         by (rewrite Hraw2; apply bv_eq; vm_compute; reflexivity).
@@ -1168,6 +1223,18 @@ Section UkInitMain.
                         ltac:(vm_compute; discriminate)).
         exact (upd_ne mw2 (Regidx a7_idx) (Regidx s2_idx) _
                  ltac:(vm_compute; discriminate)). }
+      assert (Hs1w3 : mw3 !!! Regidx s1_idx = (sign_extend' 64 pidsh : mword 64)).
+      { rewrite <- Hs1w2.
+        rewrite /mw3 (upd_ne _ (Regidx a0_idx) (Regidx s1_idx) ret
+                        ltac:(vm_compute; discriminate)).
+        exact (upd_ne mw2 (Regidx a7_idx) (Regidx s1_idx) _
+                 ltac:(vm_compute; discriminate)). }
+      assert (Ha0w3 : mw3 !!! Regidx a0_idx = ret)
+        by exact (upd_eq _ (Regidx a0_idx) ret).
+      (* the answer, opened once for the three arms below: the return value
+         is an [int] sign-extended, and either nothing was reaped or a
+         generation left the set with its escrow. *)
+      iDestruct "Hans" as (rv xs) "[%Hret Hwa]".
       (* ---- 0x4a  beq a0,s1,0x32 -- BACK EDGE to the restart head ---- *)
       assert (Etgt4a : add_vec (mword_of_int 0x4a : mword 64)
                          (sign_extend' 64 (mword_of_int 8168 : mword 13))
@@ -1184,9 +1251,33 @@ Section UkInitMain.
                   with "[] Hrun").
         { iApply (uis_init_4a with "Hcode"). }
         iNext. iIntros (hw4) "Hrun".
+        (* THE REDEMPTION.  The pid that came back is s1, the pid of the
+           shell this loop forked; on the reaping arm the answer's
+           uniqueness summary says no OTHER child of init carries it, so
+           the generation reaped IS the shell's and its escrow pairs with
+           the token init has held since the fork
+           ([ChildTok.gen_uniq_tok], then [ChildTok.gen_pay_timeless]).
+           This program's payload is trivial, so what comes back is [True];
+           L7's console-input resource arrives through exactly this step.
+           On the -1 arm nothing was reaped -- init is exiting on a killed
+           shell's behalf next round -- and the token is simply dropped. *)
+        assert (Hs1ret : (sign_extend' 64 pidsh : mword 64) = ret).
+        { rewrite <- Hs1w3, <- Ha0w3. apply eq_vec_true_iff. exact Hbeq. }
+        iDestruct "Hwa" as "[[%Hm1 %Hcseq] | (%γ' & %Hcseq & Hesc & #Huq)]".
+        { iDestruct "IH" as "[IH1 _]".
+          iApply ("IH1" $! hw4 mw3 with "[] Hsz Hstd Hcwd [Hch] Hrun").
+          { iPureIntro. exact Hs2w3. }
+          iApply (UserChildren.uch_any_of with "Hch"). }
+        assert (Hrvp : rv = pidsh).
+        { apply sext64_32_inj. rewrite <- Hret. exact (eq_sym Hs1ret). }
+        subst rv.
+        iDestruct (gen_uniq_tok cs pidsh γ' γsh (fun _ => True)%I Hin
+                     with "Huq Htok") as %->.
+        iMod (gen_pay_timeless with "Htok Hesc") as "_".
         iDestruct "IH" as "[IH1 _]".
-        iApply ("IH1" $! hw4 mw3 with "[] Hsz Hstd Hcwd Hch Hrun").
-        iPureIntro. exact Hs2w3.
+        iApply ("IH1" $! hw4 mw3 with "[] Hsz Hstd Hcwd [Hch] Hrun").
+        { iPureIntro. exact Hs2w3. }
+        iApply (UserChildren.uch_any_of with "Hch").
       * (* somebody else's child, or an error *)
         iApply (wp_uk_btype_later N hw3 mw3 (mword_of_int 0x4a)
                   (mword_of_int 8168 : mword 13) a0_idx s1_idx BEQ false
@@ -1215,9 +1306,28 @@ Section UkInitMain.
                     with "[] Hrun").
           { iApply (uis_init_4e with "Hcode"). }
           iNext. iIntros (hw5) "Hrun".
+          (* AN ORPHAN, AND THE SHELL IS STILL A CHILD.  The pid that came
+             back is not s1, so whatever generation left the set was not the
+             one init holds a token for ([ChildTok.exit_tok_tok_ne]) -- which
+             is what lets the next round be entered at the same invariant. *)
+          assert (Hs1ne : (sign_extend' 64 pidsh : mword 64) <> ret).
+          { rewrite <- Hs1w3, <- Ha0w3. apply eq_vec_false_iff. exact Hbeq. }
+          iAssert (⌜γsh ∈ cs'⌝ ∗ UserChildren.uch γch cs' ∗
+                   child_tok γsh pidsh (fun _ => True)%I)%I
+            with "[Hwa Hch Htok]" as "(%Hin' & Hch & Htok)".
+          { iDestruct "Hwa" as "[[%Hm1 %Hcseq] | (%γ' & %Hcseq & Hesc & _)]".
+            - iFrame "Hch Htok". iPureIntro. rewrite Hcseq. exact Hin.
+            - iDestruct (exit_tok_tok_ne γ' γsh rv pidsh xs (fun _ => True)%I
+                           ltac:(intro Hc; apply Hs1ne;
+                                 rewrite Hret Hc; reflexivity)
+                           with "Hesc Htok") as %Hne.
+              iFrame "Hch Htok". iPureIntro. rewrite Hcseq. set_solver. }
           iDestruct "IH" as "[_ IH2]".
-          iApply ("IH2" $! hw5 mw3 with "[] Hsz Hstd Hcwd Hch Hrun").
-          iPureIntro. exact Hs2w3.
+          iApply ("IH2" $! hw5 mw3 cs' γsh pidsh
+                    with "[] [] [] Hsz Hstd Hcwd Hch Htok Hrun").
+          { iPureIntro. exact Hs2w3. }
+          { iPureIntro. exact Hs1w3. }
+          { iPureIntro. exact Hin'. }
         + (* wait itself failed: the diagnostic at 0x52 *)
           iApply (wp_uk_btype0_later N hw4 mw3 (mword_of_int 0x4e)
                     (mword_of_int 8182 : mword 13) a0_idx BGE false

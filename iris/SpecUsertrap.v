@@ -543,9 +543,9 @@ Qed.
 (* ===================================================================== *)
 (* ...AND WAIT'S, on fork's footing exactly: the reap took the reaped      *)
 (* generation out of the caller's children reading, and what the loop      *)
-(* hands the process is what the set became ([UexecRet.uwait_ans]).  The   *)
-(* escrow and the two facts that identify the generation ride beside it    *)
-(* with WX-WAIT; the row itself is the set's move.                         *)
+(* hands the process is what the set became ([UexecRet.uwait_ans]) --      *)
+(* together, on the reaping arm, with the reaped child's escrow and the    *)
+(* pid uniqueness that names its generation.                               *)
 (* ===================================================================== *)
 Definition ut_wait_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
