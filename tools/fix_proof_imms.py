@@ -327,8 +327,8 @@ def main():
         old_by = load_bytes(os.path.join(args.old_image, 'OldKernelInstrs.v'))
         old_syms = load_syms(os.path.join(args.old_image, 'OldKernelSyms.v'))
 
-    def old_imm_at(base, off, width, plus4=False):
-        """The immediate the PRE-BUMP image had at this pc, if resolvable."""
+    def old_addr(base, off):
+        """The PRE-BUMP address of a pc a proof names as [base + off]."""
         if old_by is None:
             return None
         sym = None
@@ -339,7 +339,56 @@ def main():
             sym = base
         if sym is None or sym not in old_syms:
             return None
-        a = old_syms[sym] + off + (4 if plus4 else 0)
+        return old_syms[sym] + off
+
+    def shape_at(by, pc):
+        """The instruction at [pc] with its immediates normalised away, so a
+        pure relocation compares EQUAL and a changed instruction does not."""
+        w2 = word_at(by, pc, 2)
+        if w2 is None:
+            return None
+        if (w2 & 3) != 3:
+            a = R.decode_compressed(w2)
+        else:
+            w4 = word_at(by, pc, 4)
+            a = R.decode_base(w4) if w4 is not None else None
+        if a is None:
+            return None
+        if isinstance(a, tuple):
+            a = a[0]
+        # Normalise the IMMEDIATE ONLY.  A register decodes as
+        # [Regidx (mword_of_int 10)], so a blanket substitution erases the
+        # register too and [addi a0,a0,2208] compares equal to
+        # [addi a3,a4,5] -- which is exactly the uartintr+0x42 corruption
+        # this guard exists to catch.  Protect the register spellings first.
+        a = re.sub(r'(C?regidx|C?Regidx)\s*\(\s*mword_of_int\s+(-?\d+)\s*\)',
+                   r'\1<\2>', a)
+        a = re.sub(r'mword_of_int\s+-?\d+', 'mword_of_int _', a)
+        return a
+
+    def shape_changed(base, off, addr):
+        """Is this pc a DIFFERENT INSTRUCTION than it was before the bump?
+
+        [--old-image] proves the literal IS this pc's pre-bump immediate --
+        which it also is when the function CHANGED SHAPE and the pc now names
+        an unrelated instruction.  There the rewrite is silent corruption:
+        [lui a5,0x10000] became [auipc a4,0xa] at uartintr+0x14 and the tool
+        wrote the auipc's immediate onto the lui's literal.  Widths do not
+        catch it (LUI and AUIPC are both U20).  So compare the DECODED
+        instruction, and refuse rather than guess: a shape-changed function
+        needs proof work, not an address sweep."""
+        a = old_addr(base, off)
+        if a is None:
+            return False
+        so, sn = shape_at(old_by, a), shape_at(by, addr)
+        return so is not None and sn is not None and so != sn
+
+    def old_imm_at(base, off, width, plus4=False):
+        """The immediate the PRE-BUMP image had at this pc, if resolvable."""
+        a = old_addr(base, off)
+        if a is None:
+            return None
+        a += 4 if plus4 else 0
         w = word_at(old_by, a, width // 8)
         if w is None:
             return None
@@ -347,6 +396,7 @@ def main():
         return r[1] if r else None
 
     n_ok = n_bad = n_pc = 0
+    shape_bad = {}
     per_file = {}
     all_pc = {}
     n_amb = 0
@@ -400,6 +450,9 @@ def main():
                     if g2 and g2[0] in ('I12', 'S12'):
                         kind, want = g2
                         pair = True
+            if shape_changed(base, off, addr):
+                shape_bad.setdefault(p, []).append((base, off))
+                continue
             oldv = old_imm_at(base, off, 32 if width == 32 else 16, pair)
             # Without the width ascription a bare [mword_of_int 11] is usually a
             # REGISTER index, so taking the first match finds the wrong thing.
@@ -444,6 +497,15 @@ def main():
 
     print("pc-anchored sites seen : %d  (unresolvable alias: %d)" % (n_pc, n_amb))
     print("immediates AGREE       : %d" % n_ok)
+    if shape_bad:
+        n = sum(len(v) for v in shape_bad.values())
+        print("REFUSED (shape changed): %d site(s) in %d file(s) -- these pcs name "
+              "a DIFFERENT INSTRUCTION than before the bump; they need proof work, "
+              "not a sweep:" % (n, len(shape_bad)))
+        for f in sorted(shape_bad):
+            print("  %-28s %s" % (os.path.basename(f),
+                                  " ".join("%s+0x%x" % (b, o) for b, o in shape_bad[f][:6])
+                                  + (" ..." if len(shape_bad[f]) > 6 else "")))
     print("immediates STALE       : %d in %d file(s)" % (n_bad, len(per_file)))
     for p, es in sorted(per_file.items()):
         print("  %-28s %s" % (os.path.basename(p),

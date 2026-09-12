@@ -336,6 +336,35 @@ blindly produce `mword 4088` and `sign_extend' 52`. **And substitute in ONE
 PASS**: old→new pairs chain, so applying `0x70 -> 0x78` next to
 `0x78 -> 0x80` sequentially double-shifts the first.
 
+### The pc must still name the SAME INSTRUCTION
+
+`--old-image` proves *this literal IS this pc's pre-bump immediate*. That
+identifies the LITERAL; it says nothing about whether the pc still names the
+same instruction. In a function that changed SHAPE it does not, and the guard
+passes anyway: the proof faithfully recorded the old instruction's immediate,
+so the test succeeds and the tool writes the immediate of whatever now sits at
+that address. `uartintr+0x14` was `lui a5,0x10000` and became `auipc a4,0xa`;
+both are U20, so the width cross-check agrees too.
+
+So the tool now decodes old and new at every candidate pc and **refuses** the
+site when the instruction differs, reporting it as `REFUSED (shape changed)`.
+A shape-changed function needs proof work, not an address sweep — the refusal
+list and the shape classification of §2 should agree, and if they do not, one
+of them is wrong.
+
+Normalise the IMMEDIATE ONLY when comparing. A register decodes as
+`Regidx (mword_of_int 10)`, so a blanket `mword_of_int \d+` substitution erases
+the register too and `addi a0,a0,2208` compares equal to `addi a3,a4,5` —
+which is precisely the case the check exists to catch.
+
+**Expect false positives, and expect them to look plausible.** The window from
+one anchor can reach a literal belonging to a *different* pc whose old
+immediate coincides with it. Do not "fix" a reported site by inspection: the
+relocation lemmas are proved by `vm_compute; reflexivity` and therefore verify
+themselves, so re-derive the address from the pc and the auipc/addi pair and
+let a compile settle it. Two lemmas in one file can legitimately hold the two
+values the report wants to unify.
+
 ### A rebase onto the bump carries stale immediates in silence
 
 The batch sweeps the tree the bump ran against. A proof **written before the
