@@ -74,6 +74,11 @@ Require User.EchoSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
+(* a failing tactic in a whole-function WP looks like a hang: Rocq prints
+   the entire goal, and a [urun]-altitude goal is enormous (durable-notes,
+   "The dev loop"). *)
+Set Printing Depth 40.
+
 (* ===================================================================== *)
 (*  1.  THE PATH sh PASSES, as a byte list                                *)
 (*                                                                        *)
@@ -292,6 +297,32 @@ Section UShEcho.
 
   Global Instance sh_echo_slot_persistent T : Persistent (sh_echo_slot T).
   Proof. rewrite /sh_echo_slot. apply _. Qed.
+
+  (* ...AND E2'S SEAM, AS ONE APPLICATION (the coordinator's ruling (c)).
+     [UInitSh.init_sh_slot] will hand sh ONE claim law, at the whole of
+     [AppEcho.echo_fs_pure] rather than at each pin separately -- /init's,
+     /sh's and /echo's three conjuncts -- and both [FsShPin.era0_sh_pins]
+     and [FsEchoPin.era0_echo_pins] project out of it.  So what E2 owes
+     this lane is this, and turning it into [sh_echo_slot] is a projection
+     under the law's own [□]. *)
+  Definition sh_echo_slot_of_fs_pure (T : iProp Σ) : iProp Σ :=
+    (app_inv fsc_fs
+     ∗ □ (∀ v : aview, app_pred app_run v -∗
+                         app_pred app_run v
+                         ∗ (⌜AppEcho.echo_fs_pure v⌝ ∨ T))
+     ∗ □ (∀ (R : iProp Σ) (W : uvis),
+            T -∗ my_pay (uvis_gen W) (fun _ => R)%I -∗ R -∗ uslot W))%I.
+
+  Lemma sh_echo_slot_of_fs_pure_holds (T : iProp Σ) :
+    sh_echo_slot_of_fs_pure T -∗ sh_echo_slot T.
+  Proof.
+    iIntros "(#Hinv & #Hcl & #Hgen)".
+    rewrite /sh_echo_slot. iFrame "Hinv Hgen".
+    iModIntro. iIntros (v) "Hp".
+    iDestruct ("Hcl" $! v with "Hp") as "[$ [%Hpure | HT]]".
+    - iLeft. iPureIntro. exact (proj2 (proj2 Hpure)).
+    - iRight. iExact "HT".
+  Qed.
 
   (* =================================================================== *)
   (*  5.  THE TWO READINGS OF SH'S OWN IMAGE                              *)

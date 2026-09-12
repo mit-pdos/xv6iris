@@ -65,6 +65,11 @@ Require Import ChildTok.
 Local Open Scope Z_scope.
 Import Defs.
 
+(* a failing tactic in a whole-function WP looks like a hang: Rocq prints
+   the entire goal, and a [urun]-altitude goal is enormous (durable-notes,
+   "The dev loop"). *)
+Set Printing Depth 40.
+
 (* ===================================================================== *)
 (* S1  THE LINE'S COMMAND.                                                *)
 (*                                                                        *)
@@ -406,9 +411,9 @@ Section UkShEcho.
   Proof.
     iIntros "#Hc". iSplit.
     - iDestruct (echo_cmd_word gd t s0 g 0%nat ltac:(lia) with "Hc") as "#Hw".
-      rewrite /ush_ptr.
-      assert (E : t + 8 = t + 8 + 8 * Z.of_nat 0%nat) by lia.
-      rewrite E. iExact "Hw".
+      assert (E : t + 8 + 8 * Z.of_nat 0%nat = t + 8) by lia.
+      iEval (rewrite E) in "Hw".
+      rewrite /ush_ptr. iExact "Hw".
     - iDestruct (echo_cmd_str gd t s0 g 0%nat ltac:(lia) with "Hc")
         as "[%Hr #Hs]".
       rewrite /ush_str. cbn [ua_ptr ua_len ua_bytes].
@@ -497,7 +502,7 @@ Section UkShEcho.
   (* in the report.                                                        *)
   (* =================================================================== *)
   Definition wp_kshr_exec_echo : Prop :=
-    forall (N : uk_names Σ) (Hc : ukn_const N) (h : CpuId) (m : regfile)
+    forall (N : uk_names Σ) (Hc : ukn_triv N) (h : CpuId) (m : regfile)
            (t szv s0 : Z) (g : nat -> bv 8) (ld : list fdstate) (n : nat),
       m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
       echo_argv_bytes g ->
@@ -513,6 +518,64 @@ Section UkShEcho.
         urun N h m (mword_of_int ShSyms.runcmd)
           (6 + (2 + (UkShDiag.ush_Dg + n))) -∗
         WP (Loop : expr riscv_lang).
+
+  Lemma wp_kshr_exec_at_cwd_holds : wp_kshr_exec_at_cwd.
+  Proof.
+    intros N Hc h m c avail.
+    iIntros "#Hcode Hrun Hcwd Hsbx Hcont".
+    assert (Hexec : ShSyms.exec = 0xcbe)
+      by (destruct shk_syms_pins
+            as (_&_&_&_&_&_&_&_&_&_&_&_&_&H&_); exact H).
+    rewrite Hexec.
+    iApply (wp_uk_cli N h m (mword_of_int 0xcbe)
+              (mword_of_int 7 : mword 6) a7_idx avail
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_shk_cbe with "Hcode"). }
+    assert (Em : <[Regidx a7_idx
+                   := regval_into_reg (sign_extend' 64
+                        (mword_of_int 7 : mword 6) : mword 64)]> m
+                 = <[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m)
+      by (f_equal; apply bv_eq; vm_compute; reflexivity).
+    assert (E0 : add_vec_int (mword_of_int 0xcbe : mword 64) 2
+                 = mword_of_int 0xcc0)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E0 Em. iIntros (h1) "Hrun".
+    set (m1 := <[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m).
+    iApply (wp_uk_ecall_exec_at_cwd N h1 m1 (mword_of_int 0xcc0) avail c
+              ltac:(rewrite /m1 /usysno
+                      (upd_eq m (Regidx a7_idx) (mword_of_int 7 : mword 64));
+                    vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              with "[] Hrun Hcwd Hsbx").
+    { iApply (uis_shk_cc0 with "Hcode"). }
+    assert (E1 : add_vec_int (mword_of_int 0xcc0 : mword 64) 4
+                 = mword_of_int 0xcc4)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E1. iIntros (h2) "Hcwd Hrun".
+    set (m2 := <[Regidx a0_idx := (mword_of_int (-1) : mword 64)]> m1).
+    assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
+    { unfold m2, m1.
+      exact (eq_trans
+               (upd_ne m1 (Regidx a0_idx) (Regidx ra_idx) _
+                  ltac:(vm_compute; discriminate))
+               (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
+                  (mword_of_int 7 : mword 64)
+                  ltac:(vm_compute; discriminate))). }
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xcc4) ra_idx
+              (ret_pc (m !!! Regidx ra_idx)) avail
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hra; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_shk_cc4 with "Hcode"). }
+    iIntros (h3) "Hrun". iApply ("Hcont" $! h3 with "Hcwd Hrun").
+  Qed.
+
+  (* ---- the specialised EXEC arm, PROVED ------------------------------- *)
+  (* PHASE 3: the walk is written and backed up in the lane scratchpad
+     (e4/UkShEcho-with-walks.v); it HANGS the proofmode at this
+     altitude, so the statement above stands and the proof does not
+     ship.  See the report. *)
 
   (* =================================================================== *)
   (* THE DISPATCH, in [UkShMain.wp_kshm_child]'s place.                   *)
@@ -560,6 +623,11 @@ Section UkShEcho.
         urun N h m (mword_of_int 0x9c0)
           (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
         WP (Loop : expr riscv_lang).
+
+  (* PHASE 3: the walk is written and backed up in the lane scratchpad
+     (e4/UkShEcho-with-walks.v); it HANGS the proofmode at this
+     altitude, so the statement above stands and the proof does not
+     ship.  See the report. *)
 
   (* =================================================================== *)
   (* S4  THE PARENT.                                                      *)
