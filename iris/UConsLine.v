@@ -340,15 +340,29 @@ Section UConsLine.
   (*  to [SpecFileread.fileread_extra]), which is [UInitSh.v]'s altitude   *)
   (*  and not [UShKernel.v]'s.                                            *)
   (* =================================================================== *)
+  (* WHAT THE COUNT IS, AND WHY IT IS NOT THE BUFFER'S LENGTH (lane
+     SH-LINE 2b, phase 2).  The call asks for [cap] bytes and the caller
+     owns [k > cap] of them.  The strict inequality is LOAD-BEARING and is
+     not slack: [ConsoleInv.cons_swallow]'s copy-out reason is stated at
+     [dst + d], and a verified reader refutes it only where it OWNS the
+     byte ([UkRunSys.uk_read_nofault] off its own [ubytes]).  At [d = cap]
+     -- the call filled the whole request -- that address is one past the
+     request, so a caller whose buffer stops at the count cannot refute the
+     arm and the [False] instantiation below is unreachable.  The code has
+     no such exit (consoleread's copy loop breaks only with [n > 0], so
+     [d = cap -> dc = d]), but the landed contract does not say so, and the
+     honest price at this tier is one byte of slack in the caller's own
+     buffer. *)
   Definition ush_read_recv_leaf (N : uk_names Σ) (cn : cons_names)
       (γp : gname) (T : iProp Σ) (l : list fdstate) : iProp Σ :=
-    (∀ (h : CpuId) (m : regfile) (pc : mword 64) (a : Z) (k n : nat)
+    (∀ (h : CpuId) (m : regfile) (pc : mword 64) (a : Z) (k cap n : nat)
        (f : nat -> bv 8) (avail : nat),
        ⌜usysno m = USYS_read⌝ -∗
        (* the descriptor is fd 0, which §1's ledger says is the console *)
        ⌜bv_signed (trunc32 (m !!! Regidx a0_idx)) = 0⌝ -∗
        ⌜uint (m !!! Regidx a1_idx) = a⌝ -∗
-       ⌜uint (m !!! Regidx a2_idx) = Z.of_nat k⌝ -∗
+       ⌜uint (m !!! Regidx a2_idx) = Z.of_nat cap⌝ -∗
+       ⌜(cap < k)%nat⌝ -∗
        ⌜is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true⌝ -∗
        uinstr_is (ukn_t N) pc false (ECALL tt) -∗
        ubytes (ukn_d N) a k f -∗
@@ -363,16 +377,46 @@ Section UConsLine.
        upos γp n -∗
        urun N h m pc avail -∗
        (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8),
-          ⌜(d <= k)%nat⌝ -∗
+          ⌜(d <= cap)%nat⌝ -∗
           ⌜forall j : nat, (d <= j < k)%nat -> g j = f j⌝ -∗
           ush_std_cons (ukn_fd N) l -∗
-          ((∃ (dc : nat) (hs : list (list mobs))
+          (* THE WINDOW, AND WITH IT THE RETURN VALUE.  The receipt names
+             its OWN count [dd] and ties it to a0
+             ([SpecConsoleread]'s [(0 <= r)%Z -> r = Z.of_nat d], relayed
+             by [SpecFileread.console_receipt]); that tie is what lets a
+             one-byte reader turn its [blez] into a fact about its line.
+
+             THE WINDOW ITSELF IS CONDITIONAL ON [dd <= cap], and the
+             condition is not slack: nothing in the landed contract bounds
+             the receipt's count by the caller's request
+             ([UsysMemOk.usys_mem_ok]'s read row bounds only the bytes
+             WRITTEN, and [UexecExecInst.xv6_spost] drops
+             [SpecFileread.fileread_ret]), so the bytes the receipt speaks
+             of are readable exactly where the caller owns them.  A caller
+             that has tested its return value has the premise: [r = 1]
+             gives [dd = 1].  The SWALLOW rides the same implication for
+             the same reason -- its copy-out arm is refuted at [dst + dd]
+             and only an owned byte can refute it. *)
+          ((∃ (dd dc : nat) (hs : list (list mobs))
               (sl : list (list mobs * bv 8)),
-              ⌜cons_window sl n d g hs⌝ ∗ ⌜cons_chain sl⌝ ∗
-              ucons_swallow cn False sl d dc ∗
+              ⌜Z.of_nat dd = bv_unsigned r⌝ ∗ ⌜cons_chain sl⌝ ∗
               ucons_stored_lb cn sl ∗
               ([∗ list] hh ∈ hs, riscv_rx_tag hh) ∗
+              (⌜(dd <= cap)%nat⌝ -∗
+                 ⌜cons_window sl n dd g hs⌝ ∗
+                 ucons_swallow cn False sl dd dc) ∗
               upos γp (n + dc)%nat)
+           (* ...OR THE PROCESS WAS KILLED (lane SH-LINE 2b, phase 2).
+              consoleread answers -1 only there, and that arm pays the
+              caller's [Rd] at a position and an advance it is not told
+              ([SpecFileread.console_receipt]'s left arm) -- so the token
+              comes back somewhere and the window does not exist.  The
+              kernel's own note says the arm is not observable from user
+              mode; the trap route nevertheless quantifies the resume over
+              every [r], so the arm is HERE rather than refuted.  It is not
+              a placeholder: a killed process's [gets] breaks on [cc < 1]
+              like any other. *)
+           ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ∃ n' : nat, upos γp n')
            ∨ (T ∗ ∃ n' : nat, upos γp n')) -∗
           ubytes (ukn_d N) a k g -∗
           urun N h' (<[Regidx a0_idx := r]> m) (add_vec_int pc 4) avail -∗

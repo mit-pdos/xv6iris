@@ -2106,3 +2106,10 @@ UShConsK.v
 # its transcript against E5's named write receipt.  Above UexecExecInst,
 # UkShEcho and AppEcho, as UInitSh is one level up.
 UShEcho.v
+# UShLine = SH-LINE 2b's PAYMENT: sh's console read SUPPLIED (the linear
+# per-call deposit out of the exit payload's reader token -- [ush_read_sup])
+# and the receipt-keeping leaf [UConsLine.ush_read_recv_leaf] DISCHARGED on
+# [UkRunSys.wp_uk_ecall_read_recv].  Above UkShEcho and UConsLine and on
+# UConsOpen's mold: both need [UexecExecInst]'s instance in scope, which
+# UkSh.v and UShKernel.v (where [uexecSG] is abstract) do not have.
+UShLine.v

@@ -2890,6 +2890,44 @@ Section UkRunSys.
        (fdv' : list fdstate) (cw' : Z) (cs' : gset gname),
        ⌜ (d <= Z.to_nat cnt)%nat ⌝ -∗
        ⌜ forall j : nat, (d <= j < k)%nat -> g j = f j ⌝ -∗
+       (* THE DESTINATION RUN IS LINEAR, and the RESUME IMAGE HOLDS THE
+          BYTES (lane SH-LINE 2b, R1).  The post is stated at the resume
+          image [M'] -- [SpecFileread.console_receipt]'s per-byte ledger
+          reads the delivered bytes out of it -- while a program owns its
+          buffer as [UkRun.ubytes] at a SOURCE FUNCTION.  These two pure
+          rows are the bridge, and they can only be handed out here: [M']
+          is [UserPtTree.umem_write] of an image [urun]'s own existential
+          binds, so nothing above this leaf can state the equation.  The
+          linearity row is the same fact [SpecFileread.console_receipt]'s
+          ledger clause is guarded by, and it comes off the ownership of
+          the buffer rather than off a premise
+          ([UserHeap.uheap_ubytes_run]). *)
+       ⌜ forall i : nat, (i < k)%nat ->
+           uint (add_vec_int (m !!! Regidx (mword_of_int 11)) (Z.of_nat i))
+           = (uint (m !!! Regidx (mword_of_int 11)) + Z.of_nat i)%Z ⌝ -∗
+       ⌜ forall j : nat, (j < k)%nat ->
+           M' !! uint (add_vec_int (m !!! Regidx (mword_of_int 11))
+                         (Z.of_nat j))
+           = Some (g j) ⌝ -∗
+       (* ...AND EVERY BYTE OF THE DESTINATION IS WRITABLE-MAPPED IN ANY
+          TABLE THE KEY'S PROJECTION ADMITS (lane SH-LINE 2b, R1; lane
+          LAZY-FLAG's deliverable, CASHED).  [uk_read_nofault] above is
+          stated at the process's own [UserHeap.uheap], and no program
+          holds one: [UkRun.urun] binds the image, the permission map and
+          the break existentially, so nothing above this leaf can tie
+          [uvis_perm W] to a heap it owns.  This leaf can -- its key IS
+          [UexecSlot.uvis_of_run] at the very map the heap is at -- so the
+          refutation of [ConsoleInv.cons_swallow]'s copy-out disjunct is
+          handed out from here, in the positive form
+          [UConsLine.ush_swallow_nofault] consumes. *)
+       ⌜ forall (P : uptd) (j : nat),
+           ProcPtOwn.proc_pt_wf P ->
+           perm_of (ud_um P) (uvis_sz W) = uvis_perm W ->
+           lazy_free (ud_um P) (uvis_sz W) ->
+           (j < k)%nat ->
+           UserPtTree.uva_wmapped P
+             (uint (add_vec_int (m !!! Regidx (mword_of_int 11))
+                      (Z.of_nat j))) ⌝ -∗
        (* THE TRAPPING KEY'S THREE ARGUMENT WORDS ARE THE CALLER'S OWN *)
        ⌜tf_w (uvis_tf W) (tf_arg_idx 0) = m !!! Regidx (mword_of_int 10)⌝ -∗
        ⌜tf_w (uvis_tf W) (tf_arg_idx 1) = m !!! Regidx (mword_of_int 11)⌝ -∗
@@ -2945,6 +2983,20 @@ Section UkRunSys.
       change (2 ^ 38) with 274877906944 in Hc.
       rewrite !uint_unsigned in Hc |- *.
       apply uint_add_vec_int_small; lia. }
+    (* ...AND THE DESTINATION'S PAGES ARE WRITABLE, taken HERE because this
+       is the one place where the heap the process owns and the key's own
+       permission map are the same term (the post's row above). *)
+    iDestruct (uheap_ubytes_w (ukn_t N) (ukn_d N) (ukn_s N) M pm sz (DfracOwn 1) (uint dst) k f
+                 with "Hheap Hbuf") as %Hwacc.
+    assert (Hnf : forall (P : uptd) (j : nat),
+              ProcPtOwn.proc_pt_wf P -> perm_of (ud_um P) sz = pm ->
+              lazy_free (ud_um P) sz -> (j < k)%nat ->
+              UserPtTree.uva_wmapped P (uint (add_vec_int dst (Z.of_nat j)))).
+    { intros P j Hwf Hpmp Hlf Hjk.
+      rewrite (Hlin j Hjk).
+      destruct (Hbnd j Hjk) as [_ Hrange].
+      apply (UserHeap.lazy_free_uw_addr P sz (uint dst + Z.of_nat j)%Z Hwf Hlf);
+        [ exact Hrange | rewrite Hpmp; exact (Hwacc j Hjk) ]. }
     iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs pidv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
@@ -3031,9 +3083,28 @@ Section UkRunSys.
                  with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep [Hcont Hbuf Hstd Hpost]") as "Hkc".
     { iIntros (h'') "Hrun".
       iApply ("Hcont" $! h'' r d g (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
-                _ _ _ _ with "[%] [%] [%] [%] [%] [%] [%] Hstd Hpost Hrun Hbuf").
+                _ _ _ _
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hstd Hpost Hrun Hbuf").
       - exact Hdcap.
       - intros j Hj. apply Hgf; lia.
+      (* the destination run is linear, off the ownership of the buffer *)
+      - exact Hlin.
+      (* ...and the resume image holds the buffer: the written prefix by
+         [umem_write_lookup_in], the tail because the call did not touch it
+         and the caller's own bytes are already in the image *)
+      - intros j Hj. rewrite (Hlin j Hj).
+        destruct (decide (j < d)%nat) as [Hjd | Hjd].
+        + exact (umem_write_lookup_in M (uint dst) d g j Hjd).
+        + rewrite (umem_write_lookup_out M (uint dst) d g
+                     (uint dst + Z.of_nat j)%Z
+                     ltac:(intros i Hi; lia)).
+          destruct (Hbnd j Hj) as [HMj _]. rewrite HMj.
+          rewrite (Hgf j ltac:(lia)). reflexivity.
+      (* ...and every byte of it is writable-mapped: the key's projection
+         IS the map the heap above was read at *)
+      - intros P j Hwf Hpmp Hlf Hjk.
+        cbn [uvis_sz uvis_perm uvis_of_run] in Hpmp, Hlf.
+        exact (Hnf P j Hwf Hpmp Hlf Hjk).
       - rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc).
       - rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc).
       - rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg2 m pc).

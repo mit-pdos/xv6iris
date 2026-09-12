@@ -6269,18 +6269,24 @@ Section UkSh.
 End UkSh.
 
 (* ===================================================================== *)
-(* THE READ LEAF, DISCHARGED.  [ush_read_leaf] was a Hypothesis while     *)
-(* the general window leaf did not exist; [UkRunSys.wp_uk_ecall_read_win] is  *)
-(* that leaf's read instance, and the two spellings differ only in how    *)
-(* the count is read: the hypothesis takes a2 as the unsigned word equal  *)
-(* to the buffer's size, the leaf takes it as the C [int] the kernel      *)
-(* narrows it to.  The bridge is ONE bound -- [Z.to_nat] of the narrowed  *)
-(* count never exceeds the unsigned word -- and it needs NO side          *)
-(* condition on [k]: a negative narrow floors at zero under [Z.to_nat],   *)
-(* and a non-negative one IS the unsigned low half, which [mod] bounds    *)
-(* by the whole word.  So every lemma above that carries the hypothesis   *)
-(* as an argument is made unconditional by applying it to                 *)
-(* [ush_read_leaf_holds].                                                 *)
+(* THE NARROWED COUNT, kept: the Hypothesis above takes a2 as the          *)
+(* unsigned word equal to the buffer's size and every read leaf takes it   *)
+(* as the C [int] the kernel narrows it to, so a discharge needs ONE bound *)
+(* -- [Z.to_nat] of the narrowed count never exceeds the unsigned word --  *)
+(* and it needs NO side condition on [k]: a negative narrow floors at zero *)
+(* under [Z.to_nat], and a non-negative one IS the unsigned low half,      *)
+(* which [mod] bounds by the whole word.                                   *)
+(*                                                                        *)
+(* THE DISCHARGE ITSELF IS NOT HERE ANY MORE (lane SH-LINE 2b phase 2,     *)
+(* R1).  There were two copies of it -- this file's [ush_read_leaf_holds]  *)
+(* and [UShKernel.ush_read_leaf_of_win], the same walk through             *)
+(* [UkRunSys.wp_uk_ecall_read_win] at two spellings of the count -- and    *)
+(* only the second was ever applied ([UShKernel.sh_uexec_slot]).  The one  *)
+(* that survives the lane is neither: sh's read is a CONSOLE read, its     *)
+(* deposit carries the reader token out of the exit payload rather than    *)
+(* [sh_deps]' [UkRun.udepw_law 5], and the discharge of the                *)
+(* receipt-keeping leaf is [UShLine.ush_read_recv_leaf_holds], which needs *)
+(* the CONCRETE deposit bundle and so cannot live in this file at all.     *)
 (* ===================================================================== *)
 
 Lemma ush_narrow_count_le (w : mword 64) (k : nat) :
@@ -6306,73 +6312,3 @@ Proof.
   lia.
 Qed.
 
-Section UkShLeaf.
-  Context `{!riscvGS Σ}.
-  Context `{!ufdG Σ}.
-  Context `{GEN : GenId} `{XI : CurCtx}.
-  Context `{!ghost_varG Σ Z}.
-  (* ...and the children set's ([Xv6Cameras.uchG]), which [UkRun.urun]
-     carries beside the cwd's *)
-  Context `{!ghost_varG Σ (gset gname)}.
-  Context (N : uk_names Σ).
-  (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
-     CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_const]). *)
-  Context `{Hpay : !ukn_const N}.
-  (* the fields, under the names the engine has always used *)
-  Local Notation γt := (ukn_t N).
-  Local Notation γd := (ukn_d N).
-  Local Notation γs := (ukn_s N).
-  Local Notation γfd := (ukn_fd N).
-  Local Notation γcwd := (ukn_cwd N).
-  Local Notation γch := (ukn_ch N).
-  (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
-     and this file binds no whole-system bundle. *)
-  Context `{!ctokG Σ}.
-  Context {SG : uexecSG Σ}.
-  Context `{PS : uprogSG Σ}.
-  (* NO [psok] HYPOTHESIS (lane SUPPLY-SPLIT).  This section's one lemma
-     discharges UkSh's read-window Hypothesis, and read(5) is a CLAIM
-     number: its console arm spends the application's supply.  So the
-     discharge takes the deposit ([UkSh.sh_deps]'s read conjunct) exactly
-     as the Hypothesis it answers does. *)
-
-  Lemma ush_read_leaf_holds :
-    forall (h : CpuId) (m : regfile) (pc : mword 64) (a : Z) (k : nat)
-           (f : nat -> bv 8) (avail : nat),
-      usysno m = USYS_read ->
-      uint (m !!! Regidx (mword_of_int 11 : mword 5)) = a ->
-      uint (m !!! Regidx (mword_of_int 12 : mword 5)) = Z.of_nat k ->
-      is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-      sh_deps -∗
-      uinstr_is γt pc false (ECALL tt) -∗
-      ubytes γd a k f -∗
-      urun N h m pc avail -∗
-      (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8),
-         ⌜ (d <= k)%nat ⌝ -∗
-         ⌜ forall j : nat, (d <= j < k)%nat -> g j = f j ⌝ -∗
-         ubytes γd a k g -∗
-         urun N h' (<[Regidx (mword_of_int 10 : mword 5) := r]> m)
-           (add_vec_int pc 4) avail -∗
-         WP (Loop : expr riscv_lang)) -∗
-      WP (Loop : expr riscv_lang).
-  Proof.
-    intros h m pc a k f avail Hn Ha1 Ha2 Hal.
-    pose proof (ush_narrow_count_le (m !!! Regidx (mword_of_int 12 : mword 5))
-                  k Ha2) as Hbound.
-    subst a.
-    iIntros "#Hdp #Hi Hbuf Hrun Hcont".
-    iApply (wp_uk_ecall_read_win N h m pc
-              (bv_signed (subrange_vec_dec
-                            (m !!! Regidx (mword_of_int 12 : mword 5)) 31 0
-                          : mword 32))
-              k f avail Hn eq_refl Hbound Hal with "Hi Hrun [] Hbuf").
-    (* THE FLAGGED DEPOSIT: read(5), SH-LINE 2b's (P4) *)
-    { iApply (udepw_of_law N m pc USYS_read with "[Hdp]").
-      iDestruct "Hdp" as "($ & _)". }
-    iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
-    iApply ("Hcont" $! h' r d g with "[%] [%] Hbuf Hrun");
-      [ lia | exact Hgf ].
-  Qed.
-
-End UkShLeaf.

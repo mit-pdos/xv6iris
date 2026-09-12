@@ -7395,7 +7395,7 @@ End UkShDiagRun.
 (* point: three of runcmd's five arms fork, and a child runs its subtree  *)
 (* -- diagnostics included -- under a FRESH triple.  So this section      *)
 (* binds the gnames rather than taking them from a [Context], exactly as  *)
-(* [UkSh.v]'s [UkShLeaf] does for the read leaf.                          *)
+(* [UShLine.v]'s section does for sh's console read.                      *)
 (* ===================================================================== *)
 Section UkShDiagLeaf.
   Context `{!riscvGS Σ}.
