@@ -2557,6 +2557,21 @@ echo's must turn `kexec_args_at` (the block kexec BUILT) into `UkAbi.uk_args_c`
 law (E2: `init_sh_slot` hands ONE `echo_fs_pure` law), `udepw_law 16` (E5),
 `recv`/`tx` (TX-RECEIPT).  Phase 2 launched.
 
+SUPPLY-SPLIT AND SH-OPEN LANDED (2026-09-12; `lane/supply-split-r2` =
+`f4b39cdaf`, `lane/sh-open-r2` = `6f959f529`, main fast-forwarded; builds
+`rebase20`/`rebase21`, audit = the thirteen; lemma_diff = SUPPLY-SPLIT's 41
+known items + SH-OPEN's 23 moves into `UConsOpen` and its four deletions).  The
+rebase over LAZY-FLAG conflicted in the program entry constructors
+(UEchoKernel, UInitKernel, UShKernel, USyncKernel, UexecCond, UInitSh): both
+edits kept, the pure premises ordered `free_num`-psok → `uvis_cwd W = ROOTINO`
+(SH-OPEN) → `uvis_lazy W = false` (LAZY-FLAG) → the named deposits.  SH-OPEN's
+seam CLOSED with no restatement: `UInitSh.v:550` reads the cwd row off
+`pex_slot`'s constructor wand and passes it to `sh_slot_of_kexec` at :563.
+LAZY-FLAG's `false` bit carried into the moved `UConsOpen` suppliers.  Now on
+main: the free supply and per-program named deposits; sh's pinned console
+preamble with `ush_fd0p` as its loop invariant; `sh_deps := udepw_law 5 ∗
+udepw_law 16`; `UConsOpen.v` (init and sh as two instantiations).
+
 LAZY-FLAG LANDED (2026-09-12; the iris commit after `9af6a3873`; 78 files
 +2910/-1045; build `lazy59`, audit = the thirteen, lemma_diff = the one
 hoist).  The stored flag with real payers everywhere (see the commit message

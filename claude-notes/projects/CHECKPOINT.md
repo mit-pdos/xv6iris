@@ -286,3 +286,9 @@ REBASE-CHAIN (`brief-rebase-chain.md`): supply-split-r1 → r2 onto main, sh-ope
 sh-open-r2 on top (its cwd seam closes); then the coordinator fast-forwards main
 to sh-open-r2; then TX-RECEIPT resumes (rebase onto main) in the next free
 checkout; E2 (`-disc`, on r1) rebases onto the new main at its end.
+
+SUPPLY-SPLIT + SH-OPEN LANDED on main (2026-09-12; main = `6f959f529` + notes).
+TX-RECEIPT resumes IN MAIN (rebase `lane/tx-receipt` from `-tlw` onto main; then
+the pid_reg slice, the block conjunct, `uvis_tx`, row 16, the write leaf).  E2
+rebases onto main at its end.  In flight: TX-RECEIPT (main), E2 p2 (`-disc`),
+PRINTK-LEDGER-2 A (`-sup`), E4 p3 (`-tlw`).
