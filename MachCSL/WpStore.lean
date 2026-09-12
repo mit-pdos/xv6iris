@@ -9,6 +9,7 @@ epilogue use).
 import MachCSL.WpCycle
 import MachCSL.WpStagesM
 import MachCSL.WpGpr
+import MachCSL.WordPointsTo
 
 
 namespace MachCSL
@@ -153,45 +154,45 @@ theorem execSpec_ld [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MCo
 /-- `sd rs2, imm(rs1)` (also `c.sdsp`) to an 8-aligned RAM address. -/
 theorem wp_m_sd [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
-    (hrs1 : rs1 ≠ 0#5) (hrs2 : rs2 ≠ 0#5) (a v old : BitVec 64)
-    (hram : inRam (a + BitVec.signExtend 64 imm) 8)
-    (hal : (a + BitVec.signExtend 64 imm).toNat % 8 = 0) :
+    (hrs1 : rs1 ≠ 0#5) (hrs2 : rs2 ≠ 0#5) (a v old : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 8)) ∗
     mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rs1 (DFrac.own 1) a ∗
     gpr cpu rs2 (DFrac.own 1) v ∗ ctxTok cpu curCtx ∗
-    bytesPointsTo (a + BitVec.signExtend 64 imm) 8 (DFrac.own 1) old ∗
+    wordPointsTo (a + BitVec.signExtend 64 imm) 8 (DFrac.own 1) old ∗
     ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
         gpr cpu rs1 (DFrac.own 1) a -∗ gpr cpu rs2 (DFrac.own 1) v -∗ ctxTok cpu curCtx -∗
-        bytesPointsTo (a + BitVec.signExtend 64 imm) 8 (DFrac.own 1) v -∗ wpLoop cpu)
+        wordPointsTo (a + BitVec.signExtend 64 imm) 8 (DFrac.own 1) v -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrs1, Hrs2, Htok, Hbytes, HΦ⟩
+  iintro ⟨HI, HmConf, Hclock, Hpc, Hrs1, Hrs2, Htok, Hw, HΦ⟩
+  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hbytes⟩
   iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _
     (execSpec_sd cpu dq c hok pc _ imm rs1 rs2 hrs1 hrs2 a v old hram hal)
   iframe
   inext
   iintro HmConf Hclock Hpc ⟨Hrs1, Hrs2, Htok, Hbytes⟩
-  iapply HΦ $$ HmConf Hclock Hpc Hrs1 Hrs2 Htok Hbytes
+  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hbytes
+  iapply HΦ $$ HmConf Hclock Hpc Hrs1 Hrs2 Htok Hw
 
 /-- `ld rd, imm(rs1)` with `rd ≠ rs1` (also `c.ldsp`) from an 8-aligned RAM address. -/
 theorem wp_m_ld [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5)
-    (hrd : rd ≠ 0#5) (hrs1 : rs1 ≠ 0#5) (v a data : BitVec 64)
-    (hram : inRam (a + BitVec.signExtend 64 imm) 8)
-    (hal : (a + BitVec.signExtend 64 imm).toNat % 8 = 0) :
+    (hrd : rd ≠ 0#5) (hrs1 : rs1 ≠ 0#5) (v a data : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 8)) ∗
     mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
     gpr cpu rs1 (DFrac.own 1) a ∗ ctxTok cpu curCtx ∗
-    bytesPointsTo (a + BitVec.signExtend 64 imm) 8 dq' data ∗
+    wordPointsTo (a + BitVec.signExtend 64 imm) 8 dq' data ∗
     ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
         gpr cpu rd (DFrac.own 1) data -∗ gpr cpu rs1 (DFrac.own 1) a -∗ ctxTok cpu curCtx -∗
-        bytesPointsTo (a + BitVec.signExtend 64 imm) 8 dq' data -∗ wpLoop cpu)
+        wordPointsTo (a + BitVec.signExtend 64 imm) 8 dq' data -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Hrs1, Htok, Hbytes, HΦ⟩
+  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Hrs1, Htok, Hw, HΦ⟩
+  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hbytes⟩
   iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _
     (execSpec_ld cpu dq dq' c hok pc _ imm rd rs1 hrd hrs1 v a data hram hal)
   iframe
   inext
   iintro HmConf Hclock Hpc ⟨Hrd, Hrs1, Htok, Hbytes⟩
-  iapply HΦ $$ HmConf Hclock Hpc Hrd Hrs1 Htok Hbytes
+  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hbytes
+  iapply HΦ $$ HmConf Hclock Hpc Hrd Hrs1 Htok Hw
 
 end MachCSL

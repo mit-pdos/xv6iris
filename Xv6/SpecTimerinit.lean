@@ -15,6 +15,7 @@ The time it reads is whatever `mtime` is at that cycle, so the new
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
+import MachCSL.WordPointsTo
 import MachCSL.MConf
 import MachCSL.WpGpr
 import MachCSL.WpCsr
@@ -48,8 +49,8 @@ def wp_timerinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
     (hcbie : BitVec.extractLsb' 4 2 (c.menvcfg ||| 0x8000000000000000#64) = 0#2)
     (hpmm : BitVec.extractLsb' 32 2 (c.menvcfg ||| 0x8000000000000000#64) = 0#2)
     (hstce : BitVec.extractLsb' 63 1 (menvcfgWrite c.menvcfg (c.menvcfg ||| 0x8000000000000000#64)) = 1#1)
-    (ret sp₀ v8 v14 v15 f0 f8 : BitVec 64)
-    (hsp : inRam (sp₀ - 16#64) 16) (hal : sp₀.toNat % 16 = 0) : Prop :=
+    (ret sp₀ v8 v14 v15 f0 f8 : BitVec 64) :
+    Prop :=
   mConf cpu (DFrac.own 1) c ∗
   clockCells cpu ∗
   ctxTok cpu curCtx ∗
@@ -57,7 +58,7 @@ def wp_timerinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   pcIs cpu timerinitAddr ∗
   gpr cpu 1#5 (DFrac.own 1) ret ∗ gpr cpu 2#5 (DFrac.own 1) sp₀ ∗ gpr cpu 8#5 (DFrac.own 1) v8 ∗
   gpr cpu 14#5 (DFrac.own 1) v14 ∗ gpr cpu 15#5 (DFrac.own 1) v15 ∗
-  bytesPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) f0 ∗ bytesPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) f8 ∗
+  wordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) f0 ∗ wordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) f8 ∗
   (∀ t : BitVec 64,
    mConf cpu (DFrac.own 1) (timerinitConf c t) -∗
    clockCells cpu -∗
@@ -65,7 +66,7 @@ def wp_timerinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
    pcIs cpu (ret &&& 0xFFFFFFFFFFFFFFFE#64) -∗
    gpr cpu 1#5 (DFrac.own 1) ret -∗ gpr cpu 2#5 (DFrac.own 1) sp₀ -∗ gpr cpu 8#5 (DFrac.own 1) v8 -∗
    gpr cpu 14#5 (DFrac.own 1) 1000000#64 -∗ gpr cpu 15#5 (DFrac.own 1) (t + 1000000#64) -∗
-   bytesPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) v8 -∗ bytesPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) ret -∗
+   wordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) v8 -∗ wordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) ret -∗
    wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -73,7 +74,7 @@ def wp_timerinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
 structure TIMERINIT : Prop where
   wp_timerinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) hcbie hpmm hstce
-    (ret sp₀ v8 v14 v15 f0 f8 : BitVec 64) hsp hal,
-    wp_timerinit_body (hlc := hlc) (GF := GF) cpu c hok hcbie hpmm hstce ret sp₀ v8 v14 v15 f0 f8 hsp hal
+    (ret sp₀ v8 v14 v15 f0 f8 : BitVec 64),
+    wp_timerinit_body (hlc := hlc) (GF := GF) cpu c hok hcbie hpmm hstce ret sp₀ v8 v14 v15 f0 f8
 
 end Xv6

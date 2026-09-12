@@ -89,6 +89,7 @@ import MachCSL.WpPmpXv6
 import MachCSL.WpGpr
 import MachCSL.GprLit
 import MachCSL.Boot
+import MachCSL.WordPointsTo
 
 
 namespace MachCSL
@@ -295,7 +296,7 @@ def stackFacts (sp : BitVec 64) (n : Nat) : Prop :=
 
 /-- The slots as a list of words, slot `i` at `sp - 8 (i + 1)`. -/
 def stackSlots [CurCtx] (sp : BitVec 64) (ws : List (BitVec 64)) : IProp GF := iprop%
-  [∗list] i ↦ w ∈ ws, bytesPointsTo (sp - 8#64 * BitVec.ofNat 64 (i + 1)) 8 (DFrac.own 1) w
+  [∗list] i ↦ w ∈ ws, wordPointsTo (sp - 8#64 * BitVec.ofNat 64 (i + 1)) 8 (DFrac.own 1) w
 
 /-- Ownership of the `n` eight-byte slots just below `sp` (region
 `[sp - 8n, sp)`), with scratch contents, together with their geometry. -/
@@ -329,17 +330,17 @@ theorem stackSlot_addr (sp : BitVec 64) (m i : Nat) :
   bv_omega
 
 theorem stackSlots_shift [CurCtx] (sp : BitVec 64) (m : Nat) (ws : List (BitVec 64)) :
-    ([∗list] i ↦ w ∈ ws, bytesPointsTo (sp - 8#64 * BitVec.ofNat 64 (i + m + 1)) 8 (DFrac.own 1) w) ⊢
-      [∗list] i ↦ w ∈ ws, bytesPointsTo (GF := GF) (sp - 8#64 * BitVec.ofNat 64 m - 8#64 * BitVec.ofNat 64 (i + 1))
+    ([∗list] i ↦ w ∈ ws, wordPointsTo (sp - 8#64 * BitVec.ofNat 64 (i + m + 1)) 8 (DFrac.own 1) w) ⊢
+      [∗list] i ↦ w ∈ ws, wordPointsTo (GF := GF) (sp - 8#64 * BitVec.ofNat 64 m - 8#64 * BitVec.ofNat 64 (i + 1))
         8 (DFrac.own 1) w := by
   apply BigSepL.bigSepL_mono
   intro k x _
   rw [stackSlot_addr]
 
 theorem stackSlots_unshift [CurCtx] (sp : BitVec 64) (m : Nat) (ws : List (BitVec 64)) :
-    ([∗list] i ↦ w ∈ ws, bytesPointsTo (GF := GF) (sp - 8#64 * BitVec.ofNat 64 m - 8#64 * BitVec.ofNat 64 (i + 1))
+    ([∗list] i ↦ w ∈ ws, wordPointsTo (GF := GF) (sp - 8#64 * BitVec.ofNat 64 m - 8#64 * BitVec.ofNat 64 (i + 1))
         8 (DFrac.own 1) w) ⊢
-      [∗list] i ↦ w ∈ ws, bytesPointsTo (sp - 8#64 * BitVec.ofNat 64 (i + m + 1)) 8 (DFrac.own 1) w := by
+      [∗list] i ↦ w ∈ ws, wordPointsTo (sp - 8#64 * BitVec.ofNat 64 (i + m + 1)) 8 (DFrac.own 1) w := by
   apply BigSepL.bigSepL_mono
   intro k x _
   rw [stackSlot_addr]
@@ -402,8 +403,8 @@ theorem stackOwn_join [CurCtx] (sp : BitVec 64) (m n : Nat) (hf : stackFacts sp 
 theorem stackOwn_two_cases [CurCtx] (sp : BitVec 64) :
     stackOwn (GF := GF) sp 2 ⊢
       ⌜stackFacts sp 2⌝ ∗ ∃ w₁ w₂ : BitVec 64,
-        bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
-        bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ := by
+        wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
+        wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ := by
   unfold stackOwn stackSlots
   iintro ⟨%hf, %ws, %hlen, H⟩
   match ws, hlen with
@@ -415,8 +416,8 @@ theorem stackOwn_two_cases [CurCtx] (sp : BitVec 64) :
     ipureintro; exact hf
 
 theorem stackOwn_two_intro [CurCtx] (sp : BitVec 64) (hf : stackFacts sp 2) (w₁ w₂ : BitVec 64) :
-    bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
-    bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ ⊢ stackOwn (GF := GF) sp 2 := by
+    wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
+    wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ ⊢ stackOwn (GF := GF) sp 2 := by
   unfold stackOwn stackSlots
   iintro ⟨H₁, H₂⟩
   isplitr
@@ -426,19 +427,6 @@ theorem stackOwn_two_intro [CurCtx] (sp : BitVec 64) (hf : stackFacts sp 2) (w�
       BitVec.reduceMul, BitVec.reduceNeg, Nat.reduceAdd]
     iframe H₁ H₂
     ipureintro; rfl
-
-/-- The two frame slots are aligned RAM words. -/
-theorem frame8_ok (sp : BitVec 64) (hf : stackFacts sp 2) :
-    inRam (sp + 0xFFFFFFFFFFFFFFF8#64) 8 ∧ (sp + 0xFFFFFFFFFFFFFFF8#64).toNat % 8 = 0 := by
-  unfold stackFacts ramBase ramEnd at hf
-  have h : (sp + 0xFFFFFFFFFFFFFFF8#64).toNat = sp.toNat - 8 := by bv_omega
-  unfold inRam ramBase ramEnd; rw [h]; omega
-
-theorem frame16_ok (sp : BitVec 64) (hf : stackFacts sp 2) :
-    inRam (sp + 0xFFFFFFFFFFFFFFF0#64) 8 ∧ (sp + 0xFFFFFFFFFFFFFFF0#64).toNat % 8 = 0 := by
-  unfold stackFacts ramBase ramEnd at hf
-  have h : (sp + 0xFFFFFFFFFFFFFFF0#64).toNat = sp.toNat - 16 := by bv_omega
-  unfold inRam ramBase ramEnd; rw [h]; omega
 
 /-- The slots the trap path pushes below the interrupted thread's `sp`
 (kernelvec's 256-byte frame and kerneltrap's own frames): owed by the bundle

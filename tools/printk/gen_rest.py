@@ -200,25 +200,19 @@ theorem printk_arm_{NAME} {IFACE} {{hlc : HasLC}} {{GF : BundledGFunctors}} [Mac
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
 '''
 def ld_ap(pc):
     return f'''  -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht {hx(pc)} false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) $$ [- $Hk $Hclock $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) $$ [- $Hk $Hclock $Hpc] with [hR8]
   iintro Hk Hclock Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht {hx(pc+4)} false 8#12 14#5 15#5 (by decide)) $$ [- $Hk $Hclock $Hpc]
   iintro Hk Hclock Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht {hx(pc+8)} false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) $$ [- $Hk $Hclock $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) $$ [- $Hk $Hclock $Hpc] with [hR8, ap_next']
   iintro Hk Hclock Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
 '''
@@ -226,9 +220,7 @@ def ld_va(pc, rd, rvc):
     return f'''  -- ld x{rd},0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht {hx(pc)} {str(rvc).lower()} 0#12 {rd}#5 15#5 (by decide) (DFrac.own 1)
-    (k.regs (BitVec.ofNat 5 (11 + kk))) ?hram ?hal) $$ [- $Hk $Hclock $Hpc]
-  case hram => k_norm; exact hramV
-  case hal => k_norm; exact halV
+    (k.regs (BitVec.ofNat 5 (11 + kk)))) $$ [- $Hk $Hclock $Hpc]
   iintro Hk Hclock Hpc Hva
   ihave Hframe := Hfr $$ Hva
 '''
@@ -257,10 +249,8 @@ t += "  have hR25 : R 25#5 = k.regs 25#5 := hR.2\n"
 t += facts([0x6aa, 0x6ac, 0x6b0, 0x6b4, 0x6b8, 0x6bc, 0x6c0, 0x6c4, 0x6c8, 0x6cc, 0x6ce, 0x6d2, 0x6ec, 0x6ee])
 t += '''  -- sd s9,40(sp)
   icases pkFrame_s9_acc _ _ _ _ $$ Hframe with ⟨H18, Hfr18⟩
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x800006aa#64 true 40#12 2#5 25#5 w18 ?hram ?hal) $$ [- $Hk $Hclock $Hpc]
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x800006aa#64 true 40#12 2#5 25#5 w18) $$ [- $Hk $Hclock $Hpc]
     with [hR2, hR25]
-  case hram => k_norm [hR2]; exact (slot152_ok _ hf).1
-  case hal => k_norm [hR2]; exact (slot152_ok _ hf).2
   iintro Hk Hclock Hpc H18
   ihave Hframe := Hfr18 $$ %_ H18
 '''
@@ -286,10 +276,8 @@ t += '''  -- auipc s9,7 ; addi s9,s9,98
   iintro %R4 %cs4 Hk Hclock Hpc Hsent %h4
   -- ld s9,40(sp)
   icases pkFrame_s9_acc _ _ _ _ $$ Hframe with ⟨H18, Hfr18⟩
-  k_step (wp_s_ld cpu _ ?hs ?ht 0x800006ec#64 true 40#12 25#5 2#5 (by decide) (DFrac.own 1) (k.regs 25#5) ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht 0x800006ec#64 true 40#12 25#5 2#5 (by decide) (DFrac.own 1) (k.regs 25#5))
     $$ [- $Hk $Hclock $Hpc] with [h4.1.1]
-  case hram => k_norm [h4.1.1]; exact (slot152_ok _ hf).1
-  case hal => k_norm [h4.1.1]; exact (slot152_ok _ hf).2
   iintro Hk Hclock Hpc H18
   ihave Hframe := Hfr18 $$ %_ H18
 '''
@@ -829,8 +817,7 @@ out.append(t)
 # ---- the entry ----
 def sd(pc, rvc, imm, rs1, rs2, old, lem, slot, ind="  "):
     w = f" with [{lem}]" if lem else ""
-    return (f"{ind}k_step (wp_s_sd cpu _ ?hs ?ht {hx(pc)} {str(rvc).lower()} {imm}#12 {rs1}#5 {rs2}#5 {old} ?hram ?hal) $$ [- $Hk $Hclock $Hpc]{w}\n"
-            f"{ind}case hram => k_norm [{lem}]; exact (slot{slot}_ok _ hf24).1\n{ind}case hal => k_norm [{lem}]; exact (slot{slot}_ok _ hf24).2\n"
+    return (f"{ind}k_step (wp_s_sd cpu _ ?hs ?ht {hx(pc)} {str(rvc).lower()} {imm}#12 {rs1}#5 {rs2}#5 {old}) $$ [- $Hk $Hclock $Hpc]{w}\n"
             f"{ind}iintro Hk Hclock Hpc {old}\n")
 t = '''set_option maxHeartbeats 4000000 in
 /-- **`printk` meets its specification**, given `acquire`, `release`,
@@ -915,9 +902,7 @@ t += '''  -- a0 = &pr.lock ; jal acquire
   -- a5 = s0 + 8 ; the va_list slot
   k_step (wp_s_addi cpu _ ?hs ?ht 0x8000052c#64 false 8#12 15#5 8#5 (by decide)) $$ [- $Hk $Hclock $Hpc] with [h2_8]
   iintro Hk Hclock Hpc
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000530#64 false 3976#12 8#5 15#5 w22 ?hram ?hal) $$ [- $Hk $Hclock $Hpc] with [h2_8]
-  case hram => k_norm [h2_8]; exact (slot184_ok _ hf24).1
-  case hal => k_norm [h2_8]; exact (slot184_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000530#64 false 3976#12 8#5 15#5 w22) $$ [- $Hk $Hclock $Hpc] with [h2_8]
   iintro Hk Hclock Hpc C22
   -- lbu a0,0(s2): the first byte
   have hb0 : (f ++ [0#8])[0]? = some (fmtByte f 0) := fmtByte_get f 0 (Nat.zero_le _)

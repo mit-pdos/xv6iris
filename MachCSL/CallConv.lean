@@ -124,10 +124,10 @@ theorem cstr_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (j 
 theorem stackOwn_four_cases [CurCtx] (sp : BitVec 64) :
     stackOwn (GF := GF) sp 4 ⊢
       ⌜stackFacts sp 4⌝ ∗ ∃ w₁ w₂ w₃ w₄ : BitVec 64,
-        bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
-        bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ ∗
-        bytesPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) w₃ ∗
-        bytesPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w₄ := by
+        wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
+        wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ ∗
+        wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) w₃ ∗
+        wordPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w₄ := by
   unfold stackOwn stackSlots
   iintro ⟨%hf, %ws, %hlen, H⟩
   match ws, hlen with
@@ -139,10 +139,10 @@ theorem stackOwn_four_cases [CurCtx] (sp : BitVec 64) :
     ipureintro; exact hf
 
 theorem stackOwn_four_intro [CurCtx] (sp : BitVec 64) (hf : stackFacts sp 4) (w₁ w₂ w₃ w₄ : BitVec 64) :
-    bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
-    bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ ∗
-    bytesPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) w₃ ∗
-    bytesPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w₄ ⊢ stackOwn (GF := GF) sp 4 := by
+    wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
+    wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ ∗
+    wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) w₃ ∗
+    wordPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w₄ ⊢ stackOwn (GF := GF) sp 4 := by
   unfold stackOwn stackSlots
   iintro ⟨H₁, H₂, H₃, H₄⟩
   isplitr
@@ -153,17 +153,6 @@ theorem stackOwn_four_intro [CurCtx] (sp : BitVec 64) (hf : stackFacts sp 4) (w�
     iframe H₁ H₂ H₃ H₄
     ipureintro; rfl
 
-theorem frame24_ok (sp : BitVec 64) (hf : stackFacts sp 4) :
-    inRam (sp + 0xFFFFFFFFFFFFFFE8#64) 8 ∧ (sp + 0xFFFFFFFFFFFFFFE8#64).toNat % 8 = 0 := by
-  unfold stackFacts ramBase ramEnd at hf
-  have h : (sp + 0xFFFFFFFFFFFFFFE8#64).toNat = sp.toNat - 24 := by bv_omega
-  unfold inRam ramBase ramEnd; rw [h]; omega
-
-theorem frame32_ok (sp : BitVec 64) (hf : stackFacts sp 4) :
-    inRam (sp + 0xFFFFFFFFFFFFFFE0#64) 8 ∧ (sp + 0xFFFFFFFFFFFFFFE0#64).toNat % 8 = 0 := by
-  unfold stackFacts ramBase ramEnd at hf
-  have h : (sp + 0xFFFFFFFFFFFFFFE0#64).toNat = sp.toNat - 32 := by bv_omega
-  unfold inRam ramBase ramEnd; rw [h]; omega
 
 /-! ## The calling convention -/
 

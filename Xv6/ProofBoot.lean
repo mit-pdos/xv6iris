@@ -11,7 +11,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 theorem BootProof (E : ENTRY) (S : START) : BOOT where
-  wp_boot cpu hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 hsp hal := by
+  wp_boot cpu hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 := by
     rename_i hlc GF inst instC
     unfold wp_boot_body
     iintro ⟨HmConf, Hmhartid, Hclock, Htok, #Htext, Hslot, Hpc, Hx1, Hx2, Hx4, Hx8, Hx10, Hx11, Hx14,
@@ -25,7 +25,7 @@ theorem BootProof (E : ENTRY) (S : START) : BOOT where
     iintro HmConf Hmhartid Hclock Htok Hslot Hpc Hx1 Hx2 Hx10 Hx11
     -- `start`, up to its `mret` into `main`
     have hS := S.wp_start (hlc := hlc) (GF := GF) cpu (DFrac.own 1) hartid 0x8000001a#64
-      (bootSp s0 hartid) v4 v8 v14 v15 f0 f8 g0 g8 hsp hal
+      (bootSp s0 hartid) v4 v8 v14 v15 f0 f8 g0 g8
     unfold wp_start_body at hS
     simp only [gpr_x1, gpr_x2, gpr_x4, gpr_x8, gpr_x14, gpr_x15] at hS
     iapply hS

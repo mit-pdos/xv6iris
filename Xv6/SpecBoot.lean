@@ -39,29 +39,28 @@ supervisor mode at `main`, for every time `t` the clock read, with
 `timerinit`'s frame below it, the hart id and GOT slot unchanged, and the
 clock cells at some value. -/
 def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64)
-    (hsp : inRam (bootSp s0 hartid - 32#64) 32) (hal : (bootSp s0 hartid).toNat % 16 = 0) :
+    (cpu : CPU) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64) :
     Prop :=
   mBoot cpu (DFrac.own 1) ∗
   Register.mhartid ↦ᵣ[cpu] hartid ∗
   clockCells cpu ∗
   ctxTok cpu curCtx ∗
   kernelText ∗
-  bytesPointsTo stack0Slot 8 (DFrac.own 1) s0 ∗
+  wordPointsTo stack0Slot 8 (DFrac.own 1) s0 ∗
   pcIs cpu (BitVec.ofNat 64 KernelSyms.«_entry») ∗
   Register.x1 ↦ᵣ[cpu] v1 ∗ Register.x2 ↦ᵣ[cpu] v2 ∗ Register.x4 ↦ᵣ[cpu] v4 ∗
   Register.x8 ↦ᵣ[cpu] v8 ∗ Register.x10 ↦ᵣ[cpu] v10 ∗ Register.x11 ↦ᵣ[cpu] v11 ∗
   Register.x14 ↦ᵣ[cpu] v14 ∗ Register.x15 ↦ᵣ[cpu] v15 ∗
-  bytesPointsTo (bootSp s0 hartid - 16#64) 8 (DFrac.own 1) f0 ∗
-  bytesPointsTo (bootSp s0 hartid - 8#64) 8 (DFrac.own 1) f8 ∗
-  bytesPointsTo (bootSp s0 hartid - 32#64) 8 (DFrac.own 1) g0 ∗
-  bytesPointsTo (bootSp s0 hartid - 24#64) 8 (DFrac.own 1) g8 ∗
+  wordPointsTo (bootSp s0 hartid - 16#64) 8 (DFrac.own 1) f0 ∗
+  wordPointsTo (bootSp s0 hartid - 8#64) 8 (DFrac.own 1) f8 ∗
+  wordPointsTo (bootSp s0 hartid - 32#64) 8 (DFrac.own 1) g0 ∗
+  wordPointsTo (bootSp s0 hartid - 24#64) 8 (DFrac.own 1) g8 ∗
   (∀ t : BitVec 64,
    sConf cpu (DFrac.own 1) (startConf t) -∗
    Register.mhartid ↦ᵣ[cpu] hartid -∗
    clockCells cpu -∗
    ctxTok cpu curCtx -∗
-   bytesPointsTo stack0Slot 8 (DFrac.own 1) s0 -∗
+   wordPointsTo stack0Slot 8 (DFrac.own 1) s0 -∗
    pcIs cpu mainAddr -∗
    Register.x1 ↦ᵣ[cpu] (startAddr + 0x6a#64) -∗
    Register.x2 ↦ᵣ[cpu] (bootSp s0 hartid - 16#64) -∗
@@ -71,18 +70,18 @@ def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
    Register.x11 ↦ᵣ[cpu] (hartid + 1#64) -∗
    Register.x14 ↦ᵣ[cpu] 1000000#64 -∗
    Register.x15 ↦ᵣ[cpu] (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 hartid)) -∗
-   bytesPointsTo (bootSp s0 hartid - 16#64) 8 (DFrac.own 1) v8 -∗
-   bytesPointsTo (bootSp s0 hartid - 8#64) 8 (DFrac.own 1) 0x8000001a#64 -∗
-   bytesPointsTo (bootSp s0 hartid - 32#64) 8 (DFrac.own 1) (bootSp s0 hartid) -∗
-   bytesPointsTo (bootSp s0 hartid - 24#64) 8 (DFrac.own 1) (startAddr + 0x6a#64) -∗
+   wordPointsTo (bootSp s0 hartid - 16#64) 8 (DFrac.own 1) v8 -∗
+   wordPointsTo (bootSp s0 hartid - 8#64) 8 (DFrac.own 1) 0x8000001a#64 -∗
+   wordPointsTo (bootSp s0 hartid - 32#64) 8 (DFrac.own 1) (bootSp s0 hartid) -∗
+   wordPointsTo (bootSp s0 hartid - 24#64) 8 (DFrac.own 1) (startAddr + 0x6a#64) -∗
    wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of the boot path. -/
 structure BOOT : Prop where
   wp_boot : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64) hsp hal,
+    (cpu : CPU) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64),
     wp_boot_body (hlc := hlc) (GF := GF) cpu hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8
-      hsp hal
+     
 
 end Xv6

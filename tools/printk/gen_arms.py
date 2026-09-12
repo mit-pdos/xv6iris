@@ -34,9 +34,7 @@ def step_ld_ap(pc):
     return f'''  -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht {hx(pc)} false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) $$ [- $Hk $Hclock $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) $$ [- $Hk $Hclock $Hpc] with [hR8]
   iintro Hk Hclock Hpc Hap
 '''
 def step_addi_a4(pc):
@@ -47,9 +45,7 @@ def step_addi_a4(pc):
 def step_sd_ap(pc):
     return f'''  -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht {hx(pc)} false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) $$ [- $Hk $Hclock $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) $$ [- $Hk $Hclock $Hpc] with [hR8, ap_next']
   iintro Hk Hclock Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
 '''
@@ -68,9 +64,7 @@ def step_load_va(pc, kind):
         return f'''  -- ld a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht {hx(pc)} true 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (k.regs (BitVec.ofNat 5 (11 + kk))) ?hram ?hal) $$ [- $Hk $Hclock $Hpc]
-  case hram => k_norm; exact hramV
-  case hal => k_norm; exact halV
+    (k.regs (BitVec.ofNat 5 (11 + kk)))) $$ [- $Hk $Hclock $Hpc]
   iintro Hk Hclock Hpc Hva
   ihave Hframe := Hfr $$ Hva
 '''
@@ -80,9 +74,7 @@ def step_load_va(pc, kind):
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   icases cell8_lo_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
   k_step ({rule} cpu _ ?hs ?ht {hx(pc)} {rvc} 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk)))) ?hram ?hal) $$ [- $Hk $Hclock $Hpc]
-  case hram => k_norm; exact hramV4
-  case hal => k_norm; omega
+    (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk))))) $$ [- $Hk $Hclock $Hpc]
   iintro Hk Hclock Hpc Hlo
   ihave Hva := Hvc $$ Hlo
   ihave Hframe := Hfr $$ Hva
@@ -418,10 +410,6 @@ for (name, pc0, adv, li_a2, a1, load, jal, addiw, j) in NUM_ARMS:
     doc = f"The `%{name}` arm at `{hx(pc0)}`: the next vararg to `printint`."
     t = HDR.format(DOC=doc, NAME=name, IFACE="(PI : PRINTINT)", HYPS=hyps, PC0=hx(pc0))
     t += '''  have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
 '''
     t += instr_facts(pcs)
     t += step_ld_ap(pc0) + step_addi_a4(pc0+4) + step_sd_ap(pc0+8)
@@ -454,10 +442,6 @@ t = HDR.format(DOC="The `%c` arm at `0x800006f0`: the next vararg to `consputc`.
     (hp : i + 1 < f.length) (hkk : kk < descs.length) (hdlen : descs.length ≤ 7)
     (hkinds : pkKinds (f.drop (i + 1 + 1)) = (descs.drop (kk + 1)).map PkArgDesc.kind)''', PC0=hx(0x6f0))
 t += '''  have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
 '''
 t += instr_facts([0x6f0, 0x6f4, 0x6f8, 0x6fc, 0x6fe, 0x702])
 t += step_ld_ap(0x6f0) + step_addi_a4(0x6f4) + step_sd_ap(0x6f8) + step_load_va(0x6fc, "lw")

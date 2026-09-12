@@ -22,8 +22,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- A two-slot frame at `sp` holding `ra` and `s0`. -/
 def frame2 [CurCtx] (sp ra s0 : BitVec 64) : IProp GF := iprop%
-  ⌜stackFacts sp 2⌝ ∗ bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) ra ∗
-  bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) s0
+  ⌜stackFacts sp 2⌝ ∗ wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) ra ∗
+  wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) s0
 
 theorem KCtx.sp_eq (k : KCtx) : k.sp = k.regs 2#5 := rfl
 
@@ -123,19 +123,28 @@ macro_rules
                case hs => k_norm
                case ht => k_norm))
 
+/-- `k_code code HT`: discharge the leading `instr` conjuncts of the goal, each
+by `code` (a proof of `instr ...` from the persistent text hypothesis `HT`,
+e.g. `(text_instr _ _ _ _ rfl rfl) Htext`), in subgoals; stops at the first
+conjunct that is not an instruction.  Use it after the rest of a
+multi-instruction lemma's premise has been framed. -/
+syntax "k_code" term:max ident : tactic
+macro_rules
+  | `(tactic| k_code $code:term $ht:ident) =>
+    `(tactic| repeat (isplitr; · iapply $code:term; iexact $ht:ident))
+
 set_option hygiene false in
-/-- `k_step rule from code HT $$ pat`: as `k_step`, with the rule's `instr` premise
-derived from the text `HT` (`code : text ⊢ instr ...`) in a subgoal under
-the `iapply`, so the code facts never sit in the context. -/
+/-- `k_step rule from code HT $$ pat`: as `k_step`, with the rule's `instr`
+premises (one per instruction of the rule) derived from the text `HT`
+(`code : text ⊢ instr ...`) in subgoals under the `iapply`, so the code facts
+never sit in the context. -/
 macro_rules
   | `(tactic| k_step $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
     `(tactic| k_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
   | `(tactic| k_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
     `(tactic| (iapply $rule:term $$ $pat:specPat
                rotate_right 1
-               isplitr
-               · iapply $code:term
-                 iexact $ht:ident
+               k_code $code:term $ht:ident
                iframe #
                k_norm [$extra,*]
                iframe
@@ -163,15 +172,9 @@ theorem wp_prologue2 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie 
   k_step (wp_s_push cpu _ ?hs ?ht pc true 4080#12 2 hK imm_m16) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hframe
   icases stackOwn_two_cases _ $$ Hframe with ⟨%hf, %w₁, %w₂, Hf8, Hf16⟩
-  have ⟨hram8, hal8⟩ := frame8_ok _ hf
-  have ⟨hram16, hal16⟩ := frame16_ok _ hf
-  k_step (wp_s_sd cpu _ ?hs ?ht (pc + 2#64) true 8#12 2#5 1#5 w₁ ?hram ?hal) $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hram8
-  case hal => k_norm; exact hal8
+  k_step (wp_s_sd cpu _ ?hs ?ht (pc + 2#64) true 8#12 2#5 1#5 w₁) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf8
-  k_step (wp_s_sd cpu _ ?hs ?ht (pc + 4#64) true 0#12 2#5 8#5 w₂ ?hram ?hal) $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hram16
-  case hal => k_norm; exact hal16
+  k_step (wp_s_sd cpu _ ?hs ?ht (pc + 4#64) true 0#12 2#5 8#5 w₂) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf16
   k_step (wp_s_addi cpu _ ?hs ?ht (pc + 6#64) true 16#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc]
   iintro Hk Hpc
@@ -198,17 +201,11 @@ theorem wp_epilogue2 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie 
   unfold frame2
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, Hk, Hpc, ⟨%hf, Hf8, Hf16⟩, HΦ⟩
   icases kctx_stackFacts _ _ $$ Hk with ⟨%hfk, Hk⟩
-  have ⟨hram8, hal8⟩ := frame8_ok _ hf
-  have ⟨hram16, hal16⟩ := frame16_ok _ hf
-  k_step (wp_s_ld cpu _ ?hs ?ht pc true 8#12 1#5 2#5 (by decide) (DFrac.own 1) ra ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht pc true 8#12 1#5 2#5 (by decide) (DFrac.own 1) ra)
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram8
-  case hal => k_norm [hR2]; exact hal8
   iintro Hk Hpc Hf8
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc + 2#64) true 0#12 8#5 2#5 (by decide) (DFrac.own 1) s0 ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc + 2#64) true 0#12 8#5 2#5 (by decide) (DFrac.own 1) s0)
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram16
-  case hal => k_norm [hR2]; exact hal16
   iintro Hk Hpc Hf16
   have hf' : stackFacts ((((k.pushed 2).withRegs ((R.set 1#5 ra).set 8#5 s0)).sp + 8#64 * BitVec.ofNat 64 2))
       (2 + (trapRes (((k.pushed 2).withRegs ((R.set 1#5 ra).set 8#5 s0)).sie) +
@@ -234,10 +231,10 @@ theorem wp_epilogue2 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie 
 
 /-- A four-slot frame at `sp` holding `ra`, `s0`, `s1` (slot `0(sp)` unused). -/
 def frame4s1 [CurCtx] (sp ra s0 s1 : BitVec 64) : IProp GF := iprop%
-  ⌜stackFacts sp 4⌝ ∗ bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) ra ∗
-  bytesPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) s0 ∗
-  bytesPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) s1 ∗
-  ∃ w : BitVec 64, bytesPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w
+  ⌜stackFacts sp 4⌝ ∗ wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) ra ∗
+  wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) s0 ∗
+  wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) s1 ∗
+  ∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w
 
 theorem imm_m32 : BitVec.signExtend 64 4064#12 = -(8#64 * BitVec.ofNat 64 4) := by
   simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
@@ -264,20 +261,11 @@ theorem wp_prologue4s1 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.si
   k_step (wp_s_push cpu _ ?hs ?ht pc true 4064#12 4 hK imm_m32) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hframe
   icases stackOwn_four_cases _ $$ Hframe with ⟨%hf, %w₁, %w₂, %w₃, %w₄, Hf8, Hf16, Hf24, Hf32⟩
-  have ⟨hram8, hal8⟩ := frame8_ok _ (stackFacts_mono hf (by omega))
-  have ⟨hram16, hal16⟩ := frame16_ok _ (stackFacts_mono hf (by omega))
-  have ⟨hram24, hal24⟩ := frame24_ok _ hf
-  k_step (wp_s_sd cpu _ ?hs ?ht (pc + 2#64) true 24#12 2#5 1#5 w₁ ?hram ?hal) $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hram8
-  case hal => k_norm; exact hal8
+  k_step (wp_s_sd cpu _ ?hs ?ht (pc + 2#64) true 24#12 2#5 1#5 w₁) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf8
-  k_step (wp_s_sd cpu _ ?hs ?ht (pc + 4#64) true 16#12 2#5 8#5 w₂ ?hram ?hal) $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hram16
-  case hal => k_norm; exact hal16
+  k_step (wp_s_sd cpu _ ?hs ?ht (pc + 4#64) true 16#12 2#5 8#5 w₂) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf16
-  k_step (wp_s_sd cpu _ ?hs ?ht (pc + 6#64) true 8#12 2#5 9#5 w₃ ?hram ?hal) $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hram24
-  case hal => k_norm; exact hal24
+  k_step (wp_s_sd cpu _ ?hs ?ht (pc + 6#64) true 8#12 2#5 9#5 w₃) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf24
   k_step (wp_s_addi cpu _ ?hs ?ht (pc + 8#64) true 32#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc]
   iintro Hk Hpc
@@ -305,23 +293,14 @@ theorem wp_epilogue4s1 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.si
   unfold frame4s1
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, ⟨%hf, Hf8, Hf16, Hf24, %w₄, Hf32⟩, HΦ⟩
   icases kctx_stackFacts _ _ $$ Hk with ⟨%hfk, Hk⟩
-  have ⟨hram8, hal8⟩ := frame8_ok _ (stackFacts_mono hf (by omega))
-  have ⟨hram16, hal16⟩ := frame16_ok _ (stackFacts_mono hf (by omega))
-  have ⟨hram24, hal24⟩ := frame24_ok _ hf
-  k_step (wp_s_ld cpu _ ?hs ?ht pc true 24#12 1#5 2#5 (by decide) (DFrac.own 1) ra ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht pc true 24#12 1#5 2#5 (by decide) (DFrac.own 1) ra)
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram8
-  case hal => k_norm [hR2]; exact hal8
   iintro Hk Hpc Hf8
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc + 2#64) true 16#12 8#5 2#5 (by decide) (DFrac.own 1) s0 ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc + 2#64) true 16#12 8#5 2#5 (by decide) (DFrac.own 1) s0)
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram16
-  case hal => k_norm [hR2]; exact hal16
   iintro Hk Hpc Hf16
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc + 4#64) true 8#12 9#5 2#5 (by decide) (DFrac.own 1) s1 ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc + 4#64) true 8#12 9#5 2#5 (by decide) (DFrac.own 1) s1)
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram24
-  case hal => k_norm [hR2]; exact hal24
   iintro Hk Hpc Hf24
   have hf' : stackFacts ((((k.pushed 4).withRegs (((R.set 1#5 ra).set 8#5 s0).set 9#5 s1)).sp +
         8#64 * BitVec.ofNat 64 4))

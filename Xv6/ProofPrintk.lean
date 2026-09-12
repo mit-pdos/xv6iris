@@ -114,23 +114,14 @@ theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at this
     rw [this]; exact hR2
   -- ld ra,120(sp) ; ld s0,112(sp) ; ld s2,96(sp)
-  have ⟨hram8, hal8⟩ := slot72_ok _ hf24
-  have ⟨hram9, hal9⟩ := slot80_ok _ hf24
-  have ⟨hram11, hal11⟩ := slot96_ok _ hf24
-  k_step (wp_s_ld cpu _ ?hs ?ht 0x80000764#64 true 120#12 1#5 2#5 (by decide) (DFrac.own 1) (k.regs 1#5) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_ld cpu _ ?hs ?ht 0x80000764#64 true 120#12 1#5 2#5 (by decide) (DFrac.own 1) (k.regs 1#5)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h22]
-  case hram => k_norm [h22]; exact hram8
-  case hal => k_norm [h22]; exact hal8
   iintro Hk Hpc C8
-  k_step (wp_s_ld cpu _ ?hs ?ht 0x80000766#64 true 112#12 8#5 2#5 (by decide) (DFrac.own 1) (k.regs 8#5) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_ld cpu _ ?hs ?ht 0x80000766#64 true 112#12 8#5 2#5 (by decide) (DFrac.own 1) (k.regs 8#5)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h22]
-  case hram => k_norm [h22]; exact hram9
-  case hal => k_norm [h22]; exact hal9
   iintro Hk Hpc C9
-  k_step (wp_s_ld cpu _ ?hs ?ht 0x80000768#64 true 96#12 18#5 2#5 (by decide) (DFrac.own 1) (k.regs 18#5) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_ld cpu _ ?hs ?ht 0x80000768#64 true 96#12 18#5 2#5 (by decide) (DFrac.own 1) (k.regs 18#5)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h22]
-  case hram => k_norm [h22]; exact hram11
-  case hal => k_norm [h22]; exact hal11
   iintro Hk Hpc C11
   -- addi sp,sp,192
   ihave Hframe := stackOwn_24_intro (k.regs 2#5) hf24 v0 v1 v2 v3 v4 v5 v6 v7 (k.regs 1#5) (k.regs 8#5) v10
@@ -191,59 +182,32 @@ theorem printk_restore {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cu
   iintro ⟨#Hi0, #Hi1, #Hi2, #Hi3, #Hi4, #Hi5, #Hi6, #Hi7, #Hi8, Hk, Hpc,
     ⟨Hva, ⟨%v7, C7⟩, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17, C18, C19, C20, ⟨%v21, C21⟩, C22,
       ⟨%v23, C23⟩⟩, HΦ⟩
-  have ⟨hram10, hal10⟩ := slot88_ok _ hf
-  have ⟨hram12, hal12⟩ := slot104_ok _ hf
-  have ⟨hram13, hal13⟩ := slot112_ok _ hf
-  have ⟨hram14, hal14⟩ := slot120_ok _ hf
-  have ⟨hram15, hal15⟩ := slot128_ok _ hf
-  have ⟨hram16, hal16⟩ := slot136_ok _ hf
-  have ⟨hram17, hal17⟩ := slot144_ok _ hf
-  have ⟨hram19, hal19⟩ := slot160_ok _ hf
-  have ⟨hram20, hal20⟩ := slot168_ok _ hf
-  k_step (wp_s_ld cpu _ ?hs ?ht pc0 true 104#12 9#5 2#5 (by decide) (DFrac.own 1) (k.regs 9#5) ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht pc0 true 104#12 9#5 2#5 (by decide) (DFrac.own 1) (k.regs 9#5))
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram10
-  case hal => k_norm [hR2]; exact hal10
   iintro Hk Hpc C10
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 2#64) true 88#12 19#5 2#5 (by decide) (DFrac.own 1) (k.regs 19#5) ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 2#64) true 88#12 19#5 2#5 (by decide) (DFrac.own 1) (k.regs 19#5))
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram12
-  case hal => k_norm [hR2]; exact hal12
   iintro Hk Hpc C12
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 4#64) true 80#12 20#5 2#5 (by decide) (DFrac.own 1) (k.regs 20#5) ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 4#64) true 80#12 20#5 2#5 (by decide) (DFrac.own 1) (k.regs 20#5))
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram13
-  case hal => k_norm [hR2]; exact hal13
   iintro Hk Hpc C13
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 6#64) true 72#12 21#5 2#5 (by decide) (DFrac.own 1) (k.regs 21#5) ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 6#64) true 72#12 21#5 2#5 (by decide) (DFrac.own 1) (k.regs 21#5))
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram14
-  case hal => k_norm [hR2]; exact hal14
   iintro Hk Hpc C14
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 8#64) true 64#12 22#5 2#5 (by decide) (DFrac.own 1) (k.regs 22#5) ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 8#64) true 64#12 22#5 2#5 (by decide) (DFrac.own 1) (k.regs 22#5))
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram15
-  case hal => k_norm [hR2]; exact hal15
   iintro Hk Hpc C15
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 10#64) true 56#12 23#5 2#5 (by decide) (DFrac.own 1) (k.regs 23#5) ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 10#64) true 56#12 23#5 2#5 (by decide) (DFrac.own 1) (k.regs 23#5))
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram16
-  case hal => k_norm [hR2]; exact hal16
   iintro Hk Hpc C16
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 12#64) true 48#12 24#5 2#5 (by decide) (DFrac.own 1) (k.regs 24#5) ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 12#64) true 48#12 24#5 2#5 (by decide) (DFrac.own 1) (k.regs 24#5))
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram17
-  case hal => k_norm [hR2]; exact hal17
   iintro Hk Hpc C17
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 14#64) true 32#12 26#5 2#5 (by decide) (DFrac.own 1) (k.regs 26#5) ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 14#64) true 32#12 26#5 2#5 (by decide) (DFrac.own 1) (k.regs 26#5))
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram19
-  case hal => k_norm [hR2]; exact hal19
   iintro Hk Hpc C19
-  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 16#64) true 24#12 27#5 2#5 (by decide) (DFrac.own 1) (k.regs 27#5) ?hram ?hal)
+  k_step (wp_s_ld cpu _ ?hs ?ht (pc0 + 16#64) true 24#12 27#5 2#5 (by decide) (DFrac.own 1) (k.regs 27#5))
     $$ [- $Hk $Hpc] with [hR2]
-  case hram => k_norm [hR2]; exact hram20
-  case hal => k_norm [hR2]; exact hal20
   iintro Hk Hpc C20
   icases pkVaCells_cases _ _ $$ Hva with ⟨V6, V5, V4, V3, V2, V1, V0⟩
   ihave Hexit := pkFrameExit_intro (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5)
@@ -432,25 +396,17 @@ theorem printk_arm_d (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x800005ca#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x800005ce#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x800005d2#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- li x12,1
@@ -463,9 +419,7 @@ theorem printk_arm_d (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   icases cell8_lo_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
   k_step (wp_s_lw cpu _ ?hs ?ht 0x800005da#64 true 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk)))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV4
-  case hal => k_norm; omega
+    (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk))))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hlo
   ihave Hva := Hvc $$ Hlo
   ihave Hframe := Hfr $$ Hva
@@ -524,25 +478,17 @@ theorem printk_arm_ld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x800005ae#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x800005b2#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x800005b6#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- li x12,1
@@ -554,9 +500,7 @@ theorem printk_arm_ld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   -- ld a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x800005be#64 true 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (k.regs (BitVec.ofNat 5 (11 + kk))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV
-  case hal => k_norm; exact halV
+    (k.regs (BitVec.ofNat 5 (11 + kk)))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hva
   ihave Hframe := Hfr $$ Hva
   -- jal printint
@@ -619,25 +563,17 @@ theorem printk_arm_lld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x800005ec#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x800005f0#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x800005f4#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- li x12,1
@@ -649,9 +585,7 @@ theorem printk_arm_lld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   -- ld a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x800005fc#64 true 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (k.regs (BitVec.ofNat 5 (11 + kk))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV
-  case hal => k_norm; exact halV
+    (k.regs (BitVec.ofNat 5 (11 + kk)))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hva
   ihave Hframe := Hfr $$ Hva
   -- jal printint
@@ -714,25 +648,17 @@ theorem printk_arm_u (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x80000608#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x8000060c#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x80000610#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- li x12,0
@@ -745,9 +671,7 @@ theorem printk_arm_u (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   icases cell8_lo_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
   k_step (wp_s_lwu cpu _ ?hs ?ht 0x80000618#64 false 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk)))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV4
-  case hal => k_norm; omega
+    (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk))))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hlo
   ihave Hva := Hvc $$ Hlo
   ihave Hframe := Hfr $$ Hva
@@ -806,25 +730,17 @@ theorem printk_arm_lu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x80000622#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x80000626#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x8000062a#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- li x12,0
@@ -836,9 +752,7 @@ theorem printk_arm_lu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   -- ld a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x80000632#64 true 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (k.regs (BitVec.ofNat 5 (11 + kk))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV
-  case hal => k_norm; exact halV
+    (k.regs (BitVec.ofNat 5 (11 + kk)))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hva
   ihave Hframe := Hfr $$ Hva
   -- jal printint
@@ -901,25 +815,17 @@ theorem printk_arm_llu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x8000063e#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x80000642#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x80000646#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- li x12,0
@@ -931,9 +837,7 @@ theorem printk_arm_llu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   -- ld a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x8000064e#64 true 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (k.regs (BitVec.ofNat 5 (11 + kk))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV
-  case hal => k_norm; exact halV
+    (k.regs (BitVec.ofNat 5 (11 + kk)))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hva
   ihave Hframe := Hfr $$ Hva
   -- jal printint
@@ -996,25 +900,17 @@ theorem printk_arm_x (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x8000065a#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x8000065e#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x80000662#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- li x12,0
@@ -1027,9 +923,7 @@ theorem printk_arm_x (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   icases cell8_lo_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
   k_step (wp_s_lwu cpu _ ?hs ?ht 0x8000066a#64 false 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk)))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV4
-  case hal => k_norm; omega
+    (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk))))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hlo
   ihave Hva := Hvc $$ Hlo
   ihave Hframe := Hfr $$ Hva
@@ -1088,25 +982,17 @@ theorem printk_arm_lx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x80000674#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x80000678#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x8000067c#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- li x11,16
@@ -1115,9 +1001,7 @@ theorem printk_arm_lx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   -- ld a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x80000682#64 true 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (k.regs (BitVec.ofNat 5 (11 + kk))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV
-  case hal => k_norm; exact halV
+    (k.regs (BitVec.ofNat 5 (11 + kk)))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hva
   ihave Hframe := Hfr $$ Hva
   -- jal printint
@@ -1180,25 +1064,17 @@ theorem printk_arm_llx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x8000068e#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x80000692#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x80000696#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- li x12,0
@@ -1210,9 +1086,7 @@ theorem printk_arm_llx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   -- ld a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x8000069e#64 true 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (k.regs (BitVec.ofNat 5 (11 + kk))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV
-  case hal => k_norm; exact halV
+    (k.regs (BitVec.ofNat 5 (11 + kk)))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hva
   ihave Hframe := Hfr $$ Hva
   -- jal printint
@@ -1275,34 +1149,24 @@ theorem printk_arm_c (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
-  have hramV4 : inRam (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) 4 := by
-    unfold inRam at *; omega
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x800006f0#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x800006f4#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x800006f8#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- lw a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   icases cell8_lo_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
   k_step (wp_s_lw cpu _ ?hs ?ht 0x800006fc#64 true 0#12 10#5 15#5 (by decide) (DFrac.own 1)
-    (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk)))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV4
-  case hal => k_norm; omega
+    (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk))))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hlo
   ihave Hva := Hvc $$ Hlo
   ihave Hframe := Hfr $$ Hva
@@ -2152,40 +2016,30 @@ theorem printk_arm_p (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     · exact absurd h (by decide)
     · exact huart h
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
   have hR25 : R 25#5 = k.regs 25#5 := hR.2
   -- sd s9,40(sp)
   icases pkFrame_s9_acc _ _ _ _ $$ Hframe with ⟨H18, Hfr18⟩
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x800006aa#64 true 40#12 2#5 25#5 w18 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x800006aa#64 true 40#12 2#5 25#5 w18) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [hR2, hR25]
-  case hram => k_norm [hR2]; exact (slot152_ok _ hf).1
-  case hal => k_norm [hR2]; exact (slot152_ok _ hf).2
   iintro Hk Hpc H18
   ihave Hframe := Hfr18 $$ %_ H18
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x800006ac#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x800006b0#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x800006b4#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- ld x21,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x800006b8#64 false 0#12 21#5 15#5 (by decide) (DFrac.own 1)
-    (k.regs (BitVec.ofNat 5 (11 + kk))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV
-  case hal => k_norm; exact halV
+    (k.regs (BitVec.ofNat 5 (11 + kk)))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hva
   ihave Hframe := Hfr $$ Hva
   k_step (wp_s_addi cpu _ ?hs ?ht 0x800006bc#64 false 48#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
@@ -2247,10 +2101,8 @@ theorem printk_arm_p (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iintro %R4 %cs4 Hk Hpc Hsent %h4
   -- ld s9,40(sp)
   icases pkFrame_s9_acc _ _ _ _ $$ Hframe with ⟨H18, Hfr18⟩
-  k_step (wp_s_ld cpu _ ?hs ?ht 0x800006ec#64 true 40#12 25#5 2#5 (by decide) (DFrac.own 1) (k.regs 25#5) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_ld cpu _ ?hs ?ht 0x800006ec#64 true 40#12 25#5 2#5 (by decide) (DFrac.own 1) (k.regs 25#5)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h4.1.1]
-  case hram => k_norm [h4.1.1]; exact (slot152_ok _ hf).1
-  case hal => k_norm [h4.1.1]; exact (slot152_ok _ hf).2
   iintro Hk Hpc H18
   ihave Hframe := Hfr18 $$ %_ H18
   k_step (wp_s_j cpu _ ?hs ?ht 0x800006ee#64 true 2096768#21 ?htgt) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
@@ -2293,31 +2145,23 @@ theorem printk_arm_s (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     · exact huart h
   have hkk : kk < descs.length := (List.getElem?_eq_some_iff.mp hd).1
   have hk7 : kk < 7 := by omega
-  have ⟨hramA, halA⟩ := slot184_ok _ hf
-  have ⟨hramV, halV⟩ := va_slot_ok (k.regs 2#5) kk (by omega) hf
   -- ld a5,-120(s0)
   icases pkFrame_ap_acc _ _ _ _ $$ Hframe with ⟨Hap, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x80000704#64 false 3976#12 15#5 8#5 (by decide) (DFrac.own 1)
-    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+    (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8]
   iintro Hk Hpc Hap
   -- addi a4,a5,8
   k_step (wp_s_addi cpu _ ?hs ?ht 0x80000708#64 false 8#12 14#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sd a4,-120(s0)
   k_step (wp_s_sd cpu _ ?hs ?ht 0x8000070c#64 false 3976#12 8#5 14#5 (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk)
-    ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
-  case hram => k_norm [hR8]; exact hramA
-  case hal => k_norm [hR8]; exact halA
+   ) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hR8, ap_next']
   iintro Hk Hpc Hap
   ihave Hframe := Hfr $$ %_ Hap
   -- ld x20,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
   k_step (wp_s_ld cpu _ ?hs ?ht 0x80000710#64 false 0#12 20#5 15#5 (by decide) (DFrac.own 1)
-    (k.regs (BitVec.ofNat 5 (11 + kk))) ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact hramV
-  case hal => k_norm; exact halV
+    (k.regs (BitVec.ofNat 5 (11 + kk)))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hva
   ihave Hframe := Hfr $$ Hva
   icases pkDescs_acc k.regs descs kk d hd $$ Hdescs with ⟨Hd, Hdcl⟩
@@ -3126,49 +2970,29 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
   icases stackOwn_24_cases _ $$ Hstk with ⟨%_, %w0, %w1, %w2, %w3, %w4, %w5, %w6, %w7, %w8, %w9, %w10, %w11, %w12, %w13,
     %w14, %w15, %w16, %w17, %w18, %w19, %w20, %w21, %w22, %w23, C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12,
     C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23⟩
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000504#64 true 120#12 2#5 1#5 w8 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case hram => k_norm; exact (slot72_ok _ hf24).1
-  case hal => k_norm; exact (slot72_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000504#64 true 120#12 2#5 1#5 w8) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C8
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000506#64 true 112#12 2#5 8#5 w9 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case hram => k_norm; exact (slot80_ok _ hf24).1
-  case hal => k_norm; exact (slot80_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000506#64 true 112#12 2#5 8#5 w9) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C9
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000508#64 true 96#12 2#5 18#5 w11 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case hram => k_norm; exact (slot96_ok _ hf24).1
-  case hal => k_norm; exact (slot96_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000508#64 true 96#12 2#5 18#5 w11) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C11
   k_step (wp_s_addi cpu _ ?hs ?ht 0x8000050a#64 true 128#12 8#5 2#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ ?hs ?ht 0x8000050c#64 true 18#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000050e#64 true 8#12 8#5 11#5 w6 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case hram => k_norm; exact (slot56_ok _ hf24).1
-  case hal => k_norm; exact (slot56_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000050e#64 true 8#12 8#5 11#5 w6) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C6
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000510#64 true 16#12 8#5 12#5 w5 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case hram => k_norm; exact (slot48_ok _ hf24).1
-  case hal => k_norm; exact (slot48_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000510#64 true 16#12 8#5 12#5 w5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C5
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000512#64 true 24#12 8#5 13#5 w4 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case hram => k_norm; exact (slot40_ok _ hf24).1
-  case hal => k_norm; exact (slot40_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000512#64 true 24#12 8#5 13#5 w4) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C4
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000514#64 true 32#12 8#5 14#5 w3 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case hram => k_norm; exact (slot32_ok _ hf24).1
-  case hal => k_norm; exact (slot32_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000514#64 true 32#12 8#5 14#5 w3) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C3
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000516#64 true 40#12 8#5 15#5 w2 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case hram => k_norm; exact (slot24_ok _ hf24).1
-  case hal => k_norm; exact (slot24_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000516#64 true 40#12 8#5 15#5 w2) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C2
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000518#64 false 48#12 8#5 16#5 w1 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case hram => k_norm; exact (slot16_ok _ hf24).1
-  case hal => k_norm; exact (slot16_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000518#64 false 48#12 8#5 16#5 w1) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C1
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000051c#64 false 56#12 8#5 17#5 w0 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case hram => k_norm; exact (slot8_ok _ hf24).1
-  case hal => k_norm; exact (slot8_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000051c#64 false 56#12 8#5 17#5 w0) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C0
   -- a0 = &pr.lock ; jal acquire
   k_step (wp_s_auipc cpu _ ?hs ?ht 0x80000520#64 false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -3216,9 +3040,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
   -- a5 = s0 + 8 ; the va_list slot
   k_step (wp_s_addi cpu _ ?hs ?ht 0x8000052c#64 false 8#12 15#5 8#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_8]
   iintro Hk Hpc
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000530#64 false 3976#12 8#5 15#5 w22 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_8]
-  case hram => k_norm [h2_8]; exact (slot184_ok _ hf24).1
-  case hal => k_norm [h2_8]; exact (slot184_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000530#64 false 3976#12 8#5 15#5 w22) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_8]
   iintro Hk Hpc C22
   -- lbu a0,0(s2): the first byte
   have hb0 : (f ++ [0#8])[0]? = some (fmtByte f 0) := fmtByte_get f 0 (Nat.zero_le _)
@@ -3252,41 +3074,23 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
     iapply HΦ $$ %_ %([]) Hk Hpc %h Hbuf Hdescs Hsent
   ihave Hpc := pcIs_ite_neg _ _ _ _ h0 $$ Hpc
   have hi : 0 < f.length := fmt_lt_of_ne f 0 (Nat.zero_le _) h0
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000053c#64 true 104#12 2#5 9#5 w10 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_9]
-  case hram => k_norm [h2_2, h2_9]; exact (slot88_ok _ hf24).1
-  case hal => k_norm [h2_2, h2_9]; exact (slot88_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000053c#64 true 104#12 2#5 9#5 w10) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_9]
   iintro Hk Hpc C10
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000053e#64 true 88#12 2#5 19#5 w12 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_19]
-  case hram => k_norm [h2_2, h2_19]; exact (slot104_ok _ hf24).1
-  case hal => k_norm [h2_2, h2_19]; exact (slot104_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000053e#64 true 88#12 2#5 19#5 w12) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_19]
   iintro Hk Hpc C12
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000540#64 true 80#12 2#5 20#5 w13 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_20]
-  case hram => k_norm [h2_2, h2_20]; exact (slot112_ok _ hf24).1
-  case hal => k_norm [h2_2, h2_20]; exact (slot112_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000540#64 true 80#12 2#5 20#5 w13) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_20]
   iintro Hk Hpc C13
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000542#64 true 72#12 2#5 21#5 w14 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_21]
-  case hram => k_norm [h2_2, h2_21]; exact (slot120_ok _ hf24).1
-  case hal => k_norm [h2_2, h2_21]; exact (slot120_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000542#64 true 72#12 2#5 21#5 w14) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_21]
   iintro Hk Hpc C14
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000544#64 true 64#12 2#5 22#5 w15 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_22]
-  case hram => k_norm [h2_2, h2_22]; exact (slot128_ok _ hf24).1
-  case hal => k_norm [h2_2, h2_22]; exact (slot128_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000544#64 true 64#12 2#5 22#5 w15) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_22]
   iintro Hk Hpc C15
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000546#64 true 56#12 2#5 23#5 w16 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_23]
-  case hram => k_norm [h2_2, h2_23]; exact (slot136_ok _ hf24).1
-  case hal => k_norm [h2_2, h2_23]; exact (slot136_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000546#64 true 56#12 2#5 23#5 w16) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_23]
   iintro Hk Hpc C16
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000548#64 true 48#12 2#5 24#5 w17 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_24]
-  case hram => k_norm [h2_2, h2_24]; exact (slot144_ok _ hf24).1
-  case hal => k_norm [h2_2, h2_24]; exact (slot144_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x80000548#64 true 48#12 2#5 24#5 w17) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_24]
   iintro Hk Hpc C17
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000054a#64 true 32#12 2#5 26#5 w19 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_26]
-  case hram => k_norm [h2_2, h2_26]; exact (slot160_ok _ hf24).1
-  case hal => k_norm [h2_2, h2_26]; exact (slot160_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000054a#64 true 32#12 2#5 26#5 w19) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_26]
   iintro Hk Hpc C19
-  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000054c#64 true 24#12 2#5 27#5 w20 ?hram ?hal) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_27]
-  case hram => k_norm [h2_2, h2_27]; exact (slot168_ok _ hf24).1
-  case hal => k_norm [h2_2, h2_27]; exact (slot168_ok _ hf24).2
+  k_step (wp_s_sd cpu _ ?hs ?ht 0x8000054c#64 true 24#12 2#5 27#5 w20) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_27]
   iintro Hk Hpc C20
   k_step (wp_s_addi cpu _ ?hs ?ht 0x8000054e#64 true 0#12 20#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc

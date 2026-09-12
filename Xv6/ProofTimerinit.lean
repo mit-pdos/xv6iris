@@ -37,7 +37,7 @@ macro "ti_step" rule:term : tactic =>
 
 set_option maxHeartbeats 4000000 in
 theorem TimerinitProof : TIMERINIT where
-  wp_timerinit cpu c hok hcbie hpmm hstce ret sp₀ v8 v14 v15 f0 f8 hsp hal := by
+  wp_timerinit cpu c hok hcbie hpmm hstce ret sp₀ v8 v14 v15 f0 f8 := by
     unfold wp_timerinit_body
     iintro ⟨HmConf, Hclock, Htok, #Htext, Hpc, Hx1, Hx2, Hx8, Hx14, Hx15, Hf0, Hf8, HΦ⟩
     ihave #Hi01c := text_instr 0x8000001c#64 true (instruction.ITYPE (BitVec.signExtend 12 48#6, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
@@ -61,14 +61,6 @@ theorem TimerinitProof : TIMERINIT where
     ihave #Hi052 := text_instr 0x80000052#64 true (instruction.LOAD (0#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ Htext
     ihave #Hi054 := text_instr 0x80000054#64 true (instruction.ITYPE (BitVec.signExtend 12 16#6, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
     ihave #Hi056 := text_instr 0x80000056#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ Htext
-    have hram8 : inRam (sp₀ + 0xfffffffffffffff0#64 + BitVec.signExtend 64 8#12) 8 := by
-      simp only [BitVec.reduceSignExtend, inRam, ramBase, ramEnd] at *; bv_omega
-    have hal8 : (sp₀ + 0xfffffffffffffff0#64 + BitVec.signExtend 64 8#12).toNat % 8 = 0 := by
-      simp only [BitVec.reduceSignExtend]; bv_omega
-    have hram0 : inRam (sp₀ + 0xfffffffffffffff0#64 + BitVec.signExtend 64 0#12) 8 := by
-      simp only [BitVec.reduceSignExtend, inRam, ramBase, ramEnd] at *; bv_omega
-    have hal0 : (sp₀ + 0xfffffffffffffff0#64 + BitVec.signExtend 64 0#12).toNat % 8 = 0 := by
-      simp only [BitVec.reduceSignExtend]; bv_omega
     ti_norm
     -- 8000001c: addi sp,sp,-16
     ti_step wp_m_addi_same cpu (DFrac.own 1) c hok _ true (BitVec.signExtend 12 48#6) 2#5 (by decide) sp₀
@@ -76,12 +68,12 @@ theorem TimerinitProof : TIMERINIT where
     ti_norm
     -- 8000001e: sd ra,8(sp)
     ti_step wp_m_sd cpu (DFrac.own 1) c hok _ true 8#12 2#5 1#5 (by decide) (by decide)
-      (sp₀ + 0xfffffffffffffff0#64) ret f8 hram8 hal8
+      (sp₀ + 0xfffffffffffffff0#64) ret f8
     iintro HmConf Hclock Hpc Hx2 Hx1 Htok Hf8
     ti_norm
     -- 80000020: sd s0,0(sp)
     ti_step wp_m_sd cpu (DFrac.own 1) c hok _ true 0#12 2#5 8#5 (by decide) (by decide)
-      (sp₀ + 0xfffffffffffffff0#64) v8 f0 hram0 hal0
+      (sp₀ + 0xfffffffffffffff0#64) v8 f0
     iintro HmConf Hclock Hpc Hx2 Hx8 Htok Hf0
     ti_norm
     -- 80000022: addi s0,sp,16
@@ -153,12 +145,12 @@ theorem TimerinitProof : TIMERINIT where
       rfl rfl rfl
     -- 80000050: ld ra,8(sp)
     ti_step wp_m_ld cpu (DFrac.own 1) (DFrac.own 1) _ hok3 _ true 8#12 1#5 2#5 (by decide) (by decide) _
-      (sp₀ + 0xfffffffffffffff0#64) ret hram8 hal8
+      (sp₀ + 0xfffffffffffffff0#64) ret
     iintro HmConf Hclock Hpc Hx1 Hx2 Htok Hf8
     ti_norm
     -- 80000052: ld s0,0(sp)
     ti_step wp_m_ld cpu (DFrac.own 1) (DFrac.own 1) _ hok3 _ true 0#12 8#5 2#5 (by decide) (by decide) _
-      (sp₀ + 0xfffffffffffffff0#64) v8 hram0 hal0
+      (sp₀ + 0xfffffffffffffff0#64) v8
     iintro HmConf Hclock Hpc Hx8 Hx2 Htok Hf0
     ti_norm
     -- 80000054: addi sp,sp,16

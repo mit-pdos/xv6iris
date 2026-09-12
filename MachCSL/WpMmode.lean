@@ -11,6 +11,7 @@ instruction it expands to), so `c.lui`/`c.addi`/`c.add` are the `lui`/`addi`/
 -/
 import MachCSL.WpCycle
 import MachCSL.WpGpr
+import MachCSL.WordPointsTo
 
 namespace MachCSL
 
@@ -360,22 +361,22 @@ theorem wp_m_jal (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF)
 /-- `ld rd, imm(rd)` from an 8-aligned RAM address. -/
 theorem wp_m_ld_same [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
-    (imm : BitVec 12) (rd : BitVec 5) (hrd : rd ≠ 0#5) (a data : BitVec 64)
-    (hram : inRam (a + BitVec.signExtend 64 imm) 8)
-    (hal : (a + BitVec.signExtend 64 imm).toNat % 8 = 0) :
+    (imm : BitVec 12) (rd : BitVec 5) (hrd : rd ≠ 0#5) (a data : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rd, regidx.Regidx rd, false, 8)) ∗
     mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) a ∗ ctxTok cpu curCtx ∗
-    bytesPointsTo (a + BitVec.signExtend 64 imm) 8 dq' data ∗
+    wordPointsTo (a + BitVec.signExtend 64 imm) 8 dq' data ∗
     ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
         gpr cpu rd (DFrac.own 1) data -∗ ctxTok cpu curCtx -∗
-        bytesPointsTo (a + BitVec.signExtend 64 imm) 8 dq' data -∗ wpLoop cpu)
+        wordPointsTo (a + BitVec.signExtend 64 imm) 8 dq' data -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Htok, Hbytes, HΦ⟩
+  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Htok, Hw, HΦ⟩
+  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hbytes⟩
   iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _
     (execSpec_ld_same cpu dq dq' c hok pc _ imm rd hrd a data hram hal)
   iframe
   inext
   iintro HmConf Hclock Hpc ⟨Hrd, Htok, Hbytes⟩
-  iapply HΦ $$ HmConf Hclock Hpc Hrd Htok Hbytes
+  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hbytes
+  iapply HΦ $$ HmConf Hclock Hpc Hrd Htok Hw
 
 end MachCSL

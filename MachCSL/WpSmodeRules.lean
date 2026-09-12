@@ -220,8 +220,8 @@ theorem wp_s_lbu [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
     (fun c hok _ => execSpecF_lbu cpu (DFrac.own 1) dq' c false hok pc _ imm rd rs1 hrd.1
       (tpPin cpu k.regs) b hram)
 
-/-- `ld rd, imm(rs1)`: the word at `rs1 + imm` (8-aligned). -/
-theorem wp_s_ld [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+/-- `ld rd, imm(rs1)`: the word at `rs1 + imm` (8-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_ld`). -/
+theorem wp_s_ld_bytes [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (dq' : DFrac) (v : BitVec 64) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8)
     (hal : (k.rget cpu rs1 + BitVec.signExtend 64 imm).toNat % 8 = 0) :
@@ -235,6 +235,27 @@ theorem wp_s_ld [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = fal
   wpLoop_k_setReg_mem' cpu k hsie htier pc _ is_rvc _ rd hrd _ _ _
     (fun c hok _ => execSpecF_ld cpu (DFrac.own 1) dq' c false hok pc _ imm rd rs1 hrd.1
       (tpPin cpu k.regs) v hram hal)
+
+/-- `ld rd, imm(rs1)`: the word at `rs1 + imm`. -/
+theorem wp_s_ld [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
+    (dq' : DFrac) (v : BitVec 64) :
+    instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 8)) ∗
+    kctx cpu k ∗ pcIs cpu pc ∗
+    wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 dq' v ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctx cpu' (k.setReg rd v) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 dq' v -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
+  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  iapply (wp_s_ld_bytes cpu k hsie htier pc is_rvc imm rd rs1 hrd dq' v hram hal)
+  iframe Hi Hk Hpc Hm
+  inext
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK Hk Hpc Hm
+  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  iapply HK $$ Hk Hpc Hw
 
 /-- `sb rs2, imm(rs1)`: the low byte of `rs2` to `rs1 + imm`. -/
 theorem wp_s_sb [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
@@ -251,8 +272,8 @@ theorem wp_s_sb [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = fal
   wpLoop_k_keep_mem cpu k hsie htier pc _ is_rvc _ _ _
     (fun c hok _ => execSpecF_sb cpu (DFrac.own 1) c false hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old hram)
 
-/-- `sd rs2, imm(rs1)`: `rs2` to `rs1 + imm` (8-aligned). -/
-theorem wp_s_sd [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+/-- `sd rs2, imm(rs1)`: `rs2` to `rs1 + imm` (8-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_sd`). -/
+theorem wp_s_sd_bytes [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
     (old : BitVec 64) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8)
     (hal : (k.rget cpu rs1 + BitVec.signExtend 64 imm).toNat % 8 = 0) :
@@ -266,6 +287,26 @@ theorem wp_s_sd [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = fal
     ⊢ wpLoop cpu :=
   wpLoop_k_keep_mem cpu k hsie htier pc _ is_rvc _ _ _
     (fun c hok _ => execSpecF_sd cpu (DFrac.own 1) c false hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old hram hal)
+
+/-- `sd rs2, imm(rs1)`: `rs2` to the word at `rs1 + imm`. -/
+theorem wp_s_sd [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (old : BitVec 64) :
+    instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 8)) ∗
+    kctx cpu k ∗ pcIs cpu pc ∗
+    wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1) old ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1) (k.rget cpu rs2) -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
+  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  iapply (wp_s_sd_bytes cpu k hsie htier pc is_rvc imm rs1 rs2 old hram hal)
+  iframe Hi Hk Hpc Hm
+  inext
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK Hk Hpc Hm
+  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  iapply HK $$ Hk Hpc Hw
 
 /-! ## Control flow -/
 
@@ -527,8 +568,8 @@ theorem wp_s_csrrci_sstatus [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie :
 
 /-! ## Words -/
 
-/-- `lw rd, imm(rs1)`: the sign-extended word at `rs1 + imm` (4-aligned). -/
-theorem wp_s_lw [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+/-- `lw rd, imm(rs1)`: the sign-extended word at `rs1 + imm` (4-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_lw`). -/
+theorem wp_s_lw_bytes [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (dq' : DFrac) (w : BitVec 32) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4)
     (hal : (k.rget cpu rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0) :
@@ -544,8 +585,29 @@ theorem wp_s_lw [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = fal
     (fun c hok _ => execSpecF_lw cpu (DFrac.own 1) dq' c false hok pc _ imm rd rs1 hrd.1
       (tpPin cpu k.regs) w hram hal)
 
-/-- `sw rs2, imm(rs1)`: the low word of `rs2` to `rs1 + imm` (4-aligned). -/
-theorem wp_s_sw [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+/-- `lw rd, imm(rs1)`: the sign-extended word at `rs1 + imm`. -/
+theorem wp_s_lw [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
+    (dq' : DFrac) (w : BitVec 32) :
+    instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
+    kctx cpu k ∗ pcIs cpu pc ∗
+    wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 dq' w ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctx cpu' (k.setReg rd (BitVec.signExtend 64 w)) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 dq' w -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
+  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  iapply (wp_s_lw_bytes cpu k hsie htier pc is_rvc imm rd rs1 hrd dq' w hram hal)
+  iframe Hi Hk Hpc Hm
+  inext
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK Hk Hpc Hm
+  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  iapply HK $$ Hk Hpc Hw
+
+/-- `sw rs2, imm(rs1)`: the low word of `rs2` to `rs1 + imm` (4-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_sw`). -/
+theorem wp_s_sw_bytes [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
     (old : BitVec 32) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4)
     (hal : (k.rget cpu rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0) :
@@ -559,6 +621,27 @@ theorem wp_s_sw [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = fal
     ⊢ wpLoop cpu :=
   wpLoop_k_keep_mem cpu k hsie htier pc _ is_rvc _ _ _
     (fun c hok _ => execSpecF_sw cpu (DFrac.own 1) c false hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old hram hal)
+
+/-- `sw rs2, imm(rs1)`: the low word of `rs2` to the word at `rs1 + imm`. -/
+theorem wp_s_sw [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (old : BitVec 32) :
+    instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) ∗
+    kctx cpu k ∗ pcIs cpu pc ∗
+    wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1) old ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1)
+            (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
+  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  iapply (wp_s_sw_bytes cpu k hsie htier pc is_rvc imm rs1 rs2 old hram hal)
+  iframe Hi Hk Hpc Hm
+  inext
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK Hk Hpc Hm
+  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  iapply HK $$ Hk Hpc Hw
 
 /-- The conditional branches against `x0` as `rs1` (`blez`, `bgtz`, ...). -/
 theorem wp_s_branch0 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)

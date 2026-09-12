@@ -24,7 +24,7 @@ def pkApBase (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFFC8#64
 /-- The spilled varargs `a1..a7`, slot `j` at `pkApBase sp0 + 8j`. -/
 def pkVaCells {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (sp0 : BitVec 64) (R0 : RegMap) : IProp GF := iprop%
-  [∗list] j ∈ List.range 7, bytesPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 j) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + j)))
+  [∗list] j ∈ List.range 7, wordPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 j) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + j)))
 
 /-- The frame during the format walk: `a1..a7` spilled at slots 6..0
 (`pkVaCells`), `ra`, `s0`, `s1`, `s2` .. `s8`, `s10`, `s11` saved (slots
@@ -34,52 +34,52 @@ map. -/
 def pkFrame {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (sp0 : BitVec 64) (R0 : RegMap) (ap w18 : BitVec 64) : IProp GF := iprop%
   pkVaCells sp0 R0 ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) (w)) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFB8#64) 8 (DFrac.own 1) (R0 1#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) (R0 8#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) (R0 9#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) (R0 18#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF98#64) 8 (DFrac.own 1) (R0 19#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF90#64) 8 (DFrac.own 1) (R0 20#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF88#64) 8 (DFrac.own 1) (R0 21#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF80#64) 8 (DFrac.own 1) (R0 22#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF78#64) 8 (DFrac.own 1) (R0 23#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF70#64) 8 (DFrac.own 1) (R0 24#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) (w18) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF60#64) 8 (DFrac.own 1) (R0 26#5) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF58#64) 8 (DFrac.own 1) (R0 27#5) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF50#64) 8 (DFrac.own 1) (w)) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) (ap) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF40#64) 8 (DFrac.own 1) (w))
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) (w)) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFB8#64) 8 (DFrac.own 1) (R0 1#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) (R0 8#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) (R0 9#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) (R0 18#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF98#64) 8 (DFrac.own 1) (R0 19#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF90#64) 8 (DFrac.own 1) (R0 20#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF88#64) 8 (DFrac.own 1) (R0 21#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF80#64) 8 (DFrac.own 1) (R0 22#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF78#64) 8 (DFrac.own 1) (R0 23#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF70#64) 8 (DFrac.own 1) (R0 24#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) (w18) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF60#64) 8 (DFrac.own 1) (R0 26#5) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF58#64) 8 (DFrac.own 1) (R0 27#5) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF50#64) 8 (DFrac.own 1) (w)) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) (ap) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF40#64) 8 (DFrac.own 1) (w))
 
 /-- The frame at the release path: the callee-saved registers restored,
 only `ra`, `s0`, `s2` still to be reloaded. -/
 def pkFrameExit {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (sp0 ra s0 s2 : BitVec 64) : IProp GF := iprop%
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) (w)) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFB8#64) 8 (DFrac.own 1) (ra) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) (s0) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) (w)) ∗
-  bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) (s2) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF98#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF90#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF88#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF80#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF78#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF70#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF60#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF58#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF50#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) (w)) ∗
-  (∃ w : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF40#64) 8 (DFrac.own 1) (w))
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) (w)) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFB8#64) 8 (DFrac.own 1) (ra) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) (s0) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) (w)) ∗
+  wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) (s2) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF98#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF90#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF88#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF80#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF78#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF70#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF60#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF58#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF50#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) (w)) ∗
+  (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF40#64) 8 (DFrac.own 1) (w))
 
 /-- The constants the loop keeps in callee-saved registers. -/
 def pkConsts (R : RegMap) : Prop :=
@@ -436,15 +436,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 omit [CurCtx] in
-theorem va_slot_ok (sp0 : BitVec 64) (kk : Nat) (hk : kk ≤ 6) (hf : stackFacts sp0 24) :
-    inRam (pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk) 8 ∧ (pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk).toNat % 8 = 0 := by
-  unfold stackFacts ramBase ramEnd at hf
-  unfold pkApBase inRam ramBase ramEnd
-  have h : (sp0 + 0xFFFFFFFFFFFFFFC8#64 + 8#64 * BitVec.ofNat 64 kk).toNat = sp0.toNat - 56 + 8 * kk := by
-    bv_omega
-  rw [h]; omega
-
-omit [CurCtx] in
 theorem ap_next (sp0 : BitVec 64) (kk : Nat) :
     pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk + 8#64 = pkApBase sp0 + 8#64 * BitVec.ofNat 64 (kk + 1) := by
   rw [BitVec.ofNat_add, BitVec.mul_add]
@@ -453,13 +444,13 @@ theorem ap_next (sp0 : BitVec 64) (kk : Nat) :
 /-- Vararg slot `kk` of the frame. -/
 theorem pkVaCells_acc (sp0 : BitVec 64) (R0 : RegMap) (kk : Nat) (hk : kk < 7) :
     pkVaCells (GF := GF) sp0 R0 ⊢
-      bytesPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + kk))) ∗
-      (bytesPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + kk))) -∗
+      wordPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + kk))) ∗
+      (wordPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + kk))) -∗
         pkVaCells sp0 R0) := by
   unfold pkVaCells
   iintro H
   have hj : (List.range 7)[kk]? = some kk := by simp [List.getElem?_range hk]
-  icases BigSepL.bigSepL_lookup_acc (Φ := fun _ j => bytesPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 j) 8
+  icases BigSepL.bigSepL_lookup_acc (Φ := fun _ j => wordPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 j) 8
       (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + j)))) hj $$ H with ⟨Hj, Hclose⟩
   iframe Hj
   iintro Hj
@@ -468,20 +459,20 @@ theorem pkVaCells_acc (sp0 : BitVec 64) (R0 : RegMap) (kk : Nat) (hk : kk < 7) :
     have hl : kk < (List.range 7).length := by simp [hk]
     have := @List.set_getElem_self _ (List.range 7) kk hl
     simpa [List.getElem_range] using this
-  ihave H' := (show ([∗list] z ∈ (List.range 7).set kk kk, bytesPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 z) 8
-      (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + z)))) ⊢ [∗list] j ∈ List.range 7, bytesPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 j) 8
+  ihave H' := (show ([∗list] z ∈ (List.range 7).set kk kk, wordPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 z) 8
+      (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + z)))) ⊢ [∗list] j ∈ List.range 7, wordPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 j) 8
       (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + j))) from by rw [hj']) $$ H
   iexact H'
 
 /-- The seven spilled cells, as the frame states them. -/
 theorem pkVaCells_intro (sp0 : BitVec 64) (R0 : RegMap) :
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (R0 11#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (R0 12#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (R0 13#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (R0 14#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (R0 15#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (R0 16#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (R0 17#5) ⊢
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (R0 11#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (R0 12#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (R0 13#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (R0 14#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (R0 15#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (R0 16#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (R0 17#5) ⊢
     pkVaCells (GF := GF) sp0 R0 := by
   unfold pkVaCells pkApBase
   simp only [List.range_succ, List.range_zero, List.nil_append, List.cons_append,
@@ -493,13 +484,13 @@ theorem pkVaCells_intro (sp0 : BitVec 64) (R0 : RegMap) :
 /-- The seven spilled cells, out of the frame (for the release path). -/
 theorem pkVaCells_cases (sp0 : BitVec 64) (R0 : RegMap) :
     pkVaCells (GF := GF) sp0 R0 ⊢
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (R0 11#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (R0 12#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (R0 13#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (R0 14#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (R0 15#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (R0 16#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (R0 17#5) := by
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (R0 11#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (R0 12#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (R0 13#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (R0 14#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (R0 15#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (R0 16#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (R0 17#5) := by
   unfold pkVaCells pkApBase
   simp only [List.range_succ, List.range_zero, List.nil_append, List.cons_append,
     Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.reduceMul,
@@ -516,21 +507,10 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 theorem cell8_lo_acc (a : BitVec 64) (dq : DFrac) (w : BitVec 64) :
-    bytesPointsTo (GF := GF) a 8 dq w ⊢
-      bytesPointsTo a 4 dq (BitVec.extractLsb' 0 32 w) ∗
-      (bytesPointsTo a 4 dq (BitVec.extractLsb' 0 32 w) -∗ bytesPointsTo a 8 dq w) := by
-  have e0 : nthByte (n := 4) (BitVec.extractLsb' 0 32 w) 0 = nthByte (n := 8) w 0 := by unfold nthByte; bv_decide
-  have e1 : nthByte (n := 4) (BitVec.extractLsb' 0 32 w) 1 = nthByte (n := 8) w 1 := by unfold nthByte; bv_decide
-  have e2 : nthByte (n := 4) (BitVec.extractLsb' 0 32 w) 2 = nthByte (n := 8) w 2 := by unfold nthByte; bv_decide
-  have e3 : nthByte (n := 4) (BitVec.extractLsb' 0 32 w) 3 = nthByte (n := 8) w 3 := by unfold nthByte; bv_decide
-  unfold bytesPointsTo ctxBytes
-  simp only [List.range_succ, List.range_zero, List.nil_append, List.cons_append,
-    Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.add_zero, e0, e1, e2, e3]
-  iintro ⟨H0, H1, H2, H3, H4, H5, H6, H7, _⟩
-  iframe H0 H1 H2 H3
-  iintro ⟨H0, H1, H2, H3, _⟩
-  iframe
-  all_goals try iempintro
+    wordPointsTo (GF := GF) a 8 dq w ⊢
+      wordPointsTo a 4 dq (BitVec.extractLsb' 0 32 w) ∗
+      (wordPointsTo a 4 dq (BitVec.extractLsb' 0 32 w) -∗ wordPointsTo a 8 dq w) :=
+  wordPointsTo_lo4_acc a dq w
 
 /-- Description `kk` of the varargs. -/
 theorem pkDescs_acc (R : RegMap) (descs : List PkArgDesc) (kk : Nat) (d : PkArgDesc) (hd : descs[kk]? = some d) :
@@ -694,34 +674,34 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 theorem cell_ex (a w : BitVec 64) :
-    bytesPointsTo (GF := GF) a 8 (DFrac.own 1) w ⊢ ∃ w' : BitVec 64, bytesPointsTo a 8 (DFrac.own 1) w' := by
+    wordPointsTo (GF := GF) a 8 (DFrac.own 1) w ⊢ ∃ w' : BitVec 64, wordPointsTo a 8 (DFrac.own 1) w' := by
   iintro H; iexists w; iexact H
 
 theorem pkFrame_intro (sp0 : BitVec 64) (R0 : RegMap) (ap w7 w18 w21 w23 : BitVec 64) :
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (R0 17#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (R0 16#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (R0 15#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (R0 14#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (R0 13#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (R0 12#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (R0 11#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) (w7) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFB8#64) 8 (DFrac.own 1) (R0 1#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) (R0 8#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) (R0 9#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) (R0 18#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF98#64) 8 (DFrac.own 1) (R0 19#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF90#64) 8 (DFrac.own 1) (R0 20#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF88#64) 8 (DFrac.own 1) (R0 21#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF80#64) 8 (DFrac.own 1) (R0 22#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF78#64) 8 (DFrac.own 1) (R0 23#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF70#64) 8 (DFrac.own 1) (R0 24#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) (w18) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF60#64) 8 (DFrac.own 1) (R0 26#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF58#64) 8 (DFrac.own 1) (R0 27#5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF50#64) 8 (DFrac.own 1) (w21) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) (ap) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF40#64) 8 (DFrac.own 1) (w23) ⊢
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (R0 17#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (R0 16#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (R0 15#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (R0 14#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (R0 13#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (R0 12#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (R0 11#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) (w7) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFB8#64) 8 (DFrac.own 1) (R0 1#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) (R0 8#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) (R0 9#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) (R0 18#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF98#64) 8 (DFrac.own 1) (R0 19#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF90#64) 8 (DFrac.own 1) (R0 20#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF88#64) 8 (DFrac.own 1) (R0 21#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF80#64) 8 (DFrac.own 1) (R0 22#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF78#64) 8 (DFrac.own 1) (R0 23#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF70#64) 8 (DFrac.own 1) (R0 24#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) (w18) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF60#64) 8 (DFrac.own 1) (R0 26#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF58#64) 8 (DFrac.own 1) (R0 27#5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF50#64) 8 (DFrac.own 1) (w21) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) (ap) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF40#64) 8 (DFrac.own 1) (w23) ⊢
     pkFrame (GF := GF) sp0 R0 ap w18 := by
   unfold pkFrame
   iintro ⟨C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23⟩
@@ -733,30 +713,30 @@ theorem pkFrame_intro (sp0 : BitVec 64) (R0 : RegMap) (ap w7 w18 w21 w23 : BitVe
   iframe
 
 theorem pkFrameExit_intro (sp0 ra s0 s2 : BitVec 64) (w0 w1 w2 w3 w4 w5 w6 w7 w10 w12 w13 w14 w15 w16 w17 w18 w19 w20 w21 w22 w23 : BitVec 64) :
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (w0) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (w1) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (w2) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (w3) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (w4) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (w5) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (w6) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) (w7) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFB8#64) 8 (DFrac.own 1) (ra) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) (s0) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) (w10) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) (s2) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF98#64) 8 (DFrac.own 1) (w12) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF90#64) 8 (DFrac.own 1) (w13) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF88#64) 8 (DFrac.own 1) (w14) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF80#64) 8 (DFrac.own 1) (w15) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF78#64) 8 (DFrac.own 1) (w16) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF70#64) 8 (DFrac.own 1) (w17) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) (w18) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF60#64) 8 (DFrac.own 1) (w19) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF58#64) 8 (DFrac.own 1) (w20) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF50#64) 8 (DFrac.own 1) (w21) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) (w22) ∗
-    bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF40#64) 8 (DFrac.own 1) (w23) ⊢
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (w0) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (w1) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (w2) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (w3) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (w4) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (w5) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (w6) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) (w7) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFB8#64) 8 (DFrac.own 1) (ra) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) (s0) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) (w10) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) (s2) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF98#64) 8 (DFrac.own 1) (w12) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF90#64) 8 (DFrac.own 1) (w13) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF88#64) 8 (DFrac.own 1) (w14) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF80#64) 8 (DFrac.own 1) (w15) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF78#64) 8 (DFrac.own 1) (w16) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF70#64) 8 (DFrac.own 1) (w17) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) (w18) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF60#64) 8 (DFrac.own 1) (w19) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF58#64) 8 (DFrac.own 1) (w20) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF50#64) 8 (DFrac.own 1) (w21) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) (w22) ∗
+    wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF40#64) 8 (DFrac.own 1) (w23) ⊢
     pkFrameExit (GF := GF) sp0 ra s0 s2 := by
   unfold pkFrameExit
   iintro ⟨C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23⟩
@@ -786,8 +766,8 @@ theorem pkFrameExit_intro (sp0 ra s0 s2 : BitVec 64) (w0 w1 w2 w3 w4 w5 w6 w7 w1
 /-- The `va_list` slot (22). -/
 theorem pkFrame_ap_acc (sp0 : BitVec 64) (R0 : RegMap) (ap w18 : BitVec 64) :
     pkFrame (GF := GF) sp0 R0 ap w18 ⊢
-      bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) ap ∗
-      (∀ ap' : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) ap' -∗ pkFrame sp0 R0 ap' w18) := by
+      wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) ap ∗
+      (∀ ap' : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF48#64) 8 (DFrac.own 1) ap' -∗ pkFrame sp0 R0 ap' w18) := by
   unfold pkFrame
   iintro ⟨Hva, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23⟩
   iframe H22
@@ -797,8 +777,8 @@ theorem pkFrame_ap_acc (sp0 : BitVec 64) (R0 : RegMap) (ap w18 : BitVec 64) :
 /-- Vararg slot `kk`. -/
 theorem pkFrame_va_acc (sp0 : BitVec 64) (R0 : RegMap) (ap w18 : BitVec 64) (kk : Nat) (hk : kk < 7) :
     pkFrame (GF := GF) sp0 R0 ap w18 ⊢
-      bytesPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + kk))) ∗
-      (bytesPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + kk))) -∗
+      wordPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + kk))) ∗
+      (wordPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + kk))) -∗
         pkFrame sp0 R0 ap w18) := by
   unfold pkFrame
   iintro ⟨Hva, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23⟩
@@ -811,8 +791,8 @@ theorem pkFrame_va_acc (sp0 : BitVec 64) (R0 : RegMap) (ap w18 : BitVec 64) (kk 
 /-- The `s9` save slot (18). -/
 theorem pkFrame_s9_acc (sp0 : BitVec 64) (R0 : RegMap) (ap w18 : BitVec 64) :
     pkFrame (GF := GF) sp0 R0 ap w18 ⊢
-      bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) w18 ∗
-      (∀ w' : BitVec 64, bytesPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) w' -∗ pkFrame sp0 R0 ap w') := by
+      wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) w18 ∗
+      (∀ w' : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFF68#64) 8 (DFrac.own 1) w' -∗ pkFrame sp0 R0 ap w') := by
   unfold pkFrame
   iintro ⟨Hva, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23⟩
   iframe H18

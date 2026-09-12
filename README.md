@@ -107,6 +107,8 @@ MachCSL/                          the framework (nothing xv6-specific)
                    (`bcond`), `subw`/`addw`
   WpSmodeRules.lean the `kctx` rules `wp_s_lbu/ld/sb/sd/branch/j/jal/ret/
                    subw/addw/push/pop` (one schema, `wpLoop_k_gen`)
+  WordPointsTo.lean `wordPointsTo`: the points-to of an aligned word in RAM;
+                   the cell a load/store rule takes, no side conditions
   CallConv.lean    `byteBuf` (a byte buffer as a list), `cstr` (the
                    points-to of a C string: terminated, no NUL inside, in
                    RAM), `calleeSaved`, the canonical body context `(k.pushed m).withRegs R` and the
